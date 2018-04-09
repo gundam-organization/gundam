@@ -1,0 +1,10 @@
+#!/bin/sh
+if ! [[ ":$PATH:" == *":@CMAKE_INSTALL_PREFIX@/bin:"* ]]; then
+  export PATH=@CMAKE_INSTALL_PREFIX@/bin:$PATH
+fi
+
+if ! [[ ":$LD_LIBRARY_PATH:" == *":@CMAKE_INSTALL_PREFIX@/lib:"* ]]; then
+  export LD_LIBRARY_PATH=@CMAKE_INSTALL_PREFIX@/lib:$LD_LIBRARY_PATH
+fi
+
+source "@CMAKE_ROOTSYS@/bin/thisroot.sh"

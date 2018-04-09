@@ -1,0 +1,1991 @@
+/home/dolan/.bashrc: line 180: bind: warning: line editing not enabled
+[?1034h/home/dolan/.bashrc: line 181: bind: warning: line editing not enabled
+Setup CMT Version v1r20p20081118
+Clean G4 environment
+nd280-get-geometry: Cannot check for new geometries.
+ecalrecon-get-likelihood-pdfs: Cannot check for new pdf files.
+Setting up nd280 v11r31
+[INFO]: XSLLHFITTER root expected at: /data/t2k/dolan/software/xsLLhFitter/xsLLhFitter
+[INFO]: cmake version 2.8.12.2 lives at: /usr/bin/cmake
+[INFO]: Sourcing build setup script.
+[INFO]: $ which CCQEFit: /data/t2k/dolan/software/xsLLhFitter/xsLLhFitter/build/Linux/bin/CCQEFit
+Run as:
+makeFitterInputs.sh /path/to/InputMicroTree.root outputFileTag dataToSimPotRatio /data/t2k/dolan/software/xsLLhFitter/xsLLhFitter/inputs/newFitsFeb17
+If not running on real data, disregard the realDataFormat outputs
+If running on real data everything other than the realDataFormat outputs may fail
+Running ...
+ln: creating symbolic link `./treeConvert_jan17hl2.cc': File exists
+Warning in <TClass::TClass>: no dictionary for class PackageVersion is available
+Warning in <TClass::TClass>: no dictionary for class TrackCategoryDefinition is available
+Warning in <TClass::TClass>: no dictionary for class SelectionBase is available
+Warning in <TClass::TClass>: no dictionary for class StepBase is available
+Warning in <TClass::TClass>: no dictionary for class DocString is available
+Warning in <TClass::TClass>: no dictionary for class ConfigurationBase is available
+Warning in <TClass::TClass>: no dictionary for class SystematicBase is available
+Warning in <TClass::TClass>: no dictionary for class CorrectionBase is available
+Warning in <TClass::TClass>: no dictionary for class TrackTypeDefinition is available
+Warning in <TClass::TClass>: no dictionary for class ToyVariationWrite is available
+Warning in <TClass::TClass>: no dictionary for class Header is available
+Error in <TTree::SetBranchAddress>: unknown branch -> truehm_proton_truemom
+Error in <TTree::SetBranchAddress>: unknown branch -> truehm_proton_truecth
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 6 passed ...branch 7 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 6 passed ...branch 7 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Output Rec Tree: ***
+******************************************************************************
+*Tree    :selectedEvents: selectedEvents                                         *
+*Entries :    81351 : Total =         5886168 bytes  File  Size =    1344554 *
+*        :          : Tree compression factor =   4.28                       *
+******************************************************************************
+*Br    0 :reaction  : reaction/I                                             *
+*Entries :    81351 : Total  Size=     327066 bytes  File Size  =       2800 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression= 114.28     *
+*............................................................................*
+*Br    1 :cutBranch : cutBranch/I                                            *
+*Entries :    81351 : Total  Size=     327082 bytes  File Size  =      56237 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   5.69     *
+*............................................................................*
+*Br    2 :mectopology : mectopology/I                                        *
+*Entries :    81351 : Total  Size=     327114 bytes  File Size  =       2820 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression= 113.46     *
+*............................................................................*
+*Br    3 :D1True    : D1True/F                                               *
+*Entries :    81351 : Total  Size=     327034 bytes  File Size  =       2750 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression= 116.36     *
+*............................................................................*
+*Br    4 :D1Rec     : D1Rec/F                                                *
+*Entries :    81351 : Total  Size=     327018 bytes  File Size  =     156877 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.04     *
+*............................................................................*
+*Br    5 :D2True    : D2True/F                                               *
+*Entries :    81351 : Total  Size=     327034 bytes  File Size  =      40934 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   7.82     *
+*............................................................................*
+*Br    6 :D2Rec     : D2Rec/F                                                *
+*Entries :    81351 : Total  Size=     327018 bytes  File Size  =      24290 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=  13.17     *
+*............................................................................*
+*Br    7 :muMomRec  : muMomRec/F                                             *
+*Entries :    81351 : Total  Size=     327066 bytes  File Size  =     289027 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    8 :muMomTrue : muMomTrue/F                                            *
+*Entries :    81351 : Total  Size=     327082 bytes  File Size  =       2780 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression= 115.10     *
+*............................................................................*
+*Br    9 :muCosThetaRec : muCosThetaRec/F                                    *
+*Entries :    81351 : Total  Size=     327146 bytes  File Size  =     281102 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   1.14     *
+*............................................................................*
+*Br   10 :muCosThetaTrue : muCosThetaTrue/F                                  *
+*Entries :    81351 : Total  Size=     327162 bytes  File Size  =       2630 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression= 121.67     *
+*............................................................................*
+*Br   11 :pMomRec   : pMomRec/F                                              *
+*Entries :    81351 : Total  Size=     327050 bytes  File Size  =     119178 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.68     *
+*............................................................................*
+*Br   12 :pMomTrue  : pMomTrue/F                                             *
+*Entries :    81351 : Total  Size=     327066 bytes  File Size  =     118741 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.69     *
+*............................................................................*
+*Br   13 :pCosThetaRec : pCosThetaRec/F                                      *
+*Entries :    81351 : Total  Size=     327130 bytes  File Size  =     118355 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.70     *
+*............................................................................*
+*Br   14 :pCosThetaTrue : pCosThetaTrue/F                                    *
+*Entries :    81351 : Total  Size=     327146 bytes  File Size  =     118133 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.71     *
+*............................................................................*
+*Br   15 :Enureco   : Enureco/F                                              *
+*Entries :    81351 : Total  Size=     327050 bytes  File Size  =       2560 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression= 124.98     *
+*............................................................................*
+*Br   16 :Enutrue   : Enutrue/F                                              *
+*Entries :    81351 : Total  Size=     327050 bytes  File Size  =       2560 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression= 124.98     *
+*............................................................................*
+*Br   17 :weight    : weight/F                                               *
+*Entries :    81351 : Total  Size=     327034 bytes  File Size  =       2780 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression= 115.10     *
+*............................................................................*
+***Output True Tree: ***
+******************************************************************************
+*Tree    :trueEvents: trueEvents                                             *
+*Entries :   308649 : Total =        12391328 bytes  File  Size =    4956968 *
+*        :          : Tree compression factor =   2.45                       *
+******************************************************************************
+*Br    0 :reaction  : reaction/I                                             *
+*Entries :   308649 : Total  Size=    1239270 bytes  File Size  =     232154 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression=   5.24     *
+*............................................................................*
+*Br    1 :mectopology : mectopology/I                                        *
+*Entries :   308649 : Total  Size=    1239402 bytes  File Size  =     221778 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression=   5.48     *
+*............................................................................*
+*Br    2 :D1True    : D1True/F                                               *
+*Entries :   308649 : Total  Size=    1239182 bytes  File Size  =     426687 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression=   2.85     *
+*............................................................................*
+*Br    3 :D2True    : D2True/F                                               *
+*Entries :   308649 : Total  Size=    1239182 bytes  File Size  =     420005 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression=   2.90     *
+*............................................................................*
+*Br    4 :muMomTrue : muMomTrue/F                                            *
+*Entries :   308649 : Total  Size=    1239314 bytes  File Size  =    1081055 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression=   1.12     *
+*............................................................................*
+*Br    5 :muCosThetaTrue : muCosThetaTrue/F                                  *
+*Entries :   308649 : Total  Size=    1239534 bytes  File Size  =    1066128 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression=   1.14     *
+*............................................................................*
+*Br    6 :pMomTrue  : pMomTrue/F                                             *
+*Entries :   308649 : Total  Size=    1239270 bytes  File Size  =      10488 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression= 115.93     *
+*............................................................................*
+*Br    7 :pCosThetaTrue : pCosThetaTrue/F                                    *
+*Entries :   308649 : Total  Size=    1239490 bytes  File Size  =      10678 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression= 113.87     *
+*............................................................................*
+*Br    8 :Enutrue   : Enutrue/F                                              *
+*Entries :   308649 : Total  Size=    1239226 bytes  File Size  =    1074194 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression=   1.13     *
+*............................................................................*
+*Br    9 :weight    : weight/F                                               *
+*Entries :   308649 : Total  Size=    1239182 bytes  File Size  =     413801 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression=   2.94     *
+*............................................................................*
+(int)0
+Error in <TTree::SetBranchAddress>: unknown branch -> truehm_proton_truemom
+Error in <TTree::SetBranchAddress>: unknown branch -> truehm_proton_truecth
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 6 passed ...branch 7 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 6 passed ...branch 7 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Output Rec Tree: ***
+******************************************************************************
+*Tree    :selectedEvents: selectedEvents                                         *
+*Entries :    81351 : Total =         5886168 bytes  File  Size =    1307241 *
+*        :          : Tree compression factor =   4.41                       *
+******************************************************************************
+*Br    0 :reaction  : reaction/I                                             *
+*Entries :    81351 : Total  Size=     327066 bytes  File Size  =       2800 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression= 114.28     *
+*............................................................................*
+*Br    1 :cutBranch : cutBranch/I                                            *
+*Entries :    81351 : Total  Size=     327082 bytes  File Size  =      56237 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   5.69     *
+*............................................................................*
+*Br    2 :mectopology : mectopology/I                                        *
+*Entries :    81351 : Total  Size=     327114 bytes  File Size  =       2830 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression= 113.06     *
+*............................................................................*
+*Br    3 :D1True    : D1True/F                                               *
+*Entries :    81351 : Total  Size=     327034 bytes  File Size  =       2750 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression= 116.36     *
+*............................................................................*
+*Br    4 :D1Rec     : D1Rec/F                                                *
+*Entries :    81351 : Total  Size=     327018 bytes  File Size  =     158368 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.02     *
+*............................................................................*
+*Br    5 :D2True    : D2True/F                                               *
+*Entries :    81351 : Total  Size=     327034 bytes  File Size  =       2550 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression= 125.49     *
+*............................................................................*
+*Br    6 :D2Rec     : D2Rec/F                                                *
+*Entries :    81351 : Total  Size=     327018 bytes  File Size  =      24290 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=  13.17     *
+*............................................................................*
+*Br    7 :muMomRec  : muMomRec/F                                             *
+*Entries :    81351 : Total  Size=     327066 bytes  File Size  =     289027 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    8 :muMomTrue : muMomTrue/F                                            *
+*Entries :    81351 : Total  Size=     327082 bytes  File Size  =       2580 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression= 124.02     *
+*............................................................................*
+*Br    9 :muCosThetaRec : muCosThetaRec/F                                    *
+*Entries :    81351 : Total  Size=     327146 bytes  File Size  =     281102 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   1.14     *
+*............................................................................*
+*Br   10 :muCosThetaTrue : muCosThetaTrue/F                                  *
+*Entries :    81351 : Total  Size=     327162 bytes  File Size  =       2630 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression= 121.67     *
+*............................................................................*
+*Br   11 :pMomRec   : pMomRec/F                                              *
+*Entries :    81351 : Total  Size=     327050 bytes  File Size  =     119178 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.68     *
+*............................................................................*
+*Br   12 :pMomTrue  : pMomTrue/F                                             *
+*Entries :    81351 : Total  Size=     327066 bytes  File Size  =     118741 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.69     *
+*............................................................................*
+*Br   13 :pCosThetaRec : pCosThetaRec/F                                      *
+*Entries :    81351 : Total  Size=     327130 bytes  File Size  =     118355 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.70     *
+*............................................................................*
+*Br   14 :pCosThetaTrue : pCosThetaTrue/F                                    *
+*Entries :    81351 : Total  Size=     327146 bytes  File Size  =     118133 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.71     *
+*............................................................................*
+*Br   15 :Enureco   : Enureco/F                                              *
+*Entries :    81351 : Total  Size=     327050 bytes  File Size  =       2560 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression= 124.98     *
+*............................................................................*
+*Br   16 :Enutrue   : Enutrue/F                                              *
+*Entries :    81351 : Total  Size=     327050 bytes  File Size  =       2560 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression= 124.98     *
+*............................................................................*
+*Br   17 :weight    : weight/F                                               *
+*Entries :    81351 : Total  Size=     327034 bytes  File Size  =       2550 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression= 125.49     *
+*............................................................................*
+***Output True Tree: ***
+******************************************************************************
+*Tree    :trueEvents: trueEvents                                             *
+*Entries :   308649 : Total =        12391328 bytes  File  Size =    4959056 *
+*        :          : Tree compression factor =   2.45                       *
+******************************************************************************
+*Br    0 :reaction  : reaction/I                                             *
+*Entries :   308649 : Total  Size=    1239270 bytes  File Size  =     232154 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression=   5.24     *
+*............................................................................*
+*Br    1 :mectopology : mectopology/I                                        *
+*Entries :   308649 : Total  Size=    1239402 bytes  File Size  =     221778 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression=   5.48     *
+*............................................................................*
+*Br    2 :D1True    : D1True/F                                               *
+*Entries :   308649 : Total  Size=    1239182 bytes  File Size  =     429003 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression=   2.83     *
+*............................................................................*
+*Br    3 :D2True    : D2True/F                                               *
+*Entries :   308649 : Total  Size=    1239182 bytes  File Size  =     420005 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression=   2.90     *
+*............................................................................*
+*Br    4 :muMomTrue : muMomTrue/F                                            *
+*Entries :   308649 : Total  Size=    1239314 bytes  File Size  =    1081055 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression=   1.12     *
+*............................................................................*
+*Br    5 :muCosThetaTrue : muCosThetaTrue/F                                  *
+*Entries :   308649 : Total  Size=    1239534 bytes  File Size  =    1066128 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression=   1.14     *
+*............................................................................*
+*Br    6 :pMomTrue  : pMomTrue/F                                             *
+*Entries :   308649 : Total  Size=    1239270 bytes  File Size  =      10374 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression= 117.21     *
+*............................................................................*
+*Br    7 :pCosThetaTrue : pCosThetaTrue/F                                    *
+*Entries :   308649 : Total  Size=    1239490 bytes  File Size  =      10564 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression= 115.10     *
+*............................................................................*
+*Br    8 :Enutrue   : Enutrue/F                                              *
+*Entries :   308649 : Total  Size=    1239226 bytes  File Size  =    1074194 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression=   1.13     *
+*............................................................................*
+*Br    9 :weight    : weight/F                                               *
+*Entries :   308649 : Total  Size=    1239182 bytes  File Size  =     413801 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression=   2.94     *
+*............................................................................*
+(int)0
+Error in <TTree::SetBranchAddress>: unknown branch -> truehm_proton_truemom
+Error in <TTree::SetBranchAddress>: unknown branch -> truehm_proton_truecth
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 6 passed ...branch 7 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 6 passed ...branch 7 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Output Rec Tree: ***
+******************************************************************************
+*Tree    :selectedEvents: selectedEvents                                         *
+*Entries :    81351 : Total =         5886168 bytes  File  Size =    1303895 *
+*        :          : Tree compression factor =   4.42                       *
+******************************************************************************
+*Br    0 :reaction  : reaction/I                                             *
+*Entries :    81351 : Total  Size=     327066 bytes  File Size  =       2800 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression= 114.28     *
+*............................................................................*
+*Br    1 :cutBranch : cutBranch/I                                            *
+*Entries :    81351 : Total  Size=     327082 bytes  File Size  =      56237 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   5.69     *
+*............................................................................*
+*Br    2 :mectopology : mectopology/I                                        *
+*Entries :    81351 : Total  Size=     327114 bytes  File Size  =       2830 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression= 113.06     *
+*............................................................................*
+*Br    3 :D1True    : D1True/F                                               *
+*Entries :    81351 : Total  Size=     327034 bytes  File Size  =       2750 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression= 116.36     *
+*............................................................................*
+*Br    4 :D1Rec     : D1Rec/F                                                *
+*Entries :    81351 : Total  Size=     327018 bytes  File Size  =     155024 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.06     *
+*............................................................................*
+*Br    5 :D2True    : D2True/F                                               *
+*Entries :    81351 : Total  Size=     327034 bytes  File Size  =       2550 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression= 125.49     *
+*............................................................................*
+*Br    6 :D2Rec     : D2Rec/F                                                *
+*Entries :    81351 : Total  Size=     327018 bytes  File Size  =      24288 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=  13.17     *
+*............................................................................*
+*Br    7 :muMomRec  : muMomRec/F                                             *
+*Entries :    81351 : Total  Size=     327066 bytes  File Size  =     289027 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    8 :muMomTrue : muMomTrue/F                                            *
+*Entries :    81351 : Total  Size=     327082 bytes  File Size  =       2580 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression= 124.02     *
+*............................................................................*
+*Br    9 :muCosThetaRec : muCosThetaRec/F                                    *
+*Entries :    81351 : Total  Size=     327146 bytes  File Size  =     281102 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   1.14     *
+*............................................................................*
+*Br   10 :muCosThetaTrue : muCosThetaTrue/F                                  *
+*Entries :    81351 : Total  Size=     327162 bytes  File Size  =       2630 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression= 121.67     *
+*............................................................................*
+*Br   11 :pMomRec   : pMomRec/F                                              *
+*Entries :    81351 : Total  Size=     327050 bytes  File Size  =     119178 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.68     *
+*............................................................................*
+*Br   12 :pMomTrue  : pMomTrue/F                                             *
+*Entries :    81351 : Total  Size=     327066 bytes  File Size  =     118741 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.69     *
+*............................................................................*
+*Br   13 :pCosThetaRec : pCosThetaRec/F                                      *
+*Entries :    81351 : Total  Size=     327130 bytes  File Size  =     118355 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.70     *
+*............................................................................*
+*Br   14 :pCosThetaTrue : pCosThetaTrue/F                                    *
+*Entries :    81351 : Total  Size=     327146 bytes  File Size  =     118133 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.71     *
+*............................................................................*
+*Br   15 :Enureco   : Enureco/F                                              *
+*Entries :    81351 : Total  Size=     327050 bytes  File Size  =       2560 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression= 124.98     *
+*............................................................................*
+*Br   16 :Enutrue   : Enutrue/F                                              *
+*Entries :    81351 : Total  Size=     327050 bytes  File Size  =       2560 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression= 124.98     *
+*............................................................................*
+*Br   17 :weight    : weight/F                                               *
+*Entries :    81351 : Total  Size=     327034 bytes  File Size  =       2550 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression= 125.49     *
+*............................................................................*
+***Output True Tree: ***
+******************************************************************************
+*Tree    :trueEvents: trueEvents                                             *
+*Entries :   308649 : Total =        12391328 bytes  File  Size =    4956740 *
+*        :          : Tree compression factor =   2.45                       *
+******************************************************************************
+*Br    0 :reaction  : reaction/I                                             *
+*Entries :   308649 : Total  Size=    1239270 bytes  File Size  =     232154 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression=   5.24     *
+*............................................................................*
+*Br    1 :mectopology : mectopology/I                                        *
+*Entries :   308649 : Total  Size=    1239402 bytes  File Size  =     221778 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression=   5.48     *
+*............................................................................*
+*Br    2 :D1True    : D1True/F                                               *
+*Entries :   308649 : Total  Size=    1239182 bytes  File Size  =     420005 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression=   2.90     *
+*............................................................................*
+*Br    3 :D2True    : D2True/F                                               *
+*Entries :   308649 : Total  Size=    1239182 bytes  File Size  =     426687 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression=   2.85     *
+*............................................................................*
+*Br    4 :muMomTrue : muMomTrue/F                                            *
+*Entries :   308649 : Total  Size=    1239314 bytes  File Size  =    1081055 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression=   1.12     *
+*............................................................................*
+*Br    5 :muCosThetaTrue : muCosThetaTrue/F                                  *
+*Entries :   308649 : Total  Size=    1239534 bytes  File Size  =    1066128 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression=   1.14     *
+*............................................................................*
+*Br    6 :pMomTrue  : pMomTrue/F                                             *
+*Entries :   308649 : Total  Size=    1239270 bytes  File Size  =      10374 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression= 117.21     *
+*............................................................................*
+*Br    7 :pCosThetaTrue : pCosThetaTrue/F                                    *
+*Entries :   308649 : Total  Size=    1239490 bytes  File Size  =      10564 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression= 115.10     *
+*............................................................................*
+*Br    8 :Enutrue   : Enutrue/F                                              *
+*Entries :   308649 : Total  Size=    1239226 bytes  File Size  =    1074194 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression=   1.13     *
+*............................................................................*
+*Br    9 :weight    : weight/F                                               *
+*Entries :   308649 : Total  Size=    1239182 bytes  File Size  =     413801 *
+*Baskets :       38 : Basket Size=      32000 bytes  Compression=   2.94     *
+*............................................................................*
+(int)0
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 6 passed ...branch 7 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 6 passed ...branch 7 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Output Rec Tree: ***
+******************************************************************************
+*Tree    :selectedEvents: selectedEvents                                         *
+*Entries :    81351 : Total =         5886168 bytes  File  Size =    2781234 *
+*        :          : Tree compression factor =   2.07                       *
+******************************************************************************
+*Br    0 :reaction  : reaction/I                                             *
+*Entries :    81351 : Total  Size=     327066 bytes  File Size  =      50152 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   6.38     *
+*............................................................................*
+*Br    1 :cutBranch : cutBranch/I                                            *
+*Entries :    81351 : Total  Size=     327082 bytes  File Size  =      56237 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   5.69     *
+*............................................................................*
+*Br    2 :mectopology : mectopology/I                                        *
+*Entries :    81351 : Total  Size=     327114 bytes  File Size  =      49164 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   6.51     *
+*............................................................................*
+*Br    3 :D1True    : D1True/F                                               *
+*Entries :    81351 : Total  Size=     327034 bytes  File Size  =     156941 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.04     *
+*............................................................................*
+*Br    4 :D1Rec     : D1Rec/F                                                *
+*Entries :    81351 : Total  Size=     327018 bytes  File Size  =     156877 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.04     *
+*............................................................................*
+*Br    5 :D2True    : D2True/F                                               *
+*Entries :    81351 : Total  Size=     327034 bytes  File Size  =      19754 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=  16.20     *
+*............................................................................*
+*Br    6 :D2Rec     : D2Rec/F                                                *
+*Entries :    81351 : Total  Size=     327018 bytes  File Size  =      24290 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=  13.17     *
+*............................................................................*
+*Br    7 :muMomRec  : muMomRec/F                                             *
+*Entries :    81351 : Total  Size=     327066 bytes  File Size  =     289027 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    8 :muMomTrue : muMomTrue/F                                            *
+*Entries :    81351 : Total  Size=     327082 bytes  File Size  =     288627 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    9 :muCosThetaRec : muCosThetaRec/F                                    *
+*Entries :    81351 : Total  Size=     327146 bytes  File Size  =     281102 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   1.14     *
+*............................................................................*
+*Br   10 :muCosThetaTrue : muCosThetaTrue/F                                  *
+*Entries :    81351 : Total  Size=     327162 bytes  File Size  =     280884 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   1.14     *
+*............................................................................*
+*Br   11 :pMomRec   : pMomRec/F                                              *
+*Entries :    81351 : Total  Size=     327050 bytes  File Size  =     119178 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.68     *
+*............................................................................*
+*Br   12 :pMomTrue  : pMomTrue/F                                             *
+*Entries :    81351 : Total  Size=     327066 bytes  File Size  =     118741 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.69     *
+*............................................................................*
+*Br   13 :pCosThetaRec : pCosThetaRec/F                                      *
+*Entries :    81351 : Total  Size=     327130 bytes  File Size  =     118355 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.70     *
+*............................................................................*
+*Br   14 :pCosThetaTrue : pCosThetaTrue/F                                    *
+*Entries :    81351 : Total  Size=     327146 bytes  File Size  =     118133 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.71     *
+*............................................................................*
+*Br   15 :Enureco   : Enureco/F                                              *
+*Entries :    81351 : Total  Size=     327050 bytes  File Size  =     276890 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br   16 :Enutrue   : Enutrue/F                                              *
+*Entries :    81351 : Total  Size=     327050 bytes  File Size  =     276890 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br   17 :weight    : weight/F                                               *
+*Entries :    81351 : Total  Size=     327034 bytes  File Size  =      99992 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   3.20     *
+*............................................................................*
+***Output True Tree: ***
+******************************************************************************
+*Tree    :trueEvents: trueEvents                                             *
+*Entries :   244927 : Total =         9833984 bytes  File  Size =    6501622 *
+*        :          : Tree compression factor =   1.48                       *
+******************************************************************************
+*Br    0 :reaction  : reaction/I                                             *
+*Entries :   244927 : Total  Size=     983382 bytes  File Size  =     158811 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   6.04     *
+*............................................................................*
+*Br    1 :mectopology : mectopology/I                                        *
+*Entries :   244927 : Total  Size=     983490 bytes  File Size  =     153304 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   6.26     *
+*............................................................................*
+*Br    2 :D1True    : D1True/F                                               *
+*Entries :   244927 : Total  Size=     983310 bytes  File Size  =     835175 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   1.15     *
+*............................................................................*
+*Br    3 :D2True    : D2True/F                                               *
+*Entries :   244927 : Total  Size=     983310 bytes  File Size  =     829331 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    4 :muMomTrue : muMomTrue/F                                            *
+*Entries :   244927 : Total  Size=     983418 bytes  File Size  =     869605 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   1.10     *
+*............................................................................*
+*Br    5 :muCosThetaTrue : muCosThetaTrue/F                                  *
+*Entries :   244927 : Total  Size=     983598 bytes  File Size  =     866168 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    6 :pMomTrue  : pMomTrue/F                                             *
+*Entries :   244927 : Total  Size=     983382 bytes  File Size  =     826350 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    7 :pCosThetaTrue : pCosThetaTrue/F                                    *
+*Entries :   244927 : Total  Size=     983562 bytes  File Size  =     829358 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    8 :Enutrue   : Enutrue/F                                              *
+*Entries :   244927 : Total  Size=     983346 bytes  File Size  =     833189 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   1.15     *
+*............................................................................*
+*Br    9 :weight    : weight/F                                               *
+*Entries :   244927 : Total  Size=     983310 bytes  File Size  =     300331 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   3.20     *
+*............................................................................*
+(int)0
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Output Rec Tree: ***
+******************************************************************************
+*Tree    :selectedEvents: selectedEvents                                         *
+*Entries :    16205 : Total =         1182400 bytes  File  Size =     555238 *
+*        :          : Tree compression factor =   2.07                       *
+******************************************************************************
+*Br    0 :reaction  : reaction/I                                             *
+*Entries :    16205 : Total  Size=      65670 bytes  File Size  =       9962 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   6.42     *
+*............................................................................*
+*Br    1 :cutBranch : cutBranch/I                                            *
+*Entries :    16205 : Total  Size=      65678 bytes  File Size  =      11170 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   5.73     *
+*............................................................................*
+*Br    2 :mectopology : mectopology/I                                        *
+*Entries :    16205 : Total  Size=      65694 bytes  File Size  =       9824 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   6.51     *
+*............................................................................*
+*Br    3 :D1True    : D1True/F                                               *
+*Entries :    16205 : Total  Size=      65654 bytes  File Size  =      31243 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.05     *
+*............................................................................*
+*Br    4 :D1Rec     : D1Rec/F                                                *
+*Entries :    16205 : Total  Size=      65646 bytes  File Size  =      31206 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.05     *
+*............................................................................*
+*Br    5 :D2True    : D2True/F                                               *
+*Entries :    16205 : Total  Size=      65654 bytes  File Size  =       3941 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=  16.24     *
+*............................................................................*
+*Br    6 :D2Rec     : D2Rec/F                                                *
+*Entries :    16205 : Total  Size=      65646 bytes  File Size  =       4853 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=  13.19     *
+*............................................................................*
+*Br    7 :muMomRec  : muMomRec/F                                             *
+*Entries :    16205 : Total  Size=      65670 bytes  File Size  =      57779 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    8 :muMomTrue : muMomTrue/F                                            *
+*Entries :    16205 : Total  Size=      65678 bytes  File Size  =      57737 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    9 :muCosThetaRec : muCosThetaRec/F                                    *
+*Entries :    16205 : Total  Size=      65710 bytes  File Size  =      56234 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.14     *
+*............................................................................*
+*Br   10 :muCosThetaTrue : muCosThetaTrue/F                                  *
+*Entries :    16205 : Total  Size=      65718 bytes  File Size  =      56185 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.14     *
+*............................................................................*
+*Br   11 :pMomRec   : pMomRec/F                                              *
+*Entries :    16205 : Total  Size=      65662 bytes  File Size  =      23725 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.70     *
+*............................................................................*
+*Br   12 :pMomTrue  : pMomTrue/F                                             *
+*Entries :    16205 : Total  Size=      65670 bytes  File Size  =      23603 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.71     *
+*............................................................................*
+*Br   13 :pCosThetaRec : pCosThetaRec/F                                      *
+*Entries :    16205 : Total  Size=      65702 bytes  File Size  =      23533 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.72     *
+*............................................................................*
+*Br   14 :pCosThetaTrue : pCosThetaTrue/F                                    *
+*Entries :    16205 : Total  Size=      65710 bytes  File Size  =      23487 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.72     *
+*............................................................................*
+*Br   15 :Enureco   : Enureco/F                                              *
+*Entries :    16205 : Total  Size=      65662 bytes  File Size  =      55368 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br   16 :Enutrue   : Enutrue/F                                              *
+*Entries :    16205 : Total  Size=      65662 bytes  File Size  =      55368 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br   17 :weight    : weight/F                                               *
+*Entries :    16205 : Total  Size=      65654 bytes  File Size  =      20020 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   3.20     *
+*............................................................................*
+***Output True Tree: ***
+******************************************************************************
+*Tree    :trueEvents: trueEvents                                             *
+*Entries :    48985 : Total =         1971512 bytes  File  Size =    1300278 *
+*        :          : Tree compression factor =   1.48                       *
+******************************************************************************
+*Br    0 :reaction  : reaction/I                                             *
+*Entries :    48985 : Total  Size=     197114 bytes  File Size  =      31724 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   6.05     *
+*............................................................................*
+*Br    1 :mectopology : mectopology/I                                        *
+*Entries :    48985 : Total  Size=     197150 bytes  File Size  =      30574 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   6.28     *
+*............................................................................*
+*Br    2 :D1True    : D1True/F                                               *
+*Entries :    48985 : Total  Size=     197090 bytes  File Size  =     167073 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.15     *
+*............................................................................*
+*Br    3 :D2True    : D2True/F                                               *
+*Entries :    48985 : Total  Size=     197090 bytes  File Size  =     165879 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    4 :muMomTrue : muMomTrue/F                                            *
+*Entries :    48985 : Total  Size=     197126 bytes  File Size  =     173966 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.10     *
+*............................................................................*
+*Br    5 :muCosThetaTrue : muCosThetaTrue/F                                  *
+*Entries :    48985 : Total  Size=     197186 bytes  File Size  =     173245 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    6 :pMomTrue  : pMomTrue/F                                             *
+*Entries :    48985 : Total  Size=     197114 bytes  File Size  =     165320 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    7 :pCosThetaTrue : pCosThetaTrue/F                                    *
+*Entries :    48985 : Total  Size=     197174 bytes  File Size  =     165922 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    8 :Enutrue   : Enutrue/F                                              *
+*Entries :    48985 : Total  Size=     197102 bytes  File Size  =     166621 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.15     *
+*............................................................................*
+*Br    9 :weight    : weight/F                                               *
+*Entries :    48985 : Total  Size=     197090 bytes  File Size  =      59954 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   3.20     *
+*............................................................................*
+(int)0
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Output Rec Tree: ***
+******************************************************************************
+*Tree    :selectedEvents: selectedEvents                                         *
+*Entries :    16205 : Total =         1182400 bytes  File  Size =     555897 *
+*        :          : Tree compression factor =   2.07                       *
+******************************************************************************
+*Br    0 :reaction  : reaction/I                                             *
+*Entries :    16205 : Total  Size=      65670 bytes  File Size  =       9962 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   6.42     *
+*............................................................................*
+*Br    1 :cutBranch : cutBranch/I                                            *
+*Entries :    16205 : Total  Size=      65678 bytes  File Size  =      11170 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   5.73     *
+*............................................................................*
+*Br    2 :mectopology : mectopology/I                                        *
+*Entries :    16205 : Total  Size=      65694 bytes  File Size  =       9824 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   6.51     *
+*............................................................................*
+*Br    3 :D1True    : D1True/F                                               *
+*Entries :    16205 : Total  Size=      65654 bytes  File Size  =      31243 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.05     *
+*............................................................................*
+*Br    4 :D1Rec     : D1Rec/F                                                *
+*Entries :    16205 : Total  Size=      65646 bytes  File Size  =      31206 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.05     *
+*............................................................................*
+*Br    5 :D2True    : D2True/F                                               *
+*Entries :    16205 : Total  Size=      65654 bytes  File Size  =       3941 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=  16.24     *
+*............................................................................*
+*Br    6 :D2Rec     : D2Rec/F                                                *
+*Entries :    16205 : Total  Size=      65646 bytes  File Size  =       4853 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=  13.19     *
+*............................................................................*
+*Br    7 :muMomRec  : muMomRec/F                                             *
+*Entries :    16205 : Total  Size=      65670 bytes  File Size  =      57779 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    8 :muMomTrue : muMomTrue/F                                            *
+*Entries :    16205 : Total  Size=      65678 bytes  File Size  =      57737 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    9 :muCosThetaRec : muCosThetaRec/F                                    *
+*Entries :    16205 : Total  Size=      65710 bytes  File Size  =      56234 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.14     *
+*............................................................................*
+*Br   10 :muCosThetaTrue : muCosThetaTrue/F                                  *
+*Entries :    16205 : Total  Size=      65718 bytes  File Size  =      56185 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.14     *
+*............................................................................*
+*Br   11 :pMomRec   : pMomRec/F                                              *
+*Entries :    16205 : Total  Size=      65662 bytes  File Size  =      23725 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.70     *
+*............................................................................*
+*Br   12 :pMomTrue  : pMomTrue/F                                             *
+*Entries :    16205 : Total  Size=      65670 bytes  File Size  =      23603 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.71     *
+*............................................................................*
+*Br   13 :pCosThetaRec : pCosThetaRec/F                                      *
+*Entries :    16205 : Total  Size=      65702 bytes  File Size  =      23533 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.72     *
+*............................................................................*
+*Br   14 :pCosThetaTrue : pCosThetaTrue/F                                    *
+*Entries :    16205 : Total  Size=      65710 bytes  File Size  =      23487 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.72     *
+*............................................................................*
+*Br   15 :Enureco   : Enureco/F                                              *
+*Entries :    16205 : Total  Size=      65662 bytes  File Size  =      55368 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br   16 :Enutrue   : Enutrue/F                                              *
+*Entries :    16205 : Total  Size=      65662 bytes  File Size  =      55368 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br   17 :weight    : weight/F                                               *
+*Entries :    16205 : Total  Size=      65654 bytes  File Size  =      20679 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   3.09     *
+*............................................................................*
+***Output True Tree: ***
+******************************************************************************
+*Tree    :trueEvents: trueEvents                                             *
+*Entries :    48985 : Total =         1971512 bytes  File  Size =    1301908 *
+*        :          : Tree compression factor =   1.47                       *
+******************************************************************************
+*Br    0 :reaction  : reaction/I                                             *
+*Entries :    48985 : Total  Size=     197114 bytes  File Size  =      31724 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   6.05     *
+*............................................................................*
+*Br    1 :mectopology : mectopology/I                                        *
+*Entries :    48985 : Total  Size=     197150 bytes  File Size  =      30574 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   6.28     *
+*............................................................................*
+*Br    2 :D1True    : D1True/F                                               *
+*Entries :    48985 : Total  Size=     197090 bytes  File Size  =     167073 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.15     *
+*............................................................................*
+*Br    3 :D2True    : D2True/F                                               *
+*Entries :    48985 : Total  Size=     197090 bytes  File Size  =     165879 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    4 :muMomTrue : muMomTrue/F                                            *
+*Entries :    48985 : Total  Size=     197126 bytes  File Size  =     173966 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.10     *
+*............................................................................*
+*Br    5 :muCosThetaTrue : muCosThetaTrue/F                                  *
+*Entries :    48985 : Total  Size=     197186 bytes  File Size  =     173245 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    6 :pMomTrue  : pMomTrue/F                                             *
+*Entries :    48985 : Total  Size=     197114 bytes  File Size  =     165320 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    7 :pCosThetaTrue : pCosThetaTrue/F                                    *
+*Entries :    48985 : Total  Size=     197174 bytes  File Size  =     165922 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    8 :Enutrue   : Enutrue/F                                              *
+*Entries :    48985 : Total  Size=     197102 bytes  File Size  =     166621 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.15     *
+*............................................................................*
+*Br    9 :weight    : weight/F                                               *
+*Entries :    48985 : Total  Size=     197090 bytes  File Size  =      61584 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   3.12     *
+*............................................................................*
+(int)0
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 6 passed ...branch 7 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 6 passed ...branch 7 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Output Rec Tree: ***
+******************************************************************************
+*Tree    :selectedEvents: selectedEvents                                         *
+*Entries :    81351 : Total =         5886168 bytes  File  Size =    2784197 *
+*        :          : Tree compression factor =   2.07                       *
+******************************************************************************
+*Br    0 :reaction  : reaction/I                                             *
+*Entries :    81351 : Total  Size=     327066 bytes  File Size  =      50152 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   6.38     *
+*............................................................................*
+*Br    1 :cutBranch : cutBranch/I                                            *
+*Entries :    81351 : Total  Size=     327082 bytes  File Size  =      56237 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   5.69     *
+*............................................................................*
+*Br    2 :mectopology : mectopology/I                                        *
+*Entries :    81351 : Total  Size=     327114 bytes  File Size  =      49164 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   6.51     *
+*............................................................................*
+*Br    3 :D1True    : D1True/F                                               *
+*Entries :    81351 : Total  Size=     327034 bytes  File Size  =     158413 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.02     *
+*............................................................................*
+*Br    4 :D1Rec     : D1Rec/F                                                *
+*Entries :    81351 : Total  Size=     327018 bytes  File Size  =     158368 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.02     *
+*............................................................................*
+*Br    5 :D2True    : D2True/F                                               *
+*Entries :    81351 : Total  Size=     327034 bytes  File Size  =      19754 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=  16.20     *
+*............................................................................*
+*Br    6 :D2Rec     : D2Rec/F                                                *
+*Entries :    81351 : Total  Size=     327018 bytes  File Size  =      24290 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=  13.17     *
+*............................................................................*
+*Br    7 :muMomRec  : muMomRec/F                                             *
+*Entries :    81351 : Total  Size=     327066 bytes  File Size  =     289027 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    8 :muMomTrue : muMomTrue/F                                            *
+*Entries :    81351 : Total  Size=     327082 bytes  File Size  =     288627 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    9 :muCosThetaRec : muCosThetaRec/F                                    *
+*Entries :    81351 : Total  Size=     327146 bytes  File Size  =     281102 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   1.14     *
+*............................................................................*
+*Br   10 :muCosThetaTrue : muCosThetaTrue/F                                  *
+*Entries :    81351 : Total  Size=     327162 bytes  File Size  =     280884 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   1.14     *
+*............................................................................*
+*Br   11 :pMomRec   : pMomRec/F                                              *
+*Entries :    81351 : Total  Size=     327050 bytes  File Size  =     119178 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.68     *
+*............................................................................*
+*Br   12 :pMomTrue  : pMomTrue/F                                             *
+*Entries :    81351 : Total  Size=     327066 bytes  File Size  =     118741 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.69     *
+*............................................................................*
+*Br   13 :pCosThetaRec : pCosThetaRec/F                                      *
+*Entries :    81351 : Total  Size=     327130 bytes  File Size  =     118355 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.70     *
+*............................................................................*
+*Br   14 :pCosThetaTrue : pCosThetaTrue/F                                    *
+*Entries :    81351 : Total  Size=     327146 bytes  File Size  =     118133 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.71     *
+*............................................................................*
+*Br   15 :Enureco   : Enureco/F                                              *
+*Entries :    81351 : Total  Size=     327050 bytes  File Size  =     276890 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br   16 :Enutrue   : Enutrue/F                                              *
+*Entries :    81351 : Total  Size=     327050 bytes  File Size  =     276890 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br   17 :weight    : weight/F                                               *
+*Entries :    81351 : Total  Size=     327034 bytes  File Size  =      99992 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   3.20     *
+*............................................................................*
+***Output True Tree: ***
+******************************************************************************
+*Tree    :trueEvents: trueEvents                                             *
+*Entries :   244927 : Total =         9833984 bytes  File  Size =    6515074 *
+*        :          : Tree compression factor =   1.47                       *
+******************************************************************************
+*Br    0 :reaction  : reaction/I                                             *
+*Entries :   244927 : Total  Size=     983382 bytes  File Size  =     158811 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   6.04     *
+*............................................................................*
+*Br    1 :mectopology : mectopology/I                                        *
+*Entries :   244927 : Total  Size=     983490 bytes  File Size  =     153304 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   6.26     *
+*............................................................................*
+*Br    2 :D1True    : D1True/F                                               *
+*Entries :   244927 : Total  Size=     983310 bytes  File Size  =     848633 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   1.13     *
+*............................................................................*
+*Br    3 :D2True    : D2True/F                                               *
+*Entries :   244927 : Total  Size=     983310 bytes  File Size  =     829331 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    4 :muMomTrue : muMomTrue/F                                            *
+*Entries :   244927 : Total  Size=     983418 bytes  File Size  =     869605 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   1.10     *
+*............................................................................*
+*Br    5 :muCosThetaTrue : muCosThetaTrue/F                                  *
+*Entries :   244927 : Total  Size=     983598 bytes  File Size  =     866168 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    6 :pMomTrue  : pMomTrue/F                                             *
+*Entries :   244927 : Total  Size=     983382 bytes  File Size  =     826350 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    7 :pCosThetaTrue : pCosThetaTrue/F                                    *
+*Entries :   244927 : Total  Size=     983562 bytes  File Size  =     829358 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    8 :Enutrue   : Enutrue/F                                              *
+*Entries :   244927 : Total  Size=     983346 bytes  File Size  =     833189 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   1.15     *
+*............................................................................*
+*Br    9 :weight    : weight/F                                               *
+*Entries :   244927 : Total  Size=     983310 bytes  File Size  =     300325 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   3.20     *
+*............................................................................*
+(int)0
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Output Rec Tree: ***
+******************************************************************************
+*Tree    :selectedEvents: selectedEvents                                         *
+*Entries :    16205 : Total =         1182400 bytes  File  Size =     555801 *
+*        :          : Tree compression factor =   2.07                       *
+******************************************************************************
+*Br    0 :reaction  : reaction/I                                             *
+*Entries :    16205 : Total  Size=      65670 bytes  File Size  =       9962 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   6.42     *
+*............................................................................*
+*Br    1 :cutBranch : cutBranch/I                                            *
+*Entries :    16205 : Total  Size=      65678 bytes  File Size  =      11170 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   5.73     *
+*............................................................................*
+*Br    2 :mectopology : mectopology/I                                        *
+*Entries :    16205 : Total  Size=      65694 bytes  File Size  =       9824 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   6.51     *
+*............................................................................*
+*Br    3 :D1True    : D1True/F                                               *
+*Entries :    16205 : Total  Size=      65654 bytes  File Size  =      31520 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.03     *
+*............................................................................*
+*Br    4 :D1Rec     : D1Rec/F                                                *
+*Entries :    16205 : Total  Size=      65646 bytes  File Size  =      31492 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.03     *
+*............................................................................*
+*Br    5 :D2True    : D2True/F                                               *
+*Entries :    16205 : Total  Size=      65654 bytes  File Size  =       3941 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=  16.24     *
+*............................................................................*
+*Br    6 :D2Rec     : D2Rec/F                                                *
+*Entries :    16205 : Total  Size=      65646 bytes  File Size  =       4853 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=  13.19     *
+*............................................................................*
+*Br    7 :muMomRec  : muMomRec/F                                             *
+*Entries :    16205 : Total  Size=      65670 bytes  File Size  =      57779 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    8 :muMomTrue : muMomTrue/F                                            *
+*Entries :    16205 : Total  Size=      65678 bytes  File Size  =      57737 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    9 :muCosThetaRec : muCosThetaRec/F                                    *
+*Entries :    16205 : Total  Size=      65710 bytes  File Size  =      56234 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.14     *
+*............................................................................*
+*Br   10 :muCosThetaTrue : muCosThetaTrue/F                                  *
+*Entries :    16205 : Total  Size=      65718 bytes  File Size  =      56185 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.14     *
+*............................................................................*
+*Br   11 :pMomRec   : pMomRec/F                                              *
+*Entries :    16205 : Total  Size=      65662 bytes  File Size  =      23725 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.70     *
+*............................................................................*
+*Br   12 :pMomTrue  : pMomTrue/F                                             *
+*Entries :    16205 : Total  Size=      65670 bytes  File Size  =      23603 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.71     *
+*............................................................................*
+*Br   13 :pCosThetaRec : pCosThetaRec/F                                      *
+*Entries :    16205 : Total  Size=      65702 bytes  File Size  =      23533 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.72     *
+*............................................................................*
+*Br   14 :pCosThetaTrue : pCosThetaTrue/F                                    *
+*Entries :    16205 : Total  Size=      65710 bytes  File Size  =      23487 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.72     *
+*............................................................................*
+*Br   15 :Enureco   : Enureco/F                                              *
+*Entries :    16205 : Total  Size=      65662 bytes  File Size  =      55368 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br   16 :Enutrue   : Enutrue/F                                              *
+*Entries :    16205 : Total  Size=      65662 bytes  File Size  =      55368 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br   17 :weight    : weight/F                                               *
+*Entries :    16205 : Total  Size=      65654 bytes  File Size  =      20020 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   3.20     *
+*............................................................................*
+***Output True Tree: ***
+******************************************************************************
+*Tree    :trueEvents: trueEvents                                             *
+*Entries :    48985 : Total =         1971512 bytes  File  Size =    1302982 *
+*        :          : Tree compression factor =   1.47                       *
+******************************************************************************
+*Br    0 :reaction  : reaction/I                                             *
+*Entries :    48985 : Total  Size=     197114 bytes  File Size  =      31724 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   6.05     *
+*............................................................................*
+*Br    1 :mectopology : mectopology/I                                        *
+*Entries :    48985 : Total  Size=     197150 bytes  File Size  =      30574 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   6.28     *
+*............................................................................*
+*Br    2 :D1True    : D1True/F                                               *
+*Entries :    48985 : Total  Size=     197090 bytes  File Size  =     169777 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.13     *
+*............................................................................*
+*Br    3 :D2True    : D2True/F                                               *
+*Entries :    48985 : Total  Size=     197090 bytes  File Size  =     165879 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    4 :muMomTrue : muMomTrue/F                                            *
+*Entries :    48985 : Total  Size=     197126 bytes  File Size  =     173966 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.10     *
+*............................................................................*
+*Br    5 :muCosThetaTrue : muCosThetaTrue/F                                  *
+*Entries :    48985 : Total  Size=     197186 bytes  File Size  =     173245 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    6 :pMomTrue  : pMomTrue/F                                             *
+*Entries :    48985 : Total  Size=     197114 bytes  File Size  =     165320 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    7 :pCosThetaTrue : pCosThetaTrue/F                                    *
+*Entries :    48985 : Total  Size=     197174 bytes  File Size  =     165922 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    8 :Enutrue   : Enutrue/F                                              *
+*Entries :    48985 : Total  Size=     197102 bytes  File Size  =     166621 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.15     *
+*............................................................................*
+*Br    9 :weight    : weight/F                                               *
+*Entries :    48985 : Total  Size=     197090 bytes  File Size  =      59954 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   3.20     *
+*............................................................................*
+(int)0
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Output Rec Tree: ***
+******************************************************************************
+*Tree    :selectedEvents: selectedEvents                                         *
+*Entries :    16205 : Total =         1182400 bytes  File  Size =     556460 *
+*        :          : Tree compression factor =   2.07                       *
+******************************************************************************
+*Br    0 :reaction  : reaction/I                                             *
+*Entries :    16205 : Total  Size=      65670 bytes  File Size  =       9962 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   6.42     *
+*............................................................................*
+*Br    1 :cutBranch : cutBranch/I                                            *
+*Entries :    16205 : Total  Size=      65678 bytes  File Size  =      11170 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   5.73     *
+*............................................................................*
+*Br    2 :mectopology : mectopology/I                                        *
+*Entries :    16205 : Total  Size=      65694 bytes  File Size  =       9824 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   6.51     *
+*............................................................................*
+*Br    3 :D1True    : D1True/F                                               *
+*Entries :    16205 : Total  Size=      65654 bytes  File Size  =      31520 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.03     *
+*............................................................................*
+*Br    4 :D1Rec     : D1Rec/F                                                *
+*Entries :    16205 : Total  Size=      65646 bytes  File Size  =      31492 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.03     *
+*............................................................................*
+*Br    5 :D2True    : D2True/F                                               *
+*Entries :    16205 : Total  Size=      65654 bytes  File Size  =       3941 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=  16.24     *
+*............................................................................*
+*Br    6 :D2Rec     : D2Rec/F                                                *
+*Entries :    16205 : Total  Size=      65646 bytes  File Size  =       4853 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=  13.19     *
+*............................................................................*
+*Br    7 :muMomRec  : muMomRec/F                                             *
+*Entries :    16205 : Total  Size=      65670 bytes  File Size  =      57779 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    8 :muMomTrue : muMomTrue/F                                            *
+*Entries :    16205 : Total  Size=      65678 bytes  File Size  =      57737 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    9 :muCosThetaRec : muCosThetaRec/F                                    *
+*Entries :    16205 : Total  Size=      65710 bytes  File Size  =      56234 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.14     *
+*............................................................................*
+*Br   10 :muCosThetaTrue : muCosThetaTrue/F                                  *
+*Entries :    16205 : Total  Size=      65718 bytes  File Size  =      56185 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.14     *
+*............................................................................*
+*Br   11 :pMomRec   : pMomRec/F                                              *
+*Entries :    16205 : Total  Size=      65662 bytes  File Size  =      23725 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.70     *
+*............................................................................*
+*Br   12 :pMomTrue  : pMomTrue/F                                             *
+*Entries :    16205 : Total  Size=      65670 bytes  File Size  =      23603 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.71     *
+*............................................................................*
+*Br   13 :pCosThetaRec : pCosThetaRec/F                                      *
+*Entries :    16205 : Total  Size=      65702 bytes  File Size  =      23533 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.72     *
+*............................................................................*
+*Br   14 :pCosThetaTrue : pCosThetaTrue/F                                    *
+*Entries :    16205 : Total  Size=      65710 bytes  File Size  =      23487 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.72     *
+*............................................................................*
+*Br   15 :Enureco   : Enureco/F                                              *
+*Entries :    16205 : Total  Size=      65662 bytes  File Size  =      55368 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br   16 :Enutrue   : Enutrue/F                                              *
+*Entries :    16205 : Total  Size=      65662 bytes  File Size  =      55368 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br   17 :weight    : weight/F                                               *
+*Entries :    16205 : Total  Size=      65654 bytes  File Size  =      20679 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   3.09     *
+*............................................................................*
+***Output True Tree: ***
+******************************************************************************
+*Tree    :trueEvents: trueEvents                                             *
+*Entries :    48985 : Total =         1971512 bytes  File  Size =    1304612 *
+*        :          : Tree compression factor =   1.47                       *
+******************************************************************************
+*Br    0 :reaction  : reaction/I                                             *
+*Entries :    48985 : Total  Size=     197114 bytes  File Size  =      31724 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   6.05     *
+*............................................................................*
+*Br    1 :mectopology : mectopology/I                                        *
+*Entries :    48985 : Total  Size=     197150 bytes  File Size  =      30574 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   6.28     *
+*............................................................................*
+*Br    2 :D1True    : D1True/F                                               *
+*Entries :    48985 : Total  Size=     197090 bytes  File Size  =     169777 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.13     *
+*............................................................................*
+*Br    3 :D2True    : D2True/F                                               *
+*Entries :    48985 : Total  Size=     197090 bytes  File Size  =     165879 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    4 :muMomTrue : muMomTrue/F                                            *
+*Entries :    48985 : Total  Size=     197126 bytes  File Size  =     173966 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.10     *
+*............................................................................*
+*Br    5 :muCosThetaTrue : muCosThetaTrue/F                                  *
+*Entries :    48985 : Total  Size=     197186 bytes  File Size  =     173245 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    6 :pMomTrue  : pMomTrue/F                                             *
+*Entries :    48985 : Total  Size=     197114 bytes  File Size  =     165320 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    7 :pCosThetaTrue : pCosThetaTrue/F                                    *
+*Entries :    48985 : Total  Size=     197174 bytes  File Size  =     165922 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    8 :Enutrue   : Enutrue/F                                              *
+*Entries :    48985 : Total  Size=     197102 bytes  File Size  =     166621 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.15     *
+*............................................................................*
+*Br    9 :weight    : weight/F                                               *
+*Entries :    48985 : Total  Size=     197090 bytes  File Size  =      61584 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   3.12     *
+*............................................................................*
+(int)0
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 6 passed ...branch 7 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 6 passed ...branch 7 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Output Rec Tree: ***
+******************************************************************************
+*Tree    :selectedEvents: selectedEvents                                         *
+*Entries :    81351 : Total =         5886168 bytes  File  Size =    2777359 *
+*        :          : Tree compression factor =   2.07                       *
+******************************************************************************
+*Br    0 :reaction  : reaction/I                                             *
+*Entries :    81351 : Total  Size=     327066 bytes  File Size  =      50152 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   6.38     *
+*............................................................................*
+*Br    1 :cutBranch : cutBranch/I                                            *
+*Entries :    81351 : Total  Size=     327082 bytes  File Size  =      56237 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   5.69     *
+*............................................................................*
+*Br    2 :mectopology : mectopology/I                                        *
+*Entries :    81351 : Total  Size=     327114 bytes  File Size  =      49164 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   6.51     *
+*............................................................................*
+*Br    3 :D1True    : D1True/F                                               *
+*Entries :    81351 : Total  Size=     327034 bytes  File Size  =     154921 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.07     *
+*............................................................................*
+*Br    4 :D1Rec     : D1Rec/F                                                *
+*Entries :    81351 : Total  Size=     327018 bytes  File Size  =     155024 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.06     *
+*............................................................................*
+*Br    5 :D2True    : D2True/F                                               *
+*Entries :    81351 : Total  Size=     327034 bytes  File Size  =      19754 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=  16.20     *
+*............................................................................*
+*Br    6 :D2Rec     : D2Rec/F                                                *
+*Entries :    81351 : Total  Size=     327018 bytes  File Size  =      24288 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=  13.17     *
+*............................................................................*
+*Br    7 :muMomRec  : muMomRec/F                                             *
+*Entries :    81351 : Total  Size=     327066 bytes  File Size  =     289027 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    8 :muMomTrue : muMomTrue/F                                            *
+*Entries :    81351 : Total  Size=     327082 bytes  File Size  =     288627 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    9 :muCosThetaRec : muCosThetaRec/F                                    *
+*Entries :    81351 : Total  Size=     327146 bytes  File Size  =     281102 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   1.14     *
+*............................................................................*
+*Br   10 :muCosThetaTrue : muCosThetaTrue/F                                  *
+*Entries :    81351 : Total  Size=     327162 bytes  File Size  =     280884 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   1.14     *
+*............................................................................*
+*Br   11 :pMomRec   : pMomRec/F                                              *
+*Entries :    81351 : Total  Size=     327050 bytes  File Size  =     119178 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.68     *
+*............................................................................*
+*Br   12 :pMomTrue  : pMomTrue/F                                             *
+*Entries :    81351 : Total  Size=     327066 bytes  File Size  =     118741 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.69     *
+*............................................................................*
+*Br   13 :pCosThetaRec : pCosThetaRec/F                                      *
+*Entries :    81351 : Total  Size=     327130 bytes  File Size  =     118355 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.70     *
+*............................................................................*
+*Br   14 :pCosThetaTrue : pCosThetaTrue/F                                    *
+*Entries :    81351 : Total  Size=     327146 bytes  File Size  =     118133 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   2.71     *
+*............................................................................*
+*Br   15 :Enureco   : Enureco/F                                              *
+*Entries :    81351 : Total  Size=     327050 bytes  File Size  =     276890 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br   16 :Enutrue   : Enutrue/F                                              *
+*Entries :    81351 : Total  Size=     327050 bytes  File Size  =     276890 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br   17 :weight    : weight/F                                               *
+*Entries :    81351 : Total  Size=     327034 bytes  File Size  =      99992 *
+*Baskets :       10 : Basket Size=      32000 bytes  Compression=   3.20     *
+*............................................................................*
+***Output True Tree: ***
+******************************************************************************
+*Tree    :trueEvents: trueEvents                                             *
+*Entries :   244927 : Total =         9833984 bytes  File  Size =    6501616 *
+*        :          : Tree compression factor =   1.48                       *
+******************************************************************************
+*Br    0 :reaction  : reaction/I                                             *
+*Entries :   244927 : Total  Size=     983382 bytes  File Size  =     158811 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   6.04     *
+*............................................................................*
+*Br    1 :mectopology : mectopology/I                                        *
+*Entries :   244927 : Total  Size=     983490 bytes  File Size  =     153304 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   6.26     *
+*............................................................................*
+*Br    2 :D1True    : D1True/F                                               *
+*Entries :   244927 : Total  Size=     983310 bytes  File Size  =     829331 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    3 :D2True    : D2True/F                                               *
+*Entries :   244927 : Total  Size=     983310 bytes  File Size  =     835175 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   1.15     *
+*............................................................................*
+*Br    4 :muMomTrue : muMomTrue/F                                            *
+*Entries :   244927 : Total  Size=     983418 bytes  File Size  =     869605 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   1.10     *
+*............................................................................*
+*Br    5 :muCosThetaTrue : muCosThetaTrue/F                                  *
+*Entries :   244927 : Total  Size=     983598 bytes  File Size  =     866168 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    6 :pMomTrue  : pMomTrue/F                                             *
+*Entries :   244927 : Total  Size=     983382 bytes  File Size  =     826350 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    7 :pCosThetaTrue : pCosThetaTrue/F                                    *
+*Entries :   244927 : Total  Size=     983562 bytes  File Size  =     829358 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    8 :Enutrue   : Enutrue/F                                              *
+*Entries :   244927 : Total  Size=     983346 bytes  File Size  =     833189 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   1.15     *
+*............................................................................*
+*Br    9 :weight    : weight/F                                               *
+*Entries :   244927 : Total  Size=     983310 bytes  File Size  =     300325 *
+*Baskets :       30 : Basket Size=      32000 bytes  Compression=   3.20     *
+*............................................................................*
+(int)0
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Output Rec Tree: ***
+******************************************************************************
+*Tree    :selectedEvents: selectedEvents                                         *
+*Entries :    16205 : Total =         1182400 bytes  File  Size =     554452 *
+*        :          : Tree compression factor =   2.08                       *
+******************************************************************************
+*Br    0 :reaction  : reaction/I                                             *
+*Entries :    16205 : Total  Size=      65670 bytes  File Size  =       9962 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   6.42     *
+*............................................................................*
+*Br    1 :cutBranch : cutBranch/I                                            *
+*Entries :    16205 : Total  Size=      65678 bytes  File Size  =      11170 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   5.73     *
+*............................................................................*
+*Br    2 :mectopology : mectopology/I                                        *
+*Entries :    16205 : Total  Size=      65694 bytes  File Size  =       9824 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   6.51     *
+*............................................................................*
+*Br    3 :D1True    : D1True/F                                               *
+*Entries :    16205 : Total  Size=      65654 bytes  File Size  =      30819 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.08     *
+*............................................................................*
+*Br    4 :D1Rec     : D1Rec/F                                                *
+*Entries :    16205 : Total  Size=      65646 bytes  File Size  =      30844 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.07     *
+*............................................................................*
+*Br    5 :D2True    : D2True/F                                               *
+*Entries :    16205 : Total  Size=      65654 bytes  File Size  =       3941 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=  16.24     *
+*............................................................................*
+*Br    6 :D2Rec     : D2Rec/F                                                *
+*Entries :    16205 : Total  Size=      65646 bytes  File Size  =       4853 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=  13.19     *
+*............................................................................*
+*Br    7 :muMomRec  : muMomRec/F                                             *
+*Entries :    16205 : Total  Size=      65670 bytes  File Size  =      57779 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    8 :muMomTrue : muMomTrue/F                                            *
+*Entries :    16205 : Total  Size=      65678 bytes  File Size  =      57737 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    9 :muCosThetaRec : muCosThetaRec/F                                    *
+*Entries :    16205 : Total  Size=      65710 bytes  File Size  =      56234 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.14     *
+*............................................................................*
+*Br   10 :muCosThetaTrue : muCosThetaTrue/F                                  *
+*Entries :    16205 : Total  Size=      65718 bytes  File Size  =      56185 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.14     *
+*............................................................................*
+*Br   11 :pMomRec   : pMomRec/F                                              *
+*Entries :    16205 : Total  Size=      65662 bytes  File Size  =      23725 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.70     *
+*............................................................................*
+*Br   12 :pMomTrue  : pMomTrue/F                                             *
+*Entries :    16205 : Total  Size=      65670 bytes  File Size  =      23603 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.71     *
+*............................................................................*
+*Br   13 :pCosThetaRec : pCosThetaRec/F                                      *
+*Entries :    16205 : Total  Size=      65702 bytes  File Size  =      23533 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.72     *
+*............................................................................*
+*Br   14 :pCosThetaTrue : pCosThetaTrue/F                                    *
+*Entries :    16205 : Total  Size=      65710 bytes  File Size  =      23487 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.72     *
+*............................................................................*
+*Br   15 :Enureco   : Enureco/F                                              *
+*Entries :    16205 : Total  Size=      65662 bytes  File Size  =      55368 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br   16 :Enutrue   : Enutrue/F                                              *
+*Entries :    16205 : Total  Size=      65662 bytes  File Size  =      55368 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br   17 :weight    : weight/F                                               *
+*Entries :    16205 : Total  Size=      65654 bytes  File Size  =      20020 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   3.20     *
+*............................................................................*
+***Output True Tree: ***
+******************************************************************************
+*Tree    :trueEvents: trueEvents                                             *
+*Entries :    48985 : Total =         1971512 bytes  File  Size =    1300278 *
+*        :          : Tree compression factor =   1.48                       *
+******************************************************************************
+*Br    0 :reaction  : reaction/I                                             *
+*Entries :    48985 : Total  Size=     197114 bytes  File Size  =      31724 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   6.05     *
+*............................................................................*
+*Br    1 :mectopology : mectopology/I                                        *
+*Entries :    48985 : Total  Size=     197150 bytes  File Size  =      30574 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   6.28     *
+*............................................................................*
+*Br    2 :D1True    : D1True/F                                               *
+*Entries :    48985 : Total  Size=     197090 bytes  File Size  =     165879 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    3 :D2True    : D2True/F                                               *
+*Entries :    48985 : Total  Size=     197090 bytes  File Size  =     167073 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.15     *
+*............................................................................*
+*Br    4 :muMomTrue : muMomTrue/F                                            *
+*Entries :    48985 : Total  Size=     197126 bytes  File Size  =     173966 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.10     *
+*............................................................................*
+*Br    5 :muCosThetaTrue : muCosThetaTrue/F                                  *
+*Entries :    48985 : Total  Size=     197186 bytes  File Size  =     173245 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    6 :pMomTrue  : pMomTrue/F                                             *
+*Entries :    48985 : Total  Size=     197114 bytes  File Size  =     165320 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    7 :pCosThetaTrue : pCosThetaTrue/F                                    *
+*Entries :    48985 : Total  Size=     197174 bytes  File Size  =     165922 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    8 :Enutrue   : Enutrue/F                                              *
+*Entries :    48985 : Total  Size=     197102 bytes  File Size  =     166621 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.15     *
+*............................................................................*
+*Br    9 :weight    : weight/F                                               *
+*Entries :    48985 : Total  Size=     197090 bytes  File Size  =      59954 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   3.20     *
+*............................................................................*
+(int)0
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Warning: More than one cut branch passed***
+branch 1 passed ...branch 5 passed ...
+***Output Rec Tree: ***
+******************************************************************************
+*Tree    :selectedEvents: selectedEvents                                         *
+*Entries :    16205 : Total =         1182400 bytes  File  Size =     555111 *
+*        :          : Tree compression factor =   2.08                       *
+******************************************************************************
+*Br    0 :reaction  : reaction/I                                             *
+*Entries :    16205 : Total  Size=      65670 bytes  File Size  =       9962 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   6.42     *
+*............................................................................*
+*Br    1 :cutBranch : cutBranch/I                                            *
+*Entries :    16205 : Total  Size=      65678 bytes  File Size  =      11170 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   5.73     *
+*............................................................................*
+*Br    2 :mectopology : mectopology/I                                        *
+*Entries :    16205 : Total  Size=      65694 bytes  File Size  =       9824 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   6.51     *
+*............................................................................*
+*Br    3 :D1True    : D1True/F                                               *
+*Entries :    16205 : Total  Size=      65654 bytes  File Size  =      30819 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.08     *
+*............................................................................*
+*Br    4 :D1Rec     : D1Rec/F                                                *
+*Entries :    16205 : Total  Size=      65646 bytes  File Size  =      30844 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.07     *
+*............................................................................*
+*Br    5 :D2True    : D2True/F                                               *
+*Entries :    16205 : Total  Size=      65654 bytes  File Size  =       3941 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=  16.24     *
+*............................................................................*
+*Br    6 :D2Rec     : D2Rec/F                                                *
+*Entries :    16205 : Total  Size=      65646 bytes  File Size  =       4853 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=  13.19     *
+*............................................................................*
+*Br    7 :muMomRec  : muMomRec/F                                             *
+*Entries :    16205 : Total  Size=      65670 bytes  File Size  =      57779 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    8 :muMomTrue : muMomTrue/F                                            *
+*Entries :    16205 : Total  Size=      65678 bytes  File Size  =      57737 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    9 :muCosThetaRec : muCosThetaRec/F                                    *
+*Entries :    16205 : Total  Size=      65710 bytes  File Size  =      56234 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.14     *
+*............................................................................*
+*Br   10 :muCosThetaTrue : muCosThetaTrue/F                                  *
+*Entries :    16205 : Total  Size=      65718 bytes  File Size  =      56185 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.14     *
+*............................................................................*
+*Br   11 :pMomRec   : pMomRec/F                                              *
+*Entries :    16205 : Total  Size=      65662 bytes  File Size  =      23725 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.70     *
+*............................................................................*
+*Br   12 :pMomTrue  : pMomTrue/F                                             *
+*Entries :    16205 : Total  Size=      65670 bytes  File Size  =      23603 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.71     *
+*............................................................................*
+*Br   13 :pCosThetaRec : pCosThetaRec/F                                      *
+*Entries :    16205 : Total  Size=      65702 bytes  File Size  =      23533 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.72     *
+*............................................................................*
+*Br   14 :pCosThetaTrue : pCosThetaTrue/F                                    *
+*Entries :    16205 : Total  Size=      65710 bytes  File Size  =      23487 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   2.72     *
+*............................................................................*
+*Br   15 :Enureco   : Enureco/F                                              *
+*Entries :    16205 : Total  Size=      65662 bytes  File Size  =      55368 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br   16 :Enutrue   : Enutrue/F                                              *
+*Entries :    16205 : Total  Size=      65662 bytes  File Size  =      55368 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br   17 :weight    : weight/F                                               *
+*Entries :    16205 : Total  Size=      65654 bytes  File Size  =      20679 *
+*Baskets :        2 : Basket Size=      32000 bytes  Compression=   3.09     *
+*............................................................................*
+***Output True Tree: ***
+******************************************************************************
+*Tree    :trueEvents: trueEvents                                             *
+*Entries :    48985 : Total =         1971512 bytes  File  Size =    1301908 *
+*        :          : Tree compression factor =   1.47                       *
+******************************************************************************
+*Br    0 :reaction  : reaction/I                                             *
+*Entries :    48985 : Total  Size=     197114 bytes  File Size  =      31724 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   6.05     *
+*............................................................................*
+*Br    1 :mectopology : mectopology/I                                        *
+*Entries :    48985 : Total  Size=     197150 bytes  File Size  =      30574 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   6.28     *
+*............................................................................*
+*Br    2 :D1True    : D1True/F                                               *
+*Entries :    48985 : Total  Size=     197090 bytes  File Size  =     165879 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    3 :D2True    : D2True/F                                               *
+*Entries :    48985 : Total  Size=     197090 bytes  File Size  =     167073 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.15     *
+*............................................................................*
+*Br    4 :muMomTrue : muMomTrue/F                                            *
+*Entries :    48985 : Total  Size=     197126 bytes  File Size  =     173966 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.10     *
+*............................................................................*
+*Br    5 :muCosThetaTrue : muCosThetaTrue/F                                  *
+*Entries :    48985 : Total  Size=     197186 bytes  File Size  =     173245 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.11     *
+*............................................................................*
+*Br    6 :pMomTrue  : pMomTrue/F                                             *
+*Entries :    48985 : Total  Size=     197114 bytes  File Size  =     165320 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    7 :pCosThetaTrue : pCosThetaTrue/F                                    *
+*Entries :    48985 : Total  Size=     197174 bytes  File Size  =     165922 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.16     *
+*............................................................................*
+*Br    8 :Enutrue   : Enutrue/F                                              *
+*Entries :    48985 : Total  Size=     197102 bytes  File Size  =     166621 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   1.15     *
+*............................................................................*
+*Br    9 :weight    : weight/F                                               *
+*Entries :    48985 : Total  Size=     197090 bytes  File Size  =      61584 *
+*Baskets :        6 : Basket Size=      32000 bytes  Compression=   3.12     *
+*............................................................................*
+(int)0
+finished

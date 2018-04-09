@@ -1,0 +1,5 @@
+[dolan@pplxint8 newFitsFeb17]$ #./makeFitterInputs.sh /data/t2k/dolan/MECProcessing/CC0Pi/feb17HL2/job_nuWroNoSystV1_out/allMerged.root NuWro 0.167 $PWD &>NuWroInputMaker.log
+[dolan@pplxint8 newFitsFeb17]$ #./makeFitterInputs.sh /data/t2k/dolan/MECProcessing/CC0Pi/feb17HL2/job_NeutWaterNoSyst_out/allMerged.root NeutWater 0.19 $PWD &>NeutWaterInputMaker.log &
+[dolan@pplxint8 newFitsFeb17]$ #./makeFitterInputs.sh /data/t2k/dolan/MECProcessing/CC0Pi/feb17HL2/job_GenieAirNoSystV2_out/allMerged.root GenieAirV2 0.18 $PWD &>GenieAirInputMaker.log &
+[dolan@pplxint8 newFitsFeb17]$ #./makeFitterInputs.sh /data/t2k/dolan/MECProcessing/CC0Pi/feb17HL2/job_NeutAiNoSystV2_out/allMerged.root NeutAirV2 0.2 $PWD &>NeutAirInputMaker.log &
+[dolan@pplxint8 newFitsFeb17]$ #./makeFitterInputs.sh /data/t2k/dolan/MECProcessing/CC0Pi/feb17HL2/p6/p6DEditListOut.root Neut6DV2 0.24 $PWD &>NeutAirInputMaker.log &
