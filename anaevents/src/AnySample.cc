@@ -4,7 +4,7 @@
 //
 //
 //
-//  Created: Nov 17 2015   
+//  Created: Nov 17 2015
 //
 //////////////////////////////////////////////////////////
 #include <iostream>
@@ -19,11 +19,11 @@
 using namespace std;
 
 // ctor
-AnySample::AnySample(int sample_id, string name, 
-           std::vector<std::pair <double,double> > v_d1edges, 
-           std::vector<std::pair <double,double> > v_d2edges, 
+AnySample::AnySample(int sample_id, string name,
+           std::vector<std::pair <double,double> > v_d1edges,
+           std::vector<std::pair <double,double> > v_d2edges,
            TTree* data, bool isBuffer, bool isEmpty, bool isIngrid)
-{  
+{
   m_sampleid = sample_id; //unique id
   m_name     = name;      //some comprehensible name
   //cout<<"NEW SAMPLE with name "<<name<<" sample id "<<sample_id<<endl;
@@ -50,7 +50,7 @@ AnySample::AnySample(int sample_id, string name,
       else if(i>=23) bins_enu[i] = 5.0 + (i-23)*1.0;
     }
 
-  // New way of choosing default binning based on input binning, 
+  // New way of choosing default binning based on input binning,
   // relies on later bins always having larger values than earlier bins!
 
   int nbins_temp = v_d1edges.size();
@@ -124,7 +124,7 @@ AnySample::AnySample(int sample_id, string name,
 
   m_sig   = NULL;
   MakeHistos(); //with default binning
-  
+
   cout<<"MakeHistos called"<<endl;
   //data (or toy) histo
   m_hdata = NULL;
@@ -232,10 +232,10 @@ void AnySample::FillEventHisto(int datatype)
   }
   m_hpred->Scale(m_norm);
   m_hmc->Scale(m_norm);
-  
-  //data without stat variation: useful when nuisance parameters 
+
+  //data without stat variation: useful when nuisance parameters
   //varied in the toys
-  if(datatype==1) 
+  if(datatype==1)
   {
     SetData(m_hpred);
     m_hdata->Reset();
@@ -251,9 +251,9 @@ void AnySample::FillEventHisto(int datatype)
     }
   }
 
-  //data with statistical variation 
+  //data with statistical variation
   //(used when no nuisance sampling but nuisances are fitted)
-  else if(datatype==3) 
+  else if(datatype==3)
   {
     SetData(m_hpred);
     m_hdata->Reset();
@@ -270,7 +270,7 @@ void AnySample::FillEventHisto(int datatype)
     }
   }
 
-  //data from external (fake) dataset 
+  //data from external (fake) dataset
   else if(datatype==2 || datatype==4) {
     SetData(m_hpred);
     m_hdata->Reset();
@@ -278,15 +278,15 @@ void AnySample::FillEventHisto(int datatype)
     //double potMC_genie=384.762;
     //double potMC_genie=389.5; //neut
     //double potMC_genie=380.0; //nuwro
-    //double potMC_genie = 57.34; 
+    //double potMC_genie = 57.34;
 
-    Float_t D1_rec_tree,D2_rec_tree,wght; 
+    Float_t D1_rec_tree,D2_rec_tree,wght;
     Int_t topology;
-    m_data_tree->SetBranchAddress("cutBranch",&topology);        
-    m_data_tree->SetBranchAddress("weight",&wght); 
+    m_data_tree->SetBranchAddress("cutBranch",&topology);
+    m_data_tree->SetBranchAddress("weight",&wght);
     m_data_tree->SetBranchAddress("D1Rec",&D1_rec_tree);
     m_data_tree->SetBranchAddress("D2Rec",&D2_rec_tree);
-   
+
     for(size_t i=0;i<m_data_tree->GetEntries();i++){
       m_data_tree->GetEntry(i);
       if(topology != m_sampleid) continue;
@@ -306,7 +306,7 @@ void AnySample::FillEventHisto(int datatype)
           cout << "D2_rec_tree: " << D2_rec_tree << endl;
           cout << "Branch: " << topology << endl;
         }
-      }  
+      }
     }
 
     cout << "Data histo filled: " << endl;
@@ -316,10 +316,10 @@ void AnySample::FillEventHisto(int datatype)
       //m_hdata->Scale(potD/potMC_genie);
       //add MC or data (!!!!) statistical variations also to genie dataset to evaluate genie MC stat uncert
       //DON'T USE FOR REAL DATA!!!!!!!!!!!!
-  
+
       cout << "Warning, REWEIGHTING DATA!" << endl;
       for(int j=1;j<=m_hdata->GetNbinsX();j++)
-      {    
+      {
         double val = m_hdata->GetBinContent(j);
         if(val == 0.0) {
           cout<<"AnySample:"<<m_sampleid<<" bin "<<j<<" with 0 entries may cause problem on chi2 computations"<<endl;
@@ -329,7 +329,7 @@ void AnySample::FillEventHisto(int datatype)
         m_hdata->SetBinContent(j,binc);  //add statistical fluctuations
       }
       //m_hdata->Scale(potD/potMC_genie);
-    }    
+    }
   }
 
 }
@@ -337,16 +337,16 @@ void AnySample::FillEventHisto(int datatype)
 double AnySample::CalcChi2()
 {
   if(m_empty == true) return 0.0;
-  
-  if(m_hdata == NULL) 
+
+  if(m_hdata == NULL)
   {
     cerr<<"ERROR: need to define data histogram"<<endl;
     return 0.0;
   }
-  
+
   int nx = m_hpred->GetNbinsX();
   //int ny = m_hpred->GetNbinsY();
-  
+
   if(nx != m_hdata->GetNbinsX())// || ny != m_hdata->GetNbinsY())
   {
     cerr<<"ERROR: binning mismatch between data and mc"<<endl;
@@ -373,7 +373,7 @@ double AnySample::CalcChi2()
       //DEBUG Time:
       //cout << "obs / exp / chi2: " <<obs<<"/"<<exp<<"/"<<chi2<<endl;
     }
-  
+
   if(chi2 != chi2)
   {
     cerr<<"ERROR: stat chi2 is nan"<<endl;
@@ -390,15 +390,15 @@ double AnySample::CalcChi2()
     cout << "chi2 is:" << chi2;
     cout << endl << "*** CHI2 DEBUG ***" << endl;
   */
- 
+
   return chi2;
 }
 
-// GetSampleBreakdown 
+// GetSampleBreakdown
 void AnySample::GetSampleBreakdown(TDirectory *dirout, string tag, bool save)
 {
   int nreac = 8;
-  const char *names[] = {"cc0pi0p", "cc0pi1p", "cc0pinp", "cc1pi+", "ccother", 
+  const char *names[] = {"cc0pi0p", "cc0pi1p", "cc0pinp", "cc1pi+", "ccother",
        "backg", "Null", "OOFV"};
   TH1D *henu_rec[nreac];
   TH1D *hD1_rec[nreac];
@@ -409,7 +409,7 @@ void AnySample::GetSampleBreakdown(TDirectory *dirout, string tag, bool save)
   TH1D *hAnybin_true[nreac];
   TH1D *hAnybin_rec[nreac];
   int compos[nreac];
-  
+
   //cout<<"AnySample::GetSampleBreakdown - Inializing histos of reactions" << endl;
 
   for(int i=0;i<nreac;i++)
@@ -438,7 +438,7 @@ void AnySample::GetSampleBreakdown(TDirectory *dirout, string tag, bool save)
     hD2_rec[i]->GetXaxis()->SetTitle("Recon D2");
 
     //cout << "RecD1D2:" << endl;
-    
+
     hD1D2_rec[i] = new TH2D(Form("%s_RecD1D2_%s_%s", m_name.c_str(),names[i],tag.c_str()),
                              Form("%s_RecD1D2_%s_%s", m_name.c_str(),names[i],tag.c_str()),
                              nbinsD1_toPlot, bins_D1toPlot, nbins_D2, bins_D2);
@@ -520,7 +520,7 @@ void AnySample::GetSampleBreakdown(TDirectory *dirout, string tag, bool save)
     //cout<< "AnySample::GetSampleBreakdown - Event breakdown:" << endl;
     //m_events[i].Print();
 
-    
+
     //cout<< "AnySample::GetSampleBreakdown - Filling histos" << endl;
 
     compos[rtype]++;
@@ -547,7 +547,7 @@ void AnySample::GetSampleBreakdown(TDirectory *dirout, string tag, bool save)
         hAnybin_rec[rtype]->Fill(j+0.5,wght);
         break;
       }
-    } 
+    }
     //********************************************
     // Warning: Hardcoded signal definition below:
     //********************************************
@@ -562,7 +562,7 @@ void AnySample::GetSampleBreakdown(TDirectory *dirout, string tag, bool save)
       }
     }
   }
-  
+
   //cout<<"AnySample::GetSampleBreakdown - Wrapping up" << endl;
 
   dirout->cd();
