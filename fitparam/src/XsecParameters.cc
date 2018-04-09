@@ -343,5 +343,12 @@ void XsecParameters::ReWeight(AnaEvent *event, int nsample, int nevent,
     // }
   }
 }
+void XsecParameters::ReWeightIngrid(AnaEvent *event, int nsample, int nevent,
+            std::vector<double> &params)
+{
+  //Not implemented yet
+  ReWeight(event, nsample, nevent, params);
+}
+
 
 

@@ -39,7 +39,7 @@ int main(int argc, char *argv[])
     return 1;
   }
   string inputDir = std::string(xslf_env) + "/inputs/ingridFit";
-  string fsel     = inputDir + "/fixed_weight_extreme.root"; //"/NeutAir5_2DV2.root";
+  string fsel     = inputDir + "/fixed_weight.root"; //"/NeutAir5_2DV2.root";
   string fakeData     = inputDir + "/fixed_nominal.root"; //"/NeutAir5_2DV2.root";
   string fxsecbinning = inputDir + "/ingrid_binning.txt"; //"/dptbinning2DPS_shortest_inclusive.txt";
   int nprimbins = 8;
@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
 
 
   //input File
-  string finfluxcovFN = inputDir + "/flux_numu_cov_no_corr.root";
+  string finfluxcovFN = inputDir + "/flux_numu_cov.root";
   TFile *finfluxcov = TFile::Open(TString(finfluxcovFN)); //contains flux systematics info
 
 
@@ -134,15 +134,15 @@ int main(int argc, char *argv[])
 
   // The sample ID (first arg) should match the cutBranch corresponding to it
 
-  AnySample sam2(1, "MuTPCpTPC",v_D1edges, v_D2edges, tdata, isBuffer);
+  AnySample sam2(1, "MuTPCpTPC",v_D1edges, v_D2edges, tdata, isBuffer, false);
   sam2.SetNorm(potD/potMC);
   samples.push_back(&sam2);
 
-  AnySample sam6(5, "CC1pi",v_D1edges, v_D2edges, tdata, isBuffer);
+  AnySample sam6(5, "CC1pi",v_D1edges, v_D2edges, tdata, isBuffer, true);
   sam6.SetNorm(potD/potMC);
   samples.push_back(&sam6);
 
-  AnySample sam7(6, "DIS",v_D1edges, v_D2edges, tdata, isBuffer);
+  AnySample sam7(6, "DIS",v_D1edges, v_D2edges, tdata, isBuffer, true);
   sam7.SetNorm(potD/potMC);
   samples.push_back(&sam7);
 

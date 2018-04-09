@@ -205,7 +205,7 @@ void XsecFitter::Fit(std::vector<AnaSample*> &samples, int datatype, int fitMeth
       m_samples[s]->FillEventHisto(1);
     }
   }
-  else
+  else 
   {
     cerr<<"ERROR: no valid fitting mode provided"<<endl;
     return;
@@ -218,8 +218,8 @@ void XsecFitter::Fit(std::vector<AnaSample*> &samples, int datatype, int fitMeth
   //Do fit
   cout<<"Fit prepared"<<endl;
   double arglist[5];
-  //arglist[0] = 1000; //number of calls
-  arglist[0] = 1000000; //number of calls
+  //arglist[0] = 1000; //number of calls 
+  arglist[0] = 1000000; //number of calls 
   //arglist[1] = 1.0E-4; //tolerance
   arglist[1] = 1.0E-4; //tolerance
 
@@ -344,15 +344,15 @@ void XsecFitter::GenerateToyData(int toyindx, int toytype, int statFluct)
 
   if(toytype==3){
     finput= new TFile(paramVectorFileName.c_str(),"READ");
-    if(!finput) cout << "WARNING: Issue opening input param vector file" << endl;
+    if(!finput) cout << "WARNING: Issue opening input param vector file" << endl;  
     paramVec = ((TVectorD*)finput->Get("res_vector"));
-    if(!paramVec) cout << "WARNING: Issue getting param vector fromfile" << endl;
+    if(!paramVec) cout << "WARNING: Issue getting param vector fromfile" << endl;  
   }
 
   for(size_t i=0;i<m_fitpara.size();i++)
   {
-    cout << "XsecFitter::GenerateToyData fit param set: " << i << endl;
-    //cout << "HasRegCovMat : " << m_fitpara[i]->HasRegCovMat() << endl;
+    cout << "XsecFitter::GenerateToyData fit param set: " << i << endl; 
+    //cout << "HasRegCovMat : " << m_fitpara[i]->HasRegCovMat() << endl; 
     bool throwOkay=false;
 
     if(toyindx == 0) m_fitpara[i]->InitThrows();
@@ -447,7 +447,9 @@ double XsecFitter::FillSamples(vector< vector<double> > new_pars, int datatype)
           continue;
         else if((datatype==0) && (((TString)(m_fitpara[j]->GetName())).Contains("par_detFine")))
           continue;
-        m_fitpara[j]->ReWeight(ev, s, i, new_pars[j]);
+
+        if(m_samples[s]->isIngrid()) m_fitpara[j]->ReWeightIngrid(ev, s, i, new_pars[j]);
+        else m_fitpara[j]->ReWeight(ev, s, i, new_pars[j]);
       }
     }
     m_samples[s]->FillEventHisto(datatype);
@@ -491,7 +493,7 @@ void XsecFitter::fcn(Int_t &npar, Double_t *gin, Double_t &f,
       //if(i==0 && j!=0) chi2_reg+= reg_p1*abs(par[k-1]-par[k-2]);
       //if(i==0 && j!=0 && j<10) chi2_reg+= reg_p1*(par[k-1]-par[k-2])*(par[k-1]-par[k-2]); // MC prior for reg
       //if(i==0 && j!=0 && j<10) chi2_reg+= reg_p1*( (mcHisto->GetBinContent(j+1)*(par[k-1]/(mcHisto->GetEntries()/8))) - (mcHisto->GetBinContent(j)*(par[k-2]/(mcHisto->GetEntries()/8))) )*( (mcHisto->GetBinContent(j+1)*(par[k-1]/(mcHisto->GetEntries()/8))) - (mcHisto->GetBinContent(j)*(par[k-2]/(mcHisto->GetEntries()/8))) ); // Flat prior for reg
-
+   
       if(i==0){
         for(int p=0; p<nipsbins && j==0;p++) parAvg+=par[p];
         for(int p=0; p<nipsbins && j==0;p++) parWhtAvg+=par[p]*(mcSigHisto->GetBinContent(p+1)/mcSigHisto->Integral(0,nipsbins));
@@ -510,7 +512,7 @@ void XsecFitter::fcn(Int_t &npar, Double_t *gin, Double_t &f,
     if(i==0){
       chi2_reg+=chi2_sys;
       chi2_sys -= m_fitpara[i]->GetChi2(vec);
-    }
+    } 
 
     new_pars.push_back(vec);
     if(isGonnaBeABiggun) cout << "chi2_sys contribution from param set " << i << " is " << m_fitpara[i]->GetChi2(vec) << endl;
@@ -564,7 +566,7 @@ void XsecFitter::DoSaveFinalEvents(int fititer, vector< vector<double> > res_par
   InitOutputTree();
   for(size_t s=0;s<m_samples.size();s++){
     m_samples[s]->Write(m_dir, Form("evhist_sam%d_finaliter",(int)s), fititer);
-    //Event loop:
+    //Event loop: 
     //cout << "Saving reweighted event tree ..." << endl;
     for(int i=0;i<m_samples[s]->GetN();i++)
     {
@@ -585,7 +587,7 @@ void XsecFitter::DoSaveFinalEvents(int fititer, vector< vector<double> > res_par
       D2Reco = ev->GetRecD2trk();
       weightNom = (ev->GetEvWght()) * (ev->GetEvWghtMC());
       weightMC = ev->GetEvWghtMC();
-      weight = ev->GetEvWght() * m_potratio;
+      weight = ev->GetEvWght() * m_potratio; 
       pMomRec = ev->GetpMomRec();
       pMomTrue = ev->GetpMomTrue();
       muMomRec = ev->GetmuMomRec();
@@ -678,7 +680,7 @@ void XsecFitter::DoSaveChi2()
   delete histochi2tot;
 }
 
-void XsecFitter::DoSaveResults(vector< vector<double> > parresults, vector< vector<double> > parerrors, vector< vector<double> > parerrorsplus, vector< vector<double> > parerrorsminus,
+void XsecFitter::DoSaveResults(vector< vector<double> > parresults, vector< vector<double> > parerrors, vector< vector<double> > parerrorsplus, vector< vector<double> > parerrorsminus,  
                                vector< vector<double> > parerrorspara, vector< vector<double> > parerrorsglobc, vector< vector<double> > parerrorsprof, double chi2){
   //loop on number of parameter classes
   for(size_t i=0;i<m_fitpara.size();i++)
@@ -744,7 +746,7 @@ void XsecFitter::DoSaveResults(vector< vector<double> > parresults, vector< vect
     grapchi2->SetName("final_chi2_fromMinuit");
     m_dir->cd();
     grapchi2->Write();
-
+  
     //ADDED save actual final results
     for(size_t s=0;s<m_samples.size();s++)
     {
@@ -780,7 +782,7 @@ double XsecFitter::FindProfiledError(int param, TMatrixDSym mat){
 
   for(int i=0; i<mat.GetNrows(); i++){
     error = fabs((eigenval[i])*(eigenvec[param][i]));
-    if(error>maxerror) maxerror=error;
+    if(error>maxerror) maxerror=error; 
   }
 
   return sqrt(maxerror);

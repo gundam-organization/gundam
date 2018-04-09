@@ -31,6 +31,8 @@ public:
                     std::vector<double> &params);
   void ReWeight(AnaEvent *event, int nsample, int nevent,
                 std::vector<double> &params);
+  void ReWeightIngrid(AnaEvent *event, int nsample, int nevent,
+                std::vector<double> &params);
   void SetBinning(const char *fname);
 
 private:

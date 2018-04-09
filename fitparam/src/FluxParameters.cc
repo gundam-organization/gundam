@@ -10,15 +10,15 @@ FluxParameters::FluxParameters(std::vector<double> &enubins,
   m_enubins = enubins;
   hasRegCovMat = false;
 
-
+  
   //does one need to distinguish neutrino flavours???
   numu_flux = 11;
-
+  
   //parameter names & prior values
   for(size_t i=0;i<enubins.size()-1;i++)
   {
     pars_name.push_back(Form("%s%d", m_name.c_str(), (int)i));
-    pars_prior.push_back(1.0); //all weights are 1.0 a priori
+    pars_prior.push_back(1.0); //all weights are 1.0 a priori 
     pars_step.push_back(0.1);
     pars_limlow.push_back(0.0);
     pars_limhigh.push_back(5.0);
@@ -27,7 +27,7 @@ FluxParameters::FluxParameters(std::vector<double> &enubins,
     for(size_t i=0;i<enubins.size()-1;i++)
     {
       pars_name.push_back(Form("%s%d_INGRID", m_name.c_str(), (int)i));
-      pars_prior.push_back(1.0); //all weights are 1.0 a priori
+      pars_prior.push_back(1.0); //all weights are 1.0 a priori 
       pars_step.push_back(0.1);
       pars_limlow.push_back(0.0);
       pars_limhigh.push_back(5.0);
@@ -35,7 +35,7 @@ FluxParameters::FluxParameters(std::vector<double> &enubins,
   }
 
   Npar = pars_name.size();
-
+  
   cout<<endl<<"Flux binning:"<<endl;
   for(size_t i = 0;i<enubins.size();i++)
   {
@@ -64,9 +64,9 @@ int FluxParameters::GetBinIndex(double enu)
 }
 
 // initEventMap
-void FluxParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
+void FluxParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode) 
 {
-  m_evmap.clear();
+  m_evmap.clear();  
   //loop over events to build index map
   for(size_t s=0;s<sample.size();s++)
   {
@@ -85,14 +85,14 @@ void FluxParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
       }
       //If event is signal let the c_i params handle the reweighting:
       if( mode==1 && ((ev->GetReaction()==1)||(ev->GetReaction()==2)) ) binn = PASSEVENT;
-      row.push_back(binn);
+      row.push_back(binn); 
     }//event loop
     m_evmap.push_back(row);
   }//sample loop
 }
 
 // EventWeghts
-void FluxParameters::EventWeights(std::vector<AnaSample*> &sample,
+void FluxParameters::EventWeights(std::vector<AnaSample*> &sample, 
           std::vector<double> &params)
 {
   if(m_evmap.empty()) //build an event map
@@ -104,13 +104,13 @@ void FluxParameters::EventWeights(std::vector<AnaSample*> &sample,
     cout<<"******************************" <<endl;
     InitEventMap(sample, 0);
   }
-
+  
   for(size_t s=0;s<sample.size();s++)
   {
     for(int i=0;i<sample[s]->GetN();i++)
     {
       AnaEvent *ev = sample[s]->GetEvent(i);
-      if(sample.at(s)->isIngrid()) ReWeightIngrid(ev, s, i, params);
+      if(sample[s]->isIngrid()) ReWeightIngrid(ev, s, i, params);
       else ReWeight(ev, s, i, params);
     }
   }
@@ -127,7 +127,7 @@ void FluxParameters::ReWeight(AnaEvent *event, int nsample, int nevent,
   }
 
   int binn = m_evmap[nsample][nevent];
-
+  
   if(binn == PASSEVENT) return;
   if(binn == BADBIN) event->AddEvWght(0.0); //skip!!!!
   else
@@ -144,6 +144,7 @@ void FluxParameters::ReWeight(AnaEvent *event, int nsample, int nevent,
 void FluxParameters::ReWeightIngrid(AnaEvent *event, int nsample, int nevent,
             std::vector<double> &params)
 {
+  //cout << "ReWeighting INGRID sample" << endl;
   if(m_evmap.empty()) //need to build an event map first
   {
     cout<<"Need to build event map index for "<<m_name<<endl;
@@ -151,7 +152,7 @@ void FluxParameters::ReWeightIngrid(AnaEvent *event, int nsample, int nevent,
   }
 
   int binn = m_evmap[nsample][nevent];
-
+  
   if(binn == PASSEVENT) return;
   if(binn == BADBIN) event->AddEvWght(0.0); //skip!!!!
   else
@@ -161,7 +162,8 @@ void FluxParameters::ReWeightIngrid(AnaEvent *event, int nsample, int nevent,
       cerr<<"ERROR: number of bins "<<m_name<<" does not match num of param"<<endl;
       event->AddEvWght(0.0);
     }
-    event->AddEvWght(params[binn+Npar]);
+    //event->AddEvWght(params[binn+Npar]);
+    event->AddEvWght(params.at(binn+m_enubins.size()-1));
   }
 }
 

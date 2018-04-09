@@ -13,7 +13,6 @@
 #define __FluxParameters_hh__
 
 #include "AnaFitParameters.hh"
-#include "stdlib.h"
 
 class FluxParameters : public AnaFitParameters
 {
