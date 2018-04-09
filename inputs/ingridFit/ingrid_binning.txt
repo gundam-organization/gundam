@@ -1,1 +1,1 @@
-test_binning.txt
+one_bin.txt

@@ -32,12 +32,11 @@ int main(int argc, char *argv[])
     }
 
     std::string inputDir = std::string(xslf_env) + "/inputs/ingridFit";
-    std::string fsel     = inputDir + "/fixed_weight_extreme.root"; //"/NeutAir5_2DV2.root";
+    std::string fsel     = inputDir + "/fixed_nominal.root"; //"/NeutAir5_2DV2.root";
     std::string fakeData     = inputDir + "/fixed_nominal.root"; //"/NeutAir5_2DV2.root";
     std::string fxsecbinning = inputDir + "/ingrid_binning.txt"; //"/dptbinning2DPS_shortest_inclusive.txt";
     std::string paramVectorFname = "fitresults.root";
     std::string fnameout = "ingridFit.root";
-
 
     const double potD     = 331.6; //in units 10^19 Neut Air
     const double potMC    = 331.6; //in units 10^19 Neut Air
@@ -54,8 +53,8 @@ int main(int argc, char *argv[])
     TTree *tdata = (TTree*)(fdata->Get("selectedEvents"));
 
     //Set up bin edges
-    std::vector<std::pair<double, double>> v_D1edges;
-    std::vector<std::pair<double, double>> v_D2edges;
+    std::vector< std::pair<double, double> > v_D1edges;
+    std::vector< std::pair<double, double> > v_D2edges;
     ifstream fin(fxsecbinning.c_str());
     assert(fin.is_open());
     std::string line;

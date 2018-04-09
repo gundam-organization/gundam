@@ -207,5 +207,11 @@ void NuclFSIParameters::ReWeight(AnaEvent *event, int nsample, int nevent,
      event->AddEvWght(weight);
   }
 }
+void NuclFSIParameters::ReWeightIngrid(AnaEvent *event, int nsample, int nevent,
+            std::vector<double> &params)
+{
+  //Not implemented yet
+  ReWeight(event, nsample, nevent, params);
+}
 
 

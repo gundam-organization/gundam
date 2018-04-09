@@ -57,5 +57,10 @@ void FluxParameters_norm::ReWeight(AnaEvent *event, int nsample, int nevent,
 {
   event->AddEvWght(params[0]);
 }
-
+void FluxParameters_norm::ReWeightIngrid(AnaEvent *event, int nsample, int nevent,
+            std::vector<double> &params)
+{
+  //Not implemented yet
+  ReWeight(event, nsample, nevent, params);
+}
 

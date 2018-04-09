@@ -43,6 +43,8 @@ public:
   // in InitEventMap
   virtual void ReWeight(AnaEvent *event, int nsample, int nevent,
       std::vector<double> &params) = 0;
+  virtual void ReWeightIngrid(AnaEvent *event, int nsample, int nevent,
+      std::vector<double> &params) = 0;
   
   virtual double GetChi2(std::vector<double> &params);
   

@@ -183,3 +183,10 @@ void FitParameters::ReWeight(AnaEvent *event, int nsample, int nevent,
     //cout << "Weight is " << params[binn] << endl;
   }
 }
+
+void FitParameters::ReWeightIngrid(AnaEvent *event, int nsample, int nevent,
+            std::vector<double> &params)
+{
+  //Treat as all fit parameters
+  ReWeight(event, nsample, nevent, params);
+}

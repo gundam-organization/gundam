@@ -216,7 +216,7 @@ int superTreeConvert(
         nbytes += nb;
         passCount = 0;
         RecoNuEnergy = TrueNuEnergy;
-        weight = 1.1;
+        weight = 1.0;
         //pCosThetaRec  = TMath::Cos(pThetaRec);
         //muCosThetaRec = TMath::Cos(muThetaRec);
 
@@ -240,7 +240,7 @@ int superTreeConvert(
                 if(cutBranch==3) muMomRec=muMomRecRange;
                 branches_passed[i]++;
                 if((( (mectopology==1)||(mectopology==2) ) && ( (pMomTrue>450)&&(muMomTrue>250)&&(muCosThetaTrue>-0.6)&&(pCosThetaTrue>0.4) ))){
-                    weight = 1.1; // weight*sigWeight;
+                    weight = 1.0; // weight*sigWeight;
                 }
                 if(psdim){
                     //Phase Space Bins:
@@ -318,7 +318,7 @@ int superTreeConvert(
     for (Long64_t jentry=0; jentry<nentries_T;jentry++) {
         nb_T = nd5tree_T->GetEntry(jentry);
         nbytes_T += nb_T;
-        weight_T=1.1; // 1.0
+        weight_T=1.0; // 1.0
 
         //D1True_T = TMath::Cos(TMath::ACos(muCosThetaTrue_T) - TMath::ACos(pCosThetaTrue_T));
         D1True_T = muMomTrue_T;
@@ -347,13 +347,14 @@ int superTreeConvert(
         if(fileIndex == 1 && npioncount == 0 && mupdg == 13 && ppdg == 2212)
             mectopology = 1;
         else if(fileIndex == 1)
-            mectopology = 4;
+            continue;
+            //mectopology = 4;
 
         muMomRec = 0;
         muMomTrue = 0;
         pMomRec = 0;
         pMomTrue = 0;
-        weight = 1.1;
+        weight = 1.0;
 
         //std::cout << "Muon Angle: " << muang << std::endl;
         //std::cout << "fileIndex: " << fileIndex << std::endl;
