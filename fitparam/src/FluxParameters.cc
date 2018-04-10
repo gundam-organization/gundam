@@ -162,7 +162,8 @@ void FluxParameters::ReWeightIngrid(AnaEvent *event, int nsample, int nevent,
       cerr<<"ERROR: number of bins "<<m_name<<" does not match num of param"<<endl;
       event->AddEvWght(0.0);
     }
-    event->AddEvWght(params[binn+Npar]);
+    //event->AddEvWght(params[binn+Npar]);
+    event->AddEvWght(params.at(binn+m_enubins.size()-1));
   }
 }
 

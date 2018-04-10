@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
     assert(fin.is_open());
     std::string line;
     while (getline(fin, line))
-    {
+     {
         nbins++;
         std::stringstream ss(line);
         double D1_1, D1_2, D2_1, D2_2;
