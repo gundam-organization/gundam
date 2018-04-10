@@ -5,11 +5,11 @@ parameters defined in /fitparams/src/FitParameters
 
 ******************************************************/
 
-#include <iostream>
 #include <cstdlib>
 #include <fstream>
+#include <iomanip>
+#include <iostream>
 #include <sstream>
-#include <assert.h>
 #include <string>
 
 #include <TCanvas.h>
@@ -23,11 +23,13 @@ parameters defined in /fitparams/src/FitParameters
 
 int main(int argc, char *argv[])
 {
+    std::cout << std::fixed << std::setprecision(3);
 
-    const char* xslf_env = getenv("XSLLHFITTER");
-    if(!xslf_env){
-        std::cerr << "[ERROR]: environment variable \"XSLLHFITTER\" not set." << std::endl
-                  << "Cannot determine source tree location." << std::endl;
+    const char* xslf_env = std::getenv("XSLLHFITTER");
+    if(!xslf_env)
+    {
+        std::cerr << "[ERROR]: Environment variable \"XSLLHFITTER\" not set." << std::endl
+                  << "[ERROR]: Cannot determine source tree location." << std::endl;
         return 1;
     }
 
@@ -38,81 +40,87 @@ int main(int argc, char *argv[])
     std::string paramVectorFname = "fitresults.root";
     std::string fnameout = "ingridFit.root";
 
-    const double potD     = 331.6; //in units 10^19 Neut Air
-    const double potMC    = 331.6; //in units 10^19 Neut Air
-    const int seed  = 1019;
+    const double potD  = 331.6; //in units 10^19 Neut Air
+    const double potMC = 331.6; //in units 10^19 Neut Air
+    const int seed = 1019;
     int nbins = 0;
     int nprimbins = 8;
     int isBuffer = false; // Is the final bin just for including events that go beyond xsec binning
     // e.g. events with over 5GeV pmu if binning in pmu
 
-
     // Setup data trees
-
-    TFile *fdata = new TFile(TString(fakeData));
-    TTree *tdata = (TTree*)(fdata->Get("selectedEvents"));
+    TFile* fdata = TFile::Open(fakeData.c_str(), "READ");
+    TTree* tdata = (TTree*)(fdata->Get("selectedEvents"));
 
     //Set up bin edges
     std::vector< std::pair<double, double> > v_D1edges;
     std::vector< std::pair<double, double> > v_D2edges;
-    ifstream fin(fxsecbinning.c_str());
-    assert(fin.is_open());
-    std::string line;
-    while (getline(fin, line))
-     {
-        nbins++;
-        std::stringstream ss(line);
-        double D1_1, D1_2, D2_1, D2_2;
-        if(!(ss>>D2_1>>D2_2>>D1_1>>D1_2))
-        {
-            std::cerr<<"Bad line format: "<<std::endl
-                <<"     "<<line<<std::endl;
-            continue;
-        }
-        v_D1edges.push_back(std::make_pair(D1_1,D1_2));
-        v_D2edges.push_back(std::make_pair(D2_1,D2_2));
+
+    std::ifstream fin(fxsecbinning, std::ios::in);
+    if(!fin.is_open())
+    {
+        std::cerr << "[ERROR] Failed to open binning file: " << fxsecbinning
+                  << "Terminating execution." << std::endl;
+        return 1;
     }
-    fin.close();
+
+    else
+    {
+        std::string line;
+        while(getline(fin, line))
+        {
+            nbins++;
+            std::stringstream ss(line);
+            double D1_1, D1_2, D2_1, D2_2;
+            if(!(ss>>D2_1>>D2_2>>D1_1>>D1_2))
+            {
+                std::cerr << "Bad line format: " << line << std::endl;
+                continue;
+            }
+            v_D1edges.emplace_back(std::make_pair(D1_1,D1_2));
+            v_D2edges.emplace_back(std::make_pair(D2_1,D2_2));
+        }
+        fin.close();
+    }
 
     //Set up systematics:
-
 
     /*************************************** FLUX *****************************************/
     std::cout << "*********************************" << std::endl;
     std::cout << " Setup Flux " << std::endl;
     std::cout << "*********************************" << std::endl << std::endl;
 
-
     //input File
     std::string finfluxcovFN = inputDir + "/flux_numu_cov_no_corr.root";
-    TFile *finfluxcov = TFile::Open(TString(finfluxcovFN)); //contains flux systematics info
-
+    TFile *finfluxcov = TFile::Open(finfluxcovFN.c_str(), "READ"); //contains flux systematics info
 
     //setup enu bins and covm for flux
     TH1D *nd_numu_bins_hist = (TH1D*)finfluxcov->Get("flux_binning");
     TAxis *nd_numu_bins = nd_numu_bins_hist->GetXaxis();
+
     std::vector<double> enubins;
-    enubins.push_back(nd_numu_bins->GetBinLowEdge(1));
-    for(int i=0;i<nd_numu_bins->GetNbins();i++)
-    {
-        enubins.push_back(nd_numu_bins->GetBinUpEdge(i+1));
-    }
+    enubins.push_back(nd_numu_bins -> GetBinLowEdge(1));
+    for(int i = 0; i < nd_numu_bins -> GetNbins(); ++i)
+        enubins.push_back(nd_numu_bins -> GetBinUpEdge(i+1));
+
     //Cov mat stuff:
-    TMatrixDSym *cov_flux_in   = (TMatrixDSym*)finfluxcov->Get("flux_numu_cov");
-    TMatrixDSym cov_flux(cov_flux_in->GetNrows());
-    for(int i=0;i<cov_flux_in->GetNrows();i++){
-        for(int j=0;j<cov_flux_in->GetNrows();j++)
-        {
-            cov_flux(i, j) = (*cov_flux_in)(i,j);
-        }
-    }
-    finfluxcov->Close();
+    TMatrixDSym* cov_flux_in  = (TMatrixDSym*)finfluxcov -> Get("flux_numu_cov");
+    TMatrixDSym cov_flux = *cov_flux_in;
+
+    //TMatrixDSym cov_flux(cov_flux_in->GetNrows());
+    //for(int i=0;i<cov_flux_in->GetNrows();i++){
+    //    for(int j=0;j<cov_flux_in->GetNrows();j++)
+    //    {
+    //        cov_flux(i, j) = (*cov_flux_in)(i,j);
+    //    }
+    //}
+
+    finfluxcov -> Close();
 
     /*************************************** FLUX END *************************************/
 
-
     TFile *fout = TFile::Open(fnameout.c_str(), "RECREATE");
-    std::cout<<"output file open"<<std::endl;
+    std::cout << "Open output file: " << fnameout << std::endl;
 
     // Add analysis samples:
 
@@ -120,15 +128,15 @@ int main(int argc, char *argv[])
 
     // The sample ID (first arg) should match the cutBranch corresponding to it
 
-    AnySample sam2(1, "MuTPCpTPC",v_D1edges, v_D2edges, tdata, isBuffer);
+    AnySample sam2(1, "MuTPCpTPC",v_D1edges, v_D2edges, tdata, isBuffer, true);
     sam2.SetNorm(potD/potMC);
     samples.push_back(&sam2);
 
-    AnySample sam6(5, "CC1pi",v_D1edges, v_D2edges, tdata, isBuffer);
+    AnySample sam6(5, "CC1pi",v_D1edges, v_D2edges, tdata, isBuffer, true);
     sam6.SetNorm(potD/potMC);
     samples.push_back(&sam6);
 
-    AnySample sam7(6, "DIS",v_D1edges, v_D2edges, tdata, isBuffer);
+    AnySample sam7(6, "DIS",v_D1edges, v_D2edges, tdata, isBuffer, true);
     sam7.SetNorm(potD/potMC);
     samples.push_back(&sam7);
 
@@ -136,18 +144,17 @@ int main(int argc, char *argv[])
     sam8.SetNorm(potD/potMC);
     samples.push_back(&sam8);
 
-    int nsamples = samples.size();
-
-    //--
     //read MC events
     anyTreeMC selTree(fsel.c_str());
-    std::cout << "Reading and collecting events" << std::endl;
+    std::cout << "Reading and collecting events." << std::endl;
     selTree.GetEvents(samples);
+
     //get brakdown by reaction
-    std::cout << "Getting sample breakdown by reaction" << std::endl;
-    for(size_t s=0;s<samples.size();s++){
-        ((AnySample*)(samples[s]))->GetSampleBreakdown(fout,"nominal",true);
-    }
+    std::cout << "Getting sample breakdown by reaction." << std::endl;
+    //for(size_t s = 0; s < samples.size(); ++s)
+    //    samples[s] -> GetSampleBreakdown(fout,"nominal",true);
+    for(auto sample : samples)
+        sample -> GetSampleBreakdown(fout, "nominal", true);
 
 
     //*************** FITTER SETTINGS **************************
@@ -178,10 +185,11 @@ int main(int argc, char *argv[])
 
     //init w/ para vector
     xsecfit.InitFitter(fitpara, 0, 0, nprimbins, paramVectorFname);
-    std::cout << "fitter initialised " << std::endl;
+    std::cout << "Fitter initialised." << std::endl;
 
+    //xsecfit.FixParameter("par_ccqe0", 1.0);
 
-    xsecfit.FixParameter("par_ccqe0", 1.0);
+    /*
     xsecfit.FixParameter("par_ccqe1", 1.0);
     xsecfit.FixParameter("par_ccqe2", 1.0);
     xsecfit.FixParameter("par_ccqe3", 1.0);
@@ -197,6 +205,7 @@ int main(int argc, char *argv[])
     xsecfit.FixParameter("par_ccqe13", 1.0);
     xsecfit.FixParameter("par_ccqe14", 1.0);
     xsecfit.FixParameter("par_ccqe15", 1.0);
+    */
 
     //set frequency to save output
     xsecfit.SetSaveMode(fout, 1);
@@ -220,8 +229,7 @@ int main(int argc, char *argv[])
     //           1 = Apply Stat Fluct to fake data
 
     xsecfit.Fit(samples, 2, 2, 0);
-
-    fout->Close();
+    fout -> Close();
 
     return 0;
 }

@@ -4,7 +4,7 @@
 //
 //
 //
-//  Created: Nov 17 2015   
+//  Created: Nov 17 2015
 //
 //////////////////////////////////////////////////////////
 #ifndef __AnySample_hh__
@@ -27,22 +27,22 @@
 class AnySample : public AnaSample
 {
 public:
-  AnySample(int sample_id, std::string name, 
-       std::vector<std::pair <double,double> > v_d1edges, 
+  AnySample(int sample_id, std::string name,
+       std::vector<std::pair <double,double> > v_d1edges,
        std::vector<std::pair <double,double> > v_d2edges, TTree *data, bool isBuffer, bool isEmpty=false, bool isIngrid=false);
   ~AnySample();
-  
+
   //binning for various histograms
   void SetD1Binning(int nbins, double *bins);
   void SetD2Binning(int nbins, double *bins);
   void SetEnuBinning(int nbins, double *bins);
   void MakeHistos(); //must be called after binning is changed
-  
+
   //histogram for event distributions
   void SetData(TObject *hdata);
   void FillEventHisto(int datatype);
   double CalcChi2();
-  
+
   TH1D* GetPredHisto(){ return m_hpred; }
   TH1D* GetDataHisto(){ return m_hdata; }
   TH1D* GetMCHisto(){ return m_hmc; }
@@ -62,7 +62,7 @@ private:
   TTree * m_data_tree;
   TH1D *m_sig;
   int nbins_D1, nbins_D2, nbins_enu, nAnybins, nbinsD1_toPlot;
-  double *bins_D1, *bins_D2, *bins_enu, *bins_Any, *bins_D1toPlot; 
+  double *bins_D1, *bins_D2, *bins_enu, *bins_Any, *bins_D1toPlot;
   std::vector<std::pair<double, double> > m_D1edges;
   std::vector<std::pair<double, double> > m_D2edges;
   bool m_empty; // If true, we won't include any events in this sample (useful for testing the effect of removing samples)

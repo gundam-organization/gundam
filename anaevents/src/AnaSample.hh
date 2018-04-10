@@ -4,7 +4,7 @@
 //
 //
 //
-//  Created: Thu Jun  6 12:01:10 CEST 2013   
+//  Created: Thu Jun  6 12:01:10 CEST 2013
 //  Modified:
 //
 //////////////////////////////////////////////////////////
@@ -46,12 +46,12 @@ public:
   virtual double CalcChi2() = 0;
   virtual void Write(TDirectory *dirout, const char *bsname, int fititer) = 0;
 
-
+  virtual void GetSampleBreakdown(TDirectory *dirout, std::string tag, bool save) = 0;
 
 protected:
   int m_sampleid;
   bool m_ingrid; //is this an ingrid or an ND280 sample?
-  std::string m_name; 
+  std::string m_name;
   std::vector<AnaEvent> m_events;
   double m_norm;
 };

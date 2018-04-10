@@ -1,7 +1,11 @@
 #ifndef __XsecFitter_hh__
 #define __XsecFitter_hh__
 
+#include <algorithm>
+#include <iostream>
+#include <iterator>
 #include <string>
+
 #include <TVirtualFitter.h>
 #include <TObject.h>
 #include <TMath.h>
@@ -54,7 +58,7 @@ public:
 
   void InitOutputTree()
   {
-    // Set branches 
+    // Set branches
     outtree->Branch("reaction", &reaction, "reaction/I");
     outtree->Branch("cutBranch", &cutBranch, "cutBranch/I");
     outtree->Branch("mectopology", &mectopology, "mectopology/I");
@@ -85,11 +89,11 @@ private:
   void DoSaveFinalEvents(int fititer, std::vector< std::vector<double> > parresults);
   void DoSaveChi2();
   void CollectSampleHistos();
-  void DoSaveResults(std::vector< std::vector<double> > parresults, 
-                     std::vector< std::vector<double> > parerrors, 
-                     std::vector< std::vector<double> > parerrorsplus, 
-                     std::vector< std::vector<double> > parerrorsminus, 
-                     std::vector< std::vector<double> > parerrorspara, 
+  void DoSaveResults(std::vector< std::vector<double> > parresults,
+                     std::vector< std::vector<double> > parerrors,
+                     std::vector< std::vector<double> > parerrorsplus,
+                     std::vector< std::vector<double> > parerrorsminus,
+                     std::vector< std::vector<double> > parerrorspara,
                      std::vector< std::vector<double> > parerrorsglobc,
                      std::vector< std::vector<double> > parerrorsprof,
                      double chi2);
@@ -104,7 +108,7 @@ private:
   std::vector<AnaFitParameters*> m_fitpara;
   std::vector<int> m_nparclass;
   std::vector<AnaSample*> m_samples;
-  Double_t m_potratio; 
+  Double_t m_potratio;
   int m_npar, m_calls, m_freq;
   Int_t nipsbins;
   Double_t reg_p1, reg_p2;
@@ -118,5 +122,5 @@ private:
   std::vector<double> vec_chi2_sys;
   std::vector<double> vec_chi2_reg;
   std::vector<double> vec_chi2_reg2;
- };
+};
 #endif
