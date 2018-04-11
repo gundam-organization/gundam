@@ -183,7 +183,7 @@ void XsecFitter::Fit(std::vector<AnaSample*> &samples, int datatype, int fitMeth
         //save hists if requested
         for(size_t s=0;s<m_samples.size();s++)
         {
-            ((AnySample*)m_samples[s])->GetSampleBreakdown(m_dir,((string)"thrown"),true);
+            ((AnySample*)m_samples[s])->GetSampleBreakdown(m_dir, "thrown", true);
         }
     }
     else if(datatype==2 || datatype==3 || datatype==4){
