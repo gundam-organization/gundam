@@ -1,12 +1,4 @@
-#include <fstream>
-#include <sstream>
-#include <iomanip>
-#include <assert.h>
-#include <TRandom3.h>
-
 #include "FitParameters.hh"
-
-using namespace std;
 
 FitParameters::FitParameters(const std::string& file_name, const std::string& par_name, bool altPriorTest)
 {
@@ -84,12 +76,15 @@ void FitParameters::SetBinning(const std::string& file_name)
 
 int FitParameters::GetBinIndex(double D1, double D2)
 {
-    int binn = BADBIN;
-    for(size_t i=0;i<m_bins.size();i++)
+    for(int i = 0; i < m_bins.size(); ++i)
     {
-        if(D1>=m_bins[i].D1low && D1<m_bins[i].D1high && D2>=m_bins[i].D2low && D2<m_bins[i].D2high)  binn = (int)i;
+        if(D1 >= m_bins[i].D1low && D1 < m_bins[i].D1high && 
+           D2 >= m_bins[i].D2low && D2 < m_bins[i].D2high)  
+        {
+            return i;
+        }
     }
-    return binn;
+    return BADBIN;
 }
 
 
@@ -116,13 +111,13 @@ void FitParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
             if((ev->GetReaction()==1)||(ev->GetReaction()==2))
             {
                 //get event true D1 and D2
-                double D1   = ev->GetTrueD1trk();
+                double D1 = ev->GetTrueD1trk();
                 double D2 = ev->GetTrueD2trk();
-                int binn   = GetBinIndex(D1, D2);
+                int binn = GetBinIndex(D1, D2);
                 if(binn == BADBIN)
                 {
-                    cout<<"WARNING: "<<m_name<<" D1 = "<<D1<<" D2 = "<<D2<<" fall outside bin ranges"<<endl;
-                    cout<<"        This event will be ignored in analysis."<<endl;
+                    std::cout<<"WARNING: "<<m_name<<" D1 = "<<D1<<" D2 = "<<D2<<" fall outside bin ranges"<<std::endl;
+                    std::cout<<"        This event will be ignored in analysis."<<std::endl;
                 }
                 row.push_back(binn);
             }

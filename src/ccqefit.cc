@@ -952,7 +952,7 @@ int main(int argc, char *argv[])
   // fit parameters first. 
   
   //Fit parameters
-  FitParameters sigfitpara(fxsecbinning.c_str(), isAltPrior);
+  FitParameters sigfitpara(fxsecbinning, "par_fit", isAltPrior);
   if(fitmode==5 || fitmode==7) sigfitpara.SetRegCovarianceMatrix(&cov_reg);
   if(fitmode!=7) sigfitpara.SetCovarianceMatrix(&cov_reg_inv);
   sigfitpara.InitEventMap(samples, 0);

@@ -16,23 +16,19 @@
 
 class FluxParameters : public AnaFitParameters
 {
-public:
-  FluxParameters(std::vector<double> &enubins,
-		 const char *name = "par_flux", bool addIngrid=false);
-  ~FluxParameters();
-  
-  void InitEventMap(std::vector<AnaSample*> &sample, int mode);
-  void EventWeights(std::vector<AnaSample*> &sample, 
-		                std::vector<double> &params);
-  void ReWeight(AnaEvent *event, int nsample, int nevent,
-		            std::vector<double> &params);
-  void ReWeightIngrid(AnaEvent *event, int nsample, int nevent,
-                std::vector<double> &params);
+    public:
+        FluxParameters(std::vector<double> &enubins, const char *name = "par_flux", bool addIngrid=false);
+        ~FluxParameters();
 
-private:
-  int GetBinIndex(double enu); //binning function
-  std::vector<double> m_enubins;
-  int numu_flux;
+        void InitEventMap(std::vector<AnaSample*> &sample, int mode);
+        void EventWeights(std::vector<AnaSample*> &sample, std::vector<double> &params);
+        void ReWeight(AnaEvent *event, int nsample, int nevent, std::vector<double> &params);
+        void ReWeightIngrid(AnaEvent *event, int nsample, int nevent, std::vector<double> &params);
+
+    private:
+        int GetBinIndex(double enu); //binning function
+        std::vector<double> m_enubins;
+        int numu_flux;
 };
 
 #endif

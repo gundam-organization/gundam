@@ -59,8 +59,8 @@ int main(int argc, char *argv[])
     std::ifstream fin(fxsecbinning, std::ios::in);
     if(!fin.is_open())
     {
-        std::cerr << "[ERROR] Failed to open binning file: " << fxsecbinning
-                  << "Terminating execution." << std::endl;
+        std::cerr << "[ERROR]: Failed to open binning file: " << fxsecbinning
+                  << "[ERROR]: Terminating execution." << std::endl;
         return 1;
     }
 
@@ -74,7 +74,7 @@ int main(int argc, char *argv[])
             double D1_1, D1_2, D2_1, D2_2;
             if(!(ss>>D2_1>>D2_2>>D1_1>>D1_2))
             {
-                std::cerr << "Bad line format: " << line << std::endl;
+                std::cerr << "[IngridFit]: Bad line format: " << line << std::endl;
                 continue;
             }
             v_D1edges.emplace_back(std::make_pair(D1_1,D1_2));
@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
 
     /*************************************** FLUX *****************************************/
     std::cout << "*********************************" << std::endl;
-    std::cout << " Setup Flux " << std::endl;
+    std::cout << "[IngridFit]: Setup Flux " << std::endl;
     std::cout << "*********************************" << std::endl << std::endl;
 
     //input File
@@ -120,7 +120,7 @@ int main(int argc, char *argv[])
     /*************************************** FLUX END *************************************/
 
     TFile *fout = TFile::Open(fnameout.c_str(), "RECREATE");
-    std::cout << "Open output file: " << fnameout << std::endl;
+    std::cout << "[IngridFit]: Open output file: " << fnameout << std::endl;
 
     // Add analysis samples:
 
@@ -128,32 +128,32 @@ int main(int argc, char *argv[])
 
     // The sample ID (first arg) should match the cutBranch corresponding to it
 
-    AnySample sam2(1, "MuTPCpTPC",v_D1edges, v_D2edges, tdata, isBuffer, true);
+    AnySample sam2(1, "MuTPCpTPC",v_D1edges, v_D2edges, tdata, isBuffer, false);
     sam2.SetNorm(potD/potMC);
     samples.push_back(&sam2);
 
-    AnySample sam6(5, "CC1pi",v_D1edges, v_D2edges, tdata, isBuffer, true);
+    AnySample sam6(5, "CC1pi",v_D1edges, v_D2edges, tdata, isBuffer, false);
     sam6.SetNorm(potD/potMC);
     samples.push_back(&sam6);
 
-    AnySample sam7(6, "DIS",v_D1edges, v_D2edges, tdata, isBuffer, true);
+    AnySample sam7(6, "DIS",v_D1edges, v_D2edges, tdata, isBuffer, false);
     sam7.SetNorm(potD/potMC);
     samples.push_back(&sam7);
 
-    AnySample sam8(10, "Ingrid",v_D1edges, v_D2edges, tdata, isBuffer, false, true);
+    AnySample sam8(10, "Ingrid",v_D1edges, v_D2edges, tdata, isBuffer, true, true);
     sam8.SetNorm(potD/potMC);
     samples.push_back(&sam8);
 
     //read MC events
     anyTreeMC selTree(fsel.c_str());
-    std::cout << "Reading and collecting events." << std::endl;
+    std::cout << "[IngridFit]: Reading and collecting events." << std::endl;
     selTree.GetEvents(samples);
 
     //get brakdown by reaction
-    std::cout << "Getting sample breakdown by reaction." << std::endl;
+    std::cout << "[IngridFit]: Getting sample breakdown by reaction." << std::endl;
     //for(size_t s = 0; s < samples.size(); ++s)
     //    samples[s] -> GetSampleBreakdown(fout,"nominal",true);
-    for(auto sample : samples)
+    for(auto& sample : samples)
         sample -> GetSampleBreakdown(fout, "nominal", true);
 
 
@@ -170,7 +170,7 @@ int main(int argc, char *argv[])
     // fit parameters first.
 
     //Fit parameters
-    FitParameters sigfitpara(fxsecbinning.c_str());
+    FitParameters sigfitpara(fxsecbinning, "par_fit");
     sigfitpara.InitEventMap(samples, 0);
     fitpara.push_back(&sigfitpara);
 
@@ -185,9 +185,9 @@ int main(int argc, char *argv[])
 
     //init w/ para vector
     xsecfit.InitFitter(fitpara, 0, 0, nprimbins, paramVectorFname);
-    std::cout << "Fitter initialised." << std::endl;
+    std::cout << "[IngridFit]: Fitter initialised." << std::endl;
 
-    //xsecfit.FixParameter("par_ccqe0", 1.0);
+    //xsecfit.FixParameter("par_fit0", 1.0);
 
     /*
     xsecfit.FixParameter("par_ccqe1", 1.0);

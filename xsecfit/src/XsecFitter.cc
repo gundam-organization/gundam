@@ -1,15 +1,4 @@
 #include "XsecFitter.hh"
-#include <TGraph.h>
-#include <TFile.h>
-#include <TMatrixDSymEigen.h>
-#include <string>
-#include <sstream>
-#include <iterator>
-#include <algorithm>
-#include <fstream>
-#include <iostream>
-
-using namespace std;
 
 // ClassImp(XsecFitter);
 

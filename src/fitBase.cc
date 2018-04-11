@@ -137,7 +137,7 @@ int main(int argc, char *argv[])
   // fit parameters first. 
   
   //Fit parameters
-  FitParameters sigfitpara(fxsecbinning.c_str());
+  FitParameters sigfitpara(fxsecbinning, "par_fit");
   sigfitpara.InitEventMap(samples, 0);
   fitpara.push_back(&sigfitpara);
   
