@@ -108,7 +108,7 @@ void FitParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
             // N.B In Sara's original code THIS WAS THE OTHER WAY AROUND i.e. this if statement asked what was NOT your signal
             // Bare that in mind if you've been using older versions of the fitter.
 
-            if((ev->GetReaction()==1)||(ev->GetReaction()==2))
+            if((ev->GetTopology()==1)||(ev->GetTopology()==2))
             {
                 //get event true D1 and D2
                 double D1 = ev->GetTrueD1trk();

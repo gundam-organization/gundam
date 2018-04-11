@@ -576,8 +576,8 @@ void XsecFitter::DoSaveFinalEvents(int fititer, vector< vector<double> > res_par
             cutBranch = ev->GetSampleType();
             D1true = ev->GetTrueD1trk();
             D2true = ev->GetTrueD2trk();
-            mectopology = ev->GetReaction();
-            reaction = ev->GetReactionMode();
+            mectopology = ev->GetTopology();
+            reaction = ev->GetReaction();
             D1Reco = ev->GetRecD1trk();
             D2Reco = ev->GetRecD2trk();
             weightNom = (ev->GetEvWght()) * (ev->GetEvWghtMC());

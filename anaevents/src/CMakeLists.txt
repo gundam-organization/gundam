@@ -1,5 +1,5 @@
-set(SRCFILES AnaSample.cc AnySample.cc anyTreeMC.cc)
-set(HEADERS AnaSample.hh AnySample.hh anyTreeMC.hh)
+set(SRCFILES AnaSample.cc AnySample.cc AnyTreeMC.cc)
+set(HEADERS AnaSample.hh AnySample.hh AnyTreeMC.hh)
 
 
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)

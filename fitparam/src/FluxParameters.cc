@@ -82,7 +82,7 @@ void FluxParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
                 ev->Print();
             }
             //If event is signal let the c_i params handle the reweighting:
-            if( mode==1 && ((ev->GetReaction()==1)||(ev->GetReaction()==2)) ) binn = PASSEVENT;
+            if( mode==1 && ((ev->GetTopology()==1)||(ev->GetTopology()==2)) ) binn = PASSEVENT;
             row.push_back(binn);
         }//event loop
         m_evmap.push_back(row);

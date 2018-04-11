@@ -102,7 +102,7 @@ void DetParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
       //get event true p and D2
       double p   = ev->GetRecD1trk();
       double D2 = ev->GetRecD2trk();
-      int reaction = ev->GetReaction();
+      int reaction = ev->GetTopology();
       int binn   = GetBinIndex(p, D2,sample[s]->GetSampleType());
       if(binn == BADBIN)
       {
@@ -110,7 +110,7 @@ void DetParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
         cout<<" This event will be ignored in analysis."  <<endl;
       }
       //If event is signal let the c_i params handle the reweighting:
-      if( mode==1 && ((ev->GetReaction()==1)||(ev->GetReaction()==2)) ) binn = PASSEVENT;
+      if( mode==1 && ((ev->GetTopology()==1)||(ev->GetTopology()==2)) ) binn = PASSEVENT;
       row.push_back(binn);
     }
     m_evmap.push_back(row);

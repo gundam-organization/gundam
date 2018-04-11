@@ -17,7 +17,7 @@ parameters defined in /fitparams/src/FitParameters
 
 #include "FitParameters.hh"
 #include "XsecFitter.hh"
-#include "anyTreeMC.hh"
+#include "AnyTreeMC.hh"
 #include "AnySample.hh"
 #include "FluxParameters.hh"
 
@@ -145,7 +145,7 @@ int main(int argc, char *argv[])
     samples.push_back(&sam8);
 
     //read MC events
-    anyTreeMC selTree(fsel.c_str());
+    AnyTreeMC selTree(fsel.c_str());
     std::cout << "[IngridFit]: Reading and collecting events." << std::endl;
     selTree.GetEvents(samples);
 

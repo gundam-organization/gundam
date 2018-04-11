@@ -137,15 +137,15 @@ void NuclFSIParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
       AnaEvent *ev = sample[s]->GetEvent(i);
       //skip reactions not prepared in response function
       /*int code = PASSEVENT;
-      if(ev->GetReaction() == AntiNu || 
-         ev->GetReaction() == OutFGD) 
+      if(ev->GetTopology() == AntiNu || 
+         ev->GetTopology() == OutFGD) 
         {
           row.push_back(code);
           continue;
           }*/     
       //get event info
       int binn = GetBinIndex(static_cast<SampleTypes>(ev->GetSampleType()),
-                             static_cast<ReactionTypes>(ev->GetReaction()),
+                             static_cast<ReactionTypes>(ev->GetTopology()),
                              ev->GetRecD1trk(),ev->GetTrueD1trk(),ev->GetRecD2trk(),ev->GetTrueD2trk());
       if(binn == BADBIN) 
       {
@@ -156,7 +156,7 @@ void NuclFSIParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
         ev->Print();
       }
       //If event is signal let the c_i params handle the reweighting:
-      if( mode==1 && ((ev->GetReaction()==1)||(ev->GetReaction()==2)) ) binn = PASSEVENT;
+      if( mode==1 && ((ev->GetTopology()==1)||(ev->GetTopology()==2)) ) binn = PASSEVENT;
       row.push_back(binn); 
     }//event loop
     m_evmap.push_back(row);

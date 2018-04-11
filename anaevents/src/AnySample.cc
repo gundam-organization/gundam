@@ -499,7 +499,7 @@ void AnySample::GetSampleBreakdown(TDirectory *dirout, string tag, bool save)
     D1_true = m_events[i].GetTrueD1trk();
     D2_true = m_events[i].GetTrueD2trk();
     wght    = m_events[i].GetEvWght();
-    int rtype = m_events[i].GetReaction();
+    int rtype = m_events[i].GetTopology();
     //cout<< "AnySample::GetSampleBreakdown - rtype is: " << rtype << endl;
 
     // Warning - hard code hack warning ahead:
