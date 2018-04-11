@@ -54,7 +54,7 @@ void XsecFitter::SetSeed(int seed)
         rand->SetSeed(seed);
 }
 
-void XsecFitter::FixParameter(string par_name, double value)
+void XsecFitter::FixParameter(const std::string& par_name, const double& value)
 {
     auto iter = std::find(par_names.begin(), par_names.end(), par_name);
     if(iter != par_names.end())

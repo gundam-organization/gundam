@@ -1,5 +1,5 @@
 
-add_executable(CCQEFit ccqefit.cc)
+add_executable(CCQEFit EXCLUDE_FROM_ALL ccqefit.cc)
 
 set_target_properties(CCQEFit PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
@@ -14,7 +14,7 @@ endforeach()
 
 
 
-add_executable(CCQEFit_daT ccqefit_dat.cc)
+add_executable(CCQEFit_daT EXCLUDE_FROM_ALL ccqefit_dat.cc)
 
 set_target_properties(CCQEFit_daT PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
@@ -29,7 +29,7 @@ endforeach()
 
 
 
-add_executable(CCQEFit_dphiT ccqefit_dphit.cc)
+add_executable(CCQEFit_dphiT EXCLUDE_FROM_ALL ccqefit_dphit.cc)
 
 set_target_properties(CCQEFit_dphiT PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
@@ -45,7 +45,7 @@ endforeach()
 
 
 
-add_executable(FitBase fitBase.cc)
+add_executable(FitBase EXCLUDE_FROM_ALL fitBase.cc)
 
 set_target_properties(FitBase PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
@@ -73,7 +73,7 @@ endforeach()
 
 
 
-add_executable(PropError propError.C)
+add_executable(PropError EXCLUDE_FROM_ALL propError.C)
 
 set_target_properties(PropError PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
@@ -88,7 +88,7 @@ endforeach()
 
 
 
-add_executable(PropError_daT propError_dat.C)
+add_executable(PropError_daT EXCLUDE_FROM_ALL propError_dat.C)
 
 set_target_properties(PropError_daT PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
@@ -103,7 +103,7 @@ endforeach()
 
 
 
-add_executable(PropError_dphiT propError_dphit.C)
+add_executable(PropError_dphiT EXCLUDE_FROM_ALL propError_dphit.C)
 
 set_target_properties(PropError_dphiT PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
@@ -116,4 +116,5 @@ foreach(mod ${MODULETargets})
   target_link_libraries(PropError_dphiT ${mod})
 endforeach()
 
-install(TARGETS CCQEFit CCQEFit_daT CCQEFit_dphiT FitBase ingridFit PropError PropError_daT PropError_dphiT DESTINATION bin)
+#install(TARGETS CCQEFit CCQEFit_daT CCQEFit_dphiT FitBase ingridFit PropError PropError_daT PropError_dphiT DESTINATION bin)
+install(TARGETS ingridFit DESTINATION bin)
