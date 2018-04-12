@@ -31,7 +31,7 @@
 class AnySample : public AnaSample
 {
     public:
-        AnySample(int sample_id, std::string name,
+        AnySample(int sample_id, const std::string& name,
                 std::vector<std::pair <double,double> > v_d1edges,
                 std::vector<std::pair <double,double> > v_d2edges, TTree *data, bool isBuffer, bool isEmpty=false, bool isIngrid=false);
         ~AnySample();
@@ -40,6 +40,7 @@ class AnySample : public AnaSample
         void SetD1Binning(int nbins, double *bins);
         void SetD2Binning(int nbins, double *bins);
         void SetEnuBinning(int nbins, double *bins);
+        int GetAnyBinIndex(const double D1, const double D2);
         void MakeHistos(); //must be called after binning is changed
 
         //histogram for event distributions
@@ -53,7 +54,7 @@ class AnySample : public AnaSample
         TH1D* GetMCTruthHisto(){ return m_hmc_true; }
 
         void GetSampleBreakdown(TDirectory *dirout, const std::string& tag, bool save);
-        TH1D* GetSignalHisto(){ return m_sig; }
+        TH1D* GetSignalHisto(){ return m_hsig; }
         void Write(TDirectory *dirout, const char *bsname, int fititer);
         int GetSampleId(){ return sample_id; }
 
@@ -63,8 +64,8 @@ class AnySample : public AnaSample
         TH1D *m_hmc;
         TH1D *m_hpred; //n(pRec_mu, thetaRec_mu)
         TH1D *m_hdata;
+        TH1D *m_hsig;
         TTree * m_data_tree;
-        TH1D *m_sig;
         int nbins_D1, nbins_D2, nbins_enu, nAnybins, nbinsD1_toPlot;
         double *bins_D1, *bins_D2, *bins_enu, *bins_Any, *bins_D1toPlot;
         std::vector<std::pair<double, double> > m_D1edges;

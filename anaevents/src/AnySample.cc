@@ -10,14 +10,13 @@
 #include "AnySample.hh"
 
 // ctor
-AnySample::AnySample(int sample_id, string name,
+AnySample::AnySample(int sample_id, const std::string& name,
         std::vector<std::pair <double,double> > v_d1edges,
         std::vector<std::pair <double,double> > v_d2edges,
         TTree* data, bool isBuffer, bool isEmpty, bool isIngrid)
 {
     m_sampleid = sample_id; //unique id
     m_name     = name;      //some comprehensible name
-    //cout<<"NEW SAMPLE with name "<<name<<" sample id "<<sample_id<<endl;
     m_data_tree = data;
     m_D1edges = v_d1edges;
     m_D2edges = v_d2edges;
@@ -25,8 +24,12 @@ AnySample::AnySample(int sample_id, string name,
     m_BufferBin = isBuffer;
     m_ingrid = isIngrid;
 
-    for(int i=0;i<v_d1edges.size(); i++){
-        cout<<v_d2edges[i].first<<"  "<<v_d2edges[i].second<<"  "<<v_d1edges[i].first<<"  "<<v_d1edges[i].second<<endl;
+    std::cout << "[AnySample]: " << m_name << ", ID " << m_sampleid << std::endl
+              << "[AnySample]: Bin edges: " << std::endl;
+    for(int i = 0; i < m_D1edges.size(); ++i)
+    {
+        std::cout << m_D2edges[i].first << " " << m_D2edges[i].second << " "
+                  << m_D1edges[i].first << " " << m_D1edges[i].second << std::endl;
     }
 
     //Default binning choices
@@ -47,18 +50,19 @@ AnySample::AnySample(int sample_id, string name,
     int nbins_temp = v_d1edges.size();
     vector<double> bins_d1_vector;
     for(int i=0;i<nbins_temp;i++){
-        if (bins_d1_vector.size()==0) bins_d1_vector.push_back(v_d1edges[i].first);
+        if (bins_d1_vector.size()==0)
+            bins_d1_vector.push_back(v_d1edges[i].first);
         else{
             if (bins_d1_vector.back()!=v_d1edges[i].first){
-                if (!m_BufferBin && i>0 && v_d1edges[i].first<v_d1edges[i-1].first) bins_d1_vector.push_back(v_d1edges[i-1].second);
+                if (!m_BufferBin && i>0 && v_d1edges[i].first<v_d1edges[i-1].first)
+                    bins_d1_vector.push_back(v_d1edges[i-1].second);
                 bins_d1_vector.push_back(v_d1edges[i].first);
             }
         }
     }
     bins_d1_vector.push_back(v_d1edges[nbins_temp-1].second);
-    //
     nbins_D1 = bins_d1_vector.size()-1;
-    cout << "There are " << nbins_D1 << " d1 bins" << endl;
+    std::cout << "There are " << nbins_D1 << " d1 bins" << std::endl;
 
     bins_D1 = new double[nbins_D1 + 1];
     bool dqPlotBinsSet=false;
@@ -101,7 +105,6 @@ AnySample::AnySample(int sample_id, string name,
         cout << "bins_D2 " << i << " is " << bins_d2_vector[i] << endl;
     }
 
-
     nAnybins=m_D1edges.size();
     bins_Any = new double[nAnybins+1];
     for (int i=0; i<=nAnybins; i++){
@@ -109,17 +112,15 @@ AnySample::AnySample(int sample_id, string name,
     }
     cout<<"Any bins defined"<<endl;
     //event distribution histo
-    m_hpred = NULL;
-    m_hmc   = NULL;
-    m_hmc_true = NULL;
-
-    m_sig   = NULL;
+    m_hpred = nullptr;
+    m_hmc   = nullptr;
+    m_hmc_true = nullptr;
+    m_hsig   = nullptr;
     MakeHistos(); //with default binning
 
     cout<<"MakeHistos called"<<endl;
     //data (or toy) histo
-    m_hdata = NULL;
-
+    m_hdata = nullptr;
     m_norm  = 1.0;
 }
 
@@ -128,7 +129,7 @@ AnySample::~AnySample()
 {
     m_hpred->Delete();
     m_hmc->Delete();
-    if(m_hdata != NULL) m_hdata->Delete();
+    if(m_hdata != nullptr) m_hdata->Delete();
     delete [] bins_D1;
     delete [] bins_D2;
     delete [] bins_enu;
@@ -137,19 +138,19 @@ AnySample::~AnySample()
 // MakeEventHisto
 void AnySample::MakeHistos()
 {
-    if(m_hpred != NULL) m_hpred->Delete();
+    if(m_hpred != nullptr) m_hpred->Delete();
     m_hpred = new TH1D(Form("%s_pred_recD1D2", m_name.c_str()),
             Form("%s_pred_recD1D2", m_name.c_str()),
             nAnybins, bins_Any);
     m_hpred->SetDirectory(0);
 
-    if(m_hmc != NULL) m_hmc->Delete();
+    if(m_hmc != nullptr) m_hmc->Delete();
     m_hmc = new TH1D(Form("%s_mc_recD1D2", m_name.c_str()),
             Form("%s_mc_recD1D2", m_name.c_str()),
             nAnybins, bins_Any);
     m_hmc->SetDirectory(0);
 
-    if(m_hmc_true != NULL) m_hmc_true->Delete();
+    if(m_hmc_true != nullptr) m_hmc_true->Delete();
     m_hmc_true = new TH1D(Form("%s_mc_TrueD1D2", m_name.c_str()),
             Form("%s_mc_TrueD1D2", m_name.c_str()),
             nAnybins, bins_Any);
@@ -160,7 +161,7 @@ void AnySample::MakeHistos()
 void AnySample::SetData(TObject *hdata)
 {
     //clone the data histogram internally
-    if(m_hdata != NULL) m_hdata->Delete();
+    if(m_hdata != nullptr) m_hdata->Delete();
     m_hdata = (TH1D*)hdata->Clone(Form("%s_data", m_name.c_str()));
     m_hdata->SetDirectory(0);
 }
@@ -192,195 +193,211 @@ void AnySample::SetEnuBinning(int nbins, double *bins)
     for(int i=0;i<=nbins_enu;i++) bins_enu[i] = bins[i];
 }
 
-// FillEventHist
-void AnySample::FillEventHisto(int datatype)
+int AnySample::GetAnyBinIndex(const double D1, const double D2)
 {
-    if(m_hpred) m_hpred->Reset();
-    if(m_hmc) m_hmc->Reset();
-    if(m_empty) return; // This sample will have no events
-    for(size_t i=0;i<m_events.size();i++)
+    for(int i = 0; i < nAnybins; ++i)
     {
-        double D1_rec   = m_events[i].GetRecD1trk();
-        double D2_rec = m_events[i].GetRecD2trk();
-        double D1_true   = m_events[i].GetTrueD1trk();
-        double D2_true = m_events[i].GetTrueD2trk();
-        double wght      = m_events[i].GetEvWght();
-        for(int j=0; j<nAnybins; j++){
-            if((D1_rec > m_D1edges[j].first) && (D1_rec  < m_D1edges[j].second)  &&
-                    (D2_rec  > m_D2edges[j].first) && (D2_rec  < m_D2edges[j].second)){
-                m_hpred->Fill(j+0.5,wght);
-                m_hmc->Fill(j+0.5,wght);
-                break;
-            }
-        }
-        for(int j=0; j<nAnybins; j++){
-            if((D1_true > m_D1edges[j].first) && (D1_true  < m_D1edges[j].second)  &&
-                    (D2_true  > m_D2edges[j].first) && (D2_true  < m_D2edges[j].second)){
-                m_hmc_true->Fill(j+0.5,wght);
-                break;
+        if(D1 >= m_D1edges[i].first && D1 < m_D1edges[i].second)
+        {
+            if(D2 >= m_D2edges[i].first && D2 < m_D2edges[i].second)
+            {
+                return i;
             }
         }
     }
-    m_hpred->Scale(m_norm);
-    m_hmc->Scale(m_norm);
+    return -1;
+}
+
+// FillEventHist
+void AnySample::FillEventHisto(int datatype)
+{
+    if(m_empty)
+        return; // This sample will have no events
+    if(m_hpred != nullptr)
+        m_hpred -> Reset();
+    if(m_hmc != nullptr)
+        m_hmc -> Reset();
+
+    for(std::size_t i = 0; i < m_events.size(); ++i)
+    {
+        double D1_rec  = m_events[i].GetRecD1trk();
+        double D2_rec  = m_events[i].GetRecD2trk();
+        double D1_true = m_events[i].GetTrueD1trk();
+        double D2_true = m_events[i].GetTrueD2trk();
+        double wght    = m_events[i].GetEvWght();
+
+        int anybin_index_rec = GetAnyBinIndex(D1_rec, D2_rec);
+        int anybin_index_true = GetAnyBinIndex(D1_true, D2_true);
+
+        m_hpred -> Fill(anybin_index_rec + 0.5, wght);
+        m_hmc -> Fill(anybin_index_rec + 0.5, wght);
+        m_hmc_true -> Fill(anybin_index_true + 0.5, wght);
+    }
+
+    m_hpred -> Scale(m_norm);
+    m_hmc -> Scale(m_norm);
 
     //data without stat variation: useful when nuisance parameters
     //varied in the toys
-    if(datatype==1)
+    if(datatype == 1)
     {
         SetData(m_hpred);
         m_hdata->Reset();
-        for(int j=1;j<=m_hpred->GetNbinsX();j++)
+
+        for(int j = 1; j <= m_hpred -> GetNbinsX(); ++j)
         {
-            double val = m_hpred->GetBinContent(j);
-            //cout<<"bin "<<j<<" entry "<<val<<endl;
-            if(val == 0.0) {
-                cout<<"AnySample:"<<m_sampleid<<" bin "<<j<<" with 0 entries may cause proble on chi2 computations"<<endl;
+            double val = m_hpred -> GetBinContent(j);
+            if(val == 0.0)
+            {
+                std::cout << "[WARNING] In AnySample::FillEventHisto()\n"
+                          << "[WARNING] " << m_name << " bin " << j << " has 0 entries. This may cause a problem with chi2 computations." << std::endl;
                 continue;
             }
-            m_hdata->SetBinContent(j,val);  //without statistical fluctuations
+
+            m_hdata -> SetBinContent(j, val);  //without statistical fluctuations
         }
     }
 
     //data with statistical variation
     //(used when no nuisance sampling but nuisances are fitted)
-    else if(datatype==3)
+    else if(datatype == 3)
     {
         SetData(m_hpred);
         m_hdata->Reset();
-        for(int j=1;j<=m_hpred->GetNbinsX();j++)
+
+        for(int j = 1; j <= m_hpred -> GetNbinsX(); ++j)
         {
-            double val = m_hpred->GetBinContent(j);
-            //cout<<"bin "<<j<<" entry "<<val<<endl;
-            if(val == 0.0) {
-                cout<<"AnySample:"<<m_sampleid<<" bin "<<j<<" with 0 entries may cause proble on chi2 computations"<<endl;
+            double val = m_hpred -> GetBinContent(j);
+            if(val == 0.0)
+            {
+                std::cout << "[WARNING] In AnySample::FillEventHisto()\n"
+                          << "[WARNING] " << m_name << " bin " << j << " has 0 entries. This may cause a problem with chi2 computations." << std::endl;
                 continue;
             }
-            double binc = gRandom->Poisson(val);
-            m_hdata->SetBinContent(j,binc); //with statistical fluctuations
+
+            double poisson_val = gRandom->Poisson(val);
+            m_hdata -> SetBinContent(j, poisson_val); //with statistical fluctuations
         }
     }
 
     //data from external (fake) dataset
-    else if(datatype==2 || datatype==4) {
+    else if(datatype == 2 || datatype == 4)
+    {
         SetData(m_hpred);
         m_hdata->Reset();
-        //double potD = 57.34;   //in units of 10^19
-        //double potMC_genie=384.762;
-        //double potMC_genie=389.5; //neut
-        //double potMC_genie=380.0; //nuwro
-        //double potMC_genie = 57.34;
 
-        Float_t D1_rec_tree,D2_rec_tree,wght;
-        Int_t topology;
-        m_data_tree->SetBranchAddress("cutBranch",&topology);
-        m_data_tree->SetBranchAddress("weight",&wght);
-        m_data_tree->SetBranchAddress("D1Rec",&D1_rec_tree);
-        m_data_tree->SetBranchAddress("D2Rec",&D2_rec_tree);
+        float D1_rec_tree, D2_rec_tree, wght;
+        int topology;
 
-        for(size_t i=0;i<m_data_tree->GetEntries();i++){
-            m_data_tree->GetEntry(i);
-            if(topology != m_sampleid) continue;
-            for(int j=0; j<nAnybins; j++){
-                if((D1_rec_tree > m_D1edges[j].first) && (D1_rec_tree < m_D1edges[j].second)  &&
-                        (D2_rec_tree  > m_D2edges[j].first) && (D2_rec_tree  < m_D2edges[j].second)){
-                    m_hdata->Fill(j+0.5,wght);
-                    // cout << "Filling data event:" << endl;
-                    // cout << "D1_rec_tree: " << D1_rec_tree << endl;
-                    // cout << "D2_rec_tree: " << D2_rec_tree << endl;
-                    // cout << "Branch: " << topology << endl;
+        m_data_tree -> SetBranchAddress("cutBranch",&topology);
+        m_data_tree -> SetBranchAddress("weight",&wght);
+        m_data_tree -> SetBranchAddress("D1Rec",&D1_rec_tree);
+        m_data_tree -> SetBranchAddress("D2Rec",&D2_rec_tree);
+
+        long int n_entries = m_data_tree -> GetEntries();
+        for(std::size_t i = 0; i < n_entries; ++i)
+        {
+            m_data_tree -> GetEntry(i);
+            if(topology != m_sampleid)
+                continue;
+
+            for(int j = 0; j < nAnybins; ++j)
+            {
+                int anybin_index = GetAnyBinIndex(D1_rec_tree, D2_rec_tree);
+                if(anybin_index != -1)
+                {
+                    m_hdata -> Fill(anybin_index + 0.5, wght);
                     break;
                 }
-                else if(j==(nAnybins-1)){
-                    cout << "Warning: no bin for current data event!" << endl;
-                    cout << "D1_rec_tree: " << D1_rec_tree << endl;
-                    cout << "D2_rec_tree: " << D2_rec_tree << endl;
-                    cout << "Branch: " << topology << endl;
+                else
+                {
+                    std::cout << "[WARNING] In AnySample::FillEventHisto()\n"
+                              << "[WARNING] No bin for current data event.\n"
+                              << "[WARNING] D1_rec_tree: " << D1_rec_tree << std::endl
+                              << "[WARNING] D2_rec_tree: " << D2_rec_tree << std::endl
+                              << "[WARNING] CutBranch  : " << topology << std::endl;
+                    break;
                 }
             }
         }
 
-        cout << "Data histo filled: " << endl;
-        m_hdata->Print();
+        std::cout << "[AnySample] Data histogram filled: " << std::endl;
+        m_hdata -> Print();
 
-        if(datatype==4) {  //Reweight fake data set
-            //m_hdata->Scale(potD/potMC_genie);
+        if(datatype == 4)
+        {
+            //Reweight fake data set
             //add MC or data (!!!!) statistical variations also to genie dataset to evaluate genie MC stat uncert
             //DON'T USE FOR REAL DATA!!!!!!!!!!!!
 
-            cout << "Warning, REWEIGHTING DATA!" << endl;
-            for(int j=1;j<=m_hdata->GetNbinsX();j++)
+            std::cout << "[WARNING] REWEIGHTING DATA!" << std::endl;
+            for(int j = 1; j <= m_hdata -> GetNbinsX(); ++j)
             {
-                double val = m_hdata->GetBinContent(j);
-                if(val == 0.0) {
-                    cout<<"AnySample:"<<m_sampleid<<" bin "<<j<<" with 0 entries may cause problem on chi2 computations"<<endl;
+                double val = m_hdata -> GetBinContent(j);
+                if(val == 0.0)
+                {
+                    std::cout << "[WARNING] In AnySample::FillEventHisto()\n"
+                              << "[WARNING] " << m_name << " bin " << j << " has 0 entries. This may cause a problem with chi2 computations." << std::endl;
                     continue;
                 }
-                double binc = gRandom->Poisson(val);
-                m_hdata->SetBinContent(j,binc);  //add statistical fluctuations
+                double poisson_val = gRandom -> Poisson(val);
+                m_hdata -> SetBinContent(j, poisson_val);  //add statistical fluctuations
             }
-            //m_hdata->Scale(potD/potMC_genie);
         }
     }
-
 }
 
 double AnySample::CalcChi2()
 {
-    if(m_empty == true) return 0.0;
+    if(m_empty == true)
+        return 0.0;
 
-    if(m_hdata == NULL)
+    if(m_hdata == nullptr)
     {
-        cerr<<"ERROR: need to define data histogram"<<endl;
+        std::cerr << "[ERROR]: In AnySample::CalcChi2()\n"
+                  << "[ERROR]: Need to define data histogram." << std::endl;
         return 0.0;
     }
 
-    int nx = m_hpred->GetNbinsX();
-    //int ny = m_hpred->GetNbinsY();
-
-    if(nx != m_hdata->GetNbinsX())// || ny != m_hdata->GetNbinsY())
+    int nbins = m_hpred -> GetNbinsX();
+    if(nbins != m_hdata -> GetNbinsX())
     {
-        cerr<<"ERROR: binning mismatch between data and mc"<<endl;
+        std::cerr << "[ERROR]: In AnySample::CalcChi2()\n"
+                  << "[ERROR]: Binning mismatch between data and mc.\n"
+                  << "[ERROR]: MC bins: " << nbins << ", Data bins: " << m_hdata -> GetNbinsX() << std::endl;
         return 0.0;
     }
 
     double chi2 = 0.0;
-    for(int j=1;j<=nx;j++)
+    for(int j = 1 ; j <= nbins; ++j)
     {
-        double obs = m_hdata->GetBinContent(j);
-        double exp = m_hpred->GetBinContent(j);
-        if(exp>0.0){  //added when external fake datasets (you cannot reweight when simply 0)
+        double obs = m_hdata -> GetBinContent(j);
+        double exp = m_hpred -> GetBinContent(j);
+        if(exp > 0.0)
+        {
+            //added when external fake datasets (you cannot reweight when simply 0)
             // this didn't happen when all from same MC since if exp=0 then obs =0
-            chi2 += 2*(exp - obs);
-            if(obs>0.0) chi2 += 2*obs*TMath::Log(obs/exp);
 
-            if(chi2 < 0)
+            chi2 += 2 * (exp - obs);
+            if(obs > 0.0)
+                chi2 += 2 * obs * TMath::Log(obs/exp);
+
+            if(chi2 < 0.0)
             {
-                cerr<<"WARTNING: stat chi2 is less than 0: " << chi2 << ", setting to 0"<<endl;
-                cerr<<"exp and obs is: " << exp << " and " << obs <<endl;
+                std::cerr << "[WARNING]: In AnySample::CalcChi2()\n"
+                          << "[WARNING]: Stat chi2 is less than 0: " << chi2 << ", setting to 0." << std::endl;
+                std::cerr << "[WARNING]: exp and obs is: " << exp << " and " << obs << "." << std::endl;
                 chi2 = 0.0;
             }
         }
-        //DEBUG Time:
-        //cout << "obs / exp / chi2: " <<obs<<"/"<<exp<<"/"<<chi2<<endl;
     }
 
     if(chi2 != chi2)
     {
-        cerr<<"ERROR: stat chi2 is nan"<<endl;
+        std::cerr << "[WARNING]: In AnySample::CalcChi2()\n"
+                  << "[WARNING]: Stat chi2 is nan, setting to 0." << std::endl;
         chi2 = 0.0;
     }
-
-    /*
-    // CHI2 DEBUG
-    cout << endl << "*** CHI2 DEBUG ***" << endl;
-    cout << "data histo is:" << endl;
-    m_hdata->Print("all");
-    cout << "MC histo is:" << endl;
-    m_hpred->Print("all");
-    cout << "chi2 is:" << chi2;
-    cout << endl << "*** CHI2 DEBUG ***" << endl;
-    */
 
     return chi2;
 }
@@ -470,11 +487,11 @@ void AnySample::GetSampleBreakdown(TDirectory *dirout, const std::string& tag, b
         hAnybin_rec[i]->GetXaxis()->SetTitle("Any bins");
     }
 
-    if(m_sig != NULL) m_sig->Delete();
-    m_sig = new TH1D(Form("%s_signalOnly_%s", m_name.c_str(),tag.c_str()),
+    if(m_hsig != nullptr) m_hsig->Delete();
+    m_hsig = new TH1D(Form("%s_signalOnly_%s", m_name.c_str(),tag.c_str()),
             Form("%s_signalOnly_%s", m_name.c_str(),tag.c_str()),
             nAnybins, bins_Any);
-    m_sig->SetDirectory(0);
+    m_hsig->SetDirectory(0);
 
     //loop over the events
 
@@ -503,7 +520,7 @@ void AnySample::GetSampleBreakdown(TDirectory *dirout, const std::string& tag, b
         // 5 - BKG (not numuCC)
         // 6 - Nothing at all (WHY!?!?!?)
         // 7 - OOFGDFV
-        // So I hack in a fix to stop a NULL reaction cat.
+        // So I hack in a fix to stop a nullptr reaction cat.
 
 
         //if((rtype==7)) rtype=6; //BKG is 5 then OOFV is 7, 6 is skipped causing array to overrun
@@ -548,7 +565,7 @@ void AnySample::GetSampleBreakdown(TDirectory *dirout, const std::string& tag, b
                     ( (rtype==1) || (rtype==2) ) ) {
                 //if( (D1_true > m_D1edges[j].first) && (D1_true < m_D1edges[j].second)  &&
                 //    (D2_true > -0.5) && (D2_true < 0.5)  && (rtype==1 || rtype == 2) ) {
-                m_sig->Fill(j+0.5,wght);
+                m_hsig->Fill(j+0.5,wght);
                 break;
             }
             }
@@ -559,9 +576,9 @@ void AnySample::GetSampleBreakdown(TDirectory *dirout, const std::string& tag, b
         dirout->cd();
         //tree->Write();
         //cout << "Scale Factor Is: " << m_norm << endl;
-        //m_sig->Print("all");
-        m_sig->Scale(m_norm);
-        //m_sig->Print("all");
+        //m_hsig->Print("all");
+        m_hsig->Scale(m_norm);
+        //m_hsig->Print("all");
 
         for(int i=0;i<nreac;i++)
         {
@@ -600,16 +617,16 @@ void AnySample::GetSampleBreakdown(TDirectory *dirout, const std::string& tag, b
                 cout<<setw(10)<<names[j]<<setw(5)<<j<<setw(10)<<compos[j]
                     <<setw(10)<<(float)(compos[j])/Ntot*100.0<<"%"<<endl;
         }
-    }
+}
 
     // Write
-    void AnySample::Write(TDirectory *dirout, const char *bsname, int fititer)
-    {
-        dirout->cd();
-        m_hpred->Write(Form("%s_pred", bsname));
-        m_hmc_true->Write(Form("%s_true", bsname));
-        if(fititer==0){
-            m_hmc->Write(Form("%s_mc", bsname));
-            if(m_hdata != NULL) m_hdata->Write(Form("%s_data", bsname));
-        }
+void AnySample::Write(TDirectory *dirout, const char *bsname, int fititer)
+{
+    dirout->cd();
+    m_hpred->Write(Form("%s_pred", bsname));
+    m_hmc_true->Write(Form("%s_true", bsname));
+    if(fititer==0){
+        m_hmc->Write(Form("%s_mc", bsname));
+        if(m_hdata != nullptr) m_hdata->Write(Form("%s_data", bsname));
     }
+}
