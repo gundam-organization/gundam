@@ -54,6 +54,7 @@ class AnySample : public AnaSample
         TH1D* GetMCTruthHisto(){ return m_hmc_true; }
 
         void GetSampleBreakdown(TDirectory *dirout, const std::string& tag, bool save);
+        void GetSampleBreakdown(TDirectory *dirout, const std::string& tag, const std::vector<std::string>& topology, bool save);
         TH1D* GetSignalHisto(){ return m_hsig; }
         void Write(TDirectory *dirout, const char *bsname, int fititer);
         int GetSampleId(){ return sample_id; }

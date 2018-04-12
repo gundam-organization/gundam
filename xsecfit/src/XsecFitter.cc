@@ -162,7 +162,7 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*> &fitpara, Double_t re
 //           7 if toy from nuisances - syst + reg constrained fit variation, fit w/o reg
 //           8 if asimov (data==MC)
 //           9 if fake data from param vector
-void XsecFitter::Fit(std::vector<AnaSample*> &samples, int datatype, int fitMethod, int statFluct)
+void XsecFitter::Fit(std::vector<AnaSample*> &samples, const std::vector<std::string>& topology, int datatype, int fitMethod, int statFluct)
 {
     std::cout << "Starting to fit." << std::endl;
     m_calls = 0;
@@ -183,7 +183,7 @@ void XsecFitter::Fit(std::vector<AnaSample*> &samples, int datatype, int fitMeth
         //save hists if requested
         for(size_t s=0;s<m_samples.size();s++)
         {
-            ((AnySample*)m_samples[s])->GetSampleBreakdown(m_dir, "thrown", true);
+            m_samples[s]->GetSampleBreakdown(m_dir, "thrown", topology, true);
         }
     }
     else if(datatype==2 || datatype==3 || datatype==4){
@@ -742,10 +742,13 @@ void XsecFitter::DoSaveResults(vector< vector<double> > parresults, vector< vect
     m_dir->cd();
     grapchi2->Write();
 
+    std::vector<std::string> topology = {"cc0pi0p", "cc0pi1p", "cc0pinp", "cc1pi+", "ccother",
+        "backg", "Null", "OOFV"};
+
     //ADDED save actual final results
     for(size_t s=0;s<m_samples.size();s++)
     {
-        ((AnySample*)m_samples[s])->GetSampleBreakdown(m_dir,"fit",true);
+        m_samples[s]->GetSampleBreakdown(m_dir, "fit", topology, true);
     }
 }
 

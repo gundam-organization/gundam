@@ -29,7 +29,7 @@ class XsecFitter : public TObject
         void fcn(Int_t &npar, Double_t *gin, Double_t &f, Double_t *par, Int_t iflag);
         void InitFitter(std::vector<AnaFitParameters*> &fitpara, Double_t reg, Double_t reg2, Int_t nipsbinsin, std::string paramVectorFname);
         void FixParameter(const std::string& par_name, const double& value);
-        void Fit(std::vector<AnaSample*> &samples, int datatype, int fitMethod, int statFluct);
+        void Fit(std::vector<AnaSample*> &samples, const std::vector<std::string>& topology, int datatype, int fitMethod, int statFluct);
         void SetSaveMode(TDirectory *dirout, int freq)
         { m_dir = dirout; m_freq = freq; }
         void SetPOTRatio(double val){ m_potratio = val; }

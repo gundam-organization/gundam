@@ -118,7 +118,7 @@ AnySample::AnySample(int sample_id, const std::string& name,
     m_hsig   = nullptr;
     MakeHistos(); //with default binning
 
-    cout<<"MakeHistos called"<<endl;
+    std::cout << "[AnySample]: MakeHistos called." << std::endl;
     //data (or toy) histo
     m_hdata = nullptr;
     m_norm  = 1.0;
@@ -127,9 +127,17 @@ AnySample::AnySample(int sample_id, const std::string& name,
 // dtor
 AnySample::~AnySample()
 {
-    m_hpred->Delete();
-    m_hmc->Delete();
-    if(m_hdata != nullptr) m_hdata->Delete();
+    if(m_hpred != nullptr)
+        m_hpred -> Delete();
+    if(m_hmc != nullptr)
+        m_hmc -> Delete();
+    if(m_hmc_true != nullptr)
+        m_hmc_true -> Delete();
+    if(m_hdata != nullptr)
+        m_hdata -> Delete();
+    if(m_hsig != nullptr)
+        m_hsig -> Delete();
+
     delete [] bins_D1;
     delete [] bins_D2;
     delete [] bins_enu;
@@ -155,7 +163,8 @@ void AnySample::MakeHistos()
             Form("%s_mc_TrueD1D2", m_name.c_str()),
             nAnybins, bins_Any);
     m_hmc_true->SetDirectory(0);
-    cout<<nAnybins<<" bins inside MakeHistos"<<endl;
+
+    std::cout << "[AnySample]: " << nAnybins << " bins inside MakeHistos(). " << std::endl;
 }
 
 void AnySample::SetData(TObject *hdata)
@@ -287,9 +296,9 @@ void AnySample::FillEventHisto(int datatype)
         m_hdata->Reset();
 
         float D1_rec_tree, D2_rec_tree, wght;
-        int topology;
+        int cut_branch;
 
-        m_data_tree -> SetBranchAddress("cutBranch",&topology);
+        m_data_tree -> SetBranchAddress("cutBranch",&cut_branch);
         m_data_tree -> SetBranchAddress("weight",&wght);
         m_data_tree -> SetBranchAddress("D1Rec",&D1_rec_tree);
         m_data_tree -> SetBranchAddress("D2Rec",&D2_rec_tree);
@@ -298,7 +307,7 @@ void AnySample::FillEventHisto(int datatype)
         for(std::size_t i = 0; i < n_entries; ++i)
         {
             m_data_tree -> GetEntry(i);
-            if(topology != m_sampleid)
+            if(cut_branch != m_sampleid)
                 continue;
 
             for(int j = 0; j < nAnybins; ++j)
@@ -315,7 +324,7 @@ void AnySample::FillEventHisto(int datatype)
                               << "[WARNING] No bin for current data event.\n"
                               << "[WARNING] D1_rec_tree: " << D1_rec_tree << std::endl
                               << "[WARNING] D2_rec_tree: " << D2_rec_tree << std::endl
-                              << "[WARNING] CutBranch  : " << topology << std::endl;
+                              << "[WARNING] CutBranch  : " << cut_branch << std::endl;
                     break;
                 }
             }
@@ -619,7 +628,6 @@ void AnySample::GetSampleBreakdown(TDirectory *dirout, const std::string& tag, b
         }
 }
 
-    // Write
 void AnySample::Write(TDirectory *dirout, const char *bsname, int fititer)
 {
     dirout->cd();
@@ -630,3 +638,160 @@ void AnySample::Write(TDirectory *dirout, const char *bsname, int fititer)
         if(m_hdata != nullptr) m_hdata->Write(Form("%s_data", bsname));
     }
 }
+
+void AnySample::GetSampleBreakdown(TDirectory *dirout, const std::string& tag, const std::vector<std::string>& topology, bool save)
+{
+    const int ntopology = topology.size();
+    int compos[ntopology];
+    std::vector<TH1D> henu_rec;
+    std::vector<TH1D> hD1_rec;
+    std::vector<TH1D> hD2_rec;
+    std::vector<TH1D> hD1_true;
+    std::vector<TH1D> hD2_true;
+    std::vector<TH2D> hD1D2_rec;
+    std::vector<TH1D> hAnybin_rec;
+    std::vector<TH1D> hAnybin_true;
+
+    for(int i = 0; i < ntopology; ++i)
+    {
+        compos[i] = 0;
+        henu_rec.emplace_back(TH1D(Form("%s_RecEnu_%s_%s", m_name.c_str(), topology[i].c_str(), tag.c_str()),
+                 Form("%s_RecEnu_%s_%s", m_name.c_str(), topology[i].c_str(), tag.c_str()),
+                 nbins_enu, bins_enu));
+        henu_rec[i].SetDirectory(0);
+        henu_rec[i].GetXaxis() -> SetTitle("Recon E_{#nu} (GeV)");
+
+        hD1_rec.emplace_back(TH1D(Form("%s_RecD1_%s_%s", m_name.c_str(), topology[i].c_str(), tag.c_str()),
+                Form("%s_RecD1_%s_%s", m_name.c_str(), topology[i].c_str(), tag.c_str()),
+                nbinsD1_toPlot, bins_D1toPlot));
+        hD1_rec[i].SetDirectory(0);
+        hD1_rec[i].GetXaxis() -> SetTitle("Recon D1 (GeV/c)");
+
+        hD2_rec.emplace_back(TH1D(Form("%s_RecD2_%s_%s", m_name.c_str(), topology[i].c_str(), tag.c_str()),
+                Form("%s_RecD2_%s_%s", m_name.c_str(), topology[i].c_str(), tag.c_str()),
+                nbins_D2, bins_D2));
+        hD2_rec[i].SetDirectory(0);
+        hD2_rec[i].GetXaxis() -> SetTitle("Recon D2 (GeV/c)");
+
+        hD1D2_rec.emplace_back(TH2D(Form("%s_RecD1D2_%s_%s", m_name.c_str(), topology[i].c_str(), tag.c_str()),
+                Form("%s_RecD1D2_%s_%s", m_name.c_str(), topology[i].c_str(), tag.c_str()),
+                nbinsD1_toPlot, bins_D1toPlot, nbins_D2, bins_D2));
+        hD1D2_rec[i].SetDirectory(0);
+        hD1D2_rec[i].GetXaxis() -> SetTitle("Recon D1D2 (GeV/c)");
+
+        hD1_true.emplace_back(TH1D(Form("%s_TrueD1_%s_%s", m_name.c_str(), topology[i].c_str(), tag.c_str()),
+                Form("%s_TrueD1_%s_%s", m_name.c_str(), topology[i].c_str(), tag.c_str()),
+                nbinsD1_toPlot, bins_D1toPlot));
+        hD1_true[i].SetDirectory(0);
+        hD1_true[i].GetXaxis() -> SetTitle("True D1 (GeV/c)");
+
+        hD2_true.emplace_back(TH1D(Form("%s_TrueD2_%s_%s", m_name.c_str(), topology[i].c_str(), tag.c_str()),
+                Form("%s_TrueD2_%s_%s", m_name.c_str(), topology[i].c_str(), tag.c_str()),
+                nbins_D2, bins_D2));
+        hD2_true[i].SetDirectory(0);
+        hD2_true[i].GetXaxis() -> SetTitle("True D2 (GeV/c)");
+
+        hAnybin_rec.emplace_back(TH1D(Form("%s_Anybins_rec_%s_%s", m_name.c_str(), topology[i].c_str(), tag.c_str()),
+                Form("%s_Anybins_rec_%s_%s", m_name.c_str(), topology[i].c_str(), tag.c_str()),
+                nAnybins, bins_Any));
+        hAnybin_rec[i].SetDirectory(0);
+        hAnybin_rec[i].GetXaxis() -> SetTitle("Any bins");
+
+        hAnybin_true.emplace_back(TH1D(Form("%s_Anybins_true_%s_%s", m_name.c_str(), topology[i].c_str(), tag.c_str()),
+                Form("%s_Anybins_true_%s_%s", m_name.c_str(), topology[i].c_str(), tag.c_str()),
+                nAnybins, bins_Any));
+        hAnybin_true[i].SetDirectory(0);
+        hAnybin_true[i].GetXaxis() -> SetTitle("Any bins");
+    }
+
+    if(m_hsig != nullptr)
+        m_hsig -> Delete();
+    m_hsig = new TH1D(Form("%s_signalOnly_%s", m_name.c_str(), tag.c_str()),
+            Form("%s_signalOnly_%s", m_name.c_str(), tag.c_str()),
+            nAnybins, bins_Any);
+    m_hsig -> SetDirectory(0);
+
+    int Ntot = GetN();
+    for(std::size_t i = 0; i < m_events.size(); ++i)
+    {
+        double enu_rec, D1_rec, D2_rec, D1_true, D2_true, wght;
+        enu_rec = m_events[i].GetRecEnu();
+        D1_rec  = m_events[i].GetRecD1trk();
+        D2_rec  = m_events[i].GetRecD2trk();
+        D1_true = m_events[i].GetTrueD1trk();
+        D2_true = m_events[i].GetTrueD2trk();
+        wght    = m_events[i].GetEvWght();
+        int evt_topology = m_events[i].GetTopology();
+
+        // Warning - hard code hack warning ahead:
+        // My reaction variable is mectopology from CC0Pi HL2 v1r15 so:
+        // 0 - cc0pi0p
+        // 1 - cc0pi1p
+        // 2 - cc0pinp
+        // 3 - cc1pi
+        // 4 - ccother
+        // 5 - BKG (not numuCC)
+        // 6 - Nothing at all (WHY!?!?!?)
+        // 7 - OOFGDFV
+        // So I hack in a fix to stop a nullptr reaction cat.
+
+        //cout<< "AnySample::GetSampleBreakdown - Filling histos" << endl;
+
+        compos[evt_topology]++;
+        henu_rec[evt_topology].Fill(enu_rec, wght);
+        hD1_rec[evt_topology].Fill(D1_rec, wght);
+        hD2_rec[evt_topology].Fill(D2_rec, wght);
+        hD1_true[evt_topology].Fill(D1_true, wght);
+        hD2_true[evt_topology].Fill(D2_true, wght);
+        hD1D2_rec[evt_topology].Fill(D1_rec, D2_rec, wght);
+
+        //cout<< "AnySample::GetSampleBreakdown - Filling histos with analysis binning" << endl;
+
+        int anybin_index_rec = GetAnyBinIndex(D1_rec, D2_rec);
+        int anybin_index_true = GetAnyBinIndex(D1_true, D2_true);
+        hAnybin_rec[evt_topology].Fill(anybin_index_rec + 0.5, wght);
+        hAnybin_true[evt_topology].Fill(anybin_index_true + 0.5, wght);
+
+        if(evt_topology == 1 || evt_topology == 2)
+            m_hsig -> Fill(anybin_index_true + 0.5, wght);
+    }
+
+    dirout->cd();
+    m_hsig->Scale(m_norm);
+
+    for(int i = 0; i < ntopology; ++i)
+    {
+        henu_rec[i].Scale(m_norm);
+        hD1_rec[i].Scale(m_norm);
+        hD2_rec[i].Scale(m_norm);
+        hD1_true[i].Scale(m_norm);
+        hD2_true[i].Scale(m_norm);
+        hD1D2_rec[i].Scale(m_norm);
+        hAnybin_true[i].Scale(m_norm);
+        hAnybin_rec[i].Scale(m_norm);
+
+        if(save == true)
+        {
+            henu_rec[i].Write();
+            hD1_rec[i].Write();
+            hD2_rec[i].Write();
+            hD1_true[i].Write();
+            hD2_true[i].Write();
+            hD1D2_rec[i].Write();
+            hAnybin_true[i].Write();
+            hAnybin_rec[i].Write();
+        }
+    }
+
+    if(save == true)
+    {
+        std::cout << "[AnySample]: GetSampleBreakdown()\n"
+                  << "============ Sample " << m_name << " ==========="<<endl;
+
+        for(int j = 0; j < ntopology; ++j)
+            std::cout << std::setw(10) << topology[j] << std::setw(5) << j
+                      << std::setw(5) << compos[j] << std::setw(10)
+                      << ((1.0 * compos[j]) / Ntot) * 100.0 << "%" << std::endl;
+    }
+}
+

@@ -153,8 +153,10 @@ int main(int argc, char *argv[])
     std::cout << "[IngridFit]: Getting sample breakdown by reaction." << std::endl;
     //for(size_t s = 0; s < samples.size(); ++s)
     //    samples[s] -> GetSampleBreakdown(fout,"nominal",true);
+    std::vector<std::string> topology = {"cc0pi0p", "cc0pi1p", "cc0pinp", "cc1pi+", "ccother", "backg", "Null", "OOFV"};
+
     for(auto& sample : samples)
-        sample -> GetSampleBreakdown(fout, "nominal", true);
+        sample -> GetSampleBreakdown(fout, "nominal", topology, true);
 
 
     //*************** FITTER SETTINGS **************************
@@ -228,7 +230,7 @@ int main(int argc, char *argv[])
     //           0 = Do not apply Stat Fluct to fake data
     //           1 = Apply Stat Fluct to fake data
 
-    xsecfit.Fit(samples, 2, 2, 0);
+    xsecfit.Fit(samples, topology, 2, 2, 0);
     fout -> Close();
 
     return 0;

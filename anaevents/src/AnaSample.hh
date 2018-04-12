@@ -49,6 +49,7 @@ class AnaSample
         virtual double CalcChi2() = 0;
         virtual void Write(TDirectory *dirout, const char *bsname, int fititer) = 0;
         virtual void GetSampleBreakdown(TDirectory *dirout, const std::string& tag, bool save) = 0;
+        virtual void GetSampleBreakdown(TDirectory *dirout, const std::string& tag, const std::vector<std::string>& topology, bool save) = 0;
 
     protected:
         int m_sampleid;
