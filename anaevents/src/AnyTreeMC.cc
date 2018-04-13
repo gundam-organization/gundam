@@ -5,7 +5,7 @@
 
 AnyTreeMC::AnyTreeMC(const std::string& file_name)
 {
-    std::string tree_name("selectedEvents");
+    const std::string tree_name("selectedEvents");
     fChain = new TChain(tree_name.c_str());
     fChain -> Add(file_name.c_str());
     SetBranches();
@@ -22,7 +22,7 @@ long int AnyTreeMC::GetEntry(long int entry)
 {
     // Read contents of entry.
     if(fChain == nullptr)
-        return 0;
+        return -1;
     else
         return fChain -> GetEntry(entry);
 }
@@ -30,15 +30,15 @@ long int AnyTreeMC::GetEntry(long int entry)
 void AnyTreeMC::SetBranches()
 {
     // Set branch addresses and branch pointers
+    fChain -> SetBranchAddress("cutBranch", &cutBranch, &b_cutBranch);
     fChain -> SetBranchAddress("mectopology", &evtTopology, &b_evtTopology);
     fChain -> SetBranchAddress("reaction", &evtReaction, &b_evtReaction);
-    fChain -> SetBranchAddress("D1True", &trueD1, &b_trueD1);
-    fChain -> SetBranchAddress("D2True", &trueD2, &b_trueD2);
-    fChain -> SetBranchAddress("cutBranch", &qesampleFinal, &b_qesampleFinal);
-    fChain -> SetBranchAddress("D1Rec", &MainD1Glb, &b_MainD1Glb);
-    fChain -> SetBranchAddress("D2Rec", &MainD2, &b_MainD2);
-    fChain -> SetBranchAddress("Enureco", &MainRecEneGlb, &b_MainRecEneGlb);
-    fChain -> SetBranchAddress("Enutrue", &TrueEnergy, &b_TrueEnergy);
+    fChain -> SetBranchAddress("D1True", &D1True, &b_D1True);
+    fChain -> SetBranchAddress("D2True", &D2True, &b_D2True);
+    fChain -> SetBranchAddress("D1Rec", &D1Reco, &b_D1Reco);
+    fChain -> SetBranchAddress("D2Rec", &D2Reco, &b_D2Reco);
+    fChain -> SetBranchAddress("Enureco", &EnuReco, &b_EnuReco);
+    fChain -> SetBranchAddress("Enutrue", &EnuTrue, &b_EnuTrue);
     fChain -> SetBranchAddress("weight", &weight, &b_weight);
 
     // New kinematic variables always included for phase space cuts
@@ -68,17 +68,15 @@ void AnyTreeMC::GetEvents(std::vector<AnaSample*> ana_samples)
         nbytes += fChain -> GetEntry(jentry);
         //create and fill event structure
         AnaEvent ev(jentry);
-        ev.SetSampleType(qesampleFinal);
-        int evtTopo = evtTopology; //For my analysis 0 CC0pi0p, 1 CC0pi1p, 2 CC0pinp, 3 CC1pi, 4 CCOther, 5 backg(NC+antinu), 7 OOFV
-        //cout << "Evt Topology is " << evtTopo << endl;
+        ev.SetSampleType(cutBranch);
         ev.SetTopology(evtTopology); // mectopology (i.e. CC0Pi,CC1Pi etc)
         ev.SetReaction(evtReaction); // reaction (i.e. CCQE,CCRES etc)
-        ev.SetTrueEnu(TrueEnergy/1000.0);   //MeV - ->  GeV
-        ev.SetRecEnu(MainRecEneGlb/1000.0); //MeV - ->  GeV
-        ev.SetTrueD1trk(trueD1);
-        ev.SetRecD1trk(MainD1Glb);
-        ev.SetTrueD2trk(trueD2);
-        ev.SetRecD2trk(MainD2);
+        ev.SetTrueEnu(EnuTrue/1000.0);   //MeV - ->  GeV
+        ev.SetRecEnu(EnuReco/1000.0); //MeV - ->  GeV
+        ev.SetTrueD1(D1True);
+        ev.SetRecD1(D1Reco);
+        ev.SetTrueD2(D2True);
+        ev.SetRecD2(D2Reco);
         ev.SetEvWght(weight);
         ev.SetEvWghtMC(weight);
 
@@ -93,7 +91,7 @@ void AnyTreeMC::GetEvents(std::vector<AnaSample*> ana_samples)
 
         for(auto& sample : ana_samples)
         {
-            if(sample -> GetSampleType() == qesampleFinal)
+            if(sample -> GetSampleType() == cutBranch)
                 sample -> AddEvent(ev);
         }
     }

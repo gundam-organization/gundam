@@ -100,8 +100,8 @@ void DetParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
     {
       AnaEvent *ev = sample[s]->GetEvent(i);
       //get event true p and D2
-      double p   = ev->GetRecD1trk();
-      double D2 = ev->GetRecD2trk();
+      double p   = ev->GetRecD1();
+      double D2 = ev->GetRecD2();
       int reaction = ev->GetTopology();
       int binn   = GetBinIndex(p, D2,sample[s]->GetSampleType());
       if(binn == BADBIN)

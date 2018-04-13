@@ -229,10 +229,10 @@ void AnySample::FillEventHisto(int datatype)
 
     for(std::size_t i = 0; i < m_events.size(); ++i)
     {
-        double D1_rec  = m_events[i].GetRecD1trk();
-        double D2_rec  = m_events[i].GetRecD2trk();
-        double D1_true = m_events[i].GetTrueD1trk();
-        double D2_true = m_events[i].GetTrueD2trk();
+        double D1_rec  = m_events[i].GetRecD1();
+        double D2_rec  = m_events[i].GetRecD2();
+        double D1_true = m_events[i].GetTrueD1();
+        double D2_true = m_events[i].GetTrueD2();
         double wght    = m_events[i].GetEvWght();
 
         int anybin_index_rec = GetAnyBinIndex(D1_rec, D2_rec);
@@ -511,10 +511,10 @@ void AnySample::GetSampleBreakdown(TDirectory *dirout, const std::string& tag, b
         //cout<<"AnySample::GetSampleBreakdown - In event loop iteration " << i << " out of " << m_events.size() << endl;
         double enu_rec, D1_rec, D2_rec, D1_true, D2_true, wght;
         enu_rec = m_events[i].GetRecEnu();
-        D1_rec = m_events[i].GetRecD1trk();
-        D2_rec = m_events[i].GetRecD2trk();
-        D1_true = m_events[i].GetTrueD1trk();
-        D2_true = m_events[i].GetTrueD2trk();
+        D1_rec = m_events[i].GetRecD1();
+        D2_rec = m_events[i].GetRecD2();
+        D1_true = m_events[i].GetTrueD1();
+        D2_true = m_events[i].GetTrueD2();
         wght    = m_events[i].GetEvWght();
         int rtype = m_events[i].GetTopology();
         //cout<< "AnySample::GetSampleBreakdown - rtype is: " << rtype << endl;
@@ -716,10 +716,10 @@ void AnySample::GetSampleBreakdown(TDirectory *dirout, const std::string& tag, c
     {
         double enu_rec, D1_rec, D2_rec, D1_true, D2_true, wght;
         enu_rec = m_events[i].GetRecEnu();
-        D1_rec  = m_events[i].GetRecD1trk();
-        D2_rec  = m_events[i].GetRecD2trk();
-        D1_true = m_events[i].GetTrueD1trk();
-        D2_true = m_events[i].GetTrueD2trk();
+        D1_rec  = m_events[i].GetRecD1();
+        D2_rec  = m_events[i].GetRecD2();
+        D1_true = m_events[i].GetTrueD1();
+        D2_true = m_events[i].GetTrueD2();
         wght    = m_events[i].GetEvWght();
         int evt_topology = m_events[i].GetTopology();
 

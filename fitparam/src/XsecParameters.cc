@@ -274,7 +274,7 @@ void XsecParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
 	    //get event info
 	    int binn = GetBinIndex(static_cast<SampleTypes>(ev->GetSampleType()),
 				                     static_cast<ReactionTypes>(ev->GetTopology()),
-				                     ev->GetRecD1trk(),ev->GetTrueD1trk(),ev->GetRecD2trk(),ev->GetTrueD2trk());
+				                     ev->GetRecD1(),ev->GetTrueD1(),ev->GetRecD2(),ev->GetTrueD2());
 	    if(binn == BADBIN) 
 	    {
 	      cout<<"WARNING: "<<m_name<<" event "

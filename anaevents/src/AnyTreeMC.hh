@@ -22,15 +22,15 @@ class AnyTreeMC
         TChain *fChain; //!pointer to the analyzed TTree or TChain
 
         // Declaration of leaf types
+        int   cutBranch;
         int   evtTopology;
         int   evtReaction;
-        float trueD1;
-        float trueD2;
-        int   qesampleFinal;
-        float MainD1Glb;
-        float MainD2;
-        float MainRecEneGlb;
-        float TrueEnergy;
+        float D1True;
+        float D2True;
+        float D1Reco;
+        float D2Reco;
+        float EnuReco;
+        float EnuTrue;
         float weight;
 
 
@@ -46,15 +46,15 @@ class AnyTreeMC
 
 
         // List of branches
+        TBranch *b_cutBranch;   //!
         TBranch *b_evtTopology;   //!
         TBranch *b_evtReaction;   //!
-        TBranch *b_trueD1;   //!
-        TBranch *b_trueD2;   //!
-        TBranch *b_qesampleFinal;   //!
-        TBranch *b_MainD1Glb;   //!
-        TBranch *b_MainD2;   //!
-        TBranch *b_MainRecEneGlb;   //!
-        TBranch *b_TrueEnergy;   //!
+        TBranch *b_D1True;   //!
+        TBranch *b_D2True;   //!
+        TBranch *b_D1Reco;   //!
+        TBranch *b_D2Reco;   //!
+        TBranch *b_EnuReco;   //!
+        TBranch *b_EnuTrue;   //!
         TBranch *b_weight;   //!
 
         // New kinematic variables always included for phase space cuts
@@ -68,10 +68,10 @@ class AnyTreeMC
         TBranch *b_pCosThetaTrue;   //!
 
         AnyTreeMC(const std::string& file_name);
-        virtual ~AnyTreeMC();
-        virtual long int GetEntry(long int entry);
-        virtual void SetBranches();
-        virtual void GetEvents(std::vector<AnaSample*> ana_samples);
+        ~AnyTreeMC();
+        long int GetEntry(long int entry);
+        void SetBranches();
+        void GetEvents(std::vector<AnaSample*> ana_samples);
 };
 
 #endif

@@ -111,8 +111,8 @@ void FitParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
             if((ev->GetTopology()==1)||(ev->GetTopology()==2))
             {
                 //get event true D1 and D2
-                double D1 = ev->GetTrueD1trk();
-                double D2 = ev->GetTrueD2trk();
+                double D1 = ev->GetTrueD1();
+                double D2 = ev->GetTrueD2();
                 int binn = GetBinIndex(D1, D2);
                 if(binn == BADBIN)
                 {

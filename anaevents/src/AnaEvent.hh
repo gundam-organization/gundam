@@ -20,19 +20,19 @@ class AnaEvent
     public:
         AnaEvent(long int evid) //unique event id
         {
-            m_evid       = evid;
-            m_evtype     = 0;
-            m_topology   = -1;
-            m_reaction   = -1;
-            m_sample     = -1;
-            m_trueEnu    = -999.0;
-            m_recEnu     = -999.0;
-            m_trueD1trk  = -999.0;
-            m_trueD2trk  = -999.0;
-            m_recD1trk   = -999.0;
-            m_recD2trk   = -999.0;
-            m_wght       = 1.0;
-            m_wghtMC     = 1.0;
+            m_evid     = evid;
+            m_evtype   = 0;
+            m_topology = -1;
+            m_reaction = -1;
+            m_sample   = -1;
+            m_trueEnu  = -999.0;
+            m_recEnu   = -999.0;
+            m_trueD1   = -999.0;
+            m_trueD2   = -999.0;
+            m_recD1    = -999.0;
+            m_recD2    = -999.0;
+            m_wght     = 1.0;
+            m_wghtMC   = 1.0;
 
             // New kinematic variables always included for phase space cuts
             m_pMomRec = -999.0;
@@ -45,7 +45,6 @@ class AnaEvent
             m_pCosThetaTrue = -999.0;
 
         }
-        ~AnaEvent(){;}
 
         //Set/Get methods
         void SetEvType(int val){ m_evtype = val; }
@@ -68,17 +67,17 @@ class AnaEvent
         void SetRecEnu(double val){ m_recEnu = val; }
         double GetRecEnu(){ return m_recEnu; }
 
-        void SetTrueD1trk(double val){ m_trueD1trk = val; }
-        double GetTrueD1trk(){ return m_trueD1trk; }
+        void SetTrueD1(double val){ m_trueD1 = val; }
+        double GetTrueD1(){ return m_trueD1; }
 
-        void SetRecD1trk(double val){ m_recD1trk = val; }
-        double GetRecD1trk(){ return m_recD1trk; }
+        void SetRecD1(double val){ m_recD1 = val; }
+        double GetRecD1(){ return m_recD1; }
 
-        void SetTrueD2trk(double val){ m_trueD2trk = val; }
-        double GetTrueD2trk(){ return m_trueD2trk; }
+        void SetTrueD2(double val){ m_trueD2 = val; }
+        double GetTrueD2(){ return m_trueD2; }
 
-        void SetRecD2trk(double val){ m_recD2trk = val; }
-        double GetRecD2trk(){ return m_recD2trk; }
+        void SetRecD2(double val){ m_recD2 = val; }
+        double GetRecD2(){ return m_recD2; }
 
         void SetEvWght(double val){ m_wght  = val; }
         void SetEvWghtMC(double val){ m_wghtMC  = val; }
@@ -113,36 +112,36 @@ class AnaEvent
                       << "Sample          " << GetSampleType() << std::endl
                       << "True energy     " << GetTrueEnu() << std::endl
                       << "Recon energy    " << GetRecEnu() << std::endl
-                      << "True track D1   " << GetTrueD1trk() << std::endl
-                      << "Recon track D1  " << GetRecD1trk() << std::endl
-                      << "True track D2   " << GetTrueD2trk() << std::endl
-                      << "Recon track D2  " << GetRecD2trk() << std::endl
+                      << "True D1         " << GetTrueD1() << std::endl
+                      << "Reco D1         " << GetRecD1() << std::endl
+                      << "True D2         " << GetTrueD2() << std::endl
+                      << "Reco D2         " << GetRecD2() << std::endl
                       << "Event weight    " << GetEvWght() << std::endl
                       << "Event weight MC " << GetEvWghtMC() << std::endl
-                      << "Recon proton momentum  " << GetpMomRec() << std::endl
-                      << "True proton momentum   " << GetpMomTrue() << std::endl
-                      << "Recon muon momentum    " << GetmuMomRec() << std::endl
-                      << "True muon momentum     " << GetmuMomTrue() << std::endl
-                      << "Recon muon cos theta   " << GetmuCosThetaRec() << std::endl
-                      << "True muon cos theta    " << GetmuCosThetaTrue() << std::endl
-                      << "Recon Proton Cos Theta " << GetpCosThetaRec() << std::endl
-                      << "True Proton Cos Theta  " << GetpCosThetaTrue() << std::endl;
+                      << "Reco proton momentum  " << GetpMomRec() << std::endl
+                      << "True proton momentum  " << GetpMomTrue() << std::endl
+                      << "Reco muon momentum    " << GetmuMomRec() << std::endl
+                      << "True muon momentum    " << GetmuMomTrue() << std::endl
+                      << "Reco muon cos theta   " << GetmuCosThetaRec() << std::endl
+                      << "True muon cos theta   " << GetmuCosThetaTrue() << std::endl
+                      << "Reco Proton Cos Theta " << GetpCosThetaRec() << std::endl
+                      << "True Proton Cos Theta " << GetpCosThetaTrue() << std::endl;
         }
 
     private:
-        long int m_evid;     //unique event id
-        int m_evtype;        //0 - MC, 1 - Data event
-        int m_topology;      //final state topology type
-        int m_reaction;  //event interaction mode
-        int m_sample;        //sample type (aka cutBranch)
-        double m_trueEnu;    //true nu energy
-        double m_recEnu;     //recon nu energy
-        double m_trueD1trk;   //true D1
-        double m_trueD2trk; //true D2
-        double m_recD1trk;    //recon D1
-        double m_recD2trk;  //recon D2
-        double m_wght;       //event weight
-        double m_wghtMC;       //event weight from original MC
+        long int m_evid;   //unique event id
+        int m_evtype;      //0 - MC, 1 - Data event
+        int m_topology;    //final state topology type
+        int m_reaction;    //event interaction mode
+        int m_sample;      //sample type (aka cutBranch)
+        double m_trueEnu;  //true nu energy
+        double m_recEnu;   //recon nu energy
+        double m_trueD1;   //true D1
+        double m_trueD2;   //true D2
+        double m_recD1;    //reco D1
+        double m_recD2;    //reco D2
+        double m_wght;     //event weight
+        double m_wghtMC;   //event weight from original MC
 
         // New kinematic variables always included for phase space cuts
         double m_muMomRec;
