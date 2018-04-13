@@ -178,7 +178,7 @@ int main(int argc, char *argv[])
 
     //Flux parameters
     FluxParameters fluxpara(enubins, "par_flux", true);
-    fluxpara.SetCovarianceMatrix(&cov_flux);
+    fluxpara.SetCovarianceMatrix(cov_flux);
     fluxpara.InitEventMap(samples, 0);
     fitpara.push_back(&fluxpara);
 

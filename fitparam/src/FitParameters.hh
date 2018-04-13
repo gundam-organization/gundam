@@ -38,7 +38,7 @@ struct FitBin
 class FitParameters : public AnaFitParameters
 {
     public:
-        FitParameters(const std::string& file_name, const std::string& par_name, bool altPriorsTest = false);
+        FitParameters(const std::string& file_name, const std::string& par_name, bool random_priors = false);
         ~FitParameters();
 
         void InitEventMap(std::vector<AnaSample*> &sample, int mode);

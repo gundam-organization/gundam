@@ -140,7 +140,8 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*> &fitpara, Double_t re
     for(size_t i=0;i<m_fitpara.size();i++)
     {
         for(int j=0; j<(int)m_fitpara[i]->Npar; j++){
-            prefitParams->SetBinContent(paramNo, 1);
+            prefitParams->SetBinContent(paramNo, m_fitpara[i]->GetParPrior(j));
+            //prefitParams->SetBinContent(paramNo, 1);
             if(m_fitpara[i]->HasCovMat() && (!(m_fitpara[i]->HasRegCovMat())) && (i!=0)){
                 TMatrixDSym* covMat = m_fitpara[i]->GetCovarMat();
                 prefitParams->SetBinError(paramNo, sqrt((*covMat)[j][j]));

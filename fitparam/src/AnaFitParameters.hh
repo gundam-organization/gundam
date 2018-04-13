@@ -22,11 +22,11 @@
 #include "AnaSample.hh"
 #include "ThrowParms.hh"
 
-//some error codes
-#define PASSEVENT -1
-#define BADBIN    -2
-
 using namespace std;
+
+//some error codes
+const int PASSEVENT = -1;
+const int BADBIN = -2;
 
 class AnaFitParameters
 {
@@ -37,7 +37,7 @@ class AnaFitParameters
         // pure virtual functions
         // InitEventMap -- defines a mapping between events
         // and some unique id (e.g., bin number in True Enu)
-        virtual void InitEventMap(std::vector<AnaSample*> &sample, int mode)=0;
+        virtual void InitEventMap(std::vector<AnaSample*> &sample, int mode) = 0;
         // EventWeights calculates weights for all the samples
         virtual void EventWeights(std::vector<AnaSample*> &sample,
                 std::vector<double> &params) = 0;
@@ -50,7 +50,7 @@ class AnaFitParameters
 
         virtual double GetChi2(std::vector<double> &params);
 
-        virtual void SetCovarianceMatrix(TMatrixDSym *covmat);
+        virtual void SetCovarianceMatrix(const TMatrixDSym& covmat);
         virtual void SetRegCovarianceMatrix(TMatrixDSym *covmat);
         virtual void InitThrows();
         virtual void DoThrow(std::vector<double> &pars, int mode);
@@ -65,7 +65,7 @@ class AnaFitParameters
         void GetParPriors(std::vector<double> &vec)
         { vec = pars_prior; }
         double GetParPrior(int i)
-        { return pars_prior[i]; }
+        { return pars_prior.at(i); }
         void GetParSteps(std::vector<double> &vec)
         { vec = pars_step; }
         void GetParLimits(std::vector<double> &vec1,

@@ -1,6 +1,6 @@
 #include "FitParameters.hh"
 
-FitParameters::FitParameters(const std::string& file_name, const std::string& par_name, bool altPriorTest)
+FitParameters::FitParameters(const std::string& file_name, const std::string& par_name, bool random_priors)
 {
     m_name = par_name;
     //hasCovMat = false;
@@ -8,17 +8,17 @@ FitParameters::FitParameters(const std::string& file_name, const std::string& pa
     //get the binning from a file
     SetBinning(file_name);
 
-    double rand;
-    TRandom *r3 = new TRandom3(0);
+    double rand_prior = 0.0;
+    TRandom3 rng(0);
 
     //parameter names & prior values
-    for(size_t i=0;i<Npar;i++)
+    for(std::size_t i = 0; i < Npar; ++i)
     {
         pars_name.push_back(Form("%s%d", m_name.c_str(), (int)i));
-        if(altPriorTest == true)
+        if(random_priors == true)
         {
-            rand = 2*(r3->Rndm(0));
-            pars_prior.push_back(rand);
+            rand_prior = 2.0 * rng.Uniform(0.0, 1.0);
+            pars_prior.push_back(rand_prior);
         }
         else
             pars_prior.push_back(1.0); //all weights are 1.0 a priori
@@ -27,8 +27,6 @@ FitParameters::FitParameters(const std::string& file_name, const std::string& pa
         pars_limlow.push_back(0.0);
         pars_limhigh.push_back(10.0);
     }
-
-    delete r3;
 }
 
 FitParameters::~FitParameters()
@@ -65,11 +63,11 @@ void FitParameters::SetBinning(const std::string& file_name)
         std::cout << "[FitParameters]: Fit binning: \n";
         for(std::size_t i = 0; i < m_bins.size(); ++i)
         {
-            std::cout << setw(3) << i
-                      << setw(5) << m_bins[i].D2low
-                      << setw(5) << m_bins[i].D2high
-                      << setw(5) << m_bins[i].D1low
-                      << setw(5) << m_bins[i].D1high << std::endl;
+            std::cout << std::setw(3) << i
+                      << std::setw(5) << m_bins[i].D2low
+                      << std::setw(5) << m_bins[i].D2high
+                      << std::setw(5) << m_bins[i].D1low
+                      << std::setw(5) << m_bins[i].D1high << std::endl;
         }
     }
 }
@@ -78,8 +76,8 @@ int FitParameters::GetBinIndex(double D1, double D2)
 {
     for(int i = 0; i < m_bins.size(); ++i)
     {
-        if(D1 >= m_bins[i].D1low && D1 < m_bins[i].D1high && 
-           D2 >= m_bins[i].D2low && D2 < m_bins[i].D2high)  
+        if(D1 >= m_bins[i].D1low && D1 < m_bins[i].D1high &&
+           D2 >= m_bins[i].D2low && D2 < m_bins[i].D2high)
         {
             return i;
         }

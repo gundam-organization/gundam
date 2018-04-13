@@ -9,47 +9,45 @@ AnaFitParameters::AnaFitParameters()
     hasRegCovMat = false;
     checkDims = false;
 
-    covariance  = NULL;
-    covarianceI = NULL;
-    throwParms  = NULL;
+    covariance  = nullptr;
+    covarianceI = nullptr;
+    throwParms  = nullptr;
 }
 
 // dtor
 AnaFitParameters::~AnaFitParameters()
 {
-    if(covariance != NULL) covariance->Delete();
-    if(covarianceI != NULL) covarianceI->Delete();
-    if(throwParms != NULL) delete throwParms;
+    if(covariance != nullptr) covariance->Delete();
+    if(covarianceI != nullptr) covarianceI->Delete();
+    if(throwParms != nullptr) delete throwParms;
 }
 
 // SetCovarianceMatrix
-void AnaFitParameters::SetCovarianceMatrix(TMatrixDSym *covmat)
+void AnaFitParameters::SetCovarianceMatrix(const TMatrixDSym& covmat)
 {
+    if(covariance != nullptr) covariance->Delete();
+    if(covarianceI != nullptr) covarianceI->Delete();
 
-    //if(hasRegCovMat) cout << "WARNING: parameter set has both cov mat and reg cov mat!!" << endl;
-
-    if(covariance != NULL) covariance->Delete();
-    if(covarianceI != NULL) covarianceI->Delete();
-
-    double det;
-    covariance  = new TMatrixDSym(*covmat);
-    covarianceI = new TMatrixDSym(*covmat);
-    covarianceI->SetTol(1e-200);
-    double det_now = covarianceI->Determinant();
-    if(abs(det_now) < 1e-200){
-        cout << "Warning,  cov matrix is non invertable. Det is:" << endl;
-        cout << det_now << endl;
+    covariance  = new TMatrixDSym(covmat);
+    covarianceI = new TMatrixDSym(covmat);
+    covarianceI -> SetTol(1e-200);
+    double det = covarianceI->Determinant();
+    if(abs(det) < 1e-200)
+    {
+        std::cerr << "[ERROR]: In AnaFitParameters::SetCovarianceMatrix():\n"
+                  << "[ERROR]: Covariance matrix is non invertable. Determinant is "
+                  << det << std::endl;
         return;
     }
-    (*covarianceI).Invert(&det);
+    covarianceI -> Invert(&det);
 
-    cout<<"Number of parameters in covariance matrix for "<<m_name
-        <<" "<<covariance->GetNrows()<<endl;
+    std::cout << "[SetCovarianceMatrix]: Covariance matrix size: "
+              << covariance -> GetNrows() << " x " << covariance -> GetNrows() << std::endl;
 
-    cout << "Inverted Cov mat: " << endl;
-    covarianceI->Print();
-    cout << "Cov mat: " << endl;
-    covariance->Print();
+    std::cout << "[SetCovarianceMatrix]: Inverted Cov mat: " << std::endl;
+    covarianceI -> Print();
+    std::cout << "[SetCovarianceMatrix]: Cov mat: " << std::endl;
+    covariance -> Print();
 
     hasCovMat = true;
 }
@@ -66,8 +64,8 @@ void AnaFitParameters::SetRegCovarianceMatrix(TMatrixDSym *covmat)
 {
     //if(hasCovMat) cout << "WARNING: parameter set has both cov mat and reg cov mat!!" << endl;
 
-    if(covariance != NULL) covariance->Delete();
-    if(covarianceI != NULL) covarianceI->Delete();
+    if(covariance != nullptr) covariance->Delete();
+    if(covarianceI != nullptr) covarianceI->Delete();
 
     double det;
     covariance  = new TMatrixDSym(*covmat);
@@ -145,7 +143,7 @@ void AnaFitParameters::InitThrows()
     cout << "AnaFitParameters::InitThrows hasCovMat: " << hasCovMat << endl;
     cout << "AnaFitParameters::InitThrows hasRegCovMat: " << hasRegCovMat << endl;
     if(!hasCovMat && !hasRegCovMat) return;
-    if(throwParms!=NULL) delete throwParms;
+    if(throwParms!=nullptr) delete throwParms;
     TVectorD priorVec(covariance->GetNrows());
     for(int i=0; i<covariance->GetNrows(); i++) priorVec(i) = pars_prior[i];
 
