@@ -17,30 +17,31 @@ void dummy_fcn( Int_t &npar, Double_t *gin, Double_t &f,
 // ctor
 XsecFitter::XsecFitter(int seed)
 {
-    rand = new TRandom3(seed);
+    rng = new TRandom3(seed);
     //set gRandom to our rand
-    gRandom = rand;
-    m_dir   = NULL;
+    gRandom = rng;
+    m_dir   = nullptr;
     m_freq  = -1;
 }
 
 // dtor
 XsecFitter::~XsecFitter()
 {
-    if(rand) rand->Delete();
-    m_dir = NULL;
+    m_dir = nullptr;
+    if(rng != nullptr)
+        delete rng;
 }
 
 // SetSeed
 void XsecFitter::SetSeed(int seed)
 {
-    if(!rand)
+    if(rng == nullptr)
     {
-        rand = new TRandom3(seed);
-        gRandom = rand; //Global pointer
+        rng = new TRandom3(seed);
+        gRandom = rng; //Global pointer
     }
     else
-        rand->SetSeed(seed);
+        rng -> SetSeed(seed);
 }
 
 void XsecFitter::FixParameter(const std::string& par_name, const double& value)
@@ -62,30 +63,28 @@ void XsecFitter::FixParameter(const std::string& par_name, const double& value)
 }
 
 // PrepareFitter
-void XsecFitter::InitFitter(std::vector<AnaFitParameters*> &fitpara, Double_t reg, Double_t reg2, Int_t nipsbinsin, string paramVectorFname)
+void XsecFitter::InitFitter(std::vector<AnaFitParameters*> &fitpara, double reg, double reg2, int nipsbinsin, const std::string& paramVectorFname)
 {
     paramVectorFileName=paramVectorFname;
     reg_p1=reg;
     reg_p2=reg2;
     m_fitpara = fitpara;
     nipsbins = nipsbinsin;
-    vector<double> par_step, par_low, par_high;
-
-    //vector<int> par_fix;
+    std::vector<double> par_step, par_low, par_high;
 
     m_npar = 0;
     m_nparclass.clear();
     //get the parameter info
-    for(size_t i=0;i<m_fitpara.size();i++)
+    for(std::size_t i=0;i<m_fitpara.size();i++)
     {
         m_npar += (int)m_fitpara[i]->Npar;
         m_nparclass.push_back((int)m_fitpara[i]->Npar);
 
-        vector<string> vec0;
+        std::vector<string> vec0;
         m_fitpara[i]->GetParNames(vec0);
         par_names.insert(par_names.end(), vec0.begin(), vec0.end());
 
-        vector<double> vec1, vec2;
+        std::vector<double> vec1, vec2;
         m_fitpara[i]->GetParPriors(vec1);
         par_prefit.insert(par_prefit.end(), vec1.begin(), vec1.end());
 
@@ -95,10 +94,6 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*> &fitpara, Double_t re
         m_fitpara[i]->GetParLimits(vec1, vec2);
         par_low.insert(par_low.end(), vec1.begin(), vec1.end());
         par_high.insert(par_high.end(), vec2.begin(), vec2.end());
-
-        //vector<int> vec3
-        //m_fitpara[i]->GetFixStatus(vec3);
-        //par_fix.insert(par_fix.end(), vec3.begin(), vec3.end());
     }
 
     if(m_npar == 0)
@@ -137,11 +132,10 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*> &fitpara, Double_t re
 
     prefitParams = new TH1D("prefitParams", "prefitParams", m_npar, 0, m_npar);
     int paramNo=1;
-    for(size_t i=0;i<m_fitpara.size();i++)
+    for(std::size_t i=0;i<m_fitpara.size();i++)
     {
         for(int j=0; j<(int)m_fitpara[i]->Npar; j++){
             prefitParams->SetBinContent(paramNo, m_fitpara[i]->GetParPrior(j));
-            //prefitParams->SetBinContent(paramNo, 1);
             if(m_fitpara[i]->HasCovMat() && (!(m_fitpara[i]->HasRegCovMat())) && (i!=0)){
                 TMatrixDSym* covMat = m_fitpara[i]->GetCovarMat();
                 prefitParams->SetBinError(paramNo, sqrt((*covMat)[j][j]));
@@ -150,7 +144,6 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*> &fitpara, Double_t re
             paramNo++;
         }
     }
-
 }
 
 // Fit
@@ -170,7 +163,8 @@ void XsecFitter::Fit(std::vector<AnaSample*> &samples, const std::vector<std::st
     m_samples = samples;
     if(!fitter)
     {
-        std::cerr << "[ERROR]: Fitter has not been initialized." << std::endl;
+        std::cerr << "[ERROR]: In XsecFitter::Fit()\n"
+                  << "[ERROR]: Fitter has not been initialized." << std::endl;
         return;
     }
 
@@ -201,7 +195,8 @@ void XsecFitter::Fit(std::vector<AnaSample*> &samples, const std::vector<std::st
     }
     else
     {
-        std::cerr << "[ERROR]: No valid fitting mode provided." << std::endl;
+        std::cerr << "[ERROR]: In XsecFitter::Fit()\n"
+                  << "[ERROR]: No valid fitting mode provided." << std::endl;
         return;
     }
     if(m_freq >= 0 && m_dir)
@@ -211,7 +206,7 @@ void XsecFitter::Fit(std::vector<AnaSample*> &samples, const std::vector<std::st
     CollectSampleHistos();
 
     //Do fit
-    std::cout << "Fit prepared." << std::endl;
+    std::cout << "[XsecFitter]: Fit prepared." << std::endl;
     double arglist[5];
     //arglist[0] = 1000; //number of calls
     arglist[0] = 1000000; //number of calls
@@ -219,17 +214,17 @@ void XsecFitter::Fit(std::vector<AnaSample*> &samples, const std::vector<std::st
     arglist[1] = 1.0E-4; //tolerance
 
     if(fitMethod==1){
-        std::cout << "Calling MIGRAD ..." << std::endl;
+        std::cout << "[XsecFitter]: Calling MIGRAD ..." << std::endl;
         fitter->ExecuteCommand("MIGRAD", arglist, 2);
     }
     else if(fitMethod==2){
-        std::cout << "Calling MIGRAD ..." << std::endl;
+        std::cout << "[XsecFitter]: Calling MIGRAD ..." << std::endl;
         fitter->ExecuteCommand("MIGRAD", arglist, 2);
-        std::cout << "Calling HESSE ..." << std::endl;
+        std::cout << "[XsecFitter]: Calling HESSE ..." << std::endl;
         fitter->ExecuteCommand("HESSE", arglist, 2);
     }
     else if(fitMethod==3){
-        std::cout << "Calling MINOS ..." << std::endl;
+        std::cout << "[XsecFitter]: Calling MINOS ..." << std::endl;
         fitter->ExecuteCommand("MINOS", arglist, 2);
     }
 
@@ -377,7 +372,7 @@ void XsecFitter::GenerateToyData(int toyindx, int toytype, int statFluct)
             //Throw fit params randomly in a sensible range (here 0.1 - 3.1, want to stay away from 0 boundary)
             if((m_fitpara[i]->HasCovMat())==false){
                 for(size_t j=0;j<pars.size();j++){
-                    pars[j] = (3*gRandom->Rndm())+0.1;
+                    pars[j] = (3*gRandom -> Uniform(0,1))+0.1;
                 }
             }
         }
