@@ -128,31 +128,29 @@ int main(int argc, char *argv[])
 
     // The sample ID (first arg) should match the cutBranch corresponding to it
 
-    AnySample sam2(1, "MuTPCpTPC",v_D1edges, v_D2edges, tdata, isBuffer, false);
+    AnySample sam2(1, "MuTPCpTPC", v_D1edges, v_D2edges, tdata, isBuffer, false);
     sam2.SetNorm(potD/potMC);
     samples.push_back(&sam2);
 
-    AnySample sam6(5, "CC1pi",v_D1edges, v_D2edges, tdata, isBuffer, false);
-    sam6.SetNorm(potD/potMC);
-    samples.push_back(&sam6);
+    //AnySample sam6(5, "CC1pi", v_D1edges, v_D2edges, tdata, isBuffer, true);
+    //sam6.SetNorm(potD/potMC);
+    //samples.push_back(&sam6);
 
-    AnySample sam7(6, "DIS",v_D1edges, v_D2edges, tdata, isBuffer, false);
-    sam7.SetNorm(potD/potMC);
-    samples.push_back(&sam7);
+    //AnySample sam7(6, "DIS", v_D1edges, v_D2edges, tdata, isBuffer, true);
+    //sam7.SetNorm(potD/potMC);
+    //samples.push_back(&sam7);
 
-    AnySample sam8(10, "Ingrid",v_D1edges, v_D2edges, tdata, isBuffer, true, true);
-    sam8.SetNorm(potD/potMC);
-    samples.push_back(&sam8);
+    //AnySample sam8(10, "Ingrid", v_D1edges, v_D2edges, tdata, isBuffer, true, true);
+    //sam8.SetNorm(potD/potMC);
+    //samples.push_back(&sam8);
 
     //read MC events
     AnyTreeMC selTree(fsel.c_str());
     std::cout << "[IngridFit]: Reading and collecting events." << std::endl;
-    selTree.GetEvents(samples);
+    std::vector<int> signal_topology = {1, 2};
+    selTree.GetEvents(samples, signal_topology);
 
-    //get brakdown by reaction
     std::cout << "[IngridFit]: Getting sample breakdown by reaction." << std::endl;
-    //for(size_t s = 0; s < samples.size(); ++s)
-    //    samples[s] -> GetSampleBreakdown(fout,"nominal",true);
     std::vector<std::string> topology = {"cc0pi0p", "cc0pi1p", "cc0pinp", "cc1pi+", "ccother", "backg", "Null", "OOFV"};
 
     for(auto& sample : samples)
@@ -230,7 +228,7 @@ int main(int argc, char *argv[])
     //           0 = Do not apply Stat Fluct to fake data
     //           1 = Apply Stat Fluct to fake data
 
-    xsecfit.Fit(samples, topology, 2, 2, 0);
+    xsecfit.Fit(samples, topology, 3, 2, 0);
     fout -> Close();
 
     return 0;

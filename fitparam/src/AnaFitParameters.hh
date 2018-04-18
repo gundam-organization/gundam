@@ -48,7 +48,7 @@ class AnaFitParameters
         virtual void ReWeightIngrid(AnaEvent *event, int nsample, int nevent,
                 std::vector<double> &params) = 0;
 
-        virtual double GetChi2(std::vector<double> &params);
+        virtual double GetChi2(const std::vector<double> &params);
 
         virtual void SetCovarianceMatrix(const TMatrixDSym& covmat);
         virtual void SetRegCovarianceMatrix(TMatrixDSym *covmat);
@@ -92,7 +92,7 @@ class AnaFitParameters
 
         void SetNpar(int n)
         {
-            std::cout<<"WARNING: overriding number of parameters" << std::endl;
+            std::cout << "[WARNING]: Overriding number of parameters." << std::endl;
             Npar = n;
         }
 
@@ -101,7 +101,7 @@ class AnaFitParameters
 
     protected:
         //check all dimensions
-        void CheckDims(std::vector<double> &params);
+        bool CheckDims(const std::vector<double> &params);
 
         std::string m_name;
         std::vector<std::string> pars_name;
@@ -113,7 +113,7 @@ class AnaFitParameters
 
         //map for events in each sample
         std::vector< std::vector<int> > m_evmap;
-        bool hasCovMat, checkDims, hasRegCovMat;
+        bool hasCovMat, hasRegCovMat;
         //
         TMatrixDSym *covariance;  //cov matrix
         TMatrixDSym *covarianceI; //inverse of cov matrix

@@ -1,32 +1,33 @@
 #include "AnaFitParameters.hh"
 
-// ctor
 AnaFitParameters::AnaFitParameters()
 {
     m_name    = "none";
     Npar      = 0;
     hasCovMat = false;
     hasRegCovMat = false;
-    checkDims = false;
 
     covariance  = nullptr;
     covarianceI = nullptr;
     throwParms  = nullptr;
 }
 
-// dtor
 AnaFitParameters::~AnaFitParameters()
 {
-    if(covariance != nullptr) covariance->Delete();
-    if(covarianceI != nullptr) covarianceI->Delete();
-    if(throwParms != nullptr) delete throwParms;
+    if(covariance != nullptr)
+        delete covariance;
+    if(covarianceI != nullptr)
+        delete covarianceI;
+    if(throwParms != nullptr)
+        delete throwParms;
 }
 
-// SetCovarianceMatrix
 void AnaFitParameters::SetCovarianceMatrix(const TMatrixDSym& covmat)
 {
-    if(covariance != nullptr) covariance->Delete();
-    if(covarianceI != nullptr) covarianceI->Delete();
+    if(covariance != nullptr)
+        delete covariance;
+    if(covarianceI != nullptr)
+        delete covarianceI;
 
     covariance  = new TMatrixDSym(covmat);
     covarianceI = new TMatrixDSym(covmat);
@@ -90,51 +91,63 @@ void AnaFitParameters::SetRegCovarianceMatrix(TMatrixDSym *covmat)
     hasRegCovMat = true;
 }
 
-// GetChi2
-double AnaFitParameters::GetChi2(std::vector<double> &params)
+double AnaFitParameters::GetChi2(const std::vector<double> &params)
 {
-    //if no covariance matrix ...
     if(!hasCovMat) return 0.0;
 
-    if(!checkDims) //check dimensions of various things are ok
+    if(CheckDims(params) == false)
     {
-        CheckDims(params);
-        cout << "AnaFitParameters.cc: Warning, dimension check failed" << endl;
-        if(!checkDims) return 0.0;
+        std::cout << "[WARNING]: In AnaFitParameters::GetChi2()\n"
+                  << "[WARNING]: Warning, dimension check failed." << endl;
+        return 0.0;
     }
 
-    //for(size_t i=0;i<params.size();i++)  cout<<i<<" "<<params[i]<<" "<<pars_prior[i]<<endl;
-
     double chi2 = 0;
-    for(int i=0; i<covarianceI->GetNrows(); i++)
+    for(int i=0; i < covarianceI -> GetNrows(); i++)
     {
-        for(int j=0; j<covarianceI->GetNrows(); j++)
+        for(int j=0; j < covarianceI -> GetNrows(); j++)
         {
-            chi2+= (params[i]-pars_prior[i])*(params[j]-pars_prior[j])*(*covarianceI)(i,j);
+            chi2 += (params[i]-pars_prior[i]) * (params[j]-pars_prior[j]) * (*covarianceI)(i,j);
         }
     }
 
     return chi2;
 }
 
-// CheckDims
-void AnaFitParameters::CheckDims(std::vector<double> &params)
+bool AnaFitParameters::CheckDims(const std::vector<double> &params)
 {
-    checkDims = (params.size() == pars_prior.size());
-    if(!checkDims){
-        cerr<<"ERROR: dimensions of vectors don't match"<<endl;
-        cout << "Prams size is: " << params.size() << endl;
-        cout << "Prior size is: " << pars_prior.size() << endl;
+    bool vector_size = false;
+    bool matrix_size = false;
+
+    if(params.size() == pars_prior.size())
+    {
+        vector_size = true;
     }
-    if(hasCovMat) checkDims = checkDims && (covariance->GetNrows() == (int)pars_prior.size());
-    if(!checkDims){
-        cerr<<"ERROR: dimensions of vector and cov mat don't match"<<endl;
-        cout << "Rows in cov mat: " << covariance->GetNrows() << endl;
-        cout << "Prior size: " << pars_prior.size() << endl;
+
+    else
+    {
+        std::cerr << "[ERROR]: Dimension of parameter vector does not match priors.\n"
+                  << "[ERROR]: Prams size is: " << params.size() << std::endl
+                  << "[ERROR]: Prior size is: " << pars_prior.size() << std::endl;
+        vector_size = false;
     }
+
+    if(covariance -> GetNrows() == pars_prior.size())
+    {
+        matrix_size = true;
+    }
+
+    else
+    {
+        std::cerr << "[ERROR]: Dimension of covariance maxtix does not match priors.\n"
+                  << "[ERROR]: Rows in cov mat: " << covariance -> GetNrows() << std::endl
+                  << "[ERROR]: Prior size is: " << pars_prior.size() << std::endl;
+        matrix_size = false;
+    }
+
+    return vector_size && matrix_size;
 }
 
-// InitThrows
 void AnaFitParameters::InitThrows()
 {
     cout << "AnaFitParameters::InitThrows" << endl;

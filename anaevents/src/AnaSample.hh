@@ -47,7 +47,7 @@ class AnaSample
         virtual void SetData(TObject *data) = 0;
         virtual void FillEventHisto(int datatype) = 0;
         virtual double CalcChi2() = 0;
-        virtual void Write(TDirectory *dirout, const char *bsname, int fititer) = 0;
+        virtual void Write(TDirectory *dirout, const std::string& bsname, int fititer) = 0;
         virtual void GetSampleBreakdown(TDirectory *dirout, const std::string& tag, bool save) = 0;
         virtual void GetSampleBreakdown(TDirectory *dirout, const std::string& tag, const std::vector<std::string>& topology, bool save) = 0;
 

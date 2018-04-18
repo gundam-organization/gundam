@@ -50,10 +50,8 @@ class FitParameters : public AnaFitParameters
         void SetBinning(const std::string& file_name);
 
     private:
-        //binnig function
         int GetBinIndex(double D1, double D2);
-        int ccqe_recode;              //reaction code - defunct as it stands, signal is defined manually in FitParameters.cc
-        std::vector<FitBin> m_bins; //binning
+        std::vector<FitBin> m_bins;
 };
 
 #endif

@@ -46,32 +46,32 @@ class AnyTreeMC
 
 
         // List of branches
-        TBranch *b_cutBranch;   //!
-        TBranch *b_evtTopology;   //!
-        TBranch *b_evtReaction;   //!
-        TBranch *b_D1True;   //!
-        TBranch *b_D2True;   //!
-        TBranch *b_D1Reco;   //!
-        TBranch *b_D2Reco;   //!
-        TBranch *b_EnuReco;   //!
-        TBranch *b_EnuTrue;   //!
-        TBranch *b_weight;   //!
+        TBranch *b_cutBranch;
+        TBranch *b_evtTopology;
+        TBranch *b_evtReaction;
+        TBranch *b_D1True;
+        TBranch *b_D2True;
+        TBranch *b_D1Reco;
+        TBranch *b_D2Reco;
+        TBranch *b_EnuReco;
+        TBranch *b_EnuTrue;
+        TBranch *b_weight;
 
         // New kinematic variables always included for phase space cuts
-        TBranch *b_pMomRec;   //!
-        TBranch *b_pMomTrue;   //!
-        TBranch *b_muMomRec;   //!
-        TBranch *b_muMomTrue;   //!
-        TBranch *b_muCosThetaRec;   //!
-        TBranch *b_muCosThetaTrue;   //!
-        TBranch *b_pCosThetaRec;   //!
-        TBranch *b_pCosThetaTrue;   //!
+        TBranch *b_pMomRec;
+        TBranch *b_pMomTrue;
+        TBranch *b_muMomRec;
+        TBranch *b_muMomTrue;
+        TBranch *b_muCosThetaRec;
+        TBranch *b_muCosThetaTrue;
+        TBranch *b_pCosThetaRec;
+        TBranch *b_pCosThetaTrue;
 
         AnyTreeMC(const std::string& file_name);
         ~AnyTreeMC();
         long int GetEntry(long int entry);
         void SetBranches();
-        void GetEvents(std::vector<AnaSample*> ana_samples);
+        void GetEvents(std::vector<AnaSample*>& ana_samples, const std::vector<int>& sig_topology);
 };
 
 #endif

@@ -3,7 +3,6 @@
 FitParameters::FitParameters(const std::string& file_name, const std::string& par_name, bool random_priors)
 {
     m_name = par_name;
-    //hasCovMat = false;
 
     //get the binning from a file
     SetBinning(file_name);
@@ -92,13 +91,12 @@ void FitParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
     m_evmap.clear();
 
     //loop over events to build index map
-    for(size_t s=0;s<sample.size();s++)
+    for(std::size_t s=0; s < sample.size(); s++)
     {
         vector<int> row;
-        for(int i=0;i<sample[s]->GetN();i++)
+        for(int i=0; i < sample[s] -> GetN() ; i++)
         {
-            AnaEvent *ev = sample[s]->GetEvent(i);
-            int code = PASSEVENT; // -1 by default
+            AnaEvent *ev = sample[s] -> GetEvent(i);
 
             // SIGNAL DEFINITION TIME
             // Warning, important hard coding up ahead:
@@ -106,21 +104,23 @@ void FitParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
             // N.B In Sara's original code THIS WAS THE OTHER WAY AROUND i.e. this if statement asked what was NOT your signal
             // Bare that in mind if you've been using older versions of the fitter.
 
-            if((ev->GetTopology()==1)||(ev->GetTopology()==2))
+            //if((ev->GetTopology()==1)||(ev->GetTopology()==2))
+            if(ev -> isSignalEvent())
             {
-                //get event true D1 and D2
-                double D1 = ev->GetTrueD1();
-                double D2 = ev->GetTrueD2();
-                int binn = GetBinIndex(D1, D2);
-                if(binn == BADBIN)
+                double D1 = ev -> GetTrueD1();
+                double D2 = ev -> GetTrueD2();
+                int bin = GetBinIndex(D1, D2);
+                if(bin == BADBIN)
                 {
-                    std::cout<<"WARNING: "<<m_name<<" D1 = "<<D1<<" D2 = "<<D2<<" fall outside bin ranges"<<std::endl;
-                    std::cout<<"        This event will be ignored in analysis."<<std::endl;
+                    std::cout << "[WARNING]: " << m_name << ", Event: " << i << std::endl
+                              << "[WARNING]: D1 = " << D1 << ", D2 = " << D2 << ", falls outside bin ranges." << std::endl
+                              << "[WARNING]: This event will be ignored in the analysis." << std::endl;
                 }
-                row.push_back(binn);
+                row.push_back(bin);
             }
-            else{
-                row.push_back(code);
+            else
+            {
+                row.push_back(PASSEVENT);
                 continue;
             }
 
@@ -161,21 +161,21 @@ void FitParameters::ReWeight(AnaEvent *event, int nsample, int nevent, std::vect
         return;
     }
 
-    int binn = m_evmap[nsample][nevent];
+    int bin = m_evmap[nsample][nevent];
 
     //skip event if not Signal
-    if(binn == PASSEVENT) return;
+    if(bin == PASSEVENT) return;
 
     // If bin fell out of valid ranges, pretend the event just didn't happen:
-    if(binn == BADBIN) event->AddEvWght(0.0);
+    if(bin == BADBIN) event->AddEvWght(0.0);
     else
     {
-        if(binn>(int)params.size())
+        if(bin > params.size())
         {
             cerr<<"ERROR: number of bins "<<m_name<<" does not match num of param"<<endl;
             event->AddEvWght(0.0);
         }
-        event->AddEvWght(params[binn]);
+        event->AddEvWght(params[bin]);
         //cout << "ReWeight param " << binn << endl;
         //cout << "Weight is " << params[binn] << endl;
     }

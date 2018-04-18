@@ -169,9 +169,9 @@ void AnySample::MakeHistos()
 
 void AnySample::SetData(TObject *hdata)
 {
-    //clone the data histogram internally
-    if(m_hdata != nullptr) m_hdata->Delete();
-    m_hdata = (TH1D*)hdata->Clone(Form("%s_data", m_name.c_str()));
+    if(m_hdata != nullptr)
+        delete m_hdata;
+    m_hdata = (TH1D*)hdata -> Clone(Form("%s_data", m_name.c_str()));
     m_hdata->SetDirectory(0);
 }
 
@@ -284,7 +284,7 @@ void AnySample::FillEventHisto(int datatype)
                 continue;
             }
 
-            double poisson_val = gRandom->Poisson(val);
+            double poisson_val = gRandom -> Poisson(val);
             m_hdata -> SetBinContent(j, poisson_val); //with statistical fluctuations
         }
     }
@@ -293,7 +293,7 @@ void AnySample::FillEventHisto(int datatype)
     else if(datatype == 2 || datatype == 4)
     {
         SetData(m_hpred);
-        m_hdata->Reset();
+        m_hdata -> Reset();
 
         float D1_rec_tree, D2_rec_tree, wght;
         int cut_branch;
@@ -628,14 +628,16 @@ void AnySample::GetSampleBreakdown(TDirectory *dirout, const std::string& tag, b
         }
 }
 
-void AnySample::Write(TDirectory *dirout, const char *bsname, int fititer)
+void AnySample::Write(TDirectory *dirout, const std::string& bsname, int fititer)
 {
-    dirout->cd();
-    m_hpred->Write(Form("%s_pred", bsname));
-    m_hmc_true->Write(Form("%s_true", bsname));
-    if(fititer==0){
-        m_hmc->Write(Form("%s_mc", bsname));
-        if(m_hdata != nullptr) m_hdata->Write(Form("%s_data", bsname));
+    dirout -> cd();
+    m_hpred -> Write(Form("%s_pred", bsname.c_str()));
+    m_hmc_true -> Write(Form("%s_true", bsname.c_str()));
+    if(fititer == 0)
+    {
+        m_hmc -> Write(Form("%s_mc", bsname.c_str()));
+        if(m_hdata != nullptr)
+            m_hdata -> Write(Form("%s_data", bsname.c_str()));
     }
 }
 
@@ -705,7 +707,7 @@ void AnySample::GetSampleBreakdown(TDirectory *dirout, const std::string& tag, c
     }
 
     if(m_hsig != nullptr)
-        m_hsig -> Delete();
+        delete m_hsig;
     m_hsig = new TH1D(Form("%s_signalOnly_%s", m_name.c_str(), tag.c_str()),
             Form("%s_signalOnly_%s", m_name.c_str(), tag.c_str()),
             nAnybins, bins_Any);

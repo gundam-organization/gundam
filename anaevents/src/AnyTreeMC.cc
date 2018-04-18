@@ -52,7 +52,7 @@ void AnyTreeMC::SetBranches()
     fChain -> SetBranchAddress("muCosThetaTrue", &muCosThetaTrue, &b_muCosThetaTrue);
 }
 
-void AnyTreeMC::GetEvents(std::vector<AnaSample*> ana_samples)
+void AnyTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples, const std::vector<int>& sig_topology)
 {
     if(fChain == nullptr) return;
     if(ana_samples.empty()) return;
@@ -88,6 +88,15 @@ void AnyTreeMC::GetEvents(std::vector<AnaSample*> ana_samples)
         ev.SetpMomTrue(pMomTrue);
         ev.SetpCosThetaRec(pCosThetaRec);
         ev.SetpCosThetaTrue(pCosThetaTrue);
+
+        for(const auto& signal_topology: sig_topology)
+        {
+            if(signal_topology == evtTopology)
+            {
+                ev.SetSignalEvent();
+                break;
+            }
+        }
 
         for(auto& sample : ana_samples)
         {

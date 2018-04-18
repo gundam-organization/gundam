@@ -25,6 +25,7 @@ class AnaEvent
             m_topology = -1;
             m_reaction = -1;
             m_sample   = -1;
+            m_signal   = false;
             m_trueEnu  = -999.0;
             m_recEnu   = -999.0;
             m_trueD1   = -999.0;
@@ -58,6 +59,9 @@ class AnaEvent
 
         void SetSampleType(int val){ m_sample = val; }
         int GetSampleType(){ return m_sample; }
+
+        void SetSignalEvent(){ m_signal = true; }
+        bool isSignalEvent(){ return m_signal; }
 
         long int GetEvId(){ return m_evid; }
 
@@ -134,6 +138,7 @@ class AnaEvent
         int m_topology;    //final state topology type
         int m_reaction;    //event interaction mode
         int m_sample;      //sample type (aka cutBranch)
+        bool m_signal;     //flag if signal event
         double m_trueEnu;  //true nu energy
         double m_recEnu;   //recon nu energy
         double m_trueD1;   //true D1

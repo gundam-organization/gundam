@@ -52,18 +52,18 @@ class AnySample : public AnaSample
         TH1D* GetDataHisto(){ return m_hdata; }
         TH1D* GetMCHisto(){ return m_hmc; }
         TH1D* GetMCTruthHisto(){ return m_hmc_true; }
+        TH1D* GetSignalHisto(){ return m_hsig; }
 
         void GetSampleBreakdown(TDirectory *dirout, const std::string& tag, bool save);
         void GetSampleBreakdown(TDirectory *dirout, const std::string& tag, const std::vector<std::string>& topology, bool save);
-        TH1D* GetSignalHisto(){ return m_hsig; }
-        void Write(TDirectory *dirout, const char *bsname, int fititer);
+        void Write(TDirectory *dirout, const std::string& bsname, int fititer);
         int GetSampleId(){ return sample_id; }
 
     private:
         int sample_id;
         TH1D *m_hmc_true;
         TH1D *m_hmc;
-        TH1D *m_hpred; //n(pRec_mu, thetaRec_mu)
+        TH1D *m_hpred;
         TH1D *m_hdata;
         TH1D *m_hsig;
         TTree * m_data_tree;
