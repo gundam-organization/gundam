@@ -11,6 +11,7 @@ parameters defined in /fitparams/src/FitParameters
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <unistd.h>
 
 #include <TCanvas.h>
 #include <TH1F.h>
@@ -33,33 +34,91 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    std::string inputDir = std::string(xslf_env) + "/inputs/ingridFit";
-    std::string fsel     = inputDir + "/fixed_nominal.root"; //"/NeutAir5_2DV2.root";
-    std::string fakeData     = inputDir + "/fixed_nominal.root"; //"/NeutAir5_2DV2.root";
-    std::string fxsecbinning = inputDir + "/ingrid_binning.txt"; //"/dptbinning2DPS_shortest_inclusive.txt";
+    std::string input_dir = std::string(xslf_env) + "/inputs/ingridFit/";
+    std::string fname_data = input_dir + "fixed_nominal.root"; //"/NeutAir5_2DV2.root";
+    std::string fname_mc   = input_dir + "fixed_nominal.root"; //"/NeutAir5_2DV2.root";
+    std::string fname_binning = input_dir + "ingrid_binning.txt"; //"/dptbinning2DPS_shortest_inclusive.txt";
+    std::string fname_fluxcov = input_dir + "flux_numu_cov.root";
     std::string paramVectorFname = "fitresults.root";
-    std::string fnameout = "ingridFit.root";
+    std::string fname_output = "ingridFit.root";
 
     const double potD  = 331.6; //in units 10^19 Neut Air
     const double potMC = 331.6; //in units 10^19 Neut Air
-    const int seed = 1019;
+    int seed = 1019;
+    bool fit_nd280 = false;
+    bool fit_ingrid = false;
+    bool stat_fluc = false;
+
     int nbins = 0;
     int nprimbins = 8;
     int isBuffer = false; // Is the final bin just for including events that go beyond xsec binning
     // e.g. events with over 5GeV pmu if binning in pmu
 
+    //Argument parser for now. Possibly try cxxopts library.
+    char option;
+    while((option = getopt(argc, argv, "d:m:o:b:f:NIsS:h")) != -1)
+    {
+        switch(option)
+        {
+            case 'd':
+                fname_data = input_dir + optarg;
+                break;
+            case 'm':
+                fname_mc = input_dir + optarg;
+                break;
+            case 'o':
+                fname_output = optarg;
+                break;
+            case 'b':
+                fname_binning = input_dir + optarg;
+                break;
+            case 'f':
+                fname_fluxcov = input_dir + optarg;
+                break;
+            case 'N':
+                fit_nd280 = true;
+                break;
+            case 'I':
+                fit_ingrid = true;
+                break;
+            case 's':
+                stat_fluc = true;
+                break;
+            case 'S':
+                seed = std::stoi(optarg);
+                break;
+            case 'h':
+                std::cout << "USAGE: "
+                          << argv[0] << "\nOPTIONS:\n"
+                          << "-d : set data file\n"
+                          << "-m : set mc file\n"
+                          << "-o : set output file\n"
+                          << "-b : set binning file\n"
+                          << "-f : set flux covariance\n"
+                          << "-N : fit nd280 sample\n"
+                          << "-I : fit ingrid sample\n"
+                          << "-s : set statistical fluctuations\n"
+                          << "-S : set random seed\n";
+            default:
+                return 0;
+        }
+    }
+
+    if(fit_nd280 == false && fit_ingrid == false)
+        fit_nd280 = true;
+
     // Setup data trees
-    TFile* fdata = TFile::Open(fakeData.c_str(), "READ");
+    TFile* fdata = TFile::Open(fname_data.c_str(), "READ");
     TTree* tdata = (TTree*)(fdata->Get("selectedEvents"));
 
     //Set up bin edges
     std::vector< std::pair<double, double> > v_D1edges;
     std::vector< std::pair<double, double> > v_D2edges;
 
-    std::ifstream fin(fxsecbinning, std::ios::in);
+    std::ifstream fin(fname_binning, std::ios::in);
     if(!fin.is_open())
     {
-        std::cerr << "[ERROR]: Failed to open binning file: " << fxsecbinning
+        std::cerr << "[ERROR]: Failed to open binning file: " << fname_binning
                   << "[ERROR]: Terminating execution." << std::endl;
         return 1;
     }
@@ -91,8 +150,7 @@ int main(int argc, char *argv[])
     std::cout << "*********************************" << std::endl << std::endl;
 
     //input File
-    std::string finfluxcovFN = inputDir + "/flux_numu_cov_no_corr.root";
-    TFile *finfluxcov = TFile::Open(finfluxcovFN.c_str(), "READ"); //contains flux systematics info
+    TFile *finfluxcov = TFile::Open(fname_fluxcov.c_str(), "READ"); //contains flux systematics info
 
     //setup enu bins and covm for flux
     TH1D *nd_numu_bins_hist = (TH1D*)finfluxcov->Get("flux_binning");
@@ -104,23 +162,14 @@ int main(int argc, char *argv[])
         enubins.push_back(nd_numu_bins -> GetBinUpEdge(i+1));
 
     //Cov mat stuff:
-    TMatrixDSym* cov_flux_in  = (TMatrixDSym*)finfluxcov -> Get("flux_numu_cov");
+    TMatrixDSym* cov_flux_in = (TMatrixDSym*)finfluxcov -> Get("flux_numu_cov");
     TMatrixDSym cov_flux = *cov_flux_in;
-
-    //TMatrixDSym cov_flux(cov_flux_in->GetNrows());
-    //for(int i=0;i<cov_flux_in->GetNrows();i++){
-    //    for(int j=0;j<cov_flux_in->GetNrows();j++)
-    //    {
-    //        cov_flux(i, j) = (*cov_flux_in)(i,j);
-    //    }
-    //}
-
     finfluxcov -> Close();
 
     /*************************************** FLUX END *************************************/
 
-    TFile *fout = TFile::Open(fnameout.c_str(), "RECREATE");
-    std::cout << "[IngridFit]: Open output file: " << fnameout << std::endl;
+    TFile *fout = TFile::Open(fname_output.c_str(), "RECREATE");
+    std::cout << "[IngridFit]: Open output file: " << fname_output << std::endl;
 
     // Add analysis samples:
 
@@ -130,7 +179,8 @@ int main(int argc, char *argv[])
 
     AnySample sam2(1, "MuTPCpTPC", v_D1edges, v_D2edges, tdata, isBuffer, false);
     sam2.SetNorm(potD/potMC);
-    samples.push_back(&sam2);
+    if(fit_nd280 == true)
+        samples.push_back(&sam2);
 
     //AnySample sam6(5, "CC1pi", v_D1edges, v_D2edges, tdata, isBuffer, true);
     //sam6.SetNorm(potD/potMC);
@@ -140,12 +190,13 @@ int main(int argc, char *argv[])
     //sam7.SetNorm(potD/potMC);
     //samples.push_back(&sam7);
 
-    //AnySample sam8(10, "Ingrid", v_D1edges, v_D2edges, tdata, isBuffer, true, true);
-    //sam8.SetNorm(potD/potMC);
-    //samples.push_back(&sam8);
+    AnySample sam8(10, "Ingrid", v_D1edges, v_D2edges, tdata, isBuffer, false, true);
+    sam8.SetNorm(potD/potMC);
+    if(fit_ingrid == true)
+        samples.push_back(&sam8);
 
     //read MC events
-    AnyTreeMC selTree(fsel.c_str());
+    AnyTreeMC selTree(fname_mc.c_str());
     std::cout << "[IngridFit]: Reading and collecting events." << std::endl;
     std::vector<int> signal_topology = {1, 2};
     selTree.GetEvents(samples, signal_topology);
@@ -170,7 +221,7 @@ int main(int argc, char *argv[])
     // fit parameters first.
 
     //Fit parameters
-    FitParameters sigfitpara(fxsecbinning, "par_fit");
+    FitParameters sigfitpara(fname_binning, "par_fit");
     sigfitpara.InitEventMap(samples, 0);
     fitpara.push_back(&sigfitpara);
 
@@ -228,7 +279,11 @@ int main(int argc, char *argv[])
     //           0 = Do not apply Stat Fluct to fake data
     //           1 = Apply Stat Fluct to fake data
 
-    xsecfit.Fit(samples, topology, 3, 2, 0);
+    int fit_mode = 2;
+    if(stat_fluc == true)
+        fit_mode = 3;
+
+    xsecfit.Fit(samples, topology, fit_mode, 2, 0);
     fout -> Close();
 
     return 0;
