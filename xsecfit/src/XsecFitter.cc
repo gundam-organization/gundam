@@ -77,8 +77,8 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*> &fitpara, double reg,
     //get the parameter info
     for(std::size_t i=0;i<m_fitpara.size();i++)
     {
-        m_npar += (int)m_fitpara[i]->Npar;
-        m_nparclass.push_back((int)m_fitpara[i]->Npar);
+        m_npar += m_fitpara[i]->GetNpar();
+        m_nparclass.push_back(m_fitpara[i]->GetNpar());
 
         std::vector<string> vec0;
         m_fitpara[i]->GetParNames(vec0);
@@ -134,7 +134,7 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*> &fitpara, double reg,
     int paramNo=1;
     for(std::size_t i=0;i<m_fitpara.size();i++)
     {
-        for(int j=0; j<(int)m_fitpara[i]->Npar; j++){
+        for(int j=0; j<m_fitpara[i]->GetNpar(); j++){
             prefitParams->SetBinContent(paramNo, m_fitpara[i]->GetParPrior(j));
             if(m_fitpara[i]->HasCovMat() && (!(m_fitpara[i]->HasRegCovMat())) && (i!=0)){
                 TMatrixDSym* covMat = m_fitpara[i]->GetCovarMat();
@@ -378,7 +378,7 @@ void XsecFitter::GenerateToyData(int toyindx, int toytype, int statFluct)
         }
 
         if(toytype==3){
-            for(int j=0; j<m_fitpara[i]->Npar; j++){
+            for(int j=0; j<m_fitpara[i]->GetNpar(); j++){
                 pars.push_back((*paramVec)(gparamno));
                 gparamno++;
             }
@@ -672,8 +672,8 @@ void XsecFitter::DoSaveChi2()
     delete histochi2tot;
 }
 
-void XsecFitter::DoSaveResults(vector< vector<double> > parresults, vector< vector<double> > parerrors, vector< vector<double> > parerrorsplus, vector< vector<double> > parerrorsminus,
-        vector< vector<double> > parerrorspara, vector< vector<double> > parerrorsglobc, vector< vector<double> > parerrorsprof, double chi2){
+void XsecFitter::DoSaveResults(vector< vector<double> >& parresults, vector< vector<double> >& parerrors, vector< vector<double> >& parerrorsplus, vector< vector<double> >& parerrorsminus,
+        vector< vector<double> >& parerrorspara, vector< vector<double> >& parerrorsglobc, vector< vector<double> >& parerrorsprof, double chi2){
     //loop on number of parameter classes
     for(size_t i=0;i<m_fitpara.size();i++)
     {

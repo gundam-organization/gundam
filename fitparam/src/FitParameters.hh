@@ -20,8 +20,6 @@
 
 #include "AnaFitParameters.hh"
 
-using namespace std;
-
 struct FitBin
 {
     double D1low, D1high;

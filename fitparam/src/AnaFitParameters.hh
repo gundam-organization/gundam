@@ -20,7 +20,6 @@
 #include <TMatrixDSym.h>
 #include <TH1F.h>
 
-//#include "AnaEvent.hh"
 #include "AnaSample.hh"
 #include "ThrowParms.hh"
 
@@ -101,19 +100,17 @@ class AnaFitParameters
 
         void SetFluxHisto(TH1F* h_flux);
 
+        int GetNpar(){ return Npar; }
         void SetNpar(int n)
         {
             std::cout << "[WARNING]: Overriding number of parameters." << std::endl;
             Npar = n;
         }
 
-    public:
-        size_t Npar; //number of parameters
-
     protected:
-        //check all dimensions
         bool CheckDims(const std::vector<double> &params);
 
+        size_t Npar;
         std::string m_name;
         std::map<std::string, int> m_det_offset;
         std::map<std::string, std::vector<double> > m_det_bins;
@@ -128,7 +125,7 @@ class AnaFitParameters
         std::vector< std::vector<int> > m_evmap;
         bool m_rng_priors;
         bool hasCovMat, hasRegCovMat;
-        //
+
         TMatrixDSym *covariance;  //cov matrix
         TMatrixDSym *covarianceI; //inverse of cov matrix
         TMatrixDSym *regcovariance;  //cov matrix

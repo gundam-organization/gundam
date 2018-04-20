@@ -223,7 +223,7 @@ void AnaFitParameters::SetFluxHisto(TH1F* h_flux)
 
 void AnaFitParameters::AddDetector(const std::string& det, const std::vector<double>& bins, int offset)
 {
-    std::cout << "[AnaFitParameters]: Adding detector " << det << std::endl;
+    std::cout << "[AnaFitParameters]: Adding detector " << det << " for " << this -> m_name << std::endl;
     m_det_bins.emplace(std::make_pair(det, bins));
     m_det_offset.emplace(std::make_pair(det, offset));
 }

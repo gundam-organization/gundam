@@ -49,7 +49,6 @@ int main(int argc, char *argv[])
     bool fit_ingrid = false;
     bool stat_fluc = false;
 
-    int nbins = 0;
     int nprimbins = 8;
     int isBuffer = false; // Is the final bin just for including events that go beyond xsec binning
     // e.g. events with over 5GeV pmu if binning in pmu
@@ -115,6 +114,10 @@ int main(int argc, char *argv[])
     std::vector< std::pair<double, double> > v_D1edges;
     std::vector< std::pair<double, double> > v_D2edges;
 
+    std::cout << "------------------------------------------------\n"
+              << "[IngridFit]: Welcome to the Super-xsLLhFitter.\n" 
+              << "[IngridFit]: Initializing the fit machinery..." << std::endl;
+    std::cout << "[IngridFit]: Opening " << fname_binning << " for analysis binning." << std::endl;
     std::ifstream fin(fname_binning, std::ios::in);
     if(!fin.is_open())
     {
@@ -128,7 +131,6 @@ int main(int argc, char *argv[])
         std::string line;
         while(getline(fin, line))
         {
-            nbins++;
             std::stringstream ss(line);
             double D1_1, D1_2, D2_1, D2_2;
             if(!(ss>>D2_1>>D2_2>>D1_1>>D1_2))
@@ -145,13 +147,11 @@ int main(int argc, char *argv[])
     //Set up systematics:
 
     /*************************************** FLUX *****************************************/
-    std::cout << "*********************************" << std::endl;
     std::cout << "[IngridFit]: Setup Flux " << std::endl;
-    std::cout << "*********************************" << std::endl << std::endl;
 
     //input File
     TFile *finfluxcov = TFile::Open(fname_fluxcov.c_str(), "READ"); //contains flux systematics info
-
+    std::cout << "[IngridFit]: Opening " << fname_fluxcov << " for flux covariance." << std::endl;
     //setup enu bins and covm for flux
     TH1D *nd_numu_bins_hist = (TH1D*)finfluxcov->Get("flux_binning");
     TAxis *nd_numu_bins = nd_numu_bins_hist->GetXaxis();

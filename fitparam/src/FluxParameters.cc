@@ -1,6 +1,5 @@
 #include "FluxParameters.hh"
 
-//ctor
 FluxParameters::FluxParameters(const std::string& name)
 {
     m_name = name;
@@ -33,11 +32,9 @@ FluxParameters::FluxParameters(std::vector<double> &enubins, const std::string& 
     }
 }
 
-//dtor
 FluxParameters::~FluxParameters()
 {;}
 
-// --
 int FluxParameters::GetBinIndex(const std::string& det, double enu)
 {
     int bin = BADBIN;
@@ -54,36 +51,47 @@ int FluxParameters::GetBinIndex(const std::string& det, double enu)
     return bin;
 }
 
-// initEventMap
 void FluxParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
 {
+    for(const auto& s : sample)
+    {
+        if(m_det_bins.count(s -> GetDetector()) == 0)
+        {
+            std::cerr << "[ERROR] In FluxParameters::InitEventMap\n"
+                      << "[ERROR] Detector " << s -> GetDetector() << " not part of fit parameters.\n"
+                      << "[ERROR] Not building event map." << std::endl;
+            return;
+        }
+    }
+
     InitParameters();
     m_evmap.clear();
     //loop over events to build index map
-    for(size_t s=0;s<sample.size();s++)
+    for(std::size_t s = 0; s < sample.size(); ++s)
     {
-        vector<int> row;
-        for(int i=0;i<sample[s]->GetN();i++)
+        std::vector<int> sample_map;
+        for(int i = 0; i < sample[s] -> GetN(); ++i)
         {
-            AnaEvent *ev = sample[s]->GetEvent(i);
-            //get true neutrino energy
-            double enu = ev->GetTrueEnu();
-            int binn = GetBinIndex(sample[s] -> GetDetector(), enu);
-            if(binn == BADBIN)
+            AnaEvent* ev = sample[s] -> GetEvent(i);
+            double enu = ev -> GetTrueEnu();
+            int bin = GetBinIndex(sample[s] -> GetDetector(), enu);
+
+            if(bin == BADBIN)
             {
-                cout<<"WARNING: "<<m_name<<" enu "<<enu<<" fall outside bin ranges"<<endl;
-                cout<<"        This event will be ignored in analysis."<<endl;
-                ev->Print();
+                std::cout << "[WARNING]: Event Enu " << enu << " falls outside bin range.\n"
+                          << "[WARNING]: This event will be ignored in the analysis." << std::endl;
+                ev -> Print();
             }
             //If event is signal let the c_i params handle the reweighting:
-            if( mode==1 && ((ev->GetTopology()==1)||(ev->GetTopology()==2)) ) binn = PASSEVENT;
-            row.push_back(binn);
+            if(mode == 1 && ev -> isSignalEvent())
+                bin = PASSEVENT;
+
+            sample_map.push_back(bin);
         }//event loop
-        m_evmap.push_back(row);
+        m_evmap.push_back(sample_map);
     }//sample loop
 }
 
-// EventWeghts
 void FluxParameters::EventWeights(std::vector<AnaSample*> &sample,
         std::vector<double> &params)
 {
@@ -108,7 +116,6 @@ void FluxParameters::EventWeights(std::vector<AnaSample*> &sample,
     }
 }
 
-// ReWeight
 void FluxParameters::ReWeight(AnaEvent *event, const std::string& det, int nsample, int nevent,
         std::vector<double> &params)
 {
@@ -138,15 +145,10 @@ void FluxParameters::ReWeight(AnaEvent *event, const std::string& det, int nsamp
         }
 
         if(m_det_bins.count(det) == true)
-            event -> AddEvWght(params[bin + m_det_offset.at(det)]);
-        /*
-        else
         {
-            std::cout << "[WARNING]: In FitParameters::ReWeight()\n"
-                      << "[WARNING]: Detector " << det << " has not been added to fit parameters.\n"
-                      << "[WARNING]: Ignoring event reweight." << std::endl;
+            event -> AddEvWght(params[bin + m_det_offset.at(det)]);
+            //std::cout << "Offset: " << m_det_offset.at(det) << std::endl;
         }
-        */
     }
 }
 
@@ -166,7 +168,9 @@ void FluxParameters::InitParameters()
     std::cout << "[FluxParameters]: Flux binning " << std::endl;
     for(const auto& pear : temp_set)
     {
-        for(int i = 0; i < m_det_bins.at(pear.first).size()-1; ++i)
+        std::cout << "[FluxParameters]: Detector - " << pear.first << std::endl;
+        const int nbins = m_det_bins.at(pear.first).size() - 1;
+        for(int i = 0; i < nbins; ++i)
         {
             pars_name.push_back(Form("%s_%s_%d", m_name.c_str(), pear.first.c_str(), i));
             pars_prior.push_back(1.0); //all weights are 1.0 a priori
@@ -176,15 +180,8 @@ void FluxParameters::InitParameters()
 
             std::cout << i << ": " << m_det_bins.at(pear.first).at(i) << std::endl;
         }
+        std::cout << nbins << ": " << m_det_bins.at(pear.first).back() << std::endl;
     }
 
     Npar = pars_name.size();
-
-    /*
-    std::cout << "[FluxParameters]: Flux binning " << std::endl;
-    for(std::size_t i = 0; i < enubins.size(); ++i)
-    {
-        std::cout << i << " " << enubins[i] << std::endl;
-    }
-    */
 }

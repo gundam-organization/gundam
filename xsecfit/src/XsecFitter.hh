@@ -94,13 +94,13 @@ class XsecFitter : public TObject
         void DoSaveFinalEvents(int fititer, std::vector< std::vector<double> > parresults);
         void DoSaveChi2();
         void CollectSampleHistos();
-        void DoSaveResults(std::vector< std::vector<double> > parresults,
-                std::vector< std::vector<double> > parerrors,
-                std::vector< std::vector<double> > parerrorsplus,
-                std::vector< std::vector<double> > parerrorsminus,
-                std::vector< std::vector<double> > parerrorspara,
-                std::vector< std::vector<double> > parerrorsglobc,
-                std::vector< std::vector<double> > parerrorsprof,
+        void DoSaveResults(std::vector< std::vector<double> >& parresults,
+                std::vector< std::vector<double> >& parerrors,
+                std::vector< std::vector<double> >& parerrorsplus,
+                std::vector< std::vector<double> >& parerrorsminus,
+                std::vector< std::vector<double> >& parerrorspara,
+                std::vector< std::vector<double> >& parerrorsglobc,
+                std::vector< std::vector<double> >& parerrorsprof,
                 double chi2);
         double FindProfiledError(int param, TMatrixDSym mat);
 

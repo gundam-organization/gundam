@@ -69,6 +69,17 @@ int FitParameters::GetBinIndex(double D1, double D2)
 // initEventMap
 void FitParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
 {
+    for(const auto& s : sample)
+    {
+        if(m_det_bins.count(s -> GetDetector()) == 0)
+        {
+            std::cerr << "[ERROR] In FitParameters::InitEventMap\n"
+                      << "[ERROR] Detector " << s -> GetDetector() << " not part of fit parameters.\n"
+                      << "[ERROR] Not building event map." << std::endl;
+            return;
+        }
+    }
+
     InitParameters();
     m_evmap.clear();
 
@@ -165,14 +176,6 @@ void FitParameters::ReWeight(AnaEvent *event, const std::string& det, int nsampl
 
         if(m_det_bins.count(det) == true)
             event -> AddEvWght(params[bin]);
-        /*
-        else
-        {
-            std::cout << "[WARNING]: In FitParameters::ReWeight()\n"
-                      << "[WARNING]: Detector " << det << " has not been added to fit parameters.\n"
-                      << "[WARNING]: Ignoring event reweight." << std::endl;
-        }
-        */
     }
 }
 
