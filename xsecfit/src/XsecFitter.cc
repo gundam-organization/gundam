@@ -439,8 +439,8 @@ double XsecFitter::FillSamples(vector< vector<double> > new_pars, int datatype)
                 else if((datatype==0) && (((TString)(m_fitpara[j]->GetName())).Contains("par_detFine")))
                     continue;
 
-                if(m_samples[s]->isIngrid()) m_fitpara[j]->ReWeightIngrid(ev, s, i, new_pars[j]);
-                else m_fitpara[j]->ReWeight(ev, s, i, new_pars[j]);
+                std::string det = m_samples[s] -> GetDetector();
+                m_fitpara[j] -> ReWeight(ev, det, s, i, new_pars[j]);
             }
         }
         m_samples[s]->FillEventHisto(datatype);
@@ -566,7 +566,8 @@ void XsecFitter::DoSaveFinalEvents(int fititer, vector< vector<double> > res_par
             for(size_t j=0;j<m_fitpara.size();j++)
             {
                 if(((TString)(m_fitpara[j]->GetName())).Contains("par_detFine")) continue;
-                m_fitpara[j]->ReWeight(ev, s, i, res_params[j]);
+                std::string det = m_samples[s] -> GetDetector();
+                m_fitpara[j]->ReWeight(ev, det, s, i, res_params[j]);
             }
 
             cutBranch = ev->GetSampleType();

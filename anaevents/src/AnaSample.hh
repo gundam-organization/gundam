@@ -41,7 +41,8 @@ class AnaSample
         void PrintStats();
         void SetNorm(double val){ m_norm = val; }
         double GetNorm(){ return m_norm; }
-        bool isIngrid(){ return m_ingrid; }
+        std::string GetName(){ return m_name; }
+        std::string GetDetector(){ return m_detector; }
 
         //virtual functions
         virtual void SetData(TObject *data) = 0;
@@ -53,9 +54,9 @@ class AnaSample
 
     protected:
         int m_sampleid;
-        bool m_ingrid; //is this an ingrid or an ND280 sample?
         double m_norm;
         std::string m_name;
+        std::string m_detector;
         std::vector<AnaEvent> m_events;
 };
 

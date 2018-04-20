@@ -4,6 +4,7 @@ AnaFitParameters::AnaFitParameters()
 {
     m_name    = "none";
     Npar      = 0;
+    m_rng_priors = false;
     hasCovMat = false;
     hasRegCovMat = false;
 
@@ -220,3 +221,9 @@ void AnaFitParameters::SetFluxHisto(TH1F* h_flux)
     flux_mod->Reset();
 }
 
+void AnaFitParameters::AddDetector(const std::string& det, const std::vector<double>& bins, int offset)
+{
+    std::cout << "[AnaFitParameters]: Adding detector " << det << std::endl;
+    m_det_bins.emplace(std::make_pair(det, bins));
+    m_det_offset.emplace(std::make_pair(det, offset));
+}

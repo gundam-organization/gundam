@@ -1,13 +1,15 @@
 #include "FluxParameters.hh"
 
 //ctor
-FluxParameters::FluxParameters(std::vector<double> &enubins,
-        const char *name, bool addIngrid)
+FluxParameters::FluxParameters(const std::string& name)
+{
+    m_name = name;
+}
+
+FluxParameters::FluxParameters(std::vector<double> &enubins, const std::string& name)
 {
     m_name    = name;
     m_enubins = enubins;
-    hasRegCovMat = false;
-
 
     //does one need to distinguish neutrino flavours???
     numu_flux = 11;
@@ -21,25 +23,14 @@ FluxParameters::FluxParameters(std::vector<double> &enubins,
         pars_limlow.push_back(0.0);
         pars_limhigh.push_back(5.0);
     }
-    if(addIngrid){
-        for(size_t i=0;i<enubins.size()-1;i++)
-        {
-            pars_name.push_back(Form("%s%d_INGRID", m_name.c_str(), (int)i));
-            pars_prior.push_back(1.0); //all weights are 1.0 a priori
-            pars_step.push_back(0.1);
-            pars_limlow.push_back(0.0);
-            pars_limhigh.push_back(5.0);
-        }
-    }
 
     Npar = pars_name.size();
 
-    cout<<endl<<"Flux binning:"<<endl;
-    for(size_t i = 0;i<enubins.size();i++)
+    std::cout << "[FluxParameters]: Flux binning " << std::endl;
+    for(std::size_t i = 0; i < enubins.size(); ++i)
     {
-        cout<<i<<" "<<enubins[i]<<endl;
+        std::cout << i << " " << enubins[i] << std::endl;
     }
-    cout<<endl;
 }
 
 //dtor
@@ -47,23 +38,26 @@ FluxParameters::~FluxParameters()
 {;}
 
 // --
-int FluxParameters::GetBinIndex(double enu)
+int FluxParameters::GetBinIndex(const std::string& det, double enu)
 {
-    int binn = BADBIN;
-    for(size_t i=0;i<(m_enubins.size()-1);i++)
+    int bin = BADBIN;
+    std::vector<double> temp_bins = m_det_bins.at(det);
+
+    for(std::size_t i = 0; i < (temp_bins.size()-1); ++i)
     {
-        if(enu>=m_enubins[i] && enu<m_enubins[i+1])
+        if(enu >= temp_bins[i] && enu < temp_bins[i+1])
         {
-            binn = i;
+            bin = i;
             break;
         }
     }
-    return binn;
+    return bin;
 }
 
 // initEventMap
 void FluxParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
 {
+    InitParameters();
     m_evmap.clear();
     //loop over events to build index map
     for(size_t s=0;s<sample.size();s++)
@@ -74,7 +68,7 @@ void FluxParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
             AnaEvent *ev = sample[s]->GetEvent(i);
             //get true neutrino energy
             double enu = ev->GetTrueEnu();
-            int binn = GetBinIndex(enu);
+            int binn = GetBinIndex(sample[s] -> GetDetector(), enu);
             if(binn == BADBIN)
             {
                 cout<<"WARNING: "<<m_name<<" enu "<<enu<<" fall outside bin ranges"<<endl;
@@ -108,62 +102,89 @@ void FluxParameters::EventWeights(std::vector<AnaSample*> &sample,
         for(int i=0;i<sample[s]->GetN();i++)
         {
             AnaEvent *ev = sample[s]->GetEvent(i);
-            if(sample[s]->isIngrid()) ReWeightIngrid(ev, s, i, params);
-            else ReWeight(ev, s, i, params);
+            std::string det = sample[s] -> GetDetector();
+            ReWeight(ev, det, s, i, params);
         }
     }
 }
 
 // ReWeight
-void FluxParameters::ReWeight(AnaEvent *event, int nsample, int nevent,
+void FluxParameters::ReWeight(AnaEvent *event, const std::string& det, int nsample, int nevent,
         std::vector<double> &params)
 {
     if(m_evmap.empty()) //need to build an event map first
     {
-        cout<<"Need to build event map index for "<<m_name<<endl;
+        std::cerr << "[ERROR]: In FluxParameters::ReWeight()\n"
+                  << "[ERROR]: Need to build event map index for " << m_name << std::endl;
         return;
     }
 
-    int binn = m_evmap[nsample][nevent];
+    int bin = m_evmap[nsample][nevent];
 
-    if(binn == PASSEVENT) return;
-    if(binn == BADBIN) event->AddEvWght(0.0); //skip!!!!
+    //skip event if not Signal
+    if(bin == PASSEVENT) return;
+
+    // If bin fell out of valid ranges, pretend the event just didn't happen:
+    if(bin == BADBIN)
+        event -> AddEvWght(0.0);
     else
     {
-        if(binn>(int)params.size())
+        if(bin > params.size())
         {
-            cerr<<"ERROR: number of bins "<<m_name<<" does not match num of param"<<endl;
-            event->AddEvWght(0.0);
+            std::cout << "[WARNING]: In FluxParameters::ReWeight()\n"
+                      << "[WARNING]: Number of bins in " << m_name << " does not match num of parameters.\n"
+                      << "[WARNING]: Setting event weight to zero." << std::endl;
+            event -> AddEvWght(0.0);
         }
-        event->AddEvWght(params[binn]);
+
+        if(m_det_bins.count(det) == true)
+            event -> AddEvWght(params[bin + m_det_offset.at(det)]);
+        /*
+        else
+        {
+            std::cout << "[WARNING]: In FitParameters::ReWeight()\n"
+                      << "[WARNING]: Detector " << det << " has not been added to fit parameters.\n"
+                      << "[WARNING]: Ignoring event reweight." << std::endl;
+        }
+        */
     }
 }
-// ReWeightIngrid
-void FluxParameters::ReWeightIngrid(AnaEvent *event, int nsample, int nevent,
-        std::vector<double> &params)
+
+void FluxParameters::InitParameters()
 {
-    //cout << "ReWeighting INGRID sample" << endl;
-    if(m_evmap.empty()) //need to build an event map first
+    if(m_det_bins.size() != m_det_offset.size())
     {
-        cout<<"Need to build event map index for "<<m_name<<endl;
+        std::cerr << "[ERROR]: In FluxParameters::InitParameters()\n"
+                  << "[ERROR]: Detector bins and offset maps are not the same size!" << std::endl;
         return;
     }
 
-    int binn = m_evmap[nsample][nevent];
+    std::set<std::pair<std::string, int>, PairCompare> temp_set;
+    for(const auto& kv : m_det_offset)
+        temp_set.insert(kv);
 
-    if(binn == PASSEVENT) return;
-    if(binn == BADBIN) event->AddEvWght(0.0); //skip!!!!
-    else
+    std::cout << "[FluxParameters]: Flux binning " << std::endl;
+    for(const auto& pear : temp_set)
     {
-        if(binn>(int)params.size())
+        for(int i = 0; i < m_det_bins.at(pear.first).size()-1; ++i)
         {
-            cerr<<"ERROR: number of bins "<<m_name<<" does not match num of param"<<endl;
-            event->AddEvWght(0.0);
+            pars_name.push_back(Form("%s_%s_%d", m_name.c_str(), pear.first.c_str(), i));
+            pars_prior.push_back(1.0); //all weights are 1.0 a priori
+            pars_step.push_back(0.1);
+            pars_limlow.push_back(0.0);
+            pars_limhigh.push_back(5.0);
+
+            std::cout << i << ": " << m_det_bins.at(pear.first).at(i) << std::endl;
         }
-        //event->AddEvWght(params[binn+Npar]);
-        event->AddEvWght(params.at(binn+m_enubins.size()-1));
     }
+
+    Npar = pars_name.size();
+
+    /*
+    std::cout << "[FluxParameters]: Flux binning " << std::endl;
+    for(std::size_t i = 0; i < enubins.size(); ++i)
+    {
+        std::cout << i << " " << enubins[i] << std::endl;
+    }
+    */
 }
-
-
-

@@ -15,8 +15,8 @@ AnaSample::AnaSample()
 {
     m_sampleid = -99;    //unique id
     m_name     = "none"; //some comprehensible name
+    m_detector = "none";
     m_norm     = 1.0;
-    m_ingrid   = false;
 }
 
 // dtor

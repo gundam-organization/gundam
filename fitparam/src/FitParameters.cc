@@ -3,29 +3,10 @@
 FitParameters::FitParameters(const std::string& file_name, const std::string& par_name, bool random_priors)
 {
     m_name = par_name;
+    m_rng_priors = random_priors;
 
     //get the binning from a file
     SetBinning(file_name);
-
-    double rand_prior = 0.0;
-    TRandom3 rng(0);
-
-    //parameter names & prior values
-    for(std::size_t i = 0; i < Npar; ++i)
-    {
-        pars_name.push_back(Form("%s%d", m_name.c_str(), (int)i));
-        if(random_priors == true)
-        {
-            rand_prior = 2.0 * rng.Uniform(0.0, 1.0);
-            pars_prior.push_back(rand_prior);
-        }
-        else
-            pars_prior.push_back(1.0); //all weights are 1.0 a priori
-
-        pars_step.push_back(0.05);
-        pars_limlow.push_back(0.0);
-        pars_limhigh.push_back(10.0);
-    }
 }
 
 FitParameters::~FitParameters()
@@ -88,6 +69,7 @@ int FitParameters::GetBinIndex(double D1, double D2)
 // initEventMap
 void FitParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
 {
+    InitParameters();
     m_evmap.clear();
 
     //loop over events to build index map
@@ -147,17 +129,19 @@ void FitParameters::EventWeights(std::vector<AnaSample*> &sample, std::vector<do
         for(int i=0;i<sample[s]->GetN();i++)
         {
             AnaEvent *ev = sample[s]->GetEvent(i);
-            ReWeight(ev, s, i, params);
+            std::string det = sample[s] -> GetDetector();
+            ReWeight(ev, det, s, i, params);
         }
     }
 }
 
 
-void FitParameters::ReWeight(AnaEvent *event, int nsample, int nevent, std::vector<double> &params)
+void FitParameters::ReWeight(AnaEvent *event, const std::string& det, int nsample, int nevent, std::vector<double> &params)
 {
     if(m_evmap.empty()) //need to build an event map first
     {
-        cout<<"Need to build event map index for "<<m_name<<endl;
+        std::cerr << "[ERROR]: In FitParameters::ReWeight()\n"
+                  << "[ERROR]: Need to build event map index for " << m_name << std::endl;
         return;
     }
 
@@ -167,23 +151,50 @@ void FitParameters::ReWeight(AnaEvent *event, int nsample, int nevent, std::vect
     if(bin == PASSEVENT) return;
 
     // If bin fell out of valid ranges, pretend the event just didn't happen:
-    if(bin == BADBIN) event->AddEvWght(0.0);
+    if(bin == BADBIN)
+        event -> AddEvWght(0.0);
     else
     {
         if(bin > params.size())
         {
-            cerr<<"ERROR: number of bins "<<m_name<<" does not match num of param"<<endl;
-            event->AddEvWght(0.0);
+            std::cout << "[WARNING]: In FitParameters::ReWeight()\n"
+                      << "[WARNING]: Number of bins in " << m_name << " does not match num of parameters.\n"
+                      << "[WARNING]: Setting event weight to zero." << std::endl;
+            event -> AddEvWght(0.0);
         }
-        event->AddEvWght(params[bin]);
-        //cout << "ReWeight param " << binn << endl;
-        //cout << "Weight is " << params[binn] << endl;
+
+        if(m_det_bins.count(det) == true)
+            event -> AddEvWght(params[bin]);
+        /*
+        else
+        {
+            std::cout << "[WARNING]: In FitParameters::ReWeight()\n"
+                      << "[WARNING]: Detector " << det << " has not been added to fit parameters.\n"
+                      << "[WARNING]: Ignoring event reweight." << std::endl;
+        }
+        */
     }
 }
 
-void FitParameters::ReWeightIngrid(AnaEvent *event, int nsample, int nevent,
-        std::vector<double> &params)
+void FitParameters::InitParameters()
 {
-    //Treat as all fit parameters
-    ReWeight(event, nsample, nevent, params);
+    double rand_prior = 0.0;
+    TRandom3 rng(0);
+
+    //parameter names & prior values
+    for(std::size_t i = 0; i < Npar; ++i)
+    {
+        pars_name.push_back(Form("%s%d", m_name.c_str(), (int)i));
+        if(m_rng_priors == true)
+        {
+            rand_prior = 2.0 * rng.Uniform(0.0, 1.0);
+            pars_prior.push_back(rand_prior);
+        }
+        else
+            pars_prior.push_back(1.0); //all weights are 1.0 a priori
+
+        pars_step.push_back(0.05);
+        pars_limlow.push_back(0.0);
+        pars_limhigh.push_back(10.0);
+    }
 }

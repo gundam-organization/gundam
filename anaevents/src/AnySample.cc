@@ -10,21 +10,22 @@
 #include "AnySample.hh"
 
 // ctor
-AnySample::AnySample(int sample_id, const std::string& name,
+AnySample::AnySample(int sample_id, const std::string& name, const std::string& detector,
         std::vector<std::pair <double,double> > v_d1edges,
         std::vector<std::pair <double,double> > v_d2edges,
-        TTree* data, bool isBuffer, bool isEmpty, bool isIngrid)
+        TTree* data, bool isBuffer, bool isEmpty)
 {
     m_sampleid = sample_id; //unique id
     m_name     = name;      //some comprehensible name
+    m_detector = detector;
     m_data_tree = data;
     m_D1edges = v_d1edges;
     m_D2edges = v_d2edges;
     m_empty = isEmpty;
     m_BufferBin = isBuffer;
-    m_ingrid = isIngrid;
 
     std::cout << "[AnySample]: " << m_name << ", ID " << m_sampleid << std::endl
+              << "[AnySample]: Detector: " << m_detector << std::endl
               << "[AnySample]: Bin edges: " << std::endl;
     for(int i = 0; i < m_D1edges.size(); ++i)
     {

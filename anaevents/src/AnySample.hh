@@ -31,9 +31,9 @@
 class AnySample : public AnaSample
 {
     public:
-        AnySample(int sample_id, const std::string& name,
+        AnySample(int sample_id, const std::string& name, const std::string& detector,
                 std::vector<std::pair <double,double> > v_d1edges,
-                std::vector<std::pair <double,double> > v_d2edges, TTree *data, bool isBuffer, bool isEmpty=false, bool isIngrid=false);
+                std::vector<std::pair <double,double> > v_d2edges, TTree *data, bool isBuffer, bool isEmpty=false);
         ~AnySample();
 
         //binning for various histograms

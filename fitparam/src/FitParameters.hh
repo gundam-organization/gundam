@@ -41,11 +41,10 @@ class FitParameters : public AnaFitParameters
         FitParameters(const std::string& file_name, const std::string& par_name, bool random_priors = false);
         ~FitParameters();
 
+        void InitParameters();
         void InitEventMap(std::vector<AnaSample*> &sample, int mode);
         void EventWeights(std::vector<AnaSample*> &sample, std::vector<double> &params);
-        void ReWeight(AnaEvent *event, int nsample, int nevent,
-                std::vector<double> &params);
-        void ReWeightIngrid(AnaEvent *event, int nsample, int nevent,
+        void ReWeight(AnaEvent *event, const std::string& det, int nsample, int nevent,
                 std::vector<double> &params);
         void SetBinning(const std::string& file_name);
 

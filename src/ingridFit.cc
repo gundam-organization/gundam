@@ -177,7 +177,7 @@ int main(int argc, char *argv[])
 
     // The sample ID (first arg) should match the cutBranch corresponding to it
 
-    AnySample sam2(1, "MuTPCpTPC", v_D1edges, v_D2edges, tdata, isBuffer, false);
+    AnySample sam2(1, "MuTPCpTPC", "ND280", v_D1edges, v_D2edges, tdata, isBuffer, false);
     sam2.SetNorm(potD/potMC);
     if(fit_nd280 == true)
         samples.push_back(&sam2);
@@ -190,7 +190,7 @@ int main(int argc, char *argv[])
     //sam7.SetNorm(potD/potMC);
     //samples.push_back(&sam7);
 
-    AnySample sam8(10, "Ingrid", v_D1edges, v_D2edges, tdata, isBuffer, false, true);
+    AnySample sam8(10, "Ingrid", "INGRID", v_D1edges, v_D2edges, tdata, isBuffer, false);
     sam8.SetNorm(potD/potMC);
     if(fit_ingrid == true)
         samples.push_back(&sam8);
@@ -222,12 +222,17 @@ int main(int argc, char *argv[])
 
     //Fit parameters
     FitParameters sigfitpara(fname_binning, "par_fit");
+    sigfitpara.AddDetector("ND280", enubins, 0);
+    sigfitpara.AddDetector("INGRID", enubins, 0);
     sigfitpara.InitEventMap(samples, 0);
     fitpara.push_back(&sigfitpara);
 
     //Flux parameters
-    FluxParameters fluxpara(enubins, "par_flux", true);
+    //FluxParameters fluxpara(enubins, "par_flux");
+    FluxParameters fluxpara("par_flux");
     fluxpara.SetCovarianceMatrix(cov_flux);
+    fluxpara.AddDetector("ND280", enubins, 0);
+    fluxpara.AddDetector("INGRID", enubins, 20);
     fluxpara.InitEventMap(samples, 0);
     fitpara.push_back(&fluxpara);
 

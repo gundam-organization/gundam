@@ -12,6 +12,8 @@
 #define __AnaFitParameters_hh__
 
 #include <iostream>
+#include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -28,6 +30,15 @@ using namespace std;
 const int PASSEVENT = -1;
 const int BADBIN = -2;
 
+struct PairCompare
+{
+    template <typename T, typename U>
+    bool operator()(const std::pair<T, U>& lhs, const std::pair<T, U>& rhs)
+    {
+        return lhs.second < rhs.second;
+    }
+};
+
 class AnaFitParameters
 {
     public:
@@ -43,11 +54,11 @@ class AnaFitParameters
                 std::vector<double> &params) = 0;
         // ReWeights a single event based on m_evmap obtained
         // in InitEventMap
-        virtual void ReWeight(AnaEvent *event, int nsample, int nevent,
-                std::vector<double> &params) = 0;
-        virtual void ReWeightIngrid(AnaEvent *event, int nsample, int nevent,
+        virtual void ReWeight(AnaEvent *event, const std::string& det, int nsample, int nevent,
                 std::vector<double> &params) = 0;
 
+        virtual void InitParameters() = 0;
+        virtual void AddDetector(const std::string& det, const std::vector<double>& bins, int offset);
         virtual double GetChi2(const std::vector<double> &params);
 
         virtual void SetCovarianceMatrix(const TMatrixDSym& covmat);
@@ -104,6 +115,8 @@ class AnaFitParameters
         bool CheckDims(const std::vector<double> &params);
 
         std::string m_name;
+        std::map<std::string, int> m_det_offset;
+        std::map<std::string, std::vector<double> > m_det_bins;
         std::vector<std::string> pars_name;
         std::vector<double> pars_prior; //prior values of param
         std::vector<double> pars_throw; //vector with param throws
@@ -113,6 +126,7 @@ class AnaFitParameters
 
         //map for events in each sample
         std::vector< std::vector<int> > m_evmap;
+        bool m_rng_priors;
         bool hasCovMat, hasRegCovMat;
         //
         TMatrixDSym *covariance;  //cov matrix
