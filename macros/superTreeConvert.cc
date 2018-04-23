@@ -216,7 +216,7 @@ int superTreeConvert(
         nbytes += nb;
         passCount = 0;
         RecoNuEnergy = TrueNuEnergy;
-        weight = 1.0;
+        weight = 1.1;
         //pCosThetaRec  = TMath::Cos(pThetaRec);
         //muCosThetaRec = TMath::Cos(muThetaRec);
 
@@ -240,7 +240,7 @@ int superTreeConvert(
                 if(cutBranch==3) muMomRec=muMomRecRange;
                 branches_passed[i]++;
                 if((( (mectopology==1)||(mectopology==2) ) && ( (pMomTrue>450)&&(muMomTrue>250)&&(muCosThetaTrue>-0.6)&&(pCosThetaTrue>0.4) ))){
-                    weight = 1.0; // weight*sigWeight;
+                    weight = 1.1; // weight*sigWeight;
                 }
                 if(psdim){
                     //Phase Space Bins:
@@ -318,7 +318,7 @@ int superTreeConvert(
     for (Long64_t jentry=0; jentry<nentries_T;jentry++) {
         nb_T = nd5tree_T->GetEntry(jentry);
         nbytes_T += nb_T;
-        weight_T=1.0; // 1.0
+        weight_T=1.1; // 1.0
 
         //D1True_T = TMath::Cos(TMath::ACos(muCosThetaTrue_T) - TMath::ACos(pCosThetaTrue_T));
         D1True_T = muMomTrue_T;
@@ -346,7 +346,9 @@ int superTreeConvert(
         cutBranch = 10;
         if(fileIndex == 1 && npioncount == 0 && mupdg == 13 && ppdg == 2212)
             mectopology = 1;
-        else if(fileIndex == 1)
+        else if(fileIndex == 1 && npioncount == 1 && mupdg == 13 && ppdg == 211)
+            mectopology = 3;
+        else
             continue;
             //mectopology = 4;
 
@@ -354,7 +356,7 @@ int superTreeConvert(
         muMomTrue = 0;
         pMomRec = 0;
         pMomTrue = 0;
-        weight = 1.0;
+        weight = 1.1;
 
         //std::cout << "Muon Angle: " << muang << std::endl;
         //std::cout << "fileIndex: " << fileIndex << std::endl;
@@ -363,9 +365,8 @@ int superTreeConvert(
         //std::cout << "ppdg: " << ppdg << std::endl;
         //std::cout << "nuE: " << nuE << std::endl;
 
-        if(fileIndex == 1 && npioncount == 0 && mupdg == 13 && ppdg == 2212)
-        {
-            //std::cout << "Made it to the loop.\n" << std::endl;
+        //if(fileIndex == 1 && npioncount == 0 && mupdg == 13 && ppdg == 2212)
+        //{
             double muang_true = TMath::DegToRad() * muang;
             double pang_true = TMath::DegToRad() * pang;
             double muang_reco = muang_true * rng -> Gaus(1, 0.1);
@@ -389,10 +390,7 @@ int superTreeConvert(
             D1Reco = muMomRec;
             D2True = TMath::Cos(muang_true);
             D2Reco = TMath::Cos(muang_reco);
-        }
-
-        //D2True = 1;
-        //D2Reco = 1;
+        //}
 
         outtree -> Fill();
     }

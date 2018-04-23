@@ -50,7 +50,7 @@ class AnaFitParameters
         virtual void InitEventMap(std::vector<AnaSample*> &sample, int mode) = 0;
         // EventWeights calculates weights for all the samples
         virtual void EventWeights(std::vector<AnaSample*> &sample,
-                std::vector<double> &params) = 0;
+                std::vector<double> &params);
         // ReWeights a single event based on m_evmap obtained
         // in InitEventMap
         virtual void ReWeight(AnaEvent *event, const std::string& det, int nsample, int nevent,
@@ -69,6 +69,7 @@ class AnaFitParameters
         TMatrixDSym* GetCovarMat_reg(){ return regcovariance; }
         bool HasCovMat(){ return hasCovMat; }
         bool HasRegCovMat(){ return hasRegCovMat; }
+        void SetFluxHisto(TH1F* h_flux);
 
         void GetParNames(std::vector<std::string> &vec)
         { vec = pars_name; }
@@ -98,8 +99,6 @@ class AnaFitParameters
             pars_limhigh = vec2;
         }
 
-        void SetFluxHisto(TH1F* h_flux);
-
         int GetNpar(){ return Npar; }
         void SetNpar(int n)
         {
@@ -110,7 +109,7 @@ class AnaFitParameters
     protected:
         bool CheckDims(const std::vector<double> &params);
 
-        size_t Npar;
+        std::size_t Npar;
         std::string m_name;
         std::map<std::string, int> m_det_offset;
         std::map<std::string, std::vector<double> > m_det_bins;

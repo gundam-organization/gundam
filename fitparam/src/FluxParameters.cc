@@ -5,33 +5,6 @@ FluxParameters::FluxParameters(const std::string& name)
     m_name = name;
 }
 
-FluxParameters::FluxParameters(std::vector<double> &enubins, const std::string& name)
-{
-    m_name    = name;
-    m_enubins = enubins;
-
-    //does one need to distinguish neutrino flavours???
-    numu_flux = 11;
-
-    //parameter names & prior values
-    for(size_t i=0;i<enubins.size()-1;i++)
-    {
-        pars_name.push_back(Form("%s%d", m_name.c_str(), (int)i));
-        pars_prior.push_back(1.0); //all weights are 1.0 a priori
-        pars_step.push_back(0.1);
-        pars_limlow.push_back(0.0);
-        pars_limhigh.push_back(5.0);
-    }
-
-    Npar = pars_name.size();
-
-    std::cout << "[FluxParameters]: Flux binning " << std::endl;
-    for(std::size_t i = 0; i < enubins.size(); ++i)
-    {
-        std::cout << i << " " << enubins[i] << std::endl;
-    }
-}
-
 FluxParameters::~FluxParameters()
 {;}
 
@@ -90,30 +63,6 @@ void FluxParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
         }//event loop
         m_evmap.push_back(sample_map);
     }//sample loop
-}
-
-void FluxParameters::EventWeights(std::vector<AnaSample*> &sample,
-        std::vector<double> &params)
-{
-    if(m_evmap.empty()) //build an event map
-    {
-        cout<<"******************************" <<endl;
-        cout<<"WARNING: No event map specified for "<<m_name<<endl;
-        cout<<"Need to build event map index for "<<m_name<<endl;
-        cout<<"WARNING: initialising in mode 0" <<endl;
-        cout<<"******************************" <<endl;
-        InitEventMap(sample, 0);
-    }
-
-    for(size_t s=0;s<sample.size();s++)
-    {
-        for(int i=0;i<sample[s]->GetN();i++)
-        {
-            AnaEvent *ev = sample[s]->GetEvent(i);
-            std::string det = sample[s] -> GetDetector();
-            ReWeight(ev, det, s, i, params);
-        }
-    }
 }
 
 void FluxParameters::ReWeight(AnaEvent *event, const std::string& det, int nsample, int nevent,

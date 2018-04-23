@@ -115,7 +115,7 @@ int main(int argc, char *argv[])
     std::vector< std::pair<double, double> > v_D2edges;
 
     std::cout << "------------------------------------------------\n"
-              << "[IngridFit]: Welcome to the Super-xsLLhFitter.\n" 
+              << "[IngridFit]: Welcome to the Super-xsLLhFitter.\n"
               << "[IngridFit]: Initializing the fit machinery..." << std::endl;
     std::cout << "[IngridFit]: Opening " << fname_binning << " for analysis binning." << std::endl;
     std::ifstream fin(fname_binning, std::ios::in);
@@ -221,20 +221,19 @@ int main(int argc, char *argv[])
     // fit parameters first.
 
     //Fit parameters
-    FitParameters sigfitpara(fname_binning, "par_fit");
+    FitParameters sigfitpara("par_fit", fname_binning);
     sigfitpara.AddDetector("ND280", enubins, 0);
     sigfitpara.AddDetector("INGRID", enubins, 0);
     sigfitpara.InitEventMap(samples, 0);
     fitpara.push_back(&sigfitpara);
 
     //Flux parameters
-    //FluxParameters fluxpara(enubins, "par_flux");
     FluxParameters fluxpara("par_flux");
     fluxpara.SetCovarianceMatrix(cov_flux);
     fluxpara.AddDetector("ND280", enubins, 0);
     fluxpara.AddDetector("INGRID", enubins, 20);
     fluxpara.InitEventMap(samples, 0);
-    fitpara.push_back(&fluxpara);
+    //fitpara.push_back(&fluxpara);
 
     //Instantiate fitter obj
     XsecFitter xsecfit(seed);
@@ -243,24 +242,11 @@ int main(int argc, char *argv[])
     xsecfit.InitFitter(fitpara, 0, 0, nprimbins, paramVectorFname);
     std::cout << "[IngridFit]: Fitter initialised." << std::endl;
 
-    //xsecfit.FixParameter("par_fit0", 1.0);
-
     /*
-    xsecfit.FixParameter("par_ccqe1", 1.0);
-    xsecfit.FixParameter("par_ccqe2", 1.0);
-    xsecfit.FixParameter("par_ccqe3", 1.0);
-    xsecfit.FixParameter("par_ccqe4", 1.0);
-    xsecfit.FixParameter("par_ccqe5", 1.0);
-    xsecfit.FixParameter("par_ccqe6", 1.0);
-    xsecfit.FixParameter("par_ccqe7", 1.0);
-    xsecfit.FixParameter("par_ccqe8", 1.0);
-    xsecfit.FixParameter("par_ccqe9", 1.0);
-    xsecfit.FixParameter("par_ccqe10", 1.0);
-    xsecfit.FixParameter("par_ccqe11", 1.0);
-    xsecfit.FixParameter("par_ccqe12", 1.0);
-    xsecfit.FixParameter("par_ccqe13", 1.0);
-    xsecfit.FixParameter("par_ccqe14", 1.0);
-    xsecfit.FixParameter("par_ccqe15", 1.0);
+    for(int i = 0; i < sigfitpara.GetNpar(); ++i)
+    {
+        xsecfit.FixParameter("par_fit" + std::to_string(i), 1.0);
+    }
     */
 
     //set frequency to save output

@@ -99,7 +99,7 @@ double AnaFitParameters::GetChi2(const std::vector<double> &params)
     if(CheckDims(params) == false)
     {
         std::cout << "[WARNING]: In AnaFitParameters::GetChi2()\n"
-                  << "[WARNING]: Warning, dimension check failed." << endl;
+                  << "[WARNING]: Dimension check failed. Returning zero." << endl;
         return 0.0;
     }
 
@@ -226,4 +226,7 @@ void AnaFitParameters::AddDetector(const std::string& det, const std::vector<dou
     std::cout << "[AnaFitParameters]: Adding detector " << det << " for " << this -> m_name << std::endl;
     m_det_bins.emplace(std::make_pair(det, bins));
     m_det_offset.emplace(std::make_pair(det, offset));
+}
+void AnaFitParameters::EventWeights(std::vector<AnaSample*> &sample, std::vector<double> &params)
+{
 }

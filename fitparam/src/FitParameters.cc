@@ -1,6 +1,6 @@
 #include "FitParameters.hh"
 
-FitParameters::FitParameters(const std::string& file_name, const std::string& par_name, bool random_priors)
+FitParameters::FitParameters(const std::string& par_name, const std::string& file_name, bool random_priors)
 {
     m_name = par_name;
     m_rng_priors = random_priors;
@@ -31,8 +31,8 @@ void FitParameters::SetBinning(const std::string& file_name)
             double D1_1, D1_2, D2_1, D2_2;
             if(!(ss>>D2_1>>D2_2>>D1_1>>D1_2))
             {
-                std::cerr << "[ERROR]: In FitParameters::SetBinning()\n"
-                          << "[ERROR]: Bad line format: " << line << std::endl;
+                std::cout << "[WARNING]: In FitParameters::SetBinning()\n"
+                          << "[WARNING]: Bad line format: " << line << std::endl;
                 continue;
             }
             m_bins.emplace_back(FitBin(D1_1, D1_2, D2_1, D2_2));
@@ -86,8 +86,8 @@ void FitParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
     //loop over events to build index map
     for(std::size_t s=0; s < sample.size(); s++)
     {
-        vector<int> row;
-        for(int i=0; i < sample[s] -> GetN() ; i++)
+        vector<int> sample_map;
+        for(int i=0; i < sample[s] -> GetN(); i++)
         {
             AnaEvent *ev = sample[s] -> GetEvent(i);
 
@@ -109,43 +109,18 @@ void FitParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
                               << "[WARNING]: D1 = " << D1 << ", D2 = " << D2 << ", falls outside bin ranges." << std::endl
                               << "[WARNING]: This event will be ignored in the analysis." << std::endl;
                 }
-                row.push_back(bin);
+                sample_map.push_back(bin);
             }
             else
             {
-                row.push_back(PASSEVENT);
+                sample_map.push_back(PASSEVENT);
                 continue;
             }
 
         }
-        m_evmap.push_back(row);
+        m_evmap.push_back(sample_map);
     }
 }
-
-// EventWeghts
-void FitParameters::EventWeights(std::vector<AnaSample*> &sample, std::vector<double> &params)
-{
-    if(m_evmap.empty()) //build an event map
-    {
-        cout<<"******************************" <<endl;
-        cout<<"WARNING: No event map specified for "<<m_name<<endl;
-        cout<<"Need to build event map index for "<<m_name<<endl;
-        cout<<"WARNING: initialising in mode 0" <<endl;
-        cout<<"******************************" <<endl;
-        InitEventMap(sample, 0);
-    }
-
-    for(size_t s=0;s<sample.size();s++)
-    {
-        for(int i=0;i<sample[s]->GetN();i++)
-        {
-            AnaEvent *ev = sample[s]->GetEvent(i);
-            std::string det = sample[s] -> GetDetector();
-            ReWeight(ev, det, s, i, params);
-        }
-    }
-}
-
 
 void FitParameters::ReWeight(AnaEvent *event, const std::string& det, int nsample, int nevent, std::vector<double> &params)
 {
