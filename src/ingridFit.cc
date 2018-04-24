@@ -117,6 +117,8 @@ int main(int argc, char *argv[])
     std::cout << "------------------------------------------------\n"
               << "[IngridFit]: Welcome to the Super-xsLLhFitter.\n"
               << "[IngridFit]: Initializing the fit machinery..." << std::endl;
+    std::cout << "[IngridFit]: Opening " << fname_data << " for data selection.\n"
+              << "[IngridFit]: Opening " << fname_mc << " for MC selection." << std::endl;
     std::cout << "[IngridFit]: Opening " << fname_binning << " for analysis binning." << std::endl;
     std::ifstream fin(fname_binning, std::ios::in);
     if(!fin.is_open())
@@ -233,7 +235,7 @@ int main(int argc, char *argv[])
     fluxpara.AddDetector("ND280", enubins, 0);
     fluxpara.AddDetector("INGRID", enubins, 20);
     fluxpara.InitEventMap(samples, 0);
-    //fitpara.push_back(&fluxpara);
+    fitpara.push_back(&fluxpara);
 
     //Instantiate fitter obj
     XsecFitter xsecfit(seed);
@@ -242,12 +244,12 @@ int main(int argc, char *argv[])
     xsecfit.InitFitter(fitpara, 0, 0, nprimbins, paramVectorFname);
     std::cout << "[IngridFit]: Fitter initialised." << std::endl;
 
-    /*
+
     for(int i = 0; i < sigfitpara.GetNpar(); ++i)
     {
         xsecfit.FixParameter("par_fit" + std::to_string(i), 1.0);
     }
-    */
+
 
     //set frequency to save output
     xsecfit.SetSaveMode(fout, 1);
