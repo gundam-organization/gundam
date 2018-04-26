@@ -11,7 +11,7 @@ FluxParameters::~FluxParameters()
 int FluxParameters::GetBinIndex(const std::string& det, double enu)
 {
     int bin = BADBIN;
-    std::vector<double> temp_bins = m_det_bins.at(det);
+    const std::vector<double> temp_bins = m_det_bins.at(det);
 
     for(std::size_t i = 0; i < (temp_bins.size()-1); ++i)
     {

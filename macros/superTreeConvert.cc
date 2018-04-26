@@ -191,6 +191,7 @@ int superTreeConvert(
     Int_t mupdg;
     Int_t ppdg;
     Int_t npioncount;
+    Int_t nprotoncount;
 
     TRandom3* rng = new TRandom3();
 
@@ -203,6 +204,7 @@ int superTreeConvert(
     nd2tree->SetBranchAddress("ppdg", &ppdg);
     nd2tree->SetBranchAddress("range", &range);
     nd2tree->SetBranchAddress("npioncount", &npioncount);
+    nd2tree->SetBranchAddress("nprotoncount", &nprotoncount);
 
     Long64_t nentries = nd5tree -> GetEntriesFast();
     Long64_t nbytes = 0, nb = 0;
@@ -222,8 +224,8 @@ int superTreeConvert(
 
         //D1True = TMath::Cos(TMath::ACos(muCosThetaTrue) - TMath::ACos(pCosThetaTrue));
         //D1Reco = TMath::Cos(TMath::ACos(muCosThetaRec) - TMath::ACos(pCosThetaRec));
-        D1True = muMomTrue;
-        D1Reco = muMomRec;
+        D1True = TrueNuEnergy; //muMomTrue;
+        D1Reco = RecoNuEnergy; //muMomRec;
         D2True = muCosThetaTrue;
         D2Reco = muCosThetaRec;
 
@@ -333,7 +335,7 @@ int superTreeConvert(
     if(EvtEnd!=0) nentries=EvtEnd;
     if(EvtFrac>0.0001) nentries=nentries*EvtFrac;
 
-    for(Long64_t jentry=2000000; jentry < 2003000; jentry++) {
+    for(Long64_t jentry=2000000; jentry < 2003500; jentry++) {
         nb = nd2tree->GetEntry(jentry);
         nbytes += nb;
         if(fileIndex != 1)
@@ -344,10 +346,14 @@ int superTreeConvert(
 
         reaction = 0;
         cutBranch = 10;
-        if(fileIndex == 1 && npioncount == 0 && mupdg == 13 && ppdg == 2212)
+        if(fileIndex == 1 && npioncount == 0 && mupdg == 13 && ppdg == 2212 && nprotoncount == 1)
             mectopology = 1;
-        else if(fileIndex == 1 && npioncount == 1 && mupdg == 13 && ppdg == 211)
+        else if(fileIndex == 1 && npioncount == 0 && mupdg == 13 && ppdg == 2212 && nprotoncount > 1)
+            mectopology = 2;
+        else if(fileIndex == 1 && npioncount == 1 && mupdg == 13 && ppdg == 211 && nprotoncount == 0)
             mectopology = 3;
+        else if(fileIndex == 1 && npioncount > 0 && nprotoncount > 0 && mupdg == 13)
+            mectopology = 4;
         else
             continue;
             //mectopology = 4;
@@ -386,8 +392,8 @@ int superTreeConvert(
 
             //D1True = TMath::Cos(muang_true - pang_true);
             //D1Reco = TMath::Cos(muang_reco - pang_reco);
-            D1True = muMomTrue;
-            D1Reco = muMomRec;
+            D1True = RecoNuEnergy; //muMomTrue;
+            D1Reco = TrueNuEnergy; //muMomRec;
             D2True = TMath::Cos(muang_true);
             D2Reco = TMath::Cos(muang_reco);
         //}

@@ -239,18 +239,18 @@ int main(int argc, char *argv[])
 
     //Instantiate fitter obj
     XsecFitter xsecfit(seed);
+    xsecfit.SetPOTRatio(potD/potMC);
 
     //init w/ para vector
     xsecfit.InitFitter(fitpara, 0, 0, nprimbins, paramVectorFname);
     std::cout << "[IngridFit]: Fitter initialised." << std::endl;
 
-
+    /*
     for(int i = 0; i < sigfitpara.GetNpar(); ++i)
     {
         xsecfit.FixParameter("par_fit" + std::to_string(i), 1.0);
     }
-
-
+    */
     //set frequency to save output
     xsecfit.SetSaveMode(fout, 1);
 
