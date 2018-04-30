@@ -71,9 +71,9 @@ void calcEventRate(const std::string fname_mc, const std::string fname_data, con
     const int nbins_sample = fit_param_values -> GetXaxis() -> GetNbins();
     const TArrayD* bins_sample = fit_param_values -> GetXaxis() -> GetXbins();
 
-    TH1D* total_mc_sample = new TH1D("total_mc_sample", "total_mc_sample", nbins_sample, bins_sample -> GetArray());
-    TH1D* total_data_sample = new TH1D("total_data_sample", "total_data_sample", nbins_sample, bins_sample -> GetArray());
-    TH1D* total_fit_sample = new TH1D("total_fit_sample", "total_fit_sample", nbins_sample, bins_sample -> GetArray());
+    TH1D* total_mc_sample = new TH1D("total_mc_sample", "total_mc_sample", nbins_sample, 0, nbins_sample); //bins_sample -> GetArray());
+    TH1D* total_data_sample = new TH1D("total_data_sample", "total_data_sample", nbins_sample, 0, nbins_sample); //bins_sample -> GetArray());
+    TH1D* total_fit_sample = new TH1D("total_fit_sample", "total_fit_sample", nbins_sample, 0, nbins_sample); //bins_sample -> GetArray());
 
     TH1D* nd280_mc_sample = (TH1D*)file_fit -> Get("evhist_sam0_iter0_mc");
     TH1D* nd280_data_sample = (TH1D*)file_fit -> Get("evhist_sam0_iter0_data");
@@ -111,7 +111,7 @@ void calcEventRate(const std::string fname_mc, const std::string fname_data, con
     {
         t_sel_events_mc -> GetEntry(i);
 
-        if((mectopology == 1 || mectopology == 2) && cutBranch == 1)
+        if((mectopology == 1 || mectopology == 2) && (cutBranch == 1 || cutBranch == 10))
         {
             int idx = GetBinIndex(D1True, D2True, analysis_bins);
             signal_mc -> Fill(idx, weight);
@@ -130,7 +130,7 @@ void calcEventRate(const std::string fname_mc, const std::string fname_data, con
     {
         t_sel_events_data -> GetEntry(i);
 
-        if((mectopology == 1 || mectopology == 2) && cutBranch == 1)
+        if((mectopology == 1 || mectopology == 2) && (cutBranch == 1 || cutBranch == 10))
         {
             int idx = GetBinIndex(D1True, D2True, analysis_bins);
             signal_data -> Fill(idx, weight);
@@ -147,6 +147,16 @@ void calcEventRate(const std::string fname_mc, const std::string fname_data, con
     signal_mc -> Write();
     signal_data -> Write();
     signal_fit -> Write();
+
+    nd280_mc_sample -> Write();
+    nd280_data_sample -> Write();
+    nd280_fit_sample -> Write();
+    ingrid_mc_sample -> Write();
+    ingrid_data_sample -> Write();
+    ingrid_fit_sample -> Write();
+    total_mc_sample -> Write();
+    total_data_sample -> Write();
+    total_fit_sample -> Write();
 
     return;
 }

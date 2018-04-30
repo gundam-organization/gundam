@@ -755,7 +755,7 @@ void AnySample::GetSampleBreakdown(TDirectory *dirout, const std::string& tag, c
         hAnybin_rec[evt_topology].Fill(anybin_index_rec + 0.5, wght);
         hAnybin_true[evt_topology].Fill(anybin_index_true + 0.5, wght);
 
-        if(evt_topology == 1 || evt_topology == 2)
+        if(m_events[i].isSignalEvent())
             m_hsig -> Fill(anybin_index_true + 0.5, wght);
     }
 

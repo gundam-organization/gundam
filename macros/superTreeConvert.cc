@@ -218,16 +218,19 @@ int superTreeConvert(
         nbytes += nb;
         passCount = 0;
         RecoNuEnergy = TrueNuEnergy;
-        weight = 1.1;
+        weight = 1.0;
         //pCosThetaRec  = TMath::Cos(pThetaRec);
         //muCosThetaRec = TMath::Cos(muThetaRec);
 
         //D1True = TMath::Cos(TMath::ACos(muCosThetaTrue) - TMath::ACos(pCosThetaTrue));
         //D1Reco = TMath::Cos(TMath::ACos(muCosThetaRec) - TMath::ACos(pCosThetaRec));
-        D1True = TrueNuEnergy; //muMomTrue;
-        D1Reco = RecoNuEnergy; //muMomRec;
+        D1True = muMomTrue;
+        D1Reco = muMomRec;
         D2True = muCosThetaTrue;
         D2Reco = muCosThetaRec;
+
+        if(mectopology == 1 || mectopology == 2)
+            weight = 1.1;
 
         if(useAltPp){
             pMomTrue=pMomTrueAlt;
@@ -320,7 +323,7 @@ int superTreeConvert(
     for (Long64_t jentry=0; jentry<nentries_T;jentry++) {
         nb_T = nd5tree_T->GetEntry(jentry);
         nbytes_T += nb_T;
-        weight_T=1.1; // 1.0
+        weight_T=1.0; // 1.0
 
         //D1True_T = TMath::Cos(TMath::ACos(muCosThetaTrue_T) - TMath::ACos(pCosThetaTrue_T));
         D1True_T = muMomTrue_T;
@@ -344,25 +347,30 @@ int superTreeConvert(
         RecoNuEnergy = nuE * 1000;
         TrueNuEnergy = nuE * 1000;
 
+        muMomRec = 0;
+        muMomTrue = 0;
+        pMomRec = 0;
+        pMomTrue = 0;
+        weight = 1.0;
         reaction = 0;
         cutBranch = 10;
+
         if(fileIndex == 1 && npioncount == 0 && mupdg == 13 && ppdg == 2212 && nprotoncount == 1)
+        {
             mectopology = 1;
+            weight = 1.1;
+        }
         else if(fileIndex == 1 && npioncount == 0 && mupdg == 13 && ppdg == 2212 && nprotoncount > 1)
+        {
             mectopology = 2;
+            weight = 1.1;
+        }
         else if(fileIndex == 1 && npioncount == 1 && mupdg == 13 && ppdg == 211 && nprotoncount == 0)
             mectopology = 3;
         else if(fileIndex == 1 && npioncount > 0 && nprotoncount > 0 && mupdg == 13)
             mectopology = 4;
         else
             continue;
-            //mectopology = 4;
-
-        muMomRec = 0;
-        muMomTrue = 0;
-        pMomRec = 0;
-        pMomTrue = 0;
-        weight = 1.1;
 
         //std::cout << "Muon Angle: " << muang << std::endl;
         //std::cout << "fileIndex: " << fileIndex << std::endl;
@@ -371,32 +379,29 @@ int superTreeConvert(
         //std::cout << "ppdg: " << ppdg << std::endl;
         //std::cout << "nuE: " << nuE << std::endl;
 
-        //if(fileIndex == 1 && npioncount == 0 && mupdg == 13 && ppdg == 2212)
-        //{
-            double muang_true = TMath::DegToRad() * muang;
-            double pang_true = TMath::DegToRad() * pang;
-            double muang_reco = muang_true * rng -> Gaus(1, 0.1);
-            double pang_reco = pang_true * rng -> Gaus(1, 0.1);
+        double muang_true = TMath::DegToRad() * muang;
+        double pang_true = TMath::DegToRad() * pang;
+        double muang_reco = muang_true * rng -> Gaus(1, 0.1);
+        double pang_reco = pang_true * rng -> Gaus(1, 0.1);
 
-            muCosThetaRec = TMath::Cos(muang_reco);
-            muCosThetaTrue = TMath::Cos(muang_true);
+        muCosThetaRec = TMath::Cos(muang_reco);
+        muCosThetaTrue = TMath::Cos(muang_true);
 
-            pCosThetaRec = TMath::Cos(pang_reco);
-            pCosThetaTrue = TMath::Cos(pang_true);
+        pCosThetaRec = TMath::Cos(pang_reco);
+        pCosThetaTrue = TMath::Cos(pang_true);
 
-            double mu_mom_true = range * 0.0114127 + 0.230608;
-            double mu_mom_reco = (range * rng -> Gaus(1, 0.1)) * 0.0114127 + 0.230608;
+        double mu_mom_true = range * 0.0114127 + 0.230608;
+        double mu_mom_reco = (range * rng -> Gaus(1, 0.1)) * 0.0114127 + 0.230608;
 
-            muMomTrue = mu_mom_true * 1000.0;
-            muMomRec = mu_mom_reco * 1000.0;
+        muMomTrue = mu_mom_true * 1000.0;
+        muMomRec = mu_mom_reco * 1000.0;
 
-            //D1True = TMath::Cos(muang_true - pang_true);
-            //D1Reco = TMath::Cos(muang_reco - pang_reco);
-            D1True = RecoNuEnergy; //muMomTrue;
-            D1Reco = TrueNuEnergy; //muMomRec;
-            D2True = TMath::Cos(muang_true);
-            D2Reco = TMath::Cos(muang_reco);
-        //}
+        //D1True = TMath::Cos(muang_true - pang_true);
+        //D1Reco = TMath::Cos(muang_reco - pang_reco);
+        D1True = muMomTrue;
+        D1Reco = muMomRec;
+        D2True = TMath::Cos(muang_true);
+        D2Reco = TMath::Cos(muang_reco);
 
         outtree -> Fill();
     }
