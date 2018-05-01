@@ -227,6 +227,8 @@ void AnySample::FillEventHisto(int datatype)
         m_hpred -> Reset();
     if(m_hmc != nullptr)
         m_hmc -> Reset();
+    if(m_hmc_true != nullptr)
+        m_hmc_true -> Reset();
 
     for(std::size_t i = 0; i < m_events.size(); ++i)
     {
@@ -795,6 +797,9 @@ void AnySample::GetSampleBreakdown(TDirectory *dirout, const std::string& tag, c
             std::cout << std::setw(10) << topology[j] << std::setw(5) << j
                       << std::setw(5) << compos[j] << std::setw(10)
                       << ((1.0 * compos[j]) / Ntot) * 100.0 << "%" << std::endl;
+
+        std::cout << std::setw(10) << "Total" << std::setw(5) << " "
+                  << std::setw(5) << Ntot << std::setw(10) << "100.00%" << std::endl;
     }
 }
 
