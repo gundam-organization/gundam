@@ -36,18 +36,19 @@ struct FitBin
 class FitParameters : public AnaFitParameters
 {
     public:
-        FitParameters(const std::string& par_name, const std::string& file_name, bool random_priors = false);
+        FitParameters(const std::string& par_name, bool random_priors = false);
         ~FitParameters();
 
         void InitParameters();
         void InitEventMap(std::vector<AnaSample*> &sample, int mode);
         void ReWeight(AnaEvent *event, const std::string& det, int nsample, int nevent,
                 std::vector<double> &params);
-        void SetBinning(const std::string& file_name);
+        bool SetBinning(const std::string& file_name, std::vector<FitBin>& bins);
+        void AddDetector(const std::string& det, const std::string& f_binning, int offset);
 
     private:
-        int GetBinIndex(double D1, double D2);
-        std::vector<FitBin> m_bins;
+        int GetBinIndex(const std::string& det, double D1, double D2);
+        std::map<std::string, std::vector<FitBin> > m_fit_bins;
 };
 
 #endif

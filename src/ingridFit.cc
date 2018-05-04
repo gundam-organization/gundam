@@ -146,6 +146,7 @@ int main(int argc, char *argv[])
         fin.close();
     }
 
+    const int ing_fit_offset = v_D1edges.size();
     //Set up systematics:
 
     /*************************************** FLUX *****************************************/
@@ -223,9 +224,9 @@ int main(int argc, char *argv[])
     // fit parameters first.
 
     //Fit parameters
-    FitParameters sigfitpara("par_fit", fname_binning);
-    sigfitpara.AddDetector("ND280", enubins, 0);
-    sigfitpara.AddDetector("INGRID", enubins, 0);
+    FitParameters sigfitpara("par_fit");
+    sigfitpara.AddDetector("ND280", fname_binning, 0);
+    sigfitpara.AddDetector("INGRID", fname_binning, ing_fit_offset);
     sigfitpara.InitEventMap(samples, 0);
     fitpara.push_back(&sigfitpara);
 
@@ -248,7 +249,8 @@ int main(int argc, char *argv[])
     /*
     for(int i = 0; i < sigfitpara.GetNpar(); ++i)
     {
-        xsecfit.FixParameter("par_fit" + std::to_string(i), 1.0);
+        xsecfit.FixParameter("par_fit_ND280_" + std::to_string(i), 1.0);
+        xsecfit.FixParameter("par_fit_INGRID_" + std::to_string(i), 1.0);
     }
     */
     //set frequency to save output

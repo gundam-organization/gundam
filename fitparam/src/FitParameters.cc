@@ -1,25 +1,22 @@
 #include "FitParameters.hh"
 
-FitParameters::FitParameters(const std::string& par_name, const std::string& file_name, bool random_priors)
+FitParameters::FitParameters(const std::string& par_name, bool random_priors)
 {
     m_name = par_name;
     m_rng_priors = random_priors;
-
-    //get the binning from a file
-    SetBinning(file_name);
 }
 
 FitParameters::~FitParameters()
 {;}
 
-void FitParameters::SetBinning(const std::string& file_name)
+bool FitParameters::SetBinning(const std::string& file_name, std::vector<FitBin>& bins)
 {
     std::ifstream fin(file_name, std::ios::in);
     if(!fin.is_open())
     {
         std::cerr << "[ERROR]: In FitParameters::SetBinning()\n"
                   << "[ERROR]: Failed to open binning file: " << file_name << std::endl;
-        return;
+        return false;
     }
 
     else
@@ -35,34 +32,39 @@ void FitParameters::SetBinning(const std::string& file_name)
                           << "[WARNING]: Bad line format: " << line << std::endl;
                 continue;
             }
-            m_bins.emplace_back(FitBin(D1_1, D1_2, D2_1, D2_2));
+            bins.emplace_back(FitBin(D1_1, D1_2, D2_1, D2_2));
         }
         fin.close();
-        Npar = m_bins.size();
 
         std::cout << "[FitParameters]: Fit binning: \n";
-        for(std::size_t i = 0; i < m_bins.size(); ++i)
+        for(std::size_t i = 0; i < bins.size(); ++i)
         {
             std::cout << std::setw(3) << i
-                      << std::setw(5) << m_bins[i].D2low
-                      << std::setw(5) << m_bins[i].D2high
-                      << std::setw(5) << m_bins[i].D1low
-                      << std::setw(5) << m_bins[i].D1high << std::endl;
+                      << std::setw(5) << bins[i].D2low
+                      << std::setw(5) << bins[i].D2high
+                      << std::setw(5) << bins[i].D1low
+                      << std::setw(5) << bins[i].D1high << std::endl;
         }
+
+        return true;
     }
 }
 
-int FitParameters::GetBinIndex(double D1, double D2)
+int FitParameters::GetBinIndex(const std::string& det, double D1, double D2)
 {
-    for(int i = 0; i < m_bins.size(); ++i)
+    int bin = BADBIN;
+    const std::vector<FitBin> temp_bins = m_fit_bins.at(det);
+
+    for(int i = 0; i < temp_bins.size(); ++i)
     {
-        if(D1 >= m_bins[i].D1low && D1 < m_bins[i].D1high &&
-           D2 >= m_bins[i].D2low && D2 < m_bins[i].D2high)
+        if(D1 >= temp_bins[i].D1low && D1 < temp_bins[i].D1high &&
+           D2 >= temp_bins[i].D2low && D2 < temp_bins[i].D2high)
         {
-            return i;
+            bin = i;
+            break;
         }
     }
-    return BADBIN;
+    return bin;
 }
 
 
@@ -71,7 +73,7 @@ void FitParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
 {
     for(const auto& s : sample)
     {
-        if(m_det_bins.count(s -> GetDetector()) == 0)
+        if(m_fit_bins.count(s -> GetDetector()) == 0)
         {
             std::cerr << "[ERROR] In FitParameters::InitEventMap\n"
                       << "[ERROR] Detector " << s -> GetDetector() << " not part of fit parameters.\n"
@@ -102,7 +104,7 @@ void FitParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
             {
                 double D1 = ev -> GetTrueD1();
                 double D2 = ev -> GetTrueD2();
-                int bin = GetBinIndex(D1, D2);
+                int bin = GetBinIndex(sample[s] -> GetDetector(), D1, D2);
                 if(bin == BADBIN)
                 {
                     std::cout << "[WARNING]: " << m_name << ", Event: " << i << std::endl
@@ -149,30 +151,60 @@ void FitParameters::ReWeight(AnaEvent *event, const std::string& det, int nsampl
             event -> AddEvWght(0.0);
         }
 
-        if(m_det_bins.count(det) == true)
-            event -> AddEvWght(params[bin]);
+        if(m_fit_bins.count(det) == true)
+            event -> AddEvWght(params[bin + m_det_offset.at(det)]);
     }
 }
 
 void FitParameters::InitParameters()
 {
+    if(m_fit_bins.size() != m_det_offset.size())
+    {
+        std::cerr << "[ERROR]: In FitParameters::InitParameters()\n"
+                  << "[ERROR]: Detector bins and offset maps are not the same size!" << std::endl;
+        return;
+    }
+
+    std::set<std::pair<std::string, int>, PairCompare> temp_set;
+    for(const auto& kv : m_det_offset)
+        temp_set.insert(kv);
+
     double rand_prior = 0.0;
     TRandom3 rng(0);
 
-    //parameter names & prior values
-    for(std::size_t i = 0; i < Npar; ++i)
+    for(const auto& pear : temp_set)
     {
-        pars_name.push_back(Form("%s%d", m_name.c_str(), (int)i));
-        if(m_rng_priors == true)
+        const int nbins = m_fit_bins.at(pear.first).size();
+        for(int i = 0; i < nbins; ++i)
         {
-            rand_prior = 2.0 * rng.Uniform(0.0, 1.0);
-            pars_prior.push_back(rand_prior);
-        }
-        else
-            pars_prior.push_back(1.0); //all weights are 1.0 a priori
+            pars_name.push_back(Form("%s_%s_%d", m_name.c_str(), pear.first.c_str(), i));
+            if(m_rng_priors == true)
+            {
+                rand_prior = 2.0 * rng.Uniform(0.0, 1.0);
+                pars_prior.push_back(rand_prior);
+            }
+            else
+                pars_prior.push_back(1.0); //all weights are 1.0 a priori
 
-        pars_step.push_back(0.05);
-        pars_limlow.push_back(0.0);
-        pars_limhigh.push_back(10.0);
+            pars_step.push_back(0.05);
+            pars_limlow.push_back(0.0);
+            pars_limhigh.push_back(10.0);
+
+        }
     }
+
+    Npar = pars_name.size();
+}
+
+void FitParameters::AddDetector(const std::string& det, const std::string& f_binning, int offset)
+{
+    std::cout << "[FitParameters]: Adding detector " << det << " for " << this -> m_name << std::endl;
+    std::vector<FitBin> temp_vector;
+    if(SetBinning(f_binning, temp_vector))
+    {
+        m_fit_bins.emplace(std::make_pair(det, temp_vector));
+        m_det_offset.emplace(std::make_pair(det, offset));
+    }
+    else
+        std::cout << "[WARNING]: Adding detector failed." << std::endl;
 }

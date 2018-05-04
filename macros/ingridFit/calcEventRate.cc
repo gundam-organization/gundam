@@ -111,9 +111,15 @@ void calcEventRate(const std::string fname_mc, const std::string fname_data, con
     {
         t_sel_events_mc -> GetEntry(i);
 
-        if((mectopology == 1 || mectopology == 2) && (cutBranch == 1 || cutBranch == 10))
+        if((mectopology == 1 || mectopology == 2) && (cutBranch == 1))
         {
             int idx = GetBinIndex(D1True, D2True, analysis_bins);
+            signal_mc -> Fill(idx, weight);
+        }
+
+        if((mectopology == 1 || mectopology == 2) && (cutBranch == 10))
+        {
+            int idx = GetBinIndex(D1True, D2True, analysis_bins) + analysis_bins.size();
             signal_mc -> Fill(idx, weight);
         }
     }
@@ -130,9 +136,15 @@ void calcEventRate(const std::string fname_mc, const std::string fname_data, con
     {
         t_sel_events_data -> GetEntry(i);
 
-        if((mectopology == 1 || mectopology == 2) && (cutBranch == 1 || cutBranch == 10))
+        if((mectopology == 1 || mectopology == 2) && (cutBranch == 1))
         {
             int idx = GetBinIndex(D1True, D2True, analysis_bins);
+            signal_data -> Fill(idx, weight);
+        }
+
+        if((mectopology == 1 || mectopology == 2) && (cutBranch == 10))
+        {
+            int idx = GetBinIndex(D1True, D2True, analysis_bins) + analysis_bins.size();
             signal_data -> Fill(idx, weight);
         }
     }

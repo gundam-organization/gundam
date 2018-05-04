@@ -218,7 +218,7 @@ int superTreeConvert(
         nbytes += nb;
         passCount = 0;
         RecoNuEnergy = TrueNuEnergy;
-        weight = 1.0;
+        weight = 1.1;
         //pCosThetaRec  = TMath::Cos(pThetaRec);
         //muCosThetaRec = TMath::Cos(muThetaRec);
 
@@ -323,7 +323,7 @@ int superTreeConvert(
     for (Long64_t jentry=0; jentry<nentries_T;jentry++) {
         nb_T = nd5tree_T->GetEntry(jentry);
         nbytes_T += nb_T;
-        weight_T=1.0; // 1.0
+        weight_T=1.1; // 1.0
 
         //D1True_T = TMath::Cos(TMath::ACos(muCosThetaTrue_T) - TMath::ACos(pCosThetaTrue_T));
         D1True_T = muMomTrue_T;
@@ -351,7 +351,7 @@ int superTreeConvert(
         muMomTrue = 0;
         pMomRec = 0;
         pMomTrue = 0;
-        weight = 1.0;
+        weight = 1.1;
         reaction = 0;
         cutBranch = 10;
 
@@ -367,7 +367,7 @@ int superTreeConvert(
         }
         else if(fileIndex == 1 && npioncount == 1 && mupdg == 13 && ppdg == 211 && nprotoncount == 0)
             mectopology = 3;
-        else if(fileIndex == 1 && npioncount > 0 && nprotoncount > 0 && mupdg == 13)
+        else if(fileIndex == 1 && npioncount > 0 && mupdg == 13)
             mectopology = 4;
         else
             continue;
