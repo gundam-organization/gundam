@@ -64,6 +64,7 @@ set_target_properties(ingridFit PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
 foreach(mod ${MODULES})
  target_include_directories(ingridFit PUBLIC ${CMAKE_SOURCE_DIR}/${mod}/src)
+ target_include_directories(ingridFit PUBLIC ${CMAKE_SOURCE_DIR}/include)
 endforeach()
 
 foreach(mod ${MODULETargets})

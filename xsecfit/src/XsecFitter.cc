@@ -15,13 +15,14 @@ void dummy_fcn( Int_t &npar, Double_t *gin, Double_t &f,
 }
 
 // ctor
-XsecFitter::XsecFitter(int seed)
+XsecFitter::XsecFitter(const int seed, const int num_threads)
 {
     rng = new TRandom3(seed);
     //set gRandom to our rand
     gRandom = rng;
     m_dir   = nullptr;
     m_freq  = -1;
+    m_threads = num_threads;
 }
 
 // dtor
@@ -423,7 +424,8 @@ double XsecFitter::FillSamples(vector< vector<double> > new_pars, int datatype)
     if((m_calls<1001 && (m_calls%100==0 || m_calls<20)) || (m_calls>1001 && m_calls%1000==0) || (m_calls>10001 && m_calls%10000==0)) isGonnaBeABiggun = true;
 
     //loop over samples
-    for(size_t s=0;s<m_samples.size();s++)
+    #pragma omp parallel for num_threads(m_threads)
+    for(int s=0;s<m_samples.size();s++)
     {
         //loop over events
         for(int i=0;i<m_samples[s]->GetN();i++)
@@ -446,6 +448,7 @@ double XsecFitter::FillSamples(vector< vector<double> > new_pars, int datatype)
         m_samples[s]->FillEventHisto(datatype);
 
         //calculate chi2 for each sample
+        #pragma omp atomic
         chi2 += m_samples[s]->CalcChi2();
         if(isGonnaBeABiggun) cout << "chi2 for sample " << s << " is " <<  m_samples[s]->CalcChi2() << endl;;
     }

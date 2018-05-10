@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <iostream>
 #include <iterator>
+#include <omp.h>
 #include <sstream>
 #include <string>
 
@@ -23,7 +24,7 @@ using namespace std;
 class XsecFitter : public TObject
 {
     public:
-        XsecFitter(int seed = 1019);
+        XsecFitter(const int seed, const int num_threads);
         ~XsecFitter();
         void SetSeed(int seed);
         void fcn(Int_t &npar, Double_t *gin, Double_t &f, Double_t *par, Int_t iflag);
@@ -127,5 +128,6 @@ class XsecFitter : public TObject
         std::vector<double> vec_chi2_sys;
         std::vector<double> vec_chi2_reg;
         std::vector<double> vec_chi2_reg2;
+        int m_threads;
 };
 #endif

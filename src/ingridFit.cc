@@ -22,6 +22,9 @@ parameters defined in /fitparams/src/FitParameters
 #include "AnySample.hh"
 #include "FluxParameters.hh"
 
+#include "json.hpp"
+using json = nlohmann::json;
+
 int main(int argc, char *argv[])
 {
     std::cout << std::fixed << std::setprecision(3);
@@ -45,6 +48,7 @@ int main(int argc, char *argv[])
     const double potD  = 331.6; //in units 10^19 Neut Air
     const double potMC = 331.6; //in units 10^19 Neut Air
     int seed = 1019;
+    int threads = 1;
     bool fit_nd280 = false;
     bool fit_ingrid = false;
     bool stat_fluc = false;
@@ -55,7 +59,7 @@ int main(int argc, char *argv[])
 
     //Argument parser for now. Possibly try cxxopts library.
     char option;
-    while((option = getopt(argc, argv, "d:m:o:b:f:NIsS:h")) != -1)
+    while((option = getopt(argc, argv, "d:m:o:b:f:NIsS:t:h")) != -1)
     {
         switch(option)
         {
@@ -85,6 +89,9 @@ int main(int argc, char *argv[])
                 break;
             case 'S':
                 seed = std::stoi(optarg);
+                break;
+            case 't':
+                threads = std::stoi(optarg);
                 break;
             case 'h':
                 std::cout << "USAGE: "
@@ -239,7 +246,7 @@ int main(int argc, char *argv[])
     fitpara.push_back(&fluxpara);
 
     //Instantiate fitter obj
-    XsecFitter xsecfit(seed);
+    XsecFitter xsecfit(seed, threads);
     xsecfit.SetPOTRatio(potD/potMC);
 
     //init w/ para vector
