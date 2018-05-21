@@ -1,5 +1,5 @@
 {
-    "data_file" : "fixed_signal.root",
+    "data_file" : "fixed_nominal.root",
     "mc_file" : "fixed_nominal.root",
     "output_file" : "test.root",
     "input_dir" : "/inputs/ingridFit/",
@@ -33,9 +33,9 @@
             "cut_branch" : 10,
             "name": "INGRID",
             "detector" : "INGRID",
-            "binning" : "coarse_binning.txt",
+            "binning" : "ingrid_binning.txt",
             "flux_offset" : 20,
-            "det_offset" : 0,
+            "det_offset" : 13,
             "use_sample" : true
         }
     ]

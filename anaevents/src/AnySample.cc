@@ -13,7 +13,7 @@
 AnySample::AnySample(int sample_id, const std::string& name, const std::string& detector,
         std::vector<std::pair <double,double> > v_d1edges,
         std::vector<std::pair <double,double> > v_d2edges,
-        TTree* data, bool isBuffer, bool isEmpty)
+        TTree* data, bool isBuffer, bool useSample)
 {
     m_sampleid = sample_id; //unique id
     m_name     = name;      //some comprehensible name
@@ -21,7 +21,7 @@ AnySample::AnySample(int sample_id, const std::string& name, const std::string& 
     m_data_tree = data;
     m_D1edges = v_d1edges;
     m_D2edges = v_d2edges;
-    m_empty = isEmpty;
+    m_use_sample = useSample;
     m_BufferBin = isBuffer;
 
     std::cout << "[AnySample]: " << m_name << ", ID " << m_sampleid << std::endl
@@ -221,7 +221,7 @@ int AnySample::GetAnyBinIndex(const double D1, const double D2)
 // FillEventHist
 void AnySample::FillEventHisto(int datatype)
 {
-    if(m_empty)
+    if(!m_use_sample)
         return; // This sample will have no events
     if(m_hpred != nullptr)
         m_hpred -> Reset();
@@ -361,7 +361,7 @@ void AnySample::FillEventHisto(int datatype)
 
 double AnySample::CalcChi2()
 {
-    if(m_empty == true)
+    if(m_use_sample == false)
         return 0.0;
 
     if(m_hdata == nullptr)

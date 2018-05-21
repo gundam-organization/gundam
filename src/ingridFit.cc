@@ -87,41 +87,8 @@ int main(int argc, char* argv[])
     TFile* fdata = TFile::Open(fname_data.c_str(), "READ");
     TTree* tdata = (TTree*)(fdata->Get("selectedEvents"));
 
-    //Set up bin edges
-    std::vector< std::pair<double, double> > v_D1edges;
-    std::vector< std::pair<double, double> > v_D2edges;
-
     std::cout << "[IngridFit]: Opening " << fname_data << " for data selection.\n"
               << "[IngridFit]: Opening " << fname_mc << " for MC selection." << std::endl;
-    std::cout << "[IngridFit]: Opening " << fname_binning << " for analysis binning." << std::endl;
-    std::ifstream fin(fname_binning, std::ios::in);
-    if(!fin.is_open())
-    {
-        std::cerr << "[ERROR]: Failed to open binning file: " << fname_binning
-                  << "[ERROR]: Terminating execution." << std::endl;
-        return 1;
-    }
-
-    else
-    {
-        std::string line;
-        while(getline(fin, line))
-        {
-            std::stringstream ss(line);
-            double D1_1, D1_2, D2_1, D2_2;
-            if(!(ss>>D2_1>>D2_2>>D1_1>>D1_2))
-            {
-                std::cerr << "[IngridFit]: Bad line format: " << line << std::endl;
-                continue;
-            }
-            v_D1edges.emplace_back(std::make_pair(D1_1,D1_2));
-            v_D2edges.emplace_back(std::make_pair(D2_1,D2_2));
-        }
-        fin.close();
-    }
-
-    const int ing_fit_offset = v_D1edges.size();
-    //Set up systematics:
 
     /*************************************** FLUX *****************************************/
     std::cout << "[IngridFit]: Setup Flux " << std::endl;
@@ -152,23 +119,47 @@ int main(int argc, char* argv[])
 
     std::vector<AnaSample*> samples;
 
-    // The sample ID (first arg) should match the cutBranch corresponding to it
+    for(const auto& opt : parser.samples)
+    {
+        std::cout << "[IngridFit]: Adding new sample to fit.\n"
+                  << "[IngridFit]: Name: " << opt.name << std::endl
+                  << "[IngridFit]: CutB: " << opt.cut_branch << std::endl
+                  << "[IngridFit]: Detector: " << opt.detector << std::endl
+                  << "[IngridFit]: Use Sample: " << opt.use_sample << std::endl;
+        std::cout << "[IngridFit]: Opening " << opt.binning << " for analysis binning." << std::endl;
 
-    AnySample sam2(1, "MuTPCpTPC", "ND280", v_D1edges, v_D2edges, tdata, isBuffer, false);
-    sam2.SetNorm(potD/potMC);
-    samples.push_back(&sam2);
+        std::vector< std::pair<double, double> > D1_edges;
+        std::vector< std::pair<double, double> > D2_edges;
+        std::ifstream fin(opt.binning, std::ios::in);
+        if(!fin.is_open())
+        {
+            std::cerr << "[ERROR]: Failed to open binning file: " << fname_binning
+                      << "[ERROR]: Terminating execution." << std::endl;
+            return 1;
+        }
 
-    //AnySample sam6(5, "CC1pi", v_D1edges, v_D2edges, tdata, isBuffer, true);
-    //sam6.SetNorm(potD/potMC);
-    //samples.push_back(&sam6);
+        else
+        {
+            std::string line;
+            while(getline(fin, line))
+            {
+                std::stringstream ss(line);
+                double D1_1, D1_2, D2_1, D2_2;
+                if(!(ss>>D2_1>>D2_2>>D1_1>>D1_2))
+                {
+                    std::cerr << "[IngridFit]: Bad line format: " << line << std::endl;
+                    continue;
+                }
+                D1_edges.emplace_back(std::make_pair(D1_1,D1_2));
+                D2_edges.emplace_back(std::make_pair(D2_1,D2_2));
+            }
+            fin.close();
+        }
 
-    //AnySample sam7(6, "DIS", v_D1edges, v_D2edges, tdata, isBuffer, true);
-    //sam7.SetNorm(potD/potMC);
-    //samples.push_back(&sam7);
-
-    AnySample sam8(10, "Ingrid", "INGRID", v_D1edges, v_D2edges, tdata, isBuffer, false);
-    sam8.SetNorm(potD/potMC);
-    samples.push_back(&sam8);
+        auto s = new AnySample(opt.cut_branch, opt.name, opt.detector, D1_edges, D2_edges, tdata, false, opt.use_sample);
+        s -> SetNorm(potD/potMC);
+        samples.push_back(s);
+    }
 
     //read MC events
     AnyTreeMC selTree(fname_mc.c_str());
@@ -194,16 +185,16 @@ int main(int argc, char* argv[])
 
     //Fit parameters
     FitParameters sigfitpara("par_fit");
-    sigfitpara.AddDetector("ND280", fname_binning, 0);
-    sigfitpara.AddDetector("INGRID", fname_binning, ing_fit_offset);
+    for(const auto& opt : parser.samples)
+        sigfitpara.AddDetector(opt.detector, opt.binning, opt.det_offset);
     sigfitpara.InitEventMap(samples, 0);
     fitpara.push_back(&sigfitpara);
 
     //Flux parameters
     FluxParameters fluxpara("par_flux");
     fluxpara.SetCovarianceMatrix(cov_flux);
-    fluxpara.AddDetector("ND280", enubins, 0);
-    fluxpara.AddDetector("INGRID", enubins, 20);
+    for(const auto& opt : parser.samples)
+        fluxpara.AddDetector(opt.detector, enubins, opt.flux_offset);
     fluxpara.InitEventMap(samples, 0);
     fitpara.push_back(&fluxpara);
 

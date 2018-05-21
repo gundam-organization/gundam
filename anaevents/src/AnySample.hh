@@ -33,7 +33,7 @@ class AnySample : public AnaSample
     public:
         AnySample(int sample_id, const std::string& name, const std::string& detector,
                 std::vector<std::pair <double,double> > v_d1edges,
-                std::vector<std::pair <double,double> > v_d2edges, TTree *data, bool isBuffer, bool isEmpty=false);
+                std::vector<std::pair <double,double> > v_d2edges, TTree *data, bool isBuffer, bool useSample=true);
         ~AnySample();
 
         //binning for various histograms
@@ -71,7 +71,7 @@ class AnySample : public AnaSample
         double *bins_D1, *bins_D2, *bins_enu, *bins_Any, *bins_D1toPlot;
         std::vector<std::pair<double, double> > m_D1edges;
         std::vector<std::pair<double, double> > m_D2edges;
-        bool m_empty; // If true, we won't include any events in this sample (useful for testing the effect of removing samples)
+        bool m_use_sample; // If true, we won't include any events in this sample (useful for testing the effect of removing samples)
         bool m_BufferBin; // Should we bother plotting the last bin (dat, dphit), or is it just a buffer (dpt)?
 };
 
