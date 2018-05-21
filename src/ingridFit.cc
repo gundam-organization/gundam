@@ -21,99 +21,69 @@ parameters defined in /fitparams/src/FitParameters
 #include "AnyTreeMC.hh"
 #include "AnySample.hh"
 #include "FluxParameters.hh"
+#include "OptParser.hh"
 
-#include "json.hpp"
-using json = nlohmann::json;
-
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     std::cout << std::fixed << std::setprecision(3);
+    std::cout << "------------------------------------------------\n"
+              << "[IngridFit]: Welcome to the Super-xsLLhFitter.\n"
+              << "[IngridFit]: Initializing the fit machinery..." << std::endl;
 
-    const char* xslf_env = std::getenv("XSLLHFITTER");
-    if(!xslf_env)
+    const std::string xslf_env = std::getenv("XSLLHFITTER");
+    if(xslf_env.empty())
     {
         std::cerr << "[ERROR]: Environment variable \"XSLLHFITTER\" not set." << std::endl
                   << "[ERROR]: Cannot determine source tree location." << std::endl;
         return 1;
     }
 
-    std::string input_dir = std::string(xslf_env) + "/inputs/ingridFit/";
-    std::string fname_data = input_dir + "fixed_nominal.root"; //"/NeutAir5_2DV2.root";
-    std::string fname_mc   = input_dir + "fixed_nominal.root"; //"/NeutAir5_2DV2.root";
-    std::string fname_binning = input_dir + "ingrid_binning.txt"; //"/dptbinning2DPS_shortest_inclusive.txt";
-    std::string fname_fluxcov = input_dir + "flux_numu_cov.root";
-    std::string paramVectorFname = "fitresults.root";
-    std::string fname_output = "ingridFit.root";
+    std::string json_file;
+    char option;
+    while((option = getopt(argc, argv, "j:h")) != -1)
+    {
+        switch(option)
+        {
+            case 'j':
+                json_file = optarg;
+                break;
+            case 'h':
+                std::cout << "USAGE: "
+                          << argv[0] << "\nOPTIONS:\n"
+                          << "-j : JSON input\n";
+            default:
+                return 0;
+        }
+    }
 
-    const double potD  = 331.6; //in units 10^19 Neut Air
-    const double potMC = 331.6; //in units 10^19 Neut Air
-    int seed = 1019;
-    int threads = 1;
-    bool fit_nd280 = false;
-    bool fit_ingrid = false;
+    OptParser parser;
+    if(!parser.ParseJSON(json_file))
+    {
+        std::cerr << "[ERROR] JSON parsing failed. Exiting.\n";
+        return 1;
+    }
+
+    std::string input_dir = parser.input_dir;
+    std::string fname_data = parser.fname_data;
+    std::string fname_mc   = parser.fname_mc;
+    std::string fname_output = parser.fname_output;
+    std::string fname_binning = input_dir + "coarse_binning.txt";
+    std::string paramVectorFname = "fitresults.root";
+
+    std::vector<int> signal_topology = parser.sample_signal;
+    std::vector<std::string> topology = parser.sample_topology;
+
+    const double potD  = parser.data_POT;
+    const double potMC = parser.mc_POT;
+    int seed = parser.rng_seed;
+    int threads = parser.num_threads;
     bool stat_fluc = false;
 
     int nprimbins = 8;
     int isBuffer = false; // Is the final bin just for including events that go beyond xsec binning
     // e.g. events with over 5GeV pmu if binning in pmu
 
-    //Argument parser for now. Possibly try cxxopts library.
-    char option;
-    while((option = getopt(argc, argv, "d:m:o:b:f:NIsS:t:h")) != -1)
-    {
-        switch(option)
-        {
-            case 'd':
-                fname_data = input_dir + optarg;
-                break;
-            case 'm':
-                fname_mc = input_dir + optarg;
-                break;
-            case 'o':
-                fname_output = optarg;
-                break;
-            case 'b':
-                fname_binning = input_dir + optarg;
-                break;
-            case 'f':
-                fname_fluxcov = input_dir + optarg;
-                break;
-            case 'N':
-                fit_nd280 = true;
-                break;
-            case 'I':
-                fit_ingrid = true;
-                break;
-            case 's':
-                stat_fluc = true;
-                break;
-            case 'S':
-                seed = std::stoi(optarg);
-                break;
-            case 't':
-                threads = std::stoi(optarg);
-                break;
-            case 'h':
-                std::cout << "USAGE: "
-                          << argv[0] << "\nOPTIONS:\n"
-                          << "-d : set data file\n"
-                          << "-m : set mc file\n"
-                          << "-o : set output file\n"
-                          << "-b : set binning file\n"
-                          << "-f : set flux covariance\n"
-                          << "-N : fit nd280 sample\n"
-                          << "-I : fit ingrid sample\n"
-                          << "-s : set statistical fluctuations\n"
-                          << "-S : set random seed\n";
-            default:
-                return 0;
-        }
-    }
-
-    if(fit_nd280 == false && fit_ingrid == false)
-        fit_nd280 = true;
-
-    // Setup data trees
+    //Setup data trees
     TFile* fdata = TFile::Open(fname_data.c_str(), "READ");
     TTree* tdata = (TTree*)(fdata->Get("selectedEvents"));
 
@@ -121,9 +91,6 @@ int main(int argc, char *argv[])
     std::vector< std::pair<double, double> > v_D1edges;
     std::vector< std::pair<double, double> > v_D2edges;
 
-    std::cout << "------------------------------------------------\n"
-              << "[IngridFit]: Welcome to the Super-xsLLhFitter.\n"
-              << "[IngridFit]: Initializing the fit machinery..." << std::endl;
     std::cout << "[IngridFit]: Opening " << fname_data << " for data selection.\n"
               << "[IngridFit]: Opening " << fname_mc << " for MC selection." << std::endl;
     std::cout << "[IngridFit]: Opening " << fname_binning << " for analysis binning." << std::endl;
@@ -160,10 +127,10 @@ int main(int argc, char *argv[])
     std::cout << "[IngridFit]: Setup Flux " << std::endl;
 
     //input File
-    TFile *finfluxcov = TFile::Open(fname_fluxcov.c_str(), "READ"); //contains flux systematics info
-    std::cout << "[IngridFit]: Opening " << fname_fluxcov << " for flux covariance." << std::endl;
+    TFile *finfluxcov = TFile::Open(parser.flux_cov.fname.c_str(), "READ"); //contains flux systematics info
+    std::cout << "[IngridFit]: Opening " << parser.flux_cov.fname << " for flux covariance." << std::endl;
     //setup enu bins and covm for flux
-    TH1D *nd_numu_bins_hist = (TH1D*)finfluxcov->Get("flux_binning");
+    TH1D *nd_numu_bins_hist = (TH1D*)finfluxcov->Get(parser.flux_cov.binning.c_str());
     TAxis *nd_numu_bins = nd_numu_bins_hist->GetXaxis();
 
     std::vector<double> enubins;
@@ -172,7 +139,7 @@ int main(int argc, char *argv[])
         enubins.push_back(nd_numu_bins -> GetBinUpEdge(i+1));
 
     //Cov mat stuff:
-    TMatrixDSym* cov_flux_in = (TMatrixDSym*)finfluxcov -> Get("flux_numu_cov");
+    TMatrixDSym* cov_flux_in = (TMatrixDSym*)finfluxcov -> Get(parser.flux_cov.matrix.c_str());
     TMatrixDSym cov_flux = *cov_flux_in;
     finfluxcov -> Close();
 
@@ -189,8 +156,7 @@ int main(int argc, char *argv[])
 
     AnySample sam2(1, "MuTPCpTPC", "ND280", v_D1edges, v_D2edges, tdata, isBuffer, false);
     sam2.SetNorm(potD/potMC);
-    if(fit_nd280 == true)
-        samples.push_back(&sam2);
+    samples.push_back(&sam2);
 
     //AnySample sam6(5, "CC1pi", v_D1edges, v_D2edges, tdata, isBuffer, true);
     //sam6.SetNorm(potD/potMC);
@@ -202,18 +168,14 @@ int main(int argc, char *argv[])
 
     AnySample sam8(10, "Ingrid", "INGRID", v_D1edges, v_D2edges, tdata, isBuffer, false);
     sam8.SetNorm(potD/potMC);
-    if(fit_ingrid == true)
-        samples.push_back(&sam8);
+    samples.push_back(&sam8);
 
     //read MC events
     AnyTreeMC selTree(fname_mc.c_str());
     std::cout << "[IngridFit]: Reading and collecting events." << std::endl;
-    std::vector<int> signal_topology = {1, 2};
     selTree.GetEvents(samples, signal_topology);
 
     std::cout << "[IngridFit]: Getting sample breakdown by reaction." << std::endl;
-    std::vector<std::string> topology = {"cc0pi0p", "cc0pi1p", "cc0pinp", "cc1pi+", "ccother", "backg", "Null", "OOFV"};
-
     for(auto& sample : samples)
         sample -> GetSampleBreakdown(fout, "nominal", topology, true);
 
