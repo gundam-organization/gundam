@@ -1,5 +1,5 @@
-set(SRCFILES OptParser.cc ThrowParms.cc)
-set(HEADERS OptParser.hh ThrowParms.hh)
+set(SRCFILES OptParser.cc ThrowParms.cc ToyThrower.cc)
+set(HEADERS OptParser.hh ThrowParms.hh ToyThrower.hh)
 
 
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)
