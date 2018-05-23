@@ -179,7 +179,7 @@ void XsecFitter::Fit(std::vector<AnaSample*> &samples, const std::vector<std::st
         //save hists if requested
         for(size_t s=0;s<m_samples.size();s++)
         {
-            m_samples[s]->GetSampleBreakdown(m_dir, "thrown", topology, true);
+            m_samples[s]->GetSampleBreakdown(m_dir, "thrown", topology, false);
         }
     }
     else if(datatype==2 || datatype==3 || datatype==4){
@@ -748,7 +748,7 @@ void XsecFitter::DoSaveResults(vector< vector<double> >& parresults, vector< vec
     //ADDED save actual final results
     for(size_t s=0;s<m_samples.size();s++)
     {
-        m_samples[s]->GetSampleBreakdown(m_dir, "fit", topology, true);
+        m_samples[s]->GetSampleBreakdown(m_dir, "fit", topology, false);
     }
 }
 

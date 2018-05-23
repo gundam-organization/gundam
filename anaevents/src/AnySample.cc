@@ -129,15 +129,15 @@ AnySample::AnySample(int sample_id, const std::string& name, const std::string& 
 AnySample::~AnySample()
 {
     if(m_hpred != nullptr)
-        m_hpred -> Delete();
+        delete m_hpred;
     if(m_hmc != nullptr)
-        m_hmc -> Delete();
+        delete m_hmc;
     if(m_hmc_true != nullptr)
-        m_hmc_true -> Delete();
+        delete m_hmc_true;
     if(m_hdata != nullptr)
-        m_hdata -> Delete();
+        delete m_hdata;
     if(m_hsig != nullptr)
-        m_hsig -> Delete();
+        delete m_hsig;
 
     delete [] bins_D1;
     delete [] bins_D2;
@@ -147,23 +147,33 @@ AnySample::~AnySample()
 // MakeEventHisto
 void AnySample::MakeHistos()
 {
-    if(m_hpred != nullptr) m_hpred->Delete();
+    if(m_hpred != nullptr)
+        delete m_hpred;
     m_hpred = new TH1D(Form("%s_pred_recD1D2", m_name.c_str()),
             Form("%s_pred_recD1D2", m_name.c_str()),
             nAnybins, bins_Any);
-    m_hpred->SetDirectory(0);
+    m_hpred -> SetDirectory(0);
 
-    if(m_hmc != nullptr) m_hmc->Delete();
+    if(m_hmc != nullptr)
+        delete m_hmc;
     m_hmc = new TH1D(Form("%s_mc_recD1D2", m_name.c_str()),
             Form("%s_mc_recD1D2", m_name.c_str()),
             nAnybins, bins_Any);
-    m_hmc->SetDirectory(0);
+    m_hmc -> SetDirectory(0);
 
-    if(m_hmc_true != nullptr) m_hmc_true->Delete();
+    if(m_hmc_true != nullptr)
+        delete m_hmc_true;
     m_hmc_true = new TH1D(Form("%s_mc_TrueD1D2", m_name.c_str()),
             Form("%s_mc_TrueD1D2", m_name.c_str()),
             nAnybins, bins_Any);
-    m_hmc_true->SetDirectory(0);
+    m_hmc_true -> SetDirectory(0);
+
+    if(m_hsig != nullptr)
+        delete m_hsig;
+    m_hsig = new TH1D(Form("%s_mc_trueSignal", m_name.c_str()),
+            Form("%s_mc_trueSignal", m_name.c_str()),
+            nAnybins, bins_Any);
+    m_hsig -> SetDirectory(0);
 
     std::cout << "[AnySample]: " << nAnybins << " bins inside MakeHistos(). " << std::endl;
 }
@@ -229,6 +239,8 @@ void AnySample::FillEventHisto(int datatype)
         m_hmc -> Reset();
     if(m_hmc_true != nullptr)
         m_hmc_true -> Reset();
+    if(m_hsig != nullptr)
+        m_hsig -> Reset();
 
     for(std::size_t i = 0; i < m_events.size(); ++i)
     {
@@ -244,10 +256,14 @@ void AnySample::FillEventHisto(int datatype)
         m_hpred -> Fill(anybin_index_rec + 0.5, wght);
         m_hmc -> Fill(anybin_index_rec + 0.5, wght);
         m_hmc_true -> Fill(anybin_index_true + 0.5, wght);
+
+        if(m_events[i].isSignalEvent())
+            m_hsig -> Fill(anybin_index_true + 0.5, wght);
     }
 
     m_hpred -> Scale(m_norm);
     m_hmc -> Scale(m_norm);
+    m_hsig -> Scale(m_norm);
 
     //data without stat variation: useful when nuisance parameters
     //varied in the toys
@@ -709,13 +725,6 @@ void AnySample::GetSampleBreakdown(TDirectory *dirout, const std::string& tag, c
         hAnybin_true[i].GetXaxis() -> SetTitle("Any bins");
     }
 
-    if(m_hsig != nullptr)
-        delete m_hsig;
-    m_hsig = new TH1D(Form("%s_signalOnly_%s", m_name.c_str(), tag.c_str()),
-            Form("%s_signalOnly_%s", m_name.c_str(), tag.c_str()),
-            nAnybins, bins_Any);
-    m_hsig -> SetDirectory(0);
-
     int Ntot = GetN();
     for(std::size_t i = 0; i < m_events.size(); ++i)
     {
@@ -756,14 +765,9 @@ void AnySample::GetSampleBreakdown(TDirectory *dirout, const std::string& tag, c
         int anybin_index_true = GetAnyBinIndex(D1_true, D2_true);
         hAnybin_rec[evt_topology].Fill(anybin_index_rec + 0.5, wght);
         hAnybin_true[evt_topology].Fill(anybin_index_true + 0.5, wght);
-
-        if(m_events[i].isSignalEvent())
-            m_hsig -> Fill(anybin_index_true + 0.5, wght);
     }
 
-    dirout->cd();
-    m_hsig->Scale(m_norm);
-
+    dirout -> cd();
     for(int i = 0; i < ntopology; ++i)
     {
         henu_rec[i].Scale(m_norm);
@@ -788,18 +792,17 @@ void AnySample::GetSampleBreakdown(TDirectory *dirout, const std::string& tag, c
         }
     }
 
-    if(save == true)
+    std::cout << "[AnySample]: GetSampleBreakdown()\n"
+              << "============ Sample " << m_name << " ==========="<<endl;
+
+    for(int j = 0; j < ntopology; ++j)
     {
-        std::cout << "[AnySample]: GetSampleBreakdown()\n"
-                  << "============ Sample " << m_name << " ==========="<<endl;
-
-        for(int j = 0; j < ntopology; ++j)
-            std::cout << std::setw(10) << topology[j] << std::setw(5) << j
-                      << std::setw(5) << compos[j] << std::setw(10)
-                      << ((1.0 * compos[j]) / Ntot) * 100.0 << "%" << std::endl;
-
-        std::cout << std::setw(10) << "Total" << std::setw(5) << " "
-                  << std::setw(5) << Ntot << std::setw(10) << "100.00%" << std::endl;
+        std::cout << std::setw(10) << topology[j] << std::setw(5) << j
+                  << std::setw(5) << compos[j] << std::setw(10)
+                  << ((1.0 * compos[j]) / Ntot) * 100.0 << "%" << std::endl;
     }
+
+    std::cout << std::setw(10) << "Total" << std::setw(5) << " "
+              << std::setw(5) << Ntot << std::setw(10) << "100.00%" << std::endl;
 }
 

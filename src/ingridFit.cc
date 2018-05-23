@@ -1,10 +1,3 @@
-/******************************************************
-
-Bare bones of what needs to be set up to fit some set of
-parameters defined in /fitparams/src/FitParameters
-
-******************************************************/
-
 #include <cstdlib>
 #include <fstream>
 #include <iomanip>
@@ -13,15 +6,12 @@ parameters defined in /fitparams/src/FitParameters
 #include <string>
 #include <unistd.h>
 
-#include <TCanvas.h>
-#include <TH1F.h>
-
-#include "FitParameters.hh"
-#include "XsecFitter.hh"
-#include "AnyTreeMC.hh"
 #include "AnySample.hh"
+#include "AnyTreeMC.hh"
+#include "FitParameters.hh"
 #include "FluxParameters.hh"
 #include "OptParser.hh"
+#include "XsecFitter.hh"
 
 int main(int argc, char* argv[])
 {
@@ -67,7 +57,6 @@ int main(int argc, char* argv[])
     std::string fname_data = parser.fname_data;
     std::string fname_mc   = parser.fname_mc;
     std::string fname_output = parser.fname_output;
-    std::string fname_binning = input_dir + "coarse_binning.txt";
     std::string paramVectorFname = "fitresults.root";
 
     std::vector<int> signal_topology = parser.sample_signal;
@@ -133,7 +122,7 @@ int main(int argc, char* argv[])
         std::ifstream fin(opt.binning, std::ios::in);
         if(!fin.is_open())
         {
-            std::cerr << "[ERROR]: Failed to open binning file: " << fname_binning
+            std::cerr << "[ERROR]: Failed to open binning file: " << opt.binning
                       << "[ERROR]: Terminating execution." << std::endl;
             return 1;
         }
@@ -168,7 +157,7 @@ int main(int argc, char* argv[])
 
     std::cout << "[IngridFit]: Getting sample breakdown by reaction." << std::endl;
     for(auto& sample : samples)
-        sample -> GetSampleBreakdown(fout, "nominal", topology, true);
+        sample -> GetSampleBreakdown(fout, "nominal", topology, false);
 
 
     //*************** FITTER SETTINGS **************************
