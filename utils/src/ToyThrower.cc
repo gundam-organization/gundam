@@ -78,6 +78,7 @@ void ToyThrower::Throw(TVectorD& toy)
     if(toy.GetNrows() != npar)
     {
         std::cerr << "[ERROR]: Toy vector is not the same size as covariance matrix."
+                  << "[ERROR]: Vector: " << toy.GetNrows() << " vs Matrix: " << npar
                   << std::endl;
         return;
     }
@@ -99,7 +100,8 @@ void ToyThrower::Throw(std::vector<double>& toy)
 {
     if(toy.size() != npar)
     {
-        std::cerr << "[ERROR]: Toy vector is not the same size as covariance matrix."
+        std::cerr << "[ERROR]: Toy vector is not the same size as covariance matrix.\n"
+                  << "[ERROR]: Vector: " << toy.size() << " vs Matrix: " << npar
                   << std::endl;
         return;
     }
@@ -107,7 +109,7 @@ void ToyThrower::Throw(std::vector<double>& toy)
     for(int i = 0; i < npar; ++i)
         (*R_vector)[i] = RNG -> Gaus();
 
-    toy.clear();
+    std::fill(toy.begin(), toy.end(), 0);
     for(int j = 0; j < npar; ++j)
     {
         for(int k = 0; k < npar; ++k)

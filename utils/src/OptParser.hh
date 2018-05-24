@@ -39,6 +39,7 @@ class OptParser
         std::string fname_data;
         std::string fname_mc;
         std::string fname_output;
+        std::string fname_xsec;
         std::string input_dir;
         std::string xsLLh_env;
 

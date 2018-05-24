@@ -16,7 +16,7 @@ bool OptParser::ParseJSON(std::string json_file)
     std::fstream f;
     f.open(json_file, std::ios::in);
 
-    std::cout << "[OptParser]: Opening " << json_file << std::endl; 
+    std::cout << "[OptParser]: Opening " << json_file << std::endl;
     if(!f.is_open())
     {
         std::cout << "[ERROR] Unable to open JSON configure file.\n";
@@ -30,6 +30,7 @@ bool OptParser::ParseJSON(std::string json_file)
     fname_data = input_dir + j["data_file"].get<std::string>();
     fname_mc = input_dir + j["mc_file"].get<std::string>();
     fname_output = j["output_file"].get<std::string>();
+    fname_xsec = j["xsec_file"].get<std::string>();
 
     data_POT = j["data_POT"];
     mc_POT = j["mc_POT"];
@@ -66,5 +67,6 @@ bool OptParser::ParseJSON(std::string json_file)
 
 bool OptParser::ParseCLI(int argc, char** argv)
 {
+    std::cout << "[OptParser]: Not supported yet." << std::endl;
     return false;
 }

@@ -1,6 +1,7 @@
 #ifndef TOYTHROWER_HH
 #define TOYTHROWER_HH
 
+#include <algorithm>
 #include <iostream>
 
 #include "TDecompChol.h"
