@@ -1,7 +1,8 @@
 {
-    "data_file" : "fixed_nominal.root",
+    "data_file" : "fixed_weight.root",
     "mc_file" : "fixed_nominal.root",
     "output_file" : "test.root",
+    "xsec_file" : "xsec.root",
     "input_dir" : "/inputs/ingridFit/",
     "data_POT" : 1.0,
     "mc_POT" : 1.0,

@@ -338,7 +338,7 @@ int superTreeConvert(
     if(EvtEnd!=0) nentries=EvtEnd;
     if(EvtFrac>0.0001) nentries=nentries*EvtFrac;
 
-    for(Long64_t jentry=2000000; jentry < 2003500; jentry++) {
+    for(Long64_t jentry=2000000; jentry < 2007500; jentry++) {
         nb = nd2tree->GetEntry(jentry);
         nbytes += nb;
         if(fileIndex != 1)
@@ -367,8 +367,8 @@ int superTreeConvert(
         }
         else if(fileIndex == 1 && npioncount == 1 && mupdg == 13 && ppdg == 211 && nprotoncount == 0)
             mectopology = 3;
-        else if(fileIndex == 1 && npioncount > 0 && mupdg == 13)
-            mectopology = 4;
+        //else if(fileIndex == 1 && npioncount > 0 && mupdg == 13)
+        //    mectopology = 4;
         else
             continue;
 
