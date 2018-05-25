@@ -100,7 +100,7 @@ void AnyTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples, const std::vecto
 
         for(auto& sample : ana_samples)
         {
-            if(sample -> GetSampleType() == cutBranch)
+            if(sample -> GetSampleID() == cutBranch)
                 sample -> AddEvent(ev);
         }
     }

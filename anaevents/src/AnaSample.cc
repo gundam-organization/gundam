@@ -13,7 +13,7 @@
 // ctor
 AnaSample::AnaSample()
 {
-    m_sampleid = -99;    //unique id
+    m_sample_id = -99;    //unique id
     m_name     = "none"; //some comprehensible name
     m_detector = "none";
     m_norm     = 1.0;
@@ -71,7 +71,7 @@ void AnaSample::ResetWeights()
 void AnaSample::PrintStats()
 {
     double mem_kb = sizeof(m_events) * m_events.size() / 1000.0;
-    std::cout << "[AnaSample]: Sample " << m_name << " ID = " << m_sampleid << std::endl;
+    std::cout << "[AnaSample]: Sample " << m_name << " ID = " << m_sample_id << std::endl;
     std::cout << "[AnaSample]: Num of events = " << m_events.size() << std::endl;
     std::cout << "[AnaSample]: Memory used   = " << mem_kb << " kB." << std::endl;
 }

@@ -15,7 +15,7 @@ AnySample::AnySample(int sample_id, const std::string& name, const std::string& 
         std::vector<std::pair <double,double> > v_d2edges,
         TTree* data, bool isBuffer, bool useSample)
 {
-    m_sampleid = sample_id; //unique id
+    m_sample_id = sample_id; //unique id
     m_name     = name;      //some comprehensible name
     m_detector = detector;
     m_data_tree = data;
@@ -24,7 +24,7 @@ AnySample::AnySample(int sample_id, const std::string& name, const std::string& 
     m_use_sample = useSample;
     m_BufferBin = isBuffer;
 
-    std::cout << "[AnySample]: " << m_name << ", ID " << m_sampleid << std::endl
+    std::cout << "[AnySample]: " << m_name << ", ID " << m_sample_id << std::endl
               << "[AnySample]: Detector: " << m_detector << std::endl
               << "[AnySample]: Bin edges: " << std::endl;
     for(int i = 0; i < m_D1edges.size(); ++i)
@@ -49,7 +49,7 @@ AnySample::AnySample(int sample_id, const std::string& name, const std::string& 
     // relies on later bins always having larger values than earlier bins!
 
     int nbins_temp = v_d1edges.size();
-    vector<double> bins_d1_vector;
+    std::vector<double> bins_d1_vector;
     for(int i=0;i<nbins_temp;i++){
         if (bins_d1_vector.size()==0)
             bins_d1_vector.push_back(v_d1edges[i].first);
@@ -75,19 +75,19 @@ AnySample::AnySample(int sample_id, const std::string& name, const std::string& 
             }
         }
         bins_D1[i]  =  bins_d1_vector[i];
-        cout << "bins_D1 " << i << " is " << bins_d1_vector[i] << endl;
+        std::cout << "bins_D1 " << i << " is " << bins_d1_vector[i] << std::endl;
     }
     if(!dqPlotBinsSet) nbinsD1_toPlot=nbins_D1;
     bins_D1toPlot = new double[nbinsD1_toPlot + 1];
-    cout << "There are " << nbinsD1_toPlot << " d1 bins that will be used for plotting" << endl;
+    std::cout << "There are " << nbinsD1_toPlot << " d1 bins that will be used for plotting" << std::endl;
 
     for(int i=0;i<=nbinsD1_toPlot;i++){
         bins_D1toPlot[i]  =  bins_d1_vector[i];
-        cout << "bins_D1toPlot " << i << " is " << bins_d1_vector[i] << endl;
+        std::cout << "bins_D1toPlot " << i << " is " << bins_d1_vector[i] << std::endl;
     }
 
     nbins_temp = v_d1edges.size();
-    vector<double> bins_d2_vector;
+    std::vector<double> bins_d2_vector;
     for(int i=0;i<nbins_temp;i++){
         if (bins_d2_vector.size()==0) bins_d2_vector.push_back(v_d2edges[i].first);
         else{
@@ -97,13 +97,13 @@ AnySample::AnySample(int sample_id, const std::string& name, const std::string& 
     bins_d2_vector.push_back(v_d2edges[nbins_temp-1].second);
 
     nbins_D2 = bins_d2_vector.size()-1;
-    cout << "There are " << nbins_D2 << " d2 bins" << endl;
+    std::cout << "There are " << nbins_D2 << " d2 bins" << std::endl;
 
     bins_D2 = new double[nbins_D2 + 1];
 
     for(int i=0;i<=nbins_D2;i++){
         bins_D2[i]  =  bins_d2_vector[i];
-        cout << "bins_D2 " << i << " is " << bins_d2_vector[i] << endl;
+        std::cout << "bins_D2 " << i << " is " << bins_d2_vector[i] << std::endl;
     }
 
     nAnybins=m_D1edges.size();
@@ -111,7 +111,7 @@ AnySample::AnySample(int sample_id, const std::string& name, const std::string& 
     for (int i=0; i<=nAnybins; i++){
         bins_Any[i]=i;
     }
-    cout<<"Any bins defined"<<endl;
+    std::cout<<"Any bins defined"<<std::endl;
     //event distribution histo
     m_hpred = nullptr;
     m_hmc   = nullptr;
@@ -326,7 +326,7 @@ void AnySample::FillEventHisto(int datatype)
         for(std::size_t i = 0; i < n_entries; ++i)
         {
             m_data_tree -> GetEntry(i);
-            if(cut_branch != m_sampleid)
+            if(cut_branch != m_sample_id)
                 continue;
 
             for(int j = 0; j < nAnybins; ++j)
@@ -640,10 +640,10 @@ void AnySample::GetSampleBreakdown(TDirectory *dirout, const std::string& tag, b
             hAnybin_rec[i]->Delete();
         }
         if(save){
-            cout<<"============> Sample "<<m_name<<" <============"<<endl;
+            std::cout<<"============> Sample "<<m_name<<" <============"<<std::endl;
             for(int j=0;j<nreac;j++)
-                cout<<setw(10)<<names[j]<<setw(5)<<j<<setw(10)<<compos[j]
-                    <<setw(10)<<(float)(compos[j])/Ntot*100.0<<"%"<<endl;
+                std::cout<<std::setw(10)<<names[j]<<std::setw(5)<<j<<std::setw(10)<<compos[j]
+                    <<std::setw(10)<<(float)(compos[j])/Ntot*100.0<<"%"<<std::endl;
         }
 }
 
@@ -793,7 +793,7 @@ void AnySample::GetSampleBreakdown(TDirectory *dirout, const std::string& tag, c
     }
 
     std::cout << "[AnySample]: GetSampleBreakdown()\n"
-              << "============ Sample " << m_name << " ==========="<<endl;
+              << "============ Sample " << m_name << " ==========="<< std::endl;
 
     for(int j = 0; j < ntopology; ++j)
     {

@@ -41,7 +41,7 @@ void DetParameters::SetBinning(const char *fname, std::vector<AnaSample*> &sampl
   DetBin bin;
   //loop over the 6 samples
   for(int i=0; i<samples.size(); i++){
-    bin.sample=samples[i]->GetSampleType();
+    bin.sample=samples[i]->GetSampleID();
     ifstream fin(fname);
     assert(fin.is_open());
     while (getline(fin, line)){
@@ -103,7 +103,7 @@ void DetParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
       double p   = ev->GetRecD1();
       double D2 = ev->GetRecD2();
       int reaction = ev->GetTopology();
-      int binn   = GetBinIndex(p, D2,sample[s]->GetSampleType());
+      int binn   = GetBinIndex(p, D2,sample[s]->GetSampleID());
       if(binn == BADBIN)
       {
         cout<<"WARNING: "<<m_name<<" p = "<<p<<" D2 = "<<D2<<" fall outside bin ranges"<<endl;
