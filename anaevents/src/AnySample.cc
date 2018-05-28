@@ -265,9 +265,12 @@ void AnySample::FillEventHisto(int datatype)
     m_hmc -> Scale(m_norm);
     m_hsig -> Scale(m_norm);
 
+    if(datatype == 0)
+        return;
+
     //data without stat variation: useful when nuisance parameters
     //varied in the toys
-    if(datatype == 1)
+    else if(datatype == 1)
     {
         SetData(m_hpred);
         m_hdata->Reset();
@@ -337,20 +340,24 @@ void AnySample::FillEventHisto(int datatype)
                     m_hdata -> Fill(anybin_index + 0.5, wght);
                     break;
                 }
+
+                #ifdef DEBUG_MSG
                 else
                 {
                     std::cout << "[WARNING] In AnySample::FillEventHisto()\n"
                               << "[WARNING] No bin for current data event.\n"
                               << "[WARNING] D1_rec_tree: " << D1_rec_tree << std::endl
-                              << "[WARNING] D2_rec_tree: " << D2_rec_tree << std::endl
-                              << "[WARNING] CutBranch  : " << cut_branch << std::endl;
+                              << "[WARNING] D2_rec_tree: " << D2_rec_tree << std::endl;
                     break;
                 }
+                #endif
             }
         }
 
+        #ifdef DEBUG_MSG
         std::cout << "[AnySample] Data histogram filled: " << std::endl;
         m_hdata -> Print();
+        #endif
 
         if(datatype == 4)
         {

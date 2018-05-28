@@ -44,7 +44,7 @@ AnaEvent* AnaSample::GetEvent(int evnum)
         std::cerr << "[ERROR]: No events are found in " << m_name << " sample." << std::endl;
         return nullptr;
     }
-    else if(evnum >= this -> GetN())
+    else if(evnum >= m_events.size())
     {
         std::cerr << "[ERROR]: In AnaSample::GetEvent()" << std::endl;
         std::cerr << "[ERROR]: Event number out of bounds in " << m_name << " sample." << std::endl;

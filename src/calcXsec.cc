@@ -1,10 +1,12 @@
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
 #include <functional>
 #include <iomanip>
 #include <iostream>
+#include <omp.h>
 #include <sstream>
 #include <string>
 #include <unistd.h>
@@ -23,6 +25,7 @@ std::vector<std::vector<double> > MapThrow(const std::vector<double>& toy,
 
 int main(int argc, char** argv)
 {
+    auto t_start_total = std::chrono::high_resolution_clock::now();
     //std::cout << std::fixed << std::setprecision(3);
     std::cout << "------------------------------------------------\n"
               << "[CalcXsec]: Welcome to the Super-xsLLhFitter.\n"
@@ -103,6 +106,7 @@ int main(int argc, char** argv)
     TMatrixDSym cov_flux = *cov_flux_in;
     finfluxcov -> Close();
 
+    auto t_start_samples = std::chrono::high_resolution_clock::now();
     std::vector<AnaSample*> samples;
     for(const auto& opt : parser.samples)
     {
@@ -174,6 +178,7 @@ int main(int argc, char** argv)
         fluxpara.AddDetector(opt.detector, enubins, opt.flux_offset);
     fluxpara.InitEventMap(samples, 0);
     fitpara.push_back(&fluxpara);
+    auto t_end_samples = std::chrono::high_resolution_clock::now();
 
     TMatrixDSym* postfit_cov = (TMatrixDSym*)fpostfit -> Get("res_cov_matrix");
     TVectorD* postfit_param_root = (TVectorD*)fpostfit -> Get("res_vector");
@@ -181,12 +186,13 @@ int main(int argc, char** argv)
     const int nfitbins = sigfitpara.GetNpar();
     TH1D h_postfit("h_postfit", "h_postfit", nfitbins, 0, nfitbins);
 
+    auto t_start_throws = std::chrono::high_resolution_clock::now();
     const int num_throws = 1E4;
     const int npar = postfit_cov -> GetNrows();
-    TMatrixD cov_test(npar, npar);
+    //TMatrixD cov_test(npar, npar);
     TMatrixD xsec_cov(nfitbins, nfitbins);
     TMatrixD xsec_cor(nfitbins, nfitbins);
-    cov_test.Zero();
+    //cov_test.Zero();
     xsec_cov.Zero();
 
     std::vector<double> postfit_param;
@@ -194,23 +200,22 @@ int main(int argc, char** argv)
         postfit_param.push_back((*postfit_param_root)[i]);
 
     ToyThrower toy_thrower(*postfit_cov, seed, 1E-24);
-    //std::vector<std::vector<TH1D> > xsec_throws(samples.size(), std::vector<TH1D>());
     std::vector<TH1D> xsec_throws;
-    std::vector<std::vector<double> > throws;
+    //std::vector<std::vector<double> > throws;
     std::vector<double> toy(npar, 0);
 
     int bin = 1;
     auto toy_param = MapThrow(toy, postfit_param, fitpara);
     for(int s = 0; s < samples.size(); ++s)
     {
-        unsigned int num_events = samples[s] -> GetN();
+        const unsigned int num_events = samples[s] -> GetN();
         for(unsigned int i = 0; i < num_events; ++i)
         {
             AnaEvent* ev = samples[s] -> GetEvent(i);
             ev -> SetEvWght(ev -> GetEvWghtMC());
             for(int f = 0; f < fitpara.size(); ++f)
             {
-                std::string det = samples[s] -> GetDetector();
+                const std::string det(samples[s] -> GetDetector());
                 fitpara[f] -> ReWeight(ev, det, s, i, toy_param.at(f));
             }
         }
@@ -219,37 +224,44 @@ int main(int argc, char** argv)
         samples[s] -> FillEventHisto(2);
         samples[s] -> Write(foutput, hist_name, 0);
 
-        auto h = samples[s] -> GetPredHisto();
+        const auto h = samples[s] -> GetPredHisto();
         for(int j = 1; j <= h -> GetNbinsX(); ++j)
             h_postfit.SetBinContent(bin++, h -> GetBinContent(j));
     }
 
+    auto t_start_single = std::chrono::high_resolution_clock::now();
+    auto t_end_single = std::chrono::high_resolution_clock::now();
     for(int t = 0; t < num_throws; ++t)
     {
+        t_start_single = std::chrono::high_resolution_clock::now();
+
+        auto t_s_rand = std::chrono::high_resolution_clock::now();
         toy_thrower.Throw(toy);
-        throws.push_back(toy);
+        //throws.push_back(toy);
         toy_param = MapThrow(toy, postfit_param, fitpara);
+        auto t_e_rand = std::chrono::high_resolution_clock::now();
 
         bin = 1;
-        auto h_name = "combined_throw_" + std::to_string(t);
+        const auto h_name = "combined_throw_" + std::to_string(t);
         TH1D h_throw(h_name.c_str(), h_name.c_str(), nfitbins, 0, nfitbins);
 
+        auto t_s_fit = std::chrono::high_resolution_clock::now();
         for(int s = 0; s < samples.size(); ++s)
         {
-            unsigned int num_events = samples[s] -> GetN();
+            const unsigned int num_events = samples[s] -> GetN();
             for(unsigned int i = 0; i < num_events; ++i)
             {
                 AnaEvent* ev = samples[s] -> GetEvent(i);
-                ev -> SetEvWght(ev -> GetEvWghtMC());
+                ev -> ResetEvWght();
                 for(int f = 0; f < fitpara.size(); ++f)
                 {
-                    std::string det = samples[s] -> GetDetector();
+                    const std::string det(samples[s] -> GetDetector());
                     fitpara[f] -> ReWeight(ev, det, s, i, toy_param.at(f));
                 }
             }
 
-            samples[s] -> FillEventHisto(2);
-            auto h_pred = samples[s] -> GetPredHisto();
+            samples[s] -> FillEventHisto(0);
+            const auto h_pred = samples[s] -> GetPredHisto();
 
             //std::string hist_name = samples[s] -> GetName() + "_throw" + std::to_string(t);
             //h_pred -> Write(hist_name.c_str());
@@ -257,10 +269,22 @@ int main(int argc, char** argv)
             for(int j = 1; j <= h_pred -> GetNbinsX(); ++j)
                 h_throw.SetBinContent(bin++, h_pred -> GetBinContent(j));
         }
+        auto t_e_fit = std::chrono::high_resolution_clock::now();
 
         xsec_throws.push_back(h_throw);
+        t_end_single = std::chrono::high_resolution_clock::now();
         //h_throw.Write();
+
+        std::chrono::duration<double> t_total = t_end_single - t_start_single;
+        std::chrono::duration<double> t_rand = t_e_rand - t_s_rand;
+        std::chrono::duration<double> t_fit = t_e_fit - t_s_fit;
+
+        //std::cout << "------ Time ------" << std::endl;
+        //std::cout << "Total: " << t_total.count() << std::endl;
+        //std::cout << "Rand : " << t_rand.count() << std::endl;
+        //std::cout << "Fit  : " << t_fit.count() << std::endl;
     }
+    auto t_end_throws = std::chrono::high_resolution_clock::now();
 
     /*
     TH1D h_throw("ht", "ht", 300, -3.0, 3.0);
@@ -271,6 +295,7 @@ int main(int argc, char** argv)
     }
     */
 
+    auto t_start_cov = std::chrono::high_resolution_clock::now();
     for(int t = 0; t < num_throws; ++t)
     {
         for(int i = 0; i < nfitbins; ++i)
@@ -279,12 +304,13 @@ int main(int argc, char** argv)
             {
                 //double x = throws.at(t).at(i);
                 //double y = throws.at(t).at(j);
-                double x = xsec_throws.at(t).GetBinContent(i+1) - h_postfit.GetBinContent(i+1);
-                double y = xsec_throws.at(t).GetBinContent(j+1) - h_postfit.GetBinContent(i+1);
+                const double x = xsec_throws.at(t).GetBinContent(i+1) - h_postfit.GetBinContent(i+1);
+                const double y = xsec_throws.at(t).GetBinContent(j+1) - h_postfit.GetBinContent(i+1);
                 xsec_cov(i,j) += x * y / (1.0 * num_throws);
             }
         }
     }
+    auto t_end_cov = std::chrono::high_resolution_clock::now();
 
     for(int i = 0; i < nfitbins; ++i)
     {
@@ -307,6 +333,20 @@ int main(int argc, char** argv)
     xsec_cov.Write("xsec_cov");
     xsec_cor.Write("xsec_cor");
     //h_throw.Write("h_throw");
+
+    auto t_end_total = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> t_total = t_end_total - t_start_total;
+    std::chrono::duration<double> t_samples = t_end_samples - t_start_samples;
+    std::chrono::duration<double> t_throws = t_end_throws - t_start_throws;
+    std::chrono::duration<double> t_single = t_end_single - t_start_single;
+    std::chrono::duration<double> t_cov = t_end_cov - t_start_cov;
+
+    std::cout << "------ Time -------" << std::endl;
+    std::cout << "Total  : " << t_total.count() << std::endl;
+    std::cout << "Samples: " << t_samples.count() << std::endl;
+    std::cout << "Throws : " << t_throws.count() << std::endl;
+    std::cout << "Single : " << t_single.count() << std::endl;
+    std::cout << "Cov    : " << t_cov.count() << std::endl;
 
     return 0;
 }

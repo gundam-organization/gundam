@@ -89,6 +89,7 @@ class AnaEvent
         double GetEvWght(){ return m_wght; }
         double GetEvWghtMC(){ return m_wghtMC; }
 
+        void ResetEvWght(){ m_wght = m_wghtMC; }
         // New kinematic variables always included for phase space cuts
 
         void SetpMomRec(double val){ m_pMomRec = val; }
