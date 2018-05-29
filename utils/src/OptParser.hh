@@ -47,6 +47,7 @@ class OptParser
         int mc_POT;
         int rng_seed;
         int num_threads;
+        int num_throws;
 
         std::vector<int> sample_signal;
         std::vector<std::string> sample_topology;

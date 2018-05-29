@@ -36,6 +36,7 @@ bool OptParser::ParseJSON(std::string json_file)
     mc_POT = j["mc_POT"];
     rng_seed = j["rng_seed"];
     num_threads = j["num_threads"];
+    num_throws = j["num_throws"];
 
     sample_signal = j["sample_signal"].get<std::vector<int> >();
     sample_topology = j["sample_topology"].get<std::vector<std::string> >();

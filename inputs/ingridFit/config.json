@@ -1,5 +1,5 @@
 {
-    "data_file" : "fixed_weight.root",
+    "data_file" : "fixed_signal.root",
     "mc_file" : "fixed_nominal.root",
     "output_file" : "test.root",
     "xsec_file" : "xsec.root",
@@ -8,6 +8,7 @@
     "mc_POT" : 1.0,
     "rng_seed" : 12257,
     "num_threads" : 1,
+    "num_throws" : 1E4,
     "sample_signal" : [1,2],
     "sample_topology" : ["cc0pi0p", "cc0pi1p", "cc0pinp", "cc1pi+", "ccother", "bkg", "null", "OOFV"],
     "flux_cov" : {

@@ -78,6 +78,7 @@ int main(int argc, char** argv)
     const double potMC = parser.mc_POT;
     int seed = parser.rng_seed;
     int threads = parser.num_threads;
+    const int num_throws = parser.num_throws;
 
     TFile* fdata = TFile::Open(fname_data.c_str(), "READ");
     TTree* tdata = (TTree*)(fdata->Get("selectedEvents"));
@@ -177,22 +178,24 @@ int main(int argc, char** argv)
     for(const auto& opt : parser.samples)
         fluxpara.AddDetector(opt.detector, enubins, opt.flux_offset);
     fluxpara.InitEventMap(samples, 0);
-    fitpara.push_back(&fluxpara);
+    //fitpara.push_back(&fluxpara);
     auto t_end_samples = std::chrono::high_resolution_clock::now();
 
     TMatrixDSym* postfit_cov = (TMatrixDSym*)fpostfit -> Get("res_cov_matrix");
+    TMatrixDSym* postfit_cor = (TMatrixDSym*)fpostfit -> Get("res_cor_matrix");
     TVectorD* postfit_param_root = (TVectorD*)fpostfit -> Get("res_vector");
 
     const int nfitbins = sigfitpara.GetNpar();
     TH1D h_postfit("h_postfit", "h_postfit", nfitbins, 0, nfitbins);
 
     auto t_start_throws = std::chrono::high_resolution_clock::now();
-    const int num_throws = 1E4;
+    std::cout << "[CalcXsec]: Throwing " << num_throws << " toys." << std::endl;
     const int npar = postfit_cov -> GetNrows();
-    //TMatrixD cov_test(npar, npar);
+    TMatrixD cov_test(npar, npar);
+    TMatrixD cor_test(npar, npar);
     TMatrixD xsec_cov(nfitbins, nfitbins);
     TMatrixD xsec_cor(nfitbins, nfitbins);
-    //cov_test.Zero();
+    cov_test.Zero();
     xsec_cov.Zero();
 
     std::vector<double> postfit_param;
@@ -201,7 +204,8 @@ int main(int argc, char** argv)
 
     ToyThrower toy_thrower(*postfit_cov, seed, 1E-24);
     std::vector<TH1D> xsec_throws;
-    //std::vector<std::vector<double> > throws;
+    xsec_throws.reserve(num_throws);
+    std::vector<std::vector<double> > throws;
     std::vector<double> toy(npar, 0);
 
     int bin = 1;
@@ -234,10 +238,12 @@ int main(int argc, char** argv)
     for(int t = 0; t < num_throws; ++t)
     {
         t_start_single = std::chrono::high_resolution_clock::now();
+        if(t % 1000 == 0)
+            std::cout << "[CalcXsec]: Throw " << t << "/" << num_throws << std::endl;
 
         auto t_s_rand = std::chrono::high_resolution_clock::now();
         toy_thrower.Throw(toy);
-        //throws.push_back(toy);
+        throws.push_back(toy);
         toy_param = MapThrow(toy, postfit_param, fitpara);
         auto t_e_rand = std::chrono::high_resolution_clock::now();
 
@@ -286,26 +292,24 @@ int main(int argc, char** argv)
     }
     auto t_end_throws = std::chrono::high_resolution_clock::now();
 
-    /*
     TH1D h_throw("ht", "ht", 300, -3.0, 3.0);
     for(int t = 0; t < num_throws; ++t)
     {
         for(int i = 0; i < sigfitpara.GetNpar(); ++i)
             h_throw.Fill(throws.at(t).at(i) + postfit_param.at(i));
     }
-    */
 
     auto t_start_cov = std::chrono::high_resolution_clock::now();
-    for(int t = 0; t < num_throws; ++t)
+    for(const auto& h : xsec_throws)
     {
         for(int i = 0; i < nfitbins; ++i)
         {
             for(int j = 0; j < nfitbins; ++j)
             {
-                //double x = throws.at(t).at(i);
-                //double y = throws.at(t).at(j);
-                const double x = xsec_throws.at(t).GetBinContent(i+1) - h_postfit.GetBinContent(i+1);
-                const double y = xsec_throws.at(t).GetBinContent(j+1) - h_postfit.GetBinContent(i+1);
+                //const double x = throws.at(t).at(i);
+                //const double y = throws.at(t).at(j);
+                const double x = h.GetBinContent(i+1) - h_postfit.GetBinContent(i+1);
+                const double y = h.GetBinContent(j+1) - h_postfit.GetBinContent(j+1);
                 xsec_cov(i,j) += x * y / (1.0 * num_throws);
             }
         }
@@ -329,10 +333,11 @@ int main(int argc, char** argv)
     foutput -> cd();
     h_postfit.Write("h_postfit");
     postfit_cov -> Write("postfit_cov");
+    postfit_cor -> Write("postfit_cor");
     postfit_param_root -> Write("postfit_params");
     xsec_cov.Write("xsec_cov");
     xsec_cor.Write("xsec_cor");
-    //h_throw.Write("h_throw");
+    h_throw.Write("h_throw");
 
     auto t_end_total = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> t_total = t_end_total - t_start_total;
@@ -358,6 +363,11 @@ std::vector<std::vector<double> > MapThrow(const std::vector<double>& toy,
     std::vector<std::vector<double> > throw_vector;
     std::vector<double> param(toy.size(), 0);
     std::transform(toy.begin(), toy.end(), nom.begin(), param.begin(), std::plus<double>());
+    for(int i = 0; i < param.size(); ++i)
+    {
+        if(param[i] < 0.0)
+            param[i] = 0.0;
+    }
 
     auto start = param.begin();
     auto end = param.begin();
