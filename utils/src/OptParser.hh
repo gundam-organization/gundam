@@ -28,6 +28,16 @@ struct CovOpt
     std::string binning;
 };
 
+struct DetOpt
+{
+    std::string name;
+    std::string binning;
+    std::string flux_file;
+    std::vector<std::string> flux_hists;
+    double ntargets_val;
+    double ntargets_err;
+};
+
 class OptParser
 {
     public:
@@ -55,5 +65,6 @@ class OptParser
         CovOpt flux_cov;
         CovOpt det_cov;
         std::vector<SampleOpt> samples;
+        std::vector<DetOpt> detectors;
 };
 #endif

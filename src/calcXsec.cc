@@ -17,6 +17,7 @@
 #include "FluxParameters.hh"
 #include "OptParser.hh"
 #include "ToyThrower.hh"
+#include "XsecExtractor.hh"
 #include "XsecFitter.hh"
 
 std::vector<std::vector<double> > MapThrow(const std::vector<double>& toy,
@@ -202,6 +203,21 @@ int main(int argc, char** argv)
     for(int i = 0; i < npar; ++i)
         postfit_param.push_back((*postfit_param_root)[i]);
 
+    XsecExtractor nd280_xsec("ND280", seed);
+    XsecExtractor ingrid_xsec("INGRID", seed);
+
+    std::vector<XsecExtractor> xsec_calc;
+    for(const auto& det : parser.detectors)
+    {
+        XsecExtractor x(det.name, seed);
+        x.SetNumTargets(det.ntargets_val, det.ntargets_err);
+        xsec_calc.push_back(x);
+    }
+
+    TH1D h_nt("h_nt", "h_nt", 100, 2.70E29, 2.80E29);
+    for(int i = 0; i < num_throws; ++i)
+        h_nt.Fill(xsec_calc.at(0).ThrowNtargets());
+
     ToyThrower toy_thrower(*postfit_cov, seed, 1E-24);
     std::vector<TH1D> xsec_throws;
     xsec_throws.reserve(num_throws);
@@ -228,7 +244,7 @@ int main(int argc, char** argv)
         samples[s] -> FillEventHisto(2);
         samples[s] -> Write(foutput, hist_name, 0);
 
-        const auto h = samples[s] -> GetPredHisto();
+        const auto h = samples[s] -> GetSignalHisto();
         for(int j = 1; j <= h -> GetNbinsX(); ++j)
             h_postfit.SetBinContent(bin++, h -> GetBinContent(j));
     }
@@ -241,17 +257,15 @@ int main(int argc, char** argv)
         if(t % 1000 == 0)
             std::cout << "[CalcXsec]: Throw " << t << "/" << num_throws << std::endl;
 
-        auto t_s_rand = std::chrono::high_resolution_clock::now();
         toy_thrower.Throw(toy);
         throws.push_back(toy);
         toy_param = MapThrow(toy, postfit_param, fitpara);
-        auto t_e_rand = std::chrono::high_resolution_clock::now();
 
         bin = 1;
         const auto h_name = "combined_throw_" + std::to_string(t);
         TH1D h_throw(h_name.c_str(), h_name.c_str(), nfitbins, 0, nfitbins);
+        h_throw.SetDirectory(0);
 
-        auto t_s_fit = std::chrono::high_resolution_clock::now();
         for(int s = 0; s < samples.size(); ++s)
         {
             const unsigned int num_events = samples[s] -> GetN();
@@ -267,7 +281,7 @@ int main(int argc, char** argv)
             }
 
             samples[s] -> FillEventHisto(0);
-            const auto h_pred = samples[s] -> GetPredHisto();
+            const auto h_pred = samples[s] -> GetSignalHisto();
 
             //std::string hist_name = samples[s] -> GetName() + "_throw" + std::to_string(t);
             //h_pred -> Write(hist_name.c_str());
@@ -275,31 +289,33 @@ int main(int argc, char** argv)
             for(int j = 1; j <= h_pred -> GetNbinsX(); ++j)
                 h_throw.SetBinContent(bin++, h_pred -> GetBinContent(j));
         }
-        auto t_e_fit = std::chrono::high_resolution_clock::now();
 
         xsec_throws.push_back(h_throw);
         t_end_single = std::chrono::high_resolution_clock::now();
         //h_throw.Write();
-
-        std::chrono::duration<double> t_total = t_end_single - t_start_single;
-        std::chrono::duration<double> t_rand = t_e_rand - t_s_rand;
-        std::chrono::duration<double> t_fit = t_e_fit - t_s_fit;
-
-        //std::cout << "------ Time ------" << std::endl;
-        //std::cout << "Total: " << t_total.count() << std::endl;
-        //std::cout << "Rand : " << t_rand.count() << std::endl;
-        //std::cout << "Fit  : " << t_fit.count() << std::endl;
     }
+    std::cout << "[CalcXsec]: Throws Finished." << std::endl;
     auto t_end_throws = std::chrono::high_resolution_clock::now();
 
     TH1D h_throw("ht", "ht", 300, -3.0, 3.0);
     for(int t = 0; t < num_throws; ++t)
     {
-        for(int i = 0; i < sigfitpara.GetNpar(); ++i)
-            h_throw.Fill(throws.at(t).at(i) + postfit_param.at(i));
+        //for(int i = 0; i < sigfitpara.GetNpar(); ++i)
+            h_throw.Fill(throws.at(t).at(0) + postfit_param.at(0));
     }
 
+    TH1D h_mean("h_mean", "h_mean", nfitbins, 0, nfitbins);
+    //TH1D h_throw("h_throw", "h_throw", 100, 100, 300);
+    for(const auto& h : xsec_throws)
+    {
+        for(int i = 0; i < nfitbins; ++i)
+            h_mean.Fill(i + 0.5, h.GetBinContent(i+1));
+        //h_throw.Fill(h.GetBinContent(1));
+    }
+    h_mean.Scale(1.0 / (1.0 * num_throws));
+
     auto t_start_cov = std::chrono::high_resolution_clock::now();
+    //for(int t = 0; t < num_throws; ++t)
     for(const auto& h : xsec_throws)
     {
         for(int i = 0; i < nfitbins; ++i)
@@ -323,7 +339,7 @@ int main(int argc, char** argv)
             const double z = xsec_cov(i,j);
             const double x = xsec_cov(i,i);
             const double y = xsec_cov(j,j);
-            xsec_cor(i,j) = z / (sqrt(x) * sqrt(y));
+            xsec_cor(i,j) = z / (sqrt(x * y));
         }
     }
 
@@ -338,6 +354,8 @@ int main(int argc, char** argv)
     xsec_cov.Write("xsec_cov");
     xsec_cor.Write("xsec_cor");
     h_throw.Write("h_throw");
+    h_mean.Write("h_mean");
+    h_nt.Write("h_ntargets");
 
     auto t_end_total = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> t_total = t_end_total - t_start_total;

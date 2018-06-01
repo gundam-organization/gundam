@@ -10,9 +10,9 @@
 #include "TRandom3.h"
 #include "TVectorT.h"
 
-typedef TMatrixT<double> TMatrixD;
-typedef TMatrixTSym<double> TMatrixDSym;
-typedef TVectorT<double> TVectorD;
+using TMatrixD = TMatrixT<double>;
+using TMatrixDSym = TMatrixTSym<double>;
+using TVectorD = TVectorT<double>;
 
 class ToyThrower
 {
@@ -36,6 +36,8 @@ class ToyThrower
 
         void Throw(TVectorD& toy);
         void Throw(std::vector<double>& toy);
+
+        double ThrowSinglePar(double nom, double err) const;
 };
 
 #endif

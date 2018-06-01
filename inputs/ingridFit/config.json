@@ -8,7 +8,7 @@
     "mc_POT" : 1.0,
     "rng_seed" : 12257,
     "num_threads" : 1,
-    "num_throws" : 1E4,
+    "num_throws" : 2E4,
     "sample_signal" : [1,2],
     "sample_topology" : ["cc0pi0p", "cc0pi1p", "cc0pinp", "cc1pi+", "ccother", "bkg", "null", "OOFV"],
     "flux_cov" : {
@@ -21,6 +21,24 @@
         "matrix" : "nd280_det_cov",
         "binning" : "det_binning"
     },
+    "detectors" : [
+        {
+            "name" : "ND280",
+            "flux_file" : "",
+            "flux_hist" : [""],
+            "binning" : "coarse_binning.txt",
+            "ntargets_val" : 2.75E29,
+            "ntargets_err" : 0.0067
+        },
+        {
+            "name" : "INGRID",
+            "flux_file" : "",
+            "flux_hist" : [""],
+            "binning" : "ingrid_binning.txt",
+            "ntargets_val" : 0,
+            "ntargets_err" : 0.00
+        }
+    ],
     "samples" : [
         {
             "cut_branch" : 1,

@@ -49,6 +49,19 @@ bool OptParser::ParseJSON(std::string json_file)
     det_cov.matrix = j["det_cov"]["matrix"];
     det_cov.binning = j["det_cov"]["binning"];
 
+    for(const auto& detector : j["detectors"])
+    {
+        DetOpt d;
+        d.name = detector["name"];
+        d.binning = input_dir + detector["binning"].get<std::string>();
+        d.flux_file = input_dir + detector["flux_file"].get<std::string>();
+        for(const auto& hist: detector["flux_hist"])
+            d.flux_hists.push_back(hist);
+        d.ntargets_val = detector["ntargets_val"];
+        d.ntargets_err = detector["ntargets_err"];
+        detectors.push_back(d);
+    }
+
     for(const auto& sample : j["samples"])
     {
        SampleOpt s;

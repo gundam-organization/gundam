@@ -118,3 +118,8 @@ void ToyThrower::Throw(std::vector<double>& toy)
         }
     }
 }
+
+double ToyThrower::ThrowSinglePar(double nom, double err) const
+{
+    return RNG -> Gaus(nom, err);
+}
