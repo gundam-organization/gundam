@@ -64,13 +64,11 @@ void XsecFitter::FixParameter(const std::string& par_name, const double& value)
 }
 
 // PrepareFitter
-void XsecFitter::InitFitter(std::vector<AnaFitParameters*> &fitpara, double reg, double reg2, int nipsbinsin, const std::string& paramVectorFname)
+void XsecFitter::InitFitter(std::vector<AnaFitParameters*> &fitpara, double reg, const std::string& paramVectorFname)
 {
     paramVectorFileName=paramVectorFname;
     reg_p1=reg;
-    reg_p2=reg2;
     m_fitpara = fitpara;
-    nipsbins = nipsbinsin;
     std::vector<double> par_step, par_low, par_high;
 
     m_npar = 0;
@@ -124,24 +122,24 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*> &fitpara, double reg,
     fitter->ExecuteCommand("SET PRINT", arglist, 1);
 
     //init fitter stuff
-    for(int i=0;i<m_npar;i++)
-    {
-        fitter->SetParameter(i, par_names[i].c_str(), par_prefit[i], par_step[i], par_low[i], par_high[i]);
-    }
+    for(int i = 0; i < m_npar; ++i)
+        fitter -> SetParameter(i, par_names[i].c_str(), par_prefit[i], par_step[i], par_low[i], par_high[i]);
 
     // Save prefit parameters:
 
     prefitParams = new TH1D("prefitParams", "prefitParams", m_npar, 0, m_npar);
-    int paramNo=1;
-    for(std::size_t i=0;i<m_fitpara.size();i++)
+    int paramNo = 1;
+    for(int i = 0; i < m_fitpara.size(); ++i)
     {
-        for(int j=0; j<m_fitpara[i]->GetNpar(); j++){
+        for(int j = 0; j < m_fitpara[i] -> GetNpar(); ++j){
             prefitParams->SetBinContent(paramNo, m_fitpara[i]->GetParPrior(j));
-            if(m_fitpara[i]->HasCovMat() && (!(m_fitpara[i]->HasRegCovMat())) && (i!=0)){
+            if(m_fitpara[i]->HasCovMat() && (!(m_fitpara[i]->HasRegCovMat())) && (i!=0))
+            {
                 TMatrixDSym* covMat = m_fitpara[i]->GetCovarMat();
                 prefitParams->SetBinError(paramNo, sqrt((*covMat)[j][j]));
             }
-            else prefitParams->SetBinError(paramNo, 0);
+            else
+                prefitParams->SetBinError(paramNo, 0);
             paramNo++;
         }
     }
@@ -159,7 +157,7 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*> &fitpara, double reg,
 //           9 if fake data from param vector
 void XsecFitter::Fit(std::vector<AnaSample*> &samples, const std::vector<std::string>& topology, int datatype, int fitMethod, int statFluct)
 {
-    std::cout << "Starting to fit." << std::endl;
+    std::cout << "[XsecFitter]: Starting to fit." << std::endl;
     m_calls = 0;
     m_samples = samples;
     if(!fitter)
@@ -203,28 +201,26 @@ void XsecFitter::Fit(std::vector<AnaSample*> &samples, const std::vector<std::st
     if(m_freq >= 0 && m_dir)
         DoSaveEvents(m_calls);
 
-    //Collect Sample Histos
-    CollectSampleHistos();
-
     //Do fit
     std::cout << "[XsecFitter]: Fit prepared." << std::endl;
     double arglist[5];
-    //arglist[0] = 1000; //number of calls
     arglist[0] = 1000000; //number of calls
-    //arglist[1] = 1.0E-4; //tolerance
     arglist[1] = 1.0E-4; //tolerance
 
-    if(fitMethod==1){
+    if(fitMethod == 1)
+    {
         std::cout << "[XsecFitter]: Calling MIGRAD ..." << std::endl;
         fitter->ExecuteCommand("MIGRAD", arglist, 2);
     }
-    else if(fitMethod==2){
+    else if(fitMethod == 2)
+    {
         std::cout << "[XsecFitter]: Calling MIGRAD ..." << std::endl;
         fitter->ExecuteCommand("MIGRAD", arglist, 2);
         std::cout << "[XsecFitter]: Calling HESSE ..." << std::endl;
         fitter->ExecuteCommand("HESSE", arglist, 2);
     }
-    else if(fitMethod==3){
+    else if(fitMethod == 3)
+    {
         std::cout << "[XsecFitter]: Calling MINOS ..." << std::endl;
         fitter->ExecuteCommand("MINOS", arglist, 2);
     }
@@ -236,7 +232,8 @@ void XsecFitter::Fit(std::vector<AnaSample*> &samples, const std::vector<std::st
     fitter->GetStats(amin, edm, errdef, nvpar, nparx);
 
     //fill chi2 info
-    if(m_dir) DoSaveChi2();
+    if(m_dir)
+        DoSaveChi2();
 
     //Get Error Matrix
     TMatrixDSym matrix(nvpar,fitter->GetCovarianceMatrix());
@@ -251,24 +248,24 @@ void XsecFitter::Fit(std::vector<AnaSample*> &samples, const std::vector<std::st
 
     //save fit results
     TVectorD fitVec(nparx);
-    vector< vector<double> > res_pars;
-    vector< vector<double> > err_pars;
-    vector< vector<double> > errplus_pars;
-    vector< vector<double> > errminus_pars;
-    vector< vector<double> > errpara_pars;
-    vector< vector<double> > errglobc_pars;
-    vector< vector<double> > errprof_pars;
+    std::vector< std::vector<double> > res_pars;
+    std::vector< std::vector<double> > err_pars;
+    std::vector< std::vector<double> > errplus_pars;
+    std::vector< std::vector<double> > errminus_pars;
+    std::vector< std::vector<double> > errpara_pars;
+    std::vector< std::vector<double> > errglobc_pars;
+    std::vector< std::vector<double> > errprof_pars;
     Double_t errplus, errminus, errpara, errglobc, profErr;
     int k=0;
     for(size_t i=0;i<m_fitpara.size();i++)
     {
-        vector<double> vec_res;
-        vector<double> vec_err;
-        vector<double> vec_errplus;
-        vector<double> vec_errminus;
-        vector<double> vec_errpara;
-        vector<double> vec_errglobc;
-        vector<double> vec_errprof;
+        std::vector<double> vec_res;
+        std::vector<double> vec_err;
+        std::vector<double> vec_errplus;
+        std::vector<double> vec_errminus;
+        std::vector<double> vec_errpara;
+        std::vector<double> vec_errglobc;
+        std::vector<double> vec_errprof;
         for(int j=0;j<m_nparclass[i];j++){
             vec_err.push_back(fitter->GetParError(k));
             double parvalue=fitter->GetParameter(k);
@@ -385,8 +382,6 @@ void XsecFitter::GenerateToyData(int toyindx, int toytype, int statFluct)
             }
         }
 
-
-
         par_throws.push_back(pars);
         chi2_sys += m_fitpara[i]->GetChi2(pars);
         if(i==0) chi2_reg += chi2_reg;
@@ -415,43 +410,45 @@ void XsecFitter::GenerateToyData(int toyindx, int toytype, int statFluct)
 // FillSample with new parameters
 //datatype = 0 if fit iteration
 //           1 if toy dataset from nuisances
-double XsecFitter::FillSamples(vector< vector<double> > new_pars, int datatype)
+double XsecFitter::FillSamples(std::vector<std::vector<double> >& new_pars, int datatype)
 {
     double chi2 = 0.0;
-    //cout << "nfitpar is: " << m_fitpara.size() << endl;
-
-    bool isGonnaBeABiggun = false;
-    if((m_calls<1001 && (m_calls%100==0 || m_calls<20)) || (m_calls>1001 && m_calls%1000==0) || (m_calls>10001 && m_calls%10000==0)) isGonnaBeABiggun = true;
+    bool output_chi2 = false;
+    if((m_calls<1001 && (m_calls%100==0 || m_calls<20)) || (m_calls>1001 && m_calls%1000==0))
+        output_chi2 = true;
 
     //loop over samples
     #pragma omp parallel for num_threads(m_threads)
-    for(int s=0;s<m_samples.size();s++)
+    for(int s = 0; s < m_samples.size(); ++s)
     {
         //loop over events
-        for(int i=0;i<m_samples[s]->GetN();i++)
+        const unsigned int num_events = m_samples[s] -> GetN();
+        const std::string det = m_samples[s] -> GetDetector();
+        for(unsigned int i = 0; i < num_events; ++i)
         {
             AnaEvent* ev = m_samples[s]->GetEvent(i);
             ev->SetEvWght(ev->GetEvWghtMC());
             //do weights for each AnaFitParameters obj
-            for(size_t j=0;j<m_fitpara.size();j++)
+            for(int j = 0; j < m_fitpara.size(); ++j)
             {
-                //cout << "FillSamples: Current par name is " << m_fitpara[j]->GetName() << endl;
-                if((datatype!=0) && (((TString)(m_fitpara[j]->GetName())).Contains("par_detAve")))
-                    continue;
-                else if((datatype==0) && (((TString)(m_fitpara[j]->GetName())).Contains("par_detFine")))
-                    continue;
-
-                std::string det = m_samples[s] -> GetDetector();
                 m_fitpara[j] -> ReWeight(ev, det, s, i, new_pars[j]);
             }
         }
-        m_samples[s]->FillEventHisto(datatype);
+
+        m_samples[s] -> FillEventHisto(datatype);
+        double sample_chi2 = m_samples[s] -> CalcChi2();
 
         //calculate chi2 for each sample
         #pragma omp atomic
-        chi2 += m_samples[s]->CalcChi2();
-        if(isGonnaBeABiggun) cout << "chi2 for sample " << s << " is " <<  m_samples[s]->CalcChi2() << endl;;
+        chi2 += sample_chi2;
+
+        if(output_chi2)
+        {
+            std::cout << "[XsecFitter]: Chi2 for sample " << m_samples[s] -> GetName() << " is "
+                      <<  sample_chi2 << std::endl;
+        }
     }
+
     return chi2;
 }
 
@@ -461,87 +458,69 @@ void XsecFitter::fcn(Int_t &npar, Double_t *gin, Double_t &f,
 {
     m_calls++;
 
-    bool isGonnaBeABiggun = false;
-    if((m_calls<1001 && (m_calls%100==0 || m_calls<20)) || (m_calls>1001 && m_calls%1000==0) || (m_calls>10001 && m_calls%10000==0)) isGonnaBeABiggun = true;
-
-    if(isGonnaBeABiggun) cout << "MCHisto:" << endl;
-    if(isGonnaBeABiggun) for(int i=1;i<10;i++){cout << mcHisto->GetBinContent(i) << endl;}
-    if(isGonnaBeABiggun) cout << "MCSigHisto:" << endl;
-    if(isGonnaBeABiggun) for(int i=1;i<10;i++){cout << mcSigHisto->GetBinContent(i) << endl;}
+    bool output_chi2 = false;
+    if((m_calls<1001 && (m_calls%100==0 || m_calls<20)) || (m_calls>1001 && m_calls%1000==0))
+        output_chi2 = true;
 
     //Regularisation:
-    double chi2_reg=0.0;
-    double chi2_reg2=0.0;
-
-    vector< vector<double> > new_pars;
     int k=0;
-    double parAvg = 0;
-    double parWhtAvg = 0;
+    double chi2_reg = 0.0;
     double chi2_sys = 0.0;
-    for(size_t i=0;i<m_fitpara.size();i++)
+    std::vector<std::vector<double> > new_pars;
+    for(int i = 0; i < m_fitpara.size(); ++i)
     {
-        vector<double> vec;
-        for(int j=0;j<m_nparclass[i];j++){
+        std::vector<double> vec;
+        for(int j = 0; j < m_nparclass[i]; ++j)
+        {
             vec.push_back(par[k++]);
-            // Regularisation beyond the template weight covariance matrix:
-            //if(i==0 && j!=0) chi2_reg+= reg_p1*abs(par[k-1]-par[k-2]);
-            //if(i==0 && j!=0 && j<10) chi2_reg+= reg_p1*(par[k-1]-par[k-2])*(par[k-1]-par[k-2]); // MC prior for reg
-            //if(i==0 && j!=0 && j<10) chi2_reg+= reg_p1*( (mcHisto->GetBinContent(j+1)*(par[k-1]/(mcHisto->GetEntries()/8))) - (mcHisto->GetBinContent(j)*(par[k-2]/(mcHisto->GetEntries()/8))) )*( (mcHisto->GetBinContent(j+1)*(par[k-1]/(mcHisto->GetEntries()/8))) - (mcHisto->GetBinContent(j)*(par[k-2]/(mcHisto->GetEntries()/8))) ); // Flat prior for reg
-
-            if(i==0){
-                for(int p=0; p<nipsbins && j==0;p++) parAvg+=par[p];
-                for(int p=0; p<nipsbins && j==0;p++) parWhtAvg+=par[p]*(mcSigHisto->GetBinContent(p+1)/mcSigHisto->Integral(0,nipsbins));
-                parAvg = parAvg / nipsbins;
-                if(j==0 && isGonnaBeABiggun) cout << "Fit parameter average over IPS bins is: " << parAvg << endl;
-                if(j==0 && isGonnaBeABiggun) cout << "Fit parameter weighted average over IPS bins is: " << parWhtAvg << endl;
-                if(j>=nipsbins) chi2_reg2 += reg_p2*(par[k-1]-parWhtAvg)*(par[k-1]-parWhtAvg); // Reg for OOPS
-            }
-
-
-            // End regularisation
-            if(isGonnaBeABiggun) cout << "param " << j << " of class " << i << " has value " << par[k-1] << endl; // << " giving total chi2_reg " << chi2_reg << endl;
+            if(output_chi2)
+                std::cout << "Param " << j << " of class " << i << " has value " << par[k-1] << std::endl; // << " giving total chi2_reg " << chi2_reg << endl;
         }
-        chi2_sys += m_fitpara[i]->GetChi2(vec);
+
+        chi2_sys += m_fitpara[i] -> GetChi2(vec);
         // "Systematic error" on the fit parameters comes from the regularisation covatriance matrix, store as a chi2 reg error:
-        if(i==0){
-            chi2_reg+=chi2_sys;
+        if(i == 0)
+        {
+            chi2_reg += chi2_sys;
             chi2_sys -= m_fitpara[i]->GetChi2(vec);
         }
 
         new_pars.push_back(vec);
-        if(isGonnaBeABiggun) cout << "chi2_sys contribution from param set " << i << " is " << m_fitpara[i]->GetChi2(vec) << endl;
+        if(output_chi2)
+            std::cout << "chi2_sys contribution from param set " << i << " is " << m_fitpara[i]->GetChi2(vec) << endl;
     }
-    if(isGonnaBeABiggun) cout << "chi2_sys contribution from regularisation " << chi2_reg << endl;
+    if(output_chi2)
+        std::cout << "chi2_sys contribution from regularisation " << chi2_reg << endl;
     //chi2_sys += chi2_reg;
     vec_chi2_sys.push_back(chi2_sys);
     vec_chi2_reg.push_back(chi2_reg);
-    vec_chi2_reg2.push_back(chi2_reg2);
 
     double chi2_stat = FillSamples(new_pars, 0);
     vec_chi2_stat.push_back(chi2_stat);
 
     //save hists if requested
-    if(m_calls % (m_freq*10000) == 0  && m_dir) {
+    if(m_calls % (m_freq*10000) == 0 && m_dir)
+    {
         DoSaveParams(new_pars);
-        if(m_calls % (m_freq*10000) == 0) {
+        if(m_calls % (m_freq*10000) == 0)
             DoSaveEvents(m_calls);
-        }
     }
     // total chi2
-    f = chi2_stat + chi2_sys + chi2_reg + chi2_reg2;
+    f = chi2_stat + chi2_sys + chi2_reg;
 
     //Print status of the fit:
-    if(isGonnaBeABiggun) cout << "m_calls is: " << m_calls << endl;
-    if(isGonnaBeABiggun) cout << "Chi2 for this iter: " << f << endl;
-    if(isGonnaBeABiggun) cout << "Chi2 stat / syst / reg1 / reg2: " << chi2_stat << " / " << chi2_sys << " / " << chi2_reg << " / " << chi2_reg2 << endl;
-
+    if(output_chi2)
+    {
+        std::cout << "m_calls is: " << m_calls << endl;
+        std::cout << "Chi2 for this iter: " << f << endl;
+        std::cout << "Chi2 stat / syst / reg : " << chi2_stat << " / " << chi2_sys << " / " << chi2_reg << " / " << std::endl;
+    }
     // Update final chi2 file for L curve calc:
 
     // ofstream outfile;
     // outfile.open("chi2.txt", ios::out | ios::trunc );
     // outfile << reg_p1 << ", " << chi2_stat << ", " << chi2_reg << ", " << chi2_sys << ", " << chi2_stat + chi2_sys << endl;
     // outfile.close();
-
 }
 
 // Write hists for reweighted events
@@ -638,7 +617,6 @@ void XsecFitter::DoSaveChi2()
     TH1D* histochi2stat = new TH1D("chi2_stat_periter","chi2_stat_periter", m_calls+1, 0, m_calls+1);
     TH1D* histochi2sys = new TH1D("chi2_sys_periter","chi2_sys_periter", m_calls+1, 0, m_calls+1);
     TH1D* histochi2reg = new TH1D("chi2_reg_periter","chi2_reg_periter", m_calls+1, 0, m_calls+1);
-    TH1D* histochi2reg2 = new TH1D("chi2_reg2_periter","chi2_reg2_periter", m_calls+1, 0, m_calls+1);
     TH1D* histochi2tot = new TH1D("chi2_tot_periter","chi2_tot_periter", m_calls+1, 0, m_calls+1);
 
     TH1D* reg_param = new TH1D("reg_param","reg_param", m_calls+1, 0, m_calls+1);
@@ -656,14 +634,12 @@ void XsecFitter::DoSaveChi2()
         histochi2stat->SetBinContent(i+1,vec_chi2_stat[i]);
         histochi2sys->SetBinContent(i+1,vec_chi2_sys[i]);
         histochi2reg->SetBinContent(i+1,vec_chi2_reg[i]);
-        histochi2reg2->SetBinContent(i+1,vec_chi2_reg2[i]);
         histochi2tot->SetBinContent(i+1,vec_chi2_sys[i] + vec_chi2_stat[i]);
     }
     m_dir->cd();
     histochi2stat->Write();
     histochi2sys->Write();
     histochi2reg->Write();
-    histochi2reg2->Write();
     histochi2tot->Write();
     reg_param->Write();
     reg_param2->Write();
@@ -671,7 +647,6 @@ void XsecFitter::DoSaveChi2()
     delete histochi2stat;
     delete histochi2sys;
     delete histochi2reg;
-    delete histochi2reg2;
     delete histochi2tot;
 }
 
@@ -749,24 +724,6 @@ void XsecFitter::DoSaveResults(vector< vector<double> >& parresults, vector< vec
     for(size_t s=0;s<m_samples.size();s++)
     {
         m_samples[s]->GetSampleBreakdown(m_dir, "fit", topology, false);
-    }
-}
-
-void XsecFitter::CollectSampleHistos(){
-    //loop over samples
-    for(size_t s=0;s<m_samples.size();s++)
-    {
-        AnySample* sam = ((AnySample*)m_samples[s]);
-        if(s==0){
-            mcHisto = (TH1D*)((sam->GetMCTruthHisto())->Clone("mcHisto"));
-            mcSigHisto = (TH1D*)((sam->GetSignalHisto())->Clone("mcSigHisto"));
-        }
-        else{
-            mcHisto->Add((sam->GetMCTruthHisto()));
-            mcSigHisto->Add((sam->GetSignalHisto()));
-        }
-        //cout << "MCHisto after sample :" << s << endl;
-        //for(int i=1;i<10;i++){cout << mcHisto->GetBinContent(i) << endl;}
     }
 }
 

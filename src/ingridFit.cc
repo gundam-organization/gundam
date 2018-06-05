@@ -68,7 +68,6 @@ int main(int argc, char* argv[])
     int threads = parser.num_threads;
     bool stat_fluc = false;
 
-    int nprimbins = 8;
     int isBuffer = false; // Is the final bin just for including events that go beyond xsec binning
     // e.g. events with over 5GeV pmu if binning in pmu
 
@@ -185,14 +184,14 @@ int main(int argc, char* argv[])
     for(const auto& opt : parser.samples)
         fluxpara.AddDetector(opt.detector, enubins, opt.flux_offset);
     fluxpara.InitEventMap(samples, 0);
-    fitpara.push_back(&fluxpara);
+    //fitpara.push_back(&fluxpara);
 
     //Instantiate fitter obj
     XsecFitter xsecfit(seed, threads);
     xsecfit.SetPOTRatio(potD/potMC);
 
     //init w/ para vector
-    xsecfit.InitFitter(fitpara, 0, 0, nprimbins, paramVectorFname);
+    xsecfit.InitFitter(fitpara, 0, paramVectorFname);
     std::cout << "[IngridFit]: Fitter initialised." << std::endl;
 
     /*

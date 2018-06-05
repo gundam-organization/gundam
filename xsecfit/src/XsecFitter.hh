@@ -28,9 +28,9 @@ class XsecFitter : public TObject
         ~XsecFitter();
         void SetSeed(int seed);
         void fcn(Int_t &npar, Double_t *gin, Double_t &f, Double_t *par, Int_t iflag);
-        void InitFitter(std::vector<AnaFitParameters*> &fitpara, double reg, double reg2, int nipsbinsin, const std::string& paramVectorFname);
+        void InitFitter(std::vector<AnaFitParameters*> &fitpara, double reg, const std::string& paramVectorFname);
         void FixParameter(const std::string& par_name, const double& value);
-        void Fit(std::vector<AnaSample*> &samples, const std::vector<std::string>& topology, int datatype, int fitMethod, int statFluct);
+        void Fit(std::vector<AnaSample*>& samples, const std::vector<std::string>& topology, int datatype, int fitMethod, int statFluct);
         void SetSaveMode(TDirectory *dirout, int freq)
         { m_dir = dirout; m_freq = freq; }
         void SetPOTRatio(double val){ m_potratio = val; }
@@ -88,14 +88,13 @@ class XsecFitter : public TObject
 
     private:
         void GenerateToyData(int toyindx = 0, int toytype=0, int statFluct=0);
-        double FillSamples(std::vector< std::vector<double> > new_pars,
-                int datatype = 0);
+        double FillSamples(std::vector<std::vector<double> >& new_pars,
+                           int datatype = 0);
         void DoSaveParams(std::vector< std::vector<double> > new_pars);
         void DoSaveEvents(int fititer);
-        void DoSaveFinalEvents(int fititer, std::vector< std::vector<double> > parresults);
+        void DoSaveFinalEvents(int fititer, std::vector<std::vector<double> > parresults);
         void DoSaveChi2();
-        void CollectSampleHistos();
-        void DoSaveResults(std::vector< std::vector<double> >& parresults,
+        void DoSaveResults(std::vector<std::vector<double> >& parresults,
                 std::vector< std::vector<double> >& parerrors,
                 std::vector< std::vector<double> >& parerrorsplus,
                 std::vector< std::vector<double> >& parerrorsminus,
@@ -106,18 +105,15 @@ class XsecFitter : public TObject
         double FindProfiledError(int param, TMatrixDSym mat);
 
 
-        TH1D* mcHisto;
-        TH1D* mcSigHisto;
         TH1D* prefitParams;
         TRandom3* rng;
-        TDirectory *m_dir;
+        TDirectory* m_dir;
         std::vector<AnaFitParameters*> m_fitpara;
-        std::vector<int> m_nparclass;
         std::vector<AnaSample*> m_samples;
-        Double_t m_potratio;
+        std::vector<int> m_nparclass;
+        double m_potratio;
         int m_npar, m_calls, m_freq;
-        Int_t nipsbins;
-        Double_t reg_p1, reg_p2;
+        double reg_p1, reg_p2;
         std::string paramVectorFileName;
         std::vector<std::string> par_names;
         std::vector<double> par_prefit;
@@ -127,7 +123,6 @@ class XsecFitter : public TObject
         std::vector<double> vec_chi2_stat;
         std::vector<double> vec_chi2_sys;
         std::vector<double> vec_chi2_reg;
-        std::vector<double> vec_chi2_reg2;
         int m_threads;
 };
 #endif
