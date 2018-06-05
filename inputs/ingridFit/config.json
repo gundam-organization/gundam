@@ -24,19 +24,23 @@
     "detectors" : [
         {
             "name" : "ND280",
-            "flux_file" : "",
-            "flux_hist" : [""],
+            "flux_file" : "tuned13av2/run4/nd5_tuned13av2_13anom_run4_numode_fine.root",
+            "flux_hist" : "enu_nd5_tuned13a_numu",
+            "flux_integral" : 6.503E12,
+            "flux_error" : 0.085,
             "binning" : "coarse_binning.txt",
-            "ntargets_val" : 2.75E29,
+            "ntargets_val" : 5.537E29,
             "ntargets_err" : 0.0067
         },
         {
             "name" : "INGRID",
             "flux_file" : "",
-            "flux_hist" : [""],
+            "flux_hist" : "",
+            "flux_integral" : 6.5E12,
+            "flux_error" : 0.099,
             "binning" : "ingrid_binning.txt",
-            "ntargets_val" : 0,
-            "ntargets_err" : 0.00
+            "ntargets_val" : 1.756E29,
+            "ntargets_err" : 0.011
         }
     ],
     "samples" : [

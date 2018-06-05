@@ -33,7 +33,9 @@ struct DetOpt
     std::string name;
     std::string binning;
     std::string flux_file;
-    std::vector<std::string> flux_hists;
+    std::string flux_hist;
+    double flux_integral;
+    double flux_error;
     double ntargets_val;
     double ntargets_err;
 };

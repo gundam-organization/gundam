@@ -1,8 +1,10 @@
 #ifndef XSECEXTRACTOR_HH
 #define XSECEXTRACTOR_HH
 
+#include <cmath>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -13,6 +15,13 @@ enum class ThrowType: bool
 {
     kThrow = true,
     kNom   = false
+};
+
+enum class ErrorType
+{
+    kAbs,
+    kRel,
+    kSig
 };
 
 class XsecExtractor
@@ -35,13 +44,16 @@ class XsecExtractor
 
         void SetBinning(const std::string& binning);
         void SetFluxHist(const TH1D& h_flux);
-        void SetNumTargets(double ntargets, double nerror);
+        void SetFluxHist(const TH1D& h_flux, double err, ErrorType type = ErrorType::kRel);
+        void SetFluxVar(double nom, double err, ErrorType type = ErrorType::kRel);
+        void SetNumTargets(double ntargets, double nerror, ErrorType type = ErrorType::kRel);
 
         void ApplyBinWidths(TH1D& h_event_rate);
         void ApplyFluxInt(TH1D& h_event_rate, bool do_throw);
         void ApplyNumTargets(TH1D& h_event_rate, bool do_throw);
 
         double ThrowNtargets();
+        double ThrowFlux();
 };
 
 #endif

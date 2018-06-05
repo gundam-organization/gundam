@@ -6,6 +6,7 @@
 #include <functional>
 #include <iomanip>
 #include <iostream>
+#include <map>
 #include <omp.h>
 #include <sstream>
 #include <string>
@@ -206,17 +207,23 @@ int main(int argc, char** argv)
     XsecExtractor nd280_xsec("ND280", seed);
     XsecExtractor ingrid_xsec("INGRID", seed);
 
-    std::vector<XsecExtractor> xsec_calc;
+    std::map<std::string, XsecExtractor> xsec_calc;
     for(const auto& det : parser.detectors)
     {
-        XsecExtractor x(det.name, seed);
+        std::cout << "[CalcXsec]: Adding detector for cross section: " << det.name << std::endl;
+        XsecExtractor x(det.name, det.binning, ++seed);
         x.SetNumTargets(det.ntargets_val, det.ntargets_err);
-        xsec_calc.push_back(x);
+        x.SetFluxVar(det.flux_integral, det.flux_error);
+        xsec_calc.emplace(std::make_pair(det.name, x));
     }
 
-    TH1D h_nt("h_nt", "h_nt", 100, 2.70E29, 2.80E29);
+    TH1D h_nt("h_nt", "h_nt", 100, 5.3E29, 5.7E29);
     for(int i = 0; i < num_throws; ++i)
-        h_nt.Fill(xsec_calc.at(0).ThrowNtargets());
+        h_nt.Fill(xsec_calc.at("ND280").ThrowNtargets());
+
+    TH1D h_flux("h_flux", "h_flux", 200, 3E12, 10E12);
+    for(int i = 0; i < num_throws; ++i)
+        h_flux.Fill(xsec_calc.at("ND280").ThrowFlux());
 
     ToyThrower toy_thrower(*postfit_cov, seed, 1E-24);
     std::vector<TH1D> xsec_throws;
@@ -229,13 +236,13 @@ int main(int argc, char** argv)
     for(int s = 0; s < samples.size(); ++s)
     {
         const unsigned int num_events = samples[s] -> GetN();
+        const std::string det(samples[s] -> GetDetector());
         for(unsigned int i = 0; i < num_events; ++i)
         {
             AnaEvent* ev = samples[s] -> GetEvent(i);
             ev -> SetEvWght(ev -> GetEvWghtMC());
             for(int f = 0; f < fitpara.size(); ++f)
             {
-                const std::string det(samples[s] -> GetDetector());
                 fitpara[f] -> ReWeight(ev, det, s, i, toy_param.at(f));
             }
         }
@@ -244,7 +251,10 @@ int main(int argc, char** argv)
         samples[s] -> FillEventHisto(2);
         samples[s] -> Write(foutput, hist_name, 0);
 
-        const auto h = samples[s] -> GetSignalHisto();
+        auto h = samples[s] -> GetSignalHisto();
+        xsec_calc.at(det).ApplyBinWidths(*h);
+        xsec_calc.at(det).ApplyNumTargets(*h, false);
+        xsec_calc.at(det).ApplyFluxInt(*h, false);
         for(int j = 1; j <= h -> GetNbinsX(); ++j)
             h_postfit.SetBinContent(bin++, h -> GetBinContent(j));
     }
@@ -269,19 +279,22 @@ int main(int argc, char** argv)
         for(int s = 0; s < samples.size(); ++s)
         {
             const unsigned int num_events = samples[s] -> GetN();
+            const std::string det(samples[s] -> GetDetector());
             for(unsigned int i = 0; i < num_events; ++i)
             {
                 AnaEvent* ev = samples[s] -> GetEvent(i);
                 ev -> ResetEvWght();
                 for(int f = 0; f < fitpara.size(); ++f)
                 {
-                    const std::string det(samples[s] -> GetDetector());
                     fitpara[f] -> ReWeight(ev, det, s, i, toy_param.at(f));
                 }
             }
 
             samples[s] -> FillEventHisto(0);
-            const auto h_pred = samples[s] -> GetSignalHisto();
+            auto h_pred = samples[s] -> GetSignalHisto();
+            xsec_calc.at(det).ApplyBinWidths(*h_pred);
+            xsec_calc.at(det).ApplyNumTargets(*h_pred, true);
+            xsec_calc.at(det).ApplyFluxInt(*h_pred, true);
 
             //std::string hist_name = samples[s] -> GetName() + "_throw" + std::to_string(t);
             //h_pred -> Write(hist_name.c_str());
@@ -356,6 +369,7 @@ int main(int argc, char** argv)
     h_throw.Write("h_throw");
     h_mean.Write("h_mean");
     h_nt.Write("h_ntargets");
+    h_flux.Write("h_flux");
 
     auto t_end_total = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> t_total = t_end_total - t_start_total;
