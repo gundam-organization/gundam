@@ -10,33 +10,33 @@
 
 #include <TGraph.h>
 #include <TFile.h>
-#include <TMatrixDSymEigen.h>
-#include <TVirtualFitter.h>
-#include <TObject.h>
 #include <TMath.h>
+#include <TMatrixT.h>
+#include <TMatrixTSym.h>
 #include <TRandom3.h>
+#include <TVectorT.h>
+
+#include "Math/Minimizer.h"
+#include "Math/Factory.h"
+#include "Math/Functor.h"
 
 #include "AnaSample.hh"
 #include "AnySample.hh"
 #include "AnaFitParameters.hh"
 
 using namespace std;
-class XsecFitter : public TObject
+class XsecFitter
 {
     public:
         XsecFitter(const int seed, const int num_threads);
         ~XsecFitter();
         void SetSeed(int seed);
-        void fcn(Int_t &npar, Double_t *gin, Double_t &f, Double_t *par, Int_t iflag);
+        double CalcLikelihood(const double* par);
         void InitFitter(std::vector<AnaFitParameters*> &fitpara, double reg, const std::string& paramVectorFname);
         void FixParameter(const std::string& par_name, const double& value);
         void Fit(std::vector<AnaSample*>& samples, const std::vector<std::string>& topology, int datatype, int fitMethod, int statFluct);
-        void SetSaveMode(TDirectory *dirout, int freq)
-        { m_dir = dirout; m_freq = freq; }
+        void SetSaveMode(TDirectory *dirout, int freq){ m_dir = dirout; m_freq = freq; }
         void SetPOTRatio(double val){ m_potratio = val; }
-
-        ClassDef(XsecFitter, 0);
-
 
         TTree *outtree;
 
@@ -95,15 +95,10 @@ class XsecFitter : public TObject
         void DoSaveFinalEvents(int fititer, std::vector<std::vector<double> > parresults);
         void DoSaveChi2();
         void DoSaveResults(std::vector<std::vector<double> >& parresults,
-                std::vector< std::vector<double> >& parerrors,
-                std::vector< std::vector<double> >& parerrorsplus,
-                std::vector< std::vector<double> >& parerrorsminus,
-                std::vector< std::vector<double> >& parerrorspara,
-                std::vector< std::vector<double> >& parerrorsglobc,
-                std::vector< std::vector<double> >& parerrorsprof,
-                double chi2);
-        double FindProfiledError(int param, TMatrixDSym mat);
+                           std::vector<std::vector<double> >& parerrors);
 
+        ROOT::Math::Minimizer* m_fitter;
+        ROOT::Math::Functor* m_fcn;
 
         TH1D* prefitParams;
         TRandom3* rng;
@@ -113,7 +108,7 @@ class XsecFitter : public TObject
         std::vector<int> m_nparclass;
         double m_potratio;
         int m_npar, m_calls, m_freq;
-        double reg_p1, reg_p2;
+        double reg_p1;
         std::string paramVectorFileName;
         std::vector<std::string> par_names;
         std::vector<double> par_prefit;

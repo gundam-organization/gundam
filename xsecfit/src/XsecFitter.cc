@@ -1,25 +1,12 @@
 #include "XsecFitter.hh"
 
-// ClassImp(XsecFitter);
-
-TVirtualFitter *fitter = 0;
-
-//dummy function for SetFCN
-void dummy_fcn( Int_t &npar, Double_t *gin, Double_t &f,
-        Double_t *par, Int_t iflag )
-{
-    XsecFitter *myObj;
-    myObj = dynamic_cast<XsecFitter*>(fitter->GetObjectFit());
-    //Call the actual chi2 function inside our class
-    myObj->fcn( npar, gin, f, par, iflag );
-}
-
-// ctor
 XsecFitter::XsecFitter(const int seed, const int num_threads)
 {
     rng = new TRandom3(seed);
     //set gRandom to our rand
     gRandom = rng;
+    m_fitter = nullptr;
+    m_fcn   = nullptr;
     m_dir   = nullptr;
     m_freq  = -1;
     m_threads = num_threads;
@@ -31,6 +18,10 @@ XsecFitter::~XsecFitter()
     m_dir = nullptr;
     if(rng != nullptr)
         delete rng;
+    if(m_fitter != nullptr)
+        delete m_fitter;
+    if(m_fcn != nullptr)
+        delete m_fcn;
 }
 
 // SetSeed
@@ -51,8 +42,9 @@ void XsecFitter::FixParameter(const std::string& par_name, const double& value)
     if(iter != par_names.end())
     {
         const int i = std::distance(par_names.begin(), iter);
-        fitter -> SetParameter(i, par_names.at(i).c_str(), value, 0, value, value);
-        fitter -> FixParameter(i);
+        //fitter -> SetParameter(i, par_names.at(i).c_str(), value, 0, value, value);
+        m_fitter -> SetVariable(i, par_names.at(i).c_str(), value, 0);
+        m_fitter -> FixVariable(i);
         std::cout << "[XsecFitter]: Fixing parameter " << par_names.at(i) << " to value "
                   << value << std::endl;
     }
@@ -66,8 +58,8 @@ void XsecFitter::FixParameter(const std::string& par_name, const double& value)
 // PrepareFitter
 void XsecFitter::InitFitter(std::vector<AnaFitParameters*> &fitpara, double reg, const std::string& paramVectorFname)
 {
-    paramVectorFileName=paramVectorFname;
-    reg_p1=reg;
+    paramVectorFileName = paramVectorFname;
+    reg_p1 = reg;
     m_fitpara = fitpara;
     std::vector<double> par_step, par_low, par_high;
 
@@ -76,7 +68,7 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*> &fitpara, double reg,
     //get the parameter info
     for(std::size_t i=0;i<m_fitpara.size();i++)
     {
-        m_npar += m_fitpara[i]->GetNpar();
+        m_npar += m_fitpara[i] -> GetNpar();
         m_nparclass.push_back(m_fitpara[i]->GetNpar());
 
         std::vector<string> vec0;
@@ -98,7 +90,6 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*> &fitpara, double reg,
     if(m_npar == 0)
     {
         std::cerr << "[ERROR]: No fit parameters were defined." << std::endl;
-        fitter = 0;
         return;
     }
 
@@ -107,26 +98,21 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*> &fitpara, double reg,
     std::cout << "    Number of parameters = "  << m_npar << std::endl;
     std::cout << "===========================================" << std::endl;
 
+    m_fitter = ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad");
+    m_fcn = new ROOT::Math::Functor(this, &XsecFitter::CalcLikelihood, m_npar);
 
-    TVirtualFitter::SetDefaultFitter("Minuit");
-    fitter = TVirtualFitter::Fitter(0, m_npar);
-    //pass our object to the fitter
-    fitter->SetObjectFit(this);
-    //set the dummy fcn
-    fitter->SetFCN(dummy_fcn);
+    m_fitter -> SetFunction(*m_fcn);
+    m_fitter -> SetPrintLevel(2);
+    m_fitter -> SetMaxIterations(1E6);
+    m_fitter -> SetTolerance(1E-4);
 
-    double arglist[5];
-    // use this to have low printout
-    // arglist[0] = -1.;
-    arglist[0] = 1;
-    fitter->ExecuteCommand("SET PRINT", arglist, 1);
-
-    //init fitter stuff
     for(int i = 0; i < m_npar; ++i)
-        fitter -> SetParameter(i, par_names[i].c_str(), par_prefit[i], par_step[i], par_low[i], par_high[i]);
+    {
+        m_fitter -> SetVariable(i, par_names[i], par_prefit[i], par_step[i]);
+        m_fitter -> SetVariableLimits(i, par_low[i], par_high[i]);
+    }
 
     // Save prefit parameters:
-
     prefitParams = new TH1D("prefitParams", "prefitParams", m_npar, 0, m_npar);
     int paramNo = 1;
     for(int i = 0; i < m_fitpara.size(); ++i)
@@ -160,7 +146,7 @@ void XsecFitter::Fit(std::vector<AnaSample*> &samples, const std::vector<std::st
     std::cout << "[XsecFitter]: Starting to fit." << std::endl;
     m_calls = 0;
     m_samples = samples;
-    if(!fitter)
+    if(m_fitter == nullptr)
     {
         std::cerr << "[ERROR]: In XsecFitter::Fit()\n"
                   << "[ERROR]: Fitter has not been initialized." << std::endl;
@@ -203,116 +189,88 @@ void XsecFitter::Fit(std::vector<AnaSample*> &samples, const std::vector<std::st
 
     //Do fit
     std::cout << "[XsecFitter]: Fit prepared." << std::endl;
-    double arglist[5];
-    arglist[0] = 1000000; //number of calls
-    arglist[1] = 1.0E-4; //tolerance
 
     if(fitMethod == 1)
     {
         std::cout << "[XsecFitter]: Calling MIGRAD ..." << std::endl;
-        fitter->ExecuteCommand("MIGRAD", arglist, 2);
+        m_fitter -> Minimize();
     }
     else if(fitMethod == 2)
     {
         std::cout << "[XsecFitter]: Calling MIGRAD ..." << std::endl;
-        fitter->ExecuteCommand("MIGRAD", arglist, 2);
+        m_fitter -> Minimize();
         std::cout << "[XsecFitter]: Calling HESSE ..." << std::endl;
-        fitter->ExecuteCommand("HESSE", arglist, 2);
+        m_fitter -> Hesse();
     }
     else if(fitMethod == 3)
     {
         std::cout << "[XsecFitter]: Calling MINOS ..." << std::endl;
-        fitter->ExecuteCommand("MINOS", arglist, 2);
+        //fitter->ExecuteCommand("MINOS", arglist, 2);
     }
-
-    //print the results
-    Double_t amin;
-    Double_t edm, errdef;
-    Int_t nvpar, nparx;
-    fitter->GetStats(amin, edm, errdef, nvpar, nparx);
 
     //fill chi2 info
     if(m_dir)
         DoSaveChi2();
 
+    const int ndim  = m_fitter -> NDim();
+    const int nfree = m_fitter -> NFree();
+    double cov_array[ndim*ndim];
+    m_fitter -> GetCovMatrix(cov_array);
+
     //Get Error Matrix
-    TMatrixDSym matrix(nvpar,fitter->GetCovarianceMatrix());
+    //TMatrixDSym matrix(nvpar,fitter->GetCovarianceMatrix());
+    TMatrixDSym matrix(ndim, cov_array);
+    //for(int i = 0; i < ndim; ++i)
+    //    for(int j = 0; j < ndim; ++j)
+    //        matrix[i][j] = cov_array[i*ndim + j];
 
     //Calculate Corrolation Matrix
-    TMatrixD cormatrix(matrix.GetNrows(),matrix.GetNcols());
+    TMatrixDSym cormatrix(ndim);
     for(int r=0;r<matrix.GetNrows();r++){
         for(int c=0;c<matrix.GetNcols();c++){
             cormatrix[r][c]= matrix[r][c]/sqrt((matrix[r][r]*matrix[c][c]));
         }
     }
 
+    const double* par_val = m_fitter -> X();
+    const double* par_err = m_fitter -> Errors();
+
     //save fit results
-    TVectorD fitVec(nparx);
+    TVectorD fitVec(ndim);
     std::vector< std::vector<double> > res_pars;
     std::vector< std::vector<double> > err_pars;
-    std::vector< std::vector<double> > errplus_pars;
-    std::vector< std::vector<double> > errminus_pars;
-    std::vector< std::vector<double> > errpara_pars;
-    std::vector< std::vector<double> > errglobc_pars;
-    std::vector< std::vector<double> > errprof_pars;
-    Double_t errplus, errminus, errpara, errglobc, profErr;
-    int k=0;
+    int k = 0;
     for(size_t i=0;i<m_fitpara.size();i++)
     {
         std::vector<double> vec_res;
         std::vector<double> vec_err;
-        std::vector<double> vec_errplus;
-        std::vector<double> vec_errminus;
-        std::vector<double> vec_errpara;
-        std::vector<double> vec_errglobc;
-        std::vector<double> vec_errprof;
-        for(int j=0;j<m_nparclass[i];j++){
-            vec_err.push_back(fitter->GetParError(k));
-            double parvalue=fitter->GetParameter(k);
+
+        for(int j=0;j<m_nparclass[i];j++)
+        {
+            vec_err.push_back(par_err[k]);
+            double parvalue = par_val[k];
             vec_res.push_back(parvalue);
             fitVec(k) = parvalue;
-
-            // Get full errors:
-            fitter->GetErrors(k, errplus, errminus, errpara, errglobc);
-            vec_errplus.push_back(errplus);
-            vec_errminus.push_back(errminus);
-            vec_errpara.push_back(errpara);
-            vec_errglobc.push_back(errglobc);
-
-            // Get profiled error:
-            //WIP - it works but is a bit of an aproximation, use at your own risk
-            /*
-               profErr = FindProfiledError(k, matrix);
-               vec_errprof.push_back(profErr);
-               cout << "Profiled Error for param " << k << " is " << profErr << endl;
-               */
-            vec_errprof.push_back(1.0);
-
             k++;
         }
+
         res_pars.push_back(vec_res);
         err_pars.push_back(vec_err);
-        errplus_pars.push_back(vec_errplus);
-        errminus_pars.push_back(vec_errminus);
-        errpara_pars.push_back(vec_errpara);
-        errglobc_pars.push_back(vec_errglobc);
-        errprof_pars.push_back(vec_errprof);
     }
 
-
-
-    if(k != nparx)
+    if(k != ndim)
     {
         std::cout << "[ERROR] Number of parameters." << std::endl;
         return;
     }
+
     m_dir->cd();
     matrix.Write("res_cov_matrix");
     cormatrix.Write("res_cor_matrix");
     fitVec.Write("res_vector");
     prefitParams->Write("prefitParams");
 
-    DoSaveResults(res_pars,err_pars,errplus_pars,errminus_pars,errpara_pars,errglobc_pars,errprof_pars,amin);
+    DoSaveResults(res_pars, err_pars);
     if(m_freq>=0 && m_dir) DoSaveFinalEvents(m_calls, res_pars);
 }
 
@@ -452,9 +410,7 @@ double XsecFitter::FillSamples(std::vector<std::vector<double> >& new_pars, int 
     return chi2;
 }
 
-// fcn <-- this is the actual FCN
-void XsecFitter::fcn(Int_t &npar, Double_t *gin, Double_t &f,
-        Double_t *par, Int_t iflag)
+double XsecFitter::CalcLikelihood(const double* par)
 {
     m_calls++;
 
@@ -505,16 +461,16 @@ void XsecFitter::fcn(Int_t &npar, Double_t *gin, Double_t &f,
         if(m_calls % (m_freq*10000) == 0)
             DoSaveEvents(m_calls);
     }
-    // total chi2
-    f = chi2_stat + chi2_sys + chi2_reg;
 
     //Print status of the fit:
     if(output_chi2)
     {
         std::cout << "m_calls is: " << m_calls << endl;
-        std::cout << "Chi2 for this iter: " << f << endl;
+        std::cout << "Chi2 for this iter: " << chi2_stat + chi2_sys + chi2_reg << endl;
         std::cout << "Chi2 stat / syst / reg : " << chi2_stat << " / " << chi2_sys << " / " << chi2_reg << " / " << std::endl;
     }
+
+    return chi2_stat + chi2_sys + chi2_reg;
     // Update final chi2 file for L curve calc:
 
     // ofstream outfile;
@@ -532,10 +488,13 @@ void XsecFitter::DoSaveEvents(int fititer)
 }
 
 // Write hists for reweighted events
-void XsecFitter::DoSaveFinalEvents(int fititer, vector< vector<double> > res_params)
+void XsecFitter::DoSaveFinalEvents(int fititer, std::vector<std::vector<double> > res_params)
 {
-    cout << endl << "**************************" << endl << "Fit finished, saving results .. " << endl << "**************************" << endl << endl;
-    outtree= new TTree("selectedEvents", "selectedEvents");
+    std::cout << std::endl << "**************************" << std::endl
+              << "Fit finished, saving results .. " << std::endl
+              << "**************************" << std::endl;
+
+    outtree = new TTree("selectedEvents", "selectedEvents");
     InitOutputTree();
     for(size_t s=0;s<m_samples.size();s++){
         m_samples[s]->Write(m_dir, Form("evhist_sam%d_finaliter",(int)s), fititer);
@@ -622,7 +581,6 @@ void XsecFitter::DoSaveChi2()
     TH1D* reg_param = new TH1D("reg_param","reg_param", m_calls+1, 0, m_calls+1);
     TH1D* reg_param2 = new TH1D("reg_param2","reg_param2", m_calls+1, 0, m_calls+1);
     reg_param->Fill(reg_p1);
-    reg_param2->Fill(reg_p2);
 
     if(vec_chi2_stat.size() != vec_chi2_sys.size()){
         cout<<"Number of saved iterations for chi2 stat and chi2 syst different -  EXITING"<<endl;
@@ -650,8 +608,8 @@ void XsecFitter::DoSaveChi2()
     delete histochi2tot;
 }
 
-void XsecFitter::DoSaveResults(vector< vector<double> >& parresults, vector< vector<double> >& parerrors, vector< vector<double> >& parerrorsplus, vector< vector<double> >& parerrorsminus,
-        vector< vector<double> >& parerrorspara, vector< vector<double> >& parerrorsglobc, vector< vector<double> >& parerrorsprof, double chi2){
+void XsecFitter::DoSaveResults(std::vector<std::vector<double> >& parresults, std::vector<std::vector<double> >& parerrors)
+{
     //loop on number of parameter classes
     for(size_t i=0;i<m_fitpara.size();i++)
     {
@@ -661,21 +619,7 @@ void XsecFitter::DoSaveResults(vector< vector<double> >& parresults, vector< vec
         TH1D* histoparerr = new TH1D(Form("paramerrhist_par%s_result",m_fitpara[i]->GetName().c_str()),
                 Form("paramerrhist_par%s_result",m_fitpara[i]->GetName().c_str()),
                 m_nparclass[i], 0, m_nparclass[i]);
-        TH1D* histoparerrplus = new TH1D(Form("paramerrplushist_par%s_result",m_fitpara[i]->GetName().c_str()),
-                Form("paramerrplushist_par%s_result",m_fitpara[i]->GetName().c_str()),
-                m_nparclass[i], 0, m_nparclass[i]);
-        TH1D* histoparerrminus = new TH1D(Form("paramerrminushist_par%s_result",m_fitpara[i]->GetName().c_str()),
-                Form("paramerrminushist_par%s_result",m_fitpara[i]->GetName().c_str()),
-                m_nparclass[i], 0, m_nparclass[i]);
-        TH1D* histoparerrpara = new TH1D(Form("paramerrparahist_par%s_result",m_fitpara[i]->GetName().c_str()),
-                Form("paramerrparahist_par%s_result",m_fitpara[i]->GetName().c_str()),
-                m_nparclass[i], 0, m_nparclass[i]);
-        TH1D* histoparerrglobc = new TH1D(Form("paramerrglobchist_par%s_result",m_fitpara[i]->GetName().c_str()),
-                Form("paramerrglobchist_par%s_result",m_fitpara[i]->GetName().c_str()),
-                m_nparclass[i], 0, m_nparclass[i]);
-        TH1D* histoparerrprof = new TH1D(Form("paramerrprofhist_par%s_result",m_fitpara[i]->GetName().c_str()),
-                Form("paramerrprofhist_par%s_result",m_fitpara[i]->GetName().c_str()),
-                m_nparclass[i], 0, m_nparclass[i]);
+
         //loop on number of parameters in each class
         vector <string> parnames;
         m_fitpara[i]->GetParNames(parnames);
@@ -685,37 +629,15 @@ void XsecFitter::DoSaveResults(vector< vector<double> >& parresults, vector< vec
             histopar->SetBinContent(j+1,(parresults[i])[j]);
             histoparerr->GetXaxis()->SetBinLabel(j+1,TString(parnames[j]));
             histoparerr->SetBinContent(j+1,(parerrors[i])[j]);
-            histoparerrplus->GetXaxis()->SetBinLabel(j+1,TString(parnames[j]));
-            histoparerrplus->SetBinContent(j+1,(parerrorsplus[i])[j]);
-            histoparerrminus->GetXaxis()->SetBinLabel(j+1,TString(parnames[j]));
-            histoparerrminus->SetBinContent(j+1,(parerrorsminus[i])[j]);
-            histoparerrpara->GetXaxis()->SetBinLabel(j+1,TString(parnames[j]));
-            histoparerrpara->SetBinContent(j+1,(parerrorspara[i])[j]);
-            histoparerrglobc->GetXaxis()->SetBinLabel(j+1,TString(parnames[j]));
-            histoparerrprof->SetBinContent(j+1,(parerrorsprof[i])[j]);
         }
+
         m_dir->cd();
         histopar->Write();
         histoparerr->Write();
-        histoparerrplus->Write();
-        histoparerrminus->Write();
-        histoparerrpara->Write();
-        histoparerrglobc->Write();
-        histoparerrprof->Write();
+
         delete histopar;
         delete histoparerr;
-        delete histoparerrplus;
-        delete histoparerrminus;
-        delete histoparerrpara;
-        delete histoparerrglobc;
-        delete histoparerrprof;
     }
-    double x[1]={0};
-    double y[1]={chi2};
-    TGraph* grapchi2 = new TGraph(1,x,y);
-    grapchi2->SetName("final_chi2_fromMinuit");
-    m_dir->cd();
-    grapchi2->Write();
 
     std::vector<std::string> topology = {"cc0pi0p", "cc0pi1p", "cc0pinp", "cc1pi+", "ccother",
         "backg", "Null", "OOFV"};
@@ -726,20 +648,3 @@ void XsecFitter::DoSaveResults(vector< vector<double> >& parresults, vector< vec
         m_samples[s]->GetSampleBreakdown(m_dir, "fit", topology, false);
     }
 }
-
-double XsecFitter::FindProfiledError(int param, TMatrixDSym mat){
-    double error = 0.0;
-    double maxerror = 0.0;
-    TMatrixDSymEigen me(mat);
-
-    TVectorD eigenval = me.GetEigenValues();
-    TMatrixD eigenvec = me.GetEigenVectors();
-
-    for(int i=0; i<mat.GetNrows(); i++){
-        error = fabs((eigenval[i])*(eigenvec[param][i]));
-        if(error>maxerror) maxerror=error;
-    }
-
-    return sqrt(maxerror);
-}
-
