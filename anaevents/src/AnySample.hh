@@ -30,13 +30,13 @@ class AnySample : public AnaSample
         void SetD1Binning(int nbins, double *bins);
         void SetD2Binning(int nbins, double *bins);
         void SetEnuBinning(int nbins, double *bins);
-        int GetAnyBinIndex(const double D1, const double D2);
+        int GetAnyBinIndex(const double D1, const double D2) const;
         void MakeHistos(); //must be called after binning is changed
 
         //histogram for event distributions
         void SetData(TObject* hdata);
         void FillEventHisto(int datatype);
-        double CalcChi2();
+        double CalcChi2() const;
 
         void GetSampleBreakdown(TDirectory *dirout, const std::string& tag, bool save);
         void GetSampleBreakdown(TDirectory* dirout, const std::string& tag, const std::vector<std::string>& topology, bool save);

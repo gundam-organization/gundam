@@ -187,12 +187,11 @@ int main(int argc, char** argv)
     TMatrixDSym* postfit_cor = (TMatrixDSym*)fpostfit -> Get("res_cor_matrix");
     TVectorD* postfit_param_root = (TVectorD*)fpostfit -> Get("res_vector");
 
-    const int nfitbins = sigfitpara.GetNpar();
-    TH1D h_postfit("h_postfit", "h_postfit", nfitbins, 0, nfitbins);
 
     auto t_start_throws = std::chrono::high_resolution_clock::now();
     std::cout << "[CalcXsec]: Throwing " << num_throws << " toys." << std::endl;
     const int npar = postfit_cov -> GetNrows();
+    const int nfitbins = sigfitpara.GetNpar();
     TMatrixD cov_test(npar, npar);
     TMatrixD cor_test(npar, npar);
     TMatrixD xsec_cov(nfitbins, nfitbins);
@@ -204,10 +203,8 @@ int main(int argc, char** argv)
     for(int i = 0; i < npar; ++i)
         postfit_param.push_back((*postfit_param_root)[i]);
 
-    XsecExtractor nd280_xsec("ND280", seed);
-    XsecExtractor ingrid_xsec("INGRID", seed);
-
     std::map<std::string, XsecExtractor> xsec_calc;
+    std::vector<std::string> xsec_order;
     for(const auto& det : parser.detectors)
     {
         std::cout << "[CalcXsec]: Adding detector for cross section: " << det.name << std::endl;
@@ -215,7 +212,19 @@ int main(int argc, char** argv)
         x.SetNumTargets(det.ntargets_val, det.ntargets_err);
         x.SetFluxVar(det.flux_integral, det.flux_error);
         xsec_calc.emplace(std::make_pair(det.name, x));
+        xsec_order.emplace_back(det.name);
     }
+
+    std::map<std::string, TH1D> h_postfit_map;
+    for(const auto& det : xsec_calc)
+    {
+        const auto nbins = det.second.GetNbins();
+        const auto name  = det.second.GetName();
+        std::cout << "[XsecExtractor]: Adding " << name << " with " << nbins << " bins to postfit." << std::endl;
+        h_postfit_map.emplace(std::make_pair(name, TH1D("", "", nbins, 0, nbins)));
+    }
+
+    TH1D h_postfit("h_postfit", "h_postfit", nfitbins, 0, nfitbins);
 
     TH1D h_nt("h_nt", "h_nt", 100, 5.3E29, 5.7E29);
     for(int i = 0; i < num_throws; ++i)
@@ -231,7 +240,6 @@ int main(int argc, char** argv)
     std::vector<std::vector<double> > throws;
     std::vector<double> toy(npar, 0);
 
-    int bin = 1;
     auto toy_param = MapThrow(toy, postfit_param, fitpara);
     for(int s = 0; s < samples.size(); ++s)
     {
@@ -245,18 +253,40 @@ int main(int argc, char** argv)
             {
                 fitpara[f] -> ReWeight(ev, det, s, i, toy_param.at(f));
             }
+
+            if(ev -> isSignalEvent())
+            {
+                const auto idx = xsec_calc.at(det).GetAnyBinIndex(ev -> GetTrueD1(), ev -> GetTrueD2());
+                h_postfit_map.at(det).Fill(idx + 0.5, ev -> GetEvWght());
+            }
         }
 
-        std::string hist_name = samples[s] -> GetName() + "_postfit";
-        samples[s] -> FillEventHisto(2);
-        samples[s] -> Write(foutput, hist_name, 0);
+        //std::string hist_name = samples[s] -> GetName() + "_postfit";
+        //samples[s] -> FillEventHisto(2);
+        //samples[s] -> Write(foutput, hist_name, 0);
 
-        auto h = samples[s] -> GetSignalHisto();
-        xsec_calc.at(det).ApplyBinWidths(*h);
-        xsec_calc.at(det).ApplyNumTargets(*h, false);
-        xsec_calc.at(det).ApplyFluxInt(*h, false);
-        for(int j = 1; j <= h -> GetNbinsX(); ++j)
-            h_postfit.SetBinContent(bin++, h -> GetBinContent(j));
+        //auto h = samples[s] -> GetSignalHisto();
+        //xsec_calc.at(det).ApplyBinWidths(*h);
+        //xsec_calc.at(det).ApplyNumTargets(*h, false);
+        //xsec_calc.at(det).ApplyFluxInt(*h, false);
+        //h_postfit_map.at(det).Add(h);
+        //for(int j = 1; j <= h -> GetNbinsX(); ++j)
+        //    h_postfit.SetBinContent(bin++, h -> GetBinContent(j));
+    }
+
+    for(auto& kv : h_postfit_map)
+    {
+        xsec_calc.at(kv.first).ApplyBinWidths(kv.second);
+        xsec_calc.at(kv.first).ApplyNumTargets(kv.second, false);
+        xsec_calc.at(kv.first).ApplyFluxInt(kv.second, false);
+    }
+
+    auto bin = 1;
+    for(const auto& det : xsec_order)
+    {
+        const auto h = h_postfit_map.at(det);
+        for(int j = 1; j <= h.GetNbinsX(); ++j)
+            h_postfit.SetBinContent(bin++, h.GetBinContent(j));
     }
 
     auto t_start_single = std::chrono::high_resolution_clock::now();
@@ -292,9 +322,9 @@ int main(int argc, char** argv)
 
             samples[s] -> FillEventHisto(0);
             auto h_pred = samples[s] -> GetSignalHisto();
-            xsec_calc.at(det).ApplyBinWidths(*h_pred);
-            xsec_calc.at(det).ApplyNumTargets(*h_pred, true);
-            xsec_calc.at(det).ApplyFluxInt(*h_pred, true);
+            //xsec_calc.at(det).ApplyBinWidths(*h_pred);
+            //xsec_calc.at(det).ApplyNumTargets(*h_pred, true);
+            //xsec_calc.at(det).ApplyFluxInt(*h_pred, true);
 
             //std::string hist_name = samples[s] -> GetName() + "_throw" + std::to_string(t);
             //h_pred -> Write(hist_name.c_str());
@@ -343,7 +373,6 @@ int main(int argc, char** argv)
             }
         }
     }
-    auto t_end_cov = std::chrono::high_resolution_clock::now();
 
     for(int i = 0; i < nfitbins; ++i)
     {
@@ -356,8 +385,9 @@ int main(int argc, char** argv)
         }
     }
 
-    for(int i = 1; i <= h_postfit.GetNbinsX(); ++i)
-        h_postfit.SetBinError(i, sqrt(xsec_cov(i-1,i-1)));
+    //for(int i = 1; i <= h_postfit.GetNbinsX(); ++i)
+    //    h_postfit.SetBinError(i, sqrt(xsec_cov(i-1,i-1)));
+    auto t_end_cov = std::chrono::high_resolution_clock::now();
 
     foutput -> cd();
     h_postfit.Write("h_postfit");
@@ -370,6 +400,9 @@ int main(int argc, char** argv)
     h_mean.Write("h_mean");
     h_nt.Write("h_ntargets");
     h_flux.Write("h_flux");
+
+    foutput -> Close();
+    delete foutput;
 
     auto t_end_total = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> t_total = t_end_total - t_start_total;

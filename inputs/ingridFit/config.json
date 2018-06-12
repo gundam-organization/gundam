@@ -8,7 +8,7 @@
     "mc_POT" : 1.0,
     "rng_seed" : 12257,
     "num_threads" : 1,
-    "num_throws" : 2E4,
+    "num_throws" : 1E3,
     "sample_signal" : [1,2],
     "sample_topology" : ["cc0pi0p", "cc0pi1p", "cc0pinp", "cc1pi+", "ccother", "bkg", "null", "OOFV"],
     "flux_cov" : {
@@ -26,10 +26,10 @@
             "name" : "ND280",
             "flux_file" : "tuned13av2/run4/nd5_tuned13av2_13anom_run4_numode_fine.root",
             "flux_hist" : "enu_nd5_tuned13a_numu",
-            "flux_integral" : 6.503E12,
+            "flux_integral" : 1.12E13,
             "flux_error" : 0.085,
-            "binning" : "coarse_binning.txt",
-            "ntargets_val" : 5.537E29,
+            "binning" : "tn337_binning.txt",
+            "ntargets_val" : 5.9E29,
             "ntargets_err" : 0.0067
         },
         {
@@ -48,7 +48,34 @@
             "cut_branch" : 1,
             "name" : "muTPCpTPC",
             "detector" : "ND280",
-            "binning" : "coarse_binning.txt",
+            "binning" : "tn337_binning.txt",
+            "flux_offset" : 0,
+            "det_offset" : 0,
+            "use_sample" : true
+        },
+        {
+            "cut_branch" : 0,
+            "name" : "muTPC",
+            "detector" : "ND280",
+            "binning" : "tn337_binning.txt",
+            "flux_offset" : 0,
+            "det_offset" : 0,
+            "use_sample" : true
+        },
+        {
+            "cut_branch" : 2,
+            "name" : "muTPCpFGD",
+            "detector" : "ND280",
+            "binning" : "tn337_binning.txt",
+            "flux_offset" : 0,
+            "det_offset" : 0,
+            "use_sample" : true
+        },
+        {
+            "cut_branch" : 3,
+            "name" : "muFGDpTPC",
+            "detector" : "ND280",
+            "binning" : "tn337_binning.txt",
             "flux_offset" : 0,
             "det_offset" : 0,
             "use_sample" : true
@@ -59,7 +86,7 @@
             "detector" : "INGRID",
             "binning" : "ingrid_binning.txt",
             "flux_offset" : 20,
-            "det_offset" : 13,
+            "det_offset" : 58,
             "use_sample" : true
         }
     ]

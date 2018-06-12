@@ -1,16 +1,40 @@
 #include "XsecExtractor.hh"
+using xsllh::FitBin;
 
 XsecExtractor::XsecExtractor(const std::string& name, unsigned int seed)
-    : m_name(name), RNG(seed)
+    : m_name(name), RNG(seed), m_nbins(0)
 {
 }
 
 
 XsecExtractor::XsecExtractor(const std::string& name, const std::string& binning,
                              unsigned int seed)
-    : m_name(name), RNG(seed)
+    : m_name(name), RNG(seed), m_nbins(0)
 {
     SetBinning(binning);
+}
+
+std::string XsecExtractor::GetName() const
+{
+    return m_name;
+}
+
+unsigned int XsecExtractor::GetNbins() const
+{
+    return m_nbins;
+}
+
+int XsecExtractor::GetAnyBinIndex(const double D1, const double D2) const
+{
+    for(int i = 0; i < bin_edges.size(); ++i)
+    {
+        if(D1 >= bin_edges[i].D1low && D1 < bin_edges[i].D1high &&
+           D2 >= bin_edges[i].D2low && D2 < bin_edges[i].D2high)
+        {
+            return i;
+        }
+    }
+    return -1;
 }
 
 void XsecExtractor::SetNumTargets(double ntargets, double nerror, ErrorType type)
@@ -62,6 +86,7 @@ void XsecExtractor::SetFluxVar(double nom, double err, ErrorType type)
 void XsecExtractor::SetBinning(const std::string& binning)
 {
     m_binning = binning;
+    m_nbins = 0;
 
     std::ifstream fin(m_binning, std::ios::in);
     if(!fin.is_open())
@@ -71,6 +96,7 @@ void XsecExtractor::SetBinning(const std::string& binning)
     }
     else
     {
+        bin_widths.clear();
         std::string line;
         while(std::getline(fin, line))
         {
@@ -84,7 +110,9 @@ void XsecExtractor::SetBinning(const std::string& binning)
             double bw = std::abs(D1_2 - D1_1) * std::abs(D2_2 - D2_1);
             std::cout << "Bin Width: " << bw << std::endl;
             bin_widths.push_back(bw);
+            bin_edges.emplace_back(FitBin(D1_1, D1_2, D2_1, D2_2));
         }
+        m_nbins = bin_widths.size();
     }
 }
 

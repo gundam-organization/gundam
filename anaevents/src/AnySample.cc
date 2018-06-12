@@ -213,7 +213,7 @@ void AnySample::SetEnuBinning(int nbins, double *bins)
     for(int i=0;i<=nbins_enu;i++) bins_enu[i] = bins[i];
 }
 
-int AnySample::GetAnyBinIndex(const double D1, const double D2)
+int AnySample::GetAnyBinIndex(const double D1, const double D2) const
 {
     for(int i = 0; i < nAnybins; ++i)
     {
@@ -382,7 +382,7 @@ void AnySample::FillEventHisto(int datatype)
     }
 }
 
-double AnySample::CalcChi2()
+double AnySample::CalcChi2() const
 {
     if(m_use_sample == false)
         return 0.0;

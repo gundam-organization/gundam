@@ -1,4 +1,5 @@
 #include "FitParameters.hh"
+using xsllh::FitBin;
 
 FitParameters::FitParameters(const std::string& par_name, bool random_priors)
 {
@@ -50,7 +51,7 @@ bool FitParameters::SetBinning(const std::string& file_name, std::vector<FitBin>
     }
 }
 
-int FitParameters::GetBinIndex(const std::string& det, double D1, double D2)
+int FitParameters::GetBinIndex(const std::string& det, double D1, double D2) const
 {
     int bin = BADBIN;
     const std::vector<FitBin> temp_bins = m_fit_bins.at(det);

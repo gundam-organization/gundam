@@ -32,7 +32,7 @@ class ToyThrower
         ~ToyThrower();
 
         void SetSeed(unsigned int seed);
-        void SetupDecomp(double decomp_tol = 0xCAFEBABE);
+        bool SetupDecomp(double decomp_tol = 0xCAFEBABE);
 
         void Throw(TVectorD& toy);
         void Throw(std::vector<double>& toy);

@@ -42,7 +42,6 @@ void XsecFitter::FixParameter(const std::string& par_name, const double& value)
     if(iter != par_names.end())
     {
         const int i = std::distance(par_names.begin(), iter);
-        //fitter -> SetParameter(i, par_names.at(i).c_str(), value, 0, value, value);
         m_fitter -> SetVariable(i, par_names.at(i).c_str(), value, 0);
         m_fitter -> FixVariable(i);
         std::cout << "[XsecFitter]: Fixing parameter " << par_names.at(i) << " to value "
@@ -190,23 +189,10 @@ void XsecFitter::Fit(std::vector<AnaSample*> &samples, const std::vector<std::st
     //Do fit
     std::cout << "[XsecFitter]: Fit prepared." << std::endl;
 
-    if(fitMethod == 1)
-    {
-        std::cout << "[XsecFitter]: Calling MIGRAD ..." << std::endl;
-        m_fitter -> Minimize();
-    }
-    else if(fitMethod == 2)
-    {
-        std::cout << "[XsecFitter]: Calling MIGRAD ..." << std::endl;
-        m_fitter -> Minimize();
-        std::cout << "[XsecFitter]: Calling HESSE ..." << std::endl;
-        m_fitter -> Hesse();
-    }
-    else if(fitMethod == 3)
-    {
-        std::cout << "[XsecFitter]: Calling MINOS ..." << std::endl;
-        //fitter->ExecuteCommand("MINOS", arglist, 2);
-    }
+    std::cout << "[XsecFitter]: Calling MIGRAD ..." << std::endl;
+    m_fitter -> Minimize();
+    std::cout << "[XsecFitter]: Calling HESSE ..." << std::endl;
+    m_fitter -> Hesse();
 
     //fill chi2 info
     if(m_dir)
@@ -217,26 +203,19 @@ void XsecFitter::Fit(std::vector<AnaSample*> &samples, const std::vector<std::st
     double cov_array[ndim*ndim];
     m_fitter -> GetCovMatrix(cov_array);
 
-    //Get Error Matrix
-    //TMatrixDSym matrix(nvpar,fitter->GetCovarianceMatrix());
-    TMatrixDSym matrix(ndim, cov_array);
-    //for(int i = 0; i < ndim; ++i)
-    //    for(int j = 0; j < ndim; ++j)
-    //        matrix[i][j] = cov_array[i*ndim + j];
+    TMatrixDSym cov_matrix(ndim, cov_array);
 
     //Calculate Corrolation Matrix
-    TMatrixDSym cormatrix(ndim);
-    for(int r=0;r<matrix.GetNrows();r++){
-        for(int c=0;c<matrix.GetNcols();c++){
-            cormatrix[r][c]= matrix[r][c]/sqrt((matrix[r][r]*matrix[c][c]));
-        }
-    }
+    TMatrixDSym cor_matrix(ndim);
+    for(int r = 0; r < ndim; ++r)
+        for(int c = 0; c < ndim; ++c)
+            cor_matrix[r][c] = cov_matrix[r][c] / std::sqrt(cov_matrix[r][r] * cov_matrix[c][c]);
 
     const double* par_val = m_fitter -> X();
     const double* par_err = m_fitter -> Errors();
 
     //save fit results
-    TVectorD fitVec(ndim);
+    TVectorD postfit_param(ndim);
     std::vector< std::vector<double> > res_pars;
     std::vector< std::vector<double> > err_pars;
     int k = 0;
@@ -250,7 +229,7 @@ void XsecFitter::Fit(std::vector<AnaSample*> &samples, const std::vector<std::st
             vec_err.push_back(par_err[k]);
             double parvalue = par_val[k];
             vec_res.push_back(parvalue);
-            fitVec(k) = parvalue;
+            postfit_param[k] = parvalue;
             k++;
         }
 
@@ -265,13 +244,14 @@ void XsecFitter::Fit(std::vector<AnaSample*> &samples, const std::vector<std::st
     }
 
     m_dir->cd();
-    matrix.Write("res_cov_matrix");
-    cormatrix.Write("res_cor_matrix");
-    fitVec.Write("res_vector");
+    cov_matrix.Write("res_cov_matrix");
+    cor_matrix.Write("res_cor_matrix");
+    postfit_param.Write("res_vector");
     prefitParams->Write("prefitParams");
 
     DoSaveResults(res_pars, err_pars);
-    if(m_freq>=0 && m_dir) DoSaveFinalEvents(m_calls, res_pars);
+    if(m_freq >= 0 && m_dir)
+        DoSaveFinalEvents(m_calls, res_pars);
 }
 
 // GenerateToyData
@@ -467,7 +447,7 @@ double XsecFitter::CalcLikelihood(const double* par)
     {
         std::cout << "m_calls is: " << m_calls << endl;
         std::cout << "Chi2 for this iter: " << chi2_stat + chi2_sys + chi2_reg << endl;
-        std::cout << "Chi2 stat / syst / reg : " << chi2_stat << " / " << chi2_sys << " / " << chi2_reg << " / " << std::endl;
+        std::cout << "Chi2 stat / syst / reg : " << chi2_stat << " / " << chi2_sys << " / " << chi2_reg << std::endl;
     }
 
     return chi2_stat + chi2_sys + chi2_reg;

@@ -51,7 +51,7 @@ void ToyThrower::SetSeed(unsigned int seed)
     RNG = new TRandom3(seed);
 }
 
-void ToyThrower::SetupDecomp(double decomp_tol)
+bool ToyThrower::SetupDecomp(double decomp_tol)
 {
     TDecompChol decomp(*covmat);
     if(decomp_tol != 0xCAFEBABE)
@@ -65,12 +65,14 @@ void ToyThrower::SetupDecomp(double decomp_tol)
     {
         std::cerr << "[ERROR]: Failed to decompose uncertainty matrix."
                   << std::endl;
+        return false;
     }
 
     (*L_matrix) = decomp.GetU();
     (*L_matrix) = L_matrix -> Transpose(*L_matrix);
 
     std::cout << "[ToyThrower]: Decomposition successful." << std::endl;
+    return true;
 }
 
 void ToyThrower::Throw(TVectorD& toy)

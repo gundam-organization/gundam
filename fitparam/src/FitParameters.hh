@@ -19,19 +19,7 @@
 #include <TRandom3.h>
 
 #include "AnaFitParameters.hh"
-
-struct FitBin
-{
-    double D1low, D1high;
-    double D2low, D2high;
-
-    FitBin() : D1low(0), D1high(0), D2low(0), D2high(0) {}
-    FitBin(const double& D1_L, const double& D1_H,
-           const double& D2_L, const double& D2_H)
-          : D1low(D1_L), D1high(D1_H),
-            D2low(D2_L), D2high(D2_H)
-          {}
-};
+#include "FitStructs.hh"
 
 class FitParameters : public AnaFitParameters
 {
@@ -42,13 +30,13 @@ class FitParameters : public AnaFitParameters
         void InitParameters();
         void InitEventMap(std::vector<AnaSample*> &sample, int mode);
         void ReWeight(AnaEvent *event, const std::string& det, int nsample, int nevent,
-                std::vector<double> &params);
-        bool SetBinning(const std::string& file_name, std::vector<FitBin>& bins);
+                      std::vector<double> &params);
+        bool SetBinning(const std::string& file_name, std::vector<xsllh::FitBin>& bins);
         void AddDetector(const std::string& det, const std::string& f_binning, int offset);
 
     private:
-        int GetBinIndex(const std::string& det, double D1, double D2);
-        std::map<std::string, std::vector<FitBin> > m_fit_bins;
+        int GetBinIndex(const std::string& det, double D1, double D2) const;
+        std::map<std::string, std::vector<xsllh::FitBin> > m_fit_bins;
 };
 
 #endif
