@@ -17,6 +17,6 @@ struct FitBin
           {}
 };
 
-};
+}
 
 #endif

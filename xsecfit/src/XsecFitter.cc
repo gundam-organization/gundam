@@ -262,12 +262,12 @@ void XsecFitter::Fit(std::vector<AnaSample*> &samples, const std::vector<std::st
 void XsecFitter::GenerateToyData(int toyindx, int toytype, int statFluct)
 {
     //do parameter throws
-    vector< vector<double> > par_throws;
+    std::vector<std::vector<double> > par_throws;
     double chi2_sys = 0.0;
     double chi2_reg = 0.0;
-    int gparamno=0;
-    TFile *finput;
-    TVectorD *paramVec;
+    int gparamno = 0;
+    TFile *finput = nullptr;;
+    TVectorD *paramVec = nullptr;
 
     if(toytype==3){
         finput= new TFile(paramVectorFileName.c_str(),"READ");

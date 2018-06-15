@@ -187,16 +187,12 @@ int main(int argc, char** argv)
     TMatrixDSym* postfit_cor = (TMatrixDSym*)fpostfit -> Get("res_cor_matrix");
     TVectorD* postfit_param_root = (TVectorD*)fpostfit -> Get("res_vector");
 
-
     auto t_start_throws = std::chrono::high_resolution_clock::now();
     std::cout << "[CalcXsec]: Throwing " << num_throws << " toys." << std::endl;
     const int npar = postfit_cov -> GetNrows();
     const int nfitbins = sigfitpara.GetNpar();
-    TMatrixD cov_test(npar, npar);
-    TMatrixD cor_test(npar, npar);
     TMatrixD xsec_cov(nfitbins, nfitbins);
     TMatrixD xsec_cor(nfitbins, nfitbins);
-    cov_test.Zero();
     xsec_cov.Zero();
 
     std::vector<double> postfit_param;
@@ -226,14 +222,6 @@ int main(int argc, char** argv)
 
     TH1D h_postfit("h_postfit", "h_postfit", nfitbins, 0, nfitbins);
 
-    TH1D h_nt("h_nt", "h_nt", 100, 5.3E29, 5.7E29);
-    for(int i = 0; i < num_throws; ++i)
-        h_nt.Fill(xsec_calc.at("ND280").ThrowNtargets());
-
-    TH1D h_flux("h_flux", "h_flux", 200, 3E12, 10E12);
-    for(int i = 0; i < num_throws; ++i)
-        h_flux.Fill(xsec_calc.at("ND280").ThrowFlux());
-
     ToyThrower toy_thrower(*postfit_cov, seed, 1E-24);
     std::vector<TH1D> xsec_throws;
     xsec_throws.reserve(num_throws);
@@ -260,18 +248,6 @@ int main(int argc, char** argv)
                 h_postfit_map.at(det).Fill(idx + 0.5, ev -> GetEvWght());
             }
         }
-
-        //std::string hist_name = samples[s] -> GetName() + "_postfit";
-        //samples[s] -> FillEventHisto(2);
-        //samples[s] -> Write(foutput, hist_name, 0);
-
-        //auto h = samples[s] -> GetSignalHisto();
-        //xsec_calc.at(det).ApplyBinWidths(*h);
-        //xsec_calc.at(det).ApplyNumTargets(*h, false);
-        //xsec_calc.at(det).ApplyFluxInt(*h, false);
-        //h_postfit_map.at(det).Add(h);
-        //for(int j = 1; j <= h -> GetNbinsX(); ++j)
-        //    h_postfit.SetBinContent(bin++, h -> GetBinContent(j));
     }
 
     for(auto& kv : h_postfit_map)
@@ -284,9 +260,10 @@ int main(int argc, char** argv)
     auto bin = 1;
     for(const auto& det : xsec_order)
     {
-        const auto h = h_postfit_map.at(det);
+        auto h = h_postfit_map.at(det);
         for(int j = 1; j <= h.GetNbinsX(); ++j)
             h_postfit.SetBinContent(bin++, h.GetBinContent(j));
+        h.Reset();
     }
 
     auto t_start_single = std::chrono::high_resolution_clock::now();
@@ -301,7 +278,6 @@ int main(int argc, char** argv)
         throws.push_back(toy);
         toy_param = MapThrow(toy, postfit_param, fitpara);
 
-        bin = 1;
         const auto h_name = "combined_throw_" + std::to_string(t);
         TH1D h_throw(h_name.c_str(), h_name.c_str(), nfitbins, 0, nfitbins);
         h_throw.SetDirectory(0);
@@ -318,42 +294,42 @@ int main(int argc, char** argv)
                 {
                     fitpara[f] -> ReWeight(ev, det, s, i, toy_param.at(f));
                 }
+
+                if(ev -> isSignalEvent())
+                {
+                    const auto idx = xsec_calc.at(det).GetAnyBinIndex(ev -> GetTrueD1(), ev -> GetTrueD2());
+                    h_postfit_map.at(det).Fill(idx + 0.5, ev -> GetEvWght());
+                }
             }
+        }
 
-            samples[s] -> FillEventHisto(0);
-            auto h_pred = samples[s] -> GetSignalHisto();
-            //xsec_calc.at(det).ApplyBinWidths(*h_pred);
-            //xsec_calc.at(det).ApplyNumTargets(*h_pred, true);
-            //xsec_calc.at(det).ApplyFluxInt(*h_pred, true);
+        for(auto& kv : h_postfit_map)
+        {
+            xsec_calc.at(kv.first).ApplyBinWidths(kv.second);
+            xsec_calc.at(kv.first).ApplyNumTargets(kv.second, false);
+            xsec_calc.at(kv.first).ApplyFluxInt(kv.second, true);
+        }
 
-            //std::string hist_name = samples[s] -> GetName() + "_throw" + std::to_string(t);
-            //h_pred -> Write(hist_name.c_str());
-
-            for(int j = 1; j <= h_pred -> GetNbinsX(); ++j)
-                h_throw.SetBinContent(bin++, h_pred -> GetBinContent(j));
+        auto bin = 1;
+        for(const auto& det : xsec_order)
+        {
+            auto h = h_postfit_map.at(det);
+            for(int j = 1; j <= h.GetNbinsX(); ++j)
+                h_throw.SetBinContent(bin++, h.GetBinContent(j));
+            h.Reset();
         }
 
         xsec_throws.push_back(h_throw);
         t_end_single = std::chrono::high_resolution_clock::now();
-        //h_throw.Write();
     }
     std::cout << "[CalcXsec]: Throws Finished." << std::endl;
     auto t_end_throws = std::chrono::high_resolution_clock::now();
 
-    TH1D h_throw("ht", "ht", 300, -3.0, 3.0);
-    for(int t = 0; t < num_throws; ++t)
-    {
-        //for(int i = 0; i < sigfitpara.GetNpar(); ++i)
-            h_throw.Fill(throws.at(t).at(0) + postfit_param.at(0));
-    }
-
     TH1D h_mean("h_mean", "h_mean", nfitbins, 0, nfitbins);
-    //TH1D h_throw("h_throw", "h_throw", 100, 100, 300);
     for(const auto& h : xsec_throws)
     {
         for(int i = 0; i < nfitbins; ++i)
             h_mean.Fill(i + 0.5, h.GetBinContent(i+1));
-        //h_throw.Fill(h.GetBinContent(1));
     }
     h_mean.Scale(1.0 / (1.0 * num_throws));
 
@@ -385,8 +361,8 @@ int main(int argc, char** argv)
         }
     }
 
-    //for(int i = 1; i <= h_postfit.GetNbinsX(); ++i)
-    //    h_postfit.SetBinError(i, sqrt(xsec_cov(i-1,i-1)));
+    for(int i = 1; i <= h_postfit.GetNbinsX(); ++i)
+        h_postfit.SetBinError(i, sqrt(xsec_cov(i-1,i-1)));
     auto t_end_cov = std::chrono::high_resolution_clock::now();
 
     foutput -> cd();
@@ -396,10 +372,7 @@ int main(int argc, char** argv)
     postfit_param_root -> Write("postfit_params");
     xsec_cov.Write("xsec_cov");
     xsec_cor.Write("xsec_cor");
-    h_throw.Write("h_throw");
     h_mean.Write("h_mean");
-    h_nt.Write("h_ntargets");
-    h_flux.Write("h_flux");
 
     foutput -> Close();
     delete foutput;
