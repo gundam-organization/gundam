@@ -67,9 +67,9 @@ class AnyTreeMC
         TBranch *b_pCosThetaRec;
         TBranch *b_pCosThetaTrue;
 
-        AnyTreeMC(const std::string& file_name);
+        AnyTreeMC(const std::string& file_name, const std::string& tree_name);
         ~AnyTreeMC();
-        long int GetEntry(long int entry);
+        long int GetEntry(long int entry) const;
         void SetBranches();
         void GetEvents(std::vector<AnaSample*>& ana_samples, const std::vector<int>& sig_topology);
 };

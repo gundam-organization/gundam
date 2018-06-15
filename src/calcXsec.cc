@@ -25,6 +25,25 @@ std::vector<std::vector<double> > MapThrow(const std::vector<double>& toy,
                                            const std::vector<double>& nom,
                                            const std::vector<AnaFitParameters*>& fit);
 
+void ReweightEvents(std::vector<AnaSample*>& samples,
+                    std::vector<AnaFitParameters*>& fitpara,
+                    std::map<std::string, XsecExtractor>& xsec_calc,
+                    std::map<std::string, TH1D>& h_postfit_map,
+                    std::vector<std::vector<double>>& toy_param);
+
+void ApplyNormalization(std::map<std::string, XsecExtractor>& xsec_calc,
+                        std::map<std::string, TH1D>& h_postfit_map,
+                        bool do_throw);
+
+void CalcEfficiency(std::map<std::string, XsecExtractor>& xsec_calc,
+                    std::map<std::string, TH1D>& h_selected,
+                    std::map<std::string, TH1D>& h_true,
+                    std::map<std::string, TH1D>& h_eff);
+
+void ConcatHistograms(TH1D& h_postfit,
+                      std::map<std::string, TH1D>& h_postfit_map,
+                      const std::vector<std::string>& xsec_order);
+
 int main(int argc, char** argv)
 {
     auto t_start_total = std::chrono::high_resolution_clock::now();
@@ -83,7 +102,8 @@ int main(int argc, char** argv)
     const int num_throws = parser.num_throws;
 
     TFile* fdata = TFile::Open(fname_data.c_str(), "READ");
-    TTree* tdata = (TTree*)(fdata->Get("selectedEvents"));
+    TTree* tdata_sel = (TTree*)(fdata->Get("selectedEvents"));
+    TTree* tdata_tru = (TTree*)(fdata->Get("trueEvents"));
 
     TFile* fpostfit = TFile::Open(fname_postfit.c_str(), "READ");
     TFile* foutput  = TFile::Open(fname_xsec.c_str(), "RECREATE");
@@ -111,6 +131,7 @@ int main(int argc, char** argv)
 
     auto t_start_samples = std::chrono::high_resolution_clock::now();
     std::vector<AnaSample*> samples;
+    std::vector<AnaSample*> samples_true;
     for(const auto& opt : parser.samples)
     {
         std::cout << "[CalcXsec]: Adding new sample to fit.\n"
@@ -148,13 +169,13 @@ int main(int argc, char** argv)
             fin.close();
         }
 
-        auto s = new AnySample(opt.cut_branch, opt.name, opt.detector, D1_edges, D2_edges, tdata, false, opt.use_sample);
+        auto s = new AnySample(opt.cut_branch, opt.name, opt.detector, D1_edges, D2_edges, tdata_sel, false, opt.use_sample);
         s -> SetNorm(potD/potMC);
         samples.push_back(s);
     }
 
-    AnyTreeMC selTree(fname_mc.c_str());
     std::cout << "[CalcXsec]: Reading and collecting events." << std::endl;
+    AnyTreeMC selTree(fname_mc.c_str(), "selectedEvents");
     selTree.GetEvents(samples, signal_topology);
 
     std::cout << "[CalcXsec]: Getting sample breakdown by reaction." << std::endl;
@@ -212,15 +233,23 @@ int main(int argc, char** argv)
     }
 
     std::map<std::string, TH1D> h_postfit_map;
+    std::map<std::string, TH1D> h_postfit_map_true;
+    std::map<std::string, TH1D> h_efficiency;
     for(const auto& det : xsec_calc)
     {
         const auto nbins = det.second.GetNbins();
         const auto name  = det.second.GetName();
         std::cout << "[XsecExtractor]: Adding " << name << " with " << nbins << " bins to postfit." << std::endl;
         h_postfit_map.emplace(std::make_pair(name, TH1D("", "", nbins, 0, nbins)));
+        h_postfit_map_true.emplace(std::make_pair(name, TH1D("", "", nbins, 0, nbins)));
+        h_efficiency.emplace(std::make_pair(name, TH1D("", "", nbins, 0, nbins)));
     }
 
     TH1D h_postfit("h_postfit", "h_postfit", nfitbins, 0, nfitbins);
+
+    TH1D h_flux("h_flux", "h_flux", 200, 7E12, 2E13);
+    for(int i = 0; i < num_throws; ++i)
+        h_flux.Fill(xsec_calc.at("ND280").ThrowFlux());
 
     ToyThrower toy_thrower(*postfit_cov, seed, 1E-24);
     std::vector<TH1D> xsec_throws;
@@ -229,6 +258,13 @@ int main(int argc, char** argv)
     std::vector<double> toy(npar, 0);
 
     auto toy_param = MapThrow(toy, postfit_param, fitpara);
+    ReweightEvents(samples, fitpara, xsec_calc, h_postfit_map, toy_param);
+
+    CalcEfficiency(xsec_calc, h_postfit_map, h_postfit_map_true, h_efficiency);
+    ApplyNormalization(xsec_calc, h_postfit_map, false);
+    ConcatHistograms(h_postfit, h_postfit_map, xsec_order);
+
+    /*
     for(int s = 0; s < samples.size(); ++s)
     {
         const unsigned int num_events = samples[s] -> GetN();
@@ -260,11 +296,12 @@ int main(int argc, char** argv)
     auto bin = 1;
     for(const auto& det : xsec_order)
     {
-        auto h = h_postfit_map.at(det);
+        const auto h = h_postfit_map.at(det);
         for(int j = 1; j <= h.GetNbinsX(); ++j)
             h_postfit.SetBinContent(bin++, h.GetBinContent(j));
-        h.Reset();
+        h_postfit_map.at(det).Reset();
     }
+    */
 
     auto t_start_single = std::chrono::high_resolution_clock::now();
     auto t_end_single = std::chrono::high_resolution_clock::now();
@@ -282,6 +319,11 @@ int main(int argc, char** argv)
         TH1D h_throw(h_name.c_str(), h_name.c_str(), nfitbins, 0, nfitbins);
         h_throw.SetDirectory(0);
 
+        ReweightEvents(samples, fitpara, xsec_calc, h_postfit_map, toy_param);
+        ApplyNormalization(xsec_calc, h_postfit_map, true);
+        ConcatHistograms(h_throw, h_postfit_map, xsec_order);
+
+        /*
         for(int s = 0; s < samples.size(); ++s)
         {
             const unsigned int num_events = samples[s] -> GetN();
@@ -313,12 +355,12 @@ int main(int argc, char** argv)
         auto bin = 1;
         for(const auto& det : xsec_order)
         {
-            auto h = h_postfit_map.at(det);
+            const auto h = h_postfit_map.at(det);
             for(int j = 1; j <= h.GetNbinsX(); ++j)
                 h_throw.SetBinContent(bin++, h.GetBinContent(j));
-            h.Reset();
+            h_postfit_map.at(det).Reset();
         }
-
+        */
         xsec_throws.push_back(h_throw);
         t_end_single = std::chrono::high_resolution_clock::now();
     }
@@ -334,15 +376,12 @@ int main(int argc, char** argv)
     h_mean.Scale(1.0 / (1.0 * num_throws));
 
     auto t_start_cov = std::chrono::high_resolution_clock::now();
-    //for(int t = 0; t < num_throws; ++t)
     for(const auto& h : xsec_throws)
     {
         for(int i = 0; i < nfitbins; ++i)
         {
             for(int j = 0; j < nfitbins; ++j)
             {
-                //const double x = throws.at(t).at(i);
-                //const double y = throws.at(t).at(j);
                 const double x = h.GetBinContent(i+1) - h_postfit.GetBinContent(i+1);
                 const double y = h.GetBinContent(j+1) - h_postfit.GetBinContent(j+1);
                 xsec_cov(i,j) += x * y / (1.0 * num_throws);
@@ -373,6 +412,9 @@ int main(int argc, char** argv)
     xsec_cov.Write("xsec_cov");
     xsec_cor.Write("xsec_cor");
     h_mean.Write("h_mean");
+    h_flux.Write("h_flux");
+
+    h_efficiency.at("ND280").Write("h_eff");
 
     foutput -> Close();
     delete foutput;
@@ -417,4 +459,76 @@ std::vector<std::vector<double> > MapThrow(const std::vector<double>& toy,
     }
 
     return throw_vector;
+}
+
+void ReweightEvents(std::vector<AnaSample*>& samples,
+                    std::vector<AnaFitParameters*>& fitpara,
+                    std::map<std::string, XsecExtractor>& xsec_calc,
+                    std::map<std::string, TH1D>& h_postfit_map,
+                    std::vector<std::vector<double>>& toy_param)
+{
+    for(int s = 0; s < samples.size(); ++s)
+    {
+        const unsigned int num_events = samples[s] -> GetN();
+        const std::string det(samples[s] -> GetDetector());
+        for(unsigned int i = 0; i < num_events; ++i)
+        {
+            AnaEvent* ev = samples[s] -> GetEvent(i);
+            ev -> SetEvWght(ev -> GetEvWghtMC());
+            for(int f = 0; f < fitpara.size(); ++f)
+            {
+                fitpara[f] -> ReWeight(ev, det, s, i, toy_param.at(f));
+            }
+
+            if(ev -> isSignalEvent())
+            {
+                const auto idx = xsec_calc.at(det).GetAnyBinIndex(ev -> GetTrueD1(), ev -> GetTrueD2());
+                h_postfit_map.at(det).Fill(idx + 0.5, ev -> GetEvWght());
+            }
+        }
+    }
+
+}
+
+void ApplyNormalization(std::map<std::string, XsecExtractor>& xsec_calc,
+                        std::map<std::string, TH1D>& h_postfit_map,
+                        bool do_throw)
+{
+    for(auto& kv : h_postfit_map)
+    {
+        xsec_calc.at(kv.first).ApplyBinWidths(kv.second);
+        xsec_calc.at(kv.first).ApplyNumTargets(kv.second, do_throw);
+        xsec_calc.at(kv.first).ApplyFluxInt(kv.second, do_throw);
+    }
+}
+
+void CalcEfficiency(std::map<std::string, XsecExtractor>& xsec_calc,
+                    std::map<std::string, TH1D>& h_selected,
+                    std::map<std::string, TH1D>& h_true,
+                    std::map<std::string, TH1D>& h_eff)
+{
+    for(const auto& kv : xsec_calc)
+    {
+        const auto det = kv.first;
+        for(int i = 1; i <= h_eff.at(det).GetNbinsX(); ++i)
+        {
+            auto eff = h_selected.at(det).GetBinContent(i) / h_true.at(det).GetBinContent(i);
+            std::cout << "Bin " << i << " Eff: " << eff << std::endl;
+            h_eff.at(det).SetBinContent(i, eff);
+        }
+    }
+}
+
+void ConcatHistograms(TH1D& h_postfit,
+                      std::map<std::string, TH1D>& h_postfit_map,
+                      const std::vector<std::string>& xsec_order)
+{
+    auto bin = 1;
+    for(const auto& det : xsec_order)
+    {
+        const auto h = h_postfit_map.at(det);
+        for(int j = 1; j <= h.GetNbinsX(); ++j)
+            h_postfit.SetBinContent(bin++, h.GetBinContent(j));
+        h_postfit_map.at(det).Reset();
+    }
 }

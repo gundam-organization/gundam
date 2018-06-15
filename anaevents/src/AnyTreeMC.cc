@@ -3,9 +3,8 @@
 
 #include "AnyTreeMC.hh"
 
-AnyTreeMC::AnyTreeMC(const std::string& file_name)
+AnyTreeMC::AnyTreeMC(const std::string& file_name, const std::string& tree_name)
 {
-    const std::string tree_name("selectedEvents");
     fChain = new TChain(tree_name.c_str());
     fChain -> Add(file_name.c_str());
     SetBranches();
@@ -18,7 +17,7 @@ AnyTreeMC::~AnyTreeMC()
     delete fChain -> GetCurrentFile();
 }
 
-long int AnyTreeMC::GetEntry(long int entry)
+long int AnyTreeMC::GetEntry(long int entry) const
 {
     // Read contents of entry.
     if(fChain == nullptr)
@@ -89,7 +88,7 @@ void AnyTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples, const std::vecto
         ev.SetpCosThetaRec(pCosThetaRec);
         ev.SetpCosThetaTrue(pCosThetaTrue);
 
-        for(const auto& signal_topology: sig_topology)
+        for(const auto& signal_topology : sig_topology)
         {
             if(signal_topology == evtTopology)
             {
