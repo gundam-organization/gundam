@@ -108,6 +108,7 @@ void XsecExtractor::SetBinning(const std::string& binning)
                 continue;
             }
             double bw = std::abs(D1_2 - D1_1) * std::abs(D2_2 - D2_1);
+            bw = bw / 1000.0;
             std::cout << "Bin Width: " << bw << std::endl;
             bin_widths.push_back(bw);
             bin_edges.emplace_back(FitBin(D1_1, D1_2, D2_1, D2_2));

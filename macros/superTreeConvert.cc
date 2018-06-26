@@ -107,6 +107,7 @@ int superTreeConvert(
     Float_t        weightIn[2];
 
     Int_t          reaction_T;
+    Int_t          cutBranch_T=-999;
     Int_t          mectopology_T;
     Float_t        D1True_T;
     Float_t        D2True_T;
@@ -172,6 +173,7 @@ int superTreeConvert(
     //nd5tree_T->SetBranchAddress("weight", &weightIn_T);
 
     outtree_T->Branch("reaction", &reaction_T, "reaction/I");
+    outtree_T->Branch("cutBranch", &cutBranch_T, "cutBranch/I");
     outtree_T->Branch("mectopology", &mectopology_T, "mectopology/I");
     outtree_T->Branch("D1True", &D1True_T, ("D1True/F"));
     outtree_T->Branch("D2True", &D2True_T, ("D2True/F"));
@@ -328,6 +330,7 @@ int superTreeConvert(
         //D1True_T = TMath::Cos(TMath::ACos(muCosThetaTrue_T) - TMath::ACos(pCosThetaTrue_T));
         D1True_T = muMomTrue_T;
         D2True_T = muCosThetaTrue_T;
+        cutBranch_T = -1;
         outtree_T->Fill();
     }
 
@@ -404,6 +407,14 @@ int superTreeConvert(
         D2Reco = TMath::Cos(muang_reco);
 
         outtree -> Fill();
+
+        D1True_T = D1True;
+        D2True_T = D2True;
+        TrueNuEnergy_T = TrueNuEnergy;
+        cutBranch_T = -2;
+        mectopology_T = mectopology;
+        weight_T = weight;
+        outtree_T -> Fill();
     }
 
     printf("***Output Rec Tree: ***\n");

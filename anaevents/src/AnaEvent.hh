@@ -21,11 +21,11 @@ class AnaEvent
         AnaEvent(long int evid) //unique event id
         {
             m_evid     = evid;
-            m_evtype   = 0;
             m_topology = -1;
             m_reaction = -1;
             m_sample   = -1;
             m_signal   = false;
+            m_trueEvt  = false;
             m_trueEnu  = -999.0;
             m_recEnu   = -999.0;
             m_trueD1   = -999.0;
@@ -44,13 +44,9 @@ class AnaEvent
             m_muCosThetaTrue = -999.0;
             m_pCosThetaRec = -999.0;
             m_pCosThetaTrue = -999.0;
-
         }
 
         //Set/Get methods
-        void SetEvType(int val){ m_evtype = val; }
-        int GetEvType(){ return m_evtype; }
-
         void SetTopology(int val){ m_topology = val; }
         int GetTopology(){ return m_topology; }
 
@@ -60,8 +56,11 @@ class AnaEvent
         void SetSampleType(int val){ m_sample = val; }
         int GetSampleType(){ return m_sample; }
 
-        void SetSignalEvent(){ m_signal = true; }
+        void SetSignalEvent(const bool flag = true){ m_signal = flag; }
         bool isSignalEvent(){ return m_signal; }
+
+        void SetTrueEvent(const bool flag = true){ m_trueEvt = flag; }
+        bool isTrueEvent(){ return m_trueEvt; }
 
         long int GetEvId(){ return m_evid; }
 
@@ -135,11 +134,11 @@ class AnaEvent
 
     private:
         long int m_evid;   //unique event id
-        int m_evtype;      //0 - MC, 1 - Data event
         int m_topology;    //final state topology type
         int m_reaction;    //event interaction mode
         int m_sample;      //sample type (aka cutBranch)
         bool m_signal;     //flag if signal event
+        bool m_trueEvt;    //flag if true event
         double m_trueEnu;  //true nu energy
         double m_recEnu;   //recon nu energy
         double m_trueD1;   //true D1

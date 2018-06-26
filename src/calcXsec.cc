@@ -29,6 +29,7 @@ void ReweightEvents(std::vector<AnaSample*>& samples,
                     std::vector<AnaFitParameters*>& fitpara,
                     std::map<std::string, XsecExtractor>& xsec_calc,
                     std::map<std::string, TH1D>& h_postfit_map,
+                    std::map<std::string, TH1D>& h_postfit_map_true,
                     std::vector<std::vector<double>>& toy_param);
 
 void ApplyNormalization(std::map<std::string, XsecExtractor>& xsec_calc,
@@ -39,6 +40,10 @@ void CalcEfficiency(std::map<std::string, XsecExtractor>& xsec_calc,
                     std::map<std::string, TH1D>& h_selected,
                     std::map<std::string, TH1D>& h_true,
                     std::map<std::string, TH1D>& h_eff);
+
+void ApplyEfficiency(std::map<std::string, XsecExtractor>& xsec_calc,
+                     std::map<std::string, TH1D>& h_postfit_map,
+                     std::map<std::string, TH1D>& h_efficiency);
 
 void ConcatHistograms(TH1D& h_postfit,
                       std::map<std::string, TH1D>& h_postfit_map,
@@ -171,12 +176,16 @@ int main(int argc, char** argv)
 
         auto s = new AnySample(opt.cut_branch, opt.name, opt.detector, D1_edges, D2_edges, tdata_sel, false, opt.use_sample);
         s -> SetNorm(potD/potMC);
-        samples.push_back(s);
+        if(opt.use_sample == true)
+            samples.push_back(s);
     }
 
     std::cout << "[CalcXsec]: Reading and collecting events." << std::endl;
     AnyTreeMC selTree(fname_mc.c_str(), "selectedEvents");
-    selTree.GetEvents(samples, signal_topology);
+    selTree.GetEvents(samples, signal_topology, false);
+
+    AnyTreeMC truTree(fname_mc.c_str(), "trueEvents");
+    truTree.GetEvents(samples, signal_topology, true);
 
     std::cout << "[CalcXsec]: Getting sample breakdown by reaction." << std::endl;
     for(const auto& s : samples)
@@ -258,11 +267,19 @@ int main(int argc, char** argv)
     std::vector<double> toy(npar, 0);
 
     auto toy_param = MapThrow(toy, postfit_param, fitpara);
-    ReweightEvents(samples, fitpara, xsec_calc, h_postfit_map, toy_param);
 
+    ReweightEvents(samples, fitpara, xsec_calc, h_postfit_map, h_postfit_map_true, toy_param);
     CalcEfficiency(xsec_calc, h_postfit_map, h_postfit_map_true, h_efficiency);
+    ApplyEfficiency(xsec_calc, h_postfit_map, h_efficiency);
     ApplyNormalization(xsec_calc, h_postfit_map, false);
     ConcatHistograms(h_postfit, h_postfit_map, xsec_order);
+
+    for(const auto& kv : xsec_calc)
+    {
+        h_postfit_map.at(kv.first).Reset();
+        h_postfit_map_true.at(kv.first).Reset();
+        //h_efficiency.at(kv.first).Reset();
+    }
 
     /*
     for(int s = 0; s < samples.size(); ++s)
@@ -319,9 +336,18 @@ int main(int argc, char** argv)
         TH1D h_throw(h_name.c_str(), h_name.c_str(), nfitbins, 0, nfitbins);
         h_throw.SetDirectory(0);
 
-        ReweightEvents(samples, fitpara, xsec_calc, h_postfit_map, toy_param);
+        ReweightEvents(samples, fitpara, xsec_calc, h_postfit_map, h_postfit_map_true, toy_param);
+        //CalcEfficiency(xsec_calc, h_postfit_map, h_postfit_map_true, h_efficiency);
+        ApplyEfficiency(xsec_calc, h_postfit_map, h_efficiency);
         ApplyNormalization(xsec_calc, h_postfit_map, true);
         ConcatHistograms(h_throw, h_postfit_map, xsec_order);
+
+        for(const auto& kv : xsec_calc)
+        {
+            h_postfit_map.at(kv.first).Reset();
+            h_postfit_map_true.at(kv.first).Reset();
+            //h_efficiency.at(kv.first).Reset();
+        }
 
         /*
         for(int s = 0; s < samples.size(); ++s)
@@ -465,6 +491,7 @@ void ReweightEvents(std::vector<AnaSample*>& samples,
                     std::vector<AnaFitParameters*>& fitpara,
                     std::map<std::string, XsecExtractor>& xsec_calc,
                     std::map<std::string, TH1D>& h_postfit_map,
+                    std::map<std::string, TH1D>& h_postfit_map_true,
                     std::vector<std::vector<double>>& toy_param)
 {
     for(int s = 0; s < samples.size(); ++s)
@@ -480,14 +507,18 @@ void ReweightEvents(std::vector<AnaSample*>& samples,
                 fitpara[f] -> ReWeight(ev, det, s, i, toy_param.at(f));
             }
 
-            if(ev -> isSignalEvent())
+            if(ev -> isSignalEvent() && ev -> isTrueEvent() == false)
             {
                 const auto idx = xsec_calc.at(det).GetAnyBinIndex(ev -> GetTrueD1(), ev -> GetTrueD2());
                 h_postfit_map.at(det).Fill(idx + 0.5, ev -> GetEvWght());
             }
+            else if(ev -> isSignalEvent() && ev -> isTrueEvent() == true)
+            {
+                const auto idx = xsec_calc.at(det).GetAnyBinIndex(ev -> GetTrueD1(), ev -> GetTrueD2());
+                h_postfit_map_true.at(det).Fill(idx + 0.5, ev -> GetEvWght());
+            }
         }
     }
-
 }
 
 void ApplyNormalization(std::map<std::string, XsecExtractor>& xsec_calc,
@@ -519,6 +550,22 @@ void CalcEfficiency(std::map<std::string, XsecExtractor>& xsec_calc,
     }
 }
 
+void ApplyEfficiency(std::map<std::string, XsecExtractor>& xsec_calc,
+                     std::map<std::string, TH1D>& h_postfit_map,
+                     std::map<std::string, TH1D>& h_efficiency)
+{
+    for(const auto& kv : xsec_calc)
+    {
+        const auto det = kv.first;
+        for(int i = 1; i <= h_postfit_map.at(det).GetNbinsX(); ++i)
+        {
+            auto x = h_postfit_map.at(det).GetBinContent(i) / h_efficiency.at(det).GetBinContent(i);
+            //std::cout << "Bin " << i << " Val: " << x << std::endl;
+            h_postfit_map.at(det).SetBinContent(i, x);
+        }
+    }
+}
+
 void ConcatHistograms(TH1D& h_postfit,
                       std::map<std::string, TH1D>& h_postfit_map,
                       const std::vector<std::string>& xsec_order)
@@ -529,6 +576,5 @@ void ConcatHistograms(TH1D& h_postfit,
         const auto h = h_postfit_map.at(det);
         for(int j = 1; j <= h.GetNbinsX(); ++j)
             h_postfit.SetBinContent(bin++, h.GetBinContent(j));
-        h_postfit_map.at(det).Reset();
     }
 }

@@ -1,6 +1,6 @@
 {
-    "data_file" : "fixed_signal.root",
-    "mc_file" : "fixed_nominal.root",
+    "data_file" : "eff_nominal.root",
+    "mc_file" : "eff_nominal.root",
     "output_file" : "test.root",
     "xsec_file" : "xsec.root",
     "input_dir" : "/inputs/ingridFit/",
@@ -8,7 +8,7 @@
     "mc_POT" : 1.0,
     "rng_seed" : 12257,
     "num_threads" : 1,
-    "num_throws" : 1E3,
+    "num_throws" : 1E4,
     "sample_signal" : [1,2],
     "sample_topology" : ["cc0pi0p", "cc0pi1p", "cc0pinp", "cc1pi+", "ccother", "bkg", "null", "OOFV"],
     "flux_cov" : {
@@ -88,7 +88,24 @@
             "flux_offset" : 20,
             "det_offset" : 58,
             "use_sample" : true
+        },
+        {
+            "cut_branch" : -1,
+            "name": "ND280_True",
+            "detector" : "ND280",
+            "binning" : "tn337_binning.txt",
+            "flux_offset" : 0,
+            "det_offset" : 0,
+            "use_sample" : true
+        },
+        {
+            "cut_branch" : -2,
+            "name": "INGRID_True",
+            "detector" : "INGRID",
+            "binning" : "ingrid_binning.txt",
+            "flux_offset" : 20,
+            "det_offset" : 58,
+            "use_sample" : true
         }
     ]
 }
-

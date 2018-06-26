@@ -71,7 +71,7 @@ class AnyTreeMC
         ~AnyTreeMC();
         long int GetEntry(long int entry) const;
         void SetBranches();
-        void GetEvents(std::vector<AnaSample*>& ana_samples, const std::vector<int>& sig_topology);
+        void GetEvents(std::vector<AnaSample*>& ana_samples, const std::vector<int>& sig_topology, const bool evt_type);
 };
 
 #endif

@@ -417,6 +417,7 @@ double AnySample::CalcChi2() const
             if(obs > 0.0)
                 chi2 += 2 * obs * TMath::Log(obs/exp);
 
+            #ifdef DEBUG_MSG
             if(chi2 < 0.0)
             {
                 std::cerr << "[WARNING]: In AnySample::CalcChi2()\n"
@@ -424,6 +425,7 @@ double AnySample::CalcChi2() const
                 std::cerr << "[WARNING]: exp and obs is: " << exp << " and " << obs << "." << std::endl;
                 chi2 = 0.0;
             }
+            #endif
         }
     }
 

@@ -51,7 +51,7 @@ void AnyTreeMC::SetBranches()
     fChain -> SetBranchAddress("muCosThetaTrue", &muCosThetaTrue, &b_muCosThetaTrue);
 }
 
-void AnyTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples, const std::vector<int>& sig_topology)
+void AnyTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples, const std::vector<int>& sig_topology, const bool evt_type)
 {
     if(fChain == nullptr) return;
     if(ana_samples.empty()) return;
@@ -67,6 +67,7 @@ void AnyTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples, const std::vecto
         nbytes += fChain -> GetEntry(jentry);
         //create and fill event structure
         AnaEvent ev(jentry);
+        ev.SetTrueEvent(evt_type);
         ev.SetSampleType(cutBranch);
         ev.SetTopology(evtTopology); // mectopology (i.e. CC0Pi,CC1Pi etc)
         ev.SetReaction(evtReaction); // reaction (i.e. CCQE,CCRES etc)
