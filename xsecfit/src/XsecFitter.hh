@@ -21,7 +21,6 @@
 #include "Math/Functor.h"
 
 #include "AnaSample.hh"
-#include "AnySample.hh"
 #include "AnaFitParameters.hh"
 
 using namespace std;

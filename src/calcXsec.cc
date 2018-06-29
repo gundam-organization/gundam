@@ -12,7 +12,7 @@
 #include <string>
 #include <unistd.h>
 
-#include "AnySample.hh"
+#include "AnaSample.hh"
 #include "AnyTreeMC.hh"
 #include "FitParameters.hh"
 #include "FluxParameters.hh"
@@ -174,7 +174,7 @@ int main(int argc, char** argv)
             fin.close();
         }
 
-        auto s = new AnySample(opt.cut_branch, opt.name, opt.detector, D1_edges, D2_edges, tdata_sel, false, opt.use_sample);
+        auto s = new AnaSample(opt.cut_branch, opt.name, opt.detector, D1_edges, D2_edges, tdata_sel, false, opt.use_sample);
         s -> SetNorm(potD/potMC);
         if(opt.use_sample == true)
             samples.push_back(s);
@@ -328,8 +328,8 @@ int main(int argc, char** argv)
         if(t % 1000 == 0)
             std::cout << "[CalcXsec]: Throw " << t << "/" << num_throws << std::endl;
 
-        toy_thrower.Throw(toy);
-        throws.push_back(toy);
+        //toy_thrower.Throw(toy);
+        //throws.push_back(toy);
         toy_param = MapThrow(toy, postfit_param, fitpara);
 
         const auto h_name = "combined_throw_" + std::to_string(t);

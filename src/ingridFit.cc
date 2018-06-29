@@ -6,7 +6,7 @@
 #include <string>
 #include <unistd.h>
 
-#include "AnySample.hh"
+#include "AnaSample.hh"
 #include "AnyTreeMC.hh"
 #include "FitParameters.hh"
 #include "FluxParameters.hh"
@@ -15,7 +15,7 @@
 
 int main(int argc, char* argv[])
 {
-    std::cout << std::fixed << std::setprecision(3);
+    //std::cout << std::fixed << std::setprecision(3);
     std::cout << "------------------------------------------------\n"
               << "[IngridFit]: Welcome to the Super-xsLLhFitter.\n"
               << "[IngridFit]: Initializing the fit machinery..." << std::endl;
@@ -144,15 +144,16 @@ int main(int argc, char* argv[])
             fin.close();
         }
 
-        auto s = new AnySample(opt.cut_branch, opt.name, opt.detector, D1_edges, D2_edges, tdata, false, opt.use_sample);
+        auto s = new AnaSample(opt.cut_branch, opt.name, opt.detector, D1_edges, D2_edges, tdata, false, opt.use_sample);
         s -> SetNorm(potD/potMC);
-        samples.push_back(s);
+        if(opt.cut_branch >= 0 && opt.use_sample == true)
+            samples.push_back(s);
     }
 
     //read MC events
-    AnyTreeMC selTree(fname_mc.c_str());
+    AnyTreeMC selTree(fname_mc.c_str(), "selectedEvents");
     std::cout << "[IngridFit]: Reading and collecting events." << std::endl;
-    selTree.GetEvents(samples, signal_topology);
+    selTree.GetEvents(samples, signal_topology, false);
 
     std::cout << "[IngridFit]: Getting sample breakdown by reaction." << std::endl;
     for(auto& sample : samples)

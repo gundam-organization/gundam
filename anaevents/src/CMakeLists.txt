@@ -1,6 +1,5 @@
-set(SRCFILES AnaSample.cc AnySample.cc AnyTreeMC.cc)
-set(HEADERS AnaSample.hh AnySample.hh AnyTreeMC.hh)
-
+set(SRCFILES AnaSample.cc AnyTreeMC.cc)
+set(HEADERS AnaSample.hh AnyTreeMC.hh)
 
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)
   add_library(anaevents STATIC ${SRCFILES})
