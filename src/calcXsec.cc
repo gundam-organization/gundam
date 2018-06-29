@@ -144,37 +144,8 @@ int main(int argc, char** argv)
                   << "[CalcXsec]: CutB: " << opt.cut_branch << std::endl
                   << "[CalcXsec]: Detector: " << opt.detector << std::endl
                   << "[CalcXsec]: Use Sample: " << opt.use_sample << std::endl;
-        std::cout << "[CalcXsec]: Opening " << opt.binning << " for analysis binning." << std::endl;
 
-        std::vector< std::pair<double, double> > D1_edges;
-        std::vector< std::pair<double, double> > D2_edges;
-        std::ifstream fin(opt.binning, std::ios::in);
-        if(!fin.is_open())
-        {
-            std::cerr << "[ERROR]: Failed to open binning file: " << opt.binning
-                      << "[ERROR]: Terminating execution." << std::endl;
-            return 1;
-        }
-
-        else
-        {
-            std::string line;
-            while(getline(fin, line))
-            {
-                std::stringstream ss(line);
-                double D1_1, D1_2, D2_1, D2_2;
-                if(!(ss>>D2_1>>D2_2>>D1_1>>D1_2))
-                {
-                    std::cerr << "[CalcXsec]: Bad line format: " << line << std::endl;
-                    continue;
-                }
-                D1_edges.emplace_back(std::make_pair(D1_1,D1_2));
-                D2_edges.emplace_back(std::make_pair(D2_1,D2_2));
-            }
-            fin.close();
-        }
-
-        auto s = new AnaSample(opt.cut_branch, opt.name, opt.detector, D1_edges, D2_edges, tdata_sel, false, opt.use_sample);
+        auto s = new AnaSample(opt.cut_branch, opt.name, opt.detector, opt.binning, tdata_sel);
         s -> SetNorm(potD/potMC);
         if(opt.use_sample == true)
             samples.push_back(s);
@@ -328,8 +299,8 @@ int main(int argc, char** argv)
         if(t % 1000 == 0)
             std::cout << "[CalcXsec]: Throw " << t << "/" << num_throws << std::endl;
 
-        //toy_thrower.Throw(toy);
-        //throws.push_back(toy);
+        toy_thrower.Throw(toy);
+        throws.push_back(toy);
         toy_param = MapThrow(toy, postfit_param, fitpara);
 
         const auto h_name = "combined_throw_" + std::to_string(t);
