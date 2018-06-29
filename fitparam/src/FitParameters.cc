@@ -134,7 +134,7 @@ void FitParameters::ReWeight(AnaEvent *event, const std::string& det, int nsampl
         return;
     }
 
-    int bin = m_evmap[nsample][nevent];
+    const int bin = m_evmap[nsample][nevent];
 
     //skip event if not Signal
     if(bin == PASSEVENT) return;
