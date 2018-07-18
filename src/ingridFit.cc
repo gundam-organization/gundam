@@ -8,23 +8,28 @@
 
 #include "AnaSample.hh"
 #include "AnyTreeMC.hh"
+#include "ColorOutput.hh"
 #include "FitParameters.hh"
 #include "FluxParameters.hh"
 #include "OptParser.hh"
 #include "XsecFitter.hh"
 
-int main(int argc, char* argv[])
+const std::string TAG = color::CYAN_STR + "[IngridFit]: " + color::RESET_STR;
+const std::string ERR = color::RED_STR + color::BOLD_STR
+                        + "[ERROR]: " + color::RESET_STR;
+
+int main(int argc, char** argv)
 {
     //std::cout << std::fixed << std::setprecision(3);
     std::cout << "------------------------------------------------\n"
-              << "[IngridFit]: Welcome to the Super-xsLLhFitter.\n"
-              << "[IngridFit]: Initializing the fit machinery..." << std::endl;
+              << TAG << "Welcome to the Super-xsLLhFitter.\n"
+              << TAG << "Initializing the fit machinery..." << std::endl;
 
     const std::string xslf_env = std::getenv("XSLLHFITTER");
     if(xslf_env.empty())
     {
-        std::cerr << "[ERROR]: Environment variable \"XSLLHFITTER\" not set." << std::endl
-                  << "[ERROR]: Cannot determine source tree location." << std::endl;
+        std::cerr << ERR << "Environment variable \"XSLLHFITTER\" not set." << std::endl
+                  << ERR << "Cannot determine source tree location." << std::endl;
         return 1;
     }
 
@@ -49,7 +54,7 @@ int main(int argc, char* argv[])
     OptParser parser;
     if(!parser.ParseJSON(json_file))
     {
-        std::cerr << "[ERROR] JSON parsing failed. Exiting.\n";
+        std::cerr << ERR << "JSON parsing failed. Exiting.\n";
         return 1;
     }
 
@@ -75,15 +80,15 @@ int main(int argc, char* argv[])
     TFile* fdata = TFile::Open(fname_data.c_str(), "READ");
     TTree* tdata = (TTree*)(fdata->Get("selectedEvents"));
 
-    std::cout << "[IngridFit]: Opening " << fname_data << " for data selection.\n"
-              << "[IngridFit]: Opening " << fname_mc << " for MC selection." << std::endl;
+    std::cout << TAG << "Opening " << fname_data << " for data selection.\n"
+              << TAG << "Opening " << fname_mc << " for MC selection." << std::endl;
 
     /*************************************** FLUX *****************************************/
-    std::cout << "[IngridFit]: Setup Flux " << std::endl;
+    std::cout << TAG << "Setup Flux " << std::endl;
 
     //input File
     TFile *finfluxcov = TFile::Open(parser.flux_cov.fname.c_str(), "READ"); //contains flux systematics info
-    std::cout << "[IngridFit]: Opening " << parser.flux_cov.fname << " for flux covariance." << std::endl;
+    std::cout << TAG << "Opening " << parser.flux_cov.fname << " for flux covariance." << std::endl;
     //setup enu bins and covm for flux
     TH1D *nd_numu_bins_hist = (TH1D*)finfluxcov->Get(parser.flux_cov.binning.c_str());
     TAxis *nd_numu_bins = nd_numu_bins_hist->GetXaxis();
@@ -101,7 +106,7 @@ int main(int argc, char* argv[])
     /*************************************** FLUX END *************************************/
 
     TFile *fout = TFile::Open(fname_output.c_str(), "RECREATE");
-    std::cout << "[IngridFit]: Open output file: " << fname_output << std::endl;
+    std::cout << TAG << "Open output file: " << fname_output << std::endl;
 
     // Add analysis samples:
 
@@ -109,11 +114,11 @@ int main(int argc, char* argv[])
 
     for(const auto& opt : parser.samples)
     {
-        std::cout << "[IngridFit]: Adding new sample to fit.\n"
-                  << "[IngridFit]: Name: " << opt.name << std::endl
-                  << "[IngridFit]: CutB: " << opt.cut_branch << std::endl
-                  << "[IngridFit]: Detector: " << opt.detector << std::endl
-                  << "[IngridFit]: Use Sample: " << opt.use_sample << std::endl;
+        std::cout << TAG << "Adding new sample to fit.\n"
+                  << TAG << "Name: " << opt.name << std::endl
+                  << TAG << "CutB: " << opt.cut_branch << std::endl
+                  << TAG << "Detector: " << opt.detector << std::endl
+                  << TAG << "Use Sample: " << opt.use_sample << std::endl;
 
         auto s = new AnaSample(opt.cut_branch, opt.name, opt.detector, opt.binning, tdata);
         s -> SetNorm(potD/potMC);
@@ -123,10 +128,10 @@ int main(int argc, char* argv[])
 
     //read MC events
     AnyTreeMC selTree(fname_mc.c_str(), "selectedEvents");
-    std::cout << "[IngridFit]: Reading and collecting events." << std::endl;
+    std::cout << TAG << "Reading and collecting events." << std::endl;
     selTree.GetEvents(samples, signal_topology, false);
 
-    std::cout << "[IngridFit]: Getting sample breakdown by reaction." << std::endl;
+    std::cout << TAG << "Getting sample breakdown by reaction." << std::endl;
     for(auto& sample : samples)
         sample -> GetSampleBreakdown(fout, "nominal", topology, false);
 
@@ -164,7 +169,7 @@ int main(int argc, char* argv[])
 
     //init w/ para vector
     xsecfit.InitFitter(fitpara, 0, paramVectorFname);
-    std::cout << "[IngridFit]: Fitter initialised." << std::endl;
+    std::cout << TAG << "Fitter initialised." << std::endl;
 
     /*
     for(int i = 0; i < sigfitpara.GetNpar(); ++i)
