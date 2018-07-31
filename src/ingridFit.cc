@@ -151,7 +151,10 @@ int main(int argc, char** argv)
     //Fit parameters
     FitParameters sigfitpara("par_fit");
     for(const auto& opt : parser.samples)
-        sigfitpara.AddDetector(opt.detector, opt.binning, opt.det_offset);
+    {
+        if(opt.cut_branch >= 0 && opt.use_sample == true)
+            sigfitpara.AddDetector(opt.detector, opt.binning, opt.det_offset);
+    }
     sigfitpara.InitEventMap(samples, 0);
     fitpara.push_back(&sigfitpara);
 
@@ -159,7 +162,10 @@ int main(int argc, char** argv)
     FluxParameters fluxpara("par_flux");
     fluxpara.SetCovarianceMatrix(cov_flux);
     for(const auto& opt : parser.samples)
-        fluxpara.AddDetector(opt.detector, enubins, opt.flux_offset);
+    {
+        if(opt.cut_branch >= 0 && opt.use_sample == true)
+            fluxpara.AddDetector(opt.detector, enubins, opt.flux_offset);
+    }
     fluxpara.InitEventMap(samples, 0);
     //fitpara.push_back(&fluxpara);
 

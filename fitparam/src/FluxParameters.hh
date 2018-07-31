@@ -16,17 +16,18 @@
 
 class FluxParameters : public AnaFitParameters
 {
-    public:
-        FluxParameters(const std::string& name = "par_flux");
-        ~FluxParameters();
+public:
+    FluxParameters(const std::string& name = "par_flux");
+    ~FluxParameters();
 
-        void InitParameters();
-        void InitEventMap(std::vector<AnaSample*> &sample, int mode);
-        void ReWeight(AnaEvent *event, const std::string& det, int nsample, int nevent, std::vector<double> &params);
+    void InitParameters();
+    void InitEventMap(std::vector<AnaSample*>& sample, int mode);
+    void ReWeight(AnaEvent* event, const std::string& det, int nsample, int nevent,
+                  std::vector<double>& params);
 
-    private:
-        int GetBinIndex(const std::string& det, double enu);
-        std::vector<double> m_enubins;
+private:
+    int GetBinIndex(const std::string& det, double enu);
+    std::vector<double> m_enubins;
 };
 
 #endif

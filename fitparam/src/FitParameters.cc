@@ -89,10 +89,10 @@ void FitParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
     //loop over events to build index map
     for(std::size_t s=0; s < sample.size(); s++)
     {
-        vector<int> sample_map;
+        std::vector<int> sample_map;
         for(int i=0; i < sample[s] -> GetN(); i++)
         {
-            AnaEvent *ev = sample[s] -> GetEvent(i);
+            AnaEvent* ev = sample[s] -> GetEvent(i);
 
             // SIGNAL DEFINITION TIME
             // Warning, important hard coding up ahead:
@@ -125,7 +125,7 @@ void FitParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
     }
 }
 
-void FitParameters::ReWeight(AnaEvent *event, const std::string& det, int nsample, int nevent, std::vector<double> &params)
+void FitParameters::ReWeight(AnaEvent* event, const std::string& det, int nsample, int nevent, std::vector<double> &params)
 {
     if(m_evmap.empty()) //need to build an event map first
     {
@@ -199,7 +199,7 @@ void FitParameters::InitParameters()
 
 void FitParameters::AddDetector(const std::string& det, const std::string& f_binning, int offset)
 {
-    std::cout << "[FitParameters]: Adding detector " << det << " for " << this -> m_name << std::endl;
+    std::cout << "[FitParameters]: Adding detector " << det << " for " << m_name << std::endl;
     std::vector<FitBin> temp_vector;
     if(SetBinning(f_binning, temp_vector))
     {
