@@ -14,13 +14,15 @@
 
 #include <fstream>
 #include <iomanip>
+#include <map>
 #include <sstream>
 #include <string>
 
-#include "AnaFitParameters.hh"
 #include <TFile.h>
 #include <TGraph.h>
 
+#include "AnaFitParameters.hh"
+#include "XsecDial.hh"
 // Hard coding of sample and raction types
 
 // Sample types - should match whats in ccqefit.cc
@@ -66,22 +68,23 @@ struct XsecBin
 
 class XsecParameters : public AnaFitParameters
 {
-public:
-    XsecParameters(const std::string& name = "par_xsec");
-    ~XsecParameters();
+    public:
+        XsecParameters(const std::string& name = "par_xsec");
+        ~XsecParameters();
 
-    void StoreResponseFunctions(std::vector<TFile*> respfuncs,
-                                std::vector<std::pair<double, double>> v_D1edges,
-                                std::vector<std::pair<double, double>> v_D2edges);
-    void InitEventMap(std::vector<AnaSample*>& sample, int mode);
-    void EventWeights(std::vector<AnaSample*>& sample, std::vector<double>& params);
-    void ReWeight(AnaEvent* event, int nsample, int nevent, std::vector<double>& params);
-    void ReWeightIngrid(AnaEvent* event, int nsample, int nevent, std::vector<double>& params);
+        void StoreResponseFunctions(std::vector<TFile*> respfuncs,
+                std::vector<std::pair<double, double>> v_D1edges,
+                std::vector<std::pair<double, double>> v_D2edges);
+        void InitEventMap(std::vector<AnaSample*>& sample, int mode);
+        void EventWeights(std::vector<AnaSample*>& sample, std::vector<double>& params);
+        void ReWeight(AnaEvent* event, int nsample, int nevent, std::vector<double>& params);
+        void AddDetector(const std::string& det, const std::string& config);
 
-private:
-    int GetBinIndex(SampleTypes sampletype, ReactionTypes reactype, double recoP, double trueP,
-                    double recoD2, double trueD2);
-    std::vector<XsecBin> m_bins;
+    private:
+        int GetBinIndex(SampleTypes sampletype, ReactionTypes reactype, double recoP, double trueP,
+                double recoD2, double trueD2);
+        std::vector<XsecBin> m_bins;
+        std::map<std::string, std::vector<XsecDial>> m_dials;
 };
 
 #endif
