@@ -13,6 +13,7 @@
 #include "FluxParameters.hh"
 #include "OptParser.hh"
 #include "XsecFitter.hh"
+#include "XsecParameters.hh"
 
 const std::string TAG = color::CYAN_STR + "[IngridFit]: " + color::RESET_STR;
 const std::string ERR = color::RED_STR + color::BOLD_STR
@@ -169,6 +170,13 @@ int main(int argc, char** argv)
     fluxpara.InitEventMap(samples, 0);
     //fitpara.push_back(&fluxpara);
 
+    XsecParameters xsecpara("par_xsec");
+    for(const auto& opt : parser.samples)
+    {
+        if(opt.cut_branch >= 0 && opt.use_sample == true)
+            xsecpara.AddDetector(opt.detector, opt.xsec_config);
+    }
+
     //Instantiate fitter obj
     XsecFitter xsecfit(seed, threads);
     xsecfit.SetPOTRatio(potD/potMC);
@@ -209,7 +217,7 @@ int main(int argc, char** argv)
     if(stat_fluc == true)
         fit_mode = 3;
 
-    xsecfit.Fit(samples, topology, fit_mode, 2, 0);
+    //xsecfit.Fit(samples, topology, fit_mode, 2, 0);
     fout -> Close();
 
     return 0;

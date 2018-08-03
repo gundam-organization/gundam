@@ -70,6 +70,7 @@ bool OptParser::ParseJSON(std::string json_file)
        s.name = sample["name"];
        s.detector = sample["detector"];
        s.binning = input_dir + sample["binning"].get<std::string>();
+       s.xsec_config = input_dir + sample["xsec_dials"].get<std::string>();
        s.flux_offset = sample["flux_offset"];
        s.det_offset = sample["det_offset"];
        s.use_sample = sample["use_sample"];

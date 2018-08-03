@@ -246,21 +246,12 @@ void XsecParameters::InitEventMap(std::vector<AnaSample*>& sample, int mode)
     } // sample loop
 }
 
-// EventWeghts
-void XsecParameters::EventWeights(std::vector<AnaSample*>& sample, std::vector<double>& params)
+void XsecParameters::InitParameters()
 {
-    for(size_t s = 0; s < sample.size(); s++)
-    {
-        for(int i = 0; i < sample[s]->GetN(); i++)
-        {
-            AnaEvent* ev = sample[s]->GetEvent(i);
-            ReWeight(ev, s, i, params);
-        }
-    }
 }
 
 // ReWeight
-void XsecParameters::ReWeight(AnaEvent* event, int nsample, int nevent, std::vector<double>& params)
+void XsecParameters::ReWeight(AnaEvent* event, const std::string& det, int nsample, int nevent, std::vector<double>& params)
 {
     if(m_evmap.empty()) // need to build an event map first
     {
@@ -302,5 +293,29 @@ void XsecParameters::ReWeight(AnaEvent* event, int nsample, int nevent, std::vec
 
 void XsecParameters::AddDetector(const std::string& det, const std::string& config)
 {
+    std::cout << "[XsecParameters]: Adding detector " << det << " for " << m_name << std::endl;
+    std::fstream f;
+    f.open(config, std::ios::in);
 
+    json j;
+    f >> j;
+
+    std::string input_dir = std::string(std::getenv("XSLLHFITTER"))
+                            + j["input_dir"].get<std::string>();
+
+    std::cout << "[XsecParameters]: Adding the following dials." << std::endl;
+
+    std::vector<XsecDial> v_dials;
+    for(const auto& dial : j["dials"])
+    {
+        std::string fname_binning = input_dir + dial["binning"].get<std::string>();
+        std::string fname_splines = input_dir + dial["splines"].get<std::string>();
+
+        XsecDial x(dial["name"], fname_binning, fname_splines);
+        x.SetVars(dial["nominal"], dial["step"], dial["limit_lo"], dial["limit_hi"]);
+        x.Print(true);
+        v_dials.emplace_back(x);
+    }
+
+    m_dials.insert(std::make_pair(det, &v_dials));
 }

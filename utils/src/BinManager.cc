@@ -1,12 +1,12 @@
 #include "BinManager.hh"
 
 BinManager::BinManager()
-    : dimension(0)
+    : dimension(0), nbins(0)
 {
 }
 
 BinManager::BinManager(const std::string& filename)
-    : dimension(0), fname_binning(filename)
+    : dimension(0), nbins(0), fname_binning(filename)
 {
     SetBinning(fname_binning);
 }

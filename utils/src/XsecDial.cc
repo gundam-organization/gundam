@@ -24,6 +24,12 @@ void XsecDial::ReadSplines(const std::string& fname_splines)
     v_splines.clear();
 
     TFile* file_splines = TFile::Open(fname_splines.c_str(), "READ");
+    if(file_splines == 0)
+    {
+        std::cout << "[ERROR]: Failed to open " << fname_splines << std::endl;
+        return;
+    }
+
     TIter key_list(file_splines -> GetListOfKeys());
     TKey* key = nullptr;
     while((key = (TKey*)key_list.Next()))
@@ -32,6 +38,7 @@ void XsecDial::ReadSplines(const std::string& fname_splines)
         v_splines.emplace_back(*spline);
     }
     file_splines -> Close();
+    delete file_splines;
 
     v_splines.shrink_to_fit();
 }

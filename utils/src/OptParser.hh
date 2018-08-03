@@ -19,6 +19,7 @@ struct SampleOpt
     std::string name;
     std::string detector;
     std::string binning;
+    std::string xsec_config;
 };
 
 struct CovOpt
