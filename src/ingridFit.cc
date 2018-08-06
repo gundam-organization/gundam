@@ -176,8 +176,8 @@ int main(int argc, char** argv)
         if(opt.cut_branch >= 0 && opt.use_sample == true)
             xsecpara.AddDetector(opt.detector, opt.xsec_config);
     }
-    xsecpara.InitParameters();
-    fitpara.push_back(&xsecpara);
+    xsecpara.InitEventMap(samples, 0);
+    //fitpara.push_back(&xsecpara);
 
     //Instantiate fitter obj
     XsecFitter xsecfit(seed, threads);
@@ -219,7 +219,7 @@ int main(int argc, char** argv)
     if(stat_fluc == true)
         fit_mode = 3;
 
-    //xsecfit.Fit(samples, topology, fit_mode, 2, 0);
+    xsecfit.Fit(samples, topology, fit_mode, 2, 0);
     fout -> Close();
 
     return 0;

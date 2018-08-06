@@ -91,6 +91,9 @@ class AnaEvent
         void ResetEvWght(){ m_wght = m_wghtMC; }
         // New kinematic variables always included for phase space cuts
 
+        void SetQ2(double val){m_q2 = val;}
+        double GetQ2() const { return m_q2; }
+
         void SetpMomRec(double val){ m_pMomRec = val; }
         void SetpMomTrue(double val){ m_pMomTrue = val; }
         void SetmuMomRec(double val){ m_muMomRec = val; }
@@ -145,6 +148,7 @@ class AnaEvent
         double m_trueD2;   //true D2
         double m_recD1;    //reco D1
         double m_recD2;    //reco D2
+        double m_q2;
         double m_wght;     //event weight
         double m_wghtMC;   //event weight from original MC
 

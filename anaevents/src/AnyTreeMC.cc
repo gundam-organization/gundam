@@ -80,6 +80,12 @@ void AnyTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples, const std::vecto
         ev.SetEvWght(weight);
         ev.SetEvWghtMC(weight);
 
+        const double mu_mass = 105.6583745;
+        double emu = std::sqrt(muMomTrue*muMomTrue + mu_mass * mu_mass);
+        double q2 = 2.0 * EnuTrue * (emu - muMomTrue * muCosThetaTrue) - mu_mass * mu_mass;
+        q2 = q2 / 1.0E6;
+        ev.SetQ2(q2);
+
         ev.SetmuMomRec(muMomRec);
         ev.SetmuMomTrue(muMomTrue);
         ev.SetmuCosThetaRec(muCosThetaRec);

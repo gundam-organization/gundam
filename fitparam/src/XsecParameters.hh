@@ -87,6 +87,7 @@ class XsecParameters : public AnaFitParameters
         int GetBinIndex(SampleTypes sampletype, ReactionTypes reactype, double recoP, double trueP,
                 double recoD2, double trueD2);
         std::vector<XsecBin> m_bins;
+        std::vector<std::vector<std::vector<int>>> m_dial_evtmap;
         std::vector<std::string> v_detectors;
         std::map<std::string, std::vector<XsecDial>> m_dials;
         std::map<std::string, int> m_offset;

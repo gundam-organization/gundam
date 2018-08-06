@@ -147,35 +147,46 @@ void XsecParameters::InitEventMap(std::vector<AnaSample*>& sample, int mode)
     if(Npar == 0)
     {
         std::cerr << "[ERROR]: In XsecParameters::InitEventMap\n"
-                  << "[ERRPR]: No parameters delcared. Not building event map."
+                  << "[ERROR]: No parameters delcared. Not building event map."
                   << std::endl;
     }
-    m_evmap.clear();
+    //m_evmap.clear();
+    m_dial_evtmap.clear();
 
-    // loop over events to build index map
-    for(std::size_t s = 0; s < sample.size(); s++)
+    for(std::size_t s = 0; s < sample.size(); ++s)
     {
-        std::vector<int> sample_map;
-        for(int i = 0; i < sample[s]->GetN(); i++)
+        std::vector<std::vector<int>> sample_map;
+        for(int i = 0; i < sample[s] -> GetN(); i++)
         {
-            AnaEvent* ev = sample[s]->GetEvent(i);
-            int binn = GetBinIndex(static_cast<SampleTypes>(ev->GetSampleType()),
-                                   static_cast<ReactionTypes>(ev->GetTopology()), ev->GetRecD1(),
-                                   ev->GetTrueD1(), ev->GetRecD2(), ev->GetTrueD2());
-            if(binn == BADBIN)
+            AnaEvent* ev = sample[s] -> GetEvent(i);
+            std::vector<int> dial_index_map;
+
+            std::vector<XsecDial> &v_dials = m_dials.at(sample[s] -> GetDetector());
+            int num_dials = v_dials.size();
+
+            for(int d = 0; d < num_dials; ++d)
             {
-                std::cout << "WARNING: " << m_name << " event "
-                          << " fall outside bin ranges" << std::endl;
-                std::cout << " This event will be ignored in analysis." << std::endl;
-                ev->Print();
+                int idx = v_dials.at(d).GetSplineIndex(ev -> GetTopology(), ev -> GetReaction(),
+                                                       ev -> GetQ2());
+                if(idx == BADBIN)
+                {
+                    std::cout << "[WARNING]: Event falls outside spline range.\n"
+                              << "[WARNING]: This event will be ignored in the analysis."
+                              << std::endl;
+                    ev -> AddEvWght(0.0);
+                }
+
+                if(mode == 1 && ev -> isSignalEvent())
+                    idx = PASSEVENT;
+
+                dial_index_map.push_back(idx);
             }
-            // If event is signal let the c_i params handle the reweighting:
-            if(mode == 1 && ((ev->GetTopology() == 1) || (ev->GetTopology() == 2)))
-                binn = PASSEVENT;
-            sample_map.push_back(binn);
-        } // event loop
-        m_evmap.push_back(sample_map);
-    } // sample loop
+
+            sample_map.emplace_back(dial_index_map);
+        }
+
+        m_dial_evtmap.emplace_back(sample_map);
+    }
 }
 
 void XsecParameters::InitParameters()
@@ -208,42 +219,24 @@ void XsecParameters::InitParameters()
 // ReWeight
 void XsecParameters::ReWeight(AnaEvent* event, const std::string& det, int nsample, int nevent, std::vector<double>& params)
 {
-    if(m_evmap.empty()) // need to build an event map first
+    if(m_dial_evtmap.empty()) // need to build an event map first
     {
-        cout << "Need to build event map index for " << m_name << endl;
+        std::cerr << "[ERROR]: In XsecParameters::ReWeight()\n"
+                  << "[ERROR]: Need to build event map index for " << m_name << std::endl;
         return;
     }
 
-    int binn = m_evmap[nsample][nevent];
+    std::vector<XsecDial> &v_dials = m_dials.at(det);
+    int num_dials = v_dials.size();
+    double weight = 1.0;
 
-    if(binn == PASSEVENT)
-        return;
-    if(binn == BADBIN)
-        event->AddEvWght(0.0); // skip!!!!
-    else
+    for(int d = 0; d < num_dials; ++d)
     {
-        vector<TGraph*> respfuncs = m_bins[binn].respfuncs;
-        double weight             = 1;
-        if(respfuncs.size() > 0)
-        { // needed because there are missing reponse functions when reco very different from true
-          // (to save memory)
-            for(uint i = 0; i < Npar; i++)
-            {
-                weight = weight * (respfuncs[i]->Eval(params[i]));
-                // if(weight!=1)
-                // cout<<"reweighting using weight "<<weight<<"  from bin "<<binn<<endl;
-            }
-        }
-        double prevWght = event->GetEvWght();
-        event->AddEvWght(weight);
-        double newWght = event->GetEvWght();
-
-        // For debugging reweighting:
-        // if(prevWght!=newWght){
-        //   cout << "Reweighted! From " << prevWght << " to " << newWght << endl;
-        //   getchar();
-        // }
+        int idx = m_dial_evtmap[nsample][nevent][d];
+        weight *= v_dials[d].GetSplineValue(idx, params[d + m_offset.at(det)]);
     }
+
+    event -> AddEvWght(weight);
 }
 
 void XsecParameters::AddDetector(const std::string& det, const std::string& config)
@@ -268,6 +261,7 @@ void XsecParameters::AddDetector(const std::string& det, const std::string& conf
 
         XsecDial x(dial["name"], fname_binning, fname_splines);
         x.SetVars(dial["nominal"], dial["step"], dial["limit_lo"], dial["limit_hi"]);
+        x.SetDimensions(8, 10);
         x.Print(true);
         v_dials.emplace_back(x);
     }

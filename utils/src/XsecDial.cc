@@ -51,7 +51,10 @@ int XsecDial::GetSplineIndex(int topology, int reaction, double q2) const
 
 double XsecDial::GetSplineValue(int index, double dial_value) const
 {
-    return v_splines.at(index).Eval(dial_value);
+    if(index >= 0)
+        return v_splines.at(index).Eval(dial_value);
+    else
+        return 1.0;
 }
 
 void XsecDial::SetVars(double nominal, double step, double limit_lo, double limit_hi)

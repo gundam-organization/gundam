@@ -1,5 +1,5 @@
 {
-    "data_file" : "eff_nominal.root",
+    "data_file" : "eff_weight.root",
     "mc_file" : "eff_nominal.root",
     "output_file" : "test.root",
     "xsec_file" : "xsec.root",
@@ -45,37 +45,11 @@
     ],
     "samples" : [
         {
-            "cut_branch" : 1,
-            "name" : "muTPCpTPC",
-            "detector" : "ND280",
-            "binning" : "tn337_binning.txt",
-            "flux_offset" : 0,
-            "det_offset" : 0,
-            "use_sample" : true
-        },
-        {
             "cut_branch" : 0,
             "name" : "muTPC",
             "detector" : "ND280",
             "binning" : "tn337_binning.txt",
-            "flux_offset" : 0,
-            "det_offset" : 0,
-            "use_sample" : true
-        },
-        {
-            "cut_branch" : 2,
-            "name" : "muTPCpFGD",
-            "detector" : "ND280",
-            "binning" : "tn337_binning.txt",
-            "flux_offset" : 0,
-            "det_offset" : 0,
-            "use_sample" : true
-        },
-        {
-            "cut_branch" : 3,
-            "name" : "muFGDpTPC",
-            "detector" : "ND280",
-            "binning" : "tn337_binning.txt",
+            "xsec_dials": "dials.json",
             "flux_offset" : 0,
             "det_offset" : 0,
             "use_sample" : true
@@ -85,24 +59,7 @@
             "name": "INGRID",
             "detector" : "INGRID",
             "binning" : "ingrid_binning.txt",
-            "flux_offset" : 20,
-            "det_offset" : 58,
-            "use_sample" : true
-        },
-        {
-            "cut_branch" : -1,
-            "name": "ND280_True",
-            "detector" : "ND280",
-            "binning" : "tn337_binning.txt",
-            "flux_offset" : 0,
-            "det_offset" : 0,
-            "use_sample" : true
-        },
-        {
-            "cut_branch" : -2,
-            "name": "INGRID_True",
-            "detector" : "INGRID",
-            "binning" : "ingrid_binning.txt",
+            "xsec_dials": "dials.json",
             "flux_offset" : 20,
             "det_offset" : 58,
             "use_sample" : true
