@@ -47,9 +47,9 @@ void AnaFitParameters::SetCovarianceMatrix(const TMatrixDSym& covmat)
               << " x " << covariance->GetNrows() << std::endl;
 
     std::cout << "[SetCovarianceMatrix]: Inverted Cov mat: " << std::endl;
-    covarianceI->Print();
+    //covarianceI->Print();
     std::cout << "[SetCovarianceMatrix]: Cov mat: " << std::endl;
-    covariance->Print();
+    //covariance->Print();
 
     hasCovMat = true;
 }

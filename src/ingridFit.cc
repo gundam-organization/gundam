@@ -176,6 +176,8 @@ int main(int argc, char** argv)
         if(opt.cut_branch >= 0 && opt.use_sample == true)
             xsecpara.AddDetector(opt.detector, opt.xsec_config);
     }
+    xsecpara.InitParameters();
+    fitpara.push_back(&xsecpara);
 
     //Instantiate fitter obj
     XsecFitter xsecfit(seed, threads);

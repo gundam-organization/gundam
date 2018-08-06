@@ -5,68 +5,7 @@ XsecParameters::XsecParameters(const std::string& name)
 {
     m_name       = name;
     hasRegCovMat = false;
-    Npar         = 12;
-
-    pars_name.push_back(Form("%s%d%s", m_name.c_str(), 0, "CA5"));
-    pars_prior.push_back(1.00);
-    pars_step.push_back(0.11);
-    pars_limlow.push_back(0.25);
-    pars_limhigh.push_back(2.5);
-    pars_name.push_back(Form("%s%d%s", m_name.c_str(), 1, "MANFFRES"));
-    pars_prior.push_back(1.00);
-    pars_step.push_back(0.11);
-    pars_limlow.push_back(0.25);
-    pars_limhigh.push_back(2.5);
-    pars_name.push_back(Form("%s%d%s", m_name.c_str(), 2, "BgRES"));
-    pars_prior.push_back(1.00);
-    pars_step.push_back(0.11);
-    pars_limlow.push_back(0.25);
-    pars_limhigh.push_back(2.5);
-    pars_name.push_back(Form("%s%d%s", m_name.c_str(), 3, "CCNUE_0"));
-    pars_prior.push_back(1.00);
-    pars_step.push_back(0.11);
-    pars_limlow.push_back(0.25);
-    pars_limhigh.push_back(2.5);
-    pars_name.push_back(Form("%s%d%s", m_name.c_str(), 4, "DISMPISHP"));
-    pars_prior.push_back(1.00);
-    pars_step.push_back(0.11);
-    pars_limlow.push_back(0.25);
-    pars_limhigh.push_back(5.0); // altered to allow extra DIS scaling
-    pars_name.push_back(Form("%s%d%s", m_name.c_str(), 5, "CCCOH_C_0"));
-    pars_prior.push_back(1.00);
-    pars_step.push_back(0.11);
-    pars_limlow.push_back(0.0); // altered to allow extra COH scaling
-    pars_limhigh.push_back(2.5);
-    pars_name.push_back(Form("%s%d%s", m_name.c_str(), 6, "NCCOH_0"));
-    pars_prior.push_back(1.00);
-    pars_step.push_back(0.11);
-    pars_limlow.push_back(0.25);
-    pars_limhigh.push_back(2.5);
-    pars_name.push_back(Form("%s%d%s", m_name.c_str(), 7, "NCOTHER_0"));
-    pars_prior.push_back(1.00);
-    pars_step.push_back(0.11);
-    pars_limlow.push_back(0.25);
-    pars_limhigh.push_back(2.5);
-    pars_name.push_back(Form("%s%d%s", m_name.c_str(), 8, "EB_C"));
-    pars_prior.push_back(1.00);
-    pars_step.push_back(0.11);
-    pars_limlow.push_back(0.25);
-    pars_limhigh.push_back(2.5);
-    pars_name.push_back(Form("%s%d%s", m_name.c_str(), 9, "MAQE"));
-    pars_prior.push_back(0.95);
-    pars_step.push_back(0.11);
-    pars_limlow.push_back(0.25);
-    pars_limhigh.push_back(2.5);
-    pars_name.push_back(Form("%s%d%s", m_name.c_str(), 10, "PF"));
-    pars_prior.push_back(1.03);
-    pars_step.push_back(0.11);
-    pars_limlow.push_back(0.25);
-    pars_limhigh.push_back(2.5);
-    pars_name.push_back(Form("%s%d%s", m_name.c_str(), 11, "MEC_C"));
-    pars_prior.push_back(0.27);
-    pars_step.push_back(0.11);
-    pars_limlow.push_back(-0.5);
-    pars_limhigh.push_back(2.5);
+    Npar         = 0;
 }
 
 // dtor
@@ -204,29 +143,22 @@ int XsecParameters::GetBinIndex(SampleTypes sampletype, ReactionTypes reactype, 
 // initEventMap
 void XsecParameters::InitEventMap(std::vector<AnaSample*>& sample, int mode)
 {
-    if(m_bins.empty())
+    InitParameters();
+    if(Npar == 0)
     {
-        std::cout << "Need to build map of response functions for " << m_name << " ... exiting ..."
+        std::cerr << "[ERROR]: In XsecParameters::InitEventMap\n"
+                  << "[ERRPR]: No parameters delcared. Not building event map."
                   << std::endl;
     }
     m_evmap.clear();
 
     // loop over events to build index map
-    for(size_t s = 0; s < sample.size(); s++)
+    for(std::size_t s = 0; s < sample.size(); s++)
     {
-        vector<int> row;
+        std::vector<int> sample_map;
         for(int i = 0; i < sample[s]->GetN(); i++)
         {
             AnaEvent* ev = sample[s]->GetEvent(i);
-            // skip reactions not prepared in response function
-            /*int code = PASSEVENT;
-              if(ev->GetTopology() == AntiNu ||
-              ev->GetTopology() == OutFGD)
-              {
-              row.push_back(code);
-              continue;
-              }*/
-            // get event info
             int binn = GetBinIndex(static_cast<SampleTypes>(ev->GetSampleType()),
                                    static_cast<ReactionTypes>(ev->GetTopology()), ev->GetRecD1(),
                                    ev->GetTrueD1(), ev->GetRecD2(), ev->GetTrueD2());
@@ -240,14 +172,37 @@ void XsecParameters::InitEventMap(std::vector<AnaSample*>& sample, int mode)
             // If event is signal let the c_i params handle the reweighting:
             if(mode == 1 && ((ev->GetTopology() == 1) || (ev->GetTopology() == 2)))
                 binn = PASSEVENT;
-            row.push_back(binn);
+            sample_map.push_back(binn);
         } // event loop
-        m_evmap.push_back(row);
+        m_evmap.push_back(sample_map);
     } // sample loop
 }
 
 void XsecParameters::InitParameters()
 {
+    unsigned int offset = 0;
+    for(const auto& det : v_detectors)
+    {
+        m_offset.insert(std::make_pair(det, offset));
+        for(const auto& d : m_dials.at(det))
+        {
+            pars_name.push_back(Form("%s_%s", det.c_str(), d.GetName().c_str()));
+            pars_prior.push_back(d.GetNominal());
+            pars_step.push_back(d.GetStep());
+            pars_limlow.push_back(d.GetLimitLow());
+            pars_limhigh.push_back(d.GetLimitHigh());
+
+            std::cout << "[XsecParameters]: Added " << det << "_" << d.GetName()
+                      << std::endl;
+        }
+
+        std::cout << "[XsecParameters]: Total " << m_dials.at(det).size() << " parameters at "
+                  << offset << " for " << det << std::endl;
+
+        offset += m_dials.at(det).size();
+    }
+
+    Npar = pars_name.size();
 }
 
 // ReWeight
@@ -317,5 +272,6 @@ void XsecParameters::AddDetector(const std::string& det, const std::string& conf
         v_dials.emplace_back(x);
     }
 
-    m_dials.insert(std::make_pair(det, &v_dials));
+    v_detectors.emplace_back(det);
+    m_dials.insert(std::make_pair(det, v_dials));
 }
