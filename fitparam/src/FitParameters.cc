@@ -159,26 +159,17 @@ void FitParameters::ReWeight(AnaEvent* event, const std::string& det, int nsampl
 
 void FitParameters::InitParameters()
 {
-    if(m_fit_bins.size() != m_det_offset.size())
-    {
-        std::cerr << "[ERROR]: In FitParameters::InitParameters()\n"
-                  << "[ERROR]: Detector bins and offset maps are not the same size!" << std::endl;
-        return;
-    }
-
-    std::set<std::pair<std::string, int>, PairCompare> temp_set;
-    for(const auto& kv : m_det_offset)
-        temp_set.insert(kv);
-
     double rand_prior = 0.0;
     TRandom3 rng(0);
 
-    for(const auto& pear : temp_set)
+    unsigned int offset = 0;
+    for(const auto& det : v_detectors)
     {
-        const int nbins = m_fit_bins.at(pear.first).size();
+        m_det_offset.insert(std::make_pair(det, offset));
+        const int nbins = m_fit_bins.at(det).size();
         for(int i = 0; i < nbins; ++i)
         {
-            pars_name.push_back(Form("%s_%s_%d", m_name.c_str(), pear.first.c_str(), i));
+            pars_name.push_back(Form("%s_%s_%d", m_name.c_str(), det.c_str(), i));
             if(m_rng_priors == true)
             {
                 rand_prior = 2.0 * rng.Uniform(0.0, 1.0);
@@ -190,21 +181,25 @@ void FitParameters::InitParameters()
             pars_step.push_back(0.05);
             pars_limlow.push_back(0.0);
             pars_limhigh.push_back(10.0);
-
         }
+
+        std::cout << "[FitParameters]: Total " << nbins << " parameters at "
+                  << offset << " for " << det << std::endl;
+        offset += nbins;
     }
 
     Npar = pars_name.size();
 }
 
-void FitParameters::AddDetector(const std::string& det, const std::string& f_binning, int offset)
+void FitParameters::AddDetector(const std::string& det, const std::string& f_binning)
 {
     std::cout << "[FitParameters]: Adding detector " << det << " for " << m_name << std::endl;
+
     std::vector<FitBin> temp_vector;
     if(SetBinning(f_binning, temp_vector))
     {
         m_fit_bins.emplace(std::make_pair(det, temp_vector));
-        m_det_offset.emplace(std::make_pair(det, offset));
+        v_detectors.emplace_back(det);
     }
     else
         std::cout << "[WARNING]: Adding detector failed." << std::endl;

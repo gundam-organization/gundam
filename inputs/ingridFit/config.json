@@ -21,6 +21,10 @@
         "matrix" : "nd280_det_cov",
         "binning" : "det_binning"
     },
+    "xsec_cov" : {
+        "file" : "",
+        "matrix" : "xsec_cov"
+    },
     "detectors" : [
         {
             "name" : "ND280",
@@ -28,6 +32,7 @@
             "flux_hist" : "enu_nd5_tuned13a_numu",
             "flux_integral" : 1.12E13,
             "flux_error" : 0.085,
+            "xsec_config" : "dials.json",
             "binning" : "tn337_binning.txt",
             "ntargets_val" : 5.9E29,
             "ntargets_err" : 0.0067
@@ -38,6 +43,7 @@
             "flux_hist" : "",
             "flux_integral" : 6.5E12,
             "flux_error" : 0.099,
+            "xsec_config" : "dials.json",
             "binning" : "ingrid_binning.txt",
             "ntargets_val" : 1.756E29,
             "ntargets_err" : 0.011
@@ -49,9 +55,13 @@
             "name" : "muTPC",
             "detector" : "ND280",
             "binning" : "tn337_binning.txt",
-            "xsec_dials": "dials.json",
-            "flux_offset" : 0,
-            "det_offset" : 0,
+            "use_sample" : true
+        },
+        {
+            "cut_branch" : 5,
+            "name" : "CC1pi",
+            "detector" : "ND280",
+            "binning" : "tn337_binning.txt",
             "use_sample" : true
         },
         {
@@ -59,9 +69,6 @@
             "name": "INGRID",
             "detector" : "INGRID",
             "binning" : "ingrid_binning.txt",
-            "xsec_dials": "dials.json",
-            "flux_offset" : 20,
-            "det_offset" : 58,
             "use_sample" : true
         }
     ]

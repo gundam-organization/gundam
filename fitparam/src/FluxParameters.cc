@@ -101,34 +101,37 @@ void FluxParameters::ReWeight(AnaEvent* event, const std::string& det, int nsamp
 
 void FluxParameters::InitParameters()
 {
-    if(m_det_bins.size() != m_det_offset.size())
-    {
-        std::cerr << "[ERROR]: In FluxParameters::InitParameters()\n"
-                  << "[ERROR]: Detector bins and offset maps are not the same size!" << std::endl;
-        return;
-    }
-
-    std::set<std::pair<std::string, int>, PairCompare> temp_set;
-    for(const auto& kv : m_det_offset)
-        temp_set.insert(kv);
-
+    unsigned int offset = 0;
     std::cout << "[FluxParameters]: Flux binning " << std::endl;
-    for(const auto& pear : temp_set)
+    for(const auto& det : v_detectors)
     {
-        std::cout << "[FluxParameters]: Detector - " << pear.first << std::endl;
-        const int nbins = m_det_bins.at(pear.first).size() - 1;
+        std::cout << "[FluxParameters]: Detector - " << det << std::endl;
+        m_det_offset.insert(std::make_pair(det, offset));
+        const int nbins = m_det_bins.at(det).size() - 1;
         for(int i = 0; i < nbins; ++i)
         {
-            pars_name.push_back(Form("%s_%s_%d", m_name.c_str(), pear.first.c_str(), i));
+            pars_name.push_back(Form("%s_%s_%d", m_name.c_str(), det.c_str(), i));
             pars_prior.push_back(1.0); // all weights are 1.0 a priori
             pars_step.push_back(0.1);
             pars_limlow.push_back(0.0);
             pars_limhigh.push_back(5.0);
 
-            std::cout << i << ": " << m_det_bins.at(pear.first).at(i) << std::endl;
+            std::cout << i << ": " << m_det_bins.at(det).at(i) << std::endl;
         }
-        std::cout << nbins << ": " << m_det_bins.at(pear.first).back() << std::endl;
+        std::cout << nbins << ": " << m_det_bins.at(det).back() << std::endl;
+
+        std::cout << "[FluxParameters]: Total " << nbins << " parameters at "
+                  << offset << " for " << det << std::endl;
+        offset += nbins;
     }
 
     Npar = pars_name.size();
+}
+
+void FluxParameters::AddDetector(const std::string& det, const std::vector<double>& bins)
+{
+    std::cout << "[AnaFitParameters]: Adding detector " << det << " for " << this->m_name
+              << std::endl;
+    m_det_bins.emplace(std::make_pair(det, bins));
+    v_detectors.emplace_back(det);
 }

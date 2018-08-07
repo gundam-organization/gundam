@@ -32,11 +32,12 @@ class FitParameters : public AnaFitParameters
         void ReWeight(AnaEvent *event, const std::string& det, int nsample, int nevent,
                       std::vector<double> &params);
         bool SetBinning(const std::string& file_name, std::vector<xsllh::FitBin>& bins);
-        void AddDetector(const std::string& det, const std::string& f_binning, int offset);
+        void AddDetector(const std::string& det, const std::string& f_binning);
 
     private:
         int GetBinIndex(const std::string& det, double D1, double D2) const;
         std::map<std::string, std::vector<xsllh::FitBin> > m_fit_bins;
+        std::vector<std::string> v_detectors;
 };
 
 #endif

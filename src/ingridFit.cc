@@ -15,12 +15,12 @@
 #include "XsecFitter.hh"
 #include "XsecParameters.hh"
 
-const std::string TAG = color::CYAN_STR + "[IngridFit]: " + color::RESET_STR;
-const std::string ERR = color::RED_STR + color::BOLD_STR
-                        + "[ERROR]: " + color::RESET_STR;
-
 int main(int argc, char** argv)
 {
+    const std::string TAG = color::CYAN_STR + "[IngridFit]: " + color::RESET_STR;
+    const std::string ERR = color::RED_STR + color::BOLD_STR
+                            + "[ERROR]: " + color::RESET_STR;
+
     //std::cout << std::fixed << std::setprecision(3);
     std::cout << "------------------------------------------------\n"
               << TAG << "Welcome to the Super-xsLLhFitter.\n"
@@ -35,18 +35,23 @@ int main(int argc, char** argv)
     }
 
     std::string json_file;
+    bool dry_run = false;
     char option;
-    while((option = getopt(argc, argv, "j:h")) != -1)
+    while((option = getopt(argc, argv, "j:nh")) != -1)
     {
         switch(option)
         {
             case 'j':
                 json_file = optarg;
                 break;
+            case 'n':
+                dry_run = true;
+                break;
             case 'h':
                 std::cout << "USAGE: "
                           << argv[0] << "\nOPTIONS:\n"
-                          << "-j : JSON input\n";
+                          << "-j : JSON input\n"
+                          << "-n : Dry run - Set up but do not run fit.\n";
             default:
                 return 0;
         }
@@ -88,11 +93,11 @@ int main(int argc, char** argv)
     std::cout << TAG << "Setup Flux " << std::endl;
 
     //input File
-    TFile *finfluxcov = TFile::Open(parser.flux_cov.fname.c_str(), "READ"); //contains flux systematics info
+    TFile* finfluxcov = TFile::Open(parser.flux_cov.fname.c_str(), "READ"); //contains flux systematics info
     std::cout << TAG << "Opening " << parser.flux_cov.fname << " for flux covariance." << std::endl;
     //setup enu bins and covm for flux
-    TH1D *nd_numu_bins_hist = (TH1D*)finfluxcov->Get(parser.flux_cov.binning.c_str());
-    TAxis *nd_numu_bins = nd_numu_bins_hist->GetXaxis();
+    TH1D* nd_numu_bins_hist = (TH1D*)finfluxcov->Get(parser.flux_cov.binning.c_str());
+    TAxis* nd_numu_bins = nd_numu_bins_hist->GetXaxis();
 
     std::vector<double> enubins;
     enubins.push_back(nd_numu_bins -> GetBinLowEdge(1));
@@ -151,10 +156,9 @@ int main(int argc, char** argv)
 
     //Fit parameters
     FitParameters sigfitpara("par_fit");
-    for(const auto& opt : parser.samples)
+    for(const auto& opt : parser.detectors)
     {
-        if(opt.cut_branch >= 0 && opt.use_sample == true)
-            sigfitpara.AddDetector(opt.detector, opt.binning, opt.det_offset);
+        sigfitpara.AddDetector(opt.name, opt.binning);
     }
     sigfitpara.InitEventMap(samples, 0);
     fitpara.push_back(&sigfitpara);
@@ -162,22 +166,39 @@ int main(int argc, char** argv)
     //Flux parameters
     FluxParameters fluxpara("par_flux");
     fluxpara.SetCovarianceMatrix(cov_flux);
-    for(const auto& opt : parser.samples)
+    for(const auto& opt : parser.detectors)
     {
-        if(opt.cut_branch >= 0 && opt.use_sample == true)
-            fluxpara.AddDetector(opt.detector, enubins, opt.flux_offset);
+        fluxpara.AddDetector(opt.name, enubins);
     }
     fluxpara.InitEventMap(samples, 0);
-    //fitpara.push_back(&fluxpara);
+    fitpara.push_back(&fluxpara);
+
+    TMatrixDSym cov_xsec(4);
+    cov_xsec(0,0) = 0.011;
+    cov_xsec(0,1) = 0.0;
+    cov_xsec(0,2) = 0.010;
+    cov_xsec(0,3) = 0.0;
+    cov_xsec(1,0) = 0.0;
+    cov_xsec(1,1) = 0.0225;
+    cov_xsec(1,2) = 0.0;
+    cov_xsec(1,3) = 0.0225;
+    cov_xsec(2,0) = 0.010;
+    cov_xsec(2,1) = 0.0;
+    cov_xsec(2,2) = 0.011;
+    cov_xsec(2,3) = 0.0;
+    cov_xsec(3,0) = 0.0;
+    cov_xsec(3,1) = 0.0225;
+    cov_xsec(3,2) = 0.0;
+    cov_xsec(3,3) = 0.0226;
 
     XsecParameters xsecpara("par_xsec");
-    for(const auto& opt : parser.samples)
+    xsecpara.SetCovarianceMatrix(cov_xsec);
+    for(const auto& opt : parser.detectors)
     {
-        if(opt.cut_branch >= 0 && opt.use_sample == true)
-            xsecpara.AddDetector(opt.detector, opt.xsec_config);
+        xsecpara.AddDetector(opt.name, opt.xsec);
     }
     xsecpara.InitEventMap(samples, 0);
-    //fitpara.push_back(&xsecpara);
+    fitpara.push_back(&xsecpara);
 
     //Instantiate fitter obj
     XsecFitter xsecfit(seed, threads);
@@ -219,7 +240,8 @@ int main(int argc, char** argv)
     if(stat_fluc == true)
         fit_mode = 3;
 
-    xsecfit.Fit(samples, topology, fit_mode, 2, 0);
+    if(!dry_run)
+        xsecfit.Fit(samples, topology, fit_mode, 2, 0);
     fout -> Close();
 
     return 0;

@@ -13,13 +13,10 @@ using json = nlohmann::json;
 struct SampleOpt
 {
     int cut_branch;
-    int flux_offset;
-    int det_offset;
     bool use_sample;
     std::string name;
     std::string detector;
     std::string binning;
-    std::string xsec_config;
 };
 
 struct CovOpt
@@ -32,6 +29,7 @@ struct CovOpt
 struct DetOpt
 {
     std::string name;
+    std::string xsec;
     std::string binning;
     std::string flux_file;
     std::string flux_hist;
@@ -67,6 +65,7 @@ class OptParser
 
         CovOpt flux_cov;
         CovOpt det_cov;
+        CovOpt xsec_cov;
         std::vector<SampleOpt> samples;
         std::vector<DetOpt> detectors;
 };

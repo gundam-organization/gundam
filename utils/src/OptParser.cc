@@ -49,10 +49,14 @@ bool OptParser::ParseJSON(std::string json_file)
     det_cov.matrix = j["det_cov"]["matrix"];
     det_cov.binning = j["det_cov"]["binning"];
 
+    xsec_cov.fname = input_dir + j["xsec_cov"]["file"].get<std::string>();
+    xsec_cov.matrix = j["xsec_cov"]["matrix"];
+
     for(const auto& detector : j["detectors"])
     {
         DetOpt d;
         d.name = detector["name"];
+        d.xsec = input_dir + detector["xsec_config"].get<std::string>();
         d.binning = input_dir + detector["binning"].get<std::string>();
         d.flux_file = input_dir + detector["flux_file"].get<std::string>();
         d.flux_hist = detector["flux_hist"];
@@ -65,16 +69,13 @@ bool OptParser::ParseJSON(std::string json_file)
 
     for(const auto& sample : j["samples"])
     {
-       SampleOpt s;
-       s.cut_branch = sample["cut_branch"];
-       s.name = sample["name"];
-       s.detector = sample["detector"];
-       s.binning = input_dir + sample["binning"].get<std::string>();
-       s.xsec_config = input_dir + sample["xsec_dials"].get<std::string>();
-       s.flux_offset = sample["flux_offset"];
-       s.det_offset = sample["det_offset"];
-       s.use_sample = sample["use_sample"];
-       samples.push_back(s);
+        SampleOpt s;
+        s.cut_branch = sample["cut_branch"];
+        s.name = sample["name"];
+        s.detector = sample["detector"];
+        s.binning = input_dir + sample["binning"].get<std::string>();
+        s.use_sample = sample["use_sample"];
+        samples.push_back(s);
     }
 
     std::cout << "[OptParser]: Finished loading JSON configure file.\n";

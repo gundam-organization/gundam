@@ -172,14 +172,14 @@ int main(int argc, char** argv)
 
     FitParameters sigfitpara("par_fit");
     for(const auto& opt : parser.samples)
-        sigfitpara.AddDetector(opt.detector, opt.binning, opt.det_offset);
+        sigfitpara.AddDetector(opt.detector, opt.binning);
     sigfitpara.InitEventMap(samples, 0);
     fitpara.push_back(&sigfitpara);
 
     FluxParameters fluxpara("par_flux");
     fluxpara.SetCovarianceMatrix(cov_flux);
     for(const auto& opt : parser.samples)
-        fluxpara.AddDetector(opt.detector, enubins, opt.flux_offset);
+        fluxpara.AddDetector(opt.detector, enubins);
     fluxpara.InitEventMap(samples, 0);
     //fitpara.push_back(&fluxpara);
     auto t_end_samples = std::chrono::high_resolution_clock::now();

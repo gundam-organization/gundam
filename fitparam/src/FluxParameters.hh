@@ -24,10 +24,12 @@ public:
     void InitEventMap(std::vector<AnaSample*>& sample, int mode);
     void ReWeight(AnaEvent* event, const std::string& det, int nsample, int nevent,
                   std::vector<double>& params);
+    void AddDetector(const std::string& det, const std::vector<double>& bins);
 
 private:
     int GetBinIndex(const std::string& det, double enu);
     std::vector<double> m_enubins;
+    std::vector<std::string> v_detectors;
 };
 
 #endif
