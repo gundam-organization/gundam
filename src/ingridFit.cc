@@ -90,7 +90,7 @@ int main(int argc, char** argv)
               << TAG << "Opening " << fname_mc << " for MC selection." << std::endl;
 
     /*************************************** FLUX *****************************************/
-    std::cout << TAG << "Setup Flux " << std::endl;
+    std::cout << TAG << "Setup Flux" << std::endl;
 
     //input File
     TFile* finfluxcov = TFile::Open(parser.flux_cov.fname.c_str(), "READ"); //contains flux systematics info
@@ -110,6 +110,39 @@ int main(int argc, char** argv)
     finfluxcov -> Close();
 
     /*************************************** FLUX END *************************************/
+    std::cout << TAG << "Setup Xsec Covariance" << std::endl;
+    std::ifstream fin(parser.xsec_cov.fname, std::ios::in);
+
+    TMatrixDSym cov_xsec;
+    if(!fin.is_open())
+    {
+        std::cerr << ERR << "Failed to open " << parser.xsec_cov.fname << std::endl;
+        return 1;
+    }
+    else
+    {
+        unsigned int dim = 0;
+        std::string line;
+        if(std::getline(fin, line))
+        {
+            std::stringstream ss(line);
+            ss >> dim;
+        }
+
+        cov_xsec.ResizeTo(dim, dim);
+        for(unsigned int i = 0; i < dim; ++i)
+        {
+            std::getline(fin, line);
+            std::stringstream ss(line);
+            double val = 0;
+
+            for(unsigned int j = 0; j < dim; ++j)
+            {
+                ss >> val;
+                cov_xsec(i,j) = val;
+            }
+        }
+    }
 
     TFile *fout = TFile::Open(fname_output.c_str(), "RECREATE");
     std::cout << TAG << "Open output file: " << fname_output << std::endl;
@@ -158,7 +191,8 @@ int main(int argc, char** argv)
     FitParameters sigfitpara("par_fit");
     for(const auto& opt : parser.detectors)
     {
-        sigfitpara.AddDetector(opt.name, opt.binning);
+        if(opt.use_detector)
+            sigfitpara.AddDetector(opt.name, opt.binning);
     }
     sigfitpara.InitEventMap(samples, 0);
     fitpara.push_back(&sigfitpara);
@@ -168,11 +202,13 @@ int main(int argc, char** argv)
     fluxpara.SetCovarianceMatrix(cov_flux);
     for(const auto& opt : parser.detectors)
     {
-        fluxpara.AddDetector(opt.name, enubins);
+        if(opt.use_detector)
+            fluxpara.AddDetector(opt.name, enubins);
     }
     fluxpara.InitEventMap(samples, 0);
-    fitpara.push_back(&fluxpara);
+    //fitpara.push_back(&fluxpara);
 
+    /*
     TMatrixDSym cov_xsec(4);
     cov_xsec(0,0) = 0.011;
     cov_xsec(0,1) = 0.0;
@@ -190,12 +226,14 @@ int main(int argc, char** argv)
     cov_xsec(3,1) = 0.0225;
     cov_xsec(3,2) = 0.0;
     cov_xsec(3,3) = 0.0226;
+    */
 
     XsecParameters xsecpara("par_xsec");
     xsecpara.SetCovarianceMatrix(cov_xsec);
     for(const auto& opt : parser.detectors)
     {
-        xsecpara.AddDetector(opt.name, opt.xsec);
+        if(opt.use_detector)
+            xsecpara.AddDetector(opt.name, opt.xsec);
     }
     xsecpara.InitEventMap(samples, 0);
     fitpara.push_back(&xsecpara);

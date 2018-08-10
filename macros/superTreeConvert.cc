@@ -139,7 +139,7 @@ int superTreeConvert(
     nd5tree->SetBranchAddress("truelepton_mom", &muMomTrue);
     nd5tree->SetBranchAddress("truelepton_costheta", &muCosThetaTrue);
     nd5tree->SetBranchAddress("nu_trueE", &TrueNuEnergy);
-    nd5tree->SetBranchAddress("weight", &weight);
+    nd5tree->SetBranchAddress("weight_corr_total", &weight);
 
     outtree->Branch("reaction", &reaction, "reaction/I");
     outtree->Branch("cutBranch", &cutBranch, "cutBranch/I");
@@ -190,6 +190,7 @@ int superTreeConvert(
     Float_t nuE;
     Float_t range;
     Int_t fileIndex;
+    Int_t inttype;
     Int_t mupdg;
     Int_t ppdg;
     Int_t npioncount;
@@ -202,6 +203,7 @@ int superTreeConvert(
     nd2tree->SetBranchAddress("opening", &opening);
     nd2tree->SetBranchAddress("nuE", &nuE);
     nd2tree->SetBranchAddress("fileIndex", &fileIndex);
+    nd2tree->SetBranchAddress("inttype", &inttype);
     nd2tree->SetBranchAddress("mupdg", &mupdg);
     nd2tree->SetBranchAddress("ppdg", &ppdg);
     nd2tree->SetBranchAddress("range", &range);
@@ -325,7 +327,7 @@ int superTreeConvert(
     for (Long64_t jentry=0; jentry<nentries_T;jentry++) {
         nb_T = nd5tree_T->GetEntry(jentry);
         nbytes_T += nb_T;
-        weight_T=1.1; // 1.0
+        weight_T = 1.1; // 1.0
 
         //D1True_T = TMath::Cos(TMath::ACos(muCosThetaTrue_T) - TMath::ACos(pCosThetaTrue_T));
         D1True_T = muMomTrue_T;
@@ -341,7 +343,7 @@ int superTreeConvert(
     if(EvtEnd!=0) nentries=EvtEnd;
     if(EvtFrac>0.0001) nentries=nentries*EvtFrac;
 
-    for(Long64_t jentry=2000000; jentry < 2007500; jentry++) {
+    for(Long64_t jentry=2000000; jentry < 2010000; jentry++) {
         nb = nd2tree->GetEntry(jentry);
         nbytes += nb;
         if(fileIndex != 1)
@@ -355,8 +357,24 @@ int superTreeConvert(
         pMomRec = 0;
         pMomTrue = 0;
         weight = 1.1;
-        reaction = 0;
         cutBranch = 10;
+
+        if(inttype == 1)
+            reaction = 0;
+        else if(inttype == 2)
+            reaction = 9;
+        else if(inttype == 11 || inttype == 12 || inttype == 13)
+            reaction = 1;
+        else if(inttype == 21 || inttype == 26)
+            reaction = 2;
+        else if(inttype == 16)
+            reaction = 3;
+        else if(inttype > 30 && inttype < 47)
+            reaction = 4;
+        else if(inttype < 0)
+            reaction = 5;
+        else
+            reaction = -1;
 
         if(fileIndex == 1 && npioncount == 0 && mupdg == 13 && ppdg == 2212 && nprotoncount == 1)
         {

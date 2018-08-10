@@ -8,7 +8,48 @@
             "limit_lo" : 0.00,
             "limit_hi" : 2.00,
             "binning" : "splines/q2_binning_fine.txt",
-            "splines" : "splines/maccqe_splines.root"
+            "splines" : "splines/maccqe_splines.root",
+            "use" : true
+        },
+        {
+            "name" : "MEC_C",
+            "nominal" : 1.00,
+            "step" : 0.05,
+            "limit_lo" : 0.00,
+            "limit_hi" : 2.00,
+            "binning" : "splines/q2_binning_fine.txt",
+            "splines" : "splines/mec_c_splines.root",
+            "use" : false
+        },
+        {
+            "name" : "MEC_O",
+            "nominal" : 1.00,
+            "step" : 0.05,
+            "limit_lo" : 0.00,
+            "limit_hi" : 2.00,
+            "binning" : "splines/q2_binning_fine.txt",
+            "splines" : "splines/mec_o_splines.root",
+            "use" : false
+        },
+        {
+            "name" : "PF_C",
+            "nominal" : 217,
+            "step" : 0.05,
+            "limit_lo" : 200,
+            "limit_hi" : 300,
+            "binning" : "splines/q2_binning_fine.txt",
+            "splines" : "splines/pf_c_splines.root",
+            "use" : false
+        },
+        {
+            "name" : "PF_O",
+            "nominal" : 225,
+            "step" : 0.05,
+            "limit_lo" : 200,
+            "limit_hi" : 300,
+            "binning" : "splines/q2_binning_fine.txt",
+            "splines" : "splines/pf_o_splines.root",
+            "use" : false
         },
         {
             "name" : "MARES",
@@ -17,7 +58,38 @@
             "limit_lo" : 0.00,
             "limit_hi" : 2.00,
             "binning" : "splines/q2_binning_fine.txt",
-            "splines" : "splines/mares_splines.root"
+            "splines" : "splines/mares_splines.root",
+            "use" : true
+        },
+        {
+            "name" : "CA5",
+            "nominal" : 1.01,
+            "step" : 0.05,
+            "limit_lo" : 0.00,
+            "limit_hi" : 2.00,
+            "binning" : "splines/q2_binning_fine.txt",
+            "splines" : "splines/ca5_splines.root",
+            "use" : true
+        },
+        {
+            "name" : "I12RES",
+            "nominal" : 1.30,
+            "step" : 0.05,
+            "limit_lo" : 0.00,
+            "limit_hi" : 2.00,
+            "binning" : "splines/q2_binning_fine.txt",
+            "splines" : "splines/i12res_splines.root",
+            "use" : true
+        },
+        {
+            "name" : "DIS",
+            "nominal" : 1.00,
+            "step" : 0.05,
+            "limit_lo" : 0.00,
+            "limit_hi" : 2.00,
+            "binning" : "splines/q2_binning_fine.txt",
+            "splines" : "splines/dis_splines.root",
+            "use" : true
         }
     ]
 }

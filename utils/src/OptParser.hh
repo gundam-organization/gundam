@@ -37,6 +37,7 @@ struct DetOpt
     double flux_error;
     double ntargets_val;
     double ntargets_err;
+    bool use_detector;
 };
 
 class OptParser

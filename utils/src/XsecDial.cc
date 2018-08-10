@@ -57,6 +57,11 @@ double XsecDial::GetSplineValue(int index, double dial_value) const
         return 1.0;
 }
 
+std::string XsecDial::GetSplineName(int index) const
+{
+    return std::string(v_splines.at(index).GetName());
+}
+
 void XsecDial::SetVars(double nominal, double step, double limit_lo, double limit_hi)
 {
     m_nominal = nominal;

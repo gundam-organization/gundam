@@ -26,6 +26,7 @@ class XsecDial
 
         int GetSplineIndex(int topology, int reaction, double q2) const;
         double GetSplineValue(int index, double dial_value) const;
+        std::string GetSplineName(int index) const;
 
         void SetVars(double nominal, double step, double limit_lo, double limit_hi);
         void SetDimensions(int num_top, int num_reac);

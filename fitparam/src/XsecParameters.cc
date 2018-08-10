@@ -230,10 +230,27 @@ void XsecParameters::ReWeight(AnaEvent* event, const std::string& det, int nsamp
     int num_dials = v_dials.size();
     double weight = 1.0;
 
+
     for(int d = 0; d < num_dials; ++d)
     {
         int idx = m_dial_evtmap[nsample][nevent][d];
-        weight *= v_dials[d].GetSplineValue(idx, params[d + m_offset.at(det)]);
+        double dial_weight = v_dials[d].GetSplineValue(idx, params[d + m_offset.at(det)]);
+        weight *= dial_weight;
+
+        /*
+        if(dial_weight != 1.0 && det == "INGRID")
+        {
+            std::cout << "--------------" << std::endl;
+            std::cout << "Ev T: " << event -> GetTopology() << std::endl
+                      << "Ev R: " << event -> GetReaction() << std::endl
+                      << "Ev Q: " << event -> GetQ2() << std::endl;
+            std::cout << "Ev I: " << idx << std::endl;
+            std::cout << "Ev W: " << dial_weight << std::endl;
+            std::cout << "Dl V: " << params[d + m_offset.at(det)] << std::endl;
+            std::cout << "Dl N: " << det << "_" << v_dials[d].GetName() << std::endl;
+            std::cout << "Sp N: " << v_dials[d].GetSplineName(idx) << std::endl;
+        }
+        */
     }
 
     event -> AddEvWght(weight);
@@ -256,14 +273,17 @@ void XsecParameters::AddDetector(const std::string& det, const std::string& conf
     std::vector<XsecDial> v_dials;
     for(const auto& dial : j["dials"])
     {
-        std::string fname_binning = input_dir + dial["binning"].get<std::string>();
-        std::string fname_splines = input_dir + dial["splines"].get<std::string>();
+        if(dial["use"] == true)
+        {
+            std::string fname_binning = input_dir + dial["binning"].get<std::string>();
+            std::string fname_splines = input_dir + dial["splines"].get<std::string>();
 
-        XsecDial x(dial["name"], fname_binning, fname_splines);
-        x.SetVars(dial["nominal"], dial["step"], dial["limit_lo"], dial["limit_hi"]);
-        x.SetDimensions(8, 10);
-        x.Print(true);
-        v_dials.emplace_back(x);
+            XsecDial x(dial["name"], fname_binning, fname_splines);
+            x.SetVars(dial["nominal"], dial["step"], dial["limit_lo"], dial["limit_hi"]);
+            x.SetDimensions(8, 10);
+            x.Print(true);
+            v_dials.emplace_back(x);
+        }
     }
 
     v_detectors.emplace_back(det);

@@ -120,4 +120,5 @@ void BinManager::Print() const
         std::cout << std::endl;
     }
     std::cout.unsetf(std::ios::fixed);
+    std::cout.precision(6);
 }

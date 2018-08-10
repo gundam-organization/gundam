@@ -12,7 +12,7 @@
     "sample_signal" : [1,2],
     "sample_topology" : ["cc0pi0p", "cc0pi1p", "cc0pinp", "cc1pi+", "ccother", "bkg", "null", "OOFV"],
     "flux_cov" : {
-        "file" : "flux_numu_cov.root",
+        "file" : "flux_numu_cov_nd280.root",
         "matrix" : "flux_numu_cov",
         "binning" : "flux_binning"
     },
@@ -22,7 +22,7 @@
         "binning" : "det_binning"
     },
     "xsec_cov" : {
-        "file" : "",
+        "file" : "xsec_cov_nd280.txt",
         "matrix" : "xsec_cov"
     },
     "detectors" : [
@@ -35,7 +35,8 @@
             "xsec_config" : "dials.json",
             "binning" : "tn337_binning.txt",
             "ntargets_val" : 5.9E29,
-            "ntargets_err" : 0.0067
+            "ntargets_err" : 0.0067,
+            "use_detector" : true
         },
         {
             "name" : "INGRID",
@@ -46,13 +47,35 @@
             "xsec_config" : "dials.json",
             "binning" : "ingrid_binning.txt",
             "ntargets_val" : 1.756E29,
-            "ntargets_err" : 0.011
+            "ntargets_err" : 0.011,
+            "use_detector" : false
         }
     ],
     "samples" : [
         {
             "cut_branch" : 0,
             "name" : "muTPC",
+            "detector" : "ND280",
+            "binning" : "tn337_binning.txt",
+            "use_sample" : true
+        },
+        {
+            "cut_branch" : 1,
+            "name" : "muTPCpTPC",
+            "detector" : "ND280",
+            "binning" : "tn337_binning.txt",
+            "use_sample" : true
+        },
+        {
+            "cut_branch" : 2,
+            "name" : "muTPCpFGD",
+            "detector" : "ND280",
+            "binning" : "tn337_binning.txt",
+            "use_sample" : true
+        },
+        {
+            "cut_branch" : 3,
+            "name" : "muFGDpTPC",
             "detector" : "ND280",
             "binning" : "tn337_binning.txt",
             "use_sample" : true
@@ -65,11 +88,18 @@
             "use_sample" : true
         },
         {
+            "cut_branch" : 6,
+            "name" : "CCDIS",
+            "detector" : "ND280",
+            "binning" : "tn337_binning.txt",
+            "use_sample" : false
+        },
+        {
             "cut_branch" : 10,
             "name": "INGRID",
             "detector" : "INGRID",
             "binning" : "ingrid_binning.txt",
-            "use_sample" : true
+            "use_sample" : false
         }
     ]
 }
