@@ -77,6 +77,7 @@ int superTreeConvert(
 
     // Declaration of leaf types
     Int_t          accum_level[1500][50];
+    Int_t          nutype;
     Int_t          reaction;
     Int_t          cutBranch=-999;
     Int_t          mectopology;
@@ -106,6 +107,7 @@ int superTreeConvert(
     Float_t        weight;
     Float_t        weightIn[2];
 
+    Int_t          nutype_T;
     Int_t          reaction_T;
     Int_t          cutBranch_T=-999;
     Int_t          mectopology_T;
@@ -120,6 +122,7 @@ int superTreeConvert(
     Float_t        weightIn_T[2];
 
     nd5tree->SetBranchAddress("accum_level", &accum_level);
+    nd5tree->SetBranchAddress("nutype", &nutype);
     nd5tree->SetBranchAddress("reaction", &reaction);
     nd5tree->SetBranchAddress("mectopology", &mectopology);
     //nd5tree->SetBranchAddress(D1NameTrue, &D1True);
@@ -141,6 +144,7 @@ int superTreeConvert(
     nd5tree->SetBranchAddress("nu_trueE", &TrueNuEnergy);
     nd5tree->SetBranchAddress("weight_corr_total", &weight);
 
+    outtree->Branch("nutype", &nutype, "nutype/I");
     outtree->Branch("reaction", &reaction, "reaction/I");
     outtree->Branch("cutBranch", &cutBranch, "cutBranch/I");
     outtree->Branch("mectopology", &mectopology, "mectopology/I");
@@ -160,6 +164,7 @@ int superTreeConvert(
     outtree->Branch("Enutrue", &TrueNuEnergy, "Enutrue/F");
     outtree->Branch("weight", &weight, "weight/F");
 
+    nd5tree_T->SetBranchAddress("nutype", &nutype_T);
     nd5tree_T->SetBranchAddress("reaction", &reaction_T);
     nd5tree_T->SetBranchAddress("mectopology", &mectopology_T);
     //nd5tree_T->SetBranchAddress(D1NameTrue_T, &D1True_T);
@@ -172,6 +177,7 @@ int superTreeConvert(
     nd5tree_T->SetBranchAddress("weight", &weight_T);
     //nd5tree_T->SetBranchAddress("weight", &weightIn_T);
 
+    outtree_T->Branch("nutype", &nutype_T, "nutype/I");
     outtree_T->Branch("reaction", &reaction_T, "reaction/I");
     outtree_T->Branch("cutBranch", &cutBranch_T, "cutBranch/I");
     outtree_T->Branch("mectopology", &mectopology_T, "mectopology/I");
@@ -222,7 +228,7 @@ int superTreeConvert(
         nbytes += nb;
         passCount = 0;
         RecoNuEnergy = TrueNuEnergy;
-        weight = 1.1;
+        weight = 1.0;
         //pCosThetaRec  = TMath::Cos(pThetaRec);
         //muCosThetaRec = TMath::Cos(muThetaRec);
 
@@ -234,7 +240,7 @@ int superTreeConvert(
         D2Reco = muCosThetaRec;
 
         if(mectopology == 1 || mectopology == 2)
-            weight = 1.1;
+            weight = 1.0;
 
         if(useAltPp){
             pMomTrue=pMomTrueAlt;
@@ -249,7 +255,7 @@ int superTreeConvert(
                 if(cutBranch==3) muMomRec=muMomRecRange;
                 branches_passed[i]++;
                 if((( (mectopology==1)||(mectopology==2) ) && ( (pMomTrue>450)&&(muMomTrue>250)&&(muCosThetaTrue>-0.6)&&(pCosThetaTrue>0.4) ))){
-                    weight = 1.1; // weight*sigWeight;
+                    weight = 1.0; // weight*sigWeight;
                 }
                 if(psdim){
                     //Phase Space Bins:
@@ -327,7 +333,7 @@ int superTreeConvert(
     for (Long64_t jentry=0; jentry<nentries_T;jentry++) {
         nb_T = nd5tree_T->GetEntry(jentry);
         nbytes_T += nb_T;
-        weight_T = 1.1; // 1.0
+        weight_T = 1.0; // 1.0
 
         //D1True_T = TMath::Cos(TMath::ACos(muCosThetaTrue_T) - TMath::ACos(pCosThetaTrue_T));
         D1True_T = muMomTrue_T;
@@ -356,7 +362,8 @@ int superTreeConvert(
         muMomTrue = 0;
         pMomRec = 0;
         pMomTrue = 0;
-        weight = 1.1;
+        weight = 1.0;
+        nutype = 14;
         cutBranch = 10;
 
         if(inttype == 1)
@@ -379,12 +386,12 @@ int superTreeConvert(
         if(fileIndex == 1 && npioncount == 0 && mupdg == 13 && ppdg == 2212 && nprotoncount == 1)
         {
             mectopology = 1;
-            weight = 1.1;
+            weight = 1.0;
         }
         else if(fileIndex == 1 && npioncount == 0 && mupdg == 13 && ppdg == 2212 && nprotoncount > 1)
         {
             mectopology = 2;
-            weight = 1.1;
+            weight = 1.0;
         }
         else if(fileIndex == 1 && npioncount == 1 && mupdg == 13 && ppdg == 211 && nprotoncount == 0)
             mectopology = 3;
@@ -430,6 +437,7 @@ int superTreeConvert(
         D2True_T = D2True;
         TrueNuEnergy_T = TrueNuEnergy;
         cutBranch_T = -2;
+        nutype_T = 14;
         mectopology_T = mectopology;
         weight_T = weight;
         outtree_T -> Fill();

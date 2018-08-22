@@ -17,6 +17,14 @@ struct FitBin
           {}
 };
 
+enum Flavor
+{
+    kNumu = 0,
+    kNumubar = 1,
+    kNue = 2,
+    kNuebar = 3,
+};
+
 }
 
 #endif

@@ -29,6 +29,7 @@ long int AnyTreeMC::GetEntry(long int entry) const
 void AnyTreeMC::SetBranches()
 {
     // Set branch addresses and branch pointers
+    fChain -> SetBranchAddress("nutype", &nutype, &b_nutype);
     fChain -> SetBranchAddress("cutBranch", &cutBranch, &b_cutBranch);
     fChain -> SetBranchAddress("mectopology", &evtTopology, &b_evtTopology);
     fChain -> SetBranchAddress("reaction", &evtReaction, &b_evtReaction);
@@ -68,6 +69,7 @@ void AnyTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples, const std::vecto
         //create and fill event structure
         AnaEvent ev(jentry);
         ev.SetTrueEvent(evt_type);
+        ev.SetFlavor(nutype);
         ev.SetSampleType(cutBranch);
         ev.SetTopology(evtTopology); // mectopology (i.e. CC0Pi,CC1Pi etc)
         ev.SetReaction(evtReaction); // reaction (i.e. CCQE,CCRES etc)

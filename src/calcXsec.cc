@@ -14,12 +14,14 @@
 
 #include "AnaSample.hh"
 #include "AnyTreeMC.hh"
+#include "ColorOutput.hh"
 #include "FitParameters.hh"
 #include "FluxParameters.hh"
 #include "OptParser.hh"
 #include "ToyThrower.hh"
 #include "XsecExtractor.hh"
 #include "XsecFitter.hh"
+#include "XsecParameters.hh"
 
 std::vector<std::vector<double> > MapThrow(const std::vector<double>& toy,
                                            const std::vector<double>& nom,
@@ -51,11 +53,15 @@ void ConcatHistograms(TH1D& h_postfit,
 
 int main(int argc, char** argv)
 {
+    const std::string TAG = color::CYAN_STR + "[CalcXsec]: " + color::RESET_STR;
+    const std::string ERR = color::RED_STR + color::BOLD_STR
+                            + "[ERROR]: " + color::RESET_STR;
+
     auto t_start_total = std::chrono::high_resolution_clock::now();
     //std::cout << std::fixed << std::setprecision(3);
     std::cout << "------------------------------------------------\n"
-              << "[CalcXsec]: Welcome to the Super-xsLLhFitter.\n"
-              << "[CalcXsec]: Initializing the fit machinery..." << std::endl;
+              << TAG << "Welcome to the Super-xsLLhFitter.\n"
+              << TAG << "Initializing the fit machinery..." << std::endl;
 
     const std::string xslf_env = std::getenv("XSLLHFITTER");
     if(xslf_env.empty())
@@ -113,15 +119,15 @@ int main(int argc, char** argv)
     TFile* fpostfit = TFile::Open(fname_postfit.c_str(), "READ");
     TFile* foutput  = TFile::Open(fname_xsec.c_str(), "RECREATE");
 
-    std::cout << "[CalcXsec]: Opening " << fname_data << " for data selection.\n"
-              << "[CalcXsec]: Opening " << fname_mc << " for MC selection.\n"
-              << "[CalcXsec]: Opening " << fname_postfit << " for post-fit results.\n"
-              << "[CalcXsec]: Opening " << fname_xsec << " to store xsec results." << std::endl;
+    std::cout << TAG << "Opening " << fname_data << " for data selection.\n"
+              << TAG << "Opening " << fname_mc << " for MC selection.\n"
+              << TAG << "Opening " << fname_postfit << " for post-fit results.\n"
+              << TAG << "Opening " << fname_xsec << " to store xsec results." << std::endl;
 
-    std::cout << "[CalcXsec]: Setup Flux " << std::endl;
+    std::cout << TAG << "Setup Flux " << std::endl;
 
     TFile *finfluxcov = TFile::Open(parser.flux_cov.fname.c_str(), "READ");
-    std::cout << "[CalcXsec]: Opening " << parser.flux_cov.fname << " for flux covariance." << std::endl;
+    std::cout << TAG << "Opening " << parser.flux_cov.fname << " for flux covariance." << std::endl;
     TH1D *nd_numu_bins_hist = (TH1D*)finfluxcov->Get(parser.flux_cov.binning.c_str());
     TAxis *nd_numu_bins = nd_numu_bins_hist->GetXaxis();
 
@@ -134,31 +140,67 @@ int main(int argc, char** argv)
     TMatrixDSym cov_flux = *cov_flux_in;
     finfluxcov -> Close();
 
+    std::cout << TAG << "Setup Xsec Covariance" << std::endl;
+    std::ifstream fin(parser.xsec_cov.fname, std::ios::in);
+
+    TMatrixDSym cov_xsec;
+    if(!fin.is_open())
+    {
+        std::cerr << ERR << "Failed to open " << parser.xsec_cov.fname << std::endl;
+        return 1;
+    }
+    else
+    {
+        unsigned int dim = 0;
+        std::string line;
+        if(std::getline(fin, line))
+        {
+            std::stringstream ss(line);
+            ss >> dim;
+        }
+
+        cov_xsec.ResizeTo(dim, dim);
+        for(unsigned int i = 0; i < dim; ++i)
+        {
+            std::getline(fin, line);
+            std::stringstream ss(line);
+            double val = 0;
+
+            for(unsigned int j = 0; j < dim; ++j)
+            {
+                ss >> val;
+                cov_xsec(i,j) = val;
+            }
+        }
+    }
+
     auto t_start_samples = std::chrono::high_resolution_clock::now();
     std::vector<AnaSample*> samples;
     std::vector<AnaSample*> samples_true;
     for(const auto& opt : parser.samples)
     {
-        std::cout << "[CalcXsec]: Adding new sample to fit.\n"
-                  << "[CalcXsec]: Name: " << opt.name << std::endl
-                  << "[CalcXsec]: CutB: " << opt.cut_branch << std::endl
-                  << "[CalcXsec]: Detector: " << opt.detector << std::endl
-                  << "[CalcXsec]: Use Sample: " << opt.use_sample << std::endl;
-
-        auto s = new AnaSample(opt.cut_branch, opt.name, opt.detector, opt.binning, tdata_sel);
-        s -> SetNorm(potD/potMC);
         if(opt.use_sample == true)
+        {
+            std::cout << TAG << "Adding new sample to fit.\n"
+                << TAG << "Name: " << opt.name << std::endl
+                << TAG << "CutB: " << opt.cut_branch << std::endl
+                << TAG << "Detector: " << opt.detector << std::endl
+                << TAG << "Use Sample: " << opt.use_sample << std::endl;
+
+            auto s = new AnaSample(opt.cut_branch, opt.name, opt.detector, opt.binning, tdata_sel);
+            s -> SetNorm(potD/potMC);
             samples.push_back(s);
+        }
     }
 
-    std::cout << "[CalcXsec]: Reading and collecting events." << std::endl;
+    std::cout << TAG << "Reading and collecting events." << std::endl;
     AnyTreeMC selTree(fname_mc.c_str(), "selectedEvents");
     selTree.GetEvents(samples, signal_topology, false);
 
-    AnyTreeMC truTree(fname_mc.c_str(), "trueEvents");
-    truTree.GetEvents(samples, signal_topology, true);
+    //AnyTreeMC truTree(fname_mc.c_str(), "trueEvents");
+    //truTree.GetEvents(samples, signal_topology, true);
 
-    std::cout << "[CalcXsec]: Getting sample breakdown by reaction." << std::endl;
+    std::cout << TAG << "Getting sample breakdown by reaction." << std::endl;
     for(const auto& s : samples)
     {
         s -> GetSampleBreakdown(foutput, "nominal", topology, false);
@@ -171,17 +213,33 @@ int main(int argc, char** argv)
     std::vector<AnaFitParameters*> fitpara;
 
     FitParameters sigfitpara("par_fit");
-    for(const auto& opt : parser.samples)
-        sigfitpara.AddDetector(opt.detector, opt.binning);
+    for(const auto& opt : parser.detectors)
+    {
+        if(opt.use_detector)
+            sigfitpara.AddDetector(opt.name, opt.binning);
+    }
     sigfitpara.InitEventMap(samples, 0);
     fitpara.push_back(&sigfitpara);
 
     FluxParameters fluxpara("par_flux");
     fluxpara.SetCovarianceMatrix(cov_flux);
-    for(const auto& opt : parser.samples)
-        fluxpara.AddDetector(opt.detector, enubins);
+    for(const auto& opt : parser.detectors)
+    {
+        if(opt.use_detector)
+            fluxpara.AddDetector(opt.name, enubins);
+    }
     fluxpara.InitEventMap(samples, 0);
-    //fitpara.push_back(&fluxpara);
+    fitpara.push_back(&fluxpara);
+
+    XsecParameters xsecpara("par_xsec");
+    xsecpara.SetCovarianceMatrix(cov_xsec);
+    for(const auto& opt : parser.detectors)
+    {
+        if(opt.use_detector)
+            xsecpara.AddDetector(opt.name, opt.xsec);
+    }
+    xsecpara.InitEventMap(samples, 0);
+    fitpara.push_back(&xsecpara);
     auto t_end_samples = std::chrono::high_resolution_clock::now();
 
     TMatrixDSym* postfit_cov = (TMatrixDSym*)fpostfit -> Get("res_cov_matrix");
@@ -189,7 +247,7 @@ int main(int argc, char** argv)
     TVectorD* postfit_param_root = (TVectorD*)fpostfit -> Get("res_vector");
 
     auto t_start_throws = std::chrono::high_resolution_clock::now();
-    std::cout << "[CalcXsec]: Throwing " << num_throws << " toys." << std::endl;
+    std::cout << TAG << "Throwing " << num_throws << " toys." << std::endl;
     const int npar = postfit_cov -> GetNrows();
     const int nfitbins = sigfitpara.GetNpar();
     TMatrixD xsec_cov(nfitbins, nfitbins);
@@ -204,12 +262,15 @@ int main(int argc, char** argv)
     std::vector<std::string> xsec_order;
     for(const auto& det : parser.detectors)
     {
-        std::cout << "[CalcXsec]: Adding detector for cross section: " << det.name << std::endl;
-        XsecExtractor x(det.name, det.binning, ++seed);
-        x.SetNumTargets(det.ntargets_val, det.ntargets_err);
-        x.SetFluxVar(det.flux_integral, det.flux_error);
-        xsec_calc.emplace(std::make_pair(det.name, x));
-        xsec_order.emplace_back(det.name);
+        if(det.use_detector)
+        {
+            std::cout << TAG << "Adding detector for cross section: " << det.name << std::endl;
+            XsecExtractor x(det.name, det.binning, ++seed);
+            x.SetNumTargets(det.ntargets_val, det.ntargets_err);
+            x.SetFluxVar(det.flux_integral, det.flux_error);
+            xsec_calc.emplace(std::make_pair(det.name, x));
+            xsec_order.emplace_back(det.name);
+        }
     }
 
     std::map<std::string, TH1D> h_postfit_map;
@@ -240,8 +301,8 @@ int main(int argc, char** argv)
     auto toy_param = MapThrow(toy, postfit_param, fitpara);
 
     ReweightEvents(samples, fitpara, xsec_calc, h_postfit_map, h_postfit_map_true, toy_param);
-    CalcEfficiency(xsec_calc, h_postfit_map, h_postfit_map_true, h_efficiency);
-    ApplyEfficiency(xsec_calc, h_postfit_map, h_efficiency);
+    //CalcEfficiency(xsec_calc, h_postfit_map, h_postfit_map_true, h_efficiency);
+    //ApplyEfficiency(xsec_calc, h_postfit_map, h_efficiency);
     ApplyNormalization(xsec_calc, h_postfit_map, false);
     ConcatHistograms(h_postfit, h_postfit_map, xsec_order);
 
@@ -297,7 +358,7 @@ int main(int argc, char** argv)
     {
         t_start_single = std::chrono::high_resolution_clock::now();
         if(t % 1000 == 0)
-            std::cout << "[CalcXsec]: Throw " << t << "/" << num_throws << std::endl;
+            std::cout << TAG << "Throw " << t << "/" << num_throws << std::endl;
 
         toy_thrower.Throw(toy);
         throws.push_back(toy);
@@ -309,7 +370,7 @@ int main(int argc, char** argv)
 
         ReweightEvents(samples, fitpara, xsec_calc, h_postfit_map, h_postfit_map_true, toy_param);
         //CalcEfficiency(xsec_calc, h_postfit_map, h_postfit_map_true, h_efficiency);
-        ApplyEfficiency(xsec_calc, h_postfit_map, h_efficiency);
+        //ApplyEfficiency(xsec_calc, h_postfit_map, h_efficiency);
         ApplyNormalization(xsec_calc, h_postfit_map, true);
         ConcatHistograms(h_throw, h_postfit_map, xsec_order);
 
@@ -361,7 +422,7 @@ int main(int argc, char** argv)
         xsec_throws.push_back(h_throw);
         t_end_single = std::chrono::high_resolution_clock::now();
     }
-    std::cout << "[CalcXsec]: Throws Finished." << std::endl;
+    std::cout << TAG << "Throws Finished." << std::endl;
     auto t_end_throws = std::chrono::high_resolution_clock::now();
 
     TH1D h_mean("h_mean", "h_mean", nfitbins, 0, nfitbins);

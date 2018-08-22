@@ -90,6 +90,106 @@
             "binning" : "splines/q2_binning_fine.txt",
             "splines" : "splines/dis_splines.root",
             "use" : true
+        },
+        {
+            "name" : "CCCOH",
+            "nominal" : 1.00,
+            "step" : 0.05,
+            "limit_lo" : 0.00,
+            "limit_hi" : 2.00,
+            "binning" : "splines/q2_binning_fine.txt",
+            "splines" : "splines/cccoh_splines.root",
+            "use" : true
+        },
+        {
+            "name" : "NCCOH",
+            "nominal" : 1.00,
+            "step" : 0.05,
+            "limit_lo" : 0.00,
+            "limit_hi" : 2.00,
+            "binning" : "splines/q2_binning_fine.txt",
+            "splines" : "splines/nccoh_splines.root",
+            "use" : true
+        },
+        {
+            "name" : "NCOTH",
+            "nominal" : 1.00,
+            "step" : 0.05,
+            "limit_lo" : 0.00,
+            "limit_hi" : 2.00,
+            "binning" : "splines/q2_binning_fine.txt",
+            "splines" : "splines/ncoth_splines.root",
+            "use" : true
+        },
+        {
+            "name" : "CCNUE",
+            "nominal" : 1.00,
+            "step" : 0.05,
+            "limit_lo" : 0.00,
+            "limit_hi" : 2.00,
+            "binning" : "splines/q2_binning_fine.txt",
+            "splines" : "splines/ccnue_splines.root",
+            "use" : true
+        },
+        {
+            "name" : "FSI_INEL_LO",
+            "nominal" : 1.00,
+            "step" : 0.05,
+            "limit_lo" : 0.00,
+            "limit_hi" : 2.00,
+            "binning" : "splines/q2_binning_fine.txt",
+            "splines" : "splines/fsi_inel_lo_splines.root",
+            "use" : true
+        },
+        {
+            "name" : "FSI_PI_ABS",
+            "nominal" : 1.10,
+            "step" : 0.05,
+            "limit_lo" : 0.00,
+            "limit_hi" : 2.00,
+            "binning" : "splines/q2_binning_fine.txt",
+            "splines" : "splines/fsi_pi_abs_splines.root",
+            "use" : true
+        },
+        {
+            "name" : "FSI_CEX_LO",
+            "nominal" : 1.00,
+            "step" : 0.05,
+            "limit_lo" : 0.00,
+            "limit_hi" : 2.00,
+            "binning" : "splines/q2_binning_fine.txt",
+            "splines" : "splines/fsi_cex_lo_splines.root",
+            "use" : true
+        },
+        {
+            "name" : "FSI_PI_PROD",
+            "nominal" : 1.00,
+            "step" : 0.05,
+            "limit_lo" : 0.00,
+            "limit_hi" : 2.00,
+            "binning" : "splines/q2_binning_fine.txt",
+            "splines" : "splines/fsi_pi_prod_splines.root",
+            "use" : true
+        },
+        {
+            "name" : "FSI_INEL_HI",
+            "nominal" : 1.80,
+            "step" : 0.05,
+            "limit_lo" : 0.00,
+            "limit_hi" : 3.00,
+            "binning" : "splines/q2_binning_fine.txt",
+            "splines" : "splines/fsi_inel_hi_splines.root",
+            "use" : true
+        },
+        {
+            "name" : "FSI_CEX_HI",
+            "nominal" : 1.80,
+            "step" : 0.05,
+            "limit_lo" : 0.00,
+            "limit_hi" : 3.00,
+            "binning" : "splines/q2_binning_fine.txt",
+            "splines" : "splines/fsi_cex_hi_splines.root",
+            "use" : true
         }
     ]
 }

@@ -22,6 +22,7 @@ class AnyTreeMC
         TChain *fChain; //!pointer to the analyzed TTree or TChain
 
         // Declaration of leaf types
+        int   nutype;
         int   cutBranch;
         int   evtTopology;
         int   evtReaction;
@@ -46,6 +47,7 @@ class AnyTreeMC
 
 
         // List of branches
+        TBranch *b_nutype;
         TBranch *b_cutBranch;
         TBranch *b_evtTopology;
         TBranch *b_evtReaction;

@@ -15,12 +15,15 @@
 
 #include <TMath.h>
 
+#include <FitStructs.hh>
+
 class AnaEvent
 {
     public:
         AnaEvent(long int evid) //unique event id
         {
             m_evid     = evid;
+            m_flavor   = -1;
             m_topology = -1;
             m_reaction = -1;
             m_sample   = -1;
@@ -61,6 +64,9 @@ class AnaEvent
 
         void SetTrueEvent(const bool flag = true){ m_trueEvt = flag; }
         bool isTrueEvent(){ return m_trueEvt; }
+
+        void SetFlavor(const int flavor){ m_flavor = flavor; }
+        int GetFlavor(){ return m_flavor; }
 
         long int GetEvId(){ return m_evid; }
 
@@ -137,6 +143,7 @@ class AnaEvent
 
     private:
         long int m_evid;   //unique event id
+        int m_flavor;      //flavor of neutrino (numu, etc.)
         int m_topology;    //final state topology type
         int m_reaction;    //event interaction mode
         int m_sample;      //sample type (aka cutBranch)

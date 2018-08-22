@@ -188,7 +188,7 @@ int main(int argc, char** argv)
     // fit parameters first.
 
     //Fit parameters
-    FitParameters sigfitpara("par_fit");
+    FitParameters sigfitpara("par_fit", true);
     for(const auto& opt : parser.detectors)
     {
         if(opt.use_detector)
@@ -206,27 +206,7 @@ int main(int argc, char** argv)
             fluxpara.AddDetector(opt.name, enubins);
     }
     fluxpara.InitEventMap(samples, 0);
-    //fitpara.push_back(&fluxpara);
-
-    /*
-    TMatrixDSym cov_xsec(4);
-    cov_xsec(0,0) = 0.011;
-    cov_xsec(0,1) = 0.0;
-    cov_xsec(0,2) = 0.010;
-    cov_xsec(0,3) = 0.0;
-    cov_xsec(1,0) = 0.0;
-    cov_xsec(1,1) = 0.0225;
-    cov_xsec(1,2) = 0.0;
-    cov_xsec(1,3) = 0.0225;
-    cov_xsec(2,0) = 0.010;
-    cov_xsec(2,1) = 0.0;
-    cov_xsec(2,2) = 0.011;
-    cov_xsec(2,3) = 0.0;
-    cov_xsec(3,0) = 0.0;
-    cov_xsec(3,1) = 0.0225;
-    cov_xsec(3,2) = 0.0;
-    cov_xsec(3,3) = 0.0226;
-    */
+    fitpara.push_back(&fluxpara);
 
     XsecParameters xsecpara("par_xsec");
     xsecpara.SetCovarianceMatrix(cov_xsec);
