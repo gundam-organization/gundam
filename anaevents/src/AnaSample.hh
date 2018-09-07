@@ -15,6 +15,7 @@
 #include <TTree.h>
 
 #include "AnaEvent.hh"
+#include "ColorOutput.hh"
 #include "FitStructs.hh"
 using xsllh::FitBin;
 
@@ -48,24 +49,24 @@ class AnaSample
         void GetSampleBreakdown(TDirectory *dirout, const std::string& tag, const std::vector<std::string>& topology, bool save);
 
         double GetNorm() const
-            { return m_norm; } 
+            { return m_norm; }
         int GetSampleID() const
-            { return m_sample_id; } 
+            { return m_sample_id; }
         std::string GetName() const
-            { return m_name; } 
+            { return m_name; }
         std::string GetDetector() const
-            { return m_detector; } 
+            { return m_detector; }
 
         TH1D* GetPredHisto() const
-            { return m_hpred; } 
+            { return m_hpred; }
         TH1D* GetDataHisto() const
             { return m_hdata; }
         TH1D* GetMCHisto() const
-            { return m_hmc; } 
+            { return m_hmc; }
         TH1D* GetMCTruthHisto() const
-            { return m_hmc_true; } 
+            { return m_hmc_true; }
         TH1D* GetSignalHisto() const
-            { return m_hsig; } 
+            { return m_hsig; }
 
     protected:
         int m_sample_id;
@@ -84,6 +85,9 @@ class AnaSample
         TH1D* m_hpred;
         TH1D* m_hdata;
         TH1D* m_hsig;
+
+        std::string TAG;
+        std::string ERR;
 };
 
 #endif

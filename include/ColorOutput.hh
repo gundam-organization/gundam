@@ -21,6 +21,9 @@ enum code
     FG_DEFAULT = 39
 };
 
+const unsigned int rainbow_size = 6;
+const unsigned int rainbow_code[rainbow_size] = {31, 32, 33, 34, 35, 36};
+
 const std::string RESET_STR("\033[0m");
 const std::string BOLD_STR("\033[1m");
 const std::string RED_STR("\033[31m");
@@ -35,6 +38,33 @@ std::string ColorText(const T& text, unsigned int c)
 {
     std::stringstream ss;
     ss << "\033[" << c << "m" << text << RESET_STR;
+    return ss.str();
+}
+
+template<typename T>
+std::string RainbowText(const T& text)
+{
+    std::stringstream ss;
+    ss << text;
+
+    std::string text_str = ss.str();
+
+    ss.str("");
+    unsigned int i = 0;
+    unsigned int char_count = 0;
+    for(const auto& c : text_str)
+    {
+        if(char_count % rainbow_size == 0)
+        {
+            ss << BOLD_STR << "\033[" << rainbow_code[i++] << "m";
+            char_count = 0;
+        }
+
+        ss << c;
+        char_count++;
+    }
+    ss << RESET_STR;
+
     return ss.str();
 }
 } // namespace color

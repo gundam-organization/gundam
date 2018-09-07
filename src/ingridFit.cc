@@ -23,8 +23,8 @@ int main(int argc, char** argv)
 
     //std::cout << std::fixed << std::setprecision(3);
     std::cout << "------------------------------------------------\n"
-              << TAG << "Welcome to the Super-xsLLhFitter.\n"
-              << TAG << "Initializing the fit machinery..." << std::endl;
+              << TAG << color::RainbowText("Welcome to the Super-xsLLhFitter.\n")
+              << TAG << color::RainbowText("Initializing the fit machinery...") << std::endl;
 
     const std::string xslf_env = std::getenv("XSLLHFITTER");
     if(xslf_env.empty())

@@ -172,7 +172,8 @@ void FitParameters::InitParameters()
             pars_name.push_back(Form("%s_%s_%d", m_name.c_str(), det.c_str(), i));
             if(m_rng_priors == true)
             {
-                rand_prior = 2.0 * rng.Uniform(0.0, 1.0);
+                //rand_prior = 2.0 * rng.Uniform(0.0, 1.0);
+                rand_prior = rng.Gaus(1.0, 0.15);
                 pars_prior.push_back(rand_prior);
             }
             else

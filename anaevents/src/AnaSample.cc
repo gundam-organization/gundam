@@ -7,11 +7,14 @@ AnaSample::AnaSample(int sample_id, const std::string& name, const std::string& 
                     : m_sample_id(sample_id), m_name(name), m_detector(detector),
                       m_binning(binning), m_data_tree(t_data), m_norm(1.0)
 {
+    TAG = color::GREEN_STR + "[AnaSample]: " + color::RESET_STR;
+    ERR = color::RED_STR + "[ERROR]: " + color::RESET_STR;
+
     SetBinning(m_binning);
 
-    std::cout << "[AnySample]: " << m_name << ", ID " << m_sample_id << std::endl
-              << "[AnySample]: Detector: " << m_detector << std::endl
-              << "[AnySample]: Bin edges: " << std::endl;
+    std::cout << TAG << m_name << ", ID " << m_sample_id << std::endl
+              << TAG << "Detector: " << m_detector << std::endl
+              << TAG << "Bin edges: " << std::endl;
 
     for(const auto& bin : m_bin_edges)
     {
@@ -27,7 +30,7 @@ AnaSample::AnaSample(int sample_id, const std::string& name, const std::string& 
 
     MakeHistos(); //with default binning
 
-    std::cout << "[AnySample]: MakeHistos called." << std::endl;
+    std::cout << TAG << "MakeHistos called." << std::endl;
 }
 
 AnaSample::~AnaSample()
@@ -52,8 +55,8 @@ void AnaSample::SetBinning(const std::string& binning)
     std::ifstream fin(m_binning, std::ios::in);
     if(!fin.is_open())
     {
-        std::cerr << "[ERROR]: In AnaSample::SetBinning().\n"
-                  << "[ERROR]: Failed to open binning file: " << m_binning << std::endl;
+        std::cerr << ERR << "In AnaSample::SetBinning().\n"
+                  << ERR << "Failed to open binning file: " << m_binning << std::endl;
     }
     else
     {
@@ -64,7 +67,7 @@ void AnaSample::SetBinning(const std::string& binning)
             double D1_1, D1_2, D2_1, D2_2;
             if(!(ss>>D2_1>>D2_2>>D1_1>>D1_2))
             {
-                std::cerr << "[AnaSample]: Bad line format: " << line << std::endl;
+                std::cerr << TAG << "Bad line format: " << line << std::endl;
                 continue;
             }
             m_bin_edges.emplace_back(FitBin(D1_1, D1_2, D2_1, D2_2));
@@ -117,9 +120,9 @@ void AnaSample::ResetWeights()
 void AnaSample::PrintStats() const
 {
     double mem_kb = sizeof(m_events) * m_events.size() / 1000.0;
-    std::cout << "[AnaSample]: Sample " << m_name << " ID = " << m_sample_id << std::endl;
-    std::cout << "[AnaSample]: Num of events = " << m_events.size() << std::endl;
-    std::cout << "[AnaSample]: Memory used   = " << mem_kb << " kB." << std::endl;
+    std::cout << TAG << "Sample " << m_name << " ID = " << m_sample_id << std::endl;
+    std::cout << TAG << "Num of events = " << m_events.size() << std::endl;
+    std::cout << TAG << "Memory used   = " << mem_kb << " kB." << std::endl;
 }
 
 void AnaSample::MakeHistos()
@@ -152,7 +155,7 @@ void AnaSample::MakeHistos()
                       m_nbins, 0, m_nbins);
     m_hsig -> SetDirectory(0);
 
-    std::cout << "[AnySample]: " << m_nbins << " bins inside MakeHistos()." << std::endl;
+    std::cout << TAG << m_nbins << " bins inside MakeHistos()." << std::endl;
 }
 
 void AnaSample::SetData(TObject *hdata)
@@ -449,7 +452,7 @@ void AnaSample::GetSampleBreakdown(TDirectory *dirout, const std::string& tag, c
         }
     }
 
-    std::cout << "[AnySample]: GetSampleBreakdown()\n"
+    std::cout << TAG << "GetSampleBreakdown()\n"
               << "============ Sample " << m_name << " ==========="<< std::endl;
 
     for(int j = 0; j < ntopology; ++j)
