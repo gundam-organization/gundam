@@ -356,12 +356,13 @@ double XsecFitter::FillSamples(std::vector<std::vector<double> >& new_pars, int 
         output_chi2 = true;
 
     //loop over samples
-    #pragma omp parallel for num_threads(m_threads)
+    //#pragma omp parallel for num_threads(m_threads)
     for(int s = 0; s < m_samples.size(); ++s)
     {
         //loop over events
         const unsigned int num_events = m_samples[s] -> GetN();
         const std::string det = m_samples[s] -> GetDetector();
+        #pragma omp parallel for num_threads(m_threads)
         for(unsigned int i = 0; i < num_events; ++i)
         {
             AnaEvent* ev = m_samples[s]->GetEvent(i);
@@ -377,7 +378,7 @@ double XsecFitter::FillSamples(std::vector<std::vector<double> >& new_pars, int 
         double sample_chi2 = m_samples[s] -> CalcChi2();
 
         //calculate chi2 for each sample
-        #pragma omp atomic
+        //#pragma omp atomic
         chi2 += sample_chi2;
 
         if(output_chi2)

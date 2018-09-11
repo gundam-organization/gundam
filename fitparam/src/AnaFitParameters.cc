@@ -36,6 +36,7 @@ void AnaFitParameters::SetCovarianceMatrix(const TMatrixDSym& covmat)
 
     double det = 0;
     covarianceI->Invert(&det);
+    /*
     if(abs(det) < 1e-200)
     {
         std::cerr << "[ERROR]: In AnaFitParameters::SetCovarianceMatrix():\n"
@@ -43,7 +44,7 @@ void AnaFitParameters::SetCovarianceMatrix(const TMatrixDSym& covmat)
                   << std::endl;
         return;
     }
-
+    */
     std::cout << "[SetCovarianceMatrix]: Covariance matrix size: " << covariance->GetNrows()
               << " x " << covariance->GetNrows() << " for " << this -> m_name << std::endl;
 
