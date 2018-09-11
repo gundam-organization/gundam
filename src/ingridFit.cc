@@ -9,6 +9,7 @@
 #include "AnaSample.hh"
 #include "AnyTreeMC.hh"
 #include "ColorOutput.hh"
+#include "DetParameters.hh"
 #include "FitParameters.hh"
 #include "FluxParameters.hh"
 #include "OptParser.hh"
@@ -206,7 +207,7 @@ int main(int argc, char** argv)
             fluxpara.AddDetector(opt.name, enubins);
     }
     fluxpara.InitEventMap(samples, 0);
-    fitpara.push_back(&fluxpara);
+    //fitpara.push_back(&fluxpara);
 
     XsecParameters xsecpara("par_xsec");
     xsecpara.SetCovarianceMatrix(cov_xsec);
@@ -216,7 +217,22 @@ int main(int argc, char** argv)
             xsecpara.AddDetector(opt.name, opt.xsec);
     }
     xsecpara.InitEventMap(samples, 0);
-    fitpara.push_back(&xsecpara);
+    //fitpara.push_back(&xsecpara);
+
+    TMatrixDSym cov_det(348);
+    cov_det.Zero();
+    for(int i = 0; i < 348; ++i)
+        cov_det(i,i) = 0.1;
+
+    DetParameters detpara("par_det");
+    detpara.SetCovarianceMatrix(cov_det);
+    for(const auto& opt : parser.detectors)
+    {
+        if(opt.use_detector)
+            detpara.AddDetector(opt.name, samples, true);
+    }
+    detpara.InitEventMap(samples, 0);
+    fitpara.push_back(&detpara);
 
     //Instantiate fitter obj
     XsecFitter xsecfit(seed, threads);

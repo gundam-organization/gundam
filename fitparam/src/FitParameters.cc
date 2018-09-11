@@ -54,7 +54,7 @@ bool FitParameters::SetBinning(const std::string& file_name, std::vector<FitBin>
 int FitParameters::GetBinIndex(const std::string& det, double D1, double D2) const
 {
     int bin = BADBIN;
-    const std::vector<FitBin> temp_bins = m_fit_bins.at(det);
+    const std::vector<FitBin> &temp_bins = m_fit_bins.at(det);
 
     for(int i = 0; i < temp_bins.size(); ++i)
     {
@@ -86,7 +86,6 @@ void FitParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
     InitParameters();
     m_evmap.clear();
 
-    //loop over events to build index map
     for(std::size_t s=0; s < sample.size(); s++)
     {
         std::vector<int> sample_map;
@@ -100,7 +99,6 @@ void FitParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
             // N.B In Sara's original code THIS WAS THE OTHER WAY AROUND i.e. this if statement asked what was NOT your signal
             // Bare that in mind if you've been using older versions of the fitter.
 
-            //if((ev->GetTopology()==1)||(ev->GetTopology()==2))
             if(ev -> isSignalEvent())
             {
                 double D1 = ev -> GetTrueD1();
@@ -165,7 +163,7 @@ void FitParameters::InitParameters()
     unsigned int offset = 0;
     for(const auto& det : v_detectors)
     {
-        m_det_offset.insert(std::make_pair(det, offset));
+        m_det_offset.emplace(std::make_pair(det, offset));
         const int nbins = m_fit_bins.at(det).size();
         for(int i = 0; i < nbins; ++i)
         {

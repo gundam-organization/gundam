@@ -15,6 +15,7 @@
 #include <fstream>
 #include <iomanip>
 #include <sstream>
+#include <string>
 
 #include <TRandom3.h>
 

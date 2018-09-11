@@ -2,8 +2,8 @@
 #define __AnaSample_hh__
 
 #include <fstream>
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -19,75 +19,66 @@
 #include "FitStructs.hh"
 using xsllh::FitBin;
 
-///////////////////////////////////////
-// Class definition
-///////////////////////////////////////
 class AnaSample
 {
-    public:
-        AnaSample(int sample_id, const std::string& name, const std::string& detector,
-                  const std::string& binning, TTree* t_data);
-        ~AnaSample();
+public:
+    AnaSample(int sample_id, const std::string& name, const std::string& detector,
+              const std::string& binning, TTree* t_data);
+    ~AnaSample();
 
-        int GetN() const;
-        AnaEvent* GetEvent(int evnum);
-        void ClearEvents();
-        void AddEvent(const AnaEvent& event);
-        void ResetWeights();
+    int GetN() const;
+    AnaEvent* GetEvent(int evnum);
+    void ClearEvents();
+    void AddEvent(const AnaEvent& event);
+    void ResetWeights();
 
-        void PrintStats() const;
-        void SetNorm(const double val){ m_norm = val; }
-        void SetData(TObject* data);
+    void PrintStats() const;
+    void SetNorm(const double val) { m_norm = val; }
+    void SetData(TObject* data);
+    void MakeHistos();
 
-        void SetBinning(const std::string& binning);
-        int GetAnyBinIndex(const double D1, const double D2) const;
-        void MakeHistos();
+    void SetBinning(const std::string& binning);
+    int GetBinIndex(const double D1, const double D2) const;
+    std::vector<FitBin> GetBinEdges() const { return m_bin_edges; }
 
-        double CalcChi2() const;
-        void FillEventHisto(int datatype);
-        void Write(TDirectory* dirout, const std::string& bsname, int fititer);
-        void GetSampleBreakdown(TDirectory *dirout, const std::string& tag, const std::vector<std::string>& topology, bool save);
+    double CalcChi2() const;
+    void FillEventHisto(int datatype);
+    void Write(TDirectory* dirout, const std::string& bsname, int fititer);
+    void GetSampleBreakdown(TDirectory* dirout, const std::string& tag,
+                            const std::vector<std::string>& topology, bool save);
 
-        double GetNorm() const
-            { return m_norm; }
-        int GetSampleID() const
-            { return m_sample_id; }
-        std::string GetName() const
-            { return m_name; }
-        std::string GetDetector() const
-            { return m_detector; }
+    double GetNorm() const { return m_norm; }
+    int GetSampleID() const { return m_sample_id; }
+    std::string GetName() const { return m_name; }
+    std::string GetDetector() const { return m_detector; }
+    std::string GetDetBinning() const { return m_binning; }
 
-        TH1D* GetPredHisto() const
-            { return m_hpred; }
-        TH1D* GetDataHisto() const
-            { return m_hdata; }
-        TH1D* GetMCHisto() const
-            { return m_hmc; }
-        TH1D* GetMCTruthHisto() const
-            { return m_hmc_true; }
-        TH1D* GetSignalHisto() const
-            { return m_hsig; }
+    TH1D* GetPredHisto() const { return m_hpred; }
+    TH1D* GetDataHisto() const { return m_hdata; }
+    TH1D* GetMCHisto() const { return m_hmc; }
+    TH1D* GetMCTruthHisto() const { return m_hmc_true; }
+    TH1D* GetSignalHisto() const { return m_hsig; }
 
-    protected:
-        int m_sample_id;
-        int m_nbins;
-        double m_norm;
+protected:
+    int m_sample_id;
+    int m_nbins;
+    double m_norm;
 
-        std::string m_name;
-        std::string m_detector;
-        std::string m_binning;
-        std::vector<AnaEvent> m_events;
-        std::vector<FitBin> m_bin_edges;
+    std::string m_name;
+    std::string m_detector;
+    std::string m_binning;
+    std::vector<AnaEvent> m_events;
+    std::vector<FitBin> m_bin_edges;
 
-        TTree* m_data_tree;
-        TH1D* m_hmc_true;
-        TH1D* m_hmc;
-        TH1D* m_hpred;
-        TH1D* m_hdata;
-        TH1D* m_hsig;
+    TTree* m_data_tree;
+    TH1D* m_hmc_true;
+    TH1D* m_hmc;
+    TH1D* m_hpred;
+    TH1D* m_hdata;
+    TH1D* m_hsig;
 
-        std::string TAG;
-        std::string ERR;
+    std::string TAG;
+    std::string ERR;
 };
 
 #endif

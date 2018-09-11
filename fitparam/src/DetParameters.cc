@@ -1,180 +1,184 @@
-#include <assert.h>
-#include <fstream>
-#include <iomanip>
-#include <sstream>
-
 #include "DetParameters.hh"
-
-using namespace std;
+using xsllh::FitBin;
 
 // ctor
-DetParameters::DetParameters(const char* fname, TVectorD* detweights,
-                             std::vector<AnaSample*> samples, const char* name)
+DetParameters::DetParameters(const std::string& name)
 {
     m_name       = name;
     hasRegCovMat = false;
-
-    // get the binning from a file
-    SetBinning(fname, samples);
-
-    // parameter names & prior values
-    cout << "Det weight starting values " << endl;
-    for(size_t i = 0; i < Npar; i++)
-    {
-        pars_name.push_back(Form("%s%d", m_name.c_str(), (int)i));
-        double parprior = 1; //(*detweights)(i);  //nominal value coming from detsyst sampling (NEW
-                             //samples with corrections applied)
-        cout << i << " " << parprior << endl;
-        pars_prior.push_back(parprior);
-        pars_step.push_back(0.1);
-        pars_limlow.push_back(0.5);
-        pars_limhigh.push_back(1.5);
-    }
 }
 
 // dtor
 DetParameters::~DetParameters() { ; }
 
-void DetParameters::SetBinning(const char* fname, std::vector<AnaSample*>& samples)
+bool DetParameters::SetBinning(const std::string& file_name, std::vector<FitBin>& bins)
 {
-    string line;
-    DetBin bin;
-    // loop over the 6 samples
-    for(int i = 0; i < samples.size(); i++)
+    std::ifstream fin(file_name, std::ios::in);
+    if(!fin.is_open())
     {
-        bin.sample = samples[i]->GetSampleID();
-        ifstream fin(fname);
-        assert(fin.is_open());
+        std::cerr << "[ERROR]: In DetParameters::SetBinning()\n"
+                  << "[ERROR]: Failed to open binning file: " << file_name << std::endl;
+        return false;
+    }
+
+    else
+    {
+        std::string line;
         while(getline(fin, line))
         {
-            stringstream ss(line);
-            double D11, D12, D21, D22;
-            if(!(ss >> D21 >> D22 >> D11 >> D12))
+            std::stringstream ss(line);
+            double D1_1, D1_2, D2_1, D2_2;
+            if(!(ss>>D2_1>>D2_2>>D1_1>>D1_2))
             {
-                cerr << "Bad line format: " << endl << "     " << line << endl;
+                std::cout << "[WARNING]: In DetParameters::SetBinning()\n"
+                          << "[WARNING]: Bad line format: " << line << std::endl;
                 continue;
             }
-            bin.D1low  = D11;
-            bin.D1high = D12;
-            bin.D2low  = D21;
-            bin.D2high = D22;
-            m_bins.push_back(bin);
+            bins.emplace_back(FitBin(D1_1, D1_2, D2_1, D2_2));
         }
         fin.close();
-    }
-    Npar = m_bins.size();
 
-    cout << endl << "Det Syst binning:" << endl;
-    for(size_t i = 0; i < m_bins.size(); i++)
-    {
-        cout << setw(3) << i << setw(5) << m_bins[i].D2low << setw(5) << m_bins[i].D2high << setw(5)
-             << m_bins[i].D1low << setw(5) << m_bins[i].D1high << endl;
+        std::cout << "[DetParameters]: Fit binning: \n";
+        for(std::size_t i = 0; i < bins.size(); ++i)
+        {
+            std::cout << std::setw(3) << i
+                      << std::setw(5) << bins[i].D2low
+                      << std::setw(5) << bins[i].D2high
+                      << std::setw(5) << bins[i].D1low
+                      << std::setw(5) << bins[i].D1high << std::endl;
+        }
+
+        return true;
     }
-    cout << endl << "Det Syst # parameters: " << Npar << endl;
-    cout << endl;
 }
 
-// --
-int DetParameters::GetBinIndex(double p, double D2, int sample_id)
+int DetParameters::GetBinIndex(const int sam, double D1, double D2) const
 {
-    int binn = BADBIN;
-    for(size_t i = 0; i < m_bins.size(); i++)
+    int bin = BADBIN;
+    const std::vector<FitBin> &temp_bins = m_sample_bins.at(sam);
+
+    for(int i = 0; i < temp_bins.size(); ++i)
     {
-        if(sample_id != m_bins[i].sample)
-            continue;
-        if(p >= m_bins[i].D1low && p < m_bins[i].D1high && D2 >= m_bins[i].D2low
-           && D2 < m_bins[i].D2high)
-            binn = (int)i;
+        if(D1 >= temp_bins[i].D1low && D1 < temp_bins[i].D1high &&
+           D2 >= temp_bins[i].D2low && D2 < temp_bins[i].D2high)
+        {
+            bin = i;
+            break;
+        }
     }
-    return binn;
+    return bin;
 }
 
-// initEventMap
 void DetParameters::InitEventMap(std::vector<AnaSample*>& sample, int mode)
 {
+    InitParameters();
     m_evmap.clear();
 
-    // loop over events to build index map
-    for(size_t s = 0; s < sample.size(); s++)
+    for(std::size_t s = 0; s < sample.size(); ++s)
     {
-        vector<int> row;
-        for(int i = 0; i < sample[s]->GetN(); i++)
+        std::vector<int> sample_map;
+        for(int i = 0; i < sample[s]->GetN(); ++i)
         {
             AnaEvent* ev = sample[s]->GetEvent(i);
-            // get event true p and D2
-            double p     = ev->GetRecD1();
-            double D2    = ev->GetRecD2();
-            int reaction = ev->GetTopology();
-            int binn     = GetBinIndex(p, D2, sample[s]->GetSampleID());
-            if(binn == BADBIN)
+            double D1 = ev->GetRecD1();
+            double D2 = ev->GetRecD2();
+            int bin   = GetBinIndex(sample[s]->GetSampleID(), D1, D2);
+#ifdef DEBUG_MSG
+            if(bin == BADBIN)
             {
-                cout << "WARNING: " << m_name << " p = " << p << " D2 = " << D2
-                     << " fall outside bin ranges" << endl;
-                cout << " This event will be ignored in analysis." << endl;
+                std::cout << "[WARNING]: " << m_name << ", Event: " << i << std::endl
+                          << "[WARNING]: D1 = " << D1 << ", D2 = " << D2 << ", falls outside bin ranges." << std::endl
+                          << "[WARNING]: This event will be ignored in the analysis." << std::endl;
             }
+#endif
             // If event is signal let the c_i params handle the reweighting:
-            if(mode == 1 && ((ev->GetTopology() == 1) || (ev->GetTopology() == 2)))
-                binn = PASSEVENT;
-            row.push_back(binn);
+            if(mode == 1 && ev->isSignalEvent())
+                bin = PASSEVENT;
+            sample_map.push_back(bin);
         }
-        m_evmap.push_back(row);
+        m_evmap.push_back(sample_map);
     }
 }
 
-// EventWeghts
-void DetParameters::EventWeights(std::vector<AnaSample*>& sample, std::vector<double>& params)
-{
-    if(m_evmap.empty()) // build an event map
-    {
-        cout << "******************************" << endl;
-        cout << "WARNING: No event map specified for " << m_name << endl;
-        cout << "Need to build event map index for " << m_name << endl;
-        cout << "WARNING: initialising in mode 0" << endl;
-        cout << "******************************" << endl;
-        InitEventMap(sample, 0);
-    }
-
-    for(size_t s = 0; s < sample.size(); s++)
-    {
-        for(int i = 0; i < sample[s]->GetN(); i++)
-        {
-            AnaEvent* ev = sample[s]->GetEvent(i);
-            // if(ev->GetReaction()==0) //detector systematics apply only to signal
-            ReWeight(ev, s, i, params);
-        }
-    }
-}
-
-// ReWeight
-void DetParameters::ReWeight(AnaEvent* event, int nsample, int nevent, std::vector<double>& params)
+void DetParameters::ReWeight(AnaEvent* event, const std::string& det, int nsample, int nevent, std::vector<double>& params)
 {
     if(m_evmap.empty()) // need to build an event map first
     {
-        cout << "Need to build event map index for " << m_name << endl;
+        std::cerr << "[ERROR]: In DetParameters::ReWeight()\n"
+                  << "[ERROR]: Need to build event map index for " << m_name << std::endl;
         return;
     }
 
-    int binn = m_evmap[nsample][nevent];
+    const int bin = m_evmap[nsample][nevent];
 
-    if(binn == PASSEVENT)
+    if(bin == PASSEVENT)
         return;
-    if(binn == BADBIN)
+    if(bin == BADBIN)
         event->AddEvWght(0.0); // skip!!!!
     else
     {
-        if(binn > (int)params.size())
+        if(bin > params.size())
         {
-            cerr << "ERROR: number of bins " << binn << " for " << m_name
-                 << " does not match num of param" << endl;
+            std::cout << "[WARNING]: In DetParameters::ReWeight()\n"
+                      << "[WARNING]: Number of bins in " << m_name << " does not match num of parameters.\n"
+                      << "[WARNING]: Setting event weight to zero." << std::endl;
             event->AddEvWght(0.0);
         }
-        event->AddEvWght(params[binn]);
+
+        event->AddEvWght(params[bin + m_sample_offset.at(event->GetSampleType())]);
     }
 }
 
-void DetParameters::ReWeightIngrid(AnaEvent* event, int nsample, int nevent,
-                                   std::vector<double>& params)
+void DetParameters::InitParameters()
 {
-    // Not implemented yet
-    ReWeight(event, nsample, nevent, params);
+    unsigned int offset = 0;
+    for(const auto& sam : v_samples)
+    {
+        m_sample_offset.emplace(std::make_pair(sam, offset));
+        const int nbins = m_sample_bins.at(sam).size();
+        for(int i = 0; i < nbins; ++i)
+        {
+            pars_name.push_back(Form("%s_sam%d_%d", m_name.c_str(), sam, i));
+            pars_prior.push_back(1.0);
+            pars_step.push_back(0.05);
+            pars_limlow.push_back(0.0);
+            pars_limhigh.push_back(2.0);
+        }
+
+        std::cout << "[DetParameters]: Total " << nbins << " parameters at "
+                  << offset << " for sample ID " << sam << std::endl;
+        offset += nbins;
+    }
+
+    Npar = pars_name.size();
+}
+
+void DetParameters::AddDetector(const std::string& det, std::vector<AnaSample*>& v_sample, bool match_bins)
+{
+    std::cout << "[DetParameters]: Adding detector " << det << " for " << m_name << std::endl;
+
+    for(const auto& sample : v_sample)
+    {
+        if(sample->GetDetector() != det)
+            continue;
+
+        const int sample_id = sample->GetSampleID();
+        v_samples.emplace_back(sample_id);
+
+        std::cout << "[DetParameters]: Adding sample " << sample->GetName()
+                  << " with ID " << sample_id << " to fit." << std::endl;
+
+        if(match_bins)
+            m_sample_bins.emplace(std::make_pair(sample_id, sample->GetBinEdges()));
+        else
+        {
+            std::vector<FitBin> temp_vector;
+            if(SetBinning(sample->GetDetBinning(), temp_vector))
+            {
+                m_sample_bins.emplace(std::make_pair(sample_id, temp_vector));
+            }
+            else
+                std::cout << "[WARNING]: Adding sample binning for DetParameters failed." << std::endl;
+        }
+    }
 }

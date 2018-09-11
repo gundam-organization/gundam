@@ -12,32 +12,30 @@
 #ifndef __DetParameters_hh__
 #define __DetParameters_hh__
 
-#include "AnaFitParameters.hh"
-#include <TAxis.h>
+#include <iomanip>
+#include <iostream>
+#include <string>
 
-struct DetBin
-{
-    double D1low, D1high;
-    double D2low, D2high;
-    int sample; // from 0 to 5 for the 6 regions
-};
+#include "AnaFitParameters.hh"
+#include "FitStructs.hh"
 
 class DetParameters : public AnaFitParameters
 {
 public:
-    DetParameters(const char* fname, TVectorD* detweights, std::vector<AnaSample*> samples,
-                  const char* name = "par_det");
+    DetParameters(const std::string& name);
     ~DetParameters();
 
+    void InitParameters();
     void InitEventMap(std::vector<AnaSample*>& sample, int mode);
-    void EventWeights(std::vector<AnaSample*>& sample, std::vector<double>& params);
-    void ReWeight(AnaEvent* event, int nsample, int nevent, std::vector<double>& params);
-    void ReWeightIngrid(AnaEvent* event, int nsample, int nevent, std::vector<double>& params);
-    void SetBinning(const char* fname, std::vector<AnaSample*>& sample);
+    int GetBinIndex(const int sam, double D1, double D2) const;
+    void ReWeight(AnaEvent* event, const std::string& det, int nsample, int nevent, std::vector<double>& params);
+    bool SetBinning(const std::string& file_name, std::vector<xsllh::FitBin>& bins);
+    void AddDetector(const std::string& det, std::vector<AnaSample*>& v_sample, bool match_bins);
 
 private:
-    int GetBinIndex(double p, double D2, int sample_id); // binning function
-    std::vector<DetBin> m_bins;
+    std::map<int, std::vector<xsllh::FitBin>> m_sample_bins;
+    std::map<int, int> m_sample_offset;
+    std::vector<int> v_samples;
 };
 
 #endif
