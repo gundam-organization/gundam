@@ -53,6 +53,20 @@ foreach(mod ${MODULETargets})
   target_link_libraries(calcXsec ${mod})
 endforeach()
 
+add_executable(xsllhDetVar xsllhDetVariations.cxx)
+
+set_target_properties(xsllhDetVar PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
+
+foreach(mod ${MODULES})
+ target_include_directories(xsllhDetVar PUBLIC ${CMAKE_SOURCE_DIR}/${mod}/src)
+ target_include_directories(xsllhDetVar PUBLIC ${CMAKE_SOURCE_DIR}/include)
+endforeach()
+
+foreach(mod ${MODULETargets})
+  cmessage(STATUS "Linking with: ${mod}")
+  target_link_libraries(xsllhDetVar ${mod})
+endforeach()
+
 add_executable(PropError EXCLUDE_FROM_ALL propError.C)
 
 set_target_properties(PropError PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
@@ -67,4 +81,4 @@ foreach(mod ${MODULETargets})
 endforeach()
 
 #install(TARGETS CCQEFit CCQEFit_daT CCQEFit_dphiT FitBase ingridFit PropError PropError_daT PropError_dphiT DESTINATION bin)
-install(TARGETS calcXsec ingridFit DESTINATION bin)
+install(TARGETS calcXsec ingridFit xsllhDetVar DESTINATION bin)
