@@ -15,6 +15,7 @@
 #include "TH2.h"
 #include "TMatrixT.h"
 #include "TMatrixTSym.h"
+#include "TStyle.h"
 #include "TTree.h"
 
 #include "BinManager.hh"
@@ -33,12 +34,14 @@ int main(int argc, char** argv)
               << TAG << "Welcome to the Super-xsLLh Detector Variation Interface.\n"
               << TAG << "Initializing the variation machinery..." << std::endl;
 
-    const unsigned int num_syst = 14;
+    const unsigned int num_syst = 17;
     unsigned int syst_idx = 0;
     unsigned int num_toys = 0;
+    double weight_cut = 1.0E5;
     bool do_single_variation = false;
     bool do_covariance = false;
     bool do_projection = false;
+    bool do_print = false;
     std::string fname_input;
     std::string fname_output;
     std::string fname_binning;
@@ -52,7 +55,7 @@ int main(int argc, char** argv)
     const int cut_level[num_samples] = {7, 8, 9, 8, 7, 5, 4, 7, 8, 7};
 
     char option;
-    while((option = getopt(argc, argv, "i:o:b:t:v:s:n:p:c:Ch")) != -1)
+    while((option = getopt(argc, argv, "i:o:b:t:v:s:n:p:c:w:CPh")) != -1)
     {
         switch(option)
         {
@@ -82,11 +85,17 @@ int main(int argc, char** argv)
                 variable_plot = optarg;
                 do_projection = true;
                 break;
+            case 'w':
+                weight_cut = std::stol(optarg);
+                break;
             case 'c':
                 cut_samples = optarg;
                 break;
             case 'C':
                 do_covariance = true;
+                break;
+            case 'P':
+                do_print = true;
                 break;
             case 'h':
                 std::cout << "USAGE: " << argv[0] << "\nOPTIONS\n"
@@ -98,8 +107,10 @@ int main(int argc, char** argv)
                           << "-s : Index of systematic\n"
                           << "-n : Number of toy throws\n"
                           << "-p : Variable to plot in 1D\n"
+                          << "-w : Cut value for toy weights\n"
                           << "-c : Cut Branches (samples) to use\n"
                           << "-C : Calculate covariance matrix\n"
+                          << "-P : Print plots to PDF\n"
                           << "-h : Display this help message\n";
             default:
                 return 0;
@@ -134,6 +145,7 @@ int main(int argc, char** argv)
               << TAG << "Name of variable(s): " << variable_name << std::endl
               << TAG << "Number of toy throws: " << num_toys << std::endl
               << TAG << "Number of total bins: " << nbins << std::endl
+              << TAG << "Toy Weight Cut: " << weight_cut << std::endl
               << TAG << "Calculating Covariance: " << std::boolalpha << do_covariance << std::endl
               << TAG << "Covariance Samples: " << cut_samples << std::endl;
 
@@ -161,10 +173,11 @@ int main(int argc, char** argv)
     }
 
     std::cout << TAG << "Initalizing histograms." << std::endl;
-    std::vector<std::vector<TH1D>> v_hists;
+    std::vector<std::vector<TH1F>> v_hists;
+    std::vector<TH1F> v_avg;
     for(unsigned int s = 0; s < num_samples; ++s)
     {
-        v_hists.emplace_back(std::vector<TH1D>());
+        v_hists.emplace_back(std::vector<TH1F>());
         for(unsigned int t = 0; t < num_toys; ++t)
         {
             std::stringstream ss;
@@ -172,22 +185,35 @@ int main(int argc, char** argv)
             if(do_projection)
             {
                 std::vector<double> v_bins = bin_manager.GetBinVector(var_plot);
-                v_hists.at(s).emplace_back(TH1D(ss.str().c_str(), ss.str().c_str(),
+                v_hists.at(s).emplace_back(TH1F(ss.str().c_str(), ss.str().c_str(),
                                                 v_bins.size()-1, &v_bins[0]));
+                if(t == 0)
+                {
+                    ss.str(""); ss << "sample" << s << "_avg";
+                    v_avg.emplace_back(TH1F(ss.str().c_str(), ss.str().c_str(),
+                                                v_bins.size()-1, &v_bins[0]));
+                }
             }
             else
             {
-                v_hists.at(s).emplace_back(TH1D(ss.str().c_str(), ss.str().c_str(),
+                v_hists.at(s).emplace_back(TH1F(ss.str().c_str(), ss.str().c_str(),
                                                 nbins, 0, nbins));
+                if(t == 0)
+                {
+                    ss.str(""); ss << "sample" << s << "_avg";
+                    v_avg.emplace_back(TH1F(ss.str().c_str(), ss.str().c_str(),
+                                                nbins, 0, nbins));
+                }
             }
         }
     }
 
+    unsigned int rejected_weights = 0;
     const unsigned int num_events = tree_event -> GetEntries();
     for(unsigned int i = 0; i < num_events; ++i)
     {
         tree_event -> GetEntry(i);
-        if(i % 1000 == 0)
+        if(i % 2000 == 0)
         {
             std::cout << TAG << "Processed " << i << " of " << num_events
                       << " total events." << std::endl;
@@ -199,7 +225,7 @@ int main(int argc, char** argv)
             {
                 if(accum_level[t][s] > cut_level[s])
                 {
-                    int idx = -1;
+                    float idx = -1;
                     if(do_projection)
                         idx = hist_variables[var_plot][t];
                     else
@@ -211,31 +237,38 @@ int main(int argc, char** argv)
                     }
 
                     float weight = do_single_variation ? weight_syst[t][syst_idx] : weight_syst_total_noflux[t];
-                    v_hists[s][t].Fill(idx, weight);
+                    if(weight > 0.0 && weight < weight_cut)
+                    {
+                        v_hists[s][t].Fill(idx, weight);
+                        v_avg[s].Fill(idx, weight / num_toys);
+                    }
+                    else
+                        rejected_weights++;
                     break;
                 }
             }
         }
     }
     std::cout << TAG << "Finished processing events." << std::endl;
+    std::cout << TAG << "Rejected weights: " << rejected_weights << std::endl;
 
     //std::vector<bool> use_sample = {true, true, true, true, false, true, true, false, false, false};
     //const unsigned int num_elements = nbins * std::count(use_sample.begin(), use_sample.end(), true);
     const unsigned int num_elements = nbins * use_samples.size();
-    TMatrixTSym<double> cov_mat(num_elements);
-    TMatrixTSym<double> cor_mat(num_elements);
+    TMatrixTSym<float> cov_mat(num_elements);
+    TMatrixTSym<float> cor_mat(num_elements);
     cov_mat.Zero();
     cor_mat.Zero();
 
     if(do_covariance)
     {
         std::cout << TAG << "Calculating covariance matrix." << std::endl;
-        std::vector<std::vector<double>> v_toys;
-        std::vector<double> v_mean(num_elements, 0.0);
+        std::vector<std::vector<float>> v_toys;
+        std::vector<float> v_mean(num_elements, 0.0);
 
         for(unsigned int t = 0; t < num_toys; ++t)
         {
-            std::vector<double> i_toy;
+            std::vector<float> i_toy;
             for(unsigned int s = 0; s < num_samples; ++s)
             {
                 if(use_samples[s] != s)
@@ -285,20 +318,30 @@ int main(int argc, char** argv)
     TFile* file_output = TFile::Open(fname_output.c_str(), "RECREATE");
     file_output -> cd();
 
+    gStyle -> SetOptStat(0);
     for(unsigned int s = 0; s < num_samples; ++s)
     {
         std::stringstream ss;
         ss << "Sample" << s;
         TCanvas c(ss.str().c_str(), ss.str().c_str(), 1200, 900);
-        v_hists[s][0].Draw("axis");
+        //v_hists[s][0].Draw("axis");
+        v_avg[s].Draw("axis");
 
         for(unsigned int t = 0; t < num_toys; ++t)
         {
+            v_hists[s][t].SetLineColor(kRed);
             v_hists[s][t].Scale(1, "width");
             v_hists[s][t].Draw("hist same");
         }
 
+        v_avg[s].SetLineColor(kBlack);
+        v_avg[s].SetLineWidth(2);
+        v_avg[s].Scale(1, "width");
+        v_avg[s].Draw("hist same");
         c.Write(ss.str().c_str());
+
+        if(do_print)
+            c.Print(std::string(ss.str() + ".pdf").c_str());
     }
 
     if(do_covariance)
