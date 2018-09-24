@@ -1,5 +1,5 @@
-#ifndef AnyTreeMC_h
-#define AnyTreeMC_h
+#ifndef ANATREEMC_HH
+#define ANATREEMC_HH
 
 #include <cmath>
 #include <cstdio>
@@ -16,7 +16,7 @@
 #include "AnaEvent.hh"
 #include "AnaSample.hh"
 
-class AnyTreeMC
+class AnaTreeMC
 {
     public:
         TChain *fChain; //!pointer to the analyzed TTree or TChain
@@ -69,8 +69,8 @@ class AnyTreeMC
         TBranch *b_pCosThetaRec;
         TBranch *b_pCosThetaTrue;
 
-        AnyTreeMC(const std::string& file_name, const std::string& tree_name);
-        ~AnyTreeMC();
+        AnaTreeMC(const std::string& file_name, const std::string& tree_name);
+        ~AnaTreeMC();
         long int GetEntry(long int entry) const;
         void SetBranches();
         void GetEvents(std::vector<AnaSample*>& ana_samples, const std::vector<int>& sig_topology, const bool evt_type);

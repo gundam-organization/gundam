@@ -3,9 +3,8 @@
 // ctor
 XsecParameters::XsecParameters(const std::string& name)
 {
-    m_name       = name;
-    hasRegCovMat = false;
-    Npar         = 0;
+    m_name = name;
+    Npar = 0;
 }
 
 // dtor
@@ -229,7 +228,6 @@ void XsecParameters::ReWeight(AnaEvent* event, const std::string& det, int nsamp
     std::vector<XsecDial> &v_dials = m_dials.at(det);
     int num_dials = v_dials.size();
     double weight = 1.0;
-
 
     for(int d = 0; d < num_dials; ++d)
     {

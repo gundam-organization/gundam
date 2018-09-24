@@ -31,7 +31,7 @@ class XsecFitter
         ~XsecFitter();
         void SetSeed(int seed);
         double CalcLikelihood(const double* par);
-        void InitFitter(std::vector<AnaFitParameters*> &fitpara, double reg, const std::string& paramVectorFname);
+        void InitFitter(std::vector<AnaFitParameters*> &fitpara, const std::string& paramVectorFname);
         void FixParameter(const std::string& par_name, const double& value);
         void Fit(std::vector<AnaSample*>& samples, const std::vector<std::string>& topology, int datatype, int fitMethod, int statFluct);
         void SetSaveMode(TDirectory *dirout, int freq){ m_dir = dirout; m_freq = freq; }
@@ -107,7 +107,6 @@ class XsecFitter
         std::vector<int> m_nparclass;
         double m_potratio;
         int m_npar, m_calls, m_freq;
-        double reg_p1;
         std::string paramVectorFileName;
         std::vector<std::string> par_names;
         std::vector<double> par_prefit;
@@ -116,7 +115,6 @@ class XsecFitter
         std::vector<double> par_toydata;
         std::vector<double> vec_chi2_stat;
         std::vector<double> vec_chi2_sys;
-        std::vector<double> vec_chi2_reg;
         int m_threads;
 };
 #endif

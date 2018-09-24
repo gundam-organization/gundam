@@ -28,15 +28,6 @@ using namespace std;
 const int PASSEVENT = -1;
 const int BADBIN    = -2;
 
-struct PairCompare
-{
-    template<typename T, typename U>
-    bool operator()(const std::pair<T, U>& lhs, const std::pair<T, U>& rhs)
-    {
-        return lhs.second < rhs.second;
-    }
-};
-
 class AnaFitParameters
 {
 public:
@@ -60,14 +51,11 @@ public:
     virtual double GetChi2(const std::vector<double>& params);
 
     virtual void SetCovarianceMatrix(const TMatrixDSym& covmat);
-    virtual void SetRegCovarianceMatrix(TMatrixDSym* covmat);
     virtual void InitThrows();
     virtual void DoThrow(std::vector<double>& pars, int mode);
     std::string GetName() { return m_name; }
     TMatrixDSym* GetCovarMat() { return covariance; }
-    TMatrixDSym* GetCovarMat_reg() { return regcovariance; }
     bool HasCovMat() { return hasCovMat; }
-    bool HasRegCovMat() { return hasRegCovMat; }
     void SetFluxHisto(TH1F* h_flux);
 
     void GetParNames(std::vector<std::string>& vec) { vec = pars_name; }
@@ -113,12 +101,10 @@ protected:
     // map for events in each sample
     std::vector<std::vector<int>> m_evmap;
     bool m_rng_priors;
-    bool hasCovMat, hasRegCovMat;
+    bool hasCovMat;
 
     TMatrixDSym* covariance; // cov matrix
     TMatrixDSym* covarianceI; // inverse of cov matrix
-    TMatrixDSym* regcovariance; // cov matrix
-    TMatrixDSym* regcovarianceI; // inverse of cov matrix
     ThrowParms* throwParms;
 
     TH1F* flux;

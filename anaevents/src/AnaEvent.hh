@@ -30,7 +30,7 @@ class AnaEvent
             m_signal   = false;
             m_trueEvt  = false;
             m_trueEnu  = -999.0;
-            m_recEnu   = -999.0;
+            m_recoEnu  = -999.0;
             m_trueD1   = -999.0;
             m_trueD2   = -999.0;
             m_recD1    = -999.0;
@@ -73,8 +73,8 @@ class AnaEvent
         void SetTrueEnu(double val) {m_trueEnu = val;}
         double GetTrueEnu(){ return m_trueEnu; }
 
-        void SetRecEnu(double val){ m_recEnu = val; }
-        double GetRecEnu(){ return m_recEnu; }
+        void SetRecoEnu(double val){ m_recoEnu = val; }
+        double GetRecoEnu(){ return m_recoEnu; }
 
         void SetTrueD1(double val){ m_trueD1 = val; }
         double GetTrueD1(){ return m_trueD1; }
@@ -124,7 +124,7 @@ class AnaEvent
                       << "Topology        " << GetTopology() << std::endl
                       << "Sample          " << GetSampleType() << std::endl
                       << "True energy     " << GetTrueEnu() << std::endl
-                      << "Recon energy    " << GetRecEnu() << std::endl
+                      << "Reco energy     " << GetRecoEnu() << std::endl
                       << "True D1         " << GetTrueD1() << std::endl
                       << "Reco D1         " << GetRecD1() << std::endl
                       << "True D2         " << GetTrueD2() << std::endl
@@ -150,7 +150,7 @@ class AnaEvent
         bool m_signal;     //flag if signal event
         bool m_trueEvt;    //flag if true event
         double m_trueEnu;  //true nu energy
-        double m_recEnu;   //recon nu energy
+        double m_recoEnu;  //recon nu energy
         double m_trueD1;   //true D1
         double m_trueD2;   //true D2
         double m_recD1;    //reco D1

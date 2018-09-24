@@ -1,23 +1,23 @@
 //This is the code that actually reads int he MC tree and fills the event info.
 //The tree should be produced by feeding a HL2 microtree into the treeconvert macro.
 
-#include "AnyTreeMC.hh"
+#include "AnaTreeMC.hh"
 
-AnyTreeMC::AnyTreeMC(const std::string& file_name, const std::string& tree_name)
+AnaTreeMC::AnaTreeMC(const std::string& file_name, const std::string& tree_name)
 {
     fChain = new TChain(tree_name.c_str());
     fChain -> Add(file_name.c_str());
     SetBranches();
 }
 
-AnyTreeMC::~AnyTreeMC()
+AnaTreeMC::~AnaTreeMC()
 {
     if(fChain == nullptr)
         return;
     delete fChain -> GetCurrentFile();
 }
 
-long int AnyTreeMC::GetEntry(long int entry) const
+long int AnaTreeMC::GetEntry(long int entry) const
 {
     // Read contents of entry.
     if(fChain == nullptr)
@@ -26,7 +26,7 @@ long int AnyTreeMC::GetEntry(long int entry) const
         return fChain -> GetEntry(entry);
 }
 
-void AnyTreeMC::SetBranches()
+void AnaTreeMC::SetBranches()
 {
     // Set branch addresses and branch pointers
     fChain -> SetBranchAddress("nutype", &nutype, &b_nutype);
@@ -52,7 +52,7 @@ void AnyTreeMC::SetBranches()
     fChain -> SetBranchAddress("muCosThetaTrue", &muCosThetaTrue, &b_muCosThetaTrue);
 }
 
-void AnyTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples, const std::vector<int>& sig_topology, const bool evt_type)
+void AnaTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples, const std::vector<int>& sig_topology, const bool evt_type)
 {
     if(fChain == nullptr) return;
     if(ana_samples.empty()) return;
@@ -60,11 +60,11 @@ void AnyTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples, const std::vecto
     long int nentries = fChain -> GetEntries();
     long int nbytes = 0;
 
-    std::cout << "[AnyTreeMC]: Reading events...\n";
+    std::cout << "[AnaTreeMC]: Reading events...\n";
     for(long int jentry = 0; jentry < nentries; jentry++)
     {
-        if(jentry % (int)1e+5 == 0)
-            std::cout << "[AnyTreeMC]: Processing event " << jentry << " out of " << nentries << std::endl;
+        if(jentry % 1E5 == 0)
+            std::cout << "[AnaTreeMC]: Processing event " << jentry << " out of " << nentries << std::endl;
         nbytes += fChain -> GetEntry(jentry);
         //create and fill event structure
         AnaEvent ev(jentry);
@@ -73,8 +73,8 @@ void AnyTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples, const std::vecto
         ev.SetSampleType(cutBranch);
         ev.SetTopology(evtTopology); // mectopology (i.e. CC0Pi,CC1Pi etc)
         ev.SetReaction(evtReaction); // reaction (i.e. CCQE,CCRES etc)
-        ev.SetTrueEnu(EnuTrue/1000.0);   //MeV - ->  GeV
-        ev.SetRecEnu(EnuReco/1000.0); //MeV - ->  GeV
+        ev.SetTrueEnu(EnuTrue);
+        ev.SetRecEnu(EnuReco);
         ev.SetTrueD1(D1True);
         ev.SetRecD1(D1Reco);
         ev.SetTrueD2(D2True);

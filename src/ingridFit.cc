@@ -7,7 +7,7 @@
 #include <unistd.h>
 
 #include "AnaSample.hh"
-#include "AnyTreeMC.hh"
+#include "AnaTreeMC.hh"
 #include "ColorOutput.hh"
 #include "DetParameters.hh"
 #include "FitParameters.hh"
@@ -167,7 +167,7 @@ int main(int argc, char** argv)
     }
 
     //read MC events
-    AnyTreeMC selTree(fname_mc.c_str(), "selectedEvents");
+    AnaTreeMC selTree(fname_mc.c_str(), "selectedEvents");
     std::cout << TAG << "Reading and collecting events." << std::endl;
     selTree.GetEvents(samples, signal_topology, false);
 
@@ -189,7 +189,7 @@ int main(int argc, char** argv)
     // fit parameters first.
 
     //Fit parameters
-    FitParameters sigfitpara("par_fit", true);
+    FitParameters sigfitpara("par_fit", false);
     for(const auto& opt : parser.detectors)
     {
         if(opt.use_detector)
@@ -207,7 +207,7 @@ int main(int argc, char** argv)
             fluxpara.AddDetector(opt.name, enubins);
     }
     fluxpara.InitEventMap(samples, 0);
-    //fitpara.push_back(&fluxpara);
+    fitpara.push_back(&fluxpara);
 
     XsecParameters xsecpara("par_xsec");
     xsecpara.SetCovarianceMatrix(cov_xsec);
@@ -217,12 +217,13 @@ int main(int argc, char** argv)
             xsecpara.AddDetector(opt.name, opt.xsec);
     }
     xsecpara.InitEventMap(samples, 0);
-    //fitpara.push_back(&xsecpara);
+    fitpara.push_back(&xsecpara);
 
+    /*
     TMatrixDSym cov_det(348);
     cov_det.Zero();
     for(int i = 0; i < 348; ++i)
-        cov_det(i,i) = 0.1;
+        cov_det(i,i) = 0.01;
 
     DetParameters detpara("par_det");
     detpara.SetCovarianceMatrix(cov_det);
@@ -233,13 +234,14 @@ int main(int argc, char** argv)
     }
     detpara.InitEventMap(samples, 0);
     fitpara.push_back(&detpara);
+    */
 
     //Instantiate fitter obj
     XsecFitter xsecfit(seed, threads);
     xsecfit.SetPOTRatio(potD/potMC);
 
     //init w/ para vector
-    xsecfit.InitFitter(fitpara, 0, paramVectorFname);
+    xsecfit.InitFitter(fitpara, paramVectorFname);
     std::cout << TAG << "Fitter initialised." << std::endl;
 
     /*

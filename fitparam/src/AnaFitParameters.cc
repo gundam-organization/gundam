@@ -6,7 +6,6 @@ AnaFitParameters::AnaFitParameters()
     Npar         = 0;
     m_rng_priors = false;
     hasCovMat    = false;
-    hasRegCovMat = false;
 
     covariance  = nullptr;
     covarianceI = nullptr;
@@ -47,54 +46,13 @@ void AnaFitParameters::SetCovarianceMatrix(const TMatrixDSym& covmat)
     */
     std::cout << "[SetCovarianceMatrix]: Covariance matrix size: " << covariance->GetNrows()
               << " x " << covariance->GetNrows() << " for " << this -> m_name << std::endl;
-
+    /*
     std::cout << "[SetCovarianceMatrix]: Inverted Cov mat: " << std::endl;
     covarianceI->Print();
     std::cout << "[SetCovarianceMatrix]: Cov mat: " << std::endl;
     covariance->Print();
-
+    */
     hasCovMat = true;
-}
-
-// SetRegCovarianceMatrix
-// This is only implemented for making fake data from nusances.
-// This could be the way that regularisation is actually included in the fit but I
-// prefer thinking about the summation formulation rather than covariance matricies
-
-// N.B: Every other cov matrix provided is an actual cov matrix, i.e. it has to be inverted
-// before being used in a penalty term. The reg cov matrix provided is actually already inverte
-// so the provided matrix is the inverted cov matrix and the inverse is the actual cov matrix.
-void AnaFitParameters::SetRegCovarianceMatrix(TMatrixDSym* covmat)
-{
-    // if(hasCovMat) cout << "WARNING: parameter set has both cov mat and reg cov mat!!" << endl;
-
-    if(covariance != nullptr)
-        covariance->Delete();
-    if(covarianceI != nullptr)
-        covarianceI->Delete();
-
-    double det;
-    covariance  = new TMatrixDSym(*covmat);
-    covarianceI = new TMatrixDSym(*covmat);
-    covariance->SetTol(1e-200);
-    double det_now = covariance->Determinant();
-    if(abs(det_now) < 1e-200)
-    {
-        cout << "Warning,  reg cov matrix is non invertable. Det is:" << endl;
-        cout << det_now << endl;
-        return;
-    }
-    (*covariance).Invert(&det);
-
-    cout << "Number of parameters in reg covariance matrix for " << m_name << " "
-         << covariance->GetNrows() << endl;
-
-    cout << "Inverted reg Cov mat: " << endl;
-    covariance->Print();
-    cout << "reg Cov mat: " << endl;
-    covarianceI->Print();
-
-    hasRegCovMat = true;
 }
 
 double AnaFitParameters::GetChi2(const std::vector<double>& params)
@@ -159,10 +117,8 @@ void AnaFitParameters::InitThrows()
 {
     cout << "AnaFitParameters::InitThrows" << endl;
     cout << "AnaFitParameters::InitThrows HasCovMat: " << HasCovMat() << endl;
-    cout << "AnaFitParameters::InitThrows HasRegCovMat: " << HasRegCovMat() << endl;
     cout << "AnaFitParameters::InitThrows hasCovMat: " << hasCovMat << endl;
-    cout << "AnaFitParameters::InitThrows hasRegCovMat: " << hasRegCovMat << endl;
-    if(!hasCovMat && !hasRegCovMat)
+    if(!hasCovMat)
         return;
     if(throwParms != nullptr)
         delete throwParms;
@@ -186,7 +142,7 @@ void AnaFitParameters::DoThrow(std::vector<double>& pars, int mode)
         pars = pars_prior;
         return;
     }
-    if(!hasCovMat && !hasRegCovMat && mode == 1)
+    if(!hasCovMat && mode == 1)
     {
         pars = pars_prior;
         return;

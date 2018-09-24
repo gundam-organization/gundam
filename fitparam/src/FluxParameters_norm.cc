@@ -7,8 +7,6 @@ FluxParameters_norm::FluxParameters_norm(const char *name)
 {
   m_name    = name;
   Npar      = 1;
-  hasRegCovMat = false;
-
   
   //parameter names & prior values
   for(size_t i=0;i<Npar;i++)

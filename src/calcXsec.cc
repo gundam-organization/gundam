@@ -13,7 +13,7 @@
 #include <unistd.h>
 
 #include "AnaSample.hh"
-#include "AnyTreeMC.hh"
+#include "AnaTreeMC.hh"
 #include "ColorOutput.hh"
 #include "FitParameters.hh"
 #include "FluxParameters.hh"
@@ -194,10 +194,10 @@ int main(int argc, char** argv)
     }
 
     std::cout << TAG << "Reading and collecting events." << std::endl;
-    AnyTreeMC selTree(fname_mc.c_str(), "selectedEvents");
+    AnaTreeMC selTree(fname_mc.c_str(), "selectedEvents");
     selTree.GetEvents(samples, signal_topology, false);
 
-    //AnyTreeMC truTree(fname_mc.c_str(), "trueEvents");
+    //AnaTreeMC truTree(fname_mc.c_str(), "trueEvents");
     //truTree.GetEvents(samples, signal_topology, true);
 
     std::cout << TAG << "Getting sample breakdown by reaction." << std::endl;

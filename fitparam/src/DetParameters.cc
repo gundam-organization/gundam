@@ -4,8 +4,7 @@ using xsllh::FitBin;
 // ctor
 DetParameters::DetParameters(const std::string& name)
 {
-    m_name       = name;
-    hasRegCovMat = false;
+    m_name = name;
 }
 
 // dtor

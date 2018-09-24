@@ -55,10 +55,9 @@ void XsecFitter::FixParameter(const std::string& par_name, const double& value)
 }
 
 // PrepareFitter
-void XsecFitter::InitFitter(std::vector<AnaFitParameters*> &fitpara, double reg, const std::string& paramVectorFname)
+void XsecFitter::InitFitter(std::vector<AnaFitParameters*> &fitpara, const std::string& paramVectorFname)
 {
     paramVectorFileName = paramVectorFname;
-    reg_p1 = reg;
     m_fitpara = fitpara;
     std::vector<double> par_step, par_low, par_high;
 
@@ -118,7 +117,7 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*> &fitpara, double reg,
     {
         for(int j = 0; j < m_fitpara[i] -> GetNpar(); ++j){
             prefitParams->SetBinContent(paramNo, m_fitpara[i]->GetParPrior(j));
-            if(m_fitpara[i]->HasCovMat() && (!(m_fitpara[i]->HasRegCovMat())) && (i!=0))
+            if(m_fitpara[i]->HasCovMat() && (i!=0))
             {
                 TMatrixDSym* covMat = m_fitpara[i]->GetCovarMat();
                 prefitParams->SetBinError(paramNo, sqrt((*covMat)[j][j]));
@@ -264,7 +263,6 @@ void XsecFitter::GenerateToyData(int toyindx, int toytype, int statFluct)
     //do parameter throws
     std::vector<std::vector<double> > par_throws;
     double chi2_sys = 0.0;
-    double chi2_reg = 0.0;
     int gparamno = 0;
     TFile *finput = nullptr;;
     TVectorD *paramVec = nullptr;
@@ -279,30 +277,13 @@ void XsecFitter::GenerateToyData(int toyindx, int toytype, int statFluct)
     for(size_t i=0;i<m_fitpara.size();i++)
     {
         cout << "XsecFitter::GenerateToyData fit param set: " << i << endl;
-        //cout << "HasRegCovMat : " << m_fitpara[i]->HasRegCovMat() << endl;
         bool throwOkay=false;
 
         if(toyindx == 0) m_fitpara[i]->InitThrows();
         vector<double> pars;
         if      ((toytype==0 || toytype==2) && i!=0) m_fitpara[i]->DoThrow(pars, 0);
         else if ((toytype==0 || toytype==2) && i==0) m_fitpara[i]->DoThrow(pars, 3);
-        if(toytype==1 && (m_fitpara[i]->HasRegCovMat())==false) m_fitpara[i]->DoThrow(pars, 1);
-
-        if(toytype==1 && (m_fitpara[i]->HasRegCovMat())==true){
-            cout << "Finding good set of params from throws: " << endl;
-            while(throwOkay==false){
-                m_fitpara[i]->DoThrow(pars, 1);
-                throwOkay=true;
-                cout << "Testing set: " << endl;
-                for(size_t j=0;j<pars.size();j++){
-                    cout << pars[j] << ", ";
-                    if(pars[j]<0.3 || pars[j]>1.7) throwOkay=false;
-                }
-                cout << endl;
-            }
-            cout << "Good set found" << endl;
-        }
-        //m_fitpara[i]->GetParPriors(pars);
+        if(toytype==1) m_fitpara[i]->DoThrow(pars, 1);
 
         if(toytype==2){
             //Throw fit params randomly in a sensible range (here 0.1 - 3.1, want to stay away from 0 boundary)
@@ -322,14 +303,12 @@ void XsecFitter::GenerateToyData(int toyindx, int toytype, int statFluct)
 
         par_throws.push_back(pars);
         chi2_sys += m_fitpara[i]->GetChi2(pars);
-        if(i==0) chi2_reg += chi2_reg;
         cout << "Toy data generated with following values: " << endl;
         cout<<"Parameters "<<m_fitpara[i]->GetName()<<endl;
         for(size_t j=0;j<pars.size();j++) cout<<j<<": "<<pars[j]<< ", ";
         cout << endl;
     }
     vec_chi2_sys.push_back(chi2_sys);
-    vec_chi2_reg.push_back(chi2_reg);
 
     if(toytype==3){
         if(paramVec->GetNrows() != gparamno) cout << "ERROR: mismatch in parameters required (" << gparamno << ") vs paramters in read vector (" << paramVec->GetNrows() << ")." << endl;
@@ -401,7 +380,6 @@ double XsecFitter::CalcLikelihood(const double* par)
 
     //Regularisation:
     int k=0;
-    double chi2_reg = 0.0;
     double chi2_sys = 0.0;
     std::vector<std::vector<double> > new_pars;
     for(int i = 0; i < m_fitpara.size(); ++i)
@@ -415,22 +393,12 @@ double XsecFitter::CalcLikelihood(const double* par)
         }
 
         chi2_sys += m_fitpara[i] -> GetChi2(vec);
-        // "Systematic error" on the fit parameters comes from the regularisation covatriance matrix, store as a chi2 reg error:
-        if(i == 0)
-        {
-            chi2_reg += chi2_sys;
-            chi2_sys -= m_fitpara[i]->GetChi2(vec);
-        }
 
         new_pars.push_back(vec);
         if(output_chi2)
-            std::cout << "chi2_sys contribution from param set " << i << " is " << m_fitpara[i]->GetChi2(vec) << endl;
+            std::cout << "ChiSq contribution from " << m_fitpara[i] -> GetName() << " is " << m_fitpara[i] -> GetChi2(vec) << endl;
     }
-    if(output_chi2)
-        std::cout << "chi2_sys contribution from regularisation " << chi2_reg << endl;
-    //chi2_sys += chi2_reg;
     vec_chi2_sys.push_back(chi2_sys);
-    vec_chi2_reg.push_back(chi2_reg);
 
     double chi2_stat = FillSamples(new_pars, 0);
     vec_chi2_stat.push_back(chi2_stat);
@@ -447,17 +415,11 @@ double XsecFitter::CalcLikelihood(const double* par)
     if(output_chi2)
     {
         std::cout << "m_calls is: " << m_calls << endl;
-        std::cout << "Chi2 for this iter: " << chi2_stat + chi2_sys + chi2_reg << endl;
-        std::cout << "Chi2 stat / syst / reg : " << chi2_stat << " / " << chi2_sys << " / " << chi2_reg << std::endl;
+        std::cout << "Chi2 for this iter: " << chi2_stat + chi2_sys << endl;
+        std::cout << "Chi2 stat / syst: " << chi2_stat << " / " << chi2_sys << " / " << std::endl;
     }
 
-    return chi2_stat + chi2_sys + chi2_reg;
-    // Update final chi2 file for L curve calc:
-
-    // ofstream outfile;
-    // outfile.open("chi2.txt", ios::out | ios::trunc );
-    // outfile << reg_p1 << ", " << chi2_stat << ", " << chi2_reg << ", " << chi2_sys << ", " << chi2_stat + chi2_sys << endl;
-    // outfile.close();
+    return chi2_stat + chi2_sys;
 }
 
 // Write hists for reweighted events
@@ -556,12 +518,7 @@ void XsecFitter::DoSaveChi2()
 {
     TH1D* histochi2stat = new TH1D("chi2_stat_periter","chi2_stat_periter", m_calls+1, 0, m_calls+1);
     TH1D* histochi2sys = new TH1D("chi2_sys_periter","chi2_sys_periter", m_calls+1, 0, m_calls+1);
-    TH1D* histochi2reg = new TH1D("chi2_reg_periter","chi2_reg_periter", m_calls+1, 0, m_calls+1);
     TH1D* histochi2tot = new TH1D("chi2_tot_periter","chi2_tot_periter", m_calls+1, 0, m_calls+1);
-
-    TH1D* reg_param = new TH1D("reg_param","reg_param", m_calls+1, 0, m_calls+1);
-    TH1D* reg_param2 = new TH1D("reg_param2","reg_param2", m_calls+1, 0, m_calls+1);
-    reg_param->Fill(reg_p1);
 
     if(vec_chi2_stat.size() != vec_chi2_sys.size()){
         cout<<"Number of saved iterations for chi2 stat and chi2 syst different -  EXITING"<<endl;
@@ -572,20 +529,15 @@ void XsecFitter::DoSaveChi2()
     {
         histochi2stat->SetBinContent(i+1,vec_chi2_stat[i]);
         histochi2sys->SetBinContent(i+1,vec_chi2_sys[i]);
-        histochi2reg->SetBinContent(i+1,vec_chi2_reg[i]);
         histochi2tot->SetBinContent(i+1,vec_chi2_sys[i] + vec_chi2_stat[i]);
     }
     m_dir->cd();
     histochi2stat->Write();
     histochi2sys->Write();
-    histochi2reg->Write();
     histochi2tot->Write();
-    reg_param->Write();
-    reg_param2->Write();
 
     delete histochi2stat;
     delete histochi2sys;
-    delete histochi2reg;
     delete histochi2tot;
 }
 

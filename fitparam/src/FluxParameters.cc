@@ -6,7 +6,7 @@ FluxParameters::~FluxParameters() { ; }
 
 int FluxParameters::GetBinIndex(const std::string& det, double enu)
 {
-    int bin                             = BADBIN;
+    int bin = BADBIN;
     const std::vector<double> temp_bins = m_det_bins.at(det);
 
     for(std::size_t i = 0; i < (temp_bins.size() - 1); ++i)
@@ -42,7 +42,7 @@ void FluxParameters::InitEventMap(std::vector<AnaSample*>& sample, int mode)
         for(int i = 0; i < sample[s]->GetN(); ++i)
         {
             AnaEvent* ev = sample[s]->GetEvent(i);
-            double enu   = ev->GetTrueEnu();
+            double enu   = ev->GetTrueEnu() / 1000.0; //MeV -> GeV
             int bin      = GetBinIndex(sample[s]->GetDetector(), enu);
 
             if(bin == BADBIN)
