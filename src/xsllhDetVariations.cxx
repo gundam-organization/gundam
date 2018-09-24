@@ -271,11 +271,11 @@ int main(int argc, char** argv)
             std::vector<float> i_toy;
             for(unsigned int s = 0; s < num_samples; ++s)
             {
-                if(use_samples[s] != s)
-                    continue;
-
-                for(unsigned int b = 0; b < nbins; ++b)
-                    i_toy.push_back(v_hists[s][t].GetBinContent(b+1));
+                if(std::count(use_samples.begin(), use_samples.end(), s) > 0)
+                {
+                    for(unsigned int b = 0; b < nbins; ++b)
+                        i_toy.push_back(v_hists[s][t].GetBinContent(b+1));
+                }
             }
             v_toys.emplace_back(i_toy);
         }
@@ -330,13 +330,14 @@ int main(int argc, char** argv)
         for(unsigned int t = 0; t < num_toys; ++t)
         {
             v_hists[s][t].SetLineColor(kRed);
-            v_hists[s][t].Scale(1, "width");
+            //v_hists[s][t].Scale(1, "width");
             v_hists[s][t].Draw("hist same");
         }
 
         v_avg[s].SetLineColor(kBlack);
         v_avg[s].SetLineWidth(2);
-        v_avg[s].Scale(1, "width");
+        //v_avg[s].Scale(1, "width");
+        v_avg[s].GetYaxis() -> SetRangeUser(0, v_avg[s].GetMaximum()*1.50);
         v_avg[s].Draw("hist same");
         c.Write(ss.str().c_str());
 
