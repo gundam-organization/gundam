@@ -63,7 +63,7 @@ void AnaTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples, const std::vecto
     std::cout << "[AnaTreeMC]: Reading events...\n";
     for(long int jentry = 0; jentry < nentries; jentry++)
     {
-        if(jentry % 1E5 == 0)
+        if(jentry % static_cast<long int>(1E5) == 0)
             std::cout << "[AnaTreeMC]: Processing event " << jentry << " out of " << nentries << std::endl;
         nbytes += fChain -> GetEntry(jentry);
         //create and fill event structure
@@ -74,7 +74,7 @@ void AnaTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples, const std::vecto
         ev.SetTopology(evtTopology); // mectopology (i.e. CC0Pi,CC1Pi etc)
         ev.SetReaction(evtReaction); // reaction (i.e. CCQE,CCRES etc)
         ev.SetTrueEnu(EnuTrue);
-        ev.SetRecEnu(EnuReco);
+        ev.SetRecoEnu(EnuReco);
         ev.SetTrueD1(D1True);
         ev.SetRecD1(D1Reco);
         ev.SetTrueD2(D2True);

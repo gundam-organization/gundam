@@ -255,8 +255,8 @@ int main(int argc, char** argv)
     //std::vector<bool> use_sample = {true, true, true, true, false, true, true, false, false, false};
     //const unsigned int num_elements = nbins * std::count(use_sample.begin(), use_sample.end(), true);
     const unsigned int num_elements = nbins * use_samples.size();
-    TMatrixTSym<float> cov_mat(num_elements);
-    TMatrixTSym<float> cor_mat(num_elements);
+    TMatrixTSym<double> cov_mat(num_elements);
+    TMatrixTSym<double> cor_mat(num_elements);
     cov_mat.Zero();
     cor_mat.Zero();
 

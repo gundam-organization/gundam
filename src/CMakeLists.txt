@@ -1,58 +1,19 @@
+#xsllhCalcXsec
+add_executable(xsllhCalcXsec xsllhCalcXsec.cxx)
 
-add_executable(CCQEFit EXCLUDE_FROM_ALL ccqefit.cc)
-
-set_target_properties(CCQEFit PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
+set_target_properties(xsllhCalcXsec PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
 foreach(mod ${MODULES})
- target_include_directories(CCQEFit PUBLIC ${CMAKE_SOURCE_DIR}/${mod}/src)
+ target_include_directories(xsllhCalcXsec PUBLIC ${CMAKE_SOURCE_DIR}/${mod}/src)
+ target_include_directories(xsllhCalcXsec PUBLIC ${CMAKE_SOURCE_DIR}/include)
 endforeach()
 
 foreach(mod ${MODULETargets})
   cmessage(STATUS "Linking with: ${mod}")
-  target_link_libraries(CCQEFit ${mod})
+  target_link_libraries(xsllhCalcXsec ${mod})
 endforeach()
 
-add_executable(FitBase EXCLUDE_FROM_ALL fitBase.cc)
-
-set_target_properties(FitBase PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
-
-foreach(mod ${MODULES})
- target_include_directories(FitBase PUBLIC ${CMAKE_SOURCE_DIR}/${mod}/src)
-endforeach()
-
-foreach(mod ${MODULETargets})
-  cmessage(STATUS "Linking with: ${mod}")
-  target_link_libraries(FitBase ${mod})
-endforeach()
-
-add_executable(ingridFit ingridFit.cc)
-
-set_target_properties(ingridFit PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
-
-foreach(mod ${MODULES})
- target_include_directories(ingridFit PUBLIC ${CMAKE_SOURCE_DIR}/${mod}/src)
- target_include_directories(ingridFit PUBLIC ${CMAKE_SOURCE_DIR}/include)
-endforeach()
-
-foreach(mod ${MODULETargets})
-  cmessage(STATUS "Linking with: ${mod}")
-  target_link_libraries(ingridFit ${mod})
-endforeach()
-
-add_executable(calcXsec calcXsec.cc)
-
-set_target_properties(calcXsec PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
-
-foreach(mod ${MODULES})
- target_include_directories(calcXsec PUBLIC ${CMAKE_SOURCE_DIR}/${mod}/src)
- target_include_directories(calcXsec PUBLIC ${CMAKE_SOURCE_DIR}/include)
-endforeach()
-
-foreach(mod ${MODULETargets})
-  cmessage(STATUS "Linking with: ${mod}")
-  target_link_libraries(calcXsec ${mod})
-endforeach()
-
+#xsllhDetVariations
 add_executable(xsllhDetVar xsllhDetVariations.cxx)
 
 set_target_properties(xsllhDetVar PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
@@ -67,18 +28,35 @@ foreach(mod ${MODULETargets})
   target_link_libraries(xsllhDetVar ${mod})
 endforeach()
 
-add_executable(PropError EXCLUDE_FROM_ALL propError.C)
+#xsllhFit
+add_executable(xsllhFit xsllhFit.cxx)
 
-set_target_properties(PropError PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
+set_target_properties(xsllhFit PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
 foreach(mod ${MODULES})
- target_include_directories(PropError PUBLIC ${CMAKE_SOURCE_DIR}/${mod}/src)
+ target_include_directories(xsllhFit PUBLIC ${CMAKE_SOURCE_DIR}/${mod}/src)
+ target_include_directories(xsllhFit PUBLIC ${CMAKE_SOURCE_DIR}/include)
 endforeach()
 
 foreach(mod ${MODULETargets})
   cmessage(STATUS "Linking with: ${mod}")
-  target_link_libraries(PropError ${mod})
+  target_link_libraries(xsllhFit ${mod})
 endforeach()
 
-#install(TARGETS CCQEFit CCQEFit_daT CCQEFit_dphiT FitBase ingridFit PropError PropError_daT PropError_dphiT DESTINATION bin)
-install(TARGETS calcXsec ingridFit xsllhDetVar DESTINATION bin)
+#xsllhUnitTests
+add_executable(xsllhUnitTest xsllhUnitTests.cxx)
+
+set_target_properties(xsllhUnitTest PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
+
+foreach(mod ${MODULES})
+ target_include_directories(xsllhUnitTest PUBLIC ${CMAKE_SOURCE_DIR}/${mod}/src)
+ target_include_directories(xsllhUnitTest PUBLIC ${CMAKE_SOURCE_DIR}/include)
+endforeach()
+
+foreach(mod ${MODULETargets})
+  cmessage(STATUS "Linking with: ${mod}")
+  target_link_libraries(xsllhUnitTest ${mod})
+endforeach()
+
+#install targets
+install(TARGETS xsllhCalcXsec xsllhFit xsllhDetVar xsllhUnitTest DESTINATION bin)

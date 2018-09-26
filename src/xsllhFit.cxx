@@ -18,7 +18,7 @@
 
 int main(int argc, char** argv)
 {
-    const std::string TAG = color::CYAN_STR + "[IngridFit]: " + color::RESET_STR;
+    const std::string TAG = color::CYAN_STR + "[xsFit]: " + color::RESET_STR;
     const std::string ERR = color::RED_STR + color::BOLD_STR
                             + "[ERROR]: " + color::RESET_STR;
 
