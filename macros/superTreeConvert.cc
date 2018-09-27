@@ -142,7 +142,7 @@ int superTreeConvert(
     nd5tree->SetBranchAddress("truelepton_mom", &muMomTrue);
     nd5tree->SetBranchAddress("truelepton_costheta", &muCosThetaTrue);
     nd5tree->SetBranchAddress("nu_trueE", &TrueNuEnergy);
-    nd5tree->SetBranchAddress("weight_corr_total", &weight);
+    nd5tree->SetBranchAddress("weight_syst_total", &weight);
 
     outtree->Branch("nutype", &nutype, "nutype/I");
     outtree->Branch("reaction", &reaction, "reaction/I");
@@ -349,7 +349,7 @@ int superTreeConvert(
     if(EvtEnd!=0) nentries=EvtEnd;
     if(EvtFrac>0.0001) nentries=nentries*EvtFrac;
 
-    for(Long64_t jentry=2000000; jentry < 2010000; jentry++) {
+    for(Long64_t jentry=2000000; jentry < 2030000; jentry++) {
         nb = nd2tree->GetEntry(jentry);
         nbytes += nb;
         if(fileIndex != 1)

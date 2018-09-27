@@ -61,6 +61,9 @@ public:
         }
         std::cout << "\r" << bar_prefix << "[" << (is_rainbow ? color::RainbowText(bar) : bar)
                   << "] " << int(progress * 100.0) << "%";
+
+        if(current == max_progress)
+            std::cout << std::endl;
         std::cout.flush();
     }
 
@@ -79,6 +82,9 @@ public:
         }
         std::cout << "\r" << prefix << "[" << (is_rainbow ? color::RainbowText(bar) : bar) << "] "
                   << int(progress * 100.0) << "%";
+
+        if(current == max_progress)
+            std::cout << std::endl;
         std::cout.flush();
     }
 
@@ -97,6 +103,9 @@ public:
         }
         std::cout << "\r" << bar_prefix << "[" << (is_rainbow ? color::RainbowText(bar) : bar)
                   << "] " << int(progress * 100.0) << "%";
+
+        if(current == limit)
+            std::cout << std::endl;
         std::cout.flush();
     }
 
@@ -115,6 +124,9 @@ public:
         }
         std::cout << "\r" << prefix << "[" << (is_rainbow ? color::RainbowText(bar) : bar) << "] "
                   << int(progress * 100.0) << "%";
+
+        if(current == limit)
+            std::cout << std::endl;
         std::cout.flush();
     }
 };
