@@ -1,6 +1,7 @@
 #ifndef COLOROUTPUT_HH
 #define COLOROUTPUT_HH
 
+#include <cmath>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -52,9 +53,10 @@ std::string RainbowText(const T& text)
     ss.str("");
     unsigned int i = 0;
     unsigned int char_count = 0;
+    unsigned int char_per_color = std::ceil(text_str.length() / (rainbow_size * 1.0));
     for(const auto& c : text_str)
     {
-        if(char_count % rainbow_size == 0)
+        if(char_count == char_per_color || char_count == 0)
         {
             ss << BOLD_STR << "\033[" << rainbow_code[i++] << "m";
             char_count = 0;
