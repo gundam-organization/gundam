@@ -138,7 +138,7 @@ int main(int argc, char** argv)
 
     out_seltree -> Branch("nutype", &nutype, "nutype/I");
     out_seltree -> Branch("reaction", &reaction, "reaction/I");
-    out_seltree -> Branch("mectopology", &topology, "mectopology/I");
+    out_seltree -> Branch("topology", &topology, "topology/I");
     out_seltree -> Branch("cut_branch", &cut_branch, "cut_branch/I");
     out_seltree -> Branch("enu_true", &enu_true, "enu_true/F");
     out_seltree -> Branch("enu_reco", &enu_reco, "enu_reco/F");
@@ -162,7 +162,7 @@ int main(int argc, char** argv)
 
     out_trutree -> Branch("nutype", &nutype_true, "nutype/I");
     out_trutree -> Branch("reaction", &reaction_true, "reaction/I");
-    out_trutree -> Branch("mectopology", &topology_true, "mectopology/I");
+    out_trutree -> Branch("topology", &topology_true, "topology/I");
     out_trutree -> Branch("cut_branch", &cut_branch, "cut_branch/I");
     out_trutree -> Branch("enu_true", &enu_true, "enu_true/F");
     out_trutree -> Branch("q2_true", &q2_true, "q2_true/F");

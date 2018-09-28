@@ -29,33 +29,34 @@ long int AnaTreeMC::GetEntry(long int entry) const
 void AnaTreeMC::SetBranches()
 {
     // Set branch addresses and branch pointers
-    fChain -> SetBranchAddress("nutype", &nutype, &b_nutype);
-    fChain -> SetBranchAddress("cutBranch", &cutBranch, &b_cutBranch);
-    fChain -> SetBranchAddress("mectopology", &evtTopology, &b_evtTopology);
-    fChain -> SetBranchAddress("reaction", &evtReaction, &b_evtReaction);
-    fChain -> SetBranchAddress("D1True", &D1True, &b_D1True);
-    fChain -> SetBranchAddress("D2True", &D2True, &b_D2True);
-    fChain -> SetBranchAddress("D1Rec", &D1Reco, &b_D1Reco);
-    fChain -> SetBranchAddress("D2Rec", &D2Reco, &b_D2Reco);
-    fChain -> SetBranchAddress("Enureco", &EnuReco, &b_EnuReco);
-    fChain -> SetBranchAddress("Enutrue", &EnuTrue, &b_EnuTrue);
-    fChain -> SetBranchAddress("weight", &weight, &b_weight);
+    fChain -> SetBranchAddress("nutype", &nutype);
+    fChain -> SetBranchAddress("cut_branch", &cutBranch);
+    fChain -> SetBranchAddress("topology", &evtTopology);
+    fChain -> SetBranchAddress("reaction", &evtReaction);
+    fChain -> SetBranchAddress("D1True", &D1True);
+    fChain -> SetBranchAddress("D1Reco", &D1Reco);
+    fChain -> SetBranchAddress("D2True", &D2True);
+    fChain -> SetBranchAddress("D2Reco", &D2Reco);
+    fChain -> SetBranchAddress("q2_true", &Q2True);
+    fChain -> SetBranchAddress("q2_reco", &Q2Reco);
+    fChain -> SetBranchAddress("enu_true", &EnuTrue);
+    fChain -> SetBranchAddress("enu_reco", &EnuReco);
+    fChain -> SetBranchAddress("weight", &weight);
 
     // New kinematic variables always included for phase space cuts
-    fChain -> SetBranchAddress("pMomRec", &pMomRec, &b_pMomRec);
-    fChain -> SetBranchAddress("pMomTrue", &pMomTrue, &b_pMomTrue);
-    fChain -> SetBranchAddress("pCosThetaRec", &pCosThetaRec, &b_pCosThetaRec);
-    fChain -> SetBranchAddress("pCosThetaTrue", &pCosThetaTrue, &b_pCosThetaTrue);
-    fChain -> SetBranchAddress("muMomRec", &muMomRec, &b_muMomRec);
-    fChain -> SetBranchAddress("muMomTrue", &muMomTrue, &b_muMomTrue);
-    fChain -> SetBranchAddress("muCosThetaRec", &muCosThetaRec, &b_muCosThetaRec);
-    fChain -> SetBranchAddress("muCosThetaTrue", &muCosThetaTrue, &b_muCosThetaTrue);
+    fChain -> SetBranchAddress("pMomRec", &pMomRec);
+    fChain -> SetBranchAddress("pMomTrue", &pMomTrue);
+    fChain -> SetBranchAddress("pCosThetaRec", &pCosThetaRec);
+    fChain -> SetBranchAddress("pCosThetaTrue", &pCosThetaTrue);
+    fChain -> SetBranchAddress("muMomRec", &muMomRec);
+    fChain -> SetBranchAddress("muMomTrue", &muMomTrue);
+    fChain -> SetBranchAddress("muCosThetaRec", &muCosThetaRec);
+    fChain -> SetBranchAddress("muCosThetaTrue", &muCosThetaTrue);
 }
 
 void AnaTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples, const std::vector<int>& sig_topology, const bool evt_type)
 {
-    if(fChain == nullptr) return;
-    if(ana_samples.empty()) return;
+    if(fChain == nullptr || ana_samples.empty()) return;
 
     long int nentries = fChain -> GetEntries();
     long int nbytes = 0;
@@ -81,12 +82,8 @@ void AnaTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples, const std::vecto
         ev.SetRecD2(D2Reco);
         ev.SetEvWght(weight);
         ev.SetEvWghtMC(weight);
-
-        const double mu_mass = 105.6583745;
-        double emu = std::sqrt(muMomTrue*muMomTrue + mu_mass * mu_mass);
-        double q2 = 2.0 * EnuTrue * (emu - muMomTrue * muCosThetaTrue) - mu_mass * mu_mass;
-        q2 = q2 / 1.0E6;
-        ev.SetQ2(q2);
+        ev.SetQ2True(Q2True);
+        ev.SetQ2Reco(Q2Reco);
 
         ev.SetmuMomRec(muMomRec);
         ev.SetmuMomTrue(muMomTrue);
