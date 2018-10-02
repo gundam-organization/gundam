@@ -264,10 +264,10 @@ void AnaSample::FillEventHisto(int datatype)
         float D1_rec_tree, D2_rec_tree, wght;
         int cut_branch;
 
-        m_data_tree->SetBranchAddress("cutBranch", &cut_branch);
+        m_data_tree->SetBranchAddress("cut_branch", &cut_branch);
         m_data_tree->SetBranchAddress("weight", &wght);
-        m_data_tree->SetBranchAddress("D1Rec", &D1_rec_tree);
-        m_data_tree->SetBranchAddress("D2Rec", &D2_rec_tree);
+        m_data_tree->SetBranchAddress("D1Reco", &D1_rec_tree);
+        m_data_tree->SetBranchAddress("D2Reco", &D2_rec_tree);
 
         long int n_entries = m_data_tree->GetEntries();
         for(std::size_t i = 0; i < n_entries; ++i)

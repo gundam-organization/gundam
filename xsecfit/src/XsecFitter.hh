@@ -86,7 +86,6 @@ class XsecFitter
         }
 
     private:
-        void GenerateToyData(int toyindx = 0, int toytype=0, int statFluct=0);
         double FillSamples(std::vector<std::vector<double> >& new_pars,
                            int datatype = 0);
         void DoSaveParams(std::vector< std::vector<double> > new_pars);

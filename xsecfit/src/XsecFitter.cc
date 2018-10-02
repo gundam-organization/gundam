@@ -119,7 +119,7 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*> &fitpara, const std::
             prefitParams->SetBinContent(paramNo, m_fitpara[i]->GetParPrior(j));
             if(m_fitpara[i]->HasCovMat() && (i!=0))
             {
-                TMatrixDSym* covMat = m_fitpara[i]->GetCovarMat();
+                TMatrixDSym* covMat = m_fitpara[i]->GetCovMat();
                 prefitParams->SetBinError(paramNo, sqrt((*covMat)[j][j]));
             }
             else
@@ -151,20 +151,7 @@ void XsecFitter::Fit(std::vector<AnaSample*> &samples, const std::vector<std::st
         return;
     }
 
-    //generate toy data to fit
-    if(datatype==1 || datatype==5 || datatype==6 || datatype==7 || datatype==9){
-        if(datatype==1) GenerateToyData(0,0,statFluct);
-        if(datatype==5 || datatype==7) GenerateToyData(0,1,statFluct);
-        if(datatype==6) GenerateToyData(0,2,statFluct);
-        if(datatype==9) GenerateToyData(0,3,statFluct);
-        cout<<"toy data generated"<<endl;
-        //save hists if requested
-        for(size_t s=0;s<m_samples.size();s++)
-        {
-            m_samples[s]->GetSampleBreakdown(m_dir, "thrown", topology, false);
-        }
-    }
-    else if(datatype==2 || datatype==3 || datatype==4){
+    if(datatype==2 || datatype==3 || datatype==4){
         for(size_t s=0;s<m_samples.size();s++)
         {
             m_samples[s]->FillEventHisto(datatype);
@@ -252,77 +239,6 @@ void XsecFitter::Fit(std::vector<AnaSample*> &samples, const std::vector<std::st
     if(m_freq >= 0 && m_dir)
         DoSaveFinalEvents(m_calls, res_pars);
 }
-
-// GenerateToyData
-// toytype = 0 -> Nuisance throws only
-// toytype = 1 -> Also throw ci parmas from a reg prior
-// toytype = 2 -> Also throw ci parmas from a flat prior
-// toytype = 3 Generate toy data from provided paramVector
-void XsecFitter::GenerateToyData(int toyindx, int toytype, int statFluct)
-{
-    //do parameter throws
-    std::vector<std::vector<double> > par_throws;
-    double chi2_sys = 0.0;
-    int gparamno = 0;
-    TFile *finput = nullptr;;
-    TVectorD *paramVec = nullptr;
-
-    if(toytype==3){
-        finput= new TFile(paramVectorFileName.c_str(),"READ");
-        if(!finput) cout << "WARNING: Issue opening input param vector file" << endl;
-        paramVec = ((TVectorD*)finput->Get("res_vector"));
-        if(!paramVec) cout << "WARNING: Issue getting param vector fromfile" << endl;
-    }
-
-    for(size_t i=0;i<m_fitpara.size();i++)
-    {
-        cout << "XsecFitter::GenerateToyData fit param set: " << i << endl;
-        bool throwOkay=false;
-
-        if(toyindx == 0) m_fitpara[i]->InitThrows();
-        vector<double> pars;
-        if      ((toytype==0 || toytype==2) && i!=0) m_fitpara[i]->DoThrow(pars, 0);
-        else if ((toytype==0 || toytype==2) && i==0) m_fitpara[i]->DoThrow(pars, 3);
-        if(toytype==1) m_fitpara[i]->DoThrow(pars, 1);
-
-        if(toytype==2){
-            //Throw fit params randomly in a sensible range (here 0.1 - 3.1, want to stay away from 0 boundary)
-            if((m_fitpara[i]->HasCovMat())==false){
-                for(size_t j=0;j<pars.size();j++){
-                    pars[j] = (3*gRandom -> Uniform(0,1))+0.1;
-                }
-            }
-        }
-
-        if(toytype==3){
-            for(int j=0; j<m_fitpara[i]->GetNpar(); j++){
-                pars.push_back((*paramVec)(gparamno));
-                gparamno++;
-            }
-        }
-
-        par_throws.push_back(pars);
-        chi2_sys += m_fitpara[i]->GetChi2(pars);
-        cout << "Toy data generated with following values: " << endl;
-        cout<<"Parameters "<<m_fitpara[i]->GetName()<<endl;
-        for(size_t j=0;j<pars.size();j++) cout<<j<<": "<<pars[j]<< ", ";
-        cout << endl;
-    }
-    vec_chi2_sys.push_back(chi2_sys);
-
-    if(toytype==3){
-        if(paramVec->GetNrows() != gparamno) cout << "ERROR: mismatch in parameters required (" << gparamno << ") vs paramters in read vector (" << paramVec->GetNrows() << ")." << endl;
-    }
-
-    //Generate toy data histograms
-    double chi2_stat;
-    if(statFluct==0) chi2_stat=FillSamples(par_throws, 1);
-    else if(statFluct==1) chi2_stat=FillSamples(par_throws, 3);
-    vec_chi2_stat.push_back(chi2_stat);
-
-    if(m_freq>=0  && m_dir) DoSaveParams(par_throws);
-}
-
 
 // FillSample with new parameters
 //datatype = 0 if fit iteration

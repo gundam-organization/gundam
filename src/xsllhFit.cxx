@@ -158,7 +158,7 @@ int main(int argc, char** argv)
                   << TAG << "Name: " << opt.name << std::endl
                   << TAG << "CutB: " << opt.cut_branch << std::endl
                   << TAG << "Detector: " << opt.detector << std::endl
-                  << TAG << "Use Sample: " << opt.use_sample << std::endl;
+                  << TAG << "Use Sample: " << std::boolalpha << opt.use_sample << std::endl;
 
         auto s = new AnaSample(opt.cut_branch, opt.name, opt.detector, opt.binning, tdata);
         s -> SetNorm(potD/potMC);

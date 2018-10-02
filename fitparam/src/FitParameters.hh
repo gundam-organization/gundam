@@ -1,14 +1,3 @@
-//////////////////////////////////////////////////////////
-//
-//  CCQE cross-section parameters
-//
-//
-//
-//  Created: Thu Jun 13 11:46:03 CEST 2013
-//  Modified:
-//
-//////////////////////////////////////////////////////////
-
 #ifndef __FitParameters_hh__
 #define __FitParameters_hh__
 
@@ -38,6 +27,7 @@ class FitParameters : public AnaFitParameters
     private:
         int GetBinIndex(const std::string& det, double D1, double D2) const;
         std::map<std::string, std::vector<xsllh::FitBin> > m_fit_bins;
+        std::map<std::string, int> m_det_offset;
         std::vector<std::string> v_detectors;
 };
 

@@ -1,14 +1,3 @@
-//////////////////////////////////////////////////////////
-//
-//  Flux parameters
-//
-//
-//
-//  Created: Thu Jun 13 14:51:21 CEST 2013
-//  Modified:
-//
-//////////////////////////////////////////////////////////
-
 #ifndef __FluxParameters_hh__
 #define __FluxParameters_hh__
 
@@ -29,6 +18,8 @@ public:
 private:
     int GetBinIndex(const std::string& det, double enu);
     std::vector<double> m_enubins;
+    std::map<std::string, int> m_det_offset;
+    std::map<std::string, std::vector<double>> m_det_bins;
     std::vector<std::string> v_detectors;
 };
 
