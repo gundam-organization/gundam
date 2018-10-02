@@ -1,5 +1,5 @@
-set(SRCFILES BinManager.cc OptParser.cc ThrowParms.cc ToyThrower.cc XsecDial.cc XsecExtractor.cc)
-set(HEADERS BinManager.hh OptParser.hh ThrowParms.hh ToyThrower.hh XsecDial.hh XsecExtractor.hh)
+set(SRCFILES BinManager.cc EigenDecomp.cc OptParser.cc ThrowParms.cc ToyThrower.cc XsecDial.cc XsecExtractor.cc)
+set(HEADERS BinManager.hh EigenDecomp.hh OptParser.hh ThrowParms.hh ToyThrower.hh XsecDial.hh XsecExtractor.hh)
 
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)
   add_library(xslfutils STATIC ${SRCFILES})
