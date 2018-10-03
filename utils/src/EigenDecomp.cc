@@ -1,37 +1,25 @@
 #include "EigenDecomp.hh"
 
-EigenDecomp::EigenDecomp(const TVectorD& nom, const TMatrixD& cov, Method flag = kEigen)
+EigenDecomp::EigenDecomp(const TMatrixD& cov, Method flag)
     : npar(cov.GetNrows())
     , decomp_method(flag)
     , eigen_vectors(nullptr)
     , eigen_vectorsI(nullptr)
     , eigen_covmat(nullptr)
-    , eigen_nominal(nullptr)
     , eigen_values(nullptr)
 {
-    SetupDecomp(nom, cov);
+    SetupDecomp(cov);
 }
 
-EigenDecomp::EigenDecomp(const TVectorD& nom, const TMatrixDSym& cov, Method flag = kEigen)
+EigenDecomp::EigenDecomp(const TMatrixDSym& cov, Method flag)
     : npar(cov.GetNrows())
     , decomp_method(flag)
     , eigen_vectors(nullptr)
     , eigen_vectorsI(nullptr)
     , eigen_covmat(nullptr)
-    , eigen_nominal(nullptr)
     , eigen_values(nullptr)
 {
-    SetupDecomp(nom, cov);
-}
-
-EigenDecomp::EigenDecomp(const std::vector<double>& nom, const TMatrixD& cov, Method flag = kEigen)
-    : EigenDecomp(TVectorD(nom.size(), &nom[0]), cov, flag)
-{
-}
-
-EigenDecomp::EigenDecomp(const std::vector<double>& nom, const TMatrixDSym& cov, Method flag = kEigen)
-    : EigenDecomp(TVectorD(nom.size(), &nom[0]), cov, flag)
-{
+    SetupDecomp(cov);
 }
 
 EigenDecomp::~EigenDecomp()
@@ -42,9 +30,6 @@ EigenDecomp::~EigenDecomp()
     if(eigen_vectorsI != nullptr)
         delete eigen_vectorsI;
 
-    if(eigen_nominal != nullptr)
-        delete eigen_nominal;
-
     if(eigen_values != nullptr)
         delete eigen_values;
 
@@ -53,10 +38,9 @@ EigenDecomp::~EigenDecomp()
 }
 
 template<typename Matrix>
-void EigenDecomp::SetupDecomp(const TVectorD& nom, const Matrix& cov)
+void EigenDecomp::SetupDecomp(const Matrix& cov)
 {
-    eigen_nominal = new TVectorD(npar);
-    eigen_covmat  = new TMatrixD(npar, npar);
+    eigen_covmat = new TMatrixDSym(npar);
 
     if(decomp_method == kEigen)
     {
@@ -80,15 +64,11 @@ void EigenDecomp::SetupDecomp(const TVectorD& nom, const Matrix& cov)
 
 #ifdef DEBUG_MSG
     std::cout << "ev: " << eigen_values->GetNrows() << std::endl;
-    std::cout << "en: " << eigen_nominal->GetNrows() << std::endl;
     std::cout << "eV: " << eigen_vectors->GetNrows() << std::endl;
     std::cout << "eI: " << eigen_vectorsI->GetNrows() << std::endl;
     std::cout << "eM: " << eigen_covmat->GetNrows() << std::endl;
-    std::cout << "nm: " << nom.GetNrows() << std::endl;
     std::cout << "np: " << npar << std::endl;
 #endif
-
-    (*eigen_nominal) = (*eigen_vectorsI) * nom;
 
     eigen_covmat->Zero();
     for(int i = 0; i < npar; ++i)
@@ -96,12 +76,6 @@ void EigenDecomp::SetupDecomp(const TVectorD& nom, const Matrix& cov)
         if((*eigen_values)(i) > 0.0)
             (*eigen_covmat)(i, i) = (*eigen_values)(i);
     }
-}
-
-std::vector<double> EigenDecomp::GetEigenNominalSTL() const
-{
-    auto arr = eigen_nominal->GetMatrixArray();
-    return std::vector<double>(arr, arr + npar);
 }
 
 std::vector<double> EigenDecomp::GetEigenValuesSTL() const

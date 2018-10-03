@@ -26,30 +26,24 @@ class EigenDecomp
         Method decomp_method;
         TMatrixD* eigen_vectors;
         TMatrixD* eigen_vectorsI;
-        TMatrixD* eigen_covmat;
-        TVectorD* eigen_nominal;
         TVectorD* eigen_values;
+        TMatrixDSym* eigen_covmat;
 
         template<typename Matrix>
-            void SetupDecomp(const TVectorD& nom, const Matrix& cov);
+            void SetupDecomp(const Matrix& cov);
 
     public:
-        EigenDecomp(const TVectorD& nom, const TMatrixD& cov, Method flag);
-        EigenDecomp(const TVectorD& nom, const TMatrixDSym& cov, Method flag);
-        EigenDecomp(const std::vector<double>& nom, const TMatrixD& cov, Method flag);
-        EigenDecomp(const std::vector<double>& nom, const TMatrixDSym& cov, Method flag);
+        EigenDecomp(const TMatrixD& cov, Method flag = kEigen);
+        EigenDecomp(const TMatrixDSym& cov, Method flag = kEigen);
         ~EigenDecomp();
 
-        TMatrixD GetEigenCovMat() const { return *eigen_covmat; }
-        TMatrixD GetEigenVectors() const { return *eigen_vectors; }
-        TVectorD GetEigenNominal() const { return *eigen_nominal; }
         TVectorD GetEigenValues() const { return *eigen_values; }
+        TMatrixD GetEigenVectors() const { return *eigen_vectors; }
+        TMatrixDSym GetEigenCovMat() const { return *eigen_covmat; }
 
         double GetEigenVectors(const int i, const int j) const { return (*eigen_vectors)(i, j); }
-        double GetEigenNominal(const int i) const { return (*eigen_nominal)(i); }
         double GetEigenValues(const int i) const { return (*eigen_values)(i); }
 
-        std::vector<double> GetEigenNominalSTL() const;
         std::vector<double> GetEigenValuesSTL() const;
 
         TVectorD GetOriginalParameters(const TVectorD& param) const;
