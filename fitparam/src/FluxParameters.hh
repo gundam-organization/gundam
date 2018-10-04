@@ -6,7 +6,7 @@
 class FluxParameters : public AnaFitParameters
 {
 public:
-    FluxParameters(const std::string& name = "par_flux");
+    FluxParameters(const std::string& name);
     ~FluxParameters();
 
     void InitParameters();

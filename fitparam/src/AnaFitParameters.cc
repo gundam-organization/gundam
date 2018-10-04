@@ -4,31 +4,51 @@ AnaFitParameters::AnaFitParameters()
     : m_name("")
     , Npar(0)
     , m_rng_priors(false)
+    , m_decompose(false)
+    , eigen_decomp(nullptr)
     , covariance(nullptr)
     , covarianceI(nullptr)
+    , original_cov(nullptr)
 {
 }
 
 AnaFitParameters::~AnaFitParameters()
 {
+    if(eigen_decomp != nullptr)
+        delete eigen_decomp;
     if(covariance != nullptr)
         delete covariance;
     if(covarianceI != nullptr)
         delete covarianceI;
+    if(original_cov != nullptr)
+        delete original_cov;
 }
 
-void AnaFitParameters::SetCovarianceMatrix(const TMatrixDSym& covmat)
+void AnaFitParameters::SetCovarianceMatrix(const TMatrixDSym& covmat, bool decompose)
 {
     if(covariance != nullptr)
         delete covariance;
     if(covarianceI != nullptr)
         delete covarianceI;
+    if(original_cov != nullptr)
+        delete original_cov;
 
-    covariance  = new TMatrixDSym(covmat);
-    covarianceI = new TMatrixDSym(covmat);
-    covarianceI->SetTol(1e-200);
+    if(decompose)
+    {
+        m_decompose  = true;
+        eigen_decomp = new EigenDecomp(covmat);
+        original_cov = new TMatrixDSym(covmat);
+        covariance   = new TMatrixDSym(eigen_decomp->GetEigenCovMat());
+        covarianceI  = new TMatrixDSym(eigen_decomp->GetEigenCovMat());
+    }
+    else
+    {
+        covariance  = new TMatrixDSym(covmat);
+        covarianceI = new TMatrixDSym(covmat);
+    }
 
     double det = 0;
+    covarianceI->SetTol(1e-200);
     covarianceI->Invert(&det);
     /*
     if(abs(det) < 1e-200)
@@ -49,7 +69,7 @@ void AnaFitParameters::SetCovarianceMatrix(const TMatrixDSym& covmat)
     */
 }
 
-double AnaFitParameters::GetChi2(const std::vector<double>& params)
+double AnaFitParameters::GetChi2(const std::vector<double>& params) const
 {
     if(covariance == nullptr)
         return 0.0;
@@ -74,7 +94,7 @@ double AnaFitParameters::GetChi2(const std::vector<double>& params)
     return chi2;
 }
 
-bool AnaFitParameters::CheckDims(const std::vector<double>& params)
+bool AnaFitParameters::CheckDims(const std::vector<double>& params) const
 {
     bool vector_size = false;
     bool matrix_size = false;

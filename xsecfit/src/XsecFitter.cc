@@ -186,19 +186,31 @@ void XsecFitter::Fit(std::vector<AnaSample*> &samples, const std::vector<std::st
 
     const int ndim  = m_fitter -> NDim();
     const int nfree = m_fitter -> NFree();
+    const double* par_val = m_fitter -> X();
+    const double* par_err = m_fitter -> Errors();
     double cov_array[ndim*ndim];
     m_fitter -> GetCovMatrix(cov_array);
 
+    std::vector<double> par_val_vec(par_val, par_val + ndim);
+    std::vector<double> par_err_vec(par_err, par_err + ndim);
+
+    unsigned int par_offset = 0;
     TMatrixDSym cov_matrix(ndim, cov_array);
+    for(const auto& fit_param : m_fitpara)
+    {
+        if(fit_param -> IsDecomposed())
+        {
+            cov_matrix = fit_param -> GetOriginalCovMat(cov_matrix, par_offset);
+            par_val_vec = fit_param -> GetOriginalParameters(par_val_vec, par_offset);
+        }
+        par_offset += fit_param -> GetNpar();
+    }
 
     //Calculate Corrolation Matrix
     TMatrixDSym cor_matrix(ndim);
     for(int r = 0; r < ndim; ++r)
         for(int c = 0; c < ndim; ++c)
             cor_matrix[r][c] = cov_matrix[r][c] / std::sqrt(cov_matrix[r][r] * cov_matrix[c][c]);
-
-    const double* par_val = m_fitter -> X();
-    const double* par_err = m_fitter -> Errors();
 
     //save fit results
     TVectorD postfit_param(ndim);
@@ -212,8 +224,9 @@ void XsecFitter::Fit(std::vector<AnaSample*> &samples, const std::vector<std::st
 
         for(int j=0;j<m_nparclass[i];j++)
         {
-            vec_err.push_back(par_err[k]);
-            double parvalue = par_val[k];
+            //vec_err.push_back(par_err_vec[k]);
+            vec_err.push_back(std::sqrt(cov_matrix[k][k]));
+            double parvalue = par_val_vec[k];
             vec_res.push_back(parvalue);
             postfit_param[k] = parvalue;
             k++;
@@ -249,6 +262,16 @@ double XsecFitter::FillSamples(std::vector<std::vector<double> >& new_pars, int 
     bool output_chi2 = false;
     if((m_calls<1001 && (m_calls%100==0 || m_calls<20)) || (m_calls>1001 && m_calls%1000==0))
         output_chi2 = true;
+
+    unsigned int par_offset = 0;
+    for(int i = 0; i < m_fitpara.size(); ++i)
+    {
+        if(m_fitpara[i] -> IsDecomposed())
+        {
+            new_pars[i] = m_fitpara[i] -> GetOriginalParameters(new_pars[i]);
+        }
+        par_offset += m_fitpara[i] -> GetNpar();
+    }
 
     //loop over samples
     //#pragma omp parallel for num_threads(m_threads)

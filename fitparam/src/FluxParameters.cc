@@ -1,6 +1,9 @@
 #include "FluxParameters.hh"
 
-FluxParameters::FluxParameters(const std::string& name) { m_name = name; }
+FluxParameters::FluxParameters(const std::string& name)
+{
+    m_name = name;
+}
 
 FluxParameters::~FluxParameters() { ; }
 
@@ -71,7 +74,7 @@ void FluxParameters::ReWeight(AnaEvent* event, const std::string& det, int nsamp
         return;
     }
 
-    int bin = m_evmap[nsample][nevent];
+    const int bin = m_evmap[nsample][nevent];
 
     // skip event if not Signal
     if(bin == PASSEVENT)
@@ -126,6 +129,14 @@ void FluxParameters::InitParameters()
     }
 
     Npar = pars_name.size();
+    if(m_decompose)
+    {
+        pars_original = pars_prior;
+        pars_prior = eigen_decomp -> GetDecompParameters(pars_prior);
+        pars_limlow = std::vector<double>(Npar, -100);
+        pars_limhigh = std::vector<double>(Npar, 100);
+        std::cout << "[FluxParameters]: Decomposed parameters." << std::endl;
+    }
 }
 
 void FluxParameters::AddDetector(const std::string& det, const std::vector<double>& bins)

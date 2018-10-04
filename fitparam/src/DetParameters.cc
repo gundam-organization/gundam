@@ -1,13 +1,11 @@
 #include "DetParameters.hh"
 using xsllh::FitBin;
 
-// ctor
 DetParameters::DetParameters(const std::string& name)
 {
     m_name = name;
 }
 
-// dtor
 DetParameters::~DetParameters() { ; }
 
 bool DetParameters::SetBinning(const std::string& file_name, std::vector<FitBin>& bins)
@@ -113,7 +111,7 @@ void DetParameters::ReWeight(AnaEvent* event, const std::string& det, int nsampl
     if(bin == PASSEVENT)
         return;
     if(bin == BADBIN)
-        event->AddEvWght(0.0); // skip!!!!
+        event->AddEvWght(0.0);
     else
     {
         if(bin > params.size())
@@ -150,6 +148,14 @@ void DetParameters::InitParameters()
     }
 
     Npar = pars_name.size();
+    if(m_decompose)
+    {
+        pars_original = pars_prior;
+        pars_prior = eigen_decomp -> GetDecompParameters(pars_prior);
+        pars_limlow = std::vector<double>(Npar, -100);
+        pars_limhigh = std::vector<double>(Npar, 100);
+        std::cout << "[DetParameters]: Decomposed parameters." << std::endl;
+    }
 }
 
 void DetParameters::AddDetector(const std::string& det, std::vector<AnaSample*>& v_sample, bool match_bins)

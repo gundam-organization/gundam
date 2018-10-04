@@ -82,6 +82,14 @@ void XsecParameters::InitParameters()
     }
 
     Npar = pars_name.size();
+    if(m_decompose)
+    {
+        pars_original = pars_prior;
+        pars_prior = eigen_decomp -> GetDecompParameters(pars_prior);
+        pars_limlow = std::vector<double>(Npar, -100);
+        pars_limhigh = std::vector<double>(Npar, 100);
+        std::cout << "[XsecParameters]: Decomposed parameters." << std::endl;
+    }
 }
 
 // ReWeight

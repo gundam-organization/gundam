@@ -9,6 +9,7 @@
 using TMatrixDSym = TMatrixTSym<double>;
 
 #include "AnaSample.hh"
+#include "EigenDecomp.hh"
 
 // some error codes
 const int PASSEVENT = -1;
@@ -30,17 +31,29 @@ public:
                           std::vector<double>& params)
         = 0;
 
-    double GetChi2(const std::vector<double>& params);
-    void SetCovarianceMatrix(const TMatrixDSym& covmat);
-    std::string GetName() { return m_name; }
-    TMatrixDSym* GetCovMat() { return covariance; }
-    bool HasCovMat() { return covariance != nullptr; }
+    double GetChi2(const std::vector<double>& params) const;
+    void SetCovarianceMatrix(const TMatrixDSym& covmat, bool decompose = false);
+    std::string GetName() const { return m_name; }
+    TMatrixDSym* GetCovMat() const { return covariance; }
+    TMatrixDSym GetOriginalCovMat(const TMatrixDSym& cov, unsigned int start_idx) const
+    {
+        return eigen_decomp->GetOriginalCovMat(cov, start_idx);
+    }
+    std::vector<double> GetOriginalParameters(const std::vector<double>& param) const
+    {
+        return eigen_decomp->GetOriginalParameters(param);
+    }
+    std::vector<double> GetOriginalParameters(const std::vector<double>& param,
+                                              unsigned int start_idx) const
+    {
+        return eigen_decomp->GetOriginalParameters(param, start_idx);
+    }
 
-    void GetParNames(std::vector<std::string>& vec) { vec = pars_name; }
-    void GetParPriors(std::vector<double>& vec) { vec = pars_prior; }
-    double GetParPrior(int i) { return pars_prior.at(i); }
-    void GetParSteps(std::vector<double>& vec) { vec = pars_step; }
-    void GetParLimits(std::vector<double>& vec1, std::vector<double>& vec2)
+    void GetParNames(std::vector<std::string>& vec) const { vec = pars_name; }
+    void GetParPriors(std::vector<double>& vec) const { vec = pars_prior; }
+    double GetParPrior(int i) const { return pars_prior.at(i); }
+    void GetParSteps(std::vector<double>& vec) const { vec = pars_step; }
+    void GetParLimits(std::vector<double>& vec1, std::vector<double>& vec2) const
     {
         vec1 = pars_limlow;
         vec2 = pars_limhigh;
@@ -55,16 +68,18 @@ public:
         pars_limhigh = vec2;
     }
 
-    int GetNpar() { return Npar; }
+    int GetNpar() const { return Npar; }
+    bool HasCovMat() const { return covariance != nullptr; }
+    bool IsDecomposed() const { return m_decompose; }
 
 protected:
-    bool CheckDims(const std::vector<double>& params);
+    bool CheckDims(const std::vector<double>& params) const;
 
     std::size_t Npar;
     std::string m_name;
     std::vector<std::string> pars_name;
+    std::vector<double> pars_original;
     std::vector<double> pars_prior; // prior values of param
-    std::vector<double> pars_throw; // vector with param throws
     std::vector<double> pars_step;
     std::vector<double> pars_limlow;
     std::vector<double> pars_limhigh;
@@ -72,9 +87,12 @@ protected:
     // map for events in each sample
     std::vector<std::vector<int>> m_evmap;
     bool m_rng_priors;
+    bool m_decompose;
 
+    EigenDecomp* eigen_decomp;
     TMatrixDSym* covariance;
     TMatrixDSym* covarianceI;
+    TMatrixDSym* original_cov;
 };
 
 #endif

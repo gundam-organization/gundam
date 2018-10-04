@@ -1,0 +1,23 @@
+{
+    "ND280" : {
+        "fname" : "/mnt/home/cuddandr/work/nd280Software/v12r15/highland2/numuCCZeroPiAnalysis/v2r2/Linux-x86_64/highland_systematics.root",
+        "seltree" : "default",
+        "truetree" : "truth",
+        "nsamples" : 10,
+        "cut_level" : [7,8,9,8,7,5,4,7,8,7]
+    },
+
+    "INGRID" : {
+        "fname" : "/mnt/home/cuddandr/work/ingrid/selection_studies/datamc_neut5d3d2_20170529.root",
+        "seltree" : "tree",
+        "truetree" : "tree",
+        "nsamples" : 1,
+        "cut_level" : []
+    },
+
+    "output" : {
+        "fname" : "test.root",
+        "seltree" : "selectedEvents",
+        "truetree" : "trueEvents"
+    }
+}

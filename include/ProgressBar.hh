@@ -45,6 +45,7 @@ public:
     void SetBarChar(const char* ch) { bar_char = ch; }
     void SetRainbow(bool flag = true) { is_rainbow = flag; }
     void SetPrefix(const std::string& prefix) { bar_prefix = prefix; }
+    void SetMaxProgress(const double val) { max_progress = val; }
 
     template<typename T>
     void Print(T current)

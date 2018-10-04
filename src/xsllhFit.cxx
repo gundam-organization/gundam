@@ -200,7 +200,7 @@ int main(int argc, char** argv)
 
     //Flux parameters
     FluxParameters fluxpara("par_flux");
-    fluxpara.SetCovarianceMatrix(cov_flux);
+    fluxpara.SetCovarianceMatrix(cov_flux, true);
     for(const auto& opt : parser.detectors)
     {
         if(opt.use_detector)
@@ -208,7 +208,7 @@ int main(int argc, char** argv)
     }
     fluxpara.InitEventMap(samples, 0);
     fitpara.push_back(&fluxpara);
-
+    
     XsecParameters xsecpara("par_xsec");
     xsecpara.SetCovarianceMatrix(cov_xsec);
     for(const auto& opt : parser.detectors)

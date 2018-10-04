@@ -1,13 +1,13 @@
 {
-    "data_file" : "eff_weight.root",
-    "mc_file" : "eff_nominal.root",
+    "data_file" : "xsllh_nominal.root",
+    "mc_file" : "xsllh_nominal.root",
     "output_file" : "test.root",
     "xsec_file" : "xsec.root",
     "input_dir" : "/inputs/ingridFit/",
     "data_POT" : 1.0,
     "mc_POT" : 1.0,
     "rng_seed" : 12257,
-    "num_threads" : 1,
+    "num_threads" : 4,
     "num_throws" : 1E4,
     "sample_signal" : [1,2],
     "sample_topology" : ["cc0pi0p", "cc0pi1p", "cc0pinp", "cc1pi+", "ccother", "bkg", "null", "OOFV"],
@@ -92,7 +92,7 @@
             "name" : "CCDIS",
             "detector" : "ND280",
             "binning" : "tn337_binning.txt",
-            "use_sample" : false
+            "use_sample" : true
         },
         {
             "cut_branch" : 10,
