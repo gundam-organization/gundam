@@ -94,7 +94,7 @@ TVectorD EigenDecomp::GetDecompParameters(const TVectorD& param) const
     return (*eigen_vectorsI) * param;
 }
 
-std::vector<double> EigenDecomp::GetOriginalParameters(const std::vector<double>& param) const
+const std::vector<double> EigenDecomp::GetOriginalParameters(const std::vector<double>& param) const
 {
     std::vector<double> result(npar, 0.0);
     for(int i = 0; i < npar; ++i)
@@ -108,7 +108,37 @@ std::vector<double> EigenDecomp::GetOriginalParameters(const std::vector<double>
     return result;
 }
 
-std::vector<double> EigenDecomp::GetDecompParameters(const std::vector<double>& param) const
+const std::vector<double> EigenDecomp::GetOriginalParameters(const std::vector<double>& param,
+                                                             unsigned int start_idx) const
+{
+    const unsigned int param_size = param.size();
+    const unsigned int end_idx    = start_idx + npar;
+
+    TMatrixD V(param_size, param_size);
+    for(unsigned int i = 0; i < param_size; ++i)
+    {
+        for(unsigned int j = 0; j < param_size; ++j)
+        {
+            if(i >= start_idx && i < end_idx && j >= start_idx && j < end_idx)
+                V(i, j) = (*eigen_vectors)(i - start_idx, j - start_idx);
+            else
+                V(i, j) = (i == j) ? 1.0 : 0.0;
+        }
+    }
+
+    std::vector<double> result(param_size, 0.0);
+    for(int i = 0; i < param_size; ++i)
+    {
+        for(int j = 0; j < param_size; ++j)
+        {
+            result[i] += V[i][j] * param[j];
+        }
+    }
+
+    return result;
+}
+
+const std::vector<double> EigenDecomp::GetDecompParameters(const std::vector<double>& param) const
 {
     std::vector<double> result(npar, 0.0);
     for(int i = 0; i < npar; ++i)
@@ -116,6 +146,37 @@ std::vector<double> EigenDecomp::GetDecompParameters(const std::vector<double>& 
         for(int j = 0; j < npar; ++j)
         {
             result[i] += (*eigen_vectorsI)(i, j) * param[j];
+        }
+    }
+
+    return result;
+}
+
+const std::vector<double> EigenDecomp::GetDecompParameters(const std::vector<double>& param,
+                                                           unsigned int start_idx) const
+{
+    const unsigned int param_size = param.size();
+    const unsigned int end_idx    = start_idx + npar;
+
+    TMatrixD V(param_size, param_size);
+    for(unsigned int i = 0; i < param_size; ++i)
+    {
+        for(unsigned int j = 0; j < param_size; ++j)
+        {
+            if(i >= start_idx && i < end_idx && j >= start_idx && j < end_idx)
+                V(i, j) = (*eigen_vectors)(i - start_idx, j - start_idx);
+            else
+                V(i, j) = (i == j) ? 1.0 : 0.0;
+        }
+    }
+    V.Invert();
+
+    std::vector<double> result(param_size, 0.0);
+    for(int i = 0; i < param_size; ++i)
+    {
+        for(int j = 0; j < param_size; ++j)
+        {
+            result[i] += V[i][j] * param[j];
         }
     }
 
