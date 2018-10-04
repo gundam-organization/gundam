@@ -45,6 +45,7 @@ public:
     double GetEigenValues(const int i) const { return (*eigen_values)(i); }
 
     std::vector<double> GetEigenValuesSTL() const;
+    int GetInfoFraction(const double frac) const;
 
     TVectorD GetOriginalParameters(const TVectorD& param) const;
     TVectorD GetDecompParameters(const TVectorD& param) const;

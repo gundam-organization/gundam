@@ -24,6 +24,7 @@ struct CovOpt
     std::string fname;
     std::string matrix;
     std::string binning;
+    bool decompose;
 };
 
 struct DetOpt

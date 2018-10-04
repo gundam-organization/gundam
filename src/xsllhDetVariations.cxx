@@ -19,6 +19,8 @@
 #include "TTree.h"
 
 #include "BinManager.hh"
+#include "ColorOutput.hh"
+#include "ProgressBar.hh"
 
 const std::string RESET("\033[0m");
 const std::string RED("\033[31;1m");
@@ -53,6 +55,10 @@ int main(int argc, char** argv)
 
     const int num_samples = 10;
     const int cut_level[num_samples] = {7, 8, 9, 8, 7, 5, 4, 7, 8, 7};
+
+    ProgressBar pbar(60, "#");
+    pbar.SetRainbow();
+    pbar.SetPrefix(std::string(TAG + "Reading Events "));
 
     char option;
     while((option = getopt(argc, argv, "i:o:b:t:v:s:n:p:c:w:CPh")) != -1)
@@ -213,11 +219,8 @@ int main(int argc, char** argv)
     for(unsigned int i = 0; i < num_events; ++i)
     {
         tree_event -> GetEntry(i);
-        if(i % 2000 == 0)
-        {
-            std::cout << TAG << "Processed " << i << " of " << num_events
-                      << " total events." << std::endl;
-        }
+        if(i % 2000 == 0 || i == (num_events-1))
+            pbar.Print(i, num_events-1);
 
         for(unsigned int t = 0; t < num_toys; ++t)
         {
@@ -299,6 +302,12 @@ int main(int argc, char** argv)
                     }
                 }
             }
+        }
+
+        for(unsigned int i = 0; i < num_elements; ++i)
+        {
+            if(cov_mat(i,i) <= 0.0)
+                cov_mat(i,i) = 1.0;
         }
 
         for(unsigned int i = 0; i < num_elements; ++i)

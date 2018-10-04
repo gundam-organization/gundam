@@ -84,6 +84,24 @@ std::vector<double> EigenDecomp::GetEigenValuesSTL() const
     return std::vector<double>(arr, arr + npar);
 }
 
+int EigenDecomp::GetInfoFraction(const double frac) const
+{
+    int index = -1;
+    double current_frac = 0.0;
+    double integral = eigen_values -> Sum();
+    for(int i = 0; i < npar; ++i)
+    {
+        current_frac += (*eigen_values)(i) / integral;
+        if(current_frac >= frac)
+        {
+            index = i+1;
+            break;
+        }
+    }
+
+    return index;
+}
+
 TVectorD EigenDecomp::GetOriginalParameters(const TVectorD& param) const
 {
     return (*eigen_vectors) * param;
