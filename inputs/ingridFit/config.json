@@ -15,18 +15,21 @@
         "file" : "flux_numu_cov_nd280.root",
         "matrix" : "flux_numu_cov",
         "binning" : "flux_binning",
-        "decomp" : false
+        "decomp" : true,
+        "variance" : 0.999
     },
     "det_cov" : {
         "file" : "allbin_allsyst.root",
         "matrix" : "cov_mat",
         "binning" : "det_binning",
-        "decomp" : true
+        "decomp" : true,
+        "variance" : 0.999
     },
     "xsec_cov" : {
         "file" : "xsec_cov_nd280.txt",
         "matrix" : "xsec_cov",
-        "decomp" : false
+        "decomp" : false,
+        "variance" : 1.000
     },
     "detectors" : [
         {

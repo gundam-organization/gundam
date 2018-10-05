@@ -118,6 +118,7 @@ void FluxParameters::InitParameters()
             pars_step.push_back(0.1);
             pars_limlow.push_back(0.0);
             pars_limhigh.push_back(5.0);
+            pars_fixed.push_back(false);
 
             std::cout << i << ": " << m_det_bins.at(det).at(i) << std::endl;
         }
@@ -135,13 +136,21 @@ void FluxParameters::InitParameters()
         pars_prior = eigen_decomp -> GetDecompParameters(pars_prior);
         pars_limlow = std::vector<double>(Npar, -100);
         pars_limhigh = std::vector<double>(Npar, 100);
-        std::cout << "[FluxParameters]: Decomposed parameters." << std::endl;
+
+        const int idx = eigen_decomp -> GetInfoFraction(m_info_frac);
+        for(int i = idx; i < Npar; ++i)
+            pars_fixed[i] = true;
+
+        std::cout << "[FluxParameters]: Decomposed parameters.\n"
+                  << "[FluxParameters]: Keeping the " << idx << " largest eigen values.\n"
+                  << "[FluxParameters]: Corresponds to " << m_info_frac * 100.0
+                  << "\% total variance.\n";
     }
 }
 
 void FluxParameters::AddDetector(const std::string& det, const std::vector<double>& bins)
 {
-    std::cout << "[AnaFitParameters]: Adding detector " << det << " for " << this->m_name
+    std::cout << "[FluxParameters]: Adding detector " << det << " for " << this->m_name
               << std::endl;
     m_det_bins.emplace(std::make_pair(det, bins));
     v_detectors.emplace_back(det);

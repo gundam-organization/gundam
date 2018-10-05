@@ -94,12 +94,12 @@ int EigenDecomp::GetInfoFraction(const double frac) const
         current_frac += (*eigen_values)(i) / integral;
         if(current_frac >= frac)
         {
-            index = i+1;
+            index = i;
             break;
         }
     }
 
-    return index;
+    return index+1;
 }
 
 TVectorD EigenDecomp::GetOriginalParameters(const TVectorD& param) const

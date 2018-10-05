@@ -140,6 +140,7 @@ void DetParameters::InitParameters()
             pars_step.push_back(0.05);
             pars_limlow.push_back(0.0);
             pars_limhigh.push_back(2.0);
+            pars_fixed.push_back(false);
         }
 
         std::cout << "[DetParameters]: Total " << nbins << " parameters at "
@@ -154,7 +155,15 @@ void DetParameters::InitParameters()
         pars_prior = eigen_decomp -> GetDecompParameters(pars_prior);
         pars_limlow = std::vector<double>(Npar, -100);
         pars_limhigh = std::vector<double>(Npar, 100);
-        std::cout << "[DetParameters]: Decomposed parameters." << std::endl;
+
+        const int idx = eigen_decomp -> GetInfoFraction(m_info_frac);
+        for(int i = idx; i < Npar; ++i)
+            pars_fixed[i] = true;
+
+        std::cout << "[DetParameters]: Decomposed parameters.\n"
+                  << "[DetParameters]: Keeping the " << idx << " largest eigen values.\n"
+                  << "[DetParameters]: Corresponds to " << m_info_frac * 100.0 
+                  << "\% total variance.\n";
     }
 }
 

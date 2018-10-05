@@ -25,6 +25,7 @@ struct CovOpt
     std::string matrix;
     std::string binning;
     bool decompose;
+    double info_frac;
 };
 
 struct DetOpt

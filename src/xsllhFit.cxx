@@ -201,6 +201,7 @@ int main(int argc, char** argv)
     //Flux parameters
     FluxParameters fluxpara("par_flux");
     fluxpara.SetCovarianceMatrix(cov_flux, parser.flux_cov.decompose);
+    fluxpara.SetInfoFrac(parser.flux_cov.info_frac);
     for(const auto& opt : parser.detectors)
     {
         if(opt.use_detector)
@@ -234,6 +235,7 @@ int main(int argc, char** argv)
 
     DetParameters detpara("par_det");
     detpara.SetCovarianceMatrix(cov_det, parser.det_cov.decompose);
+    detpara.SetInfoFrac(parser.det_cov.info_frac);
     for(const auto& opt : parser.detectors)
     {
         if(opt.use_detector)

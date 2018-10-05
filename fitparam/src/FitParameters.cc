@@ -180,6 +180,7 @@ void FitParameters::InitParameters()
             pars_step.push_back(0.05);
             pars_limlow.push_back(0.0);
             pars_limhigh.push_back(10.0);
+            pars_fixed.push_back(false);
         }
 
         std::cout << "[FitParameters]: Total " << nbins << " parameters at "

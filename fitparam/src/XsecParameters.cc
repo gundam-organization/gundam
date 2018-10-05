@@ -70,6 +70,7 @@ void XsecParameters::InitParameters()
             pars_step.push_back(d.GetStep());
             pars_limlow.push_back(d.GetLimitLow());
             pars_limhigh.push_back(d.GetLimitHigh());
+            pars_fixed.push_back(false);
 
             std::cout << "[XsecParameters]: Added " << det << "_" << d.GetName()
                       << std::endl;
@@ -88,7 +89,15 @@ void XsecParameters::InitParameters()
         pars_prior = eigen_decomp -> GetDecompParameters(pars_prior);
         pars_limlow = std::vector<double>(Npar, -100);
         pars_limhigh = std::vector<double>(Npar, 100);
-        std::cout << "[XsecParameters]: Decomposed parameters." << std::endl;
+
+        const int idx = eigen_decomp -> GetInfoFraction(m_info_frac);
+        for(int i = idx; i < Npar; ++i)
+            pars_fixed[i] = true;
+
+        std::cout << "[XsecParameters]: Decomposed parameters.\n"
+                  << "[XsecParameters]: Keeping the " << idx << " largest eigen values.\n"
+                  << "[XsecParameters]: Corresponds to " << m_info_frac * 100.0
+                  << "\% total variance.\n";
     }
 }
 

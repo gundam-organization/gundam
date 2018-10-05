@@ -53,6 +53,7 @@ public:
     void GetParPriors(std::vector<double>& vec) const { vec = pars_prior; }
     double GetParPrior(int i) const { return pars_prior.at(i); }
     void GetParSteps(std::vector<double>& vec) const { vec = pars_step; }
+    void GetParFixed(std::vector<bool>& vec) const { vec = pars_fixed; }
     void GetParLimits(std::vector<double>& vec1, std::vector<double>& vec2) const
     {
         vec1 = pars_limlow;
@@ -69,6 +70,8 @@ public:
     }
 
     int GetNpar() const { return Npar; }
+    void SetInfoFrac(double frac) { m_info_frac = frac; }
+    double GetInfoFrac() const { return m_info_frac; }
     bool HasCovMat() const { return covariance != nullptr; }
     bool IsDecomposed() const { return m_decompose; }
 
@@ -83,11 +86,13 @@ protected:
     std::vector<double> pars_step;
     std::vector<double> pars_limlow;
     std::vector<double> pars_limhigh;
+    std::vector<bool> pars_fixed;
 
     // map for events in each sample
     std::vector<std::vector<int>> m_evmap;
     bool m_rng_priors;
     bool m_decompose;
+    double m_info_frac;
 
     EigenDecomp* eigen_decomp;
     TMatrixDSym* covariance;
