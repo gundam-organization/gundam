@@ -245,7 +245,8 @@ int main(int argc, char** argv)
     fitpara.push_back(&detpara);
 
     //Instantiate fitter obj
-    XsecFitter xsecfit(seed, threads);
+    XsecFitter xsecfit(fout, seed, threads);
+    //xsecfit.SetSaveFreq(10000);
     xsecfit.SetPOTRatio(potD/potMC);
 
     //init w/ para vector
@@ -259,8 +260,6 @@ int main(int argc, char** argv)
         xsecfit.FixParameter("par_fit_INGRID_" + std::to_string(i), 1.0);
     }
     */
-    //set frequency to save output
-    xsecfit.SetSaveMode(fout, 1);
 
     //fitmode: 1 = generate toy dataset from nuisances (WITH stat fluct)
     //         2 = fake data from MC or real data

@@ -292,7 +292,10 @@ int main(int argc, char** argv)
     for(int i = 0; i < num_throws; ++i)
         h_flux.Fill(xsec_calc.at("ND280").ThrowFlux());
 
-    ToyThrower toy_thrower(*postfit_cov, seed, 1E-24);
+    for(int i = 0; i < postfit_cov -> GetNrows(); ++i)
+        (*postfit_cov)(i,i) += 0.000001;
+
+    ToyThrower toy_thrower(*postfit_cov, seed, 1E-48);
     std::vector<TH1D> xsec_throws;
     xsec_throws.reserve(num_throws);
     std::vector<std::vector<double> > throws;

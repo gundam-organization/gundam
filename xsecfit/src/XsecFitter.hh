@@ -27,17 +27,20 @@ using namespace std;
 class XsecFitter
 {
     public:
-        XsecFitter(const int seed, const int num_threads);
+        XsecFitter(TDirectory* dirout, const int seed);
+        XsecFitter(TDirectory* dirout, const int seed, const int num_threads);
         ~XsecFitter();
-        void SetSeed(int seed);
         double CalcLikelihood(const double* par);
         void InitFitter(std::vector<AnaFitParameters*> &fitpara, const std::string& paramVectorFname);
         void FixParameter(const std::string& par_name, const double& value);
         void Fit(std::vector<AnaSample*>& samples, const std::vector<std::string>& topology, int datatype, int fitMethod, int statFluct);
-        void SetSaveMode(TDirectory *dirout, int freq){ m_dir = dirout; m_freq = freq; }
+
+        void SetSeed(int seed);
+        void SetNumThreads(const unsigned int num) { m_threads = num; }
+        void SetSaveFreq(int freq, bool flag = true){ m_freq = freq; m_save = flag; }
         void SetPOTRatio(double val){ m_potratio = val; }
 
-        TTree *outtree;
+        TTree* outtree;
 
         // Declaration of leaf types
         Int_t          cutBranch;
@@ -86,34 +89,30 @@ class XsecFitter
         }
 
     private:
-        double FillSamples(std::vector<std::vector<double> >& new_pars,
+        double FillSamples(std::vector<std::vector<double>>& new_pars,
                            int datatype = 0);
-        void DoSaveParams(std::vector< std::vector<double> > new_pars);
-        void DoSaveEvents(int fititer);
-        void DoSaveFinalEvents(int fititer, std::vector<std::vector<double> > parresults);
-        void DoSaveChi2();
-        void DoSaveResults(std::vector<std::vector<double> >& parresults,
-                           std::vector<std::vector<double> >& parerrors);
+        void SaveParams(const std::vector<std::vector<double>>& new_pars);
+        void SaveEvents(int fititer);
+        void SaveFinalEvents(int fititer, std::vector<std::vector<double>>& parresults);
+        void SaveChi2();
+        void SaveResults(const std::vector<std::vector<double>>& parresults,
+                         const std::vector<std::vector<double>>& parerrors);
 
         ROOT::Math::Minimizer* m_fitter;
         ROOT::Math::Functor* m_fcn;
 
-        TH1D* prefitParams;
         TRandom3* rng;
         TDirectory* m_dir;
-        std::vector<AnaFitParameters*> m_fitpara;
-        std::vector<AnaSample*> m_samples;
-        std::vector<int> m_nparclass;
+        bool m_save;
         double m_potratio;
+        int m_threads;
         int m_npar, m_calls, m_freq;
         std::string paramVectorFileName;
         std::vector<std::string> par_names;
         std::vector<double> par_prefit;
-        std::vector<double> par_postfit;
-        std::vector<double> par_errfit;
-        std::vector<double> par_toydata;
         std::vector<double> vec_chi2_stat;
         std::vector<double> vec_chi2_sys;
-        int m_threads;
+        std::vector<AnaFitParameters*> m_fitpara;
+        std::vector<AnaSample*> m_samples;
 };
 #endif

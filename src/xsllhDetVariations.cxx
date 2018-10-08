@@ -215,6 +215,7 @@ int main(int argc, char** argv)
     }
 
     unsigned int rejected_weights = 0;
+    unsigned int total_weights = 0;
     const unsigned int num_events = tree_event -> GetEntries();
     for(unsigned int i = 0; i < num_events; ++i)
     {
@@ -247,13 +248,18 @@ int main(int argc, char** argv)
                     }
                     else
                         rejected_weights++;
+                    total_weights++;
                     break;
                 }
             }
         }
     }
+    
+    double reject_fraction = (rejected_weights * 1.0) / total_weights;
     std::cout << TAG << "Finished processing events." << std::endl;
+    std::cout << TAG << "Total weights: " << total_weights << std::endl;
     std::cout << TAG << "Rejected weights: " << rejected_weights << std::endl;
+    std::cout << TAG << "Rejected fraction: " << reject_fraction << std::endl;
 
     //std::vector<bool> use_sample = {true, true, true, true, false, true, true, false, false, false};
     //const unsigned int num_elements = nbins * std::count(use_sample.begin(), use_sample.end(), true);

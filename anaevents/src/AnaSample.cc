@@ -361,17 +361,17 @@ double AnaSample::CalcChi2() const
             if(obs > 0.0)
                 chi2 += 2 * obs * TMath::Log(obs / exp);
 
-#ifdef DEBUG_MSG
             if(chi2 < 0.0)
             {
+#ifdef DEBUG_MSG
                 std::cerr << "[WARNING]: In AnySample::CalcChi2()\n"
                           << "[WARNING]: Stat chi2 is less than 0: " << chi2 << ", setting to 0."
                           << std::endl;
                 std::cerr << "[WARNING]: exp and obs is: " << exp << " and " << obs << "."
                           << std::endl;
+#endif
                 chi2 = 0.0;
             }
-#endif
         }
     }
 
