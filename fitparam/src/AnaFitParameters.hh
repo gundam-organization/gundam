@@ -15,6 +15,12 @@ using TMatrixDSym = TMatrixTSym<double>;
 const int PASSEVENT = -1;
 const int BADBIN    = -2;
 
+enum RegMethod
+{
+    kL1Reg,
+    kL2Reg
+};
+
 class AnaFitParameters
 {
 public:
@@ -30,6 +36,12 @@ public:
     virtual void ReWeight(AnaEvent* event, const std::string& det, int nsample, int nevent,
                           std::vector<double>& params)
         = 0;
+
+    virtual double CalcRegularisation(const std::vector<double>& params) const
+    { return 0.0; }
+    virtual double CalcRegularisation(const std::vector<double>& params, double strength,
+                                      RegMethod flag) const
+    { return 0.0; }
 
     double GetChi2(const std::vector<double>& params) const;
     void SetCovarianceMatrix(const TMatrixDSym& covmat, bool decompose = false);
@@ -72,6 +84,9 @@ public:
     int GetNpar() const { return Npar; }
     void SetInfoFrac(double frac) { m_info_frac = frac; }
     double GetInfoFrac() const { return m_info_frac; }
+    void SetRegularisation(double strength, const std::string method);
+    void SetRegularisation(double strength, RegMethod flag = kL2Reg);
+    bool IsRegularised() const { return m_regularised; }
     bool HasCovMat() const { return covariance != nullptr; }
     bool IsDecomposed() const { return m_decompose; }
 
@@ -92,7 +107,10 @@ protected:
     std::vector<std::vector<int>> m_evmap;
     bool m_rng_priors;
     bool m_decompose;
+    bool m_regularised;
     double m_info_frac;
+    double m_regstrength;
+    RegMethod m_regmethod;
 
     EigenDecomp* eigen_decomp;
     TMatrixDSym* covariance;

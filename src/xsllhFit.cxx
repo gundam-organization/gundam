@@ -184,12 +184,10 @@ int main(int argc, char** argv)
     //define fit param classes
     std::vector<AnaFitParameters*> fitpara;
 
-    // When filling the fitparas note that there are some assumptions later in the code
-    // that the fit parameters are stored at index 0. For this reason always fill the
-    // fit parameters first.
-
     //Fit parameters
     FitParameters sigfitpara("par_fit", false);
+    if(parser.regularise)
+        sigfitpara.SetRegularisation(parser.reg_strength, parser.reg_method);
     for(const auto& opt : parser.detectors)
     {
         if(opt.use_detector)

@@ -5,7 +5,9 @@ AnaFitParameters::AnaFitParameters()
     , Npar(0)
     , m_rng_priors(false)
     , m_decompose(false)
+    , m_regularised(false)
     , m_info_frac(1.00)
+    , m_regstrength(0.0)
     , eigen_decomp(nullptr)
     , covariance(nullptr)
     , covarianceI(nullptr)
@@ -127,4 +129,37 @@ bool AnaFitParameters::CheckDims(const std::vector<double>& params) const
     }
 
     return vector_size && matrix_size;
+}
+
+void AnaFitParameters::SetRegularisation(double strength, RegMethod flag)
+{
+    m_regularised = true;
+    m_regstrength = strength;
+    m_regmethod = flag;
+
+    std::cout << "[AnaFitParameters]: Enabled regularisation for " << m_name << std::endl
+              << "[AnaFitParameters]: Strength " << m_regstrength << std::endl;
+    if(flag == kL1Reg)
+        std::cout << "[AnaFitParameters]: Method L1" << std::endl;
+    else if(flag == kL2Reg)
+        std::cout << "[AnaFitParameters]: Method L2" << std::endl;
+    else
+    {
+        std::cout << "[WARNING]: In AnaFitParameters::SetRegularisation() "
+                  << "Invalid regularisation method!" << std::endl;
+        m_regularised = false;
+    }
+}
+
+void AnaFitParameters::SetRegularisation(double strength, const std::string method)
+{
+    if(method == "kL1Reg")
+        SetRegularisation(strength, kL1Reg);
+    else if(method == "kL2Reg")
+        SetRegularisation(strength, kL2Reg);
+    else
+    {
+        std::cout << "[WARNING]: In AnaFitParameters::SetRegularisation() "
+                  << "Invalid regularisation method!" << std::endl;
+    }
 }

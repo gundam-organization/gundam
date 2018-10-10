@@ -112,6 +112,7 @@ class XsecFitter
         std::vector<double> par_prefit;
         std::vector<double> vec_chi2_stat;
         std::vector<double> vec_chi2_sys;
+        std::vector<double> vec_chi2_reg;
         std::vector<AnaFitParameters*> m_fitpara;
         std::vector<AnaSample*> m_samples;
 };

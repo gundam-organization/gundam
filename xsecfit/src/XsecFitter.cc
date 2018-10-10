@@ -336,6 +336,7 @@ double XsecFitter::CalcLikelihood(const double* par)
     // Regularisation:
     int k           = 0;
     double chi2_sys = 0.0;
+    double chi2_reg = 0.0;
     std::vector<std::vector<double>> new_pars;
     for(int i = 0; i < m_fitpara.size(); ++i)
     {
@@ -351,6 +352,9 @@ double XsecFitter::CalcLikelihood(const double* par)
 
         chi2_sys += m_fitpara[i]->GetChi2(vec);
 
+        if(m_fitpara[i]->IsRegularised())
+            chi2_reg += m_fitpara[i]->CalcRegularisation(vec);
+
         new_pars.push_back(vec);
         if(output_chi2)
         {
@@ -358,10 +362,11 @@ double XsecFitter::CalcLikelihood(const double* par)
                       << m_fitpara[i]->GetChi2(vec) << endl;
         }
     }
-    vec_chi2_sys.push_back(chi2_sys);
 
     double chi2_stat = FillSamples(new_pars, 0);
     vec_chi2_stat.push_back(chi2_stat);
+    vec_chi2_sys.push_back(chi2_sys);
+    vec_chi2_reg.push_back(chi2_reg);
 
     // save hists if requested
     if(m_calls % m_freq == 0 && m_save)
@@ -374,11 +379,12 @@ double XsecFitter::CalcLikelihood(const double* par)
     if(output_chi2)
     {
         std::cout << "m_calls is: " << m_calls << endl;
-        std::cout << "Chi2 total: " << chi2_stat + chi2_sys << endl;
-        std::cout << "Chi2 stat / syst: " << chi2_stat << " / " << chi2_sys << std::endl;
+        std::cout << "Chi2 total: " << chi2_stat + chi2_sys + chi2_reg << endl;
+        std::cout << "Chi2 stat / syst / reg: " << chi2_stat << " / " << chi2_sys
+                  << " / " << chi2_reg << std::endl;
     }
 
-    return chi2_stat + chi2_sys;
+    return chi2_stat + chi2_sys + chi2_reg;
 }
 
 // Write hists for reweighted events
@@ -467,9 +473,10 @@ void XsecFitter::SaveParams(const std::vector<std::vector<double>>& new_pars)
 
 void XsecFitter::SaveChi2()
 {
-    TH1D histochi2stat("chi2_stat_periter", "chi2_stat_periter", m_calls + 1, 0, m_calls + 1);
-    TH1D histochi2sys("chi2_sys_periter", "chi2_sys_periter", m_calls + 1, 0, m_calls + 1);
-    TH1D histochi2tot("chi2_tot_periter", "chi2_tot_periter", m_calls + 1, 0, m_calls + 1);
+    TH1D h_chi2stat("chi2_stat_periter", "chi2_stat_periter", m_calls + 1, 0, m_calls + 1);
+    TH1D h_chi2sys("chi2_sys_periter", "chi2_sys_periter", m_calls + 1, 0, m_calls + 1);
+    TH1D h_chi2reg("chi2_reg_periter", "chi2_reg_periter", m_calls + 1, 0, m_calls + 1);
+    TH1D h_chi2tot("chi2_tot_periter", "chi2_tot_periter", m_calls + 1, 0, m_calls + 1);
 
     if(vec_chi2_stat.size() != vec_chi2_sys.size())
     {
@@ -479,15 +486,17 @@ void XsecFitter::SaveChi2()
     // loop on number of parameter classes
     for(size_t i = 0; i < vec_chi2_stat.size(); i++)
     {
-        histochi2stat.SetBinContent(i + 1, vec_chi2_stat[i]);
-        histochi2sys.SetBinContent(i + 1, vec_chi2_sys[i]);
-        histochi2tot.SetBinContent(i + 1, vec_chi2_sys[i] + vec_chi2_stat[i]);
+        h_chi2stat.SetBinContent(i + 1, vec_chi2_stat[i]);
+        h_chi2sys.SetBinContent(i + 1, vec_chi2_sys[i]);
+        h_chi2reg.SetBinContent(i + 1, vec_chi2_reg[i]);
+        h_chi2tot.SetBinContent(i + 1, vec_chi2_sys[i] + vec_chi2_stat[i] + vec_chi2_reg[i]);
     }
 
     m_dir->cd();
-    histochi2stat.Write();
-    histochi2sys.Write();
-    histochi2tot.Write();
+    h_chi2stat.Write();
+    h_chi2sys.Write();
+    h_chi2reg.Write();
+    h_chi2tot.Write();
 }
 
 void XsecFitter::SaveResults(const std::vector<std::vector<double>>& par_results,

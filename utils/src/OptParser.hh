@@ -63,6 +63,10 @@ class OptParser
         int num_threads;
         int num_throws;
 
+        bool regularise;
+        double reg_strength;
+        std::string reg_method;
+
         std::vector<int> sample_signal;
         std::vector<std::string> sample_topology;
 

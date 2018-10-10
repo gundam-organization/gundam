@@ -58,6 +58,10 @@ bool OptParser::ParseJSON(std::string json_file)
     xsec_cov.decompose = j["xsec_cov"]["decomp"];
     xsec_cov.info_frac = j["xsec_cov"]["variance"];
 
+    regularise = j["regularisation"]["enable"];
+    reg_strength = j["regularisation"]["strength"];
+    reg_method = j["regularisation"]["method"];
+
     for(const auto& detector : j["detectors"])
     {
         DetOpt d;

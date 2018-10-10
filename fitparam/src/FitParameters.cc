@@ -204,3 +204,31 @@ void FitParameters::AddDetector(const std::string& det, const std::string& f_bin
     else
         std::cout << "[WARNING]: Adding detector failed." << std::endl;
 }
+
+double FitParameters::CalcRegularisation(const std::vector<double>& params) const
+{
+    return CalcRegularisation(params, m_regstrength, m_regmethod);
+}
+
+double FitParameters::CalcRegularisation(const std::vector<double>& params, double strength,
+                                         RegMethod flag) const
+{
+    double L_reg = 0;
+    if(flag == kL1Reg)
+    {
+        for(int i = 0; i < Npar-1; ++i)
+            L_reg += std::abs(params[i] - params[i+1]);
+    }
+    else if(flag == kL2Reg)
+    {
+        for(int i = 0; i < Npar-1; ++i)
+            L_reg += (params[i] - params[i+1]) * (params[i] - params[i+1]);
+    }
+    else
+    {
+        std::cout << "[FitParameters]: In CalcRegularisation(): "
+                  << "Invalid regularisation method! Returning 0.\n";
+    }
+
+    return strength * L_reg;
+}
