@@ -204,7 +204,7 @@ int main(int argc, char** argv)
     for(const auto& s : samples)
     {
         s -> GetSampleBreakdown(foutput, "nominal", topology, false);
-        s -> FillEventHisto(2);
+        s -> FillEventHist(2);
 
         std::string hist_name = s -> GetName() + "_prefit";
         s -> Write(foutput, hist_name, 0);

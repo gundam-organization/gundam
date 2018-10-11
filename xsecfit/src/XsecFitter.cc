@@ -125,7 +125,7 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara,
 
     // Save prefit parameters:
     TH1D h_prefit("hist_prefit_par_all", "hist_prefit_par_all", m_npar, 0, m_npar);
-    int num_par  = 1;
+    int num_par = 1;
     for(int i = 0; i < m_fitpara.size(); ++i)
     {
         for(int j = 0; j < m_fitpara[i]->GetNpar(); ++j)
@@ -155,12 +155,12 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara,
 //           7 if toy from nuisances - syst + reg constrained fit variation, fit w/o reg
 //           8 if asimov (data==MC)
 //           9 if fake data from param vector
-void XsecFitter::Fit(std::vector<AnaSample*>& samples, const std::vector<std::string>& topology,
-                     int datatype, int fitMethod, int statFluct)
+void XsecFitter::Fit(const std::vector<AnaSample*>& samples, int datatype, int fit_method,
+                     bool stat_fluc)
 {
     std::cout << "[XsecFitter]: Starting to fit." << std::endl;
-    m_calls   = 0;
     m_samples = samples;
+
     if(m_fitter == nullptr)
     {
         std::cerr << "[ERROR]: In XsecFitter::Fit()\n"
@@ -168,19 +168,19 @@ void XsecFitter::Fit(std::vector<AnaSample*>& samples, const std::vector<std::st
         return;
     }
 
-    if(datatype == 2 || datatype == 3 || datatype == 4)
+    if(datatype == 1)
     {
-        for(size_t s = 0; s < m_samples.size(); s++)
-        {
-            m_samples[s]->FillEventHisto(datatype);
-        }
+        for(std::size_t s = 0; s < m_samples.size(); s++)
+            m_samples[s]->FillEventHist(kAsimov, stat_fluc);
     }
-    else if(datatype == 8 || datatype == 10)
+    else if(datatype == 2)
     {
-        for(size_t s = 0; s < m_samples.size(); s++)
-        {
-            m_samples[s]->FillEventHisto(1);
-        }
+        for(std::size_t s = 0; s < m_samples.size(); s++)
+            m_samples[s]->FillEventHist(kExternal, stat_fluc);
+    }
+    else if(datatype == 3)
+    {
+        // toy throws
     }
     else
     {
@@ -191,15 +191,12 @@ void XsecFitter::Fit(std::vector<AnaSample*>& samples, const std::vector<std::st
 
     SaveEvents(m_calls);
 
-    // Do fit
     std::cout << "[XsecFitter]: Fit prepared." << std::endl;
-
     std::cout << "[XsecFitter]: Calling MIGRAD ..." << std::endl;
     m_fitter->Minimize();
     std::cout << "[XsecFitter]: Calling HESSE ..." << std::endl;
     m_fitter->Hesse();
 
-    // fill chi2 info
     if(m_dir)
         SaveChi2();
 
@@ -308,7 +305,7 @@ double XsecFitter::FillSamples(std::vector<std::vector<double>>& new_pars, int d
             }
         }
 
-        m_samples[s]->FillEventHisto(datatype);
+        m_samples[s]->FillEventHist(datatype);
         double sample_chi2 = m_samples[s]->CalcChi2();
 
         //#pragma omp atomic
@@ -380,8 +377,8 @@ double XsecFitter::CalcLikelihood(const double* par)
     {
         std::cout << "m_calls is: " << m_calls << endl;
         std::cout << "Chi2 total: " << chi2_stat + chi2_sys + chi2_reg << endl;
-        std::cout << "Chi2 stat / syst / reg: " << chi2_stat << " / " << chi2_sys
-                  << " / " << chi2_reg << std::endl;
+        std::cout << "Chi2 stat / syst / reg: " << chi2_stat << " / " << chi2_sys << " / "
+                  << chi2_reg << std::endl;
     }
 
     return chi2_stat + chi2_sys + chi2_reg;
@@ -449,7 +446,7 @@ void XsecFitter::SaveParams(const std::vector<std::vector<double>>& new_pars)
     for(size_t i = 0; i < m_fitpara.size(); i++)
     {
         const unsigned int npar = m_fitpara[i]->GetNpar();
-        const std::string name = m_fitpara[i]->GetName();
+        const std::string name  = m_fitpara[i]->GetName();
         std::stringstream ss;
 
         ss << "hist_" << name << "_iter" << m_calls;
@@ -502,10 +499,10 @@ void XsecFitter::SaveChi2()
 void XsecFitter::SaveResults(const std::vector<std::vector<double>>& par_results,
                              const std::vector<std::vector<double>>& par_errors)
 {
-    for(size_t i = 0; i < m_fitpara.size(); i++)
+    for(std::size_t i = 0; i < m_fitpara.size(); i++)
     {
         const unsigned int npar = m_fitpara[i]->GetNpar();
-        const std::string name = m_fitpara[i]->GetName();
+        const std::string name  = m_fitpara[i]->GetName();
         std::stringstream ss;
 
         ss << "hist_" << name << "_result";
@@ -530,11 +527,9 @@ void XsecFitter::SaveResults(const std::vector<std::vector<double>>& par_results
         h_err.Write();
     }
 
-    std::vector<std::string> topology
-        = {"cc0pi0p", "cc0pi1p", "cc0pinp", "cc1pi+", "ccother", "backg", "Null", "OOFV"};
+    //std::vector<std::string> topology
+    //    = {"cc0pi0p", "cc0pi1p", "cc0pinp", "cc1pi+", "ccother", "backg", "Null", "OOFV"};
 
-    for(size_t s = 0; s < m_samples.size(); s++)
-    {
+    for(std::size_t s = 0; s < m_samples.size(); s++)
         m_samples[s]->GetSampleBreakdown(m_dir, "fit", topology, false);
-    }
 }

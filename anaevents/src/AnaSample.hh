@@ -19,6 +19,13 @@
 #include "FitStructs.hh"
 using xsllh::FitBin;
 
+enum DataType
+{
+    kMC,
+    kAsimov,
+    kExternal
+};
+
 class AnaSample
 {
 public:
@@ -42,7 +49,7 @@ public:
     std::vector<FitBin> GetBinEdges() const { return m_bin_edges; }
 
     double CalcChi2() const;
-    void FillEventHisto(int datatype);
+    void FillEventHist(int datatype, bool stat_fluc = false);
     void Write(TDirectory* dirout, const std::string& bsname, int fititer);
     void GetSampleBreakdown(TDirectory* dirout, const std::string& tag,
                             const std::vector<std::string>& topology, bool save);

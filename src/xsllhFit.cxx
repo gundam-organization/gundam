@@ -246,6 +246,7 @@ int main(int argc, char** argv)
     XsecFitter xsecfit(fout, seed, threads);
     //xsecfit.SetSaveFreq(10000);
     xsecfit.SetPOTRatio(potD/potMC);
+    xsecfit.SetTopology(topology);
 
     //init w/ para vector
     xsecfit.InitFitter(fitpara, paramVectorFname);
@@ -277,12 +278,10 @@ int main(int argc, char** argv)
     //           0 = Do not apply Stat Fluct to fake data
     //           1 = Apply Stat Fluct to fake data
 
-    int fit_mode = 2;
-    if(stat_fluc == true)
-        fit_mode = 3;
+    int fit_mode = 1;
 
     if(!dry_run)
-        xsecfit.Fit(samples, topology, fit_mode, 2, 0);
+        xsecfit.Fit(samples, fit_mode, 2, stat_fluc);
     fout -> Close();
 
     return 0;

@@ -171,7 +171,7 @@ int AnaSample::GetBinIndex(const double D1, const double D2) const
 }
 
 // FillEventHist
-void AnaSample::FillEventHisto(int datatype)
+void AnaSample::FillEventHist(int datatype, bool stat_fluc)
 {
     if(m_hpred != nullptr)
         m_hpred->Reset();
@@ -208,8 +208,6 @@ void AnaSample::FillEventHisto(int datatype)
     if(datatype == 0)
         return;
 
-    // data without stat variation: useful when nuisance parameters
-    // varied in the toys
     else if(datatype == 1)
     {
         SetData(m_hpred);
@@ -218,45 +216,23 @@ void AnaSample::FillEventHisto(int datatype)
         for(int j = 1; j <= m_hpred->GetNbinsX(); ++j)
         {
             double val = m_hpred->GetBinContent(j);
+            if(stat_fluc)
+                val = gRandom->Poisson(val);
+#ifdef DEBUG_MSG
             if(val == 0.0)
             {
-                std::cout << "[WARNING] In AnySample::FillEventHisto()\n"
+                std::cout << "[WARNING] In AnaSample::FillEventHist()\n"
                           << "[WARNING] " << m_name << " bin " << j
                           << " has 0 entries. This may cause a problem with chi2 computations."
                           << std::endl;
                 continue;
             }
-
-            m_hdata->SetBinContent(j, val); // without statistical fluctuations
+#endif
+            m_hdata->SetBinContent(j, val);
         }
     }
 
-    // data with statistical variation
-    //(used when no nuisance sampling but nuisances are fitted)
-    else if(datatype == 3)
-    {
-        SetData(m_hpred);
-        m_hdata->Reset();
-
-        for(int j = 1; j <= m_hpred->GetNbinsX(); ++j)
-        {
-            double val = m_hpred->GetBinContent(j);
-            if(val == 0.0)
-            {
-                std::cout << "[WARNING] In AnySample::FillEventHisto()\n"
-                          << "[WARNING] " << m_name << " bin " << j
-                          << " has 0 entries. This may cause a problem with chi2 computations."
-                          << std::endl;
-                continue;
-            }
-
-            double poisson_val = gRandom->Poisson(val);
-            m_hdata->SetBinContent(j, poisson_val); // with statistical fluctuations
-        }
-    }
-
-    // data from external (fake) dataset
-    else if(datatype == 2 || datatype == 4)
+    else if(datatype == 2)
     {
         SetData(m_hpred);
         m_hdata->Reset();
@@ -276,55 +252,35 @@ void AnaSample::FillEventHisto(int datatype)
             if(cut_branch != m_sample_id)
                 continue;
 
-            for(int j = 0; j < m_nbins; ++j)
-            {
+            //for(int j = 0; j < m_nbins; ++j)
+            //{
                 int anybin_index = GetBinIndex(D1_rec_tree, D2_rec_tree);
                 if(anybin_index != -1)
                 {
                     m_hdata->Fill(anybin_index + 0.5, wght);
-                    break;
                 }
-
 #ifdef DEBUG_MSG
                 else
                 {
-                    std::cout << "[WARNING] In AnySample::FillEventHisto()\n"
+                    std::cout << "[WARNING] In AnaSample::FillEventHist()\n"
                               << "[WARNING] No bin for current data event.\n"
-                              << "[WARNING] D1_rec_tree: " << D1_rec_tree << std::endl
-                              << "[WARNING] D2_rec_tree: " << D2_rec_tree << std::endl;
-                    break;
+                              << "[WARNING] D1 Reco: " << D1_rec_tree << std::endl
+                              << "[WARNING] D2 Reco: " << D2_rec_tree << std::endl;
                 }
 #endif
-            }
+            //}
         }
 
 #ifdef DEBUG_MSG
-        std::cout << "[AnySample] Data histogram filled: " << std::endl;
+        std::cout << "[AnaSample] Data histogram filled: " << std::endl;
         m_hdata->Print();
 #endif
+    }
 
-        if(datatype == 4)
-        {
-            // Reweight fake data set
-            // add MC or data (!!!!) statistical variations also to genie dataset to evaluate genie
-            // MC stat uncert DON'T USE FOR REAL DATA!!!!!!!!!!!!
-
-            std::cout << "[WARNING] REWEIGHTING DATA!" << std::endl;
-            for(int j = 1; j <= m_hdata->GetNbinsX(); ++j)
-            {
-                double val = m_hdata->GetBinContent(j);
-                if(val == 0.0)
-                {
-                    std::cout << "[WARNING] In AnySample::FillEventHisto()\n"
-                              << "[WARNING] " << m_name << " bin " << j
-                              << " has 0 entries. This may cause a problem with chi2 computations."
-                              << std::endl;
-                    continue;
-                }
-                double poisson_val = gRandom->Poisson(val);
-                m_hdata->SetBinContent(j, poisson_val); // add statistical fluctuations
-            }
-        }
+    else
+    {
+        std::cout << "[WARNING]: In AnaSample::FillEventHist()\n"
+                  << "[WARNING]: Invalid data type to fill histograms!\n";
     }
 }
 
@@ -332,7 +288,7 @@ double AnaSample::CalcChi2() const
 {
     if(m_hdata == nullptr)
     {
-        std::cerr << "[ERROR]: In AnySample::CalcChi2()\n"
+        std::cerr << "[ERROR]: In AnaSample::CalcChi2()\n"
                   << "[ERROR]: Need to define data histogram." << std::endl;
         return 0.0;
     }
@@ -340,7 +296,7 @@ double AnaSample::CalcChi2() const
     int nbins = m_hpred->GetNbinsX();
     if(nbins != m_hdata->GetNbinsX())
     {
-        std::cerr << "[ERROR]: In AnySample::CalcChi2()\n"
+        std::cerr << "[ERROR]: In AnaSample::CalcChi2()\n"
                   << "[ERROR]: Binning mismatch between data and mc.\n"
                   << "[ERROR]: MC bins: " << nbins << ", Data bins: " << m_hdata->GetNbinsX()
                   << std::endl;
@@ -364,7 +320,7 @@ double AnaSample::CalcChi2() const
             if(chi2 < 0.0)
             {
 #ifdef DEBUG_MSG
-                std::cerr << "[WARNING]: In AnySample::CalcChi2()\n"
+                std::cerr << "[WARNING]: In AnaSample::CalcChi2()\n"
                           << "[WARNING]: Stat chi2 is less than 0: " << chi2 << ", setting to 0."
                           << std::endl;
                 std::cerr << "[WARNING]: exp and obs is: " << exp << " and " << obs << "."
@@ -377,7 +333,7 @@ double AnaSample::CalcChi2() const
 
     if(chi2 != chi2)
     {
-        std::cerr << "[WARNING]: In AnySample::CalcChi2()\n"
+        std::cerr << "[WARNING]: In AnaSample::CalcChi2()\n"
                   << "[WARNING]: Stat chi2 is nan, setting to 0." << std::endl;
         chi2 = 0.0;
     }
