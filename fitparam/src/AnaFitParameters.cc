@@ -46,6 +46,7 @@ void AnaFitParameters::SetCovarianceMatrix(const TMatrixDSym& covmat, bool decom
     }
     else
     {
+        original_cov = new TMatrixDSym(covmat);
         covariance  = new TMatrixDSym(covmat);
         covarianceI = new TMatrixDSym(covmat);
     }
@@ -161,5 +162,27 @@ void AnaFitParameters::SetRegularisation(double strength, const std::string meth
     {
         std::cout << "[WARNING]: In AnaFitParameters::SetRegularisation() "
                   << "Invalid regularisation method!" << std::endl;
+    }
+}
+
+void AnaFitParameters::ThrowPar(std::vector<double>& param) const
+{
+    if(covariance != nullptr)
+    {
+        std::vector<double> toy(Npar, 0);
+        ToyThrower toy_thrower(*original_cov, 0, 1E-48);
+        toy_thrower.Throw(toy);
+
+        std::transform(toy.begin(), toy.end(), pars_original.begin(), param.begin(),
+                       std::plus<double>());
+        for(auto& val : param)
+        {
+            if(val < 0.0)
+                val = 0.0;
+        }
+    }
+    else
+    {
+        param = pars_original;
     }
 }

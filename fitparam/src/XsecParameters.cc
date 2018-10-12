@@ -83,9 +83,10 @@ void XsecParameters::InitParameters()
     }
 
     Npar = pars_name.size();
+    pars_original = pars_prior;
+
     if(m_decompose)
     {
-        pars_original = pars_prior;
         pars_prior = eigen_decomp -> GetDecompParameters(pars_prior);
         pars_limlow = std::vector<double>(Npar, -100);
         pars_limhigh = std::vector<double>(Npar, 100);
@@ -101,7 +102,6 @@ void XsecParameters::InitParameters()
     }
 }
 
-// ReWeight
 void XsecParameters::ReWeight(AnaEvent* event, const std::string& det, int nsample, int nevent, std::vector<double>& params)
 {
     if(m_dial_evtmap.empty()) // need to build an event map first

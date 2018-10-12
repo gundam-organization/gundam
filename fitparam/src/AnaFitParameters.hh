@@ -1,6 +1,8 @@
 #ifndef __AnaFitParameters_hh__
 #define __AnaFitParameters_hh__
 
+#include <algorithm>
+#include <functional>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -10,6 +12,7 @@ using TMatrixDSym = TMatrixTSym<double>;
 
 #include "AnaSample.hh"
 #include "EigenDecomp.hh"
+#include "ToyThrower.hh"
 
 // some error codes
 const int PASSEVENT = -1;
@@ -43,6 +46,7 @@ public:
                                       RegMethod flag) const
     { return 0.0; }
 
+    void ThrowPar(std::vector<double>& param) const;
     double GetChi2(const std::vector<double>& params) const;
     void SetCovarianceMatrix(const TMatrixDSym& covmat, bool decompose = false);
     std::string GetName() const { return m_name; }

@@ -188,7 +188,7 @@ void AnaSample::FillEventHist(int datatype, bool stat_fluc)
         double D2_rec  = m_events[i].GetRecD2();
         double D1_true = m_events[i].GetTrueD1();
         double D2_true = m_events[i].GetTrueD2();
-        double wght    = m_events[i].GetEvWght();
+        double wght    = datatype >= 0 ? m_events[i].GetEvWght() : m_events[i].GetEvWghtMC();
 
         int anybin_index_rec  = GetBinIndex(D1_rec, D2_rec);
         int anybin_index_true = GetBinIndex(D1_true, D2_true);
@@ -205,7 +205,7 @@ void AnaSample::FillEventHist(int datatype, bool stat_fluc)
     m_hmc->Scale(m_norm);
     m_hsig->Scale(m_norm);
 
-    if(datatype == 0)
+    if(datatype == 0 || datatype == -1)
         return;
 
     else if(datatype == 1)
@@ -252,23 +252,20 @@ void AnaSample::FillEventHist(int datatype, bool stat_fluc)
             if(cut_branch != m_sample_id)
                 continue;
 
-            //for(int j = 0; j < m_nbins; ++j)
-            //{
-                int anybin_index = GetBinIndex(D1_rec_tree, D2_rec_tree);
-                if(anybin_index != -1)
-                {
-                    m_hdata->Fill(anybin_index + 0.5, wght);
-                }
+            int anybin_index = GetBinIndex(D1_rec_tree, D2_rec_tree);
+            if(anybin_index != -1)
+            {
+                m_hdata->Fill(anybin_index + 0.5, wght);
+            }
 #ifdef DEBUG_MSG
-                else
-                {
-                    std::cout << "[WARNING] In AnaSample::FillEventHist()\n"
-                              << "[WARNING] No bin for current data event.\n"
-                              << "[WARNING] D1 Reco: " << D1_rec_tree << std::endl
-                              << "[WARNING] D2 Reco: " << D2_rec_tree << std::endl;
-                }
+            else
+            {
+                std::cout << "[WARNING] In AnaSample::FillEventHist()\n"
+                          << "[WARNING] No bin for current data event.\n"
+                          << "[WARNING] D1 Reco: " << D1_rec_tree << std::endl
+                          << "[WARNING] D2 Reco: " << D2_rec_tree << std::endl;
+            }
 #endif
-            //}
         }
 
 #ifdef DEBUG_MSG

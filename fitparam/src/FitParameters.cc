@@ -189,6 +189,7 @@ void FitParameters::InitParameters()
     }
 
     Npar = pars_name.size();
+    pars_original = pars_prior;
 }
 
 void FitParameters::AddDetector(const std::string& det, const std::string& f_binning)

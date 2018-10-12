@@ -69,7 +69,6 @@ int main(int argc, char** argv)
     std::string fname_data = parser.fname_data;
     std::string fname_mc   = parser.fname_mc;
     std::string fname_output = parser.fname_output;
-    std::string paramVectorFname = "fitresults.root";
 
     std::vector<int> signal_topology = parser.sample_signal;
     std::vector<std::string> topology = parser.sample_topology;
@@ -79,9 +78,6 @@ int main(int argc, char** argv)
     int seed = parser.rng_seed;
     int threads = parser.num_threads;
     bool stat_fluc = false;
-
-    int isBuffer = false; // Is the final bin just for including events that go beyond xsec binning
-    // e.g. events with over 5GeV pmu if binning in pmu
 
     //Setup data trees
     TFile* fdata = TFile::Open(fname_data.c_str(), "READ");
@@ -218,13 +214,6 @@ int main(int argc, char** argv)
     xsecpara.InitEventMap(samples, 0);
     fitpara.push_back(&xsecpara);
 
-    /*
-    TMatrixDSym cov_det(348);
-    cov_det.Zero();
-    for(int i = 0; i < 348; ++i)
-        cov_det(i,i) = 0.01;
-    */
-
     std::cout << TAG << "Setup Detector Covariance" << std::endl;
     TFile* file_detcov = TFile::Open(parser.det_cov.fname.c_str(), "READ");
     TMatrixDSym* cov_det_in = (TMatrixDSym*)file_detcov -> Get(parser.det_cov.matrix.c_str());
@@ -247,9 +236,10 @@ int main(int argc, char** argv)
     //xsecfit.SetSaveFreq(10000);
     xsecfit.SetPOTRatio(potD/potMC);
     xsecfit.SetTopology(topology);
+    xsecfit.SetZeroSyst(false);
 
     //init w/ para vector
-    xsecfit.InitFitter(fitpara, paramVectorFname);
+    xsecfit.InitFitter(fitpara);
     std::cout << TAG << "Fitter initialised." << std::endl;
 
     /*
@@ -278,10 +268,10 @@ int main(int argc, char** argv)
     //           0 = Do not apply Stat Fluct to fake data
     //           1 = Apply Stat Fluct to fake data
 
-    int fit_mode = 1;
+    int fit_mode = 3;
 
     if(!dry_run)
-        xsecfit.Fit(samples, fit_mode, 2, stat_fluc);
+        xsecfit.Fit(samples, fit_mode, stat_fluc);
     fout -> Close();
 
     return 0;

@@ -7,7 +7,7 @@
     "data_POT" : 1.0,
     "mc_POT" : 1.0,
     "rng_seed" : 12257,
-    "num_threads" : 8,
+    "num_threads" : 4,
     "num_throws" : 1E4,
     "sample_signal" : [0,1,2],
     "sample_topology" : ["cc0pi0p", "cc0pi1p", "cc0pinp", "cc1pi+", "ccother", "bkg", "null", "OOFV"],
@@ -15,14 +15,14 @@
         "file" : "flux_numu_cov_nd280.root",
         "matrix" : "flux_numu_cov",
         "binning" : "flux_binning",
-        "decomp" : true,
-        "variance" : 0.999
+        "decomp" : false,
+        "variance" : 1.000
     },
     "det_cov" : {
         "file" : "allbin_allsyst.root",
         "matrix" : "cov_mat",
         "binning" : "det_binning",
-        "decomp" : true,
+        "decomp" : false,
         "variance" : 0.980
     },
     "xsec_cov" : {
@@ -33,7 +33,7 @@
     },
     "regularisation" : {
         "enable" : false,
-        "strength" : 0.001,
+        "strength" : 0.011,
         "method" : "kL2Reg"
     },
     "detectors" : [

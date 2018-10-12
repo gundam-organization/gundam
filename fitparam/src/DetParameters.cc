@@ -149,9 +149,10 @@ void DetParameters::InitParameters()
     }
 
     Npar = pars_name.size();
+    pars_original = pars_prior;
+
     if(m_decompose)
     {
-        pars_original = pars_prior;
         pars_prior = eigen_decomp -> GetDecompParameters(pars_prior);
         pars_limlow = std::vector<double>(Npar, -100);
         pars_limhigh = std::vector<double>(Npar, 100);

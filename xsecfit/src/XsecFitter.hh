@@ -23,7 +23,6 @@
 #include "AnaFitParameters.hh"
 #include "AnaSample.hh"
 
-using namespace std;
 class XsecFitter
 {
 public:
@@ -31,11 +30,12 @@ public:
     XsecFitter(TDirectory* dirout, const int seed, const int num_threads);
     ~XsecFitter();
     double CalcLikelihood(const double* par);
-    void InitFitter(std::vector<AnaFitParameters*>& fitpara, const std::string& paramVectorFname);
+    void InitFitter(std::vector<AnaFitParameters*>& fitpara);
     void FixParameter(const std::string& par_name, const double& value);
-    void Fit(const std::vector<AnaSample*>& samples, int datatype, int fit_method, bool stat_fluc);
+    void Fit(const std::vector<AnaSample*>& samples, int datatype, bool stat_fluc);
 
     void SetSeed(int seed);
+    void SetZeroSyst(bool flag) { m_zerosyst = flag; }
     void SetTopology(const std::vector<std::string> v_topology) { topology = v_topology; }
     void SetNumThreads(const unsigned int num) { m_threads = num; }
     void SetSaveFreq(int freq, bool flag = true)
@@ -94,6 +94,7 @@ public:
     }
 
 private:
+    void GenerateToyData(int toytyoe, bool stat_fluc = false);
     double FillSamples(std::vector<std::vector<double>>& new_pars, int datatype = 0);
     void SaveParams(const std::vector<std::vector<double>>& new_pars);
     void SaveEvents(int fititer);
@@ -108,6 +109,7 @@ private:
     TRandom3* rng;
     TDirectory* m_dir;
     bool m_save;
+    bool m_zerosyst;
     double m_potratio;
     int m_threads;
     int m_npar, m_calls, m_freq;

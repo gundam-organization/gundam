@@ -21,9 +21,10 @@ using xsllh::FitBin;
 
 enum DataType
 {
-    kMC,
-    kAsimov,
-    kExternal
+    kReset    = -1,
+    kMC       = 0,
+    kAsimov   = 1,
+    kExternal = 2
 };
 
 class AnaSample

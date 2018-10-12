@@ -6,6 +6,7 @@ XsecFitter::XsecFitter(TDirectory* dirout, const int seed, const int num_threads
     , m_fcn(nullptr)
     , m_dir(dirout)
     , m_save(false)
+    , m_zerosyst(false)
     , m_freq(10000)
     , m_threads(num_threads)
     , m_potratio(1.0)
@@ -60,22 +61,17 @@ void XsecFitter::FixParameter(const std::string& par_name, const double& value)
     }
 }
 
-// PrepareFitter
-void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara,
-                            const std::string& paramVectorFname)
+void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara)
 {
-    paramVectorFileName = paramVectorFname;
-    m_fitpara           = fitpara;
+    m_fitpara = fitpara;
     std::vector<double> par_step, par_low, par_high;
     std::vector<bool> par_fixed;
 
-    m_npar = 0;
-    // get the parameter info
     for(std::size_t i = 0; i < m_fitpara.size(); i++)
     {
         m_npar += m_fitpara[i]->GetNpar();
 
-        std::vector<string> vec0;
+        std::vector<std::string> vec0;
         m_fitpara[i]->GetParNames(vec0);
         par_names.insert(par_names.end(), vec0.begin(), vec0.end());
 
@@ -112,6 +108,7 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara,
     m_fitter->SetFunction(*m_fcn);
     m_fitter->SetPrintLevel(2);
     m_fitter->SetMaxIterations(1E6);
+    m_fitter->SetMaxFunctionCalls(1E9);
     m_fitter->SetTolerance(1E-4);
 
     for(int i = 0; i < m_npar; ++i)
@@ -123,7 +120,6 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara,
             m_fitter->FixVariable(i);
     }
 
-    // Save prefit parameters:
     TH1D h_prefit("hist_prefit_par_all", "hist_prefit_par_all", m_npar, 0, m_npar);
     int num_par = 1;
     for(int i = 0; i < m_fitpara.size(); ++i)
@@ -145,18 +141,7 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara,
     h_prefit.Write();
 }
 
-// Fit
-// datatype = 1 if toy from nuisances - syst variation
-//           2 if external (fake) dataset
-//           3 if stat fluctuations of nominal
-//           4 if stat fluctuations of (fake) data
-//           5 if toy from nuisances - syst + reg constrained fit variation
-//           6 if toy from nuisances - syst + random fit variation
-//           7 if toy from nuisances - syst + reg constrained fit variation, fit w/o reg
-//           8 if asimov (data==MC)
-//           9 if fake data from param vector
-void XsecFitter::Fit(const std::vector<AnaSample*>& samples, int datatype, int fit_method,
-                     bool stat_fluc)
+void XsecFitter::Fit(const std::vector<AnaSample*>& samples, int datatype, bool stat_fluc)
 {
     std::cout << "[XsecFitter]: Starting to fit." << std::endl;
     m_samples = samples;
@@ -180,7 +165,7 @@ void XsecFitter::Fit(const std::vector<AnaSample*>& samples, int datatype, int f
     }
     else if(datatype == 3)
     {
-        // toy throws
+        GenerateToyData(0, stat_fluc);
     }
     else
     {
@@ -222,13 +207,11 @@ void XsecFitter::Fit(const std::vector<AnaSample*>& samples, int datatype, int f
         par_offset += fit_param->GetNpar();
     }
 
-    // Calculate Corrolation Matrix
     TMatrixDSym cor_matrix(ndim);
     for(int r = 0; r < ndim; ++r)
         for(int c = 0; c < ndim; ++c)
             cor_matrix[r][c] = cov_matrix[r][c] / std::sqrt(cov_matrix[r][r] * cov_matrix[c][c]);
 
-    // save fit results
     TVectorD postfit_param(ndim, &par_val_vec[0]);
     std::vector<std::vector<double>> res_pars;
     std::vector<std::vector<double>> err_pars;
@@ -267,9 +250,45 @@ void XsecFitter::Fit(const std::vector<AnaSample*>& samples, int datatype, int f
     std::cout << "[XsecFitter]: Fit routine finished. Results saved." << std::endl;
 }
 
-// FillSample with new parameters
-// datatype = 0 if fit iteration
-//           1 if toy dataset from nuisances
+void XsecFitter::GenerateToyData(int toytype, bool stat_fluc)
+{
+    double chi2_stat = 0.0;
+    double chi2_syst = 0.0;
+    std::vector<std::vector<double>> fitpar_throw;
+    for(const auto& fitpar : m_fitpara)
+    {
+        std::vector<double> toy_throw(fitpar->GetNpar(), 0.0);
+        fitpar -> ThrowPar(toy_throw);
+
+        chi2_syst += fitpar -> GetChi2(toy_throw);
+        fitpar_throw.emplace_back(toy_throw);
+    }
+
+    for(int s = 0; s < m_samples.size(); ++s)
+    {
+        const unsigned int N  = m_samples[s]->GetN();
+        const std::string det = m_samples[s]->GetDetector();
+#pragma omp parallel for num_threads(m_threads)
+        for(unsigned int i = 0; i < N; ++i)
+        {
+            AnaEvent* ev = m_samples[s]->GetEvent(i);
+            ev->ResetEvWght();
+            for(int j = 0; j < m_fitpara.size(); ++j)
+                m_fitpara[j]->ReWeight(ev, det, s, i, fitpar_throw[j]);
+        }
+
+        m_samples[s]->FillEventHist(kAsimov);
+        m_samples[s]->FillEventHist(kReset);
+        chi2_stat += m_samples[s]->CalcChi2();
+    }
+
+    std::cout << "[XsecFitter]: Generated toy throw from parameters.\n"
+              << "[XsecFitter]: Initial Chi2 Syst: " << chi2_syst << std::endl
+              << "[XsecFitter]: Initial Chi2 Stat: " << chi2_stat << std::endl;
+
+    SaveParams(fitpar_throw);
+}
+
 double XsecFitter::FillSamples(std::vector<std::vector<double>>& new_pars, int datatype)
 {
     double chi2      = 0.0;
@@ -291,14 +310,13 @@ double XsecFitter::FillSamples(std::vector<std::vector<double>>& new_pars, int d
     //#pragma omp parallel for num_threads(m_threads)
     for(int s = 0; s < m_samples.size(); ++s)
     {
-        // loop over events
         const unsigned int num_events = m_samples[s]->GetN();
         const std::string det         = m_samples[s]->GetDetector();
 #pragma omp parallel for num_threads(m_threads)
         for(unsigned int i = 0; i < num_events; ++i)
         {
             AnaEvent* ev = m_samples[s]->GetEvent(i);
-            ev->SetEvWght(ev->GetEvWghtMC());
+            ev->ResetEvWght();
             for(int j = 0; j < m_fitpara.size(); ++j)
             {
                 m_fitpara[j]->ReWeight(ev, det, s, i, new_pars[j]);
@@ -330,7 +348,6 @@ double XsecFitter::CalcLikelihood(const double* par)
        || (m_calls > 1001 && m_calls % 1000 == 0))
         output_chi2 = true;
 
-    // Regularisation:
     int k           = 0;
     double chi2_sys = 0.0;
     double chi2_reg = 0.0;
@@ -347,7 +364,8 @@ double XsecFitter::CalcLikelihood(const double* par)
             vec.push_back(par[k++]);
         }
 
-        chi2_sys += m_fitpara[i]->GetChi2(vec);
+        if(!m_zerosyst)
+            chi2_sys += m_fitpara[i]->GetChi2(vec);
 
         if(m_fitpara[i]->IsRegularised())
             chi2_reg += m_fitpara[i]->CalcRegularisation(vec);
@@ -356,35 +374,33 @@ double XsecFitter::CalcLikelihood(const double* par)
         if(output_chi2)
         {
             std::cout << "ChiSq contribution from " << m_fitpara[i]->GetName() << " is "
-                      << m_fitpara[i]->GetChi2(vec) << endl;
+                      << m_fitpara[i]->GetChi2(vec) << std::endl;
         }
     }
 
-    double chi2_stat = FillSamples(new_pars, 0);
+    double chi2_stat = FillSamples(new_pars, kMC);
     vec_chi2_stat.push_back(chi2_stat);
     vec_chi2_sys.push_back(chi2_sys);
     vec_chi2_reg.push_back(chi2_reg);
 
-    // save hists if requested
     if(m_calls % m_freq == 0 && m_save)
     {
         SaveParams(new_pars);
         SaveEvents(m_calls);
     }
 
-    // Print status of the fit:
     if(output_chi2)
     {
-        std::cout << "m_calls is: " << m_calls << endl;
-        std::cout << "Chi2 total: " << chi2_stat + chi2_sys + chi2_reg << endl;
-        std::cout << "Chi2 stat / syst / reg: " << chi2_stat << " / " << chi2_sys << " / "
-                  << chi2_reg << std::endl;
+        std::cout << "m_calls is: " << m_calls << std::endl;
+        std::cout << "Chi2 total: " << chi2_stat + chi2_sys + chi2_reg << std::endl;
+        std::cout << "Chi2 stat : " << chi2_stat << std::endl
+                  << "Chi2 syst : " << chi2_sys  << std::endl
+                  << "Chi2 reg  : " << chi2_reg  << std::endl;
     }
 
     return chi2_stat + chi2_sys + chi2_reg;
 }
 
-// Write hists for reweighted events
 void XsecFitter::SaveEvents(int fititer)
 {
     for(size_t s = 0; s < m_samples.size(); s++)
@@ -393,7 +409,6 @@ void XsecFitter::SaveEvents(int fititer)
     }
 }
 
-// Write hists for reweighted events
 void XsecFitter::SaveFinalEvents(int fititer, std::vector<std::vector<double>>& res_params)
 {
     outtree = new TTree("selectedEvents", "selectedEvents");
@@ -401,8 +416,6 @@ void XsecFitter::SaveFinalEvents(int fititer, std::vector<std::vector<double>>& 
     for(size_t s = 0; s < m_samples.size(); s++)
     {
         m_samples[s]->Write(m_dir, Form("evhist_sam%d_finaliter", (int)s), fititer);
-        // Event loop:
-        // cout << "Saving reweighted event tree ..." << endl;
         for(int i = 0; i < m_samples[s]->GetN(); i++)
         {
             AnaEvent* ev = m_samples[s]->GetEvent(i);
@@ -438,10 +451,8 @@ void XsecFitter::SaveFinalEvents(int fititer, std::vector<std::vector<double>>& 
     outtree->Write();
 }
 
-// Write hists for parameter values
 void XsecFitter::SaveParams(const std::vector<std::vector<double>>& new_pars)
 {
-    // loop on number of parameter classes
     std::vector<double> temp_vec;
     for(size_t i = 0; i < m_fitpara.size(); i++)
     {
@@ -480,7 +491,6 @@ void XsecFitter::SaveChi2()
         std::cout << "Number of saved iterations for chi2 stat and chi2 syst are different."
                   << std::endl;
     }
-    // loop on number of parameter classes
     for(size_t i = 0; i < vec_chi2_stat.size(); i++)
     {
         h_chi2stat.SetBinContent(i + 1, vec_chi2_stat[i]);
@@ -526,9 +536,6 @@ void XsecFitter::SaveResults(const std::vector<std::vector<double>>& par_results
         h_par.Write();
         h_err.Write();
     }
-
-    //std::vector<std::string> topology
-    //    = {"cc0pi0p", "cc0pi1p", "cc0pinp", "cc1pi+", "ccother", "backg", "Null", "OOFV"};
 
     for(std::size_t s = 0; s < m_samples.size(); s++)
         m_samples[s]->GetSampleBreakdown(m_dir, "fit", topology, false);
