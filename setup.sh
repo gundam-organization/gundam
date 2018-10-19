@@ -23,7 +23,7 @@ if [ ! -e ${BUILDSETUP} ]; then
 else
   echo "[INFO]: Sourcing build setup script."
   source ${BUILDSETUP}
-  echo "[INFO]: \$ which calcXsec: $(which calcXsec)"
+  echo "[INFO]: \$ which xsllhFit: $(which xsllhFit)"
 fi
 
 unset SETUPDIR
