@@ -32,6 +32,9 @@ bool OptParser::ParseJSON(std::string json_file)
     fname_output = j["output_file"].get<std::string>();
     fname_xsec = j["xsec_file"].get<std::string>();
 
+    fit_type = j["fit_type"];
+    stat_fluc = j["stat_fluc"];
+    zero_syst = j["zero_syst"];
     data_POT = j["data_POT"];
     mc_POT = j["mc_POT"];
     rng_seed = j["rng_seed"];
@@ -97,4 +100,21 @@ bool OptParser::ParseCLI(int argc, char** argv)
 {
     std::cout << "[OptParser]: Not supported yet." << std::endl;
     return false;
+}
+
+int OptParser::StringToEnum(const std::string& s) const
+{
+    int enum_val = -999;
+    if(s == "kAsimovFit")
+        enum_val = 0; //kAsimovFit;
+    else if(s == "kExternalFit")
+        enum_val = 1; //kExternalFit;
+    else if(s == "kDataFit")
+        enum_val = 2; //kDataFit;
+    else if(s == "kToyFit")
+        enum_val = 3; //kToyFit;
+    else
+        std::cout << "[WARNING] In OptParser::StringToEnum(), Invalid string!" << std::endl;
+
+    return enum_val;
 }

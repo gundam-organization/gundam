@@ -24,7 +24,8 @@ enum DataType
     kReset    = -1,
     kMC       = 0,
     kAsimov   = 1,
-    kExternal = 2
+    kExternal = 2,
+    kData     = 3
 };
 
 class AnaSample

@@ -254,7 +254,7 @@ int main(int argc, char** argv)
             }
         }
     }
-    
+
     double reject_fraction = (rejected_weights * 1.0) / total_weights;
     std::cout << TAG << "Finished processing events." << std::endl;
     std::cout << TAG << "Total weights: " << total_weights << std::endl;

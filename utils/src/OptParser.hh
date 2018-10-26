@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+//#include "XsecFitter.hh"
+
 #include "json.hpp"
 using json = nlohmann::json;
 
@@ -50,6 +52,8 @@ class OptParser
         bool ParseJSON(std::string json_file);
         bool ParseCLI(int argc, char** argv);
 
+        int StringToEnum(const std::string& s) const;
+
         std::string fname_data;
         std::string fname_mc;
         std::string fname_output;
@@ -57,12 +61,15 @@ class OptParser
         std::string input_dir;
         std::string xsLLh_env;
 
+        int fit_type;
         int data_POT;
         int mc_POT;
         int rng_seed;
         int num_threads;
         int num_throws;
 
+        bool stat_fluc;
+        bool zero_syst;
         bool regularise;
         double reg_strength;
         std::string reg_method;

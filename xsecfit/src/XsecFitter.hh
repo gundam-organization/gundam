@@ -23,6 +23,14 @@
 #include "AnaFitParameters.hh"
 #include "AnaSample.hh"
 
+enum FitType
+{
+    kAsimovFit,
+    kExternalFit,
+    kDataFit,
+    kToyFit
+};
+
 class XsecFitter
 {
 public:
@@ -32,7 +40,7 @@ public:
     double CalcLikelihood(const double* par);
     void InitFitter(std::vector<AnaFitParameters*>& fitpara);
     void FixParameter(const std::string& par_name, const double& value);
-    void Fit(const std::vector<AnaSample*>& samples, int datatype, bool stat_fluc);
+    void Fit(const std::vector<AnaSample*>& samples, int fit_type, bool stat_fluc);
 
     void SetSeed(int seed);
     void SetZeroSyst(bool flag) { m_zerosyst = flag; }
@@ -94,7 +102,7 @@ public:
     }
 
 private:
-    void GenerateToyData(int toytyoe, bool stat_fluc = false);
+    void GenerateToyData(int toy_type, bool stat_fluc = false);
     double FillSamples(std::vector<std::vector<double>>& new_pars, int datatype = 0);
     void SaveParams(const std::vector<std::vector<double>>& new_pars);
     void SaveEvents(int fititer);

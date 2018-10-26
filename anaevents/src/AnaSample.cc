@@ -232,7 +232,7 @@ void AnaSample::FillEventHist(int datatype, bool stat_fluc)
         }
     }
 
-    else if(datatype == 2)
+    else if(datatype == 2 || datatype == 3)
     {
         SetData(m_hpred);
         m_hdata->Reset();
@@ -266,6 +266,15 @@ void AnaSample::FillEventHist(int datatype, bool stat_fluc)
                           << "[WARNING] D2 Reco: " << D2_rec_tree << std::endl;
             }
 #endif
+        }
+
+        if(stat_fluc && datatype == 2)
+        {
+            for(unsigned int i = 0; i < m_hdata->GetNbinsX(); ++i)
+            {
+                double val = gRandom->Poisson(m_hdata->GetBinContent(i));
+                m_hdata->SetBinContent(i, val);
+            }
         }
 
 #ifdef DEBUG_MSG

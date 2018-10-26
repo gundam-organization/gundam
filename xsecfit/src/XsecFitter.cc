@@ -141,7 +141,7 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara)
     h_prefit.Write();
 }
 
-void XsecFitter::Fit(const std::vector<AnaSample*>& samples, int datatype, bool stat_fluc)
+void XsecFitter::Fit(const std::vector<AnaSample*>& samples, int fit_type, bool stat_fluc)
 {
     std::cout << "[XsecFitter]: Starting to fit." << std::endl;
     m_samples = samples;
@@ -153,17 +153,22 @@ void XsecFitter::Fit(const std::vector<AnaSample*>& samples, int datatype, bool 
         return;
     }
 
-    if(datatype == 1)
+    if(fit_type == kAsimovFit)
     {
         for(std::size_t s = 0; s < m_samples.size(); s++)
             m_samples[s]->FillEventHist(kAsimov, stat_fluc);
     }
-    else if(datatype == 2)
+    else if(fit_type == kExternalFit)
     {
         for(std::size_t s = 0; s < m_samples.size(); s++)
             m_samples[s]->FillEventHist(kExternal, stat_fluc);
     }
-    else if(datatype == 3)
+    else if(fit_type == kDataFit)
+    {
+        for(std::size_t s = 0; s < m_samples.size(); s++)
+            m_samples[s]->FillEventHist(kData, stat_fluc);
+    }
+    else if(fit_type == kToyFit)
     {
         GenerateToyData(0, stat_fluc);
     }
@@ -250,7 +255,7 @@ void XsecFitter::Fit(const std::vector<AnaSample*>& samples, int datatype, bool 
     std::cout << "[XsecFitter]: Fit routine finished. Results saved." << std::endl;
 }
 
-void XsecFitter::GenerateToyData(int toytype, bool stat_fluc)
+void XsecFitter::GenerateToyData(int toy_type, bool stat_fluc)
 {
     double chi2_stat = 0.0;
     double chi2_syst = 0.0;
@@ -307,7 +312,6 @@ double XsecFitter::FillSamples(std::vector<std::vector<double>>& new_pars, int d
         par_offset += m_fitpara[i]->GetNpar();
     }
 
-    //#pragma omp parallel for num_threads(m_threads)
     for(int s = 0; s < m_samples.size(); ++s)
     {
         const unsigned int num_events = m_samples[s]->GetN();
@@ -325,8 +329,6 @@ double XsecFitter::FillSamples(std::vector<std::vector<double>>& new_pars, int d
 
         m_samples[s]->FillEventHist(datatype);
         double sample_chi2 = m_samples[s]->CalcChi2();
-
-        //#pragma omp atomic
         chi2 += sample_chi2;
 
         if(output_chi2)
@@ -513,10 +515,17 @@ void XsecFitter::SaveResults(const std::vector<std::vector<double>>& par_results
     {
         const unsigned int npar = m_fitpara[i]->GetNpar();
         const std::string name  = m_fitpara[i]->GetName();
+        std::vector<double> par_original;
+        m_fitpara[i]->GetParOriginal(par_original);
+
         std::stringstream ss;
 
         ss << "hist_" << name << "_result";
-        TH1D h_par(ss.str().c_str(), ss.str().c_str(), npar, 0, npar);
+        TH1D h_par_final(ss.str().c_str(), ss.str().c_str(), npar, 0, npar);
+
+        ss.str("");
+        ss << "hist_" << name << "_prior";
+        TH1D h_par_prior(ss.str().c_str(), ss.str().c_str(), npar, 0, npar);
 
         ss.str("");
         ss << "hist_" << name << "_error";
@@ -526,14 +535,17 @@ void XsecFitter::SaveResults(const std::vector<std::vector<double>>& par_results
         m_fitpara[i]->GetParNames(vec_names);
         for(int j = 0; j < npar; j++)
         {
-            h_par.GetXaxis()->SetBinLabel(j + 1, vec_names[j].c_str());
-            h_par.SetBinContent(j + 1, par_results[i][j]);
+            h_par_final.GetXaxis()->SetBinLabel(j + 1, vec_names[j].c_str());
+            h_par_final.SetBinContent(j + 1, par_results[i][j]);
+            h_par_prior.GetXaxis()->SetBinLabel(j + 1, vec_names[j].c_str());
+            h_par_prior.SetBinContent(j + 1, par_original[j]);
             h_err.GetXaxis()->SetBinLabel(j + 1, vec_names[j].c_str());
             h_err.SetBinContent(j + 1, par_errors[i][j]);
         }
 
         m_dir->cd();
-        h_par.Write();
+        h_par_final.Write();
+        h_par_prior.Write();
         h_err.Write();
     }
 

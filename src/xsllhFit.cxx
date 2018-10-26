@@ -77,7 +77,6 @@ int main(int argc, char** argv)
     const double potMC = parser.mc_POT;
     int seed = parser.rng_seed;
     int threads = parser.num_threads;
-    bool stat_fluc = false;
 
     //Setup data trees
     TFile* fdata = TFile::Open(fname_data.c_str(), "READ");
@@ -236,7 +235,7 @@ int main(int argc, char** argv)
     //xsecfit.SetSaveFreq(10000);
     xsecfit.SetPOTRatio(potD/potMC);
     xsecfit.SetTopology(topology);
-    xsecfit.SetZeroSyst(false);
+    xsecfit.SetZeroSyst(parser.zero_syst);
 
     //init w/ para vector
     xsecfit.InitFitter(fitpara);
@@ -268,10 +267,8 @@ int main(int argc, char** argv)
     //           0 = Do not apply Stat Fluct to fake data
     //           1 = Apply Stat Fluct to fake data
 
-    int fit_mode = 3;
-
     if(!dry_run)
-        xsecfit.Fit(samples, fit_mode, stat_fluc);
+        xsecfit.Fit(samples, parser.fit_type, parser.stat_fluc);
     fout -> Close();
 
     return 0;
