@@ -87,15 +87,20 @@ std::vector<double> EigenDecomp::GetEigenValuesSTL() const
 int EigenDecomp::GetInfoFraction(const double frac) const
 {
     int index = -1;
-    double current_frac = 0.0;
-    double integral = eigen_values -> Sum();
-    for(int i = 0; i < npar; ++i)
+    if(frac >= 1.0)
+        index = npar;
+    else
     {
-        current_frac += (*eigen_values)(i) / integral;
-        if(current_frac >= frac)
+        double current_frac = 0.0;
+        double integral = eigen_values -> Sum();
+        for(int i = 0; i < npar; ++i)
         {
-            index = i;
-            break;
+            current_frac += (*eigen_values)(i) / integral;
+            if(current_frac >= frac)
+            {
+                index = i;
+                break;
+            }
         }
     }
 

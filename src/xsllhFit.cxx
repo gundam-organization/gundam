@@ -249,24 +249,6 @@ int main(int argc, char** argv)
     }
     */
 
-    //fitmode: 1 = generate toy dataset from nuisances (WITH stat fluct)
-    //         2 = fake data from MC or real data
-    //         3 = no nuisance sampling only stat fluctuation
-    //         4 = fake data from MC or real data with statistical fluctuations applied to that data
-    //         5 = generate toy dataset from nuisances and regularised c_i (WITH stat fluct)
-    //         6 = generate toy dataset from nuisances and random c_i (WITH stat fluct)
-    //         7 = generate toy dataset from nuisances and regularised c_i (WITH stat fluct) but fit without reg
-    //         8 = Asimov (Make fake data that == MC)
-
-
-    //fitmethod: 1 = MIGRAD only
-    //           2 = MIGRAD + HESSE
-    //           3 = MINOS
-
-    //statFluct (only relevent if fitmode is set to gen fake data with nuisances):
-    //           0 = Do not apply Stat Fluct to fake data
-    //           1 = Apply Stat Fluct to fake data
-
     if(!dry_run)
         xsecfit.Fit(samples, parser.fit_type, parser.stat_fluc);
     fout -> Close();
