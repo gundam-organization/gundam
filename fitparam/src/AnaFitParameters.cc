@@ -4,6 +4,7 @@ AnaFitParameters::AnaFitParameters()
     : m_name("")
     , Npar(0)
     , m_rng_priors(false)
+    , m_do_throw(false)
     , m_decompose(false)
     , m_regularised(false)
     , m_info_frac(1.00)
@@ -167,7 +168,7 @@ void AnaFitParameters::SetRegularisation(double strength, const std::string meth
 
 void AnaFitParameters::ThrowPar(std::vector<double>& param) const
 {
-    if(covariance != nullptr)
+    if(covariance != nullptr && m_do_throw)
     {
         std::vector<double> toy(Npar, 0);
         ToyThrower toy_thrower(*original_cov, 0, 1E-48);

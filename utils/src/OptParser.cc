@@ -47,17 +47,20 @@ bool OptParser::ParseJSON(std::string json_file)
     flux_cov.fname = input_dir + j["flux_cov"]["file"].get<std::string>();
     flux_cov.matrix = j["flux_cov"]["matrix"];
     flux_cov.binning = j["flux_cov"]["binning"];
+    flux_cov.do_throw = j["flux_cov"]["throw"];
     flux_cov.decompose = j["flux_cov"]["decomp"];
     flux_cov.info_frac = j["flux_cov"]["variance"];
 
     det_cov.fname = input_dir + j["det_cov"]["file"].get<std::string>();
     det_cov.matrix = j["det_cov"]["matrix"];
     det_cov.binning = j["det_cov"]["binning"];
+    det_cov.do_throw = j["det_cov"]["throw"];
     det_cov.decompose = j["det_cov"]["decomp"];
     det_cov.info_frac = j["det_cov"]["variance"];
 
     xsec_cov.fname = input_dir + j["xsec_cov"]["file"].get<std::string>();
     xsec_cov.matrix = j["xsec_cov"]["matrix"];
+    xsec_cov.do_throw = j["xsec_cov"]["throw"];
     xsec_cov.decompose = j["xsec_cov"]["decomp"];
     xsec_cov.info_frac = j["xsec_cov"]["variance"];
 

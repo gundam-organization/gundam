@@ -26,6 +26,7 @@ struct CovOpt
     std::string fname;
     std::string matrix;
     std::string binning;
+    bool do_throw;
     bool decompose;
     double info_frac;
 };

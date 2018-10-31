@@ -91,9 +91,11 @@ public:
     double GetInfoFrac() const { return m_info_frac; }
     void SetRegularisation(double strength, const std::string method);
     void SetRegularisation(double strength, RegMethod flag = kL2Reg);
-    bool IsRegularised() const { return m_regularised; }
     bool HasCovMat() const { return covariance != nullptr; }
+    bool IsRegularised() const { return m_regularised; }
     bool IsDecomposed() const { return m_decompose; }
+    bool DoThrow() const { return m_do_throw; }
+    void SetThrow(bool flag = true) { m_do_throw = flag; }
 
 protected:
     bool CheckDims(const std::vector<double>& params) const;
@@ -111,6 +113,7 @@ protected:
     // map for events in each sample
     std::vector<std::vector<int>> m_evmap;
     bool m_rng_priors;
+    bool m_do_throw;
     bool m_decompose;
     bool m_regularised;
     double m_info_frac;

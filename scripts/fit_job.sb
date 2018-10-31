@@ -1,0 +1,17 @@
+#!/bin/bash -login
+#SBATCH --time=9:00:00
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=4G
+#SBATCH --constraint=lac|skl
+#SBATCH --job-name=xsllhFit
+#SBATCH --output=fit_slurm.log
+
+FITROOT="/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter"
+RUNPATH="${SCRATCH}/xsllhFit"
+
+source ${HOME}/ROOT/root-6.10.08/bin/thisroot.sh
+source ${FITROOT}/setup.sh
+
+cd $RUNPATH
+
+xsllhFit -j config.json &> fit_output.log

@@ -62,7 +62,7 @@ void EigenDecomp::SetupDecomp(const Matrix& cov)
         std::cout << "[ERROR]: Invalid method in EigenDecomp()." << std::endl;
     }
 
-#ifdef DEBUG_MSG
+#ifdef DEBUG
     std::cout << "ev: " << eigen_values->GetNrows() << std::endl;
     std::cout << "eV: " << eigen_vectors->GetNrows() << std::endl;
     std::cout << "eI: " << eigen_vectorsI->GetNrows() << std::endl;
