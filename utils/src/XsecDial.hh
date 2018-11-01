@@ -25,11 +25,13 @@ class XsecDial
         void ReadSplines(const std::string& fname_splines);
 
         int GetSplineIndex(int topology, int reaction, double q2) const;
+        int GetSplineIndex(const std::vector<int>& var, const std::vector<double>& bin) const;
         double GetSplineValue(int index, double dial_value) const;
         std::string GetSplineName(int index) const;
 
         void SetVars(double nominal, double step, double limit_lo, double limit_hi);
         void SetDimensions(int num_top, int num_reac);
+        void SetDimensions(const std::vector<int>& dim);
         void Print(bool print_bins = false) const;
 
         std::string GetName() const { return m_name; }
@@ -48,7 +50,7 @@ class XsecDial
         double m_limit_lo;
         double m_limit_hi;
         std::vector<TGraph> v_splines;
-        //std::map<std::string, int> m_dimensions;
+        std::vector<int> m_dimensions;
         BinManager bin_manager;
 
         const std::string TAG;

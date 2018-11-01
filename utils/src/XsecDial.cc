@@ -49,6 +49,17 @@ int XsecDial::GetSplineIndex(int topology, int reaction, double q2) const
     return topology * nreac * nbins + reaction * nbins + b;
 }
 
+int XsecDial::GetSplineIndex(const std::vector<int>& var, const std::vector<double>& bin) const
+{
+    if(var.size() != m_dimensions.size())
+        return -1;
+
+    int idx = bin_manager.GetBinIndex(bin);
+    for(int i = 0; i < var.size(); ++i)
+        idx += var[i] * m_dimensions[i];
+    return idx;
+}
+
 double XsecDial::GetSplineValue(int index, double dial_value) const
 {
     if(index >= 0)
@@ -74,6 +85,11 @@ void XsecDial::SetDimensions(int num_top, int num_reac)
 {
     ntop = num_top;
     nreac = num_reac;
+}
+
+void XsecDial::SetDimensions(const std::vector<int>& dim)
+{
+    m_dimensions = dim;
 }
 
 void XsecDial::Print(bool print_bins) const

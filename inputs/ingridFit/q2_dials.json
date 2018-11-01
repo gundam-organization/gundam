@@ -1,5 +1,5 @@
 {
-    "input_dir" : "/inputs/ingridFit/",
+    "input_dir" : "/inputs/ingridFit/splines/",
     "dials" : [
         {
             "name" : "MACCQE",
@@ -7,8 +7,8 @@
             "step" : 0.05,
             "limit_lo" : 0.00,
             "limit_hi" : 2.00,
-            "binning" : "splines/q2_binning_fine.txt",
-            "splines" : "splines/maccqe_splines.root",
+            "binning" : "q2_splines/q2_binning_fine.txt",
+            "splines" : "q2_splines/maccqe_splines.root",
             "use" : true
         },
         {
@@ -17,8 +17,8 @@
             "step" : 0.05,
             "limit_lo" : 0.00,
             "limit_hi" : 2.00,
-            "binning" : "splines/q2_binning_fine.txt",
-            "splines" : "splines/mec_c_splines.root",
+            "binning" : "q2_splines/q2_binning_fine.txt",
+            "splines" : "q2_splines/mec_c_splines.root",
             "use" : false
         },
         {
@@ -27,8 +27,8 @@
             "step" : 0.05,
             "limit_lo" : 0.00,
             "limit_hi" : 2.00,
-            "binning" : "splines/q2_binning_fine.txt",
-            "splines" : "splines/mec_o_splines.root",
+            "binning" : "q2_splines/q2_binning_fine.txt",
+            "splines" : "q2_splines/mec_o_splines.root",
             "use" : false
         },
         {
@@ -37,8 +37,8 @@
             "step" : 0.05,
             "limit_lo" : 200,
             "limit_hi" : 300,
-            "binning" : "splines/q2_binning_fine.txt",
-            "splines" : "splines/pf_c_splines.root",
+            "binning" : "q2_splines/q2_binning_fine.txt",
+            "splines" : "q2_splines/pf_c_splines.root",
             "use" : false
         },
         {
@@ -47,8 +47,8 @@
             "step" : 0.05,
             "limit_lo" : 200,
             "limit_hi" : 300,
-            "binning" : "splines/q2_binning_fine.txt",
-            "splines" : "splines/pf_o_splines.root",
+            "binning" : "q2_splines/q2_binning_fine.txt",
+            "splines" : "q2_splines/pf_o_splines.root",
             "use" : false
         },
         {
@@ -57,8 +57,8 @@
             "step" : 0.05,
             "limit_lo" : 0.00,
             "limit_hi" : 2.00,
-            "binning" : "splines/q2_binning_fine.txt",
-            "splines" : "splines/mares_splines.root",
+            "binning" : "q2_splines/q2_binning_fine.txt",
+            "splines" : "q2_splines/mares_splines.root",
             "use" : true
         },
         {
@@ -67,8 +67,8 @@
             "step" : 0.05,
             "limit_lo" : 0.00,
             "limit_hi" : 2.00,
-            "binning" : "splines/q2_binning_fine.txt",
-            "splines" : "splines/ca5_splines.root",
+            "binning" : "q2_splines/q2_binning_fine.txt",
+            "splines" : "q2_splines/ca5_splines.root",
             "use" : true
         },
         {
@@ -77,8 +77,8 @@
             "step" : 0.05,
             "limit_lo" : 0.00,
             "limit_hi" : 2.00,
-            "binning" : "splines/q2_binning_fine.txt",
-            "splines" : "splines/i12res_splines.root",
+            "binning" : "q2_splines/q2_binning_fine.txt",
+            "splines" : "q2_splines/i12res_splines.root",
             "use" : true
         },
         {
@@ -87,8 +87,8 @@
             "step" : 0.05,
             "limit_lo" : 0.00,
             "limit_hi" : 2.00,
-            "binning" : "splines/q2_binning_fine.txt",
-            "splines" : "splines/dis_splines.root",
+            "binning" : "q2_splines/q2_binning_fine.txt",
+            "splines" : "q2_splines/dis_splines.root",
             "use" : true
         },
         {
@@ -97,8 +97,8 @@
             "step" : 0.05,
             "limit_lo" : 0.00,
             "limit_hi" : 2.00,
-            "binning" : "splines/q2_binning_fine.txt",
-            "splines" : "splines/cccoh_splines.root",
+            "binning" : "q2_splines/q2_binning_fine.txt",
+            "splines" : "q2_splines/cccoh_splines.root",
             "use" : true
         },
         {
@@ -107,8 +107,8 @@
             "step" : 0.05,
             "limit_lo" : 0.00,
             "limit_hi" : 2.00,
-            "binning" : "splines/q2_binning_fine.txt",
-            "splines" : "splines/nccoh_splines.root",
+            "binning" : "q2_splines/q2_binning_fine.txt",
+            "splines" : "q2_splines/nccoh_splines.root",
             "use" : true
         },
         {
@@ -117,8 +117,8 @@
             "step" : 0.05,
             "limit_lo" : 0.00,
             "limit_hi" : 2.00,
-            "binning" : "splines/q2_binning_fine.txt",
-            "splines" : "splines/ncoth_splines.root",
+            "binning" : "q2_splines/q2_binning_fine.txt",
+            "splines" : "q2_splines/ncoth_splines.root",
             "use" : true
         },
         {
@@ -127,8 +127,8 @@
             "step" : 0.05,
             "limit_lo" : 0.00,
             "limit_hi" : 2.00,
-            "binning" : "splines/q2_binning_fine.txt",
-            "splines" : "splines/ccnue_splines.root",
+            "binning" : "q2_splines/q2_binning_fine.txt",
+            "splines" : "q2_splines/ccnue_splines.root",
             "use" : true
         },
         {
@@ -137,8 +137,8 @@
             "step" : 0.05,
             "limit_lo" : 0.00,
             "limit_hi" : 2.00,
-            "binning" : "splines/q2_binning_fine.txt",
-            "splines" : "splines/fsi_inel_lo_splines.root",
+            "binning" : "q2_splines/q2_binning_fine.txt",
+            "splines" : "q2_splines/fsi_inel_lo_splines.root",
             "use" : true
         },
         {
@@ -147,8 +147,8 @@
             "step" : 0.05,
             "limit_lo" : 0.00,
             "limit_hi" : 2.00,
-            "binning" : "splines/q2_binning_fine.txt",
-            "splines" : "splines/fsi_pi_abs_splines.root",
+            "binning" : "q2_splines/q2_binning_fine.txt",
+            "splines" : "q2_splines/fsi_pi_abs_splines.root",
             "use" : true
         },
         {
@@ -157,8 +157,8 @@
             "step" : 0.05,
             "limit_lo" : 0.00,
             "limit_hi" : 2.00,
-            "binning" : "splines/q2_binning_fine.txt",
-            "splines" : "splines/fsi_cex_lo_splines.root",
+            "binning" : "q2_splines/q2_binning_fine.txt",
+            "splines" : "q2_splines/fsi_cex_lo_splines.root",
             "use" : true
         },
         {
@@ -167,8 +167,8 @@
             "step" : 0.05,
             "limit_lo" : 0.00,
             "limit_hi" : 2.00,
-            "binning" : "splines/q2_binning_fine.txt",
-            "splines" : "splines/fsi_pi_prod_splines.root",
+            "binning" : "q2_splines/q2_binning_fine.txt",
+            "splines" : "q2_splines/fsi_pi_prod_splines.root",
             "use" : true
         },
         {
@@ -177,8 +177,8 @@
             "step" : 0.05,
             "limit_lo" : 0.00,
             "limit_hi" : 3.00,
-            "binning" : "splines/q2_binning_fine.txt",
-            "splines" : "splines/fsi_inel_hi_splines.root",
+            "binning" : "q2_splines/q2_binning_fine.txt",
+            "splines" : "q2_splines/fsi_inel_hi_splines.root",
             "use" : true
         },
         {
@@ -187,8 +187,8 @@
             "step" : 0.05,
             "limit_lo" : 0.00,
             "limit_hi" : 3.00,
-            "binning" : "splines/q2_binning_fine.txt",
-            "splines" : "splines/fsi_cex_hi_splines.root",
+            "binning" : "q2_splines/q2_binning_fine.txt",
+            "splines" : "q2_splines/fsi_cex_hi_splines.root",
             "use" : true
         }
     ]
