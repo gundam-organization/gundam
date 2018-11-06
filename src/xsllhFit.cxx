@@ -86,7 +86,7 @@ int main(int argc, char** argv)
               << TAG << "Opening " << fname_mc << " for MC selection." << std::endl;
 
     /*************************************** FLUX *****************************************/
-    std::cout << TAG << "Setup Flux" << std::endl;
+    std::cout << TAG << "Setup Flux Covariance" << std::endl;
 
     //input File
     TFile* finfluxcov = TFile::Open(parser.flux_cov.fname.c_str(), "READ"); //contains flux systematics info
@@ -101,46 +101,17 @@ int main(int argc, char** argv)
         enubins.push_back(nd_numu_bins -> GetBinUpEdge(i+1));
 
     //Cov mat stuff:
-    TMatrixDSym* cov_flux_in = (TMatrixDSym*)finfluxcov -> Get(parser.flux_cov.matrix.c_str());
-    TMatrixDSym cov_flux = *cov_flux_in;
+    TMatrixDSym* cov_flux = (TMatrixDSym*)finfluxcov -> Get(parser.flux_cov.matrix.c_str());
     finfluxcov -> Close();
 
     /*************************************** FLUX END *************************************/
     std::cout << TAG << "Setup Xsec Covariance" << std::endl;
-    std::ifstream fin(parser.xsec_cov.fname, std::ios::in);
+    TFile* file_xsec_cov = TFile::Open(parser.xsec_cov.fname.c_str(), "READ");
+    std::cout << TAG << "Opening " << parser.xsec_cov.fname << " for xsec covariance." << std::endl;
+    TMatrixDSym* cov_xsec = (TMatrixDSym*)file_xsec_cov -> Get(parser.xsec_cov.matrix.c_str());
+    file_xsec_cov -> Close();
 
-    TMatrixDSym cov_xsec;
-    if(!fin.is_open())
-    {
-        std::cerr << ERR << "Failed to open " << parser.xsec_cov.fname << std::endl;
-        return 1;
-    }
-    else
-    {
-        unsigned int dim = 0;
-        std::string line;
-        if(std::getline(fin, line))
-        {
-            std::stringstream ss(line);
-            ss >> dim;
-        }
-
-        cov_xsec.ResizeTo(dim, dim);
-        for(unsigned int i = 0; i < dim; ++i)
-        {
-            std::getline(fin, line);
-            std::stringstream ss(line);
-            double val = 0;
-
-            for(unsigned int j = 0; j < dim; ++j)
-            {
-                ss >> val;
-                cov_xsec(i,j) = val;
-            }
-        }
-    }
-
-    TFile *fout = TFile::Open(fname_output.c_str(), "RECREATE");
+    TFile* fout = TFile::Open(fname_output.c_str(), "RECREATE");
     std::cout << TAG << "Open output file: " << fname_output << std::endl;
 
     // Add analysis samples:
@@ -193,7 +164,7 @@ int main(int argc, char** argv)
 
     //Flux parameters
     FluxParameters fluxpara("par_flux");
-    fluxpara.SetCovarianceMatrix(cov_flux, parser.flux_cov.decompose);
+    fluxpara.SetCovarianceMatrix(*cov_flux, parser.flux_cov.decompose);
     fluxpara.SetThrow(parser.flux_cov.do_throw);
     fluxpara.SetInfoFrac(parser.flux_cov.info_frac);
     for(const auto& opt : parser.detectors)
@@ -205,7 +176,7 @@ int main(int argc, char** argv)
     fitpara.push_back(&fluxpara);
 
     XsecParameters xsecpara("par_xsec");
-    xsecpara.SetCovarianceMatrix(cov_xsec, parser.xsec_cov.decompose);
+    xsecpara.SetCovarianceMatrix(*cov_xsec, parser.xsec_cov.decompose);
     xsecpara.SetThrow(parser.xsec_cov.do_throw);
     for(const auto& opt : parser.detectors)
     {

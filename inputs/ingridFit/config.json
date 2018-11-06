@@ -31,7 +31,7 @@
         "variance" : 0.99
     },
     "xsec_cov" : {
-        "file" : "xsec_cov_nd280.txt",
+        "file" : "xsec_cov_nd280.root",
         "matrix" : "xsec_cov",
         "throw"  : false,
         "decomp" : false,
