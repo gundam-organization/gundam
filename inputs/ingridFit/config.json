@@ -49,7 +49,7 @@
             "flux_hist" : "enu_nd5_tuned13a_numu",
             "flux_integral" : 1.12E13,
             "flux_error" : 0.085,
-            "xsec_config" : "q2_dials.json",
+            "xsec_config" : "ptheta_dials.json",
             "binning" : "tn337_binning.txt",
             "ntargets_val" : 5.9E29,
             "ntargets_err" : 0.0067,

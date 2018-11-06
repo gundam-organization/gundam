@@ -3,7 +3,7 @@ cmake_minimum_required (VERSION 2.8 FATAL_ERROR)
 project (xsLLhFitter)
 
 set (xsLLhFitter_VERSION_MAJOR 0)
-set (xsLLhFitter_VERSION_MINOR 1) #The q+1'th letter of the alphabet
+set (xsLLhFitter_VERSION_MINOR 9) #The q+1'th letter of the alphabet
 set (xsLLhFitter_VERSION_REVISION 0)
 
 set (VERBOSE TRUE)
@@ -41,7 +41,7 @@ cmessage(STATUS "CMAKE_BUILD_TYPE: \"${CMAKE_BUILD_TYPE}\"")
 
 ##################################  ROOT  ######################################
 if ( NOT DEFINED ENV{ROOTSYS} )
-  cmessage (FATAL_ERROR "$ROOTSYS is not defined, please set up root first.")
+  cmessage(FATAL_ERROR "$ROOTSYS is not defined, please set up root first.")
 else()
   cmessage(STATUS "Using ROOT installed at $ENV{ROOTSYS}")
   set(CMAKE_ROOTSYS $ENV{ROOTSYS})
@@ -51,7 +51,7 @@ endif()
 if (USEROOTCMAKE)
   include ($ENV{ROOTSYS}/etc/cmake/FindROOT.cmake)
   if ( NOT ROOT_FOUND )
-    cmessage (FATAL_ERROR "[ROOT]: FindROOT.cmake could not be found, or did not execute as expected is ROOT installed in $ROOTSYS = $ENV{ROOTSYS}?")
+    cmessage(FATAL_ERROR "[ROOT]: FindROOT.cmake could not be found, or did not execute as expected is ROOT installed in $ROOTSYS = $ENV{ROOTSYS}?")
   endif()
 else()
   cmessage(STATUS "Including local GENERATE_ROOT_DICTIONARY implementation.")

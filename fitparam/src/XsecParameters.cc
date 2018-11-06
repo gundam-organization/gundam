@@ -36,8 +36,10 @@ void XsecParameters::InitEventMap(std::vector<AnaSample*>& sample, int mode)
                 double q2 = ev -> GetQ2True() / 1.0E6; //MeV to GeV conversion.
                 //int idx = v_dials.at(d).GetSplineIndex(ev -> GetTopology(), ev -> GetReaction(), q2);
 
-                int idx = v_dials.at(d).GetSplineIndex(std::vector<int>{ev -> GetTopology(), ev -> GetReaction()},
-                                                       std::vector<double>{q2});
+                //int idx = v_dials.at(d).GetSplineIndex(std::vector<int>{ev -> GetTopology(), ev -> GetReaction()},
+                //                                       std::vector<double>{q2});
+                int idx = v_dials.at(d).GetSplineIndex(std::vector<int>{ev->GetTopology(), ev->GetReaction()},
+                                                       std::vector<double>{ev->GetTrueD2(), ev->GetTrueD1()});
 
                 if(idx == BADBIN)
                 {
@@ -168,7 +170,7 @@ void XsecParameters::AddDetector(const std::string& det, const std::string& conf
             XsecDial x(dial["name"], fname_binning, fname_splines);
             x.SetVars(dial["nominal"], dial["step"], dial["limit_lo"], dial["limit_hi"]);
             //x.SetDimensions(8, 10);
-            x.SetDimensions(std::vector<int>{10*16, 16});
+            x.SetDimensions(std::vector<int>{10*58, 58});
             x.Print(true);
             v_dials.emplace_back(x);
         }
