@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 2.8 FATAL_ERROR)
+cmake_minimum_required (VERSION 3.1 FATAL_ERROR)
 
 project (xsLLhFitter)
 
@@ -67,9 +67,13 @@ cmessage ( STATUS "[ROOT]: root-config --libs: " ${ROOT_LD_FLAGS} )
 
 ################################## COMPILER ####################################
 
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+option(CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ langauge." OFF)
+
 set(CXX_WARNINGS "-Wall -Wno-unused-variable -Wno-sign-compare -Wno-unused-function -Wno-unused-but-set-variable -Wno-reorder")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -std=c++11 -DDEBUG -fopenmp -g -O0 ${ROOT_CXX_FLAGS} ${CXX_WARNINGS} ")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -std=c++11 -fopenmp -march=native -fPIC -O3 ${ROOT_CXX_FLAGS} ${CXX_WARNINGS} ")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG -fopenmp -g -O0 ${ROOT_CXX_FLAGS} ${CXX_WARNINGS} ")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fopenmp -march=native -fPIC -O3 ${ROOT_CXX_FLAGS} ${CXX_WARNINGS} ")
 
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)
   set(CURRENT_CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS_DEBUG})
