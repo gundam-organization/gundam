@@ -215,7 +215,7 @@ void AnaSample::FillEventHist(int datatype, bool stat_fluc)
             double val = m_hpred->GetBinContent(j);
             if(stat_fluc)
                 val = gRandom->Poisson(val);
-#ifdef DEBUG
+#ifndef NDEBUG
             if(val == 0.0)
             {
                 std::cout << "[WARNING] In AnaSample::FillEventHist()\n"
@@ -254,7 +254,7 @@ void AnaSample::FillEventHist(int datatype, bool stat_fluc)
             {
                 m_hdata->Fill(anybin_index + 0.5, wght);
             }
-#ifdef DEBUG
+#ifndef NDEBUG
             else
             {
                 std::cout << "[WARNING] In AnaSample::FillEventHist()\n"
@@ -274,7 +274,7 @@ void AnaSample::FillEventHist(int datatype, bool stat_fluc)
             }
         }
 
-#ifdef DEBUG
+#ifndef NDEBUG
         std::cout << "[AnaSample] Data histogram filled: " << std::endl;
         m_hdata->Print();
 #endif
@@ -322,7 +322,7 @@ double AnaSample::CalcChi2() const
 
             if(chi2 < 0.0)
             {
-#ifdef DEBUG
+#ifndef NDEBUG
                 std::cerr << "[WARNING]: In AnaSample::CalcChi2()\n"
                           << "[WARNING]: Stat chi2 is less than 0: " << chi2 << ", setting to 0."
                           << std::endl;

@@ -80,7 +80,7 @@ void DetParameters::InitEventMap(std::vector<AnaSample*>& sample, int mode)
             double D1 = ev->GetRecD1();
             double D2 = ev->GetRecD2();
             int bin   = GetBinIndex(sample[s]->GetSampleID(), D1, D2);
-#ifdef DEBUG
+#ifndef NDEBUG
             if(bin == BADBIN)
             {
                 std::cout << WAR << m_name << ", Event: " << i << std::endl

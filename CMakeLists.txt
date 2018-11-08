@@ -1,10 +1,9 @@
 cmake_minimum_required (VERSION 3.5 FATAL_ERROR)
 
-project(xsLLhFitter VERSION 0.9.0 LANGUAGES C CXX)
-
-#set(xsLLhFitter_VERSION_MAJOR 0)
-#set(xsLLhFitter_VERSION_MINOR 9) #The q+1'th letter of the alphabet
-#set(xsLLhFitter_VERSION_REVISION 0)
+project(xsLLhFitter)
+set (xsLLhFitter_VERSION_MAJOR 0)
+set (xsLLhFitter_VERSION_MINOR 9)
+set (xsLLhFitter_VERSION_REVISION 0)
 
 set(VERBOSE TRUE)
 set(CMAKE_SKIP_BUILD_RPATH TRUE)
@@ -70,7 +69,7 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
         cmessage(FATAL_ERROR "GCC version must be at least 4.8.5")
     endif()
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 3.2)
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 3.3)
         cmessage(STATUS "Detected Clang version: ${CMAKE_CXX_COMPILER_VERSION}")
         cmessage(FATAL_ERROR "Clang version must be at least 3.2")
     endif()
@@ -83,6 +82,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 option(CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ langauge (-std=gnu++11)." OFF)
 option(CXX_MARCH_FLAG "Enable cpu architecture specific optimzations." OFF)
 option(CXX_WARNINGS "Enable most C++ warning flags." ON)
+option(COLOR_OUTPUT "Enable colored terminal output." ON)
 
 include(FindOpenMP)
 if(OPENMP_FOUND)
@@ -99,7 +99,11 @@ if(CXX_WARNINGS)
     set(CXX_WARNINGS "-Wall -Wno-unused-variable -Wno-sign-compare -Wno-unused-function -Wno-unused-but-set-variable -Wno-reorder")
 endif()
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG ${ROOT_CXX_FLAGS} ${CXX_WARNINGS}")
+if(NOT COLOR_OUTPUT)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNOCOLOR")
+endif()
+
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${ROOT_CXX_FLAGS} ${CXX_WARNINGS}")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fPIC ${ROOT_CXX_FLAGS} ${CXX_WARNINGS}")
 
 if(VERBOSE)
