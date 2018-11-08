@@ -1,15 +1,13 @@
-cmake_minimum_required (VERSION 2.8 FATAL_ERROR)
+cmake_minimum_required (VERSION 3.5 FATAL_ERROR)
 
-project (xsLLhFitter)
+project(xsLLhFitter VERSION 0.9.0 LANGUAGES C CXX)
 
-set (xsLLhFitter_VERSION_MAJOR 0)
-set (xsLLhFitter_VERSION_MINOR 9) #The q+1'th letter of the alphabet
-set (xsLLhFitter_VERSION_REVISION 0)
+#set(xsLLhFitter_VERSION_MAJOR 0)
+#set(xsLLhFitter_VERSION_MINOR 9) #The q+1'th letter of the alphabet
+#set(xsLLhFitter_VERSION_REVISION 0)
 
-set (VERBOSE TRUE)
-
-set (CMAKE_SKIP_BUILD_RPATH TRUE)
-
+set(VERBOSE TRUE)
+set(CMAKE_SKIP_BUILD_RPATH TRUE)
 include(${CMAKE_SOURCE_DIR}/cmake/cmessage.cmake)
 
 #Changes default install path to be a subdirectory of the build dir.
@@ -21,7 +19,6 @@ elseif(NOT DEFINED CMAKE_INSTALL_PREFIX)
 endif()
 
 cmessage(STATUS "CMAKE_INSTALL_PREFIX: \"${CMAKE_INSTALL_PREFIX}\"")
-
 
 if(CMAKE_BUILD_TYPE STREQUAL "")
   set(CMAKE_BUILD_TYPE DEBUG)
@@ -61,29 +58,54 @@ endif()
 execute_process (COMMAND root-config --cflags OUTPUT_VARIABLE ROOT_CXX_FLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
 execute_process (COMMAND root-config --libs OUTPUT_VARIABLE ROOT_LD_FLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
 execute_process (COMMAND root-config --version OUTPUT_VARIABLE ROOT_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
-cmessage ( STATUS "[ROOT]: root-config --version: " ${ROOT_VERSION})
-cmessage ( STATUS "[ROOT]: root-config --cflags: " ${ROOT_CXX_FLAGS} )
-cmessage ( STATUS "[ROOT]: root-config --libs: " ${ROOT_LD_FLAGS} )
+cmessage(STATUS "[ROOT]: root-config --version: ${ROOT_VERSION}")
+cmessage(STATUS "[ROOT]: root-config --cflags: ${ROOT_CXX_FLAGS}")
+cmessage(STATUS "[ROOT]: root-config --libs: ${ROOT_LD_FLAGS}")
 
 ################################## COMPILER ####################################
 
-set(CXX_WARNINGS "-Wall -Wno-unused-variable -Wno-sign-compare -Wno-unused-function -Wno-unused-but-set-variable -Wno-reorder")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -std=c++11 -DDEBUG -fopenmp -g -O0 ${ROOT_CXX_FLAGS} ${CXX_WARNINGS} ")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -std=c++11 -fopenmp -march=native -fPIC -O3 ${ROOT_CXX_FLAGS} ${CXX_WARNINGS} ")
-
-if(CMAKE_BUILD_TYPE MATCHES DEBUG)
-  set(CURRENT_CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS_DEBUG})
-elseif(CMAKE_BUILD_TYPE MATCHES RELEASE)
-  set(CURRENT_CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS_RELEASE})
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.8.5)
+        cmessage(STATUS "Detected GCC version: ${CMAKE_CXX_COMPILER_VERSION}")
+        cmessage(FATAL_ERROR "GCC version must be at least 4.8.5")
+    endif()
+elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 3.2)
+        cmessage(STATUS "Detected Clang version: ${CMAKE_CXX_COMPILER_VERSION}")
+        cmessage(FATAL_ERROR "Clang version must be at least 3.2")
+    endif()
 else()
-  cmessage(FATAL_ERROR "[ERROR]: Unknown CMAKE_BUILD_TYPE (\"${CMAKE_BUILD_TYPE}\"): Should be \"DEBUG\" or \"RELEASE\".")
+    message(WARNING "You are using an untested compiler.")
 endif()
 
-if (VERBOSE)
-  cmessage (STATUS "C++ Compiler      : " ${CXX_COMPILER_NAME})
-  cmessage (STATUS "    Release flags : " ${CMAKE_CXX_FLAGS_RELEASE})
-  cmessage (STATUS "    Debug flags   : " ${CMAKE_CXX_FLAGS_DEBUG})
-  cmessage (STATUS "    Link Flags    : " ${CMAKE_LINK_FLAGS})
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+option(CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ langauge (-std=gnu++11)." OFF)
+option(CXX_MARCH_FLAG "Enable cpu architecture specific optimzations." OFF)
+option(CXX_WARNINGS "Enable most C++ warning flags." ON)
+
+include(FindOpenMP)
+if(OPENMP_FOUND)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+else()
+    cmessage(STATUS "OpenMP not found. Threading not available.")
+endif()
+
+if(CXX_MARCH_FLAG)
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native")
+endif()
+
+if(CXX_WARNINGS)
+    set(CXX_WARNINGS "-Wall -Wno-unused-variable -Wno-sign-compare -Wno-unused-function -Wno-unused-but-set-variable -Wno-reorder")
+endif()
+
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG ${ROOT_CXX_FLAGS} ${CXX_WARNINGS}")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fPIC ${ROOT_CXX_FLAGS} ${CXX_WARNINGS}")
+
+if(VERBOSE)
+  cmessage (STATUS "C++ Compiler      : ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
+  cmessage (STATUS "C++ Release flags : ${CMAKE_CXX_FLAGS_RELEASE}")
+  cmessage (STATUS "C++ Debug flags   : ${CMAKE_CXX_FLAGS_DEBUG}")
 endif()
 
 ################################################################################
