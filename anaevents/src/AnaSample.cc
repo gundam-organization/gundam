@@ -11,9 +11,6 @@ AnaSample::AnaSample(int sample_id, const std::string& name, const std::string& 
     , m_data_tree(t_data)
     , m_norm(1.0)
 {
-    TAG = color::GREEN_STR + "[AnaSample]: " + color::RESET_STR;
-    ERR = color::RED_STR + "[ERROR]: " + color::RESET_STR;
-
     SetBinning(m_binning);
 
     std::cout << TAG << m_name << ", ID " << m_sample_id << std::endl

@@ -13,11 +13,10 @@ void XsecParameters::InitEventMap(std::vector<AnaSample*>& sample, int mode)
     InitParameters();
     if(Npar == 0)
     {
-        std::cerr << "[ERROR]: In XsecParameters::InitEventMap\n"
-                  << "[ERROR]: No parameters delcared. Not building event map."
+        std::cerr << ERR << "In XsecParameters::InitEventMap\n"
+                  << ERR << "No parameters delcared. Not building event map."
                   << std::endl;
     }
-    //m_evmap.clear();
     m_dial_evtmap.clear();
 
     for(std::size_t s = 0; s < sample.size(); ++s)
@@ -43,8 +42,8 @@ void XsecParameters::InitEventMap(std::vector<AnaSample*>& sample, int mode)
 
                 if(idx == BADBIN)
                 {
-                    std::cout << "[WARNING]: Event falls outside spline range.\n"
-                              << "[WARNING]: This event will be ignored in the analysis."
+                    std::cout << WAR << "Event falls outside spline range.\n"
+                              << WAR << "This event will be ignored in the analysis."
                               << std::endl;
                     ev -> AddEvWght(0.0);
                 }
@@ -77,11 +76,11 @@ void XsecParameters::InitParameters()
             pars_limhigh.push_back(d.GetLimitHigh());
             pars_fixed.push_back(false);
 
-            std::cout << "[XsecParameters]: Added " << det << "_" << d.GetName()
+            std::cout << TAG << "Added " << det << "_" << d.GetName()
                       << std::endl;
         }
 
-        std::cout << "[XsecParameters]: Total " << m_dials.at(det).size() << " parameters at "
+        std::cout << TAG << "Total " << m_dials.at(det).size() << " parameters at "
                   << offset << " for " << det << std::endl;
 
         offset += m_dials.at(det).size();
@@ -100,9 +99,9 @@ void XsecParameters::InitParameters()
         for(int i = idx; i < Npar; ++i)
             pars_fixed[i] = true;
 
-        std::cout << "[XsecParameters]: Decomposed parameters.\n"
-                  << "[XsecParameters]: Keeping the " << idx << " largest eigen values.\n"
-                  << "[XsecParameters]: Corresponds to " << m_info_frac * 100.0
+        std::cout << TAG << "Decomposed parameters.\n"
+                  << TAG << "Keeping the " << idx-1 << " largest eigen values.\n"
+                  << TAG << "Corresponds to " << m_info_frac * 100.0
                   << "\% total variance.\n";
     }
 }
@@ -111,8 +110,8 @@ void XsecParameters::ReWeight(AnaEvent* event, const std::string& det, int nsamp
 {
     if(m_dial_evtmap.empty()) // need to build an event map first
     {
-        std::cerr << "[ERROR]: In XsecParameters::ReWeight()\n"
-                  << "[ERROR]: Need to build event map index for " << m_name << std::endl;
+        std::cerr << ERR << "In XsecParameters::ReWeight()\n"
+                  << ERR << "Need to build event map index for " << m_name << std::endl;
         return;
     }
 
@@ -147,7 +146,7 @@ void XsecParameters::ReWeight(AnaEvent* event, const std::string& det, int nsamp
 
 void XsecParameters::AddDetector(const std::string& det, const std::string& config)
 {
-    std::cout << "[XsecParameters]: Adding detector " << det << " for " << m_name << std::endl;
+    std::cout << TAG << "Adding detector " << det << " for " << m_name << std::endl;
     std::fstream f;
     f.open(config, std::ios::in);
 
@@ -157,7 +156,7 @@ void XsecParameters::AddDetector(const std::string& det, const std::string& conf
     std::string input_dir = std::string(std::getenv("XSLLHFITTER"))
                             + j["input_dir"].get<std::string>();
 
-    std::cout << "[XsecParameters]: Adding the following dials." << std::endl;
+    std::cout << TAG << "Adding the following dials." << std::endl;
 
     std::vector<XsecDial> v_dials;
     for(const auto& dial : j["dials"])
@@ -171,7 +170,7 @@ void XsecParameters::AddDetector(const std::string& det, const std::string& conf
             x.SetVars(dial["nominal"], dial["step"], dial["limit_lo"], dial["limit_hi"]);
             //x.SetDimensions(8, 10);
             x.SetDimensions(std::vector<int>{10*58, 58});
-            x.Print(true);
+            x.Print(false);
             v_dials.emplace_back(x);
         }
     }

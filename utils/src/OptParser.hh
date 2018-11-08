@@ -8,6 +8,7 @@
 #include <vector>
 
 //#include "XsecFitter.hh"
+#include "ColorOutput.hh"
 
 #include "json.hpp"
 using json = nlohmann::json;
@@ -54,6 +55,7 @@ class OptParser
         bool ParseCLI(int argc, char** argv);
 
         int StringToEnum(const std::string& s) const;
+        void PrintOptions(bool short_list = true) const;
 
         std::string fname_data;
         std::string fname_mc;
@@ -83,5 +85,11 @@ class OptParser
         CovOpt xsec_cov;
         std::vector<SampleOpt> samples;
         std::vector<DetOpt> detectors;
+
+    private:
+
+        const std::string TAG = color::GREEN_STR + "[OptParser]: " + color::RESET_STR;
+        const std::string ERR = color::RED_STR + color::BOLD_STR
+                                + "[ERROR]: " + color::RESET_STR;
 };
 #endif

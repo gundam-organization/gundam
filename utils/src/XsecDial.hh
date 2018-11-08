@@ -13,6 +13,7 @@
 #include <TKey.h>
 
 #include "BinManager.hh"
+#include "ColorOutput.hh"
 
 class XsecDial
 {
@@ -53,7 +54,7 @@ class XsecDial
         std::vector<int> m_dimensions;
         BinManager bin_manager;
 
-        const std::string TAG;
+        const std::string TAG = color::MAGENTA_STR + "[XsecDial]: " + color::RESET_STR;
 };
 
 #endif

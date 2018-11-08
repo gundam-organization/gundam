@@ -32,6 +32,8 @@ class FitParameters : public AnaFitParameters
         std::map<std::string, std::vector<xsllh::FitBin> > m_fit_bins;
         std::map<std::string, int> m_det_offset;
         std::vector<std::string> v_detectors;
+
+        const std::string TAG = color::GREEN_STR + "[FitParameters]: " + color::RESET_STR;
 };
 
 #endif

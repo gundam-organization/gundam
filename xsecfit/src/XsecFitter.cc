@@ -51,13 +51,13 @@ void XsecFitter::FixParameter(const std::string& par_name, const double& value)
         const int i = std::distance(par_names.begin(), iter);
         m_fitter->SetVariable(i, par_names.at(i).c_str(), value, 0);
         m_fitter->FixVariable(i);
-        std::cout << "[XsecFitter]: Fixing parameter " << par_names.at(i) << " to value " << value
+        std::cout << TAG << "Fixing parameter " << par_names.at(i) << " to value " << value
                   << std::endl;
     }
     else
     {
-        std::cerr << "[Error]: In function XsecFitter::FixParameter()\n"
-                  << "[Error]: Parameter " << par_name << " not found!" << std::endl;
+        std::cerr << ERR << "In function XsecFitter::FixParameter()\n"
+                  << ERR << "Parameter " << par_name << " not found!" << std::endl;
     }
 }
 
@@ -93,7 +93,7 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara)
 
     if(m_npar == 0)
     {
-        std::cerr << "[ERROR]: No fit parameters were defined." << std::endl;
+        std::cerr << ERR << "No fit parameters were defined." << std::endl;
         return;
     }
 
@@ -143,13 +143,13 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara)
 
 void XsecFitter::Fit(const std::vector<AnaSample*>& samples, int fit_type, bool stat_fluc)
 {
-    std::cout << "[XsecFitter]: Starting to fit." << std::endl;
+    std::cout << TAG << "Starting to fit." << std::endl;
     m_samples = samples;
 
     if(m_fitter == nullptr)
     {
-        std::cerr << "[ERROR]: In XsecFitter::Fit()\n"
-                  << "[ERROR]: Fitter has not been initialized." << std::endl;
+        std::cerr << ERR << "In XsecFitter::Fit()\n"
+                  << ERR << "Fitter has not been initialized." << std::endl;
         return;
     }
 
@@ -174,17 +174,17 @@ void XsecFitter::Fit(const std::vector<AnaSample*>& samples, int fit_type, bool 
     }
     else
     {
-        std::cerr << "[ERROR]: In XsecFitter::Fit()\n"
-                  << "[ERROR]: No valid fitting mode provided." << std::endl;
+        std::cerr << ERR << "In XsecFitter::Fit()\n"
+                  << ERR << "No valid fitting mode provided." << std::endl;
         return;
     }
 
     SaveEvents(m_calls);
 
-    std::cout << "[XsecFitter]: Fit prepared." << std::endl;
-    std::cout << "[XsecFitter]: Calling MIGRAD ..." << std::endl;
+    std::cout << TAG << "Fit prepared." << std::endl;
+    std::cout << TAG << "Calling MIGRAD ..." << std::endl;
     m_fitter->Minimize();
-    std::cout << "[XsecFitter]: Calling HESSE ..." << std::endl;
+    std::cout << TAG << "Calling HESSE ..." << std::endl;
     m_fitter->Hesse();
 
     if(m_dir)
@@ -240,7 +240,7 @@ void XsecFitter::Fit(const std::vector<AnaSample*>& samples, int fit_type, bool 
 
     if(k != ndim)
     {
-        std::cout << "[ERROR] Number of parameters." << std::endl;
+        std::cout << ERR << "Number of parameters does not match." << std::endl;
         return;
     }
 
@@ -252,7 +252,7 @@ void XsecFitter::Fit(const std::vector<AnaSample*>& samples, int fit_type, bool 
     SaveResults(res_pars, err_pars);
     SaveFinalEvents(m_calls, res_pars);
 
-    std::cout << "[XsecFitter]: Fit routine finished. Results saved." << std::endl;
+    std::cout << TAG << "Fit routine finished. Results saved." << std::endl;
 }
 
 void XsecFitter::GenerateToyData(int toy_type, bool stat_fluc)
@@ -287,9 +287,9 @@ void XsecFitter::GenerateToyData(int toy_type, bool stat_fluc)
         chi2_stat += m_samples[s]->CalcChi2();
     }
 
-    std::cout << "[XsecFitter]: Generated toy throw from parameters.\n"
-              << "[XsecFitter]: Initial Chi2 Syst: " << chi2_syst << std::endl
-              << "[XsecFitter]: Initial Chi2 Stat: " << chi2_stat << std::endl;
+    std::cout << TAG << "Generated toy throw from parameters.\n"
+              << TAG << "Initial Chi2 Syst: " << chi2_syst << std::endl
+              << TAG << "Initial Chi2 Stat: " << chi2_stat << std::endl;
 
     SaveParams(fitpar_throw);
 }
@@ -333,7 +333,7 @@ double XsecFitter::FillSamples(std::vector<std::vector<double>>& new_pars, int d
 
         if(output_chi2)
         {
-            std::cout << "[XsecFitter]: Chi2 for sample " << m_samples[s]->GetName() << " is "
+            std::cout << TAG << "Chi2 for sample " << m_samples[s]->GetName() << " is "
                       << sample_chi2 << std::endl;
         }
     }
@@ -375,7 +375,7 @@ double XsecFitter::CalcLikelihood(const double* par)
         new_pars.push_back(vec);
         if(output_chi2)
         {
-            std::cout << "ChiSq contribution from " << m_fitpara[i]->GetName() << " is "
+            std::cout << TAG << "Chi2 contribution from " << m_fitpara[i]->GetName() << " is "
                       << m_fitpara[i]->GetChi2(vec) << std::endl;
         }
     }
@@ -393,11 +393,11 @@ double XsecFitter::CalcLikelihood(const double* par)
 
     if(output_chi2)
     {
-        std::cout << "m_calls is: " << m_calls << std::endl;
-        std::cout << "Chi2 total: " << chi2_stat + chi2_sys + chi2_reg << std::endl;
-        std::cout << "Chi2 stat : " << chi2_stat << std::endl
-                  << "Chi2 syst : " << chi2_sys  << std::endl
-                  << "Chi2 reg  : " << chi2_reg  << std::endl;
+        std::cout << TAG << "Iterations: " << m_calls << std::endl;
+        std::cout << TAG << "Chi2 total: " << chi2_stat + chi2_sys + chi2_reg << std::endl;
+        std::cout << TAG << "Chi2 stat : " << chi2_stat << std::endl
+                  << TAG << "Chi2 syst : " << chi2_sys  << std::endl
+                  << TAG << "Chi2 reg  : " << chi2_reg  << std::endl;
     }
 
     return chi2_stat + chi2_sys + chi2_reg;
@@ -490,7 +490,7 @@ void XsecFitter::SaveChi2()
 
     if(vec_chi2_stat.size() != vec_chi2_sys.size())
     {
-        std::cout << "Number of saved iterations for chi2 stat and chi2 syst are different."
+        std::cout << ERR << "Number of saved iterations for chi2 stat and chi2 syst are different."
                   << std::endl;
     }
     for(size_t i = 0; i < vec_chi2_stat.size(); i++)

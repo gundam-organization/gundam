@@ -1,12 +1,13 @@
-//This is the code that actually reads int he MC tree and fills the event info.
-//The tree should be produced by feeding a HL2 microtree into the treeconvert macro.
+// This is the code that actually reads int he MC tree and fills the event info.
+// The tree should be produced by feeding a HL2 microtree into the treeconvert macro.
 
 #include "AnaTreeMC.hh"
 
-AnaTreeMC::AnaTreeMC(const std::string& file_name, const std::string& tree_name)
+AnaTreeMC::AnaTreeMC(const std::string& file_name, const std::string& tree_name, bool extra_var)
+    : read_extra_var(extra_var)
 {
     fChain = new TChain(tree_name.c_str());
-    fChain -> Add(file_name.c_str());
+    fChain->Add(file_name.c_str());
     SetBranches();
 }
 
@@ -14,7 +15,7 @@ AnaTreeMC::~AnaTreeMC()
 {
     if(fChain == nullptr)
         return;
-    delete fChain -> GetCurrentFile();
+    delete fChain->GetCurrentFile();
 }
 
 long int AnaTreeMC::GetEntry(long int entry) const
@@ -23,51 +24,57 @@ long int AnaTreeMC::GetEntry(long int entry) const
     if(fChain == nullptr)
         return -1;
     else
-        return fChain -> GetEntry(entry);
+        return fChain->GetEntry(entry);
 }
 
 void AnaTreeMC::SetBranches()
 {
     // Set branch addresses and branch pointers
-    fChain -> SetBranchAddress("nutype", &nutype);
-    fChain -> SetBranchAddress("cut_branch", &cutBranch);
-    fChain -> SetBranchAddress("topology", &evtTopology);
-    fChain -> SetBranchAddress("reaction", &evtReaction);
-    fChain -> SetBranchAddress("D1True", &D1True);
-    fChain -> SetBranchAddress("D1Reco", &D1Reco);
-    fChain -> SetBranchAddress("D2True", &D2True);
-    fChain -> SetBranchAddress("D2Reco", &D2Reco);
-    fChain -> SetBranchAddress("q2_true", &Q2True);
-    fChain -> SetBranchAddress("q2_reco", &Q2Reco);
-    fChain -> SetBranchAddress("enu_true", &EnuTrue);
-    fChain -> SetBranchAddress("enu_reco", &EnuReco);
-    fChain -> SetBranchAddress("weight", &weight);
+    fChain->SetBranchAddress("nutype", &nutype);
+    fChain->SetBranchAddress("cut_branch", &cutBranch);
+    fChain->SetBranchAddress("topology", &evtTopology);
+    fChain->SetBranchAddress("reaction", &evtReaction);
+    fChain->SetBranchAddress("D1True", &D1True);
+    fChain->SetBranchAddress("D1Reco", &D1Reco);
+    fChain->SetBranchAddress("D2True", &D2True);
+    fChain->SetBranchAddress("D2Reco", &D2Reco);
+    fChain->SetBranchAddress("q2_true", &Q2True);
+    fChain->SetBranchAddress("q2_reco", &Q2Reco);
+    fChain->SetBranchAddress("enu_true", &EnuTrue);
+    fChain->SetBranchAddress("enu_reco", &EnuReco);
+    fChain->SetBranchAddress("weight", &weight);
 
     // New kinematic variables always included for phase space cuts
-    fChain -> SetBranchAddress("pMomRec", &pMomRec);
-    fChain -> SetBranchAddress("pMomTrue", &pMomTrue);
-    fChain -> SetBranchAddress("pCosThetaRec", &pCosThetaRec);
-    fChain -> SetBranchAddress("pCosThetaTrue", &pCosThetaTrue);
-    fChain -> SetBranchAddress("muMomRec", &muMomRec);
-    fChain -> SetBranchAddress("muMomTrue", &muMomTrue);
-    fChain -> SetBranchAddress("muCosThetaRec", &muCosThetaRec);
-    fChain -> SetBranchAddress("muCosThetaTrue", &muCosThetaTrue);
+    if(read_extra_var)
+    {
+        fChain->SetBranchAddress("pMomRec", &pMomRec);
+        fChain->SetBranchAddress("pMomTrue", &pMomTrue);
+        fChain->SetBranchAddress("pCosThetaRec", &pCosThetaRec);
+        fChain->SetBranchAddress("pCosThetaTrue", &pCosThetaTrue);
+        fChain->SetBranchAddress("muMomRec", &muMomRec);
+        fChain->SetBranchAddress("muMomTrue", &muMomTrue);
+        fChain->SetBranchAddress("muCosThetaRec", &muCosThetaRec);
+        fChain->SetBranchAddress("muCosThetaTrue", &muCosThetaTrue);
+    }
 }
 
-void AnaTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples, const std::vector<int>& sig_topology, const bool evt_type)
+void AnaTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples,
+                          const std::vector<int>& sig_topology, const bool evt_type)
 {
-    if(fChain == nullptr || ana_samples.empty()) return;
+    if(fChain == nullptr || ana_samples.empty())
+        return;
 
-    long int nentries = fChain -> GetEntries();
-    long int nbytes = 0;
+    ProgressBar pbar(60, "#");
+    pbar.SetRainbow();
+    pbar.SetPrefix(std::string(TAG + "Reading Events "));
 
-    std::cout << "[AnaTreeMC]: Reading events...\n";
+    long int nentries = fChain->GetEntries();
+    long int nbytes   = 0;
+
+    std::cout << TAG << "Reading events...\n";
     for(long int jentry = 0; jentry < nentries; jentry++)
     {
-        if(jentry % static_cast<long int>(1E5) == 0)
-            std::cout << "[AnaTreeMC]: Processing event " << jentry << " out of " << nentries << std::endl;
-        nbytes += fChain -> GetEntry(jentry);
-        //create and fill event structure
+        nbytes += fChain->GetEntry(jentry);
         AnaEvent ev(jentry);
         ev.SetTrueEvent(evt_type);
         ev.SetFlavor(nutype);
@@ -85,14 +92,17 @@ void AnaTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples, const std::vecto
         ev.SetQ2True(Q2True);
         ev.SetQ2Reco(Q2Reco);
 
-        ev.SetmuMomRec(muMomRec);
-        ev.SetmuMomTrue(muMomTrue);
-        ev.SetmuCosThetaRec(muCosThetaRec);
-        ev.SetmuCosThetaTrue(muCosThetaTrue);
-        ev.SetpMomRec(pMomRec);
-        ev.SetpMomTrue(pMomTrue);
-        ev.SetpCosThetaRec(pCosThetaRec);
-        ev.SetpCosThetaTrue(pCosThetaTrue);
+        if(read_extra_var)
+        {
+            ev.SetmuMomRec(muMomRec);
+            ev.SetmuMomTrue(muMomTrue);
+            ev.SetmuCosThetaRec(muCosThetaRec);
+            ev.SetmuCosThetaTrue(muCosThetaTrue);
+            ev.SetpMomRec(pMomRec);
+            ev.SetpMomTrue(pMomTrue);
+            ev.SetpCosThetaRec(pCosThetaRec);
+            ev.SetpCosThetaTrue(pCosThetaTrue);
+        }
 
         for(const auto& signal_topology : sig_topology)
         {
@@ -105,11 +115,14 @@ void AnaTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples, const std::vecto
 
         for(auto& sample : ana_samples)
         {
-            if(sample -> GetSampleID() == cutBranch)
-                sample -> AddEvent(ev);
+            if(sample->GetSampleID() == cutBranch)
+                sample->AddEvent(ev);
         }
+
+        if(jentry % 2000 == 0 || jentry == (nentries - 1))
+            pbar.Print(jentry, nentries - 1);
     }
 
     for(auto& sample : ana_samples)
-        sample -> PrintStats();
+        sample->PrintStats();
 }

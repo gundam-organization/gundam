@@ -21,6 +21,8 @@ private:
     std::map<std::string, int> m_det_offset;
     std::map<std::string, std::vector<double>> m_det_bins;
     std::vector<std::string> v_detectors;
+
+    const std::string TAG = color::GREEN_STR + "[FluxParameters]: " + color::RESET_STR;
 };
 
 #endif

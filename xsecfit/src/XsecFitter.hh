@@ -22,6 +22,7 @@
 
 #include "AnaFitParameters.hh"
 #include "AnaSample.hh"
+#include "ColorOutput.hh"
 
 enum FitType
 {
@@ -130,5 +131,8 @@ private:
     std::vector<double> vec_chi2_reg;
     std::vector<AnaFitParameters*> m_fitpara;
     std::vector<AnaSample*> m_samples;
+
+    const std::string TAG = color::YELLOW_STR + "[XsecFitter]: " + color::RESET_STR;
+    const std::string ERR = color::RED_STR + color::BOLD_STR + "[ERROR]: " + color::RESET_STR;
 };
 #endif

@@ -13,8 +13,8 @@ bool DetParameters::SetBinning(const std::string& file_name, std::vector<FitBin>
     std::ifstream fin(file_name, std::ios::in);
     if(!fin.is_open())
     {
-        std::cerr << "[ERROR]: In DetParameters::SetBinning()\n"
-                  << "[ERROR]: Failed to open binning file: " << file_name << std::endl;
+        std::cerr << ERR << "In DetParameters::SetBinning()\n"
+                  << ERR << "Failed to open binning file: " << file_name << std::endl;
         return false;
     }
 
@@ -27,15 +27,15 @@ bool DetParameters::SetBinning(const std::string& file_name, std::vector<FitBin>
             double D1_1, D1_2, D2_1, D2_2;
             if(!(ss>>D2_1>>D2_2>>D1_1>>D1_2))
             {
-                std::cout << "[WARNING]: In DetParameters::SetBinning()\n"
-                          << "[WARNING]: Bad line format: " << line << std::endl;
+                std::cout << WAR << "In DetParameters::SetBinning()\n"
+                          << WAR << "Bad line format: " << line << std::endl;
                 continue;
             }
             bins.emplace_back(FitBin(D1_1, D1_2, D2_1, D2_2));
         }
         fin.close();
 
-        std::cout << "[DetParameters]: Fit binning: \n";
+        std::cout << TAG << "Fit binning: \n";
         for(std::size_t i = 0; i < bins.size(); ++i)
         {
             std::cout << std::setw(3) << i
@@ -83,9 +83,9 @@ void DetParameters::InitEventMap(std::vector<AnaSample*>& sample, int mode)
 #ifdef DEBUG
             if(bin == BADBIN)
             {
-                std::cout << "[WARNING]: " << m_name << ", Event: " << i << std::endl
-                          << "[WARNING]: D1 = " << D1 << ", D2 = " << D2 << ", falls outside bin ranges." << std::endl
-                          << "[WARNING]: This event will be ignored in the analysis." << std::endl;
+                std::cout << WAR << m_name << ", Event: " << i << std::endl
+                          << WAR << "D1 = " << D1 << ", D2 = " << D2 << ", falls outside bin ranges." << std::endl
+                          << WAR << "This event will be ignored in the analysis." << std::endl;
             }
 #endif
             // If event is signal let the c_i params handle the reweighting:
@@ -101,8 +101,8 @@ void DetParameters::ReWeight(AnaEvent* event, const std::string& det, int nsampl
 {
     if(m_evmap.empty()) // need to build an event map first
     {
-        std::cerr << "[ERROR]: In DetParameters::ReWeight()\n"
-                  << "[ERROR]: Need to build event map index for " << m_name << std::endl;
+        std::cerr << ERR << "In DetParameters::ReWeight()\n"
+                  << ERR << "Need to build event map index for " << m_name << std::endl;
         return;
     }
 
@@ -116,9 +116,9 @@ void DetParameters::ReWeight(AnaEvent* event, const std::string& det, int nsampl
     {
         if(bin > params.size())
         {
-            std::cout << "[WARNING]: In DetParameters::ReWeight()\n"
-                      << "[WARNING]: Number of bins in " << m_name << " does not match num of parameters.\n"
-                      << "[WARNING]: Setting event weight to zero." << std::endl;
+            std::cout << WAR << "In DetParameters::ReWeight()\n"
+                      << WAR << "Number of bins in " << m_name << " does not match num of parameters.\n"
+                      << WAR << "Setting event weight to zero." << std::endl;
             event->AddEvWght(0.0);
         }
 
@@ -143,7 +143,7 @@ void DetParameters::InitParameters()
             pars_fixed.push_back(false);
         }
 
-        std::cout << "[DetParameters]: Total " << nbins << " parameters at "
+        std::cout << TAG << "Total " << nbins << " parameters at "
                   << offset << " for sample ID " << sam << std::endl;
         offset += nbins;
     }
@@ -161,16 +161,16 @@ void DetParameters::InitParameters()
         for(int i = idx; i < Npar; ++i)
             pars_fixed[i] = true;
 
-        std::cout << "[DetParameters]: Decomposed parameters.\n"
-                  << "[DetParameters]: Keeping the " << idx << " largest eigen values.\n"
-                  << "[DetParameters]: Corresponds to " << m_info_frac * 100.0 
+        std::cout << TAG << "Decomposed parameters.\n"
+                  << TAG << "Keeping the " << idx-1 << " largest eigen values.\n"
+                  << TAG << "Corresponds to " << m_info_frac * 100.0
                   << "\% total variance.\n";
     }
 }
 
 void DetParameters::AddDetector(const std::string& det, std::vector<AnaSample*>& v_sample, bool match_bins)
 {
-    std::cout << "[DetParameters]: Adding detector " << det << " for " << m_name << std::endl;
+    std::cout << TAG << "Adding detector " << det << " for " << m_name << std::endl;
 
     for(const auto& sample : v_sample)
     {
@@ -180,7 +180,7 @@ void DetParameters::AddDetector(const std::string& det, std::vector<AnaSample*>&
         const int sample_id = sample->GetSampleID();
         v_samples.emplace_back(sample_id);
 
-        std::cout << "[DetParameters]: Adding sample " << sample->GetName()
+        std::cout << TAG << "Adding sample " << sample->GetName()
                   << " with ID " << sample_id << " to fit." << std::endl;
 
         if(match_bins)
@@ -193,7 +193,7 @@ void DetParameters::AddDetector(const std::string& det, std::vector<AnaSample*>&
                 m_sample_bins.emplace(std::make_pair(sample_id, temp_vector));
             }
             else
-                std::cout << "[WARNING]: Adding sample binning for DetParameters failed." << std::endl;
+                std::cout << WAR << "Adding sample binning for DetParameters failed." << std::endl;
         }
     }
 }

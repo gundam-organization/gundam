@@ -1,13 +1,13 @@
 #include "XsecDial.hh"
 
 XsecDial::XsecDial(const std::string& dial_name)
-    : m_name(dial_name), TAG("\033[92m[XsecDial]: \033[0m")
+    : m_name(dial_name)
 {
 }
 
 XsecDial::XsecDial(const std::string& dial_name, const std::string& fname_binning,
                    const std::string& fname_splines)
-    : m_name(dial_name), TAG("\033[92m[XsecDial]: \033[0m")
+    : m_name(dial_name)
 {
     SetBinning(fname_binning);
     ReadSplines(fname_splines);

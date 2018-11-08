@@ -25,6 +25,8 @@ private:
     std::map<int, std::vector<xsllh::FitBin>> m_sample_bins;
     std::map<int, int> m_sample_offset;
     std::vector<int> v_samples;
+
+    const std::string TAG = color::GREEN_STR + "[DetParameters]: " + color::RESET_STR;
 };
 
 #endif

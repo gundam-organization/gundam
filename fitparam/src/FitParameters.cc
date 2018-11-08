@@ -15,8 +15,8 @@ bool FitParameters::SetBinning(const std::string& file_name, std::vector<FitBin>
     std::ifstream fin(file_name, std::ios::in);
     if(!fin.is_open())
     {
-        std::cerr << "[ERROR]: In FitParameters::SetBinning()\n"
-                  << "[ERROR]: Failed to open binning file: " << file_name << std::endl;
+        std::cerr << ERR << "In FitParameters::SetBinning()\n"
+                  << ERR << "Failed to open binning file: " << file_name << std::endl;
         return false;
     }
 
@@ -29,15 +29,15 @@ bool FitParameters::SetBinning(const std::string& file_name, std::vector<FitBin>
             double D1_1, D1_2, D2_1, D2_2;
             if(!(ss>>D2_1>>D2_2>>D1_1>>D1_2))
             {
-                std::cout << "[WARNING]: In FitParameters::SetBinning()\n"
-                          << "[WARNING]: Bad line format: " << line << std::endl;
+                std::cout << WAR << "In FitParameters::SetBinning()\n"
+                          << WAR << "Bad line format: " << line << std::endl;
                 continue;
             }
             bins.emplace_back(FitBin(D1_1, D1_2, D2_1, D2_2));
         }
         fin.close();
 
-        std::cout << "[FitParameters]: Fit binning: \n";
+        std::cout << TAG << "Fit binning: \n";
         for(std::size_t i = 0; i < bins.size(); ++i)
         {
             std::cout << std::setw(3) << i
@@ -76,9 +76,9 @@ void FitParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
     {
         if(m_fit_bins.count(s -> GetDetector()) == 0)
         {
-            std::cerr << "[ERROR] In FitParameters::InitEventMap\n"
-                      << "[ERROR] Detector " << s -> GetDetector() << " not part of fit parameters.\n"
-                      << "[ERROR] Not building event map." << std::endl;
+            std::cerr << ERR << "In FitParameters::InitEventMap\n"
+                      << ERR << "Detector " << s -> GetDetector() << " not part of fit parameters.\n"
+                      << ERR << "Not building event map." << std::endl;
             return;
         }
     }
@@ -106,9 +106,9 @@ void FitParameters::InitEventMap(std::vector<AnaSample*> &sample, int mode)
                 int bin = GetBinIndex(sample[s] -> GetDetector(), D1, D2);
                 if(bin == BADBIN)
                 {
-                    std::cout << "[WARNING]: " << m_name << ", Event: " << i << std::endl
-                              << "[WARNING]: D1 = " << D1 << ", D2 = " << D2 << ", falls outside bin ranges." << std::endl
-                              << "[WARNING]: This event will be ignored in the analysis." << std::endl;
+                    std::cout << WAR << m_name << ", Event: " << i << std::endl
+                              << WAR << "D1 = " << D1 << ", D2 = " << D2 << ", falls outside bin ranges." << std::endl
+                              << WAR << "This event will be ignored in the analysis." << std::endl;
                 }
                 sample_map.push_back(bin);
             }
@@ -127,8 +127,8 @@ void FitParameters::ReWeight(AnaEvent* event, const std::string& det, int nsampl
 {
     if(m_evmap.empty()) //need to build an event map first
     {
-        std::cerr << "[ERROR]: In FitParameters::ReWeight()\n"
-                  << "[ERROR]: Need to build event map index for " << m_name << std::endl;
+        std::cerr << ERR << "In FitParameters::ReWeight()\n"
+                  << ERR << "Need to build event map index for " << m_name << std::endl;
         return;
     }
 
@@ -144,9 +144,9 @@ void FitParameters::ReWeight(AnaEvent* event, const std::string& det, int nsampl
     {
         if(bin > params.size())
         {
-            std::cout << "[WARNING]: In FitParameters::ReWeight()\n"
-                      << "[WARNING]: Number of bins in " << m_name << " does not match num of parameters.\n"
-                      << "[WARNING]: Setting event weight to zero." << std::endl;
+            std::cout << WAR << "In FitParameters::ReWeight()\n"
+                      << WAR << "Number of bins in " << m_name << " does not match num of parameters.\n"
+                      << WAR << "Setting event weight to zero." << std::endl;
             event -> AddEvWght(0.0);
         }
 
@@ -183,7 +183,7 @@ void FitParameters::InitParameters()
             pars_fixed.push_back(false);
         }
 
-        std::cout << "[FitParameters]: Total " << nbins << " parameters at "
+        std::cout << TAG << "Total " << nbins << " parameters at "
                   << offset << " for " << det << std::endl;
         offset += nbins;
     }
@@ -194,7 +194,7 @@ void FitParameters::InitParameters()
 
 void FitParameters::AddDetector(const std::string& det, const std::string& f_binning)
 {
-    std::cout << "[FitParameters]: Adding detector " << det << " for " << m_name << std::endl;
+    std::cout << TAG << "Adding detector " << det << " for " << m_name << std::endl;
 
     std::vector<FitBin> temp_vector;
     if(SetBinning(f_binning, temp_vector))
@@ -203,7 +203,7 @@ void FitParameters::AddDetector(const std::string& det, const std::string& f_bin
         v_detectors.emplace_back(det);
     }
     else
-        std::cout << "[WARNING]: Adding detector failed." << std::endl;
+        std::cout << WAR << "Adding detector failed." << std::endl;
 }
 
 double FitParameters::CalcRegularisation(const std::vector<double>& params) const
@@ -227,7 +227,7 @@ double FitParameters::CalcRegularisation(const std::vector<double>& params, doub
     }
     else
     {
-        std::cout << "[FitParameters]: In CalcRegularisation(): "
+        std::cout << TAG << "In CalcRegularisation(): "
                   << "Invalid regularisation method! Returning 0.\n";
     }
 

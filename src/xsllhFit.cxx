@@ -22,7 +22,6 @@ int main(int argc, char** argv)
     const std::string ERR = color::RED_STR + color::BOLD_STR
                             + "[ERROR]: " + color::RESET_STR;
 
-    //std::cout << std::fixed << std::setprecision(3);
     std::cout << "------------------------------------------------\n"
               << TAG << color::RainbowText("Welcome to the Super-xsLLhFitter.\n")
               << TAG << color::RainbowText("Initializing the fit machinery...") << std::endl;
@@ -64,6 +63,7 @@ int main(int argc, char** argv)
         std::cerr << ERR << "JSON parsing failed. Exiting.\n";
         return 1;
     }
+    parser.PrintOptions();
 
     std::string input_dir = parser.input_dir;
     std::string fname_data = parser.fname_data;
@@ -82,6 +82,7 @@ int main(int argc, char** argv)
     TFile* fdata = TFile::Open(fname_data.c_str(), "READ");
     TTree* tdata = (TTree*)(fdata->Get("selectedEvents"));
 
+    std::cout << TAG << "Configure file parsing finished." << std::endl;
     std::cout << TAG << "Opening " << fname_data << " for data selection.\n"
               << TAG << "Opening " << fname_mc << " for MC selection." << std::endl;
 
@@ -120,16 +121,19 @@ int main(int argc, char** argv)
 
     for(const auto& opt : parser.samples)
     {
-        std::cout << TAG << "Adding new sample to fit.\n"
-                  << TAG << "Name: " << opt.name << std::endl
-                  << TAG << "CutB: " << opt.cut_branch << std::endl
-                  << TAG << "Detector: " << opt.detector << std::endl
-                  << TAG << "Use Sample: " << std::boolalpha << opt.use_sample << std::endl;
+        if(opt.use_sample == true)
+        {
+            std::cout << TAG << "Adding new sample to fit.\n"
+                      << TAG << "Name: " << opt.name << std::endl
+                      << TAG << "CutB: " << opt.cut_branch << std::endl
+                      << TAG << "Detector: " << opt.detector << std::endl
+                      << TAG << "Use Sample: " << std::boolalpha << opt.use_sample << std::endl;
 
-        auto s = new AnaSample(opt.cut_branch, opt.name, opt.detector, opt.binning, tdata);
-        s -> SetNorm(potD/potMC);
-        if(opt.cut_branch >= 0 && opt.use_sample == true)
-            samples.push_back(s);
+            auto s = new AnaSample(opt.cut_branch, opt.name, opt.detector, opt.binning, tdata);
+            s -> SetNorm(potD/potMC);
+            if(opt.cut_branch >= 0)
+                samples.push_back(s);
+        }
     }
 
     //read MC events

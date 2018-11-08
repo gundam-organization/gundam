@@ -58,8 +58,8 @@ void AnaFitParameters::SetCovarianceMatrix(const TMatrixDSym& covmat, bool decom
     /*
     if(abs(det) < 1e-200)
     {
-        std::cerr << "[ERROR]: In AnaFitParameters::SetCovarianceMatrix():\n"
-                  << "[ERROR]: Covariance matrix is non invertable. Determinant is " << det
+        std::cerr << ERR << "In AnaFitParameters::SetCovarianceMatrix():\n"
+                  << ERR << "Covariance matrix is non invertable. Determinant is " << det
                   << std::endl;
         return;
     }
@@ -81,8 +81,8 @@ double AnaFitParameters::GetChi2(const std::vector<double>& params) const
 
     if(CheckDims(params) == false)
     {
-        std::cout << "[WARNING]: In AnaFitParameters::GetChi2()\n"
-                  << "[WARNING]: Dimension check failed. Returning zero." << std::endl;
+        std::cout << WAR << "In AnaFitParameters::GetChi2()\n"
+                  << WAR << "Dimension check failed. Returning zero." << std::endl;
         return 0.0;
     }
 
@@ -111,9 +111,9 @@ bool AnaFitParameters::CheckDims(const std::vector<double>& params) const
 
     else
     {
-        std::cerr << "[ERROR]: Dimension of parameter vector does not match priors.\n"
-                  << "[ERROR]: Prams size is: " << params.size() << std::endl
-                  << "[ERROR]: Prior size is: " << pars_prior.size() << std::endl;
+        std::cerr << ERR << "Dimension of parameter vector does not match priors.\n"
+                  << ERR << "Prams size is: " << params.size() << std::endl
+                  << ERR << "Prior size is: " << pars_prior.size() << std::endl;
         vector_size = false;
     }
 
@@ -124,9 +124,9 @@ bool AnaFitParameters::CheckDims(const std::vector<double>& params) const
 
     else
     {
-        std::cerr << "[ERROR]: Dimension of covariance maxtix does not match priors.\n"
-                  << "[ERROR]: Rows in cov mat: " << covariance->GetNrows() << std::endl
-                  << "[ERROR]: Prior size is: " << pars_prior.size() << std::endl;
+        std::cerr << ERR << "Dimension of covariance maxtix does not match priors.\n"
+                  << ERR << "Rows in cov mat: " << covariance->GetNrows() << std::endl
+                  << ERR << "Prior size is: " << pars_prior.size() << std::endl;
         matrix_size = false;
     }
 
@@ -147,7 +147,7 @@ void AnaFitParameters::SetRegularisation(double strength, RegMethod flag)
         std::cout << "[AnaFitParameters]: Method L2" << std::endl;
     else
     {
-        std::cout << "[WARNING]: In AnaFitParameters::SetRegularisation() "
+        std::cout << WAR << "In AnaFitParameters::SetRegularisation() "
                   << "Invalid regularisation method!" << std::endl;
         m_regularised = false;
     }
@@ -161,7 +161,7 @@ void AnaFitParameters::SetRegularisation(double strength, const std::string meth
         SetRegularisation(strength, kL2Reg);
     else
     {
-        std::cout << "[WARNING]: In AnaFitParameters::SetRegularisation() "
+        std::cout << WAR << "In AnaFitParameters::SetRegularisation() "
                   << "Invalid regularisation method!" << std::endl;
     }
 }

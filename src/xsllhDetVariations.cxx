@@ -22,16 +22,11 @@
 #include "ColorOutput.hh"
 #include "ProgressBar.hh"
 
-const std::string RESET("\033[0m");
-const std::string RED("\033[31;1m");
-const std::string GREEN("\033[92m");
-const std::string COMMENT_CHAR("#");
-
-const std::string TAG = GREEN + "[xsDetVariation]: " + RESET;
-const std::string ERR = RED + "[ERROR]: " + RESET;
-
 int main(int argc, char** argv)
 {
+    const std::string TAG = color::GREEN_STR + "[xsDetVariation]: " + color::RESET_STR;
+    const std::string ERR = color::RED_STR + color::BOLD_STR + "[ERROR]: " + color::RESET_STR;
+
     std::cout << "--------------------------------------------------------\n"
               << TAG << "Welcome to the Super-xsLLh Detector Variation Interface.\n"
               << TAG << "Initializing the variation machinery..." << std::endl;

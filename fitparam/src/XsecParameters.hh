@@ -32,6 +32,8 @@ class XsecParameters : public AnaFitParameters
         std::vector<std::string> v_detectors;
         std::map<std::string, std::vector<XsecDial>> m_dials;
         std::map<std::string, int> m_offset;
+
+        const std::string TAG = color::GREEN_STR + "[XsecParameters]: " + color::RESET_STR;
 };
 
 #endif

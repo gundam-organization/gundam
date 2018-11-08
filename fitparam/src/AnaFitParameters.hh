@@ -11,6 +11,7 @@
 using TMatrixDSym = TMatrixTSym<double>;
 
 #include "AnaSample.hh"
+#include "ColorOutput.hh"
 #include "EigenDecomp.hh"
 #include "ToyThrower.hh"
 
@@ -124,6 +125,10 @@ protected:
     TMatrixDSym* covariance;
     TMatrixDSym* covarianceI;
     TMatrixDSym* original_cov;
+
+    const std::string TAG = color::GREEN_STR + "[AnaFitParameters]: " + color::RESET_STR;
+    const std::string ERR = color::RED_STR + color::BOLD_STR + "[ERROR]: " + color::RESET_STR;
+    const std::string WAR = color::RED_STR + "[WARNING]: " + color::RESET_STR;
 };
 
 #endif
