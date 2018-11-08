@@ -26,4 +26,4 @@ echo "Threads: ${THREADS}"
 cp ${1} $RUNPATH
 cd $RUNPATH
 
-sbatch ${FITROOT}/fit_job.sb
+sbatch ${FITROOT}/scripts/fit_job.sb
