@@ -1,0 +1,34 @@
+{
+    "files" : [
+        {
+            "fname_input" : "/mnt/home/cuddandr/work/nd280Software/v12r15/highland2/numuCCZeroPiAnalysis/v2r2/Linux-x86_64/highland_systematics.root",
+            "fname_binning" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/tn337_binning.txt",
+            "tree_name" : "all_syst",
+            "detector": "FGD1",
+            "num_toys" : 500,
+            "num_syst" : 17,
+            "num_samples" : 10,
+            "samples" : [0,1,2,3,4,5,6],
+            "cuts" : [7,8,9,8,7,5,4,7,8,7]
+        },
+        {
+            "fname_input" : "/mnt/home/cuddandr/work/nd280Software/v12r15/highland2/numuCCZeroPiAnalysis/v2r2/Linux-x86_64/highland_systematics.root",
+            "fname_binning" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/tn337_binning.txt",
+            "tree_name" : "all_syst",
+            "detector": "FGD2",
+            "num_toys" : 500,
+            "num_syst" : 17,
+            "num_samples" : 10,
+            "samples" : [0,1,2,3,4,5,6],
+            "cuts" : [7,8,9,8,7,5,4,7,8,7]
+        }
+    ],
+
+    "fname_output" : "cov.root",
+    "single_syst" : false,
+    "syst_idx" : 0,
+    "var_names" : "selmu_costheta,selmu_mom",
+    "weight_cut" : 10,
+    "covariance" : true,
+    "pdf_print" : false
+}
