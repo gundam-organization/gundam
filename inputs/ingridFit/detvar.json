@@ -27,7 +27,9 @@
     "fname_output" : "cov.root",
     "single_syst" : false,
     "syst_idx" : 0,
-    "var_names" : "selmu_costheta,selmu_mom",
+    "var_names" : ["selmu_costheta", "selmu_mom"],
+    "projection" : false,
+    "plot_variable" : "selmu_mom",
     "weight_cut" : 10,
     "covariance" : true,
     "pdf_print" : false

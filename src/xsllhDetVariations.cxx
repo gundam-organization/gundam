@@ -82,7 +82,7 @@ int main(int argc, char** argv)
     json j;
     f >> j;
 
-    bool do_projection = false;
+    bool do_projection = j["projection"];
     bool do_single_variation = j["single_syst"];
     bool do_covariance = j["covariance"];
     bool do_print = j["pdf_print"];
@@ -91,11 +91,10 @@ int main(int argc, char** argv)
     double weight_cut = j["weight_cut"];
 
     std::string fname_output = j["fname_output"];
-    std::string variable_name = j["var_names"];
+    std::string variable_plot = j["plot_variable"];
+    std::vector<std::string> var_names = j["var_names"].get<std::vector<std::string>>();
 
-    unsigned int num_load_samples = 10;
     unsigned int num_use_samples = 0;
-    unsigned int num_samples = 10;
 
     std::vector<FileOptions> v_files;
     for(const auto& file : j["files"])
@@ -119,13 +118,7 @@ int main(int argc, char** argv)
     std::string fname_input = v_files[0].fname_input;
     std::string fname_binning = v_files[0].fname_binning;
     std::string tree_name = v_files[0].tree_name;
-    std::string variable_plot;
     std::string cut_samples;
-    std::vector<std::string> var_names;
-
-    std::stringstream ss_var(variable_name);
-    for(std::string s; std::getline(ss_var, s, ',');)
-        var_names.emplace_back(s);
 
     BinManager bin_manager(fname_binning);
     bin_manager.Print();
@@ -135,9 +128,13 @@ int main(int argc, char** argv)
     const int num_toys = 500;
 
     std::cout << TAG << "Output ROOT file: " << fname_output << std::endl
-              << TAG << "Name of variable(s): " << variable_name << std::endl
               << TAG << "Toy Weight Cut: " << weight_cut << std::endl
               << TAG << "Calculating Covariance: " << std::boolalpha << do_covariance << std::endl;
+
+    std::cout << TAG << "Covariance Variables: ";
+    for(const auto& var : var_names)
+        std::cout << var << " ";
+    std::cout << std::endl;
 
     int var_plot = -1;
     if(do_projection)
@@ -339,19 +336,20 @@ int main(int argc, char** argv)
             std::stringstream ss;
             ss << file.detector << "_sample" << file.samples[s];
             TCanvas c(ss.str().c_str(), ss.str().c_str(), 1200, 900);
-            //v_hists[s][0].Draw("axis");
             v_avg[s+offset].Draw("axis");
 
             for(unsigned int t = 0; t < num_toys; ++t)
             {
                 v_hists[s+offset][t].SetLineColor(kRed);
-                //v_hists[s+offset][t].Scale(1, "width");
+                if(do_projection)
+                    v_hists[s+offset][t].Scale(1, "width");
                 v_hists[s+offset][t].Draw("hist same");
             }
 
             v_avg[s+offset].SetLineColor(kBlack);
             v_avg[s+offset].SetLineWidth(2);
-            //v_avg[s+offset].Scale(1, "width");
+            if(do_projection)
+                v_avg[s+offset].Scale(1, "width");
             v_avg[s+offset].GetYaxis() -> SetRangeUser(0, v_avg[s+offset].GetMaximum()*1.50);
             v_avg[s+offset].Draw("hist same");
             c.Write(ss.str().c_str());
