@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <map>
 #include <sstream>
 #include <string>
 #include <unistd.h>
@@ -34,8 +35,8 @@ struct FileOptions
     unsigned int num_samples;
     unsigned int num_toys;
     unsigned int num_syst;
-    std::vector<int> samples;
     std::vector<int> cuts;
+    std::map<int, std::vector<int>> samples;
     BinManager bin_manager;
 };
 
@@ -99,20 +100,27 @@ int main(int argc, char** argv)
     std::vector<FileOptions> v_files;
     for(const auto& file : j["files"])
     {
-        FileOptions f;
-        f.fname_input = file["fname_input"];
-        f.fname_binning = file["fname_binning"];
-        f.tree_name = file["tree_name"];
-        f.detector = file["detector"];
-        f.num_toys = file["num_toys"];
-        f.num_syst = file["num_syst"];
-        f.num_samples = file["num_samples"];
-        f.samples = file["samples"].get<std::vector<int>>();
-        f.cuts = file["cuts"].get<std::vector<int>>();
-        f.bin_manager.SetBinning(f.fname_binning);
-        v_files.emplace_back(f);
+        if(file["use"])
+        {
+            FileOptions f;
+            f.fname_input = file["fname_input"];
+            f.fname_binning = file["fname_binning"];
+            f.tree_name = file["tree_name"];
+            f.detector = file["detector"];
+            f.num_toys = file["num_toys"];
+            f.num_syst = file["num_syst"];
+            f.num_samples = file["num_samples"];
+            f.cuts = file["cuts"].get<std::vector<int>>();
+            f.bin_manager.SetBinning(f.fname_binning);
 
-        num_use_samples += f.samples.size();
+            std::map<std::string, std::vector<int>> temp_json = file["samples"];
+            for(const auto& kv : temp_json)
+                f.samples.emplace(std::make_pair(std::stoi(kv.first), kv.second));
+
+            v_files.emplace_back(f);
+
+            num_use_samples += f.samples.size();
+        }
     }
 
     std::string fname_input = v_files[0].fname_input;
@@ -148,8 +156,9 @@ int main(int argc, char** argv)
     std::vector<TH1F> v_avg;
     for(const auto& file : v_files)
     {
-        for(const auto& sam : file.samples)
+        for(const auto& kv : file.samples)
         {
+            const int sam = kv.first;
             std::vector<TH1F> v_temp;
             for(unsigned int t = 0; t < num_toys; ++t)
             {
@@ -199,6 +208,15 @@ int main(int argc, char** argv)
                   << TAG << "Num Toys: " << file.num_toys << std::endl
                   << TAG << "Num Syst: " << file.num_syst << std::endl;
 
+        std::cout << TAG << "Branch to Sample mapping:" << std::endl;
+        for(const auto& kv : file.samples)
+        {
+            std::cout << TAG << "Sample " << kv.first << ": ";
+            for(const auto& b : kv.second)
+                std::cout << b << " ";
+            std::cout << std::endl;
+        }
+
         TFile* file_input = TFile::Open(file.fname_input.c_str(), "READ");
         TTree* tree_event = (TTree*)file_input -> Get(file.tree_name.c_str());
 
@@ -221,32 +239,35 @@ int main(int argc, char** argv)
 
             for(unsigned int t = 0; t < file.num_toys; ++t)
             {
-                for(unsigned int s = 0; s < file.samples.size(); ++s)
+                for(const auto& kv : file.samples)
                 {
-                    unsigned int si = file.samples[s];
-                    if(accum_level[t][si] > file.cuts[si])
+                    unsigned int s = kv.first;
+                    for(const auto& branch : kv.second)
                     {
-                        float idx = -1;
-                        if(do_projection)
-                            idx = hist_variables[var_plot][t];
-                        else
+                        if(accum_level[t][branch] > file.cuts[branch])
                         {
-                            std::vector<double> vars;
-                            for(unsigned int v = 0; v < nvars; ++v)
-                                vars.push_back(hist_variables[v][t]);
-                            idx = file.bin_manager.GetBinIndex(vars);
-                        }
+                            float idx = -1;
+                            if(do_projection)
+                                idx = hist_variables[var_plot][t];
+                            else
+                            {
+                                std::vector<double> vars;
+                                for(unsigned int v = 0; v < nvars; ++v)
+                                    vars.push_back(hist_variables[v][t]);
+                                idx = file.bin_manager.GetBinIndex(vars);
+                            }
 
-                        float weight = do_single_variation ? weight_syst[t][syst_idx] : weight_syst_total_noflux[t];
-                        if(weight > 0.0 && weight < weight_cut)
-                        {
-                            v_hists[s+offset][t].Fill(idx, weight);
-                            v_avg[s+offset].Fill(idx, weight / num_toys);
+                            float weight = do_single_variation ? weight_syst[t][syst_idx] : weight_syst_total_noflux[t];
+                            if(weight > 0.0 && weight < weight_cut)
+                            {
+                                v_hists[s+offset][t].Fill(idx, weight);
+                                v_avg[s+offset].Fill(idx, weight / num_toys);
+                            }
+                            else
+                                rejected_weights++;
+                            total_weights++;
+                            break;
                         }
-                        else
-                            rejected_weights++;
-                        total_weights++;
-                        break;
                     }
                 }
             }
@@ -331,10 +352,11 @@ int main(int argc, char** argv)
     gStyle -> SetOptStat(0);
     for(const auto& file : v_files)
     {
-        for(unsigned int s = 0; s < file.samples.size(); ++s)
+        for(const auto& kv : file.samples)
         {
+            unsigned int s = kv.first;
             std::stringstream ss;
-            ss << file.detector << "_sample" << file.samples[s];
+            ss << file.detector << "_sample" << s;
             TCanvas c(ss.str().c_str(), ss.str().c_str(), 1200, 900);
             v_avg[s+offset].Draw("axis");
 
