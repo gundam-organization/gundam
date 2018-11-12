@@ -71,6 +71,7 @@ int main(int argc, char** argv)
                           << "-o : Output ROOT filename\n"
                           << "-m : Covariance matrix name\n"
                           << "-b : Add value to diagonal\n"
+                          << "-r : Parameter mask\n"
                           << "-C : Calculate correlation matrix\n"
                           << "-I : Build INGRID covariance\n"
                           << "-S : Store as TMatrixT\n"

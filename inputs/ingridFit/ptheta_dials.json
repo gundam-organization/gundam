@@ -12,6 +12,26 @@
             "use" : true
         },
         {
+            "name" : "PF_C",
+            "nominal" : 217,
+            "step" : 0.05,
+            "limit_lo" : 200,
+            "limit_hi" : 300,
+            "binning" : "ptheta_splines/tn337_binning.txt",
+            "splines" : "ptheta_splines/pf_c_splines.root",
+            "use" : false
+        },
+        {
+            "name" : "PF_O",
+            "nominal" : 225,
+            "step" : 0.05,
+            "limit_lo" : 200,
+            "limit_hi" : 300,
+            "binning" : "ptheta_splines/tn337_binning.txt",
+            "splines" : "ptheta_splines/pf_o_splines.root",
+            "use" : false
+        },
+        {
             "name" : "MEC_C",
             "nominal" : 1.00,
             "step" : 0.05,
@@ -19,7 +39,7 @@
             "limit_hi" : 2.00,
             "binning" : "ptheta_splines/tn337_binning.txt",
             "splines" : "ptheta_splines/mec_c_splines.root",
-            "use" : false
+            "use" : true
         },
         {
             "name" : "MEC_O",
@@ -39,7 +59,7 @@
             "limit_hi" : 2.00,
             "binning" : "ptheta_splines/tn337_binning.txt",
             "splines" : "ptheta_splines/mec_c_shape_splines.root",
-            "use" : false
+            "use" : true
         },
         {
             "name" : "MEC_O_SHAPE",
@@ -49,26 +69,6 @@
             "limit_hi" : 2.00,
             "binning" : "ptheta_splines/tn337_binning.txt",
             "splines" : "ptheta_splines/mec_o_shape_splines.root",
-            "use" : false
-        },
-        {
-            "name" : "PF_C",
-            "nominal" : 217,
-            "step" : 0.05,
-            "limit_lo" : 200,
-            "limit_hi" : 300,
-            "binning" : "ptheta_splines/tn337_binning.txt",
-            "splines" : "ptheta_splines/pf_c_splines.root",
-            "use" : false
-        },
-        {
-            "name" : "PF_O",
-            "nominal" : 225,
-            "step" : 0.05,
-            "limit_lo" : 200,
-            "limit_hi" : 300,
-            "binning" : "ptheta_splines/tn337_binning.txt",
-            "splines" : "ptheta_splines/pf_o_splines.root",
             "use" : false
         },
         {
@@ -109,6 +109,46 @@
             "limit_hi" : 2.00,
             "binning" : "ptheta_splines/tn337_binning.txt",
             "splines" : "ptheta_splines/dis_splines.root",
+            "use" : true
+        },
+        {
+            "name" : "CC1PI_E0",
+            "nominal" : 1.00,
+            "step" : 0.05,
+            "limit_lo" : 0.00,
+            "limit_hi" : 2.00,
+            "binning" : "ptheta_splines/tn337_binning.txt",
+            "splines" : "ptheta_splines/cc1pi_e0_splines.root",
+            "use" : true
+        },
+        {
+            "name" : "CC1PI_E1",
+            "nominal" : 1.00,
+            "step" : 0.05,
+            "limit_lo" : 0.00,
+            "limit_hi" : 2.00,
+            "binning" : "ptheta_splines/tn337_binning.txt",
+            "splines" : "ptheta_splines/cc1pi_e1_splines.root",
+            "use" : true
+        },
+        {
+            "name" : "CCDIS_NORM",
+            "nominal" : 1.00,
+            "step" : 0.05,
+            "limit_lo" : 0.00,
+            "limit_hi" : 2.00,
+            "binning" : "ptheta_splines/tn337_binning.txt",
+            "splines" : "ptheta_splines/ccdis_norm_splines.root",
+            "use" : true
+        },
+        {
+            "name" : "CCMULTIPI",
+            "nominal" : 1.00,
+            "step" : 0.05,
+            "limit_lo" : 0.00,
+            "limit_hi" : 2.00,
+            "binning" : "ptheta_splines/tn337_binning.txt",
+            "splines" : "ptheta_splines/ccmultipi_splines.root",
             "use" : true
         },
         {
