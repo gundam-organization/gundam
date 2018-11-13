@@ -2,27 +2,40 @@
     "files" : [
         {
             "fname_input" : "/mnt/home/cuddandr/work/nd280Software/v12r15/highland2/numuCCZeroPiAnalysis/v2r2/Linux-x86_64/highland_systematics.root",
-            "fname_binning" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/tn337_binning.txt",
             "tree_name" : "all_syst",
             "detector": "FGD1",
             "num_toys" : 500,
             "num_syst" : 17,
             "num_samples" : 10,
             "samples" : {"0": [0], "1": [1], "2": [2], "3": [3], "4": [4], "5": [5], "6": [6]},
+            "sample_binning" : {
+                "0" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/tn337_binning.txt",
+                "1" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/tn337_binning.txt",
+                "2" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/tn337_binning.txt",
+                "3" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/tn337_binning.txt",
+                "4" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/tn337_binning.txt",
+                "5" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/tn337_binning.txt",
+                "6" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/tn337_binning.txt"
+            },
             "cuts" : [7,8,9,8,7,5,4,7,8,7],
             "use" : true
         },
         {
             "fname_input" : "/mnt/home/cuddandr/work/nd280Software/v12r15/highland2/numuCCZeroPiAnalysis/v2r2/Linux-x86_64/highland_systematics.root",
-            "fname_binning" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/tn337_binning.txt",
             "tree_name" : "all_syst",
             "detector": "FGD2",
             "num_toys" : 500,
             "num_syst" : 17,
             "num_samples" : 10,
-            "samples" : {"0": [0,1,2], "1": [5,6]},
+            "samples" : {"0": [0,1,2], "1": [3,4], "2": [5], "3": [6]},
+            "sample_binning" : {
+                "0" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/tn337_binning.txt",
+                "1" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/tn337_binning.txt",
+                "2" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/tn337_binning.txt",
+                "3" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/tn337_binning.txt"
+            },
             "cuts" : [7,8,9,8,7,5,4,7,8,7],
-            "use" : true
+            "use" : false
         }
     ],
 
@@ -32,7 +45,9 @@
     "var_names" : ["selmu_costheta", "selmu_mom"],
     "projection" : false,
     "plot_variable" : "selmu_mom",
+    "pdf_print" : false,
     "weight_cut" : 10,
     "covariance" : true,
-    "pdf_print" : false
+    "covariance_name" : "cov_mat",
+    "correlation_name": "cor_mat"
 }
