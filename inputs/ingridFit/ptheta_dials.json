@@ -1,5 +1,6 @@
 {
     "input_dir" : "/inputs/ingridFit/splines/",
+    "dimensions" : [580, 58],
     "dials" : [
         {
             "name" : "MACCQE",

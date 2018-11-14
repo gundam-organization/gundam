@@ -26,6 +26,7 @@ class AnaEvent
             m_flavor   = -1;
             m_topology = -1;
             m_reaction = -1;
+            m_target   = -1;
             m_sample   = -1;
             m_signal   = false;
             m_trueEvt  = false;
@@ -33,8 +34,8 @@ class AnaEvent
             m_recoEnu  = -999.0;
             m_trueD1   = -999.0;
             m_trueD2   = -999.0;
-            m_recD1    = -999.0;
-            m_recD2    = -999.0;
+            m_recoD1    = -999.0;
+            m_recoD2    = -999.0;
             m_wght     = 1.0;
             m_wghtMC   = 1.0;
 
@@ -55,6 +56,9 @@ class AnaEvent
 
         void SetReaction(int val){ m_reaction = val; }
         int GetReaction(){ return m_reaction; }
+
+        void SetTarget(int val){ m_target = val; }
+        int GetTarget(){ return m_target; }
 
         void SetSampleType(int val){ m_sample = val; }
         int GetSampleType(){ return m_sample; }
@@ -79,14 +83,14 @@ class AnaEvent
         void SetTrueD1(double val){ m_trueD1 = val; }
         double GetTrueD1(){ return m_trueD1; }
 
-        void SetRecD1(double val){ m_recD1 = val; }
-        double GetRecD1(){ return m_recD1; }
+        void SetRecoD1(double val){ m_recoD1 = val; }
+        double GetRecoD1(){ return m_recoD1; }
 
         void SetTrueD2(double val){ m_trueD2 = val; }
         double GetTrueD2(){ return m_trueD2; }
 
-        void SetRecD2(double val){ m_recD2 = val; }
-        double GetRecD2(){ return m_recD2; }
+        void SetRecoD2(double val){ m_recoD2 = val; }
+        double GetRecoD2(){ return m_recoD2; }
 
         void SetEvWght(double val){ m_wght  = val; }
         void SetEvWghtMC(double val){ m_wghtMC  = val; }
@@ -129,9 +133,9 @@ class AnaEvent
                       << "True energy     " << GetTrueEnu() << std::endl
                       << "Reco energy     " << GetRecoEnu() << std::endl
                       << "True D1         " << GetTrueD1() << std::endl
-                      << "Reco D1         " << GetRecD1() << std::endl
+                      << "Reco D1         " << GetRecoD1() << std::endl
                       << "True D2         " << GetTrueD2() << std::endl
-                      << "Reco D2         " << GetRecD2() << std::endl
+                      << "Reco D2         " << GetRecoD2() << std::endl
                       << "Event weight    " << GetEvWght() << std::endl
                       << "Event weight MC " << GetEvWghtMC() << std::endl
                       << "Reco proton momentum  " << GetpMomRec() << std::endl
@@ -149,6 +153,7 @@ class AnaEvent
         int m_flavor;      //flavor of neutrino (numu, etc.)
         int m_topology;    //final state topology type
         int m_reaction;    //event interaction mode
+        int m_target;      //target nuclei
         int m_sample;      //sample type (aka cutBranch)
         bool m_signal;     //flag if signal event
         bool m_trueEvt;    //flag if true event
@@ -156,8 +161,8 @@ class AnaEvent
         double m_recoEnu;  //recon nu energy
         double m_trueD1;   //true D1
         double m_trueD2;   //true D2
-        double m_recD1;    //reco D1
-        double m_recD2;    //reco D2
+        double m_recoD1;   //reco D1
+        double m_recoD2;   //reco D2
         double m_q2true;
         double m_q2reco;
         double m_wght;     //event weight

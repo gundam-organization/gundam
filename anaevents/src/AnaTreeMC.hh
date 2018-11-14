@@ -28,6 +28,7 @@ private:
     int cutBranch;
     int evtTopology;
     int evtReaction;
+    int evtTarget;
     float D1True;
     float D1Reco;
     float D2True;

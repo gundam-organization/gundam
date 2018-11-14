@@ -433,8 +433,9 @@ void XsecFitter::SaveFinalEvents(int fititer, std::vector<std::vector<double>>& 
             D2true         = ev->GetTrueD2();
             mectopology    = ev->GetTopology();
             reaction       = ev->GetReaction();
-            D1Reco         = ev->GetRecD1();
-            D2Reco         = ev->GetRecD2();
+            target         = ev->GetTarget();
+            D1Reco         = ev->GetRecoD1();
+            D2Reco         = ev->GetRecoD2();
             weightNom      = (ev->GetEvWght()) * (ev->GetEvWghtMC());
             weightMC       = ev->GetEvWghtMC();
             weight         = ev->GetEvWght() * m_potratio;

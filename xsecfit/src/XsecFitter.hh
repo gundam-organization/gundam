@@ -60,8 +60,10 @@ public:
     Int_t cutBranch;
     Float_t D1true;
     Float_t D2true;
+    Int_t nutype;
     Int_t mectopology;
     Int_t reaction;
+    Int_t target;
     Float_t D1Reco;
     Float_t D2Reco;
     Float_t weight;
@@ -81,7 +83,9 @@ public:
     void InitOutputTree()
     {
         // Set branches
+        outtree->Branch("nutype", &nutype, "nutype/I");
         outtree->Branch("reaction", &reaction, "reaction/I");
+        outtree->Branch("target", &target, "target/I");
         outtree->Branch("cutBranch", &cutBranch, "cutBranch/I");
         outtree->Branch("mectopology", &mectopology, "mectopology/I");
         outtree->Branch("D1True", &D1true, ("D1True/F"));

@@ -100,6 +100,11 @@ void XsecDial::Print(bool print_bins) const
               << TAG << "Limits: [" << m_limit_lo << "," << m_limit_hi << "]" << std::endl
               << TAG << "Splines: " << v_splines.size() << std::endl;
 
+    std::cout << TAG << "Dimensions:";
+    for(const auto& dim : m_dimensions)
+        std::cout << " " << dim;
+    std::cout << std::endl;
+
     if(print_bins)
         bin_manager.Print();
 }

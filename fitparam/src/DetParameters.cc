@@ -77,8 +77,8 @@ void DetParameters::InitEventMap(std::vector<AnaSample*>& sample, int mode)
         for(int i = 0; i < sample[s]->GetN(); ++i)
         {
             AnaEvent* ev = sample[s]->GetEvent(i);
-            double D1 = ev->GetRecD1();
-            double D2 = ev->GetRecD2();
+            double D1 = ev->GetRecoD1();
+            double D2 = ev->GetRecoD2();
             int bin   = GetBinIndex(sample[s]->GetSampleID(), D1, D2);
 #ifndef NDEBUG
             if(bin == BADBIN)

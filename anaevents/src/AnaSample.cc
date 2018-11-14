@@ -181,8 +181,8 @@ void AnaSample::FillEventHist(int datatype, bool stat_fluc)
 
     for(std::size_t i = 0; i < m_events.size(); ++i)
     {
-        double D1_rec  = m_events[i].GetRecD1();
-        double D2_rec  = m_events[i].GetRecD2();
+        double D1_rec  = m_events[i].GetRecoD1();
+        double D2_rec  = m_events[i].GetRecoD2();
         double D1_true = m_events[i].GetTrueD1();
         double D2_true = m_events[i].GetTrueD2();
         double wght    = datatype >= 0 ? m_events[i].GetEvWght() : m_events[i].GetEvWghtMC();
@@ -386,8 +386,8 @@ void AnaSample::GetSampleBreakdown(TDirectory* dirout, const std::string& tag,
     int Ntot = GetN();
     for(std::size_t i = 0; i < m_events.size(); ++i)
     {
-        double D1_rec    = m_events[i].GetRecD1();
-        double D2_rec    = m_events[i].GetRecD2();
+        double D1_rec    = m_events[i].GetRecoD1();
+        double D2_rec    = m_events[i].GetRecoD2();
         double D1_true   = m_events[i].GetTrueD1();
         double D2_true   = m_events[i].GetTrueD2();
         double wght      = m_events[i].GetEvWght();
