@@ -1,23 +1,76 @@
 {
-    "ND280" : {
-        "fname" : "/mnt/home/cuddandr/work/nd280Software/v12r15/highland2/numuCCZeroPiAnalysis/v2r2/Linux-x86_64/highland_systematics.root",
-        "seltree" : "default",
-        "truetree" : "truth",
-        "nsamples" : 10,
-        "cut_level" : [7,8,9,8,7,5,4,7,8,7]
-    },
-
-    "INGRID" : {
-        "fname" : "/mnt/home/cuddandr/work/ingrid/selection_studies/datamc_neut5d3d2_20170529.root",
-        "seltree" : "tree",
-        "truetree" : "tree",
-        "nsamples" : 1,
-        "cut_level" : []
-    },
-
     "output" : {
         "fname" : "test.root",
-        "seltree" : "selectedEvents",
-        "truetree" : "trueEvents"
-    }
+        "sel_tree" : "selectedEvents",
+        "tru_tree" : "trueEvents"
+    },
+
+    "highland_files" : [
+        {
+            "fname" : "/mnt/home/cuddandr/work/nd280Software/v12r15/highland2/numuCCZeroPiAnalysis/v2r2/Linux-x86_64/highland_systematics.root",
+            "file_id" : 0,
+            "sel_tree" : "default",
+            "tru_tree" : "truth",
+            "num_branches" : 10,
+            "cut_level" : [7,8,9,8,7,5,4,7,8,7],
+            "samples" : {"0": [0], "1": [1], "2": [2], "3": [3], "4": [4], "5": [5], "6": [6], "7": [7], "8": [8], "9": [9]},
+            "use" : true,
+            "sel_var" : {
+                "reaction" : "reaction",
+                "topology" : "mectopology",
+                "target"   : "target",
+                "nutype"   : "nutype",
+                "enu_true" : "nu_trueE",
+                "enu_reco" : "selmu_nuErecQE",
+                "weight"   : "weight_syst_total",
+                "D1True"   : "truelepton_mom",
+                "D1Reco"   : "selmu_mom",
+                "D2True"   : "truelepton_costheta",
+                "D2Reco"   : "selmu_costheta"
+            },
+            "tru_var" : {
+                "reaction" : "reaction",
+                "topology" : "mectopology",
+                "target"   : "target",
+                "nutype"   : "nutype",
+                "enu_true" : "nu_trueE",
+                "weight"   : "weight",
+                "D1True"   : "truelepton_mom",
+                "D2True"   : "truelepton_costheta"
+            }
+        },
+        {
+            "fname" : "/mnt/home/cuddandr/work/nd280Software/v12r15/highland2/numuCCZeroPiAnalysis/v2r2/Linux-x86_64/highland_fgd2_syst.root",
+            "file_id" : 1,
+            "sel_tree" : "default",
+            "tru_tree" : "truth",
+            "num_branches" : 10,
+            "cut_level" : [7,8,9,8,7,5,4,7,8,7],
+            "samples" : {"10": [0], "11": [1], "12": [2], "13": [3], "14": [4], "15": [5], "16": [6], "17": [7], "18": [8], "19": [9]},
+            "use" : false,
+            "sel_var" : {
+                "reaction" : "reaction",
+                "topology" : "mectopology",
+                "target"   : "target",
+                "nutype"   : "nutype",
+                "enu_true" : "nu_trueE",
+                "enu_reco" : "selmu_nuErecQE",
+                "weight"   : "weight_syst_total",
+                "D1True"   : "truelepton_mom",
+                "D1Reco"   : "selmu_mom",
+                "D2True"   : "truelepton_costheta",
+                "D2Reco"   : "selmu_costheta"
+            },
+            "tru_var" : {
+                "reaction" : "reaction",
+                "topology" : "mectopology",
+                "target"   : "target",
+                "nutype"   : "nutype",
+                "enu_true" : "nu_trueE",
+                "weight"   : "weight",
+                "D1True"   : "truelepton_mom",
+                "D2True"   : "truelepton_costheta"
+            }
+        }
+    ]
 }

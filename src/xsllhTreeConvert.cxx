@@ -3,6 +3,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <map>
 #include <sstream>
 #include <string>
 #include <unistd.h>
@@ -18,6 +19,38 @@ using json = nlohmann::json;
 
 #include "ColorOutput.hh"
 #include "ProgressBar.hh"
+
+struct HL2TreeVar
+{
+    std::string reaction;
+    std::string topology;
+    std::string target;
+    std::string nutype;
+    std::string enu_true;
+    std::string enu_reco;
+    std::string weight;
+    std::string D1True;
+    std::string D1Reco;
+    std::string D2True;
+    std::string D2Reco;
+};
+
+struct HL2FileOpt
+{
+    std::string fname_input;
+    std::string sel_tree;
+    std::string tru_tree;
+    unsigned int file_id;
+    unsigned int num_branches;
+    std::vector<int> cuts;
+    std::map<int, std::vector<int>> samples;
+
+    HL2TreeVar sel_var;
+    HL2TreeVar tru_var;
+};
+
+template <typename T>
+HL2TreeVar ParseHL2Var(T json_obj, bool flag);
 
 int main(int argc, char** argv)
 {
@@ -64,45 +97,24 @@ int main(int argc, char** argv)
     json j;
     f >> j;
 
-    std::string nd2_fname = j["INGRID"]["fname"];
-    std::string nd2_seltree_name = j["INGRID"]["seltree"];
-    std::string nd2_trutree_name = j["INGRID"]["truetree"];
-    std::string nd5_fname = j["ND280"]["fname"];
-    std::string nd5_seltree_name = j["ND280"]["seltree"];
-    std::string nd5_trutree_name = j["ND280"]["truetree"];
+    std::cout << TAG << "Reading configuration options..." << std::endl;
     std::string out_fname = j["output"]["fname"];
-    std::string out_seltree_name = j["output"]["seltree"];
-    std::string out_trutree_name = j["output"]["truetree"];
+    std::string out_seltree_name = j["output"]["sel_tree"];
+    std::string out_trutree_name = j["output"]["tru_tree"];
 
-    const int nd5_samples = j["ND280"]["nsamples"];
-    std::vector<int> cut_level = j["ND280"]["cut_level"].get<std::vector<int>>();
-
-    std::cout << TAG << "ND2 File: " << nd2_fname << std::endl
-              << TAG << "ND2 Selection Tree: " << nd2_seltree_name << std::endl
-              << TAG << "ND2 Truth Tree    : " << nd2_trutree_name << std::endl;
-    std::cout << TAG << "ND5 File: " << nd5_fname << std::endl
-              << TAG << "ND5 Selection Tree: " << nd5_seltree_name << std::endl
-              << TAG << "ND5 Truth Tree    : " << nd5_trutree_name << std::endl;
     std::cout << TAG << "Out File: " << out_fname << std::endl
               << TAG << "Out Selection Tree: " << out_seltree_name << std::endl
               << TAG << "Out Truth Tree    : " << out_trutree_name << std::endl;
-
-    TFile* nd2_file = TFile::Open(nd2_fname.c_str(), "READ");
-    TTree* nd2_seltree = (TTree*)nd2_file -> Get(nd2_seltree_name.c_str());
-    TTree* nd2_trutree = (TTree*)nd2_file -> Get(nd2_trutree_name.c_str());
-
-    TFile* nd5_file = TFile::Open(nd5_fname.c_str(), "READ");
-    TTree* nd5_seltree = (TTree*)nd5_file -> Get(nd5_seltree_name.c_str());
-    TTree* nd5_trutree = (TTree*)nd5_file -> Get(nd5_trutree_name.c_str());
 
     TFile* out_file = TFile::Open(out_fname.c_str(), "RECREATE");
     TTree* out_seltree = new TTree(out_seltree_name.c_str(), out_seltree_name.c_str());
     TTree* out_trutree = new TTree(out_trutree_name.c_str(), out_trutree_name.c_str());
 
-    int accum_level[1][nd5_samples];
+    const float mu_mass = 105.658374;
     int nutype, nutype_true;
     int reaction, reaction_true;
     int topology, topology_true;
+    int target, target_true;
     int cut_branch;
     float enu_true, enu_reco;
     float q2_true, q2_reco;
@@ -110,35 +122,10 @@ int main(int argc, char** argv)
     float D2True, D2Reco;
     float weight, weight_true;
 
-    const float mu_mass = 105.658374;
-
-    float selmu_mom, selmu_cos;
-    float selmu_mom_range;
-    float selp_mom, selp_cos;
-    float selp_mom_range;
-    float selmu_mom_true, selmu_cos_true;
-    float selp_mom_true, selp_cos_true;
-
-    nd5_seltree -> SetBranchAddress("accum_level", &accum_level);
-    nd5_seltree -> SetBranchAddress("nutype", &nutype);
-    nd5_seltree -> SetBranchAddress("reaction", &reaction);
-    nd5_seltree -> SetBranchAddress("mectopology", &topology);
-    nd5_seltree -> SetBranchAddress("selp_mom", &selp_mom);
-    nd5_seltree -> SetBranchAddress("selp_costheta", &selp_cos);
-    nd5_seltree -> SetBranchAddress("selp_mom_range_oarecon", &selp_mom_range);
-    nd5_seltree -> SetBranchAddress("truep_truemom", &selp_mom_true);
-    nd5_seltree -> SetBranchAddress("truep_truecostheta", &selp_cos_true);
-    nd5_seltree -> SetBranchAddress("selmu_mom", &selmu_mom);
-    nd5_seltree -> SetBranchAddress("selmu_costheta", &selmu_cos);
-    nd5_seltree -> SetBranchAddress("selmu_mom_range_oarecon", &selmu_mom_range);
-    nd5_seltree -> SetBranchAddress("truelepton_mom", &selmu_mom_true);
-    nd5_seltree -> SetBranchAddress("truelepton_costheta", &selmu_cos_true);
-    nd5_seltree -> SetBranchAddress("nu_trueE", &enu_true);
-    nd5_seltree -> SetBranchAddress("weight_syst_total", &weight);
-
     out_seltree -> Branch("nutype", &nutype, "nutype/I");
     out_seltree -> Branch("reaction", &reaction, "reaction/I");
     out_seltree -> Branch("topology", &topology, "topology/I");
+    out_seltree -> Branch("target", &target, "target/I");
     out_seltree -> Branch("cut_branch", &cut_branch, "cut_branch/I");
     out_seltree -> Branch("enu_true", &enu_true, "enu_true/F");
     out_seltree -> Branch("enu_reco", &enu_reco, "enu_reco/F");
@@ -150,19 +137,10 @@ int main(int argc, char** argv)
     out_seltree -> Branch("D2Reco", &D2Reco, "D2Reco/F");
     out_seltree -> Branch("weight", &weight, "weight/F");
 
-    nd5_trutree -> SetBranchAddress("nutype", &nutype_true);
-    nd5_trutree -> SetBranchAddress("reaction", &reaction_true);
-    nd5_trutree -> SetBranchAddress("mectopology", &topology_true);
-    nd5_trutree -> SetBranchAddress("truehm_proton_truemom", &selp_mom_true);
-    nd5_trutree -> SetBranchAddress("truehm_proton_truecth", &selp_cos_true);
-    nd5_trutree -> SetBranchAddress("truelepton_mom", &selmu_mom_true);
-    nd5_trutree -> SetBranchAddress("truelepton_costheta", &selmu_cos_true);
-    nd5_trutree -> SetBranchAddress("nu_trueE", &enu_true);
-    nd5_trutree -> SetBranchAddress("weight", &weight_true);
-
     out_trutree -> Branch("nutype", &nutype_true, "nutype/I");
     out_trutree -> Branch("reaction", &reaction_true, "reaction/I");
     out_trutree -> Branch("topology", &topology_true, "topology/I");
+    out_trutree -> Branch("target", &target_true, "target/I");
     out_trutree -> Branch("cut_branch", &cut_branch, "cut_branch/I");
     out_trutree -> Branch("enu_true", &enu_true, "enu_true/F");
     out_trutree -> Branch("q2_true", &q2_true, "q2_true/F");
@@ -170,195 +148,172 @@ int main(int argc, char** argv)
     out_trutree -> Branch("D2True", &D2True, "D2True/F");
     out_trutree -> Branch("weight", &weight_true, "weight/F");
 
-    long int nevents = nd5_seltree -> GetEntries();
-    for(int i = 0; i < nevents; ++i)
+    std::vector<HL2FileOpt> v_files;
+    for(const auto& file : j["highland_files"])
     {
-        nd5_seltree -> GetEntry(i);
-
-        bool event_passed = false;
-        int branches_passed = 0;
-        for(int s = 0; s < nd5_samples; ++s)
+        if(file["use"])
         {
-            if(accum_level[0][s] > cut_level[s])
+            HL2FileOpt f;
+            f.fname_input = file["fname"];
+            f.sel_tree = file["sel_tree"];
+            f.tru_tree = file["tru_tree"];
+            f.file_id = file["file_id"];
+            f.num_branches = file["num_branches"];
+            f.cuts = file["cut_level"].get<std::vector<int>>();
+
+            std::map<std::string, std::vector<int>> temp_json = file["samples"];
+            for(const auto& kv : temp_json)
+                f.samples.emplace(std::make_pair(std::stoi(kv.first), kv.second));
+
+            f.sel_var = ParseHL2Var(file["sel_var"], true);
+            f.tru_var = ParseHL2Var(file["tru_var"], false);
+
+            v_files.emplace_back(f);
+        }
+    }
+
+    for(const auto& file : v_files)
+    {
+        std::cout << TAG << "Reading file: " << file.fname_input << std::endl
+                  << TAG << "File ID: " << file.file_id << std::endl
+                  << TAG << "Selected tree: " << file.sel_tree << std::endl
+                  << TAG << "Truth tree: " << file.tru_tree << std::endl
+                  << TAG << "Num. Branches: " << file.num_branches << std::endl;
+
+        std::cout << TAG << "Branch to Sample mapping:" << std::endl;
+        for(const auto& kv : file.samples)
+        {
+            std::cout << TAG << "Sample " << kv.first << ": ";
+            for(const auto& b : kv.second)
+                std::cout << b << " ";
+            std::cout << std::endl;
+        }
+
+        TFile* hl2_file = TFile::Open(file.fname_input.c_str(), "READ");
+        TTree* hl2_seltree = (TTree*)hl2_file -> Get(file.sel_tree.c_str());
+        TTree* hl2_trutree = (TTree*)hl2_file -> Get(file.tru_tree.c_str());
+
+        int accum_level[1][file.num_branches];
+
+        hl2_seltree -> SetBranchAddress("accum_level", &accum_level);
+        hl2_seltree -> SetBranchAddress(file.sel_var.nutype.c_str(), &nutype);
+        hl2_seltree -> SetBranchAddress(file.sel_var.reaction.c_str(), &reaction);
+        hl2_seltree -> SetBranchAddress(file.sel_var.topology.c_str(), &topology);
+        hl2_seltree -> SetBranchAddress(file.sel_var.target.c_str(), &target);
+        hl2_seltree -> SetBranchAddress(file.sel_var.D1Reco.c_str(), &D1Reco);
+        hl2_seltree -> SetBranchAddress(file.sel_var.D2Reco.c_str(), &D2Reco);
+        hl2_seltree -> SetBranchAddress(file.sel_var.D1True.c_str(), &D1True);
+        hl2_seltree -> SetBranchAddress(file.sel_var.D2True.c_str(), &D2True);
+        hl2_seltree -> SetBranchAddress(file.sel_var.enu_true.c_str(), &enu_true);
+        hl2_seltree -> SetBranchAddress(file.sel_var.enu_reco.c_str(), &enu_reco);
+        hl2_seltree -> SetBranchAddress(file.sel_var.weight.c_str(), &weight);
+
+        long int npassed = 0;
+        long int nevents = hl2_seltree -> GetEntries();
+        std::cout << TAG << "Reading selected events tree." << std::endl
+                  << TAG << "Num. events: " << nevents << std::endl;
+
+        for(int i = 0; i < nevents; ++i)
+        {
+            hl2_seltree -> GetEntry(i);
+
+            bool event_passed = false;
+            for(const auto& kv : file.samples)
             {
-                cut_branch = s;
-                event_passed = true;
-                branches_passed++;
+                for(const auto& branch : kv.second)
+                {
+                    if(accum_level[0][branch] > file.cuts[branch])
+                    {
+                        cut_branch = kv.first;
+                        event_passed = true;
+                        npassed++;
+                        break;
+                    }
+                }
             }
-        }
-        enu_reco = enu_true;
-        double emu_true = std::sqrt(selmu_mom_true * selmu_mom_true + mu_mass * mu_mass);
-        q2_true = 2.0 * enu_true * (emu_true - selmu_mom_true * selmu_cos_true)
-                         - mu_mass * mu_mass;
 
-        double emu_reco = std::sqrt(selmu_mom * selmu_mom + mu_mass * mu_mass);
-        q2_reco = 2.0 * enu_reco * (emu_reco - selmu_mom * selmu_cos)
-                         - mu_mass * mu_mass;
-        /*
-        if(cut_branch == 3)
+            float selmu_mom = D1Reco;
+            float selmu_cos = D2Reco;
+            float selmu_mom_true = D1True;
+            float selmu_cos_true = D2True;
+
+            double emu_true = std::sqrt(selmu_mom_true * selmu_mom_true + mu_mass * mu_mass);
+            q2_true = 2.0 * enu_true * (emu_true - selmu_mom_true * selmu_cos_true)
+                - mu_mass * mu_mass;
+
+            double emu_reco = std::sqrt(selmu_mom * selmu_mom + mu_mass * mu_mass);
+            q2_reco = 2.0 * enu_reco * (emu_reco - selmu_mom * selmu_cos)
+                - mu_mass * mu_mass;
+
+            if(event_passed)
+                out_seltree -> Fill();
+
+            if(i % 2000 == 0 || i == (nevents-1))
+                pbar.Print(i, nevents-1);
+        }
+        std::cout << TAG << "Selected events passing cuts: " << npassed << std::endl;
+
+        hl2_trutree -> SetBranchAddress(file.tru_var.nutype.c_str(), &nutype_true);
+        hl2_trutree -> SetBranchAddress(file.tru_var.reaction.c_str(), &reaction_true);
+        hl2_trutree -> SetBranchAddress(file.tru_var.topology.c_str(), &topology_true);
+        hl2_trutree -> SetBranchAddress(file.tru_var.target.c_str(), &target_true);
+        hl2_trutree -> SetBranchAddress(file.tru_var.D1True.c_str(), &D1True);
+        hl2_trutree -> SetBranchAddress(file.tru_var.D2True.c_str(), &D2True);
+        hl2_trutree -> SetBranchAddress(file.tru_var.enu_true.c_str(), &enu_true);
+        hl2_trutree -> SetBranchAddress(file.tru_var.weight.c_str(), &weight_true);
+
+        nevents = hl2_trutree -> GetEntries();
+        std::cout << TAG << "Reading truth events tree." << std::endl
+                  << TAG << "Num. events: " << nevents << std::endl;
+        for(int i = 0; i < nevents; ++i)
         {
-            D1True = selmu_mom_true;
-            D1Reco = selmu_mom_range;
-            D2True = selmu_cos_true;
-            D2Reco = selmu_cos;
+            hl2_trutree -> GetEntry(i);
+            cut_branch = -1;
+
+            float selmu_mom_true = D1True;
+            float selmu_cos_true = D2True;
+
+            double emu_true = std::sqrt(selmu_mom_true * selmu_mom_true + mu_mass * mu_mass);
+            q2_true = 2.0 * enu_true * (emu_true - selmu_mom_true * selmu_cos_true)
+                - mu_mass * mu_mass;
+
+            out_trutree -> Fill();
+
+            if(i % 2000 == 0 || i == (nevents-1))
+                pbar.Print(i, nevents-1);
         }
-        else
-        {
-            D1True = selmu_mom_true;
-            D1Reco = selmu_mom;
-            D2True = selmu_cos_true;
-            D2Reco = selmu_cos;
-        }
-        */
-            D1True = selmu_mom_true;
-            D1Reco = selmu_mom;
-            D2True = selmu_cos_true;
-            D2Reco = selmu_cos;
 
-        if(event_passed && branches_passed == 1)
-            out_seltree -> Fill();
-
-        if(i % 2000 == 0 || i == (nevents-1))
-            pbar.Print(i, nevents-1);
-    }
-
-    nevents = nd5_trutree -> GetEntries();
-    for(int i = 0; i < nevents; ++i)
-    {
-        nd5_trutree -> GetEntry(i);
-        cut_branch = -1;
-
-        double emu_true = std::sqrt(selmu_mom_true * selmu_mom_true + mu_mass * mu_mass);
-        q2_true = 2.0 * enu_true * (emu_true - selmu_mom_true * selmu_cos_true)
-                         - mu_mass * mu_mass;
-
-        D1True = selmu_mom_true;
-        D2True = selmu_cos_true;
-
-        out_trutree -> Fill();
-
-        if(i % 2000 == 0 || i == (nevents-1))
-            pbar.Print(i, nevents-1);
-    }
-
-    float muang, pang;
-    float nuE, range;
-    float opening;
-    int file_index, inttype;
-    int mupdg, ppdg;
-    int npioncount;
-    int nprotoncount;
-
-    nd2_seltree->SetBranchAddress("muang", &muang);
-    nd2_seltree->SetBranchAddress("pang", &pang);
-    nd2_seltree->SetBranchAddress("opening", &opening);
-    nd2_seltree->SetBranchAddress("nuE", &nuE);
-    nd2_seltree->SetBranchAddress("fileIndex", &file_index);
-    nd2_seltree->SetBranchAddress("inttype", &inttype);
-    nd2_seltree->SetBranchAddress("mupdg", &mupdg);
-    nd2_seltree->SetBranchAddress("ppdg", &ppdg);
-    nd2_seltree->SetBranchAddress("range", &range);
-    nd2_seltree->SetBranchAddress("npioncount", &npioncount);
-    nd2_seltree->SetBranchAddress("nprotoncount", &nprotoncount);
-
-    TRandom3 rng;
-
-    //nevents = nd2_seltree -> GetEntries();
-    int sevents = 2000000;
-    nevents = 2030000;
-
-    for(int i = sevents; i < nevents; ++i)
-    {
-        nd2_seltree -> GetEntry(i);
-        if(i % 2000 == 0 || i == (nevents-1))
-            pbar.Print(i, nevents-1);
-
-        if(file_index != 1)
-            continue;
-
-        enu_reco = nuE * 1000;
-        enu_true = nuE * 1000;
-        nutype = 14;
-        nutype_true = 14;
-        cut_branch = 10;
-        weight = 1.0;
-
-        if(inttype == 1)
-            reaction = 0;
-        else if(inttype == 2)
-            reaction = 9;
-        else if(inttype == 11 || inttype == 12 || inttype == 13)
-            reaction = 1;
-        else if(inttype == 21 || inttype == 26)
-            reaction = 2;
-        else if(inttype == 16)
-            reaction = 3;
-        else if(inttype > 30 && inttype < 47)
-            reaction = 4;
-        else if(inttype < 0)
-            reaction = 5;
-        else
-            reaction = -1;
-
-        if(file_index == 1 && npioncount == 0 && mupdg == 13 && ppdg == 2212 && nprotoncount == 1)
-        {
-            topology = 1;
-            weight = 1.0;
-        }
-        else if(file_index == 1 && npioncount == 0 && mupdg == 13 && ppdg == 2212 && nprotoncount > 1)
-        {
-            topology = 2;
-            weight = 1.0;
-        }
-        else if(file_index == 1 && npioncount == 1 && mupdg == 13 && ppdg == 211 && nprotoncount == 0)
-            topology = 3;
-        else
-            continue;
-
-        double muang_true = TMath::DegToRad() * muang;
-        double pang_true = TMath::DegToRad() * pang;
-        double muang_reco = muang_true * rng.Gaus(1, 0.1);
-        double pang_reco = pang_true * rng.Gaus(1, 0.1);
-
-        selmu_cos = TMath::Cos(muang_reco);
-        selmu_cos_true = TMath::Cos(muang_true);
-
-        selp_cos = TMath::Cos(pang_reco);
-        selp_cos_true = TMath::Cos(pang_true);
-
-        selmu_mom_true = (range * 0.0114127 + 0.230608) * 1000.0;
-        selmu_mom = ((range * rng.Gaus(1, 0.1)) * 0.0114127 + 0.230608) * 1000.0;
-
-        double emu_true = std::sqrt(selmu_mom_true * selmu_mom_true + mu_mass * mu_mass);
-        q2_true = 2.0 * enu_true * (emu_true - selmu_mom_true * selmu_cos_true)
-                         - mu_mass * mu_mass;
-
-        double emu_reco = std::sqrt(selmu_mom * selmu_mom + mu_mass * mu_mass);
-        q2_reco = 2.0 * enu_reco * (emu_reco - selmu_mom * selmu_cos)
-                         - mu_mass * mu_mass;
-
-        D1True = selmu_mom_true;
-        D1Reco = selmu_mom;
-        D2True = selmu_cos_true;
-        D2Reco = selmu_cos;
-
-        out_seltree -> Fill();
-
-        cut_branch = -2;
-        reaction_true = reaction;
-        topology_true = topology;
-        nutype_true = nutype;
-        weight_true = weight;
-
-        out_trutree -> Fill();
+        hl2_file -> Close();
     }
 
     out_file -> cd();
     out_file -> Write();
-
-    nd2_file -> Close();
-    nd5_file -> Close();
     out_file -> Close();
+    std::cout << TAG << "Finished." << std::endl;
 
     return 0;
+}
+
+template <typename T>
+HL2TreeVar ParseHL2Var(T j, bool reco_info)
+{
+    HL2TreeVar v;
+    v.reaction = j["reaction"];
+    v.topology = j["topology"];
+    v.target   = j["target"];
+    v.nutype   = j["nutype"];
+    v.enu_true = j["enu_true"];
+    v.weight = j["weight"];
+
+    v.D1True = j["D1True"];
+    v.D2True = j["D2True"];
+
+    if(reco_info)
+    {
+        v.enu_reco = j["enu_reco"];
+        v.D1Reco = j["D1Reco"];
+        v.D2Reco = j["D2Reco"];
+    }
+
+    return v;
 }
