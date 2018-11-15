@@ -25,29 +25,19 @@ private:
 
     // Declaration of leaf types
     int nutype;
-    int cutBranch;
-    int evtTopology;
-    int evtReaction;
-    int evtTarget;
+    int sample;
+    int topology;
+    int reaction;
+    int target;
     float D1True;
     float D1Reco;
     float D2True;
     float D2Reco;
-    float Q2True;
-    float Q2Reco;
-    float EnuTrue;
-    float EnuReco;
+    float q2_true;
+    float q2_reco;
+    float enu_true;
+    float enu_reco;
     float weight;
-
-    // New kinematic variables always included for phase space cuts
-    float pMomRec;
-    float pMomTrue;
-    float muMomRec;
-    float muMomTrue;
-    float muCosThetaRec;
-    float muCosThetaTrue;
-    float pCosThetaRec;
-    float pCosThetaTrue;
 
     bool read_extra_var;
     const std::string TAG = color::GREEN_STR + "[AnaTreeMC]: " + color::RESET_STR;
@@ -55,6 +45,7 @@ private:
 public:
     AnaTreeMC(const std::string& file_name, const std::string& tree_name, bool extra_var = false);
     ~AnaTreeMC();
+
     long int GetEntry(long int entry) const;
     void SetBranches();
     void GetEvents(std::vector<AnaSample*>& ana_samples, const std::vector<int>& sig_topology,

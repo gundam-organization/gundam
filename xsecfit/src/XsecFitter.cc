@@ -428,25 +428,18 @@ void XsecFitter::SaveFinalEvents(int fititer, std::vector<std::vector<double>>& 
                 m_fitpara[j]->ReWeight(ev, det, s, i, res_params[j]);
             }
 
-            cutBranch      = ev->GetSampleType();
-            D1true         = ev->GetTrueD1();
-            D2true         = ev->GetTrueD2();
-            mectopology    = ev->GetTopology();
-            reaction       = ev->GetReaction();
-            target         = ev->GetTarget();
-            D1Reco         = ev->GetRecoD1();
-            D2Reco         = ev->GetRecoD2();
-            weightNom      = (ev->GetEvWght()) * (ev->GetEvWghtMC());
-            weightMC       = ev->GetEvWghtMC();
-            weight         = ev->GetEvWght() * m_potratio;
-            pMomRec        = ev->GetpMomRec();
-            pMomTrue       = ev->GetpMomTrue();
-            muMomRec       = ev->GetmuMomRec();
-            muMomTrue      = ev->GetmuMomTrue();
-            muCosThetaRec  = ev->GetmuCosThetaRec();
-            muCosThetaTrue = ev->GetmuCosThetaTrue();
-            pCosThetaRec   = ev->GetpCosThetaRec();
-            pCosThetaTrue  = ev->GetpCosThetaTrue();
+            sample    = ev->GetSampleType();
+            D1true    = ev->GetTrueD1();
+            D2true    = ev->GetTrueD2();
+            topology  = ev->GetTopology();
+            reaction  = ev->GetReaction();
+            target    = ev->GetTarget();
+            nutype    = ev->GetFlavor();
+            D1Reco    = ev->GetRecoD1();
+            D2Reco    = ev->GetRecoD2();
+            weightNom = (ev->GetEvWght()) * (ev->GetEvWghtMC());
+            weightMC  = ev->GetEvWghtMC();
+            weight    = ev->GetEvWght() * m_potratio;
             outtree->Fill();
         }
     }
@@ -551,5 +544,5 @@ void XsecFitter::SaveResults(const std::vector<std::vector<double>>& par_results
     }
 
     for(std::size_t s = 0; s < m_samples.size(); s++)
-        m_samples[s]->GetSampleBreakdown(m_dir, "fit", topology, false);
+        m_samples[s]->GetSampleBreakdown(m_dir, "fit", v_topology, false);
 }

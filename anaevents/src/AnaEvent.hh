@@ -1,13 +1,3 @@
-//////////////////////////////////////////////////////////
-//
-//  A container with subset of necessary event
-//  information for CCQE analysis
-//
-//
-//  Created: Thu Jun  6 11:28:13 CEST 2013
-//  Modified:
-//
-//////////////////////////////////////////////////////////
 #ifndef __AnaEvent_hh__
 #define __AnaEvent_hh__
 
@@ -20,7 +10,7 @@
 class AnaEvent
 {
     public:
-        AnaEvent(long int evid) //unique event id
+        AnaEvent(long int evid)
         {
             m_evid     = evid;
             m_flavor   = -1;
@@ -29,25 +19,17 @@ class AnaEvent
             m_target   = -1;
             m_sample   = -1;
             m_signal   = false;
-            m_trueEvt  = false;
-            m_trueEnu  = -999.0;
-            m_recoEnu  = -999.0;
+            m_true_evt = false;
+            m_enu_true = -999.0;
+            m_enu_reco = -999.0;
             m_trueD1   = -999.0;
             m_trueD2   = -999.0;
-            m_recoD1    = -999.0;
-            m_recoD2    = -999.0;
+            m_recoD1   = -999.0;
+            m_recoD2   = -999.0;
+            m_q2_true  = -999.0;
+            m_q2_reco  = -999.0;
             m_wght     = 1.0;
             m_wghtMC   = 1.0;
-
-            // New kinematic variables always included for phase space cuts
-            m_pMomRec = -999.0;
-            m_pMomTrue = -999.0;
-            m_muMomRec = -999.0;
-            m_muMomTrue = -999.0;
-            m_muCosThetaRec = -999.0;
-            m_muCosThetaTrue = -999.0;
-            m_pCosThetaRec = -999.0;
-            m_pCosThetaTrue = -999.0;
         }
 
         //Set/Get methods
@@ -66,19 +48,19 @@ class AnaEvent
         void SetSignalEvent(const bool flag = true){ m_signal = flag; }
         bool isSignalEvent(){ return m_signal; }
 
-        void SetTrueEvent(const bool flag = true){ m_trueEvt = flag; }
-        bool isTrueEvent(){ return m_trueEvt; }
+        void SetTrueEvent(const bool flag = true){ m_true_evt = flag; }
+        bool isTrueEvent(){ return m_true_evt; }
 
         void SetFlavor(const int flavor){ m_flavor = flavor; }
         int GetFlavor(){ return m_flavor; }
 
         long int GetEvId(){ return m_evid; }
 
-        void SetTrueEnu(double val) {m_trueEnu = val;}
-        double GetTrueEnu(){ return m_trueEnu; }
+        void SetTrueEnu(double val) {m_enu_true = val;}
+        double GetTrueEnu(){ return m_enu_true; }
 
-        void SetRecoEnu(double val){ m_recoEnu = val; }
-        double GetRecoEnu(){ return m_recoEnu; }
+        void SetRecoEnu(double val){ m_enu_reco = val; }
+        double GetRecoEnu(){ return m_enu_reco; }
 
         void SetTrueD1(double val){ m_trueD1 = val; }
         double GetTrueD1(){ return m_trueD1; }
@@ -99,53 +81,29 @@ class AnaEvent
         double GetEvWghtMC(){ return m_wghtMC; }
 
         void ResetEvWght(){ m_wght = m_wghtMC; }
-        // New kinematic variables always included for phase space cuts
 
-        void SetQ2Reco(double val){m_q2reco = val;}
-        double GetQ2Reco() const { return m_q2reco; }
+        void SetQ2Reco(double val){m_q2_reco = val;}
+        double GetQ2Reco() const { return m_q2_reco; }
 
-        void SetQ2True(double val){m_q2true = val;}
-        double GetQ2True() const { return m_q2true; }
-
-        void SetpMomRec(double val){ m_pMomRec = val; }
-        void SetpMomTrue(double val){ m_pMomTrue = val; }
-        void SetmuMomRec(double val){ m_muMomRec = val; }
-        void SetmuMomTrue(double val){ m_muMomTrue = val; }
-        void SetmuCosThetaRec(double val){ m_muCosThetaRec = val; }
-        void SetmuCosThetaTrue(double val){ m_muCosThetaTrue = val; }
-        void SetpCosThetaRec(double val){ m_pCosThetaRec = val; }
-        void SetpCosThetaTrue(double val){ m_pCosThetaTrue = val; }
-
-        double GetpMomRec(){ return m_pMomRec; }
-        double GetpMomTrue(){ return m_pMomTrue; }
-        double GetmuMomRec(){ return m_muMomRec; }
-        double GetmuMomTrue(){ return m_muMomTrue; }
-        double GetmuCosThetaRec(){ return m_muCosThetaRec; }
-        double GetmuCosThetaTrue(){ return m_muCosThetaTrue; }
-        double GetpCosThetaRec(){ return m_pCosThetaRec; }
-        double GetpCosThetaTrue(){ return m_pCosThetaTrue; }
+        void SetQ2True(double val){m_q2_true = val;}
+        double GetQ2True() const { return m_q2_true; }
 
         void Print()
         {
-            std::cout << "Event ID        " << m_evid << std::endl
-                      << "Topology        " << GetTopology() << std::endl
-                      << "Sample          " << GetSampleType() << std::endl
-                      << "True energy     " << GetTrueEnu() << std::endl
-                      << "Reco energy     " << GetRecoEnu() << std::endl
-                      << "True D1         " << GetTrueD1() << std::endl
-                      << "Reco D1         " << GetRecoD1() << std::endl
-                      << "True D2         " << GetTrueD2() << std::endl
-                      << "Reco D2         " << GetRecoD2() << std::endl
-                      << "Event weight    " << GetEvWght() << std::endl
-                      << "Event weight MC " << GetEvWghtMC() << std::endl
-                      << "Reco proton momentum  " << GetpMomRec() << std::endl
-                      << "True proton momentum  " << GetpMomTrue() << std::endl
-                      << "Reco muon momentum    " << GetmuMomRec() << std::endl
-                      << "True muon momentum    " << GetmuMomTrue() << std::endl
-                      << "Reco muon cos theta   " << GetmuCosThetaRec() << std::endl
-                      << "True muon cos theta   " << GetmuCosThetaTrue() << std::endl
-                      << "Reco Proton Cos Theta " << GetpCosThetaRec() << std::endl
-                      << "True Proton Cos Theta " << GetpCosThetaTrue() << std::endl;
+            std::cout << "Event ID    " << m_evid << std::endl
+                      << "Topology    " << GetTopology() << std::endl
+                      << "Reaction    " << GetReaction() << std::endl
+                      << "Target      " << GetTarget() << std::endl
+                      << "Flavor      " << GetFlavor() << std::endl
+                      << "Sample      " << GetSampleType() << std::endl
+                      << "True energy " << GetTrueEnu() << std::endl
+                      << "Reco energy " << GetRecoEnu() << std::endl
+                      << "True D1     " << GetTrueD1() << std::endl
+                      << "Reco D1     " << GetRecoD1() << std::endl
+                      << "True D2     " << GetTrueD2() << std::endl
+                      << "Reco D2     " << GetRecoD2() << std::endl
+                      << "Weight      " << GetEvWght() << std::endl
+                      << "Weight MC   " << GetEvWghtMC() << std::endl;
         }
 
     private:
@@ -156,27 +114,17 @@ class AnaEvent
         int m_target;      //target nuclei
         int m_sample;      //sample type (aka cutBranch)
         bool m_signal;     //flag if signal event
-        bool m_trueEvt;    //flag if true event
-        double m_trueEnu;  //true nu energy
-        double m_recoEnu;  //recon nu energy
+        bool m_true_evt;   //flag if true event
+        double m_enu_true; //true nu energy
+        double m_enu_reco; //recon nu energy
         double m_trueD1;   //true D1
         double m_trueD2;   //true D2
         double m_recoD1;   //reco D1
         double m_recoD2;   //reco D2
-        double m_q2true;
-        double m_q2reco;
+        double m_q2_true;
+        double m_q2_reco;
         double m_wght;     //event weight
         double m_wghtMC;   //event weight from original MC
-
-        // New kinematic variables always included for phase space cuts
-        double m_muMomRec;
-        double m_muMomTrue;
-        double m_muCosThetaRec;
-        double m_muCosThetaTrue;
-        double m_pMomRec;
-        double m_pMomTrue;
-        double m_pCosThetaRec;
-        double m_pCosThetaTrue;
 };
 
 #endif

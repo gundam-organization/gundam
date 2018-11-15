@@ -45,7 +45,7 @@ public:
 
     void SetSeed(int seed);
     void SetZeroSyst(bool flag) { m_zerosyst = flag; }
-    void SetTopology(const std::vector<std::string> v_topology) { topology = v_topology; }
+    void SetTopology(const std::vector<std::string> vec_top) { v_topology = vec_top; }
     void SetNumThreads(const unsigned int num) { m_threads = num; }
     void SetSaveFreq(int freq, bool flag = true)
     {
@@ -57,11 +57,11 @@ public:
     TTree* outtree;
 
     // Declaration of leaf types
-    Int_t cutBranch;
+    Int_t sample;
     Float_t D1true;
     Float_t D2true;
     Int_t nutype;
-    Int_t mectopology;
+    Int_t topology;
     Int_t reaction;
     Int_t target;
     Float_t D1Reco;
@@ -70,40 +70,21 @@ public:
     Float_t weightNom;
     Float_t weightMC;
 
-    // New kinematic variables always included for phase space cuts
-    Float_t pMomRec;
-    Float_t pMomTrue;
-    Float_t muMomRec;
-    Float_t muMomTrue;
-    Float_t muCosThetaRec;
-    Float_t muCosThetaTrue;
-    Float_t pCosThetaRec;
-    Float_t pCosThetaTrue;
-
     void InitOutputTree()
     {
         // Set branches
         outtree->Branch("nutype", &nutype, "nutype/I");
         outtree->Branch("reaction", &reaction, "reaction/I");
         outtree->Branch("target", &target, "target/I");
-        outtree->Branch("cutBranch", &cutBranch, "cutBranch/I");
-        outtree->Branch("mectopology", &mectopology, "mectopology/I");
+        outtree->Branch("sample", &sample, "cutBranch/I");
+        outtree->Branch("topology", &topology, "topology/I");
         outtree->Branch("D1True", &D1true, ("D1True/F"));
-        outtree->Branch("D1Rec", &D1Reco, ("D1Rec/F"));
+        outtree->Branch("D1Reco", &D1Reco, ("D1Rec/F"));
         outtree->Branch("D2True", &D2true, ("D2True/F"));
-        outtree->Branch("D2Rec", &D2Reco, ("D2Rec/F"));
+        outtree->Branch("D2Reco", &D2Reco, ("D2Rec/F"));
         outtree->Branch("weight", &weight, "weight/F");
         outtree->Branch("weightNom", &weightNom, "weightNom/F");
         outtree->Branch("weightMC", &weightMC, "weightMC/F");
-
-        outtree->Branch("muMomRec", &muMomRec, ("muMomRec/F"));
-        outtree->Branch("muMomTrue", &muMomTrue, ("muMomTrue/F"));
-        outtree->Branch("muCosThetaRec", &muCosThetaRec, ("muCosThetaRec/F"));
-        outtree->Branch("muCosThetaTrue", &muCosThetaTrue, ("muCosThetaTrue/F"));
-        outtree->Branch("pMomRec", &pMomRec, ("pMomRec/F"));
-        outtree->Branch("pMomTrue", &pMomTrue, ("pMomTrue/F"));
-        outtree->Branch("pCosThetaRec", &pCosThetaRec, ("pCosThetaRec/F"));
-        outtree->Branch("pCosThetaTrue", &pCosThetaTrue, ("pCosThetaTrue/F"));
     }
 
 private:
@@ -127,7 +108,7 @@ private:
     int m_threads;
     int m_npar, m_calls, m_freq;
     std::string paramVectorFileName;
-    std::vector<std::string> topology;
+    std::vector<std::string> v_topology;
     std::vector<std::string> par_names;
     std::vector<double> par_prefit;
     std::vector<double> vec_chi2_stat;
