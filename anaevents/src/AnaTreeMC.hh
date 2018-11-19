@@ -17,6 +17,7 @@
 #include "AnaSample.hh"
 #include "ColorOutput.hh"
 #include "ProgressBar.hh"
+#include "OptParser.hh"
 
 class AnaTreeMC
 {
@@ -49,6 +50,8 @@ public:
     long int GetEntry(long int entry) const;
     void SetBranches();
     void GetEvents(std::vector<AnaSample*>& ana_samples, const std::vector<int>& sig_topology,
+                   const bool evt_type);
+    void GetEvents(std::vector<AnaSample*>& ana_samples, const std::vector<SignalDef>& v_signal,
                    const bool evt_type);
 };
 

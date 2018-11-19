@@ -82,6 +82,23 @@ bool OptParser::ParseJSON(std::string json_file)
         d.ntargets_err = detector["ntargets_err"];
         d.use_detector = detector["use_detector"];
         detectors.push_back(d);
+
+        if(d.use_detector == true)
+        {
+            for(const auto& t : detector["template_par"])
+            {
+                SignalDef sd;
+                sd.name = t["name"];
+                sd.detector = d.name;
+                sd.binning = input_dir + t["binning"].get<std::string>();
+                sd.use_signal = t["use"];
+                sd.definition = t["signal"].get<std::map<std::string, std::vector<int>>>();
+
+                if(sd.use_signal)
+                    signal_definition.push_back(sd);
+            }
+        }
+
     }
 
     for(const auto& sample : j["samples"])

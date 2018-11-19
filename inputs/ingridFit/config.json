@@ -5,7 +5,7 @@
     "xsec_file" : "xsec.root",
     "input_dir" : "/inputs/ingridFit/",
     "fit_type"  : 0,
-    "stat_fluc" : false,
+    "stat_fluc" : true,
     "zero_syst" : false,
     "data_POT"  : 1.0,
     "mc_POT"    : 1.0,
@@ -28,7 +28,7 @@
         "binning" : "det_binning",
         "throw"  : false,
         "decomp" : true,
-        "variance" : 0.99
+        "variance" : 0.98
     },
     "xsec_cov" : {
         "file" : "xsec_cov_nd280.root",
@@ -53,6 +53,22 @@
             "binning" : "tn337_binning.txt",
             "ntargets_val" : 5.9E29,
             "ntargets_err" : 0.0067,
+            "template_par" : [
+                {
+                    "name" : "CC0pi_C",
+                    "binning" : "tn337_binning.txt",
+                    "signal" : {"topology" : [0,1,2],
+                                "target" : [6]},
+                    "use" : true
+                },
+                {
+                    "name" : "CC0pi_O",
+                    "binning" : "tn337_binning.txt",
+                    "signal" : {"topology" : [0,1,2],
+                                "target" : [8]},
+                    "use" : false
+                }
+            ],
             "use_detector" : true
         },
         {
@@ -61,10 +77,18 @@
             "flux_hist" : "",
             "flux_integral" : 6.5E12,
             "flux_error" : 0.099,
-            "xsec_config" : "q2_dials.json",
+            "xsec_config" : "ptheta_dials.json",
             "binning" : "ingrid_binning.txt",
             "ntargets_val" : 1.756E29,
             "ntargets_err" : 0.011,
+            "template_par" : [
+                {
+                    "name" : "CC0pi",
+                    "binning" : "tn337_binning.txt",
+                    "signal" : {"topology" : [0,1,2]},
+                    "use" : true
+                }
+            ],
             "use_detector" : false
         }
     ],

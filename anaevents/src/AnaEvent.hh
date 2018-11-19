@@ -19,6 +19,7 @@ class AnaEvent
             m_target   = -1;
             m_sample   = -1;
             m_signal   = false;
+            m_sig_type = -1;
             m_true_evt = false;
             m_enu_true = -999.0;
             m_enu_reco = -999.0;
@@ -47,6 +48,9 @@ class AnaEvent
 
         void SetSignalEvent(const bool flag = true){ m_signal = flag; }
         bool isSignalEvent(){ return m_signal; }
+
+        void SetSignalType(int val){ m_sig_type = val; }
+        int GetSignalType(){ return m_sig_type; }
 
         void SetTrueEvent(const bool flag = true){ m_true_evt = flag; }
         bool isTrueEvent(){ return m_true_evt; }
@@ -96,6 +100,7 @@ class AnaEvent
                       << "Target      " << GetTarget() << std::endl
                       << "Flavor      " << GetFlavor() << std::endl
                       << "Sample      " << GetSampleType() << std::endl
+                      << "Signal      " << GetSignalType() << std::endl
                       << "True energy " << GetTrueEnu() << std::endl
                       << "Reco energy " << GetRecoEnu() << std::endl
                       << "True D1     " << GetTrueD1() << std::endl
@@ -106,6 +111,24 @@ class AnaEvent
                       << "Weight MC   " << GetEvWghtMC() << std::endl;
         }
 
+        int GetEventVar(const std::string& var) const
+        {
+            if(var == "topology")
+                return m_topology;
+            else if(var == "reaction")
+                return m_reaction;
+            else if(var == "target")
+                return m_target;
+            else if(var == "flavor")
+                return m_flavor;
+            else if(var == "sample")
+                return m_sample;
+            else if(var == "signal")
+                return m_sig_type;
+            else
+                return -1;
+        }
+
     private:
         long int m_evid;   //unique event id
         int m_flavor;      //flavor of neutrino (numu, etc.)
@@ -113,6 +136,7 @@ class AnaEvent
         int m_reaction;    //event interaction mode
         int m_target;      //target nuclei
         int m_sample;      //sample type (aka cutBranch)
+        int m_sig_type;
         bool m_signal;     //flag if signal event
         bool m_true_evt;   //flag if true event
         double m_enu_true; //true nu energy

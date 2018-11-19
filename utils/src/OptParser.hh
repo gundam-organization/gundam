@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -20,6 +21,15 @@ struct SampleOpt
     std::string name;
     std::string detector;
     std::string binning;
+};
+
+struct SignalDef
+{
+    bool use_signal;
+    std::string name;
+    std::string detector;
+    std::string binning;
+    std::map<std::string, std::vector<int>> definition;
 };
 
 struct CovOpt
@@ -79,6 +89,7 @@ class OptParser
 
         std::vector<int> sample_signal;
         std::vector<std::string> sample_topology;
+        std::vector<SignalDef> signal_definition;
 
         CovOpt flux_cov;
         CovOpt det_cov;

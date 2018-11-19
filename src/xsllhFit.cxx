@@ -139,7 +139,7 @@ int main(int argc, char** argv)
     //read MC events
     AnaTreeMC selTree(fname_mc.c_str(), "selectedEvents");
     std::cout << TAG << "Reading and collecting events." << std::endl;
-    selTree.GetEvents(samples, signal_topology, false);
+    selTree.GetEvents(samples, parser.signal_definition, false);
 
     std::cout << TAG << "Getting sample breakdown by reaction." << std::endl;
     for(auto& sample : samples)
@@ -161,7 +161,8 @@ int main(int argc, char** argv)
     for(const auto& opt : parser.detectors)
     {
         if(opt.use_detector)
-            sigfitpara.AddDetector(opt.name, opt.binning);
+            sigfitpara.AddDetector(opt.name, parser.signal_definition);
+            //sigfitpara.AddDetector(opt.name, opt.binning);
     }
     sigfitpara.InitEventMap(samples, 0);
     fitpara.push_back(&sigfitpara);

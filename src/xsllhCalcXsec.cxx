@@ -195,7 +195,7 @@ int main(int argc, char** argv)
 
     std::cout << TAG << "Reading and collecting events." << std::endl;
     AnaTreeMC selTree(fname_mc.c_str(), "selectedEvents");
-    selTree.GetEvents(samples, signal_topology, false);
+    selTree.GetEvents(samples, parser.signal_definition, false);
 
     //AnaTreeMC truTree(fname_mc.c_str(), "trueEvents");
     //truTree.GetEvents(samples, signal_topology, true);

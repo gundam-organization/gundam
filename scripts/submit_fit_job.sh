@@ -17,8 +17,8 @@ fi
 THREADS=$(grep -i "num_threads" ${1} | sed 's/[^0-9]*//g')
 CONFIG=$(basename ${1})
 
-sed -i "/#SBATCH --cpus-per-task/c\#SBATCH --cpus-per-task=${THREADS}" fit_job.sb
-sed -i "/xsllhFit -j/c\xsllhFit -j ${CONFIG} &> fit_output.log" fit_job.sb
+sed -i "/#SBATCH --cpus-per-task/c\#SBATCH --cpus-per-task=${THREADS}" ${FITROOT}/scripts/fit_job.sb
+sed -i "/xsllhFit -j/c\xsllhFit -j ${CONFIG} &> fit_output.log" ${FITROOT}/scripts/fit_job.sb
 
 echo "Config File: ${1}"
 echo "Threads: ${THREADS}"

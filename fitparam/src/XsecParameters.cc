@@ -159,6 +159,8 @@ void XsecParameters::AddDetector(const std::string& det, const std::string& conf
     std::cout << TAG << "Adding the following dials." << std::endl;
 
     std::vector<int> dimensions = {};
+    dimensions = j["dimensions"].get<std::vector<int>>();
+
     std::vector<XsecDial> v_dials;
     for(const auto& dial : j["dials"])
     {
@@ -167,6 +169,7 @@ void XsecParameters::AddDetector(const std::string& det, const std::string& conf
             std::string fname_binning = input_dir + dial["binning"].get<std::string>();
             std::string fname_splines = input_dir + dial["splines"].get<std::string>();
 
+            /*
             try
             {
                 if(!dial["dimensions"].is_null())
@@ -182,6 +185,7 @@ void XsecParameters::AddDetector(const std::string& det, const std::string& conf
                 if(dimensions.empty())
                     std::cout << ERR << "No spline dimensions for " << dial["name"] << std::endl;
             }
+            */
 
             XsecDial x(dial["name"], fname_binning, fname_splines);
             x.SetVars(dial["nominal"], dial["step"], dial["limit_lo"], dial["limit_hi"]);

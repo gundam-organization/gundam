@@ -51,7 +51,7 @@ void AnaTreeMC::SetBranches()
 }
 
 void AnaTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples,
-                          const std::vector<int>& sig_topology, const bool evt_type)
+                          const std::vector<SignalDef>& v_signal, const bool evt_type)
 {
     if(fChain == nullptr || ana_samples.empty())
         return;
@@ -90,13 +90,27 @@ void AnaTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples,
             //Put extra variables here.
         }
 
-        for(const auto& signal_topology : sig_topology)
+        int signal_type = 0;
+        for(const auto& sd : v_signal)
         {
-            if(signal_topology == topology)
+            bool sig_passed = true;
+            for(const auto& kv : sd.definition)
             {
+                bool var_passed = false;
+                for(const auto& val : kv.second)
+                {
+                    if(ev.GetEventVar(kv.first) == val)
+                        var_passed = true;
+                }
+                sig_passed = sig_passed && var_passed;
+            }
+            if(sig_passed)
+            {
+                ev.SetSignalType(signal_type);
                 ev.SetSignalEvent();
                 break;
             }
+            signal_type++;
         }
 
         for(auto& s : ana_samples)
