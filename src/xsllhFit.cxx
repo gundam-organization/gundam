@@ -69,8 +69,6 @@ int main(int argc, char** argv)
     std::string fname_data = parser.fname_data;
     std::string fname_mc   = parser.fname_mc;
     std::string fname_output = parser.fname_output;
-
-    std::vector<int> signal_topology = parser.sample_signal;
     std::vector<std::string> topology = parser.sample_topology;
 
     const double potD  = parser.data_POT;

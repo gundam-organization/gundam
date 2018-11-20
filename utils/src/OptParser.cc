@@ -41,8 +41,7 @@ bool OptParser::ParseJSON(std::string json_file)
     num_threads = j["num_threads"];
     num_throws = j["num_throws"];
 
-    sample_signal = j["sample_signal"].get<std::vector<int> >();
-    sample_topology = j["sample_topology"].get<std::vector<std::string> >();
+    sample_topology = j["sample_topology"].get<std::vector<std::string>>();
 
     flux_cov.fname = input_dir + j["flux_cov"]["file"].get<std::string>();
     flux_cov.matrix = j["flux_cov"]["matrix"];

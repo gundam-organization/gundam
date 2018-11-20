@@ -4,9 +4,12 @@
 #include <algorithm>
 #include <iostream>
 #include <iterator>
-#include <omp.h>
 #include <sstream>
 #include <string>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 #include <TFile.h>
 #include <TGraph.h>

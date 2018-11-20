@@ -87,7 +87,6 @@ class OptParser
         double reg_strength;
         std::string reg_method;
 
-        std::vector<int> sample_signal;
         std::vector<std::string> sample_topology;
         std::vector<SignalDef> signal_definition;
 

@@ -7,7 +7,6 @@
 #include <iomanip>
 #include <iostream>
 #include <map>
-#include <omp.h>
 #include <sstream>
 #include <string>
 #include <unistd.h>
@@ -63,6 +62,9 @@ int main(int argc, char** argv)
               << TAG << "Welcome to the Super-xsLLhFitter.\n"
               << TAG << "Initializing the fit machinery..." << std::endl;
 
+    std::cout << ERR << "This code doesn't work as is. It will be rewritten." << std::endl;
+    return 0;
+
     const std::string xslf_env = std::getenv("XSLLHFITTER");
     if(xslf_env.empty())
     {
@@ -103,7 +105,7 @@ int main(int argc, char** argv)
     std::string fname_xsec = parser.fname_xsec;
     std::string paramVectorFname = "fitresults.root";
 
-    std::vector<int> signal_topology = parser.sample_signal;
+    std::vector<int> signal_topology = {0,1,2};
     std::vector<std::string> topology = parser.sample_topology;
 
     const double potD  = parser.data_POT;

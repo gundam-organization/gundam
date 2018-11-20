@@ -5,14 +5,13 @@
     "xsec_file" : "xsec.root",
     "input_dir" : "/inputs/ingridFit/",
     "fit_type"  : 0,
-    "stat_fluc" : true,
+    "stat_fluc" : false,
     "zero_syst" : false,
     "data_POT"  : 1.0,
     "mc_POT"    : 1.0,
     "rng_seed"  : 12257,
     "num_threads" : 8,
     "num_throws"  : 1E4,
-    "sample_signal" : [0,1,2],
     "sample_topology" : ["cc0pi0p", "cc0pi1p", "cc0pinp", "cc1pi+", "ccother", "bkg", "null", "OOFV"],
     "flux_cov" : {
         "file" : "flux_numu_cov_nd280.root",
@@ -28,7 +27,7 @@
         "binning" : "det_binning",
         "throw"  : false,
         "decomp" : true,
-        "variance" : 0.98
+        "variance" : 0.99
     },
     "xsec_cov" : {
         "file" : "xsec_cov_nd280.root",
@@ -55,17 +54,15 @@
             "ntargets_err" : 0.0067,
             "template_par" : [
                 {
-                    "name" : "CC0pi_C",
+                    "name" : "CC0pi",
                     "binning" : "tn337_binning.txt",
-                    "signal" : {"topology" : [0,1,2],
-                                "target" : [6]},
+                    "signal" : {"topology" : [0,1,2]},
                     "use" : true
                 },
                 {
-                    "name" : "CC0pi_O",
+                    "name" : "CC1pi",
                     "binning" : "tn337_binning.txt",
-                    "signal" : {"topology" : [0,1,2],
-                                "target" : [8]},
+                    "signal" : {"topology" : [3]},
                     "use" : false
                 }
             ],
