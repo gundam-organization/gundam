@@ -512,6 +512,8 @@ void XsecFitter::SaveResults(const std::vector<std::vector<double>>& par_results
         std::vector<double> par_original;
         m_fitpara[i]->GetParOriginal(par_original);
 
+        TMatrixDSym* cov_mat = m_fitpara[i]->GetOriginalCovMat();
+
         std::stringstream ss;
 
         ss << "hist_" << name << "_result";
@@ -522,8 +524,12 @@ void XsecFitter::SaveResults(const std::vector<std::vector<double>>& par_results
         TH1D h_par_prior(ss.str().c_str(), ss.str().c_str(), npar, 0, npar);
 
         ss.str("");
-        ss << "hist_" << name << "_error";
-        TH1D h_err(ss.str().c_str(), ss.str().c_str(), npar, 0, npar);
+        ss << "hist_" << name << "_error_final";
+        TH1D h_err_final(ss.str().c_str(), ss.str().c_str(), npar, 0, npar);
+
+        ss.str("");
+        ss << "hist_" << name << "_error_prior";
+        TH1D h_err_prior(ss.str().c_str(), ss.str().c_str(), npar, 0, npar);
 
         std::vector<std::string> vec_names;
         m_fitpara[i]->GetParNames(vec_names);
@@ -533,16 +539,21 @@ void XsecFitter::SaveResults(const std::vector<std::vector<double>>& par_results
             h_par_final.SetBinContent(j + 1, par_results[i][j]);
             h_par_prior.GetXaxis()->SetBinLabel(j + 1, vec_names[j].c_str());
             h_par_prior.SetBinContent(j + 1, par_original[j]);
-            h_err.GetXaxis()->SetBinLabel(j + 1, vec_names[j].c_str());
-            h_err.SetBinContent(j + 1, par_errors[i][j]);
+            h_err_final.GetXaxis()->SetBinLabel(j + 1, vec_names[j].c_str());
+            h_err_final.SetBinContent(j + 1, par_errors[i][j]);
+
+            double err_prior = 0.0;
+            if(cov_mat != nullptr)
+                err_prior = TMath::Sqrt((*cov_mat)(j,j));
+
+            h_err_prior.GetXaxis()->SetBinLabel(j + 1, vec_names[j].c_str());
+            h_err_prior.SetBinContent(j + 1, err_prior);
         }
 
         m_dir->cd();
         h_par_final.Write();
         h_par_prior.Write();
-        h_err.Write();
+        h_err_final.Write();
+        h_err_prior.Write();
     }
-
-    for(std::size_t s = 0; s < m_samples.size(); s++)
-        m_samples[s]->GetSampleBreakdown(m_dir, "fit", v_topology, false);
 }

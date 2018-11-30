@@ -5,7 +5,7 @@
     "xsec_file" : "xsec.root",
     "input_dir" : "/inputs/ingridFit/",
     "fit_type"  : 0,
-    "stat_fluc" : false,
+    "stat_fluc" : true,
     "zero_syst" : false,
     "data_POT"  : 1.0,
     "mc_POT"    : 1.0,
@@ -16,7 +16,7 @@
     "flux_cov" : {
         "file" : "flux_numu_cov_nd280.root",
         "matrix" : "flux_numu_cov",
-        "binning" : "flux_binning",
+        "binning" : "hist_bins",
         "throw"  : false,
         "decomp" : true,
         "variance" : 1.00

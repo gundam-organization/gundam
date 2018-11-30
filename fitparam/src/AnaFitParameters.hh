@@ -52,6 +52,7 @@ public:
     void SetCovarianceMatrix(const TMatrixDSym& covmat, bool decompose = false);
     std::string GetName() const { return m_name; }
     TMatrixDSym* GetCovMat() const { return covariance; }
+    TMatrixDSym* GetOriginalCovMat() const { return original_cov; }
     TMatrixDSym GetOriginalCovMat(const TMatrixDSym& cov, unsigned int start_idx) const
     {
         return eigen_decomp->GetOriginalCovMat(cov, start_idx);
