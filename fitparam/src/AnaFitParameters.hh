@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include <TDecompLU.h>
 #include <TMatrixTSym.h>
 using TMatrixDSym = TMatrixTSym<double>;
 
@@ -31,12 +32,8 @@ public:
     AnaFitParameters();
     virtual ~AnaFitParameters();
 
-    // pure virtual functions
-    // InitEventMap -- defines a mapping between events
-    // and some unique id (e.g., bin number in True Enu)
     virtual void InitParameters()                                        = 0;
     virtual void InitEventMap(std::vector<AnaSample*>& sample, int mode) = 0;
-    // ReWeights a single event based on m_evmap obtained in InitEventMap
     virtual void ReWeight(AnaEvent* event, const std::string& det, int nsample, int nevent,
                           std::vector<double>& params)
         = 0;
@@ -106,13 +103,12 @@ protected:
     std::string m_name;
     std::vector<std::string> pars_name;
     std::vector<double> pars_original;
-    std::vector<double> pars_prior; // prior values of param
+    std::vector<double> pars_prior;
     std::vector<double> pars_step;
     std::vector<double> pars_limlow;
     std::vector<double> pars_limhigh;
     std::vector<bool> pars_fixed;
 
-    // map for events in each sample
     std::vector<std::vector<int>> m_evmap;
     bool m_rng_priors;
     bool m_do_throw;

@@ -36,6 +36,8 @@ void AnaFitParameters::SetCovarianceMatrix(const TMatrixDSym& covmat, bool decom
         delete covarianceI;
     if(original_cov != nullptr)
         delete original_cov;
+    if(eigen_decomp != nullptr)
+        delete eigen_decomp;
 
     if(decompose)
     {
@@ -53,18 +55,22 @@ void AnaFitParameters::SetCovarianceMatrix(const TMatrixDSym& covmat, bool decom
     }
 
     double det = 0;
-    covarianceI->SetTol(1e-200);
-    covarianceI->Invert(&det);
-    /*
-    if(abs(det) < 1e-200)
+    TDecompLU inv_test;
+    TMatrixD inv_matrix(*covariance);
+    if(inv_test.InvertLU(inv_matrix, 1E-48, &det))
+    {
+        covarianceI->SetMatrixArray(inv_matrix.GetMatrixArray());
+        std::cout << TAG << "Covariance matrix inverted successfully." << std::endl;
+    }
+    else
     {
         std::cerr << ERR << "In AnaFitParameters::SetCovarianceMatrix():\n"
                   << ERR << "Covariance matrix is non invertable. Determinant is " << det
                   << std::endl;
         return;
     }
-    */
-    std::cout << "[SetCovarianceMatrix]: Covariance matrix size: " << covariance->GetNrows()
+
+    std::cout << TAG << "Covariance matrix size: " << covariance->GetNrows()
               << " x " << covariance->GetNrows() << " for " << this->m_name << std::endl;
     /*
     std::cout << "[SetCovarianceMatrix]: Inverted Cov mat: " << std::endl;
