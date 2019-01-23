@@ -121,6 +121,7 @@ set(MODULES
   fitparam
   xsecfit
   utils
+  errprop
   )
 set(MODULETargets "")
 foreach(mod ${MODULES})

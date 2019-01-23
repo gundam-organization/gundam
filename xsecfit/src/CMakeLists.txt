@@ -1,9 +1,6 @@
 set(SRCFILES XsecFitter.cc)
 set(HEADERS XsecFitter.hh)
 
-#ROOT_GENERATE_DICTIONARY(${CMAKE_CURRENT_BINARY_DIR}/XSecFitterDict XsecFitter.hh
-#  LINKDEF LinkDef.h)
-
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)
   add_library(xsecfit STATIC ${SRCFILES})
 else(CMAKE_BUILD_TYPE MATCHES RELEASE)
