@@ -53,6 +53,7 @@ int main(int argc, char** argv)
 
     std::cout << TAG << "Constructing the extractor..." << std::endl;
     XsecCalc xsec(json_file);
+    xsec.ReweightNominal();
 
     TH1D sel_signal = xsec.GetSelSignal(0);
     TH1D tru_signal = xsec.GetTruSignal(0);

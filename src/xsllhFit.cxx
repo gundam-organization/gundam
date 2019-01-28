@@ -119,7 +119,7 @@ int main(int argc, char** argv)
 
     for(const auto& opt : parser.samples)
     {
-        if(opt.use_sample == true)
+        if(opt.use_sample == true && opt.cut_branch >= 0)
         {
             std::cout << TAG << "Adding new sample to fit.\n"
                       << TAG << "Name: " << opt.name << std::endl
@@ -129,7 +129,7 @@ int main(int argc, char** argv)
 
             auto s = new AnaSample(opt.cut_branch, opt.name, opt.detector, opt.binning, tdata);
             s -> SetNorm(potD/potMC);
-            if(opt.cut_branch >= 0)
+            //if(opt.cut_branch >= 0)
                 samples.push_back(s);
         }
     }

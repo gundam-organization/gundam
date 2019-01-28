@@ -33,6 +33,8 @@ class FitObj
         void InitSignalHist(const std::vector<SignalDef>& v_signal);
         void ReweightEvents(const std::vector<double>& parameters);
 
+        void ReweightNominal();
+
         std::vector<TH1D> GetSignalHist() {return signal_hist;};
         TH1D GetSignalHist(const int signal_id) {return signal_hist.at(signal_id);}
 
@@ -44,6 +46,7 @@ class FitObj
         std::vector<BinManager> signal_bins;
 
         int m_threads;
+        std::string m_tree_type;
 
         const std::string TAG = color::GREEN_STR + "[FitObj]: " + color::RESET_STR;
         const std::string ERR = color::RED_STR + "[ERROR]: " + color::RESET_STR;

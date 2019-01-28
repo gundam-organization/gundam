@@ -5,6 +5,8 @@ FitParameters::FitParameters(const std::string& par_name, bool random_priors)
 {
     m_name = par_name;
     m_rng_priors = random_priors;
+
+    signal_id = 0;
 }
 
 FitParameters::~FitParameters()
@@ -223,7 +225,7 @@ void FitParameters::AddDetector(const std::string& det, const std::vector<Signal
 {
     std::cout << TAG << "Adding detector " << det << " for " << m_name << std::endl;
 
-    static int signal_id = 0;
+    //static int signal_id = 0;
     for(const auto& sig : v_input)
     {
         if(sig.detector != det || sig.use_signal == false)

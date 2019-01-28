@@ -5,7 +5,7 @@
     "xsec_file" : "xsec.root",
     "input_dir" : "/inputs/ingridFit/",
     "fit_type"  : 0,
-    "stat_fluc" : true,
+    "stat_fluc" : false,
     "zero_syst" : false,
     "data_POT"  : 1.0,
     "mc_POT"    : 1.0,
@@ -19,7 +19,7 @@
         "binning" : "hist_bins",
         "throw"  : false,
         "decomp" : true,
-        "variance" : 1.00
+        "variance" : 0.99
     },
     "det_cov" : {
         "file" : "allbin_allsyst_allsam.root",
@@ -27,7 +27,7 @@
         "binning" : "det_binning",
         "throw"  : false,
         "decomp" : true,
-        "variance" : 0.99
+        "variance" : 0.98
     },
     "xsec_cov" : {
         "file" : "xsec_cov_nd280.root",
@@ -63,7 +63,7 @@
                     "name" : "CC1pi",
                     "binning" : "tn337_binning.txt",
                     "signal" : {"topology" : [3]},
-                    "use" : false
+                    "use" : true
                 }
             ],
             "use_detector" : true
@@ -90,6 +90,13 @@
         }
     ],
     "samples" : [
+        {
+            "cut_branch" : -1,
+            "name" : "truth",
+            "detector" : "ND280",
+            "binning" : "tn337_binning.txt",
+            "use_sample" : true
+        },
         {
             "cut_branch" : 0,
             "name" : "muTPC",

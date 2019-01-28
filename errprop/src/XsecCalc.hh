@@ -23,6 +23,8 @@ class XsecCalc
         XsecCalc(const std::string& json_config);
         ~XsecCalc();
 
+        void ReweightNominal();
+
         void GenerateToys();
         void GenerateToys(const int ntoys);
 

@@ -9,6 +9,7 @@ FitObj::FitObj(const std::string& json_config, const std::string& event_tree_nam
         return;
     }
     parser.PrintOptions();
+    m_tree_type = is_true_tree ? "true" : "selected";
 
     std::string input_dir = parser.input_dir;
     std::string fname_data = parser.fname_data;
@@ -35,11 +36,14 @@ FitObj::FitObj(const std::string& json_config, const std::string& event_tree_nam
                       << TAG << "Name: " << opt.name << std::endl
                       << TAG << "CutB: " << opt.cut_branch << std::endl
                       << TAG << "Detector: " << opt.detector << std::endl
+                      << TAG << "True tree: " << std::boolalpha << is_true_tree << std::endl
                       << TAG << "Use Sample: " << std::boolalpha << opt.use_sample << std::endl;
 
             auto s = new AnaSample(opt.cut_branch, opt.name, opt.detector, opt.binning, tdata);
             s -> SetNorm(potD/potMC);
-            if(opt.cut_branch >= 0)
+            if(opt.cut_branch >= 0 && !is_true_tree)
+                samples.push_back(s);
+            else if(opt.cut_branch < 0 && is_true_tree)
                 samples.push_back(s);
         }
     }
@@ -91,14 +95,17 @@ FitObj::FitObj(const std::string& json_config, const std::string& event_tree_nam
     fit_par.push_back(xsecpara);
 
     //DetParameters detpara("par_det");
-    DetParameters* detpara = new DetParameters("par_det");
-    for(const auto& opt : parser.detectors)
+    if(!is_true_tree)
     {
-        if(opt.use_detector)
-            detpara->AddDetector(opt.name, samples, true);
+        DetParameters* detpara = new DetParameters("par_det");
+        for(const auto& opt : parser.detectors)
+        {
+            if(opt.use_detector)
+                detpara->AddDetector(opt.name, samples, true);
+        }
+        detpara->InitEventMap(samples, 0);
+        fit_par.push_back(detpara);
     }
-    detpara->InitEventMap(samples, 0);
-    fit_par.push_back(detpara);
 
     InitSignalHist(parser.signal_definition);
     std::cout << TAG << "Finished initialization." << std::endl;
@@ -131,11 +138,11 @@ void FitObj::InitSignalHist(const std::vector<SignalDef>& v_signal)
     for(int i = 0; i < signal_id; ++i)
     {
         std::stringstream ss;
-        ss << "hist_signal_" << i;
+        ss << "hist_" << m_tree_type << "_signal_" << i;
 
         const int nbins = signal_bins.at(i).GetNbins();
         signal_hist.emplace_back(TH1D(ss.str().c_str(), ss.str().c_str(), nbins, 0, nbins));
-        signal_hist[i].SetDirectory(0);
+        //signal_hist[i].SetDirectory(0);
     }
 }
 
@@ -165,8 +172,27 @@ void FitObj::ReweightEvents(const std::vector<double>& input_par)
             if(ev -> isSignalEvent())
             {
                 int signal_id = ev -> GetSignalType();
-                int bin_idx = signal_bins[signal_id].GetBinIndex(std::vector<double>{ev->GetTrueD1(),ev->GetTrueD2()});
+                int bin_idx = signal_bins[signal_id].GetBinIndex(std::vector<double>{ev->GetTrueD2(),ev->GetTrueD1()});
                 signal_hist[signal_id].Fill(bin_idx + 0.5, ev->GetEvWght());
+            }
+        }
+    }
+}
+
+void FitObj::ReweightNominal()
+{
+    for(int s = 0; s < samples.size(); ++s)
+    {
+        const unsigned int num_events = samples[s] -> GetN();
+        const std::string det(samples[s] -> GetDetector());
+        for(unsigned int i = 0; i < num_events; ++i)
+        {
+            AnaEvent* ev = samples[s] -> GetEvent(i);
+            if(ev -> isSignalEvent())
+            {
+                int signal_id = ev -> GetSignalType();
+                int bin_idx = signal_bins[signal_id].GetBinIndex(std::vector<double>{ev->GetTrueD2(),ev->GetTrueD1()});
+                signal_hist[signal_id].Fill(bin_idx + 0.5, ev->GetEvWghtMC());
             }
         }
     }
