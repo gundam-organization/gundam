@@ -63,7 +63,7 @@
                     "name" : "CC1pi",
                     "binning" : "tn337_binning.txt",
                     "signal" : {"topology" : [3]},
-                    "use" : true
+                    "use" : false
                 }
             ],
             "use_detector" : true

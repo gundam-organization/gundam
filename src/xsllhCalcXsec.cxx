@@ -57,7 +57,7 @@ int main(int argc, char** argv)
 
     TH1D sel_signal = xsec.GetSelSignal(0);
     TH1D tru_signal = xsec.GetTruSignal(0);
-    TFile* foutput = TFile::Open("test.root", "RECREATE");
+    TFile* foutput = TFile::Open(xsec.GetOutputFileName().c_str(), "RECREATE");
     foutput->cd();
     sel_signal.Write("sel_signal");
     tru_signal.Write("tru_signal");

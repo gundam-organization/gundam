@@ -20,6 +20,7 @@ FitObj::FitObj(const std::string& json_config, const std::string& event_tree_nam
     const double potD  = parser.data_POT;
     const double potMC = parser.mc_POT;
     m_threads = parser.num_threads;
+    signal_def = parser.signal_definition;
 
     TFile* fdata = TFile::Open(fname_data.c_str(), "READ");
     TTree* tdata = (TTree*)(fdata->Get("selectedEvents"));

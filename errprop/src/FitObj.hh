@@ -38,12 +38,15 @@ class FitObj
         std::vector<TH1D> GetSignalHist() {return signal_hist;};
         TH1D GetSignalHist(const int signal_id) {return signal_hist.at(signal_id);}
 
+        std::vector<SignalDef> GetSignalDef() {return signal_def;};
+
     private:
         std::vector<AnaFitParameters*> fit_par;
         std::vector<AnaSample*> samples;
 
         std::vector<TH1D> signal_hist;
         std::vector<BinManager> signal_bins;
+        std::vector<SignalDef> signal_def;
 
         int m_threads;
         std::string m_tree_type;
