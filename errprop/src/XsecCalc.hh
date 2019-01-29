@@ -79,6 +79,9 @@ class XsecCalc
         TMatrixDSym* postfit_cor;
         std::vector<double> postfit_param;
 
+        TH1D sel_best_fit;
+        TH1D tru_best_fit;
+        TH1D eff_best_fit;
         std::vector<TH1D> toys_sel_events;
         std::vector<TH1D> toys_tru_events;
         std::vector<TH1D> toys_eff;

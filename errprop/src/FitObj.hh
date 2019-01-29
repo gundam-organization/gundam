@@ -36,6 +36,7 @@ class FitObj
         void ReweightNominal();
         void ResetHist();
 
+        TH1D GetHistCombined(const std::string& suffix = "");
         std::vector<TH1D> GetSignalHist() {return signal_hist;};
         TH1D GetSignalHist(const int signal_id) {return signal_hist.at(signal_id);}
 
@@ -50,6 +51,7 @@ class FitObj
         std::vector<SignalDef> signal_def;
 
         int m_threads;
+        unsigned int total_signal_bins;
         std::string m_tree_type;
 
         const std::string TAG = color::YELLOW_STR + "[FitObj]: " + color::RESET_STR;

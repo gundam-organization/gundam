@@ -136,6 +136,7 @@ void FitObj::InitSignalHist(const std::vector<SignalDef>& v_signal)
         signal_id++;
     }
 
+    total_signal_bins = 0;
     for(int i = 0; i < signal_id; ++i)
     {
         std::stringstream ss;
@@ -143,7 +144,7 @@ void FitObj::InitSignalHist(const std::vector<SignalDef>& v_signal)
 
         const int nbins = signal_bins.at(i).GetNbins();
         signal_hist.emplace_back(TH1D(ss.str().c_str(), ss.str().c_str(), nbins, 0, nbins));
-        //signal_hist[i].SetDirectory(0);
+        total_signal_bins += nbins;
     }
 }
 
@@ -207,4 +208,20 @@ void FitObj::ResetHist()
 {
     for(auto& hist : signal_hist)
         hist.Reset();
+}
+
+TH1D FitObj::GetHistCombined(const std::string& suffix)
+{
+    std::string hist_name = m_tree_type + "_signal_" + suffix;
+    TH1D hist_combined(hist_name.c_str(), hist_name.c_str(),
+                       total_signal_bins, 0, total_signal_bins);
+
+    unsigned int bin = 1;
+    for(const auto& hist : signal_hist)
+    {
+        for(int i = 1; i <= hist.GetNbinsX(); ++i)
+            hist_combined.SetBinContent(bin++, hist.GetBinContent(i));
+    }
+
+    return hist_combined;
 }

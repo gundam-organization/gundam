@@ -73,6 +73,7 @@ int main(int argc, char** argv)
         xsec.ReadFitFile(input_file);
     //xsec.ReweightNominal();
     xsec.ReweightBestFit();
+    xsec.GenerateToys();
     if(!output_file.empty())
         xsec.SaveOutput(output_file);
     else

@@ -143,6 +143,12 @@ void XsecCalc::ReweightNominal()
 void XsecCalc::ReweightBestFit()
 {
     ReweightParam(postfit_param);
+    sel_best_fit = selected_events -> GetHistCombined("best_fit");
+    tru_best_fit = true_events -> GetHistCombined("best_fit");
+
+    eff_best_fit = sel_best_fit;
+    eff_best_fit.Divide(&sel_best_fit, &tru_best_fit);
+    eff_best_fit.SetName("eff_best_fit");
 }
 
 void XsecCalc::ReweightParam(const std::vector<double>& param)
@@ -153,10 +159,36 @@ void XsecCalc::ReweightParam(const std::vector<double>& param)
 
 void XsecCalc::GenerateToys()
 {
+    GenerateToys(num_toys);
 }
 
 void XsecCalc::GenerateToys(const int ntoys)
 {
+    num_toys = ntoys;
+    for(int i = 0; i < ntoys; ++i)
+    {
+        const unsigned int npar = postfit_param.size();
+        std::vector<double> toy(npar, 0.0);
+        toy_thrower -> Throw(toy);
+
+        std::transform(toy.begin(), toy.end(), postfit_param.begin(), toy.begin(), std::plus<double>());
+        for(int i = 0; i < npar; ++i)
+        {
+            if(toy[i] < 0.0)
+                toy[i] = 0.0;
+        }
+
+        selected_events -> ReweightEvents(toy);
+        true_events -> ReweightEvents(toy);
+
+        std::string suffix = "toy" + std::to_string(i);
+        toys_sel_events.emplace_back(selected_events->GetHistCombined(suffix));
+        toys_tru_events.emplace_back(true_events->GetHistCombined(suffix));
+
+        toys_eff.emplace_back(toys_sel_events.at(i));
+        toys_eff.at(i).Divide(&toys_sel_events[i], &toys_tru_events[i]);
+        toys_eff.at(i).SetName(("eff_" + suffix).c_str());
+    }
 }
 
 void XsecCalc::SaveOutput(const std::string& override_file)
@@ -167,12 +199,18 @@ void XsecCalc::SaveOutput(const std::string& override_file)
     else
         file = TFile::Open(output_file.c_str(), "RECREATE");
 
-    TH1D sel_signal = GetSelSignal(0);
-    TH1D tru_signal = GetTruSignal(0);
 
     file->cd();
-    sel_signal.Write("sel_signal");
-    tru_signal.Write("tru_signal");
+    for(int i = 0; i < num_toys; ++i)
+    {
+        toys_sel_events.at(i).Write();
+        toys_tru_events.at(i).Write();
+        toys_eff.at(i).Write();
+    }
+
+    sel_best_fit.Write("sel_best_fit");
+    tru_best_fit.Write("tru_best_fit");
+    eff_best_fit.Write("eff_best_fit");
 
     postfit_cov->Write("postfit_cov");
     postfit_cor->Write("postfit_cor");
