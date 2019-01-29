@@ -2,7 +2,7 @@
 using json = nlohmann::json;
 
 XsecCalc::XsecCalc(const std::string& json_config)
-    : num_toys(0), rng_seed(0), postfit_cov(nullptr), postfit_cor(nullptr)
+    : num_toys(0), rng_seed(0), postfit_cov(nullptr), postfit_cor(nullptr), toy_thrower(nullptr)
 {
     std::cout << TAG << "Reading error propagation options." << std::endl;
     std::fstream f;
@@ -71,6 +71,22 @@ void XsecCalc::ReadFitFile(const std::string& file)
     postfit_file->Close();
 
     std::cout << TAG << "Successfully read fit file." << std::endl;
+    InitToyThrower();
+}
+
+void XsecCalc::InitToyThrower()
+{
+    std::cout << TAG << "Initializing toy-thrower..." << std::endl;
+    if(toy_thrower != nullptr)
+        delete toy_thrower;
+
+    toy_thrower = new ToyThrower(*postfit_cov, rng_seed, 1E-48);
+    if(!toy_thrower -> ForcePosDef(1E-5, 1E-48))
+    {
+        std::cout << ERR << "Covariance matrix could not be made positive definite.\n"
+                  << "Exiting." << std::endl;
+        exit(1);
+    }
 }
 
 void XsecCalc::InitNormalization(const nlohmann::json& j)
@@ -122,6 +138,17 @@ void XsecCalc::ReweightNominal()
 {
     selected_events -> ReweightNominal();
     true_events -> ReweightNominal();
+}
+
+void XsecCalc::ReweightBestFit()
+{
+    ReweightParam(postfit_param);
+}
+
+void XsecCalc::ReweightParam(const std::vector<double>& param)
+{
+    selected_events -> ReweightEvents(param);
+    true_events -> ReweightEvents(param);
 }
 
 void XsecCalc::GenerateToys()

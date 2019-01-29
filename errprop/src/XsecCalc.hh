@@ -46,6 +46,8 @@ class XsecCalc
 
         void ReadFitFile(const std::string& file);
 
+        void ReweightParam(const std::vector<double>& param);
+        void ReweightBestFit();
         void ReweightNominal();
         void GenerateToys();
         void GenerateToys(const int ntoys);
@@ -65,12 +67,13 @@ class XsecCalc
         void SetNumToys(const int n) {num_toys = n;};
 
     private:
+        void InitToyThrower();
         void InitNormalization(const nlohmann::json& j);
 
         FitObj* selected_events;
         FitObj* true_events;
 
-        //ToyThrower toy_thrower;
+        ToyThrower* toy_thrower;
 
         TMatrixDSym* postfit_cov;
         TMatrixDSym* postfit_cor;
@@ -87,7 +90,7 @@ class XsecCalc
         unsigned int num_toys;
         unsigned int rng_seed;
 
-        const std::string TAG = color::GREEN_STR + "[XsecExtract]: " + color::RESET_STR;
+        const std::string TAG = color::YELLOW_STR + "[XsecExtract]: " + color::RESET_STR;
         const std::string ERR = color::RED_STR + "[ERROR]: " + color::RESET_STR;
 };
 

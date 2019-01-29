@@ -10,6 +10,8 @@
 #include "TRandom3.h"
 #include "TVectorT.h"
 
+#include "ColorOutput.hh"
+
 using TMatrixD = TMatrixT<double>;
 using TMatrixDSym = TMatrixTSym<double>;
 using TVectorD = TVectorT<double>;
@@ -23,6 +25,7 @@ class ToyThrower
         TRandom3* RNG;
 
         unsigned int npar;
+        unsigned int force_limit;
 
         ToyThrower(int nrows, unsigned int seed = 0);
 
@@ -33,11 +36,16 @@ class ToyThrower
 
         void SetSeed(unsigned int seed);
         bool SetupDecomp(double decomp_tol = 0xCAFEBABE);
+        bool ForcePosDef(double val, double decomp_tol = 0xCAFEBABE);
 
         void Throw(TVectorD& toy);
         void Throw(std::vector<double>& toy);
 
         double ThrowSinglePar(double nom, double err) const;
+
+        const std::string TAG = color::MAGENTA_STR + "[ToyThrower]: " + color::RESET_STR;
+        const std::string ERR = color::RED_STR + color::BOLD_STR
+                                + "[ERROR]: " + color::RESET_STR;
 };
 
 #endif

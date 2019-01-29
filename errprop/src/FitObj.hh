@@ -52,7 +52,7 @@ class FitObj
         int m_threads;
         std::string m_tree_type;
 
-        const std::string TAG = color::GREEN_STR + "[FitObj]: " + color::RESET_STR;
+        const std::string TAG = color::YELLOW_STR + "[FitObj]: " + color::RESET_STR;
         const std::string ERR = color::RED_STR + "[ERROR]: " + color::RESET_STR;
 };
 

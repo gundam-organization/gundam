@@ -96,17 +96,17 @@ FitObj::FitObj(const std::string& json_config, const std::string& event_tree_nam
     fit_par.push_back(xsecpara);
 
     //DetParameters detpara("par_det");
-    if(!is_true_tree)
+    DetParameters* detpara = new DetParameters("par_det");
+    for(const auto& opt : parser.detectors)
     {
-        DetParameters* detpara = new DetParameters("par_det");
-        for(const auto& opt : parser.detectors)
-        {
-            if(opt.use_detector)
-                detpara->AddDetector(opt.name, samples, true);
-        }
-        detpara->InitEventMap(samples, 0);
-        fit_par.push_back(detpara);
+        if(opt.use_detector)
+            detpara->AddDetector(opt.name, samples, true);
     }
+    if(is_true_tree)
+        detpara->InitEventMap(samples, 2);
+    else
+        detpara->InitEventMap(samples, 0);
+    fit_par.push_back(detpara);
 
     InitSignalHist(parser.signal_definition);
     std::cout << TAG << "Finished initialization." << std::endl;
