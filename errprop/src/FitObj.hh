@@ -34,6 +34,7 @@ class FitObj
         void ReweightEvents(const std::vector<double>& parameters);
 
         void ReweightNominal();
+        void ResetHist();
 
         std::vector<TH1D> GetSignalHist() {return signal_hist;};
         TH1D GetSignalHist(const int signal_id) {return signal_hist.at(signal_id);}

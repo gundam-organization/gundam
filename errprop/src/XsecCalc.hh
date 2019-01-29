@@ -12,11 +12,17 @@
 
 #include <TFile.h>
 #include <TH1D.h>
+#include <TMatrixT.h>
+#include <TVectorT.h>
 
 #include "ColorOutput.hh"
 #include "FitObj.hh"
 #include "OptParser.hh"
 #include "ToyThrower.hh"
+
+using TMatrixD = TMatrixT<double>;
+using TMatrixDSym = TMatrixTSym<double>;
+using TVectorD = TVectorT<double>;
 
 struct SigNorm
 {
@@ -38,8 +44,9 @@ class XsecCalc
         XsecCalc(const std::string& json_config);
         ~XsecCalc();
 
-        void ReweightNominal();
+        void ReadFitFile(const std::string& file);
 
+        void ReweightNominal();
         void GenerateToys();
         void GenerateToys(const int ntoys);
 
@@ -49,8 +56,13 @@ class XsecCalc
         std::vector<TH1D> GetTruSignal() {return true_events -> GetSignalHist();};
         TH1D GetTruSignal(const int signal_id) {return true_events -> GetSignalHist(signal_id);};
 
+        void SaveOutput(const std::string& override_file = "");
+
         std::string GetOutputFileName() {return output_file;};
         std::string GetInputFileName() {return input_file;};
+
+        unsigned int GetNumToys() {return num_toys;};
+        void SetNumToys(const int n) {num_toys = n;};
 
     private:
         void InitNormalization(const nlohmann::json& j);
@@ -59,6 +71,10 @@ class XsecCalc
         FitObj* true_events;
 
         //ToyThrower toy_thrower;
+
+        TMatrixDSym* postfit_cov;
+        TMatrixDSym* postfit_cor;
+        std::vector<double> postfit_param;
 
         std::vector<TH1D> toys_sel_events;
         std::vector<TH1D> toys_tru_events;

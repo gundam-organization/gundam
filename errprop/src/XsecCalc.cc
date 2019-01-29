@@ -2,7 +2,7 @@
 using json = nlohmann::json;
 
 XsecCalc::XsecCalc(const std::string& json_config)
-    : num_toys(0), rng_seed(0)
+    : num_toys(0), rng_seed(0), postfit_cov(nullptr), postfit_cor(nullptr)
 {
     std::cout << TAG << "Reading error propagation options." << std::endl;
     std::fstream f;
@@ -30,6 +30,9 @@ XsecCalc::XsecCalc(const std::string& json_config)
               << TAG << "Selected events config: " << sel_json_config << std::endl
               << TAG << "True events config: " << tru_json_config << std::endl;
 
+    std::cout << TAG << "Reading post-fit file..." << std::endl;
+    ReadFitFile(input_file);
+
     std::cout << TAG << "Initializing fit objects..." << std::endl;
     selected_events = new FitObj(sel_json_config, "selectedEvents", false);
     true_events = new FitObj(tru_json_config, "trueEvents", true);
@@ -42,6 +45,32 @@ XsecCalc::~XsecCalc()
 {
     delete selected_events;
     delete true_events;
+
+    delete postfit_cov;
+    delete postfit_cor;
+}
+
+void XsecCalc::ReadFitFile(const std::string& file)
+{
+    if(postfit_cov != nullptr)
+        delete postfit_cov;
+    if(postfit_cor != nullptr)
+        delete postfit_cor;
+    postfit_param.clear();
+
+    std::cout << TAG << "Opening " << file << std::endl;
+
+    TFile* postfit_file = TFile::Open(file.c_str(), "READ");
+    postfit_cov = (TMatrixDSym*)postfit_file -> Get("res_cov_matrix");
+    postfit_cor = (TMatrixDSym*)postfit_file -> Get("res_cor_matrix");
+
+    TVectorD* postfit_param_root = (TVectorD*)postfit_file -> Get("res_vector");
+    for(int i = 0; i < postfit_param_root->GetNoElements(); ++i)
+        postfit_param.emplace_back((*postfit_param_root)[i]);
+
+    postfit_file->Close();
+
+    std::cout << TAG << "Successfully read fit file." << std::endl;
 }
 
 void XsecCalc::InitNormalization(const nlohmann::json& j)
@@ -101,4 +130,28 @@ void XsecCalc::GenerateToys()
 
 void XsecCalc::GenerateToys(const int ntoys)
 {
+}
+
+void XsecCalc::SaveOutput(const std::string& override_file)
+{
+    TFile* file = nullptr;
+    if(!override_file.empty())
+        file = TFile::Open(override_file.c_str(), "RECREATE");
+    else
+        file = TFile::Open(output_file.c_str(), "RECREATE");
+
+    TH1D sel_signal = GetSelSignal(0);
+    TH1D tru_signal = GetTruSignal(0);
+
+    file->cd();
+    sel_signal.Write("sel_signal");
+    tru_signal.Write("tru_signal");
+
+    postfit_cov->Write("postfit_cov");
+    postfit_cor->Write("postfit_cor");
+
+    TVectorD postfit_param_root(postfit_param.size(), postfit_param.data());
+    postfit_param_root.Write("postfit_param");
+
+    file->Close();
 }

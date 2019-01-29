@@ -149,6 +149,8 @@ void FitObj::InitSignalHist(const std::vector<SignalDef>& v_signal)
 
 void FitObj::ReweightEvents(const std::vector<double>& input_par)
 {
+    ResetHist();
+
     std::vector<std::vector<double>> new_par;
     auto start = input_par.begin();
     auto end = input_par.begin();
@@ -182,6 +184,8 @@ void FitObj::ReweightEvents(const std::vector<double>& input_par)
 
 void FitObj::ReweightNominal()
 {
+    ResetHist();
+
     for(int s = 0; s < samples.size(); ++s)
     {
         const unsigned int num_events = samples[s] -> GetN();
@@ -197,4 +201,10 @@ void FitObj::ReweightNominal()
             }
         }
     }
+}
+
+void FitObj::ResetHist()
+{
+    for(auto& hist : signal_hist)
+        hist.Reset();
 }
