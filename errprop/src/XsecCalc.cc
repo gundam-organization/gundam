@@ -45,6 +45,7 @@ XsecCalc::XsecCalc(const std::string& json_config)
 
 XsecCalc::~XsecCalc()
 {
+    delete toy_thrower;
     delete selected_events;
     delete true_events;
 
@@ -146,12 +147,15 @@ void XsecCalc::ReweightNominal()
 void XsecCalc::ReweightBestFit()
 {
     ReweightParam(postfit_param);
-    sel_best_fit = selected_events -> GetHistCombined("best_fit");
-    tru_best_fit = true_events -> GetHistCombined("best_fit");
 
-    eff_best_fit = sel_best_fit;
-    eff_best_fit.Divide(&sel_best_fit, &tru_best_fit);
-    eff_best_fit.SetName("eff_best_fit");
+    auto sel_hists = selected_events -> GetSignalHist();
+    auto tru_hists = true_events -> GetSignalHist();
+
+    ApplyEff(sel_hists, tru_hists, false);
+    ApplyNorm(sel_hists, false);
+
+    sel_best_fit = ConcatHist(sel_hists, "sel_best_fit");
+    tru_best_fit = ConcatHist(tru_hists, "tru_best_fit");
 }
 
 void XsecCalc::ReweightParam(const std::vector<double>& param)
@@ -168,8 +172,17 @@ void XsecCalc::GenerateToys()
 void XsecCalc::GenerateToys(const int ntoys)
 {
     num_toys = ntoys;
+    std::cout << TAG << "Throwing " << num_toys << " toys..." << std::endl;
+
+    ProgressBar pbar(60, "#");
+    pbar.SetRainbow();
+    pbar.SetPrefix(std::string(TAG + "Throwing "));
+
     for(int i = 0; i < ntoys; ++i)
     {
+        if(i % 10 == 0 || i == (ntoys - 1))
+            pbar.Print(i, ntoys - 1);
+
         const unsigned int npar = postfit_param.size();
         std::vector<double> toy(npar, 0.0);
         toy_thrower -> Throw(toy);
@@ -178,7 +191,7 @@ void XsecCalc::GenerateToys(const int ntoys)
         for(int i = 0; i < npar; ++i)
         {
             if(toy[i] < 0.0)
-                toy[i] = 0.0;
+                toy[i] = 0.1;
         }
 
         selected_events -> ReweightEvents(toy);
@@ -187,25 +200,15 @@ void XsecCalc::GenerateToys(const int ntoys)
         auto sel_hists = selected_events -> GetSignalHist();
         auto tru_hists = true_events -> GetSignalHist();
 
-        ApplyEff(sel_hists, tru_hists);
+        ApplyEff(sel_hists, tru_hists, true);
         ApplyNorm(sel_hists, true);
 
         toys_sel_events.emplace_back(ConcatHist(sel_hists, ("sel_signal_toy" + std::to_string(i))));
         toys_tru_events.emplace_back(ConcatHist(tru_hists, ("tru_signal_toy" + std::to_string(i))));
-
-        /*
-        std::string suffix = "toy" + std::to_string(i);
-        toys_sel_events.emplace_back(selected_events->GetHistCombined(suffix));
-        toys_tru_events.emplace_back(true_events->GetHistCombined(suffix));
-
-        toys_eff.emplace_back(toys_sel_events.at(i));
-        toys_eff.at(i).Divide(&toys_sel_events[i], &toys_tru_events[i]);
-        toys_eff.at(i).SetName(("eff_" + suffix).c_str());
-        */
     }
 }
 
-void XsecCalc::ApplyEff(std::vector<TH1D>& sel_hist, std::vector<TH1D>& tru_hist)
+void XsecCalc::ApplyEff(std::vector<TH1D>& sel_hist, std::vector<TH1D>& tru_hist, bool is_toy)
 {
     std::vector<TH1D> eff_hist;
     for(int i = 0; i < num_signals; ++i)
@@ -222,8 +225,15 @@ void XsecCalc::ApplyEff(std::vector<TH1D>& sel_hist, std::vector<TH1D>& tru_hist
         }
     }
 
-    std::string eff_name = "eff_combined_toy" + std::to_string(toys_eff.size());
-    toys_eff.emplace_back(ConcatHist(eff_hist, eff_name));
+    if(is_toy)
+    {
+        std::string eff_name = "eff_combined_toy" + std::to_string(toys_eff.size());
+        toys_eff.emplace_back(ConcatHist(eff_hist, eff_name));
+    }
+    else
+    {
+        eff_best_fit = ConcatHist(eff_hist, "eff_best_fit");
+    }
 }
 
 void XsecCalc::ApplyNorm(std::vector<TH1D>& vec_hist, bool is_toy)
@@ -296,26 +306,103 @@ TH1D XsecCalc::ConcatHist(const std::vector<TH1D>& vec_hist, const std::string& 
     return hist_combined;
 }
 
-void XsecCalc::SaveOutput(const std::string& override_file)
+void XsecCalc::CalcCovariance(bool use_best_fit)
+{
+    std::cout << TAG << "Calculating covariance matrix..." << std::endl;
+
+    TH1D h_cov("h_cov", "h_cov", total_signal_bins, 0, total_signal_bins);
+    if(use_best_fit)
+    {
+        ReweightBestFit();
+        h_cov = sel_best_fit;
+        std::cout << TAG << "Using best fit for covariance." << std::endl;
+    }
+    else
+    {
+        TH1D h_mean("","",total_signal_bins, 0, total_signal_bins);
+        for(const auto& hist : toys_sel_events)
+        {
+            for(int i = 0; i < total_signal_bins; ++i)
+                h_mean.Fill(i + 0.5, hist.GetBinContent(i+1));
+        }
+        h_mean.Scale(1.0 / (1.0 * num_toys));
+        h_cov = h_mean;
+
+        std::cout << TAG << "Using mean of toys for covariance." << std::endl;
+    }
+
+    xsec_cov.ResizeTo(total_signal_bins, total_signal_bins);
+    xsec_cov.Zero();
+
+    xsec_cor.ResizeTo(total_signal_bins, total_signal_bins);
+    xsec_cor.Zero();
+
+    for(const auto& hist : toys_sel_events)
+    {
+        for(int i = 0; i < total_signal_bins; ++i)
+        {
+            for(int j = 0; j < total_signal_bins; ++j)
+            {
+                const double x = hist.GetBinContent(i+1) - h_cov.GetBinContent(i+1);
+                const double y = hist.GetBinContent(j+1) - h_cov.GetBinContent(j+1);
+                xsec_cov(i,j) += x * y / (1.0 * num_toys);
+            }
+        }
+    }
+
+    for(int i = 0; i < total_signal_bins; ++i)
+    {
+        for(int j = 0; j < total_signal_bins; ++j)
+        {
+            const double x = xsec_cov(i,i);
+            const double y = xsec_cov(j,j);
+            const double z = xsec_cov(i,j);
+            xsec_cor(i,j) = z / (sqrt(x * y));
+
+            if(std::isnan(xsec_cor(i,j)))
+                xsec_cor(i,j) = 0.0;
+        }
+    }
+
+    for(int i = 0; i < total_signal_bins; ++i)
+        sel_best_fit.SetBinError(i+1, sqrt(xsec_cov(i,i)));
+
+    std::cout << TAG << "Covariance and correlation matrix calculated." << std::endl;
+}
+
+void XsecCalc::SaveOutput(const std::string& override_file, bool save_toys)
 {
     TFile* file = nullptr;
     if(!override_file.empty())
+    {
         file = TFile::Open(override_file.c_str(), "RECREATE");
+        std::cout << TAG << "Saving output to " << override_file << std::endl;
+    }
     else
+    {
         file = TFile::Open(output_file.c_str(), "RECREATE");
+        std::cout << TAG << "Saving output to " << output_file << std::endl;
+    }
 
 
     file->cd();
-    for(int i = 0; i < num_toys; ++i)
+    if(save_toys)
     {
-        toys_sel_events.at(i).Write();
-        toys_tru_events.at(i).Write();
-        toys_eff.at(i).Write();
+        for(int i = 0; i < num_toys; ++i)
+        {
+            toys_sel_events.at(i).Write();
+            toys_tru_events.at(i).Write();
+            toys_eff.at(i).Write();
+        }
     }
+
 
     sel_best_fit.Write("sel_best_fit");
     tru_best_fit.Write("tru_best_fit");
     eff_best_fit.Write("eff_best_fit");
+
+    xsec_cov.Write("xsec_cov");
+    xsec_cor.Write("xsec_cor");
 
     postfit_cov->Write("postfit_cov");
     postfit_cor->Write("postfit_cor");

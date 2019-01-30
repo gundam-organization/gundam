@@ -19,6 +19,7 @@
 #include "ColorOutput.hh"
 #include "FitObj.hh"
 #include "OptParser.hh"
+#include "ProgressBar.hh"
 #include "ToyThrower.hh"
 
 using TMatrixD = TMatrixT<double>;
@@ -53,7 +54,9 @@ class XsecCalc
         void GenerateToys();
         void GenerateToys(const int ntoys);
 
-        void ApplyEff(std::vector<TH1D>& sel_hist, std::vector<TH1D>& tru_hist);
+        void CalcCovariance(bool use_best_fit);
+
+        void ApplyEff(std::vector<TH1D>& sel_hist, std::vector<TH1D>& tru_hist, bool is_toy);
         void ApplyNorm(std::vector<TH1D>& vec_hist, bool is_toy);
         void ApplyTargets(const unsigned int signal_id, TH1D& hist, bool is_toy);
         void ApplyFlux(const unsigned int signal_id, TH1D& hist, bool is_toy);
@@ -67,11 +70,10 @@ class XsecCalc
         std::vector<TH1D> GetTruSignal() {return true_events -> GetSignalHist();};
         TH1D GetTruSignal(const int signal_id) {return true_events -> GetSignalHist(signal_id);};
 
-        void SaveOutput(const std::string& override_file = "");
+        void SaveOutput(const std::string& override_file = "", bool save_toys = false);
 
         std::string GetOutputFileName() {return output_file;};
         std::string GetInputFileName() {return input_file;};
-
         unsigned int GetNumToys() {return num_toys;};
         void SetNumToys(const int n) {num_toys = n;};
 
@@ -87,6 +89,9 @@ class XsecCalc
         TMatrixDSym* postfit_cov;
         TMatrixDSym* postfit_cor;
         std::vector<double> postfit_param;
+
+        TMatrixDSym xsec_cov;
+        TMatrixDSym xsec_cor;
 
         TH1D sel_best_fit;
         TH1D tru_best_fit;
