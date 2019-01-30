@@ -100,6 +100,23 @@ std::vector<double> BinManager::GetBinVector(const double d) const
     return v;
 }
 
+double BinManager::GetBinWidth(const int i) const
+{
+    double total_width = 1.0;
+    for(int d = 0; d < dimension; ++d)
+    {
+        double dim_width = std::abs(bin_edges[d][i].second - bin_edges[d][i].first);
+        total_width *= dim_width;
+    }
+
+    return total_width;
+}
+
+double BinManager::GetBinWidth(const int i, const int d) const
+{
+    return std::abs(bin_edges[d][i].second - bin_edges[d][i].first);
+}
+
 bool BinManager::CheckBinIndex(const int i, const int d, const double val) const
 {
     return bin_edges[d][i].first <= val && val < bin_edges[d][i].second;

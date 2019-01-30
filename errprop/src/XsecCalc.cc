@@ -2,7 +2,8 @@
 using json = nlohmann::json;
 
 XsecCalc::XsecCalc(const std::string& json_config)
-    : num_toys(0), rng_seed(0), postfit_cov(nullptr), postfit_cor(nullptr), toy_thrower(nullptr)
+    : num_toys(0), rng_seed(0), num_signals(0), total_signal_bins(0),
+      postfit_cov(nullptr), postfit_cor(nullptr), toy_thrower(nullptr)
 {
     std::cout << TAG << "Reading error propagation options." << std::endl;
     std::fstream f;
@@ -36,6 +37,7 @@ XsecCalc::XsecCalc(const std::string& json_config)
     std::cout << TAG << "Initializing fit objects..." << std::endl;
     selected_events = new FitObj(sel_json_config, "selectedEvents", false);
     true_events = new FitObj(tru_json_config, "trueEvents", true);
+    total_signal_bins = selected_events -> GetNumSignalBins();
 
     InitNormalization(j["sig_norm"]);
     std::cout << TAG << "Finished initialization." << std::endl;
@@ -132,6 +134,7 @@ void XsecCalc::InitNormalization(const nlohmann::json& j)
                       << TAG << "Num. targets err: " << n.num_targets_err << std::endl;
         }
     }
+    num_signals = v_normalization.size();
 }
 
 void XsecCalc::ReweightNominal()
@@ -181,6 +184,16 @@ void XsecCalc::GenerateToys(const int ntoys)
         selected_events -> ReweightEvents(toy);
         true_events -> ReweightEvents(toy);
 
+        auto sel_hists = selected_events -> GetSignalHist();
+        auto tru_hists = true_events -> GetSignalHist();
+
+        ApplyEff(sel_hists, tru_hists);
+        ApplyNorm(sel_hists, true);
+
+        toys_sel_events.emplace_back(ConcatHist(sel_hists, ("sel_signal_toy" + std::to_string(i))));
+        toys_tru_events.emplace_back(ConcatHist(tru_hists, ("tru_signal_toy" + std::to_string(i))));
+
+        /*
         std::string suffix = "toy" + std::to_string(i);
         toys_sel_events.emplace_back(selected_events->GetHistCombined(suffix));
         toys_tru_events.emplace_back(true_events->GetHistCombined(suffix));
@@ -188,7 +201,99 @@ void XsecCalc::GenerateToys(const int ntoys)
         toys_eff.emplace_back(toys_sel_events.at(i));
         toys_eff.at(i).Divide(&toys_sel_events[i], &toys_tru_events[i]);
         toys_eff.at(i).SetName(("eff_" + suffix).c_str());
+        */
     }
+}
+
+void XsecCalc::ApplyEff(std::vector<TH1D>& sel_hist, std::vector<TH1D>& tru_hist)
+{
+    std::vector<TH1D> eff_hist;
+    for(int i = 0; i < num_signals; ++i)
+    {
+        TH1D eff = sel_hist[i];
+        eff.Divide(&sel_hist[i], &tru_hist[i]);
+        eff_hist.emplace_back(eff);
+
+        for(int j = 1; j <= sel_hist[i].GetNbinsX(); ++j)
+        {
+            double bin_eff = eff.GetBinContent(j);
+            double bin_val = sel_hist[i].GetBinContent(j);
+            sel_hist[i].SetBinContent(j, bin_val / bin_eff);
+        }
+    }
+
+    std::string eff_name = "eff_combined_toy" + std::to_string(toys_eff.size());
+    toys_eff.emplace_back(ConcatHist(eff_hist, eff_name));
+}
+
+void XsecCalc::ApplyNorm(std::vector<TH1D>& vec_hist, bool is_toy)
+{
+    for(unsigned int i = 0; i < num_signals; ++i)
+    {
+        ApplyTargets(i, vec_hist[i], is_toy);
+        ApplyFlux(i, vec_hist[i], is_toy);
+        ApplyBinWidth(i, vec_hist[i], 1000);
+    }
+}
+
+void XsecCalc::ApplyTargets(const unsigned int signal_id, TH1D& hist, bool is_toy)
+{
+    double num_targets = 1.0;
+    if(is_toy)
+    {
+        num_targets = toy_thrower -> ThrowSinglePar(v_normalization[signal_id].num_targets_val,
+                                                    v_normalization[signal_id].num_targets_err);
+    }
+    else
+        num_targets = v_normalization[signal_id].num_targets_val;
+
+    hist.Scale(1.0 / num_targets);
+}
+
+void XsecCalc::ApplyFlux(const unsigned int signal_id, TH1D& hist, bool is_toy)
+{
+    if(v_normalization[signal_id].use_flux_fit)
+    {
+    }
+    else
+    {
+        double flux_int = 1.0;
+        if(is_toy)
+        {
+            flux_int = toy_thrower -> ThrowSinglePar(v_normalization[signal_id].flux_int,
+                                                     v_normalization[signal_id].flux_err);
+        }
+        else
+            flux_int = v_normalization[signal_id].flux_int;
+
+        hist.Scale(1.0 / flux_int);
+    }
+}
+
+void XsecCalc::ApplyBinWidth(const unsigned int signal_id, TH1D& hist, const double unit_scale)
+{
+    BinManager bm = selected_events -> GetBinManager(signal_id);
+    for(int i = 0; i < hist.GetNbinsX(); ++i)
+    {
+        const double bin_width = bm.GetBinWidth(i) / unit_scale;
+        const double bin_value = hist.GetBinContent(i+1);
+        hist.SetBinContent(i+1, bin_value / bin_width);
+    }
+}
+
+TH1D XsecCalc::ConcatHist(const std::vector<TH1D>& vec_hist, const std::string& hist_name)
+{
+    TH1D hist_combined(hist_name.c_str(), hist_name.c_str(),
+                       total_signal_bins, 0, total_signal_bins);
+
+    unsigned int bin = 1;
+    for(const auto& hist : vec_hist)
+    {
+        for(int i = 1; i <= hist.GetNbinsX(); ++i)
+            hist_combined.SetBinContent(bin++, hist.GetBinContent(i));
+    }
+
+    return hist_combined;
 }
 
 void XsecCalc::SaveOutput(const std::string& override_file)

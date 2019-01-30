@@ -15,6 +15,7 @@
 #include <TMatrixT.h>
 #include <TVectorT.h>
 
+#include "BinManager.hh"
 #include "ColorOutput.hh"
 #include "FitObj.hh"
 #include "OptParser.hh"
@@ -51,6 +52,14 @@ class XsecCalc
         void ReweightNominal();
         void GenerateToys();
         void GenerateToys(const int ntoys);
+
+        void ApplyEff(std::vector<TH1D>& sel_hist, std::vector<TH1D>& tru_hist);
+        void ApplyNorm(std::vector<TH1D>& vec_hist, bool is_toy);
+        void ApplyTargets(const unsigned int signal_id, TH1D& hist, bool is_toy);
+        void ApplyFlux(const unsigned int signal_id, TH1D& hist, bool is_toy);
+        void ApplyBinWidth(const unsigned int signal_id, TH1D& hist, const double unit_scale);
+
+        TH1D ConcatHist(const std::vector<TH1D>& vec_hists, const std::string& hist_name = "");
 
         std::vector<TH1D> GetSelSignal() {return selected_events -> GetSignalHist();};
         TH1D GetSelSignal(const int signal_id) {return selected_events -> GetSignalHist(signal_id);};
@@ -92,6 +101,8 @@ class XsecCalc
 
         unsigned int num_toys;
         unsigned int rng_seed;
+        unsigned int num_signals;
+        unsigned int total_signal_bins;
 
         const std::string TAG = color::YELLOW_STR + "[XsecExtract]: " + color::RESET_STR;
         const std::string ERR = color::RED_STR + "[ERROR]: " + color::RESET_STR;

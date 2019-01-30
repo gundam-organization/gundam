@@ -84,7 +84,7 @@ bool ToyThrower::ForcePosDef(double val, double decomp_tol)
     {
         if(limit++ > force_limit)
         {
-            std::cout << ERR << "Reached iteration limit of " << force_limit 
+            std::cout << ERR << "Reached iteration limit of " << force_limit
                       << std::endl;
             return false;
         }

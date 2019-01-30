@@ -210,7 +210,7 @@ void FitObj::ResetHist()
         hist.Reset();
 }
 
-TH1D FitObj::GetHistCombined(const std::string& suffix)
+TH1D FitObj::GetHistCombined(const std::string& suffix) const
 {
     std::string hist_name = m_tree_type + "_signal_" + suffix;
     TH1D hist_combined(hist_name.c_str(), hist_name.c_str(),

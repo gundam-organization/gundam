@@ -2,6 +2,7 @@
 #define BINMANAGER_H
 
 #include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -18,6 +19,8 @@ class BinManager
         int GetNbins() const;
         int SetBinning(const std::string& filename);
         int GetBinIndex(const std::vector<double>& val) const;
+        double GetBinWidth(const int i) const;
+        double GetBinWidth(const int i, const int d) const;
         std::vector<double> GetBinVector(const double d) const;
         void Print() const;
 

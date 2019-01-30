@@ -10,18 +10,18 @@
         "CC0pi" : {
             "flux_file" : "flux.root",
             "flux_hist" : "flux_numu",
-            "flux_int"  : 1.0E13,
-            "flux_err"  : 0.08,
-            "use_flux_fit" : true,
-            "num_targets_val" : 5.5E29,
-            "num_targets_err" : 0.0087
+            "flux_int"  : 1.12E13,
+            "flux_err"  : 0.085,
+            "use_flux_fit" : false,
+            "num_targets_val" : 5.9E29,
+            "num_targets_err" : 0.0067
         },
         "CC1pi" : {
             "flux_file" : "flux.root",
             "flux_hist" : "flux_numu",
             "flux_int"  : 1.0E13,
             "flux_err"  : 0.08,
-            "use_flux_fit" : true,
+            "use_flux_fit" : false,
             "num_targets_val" : 5.5E29,
             "num_targets_err" : 0.0087
         }

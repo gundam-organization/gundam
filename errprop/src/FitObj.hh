@@ -36,11 +36,14 @@ class FitObj
         void ReweightNominal();
         void ResetHist();
 
-        TH1D GetHistCombined(const std::string& suffix = "");
-        std::vector<TH1D> GetSignalHist() {return signal_hist;};
-        TH1D GetSignalHist(const int signal_id) {return signal_hist.at(signal_id);}
+        TH1D GetHistCombined(const std::string& suffix = "") const;
+        std::vector<TH1D> GetSignalHist() const {return signal_hist;};
+        TH1D GetSignalHist(const int signal_id) const {return signal_hist.at(signal_id);}
 
-        std::vector<SignalDef> GetSignalDef() {return signal_def;};
+        std::vector<SignalDef> GetSignalDef() const {return signal_def;};
+        BinManager& GetBinManager(const int signal_id) {return signal_bins.at(signal_id);};
+        unsigned int GetNumSignalBins() const {return total_signal_bins;};
+        unsigned int GetNumSignalBins(const int signal_id) const {return signal_bins.at(signal_id).GetNbins();};
 
     private:
         std::vector<AnaFitParameters*> fit_par;
