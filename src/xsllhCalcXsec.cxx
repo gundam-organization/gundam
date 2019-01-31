@@ -71,6 +71,7 @@ int main(int argc, char** argv)
     XsecCalc xsec(json_file);
     if(!input_file.empty())
         xsec.ReadFitFile(input_file);
+    xsec.ReweightBestFit();
     if(num_toys != 0)
         xsec.GenerateToys(num_toys);
     else

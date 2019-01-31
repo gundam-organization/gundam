@@ -83,8 +83,11 @@ void XsecCalc::InitToyThrower()
     if(toy_thrower != nullptr)
         delete toy_thrower;
 
+    //for(int i = 0; i < postfit_cov->GetNcols(); ++i)
+    //    (*postfit_cov)(i,i) += 1E-6;
+
     toy_thrower = new ToyThrower(*postfit_cov, rng_seed, 1E-48);
-    if(!toy_thrower -> ForcePosDef(1E-5, 1E-48))
+    if(!toy_thrower -> ForcePosDef(1E-6, 1E-48))
     {
         std::cout << ERR << "Covariance matrix could not be made positive definite.\n"
                   << "Exiting." << std::endl;
@@ -124,6 +127,12 @@ void XsecCalc::InitNormalization(const nlohmann::json& j)
             n.use_flux_fit = s["use_flux_fit"];
             n.num_targets_val = s["num_targets_val"];
             n.num_targets_err = s["num_targets_err"];
+            n.is_rel_err = s["relative_err"];
+            if(n.is_rel_err)
+            {
+                n.flux_err = n.flux_int * n.flux_err;
+                n.num_targets_err = n.num_targets_val * n.num_targets_err;
+            }
             v_normalization.push_back(n);
 
             std::cout << TAG << "Flux file: " << n.flux_file << std::endl
@@ -132,7 +141,8 @@ void XsecCalc::InitNormalization(const nlohmann::json& j)
                       << TAG << "Flux error: " << n.flux_err << std::endl
                       << TAG << "Use flux fit: " << std::boolalpha << n.use_flux_fit << std::endl
                       << TAG << "Num. targets: " << n.num_targets_val << std::endl
-                      << TAG << "Num. targets err: " << n.num_targets_err << std::endl;
+                      << TAG << "Num. targets err: " << n.num_targets_err << std::endl
+                      << TAG << "Relative err: " << std::boolalpha << n.is_rel_err << std::endl;
         }
     }
     num_signals = v_normalization.size();
@@ -191,7 +201,7 @@ void XsecCalc::GenerateToys(const int ntoys)
         for(int i = 0; i < npar; ++i)
         {
             if(toy[i] < 0.0)
-                toy[i] = 0.1;
+                toy[i] = 0.0;
         }
 
         selected_events -> ReweightEvents(toy);
@@ -205,6 +215,15 @@ void XsecCalc::GenerateToys(const int ntoys)
 
         toys_sel_events.emplace_back(ConcatHist(sel_hists, ("sel_signal_toy" + std::to_string(i))));
         toys_tru_events.emplace_back(ConcatHist(tru_hists, ("tru_signal_toy" + std::to_string(i))));
+
+        /*
+        total_signal_bins = npar;
+        std::string temp = "toy" + std::to_string(i);
+        TH1D h_toy(temp.c_str(), temp.c_str(), total_signal_bins, 0, total_signal_bins);
+        for(int i = 0; i < total_signal_bins; ++i)
+            h_toy.SetBinContent(i+1, toy[i]);
+        toys_sel_events.emplace_back(h_toy);
+        */
     }
 }
 
@@ -319,14 +338,17 @@ void XsecCalc::CalcCovariance(bool use_best_fit)
     }
     else
     {
-        TH1D h_mean("","",total_signal_bins, 0, total_signal_bins);
+        //TH1D h_mean("","",total_signal_bins, 0, total_signal_bins);
         for(const auto& hist : toys_sel_events)
         {
             for(int i = 0; i < total_signal_bins; ++i)
-                h_mean.Fill(i + 0.5, hist.GetBinContent(i+1));
+                h_cov.Fill(i + 0.5, hist.GetBinContent(i+1));
         }
-        h_mean.Scale(1.0 / (1.0 * num_toys));
-        h_cov = h_mean;
+        h_cov.Scale(1.0 / (1.0 * num_toys));
+        //h_cov = h_mean;
+
+        for(int i = 1; i <= total_signal_bins; ++i)
+            std::cout << "Bin " << i << ": " << h_cov.GetBinContent(i) << std::endl;
 
         std::cout << TAG << "Using mean of toys for covariance." << std::endl;
     }

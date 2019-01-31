@@ -75,11 +75,11 @@ class OptParser
         std::string xsLLh_env;
 
         int fit_type;
-        int data_POT;
-        int mc_POT;
         int rng_seed;
         int num_threads;
         int num_throws;
+        double data_POT;
+        double mc_POT;
 
         bool stat_fluc;
         bool zero_syst;

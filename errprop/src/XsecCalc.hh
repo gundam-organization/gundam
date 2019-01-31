@@ -1,8 +1,10 @@
 #ifndef XSECCALC_HH
 #define XSECCALC_HH
 
+#include <algorithm>
 #include <cstdlib>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -38,6 +40,7 @@ struct SigNorm
 
     double num_targets_val;
     double num_targets_err;
+    bool is_rel_err;
 };
 
 class XsecCalc

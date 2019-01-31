@@ -54,6 +54,7 @@ class FitObj
         std::vector<SignalDef> signal_def;
 
         int m_threads;
+        double m_norm;
         unsigned int total_signal_bins;
         std::string m_tree_type;
 
