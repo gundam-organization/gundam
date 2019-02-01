@@ -28,13 +28,15 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    bool do_save_toys = false;
+    bool use_best_fit = true;
     std::string json_file;
     std::string input_file;
     std::string output_file;
     unsigned int num_toys{0};
 
     char option;
-    while((option = getopt(argc, argv, "j:i:o:n:h")) != -1)
+    while((option = getopt(argc, argv, "j:i:o:n:mth")) != -1)
     {
         switch(option)
         {
@@ -50,12 +52,20 @@ int main(int argc, char** argv)
             case 'n':
                 num_toys = std::stoi(optarg);
                 break;
+            case 'm':
+                use_best_fit = false;
+                break;
+            case 't':
+                do_save_toys = true;
+                break;
             case 'h':
                 std::cout << "USAGE: " << argv[0] << "\nOPTIONS:\n"
                           << "-j : JSON input\n"
                           << "-i : Input file (overrides JSON config)\n"
                           << "-o : Output file (overrides JSON config)\n"
-                          << "-n : Number of toys (overrides JSON config)\n";
+                          << "-n : Number of toys (overrides JSON config)\n"
+                          << "-m : Use mean of toys for covariance calculation\n"
+                          << "-t : Save toys in output file\n";
             default:
                 return 0;
         }
@@ -76,12 +86,10 @@ int main(int argc, char** argv)
         xsec.GenerateToys(num_toys);
     else
         xsec.GenerateToys();
-    xsec.CalcCovariance(false);
+    xsec.CalcCovariance(use_best_fit);
     if(!output_file.empty())
-        xsec.SaveOutput(output_file, true);
-    else
-        xsec.SaveOutput();
-
+        xsec.SetOutputFile(output_file);
+    xsec.SaveOutput(do_save_toys);
     std::cout << TAG << "Finished." << std::endl;
     std::cout << TAG << "\u3042\u308a\u304c\u3068\u3046\u3054\u3056\u3044\u307e\u3057\u305f\uff01"
               << std::endl;

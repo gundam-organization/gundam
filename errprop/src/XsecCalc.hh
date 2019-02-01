@@ -73,11 +73,12 @@ class XsecCalc
         std::vector<TH1D> GetTruSignal() {return true_events -> GetSignalHist();};
         TH1D GetTruSignal(const int signal_id) {return true_events -> GetSignalHist(signal_id);};
 
-        void SaveOutput(const std::string& override_file = "", bool save_toys = false);
+        void SaveOutput(bool save_toys = false);
+        void SetOutputFile(const std::string& override_file) {output_file = override_file;};
 
-        std::string GetOutputFileName() {return output_file;};
-        std::string GetInputFileName() {return input_file;};
-        unsigned int GetNumToys() {return num_toys;};
+        std::string GetOutputFileName() const {return output_file;};
+        std::string GetInputFileName() const {return input_file;};
+        unsigned int GetNumToys() const {return num_toys;};
         void SetNumToys(const int n) {num_toys = n;};
 
     private:

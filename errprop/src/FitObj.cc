@@ -167,13 +167,22 @@ void FitObj::ReweightEvents(const std::vector<double>& input_par)
     {
         const unsigned int num_events = samples[s] -> GetN();
         const std::string det(samples[s] -> GetDetector());
+#pragma omp parallel for num_threads(m_threads)
         for(unsigned int i = 0; i < num_events; ++i)
         {
             AnaEvent* ev = samples[s] -> GetEvent(i);
             ev -> ResetEvWght();
             for(int f = 0; f < fit_par.size(); ++f)
                 fit_par[f] -> ReWeight(ev, det, s, i, new_par.at(f));
+        }
+    }
 
+    for(int s = 0; s < samples.size(); ++s)
+    {
+        const unsigned int num_events = samples[s] -> GetN();
+        for(unsigned int i = 0; i < num_events; ++i)
+        {
+            AnaEvent* ev = samples[s] -> GetEvent(i);
             if(ev -> isSignalEvent())
             {
                 int signal_id = ev -> GetSignalType();
@@ -194,7 +203,6 @@ void FitObj::ReweightNominal()
     for(int s = 0; s < samples.size(); ++s)
     {
         const unsigned int num_events = samples[s] -> GetN();
-        const std::string det(samples[s] -> GetDetector());
         for(unsigned int i = 0; i < num_events; ++i)
         {
             AnaEvent* ev = samples[s] -> GetEvent(i);

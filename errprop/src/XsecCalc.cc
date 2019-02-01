@@ -32,6 +32,7 @@ XsecCalc::XsecCalc(const std::string& json_config)
               << TAG << "True events config: " << tru_json_config << std::endl;
 
     std::cout << TAG << "Reading post-fit file..." << std::endl;
+    TH1::AddDirectory(false);
     ReadFitFile(input_file);
 
     std::cout << TAG << "Initializing fit objects..." << std::endl;
@@ -201,7 +202,7 @@ void XsecCalc::GenerateToys(const int ntoys)
         for(int i = 0; i < npar; ++i)
         {
             if(toy[i] < 0.0)
-                toy[i] = 0.0;
+                toy[i] = 0.1;
         }
 
         selected_events -> ReweightEvents(toy);
@@ -329,7 +330,7 @@ void XsecCalc::CalcCovariance(bool use_best_fit)
 {
     std::cout << TAG << "Calculating covariance matrix..." << std::endl;
 
-    TH1D h_cov("h_cov", "h_cov", total_signal_bins, 0, total_signal_bins);
+    TH1D h_cov;
     if(use_best_fit)
     {
         ReweightBestFit();
@@ -338,14 +339,14 @@ void XsecCalc::CalcCovariance(bool use_best_fit)
     }
     else
     {
-        //TH1D h_mean("","",total_signal_bins, 0, total_signal_bins);
+        TH1D h_mean("","",total_signal_bins, 0, total_signal_bins);
         for(const auto& hist : toys_sel_events)
         {
             for(int i = 0; i < total_signal_bins; ++i)
-                h_cov.Fill(i + 0.5, hist.GetBinContent(i+1));
+                h_mean.Fill(i + 0.5, hist.GetBinContent(i+1));
         }
-        h_cov.Scale(1.0 / (1.0 * num_toys));
-        //h_cov = h_mean;
+        h_mean.Scale(1.0 / (1.0 * num_toys));
+        h_cov = h_mean;
 
         for(int i = 1; i <= total_signal_bins; ++i)
             std::cout << "Bin " << i << ": " << h_cov.GetBinContent(i) << std::endl;
@@ -392,24 +393,15 @@ void XsecCalc::CalcCovariance(bool use_best_fit)
     std::cout << TAG << "Covariance and correlation matrix calculated." << std::endl;
 }
 
-void XsecCalc::SaveOutput(const std::string& override_file, bool save_toys)
+void XsecCalc::SaveOutput(bool save_toys)
 {
-    TFile* file = nullptr;
-    if(!override_file.empty())
-    {
-        file = TFile::Open(override_file.c_str(), "RECREATE");
-        std::cout << TAG << "Saving output to " << override_file << std::endl;
-    }
-    else
-    {
-        file = TFile::Open(output_file.c_str(), "RECREATE");
-        std::cout << TAG << "Saving output to " << output_file << std::endl;
-    }
-
+    TFile* file = TFile::Open(output_file.c_str(), "RECREATE");
+    std::cout << TAG << "Saving output to " << output_file << std::endl;
 
     file->cd();
     if(save_toys)
     {
+        std::cout << TAG << "Saving toys to file." << std::endl;
         for(int i = 0; i < num_toys; ++i)
         {
             toys_sel_events.at(i).Write();
@@ -417,7 +409,6 @@ void XsecCalc::SaveOutput(const std::string& override_file, bool save_toys)
             toys_eff.at(i).Write();
         }
     }
-
 
     sel_best_fit.Write("sel_best_fit");
     tru_best_fit.Write("tru_best_fit");
