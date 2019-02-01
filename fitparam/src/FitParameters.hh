@@ -25,12 +25,12 @@ class FitParameters : public AnaFitParameters
         bool SetBinning(const std::string& file_name, std::vector<xsllh::FitBin>& bins);
         void AddDetector(const std::string& det, const std::string& f_binning);
         void AddDetector(const std::string& det, const std::vector<SignalDef>& v_input);
+        int GetBinIndex(const int sig, double D1, double D2) const;
         double CalcRegularisation(const std::vector<double>& params) const;
         double CalcRegularisation(const std::vector<double>& params, double strength,
                                   RegMethod flag = kL2Reg) const;
 
     private:
-        int GetBinIndex(const int sig, double D1, double D2) const;
         std::map<std::string, std::vector<xsllh::FitBin>> m_fit_bins;
         std::map<std::string, int> m_det_offset;
         std::vector<std::string> v_detectors;

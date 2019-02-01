@@ -1,6 +1,7 @@
 #include "FitObj.hh"
 
-FitObj::FitObj(const std::string& json_config, const std::string& event_tree_name, bool is_true_tree)
+FitObj::FitObj(const std::string& json_config, const std::string& event_tree_name,
+               bool is_true_tree)
 {
     OptParser parser;
     if(!parser.ParseJSON(json_config))
@@ -13,11 +14,11 @@ FitObj::FitObj(const std::string& json_config, const std::string& event_tree_nam
 
     std::string input_dir = parser.input_dir;
     std::string fname_data = parser.fname_data;
-    std::string fname_mc   = parser.fname_mc;
+    std::string fname_mc = parser.fname_mc;
     std::string fname_output = parser.fname_output;
     std::vector<std::string> topology = parser.sample_topology;
 
-    const double potD  = parser.data_POT;
+    const double potD = parser.data_POT;
     const double potMC = parser.mc_POT;
     m_norm = potD / potMC;
     m_threads = parser.num_threads;
@@ -42,7 +43,7 @@ FitObj::FitObj(const std::string& json_config, const std::string& event_tree_nam
                       << TAG << "Use Sample: " << std::boolalpha << opt.use_sample << std::endl;
 
             auto s = new AnaSample(opt.cut_branch, opt.name, opt.detector, opt.binning, tdata);
-            s -> SetNorm(potD/potMC);
+            s->SetNorm(potD / potMC);
             if(opt.cut_branch >= 0 && !is_true_tree)
                 samples.push_back(s);
             else if(opt.cut_branch < 0 && is_true_tree)
@@ -61,12 +62,12 @@ FitObj::FitObj(const std::string& json_config, const std::string& event_tree_nam
     TAxis* nd_numu_bins = nd_numu_bins_hist->GetXaxis();
 
     std::vector<double> enubins;
-    enubins.push_back(nd_numu_bins -> GetBinLowEdge(1));
-    for(int i = 0; i < nd_numu_bins -> GetNbins(); ++i)
-        enubins.push_back(nd_numu_bins -> GetBinUpEdge(i+1));
-    finfluxcov -> Close();
+    enubins.push_back(nd_numu_bins->GetBinLowEdge(1));
+    for(int i = 0; i < nd_numu_bins->GetNbins(); ++i)
+        enubins.push_back(nd_numu_bins->GetBinUpEdge(i + 1));
+    finfluxcov->Close();
 
-    //FitParameters sigfitpara("par_fit", false);
+    // FitParameters sigfitpara("par_fit", false);
     FitParameters* sigfitpara = new FitParameters("par_fit", false);
     for(const auto& opt : parser.detectors)
     {
@@ -76,7 +77,7 @@ FitObj::FitObj(const std::string& json_config, const std::string& event_tree_nam
     sigfitpara->InitEventMap(samples, 0);
     fit_par.push_back(sigfitpara);
 
-    //FluxParameters fluxpara("par_flux");
+    // FluxParameters fluxpara("par_flux");
     FluxParameters* fluxpara = new FluxParameters("par_flux");
     for(const auto& opt : parser.detectors)
     {
@@ -85,8 +86,9 @@ FitObj::FitObj(const std::string& json_config, const std::string& event_tree_nam
     }
     fluxpara->InitEventMap(samples, 0);
     fit_par.push_back(fluxpara);
+    m_flux_par = fluxpara;
 
-    //XsecParameters xsecpara("par_xsec");
+    // XsecParameters xsecpara("par_xsec");
     XsecParameters* xsecpara = new XsecParameters("par_xsec");
     for(const auto& opt : parser.detectors)
     {
@@ -96,7 +98,7 @@ FitObj::FitObj(const std::string& json_config, const std::string& event_tree_nam
     xsecpara->InitEventMap(samples, 0);
     fit_par.push_back(xsecpara);
 
-    //DetParameters detpara("par_det");
+    // DetParameters detpara("par_det");
     DetParameters* detpara = new DetParameters("par_det");
     for(const auto& opt : parser.detectors)
     {
@@ -130,8 +132,8 @@ void FitObj::InitSignalHist(const std::vector<SignalDef>& v_signal)
         if(sig.use_signal == false)
             continue;
 
-        std::cout << TAG << "Adding signal " << sig.name << " with ID " << signal_id
-                  << " to fit." << std::endl;
+        std::cout << TAG << "Adding signal " << sig.name << " with ID " << signal_id << " to fit."
+                  << std::endl;
 
         signal_bins.emplace_back(BinManager(sig.binning));
         signal_id++;
@@ -159,34 +161,35 @@ void FitObj::ReweightEvents(const std::vector<double>& input_par)
     for(const auto& param_type : fit_par)
     {
         start = end;
-        end = start + param_type -> GetNpar();
+        end = start + param_type->GetNpar();
         new_par.emplace_back(std::vector<double>(start, end));
     }
 
     for(int s = 0; s < samples.size(); ++s)
     {
-        const unsigned int num_events = samples[s] -> GetN();
-        const std::string det(samples[s] -> GetDetector());
+        const unsigned int num_events = samples[s]->GetN();
+        const std::string det(samples[s]->GetDetector());
 #pragma omp parallel for num_threads(m_threads)
         for(unsigned int i = 0; i < num_events; ++i)
         {
-            AnaEvent* ev = samples[s] -> GetEvent(i);
-            ev -> ResetEvWght();
+            AnaEvent* ev = samples[s]->GetEvent(i);
+            ev->ResetEvWght();
             for(int f = 0; f < fit_par.size(); ++f)
-                fit_par[f] -> ReWeight(ev, det, s, i, new_par.at(f));
+                fit_par[f]->ReWeight(ev, det, s, i, new_par.at(f));
         }
     }
 
     for(int s = 0; s < samples.size(); ++s)
     {
-        const unsigned int num_events = samples[s] -> GetN();
+        const unsigned int num_events = samples[s]->GetN();
         for(unsigned int i = 0; i < num_events; ++i)
         {
-            AnaEvent* ev = samples[s] -> GetEvent(i);
-            if(ev -> isSignalEvent())
+            AnaEvent* ev = samples[s]->GetEvent(i);
+            if(ev->isSignalEvent())
             {
-                int signal_id = ev -> GetSignalType();
-                int bin_idx = signal_bins[signal_id].GetBinIndex(std::vector<double>{ev->GetTrueD2(),ev->GetTrueD1()});
+                int signal_id = ev->GetSignalType();
+                int bin_idx = signal_bins[signal_id].GetBinIndex(
+                    std::vector<double>{ev->GetTrueD2(), ev->GetTrueD1()});
                 signal_hist[signal_id].Fill(bin_idx + 0.5, ev->GetEvWght());
             }
         }
@@ -202,14 +205,15 @@ void FitObj::ReweightNominal()
 
     for(int s = 0; s < samples.size(); ++s)
     {
-        const unsigned int num_events = samples[s] -> GetN();
+        const unsigned int num_events = samples[s]->GetN();
         for(unsigned int i = 0; i < num_events; ++i)
         {
-            AnaEvent* ev = samples[s] -> GetEvent(i);
-            if(ev -> isSignalEvent())
+            AnaEvent* ev = samples[s]->GetEvent(i);
+            if(ev->isSignalEvent())
             {
-                int signal_id = ev -> GetSignalType();
-                int bin_idx = signal_bins[signal_id].GetBinIndex(std::vector<double>{ev->GetTrueD2(),ev->GetTrueD1()});
+                int signal_id = ev->GetSignalType();
+                int bin_idx = signal_bins[signal_id].GetBinIndex(
+                    std::vector<double>{ev->GetTrueD2(), ev->GetTrueD1()});
                 signal_hist[signal_id].Fill(bin_idx + 0.5, ev->GetEvWghtMC());
             }
         }
@@ -228,8 +232,8 @@ void FitObj::ResetHist()
 TH1D FitObj::GetHistCombined(const std::string& suffix) const
 {
     std::string hist_name = m_tree_type + "_signal_" + suffix;
-    TH1D hist_combined(hist_name.c_str(), hist_name.c_str(),
-                       total_signal_bins, 0, total_signal_bins);
+    TH1D hist_combined(hist_name.c_str(), hist_name.c_str(), total_signal_bins, 0,
+                       total_signal_bins);
 
     unsigned int bin = 1;
     for(const auto& hist : signal_hist)
@@ -239,4 +243,30 @@ TH1D FitObj::GetHistCombined(const std::string& suffix) const
     }
 
     return hist_combined;
+}
+
+double FitObj::ReweightFluxHist(const std::vector<double>& input_par, TH1D& flux_hist,
+                                const std::string& det)
+{
+    std::vector<double> flux_par;
+    auto start = input_par.begin();
+    auto end = input_par.begin();
+    for(const auto& param_type : fit_par)
+    {
+        start = end;
+        end = start + param_type->GetNpar();
+        if(param_type == m_flux_par)
+            flux_par.assign(start, end);
+    }
+
+    double flux_int = 0.0;
+    for(int i = 1; i <= flux_hist.GetNbinsX(); ++i)
+    {
+        const double enu = flux_hist.GetBinCenter(i);
+        const double val = flux_hist.GetBinContent(i);
+        const int idx = m_flux_par->GetBinIndex(det, enu);
+        flux_int += val * flux_par[i - 1];
+    }
+
+    return flux_int;
 }

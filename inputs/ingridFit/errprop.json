@@ -8,11 +8,11 @@
     "tru_config" : "config.json",
     "sig_norm" : {
         "CC0pi" : {
-            "flux_file" : "flux.root",
-            "flux_hist" : "flux_numu",
+            "flux_file" : "weighted_flux13av2_run2-4.root",
+            "flux_hist" : "flux_rebin",
             "flux_int"  : 1.12E13,
             "flux_err"  : 0.085,
-            "use_flux_fit" : false,
+            "use_flux_fit" : true,
             "num_targets_val" : 5.9E29,
             "num_targets_err" : 0.0067,
             "relative_err" : true

@@ -14,9 +14,9 @@ public:
     void ReWeight(AnaEvent* event, const std::string& det, int nsample, int nevent,
                   std::vector<double>& params);
     void AddDetector(const std::string& det, const std::vector<double>& bins);
+    int GetBinIndex(const std::string& det, double enu);
 
 private:
-    int GetBinIndex(const std::string& det, double enu);
     std::vector<double> m_enubins;
     std::map<std::string, int> m_det_offset;
     std::map<std::string, std::vector<double>> m_det_bins;
