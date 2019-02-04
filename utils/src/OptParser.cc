@@ -30,7 +30,6 @@ bool OptParser::ParseJSON(std::string json_file)
     fname_data = input_dir + j["data_file"].get<std::string>();
     fname_mc = input_dir + j["mc_file"].get<std::string>();
     fname_output = j["output_file"].get<std::string>();
-    fname_xsec = j["xsec_file"].get<std::string>();
 
     fit_type = j["fit_type"];
     stat_fluc = j["stat_fluc"];
@@ -39,7 +38,6 @@ bool OptParser::ParseJSON(std::string json_file)
     mc_POT = j["mc_POT"];
     rng_seed = j["rng_seed"];
     num_threads = j["num_threads"];
-    num_throws = j["num_throws"];
 
     sample_topology = j["sample_topology"].get<std::vector<std::string>>();
 
@@ -73,12 +71,6 @@ bool OptParser::ParseJSON(std::string json_file)
         d.name = detector["name"];
         d.xsec = input_dir + detector["xsec_config"].get<std::string>();
         d.binning = input_dir + detector["binning"].get<std::string>();
-        d.flux_file = input_dir + detector["flux_file"].get<std::string>();
-        d.flux_hist = detector["flux_hist"];
-        d.flux_integral = detector["flux_integral"];
-        d.flux_error = detector["flux_error"];
-        d.ntargets_val = detector["ntargets_val"];
-        d.ntargets_err = detector["ntargets_err"];
         d.use_detector = detector["use_detector"];
         detectors.push_back(d);
 

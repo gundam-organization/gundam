@@ -118,6 +118,9 @@ private:
     unsigned int num_signals;
     unsigned int total_signal_bins;
 
+    const double perMeV = 1.0;
+    const double perGeV = 1000.0;
+
     const std::string TAG = color::YELLOW_STR + "[XsecExtract]: " + color::RESET_STR;
     const std::string ERR = color::RED_STR + "[ERROR]: " + color::RESET_STR;
 };

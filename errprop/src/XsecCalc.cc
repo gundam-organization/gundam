@@ -280,7 +280,7 @@ void XsecCalc::ApplyNorm(std::vector<TH1D>& vec_hist, const std::vector<double>&
     {
         ApplyTargets(i, vec_hist[i], is_toy);
         ApplyFlux(i, vec_hist[i], param, is_toy);
-        ApplyBinWidth(i, vec_hist[i], 1000);
+        ApplyBinWidth(i, vec_hist[i], perGeV);
     }
 }
 
@@ -375,8 +375,8 @@ void XsecCalc::CalcCovariance(bool use_best_fit)
         h_mean.Scale(1.0 / (1.0 * num_toys));
         h_cov = h_mean;
 
-        for(int i = 1; i <= total_signal_bins; ++i)
-            std::cout << "Bin " << i << ": " << h_cov.GetBinContent(i) << std::endl;
+        //for(int i = 1; i <= total_signal_bins; ++i)
+        //    std::cout << "Bin " << i << ": " << h_cov.GetBinContent(i) << std::endl;
 
         std::cout << TAG << "Using mean of toys for covariance." << std::endl;
     }
@@ -452,7 +452,7 @@ void XsecCalc::SaveOutput(bool save_toys)
 
     for(const auto& n : v_normalization)
     {
-        std::string name = n.name + "_flux";
+        std::string name = n.name + "_flux_nominal";
         n.flux_hist.Write(name.c_str());
 
         name = n.name + "_flux_throws";

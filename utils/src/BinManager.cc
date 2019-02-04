@@ -102,6 +102,12 @@ std::vector<double> BinManager::GetBinVector(const double d) const
 
 double BinManager::GetBinWidth(const int i) const
 {
+    if(i >= nbins)
+    {
+        std::cout << "[WARNING]: Index " << i << " out of bounds." << std::endl;
+        return 1.0;
+    }
+
     double total_width = 1.0;
     for(int d = 0; d < dimension; ++d)
     {

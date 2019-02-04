@@ -47,12 +47,6 @@ struct DetOpt
     std::string name;
     std::string xsec;
     std::string binning;
-    std::string flux_file;
-    std::string flux_hist;
-    double flux_integral;
-    double flux_error;
-    double ntargets_val;
-    double ntargets_err;
     bool use_detector;
 };
 
@@ -70,14 +64,12 @@ class OptParser
         std::string fname_data;
         std::string fname_mc;
         std::string fname_output;
-        std::string fname_xsec;
         std::string input_dir;
         std::string xsLLh_env;
 
         int fit_type;
         int rng_seed;
         int num_threads;
-        int num_throws;
         double data_POT;
         double mc_POT;
 
