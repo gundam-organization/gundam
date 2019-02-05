@@ -35,6 +35,8 @@ struct SigNorm
     TH1D target_throws;
     std::string name;
     std::string detector;
+    unsigned int nbins;
+
     std::string flux_file;
     std::string flux_name;
     double flux_int;
@@ -78,6 +80,8 @@ public:
     TH1D GetTruSignal(const int signal_id) { return true_events->GetSignalHist(signal_id); };
 
     void SaveOutput(bool save_toys = false);
+    void SaveSignalHist(TFile* file);
+    void SaveExtra(TFile* file);
     void SetOutputFile(const std::string& override_file) { output_file = override_file; };
 
     std::string GetOutputFileName() const { return output_file; };
@@ -105,6 +109,7 @@ private:
     TH1D sel_best_fit;
     TH1D tru_best_fit;
     TH1D eff_best_fit;
+    std::vector<TH1D> signal_best_fit;
     std::vector<TH1D> toys_sel_events;
     std::vector<TH1D> toys_tru_events;
     std::vector<TH1D> toys_eff;
@@ -112,6 +117,7 @@ private:
 
     std::string input_file;
     std::string output_file;
+    std::string extra_hists;
 
     unsigned int num_toys;
     unsigned int rng_seed;

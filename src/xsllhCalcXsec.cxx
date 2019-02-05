@@ -13,12 +13,12 @@
 
 int main(int argc, char** argv)
 {
-    const std::string TAG = color::CYAN_STR + "[CalcXsec]: " + color::RESET_STR;
+    const std::string TAG = color::CYAN_STR + "[xsCalc]: " + color::RESET_STR;
     const std::string ERR = color::RED_STR + color::BOLD_STR + "[ERROR]: " + color::RESET_STR;
 
     std::cout << "------------------------------------------------\n"
-              << TAG << "Welcome to the Super-xsLLhFitter.\n"
-              << TAG << "Initializing the fit machinery..." << std::endl;
+              << TAG << color::RainbowText("Welcome to the Super-xsLLh Cross-section Calculator.\n")
+              << TAG << color::RainbowText("Initializing the machinery...") << std::endl;
 
     const std::string xslf_env = std::getenv("XSLLHFITTER");
     if(xslf_env.empty())

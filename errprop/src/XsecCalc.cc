@@ -22,6 +22,11 @@ XsecCalc::XsecCalc(const std::string& json_config)
 
     input_file = input_dir + j["input_fit_file"].get<std::string>();
     output_file = j["output_file"].get<std::string>();
+    //extra_hists = input_dir + j["extra_hists"].get<std::string>();
+
+    extra_hists = j.value("extra_hists", "");
+    if(!extra_hists.empty())
+        extra_hists = input_dir + extra_hists;
 
     num_toys = j["num_toys"];
     rng_seed = j["rng_seed"];
@@ -68,6 +73,7 @@ void XsecCalc::ReadFitFile(const std::string& file)
     postfit_param.clear();
 
     std::cout << TAG << "Opening " << file << std::endl;
+    input_file = file;
 
     TFile* postfit_file = TFile::Open(file.c_str(), "READ");
     postfit_cov = (TMatrixDSym*)postfit_file->Get("res_cov_matrix");
@@ -93,7 +99,7 @@ void XsecCalc::InitToyThrower()
     //    (*postfit_cov)(i,i) += 1E-6;
 
     toy_thrower = new ToyThrower(*postfit_cov, rng_seed, 1E-48);
-    if(!toy_thrower->ForcePosDef(1E-6, 1E-48))
+    if(!toy_thrower->ForcePosDef(1E-9, 1E-48))
     {
         std::cout << ERR << "Covariance matrix could not be made positive definite.\n"
                   << "Exiting." << std::endl;
@@ -140,7 +146,11 @@ void XsecCalc::InitNormalization(const nlohmann::json& j, const std::string inpu
                 n.num_targets_err = n.num_targets_val * n.num_targets_err;
             }
 
-            std::cout << TAG << "Flux file: " << n.flux_file << std::endl
+            BinManager bm(sig_def.binning);
+            n.nbins = bm.GetNbins();
+
+            std::cout << TAG << "Num. bins: " << n.nbins << std::endl
+                      << TAG << "Flux file: " << n.flux_file << std::endl
                       << TAG << "Flux hist: " << n.flux_name << std::endl
                       << TAG << "Flux integral: " << n.flux_int << std::endl
                       << TAG << "Flux error: " << n.flux_err << std::endl
@@ -187,6 +197,7 @@ void XsecCalc::ReweightBestFit()
 
     sel_best_fit = ConcatHist(sel_hists, "sel_best_fit");
     tru_best_fit = ConcatHist(tru_hists, "tru_best_fit");
+    signal_best_fit = std::move(sel_hists);
 }
 
 void XsecCalc::ReweightParam(const std::vector<double>& param)
@@ -417,7 +428,18 @@ void XsecCalc::CalcCovariance(bool use_best_fit)
     for(int i = 0; i < total_signal_bins; ++i)
         sel_best_fit.SetBinError(i + 1, sqrt(xsec_cov(i, i)));
 
+    unsigned int idx = 0;
+    for(int n = 0; n < signal_best_fit.size(); ++n)
+    {
+        unsigned int nbins = v_normalization.at(n).nbins;
+        for(int i = 0; i < nbins; ++i)
+            signal_best_fit.at(n).SetBinError(i + 1, sqrt(xsec_cov(i+idx,i+idx)));
+
+        idx += nbins;
+    }
+
     std::cout << TAG << "Covariance and correlation matrix calculated." << std::endl;
+    std::cout << TAG << "Errors applied to histograms." << std::endl;
 }
 
 void XsecCalc::SaveOutput(bool save_toys)
@@ -450,6 +472,8 @@ void XsecCalc::SaveOutput(bool save_toys)
     TVectorD postfit_param_root(postfit_param.size(), postfit_param.data());
     postfit_param_root.Write("postfit_param");
 
+    SaveSignalHist(file);
+
     for(const auto& n : v_normalization)
     {
         std::string name = n.name + "_flux_nominal";
@@ -462,5 +486,83 @@ void XsecCalc::SaveOutput(bool save_toys)
         n.target_throws.Write(name.c_str());
     }
 
+    SaveExtra(file);
     file->Close();
+}
+
+void XsecCalc::SaveSignalHist(TFile* file)
+{
+    file->cd();
+    for(int id = 0; id < num_signals; ++id)
+    {
+        signal_best_fit.at(id).Write();
+
+        BinManager bm = selected_events->GetBinManager(id);
+        auto cos_edges = bm.GetEdgeVector(0);
+        auto pmu_edges = bm.GetEdgeVector(1);
+
+        std::vector<std::vector<double>> bin_edges;
+        bin_edges.emplace_back(std::vector<double>());
+        bin_edges.at(bin_edges.size()-1).emplace_back(pmu_edges.at(0).first);
+        bin_edges.at(bin_edges.size()-1).emplace_back(pmu_edges.at(0).second);
+
+        for(int m = 1; m < cos_edges.size(); ++m)
+        {
+            if(cos_edges[m] != cos_edges[m-1])
+                bin_edges.emplace_back(std::vector<double>());
+
+            bin_edges.at(bin_edges.size()-1).emplace_back(pmu_edges.at(m).first);
+            bin_edges.at(bin_edges.size()-1).emplace_back(pmu_edges.at(m).second);
+        }
+
+        for(int n = 0; n < bin_edges.size(); ++n)
+        {
+            std::sort(bin_edges.at(n).begin(), bin_edges.at(n).end());
+            auto iter = std::unique(bin_edges.at(n).begin(), bin_edges.at(n).end());
+            bin_edges.at(n).erase(iter, bin_edges.at(n).end());
+        }
+
+        unsigned int offset = 0;
+        for(int k = 0; k < bin_edges.size(); ++k)
+        {
+            std::string name = v_normalization.at(id).name + "_cos_bin" + std::to_string(k);
+            TH1D temp(name.c_str(), name.c_str(), bin_edges.at(k).size()-1, bin_edges.at(k).data());
+
+            for(int l = 1; l <= temp.GetNbinsX(); ++l)
+            {
+                temp.SetBinContent(l, signal_best_fit.at(id).GetBinContent(l+offset));
+                temp.SetBinError(l, signal_best_fit.at(id).GetBinError(l+offset));
+            }
+            offset += temp.GetNbinsX();
+            temp.GetXaxis()->SetRange(1,temp.GetNbinsX()-1);
+            temp.Write();
+        }
+    }
+}
+
+void XsecCalc::SaveExtra(TFile* output)
+{
+    if(extra_hists.empty())
+        return;
+
+    std::ifstream fin(extra_hists, std::ios::in);
+    if(!fin.is_open())
+    {
+        std::cout << ERR << "Failed to open file: " << extra_hists << std::endl;
+        return;
+    }
+    else
+    {
+        std::cout << TAG << "Saving extra histograms from fit output." << std::endl;
+        TFile* file = TFile::Open(input_file.c_str(), "READ");
+        output->cd();
+
+        std::string line;
+        while(std::getline(fin, line))
+        {
+            TH1D* temp = (TH1D*)file->Get(line.c_str());
+            temp->Write();
+        }
+        file->Close();
+    }
 }

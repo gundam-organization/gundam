@@ -2,6 +2,7 @@
     "input_dir" : "/inputs/ingridFit/",
     "input_fit_file" : "test.root",
     "output_file" : "xsec.root",
+    "extra_hists" : "extra_hists.txt",
     "num_toys" : 500,
     "rng_seed" : 12257,
     "sel_config" : "config.json",
@@ -18,13 +19,13 @@
             "relative_err" : true
         },
         "CC1pi" : {
-            "flux_file" : "flux.root",
-            "flux_hist" : "flux_numu",
-            "flux_int"  : 1.0E13,
-            "flux_err"  : 0.08,
-            "use_flux_fit" : false,
-            "num_targets_val" : 5.5E29,
-            "num_targets_err" : 0.0087,
+            "flux_file" : "weighted_flux13av2_run2-4.root",
+            "flux_hist" : "flux_rebin",
+            "flux_int"  : 1.12E13,
+            "flux_err"  : 0.085,
+            "use_flux_fit" : true,
+            "num_targets_val" : 5.9E29,
+            "num_targets_err" : 0.0067,
             "relative_err" : true
         }
     }

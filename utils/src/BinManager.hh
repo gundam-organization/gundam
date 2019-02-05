@@ -23,6 +23,7 @@ class BinManager
         double GetBinWidth(const int i, const int d) const;
         std::vector<double> GetBinVector(const double d) const;
         std::vector<std::vector<std::pair<double, double>>> GetEdgeVector() const { return bin_edges; };
+        std::vector<std::pair<double, double>> GetEdgeVector(const int d) const { return bin_edges.at(d); };
         void Print() const;
 
     private:
