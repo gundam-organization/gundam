@@ -20,7 +20,7 @@
         "variance" : 1.00
     },
     "det_cov" : {
-        "file" : "allbin_allsyst_allsam.root",
+        "file" : "detector_cov.root",
         "matrix" : "cov_mat",
         "binning" : "det_binning",
         "throw"  : false,
@@ -43,17 +43,17 @@
         {
             "name" : "ND280",
             "xsec_config" : "ptheta_dials.json",
-            "binning" : "tn337_binning.txt",
+            "binning" : "binning/analysis_binning.txt",
             "template_par" : [
                 {
                     "name" : "CC0pi",
-                    "binning" : "tn337_binning.txt",
+                    "binning" : "binning/analysis_binning.txt",
                     "signal" : {"topology" : [0,1,2]},
                     "use" : true
                 },
                 {
                     "name" : "CC1pi",
-                    "binning" : "tn337_binning.txt",
+                    "binning" : "binning/analysis_binning.txt",
                     "signal" : {"topology" : [3]},
                     "use" : false
                 }
@@ -80,56 +80,56 @@
             "cut_branch" : -1,
             "name" : "truth",
             "detector" : "ND280",
-            "binning" : "tn337_binning.txt",
+            "binning" : "binning/analysis_binning.txt",
             "use_sample" : true
         },
         {
             "cut_branch" : 0,
             "name" : "muTPC",
             "detector" : "ND280",
-            "binning" : "tn337_binning.txt",
+            "binning" : "binning/sample0_bins.txt",
             "use_sample" : true
         },
         {
             "cut_branch" : 1,
             "name" : "muTPCpTPC",
             "detector" : "ND280",
-            "binning" : "tn337_binning.txt",
+            "binning" : "binning/sample1_bins.txt",
             "use_sample" : true
         },
         {
             "cut_branch" : 2,
             "name" : "muTPCpFGD",
             "detector" : "ND280",
-            "binning" : "tn337_binning.txt",
+            "binning" : "binning/sample2_bins.txt",
             "use_sample" : true
         },
         {
             "cut_branch" : 3,
             "name" : "muFGDpTPC",
             "detector" : "ND280",
-            "binning" : "tn337_binning.txt",
+            "binning" : "binning/sample3_bins.txt",
             "use_sample" : true
         },
         {
             "cut_branch" : 4,
             "name" : "muFGD",
             "detector" : "ND280",
-            "binning" : "tn337_binning.txt",
+            "binning" : "binning/sample4_bins.txt",
             "use_sample" : true
         },
         {
             "cut_branch" : 5,
             "name" : "CC1pi",
             "detector" : "ND280",
-            "binning" : "tn337_binning.txt",
+            "binning" : "binning/sample5_bins.txt",
             "use_sample" : true
         },
         {
             "cut_branch" : 6,
             "name" : "CCDIS",
             "detector" : "ND280",
-            "binning" : "tn337_binning.txt",
+            "binning" : "binning/sample6_bins.txt",
             "use_sample" : true
         },
         {

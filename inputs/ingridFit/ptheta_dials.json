@@ -224,20 +224,20 @@
         },
         {
             "name" : "FSI_PI_PROD",
-            "nominal" : 1.00,
+            "nominal" : 1.80,
             "step" : 0.05,
             "limit_lo" : 0.00,
-            "limit_hi" : 2.00,
+            "limit_hi" : 3.00,
             "binning" : "ptheta_splines/tn337_binning.txt",
             "splines" : "ptheta_splines/fsi_pi_prod_splines.root",
             "use" : true
         },
         {
             "name" : "FSI_INEL_HI",
-            "nominal" : 1.80,
+            "nominal" : 1.00,
             "step" : 0.05,
             "limit_lo" : 0.00,
-            "limit_hi" : 3.00,
+            "limit_hi" : 2.00,
             "binning" : "ptheta_splines/tn337_binning.txt",
             "splines" : "ptheta_splines/fsi_inel_hi_splines.root",
             "use" : true

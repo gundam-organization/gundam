@@ -1,7 +1,7 @@
 {
     "files" : [
         {
-            "fname_input" : "/mnt/home/cuddandr/work/nd280Software/v12r15/highland2/numuCCZeroPiAnalysis/v2r2/Linux-x86_64/highland_systematics.root",
+            "fname_input" : "/mnt/home/cuddandr/work/nd280Software/v12r15/highland2/numuCCZeroPiAnalysis/v2r2/Linux-x86_64/hl_files/fgd1/highland_systematics.root",
             "tree_name" : "all_syst",
             "detector": "FGD1",
             "num_toys" : 500,
@@ -9,13 +9,13 @@
             "num_samples" : 10,
             "samples" : {"0": [0], "1": [1], "2": [2], "3": [3], "4": [4], "5": [5], "6": [6]},
             "sample_binning" : {
-                "0" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/tn337_binning.txt",
-                "1" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/tn337_binning.txt",
-                "2" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/tn337_binning.txt",
-                "3" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/tn337_binning.txt",
-                "4" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/tn337_binning.txt",
-                "5" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/tn337_binning.txt",
-                "6" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/tn337_binning.txt"
+                "0" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/binning/sample0_bins.txt",
+                "1" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/binning/sample1_bins.txt",
+                "2" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/binning/sample2_bins.txt",
+                "3" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/binning/sample3_bins.txt",
+                "4" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/binning/sample4_bins.txt",
+                "5" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/binning/sample5_bins.txt",
+                "6" : "/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter/inputs/ingridFit/binning/sample6_bins.txt"
             },
             "cuts" : [7,8,9,8,7,5,4,7,8,7],
             "use" : true
