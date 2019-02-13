@@ -26,6 +26,7 @@
 #include "AnaFitParameters.hh"
 #include "AnaSample.hh"
 #include "ColorOutput.hh"
+#include "OptParser.hh"
 
 enum FitType
 {
@@ -46,6 +47,7 @@ public:
     void FixParameter(const std::string& par_name, const double& value);
     void Fit(const std::vector<AnaSample*>& samples, int fit_type, bool stat_fluc);
 
+    void SetMinSettings(const MinSettings& ms);
     void SetSeed(int seed);
     void SetZeroSyst(bool flag) { m_zerosyst = flag; }
     void SetTopology(const std::vector<std::string> vec_top) { v_topology = vec_top; }
@@ -120,6 +122,7 @@ private:
     std::vector<AnaFitParameters*> m_fitpara;
     std::vector<AnaSample*> m_samples;
 
+    MinSettings min_settings;
     const std::string TAG = color::YELLOW_STR + "[XsecFitter]: " + color::RESET_STR;
     const std::string ERR = color::RED_STR + color::BOLD_STR + "[ERROR]: " + color::RESET_STR;
 };

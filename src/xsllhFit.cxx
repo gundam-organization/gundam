@@ -210,6 +210,7 @@ int main(int argc, char** argv)
     //Instantiate fitter obj
     XsecFitter xsecfit(fout, seed, threads);
     //xsecfit.SetSaveFreq(10000);
+    xsecfit.SetMinSettings(parser.min_settings);
     xsecfit.SetPOTRatio(potD/potMC);
     xsecfit.SetTopology(topology);
     xsecfit.SetZeroSyst(parser.zero_syst);

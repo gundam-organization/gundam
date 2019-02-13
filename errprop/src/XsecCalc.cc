@@ -22,7 +22,6 @@ XsecCalc::XsecCalc(const std::string& json_config)
 
     input_file = input_dir + j["input_fit_file"].get<std::string>();
     output_file = j["output_file"].get<std::string>();
-    //extra_hists = input_dir + j["extra_hists"].get<std::string>();
 
     extra_hists = j.value("extra_hists", "");
     if(!extra_hists.empty())

@@ -14,6 +14,14 @@ XsecFitter::XsecFitter(TDirectory* dirout, const int seed, const int num_threads
     , m_calls(0)
 {
     gRandom = rng;
+
+    min_settings.minimizer = "Minuit2";
+    min_settings.algorithm = "Migrad";
+    min_settings.print_level = 2;
+    min_settings.strategy  = 1;
+    min_settings.tolerance = 1E-4;
+    min_settings.max_iter  = 1E6;
+    min_settings.max_fcn   = 1E9;
 }
 
 XsecFitter::XsecFitter(TDirectory* dirout, const int seed)
@@ -61,6 +69,19 @@ void XsecFitter::FixParameter(const std::string& par_name, const double& value)
     }
 }
 
+void XsecFitter::SetMinSettings(const MinSettings& ms)
+{
+    min_settings = ms;
+    if(m_fitter != nullptr)
+    {
+        m_fitter->SetStrategy(min_settings.strategy);
+        m_fitter->SetPrintLevel(min_settings.print_level);
+        m_fitter->SetTolerance(min_settings.tolerance);
+        m_fitter->SetMaxIterations(min_settings.max_iter);
+        m_fitter->SetMaxFunctionCalls(min_settings.max_fcn);
+    }
+}
+
 void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara)
 {
     m_fitpara = fitpara;
@@ -102,14 +123,25 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara)
     std::cout << "    Number of parameters = " << m_npar << std::endl;
     std::cout << "===========================================" << std::endl;
 
-    m_fitter = ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad");
+    std::cout << TAG << "Minimizer settings..." << std::endl
+              << TAG << "Minimizer: " << min_settings.minimizer << std::endl
+              << TAG << "Algorithm: " << min_settings.algorithm << std::endl
+              << TAG << "Strategy : " << min_settings.strategy << std::endl
+              << TAG << "Print Lvl: " << min_settings.print_level << std::endl
+              << TAG << "Tolerance: " << min_settings.tolerance << std::endl
+              << TAG << "Max Iterations: " << min_settings.max_iter << std::endl
+              << TAG << "Max Fcn Calls : " << min_settings.max_fcn << std::endl;
+
+    //m_fitter = ROOT::Math::Factory::CreateMinimizer("Minuit2", "Fumili2");
+    m_fitter = ROOT::Math::Factory::CreateMinimizer(min_settings.minimizer.c_str(), min_settings.algorithm.c_str());
     m_fcn    = new ROOT::Math::Functor(this, &XsecFitter::CalcLikelihood, m_npar);
 
     m_fitter->SetFunction(*m_fcn);
-    m_fitter->SetPrintLevel(2);
-    m_fitter->SetMaxIterations(1E6);
-    m_fitter->SetMaxFunctionCalls(1E9);
-    m_fitter->SetTolerance(1E-4);
+    m_fitter->SetStrategy(min_settings.strategy);
+    m_fitter->SetPrintLevel(min_settings.print_level);
+    m_fitter->SetTolerance(min_settings.tolerance);
+    m_fitter->SetMaxIterations(min_settings.max_iter);
+    m_fitter->SetMaxFunctionCalls(min_settings.max_fcn);
 
     for(int i = 0; i < m_npar; ++i)
     {
@@ -360,9 +392,9 @@ double XsecFitter::CalcLikelihood(const double* par)
         std::vector<double> vec;
         for(int j = 0; j < npar; ++j)
         {
-            if(output_chi2)
-                std::cout << "Parameter " << j << " for " << m_fitpara[i]->GetName()
-                          << " has value " << par[k] << std::endl;
+            //if(output_chi2)
+            //    std::cout << "Parameter " << j << " for " << m_fitpara[i]->GetName()
+            //              << " has value " << par[k] << std::endl;
             vec.push_back(par[k++]);
         }
 

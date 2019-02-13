@@ -50,7 +50,6 @@ bool OptParser::ParseJSON(std::string json_file)
 
     det_cov.fname = input_dir + j["det_cov"]["file"].get<std::string>();
     det_cov.matrix = j["det_cov"]["matrix"];
-    det_cov.binning = j["det_cov"]["binning"];
     det_cov.do_throw = j["det_cov"]["throw"];
     det_cov.decompose = j["det_cov"]["decomp"];
     det_cov.info_frac = j["det_cov"]["variance"];
@@ -101,6 +100,32 @@ bool OptParser::ParseJSON(std::string json_file)
         s.binning = input_dir + sample["binning"].get<std::string>();
         s.use_sample = sample["use_sample"];
         samples.push_back(s);
+    }
+
+    json m;
+    try
+    {
+        m = j.at("min_settings");
+        min_settings.minimizer = m.value("minimizer", "Minuit2");
+        min_settings.algorithm = m.value("algorithm", "Migrad");
+        min_settings.print_level = m.value("print_level", 2);
+        min_settings.strategy  = m.value("strategy", 1);
+        min_settings.tolerance = m.value("tolerance", 1E-4);
+        min_settings.max_iter  = m.value("max_iter", 1E6);
+        min_settings.max_fcn   = m.value("max_fcn", 1E9);
+    }
+    catch(json::exception& e)
+    {
+        std::cout << TAG << "Using default minimizer settings."
+                  << std::endl;
+
+        min_settings.minimizer = "Minuit2";
+        min_settings.algorithm = "Migrad";
+        min_settings.print_level = 2;
+        min_settings.strategy  = 1;
+        min_settings.tolerance = 1E-4;
+        min_settings.max_iter  = 1E6;
+        min_settings.max_fcn   = 1E9;
     }
 
     std::cout << TAG << "Finished loading JSON configure file.\n";

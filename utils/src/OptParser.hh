@@ -50,6 +50,17 @@ struct DetOpt
     bool use_detector;
 };
 
+struct MinSettings
+{
+    std::string minimizer;
+    std::string algorithm;
+    int print_level;
+    int strategy;
+    double tolerance;
+    double max_iter;
+    double max_fcn;
+};
+
 class OptParser
 {
     public:
@@ -85,6 +96,7 @@ class OptParser
         CovOpt flux_cov;
         CovOpt det_cov;
         CovOpt xsec_cov;
+        MinSettings min_settings;
         std::vector<SampleOpt> samples;
         std::vector<DetOpt> detectors;
 
