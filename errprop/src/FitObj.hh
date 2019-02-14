@@ -13,6 +13,9 @@
 #include <TAxis.h>
 #include <TFile.h>
 #include <TH1D.h>
+#include <TMatrixT.h>
+
+using TMatrixDSym = TMatrixTSym<double>;
 
 #include "AnaSample.hh"
 #include "AnaTreeMC.hh"
@@ -51,7 +54,12 @@ public:
         return signal_bins.at(signal_id).GetNbins();
     };
 
+    TMatrixDSym GetPrefitCov();
+    TMatrixDSym CalcTemplateCov();
+    unsigned int GetNpar() const { return npar; };
+
 private:
+    FitParameters* m_fit_par;
     FluxParameters* m_flux_par;
 
     std::vector<AnaFitParameters*> fit_par;
@@ -63,6 +71,7 @@ private:
 
     int m_threads;
     double m_norm;
+    unsigned int npar;
     unsigned int total_signal_bins;
     std::string m_tree_type;
 

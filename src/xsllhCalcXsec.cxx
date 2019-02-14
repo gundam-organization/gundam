@@ -29,6 +29,7 @@ int main(int argc, char** argv)
     }
 
     bool do_save_toys = false;
+    bool use_prefit_cov = false;
     bool use_best_fit = true;
     std::string json_file;
     std::string input_file;
@@ -36,7 +37,7 @@ int main(int argc, char** argv)
     unsigned int num_toys{0};
 
     char option;
-    while((option = getopt(argc, argv, "j:i:o:n:mth")) != -1)
+    while((option = getopt(argc, argv, "j:i:o:n:pmth")) != -1)
     {
         switch(option)
         {
@@ -52,6 +53,9 @@ int main(int argc, char** argv)
             case 'n':
                 num_toys = std::stoi(optarg);
                 break;
+            case 'p':
+                use_prefit_cov = true;
+                break;
             case 'm':
                 use_best_fit = false;
                 break;
@@ -64,6 +68,7 @@ int main(int argc, char** argv)
                           << "-i : Input file (overrides JSON config)\n"
                           << "-o : Output file (overrides JSON config)\n"
                           << "-n : Number of toys (overrides JSON config)\n"
+                          << "-p : Use prefit covariance for error bands\n"
                           << "-m : Use mean of toys for covariance calculation\n"
                           << "-t : Save toys in output file\n";
             default:
@@ -81,6 +86,8 @@ int main(int argc, char** argv)
     XsecCalc xsec(json_file);
     if(!input_file.empty())
         xsec.ReadFitFile(input_file);
+    if(use_prefit_cov)
+        xsec.UsePrefitCov();
     xsec.ReweightBestFit();
     if(num_toys != 0)
         xsec.GenerateToys(num_toys);

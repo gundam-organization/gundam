@@ -18,6 +18,7 @@ FitObj::FitObj(const std::string& json_config, const std::string& event_tree_nam
     std::string fname_output = parser.fname_output;
     std::vector<std::string> topology = parser.sample_topology;
 
+    npar = 0;
     const double potD = parser.data_POT;
     const double potMC = parser.mc_POT;
     m_norm = potD / potMC;
@@ -65,7 +66,21 @@ FitObj::FitObj(const std::string& json_config, const std::string& event_tree_nam
     enubins.push_back(nd_numu_bins->GetBinLowEdge(1));
     for(int i = 0; i < nd_numu_bins->GetNbins(); ++i)
         enubins.push_back(nd_numu_bins->GetBinUpEdge(i + 1));
+
+    TMatrixDSym* cov_flux = (TMatrixDSym*)finfluxcov -> Get(parser.flux_cov.matrix.c_str());
     finfluxcov->Close();
+
+    std::cout << TAG << "Setup Xsec Covariance" << std::endl;
+    TFile* file_xsec_cov = TFile::Open(parser.xsec_cov.fname.c_str(), "READ");
+    std::cout << TAG << "Opening " << parser.xsec_cov.fname << " for xsec covariance." << std::endl;
+    TMatrixDSym* cov_xsec = (TMatrixDSym*)file_xsec_cov -> Get(parser.xsec_cov.matrix.c_str());
+    file_xsec_cov -> Close();
+
+    std::cout << TAG << "Setup Detector Covariance" << std::endl;
+    TFile* file_detcov = TFile::Open(parser.det_cov.fname.c_str(), "READ");
+    TMatrixDSym* cov_det_in = (TMatrixDSym*)file_detcov -> Get(parser.det_cov.matrix.c_str());
+    TMatrixDSym cov_det = *cov_det_in;
+    file_detcov -> Close();
 
     // FitParameters sigfitpara("par_fit", false);
     FitParameters* sigfitpara = new FitParameters("par_fit", false);
@@ -76,9 +91,12 @@ FitObj::FitObj(const std::string& json_config, const std::string& event_tree_nam
     }
     sigfitpara->InitEventMap(samples, 0);
     fit_par.push_back(sigfitpara);
+    m_fit_par = sigfitpara;
+    npar += sigfitpara->GetNpar();
 
     // FluxParameters fluxpara("par_flux");
     FluxParameters* fluxpara = new FluxParameters("par_flux");
+    fluxpara->SetCovarianceMatrix(*cov_flux, parser.flux_cov.decompose);
     for(const auto& opt : parser.detectors)
     {
         if(opt.use_detector)
@@ -87,9 +105,11 @@ FitObj::FitObj(const std::string& json_config, const std::string& event_tree_nam
     fluxpara->InitEventMap(samples, 0);
     fit_par.push_back(fluxpara);
     m_flux_par = fluxpara;
+    npar += fluxpara->GetNpar();
 
     // XsecParameters xsecpara("par_xsec");
     XsecParameters* xsecpara = new XsecParameters("par_xsec");
+    xsecpara->SetCovarianceMatrix(*cov_xsec, parser.xsec_cov.decompose);
     for(const auto& opt : parser.detectors)
     {
         if(opt.use_detector)
@@ -97,9 +117,11 @@ FitObj::FitObj(const std::string& json_config, const std::string& event_tree_nam
     }
     xsecpara->InitEventMap(samples, 0);
     fit_par.push_back(xsecpara);
+    npar += xsecpara->GetNpar();
 
     // DetParameters detpara("par_det");
     DetParameters* detpara = new DetParameters("par_det");
+    detpara->SetCovarianceMatrix(cov_det, parser.det_cov.decompose);
     for(const auto& opt : parser.detectors)
     {
         if(opt.use_detector)
@@ -110,6 +132,7 @@ FitObj::FitObj(const std::string& json_config, const std::string& event_tree_nam
     else
         detpara->InitEventMap(samples, 0);
     fit_par.push_back(detpara);
+    npar += detpara->GetNpar();
 
     InitSignalHist(parser.signal_definition);
     std::cout << TAG << "Finished initialization." << std::endl;
@@ -269,4 +292,45 @@ double FitObj::ReweightFluxHist(const std::vector<double>& input_par, TH1D& flux
     }
 
     return flux_int;
+}
+
+TMatrixDSym FitObj::GetPrefitCov()
+{
+    TMatrixDSym prefit_cov(npar);
+    TMatrixDSym temp_mat = CalcTemplateCov();
+
+    unsigned int idx = 0;
+    for(const auto& param_type : fit_par)
+    {
+        TMatrixDSym* cov_mat = nullptr;
+        if(param_type == m_fit_par)
+            cov_mat = &temp_mat;
+        else
+            cov_mat = param_type->GetOriginalCovMat();
+
+        for(int i = 0; i < cov_mat->GetNrows(); ++i)
+        {
+            for(int j = 0; j < cov_mat->GetNrows(); ++j)
+            {
+                prefit_cov(idx+i, idx+j) = (*cov_mat)(i,j);
+            }
+        }
+
+        idx += cov_mat->GetNrows();
+    }
+
+    return prefit_cov;
+}
+
+TMatrixDSym FitObj::CalcTemplateCov()
+{
+    TMatrixDSym temp_cov(m_fit_par->GetNpar());
+
+    ReweightNominal();
+    auto signal_hist = GetHistCombined("prefit");
+
+    for(int i = 0; i < m_fit_par->GetNpar(); ++i)
+        temp_cov(i,i) = 1.0 / std::sqrt(signal_hist.GetBinContent(i+1));
+
+    return temp_cov;
 }
