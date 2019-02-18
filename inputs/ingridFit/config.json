@@ -26,21 +26,24 @@
         "binning" : "hist_bins",
         "throw"  : false,
         "decomp" : true,
-        "variance" : 1.00
+        "variance" : 1.00,
+        "fit_par" : true
     },
     "det_cov" : {
         "file" : "detector_cov.root",
         "matrix" : "cov_mat",
         "throw"  : false,
         "decomp" : true,
-        "variance" : 0.99
+        "variance" : 0.99,
+        "fit_par" : true
     },
     "xsec_cov" : {
         "file" : "xsec_cov_nd280.root",
         "matrix" : "xsec_cov",
         "throw"  : false,
         "decomp" : false,
-        "variance" : 1.00
+        "variance" : 1.00,
+        "fit_par" : true
     },
     "regularisation" : {
         "enable" : false,

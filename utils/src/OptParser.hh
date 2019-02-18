@@ -39,6 +39,7 @@ struct CovOpt
     std::string binning;
     bool do_throw;
     bool decompose;
+    bool do_fit;
     double info_frac;
 };
 
