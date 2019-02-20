@@ -120,7 +120,6 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara)
 
     std::cout << "===========================================" << std::endl;
     std::cout << "           Initilizing fitter              " << std::endl;
-    std::cout << "    Number of parameters = " << m_npar << std::endl;
     std::cout << "===========================================" << std::endl;
 
     std::cout << TAG << "Minimizer settings..." << std::endl
@@ -132,7 +131,6 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara)
               << TAG << "Max Iterations: " << min_settings.max_iter << std::endl
               << TAG << "Max Fcn Calls : " << min_settings.max_fcn << std::endl;
 
-    //m_fitter = ROOT::Math::Factory::CreateMinimizer("Minuit2", "Fumili2");
     m_fitter = ROOT::Math::Factory::CreateMinimizer(min_settings.minimizer.c_str(), min_settings.algorithm.c_str());
     m_fcn    = new ROOT::Math::Functor(this, &XsecFitter::CalcLikelihood, m_npar);
 
@@ -151,6 +149,11 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara)
         if(par_fixed[i] == true)
             m_fitter->FixVariable(i);
     }
+
+    std::cout << TAG << "Number of defined parameters: " << m_fitter->NDim() << std::endl
+              << TAG << "Number of free parameters   : " << m_fitter->NFree() << std::endl
+              << TAG << "Number of fixed parameters  : " << m_fitter->NDim() - m_fitter->NFree()
+              << std::endl;
 
     TH1D h_prefit("hist_prefit_par_all", "hist_prefit_par_all", m_npar, 0, m_npar);
     int num_par = 1;
@@ -213,11 +216,40 @@ void XsecFitter::Fit(const std::vector<AnaSample*>& samples, int fit_type, bool 
 
     SaveEvents(m_calls);
 
+    bool did_converge = false;
     std::cout << TAG << "Fit prepared." << std::endl;
-    std::cout << TAG << "Calling MIGRAD ..." << std::endl;
-    m_fitter->Minimize();
-    std::cout << TAG << "Calling HESSE ..." << std::endl;
-    m_fitter->Hesse();
+    std::cout << TAG << "Calling Minimize, running " << min_settings.algorithm << std::endl;
+    did_converge = m_fitter->Minimize();
+
+    if(!did_converge)
+    {
+        std::cout << ERR << "Fit did not converge while running " << min_settings.algorithm
+                  << std::endl;
+        std::cout << ERR << "Failed with status code: " << m_fitter->Status() << std::endl
+                  << ERR << "Exiting." << std::endl;
+        return;
+    }
+    else
+    {
+        std::cout << TAG << "Fit converged." << std::endl
+                  << TAG << "Status code: " << m_fitter->Status() << std::endl;
+    }
+
+    std::cout << TAG << "Calling HESSE." << std::endl;
+    did_converge = m_fitter->Hesse();
+
+    if(!did_converge)
+    {
+        std::cout << ERR << "Hesse did not converge." << std::endl;
+        std::cout << ERR << "Failed with status code: " << m_fitter->Status() << std::endl
+                  << ERR << "Exiting." << std::endl;
+        return;
+    }
+    else
+    {
+        std::cout << TAG << "Hesse converged." << std::endl
+                  << TAG << "Status code: " << m_fitter->Status() << std::endl;
+    }
 
     if(m_dir)
         SaveChi2();

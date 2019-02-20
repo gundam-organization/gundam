@@ -5,7 +5,7 @@
             "tree_name" : "all_syst",
             "detector": "FGD1",
             "num_toys" : 500,
-            "num_syst" : 17,
+            "num_syst" : 15,
             "num_samples" : 10,
             "samples" : {"0": [0], "1": [1], "2": [2], "3": [3], "4": [4], "5": [5], "6": [6]},
             "sample_binning" : {

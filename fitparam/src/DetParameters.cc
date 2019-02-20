@@ -167,7 +167,7 @@ void DetParameters::InitParameters()
             pars_fixed[i] = true;
 
         std::cout << TAG << "Decomposed parameters.\n"
-                  << TAG << "Keeping the " << idx-1 << " largest eigen values.\n"
+                  << TAG << "Keeping the " << idx << " largest eigen values.\n"
                   << TAG << "Corresponds to " << m_info_frac * 100.0
                   << "\% total variance.\n";
     }

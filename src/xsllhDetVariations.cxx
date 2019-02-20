@@ -114,9 +114,11 @@ int main(int argc, char** argv)
             for(const auto& kv : temp_json)
                 f.samples.emplace(std::make_pair(std::stoi(kv.first), kv.second));
 
+            f.bin_manager.resize(f.samples.size());
             std::map<std::string, std::string> temp_bins = file["sample_binning"];
             for(const auto& kv : temp_bins)
-                f.bin_manager.emplace_back(BinManager(kv.second));
+                f.bin_manager.at(std::stoi(kv.first)) = std::move(BinManager(kv.second));
+                //f.bin_manager.emplace_back(BinManager(kv.second));
 
             v_files.emplace_back(f);
         }
