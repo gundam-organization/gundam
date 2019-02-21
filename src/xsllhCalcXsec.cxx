@@ -70,7 +70,8 @@ int main(int argc, char** argv)
                           << "-n : Number of toys (overrides JSON config)\n"
                           << "-p : Use prefit covariance for error bands\n"
                           << "-m : Use mean of toys for covariance calculation\n"
-                          << "-t : Save toys in output file\n";
+                          << "-t : Save toys in output file\n"
+                          << "-h : Print this usage guide\n";
             default:
                 return 0;
         }
