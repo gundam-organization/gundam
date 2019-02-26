@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 3.5 FATAL_ERROR)
 
 project(xsLLhFitter)
 set (xsLLhFitter_VERSION_MAJOR 0)
-set (xsLLhFitter_VERSION_MINOR 14)
+set (xsLLhFitter_VERSION_MINOR 15)
 set (xsLLhFitter_VERSION_REVISION 0)
 
 set(VERBOSE TRUE)
@@ -117,11 +117,11 @@ endif()
 ################################################################################
 
 set(MODULES
+  errprop
   anaevents
   fitparam
   xsecfit
   utils
-  errprop
   )
 set(MODULETargets "")
 foreach(mod ${MODULES})

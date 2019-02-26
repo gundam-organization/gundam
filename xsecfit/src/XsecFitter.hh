@@ -45,7 +45,7 @@ public:
     double CalcLikelihood(const double* par);
     void InitFitter(std::vector<AnaFitParameters*>& fitpara);
     void FixParameter(const std::string& par_name, const double& value);
-    void Fit(const std::vector<AnaSample*>& samples, int fit_type, bool stat_fluc);
+    bool Fit(const std::vector<AnaSample*>& samples, int fit_type, bool stat_fluc);
 
     void SetMinSettings(const MinSettings& ms);
     void SetSeed(int seed);
