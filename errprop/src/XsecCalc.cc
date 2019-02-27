@@ -30,6 +30,11 @@ XsecCalc::XsecCalc(const std::string& json_config)
     num_toys = j["num_toys"];
     rng_seed = j["rng_seed"];
 
+    do_incompl_chol = j["decomposition"].value("incomplete_chol", false);
+    dropout_tol = j["decomposition"].value("drop_tolerance", 1.0E-3);
+    do_force_posdef = j["decomposition"].value("do_force_posdef", false);
+    force_padd = j["decomposition"].value("force_posdef_val", 1.0E-9);
+
     std::string sel_json_config = input_dir + j["sel_config"].get<std::string>();
     std::string tru_json_config = input_dir + j["tru_config"].get<std::string>();
 
@@ -106,9 +111,6 @@ void XsecCalc::InitToyThrower()
     if(toy_thrower != nullptr)
         delete toy_thrower;
 
-    // for(int i = 0; i < postfit_cov->GetNcols(); ++i)
-    //    (*postfit_cov)(i,i) += 1E-6;
-
     TMatrixDSym cov_mat;
     if(use_prefit_cov)
     {
@@ -123,12 +125,26 @@ void XsecCalc::InitToyThrower()
         cov_mat = *postfit_cov;
     }
 
-    toy_thrower = new ToyThrower(cov_mat, rng_seed, 1E-48);
-    if(!toy_thrower->ForcePosDef(1E-9, 1E-48))
+    toy_thrower = new ToyThrower(cov_mat, rng_seed, false, 1E-48);
+    if(do_force_posdef)
     {
-        std::cout << ERR << "Covariance matrix could not be made positive definite.\n"
-                  << "Exiting." << std::endl;
-        exit(1);
+        if(!toy_thrower->ForcePosDef(force_padd, 1E-48))
+        {
+            std::cout << ERR << "Covariance matrix could not be made positive definite.\n"
+                << "Exiting." << std::endl;
+            exit(1);
+        }
+    }
+
+    if(do_incompl_chol)
+    {
+        std::cout << TAG << "Performing incomplete Cholesky decomposition." << std::endl;
+        toy_thrower->IncompCholDecomp(dropout_tol, true);
+    }
+    else
+    {
+        std::cout << TAG << "Performing ROOT Cholesky decomposition." << std::endl;
+        toy_thrower->SetupDecomp(1E-48);
     }
 }
 
@@ -256,7 +272,7 @@ void XsecCalc::GenerateToys(const int ntoys)
         for(int i = 0; i < npar; ++i)
         {
             if(toy[i] < 0.0)
-                toy[i] = 0.1;
+                toy[i] = 0.01;
         }
 
         selected_events->ReweightEvents(toy);
@@ -392,6 +408,7 @@ TH1D XsecCalc::ConcatHist(const std::vector<TH1D>& vec_hist, const std::string& 
 void XsecCalc::CalcCovariance(bool use_best_fit)
 {
     std::cout << TAG << "Calculating covariance matrix..." << std::endl;
+    std::cout << TAG << "Using " << num_toys << " toys." << std::endl;
 
     TH1D h_cov;
     if(use_best_fit)
@@ -411,8 +428,8 @@ void XsecCalc::CalcCovariance(bool use_best_fit)
         h_mean.Scale(1.0 / (1.0 * num_toys));
         h_cov = h_mean;
 
-        //for(int i = 1; i <= total_signal_bins; ++i)
-        //    std::cout << "Bin " << i << ": " << h_cov.GetBinContent(i) << std::endl;
+        for(int i = 1; i <= total_signal_bins; ++i)
+            std::cout << "Bin " << i << ": " << h_cov.GetBinContent(i) << std::endl;
 
         std::cout << TAG << "Using mean of toys for covariance." << std::endl;
     }
@@ -588,8 +605,11 @@ void XsecCalc::SaveExtra(TFile* output)
         std::string line;
         while(std::getline(fin, line))
         {
-            TH1D* temp = (TH1D*)file->Get(line.c_str());
-            temp->Write();
+            if(line.front() != COMMENT_CHAR)
+            {
+                TH1D* temp = (TH1D*)file->Get(line.c_str());
+                temp->Write();
+            }
         }
         file->Close();
     }
