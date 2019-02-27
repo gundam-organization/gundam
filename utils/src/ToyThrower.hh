@@ -30,13 +30,18 @@ class ToyThrower
         ToyThrower(int nrows, unsigned int seed = 0);
 
     public:
-        ToyThrower(const TMatrixD &cov, unsigned int seed = 0, double decomp_tol = 0xCAFEBABE);
-        ToyThrower(const TMatrixDSym &cov, unsigned int seed = 0, double decomp_tol = 0xCAFEBABE);
+        ToyThrower(const TMatrixD &cov, unsigned int seed = 0, bool do_setup = true, double decomp_tol = 0xCAFEBABE);
+        ToyThrower(const TMatrixDSym &cov, unsigned int seed = 0, bool do_setup = true, double decomp_tol = 0xCAFEBABE);
         ~ToyThrower();
 
         void SetSeed(unsigned int seed);
+        void SetMatrix(const TMatrixD& cov);
+        void SetMatrix(const TMatrixDSym& cov);
         bool SetupDecomp(double decomp_tol = 0xCAFEBABE);
         bool ForcePosDef(double val, double decomp_tol = 0xCAFEBABE);
+
+        bool CholDecomp();
+        bool IncompCholDecomp(const double tol = 1.0E-3, bool modify_cov = true);
 
         void Throw(TVectorD& toy);
         void Throw(std::vector<double>& toy);

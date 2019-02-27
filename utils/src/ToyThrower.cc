@@ -9,7 +9,7 @@ ToyThrower::ToyThrower(int nrows, unsigned int seed)
     RNG = new TRandom3(seed);
 }
 
-ToyThrower::ToyThrower(const TMatrixD &cov, unsigned int seed, double decomp_tol)
+ToyThrower::ToyThrower(const TMatrixD &cov, unsigned int seed, bool do_setup, double decomp_tol)
     : ToyThrower(cov.GetNrows(), seed)
 {
     for(int i = 0; i < npar; ++i)
@@ -20,10 +20,11 @@ ToyThrower::ToyThrower(const TMatrixD &cov, unsigned int seed, double decomp_tol
         }
     }
 
-    SetupDecomp(decomp_tol);
+    if(do_setup)
+        SetupDecomp(decomp_tol);
 }
 
-ToyThrower::ToyThrower(const TMatrixDSym &cov, unsigned int seed, double decomp_tol)
+ToyThrower::ToyThrower(const TMatrixDSym &cov, unsigned int seed, bool do_setup, double decomp_tol)
     : ToyThrower(cov.GetNrows(), seed)
 {
     for(int i = 0; i < npar; ++i)
@@ -34,7 +35,8 @@ ToyThrower::ToyThrower(const TMatrixDSym &cov, unsigned int seed, double decomp_
         }
     }
 
-    SetupDecomp(decomp_tol);
+    if(do_setup)
+        SetupDecomp(decomp_tol);
 }
 
 ToyThrower::~ToyThrower()
@@ -50,6 +52,47 @@ void ToyThrower::SetSeed(unsigned int seed)
     delete RNG;
     RNG = new TRandom3(seed);
 }
+
+void ToyThrower::SetMatrix(const TMatrixD& cov)
+{
+    std::cout << TAG << "Setting matrix." << std::endl
+              << TAG << "Npar = " << cov.GetNrows() << std::endl;
+
+    npar = cov.GetNrows();
+    covmat->ResizeTo(npar, npar);
+
+    for(int i = 0; i < npar; ++i)
+    {
+        for(int j = 0; j < npar; ++j)
+        {
+            (*covmat)[i][j] = cov[i][j];
+        }
+    }
+
+    L_matrix->ResizeTo(npar, npar);
+    L_matrix->Zero();
+}
+
+void ToyThrower::SetMatrix(const TMatrixDSym& cov)
+{
+    std::cout << TAG << "Setting matrix." << std::endl
+              << TAG << "Npar = " << cov.GetNrows() << std::endl;
+
+    npar = cov.GetNrows();
+    covmat->ResizeTo(npar, npar);
+
+    for(int i = 0; i < npar; ++i)
+    {
+        for(int j = 0; j < npar; ++j)
+        {
+            (*covmat)[i][j] = cov[i][j];
+        }
+    }
+
+    L_matrix->ResizeTo(npar, npar);
+    L_matrix->Zero();
+}
+
 
 bool ToyThrower::SetupDecomp(double decomp_tol)
 {
@@ -147,4 +190,104 @@ void ToyThrower::Throw(std::vector<double>& toy)
 double ToyThrower::ThrowSinglePar(double nom, double err) const
 {
     return RNG -> Gaus(nom, err);
+}
+
+bool ToyThrower::CholDecomp()
+{
+    TMatrixD chol_mat(*covmat);
+
+    for(int i = 0; i < npar; ++i)
+    {
+        for(int j = 0; j < npar; ++j)
+        {
+            double sum = chol_mat(i,j);
+            for(int k = 0; k < i; ++k)
+                sum -= chol_mat(i,k)*chol_mat(j,k);
+
+            if(i == j)
+            {
+                if(sum <= 0.0)
+                {
+                    std::cout << ERR << "Matrix not positive definite. Decomposition failed." << std::endl;
+                    return false;
+                }
+
+                chol_mat(i,j) = std::sqrt(sum);
+            }
+
+            else
+                chol_mat(j,i) = sum / chol_mat(i,i);
+        }
+    }
+
+    for(int i = 0; i < npar; ++i)
+        for(int j = i+1; j < npar; ++j)
+            chol_mat(i,j) = 0.0;
+
+    std::cout << TAG << "Decomposition successful." << std::endl;
+
+    (*L_matrix) = chol_mat;
+    return true;
+}
+
+bool ToyThrower::IncompCholDecomp(const double tol, bool modify_cov)
+{
+    TMatrixD chol_mat(*covmat);
+
+    if(modify_cov)
+    {
+        std::cout << TAG << "Modifying covariance matrix for decomposition." << std::endl
+                  << TAG << "Setting elements with abs(val) less than " << tol << " to zero."
+                  << std::endl;
+
+        for(int i = 0; i < npar; ++i)
+        {
+            for(int j = 0; j < npar; ++j)
+            {
+                if(std::fabs(chol_mat(i,j)) < tol)
+                    chol_mat(i,j) = 0.0;
+            }
+        }
+    }
+
+    std::cout << TAG << "Performing incomplete Cholesky decomposition." << std::endl
+              << TAG << "Dropout tolerance is " << tol << std::endl;
+
+    for(int i = 0; i < npar; ++i)
+    {
+        for(int j = 0; j < npar; ++j)
+        {
+            double sum = chol_mat(i,j);
+            for(int k = 0; k < i; ++k)
+                sum -= chol_mat(i,k)*chol_mat(j,k);
+
+            if(i == j)
+            {
+                if(sum <= 0.0)
+                {
+                    std::cout << ERR << "Matrix not positive definite. Decomposition failed." << std::endl;
+                    return false;
+                }
+
+                chol_mat(i,j) = std::sqrt(sum);
+            }
+
+            else
+            {
+                if(std::fabs(chol_mat(j,i)) > tol)
+                    chol_mat(j,i) = sum / chol_mat(i,i);
+                else
+                    chol_mat(j,i) = 0.0;
+            }
+        }
+    }
+
+    for(int i = 0; i < npar; ++i)
+        for(int j = i+1; j < npar; ++j)
+            chol_mat(i,j) = 0.0;
+
+    std::cout << TAG << "Decomposition successful." << std::endl;
+
+    (*L_matrix) = chol_mat;
+    return true;
 }
