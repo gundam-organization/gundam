@@ -256,21 +256,39 @@ double FitParameters::CalcRegularisation(const std::vector<double>& params) cons
 double FitParameters::CalcRegularisation(const std::vector<double>& params, double strength,
                                          RegMethod flag) const
 {
+    /*
+    auto L2_lambda = [](double a, double b) -> double
+    {
+        return (a - b) * (a - b);
+    };
+    */
+
     double L_reg = 0;
-    if(flag == kL1Reg)
+    unsigned int offset = 0;
+    for(const auto& signal_id : v_signals)
     {
-        for(int i = 0; i < Npar-1; ++i)
-            L_reg += std::abs(params[i] - params[i+1]);
-    }
-    else if(flag == kL2Reg)
-    {
-        for(int i = 0; i < Npar-1; ++i)
-            L_reg += (params[i] - params[i+1]) * (params[i] - params[i+1]);
-    }
-    else
-    {
-        std::cout << TAG << "In CalcRegularisation(): "
-                  << "Invalid regularisation method! Returning 0.\n";
+        const unsigned int nbins = m_signal_bins.at(signal_id).size();
+
+        if(flag == kL1Reg)
+        {
+            for(int i = offset; i < offset+nbins-1; ++i)
+                L_reg += std::fabs(params[i] - params[i+1]);
+        }
+
+        else if(flag == kL2Reg)
+        {
+            for(int i = offset; i < offset+nbins-1; ++i)
+                L_reg += (params[i] - params[i+1]) * (params[i] - params[i+1]);
+        }
+
+        else
+        {
+            std::cout << WAR << "In CalcRegularisation(): "
+                      << "Invalid regularisation method! Returning 0.\n";
+            break;
+        }
+
+        offset += nbins;
     }
 
     return strength * L_reg;
