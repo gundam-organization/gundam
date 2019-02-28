@@ -1,0 +1,17 @@
+site_name: Super-xsllh Fitter
+site_url: https://cuddandr.gitlab.io/xsLLhFitter
+nav:
+    - Home: README.md
+    - Install: install.md
+    - User Guide:
+        - 'xsllhFit' : user-guide/xsllhfit.md
+        - 'xsllhCalcXsec' : user-guide/xsllhcalcxsec.md
+        - 'xsllhTreeConvert' : user-guide/xsllhtreeconvert.md
+        - 'xsllhDetVariations' : user-guide/xsllhdetvariations.md
+        - 'xsllhXsecCov' : user-guide/xsllhxseccov.md
+
+theme:
+    name: 'cinder'
+
+markdown_extensions:
+    - nl2br

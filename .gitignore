@@ -1,6 +1,7 @@
 # Directories
 test/
 build/
+site/
 
 # Misc Files
 *.root
