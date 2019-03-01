@@ -7,3 +7,6 @@ The goal of the Super-xsllhFitter is to provide a general purpose likelihood-bas
 The code is under very active development and to give some kind of stability, it is recommended you checkout/download a tagged version of the fitter. The code is hosted on GitLab, and can be found here: [xsLLhFitter](https://gitlab.com/cuddandr/xsLLhFitter).
 
 This document is currently all about the code for the fitter. For anything related to the principles behind the fitter, browse any of the following technotes: TN214, TN261, TN263, TN287, TN337, TN338.
+
+---
+![xkcd: Data Pipeline](https://imgs.xkcd.com/comics/data_pipeline.png)

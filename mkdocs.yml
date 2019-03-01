@@ -1,4 +1,7 @@
 site_name: Super-xsllh Fitter
+site_url: https://cuddandr.gitlab.io/xsLLhFitter
+repo_url: https://gitlab.com/cuddandr/xsLLhFitter
+edit_uri: ''
 nav:
     - Home: README.md
     - Install: install.md
@@ -10,6 +13,8 @@ nav:
         - 'xsllhXsecCov' : user-guide/xsllhxseccov.md
     - Reference:
         - 'Toy Throws' : reference/toythrows.md
+        - 'JSON' : reference/json.md
+        - 'Debugging' : reference/debugging.md
 
 theme:
     name: 'cinder'

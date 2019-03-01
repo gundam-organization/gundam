@@ -2,9 +2,9 @@
 
 There are several requirements for building the fitter:
 
-* GCC 4.8.5+ or Clang 3.3+ (a C++11 enabled compiler)
-* CMake 3.5+
-* ROOT 5 or 6
+- GCC 4.8.5+ or Clang 3.3+ (a C++11 enabled compiler)
+- CMake 3.5+
+- ROOT 5 or 6
 
 ROOT needs either Minuit or Minuit2 and optionally the MathMore package enabled to perform the minimization. The recommendation is to have both Minuit and Minuit2 enabled. In addition it is highly recommended to have a working OpenMP installation to take advantage of parallelism when running the code.
 
@@ -44,10 +44,10 @@ The default build is `DEBUG`, which compiles the libraries statically and includ
 
 There are a few extra options to configure the build. The default option is listed in brackets:
 
-* CMAKE_CXX_EXTENSIONS [OFF]: Enable GNU extensions to C++ language (-std=gnu++11)
-* CXX_MARCH_FLAG [OFF]: Enable cpu architecture specific optimizations
-* CXX_WARNINGS [ON]: Enable most C++ warning flags
-* COLOR_OUTPUT [ON]: Enable colored terminal output
+- **CMAKE_CXX_EXTENSIONS** [OFF]: Enable GNU extensions to C++ language (-std=gnu++11)
+- **CXX_MARCH_FLAG** [OFF]: Enable cpu architecture specific optimizations
+- **CXX_WARNINGS** [ON]: Enable most C++ warning flags
+- **COLOR_OUTPUT** [ON]: Enable colored terminal output
 
 For future use, the root setup.sh script will perform all the necessary setup to run the fitter. Once configured with CMake, only the `make install` step needs to be performed if the code needs to be rebuilt/recompiled. Sometimes `make clean` will need to be run before `make install` to correctly build.
 
