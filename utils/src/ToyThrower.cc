@@ -91,6 +91,8 @@ void ToyThrower::SetMatrix(const TMatrixDSym& cov)
 
     L_matrix->ResizeTo(npar, npar);
     L_matrix->Zero();
+
+    R_vector->ResizeTo(npar);
 }
 
 

@@ -1,5 +1,4 @@
 site_name: Super-xsllh Fitter
-site_url: https://cuddandr.gitlab.io/xsLLhFitter
 nav:
     - Home: README.md
     - Install: install.md
@@ -9,9 +8,15 @@ nav:
         - 'xsllhTreeConvert' : user-guide/xsllhtreeconvert.md
         - 'xsllhDetVariations' : user-guide/xsllhdetvariations.md
         - 'xsllhXsecCov' : user-guide/xsllhxseccov.md
+    - Reference:
+        - 'Toy Throws' : reference/toythrows.md
 
 theme:
     name: 'cinder'
 
+extra_javascript:
+    - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML
+
 markdown_extensions:
     - nl2br
+    - mdx_math

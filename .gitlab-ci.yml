@@ -6,6 +6,7 @@ before_script:
   ## (https://github.com/mkdocs/mkdocs/wiki/MkDocs-Themes)
   - pip install mkdocs-material
   - pip install mkdocs-cinder
+  - pip install python-markdown-math
 
 pages:
   script:
