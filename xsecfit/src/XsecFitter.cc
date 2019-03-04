@@ -19,7 +19,7 @@ XsecFitter::XsecFitter(TDirectory* dirout, const int seed, const int num_threads
     min_settings.algorithm = "Migrad";
     min_settings.print_level = 2;
     min_settings.strategy  = 1;
-    min_settings.tolerance = 1E-4;
+    min_settings.tolerance = 1E-2;
     min_settings.max_iter  = 1E6;
     min_settings.max_fcn   = 1E9;
 }
