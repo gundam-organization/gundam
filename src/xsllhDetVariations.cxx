@@ -45,8 +45,8 @@ int main(int argc, char** argv)
     const std::string ERR = color::RED_STR + color::BOLD_STR + "[ERROR]: " + color::RESET_STR;
 
     std::cout << "--------------------------------------------------------\n"
-              << TAG << "Welcome to the Super-xsLLh Detector Variation Interface.\n"
-              << TAG << "Initializing the variation machinery..." << std::endl;
+              << TAG << color::RainbowText("Welcome to the Super-xsLLh Detector Variation Interface.\n")
+              << TAG << color::RainbowText("Initializing the variation machinery...") << std::endl;
 
     ProgressBar pbar(60, "#");
     pbar.SetRainbow();
@@ -86,8 +86,8 @@ int main(int argc, char** argv)
     bool do_covariance  = j["covariance"];
     bool do_print       = j["pdf_print"];
 
-    unsigned int syst_idx = j["syst_idx"];
-    double weight_cut     = j["weight_cut"];
+    unsigned int syst_idx   = j["syst_idx"];
+    const double weight_cut = j["weight_cut"];
 
     std::string fname_output  = j["fname_output"];
     std::string variable_plot = j["plot_variable"];
@@ -95,7 +95,17 @@ int main(int argc, char** argv)
     std::string cor_mat_name  = j["correlation_name"];
 
     std::vector<std::string> var_names = j["var_names"].get<std::vector<std::string>>();
+    const int nvars = var_names.size();
 
+    std::vector<BinManager> cov_bin_manager;
+    std::map<std::string, std::string> temp_cov_binning = j["cov_sample_binning"];
+
+    const unsigned int num_cov_samples = temp_cov_binning.size();
+    cov_bin_manager.resize(num_cov_samples);
+    for(const auto& kv : temp_cov_binning)
+        cov_bin_manager.at(std::stoi(kv.first)) = std::move(BinManager(kv.second));
+
+    unsigned int usable_toys = 0;
     std::vector<FileOptions> v_files;
     for(const auto& file : j["files"])
     {
@@ -112,19 +122,23 @@ int main(int argc, char** argv)
 
             std::map<std::string, std::vector<int>> temp_json = file["samples"];
             for(const auto& kv : temp_json)
-                f.samples.emplace(std::make_pair(std::stoi(kv.first), kv.second));
-
-            f.bin_manager.resize(f.samples.size());
-            std::map<std::string, std::string> temp_bins = file["sample_binning"];
-            for(const auto& kv : temp_bins)
-                f.bin_manager.at(std::stoi(kv.first)) = std::move(BinManager(kv.second));
-                //f.bin_manager.emplace_back(BinManager(kv.second));
+            {
+                const int sam = std::stoi(kv.first);
+                if(sam <= num_cov_samples)
+                    f.samples.emplace(std::make_pair(sam, kv.second));
+                else
+                {
+                    std::cout << ERR << "Invalid sample number: " << sam << std::endl;
+                    return 64;
+                }
+            }
 
             v_files.emplace_back(f);
+
+            if(f.num_toys < usable_toys || usable_toys == 0)
+                usable_toys = f.num_toys;
         }
     }
-
-    const int nvars = var_names.size();
 
     std::cout << TAG << "Output ROOT file: " << fname_output << std::endl
               << TAG << "Toy Weight Cut: " << weight_cut << std::endl
@@ -143,57 +157,53 @@ int main(int argc, char** argv)
     }
 
     std::cout << TAG << "Initalizing histograms." << std::endl;
+    std::cout << TAG << "Using " << usable_toys << " toys." << std::endl;
+
     std::vector<std::vector<TH1F>> v_hists;
     std::vector<TH1F> v_avg;
-    for(const auto& file : v_files)
+    for(int i = 0; i < cov_bin_manager.size(); ++i)
     {
-        for(const auto& kv : file.samples)
-        {
-            const int sam   = kv.first;
-            BinManager bm   = file.bin_manager.at(sam);
-            const int nbins = bm.GetNbins();
-            std::vector<TH1F> v_temp;
+        BinManager bm   = cov_bin_manager.at(i);
+        const int nbins = bm.GetNbins();
+        std::vector<TH1F> v_temp;
 
-            for(unsigned int t = 0; t < file.num_toys; ++t)
+        for(unsigned int t = 0; t < usable_toys; ++t)
+        {
+            std::stringstream ss;
+            ss << "cov_sample" << i << "_toy" << t;
+            if(do_projection)
             {
-                std::stringstream ss;
-                ss << file.detector << "_sample" << sam << "_toy" << t;
-                if(do_projection)
+                std::vector<double> v_bins = bm.GetBinVector(var_plot);
+                v_temp.emplace_back(
+                    TH1F(ss.str().c_str(), ss.str().c_str(), v_bins.size() - 1, &v_bins[0]));
+                if(t == 0)
                 {
-                    std::vector<double> v_bins = bm.GetBinVector(var_plot);
-                    v_temp.emplace_back(
+                    ss.str("");
+                    ss << "cov_sample" << i << "_avg";
+                    v_avg.emplace_back(
                         TH1F(ss.str().c_str(), ss.str().c_str(), v_bins.size() - 1, &v_bins[0]));
-                    if(t == 0)
-                    {
-                        ss.str("");
-                        ss << file.detector << "_sample" << sam << "_avg";
-                        v_avg.emplace_back(TH1F(ss.str().c_str(), ss.str().c_str(),
-                                                v_bins.size() - 1, &v_bins[0]));
-                    }
-                }
-                else
-                {
-                    v_temp.emplace_back(TH1F(ss.str().c_str(), ss.str().c_str(), nbins, 0, nbins));
-                    if(t == 0)
-                    {
-                        ss.str("");
-                        ss << file.detector << "_sample" << sam << "_avg";
-                        v_avg.emplace_back(
-                            TH1F(ss.str().c_str(), ss.str().c_str(), nbins, 0, nbins));
-                    }
                 }
             }
-            v_hists.emplace_back(v_temp);
+            else
+            {
+                v_temp.emplace_back(TH1F(ss.str().c_str(), ss.str().c_str(), nbins, 0, nbins));
+                if(t == 0)
+                {
+                    ss.str("");
+                    ss << "cov_sample" << i << "_avg";
+                    v_avg.emplace_back(TH1F(ss.str().c_str(), ss.str().c_str(), nbins, 0, nbins));
+                }
+            }
         }
+        v_hists.emplace_back(v_temp);
     }
 
     std::cout << TAG << "Finished initializing histograms" << std::endl
               << TAG << "Reading events from files..." << std::endl;
 
-    unsigned int cov_toys = 0;
-    unsigned int offset   = 0;
     for(const auto& file : v_files)
     {
+        int NTOYS = 0;
         int accum_level[file.num_toys][file.num_samples];
         float hist_variables[nvars][file.num_toys];
         float weight_syst_total_noflux[file.num_toys];
@@ -216,6 +226,7 @@ int main(int argc, char** argv)
         TFile* file_input = TFile::Open(file.fname_input.c_str(), "READ");
         TTree* tree_event = (TTree*)file_input->Get(file.tree_name.c_str());
 
+        tree_event->SetBranchAddress("NTOYS", &NTOYS);
         tree_event->SetBranchAddress("accum_level", accum_level);
         tree_event->SetBranchAddress("weight_syst", weight_syst);
         tree_event->SetBranchAddress("weight_syst_total_noflux", weight_syst_total_noflux);
@@ -230,10 +241,13 @@ int main(int argc, char** argv)
         for(unsigned int i = 0; i < num_events; ++i)
         {
             tree_event->GetEntry(i);
+            if(NTOYS != file.num_toys)
+                std::cout << ERR << "Incorrect number of toys specified!" << std::endl;
+
             if(i % 2000 == 0 || i == (num_events - 1))
                 pbar.Print(i, num_events - 1);
 
-            for(unsigned int t = 0; t < file.num_toys; ++t)
+            for(unsigned int t = 0; t < usable_toys; ++t)
             {
                 for(const auto& kv : file.samples)
                 {
@@ -242,7 +256,7 @@ int main(int argc, char** argv)
                     {
                         if(accum_level[t][branch] > file.cuts[branch])
                         {
-                            float idx = -1;
+                            int idx = -1;
                             if(do_projection)
                                 idx = hist_variables[var_plot][t];
                             else
@@ -250,15 +264,15 @@ int main(int argc, char** argv)
                                 std::vector<double> vars;
                                 for(unsigned int v = 0; v < nvars; ++v)
                                     vars.push_back(hist_variables[v][t]);
-                                idx = file.bin_manager[s].GetBinIndex(vars);
+                                idx = cov_bin_manager[s].GetBinIndex(vars);
                             }
 
                             float weight = do_single_syst ? weight_syst[t][syst_idx]
                                                           : weight_syst_total_noflux[t];
                             if(weight > 0.0 && weight < weight_cut)
                             {
-                                v_hists[s + offset][t].Fill(idx, weight);
-                                v_avg[s + offset].Fill(idx, weight / file.num_toys);
+                                v_hists[s][t].Fill(idx, weight);
+                                v_avg[s].Fill(idx, weight / file.num_toys);
                             }
                             else
                                 rejected_weights++;
@@ -270,15 +284,13 @@ int main(int argc, char** argv)
             }
         }
 
-        if(file.num_toys < cov_toys || cov_toys == 0)
-            cov_toys = file.num_toys;
-
-        offset += file.samples.size();
         double reject_fraction = (rejected_weights * 1.0) / total_weights;
         std::cout << TAG << "Finished processing events." << std::endl;
         std::cout << TAG << "Total weights: " << total_weights << std::endl;
         std::cout << TAG << "Rejected weights: " << rejected_weights << std::endl;
         std::cout << TAG << "Rejected fraction: " << reject_fraction << std::endl;
+
+        file_input->Close();
     }
 
     unsigned int num_elements = 0;
@@ -290,25 +302,19 @@ int main(int argc, char** argv)
         std::cout << TAG << "Calculating covariance matrix." << std::endl;
         std::vector<std::vector<float>> v_toys;
 
-        for(unsigned int t = 0; t < cov_toys; ++t)
+        for(unsigned int t = 0; t < usable_toys; ++t)
         {
-            offset = 0;
             std::vector<float> i_toy;
-            for(const auto& file : v_files)
+            for(int s = 0; s < cov_bin_manager.size(); ++s)
             {
-                for(const auto& kv : file.samples)
-                {
-                    const unsigned int s     = kv.first;
-                    const unsigned int nbins = file.bin_manager[s].GetNbins();
-                    for(unsigned int b = 0; b < nbins; ++b)
-                        i_toy.emplace_back(v_hists[s + offset][t].GetBinContent(b + 1));
-                }
-                offset += file.samples.size();
+                const unsigned int nbins = cov_bin_manager[s].GetNbins();
+                for(unsigned int b = 0; b < nbins; ++b)
+                    i_toy.emplace_back(v_hists[s][t].GetBinContent(b + 1));
             }
             v_toys.emplace_back(i_toy);
         }
 
-        std::cout << TAG << "Using " << cov_toys << " toys." << std::endl;
+        std::cout << TAG << "Using " << usable_toys << " toys." << std::endl;
         num_elements = v_toys.at(0).size();
         std::vector<float> v_mean(num_elements, 0.0);
         cov_mat.ResizeTo(num_elements, num_elements);
@@ -316,13 +322,13 @@ int main(int argc, char** argv)
         cov_mat.Zero();
         cor_mat.Zero();
 
-        for(unsigned int t = 0; t < cov_toys; ++t)
+        for(unsigned int t = 0; t < usable_toys; ++t)
         {
             for(unsigned int i = 0; i < num_elements; ++i)
-                v_mean[i] += v_toys[t][i] / (1.0 * cov_toys);
+                v_mean[i] += v_toys[t][i] / (1.0 * usable_toys);
         }
 
-        for(unsigned int t = 0; t < cov_toys; ++t)
+        for(unsigned int t = 0; t < usable_toys; ++t)
         {
             for(unsigned int i = 0; i < num_elements; ++i)
             {
@@ -331,7 +337,7 @@ int main(int argc, char** argv)
                     if(v_mean[i] != 0 && v_mean[j] != 0)
                     {
                         cov_mat(i, j) += (1.0 - v_toys[t][i] / v_mean[i])
-                                         * (1.0 - v_toys[t][j] / v_mean[j]) / (1.0 * cov_toys);
+                                         * (1.0 - v_toys[t][j] / v_mean[j]) / (1.0 * usable_toys);
                     }
                 }
             }
@@ -360,38 +366,32 @@ int main(int argc, char** argv)
     TFile* file_output = TFile::Open(fname_output.c_str(), "RECREATE");
     file_output->cd();
 
-    offset = 0;
     gStyle->SetOptStat(0);
-    for(const auto& file : v_files)
+    for(int s = 0; s < cov_bin_manager.size(); ++s)
     {
-        for(const auto& kv : file.samples)
+        std::stringstream ss;
+        ss << "cov_sample" << s;
+        TCanvas c(ss.str().c_str(), ss.str().c_str(), 1200, 900);
+        v_avg[s].Draw("axis");
+
+        for(unsigned int t = 0; t < usable_toys; ++t)
         {
-            unsigned int s = kv.first;
-            std::stringstream ss;
-            ss << file.detector << "_sample" << s;
-            TCanvas c(ss.str().c_str(), ss.str().c_str(), 1200, 900);
-            v_avg[s + offset].Draw("axis");
-
-            for(unsigned int t = 0; t < file.num_toys; ++t)
-            {
-                v_hists[s + offset][t].SetLineColor(kRed);
-                if(do_projection)
-                    v_hists[s + offset][t].Scale(1, "width");
-                v_hists[s + offset][t].Draw("hist same");
-            }
-
-            v_avg[s + offset].SetLineColor(kBlack);
-            v_avg[s + offset].SetLineWidth(2);
+            v_hists[s][t].SetLineColor(kRed);
             if(do_projection)
-                v_avg[s + offset].Scale(1, "width");
-            v_avg[s + offset].GetYaxis()->SetRangeUser(0, v_avg[s + offset].GetMaximum() * 1.50);
-            v_avg[s + offset].Draw("hist same");
-            c.Write(ss.str().c_str());
-
-            if(do_print)
-                c.Print(std::string(ss.str() + ".pdf").c_str());
+                v_hists[s][t].Scale(1, "width");
+            v_hists[s][t].Draw("hist same");
         }
-        offset += file.samples.size();
+
+        v_avg[s].SetLineColor(kBlack);
+        v_avg[s].SetLineWidth(2);
+        if(do_projection)
+            v_avg[s].Scale(1, "width");
+        v_avg[s].GetYaxis()->SetRangeUser(0, v_avg[s].GetMaximum() * 1.50);
+        v_avg[s].Draw("hist same");
+        c.Write(ss.str().c_str());
+
+        if(do_print)
+            c.Print(std::string(ss.str() + ".pdf").c_str());
     }
 
     if(do_covariance)
@@ -403,5 +403,7 @@ int main(int argc, char** argv)
     file_output->Close();
 
     std::cout << TAG << "Finished." << std::endl;
+    std::cout << TAG << "\u3042\u308a\u304c\u3068\u3046\u3054\u3056\u3044\u307e\u3057\u305f\uff01"
+              << std::endl;
     return 0;
 }
