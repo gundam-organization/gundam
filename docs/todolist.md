@@ -7,3 +7,5 @@ List of things in no particular order that I am looking at improving in the fit:
 + CLI override options for `xsllhFit`
 + Better error handling
 + Better documenation
++ Individual sample POT scaling
++ More descriptive variable names

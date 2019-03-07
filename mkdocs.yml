@@ -11,6 +11,7 @@ nav:
         - 'xsllhTreeConvert' : user-guide/xsllhtreeconvert.md
         - 'xsllhDetVariations' : user-guide/xsllhdetvariations.md
         - 'xsllhXsecCov' : user-guide/xsllhxseccov.md
+        - 'scripts' : user-guide/scripts.md
     - Reference:
         - 'Toy Throws' : reference/toythrows.md
         - 'JSON' : reference/json.md
