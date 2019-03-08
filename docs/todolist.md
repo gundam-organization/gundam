@@ -9,3 +9,4 @@ List of things in no particular order that I am looking at improving in the fit:
 + Better documenation
 + Individual sample POT scaling
 + More descriptive variable names
++ Use the BinManager for `xsllhFit`
