@@ -303,8 +303,9 @@ double FitObj::ReweightFluxHist(const std::vector<double>& input_par, TH1D& flux
         {
             const double enu = flux_hist.GetBinCenter(i);
             const double val = flux_hist.GetBinContent(i);
-            const int idx = m_flux_par->GetBinIndex(det, enu);
-            flux_int += val * flux_par[i - 1];
+            const int idx = m_flux_par->GetBinIndex(det, enu)
+                            + m_flux_par->GetDetectorOffset(det);
+            flux_int += val * flux_par[idx];
         }
     }
 

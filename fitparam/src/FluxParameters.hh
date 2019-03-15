@@ -15,6 +15,7 @@ public:
                   std::vector<double>& params);
     void AddDetector(const std::string& det, const std::vector<double>& bins);
     int GetBinIndex(const std::string& det, double enu);
+    int GetDetectorOffset(const std::string& det) const { return m_det_offset.at(det); };
 
 private:
     std::vector<double> m_enubins;
