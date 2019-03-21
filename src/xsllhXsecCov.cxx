@@ -170,7 +170,13 @@ int main(int argc, char** argv)
     {
         std::cout << TAG << "Matrix is invertible." << std::endl;
         std::string name = matrix_name + "_cov";
-        xsec_cov.Write(name.c_str());
+        if(do_sym_matrix)
+            xsec_cov.Write(name.c_str());
+        else
+        {
+            TMatrixD temp(xsec_cov);
+            temp.Write(name.c_str());
+        }
     }
 
     if(do_correlation)
@@ -187,7 +193,13 @@ int main(int argc, char** argv)
             }
         }
         const std::string name = matrix_name + "_cor";
-        xsec_cor.Write(name.c_str());
+        if(do_sym_matrix)
+            xsec_cor.Write(name.c_str());
+        else
+        {
+            TMatrixD temp(xsec_cor);
+            temp.Write(name.c_str());
+        }
     }
 
     if(do_ingrid)
@@ -218,24 +230,37 @@ int main(int argc, char** argv)
         {
             std::cout << TAG << "Matrix is invertible." << std::endl;
             std::string name = matrix_name + "_ingrid_cov";
-            xsec_cov_ingrid.Write(name.c_str());
+
+            if(do_sym_matrix)
+                xsec_cov_ingrid.Write(name.c_str());
+            else
+            {
+                TMatrixD temp(xsec_cov_ingrid);
+                temp.Write(name.c_str());
+            }
         }
 
         if(do_correlation)
         {
             std::cout << TAG << "Calculation correlation matrix." << std::endl;
-            TMatrixDSym xsec_cor(dim_multi);
+            TMatrixDSym xsec_cor_ingrid(dim_multi);
             for(unsigned int i = 0; i < dim_multi; ++i)
             {
                 for(unsigned int j = 0; j < dim_multi; ++j)
                 {
                     double x = xsec_cov_ingrid(i,i);
                     double y = xsec_cov_ingrid(j,j);
-                    xsec_cor(i,j) = xsec_cov_ingrid(i,j) / std::sqrt(x*y);
+                    xsec_cor_ingrid(i,j) = xsec_cov_ingrid(i,j) / std::sqrt(x*y);
                 }
             }
             std::string name = matrix_name + "_ingrid_cor";
-            xsec_cor.Write(name.c_str());
+            if(do_sym_matrix)
+                xsec_cor_ingrid.Write(name.c_str());
+            else
+            {
+                TMatrixD temp(xsec_cor_ingrid);
+                temp.Write(name.c_str());
+            }
         }
     }
 

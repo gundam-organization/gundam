@@ -14,7 +14,6 @@ OPTIONS
 -b : Add value to diagonal
 -r : Parameter mask
 -C : Calculate correlation matrix
--I : Build INGRID covariance
 -S : Store as TMatrixT
 -h : Display this help message
 ```
@@ -26,6 +25,7 @@ The `-i` flag is required and is the cross-section covariance in a text file. Th
 + `-b` : Optional amount to add to the diagonal to force positive definite (e.g. `-b 0.0001`).
 + `-r` : Parameters not to include (explained below).
 + `-C` : Flag to calculate correlation matrix.
++ `-S` : Flag to save the matrices as TMatrixT's instead of TMatrixTSym's.
 
 ### Overview
 
@@ -35,7 +35,7 @@ A text file containing the covariance matrix elements as numbers is read in and 
 
 ### Example Text File
 
-The first line of the text file **must** start with a number indicating the size of the matrix. Everything else on the first line is ignored, so it is suggested to list the parameter names to label the covariance matrix.
+The first line of the text file **must** start with a single number indicating the size of the matrix. Everything else on the first line is ignored, so it is suggested to list the parameter names to label the covariance matrix.
 
 Below is an example of a text file using the FSI parameters. There are six parameters, so the first line starts with `6` and the parameter names are then ignored by the rest of the code. Each element must be separated by at least one space character, and must be arranged into columns and rows. The text file is read starting at the upper left element, and proceeds left to right, top to bottom. In this example, \(V_{00} = 0.1681\) and \(V_{55} = 0.2540\), with the indices matching how they would be stored in the computer.
 

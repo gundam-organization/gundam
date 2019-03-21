@@ -8,14 +8,14 @@ There are several requirements for building the fitter:
 
 ROOT needs either Minuit or Minuit2 and optionally the MathMore package enabled to perform the minimization. The recommendation is to have both Minuit and Minuit2 enabled. In addition it is highly recommended to have a working OpenMP installation to take advantage of parallelism when running the code.
 
-To checkout a tagged version of the code using git:
+To checkout a tagged version of the code using git and place it in a local branch:
 
 ```bash
 $ git clone https://gitlab.com/cuddandr/xsLLhFitter.git
 $ git checkout -b <choose a branch name> <tag>
 ```
 
-Tagged versions of the code can also be downloaded as zipped archives from the Tags section on the GitLab page.
+It is highly recommended if you use Git to use a new local branch to manage any changes you make to the code. Tagged versions of the code can also be downloaded as zipped archives from the Tags section on the GitLab page.
 
 Set up the ROOT environment before attempting to build by:
 
