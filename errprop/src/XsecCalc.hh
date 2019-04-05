@@ -57,9 +57,7 @@ public:
     void ReadFitFile(const std::string& file);
     void UsePrefitCov();
 
-    void ReweightParam(const std::vector<double>& param);
     void ReweightBestFit();
-    void ReweightNominal();
     void GenerateToys();
     void GenerateToys(const int ntoys);
 

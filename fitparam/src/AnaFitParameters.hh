@@ -67,6 +67,7 @@ public:
     void GetParNames(std::vector<std::string>& vec) const { vec = pars_name; }
     void GetParPriors(std::vector<double>& vec) const { vec = pars_prior; }
     void GetParOriginal(std::vector<double>& vec) const { vec = pars_original; }
+    double GetParOriginal(int i) const { return pars_original.at(i); }
     double GetParPrior(int i) const { return pars_prior.at(i); }
     void GetParSteps(std::vector<double>& vec) const { vec = pars_step; }
     void GetParFixed(std::vector<bool>& vec) const { vec = pars_fixed; }

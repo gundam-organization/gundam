@@ -220,31 +220,21 @@ void XsecCalc::InitNormalization(const nlohmann::json& j, const std::string inpu
     num_signals = v_normalization.size();
 }
 
-void XsecCalc::ReweightNominal()
-{
-    selected_events->ReweightNominal();
-    true_events->ReweightNominal();
-}
-
 void XsecCalc::ReweightBestFit()
 {
-    ReweightParam(postfit_param);
+    selected_events->ReweightEvents(postfit_param);
+    true_events->ReweightNominal();
 
     auto sel_hists = selected_events->GetSignalHist();
     auto tru_hists = true_events->GetSignalHist();
 
     ApplyEff(sel_hists, tru_hists, false);
     ApplyNorm(sel_hists, postfit_param, false);
+    ApplyNorm(tru_hists, postfit_param, false);
 
     sel_best_fit = ConcatHist(sel_hists, "sel_best_fit");
     tru_best_fit = ConcatHist(tru_hists, "tru_best_fit");
     signal_best_fit = std::move(sel_hists);
-}
-
-void XsecCalc::ReweightParam(const std::vector<double>& param)
-{
-    selected_events->ReweightEvents(param);
-    true_events->ReweightEvents(param);
 }
 
 void XsecCalc::GenerateToys() { GenerateToys(num_toys); }

@@ -156,24 +156,31 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara)
               << std::endl;
 
     TH1D h_prefit("hist_prefit_par_all", "hist_prefit_par_all", m_npar, 0, m_npar);
+    TVectorD v_prefit_original(m_npar);
+    TVectorD v_prefit_decomp(m_npar);
+
     int num_par = 1;
     for(int i = 0; i < m_fitpara.size(); ++i)
     {
+        TMatrixDSym* cov_mat = m_fitpara[i]->GetCovMat();
         for(int j = 0; j < m_fitpara[i]->GetNpar(); ++j)
         {
             h_prefit.SetBinContent(num_par, m_fitpara[i]->GetParPrior(j));
             if(m_fitpara[i]->HasCovMat())
-            {
-                TMatrixDSym* covMat = m_fitpara[i]->GetCovMat();
-                h_prefit.SetBinError(num_par, std::sqrt((*covMat)[j][j]));
-            }
+                h_prefit.SetBinError(num_par, std::sqrt((*cov_mat)[j][j]));
             else
                 h_prefit.SetBinError(num_par, 0);
+
+            v_prefit_original[num_par-1] = m_fitpara[i]->GetParOriginal(j);
+            v_prefit_decomp[num_par-1] = m_fitpara[i]->GetParPrior(j);
             num_par++;
         }
     }
+
     m_dir->cd();
     h_prefit.Write();
+    v_prefit_original.Write("vec_prefit_original");
+    v_prefit_decomp.Write("vec_prefit_decomp");
 }
 
 bool XsecFitter::Fit(const std::vector<AnaSample*>& samples, int fit_type, bool stat_fluc)
