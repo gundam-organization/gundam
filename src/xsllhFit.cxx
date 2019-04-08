@@ -35,14 +35,27 @@ int main(int argc, char** argv)
     }
 
     std::string json_file;
+    std::string fname_output;
     bool dry_run = false;
+    int seed = -1;
+    int threads = -1;
+
     char option;
-    while((option = getopt(argc, argv, "j:nh")) != -1)
+    while((option = getopt(argc, argv, "j:o:s:t:nh")) != -1)
     {
         switch(option)
         {
             case 'j':
                 json_file = optarg;
+                break;
+            case 'o':
+                fname_output = optarg;
+                break;
+            case 's':
+                seed = std::stoi(optarg);
+                break;
+            case 't':
+                threads = std::stoi(optarg);
                 break;
             case 'n':
                 dry_run = true;
@@ -51,6 +64,9 @@ int main(int argc, char** argv)
                 std::cout << "USAGE: "
                           << argv[0] << "\nOPTIONS:\n"
                           << "-j : JSON input\n"
+                          << "-o : Output file (overrides JSON config)\n"
+                          << "-s : RNG seed (overrides JSON config)\n"
+                          << "-t : Num. threads (overrides JSON config)\n"
                           << "-n : Dry run - Set up but do not run fit.\n";
             default:
                 return 0;
@@ -68,13 +84,25 @@ int main(int argc, char** argv)
     std::string input_dir = parser.input_dir;
     std::string fname_data = parser.fname_data;
     std::string fname_mc   = parser.fname_mc;
-    std::string fname_output = parser.fname_output;
     std::vector<std::string> topology = parser.sample_topology;
 
     const double potD  = parser.data_POT;
     const double potMC = parser.mc_POT;
-    int seed = parser.rng_seed;
-    int threads = parser.num_threads;
+
+    if(fname_output.empty())
+        fname_output = parser.fname_output;
+    else
+        std::cout << TAG << "Output file set by CLI to: " << fname_output << std::endl;
+
+    if(seed < 0)
+        seed = parser.rng_seed;
+    else
+        std::cout << TAG << "RNG seed set by CLI to: " << seed << std::endl;
+
+    if(threads < 0)
+        threads = parser.num_threads;
+    else
+        std::cout << TAG << "threads set by CLI to: " << seed << std::endl;
 
     //Setup data trees
     TFile* fdata = TFile::Open(fname_data.c_str(), "READ");
