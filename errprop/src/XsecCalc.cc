@@ -74,7 +74,10 @@ void XsecCalc::ReadFitFile(const std::string& file)
         delete postfit_cov;
     if(postfit_cor != nullptr)
         delete postfit_cor;
+
     postfit_param.clear();
+    prefit_param_original.clear();
+    prefit_param_decomp.clear();
 
     std::cout << TAG << "Opening " << file << std::endl;
     input_file = file;
@@ -86,6 +89,14 @@ void XsecCalc::ReadFitFile(const std::string& file)
     TVectorD* postfit_param_root = (TVectorD*)postfit_file->Get("res_vector");
     for(int i = 0; i < postfit_param_root->GetNoElements(); ++i)
         postfit_param.emplace_back((*postfit_param_root)[i]);
+
+    TVectorD* prefit_original_root = (TVectorD*)postfit_file->Get("vec_prefit_original");
+    for(int i = 0; i < prefit_original_root->GetNoElements(); ++i)
+        prefit_param_original.emplace_back((*prefit_original_root)[i]);
+
+    TVectorD* prefit_decomp_root = (TVectorD*)postfit_file->Get("vec_prefit_decomp");
+    for(int i = 0; i < prefit_decomp_root->GetNoElements(); ++i)
+        prefit_param_decomp.emplace_back((*prefit_decomp_root)[i]);
 
     postfit_file->Close();
     use_prefit_cov = false;
@@ -223,13 +234,16 @@ void XsecCalc::InitNormalization(const nlohmann::json& j, const std::string inpu
 void XsecCalc::ReweightBestFit()
 {
     selected_events->ReweightEvents(postfit_param);
-    true_events->ReweightNominal();
+    true_events->ReweightEvents(postfit_param);
 
     auto sel_hists = selected_events->GetSignalHist();
     auto tru_hists = true_events->GetSignalHist();
 
     ApplyEff(sel_hists, tru_hists, false);
     ApplyNorm(sel_hists, postfit_param, false);
+
+    true_events->ReweightNominal();
+    tru_hists = true_events->GetSignalHist();
     ApplyNorm(tru_hists, postfit_param, false);
 
     sel_best_fit = ConcatHist(sel_hists, "sel_best_fit");
@@ -506,6 +520,12 @@ void XsecCalc::SaveOutput(bool save_toys)
 
     TVectorD postfit_param_root(postfit_param.size(), postfit_param.data());
     postfit_param_root.Write("postfit_param");
+
+    TVectorD prefit_original_root(prefit_param_original.size(), prefit_param_original.data());
+    prefit_original_root.Write("prefit_param_original");
+
+    TVectorD prefit_decomp_root(prefit_param_decomp.size(), prefit_param_decomp.data());
+    prefit_decomp_root.Write("prefit_param_decomp");
 
     SaveSignalHist(file);
 
