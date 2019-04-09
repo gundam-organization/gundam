@@ -1,10 +1,11 @@
 #!/bin/bash -login
-#SBATCH --time=9:00:00
+#SBATCH --time=4:00:00
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=4G
-#SBATCH --constraint=lac|skl
+#SBATCH --constraint=[lac|skl]
 #SBATCH --job-name=xsllhFit
 #SBATCH --output=fit_slurm.log
+#SBATCH --array=0-3
 
 FITROOT="/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter"
 RUNPATH="${SCRATCH}/xsllhFit"
@@ -14,4 +15,9 @@ source ${FITROOT}/setup.sh
 
 cd $RUNPATH
 
-xsllhFit -j config.json &> fit_output.log
+SEED=$(($SLURM_ARRAY_TASK_ID+100))
+FITCONFIG="config.json"
+printf -v output "$RUNPATH/fit_%03d.root" ${SLURM_ARRAY_TASK_ID}
+printf -v log "$RUNPATH/log_%03d.log" ${SLURM_ARRAY_TASK_ID}
+
+xsllhFit -j ${FITCONFIG} -o ${output} -s ${SEED} &> ${log}
