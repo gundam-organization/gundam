@@ -5,7 +5,7 @@
 #SBATCH --constraint=[lac|skl]
 #SBATCH --job-name=xsllhFit
 #SBATCH --output=fit_slurm.log
-#SBATCH --array=0-3
+#SBATCH --array=0-199
 
 FITROOT="/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter"
 RUNPATH="${SCRATCH}/xsllhFit"
@@ -15,9 +15,13 @@ source ${FITROOT}/setup.sh
 
 cd $RUNPATH
 
-SEED=$(($SLURM_ARRAY_TASK_ID+100))
+OFFSET=100
+SEED=$(($SLURM_ARRAY_TASK_ID+$OFFSET))
 FITCONFIG="config.json"
-printf -v output "$RUNPATH/fit_%03d.root" ${SLURM_ARRAY_TASK_ID}
-printf -v log "$RUNPATH/log_%03d.log" ${SLURM_ARRAY_TASK_ID}
+ERRCONFIG="errprop.json"
+printf -v output "$RUNPATH/fit_%06d.root" ${SEED}
+printf -v fitlog "$RUNPATH/log_%06d.log" ${SEED}
+printf -v xsec "$RUNPATH/xsec_%06d.root" ${SEED}
 
-xsllhFit -j ${FITCONFIG} -o ${output} -s ${SEED} &> ${log}
+xsllhFit -j ${FITCONFIG} -o ${output} -s ${SEED} &> ${fitlog}
+xsllhCalcXsec -j ${ERRCONFIG} -i ${output} -o ${xsec} &>> ${fitlog}
