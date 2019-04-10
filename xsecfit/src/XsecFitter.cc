@@ -334,13 +334,14 @@ bool XsecFitter::Fit(const std::vector<AnaSample*>& samples, int fit_type, bool 
 
 void XsecFitter::GenerateToyData(int toy_type, bool stat_fluc)
 {
+    int temp_seed = rng->GetSeed();
     double chi2_stat = 0.0;
     double chi2_syst = 0.0;
     std::vector<std::vector<double>> fitpar_throw;
     for(const auto& fitpar : m_fitpara)
     {
         std::vector<double> toy_throw(fitpar->GetNpar(), 0.0);
-        fitpar -> ThrowPar(toy_throw);
+        fitpar -> ThrowPar(toy_throw, temp_seed++);
 
         chi2_syst += fitpar -> GetChi2(toy_throw);
         fitpar_throw.emplace_back(toy_throw);

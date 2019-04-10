@@ -172,12 +172,12 @@ void AnaFitParameters::SetRegularisation(double strength, const std::string meth
     }
 }
 
-void AnaFitParameters::ThrowPar(std::vector<double>& param) const
+void AnaFitParameters::ThrowPar(std::vector<double>& param, const int seed) const
 {
     if(covariance != nullptr && m_do_throw)
     {
         std::vector<double> toy(Npar, 0);
-        ToyThrower toy_thrower(*original_cov, 0, true, 1E-48);
+        ToyThrower toy_thrower(*original_cov, seed, true, 1E-48);
         toy_thrower.Throw(toy);
 
         std::transform(toy.begin(), toy.end(), pars_original.begin(), param.begin(),
