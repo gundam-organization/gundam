@@ -1,7 +1,7 @@
 #include "XsecCalc.hh"
 using json = nlohmann::json;
 
-XsecCalc::XsecCalc(const std::string& json_config)
+XsecCalc::XsecCalc(const std::string& json_config, const std::string& cli_filename)
     : num_toys(0)
     , rng_seed(0)
     , num_signals(0)
@@ -20,7 +20,11 @@ XsecCalc::XsecCalc(const std::string& json_config)
     std::string input_dir
         = std::string(std::getenv("XSLLHFITTER")) + j["input_dir"].get<std::string>();
 
-    input_file = input_dir + j["input_fit_file"].get<std::string>();
+    if(cli_filename.empty())
+        input_file = input_dir + j["input_fit_file"].get<std::string>();
+    else
+        input_file = cli_filename;
+
     output_file = j["output_file"].get<std::string>();
 
     extra_hists = j.value("extra_hists", "");
@@ -45,14 +49,15 @@ XsecCalc::XsecCalc(const std::string& json_config)
               << TAG << "Selected events config: " << sel_json_config << std::endl
               << TAG << "True events config: " << tru_json_config << std::endl;
 
-    std::cout << TAG << "Reading post-fit file..." << std::endl;
-    TH1::AddDirectory(false);
-    ReadFitFile(input_file);
-
     std::cout << TAG << "Initializing fit objects..." << std::endl;
     selected_events = new FitObj(sel_json_config, "selectedEvents", false);
     true_events = new FitObj(tru_json_config, "trueEvents", true);
     total_signal_bins = selected_events->GetNumSignalBins();
+    is_fit_type_throw = selected_events->GetFitType() == 3 ? true : false;
+
+    std::cout << TAG << "Reading post-fit file..." << std::endl;
+    TH1::AddDirectory(false);
+    ReadFitFile(input_file);
 
     InitNormalization(j["sig_norm"], input_dir);
     std::cout << TAG << "Finished initialization." << std::endl;
@@ -97,6 +102,13 @@ void XsecCalc::ReadFitFile(const std::string& file)
     TVectorD* prefit_decomp_root = (TVectorD*)postfit_file->Get("vec_prefit_decomp");
     for(int i = 0; i < prefit_decomp_root->GetNoElements(); ++i)
         prefit_param_decomp.emplace_back((*prefit_decomp_root)[i]);
+
+    if(is_fit_type_throw)
+    {
+        TVectorD* prefit_toy_root = (TVectorD*)postfit_file->Get("vec_par_all_iter0");
+        for(int i = 0; i < prefit_toy_root->GetNoElements(); ++i)
+            prefit_param_toy.emplace_back((*prefit_toy_root)[i]);
+    }
 
     postfit_file->Close();
     use_prefit_cov = false;
@@ -242,9 +254,18 @@ void XsecCalc::ReweightBestFit()
     ApplyEff(sel_hists, tru_hists, false);
     ApplyNorm(sel_hists, postfit_param, false);
 
-    true_events->ReweightNominal();
-    tru_hists = true_events->GetSignalHist();
-    ApplyNorm(tru_hists, postfit_param, false);
+    if(is_fit_type_throw)
+    {
+        true_events->ReweightEvents(prefit_param_toy);
+        tru_hists = true_events->GetSignalHist();
+        ApplyNorm(tru_hists, prefit_param_toy, false);
+    }
+    else
+    {
+        true_events->ReweightNominal();
+        tru_hists = true_events->GetSignalHist();
+        ApplyNorm(tru_hists, prefit_param_original, false);
+    }
 
     sel_best_fit = ConcatHist(sel_hists, "sel_best_fit");
     tru_best_fit = ConcatHist(tru_hists, "tru_best_fit");
@@ -526,6 +547,12 @@ void XsecCalc::SaveOutput(bool save_toys)
 
     TVectorD prefit_decomp_root(prefit_param_decomp.size(), prefit_param_decomp.data());
     prefit_decomp_root.Write("prefit_param_decomp");
+
+    if(is_fit_type_throw)
+    {
+        TVectorD prefit_toy_root(prefit_param_toy.size(), prefit_param_toy.data());
+        prefit_toy_root.Write("prefit_param_toy");
+    }
 
     SaveSignalHist(file);
 

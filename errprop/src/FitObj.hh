@@ -54,6 +54,7 @@ public:
         return signal_bins.at(signal_id).GetNbins();
     };
 
+    int GetFitType() const { return m_fit_type; };
     TMatrixDSym GetPrefitCov();
     TMatrixDSym CalcTemplateCov();
     unsigned int GetNpar() const { return npar; };
@@ -70,6 +71,7 @@ private:
     std::vector<SignalDef> signal_def;
 
     int m_threads;
+    int m_fit_type;
     double m_norm;
     unsigned int npar;
     unsigned int total_signal_bins;

@@ -84,9 +84,9 @@ int main(int argc, char** argv)
     }
 
     std::cout << TAG << "Constructing the extractor..." << std::endl;
-    XsecCalc xsec(json_file);
-    if(!input_file.empty())
-        xsec.ReadFitFile(input_file);
+    XsecCalc xsec(json_file, input_file);
+    //if(!input_file.empty())
+    //    xsec.ReadFitFile(input_file);
     if(use_prefit_cov)
         xsec.UsePrefitCov();
     xsec.ReweightBestFit();

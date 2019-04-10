@@ -51,7 +51,7 @@ struct SigNorm
 class XsecCalc
 {
 public:
-    XsecCalc(const std::string& json_config);
+    XsecCalc(const std::string& json_config, const std::string& cli_filename = "");
     ~XsecCalc();
 
     void ReadFitFile(const std::string& file);
@@ -103,6 +103,7 @@ private:
     std::vector<double> postfit_param;
     std::vector<double> prefit_param_original;
     std::vector<double> prefit_param_decomp;
+    std::vector<double> prefit_param_toy;
 
     TMatrixDSym xsec_cov;
     TMatrixDSym xsec_cor;
@@ -120,6 +121,7 @@ private:
     std::string output_file;
     std::string extra_hists;
 
+    bool is_fit_type_throw;
     unsigned int num_toys;
     unsigned int rng_seed;
     unsigned int num_signals;

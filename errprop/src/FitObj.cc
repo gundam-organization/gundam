@@ -25,6 +25,7 @@ FitObj::FitObj(const std::string& json_config, const std::string& event_tree_nam
     const double potMC = parser.mc_POT;
     m_norm = potD / potMC;
     m_threads = parser.num_threads;
+    m_fit_type = parser.fit_type;
     signal_def = parser.signal_definition;
 
     std::cout << TAG << "Configure file parsing finished." << std::endl;
