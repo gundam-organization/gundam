@@ -102,7 +102,7 @@ int main(int argc, char** argv)
     if(threads < 0)
         threads = parser.num_threads;
     else
-        std::cout << TAG << "threads set by CLI to: " << seed << std::endl;
+        std::cout << TAG << "Threads set by CLI to: " << seed << std::endl;
 
     //Setup data trees
     TFile* fdata = TFile::Open(fname_data.c_str(), "READ");
@@ -112,37 +112,10 @@ int main(int argc, char** argv)
     std::cout << TAG << "Opening " << fname_data << " for data selection.\n"
               << TAG << "Opening " << fname_mc << " for MC selection." << std::endl;
 
-    /*************************************** FLUX *****************************************/
-    std::cout << TAG << "Setup Flux Covariance" << std::endl;
-
-    //input File
-    TFile* finfluxcov = TFile::Open(parser.flux_cov.fname.c_str(), "READ"); //contains flux systematics info
-    std::cout << TAG << "Opening " << parser.flux_cov.fname << " for flux covariance." << std::endl;
-    //setup enu bins and covm for flux
-    TH1D* nd_numu_bins_hist = (TH1D*)finfluxcov->Get(parser.flux_cov.binning.c_str());
-    TAxis* nd_numu_bins = nd_numu_bins_hist->GetXaxis();
-
-    std::vector<double> enubins;
-    enubins.push_back(nd_numu_bins -> GetBinLowEdge(1));
-    for(int i = 0; i < nd_numu_bins -> GetNbins(); ++i)
-        enubins.push_back(nd_numu_bins -> GetBinUpEdge(i+1));
-
-    //Cov mat stuff:
-    TMatrixDSym* cov_flux = (TMatrixDSym*)finfluxcov -> Get(parser.flux_cov.matrix.c_str());
-    finfluxcov -> Close();
-
-    /*************************************** FLUX END *************************************/
-    std::cout << TAG << "Setup Xsec Covariance" << std::endl;
-    TFile* file_xsec_cov = TFile::Open(parser.xsec_cov.fname.c_str(), "READ");
-    std::cout << TAG << "Opening " << parser.xsec_cov.fname << " for xsec covariance." << std::endl;
-    TMatrixDSym* cov_xsec = (TMatrixDSym*)file_xsec_cov -> Get(parser.xsec_cov.matrix.c_str());
-    file_xsec_cov -> Close();
-
     TFile* fout = TFile::Open(fname_output.c_str(), "RECREATE");
     std::cout << TAG << "Open output file: " << fname_output << std::endl;
 
     // Add analysis samples:
-
     std::vector<AnaSample*> samples;
 
     for(const auto& opt : parser.samples)
@@ -157,8 +130,7 @@ int main(int argc, char** argv)
 
             auto s = new AnaSample(opt.cut_branch, opt.name, opt.detector, opt.binning, tdata);
             s -> SetNorm(potD/potMC);
-            //if(opt.cut_branch >= 0)
-                samples.push_back(s);
+            samples.push_back(s);
         }
     }
 
@@ -193,10 +165,30 @@ int main(int argc, char** argv)
     sigfitpara.InitEventMap(samples, 0);
     fitpara.push_back(&sigfitpara);
 
-    //Flux parameters
     FluxParameters fluxpara("par_flux");
     if(parser.flux_cov.do_fit)
     {
+        std::cout << TAG << "Setup Flux Covariance." << std::endl
+                  << TAG << "Opening " << parser.flux_cov.fname << " for flux covariance."
+                  << std::endl;
+
+        TFile* file_flux_cov = TFile::Open(parser.flux_cov.fname.c_str(), "READ");
+        if(file_flux_cov == nullptr)
+        {
+            std::cout << ERR << "Could not open file! Exiting." << std::endl;
+            return 1;
+        }
+        TH1D* nd_numu_bins_hist = (TH1D*)file_flux_cov->Get(parser.flux_cov.binning.c_str());
+        TAxis* nd_numu_bins = nd_numu_bins_hist->GetXaxis();
+
+        std::vector<double> enubins;
+        enubins.push_back(nd_numu_bins -> GetBinLowEdge(1));
+        for(int i = 0; i < nd_numu_bins -> GetNbins(); ++i)
+            enubins.push_back(nd_numu_bins -> GetBinUpEdge(i+1));
+
+        TMatrixDSym* cov_flux = (TMatrixDSym*)file_flux_cov -> Get(parser.flux_cov.matrix.c_str());
+        file_flux_cov -> Close();
+
         fluxpara.SetCovarianceMatrix(*cov_flux, parser.flux_cov.decompose);
         fluxpara.SetThrow(parser.flux_cov.do_throw);
         fluxpara.SetInfoFrac(parser.flux_cov.info_frac);
@@ -212,6 +204,19 @@ int main(int argc, char** argv)
     XsecParameters xsecpara("par_xsec");
     if(parser.xsec_cov.do_fit)
     {
+        std::cout << TAG << "Setup Xsec Covariance." << std::endl
+                  << TAG << "Opening " << parser.xsec_cov.fname << " for xsec covariance."
+                  << std::endl;
+
+        TFile* file_xsec_cov = TFile::Open(parser.xsec_cov.fname.c_str(), "READ");
+        if(file_xsec_cov == nullptr)
+        {
+            std::cout << ERR << "Could not open file! Exiting." << std::endl;
+            return 1;
+        }
+        TMatrixDSym* cov_xsec = (TMatrixDSym*)file_xsec_cov -> Get(parser.xsec_cov.matrix.c_str());
+        file_xsec_cov -> Close();
+
         xsecpara.SetCovarianceMatrix(*cov_xsec, parser.xsec_cov.decompose);
         xsecpara.SetThrow(parser.xsec_cov.do_throw);
         for(const auto& opt : parser.detectors)
@@ -223,16 +228,23 @@ int main(int argc, char** argv)
         fitpara.push_back(&xsecpara);
     }
 
-    std::cout << TAG << "Setup Detector Covariance" << std::endl;
-    TFile* file_detcov = TFile::Open(parser.det_cov.fname.c_str(), "READ");
-    TMatrixDSym* cov_det_in = (TMatrixDSym*)file_detcov -> Get(parser.det_cov.matrix.c_str());
-    TMatrixDSym cov_det = *cov_det_in;
-    file_detcov -> Close();
-
     DetParameters detpara("par_det");
     if(parser.det_cov.do_fit)
     {
-        detpara.SetCovarianceMatrix(cov_det, parser.det_cov.decompose);
+        std::cout << TAG << "Setup Detector Covariance." << std::endl
+                  << TAG << "Opening " << parser.det_cov.fname << " for detector covariance."
+                  << std::endl;
+
+        TFile* file_det_cov = TFile::Open(parser.det_cov.fname.c_str(), "READ");
+        if(file_det_cov == nullptr)
+        {
+            std::cout << ERR << "Could not open file! Exiting." << std::endl;
+            return 1;
+        }
+        TMatrixDSym* cov_det = (TMatrixDSym*)file_det_cov -> Get(parser.det_cov.matrix.c_str());
+        file_det_cov -> Close();
+
+        detpara.SetCovarianceMatrix(*cov_det, parser.det_cov.decompose);
         detpara.SetThrow(parser.det_cov.do_throw);
         detpara.SetInfoFrac(parser.det_cov.info_frac);
         for(const auto& opt : parser.detectors)
