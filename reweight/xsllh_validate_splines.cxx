@@ -251,7 +251,9 @@ int main(int argc, char** argv)
         int step = -1.0 * std::floor(dsteps / 2.0) + w;
         if(limits)
         {
-            double inc = (error_pos - error_neg) / (dsteps - 1);
+            //double inc = (error_pos - error_neg) / (dsteps - 1);
+            double lim = step < 0 ? error_neg : error_pos;
+            double inc = 2 * std::abs(lim - nominal) / (dsteps - 1);
             dial_value[w] = nominal + step * inc;
         }
         else
@@ -261,7 +263,7 @@ int main(int argc, char** argv)
             else
                 dial_value[w] = nominal + step * error_pos;
         }
-        std::cout.unsetf(std::ios::fixed);
+        //std::cout.unsetf(std::ios::fixed);
         std::cout << "Dial Step: " << step << "; Value: " << dial_value[w] << std::endl;
     }
 

@@ -202,7 +202,9 @@ int main(int argc, char** argv)
         int step = -1.0 * std::floor(dial_steps / 2.0) + d;
         if(limits)
         {
-            double inc = (error_pos - error_neg) / (dial_steps - 1);
+            //double inc = (error_pos - error_neg) / (dial_steps - 1);
+            double lim = step < 0 ? error_neg : error_pos;
+            double inc = 2 * std::abs(lim - nominal) / (dial_steps - 1);
             v_dial_val.emplace_back(step * inc / nominal);
         }
         else
@@ -214,8 +216,9 @@ int main(int argc, char** argv)
         }
     }
 
-    //for(const auto& v : v_dial_val)
-    //    std::cout << nominal * (1 + v) << std::endl;
+    std::cout << TAG << "Dial Values: " << std::endl;
+    for(const auto& v : v_dial_val)
+        std::cout << nominal * (1 + v) << std::endl;
 
     TFile* file_output = TFile::Open(fname_output.c_str(), "RECREATE");
     TTree* tree_output = new TTree("selectedEvents", "selectedEvents");
