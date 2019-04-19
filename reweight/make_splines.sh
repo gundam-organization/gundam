@@ -50,6 +50,11 @@ while getopts ":hTLNd:i:n:b:o:" opt; do
     esac
 done
 
+if [ -z ${FILE_DIALS} ]; then
+    echo -e "\033[31mMissing dials file!\033[0m"
+    exit 1
+fi
+
 echo -e "\033[96mMaking splines...\033[0m"
 
 WEIGHTS_SUFFIX="weights.root"

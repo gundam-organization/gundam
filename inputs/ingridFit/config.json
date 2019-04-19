@@ -4,7 +4,7 @@
     "output_file" : "test.root",
     "input_dir" : "/inputs/ingridFit/",
     "fit_type"  : 0,
-    "stat_fluc" : false,
+    "stat_fluc" : true,
     "zero_syst" : false,
     "data_POT"  : 5.76E20,
     "mc_POT"    : 1.32E21,
@@ -15,7 +15,7 @@
         "minimizer" : "Minuit2",
         "algorithm" : "Migrad",
         "print_level" : 2,
-        "tolerance" : 1E-4,
+        "tolerance" : 1E-1,
         "strategy" : 1,
         "max_iter" : 1E6,
         "max_fcn" : 1E9
@@ -35,10 +35,10 @@
         "throw"  : false,
         "decomp" : true,
         "variance" : 0.99,
-        "fit_par" : true
+        "fit_par" : false
     },
     "xsec_cov" : {
-        "file" : "xsec_cov_nd280.root",
+        "file" : "xsec_cov_normalized.root",
         "matrix" : "xsec_cov",
         "throw"  : false,
         "decomp" : false,
@@ -53,7 +53,7 @@
     "detectors" : [
         {
             "name" : "ND280",
-            "xsec_config" : "ptheta_dials.json",
+            "xsec_config" : "normalized_dials.json",
             "binning" : "binning/analysis_binning.txt",
             "template_par" : [
                 {

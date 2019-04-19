@@ -327,6 +327,8 @@ int main(int argc, char** argv)
                 }
             }
 
+            event_pass = event_pass || use_truth_tree;
+
             if(pmu_reco < 0 || pmu_reco > 30000 || event_pass == false)
                 continue;
 
