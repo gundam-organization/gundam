@@ -4,9 +4,9 @@ There are several requirements for building the fitter:
 
 - GCC 4.8.5+ or Clang 3.3+ (a C++11 enabled compiler)
 - CMake 3.5+
-- ROOT 5 or 6
+- ROOT 5.34.34+ or 6+
 
-ROOT needs either Minuit or Minuit2 and optionally the MathMore package enabled to perform the minimization. The recommendation is to have both Minuit and Minuit2 enabled. In addition it is highly recommended to have a working OpenMP installation to take advantage of parallelism when running the code.
+ROOT needs either Minuit or Minuit2 and optionally the MathMore package enabled to perform the minimization. The recommendation is to have both Minuit and Minuit2 enabled. In addition it is highly recommended to have a working OpenMP installation to take advantage of parallelism when running the code. It has been found that there is a minimium version of ROOT 5 that is needed for the fit code to compile, somewhere between 5.34.09 and 5.34.34, so try older versions at your own risk.
 
 To checkout a tagged version of the code using git and place it in a local branch:
 

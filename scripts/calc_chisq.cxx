@@ -31,7 +31,7 @@ double calc_chisq(std::string filename, bool is_txt_file = false)
         v_files.emplace_back(filename);
 
     unsigned int dof = 0;
-    TH1D* h_chisq = new TH1D("h_chisq", "h_chisq", 25, 0, 100);
+    TH1D* h_chisq = new TH1D("h_chisq", "h_chisq", 25, 0, 150);
 
     for(const auto& file : v_files)
     {
@@ -86,7 +86,7 @@ double calc_chisq(std::string filename, bool is_txt_file = false)
         }
     }
 
-    TF1* f_chisq = new TF1("f_chisq", "ROOT::Math::chisquared_pdf(x,[0],0)",0,100);
+    TF1* f_chisq = new TF1("f_chisq", "ROOT::Math::chisquared_pdf(x,[0],0)",0,150);
     f_chisq->SetParameter(0, dof);
 
     TCanvas* c = new TCanvas("c","c",1200,900);

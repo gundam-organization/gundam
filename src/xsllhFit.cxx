@@ -268,14 +268,6 @@ int main(int argc, char** argv)
     xsecfit.InitFitter(fitpara);
     std::cout << TAG << "Fitter initialised." << std::endl;
 
-    /*
-    for(int i = 0; i < sigfitpara.GetNpar(); ++i)
-    {
-        xsecfit.FixParameter("par_fit_ND280_" + std::to_string(i), 1.0);
-        xsecfit.FixParameter("par_fit_INGRID_" + std::to_string(i), 1.0);
-    }
-    */
-
     bool did_converge = false;
     if(!dry_run)
     {
@@ -287,5 +279,6 @@ int main(int argc, char** argv)
 
     std::cout << TAG << "\u3042\u308a\u304c\u3068\u3046\u3054\u3056\u3044\u307e\u3057\u305f\uff01"
               << std::endl;
-    return 0;
+
+    return did_converge ? 0 : 121;
 }
