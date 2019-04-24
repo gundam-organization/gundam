@@ -3,8 +3,9 @@
 TRUTH_TREE=""
 READ_LIMITS=""
 NORM_DIALS=""
+DUMMY_SPLINES=""
 
-while getopts ":hTLNd:i:n:b:o:" opt; do
+while getopts ":hTLNDd:i:n:b:o:" opt; do
     case ${opt} in
         h )
             echo "USAGE: "
@@ -17,6 +18,7 @@ while getopts ":hTLNd:i:n:b:o:" opt; do
             echo "-T: Use truth tree"
             echo "-L: Read errors as upper/lower limits"
             echo "-N: Normalize dial values for splines"
+            echo "-D: Create dummy spline inputs"
             exit 0
             ;;
         i )
@@ -43,6 +45,9 @@ while getopts ":hTLNd:i:n:b:o:" opt; do
         N )
             NORM_DIALS="-N"
             ;;
+        D )
+            DUMMY_SPLINES="-D"
+            ;;
         \? )
             echo -e "\033[31mInvalid argument: $OPTARG\033[0m"
             exit 1
@@ -67,7 +72,7 @@ do
     echo -e "\033[93mGenerating splines for ${dial}\033[0m"
     FILE_WEIGHTS=$(echo "${dial}_${WEIGHTS_SUFFIX}" | awk '{print tolower($0)}')
     FILE_SPLINES=$(echo "${dial}_${SPLINES_SUFFIX}" | awk '{print tolower($0)}')
-    ./xsllh_response_functions.exe -i ${HIGHLAND_INPUT} -o ${FILE_WEIGHTS} -d ${FILE_DIALS} -r ${dial} -n ${NUM_STEPS} ${READ_LIMITS} ${TRUTH_TREE}
+    ./xsllh_response_functions.exe -i ${HIGHLAND_INPUT} -o ${FILE_WEIGHTS} -d ${FILE_DIALS} -r ${dial} -n ${NUM_STEPS} ${READ_LIMITS} ${TRUTH_TREE} ${DUMMY_SPLINES}
     ./xsllh_generate_splines.exe -i ${FILE_WEIGHTS} -o ${FILE_SPLINES} -b ${FILE_BINNING} -d ${FILE_DIALS} -r ${dial} -n ${NUM_STEPS} ${READ_LIMITS} ${NORM_DIALS}
     ./xsllh_validate_splines.exe -i ${FILE_WEIGHTS} -o ${FILE_VALIDATE} -b ${FILE_BINNING} -s ${FILE_SPLINES} -d ${FILE_DIALS} -r ${dial} -n ${NUM_STEPS} -U ${READ_LIMITS} ${NORM_DIALS}
 done

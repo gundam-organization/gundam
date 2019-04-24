@@ -50,6 +50,7 @@ int main(int argc, char** argv)
 
     bool limits = false;
     bool use_truth_tree = false;
+    bool do_dummy_splines = false;
     unsigned int dial_steps = 15;
     double nominal = 0;
     double error_neg = 0;
@@ -64,7 +65,7 @@ int main(int argc, char** argv)
     const int cut_level[num_samples] = {7, 8, 9, 8, 7, 5, 4, 7, 8, 7};
 
     char option;
-    while((option = getopt(argc, argv, "i:o:r:n:d:LTh")) != -1)
+    while((option = getopt(argc, argv, "i:o:r:n:d:LTDh")) != -1)
     {
         switch(option)
         {
@@ -89,6 +90,9 @@ int main(int argc, char** argv)
             case 'T':
                 use_truth_tree = true;
                 break;
+            case 'D':
+                do_dummy_splines = true;
+                break;
             case 'h':
                 std::cout << "USAGE: " << argv[0] << "\nOPTIONS\n"
                           << "-i : Input list of Highland trees (.txt)\n"
@@ -98,6 +102,7 @@ int main(int argc, char** argv)
                           << "-d : Dial value file (.txt)\n"
                           << "-L : Read errors as upper and lower limits\n"
                           << "-T : Use truth tree for reweighting\n"
+                          << "-D : Make inputs for dummy splines\n"
                           << "-h : Display this help message\n";
             default:
                 return 0;
@@ -184,6 +189,7 @@ int main(int argc, char** argv)
     int topology, reaction, sample, target;
     int accum_level[num_samples][num_samples];
     int input_RooVtxIndex, input_RooVtxEntry;
+    int TruthVertexID;
     float input_weight;
     float pmu_range;
     float s_mu_true_mom;
@@ -279,6 +285,7 @@ int main(int argc, char** argv)
             tree_input->SetBranchAddress("weight", &input_weight);
             tree_input->SetBranchAddress("RooVtxIndex", &input_RooVtxIndex);
             tree_input->SetBranchAddress("RooVtxEntry", &input_RooVtxEntry);
+            tree_input->SetBranchAddress("TruthVertexID", &TruthVertexID);
         }
 
         else
@@ -299,6 +306,7 @@ int main(int argc, char** argv)
             tree_input->SetBranchAddress("weight_corr_total", &input_weight);
             tree_input->SetBranchAddress("RooVtxIndex", &input_RooVtxIndex);
             tree_input->SetBranchAddress("RooVtxEntry", &input_RooVtxEntry);
+            tree_input->SetBranchAddress("TruthVertexID", &TruthVertexID);
         }
 
         unsigned int roovtx_events = tree_RooVtx->GetEntries();
@@ -312,7 +320,25 @@ int main(int argc, char** argv)
             tree_input -> GetEntry(i);
             tree_RooVtx -> LoadTree(input_RooVtxEntry);
             tree_RooVtx -> GetEntry(input_RooVtxEntry);
+
+            #ifdef OA_FAST
             ND::NRooTrackerVtx* vtx = (ND::NRooTrackerVtx*)nRooVtxs->At(input_RooVtxIndex);
+            #else
+            ND::NRooTrackerVtx* vtx = nullptr;
+            for(int v = 0; v < NRooVtx; ++v)
+            {
+                vtx = (ND::NRooTrackerVtx*)nRooVtxs->At(v);
+                if(vtx->TruthVertexID == TruthVertexID)
+                {
+                    #ifdef DEBUG_MSG
+                    std::cout << "NVtx = " << NRooVtx << std::endl;
+                    std::cout << "Vtx->" << vtx->TruthVertexID << " vs. " << TruthVertexID << std::endl;
+                    std::cout << "RooVtxIdx: " << input_RooVtxIndex << " vs. " << v << std::endl;
+                    #endif
+                    break;
+                }
+            }
+            #endif
 
             if(i % 1000 == 0)
                 std::cout << TAG << "Processing event " << i << std::endl;
@@ -353,14 +379,20 @@ int main(int argc, char** argv)
                 rw.Systematics().SetTwkDial(t2ksyst, v_dial_val.at(step));
                 rw.Reconfigure();
 
-                if(!vtx && step == 0)
+                if(!vtx)
                 {
-                    std::cout << TAG << "No vertex for event " << i << std::endl;
+                    if(step == 0)
+                    {
+                        std::cout << TAG << "No vertex for event " << i << std::endl;
+                        std::cout << TAG << "NVtx = " << NRooVtx << std::endl;
+                        std::cout << TAG << "RooVtxIndex = " << input_RooVtxIndex << std::endl;
+                    }
+
                     continue;
                 }
                 else
                 {
-                    weight_syst[step] = rw.CalcWeight(vtx);
+                    weight_syst[step] = do_dummy_splines ? 1.0 : rw.CalcWeight(vtx);
                     v_hists.at(step).Fill(pmu_reco, weight_nom * weight_syst[step]);
                 }
             }
