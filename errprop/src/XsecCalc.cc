@@ -645,7 +645,8 @@ void XsecCalc::SaveExtra(TFile* output)
             if(line.front() != COMMENT_CHAR)
             {
                 TH1D* temp = (TH1D*)file->Get(line.c_str());
-                temp->Write();
+                if(temp != nullptr)
+                    temp->Write();
             }
         }
         file->Close();

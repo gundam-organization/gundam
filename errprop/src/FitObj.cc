@@ -60,31 +60,6 @@ FitObj::FitObj(const std::string& json_config, const std::string& event_tree_nam
     std::cout << TAG << "Tree: " << event_tree_name << std::endl;
     event_tree.GetEvents(samples, parser.signal_definition, is_true_tree);
 
-    TFile* finfluxcov = TFile::Open(parser.flux_cov.fname.c_str(), "READ");
-    std::cout << TAG << "Opening " << parser.flux_cov.fname << " for flux covariance." << std::endl;
-    TH1D* nd_numu_bins_hist = (TH1D*)finfluxcov->Get(parser.flux_cov.binning.c_str());
-    TAxis* nd_numu_bins = nd_numu_bins_hist->GetXaxis();
-
-    std::vector<double> enubins;
-    enubins.push_back(nd_numu_bins->GetBinLowEdge(1));
-    for(int i = 0; i < nd_numu_bins->GetNbins(); ++i)
-        enubins.push_back(nd_numu_bins->GetBinUpEdge(i + 1));
-
-    TMatrixDSym* cov_flux = (TMatrixDSym*)finfluxcov -> Get(parser.flux_cov.matrix.c_str());
-    finfluxcov->Close();
-
-    std::cout << TAG << "Setup Xsec Covariance" << std::endl;
-    TFile* file_xsec_cov = TFile::Open(parser.xsec_cov.fname.c_str(), "READ");
-    std::cout << TAG << "Opening " << parser.xsec_cov.fname << " for xsec covariance." << std::endl;
-    TMatrixDSym* cov_xsec = (TMatrixDSym*)file_xsec_cov -> Get(parser.xsec_cov.matrix.c_str());
-    file_xsec_cov -> Close();
-
-    std::cout << TAG << "Setup Detector Covariance" << std::endl;
-    TFile* file_detcov = TFile::Open(parser.det_cov.fname.c_str(), "READ");
-    TMatrixDSym* cov_det_in = (TMatrixDSym*)file_detcov -> Get(parser.det_cov.matrix.c_str());
-    TMatrixDSym cov_det = *cov_det_in;
-    file_detcov -> Close();
-
     // FitParameters sigfitpara("par_fit", false);
     FitParameters* sigfitpara = new FitParameters("par_fit", false);
     for(const auto& opt : parser.detectors)
@@ -101,6 +76,27 @@ FitObj::FitObj(const std::string& json_config, const std::string& event_tree_nam
     FluxParameters* fluxpara = new FluxParameters("par_flux");
     if(parser.flux_cov.do_fit)
     {
+        std::cout << TAG << "Setup Flux Covariance." << std::endl
+                  << TAG << "Opening " << parser.flux_cov.fname << " for flux covariance."
+                  << std::endl;
+
+        TFile* file_flux_cov = TFile::Open(parser.flux_cov.fname.c_str(), "READ");
+        if(file_flux_cov == nullptr)
+        {
+            std::cout << ERR << "Could not open file! Exiting." << std::endl;
+            std::exit(121);
+        }
+        TH1D* nd_numu_bins_hist = (TH1D*)file_flux_cov->Get(parser.flux_cov.binning.c_str());
+        TAxis* nd_numu_bins = nd_numu_bins_hist->GetXaxis();
+
+        std::vector<double> enubins;
+        enubins.push_back(nd_numu_bins -> GetBinLowEdge(1));
+        for(int i = 0; i < nd_numu_bins -> GetNbins(); ++i)
+            enubins.push_back(nd_numu_bins -> GetBinUpEdge(i+1));
+
+        TMatrixDSym* cov_flux = (TMatrixDSym*)file_flux_cov -> Get(parser.flux_cov.matrix.c_str());
+        file_flux_cov -> Close();
+
         fluxpara->SetCovarianceMatrix(*cov_flux, parser.flux_cov.decompose);
         for(const auto& opt : parser.detectors)
         {
@@ -117,6 +113,19 @@ FitObj::FitObj(const std::string& json_config, const std::string& event_tree_nam
     XsecParameters* xsecpara = new XsecParameters("par_xsec");
     if(parser.xsec_cov.do_fit)
     {
+        std::cout << TAG << "Setup Xsec Covariance." << std::endl
+                  << TAG << "Opening " << parser.xsec_cov.fname << " for xsec covariance."
+                  << std::endl;
+
+        TFile* file_xsec_cov = TFile::Open(parser.xsec_cov.fname.c_str(), "READ");
+        if(file_xsec_cov == nullptr)
+        {
+            std::cout << ERR << "Could not open file! Exiting." << std::endl;
+            std::exit(1);
+        }
+        TMatrixDSym* cov_xsec = (TMatrixDSym*)file_xsec_cov -> Get(parser.xsec_cov.matrix.c_str());
+        file_xsec_cov -> Close();
+
         xsecpara->SetCovarianceMatrix(*cov_xsec, parser.xsec_cov.decompose);
         for(const auto& opt : parser.detectors)
         {
@@ -132,7 +141,20 @@ FitObj::FitObj(const std::string& json_config, const std::string& event_tree_nam
     DetParameters* detpara = new DetParameters("par_det");
     if(parser.det_cov.do_fit)
     {
-        detpara->SetCovarianceMatrix(cov_det, parser.det_cov.decompose);
+        std::cout << TAG << "Setup Detector Covariance." << std::endl
+                  << TAG << "Opening " << parser.det_cov.fname << " for detector covariance."
+                  << std::endl;
+
+        TFile* file_det_cov = TFile::Open(parser.det_cov.fname.c_str(), "READ");
+        if(file_det_cov == nullptr)
+        {
+            std::cout << ERR << "Could not open file! Exiting." << std::endl;
+            std::exit(1);
+        }
+        TMatrixDSym* cov_det = (TMatrixDSym*)file_det_cov -> Get(parser.det_cov.matrix.c_str());
+        file_det_cov -> Close();
+
+        detpara->SetCovarianceMatrix(*cov_det, parser.det_cov.decompose);
         for(const auto& opt : parser.detectors)
         {
             if(opt.use_detector)

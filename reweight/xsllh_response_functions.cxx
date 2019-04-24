@@ -122,6 +122,15 @@ int main(int argc, char** argv)
               << TAG << "Generating weights for " << dial_name << std::endl
               << TAG << "Number of dial steps: " << dial_steps << std::endl;
 
+    if(do_dummy_splines)
+        std::cout << TAG << "Producing dummy spline inputs." << std::endl;
+
+    #ifdef OA_FAST
+    std::cout << TAG << "Using RooVtxIndex for vertex finding." << std::endl;
+    #else
+    std::cout << TAG << "Using TruthVtxID for vertex finding." << std::endl;
+    #endif
+
     std::ifstream fdial(fname_dials, std::ios::in);
     if(!fdial.is_open())
     {
