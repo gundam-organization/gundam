@@ -1,7 +1,7 @@
 #include "FitObj.hh"
 
 FitObj::FitObj(const std::string& json_config, const std::string& event_tree_name,
-               bool is_true_tree)
+               bool is_true_tree, bool read_data_file)
 {
     OptParser parser;
     if(!parser.ParseJSON(json_config))
@@ -55,7 +55,11 @@ FitObj::FitObj(const std::string& json_config, const std::string& event_tree_nam
         }
     }
 
-    AnaTreeMC event_tree(fname_mc.c_str(), event_tree_name);
+    std::string event_file = read_data_file ? fname_data : fname_mc;
+    if(read_data_file)
+        std::cout << TAG << "Reading events from data file!" << std::endl;
+
+    AnaTreeMC event_tree(event_file.c_str(), event_tree_name);
     std::cout << TAG << "Reading and collecting events." << std::endl;
     std::cout << TAG << "Tree: " << event_tree_name << std::endl;
     event_tree.GetEvents(samples, parser.signal_definition, is_true_tree);

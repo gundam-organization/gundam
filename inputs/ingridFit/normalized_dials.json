@@ -20,7 +20,7 @@
             "limit_hi" : 1.5,
             "binning" : "normalized_splines/tn337_binning.txt",
             "splines" : "normalized_splines/pf_c_splines.root",
-            "use" : true
+            "use" : false
         },
         {
             "name" : "PF_O",

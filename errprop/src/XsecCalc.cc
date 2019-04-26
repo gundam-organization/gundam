@@ -12,6 +12,8 @@ XsecCalc::XsecCalc(const std::string& json_config, const std::string& cli_filena
 {
     std::cout << TAG << "Reading error propagation options." << std::endl;
     std::fstream f;
+
+    config_file = json_config;
     f.open(json_config, std::ios::in);
 
     json j;
@@ -26,6 +28,8 @@ XsecCalc::XsecCalc(const std::string& json_config, const std::string& cli_filena
         input_file = cli_filename;
 
     output_file = j["output_file"].get<std::string>();
+
+    do_read_data_events = j.value("read_data_events", false);
 
     extra_hists = j.value("extra_hists", "");
     if(!extra_hists.empty())
@@ -269,7 +273,9 @@ void XsecCalc::ReweightBestFit()
 
     sel_best_fit = ConcatHist(sel_hists, "sel_best_fit");
     tru_best_fit = ConcatHist(tru_hists, "tru_best_fit");
+
     signal_best_fit = std::move(sel_hists);
+    truth_best_fit = std::move(tru_hists);
 }
 
 void XsecCalc::GenerateToys() { GenerateToys(num_toys); }
@@ -554,7 +560,8 @@ void XsecCalc::SaveOutput(bool save_toys)
         prefit_toy_root.Write("prefit_param_toy");
     }
 
-    SaveSignalHist(file);
+    SaveSignalHist(file, signal_best_fit, "sel");
+    SaveSignalHist(file, truth_best_fit, "tru");
 
     for(const auto& n : v_normalization)
     {
@@ -568,16 +575,19 @@ void XsecCalc::SaveOutput(bool save_toys)
         n.target_throws.Write(name.c_str());
     }
 
+    if(do_read_data_events)
+        SaveDataEvents(file);
+
     SaveExtra(file);
     file->Close();
 }
 
-void XsecCalc::SaveSignalHist(TFile* file)
+void XsecCalc::SaveSignalHist(TFile* file, const std::vector<TH1D> v_hists, const std::string suffix)
 {
     file->cd();
     for(int id = 0; id < num_signals; ++id)
     {
-        signal_best_fit.at(id).Write();
+        v_hists.at(id).Write();
 
         BinManager bm = selected_events->GetBinManager(id);
         auto cos_edges = bm.GetEdgeVector(0);
@@ -607,13 +617,14 @@ void XsecCalc::SaveSignalHist(TFile* file)
         unsigned int offset = 0;
         for(int k = 0; k < bin_edges.size(); ++k)
         {
-            std::string name = v_normalization.at(id).name + "_cos_bin" + std::to_string(k);
+            std::string name = v_normalization.at(id).name + "_cos_bin" + std::to_string(k)
+                               + "_" + suffix;
             TH1D temp(name.c_str(), name.c_str(), bin_edges.at(k).size()-1, bin_edges.at(k).data());
 
             for(int l = 1; l <= temp.GetNbinsX(); ++l)
             {
-                temp.SetBinContent(l, signal_best_fit.at(id).GetBinContent(l+offset));
-                temp.SetBinError(l, signal_best_fit.at(id).GetBinError(l+offset));
+                temp.SetBinContent(l, v_hists.at(id).GetBinContent(l+offset));
+                temp.SetBinError(l, v_hists.at(id).GetBinError(l+offset));
             }
             offset += temp.GetNbinsX();
             temp.GetXaxis()->SetRange(1,temp.GetNbinsX()-1);
@@ -651,4 +662,41 @@ void XsecCalc::SaveExtra(TFile* output)
         }
         file->Close();
     }
+}
+
+void XsecCalc::SaveDataEvents(TFile* output)
+{
+    std::cout << TAG << "Reading data events." << std::endl;
+    std::fstream f;
+    f.open(config_file, std::ios::in);
+
+    json j;
+    f >> j;
+
+    std::string input_dir
+        = std::string(std::getenv("XSLLHFITTER")) + j["input_dir"].get<std::string>();
+
+    std::string true_events_config = input_dir + j["tru_config"].get<std::string>();
+    FitObj fake_data_events(true_events_config, "trueEvents", true, true);
+
+    fake_data_events.ReweightNominal();
+    auto fake_data_hists = fake_data_events.GetSignalHist();
+    ApplyNorm(fake_data_hists, prefit_param_original, false);
+
+    for(unsigned int i = 0; i < fake_data_hists.size(); ++i)
+    {
+        std::string name = "hist_data_signal_" + std::to_string(i);
+        fake_data_hists.at(i).SetName(name.c_str());
+        fake_data_hists.at(i).SetTitle(name.c_str());
+    }
+
+    auto fake_data_concat = ConcatHist(fake_data_hists, "fake_data_concat");
+
+    std::cout << TAG << "Saving data histograms." << std::endl;
+    output->cd();
+    fake_data_concat.Write();
+
+    SaveSignalHist(output, fake_data_hists, "data");
+
+    f.close();
 }

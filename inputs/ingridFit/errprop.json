@@ -7,6 +7,7 @@
     "rng_seed" : 0,
     "sel_config" : "config.json",
     "tru_config" : "config.json",
+    "read_data_events" : true,
     "decomposition" : {
         "do_force_posdef" : true,
         "force_posdef_val" : 1E-6,

@@ -79,8 +79,9 @@ public:
     TH1D GetTruSignal(const int signal_id) { return true_events->GetSignalHist(signal_id); };
 
     void SaveOutput(bool save_toys = false);
-    void SaveSignalHist(TFile* file);
-    void SaveExtra(TFile* file);
+    void SaveSignalHist(TFile* file, const std::vector<TH1D> v_hists, const std::string suffix = "");
+    void SaveExtra(TFile* output);
+    void SaveDataEvents(TFile* output);
     void SetOutputFile(const std::string& override_file) { output_file = override_file; };
 
     std::string GetOutputFileName() const { return output_file; };
@@ -112,16 +113,19 @@ private:
     TH1D tru_best_fit;
     TH1D eff_best_fit;
     std::vector<TH1D> signal_best_fit;
+    std::vector<TH1D> truth_best_fit;
     std::vector<TH1D> toys_sel_events;
     std::vector<TH1D> toys_tru_events;
     std::vector<TH1D> toys_eff;
     std::vector<SigNorm> v_normalization;
 
+    std::string config_file;
     std::string input_file;
     std::string output_file;
     std::string extra_hists;
 
     bool is_fit_type_throw;
+    bool do_read_data_events;
     unsigned int num_toys;
     unsigned int rng_seed;
     unsigned int num_signals;
