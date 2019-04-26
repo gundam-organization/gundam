@@ -1,11 +1,11 @@
 #!/bin/bash -login
 #SBATCH --time=4:00:00
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=12
 #SBATCH --mem=4G
 #SBATCH --constraint=[lac|skl]
 #SBATCH --job-name=xsllhFit
 #SBATCH --output=fit_slurm.log
-#SBATCH --array=0-199
+#SBATCH --array=0-0
 
 FITROOT="/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter"
 RUNPATH="${SCRATCH}/xsllhFit"
@@ -15,7 +15,7 @@ source ${FITROOT}/setup.sh
 
 cd $RUNPATH
 
-OFFSET=100
+OFFSET=12257
 SEED=$(($SLURM_ARRAY_TASK_ID+$OFFSET))
 FITCONFIG="config.json"
 ERRCONFIG="errprop.json"
@@ -24,4 +24,9 @@ printf -v fitlog "$RUNPATH/log_%06d.log" ${SEED}
 printf -v xsec "$RUNPATH/xsec_%06d.root" ${SEED}
 
 xsllhFit -j ${FITCONFIG} -o ${output} -s ${SEED} &> ${fitlog}
-xsllhCalcXsec -j ${ERRCONFIG} -i ${output} -o ${xsec} &>> ${fitlog}
+
+if [ $? -eq 0 ]; then
+    xsllhCalcXsec -j ${ERRCONFIG} -i ${output} -o ${xsec} &>> ${fitlog}
+else
+    echo "Fit failed. Do not run error propagation and cross-section calculation." >> ${fitlog}
+fi

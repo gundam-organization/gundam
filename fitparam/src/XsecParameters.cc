@@ -141,6 +141,9 @@ void XsecParameters::ReWeight(AnaEvent* event, const std::string& det, int nsamp
         */
     }
 
+    if(m_do_cap_weights)
+        weight = weight > m_weight_cap ? m_weight_cap : weight;
+
     event -> AddEvWght(weight);
 }
 

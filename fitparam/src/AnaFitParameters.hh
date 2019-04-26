@@ -96,6 +96,7 @@ public:
     bool IsDecomposed() const { return m_decompose; }
     bool DoThrow() const { return m_do_throw; }
     void SetThrow(bool flag = true) { m_do_throw = flag; }
+    void SetWeightCap(double cap, bool flag = true) { m_do_cap_weights = flag; m_weight_cap = cap; }
 
 protected:
     bool CheckDims(const std::vector<double>& params) const;
@@ -115,6 +116,8 @@ protected:
     bool m_do_throw;
     bool m_decompose;
     bool m_regularised;
+    bool m_do_cap_weights;
+    double m_weight_cap;
     double m_info_frac;
     double m_regstrength;
     RegMethod m_regmethod;
