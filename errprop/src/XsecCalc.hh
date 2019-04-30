@@ -79,7 +79,7 @@ public:
     TH1D GetTruSignal(const int signal_id) { return true_events->GetSignalHist(signal_id); };
 
     void SaveOutput(bool save_toys = false);
-    void SaveSignalHist(TFile* file, const std::vector<TH1D> v_hists, const std::string suffix = "");
+    void SaveSignalHist(TFile* file, std::vector<TH1D> v_hists, const std::string suffix = "");
     void SaveExtra(TFile* output);
     void SaveDataEvents(TFile* output);
     void SetOutputFile(const std::string& override_file) { output_file = override_file; };

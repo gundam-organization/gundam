@@ -1,0 +1,9 @@
+{
+    "xsec_plots" : [
+        {
+            "signal_name" : "CC0pi",
+            "hist_title" : "ND280 CC0#pi",
+            "binning" : "analysis_binning.txt"
+        }
+    ]
+}

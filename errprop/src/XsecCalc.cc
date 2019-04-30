@@ -560,8 +560,8 @@ void XsecCalc::SaveOutput(bool save_toys)
         prefit_toy_root.Write("prefit_param_toy");
     }
 
-    SaveSignalHist(file, signal_best_fit, "sel");
-    SaveSignalHist(file, truth_best_fit, "tru");
+    SaveSignalHist(file, signal_best_fit, "postfit");
+    SaveSignalHist(file, truth_best_fit, "nominal");
 
     for(const auto& n : v_normalization)
     {
@@ -582,11 +582,14 @@ void XsecCalc::SaveOutput(bool save_toys)
     file->Close();
 }
 
-void XsecCalc::SaveSignalHist(TFile* file, const std::vector<TH1D> v_hists, const std::string suffix)
+void XsecCalc::SaveSignalHist(TFile* file, std::vector<TH1D> v_hists, const std::string suffix)
 {
     file->cd();
     for(int id = 0; id < num_signals; ++id)
     {
+        std::string hist_name = v_normalization.at(id).name + "_" + suffix;
+        v_hists.at(id).SetName(hist_name.c_str());
+        v_hists.at(id).SetTitle(hist_name.c_str());
         v_hists.at(id).Write();
 
         BinManager bm = selected_events->GetBinManager(id);
@@ -685,7 +688,8 @@ void XsecCalc::SaveDataEvents(TFile* output)
 
     for(unsigned int i = 0; i < fake_data_hists.size(); ++i)
     {
-        std::string name = "hist_data_signal_" + std::to_string(i);
+        //std::string name = "hist_data_signal_" + std::to_string(i);
+        std::string name = v_normalization.at(i).name + "_data";
         fake_data_hists.at(i).SetName(name.c_str());
         fake_data_hists.at(i).SetTitle(name.c_str());
     }

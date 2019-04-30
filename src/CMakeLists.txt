@@ -43,6 +43,21 @@ foreach(mod ${MODULETargets})
   target_link_libraries(xsllhFit ${mod})
 endforeach()
 
+#xsllhPlot
+add_executable(xsllhPlot xsllhPlot.cxx)
+
+set_target_properties(xsllhPlot PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
+
+foreach(mod ${MODULES})
+ target_include_directories(xsllhPlot PUBLIC ${CMAKE_SOURCE_DIR}/${mod}/src)
+ target_include_directories(xsllhPlot PUBLIC ${CMAKE_SOURCE_DIR}/include)
+endforeach()
+
+foreach(mod ${MODULETargets})
+  cmessage(STATUS "Linking with: ${mod}")
+  target_link_libraries(xsllhPlot ${mod})
+endforeach()
+
 #xsllhTreeConvert
 add_executable(xsllhTreeConvert xsllhTreeConvert.cxx)
 
@@ -89,4 +104,4 @@ foreach(mod ${MODULETargets})
 endforeach()
 
 #install targets
-install(TARGETS xsllhCalcXsec xsllhFit xsllhDetVar xsllhTreeConvert xsllhUnitTest xsllhXsecCov DESTINATION bin)
+install(TARGETS xsllhCalcXsec xsllhFit xsllhDetVar xsllhPlot xsllhTreeConvert xsllhUnitTest xsllhXsecCov DESTINATION bin)
