@@ -22,6 +22,7 @@
 using json = nlohmann::json;
 
 #include "BinManager.hh"
+#include "CalcChisq.hh"
 #include "ColorOutput.hh"
 #include "PlotStyle.hh"
 
@@ -152,6 +153,31 @@ int main(int argc, char** argv)
 
             output_file->cd();
             temp_hist->Write();
+        }
+
+        json empty_json;
+        json chisq_json = pj.value("chisq", empty_json);
+        if(!chisq_json.empty())
+        {
+            std::cout << TAG << "Adding chi-square comparison." << std::endl;
+            std::string h1_name = chisq_json["hist_one"];
+            std::string h2_name = chisq_json["hist_two"];
+            std::string cov_name = chisq_json["covariance"];
+            std::string label = chisq_json["legend_label"];
+
+            TH1D* h1 = nullptr;
+            TH1D* h2 = nullptr;
+            TMatrixDSym* cov_mat = nullptr;
+
+            temp_file->cd();
+            temp_file->GetObject(cov_name.c_str(), cov_mat);
+            temp_file->GetObject(h1_name.c_str(), h1);
+            temp_file->GetObject(h2_name.c_str(), h2);
+            CalcChisq calc_chisq(*cov_mat);
+            double chisq = calc_chisq.CalcChisqCov(*h1, *h2);
+
+            label = label + std::to_string(chisq);
+            temp_legend.AddEntry((TObject*)nullptr, label.c_str(), "");
         }
 
         temp_legend.Draw();

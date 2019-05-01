@@ -43,7 +43,13 @@
             "legend_coordinates" : [0.60, 0.60, 0.80, 0.80],
             "legend_title" : "",
             "x_axis" : "Bin Number",
-            "y_axis" : "cross-section"
+            "y_axis" : "cross-section",
+            "chisq" : {
+                "covariance" : "xsec_cov",
+                "hist_one" : "CC0pi_postfit",
+                "hist_two" : "CC0pi_nominal",
+                "legend_label" : "#chi^{2} = "
+            }
         },
         {
             "name" : "CC0pi_cos_bin3",
