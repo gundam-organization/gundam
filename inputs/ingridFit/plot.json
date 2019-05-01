@@ -1,9 +1,91 @@
 {
-    "xsec_plots" : [
+    "global_style" : "",
+    "output_filename" : "plots.root",
+    "plot_extension" : ".pdf",
+    "plots" : [
         {
-            "signal_name" : "CC0pi",
-            "hist_title" : "ND280 CC0#pi",
-            "binning" : "analysis_binning.txt"
+            "name" : "CC0pi_all_bins",
+            "save_as" : "CC0pi_all_bins",
+            "root_file" : "xsec.root",
+            "hists" : [
+                {
+                    "name" : "CC0pi_postfit",
+                    "line_color" : 1,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "marker_color" : 1,
+                    "marker_style" : 20,
+                    "marker_size" : 1,
+                    "legend_entry" : "Postfit",
+                    "legend_draw" : "lpe",
+                    "draw" : "e same"
+                },
+                {
+                    "name" : "CC0pi_nominal",
+                    "line_color" : 4,
+                    "line_style" : 7,
+                    "line_width" : 2,
+                    "legend_entry" : "Nominal MC",
+                    "draw" : "hist same"
+                },
+                {
+                    "name" : "CC0pi_data",
+                    "line_color" : 2,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "legend_entry" : "Fake Data",
+                    "draw" : "hist same"
+                }
+            ],
+
+            "print" : true,
+            "use" : true,
+            "legend_coordinates" : [0.60, 0.60, 0.80, 0.80],
+            "legend_title" : "",
+            "x_axis" : "Bin Number",
+            "y_axis" : "cross-section"
+        },
+        {
+            "name" : "CC0pi_cos_bin3",
+            "save_as" : "CC0pi_cos_bin3",
+            "root_file" : "xsec.root",
+            "hists" : [
+                {
+                    "name" : "CC0pi_cos_bin3_postfit",
+                    "line_color" : 1,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "marker_color" : 1,
+                    "marker_style" : 20,
+                    "marker_size" : 1,
+                    "legend_entry" : "Postfit",
+                    "legend_draw" : "lpe",
+                    "draw" : "e same"
+                },
+                {
+                    "name" : "CC0pi_cos_bin3_nominal",
+                    "line_color" : 4,
+                    "line_style" : 7,
+                    "line_width" : 2,
+                    "legend_entry" : "Nominal MC",
+                    "draw" : "hist same"
+                },
+                {
+                    "name" : "CC0pi_cos_bin3_data",
+                    "line_color" : 2,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "legend_entry" : "Fake Data",
+                    "draw" : "hist same"
+                }
+            ],
+
+            "print" : true,
+            "use" : true,
+            "legend_coordinates" : [0.60, 0.60, 0.80, 0.80],
+            "legend_title" : "",
+            "x_axis" : "Bin Number",
+            "y_axis" : "cross-section"
         }
     ]
 }
