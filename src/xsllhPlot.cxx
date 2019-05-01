@@ -22,6 +22,7 @@
 using json = nlohmann::json;
 
 #include "BinManager.hh"
+#include "CalcChisq.hh"
 #include "ColorOutput.hh"
 #include "PlotStyle.hh"
 
@@ -120,6 +121,7 @@ int main(int argc, char** argv)
 
     TFile* output_file = TFile::Open(output_filename.c_str(), "RECREATE");
     TFile* xsec_file = TFile::Open(xsec_filename.c_str(), "READ");
+
     for(const auto& s : j["xsec_plots"])
     {
         xsec_file->cd();
@@ -146,6 +148,17 @@ int main(int argc, char** argv)
         l.AddEntry(hist_postfit, "Post-fit", "lpe");
         l.AddEntry(hist_nominal, "Nominal MC", "l");
         l.AddEntry(hist_data, "Fake Data", "l");
+
+        TMatrixDSym* cov_mat = (TMatrixDSym*)xsec_file->Get("xsec_cov");
+        CalcChisq calc_chisq(*cov_mat);
+        double cov_chisq_nominal = calc_chisq.CalcChisqCov(*hist_postfit, *hist_nominal);
+        double cov_chisq_data = calc_chisq.CalcChisqCov(*hist_postfit, *hist_data);
+
+        std::string chisq_nominal = "#chi^{2} = " + std::to_string(cov_chisq_nominal);
+        std::string chisq_data = "#chi^{2} = " + std::to_string(cov_chisq_data);
+        l.AddEntry((TObject*)nullptr, chisq_nominal.c_str(), "");
+        l.AddEntry((TObject*)nullptr, chisq_data.c_str(), "");
+
         l.Draw();
 
         output_file->cd();
@@ -215,7 +228,64 @@ int main(int argc, char** argv)
         }
     }
 
+    TFile* fit_file = TFile::Open(fit_filename.c_str(), "READ");
+    const unsigned int num_samples = 7;
+
+    HistStyle sample_postfit;
+    sample_postfit.SetLineAtt(kRed, kSolid, 2);
+    sample_postfit.SetAxisTitle("Reco Bin Number","Num. Events");
+
+    HistStyle sample_nominal;
+    sample_nominal.SetLineAtt(kBlue, kDashed, 2);
+
+    HistStyle sample_data;
+    sample_data.SetLineAtt(kBlack, kSolid, 2);
+    sample_data.SetMarkerAtt(kBlack, kFullCircle, 1);
+
+    for(unsigned int s = 0; s < num_samples; ++s)
+    {
+        std::string canvas_name = "sample" + std::to_string(s);
+        TCanvas temp_c(canvas_name.c_str(), canvas_name.c_str(), 1200, 900);
+
+        fit_file->cd();
+        std::cout << TAG << "Making sample plots for " << std::to_string(s) << std::endl;
+        std::string hist_name = "evhist_sam" + std::to_string(s);
+        TH1D* temp_postfit = (TH1D*)fit_file->Get((hist_name + "_finaliter_pred").c_str());
+        TH1D* temp_nominal = (TH1D*)fit_file->Get((hist_name + "_iter0_mc").c_str());
+        TH1D* temp_data = (TH1D*)fit_file->Get((hist_name + "_iter0_data").c_str());
+
+        sample_postfit.ApplyStyle(*temp_postfit);
+        sample_nominal.ApplyStyle(*temp_nominal);
+        sample_data.ApplyStyle(*temp_data);
+
+        temp_postfit->Draw("hist");
+        temp_nominal->Draw("hist same");
+        temp_data->Draw("e same");
+
+        TLegend temp_l(0.65, 0.65, 0.85, 0.85);
+        temp_l.AddEntry(temp_postfit, "Post-fit", "l");
+        temp_l.AddEntry(temp_nominal, "Nominal MC", "l");
+        temp_l.AddEntry(temp_data, "Fake Data", "lpe");
+
+        CalcChisq calc_chisq;
+        double cov_chisq_data = calc_chisq.CalcChisqStat(*temp_data, *temp_postfit);
+        std::string chisq_data = "#chi^{2} = " + std::to_string(cov_chisq_data);
+        temp_l.AddEntry((TObject*)nullptr, chisq_data.c_str(), "");
+        temp_l.Draw();
+
+        output_file->cd();
+        temp_c.Write();
+        temp_postfit->Write();
+        temp_nominal->Write();
+        temp_data->Write();
+
+        delete temp_postfit;
+        delete temp_nominal;
+        delete temp_data;
+    }
+
     xsec_file->Close();
+    fit_file->Close();
     output_file->Close();
 
     std::cout << TAG << "Finished." << std::endl;
