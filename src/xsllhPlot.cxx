@@ -43,7 +43,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    bool do_print_plots = false;
+    bool do_print_plots = true;
     std::string json_file;
     std::string output_filename;
     std::string plot_extension;
@@ -63,14 +63,14 @@ int main(int argc, char** argv)
                 plot_extension = optarg;
                 break;
             case 'P':
-                do_print_plots = true;
+                do_print_plots = false;
                 break;
             case 'h':
                 std::cout << "USAGE: " << argv[0] << "\nOPTIONS:\n"
                           << "-j : JSON input\n"
                           << "-o : Output file (overrides JSON config)\n"
                           << "-e : File extension to use when printing plots\n"
-                          << "-P : Print plots to directory\n"
+                          << "-P : Disable printing plots\n"
                           << "-h : Print this usage guide\n";
             default:
                 return 0;
@@ -119,6 +119,7 @@ int main(int argc, char** argv)
         std::string leg_title = pj.value("legend_title", "");
         std::vector<double> leg_coords = pj["legend_coordinates"].get<std::vector<double>>();
         TLegend temp_legend(leg_coords[0], leg_coords[1], leg_coords[2], leg_coords[3]);
+        temp_legend.SetFillStyle(0);
         temp_legend.SetHeader(leg_title.c_str());
 
         std::string input_file = pj["root_file"];
@@ -127,6 +128,10 @@ int main(int argc, char** argv)
 
         for(const auto& hj : pj["hists"])
         {
+            bool do_use_plot = hj.value("use", true);
+            if(!do_use_plot)
+                continue;
+
             HistStyle temp_style;
             temp_style.SetLineAtt(hj.value("line_color", kBlack), hj.value("line_style", kSolid), hj.value("line_width", 2));
             temp_style.SetFillAtt(hj.value("fill_color", kBlack), hj.value("fill_style", 0));
@@ -143,6 +148,22 @@ int main(int argc, char** argv)
 
             std::cout << TAG << "Adding " << hist_name << std::endl;
             temp_style.ApplyStyle(*temp_hist);
+
+            double x_scale = pj.value("scale_x_axis", 0.0);
+            if(x_scale > 0.0)
+                temp_style.ScaleXbins(*temp_hist, x_scale);
+
+            std::string error_name = hj.value("errors", "");
+            TH1D* temp_errors = nullptr;
+
+            if(!error_name.empty())
+                temp_file->GetObject(error_name.c_str(), temp_errors);
+
+            if(temp_errors != nullptr)
+            {
+                for(unsigned int b = 1; b <= temp_errors->GetNbinsX(); ++b)
+                    temp_hist->SetBinError(b, temp_errors->GetBinContent(b));
+            }
 
             std::string draw_str = hj["draw"];
             temp_hist->Draw(draw_str.c_str());
@@ -185,7 +206,7 @@ int main(int argc, char** argv)
         output_file->cd();
         temp_canvas.Write();
 
-        if(pj.value("print", false))
+        if(pj.value("print", false) && do_print_plots)
         {
             std::string save_str = pj["save_as"];
             save_str = save_str + plot_extension;
