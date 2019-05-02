@@ -45,12 +45,20 @@
             "legend_title" : "",
             "x_axis" : "True Bin Number",
             "y_axis" : "#frac{d#sigma}{dp_{#mu} dcos#theta_{#mu}} #frac{cm^{2}}{nucleon GeV/c}",
-            "chisq" : {
-                "covariance" : "xsec_cov",
-                "hist_one" : "CC0pi_postfit",
-                "hist_two" : "CC0pi_nominal",
-                "legend_label" : "#chi^{2} = "
-            }
+            "chisq" : [
+                {
+                    "covariance" : "xsec_cov",
+                    "hist_one" : "CC0pi_postfit",
+                    "hist_two" : "CC0pi_nominal",
+                    "legend_label" : "Nominal #chi^{2} = "
+                },
+                {
+                    "covariance" : "xsec_cov",
+                    "hist_one" : "CC0pi_postfit",
+                    "hist_two" : "CC0pi_data",
+                    "legend_label" : "Fake Data #chi^{2} = "
+                }
+            ]
         },
         {
             "name" : "CC0pi_cos_bin0",

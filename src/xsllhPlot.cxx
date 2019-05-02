@@ -113,7 +113,8 @@ int main(int argc, char** argv)
             continue;
 
         std::string name = pj["name"];
-        TCanvas temp_canvas(name.c_str(), name.c_str(), 1200, 900);
+        std::string canvas_name = name + "_canvas";
+        TCanvas temp_canvas(canvas_name.c_str(), canvas_name.c_str(), 1200, 900);
 
         std::cout << TAG << "Making " << name << std::endl;
         std::string leg_title = pj.value("legend_title", "");
@@ -180,25 +181,28 @@ int main(int argc, char** argv)
         json chisq_json = pj.value("chisq", empty_json);
         if(!chisq_json.empty())
         {
-            std::cout << TAG << "Adding chi-square comparison." << std::endl;
-            std::string h1_name = chisq_json["hist_one"];
-            std::string h2_name = chisq_json["hist_two"];
-            std::string cov_name = chisq_json["covariance"];
-            std::string label = chisq_json["legend_label"];
+            for(const auto& entry : chisq_json)
+            {
+                std::cout << TAG << "Adding chi-square comparison." << std::endl;
+                std::string h1_name = entry["hist_one"];
+                std::string h2_name = entry["hist_two"];
+                std::string cov_name = entry["covariance"];
+                std::string label = entry["legend_label"];
 
-            TH1D* h1 = nullptr;
-            TH1D* h2 = nullptr;
-            TMatrixDSym* cov_mat = nullptr;
+                TH1D* h1 = nullptr;
+                TH1D* h2 = nullptr;
+                TMatrixDSym* cov_mat = nullptr;
 
-            temp_file->cd();
-            temp_file->GetObject(cov_name.c_str(), cov_mat);
-            temp_file->GetObject(h1_name.c_str(), h1);
-            temp_file->GetObject(h2_name.c_str(), h2);
-            CalcChisq calc_chisq(*cov_mat);
-            double chisq = calc_chisq.CalcChisqCov(*h1, *h2);
+                temp_file->cd();
+                temp_file->GetObject(cov_name.c_str(), cov_mat);
+                temp_file->GetObject(h1_name.c_str(), h1);
+                temp_file->GetObject(h2_name.c_str(), h2);
+                CalcChisq calc_chisq(*cov_mat);
+                double chisq = calc_chisq.CalcChisqCov(*h1, *h2);
 
-            label = label + std::to_string(chisq);
-            temp_legend.AddEntry((TObject*)nullptr, label.c_str(), "");
+                label = label + std::to_string(chisq);
+                temp_legend.AddEntry((TObject*)nullptr, label.c_str(), "");
+            }
         }
 
         temp_legend.Draw();
