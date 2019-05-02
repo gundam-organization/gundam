@@ -37,7 +37,7 @@ void GlobalStyle::SetDefault()
     title_font = global_font;
     title_size = 0.06;
     legend_font = global_font;
-    legend_text_size = 0.05;
+    legend_text_size = 0.04;
 
     do_pad_ticks = true;
     do_strip_decimals = false;

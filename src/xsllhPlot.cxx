@@ -43,13 +43,10 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    bool read_fake_data = false;
-    bool do_print_plots = false;
+    bool do_print_plots = true;
     std::string json_file;
-    std::string xsec_filename;
-    std::string fit_filename;
     std::string output_filename;
-    std::string plot_extension = ".pdf";
+    std::string plot_extension;
 
     char option;
     while((option = getopt(argc, argv, "j:f:x:o:e:Ph")) != -1)
@@ -59,12 +56,6 @@ int main(int argc, char** argv)
             case 'j':
                 json_file = optarg;
                 break;
-            case 'f':
-                fit_filename = optarg;
-                break;
-            case 'x':
-                xsec_filename = optarg;
-                break;
             case 'o':
                 output_filename = optarg;
                 break;
@@ -72,16 +63,14 @@ int main(int argc, char** argv)
                 plot_extension = optarg;
                 break;
             case 'P':
-                do_print_plots = true;
+                do_print_plots = false;
                 break;
             case 'h':
                 std::cout << "USAGE: " << argv[0] << "\nOPTIONS:\n"
                           << "-j : JSON input\n"
-                          << "-f : Input fit file (overrides JSON config)\n"
-                          << "-x : Input xsec file (overrides JSON config)\n"
                           << "-o : Output file (overrides JSON config)\n"
                           << "-e : File extension to use when printing plots\n"
-                          << "-P : Print plots to directory\n"
+                          << "-P : Disable printing plots\n"
                           << "-h : Print this usage guide\n";
             default:
                 return 0;
@@ -106,186 +95,130 @@ int main(int argc, char** argv)
     json j;
     f >> j;
 
+    if(plot_extension.empty())
+        plot_extension = j.value("plot_extension", ".pdf");
+
     GlobalStyle xsllh_style;
     xsllh_style.ApplyStyle();
 
-    HistStyle postfit_style;
-    postfit_style.SetLineAtt(kBlack, kSolid, 2);
-    postfit_style.SetAxisTitle("Bin Number","#frac{d#sigma}{dp_{#mu} dcos#theta_{#mu}} #frac{cm^{2}}{nucleon GeV/c}");
-
-    HistStyle nominal_style;
-    nominal_style.SetLineAtt(kBlue, kDashed, 2);
-
-    HistStyle data_style;
-    data_style.SetLineAtt(kRed, kSolid, 2);
+    if(output_filename.empty())
+        output_filename = j["output_filename"];
 
     TFile* output_file = TFile::Open(output_filename.c_str(), "RECREATE");
-    TFile* xsec_file = TFile::Open(xsec_filename.c_str(), "READ");
-
-    for(const auto& s : j["xsec_plots"])
+    for(const auto& pj : j["plots"])
     {
-        xsec_file->cd();
-        std::string root_string = s["signal_name"];
-        std::string hist_title = s["hist_title"];
-        std::string binning_file = s["binning"];
+        bool do_make_plot = pj.value("use", true);
+        if(!do_make_plot)
+            continue;
 
-        std::cout << TAG << "Building cross-section plot for " << root_string << std::endl;
+        std::string name = pj["name"];
+        std::string canvas_name = name + "_canvas";
+        TCanvas temp_canvas(canvas_name.c_str(), canvas_name.c_str(), 1200, 900);
 
-        TH1D* hist_postfit = (TH1D*)xsec_file->Get((root_string + "_postfit").c_str());
-        TH1D* hist_nominal = (TH1D*)xsec_file->Get((root_string + "_nominal").c_str());
-        TH1D* hist_data = (TH1D*)xsec_file->Get((root_string + "_data").c_str());
+        std::cout << TAG << "Making " << name << std::endl;
+        std::string leg_title = pj.value("legend_title", "");
+        std::vector<double> leg_coords = pj["legend_coordinates"].get<std::vector<double>>();
+        TLegend temp_legend(leg_coords[0], leg_coords[1], leg_coords[2], leg_coords[3]);
+        temp_legend.SetFillStyle(0);
+        temp_legend.SetHeader(leg_title.c_str());
 
-        postfit_style.ApplyStyle(*hist_postfit);
-        nominal_style.ApplyStyle(*hist_nominal);
-        data_style.ApplyStyle(*hist_data);
+        std::string input_file = pj["root_file"];
+        TFile* temp_file = TFile::Open(input_file.c_str(), "READ");
+        temp_file->cd();
 
-        TCanvas c(root_string.c_str(), root_string.c_str(), 1200, 900);
-        hist_postfit->Draw("e");
-        hist_nominal->Draw("hist same");
-        hist_data->Draw("hist same");
-
-        TLegend l(0.65, 0.65, 0.85, 0.85);
-        l.AddEntry(hist_postfit, "Post-fit", "lpe");
-        l.AddEntry(hist_nominal, "Nominal MC", "l");
-        l.AddEntry(hist_data, "Fake Data", "l");
-
-        TMatrixDSym* cov_mat = (TMatrixDSym*)xsec_file->Get("xsec_cov");
-        CalcChisq calc_chisq(*cov_mat);
-        double cov_chisq_nominal = calc_chisq.CalcChisqCov(*hist_postfit, *hist_nominal);
-        double cov_chisq_data = calc_chisq.CalcChisqCov(*hist_postfit, *hist_data);
-
-        std::string chisq_nominal = "#chi^{2} = " + std::to_string(cov_chisq_nominal);
-        std::string chisq_data = "#chi^{2} = " + std::to_string(cov_chisq_data);
-        l.AddEntry((TObject*)nullptr, chisq_nominal.c_str(), "");
-        l.AddEntry((TObject*)nullptr, chisq_data.c_str(), "");
-
-        l.Draw();
-
-        output_file->cd();
-        c.Write();
-        hist_postfit->Write();
-        hist_nominal->Write();
-        hist_data->Write();
-
-        if(do_print_plots)
+        for(const auto& hj : pj["hists"])
         {
-            std::string save_string = root_string + plot_extension;
-            c.Print(save_string.c_str());
-        }
+            bool do_use_plot = hj.value("use", true);
+            if(!do_use_plot)
+                continue;
 
-        delete hist_postfit;
-        delete hist_nominal;
-        delete hist_data;
+            HistStyle temp_style;
+            temp_style.SetLineAtt(hj.value("line_color", kBlack), hj.value("line_style", kSolid), hj.value("line_width", 2));
+            temp_style.SetFillAtt(hj.value("fill_color", kBlack), hj.value("fill_style", 0));
+            temp_style.SetMarkerAtt(hj.value("marker_color", kBlack), hj.value("marker_style", kFullCircle), hj.value("marker_size", 1));
+            temp_style.SetAxisTitle(pj.value("x_axis", ""), pj.value("y_axis", ""));
 
-        const unsigned int cos_bins = 9;
-        for(unsigned int i = 0; i < cos_bins; ++i)
-        {
-            std::string canvas_name = root_string + "_cos_bin" + std::to_string(i);
-            TCanvas temp_c(canvas_name.c_str(), canvas_name.c_str(), 1200, 900);
+            std::string hist_name = hj["name"];
+            TH1D* temp_hist = nullptr;
+            temp_file->cd();
+            temp_file->GetObject(hist_name.c_str(), temp_hist);
 
-            std::cout << TAG << "Building kinematic plots for " << canvas_name << std::endl;
+            if(temp_hist == nullptr)
+                continue;
 
-            xsec_file->cd();
-            std::string hist_name = root_string + "_cos_bin" + std::to_string(i);
-            TH1D* temp_postfit = (TH1D*)xsec_file->Get((hist_name + "_postfit").c_str());
-            TH1D* temp_nominal = (TH1D*)xsec_file->Get((hist_name + "_nominal").c_str());
-            TH1D* temp_data = (TH1D*)xsec_file->Get((hist_name + "_data").c_str());
+            std::cout << TAG << "Adding " << hist_name << std::endl;
+            temp_style.ApplyStyle(*temp_hist);
 
-            postfit_style.SetAxisTitle("p^{true}_{#mu} (GeV/c)", "#frac{d#sigma}{dp_{#mu} dcos#theta_{#mu}} #frac{cm^{2}}{nucleon GeV/c}");
-            postfit_style.ScaleXbins(*temp_postfit, 0.001);
-            nominal_style.ScaleXbins(*temp_nominal, 0.001);
-            data_style.ScaleXbins(*temp_data, 0.001);
+            double x_scale = pj.value("scale_x_axis", 0.0);
+            if(x_scale > 0.0)
+                temp_style.ScaleXbins(*temp_hist, x_scale);
 
-            postfit_style.ApplyStyle(*temp_postfit);
-            nominal_style.ApplyStyle(*temp_nominal);
-            data_style.ApplyStyle(*temp_data);
+            std::string error_name = hj.value("errors", "");
+            TH1D* temp_errors = nullptr;
 
-            temp_postfit->Draw("e");
-            temp_nominal->Draw("hist same");
-            temp_data->Draw("hist same");
+            if(!error_name.empty())
+                temp_file->GetObject(error_name.c_str(), temp_errors);
 
-            TLegend temp_l(0.65, 0.65, 0.85, 0.85);
-            temp_l.AddEntry(temp_postfit, "Post-fit", "lpe");
-            temp_l.AddEntry(temp_nominal, "Nominal MC", "l");
-            temp_l.AddEntry(temp_data, "Fake Data", "l");
-            temp_l.Draw();
-
-            output_file->cd();
-            temp_c.Write();
-            temp_postfit->Write();
-            temp_nominal->Write();
-            temp_data->Write();
-
-            if(do_print_plots)
+            if(temp_errors != nullptr)
             {
-                std::string save_string = canvas_name + plot_extension;
-                c.Print(save_string.c_str());
+                for(unsigned int b = 1; b <= temp_errors->GetNbinsX(); ++b)
+                    temp_hist->SetBinError(b, temp_errors->GetBinContent(b));
             }
 
-            delete temp_postfit;
-            delete temp_nominal;
-            delete temp_data;
+            std::string draw_str = hj["draw"];
+            temp_hist->Draw(draw_str.c_str());
+
+            std::string legend_entry = hj["legend_entry"];
+            std::string legend_draw = hj.value("legend_draw", "l");
+            temp_legend.AddEntry(temp_hist, legend_entry.c_str(), legend_draw.c_str());
+
+            output_file->cd();
+            temp_hist->Write();
         }
-    }
 
-    TFile* fit_file = TFile::Open(fit_filename.c_str(), "READ");
-    const unsigned int num_samples = 7;
+        json empty_json;
+        json chisq_json = pj.value("chisq", empty_json);
+        if(!chisq_json.empty())
+        {
+            for(const auto& entry : chisq_json)
+            {
+                std::cout << TAG << "Adding chi-square comparison." << std::endl;
+                std::string h1_name = entry["hist_one"];
+                std::string h2_name = entry["hist_two"];
+                std::string cov_name = entry["covariance"];
+                std::string label = entry["legend_label"];
 
-    HistStyle sample_postfit;
-    sample_postfit.SetLineAtt(kRed, kSolid, 2);
-    sample_postfit.SetAxisTitle("Reco Bin Number","Num. Events");
+                TH1D* h1 = nullptr;
+                TH1D* h2 = nullptr;
+                TMatrixDSym* cov_mat = nullptr;
 
-    HistStyle sample_nominal;
-    sample_nominal.SetLineAtt(kBlue, kDashed, 2);
+                temp_file->cd();
+                temp_file->GetObject(cov_name.c_str(), cov_mat);
+                temp_file->GetObject(h1_name.c_str(), h1);
+                temp_file->GetObject(h2_name.c_str(), h2);
+                CalcChisq calc_chisq(*cov_mat);
+                double chisq = calc_chisq.CalcChisqCov(*h1, *h2);
 
-    HistStyle sample_data;
-    sample_data.SetLineAtt(kBlack, kSolid, 2);
-    sample_data.SetMarkerAtt(kBlack, kFullCircle, 1);
+                label = label + std::to_string(chisq);
+                temp_legend.AddEntry((TObject*)nullptr, label.c_str(), "");
+            }
+        }
 
-    for(unsigned int s = 0; s < num_samples; ++s)
-    {
-        std::string canvas_name = "sample" + std::to_string(s);
-        TCanvas temp_c(canvas_name.c_str(), canvas_name.c_str(), 1200, 900);
-
-        fit_file->cd();
-        std::cout << TAG << "Making sample plots for " << std::to_string(s) << std::endl;
-        std::string hist_name = "evhist_sam" + std::to_string(s);
-        TH1D* temp_postfit = (TH1D*)fit_file->Get((hist_name + "_finaliter_pred").c_str());
-        TH1D* temp_nominal = (TH1D*)fit_file->Get((hist_name + "_iter0_mc").c_str());
-        TH1D* temp_data = (TH1D*)fit_file->Get((hist_name + "_iter0_data").c_str());
-
-        sample_postfit.ApplyStyle(*temp_postfit);
-        sample_nominal.ApplyStyle(*temp_nominal);
-        sample_data.ApplyStyle(*temp_data);
-
-        temp_postfit->Draw("hist");
-        temp_nominal->Draw("hist same");
-        temp_data->Draw("e same");
-
-        TLegend temp_l(0.65, 0.65, 0.85, 0.85);
-        temp_l.AddEntry(temp_postfit, "Post-fit", "l");
-        temp_l.AddEntry(temp_nominal, "Nominal MC", "l");
-        temp_l.AddEntry(temp_data, "Fake Data", "lpe");
-
-        CalcChisq calc_chisq;
-        double cov_chisq_data = calc_chisq.CalcChisqStat(*temp_data, *temp_postfit);
-        std::string chisq_data = "#chi^{2} = " + std::to_string(cov_chisq_data);
-        temp_l.AddEntry((TObject*)nullptr, chisq_data.c_str(), "");
-        temp_l.Draw();
+        temp_legend.Draw();
 
         output_file->cd();
-        temp_c.Write();
-        temp_postfit->Write();
-        temp_nominal->Write();
-        temp_data->Write();
+        temp_canvas.Write();
 
-        delete temp_postfit;
-        delete temp_nominal;
-        delete temp_data;
+        if(pj.value("print", false) && do_print_plots)
+        {
+            std::string save_str = pj["save_as"];
+            save_str = save_str + plot_extension;
+            temp_canvas.Print(save_str.c_str());
+        }
+
+        temp_file->Close();
     }
 
-    xsec_file->Close();
-    fit_file->Close();
     output_file->Close();
 
     std::cout << TAG << "Finished." << std::endl;

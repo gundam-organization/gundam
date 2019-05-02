@@ -1,9 +1,898 @@
 {
-    "xsec_plots" : [
+    "global_style" : "",
+    "output_filename" : "plots.root",
+    "plot_extension" : ".pdf",
+    "plots" : [
         {
-            "signal_name" : "CC0pi",
-            "hist_title" : "ND280 CC0#pi",
-            "binning" : "analysis_binning.txt"
+            "name" : "CC0pi_all_bins",
+            "save_as" : "CC0pi_all_bins",
+            "root_file" : "xsec.root",
+            "hists" : [
+                {
+                    "name" : "CC0pi_postfit",
+                    "line_color" : 1,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "marker_color" : 1,
+                    "marker_style" : 20,
+                    "marker_size" : 1,
+                    "legend_entry" : "Postfit",
+                    "legend_draw" : "lpe",
+                    "draw" : "e same"
+                },
+                {
+                    "name" : "CC0pi_nominal",
+                    "line_color" : 4,
+                    "line_style" : 7,
+                    "line_width" : 2,
+                    "legend_entry" : "Nominal MC",
+                    "draw" : "hist same"
+                },
+                {
+                    "name" : "CC0pi_data",
+                    "line_color" : 2,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "legend_entry" : "Fake Data",
+                    "draw" : "hist same",
+                    "use" : false
+                }
+            ],
+
+            "print" : true,
+            "use" : true,
+            "legend_coordinates" : [0.60, 0.60, 0.80, 0.80],
+            "legend_title" : "",
+            "x_axis" : "True Bin Number",
+            "y_axis" : "#frac{d#sigma}{dp_{#mu} dcos#theta_{#mu}} #frac{cm^{2}}{nucleon GeV/c}",
+            "chisq" : [
+                {
+                    "covariance" : "xsec_cov",
+                    "hist_one" : "CC0pi_postfit",
+                    "hist_two" : "CC0pi_nominal",
+                    "legend_label" : "Nominal #chi^{2} = "
+                },
+                {
+                    "covariance" : "xsec_cov",
+                    "hist_one" : "CC0pi_postfit",
+                    "hist_two" : "CC0pi_data",
+                    "legend_label" : "Fake Data #chi^{2} = "
+                }
+            ]
+        },
+        {
+            "name" : "CC0pi_cos_bin0",
+            "save_as" : "CC0pi_cos_bin0",
+            "root_file" : "xsec.root",
+            "hists" : [
+                {
+                    "name" : "CC0pi_cos_bin0_postfit",
+                    "line_color" : 1,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "marker_color" : 1,
+                    "marker_style" : 20,
+                    "marker_size" : 1,
+                    "legend_entry" : "Postfit",
+                    "legend_draw" : "lpe",
+                    "draw" : "e same"
+                },
+                {
+                    "name" : "CC0pi_cos_bin0_nominal",
+                    "line_color" : 4,
+                    "line_style" : 7,
+                    "line_width" : 2,
+                    "legend_entry" : "Nominal MC",
+                    "draw" : "hist same"
+                },
+                {
+                    "name" : "CC0pi_cos_bin0_data",
+                    "line_color" : 2,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "legend_entry" : "Fake Data",
+                    "draw" : "hist same",
+                    "use" : false
+                }
+            ],
+
+            "print" : true,
+            "use" : true,
+            "legend_coordinates" : [0.60, 0.60, 0.80, 0.80],
+            "legend_title" : "-1 < cos < 0.2",
+            "x_axis" : "p^{true}_{#mu} (GeV/c)",
+            "scale_x_axis" : 0.001,
+            "y_axis" : "#frac{d#sigma}{dp_{#mu} dcos#theta_{#mu}} #frac{cm^{2}}{nucleon GeV/c}"
+        },
+        {
+            "name" : "CC0pi_cos_bin1",
+            "save_as" : "CC0pi_cos_bin1",
+            "root_file" : "xsec.root",
+            "hists" : [
+                {
+                    "name" : "CC0pi_cos_bin1_postfit",
+                    "line_color" : 1,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "marker_color" : 1,
+                    "marker_style" : 20,
+                    "marker_size" : 1,
+                    "legend_entry" : "Postfit",
+                    "legend_draw" : "lpe",
+                    "draw" : "e same"
+                },
+                {
+                    "name" : "CC0pi_cos_bin1_nominal",
+                    "line_color" : 4,
+                    "line_style" : 7,
+                    "line_width" : 2,
+                    "legend_entry" : "Nominal MC",
+                    "draw" : "hist same"
+                },
+                {
+                    "name" : "CC0pi_cos_bin1_data",
+                    "line_color" : 2,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "legend_entry" : "Fake Data",
+                    "draw" : "hist same",
+                    "use" : false
+                }
+            ],
+
+            "print" : true,
+            "use" : true,
+            "legend_coordinates" : [0.20, 0.60, 0.40, 0.80],
+            "legend_title" : "0.2 < cos < 0.6",
+            "x_axis" : "p^{true}_{#mu} (GeV/c)",
+            "scale_x_axis" : 0.001,
+            "y_axis" : "#frac{d#sigma}{dp_{#mu} dcos#theta_{#mu}} #frac{cm^{2}}{nucleon GeV/c}"
+        },
+        {
+            "name" : "CC0pi_cos_bin2",
+            "save_as" : "CC0pi_cos_bin2",
+            "root_file" : "xsec.root",
+            "hists" : [
+                {
+                    "name" : "CC0pi_cos_bin2_postfit",
+                    "line_color" : 1,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "marker_color" : 1,
+                    "marker_style" : 20,
+                    "marker_size" : 1,
+                    "legend_entry" : "Postfit",
+                    "legend_draw" : "lpe",
+                    "draw" : "e same"
+                },
+                {
+                    "name" : "CC0pi_cos_bin2_nominal",
+                    "line_color" : 4,
+                    "line_style" : 7,
+                    "line_width" : 2,
+                    "legend_entry" : "Nominal MC",
+                    "draw" : "hist same"
+                },
+                {
+                    "name" : "CC0pi_cos_bin2_data",
+                    "line_color" : 2,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "legend_entry" : "Fake Data",
+                    "draw" : "hist same",
+                    "use" : false
+                }
+            ],
+
+            "print" : true,
+            "use" : true,
+            "legend_coordinates" : [0.20, 0.60, 0.40, 0.80],
+            "legend_title" : "0.6 < cos < 0.7",
+            "x_axis" : "p^{true}_{#mu} (GeV/c)",
+            "scale_x_axis" : 0.001,
+            "y_axis" : "#frac{d#sigma}{dp_{#mu} dcos#theta_{#mu}} #frac{cm^{2}}{nucleon GeV/c}"
+        },
+        {
+            "name" : "CC0pi_cos_bin3",
+            "save_as" : "CC0pi_cos_bin3",
+            "root_file" : "xsec.root",
+            "hists" : [
+                {
+                    "name" : "CC0pi_cos_bin3_postfit",
+                    "line_color" : 1,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "marker_color" : 1,
+                    "marker_style" : 20,
+                    "marker_size" : 1,
+                    "legend_entry" : "Postfit",
+                    "legend_draw" : "lpe",
+                    "draw" : "e same"
+                },
+                {
+                    "name" : "CC0pi_cos_bin3_nominal",
+                    "line_color" : 4,
+                    "line_style" : 7,
+                    "line_width" : 2,
+                    "legend_entry" : "Nominal MC",
+                    "draw" : "hist same"
+                },
+                {
+                    "name" : "CC0pi_cos_bin3_data",
+                    "line_color" : 2,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "legend_entry" : "Fake Data",
+                    "draw" : "hist same",
+                    "use" : false
+                }
+            ],
+
+            "print" : true,
+            "use" : true,
+            "legend_coordinates" : [0.20, 0.60, 0.40, 0.80],
+            "legend_title" : "0.7 < cos < 0.8",
+            "x_axis" : "p^{true}_{#mu} (GeV/c)",
+            "scale_x_axis" : 0.001,
+            "y_axis" : "#frac{d#sigma}{dp_{#mu} dcos#theta_{#mu}} #frac{cm^{2}}{nucleon GeV/c}"
+        },
+        {
+            "name" : "CC0pi_cos_bin4",
+            "save_as" : "CC0pi_cos_bin4",
+            "root_file" : "xsec.root",
+            "hists" : [
+                {
+                    "name" : "CC0pi_cos_bin4_postfit",
+                    "line_color" : 1,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "marker_color" : 1,
+                    "marker_style" : 20,
+                    "marker_size" : 1,
+                    "legend_entry" : "Postfit",
+                    "legend_draw" : "lpe",
+                    "draw" : "e same"
+                },
+                {
+                    "name" : "CC0pi_cos_bin4_nominal",
+                    "line_color" : 4,
+                    "line_style" : 7,
+                    "line_width" : 2,
+                    "legend_entry" : "Nominal MC",
+                    "draw" : "hist same"
+                },
+                {
+                    "name" : "CC0pi_cos_bin4_data",
+                    "line_color" : 2,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "legend_entry" : "Fake Data",
+                    "draw" : "hist same",
+                    "use" : false
+                }
+            ],
+
+            "print" : true,
+            "use" : true,
+            "legend_coordinates" : [0.60, 0.60, 0.80, 0.80],
+            "legend_title" : "0.8 < cos < 0.85",
+            "x_axis" : "p^{true}_{#mu} (GeV/c)",
+            "scale_x_axis" : 0.001,
+            "y_axis" : "#frac{d#sigma}{dp_{#mu} dcos#theta_{#mu}} #frac{cm^{2}}{nucleon GeV/c}"
+        },
+        {
+            "name" : "CC0pi_cos_bin5",
+            "save_as" : "CC0pi_cos_bin5",
+            "root_file" : "xsec.root",
+            "hists" : [
+                {
+                    "name" : "CC0pi_cos_bin5_postfit",
+                    "line_color" : 1,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "marker_color" : 1,
+                    "marker_style" : 20,
+                    "marker_size" : 1,
+                    "legend_entry" : "Postfit",
+                    "legend_draw" : "lpe",
+                    "draw" : "e same"
+                },
+                {
+                    "name" : "CC0pi_cos_bin5_nominal",
+                    "line_color" : 4,
+                    "line_style" : 7,
+                    "line_width" : 2,
+                    "legend_entry" : "Nominal MC",
+                    "draw" : "hist same"
+                },
+                {
+                    "name" : "CC0pi_cos_bin5_data",
+                    "line_color" : 2,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "legend_entry" : "Fake Data",
+                    "draw" : "hist same",
+                    "use" : false
+                }
+            ],
+
+            "print" : true,
+            "use" : true,
+            "legend_coordinates" : [0.60, 0.60, 0.80, 0.80],
+            "legend_title" : "0.85 < cos < 0.90",
+            "x_axis" : "p^{true}_{#mu} (GeV/c)",
+            "scale_x_axis" : 0.001,
+            "y_axis" : "#frac{d#sigma}{dp_{#mu} dcos#theta_{#mu}} #frac{cm^{2}}{nucleon GeV/c}"
+        },
+        {
+            "name" : "CC0pi_cos_bin6",
+            "save_as" : "CC0pi_cos_bin6",
+            "root_file" : "xsec.root",
+            "hists" : [
+                {
+                    "name" : "CC0pi_cos_bin6_postfit",
+                    "line_color" : 1,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "marker_color" : 1,
+                    "marker_style" : 20,
+                    "marker_size" : 1,
+                    "legend_entry" : "Postfit",
+                    "legend_draw" : "lpe",
+                    "draw" : "e same"
+                },
+                {
+                    "name" : "CC0pi_cos_bin6_nominal",
+                    "line_color" : 4,
+                    "line_style" : 7,
+                    "line_width" : 2,
+                    "legend_entry" : "Nominal MC",
+                    "draw" : "hist same"
+                },
+                {
+                    "name" : "CC0pi_cos_bin6_data",
+                    "line_color" : 2,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "legend_entry" : "Fake Data",
+                    "draw" : "hist same",
+                    "use" : false
+                }
+            ],
+
+            "print" : true,
+            "use" : true,
+            "legend_coordinates" : [0.60, 0.60, 0.80, 0.80],
+            "legend_title" : "0.90 < cos < 0.94",
+            "x_axis" : "p^{true}_{#mu} (GeV/c)",
+            "scale_x_axis" : 0.001,
+            "y_axis" : "#frac{d#sigma}{dp_{#mu} dcos#theta_{#mu}} #frac{cm^{2}}{nucleon GeV/c}"
+        },
+        {
+            "name" : "CC0pi_cos_bin7",
+            "save_as" : "CC0pi_cos_bin7",
+            "root_file" : "xsec.root",
+            "hists" : [
+                {
+                    "name" : "CC0pi_cos_bin7_postfit",
+                    "line_color" : 1,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "marker_color" : 1,
+                    "marker_style" : 20,
+                    "marker_size" : 1,
+                    "legend_entry" : "Postfit",
+                    "legend_draw" : "lpe",
+                    "draw" : "e same"
+                },
+                {
+                    "name" : "CC0pi_cos_bin7_nominal",
+                    "line_color" : 4,
+                    "line_style" : 7,
+                    "line_width" : 2,
+                    "legend_entry" : "Nominal MC",
+                    "draw" : "hist same"
+                },
+                {
+                    "name" : "CC0pi_cos_bin7_data",
+                    "line_color" : 2,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "legend_entry" : "Fake Data",
+                    "draw" : "hist same",
+                    "use" : false
+                }
+            ],
+
+            "print" : true,
+            "use" : true,
+            "legend_coordinates" : [0.60, 0.60, 0.80, 0.80],
+            "legend_title" : "0.94 < cos < 0.98",
+            "x_axis" : "p^{true}_{#mu} (GeV/c)",
+            "scale_x_axis" : 0.001,
+            "y_axis" : "#frac{d#sigma}{dp_{#mu} dcos#theta_{#mu}} #frac{cm^{2}}{nucleon GeV/c}"
+        },
+        {
+            "name" : "CC0pi_cos_bin8",
+            "save_as" : "CC0pi_cos_bin8",
+            "root_file" : "xsec.root",
+            "hists" : [
+                {
+                    "name" : "CC0pi_cos_bin8_postfit",
+                    "line_color" : 1,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "marker_color" : 1,
+                    "marker_style" : 20,
+                    "marker_size" : 1,
+                    "legend_entry" : "Postfit",
+                    "legend_draw" : "lpe",
+                    "draw" : "e same"
+                },
+                {
+                    "name" : "CC0pi_cos_bin8_nominal",
+                    "line_color" : 4,
+                    "line_style" : 7,
+                    "line_width" : 2,
+                    "legend_entry" : "Nominal MC",
+                    "draw" : "hist same"
+                },
+                {
+                    "name" : "CC0pi_cos_bin8_data",
+                    "line_color" : 2,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "legend_entry" : "Fake Data",
+                    "draw" : "hist same",
+                    "use" : false
+                }
+            ],
+
+            "print" : true,
+            "use" : true,
+            "legend_coordinates" : [0.60, 0.60, 0.80, 0.80],
+            "legend_title" : "0.98 < cos < 1.00",
+            "x_axis" : "p^{true}_{#mu} (GeV/c)",
+            "scale_x_axis" : 0.001,
+            "y_axis" : "#frac{d#sigma}{dp_{#mu} dcos#theta_{#mu}} #frac{cm^{2}}{nucleon GeV/c}"
+        },
+        {
+            "name" : "reco_events_sample0",
+            "save_as" : "reco_events_sample0",
+            "root_file" : "test.root",
+            "hists" : [
+                {
+                    "name" : "evhist_sam0_finaliter_pred",
+                    "line_color" : 2,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "legend_entry" : "Postfit",
+                    "draw" : "hist same"
+                },
+                {
+                    "name" : "evhist_sam0_iter0_mc",
+                    "line_color" : 4,
+                    "line_style" : 7,
+                    "line_width" : 2,
+                    "legend_entry" : "MC",
+                    "draw" : "hist same"
+                },
+                {
+                    "name" : "evhist_sam0_iter0_data",
+                    "line_color" : 1,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "marker_color" : 1,
+                    "marker_style" : 20,
+                    "marker_size" : 1,
+                    "legend_entry" : "Data",
+                    "legend_draw" : "lep",
+                    "draw" : "e same"
+                }
+            ],
+
+            "print" : true,
+            "use" : true,
+            "legend_coordinates" : [0.70, 0.68, 0.90, 0.83],
+            "legend_title" : "Sample 0",
+            "x_axis" : "Reco Bin Number",
+            "y_axis" : "Num. Events per Bin"
+        },
+        {
+            "name" : "reco_events_sample1",
+            "save_as" : "reco_events_sample1",
+            "root_file" : "test.root",
+            "hists" : [
+                {
+                    "name" : "evhist_sam1_finaliter_pred",
+                    "line_color" : 2,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "legend_entry" : "Postfit",
+                    "draw" : "hist same"
+                },
+                {
+                    "name" : "evhist_sam1_iter0_mc",
+                    "line_color" : 4,
+                    "line_style" : 7,
+                    "line_width" : 2,
+                    "legend_entry" : "MC",
+                    "draw" : "hist same"
+                },
+                {
+                    "name" : "evhist_sam1_iter0_data",
+                    "line_color" : 1,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "marker_color" : 1,
+                    "marker_style" : 20,
+                    "marker_size" : 1,
+                    "legend_entry" : "Data",
+                    "legend_draw" : "lep",
+                    "draw" : "e same"
+                }
+            ],
+
+            "print" : true,
+            "use" : true,
+            "legend_coordinates" : [0.70, 0.68, 0.90, 0.83],
+            "legend_title" : "Sample 1",
+            "x_axis" : "Reco Bin Number",
+            "y_axis" : "Num. Events per Bin"
+        },
+        {
+            "name" : "reco_events_sample2",
+            "save_as" : "reco_events_sample2",
+            "root_file" : "test.root",
+            "hists" : [
+                {
+                    "name" : "evhist_sam2_finaliter_pred",
+                    "line_color" : 2,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "legend_entry" : "Postfit",
+                    "draw" : "hist same"
+                },
+                {
+                    "name" : "evhist_sam2_iter0_mc",
+                    "line_color" : 4,
+                    "line_style" : 7,
+                    "line_width" : 2,
+                    "legend_entry" : "MC",
+                    "draw" : "hist same"
+                },
+                {
+                    "name" : "evhist_sam2_iter0_data",
+                    "line_color" : 1,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "marker_color" : 1,
+                    "marker_style" : 20,
+                    "marker_size" : 1,
+                    "legend_entry" : "Data",
+                    "legend_draw" : "lep",
+                    "draw" : "e same"
+                }
+            ],
+
+            "print" : true,
+            "use" : true,
+            "legend_coordinates" : [0.70, 0.68, 0.90, 0.83],
+            "legend_title" : "Sample 2",
+            "x_axis" : "Reco Bin Number",
+            "y_axis" : "Num. Events per Bin"
+        },
+        {
+            "name" : "reco_events_sample3",
+            "save_as" : "reco_events_sample3",
+            "root_file" : "test.root",
+            "hists" : [
+                {
+                    "name" : "evhist_sam3_finaliter_pred",
+                    "line_color" : 2,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "legend_entry" : "Postfit",
+                    "draw" : "hist same"
+                },
+                {
+                    "name" : "evhist_sam3_iter0_mc",
+                    "line_color" : 4,
+                    "line_style" : 7,
+                    "line_width" : 2,
+                    "legend_entry" : "MC",
+                    "draw" : "hist same"
+                },
+                {
+                    "name" : "evhist_sam3_iter0_data",
+                    "line_color" : 1,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "marker_color" : 1,
+                    "marker_style" : 20,
+                    "marker_size" : 1,
+                    "legend_entry" : "Data",
+                    "legend_draw" : "lep",
+                    "draw" : "e same"
+                }
+            ],
+
+            "print" : true,
+            "use" : true,
+            "legend_coordinates" : [0.70, 0.68, 0.90, 0.83],
+            "legend_title" : "Sample 3",
+            "x_axis" : "Reco Bin Number",
+            "y_axis" : "Num. Events per Bin"
+        },
+        {
+            "name" : "reco_events_sample4",
+            "save_as" : "reco_events_sample4",
+            "root_file" : "test.root",
+            "hists" : [
+                {
+                    "name" : "evhist_sam4_finaliter_pred",
+                    "line_color" : 2,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "legend_entry" : "Postfit",
+                    "draw" : "hist same"
+                },
+                {
+                    "name" : "evhist_sam4_iter0_mc",
+                    "line_color" : 4,
+                    "line_style" : 7,
+                    "line_width" : 2,
+                    "legend_entry" : "MC",
+                    "draw" : "hist same"
+                },
+                {
+                    "name" : "evhist_sam4_iter0_data",
+                    "line_color" : 1,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "marker_color" : 1,
+                    "marker_style" : 20,
+                    "marker_size" : 1,
+                    "legend_entry" : "Data",
+                    "legend_draw" : "lep",
+                    "draw" : "e same"
+                }
+            ],
+
+            "print" : true,
+            "use" : true,
+            "legend_coordinates" : [0.70, 0.68, 0.90, 0.83],
+            "legend_title" : "Sample 4",
+            "x_axis" : "Reco Bin Number",
+            "y_axis" : "Num. Events per Bin"
+        },
+        {
+            "name" : "reco_events_sample5",
+            "save_as" : "reco_events_sample5",
+            "root_file" : "test.root",
+            "hists" : [
+                {
+                    "name" : "evhist_sam5_finaliter_pred",
+                    "line_color" : 2,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "legend_entry" : "Postfit",
+                    "draw" : "hist same"
+                },
+                {
+                    "name" : "evhist_sam5_iter0_mc",
+                    "line_color" : 4,
+                    "line_style" : 7,
+                    "line_width" : 2,
+                    "legend_entry" : "MC",
+                    "draw" : "hist same"
+                },
+                {
+                    "name" : "evhist_sam5_iter0_data",
+                    "line_color" : 1,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "marker_color" : 1,
+                    "marker_style" : 20,
+                    "marker_size" : 1,
+                    "legend_entry" : "Data",
+                    "legend_draw" : "lep",
+                    "draw" : "e same"
+                }
+            ],
+
+            "print" : true,
+            "use" : true,
+            "legend_coordinates" : [0.20, 0.68, 0.40, 0.83],
+            "legend_title" : "Sample 5",
+            "x_axis" : "Reco Bin Number",
+            "y_axis" : "Num. Events per Bin"
+        },
+        {
+            "name" : "reco_events_sample6",
+            "save_as" : "reco_events_sample6",
+            "root_file" : "test.root",
+            "hists" : [
+                {
+                    "name" : "evhist_sam6_finaliter_pred",
+                    "line_color" : 2,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "legend_entry" : "Postfit",
+                    "draw" : "hist same"
+                },
+                {
+                    "name" : "evhist_sam6_iter0_mc",
+                    "line_color" : 4,
+                    "line_style" : 7,
+                    "line_width" : 2,
+                    "legend_entry" : "MC",
+                    "draw" : "hist same"
+                },
+                {
+                    "name" : "evhist_sam6_iter0_data",
+                    "line_color" : 1,
+                    "line_style" : 1,
+                    "line_width" : 2,
+                    "marker_color" : 1,
+                    "marker_style" : 20,
+                    "marker_size" : 1,
+                    "legend_entry" : "Data",
+                    "legend_draw" : "lep",
+                    "draw" : "e same"
+                }
+            ],
+
+            "print" : true,
+            "use" : true,
+            "legend_coordinates" : [0.20, 0.68, 0.40, 0.83],
+            "legend_title" : "Sample 6",
+            "x_axis" : "Reco Bin Number",
+            "y_axis" : "Num. Events per Bin"
+        },
+        {
+            "name" : "par_template",
+            "save_as" : "par_template",
+            "root_file" : "test.root",
+            "hists" : [
+                {
+                    "name" : "hist_par_fit_prior",
+                    "errors" : "hist_par_fit_error_prior",
+                    "fill_color" : 4,
+                    "fill_style" : 3002,
+                    "marker_color" : 4,
+                    "marker_style" : 21,
+                    "legend_entry" : "Prefit",
+                    "legend_draw" : "fpe",
+                    "draw" : "P E2"
+                },
+                {
+                    "name" : "hist_par_fit_result",
+                    "errors" : "hist_par_fit_error_final",
+                    "fill_color" : 2,
+                    "fill_style" : 3013,
+                    "marker_color" : 2,
+                    "marker_style" : 20,
+                    "legend_entry" : "Postfit",
+                    "legend_draw" : "fpe",
+                    "draw" : "P E2 same"
+                }
+            ],
+
+            "print" : true,
+            "use" : true,
+            "legend_coordinates" : [0.20, 0.68, 0.40, 0.83],
+            "legend_title" : "Template Parameters",
+            "x_axis" : "",
+            "y_axis" : "Fractional Value"
+        },
+        {
+            "name" : "par_flux",
+            "save_as" : "par_flux",
+            "root_file" : "test.root",
+            "hists" : [
+                {
+                    "name" : "hist_par_flux_prior",
+                    "errors" : "hist_par_flux_error_prior",
+                    "fill_color" : 4,
+                    "fill_style" : 3002,
+                    "marker_color" : 4,
+                    "marker_style" : 21,
+                    "legend_entry" : "Prefit",
+                    "legend_draw" : "fpe",
+                    "draw" : "P E2"
+                },
+                {
+                    "name" : "hist_par_flux_result",
+                    "errors" : "hist_par_flux_error_final",
+                    "fill_color" : 2,
+                    "fill_style" : 3013,
+                    "marker_color" : 2,
+                    "marker_style" : 20,
+                    "legend_entry" : "Postfit",
+                    "legend_draw" : "fpe",
+                    "draw" : "P E2 same"
+                }
+            ],
+
+            "print" : true,
+            "use" : true,
+            "legend_coordinates" : [0.20, 0.68, 0.40, 0.83],
+            "legend_title" : "Flux Parameters",
+            "x_axis" : "",
+            "y_axis" : "Fractional Value"
+        },
+        {
+            "name" : "par_xsec",
+            "save_as" : "par_xsec",
+            "root_file" : "test.root",
+            "hists" : [
+                {
+                    "name" : "hist_par_xsec_prior",
+                    "errors" : "hist_par_xsec_error_prior",
+                    "fill_color" : 4,
+                    "fill_style" : 3002,
+                    "marker_color" : 4,
+                    "marker_style" : 21,
+                    "legend_entry" : "Prefit",
+                    "legend_draw" : "fpe",
+                    "draw" : "P E2"
+                },
+                {
+                    "name" : "hist_par_xsec_result",
+                    "errors" : "hist_par_xsec_error_final",
+                    "fill_color" : 2,
+                    "fill_style" : 3013,
+                    "marker_color" : 2,
+                    "marker_style" : 20,
+                    "legend_entry" : "Postfit",
+                    "legend_draw" : "fpe",
+                    "draw" : "P E2 same"
+                }
+            ],
+
+            "print" : true,
+            "use" : true,
+            "legend_coordinates" : [0.20, 0.68, 0.40, 0.83],
+            "legend_title" : "Xsec Parameters",
+            "x_axis" : "",
+            "y_axis" : "Fractional Value"
+        },
+        {
+            "name" : "par_det",
+            "save_as" : "par_det",
+            "root_file" : "test.root",
+            "hists" : [
+                {
+                    "name" : "hist_par_det_prior",
+                    "errors" : "hist_par_det_error_prior",
+                    "fill_color" : 4,
+                    "fill_style" : 3002,
+                    "marker_color" : 4,
+                    "marker_style" : 21,
+                    "legend_entry" : "Prefit",
+                    "legend_draw" : "fpe",
+                    "draw" : "P E2"
+                },
+                {
+                    "name" : "hist_par_det_result",
+                    "errors" : "hist_par_det_error_final",
+                    "fill_color" : 2,
+                    "fill_style" : 3013,
+                    "marker_color" : 2,
+                    "marker_style" : 20,
+                    "legend_entry" : "Postfit",
+                    "legend_draw" : "fpe",
+                    "draw" : "P E2 same"
+                }
+            ],
+
+            "print" : true,
+            "use" : false,
+            "legend_coordinates" : [0.20, 0.68, 0.40, 0.83],
+            "legend_title" : "Detector Parameters",
+            "x_axis" : "",
+            "y_axis" : "Fractional Value"
         }
     ]
 }
