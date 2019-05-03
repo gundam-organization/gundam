@@ -81,6 +81,7 @@ class HistStyle
 
         void SetDefault();
         void SetAxisTitle(const std::string& x_str, const std::string& y_str);
+        void SetAxisRange(double x1, double x2, double y1, double y2);
         void ScaleXbins(TH1D& hist, double scale_factor);
         void SetFillAtt(int f_color, int f_style);
         void SetLineAtt(int l_color, int l_style, int l_width);
@@ -97,6 +98,8 @@ class HistStyle
         int marker_color;
         int marker_style;
         float marker_size;
+        double x_lo, x_up;
+        double y_lo, y_up;
 };
 
 #endif

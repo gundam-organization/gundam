@@ -111,6 +111,11 @@ void HistStyle::SetDefault()
     marker_color = kBlack;
     marker_style = kFullCircle;
     marker_size = 1;
+
+    x_lo = 0;
+    x_up = 0;
+    y_lo = 0;
+    y_up = 0;
 }
 
 void HistStyle::ApplyStyle(TH1D& hist)
@@ -125,6 +130,12 @@ void HistStyle::ApplyStyle(TH1D& hist)
     hist.SetMarkerColor(marker_color);
     hist.SetMarkerStyle(marker_style);
     hist.SetMarkerSize(marker_size);
+
+    if(x_lo != x_up)
+        hist.GetXaxis()->SetRangeUser(x_lo, x_up);
+
+    if(y_lo != y_up)
+        hist.GetYaxis()->SetRangeUser(y_lo, y_up);
 }
 
 void HistStyle::ApplyStyle(std::vector<TH1D>& v_hist)
@@ -137,6 +148,14 @@ void HistStyle::SetAxisTitle(const std::string& x_str, const std::string& y_str)
 {
     x_axis_title = x_str;
     y_axis_title = y_str;
+}
+
+void HistStyle::SetAxisRange(double x1, double x2, double y1, double y2)
+{
+    x_lo = x1;
+    x_up = x2;
+    y_lo = y1;
+    y_up = y2;
 }
 
 void HistStyle::ScaleXbins(TH1D& hist, double scale_factor)

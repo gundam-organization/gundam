@@ -45,16 +45,20 @@ int main(int argc, char** argv)
 
     bool do_print_plots = true;
     std::string json_file;
+    std::string default_filename;
     std::string output_filename;
     std::string plot_extension;
 
     char option;
-    while((option = getopt(argc, argv, "j:f:x:o:e:Ph")) != -1)
+    while((option = getopt(argc, argv, "j:i:o:e:Ph")) != -1)
     {
         switch(option)
         {
             case 'j':
                 json_file = optarg;
+                break;
+            case 'i':
+                default_filename = optarg;
                 break;
             case 'o':
                 output_filename = optarg;
@@ -68,7 +72,8 @@ int main(int argc, char** argv)
             case 'h':
                 std::cout << "USAGE: " << argv[0] << "\nOPTIONS:\n"
                           << "-j : JSON input\n"
-                          << "-o : Output file (overrides JSON config)\n"
+                          << "-i : Default file for input (overrides JSON config)\n"
+                          << "-o : Output file for plots (overrides JSON config)\n"
                           << "-e : File extension to use when printing plots\n"
                           << "-P : Disable printing plots\n"
                           << "-h : Print this usage guide\n";
@@ -95,6 +100,9 @@ int main(int argc, char** argv)
     json j;
     f >> j;
 
+    if(default_filename.empty())
+        default_filename = j.value("default_root_file", "");
+
     if(plot_extension.empty())
         plot_extension = j.value("plot_extension", ".pdf");
 
@@ -112,18 +120,43 @@ int main(int argc, char** argv)
             continue;
 
         std::string name = pj["name"];
+        std::cout << "------------" << std::endl;
+        std::cout << TAG << "Making " << name << std::endl;
+
         std::string canvas_name = name + "_canvas";
         TCanvas temp_canvas(canvas_name.c_str(), canvas_name.c_str(), 1200, 900);
 
-        std::cout << TAG << "Making " << name << std::endl;
+        std::vector<int> log_axis = pj.value("log_axis", std::vector<int>{});
+        if(!log_axis.empty())
+        {
+            temp_canvas.SetLogx(log_axis[0]);
+            temp_canvas.SetLogy(log_axis[1]);
+        }
+
         std::string leg_title = pj.value("legend_title", "");
         std::vector<double> leg_coords = pj["legend_coordinates"].get<std::vector<double>>();
         TLegend temp_legend(leg_coords[0], leg_coords[1], leg_coords[2], leg_coords[3]);
         temp_legend.SetFillStyle(0);
         temp_legend.SetHeader(leg_title.c_str());
 
-        std::string input_file = pj["root_file"];
-        TFile* temp_file = TFile::Open(input_file.c_str(), "READ");
+        TFile* temp_file = nullptr;
+        std::string input_file = pj.value("root_file", "");
+        if(!input_file.empty())
+        {
+            std::cout << TAG << "Opening " << input_file << std::endl;
+            temp_file = TFile::Open(input_file.c_str(), "READ");
+        }
+        else
+        {
+            std::cout << TAG << "Opening " << default_filename << std::endl;
+            temp_file = TFile::Open(default_filename.c_str(), "READ");
+        }
+
+        if(!temp_file->IsOpen())
+        {
+            std::cout << TAG << "Unable to open ROOT file. Skipping plot." << std::endl;
+            continue;
+        }
         temp_file->cd();
 
         for(const auto& hj : pj["hists"])
@@ -137,6 +170,10 @@ int main(int argc, char** argv)
             temp_style.SetFillAtt(hj.value("fill_color", kBlack), hj.value("fill_style", 0));
             temp_style.SetMarkerAtt(hj.value("marker_color", kBlack), hj.value("marker_style", kFullCircle), hj.value("marker_size", 1));
             temp_style.SetAxisTitle(pj.value("x_axis", ""), pj.value("y_axis", ""));
+
+            std::vector<double> axis_range = pj.value("axis_range", std::vector<double>{});
+            if(!axis_range.empty())
+                temp_style.SetAxisRange(axis_range[0], axis_range[1], axis_range[2], axis_range[3]);
 
             std::string hist_name = hj["name"];
             TH1D* temp_hist = nullptr;
@@ -185,19 +222,30 @@ int main(int argc, char** argv)
                 std::cout << TAG << "Adding chi-square comparison." << std::endl;
                 std::string h1_name = entry["hist_one"];
                 std::string h2_name = entry["hist_two"];
-                std::string cov_name = entry["covariance"];
                 std::string label = entry["legend_label"];
+                std::string cov_name = entry.value("covariance","");
 
                 TH1D* h1 = nullptr;
                 TH1D* h2 = nullptr;
                 TMatrixDSym* cov_mat = nullptr;
 
                 temp_file->cd();
-                temp_file->GetObject(cov_name.c_str(), cov_mat);
                 temp_file->GetObject(h1_name.c_str(), h1);
                 temp_file->GetObject(h2_name.c_str(), h2);
-                CalcChisq calc_chisq(*cov_mat);
-                double chisq = calc_chisq.CalcChisqCov(*h1, *h2);
+
+                double chisq = 0;
+                CalcChisq calc_chisq;
+                if(!cov_name.empty())
+                {
+                    temp_file->GetObject(cov_name.c_str(), cov_mat);
+
+                    calc_chisq.SetCovariance(*cov_mat);
+                    chisq = calc_chisq.CalcChisqCov(*h1, *h2);
+                }
+                else
+                {
+                    chisq = calc_chisq.CalcChisqStat(*h1, *h2);
+                }
 
                 label = label + std::to_string(chisq);
                 temp_legend.AddEntry((TObject*)nullptr, label.c_str(), "");
