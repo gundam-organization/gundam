@@ -145,7 +145,7 @@ void FitParameters::ReWeight(AnaEvent* event, const std::string& det, int nsampl
 
     // If bin fell out of valid ranges, pretend the event just didn't happen:
     if(bin == BADBIN)
-        event -> AddEvWght(0.0);
+        event -> AddEvWght(1.0);
     else
     {
         if(bin > params.size())
@@ -186,7 +186,7 @@ void FitParameters::InitParameters()
             pars_name.push_back(Form("%s_sig%d_%d", m_name.c_str(), sig, i));
             if(m_rng_priors == true)
             {
-                rand_prior = rng.Gaus(1.0, 0.15);
+                rand_prior = rng.Gaus(1.0, 0.10);
                 pars_prior.push_back(rand_prior);
             }
             else

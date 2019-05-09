@@ -126,7 +126,7 @@ void XsecParameters::ReWeight(AnaEvent* event, const std::string& det, int nsamp
         weight *= dial_weight;
 
         /*
-        if(dial_weight != 1.0 && det == "INGRID")
+        if(dial_weight > 3.0)
         {
             std::cout << "--------------" << std::endl;
             std::cout << "Ev T: " << event -> GetTopology() << std::endl

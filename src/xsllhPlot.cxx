@@ -247,7 +247,10 @@ int main(int argc, char** argv)
                     chisq = calc_chisq.CalcChisqStat(*h1, *h2);
                 }
 
-                label = label + std::to_string(chisq);
+                //label = label + std::to_string(chisq);
+                std::stringstream ss;
+                ss << std::setprecision(3) << std::fixed << label << chisq;
+                label = ss.str();
                 temp_legend.AddEntry((TObject*)nullptr, label.c_str(), "");
             }
         }

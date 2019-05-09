@@ -63,6 +63,7 @@ void GlobalStyle::ApplyStyle()
     custom_style.SetPadBottomMargin(pad_bottom_margin);
     custom_style.SetPadLeftMargin(pad_left_margin);
 
+    custom_style.SetPaintTextFormat(".3f");
     custom_style.SetTextFont(text_font);
     custom_style.SetTextSize(text_size);
     custom_style.SetLabelFont(label_font,"xyzt");
