@@ -42,6 +42,7 @@ struct HL2FileOpt
     std::string tru_tree;
     unsigned int file_id;
     unsigned int num_branches;
+    double pot_norm;
     std::vector<int> cuts;
     std::map<int, std::vector<int>> samples;
 
@@ -160,6 +161,7 @@ int main(int argc, char** argv)
             f.file_id = file["file_id"];
             f.num_branches = file["num_branches"];
             f.cuts = file["cut_level"].get<std::vector<int>>();
+            f.pot_norm = file["pot_norm"];
 
             std::map<std::string, std::vector<int>> temp_json = file["samples"];
             for(const auto& kv : temp_json)
@@ -178,6 +180,7 @@ int main(int argc, char** argv)
                   << TAG << "File ID: " << file.file_id << std::endl
                   << TAG << "Selected tree: " << file.sel_tree << std::endl
                   << TAG << "Truth tree: " << file.tru_tree << std::endl
+                  << TAG << "POT Norm: " << file.pot_norm << std::endl
                   << TAG << "Num. Branches: " << file.num_branches << std::endl;
 
         std::cout << TAG << "Branch to Sample mapping:" << std::endl;
@@ -245,6 +248,8 @@ int main(int argc, char** argv)
             q2_reco = 2.0 * enu_reco * (emu_reco - selmu_mom * selmu_cos)
                 - mu_mass * mu_mass;
 
+            weight *= file.pot_norm;
+
             if(event_passed)
                 out_seltree -> Fill();
 
@@ -277,6 +282,7 @@ int main(int argc, char** argv)
             q2_true = 2.0 * enu_true * (emu_true - selmu_mom_true * selmu_cos_true)
                 - mu_mass * mu_mass;
 
+            weight *= file.pot_norm;
             out_trutree -> Fill();
 
             if(i % 2000 == 0 || i == (nevents-1))
