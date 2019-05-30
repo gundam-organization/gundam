@@ -282,7 +282,7 @@ int main(int argc, char** argv)
             q2_true = 2.0 * enu_true * (emu_true - selmu_mom_true * selmu_cos_true)
                 - mu_mass * mu_mass;
 
-            weight *= file.pot_norm;
+            weight_true *= file.pot_norm;
             out_trutree -> Fill();
 
             if(i % 2000 == 0 || i == (nevents-1))
