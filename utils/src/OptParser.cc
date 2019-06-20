@@ -32,12 +32,13 @@ bool OptParser::ParseJSON(std::string json_file)
     fname_output = j["output_file"].get<std::string>();
 
     fit_type = j["fit_type"];
-    stat_fluc = j["stat_fluc"];
-    zero_syst = j["zero_syst"];
-    data_POT = j["data_POT"];
-    mc_POT = j["mc_POT"];
-    rng_seed = j["rng_seed"];
-    num_threads = j["num_threads"];
+    stat_fluc = j.value("stat_fluc", false);
+    zero_syst = j.value("zero_syst", false);
+    data_POT = j.value("data_POT", 1.0);
+    mc_POT = j.value("mc_POT", 1.0);
+    rng_template = j.value("rng_template", false);
+    rng_seed = j.value("rng_seed", 0);
+    num_threads = j.value("num_threads", 1);
 
     sample_topology = j["sample_topology"].get<std::vector<std::string>>();
 
@@ -48,6 +49,7 @@ bool OptParser::ParseJSON(std::string json_file)
     flux_cov.decompose = j["flux_cov"]["decomp"];
     flux_cov.info_frac = j["flux_cov"]["variance"];
     flux_cov.do_fit = j["flux_cov"]["fit_par"];
+    flux_cov.rng_start = j["flux_cov"].value("rng_start", false);
 
     det_cov.fname = input_dir + j["det_cov"]["file"].get<std::string>();
     det_cov.matrix = j["det_cov"]["matrix"];
@@ -55,6 +57,7 @@ bool OptParser::ParseJSON(std::string json_file)
     det_cov.decompose = j["det_cov"]["decomp"];
     det_cov.info_frac = j["det_cov"]["variance"];
     det_cov.do_fit = j["det_cov"]["fit_par"];
+    det_cov.rng_start = j["det_cov"].value("rng_start", false);
 
     xsec_cov.fname = input_dir + j["xsec_cov"]["file"].get<std::string>();
     xsec_cov.matrix = j["xsec_cov"]["matrix"];
@@ -62,6 +65,7 @@ bool OptParser::ParseJSON(std::string json_file)
     xsec_cov.decompose = j["xsec_cov"]["decomp"];
     xsec_cov.info_frac = j["xsec_cov"]["variance"];
     xsec_cov.do_fit = j["xsec_cov"]["fit_par"];
+    xsec_cov.rng_start = j["xsec_cov"].value("rng_start", false);
 
     regularise = j["regularisation"]["enable"];
     reg_strength = j["regularisation"]["strength"];

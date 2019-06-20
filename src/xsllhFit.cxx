@@ -153,7 +153,9 @@ int main(int argc, char** argv)
     std::vector<AnaFitParameters*> fitpara;
 
     //Fit parameters
-    FitParameters sigfitpara("par_fit", false);
+    FitParameters sigfitpara("par_fit");
+    if(parser.rng_template)
+        sigfitpara.SetRNGstart();
     if(parser.regularise)
         sigfitpara.SetRegularisation(parser.reg_strength, parser.reg_method);
     for(const auto& opt : parser.detectors)
@@ -189,6 +191,9 @@ int main(int argc, char** argv)
         TMatrixDSym* cov_flux = (TMatrixDSym*)file_flux_cov -> Get(parser.flux_cov.matrix.c_str());
         file_flux_cov -> Close();
 
+        if(parser.flux_cov.rng_start)
+            fluxpara.SetRNGstart();
+
         fluxpara.SetCovarianceMatrix(*cov_flux, parser.flux_cov.decompose);
         fluxpara.SetThrow(parser.flux_cov.do_throw);
         fluxpara.SetInfoFrac(parser.flux_cov.info_frac);
@@ -217,6 +222,9 @@ int main(int argc, char** argv)
         TMatrixDSym* cov_xsec = (TMatrixDSym*)file_xsec_cov -> Get(parser.xsec_cov.matrix.c_str());
         file_xsec_cov -> Close();
 
+        if(parser.xsec_cov.rng_start)
+            xsecpara.SetRNGstart();
+
         xsecpara.SetCovarianceMatrix(*cov_xsec, parser.xsec_cov.decompose);
         xsecpara.SetThrow(parser.xsec_cov.do_throw);
         for(const auto& opt : parser.detectors)
@@ -243,6 +251,9 @@ int main(int argc, char** argv)
         }
         TMatrixDSym* cov_det = (TMatrixDSym*)file_det_cov -> Get(parser.det_cov.matrix.c_str());
         file_det_cov -> Close();
+
+        if(parser.det_cov.rng_start)
+            detpara.SetRNGstart();
 
         detpara.SetCovarianceMatrix(*cov_det, parser.det_cov.decompose);
         detpara.SetThrow(parser.det_cov.do_throw);

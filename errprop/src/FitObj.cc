@@ -65,7 +65,7 @@ FitObj::FitObj(const std::string& json_config, const std::string& event_tree_nam
     event_tree.GetEvents(samples, parser.signal_definition, is_true_tree);
 
     // FitParameters sigfitpara("par_fit", false);
-    FitParameters* sigfitpara = new FitParameters("par_fit", false);
+    FitParameters* sigfitpara = new FitParameters("par_fit");
     for(const auto& opt : parser.detectors)
     {
         if(opt.use_detector)

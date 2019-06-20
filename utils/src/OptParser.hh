@@ -40,6 +40,7 @@ struct CovOpt
     bool do_throw;
     bool decompose;
     bool do_fit;
+    bool rng_start;
     double info_frac;
 };
 
@@ -88,6 +89,7 @@ class OptParser
         bool stat_fluc;
         bool zero_syst;
         bool regularise;
+        bool rng_template;
         double reg_strength;
         std::string reg_method;
 

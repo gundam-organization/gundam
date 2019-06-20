@@ -3,7 +3,7 @@
 AnaFitParameters::AnaFitParameters()
     : m_name("")
     , Npar(0)
-    , m_rng_priors(false)
+    , m_rng_start(false)
     , m_do_throw(false)
     , m_decompose(false)
     , m_regularised(false)

@@ -95,7 +95,9 @@ public:
     bool IsRegularised() const { return m_regularised; }
     bool IsDecomposed() const { return m_decompose; }
     bool DoThrow() const { return m_do_throw; }
+    bool DoRNGstart() const { return m_rng_start; }
     void SetThrow(bool flag = true) { m_do_throw = flag; }
+    void SetRNGstart(bool flag = true) { m_rng_start = flag; }
     void SetWeightCap(double cap, bool flag = true) { m_do_cap_weights = flag; m_weight_cap = cap; }
 
 protected:
@@ -112,7 +114,7 @@ protected:
     std::vector<bool> pars_fixed;
 
     std::vector<std::vector<int>> m_evmap;
-    bool m_rng_priors;
+    bool m_rng_start;
     bool m_do_throw;
     bool m_decompose;
     bool m_regularised;

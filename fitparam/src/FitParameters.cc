@@ -1,11 +1,9 @@
 #include "FitParameters.hh"
 using xsllh::FitBin;
 
-FitParameters::FitParameters(const std::string& par_name, bool random_priors)
+FitParameters::FitParameters(const std::string& par_name)
 {
     m_name = par_name;
-    m_rng_priors = random_priors;
-
     signal_id = 0;
 }
 
@@ -173,9 +171,6 @@ void FitParameters::ReWeight(AnaEvent* event, const std::string& det, int nsampl
 
 void FitParameters::InitParameters()
 {
-    double rand_prior = 0.0;
-    TRandom3 rng(0);
-
     unsigned int offset = 0;
     for(const auto& sig : v_signals)
     {
@@ -184,14 +179,7 @@ void FitParameters::InitParameters()
         for(int i = 0; i < nbins; ++i)
         {
             pars_name.push_back(Form("%s_sig%d_%d", m_name.c_str(), sig, i));
-            if(m_rng_priors == true)
-            {
-                rand_prior = rng.Gaus(1.0, 0.10);
-                pars_prior.push_back(rand_prior);
-            }
-            else
-                pars_prior.push_back(1.0); //all weights are 1.0 a priori
-
+            pars_prior.push_back(1.0); //all weights are 1.0 a priori
             pars_step.push_back(0.05);
             pars_limlow.push_back(0.0);
             pars_limhigh.push_back(10.0);
@@ -225,7 +213,6 @@ void FitParameters::AddDetector(const std::string& det, const std::vector<Signal
 {
     std::cout << TAG << "Adding detector " << det << " for " << m_name << std::endl;
 
-    //static int signal_id = 0;
     for(const auto& sig : v_input)
     {
         if(sig.detector != det || sig.use_signal == false)

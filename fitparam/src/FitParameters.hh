@@ -15,7 +15,7 @@
 class FitParameters : public AnaFitParameters
 {
     public:
-        FitParameters(const std::string& par_name, bool random_priors = false);
+        FitParameters(const std::string& par_name);
         ~FitParameters();
 
         void InitParameters();
