@@ -6,9 +6,10 @@
     "fit_type"  : 0,
     "stat_fluc" : false,
     "zero_syst" : false,
-    "rng_template" : true,
+    "rng_template" : false,
     "rng_seed"  : 12257,
     "num_threads" : 8,
+    "par_scan_list" : [78, 79, 80, 81, 82, 83],
     "sample_topology" : ["cc0pi0p", "cc0pi1p", "cc0pinp", "cc1pi+", "ccother", "bkg", "null", "OOFV"],
     "min_settings" : {
         "minimizer" : "Minuit2",
@@ -26,7 +27,6 @@
         "throw"  : false,
         "decomp" : false,
         "variance" : 1.00,
-        "rng_start": true,
         "fit_par" : true
     },
     "det_cov" : {

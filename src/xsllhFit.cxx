@@ -285,6 +285,10 @@ int main(int argc, char** argv)
         did_converge = xsecfit.Fit(samples, parser.fit_type, parser.stat_fluc);
         if(!did_converge)
             std::cout << TAG << "Fit did not coverge." << std::endl;
+
+        std::vector<int> par_scans = parser.par_scan_list;
+        if(!par_scans.empty())
+            xsecfit.ParameterScans(par_scans, parser.par_scan_steps);
     }
     fout -> Close();
 

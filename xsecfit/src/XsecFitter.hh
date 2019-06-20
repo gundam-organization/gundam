@@ -46,6 +46,7 @@ public:
     void InitFitter(std::vector<AnaFitParameters*>& fitpara);
     void FixParameter(const std::string& par_name, const double& value);
     bool Fit(const std::vector<AnaSample*>& samples, int fit_type, bool stat_fluc);
+    void ParameterScans(const std::vector<int>& param_list, unsigned int nsteps);
 
     void SetMinSettings(const MinSettings& ms);
     void SetSeed(int seed);

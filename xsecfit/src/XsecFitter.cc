@@ -649,3 +649,29 @@ void XsecFitter::SaveResults(const std::vector<std::vector<double>>& par_results
         h_err_prior.Write();
     }
 }
+
+void XsecFitter::ParameterScans(const std::vector<int>& param_list, unsigned int nsteps)
+{
+    std::cout << TAG << "Performing parameter scans..." << std::endl;
+
+    //Internally Scan performs steps-1, so add one to actually get the number of steps
+    //we ask for.
+    unsigned int adj_steps = nsteps+1;
+    double x[adj_steps] = {};
+    double y[adj_steps] = {};
+
+    for(const auto& p : param_list)
+    {
+        std::cout << TAG << "Scanning parameter " << p
+                  << " (" << m_fitter->VariableName(p) << ")." << std::endl;
+
+        bool success = m_fitter->Scan(p, adj_steps, x, y);
+
+        TGraph scan_graph(nsteps, x, y);
+        m_dir->cd();
+
+        std::stringstream ss;
+        ss << "par_scan_" << std::to_string(p);
+        scan_graph.Write(ss.str().c_str());
+    }
+}
