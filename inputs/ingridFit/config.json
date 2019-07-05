@@ -1,6 +1,6 @@
 {
-    "data_file" : "xsllh_nominal.root",
-    "mc_file"   : "xsllh_nominal.root",
+    "data_file" : "xsllh_nominal_full.root",
+    "mc_file"   : "xsllh_nominal_full.root",
     "output_file" : "test.root",
     "input_dir" : "/inputs/ingridFit/",
     "fit_type"  : 0,

@@ -657,8 +657,8 @@ void XsecFitter::ParameterScans(const std::vector<int>& param_list, unsigned int
     //Internally Scan performs steps-1, so add one to actually get the number of steps
     //we ask for.
     unsigned int adj_steps = nsteps+1;
-    double x[adj_steps] = {};
-    double y[adj_steps] = {};
+    double* x = new double[adj_steps] {};
+    double* y = new double[adj_steps] {};
 
     for(const auto& p : param_list)
     {
@@ -674,4 +674,7 @@ void XsecFitter::ParameterScans(const std::vector<int>& param_list, unsigned int
         ss << "par_scan_" << std::to_string(p);
         scan_graph.Write(ss.str().c_str());
     }
+
+    delete[] x;
+    delete[] y;
 }
