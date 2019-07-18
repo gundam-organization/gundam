@@ -11,6 +11,7 @@ AnaSample::AnaSample(int sample_id, const std::string& name, const std::string& 
     , m_data_tree(t_data)
     , m_norm(1.0)
 {
+    TH1::SetDefaultSumw2(true);
     SetBinning(m_binning);
 
     std::cout << TAG << m_name << ", ID " << m_sample_id << std::endl
@@ -347,6 +348,39 @@ double AnaSample::CalcChi2() const
     }
 
     return chi2;
+}
+
+double AnaSample::CalcEffLLH() const
+{
+    const unsigned int nbins = m_hpred->GetNbinsX();
+    double* exp_w  = m_hpred->GetArray();
+    double* exp_w2 = m_hpred->GetSumw2()->GetArray();
+    double* data   = m_hdata->GetArray();
+
+    //std::cout << m_name << std::endl;
+
+    double llh_eff = 0.0;
+    for(unsigned int i = 1; i <= nbins; ++i)
+    {
+        if(exp_w[i] <= 0.0)
+            continue;
+
+        const double b = exp_w[i] / exp_w2[i];
+        const double a = (exp_w[i] * b) + 1.0;
+        const double k = data[i];
+
+        //std::cout << "--------------" << std::endl;
+        //std::cout << "i  : " << i << std::endl;
+        //std::cout << "w  : " << exp_w[i] << std::endl;
+        //std::cout << "w2 : " << exp_w2[i] << std::endl;
+        //std::cout << "a  : " << a << std::endl;
+        //std::cout << "b  : " << b << std::endl;
+        //std::cout << "k  : " << data[i] << std::endl;
+
+        llh_eff += a * std::log(b) + std::lgamma(k+a) - std::lgamma(k+1) - ((k+a) * std::log1p(b)) - std::lgamma(a);
+    }
+
+    return -2 * llh_eff;
 }
 
 void AnaSample::Write(TDirectory* dirout, const std::string& bsname, int fititer)

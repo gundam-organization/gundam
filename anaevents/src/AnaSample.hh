@@ -1,6 +1,7 @@
 #ifndef __AnaSample_hh__
 #define __AnaSample_hh__
 
+#include <cmath>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -51,6 +52,7 @@ public:
     std::vector<FitBin> GetBinEdges() const { return m_bin_edges; }
 
     double CalcChi2() const;
+    double CalcEffLLH() const;
     void FillEventHist(int datatype, bool stat_fluc = false);
     void Write(TDirectory* dirout, const std::string& bsname, int fititer);
     void GetSampleBreakdown(TDirectory* dirout, const std::string& tag,

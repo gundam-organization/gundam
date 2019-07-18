@@ -177,6 +177,7 @@ void OptParser::PrintOptions(bool short_list) const
     << std::endl << TAG << "MC   POT : " << mc_POT
     << std::endl << TAG << "RNG Seed : " << rng_seed
     << std::endl << TAG << "N Threads: " << num_threads
+    << std::endl << TAG << "Saving Events: " << std::boolalpha << save_events
     << std::endl << TAG << "Enable Stat flucutations : " << std::boolalpha << stat_fluc
     << std::endl << TAG << "Enable Zero syst penalty : " << std::boolalpha << zero_syst
     << std::endl << TAG << "Enable Fit regularisation: " << std::boolalpha << regularise

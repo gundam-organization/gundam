@@ -2,13 +2,6 @@
 FITROOT="/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter"
 RUNPATH="${SCRATCH}/xsllhFit"
 
-if [ ! -d $RUNPATH ]; then
-    echo "Creating directory: $RUNPATH"
-    mkdir $RUNPATH
-#else
-#    rm $RUNPATH/*
-fi
-
 if [ -z ${1} ]; then
     echo "No fit config file specified. Exiting."
     exit 64
@@ -31,6 +24,19 @@ else
     SEEDOFFSET=${4}
 fi
 
+if [ -z ${5} ]; then
+    RUNPATH="${SCRATCH}/xsllhFit"
+else
+    RUNPATH="${RUNPATH}/${5}"
+fi
+
+if [ ! -d $RUNPATH ]; then
+    echo "Creating directory: $RUNPATH"
+    mkdir $RUNPATH
+#else
+#    rm $RUNPATH/*
+fi
+
 THREADS=$(grep -i "num_threads" ${1} | sed 's/[^0-9]*//g')
 FITCONFIG=$(basename ${1})
 ERRCONFIG=$(basename ${2})
@@ -40,6 +46,7 @@ sed -i "/#SBATCH --array/c\#SBATCH --array=0-${NUMJOBS}" ${FITROOT}/scripts/fit_
 sed -i "/FITCONFIG=/c\FITCONFIG=\"${FITCONFIG}\"" ${FITROOT}/scripts/fit_job.sb
 sed -i "/ERRCONFIG=/c\ERRCONFIG=\"${ERRCONFIG}\"" ${FITROOT}/scripts/fit_job.sb
 sed -i "/OFFSET=/c\OFFSET=${SEEDOFFSET}" ${FITROOT}/scripts/fit_job.sb
+sed -i "/RUNPATH=/c\RUNPATH=\"${RUNPATH}\"" ${FITROOT}/scripts/fit_job.sb
 
 echo "Fit Config File: ${1}"
 echo "Err Config File: ${2}"

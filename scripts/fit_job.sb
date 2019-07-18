@@ -5,10 +5,10 @@
 #SBATCH --constraint=[lac|skl]
 #SBATCH --job-name=xsllhFit
 #SBATCH --output=fit_slurm.log
-#SBATCH --array=0-0
+#SBATCH --array=0-2
 
 FITROOT="/mnt/home/cuddandr/work/nd280Software/v12r15/xsLLhFitter"
-RUNPATH="${SCRATCH}/xsllhFit"
+RUNPATH="/mnt/scratch/cuddandr/xsllhFit/adhoc"
 
 source ${HOME}/ROOT/root-6.10.08/bin/thisroot.sh
 source ${FITROOT}/setup.sh

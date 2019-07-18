@@ -424,6 +424,7 @@ double XsecFitter::FillSamples(std::vector<std::vector<double>>& new_pars, int d
 
         m_samples[s]->FillEventHist(datatype);
         double sample_chi2 = m_samples[s]->CalcChi2();
+        //double sample_chi2 = m_samples[s]->CalcEffLLH();
         chi2 += sample_chi2;
 
         if(output_chi2)
