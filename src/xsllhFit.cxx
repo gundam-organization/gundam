@@ -274,6 +274,7 @@ int main(int argc, char** argv)
     xsecfit.SetPOTRatio(potD/potMC);
     xsecfit.SetTopology(topology);
     xsecfit.SetZeroSyst(parser.zero_syst);
+    xsecfit.SetSaveEvents(parser.save_events);
 
     //init w/ para vector
     xsecfit.InitFitter(fitpara);

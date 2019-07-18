@@ -90,6 +90,7 @@ class OptParser
         bool zero_syst;
         bool regularise;
         bool rng_template;
+        bool save_events;
         double reg_strength;
         std::string reg_method;
 

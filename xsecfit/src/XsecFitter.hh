@@ -58,6 +58,7 @@ public:
         m_freq = freq;
         m_save = flag;
     }
+    void SetSaveEvents(bool flag = true) { m_save_events = flag; };
     void SetPOTRatio(double val) { m_potratio = val; }
 
     TTree* outtree;
@@ -70,6 +71,7 @@ public:
     Int_t topology;
     Int_t reaction;
     Int_t target;
+    Int_t sigtype;
     Float_t D1Reco;
     Float_t D2Reco;
     Float_t weight;
@@ -78,18 +80,17 @@ public:
 
     void InitOutputTree()
     {
-        // Set branches
         outtree->Branch("nutype", &nutype, "nutype/I");
         outtree->Branch("reaction", &reaction, "reaction/I");
         outtree->Branch("target", &target, "target/I");
-        outtree->Branch("sample", &sample, "cutBranch/I");
+        outtree->Branch("sample", &sample, "cut_branch/I");
+        outtree->Branch("sigtype", &sigtype, "signal/I");
         outtree->Branch("topology", &topology, "topology/I");
         outtree->Branch("D1True", &D1true, ("D1True/F"));
-        outtree->Branch("D1Reco", &D1Reco, ("D1Rec/F"));
+        outtree->Branch("D1Reco", &D1Reco, ("D1Reco/F"));
         outtree->Branch("D2True", &D2true, ("D2True/F"));
-        outtree->Branch("D2Reco", &D2Reco, ("D2Rec/F"));
+        outtree->Branch("D2Reco", &D2Reco, ("D2Reco/F"));
         outtree->Branch("weight", &weight, "weight/F");
-        outtree->Branch("weightNom", &weightNom, "weightNom/F");
         outtree->Branch("weightMC", &weightMC, "weightMC/F");
     }
 
@@ -109,6 +110,7 @@ private:
     TRandom3* rng;
     TDirectory* m_dir;
     bool m_save;
+    bool m_save_events;
     bool m_zerosyst;
     double m_potratio;
     int m_threads;

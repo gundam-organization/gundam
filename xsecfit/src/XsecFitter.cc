@@ -6,6 +6,7 @@ XsecFitter::XsecFitter(TDirectory* dirout, const int seed, const int num_threads
     , m_fcn(nullptr)
     , m_dir(dirout)
     , m_save(false)
+    , m_save_events(true)
     , m_zerosyst(false)
     , m_freq(10000)
     , m_threads(num_threads)
@@ -337,7 +338,9 @@ bool XsecFitter::Fit(const std::vector<AnaSample*>& samples, int fit_type, bool 
     postfit_globalcc.Write("res_globalcc");
 
     SaveResults(res_pars, err_pars);
-    SaveFinalEvents(m_calls, res_pars);
+
+    if(m_save_events)
+        SaveFinalEvents(m_calls, res_pars);
 
     if(!did_converge)
         std::cout << ERR << "Not valid fit result." << std::endl;
@@ -516,22 +519,22 @@ void XsecFitter::SaveFinalEvents(int fititer, std::vector<std::vector<double>>& 
             ev->SetEvWght(ev->GetEvWghtMC());
             for(size_t j = 0; j < m_fitpara.size(); j++)
             {
-                std::string det = m_samples[s]->GetDetector();
+                const std::string det = m_samples[s]->GetDetector();
                 m_fitpara[j]->ReWeight(ev, det, s, i, res_params[j]);
             }
 
-            sample    = ev->GetSampleType();
-            D1true    = ev->GetTrueD1();
-            D2true    = ev->GetTrueD2();
-            topology  = ev->GetTopology();
-            reaction  = ev->GetReaction();
-            target    = ev->GetTarget();
-            nutype    = ev->GetFlavor();
-            D1Reco    = ev->GetRecoD1();
-            D2Reco    = ev->GetRecoD2();
-            weightNom = (ev->GetEvWght()) * (ev->GetEvWghtMC());
-            weightMC  = ev->GetEvWghtMC();
-            weight    = ev->GetEvWght() * m_potratio;
+            sample   = ev->GetSampleType();
+            sigtype  = ev->GetSignalType();
+            topology = ev->GetTopology();
+            reaction = ev->GetReaction();
+            target   = ev->GetTarget();
+            nutype   = ev->GetFlavor();
+            D1true   = ev->GetTrueD1();
+            D2true   = ev->GetTrueD2();
+            D1Reco   = ev->GetRecoD1();
+            D2Reco   = ev->GetRecoD2();
+            weightMC = ev->GetEvWghtMC() * m_potratio;
+            weight   = ev->GetEvWght() * m_potratio;
             outtree->Fill();
         }
     }
