@@ -231,12 +231,12 @@ bool XsecFitter::Fit(const std::vector<AnaSample*>& samples, int fit_type, bool 
         return false;
     }
 
-    SaveEvents(m_calls);
+    SaveEventHist(m_calls);
 
     bool did_converge = false;
     std::cout << TAG << "Fit prepared." << std::endl;
     std::cout << TAG << "Calling Minimize, running " << min_settings.algorithm << std::endl;
-    did_converge = m_fitter->Minimize();
+    //did_converge = m_fitter->Minimize();
 
     if(!did_converge)
     {
@@ -250,7 +250,7 @@ bool XsecFitter::Fit(const std::vector<AnaSample*>& samples, int fit_type, bool 
                   << TAG << "Status code: " << m_fitter->Status() << std::endl;
 
         std::cout << TAG << "Calling HESSE." << std::endl;
-        did_converge = m_fitter->Hesse();
+        //did_converge = m_fitter->Hesse();
     }
 
     if(!did_converge)
@@ -338,9 +338,10 @@ bool XsecFitter::Fit(const std::vector<AnaSample*>& samples, int fit_type, bool 
     postfit_globalcc.Write("res_globalcc");
 
     SaveResults(res_pars, err_pars);
+    SaveEventHist(m_calls, true);
 
     if(m_save_events)
-        SaveFinalEvents(m_calls, res_pars);
+        SaveEventTree(res_pars);
 
     if(!did_converge)
         std::cout << ERR << "Not valid fit result." << std::endl;
@@ -484,7 +485,7 @@ double XsecFitter::CalcLikelihood(const double* par)
     if(m_calls % m_freq == 0 && m_save)
     {
         SaveParams(new_pars);
-        SaveEvents(m_calls);
+        SaveEventHist(m_calls);
     }
 
     if(output_chi2)
@@ -499,21 +500,28 @@ double XsecFitter::CalcLikelihood(const double* par)
     return chi2_stat + chi2_sys + chi2_reg;
 }
 
-void XsecFitter::SaveEvents(int fititer)
+void XsecFitter::SaveEventHist(int fititer, bool is_final)
 {
-    for(size_t s = 0; s < m_samples.size(); s++)
+    for(int s = 0; s < m_samples.size(); s++)
     {
-        m_samples[s]->Write(m_dir, Form("evhist_sam%d_iter%d", (int)s, m_calls), fititer);
+        std::stringstream ss;
+        ss << "evhist_sam" << s;
+        if(is_final)
+            ss << "_finaliter";
+        else
+            ss << "_iter" << m_calls;
+
+        m_samples[s]->Write(m_dir, ss.str(), fititer);
     }
 }
 
-void XsecFitter::SaveFinalEvents(int fititer, std::vector<std::vector<double>>& res_params)
+void XsecFitter::SaveEventTree(std::vector<std::vector<double>>& res_params)
 {
     outtree = new TTree("selectedEvents", "selectedEvents");
     InitOutputTree();
+
     for(size_t s = 0; s < m_samples.size(); s++)
     {
-        m_samples[s]->Write(m_dir, Form("evhist_sam%d_finaliter", (int)s), fititer);
         for(int i = 0; i < m_samples[s]->GetN(); i++)
         {
             AnaEvent* ev = m_samples[s]->GetEvent(i);

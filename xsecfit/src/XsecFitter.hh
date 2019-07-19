@@ -98,8 +98,8 @@ private:
     void GenerateToyData(int toy_type, bool stat_fluc = false);
     double FillSamples(std::vector<std::vector<double>>& new_pars, int datatype = 0);
     void SaveParams(const std::vector<std::vector<double>>& new_pars);
-    void SaveEvents(int fititer);
-    void SaveFinalEvents(int fititer, std::vector<std::vector<double>>& parresults);
+    void SaveEventHist(int fititer, bool is_final = false);
+    void SaveEventTree(std::vector<std::vector<double>>& par_results);
     void SaveChi2();
     void SaveResults(const std::vector<std::vector<double>>& parresults,
                      const std::vector<std::vector<double>>& parerrors);
