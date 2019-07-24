@@ -236,7 +236,7 @@ bool XsecFitter::Fit(const std::vector<AnaSample*>& samples, int fit_type, bool 
     bool did_converge = false;
     std::cout << TAG << "Fit prepared." << std::endl;
     std::cout << TAG << "Calling Minimize, running " << min_settings.algorithm << std::endl;
-    //did_converge = m_fitter->Minimize();
+    did_converge = m_fitter->Minimize();
 
     if(!did_converge)
     {
@@ -250,7 +250,7 @@ bool XsecFitter::Fit(const std::vector<AnaSample*>& samples, int fit_type, bool 
                   << TAG << "Status code: " << m_fitter->Status() << std::endl;
 
         std::cout << TAG << "Calling HESSE." << std::endl;
-        //did_converge = m_fitter->Hesse();
+        did_converge = m_fitter->Hesse();
     }
 
     if(!did_converge)
