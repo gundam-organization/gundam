@@ -4,6 +4,10 @@
 #include <iostream>
 #include <string>
 
+#ifdef TTYCHECK
+#include <unistd.h>
+#endif
+
 #include "ColorOutput.hh"
 
 class ProgressBar
@@ -50,64 +54,19 @@ public:
     template<typename T>
     void Print(T current)
     {
-        std::string bar;
-        float progress = static_cast<float>(current) / max_progress;
-        int pos        = bar_size * progress;
-        for(int b = 0; b < bar_size; ++b)
-        {
-            if(b < pos)
-                bar.replace(b, 1, bar_char);
-            else
-                bar.replace(b, 1, " ");
-        }
-        std::cout << "\r" << bar_prefix << "[" << (is_rainbow ? color::RainbowText(bar) : bar)
-                  << "] " << int(progress * 100.0) << "%";
-
-        if(current == max_progress)
-            std::cout << std::endl;
-        std::cout.flush();
+        Print(bar_prefix, current, max_progress);
     }
 
     template<typename T>
     void Print(const std::string& prefix, T current)
     {
-        std::string bar;
-        float progress = static_cast<float>(current) / max_progress;
-        int pos        = bar_size * progress;
-        for(int b = 0; b < bar_size; ++b)
-        {
-            if(b < pos)
-                bar.replace(b, 1, bar_char);
-            else
-                bar.replace(b, 1, " ");
-        }
-        std::cout << "\r" << prefix << "[" << (is_rainbow ? color::RainbowText(bar) : bar) << "] "
-                  << int(progress * 100.0) << "%";
-
-        if(current == max_progress)
-            std::cout << std::endl;
-        std::cout.flush();
+        Print(prefix, current, max_progress);
     }
 
     template<typename T, typename U>
     void Print(T current, U limit)
     {
-        std::string bar;
-        float progress = static_cast<float>(current) / limit;
-        int pos        = bar_size * progress;
-        for(int b = 0; b < bar_size; ++b)
-        {
-            if(b < pos)
-                bar.replace(b, 1, bar_char);
-            else
-                bar.replace(b, 1, " ");
-        }
-        std::cout << "\r" << bar_prefix << "[" << (is_rainbow ? color::RainbowText(bar) : bar)
-                  << "] " << int(progress * 100.0) << "%";
-
-        if(current == limit)
-            std::cout << std::endl;
-        std::cout.flush();
+        Print(bar_prefix, current, limit);
     }
 
     template<typename T, typename U>
@@ -123,8 +82,22 @@ public:
             else
                 bar.replace(b, 1, " ");
         }
-        std::cout << "\r" << prefix << "[" << (is_rainbow ? color::RainbowText(bar) : bar) << "] "
-                  << int(progress * 100.0) << "%";
+        
+        #ifdef TTYCHECK
+        if(isatty(fileno(stdout)))
+        {
+            std::cout << "\r" << prefix << "[" << (is_rainbow ? color::RainbowText(bar) : bar) << "] "
+                      << int(progress * 100.0) << "%";
+        }
+        else
+        {
+            std::cout << " " << int(progress * 100.0) << "%";
+        }
+        #else
+            std::cout << "\r" << prefix << "[" << (is_rainbow ? color::RainbowText(bar) : bar) << "] "
+                      << int(progress * 100.0) << "%";
+        #endif
+
 
         if(current == limit)
             std::cout << std::endl;

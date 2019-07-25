@@ -83,6 +83,7 @@ option(CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ langauge (-std=gnu++11
 option(CXX_MARCH_FLAG "Enable cpu architecture specific optimzations." OFF)
 option(CXX_WARNINGS "Enable most C++ warning flags." ON)
 option(COLOR_OUTPUT "Enable colored terminal output." ON)
+option(TTYCHECK "Enable check if output is being sent to terminal/TTY." ON)
 
 include(FindOpenMP)
 if(OPENMP_FOUND)
@@ -101,6 +102,10 @@ endif()
 
 if(NOT COLOR_OUTPUT)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNOCOLOR")
+endif()
+
+if(TTYCHECK)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DTTYCHECK")
 endif()
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${ROOT_CXX_FLAGS} ${CXX_WARNING_FLAGS}")
