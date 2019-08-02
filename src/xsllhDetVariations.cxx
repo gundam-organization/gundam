@@ -18,6 +18,7 @@
 #include "TMatrixTSym.h"
 #include "TStyle.h"
 #include "TTree.h"
+#include "TVectorT.h"
 
 #include "json.hpp"
 using json = nlohmann::json;
@@ -81,6 +82,7 @@ int main(int argc, char** argv)
     json j;
     f >> j;
 
+    bool do_mc_stat     = j["mc_stat_error"];
     bool do_projection  = j["projection"];
     bool do_single_syst = j["single_syst"];
     bool do_covariance  = j["covariance"];
@@ -159,8 +161,11 @@ int main(int argc, char** argv)
     std::cout << TAG << "Initalizing histograms." << std::endl;
     std::cout << TAG << "Using " << usable_toys << " toys." << std::endl;
 
+    TH1::SetDefaultSumw2();
+
     std::vector<std::vector<TH1F>> v_hists;
     std::vector<TH1F> v_avg;
+    std::vector<TH1F> v_mc_stat;
     for(int i = 0; i < cov_bin_manager.size(); ++i)
     {
         BinManager bm   = cov_bin_manager.at(i);
@@ -182,6 +187,11 @@ int main(int argc, char** argv)
                     ss << "cov_sample" << i << "_avg";
                     v_avg.emplace_back(
                         TH1F(ss.str().c_str(), ss.str().c_str(), v_bins.size() - 1, &v_bins[0]));
+
+                    ss.str("");
+                    ss << "cov_sample" << i << "_mc_stat";
+                    v_mc_stat.emplace_back(
+                        TH1F(ss.str().c_str(), ss.str().c_str(), v_bins.size() - 1, &v_bins[0]));
                 }
             }
             else
@@ -192,6 +202,10 @@ int main(int argc, char** argv)
                     ss.str("");
                     ss << "cov_sample" << i << "_avg";
                     v_avg.emplace_back(TH1F(ss.str().c_str(), ss.str().c_str(), nbins, 0, nbins));
+
+                    ss.str("");
+                    ss << "cov_sample" << i << "_mc_stat";
+                    v_mc_stat.emplace_back(TH1F(ss.str().c_str(), ss.str().c_str(), nbins, 0, nbins));
                 }
             }
         }
@@ -209,6 +223,10 @@ int main(int argc, char** argv)
         float weight_syst_total_noflux[file.num_toys];
         float weight_syst[file.num_toys][file.num_syst];
 
+        int accum_level_mc[file.num_toys][file.num_samples];
+        float hist_variables_mc[nvars];
+        float weight_syst_total_noflux_mc;
+
         std::cout << TAG << "Opening file: " << file.fname_input << std::endl
                   << TAG << "Reading tree: " << file.tree_name << std::endl
                   << TAG << "Num Toys: " << file.num_toys << std::endl
@@ -225,17 +243,23 @@ int main(int argc, char** argv)
 
         TFile* file_input = TFile::Open(file.fname_input.c_str(), "READ");
         TTree* tree_event = (TTree*)file_input->Get(file.tree_name.c_str());
+        TTree* tree_default = (TTree*)file_input->Get("default");
 
         tree_event->SetBranchAddress("NTOYS", &NTOYS);
         tree_event->SetBranchAddress("accum_level", accum_level);
         tree_event->SetBranchAddress("weight_syst", weight_syst);
-        tree_event->SetBranchAddress("weight_syst_total_noflux", weight_syst_total_noflux);
+        tree_event->SetBranchAddress("weight_syst_total", weight_syst_total_noflux);
         for(unsigned int i = 0; i < nvars; ++i)
             tree_event->SetBranchAddress(var_names[i].c_str(), hist_variables[i]);
 
+        tree_default->SetBranchAddress("accum_level", accum_level_mc);
+        tree_default->SetBranchAddress("weight_syst_total", &weight_syst_total_noflux_mc);
+        for(unsigned int i = 0; i < nvars; ++i)
+            tree_default->SetBranchAddress(var_names[i].c_str(), &hist_variables_mc[i]);
+
         unsigned int rejected_weights = 0;
         unsigned int total_weights    = 0;
-        const unsigned int num_events = tree_event->GetEntries();
+        unsigned int num_events = tree_event->GetEntries();
 
         std::cout << TAG << "Number of events: " << num_events << std::endl;
         for(unsigned int i = 0; i < num_events; ++i)
@@ -284,6 +308,38 @@ int main(int argc, char** argv)
             }
         }
 
+        std::cout << TAG << "Reading default events..." << std::endl;
+        num_events = tree_default->GetEntries();
+        for(unsigned int i = 0; i < num_events; ++i)
+        {
+            tree_default->GetEntry(i);
+            for(const auto& kv : file.samples)
+            {
+                unsigned int s = kv.first;
+                for(const auto& branch : kv.second)
+                {
+                    if(accum_level_mc[0][branch] > file.cuts[branch])
+                    {
+                        int idx = -1;
+                        if(do_projection)
+                            idx = hist_variables_mc[var_plot];
+                        else
+                        {
+                            std::vector<double> vars;
+                            for(unsigned int v = 0; v < nvars; ++v)
+                                vars.push_back(hist_variables_mc[v]);
+                            idx = cov_bin_manager[s].GetBinIndex(vars);
+                        }
+
+                        float weight = weight_syst_total_noflux_mc;
+                        v_mc_stat[s].Fill(idx, weight);
+
+                        break;
+                    }
+                }
+            }
+        }
+
         double reject_fraction = (rejected_weights * 1.0) / total_weights;
         std::cout << TAG << "Finished processing events." << std::endl;
         std::cout << TAG << "Total weights: " << total_weights << std::endl;
@@ -296,6 +352,7 @@ int main(int argc, char** argv)
     unsigned int num_elements = 0;
     TMatrixTSym<double> cov_mat(num_elements);
     TMatrixTSym<double> cor_mat(num_elements);
+    std::vector<float> v_mc_error;
 
     if(do_covariance)
     {
@@ -312,6 +369,21 @@ int main(int argc, char** argv)
                     i_toy.emplace_back(v_hists[s][t].GetBinContent(b + 1));
             }
             v_toys.emplace_back(i_toy);
+        }
+
+        for(int s = 0; s < cov_bin_manager.size(); ++s)
+        {
+            const unsigned int nbins = cov_bin_manager[s].GetNbins();
+            float* w  = v_mc_stat[s].GetArray();
+            double* w2 = v_mc_stat[s].GetSumw2()->GetArray();
+            //std::cout << "Sample " << s << std::endl;
+            for(unsigned int b = 0; b < nbins; ++b)
+            {
+                //std::cout << "Bin : " << w[b+1] << std::endl;
+                //std::cout << "W2  : " << w2[b+1] << std::endl;
+                float rel_error = w2[b+1] / (w[b+1] * w[b+1]);
+                v_mc_error.emplace_back(rel_error);
+            }
         }
 
         std::cout << TAG << "Using " << usable_toys << " toys." << std::endl;
@@ -340,6 +412,15 @@ int main(int argc, char** argv)
                                          * (1.0 - v_toys[t][j] / v_mean[j]) / (1.0 * usable_toys);
                     }
                 }
+            }
+        }
+
+        if(do_mc_stat)
+        {
+            std::cout << TAG << "Adding MC stat error to covariance." << std::endl;
+            for(unsigned int i = 0; i < num_elements; ++i)
+            {
+                cov_mat(i, i) += v_mc_error[i];
             }
         }
 
@@ -398,6 +479,12 @@ int main(int argc, char** argv)
     {
         cov_mat.Write(cov_mat_name.c_str());
         cor_mat.Write(cor_mat_name.c_str());
+    }
+
+    if(do_mc_stat)
+    {
+        TVectorT<float> v_mc_root(v_mc_error.size(), v_mc_error.data());
+        v_mc_root.Write("mc_stat_error");
     }
 
     file_output->Close();
