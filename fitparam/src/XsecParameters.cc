@@ -122,7 +122,7 @@ void XsecParameters::ReWeight(AnaEvent* event, const std::string& det, int nsamp
     for(int d = 0; d < num_dials; ++d)
     {
         int idx = m_dial_evtmap[nsample][nevent][d];
-        double dial_weight = v_dials[d].GetSplineValue(idx, params[d + m_offset.at(det)]);
+        double dial_weight = v_dials[d].GetBoundedValue(idx, params[d + m_offset.at(det)]);
         weight *= dial_weight;
 
         /*

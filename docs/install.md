@@ -48,6 +48,7 @@ There are a few extra options to configure the build. The default option is list
 - **CXX_MARCH_FLAG** [OFF]: Enable cpu architecture specific optimizations
 - **CXX_WARNINGS** [ON]: Enable most C++ warning flags
 - **COLOR_OUTPUT** [ON]: Enable colored terminal output
+- **TTYCHECK** [ON]: Enable checking if stdout points to a terminal
 
 For future use, the root setup.sh script will perform all the necessary setup to run the fitter. Once configured with CMake, only the `make install` step needs to be performed if the code needs to be rebuilt/recompiled. Sometimes `make clean` will need to be run before `make install` to correctly build.
 

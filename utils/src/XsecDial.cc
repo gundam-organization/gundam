@@ -34,19 +34,14 @@ void XsecDial::ReadSplines(const std::string& fname_splines)
     TKey* key = nullptr;
     while((key = (TKey*)key_list.Next()))
     {
-        TGraph* spline = (TGraph*)key -> ReadObj();
-        v_splines.emplace_back(*spline);
+        TGraph* graph = (TGraph*)key -> ReadObj();
+        v_splines.emplace_back(TSpline3(graph->GetName(), graph));
+        //v_splines.emplace_back(*spline);
     }
     file_splines -> Close();
     delete file_splines;
 
     v_splines.shrink_to_fit();
-}
-
-int XsecDial::GetSplineIndex(int topology, int reaction, double q2) const
-{
-    const int b = bin_manager.GetBinIndex(std::vector<double>{q2});
-    return topology * nreac * nbins + reaction * nbins + b;
 }
 
 int XsecDial::GetSplineIndex(const std::vector<int>& var, const std::vector<double>& bin) const
@@ -68,9 +63,24 @@ double XsecDial::GetSplineValue(int index, double dial_value) const
         return 1.0;
 }
 
+double XsecDial::GetBoundedValue(int index, double dial_value) const
+{
+    if(index >= 0)
+    {
+        if(dial_value < m_limit_lo)
+            return v_splines.at(index).Eval(m_limit_lo);
+        else if(dial_value > m_limit_hi)
+            return v_splines.at(index).Eval(m_limit_hi);
+        else
+            return v_splines.at(index).Eval(dial_value);
+    }
+    else
+        return 1.0;
+}
+
 std::string XsecDial::GetSplineName(int index) const
 {
-    return std::string(v_splines.at(index).GetName());
+    return std::string(v_splines.at(index).GetTitle());
 }
 
 void XsecDial::SetVars(double nominal, double step, double limit_lo, double limit_hi)
@@ -79,12 +89,6 @@ void XsecDial::SetVars(double nominal, double step, double limit_lo, double limi
     m_step = step;
     m_limit_lo = limit_lo;
     m_limit_hi = limit_hi;
-}
-
-void XsecDial::SetDimensions(int num_top, int num_reac)
-{
-    ntop = num_top;
-    nreac = num_reac;
 }
 
 void XsecDial::SetDimensions(const std::vector<int>& dim)
