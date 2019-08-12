@@ -536,6 +536,14 @@ void XsecCalc::SaveOutput(bool save_toys)
     tru_best_fit.Write("tru_best_fit");
     eff_best_fit.Write("eff_best_fit");
 
+    TH1D temp("sel_best_error", "sel_best_error", total_signal_bins, 0, total_signal_bins);
+    for(int i = 0; i < total_signal_bins; ++i)
+    {
+        double rel_error = sel_best_fit.GetBinError(i+1) / sel_best_fit.GetBinContent(i+1);
+        temp.SetBinContent(i+1, rel_error);
+    }
+    temp.Write();
+
     xsec_cov.Write("xsec_cov");
     xsec_cor.Write("xsec_cor");
 
@@ -624,14 +632,23 @@ void XsecCalc::SaveSignalHist(TFile* file, std::vector<TH1D> v_hists, const std:
                                + "_" + suffix;
             TH1D temp(name.c_str(), name.c_str(), bin_edges.at(k).size()-1, bin_edges.at(k).data());
 
+            name = v_normalization.at(id).name + "_error_bin" + std::to_string(k) + "_" + suffix;
+            TH1D error(name.c_str(), name.c_str(), bin_edges.at(k).size()-1, bin_edges.at(k).data());
+
             for(int l = 1; l <= temp.GetNbinsX(); ++l)
             {
                 temp.SetBinContent(l, v_hists.at(id).GetBinContent(l+offset));
                 temp.SetBinError(l, v_hists.at(id).GetBinError(l+offset));
+
+                double rel_error = v_hists.at(id).GetBinError(l+offset) / v_hists.at(id).GetBinContent(l+offset);
+                error.SetBinContent(l, rel_error);
             }
             offset += temp.GetNbinsX();
-            temp.GetXaxis()->SetRange(1,temp.GetNbinsX()-1);
+            temp.GetXaxis()->SetRange(1,temp.GetNbinsX());
             temp.Write();
+
+            error.GetXaxis()->SetRange(1,temp.GetNbinsX());
+            error.Write();
         }
     }
 }
@@ -688,7 +705,6 @@ void XsecCalc::SaveDataEvents(TFile* output)
 
     for(unsigned int i = 0; i < fake_data_hists.size(); ++i)
     {
-        //std::string name = "hist_data_signal_" + std::to_string(i);
         std::string name = v_normalization.at(i).name + "_data";
         fake_data_hists.at(i).SetName(name.c_str());
         fake_data_hists.at(i).SetTitle(name.c_str());
