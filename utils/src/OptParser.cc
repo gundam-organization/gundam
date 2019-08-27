@@ -119,6 +119,7 @@ bool OptParser::ParseJSON(std::string json_file)
         m = j.at("min_settings");
         min_settings.minimizer = m.value("minimizer", "Minuit2");
         min_settings.algorithm = m.value("algorithm", "Migrad");
+        min_settings.likelihood = m.value("likelihood", "Poisson");
         min_settings.print_level = m.value("print_level", 2);
         min_settings.strategy  = m.value("strategy", 1);
         min_settings.tolerance = m.value("tolerance", 1E-4);
@@ -132,6 +133,7 @@ bool OptParser::ParseJSON(std::string json_file)
 
         min_settings.minimizer = "Minuit2";
         min_settings.algorithm = "Migrad";
+        min_settings.likelihood = "Poisson";
         min_settings.print_level = 2;
         min_settings.strategy  = 1;
         min_settings.tolerance = 1E-2;

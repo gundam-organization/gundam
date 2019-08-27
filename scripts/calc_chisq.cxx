@@ -31,7 +31,10 @@ double calc_chisq(std::string filename, bool is_txt_file = false)
         v_files.emplace_back(filename);
 
     unsigned int dof = 0;
-    TH1D* h_chisq = new TH1D("h_chisq", "h_chisq", 25, 0, 150);
+    TH1D* h_chisq = new TH1D("h_chisq", "h_chisq", 50, 0, 300);
+    TH2D* h_candle = new TH2D("h_candle", "h_candle", 70, 0, 70, 10000, -2E-39, 15E-39);
+    //TH2D* h_errors = new TH2D("h_errors", "h_errors", 70, 0, 70, 10000, 1E-42, 5E-39);
+    TH2D* h_errors = new TH2D("h_errors", "h_errors", 70, 0, 70, 1000, 0, 3);
 
     for(const auto& file : v_files)
     {
@@ -71,6 +74,9 @@ double calc_chisq(std::string filename, bool is_txt_file = false)
                 double y = h1->GetBinContent(j+1) - h2->GetBinContent(j+1);
                 chisq += x * y * inv[i][j];
             }
+
+            h_candle->Fill(i, h1->GetBinContent(i+1));
+            h_errors->Fill(i, h1->GetBinError(i+1)/h1->GetBinContent(i+1));
         }
 
         if(is_txt_file)
@@ -95,5 +101,12 @@ double calc_chisq(std::string filename, bool is_txt_file = false)
     f_chisq->Draw("same");
 
     c->Print("chisq_dist.png");
+
+    TCanvas* v = new TCanvas("v","v",1200,900);
+    h_candle->Draw("CANDLEX3");
+
+    TCanvas* e = new TCanvas("e","e",1200,900);
+    h_errors->Draw("CANDLEX3");
+
     return 0;
 }

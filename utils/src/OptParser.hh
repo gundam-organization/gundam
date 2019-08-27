@@ -56,6 +56,7 @@ struct MinSettings
 {
     std::string minimizer;
     std::string algorithm;
+    std::string likelihood;
     int print_level;
     int strategy;
     double tolerance;

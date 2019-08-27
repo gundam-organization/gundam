@@ -18,6 +18,7 @@
 #include "AnaEvent.hh"
 #include "ColorOutput.hh"
 #include "FitStructs.hh"
+#include "Likelihoods.hh"
 using xsllh::FitBin;
 
 enum DataType
@@ -51,6 +52,9 @@ public:
     int GetBinIndex(const double D1, const double D2) const;
     std::vector<FitBin> GetBinEdges() const { return m_bin_edges; }
 
+    void SetLLHFunction(const std::string& func_name);
+    double CalcLLH() const;
+
     double CalcChi2() const;
     double CalcEffLLH() const;
     void FillEventHist(int datatype, bool stat_fluc = false);
@@ -80,6 +84,8 @@ protected:
     std::string m_binning;
     std::vector<AnaEvent> m_events;
     std::vector<FitBin> m_bin_edges;
+
+    CalcLLHFunc* m_llh;
 
     TTree* m_data_tree;
     TH1D* m_hmc_true;

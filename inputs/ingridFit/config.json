@@ -15,6 +15,7 @@
     "min_settings" : {
         "minimizer" : "Minuit2",
         "algorithm" : "Migrad",
+        "likelihood" : "Poisson",
         "print_level" : 2,
         "tolerance" : 1E-1,
         "strategy" : 1,

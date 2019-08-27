@@ -89,7 +89,7 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara)
     std::vector<double> par_step, par_low, par_high;
     std::vector<bool> par_fixed;
 
-    TRandom3 rng(0);
+    //TRandom3 rng(0);
     for(std::size_t i = 0; i < m_fitpara.size(); i++)
     {
         m_npar += m_fitpara[i]->GetNpar();
@@ -104,7 +104,7 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara)
         {
             std::cout << TAG << "Randomizing start point for " << m_fitpara[i]->GetName() << std::endl;
             for(auto& p : vec1)
-                p += (p * rng.Gaus(0.0, 0.1));
+                p += (p * rng->Gaus(0.0, 0.1));
         }
         par_prefit.insert(par_prefit.end(), vec1.begin(), vec1.end());
 
@@ -133,6 +133,7 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara)
     std::cout << TAG << "Minimizer settings..." << std::endl
               << TAG << "Minimizer: " << min_settings.minimizer << std::endl
               << TAG << "Algorithm: " << min_settings.algorithm << std::endl
+              << TAG << "Likelihood: " << min_settings.likelihood << std::endl
               << TAG << "Strategy : " << min_settings.strategy << std::endl
               << TAG << "Print Lvl: " << min_settings.print_level << std::endl
               << TAG << "Tolerance: " << min_settings.tolerance << std::endl
@@ -152,7 +153,7 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara)
     for(int i = 0; i < m_npar; ++i)
     {
         m_fitter->SetVariable(i, par_names[i], par_prefit[i], par_step[i]);
-        m_fitter->SetVariableLimits(i, par_low[i], par_high[i]);
+        //m_fitter->SetVariableLimits(i, par_low[i], par_high[i]);
 
         if(par_fixed[i] == true)
             m_fitter->FixVariable(i);
@@ -424,7 +425,8 @@ double XsecFitter::FillSamples(std::vector<std::vector<double>>& new_pars, int d
         }
 
         m_samples[s]->FillEventHist(datatype);
-        double sample_chi2 = m_samples[s]->CalcChi2();
+        //double sample_chi2 = m_samples[s]->CalcChi2();
+        double sample_chi2 = m_samples[s]->CalcLLH();
         //double sample_chi2 = m_samples[s]->CalcEffLLH();
         chi2 += sample_chi2;
 

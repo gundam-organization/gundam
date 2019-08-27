@@ -30,6 +30,8 @@ AnaSample::AnaSample(int sample_id, const std::string& name, const std::string& 
     m_hsig     = nullptr;
     m_hdata    = nullptr;
 
+    m_llh = new PoissonLLH;
+
     MakeHistos(); // with default binning
 
     std::cout << TAG << "MakeHistos called." << std::endl;
@@ -291,6 +293,47 @@ void AnaSample::FillEventHist(int datatype, bool stat_fluc)
         std::cout << "[WARNING]: In AnaSample::FillEventHist()\n"
                   << "[WARNING]: Invalid data type to fill histograms!\n";
     }
+}
+
+void AnaSample::SetLLHFunction(const std::string& func_name)
+{
+    if(m_llh != nullptr)
+        delete m_llh;
+
+    if(func_name.empty())
+    {
+        std::cout << TAG << "Likelihood function name empty. Setting to Poisson by default." << std::endl;
+        m_llh = new PoissonLLH;
+    }
+    else if(func_name == "Poisson")
+    {
+        std::cout << TAG << "Setting likelihood function to Poisson." << std::endl;
+        m_llh = new PoissonLLH;
+    }
+    else if(func_name == "Effective")
+    {
+        std::cout << TAG << "Setting likelihood function to Tianlu's effective likelihood." << std::endl;
+        m_llh = new EffLLH;
+    }
+    else if(func_name == "Barlow")
+    {
+        std::cout << TAG << "Setting likelihood function to Barlow-Beeston." << std::endl;
+        m_llh = new BarlowLLH;
+    }
+}
+
+double AnaSample::CalcLLH() const
+{
+    const unsigned int nbins = m_hpred->GetNbinsX();
+    double* exp_w  = m_hpred->GetArray();
+    double* exp_w2 = m_hpred->GetSumw2()->GetArray();
+    double* data   = m_hdata->GetArray();
+
+    double chi2 = 0.0;
+    for(unsigned int i = 1; i <= nbins; ++i)
+        chi2 += (*m_llh)(exp_w[i], exp_w2[i], data[i]);
+
+    return chi2;
 }
 
 double AnaSample::CalcChi2() const
