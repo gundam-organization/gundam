@@ -85,47 +85,65 @@ void XsecFitter::SetMinSettings(const MinSettings& ms)
 
 void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara)
 {
+    // Vector of the different parameter types such as [template, flux, detector, cross section]:
     m_fitpara = fitpara;
+
+    // Vectors holding the settings for the fit parameters (for all parameter types):
     std::vector<double> par_step, par_low, par_high;
     std::vector<bool> par_fixed;
 
+    // ROOT random number interface (seed of 0 means that seed is automatically computed based on time):
     //TRandom3 rng(0);
+
+    // loop over all the different parameter types such as [template, flux, detector, cross section]:
     for(std::size_t i = 0; i < m_fitpara.size(); i++)
     {
+        // m_npar is the number of total fit paramters:
         m_npar += m_fitpara[i]->GetNpar();
 
+        // Get names of all the different parameters (for all parameter types) and store them in par_names:
         std::vector<std::string> vec0;
         m_fitpara[i]->GetParNames(vec0);
         par_names.insert(par_names.end(), vec0.begin(), vec0.end());
 
+        // Get the priors for this parameter type (should be 1 unless decomp has been set to true in the .json config file) and store them in vec1:
         std::vector<double> vec1, vec2;
         m_fitpara[i]->GetParPriors(vec1);
+
+        // If rng_template has been set to true in the .json config file, the template parameters will be randomized (around 1) according to a gaussian distribution:
         if(m_fitpara[i]->DoRNGstart())
         {
             std::cout << TAG << "Randomizing start point for " << m_fitpara[i]->GetName() << std::endl;
             for(auto& p : vec1)
                 p += (p * rng->Gaus(0.0, 0.1));
         }
+
+        // Store the prefit values (for all parameter types) in par_prefit:
         par_prefit.insert(par_prefit.end(), vec1.begin(), vec1.end());
 
+        // Store the pars_step values (for all parameter types) and store them in par_step:
         m_fitpara[i]->GetParSteps(vec1);
         par_step.insert(par_step.end(), vec1.begin(), vec1.end());
 
+        // Store the lower and upper limits for the fit parameters (for all parameter types) in par_low and par_high:
         m_fitpara[i]->GetParLimits(vec1, vec2);
         par_low.insert(par_low.end(), vec1.begin(), vec1.end());
         par_high.insert(par_high.end(), vec2.begin(), vec2.end());
 
+        // Store the flags indicating whether a parameter is fixed (for all parameter types) in par_fixed:
         std::vector<bool> vec3;
         m_fitpara[i]->GetParFixed(vec3);
         par_fixed.insert(par_fixed.end(), vec3.begin(), vec3.end());
     }
 
+    // Nothing to fit with zero fit parameters:
     if(m_npar == 0)
     {
         std::cerr << ERR << "No fit parameters were defined." << std::endl;
         return;
     }
 
+    // Print information about the minimizer settings specified in the .json config file:
     std::cout << "===========================================" << std::endl;
     std::cout << "           Initilizing fitter              " << std::endl;
     std::cout << "===========================================" << std::endl;
@@ -140,7 +158,10 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara)
               << TAG << "Max Iterations: " << min_settings.max_iter << std::endl
               << TAG << "Max Fcn Calls : " << min_settings.max_fcn << std::endl;
 
+    // Create ROOT minimizer of given minimizerType and algoType:
     m_fitter = ROOT::Math::Factory::CreateMinimizer(min_settings.minimizer.c_str(), min_settings.algorithm.c_str());
+
+    // The ROOT Functor class is used to wrap multi-dimensional function objects:
     m_fcn    = new ROOT::Math::Functor(this, &XsecFitter::CalcLikelihood, m_npar);
 
     m_fitter->SetFunction(*m_fcn);
@@ -442,26 +463,44 @@ double XsecFitter::FillSamples(std::vector<std::vector<double>>& new_pars, int d
 
 double XsecFitter::CalcLikelihood(const double* par)
 {
+    // Increase the number of function calls by 1:
     m_calls++;
 
+    // If the output_chi2 flag is true the different chi2 contributions are printed:
     bool output_chi2 = false;
+
+    // Print chi2 contributions for the first 19 function calls then for every 100th function call for the first 1000 function calls and then every 1000th function call:
     if((m_calls < 1001 && (m_calls % 100 == 0 || m_calls < 20))
        || (m_calls > 1001 && m_calls % 1000 == 0))
         output_chi2 = true;
 
+    // Index for looping over fit parameters of this parameter type:
     int k           = 0;
+
+    // Penalty terms for systematic uncertainties and regularization:
     double chi2_sys = 0.0;
     double chi2_reg = 0.0;
+
+    // Vector to store all the parameter values of all parameter types:
     std::vector<std::vector<double>> new_pars;
+
+    // loop over all the different parameter types such as [template, flux, detector, cross section]:
     for(int i = 0; i < m_fitpara.size(); ++i)
     {
+        // Number of fit parameters for this parameter type:
         const unsigned int npar = m_fitpara[i]->GetNpar();
+
+        // vec stores the parameter values of this iteration for this parameter type:
         std::vector<double> vec;
+
+        // Loop over fit parameters for this parameter type:
         for(int j = 0; j < npar; ++j)
         {
             //if(output_chi2)
             //    std::cout << "Parameter " << j << " for " << m_fitpara[i]->GetName()
             //              << " has value " << par[k] << std::endl;
+
+            // Fill vec with the parameter values of this iteration for this parameter type:
             vec.push_back(par[k++]);
         }
 
