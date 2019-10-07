@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 3.5 FATAL_ERROR)
 
 project(xsLLhFitter)
 set (xsLLhFitter_VERSION_MAJOR 0)
-set (xsLLhFitter_VERSION_MINOR 21)
+set (xsLLhFitter_VERSION_MINOR 23)
 set (xsLLhFitter_VERSION_REVISION 0)
 
 set(VERBOSE TRUE)
