@@ -22,10 +22,13 @@ public:
 class PoissonLLH : public CalcLLHFunc
 {
 public:
+    // Compute the standard Poisson likelihood (chi2_stat contribution from a certain sample and bin) based on the number of MC predicted (mc) and the number of data events (data):
     double operator()(double mc, double w2, double data)
     {
-        // Standard Poisson LLH.
+        // Initialize chi2 variable which will be updated below and then returned:
         double chi2 = 0.0;
+
+        // If number of MC predicted events is greater than zero, we calculate the statistical chi2 according to 2 * (N_pred - N_data + N_data * log(N_data/N_pred)):
         if(mc > 0.0)
         {
             chi2 = 2 * (mc - data);
@@ -33,6 +36,7 @@ public:
                 chi2 += 2 * data * TMath::Log(data / mc);
         }
 
+        // If chi2 is greater or equal to zero, we return the value calculated above, otherwise zero is returned:
         return (chi2 >= 0.0) ? chi2 : 0.0;
     }
 };

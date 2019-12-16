@@ -14,6 +14,7 @@ class AnaEvent
         {
             m_evid     = evid;
             m_flavor   = -1;
+            m_beammode = -1;
             m_topology = -1;
             m_reaction = -1;
             m_target   = -1;
@@ -58,6 +59,9 @@ class AnaEvent
         void SetFlavor(const int flavor){ m_flavor = flavor; }
         int GetFlavor(){ return m_flavor; }
 
+        void SetBeamMode(int val){ m_beammode = val; }
+        int GetBeamMode(){ return m_beammode; }
+
         long int GetEvId(){ return m_evid; }
 
         void SetTrueEnu(double val) {m_enu_true = val;}
@@ -80,7 +84,10 @@ class AnaEvent
 
         void SetEvWght(double val){ m_wght  = val; }
         void SetEvWghtMC(double val){ m_wghtMC  = val; }
+
+        // Multiplies the current event weight with the input argument:
         void AddEvWght(double val){ m_wght *= val; }
+        
         double GetEvWght(){ return m_wght; }
         double GetEvWghtMC(){ return m_wghtMC; }
 
@@ -99,6 +106,7 @@ class AnaEvent
                       << "Reaction    " << GetReaction() << std::endl
                       << "Target      " << GetTarget() << std::endl
                       << "Flavor      " << GetFlavor() << std::endl
+                      << "Beam mode   " << GetBeamMode() << std::endl
                       << "Sample      " << GetSampleType() << std::endl
                       << "Signal      " << GetSignalType() << std::endl
                       << "True energy " << GetTrueEnu() << std::endl
@@ -119,6 +127,8 @@ class AnaEvent
                 return m_reaction;
             else if(var == "target")
                 return m_target;
+            else if(var == "beammode")
+                return m_beammode;
             else if(var == "flavor")
                 return m_flavor;
             else if(var == "sample")
@@ -132,6 +142,7 @@ class AnaEvent
     private:
         long int m_evid;   //unique event id
         int m_flavor;      //flavor of neutrino (numu, etc.)
+        int m_beammode;    //Forward horn current (+1) or reverse horn current (-1)
         int m_topology;    //final state topology type
         int m_reaction;    //event interaction mode
         int m_target;      //target nuclei

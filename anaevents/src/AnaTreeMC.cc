@@ -1,4 +1,4 @@
-// This is the code that actually reads int he MC tree and fills the event info.
+// This is the code that actually reads in the MC tree and fills the event info.
 // The tree should be produced by feeding a HL2 microtree into the treeconvert macro.
 
 #include "AnaTreeMC.hh"
@@ -30,6 +30,7 @@ void AnaTreeMC::SetBranches()
 {
     // Set branch addresses and branch pointers
     fChain->SetBranchAddress("nutype", &nutype);
+    fChain->SetBranchAddress("beammode", &beammode);
     fChain->SetBranchAddress("cut_branch", &sample);
     fChain->SetBranchAddress("topology", &topology);
     fChain->SetBranchAddress("reaction", &reaction);
@@ -64,12 +65,15 @@ void AnaTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples,
     long int nbytes   = 0;
 
     std::cout << TAG << "Reading events...\n";
+
+    // Loop over all events:
     for(long int jentry = 0; jentry < nentries; jentry++)
     {
         nbytes += fChain->GetEntry(jentry);
         AnaEvent ev(jentry);
         ev.SetTrueEvent(evt_type);
         ev.SetFlavor(nutype);
+        ev.SetBeamMode(beammode);
         ev.SetSampleType(sample);
         ev.SetTopology(topology); // mectopology (i.e. CC0Pi,CC1Pi etc)
         ev.SetReaction(reaction); // reaction (i.e. CCQE,CCRES etc)
@@ -91,12 +95,18 @@ void AnaTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples,
         }
 
         int signal_type = 0;
+
+        // Loop over all sets of temlate parameters as defined in the .json config file in the "template_par" entry for this detector:
         for(const auto& sd : v_signal)
         {
             bool sig_passed = true;
+
+            // Loop over all the different signal definitions for this set of template parameters (e.g. topology, target, nutype, etc.):
             for(const auto& kv : sd.definition)
             {
                 bool var_passed = false;
+                
+                // Loop over all the values for the current signal definition (e.g. all the different topology integers):
                 for(const auto& val : kv.second)
                 {
                     if(ev.GetEventVar(kv.first) == val)

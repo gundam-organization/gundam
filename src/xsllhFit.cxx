@@ -81,10 +81,12 @@ int main(int argc, char** argv)
     }
     parser.PrintOptions();
 
+    // Initializing some variables from the .json config file:
     std::string input_dir = parser.input_dir;
     std::string fname_data = parser.fname_data;
     std::string fname_mc   = parser.fname_mc;
     std::vector<std::string> topology = parser.sample_topology;
+    std::vector<int> topology_HL_codes = parser.topology_HL_code;
 
     const double potD  = parser.data_POT;
     const double potMC = parser.mc_POT;
@@ -140,9 +142,14 @@ int main(int argc, char** argv)
     std::cout << TAG << "Reading and collecting events." << std::endl;
     selTree.GetEvents(samples, parser.signal_definition, false);
 
-    std::cout << TAG << "Getting sample breakdown by reaction." << std::endl;
+    std::cout << TAG << "Getting sample breakdown by topology." << std::endl;
+
+    // Mapping the Highland topology codes to consecutive integers and then getting the topology breakdown for each sample:
     for(auto& sample : samples)
-        sample -> GetSampleBreakdown(fout, "nominal", topology, false);
+        {
+            sample -> SetTopologyHLCode(topology_HL_codes);
+            sample -> GetSampleBreakdown(fout, "nominal", topology, false);
+        }
 
 
     //*************** FITTER SETTINGS **************************
@@ -153,7 +160,7 @@ int main(int argc, char** argv)
     //define fit param classes
     std::vector<AnaFitParameters*> fitpara;
 
-    //Fit parameters
+    // Fit parameters (template parameters):
     FitParameters sigfitpara("par_fit");
     if(parser.rng_template)
         sigfitpara.SetRNGstart();
@@ -168,6 +175,7 @@ int main(int argc, char** argv)
     sigfitpara.InitEventMap(samples, 0);
     fitpara.push_back(&sigfitpara);
 
+    // Flux parameters:
     FluxParameters fluxpara("par_flux");
     if(parser.flux_cov.do_fit)
     {
@@ -181,13 +189,13 @@ int main(int argc, char** argv)
             std::cout << ERR << "Could not open file! Exiting." << std::endl;
             return 1;
         }
-        TH1D* nd_numu_bins_hist = (TH1D*)file_flux_cov->Get(parser.flux_cov.binning.c_str());
-        TAxis* nd_numu_bins = nd_numu_bins_hist->GetXaxis();
+        //TH1D* nd_numu_bins_hist = (TH1D*)file_flux_cov->Get(parser.flux_cov.binning.c_str());
+        //TAxis* nd_numu_bins = nd_numu_bins_hist->GetXaxis();
 
-        std::vector<double> enubins;
-        enubins.push_back(nd_numu_bins -> GetBinLowEdge(1));
-        for(int i = 0; i < nd_numu_bins -> GetNbins(); ++i)
-            enubins.push_back(nd_numu_bins -> GetBinUpEdge(i+1));
+        //std::vector<double> enubins;
+        //enubins.push_back(nd_numu_bins -> GetBinLowEdge(1));
+        //for(int i = 0; i < nd_numu_bins -> GetNbins(); ++i)
+        //    enubins.push_back(nd_numu_bins -> GetBinUpEdge(i+1));
 
         TMatrixDSym* cov_flux = (TMatrixDSym*)file_flux_cov -> Get(parser.flux_cov.matrix.c_str());
         file_flux_cov -> Close();
@@ -201,11 +209,12 @@ int main(int argc, char** argv)
         for(const auto& opt : parser.detectors)
         {
             if(opt.use_detector)
-                fluxpara.AddDetector(opt.name, enubins);
+                fluxpara.AddDetector(opt.name, parser.flux_cov.binning);
         }
         fluxpara.InitEventMap(samples, 0);
         fitpara.push_back(&fluxpara);
     }
+
 
     XsecParameters xsecpara("par_xsec");
     if(parser.xsec_cov.do_fit)
@@ -277,14 +286,16 @@ int main(int argc, char** argv)
     xsecfit.SetZeroSyst(parser.zero_syst);
     xsecfit.SetSaveEvents(parser.save_events);
 
-    //init w/ para vector
+    // Initialize fitter with fitpara vector (vector of AnaFitParameters objects):
     xsecfit.InitFitter(fitpara);
     std::cout << TAG << "Fitter initialised." << std::endl;
 
     bool did_converge = false;
     if(!dry_run)
     {
+        // Run the fitter with the given samples, fit type and statistical fluctuations as specified in the .json config file:
         did_converge = xsecfit.Fit(samples, parser.fit_type, parser.stat_fluc);
+
         if(!did_converge)
             std::cout << TAG << "Fit did not coverge." << std::endl;
 
@@ -294,7 +305,8 @@ int main(int argc, char** argv)
     }
     fout -> Close();
 
-    std::cout << TAG << "\u3042\u308a\u304c\u3068\u3046\u3054\u3056\u3044\u307e\u3057\u305f\uff01"
+    // Print Arigatou Gozaimashita with Rainbowtext :)
+    std::cout << TAG << color::RainbowText("\u3042\u308a\u304c\u3068\u3046\u3054\u3056\u3044\u307e\u3057\u305f\uff01")
               << std::endl;
 
     return did_converge ? 0 : 121;

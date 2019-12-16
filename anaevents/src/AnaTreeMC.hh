@@ -26,6 +26,7 @@ private:
 
     // Declaration of leaf types
     int nutype;
+    int beammode;
     int sample;
     int topology;
     int reaction;

@@ -49,6 +49,10 @@ public:
     void MakeHistos();
 
     void SetBinning(const std::string& binning);
+
+    // Function to map the Highland topology codes to consecutive integers:
+    void SetTopologyHLCode(const std::vector<int>& HLTopologyCodes);
+
     int GetBinIndex(const double D1, const double D2) const;
     std::vector<FitBin> GetBinEdges() const { return m_bin_edges; }
 
@@ -84,6 +88,9 @@ protected:
     std::string m_binning;
     std::vector<AnaEvent> m_events;
     std::vector<FitBin> m_bin_edges;
+
+    // Mapping between Highland topology codes and consecutive integers
+    std::map<int, int> topology_HL_code;
 
     CalcLLHFunc* m_llh;
 

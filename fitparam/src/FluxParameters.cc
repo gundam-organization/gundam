@@ -27,7 +27,8 @@ void FluxParameters::InitEventMap(std::vector<AnaSample*>& sample, int mode)
 {
     for(const auto& s : sample)
     {
-        if(m_det_bins.count(s->GetDetector()) == 0)
+        //if(m_det_bins.count(s->GetDetector()) == 0)
+        if(m_det_bm.count(s->GetDetector()) == 0)
         {
             std::cerr << ERR << "In FluxParameters::InitEventMap\n"
                       << ERR << "Detector " << s->GetDetector() << " not part of fit parameters.\n"
@@ -38,15 +39,19 @@ void FluxParameters::InitEventMap(std::vector<AnaSample*>& sample, int mode)
 
     InitParameters();
     m_evmap.clear();
-    // loop over events to build index map
+    // Loop over events to build index map:
     for(std::size_t s = 0; s < sample.size(); ++s)
     {
         std::vector<int> sample_map;
         for(int i = 0; i < sample[s]->GetN(); ++i)
         {
             AnaEvent* ev = sample[s]->GetEvent(i);
-            double enu   = ev->GetTrueEnu() / 1000.0; //MeV -> GeV
-            int bin      = GetBinIndex(sample[s]->GetDetector(), enu);
+            //double enu   = ev->GetTrueEnu() / 1000.0; //MeV -> GeV
+            double enu   = ev->GetTrueEnu();
+            int nutype   = ev->GetFlavor();
+            int beammode = ev->GetBeamMode();
+            //int bin      = GetBinIndex(sample[s]->GetDetector(), enu);
+            int bin      = m_det_bm.at(sample[s]->GetDetector()).GetBinIndex(std::vector<double>{enu}, nutype, beammode);
 
             if(bin == BADBIN)
             {
@@ -64,27 +69,33 @@ void FluxParameters::InitEventMap(std::vector<AnaSample*>& sample, int mode)
     } // sample loop
 }
 
+// Multiplies the current event weight for AnaEvent* event with the correct flux parameter for the true neutrino energy bin that this event falls in:
 void FluxParameters::ReWeight(AnaEvent* event, const std::string& det, int nsample, int nevent,
                               std::vector<double>& params)
 {
-    if(m_evmap.empty()) // need to build an event map first
+    // m_evmap is a vector containing vectors of which bin an event falls in for all samples. This event map needs to be built first, otherwise an error is thrown:
+    if(m_evmap.empty())
     {
         std::cerr << ERR << "In FluxParameters::ReWeight()\n"
                   << ERR << "Need to build event map index for " << m_name << std::endl;
         return;
     }
 
+    // Get the bin that this event falls in:
     const int bin = m_evmap[nsample][nevent];
 
-    // skip event if not Signal
+    // Event is skipped if it isn't signal (if bin = PASSEVENT = -1):
     if(bin == PASSEVENT)
         return;
 
-    // If bin fell out of valid ranges, pretend the event just didn't happen:
+    // If the bin fell out of the valid bin ranges (if bin = BADBIN = -2), we assign an event weight of 0 and pretend the event just didn't happen:
     if(bin == BADBIN)
         event->AddEvWght(0.0);
+
+    // Otherwise, we multiply the event weight with the parameter for this neutrino energy:
     else
     {
+        // If the bin number is larger than the number of parameters, we set the event weight to zero (this should not happen):
         if(bin > params.size())
         {
             std::cout << WAR << "In FluxParameters::ReWeight()\n"
@@ -94,8 +105,11 @@ void FluxParameters::ReWeight(AnaEvent* event, const std::string& det, int nsamp
             event->AddEvWght(0.0);
         }
 
-        if(m_det_bins.count(det) == true)
+        // If the detector key is present in the m_det_bins map, we multiply the event weight with the parameter for the energy bin that this event falls in:
+        //if(m_det_bins.count(det) == true)
+        if(m_det_bm.count(det) == true)
         {
+            // Multiply the current event weight by the parameter for the energy bin that this event falls in (defined in AnaEvent.hh):
             event->AddEvWght(params[bin + m_det_offset.at(det)]);
             // std::cout << "Offset: " << m_det_offset.at(det) << std::endl;
         }
@@ -108,9 +122,10 @@ void FluxParameters::InitParameters()
     std::cout << TAG << "Flux binning " << std::endl;
     for(const auto& det : v_detectors)
     {
-        std::cout << TAG << "Detector - " << det << std::endl;
+        std::cout << TAG << "Detector: " << det << std::endl;
         m_det_offset.insert(std::make_pair(det, offset));
-        const int nbins = m_det_bins.at(det).size() - 1;
+        //const int nbins = m_det_bins.at(det).size() - 1;
+        const int nbins = m_det_bm.at(det).GetNbins();
         for(int i = 0; i < nbins; ++i)
         {
             pars_name.push_back(Form("%s_%s_%d", m_name.c_str(), det.c_str(), i));
@@ -120,10 +135,11 @@ void FluxParameters::InitParameters()
             pars_limhigh.push_back(5.0);
             pars_fixed.push_back(false);
 
-            std::cout << i << ": " << m_det_bins.at(det).at(i) << std::endl;
+            //std::cout << i << ": " << m_det_bins.at(det).at(i) << std::endl;
         }
-        std::cout << nbins << ": " << m_det_bins.at(det).back() << std::endl;
+        //std::cout << nbins << ": " << m_det_bins.at(det).back() << std::endl;
 
+        m_det_bm.at(det).Print();
         std::cout << TAG << "Total " << nbins << " parameters at "
                   << offset << " for " << det << std::endl;
         offset += nbins;
@@ -154,5 +170,14 @@ void FluxParameters::AddDetector(const std::string& det, const std::vector<doubl
     std::cout << TAG << "Adding detector " << det << " for " << this->m_name
               << std::endl;
     m_det_bins.emplace(std::make_pair(det, bins));
+    v_detectors.emplace_back(det);
+}
+
+void FluxParameters::AddDetector(const std::string& det, const std::string& binning_file)
+{
+    std::cout << TAG << "Adding detector " << det << " for " << this->m_name
+              << std::endl;
+    BinManager temp(binning_file, true);
+    m_det_bm.emplace(std::make_pair(det, std::move(temp)));
     v_detectors.emplace_back(det);
 }

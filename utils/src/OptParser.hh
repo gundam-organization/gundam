@@ -99,6 +99,10 @@ class OptParser
         std::vector<int> par_scan_list;
 
         std::vector<std::string> sample_topology;
+
+        // Vector to store the Highland topology codes:
+        std::vector<int> topology_HL_code;
+
         std::vector<SignalDef> signal_definition;
 
         CovOpt flux_cov;

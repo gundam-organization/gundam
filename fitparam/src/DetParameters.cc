@@ -102,23 +102,32 @@ void DetParameters::InitEventMap(std::vector<AnaSample*>& sample, int mode)
     }
 }
 
+// Multiplies the current event weight for AnaEvent* event with the detector parameter for the sample and reco bin that this event falls in:
 void DetParameters::ReWeight(AnaEvent* event, const std::string& det, int nsample, int nevent, std::vector<double>& params)
 {
-    if(m_evmap.empty()) // need to build an event map first
+    // m_evmap is a vector containing vectors of which bin an event falls in for all samples. This event map needs to be built first, otherwise an error is thrown:
+    if(m_evmap.empty())
     {
         std::cerr << ERR << "In DetParameters::ReWeight()\n"
                   << ERR << "Need to build event map index for " << m_name << std::endl;
         return;
     }
 
+    // Get the bin that this event falls in:
     const int bin = m_evmap[nsample][nevent];
 
+    // Event is skipped if it isn't signal (if bin = PASSEVENT = -1):
     if(bin == PASSEVENT)
         return;
+    
+    // If the bin fell out of the valid bin ranges (if bin = BADBIN = -2), we assign an event weight of 0 and pretend the event just didn't happen:
     if(bin == BADBIN)
         event->AddEvWght(0.0);
+
+    // Otherwise, we multiply the event weight with the parameter for this sample, signal and reco bin:
     else
     {
+        // If the bin number is larger than the number of parameters, we set the event weight to zero (this should not happen):
         if(bin > params.size())
         {
             std::cout << WAR << "In DetParameters::ReWeight()\n"
@@ -127,6 +136,7 @@ void DetParameters::ReWeight(AnaEvent* event, const std::string& det, int nsampl
             event->AddEvWght(0.0);
         }
 
+        // Multiply the current event weight by the parameter for the reco bin and signal that this event falls in (defined in AnaEvent.hh):
         event->AddEvWght(params[bin + m_sample_offset.at(event->GetSampleType())]);
     }
 }

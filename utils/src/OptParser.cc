@@ -46,9 +46,12 @@ bool OptParser::ParseJSON(std::string json_file)
 
     sample_topology = j["sample_topology"].get<std::vector<std::string>>();
 
+    // Get the Highland codes for the different topologies and store them in the topology_HL_code vector:
+    topology_HL_code = j["topology_HL_code"].get<std::vector<int>>();
+
     flux_cov.fname = input_dir + j["flux_cov"]["file"].get<std::string>();
     flux_cov.matrix = j["flux_cov"]["matrix"];
-    flux_cov.binning = j["flux_cov"]["binning"];
+    flux_cov.binning = input_dir + j["flux_cov"]["binning"].get<std::string>();
     flux_cov.do_throw = j["flux_cov"]["throw"];
     flux_cov.decompose = j["flux_cov"]["decomp"];
     flux_cov.info_frac = j["flux_cov"]["variance"];

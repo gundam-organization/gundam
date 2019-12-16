@@ -45,6 +45,8 @@ struct HL2FileOpt
     std::string sel_tree;
     std::string tru_tree;
     unsigned int file_id;
+    int beammode;
+    int nutype_selection;
     unsigned int num_branches;
     double pot_norm;
     std::vector<int> cuts;
@@ -117,7 +119,7 @@ int main(int argc, char** argv)
               << TAG << "Out Selection Tree: " << out_seltree_name << std::endl
               << TAG << "Out Truth Tree    : " << out_trutree_name << std::endl;
 
-    // Create the output file and define the its ROOT trees. If it already exists, it will be overwritten:
+    // Create the output file and define its ROOT trees. If it already exists, it will be overwritten:
     TFile* out_file = TFile::Open(out_fname.c_str(), "RECREATE");
     TTree* out_seltree = new TTree(out_seltree_name.c_str(), out_seltree_name.c_str());
     TTree* out_trutree = new TTree(out_trutree_name.c_str(), out_trutree_name.c_str());
@@ -129,6 +131,8 @@ int main(int argc, char** argv)
     int topology, topology_true;
     int target, target_true;
     int cut_branch;
+    int beammode;
+    int nutype_selection;
     float enu_true, enu_reco;
     float q2_true, q2_reco;
     float D1True, D1Reco;
@@ -141,6 +145,8 @@ int main(int argc, char** argv)
     out_seltree -> Branch("topology", &topology, "topology/I");
     out_seltree -> Branch("target", &target, "target/I");
     out_seltree -> Branch("cut_branch", &cut_branch, "cut_branch/I");
+    out_seltree -> Branch("beammode", &beammode, "beammode/I");
+    out_seltree -> Branch("nutype_selection", &nutype_selection, "nutype_selection/I");
     out_seltree -> Branch("enu_true", &enu_true, "enu_true/F");
     out_seltree -> Branch("enu_reco", &enu_reco, "enu_reco/F");
     out_seltree -> Branch("q2_true", &q2_true, "q2_true/F");
@@ -156,6 +162,8 @@ int main(int argc, char** argv)
     out_trutree -> Branch("topology", &topology_true, "topology/I");
     out_trutree -> Branch("target", &target_true, "target/I");
     out_trutree -> Branch("cut_branch", &cut_branch, "cut_branch/I");
+    out_trutree -> Branch("beammode", &beammode, "beammode/I");
+    out_trutree -> Branch("nutype_selection", &nutype_selection, "nutype_selection/I");
     out_trutree -> Branch("enu_true", &enu_true, "enu_true/F");
     out_trutree -> Branch("q2_true", &q2_true, "q2_true/F");
     out_trutree -> Branch("D1True", &D1True, "D1True/F");
@@ -170,24 +178,63 @@ int main(int argc, char** argv)
     {
         if(file["use"])
         {
-            HL2FileOpt f;
-            f.fname_input = file["fname"];
-            f.sel_tree = file["sel_tree"];
-            f.tru_tree = file["tru_tree"];
-            f.file_id = file["file_id"];
-            f.num_branches = file["num_branches"];
-            f.cuts = file["cut_level"].get<std::vector<int>>();
-            f.pot_norm = file["pot_norm"];
+            // If there is a "flist" key present in the .json config file, we add from the corresponding text file:
+            if(file.find("flist") != file.end())
+            {
+                // Text file containing all files to be read in:
+                std::ifstream in(file["flist"]);
+                std::string filename;
 
-            std::map<std::string, std::vector<int>> temp_json = file["samples"];
-            for(const auto& kv : temp_json)
-                f.samples.emplace(std::make_pair(std::stoi(kv.first), kv.second));
+                // Loop over lines of text file with the file list and add contents to the v_files vector:
+                while(std::getline(in, filename))
+                {
+                    HL2FileOpt f;
+                    f.fname_input = filename;
+                    f.sel_tree = file["sel_tree"];
+                    f.tru_tree = file["tru_tree"];
+                    f.file_id = file["file_id"];
+                    f.beammode = file["beammode"];
+                    f.nutype_selection = file["nutype_selection"];
+                    f.num_branches = file["num_branches"];
+                    f.cuts = file["cut_level"].get<std::vector<int>>();
+                    f.pot_norm = file["pot_norm"];
 
-            // Read out the json objects for "sel_var" and "tru_var":
-            f.sel_var = ParseHL2Var(file["sel_var"], true);
-            f.tru_var = ParseHL2Var(file["tru_var"], false);
+                    std::map<std::string, std::vector<int>> temp_json = file["samples"];
+                    for(const auto& kv : temp_json)
+                        f.samples.emplace(std::make_pair(std::stoi(kv.first), kv.second));
 
-            v_files.emplace_back(f);
+                    // Read out the json objects for "sel_var" and "tru_var":
+                    f.sel_var = ParseHL2Var(file["sel_var"], true);
+                    f.tru_var = ParseHL2Var(file["tru_var"], false);
+
+                    v_files.emplace_back(f);
+                }
+            }
+
+            // Otherwise we use the "fname" key to get the name of the file which is to be read in:
+            else
+            {
+                HL2FileOpt f;
+                f.fname_input = file["fname"];
+                f.sel_tree = file["sel_tree"];
+                f.tru_tree = file["tru_tree"];
+                f.file_id = file["file_id"];
+                f.beammode = file["beammode"];
+                f.nutype_selection = file["nutype_selection"];
+                f.num_branches = file["num_branches"];
+                f.cuts = file["cut_level"].get<std::vector<int>>();
+                f.pot_norm = file["pot_norm"];
+
+                std::map<std::string, std::vector<int>> temp_json = file["samples"];
+                for(const auto& kv : temp_json)
+                    f.samples.emplace(std::make_pair(std::stoi(kv.first), kv.second));
+
+                // Read out the json objects for "sel_var" and "tru_var":
+                f.sel_var = ParseHL2Var(file["sel_var"], true);
+                f.tru_var = ParseHL2Var(file["tru_var"], false);
+
+                v_files.emplace_back(f);
+            }
         }
     }
 
@@ -200,6 +247,8 @@ int main(int argc, char** argv)
                   << TAG << "Selected tree: " << file.sel_tree << std::endl
                   << TAG << "Truth tree: " << file.tru_tree << std::endl
                   << TAG << "POT Norm: " << file.pot_norm << std::endl
+                  << TAG << "Beam mode: " << file.beammode << std::endl
+                  << TAG << "Nu-type Selection: " << file.nutype_selection << std::endl
                   << TAG << "Num. Branches: " << file.num_branches << std::endl;
 
         std::cout << TAG << "Branch to Sample mapping:" << std::endl;
@@ -210,6 +259,10 @@ int main(int argc, char** argv)
                 std::cout << b << " ";
             std::cout << std::endl;
         }
+
+        // Beam mode was previously read in from the .json config file:
+        beammode = file.beammode;
+        nutype_selection = file.nutype_selection;
 
         // Open input ROOT file to read it and get the selected and truth trees:
         TFile* hl2_file = TFile::Open(file.fname_input.c_str(), "READ");
@@ -314,6 +367,7 @@ int main(int argc, char** argv)
 
             weight *= file.pot_norm;
 
+            // If the event passed the cuts, we fill the output ROOT file with the variables we defined:
             if(event_passed)
                 out_seltree -> Fill();
 

@@ -80,6 +80,15 @@ void AnaSample::SetBinning(const std::string& binning)
     }
 }
 
+// Mapping the Highland topology codes to consecutive integers:
+void AnaSample::SetTopologyHLCode(const std::vector<int>& HLTopologyCodes)
+{
+    for(std::size_t i=0; i < HLTopologyCodes.size(); ++i)
+    {
+        topology_HL_code[i] = HLTopologyCodes[i];
+    }
+}
+
 // ClearEvents -- clears all events from event vector
 void AnaSample::ClearEvents() { m_events.clear(); }
 
@@ -322,17 +331,32 @@ void AnaSample::SetLLHFunction(const std::string& func_name)
     }
 }
 
+// Compute the statistical chi2 contribution from this sample based on the current m_hpred and m_hdata histograms:
 double AnaSample::CalcLLH() const
 {
+    // Number of reco bins as specified in binning file:
     const unsigned int nbins = m_hpred->GetNbinsX();
+
+    // Array of the number of expected events in each bin:
     double* exp_w  = m_hpred->GetArray();
+
+    // Array of sum of squares of weights in each bin for the expected events:
     double* exp_w2 = m_hpred->GetSumw2()->GetArray();
+
+    // Array of the number of measured events in data in each bin:
     double* data   = m_hdata->GetArray();
 
+    // Initialize chi2 variable which will be updated below and then returned:
     double chi2 = 0.0;
-    for(unsigned int i = 1; i <= nbins; ++i)
-        chi2 += (*m_llh)(exp_w[i], exp_w2[i], data[i]);
 
+    // Loop over all bins:
+    for(unsigned int i = 1; i <= nbins; ++i)
+        {
+            // Compute chi2 contribution from current bin (done in Likelihoods.hh):
+            chi2 += (*m_llh)(exp_w[i], exp_w2[i], data[i]);
+        }
+
+    // Sum of the chi2 contributions for each bin is returned:
     return chi2;
 }
 
@@ -466,6 +490,8 @@ void AnaSample::GetSampleBreakdown(TDirectory* dirout, const std::string& tag,
     }
 
     int Ntot = GetN();
+
+    // Loop over all events:
     for(std::size_t i = 0; i < m_events.size(); ++i)
     {
         double D1_rec    = m_events[i].GetRecoD1();
@@ -478,8 +504,10 @@ void AnaSample::GetSampleBreakdown(TDirectory* dirout, const std::string& tag,
         compos[evt_topology]++;
         int anybin_index_rec  = GetBinIndex(D1_rec, D2_rec);
         int anybin_index_true = GetBinIndex(D1_true, D2_true);
-        hAnybin_rec[evt_topology].Fill(anybin_index_rec + 0.5, wght);
-        hAnybin_true[evt_topology].Fill(anybin_index_true + 0.5, wght);
+
+        // Fill histogram for this topolgy with the current event:
+        hAnybin_rec[topology_HL_code[evt_topology]].Fill(anybin_index_rec + 0.5, wght);
+        hAnybin_true[topology_HL_code[evt_topology]].Fill(anybin_index_true + 0.5, wght);
     }
 
     dirout->cd();

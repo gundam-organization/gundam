@@ -83,6 +83,7 @@ void XsecFitter::SetMinSettings(const MinSettings& ms)
     }
 }
 
+// Initializes the fit by setting up the fit parameters and creating the ROOT minimizer:
 void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara)
 {
     // Vector of the different parameter types such as [template, flux, detector, cross section]:
@@ -145,7 +146,7 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara)
 
     // Print information about the minimizer settings specified in the .json config file:
     std::cout << "===========================================" << std::endl;
-    std::cout << "           Initilizing fitter              " << std::endl;
+    std::cout << "           Initializing fitter             " << std::endl;
     std::cout << "===========================================" << std::endl;
 
     std::cout << TAG << "Minimizer settings..." << std::endl
@@ -161,7 +162,7 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara)
     // Create ROOT minimizer of given minimizerType and algoType:
     m_fitter = ROOT::Math::Factory::CreateMinimizer(min_settings.minimizer.c_str(), min_settings.algorithm.c_str());
 
-    // The ROOT Functor class is used to wrap multi-dimensional function objects:
+    // The ROOT Functor class is used to wrap multi-dimensional function objects, in this case the XsecFitter::CalcLikelihood function calculates and returns chi2_stat + chi2_sys + chi2_reg in each iteration of the fitter:
     m_fcn    = new ROOT::Math::Functor(this, &XsecFitter::CalcLikelihood, m_npar);
 
     m_fitter->SetFunction(*m_fcn);
@@ -218,8 +219,11 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara)
 bool XsecFitter::Fit(const std::vector<AnaSample*>& samples, int fit_type, bool stat_fluc)
 {
     std::cout << TAG << "Starting to fit." << std::endl;
+
+    // Vector of AnaSample objects:
     m_samples = samples;
 
+    // Fitter should have been initialized by now with InitFitter():
     if(m_fitter == nullptr)
     {
         std::cerr << ERR << "In XsecFitter::Fit()\n"
@@ -227,25 +231,36 @@ bool XsecFitter::Fit(const std::vector<AnaSample*>& samples, int fit_type, bool 
         return false;
     }
 
+    // Check what fit-type was specified in the .json config file:
+
+    // fit-type = kAsimovFit = 0:
     if(fit_type == kAsimovFit)
     {
         for(std::size_t s = 0; s < m_samples.size(); s++)
             m_samples[s]->FillEventHist(kAsimov, stat_fluc);
     }
+
+    // fit-type = kAsimovFit = 1:
     else if(fit_type == kExternalFit)
     {
         for(std::size_t s = 0; s < m_samples.size(); s++)
             m_samples[s]->FillEventHist(kExternal, stat_fluc);
     }
+
+    // fit-type = kAsimovFit = 2:
     else if(fit_type == kDataFit)
     {
         for(std::size_t s = 0; s < m_samples.size(); s++)
             m_samples[s]->FillEventHist(kData, stat_fluc);
     }
+
+    // fit-type = kAsimovFit = 3:
     else if(fit_type == kToyFit)
     {
         GenerateToyData(0, stat_fluc);
     }
+
+    // Exit if no valid fit-type specified:
     else
     {
         std::cerr << ERR << "In XsecFitter::Fit()\n"
@@ -255,9 +270,14 @@ bool XsecFitter::Fit(const std::vector<AnaSample*>& samples, int fit_type, bool 
 
     SaveEventHist(m_calls);
 
+    // did_converge flag which is returned at the end:
     bool did_converge = false;
+
+    // Info messages:
     std::cout << TAG << "Fit prepared." << std::endl;
     std::cout << TAG << "Calling Minimize, running " << min_settings.algorithm << std::endl;
+
+    // Run the actual fitter:
     did_converge = m_fitter->Minimize();
 
     if(!did_converge)
@@ -412,45 +432,75 @@ void XsecFitter::GenerateToyData(int toy_type, bool stat_fluc)
     SaveParams(fitpar_throw);
 }
 
+// Loops over all samples and all bins therein, then resets event weights based on current fit parameter values, updates m_hpred, m_hmc, m_hmc_true and m_hsig histograms accordingly and computes the chi2 value which is returned:
 double XsecFitter::FillSamples(std::vector<std::vector<double>>& new_pars, int datatype)
 {
+    // Initialize chi2 variable which will be updated below and then returned:
     double chi2      = 0.0;
+
+    // If the output_chi2 flag is true the chi2 contributions from the different samples are printed:
     bool output_chi2 = false;
+
+    // Print chi2 contributions for the first 19 function calls then for every 100th function call for the first 1000 function calls and then every 1000th function call:
     if((m_calls < 1001 && (m_calls % 100 == 0 || m_calls < 20))
        || (m_calls > 1001 && m_calls % 1000 == 0))
         output_chi2 = true;
 
+    // par_offset stores the number of fit parameters for all parameter types:
     unsigned int par_offset = 0;
+
+    // Loop over all the different parameter types such as [template, flux, detector, cross section]:
     for(int i = 0; i < m_fitpara.size(); ++i)
     {
+        // If we performed an eigendecomposition for this parameter type, we change the eigendecomposed input parameters back to the original parameters:
         if(m_fitpara[i]->IsDecomposed())
         {
             new_pars[i] = m_fitpara[i]->GetOriginalParameters(new_pars[i]);
         }
+
+        // Update number of fit parameters as we loop through the different parameter types:
         par_offset += m_fitpara[i]->GetNpar();
     }
 
+    // Loop over the different selection samples defined in the .json config file:
     for(int s = 0; s < m_samples.size(); ++s)
     {
+        // Get number of events within the current sample:
         const unsigned int num_events = m_samples[s]->GetN();
+
+        // Get the name of the detector for the current sample (as defined in the .json config file):
         const std::string det         = m_samples[s]->GetDetector();
+
+        // Loop over all events in the current sample (this loop will be divided amongst the different threads):
 #pragma omp parallel for num_threads(m_threads)
         for(unsigned int i = 0; i < num_events; ++i)
         {
+            // Get ith event (which contains the event information such as topology, reaction, truth/reco variables, event weights, etc.):
             AnaEvent* ev = m_samples[s]->GetEvent(i);
+
+            // Reset the event weight to the original one from Highland:
             ev->ResetEvWght();
+
+            // Loop over all the different parameter types such as [template, flux, detector, cross section]:
             for(int j = 0; j < m_fitpara.size(); ++j)
             {
+                // Multiply the current event weight for event ev with the paramter of the current parameter type for the (truth bin)/(reco bin)/(energy bin) that this event falls in:
                 m_fitpara[j]->ReWeight(ev, det, s, i, new_pars[j]);
             }
         }
 
+        // Reset m_hpred, m_hmc, m_hmc_true and m_hsig and then fill them with the updated events:
         m_samples[s]->FillEventHist(datatype);
+
+        // Compute chi2 for the current sample (done with AnaSample::CalcLLH):
         //double sample_chi2 = m_samples[s]->CalcChi2();
         double sample_chi2 = m_samples[s]->CalcLLH();
         //double sample_chi2 = m_samples[s]->CalcEffLLH();
+
+        // Add the chi2 contribution from the current sample to the total chi2 variable:
         chi2 += sample_chi2;
 
+        // If output_chi2 has been set to true before, the chi2 contribution from this sample is printed:
         if(output_chi2)
         {
             std::cout << TAG << "Chi2 for sample " << m_samples[s]->GetName() << " is "
@@ -458,15 +508,17 @@ double XsecFitter::FillSamples(std::vector<std::vector<double>>& new_pars, int d
         }
     }
 
+    // The total chi2 value is returned:
     return chi2;
 }
 
+// Function which is called in each iteration of the fitter to calculate and return chi2_stat + chi2_sys + chi2_reg:
 double XsecFitter::CalcLikelihood(const double* par)
 {
     // Increase the number of function calls by 1:
     m_calls++;
 
-    // If the output_chi2 flag is true the different chi2 contributions are printed:
+    // If the output_chi2 flag is true the chi2 contributions from the different parameter types such as [template, flux, detector, cross section] are printed:
     bool output_chi2 = false;
 
     // Print chi2 contributions for the first 19 function calls then for every 100th function call for the first 1000 function calls and then every 1000th function call:
@@ -499,18 +551,23 @@ double XsecFitter::CalcLikelihood(const double* par)
             //if(output_chi2)
             //    std::cout << "Parameter " << j << " for " << m_fitpara[i]->GetName()
             //              << " has value " << par[k] << std::endl;
-
+            
             // Fill vec with the parameter values of this iteration for this parameter type:
             vec.push_back(par[k++]);
         }
 
+        // If we are not using zero systematics, the systematic chi2 value is computed with AnaFitParameters::GetChi2 for this parameter type and added to chi2_sys:
         if(!m_zerosyst)
             chi2_sys += m_fitpara[i]->GetChi2(vec);
 
+        // If we are using regularization, the regularization chi2 value is computed with FitParameters::CalcRegularisation for this parameter type and added to chi2_reg:
         if(m_fitpara[i]->IsRegularised())
             chi2_reg += m_fitpara[i]->CalcRegularisation(vec);
 
+        // Fill new_pars with the parameter values of all parameter types:
         new_pars.push_back(vec);
+
+        // If output_chi2 has been set to true before, the chi2 contribution from this parameter type is printed:
         if(output_chi2)
         {
             std::cout << TAG << "Chi2 contribution from " << m_fitpara[i]->GetName() << " is "
@@ -518,17 +575,22 @@ double XsecFitter::CalcLikelihood(const double* par)
         }
     }
 
+    // Reset event weights based on current fit parameter values, update m_hpred, m_hmc, m_hmc_true and m_hsig histograms accordingly and compute the chi2_stat value:
     double chi2_stat = FillSamples(new_pars, kMC);
+
+    // The different chi2 values for the current iteration of the fitter are stored in the corresponding vectors:
     vec_chi2_stat.push_back(chi2_stat);
     vec_chi2_sys.push_back(chi2_sys);
     vec_chi2_reg.push_back(chi2_reg);
 
+    // If the m_save flag has been set to true, the fit parameters for the current iteration are saved with the given frequency m_freq:
     if(m_calls % m_freq == 0 && m_save)
     {
         SaveParams(new_pars);
         SaveEventHist(m_calls);
     }
 
+    // If output_chi2 has been set to true before, the different chi2 contributions are printed:
     if(output_chi2)
     {
         std::cout << TAG << "Func Calls: " << m_calls << std::endl;
@@ -538,6 +600,7 @@ double XsecFitter::CalcLikelihood(const double* par)
                   << TAG << "Chi2 reg  : " << chi2_reg  << std::endl;
     }
 
+    // The total chi2 value is returned:
     return chi2_stat + chi2_sys + chi2_reg;
 }
 
