@@ -38,6 +38,16 @@ struct FileOptions
     unsigned int num_syst;
     std::vector<int> cuts;
     std::map<int, std::vector<int>> samples;
+
+    // Vector which will hold the mapping of variable names to branch number for all variables (e.g., reco muon momentum and reco muon costheta):
+    std::vector<std::map<std::string, std::vector<int>>> variable_mapping;
+
+    // Number of variable names:
+    unsigned int num_var_names;
+
+    // Names of all variables:
+    std::vector<std::string> variable_names;
+
     std::vector<BinManager> bin_manager;
 };
 
@@ -185,6 +195,25 @@ int main(int argc, char** argv)
                         }
                     }
 
+                    // Get the mapping of variable names to branch numbers:
+                    std::vector<std::map<std::string, std::vector<int>>> var_map_temp = file["variable_mapping"];
+                    f.variable_mapping = var_map_temp;
+
+                    // Get the variable names and their total number:
+                    unsigned int number_var_names = 0;
+                    std::vector<std::string> variable_names_temp;
+                    for(const auto& varmap : var_map_temp)
+                    {
+                        number_var_names += varmap.size();
+
+                        for(const auto& kv : varmap)
+                        {
+                            variable_names_temp.emplace_back(kv.first);
+                        }
+                    }
+                    f.num_var_names = number_var_names;
+                    f.variable_names = variable_names_temp;
+
                     // Add the file options of the current file to the vector v_files:
                     v_files.emplace_back(f);
 
@@ -228,6 +257,25 @@ int main(int argc, char** argv)
                     }
                 }
 
+                // Get the mapping of variable names to branch numbers:
+                std::vector<std::map<std::string, std::vector<int>>> var_map_temp = file["variable_mapping"];
+                f.variable_mapping = var_map_temp;
+
+                // Get the variable names and their total number:
+                unsigned int number_var_names = 0;
+                std::vector<std::string> variable_names_temp;
+                for(const auto& varmap : var_map_temp)
+                {
+                    number_var_names += varmap.size();
+
+                    for(const auto& kv : varmap)
+                    {
+                        variable_names_temp.emplace_back(kv.first);
+                    }
+                }
+                f.num_var_names = number_var_names;
+                f.variable_names = variable_names_temp;
+
                 // Add the file options of the current file to the vector v_files:
                 v_files.emplace_back(f);
 
@@ -243,7 +291,7 @@ int main(int argc, char** argv)
               << TAG << "Toy Weight Cut: " << weight_cut << std::endl
               << TAG << "Calculating Covariance: " << std::boolalpha << do_covariance << std::endl;
 
-    // Print the covariance variables as specified in the .json config file (which are used for the binning):
+    // Print the covariance variables as specified in the .json config file:
     std::cout << TAG << "Covariance Variables: ";
     for(const auto& var : var_names)
         std::cout << var << " ";
@@ -349,12 +397,12 @@ int main(int argc, char** argv)
         // Declare some variables that will hold the values that we need from the input ROOT files:
         int NTOYS = 0;
         int accum_level[file.num_toys][file.num_samples];
-        float hist_variables[nvars][file.num_toys];
+        float hist_variables[file.num_var_names][file.num_toys];
         float weight_syst_total_noflux[file.num_toys];
         float weight_syst[file.num_toys][file.num_syst];
 
         int accum_level_mc[file.num_toys][file.num_samples];
-        float hist_variables_mc[nvars];
+        float hist_variables_mc[file.num_var_names];
         float weight_syst_total_noflux_mc;
 
         // Print some information about which file is opened, which tree is read in, the number of toys and systematics, and which selection branches are mapped to which selection samples:
@@ -383,22 +431,22 @@ int main(int argc, char** argv)
         tree_event->SetBranchAddress("weight_syst", weight_syst);
         tree_event->SetBranchAddress("weight_syst_total", weight_syst_total_noflux);
 
-        // Loop over all the variables specified in the .json config file (e.g., selmu_mom and selmu_costheta):
-        for(unsigned int i = 0; i < nvars; ++i)
+        // Loop over all the variable names specified in the .json config file (e.g., selmu_mom, selmu_mom_range_oarecon and selmu_costheta):
+        for(unsigned int i = 0; i < file.num_var_names; ++i)
         {
             // Set the branch address of the current variable of the hist_variables (declared above) array to the variable name:
-            tree_event->SetBranchAddress(var_names[i].c_str(), hist_variables[i]);
+            tree_event->SetBranchAddress(file.variable_names[i].c_str(), hist_variables[i]);
         }
 
         // Set the branch addresses for the default tree to the previously declared variables:
         tree_default->SetBranchAddress("accum_level", accum_level_mc);
         tree_default->SetBranchAddress("weight_syst_total", &weight_syst_total_noflux_mc);
 
-        // Loop over all the variables specified in the .json config file (e.g., selmu_mom and selmu_costheta):
-        for(unsigned int i = 0; i < nvars; ++i)
+        // Loop over all the variable names specified in the .json config file (e.g., selmu_mom, selmu_mom_range_oarecon and selmu_costheta):
+        for(unsigned int i = 0; i < file.num_var_names; ++i)
         {
             // Set the branch address of the current variable of the hist_variables_mc (declared above) array to the variable name:
-            tree_default->SetBranchAddress(var_names[i].c_str(), &hist_variables_mc[i]);
+            tree_default->SetBranchAddress(file.variable_names[i].c_str(), &hist_variables_mc[i]);
         }
 
         // Numbers which will hold the number of rejected events, number of events which passed all the cuts, and total number of events:
@@ -438,12 +486,38 @@ int main(int argc, char** argv)
                         // Only consider events that passed the selection (accum_level is higher than the given cut for this branch):
                         if(accum_level[t][branch] > file.cuts[branch])
                         {
+                            // Get the names and locations (indices) of the kinematic variables for the current branch:
+                            std::vector<std::string> variable_names_current_branch;
+                            std::vector<int> variable_loc_current_branch;
+
+                            // Loop over the number of kinematic variables:
+                            for(unsigned int Var = 0; Var < nvars; ++Var)
+                            {
+                                // Location of the current variable, will be updated below:
+                                int loc_current_var = 0;
+
+                                // Loop over the number of variables used for the current kinematic variable:
+                                for(const auto& kv : file.variable_mapping[Var])
+                                {
+                                    // If the current branch is in the vector of branch numbers for current variable, we add the current variable name to variable_names_current_branch:
+                                    if(std::find(kv.second.begin(), kv.second.end(), branch) != kv.second.end())
+                                    {
+                                        variable_names_current_branch.push_back(kv.first);
+                                        variable_loc_current_branch.push_back(loc_current_var);
+                                        break;
+                                    }
+
+                                    // Update location (index) of current variable:
+                                    ++loc_current_var;
+                                }
+                            }
+
                             // idx is the bin number for the current event (will be updated below) in the ROOT histograms which have been initialized:
                             int idx = -1;
 
-                            // If do_projection is true, plots are saved with axis as kinematic variable (specified in .json config file, e.g., selmu_mom) instead of bin number. In this case idx will be the value of the current plot variable (e.g., selmu_mom) for the current toy of this event:
+                            // If do_projection is true, plots are saved with axis as kinematic variable (specified in .json config file, e.g., selmu_mom) instead of bin number. In this case idx will be the value of the plot variable (e.g., selmu_mom) for the current toy of this event:
                             if(do_projection)
-                                idx = hist_variables[var_plot][t];
+                                idx = hist_variables[variable_loc_current_branch[var_plot]][t];
 
                             // If do_projection is false, plots are saved with axis as bin number (instead of kinematic variable). In this case idx will be the index of the bin that this event/toy falls in:
                             else
@@ -451,9 +525,16 @@ int main(int argc, char** argv)
                                 // vars will hold the values of the kinematic variables for the current event and toy:
                                 std::vector<double> vars;
 
-                                // Loop over the kinematic variable (e.g., selmu_costheta and selmu_mom) and add the value for the current event and toy to the vars vector:
+                                // Counts number of variables used for previous kinematic variables so that the correct index of hist_variables is used down below:
+                                int count = 0;
+
+                                // Loop over the kinematic variables (e.g., muon angle and muon momentum) and add the value for the current event and toy to the vars vector:
                                 for(unsigned int v = 0; v < nvars; ++v)
-                                    vars.push_back(hist_variables[v][t]);
+                                {
+                                    int current_index = variable_loc_current_branch[v] + count;
+                                    vars.push_back(hist_variables[current_index][t]);
+                                    count += file.variable_mapping[v].size();
+                                }
                                 
                                 // We get the index of the bin for this event and this sample (as specified in the cov_sample_binning files) and set idx equal to it:
                                 idx = cov_bin_manager[s].GetBinIndex(vars);
@@ -509,12 +590,38 @@ int main(int argc, char** argv)
                     // Only consider events that passed the selection (accum_level is higher than the given cut for this branch):
                     if(accum_level_mc[0][branch] > file.cuts[branch])
                     {
+                    // Get the names and locations (indices) of the kinematic variables for the current branch:
+                        std::vector<std::string> variable_names_current_branch;
+                        std::vector<int> variable_loc_current_branch;
+
+                        // Loop over the number of kinematic variables:
+                        for(unsigned int Var = 0; Var < nvars; ++Var)
+                        {
+                            // Location of the current variable, will be updated below:
+                            int loc_current_var = 0;
+
+                            // Loop over the number of variables used for the current kinematic variable:
+                            for(const auto& kv : file.variable_mapping[Var])
+                            {
+                                // If the current branch is in the vector of branch numbers for current variable, we add the current variable name to variable_names_current_branch:
+                                if(std::find(kv.second.begin(), kv.second.end(), branch) != kv.second.end())
+                                {
+                                    variable_names_current_branch.push_back(kv.first);
+                                    variable_loc_current_branch.push_back(loc_current_var);
+                                    break;
+                                }
+
+                                // Update location (index) of current variable:
+                                ++loc_current_var;
+                            }
+                        }
+
                         // idx is the bin number for the current event (will be updated below) in the ROOT histograms which have been initialized:
                         int idx = -1;
 
                         // If do_projection is true, plots are saved with axis as kinematic variable (specified in .json config file, e.g., selmu_mom) instead of bin number. In this case idx will be the value of the current plot variable (e.g., selmu_mom) for the current event:
                         if(do_projection)
-                            idx = hist_variables_mc[var_plot];
+                            idx = hist_variables_mc[variable_loc_current_branch[var_plot]];
 
                         // If do_projection is false, plots are saved with axis as bin number (instead of kinematic variable). In this case idx will be the index of the bin that this event falls in:
                         else
@@ -522,9 +629,16 @@ int main(int argc, char** argv)
                             // vars will hold the values of the kinematic variables for the current event:
                             std::vector<double> vars;
 
-                            // Loop over the kinematic variable (e.g., selmu_costheta and selmu_mom) and add the value for the current event to the vars vector:
+                            // Counts number of variables used for previous kinematic variables so that the correct index of hist_variables is used down below:
+                            int count = 0;
+
+                            // Loop over the kinematic variables (e.g., muon angle and muon momentum) and add the value for the current event and toy to the vars vector:
                             for(unsigned int v = 0; v < nvars; ++v)
-                                vars.push_back(hist_variables_mc[v]);
+                            {
+                                int current_index = variable_loc_current_branch[v] + count;
+                                vars.push_back(hist_variables_mc[current_index]);
+                                count += file.variable_mapping[v].size();
+                            }
 
                             // We get the index of the bin for this event and this sample (as specified in the cov_sample_binning files) and set idx equal to it:
                             idx = cov_bin_manager[s].GetBinIndex(vars);
