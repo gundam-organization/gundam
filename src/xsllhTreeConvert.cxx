@@ -46,7 +46,6 @@ struct HL2FileOpt
     std::string tru_tree;
     unsigned int file_id;
     int beammode;
-    int nutype_selection;
     unsigned int num_branches;
     double pot_norm;
     std::vector<int> cuts;
@@ -132,7 +131,6 @@ int main(int argc, char** argv)
     int target, target_true;
     int cut_branch;
     int beammode;
-    int nutype_selection;
     float enu_true, enu_reco;
     float q2_true, q2_reco;
     float D1True, D1Reco;
@@ -146,7 +144,6 @@ int main(int argc, char** argv)
     out_seltree -> Branch("target", &target, "target/I");
     out_seltree -> Branch("cut_branch", &cut_branch, "cut_branch/I");
     out_seltree -> Branch("beammode", &beammode, "beammode/I");
-    out_seltree -> Branch("nutype_selection", &nutype_selection, "nutype_selection/I");
     out_seltree -> Branch("enu_true", &enu_true, "enu_true/F");
     out_seltree -> Branch("enu_reco", &enu_reco, "enu_reco/F");
     out_seltree -> Branch("q2_true", &q2_true, "q2_true/F");
@@ -163,7 +160,6 @@ int main(int argc, char** argv)
     out_trutree -> Branch("target", &target_true, "target/I");
     out_trutree -> Branch("cut_branch", &cut_branch, "cut_branch/I");
     out_trutree -> Branch("beammode", &beammode, "beammode/I");
-    out_trutree -> Branch("nutype_selection", &nutype_selection, "nutype_selection/I");
     out_trutree -> Branch("enu_true", &enu_true, "enu_true/F");
     out_trutree -> Branch("q2_true", &q2_true, "q2_true/F");
     out_trutree -> Branch("D1True", &D1True, "D1True/F");
@@ -194,7 +190,6 @@ int main(int argc, char** argv)
                     f.tru_tree = file["tru_tree"];
                     f.file_id = file["file_id"];
                     f.beammode = file["beammode"];
-                    f.nutype_selection = file["nutype_selection"];
                     f.num_branches = file["num_branches"];
                     f.cuts = file["cut_level"].get<std::vector<int>>();
                     f.pot_norm = file["pot_norm"];
@@ -220,7 +215,6 @@ int main(int argc, char** argv)
                 f.tru_tree = file["tru_tree"];
                 f.file_id = file["file_id"];
                 f.beammode = file["beammode"];
-                f.nutype_selection = file["nutype_selection"];
                 f.num_branches = file["num_branches"];
                 f.cuts = file["cut_level"].get<std::vector<int>>();
                 f.pot_norm = file["pot_norm"];
@@ -248,7 +242,6 @@ int main(int argc, char** argv)
                   << TAG << "Truth tree: " << file.tru_tree << std::endl
                   << TAG << "POT Norm: " << file.pot_norm << std::endl
                   << TAG << "Beam mode: " << file.beammode << std::endl
-                  << TAG << "Nu-type Selection: " << file.nutype_selection << std::endl
                   << TAG << "Num. Branches: " << file.num_branches << std::endl;
 
         std::cout << TAG << "Branch to Sample mapping:" << std::endl;
@@ -262,7 +255,6 @@ int main(int argc, char** argv)
 
         // Beam mode was previously read in from the .json config file:
         beammode = file.beammode;
-        nutype_selection = file.nutype_selection;
 
         // Open input ROOT file to read it and get the selected and truth trees:
         TFile* hl2_file = TFile::Open(file.fname_input.c_str(), "READ");
