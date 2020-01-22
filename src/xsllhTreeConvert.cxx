@@ -311,6 +311,8 @@ int main(int argc, char** argv)
 
             bool event_passed = false;
 
+            int event_branch;
+
             // Loop over all samples specified in .json config file:
             for(const auto& kv : file.samples)
             {
@@ -322,6 +324,7 @@ int main(int argc, char** argv)
                     {
                         cut_branch = kv.first;
                         event_passed = true;
+                        event_branch = branch;
                         npassed++;
                         break;
                     }
@@ -334,7 +337,7 @@ int main(int argc, char** argv)
                 int it = 0;
                 for(const auto& kv : file.sel_var.D1Reco_multi)
                 {
-                    if(std::find(kv.second.begin(), kv.second.end(), cut_branch) != kv.second.end())
+                    if(std::find(kv.second.begin(), kv.second.end(), event_branch) != kv.second.end())
                     {
                         D1Reco = D1Reco_vector[it];
                         break;

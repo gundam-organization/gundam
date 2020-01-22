@@ -1,0 +1,213 @@
+{
+    "data_file" : "Events_Numu_Runs_2_3_4_AntiNumu_Run_5.root",
+    "mc_file"   : "Events_Numu_Runs_2_3_4_AntiNumu_Run_5.root",
+    "output_file" : "fit_result_Numu_AntiNumu.root",
+    "input_dir" : "/inputs/Numu_AntiNumu_Fit/Fit/",
+    "fit_type"  : 0,
+    "stat_fluc" : false,
+    "zero_syst" : false,
+    "rng_template" : true,
+    "save_events" : false,
+    "data_POT"  : 3.14E20,
+    "mc_POT"    : 3.14E21,
+    "rng_seed"  : 1234,
+    "num_threads" : 16,
+    "sample_topology" : ["CC-0Pi", "CC-1Pi", "CC-Other", "BKG", "out FV", "no truth", "sand #mu"],
+    "topology_HL_code" : [0, 1, 2, 3, 7, -1, 777],
+    "min_settings" : {
+        "minimizer" : "Minuit2",
+        "algorithm" : "Migrad",
+        "likelihood" : "Poisson",
+        "print_level" : 2,
+        "tolerance" : 1E-4,
+        "strategy" : 1,
+        "max_iter" : 1E6,
+        "max_fcn" : 1E9
+    },
+    "flux_cov" : {
+        "file" : "flux_variations.root",
+        "matrix" : "flux_numu_cov",
+        "binning" : "flux_binning.txt",
+        "throw"  : false,
+        "decomp" : true,
+        "variance" : 0.99,
+        "fit_par" : true
+    },
+    "det_cov" : {
+        "file" : "detector_variations.root",
+        "matrix" : "detector_covariance_matrix",
+        "throw"  : false,
+        "decomp" : true,
+        "variance" : 0.99,
+        "fit_par" : true
+    },
+    "xsec_cov" : {
+        "file" : "xsec_cov_nd280.root",
+        "matrix" : "xsec_cov",
+        "throw"  : false,
+        "decomp" : false,
+        "variance" : 1.00,
+        "fit_par" : false
+    },
+    "regularisation" : {
+        "enable" : false,
+        "strength" : 0.011,
+        "method" : "kL2Reg"
+    },
+    "detectors" : [
+        {
+            "name" : "ND280",
+            "xsec_config" : "ptheta_dials.json",
+            "binning" : "coarse_binning.txt",
+            "template_par" : [
+                {
+                    "name" : "Numu-CC0pi",
+                    "binning" : "coarse_binning.txt",
+                    "signal" : {"topology" : [0], "target" : [6], "beammode" : [1], "flavor" : [14]},
+                    "use" : true
+                },
+                {
+                    "name" : "AntiNumu-CC0pi",
+                    "binning" : "coarse_binning.txt",
+                    "signal" : {"topology" : [0], "target" : [6], "beammode" : [-1], "flavor" : [-14]},
+                    "use" : true
+                },
+                {
+                    "name" : "CC1pi",
+                    "binning" : "analysis_binning.txt",
+                    "signal" : {"topology" : [1], "target" : [6]},
+                    "use" : false
+                }
+            ],
+            "use_detector" : true
+        },
+        {
+            "name" : "INGRID",
+            "xsec_config" : "ptheta_dials.json",
+            "binning" : "ingrid_binning.txt",
+            "template_par" : [
+                {
+                    "name" : "CC0pi",
+                    "binning" : "tn337_binning.txt",
+                    "signal" : {"topology" : [0,1,2]},
+                    "use" : false
+                }
+            ],
+            "use_detector" : false
+        }
+    ],
+    "samples" : [
+        {
+            "cut_branch" : -1,
+            "name" : "truth",
+            "detector" : "ND280",
+            "binning" : "coarse_binning.txt",
+            "use_sample" : true
+        },
+        {
+            "cut_branch" : 0,
+            "name" : "Numu-muTPC",
+            "detector" : "ND280",
+            "binning" : "coarse_binning.txt",
+            "use_sample" : true
+        },
+        {
+            "cut_branch" : 1,
+            "name" : "Numu-muTPCpTPC",
+            "detector" : "ND280",
+            "binning" : "coarse_binning.txt",
+            "use_sample" : true
+        },
+        {
+            "cut_branch" : 2,
+            "name" : "Numu-muTPCpFGD",
+            "detector" : "ND280",
+            "binning" : "coarse_binning.txt",
+            "use_sample" : true
+        },
+        {
+            "cut_branch" : 3,
+            "name" : "Numu-muFGDpTPC",
+            "detector" : "ND280",
+            "binning" : "very_coarse_binning.txt",
+            "use_sample" : true
+        },
+        {
+            "cut_branch" : 4,
+            "name" : "Numu-muFGD",
+            "detector" : "ND280",
+            "binning" : "very_coarse_binning.txt",
+            "use_sample" : true
+        },
+        {
+            "cut_branch" : 5,
+            "name" : "Numu-CC1pi",
+            "detector" : "ND280",
+            "binning" : "coarse_binning.txt",
+            "use_sample" : true
+        },
+        {
+            "cut_branch" : 6,
+            "name" : "Numu-CCDIS",
+            "detector" : "ND280",
+            "binning" : "coarse_binning.txt",
+            "use_sample" : true
+        },
+        {
+            "cut_branch" : 7,
+            "name" : "Numu-CCMichel",
+            "detector" : "ND280",
+            "binning" : "coarse_binning.txt",
+            "use_sample" : true
+        },
+        {
+            "cut_branch" : 8,
+            "name" : "Numu-CCEcalVeto",
+            "detector" : "ND280",
+            "binning" : "coarse_binning.txt",
+            "use_sample" : true
+        },
+        {
+            "cut_branch" : 9,
+            "name" : "Numu-muTPCNp",
+            "detector" : "ND280",
+            "binning" : "coarse_binning.txt",
+            "use_sample" : true
+        },
+        {
+            "cut_branch" : 10,
+            "name" : "AntiNumu-FwdCC0pi",
+            "detector" : "ND280",
+            "binning" : "coarse_binning.txt",
+            "use_sample" : true
+        },
+        {
+            "cut_branch" : 11,
+            "name" : "AntiNumu-HAFwdCC0pi",
+            "detector" : "ND280",
+            "binning" : "very_coarse_binning.txt",
+            "use_sample" : true
+        },
+        {
+            "cut_branch" : 12,
+            "name" : "AntiNumu-CC1pi",
+            "detector" : "ND280",
+            "binning" : "coarse_binning.txt",
+            "use_sample" : true
+        },
+        {
+            "cut_branch" : 13,
+            "name" : "AntiNumu-CCOther",
+            "detector" : "ND280",
+            "binning" : "coarse_binning.txt",
+            "use_sample" : true
+        },
+        {
+            "cut_branch" : 10,
+            "name": "INGRID",
+            "detector" : "INGRID",
+            "binning" : "ingrid_binning.txt",
+            "use_sample" : false
+        }
+    ]
+}
