@@ -3,7 +3,7 @@
 This program performs the error propagation and cross-section calculation using the post-fit file from `xsllhFit`.
 
 It is designed to be run with a JSON configuration file, and has CLI options which override certain options in the configure file. The usage of the command is as follows:
-```
+```bash
 $ xsllhCalcXsec [-i,o,n,p,m,t,h] -j </path/to/config.json>
 USAGE: xsllhCalcXsec
 OPTIONS:

@@ -4,9 +4,16 @@ This program performs the minimization and fit to the data/MC producing a set of
 
 It is designed to be run with a JSON configuration file. The usage of the command is as follows:
 ```bash
-$ xsllhFit [-n,h] -j </path/to/config.json>
+$ xsllhFit [-n,o,s,t,h] -j </path/to/config.json>
+USAGE: xsllhFit
+OPTIONS:
+-j : JSON input
+-o : Output file (overrides JSON config)
+-s : RNG seed (overrides JSON config)
+-t : Num. threads (overrides JSON config)
+-n : Dry run - Set up but do not run fit.
 ```
-The `-j` flag is required and is config file for the fit. The `-n` flag does a "dry-run" of the fit where it is initialized but the minimization is not performed. The `-h` displays the help output and available options.
+The `-j` flag is required and is config file for the fit. The `-n` flag does a "dry-run" of the fit where it is initialized but the minimization is not performed. The `-h` displays the help output and available options. The remaining variables allow for overriding the settings in the configure file, which is useful for scripting, and are all optional.
 
 ### Configuration file
 
@@ -75,7 +82,7 @@ Below is an example of the JSON to define two signals in the configuration file.
     }
 ],
 ```
-This defines two signals using the topology and target variables. For an event to be tagged as a `CC0pi_carbon` event, it must have a topology of 0 or 1 or 2 and it must have a target value of 6. If the event has a topology of 3 and a target of 6, then it will be tagged as a `CC1pi_carbon` event. If it does not match any signal definition, it is a background event. 
+This defines two signals using the topology and target variables. For an event to be tagged as a `CC0pi_carbon` event, it must have a topology of 0 or 1 or 2 and it must have a target value of 6. If the event has a topology of 3 and a target of 6, then it will be tagged as a `CC1pi_carbon` event. If it does not match any signal definition, it is a background event.
 
 Both signals use the same binning file, and in this example the `CC1pi_carbon` signal would not be used in the fit. The `use` option is a flag to enable/disable using the signal in the fit.
 

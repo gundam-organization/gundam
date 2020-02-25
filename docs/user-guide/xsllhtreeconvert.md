@@ -65,6 +65,7 @@ For using the base provided tree converter, this is a description of each option
 + **highland_files** : JSON array of objects holding information for each HighLAND file to process
     - **fname** : [string] full path name of the HighLAND file to process
     - **file_id** : [int] user-defined file ID
+    - **pot_norm** : [float] POT normalization to apply to all events in this file
     - **sel_tree** : [string] name of tree containing selected events (e.g. `default` for HL files)
     - **tru_tree** : [string] name of tree containing true events (e.g. `truth` for HL files)
     - **num_branches** : [int] number of branches in the selection

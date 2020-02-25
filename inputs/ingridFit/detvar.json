@@ -37,7 +37,7 @@
     "single_syst" : false,
     "syst_idx" : 0,
     "var_names" : ["selmu_costheta", "selmu_mom"],
-    "mc_stat_error" : true,
+    "mc_stat_error" : false,
     "projection" : false,
     "plot_variable" : "selmu_mom",
     "pdf_print" : false,
