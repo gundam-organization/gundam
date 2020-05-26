@@ -37,7 +37,9 @@ void XsecParameters::InitEventMap(std::vector<AnaSample*>& sample, int mode)
 
                 //int idx = v_dials.at(d).GetSplineIndex(std::vector<int>{ev -> GetTopology(), ev -> GetReaction()},
                 //                                       std::vector<double>{q2});
-                int idx = v_dials.at(d).GetSplineIndex(std::vector<int>{ev->GetTopology(), ev->GetReaction()},
+//                int idx = v_dials.at(d).GetSplineIndex(std::vector<int>{ev->GetTopology(), ev->GetReaction()},
+//                                                       std::vector<double>{ev->GetTrueD2(), ev->GetTrueD1()});
+                int idx = v_dials.at(d).GetSplineIndex(std::vector<int>{ev->GetSampleType(), ev->GetReaction()},
                                                        std::vector<double>{ev->GetTrueD2(), ev->GetTrueD1()});
 
                 if(idx == BADBIN)
@@ -123,6 +125,9 @@ void XsecParameters::ReWeight(AnaEvent* event, const std::string& det, int nsamp
     {
         int idx = m_dial_evtmap[nsample][nevent][d];
         double dial_weight = v_dials[d].GetBoundedValue(idx, params[d + m_offset.at(det)]);
+//        if(fabs(dial_weight)>10){
+//            std::cout << "nsample=" << nsample << " / dial_weight=" << dial_weight << std::endl;
+//        }
         weight *= dial_weight;
 
         /*
@@ -140,6 +145,7 @@ void XsecParameters::ReWeight(AnaEvent* event, const std::string& det, int nsamp
         }
         */
     }
+//    std::cout << "weight=" << weight << std::endl;
 
     if(m_do_cap_weights)
         weight = weight > m_weight_cap ? m_weight_cap : weight;
@@ -151,6 +157,7 @@ void XsecParameters::AddDetector(const std::string& det, const std::string& conf
 {
     std::cout << TAG << "Adding detector " << det << " for " << m_name << std::endl;
     std::fstream f;
+    std::cout << TAG << "Opening config file " << config << std::endl;
     f.open(config, std::ios::in);
 
     json j;

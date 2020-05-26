@@ -25,6 +25,7 @@ struct HL2TreeVar
 {
     std::string reaction;
     std::string topology;
+    std::string sample;
     std::string target;
     std::string nutype;
     std::string enu_true;
@@ -36,6 +37,9 @@ struct HL2TreeVar
     bool use_D1Reco_multi;
     std::string D2True;
     std::string D2Reco;
+    std::string vertexID;
+    std::string run;
+    std::string subrun;
 };
 
 // Structure that holds the file information for the Highland2 file (including variable names):
@@ -128,9 +132,13 @@ int main(int argc, char** argv)
     int nutype, nutype_true;
     int reaction, reaction_true;
     int topology, topology_true;
+    int sample;
     int target, target_true;
     int cut_branch;
     int beammode;
+    int vertexID, vertexID_true;
+    int run, run_true;
+    int subrun, subrun_true;
     float enu_true, enu_reco;
     float q2_true, q2_reco;
     float D1True, D1Reco;
@@ -141,6 +149,7 @@ int main(int argc, char** argv)
     out_seltree -> Branch("nutype", &nutype, "nutype/I");
     out_seltree -> Branch("reaction", &reaction, "reaction/I");
     out_seltree -> Branch("topology", &topology, "topology/I");
+    out_seltree -> Branch("sample", &sample, "sample/I");
     out_seltree -> Branch("target", &target, "target/I");
     out_seltree -> Branch("cut_branch", &cut_branch, "cut_branch/I");
     out_seltree -> Branch("beammode", &beammode, "beammode/I");
@@ -153,6 +162,9 @@ int main(int argc, char** argv)
     out_seltree -> Branch("D2True", &D2True, "D2True/F");
     out_seltree -> Branch("D2Reco", &D2Reco, "D2Reco/F");
     out_seltree -> Branch("weight", &weight, "weight/F");
+    out_seltree -> Branch("vertexID", &vertexID, "vertexID/I");
+    out_seltree -> Branch("run", &run, "run/I");
+    out_seltree -> Branch("subrun", &subrun, "subrun/I");
 
     out_trutree -> Branch("nutype", &nutype_true, "nutype/I");
     out_trutree -> Branch("reaction", &reaction_true, "reaction/I");
@@ -165,6 +177,9 @@ int main(int argc, char** argv)
     out_trutree -> Branch("D1True", &D1True, "D1True/F");
     out_trutree -> Branch("D2True", &D2True, "D2True/F");
     out_trutree -> Branch("weight", &weight_true, "weight/F");
+    out_trutree -> Branch("vertexID", &vertexID_true, "vertexID/I");
+    out_trutree -> Branch("run", &run_true, "run/I");
+    out_trutree -> Branch("subrun", &subrun_true, "subrun/I");
 
     // This vector will store the file information for all files specified in the .json config file (including variable names):
     std::vector<HL2FileOpt> v_files;
@@ -223,6 +238,7 @@ int main(int argc, char** argv)
                 for(const auto& kv : temp_json)
                     f.samples.emplace(std::make_pair(std::stoi(kv.first), kv.second));
 
+
                 // Read out the json objects for "sel_var" and "tru_var":
                 f.sel_var = ParseHL2Var(file["sel_var"], true);
                 f.tru_var = ParseHL2Var(file["tru_var"], false);
@@ -268,6 +284,7 @@ int main(int argc, char** argv)
         hl2_seltree -> SetBranchAddress(file.sel_var.nutype.c_str(), &nutype);
         hl2_seltree -> SetBranchAddress(file.sel_var.reaction.c_str(), &reaction);
         hl2_seltree -> SetBranchAddress(file.sel_var.topology.c_str(), &topology);
+        hl2_seltree -> SetBranchAddress(file.sel_var.sample.c_str(), &sample);
         hl2_seltree -> SetBranchAddress(file.sel_var.target.c_str(), &target);
 
         // If the use_D1Reco_multi flag has been set to true, different selection branches will have different D1Reco variables:
@@ -298,6 +315,9 @@ int main(int argc, char** argv)
         hl2_seltree -> SetBranchAddress(file.sel_var.enu_true.c_str(), &enu_true);
         hl2_seltree -> SetBranchAddress(file.sel_var.enu_reco.c_str(), &enu_reco);
         hl2_seltree -> SetBranchAddress(file.sel_var.weight.c_str(), &weight);
+        hl2_seltree -> SetBranchAddress(file.sel_var.vertexID.c_str(), &vertexID);
+        hl2_seltree -> SetBranchAddress(file.sel_var.run.c_str(), &run);
+        hl2_seltree -> SetBranchAddress(file.sel_var.subrun.c_str(), &subrun);
 
         long int npassed = 0;
         long int nevents = hl2_seltree -> GetEntries();
@@ -308,6 +328,8 @@ int main(int argc, char** argv)
         for(int i = 0; i < nevents; ++i)
         {
             hl2_seltree -> GetEntry(i);
+
+            if(reaction == 999) continue;
 
             bool event_passed = false;
 
@@ -381,6 +403,9 @@ int main(int argc, char** argv)
         hl2_trutree -> SetBranchAddress(file.tru_var.D2True.c_str(), &D2True);
         hl2_trutree -> SetBranchAddress(file.tru_var.enu_true.c_str(), &enu_true);
         hl2_trutree -> SetBranchAddress(file.tru_var.weight.c_str(), &weight_true);
+        hl2_trutree -> SetBranchAddress(file.tru_var.vertexID.c_str(), &vertexID_true);
+        hl2_trutree -> SetBranchAddress(file.tru_var.run.c_str(), &run_true);
+        hl2_trutree -> SetBranchAddress(file.tru_var.subrun.c_str(), &subrun_true);
 
         nevents = hl2_trutree -> GetEntries();
         std::cout << TAG << "Reading truth events tree." << std::endl
@@ -423,13 +448,17 @@ int main(int argc, char** argv)
 template <typename T>
 HL2TreeVar ParseHL2Var(T j, bool reco_info)
 {
+
     HL2TreeVar v;
     v.reaction = j["reaction"];
     v.topology = j["topology"];
     v.target   = j["target"];
     v.nutype   = j["nutype"];
     v.enu_true = j["enu_true"];
-    v.weight = j["weight"];
+    v.weight   = j["weight"];
+    v.vertexID = j["vertexID"];
+    v.run      = j["run"];
+    v.subrun   = j["subrun"];
 
     v.D1True = j["D1True"];
     v.D2True = j["D2True"];
@@ -438,6 +467,7 @@ HL2TreeVar ParseHL2Var(T j, bool reco_info)
     if(reco_info)
     {
         v.enu_reco = j["enu_reco"];
+        v.sample   = j["sample"];
 
         // If the "D1Reco" entry is a string, the same variable will be used for D1Reco for all branches of the selection:
         if(j["D1Reco"].is_string())

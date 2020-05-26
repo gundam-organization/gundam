@@ -794,3 +794,43 @@ void XsecFitter::ParameterScans(const std::vector<int>& param_list, unsigned int
     delete[] x;
     delete[] y;
 }
+
+TMatrixD XsecFitter::GetPriorCovarianceMatrix(){
+
+  std::vector<TMatrixD*> matrix_category_list;
+  int nb_dof = 0;
+  for(int i_parameter = 0 ; i_parameter < m_fitpara.size() ; i_parameter++){
+    nb_dof += m_fitpara[i_parameter]->GetOriginalCovMat()->GetNrows();
+  }
+
+  TMatrixD covMatrix(nb_dof,nb_dof);
+
+  int index_shift = 0;
+  for(int i_parameter = 0 ; i_parameter < m_fitpara.size() ; i_parameter++){
+    for(int i_entry = 0 ; i_entry < m_fitpara[i_parameter]->GetOriginalCovMat()->GetNrows() ; i_entry++){
+      for(int j_entry = 0 ; j_entry < m_fitpara[i_parameter]->GetOriginalCovMat()->GetNrows() ; j_entry++){
+        covMatrix[i_entry+index_shift][j_entry+index_shift] = (*m_fitpara[i_parameter]->GetOriginalCovMat())[i_entry][j_entry] ;
+      }
+    }
+    index_shift += m_fitpara[i_parameter]->GetOriginalCovMat()->GetNrows();
+  }
+
+  return covMatrix;
+
+}
+
+TMatrixD XsecFitter::GetPosteriorCovarianceMatrix(){
+
+  TMatrixD covMatrix(m_fitter->NDim(), m_fitter->NDim() );
+  m_fitter->GetCovMatrix( covMatrix.GetMatrixArray() );
+  return covMatrix;
+
+}
+
+void XsecFitter::WriteCovarianceMatrices(){
+
+  std::cout << TAG << "Writing Covariance Matrices..." << std::endl;
+  m_dir->WriteTObject(GetPriorCovarianceMatrix().Clone(), "PriorCovarianceMatrix_TMatrixD");
+  m_dir->WriteTObject(GetPosteriorCovarianceMatrix().Clone(), "PosteriorCovarianceMatrix_TMatrixD");
+
+}

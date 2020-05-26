@@ -37,15 +37,15 @@ bool FitParameters::SetBinning(const std::string& file_name, std::vector<FitBin>
         }
         fin.close();
 
-        std::cout << TAG << "Fit binning: \n";
-        for(std::size_t i = 0; i < bins.size(); ++i)
-        {
-            std::cout << std::setw(3) << i
-                      << std::setw(5) << bins[i].D2low
-                      << std::setw(5) << bins[i].D2high
-                      << std::setw(5) << bins[i].D1low
-                      << std::setw(5) << bins[i].D1high << std::endl;
-        }
+//        std::cout << TAG << "Fit binning: \n";
+//        for(std::size_t i = 0; i < bins.size(); ++i)
+//        {
+//            std::cout << std::setw(3) << i
+//                      << std::setw(5) << bins[i].D2low
+//                      << std::setw(5) << bins[i].D2high
+//                      << std::setw(5) << bins[i].D1low
+//                      << std::setw(5) << bins[i].D1high << std::endl;
+//        }
 
         return true;
     }

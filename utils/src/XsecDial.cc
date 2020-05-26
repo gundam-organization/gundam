@@ -34,9 +34,11 @@ void XsecDial::ReadSplines(const std::string& fname_splines)
     TKey* key = nullptr;
     while((key = (TKey*)key_list.Next()))
     {
-        TGraph* graph = (TGraph*)key -> ReadObj();
-        v_splines.emplace_back(TSpline3(graph->GetName(), graph));
-        //v_splines.emplace_back(*spline);
+        if (strcmp(key->ReadObj()->GetName(), "Graph") == 0){
+            TGraph* graph = (TGraph*)key -> ReadObj();
+            v_splines.emplace_back(TSpline3(graph->GetName(), graph));
+            //v_splines.emplace_back(*spline);
+        }
     }
     file_splines -> Close();
     delete file_splines;

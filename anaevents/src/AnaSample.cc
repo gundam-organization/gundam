@@ -18,11 +18,11 @@ AnaSample::AnaSample(int sample_id, const std::string& name, const std::string& 
               << TAG << "Detector: " << m_detector << std::endl
               << TAG << "Bin edges: " << std::endl;
 
-    for(const auto& bin : m_bin_edges)
-    {
-        std::cout << bin.D2low << " " << bin.D2high << " " << bin.D1low << " " << bin.D1high
-                  << std::endl;
-    }
+//    for(const auto& bin : m_bin_edges)
+//    {
+//        std::cout << bin.D2low << " " << bin.D2high << " " << bin.D1low << " " << bin.D1high
+//                  << std::endl;
+//    }
 
     m_hpred    = nullptr;
     m_hmc      = nullptr;
@@ -239,6 +239,7 @@ void AnaSample::FillEventHist(int datatype, bool stat_fluc)
                 continue;
             }
 #endif
+//            std::cout << "j=" << j << " / val=" << val << std::endl;
             m_hdata->SetBinContent(j, val);
         }
     }

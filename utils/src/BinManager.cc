@@ -134,6 +134,7 @@ int BinManager::GetBinIndex(const std::vector<double>& val) const
     if(val.size() != dimension)
     {
         std::cout << "[ERROR]: Number of parameters does not match dimension!" << std::endl;
+        exit(EXIT_FAILURE);
         return -1;
     }
 
@@ -159,6 +160,7 @@ int BinManager::GetBinIndex(const std::vector<double>& val, const int val_nutype
     if(val.size() != dimension)
     {
         std::cout << "[ERROR]: Number of parameters does not match dimension!" << std::endl;
+        exit(EXIT_FAILURE);
         return -1;
     }
 

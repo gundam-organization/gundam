@@ -48,6 +48,11 @@ public:
     bool Fit(const std::vector<AnaSample*>& samples, int fit_type, bool stat_fluc);
     void ParameterScans(const std::vector<int>& param_list, unsigned int nsteps);
 
+    TMatrixD GetPriorCovarianceMatrix();
+    TMatrixD GetPosteriorCovarianceMatrix();
+
+    void WriteCovarianceMatrices();
+
     void SetMinSettings(const MinSettings& ms);
     void SetSeed(int seed);
     void SetZeroSyst(bool flag) { m_zerosyst = flag; }

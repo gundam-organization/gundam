@@ -13,6 +13,23 @@ foreach(mod ${MODULETargets})
   target_link_libraries(xsllhCalcXsec ${mod})
 endforeach()
 
+
+# xsllhND280UpPhysics.cxx
+add_executable(xsllhND280UpPhysics xsllhND280UpFit.cxx)
+
+set_target_properties(xsllhND280UpPhysics PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
+
+foreach(mod ${MODULES})
+    target_include_directories(xsllhND280UpPhysics PUBLIC ${CMAKE_SOURCE_DIR}/${mod}/src)
+    target_include_directories(xsllhND280UpPhysics PUBLIC ${CMAKE_SOURCE_DIR}/include)
+endforeach()
+
+foreach(mod ${MODULETargets})
+    cmessage(STATUS "Linking with: ${mod}")
+    target_link_libraries(xsllhND280UpPhysics ${mod})
+endforeach()
+
+
 #xsllhDetVariations
 add_executable(xsllhDetVar xsllhDetVariations.cxx)
 
@@ -73,6 +90,21 @@ foreach(mod ${MODULETargets})
   target_link_libraries(xsllhTreeConvert ${mod})
 endforeach()
 
+#xsllhGenWeightsBinner
+add_executable(xsllhGenWeightsBinner xsllhGenWeightsBinner.cxx)
+
+set_target_properties(xsllhGenWeightsBinner PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
+
+foreach(mod ${MODULES})
+    target_include_directories(xsllhGenWeightsBinner PUBLIC ${CMAKE_SOURCE_DIR}/${mod}/src)
+    target_include_directories(xsllhGenWeightsBinner PUBLIC ${CMAKE_SOURCE_DIR}/include)
+endforeach()
+
+foreach(mod ${MODULETargets})
+    cmessage(STATUS "Linking with: ${mod}")
+    target_link_libraries(xsllhGenWeightsBinner ${mod})
+endforeach()
+
 #xsllhUnitTests
 add_executable(xsllhUnitTest xsllhUnitTests.cxx)
 
@@ -104,4 +136,4 @@ foreach(mod ${MODULETargets})
 endforeach()
 
 #install targets
-install(TARGETS xsllhCalcXsec xsllhFit xsllhDetVar xsllhPlot xsllhTreeConvert xsllhUnitTest xsllhXsecCov DESTINATION bin)
+install(TARGETS xsllhCalcXsec xsllhND280UpPhysics xsllhFit xsllhDetVar xsllhPlot xsllhTreeConvert xsllhGenWeightsBinner xsllhUnitTest xsllhXsecCov DESTINATION bin)
