@@ -125,8 +125,8 @@ void XsecParameters::ReWeight(AnaEvent* event, const std::string& det, int nsamp
     {
         int idx = m_dial_evtmap[nsample][nevent][d];
         double dial_weight = v_dials[d].GetBoundedValue(idx, params[d + m_offset.at(det)]);
-//        if(fabs(dial_weight)>10){
-//            std::cout << "nsample=" << nsample << " / dial_weight=" << dial_weight << std::endl;
+//        if(fabs(dial_weight) != 1 or true){
+//            std::cout << "parameter:" << d << " / param_value = " << params[d + m_offset.at(det)] << " / nsample=" << nsample << " / dial_weight=" << dial_weight << std::endl;
 //        }
         weight *= dial_weight;
 

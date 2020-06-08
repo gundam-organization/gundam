@@ -74,7 +74,7 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
         cmessage(FATAL_ERROR "Clang version must be at least 3.3")
     endif()
 else()
-    message(WARNING "You are using an untested compiler.")
+    #message(WARNING "You are using an untested compiler.")
 endif()
 
 set(CMAKE_CXX_STANDARD 11)

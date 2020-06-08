@@ -1,11 +1,8 @@
 #include <algorithm>
 #include <cmath>
-#include <cstdlib>
-#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <map>
-#include <sstream>
 #include <string>
 #include <unistd.h>
 #include <vector>
@@ -13,7 +10,6 @@
 #include "TCanvas.h"
 #include "TFile.h"
 #include "TH1.h"
-#include "TH2.h"
 #include "TMatrixT.h"
 #include "TMatrixTSym.h"
 #include "TStyle.h"
@@ -28,14 +24,16 @@ using json = nlohmann::json;
 #include "ProgressBar.hh"
 
 // Structure that holds the options and the binning for a file specified in the .json config file:
-struct FileOptions
-{
+struct FileOptions {
+
+    FileOptions() = default;
+
     std::string fname_input;
     std::string tree_name;
     std::string detector;
-    unsigned int num_samples;
-    unsigned int num_toys;
-    unsigned int num_syst;
+    unsigned int num_samples{};
+    unsigned int num_toys{};
+    unsigned int num_syst{};
     std::vector<int> cuts;
     std::map<int, std::vector<int>> samples;
 
@@ -43,12 +41,47 @@ struct FileOptions
     std::vector<std::map<std::string, std::vector<int>>> variable_mapping;
 
     // Number of variable names:
-    unsigned int num_var_names;
+    unsigned int num_var_names{};
 
     // Names of all variables:
     std::vector<std::string> variable_names;
 
     std::vector<BinManager> bin_manager;
+
+    FileOptions(const FileOptions& source_){
+
+        fname_input = source_.fname_input;
+        tree_name = source_.tree_name;
+        detector = source_.detector;
+
+        num_samples = source_.num_samples;
+        num_toys = source_.num_toys;
+        num_syst = source_.num_syst;
+
+        for(const auto& cut: source_.cuts ) cuts.emplace_back(cut);
+        for(const auto& sample: source_.samples ) samples[sample.first] = sample.second;
+        for(const auto& a_variable_mapping: source_.variable_mapping ){
+            variable_mapping.emplace_back(std::map<std::string, std::vector<int>>());
+            for(const auto& var: a_variable_mapping){
+                variable_mapping.back()[var.first] = std::vector<int>();
+                for(const auto& map: var.second){
+                    variable_mapping.back()[var.first].emplace_back(map);
+                }
+            }
+        }
+
+        num_var_names = source_.num_var_names;
+
+        for(const auto& variable_name: source_.variable_names){
+            variable_names.emplace_back(variable_name);
+        }
+
+        for(const auto& bin: source_.bin_manager){
+            bin_manager.emplace_back(bin);
+        }
+
+    }
+
 };
 
 int main(int argc, char** argv)
@@ -72,7 +105,7 @@ int main(int argc, char** argv)
 
     // Initialize json_file with the name parsed from the command line using -j. Print USAGE and exit when -h is used:
     char option;
-    while((option = getopt(argc, argv, "j:h")) != -1)
+    while((option = char(getopt(argc, argv, "j:h"))) != -1)
     {
         switch(option)
         {
@@ -131,7 +164,7 @@ int main(int argc, char** argv)
     cov_bin_manager.resize(num_cov_samples);
 
     // Loop over all the different samples:
-    for(const auto& kv : temp_cov_binning)
+    for( const auto& kv : temp_cov_binning )
     {
         //cov_bin_manager.at(std::stoi(kv.first)) = std::move(BinManager(kv.second));
         // Get the sample number and name of the binning file for the current sample:
@@ -139,7 +172,7 @@ int main(int argc, char** argv)
         std::string binning_file = kv.second;
 
         // Set up the binning from the binning text file and fill the cov_bin_manager vector with it:
-        cov_bin_manager.at(sample_number) = std::move(BinManager(binning_file));        
+        cov_bin_manager.at(sample_number) = BinManager(binning_file);
     }
 
     // Number of usable toys:
@@ -149,33 +182,33 @@ int main(int argc, char** argv)
     std::vector<FileOptions> v_files;
 
     // Loop over all input Highland ROOT files:
-    for(const auto& file : j["files"])
+    for(const auto& json_input_file : j["files"])
     {
         // Only consider the files which have the "use" key set to true:
-        if(file["use"])
+        if(json_input_file["use"])
         {
             // If there is a "flist" key present in the .json config file, we add from the corresponding text file:
-            if(file.find("flist") != file.end())
+            if(json_input_file.find("flist") != json_input_file.end())
             {
                 // Text file containing all files to be read in:
-                std::ifstream in(file["flist"]);
+                std::ifstream in(json_input_file["flist"]);
                 std::string filename;
 
                 // Loop over lines of text file with the file list and add contents to the v_files vector:
                 while(std::getline(in, filename))
                 {
                     // Fill the FileOptions struct f with the file options in the .json config file:
-                    FileOptions f;
-                    f.fname_input = filename;
-                    f.tree_name   = file["tree_name"];
-                    f.detector    = file["detector"];
-                    f.num_toys    = file["num_toys"];
-                    f.num_syst    = file["num_syst"];
-                    f.num_samples = file["num_samples"];
-                    f.cuts        = file["cuts"].get<std::vector<int>>();
+                    FileOptions f_opt;
+                    f_opt.fname_input = filename;
+                    f_opt.tree_name   = json_input_file["tree_name"];
+                    f_opt.detector    = json_input_file["detector"];
+                    f_opt.num_toys    = int(json_input_file["num_toys"]);
+                    f_opt.num_syst    = json_input_file["num_syst"];
+                    f_opt.num_samples = json_input_file["num_samples"];
+                    f_opt.cuts        = json_input_file["cuts"].get<std::vector<int>>();
 
                     // temp_json is a map between sample numbers and selection branches in the Highland ROOT file (as specified in the .json config file):
-                    std::map<std::string, std::vector<int>> temp_json = file["samples"];
+                    std::map<std::string, std::vector<int>> temp_json = json_input_file["samples"];
 
                     // Loop over all the samples of the current file:
                     for(const auto& kv : temp_json)
@@ -185,7 +218,7 @@ int main(int argc, char** argv)
 
                         // If the number of the current sample is less than or equal to the total number of samples, we add an entry to the samples map of the FileOptions struct f (this is a map between sample number and a vector containing the selection branch numbers of the Highland ROOT file):
                         if(sam <= num_cov_samples)
-                            f.samples.emplace(std::make_pair(sam, kv.second));
+                            f_opt.samples.emplace(std::make_pair(sam, kv.second));
 
                         // If the nuber of the current sample is greater than the total number of samples, an error is thrown:
                         else
@@ -196,8 +229,8 @@ int main(int argc, char** argv)
                     }
 
                     // Get the mapping of variable names to branch numbers:
-                    std::vector<std::map<std::string, std::vector<int>>> var_map_temp = file["variable_mapping"];
-                    f.variable_mapping = var_map_temp;
+                    std::vector<std::map<std::string, std::vector<int>>> var_map_temp = json_input_file["variable_mapping"];
+                    f_opt.variable_mapping = var_map_temp;
 
                     // Get the variable names and their total number:
                     unsigned int number_var_names = 0;
@@ -211,33 +244,34 @@ int main(int argc, char** argv)
                             variable_names_temp.emplace_back(kv.first);
                         }
                     }
-                    f.num_var_names = number_var_names;
-                    f.variable_names = variable_names_temp;
+                    f_opt.num_var_names = number_var_names;
+                    f_opt.variable_names = variable_names_temp;
 
                     // Add the file options of the current file to the vector v_files:
-                    v_files.emplace_back(f);
+                    v_files.emplace_back(f_opt);
 
                     // As usable_toys was set to zero previously, this condition will be fulfilled and usable_toys will be set to the number of usable toys as specified in the .json config file:
-                    if(f.num_toys < usable_toys || usable_toys == 0)
-                        usable_toys = f.num_toys;
+                    if(f_opt.num_toys < usable_toys || usable_toys == 0)
+                        usable_toys = f_opt.num_toys;
                 }
             }
 
             // Otherwise we use the "fname_input" key to get the name of the file which is to be read in:
             else
             {
+
                 // Fill the FileOptions struct f with the file options in the .json config file:
-                FileOptions f;
-                f.fname_input = file["fname_input"];
-                f.tree_name   = file["tree_name"];
-                f.detector    = file["detector"];
-                f.num_toys    = file["num_toys"];
-                f.num_syst    = file["num_syst"];
-                f.num_samples = file["num_samples"];
-                f.cuts        = file["cuts"].get<std::vector<int>>();
+                FileOptions f_opt;
+                f_opt.fname_input = json_input_file["fname_input"];
+                f_opt.tree_name   = json_input_file["tree_name"];
+                f_opt.detector    = json_input_file["detector"];
+                f_opt.num_toys    = int(json_input_file["num_toys"]);
+                f_opt.num_syst    = json_input_file["num_syst"];
+                f_opt.num_samples = json_input_file["num_samples"];
+                f_opt.cuts        = json_input_file["cuts"].get<std::vector<int>>();
 
                 // temp_json is a map between sample numbers and selection branches in the Highland ROOT file (as specified in the .json config file):
-                std::map<std::string, std::vector<int>> temp_json = file["samples"];
+                std::map<std::string, std::vector<int>> temp_json = json_input_file["samples"];
 
                 // Loop over all the samples of the current file:
                 for(const auto& kv : temp_json)
@@ -247,7 +281,7 @@ int main(int argc, char** argv)
 
                     // If the number of the current sample is less than or equal to the total number of samples, we add an entry to the samples map of the FileOptions struct f (this is a map between sample number and a vector containing the selection branch numbers of the Highland ROOT file):
                     if(sam <= num_cov_samples)
-                        f.samples.emplace(std::make_pair(sam, kv.second));
+                        f_opt.samples.emplace(std::make_pair(sam, kv.second));
 
                     // If the nuber of the current sample is greater than the total number of samples, an error is thrown:
                     else
@@ -258,8 +292,8 @@ int main(int argc, char** argv)
                 }
 
                 // Get the mapping of variable names to branch numbers:
-                std::vector<std::map<std::string, std::vector<int>>> var_map_temp = file["variable_mapping"];
-                f.variable_mapping = var_map_temp;
+                std::vector<std::map<std::string, std::vector<int>>> var_map_temp = json_input_file["variable_mapping"];
+                f_opt.variable_mapping = var_map_temp;
 
                 // Get the variable names and their total number:
                 unsigned int number_var_names = 0;
@@ -273,15 +307,15 @@ int main(int argc, char** argv)
                         variable_names_temp.emplace_back(kv.first);
                     }
                 }
-                f.num_var_names = number_var_names;
-                f.variable_names = variable_names_temp;
+                f_opt.num_var_names = number_var_names;
+                f_opt.variable_names = variable_names_temp;
 
                 // Add the file options of the current file to the vector v_files:
-                v_files.emplace_back(f);
+                v_files.emplace_back(f_opt);
 
                 // As usable_toys was set to zero previously, this condition will be fulfilled and usable_toys will be set to the number of usable toys as specified in the .json config file:
-                if(f.num_toys < usable_toys || usable_toys == 0)
-                    usable_toys = f.num_toys;
+                if(f_opt.num_toys < usable_toys || usable_toys == 0)
+                    usable_toys = f_opt.num_toys;
             }
         }
     }
@@ -347,7 +381,7 @@ int main(int argc, char** argv)
                 // Create a new ROOT TH1F histogram (name and title are ss, number of bins is the size of v_bins minus 1, and the binning is given by bin edges of the plot_variable) and add it to the v_temp vector of the current sample:
                 v_temp.emplace_back(
                     TH1F(ss.str().c_str(), ss.str().c_str(), v_bins.size() - 1, &v_bins[0]));
-                
+
                 // If it is the very first toy, we create new ROOT TH1F histograms for holding the averages and the MC statistical errors and add them to the v_avg and v_mc_stat vectors (these will have the same length as the number of samples):
                 if(t == 0)
                 {
@@ -392,27 +426,27 @@ int main(int argc, char** argv)
               << TAG << "Reading events from files..." << std::endl;
 
     // Loop over all files specified in the .json config file:
-    for(const auto& file : v_files)
+    for(const auto& file_ : v_files)
     {
         // Declare some variables that will hold the values that we need from the input ROOT files:
         int NTOYS = 0;
-        int accum_level[file.num_toys][file.num_samples];
-        float hist_variables[file.num_var_names][file.num_toys];
-        float weight_syst_total_noflux[file.num_toys];
-        float weight_syst[file.num_toys][file.num_syst];
+        int accum_level[file_.num_toys][file_.num_samples];
+        float hist_variables[file_.num_var_names][file_.num_toys];
+        float weight_syst_total_noflux[file_.num_toys];
+        float weight_syst[file_.num_toys][file_.num_syst];
 
-        int accum_level_mc[file.num_toys][file.num_samples];
-        float hist_variables_mc[file.num_var_names];
+        int accum_level_mc[file_.num_toys][file_.num_samples];
+        float hist_variables_mc[file_.num_var_names];
         float weight_syst_total_noflux_mc;
 
         // Print some information about which file is opened, which tree is read in, the number of toys and systematics, and which selection branches are mapped to which selection samples:
-        std::cout << TAG << "Opening file: " << file.fname_input << std::endl
-                  << TAG << "Reading tree: " << file.tree_name << std::endl
-                  << TAG << "Num Toys: " << file.num_toys << std::endl
-                  << TAG << "Num Syst: " << file.num_syst << std::endl;
+        std::cout << TAG << "Opening file: " << file_.fname_input << std::endl
+                  << TAG << "Reading tree: " << file_.tree_name << std::endl
+                  << TAG << "Num Toys: " << file_.num_toys << std::endl
+                  << TAG << "Num Syst: " << file_.num_syst << std::endl;
 
         std::cout << TAG << "Branch to Sample mapping:" << std::endl;
-        for(const auto& kv : file.samples)
+        for(const auto& kv : file_.samples)
         {
             std::cout << TAG << "Sample " << kv.first << ": ";
             for(const auto& b : kv.second)
@@ -421,21 +455,21 @@ int main(int argc, char** argv)
         }
 
         // Open current ROOT input file and access the default tree and the one specified in the .json config file (e.g, all_syst):
-        TFile* file_input = TFile::Open(file.fname_input.c_str(), "READ");
-        TTree* tree_event = (TTree*)file_input->Get(file.tree_name.c_str());
-        TTree* tree_default = (TTree*)file_input->Get("default");
+        TFile* file_input = TFile::Open(file_.fname_input.c_str(), "READ");
+        auto* tree_event = (TTree*)file_input->Get(file_.tree_name.c_str());
+        auto* tree_default = (TTree*)file_input->Get("default");
 
         // Set the branch addresses for the selected tree to the previously declared variables:
-        tree_event->SetBranchAddress("NTOYS", &NTOYS);
-        tree_event->SetBranchAddress("accum_level", accum_level);
-        tree_event->SetBranchAddress("weight_syst", weight_syst);
-        tree_event->SetBranchAddress("weight_syst_total", weight_syst_total_noflux);
+//        tree_event->SetBranchAddress("NTOYS", &NTOYS);
+//        tree_event->SetBranchAddress("accum_level", accum_level);
+//        tree_event->SetBranchAddress("weight_syst", weight_syst);
+//        tree_event->SetBranchAddress("weight_syst_total", weight_syst_total_noflux);
 
         // Loop over all the variable names specified in the .json config file (e.g., selmu_mom, selmu_mom_range_oarecon and selmu_costheta):
-        for(unsigned int i = 0; i < file.num_var_names; ++i)
+        for(unsigned int i = 0; i < file_.num_var_names; ++i)
         {
             // Set the branch address of the current variable of the hist_variables (declared above) array to the variable name:
-            tree_event->SetBranchAddress(file.variable_names[i].c_str(), hist_variables[i]);
+            tree_event->SetBranchAddress(file_.variable_names[i].c_str(), hist_variables[i]);
         }
 
         // Set the branch addresses for the default tree to the previously declared variables:
@@ -443,10 +477,10 @@ int main(int argc, char** argv)
         tree_default->SetBranchAddress("weight_syst_total", &weight_syst_total_noflux_mc);
 
         // Loop over all the variable names specified in the .json config file (e.g., selmu_mom, selmu_mom_range_oarecon and selmu_costheta):
-        for(unsigned int i = 0; i < file.num_var_names; ++i)
+        for(unsigned int i = 0; i < file_.num_var_names; ++i)
         {
             // Set the branch address of the current variable of the hist_variables_mc (declared above) array to the variable name:
-            tree_default->SetBranchAddress(file.variable_names[i].c_str(), &hist_variables_mc[i]);
+            tree_default->SetBranchAddress(file_.variable_names[i].c_str(), &hist_variables_mc[i]);
         }
 
         // Numbers which will hold the number of rejected events, number of events which passed all the cuts, and total number of events:
@@ -464,10 +498,10 @@ int main(int argc, char** argv)
             tree_event->GetEntry(i);
 
             // If the number of toys from the input ROOT file does not match the number of toys specified in the .json config file, an error message is printed:
-            if(NTOYS != file.num_toys)
-                std::cout << ERR << "Incorrect number of toys specified!" << std::endl;
+//            if(NTOYS != file_.num_toys)
+//                std::cerr << ERR << "Incorrect number of toys specified!" << std::endl;
 
-            // Update progress bar every 2000 events (or if it is the last event):
+//          Update progress bar every 2000 events (or if it is the last event):
             if(i % 2000 == 0 || i == (num_events - 1))
                 pbar.Print(i, num_events - 1);
 
@@ -475,7 +509,8 @@ int main(int argc, char** argv)
             for(unsigned int t = 0; t < usable_toys; ++t)
             {
                 // Loop over all selection samples:
-                for(const auto& kv : file.samples)
+                std::map<int, std::vector<int>> my_samples = file_.samples;
+                for(const auto& kv : my_samples)
                 {
                     // s is the sample number:
                     unsigned int s = kv.first;
@@ -484,7 +519,7 @@ int main(int argc, char** argv)
                     for(const auto& branch : kv.second)
                     {
                         // Only consider events that passed the selection (accum_level is higher than the given cut for this branch):
-                        if(accum_level[t][branch] > file.cuts[branch])
+                        if(accum_level[t][branch] > file_.cuts[branch])
                         {
                             // Get the names and locations (indices) of the kinematic variables for the current branch:
                             std::vector<std::string> variable_names_current_branch;
@@ -497,12 +532,12 @@ int main(int argc, char** argv)
                                 int loc_current_var = 0;
 
                                 // Loop over the number of variables used for the current kinematic variable:
-                                for(const auto& kv : file.variable_mapping[Var])
+                                for(const auto& kv_ : file_.variable_mapping[Var])
                                 {
                                     // If the current branch is in the vector of branch numbers for current variable, we add the current variable name to variable_names_current_branch:
-                                    if(std::find(kv.second.begin(), kv.second.end(), branch) != kv.second.end())
+                                    if(std::find(kv_.second.begin(), kv_.second.end(), branch) != kv_.second.end())
                                     {
-                                        variable_names_current_branch.push_back(kv.first);
+                                        variable_names_current_branch.push_back(kv_.first);
                                         variable_loc_current_branch.push_back(loc_current_var);
                                         break;
                                     }
@@ -517,7 +552,7 @@ int main(int argc, char** argv)
 
                             // If do_projection is true, plots are saved with axis as kinematic variable (specified in .json config file, e.g., selmu_mom) instead of bin number. In this case idx will be the value of the plot variable (e.g., selmu_mom) for the current toy of this event:
                             if(do_projection)
-                                idx = hist_variables[variable_loc_current_branch[var_plot]][t];
+                                idx = int(hist_variables[variable_loc_current_branch[var_plot]][t]);
 
                             // If do_projection is false, plots are saved with axis as bin number (instead of kinematic variable). In this case idx will be the index of the bin that this event/toy falls in:
                             else
@@ -533,9 +568,9 @@ int main(int argc, char** argv)
                                 {
                                     int current_index = variable_loc_current_branch[v] + count;
                                     vars.push_back(hist_variables[current_index][t]);
-                                    count += file.variable_mapping[v].size();
+                                    count += file_.variable_mapping[v].size();
                                 }
-                                
+
                                 // We get the index of the bin for this event and this sample (as specified in the cov_sample_binning files) and set idx equal to it:
                                 idx = cov_bin_manager[s].GetBinIndex(vars);
                             }
@@ -543,18 +578,18 @@ int main(int argc, char** argv)
                             // If "single_syst" has been set to true in the .json config file, the weight for the current event and toy will be the weight given by this single systematic (which needs to be given the correct index in the .json config file). Otherwise the weight will be the total weight for this event and toy:
                             float weight = do_single_syst ? weight_syst[t][syst_idx]
                                                           : weight_syst_total_noflux[t];
-                            
+
                             // If the weight for this event and toy is between zero and the weight cut set in the .json config file, we fill the ROOT histogram for the current sample and toy with the weight of the event in the bin that this event falls in. We also fill the average histogram for the current sample (for all toys) with the weight divided by the number of toys:
                             if(weight > 0.0 && weight < weight_cut)
                             {
                                 v_hists[s][t].Fill(idx, weight);
-                                v_avg[s].Fill(idx, weight / file.num_toys);
+                                v_avg[s].Fill(idx, weight / double(file_.num_toys));
                             }
 
                             // If the weight for this event and toy is less than zero or greater than the weight cut, we ignore the event and increase the rejected_weights number by 1:
                             else
                                 rejected_weights++;
-                            
+
                             // total_weights is the number of events that passed all selection cuts. This is increased by 1:
                             total_weights++;
 
@@ -579,7 +614,7 @@ int main(int argc, char** argv)
             tree_default->GetEntry(i);
 
             // Loop over all selection samples:
-            for(const auto& kv : file.samples)
+            for(const auto& kv : file_.samples)
             {
                 // s is the sample number:
                 unsigned int s = kv.first;
@@ -588,7 +623,7 @@ int main(int argc, char** argv)
                 for(const auto& branch : kv.second)
                 {
                     // Only consider events that passed the selection (accum_level is higher than the given cut for this branch):
-                    if(accum_level_mc[0][branch] > file.cuts[branch])
+                    if(accum_level_mc[0][branch] > file_.cuts[branch])
                     {
                     // Get the names and locations (indices) of the kinematic variables for the current branch:
                         std::vector<std::string> variable_names_current_branch;
@@ -601,12 +636,12 @@ int main(int argc, char** argv)
                             int loc_current_var = 0;
 
                             // Loop over the number of variables used for the current kinematic variable:
-                            for(const auto& kv : file.variable_mapping[Var])
+                            for(const auto& kv_ : file_.variable_mapping[Var])
                             {
                                 // If the current branch is in the vector of branch numbers for current variable, we add the current variable name to variable_names_current_branch:
-                                if(std::find(kv.second.begin(), kv.second.end(), branch) != kv.second.end())
+                                if(std::find(kv_.second.begin(), kv_.second.end(), branch) != kv_.second.end())
                                 {
-                                    variable_names_current_branch.push_back(kv.first);
+                                    variable_names_current_branch.push_back(kv_.first);
                                     variable_loc_current_branch.push_back(loc_current_var);
                                     break;
                                 }
@@ -621,7 +656,7 @@ int main(int argc, char** argv)
 
                         // If do_projection is true, plots are saved with axis as kinematic variable (specified in .json config file, e.g., selmu_mom) instead of bin number. In this case idx will be the value of the current plot variable (e.g., selmu_mom) for the current event:
                         if(do_projection)
-                            idx = hist_variables_mc[variable_loc_current_branch[var_plot]];
+                            idx = int(hist_variables_mc[variable_loc_current_branch[var_plot]]);
 
                         // If do_projection is false, plots are saved with axis as bin number (instead of kinematic variable). In this case idx will be the index of the bin that this event falls in:
                         else
@@ -637,7 +672,7 @@ int main(int argc, char** argv)
                             {
                                 int current_index = variable_loc_current_branch[v] + count;
                                 vars.push_back(hist_variables_mc[current_index]);
-                                count += file.variable_mapping[v].size();
+                                count += file_.variable_mapping[v].size();
                             }
 
                             // We get the index of the bin for this event and this sample (as specified in the cov_sample_binning files) and set idx equal to it:
@@ -704,11 +739,11 @@ int main(int argc, char** argv)
                         // Get the bin content of bin b (sum of all weights of events that fall into this bin) for current sample s and toy t, and add this to i_toy vector:
                         i_toy.emplace_back(v_hists[s][t].GetBinContent(b + 1));
                     }
-                    
+
             }
 
             // Add the vector with the bin content for all samples for current toy t to the v_toys vector:
-            v_toys.emplace_back(i_toy);            
+            v_toys.emplace_back(i_toy);
         }
 
         // Loop over all samples:
@@ -731,7 +766,7 @@ int main(int argc, char** argv)
                 //std::cout << "W2  : " << w2[b+1] << std::endl;
 
                 // Compute the relative error for current sample s and current bin b:
-                float rel_error = w2[b+1] / (w[b+1] * w[b+1]);
+                float rel_error = float(w2[b+1]) / (w[b+1] * w[b+1]);
 
                 // Add the relative error for current sample and bin to the v_mc_error vector:
                 v_mc_error.emplace_back(rel_error);
@@ -773,14 +808,14 @@ int main(int argc, char** argv)
             for(unsigned int i = 0; i < num_elements; ++i)
             {
                 // Second loop over all bins in all samples:
-                for(unsigned int j = 0; j < num_elements; ++j)
+                for(unsigned int j_ = 0; j_ < num_elements; ++j_)
                 {
                     // Only compute the matrix element, if the denominators in the expression below are both not zero:
-                    if(v_mean[i] != 0 && v_mean[j] != 0)
+                    if(v_mean[i] != 0 && v_mean[j_] != 0)
                     {
                         // Compute current matrix element of the covariance matrix:
-                        cov_mat(i, j) += (1.0 - v_toys[t][i] / v_mean[i])
-                                         * (1.0 - v_toys[t][j] / v_mean[j]) / (1.0 * usable_toys);
+                        cov_mat(i, j_) += (1.0 - v_toys[t][i] / v_mean[i])
+                                         * (1.0 - v_toys[t][j_] / v_mean[j_]) / (1.0 * usable_toys);
                     }
                 }
             }
@@ -810,18 +845,18 @@ int main(int argc, char** argv)
         for(unsigned int i = 0; i < num_elements; ++i)
         {
             // Second loop over all bins in all samples:
-            for(unsigned int j = 0; j < num_elements; ++j)
+            for(unsigned int j_ = 0; j_ < num_elements; ++j_)
             {
                 // Get the diagonal entries of the covariance matrix:
                 double bin_i  = cov_mat(i, i);
-                double bin_j  = cov_mat(j, j);
+                double bin_j  = cov_mat(j_, j_);
 
                 // Compute current matrix element of the correlation matrix:
-                cor_mat(i, j) = cov_mat(i, j) / std::sqrt(bin_i * bin_j);
+                cor_mat(i, j_) = cov_mat(i, j_) / std::sqrt(bin_i * bin_j);
 
                 // If the current matrix element is a nan, we set it to zero:
-                if(std::isnan(cor_mat(i, j)))
-                    cor_mat(i, j) = 0;
+                if(std::isnan(cor_mat(i, j_)))
+                    cor_mat(i, j_) = 0;
             }
         }
     }
@@ -891,6 +926,6 @@ int main(int argc, char** argv)
     // Print Arigatou Gozaimashita with Rainbowtext :)
     std::cout << TAG << color::RainbowText("\u3042\u308a\u304c\u3068\u3046\u3054\u3056\u3044\u307e\u3057\u305f\uff01")
               << std::endl;
-    
+
     return 0;
 }

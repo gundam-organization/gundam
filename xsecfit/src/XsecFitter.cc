@@ -484,6 +484,7 @@ double XsecFitter::FillSamples(std::vector<std::vector<double>>& new_pars, int d
             // Loop over all the different parameter types such as [template, flux, detector, cross section]:
             for(int j = 0; j < m_fitpara.size(); ++j)
             {
+//                std::cout << "Reweighting for "<< m_fitpara[j]->GetName() << std::endl;
                 // Multiply the current event weight for event ev with the paramter of the current parameter type for the (truth bin)/(reco bin)/(energy bin) that this event falls in:
                 m_fitpara[j]->ReWeight(ev, det, s, i, new_pars[j]);
             }
@@ -548,9 +549,9 @@ double XsecFitter::CalcLikelihood(const double* par)
         // Loop over fit parameters for this parameter type:
         for(int j = 0; j < npar; ++j)
         {
-            //if(output_chi2)
-            //    std::cout << "Parameter " << j << " for " << m_fitpara[i]->GetName()
-            //              << " has value " << par[k] << std::endl;
+//            if(output_chi2)
+//                std::cout << "Parameter " << j << " for " << m_fitpara[i]->GetName()
+//                          << " has value " << par[k] << std::endl;
             
             // Fill vec with the parameter values of this iteration for this parameter type:
             vec.push_back(par[k++]);

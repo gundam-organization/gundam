@@ -160,6 +160,12 @@ std::string get_current_working_folder_path(){
     return cwd;
 
 }
+std::string to_lower_case(std::string &input_str_){
+    std::string output_str(input_str_);
+    std::transform(output_str.begin(), output_str.end(), output_str.begin(),
+                   [](unsigned char c){ return std::tolower(c); });
+    return output_str;
+}
 
 std::vector<std::string> read_file(std::string file_path_){
 

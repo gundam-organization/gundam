@@ -2,6 +2,8 @@
 test/
 build/
 site/
+inputs/
+cmake-build-debug/
 
 # Misc Files
 *.root

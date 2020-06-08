@@ -38,6 +38,7 @@ bool do_tfile_is_valid(TFile *input_tfile_, bool check_if_writable_ = false);
 
 std::string join_vector_string(std::vector<std::string> string_list_, std::string delimiter_, int begin_index_ = 0, int end_index_ = 0);
 std::string get_current_working_folder_path();
+std::string to_lower_case(std::string &input_str_);
 
 std::vector<std::string> read_file(std::string file_path_);
 std::vector<std::string> split_string(std::string& input_string_, std::string delimiter_);

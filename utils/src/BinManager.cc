@@ -11,6 +11,35 @@ BinManager::BinManager(const std::string& filename, bool UseNutypeBeammode)
     SetBinning(fname_binning, UseNutypeBeammode);
 }
 
+BinManager::BinManager(const BinManager& source_){
+
+    nbins = source_.nbins;
+    dimension = source_.dimension;
+    fname_binning = source_.fname_binning;
+
+    for(const auto& bin_edge_row: source_.bin_edges){
+        bin_edges.emplace_back(std::vector<std::pair<double, double>>());
+        for(const auto& bin_edge_col: bin_edge_row){
+            bin_edges.back().emplace_back(std::pair<double, double>(bin_edge_col.first,bin_edge_col.second));
+        }
+    }
+
+    for(const auto& bin_row: source_.bin_nutype){
+        bin_nutype.emplace_back(std::vector<int>());
+        for(const auto& bin_col: bin_row){
+            bin_nutype.back().emplace_back(bin_col);
+        }
+    }
+
+    for(const auto& bin_row: source_.bin_beammode){
+        bin_beammode.emplace_back(std::vector<int>());
+        for(const auto& bin_col: bin_row){
+            bin_beammode.back().emplace_back(bin_col);
+        }
+    }
+
+}
+
 // Reads in a binning text file with the binning and stores it in bin_edges vector:
 int BinManager::SetBinning(const std::string& filename, bool UseNutypeBeammode)
 {
@@ -131,6 +160,7 @@ int BinManager::GetNbins() const
 
 int BinManager::GetBinIndex(const std::vector<double>& val) const
 {
+//    std::cerr << "dimension = " << dimension << std::endl;
     if(val.size() != dimension)
     {
         std::cout << "[ERROR]: Number of parameters does not match dimension!" << std::endl;

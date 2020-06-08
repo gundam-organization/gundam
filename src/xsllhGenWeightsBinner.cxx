@@ -31,10 +31,13 @@ std::string __tree_converter_file_path__;
 std::string __covariance_matrix_file_path__;
 
 std::vector<std::string> __genweights_file_path_list__;
-std::vector<std::string> __systematic_Xsec_names_list__;
+std::vector<std::string> __systematic_Xsec_spline_names_list__;
 std::map<std::string, std::string> __from_Xsec_to_genWeights__;
+std::vector<std::string> __relative_variation_component_list__;
 std::map<std::string, int> __samples_name_to_index__;
 std::map<std::string, int> __reaction_name_to_index__;
+std::map<std::string, double> __parameter_nominal_values_map__;
+std::map<std::string, double> __parameter_error_map__;
 
 TFile* __input_genWeights_tfile__;
 TTree* __sample_sum__;
@@ -54,7 +57,8 @@ std::map<std::string, TFile*> __output_tfile_splines__;
 std::vector<xsllh::FitBin> __bin_edges__;
 
 std::vector<std::string> __missing_splines__;
-std::vector<std::string> __norm_splines__;
+std::vector<std::string> __systematics_norm_splines_names_list__;
+std::vector<std::string> __systematics_names_list__;
 
 std::vector<int> __samples_list__;
 std::vector<int> __reactions_list__;
@@ -90,6 +94,11 @@ void build_tree_sync_cache();
 void map_tree_converter_entries();
 void fill_component_mapping();
 
+void fill_parameter_nominal_values();
+double from_relative_par_value_to_absolute(std::string par_name_,
+                                           double deviation_param_value_);
+
+bool do_syst_param_has_relative_X_scale(std::string& syst_name_);
 
 int main(int argc, char** argv)
 {
@@ -102,8 +111,13 @@ int main(int argc, char** argv)
 
     initialize_objects();
     get_list_of_parameters();
-    create_norm_splines();
+    fill_parameter_nominal_values();
 
+    for( auto &syst_name : __systematics_names_list__){
+        std::cout << ALERT << syst_name << " is relative ? " << do_syst_param_has_relative_X_scale(syst_name) << std::endl;
+    }
+
+    create_norm_splines();
 
     //////////////////////////////////////////////////////////////////////
     //  READING GENWEIGHTS FILES
@@ -140,7 +154,7 @@ int main(int argc, char** argv)
         int nb_of_samples = __sample_sum__->GetLeaf("NSamples")->GetValue(0);
         std::map<std::string, TClonesArray*> clone_array_map;
         GenericToolbox::toggle_quiet_root();
-        for( auto &syst_name : __systematic_Xsec_names_list__){
+        for( auto &syst_name : __systematic_Xsec_spline_names_list__){
 
             if(__output_tfile_splines__[syst_name] == nullptr){
                 __output_tfile_splines__[syst_name] = TFile::Open(
@@ -180,7 +194,7 @@ int main(int argc, char** argv)
             if(not GenericToolbox::does_element_is_in_vector(__current_event_sample__, __samples_list__)) continue;
             if(not GenericToolbox::does_element_is_in_vector(__current_event_reaction__, __reactions_list__)) continue;
 
-            for( auto &syst_name : __systematic_Xsec_names_list__){
+            for( auto &syst_name : __systematic_Xsec_spline_names_list__){
 
                 for(int i_sample = 0 ; i_sample < nb_of_samples ; i_sample++ ){
 
@@ -234,7 +248,7 @@ int main(int argc, char** argv)
         } // i_entry
 
         std::cout << INFO << "Freeing up memory..." << std::endl;
-        for( auto &syst_name : __systematic_Xsec_names_list__){
+        for( auto &syst_name : __systematic_Xsec_spline_names_list__){
 
             __output_tfile_splines__[syst_name]->Close();
             delete __output_tfile_splines__[syst_name];
@@ -263,7 +277,7 @@ int main(int argc, char** argv)
     TGraph* graph_buffer;
     std::map<std::string, std::map<std::string, TSpline3*> > spline_list_map;
     std::map<std::string, std::map<std::string, TGraph*> > merged_graph_list_map;
-    for( auto &syst_name : __systematic_Xsec_names_list__ ){
+    for( auto &syst_name : __systematic_Xsec_spline_names_list__){
 
         __output_tfile_splines__[syst_name] = TFile::Open(
             Form("%s_splines.root", syst_name.c_str()),
@@ -310,6 +324,9 @@ int main(int argc, char** argv)
                         }
                     }
                     Y.back() /= double(nb_samples);
+
+                    // convert to absolute syst parameter value
+                    X[x_index] = from_relative_par_value_to_absolute(syst_name, X[x_index]);
                 }
 
                 graph_buffer = new TGraph(X.size(), &X[0], &Y[0]);
@@ -353,7 +370,7 @@ int main(int argc, char** argv)
     //  GENERATING MISSING GRAPHS
     //////////////////////////////////////////////////////////////////////
     std::cout << INFO << "Fixing missing graphs" << std::endl;
-    for( auto &syst_name : __systematic_Xsec_names_list__ ) {
+    for( auto &syst_name : __systematic_Xsec_spline_names_list__) {
 
         for( int i_sam = 0 ; i_sam < __samples_list__.size() ; i_sam++){
             for( int i_rea = 0 ; i_rea < __reactions_list__.size() ; i_rea++){
@@ -387,6 +404,10 @@ int main(int argc, char** argv)
                     X_points.emplace_back(0.25);
                     X_points.emplace_back(0.5);
                     X_points.emplace_back(0.75);
+                    for(auto &X_point: X_points){
+                        // convert to absolute syst parameter value
+                        X_point = from_relative_par_value_to_absolute(syst_name, X_point);
+                    }
                     std::vector<double> Y_points;
                     Y_points.emplace_back(1);
                     Y_points.emplace_back(1);
@@ -417,7 +438,7 @@ int main(int argc, char** argv)
     //  SAVING RESULTS
     //////////////////////////////////////////////////////////////////////
     std::cout << INFO << "Writing Splines" << std::endl;
-    for(auto &syst_name : __systematic_Xsec_names_list__){
+    for(auto &syst_name : __systematic_Xsec_spline_names_list__){
 
         __output_tfile_splines__[syst_name] = TFile::Open(
             Form("%s_splines.root", syst_name.c_str()),
@@ -454,7 +475,46 @@ int main(int argc, char** argv)
 
 
     //////////////////////////////////////////////////////////////////////
-    //  REMOVING FILES FOR MISSING SPLINES
+    //  CHECKING SPLINES AT NOMINAL VALUE
+    //////////////////////////////////////////////////////////////////////
+    std::cout << INFO << "Checking written splines at nominal value..." << std::endl;
+    for(auto &syst_name : __systematics_names_list__){
+
+        if(GenericToolbox::does_element_is_in_vector(syst_name, __missing_splines__)){
+            continue;
+        }
+
+        __output_tfile_splines__[syst_name] = TFile::Open(
+            Form("%s_splines.root", syst_name.c_str()),
+            "READ"
+        );
+
+        __output_tfile_splines__[syst_name]->cd();
+        // Write in the ORDER => in the fitter its needed
+        TGraph* graph_buffer=nullptr;
+        TSpline3* spline_buffer=nullptr;
+        for( int i_sam = 0 ; i_sam < __samples_list__.size() ; i_sam++){
+            for( int i_rea = 0 ; i_rea < __reactions_list__.size() ; i_rea++){
+                for( int i_bin = 0 ; i_bin < __bin_edges__.size() ; i_bin++ ){
+                    std::string bin_name = Form("spline_sam%i_reac%i_bin%i", __samples_list__[i_sam], __reactions_list__[i_rea], i_bin);
+                    graph_buffer = (TGraph*) __output_tfile_splines__[syst_name]->Get(bin_name.c_str());
+                    spline_buffer = new TSpline3(bin_name.c_str(), graph_buffer);
+                    double weight = spline_buffer->Eval(__parameter_nominal_values_map__[syst_name]);
+                    if( weight!=weight or fabs(weight-1) > 0.001){
+                        std::cout << ERROR << "CAUTION: Spline " << syst_name << "(sample=" << i_sam;
+                        std::cout << ", reaction=" << i_rea << ", bin=" << i_bin;
+                        std::cout << ") has weight=" << weight << " at nominal value." << std::endl;
+                    }
+                    delete spline_buffer;
+                }
+            }
+        }
+
+        __output_tfile_splines__[syst_name]->Close();
+    }
+
+    //////////////////////////////////////////////////////////////////////
+    //  REMOVING FILES FOR MISSING SYSTEMATICS
     //////////////////////////////////////////////////////////////////////
     std::cout << INFO << "Removing Missing Splines Files" << std::endl;
     for(auto const &missing_spline_name : __missing_splines__){
@@ -661,17 +721,19 @@ void get_list_of_parameters(){
     auto* xsec_param_names = dynamic_cast<TObjArray *>(covariance_matrix_tfile->Get("xsec_param_names"));
     for(int i_parameter = 0 ; i_parameter < xsec_param_names->GetEntries() ; i_parameter++){
 
+        __systematics_names_list__.emplace_back(xsec_param_names->At(i_parameter)->GetName());
+
         if(not __from_Xsec_to_genWeights__[xsec_param_names->At(i_parameter)->GetName()].empty()){
             std::cout << INFO << "  -> GenWeights component : \"" << __from_Xsec_to_genWeights__[xsec_param_names->At(i_parameter)->GetName()];
             std::cout << "\" has been identified as " << xsec_param_names->At(i_parameter)->GetName() << "." << std::endl;
         } else {
             std::cout << ALERT << "  -> No equivalent for " << xsec_param_names->At(i_parameter)->GetName() << " in GenWeights. Will be treated as a norm factor." << std::endl;
-            __norm_splines__.emplace_back(xsec_param_names->At(i_parameter)->GetName());
+            __systematics_norm_splines_names_list__.emplace_back(xsec_param_names->At(i_parameter)->GetName());
 //            __missing_splines__.emplace_back(xsec_param_names->At(i_parameter)->GetName());
             continue;
         }
 
-        __systematic_Xsec_names_list__.emplace_back(xsec_param_names->At(i_parameter)->GetName());
+        __systematic_Xsec_spline_names_list__.emplace_back(xsec_param_names->At(i_parameter)->GetName());
 
         __output_tfile_splines__[xsec_param_names->At(i_parameter)->GetName()] = TFile::Open(
             Form("%s_splines.root", xsec_param_names->At(i_parameter)->GetName()),
@@ -740,19 +802,24 @@ void create_norm_splines(){
     __tree_converter_reco_ttree__->SetBranchStatus("*", true);
 
     std::cout << INFO << "Now writing norm splines..." << std::endl;
-    std::vector<double> X_points;
-    X_points.emplace_back(-0.75);
-    X_points.emplace_back(-0.5);
-    X_points.emplace_back(-0.25);
-    X_points.emplace_back(0.);
-    X_points.emplace_back(0.25);
-    X_points.emplace_back(0.5);
-    X_points.emplace_back(0.75);
-    std::vector<double> Y_points = X_points;
-    for(auto& Y_point : Y_points) Y_point += 1.;
-    std::vector<double> Y_flat_points(X_points.size());
-    for(auto& Y_flat_point : Y_flat_points) Y_flat_point = 1;
-    for(auto const& norm_spline_name : __norm_splines__){
+    for(auto const& norm_spline_name : __systematics_norm_splines_names_list__){
+
+        std::vector<double> X_points;
+        X_points.emplace_back(-0.75);
+        X_points.emplace_back(-0.5);
+        X_points.emplace_back(-0.25);
+        X_points.emplace_back(0.);
+        X_points.emplace_back(0.25);
+        X_points.emplace_back(0.5);
+        X_points.emplace_back(0.75);
+        std::vector<double> Y_points = X_points;
+        for(auto& Y_point : Y_points) Y_point += 1.;
+        std::vector<double> Y_flat_points(X_points.size());
+        for(auto& Y_flat_point : Y_flat_points) Y_flat_point = 1;
+        for(auto &X_point: X_points){
+            // convert to absolute syst parameter value
+            X_point = from_relative_par_value_to_absolute(norm_spline_name, X_point);
+        }
 
         __output_tfile_splines__[norm_spline_name] = TFile::Open(
             Form("%s_splines.root", norm_spline_name.c_str()), "RECREATE");
@@ -984,6 +1051,7 @@ void regenarte_covariance_matrix_file(){
     }
     chopped_hcov->Write();
     chopped_covariance_matrix_tfile->Close();
+    covariance_matrix_tfile->Close();
 
 }
 void generate_json_config_file(){
@@ -1058,6 +1126,8 @@ void generate_json_config_file(){
     config_ss << "  ]" << std::endl;
     config_ss << "}" << std::endl;
     GenericToolbox::write_string_in_file("./config_splines.json", config_ss.str());
+
+    covariance_matrix_tfile->Close();
 
 }
 void read_genweights_files_list(){
@@ -1321,4 +1391,116 @@ void fill_component_mapping(){
     __from_Xsec_to_genWeights__["EB_bin_C_nubar"] = "EB_bin_C_nubar";
     __from_Xsec_to_genWeights__["EB_bin_O_nubar"] = "EB_bin_O_nubar";
 
+
+    // https://github.com/t2k-software/T2KReWeight/blob/ecd103a17acfae04de001052b357fb07de364c58/app/genWeightsFromNRooTracker_BANFF_2020.cxx#L425-L465
+
+    // CCQE:
+//    __relative_variation_component_list__.emplace_back("kNXSec_MaCCQE");
+    __relative_variation_component_list__.emplace_back("kNXSec_MaQE");
+
+    // CC and NC single pion resonance:
+    __relative_variation_component_list__.emplace_back("kNXSec_CA5RES");
+    __relative_variation_component_list__.emplace_back("kNXSec_MaRES");
+
+    // Use the separate iso half background dials
+    __relative_variation_component_list__.emplace_back("kNXSec_BgSclRES");
+    __relative_variation_component_list__.emplace_back("kNXSec_BgSclLMCPiBarRES");
+
+    // All other CC and NC
+    // Ed's CC DIS dials for 2020 Analysis
+//    __relative_variation_component_list__.emplace_back("kNIWG_DIS_BY_corr");
+//    __relative_variation_component_list__.emplace_back("kNIWG_MultiPi_BY_corr");
+//    __relative_variation_component_list__.emplace_back("kNIWG_MultiPi_Xsec_AGKY");
+
+    __relative_variation_component_list__.emplace_back("kNIWG_rpaCCQE_norm");
+    __relative_variation_component_list__.emplace_back("kNIWG_rpaCCQE_shape");
+
+    // FSI dials
+    __relative_variation_component_list__.emplace_back("kNCasc_FrAbs_pi");
+    __relative_variation_component_list__.emplace_back("kNCasc_FrCExLow_pi");
+    __relative_variation_component_list__.emplace_back("kNCasc_FrInelLow_pi");
+    __relative_variation_component_list__.emplace_back("kNCasc_FrPiProd_pi");
+    __relative_variation_component_list__.emplace_back("kNCasc_FrInelHigh_pi");
+
+    //-- PDD Weights, New Eb dial
+    __relative_variation_component_list__.emplace_back("kNIWGMEC_PDDWeight_C12");
+    __relative_variation_component_list__.emplace_back("kNIWGMEC_PDDWeight_O16");
+
+    //2p2hEdep parameters
+    __relative_variation_component_list__.emplace_back("kNIWG_2p2hEdep_lowEnu");
+    __relative_variation_component_list__.emplace_back("kNIWG_2p2hEdep_highEnu");
+    __relative_variation_component_list__.emplace_back("kNIWG_2p2hEdep_lowEnubar");
+    __relative_variation_component_list__.emplace_back("kNIWG_2p2hEdep_highEnubar");
+
+
+}
+bool do_syst_param_has_relative_X_scale(std::string& syst_name_){
+    bool is_relative_X = false;
+    std::string genWeigths_name = __from_Xsec_to_genWeights__[syst_name_];
+    if(genWeigths_name.empty()){
+        genWeigths_name = syst_name_;
+    }
+    for(auto& relative_component_name: __relative_variation_component_list__){
+
+        if(GenericToolbox::do_string_contains_substring(
+            GenericToolbox::to_lower_case(relative_component_name),
+            GenericToolbox::to_lower_case(genWeigths_name)
+            )
+           ){
+//            std::cout << GenericToolbox::to_lower_case(relative_component_name) << " has ";
+//            std::cout << GenericToolbox::to_lower_case(genWeigths_name) << " / " << syst_name_ << std::endl;
+            is_relative_X = true;
+            break;
+        }
+    }
+//    std::cout << ALERT << syst_name_ << " is relative ? " << is_relative_X << std::endl;
+    return is_relative_X;
+}
+void fill_parameter_nominal_values(){
+
+//    __parameter_nominal_values_map__
+    std::cout << WARNING << "Reading nominal value of parameters..." << std::endl;
+
+    if(__covariance_matrix_file_path__.empty()){
+        std::cerr << ERROR << "__covariance_matrix_file_path__ is not set." << std::endl;
+        exit(EXIT_FAILURE);
+    }
+
+    TFile* covariance_matrix_tfile = TFile::Open(__covariance_matrix_file_path__.c_str(), "READ");
+    if(not covariance_matrix_tfile->IsOpen()){
+        std::cerr << ERROR << "Could not open : " << covariance_matrix_tfile->GetName() << std::endl;
+        exit(EXIT_FAILURE);
+    }
+
+    __parameter_nominal_values_map__.clear();
+    __parameter_error_map__.clear();
+
+    auto* xsec_param_names = dynamic_cast<TObjArray *>(covariance_matrix_tfile->Get("xsec_param_names"));
+    auto* xsec_param_nom_unnorm = (TVectorT<double> *)(covariance_matrix_tfile->Get("xsec_param_nom_unnorm"));
+    auto* xsec_cov_matrix = (TMatrixT<double> *)(covariance_matrix_tfile->Get("xsec_cov"));
+
+    for(int i_parameter = 0 ; i_parameter < xsec_param_names->GetEntries() ; i_parameter++){
+        __parameter_nominal_values_map__[xsec_param_names->At(i_parameter)->GetName()] = (*xsec_param_nom_unnorm)[i_parameter];
+        __parameter_error_map__[xsec_param_names->At(i_parameter)->GetName()] = (*xsec_cov_matrix)[i_parameter][i_parameter];
+    }
+
+
+
+    covariance_matrix_tfile->Close();
+
+}
+double from_relative_par_value_to_absolute(std::string par_name_, double deviation_param_value_){
+
+    double output;
+    if(do_syst_param_has_relative_X_scale(par_name_)){
+        // 0 -> nominal value
+        // 0.1 -> +10% of the initial parameter
+        output = __parameter_nominal_values_map__[par_name_]*(1 + deviation_param_value_);
+    }
+    else{
+        // 0 -> nominal value
+        // 0.1 -> +10% of 1 sigma
+        output = __parameter_nominal_values_map__[par_name_] + deviation_param_value_*__parameter_error_map__[par_name_];
+    }
+    return output;
 }
