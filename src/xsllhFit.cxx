@@ -66,7 +66,7 @@ int main(int argc, char** argv)
                           << "-j : JSON input\n"
                           << "-o : Output file (overrides JSON config)\n"
                           << "-s : RNG seed (overrides JSON config)\n"
-                          << "-t : Num. threads (overrides JSON config)\n"
+                          << "-t : Num. __nb_threads__ (overrides JSON config)\n"
                           << "-n : Dry run - Set up but do not run fit.\n";
             default:
                 return 0;
@@ -146,10 +146,10 @@ int main(int argc, char** argv)
 
     // Mapping the Highland topology codes to consecutive integers and then getting the topology breakdown for each sample:
     for(auto& sample : samples)
-        {
-            sample -> SetTopologyHLCode(topology_HL_codes);
-            sample -> GetSampleBreakdown(fout, "nominal", topology, false);
-        }
+    {
+        sample -> SetTopologyHLCode(topology_HL_codes);
+        sample -> GetSampleBreakdown(fout, "nominal", topology, false);
+    }
 
 
     //*************** FITTER SETTINGS **************************
@@ -170,10 +170,10 @@ int main(int argc, char** argv)
     {
         if(opt.use_detector)
             sigfitpara.AddDetector(opt.name, parser.signal_definition);
-            //sigfitpara.AddDetector(opt.name, opt.binning);
+        //sigfitpara.AddDetector(opt.name, opt.binning);
     }
     sigfitpara.InitEventMap(samples, 0);
-    fitpara.push_back(&sigfitpara);
+//    fitpara.push_back(&sigfitpara);
 
     // Flux parameters:
     FluxParameters fluxpara("par_flux");
@@ -298,6 +298,10 @@ int main(int argc, char** argv)
 
         if(!did_converge)
             std::cout << TAG << "Fit did not coverge." << std::endl;
+        else
+            std::cout << TAG << "Fit has converged." << std::endl;
+
+        xsecfit.WriteCovarianceMatrices();
 
         std::vector<int> par_scans = parser.par_scan_list;
         if(!par_scans.empty())

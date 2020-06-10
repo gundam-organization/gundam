@@ -12,6 +12,8 @@
 #include <FitParameters.hh>
 #include <FluxParameters.hh>
 #include <XsecParameters.hh>
+#include <DetParameters.hh>
+#include <XsecFitter.hh>
 #include <GenericToolbox.h>
 
 const std::string ERROR    = "\033[1;31m[xsllhND280UpFit.cxx] \033[00m";
@@ -21,11 +23,16 @@ const std::string ALERT = "\033[1;35m[xsllhND280UpFit.cxx] \033[00m";
 
 
 //! Global Variables
+bool __is_dry_run__ = false;
+int __nb_threads__ = -1;
+int __PRNG_seed__ = -1;
 std::string __json_config_path__;
 
 std::string __command_line__;
 int __argc__;
 char **__argv__;
+
+
 
 
 //! Local Functions
@@ -218,12 +225,85 @@ int main(int argc, char** argv)
     }
 
 
+    // Detector parameters:
+    DetParameters detpara("par_det");
+    if(options_parser.det_cov.do_fit)
+    {
+        std::cout << WARNING << "Setup Detector Covariance." << std::endl
+                  << WARNING << "Opening " << options_parser.det_cov.fname << " for detector covariance."
+                  << std::endl;
+
+        TFile* file_det_cov = TFile::Open(options_parser.det_cov.fname.c_str(), "READ");
+        if(file_det_cov == nullptr)
+        {
+            std::cout << ERROR << "Could not open file! Exiting." << std::endl;
+            return 1;
+        }
+        auto* cov_det = (TMatrixDSym*)file_det_cov -> Get(options_parser.det_cov.matrix.c_str());
+        file_det_cov -> Close();
+
+        if(options_parser.det_cov.rng_start)
+            detpara.SetRNGstart();
+
+        detpara.SetCovarianceMatrix(*cov_det, options_parser.det_cov.decompose);
+        detpara.SetThrow(options_parser.det_cov.do_throw);
+        detpara.SetInfoFrac(options_parser.det_cov.info_frac);
+        for(const auto& detector : options_parser.detectors)
+        {
+            if(detector.use_detector)
+                detpara.AddDetector(detector.name, analysis_sample_list, true);
+        }
+        detpara.InitEventMap(analysis_sample_list, 0);
+        fit_parameters_list.emplace_back(&detpara);
+    }
 
 
 
+    if(__PRNG_seed__ == -1)
+        __PRNG_seed__ = options_parser.rng_seed;
+    if(__nb_threads__ == -1)
+        __nb_threads__ = options_parser.num_threads;
 
 
-    return EXIT_SUCCESS;
+
+    //Instantiate fitter obj
+    XsecFitter xsecfit(output_tfile, __PRNG_seed__, __nb_threads__);
+    //xsecfit.SetSaveFreq(10000);
+    xsecfit.SetMinSettings(options_parser.min_settings);
+    xsecfit.SetPOTRatio(data_POT/mc_POT);
+    xsecfit.SetTopology(sample_topology_list);
+    xsecfit.SetZeroSyst(options_parser.zero_syst);
+    xsecfit.SetSaveEvents(options_parser.save_events);
+
+    // Initialize fitter with fitpara vector (vector of AnaFitParameters objects):
+    xsecfit.InitFitter(fit_parameters_list);
+    std::cout << INFO << "Fitter initialised." << std::endl;
+
+
+    bool did_converge = false;
+    if(!__is_dry_run__)
+    {
+        // Run the fitter with the given samples, fit type and statistical fluctuations as specified in the .json config file:
+        did_converge = xsecfit.Fit(analysis_sample_list, options_parser.fit_type, options_parser.stat_fluc);
+
+        if(!did_converge)
+            std::cout << WARNING << "Fit did not coverge." << std::endl;
+        else
+            std::cout << WARNING << "Fit has converged." << std::endl;
+
+        xsecfit.WriteCovarianceMatrices();
+
+        std::vector<int> par_scans = options_parser.par_scan_list;
+        if(!par_scans.empty())
+            xsecfit.ParameterScans(par_scans, options_parser.par_scan_steps);
+    }
+    output_tfile -> Close();
+
+    // Print Arigatou Gozaimashita with Rainbowtext :)
+    std::cout << WARNING << color::RainbowText("\u3042\u308a\u304c\u3068\u3046\u3054\u3056\u3044\u307e\u3057\u305f\uff01")
+              << std::endl;
+
+    return did_converge ? EXIT_SUCCESS : 121;
 }
 
 

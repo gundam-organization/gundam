@@ -9,6 +9,11 @@
 #include <vector>
 #include <sys/stat.h>
 
+#include <TMatrixD.h>
+#include <TMatrixDSym.h>
+#include <TH1D.h>
+#include <TH2D.h>
+
 namespace GenericToolbox {
 
 static std::string NORMAL = "\033[00m";
@@ -22,8 +27,6 @@ void display_loading(int current_index_, int end_index_, std::string title_ = ""
 void write_string_in_file(std::string file_path_, std::string string_to_write_);
 void toggle_quiet_root();
 
-//  template<typename T>
-//  bool do_element_in_vector(T element_, std::vector<T>& vector_);
 bool does_element_is_in_vector(int element_, std::vector<int>& vector_);
 bool does_element_is_in_vector(double element_, std::vector<double>& vector_);
 bool does_element_is_in_vector(std::string element_, std::vector<std::string>& vector_);
@@ -42,6 +45,15 @@ std::string to_lower_case(std::string &input_str_);
 
 std::vector<std::string> read_file(std::string file_path_);
 std::vector<std::string> split_string(std::string& input_string_, std::string delimiter_);
+
+TMatrixDSym* convert_to_symmetric_matrix(TMatrixD* matrix_);
+std::map<std::string, TMatrixD*> SVD_matrix_inversion(TMatrixD *matrix_);
+
+TH1D* get_TH1D_from_TVectorD(std::string graph_title_, TVectorD *Y_values_, std::string Y_title_ = "", std::string X_title_ = "Entry #", TVectorD *Y_errors_ = nullptr);
+TH2D* get_TH2D_from_TMatrixD(TMatrixD *XY_values_, std::string graph_title_ = "", std::string Z_title_ = "",std::string Y_title_ = "Row #", std::string X_title_ = "Col #");
+
+TVectorD* get_TVectorD_from_vector(std::vector<double>& vect_);
+
 
 };
 

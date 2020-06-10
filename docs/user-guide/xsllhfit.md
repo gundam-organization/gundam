@@ -10,7 +10,7 @@ OPTIONS:
 -j : JSON input
 -o : Output file (overrides JSON config)
 -s : RNG seed (overrides JSON config)
--t : Num. threads (overrides JSON config)
+-t : Num. __nb_threads__ (overrides JSON config)
 -n : Dry run - Set up but do not run fit.
 ```
 The `-j` flag is required and is config file for the fit. The `-n` flag does a "dry-run" of the fit where it is initialized but the minimization is not performed. The `-h` displays the help output and available options. The remaining variables allow for overriding the settings in the configure file, which is useful for scripting, and are all optional.

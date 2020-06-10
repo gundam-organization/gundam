@@ -176,7 +176,7 @@ int BinManager::GetBinIndex(const std::vector<double>& val) const
             flag = flag && CheckBinIndex(i, d, val.at(d));
         }
 
-        if(flag == true)
+        if(flag)
         {
             return i;
         }

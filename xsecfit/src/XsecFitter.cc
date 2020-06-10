@@ -471,7 +471,7 @@ double XsecFitter::FillSamples(std::vector<std::vector<double>>& new_pars, int d
         // Get the name of the detector for the current sample (as defined in the .json config file):
         const std::string det         = m_samples[s]->GetDetector();
 
-        // Loop over all events in the current sample (this loop will be divided amongst the different threads):
+        // Loop over all events in the current sample (this loop will be divided amongst the different __nb_threads__):
 #pragma omp parallel for num_threads(m_threads)
         for(unsigned int i = 0; i < num_events; ++i)
         {
