@@ -1,8 +1,8 @@
-# Super-xsllhFitter
+# Super-xsllhFitter (ND280UpFit branch)
 
 ## Introduction
 
-The goal of the Super-xsllhFitter is to provide a general purpose likelihood-based fit framework for performing cross section analyses. The current state of the code and documentation is very much work in progress and is ~~really not~~ kind of ready for general use. However, if you're desperate or can't wait then read on! There is no guarantee the fitter will be able to perform your analysis.
+The goal of the Super-xsllhFitter is to provide a general purpose likelihood-based fit framework for performing sentivity studies for the upgraded ND280.
 
 The code is under very active development and to give some kind of stability, it is recommended you checkout/download a tagged version of the fitter.
 
@@ -20,22 +20,25 @@ ROOT needs either Minuit or Minuit2 and optionally the MathMore package enabled 
 To checkout a tagged version of the code using git:
 
 ```bash
-$ git clone https://gitlab.com/cuddandr/xsLLhFitter.git
-$ git checkout -b <choose a branch name> <tag>
+git clone https://gitlab.com/cuddandr/xsLLhFitter.git
+git tag # find your suitable tag
+git checkout -b remotes/origin/ND280UpFit <tag>
 ```
 
-Tagged versions of the code can also be downloaded as zipped archives from the Tags section on the GitLab page.
-
-Set up the ROOT environment before attempting to build by:
+This setup guide assumes that you've already set the following env variables.
 
 ```bash
-$ source /path/to/ROOT/bin/thisroot.sh
+export REPO_DIR="/folder/path/where/your/store/your/git/repository"
+export BUILD_DIR="/folder/path/where/your/store/your/build/files"
+export INSTALL_DIR="/folder/path/where/your/store/your/installed/bin/files"
 ```
 
-Then source the package setup script.
+In this guide `$REPO_DIR/xsllhFitter` is where the source code is placed, in `$BUILD_DIR/xsllhFitter` there will be your Makefiles and finally `$INSTALL_DIR/xsllhFitter` will contain the folders `bin` `lib`.
+
+Before building the code, you need to source the setup script.
 
 ```bash
-$ source /path/to/xsLLhFitter/setup.sh
+source $REPO_DIR/xsllhFitter/setup.sh
 ```
 
 The first time this script is run it will notify you that it cannot find the build setup script, this is normal. The fitter is designed to be built in a build directory specified by the user and is configured using CMake.
@@ -43,10 +46,11 @@ The first time this script is run it will notify you that it cannot find the bui
 To build (with default settings):
 
 ```bash
-$ mkdir build; cd build
-$ cmake ../
-$ make install -j
-$ source $(uname)/setup.sh
+cd $BUILD_DIR/xsLLhFitter
+cmake \
+      -DCMAKE_INSTALL_PREFIX:PATH=$INSTALL_DIR/xsLLhFitter \
+      -D CMAKE_BUILD_TYPE=RELEASE \
+      $REPO_DIR/xsLLhFitter/.
 ```
 
 The default build is `DEBUG`, which compiles the libraries statically and includes debugging symbols. The other build type is `RELEASE`, which can be enabled by either calling cmake with `-DCMAKE_BUILD_TYPE=RELEASE` or by using the ccmake command. The `RELEASE` build enables compiler optimizations, disables debug symbols, and builds/links the libraries as shared objects. Other options can be passed to CMake by using `-DOPTION_NAME=VALUE` when invoking cmake, or by using ccmake.

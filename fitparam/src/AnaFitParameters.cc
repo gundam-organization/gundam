@@ -1,4 +1,5 @@
 #include "AnaFitParameters.hh"
+#include "GenericToolbox.h"
 
 AnaFitParameters::AnaFitParameters()
     : m_name("")
@@ -56,21 +57,26 @@ void AnaFitParameters::SetCovarianceMatrix(const TMatrixDSym& covmat, bool decom
         covarianceI = new TMatrixDSym(covmat);
     }
 
-    double det = 0;
-    TDecompLU inv_test;
-    TMatrixD inv_matrix(*covariance);
-    if(inv_test.InvertLU(inv_matrix, 1E-48, &det))
-    {
-        covarianceI->SetMatrixArray(inv_matrix.GetMatrixArray());
-        std::cout << TAG << "Covariance matrix inverted successfully." << std::endl;
-    }
-    else
-    {
-        std::cerr << ERR << "In AnaFitParameters::SetCovarianceMatrix():\n"
-                  << ERR << "Covariance matrix is non invertable. Determinant is " << det
-                  << std::endl;
-        return;
-    }
+//    double det = 0;
+    TMatrixD* temp = GenericToolbox::SVD_matrix_inversion((TMatrixD*) covariance)["inverse_covariance_matrix"];
+    delete covarianceI;
+    covarianceI = GenericToolbox::convert_to_symmetric_matrix(temp);
+    delete temp;
+
+//    TDecompLU inv_test;
+//    TMatrixD inv_matrix(*covariance);
+//    if(inv_test.InvertLU(inv_matrix, 1E-48, &det))
+//    {
+//        covarianceI->SetMatrixArray(inv_matrix.GetMatrixArray());
+//        std::cout << TAG << "Covariance matrix inverted successfully." << std::endl;
+//    }
+//    else
+//    {
+//        std::cerr << ERR << "In AnaFitParameters::SetCovarianceMatrix():\n"
+//                  << ERR << "Covariance matrix is non invertable. Determinant is " << det
+//                  << std::endl;
+//        return;
+//    }
 
     std::cout << TAG << "Covariance matrix size: " << covariance->GetNrows()
               << " x " << covariance->GetNrows() << " for " << this->m_name << std::endl;
