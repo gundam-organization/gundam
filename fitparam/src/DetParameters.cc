@@ -172,7 +172,10 @@ void DetParameters::InitParameters()
         pars_limlow = std::vector<double>(Npar, -100);
         pars_limhigh = std::vector<double>(Npar, 100);
 
-        const int idx = eigen_decomp -> GetInfoFraction(m_info_frac);
+        int idx = eigen_decomp -> GetInfoFraction(m_info_frac);
+        if(idx > Npar - m_nb_dropped_dof){
+            idx = Npar - m_nb_dropped_dof;
+        }
         for(int i = idx; i < Npar; ++i)
             pars_fixed[i] = true;
 

@@ -9,6 +9,7 @@ AnaFitParameters::AnaFitParameters()
     , m_decompose(false)
     , m_regularised(false)
     , m_do_cap_weights(false)
+    , m_nb_dropped_dof(0)
     , m_weight_cap(1000)
     , m_info_frac(1.00)
     , m_regstrength(0.0)
@@ -33,6 +34,13 @@ AnaFitParameters::~AnaFitParameters()
 
 void AnaFitParameters::SetCovarianceMatrix(const TMatrixDSym& covmat, bool decompose)
 {
+    m_decompose = decompose;
+    std::cout << TAG << "Using decompose ? " << m_decompose << std::endl;
+
+    if(covmat.GetNrows() > 500){
+        std::cout << WAR << "dof > 500 : Matrix inversion will take some time" << std::endl;
+    }
+
     if(covariance != nullptr)
         delete covariance;
     if(covarianceI != nullptr)
@@ -42,10 +50,9 @@ void AnaFitParameters::SetCovarianceMatrix(const TMatrixDSym& covmat, bool decom
     if(eigen_decomp != nullptr)
         delete eigen_decomp;
 
-    if(decompose)
+    if(m_decompose)
     {
-        m_decompose  = true;
-        eigen_decomp = new EigenDecomp(covmat);
+        eigen_decomp = new EigenDecomp(covmat, kSVD);
         original_cov = new TMatrixDSym(covmat);
         covariance   = new TMatrixDSym(eigen_decomp->GetEigenCovMat());
         covarianceI  = new TMatrixDSym(eigen_decomp->GetEigenCovMat());
@@ -57,15 +64,20 @@ void AnaFitParameters::SetCovarianceMatrix(const TMatrixDSym& covmat, bool decom
         covarianceI = new TMatrixDSym(covmat);
     }
 
-//    double det = 0;
-    TMatrixD* temp = GenericToolbox::SVD_matrix_inversion((TMatrixD*) covariance)["inverse_covariance_matrix"];
-    delete covarianceI;
-    covarianceI = GenericToolbox::convert_to_symmetric_matrix(temp);
-    delete temp;
+    std::map<std::string, TMatrixD*> temp = GenericToolbox::SVD_matrix_inversion((TMatrixD*) covariance, "inverse_covariance_matrix:regularized_eigen_values");
+    m_nb_dropped_dof = 0;
+    while( (*temp["regularized_eigen_values"])[ temp["regularized_eigen_values"]->GetNrows()-1 - m_nb_dropped_dof ][0] == 0 ){
+        m_nb_dropped_dof++;
+    }
+    if(m_nb_dropped_dof != 0){
+        std::cout << WAR << "SVD matrix inversion has dropped " << m_nb_dropped_dof << " degree of freedom." << std::endl;
+    }
+    covarianceI = GenericToolbox::convert_to_symmetric_matrix(temp["inverse_covariance_matrix"]);
+    for(const auto& content: temp) delete content.second;
 
-//    TDecompLU inv_test;
+//    double det = 0;
 //    TMatrixD inv_matrix(*covariance);
-//    if(inv_test.InvertLU(inv_matrix, 1E-48, &det))
+//    if(TDecompLU::InvertLU(inv_matrix, 1E-48, &det))
 //    {
 //        covarianceI->SetMatrixArray(inv_matrix.GetMatrixArray());
 //        std::cout << TAG << "Covariance matrix inverted successfully." << std::endl;

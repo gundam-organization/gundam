@@ -119,6 +119,7 @@ protected:
     bool m_decompose;
     bool m_regularised;
     bool m_do_cap_weights;
+    int m_nb_dropped_dof;
     double m_weight_cap;
     double m_info_frac;
     double m_regstrength;

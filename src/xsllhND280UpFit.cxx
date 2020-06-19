@@ -29,6 +29,7 @@ int __PRNG_seed__ = -1;
 std::string __json_config_path__;
 
 std::string __command_line__;
+std::string __output_file_path__;
 int __argc__;
 char **__argv__;
 
@@ -70,9 +71,9 @@ int main(int argc, char** argv)
     auto* data_ttree  = (TTree*)(data_tfile->Get("selectedEvents"));
 
     // Setup output tfile
-    std::string output_file_path = options_parser.fname_output;
-    std::cout << INFO << "Opening output file: " << output_file_path << std::endl;
-    TFile* output_tfile          = TFile::Open(output_file_path.c_str(), "RECREATE");
+    if(__output_file_path__.empty()) __output_file_path__ = options_parser.fname_output;
+    std::cout << INFO << "Opening output file: " << __output_file_path__ << std::endl;
+    TFile* output_tfile          = TFile::Open(__output_file_path__.c_str(), "RECREATE");
 
     // Add analysis samples:
     const double data_POT  = options_parser.data_POT;
@@ -307,20 +308,24 @@ int main(int argc, char** argv)
 }
 
 
-std::string remind_usage(){
+std::string remind_usage()
+{
 
     std::stringstream remind_usage_ss;
     remind_usage_ss << "*********************************************************" << std::endl;
     remind_usage_ss << " > Command Line Arguments" << std::endl;
     remind_usage_ss << "  -j : JSON input (Current : " << __json_config_path__ << ")" << std::endl;
+    remind_usage_ss << "  -o : Specify output file path (Current : " << __json_config_path__ << ")" << std::endl;
     remind_usage_ss << "*********************************************************" << std::endl;
 
     std::cerr << remind_usage_ss.str();
     return remind_usage_ss.str();
 
 }
-void reset_parameters(){
+void reset_parameters()
+{
     __json_config_path__ = "";
+    __output_file_path__ = "";
 }
 void get_user_parameters(){
 
@@ -353,7 +358,18 @@ void get_user_parameters(){
             if (i_arg < __argc__ - 1) {
                 int j_arg = i_arg + 1;
                 __json_config_path__ = std::string(__argv__[j_arg]);
-            } else {
+            }
+            else {
+                std::cout << ERROR << "Give an argument after " << __argv__[i_arg] << std::endl;
+                throw std::logic_error(std::string(__argv__[i_arg]) + " : no argument found");
+            }
+        }
+        else if(std::string(__argv__[i_arg]) == "-o"){
+            if (i_arg < __argc__ - 1) {
+                int j_arg = i_arg + 1;
+                __output_file_path__ = std::string(__argv__[j_arg]);
+            }
+            else {
                 std::cout << ERROR << "Give an argument after " << __argv__[i_arg] << std::endl;
                 throw std::logic_error(std::string(__argv__[i_arg]) + " : no argument found");
             }

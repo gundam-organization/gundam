@@ -118,9 +118,7 @@ bool do_string_ends_with_substring(std::string string_, std::string substring_)
 
 bool do_path_is_file(std::string file_path_)
 {
-    struct stat info
-    {
-    };
+    struct stat info{};
     stat(file_path_.c_str(), &info);
     return S_ISREG(info.st_mode);
 }
@@ -284,14 +282,38 @@ TMatrixDSym* convert_to_symmetric_matrix(TMatrixD* matrix_)
 
     return result;
 }
-std::map<std::string, TMatrixD*> SVD_matrix_inversion(TMatrixD* matrix_)
+std::map<std::string, TMatrixD*> SVD_matrix_inversion(TMatrixD* matrix_, std::string output_content_)
 {
-
     std::map<std::string, TMatrixD*> results_handler;
 
-    results_handler["inverse_covariance_matrix"]
-        = new TMatrixD(matrix_->GetNrows(), matrix_->GetNcols());
-    results_handler["projector"] = new TMatrixD(matrix_->GetNrows(), matrix_->GetNcols());
+    auto content_names = GenericToolbox::split_string(output_content_, ":");
+
+    if(does_element_is_in_vector("inverse_covariance_matrix", content_names)){
+        results_handler["inverse_covariance_matrix"]
+            = new TMatrixD(matrix_->GetNrows(), matrix_->GetNcols());
+    }
+    if(does_element_is_in_vector("regularized_covariance_matrix", content_names)){
+        results_handler["regularized_covariance_matrix"]
+            = new TMatrixD(matrix_->GetNrows(), matrix_->GetNcols());
+    }
+    if(does_element_is_in_vector("projector", content_names)){
+        results_handler["projector"]
+            = new TMatrixD(matrix_->GetNrows(), matrix_->GetNcols());
+    }
+    if(does_element_is_in_vector("regularized_eigen_values", content_names)){
+        results_handler["regularized_eigen_values"]
+            = new TMatrixD(matrix_->GetNrows(), 1);
+    }
+
+    // make sure all are 0
+    for(const auto& matrix_handler : results_handler){
+        for(int i_dof = 0; i_dof < matrix_handler.second->GetNrows(); i_dof++){
+            for(int j_dof = 0; j_dof < matrix_handler.second->GetNcols(); j_dof++){
+                (*matrix_handler.second)[i_dof][j_dof] = 0.;
+            }
+        }
+    }
+
 
     // Covariance matrices are symetric :
     auto* symmetric_matrix        = convert_to_symmetric_matrix(matrix_);
@@ -299,30 +321,47 @@ std::map<std::string, TMatrixD*> SVD_matrix_inversion(TMatrixD* matrix_)
     auto* Eigen_values            = &(Eigen_matrix_decomposer->GetEigenValues());
     auto* Eigen_vectors           = &(Eigen_matrix_decomposer->GetEigenVectors());
 
+    double max_eigen_value = (*Eigen_values)[0];
+    for(int i_eigen_value = 0; i_eigen_value < matrix_->GetNcols(); i_eigen_value++){
+        if(max_eigen_value < (*Eigen_values)[i_eigen_value]){
+            max_eigen_value = (*Eigen_values)[i_eigen_value];
+        }
+    }
+
     for(int i_eigen_value = 0; i_eigen_value < matrix_->GetNcols(); i_eigen_value++)
     {
-
-        if((*Eigen_values)[i_eigen_value] > 1E-5)
+        if((*Eigen_values)[i_eigen_value] > max_eigen_value*1E-5)
         {
+            if(results_handler.find("regularized_eigen_values") != results_handler.end()){
+                (*results_handler["regularized_eigen_values"])[i_eigen_value][0]
+                    = (*Eigen_values)[i_eigen_value];
+            }
+            for(int i_dof = 0; i_dof < matrix_->GetNrows(); i_dof++){
+                for(int j_dof = 0; j_dof < matrix_->GetNrows(); j_dof++){
+                    if(results_handler.find("inverse_covariance_matrix") != results_handler.end()){
+                        (*results_handler["inverse_covariance_matrix"])[i_dof][j_dof]
+                            += (1. / (*Eigen_values)[i_eigen_value])
+                               * (*Eigen_vectors)[i_dof][i_eigen_value]
+                               * (*Eigen_vectors)[j_dof][i_eigen_value];
+                    }
+                    if(results_handler.find("projector") != results_handler.end()){
+                        (*results_handler["projector"])[i_dof][j_dof]
+                            += (*Eigen_vectors)[i_dof][i_eigen_value]
+                               * (*Eigen_vectors)[j_dof][i_eigen_value];
+                    }
+                    if(results_handler.find("regularized_covariance_matrix") != results_handler.end()){
+                        (*results_handler["regularized_covariance_matrix"])[i_dof][j_dof]
+                            += (*Eigen_values)[i_eigen_value]
+                               * (*Eigen_vectors)[i_dof][i_eigen_value]
+                               * (*Eigen_vectors)[j_dof][i_eigen_value];
+                    }
 
-            for(int i_dof = 0; i_dof < matrix_->GetNrows(); i_dof++)
-            {
-                for(int j_dof = 0; j_dof < matrix_->GetNrows(); j_dof++)
-                {
-                    (*results_handler["inverse_covariance_matrix"])[i_dof][j_dof]
-                        += (1. / (*Eigen_values)[i_eigen_value])
-                           * (*Eigen_vectors)[i_dof][i_eigen_value]
-                           * (*Eigen_vectors)[j_dof][i_eigen_value];
-                    (*results_handler["projector"])[i_dof][j_dof]
-                        += (*Eigen_vectors)[i_dof][i_eigen_value]
-                           * (*Eigen_vectors)[j_dof][i_eigen_value];
                 }
             }
         }
-        else
-        {
-            std::cout << ALERT << "Skipping i_eigen_value = " << (*Eigen_values)[i_eigen_value]
-                      << std::endl;
+        else{
+//            std::cout << ALERT << "Skipping i_eigen_value = " << (*Eigen_values)[i_eigen_value]
+//                      << std::endl;
         }
     }
 
