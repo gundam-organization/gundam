@@ -2,16 +2,14 @@
 #include <cstdlib>
 #include <fstream>
 #include <iomanip>
-#include <iostream>
 #include <map>
-#include <sstream>
 #include <string>
-#include <unistd.h>
 #include <vector>
 
+#include "GenericToolbox.h"
+#include "Logger.h"
+
 #include <TFile.h>
-#include <TMath.h>
-#include <TRandom3.h>
 #include <TTree.h>
 
 #include "json.hpp"
@@ -34,7 +32,7 @@ struct HL2TreeVar
     std::string D1True;
     std::string D1Reco;
     std::map<std::string, std::vector<int>> D1Reco_multi;
-    bool use_D1Reco_multi;
+    bool use_D1Reco_multi{};
     std::string D2True;
     std::string D2Reco;
     std::string vertexID;
@@ -48,10 +46,10 @@ struct HL2FileOpt
     std::string fname_input;
     std::string sel_tree;
     std::string tru_tree;
-    unsigned int file_id;
-    int beammode;
-    unsigned int num_branches;
-    double pot_norm;
+    unsigned int file_id{};
+    int beammode{};
+    unsigned int num_branches{};
+    double pot_norm{};
     std::vector<int> cuts;
     std::map<int, std::vector<int>> samples;
 
@@ -60,79 +58,74 @@ struct HL2FileOpt
 };
 
 template <typename T>
-HL2TreeVar ParseHL2Var(T json_obj, bool flag);
+HL2TreeVar ParseHL2Var(T json_obj, bool reco_info);
+//! Local Functions
+std::string remind_usage();
+void reset_parameters();
+void get_user_parameters();
+int GetNbIndicesOfBranch(TTree* tree_, const std::string& branchName_);
 
-int main(int argc, char** argv)
-{
-    // Define colors and strings for info and error messages:
-    const std::string TAG = color::GREEN_STR + "[xsTreeConvert]: " + color::RESET_STR;
-    const std::string ERR = color::RED_STR + color::BOLD_STR + "[ERROR]: " + color::RESET_STR;
+
+// .json config file that will be parsed from the command line:
+int __argc__;
+char **__argv__;
+std::string __json_config_path__;
+int __fgd_id__;
+
+
+int main(int argc, char** argv){
+
+    Logger::setUserHeaderStr("[xsTreeConvert]");
+
+    LogInfo << "-------------------------------------------------" << std::endl;
+    LogInfo << "Welcome to the Super-xsLLh Tree Converter." << std::endl;
 
     // Progress bar for reading in events from the ROOT file:
     ProgressBar pbar(60, "#");
     pbar.SetRainbow();
-    pbar.SetPrefix(std::string(TAG + "Reading Events "));
+    pbar.SetPrefix(std::string(LogInfo.getPrefixString() + "Reading Events "));
 
-    // Print welcome message:
-    std::cout << "-------------------------------------------------\n"
-              << TAG << "Welcome to the Super-xsLLh Tree Converter.\n"
-              << TAG << "Initializing the tree machinery..." << std::endl;
+    // passing command line args to these global variables
+    __argc__ = argc;
+    __argv__ = argv;
 
-    // .json config file that will be parsed from the command line:
-    std::string json_file;
-
-    // Initialize json_file with the name parsed from the command line using -j. Print USAGE and exit when -h is used:
-    char option;
-    while((option = getopt(argc, argv, "j:h")) != -1)
-    {
-        switch(option)
-        {
-            case 'j':
-                json_file = optarg;
-                break;
-            case 'h':
-                std::cout << "USAGE: "
-                          << argv[0] << "\nOPTIONS:\n"
-                          << "-j : JSON input\n";
-            default:
-                return 0;
-        }
-    }
+    // reading user parameters
+    reset_parameters();
+    get_user_parameters();
+    remind_usage();
 
     // Read in .json config file:
-    std::fstream f;
-    f.open(json_file, std::ios::in);
-    std::cout << TAG << "Opening " << json_file << std::endl;
-    if(!f.is_open())
-    {
-        std::cout << ERR << "Unable to open JSON configure file." << std::endl;
+    std::fstream configFile;
+    LogWarning << "Opening " << __json_config_path__ << std::endl;
+    configFile.open(__json_config_path__, std::ios::in);
+    if(not configFile.is_open()){
+        LogFatal << "Unable to open JSON configure file." << std::endl;
         return 1;
     }
-
     json j;
-    f >> j;
+    configFile >> j;
 
-    std::cout << TAG << "Reading configuration options..." << std::endl;
+    LogInfo << "Reading configuration options..." << std::endl;
     std::string out_fname = j["output"]["fname"];
     std::string out_seltree_name = j["output"]["sel_tree"];
     std::string out_trutree_name = j["output"]["tru_tree"];
 
     // Print names of the output file and the selection/truth tree names:
-    std::cout << TAG << "Out File: " << out_fname << std::endl
-              << TAG << "Out Selection Tree: " << out_seltree_name << std::endl
-              << TAG << "Out Truth Tree    : " << out_trutree_name << std::endl;
+    LogInfo << "Out File: " << out_fname << std::endl;
+    LogInfo << "Out Selection Tree: " << out_seltree_name << std::endl;
+    LogInfo << "Out Truth Tree    : " << out_trutree_name << std::endl;
 
     // Create the output file and define its ROOT trees. If it already exists, it will be overwritten:
     TFile* out_file = TFile::Open(out_fname.c_str(), "RECREATE");
-    TTree* out_seltree = new TTree(out_seltree_name.c_str(), out_seltree_name.c_str());
-    TTree* out_trutree = new TTree(out_trutree_name.c_str(), out_trutree_name.c_str());
+    auto* out_seltree = new TTree(out_seltree_name.c_str(), out_seltree_name.c_str());
+    auto* out_trutree = new TTree(out_trutree_name.c_str(), out_trutree_name.c_str());
 
     // Declare some variables that will hold the values written to the output ROOT file:
     const float mu_mass = 105.658374;
     int nutype, nutype_true;
     int reaction, reaction_true;
     int topology, topology_true;
-    int sample;
+    int sample, fgd;
     int target, target_true;
     int cut_branch;
     int beammode;
@@ -150,6 +143,7 @@ int main(int argc, char** argv)
     out_seltree -> Branch("reaction", &reaction, "reaction/I");
     out_seltree -> Branch("topology", &topology, "topology/I");
     out_seltree -> Branch("sample", &sample, "sample/I");
+    out_seltree -> Branch("fgd", &fgd, "fgd/I");
     out_seltree -> Branch("target", &target, "target/I");
     out_seltree -> Branch("cut_branch", &cut_branch, "cut_branch/I");
     out_seltree -> Branch("beammode", &beammode, "beammode/I");
@@ -252,21 +246,21 @@ int main(int argc, char** argv)
     for(const auto& file : v_files)
     {
         // Some info messages about each file:
-        std::cout << TAG << "Reading file: " << file.fname_input << std::endl
-                  << TAG << "File ID: " << file.file_id << std::endl
-                  << TAG << "Selected tree: " << file.sel_tree << std::endl
-                  << TAG << "Truth tree: " << file.tru_tree << std::endl
-                  << TAG << "POT Norm: " << file.pot_norm << std::endl
-                  << TAG << "Beam mode: " << file.beammode << std::endl
-                  << TAG << "Num. Branches: " << file.num_branches << std::endl;
+        LogInfo << "Reading file: " << file.fname_input << std::endl;
+        LogInfo << "File ID: " << file.file_id << std::endl;
+        LogInfo << "Selected tree: " << file.sel_tree << std::endl;
+        LogInfo << "Truth tree: " << file.tru_tree << std::endl;
+        LogInfo << "POT Norm: " << file.pot_norm << std::endl;
+        LogInfo << "Beam mode: " << file.beammode << std::endl;
+        LogInfo << "Num. Branches: " << file.num_branches << std::endl;
 
-        std::cout << TAG << "Branch to Sample mapping:" << std::endl;
+        LogInfo << "Branch to Sample mapping:" << std::endl;
         for(const auto& kv : file.samples)
         {
-            std::cout << TAG << "Sample " << kv.first << ": ";
+            LogInfo << "Sample " << kv.first << ": ";
             for(const auto& b : kv.second)
-                std::cout << b << " ";
-            std::cout << std::endl;
+                LogInfo << b << " ";
+            LogInfo << std::endl;
         }
 
         // Beam mode was previously read in from the .json config file:
@@ -274,30 +268,38 @@ int main(int argc, char** argv)
 
         // Open input ROOT file to read it and get the selected and truth trees:
         TFile* hl2_file = TFile::Open(file.fname_input.c_str(), "READ");
-        TTree* hl2_seltree = (TTree*)hl2_file -> Get(file.sel_tree.c_str());
-        TTree* hl2_trutree = (TTree*)hl2_file -> Get(file.tru_tree.c_str());
+        auto* hl2_seltree = (TTree*)hl2_file -> Get(file.sel_tree.c_str());
+        auto* hl2_trutree = (TTree*)hl2_file -> Get(file.tru_tree.c_str());
 
         // Set the branch addresses for the selected tree to the previously declared variables:
-        int accum_level[1][file.num_branches];
+        int nbFGDs = 2;
+        if(GetNbIndicesOfBranch(hl2_seltree, "accum_level") == 2){
+            nbFGDs = 1; // should be equivalent to int accum_level[1][file.num_branches];
+            LogWarning << "1 FGD branch has been detected." << std::endl;
+        }
+        else{
+            LogWarning << "2 FGD branches have been detected." << std::endl;
+        }
+        int accum_level[1][nbFGDs][file.num_branches];
 
         hl2_seltree -> SetBranchAddress("accum_level", &accum_level);
-        hl2_seltree -> SetBranchAddress(file.sel_var.nutype.c_str(), &nutype);
-        hl2_seltree -> SetBranchAddress(file.sel_var.reaction.c_str(), &reaction);
-        hl2_seltree -> SetBranchAddress(file.sel_var.topology.c_str(), &topology);
-        hl2_seltree -> SetBranchAddress(file.sel_var.sample.c_str(), &sample);
-        hl2_seltree -> SetBranchAddress(file.sel_var.target.c_str(), &target);
+        hl2_seltree -> SetBranchAddress((file.sel_var.nutype).c_str(), &nutype);
+        hl2_seltree -> SetBranchAddress((file.sel_var.reaction).c_str(), &reaction);
+        hl2_seltree -> SetBranchAddress((file.sel_var.topology).c_str(), &topology);
+        hl2_seltree -> SetBranchAddress((file.sel_var.sample).c_str(), &sample);
+        hl2_seltree -> SetBranchAddress((file.sel_var.target).c_str(), &target);
 
         // If the use_D1Reco_multi flag has been set to true, different selection branches will have different D1Reco variables:
         std::vector<float> D1Reco_vector(file.sel_var.D1Reco_multi.size());
         if(file.sel_var.use_D1Reco_multi)
         {
-            std::cout << TAG << "Using different D1Reco variables depending on the branch." << std::endl;
+            LogInfo << "Using different D1Reco variables depending on the branch." << std::endl;
             int iter = 0;
 
             // Loop over all entries of the D1Reco json object:
             for(const auto& kv : file.sel_var.D1Reco_multi)
             {
-                hl2_seltree -> SetBranchAddress(kv.first.c_str(), &D1Reco_vector[iter]);
+                hl2_seltree -> SetBranchAddress((kv.first).c_str(), &D1Reco_vector[iter]);
                 ++iter;
             }
         }
@@ -305,24 +307,24 @@ int main(int argc, char** argv)
         // Otherwise the same D1Reco variable will be used for all selection branches:
         else
         {
-            std::cout << TAG << "Using the same D1Reco variables for all branches." << std::endl;
-            hl2_seltree -> SetBranchAddress(file.sel_var.D1Reco.c_str(), &D1Reco);
+            LogInfo << "Using the same D1Reco variables for all branches." << std::endl;
+            hl2_seltree -> SetBranchAddress((file.sel_var.D1Reco).c_str(), &D1Reco);
         }
 
-        hl2_seltree -> SetBranchAddress(file.sel_var.D2Reco.c_str(), &D2Reco);
-        hl2_seltree -> SetBranchAddress(file.sel_var.D1True.c_str(), &D1True);
-        hl2_seltree -> SetBranchAddress(file.sel_var.D2True.c_str(), &D2True);
-        hl2_seltree -> SetBranchAddress(file.sel_var.enu_true.c_str(), &enu_true);
-        hl2_seltree -> SetBranchAddress(file.sel_var.enu_reco.c_str(), &enu_reco);
-        hl2_seltree -> SetBranchAddress(file.sel_var.weight.c_str(), &weight);
-        hl2_seltree -> SetBranchAddress(file.sel_var.vertexID.c_str(), &vertexID);
-        hl2_seltree -> SetBranchAddress(file.sel_var.run.c_str(), &run);
-        hl2_seltree -> SetBranchAddress(file.sel_var.subrun.c_str(), &subrun);
+        hl2_seltree -> SetBranchAddress((file.sel_var.D2Reco).c_str(), &D2Reco);
+        hl2_seltree -> SetBranchAddress((file.sel_var.D1True).c_str(), &D1True);
+        hl2_seltree -> SetBranchAddress((file.sel_var.D2True).c_str(), &D2True);
+        hl2_seltree -> SetBranchAddress((file.sel_var.enu_true).c_str(), &enu_true);
+        hl2_seltree -> SetBranchAddress((file.sel_var.enu_reco).c_str(), &enu_reco);
+        hl2_seltree -> SetBranchAddress((file.sel_var.weight).c_str(), &weight);
+        hl2_seltree -> SetBranchAddress((file.sel_var.vertexID).c_str(), &vertexID);
+        hl2_seltree -> SetBranchAddress((file.sel_var.run).c_str(), &run);
+        hl2_seltree -> SetBranchAddress((file.sel_var.subrun).c_str(), &subrun);
 
         long int npassed = 0;
         long int nevents = hl2_seltree -> GetEntries();
-        std::cout << TAG << "Reading selected events tree." << std::endl
-                  << TAG << "Num. events: " << nevents << std::endl;
+        LogInfo << "Reading selected events tree." << std::endl;
+        LogInfo << "Num. events: " << nevents << std::endl;
 
         // Loop over all events in the input ROOT file in the selected tree:
         for(int i = 0; i < nevents; ++i)
@@ -336,20 +338,23 @@ int main(int argc, char** argv)
             int event_branch;
 
             // Loop over all samples specified in .json config file:
-            for(const auto& kv : file.samples)
-            {
-                // Loop over all branches in current sample:
-                for(const auto& branch : kv.second)
-                {
-                    // Event passed if its accum_level is higher than the given cut for this branch:
-                    if(accum_level[0][branch] > file.cuts[branch])
-                    {
-                        cut_branch = kv.first;
-                        event_passed = true;
-                        event_branch = branch;
-                        npassed++;
-                        break;
+            for(const auto& kv : file.samples) {
+                for(int iFGD = 0 ; iFGD < nbFGDs ; iFGD++) {
+                    bool eventFGDPassed = false;
+                    // Loop over all branches in current sample:
+                    for(const auto& branch : kv.second) {
+                        // Event passed if its accum_level is higher than the given cut for this branch:
+                        if(accum_level[0][iFGD][branch] > file.cuts[branch]) {
+                            cut_branch = kv.first;
+                            event_passed = true;
+                            event_branch = branch;
+                            fgd = iFGD;
+                            npassed++;
+                            eventFGDPassed = true;
+                            break;
+                        }
                     }
+                    if(eventFGDPassed) break;
                 }
             }
 
@@ -392,24 +397,24 @@ int main(int argc, char** argv)
             if(i % 2000 == 0 || i == (nevents-1))
                 pbar.Print(i, nevents-1);
         }
-        std::cout << TAG << "Selected events passing cuts: " << npassed << std::endl;
+        LogInfo << "Selected events passing cuts: " << npassed << std::endl;
 
         // Set the branch addresses for the true tree to the previously declared variables:
-        hl2_trutree -> SetBranchAddress(file.tru_var.nutype.c_str(), &nutype_true);
-        hl2_trutree -> SetBranchAddress(file.tru_var.reaction.c_str(), &reaction_true);
-        hl2_trutree -> SetBranchAddress(file.tru_var.topology.c_str(), &topology_true);
-        hl2_trutree -> SetBranchAddress(file.tru_var.target.c_str(), &target_true);
-        hl2_trutree -> SetBranchAddress(file.tru_var.D1True.c_str(), &D1True);
-        hl2_trutree -> SetBranchAddress(file.tru_var.D2True.c_str(), &D2True);
-        hl2_trutree -> SetBranchAddress(file.tru_var.enu_true.c_str(), &enu_true);
-        hl2_trutree -> SetBranchAddress(file.tru_var.weight.c_str(), &weight_true);
-        hl2_trutree -> SetBranchAddress(file.tru_var.vertexID.c_str(), &vertexID_true);
-        hl2_trutree -> SetBranchAddress(file.tru_var.run.c_str(), &run_true);
-        hl2_trutree -> SetBranchAddress(file.tru_var.subrun.c_str(), &subrun_true);
+        hl2_trutree -> SetBranchAddress((file.tru_var.nutype).c_str(), &nutype_true);
+        hl2_trutree -> SetBranchAddress((file.tru_var.reaction).c_str(), &reaction_true);
+        hl2_trutree -> SetBranchAddress((file.tru_var.topology).c_str(), &topology_true);
+        hl2_trutree -> SetBranchAddress((file.tru_var.target).c_str(), &target_true);
+        hl2_trutree -> SetBranchAddress((file.tru_var.D1True).c_str(), &D1True);
+        hl2_trutree -> SetBranchAddress((file.tru_var.D2True).c_str(), &D2True);
+        hl2_trutree -> SetBranchAddress((file.tru_var.enu_true).c_str(), &enu_true);
+        hl2_trutree -> SetBranchAddress((file.tru_var.weight).c_str(), &weight_true);
+        hl2_trutree -> SetBranchAddress((file.tru_var.vertexID).c_str(), &vertexID_true);
+        hl2_trutree -> SetBranchAddress((file.tru_var.run).c_str(), &run_true);
+        hl2_trutree -> SetBranchAddress((file.tru_var.subrun).c_str(), &subrun_true);
 
         nevents = hl2_trutree -> GetEntries();
-        std::cout << TAG << "Reading truth events tree." << std::endl
-                  << TAG << "Num. events: " << nevents << std::endl;
+        LogInfo << "Reading truth events tree." << std::endl;
+        LogInfo << "Num. events: " << nevents << std::endl;
 
         // Loop over all events in the input ROOT file in the truth tree:
         for(int i = 0; i < nevents; ++i)
@@ -439,7 +444,7 @@ int main(int argc, char** argv)
     out_file -> cd();
     out_file -> Write();
     out_file -> Close();
-    std::cout << TAG << "Finished." << std::endl;
+    LogInfo << "Finished." << std::endl;
 
     return 0;
 }
@@ -488,4 +493,100 @@ HL2TreeVar ParseHL2Var(T j, bool reco_info)
         v.D2Reco = j["D2Reco"];
     }
     return v;
+}
+std::string remind_usage()
+{
+
+    std::stringstream remind_usage_ss;
+
+    remind_usage_ss << "-------------------------------------------------" << std::endl;
+    remind_usage_ss << " > Command Line Arguments" << std::endl;
+    remind_usage_ss << "   -j : Specify JSON input file (Current : " << __json_config_path__ << ")" << std::endl;
+    remind_usage_ss << "   -fgd : Specify which FGD to process (Current : " << __fgd_id__ << ")" << std::endl;
+    remind_usage_ss << "   -h : Show this message" << std::endl;
+    remind_usage_ss << "-------------------------------------------------" << std::endl;
+
+    LogWarning << remind_usage_ss.str();
+
+    return remind_usage_ss.str();
+
+}
+void reset_parameters(){
+    __json_config_path__ = "";
+    __fgd_id__ = 1;
+}
+void get_user_parameters(){
+
+    if(__argc__ == 1){
+        remind_usage();
+        exit(EXIT_FAILURE);
+    }
+
+    LogInfo << "Sanity check" << std::endl;
+
+    const std::string XSLLHFITTER = std::getenv("XSLLHFITTER");
+    if(XSLLHFITTER.empty()){
+        LogError << "Environment variable \"XSLLHFITTER\" not set." << std::endl;
+        LogError << "Cannot determine source tree location." << std::endl;
+        remind_usage();
+        exit(EXIT_FAILURE);
+    }
+
+    LogInfo << "Reading user parameters" << std::endl;
+
+    for(int i_arg = 0; i_arg < __argc__; i_arg++){
+
+        if(std::string(__argv__[i_arg]) == "-j"){
+            if (i_arg < __argc__ - 1) {
+                int j_arg = i_arg + 1;
+                __json_config_path__ = std::string(__argv__[j_arg]);
+            }
+            else {
+                LogError << "Give an argument after " << __argv__[i_arg] << std::endl;
+                throw std::logic_error(std::string(__argv__[i_arg]) + " : no argument found");
+            }
+        }
+        if(std::string(__argv__[i_arg]) == "-fgd"){
+            if (i_arg < __argc__ - 1) {
+                int j_arg = i_arg + 1;
+                __fgd_id__ = std::stoi(__argv__[j_arg]);
+                if(__fgd_id__ > 2){
+                    LogError << __argv__[i_arg] << " args can either be 1, 2 or -1 (for both). " << std::endl;
+                    throw std::logic_error(std::string(__argv__[i_arg]) + " args can either be 1 or 2.");
+                }
+            }
+            else {
+                LogError << "Give an argument after " << __argv__[i_arg] << std::endl;
+                throw std::logic_error(std::string(__argv__[i_arg]) + " : no argument found");
+            }
+        }
+        else if(std::string(__argv__[i_arg]) == "-h"){
+            remind_usage();
+            exit(EXIT_SUCCESS);
+        }
+
+    }
+
+}
+int GetNbIndicesOfBranch(TTree* tree_, const std::string& branchName_){
+
+    int NbIndices = 0;
+    std::string branchTitle;
+    for(int iBranch = 0 ; iBranch < tree_->GetListOfBranches()->GetEntries() ; iBranch++){
+
+        if(tree_->GetListOfBranches()->At(iBranch)->GetName() == branchName_){
+            branchTitle = tree_->GetListOfBranches()->At(iBranch)->GetTitle();
+            break;
+        }
+
+    }
+
+    // Count the number of openning squared brackets
+    for(const char& c : branchTitle) {
+        if(c == '['){
+            NbIndices++;
+        }
+    }
+
+    return NbIndices;
 }

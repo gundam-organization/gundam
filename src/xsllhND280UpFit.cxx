@@ -5,21 +5,21 @@
 #include <TFile.h>
 #include <TTree.h>
 
-#include <OptParser.hh>
+#include <AnaFitParameters.hh>
 #include <AnaSample.hh>
 #include <AnaTreeMC.hh>
-#include <AnaFitParameters.hh>
+#include <DetParameters.hh>
 #include <FitParameters.hh>
 #include <FluxParameters.hh>
-#include <XsecParameters.hh>
-#include <DetParameters.hh>
+#include <LocalGenericToolbox.h>
+#include <OptParser.hh>
 #include <XsecFitter.hh>
-#include <GenericToolbox.h>
+#include <XsecParameters.hh>
 
-const std::string ERROR    = "\033[1;31m[xsllhND280UpFit.cxx] \033[00m";
-const std::string INFO  = "\033[1;32m[xsllhND280UpFit.cxx] \033[00m";
-const std::string WARNING   = "\033[1;33m[xsllhND280UpFit.cxx] \033[00m";
-const std::string ALERT = "\033[1;35m[xsllhND280UpFit.cxx] \033[00m";
+const std::string ERROR    = "\033[31m[xsllhND280UpFit.cxx] \033[00m";
+const std::string INFO  = "\033[32m[xsllhND280UpFit.cxx] \033[00m";
+const std::string WARNING   = "\033[33m[xsllhND280UpFit.cxx] \033[00m";
+const std::string ALERT = "\033[35m[xsllhND280UpFit.cxx] \033[00m";
 
 
 //! Global Variables
@@ -63,7 +63,7 @@ int main(int argc, char** argv)
     // Setup data trees
     std::string data_tfile_path = options_parser.fname_data;
     std::cout << INFO << "Opening data file: " << data_tfile_path << std::endl;
-    if(not GenericToolbox::do_tfile_is_valid(data_tfile_path)){
+    if(not LocalGenericToolbox::do_tfile_is_valid(data_tfile_path)){
         std::cerr << ERROR << data_tfile_path << " can't be opened." << std::endl;
         exit(EXIT_FAILURE);
     }
@@ -154,7 +154,7 @@ int main(int argc, char** argv)
                   << WARNING << "Opening " << options_parser.flux_cov.fname << " for flux covariance."
                   << std::endl;
 
-        if(not GenericToolbox::do_tfile_is_valid(options_parser.flux_cov.fname)){
+        if(not LocalGenericToolbox::do_tfile_is_valid(options_parser.flux_cov.fname)){
             std::cerr << ERROR << options_parser.flux_cov.fname << " can't be opened." << std::endl;
             exit(EXIT_FAILURE);
         }
@@ -199,7 +199,7 @@ int main(int argc, char** argv)
                   << WARNING << "Opening " << options_parser.xsec_cov.fname << " for xsec covariance."
                   << std::endl;
 
-        if(not GenericToolbox::do_tfile_is_valid(options_parser.xsec_cov.fname)){
+        if(not LocalGenericToolbox::do_tfile_is_valid(options_parser.xsec_cov.fname)){
             std::cerr << ERROR << options_parser.xsec_cov.fname << " can't be opened." << std::endl;
             exit(EXIT_FAILURE);
         }

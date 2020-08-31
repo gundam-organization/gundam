@@ -22,8 +22,8 @@ using json = nlohmann::json;
 
 #include "BinManager.hh"
 #include "ColorOutput.hh"
+#include "LocalGenericToolbox.h"
 #include "ProgressBar.hh"
-#include "GenericToolbox.h"
 
 // Structure that holds the options and the binning for a file specified in the .json config file:
 struct FileOptions {
@@ -876,12 +876,12 @@ int main(int argc, char** argv)
 
 
         std::vector<double> v_mean_double(v_mean.begin(), v_mean.end());
-        auto* bin_contents = GenericToolbox::get_TVectorD_from_vector(v_mean_double);
+        auto* bin_contents = LocalGenericToolbox::get_TVectorD_from_vector(v_mean_double);
         auto* diagonal_values = new TVectorD(num_elements);
         for(int i_diag = 0 ; i_diag < num_elements ; i_diag++){
             (*diagonal_values)[i_diag] = TMath::Sqrt(cov_mat(i_diag,i_diag)*(*bin_contents)[i_diag]);
         }
-        data_histogram = GenericToolbox::get_TH1D_from_TVectorD("MC_data_and_detector_errors", bin_contents, "Counts", "Bin #", diagonal_values);
+        data_histogram = LocalGenericToolbox::get_TH1D_from_TVectorD("MC_data_and_detector_errors", bin_contents, "Counts", "Bin #", diagonal_values);
 
     }
 

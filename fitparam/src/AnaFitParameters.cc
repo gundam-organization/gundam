@@ -1,5 +1,5 @@
 #include "AnaFitParameters.hh"
-#include "GenericToolbox.h"
+#include "LocalGenericToolbox.h"
 
 AnaFitParameters::AnaFitParameters()
     : m_name("")
@@ -64,7 +64,7 @@ void AnaFitParameters::SetCovarianceMatrix(const TMatrixDSym& covmat, bool decom
         covarianceI = new TMatrixDSym(covmat);
     }
 
-    std::map<std::string, TMatrixD*> temp = GenericToolbox::SVD_matrix_inversion((TMatrixD*) covariance, "inverse_covariance_matrix:regularized_eigen_values");
+    std::map<std::string, TMatrixD*> temp = LocalGenericToolbox::SVD_matrix_inversion((TMatrixD*) covariance, "inverse_covariance_matrix:regularized_eigen_values");
     m_nb_dropped_dof = 0;
     while( (*temp["regularized_eigen_values"])[ temp["regularized_eigen_values"]->GetNrows()-1 - m_nb_dropped_dof ][0] == 0 ){
         m_nb_dropped_dof++;
@@ -72,7 +72,7 @@ void AnaFitParameters::SetCovarianceMatrix(const TMatrixDSym& covmat, bool decom
     if(m_nb_dropped_dof != 0){
         std::cout << WAR << "SVD matrix inversion has dropped " << m_nb_dropped_dof << " degree of freedom." << std::endl;
     }
-    covarianceI = GenericToolbox::convert_to_symmetric_matrix(temp["inverse_covariance_matrix"]);
+    covarianceI = LocalGenericToolbox::convert_to_symmetric_matrix(temp["inverse_covariance_matrix"]);
     for(const auto& content: temp) delete content.second;
 
 //    double det = 0;

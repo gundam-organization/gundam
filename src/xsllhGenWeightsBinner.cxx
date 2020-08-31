@@ -12,8 +12,8 @@
 #include <TH2D.h>
 
 #include <FitStructs.hh>
+#include <LocalGenericToolbox.h>
 #include <fstream>
-#include <GenericToolbox.h>
 
 const std::string ERROR    = "\033[1;31m[xsllhGenWeightsBinner] \033[00m";
 const std::string INFO  = "\033[1;32m[xsllhGenWeightsBinner] \033[00m";
@@ -131,7 +131,7 @@ int main(int argc, char** argv)
             std::cout << ERROR << "__genweights_file_path__ not set." << std::endl;
             exit(EXIT_FAILURE);
         }
-        if(not GenericToolbox::do_tfile_is_valid(__genweights_file_path__)){
+        if(not LocalGenericToolbox::do_tfile_is_valid(__genweights_file_path__)){
             std::cout << ERROR << __genweights_file_path__ << " can't be opened. Skipping..." << std::endl;
             continue; // skip
         }
@@ -152,7 +152,7 @@ int main(int argc, char** argv)
         __sample_sum__->GetEntry(0);
         int nb_of_samples = __sample_sum__->GetLeaf("NSamples")->GetValue(0);
         std::map<std::string, TClonesArray*> clone_array_map;
-        GenericToolbox::toggle_quiet_root();
+        LocalGenericToolbox::toggle_quiet_root();
         for( auto &syst_name : __systematic_Xsec_spline_names_list__){
 
             if(__output_tfile_splines__[syst_name] == nullptr){
@@ -170,14 +170,14 @@ int main(int argc, char** argv)
             );
 
         }
-        GenericToolbox::toggle_quiet_root();
+        LocalGenericToolbox::toggle_quiet_root();
 
         std::cout << INFO << "Looping over all the genWeights entries..." << std::endl;
         int nb_entries = __sample_sum__->GetEntries();
         int nb_graphs_found = 0;
         for(int i_entry = 0 ; i_entry < nb_entries ; i_entry++){
 
-            GenericToolbox::display_loading(
+            LocalGenericToolbox::display_loading(
                 i_entry, nb_entries,
                 Form("%s%i graphs found", WARNING.c_str(), nb_graphs_found)
             );
@@ -190,8 +190,8 @@ int main(int argc, char** argv)
             identify_event_bin(i_entry);
 
             if(__current_event_bin__ == -1) continue;
-            if(not GenericToolbox::does_element_is_in_vector(__current_event_sample__, __samples_list__)) continue;
-            if(not GenericToolbox::does_element_is_in_vector(__current_event_reaction__, __reactions_list__)) continue;
+            if(not LocalGenericToolbox::does_element_is_in_vector(__current_event_sample__, __samples_list__)) continue;
+            if(not LocalGenericToolbox::does_element_is_in_vector(__current_event_reaction__, __reactions_list__)) continue;
 
             for( auto &syst_name : __systematic_Xsec_spline_names_list__){
 
@@ -221,9 +221,9 @@ int main(int argc, char** argv)
                         new_graph->SetName(bin_name.c_str());
                         nb_graphs_found++;
 
-                        GenericToolbox::toggle_quiet_root(); // ON
+                        LocalGenericToolbox::toggle_quiet_root(); // ON
                         __output_tfile_splines__[syst_name]->mkdir(Form("Graphs/%s", bin_name.c_str()));
-                        GenericToolbox::toggle_quiet_root(); // OFF
+                        LocalGenericToolbox::toggle_quiet_root(); // OFF
 
                         __output_tfile_splines__[syst_name]->cd(Form("Graphs/%s", bin_name.c_str()));
                         graph_list_map[syst_name][bin_name].emplace_back( (TGraph*) new_graph->Clone() );
@@ -304,7 +304,7 @@ int main(int argc, char** argv)
                 // look for all X points
                 for(auto &graph : graph_list_map[syst_name][bin_name]){
                     for(int i_pt = 0 ; i_pt < graph->GetN() ; i_pt++){
-                        if(not GenericToolbox::does_element_is_in_vector(graph->GetX()[i_pt], X)){
+                        if(not LocalGenericToolbox::does_element_is_in_vector(graph->GetX()[i_pt], X)){
                             X.emplace_back(graph->GetX()[i_pt]);
                         }
                     }
@@ -479,7 +479,7 @@ int main(int argc, char** argv)
     std::cout << INFO << "Checking written splines at nominal value..." << std::endl;
     for(auto &syst_name : __systematics_names_list__){
 
-        if(GenericToolbox::does_element_is_in_vector(syst_name, __missing_splines__)){
+        if(LocalGenericToolbox::does_element_is_in_vector(syst_name, __missing_splines__)){
             continue;
         }
 
@@ -589,7 +589,7 @@ void get_user_parameters(){
             if (i_arg < __argc__ - 1) {
                 int j_arg = i_arg + 1;
                 __json_config_path__ = std::string(__argv__[j_arg]);
-                if(not GenericToolbox::do_path_is_file(__json_config_path__)){
+                if(not LocalGenericToolbox::do_path_is_file(__json_config_path__)){
                     std::cerr << ERROR << std::string(__argv__[i_arg]) << ": " << __json_config_path__ << " could not be found." << std::endl;
                     exit(EXIT_FAILURE);
                 }
@@ -602,7 +602,7 @@ void get_user_parameters(){
             if (i_arg < __argc__ - 1) {
                 do{
                     int j_arg = i_arg + 1;
-                    if(not GenericToolbox::do_path_is_file(std::string(__argv__[j_arg]))){
+                    if(not LocalGenericToolbox::do_path_is_file(std::string(__argv__[j_arg]))){
                         std::cerr << ERROR << std::string(__argv__[i_arg]) << ": " << std::string(__argv__[j_arg]) << " could not be found." << std::endl;
                         exit(EXIT_FAILURE);
                     }
@@ -619,7 +619,7 @@ void get_user_parameters(){
             if (i_arg < __argc__ - 1) {
                 int j_arg = i_arg + 1;
                 __binning_file_path__ = std::string(__argv__[j_arg]);
-                if(not GenericToolbox::do_path_is_file(__binning_file_path__)){
+                if(not LocalGenericToolbox::do_path_is_file(__binning_file_path__)){
                     std::cerr << ERROR << std::string(__argv__[i_arg]) << ": " << __binning_file_path__ << " could not be found." << std::endl;
                     exit(EXIT_FAILURE);
                 }
@@ -632,7 +632,7 @@ void get_user_parameters(){
             if (i_arg < __argc__ - 1) {
                 int j_arg = i_arg + 1;
                 __tree_converter_file_path__ = std::string(__argv__[j_arg]);
-                if(not GenericToolbox::do_path_is_file(__tree_converter_file_path__)){
+                if(not LocalGenericToolbox::do_path_is_file(__tree_converter_file_path__)){
                     std::cerr << ERROR << std::string(__argv__[i_arg]) << ": " << __covariance_matrix_file_path__ << " could not be found." << std::endl;
                     exit(EXIT_FAILURE);
                 }
@@ -645,7 +645,7 @@ void get_user_parameters(){
             if (i_arg < __argc__ - 1) {
                 int j_arg = i_arg + 1;
                 __covariance_matrix_file_path__ = std::string(__argv__[j_arg]);
-                if(not GenericToolbox::do_path_is_file(__covariance_matrix_file_path__)){
+                if(not LocalGenericToolbox::do_path_is_file(__covariance_matrix_file_path__)){
                     std::cerr << ERROR << std::string(__argv__[i_arg]) << ": " << __covariance_matrix_file_path__ << " could not be found." << std::endl;
                     exit(EXIT_FAILURE);
                 }
@@ -658,7 +658,7 @@ void get_user_parameters(){
             if (i_arg < __argc__ - 1) {
                 int j_arg = i_arg + 1;
                 __genweights_file_list_path__ = std::string(__argv__[j_arg]);
-                if(not GenericToolbox::do_path_is_file(__genweights_file_list_path__)){
+                if(not LocalGenericToolbox::do_path_is_file(__genweights_file_list_path__)){
                     std::cerr << ERROR << std::string(__argv__[i_arg]) << ": " << __genweights_file_list_path__ << " could not be found." << std::endl;
                     exit(EXIT_FAILURE);
                 }
@@ -774,7 +774,7 @@ void create_norm_splines(){
     __tree_converter_reco_ttree__->SetBranchStatus("cut_branch", true);
 
     for( int i_entry = 0 ; i_entry < __tree_converter_reco_ttree__->GetEntries() ; i_entry++){
-        GenericToolbox::display_loading(i_entry, __tree_converter_reco_ttree__->GetEntries(), WARNING + "Looking for the samples and reactions...");
+        LocalGenericToolbox::display_loading(i_entry, __tree_converter_reco_ttree__->GetEntries(), WARNING + "Looking for the samples and reactions...");
         __tree_converter_reco_ttree__->GetEntry(i_entry);
 
 //        __current_event_sample__ = int(__tree_converter_reco_ttree__->GetLeaf("sample")->GetValue());
@@ -783,13 +783,13 @@ void create_norm_splines(){
         if(__current_event_sample__ == -1) continue;
         if(__current_event_reaction__ == -1 or __current_event_reaction__ == 999) continue;
 
-        if(not GenericToolbox::does_element_is_in_vector(
+        if(not LocalGenericToolbox::does_element_is_in_vector(
                int(__tree_converter_reco_ttree__->GetLeaf("reaction")->GetValue()),
                __reactions_list__)
            ){
             __reactions_list__.emplace_back(int(__tree_converter_reco_ttree__->GetLeaf("reaction")->GetValue()));
         }
-        if(not GenericToolbox::does_element_is_in_vector(
+        if(not LocalGenericToolbox::does_element_is_in_vector(
 //            int(__tree_converter_reco_ttree__->GetLeaf("sample")->GetValue()),
             int(__tree_converter_reco_ttree__->GetLeaf("cut_branch")->GetValue()),
                __samples_list__)
@@ -827,31 +827,31 @@ void create_norm_splines(){
         std::vector<int> valid_reaction_index_list;
         std::vector<int> exclude_sample_index_list;
         // https://t2k.org/comm/pubboard/review/OA2020/technical-notes/niwg/TN344/TN344
-        if(GenericToolbox::do_string_starts_with_substring(norm_spline_name, "2p2h_norm")){
+        if(LocalGenericToolbox::do_string_starts_with_substring(norm_spline_name, "2p2h_norm")){
             // 2p2h_norm* - 2p2h
             valid_reaction_index_list.emplace_back(__reaction_name_to_index__["2p2h"]);
         }
-        else if(GenericToolbox::do_string_starts_with_substring(norm_spline_name, "Q2_")){
+        else if(LocalGenericToolbox::do_string_starts_with_substring(norm_spline_name, "Q2_")){
             // Q2_* - CCQE
             valid_reaction_index_list.emplace_back(__reaction_name_to_index__["CCQE"]);
         }
-        else if(GenericToolbox::do_string_starts_with_substring(norm_spline_name, "EB_")){
+        else if(LocalGenericToolbox::do_string_starts_with_substring(norm_spline_name, "EB_")){
             // EB* - CCQE
             valid_reaction_index_list.emplace_back(__reaction_name_to_index__["CCQE"]);
         }
-        else if(GenericToolbox::do_string_starts_with_substring(norm_spline_name, "CC_norm_")){
+        else if(LocalGenericToolbox::do_string_starts_with_substring(norm_spline_name, "CC_norm_")){
             // CC_norm_nu - All nu CC
             // CC_norm_anu - All nubar CC
             valid_reaction_index_list.emplace_back(__reaction_name_to_index__["CCQE"]);
         }
-        else if(GenericToolbox::do_string_starts_with_substring(norm_spline_name, "nue_")){
+        else if(LocalGenericToolbox::do_string_starts_with_substring(norm_spline_name, "nue_")){
             // nue_numu - All nue
             // nuebar_numubar - All nuebar
             for(auto const& reaction : __reaction_name_to_index__){
                 valid_reaction_index_list.emplace_back(reaction.second);
             }
         }
-        else if(GenericToolbox::do_string_starts_with_substring(norm_spline_name, "CC_Misc")){
+        else if(LocalGenericToolbox::do_string_starts_with_substring(norm_spline_name, "CC_Misc")){
             // CC_Misc - CCGamma, CCKaon, CCEta
             // CC Misc Misc Spline 100% normalisation error on CC1γ, CC1K, CC1η.
             // all reactions but -> only CC-Other
@@ -861,20 +861,20 @@ void create_norm_splines(){
                 valid_reaction_index_list.emplace_back(reaction.second);
             }
         }
-        else if(GenericToolbox::do_string_starts_with_substring(norm_spline_name, "CC_DIS_MultPi")){
+        else if(LocalGenericToolbox::do_string_starts_with_substring(norm_spline_name, "CC_DIS_MultPi")){
             // CC_DIS_MultiPi_Norm_Nu - CCDIS and CCMultPi, nu only
             // CC_DIS_MultiPi_Norm_nuBar - CCDIS and CCMultPi, anu only
             exclude_sample_index_list.emplace_back(__samples_name_to_index__["CC-0pi"]);
             exclude_sample_index_list.emplace_back(__samples_name_to_index__["CC-1pi"]);
             valid_reaction_index_list.emplace_back(__reaction_name_to_index__["DIS"]);
         }
-        else if(GenericToolbox::do_string_starts_with_substring(norm_spline_name, "CC_Coh_")){
+        else if(LocalGenericToolbox::do_string_starts_with_substring(norm_spline_name, "CC_Coh_")){
             //
             exclude_sample_index_list.emplace_back(__samples_name_to_index__["CC-0pi"]);
             exclude_sample_index_list.emplace_back(__samples_name_to_index__["CC-1pi"]);
             valid_reaction_index_list.emplace_back(__reaction_name_to_index__["Coh"]);
         }
-        else if(GenericToolbox::do_string_starts_with_substring(norm_spline_name, "NC_other_near")){
+        else if(LocalGenericToolbox::do_string_starts_with_substring(norm_spline_name, "NC_other_near")){
             // NC_other_near - all NC which isn't Coh or 1gamma
             for(auto const& reaction : __reaction_name_to_index__){
                 valid_reaction_index_list.emplace_back(reaction.second);
@@ -888,8 +888,8 @@ void create_norm_splines(){
                     TGraph* graph = nullptr;
 
                     __output_tfile_splines__[norm_spline_name]->cd();
-                    if(not GenericToolbox::does_element_is_in_vector(sample_id,exclude_sample_index_list)
-                       and GenericToolbox::does_element_is_in_vector(reaction_id,valid_reaction_index_list)
+                    if(not LocalGenericToolbox::does_element_is_in_vector(sample_id,exclude_sample_index_list)
+                       and LocalGenericToolbox::does_element_is_in_vector(reaction_id,valid_reaction_index_list)
                        ){
                         graph = new TGraph(X_points.size(), &X_points[0], &Y_points[0]);
                     }
@@ -985,7 +985,7 @@ void regenarte_covariance_matrix_file(){
     int i_chopped_parameter = 0;
     for(int i_parameter = 0 ; i_parameter < TObjArray_list["xsec_param_names"]->GetEntries() ; i_parameter++){
 
-        if(GenericToolbox::does_element_is_in_vector(TObjArray_list["xsec_param_names"]->At(i_parameter)->GetName(),__missing_splines__)){
+        if(LocalGenericToolbox::does_element_is_in_vector(TObjArray_list["xsec_param_names"]->At(i_parameter)->GetName(),__missing_splines__)){
             continue;
         }
 
@@ -1001,7 +1001,7 @@ void regenarte_covariance_matrix_file(){
         int j_chopped_parameter = 0;
         for(int j_parameter = 0 ; j_parameter < TObjArray_list["xsec_param_names"]->GetEntries() ; j_parameter++){
 
-            if(GenericToolbox::does_element_is_in_vector(TObjArray_list["xsec_param_names"]->At(j_parameter)->GetName(),__missing_splines__)){
+            if(LocalGenericToolbox::does_element_is_in_vector(TObjArray_list["xsec_param_names"]->At(j_parameter)->GetName(),__missing_splines__)){
                 continue;
             }
 
@@ -1077,8 +1077,7 @@ void generate_json_config_file(){
     std::vector<std::string> dial_strings;
     for(int i_parameter = 0 ; i_parameter < xsec_param_names->GetEntries() ; i_parameter++){
 
-        if(
-            GenericToolbox::does_element_is_in_vector(
+        if(LocalGenericToolbox::does_element_is_in_vector(
                 xsec_param_names->At(i_parameter)->GetName(),
                 __missing_splines__)){
             continue;
@@ -1103,8 +1102,8 @@ void generate_json_config_file(){
     std::vector<std::string> input_dir_elements;
     input_dir_elements.emplace_back("inputs");
     input_dir_elements.emplace_back("BANFF_Fit");
-    auto cwd = GenericToolbox::get_current_working_folder_path();
-    auto path_elements = GenericToolbox::split_string(cwd, "/");
+    auto cwd = LocalGenericToolbox::get_current_working_folder_path();
+    auto path_elements = LocalGenericToolbox::splitString(cwd, "/");
     bool is_triggered = false;
     for(int i_folder = 0 ; i_folder < int(path_elements.size()) ; i_folder++){
         if(is_triggered){
@@ -1117,21 +1116,21 @@ void generate_json_config_file(){
 
     std::stringstream config_ss;
     config_ss << "{" << std::endl;
-    config_ss << "  \"input_dir\" : \"/" << GenericToolbox::join_vector_string(input_dir_elements, "/") << "/\"," << std::endl;
+    config_ss << "  \"input_dir\" : \"/" << LocalGenericToolbox::join_vector_string(input_dir_elements, "/") << "/\"," << std::endl;
     config_ss << "  \"dimensions\" : [" << __reactions_list__.size()*__bin_edges__.size() << ", " << __bin_edges__.size() << "]," << std::endl;
     config_ss << "  \"dials\" : " << std::endl;
     config_ss << "  [" << std::endl;
-    config_ss << GenericToolbox::join_vector_string(dial_strings, ",\n") << std::endl;
+    config_ss << LocalGenericToolbox::join_vector_string(dial_strings, ",\n") << std::endl;
     config_ss << "  ]" << std::endl;
     config_ss << "}" << std::endl;
-    GenericToolbox::write_string_in_file("./config_splines.json", config_ss.str());
+    LocalGenericToolbox::write_string_in_file("./config_splines.json", config_ss.str());
 
     covariance_matrix_tfile->Close();
 
 }
 void read_genweights_files_list(){
 
-    __genweights_file_path_list__ = GenericToolbox::read_file(__genweights_file_list_path__);
+    __genweights_file_path_list__ = LocalGenericToolbox::readFile(__genweights_file_list_path__);
 
 }
 void define_binning(std::string binning_file_) {
@@ -1253,7 +1252,7 @@ void build_tree_sync_cache(){
     __tree_converter_reco_ttree__->SetBranchStatus("run", true);
     __tree_converter_reco_ttree__->SetBranchStatus("subrun", true);
     for(int i_entry = 0 ; i_entry < nb_entries ; i_entry++){ // genWeights
-        GenericToolbox::display_loading(i_entry, nb_entries, Form("%sSynchronizing trees... (%i matches,%i miss)", WARNING.c_str(), nb_matches, nb_missing));
+        LocalGenericToolbox::display_loading(i_entry, nb_entries, Form("%sSynchronizing trees... (%i matches,%i miss)", WARNING.c_str(), nb_matches, nb_missing));
         __flattree__->GetEntry(i_entry);
         __tree_sync_cache__[i_entry] = -1;
         sTrueVertexID = __flattree__->GetLeaf("sTrueVertexID")->GetValue(0);
@@ -1441,9 +1440,9 @@ bool do_syst_param_has_relative_X_scale(std::string& syst_name_){
     }
     for(auto& relative_component_name: __relative_variation_component_list__){
 
-        if(GenericToolbox::do_string_contains_substring(
-            GenericToolbox::to_lower_case(relative_component_name),
-            GenericToolbox::to_lower_case(genWeigths_name)
+        if(LocalGenericToolbox::do_string_contains_substring(
+               LocalGenericToolbox::to_lower_case(relative_component_name),
+               LocalGenericToolbox::to_lower_case(genWeigths_name)
             )
            ){
 //            std::cout << GenericToolbox::to_lower_case(relative_component_name) << " has ";

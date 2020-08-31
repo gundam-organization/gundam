@@ -118,6 +118,32 @@ if(VERBOSE)
 endif()
 
 ################################################################################
+#                       Specify Include Directories
+################################################################################
+
+# SubModules
+
+## Add the GenericToolbox
+include_directories(submodules/cpp-generic-toolbox/include)
+
+## Add the Logger
+include_directories(submodules/simple-cpp-logger/include)
+
+if(${CMAKE_BUILD_TYPE} MATCHES Release)
+    add_definitions( -D LOGGER_MAX_LOG_LEVEL_PRINTED=4 )
+    add_definitions( -D LOGGER_PREFIX_LEVEL=0 )
+    add_definitions( -D LOGGER_ENABLE_COLORS=1 )
+    add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=1 )
+elseif(${CMAKE_BUILD_TYPE} MATCHES Debug)
+    add_definitions( -D LOGGER_MAX_LOG_LEVEL_PRINTED=6 )
+    add_definitions( -D LOGGER_PREFIX_LEVEL=3 )
+    add_definitions( -D LOGGER_ENABLE_COLORS=1 )
+    add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=1 )
+endif()
+
+
+
+################################################################################
 #                            Specify Target Subdirs
 ################################################################################
 
@@ -140,3 +166,5 @@ configure_file(cmake/build_setup.sh.in
   "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/setup.sh" @ONLY)
 install(FILES
   "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/setup.sh" DESTINATION ${CMAKE_INSTALL_PREFIX})
+
+
