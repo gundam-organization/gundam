@@ -24,14 +24,18 @@ class XsecParameters : public AnaFitParameters
 
         void InitEventMap(std::vector<AnaSample*>& sample, int mode);
         void InitParameters();
-        void ReWeight(AnaEvent* event, const std::string& det, int nsample, int nevent, std::vector<double>& params);
+        void ReWeight(AnaEvent* event, const std::string& detectorName, int nsample, int nevent, std::vector<double>& params);
         void AddDetector(const std::string& det, const std::string& config);
+
+        void SetNbThreads(int nbThreads_);
 
     private:
         std::vector<std::vector<std::vector<int>>> m_dial_evtmap;
         std::vector<std::string> v_detectors;
         std::map<std::string, std::vector<XsecDial>> m_dials;
         std::map<std::string, int> m_offset;
+
+        int _nb_threads_;
 
         const std::string TAG = color::GREEN_STR + "[XsecParameters]: " + color::RESET_STR;
 };

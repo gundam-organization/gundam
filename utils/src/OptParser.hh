@@ -21,6 +21,9 @@ struct SampleOpt
     std::string name;
     std::string detector;
     std::string binning;
+    std::string additional_cuts;
+    double data_POT;
+    double mc_POT;
 };
 
 struct SignalDef

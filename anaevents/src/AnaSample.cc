@@ -1,4 +1,7 @@
 #include "AnaSample.hh"
+#include "Logger.h"
+#include "TTreeFormula.h"
+
 using xsllh::FitBin;
 
 // ctor
@@ -11,12 +14,44 @@ AnaSample::AnaSample(int sample_id, const std::string& name, const std::string& 
     , m_data_tree(t_data)
     , m_norm(1.0)
 {
+    Reset();
+}
+
+AnaSample::AnaSample(const SampleOpt& sample, TTree* t_data){
+
+    m_sample_id = sample.cut_branch;
+    m_name = sample.name;
+    m_detector = sample.detector;
+    m_binning = sample.binning;
+    m_additional_cuts = sample.additional_cuts;
+    m_data_POT = sample.data_POT;
+    m_mc_POT = sample.mc_POT;
+    m_norm = 1.0;
+
+    m_data_tree = t_data;
+
+    this->Reset();
+
+}
+
+// Private constructor
+void AnaSample::Reset() {
+
+    Logger::setUserHeaderStr("[AnaSample]");
+    m_additional_cuts_formulae = new TTreeFormula(
+        "additional_cuts", m_additional_cuts.c_str(), m_data_tree
+    );
+
     TH1::SetDefaultSumw2(true);
     SetBinning(m_binning);
 
-    std::cout << TAG << m_name << ", ID " << m_sample_id << std::endl
-              << TAG << "Detector: " << m_detector << std::endl
-              << TAG << "Bin edges: " << std::endl;
+    if(m_data_POT != 0 and m_mc_POT != 0){
+        SetNorm(m_data_POT/m_mc_POT);
+    }
+
+    LogInfo << m_name << ", ID " << m_sample_id << std::endl
+             << "Detector: " << m_detector << std::endl
+             << "Bin edges: " << std::endl;
 
 //    for(const auto& bin : m_bin_edges)
 //    {
@@ -34,7 +69,8 @@ AnaSample::AnaSample(int sample_id, const std::string& name, const std::string& 
 
     MakeHistos(); // with default binning
 
-    std::cout << TAG << "MakeHistos called." << std::endl;
+    LogInfo << "MakeHistos called." << std::endl;
+
 }
 
 AnaSample::~AnaSample()
@@ -59,8 +95,8 @@ void AnaSample::SetBinning(const std::string& binning)
     std::ifstream fin(m_binning, std::ios::in);
     if(!fin.is_open())
     {
-        std::cerr << ERR << "In AnaSample::SetBinning().\n"
-                  << ERR << "Failed to open binning file: " << m_binning << std::endl;
+        LogError << "In AnaSample::SetBinning().\n"
+                 << "Failed to open binning file: " << m_binning << std::endl;
     }
     else
     {
@@ -71,7 +107,7 @@ void AnaSample::SetBinning(const std::string& binning)
             double D1_1, D1_2, D2_1, D2_2;
             if(!(ss >> D2_1 >> D2_2 >> D1_1 >> D1_2))
             {
-                std::cerr << TAG << "Bad line format: " << line << std::endl;
+                LogError << "Bad line format: " << line << std::endl;
                 continue;
             }
             m_bin_edges.emplace_back(FitBin(D1_1, D1_2, D2_1, D2_2));
@@ -99,14 +135,14 @@ AnaEvent* AnaSample::GetEvent(int evnum)
 {
     if(m_events.empty())
     {
-        std::cerr << "[ERROR]: In AnaSample::GetEvent()" << std::endl;
-        std::cerr << "[ERROR]: No events are found in " << m_name << " sample." << std::endl;
+        LogError << "In AnaSample::GetEvent()" << std::endl;
+        LogError << "No events are found in " << m_name << " sample." << std::endl;
         return nullptr;
     }
     else if(evnum >= m_events.size())
     {
-        std::cerr << "[ERROR]: In AnaSample::GetEvent()" << std::endl;
-        std::cerr << "[ERROR]: Event number out of bounds in " << m_name << " sample." << std::endl;
+        LogError << "In AnaSample::GetEvent()" << std::endl;
+        LogError << "Event number out of bounds in " << m_name << " sample." << std::endl;
         return nullptr;
     }
 
@@ -124,9 +160,9 @@ void AnaSample::ResetWeights()
 void AnaSample::PrintStats() const
 {
     double mem_kb = sizeof(m_events) * m_events.size() / 1000.0;
-    std::cout << TAG << "Sample " << m_name << " ID = " << m_sample_id << std::endl;
-    std::cout << TAG << "Num of events = " << m_events.size() << std::endl;
-    std::cout << TAG << "Memory used   = " << mem_kb << " kB." << std::endl;
+    LogInfo << "Sample " << m_name << " ID = " << m_sample_id << std::endl;
+    LogInfo << "Num of events = " << m_events.size() << std::endl;
+    LogInfo << "Memory used   = " << mem_kb << " kB." << std::endl;
 }
 
 void AnaSample::MakeHistos()
@@ -155,7 +191,7 @@ void AnaSample::MakeHistos()
                       Form("%s_mc_trueSignal", m_name.c_str()), m_nbins, 0, m_nbins);
     m_hsig->SetDirectory(0);
 
-    std::cout << TAG << m_nbins << " bins inside MakeHistos()." << std::endl;
+    LogInfo << m_nbins << " bins inside MakeHistos()." << std::endl;
 }
 
 void AnaSample::SetData(TObject* hdata)
@@ -222,7 +258,7 @@ void AnaSample::FillEventHist(int datatype, bool stat_fluc)
         m_hdata->Reset();
 
         if(stat_fluc)
-            std::cout << TAG << "Applying statistical fluctuations..." << std::endl;
+            LogInfo << "Applying statistical fluctuations..." << std::endl;
 
         for(int j = 1; j <= m_hpred->GetNbinsX(); ++j)
         {
@@ -232,10 +268,10 @@ void AnaSample::FillEventHist(int datatype, bool stat_fluc)
 #ifndef NDEBUG
             if(val == 0.0)
             {
-                std::cout << "[WARNING] In AnaSample::FillEventHist()\n"
-                          << "[WARNING] " << m_name << " bin " << j
-                          << " has 0 entries. This may cause a problem with chi2 computations."
-                          << std::endl;
+                LogWarning << "In AnaSample::FillEventHist()\n"
+                           << m_name << " bin " << j
+                           << " has 0 entries. This may cause a problem with chi2 computations."
+                           << std::endl;
                 continue;
             }
 #endif
@@ -257,12 +293,27 @@ void AnaSample::FillEventHist(int datatype, bool stat_fluc)
         m_data_tree->SetBranchAddress("D1Reco", &D1_rec_tree);
         m_data_tree->SetBranchAddress("D2Reco", &D2_rec_tree);
 
+        m_additional_cuts_formulae->SetTree(m_data_tree);
+        m_data_tree->SetNotify(m_additional_cuts_formulae); // This is needed only for TChain.
+
         long int n_entries = m_data_tree->GetEntries();
         for(std::size_t i = 0; i < n_entries; ++i)
         {
             m_data_tree->GetEntry(i);
             if(cut_branch != m_sample_id)
                 continue;
+
+            bool doesEventPassAdditionalCuts = false;
+            for(int jInstance = 0; jInstance < m_additional_cuts_formulae->GetNdata(); jInstance++) {
+                if (m_additional_cuts_formulae->EvalInstance(jInstance) ) {
+                    doesEventPassAdditionalCuts = true;
+                    break;
+                }
+            }
+
+            if(not doesEventPassAdditionalCuts){
+                continue;
+            }
 
             int anybin_index = GetBinIndex(D1_rec_tree, D2_rec_tree);
             if(anybin_index != -1)
@@ -272,10 +323,10 @@ void AnaSample::FillEventHist(int datatype, bool stat_fluc)
 #ifndef NDEBUG
             else
             {
-                std::cout << "[WARNING] In AnaSample::FillEventHist()\n"
-                          << "[WARNING] No bin for current data event.\n"
-                          << "[WARNING] D1 Reco: " << D1_rec_tree << std::endl
-                          << "[WARNING] D2 Reco: " << D2_rec_tree << std::endl;
+                LogWarning << "In AnaSample::FillEventHist()\n"
+                          << "No bin for current data event.\n"
+                          << "D1 Reco: " << D1_rec_tree << std::endl
+                          << "D2 Reco: " << D2_rec_tree << std::endl;
             }
 #endif
         }
@@ -283,7 +334,7 @@ void AnaSample::FillEventHist(int datatype, bool stat_fluc)
         if(stat_fluc && datatype == 2)
         {
             if(stat_fluc)
-                std::cout << TAG << "Applying statistical fluctuations..." << std::endl;
+                LogInfo << "Applying statistical fluctuations..." << std::endl;
 
             for(unsigned int i = 1; i <= m_hdata->GetNbinsX(); ++i)
             {
@@ -293,15 +344,15 @@ void AnaSample::FillEventHist(int datatype, bool stat_fluc)
         }
 
 #ifndef NDEBUG
-        std::cout << TAG << "Data histogram filled: " << std::endl;
+        LogInfo << "Data histogram filled: " << std::endl;
         m_hdata->Print();
 #endif
     }
 
     else
     {
-        std::cout << "[WARNING]: In AnaSample::FillEventHist()\n"
-                  << "[WARNING]: Invalid data type to fill histograms!\n";
+        LogWarning << "In AnaSample::FillEventHist()\n"
+                  << "Invalid data type to fill histograms!\n";
     }
 }
 
@@ -312,22 +363,22 @@ void AnaSample::SetLLHFunction(const std::string& func_name)
 
     if(func_name.empty())
     {
-        std::cout << TAG << "Likelihood function name empty. Setting to Poisson by default." << std::endl;
+        LogInfo << "Likelihood function name empty. Setting to Poisson by default." << std::endl;
         m_llh = new PoissonLLH;
     }
     else if(func_name == "Poisson")
     {
-        std::cout << TAG << "Setting likelihood function to Poisson." << std::endl;
+        LogInfo << "Setting likelihood function to Poisson." << std::endl;
         m_llh = new PoissonLLH;
     }
     else if(func_name == "Effective")
     {
-        std::cout << TAG << "Setting likelihood function to Tianlu's effective likelihood." << std::endl;
+        LogInfo << "Setting likelihood function to Tianlu's effective likelihood." << std::endl;
         m_llh = new EffLLH;
     }
     else if(func_name == "Barlow")
     {
-        std::cout << TAG << "Setting likelihood function to Barlow-Beeston." << std::endl;
+        LogInfo << "Setting likelihood function to Barlow-Beeston." << std::endl;
         m_llh = new BarlowLLH;
     }
 }
@@ -335,6 +386,13 @@ void AnaSample::SetLLHFunction(const std::string& func_name)
 // Compute the statistical chi2 contribution from this sample based on the current m_hpred and m_hdata histograms:
 double AnaSample::CalcLLH() const
 {
+    if(m_hdata == nullptr)
+    {
+        LogError << "In AnaSample::CalcLLH()\n"
+                  << "Need to define data histogram." << std::endl;
+        throw std::runtime_error("m_hdata is a nullptr.");
+    }
+
     // Number of reco bins as specified in binning file:
     const unsigned int nbins = m_hpred->GetNbinsX();
 
@@ -365,17 +423,17 @@ double AnaSample::CalcChi2() const
 {
     if(m_hdata == nullptr)
     {
-        std::cerr << "[ERROR]: In AnaSample::CalcChi2()\n"
-                  << "[ERROR]: Need to define data histogram." << std::endl;
+        LogError << "In AnaSample::CalcChi2()\n"
+                  << "Need to define data histogram." << std::endl;
         return 0.0;
     }
 
     int nbins = m_hpred->GetNbinsX();
     if(nbins != m_hdata->GetNbinsX())
     {
-        std::cerr << "[ERROR]: In AnaSample::CalcChi2()\n"
-                  << "[ERROR]: Binning mismatch between data and mc.\n"
-                  << "[ERROR]: MC bins: " << nbins << ", Data bins: " << m_hdata->GetNbinsX()
+        LogError << "In AnaSample::CalcChi2()\n"
+                  << "Binning mismatch between data and mc.\n"
+                  << "MC bins: " << nbins << ", Data bins: " << m_hdata->GetNbinsX()
                   << std::endl;
         return 0.0;
     }
@@ -397,10 +455,10 @@ double AnaSample::CalcChi2() const
             if(chi2 < 0.0)
             {
 #ifndef NDEBUG
-                std::cerr << "[WARNING]: In AnaSample::CalcChi2()\n"
-                          << "[WARNING]: Stat chi2 is less than 0: " << chi2 << ", setting to 0."
+                LogWarning << "In AnaSample::CalcChi2()\n"
+                          << "Stat chi2 is less than 0: " << chi2 << ", setting to 0."
                           << std::endl;
-                std::cerr << "[WARNING]: exp and obs is: " << exp << " and " << obs << "."
+                LogWarning << "exp and obs is: " << exp << " and " << obs << "."
                           << std::endl;
 #endif
                 chi2 = 0.0;
@@ -410,8 +468,8 @@ double AnaSample::CalcChi2() const
 
     if(chi2 != chi2)
     {
-        std::cerr << "[WARNING]: In AnaSample::CalcChi2()\n"
-                  << "[WARNING]: Stat chi2 is nan, setting to 0." << std::endl;
+        LogWarning << "In AnaSample::CalcChi2()\n"
+                  << "Stat chi2 is nan, setting to 0." << std::endl;
         chi2 = 0.0;
     }
 
@@ -524,7 +582,7 @@ void AnaSample::GetSampleBreakdown(TDirectory* dirout, const std::string& tag,
         }
     }
 
-    std::cout << TAG << "GetSampleBreakdown()\n"
+    LogInfo << "GetSampleBreakdown()\n"
               << "============ Sample " << m_name << " ===========" << std::endl;
 
     for(int j = 0; j < ntopology; ++j)

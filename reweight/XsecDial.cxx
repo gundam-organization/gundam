@@ -1,14 +1,17 @@
 #include "XsecDial.h"
+#include "Logger.h"
 
 XsecDial::XsecDial(const std::string& dial_name)
     : m_name(dial_name), TAG("\033[92m[XsecDial]: \033[0m")
 {
+    Logger::setUserHeaderStr("[XsecDial]");
 }
 
 XsecDial::XsecDial(const std::string& dial_name, const std::string& fname_binning,
                    const std::string& fname_splines)
     : m_name(dial_name), TAG("\033[92m[XsecDial]: \033[0m")
 {
+    Logger::setUserHeaderStr("[XsecDial]");
     SetBinning(fname_binning);
     ReadSplines(fname_splines);
 }
@@ -79,11 +82,11 @@ void XsecDial::SetDimensions(const std::vector<int>& dim)
 
 void XsecDial::Print(bool print_bins) const
 {
-    std::cout << TAG << "Name: " <<  m_name << std::endl
-              << TAG << "Nominal: " << m_nominal << std::endl
-              << TAG << "Step: " << m_step << std::endl
-              << TAG << "Limits: [" << m_limit_lo << "," << m_limit_hi << "]" << std::endl
-              << TAG << "Splines: " << v_splines.size() << std::endl;
+    LogAlert << "Name: " <<  m_name << std::endl
+              << "Nominal: " << m_nominal << std::endl
+              << "Step: " << m_step << std::endl
+              << "Limits: [" << m_limit_lo << "," << m_limit_hi << "]" << std::endl
+              << "Splines: " << v_splines.size() << std::endl;
 
     if(print_bins)
         bin_manager.Print();

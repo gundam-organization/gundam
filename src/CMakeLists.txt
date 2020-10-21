@@ -14,19 +14,19 @@ foreach(mod ${MODULETargets})
 endforeach()
 
 
-# xsllhND280UpPhysics.cxx
-add_executable(xsllhND280UpPhysics xsllhND280UpFit.cxx)
+# xsllhND280UpFit.cxx
+add_executable(xsllhND280UpFit xsllhND280UpFit.cxx)
 
-set_target_properties(xsllhND280UpPhysics PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
+set_target_properties(xsllhND280UpFit PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
 foreach(mod ${MODULES})
-    target_include_directories(xsllhND280UpPhysics PUBLIC ${CMAKE_SOURCE_DIR}/${mod}/src)
-    target_include_directories(xsllhND280UpPhysics PUBLIC ${CMAKE_SOURCE_DIR}/include)
+    target_include_directories(xsllhND280UpFit PUBLIC ${CMAKE_SOURCE_DIR}/${mod}/src)
+    target_include_directories(xsllhND280UpFit PUBLIC ${CMAKE_SOURCE_DIR}/include)
 endforeach()
 
 foreach(mod ${MODULETargets})
     cmessage(STATUS "Linking with: ${mod}")
-    target_link_libraries(xsllhND280UpPhysics ${mod})
+    target_link_libraries(xsllhND280UpFit ${mod})
 endforeach()
 
 
@@ -105,6 +105,21 @@ foreach(mod ${MODULETargets})
     target_link_libraries(xsllhGenWeightsBinner ${mod})
 endforeach()
 
+#xsllhGenWeightsFormater
+add_executable(xsllhGenWeightsFormater xsllhGenWeightsFormater.cc)
+
+set_target_properties(xsllhGenWeightsFormater PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
+
+foreach(mod ${MODULES})
+    target_include_directories(xsllhGenWeightsFormater PUBLIC ${CMAKE_SOURCE_DIR}/${mod}/src)
+    target_include_directories(xsllhGenWeightsFormater PUBLIC ${CMAKE_SOURCE_DIR}/include)
+endforeach()
+
+foreach(mod ${MODULETargets})
+    cmessage(STATUS "Linking with: ${mod}")
+    target_link_libraries(xsllhGenWeightsFormater ${mod})
+endforeach()
+
 #xsllhUnitTests
 add_executable(xsllhUnitTest xsllhUnitTests.cxx)
 
@@ -136,4 +151,4 @@ foreach(mod ${MODULETargets})
 endforeach()
 
 #install targets
-install(TARGETS xsllhCalcXsec xsllhND280UpPhysics xsllhFit xsllhDetVar xsllhPlot xsllhTreeConvert xsllhGenWeightsBinner xsllhUnitTest xsllhXsecCov DESTINATION bin)
+install(TARGETS xsllhCalcXsec xsllhND280UpFit xsllhFit xsllhDetVar xsllhPlot xsllhTreeConvert xsllhGenWeightsBinner xsllhGenWeightsFormater xsllhUnitTest xsllhXsecCov DESTINATION bin)

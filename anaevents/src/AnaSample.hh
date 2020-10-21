@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include <OptParser.hh>
 #include <TDirectory.h>
 #include <TH1D.h>
 #include <TH2D.h>
@@ -35,7 +36,10 @@ class AnaSample
 public:
     AnaSample(int sample_id, const std::string& name, const std::string& detector,
               const std::string& binning, TTree* t_data);
+    AnaSample(const SampleOpt& sample, TTree* t_data);
     ~AnaSample();
+
+    void Reset();
 
     int GetN() const;
     AnaEvent* GetEvent(int evnum);
@@ -71,12 +75,14 @@ public:
     std::string GetName() const { return m_name; }
     std::string GetDetector() const { return m_detector; }
     std::string GetDetBinning() const { return m_binning; }
+    std::string GetAdditionalCuts() const { return m_additional_cuts; }
 
     TH1D* GetPredHisto() const { return m_hpred; }
     TH1D* GetDataHisto() const { return m_hdata; }
     TH1D* GetMCHisto() const { return m_hmc; }
     TH1D* GetMCTruthHisto() const { return m_hmc_true; }
     TH1D* GetSignalHisto() const { return m_hsig; }
+    TTreeFormula* GetAdditionalCutsFormulae() {return m_additional_cuts_formulae;}
 
 protected:
     int m_sample_id;
@@ -86,6 +92,9 @@ protected:
     std::string m_name;
     std::string m_detector;
     std::string m_binning;
+    std::string m_additional_cuts;
+    double m_data_POT;
+    double m_mc_POT;
     std::vector<AnaEvent> m_events;
     std::vector<FitBin> m_bin_edges;
 
@@ -100,6 +109,8 @@ protected:
     TH1D* m_hpred;
     TH1D* m_hdata;
     TH1D* m_hsig;
+
+    TTreeFormula* m_additional_cuts_formulae;
 
     const std::string TAG = color::GREEN_STR + "[AnaSample]: " + color::RESET_STR;
     const std::string ERR = color::RED_STR + "[ERROR]: " + color::RESET_STR;

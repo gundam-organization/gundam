@@ -17,6 +17,8 @@
 #include "TTree.h"
 #include "TVectorT.h"
 
+#include <Logger.h>
+
 #include "json.hpp"
 using json = nlohmann::json;
 
@@ -88,19 +90,22 @@ struct FileOptions {
 
 int main(int argc, char** argv)
 {
+
+    Logger::setUserHeaderStr("[xsDetVariation]");
+
     // Define colors and strings for info and error messages:
-    const std::string TAG = color::GREEN_STR + "[xsDetVariation]: " + color::RESET_STR;
-    const std::string ERR = color::RED_STR + color::BOLD_STR + "[ERROR]: " + color::RESET_STR;
+//    const std::string TAG = color::GREEN_STR + "[xsDetVariation]: " + color::RESET_STR;
+//    const std::string ERR = color::RED_STR + color::BOLD_STR + "[ERROR]: " + color::RESET_STR;
 
     // Print welcome message:
-    std::cout << "--------------------------------------------------------\n"
-              << TAG << color::RainbowText("Welcome to the Super-xsLLh Detector Variation Interface.\n")
-              << TAG << color::RainbowText("Initializing the variation machinery...") << std::endl;
+    LogInfo << "--------------------------------------------------------\n"
+              << color::RainbowText("Welcome to the Super-xsLLh Detector Variation Interface.\n")
+              << color::RainbowText("Initializing the variation machinery...") << std::endl;
 
     // Progress bar for reading in events from the ROOT file:
     ProgressBar pbar(60, "#");
     pbar.SetRainbow();
-    pbar.SetPrefix(std::string(TAG + "Reading Events "));
+    pbar.SetPrefix(std::string(Logger::getPrefixString() + "Reading Events "));
 
     // .json config file that will be parsed from the command line:
     std::string json_file;
@@ -125,10 +130,10 @@ int main(int argc, char** argv)
     // Read in the .json config file:
     std::fstream f;
     f.open(json_file, std::ios::in);
-    std::cout << TAG << "Opening " << json_file << std::endl;
+    LogInfo << "Opening " << json_file << std::endl;
     if(!f.is_open())
     {
-        std::cout << ERR << "Unable to open JSON configure file." << std::endl;
+        LogError << "Unable to open JSON configure file." << std::endl;
         return 1;
     }
 
@@ -225,7 +230,7 @@ int main(int argc, char** argv)
                         // If the nuber of the current sample is greater than the total number of samples, an error is thrown:
                         else
                         {
-                            std::cout << ERR << "Invalid sample number: " << sam << std::endl;
+                            LogError << "Invalid sample number: " << sam << std::endl;
                             return 64;
                         }
                     }
@@ -288,7 +293,7 @@ int main(int argc, char** argv)
                     // If the nuber of the current sample is greater than the total number of samples, an error is thrown:
                     else
                     {
-                        std::cout << ERR << "Invalid sample number: " << sam << std::endl;
+                        LogError << "Invalid sample number: " << sam << std::endl;
                         return 64;
                     }
                 }
@@ -323,12 +328,12 @@ int main(int argc, char** argv)
     }
 
     // Print some information about which options were set in the .json config file:
-    std::cout << TAG << "Output ROOT file: " << fname_output << std::endl
-              << TAG << "Toy Weight Cut: " << weight_cut << std::endl
-              << TAG << "Calculating Covariance: " << std::boolalpha << do_covariance << std::endl;
+    LogInfo << "Output ROOT file: " << fname_output << std::endl
+              << "Toy Weight Cut: " << weight_cut << std::endl
+              << "Calculating Covariance: " << std::boolalpha << do_covariance << std::endl;
 
     // Print the covariance variables as specified in the .json config file:
-    std::cout << TAG << "Covariance Variables: ";
+    LogInfo << "Covariance Variables: ";
     for(const auto& var : var_names)
         std::cout << var << " ";
     std::cout << std::endl;
@@ -342,8 +347,8 @@ int main(int argc, char** argv)
     }
 
     // Now starting with the histogram initialization and printing the number of toys which will be used:
-    std::cout << TAG << "Initalizing histograms." << std::endl;
-    std::cout << TAG << "Using " << usable_toys << " toys." << std::endl;
+    LogInfo << "Initalizing histograms." << std::endl;
+    LogInfo << "Using " << usable_toys << " toys." << std::endl;
 
     // All new histograms will automatically activate the storage of the sum of squares of errors:
     TH1::SetDefaultSumw2();
@@ -424,8 +429,8 @@ int main(int argc, char** argv)
     }
 
     // Print information, that the initialization of the histograms was has finished and we can move to reading the events from the ROOT files:
-    std::cout << TAG << "Finished initializing histograms" << std::endl
-              << TAG << "Reading events from files..." << std::endl;
+    LogInfo << "Finished initializing histograms" << std::endl
+              << "Reading events from files..." << std::endl;
 
     // Loop over all files specified in the .json config file:
     for(const auto& file_ : v_files)
@@ -442,15 +447,15 @@ int main(int argc, char** argv)
         float weight_syst_total_noflux_mc;
 
         // Print some information about which file is opened, which tree is read in, the number of toys and systematics, and which selection branches are mapped to which selection samples:
-        std::cout << TAG << "Opening file: " << file_.fname_input << std::endl
-                  << TAG << "Reading tree: " << file_.tree_name << std::endl
-                  << TAG << "Num Toys: " << file_.num_toys << std::endl
-                  << TAG << "Num Syst: " << file_.num_syst << std::endl;
+        LogInfo << "Opening file: " << file_.fname_input << std::endl
+                  << "Reading tree: " << file_.tree_name << std::endl
+                  << "Num Toys: " << file_.num_toys << std::endl
+                  << "Num Syst: " << file_.num_syst << std::endl;
 
-        std::cout << TAG << "Branch to Sample mapping:" << std::endl;
+        LogInfo << "Branch to Sample mapping:" << std::endl;
         for(const auto& kv : file_.samples)
         {
-            std::cout << TAG << "Sample " << kv.first << ": ";
+            LogInfo << "Sample " << kv.first << ": ";
             for(const auto& b : kv.second)
                 std::cout << b << " ";
             std::cout << std::endl;
@@ -491,7 +496,7 @@ int main(int argc, char** argv)
         unsigned int num_events = tree_event->GetEntries();
 
         // Print out total number of events:
-        std::cout << TAG << "Number of events: " << num_events << std::endl;
+        LogInfo << "Number of events: " << num_events << std::endl;
 
         // Loop over all events:
         for(unsigned int i = 0; i < num_events; ++i)
@@ -501,7 +506,7 @@ int main(int argc, char** argv)
 
             // If the number of toys from the input ROOT file does not match the number of toys specified in the .json config file, an error message is printed:
             if(NTOYS != file_.num_toys)
-                std::cerr << ERR << "Incorrect number of toys specified!" << std::endl;
+                LogError << "Incorrect number of toys specified!" << std::endl;
 
             //  Update progress bar every 2000 events (or if it is the last event):
             if(i % 2000 == 0 || i == (num_events - 1))
@@ -611,7 +616,7 @@ int main(int argc, char** argv)
         }
 
         // We now move on to reading out the default tree:
-        std::cout << TAG << "Reading default events..." << std::endl;
+        LogInfo << "Reading default events..." << std::endl;
 
         // Get the number of events:
         num_events = tree_default->GetEntries();
@@ -706,10 +711,10 @@ int main(int argc, char** argv)
 
         // Print some information about how many events passed all the selection cuts (total_weights), how many had a weight less than zero or higher than the weight cut (rejected_weights), and their fraction:
         double reject_fraction = (rejected_weights * 1.0) / total_weights;
-        std::cout << TAG << "Finished processing events." << std::endl;
-        std::cout << TAG << "Total weights: " << total_weights << std::endl;
-        std::cout << TAG << "Rejected weights: " << rejected_weights << std::endl;
-        std::cout << TAG << "Rejected fraction: " << reject_fraction << std::endl;
+        LogInfo << "Finished processing events." << std::endl;
+        LogInfo << "Total weights: " << total_weights << std::endl;
+        LogInfo << "Rejected weights: " << rejected_weights << std::endl;
+        LogInfo << "Rejected fraction: " << reject_fraction << std::endl;
 
         // Close the current ROOT input file and move on to the next one (it this was not the last one):
         file_input->Close();
@@ -729,7 +734,7 @@ int main(int argc, char** argv)
     // If the covariance key is set to true in the .json config file, we compute the covariance and correlation matrices below:
     if(do_covariance)
     {
-        std::cout << TAG << "Calculating covariance matrix." << std::endl;
+        LogInfo << "Calculating covariance matrix." << std::endl;
 
         // Vector which will later be filled with the bin content (sum of all weights of events that fall into this bin) for each sample and each toy:
         std::vector<std::vector<float>> v_toys;
@@ -787,7 +792,7 @@ int main(int argc, char** argv)
         }
 
         // Print information about the number of toys we are using:
-        std::cout << TAG << "Using " << usable_toys << " toys." << std::endl;
+        LogInfo << "Using " << usable_toys << " toys." << std::endl;
 
         // Number of elements is the sum of the number of bins in each sample:
         num_elements = v_toys.at(0).size();
@@ -838,7 +843,7 @@ int main(int argc, char** argv)
         // If the "mc_stat_error" key was set to true in the .json config file, we add the MC statistical error to the diagonal entries of the covariance matrix:
         if(do_mc_stat)
         {
-            std::cout << TAG << "Adding MC stat error to covariance." << std::endl;
+            LogInfo << "Adding MC stat error to covariance." << std::endl;
 
             // Loop over all bins in all samples:
             for(unsigned int i = 0; i < num_elements; ++i)
@@ -885,7 +890,7 @@ int main(int argc, char** argv)
 
     }
 
-    std::cout << TAG << "Saving to output file." << std::endl;
+    LogInfo << "Saving to output file." << std::endl;
 
     // Create the output file. If it already exists, it will be overwritten:
     TFile* file_output = TFile::Open(fname_output.c_str(), "RECREATE");
@@ -947,10 +952,10 @@ int main(int argc, char** argv)
     // Close the output file:
     file_output->Close();
 
-    std::cout << TAG << "Finished." << std::endl;
+    LogInfo << "Finished." << std::endl;
 
     // Print Arigatou Gozaimashita with Rainbowtext :)
-    std::cout << TAG << color::RainbowText("\u3042\u308a\u304c\u3068\u3046\u3054\u3056\u3044\u307e\u3057\u305f\uff01")
+    LogInfo << color::RainbowText("\u3042\u308a\u304c\u3068\u3046\u3054\u3056\u3044\u307e\u3057\u305f\uff01")
               << std::endl;
 
     return 0;

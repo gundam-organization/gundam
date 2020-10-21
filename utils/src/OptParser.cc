@@ -1,13 +1,15 @@
 #include "OptParser.hh"
+#include "Logger.h"
 
 OptParser::OptParser()
 {
+    Logger::setUserHeaderStr("[OptParser]");
     xsLLh_env = std::string(std::getenv("XSLLHFITTER"));
 
     if(xsLLh_env.empty())
     {
-        std::cerr << TAG << "Environment variable \"XSLLHFITTER\" not set." << std::endl
-                  << TAG << "Cannot determine source tree location." << std::endl;
+        LogError << "Environment variable \"XSLLHFITTER\" not set." << std::endl
+                 << "Cannot determine source tree location." << std::endl;
     }
 }
 
@@ -16,10 +18,10 @@ bool OptParser::ParseJSON(std::string json_file)
     std::fstream f;
     f.open(json_file, std::ios::in);
 
-    std::cout << TAG << "Opening " << json_file << std::endl;
+    LogInfo << "Opening " << json_file << std::endl;
     if(!f.is_open())
     {
-        std::cout << ERR << "Unable to open JSON configure file.\n";
+        LogError << "Unable to open JSON configure file.\n";
         return false;
     }
 
@@ -113,6 +115,9 @@ bool OptParser::ParseJSON(std::string json_file)
         s.detector = sample["detector"];
         s.binning = input_dir + sample["binning"].get<std::string>();
         s.use_sample = sample["use_sample"];
+        if(sample.find("additional_cuts") != sample.end()) s.additional_cuts = sample["additional_cuts"].get<std::string>();
+        if(sample.find("data_POT") != sample.end()) s.data_POT = sample["data_POT"].get<double>();
+        if(sample.find("mc_POT") != sample.end()) s.mc_POT = sample["mc_POT"].get<double>();
         samples.push_back(s);
     }
 
@@ -131,7 +136,7 @@ bool OptParser::ParseJSON(std::string json_file)
     }
     catch(json::exception& e)
     {
-        std::cout << TAG << "Using default minimizer settings."
+        LogInfo << "Using default minimizer settings."
                   << std::endl;
 
         min_settings.minimizer = "Minuit2";
@@ -144,13 +149,13 @@ bool OptParser::ParseJSON(std::string json_file)
         min_settings.max_fcn   = 1E9;
     }
 
-    std::cout << TAG << "Finished loading JSON configure file.\n";
+    LogInfo << "Finished loading JSON configure file.\n";
     return true;
 }
 
 bool OptParser::ParseCLI(int argc, char** argv)
 {
-    std::cout << TAG << "Not supported yet." << std::endl;
+    LogInfo << "Not supported yet." << std::endl;
     return false;
 }
 
@@ -166,40 +171,40 @@ int OptParser::StringToEnum(const std::string& s) const
     else if(s == "kToyFit")
         enum_val = 3; //kToyFit;
     else
-        std::cout << "[WARNING] In OptParser::StringToEnum(), Invalid string!" << std::endl;
+        LogWarning << "In OptParser::StringToEnum(), Invalid string!" << std::endl;
 
     return enum_val;
 }
 
 void OptParser::PrintOptions(bool short_list) const
 {
-    std::cout << TAG << "Printing parsed options..."
-    << std::endl << TAG << "Data   File : " << fname_data
-    << std::endl << TAG << "MC     File : " << fname_mc
-    << std::endl << TAG << "Output File : " << fname_output
-    << std::endl << TAG << "Fit Type : " << fit_type
-    << std::endl << TAG << "Data POT : " << data_POT
-    << std::endl << TAG << "MC   POT : " << mc_POT
-    << std::endl << TAG << "RNG Seed : " << rng_seed
-    << std::endl << TAG << "N Threads: " << num_threads
-    << std::endl << TAG << "Saving Events: " << std::boolalpha << save_events
-    << std::endl << TAG << "Enable Stat flucutations : " << std::boolalpha << stat_fluc
-    << std::endl << TAG << "Enable Zero syst penalty : " << std::boolalpha << zero_syst
-    << std::endl << TAG << "Enable Fit regularisation: " << std::boolalpha << regularise
+    LogInfo << "Printing parsed options..."
+    << std::endl << "Data   File : " << fname_data
+    << std::endl << "MC     File : " << fname_mc
+    << std::endl << "Output File : " << fname_output
+    << std::endl << "Fit Type : " << fit_type
+    << std::endl << "Data POT : " << data_POT
+    << std::endl << "MC   POT : " << mc_POT
+    << std::endl << "RNG Seed : " << rng_seed
+    << std::endl << "N Threads: " << num_threads
+    << std::endl << "Saving Events: " << std::boolalpha << save_events
+    << std::endl << "Enable Stat flucutations : " << std::boolalpha << stat_fluc
+    << std::endl << "Enable Zero syst penalty : " << std::boolalpha << zero_syst
+    << std::endl << "Enable Fit regularisation: " << std::boolalpha << regularise
     << std::endl;
 
     if(!short_list)
     {
-        std::cout << TAG << "Printing more options..."
-        << std::endl << TAG << "Flux Covariance file: " << flux_cov.fname
-        << std::endl << TAG << "Enable flux throw : " << std::boolalpha << flux_cov.do_throw
-        << std::endl << TAG << "Enable flux decomp: " << std::boolalpha << flux_cov.decompose
-        << std::endl << TAG << "Det  Covariance file: " << det_cov.fname
-        << std::endl << TAG << "Enable det throw : " << std::boolalpha << det_cov.do_throw
-        << std::endl << TAG << "Enable det decomp: " << std::boolalpha << det_cov.decompose
-        << std::endl << TAG << "Xsec Covariance file: " << xsec_cov.fname
-        << std::endl << TAG << "Enable xsec throw : " << std::boolalpha << xsec_cov.do_throw
-        << std::endl << TAG << "Enable xsec decomp: " << std::boolalpha << xsec_cov.decompose
+        LogInfo << "Printing more options..."
+        << std::endl << "Flux Covariance file: " << flux_cov.fname
+        << std::endl << "Enable flux throw : " << std::boolalpha << flux_cov.do_throw
+        << std::endl << "Enable flux decomp: " << std::boolalpha << flux_cov.decompose
+        << std::endl << "Det  Covariance file: " << det_cov.fname
+        << std::endl << "Enable det throw : " << std::boolalpha << det_cov.do_throw
+        << std::endl << "Enable det decomp: " << std::boolalpha << det_cov.decompose
+        << std::endl << "Xsec Covariance file: " << xsec_cov.fname
+        << std::endl << "Enable xsec throw : " << std::boolalpha << xsec_cov.do_throw
+        << std::endl << "Enable xsec decomp: " << std::boolalpha << xsec_cov.decompose
         << std::endl;
     }
 }

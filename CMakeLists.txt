@@ -125,12 +125,14 @@ endif()
 
 ## Add the GenericToolbox
 include_directories(submodules/cpp-generic-toolbox/include)
+add_definitions( -D PROGRESS_BAR_ENABLE_RAINBOW=1 )
+add_definitions( -D PROGRESS_BAR_FILL_TAG="\\\"T2K\#"\\\" )
 
 ## Add the Logger
 include_directories(submodules/simple-cpp-logger/include)
 
 if(${CMAKE_BUILD_TYPE} MATCHES Release)
-    add_definitions( -D LOGGER_MAX_LOG_LEVEL_PRINTED=4 )
+    add_definitions( -D LOGGER_MAX_LOG_LEVEL_PRINTED=6 )
     add_definitions( -D LOGGER_PREFIX_LEVEL=0 )
     add_definitions( -D LOGGER_ENABLE_COLORS=1 )
     add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=1 )
@@ -139,6 +141,7 @@ elseif(${CMAKE_BUILD_TYPE} MATCHES Debug)
     add_definitions( -D LOGGER_PREFIX_LEVEL=3 )
     add_definitions( -D LOGGER_ENABLE_COLORS=1 )
     add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=1 )
+    add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {USER_HEADER} {FILELINE}"\\\" )
 endif()
 
 
@@ -152,6 +155,7 @@ set(MODULES
   anaevents
   fitparam
   xsecfit
+  nd280Fit
   utils
   )
 set(MODULETargets "")

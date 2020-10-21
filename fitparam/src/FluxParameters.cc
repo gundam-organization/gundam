@@ -1,7 +1,9 @@
 #include "FluxParameters.hh"
+#include "Logger.h"
 
 FluxParameters::FluxParameters(const std::string& name)
 {
+    Logger::setUserHeaderStr("[FluxParameters]");
     m_name = name;
 }
 
@@ -30,9 +32,9 @@ void FluxParameters::InitEventMap(std::vector<AnaSample*>& sample, int mode)
         //if(m_det_bins.count(s->GetDetector()) == 0)
         if(m_det_bm.count(s->GetDetector()) == 0)
         {
-            std::cerr << ERR << "In FluxParameters::InitEventMap\n"
-                      << ERR << "Detector " << s->GetDetector() << " not part of fit parameters.\n"
-                      << ERR << "Not building event map." << std::endl;
+            LogError << "In FluxParameters::InitEventMap\n"
+                     << "Detector " << s->GetDetector() << " not part of fit parameters.\n"
+                     << "Not building event map." << std::endl;
             return;
         }
     }
@@ -55,8 +57,8 @@ void FluxParameters::InitEventMap(std::vector<AnaSample*>& sample, int mode)
 
             if(bin == BADBIN)
             {
-                std::cout << WAR << "Event Enu " << enu << " falls outside bin range.\n"
-                          << WAR << "This event will be ignored in the analysis." << std::endl;
+                LogWarning << "Event Enu " << enu << " falls outside bin range.\n"
+                           << "This event will be ignored in the analysis." << std::endl;
                 ev->Print();
             }
             // If event is signal let the c_i params handle the reweighting:
@@ -76,7 +78,7 @@ void FluxParameters::ReWeight(AnaEvent* event, const std::string& det, int nsamp
     // m_evmap is a vector containing vectors of which bin an event falls in for all samples. This event map needs to be built first, otherwise an error is thrown:
     if(m_evmap.empty())
     {
-        std::cerr << ERR << "In FluxParameters::ReWeight()\n"
+        LogError << "In FluxParameters::ReWeight()\n"
                   << ERR << "Need to build event map index for " << m_name << std::endl;
         return;
     }
@@ -98,10 +100,10 @@ void FluxParameters::ReWeight(AnaEvent* event, const std::string& det, int nsamp
         // If the bin number is larger than the number of parameters, we set the event weight to zero (this should not happen):
         if(bin > params.size())
         {
-            std::cout << WAR << "In FluxParameters::ReWeight()\n"
-                      << WAR << "Number of bins in " << m_name
-                      << " does not match num of parameters.\n"
-                      << WAR << "Setting event weight to zero." << std::endl;
+            LogWarning << "In FluxParameters::ReWeight()\n"
+                       << "Number of bins in " << m_name
+                       << " does not match num of parameters.\n"
+                       << "Setting event weight to zero." << std::endl;
             event->AddEvWght(0.0);
         }
 
@@ -119,10 +121,10 @@ void FluxParameters::ReWeight(AnaEvent* event, const std::string& det, int nsamp
 void FluxParameters::InitParameters()
 {
     unsigned int offset = 0;
-    std::cout << TAG << "Flux binning " << std::endl;
+    LogInfo << "Flux binning " << std::endl;
     for(const auto& det : v_detectors)
     {
-        std::cout << TAG << "Detector: " << det << std::endl;
+        LogInfo << "Detector: " << det << std::endl;
         m_det_offset.insert(std::make_pair(det, offset));
         //const int nbins = m_det_bins.at(det).size() - 1;
         const int nbins = m_det_bm.at(det).GetNbins();
@@ -140,7 +142,7 @@ void FluxParameters::InitParameters()
         //std::cout << nbins << ": " << m_det_bins.at(det).back() << std::endl;
 
         m_det_bm.at(det).Print();
-        std::cout << TAG << "Total " << nbins << " parameters at "
+        LogInfo << "Total " << nbins << " parameters at "
                   << offset << " for " << det << std::endl;
         offset += nbins;
     }
@@ -158,7 +160,7 @@ void FluxParameters::InitParameters()
         for(int i = idx; i < Npar; ++i)
             pars_fixed[i] = true;
 
-        std::cout << TAG << "Decomposed parameters.\n"
+        LogInfo << "Decomposed parameters.\n"
                   << TAG << "Keeping the " << idx << " largest eigen values.\n"
                   << TAG << "Corresponds to " << m_info_frac * 100.0
                   << "\% total variance.\n";
@@ -167,7 +169,7 @@ void FluxParameters::InitParameters()
 
 void FluxParameters::AddDetector(const std::string& det, const std::vector<double>& bins)
 {
-    std::cout << TAG << "Adding detector " << det << " for " << this->m_name
+    LogInfo << "Adding detector " << det << " for " << this->m_name
               << std::endl;
     m_det_bins.emplace(std::make_pair(det, bins));
     v_detectors.emplace_back(det);
@@ -175,7 +177,7 @@ void FluxParameters::AddDetector(const std::string& det, const std::vector<doubl
 
 void FluxParameters::AddDetector(const std::string& det, const std::string& binning_file)
 {
-    std::cout << TAG << "Adding detector " << det << " for " << this->m_name
+    LogInfo << "Adding detector " << det << " for " << this->m_name
               << std::endl;
     BinManager temp(binning_file, true);
     m_det_bm.emplace(std::make_pair(det, std::move(temp)));

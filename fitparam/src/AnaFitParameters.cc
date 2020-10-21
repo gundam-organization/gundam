@@ -1,5 +1,7 @@
 #include "AnaFitParameters.hh"
-#include "LocalGenericToolbox.h"
+#include "GenericToolbox.h"
+#include "GenericToolboxRootExt.h"
+#include "Logger.h"
 
 AnaFitParameters::AnaFitParameters()
     : m_name("")
@@ -18,6 +20,7 @@ AnaFitParameters::AnaFitParameters()
     , covarianceI(nullptr)
     , original_cov(nullptr)
 {
+    Logger::setUserHeaderStr("[AnaFitParameters]");
 }
 
 AnaFitParameters::~AnaFitParameters()
@@ -35,10 +38,10 @@ AnaFitParameters::~AnaFitParameters()
 void AnaFitParameters::SetCovarianceMatrix(const TMatrixDSym& covmat, bool decompose)
 {
     m_decompose = decompose;
-    std::cout << TAG << "Using decompose ? " << m_decompose << std::endl;
+    LogInfo << "Using decompose ? " << m_decompose << std::endl;
 
     if(covmat.GetNrows() > 500){
-        std::cout << WAR << "dof > 500 : Matrix inversion will take some time" << std::endl;
+        LogWarning << "dof > 500 : Matrix inversion will take some time" << std::endl;
     }
 
     if(covariance != nullptr)
@@ -64,15 +67,18 @@ void AnaFitParameters::SetCovarianceMatrix(const TMatrixDSym& covmat, bool decom
         covarianceI = new TMatrixDSym(covmat);
     }
 
-    std::map<std::string, TMatrixD*> temp = LocalGenericToolbox::SVD_matrix_inversion((TMatrixD*) covariance, "inverse_covariance_matrix:regularized_eigen_values");
+    std::map<std::string, TMatrixD*> temp = GenericToolbox::invertMatrixSVD(
+        (TMatrixD*) covariance, "inverse_covariance_matrix:regularized_eigen_values"
+        );
     m_nb_dropped_dof = 0;
+
     while( (*temp["regularized_eigen_values"])[ temp["regularized_eigen_values"]->GetNrows()-1 - m_nb_dropped_dof ][0] == 0 ){
         m_nb_dropped_dof++;
     }
     if(m_nb_dropped_dof != 0){
-        std::cout << WAR << "SVD matrix inversion has dropped " << m_nb_dropped_dof << " degree of freedom." << std::endl;
+        LogWarning << "SVD matrix inversion has dropped " << m_nb_dropped_dof << " degree of freedom." << std::endl;
     }
-    covarianceI = LocalGenericToolbox::convert_to_symmetric_matrix(temp["inverse_covariance_matrix"]);
+    covarianceI = GenericToolbox::convertToSymmetricMatrix(temp["inverse_covariance_matrix"]);
     for(const auto& content: temp) delete content.second;
 
 //    double det = 0;
@@ -80,17 +86,17 @@ void AnaFitParameters::SetCovarianceMatrix(const TMatrixDSym& covmat, bool decom
 //    if(TDecompLU::InvertLU(inv_matrix, 1E-48, &det))
 //    {
 //        covarianceI->SetMatrixArray(inv_matrix.GetMatrixArray());
-//        std::cout << TAG << "Covariance matrix inverted successfully." << std::endl;
+//        LogInfo << "Covariance matrix inverted successfully." << std::endl;
 //    }
 //    else
 //    {
-//        std::cerr << ERR << "In AnaFitParameters::SetCovarianceMatrix():\n"
+//        LogError << "In AnaFitParameters::SetCovarianceMatrix():\n"
 //                  << ERR << "Covariance matrix is non invertable. Determinant is " << det
 //                  << std::endl;
 //        return;
 //    }
 
-    std::cout << TAG << "Covariance matrix size: " << covariance->GetNrows()
+    LogInfo << "Covariance matrix size: " << covariance->GetNrows()
               << " x " << covariance->GetNrows() << " for " << this->m_name << std::endl;
     /*
     std::cout << "[SetCovarianceMatrix]: Inverted Cov mat: " << std::endl;
@@ -107,7 +113,7 @@ double AnaFitParameters::GetChi2(const std::vector<double>& params) const
 
     if(CheckDims(params) == false)
     {
-        std::cout << WAR << "In AnaFitParameters::GetChi2()\n"
+        LogWarning << "In AnaFitParameters::GetChi2()\n"
                   << WAR << "Dimension check failed. Returning zero." << std::endl;
         return 0.0;
     }
@@ -137,9 +143,9 @@ bool AnaFitParameters::CheckDims(const std::vector<double>& params) const
 
     else
     {
-        std::cerr << ERR << "Dimension of parameter vector does not match priors.\n"
-                  << ERR << "Prams size is: " << params.size() << std::endl
-                  << ERR << "Prior size is: " << pars_prior.size() << std::endl;
+        LogError << "Dimension of parameter vector does not match priors.\n"
+                  << "Prams size is: " << params.size() << std::endl
+                  << "Prior size is: " << pars_prior.size() << std::endl;
         vector_size = false;
     }
 
@@ -150,9 +156,9 @@ bool AnaFitParameters::CheckDims(const std::vector<double>& params) const
 
     else
     {
-        std::cerr << ERR << "Dimension of covariance maxtix does not match priors.\n"
-                  << ERR << "Rows in cov mat: " << covariance->GetNrows() << std::endl
-                  << ERR << "Prior size is: " << pars_prior.size() << std::endl;
+        LogError << "Dimension of covariance maxtix does not match priors.\n"
+                  << "Rows in cov mat: " << covariance->GetNrows() << std::endl
+                  << "Prior size is: " << pars_prior.size() << std::endl;
         matrix_size = false;
     }
 
@@ -165,15 +171,15 @@ void AnaFitParameters::SetRegularisation(double strength, RegMethod flag)
     m_regstrength = strength;
     m_regmethod = flag;
 
-    std::cout << "[AnaFitParameters]: Enabled regularisation for " << m_name << std::endl
-              << "[AnaFitParameters]: Strength " << m_regstrength << std::endl;
+    LogInfo << "Enabled regularisation for " << m_name << std::endl
+              << "Strength " << m_regstrength << std::endl;
     if(flag == kL1Reg)
-        std::cout << "[AnaFitParameters]: Method L1" << std::endl;
+        LogInfo << "Method L1" << std::endl;
     else if(flag == kL2Reg)
-        std::cout << "[AnaFitParameters]: Method L2" << std::endl;
+        LogInfo << "Method L2" << std::endl;
     else
     {
-        std::cout << WAR << "In AnaFitParameters::SetRegularisation() "
+        LogWarning << "In AnaFitParameters::SetRegularisation() "
                   << "Invalid regularisation method!" << std::endl;
         m_regularised = false;
     }
@@ -187,7 +193,7 @@ void AnaFitParameters::SetRegularisation(double strength, const std::string meth
         SetRegularisation(strength, kL2Reg);
     else
     {
-        std::cout << WAR << "In AnaFitParameters::SetRegularisation() "
+        LogWarning << "In AnaFitParameters::SetRegularisation() "
                   << "Invalid regularisation method!" << std::endl;
     }
 }

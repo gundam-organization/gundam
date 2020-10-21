@@ -4,6 +4,9 @@
 #include <iostream>
 
 #include <TMath.h>
+#include "TLeaf.h"
+
+#include "Logger.h"
 
 #include <FitStructs.hh>
 
@@ -32,6 +35,19 @@ class AnaEvent
             m_q2_reco  = -999.0;
             m_wght     = 1.0;
             m_wghtMC   = 1.0;
+        }
+
+        void DumpTreeEntryContent(TTree* tree_){
+            TLeaf* leafBuffer = nullptr;
+            for( int iKey = 0 ; iKey < tree_->GetListOfLeaves()->GetEntries() ; iKey++ ){
+                leafBuffer = (TLeaf*) tree_->GetListOfLeaves()->At(iKey);
+                if( std::string(leafBuffer->GetTypeName()) == "Int_t" ){
+                  this->_intVarsMapHandler_[leafBuffer->GetName()] = leafBuffer->GetValue(0);
+                }
+                else if( std::string(leafBuffer->GetTypeName()) == "Float_t" ){
+                  this->_floatVarsMapHandler_[leafBuffer->GetName()] = leafBuffer->GetValue(0);
+                }
+            }
         }
 
         //Set/Get methods
@@ -139,7 +155,18 @@ class AnaEvent
                 return -1;
         }
 
+        int GetEventVarInt(const std::string& var) const{
+          if(_intVarsMapHandler_.find( var ) == _intVarsMapHandler_.end() ){
+              LogFatal << "Could not find int leaf named: " << var << std::endl;
+              throw std::logic_error("Could not find int leaf named: " + var);
+          }
+          return _intVarsMapHandler_.at(var);
+        }
+
     private:
+        std::map<std::string, Int_t>    _intVarsMapHandler_;
+        std::map<std::string, Float_t>  _floatVarsMapHandler_;
+
         long int m_evid;   //unique event id
         int m_flavor;      //flavor of neutrino (numu, etc.)
         int m_beammode;    //Forward horn current (+1) or reverse horn current (-1)

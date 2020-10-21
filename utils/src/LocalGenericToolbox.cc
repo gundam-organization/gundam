@@ -56,7 +56,6 @@ void write_string_in_file(std::string file_path_, std::string string_to_write_)
 static Int_t old_verbosity = -1;
 void toggle_quiet_root()
 {
-
     if(old_verbosity == -1)
     {
         old_verbosity     = gErrorIgnoreLevel;

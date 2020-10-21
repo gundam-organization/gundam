@@ -2,10 +2,14 @@
 // The tree should be produced by feeding a HL2 microtree into the treeconvert macro.
 
 #include "AnaTreeMC.hh"
+#include "TTreeFormula.h"
+#include "GenericToolbox.h"
+#include "Logger.h"
 
 AnaTreeMC::AnaTreeMC(const std::string& file_name, const std::string& tree_name, bool extra_var)
     : read_extra_var(extra_var)
 {
+    Logger::setUserHeaderStr("[AnaTreeMC]");
     fChain = new TChain(tree_name.c_str());
     fChain->Add(file_name.c_str());
     SetBranches();
@@ -57,20 +61,35 @@ void AnaTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples,
     if(fChain == nullptr || ana_samples.empty())
         return;
 
+    std::vector<TTreeFormula*> additionalCutsList;
+    for(size_t iSample = 0 ; iSample < ana_samples.size() ; iSample++){
+        additionalCutsList.emplace_back(
+            new TTreeFormula(
+                Form("additional_cuts_%i", int(iSample)),
+                ana_samples[iSample]->GetAdditionalCuts().c_str(),
+                fChain
+                )
+            );
+        additionalCutsList.back()->SetTree(fChain);
+    }
+
     ProgressBar pbar(60, "#");
     pbar.SetRainbow();
     pbar.SetPrefix(std::string(TAG + "Reading Events "));
 
-    long int nentries = fChain->GetEntries();
-    long int nbytes   = 0;
+    int nentries = fChain->GetEntries();
+    int nbytes   = 0;
 
-    std::cout << TAG << "Reading events...\n";
+    LogInfo << "Reading events (" << nentries << ")..." << std::endl;
+    std::string progressBarPrefix = LogInfo.getPrefixString() + "Reading events...";
 
     // Loop over all events:
-    for(long int jentry = 0; jentry < nentries; jentry++)
+    for( int jEntry = 0; jEntry < nentries; jEntry++ )
     {
-        nbytes += fChain->GetEntry(jentry);
-        AnaEvent ev(jentry);
+        GenericToolbox::displayProgressBar(jEntry, nentries, progressBarPrefix);
+        nbytes += fChain->GetEntry(jEntry);
+        AnaEvent ev(jEntry);
+        ev.DumpTreeEntryContent(fChain);
         ev.SetTrueEvent(evt_type);
         ev.SetFlavor(nutype);
         ev.SetBeamMode(beammode);
@@ -123,16 +142,28 @@ void AnaTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples,
             signal_type++;
         }
 
-        for(auto& s : ana_samples)
-        {
-            if(s->GetSampleID() == sample)
-                s->AddEvent(ev);
+        for(size_t iSample = 0 ; iSample < ana_samples.size() ; iSample++){
+            if(ana_samples[iSample]->GetSampleID() == sample){
+
+                fChain->SetNotify(additionalCutsList[iSample]);
+                for(int jInstance = 0; jInstance < additionalCutsList[iSample]->GetNdata(); jInstance++) {
+                    if (additionalCutsList[iSample]->EvalInstance(jInstance) ) {
+                        ana_samples[iSample]->AddEvent(ev);
+                        break;
+                    }
+                }
+
+            }
         }
 
-        if(jentry % 2000 == 0 || jentry == (nentries - 1))
-            pbar.Print(jentry, nentries - 1);
+//        if(jEntry % 2000 == 0 || jEntry == (nentries - 1))
+//            pbar.Print(jEntry, nentries - 1);
     }
 
     for(auto& sample : ana_samples)
         sample->PrintStats();
+
+    for(auto& additionalCuts : additionalCutsList){
+        delete additionalCuts;
+    }
 }
