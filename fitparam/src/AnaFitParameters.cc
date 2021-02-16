@@ -44,14 +44,10 @@ void AnaFitParameters::SetCovarianceMatrix(const TMatrixDSym& covmat, bool decom
         LogWarning << "dof > 500 : Matrix inversion will take some time" << std::endl;
     }
 
-    if(covariance != nullptr)
-        delete covariance;
-    if(covarianceI != nullptr)
-        delete covarianceI;
-    if(original_cov != nullptr)
-        delete original_cov;
-    if(eigen_decomp != nullptr)
-        delete eigen_decomp;
+    delete covariance; covariance = nullptr;
+    delete covarianceI; covarianceI = nullptr;
+    delete original_cov; original_cov = nullptr;
+    delete eigen_decomp; eigen_decomp = nullptr;
 
     if(m_decompose)
     {
@@ -81,29 +77,16 @@ void AnaFitParameters::SetCovarianceMatrix(const TMatrixDSym& covmat, bool decom
     covarianceI = GenericToolbox::convertToSymmetricMatrix(temp["inverse_covariance_matrix"]);
     for(const auto& content: temp) delete content.second;
 
-//    double det = 0;
-//    TMatrixD inv_matrix(*covariance);
-//    if(TDecompLU::InvertLU(inv_matrix, 1E-48, &det))
-//    {
-//        covarianceI->SetMatrixArray(inv_matrix.GetMatrixArray());
-//        LogInfo << "Covariance matrix inverted successfully." << std::endl;
-//    }
-//    else
-//    {
-//        LogError << "In AnaFitParameters::SetCovarianceMatrix():\n"
-//                  << ERR << "Covariance matrix is non invertable. Determinant is " << det
-//                  << std::endl;
-//        return;
-//    }
-
     LogInfo << "Covariance matrix size: " << covariance->GetNrows()
               << " x " << covariance->GetNrows() << " for " << this->m_name << std::endl;
+
     /*
     std::cout << "[SetCovarianceMatrix]: Inverted Cov mat: " << std::endl;
     covarianceI->Print();
     std::cout << "[SetCovarianceMatrix]: Cov mat: " << std::endl;
     covariance->Print();
     */
+
 }
 
 double AnaFitParameters::GetChi2(const std::vector<double>& params) const
@@ -219,3 +202,5 @@ void AnaFitParameters::ThrowPar(std::vector<double>& param, const int seed) cons
         param = pars_original;
     }
 }
+
+void AnaFitParameters::SetParNames(std::vector<std::string>& vec) { pars_name = vec; }

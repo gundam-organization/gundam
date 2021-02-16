@@ -18,6 +18,7 @@
 #include <TMatrixTSym.h>
 #include <TRandom3.h>
 #include <TVectorT.h>
+#include <future>
 
 #include "Math/Factory.h"
 #include "Math/Functor.h"
@@ -57,10 +58,15 @@ public:
 
     // Post-initialization Methods
     void WritePrefitData();
+    void MakeOneSigmaChecks();
     bool Fit();
     void WritePostFitData();
 
-    double CalcLikelihood(const double* par);
+    double EvalFit(const double* par);
+    void UpdateFitParameterValues(const double* par);
+    void PropagateSystematics();
+    void ComputeChi2();
+
     void InitFitter(std::vector<AnaFitParameters*>& fitpara);
     void FixParameter(const std::string& par_name, const double& value);
     void ParameterScans(const std::vector<int>& param_list, unsigned int nsteps);
@@ -102,62 +108,87 @@ public:
     }
 
 protected:
+    void InitializeThreadsParameters();
     void InitializeFitParameters();
-    void InitializeSamples();
+    void InitializeDataSamples();
     void InitializeFitter();
 
     void PassIfInitialized(const std::string& method_name_) const;
     void PassIfNotInitialized(const std::string& method_name_) const;
 
     void GenerateToyData(int toy_type, bool stat_fluc = false);
-    double FillSamples(std::vector<std::vector<double>>& new_pars, int datatype = 0);
     void SaveParams(const std::vector<std::vector<double>>& new_pars);
     void SaveEventHist(int fititer, bool is_final = false);
     void SaveEventTree(std::vector<std::vector<double>>& par_results);
     void SaveResults(const std::vector<std::vector<double>>& parresults,
                      const std::vector<std::vector<double>>& parerrors);
 
+    // Parallel methods
+    void ReWeightEvents(int iThread_ = -1);
+    void ReFillSampleMcHistograms(int iThread_ = -1);
+
+
 private:
 
     bool _is_initialized_;
-    bool _fit_has_been_called_;
+    bool _fitHasBeenDone_;
     bool _fit_has_converged_;
     bool _save_fit_params_;
     bool _save_event_tree_;
-    bool _disable_syst_fit_;
+    bool _disableChi2Pulls_;
     bool _apply_statistical_fluctuations_on_samples_;
+    bool _printFitState_;
 
     int _PRNG_seed_;
     int _nb_threads_;
     int _nb_fit_parameters_;
-    int _nb_fit_calls_;
-    int _save_fit_params_frequency_;
+    int _nbFitCalls_;
+    int _saveFitParamsFrequency_;
+    int _nbTotalEvents_;
 
     double _MC_normalization_factor_;
 
+    double _chi2Buffer_;
+    double _chi2StatBuffer_;
+    double _chi2PullsBuffer_;
+    double _chi2RegBuffer_;
+
     std::vector<std::string> _parameter_names_;
-    std::vector<bool> _parameter_fixed_list_;
-    std::vector<double> _parameter_prefit_values_;
-    std::vector<double> _parameter_steps_;
+    std::vector<bool> _fixParameterStatusList_;
+    std::vector<double> _parameterPriorValues_;
+    std::vector<double> _parameterSteps_;
     std::vector<double> _parameter_low_edges_;
     std::vector<double> _parameter_high_edges_;
-    std::vector<AnaFitParameters*> _AnaFitParameters_list_;
-    std::vector<AnaSample*> _AnaSample_list_;
+    std::vector<AnaFitParameters*> _fitParametersGroupList_;
+    std::vector<AnaSample*> _samplesList_;
+    std::vector<std::vector<double>> _newParametersList_;
+
+    std::vector<std::vector<std::vector<long long>>> _durationReweightParameters_; // [SystGroup][Thread][Iteration] = time
+    std::map<int, std::vector<double>> _durationHistoryHandler_;
 
     DataType _selected_data_type_;
     MinSettings _minimization_settings_;
 
     TRandom3* _PRNG_;
-    TDirectory* _output_tdirectory_;
+    TDirectory* _outputTDirectory_;
     ROOT::Math::Minimizer* _minimizer_;
     ROOT::Math::Functor* _functor_;
 
     std::chrono::high_resolution_clock::time_point _startTime_;
     std::chrono::high_resolution_clock::time_point _endTime_;
 
-    std::vector<double> vec_chi2_stat;
-    std::vector<double> vec_chi2_sys;
-    std::vector<double> vec_chi2_reg;
+    std::vector<double> _chi2StatHistory_;
+    std::vector<double> _chi2PullsHistory_;
+    std::vector<double> _chi2RegHistory_;
+
+    // Multi-thread
+    std::mutex _threadMutex_;
+    int _counterThread_;
+    bool _stopThreads_;
+    std::vector<bool> _triggerReweightThreads_;
+    std::vector<bool> _triggerReFillMcHistogramsThreads_;
+    std::vector<std::future<void>> _asyncFitThreads_;
+    std::vector<std::vector<std::vector<TH1D*>>> _histThreadHandlers_;
 
 };
 

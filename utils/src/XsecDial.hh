@@ -25,62 +25,82 @@
 #include "ColorOutput.hh"
 
 struct SplineBin{
-    std::map<std::string, int> splitVarValue{};
+
+    std::vector<std::string> splitVarNameList{};
+    std::vector<int>         splitVarValueList{};
     int kinematicBin = -1;
+
+    int entry = -1;
+
     Float_t D1Reco = -1;
     Float_t D2Reco = -1;
     TGraph* graphHandler = nullptr;
-    TSpline3* splineHandler = nullptr;
+    TSpline3* splinePtr  = nullptr;
 
     std::string print(){
         std::stringstream out;
+        out << GET_VAR_NAME_VALUE(entry) << std::endl;
         out << GET_VAR_NAME_VALUE(D1Reco) << std::endl;
         out << GET_VAR_NAME_VALUE(D2Reco) << std::endl;
         out << GET_VAR_NAME_VALUE(graphHandler) << std::endl;
-        out << GET_VAR_NAME_VALUE(splineHandler) << std::endl;
-        for(const auto& splitVarVal : splitVarValue){
-            out << splitVarVal.first << " = " << splitVarVal.second << std::endl;
+        out << GET_VAR_NAME_VALUE(splinePtr) << std::endl;
+        for( int iSplitVar = 0 ; iSplitVar < int(splitVarNameList.size()) ; iSplitVar++ ){
+            out << splitVarNameList[iSplitVar] << " = " << splitVarValueList[iSplitVar] << std::endl;
         }
         out << GET_VAR_NAME_VALUE(kinematicBin) << std::endl;
         return out.str();
     }
-    std::string getBinName(){
+    std::string generateBinName() const {
         std::stringstream out;
-        for(const auto& splitVarVal : splitVarValue){
-            out << splitVarVal.first << "_" << splitVarVal.second << "_";
+        for( int iSplitVar = 0 ; iSplitVar < int(splitVarNameList.size()) ; iSplitVar++ ){
+            out << splitVarNameList[iSplitVar] << "_" << splitVarValueList[iSplitVar] << "_";
         }
         out << "bin_" << kinematicBin;
         return out.str();
     }
+    void addSplitVar(std::string splitVarName_, int splitValue_){
+        splitVarNameList.emplace_back(splitVarName_);
+        splitVarValueList.emplace_back(splitValue_);
+    }
     void reset(){
+        entry = -1;
         D1Reco = -1;
         D2Reco = -1;
         kinematicBin = -1;
-        for(auto& splitVarPair : splitVarValue){
-            splitVarPair.second = -1;
+        for( int iSplitVar = 0 ; iSplitVar < int(splitVarNameList.size()) ; iSplitVar++ ){
+            splitVarValueList[iSplitVar] = -1;
         }
         graphHandler = nullptr;
-        splineHandler = nullptr;
+        splinePtr    = nullptr;
     }
     bool operator==(const SplineBin& otherBin){
         if(this->kinematicBin != otherBin.kinematicBin) return false;
-        for(const auto& splitVarVal : this->splitVarValue){
-            if(otherBin.splitVarValue.count( splitVarVal.first ) == 0) return false;
-            if(this->splitVarValue[splitVarVal.first] != otherBin.splitVarValue.at(splitVarVal.first)){
+        for( int iSplitVar = 0 ; iSplitVar < int(splitVarNameList.size()) ; iSplitVar++ ){
+            int otherBinIndex = GenericToolbox::findElementIndex(splitVarNameList[iSplitVar], otherBin.splitVarNameList);
+            if( otherBinIndex == -1 ) return false;
+            if( this->splitVarValueList.at(iSplitVar) != otherBin.splitVarValueList.at(otherBinIndex) ){
                 return false;
             }
         }
         return true;
     }
     SplineBin& operator=(const SplineBin& otherBin){
-        for(const auto& splitVar : otherBin.splitVarValue){
-            splitVarValue[splitVar.first] = otherBin.splitVarValue.at(splitVar.first);
+
+        this->splitVarNameList.clear();
+        this->splitVarValueList.clear();
+        reset();
+
+        for( int iSplitVar = 0 ; iSplitVar < int(otherBin.splitVarNameList.size()) ; iSplitVar++ ){
+            this->splitVarNameList.emplace_back(otherBin.splitVarNameList.at(iSplitVar));
+            this->splitVarValueList.emplace_back(otherBin.splitVarValueList.at(iSplitVar));
         }
+
         kinematicBin = otherBin.kinematicBin;
+        entry = otherBin.entry;
         D1Reco = otherBin.D1Reco;
         D2Reco = otherBin.D2Reco;
         graphHandler = otherBin.graphHandler;
-        splineHandler = otherBin.splineHandler;
+        splinePtr    = otherBin.splinePtr;
         return *this;
     }
 };
@@ -89,28 +109,44 @@ class XsecDial
 {
     public:
 
-        explicit XsecDial(const std::string& dial_name);
-        XsecDial(const std::string& dial_name, const std::string& fname_splines,
+        explicit XsecDial(std::string  dial_name);
+        XsecDial(std::string  dial_name, const std::string& fname_splines,
                  const std::string& fname_binning);
 
         void SetBinning(const std::string& fname_binning);
+        void SetApplyOnlyOnMap(const std::map<std::string, std::vector<int>>& applyOnlyOnMap_);
+        void SetDontApplyOnMap(const std::map<std::string, std::vector<int>>& dontApplyOnMap_);
         void ReadSplines(const std::string& fname_splines);
 
         bool GetUseSplineSplitMapping() const;
+        bool GetIsNormalizationDial() const;
 
         int GetSplineIndex(const std::vector<int>& var, const std::vector<double>& bin) const;
-        int GetSplineIndex(AnaEvent* anaEvent_);
+        int GetSplineIndex(AnaEvent* eventPtr_, SplineBin* eventSplineBinPtr_ = nullptr);
+        int GetSplineIndex(SplineBin& splineBinToLookFor_);
         double GetSplineValue(int index, double dial_value) const;
-        double GetBoundedValue(int index, double dial_value) const;
-        double GetBoundedValue(AnaEvent* anaEvent_, double dial_value_);
+        double GetBoundedValue(int splineIndex_, double dialValue_);
         std::string GetSplineName(int index) const;
+        std::map<std::string, std::vector<int>>* GetApplyOnlyOnMapPtr() { return &_applyOnlyOnMap_; };
+        std::map<std::string, std::vector<int>>* GetDontApplyOnMapPtr() { return &_dontApplyOnMap_; };
+
+        std::vector<TSpline3*>& GetSplinePtrList(){ return _splinePtrList_; }
+        std::vector<TSpline3>& GetSplineList(){ return v_splines; }
 
         void SetVars(double nominal, double step, double limit_lo, double limit_hi);
         void SetDimensions(const std::vector<int>& dim);
         void Print(bool print_bins = false) const;
 
+        void SetNominal(double nominal);
+        void SetPrior(double prior);
+        void SetStep(double step);
+        void SetLimitLo(double limit_lo);
+        void SetLimitHi(double limit_hi);
+        void SetIsNormalizationDial(bool isNormalizationDial_);
+
         std::string GetName() const { return m_name; }
-        double GetNominal() const { return m_nominal; }
+        double GetNominal() const { return m_nominalDial; }
+        double GetPrior() const { return m_prior; }
         double GetStep() const { return m_step; }
         double GetLimitLow() const { return m_limit_lo; }
         double GetLimitHigh() const { return m_limit_hi; }
@@ -120,25 +156,31 @@ class XsecDial
     private:
         unsigned int nbins{};
         std::string m_name;
-        double m_nominal{};
+        double m_nominalDial{};
+        double m_prior{};
         double m_step{};
         double m_limit_lo{};
         double m_limit_hi{};
         //std::vector<TGraph> v_graphs;
+        std::vector<SplineBin> _splineBinList_;
         std::vector<std::string> v_splitVarNames;
         std::vector<TSpline3> v_splines;
-        std::vector<TSpline3*> v_splinesPtr;
-        std::vector<std::string> v_splineNames;
+        std::vector<TSpline3*> _splinePtrList_;
+        std::vector<std::string> _splineNameList_;
         std::vector<int> m_dimensions;
         BinManager bin_manager;
 
+        bool _isNormalizationDial_;
         bool _useSplineSplitMapping_;
         TTree* _interpolatedBinnedSplinesTTree_;
-        std::map<std::string, TSpline3*> _splineMapping_;
-        SplineBin _splineSplitBinHandler_;
-        std::vector<std::vector<std::pair<double, double>>> _binEdgesList_;
 
-        std::map<AnaEvent*, std::pair<bool, TSpline3*> > _eventSplineMapping_;
+        SplineBin _splineBinBuffer_;
+        std::vector<std::vector<std::pair<double, double>>> _binEdgesList_;
+        std::map<std::string, std::vector<int>> _applyOnlyOnMap_;
+        std::map<std::string, std::vector<int>> _dontApplyOnMap_;
+
+        std::vector<double> _weightValueCacheList_;
+        std::vector<double> _dialValueCacheList_;
 
 
         const std::string TAG = color::MAGENTA_STR + "[XsecDial]: " + color::RESET_STR;

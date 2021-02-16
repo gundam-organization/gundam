@@ -1,5 +1,5 @@
-set(SRCFILES BinManager.cc CalcChisq.cc EigenDecomp.cc OptParser.cc PlotStyle.cc ToyThrower.cc XsecDial.cc LocalGenericToolbox.cc)
-set(HEADERS BinManager.hh CalcChisq.hh EigenDecomp.hh OptParser.hh PlotStyle.hh ToyThrower.hh XsecDial.hh LocalGenericToolbox.h)
+set(SRCFILES BinManager.cc CalcChisq.cc EigenDecomp.cc OptParser.cc PlotStyle.cc ToyThrower.cc XsecDial.cc GlobalVariables.cc)
+set(HEADERS BinManager.hh CalcChisq.hh EigenDecomp.hh OptParser.hh PlotStyle.hh ToyThrower.hh XsecDial.hh GlobalVariables.h)
 
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)
   add_library(xslfutils STATIC ${SRCFILES})

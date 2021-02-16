@@ -2,7 +2,7 @@
 test/
 build/
 site/
-inputs/
+inputs
 cmake-build-debug/
 
 # Misc Files

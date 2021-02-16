@@ -35,8 +35,7 @@ public:
     virtual void InitParameters()                                        = 0;
     virtual void InitEventMap(std::vector<AnaSample*>& sample, int mode) = 0;
     virtual void ReWeight(AnaEvent* event, const std::string& det, int nsample, int nevent,
-                          std::vector<double>& params)
-        = 0;
+                          std::vector<double>& params) = 0;
 
     virtual double CalcRegularisation(const std::vector<double>& params) const
     { return 0.0; }
@@ -65,6 +64,7 @@ public:
     }
 
     void GetParNames(std::vector<std::string>& vec) const { vec = pars_name; }
+    std::vector<std::string>& GetParNames() { return pars_name; }
     void GetParPriors(std::vector<double>& vec) const { vec = pars_prior; }
     void GetParOriginal(std::vector<double>& vec) const { vec = pars_original; }
     double GetParOriginal(int i) const { return pars_original.at(i); }
@@ -77,7 +77,7 @@ public:
         vec2 = pars_limhigh;
     }
 
-    void SetParNames(std::vector<std::string>& vec) { pars_name = vec; }
+    virtual void SetParNames(std::vector<std::string>& vec);
     void SetParPriors(std::vector<double>& vec) { pars_prior = vec; }
     void SetParSteps(std::vector<double>& vec) { pars_step = vec; }
     void SetParLimits(std::vector<double>& vec1, std::vector<double>& vec2)
@@ -99,6 +99,8 @@ public:
     void SetThrow(bool flag = true) { m_do_throw = flag; }
     void SetRNGstart(bool flag = true) { m_rng_start = flag; }
     void SetWeightCap(double cap, bool flag = true) { m_do_cap_weights = flag; m_weight_cap = cap; }
+    void SetLastAppliedParamList(std::vector<double>& lastAppliedParamList_){
+        _lastAppliedParamList_ = lastAppliedParamList_; }
 
 protected:
     bool CheckDims(const std::vector<double>& params) const;
@@ -112,6 +114,7 @@ protected:
     std::vector<double> pars_limlow;
     std::vector<double> pars_limhigh;
     std::vector<bool> pars_fixed;
+    std::vector<double> _lastAppliedParamList_;
 
     std::vector<std::vector<int>> m_evmap;
     bool m_rng_start;

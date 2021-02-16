@@ -1,18 +1,23 @@
+#include <utility>
+
+
 #include "XsecDial.hh"
 #include "Logger.h"
 
 
-XsecDial::XsecDial(const std::string& dial_name)
-    : m_name(dial_name)
+XsecDial::XsecDial(std::string dial_name)
+    : m_name(std::move(dial_name))
 {
+    _isNormalizationDial_ = false;
     _useSplineSplitMapping_ = false;
     Logger::setUserHeaderStr("[XsecDial]");
 }
 
-XsecDial::XsecDial(const std::string& dial_name, const std::string& fname_binning,
+XsecDial::XsecDial(std::string  dial_name, const std::string& fname_binning,
                    const std::string& fname_splines)
-    : m_name(dial_name)
+    : m_name(std::move(dial_name))
 {
+    _isNormalizationDial_ = false;
     _useSplineSplitMapping_ = false;
     Logger::setUserHeaderStr("[XsecDial]");
     SetBinning(fname_binning);
@@ -28,15 +33,16 @@ void XsecDial::SetBinning(const std::string& fname_binning)
     }
 }
 
+void XsecDial::SetApplyOnlyOnMap(const std::map<std::string, std::vector<int>>& applyOnlyOnMap_){
+    _applyOnlyOnMap_ = applyOnlyOnMap_;
+}
+void XsecDial::SetDontApplyOnMap(const std::map<std::string, std::vector<int>>& dontApplyOnMap_){
+    _dontApplyOnMap_ = dontApplyOnMap_;
+}
+
 void XsecDial::ReadSplines(const std::string& fname_splines)
 {
     v_splines.clear();
-
-    if(fname_splines.empty()){
-        LogWarning << "No spline file specified for " << m_name << std::endl;
-        LogWarning << " > Will be treated as normalisation factor." << std::endl;
-        return;
-    }
 
     TFile* file_splines = TFile::Open(fname_splines.c_str(), "READ");
     if(file_splines == nullptr)
@@ -45,7 +51,7 @@ void XsecDial::ReadSplines(const std::string& fname_splines)
         return;
     }
 
-    if(file_splines->Get("UnbinnedSplines") != nullptr){
+    if(file_splines->Get("InterpolatedBinnedSplines") != nullptr){
         LogWarning << "Splines in TTrees has been detected." << std::endl;
         _useSplineSplitMapping_ = true;
     }
@@ -54,36 +60,53 @@ void XsecDial::ReadSplines(const std::string& fname_splines)
 
         _interpolatedBinnedSplinesTTree_ = (TTree*) file_splines->Get("InterpolatedBinnedSplines");
         if(_interpolatedBinnedSplinesTTree_ == nullptr){
-            LogError << "No splines has been found for " << m_name << std::endl;
-            return;
+            LogFatal << "InterpolatedBinnedSplines TTree could not be found for: " << m_name << std::endl;
+            throw std::runtime_error("Missing splines");
         }
 
-        // Hooking to the tree
-        _interpolatedBinnedSplinesTTree_->SetBranchAddress("kinematicBin", &_splineSplitBinHandler_.kinematicBin);
-        _interpolatedBinnedSplinesTTree_->SetBranchAddress("spline", &_splineSplitBinHandler_.splineHandler);
-//        _interpolatedBinnedSplinesTTree_->SetBranchAddress("graph", &_splineSplitBinHandler_.graphHandler);
+        _splineBinBuffer_.splitVarNameList.clear();
+        _splineBinBuffer_.splitVarValueList.clear();
+
+        // Searching for split values
         for( int iKey = 0 ; iKey < _interpolatedBinnedSplinesTTree_->GetListOfLeaves()->GetEntries() ; iKey++ ){
             std::string leafName = _interpolatedBinnedSplinesTTree_->GetListOfLeaves()->At(iKey)->GetName();
             if(    leafName != "kinematicBin"
-               and leafName != "spline"
-               and leafName != "graph"
-               ){
+                   and leafName != "spline"
+                   and leafName != "graph"
+                ){
                 v_splitVarNames.emplace_back(leafName);
-                _splineSplitBinHandler_.splitVarValue[leafName] = -1; // allocate memory
-                _interpolatedBinnedSplinesTTree_->SetBranchAddress(leafName.c_str(), &_splineSplitBinHandler_.splitVarValue[leafName]);
+                _splineBinBuffer_.splitVarNameList.emplace_back(leafName);
             }
+        }
+        _splineBinBuffer_.splitVarValueList.resize(_splineBinBuffer_.splitVarNameList.size());
+
+
+        // Hooking to the tree
+        _interpolatedBinnedSplinesTTree_->SetBranchAddress("kinematicBin", &_splineBinBuffer_.kinematicBin);
+        _interpolatedBinnedSplinesTTree_->SetBranchAddress("spline", &_splineBinBuffer_.splinePtr);
+        for(int iSplitVar = 0 ; iSplitVar < int(_splineBinBuffer_.splitVarNameList.size()) ; iSplitVar++){
+            _interpolatedBinnedSplinesTTree_->SetBranchAddress(
+                _splineBinBuffer_.splitVarNameList[iSplitVar].c_str(),
+                &_splineBinBuffer_.splitVarValueList[iSplitVar]);
         }
 
         // Copying splines in RAM
         auto ramBefore = GenericToolbox::getProcessMemoryUsage();
-        TSpline3* splineTemp = nullptr;
         for( int iEntry = 0 ; iEntry < _interpolatedBinnedSplinesTTree_->GetEntries() ; iEntry++ ){
+
             _interpolatedBinnedSplinesTTree_->GetEntry(iEntry);
-            splineTemp = (TSpline3*) _splineSplitBinHandler_.splineHandler->Clone();
-//            v_splines.emplace_back(*splineTemp);
-//            _splineMapping_[_splineSplitBinHandler_.getBinName()] = splineTemp;
-            v_splinesPtr.emplace_back(splineTemp);
-            v_splineNames.emplace_back(_splineSplitBinHandler_.getBinName());
+
+            _splineBinBuffer_.entry = iEntry;
+            _splineBinBuffer_.splinePtr = (TSpline3*)_splineBinBuffer_.splinePtr->Clone();
+
+            // Cache for faster spline indexing
+            _splinePtrList_.emplace_back(_splineBinBuffer_.splinePtr);
+            _splineBinList_.emplace_back(_splineBinBuffer_);
+//            _splineNameList_.emplace_back(_splineBinBuffer_.generateBinName());
+
+            // Cache for faster spline read
+            _dialValueCacheList_.emplace_back(0);
+            _weightValueCacheList_.emplace_back(_splineBinBuffer_.splinePtr->Eval(0));
         }
 
         file_splines -> Close();
@@ -96,7 +119,7 @@ void XsecDial::ReadSplines(const std::string& fname_splines)
     }
     else{
         TIter key_list(file_splines -> GetListOfKeys());
-        TKey* key = nullptr;
+        TKey* key;
         while((key = (TKey*)key_list.Next()))
         {
             if (strcmp(key->ReadObj()->GetName(), "Graph") == 0){
@@ -116,6 +139,9 @@ void XsecDial::ReadSplines(const std::string& fname_splines)
 bool XsecDial::GetUseSplineSplitMapping() const{
     return this->_useSplineSplitMapping_;
 }
+bool XsecDial::GetIsNormalizationDial() const {
+    return this->_isNormalizationDial_;
+}
 
 int XsecDial::GetSplineIndex(const std::vector<int>& var, const std::vector<double>& bin) const
 {
@@ -128,50 +154,68 @@ int XsecDial::GetSplineIndex(const std::vector<int>& var, const std::vector<doub
     return idx;
 }
 
-int XsecDial::GetSplineIndex(AnaEvent* anaEvent_)
-{
+int XsecDial::GetSplineIndex(AnaEvent* eventPtr_, SplineBin* eventSplineBinPtr_){
+
+    if(_isNormalizationDial_){
+        LogFatal << "Can't find the spline index on a normalization spline." << std::endl;
+        throw std::logic_error("Can't find the spline index on a normalization spline.");
+    }
+
     int outSplineIndex = -1;
 
-    if(not v_splineNames.empty())
-    {
-        // need to recreate the holder since this function is call in multithread
-        SplineBin* currentSplineBin;
+    bool createSplineBin = false; // if true, will be deleted before leaving
+    if(eventSplineBinPtr_ == nullptr){
+        createSplineBin = true;
+        eventSplineBinPtr_ = new SplineBin();
+    }
 
-//        currentSplineBin = &_splineSplitBinHandler_;
-        currentSplineBin = new SplineBin();
-
-        currentSplineBin->D1Reco = anaEvent_->GetRecoD1();
-        currentSplineBin->D2Reco = anaEvent_->GetRecoD2();
-        // Identify Kinematic Bin
-        currentSplineBin->kinematicBin = -1;
-        for(int iBin = 0; iBin < int(_binEdgesList_.size()); iBin++)
-        {
-            if(currentSplineBin->D1Reco >= _binEdgesList_[iBin][0].first
-               and currentSplineBin->D1Reco < _binEdgesList_[iBin][0].second
-               and currentSplineBin->D2Reco >= _binEdgesList_[iBin][1].first
-               and currentSplineBin->D2Reco < _binEdgesList_[iBin][1].second)
-            {
-                currentSplineBin->kinematicBin = iBin;
-                break;
-            }
+    eventSplineBinPtr_->kinematicBin = -1;
+    for(size_t iBin = 0; iBin < _binEdgesList_.size(); iBin++){
+        if(    eventPtr_->GetRecoD1() >= _binEdgesList_[iBin][0].first
+           and eventPtr_->GetRecoD1() <  _binEdgesList_[iBin][0].second
+           and eventPtr_->GetRecoD2() >= _binEdgesList_[iBin][1].first
+           and eventPtr_->GetRecoD2() <  _binEdgesList_[iBin][1].second
+            ) {
+            eventSplineBinPtr_->kinematicBin = iBin;
+            break;
         }
-        if(currentSplineBin->kinematicBin != -1)
-        {
-            // Loop over the defined split variables
-            for(const auto& splineVarName : v_splitVarNames)
-            {
-                currentSplineBin->splitVarValue[splineVarName]
-                    = anaEvent_->GetEventVarInt(splineVarName);
+    }
+
+    if(eventSplineBinPtr_->kinematicBin != -1){
+
+        bool isCandidate;
+        for(size_t iSpline = 0 ; iSpline < _splineBinList_.size() ; iSpline++){
+
+            isCandidate = true;
+
+            if(_splineBinList_[iSpline].kinematicBin != eventSplineBinPtr_->kinematicBin) continue; // next spline
+
+            // first make the selection on split vars
+            for(size_t iSplitVar = 0 ; iSplitVar < v_splitVarNames.size() ; iSplitVar++ ){
+                if( _splineBinList_[iSpline].splitVarValueList[iSplitVar] != eventPtr_->GetEventVarInt(v_splitVarNames[iSplitVar]) ){
+                    isCandidate = false;
+                    break; // next spline
+                }
             }
 
-            //
-            outSplineIndex = GenericToolbox::findElementIndex(currentSplineBin->getBinName(), v_splineNames);
-        }
+            if(isCandidate){
+                outSplineIndex = iSpline;
+                break; // LEAVE THE SPLINE LOOP
+            }
 
-        delete currentSplineBin;
-    } // not v_splineNames.empty()
+        }
+    }
+
+    if(createSplineBin) delete eventSplineBinPtr_;
 
     return outSplineIndex;
+}
+
+int XsecDial::GetSplineIndex(SplineBin& splineBinToLookFor_){
+
+    // find the bin by generating the name string (slow? -> no FASTER!)
+    return GenericToolbox::findElementIndex(splineBinToLookFor_.generateBinName(), _splineNameList_);
+
 }
 
 double XsecDial::GetSplineValue(int index, double dial_value) const
@@ -182,136 +226,109 @@ double XsecDial::GetSplineValue(int index, double dial_value) const
         return 1.0;
 }
 
-double XsecDial::GetBoundedValue(int index, double dial_value) const
-{
+double XsecDial::GetBoundedValue(int splineIndex_, double dialValue_){
+
+    // Output default
     double dialWeight = 1;
 
-    // Legacy way
-    if(not v_splines.empty())
-    {
-        if(index >= 0)
-        {
-            if(dial_value < m_limit_lo)
-                dialWeight = v_splines.at(index).Eval(m_limit_lo);
-            else if(dial_value > m_limit_hi)
-                dialWeight = v_splines.at(index).Eval(m_limit_hi);
+    // Switch between different dial styles:
+    if(_isNormalizationDial_){
+        // Normalization spline
+        return dialValue_;
+    }
+    else if(_useSplineSplitMapping_){
+        // Splines in TTrees
+
+        if(splineIndex_ < 0){
+            // The index is invalid, returning default weight
+            return dialWeight;
+        }
+
+        if(_splinePtrList_.empty()){
+            // if no splines are stored, there is a problem
+            LogFatal << "Can't eval weight. Splines are missing: " << GetName() << std::endl;
+            throw std::runtime_error("Missing splines");
+        }
+
+        if(_dialValueCacheList_[splineIndex_] == dialValue_){
+            // If the spline has already been calculated, return the cached value
+            return _weightValueCacheList_[splineIndex_];
+        }
+
+        if(splineIndex_ >= 0){
+            // Lower bound
+            if     (dialValue_ < std::max(m_limit_lo, _splinePtrList_[splineIndex_]->GetXmin()) ){
+                dialValue_ = std::max(m_limit_lo, _splinePtrList_[splineIndex_]->GetXmin());
+            }
+            // Higher bound
+            else if(dialValue_ > std::min(m_limit_hi, _splinePtrList_[splineIndex_]->GetXmax()) ){
+                dialValue_ = std::min(m_limit_hi, _splinePtrList_[splineIndex_]->GetXmax());
+            }
+            dialWeight = _splinePtrList_[splineIndex_]->Eval(dialValue_);
+        }
+
+        _dialValueCacheList_[splineIndex_] = dialValue_;
+        _weightValueCacheList_[splineIndex_] = dialWeight;
+
+    }
+    else if(not v_splines.empty()){
+        // Legacy way
+        if(splineIndex_ >= 0){
+            if(dialValue_ < m_limit_lo)
+                dialWeight = v_splines.at(splineIndex_).Eval(m_limit_lo);
+            else if(dialValue_ > m_limit_hi)
+                dialWeight = v_splines.at(splineIndex_).Eval(m_limit_hi);
             else
-                dialWeight = v_splines.at(index).Eval(dial_value);
+                dialWeight = v_splines.at(splineIndex_).Eval(dialValue_);
         }
-        else
-            return 1.0;
-    }
-    // Splines in TTree
-    else if(not v_splinesPtr.empty())
-    {
-        if(index >= 0)
-        {
-            if     ( dial_value < std::max(m_limit_lo, v_splinesPtr[index]->GetXmin()) ){
-                dial_value = std::max(m_limit_lo, v_splinesPtr[index]->GetXmin());
-            }
-            else if( dial_value > std::min(m_limit_hi, v_splinesPtr[index]->GetXmax()) ){
-                dial_value = std::min(m_limit_hi, v_splinesPtr[index]->GetXmax());
-            }
-            dialWeight = v_splinesPtr[index]->Eval(dial_value);
-        }
-    }
-    // Norm splines
-    else{
-        // norm spline
-        // TODO: check apply_on variables
-        dialWeight = 1 + dial_value;
-    }
-
-    return dialWeight;
-}
-
-double XsecDial::GetBoundedValue(AnaEvent* anaEvent_, double dial_value_){
-
-    double dialWeight = 1;
-
-    if(_splineMapping_.empty()){
-        // norm spline
-        // TODO: check apply_on variables
-        dialWeight = 1 + dial_value_;
     }
     else{
-        TSpline3* selectedSpline = getCorrespondingSpline(anaEvent_);
-        if(selectedSpline != nullptr){
-            double dialValue;
-            if     ( dial_value_ < std::max(m_limit_lo, selectedSpline->GetXmin()) ){
-                dialValue = std::max(m_limit_lo, selectedSpline->GetXmin());
-            }
-            else if( dial_value_ > std::min(m_limit_hi, selectedSpline->GetXmax()) ){
-                dialValue = std::min(m_limit_hi, selectedSpline->GetXmax());
-            }
-            else{
-                dialValue = dial_value_;
-            }
-            dialWeight = selectedSpline->Eval(dialValue);
-            if( dialWeight == 0 ){
-                LogError << "0 weight detected: " << this->GetName() << ", spline(" << selectedSpline << ")->Eval(" << dialValue << ") = " << dialWeight << std::endl;
-            }
-        }
+        dialWeight += dialValue_; // legacy?
+        LogFatal << GET_VAR_NAME_VALUE(this->GetName()) << std::endl;
+        LogFatal << "should not be there." << std::endl;
+        throw std::logic_error("should not be there.");
     }
 
-    return dialWeight;
+//    LogTrace << GET_VAR_NAME_VALUE(splineIndex_) << " -> " << GET_VAR_NAME_VALUE(dialValue_) << " -> " << GET_VAR_NAME_VALUE(dialWeight) << std::endl;
 
+    return dialWeight;
 }
 
 TSpline3* XsecDial::getCorrespondingSpline(AnaEvent* anaEvent_){
 
-    if(_splineMapping_.empty()){
-        return nullptr;
-    }
+    TSpline3* outSplinePtr = nullptr;
 
-    if(
-//        true
-        not _eventSplineMapping_[anaEvent_].first
-        ){
+    // need to recreate the holder since this function is call in multithread
+    SplineBin currentSplineBin = _splineBinBuffer_;
 
-        // need to recreate the holder since this function is call in multithread
-        SplineBin currentSplineBin;
+    // reset all vars to -1
+    currentSplineBin.reset();
 
-        // reset all vars to -1
-        currentSplineBin.reset();
-
-        currentSplineBin.D1Reco = anaEvent_->GetRecoD1();
-        currentSplineBin.D2Reco = anaEvent_->GetRecoD2();
-        // Identify Kinematic Bin
-        currentSplineBin.kinematicBin = -1;
-        for(int iBin = 0 ; iBin < int(_binEdgesList_.size()) ; iBin++){
-            if(     currentSplineBin.D1Reco >= _binEdgesList_[iBin][0].first
-                    and currentSplineBin.D1Reco <  _binEdgesList_[iBin][0].second
-                    and currentSplineBin.D2Reco >= _binEdgesList_[iBin][1].first
-                    and currentSplineBin.D2Reco <  _binEdgesList_[iBin][1].second
-                ){
-                currentSplineBin.kinematicBin = iBin;
-                break;
-            }
-        }
-        if(currentSplineBin.kinematicBin == -1){
-//            return nullptr;
-            #pragma omp critical
-            {
-                _eventSplineMapping_[anaEvent_].second = nullptr;
-                _eventSplineMapping_[anaEvent_].first = true;
-            }
-        }
-        else{
-            // Loop over the defined split variables
-            for(auto& splineSplitBinPair : _splineSplitBinHandler_.splitVarValue){
-                currentSplineBin.splitVarValue[splineSplitBinPair.first] = anaEvent_->GetEventVarInt(splineSplitBinPair.first);
-            }
-            #pragma omp critical
-            {
-            _eventSplineMapping_[anaEvent_].second = _splineMapping_[_splineSplitBinHandler_.getBinName()];
-            _eventSplineMapping_[anaEvent_].first = true;
-            }
-//            return _splineMapping_[_splineSplitBinHandler_.getBinName()];
+    currentSplineBin.D1Reco = anaEvent_->GetRecoD1();
+    currentSplineBin.D2Reco = anaEvent_->GetRecoD2();
+    // Identify Kinematic Bin
+    currentSplineBin.kinematicBin = -1;
+    for(int iBin = 0 ; iBin < int(_binEdgesList_.size()) ; iBin++){
+        if(     currentSplineBin.D1Reco >= _binEdgesList_[iBin][0].first
+                and currentSplineBin.D1Reco <  _binEdgesList_[iBin][0].second
+                and currentSplineBin.D2Reco >= _binEdgesList_[iBin][1].first
+                and currentSplineBin.D2Reco <  _binEdgesList_[iBin][1].second
+            ){
+            currentSplineBin.kinematicBin = iBin;
+            break;
         }
     }
+    if(currentSplineBin.kinematicBin != -1){
+        // Loop over the defined split variables
+        for(int iSplitVar = 0 ; iSplitVar < int(_splineBinBuffer_.splitVarNameList.size()) ; iSplitVar++){
+            currentSplineBin.splitVarValueList[iSplitVar] = anaEvent_->GetEventVarInt(_splineBinBuffer_.splitVarNameList[iSplitVar]);
+        }
+        // Now look for the spline ptr:
+        int splineIndex = GetSplineIndex(currentSplineBin);
+        if(splineIndex != -1) outSplinePtr = _splineBinList_[splineIndex].splinePtr;
+    }
 
-    return _eventSplineMapping_[anaEvent_].second;
+    return outSplinePtr;
 }
 
 std::string XsecDial::GetSplineName(int index) const
@@ -321,7 +338,7 @@ std::string XsecDial::GetSplineName(int index) const
 
 void XsecDial::SetVars(double nominal, double step, double limit_lo, double limit_hi)
 {
-    m_nominal = nominal;
+    m_nominalDial = nominal;
     m_step = step;
     m_limit_lo = limit_lo;
     m_limit_hi = limit_hi;
@@ -334,19 +351,65 @@ void XsecDial::SetDimensions(const std::vector<int>& dim)
 
 void XsecDial::Print(bool print_bins) const
 {
-    LogAlert << "Name: " <<  m_name << std::endl
-             << "Nominal: " << m_nominal << std::endl
+    LogWarning << "Name: " <<  m_name << std::endl
+             << "Nominal Dial Value: " << m_nominalDial << std::endl
+             << "Prior: " << m_prior << std::endl
              << "Step: " << m_step << std::endl
              << "Limits: [" << m_limit_lo << "," << m_limit_hi << "]" << std::endl
-             << "Splines: " << v_splines.size() << std::endl;
+             << "Is Normalization Dial: " << (_isNormalizationDial_? "true": "false") << std::endl;
 
-    if(not m_dimensions.empty()){
-        LogAlert << "Dimensions:";
-        for(const auto& dim : m_dimensions)
-            LogAlert << " " << dim;
-        LogAlert << std::endl;
+    if(_isNormalizationDial_){
+        std::function<std::string(int)> intToString = [](int elementInt_){return std::to_string(elementInt_);};
+        if(not _applyOnlyOnMap_.empty())
+        {
+            LogWarning << "ApplyOnlyOn: {";
+            for(const auto& applyCond : _applyOnlyOnMap_){
+                LogWarning << " \"" << applyCond.first << "\": [";
+                LogWarning << GenericToolbox::joinVectorString(
+                    GenericToolbox::convertVectorType(applyCond.second, intToString), ", ");
+                LogWarning << "], ";
+            }
+            LogWarning << "}" << std::endl;
+        }
+        if(not _dontApplyOnMap_.empty()){
+            LogWarning << "DontApplyOn: {";
+            for(const auto& applyCond : _dontApplyOnMap_){
+                LogWarning << " \"" << applyCond.first << "\": [";
+                LogWarning << GenericToolbox::joinVectorString(
+                    GenericToolbox::convertVectorType(applyCond.second, intToString), ", ");
+                LogWarning << "], ";
+            }
+            LogWarning << "}" << std::endl;
+        }
+    }
+    else{
+        if(_useSplineSplitMapping_){
+            LogWarning << "Nb of Splines: " << _splinePtrList_.size() << std::endl;
+        }
+        else{
+            LogWarning << "Nb of Splines: " << v_splines.size() << std::endl;
+        }
     }
 
-    if(print_bins)
+
+
+    if(not m_dimensions.empty()){
+        LogWarning << "Dimensions:";
+        for(const auto& dim : m_dimensions)
+            LogWarning << " " << dim;
+        LogWarning << std::endl;
+    }
+
+    if(print_bins){
         bin_manager.Print();
+    }
+
+
 }
+
+void XsecDial::SetNominal(double nominal) { m_nominalDial = nominal; }
+void XsecDial::SetPrior(double prior) { m_prior = prior; }
+void XsecDial::SetStep(double step) { m_step = step; }
+void XsecDial::SetLimitLo(double limit_lo) { m_limit_lo = limit_lo; }
+void XsecDial::SetLimitHi(double limit_hi) { m_limit_hi = limit_hi; }
+void XsecDial::SetIsNormalizationDial(bool isNormalizationDial_) { _isNormalizationDial_ = isNormalizationDial_; }

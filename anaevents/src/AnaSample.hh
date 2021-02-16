@@ -43,8 +43,9 @@ public:
 
     int GetN() const;
     AnaEvent* GetEvent(int evnum);
+    std::vector<AnaEvent>& GetEventList();
     void ClearEvents();
-    void AddEvent(const AnaEvent& event);
+    void AddEvent(AnaEvent& event);
     void ResetWeights();
 
     void PrintStats() const;
@@ -65,7 +66,9 @@ public:
 
     double CalcChi2() const;
     double CalcEffLLH() const;
+
     void FillEventHist(int datatype, bool stat_fluc = false);
+
     void Write(TDirectory* dirout, const std::string& bsname, int fititer);
     void GetSampleBreakdown(TDirectory* dirout, const std::string& tag,
                             const std::vector<std::string>& topology, bool save);
@@ -76,6 +79,7 @@ public:
     std::string GetDetector() const { return m_detector; }
     std::string GetDetBinning() const { return m_binning; }
     std::string GetAdditionalCuts() const { return m_additional_cuts; }
+    std::vector<AnaEvent>& GetEvents() { return m_events; }
 
     TH1D* GetPredHisto() const { return m_hpred; }
     TH1D* GetDataHisto() const { return m_hdata; }

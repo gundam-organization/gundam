@@ -129,7 +129,7 @@ void AnaSample::SetTopologyHLCode(const std::vector<int>& HLTopologyCodes)
 void AnaSample::ClearEvents() { m_events.clear(); }
 
 // GetN -- get number of events stored
-int AnaSample::GetN() const { return (int)m_events.size(); }
+int AnaSample::GetN() const { return m_events.size(); }
 
 AnaEvent* AnaSample::GetEvent(int evnum)
 {
@@ -149,7 +149,16 @@ AnaEvent* AnaSample::GetEvent(int evnum)
     return &m_events.at(evnum);
 }
 
-void AnaSample::AddEvent(const AnaEvent& event) { m_events.push_back(event); }
+std::vector<AnaEvent>& AnaSample::GetEventList(){
+    return m_events;
+}
+
+void AnaSample::AddEvent(AnaEvent& event) {
+    m_events.emplace_back(event);
+    // since default constructor doesn't do it by itself
+    m_events.back().HookIntMembers();
+    m_events.back().HookFloatMembers();
+}
 
 void AnaSample::ResetWeights()
 {
@@ -215,24 +224,20 @@ int AnaSample::GetBinIndex(const double D1, const double D2) const
     return -1;
 }
 
-void AnaSample::FillEventHist(int datatype, bool stat_fluc)
-{
-    if(m_hpred != nullptr)
-        m_hpred->Reset();
-    if(m_hmc != nullptr)
-        m_hmc->Reset();
-    if(m_hmc_true != nullptr)
-        m_hmc_true->Reset();
-    if(m_hsig != nullptr)
-        m_hsig->Reset();
+void AnaSample::FillEventHist(int datatype, bool stat_fluc){
 
-    for(std::size_t i = 0; i < m_events.size(); ++i)
-    {
-        double D1_rec  = m_events[i].GetRecoD1();
-        double D2_rec  = m_events[i].GetRecoD2();
-        double D1_true = m_events[i].GetTrueD1();
-        double D2_true = m_events[i].GetTrueD2();
-        double wght    = datatype >= 0 ? m_events[i].GetEvWght() : m_events[i].GetEvWghtMC();
+    if(m_hpred != nullptr) m_hpred->Reset();
+    if(m_hmc != nullptr) m_hmc->Reset();
+    if(m_hmc_true != nullptr) m_hmc_true->Reset();
+    if(m_hsig != nullptr) m_hsig->Reset();
+
+    for(std::size_t iEvent = 0; iEvent < m_events.size(); ++iEvent){
+
+        double D1_rec  = m_events[iEvent].GetRecoD1();
+        double D2_rec  = m_events[iEvent].GetRecoD2();
+        double D1_true = m_events[iEvent].GetTrueD1();
+        double D2_true = m_events[iEvent].GetTrueD2();
+        double wght    = datatype >= 0 ? m_events[iEvent].GetEvWght() : m_events[iEvent].GetEvWghtMC();
 
         int anybin_index_rec  = GetBinIndex(D1_rec, D2_rec);
         int anybin_index_true = GetBinIndex(D1_true, D2_true);
@@ -241,7 +246,7 @@ void AnaSample::FillEventHist(int datatype, bool stat_fluc)
         m_hmc->Fill(anybin_index_rec + 0.5, wght);
         m_hmc_true->Fill(anybin_index_true + 0.5, wght);
 
-        if(m_events[i].isSignalEvent())
+        if(m_events[iEvent].isSignalEvent())
             m_hsig->Fill(anybin_index_true + 0.5, wght);
     }
 
@@ -275,7 +280,6 @@ void AnaSample::FillEventHist(int datatype, bool stat_fluc)
                 continue;
             }
 #endif
-//            std::cout << "j=" << j << " / val=" << val << std::endl;
             m_hdata->SetBinContent(j, val);
         }
     }
@@ -324,9 +328,9 @@ void AnaSample::FillEventHist(int datatype, bool stat_fluc)
             else
             {
                 LogWarning << "In AnaSample::FillEventHist()\n"
-                          << "No bin for current data event.\n"
-                          << "D1 Reco: " << D1_rec_tree << std::endl
-                          << "D2 Reco: " << D2_rec_tree << std::endl;
+                           << "No bin for current data event.\n"
+                           << "D1 Reco: " << D1_rec_tree << std::endl
+                           << "D2 Reco: " << D2_rec_tree << std::endl;
             }
 #endif
         }
@@ -352,8 +356,9 @@ void AnaSample::FillEventHist(int datatype, bool stat_fluc)
     else
     {
         LogWarning << "In AnaSample::FillEventHist()\n"
-                  << "Invalid data type to fill histograms!\n";
+                   << "Invalid data type to fill histograms!\n";
     }
+
 }
 
 void AnaSample::SetLLHFunction(const std::string& func_name)

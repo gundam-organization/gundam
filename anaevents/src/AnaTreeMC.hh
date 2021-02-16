@@ -44,16 +44,17 @@ private:
     bool read_extra_var;
     const std::string TAG = color::GREEN_STR + "[AnaTreeMC]: " + color::RESET_STR;
 
+    std::string _file_name_;
+
 public:
     AnaTreeMC(const std::string& file_name, const std::string& tree_name, bool extra_var = false);
     ~AnaTreeMC();
 
     long int GetEntry(long int entry) const;
     void SetBranches();
-    void GetEvents(std::vector<AnaSample*>& ana_samples, const std::vector<int>& sig_topology,
-                   const bool evt_type);
     void GetEvents(std::vector<AnaSample*>& ana_samples, const std::vector<SignalDef>& v_signal,
                    const bool evt_type);
+
 };
 
 #endif

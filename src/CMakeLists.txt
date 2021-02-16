@@ -32,17 +32,22 @@ endforeach()
 
 #xsllhDetVariations
 add_executable(xsllhDetVar xsllhDetVariations.cxx)
+add_executable(xsllhGetDetParCov xsllhGetDetParCov.cxx)
 
 set_target_properties(xsllhDetVar PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
+set_target_properties(xsllhGetDetParCov PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
 foreach(mod ${MODULES})
  target_include_directories(xsllhDetVar PUBLIC ${CMAKE_SOURCE_DIR}/${mod}/src)
  target_include_directories(xsllhDetVar PUBLIC ${CMAKE_SOURCE_DIR}/include)
+ target_include_directories(xsllhGetDetParCov PUBLIC ${CMAKE_SOURCE_DIR}/${mod}/src)
+ target_include_directories(xsllhGetDetParCov PUBLIC ${CMAKE_SOURCE_DIR}/include)
 endforeach()
 
 foreach(mod ${MODULETargets})
   cmessage(STATUS "Linking with: ${mod}")
   target_link_libraries(xsllhDetVar ${mod})
+  target_link_libraries(xsllhGetDetParCov ${mod})
 endforeach()
 
 #xsllhFit
@@ -106,7 +111,7 @@ foreach(mod ${MODULETargets})
 endforeach()
 
 #xsllhGenWeightsFormater
-add_executable(xsllhGenWeightsFormater xsllhGenWeightsFormater.cc)
+add_executable(xsllhGenWeightsFormater xsllhGenWeightsFormater.cxx)
 
 set_target_properties(xsllhGenWeightsFormater PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 

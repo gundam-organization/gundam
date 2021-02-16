@@ -17,14 +17,20 @@
 #include "TTree.h"
 #include "TVectorT.h"
 
+#include <GenericToolbox.h>
 #include <Logger.h>
+#include <OptParser.hh>
+#include <TFormula.h>
+#include <TLeaf.h>
+#include <TTreeFormula.h>
 
 #include "json.hpp"
 using json = nlohmann::json;
 
 #include "BinManager.hh"
 #include "ColorOutput.hh"
-#include "LocalGenericToolbox.h"
+#include "GenericToolbox.h"
+#include "GenericToolboxRootExt.h"
 #include "ProgressBar.hh"
 
 // Structure that holds the options and the binning for a file specified in the .json config file:
@@ -88,10 +94,59 @@ struct FileOptions {
 
 };
 
+std::map<std::string, std::function<double(TTree* tree)>> __cutDictionnary__;
+int __currentFGD__;
+TFile* __currentInputFile__;
+TTree* __currentInputTree__;
+
+std::vector<SampleOpt> sampleList;
+std::vector<TTreeFormula*> cutFormulaList;
+TFile* __treeConverterFile__ = nullptr;
+TTree* __treeConverterRecoTTree__ = nullptr;
+std::map<int, std::map<int, std::map<int, Int_t>>> __treeConvEntryToVertexIDSplit__; // run, subrun, entry, vertexID
+std::map<int, int> __currentFlatToTreeConvEntryMapping__;
+
+struct AdditionalCutParser{
+
+    AdditionalCutParser() = default;
+
+    void initializeFormula(){
+
+        if(cutString.empty()){
+            LogFatal << "Can't initialize formula: cutString is empty." << std::endl;
+            exit(EXIT_FAILURE);
+        }
+
+        // parsing cutString
+        int parameterId = 0;
+        std::stringstream ss;
+        std::string parsedCutString = cutString;
+        for(auto& cutDictPair: __cutDictionnary__){
+            ss << "[" << parameterId << "]";
+            std::string newParsedCutStr = GenericToolbox::replaceSubstringInString(parsedCutString, cutDictPair.first, ss.str());
+            if(newParsedCutStr != parsedCutString){
+
+            }
+        }
+
+    }
+
+    std::string cutString;
+    std::vector<std::string> parameterNameList;
+    TFormula* cutFormula = nullptr;
+
+};
+
+bool doesEntryPassAdditionalCut(TTree* tree_, int sampleId_);
+void initCutDictionnary();
+void mapTreeConverterEntries();
+bool buildTreeSyncCache();
+
 int main(int argc, char** argv)
 {
 
     Logger::setUserHeaderStr("[xsDetVariation]");
+    initCutDictionnary();
 
     // Define colors and strings for info and error messages:
 //    const std::string TAG = color::GREEN_STR + "[xsDetVariation]: " + color::RESET_STR;
@@ -109,21 +164,33 @@ int main(int argc, char** argv)
 
     // .json config file that will be parsed from the command line:
     std::string json_file;
+    std::string sampleDefConfigFilePath;
+    int rebin_factor = 1;
 
-    // Initialize json_file with the name parsed from the command line using -j. Print USAGE and exit when -h is used:
-    char option;
-    while((option = char(getopt(argc, argv, "j:h"))) != -1)
-    {
-        switch(option)
-        {
-            case 'j':
-                json_file = optarg;
-                break;
-            case 'h':
-                std::cout << "USAGE: " << argv[0] << "\nOPTIONS:\n"
-                          << "-j : JSON input\n";
-            default:
-                return 0;
+    for(int iArg = 0 ; iArg < argc ; iArg++){
+        if(std::string(argv[iArg]) == "-j"){
+            int jArg = iArg + 1;
+            if (jArg < argc) {
+                json_file = std::string(argv[jArg]);
+            }
+            else {
+                LogError << "Give an argument after " << argv[iArg] << std::endl;
+                throw std::logic_error(std::string(argv[iArg]) + " : no argument found");
+            }
+        }
+        else if(std::string(argv[iArg]) == "-r"){
+            int jArg = iArg + 1;
+            if (jArg < argc) {
+                rebin_factor = std::stoi(argv[jArg]);
+            }
+            else {
+                LogError << "Give an argument after " << argv[iArg] << std::endl;
+                throw std::logic_error(std::string(argv[iArg]) + " : no argument found");
+            }
+        }
+        else if(std::string(argv[iArg]) == "-h"){
+            std::cout << "USAGE: " << argv[0] << "\nOPTIONS:\n"
+                      << "-j : JSON input\n";
         }
     }
 
@@ -151,21 +218,134 @@ int main(int argc, char** argv)
     const double weight_cut = j["weight_cut"];
 
     std::string fname_output  = j["fname_output"];
-    std::string variable_plot = j["plot_variable"];
     std::string cov_mat_name  = j["covariance_name"];
     std::string cor_mat_name  = j["correlation_name"];
+
+    std::string variable_plot;
+    if(j.find("plot_variable") != j.end()) variable_plot = j["plot_variable"].get<std::string>();
 
     std::vector<std::string> var_names = j["var_names"].get<std::vector<std::string>>();
     const int nvars = var_names.size();
 
+    std::vector<int> sampleCuts;
+    std::vector<int> sampleRebin;
+
     // cov_bin_manager will hold the binnings of the different samples (the length of this vector will be equal to the number of samples):
     std::vector<BinManager> cov_bin_manager;
-
-    // temp_cov_binning holds the binning text files for the different samples:
-    std::map<std::string, std::string> temp_cov_binning = j["cov_sample_binning"];
+    std::map<std::string, std::string> temp_cov_binning;
 
     // Number of samples:
-    const unsigned int num_cov_samples = temp_cov_binning.size();
+    unsigned int num_cov_samples;
+
+    if(j.find("sample_definition_config") != j.end()) sampleDefConfigFilePath = j["sample_definition_config"].get<std::string>();
+
+
+    if(not sampleDefConfigFilePath.empty()){
+
+        if(j.find("sample_cuts") != j.end()){
+            sampleCuts = j["sample_cuts"].get<std::vector<int>>();
+        }
+        else{
+            LogFatal << "Could not find \"sample_cuts\" parameter in the config file." << std::endl;
+            LogFatal << "This parameter is mandatory while you are using '-s' option." << std::endl;
+            LogFatal << "\"sample_cuts\" is an array which represent the accum level of each sample." << std::endl;
+            LogFatal << "For example: [7,7,6]" << std::endl;
+            throw std::logic_error("Could not find \"sample_cuts\" parameter.");
+        }
+
+        if(rebin_factor != -1){
+            sampleRebin.resize(sampleCuts.size(), rebin_factor);
+        }
+        else if(j.find("sample_rebin") != j.end()){
+            sampleRebin = j["sample_rebin"].get<std::vector<int>>();
+            if(sampleRebin.size() != sampleCuts.size()){
+                LogFatal << "Could not find \"sample_rebin\" array does not match \"sample_cuts\"'s one." << std::endl;
+                throw std::logic_error("Invalid size of \"sample_rebin\" array.");
+            }
+            LogWarning << "Sample will be re-binned as follows:" << std::endl;
+            LogWarning; GenericToolbox::printVector(sampleRebin);
+        }
+
+        std::string input_dir = GenericToolbox::getFolderPathFromFilePath(sampleDefConfigFilePath) + "/";
+        std::fstream configSampleDefinitionStream;
+
+        configSampleDefinitionStream.open(sampleDefConfigFilePath, std::ios::in);
+        LogInfo << "Opening " << json_file << std::endl;
+        if(not configSampleDefinitionStream.is_open())
+        {
+            LogError << "Unable to open JSON configure file." << std::endl;
+            return 1;
+        }
+        json configJsonSampleDef;
+        configSampleDefinitionStream >> configJsonSampleDef;
+
+        std::string treeConverterFilePath = configJsonSampleDef["mc_file"];
+        __treeConverterFile__       = TFile::Open((input_dir+treeConverterFilePath).c_str());
+        __treeConverterRecoTTree__  = (TTree*) __treeConverterFile__->Get("selectedEvents");
+        mapTreeConverterEntries();
+
+        LogInfo << "Looking for defined samples..." << std::endl;
+
+        for(const auto& configSample : configJsonSampleDef["samples"]){
+
+            if(configSample["use_sample"] == false or configSample["cut_branch"] == -1){
+                continue;
+            }
+
+            sampleList.emplace_back(SampleOpt());
+            sampleList.back().cut_branch    = configSample["cut_branch"];
+            sampleList.back().name          = configSample["name"];
+            sampleList.back().detector      = configSample["detector"];
+            sampleList.back().binning       = input_dir + configSample["binning"].get<std::string>();
+            sampleList.back().use_sample    = configSample["use_sample"];
+            if(configSample.find("additional_cuts") != configSample.end()) sampleList.back().additional_cuts = configSample["additional_cuts"].get<std::string>();
+            cutFormulaList.emplace_back(nullptr);
+
+            LogWarning << "Added sample: \"" << sampleList.back().name << "\"";
+
+            if(not sampleList.back().additional_cuts.empty()){
+                LogWarning << "-> \"" << sampleList.back().additional_cuts << "\"";
+                cutFormulaList.back() = new TTreeFormula(
+                    Form("additional_cuts_%i", int(cutFormulaList.size())),
+                    sampleList.back().additional_cuts.c_str(), __treeConverterRecoTTree__
+                    );
+                cutFormulaList.back()->SetTree(__treeConverterRecoTTree__);
+                __treeConverterRecoTTree__->SetNotify(cutFormulaList.back()); // This is needed only for TChain.
+            }
+            LogWarning << std::endl;
+        }
+
+        LogInfo << "Re-binning samples for the covariance matrix..." << std::endl;
+        for(size_t iSample = 0 ; iSample < sampleList.size() ; iSample++){
+            cov_bin_manager.emplace_back(BinManager(sampleList[iSample].binning));
+            if(not sampleRebin.empty()){
+                cov_bin_manager.back().MergeBins(sampleRebin[iSample]);
+            }
+            LogInfo << GET_VAR_NAME_VALUE(iSample) << std::endl;
+            cov_bin_manager.back().Print();
+        }
+    }
+    else{
+        // temp_cov_binning holds the binning text files for the different samples:
+        std::map<std::string, std::string> temp_cov_binning = j["cov_sample_binning"];
+
+        // Set length of cov_bin_manager vector to the number of samples:
+        cov_bin_manager.resize(temp_cov_binning.size());
+
+        // Loop over all the different samples:
+        for( const auto& kv : temp_cov_binning ){
+            //cov_bin_manager.at(std::stoi(kv.first)) = std::move(BinManager(kv.second));
+            // Get the sample number and name of the binning file for the current sample:
+            int sample_number = std::stoi(kv.first);
+            std::string binning_file = kv.second;
+
+            // Set up the binning from the binning text file and fill the cov_bin_manager vector with it:
+            cov_bin_manager.at(sample_number) = BinManager(binning_file);
+        }
+    }
+
+    // Number of samples:
+    num_cov_samples = cov_bin_manager.size();
 
     // Set length of cov_bin_manager vector to the number of samples:
     cov_bin_manager.resize(num_cov_samples);
@@ -214,24 +394,31 @@ int main(int argc, char** argv)
                     f_opt.num_samples = json_input_file["num_samples"];
                     f_opt.cuts        = json_input_file["cuts"].get<std::vector<int>>();
 
-                    // temp_json is a map between sample numbers and selection branches in the Highland ROOT file (as specified in the .json config file):
-                    std::map<std::string, std::vector<int>> temp_json = json_input_file["samples"];
+                    if(not sampleDefConfigFilePath.empty()){
+                        for(size_t iSample = 0 ; iSample < sampleList.size() ; iSample++){
+                            f_opt.samples.emplace(std::make_pair(iSample, sampleList[iSample].cut_branch));
+                        }
+                    }
+                    else{
+                        // temp_json is a map between sample numbers and selection branches in the Highland ROOT file (as specified in the .json config file):
+                        std::map<std::string, std::vector<int>> temp_json = json_input_file["samples"];
 
-                    // Loop over all the samples of the current file:
-                    for(const auto& kv : temp_json)
-                    {
-                        // Number of the current sample:
-                        const int sam = std::stoi(kv.first);
-
-                        // If the number of the current sample is less than or equal to the total number of samples, we add an entry to the samples map of the FileOptions struct f (this is a map between sample number and a vector containing the selection branch numbers of the Highland ROOT file):
-                        if(sam <= num_cov_samples)
-                            f_opt.samples.emplace(std::make_pair(sam, kv.second));
-
-                        // If the nuber of the current sample is greater than the total number of samples, an error is thrown:
-                        else
+                        // Loop over all the samples of the current file:
+                        for(const auto& kv : temp_json)
                         {
-                            LogError << "Invalid sample number: " << sam << std::endl;
-                            return 64;
+                            // Number of the current sample:
+                            const int sam = std::stoi(kv.first);
+
+                            // If the number of the current sample is less than or equal to the total number of samples, we add an entry to the samples map of the FileOptions struct f (this is a map between sample number and a vector containing the selection branch numbers of the Highland ROOT file):
+                            if(not sampleDefConfigFilePath.empty() and sam <= num_cov_samples)
+                                f_opt.samples.emplace(std::make_pair(sam, kv.second));
+
+                                // If the nuber of the current sample is greater than the total number of samples, an error is thrown:
+                            else
+                            {
+                                LogError << "Invalid sample number: " << sam << std::endl;
+                                return 64;
+                            }
                         }
                     }
 
@@ -257,6 +444,8 @@ int main(int argc, char** argv)
                     // Add the file options of the current file to the vector v_files:
                     v_files.emplace_back(f_opt);
 
+                    LogWarning << GET_VAR_NAME_VALUE(f_opt.num_toys) << std::endl;
+
                     // As usable_toys was set to zero previously, this condition will be fulfilled and usable_toys will be set to the number of usable toys as specified in the .json config file:
                     if(f_opt.num_toys < usable_toys || usable_toys == 0)
                         usable_toys = f_opt.num_toys;
@@ -274,32 +463,45 @@ int main(int argc, char** argv)
                 f_opt.detector    = json_input_file["detector"];
                 f_opt.num_toys    = int(json_input_file["num_toys"]);
                 f_opt.num_syst    = json_input_file["num_syst"];
-                f_opt.num_samples = json_input_file["num_samples"];
-                f_opt.cuts        = json_input_file["cuts"].get<std::vector<int>>();
+                if(json_input_file.find("num_samples")  != json_input_file.end())
+                    f_opt.num_samples = json_input_file["num_samples"];
+                if(json_input_file.find("cuts")         != json_input_file.end())
+                    f_opt.cuts        = json_input_file["cuts"].get<std::vector<int>>();
 
-                // temp_json is a map between sample numbers and selection branches in the Highland ROOT file (as specified in the .json config file):
-                std::map<std::string, std::vector<int>> temp_json = json_input_file["samples"];
+                if(not sampleDefConfigFilePath.empty()){
+                    for(size_t iSample = 0 ; iSample < sampleList.size() ; iSample++){
+                        f_opt.samples[iSample] = {sampleCuts[iSample]};
+                    }
+                }
+                else{
+                    // temp_json is a map between sample numbers and selection branches in the Highland ROOT file (as specified in the .json config file):
+                    std::map<std::string, std::vector<int>> temp_json = json_input_file["samples"];
 
-                // Loop over all the samples of the current file:
-                for(const auto& kv : temp_json)
-                {
-                    // Number of the current sample:
-                    const int sam = std::stoi(kv.first);
-
-                    // If the number of the current sample is less than or equal to the total number of samples, we add an entry to the samples map of the FileOptions struct f (this is a map between sample number and a vector containing the selection branch numbers of the Highland ROOT file):
-                    if(sam <= num_cov_samples)
-                        f_opt.samples.emplace(std::make_pair(sam, kv.second));
-
-                    // If the nuber of the current sample is greater than the total number of samples, an error is thrown:
-                    else
+                    // Loop over all the samples of the current file:
+                    for(const auto& kv : temp_json)
                     {
-                        LogError << "Invalid sample number: " << sam << std::endl;
-                        return 64;
+                        // Number of the current sample:
+                        const int sam = std::stoi(kv.first);
+
+                        // If the number of the current sample is less than or equal to the total number of samples, we add an entry to the samples map of the FileOptions struct f (this is a map between sample number and a vector containing the selection branch numbers of the Highland ROOT file):
+                        if(sam <= num_cov_samples){
+                            f_opt.samples.emplace(std::make_pair(sam, kv.second));
+                        }
+
+
+                            // If the nuber of the current sample is greater than the total number of samples, an error is thrown:
+                        else
+                        {
+                            LogError << "Invalid sample number: " << sam << std::endl;
+                            return 64;
+                        }
                     }
                 }
 
                 // Get the mapping of variable names to branch numbers:
-                std::vector<std::map<std::string, std::vector<int>>> var_map_temp = json_input_file["variable_mapping"];
+                std::vector<std::map<std::string, std::vector<int>>> var_map_temp;
+                if(json_input_file.find("variable_mapping") != json_input_file.end())
+                    var_map_temp = json_input_file["variable_mapping"].get<std::vector<std::map<std::string, std::vector<int>>>>();
                 f_opt.variable_mapping = var_map_temp;
 
                 // Get the variable names and their total number:
@@ -319,6 +521,8 @@ int main(int argc, char** argv)
 
                 // Add the file options of the current file to the vector v_files:
                 v_files.emplace_back(f_opt);
+
+                LogWarning << GET_VAR_NAME_VALUE(f_opt.num_toys) << std::endl;
 
                 // As usable_toys was set to zero previously, this condition will be fulfilled and usable_toys will be set to the number of usable toys as specified in the .json config file:
                 if(f_opt.num_toys < usable_toys || usable_toys == 0)
@@ -466,6 +670,9 @@ int main(int argc, char** argv)
         auto* tree_event = (TTree*)file_input->Get(file_.tree_name.c_str());
         auto* tree_default = (TTree*)file_input->Get("default");
 
+        __currentInputFile__ = file_input; // globals
+        if(__treeConverterRecoTTree__ != nullptr) buildTreeSyncCache();
+
         // Set the branch addresses for the selected tree to the previously declared variables:
         tree_event->SetBranchAddress("NTOYS", &NTOYS);
         tree_event->SetBranchAddress("accum_level", accum_level);
@@ -503,6 +710,7 @@ int main(int argc, char** argv)
         {
             // Get the ith event:
             tree_event->GetEntry(i);
+            __treeConverterRecoTTree__->GetEntry(__currentFlatToTreeConvEntryMapping__[i]);
 
             // If the number of toys from the input ROOT file does not match the number of toys specified in the .json config file, an error message is printed:
             if(NTOYS != file_.num_toys)
@@ -524,13 +732,20 @@ int main(int argc, char** argv)
 
                     for(unsigned int i_FGD = 0 ; i_FGD < 2 ; i_FGD++){
 
+                        __currentFGD__ = i_FGD;
+
                         // Loop over all selection branches in current selection sample:
                         for(const auto& branch : my_sample.second)
                         {
 
                             // Only consider events that passed the selection (accum_level is higher than the given cut for this branch):
-                            if(accum_level[i_toy][i_FGD][branch] > file_.cuts[branch])
+                            if(accum_level[i_toy][i_FGD][branch] > file_.cuts[sample_id])
                             {
+
+                                if(not sampleList.empty() and not doesEntryPassAdditionalCut(tree_event, sample_id)){
+                                    continue;
+                                }
+
                                 // Get the names and locations (indices) of the kinematic variables for the current branch:
                                 std::vector<std::string> variable_names_current_branch;
                                 std::vector<int> variable_loc_current_branch;
@@ -771,7 +986,7 @@ int main(int argc, char** argv)
             const unsigned int nbins = cov_bin_manager[s].GetNbins();
 
             // Array of the bin content (sum of all weights of events that fall into this bin) for current sample s (v_mc_stat was filled from the default tree):
-            float* w  = v_mc_stat[s].GetArray();
+            float* w   = v_mc_stat[s].GetArray();
 
             // Array of the sum of squares of the bin content for current sample s (v_mc_stat was filled from the default tree):
             double* w2 = v_mc_stat[s].GetSumw2()->GetArray();
@@ -881,12 +1096,15 @@ int main(int argc, char** argv)
 
 
         std::vector<double> v_mean_double(v_mean.begin(), v_mean.end());
-        auto* bin_contents = LocalGenericToolbox::get_TVectorD_from_vector(v_mean_double);
+        auto* bin_contents = GenericToolbox::convertStdVectorToTVectorD(v_mean_double);
         auto* diagonal_values = new TVectorD(num_elements);
         for(int i_diag = 0 ; i_diag < num_elements ; i_diag++){
             (*diagonal_values)[i_diag] = TMath::Sqrt(cov_mat(i_diag,i_diag)*(*bin_contents)[i_diag]);
         }
-        data_histogram = LocalGenericToolbox::get_TH1D_from_TVectorD("MC_data_and_detector_errors", bin_contents, "Counts", "Bin #", diagonal_values);
+        data_histogram = GenericToolbox::convertTVectorDtoTH1D(
+            bin_contents,
+            "MC_data_and_detector_errors", "Counts", "Bin #",
+            diagonal_values);
 
     }
 
@@ -959,4 +1177,164 @@ int main(int argc, char** argv)
               << std::endl;
 
     return 0;
+}
+
+
+bool doesEntryPassAdditionalCut(TTree* tree_, int sampleId_){
+
+    if(sampleList[sampleId_].additional_cuts.empty()) return true;
+
+    __treeConverterRecoTTree__->SetNotify(cutFormulaList[sampleId_]);
+    bool doEventPassCut = true;
+    for(int jInstance = 0; jInstance < cutFormulaList[sampleId_]->GetNdata(); jInstance++) {
+        if ( cutFormulaList[sampleId_]->EvalInstance(jInstance) == 0 ) {
+            doEventPassCut = false;
+            break;
+        }
+    }
+
+    return doEventPassCut;
+
+}
+void initCutDictionnary(){
+
+    __cutDictionnary__["beammode"] = [](TTree* tree){
+        double run = tree->GetLeaf("sRun")->GetValue(0);
+
+        int beam_mode = 0;
+        if(int(run/1E7) == 9){
+            beam_mode = 1;
+        }
+        else if(int(run/1E7) == 8){
+            beam_mode = -1;
+        }
+        else {
+            beam_mode = 0;
+        }
+        return double(beam_mode);
+    };
+
+    __cutDictionnary__["fgd_reco"] = [](TTree* tree){
+        return __currentFGD__;
+    };
+
+    __cutDictionnary__["analysis"] = [](TTree* tree){
+
+        double analysis = 0;
+
+        auto splitFileName = GenericToolbox::splitString(GenericToolbox::getFileNameFromFilePath(__currentInputFile__->GetName()), "_");
+        if(splitFileName.size() > 2){
+            if(splitFileName[1] == "NumuCCMultiPiAnalysis"){
+                analysis = 1;
+            }
+            else if(splitFileName[1] == "AntiNumuCCMultiPiAnalysis"){
+                analysis = -1;
+            }
+        }
+
+        return analysis;
+    };
+
+}
+bool buildTreeSyncCache(){
+
+    if(__treeConvEntryToVertexIDSplit__.empty()) mapTreeConverterEntries();
+
+    LogInfo << "Building tree sync cache..." << std::endl;
+
+    // genWeights tree (same number of events as __flattree__)
+    int nbGenWeightsEntries = __currentInputTree__->GetEntries();
+
+    Int_t sTrueVertexID;
+    Int_t sRun;
+    Int_t sSubRun;
+
+    __currentInputTree__->SetBranchStatus("*", false);
+
+    __currentInputTree__->SetBranchStatus("sTrueVertexID", true);
+    __currentInputTree__->SetBranchStatus("sRun", true);
+    __currentInputTree__->SetBranchStatus("sSubRun", true);
+
+//    __currentFlatTree__->SetBranchAddress("sTrueVertexID[0]", &sTrueVertexID); // Can't do that
+    __currentInputTree__->SetBranchAddress("sRun", &sRun);
+    __currentInputTree__->SetBranchAddress("sSubRun", &sSubRun);
+
+    __currentFlatToTreeConvEntryMapping__.clear();
+
+    int nbMatches = 0, nbMissing = 0;
+    for(int iGenWeightsEntry = 0 ; iGenWeightsEntry < nbGenWeightsEntries; iGenWeightsEntry++){ // genWeights
+        __currentInputTree__->GetEntry(iGenWeightsEntry);
+        __currentFlatToTreeConvEntryMapping__[iGenWeightsEntry] = -1; // reset
+
+        int tcEntry = -1;
+        int tcVertexID = -1;
+        for(const auto& runMapPair : __treeConvEntryToVertexIDSplit__){
+            if(runMapPair.first != sRun) continue;
+            for(const auto& subrunMapPair : runMapPair.second){
+                if(subrunMapPair.first != sSubRun) continue;
+
+                sTrueVertexID = __currentInputTree__->GetLeaf("sTrueVertexID")->GetValue(0);
+
+                for(const auto& tcEntryToVertexID : subrunMapPair.second){
+                    tcEntry = tcEntryToVertexID.first;
+                    tcVertexID = tcEntryToVertexID.second;
+
+                    // Looking for the sTrueVertexID in TC
+                    if(tcVertexID != sTrueVertexID ) {
+                        continue;
+                    }
+                    else{
+                        // Check if the corresponding run/subrun matches
+                        __currentFlatToTreeConvEntryMapping__[iGenWeightsEntry] = tcEntry;
+                        break;
+
+                    }
+                }
+            }
+        }
+        if(__currentFlatToTreeConvEntryMapping__[iGenWeightsEntry] == -1){
+            nbMissing++;
+        }
+        else {
+            nbMatches++;
+        }
+    }
+
+    LogInfo << "Tree synchronization has: " << nbMatches << " matches, " << nbMissing << " miss." << std::endl;
+
+    __currentInputTree__->ResetBranchAddress(__currentInputTree__->GetBranch("sTrueVertexID"));
+    __currentInputTree__->ResetBranchAddress(__currentInputTree__->GetBranch("sRun"));
+    __currentInputTree__->ResetBranchAddress(__currentInputTree__->GetBranch("sSubRun"));
+
+//    __treeConverterRecoTTree__->ResetBranchAddress(__treeConverterRecoTTree__->GetBranch("run"));
+//    __treeConverterRecoTTree__->ResetBranchAddress(__treeConverterRecoTTree__->GetBranch("subrun"));
+
+    __currentInputTree__->SetBranchStatus("*", true);
+
+    if(nbMatches == 0){
+        LogError << "Could not sync genWeights file and TreeConverter." << std::endl;
+        return false;
+    }
+    return true;
+
+}
+void mapTreeConverterEntries(){
+
+    LogInfo << "Mapping Tree Converter File..." << std::endl;
+
+    Int_t vertexID;
+    int run;
+    int subrun;
+    __treeConverterRecoTTree__->SetBranchAddress("vertexID", &vertexID);
+    __treeConverterRecoTTree__->SetBranchAddress("run", &run);
+    __treeConverterRecoTTree__->SetBranchAddress("subrun", &subrun);
+
+    std::string loadTitle = LogInfo.getPrefixString() + "Mapping TC entries...";
+    for(int iEntry = 0 ; iEntry < __treeConverterRecoTTree__->GetEntries(); iEntry++){
+        GenericToolbox::displayProgressBar(iEntry, __treeConverterRecoTTree__->GetEntries(), loadTitle);
+        __treeConverterRecoTTree__->GetEntry(iEntry);
+        __treeConvEntryToVertexIDSplit__[run][subrun][iEntry] = vertexID;
+    }
+    __treeConverterRecoTTree__->ResetBranchAddress(__treeConverterRecoTTree__->GetBranch("vertexID"));
+
 }

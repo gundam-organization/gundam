@@ -16,10 +16,12 @@
 #include "TTree.h"
 
 // This project
+#include "XsecDial.hh"
 #include <FitStructs.hh>
 #include <TGraph.h>
 #include <TSpline.h>
-#include "XsecDial.hh"
+#include <future>
+#include "GlobalVariables.h"
 
 // Submodules
 #include "Logger.h"
@@ -36,6 +38,9 @@ std::string __pathTreeConverterFile__;
 std::string __pathBinningFile__;
 std::string __pathGenWeightsFileList__;
 std::vector<std::string> __listGenWeightsFiles__;
+bool __onlyRegenConfig__;
+bool __skipReadSplines__;
+bool __skipReadAndMergeSplines__;
 
 // Internals
 int __argc__;
@@ -53,7 +58,7 @@ std::map<std::string, double> __mapErrorValues__;
 std::map<std::string, std::string> __mapXsecToGenWeights__;
 std::map<std::string, TFile*> __mapOutSplineTFiles__;
 std::map<std::string, TTree*> __mapOutSplineTTrees__;
-std::map<std::string, int> __toSamplesIndex__;
+std::map<std::string, int> __toTopologyIndex__;
 std::map<std::string, int> __toReactionIndex__;
 std::map<int, int> __currentGenWeightToTreeConvEntry__;
 std::map<int, Int_t> __treeConvEntryToVertexID__;
@@ -68,6 +73,7 @@ bool TEST__;
 
 SplineBin __splineBinHandler__;
 
+int __nbThreads__;
 
 /****************************/
 //! Subroutines
@@ -125,14 +131,7 @@ int main(int argc, char** argv){
     fillDictionaries();
 
     // CORE
-    binSplines();
-
-    std::vector<int> testIntVec = {6,5,4,3,2,1};
-
-    std::function<bool(const int, const int)> f = [](const int a, const int b){ return a < b; };
-    auto p = GenericToolbox::getSortPermutation(testIntVec, f);
-    GenericToolbox::applyPermutation(testIntVec, p);
-    GenericToolbox::printVector(testIntVec);
+    if(not __onlyRegenConfig__) binSplines();
 
     generateJsonConfigFile();
     destroyObjects();
@@ -151,11 +150,15 @@ std::string remindUsage(){
     std::stringstream remind_usage_ss;
     remind_usage_ss << "***********************************************" << std::endl;
     remind_usage_ss << " > Command Line Arguments" << std::endl;
-    remind_usage_ss << "  -w : genweights input files (Current : " << GenericToolbox::parseVectorAsString(__listGenWeightsFiles__) << ")" << std::endl;
+    remind_usage_ss << "  -w : genweights input files (Current : " << GenericToolbox::parseVectorAsString(__listGenWeightsFiles__, true) << ")" << std::endl;
     remind_usage_ss << "  -l : genweights input file list (Current : " << __pathGenWeightsFileList__ << ")" << std::endl;
     remind_usage_ss << "  -b : binning file (Current : " << __pathBinningFile__ << ")" << std::endl;
     remind_usage_ss << "  -t : tree converter file (Current : " << __pathTreeConverterFile__ << ")" << std::endl;
     remind_usage_ss << "  -c : file containing infos on the covariance matrix (Current : " << __pathCovarianceMatrixFile__ << ")" << std::endl;
+    remind_usage_ss << "  -mt : number of cores for reading files (Current : " << __nbThreads__ << ")" << std::endl;
+    remind_usage_ss << "  --regen-config-only : Does not call binSplines, but only regen .json file (Current : " << __onlyRegenConfig__ << ")" << std::endl;
+    remind_usage_ss << "  --skip-read-splines : Only merge and interpolate will be processed (Current : " << __skipReadSplines__ << ")" << std::endl;
+    remind_usage_ss << "  --skip-read-merge-splines : Only interpolate will be processed (Current : " << __skipReadAndMergeSplines__ << ")" << std::endl;
     remind_usage_ss << "***********************************************" << std::endl;
 
     LogWarning << remind_usage_ss.str();
@@ -173,7 +176,13 @@ void resetParameters(){
     __pathBinningFile__ = "";
     __pathGenWeightsFileList__ = "";
 
+    __onlyRegenConfig__ = false;
+    __skipReadSplines__ = false;
+    __skipReadAndMergeSplines__ = false;
+
     __listSplitVarNames__ = {"beammode", "analysis", "fgd_reco", "cut_branch", "reaction"};
+
+    __nbThreads__ = 1;
 
     __listGenWeightsFiles__.clear();
 }
@@ -198,10 +207,12 @@ void getUserParameters(){
     LogWarning << "Reading user parameters" << std::endl;
 
     __commandLine__ = GenericToolbox::joinVectorString(\
-        std::vector<std::string>(__argv__ + 1, __argv__ + __argc__), " ");
+        std::vector<std::string>(__argv__ + 1, __argv__ + __argc__)
+            , " ");
 
     for(int i_arg = 0; i_arg < __argc__; i_arg++){
 
+        // Parameters
         if(std::string(__argv__[i_arg]) == "-j"){
             if (i_arg < __argc__ - 1) {
                 int j_arg = i_arg + 1;
@@ -295,25 +306,25 @@ void getUserParameters(){
                 throw std::logic_error(std::string(__argv__[i_arg]) + " : no argument found");
             }
         }
-        else if(std::string(__argv__[i_arg]) == "-split"){
+        else if(std::string(__argv__[i_arg]) == "-mt"){
             if (i_arg < __argc__ - 1) {
                 int j_arg = i_arg + 1;
-                __pathGenWeightsFileList__ = std::string(__argv__[j_arg]);
-                if(not GenericToolbox::doesPathIsFile(__pathGenWeightsFileList__)){
-                    LogError << std::string(__argv__[i_arg]) << ": " << __pathGenWeightsFileList__
-                             << " could not be found." << std::endl;
-                    exit(EXIT_FAILURE);
-                }
-                auto fileList = GenericToolbox::dumpFileAsVectorString(__pathGenWeightsFileList__);
-                __listGenWeightsFiles__.insert(
-                    __listGenWeightsFiles__.end(),
-                    fileList.begin(),
-                    fileList.end()
-                    );
+                __nbThreads__ = std::stoi(__argv__[j_arg]);
             } else {
                 LogError << "Give an argument after " << __argv__[i_arg] << std::endl;
                 throw std::logic_error(std::string(__argv__[i_arg]) + " : no argument found");
             }
+        }
+
+        // Triggers
+        else if(std::string(__argv__[i_arg]) == "--regen-config-only"){
+            __onlyRegenConfig__ = true;
+        }
+        else if(std::string(__argv__[i_arg]) == "--skip-read-splines"){
+            __skipReadSplines__ = true;
+        }
+        else if(std::string(__argv__[i_arg]) == "--skip-read-merge-splines"){
+            __skipReadAndMergeSplines__ = true;
         }
 
     }
@@ -341,7 +352,8 @@ void initializeObjects(){
 
     LogInfo << "Claiming memory slots for the bin handler..." << std::endl;
     for(const auto& splitVarName: __listSplitVarNames__){
-        __splineBinHandler__.splitVarValue[splitVarName] = -1;
+        __splineBinHandler__.splitVarNameList.emplace_back(splitVarName);
+        __splineBinHandler__.splitVarValueList.emplace_back(-1);
     }
     __splineBinHandler__.reset();
 
@@ -533,7 +545,7 @@ void getListOfParameters() {
     LogInfo << "List of systematics to process:" << std::endl;
     for( auto & systName : __listSystematicNames__){
         if(doesParamHasRelativeXScale(systName)) LogAlert << "  - " << systName << " (Relative)" << std::endl;
-        else LogWarning << "  - " << systName << std::endl;
+        else LogInfo << "  - " << systName << std::endl;
     }
 
 }
@@ -569,9 +581,9 @@ void readInputCovarianceFile() {
 }
 void fillDictionaries(){
 
-    __toSamplesIndex__["CC-0pi"] = 0;
-    __toSamplesIndex__["CC-1pi"] = 1;
-    __toSamplesIndex__["CC-Other"] = 2;
+    __toTopologyIndex__["CC-0pi"] = 0;
+    __toTopologyIndex__["CC-1pi"] = 1;
+    __toTopologyIndex__["CC-Other"] = 2;
 
     __toReactionIndex__["CCQE"] = 0;
     __toReactionIndex__["2p2h"] = 9;
@@ -592,10 +604,10 @@ void fillDictionaries(){
 void binSplines(){
 
     // Read splines
-    readGenWeightsFiles();
+    if(not __skipReadSplines__ and not __skipReadAndMergeSplines__) readGenWeightsFiles();
 
     // Merge splines
-    mergeSplines();
+    if(not __skipReadAndMergeSplines__) mergeSplines();
 
     // Process interpolation between kinematic bins
     processInterpolation();
@@ -616,147 +628,316 @@ void readGenWeightsFiles(){
 
     LogInfo << "Hooking Output Unbinned Splines TTree" << std::endl;
     for( auto & systName : __listSystematicXsecSplineNames__){
-        for(const auto& splitVarName : __listSplitVarNames__){
+        for( int iSplitVar = 0 ; iSplitVar < int(__listSplitVarNames__.size()) ; iSplitVar++ ){
             __mapOutSplineTTrees__[systName + "_Unbinned"]->Branch(
-                splitVarName.c_str(), &__splineBinHandler__.splitVarValue[splitVarName]
+                __splineBinHandler__.splitVarNameList[iSplitVar].c_str(), &__splineBinHandler__.splitVarValueList[iSplitVar]
             );
         }
         __mapOutSplineTTrees__[systName + "_Unbinned"]->Branch("D1Reco", &__splineBinHandler__.D1Reco);
         __mapOutSplineTTrees__[systName + "_Unbinned"]->Branch("D2Reco", &__splineBinHandler__.D2Reco);
         __mapOutSplineTTrees__[systName + "_Unbinned"]->Branch("kinematicBin", &__splineBinHandler__.kinematicBin);
         __mapOutSplineTTrees__[systName + "_Unbinned"]->Branch("graph", &__splineBinHandler__.graphHandler);
-        __mapOutSplineTTrees__[systName + "_Unbinned"]->Branch("spline", &__splineBinHandler__.splineHandler);
+        __mapOutSplineTTrees__[systName + "_Unbinned"]->Branch("spline", &__splineBinHandler__.splinePtr);
     }
 
     LogInfo << "Reading genWeights input files..." << std::endl;
     int nbGenWightsFiles = __listGenWeightsFiles__.size();
-    TEST__ = false;
-    for(int iFile = 0 ; iFile < nbGenWightsFiles; iFile++){
 
-        GenericToolbox::displayProgressBar(iFile, nbGenWightsFiles, LogWarning.getPrefixString()+"Reading genWeights files...");
-        LogAlert << "Opening genWeights file " << GenericToolbox::splitString(__listGenWeightsFiles__[iFile], "/").back();
-        LogAlert << " " << iFile+1 << "/" << int(__listGenWeightsFiles__.size()) << "..." << std::endl;
+    std::function<void(int)> readInputFilesFunction = [nbGenWightsFiles](int iThread_){
 
-        if( not GenericToolbox::doesTFileIsValid(__listGenWeightsFiles__[iFile]) ){
-            LogError << __listGenWeightsFiles__[iFile] << " can't be opened. Skipping..." << std::endl;
-            continue; // skip
-        }
+        bool isMultiThreaded = (iThread_ != -1);
+        TFile* genWeightsTFilePtr = nullptr;
+        TTree* sampleSumTTreePtr = nullptr;
+        TTree* flatTTreePtr = nullptr;
+        TTree* treeConverterRecoTTree    = (TTree*) __treeConverterTFile__->Get("selectedEvents");
+        SplineBin splineBinHandler;
 
-        // Closing the previously opened genWeights file
-        if(__currentGenWeightsTFile__ != nullptr){
-            __currentGenWeightsTFile__->Close();
-            delete __currentGenWeightsTFile__;
-            __currentSampleSumTTree__ = nullptr;
-            __currentFlatTree__ = nullptr;
-        }
-        __currentGenWeightsTFile__ = TFile::Open(__listGenWeightsFiles__[iFile].c_str(), "READ");
-        __currentSampleSumTTree__  = (TTree*)__currentGenWeightsTFile__->Get("sample_sum");
-        __currentFlatTree__        = (TTree*)__currentGenWeightsTFile__->Get("flattree");
+        for(int iFile = 0 ; iFile < nbGenWightsFiles; iFile++){
 
-        if(__currentSampleSumTTree__ == nullptr or __currentFlatTree__ == nullptr){
-            LogError << "Could not find needed TTrees: ";
-            LogError << "__currentFlatTree__=" << __currentFlatTree__;
-            LogError << "__currentFlatTree__=" << __currentFlatTree__ << std::endl;
-            LogError << "Skipping..." << std::endl;
-            continue;
-        }
-
-        if(not buildTreeSyncCache()) continue;
-
-        LogInfo << "Grabbing Splines Graphs..." << std::endl;
-        __currentSampleSumTTree__->GetEntry(0);
-        int nbOfSamples = __currentSampleSumTTree__->GetLeaf("NSamples")->GetValue(0);
-        std::map<std::string, TClonesArray*> clone_array_map;
-        GenericToolbox::muteRoot();
-        for( auto &syst_name : __listSystematicXsecSplineNames__ ){
-
-            clone_array_map[syst_name] = new TClonesArray("TGraph", nbOfSamples);
-
-            __currentSampleSumTTree__->SetBranchAddress(
-                Form("%sGraph", __mapXsecToGenWeights__[syst_name].c_str()),
-                &clone_array_map[syst_name]
-            );
-
-        }
-        GenericToolbox::unmuteRoot();
-
-        LogInfo << "Looping over all the genWeights entries..." << std::endl;
-        int nbGenWeightsEntries = __currentSampleSumTTree__->GetEntries();
-        int nbGraphsFound = 0;
-        for(int iGenWeightsEntry = 0 ; iGenWeightsEntry < nbGenWeightsEntries; iGenWeightsEntry++){
-
-            if(__currentGenWeightToTreeConvEntry__[iGenWeightsEntry] == -1){
+            if(isMultiThreaded and iFile% __nbThreads__ != iThread_){
                 continue;
             }
 
-            __currentSampleSumTTree__->GetEntry(iGenWeightsEntry);
-            __treeConverterRecoTTree__->GetEntry(__currentGenWeightToTreeConvEntry__[iGenWeightsEntry]);
+            GlobalVariables::getThreadMutex().lock();
+            GenericToolbox::displayProgressBar(iFile, nbGenWightsFiles, LogWarning.getPrefixString()+"Reading genWeights files...");
+            LogAlert << "Opening genWeights file " << GenericToolbox::splitString(__listGenWeightsFiles__.at(iFile), "/").back();
+            LogAlert << " " << iFile+1 << "/" << int(__listGenWeightsFiles__.size()) << "..." << std::endl;
 
-            fillSplineBin(__splineBinHandler__, __treeConverterRecoTTree__);
+            if( not GenericToolbox::doesTFileIsValid(__listGenWeightsFiles__.at(iFile)) ){
+                LogError << __listGenWeightsFiles__.at(iFile) << " can't be opened. Skipping..." << std::endl;
+                continue; // skip
+            }
+            GlobalVariables::getThreadMutex().unlock();
 
-            if(__splineBinHandler__.kinematicBin == -1) continue;
+            // Closing the previously opened genWeights file
+            if(genWeightsTFilePtr != nullptr){
+                genWeightsTFilePtr->Close();
+                delete genWeightsTFilePtr;
+                sampleSumTTreePtr = nullptr;
+                flatTTreePtr = nullptr;
+            }
+            genWeightsTFilePtr = TFile::Open(__listGenWeightsFiles__.at(iFile).c_str(), "READ");
+            sampleSumTTreePtr  = (TTree*) genWeightsTFilePtr->Get("sample_sum");
+            flatTTreePtr       = (TTree*) genWeightsTFilePtr->Get("flattree"); // BUGGY LINE IN MULTI THREAD... -> strange segfault
 
-            for( auto & systName : __listSystematicXsecSplineNames__){
 
-                for(int iSample = 0 ; iSample < nbOfSamples ; iSample++ ){
-
-                    if(iSample >= clone_array_map[systName]->GetSize() ) continue;
-
-                    auto* newGraph = (TGraph*)(clone_array_map[systName]->At(iSample));
-
-                    if( clone_array_map[systName]->At(iSample) != nullptr
-                        and newGraph->GetN() > 1
-                        ){
-
-                        bool splines_are_non_zeroed = false;
-                        for(int i_point = 0 ; i_point < newGraph->GetN() ; i_point++){
-                            if(newGraph->GetY()[i_point] != 0){
-                                splines_are_non_zeroed = true;
-                                break;
-                            }
-                        }
-                        if(not splines_are_non_zeroed)
-                            continue;
-
-                        std::string binName = "graph_";
-                        for(const auto& splitVarName : __listSplitVarNames__){
-                            binName += Form("%s_%i_", splitVarName.c_str(),
-                                            __splineBinHandler__.splitVarValue[splitVarName]
-                                            );
-                        }
-                        binName += Form("%i", __splineBinHandler__.kinematicBin);
-
-                        newGraph->SetName(binName.c_str());
-                        newGraph->SetTitle(binName.c_str());
-                        newGraph->SetMarkerStyle(kFullDotLarge);
-                        newGraph->SetMarkerSize(1);
-                        nbGraphsFound++;
-
-                        __splineBinHandler__.graphHandler = (TGraph*)newGraph->Clone();
-                        __splineBinHandler__.splineHandler = new TSpline3(
-                            __splineBinHandler__.graphHandler->GetName(), __splineBinHandler__.graphHandler );
-
-                        __mapOutSplineTTrees__[systName + "_Unbinned"]->Fill();
-
-                    }
-                }
-
+            if(sampleSumTTreePtr == nullptr or flatTTreePtr == nullptr){
+                LogError << "Could not find needed TTrees: ";
+                LogError << "flatTTreePtr=" << flatTTreePtr;
+                LogError << "sampleSumTTreePtr=" << sampleSumTTreePtr << std::endl;
+                LogError << "Skipping..." << std::endl;
+                continue;
             }
 
-        } // i_entry
 
-        LogInfo << "Freeing up memory..." << std::endl;
-        LogDebug << "RAM used before: " << GenericToolbox::parseSizeUnits(GenericToolbox::getProcessMemoryUsage()) << std::endl;
-        for( auto &syst_name : __listSystematicXsecSplineNames__){
-            delete clone_array_map[syst_name];
+            GlobalVariables::getThreadMutex().lock();
+            __currentSampleSumTTree__ = sampleSumTTreePtr;
+            __currentFlatTree__ = flatTTreePtr;
+            if(not buildTreeSyncCache()){
+                GlobalVariables::getThreadMutex().unlock();
+                continue;
+            }
+            auto currentGenWeightToTreeConvEntry = __currentGenWeightToTreeConvEntry__; // copy
+            GlobalVariables::getThreadMutex().unlock();
+
+            LogInfo << "Grabbing Splines Graphs..." << std::endl;
+            sampleSumTTreePtr->GetEntry(0);
+            int nbOfSamples = sampleSumTTreePtr->GetLeaf("NSamples")->GetValue(0);
+            std::map<std::string, TClonesArray*> clone_array_map;
+            GenericToolbox::muteRoot();
+            for( auto &syst_name : __listSystematicXsecSplineNames__ ){
+
+                clone_array_map[syst_name] = new TClonesArray("TGraph", nbOfSamples);
+
+                sampleSumTTreePtr->SetBranchAddress(
+                    Form("%sGraph", __mapXsecToGenWeights__[syst_name].c_str()),
+                    &clone_array_map[syst_name]
+                );
+
+            }
+            GenericToolbox::unmuteRoot();
+
+
+
+            LogInfo << "Looping over all the genWeights entries..." << std::endl;
+            int nbGenWeightsEntries = sampleSumTTreePtr->GetEntries();
+            int nbGraphsFound = 0;
+            for(int iGenWeightsEntry = 0 ; iGenWeightsEntry < nbGenWeightsEntries; iGenWeightsEntry++){
+
+                if(currentGenWeightToTreeConvEntry[iGenWeightsEntry] == -1){
+                    continue;
+                }
+
+                sampleSumTTreePtr->GetEntry(iGenWeightsEntry);
+                treeConverterRecoTTree->GetEntry(currentGenWeightToTreeConvEntry[iGenWeightsEntry]);
+
+                GlobalVariables::getThreadMutex().lock();
+                fillSplineBin(__splineBinHandler__, treeConverterRecoTTree);
+
+                if(__splineBinHandler__.kinematicBin == -1){
+                    GlobalVariables::getThreadMutex().unlock();
+                    continue;
+                }
+
+                for( auto & systName : __listSystematicXsecSplineNames__){
+
+                    for(int iSample = 0 ; iSample < nbOfSamples ; iSample++ ){
+
+                        if(iSample >= clone_array_map[systName]->GetSize() ) continue;
+
+                        auto* newGraph = (TGraph*)(clone_array_map[systName]->At(iSample));
+
+                        if( clone_array_map[systName]->At(iSample) != nullptr
+                            and newGraph->GetN() > 1
+                            ){
+
+                            bool splines_are_non_zeroed = false;
+                            for(int i_point = 0 ; i_point < newGraph->GetN() ; i_point++){
+                                if(newGraph->GetY()[i_point] != 0){
+                                    splines_are_non_zeroed = true;
+                                    break;
+                                }
+                            }
+                            if(not splines_are_non_zeroed)
+                                continue;
+
+                            std::string binName = "graph_";
+                            binName += __splineBinHandler__.generateBinName();
+
+                            newGraph->SetName(binName.c_str());
+                            newGraph->SetTitle(binName.c_str());
+                            newGraph->SetMarkerStyle(kFullDotLarge);
+                            newGraph->SetMarkerSize(1);
+                            nbGraphsFound++;
+
+                            __splineBinHandler__.graphHandler = (TGraph*)newGraph->Clone();
+                            __splineBinHandler__.splinePtr
+                                = new TSpline3(
+                                __splineBinHandler__.graphHandler->GetName(), __splineBinHandler__.graphHandler );
+
+                            __mapOutSplineTTrees__[systName + "_Unbinned"]->Fill();
+
+                        }
+                    }
+
+                }
+                GlobalVariables::getThreadMutex().unlock();
+
+            } // i_entry
+
+            LogInfo << "Freeing up memory..." << std::endl;
+            LogDebug << "RAM used before: " << GenericToolbox::parseSizeUnits(GenericToolbox::getProcessMemoryUsage()) << std::endl;
+            for( auto &syst_name : __listSystematicXsecSplineNames__){
+                delete clone_array_map[syst_name];
+            }
+            LogDebug << "RAM used after: " << GenericToolbox::parseSizeUnits(GenericToolbox::getProcessMemoryUsage()) << std::endl;
+
+            LogInfo.quietLineJump();
+
         }
-        LogDebug << "RAM used after: " << GenericToolbox::parseSizeUnits(GenericToolbox::getProcessMemoryUsage()) << std::endl;
+    };
 
-        LogInfo.quietLineJump();
 
-        TEST__ = true;
+    if(__nbThreads__ > 1){
+        std::vector<std::future<void>> threadsList;
+        for( int iThread = 0 ; iThread < __nbThreads__; iThread++ ){
+            threadsList.emplace_back(
+                std::async( std::launch::async, std::bind(readInputFilesFunction, iThread) )
+            );
+        }
 
+        std::string progressBarPrefix = LogWarning.getPrefixString() + "Reading events...";
+        for( int iThread = 0 ; iThread < __nbThreads__; iThread++ ){
+            while(threadsList[iThread].wait_for(std::chrono::milliseconds(33)) != std::future_status::ready){
+//                GenericToolbox::displayProgressBar(*counterPtr, totalNbEventsToLoad, progressBarPrefix);
+            }
+            threadsList[iThread].get();
+        }
     }
+    else{
+        readInputFilesFunction(-1);
+    }
+
+//    for(int iFile = 0 ; iFile < nbGenWightsFiles; iFile++){
+//
+//        GenericToolbox::displayProgressBar(iFile, nbGenWightsFiles, LogWarning.getPrefixString()+"Reading genWeights files...");
+//        LogAlert << "Opening genWeights file " << GenericToolbox::splitString(__listGenWeightsFiles__[iFile], "/").back();
+//        LogAlert << " " << iFile+1 << "/" << int(__listGenWeightsFiles__.size()) << "..." << std::endl;
+//
+//        if( not GenericToolbox::doesTFileIsValid(__listGenWeightsFiles__[iFile]) ){
+//            LogError << __listGenWeightsFiles__[iFile] << " can't be opened. Skipping..." << std::endl;
+//            continue; // skip
+//        }
+//
+//        // Closing the previously opened genWeights file
+//        if(__currentGenWeightsTFile__ != nullptr){
+//            __currentGenWeightsTFile__->Close();
+//            delete __currentGenWeightsTFile__;
+//            __currentSampleSumTTree__ = nullptr;
+//            __currentFlatTree__ = nullptr;
+//        }
+//        __currentGenWeightsTFile__ = TFile::Open(__listGenWeightsFiles__[iFile].c_str(), "READ");
+//        __currentSampleSumTTree__  = (TTree*)__currentGenWeightsTFile__->Get("sample_sum");
+//        __currentFlatTree__        = (TTree*)__currentGenWeightsTFile__->Get("flattree");
+//
+//        if(__currentSampleSumTTree__ == nullptr or __currentFlatTree__ == nullptr){
+//            LogError << "Could not find needed TTrees: ";
+//            LogError << "__currentFlatTree__=" << __currentFlatTree__;
+//            LogError << "__currentFlatTree__=" << __currentFlatTree__ << std::endl;
+//            LogError << "Skipping..." << std::endl;
+//            continue;
+//        }
+//
+//        if(not buildTreeSyncCache()) continue;
+//
+//        LogInfo << "Grabbing Splines Graphs..." << std::endl;
+//        __currentSampleSumTTree__->GetEntry(0);
+//        int nbOfSamples = __currentSampleSumTTree__->GetLeaf("NSamples")->GetValue(0);
+//        std::map<std::string, TClonesArray*> clone_array_map;
+//        GenericToolbox::muteRoot();
+//        for( auto &syst_name : __listSystematicXsecSplineNames__ ){
+//
+//            clone_array_map[syst_name] = new TClonesArray("TGraph", nbOfSamples);
+//
+//            __currentSampleSumTTree__->SetBranchAddress(
+//                Form("%sGraph", __mapXsecToGenWeights__[syst_name].c_str()),
+//                &clone_array_map[syst_name]
+//            );
+//
+//        }
+//        GenericToolbox::unmuteRoot();
+//
+//        LogInfo << "Looping over all the genWeights entries..." << std::endl;
+//        int nbGenWeightsEntries = __currentSampleSumTTree__->GetEntries();
+//        int nbGraphsFound = 0;
+//        for(int iGenWeightsEntry = 0 ; iGenWeightsEntry < nbGenWeightsEntries; iGenWeightsEntry++){
+//
+//            if(__currentGenWeightToTreeConvEntry__[iGenWeightsEntry] == -1){
+//                continue;
+//            }
+//
+//            __currentSampleSumTTree__->GetEntry(iGenWeightsEntry);
+//            __treeConverterRecoTTree__->GetEntry(__currentGenWeightToTreeConvEntry__[iGenWeightsEntry]);
+//
+//            fillSplineBin(__splineBinHandler__, __treeConverterRecoTTree__);
+//
+//            if(__splineBinHandler__.kinematicBin == -1) continue;
+//
+//            for( auto & systName : __listSystematicXsecSplineNames__){
+//
+//                for(int iSample = 0 ; iSample < nbOfSamples ; iSample++ ){
+//
+//                    if(iSample >= clone_array_map[systName]->GetSize() ) continue;
+//
+//                    auto* newGraph = (TGraph*)(clone_array_map[systName]->At(iSample));
+//
+//                    if( clone_array_map[systName]->At(iSample) != nullptr
+//                        and newGraph->GetN() > 1
+//                        ){
+//
+//                        bool splines_are_non_zeroed = false;
+//                        for(int i_point = 0 ; i_point < newGraph->GetN() ; i_point++){
+//                            if(newGraph->GetY()[i_point] != 0){
+//                                splines_are_non_zeroed = true;
+//                                break;
+//                            }
+//                        }
+//                        if(not splines_are_non_zeroed)
+//                            continue;
+//
+//                        std::string binName = "graph_";
+//                        binName += __splineBinHandler__.generateBinName();
+//
+//                        newGraph->SetName(binName.c_str());
+//                        newGraph->SetTitle(binName.c_str());
+//                        newGraph->SetMarkerStyle(kFullDotLarge);
+//                        newGraph->SetMarkerSize(1);
+//                        nbGraphsFound++;
+//
+//                        __splineBinHandler__.graphHandler = (TGraph*)newGraph->Clone();
+//                        __splineBinHandler__.splinePtr
+//                            = new TSpline3(
+//                            __splineBinHandler__.graphHandler->GetName(), __splineBinHandler__.graphHandler );
+//
+//                        __mapOutSplineTTrees__[systName + "_Unbinned"]->Fill();
+//
+//                    }
+//                }
+//
+//            }
+//
+//        } // i_entry
+//
+//        LogInfo << "Freeing up memory..." << std::endl;
+//        LogDebug << "RAM used before: " << GenericToolbox::parseSizeUnits(GenericToolbox::getProcessMemoryUsage()) << std::endl;
+//        for( auto &syst_name : __listSystematicXsecSplineNames__){
+//            delete clone_array_map[syst_name];
+//        }
+//        LogDebug << "RAM used after: " << GenericToolbox::parseSizeUnits(GenericToolbox::getProcessMemoryUsage()) << std::endl;
+//
+//        LogInfo.quietLineJump();
+//
+//    }
 
     LogInfo << "Writing Unbinned Splines TTrees..." << std::endl;
     for( auto &syst_name : __listSystematicXsecSplineNames__){
@@ -773,64 +954,96 @@ void mergeSplines(){
 
     LogWarning << "Averaging splines in bins..." << std::endl;
 
+    // Holders
+    std::vector<SplineBin> processedBins;
+    std::vector<std::vector<TGraph*>> graphsListHolder;
+    TTree* unbinnedSplinesTreeBuf = nullptr;
+    SplineBin currentEntryBin;
+    for(int iSplitVar = 0 ; iSplitVar < int(__listSplitVarNames__.size()) ; iSplitVar++){
+        currentEntryBin.addSplitVar(__listSplitVarNames__[iSplitVar], -1);
+    }
+
+    GenericToolbox::getProcessMemoryUsageDiffSinceLastCall(); // init
     int nbXsecSplines = __listSystematicXsecSplineNames__.size();
     for( int iXsec = 0 ; iXsec < nbXsecSplines ; iXsec++ ){
 
         std::string xsecSplineName = __listSystematicXsecSplineNames__[iXsec];
 
-        GenericToolbox::displayProgressBar(
-            iXsec, nbXsecSplines,
-            LogInfo.getPrefixString() + " > Averaging splines: " + xsecSplineName );
-
         // Holders
-        std::vector<SplineBin> processedBins;
-        std::vector<std::vector<TGraph*>> graphsHolder;
-        TGraph* graphBuffer = nullptr;
-        SplineBin currentEntryBin;
+        processedBins.clear();
+        graphsListHolder.clear();
+        currentEntryBin.reset();
 
         __mapOutSplineTFiles__[xsecSplineName] = TFile::Open(
             Form("%s_splines.root", xsecSplineName.c_str()),
             "READ"
         );
-        __mapOutSplineTTrees__[xsecSplineName + "_Unbinned"] = (TTree*) __mapOutSplineTFiles__[xsecSplineName]->Get("UnbinnedSplines");
-        int nbEntries = __mapOutSplineTTrees__[xsecSplineName + "_Unbinned"]->GetEntries();
+        unbinnedSplinesTreeBuf = (TTree*) __mapOutSplineTFiles__[xsecSplineName]->Get("UnbinnedSplines");
+        int nbEntries = unbinnedSplinesTreeBuf->GetEntries();
+
+        LogInfo << "Gathering " << xsecSplineName << " splines. (" << nbEntries << " graphs)" << std::endl;
 
         // Hooking the spline bin the TTree
-        __mapOutSplineTTrees__[xsecSplineName + "_Unbinned"]->SetBranchAddress("kinematicBin", &currentEntryBin.kinematicBin);
-        for( auto& splitVarName: __listSplitVarNames__ ){
-            __mapOutSplineTTrees__[xsecSplineName + "_Unbinned"]->SetBranchAddress(splitVarName.c_str(), &currentEntryBin.splitVarValue[splitVarName] );
+        unbinnedSplinesTreeBuf->SetBranchAddress("kinematicBin", &currentEntryBin.kinematicBin);
+        for(int iSplitVar = 0 ; iSplitVar < int(__listSplitVarNames__.size()) ; iSplitVar++){
+            unbinnedSplinesTreeBuf->SetBranchAddress(
+                currentEntryBin.splitVarNameList[iSplitVar].c_str(),
+                &currentEntryBin.splitVarValueList[iSplitVar]
+                );
         }
-        __mapOutSplineTTrees__[xsecSplineName + "_Unbinned"]->SetBranchAddress("graph", &graphBuffer);
+        unbinnedSplinesTreeBuf->SetBranchAddress("graph", &currentEntryBin.graphHandler);
 
         // Reading the tree
+        std::string progressTitle = LogWarning.getPrefixString() + "Gathering " + xsecSplineName + " splines";
         for( int iSplineEntry = 0 ; iSplineEntry < nbEntries ; iSplineEntry++ ){
 
-            __mapOutSplineTTrees__[xsecSplineName + "_Unbinned"]->GetEntry(iSplineEntry);
+            GenericToolbox::displayProgressBar(iSplineEntry, nbEntries, progressTitle);
 
-            if(currentEntryBin.kinematicBin < 0) continue;
-            if(currentEntryBin.kinematicBin >= __listKinematicBins__.size()) continue;
+            unbinnedSplinesTreeBuf->GetEntry(iSplineEntry);
 
-            bool binAlreadyProcessed = false;
-            for(const auto& processedBin : processedBins){
-                if(currentEntryBin == processedBin){
-                    binAlreadyProcessed = true;
+            // Fast skip
+            if(   currentEntryBin.kinematicBin <  0
+               or currentEntryBin.kinematicBin >= __listKinematicBins__.size()) continue;
+
+            int index = -1;
+            std::string currentBinName = currentEntryBin.generateBinName();
+            for(size_t iProcessedBin = 0 ; iProcessedBin < processedBins.size() ; iProcessedBin++){
+                if(processedBins[iProcessedBin].generateBinName() == currentBinName){
+                    index = iProcessedBin;
                     break;
                 }
             }
 
-            if(not binAlreadyProcessed){
-                processedBins.emplace_back(currentEntryBin);
-                graphsHolder.emplace_back(std::vector<TGraph*>());
-
-                // Gathering splines which have the same properties as processedBins.back()
-                for(int jSplineEntry = iSplineEntry ; jSplineEntry < nbEntries ; jSplineEntry++ ){
-                    __mapOutSplineTTrees__[xsecSplineName + "_Unbinned"]->GetEntry(jSplineEntry);
-
-                    if(currentEntryBin == processedBins.back()){
-                        graphsHolder.back().emplace_back(graphBuffer);
-                    }
-                }
+            if(index == -1){ // NEW BIN
+                processedBins.emplace_back(currentEntryBin); // copied
+                graphsListHolder.emplace_back(std::vector<TGraph*>());
+                index = graphsListHolder.size()-1;
             }
+
+            graphsListHolder[index].emplace_back((TGraph*) currentEntryBin.graphHandler->Clone()); // add the graph to the current bin
+            graphsListHolder[index].back()->SetTitle(
+                Form("%s_%i", currentBinName.c_str()
+                     , int(graphsListHolder[index].size())));
+            graphsListHolder[index].back()->SetName(
+                Form("%s_%i", currentBinName.c_str()
+                    , int(graphsListHolder[index].size())));
+
+            // CHECK IF FLAT
+//            double Ycheck = -1;
+//            for(int i_pt = 0 ; i_pt < currentEntryBin.graphHandler->GetN() ; i_pt++){
+//
+//                if(Ycheck == -1){
+//                    Ycheck = currentEntryBin.graphHandler->GetY()[i_pt];
+//                }
+//                else if(Ycheck != currentEntryBin.graphHandler->GetY()[i_pt]){
+//                    break;
+//                }
+//                else if(i_pt+1 == currentEntryBin.graphHandler->GetN()){
+//                    LogAlert << xsecSplineName << ": " << currentEntryBin.generateBinName() << " is FLAT." << std::endl;
+//                }
+//
+//            }
+
 
         } // iSplineEntry
 
@@ -840,13 +1053,14 @@ void mergeSplines(){
         }
 
         // Merging splines
+        LogInfo << "Now merging splines (" << processedBins.size() << " bins to process)" << std::endl;
         for( int iBin = 0 ; iBin < int(processedBins.size()) ; iBin++ ){
 
             std::vector<double> X;
             std::vector<double> Y;
 
             // look for all sampled X points
-            for( const auto &graph : graphsHolder[iBin] ){
+            for( const auto &graph : graphsListHolder[iBin] ){
                 for( int i_pt = 0 ; i_pt < graph->GetN() ; i_pt++ ){
                     if(not GenericToolbox::doesElementIsInVector( graph->GetX()[i_pt], X )){
                         X.emplace_back(graph->GetX()[i_pt]);
@@ -859,7 +1073,7 @@ void mergeSplines(){
 
                 Y.emplace_back(0);
                 int nbSamples = 0; // count how many time iX has been measured
-                for(auto &graph : graphsHolder[iBin]){
+                for(auto &graph : graphsListHolder[iBin]){
                     for(int i_pt = 0 ; i_pt < graph->GetN() ; i_pt++){
                         if(graph->GetX()[i_pt] == X[iX]){
                             Y.back() += graph->GetY()[i_pt];
@@ -875,21 +1089,28 @@ void mergeSplines(){
             }
 
             processedBins[iBin].graphHandler  = new TGraph( X.size(), &X[0], &Y[0] );
-            processedBins[iBin].splineHandler = new TSpline3( processedBins[iBin].getBinName().c_str(), graphBuffer );
+            processedBins[iBin].splinePtr
+                = new TSpline3(processedBins[iBin].generateBinName().c_str(), processedBins[iBin].graphHandler );
 
         } // iBin
 
-        auto aGoesFirst = [](const SplineBin& a, const SplineBin& b){
-            for(auto & iVar : __listSplitVarNames__){
-                if(a.splitVarValue.at(iVar) != b.splitVarValue.at(iVar)){
-                    return a.splitVarValue.at(iVar) < b.splitVarValue.at(iVar);
+        // Sort
+        LogInfo << "Sorting bins by name" << std::endl;
+        std::function<bool(SplineBin, SplineBin)> aGoesFirst = [](const SplineBin& a, const SplineBin& b){
+            for(int iSplitVar = 0 ; iSplitVar < int(__listSplitVarNames__.size()) ; iSplitVar++){
+                if(a.splitVarValueList[iSplitVar] != b.splitVarValueList[iSplitVar]){
+                    return a.splitVarValueList[iSplitVar] < b.splitVarValueList[iSplitVar];
                 }
             }
             if( a.kinematicBin != b.kinematicBin ) return a.kinematicBin < b.kinematicBin;
             return false; // arbitrary
         };
-        std::sort(processedBins.begin(), processedBins.end(), aGoesFirst);
+//        std::sort(processedBins.begin(), processedBins.end(), aGoesFirst);
+        auto p = GenericToolbox::getSortPermutation(processedBins, aGoesFirst);
+        processedBins    = GenericToolbox::applyPermutation(processedBins, p);
+        graphsListHolder = GenericToolbox::applyPermutation(graphsListHolder, p);
 
+        // Reopening
         __mapOutSplineTFiles__[xsecSplineName]->Close();
         delete __mapOutSplineTFiles__[xsecSplineName];
         __mapOutSplineTFiles__[xsecSplineName] = TFile::Open(
@@ -898,26 +1119,65 @@ void mergeSplines(){
         );
         __mapOutSplineTTrees__[xsecSplineName + "_Binned"] = new TTree("BinnedSplines", "BinnedSplines");
 
+        TDirectory* unbinnedSplinesDirectory = GenericToolbox::mkdirTFile(__mapOutSplineTFiles__[xsecSplineName], "UnbinnedSplinesPlots");
+
+        for( int iBin = 0 ; iBin < int(processedBins.size()) ; iBin++ ){
+            unbinnedSplinesDirectory->cd();
+            std::string binName = processedBins[iBin].generateBinName();
+            GenericToolbox::mkdirTFile(unbinnedSplinesDirectory, binName)->cd();
+            for( size_t iEntry = 0 ; iEntry < graphsListHolder[iBin].size() ; iEntry++ ){
+
+                bool isFlat = false;
+
+                // CHECK IF FLAT
+                double Ycheck = -1;
+                for(int i_pt = 0 ; i_pt < graphsListHolder[iBin][iEntry]->GetN() ; i_pt++){
+
+                    if(Ycheck == -1){
+                        Ycheck = graphsListHolder[iBin][iEntry]->GetY()[i_pt];
+                    }
+                    else if(Ycheck != graphsListHolder[iBin][iEntry]->GetY()[i_pt]){
+                        break;
+                    }
+                    else if(i_pt+1 == graphsListHolder[iBin][iEntry]->GetN()){
+//                        LogAlert << xsecSplineName << ": " << currentEntryBin.generateBinName() << " is FLAT." << std::endl;
+                        isFlat = true;
+                    }
+
+                }
+
+                if(not isFlat){
+                    graphsListHolder[iBin][iEntry]->Write(Form("%i_Graph", int(iEntry)));
+                }
+                else{
+                    graphsListHolder[iBin][iEntry]->Write(Form("%i_FLAT_Graph", int(iEntry)));
+                }
+            }
+        }
+
+
+        TDirectory* binnedSplinesDirectory = GenericToolbox::mkdirTFile(__mapOutSplineTFiles__[xsecSplineName], "BinnedSplinesPlots");
+        binnedSplinesDirectory->cd();
+
         // Hooking the spline bin the TTree
-        for( auto& splitVarName: __listSplitVarNames__ ){
-            __mapOutSplineTTrees__[xsecSplineName + "_Binned"]->Branch( splitVarName.c_str(), &currentEntryBin.splitVarValue[splitVarName] );
+        for(int iSplitVar = 0 ; iSplitVar < int(__listSplitVarNames__.size()) ; iSplitVar++){
+            __mapOutSplineTTrees__[xsecSplineName + "_Binned"]->Branch(
+                currentEntryBin.splitVarNameList[iSplitVar].c_str(),
+                &currentEntryBin.splitVarValueList[iSplitVar] );
         }
         __mapOutSplineTTrees__[xsecSplineName + "_Binned"]->Branch("kinematicBin", &currentEntryBin.kinematicBin);
         __mapOutSplineTTrees__[xsecSplineName + "_Binned"]->Branch("graph",  &currentEntryBin.graphHandler  );
-        __mapOutSplineTTrees__[xsecSplineName + "_Binned"]->Branch("spline", &currentEntryBin.splineHandler );
+        __mapOutSplineTTrees__[xsecSplineName + "_Binned"]->Branch("spline", &currentEntryBin.splinePtr);
 
         for( int iBin = 0 ; iBin < int(processedBins.size()) ; iBin++ ){
 
-            currentEntryBin.kinematicBin = processedBins[iBin].kinematicBin;
-            currentEntryBin.graphHandler = processedBins[iBin].graphHandler;
-            currentEntryBin.splineHandler = processedBins[iBin].splineHandler;
-            for( auto& splitVarValuePair: currentEntryBin.splitVarValue ){
-                splitVarValuePair.second = processedBins[iBin].splitVarValue[splitVarValuePair.first];
-            }
+            currentEntryBin = processedBins[iBin];
             __mapOutSplineTTrees__[xsecSplineName + "_Binned"]->Fill();
+            currentEntryBin.graphHandler->Write((currentEntryBin.generateBinName() + "_TGraph").c_str());
 
         } // iBin
 
+        __mapOutSplineTFiles__[xsecSplineName]->cd();
         __mapOutSplineTFiles__[xsecSplineName]->WriteObject(__mapOutSplineTTrees__[xsecSplineName+"_Binned"], "BinnedSplines");
         __mapOutSplineTFiles__[xsecSplineName]->Close();
         delete __mapOutSplineTFiles__[xsecSplineName];
@@ -927,9 +1187,13 @@ void mergeSplines(){
         for( int iBin = 0 ; iBin < int(processedBins.size()) ; iBin++ ){
 
             delete processedBins[iBin].graphHandler;
-            delete processedBins[iBin].splineHandler;
+            delete processedBins[iBin].splinePtr;
 
         }
+
+        LogDebug << "RAM loss after " << xsecSplineName
+                 << GenericToolbox::parseSizeUnits(GenericToolbox::getProcessMemoryUsageDiffSinceLastCall())
+                 << std::endl;
 
     } // Xsec
 
@@ -957,6 +1221,9 @@ void processInterpolation(){
         TGraph* graphBuffer = nullptr;
         TSpline3* splineBuffer = nullptr;
         SplineBin currentEntryBin;
+        for(int iSplitVar = 0 ; iSplitVar < int(__listSplitVarNames__.size()) ; iSplitVar++){
+            currentEntryBin.addSplitVar(__listSplitVarNames__[iSplitVar], -1);
+        }
         SplineBin lastEntryBin; lastEntryBin.reset();
 
         __mapOutSplineTFiles__[xsecSplineName] = TFile::Open(
@@ -975,11 +1242,14 @@ void processInterpolation(){
 
         // Hooking the spline bin the TTree
         __mapOutSplineTTrees__[xsecSplineName + "_Binned"]->SetBranchAddress("kinematicBin", &currentEntryBin.kinematicBin);
-        for( auto& splitVarName: __listSplitVarNames__ ){
-            __mapOutSplineTTrees__[xsecSplineName + "_Binned"]->SetBranchAddress(splitVarName.c_str(), &currentEntryBin.splitVarValue[splitVarName] );
+        for(int iSplitVar = 0 ; iSplitVar < int(__listSplitVarNames__.size()) ; iSplitVar++){
+            __mapOutSplineTTrees__[xsecSplineName + "_Binned"]->SetBranchAddress(
+                currentEntryBin.splitVarNameList[iSplitVar].c_str(),
+                &currentEntryBin.splitVarValueList[iSplitVar]
+                );
         }
         __mapOutSplineTTrees__[xsecSplineName + "_Binned"]->SetBranchAddress("graph", &currentEntryBin.graphHandler);
-        __mapOutSplineTTrees__[xsecSplineName + "_Binned"]->SetBranchAddress("spline", &currentEntryBin.splineHandler);
+        __mapOutSplineTTrees__[xsecSplineName + "_Binned"]->SetBranchAddress("spline", &currentEntryBin.splinePtr);
 
         // Reading the tree
         std::string splitBinName;
@@ -988,7 +1258,7 @@ void processInterpolation(){
             __mapOutSplineTTrees__[xsecSplineName + "_Binned"]->GetEntry(iSplineEntry);
             splitBinName = "";
             splitBinName = GenericToolbox::joinVectorString(
-                GenericToolbox::splitString(currentEntryBin.splineHandler->GetTitle(), "_"),
+                GenericToolbox::splitString(currentEntryBin.splinePtr->GetTitle(), "_"),
                 "_", 0, -2);
 
             splittedBinsMap[splitBinName].emplace_back(currentEntryBin);
@@ -1049,24 +1319,24 @@ void processInterpolation(){
         __mapOutSplineTTrees__[xsecSplineName + "_InterpolatedBinned"] = new TTree("InterpolatedBinnedSplines", "InterpolatedBinnedSplines");
 
         // Hooking the spline bin the TTree
+        for(int iSplitVar = 0 ; iSplitVar < int(__listSplitVarNames__.size()) ; iSplitVar++){
+            __mapOutSplineTTrees__[xsecSplineName + "_InterpolatedBinned"]->Branch(
+                currentEntryBin.splitVarNameList[iSplitVar].c_str(),
+                &currentEntryBin.splitVarValueList[iSplitVar] );
+        }
         for( auto& splitVarName: __listSplitVarNames__ ){
-            __mapOutSplineTTrees__[xsecSplineName + "_InterpolatedBinned"]->Branch( splitVarName.c_str(), &currentEntryBin.splitVarValue[splitVarName] );
+
         }
         __mapOutSplineTTrees__[xsecSplineName + "_InterpolatedBinned"]->Branch("kinematicBin", &currentEntryBin.kinematicBin);
         __mapOutSplineTTrees__[xsecSplineName + "_InterpolatedBinned"]->Branch("graph",  &currentEntryBin.graphHandler  );
-        __mapOutSplineTTrees__[xsecSplineName + "_InterpolatedBinned"]->Branch("spline", &currentEntryBin.splineHandler );
+        __mapOutSplineTTrees__[xsecSplineName + "_InterpolatedBinned"]->Branch("spline", &currentEntryBin.splinePtr);
 
         // Writing
         for( auto& splittedBinPair : splittedBinsMap ){
 
             for( int iBin = 0 ; iBin < int(splittedBinPair.second.size()) ; iBin++ ){
 
-                currentEntryBin.kinematicBin = splittedBinPair.second[iBin].kinematicBin;
-                currentEntryBin.graphHandler = splittedBinPair.second[iBin].graphHandler;
-                currentEntryBin.splineHandler = splittedBinPair.second[iBin].splineHandler;
-                for( auto& splitVarValuePair: currentEntryBin.splitVarValue ){
-                    splitVarValuePair.second = splittedBinPair.second[iBin].splitVarValue[splitVarValuePair.first];
-                }
+                currentEntryBin = splittedBinPair.second[iBin];
 
                 std::string title = splittedBinPair.first;
                 title += "_" + std::to_string(splittedBinPair.second[iBin].kinematicBin);
@@ -1078,8 +1348,8 @@ void processInterpolation(){
 
                 currentEntryBin.graphHandler->SetTitle(title.c_str());
                 currentEntryBin.graphHandler->SetName(title.c_str());
-                currentEntryBin.splineHandler->SetTitle(title.c_str());
-                currentEntryBin.splineHandler->SetName(title.c_str());
+                currentEntryBin.splinePtr->SetTitle(title.c_str());
+                currentEntryBin.splinePtr->SetName(title.c_str());
                 __mapOutSplineTTrees__[xsecSplineName + "_InterpolatedBinned"]->Fill();
 
             } // iBin
@@ -1105,9 +1375,9 @@ void processInterpolation(){
                     delete splittedBinPair.second[iBin].graphHandler;
                 }
 
-                if(not GenericToolbox::doesElementIsInVector(splittedBinPair.second[iBin].splineHandler, deletedSplines)){
-                    deletedSplines.emplace_back(splittedBinPair.second[iBin].splineHandler);
-                    delete splittedBinPair.second[iBin].splineHandler;
+                if(not GenericToolbox::doesElementIsInVector(splittedBinPair.second[iBin].splinePtr, deletedSplines)){
+                    deletedSplines.emplace_back(splittedBinPair.second[iBin].splinePtr);
+                    delete splittedBinPair.second[iBin].splinePtr;
                 }
 
 
@@ -1234,8 +1504,8 @@ void fillSplineBin(SplineBin& splineBin_, TTree* tree_){
     splineBin_.D1Reco = tree_->GetLeaf("D1Reco")->GetValue(0);
     splineBin_.D2Reco = tree_->GetLeaf("D2Reco")->GetValue(0);
 
-    for(const auto& splitVarName : __listSplitVarNames__){
-        splineBin_.splitVarValue[splitVarName] = tree_->GetLeaf(splitVarName.c_str())->GetValue(0);
+    for(int iSplitVar = 0 ; iSplitVar < int(__listSplitVarNames__.size()) ; iSplitVar++){
+        splineBin_.splitVarValueList[iSplitVar] = tree_->GetLeaf(splineBin_.splitVarNameList[iSplitVar].c_str())->GetValue(0);
     }
 
     splineBin_.kinematicBin = -1;
@@ -1269,11 +1539,11 @@ void generateJsonConfigFile(){
         exit(EXIT_FAILURE);
     }
 
-    TObjArray* xsec_param_names = dynamic_cast<TObjArray *>(covariance_matrix_tfile->Get("xsec_param_names"));
-    TVectorT<double>* xsec_param_nom_unnorm = (TVectorT<double> *)(covariance_matrix_tfile->Get("xsec_param_nom_unnorm"));
-//  TVectorT<double>* xsec_param_prior_unnorm = (TVectorT<double> *)(covariance_matrix_tfile->Get("xsec_param_prior_unnorm"));
-    TVectorT<double>* xsec_param_lb = (TVectorT<double> *)(covariance_matrix_tfile->Get("xsec_param_lb"));
-    TVectorT<double>* xsec_param_ub = (TVectorT<double> *)(covariance_matrix_tfile->Get("xsec_param_ub"));
+    auto* xsec_param_names = dynamic_cast<TObjArray *>(covariance_matrix_tfile->Get("xsec_param_names"));
+    auto* xsec_param_nom_unnorm = (TVectorT<double> *)(covariance_matrix_tfile->Get("xsec_param_nom_unnorm"));
+    auto* xsec_param_prior_unnorm = (TVectorT<double> *)(covariance_matrix_tfile->Get("xsec_param_prior_unnorm"));
+    auto* xsec_param_lb = (TVectorT<double> *)(covariance_matrix_tfile->Get("xsec_param_lb"));
+    auto* xsec_param_ub = (TVectorT<double> *)(covariance_matrix_tfile->Get("xsec_param_ub"));
 
     std::vector<std::string> dial_strings;
 
@@ -1281,18 +1551,28 @@ void generateJsonConfigFile(){
 
         std::string xsecSplineName = xsec_param_names->At(iSpline)->GetName();
 
+        double step;
+        step = std::min(
+            fabs((*xsec_param_nom_unnorm)[iSpline] - (*xsec_param_ub)[iSpline]),
+            fabs((*xsec_param_nom_unnorm)[iSpline] - (*xsec_param_lb)[iSpline])
+        );
+        step *= 0.05;
+
         if(GenericToolbox::doesElementIsInVector(xsecSplineName, __listSystematicXsecSplineNames__)){
 
+            // Splined parameter
             std::stringstream dial_ss;
             dial_ss << "    {" << std::endl;
             dial_ss << "      \"name\" : \"" << xsecSplineName << "\"," << std::endl;
+            dial_ss << "      \"is_normalization_dial\" : false," << std::endl;
             dial_ss << "      \"nominal\" : " << (*xsec_param_nom_unnorm)[iSpline] << "," << std::endl;
-            dial_ss << "      \"step\" : 0.05," << std::endl;
+            dial_ss << "      \"prior\" : " << (*xsec_param_prior_unnorm)[iSpline] << "," << std::endl;
+            dial_ss << "      \"step\" : " << step << "," << std::endl;
             dial_ss << "      \"limit_lo\" : " << (*xsec_param_lb)[iSpline] << "," << std::endl;
             dial_ss << "      \"limit_hi\" : " << (*xsec_param_ub)[iSpline] << "," << std::endl;
             dial_ss << "      \"binning\" : \"" << __pathBinningFile__ << "\"," << std::endl;
             dial_ss << "      \"splines\" : \"" << Form("%s_splines.root", xsecSplineName.c_str())  << "\"," << std::endl;
-            dial_ss << "      \"use\" : true" << std::endl;
+            dial_ss << "      \"use\" : true" << std::endl; // The fitter will throw us out if no splines are to be found
             dial_ss << "    }";
 
             dial_strings.emplace_back(dial_ss.str());
@@ -1300,61 +1580,101 @@ void generateJsonConfigFile(){
         }
         else{
 
+            // Normalization parameter
             std::stringstream dial_ss;
             dial_ss << "    {" << std::endl;
             dial_ss << "      \"name\" : \"" << xsecSplineName << "\"," << std::endl;
+            dial_ss << "      \"is_normalization_dial\" : true," << std::endl;
             dial_ss << "      \"nominal\" : " << (*xsec_param_nom_unnorm)[iSpline] << "," << std::endl;
-            dial_ss << "      \"step\" : 0.05," << std::endl;
+            dial_ss << "      \"prior\" : " << (*xsec_param_prior_unnorm)[iSpline] << "," << std::endl;
+            dial_ss << "      \"step\" : " << step << "," << std::endl; // 5 %
             dial_ss << "      \"limit_lo\" : " << (*xsec_param_lb)[iSpline] << "," << std::endl;
             dial_ss << "      \"limit_hi\" : " << (*xsec_param_ub)[iSpline] << "," << std::endl;
 
-            if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "2p2h_norm")){
+            std::map<std::string, std::vector<int>> applyOnlyOnMap;
+
+            if(     GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "2p2h_norm")){
                 // 2p2h_norm* - 2p2h
-                dial_ss << "      \"apply_only_on\" : { \"reaction\" : [" << __toReactionIndex__["2p2h"] << "] }," << std::endl;
+                applyOnlyOnMap["reaction"].emplace_back(__toReactionIndex__["2p2h"]);
             }
-            else if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "Q2_")){
-                // Q2_* - CCQE
-                dial_ss << "      \"apply_only_on\" : { \"reaction\" : [" << __toReactionIndex__["CCQE"] << "] }," << std::endl;
+            if(   GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "Q2_")
+               or GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "EB_")
+               or GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "CC_norm_")
+               ){
+                applyOnlyOnMap["reaction"].emplace_back(__toReactionIndex__["CCQE"]);
             }
-            else if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "EB_")){
-                // EB* - CCQE
-                dial_ss << "      \"apply_only_on\" : { \"reaction\" : [" << __toReactionIndex__["CCQE"] << "] }," << std::endl;
-            }
-            else if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "CC_norm_")){
-                // CC_norm_nu - All nu CC
-                // CC_norm_anu - All nubar CC
-                dial_ss << "      \"apply_only_on\" : { \"reaction\" : [" << __toReactionIndex__["CCQE"] << "] }," << std::endl;
-            }
-            else if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "nue_")){
-                // nue_numu - All nue
-                // nuebar_numubar - All nuebar
-                dial_ss << "      \"apply_only_on\" : { \"nutype\" : [12] }," << std::endl;
-            }
-            else if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "nuebar_")){
-                // nue_numu - All nue
-                // nuebar_numubar - All nuebar
-                dial_ss << "      \"apply_only_on\" : { \"nutype\" : [-12] }," << std::endl;
-            }
-            else if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "CC_Misc")){
+            if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "CC_Misc")){
                 // CC_Misc - CCGamma, CCKaon, CCEta
                 // CC Misc Misc Spline 100% normalisation error on CC1γ, CC1K, CC1η.
                 // all reactions but -> only CC-Other
-                dial_ss << "      \"apply_only_on\" : { \"cut_branch\" : [" << __toSamplesIndex__["CCOther"] << "] }," << std::endl;
+                applyOnlyOnMap["topology"].emplace_back(__toTopologyIndex__["CCOther"]);
             }
-            else if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "CC_DIS_MultPi")){
+            if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "CC_DIS_MultPi")){
                 // CC_DIS_MultiPi_Norm_Nu - CCDIS and CCMultPi, nu only
                 // CC_DIS_MultiPi_Norm_nuBar - CCDIS and CCMultPi, anu only
-                dial_ss << "      \"apply_only_on\" : { \"cut_branch\" : [" << __toSamplesIndex__["CCOther"] << "], "
-                        << "\"reaction\" : [" << __toReactionIndex__["DIS"] << "] }," << std::endl;
+                applyOnlyOnMap["topology"].emplace_back(__toTopologyIndex__["CCOther"]);
+                applyOnlyOnMap["reaction"].emplace_back(__toReactionIndex__["DIS"]);
             }
-            else if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "CC_Coh_")){
+            if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "CC_Coh_")){
                 //
-                dial_ss << "      \"apply_only_on\" : { \"cut_branch\" : [" << __toSamplesIndex__["CCOther"] << "], "
-                        << "\"reaction\" : [" << __toReactionIndex__["Coh"] << "] }," << std::endl;
+                applyOnlyOnMap["topology"].emplace_back(__toTopologyIndex__["CCOther"]);
+                applyOnlyOnMap["reaction"].emplace_back(__toTopologyIndex__["Coh"]);
             }
-            else if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "NC_other_near")){
+
+            if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "nue_numu")){
+                // nue_numu - All nue
+                applyOnlyOnMap["nutype"].emplace_back(12);
+            }
+            else if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "nuebar_numubar")){
+                // nuebar_numubar - All nuebar
+                applyOnlyOnMap["nutype"].emplace_back(-12);
+            }
+            else if(GenericToolbox::doesStringEndsWithSubstring(xsecSplineName, "_nu", true)){
+                applyOnlyOnMap["nutype"].emplace_back(12);
+                applyOnlyOnMap["nutype"].emplace_back(14);
+            }
+            else if(GenericToolbox::doesStringEndsWithSubstring(xsecSplineName, "_nubar", true)){
+                applyOnlyOnMap["nutype"].emplace_back(-12);
+                applyOnlyOnMap["nutype"].emplace_back(-14);
+            }
+
+            if(not applyOnlyOnMap.empty()){
+                dial_ss << "      \"apply_only_on\" : {" << std::endl;
+                bool isFirstCondition = true;
+                for(const auto& applyOnlyOnCondition : applyOnlyOnMap){
+                    if(not isFirstCondition) dial_ss << "," << std::endl;
+                    isFirstCondition = false;
+                    dial_ss << "        \"" << applyOnlyOnCondition.first << "\" : [ ";
+                    for(size_t iInt = 0 ; iInt < applyOnlyOnCondition.second.size() ; iInt++){
+                        if(iInt != 0) dial_ss << ", ";
+                        dial_ss << applyOnlyOnCondition.second[iInt];
+                    }
+                    dial_ss << " ]";
+                }
+                dial_ss << std::endl << "      }," << std::endl;
+            }
+
+            std::map<std::string, std::vector<int>> dontApplyOnMap;
+
+            if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "NC_other_near")){
                 // NC_other_near - all NC which isn't Coh or 1gamma
-                dial_ss << "      \"exclude\" : { \"reaction\" : [" << __toReactionIndex__["Coh"] << "] }," << std::endl;
+                dontApplyOnMap["reaction"].emplace_back(__toReactionIndex__["Coh"]);
+            }
+
+            if(not dontApplyOnMap.empty()){
+                dial_ss << "      \"dont_apply_on\" : {" << std::endl;
+                bool isFirstCondition = true;
+                for(const auto& dontApplyOnCondition : dontApplyOnMap){
+                    if(not isFirstCondition) dial_ss << "," << std::endl;
+                    isFirstCondition = false;
+                    dial_ss << "        \"" << dontApplyOnCondition.first << "\" : [ ";
+                    for(size_t iInt = 0 ; iInt < dontApplyOnCondition.second.size() ; iInt++){
+                        if(iInt != 0) dial_ss << ", ";
+                        dial_ss << dontApplyOnCondition.second[iInt];
+                    }
+                    dial_ss << " ]" << std::endl;
+                }
+                dial_ss << "      }," << std::endl;
             }
 
             dial_ss << "      \"use\" : true" << std::endl;

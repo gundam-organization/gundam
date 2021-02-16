@@ -1,17 +1,20 @@
 #include "XsecParameters.hh"
 #include "GenericToolbox.h"
 #include "Logger.h"
+#include <future>
+#include "GlobalVariables.h"
 
 XsecParameters::XsecParameters(const std::string& name)
 {
     m_name = name;
     Npar = 0;
+    _enableZeroWeightFenceGate_ = false;
     Logger::setUserHeaderStr("[XsecParameters]");
 }
 
 XsecParameters::~XsecParameters() { ; }
 
-void XsecParameters::InitEventMap(std::vector<AnaSample*>& sample, int mode)
+void XsecParameters::InitEventMap(std::vector<AnaSample*>& samplesList_, int mode)
 {
     LogWarning << "Initializing Event Map..." << std::endl;
 
@@ -24,89 +27,211 @@ void XsecParameters::InitEventMap(std::vector<AnaSample*>& sample, int mode)
                  << std::endl;
     }
 
-    m_dial_evtmap.clear();
-    for(std::size_t iSample = 0; iSample < sample.size(); ++iSample)
-    {
-        LogInfo << "Mapping events in sample: " << sample[iSample]->GetName() << " (" << sample[iSample] -> GetN() << " events)" << std::endl;
+    _eventDialsIndexList_.clear();
 
-        std::vector<std::vector<int>> sample_map;
-//        #pragma omp parallel for num_threads(_nb_threads_)
-        for(int iEvent = 0; iEvent < sample[iSample] -> GetN(); iEvent++)
+    LogDebug << "Claiming memory for event mapping..." << std::endl;
+    auto ramBefore = GenericToolbox::getProcessMemoryUsage();
+
+    _eventDialsIndexList_.resize(samplesList_.size());
+    _reweightCacheList_.resize(samplesList_.size());
+    for(std::size_t iSample = 0; iSample < samplesList_.size(); ++iSample){
+
+        _eventDialsIndexList_.at(iSample).resize(samplesList_.at(iSample)->GetN());
+        _reweightCacheList_.at(iSample).resize(samplesList_.at(iSample)->GetN());
+
+        // Count the number of spline-dials that need to be cached and indexed
+        int detectorIndex = XsecParameters::GetDetectorIndex(samplesList_.at(iSample)->GetDetector());
+
+        std::vector<std::vector<int>> sample_map(samplesList_[iSample] -> GetN());
+        for(int iEvent = 0; iEvent < samplesList_[iSample] -> GetN(); iEvent++){
+            _eventDialsIndexList_.at(iSample).at(iEvent).resize(_dialsList_.at(detectorIndex).size());
+            _reweightCacheList_.at(iSample).at(iEvent).resize(_dialsList_.at(detectorIndex).size());
+        }
+    }
+    LogDebug << GenericToolbox::parseSizeUnits(GenericToolbox::getProcessMemoryUsage() - ramBefore)
+             << " of RAM has been taken." << std::endl;
+
+    int totalNbEvents = 0.;
+    for(const auto& anaSample : samplesList_){
+        totalNbEvents += anaSample->GetN();
+    }
+
+    auto* counterPtr = new int();
+    std::function<void(int)> fillEventMapThread = [counterPtr, samplesList_, mode, this](int iThread_){
+
+//        GlobalVariables::getThreadMutex().lock();
+        auto* splineBinPtr = new SplineBin();
+        bool isMultiThreaded = (iThread_ != -1);
+        AnaEvent* eventPtr;
+        int splineIndex;
+        std::string progressBarTitle;
+        XsecDial* currentDial;
+        // Speed optimization: avoid trying to fetch each sub index in vector
+        std::vector<int>* eventDialsIndexListPtr;
+        std::vector<std::vector<int>>* sampleDialsIndexListPtr;
+        std::vector<double>* eventReweightCachePtr;
+        std::vector<std::vector<double>>* sampleReweightCachePtr;
+//        GlobalVariables::getThreadMutex().unlock();
+
+
+        for(std::size_t iSample = 0; iSample < samplesList_.size(); ++iSample)
         {
-            GenericToolbox::displayProgressBar(iEvent, sample[iSample] -> GetN(), LogInfo.getPrefixString() + "Reading sample events");
+            if(iThread_ == -1){
+                LogInfo << "Mapping events in samplesList_: " << samplesList_[iSample]->GetName()
+                        << " (" << samplesList_[iSample] -> GetN() << " events)" << std::endl;
+                progressBarTitle = LogWarning.getPrefixString() + "Associating events with splines";
+            }
 
-            AnaEvent* anaEvent = sample[iSample] -> GetEvent(iEvent);
-            std::vector<int> dial_index_map;
+            sampleDialsIndexListPtr = &_eventDialsIndexList_.at(iSample);
+            sampleReweightCachePtr = &_reweightCacheList_.at(iSample);
 
-            std::vector<XsecDial>* v_dials = &m_dials.at(sample[iSample] -> GetDetector());
-            int num_dials = v_dials->size();
-
-            for(int iDial = 0; iDial < num_dials; ++iDial)
+            for(int iEvent = 0; iEvent < samplesList_[iSample] -> GetN(); iEvent++)
             {
-                int idx;
-                if(v_dials->at(iDial).GetUseSplineSplitMapping()){
-                    // event mapping is done internaly
-                    idx = v_dials->at(iDial).GetSplineIndex(anaEvent);
-                }
-                else{
-                    double q2 = anaEvent-> GetQ2True() / 1.0E6; //MeV to GeV conversion.
-                    //idx = v_dials.at(iDial).GetSplineIndex(anaEvent -> GetTopology(), anaEvent -> GetReaction(), q2);
 
-                    //idx = v_dials.at(iDial).GetSplineIndex(std::vector<int>{anaEvent -> GetTopology(), anaEvent -> GetReaction()},
-                    //                                       std::vector<double>{q2});
-//                idx = v_dials.at(iDial).GetSplineIndex(std::vector<int>{anaEvent->GetTopology(), anaEvent->GetReaction()},
-//                                                       std::vector<double>{anaEvent->GetTrueD2(), anaEvent->GetTrueD1()});
-                    idx = v_dials->at(iDial).GetSplineIndex(std::vector<int>{anaEvent->GetSampleType(), anaEvent->GetReaction()},
-                                                           std::vector<double>{anaEvent->GetTrueD2(), anaEvent->GetTrueD1()});
+                if(isMultiThreaded){
 
-                    if(idx == BADBIN)
-                    {
-                        LogWarning << "Event falls outside spline range.\n"
-                                   << "This event will be ignored in the analysis."
-                                   << std::endl;
-                        anaEvent-> AddEvWght(0.0);
+                    if( iEvent % GlobalVariables::getNbThreads() != iThread_ ){
+                        continue; // skip
                     }
 
-                    if(mode == 1 && anaEvent-> isSignalEvent())
-                        idx = PASSEVENT;
+                    if( iThread_ == 0 ){
+                        // If thread lock every event, slows down the process
+                        (*counterPtr) += GlobalVariables::getNbThreads();
+                    }
+
                 }
-                dial_index_map.emplace_back(idx);
-            } // iDial
+                else{
+                    GenericToolbox::displayProgressBar(iEvent, samplesList_[iSample] -> GetN(), progressBarTitle);
+                }
 
-            #pragma omp critical
-            {
-            sample_map.emplace_back(dial_index_map);
+                eventDialsIndexListPtr = &sampleDialsIndexListPtr->at(iEvent);
+                eventReweightCachePtr = &sampleReweightCachePtr->at(iEvent);
+                eventPtr          = samplesList_.at(iSample)->GetEvent(iEvent);
+                std::vector<XsecDial>* detectorDialsList = &_dialsList_.at(
+                    this->GetDetectorIndex(samplesList_.at(iSample)->GetDetector())
+                    );
+
+                for(size_t iDial = 0 ; iDial < detectorDialsList->size() ; iDial++)
+                {
+                    currentDial = &detectorDialsList->at(iDial);
+                    splineIndex = -1; // NO SPLINE = Not affected
+
+                    // If this point is reached, then a valid spline index should be associated to the eventPtr
+                    if( currentDial->GetIsNormalizationDial() ){
+                        bool skipThisDial = false;
+                        if(not currentDial->GetApplyOnlyOnMapPtr()->empty()){
+                            for(const auto& applyCondition : *currentDial->GetApplyOnlyOnMapPtr()){
+                                if(not GenericToolbox::doesElementIsInVector(
+                                    eventPtr->GetEventVarInt(applyCondition.first),
+                                    applyCondition.second)
+                                    ){
+                                    skipThisDial = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if(not skipThisDial and not currentDial->GetDontApplyOnMapPtr()->empty()){
+                            for(const auto& applyCondition : *currentDial->GetDontApplyOnMapPtr()){
+                                if( GenericToolbox::doesElementIsInVector(
+                                    eventPtr->GetEventVarInt(applyCondition.first),
+                                    applyCondition.second
+                                )){
+                                    skipThisDial = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if(not skipThisDial){
+                            splineIndex = 0; // event will be renormalized
+                        }
+                    }
+                    else if( currentDial->GetUseSplineSplitMapping() ){
+                        splineIndex = currentDial->GetSplineIndex(eventPtr, splineBinPtr);
+                    }
+                    else{
+                        // OLD ROUTINE
+                        splineIndex
+                            = currentDial->GetSplineIndex(
+                            std::vector<int>    {eventPtr->GetSampleType(), eventPtr->GetReaction()},
+                            std::vector<double> {eventPtr->GetTrueD2(),     eventPtr->GetTrueD1()}
+                        );
+
+                        if(splineIndex == BADBIN){
+                            LogWarning << "Event falls outside spline range.\n"
+                                       << "This eventPtr will be ignored in the analysis."
+                                       << std::endl;
+                            eventPtr->AddEvWght(0.0);
+                        }
+
+                        if(mode == 1 && eventPtr->isSignalEvent())
+                            splineIndex = PASSEVENT;
+                    }
+
+                    eventDialsIndexListPtr->at(iDial) = splineIndex;
+                    eventReweightCachePtr->at(iDial) = -1; // INVALIDATE THE CACHE
+
+                } // iDial
+
+            } // iEvent
+
+        } // iSample
+
+        delete splineBinPtr;
+    };
+
+    LogInfo << "Associating events with spline indexes..." << std::endl;
+    GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(0);
+    if(GlobalVariables::getNbThreads() > 1){
+        std::vector<std::future<void>> threadsList;
+        for( int iThread = 0 ; iThread < GlobalVariables::getNbThreads(); iThread++ ){
+            threadsList.emplace_back(
+                std::async( std::launch::async, std::bind(fillEventMapThread, iThread) )
+            );
+        }
+
+        std::string progressBarPrefix = LogWarning.getPrefixString() + "Associating events with splines";
+        GenericToolbox::ProgressBar::lastDisplayedPercentValue = -1;
+        for( int iThread = 0 ; iThread < GlobalVariables::getNbThreads(); iThread++ ){
+            while(threadsList[iThread].wait_for(std::chrono::milliseconds(33)) != std::future_status::ready){
+                GenericToolbox::displayProgressBar(*counterPtr, totalNbEvents, progressBarPrefix);
             }
-        } // iEvent
+            threadsList[iThread].get();
+        }
+    }
+    else{
+        fillEventMapThread(-1);
+    }
+    LogDebug << "Event-splines assotiation took: "
+             << GenericToolbox::parseTimeUnit(GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(0))
+             << std::endl;
 
-        m_dial_evtmap.emplace_back(sample_map);
-    } // iSample
+    LogInfo << "Event mapping has been done." << std::endl;
 
 }
 
 void XsecParameters::InitParameters()
 {
     unsigned int offset = 0;
-    for(const auto& det : v_detectors)
-    {
-        m_offset.insert(std::make_pair(det, offset));
-        for(const auto& d : m_dials.at(det))
+    for(size_t detectorIndex = 0 ; detectorIndex < v_detectors.size() ; detectorIndex++){
+        v_offsets.emplace_back(offset);
+        for(const auto& xsecDial : _dialsList_.at(detectorIndex))
         {
-            pars_name.push_back(Form("%s_%s", det.c_str(), d.GetName().c_str()));
-            pars_prior.push_back(d.GetNominal());
-            pars_step.push_back(d.GetStep());
-            pars_limlow.push_back(d.GetLimitLow());
-            pars_limhigh.push_back(d.GetLimitHigh());
+            pars_name.emplace_back(Form("%s_%s", v_detectors[detectorIndex].c_str(), xsecDial.GetName().c_str()));
+            pars_prior.push_back(xsecDial.GetPrior());
+            pars_step.push_back(xsecDial.GetStep());
+            pars_limlow.push_back(xsecDial.GetLimitLow());
+            pars_limhigh.push_back(xsecDial.GetLimitHigh());
             pars_fixed.push_back(false);
 
-            LogInfo << "Added " << det << "_" << d.GetName()
-                      << std::endl;
+            LogInfo << "Added " << v_detectors[detectorIndex] << "_" << xsecDial.GetName()
+                    << std::endl;
         }
+        LogInfo << "Total " << _dialsList_.at(detectorIndex).size() << " parameters at "
+                << offset << " for " << v_detectors[detectorIndex] << std::endl;
 
-        LogInfo << "Total " << m_dials.at(det).size() << " parameters at "
-                  << offset << " for " << det << std::endl;
-
-        offset += m_dials.at(det).size();
+        offset += _dialsList_.at(detectorIndex).size();
     }
 
     Npar = pars_name.size();
@@ -129,60 +254,119 @@ void XsecParameters::InitParameters()
     }
 }
 
-void XsecParameters::ReWeight(AnaEvent* event, const std::string& detectorName, int nsample, int nevent, std::vector<double>& params)
-{
-    if(m_dial_evtmap.empty()) // need to build an event map first
+void XsecParameters::ReWeight(AnaEvent* event, const std::string& detectorName, int nsample, int nevent, std::vector<double>& params){
+
+    if(_eventDialsIndexList_.empty()) // need to build an event map first
     {
         LogError << "In XsecParameters::ReWeight()\n"
                  << "Need to build event map index for " << m_name << std::endl;
         return;
     }
 
-    std::vector<XsecDial> &v_dials = m_dials.at(detectorName);
-    int num_dials = v_dials.size();
-    double weight = 1.0;
+    double totalEventWeight = 1.0;
+    int detectorIndex = this->GetDetectorIndex(detectorName);
+    auto* detectorDials = &_dialsList_.at(detectorIndex);
+    auto* eventReweightCache = &_reweightCacheList_.at(nsample).at(nevent);
+    auto* eventDialIndexes = &_eventDialsIndexList_.at(nsample).at(nevent);
+    double currentDialWeight = 1;
+    XsecDial* currentDial = nullptr;
 
-    for(int iDial = 0; iDial < num_dials; ++iDial)
-    {
-        int idx = m_dial_evtmap[nsample][nevent][iDial];
-        double dial_weight = v_dials[iDial].GetBoundedValue(idx, params[iDial + m_offset.at(detectorName)]);
+    for(size_t iDial = 0 ; iDial < detectorDials->size() ; iDial++){
 
-        if(dial_weight == 0){
-            LogFatal << "dial_weight is 0" << std::endl;
-            throw std::logic_error("0");
+        // RESET
+        currentDialWeight = 1;
+
+        if(not _lastAppliedParamList_.empty() // has it been set?
+           and eventReweightCache->at(iDial) != -1 // cache is valid?
+           and _lastAppliedParamList_.at(iDial + v_offsets.at(detectorIndex)) == params.at(iDial + v_offsets.at(detectorIndex))){
+
+            currentDialWeight = eventReweightCache->at(iDial); // get from cache
+
+        }
+        else{
+
+            if(eventDialIndexes->at(iDial) >= 0){
+
+                // Then the dial has to affect the event (spline or normalization)
+                currentDial = &detectorDials->at(iDial);
+                currentDialWeight = currentDial->GetBoundedValue(
+                    eventDialIndexes->at(iDial),
+                    params.at(iDial + v_offsets.at(detectorIndex))
+                );
+
+            }
+
+            // filling cache
+            eventReweightCache->at(iDial) = currentDialWeight;
+
         }
 
-        weight *= dial_weight;
-
-        /*
-        if(dial_weight > 3.0)
-        {
-            std::cout << "--------------" << std::endl;
-            std::cout << "Ev T: " << event -> GetTopology() << std::endl
-                      << "Ev R: " << event -> GetReaction() << std::endl
-                      << "Ev Q: " << event -> GetQ2() << std::endl;
-            std::cout << "Ev I: " << idx << std::endl;
-            std::cout << "Ev W: " << dial_weight << std::endl;
-            std::cout << "Dl V: " << params[iDial + m_offset.at(detectorName)] << std::endl;
-            std::cout << "Dl N: " << detectorName << "_" << v_dials[iDial].GetName() << std::endl;
-            std::cout << "Sp N: " << v_dials[iDial].GetSplineName(idx) << std::endl;
+        if(_enableZeroWeightFenceGate_ and currentDialWeight == 0){
+            GlobalVariables::getThreadMutex().lock(); // stop all other threads
+            Logger::quietLineJump();
+            LogFatal << "Dial: " << currentDial->GetName() << " returned null weight." << std::endl;
+            currentDial->Print();
+            LogFatal << "Event: " << std::endl;
+            event->Print();
+            if(not currentDial->GetIsNormalizationDial()) LogFatal << "Spline Index: " << eventDialIndexes->at(iDial) << std::endl;
+            LogFatal << "Dial Value: " << params.at(iDial + v_offsets.at(detectorIndex)) << std::endl;
+            if(not _lastAppliedParamList_.empty()
+               and _lastAppliedParamList_[iDial + v_offsets.at(detectorIndex)] == params.at(iDial + v_offsets.at(detectorIndex))){
+                LogFatal << "GOT WEIGHT FROM CACHE: " << eventReweightCache->at(iDial) << std::endl;
+                LogFatal << "Cache: " << GenericToolbox::parseVectorAsString(_reweightCacheList_.at(nsample).at(nevent)) << std::endl;
+                LogFatal << "Index: " << iDial + v_offsets.at(detectorIndex) << std::endl;
+            }
+            else{
+                if(not currentDial->GetApplyOnlyOnMapPtr()->empty()){
+                    LogFatal << "Apply only on conditions:" << std::endl;
+                    for(const auto& applyCondition : *currentDial->GetApplyOnlyOnMapPtr()){
+                        if(not GenericToolbox::doesElementIsInVector(
+                            event->GetEventVarInt(applyCondition.first),
+                            applyCondition.second)
+                            ){
+                            LogError << " -> NOT OK:" << applyCondition.first << ": didn't found \"" << event->GetEventVarInt(applyCondition.first) << "\" in " << GenericToolbox::parseVectorAsString(applyCondition.second) << std::endl;
+                        }
+                        else{
+                            LogWarning << " -> OK: " << applyCondition.first << ": did found \"" << event->GetEventVarInt(applyCondition.first) << "\" in " << GenericToolbox::parseVectorAsString(applyCondition.second) << std::endl;
+                        }
+                    }
+                }
+                if(not currentDial->GetDontApplyOnMapPtr()->empty()){
+                    LogFatal << "Don't apply on conditions:" << std::endl;
+                    for(const auto& applyCondition : *currentDial->GetDontApplyOnMapPtr()){
+                        if(GenericToolbox::doesElementIsInVector(
+                            event->GetEventVarInt(applyCondition.first),
+                            applyCondition.second)
+                            ){
+                            LogWarning << " -> OK: " << applyCondition.first << ": didn't found \"" << event->GetEventVarInt(applyCondition.first) << "\" in " << GenericToolbox::parseVectorAsString(applyCondition.second) << std::endl;
+                        }
+                        else{
+                            LogError << " -> NOT OK:" << applyCondition.first << ": did found \"" << event->GetEventVarInt(applyCondition.first) << "\" in " << GenericToolbox::parseVectorAsString(applyCondition.second) << std::endl;
+                        }
+                    }
+                }
+            }
+            throw std::runtime_error(GET_VAR_NAME_VALUE(currentDialWeight));
         }
-        */
+
+        // Adding weight
+        totalEventWeight *= currentDialWeight;
+
     }
-//    std::cout << "weight=" << weight << std::endl;
 
-    if(m_do_cap_weights)
-        weight = weight > m_weight_cap ? m_weight_cap : weight;
+    if(m_do_cap_weights){
+        totalEventWeight = totalEventWeight > m_weight_cap ? m_weight_cap : totalEventWeight;
+    }
 
-    event -> AddEvWght(weight);
+    event -> AddEvWght(totalEventWeight);
 }
 
-void XsecParameters::AddDetector(const std::string& det, const std::string& config)
+void XsecParameters::AddDetector(const std::string& detectorName_, const std::string& configFilePath_)
 {
-    LogInfo << "Adding detector " << det << " for " << m_name << std::endl;
+    LogInfo << "Adding detector " << detectorName_ << " for " << m_name << std::endl;
     std::fstream f;
-    LogInfo << "Opening config file " << config << std::endl;
-    f.open(config, std::ios::in);
+    LogInfo << "Opening config file " << configFilePath_ << std::endl;
+    f.open(configFilePath_, std::ios::in);
 
     json j;
     f >> j;
@@ -196,36 +380,95 @@ void XsecParameters::AddDetector(const std::string& det, const std::string& conf
         std::vector<int> global_dimensions = j["dimensions"].get<std::vector<int>>();
     }
 
-    std::vector<XsecDial> v_dials;
-    for(const auto& dial : j["dials"])
-    {
-        if(dial["use"] == true)
-        {
+    std::vector<XsecDial> xsecDialList;
+    for(const auto& dialConfig : j["dials"]){
+        if(dialConfig["use"] == true){
+            LogInfo << "Setting up " << dialConfig["name"] << " dial..." << std::endl;
+            XsecDial xsecDial(dialConfig["name"]);
 
-
-            std::string fname_splines;
-            std::string fname_binning;
-            if(dial.find("splines") != dial.end()){
-                fname_binning = input_dir + dial["binning"].get<std::string>();
-                fname_splines = input_dir + dial["splines"].get<std::string>();
+            if(dialConfig.find("splines") != dialConfig.end()){
+                std::string fname_splines = input_dir + dialConfig["splines"].get<std::string>();
+                std::string fname_binning = input_dir + dialConfig["binning"].get<std::string>();;
+                xsecDial.SetBinning(fname_binning);
+                xsecDial.ReadSplines(fname_splines);
+                if(xsecDial.GetSplineList().empty() and xsecDial.GetSplinePtrList().empty()){
+                    LogAlert << "No splines has been found in " << fname_splines << ". Skipping..." << std::endl;
+                    continue;
+                }
+            }
+            else if(dialConfig.find("is_normalization_dial") != dialConfig.end() and bool(dialConfig["is_normalization_dial"])){
+                xsecDial.SetIsNormalizationDial(true);
+            }
+            else{
+                LogError << "Don't have splines and is not tagged as a normalization systematic. Skipping..." << std::endl;
+                continue;
             }
 
-            XsecDial x(dial["name"], fname_binning, fname_splines);
-            x.SetVars(dial["nominal"], dial["step"], dial["limit_lo"], dial["limit_hi"]);
-            x.Print(false);
+            xsecDial.SetNominal(dialConfig["nominal"]);
+            xsecDial.SetStep(dialConfig["step"]);
+            xsecDial.SetLimitLo(dialConfig["limit_lo"]);
+            xsecDial.SetLimitHi(dialConfig["limit_hi"]);
+            if(dialConfig.find("prior") == dialConfig.end()){
+                LogWarning << "Prior value parameter for dial " << dialConfig["name"]
+                           << " not found. Nominal will be used as prior." << std::endl
+                           << "Please consider setting this parameter in the future.";
+                xsecDial.SetPrior(xsecDial.GetNominal());
+            }
+            else{
+//                xsecDial.SetPrior(dialConfig["prior"]);
+                xsecDial.SetPrior(xsecDial.GetNominal());
+            }
+
+            if(dialConfig.find("apply_only_on") != dialConfig.end())
+            {
+                std::map<std::string, std::vector<int>> applyOnlyOnMap;
+                auto conditions = dialConfig["apply_only_on"].items();
+                for (auto condition = conditions.begin(); condition != conditions.end(); ++condition){
+                    applyOnlyOnMap[condition.key()] = dialConfig["apply_only_on"][condition.key()].get<std::vector<int>>();
+                }
+                xsecDial.SetApplyOnlyOnMap(applyOnlyOnMap);
+            }
+            if(dialConfig.find("dont_apply_on") != dialConfig.end())
+            {
+                std::map<std::string, std::vector<int>> dontApplyOnMap;
+                auto conditions = dialConfig["dont_apply_on"].items();
+                for (auto condition = conditions.begin(); condition != conditions.end(); ++condition){
+                    dontApplyOnMap[condition.key()] = dialConfig["dont_apply_on"][condition.key()].get<std::vector<int>>();
+                }
+                xsecDial.SetDontApplyOnMap(dontApplyOnMap);
+            }
+
+            xsecDial.Print(false);
+
             if(not global_dimensions.empty()){
-                std::vector<int> dimensions = dial.value("dimensions", global_dimensions);
-                x.SetDimensions(dimensions);
+                std::vector<int> dimensions = dialConfig.value("dimensions", global_dimensions);
+                xsecDial.SetDimensions(dimensions);
             }
 
-            v_dials.emplace_back(x);
+            xsecDialList.emplace_back(xsecDial);
+        }
+        else{
+            LogAlert << "Skipping " << dialConfig["name"] << " dial (\"use\" == false)..." << std::endl;
         }
     }
 
-    v_detectors.emplace_back(det);
-    m_dials.insert(std::make_pair(det, v_dials));
+    v_detectors.emplace_back(detectorName_);
+    _dialsList_.emplace_back(xsecDialList);
 }
 
-void XsecParameters::SetNbThreads(int nbThreads_){
-  _nb_threads_ = nbThreads_;
+void XsecParameters::SetEnableZeroWeightFenceGate(bool enableZeroWeightFenceGate_){
+    _enableZeroWeightFenceGate_ = enableZeroWeightFenceGate_;
+}
+
+int XsecParameters::GetDetectorIndex(const std::string& detectorName_){
+    int detectorIndex = GenericToolbox::findElementIndex(detectorName_, v_detectors);
+    if(detectorIndex == -1){
+        LogFatal << "Invalid detector name: " << detectorName_ << std::endl;
+        throw std::logic_error("Invalid detector name.");
+    }
+    return detectorIndex;
+}
+
+std::vector<XsecDial> XsecParameters::GetDetectorDials(const std::string& detectorName_){
+    return _dialsList_.at(GetDetectorIndex(detectorName_));
 }

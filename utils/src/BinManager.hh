@@ -23,10 +23,12 @@ class BinManager
         int GetBinIndex(const std::vector<double>& val, const int val_nutype, const int val_beammode) const;
         double GetBinWidth(const int i) const;
         double GetBinWidth(const int i, const int d) const;
+        unsigned int GetDimension() const;
         std::vector<double> GetBinVector(const double d) const;
         std::vector<std::vector<std::pair<double, double>>> GetEdgeVector() const { return bin_edges; };
         std::vector<std::pair<double, double>> GetEdgeVector(const int d) const { return bin_edges.at(d); };
         void Print() const;
+        void MergeBins(unsigned int groupSize_, int dimIndexToRebin_ = -1);
 
     private:
         bool CheckBinIndex(const int i, const int d, const double val) const;

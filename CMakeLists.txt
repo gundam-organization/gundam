@@ -97,7 +97,8 @@ if(CXX_MARCH_FLAG)
 endif()
 
 if(CXX_WARNINGS)
-    set(CXX_WARNING_FLAGS "-Wall -Wno-unused-variable -Wno-sign-compare -Wno-unused-function -Wno-unused-but-set-variable -Wno-reorder")
+#    set(CXX_WARNING_FLAGS "-Wall -Wno-unused-variable -Wno-sign-compare -Wno-unused-function -Wno-unused-but-set-variable -Wno-reorder")
+    set(CXX_WARNING_FLAGS "-Wall -Wno-unused-variable -Wno-sign-compare -Wno-unused-function -Wformat=0 -Wno-reorder")
 endif()
 
 if(NOT COLOR_OUTPUT)
@@ -130,6 +131,12 @@ add_definitions( -D PROGRESS_BAR_FILL_TAG="\\\"T2K\#"\\\" )
 
 ## Add the Logger
 include_directories(submodules/simple-cpp-logger/include)
+
+add_definitions( -D LOGGER_MAX_LOG_LEVEL_PRINTED=6 )
+add_definitions( -D LOGGER_PREFIX_LEVEL=3 )
+add_definitions( -D LOGGER_ENABLE_COLORS=1 )
+add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=1 )
+add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {USER_HEADER} {FILELINE}"\\\" )
 
 if(${CMAKE_BUILD_TYPE} MATCHES Release)
     add_definitions( -D LOGGER_MAX_LOG_LEVEL_PRINTED=6 )

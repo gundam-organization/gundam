@@ -72,7 +72,7 @@ int GetNbIndicesOfBranch(TTree* tree_, const std::string& branchName_);
 // .json config file that will be parsed from the command line:
 int __argc__;
 char **__argv__;
-std::string __json_config_path__;
+std::string __jsonConfigPath__;
 int __fgd_id__;
 
 
@@ -102,8 +102,8 @@ int main(int argc, char** argv){
 
     // Read in .json config file:
     std::fstream configFile;
-    LogWarning << "Opening " << __json_config_path__ << std::endl;
-    configFile.open(__json_config_path__, std::ios::in);
+    LogWarning << "Opening " << __jsonConfigPath__ << std::endl;
+    configFile.open(__jsonConfigPath__, std::ios::in);
     if(not configFile.is_open()){
         LogFatal << "Unable to open JSON configure file." << std::endl;
         return 1;
@@ -145,16 +145,16 @@ int main(int argc, char** argv){
     float weight, weight_true;
 
     // Add branches to output ROOT file:
-    out_seltree -> Branch("nutype", &nutype, "nutype/I");
-    out_seltree -> Branch("reaction", &reaction, "reaction/I");
-    out_seltree -> Branch("topology", &topology, "topology/I");
-    out_seltree -> Branch("sample", &sample, "sample/I");
-    out_seltree -> Branch("fgd_reco", &fgd_reco, "fgd_reco/I");
-    out_seltree -> Branch("target", &target, "target/I");
+    out_seltree -> Branch("nutype",     &nutype, "nutype/I");
+    out_seltree -> Branch("reaction",   &reaction, "reaction/I");
+    out_seltree -> Branch("topology",   &topology, "topology/I");
+    out_seltree -> Branch("sample",     &sample, "sample/I");
+    out_seltree -> Branch("fgd_reco",   &fgd_reco, "fgd_reco/I");
+    out_seltree -> Branch("target",     &target, "target/I");
     out_seltree -> Branch("cut_branch", &cut_branch, "cut_branch/I");
-    out_seltree -> Branch("beammode", &beammode, "beammode/I");
-    out_seltree -> Branch("analysis", &analysis, "analysis/I");
-    out_seltree -> Branch("enu_true", &enu_true, "enu_true/F");
+    out_seltree -> Branch("beammode",   &beammode, "beammode/I");
+    out_seltree -> Branch("analysis",   &analysis, "analysis/I");
+    out_seltree -> Branch("enu_true",   &enu_true, "enu_true/F");
     out_seltree -> Branch("enu_reco", &enu_reco, "enu_reco/F");
     out_seltree -> Branch("q2_true", &q2_true, "q2_true/F");
     out_seltree -> Branch("q2_reco", &q2_reco, "q2_reco/F");
@@ -202,15 +202,15 @@ int main(int argc, char** argv){
                 while(std::getline(in, filename))
                 {
                     HL2FileOpt f;
-                    f.fname_input = filename;
-                    f.sel_tree = file["sel_tree"];
-                    f.tru_tree = file["tru_tree"];
-                    f.file_id = file["file_id"];
-                    f.beammode = file["beammode"];
-                    f.analysis = file["analysis"];
-                    f.num_branches = file["num_branches"];
-                    f.cuts = file["cut_level"].get<std::vector<int>>();
-                    f.pot_norm = file["pot_norm"];
+                    f.fname_input   = filename;
+                    f.sel_tree      = file["sel_tree"];
+                    f.tru_tree      = file["tru_tree"];
+                    f.file_id       = file["file_id"];
+                    f.beammode      = file["beammode"];
+                    f.analysis      = file["analysis"];
+                    f.num_branches  = file["num_branches"];
+                    f.cuts          = file["cut_level"].get<std::vector<int>>();
+                    f.pot_norm      = file["pot_norm"];
 
                     std::map<std::string, std::vector<int>> temp_json = file["samples"];
                     for(const auto& kv : temp_json)
@@ -561,7 +561,7 @@ std::string remindUsage()
 
     remind_usage_ss << "-------------------------------------------------" << std::endl;
     remind_usage_ss << " > Command Line Arguments" << std::endl;
-    remind_usage_ss << "   -j : Specify JSON input file (Current : " << __json_config_path__ << ")" << std::endl;
+    remind_usage_ss << "   -j : Specify JSON input file (Current : " << __jsonConfigPath__ << ")" << std::endl;
     remind_usage_ss << "   -fgd : Specify which FGD to process (Current : " << __fgd_id__ << ")" << std::endl;
     remind_usage_ss << "   -h : Show this message" << std::endl;
     remind_usage_ss << "-------------------------------------------------" << std::endl;
@@ -572,7 +572,7 @@ std::string remindUsage()
 
 }
 void resetParameters(){
-    __json_config_path__ = "";
+    __jsonConfigPath__ = "";
     __fgd_id__ = 1;
 }
 void getUserParameters(){
@@ -599,7 +599,7 @@ void getUserParameters(){
         if(std::string(__argv__[i_arg]) == "-j"){
             if (i_arg < __argc__ - 1) {
                 int j_arg = i_arg + 1;
-                __json_config_path__ = std::string(__argv__[j_arg]);
+                __jsonConfigPath__ = std::string(__argv__[j_arg]);
             }
             else {
                 LogError << "Give an argument after " << __argv__[i_arg] << std::endl;

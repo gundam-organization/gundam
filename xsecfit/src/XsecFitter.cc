@@ -162,7 +162,7 @@ void XsecFitter::InitFitter(std::vector<AnaFitParameters*>& fitpara)
     // Create ROOT minimizer of given minimizerType and algoType:
     m_fitter = ROOT::Math::Factory::CreateMinimizer(min_settings.minimizer.c_str(), min_settings.algorithm.c_str());
 
-    // The ROOT Functor class is used to wrap multi-dimensional function objects, in this case the XsecFitter::CalcLikelihood function calculates and returns chi2_stat + chi2_sys + chi2_reg in each iteration of the fitter:
+    // The ROOT Functor class is used to wrap multi-dimensional function objects, in this case the XsecFitter::EvalFit function calculates and returns chi2_stat + chi2_sys + chi2_reg in each iteration of the fitter:
     m_fcn    = new ROOT::Math::Functor(this, &XsecFitter::CalcLikelihood, m_npar);
 
     m_fitter->SetFunction(*m_fcn);

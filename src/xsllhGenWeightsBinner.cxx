@@ -19,7 +19,7 @@
 #include <fstream>
 
 //! Global Variables
-std::string __json_config_path__;
+std::string __jsonConfigPath__;
 std::string __listGenWeightsFiles__;
 std::string __pathGenWeightsFileList__;
 std::string __pathBinningFile__;
@@ -30,7 +30,7 @@ std::vector<std::string> __genweights_file_path_list__;
 std::vector<std::string> __listSystematicXsecSplineNames__;
 std::map<std::string, std::string> __mapXsecToGenWeights__;
 std::vector<std::string> __listRelativeVariationComponent__;
-std::map<std::string, int> __toSamplesIndex__;
+std::map<std::string, int> __toTopologyIndex__;
 std::map<std::string, int> __toReactionIndex__;
 std::map<std::string, double> __mapNominalValues__;
 std::map<std::string, double> __mapErrorValues__;
@@ -550,7 +550,7 @@ std::string remindUsage(){
 
 }
 void resetParameters(){
-    __json_config_path__ = "";
+    __jsonConfigPath__            = "";
     __listGenWeightsFiles__       = "";
     __pathGenWeightsFileList__    = "";
     __pathBinningFile__           = "";
@@ -586,9 +586,10 @@ void getUserParameters(){
         if(std::string(__argv__[i_arg]) == "-j"){
             if (i_arg < __argc__ - 1) {
                 int j_arg = i_arg + 1;
-                __json_config_path__ = std::string(__argv__[j_arg]);
-                if(not GenericToolbox::doesPathIsFile(__json_config_path__)){
-                    LogError << std::string(__argv__[i_arg]) << ": " << __json_config_path__ << " could not be found." << std::endl;
+                __jsonConfigPath__ = std::string(__argv__[j_arg]);
+                if(not GenericToolbox::doesPathIsFile(__jsonConfigPath__)){
+                    LogError << std::string(__argv__[i_arg]) << ": " << __jsonConfigPath__
+                             << " could not be found." << std::endl;
                     exit(EXIT_FAILURE);
                 }
             } else {
@@ -861,8 +862,8 @@ void createNormSplines(){
             // CC_Misc - CCGamma, CCKaon, CCEta
             // CC Misc Misc Spline 100% normalisation error on CC1γ, CC1K, CC1η.
             // all reactions but -> only CC-Other
-            exclude_sample_index_list.emplace_back(__toSamplesIndex__["CC-0pi"]);
-            exclude_sample_index_list.emplace_back(__toSamplesIndex__["CC-1pi"]);
+            exclude_sample_index_list.emplace_back(__toTopologyIndex__["CC-0pi"]);
+            exclude_sample_index_list.emplace_back(__toTopologyIndex__["CC-1pi"]);
             for(auto const& reaction : __toReactionIndex__){
                 valid_reaction_index_list.emplace_back(reaction.second);
             }
@@ -870,14 +871,14 @@ void createNormSplines(){
         else if(GenericToolbox::doesStringStartsWithSubstring(norm_spline_name, "CC_DIS_MultPi")){
             // CC_DIS_MultiPi_Norm_Nu - CCDIS and CCMultPi, nu only
             // CC_DIS_MultiPi_Norm_nuBar - CCDIS and CCMultPi, anu only
-            exclude_sample_index_list.emplace_back(__toSamplesIndex__["CC-0pi"]);
-            exclude_sample_index_list.emplace_back(__toSamplesIndex__["CC-1pi"]);
+            exclude_sample_index_list.emplace_back(__toTopologyIndex__["CC-0pi"]);
+            exclude_sample_index_list.emplace_back(__toTopologyIndex__["CC-1pi"]);
             valid_reaction_index_list.emplace_back(__toReactionIndex__["DIS"]);
         }
         else if(GenericToolbox::doesStringStartsWithSubstring(norm_spline_name, "CC_Coh_")){
             //
-            exclude_sample_index_list.emplace_back(__toSamplesIndex__["CC-0pi"]);
-            exclude_sample_index_list.emplace_back(__toSamplesIndex__["CC-1pi"]);
+            exclude_sample_index_list.emplace_back(__toTopologyIndex__["CC-0pi"]);
+            exclude_sample_index_list.emplace_back(__toTopologyIndex__["CC-1pi"]);
             valid_reaction_index_list.emplace_back(__toReactionIndex__["Coh"]);
         }
         else if(GenericToolbox::doesStringStartsWithSubstring(norm_spline_name, "NC_other_near")){
@@ -1218,9 +1219,9 @@ int identifyEventBin(int entry_) {
 
 void fillDictionaries(){
 
-    __toSamplesIndex__["CC-0pi"] = 0;
-    __toSamplesIndex__["CC-1pi"] = 1;
-    __toSamplesIndex__["CC-Other"] = 2;
+    __toTopologyIndex__["CC-0pi"] = 0;
+    __toTopologyIndex__["CC-1pi"] = 1;
+    __toTopologyIndex__["CC-Other"] = 2;
 
     __toReactionIndex__["CCQE"] = 0;
     __toReactionIndex__["2p2h"] = 9;
