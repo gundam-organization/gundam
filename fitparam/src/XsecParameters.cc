@@ -59,9 +59,9 @@ void XsecParameters::InitEventMap(std::vector<AnaSample*>& samplesList_, int mod
     auto* counterPtr = new int();
     std::function<void(int)> fillEventMapThread = [counterPtr, samplesList_, mode, this](int iThread_){
 
-//        GlobalVariables::getThreadMutex().lock();
         auto* splineBinPtr = new SplineBin();
         bool isMultiThreaded = (iThread_ != -1);
+        if(not isMultiThreaded) iThread_ = 0;
         AnaEvent* eventPtr;
         int splineIndex;
         std::string progressBarTitle;
@@ -71,12 +71,11 @@ void XsecParameters::InitEventMap(std::vector<AnaSample*>& samplesList_, int mod
         std::vector<std::vector<int>>* sampleDialsIndexListPtr;
         std::vector<double>* eventReweightCachePtr;
         std::vector<std::vector<double>>* sampleReweightCachePtr;
-//        GlobalVariables::getThreadMutex().unlock();
 
 
         for(std::size_t iSample = 0; iSample < samplesList_.size(); ++iSample)
         {
-            if(iThread_ == -1){
+            if(not isMultiThreaded){
                 LogInfo << "Mapping events in samplesList_: " << samplesList_[iSample]->GetName()
                         << " (" << samplesList_[iSample] -> GetN() << " events)" << std::endl;
                 progressBarTitle = LogWarning.getPrefixString() + "Associating events with splines";
@@ -137,6 +136,22 @@ void XsecParameters::InitEventMap(std::vector<AnaSample*>& samplesList_, int mod
                                     eventPtr->GetEventVarInt(applyCondition.first),
                                     applyCondition.second
                                 )){
+                                    skipThisDial = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if(not skipThisDial and not currentDial->GetApplyCondition().empty()){
+                            if(GlobalVariables::getChainList().empty()){
+                                LogFatal << GET_VAR_NAME_VALUE(GlobalVariables::getChainList().empty());
+                                LogFatal << ": Can't check cut condition." << std::endl;
+                                throw std::logic_error(GET_VAR_NAME_VALUE(GlobalVariables::getChainList().empty()));
+                            }
+                            GlobalVariables::getChainList().at(iThread_)->GetEntry(eventPtr->GetEvId());
+//                            GlobalVariables::getMcTreePtr()->GetEntry(eventPtr->GetEvId());
+                            for(int jInstance = 0; jInstance < currentDial->getApplyConditionFormulaeList().at(iThread_)->GetNdata(); jInstance++) {
+                                if ( currentDial->getApplyConditionFormulaeList().at(iThread_)->EvalInstance(jInstance) == 0 ) {
                                     skipThisDial = true;
                                     break;
                                 }
@@ -419,8 +434,7 @@ void XsecParameters::AddDetector(const std::string& detectorName_, const std::st
                 xsecDial.SetPrior(xsecDial.GetNominal());
             }
 
-            if(dialConfig.find("apply_only_on") != dialConfig.end())
-            {
+            if(dialConfig.find("apply_only_on") != dialConfig.end()){
                 std::map<std::string, std::vector<int>> applyOnlyOnMap;
                 auto conditions = dialConfig["apply_only_on"].items();
                 for (auto condition = conditions.begin(); condition != conditions.end(); ++condition){
@@ -428,14 +442,17 @@ void XsecParameters::AddDetector(const std::string& detectorName_, const std::st
                 }
                 xsecDial.SetApplyOnlyOnMap(applyOnlyOnMap);
             }
-            if(dialConfig.find("dont_apply_on") != dialConfig.end())
-            {
+            if(dialConfig.find("dont_apply_on") != dialConfig.end()){
                 std::map<std::string, std::vector<int>> dontApplyOnMap;
                 auto conditions = dialConfig["dont_apply_on"].items();
                 for (auto condition = conditions.begin(); condition != conditions.end(); ++condition){
                     dontApplyOnMap[condition.key()] = dialConfig["dont_apply_on"][condition.key()].get<std::vector<int>>();
                 }
                 xsecDial.SetDontApplyOnMap(dontApplyOnMap);
+            }
+            if(dialConfig.find("apply_condition") != dialConfig.end()){
+                std::string applyCondition = dialConfig["apply_condition"].get<std::string>();
+                xsecDial.SetApplyCondition(applyCondition);
             }
 
             xsecDial.Print(false);

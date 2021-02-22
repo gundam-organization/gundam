@@ -797,7 +797,6 @@ void readGenWeightsFiles(){
         }
     };
 
-
     if(__nbThreads__ > 1){
         std::vector<std::future<void>> threadsList;
         for( int iThread = 0 ; iThread < __nbThreads__; iThread++ ){
@@ -817,127 +816,6 @@ void readGenWeightsFiles(){
     else{
         readInputFilesFunction(-1);
     }
-
-//    for(int iFile = 0 ; iFile < nbGenWightsFiles; iFile++){
-//
-//        GenericToolbox::displayProgressBar(iFile, nbGenWightsFiles, LogWarning.getPrefixString()+"Reading genWeights files...");
-//        LogAlert << "Opening genWeights file " << GenericToolbox::splitString(__listGenWeightsFiles__[iFile], "/").back();
-//        LogAlert << " " << iFile+1 << "/" << int(__listGenWeightsFiles__.size()) << "..." << std::endl;
-//
-//        if( not GenericToolbox::doesTFileIsValid(__listGenWeightsFiles__[iFile]) ){
-//            LogError << __listGenWeightsFiles__[iFile] << " can't be opened. Skipping..." << std::endl;
-//            continue; // skip
-//        }
-//
-//        // Closing the previously opened genWeights file
-//        if(__currentGenWeightsTFile__ != nullptr){
-//            __currentGenWeightsTFile__->Close();
-//            delete __currentGenWeightsTFile__;
-//            __currentSampleSumTTree__ = nullptr;
-//            __currentFlatTree__ = nullptr;
-//        }
-//        __currentGenWeightsTFile__ = TFile::Open(__listGenWeightsFiles__[iFile].c_str(), "READ");
-//        __currentSampleSumTTree__  = (TTree*)__currentGenWeightsTFile__->Get("sample_sum");
-//        __currentFlatTree__        = (TTree*)__currentGenWeightsTFile__->Get("flattree");
-//
-//        if(__currentSampleSumTTree__ == nullptr or __currentFlatTree__ == nullptr){
-//            LogError << "Could not find needed TTrees: ";
-//            LogError << "__currentFlatTree__=" << __currentFlatTree__;
-//            LogError << "__currentFlatTree__=" << __currentFlatTree__ << std::endl;
-//            LogError << "Skipping..." << std::endl;
-//            continue;
-//        }
-//
-//        if(not buildTreeSyncCache()) continue;
-//
-//        LogInfo << "Grabbing Splines Graphs..." << std::endl;
-//        __currentSampleSumTTree__->GetEntry(0);
-//        int nbOfSamples = __currentSampleSumTTree__->GetLeaf("NSamples")->GetValue(0);
-//        std::map<std::string, TClonesArray*> clone_array_map;
-//        GenericToolbox::muteRoot();
-//        for( auto &syst_name : __listSystematicXsecSplineNames__ ){
-//
-//            clone_array_map[syst_name] = new TClonesArray("TGraph", nbOfSamples);
-//
-//            __currentSampleSumTTree__->SetBranchAddress(
-//                Form("%sGraph", __mapXsecToGenWeights__[syst_name].c_str()),
-//                &clone_array_map[syst_name]
-//            );
-//
-//        }
-//        GenericToolbox::unmuteRoot();
-//
-//        LogInfo << "Looping over all the genWeights entries..." << std::endl;
-//        int nbGenWeightsEntries = __currentSampleSumTTree__->GetEntries();
-//        int nbGraphsFound = 0;
-//        for(int iGenWeightsEntry = 0 ; iGenWeightsEntry < nbGenWeightsEntries; iGenWeightsEntry++){
-//
-//            if(__currentGenWeightToTreeConvEntry__[iGenWeightsEntry] == -1){
-//                continue;
-//            }
-//
-//            __currentSampleSumTTree__->GetEntry(iGenWeightsEntry);
-//            __treeConverterRecoTTree__->GetEntry(__currentGenWeightToTreeConvEntry__[iGenWeightsEntry]);
-//
-//            fillSplineBin(__splineBinHandler__, __treeConverterRecoTTree__);
-//
-//            if(__splineBinHandler__.kinematicBin == -1) continue;
-//
-//            for( auto & systName : __listSystematicXsecSplineNames__){
-//
-//                for(int iSample = 0 ; iSample < nbOfSamples ; iSample++ ){
-//
-//                    if(iSample >= clone_array_map[systName]->GetSize() ) continue;
-//
-//                    auto* newGraph = (TGraph*)(clone_array_map[systName]->At(iSample));
-//
-//                    if( clone_array_map[systName]->At(iSample) != nullptr
-//                        and newGraph->GetN() > 1
-//                        ){
-//
-//                        bool splines_are_non_zeroed = false;
-//                        for(int i_point = 0 ; i_point < newGraph->GetN() ; i_point++){
-//                            if(newGraph->GetY()[i_point] != 0){
-//                                splines_are_non_zeroed = true;
-//                                break;
-//                            }
-//                        }
-//                        if(not splines_are_non_zeroed)
-//                            continue;
-//
-//                        std::string binName = "graph_";
-//                        binName += __splineBinHandler__.generateBinName();
-//
-//                        newGraph->SetName(binName.c_str());
-//                        newGraph->SetTitle(binName.c_str());
-//                        newGraph->SetMarkerStyle(kFullDotLarge);
-//                        newGraph->SetMarkerSize(1);
-//                        nbGraphsFound++;
-//
-//                        __splineBinHandler__.graphHandler = (TGraph*)newGraph->Clone();
-//                        __splineBinHandler__.splinePtr
-//                            = new TSpline3(
-//                            __splineBinHandler__.graphHandler->GetName(), __splineBinHandler__.graphHandler );
-//
-//                        __mapOutSplineTTrees__[systName + "_Unbinned"]->Fill();
-//
-//                    }
-//                }
-//
-//            }
-//
-//        } // i_entry
-//
-//        LogInfo << "Freeing up memory..." << std::endl;
-//        LogDebug << "RAM used before: " << GenericToolbox::parseSizeUnits(GenericToolbox::getProcessMemoryUsage()) << std::endl;
-//        for( auto &syst_name : __listSystematicXsecSplineNames__){
-//            delete clone_array_map[syst_name];
-//        }
-//        LogDebug << "RAM used after: " << GenericToolbox::parseSizeUnits(GenericToolbox::getProcessMemoryUsage()) << std::endl;
-//
-//        LogInfo.quietLineJump();
-//
-//    }
 
     LogInfo << "Writing Unbinned Splines TTrees..." << std::endl;
     for( auto &syst_name : __listSystematicXsecSplineNames__){
@@ -1592,53 +1470,71 @@ void generateJsonConfigFile(){
             dial_ss << "      \"limit_hi\" : " << (*xsec_param_ub)[iSpline] << "," << std::endl;
 
             std::map<std::string, std::vector<int>> applyOnlyOnMap;
+            std::vector<std::string> applyConditionsList;
 
             if(     GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "2p2h_norm")){
                 // 2p2h_norm* - 2p2h
                 applyOnlyOnMap["reaction"].emplace_back(__toReactionIndex__["2p2h"]);
+                applyConditionsList.emplace_back(
+                    "reaction == " + std::to_string(__toReactionIndex__["2p2h"])
+                    );
             }
             if(   GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "Q2_")
                or GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "EB_")
                or GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "CC_norm_")
                ){
                 applyOnlyOnMap["reaction"].emplace_back(__toReactionIndex__["CCQE"]);
+                applyConditionsList.emplace_back(
+                    "reaction == " + std::to_string(__toReactionIndex__["CCQE"])
+                );
             }
             if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "CC_Misc")){
                 // CC_Misc - CCGamma, CCKaon, CCEta
                 // CC Misc Misc Spline 100% normalisation error on CC1γ, CC1K, CC1η.
                 // all reactions but -> only CC-Other
                 applyOnlyOnMap["topology"].emplace_back(__toTopologyIndex__["CCOther"]);
+                applyConditionsList.emplace_back(
+                    "topology == " + std::to_string(__toTopologyIndex__["CCOther"])
+                );
             }
             if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "CC_DIS_MultPi")){
                 // CC_DIS_MultiPi_Norm_Nu - CCDIS and CCMultPi, nu only
                 // CC_DIS_MultiPi_Norm_nuBar - CCDIS and CCMultPi, anu only
                 applyOnlyOnMap["topology"].emplace_back(__toTopologyIndex__["CCOther"]);
                 applyOnlyOnMap["reaction"].emplace_back(__toReactionIndex__["DIS"]);
+                applyConditionsList.emplace_back("topology == " + std::to_string(__toTopologyIndex__["CCOther"]));
+                applyConditionsList.emplace_back("reaction == " + std::to_string(__toReactionIndex__["DIS"]));
             }
             if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "CC_Coh_")){
                 //
                 applyOnlyOnMap["topology"].emplace_back(__toTopologyIndex__["CCOther"]);
-                applyOnlyOnMap["reaction"].emplace_back(__toTopologyIndex__["Coh"]);
+                applyOnlyOnMap["reaction"].emplace_back(__toReactionIndex__["COH"]);
+                applyConditionsList.emplace_back("topology == " + std::to_string(__toTopologyIndex__["CCOther"]));
+                applyConditionsList.emplace_back("reaction == " + std::to_string(__toReactionIndex__["COH"]));
             }
 
             if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "nue_numu")){
                 // nue_numu - All nue
                 applyOnlyOnMap["nutype"].emplace_back(12);
+                applyConditionsList.emplace_back("nutype == 12");
             }
             else if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "nuebar_numubar")){
                 // nuebar_numubar - All nuebar
                 applyOnlyOnMap["nutype"].emplace_back(-12);
+                applyConditionsList.emplace_back("nutype == -12");
             }
             else if(GenericToolbox::doesStringEndsWithSubstring(xsecSplineName, "_nu", true)){
                 applyOnlyOnMap["nutype"].emplace_back(12);
                 applyOnlyOnMap["nutype"].emplace_back(14);
+                applyConditionsList.emplace_back("nutype > 0");
             }
             else if(GenericToolbox::doesStringEndsWithSubstring(xsecSplineName, "_nubar", true)){
                 applyOnlyOnMap["nutype"].emplace_back(-12);
                 applyOnlyOnMap["nutype"].emplace_back(-14);
+                applyConditionsList.emplace_back("nutype < 0");
             }
 
-            if(not applyOnlyOnMap.empty()){
+            if(not applyOnlyOnMap.empty() and false){ // DISABLED
                 dial_ss << "      \"apply_only_on\" : {" << std::endl;
                 bool isFirstCondition = true;
                 for(const auto& applyOnlyOnCondition : applyOnlyOnMap){
@@ -1658,10 +1554,12 @@ void generateJsonConfigFile(){
 
             if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "NC_other_near")){
                 // NC_other_near - all NC which isn't Coh or 1gamma
-                dontApplyOnMap["reaction"].emplace_back(__toReactionIndex__["Coh"]);
+                dontApplyOnMap["reaction"].emplace_back(__toReactionIndex__["COH"]);
+                applyConditionsList.emplace_back("reaction == " + std::to_string(__toReactionIndex__["NC"]));
+//                applyConditionsList.emplace_back("reaction != " + std::to_string(__toReactionIndex__["COH"]));
             }
 
-            if(not dontApplyOnMap.empty()){
+            if(not dontApplyOnMap.empty() and false){ // DISABLED
                 dial_ss << "      \"dont_apply_on\" : {" << std::endl;
                 bool isFirstCondition = true;
                 for(const auto& dontApplyOnCondition : dontApplyOnMap){
@@ -1677,8 +1575,16 @@ void generateJsonConfigFile(){
                 dial_ss << "      }," << std::endl;
             }
 
-            dial_ss << "      \"use\" : true" << std::endl;
+            if(not applyConditionsList.empty()){
+                dial_ss << "      \"apply_condition\" : \"" << GenericToolbox::joinVectorString(applyConditionsList, " && ") << "\"," << std::endl;
+            }
+
+            if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "EB")) dial_ss << "      \"use\" : false" << std::endl;
+            else dial_ss << "      \"use\" : true" << std::endl;
             dial_ss << "    }";
+
+
+
 
             dial_strings.emplace_back(dial_ss.str());
 
@@ -1704,7 +1610,7 @@ void generateJsonConfigFile(){
     std::stringstream config_ss;
     config_ss << "{" << std::endl;
     config_ss << "  \"input_dir\" : \"/" << GenericToolbox::joinVectorString(input_dir_elements, "/") << "/\"," << std::endl;
-    config_ss << "  \"dials\" : " << std::endl;
+    config_ss << "  \"dials\" :" << std::endl;
     config_ss << "  [" << std::endl;
     config_ss << GenericToolbox::joinVectorString(dial_strings, ",\n") << std::endl;
     config_ss << "  ]" << std::endl;

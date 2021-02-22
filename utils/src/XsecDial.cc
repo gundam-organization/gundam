@@ -39,6 +39,26 @@ void XsecDial::SetApplyOnlyOnMap(const std::map<std::string, std::vector<int>>& 
 void XsecDial::SetDontApplyOnMap(const std::map<std::string, std::vector<int>>& dontApplyOnMap_){
     _dontApplyOnMap_ = dontApplyOnMap_;
 }
+void XsecDial::SetApplyCondition(std::string applyCondition_){
+    _applyCondition_ = std::move(applyCondition_);
+
+    if(GlobalVariables::getChainList().empty()){
+        LogFatal << GET_VAR_NAME_VALUE(GlobalVariables::getChainList().empty()) << std::endl;
+        throw std::logic_error(GET_VAR_NAME_VALUE(GlobalVariables::getChainList().empty()));
+    }
+
+    for(size_t iThread = 0 ; iThread < GlobalVariables::getChainList().size() ; iThread++){
+        _applyConditionFormulaeList_.emplace_back(
+            new TTreeFormula(
+                Form("apply_conditions_%s_%i", m_name.c_str(), iThread),
+                _applyCondition_.c_str(),
+                GlobalVariables::getChainList().at(iThread)
+            )
+        );
+        GlobalVariables::getChainList().at(iThread)->SetNotify(_applyConditionFormulaeList_.at(iThread));
+    }
+
+}
 
 void XsecDial::ReadSplines(const std::string& fname_splines)
 {
@@ -335,6 +355,7 @@ std::string XsecDial::GetSplineName(int index) const
 {
     return std::string(v_splines.at(index).GetTitle());
 }
+const std::string& XsecDial::GetApplyCondition() const { return _applyCondition_; }
 
 void XsecDial::SetVars(double nominal, double step, double limit_lo, double limit_hi)
 {
@@ -413,3 +434,6 @@ void XsecDial::SetStep(double step) { m_step = step; }
 void XsecDial::SetLimitLo(double limit_lo) { m_limit_lo = limit_lo; }
 void XsecDial::SetLimitHi(double limit_hi) { m_limit_hi = limit_hi; }
 void XsecDial::SetIsNormalizationDial(bool isNormalizationDial_) { _isNormalizationDial_ = isNormalizationDial_; }
+std::vector<TTreeFormula*>& XsecDial::getApplyConditionFormulaeList() {
+    return _applyConditionFormulaeList_;
+}

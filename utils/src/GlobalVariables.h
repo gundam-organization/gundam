@@ -8,6 +8,9 @@
 #include <map>
 #include <mutex>
 
+#include <TTree.h>
+#include <TChain.h>
+
 class GlobalVariables{
 
 public:
@@ -19,13 +22,14 @@ public:
     static int& getNbThreads();
     static std::mutex& getThreadMutex();
     static std::map<std::string, bool>& getBoolMap();
-
+    static std::vector<TChain*>& getChainList();
 
 private:
 
     static int _nbThreads_;
     static std::mutex _threadMutex_;
     static std::map<std::string, bool> _boolMap_;
+    static std::vector<TChain*> _chainList_;
 
 };
 

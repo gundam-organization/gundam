@@ -8,6 +8,7 @@
 int GlobalVariables::_nbThreads_ = 1;
 std::mutex GlobalVariables::_threadMutex_;
 std::map<std::string, bool> GlobalVariables::_boolMap_;
+std::vector<TChain*> GlobalVariables::_chainList_;
 
 
 void GlobalVariables::setNbThreads(int nbThreads_){
@@ -17,3 +18,4 @@ void GlobalVariables::setNbThreads(int nbThreads_){
 int& GlobalVariables::getNbThreads(){ return _nbThreads_; }
 std::mutex& GlobalVariables::getThreadMutex() { return _threadMutex_; }
 std::map<std::string, bool>& GlobalVariables::getBoolMap() { return _boolMap_; }
+std::vector<TChain*>& GlobalVariables::getChainList() { return _chainList_; }

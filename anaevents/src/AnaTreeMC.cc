@@ -115,7 +115,7 @@ void AnaTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples,
     eventHolder.SetFloatVarNameListPtr(enabledFloatLeafs);
 
     // Claiming memory and mapping events
-    LogInfo << "Claiming memory and mapping events..." << std::endl;
+    LogInfo << "Performing topology cuts on samples and claiming memory..." << std::endl;
     std::string progressTitle = LogWarning.getPrefixString() + "Claiming memory and mapping events...";
     int totalNbEventsToLoad = 0;
     for( int jEntry = 0 ; jEntry < fChain->GetEntries() ; jEntry++ ) {
@@ -150,14 +150,27 @@ void AnaTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples,
     } // jEntry
 
     auto* counterPtr = new int();
-    std::vector<TChain*>* chainListPtr = nullptr;
+
+    // Will be used externally:
+    GlobalVariables::getChainList().resize(GlobalVariables::getNbThreads());
     if(GlobalVariables::getNbThreads() > 1){
-        chainListPtr = new std::vector<TChain*>();
         for( int iThread = 0 ; iThread < GlobalVariables::getNbThreads() ; iThread++ ){
-            chainListPtr->emplace_back(new TChain(fChain->GetName()));
-            chainListPtr->back()->Add(_file_name_.c_str());
+            GlobalVariables::getChainList().at(iThread) = new TChain(fChain->GetName());
+            GlobalVariables::getChainList().at(iThread)->Add(_file_name_.c_str());
         }
     }
+    else{
+        GlobalVariables::getChainList().at(0) = fChain;
+    }
+
+    std::vector<TChain*>* chainListPtr = &GlobalVariables::getChainList();
+//    if(GlobalVariables::getNbThreads() > 1){
+//        chainListPtr = new std::vector<TChain*>();
+//        for( int iThread = 0 ; iThread < GlobalVariables::getNbThreads() ; iThread++ ){
+//            chainListPtr->emplace_back(new TChain(fChain->GetName()));
+//            chainListPtr->back()->Add(_file_name_.c_str());
+//        }
+//    }
 
     std::function<void(int)> fillEvents = [counterPtr, chainListPtr, ana_samples, additionalCutsList, this](int iThread_){
 
@@ -203,12 +216,6 @@ void AnaTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples,
             }
 
         }
-
-//        if(isMultiThreaded){
-//            GlobalVariables::getThreadMutex().lock(); // if not locked -> delete crash
-//            delete threadChain;
-//            GlobalVariables::getThreadMutex().unlock();
-//        }
 
     };
 
