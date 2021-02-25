@@ -61,6 +61,7 @@ public:
     void MakeOneSigmaChecks();
     bool Fit();
     void WritePostFitData();
+    void ScanParameters(unsigned int nbSteps_);
 
     double EvalFit(const double* par);
     void UpdateFitParameterValues(const double* par);
@@ -116,7 +117,6 @@ protected:
     void PassIfInitialized(const std::string& method_name_) const;
     void PassIfNotInitialized(const std::string& method_name_) const;
 
-    void GenerateToyData(int toy_type, bool stat_fluc = false);
     void SaveParams(const std::vector<std::vector<double>>& new_pars);
     void SaveEventHist(int fititer, bool is_final = false);
     void SaveEventTree(std::vector<std::vector<double>>& par_results);

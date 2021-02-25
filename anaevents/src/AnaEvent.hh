@@ -16,14 +16,28 @@
 
 class AnaEvent
 {
+
 public:
 
+    typedef enum{
+        MC = 0,
+        DATA
+    } AnaEventType;
+
     AnaEvent(){
+        _anaEventType_     = MC;
+        _intNameListPtr_ = nullptr;
+        _floatNameListPtr_ = nullptr;
+        Reset();
+    }
+    AnaEvent(AnaEventType anaEventType_){
+        _anaEventType_ = anaEventType_;
         _intNameListPtr_ = nullptr;
         _floatNameListPtr_ = nullptr;
         Reset();
     }
     explicit AnaEvent(long int evid){
+        _anaEventType_     = MC;
         _intNameListPtr_ = nullptr;
         _floatNameListPtr_ = nullptr;
         Reset();
@@ -53,13 +67,16 @@ public:
     void ResetIntContainer(){
         _defaultIntNameList_.clear();
 
-        _defaultIntNameList_.emplace_back("topology");
-        _defaultIntNameList_.emplace_back("reaction");
-        _defaultIntNameList_.emplace_back("target");
-        _defaultIntNameList_.emplace_back("cut_branch");
-        _defaultIntNameList_.emplace_back("nutype");
         _defaultIntNameList_.emplace_back("beammode");
-        _defaultIntNameList_.emplace_back("signal");
+        _defaultIntNameList_.emplace_back("topology");
+        _defaultIntNameList_.emplace_back("cut_branch");
+
+        if(_anaEventType_ == MC){
+            _defaultIntNameList_.emplace_back("nutype");
+            _defaultIntNameList_.emplace_back("reaction");
+            _defaultIntNameList_.emplace_back("target");
+            _defaultIntNameList_.emplace_back("signal");
+        }
 
         _intNameListPtr_ = &_defaultIntNameList_;
         _intValuesList_.resize(_intNameListPtr_->size());
@@ -69,16 +86,19 @@ public:
     void ResetFloatContainer(){
         _defaultFloatNameList_.clear();
 
-        _defaultFloatNameList_.emplace_back("enu_true");
         _defaultFloatNameList_.emplace_back("enu_reco");
-        _defaultFloatNameList_.emplace_back("D1True");
         _defaultFloatNameList_.emplace_back("D1Reco");
-        _defaultFloatNameList_.emplace_back("D2True");
         _defaultFloatNameList_.emplace_back("D2Reco");
         _defaultFloatNameList_.emplace_back("q2_reco");
-        _defaultFloatNameList_.emplace_back("q2_true");
-        _defaultFloatNameList_.emplace_back("weight");
-        _defaultFloatNameList_.emplace_back("weightMC");
+        _defaultFloatNameList_.emplace_back("weight"); // asimov
+
+        if(_anaEventType_ == MC){
+            _defaultFloatNameList_.emplace_back("enu_true");
+            _defaultFloatNameList_.emplace_back("D1True");
+            _defaultFloatNameList_.emplace_back("D2True");
+            _defaultFloatNameList_.emplace_back("q2_true");
+            _defaultFloatNameList_.emplace_back("weightMC");
+        }
 
         _floatNameListPtr_ = &_defaultFloatNameList_;
         _floatValuesList_.resize(_floatNameListPtr_->size());
@@ -167,6 +187,9 @@ public:
     }
 
     // Setters
+    void SetAnaEventType(AnaEventType anaEventType_){
+        _anaEventType_ = anaEventType_;
+    }
     void SetEventId(long int evid){ m_evid = evid; }
     void SetTrueBinIndex(int trueBinIndex_) { _trueBinIndex_ = trueBinIndex_; }
     void SetRecoBinIndex(int recoBinIndex_) { _recoBinIndex_ = recoBinIndex_; }
@@ -174,15 +197,36 @@ public:
     void SetTrueEvent(const bool flag = true){ m_true_evt = flag; }
 
     void SetIntVarNameListPtr(std::vector<std::string>*   intNameListPtr_){
+        // Copy old values
+        std::vector<Int_t> newIntValuesList(intNameListPtr_->size());
+        for( size_t iName = 0 ; iName < _intNameListPtr_->size() ; iName++ ){
+            for( size_t jName = 0 ; jName < intNameListPtr_->size() ; jName++ ){
+                if(_intNameListPtr_->at(iName) == intNameListPtr_->at(jName)){
+                    newIntValuesList.at(jName) = _intValuesList_.at(iName);
+                }
+            }
+        }
+
         _intNameListPtr_ = intNameListPtr_;
         _defaultIntNameList_.clear(); // save memory since it's not used anymore
-        _intValuesList_.resize(_intNameListPtr_->size());
+
+        _intValuesList_ = newIntValuesList;
         HookIntMembers();
     }
     void SetFloatVarNameListPtr(std::vector<std::string>*   floatNameListPtr_){
+        // Copy old values
+        std::vector<Float_t> newFloatValuesList(floatNameListPtr_->size());
+        for( size_t iName = 0 ; iName < _floatNameListPtr_->size() ; iName++ ){
+            for( size_t jName = 0 ; jName < floatNameListPtr_->size() ; jName++ ){
+                if(_floatNameListPtr_->at(iName) == floatNameListPtr_->at(jName)){
+                    newFloatValuesList.at(jName) = _floatValuesList_.at(iName);
+                }
+            }
+        }
+
         _floatNameListPtr_ = floatNameListPtr_;
         _defaultFloatNameList_.clear(); // save memory since it's not used anymore
-        _floatValuesList_.resize(_floatNameListPtr_->size());
+        _floatValuesList_ = newFloatValuesList;
         HookFloatMembers();
     }
 
@@ -260,23 +304,6 @@ public:
             LogInfo << "  \"" << (*_floatNameListPtr_)[iFloat] << "\": " << _floatValuesList_[GetFloatIndex((*_floatNameListPtr_)[iFloat])];
         }
         LogInfo << std::endl << "}" << std::endl;
-
-//        std::cout << "Event ID    " << m_evid << std::endl
-//                  << "Topology    " << GetTopology() << std::endl
-//                  << "Reaction    " << GetReaction() << std::endl
-//                  << "Target      " << GetTarget() << std::endl
-//                  << "Flavor      " << GetFlavor() << std::endl
-//                  << "Beam mode   " << GetBeamMode() << std::endl
-//                  << "Sample      " << GetSampleType() << std::endl
-//                  << "Signal      " << GetSignalType() << std::endl
-//                  << "True energy " << GetTrueEnu() << std::endl
-//                  << "Reco energy " << GetRecoEnu() << std::endl
-//                  << "True D1     " << GetTrueD1() << std::endl
-//                  << "Reco D1     " << GetRecoD1() << std::endl
-//                  << "True D2     " << GetTrueD2() << std::endl
-//                  << "Reco D2     " << GetRecoD2() << std::endl
-//                  << "Weight      " << GetEvWght() << std::endl
-//                  << "Weight MC   " << GetEvWghtMC() << std::endl;
     }
 
     Int_t& GetEventVarInt(const std::string& varName_) {
@@ -288,32 +315,12 @@ public:
 
     // Deprecated
     Int_t GetEventVar(const std::string& var) {
-//        if(var == "topology")
-//            return m_topology;
-//        else if(var == "reaction")
-//            return m_reaction;
-//        else if(var == "target")
-//            return m_target;
-//        else if(var == "beammode")
-//            return m_beammode;
-//        else if(var == "flavor")
-//            return m_flavor;
-//        else if(var == "sample")
-//            return m_sample;
-//        else if(var == "signal")
-//            return m_sig_type;
-//        else{
-//            try{
-//                return GetEventVarInt(var);
-//            }
-//            catch(...){
-//                return -1;
-//            }
-//        }
         return GetEventVarInt(var);
     }
 
 private:
+
+    AnaEventType _anaEventType_;
 
     // Multi-thread security
     bool _isBeingEdited_;

@@ -24,7 +24,9 @@
 
 
 //! Global Variables
-bool __is_dry_run__ = false;
+bool __isDryRun__           = false;
+bool __skipOneSigmaChecks__ = false;
+
 int __PRNG_seed__ = -1;
 std::string __jsonConfigPath__;
 
@@ -313,13 +315,13 @@ int main(int argc, char** argv)
     xsec_parameters.SetEnableZeroWeightFenceGate(true);
     fitter.Initialize();
     fitter.WritePrefitData();
-    fitter.MakeOneSigmaChecks();
+    if(not __skipOneSigmaChecks__) fitter.MakeOneSigmaChecks();
     xsec_parameters.SetEnableZeroWeightFenceGate(false);
 
     monitorRAMPoint("RAM taken by the fitter");
 
     bool did_converge = false;
-    if(not __is_dry_run__) {
+    if(not __isDryRun__) {
 
         // Do the Fit
         did_converge = fitter.Fit();
@@ -330,10 +332,8 @@ int main(int argc, char** argv)
             LogWarning  << "Fit has converged." << std::endl;
 
         fitter.WritePostFitData();
+        fitter.ScanParameters(100);
 
-//        std::vector<int> par_scans = options_parser.par_scan_list;
-//        if(!par_scans.empty())
-//            fitter.ParameterScans(par_scans, options_parser.par_scan_steps);
     }
     else{
         LogWarning << "Dry run is enabled. The fit is ignored." << std::endl;
@@ -363,7 +363,8 @@ std::string remindUsage()
     remind_usage_ss << "  -j : JSON input (Current : " << __jsonConfigPath__ << ")" << std::endl;
     remind_usage_ss << "  -o : Override output file path (Current : " << __outFilePath__ << ")" << std::endl;
     remind_usage_ss << "  -t : Override number of threads (Current : " << GlobalVariables::getNbThreads() << ")" << std::endl;
-    remind_usage_ss << "  -d : Enable dry run (Current : " << __is_dry_run__ << ")" << std::endl;
+    remind_usage_ss << "  -d : Enable dry run (Current : " << __isDryRun__ << ")" << std::endl;
+    remind_usage_ss << "  --skip-one-sigma-checks : Skip one sigma checks (Current : " << __skipOneSigmaChecks__ << ")" << std::endl;
     remind_usage_ss << "*********************************************************" << std::endl;
 
     LogInfo << remind_usage_ss.str();
@@ -433,7 +434,10 @@ void getUserParameters(){
             }
         }
         else if(std::string(__argv__[i_arg]) == "-d"){
-            __is_dry_run__ = true;
+            __isDryRun__ = true;
+        }
+        else if(std::string(__argv__[i_arg]) == "--skip-one-sigma-checks"){
+            __skipOneSigmaChecks__ = true;
         }
 
     }

@@ -126,51 +126,51 @@ void AnaSample::SetTopologyHLCode(const std::vector<int>& HLTopologyCodes)
 }
 
 // ClearEvents -- clears all events from event vector
-void AnaSample::ClearEvents() { m_events.clear(); }
+void AnaSample::ClearEvents() { m_mc_events.clear(); }
 
 // GetN -- get number of events stored
-int AnaSample::GetN() const { return m_events.size(); }
+int AnaSample::GetN() const { return m_mc_events.size(); }
 
 AnaEvent* AnaSample::GetEvent(int evnum)
 {
-    if(m_events.empty())
+    if(m_mc_events.empty())
     {
         LogError << "In AnaSample::GetEvent()" << std::endl;
         LogError << "No events are found in " << m_name << " sample." << std::endl;
         return nullptr;
     }
-    else if(evnum >= m_events.size())
+    else if(evnum >= m_mc_events.size())
     {
         LogError << "In AnaSample::GetEvent()" << std::endl;
         LogError << "Event number out of bounds in " << m_name << " sample." << std::endl;
         return nullptr;
     }
 
-    return &m_events.at(evnum);
+    return &m_mc_events.at(evnum);
 }
 
 std::vector<AnaEvent>& AnaSample::GetEventList(){
-    return m_events;
+    return m_mc_events;
 }
 
 void AnaSample::AddEvent(AnaEvent& event) {
-    m_events.emplace_back(event);
+    m_mc_events.emplace_back(event);
     // since default constructor doesn't do it by itself
-    m_events.back().HookIntMembers();
-    m_events.back().HookFloatMembers();
+    m_mc_events.back().HookIntMembers();
+    m_mc_events.back().HookFloatMembers();
 }
 
 void AnaSample::ResetWeights()
 {
-    for(auto& event : m_events)
+    for(auto& event : m_mc_events)
         event.SetEvWght(1.0);
 }
 
 void AnaSample::PrintStats() const
 {
-    double mem_kb = sizeof(m_events) * m_events.size() / 1000.0;
+    double mem_kb = sizeof(m_mc_events) * m_mc_events.size() / 1000.0;
     LogInfo << "Sample " << m_name << " ID = " << m_sample_id << std::endl;
-    LogInfo << "Num of events = " << m_events.size() << std::endl;
+    LogInfo << "Num of events = " << m_mc_events.size() << std::endl;
     LogInfo << "Memory used   = " << mem_kb << " kB." << std::endl;
 }
 
@@ -226,18 +226,24 @@ int AnaSample::GetBinIndex(const double D1, const double D2) const
 
 void AnaSample::FillEventHist(int datatype, bool stat_fluc){
 
+    this->FillEventHist(DataType(datatype), stat_fluc);
+
+}
+
+void AnaSample::FillEventHist(DataType datatype, bool stat_fluc){
+
     if(m_hpred != nullptr) m_hpred->Reset();
     if(m_hmc != nullptr) m_hmc->Reset();
     if(m_hmc_true != nullptr) m_hmc_true->Reset();
     if(m_hsig != nullptr) m_hsig->Reset();
 
-    for(std::size_t iEvent = 0; iEvent < m_events.size(); ++iEvent){
+    for(std::size_t iEvent = 0; iEvent < m_mc_events.size(); ++iEvent){
 
-        double D1_rec  = m_events[iEvent].GetRecoD1();
-        double D2_rec  = m_events[iEvent].GetRecoD2();
-        double D1_true = m_events[iEvent].GetTrueD1();
-        double D2_true = m_events[iEvent].GetTrueD2();
-        double wght    = datatype >= 0 ? m_events[iEvent].GetEvWght() : m_events[iEvent].GetEvWghtMC();
+        double D1_rec  = m_mc_events[iEvent].GetRecoD1();
+        double D2_rec  = m_mc_events[iEvent].GetRecoD2();
+        double D1_true = m_mc_events[iEvent].GetTrueD1();
+        double D2_true = m_mc_events[iEvent].GetTrueD2();
+        double wght    = datatype >= 0 ? m_mc_events[iEvent].GetEvWght() : m_mc_events[iEvent].GetEvWghtMC();
 
         int anybin_index_rec  = GetBinIndex(D1_rec, D2_rec);
         int anybin_index_true = GetBinIndex(D1_true, D2_true);
@@ -246,7 +252,7 @@ void AnaSample::FillEventHist(int datatype, bool stat_fluc){
         m_hmc->Fill(anybin_index_rec + 0.5, wght);
         m_hmc_true->Fill(anybin_index_true + 0.5, wght);
 
-        if(m_events[iEvent].isSignalEvent())
+        if(m_mc_events[iEvent].isSignalEvent())
             m_hsig->Fill(anybin_index_true + 0.5, wght);
     }
 
@@ -254,94 +260,46 @@ void AnaSample::FillEventHist(int datatype, bool stat_fluc){
     m_hmc->Scale(m_norm);
     m_hsig->Scale(m_norm);
 
-    if(datatype == 0 || datatype == -1)
+    if(datatype == kMC or datatype == kReset) {
         return;
+    }
+    else if( datatype == kAsimov or datatype == kExternal or datatype == kData ) {
 
-    else if(datatype == 1)
-    {
+        SetDataType(datatype);
         SetData(m_hpred);
         m_hdata->Reset();
 
-        if(stat_fluc)
+        if(m_data_events.empty()){
+            FillDataEventList();
+        }
+
+        int kinematicBinIndex;
+        for( size_t iEvent = 0 ; iEvent < m_data_events.size() ; iEvent++ ){
+            kinematicBinIndex = this->GetBinIndex(
+                m_data_events[iEvent].GetRecoD1(), m_data_events[iEvent].GetRecoD2()
+            );
+
+            if(kinematicBinIndex != -1) {
+                m_hdata->Fill(kinematicBinIndex + 0.5, m_data_events[iEvent].GetEvWght());
+            }
+//#ifndef NDEBUG
+//            else {
+//                LogWarning << "In AnaSample::FillEventHist()\n"
+//                           << "No bin for current data event.\n"
+//                           << "D1 Reco: " << m_data_events[iEvent].GetRecoD1() << std::endl
+//                           << "D2 Reco: " << m_data_events[iEvent].GetRecoD2() << std::endl;
+//            }
+//#endif
+        }
+
+        if( datatype == kAsimov ){
+            m_hdata->Scale( m_norm ); // should be normalized the same way as MC
+        }
+
+        if( (datatype == kAsimov or datatype == kExternal) and stat_fluc ) {
             LogInfo << "Applying statistical fluctuations..." << std::endl;
 
-        for(int j = 1; j <= m_hpred->GetNbinsX(); ++j)
-        {
-            double val = m_hpred->GetBinContent(j);
-            if(stat_fluc)
-                val = gRandom->Poisson(val);
-#ifndef NDEBUG
-            if(val == 0.0)
-            {
-                LogWarning << "In AnaSample::FillEventHist()\n"
-                           << m_name << " bin " << j
-                           << " has 0 entries. This may cause a problem with chi2 computations."
-                           << std::endl;
-                continue;
-            }
-#endif
-            m_hdata->SetBinContent(j, val);
-        }
-    }
-
-    else if(datatype == 2 || datatype == 3)
-    {
-        SetData(m_hpred);
-        m_hdata->Reset();
-
-        float D1_rec_tree, D2_rec_tree, wght;
-        int cut_branch;
-
-        m_data_tree->SetBranchAddress("cut_branch", &cut_branch);
-        m_data_tree->SetBranchAddress("weight", &wght);
-        m_data_tree->SetBranchAddress("D1Reco", &D1_rec_tree);
-        m_data_tree->SetBranchAddress("D2Reco", &D2_rec_tree);
-
-        m_additional_cuts_formulae->SetTree(m_data_tree);
-        m_data_tree->SetNotify(m_additional_cuts_formulae); // This is needed only for TChain.
-
-        long int n_entries = m_data_tree->GetEntries();
-        for(std::size_t i = 0; i < n_entries; ++i)
-        {
-            m_data_tree->GetEntry(i);
-            if(cut_branch != m_sample_id)
-                continue;
-
-            bool doesEventPassAdditionalCuts = false;
-            for(int jInstance = 0; jInstance < m_additional_cuts_formulae->GetNdata(); jInstance++) {
-                if (m_additional_cuts_formulae->EvalInstance(jInstance) ) {
-                    doesEventPassAdditionalCuts = true;
-                    break;
-                }
-            }
-
-            if(not doesEventPassAdditionalCuts){
-                continue;
-            }
-
-            int anybin_index = GetBinIndex(D1_rec_tree, D2_rec_tree);
-            if(anybin_index != -1)
-            {
-                m_hdata->Fill(anybin_index + 0.5, wght);
-            }
-#ifndef NDEBUG
-            else
-            {
-                LogWarning << "In AnaSample::FillEventHist()\n"
-                           << "No bin for current data event.\n"
-                           << "D1 Reco: " << D1_rec_tree << std::endl
-                           << "D2 Reco: " << D2_rec_tree << std::endl;
-            }
-#endif
-        }
-
-        if(stat_fluc && datatype == 2)
-        {
-            if(stat_fluc)
-                LogInfo << "Applying statistical fluctuations..." << std::endl;
-
-            for(unsigned int i = 1; i <= m_hdata->GetNbinsX(); ++i)
-            {
+            for(unsigned int i = 1; i <= m_hdata->GetNbinsX(); ++i) {
                 double val = gRandom->Poisson(m_hdata->GetBinContent(i));
                 m_hdata->SetBinContent(i, val);
             }
@@ -351,12 +309,87 @@ void AnaSample::FillEventHist(int datatype, bool stat_fluc){
         LogInfo << "Data histogram filled: " << std::endl;
         m_hdata->Print();
 #endif
-    }
 
-    else
-    {
+    }
+    else {
         LogWarning << "In AnaSample::FillEventHist()\n"
                    << "Invalid data type to fill histograms!\n";
+    }
+
+}
+
+void AnaSample::FillDataEventList(){
+
+    if(not m_data_events.empty()){
+        LogFatal << "Data event list not empty." << std::endl;
+        throw std::logic_error("Data event list not empty.");
+    }
+
+    if(m_hdata_type == kReset){
+        LogFatal << "m_hdata_type not set." << std::endl;
+        throw std::logic_error("m_hdata_type not set.");
+    }
+
+    if(m_hdata_type == kAsimov){
+        LogDebug << "Filling data events (Asimov)..." << std::endl;
+        for( size_t iEvent = 0 ; iEvent < m_mc_events.size() ; iEvent++ ){
+            m_data_events.emplace_back(AnaEvent(m_mc_events[iEvent])); // Copy
+            m_data_events.back().SetAnaEventType(AnaEvent::AnaEventType::DATA);
+        }
+    }
+    else{
+        LogDebug << "Filling data events..." << std::endl;
+        Long64_t nbEntries = m_data_tree->GetEntries();
+
+        int cut_branch;
+        m_data_tree->SetBranchAddress("cut_branch", &cut_branch);
+
+        m_additional_cuts_formulae->SetTree(m_data_tree);
+        m_data_tree->SetNotify(m_additional_cuts_formulae); // This is needed only for TChain.
+
+        bool skipEvent;
+        for(Long64_t iEntry = 0 ; iEntry < nbEntries; iEntry++){
+
+            m_data_tree->GetEntry(iEntry);
+            skipEvent = false;
+
+            if(cut_branch != m_sample_id){
+                skipEvent = true;
+            }
+            if(skipEvent) continue;
+
+            for( Int_t iInstance = 0 ; iInstance < m_additional_cuts_formulae->GetNdata() ; iInstance++ ) {
+                if ( m_additional_cuts_formulae->EvalInstance(iInstance) == 0 ) {
+                    skipEvent = true;
+                    break;
+                }
+            }
+            if(skipEvent) continue;
+
+            m_data_events.emplace_back(AnaEvent(AnaEvent::AnaEventType::DATA));
+
+            m_data_events.back().SetEventId(iEntry);
+            m_data_events.back().DumpTreeEntryContent(m_data_tree);
+
+        }
+    }
+
+
+}
+
+void AnaSample::PropagateMcWeightsToAsimovDataEvents(){
+
+    if(m_hdata_type != DataType::kAsimov){
+        LogFatal << __METHOD_NAME__ << " can only be used with DataType::kAsimov." << std::endl;
+        throw std::logic_error("m_hdata_type != DataType::kAsimov");
+    }
+    if(m_data_events.empty()){
+        LogFatal << "Data event list empty." << std::endl;
+        throw std::logic_error("Data event list empty.");
+    }
+
+    for( size_t iEvent = 0 ; iEvent < m_mc_events.size() ; iEvent++ ){
+        m_data_events.at(iEvent).SetEvWght( m_mc_events.at(iEvent).GetEvWght() );
     }
 
 }
@@ -386,6 +419,13 @@ void AnaSample::SetLLHFunction(const std::string& func_name)
         LogInfo << "Setting likelihood function to Barlow-Beeston." << std::endl;
         m_llh = new BarlowLLH;
     }
+}
+void AnaSample::SetDataType(DataType dataType_){
+    if(dataType_ == DataType::kReset or dataType_ == DataType::kMC){
+        LogFatal << "Can't set data type to either kReset or kMC" << std::endl;
+        throw std::logic_error("Invalid data type.");
+    }
+    m_hdata_type = dataType_;
 }
 
 // Compute the statistical chi2 contribution from this sample based on the current m_hpred and m_hdata histograms:
@@ -556,14 +596,14 @@ void AnaSample::GetSampleBreakdown(TDirectory* dirout, const std::string& tag,
     int Ntot = GetN();
 
     // Loop over all events:
-    for(std::size_t i = 0; i < m_events.size(); ++i)
+    for(std::size_t i = 0; i < m_mc_events.size(); ++i)
     {
-        double D1_rec    = m_events[i].GetRecoD1();
-        double D2_rec    = m_events[i].GetRecoD2();
-        double D1_true   = m_events[i].GetTrueD1();
-        double D2_true   = m_events[i].GetTrueD2();
-        double wght      = m_events[i].GetEvWght();
-        int evt_topology = m_events[i].GetTopology();
+        double D1_rec    = m_mc_events[i].GetRecoD1();
+        double D2_rec    = m_mc_events[i].GetRecoD2();
+        double D1_true   = m_mc_events[i].GetTrueD1();
+        double D2_true   = m_mc_events[i].GetTrueD2();
+        double wght      = m_mc_events[i].GetEvWght();
+        int evt_topology = m_mc_events[i].GetTopology();
 
         compos[evt_topology]++;
         int anybin_index_rec  = GetBinIndex(D1_rec, D2_rec);
