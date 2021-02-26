@@ -79,13 +79,17 @@ int main(int argc, char** argv)
 
     // Setup data trees
     std::string data_tfile_path = options_parser.fname_data;
-    LogInfo << "Opening data file: " << data_tfile_path << std::endl;
-    if(not GenericToolbox::doesTFileIsValid(data_tfile_path)){
-        LogError << data_tfile_path << " can't be opened." << std::endl;
-        exit(EXIT_FAILURE);
+    TTree* data_ttree = nullptr;
+    if(not data_tfile_path.empty()){
+        LogInfo << "Opening data file: " << data_tfile_path << std::endl;
+        if(not GenericToolbox::doesTFileIsValid(data_tfile_path)){
+            LogError << data_tfile_path << " can't be opened." << std::endl;
+            exit(EXIT_FAILURE);
+        }
+        TFile* data_tfile = TFile::Open(data_tfile_path.c_str(), "READ");
+        data_ttree  = (TTree*)(data_tfile->Get("selectedEvents"));
     }
-    TFile* data_tfile = TFile::Open(data_tfile_path.c_str(), "READ");
-    auto* data_ttree  = (TTree*)(data_tfile->Get("selectedEvents"));
+
 
     // Setup output tfile
     if(__outFilePath__.empty()){
@@ -127,14 +131,14 @@ int main(int argc, char** argv)
     LogInfo << "Reading and collecting events..." << std::endl;
     selected_events_AnaTreeMC.GetEvents(analysisSampleList, options_parser.signal_definition, false);
 
-    LogInfo << "Getting sample breakdown by topology..." << std::endl;
-    std::vector<std::string> sampleTopologyList = options_parser.sample_topology;
-    std::vector<int> topology_HL_codes = options_parser.topology_HL_code;
-    // Mapping the Highland topology codes to consecutive integers and then getting the topology breakdown for each sample:
-    for(auto& analysis_sample : analysisSampleList) {
-        analysis_sample->SetTopologyHLCode(topology_HL_codes);
-        analysis_sample->GetSampleBreakdown(output_tfile, "nominal", sampleTopologyList, false);
-    }
+//    LogInfo << "Getting sample breakdown by topology..." << std::endl;
+//    std::vector<std::string> sampleTopologyList = options_parser.sample_topology;
+//    std::vector<int> topology_HL_codes = options_parser.topology_HL_code;
+//    // Mapping the Highland topology codes to consecutive integers and then getting the topology breakdown for each sample:
+//    for(auto& analysis_sample : analysisSampleList) {
+//        analysis_sample->SetTopologyHLCode(topology_HL_codes);
+//        analysis_sample->GetSampleBreakdown(output_tfile, "nominal", sampleTopologyList, false);
+//    }
 
     monitorRAMPoint("RAM taken by samples definition");
 
@@ -314,7 +318,7 @@ int main(int argc, char** argv)
 
     xsec_parameters.SetEnableZeroWeightFenceGate(true);
     fitter.Initialize();
-    fitter.WritePrefitData();
+//    fitter.WritePrefitData();
     if(not __skipOneSigmaChecks__) fitter.MakeOneSigmaChecks();
     xsec_parameters.SetEnableZeroWeightFenceGate(false);
 

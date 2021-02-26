@@ -42,7 +42,6 @@ public:
     // Pre-initialization Methods
     void SetOutputTDirectory(TDirectory* output_tdirectory_);
     void SetPrngSeed(int PRNG_seed_);
-    void SetNbThreads(int nb_threads_);
     void SetMcNormalizationFactor(double MC_normalization_factor_);
     void SetMinimizationSettings(const MinSettings& minimization_settings_);
     void SetDisableSystFit(bool disable_syst_fit_);
@@ -125,10 +124,10 @@ protected:
 
     // Parallel methods
     void ReWeightEvents(int iThread_ = -1);
-    void ReFillSampleMcHistograms(int iThread_ = -1);
-
 
 private:
+
+    bool _disableMultiThread_;
 
     bool _is_initialized_;
     bool _fitHasBeenDone_;

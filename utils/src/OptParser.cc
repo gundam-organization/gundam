@@ -29,7 +29,8 @@ bool OptParser::ParseJSON(std::string json_file)
     f >> j;
 
     input_dir = xsLLh_env + j["input_dir"].get<std::string>();
-    fname_data = input_dir + j["data_file"].get<std::string>();
+    fname_data = j["data_file"].get<std::string>();
+    if(not fname_data.empty()) fname_data = input_dir + fname_data;
     fname_mc = input_dir + j["mc_file"].get<std::string>();
     fname_output = j["output_file"].get<std::string>();
 

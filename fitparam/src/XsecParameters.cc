@@ -293,7 +293,9 @@ void XsecParameters::ReWeight(AnaEvent* event, const std::string& detectorName, 
 
         if(not _lastAppliedParamList_.empty() // has it been set?
            and eventReweightCache->at(iDial) != -1 // cache is valid?
-           and _lastAppliedParamList_.at(iDial + v_offsets.at(detectorIndex)) == params.at(iDial + v_offsets.at(detectorIndex))){
+           and _lastAppliedParamList_.at(iDial + v_offsets.at(detectorIndex)) == params.at(iDial + v_offsets.at(detectorIndex))
+//           and false // DISABLE CACHE
+           ){
 
             currentDialWeight = eventReweightCache->at(iDial); // get from cache
 

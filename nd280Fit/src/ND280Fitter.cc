@@ -20,6 +20,8 @@ ND280Fitter::ND280Fitter() {
     _PRNG_ = new TRandom3();
     gRandom = _PRNG_;
 
+    _disableMultiThread_ = false;
+
     // Nullifying Native Objects which are handled by this class
     _minimizer_ = nullptr;
     _functor_   = nullptr;
@@ -163,8 +165,8 @@ void ND280Fitter::Initialize(){
 
     InitializeThreadsParameters();
     InitializeFitParameters();
-    InitializeDataSamples();
     InitializeFitter();
+    InitializeDataSamples();
 
     _is_initialized_ = true;
     LogWarning << "ND280 Fitter has been initialized." << std::endl;
@@ -185,6 +187,9 @@ void ND280Fitter::WritePrefitData(){
     std::vector<Color_t> colorCells = {kGreen-3, kTeal+3, kAzure+7, kCyan-2, kBlue-7, kBlue+2, kOrange+1, kOrange+9, kRed+2, kPink+9};
 
     GenericToolbox::mkdirTFile(_outputTDirectory_, "prefit")->cd();
+
+//    double maxD1Scale = 2000;
+    double maxD1Scale = -1;
 
     std::map<int, std::pair<std::string, Color_t>> reactionNamesAndColors = {
         {-1, {"no truth", kBlack}},
@@ -411,10 +416,12 @@ void ND280Fitter::WritePrefitData(){
         if(histToPlotList.empty()) continue;
 
         // Sorting histograms by norm (lowest stat first)
-        std::function<bool(TH1D*, TH1D*)> aGoesFirst = [](TH1D* histA_, TH1D* histB_){
+        std::function<bool(TH1D*, TH1D*)> aGoesFirst = [maxD1Scale](TH1D* histA_, TH1D* histB_){
             bool aGoesFirst = true; // A is smaller = A goes first
-            if(  histA_->Integral(histA_->FindBin(0), histA_->FindBin(2000)-1)
-               > histB_->Integral(histB_->FindBin(0), histB_->FindBin(2000)-1) ) aGoesFirst = false;
+            double Xmax = histA_->GetXaxis()->GetXmax();
+            if(maxD1Scale > 0) Xmax = maxD1Scale;
+            if(  histA_->Integral(histA_->FindBin(0), histA_->FindBin(Xmax)-1)
+               > histB_->Integral(histB_->FindBin(0), histB_->FindBin(Xmax)-1) ) aGoesFirst = false;
             return aGoesFirst;
         };
         auto p = GenericToolbox::getSortPermutation( histToPlotList, aGoesFirst );
@@ -442,7 +449,7 @@ void ND280Fitter::WritePrefitData(){
             if( iHist == lastIndex ){
                 double lastBinLowEdge = histToPlotList[iHist]->GetXaxis()->GetBinLowEdge(histToPlotList[iHist]->GetXaxis()->GetNbins());
                 histToPlotList[iHist]->GetXaxis()->SetRange(0,lastBinLowEdge);
-                histToPlotList[iHist]->GetXaxis()->SetRangeUser(0,2000);
+                histToPlotList[iHist]->GetXaxis()->SetRangeUser(histToPlotList[iHist]->GetXaxis()->GetXmin(),maxD1Scale);
                 double maxYplot = histToPlotList[iHist]->GetMaximum()*1.2;
                 histToPlotList[iHist]->GetYaxis()->SetRangeUser(minYValNonZero, maxYplot);
                 histToPlotList[iHist]->Draw("HIST");
@@ -579,10 +586,38 @@ void ND280Fitter::MakeOneSigmaChecks(){
     }
     oneSigmaDir->cd();
 
+    LogDebug << "Copying current weights..." << std::endl;
+    auto* par = new double[_minimizer_->NDim()];
+    for(unsigned int iPar = 0 ; iPar < _minimizer_->NDim() ; iPar++){
+        par[iPar] = _minimizer_->X()[iPar];
+    }
 
     // Make sure all weights a applied
     LogDebug << "Re-computing weights..." << std::endl;
-    this->PropagateSystematics();
+    UpdateFitParameterValues(par);
+    PropagateSystematics();
+    ComputeChi2();
+
+    double originalChi2 = _chi2Buffer_;
+
+    bool stopNow = false;
+    for(const auto& sample : _samplesList_){
+        double llh = sample->CalcLLH();
+        LogDebug << GET_VAR_NAME_VALUE(llh) << std::endl;
+        if(llh != 0){
+            stopNow = true;
+        }
+    }
+    if(stopNow){
+        _disableMultiThread_ = true;
+        LogError << "RETRYING SINGLE THREAD?" << std::endl;
+        this->PropagateSystematics();
+        for(const auto& sample : _samplesList_){
+            double llh = sample->CalcLLH();
+            LogDebug << GET_VAR_NAME_VALUE(llh) << std::endl;
+        }
+        throw std::runtime_error("STOP");
+    }
 
     LogDebug << "Computing nominal MC histograms..." << std::endl;
     std::map<std::string, TH1D*> nominalHistMap;
@@ -634,6 +669,8 @@ void ND280Fitter::MakeOneSigmaChecks(){
 
     }
 
+    auto originalParams = _newParametersList_;
+
 
     LogDebug << "Performing individual one sigma variations..." << std::endl;
     TMatrixD* covarianceMatrix = this->GeneratePriorCovarianceMatrix();
@@ -649,29 +686,35 @@ void ND280Fitter::MakeOneSigmaChecks(){
         LogDebug << "Running +1 sigma on: " << _parameter_names_[iSyst] << std::endl;
 
         // Create associated subdirectory
-        auto* currentDir = GenericToolbox::mkdirTFile( oneSigmaDir, _parameter_names_[iSyst].c_str() );
+        auto* currentDir = GenericToolbox::mkdirTFile( oneSigmaDir, _parameter_names_[iSyst] );
         currentDir->cd();
 
         // Put the parameter at 1 sigma
-        int systCandidate = 0;
-        double syst_val = -1;
-        double syst_shift = -1;
-        for(int jCat = 0; jCat < _fitParametersGroupList_.size(); ++jCat){
-            for(int jPar = 0 ; jPar < _fitParametersGroupList_[jCat]->GetNpar() ; jPar++){
-                if(systCandidate == iSyst){
-                    syst_val = _parameterPriorValues_[iSyst];
-                    _newParametersList_[jCat][jPar] = _parameterPriorValues_[iSyst] + TMath::Sqrt((*covarianceMatrix)[iSyst][iSyst]);
-                    syst_shift = TMath::Sqrt((*covarianceMatrix)[iSyst][iSyst]);
-//                    LogTrace << GET_VAR_NAME_VALUE(iSyst) << std::endl;
-//                    LogTrace << GET_VAR_NAME_VALUE(syst_val) << std::endl;
-//                    LogTrace << GET_VAR_NAME_VALUE(syst_shift) << std::endl;
-                }
-                systCandidate++;
-            }
-        }
+//        int systCandidate = 0;
+//        double syst_val = -1;
+//        double syst_shift = -1;
+//
+//        for( size_t jCat = 0 ; jCat < _fitParametersGroupList_.size() ; jCat++ ){
+//            for( int jPar = 0 ; jPar < _fitParametersGroupList_[jCat]->GetNpar() ; jPar++ ){
+//                if(systCandidate == iSyst){
+//                    syst_val = _parameterPriorValues_[iSyst];
+//                    syst_shift = TMath::Sqrt((*covarianceMatrix)[iSyst][iSyst]);
+//                    _newParametersList_[jCat][jPar] = syst_val + syst_shift;
+//                }
+//                systCandidate++;
+//            }
+//        }
+
+        double originalPar = par[iSyst];
+        par[iSyst] += TMath::Sqrt((*covarianceMatrix)[iSyst][iSyst]);
+        UpdateFitParameterValues(par);
+        PropagateSystematics();
+        ComputeChi2();
 
         // Propagate systematics
-        this->PropagateSystematics();
+        _printFitState_ = true;
+        this->ComputeChi2();
+        double chi2 = _chi2Buffer_;
 
         std::vector<Color_t> colorWheel = {
             kGreen-3,
@@ -803,21 +846,28 @@ void ND280Fitter::MakeOneSigmaChecks(){
             delete canvas.second;
         }
 
-        // Get back to 0 sigmas
-        systCandidate = 0;
-        for(int jCat = 0; jCat < _fitParametersGroupList_.size(); ++jCat){
-            for(int jPar = 0 ; jPar < _fitParametersGroupList_[jCat]->GetNpar() ; jPar++){
-                if(systCandidate == iSyst){
-                    _newParametersList_[jCat][jPar] = _parameterPriorValues_[iSyst];
+        LogDebug << std::endl;
+
+        par[iSyst] = originalPar;
+        UpdateFitParameterValues(par);
+        PropagateSystematics();
+        ComputeChi2();
+
+        if(originalChi2 != _chi2Buffer_){
+            for(const auto& sample : _samplesList_){
+                double llh = sample->CalcLLH();
+                LogDebug << GET_VAR_NAME_VALUE(llh) << ": " << (llh == 0) << std::endl;
+                if(llh != 0){
+                    throw std::runtime_error("lol");
                 }
-                systCandidate++;
             }
         }
 
-        LogDebug << std::endl;
+
 
     }
 
+    delete[] par;
     _outputTDirectory_->cd();
 
     LogInfo << "Make one sigma check just ended." << std::endl;
@@ -1043,7 +1093,9 @@ void ND280Fitter::InitializeThreadsParameters(){
                 }
 
                 if(_triggerReFillMcHistogramsThreads_.at(iThread_)){
-                    this->ReFillSampleMcHistograms(iThread_);
+                    for( size_t iSample = 0 ; iSample < _samplesList_.size() ; iSample++ ){
+                        _samplesList_[iSample]->FillMcHistogramsThread(iThread_);
+                    }
                     _triggerReFillMcHistogramsThreads_.at(iThread_) = false; // toggle off the trigger
                 }
 
@@ -1129,8 +1181,7 @@ void ND280Fitter::InitializeFitParameters(){
         return;
     }
 
-    // Prior Re-Weighting
-    LogInfo << "Applying prior systematics..." << std::endl;
+    LogWarning << "Propagating prior systematics..." << std::endl;
     this->PropagateSystematics();
 
 }
@@ -1394,18 +1445,6 @@ double ND280Fitter::EvalFit(const double* par){
         SaveEventHist(_nbFitCalls_);
     }
 
-    _chi2Buffer_ = _chi2StatBuffer_ + _chi2PullsBuffer_ + _chi2RegBuffer_;
-
-    ////////////////////////////////
-    // Print state
-    if(_printFitState_){
-        LogWarning << "Func Calls: " << _nbFitCalls_ << std::endl;
-        LogWarning << "Chi2 total: " << _chi2Buffer_ << std::endl;
-        LogWarning << "Chi2 stat : " << _chi2StatBuffer_ << std::endl
-                   << "Chi2 syst : " << _chi2PullsBuffer_ << std::endl
-                   << "Chi2 reg  : " << _chi2RegBuffer_ << std::endl;
-    }
-
     _durationHistoryHandler_[FIT_IT_TIME_POINT].emplace_back(GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(FIT_IT_TIME_POINT));
     LogDebug << "Call " << _nbFitCalls_ << " took: "
              << GenericToolbox::parseTimeUnit(_durationHistoryHandler_[FIT_IT_TIME_POINT].back())
@@ -1426,15 +1465,15 @@ void ND280Fitter::UpdateFitParameterValues(const double* par){
     ////////////////////////////////
 
     int iMinuitParIndex = 0;
-    for(int iSystSource = 0; iSystSource < _fitParametersGroupList_.size(); iSystSource++){
-        for(int iParameter = 0; iParameter < _fitParametersGroupList_[iSystSource]->GetNpar(); iParameter++){
-            _newParametersList_[iSystSource][iParameter] = par[iMinuitParIndex];
+    for(int iGroup = 0; iGroup < _fitParametersGroupList_.size(); iGroup++){
+        for(int iParameter = 0; iParameter < _fitParametersGroupList_[iGroup]->GetNpar(); iParameter++){
+            _newParametersList_[iGroup][iParameter] = par[iMinuitParIndex];
             iMinuitParIndex++;
         }
 
-        if(_fitParametersGroupList_[iSystSource]->IsDecomposed()){
-            _newParametersList_[iSystSource] = _fitParametersGroupList_[iSystSource]->GetOriginalParameters(
-                    _newParametersList_[iSystSource]
+        if(_fitParametersGroupList_[iGroup]->IsDecomposed()){
+            _newParametersList_[iGroup] = _fitParametersGroupList_[iGroup]->GetOriginalParameters(
+                    _newParametersList_[iGroup]
                 );
         }
     }
@@ -1454,7 +1493,7 @@ void ND280Fitter::PropagateSystematics(){
     ////////////////////////////////
     GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(REWEIGHT_TIME_POINT);
 
-    if(GlobalVariables::getNbThreads() > 1){
+    if(not _disableMultiThread_ and GlobalVariables::getNbThreads() > 1){
         for(int iThread = 0 ; iThread < GlobalVariables::getNbThreads(); iThread++){
             // Start every waiting thread
             _triggerReweightThreads_[iThread] = true;
@@ -1505,18 +1544,14 @@ void ND280Fitter::PropagateSystematics(){
     ////////////////////////////////
     GenericToolbox::getElapsedTimeSinceLastCallStr(FILL_TIME_POINT);
 
-    for(int iSample = 0 ; iSample < _samplesList_.size() ; iSample++){
-        if(_samplesList_[iSample]->GetPredHisto() != nullptr)
-            _samplesList_[iSample]->GetPredHisto()   ->Reset("ICESM");
-        if(_samplesList_[iSample]->GetMCHisto() != nullptr)
-            _samplesList_[iSample]->GetMCHisto()     ->Reset("ICESM");
-        if(_samplesList_[iSample]->GetMCTruthHisto() != nullptr)
-            _samplesList_[iSample]->GetMCTruthHisto()->Reset("ICESM");
-        if(_samplesList_[iSample]->GetSignalHisto() != nullptr)
-            _samplesList_[iSample]->GetSignalHisto() ->Reset("ICESM");
+    for( size_t iSample = 0 ; iSample < _samplesList_.size() ; iSample++ ){
+        _samplesList_[iSample]->ResetMcHistograms();
     }
 
-    if(GlobalVariables::getNbThreads() > 1){
+    if( GlobalVariables::getNbThreads() > 1
+//        and false
+        and not _disableMultiThread_
+       ){
         // Starting reweighting threads
         for(int iThread = 0 ; iThread < GlobalVariables::getNbThreads(); iThread++){
             _triggerReFillMcHistogramsThreads_[iThread] = true;
@@ -1524,25 +1559,22 @@ void ND280Fitter::PropagateSystematics(){
 
         // Wait for threads to finish their jobs
         for(int iThread = 0 ; iThread < GlobalVariables::getNbThreads(); iThread++){
-            while(_triggerReFillMcHistogramsThreads_[iThread]){ // triggerReweight are set to false when the thread is finished
+            while(_triggerReFillMcHistogramsThreads_[iThread]){
+                // triggerReweight are set to false when the thread is finished
 //                std::this_thread::sleep_for(std::chrono::milliseconds(30));
             }
         }
     } // _nbThreads_ > 1
     else {
         // single core
-        this->ReFillSampleMcHistograms();
+        for( size_t iSample = 0 ; iSample < _samplesList_.size() ; iSample++ ){
+            _samplesList_[iSample]->FillMcHistogramsThread();
+        }
     }
 
     for(int iSample = 0 ; iSample < _samplesList_.size() ; iSample++){
-        if(_samplesList_[iSample]->GetPredHisto() != nullptr)
-            _samplesList_[iSample]->GetPredHisto()   ->Scale(_samplesList_[iSample]->GetNorm());
-        if(_samplesList_[iSample]->GetMCHisto() != nullptr)
-            _samplesList_[iSample]->GetMCHisto()     ->Scale(_samplesList_[iSample]->GetNorm());
-        if(_samplesList_[iSample]->GetMCTruthHisto() != nullptr)
-            _samplesList_[iSample]->GetMCTruthHisto()->Scale(_samplesList_[iSample]->GetNorm());
-        if(_samplesList_[iSample]->GetSignalHisto() != nullptr)
-            _samplesList_[iSample]->GetSignalHisto() ->Scale(_samplesList_[iSample]->GetNorm());
+        _samplesList_[iSample]->MergeMcHistogramsThread(); // do nothing if single threaded
+        _samplesList_[iSample]->NormalizeMcHistograms();
     }
 
     _durationHistoryHandler_[FILL_TIME_POINT].emplace_back(
@@ -1563,32 +1595,37 @@ void ND280Fitter::ComputeChi2(){
     ////////////////////////////////
     // Compute chi2 stat
     ////////////////////////////////
+    _chi2StatBuffer_ = 0; // reset
+    double buffer;
     for(auto & sampleContainer : _samplesList_){
 
-        //double sampleChi2Stat = _samplesList_.at(sampleContainer)->CalcChi2();
-        double sampleChi2Stat = sampleContainer->CalcLLH();
-        //double sampleChi2Stat = _samplesList_.at(sampleContainer)->CalcEffLLH();
+        //buffer = _samplesList_.at(sampleContainer)->CalcChi2();
+        buffer = sampleContainer->CalcLLH();
+        //buffer = _samplesList_.at(sampleContainer)->CalcEffLLH();
 
         if(_printFitState_){
             LogInfo << "Chi2 stat for sample " << sampleContainer->GetName() << " is "
-                    << sampleChi2Stat << std::endl;
+                    << buffer << std::endl;
         }
 
-        _chi2StatBuffer_ += sampleChi2Stat;
+        _chi2StatBuffer_ += buffer;
+
     }
 
 
     ////////////////////////////////
     // Compute the penalty terms
     ////////////////////////////////
+    _chi2PullsBuffer_ = 0;
+    _chi2RegBuffer_ = 0;
     for(size_t iGroup = 0; iGroup < _fitParametersGroupList_.size(); iGroup++){
 
         if(not _disableChi2Pulls_){
-            double systChi2Pull = _fitParametersGroupList_[iGroup]->GetChi2(_newParametersList_[iGroup]);
-            _chi2PullsBuffer_ += systChi2Pull;
+            buffer = _fitParametersGroupList_[iGroup]->GetChi2(_newParametersList_[iGroup]);
+            _chi2PullsBuffer_ += buffer;
             if(_printFitState_){
                 LogInfo << "Chi2 contribution from " << _fitParametersGroupList_[iGroup]->GetName() << " is "
-                        << systChi2Pull
+                        << buffer
                         << std::endl;
             }
         }
@@ -1599,37 +1636,60 @@ void ND280Fitter::ComputeChi2(){
 
     }
 
+    _chi2Buffer_ = _chi2StatBuffer_ + _chi2PullsBuffer_ + _chi2RegBuffer_;
+
+    ////////////////////////////////
+    // Print state
+    if(_printFitState_){
+        LogWarning << "Func Calls: " << _nbFitCalls_ << std::endl;
+        LogWarning << "Chi2 total: " << _chi2Buffer_ << std::endl;
+        LogWarning << "Chi2 stat : " << _chi2StatBuffer_ << std::endl
+                   << "Chi2 syst : " << _chi2PullsBuffer_ << std::endl
+                   << "Chi2 reg  : " << _chi2RegBuffer_ << std::endl;
+    }
+
 }
 
 // Multi-thread compatible methods
 void ND280Fitter::ReWeightEvents(int iThread_){
 
-    AnaEvent* eventPtr;
+    AnaEvent* currentEventPtr;
+    AnaSample* currentSamplePtr;
     bool isMultiThreaded = (iThread_ != -1);
-    std::string progressTitle; // single core only
+    size_t nEvents;
 
     // Looping over all events
-    for(int iSample = 0; iSample < _samplesList_.size(); iSample++){
-        for(int iEvent = 0; iEvent < _samplesList_.at(iSample)->GetN(); iEvent++){
+    for( size_t iSample = 0; iSample < _samplesList_.size(); iSample++ ){
+        currentSamplePtr = _samplesList_.at(iSample);
+        nEvents = currentSamplePtr->GetMcEvents().size();
+        for( size_t iEvent = 0; iEvent < nEvents ; iEvent++ ){
 
             if(isMultiThreaded){
-                if( iEvent % GlobalVariables::getNbThreads() != iThread_){
+                if( iEvent % GlobalVariables::getNbThreads() != iThread_ ){
                     continue; // skip this event
                 }
             }
 
-            eventPtr = _samplesList_.at(iSample)->GetEvent(iEvent);
-            eventPtr->ResetEvWght();
+            currentEventPtr = &currentSamplePtr->GetMcEvents().at(iEvent);
+
+            // lock (even if it's useless: for debug)
+            while(currentEventPtr->GetIsBeingEdited()) LogAlert << "WAITING...." << std::endl;
+            currentEventPtr->SetIsBeingEdited(true);
+
+            currentEventPtr->ResetEvWght();
 
             for(size_t jGroup = 0 ; jGroup < _fitParametersGroupList_.size() ; jGroup++){
                 GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(10000+iThread_);
                 _fitParametersGroupList_.at(jGroup)->ReWeight(
-                    eventPtr, _samplesList_.at(iSample)->GetDetector(),
+                    currentEventPtr, currentSamplePtr->GetDetector(),
                     iSample, iEvent,_newParametersList_.at(jGroup)
                 );
                 if(isMultiThreaded) _durationReweightParameters_[jGroup][iThread_].back() += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(10000+iThread_);
                 else _durationReweightParameters_[jGroup][0].back() += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(10000+iThread_);
             } // jParam
+
+            // unlock
+            currentEventPtr->SetIsBeingEdited(false);
 
         } // iEvent
 
@@ -1638,101 +1698,6 @@ void ND280Fitter::ReWeightEvents(int iThread_){
     // For the cache at the next reweight call
     for(size_t jGroup = 0 ; jGroup < _fitParametersGroupList_.size() ; jGroup++){
         _fitParametersGroupList_.at(jGroup)->SetLastAppliedParamList(_newParametersList_.at(jGroup));
-    }
-
-}
-void ND280Fitter::ReFillSampleMcHistograms(int iThread_){
-
-    bool isMultiThreaded = (iThread_ != -1);
-
-//    GlobalVariables::getThreadMutex().lock();
-    TH1D* histPredPtr = nullptr;
-    TH1D* histMcPtr = nullptr;
-    TH1D* histMcTruePtr = nullptr;
-    TH1D* histSigPtr = nullptr;
-    AnaEvent* anaEventPtr = nullptr;
-    double eventWeightBuffer;
-//    GlobalVariables::getThreadMutex().unlock();
-
-    for(int iSample = 0 ; iSample < _samplesList_.size() ; iSample++){
-
-        if(isMultiThreaded){
-            histPredPtr   = _histThreadHandlers_[iThread_][iSample][0];
-            histMcPtr     = _histThreadHandlers_[iThread_][iSample][1];
-            histMcTruePtr = _histThreadHandlers_[iThread_][iSample][2];
-            histSigPtr    = _histThreadHandlers_[iThread_][iSample][3];
-        }
-        else{
-            histPredPtr   = _samplesList_[iSample]->GetPredHisto();
-            histMcPtr     = _samplesList_[iSample]->GetMCHisto();
-            histMcTruePtr = _samplesList_[iSample]->GetMCTruthHisto();
-            histSigPtr    = _samplesList_[iSample]->GetSignalHisto();
-        }
-
-        if(histPredPtr != nullptr)   histPredPtr->Reset("ICESM");
-        if(histMcPtr != nullptr)     histMcPtr->Reset("ICESM");
-        if(histMcTruePtr != nullptr) histMcTruePtr->Reset("ICESM");
-        if(histSigPtr != nullptr)    histSigPtr->Reset("ICESM");
-
-        for(int iEvent = 0 ; iEvent < _samplesList_[iSample]->GetN() ; iEvent++){
-
-            if(isMultiThreaded){
-                if( iEvent%GlobalVariables::getNbThreads() != iThread_){
-                   continue;
-                }
-            }
-
-            anaEventPtr = _samplesList_[iSample]->GetEvent(iEvent);
-
-            // Events are not supposed to move for one bin to another with the current implementation
-            // So the bin index shall be computed once
-            if(anaEventPtr->GetTrueBinIndex() == -1){
-                anaEventPtr->GetTrueBinIndex() = _samplesList_[iSample]->GetBinIndex(
-                    anaEventPtr->GetTrueD1(),
-                    anaEventPtr->GetTrueD2()
-                );
-            }
-
-            if(anaEventPtr->GetRecoBinIndex() == -1){
-                anaEventPtr->GetRecoBinIndex() = _samplesList_[iSample]->GetBinIndex(
-                    anaEventPtr->GetRecoD1(),
-                    anaEventPtr->GetRecoD2()
-                );
-            }
-
-            eventWeightBuffer = anaEventPtr->GetEvWght();
-
-            if(histPredPtr != nullptr) histPredPtr->Fill(
-                anaEventPtr->GetRecoBinIndex() + 0.5, eventWeightBuffer
-            );
-            if(histMcPtr != nullptr) histMcPtr->Fill(
-                anaEventPtr->GetRecoBinIndex() + 0.5, eventWeightBuffer
-            );
-            if(histMcTruePtr != nullptr) histMcTruePtr->Fill(
-                anaEventPtr->GetTrueBinIndex() + 0.5, eventWeightBuffer
-            );
-
-            if(anaEventPtr->isSignalEvent()){
-                if(histSigPtr != nullptr) histSigPtr->Fill(
-                    anaEventPtr->GetTrueBinIndex() + 0.5, eventWeightBuffer
-                );
-            }
-
-        }
-
-        if(isMultiThreaded){
-            GlobalVariables::getThreadMutex().lock();
-            if(_samplesList_[iSample]->GetPredHisto() != nullptr)
-                _samplesList_[iSample]->GetPredHisto()->Add(histPredPtr);
-            if(_samplesList_[iSample]->GetMCHisto() != nullptr)
-                _samplesList_[iSample]->GetMCHisto()->Add(histMcPtr);
-            if(_samplesList_[iSample]->GetMCTruthHisto() != nullptr)
-                _samplesList_[iSample]->GetMCTruthHisto()->Add(histMcTruePtr);
-            if(_samplesList_[iSample]->GetSignalHisto() != nullptr)
-                _samplesList_[iSample]->GetSignalHisto()->Add(histSigPtr);
-            GlobalVariables::getThreadMutex().unlock();
-        }
-
     }
 
 }

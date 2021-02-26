@@ -19,7 +19,7 @@ public:
     static void setNbThreads(int nbThreads_);
 
     // Getters
-    static int& getNbThreads();
+    static const int& getNbThreads();
     static std::mutex& getThreadMutex();
     static std::map<std::string, bool>& getBoolMap();
     static std::vector<TChain*>& getChainList();

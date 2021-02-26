@@ -74,6 +74,13 @@ public:
     void FillEventHist(int datatype, bool stat_fluc = false);
     void FillEventHist(DataType datatype, bool stat_fluc = false);
 
+    void FillMcHistograms();
+
+    void ResetMcHistograms();
+    void FillMcHistogramsThread(int iThread_ = -1);
+    void MergeMcHistogramsThread();
+    void NormalizeMcHistograms();
+
     void FillDataEventList();
 
     void PropagateMcWeightsToAsimovDataEvents();
@@ -125,6 +132,8 @@ protected:
     CalcLLHFunc* m_llh;
 
     TTree* m_data_tree;
+
+    std::vector<std::map<TH1D*, TH1D*>> _histThreadHandlers_;
     TH1D* m_hmc_true;
     TH1D* m_hmc;
     TH1D* m_hpred;
