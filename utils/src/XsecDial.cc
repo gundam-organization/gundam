@@ -9,7 +9,7 @@ XsecDial::XsecDial(std::string dial_name)
     : m_name(std::move(dial_name))
 {
     _isNormalizationDial_ = false;
-    _useSplineSplitMapping_ = false;
+    _isSplinesInTTree_    = false;
     Logger::setUserHeaderStr("[XsecDial]");
 }
 
@@ -18,7 +18,7 @@ XsecDial::XsecDial(std::string  dial_name, const std::string& fname_binning,
     : m_name(std::move(dial_name))
 {
     _isNormalizationDial_ = false;
-    _useSplineSplitMapping_ = false;
+    _isSplinesInTTree_    = false;
     Logger::setUserHeaderStr("[XsecDial]");
     SetBinning(fname_binning);
     ReadSplines(fname_splines);
@@ -73,10 +73,10 @@ void XsecDial::ReadSplines(const std::string& fname_splines)
 
     if(file_splines->Get("InterpolatedBinnedSplines") != nullptr){
         LogWarning << "Splines in TTrees has been detected." << std::endl;
-        _useSplineSplitMapping_ = true;
+        _isSplinesInTTree_ = true;
     }
 
-    if(_useSplineSplitMapping_){
+    if(_isSplinesInTTree_){
 
         _interpolatedBinnedSplinesTTree_ = (TTree*) file_splines->Get("InterpolatedBinnedSplines");
         if(_interpolatedBinnedSplinesTTree_ == nullptr){
@@ -125,8 +125,13 @@ void XsecDial::ReadSplines(const std::string& fname_splines)
 //            _splineNameList_.emplace_back(_splineBinBuffer_.generateBinName());
 
             // Cache for faster spline read
-            _dialValueCacheList_.emplace_back(0);
-            _weightValueCacheList_.emplace_back(_splineBinBuffer_.splinePtr->Eval(0));
+            _splineCacheList_.emplace_back(SplineCache());
+            _splineCacheList_.back().isBeingEdited = false;
+            _splineCacheList_.back().cachedDialValue = std::numeric_limits<double>::quiet_NaN();
+            _splineCacheList_.back().cachedDialWeight = std::numeric_limits<double>::quiet_NaN();
+
+//            _dialValueCacheList_.emplace_back(0);
+//            _weightValueCacheList_.emplace_back(_splineBinBuffer_.splinePtr->Eval(0));
         }
 
         file_splines -> Close();
@@ -156,8 +161,8 @@ void XsecDial::ReadSplines(const std::string& fname_splines)
 
 }
 
-bool XsecDial::GetUseSplineSplitMapping() const{
-    return this->_useSplineSplitMapping_;
+bool XsecDial::GetIsSplinesInTree() const{
+    return this->_isSplinesInTTree_;
 }
 bool XsecDial::GetIsNormalizationDial() const {
     return this->_isNormalizationDial_;
@@ -256,39 +261,53 @@ double XsecDial::GetBoundedValue(int splineIndex_, double dialValue_){
         // Normalization spline
         return dialValue_;
     }
-    else if(_useSplineSplitMapping_){
+    else if(_isSplinesInTTree_){
         // Splines in TTrees
-
-        if(splineIndex_ < 0){
-            // The index is invalid, returning default weight
-            return dialWeight;
-        }
 
         if(_splinePtrList_.empty()){
             // if no splines are stored, there is a problem
             LogFatal << "Can't eval weight. Splines are missing: " << GetName() << std::endl;
             throw std::runtime_error("Missing splines");
         }
+        else if(splineIndex_ < 0){
+            // The index is invalid, the event is supposed to not be affected
+            // returning default weight
+            return dialWeight;
+        }
 
-        if(_dialValueCacheList_[splineIndex_] == dialValue_){
+        SplineCache* splineCachePtr = &_splineCacheList_[splineIndex_]; // .at() or [] are slower
+
+        // wait for the cache to be filled if another thread is taking care of it
+        while(splineCachePtr->isBeingEdited);
+
+        // This if scope might not be thread safe... If corruption happen, set "isBeingEdited" before
+        if(splineCachePtr->cachedDialValue == dialValue_
+//           and false // disable cache for debug
+           ){
             // If the spline has already been calculated, return the cached value
-            return _weightValueCacheList_[splineIndex_];
+            return splineCachePtr->cachedDialWeight;
         }
 
-        if(splineIndex_ >= 0){
-            // Lower bound
-            if     (dialValue_ < std::max(m_limit_lo, _splinePtrList_[splineIndex_]->GetXmin()) ){
-                dialValue_ = std::max(m_limit_lo, _splinePtrList_[splineIndex_]->GetXmin());
-            }
-            // Higher bound
-            else if(dialValue_ > std::min(m_limit_hi, _splinePtrList_[splineIndex_]->GetXmax()) ){
-                dialValue_ = std::min(m_limit_hi, _splinePtrList_[splineIndex_]->GetXmax());
-            }
-            dialWeight = _splinePtrList_[splineIndex_]->Eval(dialValue_);
-        }
+        // Take the lock already to avoid another thread to update the cache while it's being computed
+        splineCachePtr->isBeingEdited = true;
 
-        _dialValueCacheList_[splineIndex_] = dialValue_;
-        _weightValueCacheList_[splineIndex_] = dialWeight;
+        TSpline3* currentSplinePtr = _splinePtrList_[splineIndex_]; // .at() or [] are slower
+
+        // Lower bound
+        if     (dialValue_ < std::max(m_limit_lo, currentSplinePtr->GetXmin()) ){
+            dialValue_ = std::max(m_limit_lo, currentSplinePtr->GetXmin());
+        }
+        // Higher bound
+        else if(dialValue_ > std::min(m_limit_hi, currentSplinePtr->GetXmax()) ){
+            dialValue_ = std::min(m_limit_hi, currentSplinePtr->GetXmax());
+        }
+//            GlobalVariables::getThreadMutex().lock(); // is Eval thread safe?
+        dialWeight = currentSplinePtr->Eval(dialValue_);
+//            GlobalVariables::getThreadMutex().unlock();
+
+        splineCachePtr->cachedDialValue = dialValue_;
+        splineCachePtr->cachedDialWeight = dialWeight;
+        splineCachePtr->isBeingEdited = false;
 
     }
     else if(not v_splines.empty()){
@@ -308,8 +327,6 @@ double XsecDial::GetBoundedValue(int splineIndex_, double dialValue_){
         LogFatal << "should not be there." << std::endl;
         throw std::logic_error("should not be there.");
     }
-
-//    LogTrace << GET_VAR_NAME_VALUE(splineIndex_) << " -> " << GET_VAR_NAME_VALUE(dialValue_) << " -> " << GET_VAR_NAME_VALUE(dialWeight) << std::endl;
 
     return dialWeight;
 }
@@ -404,7 +421,7 @@ void XsecDial::Print(bool print_bins) const
         }
     }
     else{
-        if(_useSplineSplitMapping_){
+        if(_isSplinesInTTree_){
             LogWarning << "Nb of Splines: " << _splinePtrList_.size() << std::endl;
         }
         else{

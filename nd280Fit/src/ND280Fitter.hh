@@ -42,7 +42,6 @@ public:
     // Pre-initialization Methods
     void SetOutputTDirectory(TDirectory* output_tdirectory_);
     void SetPrngSeed(int PRNG_seed_);
-    void SetMcNormalizationFactor(double MC_normalization_factor_);
     void SetMinimizationSettings(const MinSettings& minimization_settings_);
     void SetDisableSystFit(bool disable_syst_fit_);
     void SetSaveEventTree(bool save_event_tree_);
@@ -62,6 +61,8 @@ public:
     void WritePostFitData();
     void ScanParameters(unsigned int nbSteps_);
 
+    void WriteSamplePlots(TDirectory* outputDir_);
+
     double EvalFit(const double* par);
     void UpdateFitParameterValues(const double* par);
     void PropagateSystematics();
@@ -74,40 +75,9 @@ public:
     TMatrixD* GeneratePriorCovarianceMatrix();
     TMatrixD* GeneratePosteriorCovarianceMatrix();
 
-    TTree* outtree;
 
-    // Declaration of leaf types
-    Int_t sample;
-    Float_t D1true;
-    Float_t D2true;
-    Int_t nutype;
-    Int_t topology;
-    Int_t reaction;
-    Int_t target;
-    Int_t sigtype;
-    Float_t D1Reco;
-    Float_t D2Reco;
-    Float_t weight;
-    Float_t weightNom;
-    Float_t weightMC;
+private:
 
-    void InitOutputTree()
-    {
-        outtree->Branch("nutype", &nutype, "nutype/I");
-        outtree->Branch("reaction", &reaction, "reaction/I");
-        outtree->Branch("target", &target, "target/I");
-        outtree->Branch("sample", &sample, "cut_branch/I");
-        outtree->Branch("sigtype", &sigtype, "signal/I");
-        outtree->Branch("topology", &topology, "topology/I");
-        outtree->Branch("D1True", &D1true, ("D1True/F"));
-        outtree->Branch("D1Reco", &D1Reco, ("D1Reco/F"));
-        outtree->Branch("D2True", &D2true, ("D2True/F"));
-        outtree->Branch("D2Reco", &D2Reco, ("D2Reco/F"));
-        outtree->Branch("weight", &weight, "weight/F");
-        outtree->Branch("weightMC", &weightMC, "weightMC/F");
-    }
-
-protected:
     void InitializeThreadsParameters();
     void InitializeFitParameters();
     void InitializeDataSamples();
@@ -118,39 +88,41 @@ protected:
 
     void SaveParams(const std::vector<std::vector<double>>& new_pars);
     void SaveEventHist(int fititer, bool is_final = false);
-    void SaveEventTree(std::vector<std::vector<double>>& par_results);
     void SaveResults(const std::vector<std::vector<double>>& parresults,
                      const std::vector<std::vector<double>>& parerrors);
 
     // Parallel methods
     void ReWeightEvents(int iThread_ = -1);
 
-private:
+    // Internal
+    bool _isInitialized_{};
+    bool _fitHasBeenDone_{};
+    bool _fitHasConverged_{};
 
-    bool _disableMultiThread_;
+    // Options (Fitter)
+    bool _disableChi2Pulls_{};
 
-    bool _is_initialized_;
-    bool _fitHasBeenDone_;
-    bool _fit_has_converged_;
-    bool _save_fit_params_;
-    bool _save_event_tree_;
-    bool _disableChi2Pulls_;
-    bool _apply_statistical_fluctuations_on_samples_;
-    bool _printFitState_;
 
-    int _PRNG_seed_;
-    int _nb_threads_;
-    int _nb_fit_parameters_;
-    int _nbFitCalls_;
-    int _saveFitParamsFrequency_;
-    int _nbTotalEvents_;
+    // Options (Debug and Monitoring)
+    bool _saveFitParameters_{};
+    bool _saveEventTree_{};
+    bool _disableMultiThread_{};
+    bool _advancedTimeMonitoring_{};
 
-    double _MC_normalization_factor_;
+    bool _apply_statistical_fluctuations_on_samples_{};
+    bool _printFitState_{};
 
-    double _chi2Buffer_;
-    double _chi2StatBuffer_;
-    double _chi2PullsBuffer_;
-    double _chi2RegBuffer_;
+    int _PRNG_seed_{};
+    int _nb_threads_{};
+    int _nb_fit_parameters_{};
+    int _nbFitCalls_{};
+    int _saveFitParamsFrequency_{};
+    int _nbTotalEvents_{};
+
+    double _chi2Buffer_{};
+    double _chi2StatBuffer_{};
+    double _chi2PullsBuffer_{};
+    double _chi2RegBuffer_{};
 
     std::vector<std::string> _parameter_names_;
     std::vector<bool> _fixParameterStatusList_;
@@ -169,7 +141,7 @@ private:
     MinSettings _minimization_settings_;
 
     TRandom3* _PRNG_;
-    TDirectory* _outputTDirectory_;
+    TDirectory* _outputTDirectory_{};
     ROOT::Math::Minimizer* _minimizer_;
     ROOT::Math::Functor* _functor_;
 
@@ -182,8 +154,8 @@ private:
 
     // Multi-thread
     std::mutex _threadMutex_;
-    int _counterThread_;
-    bool _stopThreads_;
+    int _counterThread_{};
+    bool _stopThreads_{};
     std::vector<bool> _triggerReweightThreads_;
     std::vector<bool> _triggerReFillMcHistogramsThreads_;
     std::vector<std::future<void>> _asyncFitThreads_;

@@ -589,7 +589,7 @@ void fillDictionaries(){
     __toReactionIndex__["2p2h"] = 9;
     __toReactionIndex__["RES"] = 1;
     __toReactionIndex__["DIS"] = 2;
-    __toReactionIndex__["COH"] = 3;
+    __toReactionIndex__["Coh"] = 3;
     __toReactionIndex__["NC"] = 4;
     __toReactionIndex__["CC-#bar{#nu}_{#mu}"] = 5;
     __toReactionIndex__["CC-#nu_{e}, CC-#bar{#nu}_{e}"] = 6;
@@ -1475,63 +1475,81 @@ void generateJsonConfigFile(){
             if(     GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "2p2h_norm")){
                 // 2p2h_norm* - 2p2h
                 applyOnlyOnMap["reaction"].emplace_back(__toReactionIndex__["2p2h"]);
-                applyConditionsList.emplace_back(
-                    "reaction == " + std::to_string(__toReactionIndex__["2p2h"])
-                    );
+                applyConditionsList.emplace_back("reaction == " + std::to_string(__toReactionIndex__["2p2h"]));
+                if(xsecSplineName == "2p2h_norm_nu"){
+                    applyConditionsList.emplace_back("nutype > 0");
+                }
+                else if(xsecSplineName == "2p2h_norm_nubar"){
+                    applyConditionsList.emplace_back("nutype < 0");
+                }
+                else if(xsecSplineName == "2p2h_norm_nubar"){
+                    // TODO: implement anti-correlations in XsecDial
+//                    applyConditionsList.emplace_back("(target == 6)*(1)"); // C
+//                    applyConditionsList.emplace_back("(target == 8)*(-1)"); // O
+                }
             }
             if(   GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "Q2_")
-               or GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "EB_")
+//               or GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "EB_") // EB dials are described by splines
                or GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "CC_norm_")
                ){
                 applyOnlyOnMap["reaction"].emplace_back(__toReactionIndex__["CCQE"]);
-                applyConditionsList.emplace_back(
-                    "reaction == " + std::to_string(__toReactionIndex__["CCQE"])
-                );
+                applyConditionsList.emplace_back("reaction == " + std::to_string(__toReactionIndex__["CCQE"]));
             }
             if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "CC_Misc")){
                 // CC_Misc - CCGamma, CCKaon, CCEta
                 // CC Misc Misc Spline 100% normalisation error on CC1γ, CC1K, CC1η.
                 // all reactions but -> only CC-Other
-                applyOnlyOnMap["topology"].emplace_back(__toTopologyIndex__["CCOther"]);
-                applyConditionsList.emplace_back(
-                    "topology == " + std::to_string(__toTopologyIndex__["CCOther"])
-                );
+                applyOnlyOnMap["topology"].emplace_back(__toTopologyIndex__["CC-Other"]);
+                applyConditionsList.emplace_back("topology == " + std::to_string(__toTopologyIndex__["CC-Other"]));
             }
             if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "CC_DIS_MultPi")){
                 // CC_DIS_MultiPi_Norm_Nu - CCDIS and CCMultPi, nu only
                 // CC_DIS_MultiPi_Norm_nuBar - CCDIS and CCMultPi, anu only
-                applyOnlyOnMap["topology"].emplace_back(__toTopologyIndex__["CCOther"]);
+                applyOnlyOnMap["topology"].emplace_back(__toTopologyIndex__["CC-Other"]);
                 applyOnlyOnMap["reaction"].emplace_back(__toReactionIndex__["DIS"]);
-                applyConditionsList.emplace_back("topology == " + std::to_string(__toTopologyIndex__["CCOther"]));
+
+                applyConditionsList.emplace_back("topology == " + std::to_string(__toTopologyIndex__["CC-Other"]));
                 applyConditionsList.emplace_back("reaction == " + std::to_string(__toReactionIndex__["DIS"]));
+                if(xsecSplineName == "CC_DIS_MultPi_Norm_Nu"){
+                    applyConditionsList.emplace_back("nutype > 0");
+                }
+                else if(xsecSplineName == "CC_DIS_MultPi_Norm_Nubar"){
+                    applyConditionsList.emplace_back("nutype < 0");
+                }
             }
             if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "CC_Coh_")){
                 //
-                applyOnlyOnMap["topology"].emplace_back(__toTopologyIndex__["CCOther"]);
-                applyOnlyOnMap["reaction"].emplace_back(__toReactionIndex__["COH"]);
-                applyConditionsList.emplace_back("topology == " + std::to_string(__toTopologyIndex__["CCOther"]));
-                applyConditionsList.emplace_back("reaction == " + std::to_string(__toReactionIndex__["COH"]));
+                applyOnlyOnMap["topology"].emplace_back(__toTopologyIndex__["CC-Other"]);
+                applyOnlyOnMap["reaction"].emplace_back(__toReactionIndex__["Coh"]);
+//                applyConditionsList.emplace_back("topology == " + std::to_string(__toTopologyIndex__["CC-Other"]));
+                applyConditionsList.emplace_back("reaction == " + std::to_string(__toReactionIndex__["Coh"]));
+                if(xsecSplineName == "CC_Coh_O"){
+                    applyConditionsList.emplace_back("target == 8");
+                }
+                if(xsecSplineName == "CC_Coh_C"){
+                    applyConditionsList.emplace_back("target == 6");
+                }
             }
 
             if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "nue_numu")){
                 // nue_numu - All nue
                 applyOnlyOnMap["nutype"].emplace_back(12);
-                applyConditionsList.emplace_back("nutype == 12");
+                // TODO: CHECK? my guess: Implement anti-correlated dials
+                applyConditionsList.emplace_back("(nutype == 12)*(1)");
+//                applyConditionsList.emplace_back("(nutype == 14)*(-1)");
             }
             else if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "nuebar_numubar")){
                 // nuebar_numubar - All nuebar
-                applyOnlyOnMap["nutype"].emplace_back(-12);
+                // TODO: CHECK? my guess: Implement anti-correlated dials
                 applyConditionsList.emplace_back("nutype == -12");
+//                applyConditionsList.emplace_back("(nutype == -14)*(-1)");
             }
-            else if(GenericToolbox::doesStringEndsWithSubstring(xsecSplineName, "_nu", true)){
-                applyOnlyOnMap["nutype"].emplace_back(12);
-                applyOnlyOnMap["nutype"].emplace_back(14);
-                applyConditionsList.emplace_back("nutype > 0");
+
+            if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "NC_Coh")){
+                applyConditionsList.emplace_back("reaction == " + std::to_string(__toReactionIndex__["Coh"]));
             }
-            else if(GenericToolbox::doesStringEndsWithSubstring(xsecSplineName, "_nubar", true)){
-                applyOnlyOnMap["nutype"].emplace_back(-12);
-                applyOnlyOnMap["nutype"].emplace_back(-14);
-                applyConditionsList.emplace_back("nutype < 0");
+            else if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "NC")){
+                applyConditionsList.emplace_back("reaction == " + std::to_string(__toReactionIndex__["NC"]));
             }
 
             if(not applyOnlyOnMap.empty() and false){ // DISABLED
@@ -1554,9 +1572,8 @@ void generateJsonConfigFile(){
 
             if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "NC_other_near")){
                 // NC_other_near - all NC which isn't Coh or 1gamma
-                dontApplyOnMap["reaction"].emplace_back(__toReactionIndex__["COH"]);
-                applyConditionsList.emplace_back("reaction == " + std::to_string(__toReactionIndex__["NC"]));
-//                applyConditionsList.emplace_back("reaction != " + std::to_string(__toReactionIndex__["COH"]));
+                dontApplyOnMap["reaction"].emplace_back(__toReactionIndex__["Coh"]);
+//                applyConditionsList.emplace_back("reaction != " + std::to_string(__toReactionIndex__["Coh"]));
             }
 
             if(not dontApplyOnMap.empty() and false){ // DISABLED
@@ -1578,8 +1595,11 @@ void generateJsonConfigFile(){
             if(not applyConditionsList.empty()){
                 dial_ss << "      \"apply_condition\" : \"" << GenericToolbox::joinVectorString(applyConditionsList, " && ") << "\"," << std::endl;
             }
+            else{
+                LogError << "No apply condition for normalization spline: " << xsecSplineName << std::endl;
+            }
 
-            if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "EB")) dial_ss << "      \"use\" : false" << std::endl;
+            if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "EB")) dial_ss << "      \"use\" : false" << std::endl; // DISABLED
             else dial_ss << "      \"use\" : true" << std::endl;
             dial_ss << "    }";
 

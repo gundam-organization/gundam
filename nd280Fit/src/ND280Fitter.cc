@@ -40,7 +40,11 @@ ND280Fitter::~ND280Fitter()
 
 void ND280Fitter::Reset(){
 
-    _is_initialized_ = false;
+    // Internals
+    _isInitialized_     = false;
+    _fitHasBeenDone_    = false;
+    _fitHasConverged_   = false;
+
 
     if(GlobalVariables::getNbThreads() > 1 and _stopThreads_ == false){
         LogInfo << "Stopping parallel threads..." << std::endl;
@@ -51,8 +55,7 @@ void ND280Fitter::Reset(){
 //        }
     }
 
-    _fitHasBeenDone_    = false;
-    _fit_has_converged_ = false;
+    _advancedTimeMonitoring_ = false;
 
     _PRNG_seed_ = -1;
 
@@ -61,8 +64,8 @@ void ND280Fitter::Reset(){
 
     _outputTDirectory_ = nullptr; // not handle by this class
 
-    _save_fit_params_   = false;
-    _save_event_tree_   = true;
+    _saveFitParameters_                         = false;
+    _saveEventTree_                             = true;
     _disableChi2Pulls_                          = false;
     _apply_statistical_fluctuations_on_samples_ = false;
 
@@ -70,8 +73,6 @@ void ND280Fitter::Reset(){
     _nb_fit_parameters_          = 0;
     _nbFitCalls_                 = 0;
     _nbTotalEvents_              = 0;
-
-    _MC_normalization_factor_ = 1;
 
     _selected_data_type_ = DataType::kReset;
 
@@ -98,9 +99,6 @@ void ND280Fitter::SetOutputTDirectory(TDirectory* output_tdirectory_) {
 void ND280Fitter::SetPrngSeed(int PRNG_seed_){
     _PRNG_seed_ = PRNG_seed_;
 }
-void ND280Fitter::SetMcNormalizationFactor(double MC_normalization_factor_){
-    _MC_normalization_factor_ = MC_normalization_factor_;
-}
 void ND280Fitter::SetMinimizationSettings(const MinSettings& minimization_settings_){
     _minimization_settings_ = minimization_settings_;
     if(_minimizer_ != nullptr){
@@ -114,11 +112,10 @@ void ND280Fitter::SetMinimizationSettings(const MinSettings& minimization_settin
 void ND280Fitter::SetDisableSystFit(bool disable_syst_fit_) {
     _disableChi2Pulls_ = disable_syst_fit_;
 }
-void ND280Fitter::SetSaveEventTree(bool save_event_tree_){
-    _save_event_tree_ = save_event_tree_;
+void ND280Fitter::SetSaveEventTree(bool save_event_tree_){ _saveEventTree_ = save_event_tree_;
 }
 void ND280Fitter::SetSaveFitParams(bool save_fit_params_){
-    _save_fit_params_ = save_fit_params_;
+    _saveFitParameters_ = save_fit_params_;
 }
 void ND280Fitter::SetApplyStatisticalFluctuationsOnSamples(bool apply_statistical_fluctuations_on_samples_){
     _apply_statistical_fluctuations_on_samples_ = apply_statistical_fluctuations_on_samples_;
@@ -168,7 +165,13 @@ void ND280Fitter::Initialize(){
     InitializeFitter();
     InitializeDataSamples();
 
-    _is_initialized_ = true;
+    LogInfo << "Saving snapshot of samples state..." << std::endl;
+    for(const auto& sample : _samplesList_){
+        sample->SaveMcEventsSnapshot();
+        sample->SaveHistogramsSnapshot();
+    }
+
+    _isInitialized_ = true;
     LogWarning << "ND280 Fitter has been initialized." << std::endl;
 
 }
@@ -179,304 +182,14 @@ void ND280Fitter::WritePrefitData(){
     LogInfo << "Writing prefit data..." << std::endl;
     PassIfInitialized(__METHOD_NAME__);
 
-
-    /////////////////////////////
-    // Samples
-    /////////////////////////////
-    LogDebug << "Writing prefit samples plots..." << std::endl;
-    std::vector<Color_t> colorCells = {kGreen-3, kTeal+3, kAzure+7, kCyan-2, kBlue-7, kBlue+2, kOrange+1, kOrange+9, kRed+2, kPink+9};
-
-    GenericToolbox::mkdirTFile(_outputTDirectory_, "prefit")->cd();
-
-//    double maxD1Scale = 2000;
-    double maxD1Scale = -1;
-
-    std::map<int, std::pair<std::string, Color_t>> reactionNamesAndColors = {
-        {-1, {"no truth", kBlack}},
-        {0, {"CCQE", kOrange+1}},
-        {1, {"RES", kGreen-3}},
-        {2, {"DIS", kTeal+3}},
-        {3, {"COH", kAzure+7}},
-        {4, {"NC", kCyan-2}},
-        {5, {"CC-#bar{#nu}_{#mu}", kBlue-7}},
-        {6, {"CC-#nu_{e}, CC-#bar{#nu}_{e}", kBlue+2}},
-        {7, {"out FV", kPink+9}},
-        {9, {"2p2h", kRed+2}},
-        {777, {"sand #mu", kGray}},
-        {999, {"other", kGray+2}},
-    };
-
-    std::function<int(std::string)> fetchReactionCodeFormName =
-        [reactionNamesAndColors]( const std::string& reactionName_ ){
-            int outputReactionCode = -2;
-            for( const auto& reactionEntry : reactionNamesAndColors){
-                if(reactionEntry.second.first == reactionName_){
-                    outputReactionCode = reactionEntry.first;
-                    break;
-                }
-            }
-
-            return outputReactionCode;
-        };
-
-    std::map<std::string, TH1D*> TH1D_handler;
-    int iColor = 0;
-    GenericToolbox::mkdirTFile(_outputTDirectory_, "prefit/samples")->cd();
-    for(const auto& anaSample : _samplesList_){
-
-        std::map<std::string, TH1D*> tempHistMap;
-
-        LogDebug << "Preparing prefit plots: " << anaSample->GetName() << std::endl;
-        std::string tempHistName;
-
-        // Build the histograms binning
-        bool isSimpleBinning = true; // TODO: check if a simple binning can be applied
-        std::vector<double> D1binning;
-        auto bins = anaSample->GetBinEdges();
-        for(const auto& bin : bins){
-            if(D1binning.empty()) D1binning.emplace_back(bin.D1low);
-            if(not GenericToolbox::doesElementIsInVector(bin.D1high, D1binning)){
-                D1binning.emplace_back(bin.D1high);
-            }
-        }
-        std::sort(D1binning.begin(), D1binning.end());
-
-        //////////////////////
-        // Define Histograms
-        //////////////////////
-        tempHistName              = anaSample->GetName() + "/D1/MC";
-        tempHistMap[tempHistName] = new TH1D(tempHistName.c_str(), tempHistName.c_str(),
-                                              D1binning.size() - 1, &D1binning[0]);
-        tempHistName              = anaSample->GetName() + "/D1/Data";
-        tempHistMap[tempHistName] = new TH1D(tempHistName.c_str(), tempHistName.c_str(),
-                                             D1binning.size() - 1, &D1binning[0]);
-
-        // Histograms splitted by reaction
-        std::vector<int> reactionsList;
-        for(int iEvent = 0 ; iEvent < anaSample->GetN() ; iEvent++){
-            auto* anaEvent = anaSample->GetEvent(iEvent);
-            if(not GenericToolbox::doesElementIsInVector(anaEvent->GetReaction(), reactionsList)){
-                reactionsList.emplace_back(anaEvent->GetReaction());
-            }
-        }
-
-        for(const auto& thisReaction : reactionsList){
-            tempHistName = anaSample->GetName() + "/D1/reactions/" + reactionNamesAndColors[thisReaction].first;
-            tempHistMap[tempHistName] = new TH1D(tempHistName.c_str(), tempHistName.c_str(),
-                                                  D1binning.size() - 1, &D1binning[0]);
-        }
-
-
-        // Fill the histograms (MC)
-        for( size_t iEvent = 0 ; iEvent < anaSample->GetMcEvents().size() ; iEvent++ ){
-            auto* anaEvent = &anaSample->GetMcEvents()[iEvent];
-            tempHistMap[anaSample->GetName() + "/D1/MC"]->Fill(
-                anaEvent->GetRecoD1(), anaEvent->GetEvWght()
-            );
-            tempHistMap[anaSample->GetName() + "/D1/reactions/" + reactionNamesAndColors[anaEvent->GetReaction()].first]->Fill(
-                anaEvent->GetRecoD1(), anaEvent->GetEvWght()
-            );
-        }
-
-        // Fill the histograms (Data)
-        for( size_t iEvent = 0 ; iEvent < anaSample->GetDataEvents().size() ; iEvent++ ){
-            auto* anaEvent = &anaSample->GetDataEvents()[iEvent];
-            tempHistMap[anaSample->GetName() + "/D1/Data"]->Fill(
-                anaEvent->GetRecoD1(), anaEvent->GetEvWght()
-            );
-        }
-
-        std::function<void(TH1D*)> makeupHist = [colorCells, iColor](TH1D* hist_){
-            hist_->SetLineColor(colorCells[iColor]);
-            hist_->SetLineWidth(2);
-            hist_->SetMarkerColor(colorCells[iColor]);
-            if(GenericToolbox::doesStringContainsSubstring(hist_->GetName(), "D1")){
-                hist_->GetXaxis()->SetTitle("D1 Reco");
-            }
-            hist_->GetYaxis()->SetTitle("Counts/(100 MeV)");
-            hist_->GetYaxis()->SetRangeUser(0, hist_->GetMaximum()*1.2);
-        };
-
-
-        for(auto& histPair : tempHistMap){
-
-            // Get Number of counts per 100 MeV
-            for(int iBin = 0 ; iBin < histPair.second->GetNbinsX() ; iBin++){
-                histPair.second->SetBinContent(iBin,histPair.second->GetBinContent(iBin)/histPair.second->GetBinWidth(iBin)*100.);
-                histPair.second->SetBinError( iBin, TMath::Sqrt(histPair.second->GetBinContent(iBin))/histPair.second->GetBinWidth(iBin)*100.);
-            }
-
-            if(not GenericToolbox::doesStringEndsWithSubstring(histPair.first, "Data")){
-                // IS MC
-                histPair.second->Scale(anaSample->GetNorm());
-                histPair.second->SetLineColor(colorCells[iColor]);
-                histPair.second->SetMarkerColor(colorCells[iColor]);
-            }
-            else{
-                // IS DATA
-                if(anaSample->GetDataType() == DataType::kAsimov){
-                    histPair.second->Scale(anaSample->GetNorm());
-                }
-                histPair.second->SetLineColor(kBlack);
-                histPair.second->SetMarkerColor(kBlack);
-                histPair.second->SetMarkerStyle(kFullDotLarge);
-            }
-
-            histPair.second->SetLineWidth(2);
-            if(GenericToolbox::doesStringContainsSubstring(histPair.second->GetName(), "D1")){
-                histPair.second->GetXaxis()->SetTitle("D1 Reco");
-            }
-            histPair.second->GetYaxis()->SetTitle("Counts/(100 MeV)");
-
-//            for( int iBin = 0 ; iBin <= histPair.second->GetNbinsX() ; iBin++ ){
-//                if(histPair.second->GetBinContent(iBin) <= 0){
-//                    histPair.second->SetBinContent(iBin, 0);
-//                }
-//            }
-
-            histPair.second->GetYaxis()->SetRangeUser(
-                histPair.second->GetMinimum(0)*1E-2, // 0 as min will prevent to set log scale
-                histPair.second->GetMaximum()*1.2
-                );
-
-        }
-
-        GenericToolbox::appendToMap(TH1D_handler, tempHistMap);
-
-        // Next Loop
-        iColor++;
-
+    if(_fitHasBeenDone_){
+        LogFatal << "Can't write prefit data when fit has been performed." << std::endl;
+        throw std::logic_error(GET_VAR_NAME_VALUE(_fitHasBeenDone_).c_str());
     }
 
+    auto* preFitDir = GenericToolbox::mkdirTFile(_outputTDirectory_, "prefit");
 
-    // Saving Histograms
-    for(auto& hist : TH1D_handler){
-        std::string histSubFolder = GenericToolbox::joinVectorString(
-            GenericToolbox::splitString(hist.second->GetName(), "/"),
-            "/", 0, -1);
-        GenericToolbox::mkdirTFile(_outputTDirectory_, Form("prefit/samples/%s",histSubFolder.c_str()))->cd();
-
-        // Writing histo
-        hist.second->Write((GenericToolbox::splitString(hist.second->GetName(), "/").back() + "_TH1D").c_str());
-    }
-
-    // Building canvas
-    std::map<std::string, TCanvas*> canvasHandler;
-    int iCanvas = 1;
-    int nbXPlots = 3;
-    int nbYPlots = 2;
-
-    auto processCanvasName = [nbXPlots, nbYPlots](int iCanvas_){
-        std::string canvasD1ReactionName = "D1/reactions/samples_";
-        canvasD1ReactionName += std::to_string(1 + (iCanvas_-1) * nbXPlots*nbYPlots );
-        canvasD1ReactionName += "_to_";
-        canvasD1ReactionName += std::to_string(iCanvas_ * nbXPlots*nbYPlots );
-        return canvasD1ReactionName;
-    };
-
-    std::string canvasD1ReactionName = processCanvasName(iCanvas);
-    canvasHandler[canvasD1ReactionName] = new TCanvas(canvasD1ReactionName.c_str(), canvasD1ReactionName.c_str(), 1200, 700);
-    canvasHandler[canvasD1ReactionName]->Divide(nbXPlots,nbYPlots);
-    int iSlot = 1;
-    for(const auto& anaSample : _samplesList_){
-        // select the canvas slot
-        if(iSlot > nbXPlots*nbYPlots){
-            iSlot = 1;
-            iCanvas++;
-            canvasD1ReactionName = processCanvasName(iCanvas);
-            canvasHandler[canvasD1ReactionName] = new TCanvas(canvasD1ReactionName.c_str(), canvasD1ReactionName.c_str(), 1200, 700);
-            canvasHandler[canvasD1ReactionName]->Divide(3,2);
-            canvasHandler[canvasD1ReactionName]->cd();
-        }
-        canvasHandler[canvasD1ReactionName]->cd(iSlot);
-
-        TH1D* dataSampleHist = TH1D_handler[anaSample->GetName() + "/D1/Data"];
-
-        // Select which histograms which be displayed
-        double minYValNonZero = -1;
-        std::vector<TH1D*> histToPlotList;
-        std::vector<int> reactionCodesList;
-        for(auto& hist: TH1D_handler){
-            if(not GenericToolbox::doesStringContainsSubstring(hist.first, anaSample->GetName())) continue; // select the sample
-
-            auto histSubFolderList = GenericToolbox::splitString(hist.first, "/");
-            int reactionsSubFolderIndex = GenericToolbox::findElementIndex("reactions", histSubFolderList);
-
-            if(reactionsSubFolderIndex != -1 ){
-                histToPlotList.emplace_back(hist.second);
-                reactionCodesList.emplace_back(fetchReactionCodeFormName(histSubFolderList[reactionsSubFolderIndex +1]));
-
-                if(minYValNonZero == -1 or minYValNonZero > histToPlotList.back()->GetMinimum(0)){
-                    minYValNonZero = histToPlotList.back()->GetMinimum(0);
-                }
-
-            }
-
-        }
-        if(histToPlotList.empty()) continue;
-
-        // Sorting histograms by norm (lowest stat first)
-        std::function<bool(TH1D*, TH1D*)> aGoesFirst = [maxD1Scale](TH1D* histA_, TH1D* histB_){
-            bool aGoesFirst = true; // A is smaller = A goes first
-            double Xmax = histA_->GetXaxis()->GetXmax();
-            if(maxD1Scale > 0) Xmax = maxD1Scale;
-            if(  histA_->Integral(histA_->FindBin(0), histA_->FindBin(Xmax)-1)
-               > histB_->Integral(histB_->FindBin(0), histB_->FindBin(Xmax)-1) ) aGoesFirst = false;
-            return aGoesFirst;
-        };
-        auto p = GenericToolbox::getSortPermutation( histToPlotList, aGoesFirst );
-        histToPlotList = GenericToolbox::applyPermutation(histToPlotList, p);
-        reactionCodesList = GenericToolbox::applyPermutation(reactionCodesList, p);
-
-
-        // Stacking histograms
-        TH1D* histPileBuffer = nullptr;
-        for( size_t iHist = 0 ; iHist < histToPlotList.size() ; iHist++ ){
-            if(histPileBuffer != nullptr) histToPlotList[iHist]->Add(histPileBuffer);
-            histPileBuffer = histToPlotList[iHist];
-        }
-
-        // Draw (the one on top of the pile should be drawn first, otherwise it will hide the others...)
-        int lastIndex = histToPlotList.size()-1;
-        for( int iHist = lastIndex ; iHist >= 0 ; iHist-- ){
-
-            histToPlotList[iHist]->SetTitle(reactionNamesAndColors[reactionCodesList[iHist]].first.c_str());
-            histToPlotList[iHist]->SetLineColor(reactionNamesAndColors[reactionCodesList[iHist]].second);
-            histToPlotList[iHist]->SetMarkerColor(reactionNamesAndColors[reactionCodesList[iHist]].second);
-            histToPlotList[iHist]->SetFillColor(reactionNamesAndColors[reactionCodesList[iHist]].second);
-            histToPlotList[iHist]->SetLineWidth(2);
-
-            if( iHist == lastIndex ){
-                double lastBinLowEdge = histToPlotList[iHist]->GetXaxis()->GetBinLowEdge(histToPlotList[iHist]->GetXaxis()->GetNbins());
-                histToPlotList[iHist]->GetXaxis()->SetRange(0,lastBinLowEdge);
-                histToPlotList[iHist]->GetXaxis()->SetRangeUser(histToPlotList[iHist]->GetXaxis()->GetXmin(),maxD1Scale);
-                double maxYplot = histToPlotList[iHist]->GetMaximum()*1.2;
-                histToPlotList[iHist]->GetYaxis()->SetRangeUser(minYValNonZero, maxYplot);
-                histToPlotList[iHist]->Draw("HIST");
-            }
-            else {
-                histToPlotList[iHist]->Draw("HISTSAME");
-            }
-        }
-
-        dataSampleHist->SetTitle("Data");
-        dataSampleHist->Draw("EPSAME");
-
-        gPad->BuildLegend(0.6,0.5,0.9,0.9);
-        histToPlotList[lastIndex]->SetTitle(anaSample->GetName().c_str());
-        gPad->SetGridx();
-        gPad->SetGridy();
-        iSlot++;
-    }
-
-    _outputTDirectory_->cd("prefit/samples");
-    for(auto& canvas : canvasHandler){
-        std::string canvasSubFolder = GenericToolbox::joinVectorString(
-            GenericToolbox::splitString(canvas.first, "/"),
-            "/", 0, -1);
-        GenericToolbox::mkdirTFile(_outputTDirectory_, Form("prefit/samples/%s", canvasSubFolder.c_str()))->cd();
-        canvas.second->Write((GenericToolbox::splitString(canvas.first, "/").back() + "_TCanvas").c_str());
-    }
+    this->WriteSamplePlots(preFitDir);
 
 
     /////////////////////////////
@@ -586,14 +299,14 @@ void ND280Fitter::MakeOneSigmaChecks(){
     }
     oneSigmaDir->cd();
 
-    LogDebug << "Copying current weights..." << std::endl;
+    LogInfo << "Copying current parameters..." << std::endl;
     auto* par = new double[_minimizer_->NDim()];
     for(unsigned int iPar = 0 ; iPar < _minimizer_->NDim() ; iPar++){
         par[iPar] = _minimizer_->X()[iPar];
     }
 
     // Make sure all weights a applied
-    LogDebug << "Re-computing weights..." << std::endl;
+    LogInfo << "Re-computing weights..." << std::endl;
     UpdateFitParameterValues(par);
     PropagateSystematics();
     ComputeChi2();
@@ -603,8 +316,10 @@ void ND280Fitter::MakeOneSigmaChecks(){
     bool stopNow = false;
     for(const auto& sample : _samplesList_){
         double llh = sample->CalcLLH();
-        LogDebug << GET_VAR_NAME_VALUE(llh) << std::endl;
         if(llh != 0){
+            sample->CompareMcEventsWeightsWithSnapshot();
+            sample->CompareHistogramsWithSnapshot();
+            LogDebug << GET_VAR_NAME_VALUE(llh) << std::endl;
             stopNow = true;
         }
     }
@@ -619,7 +334,7 @@ void ND280Fitter::MakeOneSigmaChecks(){
         throw std::runtime_error("STOP");
     }
 
-    LogDebug << "Computing nominal MC histograms..." << std::endl;
+    LogInfo << "Computing nominal MC histograms..." << std::endl;
     std::map<std::string, TH1D*> nominalHistMap;
     for(const auto& anaSample : _samplesList_){
 
@@ -644,8 +359,8 @@ void ND280Fitter::MakeOneSigmaChecks(){
 
         // Histograms splitted by reaction
         std::vector<int> reactionsList;
-        for(int iEvent = 0 ; iEvent < anaSample->GetN() ; iEvent++){
-            auto* anaEvent = anaSample->GetEvent(iEvent);
+        for( size_t iEvent = 0 ; iEvent < anaSample->GetMcEvents().size() ; iEvent++ ){
+            auto* anaEvent = &anaSample->GetMcEvents().at(iEvent);
             if(not GenericToolbox::doesElementIsInVector(anaEvent->GetReaction(), reactionsList)){
                 reactionsList.emplace_back(anaEvent->GetReaction());
             }
@@ -656,23 +371,15 @@ void ND280Fitter::MakeOneSigmaChecks(){
                                                  D1binning.size() - 1, &D1binning[0]);
         }
 
-
         // Fill the histograms
-        for(int iEvent = 0 ; iEvent < anaSample->GetN() ; iEvent++){
-            auto* anaEvent = anaSample->GetEvent(iEvent);
-            nominalHistMap[anaSample->GetName() + "/D1"]->Fill(
-                anaEvent->GetRecoD1()
-                , anaEvent->GetEvWght()
-//                    *anaSample->GetNorm()
-            );
+        for( size_t iEvent = 0 ; iEvent < anaSample->GetMcEvents().size() ; iEvent++ ){
+            auto* anaEvent = &anaSample->GetMcEvents().at(iEvent);
+            nominalHistMap[anaSample->GetName() + "/D1"]->Fill( anaEvent->GetRecoD1(), anaEvent->GetEvWght() );
         }
 
     }
 
-    auto originalParams = _newParametersList_;
-
-
-    LogDebug << "Performing individual one sigma variations..." << std::endl;
+    LogInfo << "Performing individual one sigma variations..." << std::endl;
     TMatrixD* covarianceMatrix = this->GeneratePriorCovarianceMatrix();
     std::vector<std::map<std::string, TH1D*>> oneSigmaHistMap(_minimizer_->NDim());
     for( int iSyst = 0 ; iSyst < _minimizer_->NDim() ; iSyst++ ){
@@ -683,38 +390,22 @@ void ND280Fitter::MakeOneSigmaChecks(){
             continue;
         }
 
-        LogDebug << "Running +1 sigma on: " << _parameter_names_[iSyst] << std::endl;
+        LogInfo << "Running +1 sigma on: " << _parameter_names_[iSyst] << std::endl;
 
         // Create associated subdirectory
         auto* currentDir = GenericToolbox::mkdirTFile( oneSigmaDir, _parameter_names_[iSyst] );
         currentDir->cd();
 
         // Put the parameter at 1 sigma
-//        int systCandidate = 0;
-//        double syst_val = -1;
-//        double syst_shift = -1;
-//
-//        for( size_t jCat = 0 ; jCat < _fitParametersGroupList_.size() ; jCat++ ){
-//            for( int jPar = 0 ; jPar < _fitParametersGroupList_[jCat]->GetNpar() ; jPar++ ){
-//                if(systCandidate == iSyst){
-//                    syst_val = _parameterPriorValues_[iSyst];
-//                    syst_shift = TMath::Sqrt((*covarianceMatrix)[iSyst][iSyst]);
-//                    _newParametersList_[jCat][jPar] = syst_val + syst_shift;
-//                }
-//                systCandidate++;
-//            }
-//        }
-
         double originalPar = par[iSyst];
         par[iSyst] += TMath::Sqrt((*covarianceMatrix)[iSyst][iSyst]);
         UpdateFitParameterValues(par);
         PropagateSystematics();
-        ComputeChi2();
+
+//        ComputeChi2();
+//        double chi2 = _chi2Buffer_;
 
         // Propagate systematics
-        _printFitState_ = true;
-        this->ComputeChi2();
-        double chi2 = _chi2Buffer_;
 
         std::vector<Color_t> colorWheel = {
             kGreen-3,
@@ -747,13 +438,9 @@ void ND280Fitter::MakeOneSigmaChecks(){
             }
 
             // Fill the histograms
-            for(int iEvent = 0 ; iEvent < anaSample->GetN() ; iEvent++){
-                auto* anaEvent = anaSample->GetEvent(iEvent);
-                oneSigmaHistMap[iSyst][tempHistName]->Fill(
-                    anaEvent->GetRecoD1()
-                    , anaEvent->GetEvWght()
-                );
-//                if(anaEvent->GetEvWght() != 1) LogAlert << GET_VAR_NAME_VALUE(anaEvent->GetEvWght()) << std::endl;
+            for( size_t iEvent = 0 ; iEvent < anaSample->GetMcEvents().size() ; iEvent++ ){
+                auto* anaEvent = &anaSample->GetMcEvents().at(iEvent);
+                oneSigmaHistMap[iSyst][tempHistName]->Fill( anaEvent->GetRecoD1(), anaEvent->GetEvWght() );
             }
 
             bool isUnaffected = true;
@@ -846,24 +533,26 @@ void ND280Fitter::MakeOneSigmaChecks(){
             delete canvas.second;
         }
 
-        LogDebug << std::endl;
-
+        LogDebug << "Comming back to 0 sigmas..." << std::endl;
         par[iSyst] = originalPar;
         UpdateFitParameterValues(par);
         PropagateSystematics();
+        _printFitState_ = false;
         ComputeChi2();
-
+        _printFitState_ = true;
         if(originalChi2 != _chi2Buffer_){
             for(const auto& sample : _samplesList_){
                 double llh = sample->CalcLLH();
                 LogDebug << GET_VAR_NAME_VALUE(llh) << ": " << (llh == 0) << std::endl;
                 if(llh != 0){
+                    sample->CompareMcEventsWeightsWithSnapshot();
+                    sample->CompareHistogramsWithSnapshot();
                     throw std::runtime_error("lol");
                 }
             }
         }
 
-
+        LogDebug << std::endl; // aesthetic
 
     }
 
@@ -882,10 +571,10 @@ bool ND280Fitter::Fit(){
     LogInfo << "Calling Minimize, running: " << _minimization_settings_.algorithm << std::endl;
 
     // Run the actual fitter:
-    _fit_has_converged_ = _minimizer_->Minimize();
-    _fit_has_converged_ = true;
+    _fitHasConverged_ = _minimizer_->Minimize();
+    _fitHasConverged_ = true;
 
-    if(not _fit_has_converged_){
+    if(not _fitHasConverged_){
         LogError << "Fit did not converge while running " << _minimization_settings_.algorithm
                  << std::endl;
         LogError << "Failed with status code: " << _minimizer_->Status() << std::endl;
@@ -895,10 +584,10 @@ bool ND280Fitter::Fit(){
                 << "Status code: " << _minimizer_->Status() << std::endl;
 
         LogInfo << "Calling HESSE." << std::endl;
-        _fit_has_converged_ = _minimizer_->Hesse();
+        _fitHasConverged_ = _minimizer_->Hesse();
     }
 
-    if(not _fit_has_converged_){
+    if(not _fitHasConverged_){
         LogError  << "Hesse did not converge." << std::endl;
         LogError  << "Failed with status code: " << _minimizer_->Status() << std::endl;
     }
@@ -908,7 +597,7 @@ bool ND280Fitter::Fit(){
     }
 
     LogWarning << "Fit has ended." << std::endl;
-    return _fit_has_converged_;
+    return _fitHasConverged_;
 
 }
 void ND280Fitter::WritePostFitData(){
@@ -1022,7 +711,7 @@ void ND280Fitter::WritePostFitData(){
 //    SaveResults(res_pars, err_pars);
 //    SaveEventHist(_nbFitCalls_, true);
 //
-//    if(_save_event_tree_) SaveEventTree(res_pars);
+//    if(_saveEventTree_) SaveEventTree(res_pars);
 
     _outputTDirectory_->cd();
 
@@ -1055,32 +744,411 @@ void ND280Fitter::ScanParameters(unsigned int nbSteps_){
 
 }
 
+void ND280Fitter::WriteSamplePlots(TDirectory* outputDir_) {
+
+    LogWarning << "Generating sample plots." << std::endl;
+
+    auto* samplesDir = GenericToolbox::mkdirTFile(outputDir_, "samples");
+    LogInfo << "Samples plots will be writen in: " << samplesDir->GetPath() << std::endl;
+
+    double maxD1Scale = 2000;
+//    double maxD1Scale = -1;
+
+    // TODO: do the same thing for histograms
+
+    // Select which canvas to plot
+    std::vector<std::string> canvasSubFolderList;
+    canvasSubFolderList.emplace_back("Raw");
+    canvasSubFolderList.emplace_back("Raw/reactions");
+    canvasSubFolderList.emplace_back("D1");             // varToPlot
+    canvasSubFolderList.emplace_back("D1/reactions");   // varToPlot/splitHist
+    canvasSubFolderList.emplace_back("D2");             // varToPlot
+    canvasSubFolderList.emplace_back("D2/reactions");   // varToPlot/splitHist
+
+    std::vector<Color_t> colorWheel = {
+        kGreen-3, kTeal+3, kAzure+7,
+        kCyan-2, kBlue-7, kBlue+2,
+        kOrange+1, kOrange+9, kRed+2, kPink+9
+    };
+
+    std::map<int, std::pair<std::string, Color_t>> reactionNamesAndColors = {
+        {-1, {"no truth", kBlack}},
+        {0, {"CCQE", kOrange+1}},
+        {1, {"RES", kGreen-3}},
+        {2, {"DIS", kTeal+3}},
+        {3, {"COH", kAzure+7}},
+        {4, {"NC", kCyan-2}},
+        {5, {"CC-#bar{#nu}_{#mu}", kBlue-7}},
+        {6, {"CC-#nu_{e}, CC-#bar{#nu}_{e}", kBlue+2}},
+        {7, {"out FV", kPink+9}},
+        {9, {"2p2h", kRed+2}},
+        {777, {"sand #mu", kGray}},
+        {999, {"other", kGray+2}},
+    };
+
+
+    LogInfo << "Generating and writing sample histograms..." << std::endl;
+    std::map<std::string, TH1D*> TH1D_handler;
+    std::map<std::string, int> splitVarColor;
+    int sampleColor = 0;
+    samplesDir->cd();
+    for(const auto& anaSample : _samplesList_){
+
+        std::map<std::string, TH1D*> tempHistMap;
+
+        LogDebug << "Processing histograms for: " << anaSample->GetName() << std::endl;
+
+        std::string histNameBuffer;
+
+        // Sample's raw histograms (what's actually fitted)
+        histNameBuffer              = anaSample->GetName() + "/Raw/MC";
+        tempHistMap[histNameBuffer] = (TH1D*) anaSample->GetPredHisto().Clone();
+        tempHistMap[histNameBuffer]->SetName(histNameBuffer.c_str());
+        tempHistMap[histNameBuffer]->SetTitle("MC");
+        histNameBuffer              = anaSample->GetName() + "/Raw/Data";
+        tempHistMap[histNameBuffer] = (TH1D*) anaSample->GetDataHisto().Clone();
+        tempHistMap[histNameBuffer]->SetName(histNameBuffer.c_str());
+        tempHistMap[histNameBuffer]->SetTitle("Data");
+
+        // Build the histograms binning (D1)
+        // TODO: check if a simple binning can be applied
+        bool isSimpleBinning = true;
+        std::vector<double> D1binning;
+        auto bins = anaSample->GetBinEdges();
+        for(const auto& bin : bins){
+            if(D1binning.empty()) D1binning.emplace_back(bin.D1low);
+            if(not GenericToolbox::doesElementIsInVector(bin.D1high, D1binning)){
+                D1binning.emplace_back(bin.D1high);
+            }
+        }
+        std::sort(D1binning.begin(), D1binning.end());
+
+        histNameBuffer              = anaSample->GetName() + "/D1/MC";
+        tempHistMap[histNameBuffer] = new TH1D(histNameBuffer.c_str(), "MC",
+                                             D1binning.size() - 1, &D1binning[0]);
+        histNameBuffer              = anaSample->GetName() + "/D1/Data";
+        tempHistMap[histNameBuffer] = new TH1D(histNameBuffer.c_str(), "Data",
+                                             D1binning.size() - 1, &D1binning[0]);
+
+        // Build the histograms binning (D2)
+        // TODO: check if a simple binning can be applied
+        isSimpleBinning = true;
+        std::vector<double> D2binning;
+        for(const auto& bin : bins){
+            if(D2binning.empty()) D2binning.emplace_back(bin.D2low);
+            if(not GenericToolbox::doesElementIsInVector(bin.D2high, D2binning)){
+                D2binning.emplace_back(bin.D2high);
+            }
+        }
+        std::sort(D2binning.begin(), D2binning.end());
+
+        histNameBuffer              = anaSample->GetName() + "/D2/MC";
+        tempHistMap[histNameBuffer] = new TH1D(histNameBuffer.c_str(), "MC",
+                                               D2binning.size() - 1, &D2binning[0]);
+        histNameBuffer              = anaSample->GetName() + "/D2/Data";
+        tempHistMap[histNameBuffer] = new TH1D(histNameBuffer.c_str(), "Data",
+                                               D2binning.size() - 1, &D2binning[0]);
+
+        // Get the list of valid sub-divisions...
+        {   // Reaction
+            splitVarColor["reactions"] = 0;
+            std::vector<int> reactionCodesList;
+            for( size_t iEvent = 0 ; iEvent < anaSample->GetMcEvents().size() ; iEvent++ ){
+                auto* anaEvent = anaSample->GetEvent(iEvent);
+                if(not GenericToolbox::doesElementIsInVector(anaEvent->GetReaction(),
+                                                             reactionCodesList)){
+                    reactionCodesList.emplace_back(anaEvent->GetReaction());
+                }
+            }
+            for(const auto& thisReactionCode : reactionCodesList){
+                histNameBuffer = anaSample->GetName() + "/D1/reactions/" + std::to_string(thisReactionCode);
+                tempHistMap[histNameBuffer] = (TH1D*) tempHistMap[anaSample->GetName() + "/D1/MC"]->Clone();
+                tempHistMap[histNameBuffer]->Reset("ICESM");
+                tempHistMap[histNameBuffer]->SetName(histNameBuffer.c_str());
+                tempHistMap[histNameBuffer]->SetTitle(reactionNamesAndColors[thisReactionCode].first.c_str());
+
+                histNameBuffer = anaSample->GetName() + "/D2/reactions/" + std::to_string(thisReactionCode);
+                tempHistMap[histNameBuffer] = (TH1D*) tempHistMap[anaSample->GetName() + "/D2/MC"]->Clone();
+                tempHistMap[histNameBuffer]->Reset("ICESM");
+                tempHistMap[histNameBuffer]->SetName(histNameBuffer.c_str());
+                tempHistMap[histNameBuffer]->SetTitle(reactionNamesAndColors[thisReactionCode].first.c_str());
+
+                histNameBuffer = anaSample->GetName() + "/Raw/reactions/" + std::to_string(thisReactionCode);
+                tempHistMap[histNameBuffer] = (TH1D*) tempHistMap[anaSample->GetName() + "/Raw/MC"]->Clone();
+                tempHistMap[histNameBuffer]->Reset("ICESM");
+                tempHistMap[histNameBuffer]->SetName(histNameBuffer.c_str());
+                tempHistMap[histNameBuffer]->SetTitle(reactionNamesAndColors[thisReactionCode].first.c_str());
+            }
+        }
+
+
+
+        // Fill the histograms (MC)
+        for( size_t iEvent = 0 ; iEvent < anaSample->GetMcEvents().size() ; iEvent++ ){
+            auto* anaEvent = &anaSample->GetMcEvents()[iEvent];
+            tempHistMap[anaSample->GetName() + "/D1/MC"]->Fill(
+                anaEvent->GetRecoD1(), anaEvent->GetEvWght()
+            );
+            tempHistMap[anaSample->GetName() + "/D2/MC"]->Fill(
+                anaEvent->GetRecoD2(), anaEvent->GetEvWght()
+            );
+            tempHistMap[anaSample->GetName() + "/D1/reactions/" + std::to_string(anaEvent->GetReaction())]->Fill(
+                anaEvent->GetRecoD1(), anaEvent->GetEvWght()
+            );
+            tempHistMap[anaSample->GetName() + "/D2/reactions/" + std::to_string(anaEvent->GetReaction())]->Fill(
+                anaEvent->GetRecoD2(), anaEvent->GetEvWght()
+            );
+            tempHistMap[anaSample->GetName() + "/Raw/reactions/" + std::to_string(anaEvent->GetReaction())]->Fill(
+                anaEvent->GetRecoBinIndex() + 0.5, anaEvent->GetEvWght()
+            );
+        }
+
+        // Fill the histograms (Data)
+        for( size_t iEvent = 0 ; iEvent < anaSample->GetDataEvents().size() ; iEvent++ ){
+            auto* anaEvent = &anaSample->GetDataEvents()[iEvent];
+            tempHistMap[anaSample->GetName() + "/D1/Data"]->Fill(
+                anaEvent->GetRecoD1(), anaEvent->GetEvWght()
+            );
+            tempHistMap[anaSample->GetName() + "/D2/Data"]->Fill(
+                anaEvent->GetRecoD2(), anaEvent->GetEvWght()
+            );
+        }
+
+        // Cosmetics, Normalization and Write
+        for(auto& histPair : tempHistMap){
+
+            LogTrace << " -> " << histPair.first << std::endl;
+
+            auto pathElements = GenericToolbox::splitString(histPair.first, "/");
+            std::string xVarName = pathElements[1]; // SampleName/Var/SplitVar/...
+            std::string splitVarName;
+            std::string splitVarCode;
+            if(pathElements.size() >= 4){
+                splitVarName = pathElements[2]; // "reactions" for example
+                splitVarCode = pathElements[3]; // "0" for example
+            }
+
+            histPair.second->GetXaxis()->SetTitle(xVarName.c_str());
+            if(xVarName == "D1"){
+                // Get Number of counts per 100 MeV
+                for(int iBin = 0 ; iBin <= histPair.second->GetNbinsX()+1 ; iBin++){
+                    histPair.second->SetBinContent( iBin, histPair.second->GetBinContent(iBin)/histPair.second->GetBinWidth(iBin)*100.);
+                    histPair.second->SetBinError( iBin, TMath::Sqrt(histPair.second->GetBinContent(iBin))/histPair.second->GetBinWidth(iBin)*100.);
+                }
+                histPair.second->GetYaxis()->SetTitle("Counts/(100 MeV)");
+                histPair.second->GetXaxis()->SetRangeUser(histPair.second->GetXaxis()->GetXmin(),maxD1Scale);
+            }
+            else{
+                histPair.second->GetYaxis()->SetTitle("Counts");
+            }
+
+            if(pathElements.back() == "Data"){
+                // IS DATA
+                if( anaSample->GetDataType() == DataType::kAsimov
+                    and xVarName != "Raw" // RAW IS NOT RENORMALIZED
+                   ){
+                    histPair.second->Scale(anaSample->GetNorm());
+                }
+                for( int iBin = 0 ; iBin <= histPair.second->GetNbinsX()+1 ; iBin++ ){
+                    histPair.second->SetBinError(iBin, TMath::Sqrt(histPair.second->GetBinContent(iBin)));
+                }
+                histPair.second->SetLineColor(kBlack);
+                histPair.second->SetMarkerColor(kBlack);
+                histPair.second->SetMarkerStyle(kFullDotLarge);
+                histPair.second->SetOption("EP");
+            }
+            else{
+                // IS MC (if it's broken down by reaction, is MC too)
+                if(xVarName != "Raw" or not splitVarName.empty()){ // RAW IS NOT RENORMALIZED, unless we rebuild it (for split var)
+                    histPair.second->Scale(anaSample->GetNorm());
+                }
+
+                if(splitVarName == "reactions"){
+                    histPair.second->SetLineColor(reactionNamesAndColors[stoi(splitVarCode)].second);
+//                    histPair.second->SetFillColorAlpha(reactionNamesAndColors[stoi(splitVarCode)].second, 0.8);
+                    histPair.second->SetFillColor(reactionNamesAndColors[stoi(splitVarCode)].second);
+                    histPair.second->SetMarkerColor(reactionNamesAndColors[stoi(splitVarCode)].second);
+                }
+                else if( not splitVarName.empty() ){
+                    histPair.second->SetLineColor(
+                        colorWheel[splitVarColor[splitVarName]% colorWheel.size()]);
+                    histPair.second->SetFillColor(
+                        colorWheel[splitVarColor[splitVarName]% colorWheel.size()]);
+                    histPair.second->SetMarkerColor(
+                        colorWheel[splitVarColor[splitVarName]% colorWheel.size()]);
+                    splitVarColor[splitVarName]++;
+                }
+                else{
+                    histPair.second->SetLineColor(colorWheel[sampleColor% colorWheel.size()]);
+                    histPair.second->SetFillColor(colorWheel[sampleColor% colorWheel.size()]);
+                    histPair.second->SetMarkerColor(colorWheel[sampleColor% colorWheel.size()]);
+                }
+
+                histPair.second->SetOption("HIST");
+            }
+
+            histPair.second->SetLineWidth(2);
+            histPair.second->GetYaxis()->SetRangeUser(
+                histPair.second->GetMinimum(0), // 0 or lower as min will prevent to set log scale
+                histPair.second->GetMaximum()*1.2
+            );
+
+            // Writing the histogram
+            std::string subFolderPath = GenericToolbox::joinVectorString(pathElements, "/", 0, -1);
+            GenericToolbox::mkdirTFile(samplesDir, subFolderPath)->cd();
+            TH1D* tempHistPtr = (TH1D*) histPair.second->Clone();
+            tempHistPtr->Write((pathElements.back() + "_TH1D").c_str());
+
+        }
+
+        GenericToolbox::appendToMap(TH1D_handler, tempHistMap);
+
+        // Next Loop
+        sampleColor++;
+
+    }
+
+
+    // Building canvas
+    LogInfo << "Generating and writing sample canvas..." << std::endl;
+    std::map<std::string, std::vector<TCanvas*>> canvasHandler;
+    int nbXPlots       = 3;
+    int nbYPlots       = 2;
+    int nbSamples      = _samplesList_.size();
+
+
+    int sampleCounter = 0;
+    while(sampleCounter != nbSamples){
+        std::stringstream canvasName;
+        canvasName << "samples_" << sampleCounter+1;
+        sampleCounter += nbXPlots*nbYPlots;
+        if(sampleCounter > nbSamples){
+            sampleCounter = nbSamples;
+        }
+        canvasName << "_to_" << sampleCounter;
+
+        std::string pathBuffer;
+        for(auto& canvasSubFolder : canvasSubFolderList){
+            pathBuffer = canvasSubFolder + "/" + canvasName.str();
+            canvasHandler[canvasSubFolder].emplace_back(new TCanvas(pathBuffer.c_str(), canvasName.str().c_str(), 1200, 700));
+            canvasHandler[canvasSubFolder].back()->Divide(nbXPlots,nbYPlots);
+        }
+    }
+
+
+    for(auto& canvasFolderPair : canvasHandler){
+
+        LogDebug << "Processing canvas: " << canvasFolderPair.first << std::endl;
+
+        int canvasIndex = 0;
+        int iSlot       = 1;
+        for(const auto& anaSample : _samplesList_){
+
+            LogTrace << "Processing plot for: " << anaSample->GetName() << std::endl;
+
+            if(iSlot > nbXPlots*nbYPlots){
+                canvasIndex++;
+                iSlot = 1;
+            }
+
+            canvasFolderPair.second[canvasIndex]->cd(iSlot);
+
+            auto subFolderList = GenericToolbox::splitString(canvasFolderPair.first, "/", true);
+            std::string xVarName = subFolderList[0];
+
+            TH1D* dataSampleHist = TH1D_handler[anaSample->GetName() + "/" + xVarName + "/Data"];
+            std::vector<TH1D*> mcSampleHistList;
+
+            if(subFolderList.size() == 1){ // no splitting of MC hist
+                mcSampleHistList.emplace_back(TH1D_handler[anaSample->GetName() + "/" + xVarName + "/MC"]);
+            }
+            else{
+                std::string splitVarName = subFolderList[1];
+                for(auto& histNamePair : TH1D_handler){
+                    if(GenericToolbox::doesStringStartsWithSubstring(
+                        histNamePair.first,
+                        anaSample->GetName() + "/" + xVarName + "/" + splitVarName + "/"
+                    )){
+                        mcSampleHistList.emplace_back(histNamePair.second);
+                    }
+                }
+            }
+
+            if(mcSampleHistList.empty()) continue;
+
+            // Sorting histograms by norm (lowest stat first)
+            std::function<bool(TH1D*, TH1D*)> aGoesFirst = [maxD1Scale](TH1D* histA_, TH1D* histB_){
+                bool aGoesFirst = true; // A is smaller = A goes first
+                double Xmax = histA_->GetXaxis()->GetXmax();
+                if(maxD1Scale > 0) Xmax = maxD1Scale;
+                if(  histA_->Integral(histA_->FindBin(0), histA_->FindBin(Xmax)-1)
+                     > histB_->Integral(histB_->FindBin(0), histB_->FindBin(Xmax)-1) ) aGoesFirst = false;
+                return aGoesFirst;
+            };
+            auto p = GenericToolbox::getSortPermutation( mcSampleHistList, aGoesFirst );
+            mcSampleHistList = GenericToolbox::applyPermutation(mcSampleHistList, p);
+
+            // Stacking histograms
+            TH1D* histPileBuffer = nullptr;
+            double minYValue = 1;
+            for( size_t iHist = 0 ; iHist < mcSampleHistList.size() ; iHist++ ){
+                if(minYValue > mcSampleHistList.back()->GetMinimum(0)){
+                    minYValue = mcSampleHistList.back()->GetMinimum(0);
+                }
+                if(histPileBuffer != nullptr) mcSampleHistList[iHist]->Add(histPileBuffer);
+                histPileBuffer = mcSampleHistList[iHist];
+            }
+
+            // Draw (the one on top of the pile should be drawn first, otherwise it will hide the others...)
+            int lastIndex = mcSampleHistList.size()-1;
+            for( int iHist = lastIndex ; iHist >= 0 ; iHist-- ){
+                if( iHist == lastIndex ){
+                    mcSampleHistList[iHist]->GetYaxis()->SetRangeUser(
+                        minYValue,
+                        mcSampleHistList[iHist]->GetMaximum()*1.2
+                        );
+                    mcSampleHistList[iHist]->Draw("HIST");
+                }
+                else {
+                    mcSampleHistList[iHist]->Draw("HISTSAME");
+                }
+            }
+
+            dataSampleHist->SetTitle("Data");
+            dataSampleHist->Draw("EPSAME");
+
+            // Legend
+            double Xmax = 0.9;
+            double Ymax = 0.9;
+            double Xmin = 0.5;
+            double Ymin = Ymax - 0.04*(mcSampleHistList.size()+1);
+            gPad->BuildLegend(Xmin,Ymin,Xmax,Ymax);
+
+            mcSampleHistList[lastIndex]->SetTitle(anaSample->GetName().c_str()); // the actual title
+            gPad->SetGridx();
+            gPad->SetGridy();
+            iSlot++;
+
+        } // sample
+
+        samplesDir->cd();
+        GenericToolbox::mkdirTFile(samplesDir, "canvas/" + canvasFolderPair.first)->cd();
+        for(auto& canvas : canvasFolderPair.second){
+            canvas->Write((canvas->GetTitle() + std::string("_TCanvas")).c_str());
+        }
+
+    } // canvas
+
+
+
+}
+
 
 void ND280Fitter::InitializeThreadsParameters(){
 
     if(GlobalVariables::getNbThreads() > 1){
 
         LogWarning << "Initializing threads workers..." << std::endl;
-
-        _histThreadHandlers_.resize(GlobalVariables::getNbThreads());
-        for(int iThread = 0 ; iThread < GlobalVariables::getNbThreads(); iThread++){
-            _histThreadHandlers_[iThread].resize(_samplesList_.size());
-            for(size_t iSample = 0 ; iSample < _samplesList_.size() ; iSample++){
-                _histThreadHandlers_[iThread][iSample].resize(4, nullptr);
-                if(_samplesList_[iSample]->GetPredHisto() != nullptr){
-                    _histThreadHandlers_[iThread][iSample][0] = (TH1D*)_samplesList_[iSample]->GetPredHisto()->Clone();
-                }
-                if(_samplesList_[iSample]->GetMCHisto() != nullptr){
-                    _histThreadHandlers_[iThread][iSample][1] = (TH1D*)_samplesList_[iSample]->GetMCHisto()->Clone();
-                }
-                if(_samplesList_[iSample]->GetMCTruthHisto() != nullptr){
-                    _histThreadHandlers_[iThread][iSample][2] = (TH1D*)_samplesList_[iSample]->GetMCTruthHisto()->Clone();
-                }
-                if(_samplesList_[iSample]->GetSignalHisto() != nullptr){
-                    _histThreadHandlers_[iThread][iSample][3] = (TH1D*)_samplesList_[iSample]->GetSignalHisto()->Clone();
-                }
-            }
-        }
 
         std::function<void(int)> asyncLoop = [this](int iThread_){
             while(not _stopThreads_){
@@ -1094,7 +1162,7 @@ void ND280Fitter::InitializeThreadsParameters(){
 
                 if(_triggerReFillMcHistogramsThreads_.at(iThread_)){
                     for( size_t iSample = 0 ; iSample < _samplesList_.size() ; iSample++ ){
-                        _samplesList_[iSample]->FillMcHistogramsThread(iThread_);
+                        _samplesList_[iSample]->FillMcHistograms(iThread_);
                     }
                     _triggerReFillMcHistogramsThreads_.at(iThread_) = false; // toggle off the trigger
                 }
@@ -1189,7 +1257,7 @@ void ND280Fitter::InitializeDataSamples(){
 
     LogWarning << "Initializing data samples..." << std::endl;
 
-    if(_selected_data_type_ == kReset){
+    if(_selected_data_type_ == kReset or _selected_data_type_ == kMC){
         LogFatal << "In " << __METHOD_NAME__ << std::endl;
         LogFatal << "No valid _selected_data_type_ provided." << std::endl;
         throw std::logic_error("No valid _selected_data_type_ provided.");
@@ -1253,13 +1321,13 @@ void ND280Fitter::InitializeFitter(){
 }
 
 void ND280Fitter::PassIfInitialized(const std::string& method_name_) const{
-    if(not _is_initialized_){
+    if(not _isInitialized_){
         LogFatal << "Can't do " << method_name_ << " while not initialized." << std::endl;
         throw std::logic_error("Can't do " + method_name_ + " while not initialized.");
     }
 }
 void ND280Fitter::PassIfNotInitialized(const std::string& method_name_) const{
-    if(_is_initialized_){
+    if(_isInitialized_){
         LogFatal << "Can't do " << method_name_ << " while already initialized." << std::endl;
         throw std::logic_error("Can't do " + method_name_ + " while already initialized.");
     }
@@ -1440,7 +1508,7 @@ double ND280Fitter::EvalFit(const double* par){
     _chi2PullsHistory_.emplace_back(_chi2PullsBuffer_);
     _chi2RegHistory_.emplace_back(_chi2RegBuffer_);
 
-    if(_nbFitCalls_ % _saveFitParamsFrequency_ == 0 and _save_fit_params_){
+    if(_nbFitCalls_ % _saveFitParamsFrequency_ == 0 and _saveFitParameters_){
         SaveParams(_newParametersList_);
         SaveEventHist(_nbFitCalls_);
     }
@@ -1493,7 +1561,10 @@ void ND280Fitter::PropagateSystematics(){
     ////////////////////////////////
     GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(REWEIGHT_TIME_POINT);
 
-    if(not _disableMultiThread_ and GlobalVariables::getNbThreads() > 1){
+    if( GlobalVariables::getNbThreads() > 1
+       and not _disableMultiThread_
+//       and false // DISABLE FOR DEBUG
+       ){
         for(int iThread = 0 ; iThread < GlobalVariables::getNbThreads(); iThread++){
             // Start every waiting thread
             _triggerReweightThreads_[iThread] = true;
@@ -1516,18 +1587,20 @@ void ND280Fitter::PropagateSystematics(){
         GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(REWEIGHT_TIME_POINT)
         );
     if(_printFitState_){
-        for(size_t jGroup = 0 ; jGroup < _fitParametersGroupList_.size() ; jGroup++){
+        if(_advancedTimeMonitoring_){
+            for(size_t jGroup = 0 ; jGroup < _fitParametersGroupList_.size() ; jGroup++){
 
-            long long cpuTimeSpent = 0;
-            long long averageTimeSpent = 0;
-            for( int iThread = 0 ; iThread < TMath::Abs(GlobalVariables::getNbThreads()) ; iThread++ )
-            {
-                cpuTimeSpent += _durationReweightParameters_[jGroup][iThread].back();
-                averageTimeSpent += GenericToolbox::getAverage(_durationReweightParameters_[jGroup][iThread]); // average over all instances
+                long long cpuTimeSpent = 0;
+                long long averageTimeSpent = 0;
+                for( int iThread = 0 ; iThread < TMath::Abs(GlobalVariables::getNbThreads()) ; iThread++ )
+                {
+                    cpuTimeSpent += _durationReweightParameters_[jGroup][iThread].back();
+                    averageTimeSpent += GenericToolbox::getAverage(_durationReweightParameters_[jGroup][iThread]); // average over all instances
+                }
+
+                LogTrace << _fitParametersGroupList_[jGroup]->GetName() << " -> " << GenericToolbox::parseTimeUnit(cpuTimeSpent/TMath::Abs(GlobalVariables::getNbThreads()));
+                LogTrace << " (average: " << GenericToolbox::parseTimeUnit(averageTimeSpent /TMath::Abs(GlobalVariables::getNbThreads())) << ")" << std::endl;
             }
-
-            LogTrace << _fitParametersGroupList_[jGroup]->GetName() << " -> " << GenericToolbox::parseTimeUnit(cpuTimeSpent/TMath::Abs(GlobalVariables::getNbThreads()));
-            LogTrace << " (average: " << GenericToolbox::parseTimeUnit(averageTimeSpent /TMath::Abs(GlobalVariables::getNbThreads())) << ")" << std::endl;
         }
         LogTrace << "Reweighting took: "
                  << GenericToolbox::parseTimeUnit(
@@ -1544,15 +1617,11 @@ void ND280Fitter::PropagateSystematics(){
     ////////////////////////////////
     GenericToolbox::getElapsedTimeSinceLastCallStr(FILL_TIME_POINT);
 
-    for( size_t iSample = 0 ; iSample < _samplesList_.size() ; iSample++ ){
-        _samplesList_[iSample]->ResetMcHistograms();
-    }
-
     if( GlobalVariables::getNbThreads() > 1
-//        and false
+//        and false // DISABLE FOR DEBUG
         and not _disableMultiThread_
        ){
-        // Starting reweighting threads
+        // Starting refill threads
         for(int iThread = 0 ; iThread < GlobalVariables::getNbThreads(); iThread++){
             _triggerReFillMcHistogramsThreads_[iThread] = true;
         }
@@ -1564,17 +1633,17 @@ void ND280Fitter::PropagateSystematics(){
 //                std::this_thread::sleep_for(std::chrono::milliseconds(30));
             }
         }
+
+        // MERGE HISTOGRAMS
+        for( size_t iSample = 0 ; iSample < _samplesList_.size() ; iSample++ ){
+            _samplesList_[iSample]->MergeMcHistogramsThread();
+        }
     } // _nbThreads_ > 1
     else {
         // single core
         for( size_t iSample = 0 ; iSample < _samplesList_.size() ; iSample++ ){
-            _samplesList_[iSample]->FillMcHistogramsThread();
+            _samplesList_[iSample]->FillMcHistograms();
         }
-    }
-
-    for(int iSample = 0 ; iSample < _samplesList_.size() ; iSample++){
-        _samplesList_[iSample]->MergeMcHistogramsThread(); // do nothing if single threaded
-        _samplesList_[iSample]->NormalizeMcHistograms();
     }
 
     _durationHistoryHandler_[FILL_TIME_POINT].emplace_back(
@@ -1656,7 +1725,14 @@ void ND280Fitter::ReWeightEvents(int iThread_){
     AnaEvent* currentEventPtr;
     AnaSample* currentSamplePtr;
     bool isMultiThreaded = (iThread_ != -1);
+    if(not isMultiThreaded) iThread_ = 0;
     size_t nEvents;
+
+    if(_advancedTimeMonitoring_){
+        GlobalVariables::getThreadMutex().lock();
+        GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(10000+(iThread_+1)); // Claim memory (avoid seg fault)
+        GlobalVariables::getThreadMutex().unlock();
+    }
 
     // Looping over all events
     for( size_t iSample = 0; iSample < _samplesList_.size(); iSample++ ){
@@ -1673,20 +1749,31 @@ void ND280Fitter::ReWeightEvents(int iThread_){
             currentEventPtr = &currentSamplePtr->GetMcEvents().at(iEvent);
 
             // lock (even if it's useless: for debug)
-            while(currentEventPtr->GetIsBeingEdited()) LogAlert << "WAITING...." << std::endl;
+            while(currentEventPtr->GetIsBeingEdited()){
+                LogAlert << "WAITING (more than 1 thread editing this event?)...." << std::endl;
+            }
             currentEventPtr->SetIsBeingEdited(true);
 
             currentEventPtr->ResetEvWght();
 
             for(size_t jGroup = 0 ; jGroup < _fitParametersGroupList_.size() ; jGroup++){
-                GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(10000+iThread_);
+                if(_advancedTimeMonitoring_){
+                    GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(10000+(iThread_+1));
+                }
                 _fitParametersGroupList_.at(jGroup)->ReWeight(
                     currentEventPtr, currentSamplePtr->GetDetector(),
                     iSample, iEvent,_newParametersList_.at(jGroup)
                 );
-                if(isMultiThreaded) _durationReweightParameters_[jGroup][iThread_].back() += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(10000+iThread_);
-                else _durationReweightParameters_[jGroup][0].back() += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(10000+iThread_);
+                if(_advancedTimeMonitoring_){
+                    _durationReweightParameters_[jGroup][iThread_].back() += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(10000+(iThread_+1));
+                }
             } // jParam
+
+            if(currentEventPtr->GetEvWght() < 0){
+                GlobalVariables::getThreadMutex().lock();
+                LogError <<  "Event#" << currentEventPtr->GetEvId() << ": " << GET_VAR_NAME_VALUE(currentEventPtr->GetEvWght()) << std::endl;
+                throw std::runtime_error("Event has a negative weight.");
+            }
 
             // unlock
             currentEventPtr->SetIsBeingEdited(false);
@@ -1694,11 +1781,6 @@ void ND280Fitter::ReWeightEvents(int iThread_){
         } // iEvent
 
     } // iSample
-
-    // For the cache at the next reweight call
-    for(size_t jGroup = 0 ; jGroup < _fitParametersGroupList_.size() ; jGroup++){
-        _fitParametersGroupList_.at(jGroup)->SetLastAppliedParamList(_newParametersList_.at(jGroup));
-    }
 
 }
 
@@ -1745,41 +1827,6 @@ void ND280Fitter::SaveEventHist(int fititer, bool is_final)
 
         _samplesList_[s]->Write(_outputTDirectory_, ss.str(), fititer);
     }
-}
-void ND280Fitter::SaveEventTree(std::vector<std::vector<double>>& res_params)
-{
-    outtree = new TTree("selectedEvents", "selectedEvents");
-    InitOutputTree();
-
-    for(size_t s = 0; s < _samplesList_.size(); s++)
-    {
-        for(int i = 0; i < _samplesList_[s]->GetN(); i++)
-        {
-            AnaEvent* ev = _samplesList_[s]->GetEvent(i);
-            ev->SetEvWght(ev->GetEvWghtMC());
-            for(size_t j = 0; j < _fitParametersGroupList_.size(); j++)
-            {
-                const std::string det = _samplesList_[s]->GetDetector();
-                _fitParametersGroupList_[j]->ReWeight(ev, det, s, i, res_params[j]);
-            }
-
-            sample   = ev->GetSampleType();
-            sigtype  = ev->GetSignalType();
-            topology = ev->GetTopology();
-            reaction = ev->GetReaction();
-            target   = ev->GetTarget();
-            nutype   = ev->GetFlavor();
-            D1true   = ev->GetTrueD1();
-            D2true   = ev->GetTrueD2();
-            D1Reco   = ev->GetRecoD1();
-            D2Reco   = ev->GetRecoD2();
-            weightMC = ev->GetEvWghtMC() * _MC_normalization_factor_;
-            weight   = ev->GetEvWght()   * _MC_normalization_factor_;
-            outtree->Fill();
-        }
-    }
-    _outputTDirectory_->cd();
-    outtree->Write();
 }
 void ND280Fitter::SaveParams(const std::vector<std::vector<double>>& new_pars)
 {

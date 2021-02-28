@@ -121,7 +121,7 @@ public:
     void SetApplyCondition(std::string applyCondition_);
     void ReadSplines(const std::string& fname_splines);
 
-    bool GetUseSplineSplitMapping() const;
+    bool GetIsSplinesInTree() const;
     bool GetIsNormalizationDial() const;
 
     int GetSplineIndex(const std::vector<int>& var, const std::vector<double>& bin) const;
@@ -160,13 +160,16 @@ public:
     TSpline3* getCorrespondingSpline(AnaEvent* anaEvent_);
 
 private:
+
     unsigned int nbins{};
-    std::string m_name;
     double m_nominalDial{};
     double m_prior{};
     double m_step{};
     double m_limit_lo{};
     double m_limit_hi{};
+
+    std::string m_name;
+
     //std::vector<TGraph> v_graphs;
     std::vector<SplineBin> _splineBinList_;
     std::vector<std::string> v_splitVarNames;
@@ -174,10 +177,11 @@ private:
     std::vector<TSpline3*> _splinePtrList_;
     std::vector<std::string> _splineNameList_;
     std::vector<int> m_dimensions;
+
     BinManager bin_manager;
 
     bool _isNormalizationDial_;
-    bool _useSplineSplitMapping_;
+    bool _isSplinesInTTree_;
     TTree* _interpolatedBinnedSplinesTTree_;
 
     SplineBin _splineBinBuffer_;
@@ -188,9 +192,13 @@ private:
 
     std::vector<TTreeFormula*> _applyConditionFormulaeList_; // threads
 
-    std::vector<double> _weightValueCacheList_;
-    std::vector<double> _dialValueCacheList_;
+    typedef struct{
+        bool isBeingEdited;
+        double cachedDialValue;
+        double cachedDialWeight;
+    } SplineCache;
 
+    std::vector<SplineCache> _splineCacheList_;
 
     const std::string TAG = color::MAGENTA_STR + "[XsecDial]: " + color::RESET_STR;
 };

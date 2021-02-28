@@ -1,6 +1,8 @@
 #include "AnaSample.hh"
 #include "GlobalVariables.h"
 #include "Logger.h"
+#include "GenericToolbox.h"
+#include "GenericToolboxRootExt.h"
 #include "TTreeFormula.h"
 
 using xsllh::FitBin;
@@ -15,6 +17,13 @@ AnaSample::AnaSample(int sample_id, const std::string& name, const std::string& 
     , m_data_tree(t_data)
     , m_norm(1.0)
 {
+
+    m_hpred    = nullptr;
+    m_hmc      = nullptr;
+    m_hmc_true = nullptr;
+    m_hsig     = nullptr;
+    m_hdata    = nullptr;
+
     Reset();
 }
 
@@ -28,6 +37,12 @@ AnaSample::AnaSample(const SampleOpt& sample, TTree* t_data){
     m_data_POT = sample.data_POT;
     m_mc_POT = sample.mc_POT;
     m_norm = 1.0;
+
+    m_hpred    = nullptr;
+    m_hmc      = nullptr;
+    m_hmc_true = nullptr;
+    m_hsig     = nullptr;
+    m_hdata    = nullptr;
 
     m_data_tree = t_data;
 
@@ -62,12 +77,6 @@ void AnaSample::Reset() {
 //        std::cout << bin.D2low << " " << bin.D2high << " " << bin.D1low << " " << bin.D1high
 //                  << std::endl;
 //    }
-
-    m_hpred    = nullptr;
-    m_hmc      = nullptr;
-    m_hmc_true = nullptr;
-    m_hsig     = nullptr;
-    m_hdata    = nullptr;
 
     m_llh = new PoissonLLH;
 
@@ -221,10 +230,9 @@ void AnaSample::MakeHistos()
 
 void AnaSample::SetData(TObject* hdata)
 {
-    if(m_hdata != nullptr)
-        delete m_hdata;
-    m_hdata = (TH1D*)hdata->Clone(Form("%s_data", m_name.c_str()));
-    m_hdata->SetDirectory(0);
+    delete m_hdata;
+    m_hdata = (TH1D*) hdata->Clone(Form("%s_data", m_name.c_str()));
+    m_hdata->SetDirectory(nullptr);
 }
 
 int AnaSample::GetBinIndex(const double D1, const double D2) const
@@ -250,7 +258,28 @@ void AnaSample::FillEventHist(DataType datatype, bool stat_fluc){
 
     LogWarning << "Filling histograms of sample: " << this->GetName() << std::endl;
 
-    this->FillMcHistograms();
+    this->FillMcHistograms(); // single thread
+
+    // OLD FILL METHOD
+//    for(std::size_t iEvent = 0; iEvent < m_mc_events.size(); ++iEvent){
+//
+//        double D1_rec  = m_mc_events[iEvent].GetRecoD1();
+//        double D2_rec  = m_mc_events[iEvent].GetRecoD2();
+//        double D1_true = m_mc_events[iEvent].GetTrueD1();
+//        double D2_true = m_mc_events[iEvent].GetTrueD2();
+////        double wght    = datatype >= 0 ? m_mc_events[iEvent].GetEvWght() : m_mc_events[iEvent].GetEvWghtMC();
+//        double wght    = m_mc_events[iEvent].GetEvWght();
+//
+//        int anybin_index_rec  = GetBinIndex(D1_rec, D2_rec);
+//        int anybin_index_true = GetBinIndex(D1_true, D2_true);
+//
+//        m_hpred->Fill(anybin_index_rec + 0.5, wght);
+//        m_hmc->Fill(anybin_index_rec + 0.5, wght);
+//        m_hmc_true->Fill(anybin_index_true + 0.5, wght);
+//
+//        if(m_mc_events[iEvent].isSignalEvent())
+//            m_hsig->Fill(anybin_index_true + 0.5, wght);
+//    }
 
     if(datatype == kMC or datatype == kReset) {
         return;
@@ -274,14 +303,6 @@ void AnaSample::FillEventHist(DataType datatype, bool stat_fluc){
             if(kinematicBinIndex != -1) {
                 m_hdata->Fill(kinematicBinIndex + 0.5, m_data_events[iEvent].GetEvWght());
             }
-//#ifndef NDEBUG
-//            else {
-//                LogWarning << "In AnaSample::FillEventHist()\n"
-//                           << "No bin for current data event.\n"
-//                           << "D1 Reco: " << m_data_events[iEvent].GetRecoD1() << std::endl
-//                           << "D2 Reco: " << m_data_events[iEvent].GetRecoD2() << std::endl;
-//            }
-//#endif
         }
 
         if( datatype == kAsimov ){
@@ -289,18 +310,12 @@ void AnaSample::FillEventHist(DataType datatype, bool stat_fluc){
         }
 
         if( (datatype == kAsimov or datatype == kExternal) and stat_fluc ) {
-            LogInfo << "Applying statistical fluctuations..." << std::endl;
-
+            LogInfo << "Applying statistical fluctuations on data..." << std::endl;
             for(unsigned int i = 1; i <= m_hdata->GetNbinsX(); ++i) {
                 double val = gRandom->Poisson(m_hdata->GetBinContent(i));
                 m_hdata->SetBinContent(i, val);
             }
         }
-
-//#ifndef NDEBUG
-//        LogInfo << "Data histogram filled: " << std::endl;
-//        m_hdata->Print();
-//#endif
 
     }
     else {
@@ -308,56 +323,14 @@ void AnaSample::FillEventHist(DataType datatype, bool stat_fluc){
                    << "Invalid data type to fill histograms!\n";
     }
 
-}
-
-void AnaSample::FillMcHistograms(){
-
-    this->ResetMcHistograms();
-    this->FillMcHistogramsThread(); // single thread
-
-    // OLD FILL METHOD
-//    for(std::size_t iEvent = 0; iEvent < m_mc_events.size(); ++iEvent){
-//
-//        double D1_rec  = m_mc_events[iEvent].GetRecoD1();
-//        double D2_rec  = m_mc_events[iEvent].GetRecoD2();
-//        double D1_true = m_mc_events[iEvent].GetTrueD1();
-//        double D2_true = m_mc_events[iEvent].GetTrueD2();
-////        double wght    = datatype >= 0 ? m_mc_events[iEvent].GetEvWght() : m_mc_events[iEvent].GetEvWghtMC();
-//        double wght    = m_mc_events[iEvent].GetEvWght();
-//
-//        int anybin_index_rec  = GetBinIndex(D1_rec, D2_rec);
-//        int anybin_index_true = GetBinIndex(D1_true, D2_true);
-//
-//        m_hpred->Fill(anybin_index_rec + 0.5, wght);
-//        m_hmc->Fill(anybin_index_rec + 0.5, wght);
-//        m_hmc_true->Fill(anybin_index_true + 0.5, wght);
-//
-//        if(m_mc_events[iEvent].isSignalEvent())
-//            m_hsig->Fill(anybin_index_true + 0.5, wght);
-//    }
-
-    this->MergeMcHistogramsThread(); // useless here since it's single core
-    this->NormalizeMcHistograms();
-}
-
-void AnaSample::ResetMcHistograms(){
-
-    m_hpred->Reset("ICESM");
-    m_hmc->Reset("ICESM");
-    m_hmc_true->Reset("ICESM");
-    m_hsig->Reset("ICESM");
-
-    for(auto& histThread: _histThreadHandlers_){
-        // histThread is a map<TH1D*, TH1D*> -> for example  histThread[m_hpred] = m_hpred for a given thread.
-        for(auto& histPair: histThread){
-            histPair.second->Reset("ICESM");
-        }
-    }
+    LogInfo << GET_VAR_NAME_VALUE(this->CalcLLH()) << std::endl;
 
 }
-void AnaSample::FillMcHistogramsThread(int iThread_){
+
+void AnaSample::FillMcHistograms(int iThread_){
 
     bool isMultiThreaded = (iThread_ != -1);
+    bool foundNan = false;
     TH1D* histPredPtr = nullptr;
     TH1D* histMcPtr = nullptr;
     TH1D* histMcTruePtr = nullptr;
@@ -377,6 +350,16 @@ void AnaSample::FillMcHistogramsThread(int iThread_){
         histSigPtr    = m_hsig;
     }
 
+    histPredPtr->Reset("ICESM");
+    histMcPtr->Reset("ICESM");
+    histMcTruePtr->Reset("ICESM");
+    histSigPtr->Reset("ICESM");
+
+//    GenericToolbox::resetHistogram(histPredPtr);
+//    GenericToolbox::resetHistogram(histMcPtr);
+//    GenericToolbox::resetHistogram(histMcTruePtr);
+//    GenericToolbox::resetHistogram(histSigPtr);
+
     for( size_t iMcEvent = 0 ; iMcEvent < m_mc_events.size() ; iMcEvent++ ){
 
         if(isMultiThreaded){
@@ -389,17 +372,32 @@ void AnaSample::FillMcHistogramsThread(int iThread_){
 
         // Events are not supposed to move for one bin to another with the current implementation
         // So the bin index shall be computed once
+
+        // Wait if another thread is editing the binning
+        while(anaEventPtr->GetIsBeingEdited());
         if(anaEventPtr->GetTrueBinIndex() == -1){
-            anaEventPtr->GetTrueBinIndex() = this->GetBinIndex(
-                anaEventPtr->GetTrueD1(),
-                anaEventPtr->GetTrueD2()
-            );
+            anaEventPtr->SetIsBeingEdited(true);
+            anaEventPtr->SetTrueBinIndex(
+                this->GetBinIndex(anaEventPtr->GetTrueD1(), anaEventPtr->GetTrueD2())
+                );
+            anaEventPtr->SetIsBeingEdited(false);
         }
+        // Wait if another thread is editing the binning
+        while(anaEventPtr->GetIsBeingEdited());
         if(anaEventPtr->GetRecoBinIndex() == -1){
-            anaEventPtr->GetRecoBinIndex() = this->GetBinIndex(
-                anaEventPtr->GetRecoD1(),
-                anaEventPtr->GetRecoD2()
-            );
+            anaEventPtr->SetIsBeingEdited(true);
+            anaEventPtr->SetRecoBinIndex(
+                this->GetBinIndex(anaEventPtr->GetRecoD1(), anaEventPtr->GetRecoD2())
+                );
+            anaEventPtr->SetIsBeingEdited(false);
+        }
+
+        if(anaEventPtr->GetEvWght() != anaEventPtr->GetEvWght()){
+            GlobalVariables::getThreadMutex().lock();
+            if(not foundNan) foundNan = true;
+            LogError << this->GetName() << ": Event#" << anaEventPtr->GetEvId()
+                     << " -> " << GET_VAR_NAME_VALUE(anaEventPtr->GetEvWght()) << std::endl;
+            GlobalVariables::getThreadMutex().unlock();
         }
 
         histPredPtr->Fill(anaEventPtr->GetRecoBinIndex() + 0.5, anaEventPtr->GetEvWght());
@@ -412,19 +410,49 @@ void AnaSample::FillMcHistogramsThread(int iThread_){
 
     }
 
-}
-void AnaSample::MergeMcHistogramsThread(){
+    if(foundNan){
+        throw std::runtime_error("foundNan");
+    }
 
-    // if single thread, this will be skipped.
-    for(auto& histThread: _histThreadHandlers_){
-        // histThread is a map<TH1D*, TH1D*> -> for example  histThread[m_hpred] = m_hpred for a given thread.
-        for(auto& histPair: histThread){
-            histPair.first->Add(histPair.second);
-        }
+    if(not isMultiThreaded){
+        // DONT APPLY NORMALISATION ON THREAD HISTOGRAMS
+        // It leaves computational noise after stacking already normalized histograms
+        // Computational noise appears in the chi2 at approx 1E-13
+        m_hpred->Scale(m_norm);
+        m_hmc->Scale(m_norm);
+        m_hsig->Scale(m_norm);
     }
 
 }
-void AnaSample::NormalizeMcHistograms(){
+void AnaSample::MergeMcHistogramsThread()
+{
+
+    m_hpred->Reset("ICESM");
+    m_hmc->Reset("ICESM");
+    m_hmc_true->Reset("ICESM");
+    m_hsig->Reset("ICESM");
+
+//    GenericToolbox::resetHistogram(m_hpred);
+//    GenericToolbox::resetHistogram(m_hmc);
+//    GenericToolbox::resetHistogram(m_hmc_true);
+//    GenericToolbox::resetHistogram(m_hsig);
+
+    for(size_t iThread = 0; iThread < _histThreadHandlers_.size(); iThread++)
+    {
+        for(auto& histPair: _histThreadHandlers_[iThread]){
+            for( int iBin = 0 ; iBin <= histPair.first->GetNbinsX()+1 ; iBin++ ){
+                histPair.first->SetBinContent(
+                    iBin,
+                    histPair.first->GetBinContent(iBin)
+                    + histPair.second->GetBinContent(iBin)
+                    );
+            }
+        }
+//        m_hpred->Add(_histThreadHandlers_[iThread][m_hpred]);
+//        m_hmc->Add(_histThreadHandlers_[iThread][m_hmc]);
+//        m_hmc_true->Add(_histThreadHandlers_[iThread][m_hmc_true]);
+//        m_hsig->Add(_histThreadHandlers_[iThread][m_hsig]);
+    }
 
     m_hpred->Scale(m_norm);
     m_hmc->Scale(m_norm);
@@ -599,7 +627,6 @@ double AnaSample::CalcLLH() const
     // Sum of the chi2 contributions for each bin is returned:
     return chi2;
 }
-
 double AnaSample::CalcChi2() const
 {
     if(m_hdata == nullptr)
@@ -656,7 +683,6 @@ double AnaSample::CalcChi2() const
 
     return chi2;
 }
-
 double AnaSample::CalcEffLLH() const
 {
     const unsigned int nbins = m_hpred->GetNbinsX();
@@ -775,3 +801,93 @@ void AnaSample::GetSampleBreakdown(TDirectory* dirout, const std::string& tag,
     std::cout << std::setw(10) << "Total" << std::setw(5) << " " << std::setw(5) << Ntot
               << std::setw(10) << "100.00%" << std::endl;
 }
+
+
+void AnaSample::SaveMcEventsSnapshot() {
+
+//    LogWarning << "Saving MC events in a snapshot..." << std::endl;
+
+    m_mc_events_snap.clear();
+    for( size_t iEvent = 0 ; iEvent < m_mc_events.size() ; iEvent++ ){
+        m_mc_events_snap.emplace_back(m_mc_events.at(iEvent)); // COPY
+        m_mc_events_snap.back().HookIntMembers();
+        m_mc_events_snap.back().HookFloatMembers();
+    }
+
+//    LogInfo << "MC events saved." << std::endl;
+
+}
+void AnaSample::SaveHistogramsSnapshot(){
+
+//    LogWarning << "Saving MC histograms in a snapshot..." << std::endl;
+
+    m_hmc_true_snap = (TH1D*) m_hmc_true->Clone();
+    m_hmc_snap = (TH1D*) m_hmc->Clone();
+    m_hpred_snap = (TH1D*) m_hpred->Clone();
+    m_hdata_snap = (TH1D*) m_hdata->Clone();
+    m_hsig_snap = (TH1D*) m_hsig->Clone();
+
+    for( size_t iThread = 0 ; iThread < _histThreadHandlers_.size() ; iThread++){
+        _histThreadHandlersSnap_.emplace_back();
+        _histThreadHandlersSnap_[iThread][m_hmc_true] = (TH1D*) _histThreadHandlers_[iThread][m_hmc_true]->Clone();
+        _histThreadHandlersSnap_[iThread][m_hmc] = (TH1D*) _histThreadHandlers_[iThread][m_hmc]->Clone();
+        _histThreadHandlersSnap_[iThread][m_hpred] = (TH1D*) _histThreadHandlers_[iThread][m_hpred]->Clone();
+        _histThreadHandlersSnap_[iThread][m_hsig] = (TH1D*) _histThreadHandlers_[iThread][m_hsig]->Clone();
+    }
+
+//    LogInfo << "MC histograms saved." << std::endl;
+
+}
+
+void AnaSample::CompareHistogramsWithSnapshot(){
+
+    LogWarning << "Comparing histograms with the snapshot..." << std::endl;
+
+    std::function<void(TH1D*, TH1D*)> compareHist = [](TH1D* hSnap_, TH1D* hCurrent_){
+
+        for( int iBin = 0 ; iBin <= hCurrent_->GetNbinsX()+1 ; iBin++ ){
+            if(hSnap_->GetBinContent(iBin) != hCurrent_->GetBinContent(iBin)){
+                LogAlert << hCurrent_->GetName() << " (" << GET_VAR_NAME_VALUE(iBin) << "): ";
+                LogAlert << hSnap_->GetBinContent(iBin);
+                LogAlert << (hSnap_->GetBinContent(iBin) > hCurrent_->GetBinContent(iBin) ? " > ": " < ");
+                LogAlert << hCurrent_->GetBinContent(iBin) << std::endl;
+            }
+        }
+
+    };
+
+    compareHist(m_hmc_true_snap, m_hmc_true);
+    compareHist(m_hmc_snap, m_hmc);
+    compareHist(m_hpred_snap, m_hpred);
+    compareHist(m_hdata_snap, m_hdata);
+    compareHist(m_hsig_snap, m_hsig);
+
+    for( size_t iThread = 0 ; iThread < _histThreadHandlers_.size() ; iThread++){
+        LogInfo << GET_VAR_NAME_VALUE(iThread) << std::endl;
+        compareHist(_histThreadHandlersSnap_[iThread][m_hmc_true], _histThreadHandlers_[iThread][m_hmc_true]);
+        compareHist(_histThreadHandlersSnap_[iThread][m_hmc], _histThreadHandlers_[iThread][m_hmc]);
+        compareHist(_histThreadHandlersSnap_[iThread][m_hpred], _histThreadHandlers_[iThread][m_hpred]);
+        compareHist(_histThreadHandlersSnap_[iThread][m_hsig], _histThreadHandlers_[iThread][m_hsig]);
+    }
+
+    LogInfo << "Format: snapshot -> current" << std::endl;
+    LogInfo << "Comparison with the snapshot ended." << std::endl;
+
+}
+void AnaSample::CompareMcEventsWeightsWithSnapshot()
+{
+
+    LogWarning << "Comparing MC event weights with the snapshot..." << std::endl;
+    bool isIdentical = true;
+    for( size_t iEvent = 0 ; iEvent < m_mc_events.size() ; iEvent++ ){
+        if(m_mc_events_snap[iEvent].GetEvWght() != m_mc_events[iEvent].GetEvWght()){
+            LogAlert << GET_VAR_NAME_VALUE(iEvent) << ": "
+                     << m_mc_events_snap[iEvent].GetEvWght() << " -> "
+                     << m_mc_events[iEvent].GetEvWght() << std::endl;
+        }
+    }
+    LogInfo << "Format: snapshot-weight -> current-weight" << std::endl;
+    LogInfo << "Comparison with the snapshot ended." << std::endl;
+
+}
+

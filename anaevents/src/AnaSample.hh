@@ -55,6 +55,12 @@ public:
     void SetData(TObject* data);
     void MakeHistos();
 
+    void SaveMcEventsSnapshot();
+    void SaveHistogramsSnapshot();
+
+    void CompareHistogramsWithSnapshot();
+    void CompareMcEventsWeightsWithSnapshot();
+
     void SetBinning(const std::string& binning);
 
     // Function to map the Highland topology codes to consecutive integers:
@@ -74,12 +80,8 @@ public:
     void FillEventHist(int datatype, bool stat_fluc = false);
     void FillEventHist(DataType datatype, bool stat_fluc = false);
 
-    void FillMcHistograms();
-
-    void ResetMcHistograms();
-    void FillMcHistogramsThread(int iThread_ = -1);
+    void FillMcHistograms(int iThread_ = -1);
     void MergeMcHistogramsThread();
-    void NormalizeMcHistograms();
 
     void FillDataEventList();
 
@@ -98,11 +100,13 @@ public:
     std::vector<AnaEvent>& GetMcEvents() { return m_mc_events; }
     std::vector<AnaEvent>& GetDataEvents() { return m_data_events; }
 
-    TH1D* GetPredHisto() const { return m_hpred; }
-    TH1D* GetDataHisto() const { return m_hdata; }
-    TH1D* GetMCHisto() const { return m_hmc; }
-    TH1D* GetMCTruthHisto() const { return m_hmc_true; }
-    TH1D* GetSignalHisto() const { return m_hsig; }
+    // Return the const ref to avoid external modifications
+    const TH1D& GetPredHisto() const { return *m_hpred; }
+    const TH1D& GetDataHisto() const { return *m_hdata; }
+    const TH1D& GetMCHisto() const { return *m_hmc; }
+    const TH1D& GetMCTruthHisto() const { return *m_hmc_true; }
+    const TH1D& GetSignalHisto() const { return *m_hsig; }
+
     TTreeFormula* GetAdditionalCutsFormulae() {return m_additional_cuts_formulae;}
 
     // Deprecated
@@ -123,6 +127,7 @@ protected:
     double m_data_POT;
     double m_mc_POT;
     std::vector<AnaEvent> m_mc_events;
+    std::vector<AnaEvent> m_mc_events_snap;
     std::vector<AnaEvent> m_data_events;
     std::vector<FitBin> m_bin_edges;
 
@@ -144,6 +149,15 @@ protected:
 
     const std::string TAG = color::GREEN_STR + "[AnaSample]: " + color::RESET_STR;
     const std::string ERR = color::RED_STR + "[ERROR]: " + color::RESET_STR;
+
+    std::vector<std::map<TH1D*, TH1D*>> _histThreadHandlersSnap_;
+    TH1D* m_hmc_true_snap;
+    TH1D* m_hmc_snap;
+    TH1D* m_hpred_snap;
+    TH1D* m_hdata_snap;
+    TH1D* m_hsig_snap;
+
+
 
 };
 

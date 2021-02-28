@@ -99,8 +99,6 @@ public:
     void SetThrow(bool flag = true) { m_do_throw = flag; }
     void SetRNGstart(bool flag = true) { m_rng_start = flag; }
     void SetWeightCap(double cap, bool flag = true) { m_do_cap_weights = flag; m_weight_cap = cap; }
-    void SetLastAppliedParamList(std::vector<double>& lastAppliedParamList_){
-        _lastAppliedParamList_ = lastAppliedParamList_; }
 
 protected:
     bool CheckDims(const std::vector<double>& params) const;
@@ -114,7 +112,6 @@ protected:
     std::vector<double> pars_limlow;
     std::vector<double> pars_limhigh;
     std::vector<bool> pars_fixed;
-    std::vector<double> _lastAppliedParamList_;
 
     std::vector<std::vector<int>> m_evmap;
     bool m_rng_start;

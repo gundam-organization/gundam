@@ -35,11 +35,18 @@ public:
 
 private:
 
-    std::vector<std::vector<std::vector<double>>> _reweightCacheList_; // reweight cache
-    std::vector<std::vector<std::vector<int>>> _eventDialsIndexList_; // dial cache
+    std::vector<std::vector<std::vector<int>>> _eventDialSplineIndexList_; // [iSample][iEvent][iDial] = Spline index
     std::vector<std::vector<XsecDial>> _dialsList_;
     std::vector<std::string> v_detectors;
     std::vector<int> v_offsets;
+
+    typedef struct{
+        bool isBeingEdited;
+        double fitParameterValue;
+        double cachedWeight;
+    } DialCache;
+
+    std::vector<DialCache> _dialCacheWeight_;
 
     bool _enableZeroWeightFenceGate_;
 
