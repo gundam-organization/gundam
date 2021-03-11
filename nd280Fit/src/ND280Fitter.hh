@@ -125,7 +125,7 @@ private:
     double _chi2RegBuffer_{};
 
     std::vector<std::string> _parameter_names_;
-    std::vector<bool> _fixParameterStatusList_;
+    std::vector<bool> _parameterFixedStatusList_;
     std::vector<double> _parameterPriorValues_;
     std::vector<double> _parameterSteps_;
     std::vector<double> _parameter_low_edges_;

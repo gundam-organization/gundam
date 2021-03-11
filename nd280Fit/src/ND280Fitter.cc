@@ -188,7 +188,6 @@ void ND280Fitter::WritePrefitData(){
     }
 
     auto* preFitDir = GenericToolbox::mkdirTFile(_outputTDirectory_, "prefit");
-
     this->WriteSamplePlots(preFitDir);
 
 
@@ -207,7 +206,7 @@ void ND280Fitter::WritePrefitData(){
     int parGlobalIndex = 1;
     for(const auto & anaFitParameters : _fitParametersGroupList_){
 
-        GenericToolbox::mkdirTFile(_outputTDirectory_, Form("prefit/systematics/%s", anaFitParameters->GetName().c_str()))->cd();
+        GenericToolbox::mkdirTFile(_outputTDirectory_, Form("prefit/parameters/%s", anaFitParameters->GetName().c_str()))->cd();
 
         auto* covMatrix = anaFitParameters->GetCovMat();
         auto* corMatrix = GenericToolbox::convertToCorrelationMatrix((TMatrixD*) covMatrix);
@@ -264,7 +263,7 @@ void ND280Fitter::WritePrefitData(){
 
     }
 
-    _outputTDirectory_->cd("prefit/systematics");
+    GenericToolbox::mkdirTFile(_outputTDirectory_, "prefit/parameters")->cd();
 
     histPrefitParameters->Write("histPrefitParameters");
     vecPrefitParameters.Write("vecPrefitParameters");
@@ -385,7 +384,7 @@ void ND280Fitter::MakeOneSigmaChecks(){
     for( int iSyst = 0 ; iSyst < _minimizer_->NDim() ; iSyst++ ){
 
         // If this parameter is fixed, then it won't be writen
-        if(_fixParameterStatusList_[iSyst]){
+        if(_parameterFixedStatusList_[iSyst]){
             LogTrace << "Skipping fixed parameter: " << iSyst << std::endl;
             continue;
         }
@@ -416,6 +415,8 @@ void ND280Fitter::MakeOneSigmaChecks(){
             kBlue+2
         };
         int colorTick = 0;
+
+        bool parameterHasNoEffect = true;
 
         // Generate plots
         for( const auto& anaSample : _samplesList_){
@@ -457,7 +458,10 @@ void ND280Fitter::MakeOneSigmaChecks(){
                 }
             }
             if(isUnaffected){
-                LogWarning << anaSample->GetName() << " is unaffected by " << _parameter_names_[iSyst] << std::endl;
+                LogWarning << anaSample->GetName() << " is unaffected by \"" << _parameter_names_[iSyst] << "\"" << std::endl;
+            }
+            else{
+                parameterHasNoEffect = false;
             }
 
             // Y axis
@@ -486,6 +490,13 @@ void ND280Fitter::MakeOneSigmaChecks(){
             oneSigmaHistMap[iSyst][tempHistName]->GetXaxis()->SetRangeUser(0, 2000); //! TODO: COMMENT THIS LINE IN THE FUTURE
 
         }
+
+        if(parameterHasNoEffect){
+            LogAlert << "Parameter: \"" << _parameter_names_[iSyst] << "\" has no effect on the spectra, fixing it for the fit." << std::endl;
+            _parameterFixedStatusList_[iSyst] = true;
+            _minimizer_->FixVariable(iSyst);
+        }
+
         GenericToolbox::mkdirTFile(currentDir,"Histograms")->cd();
         for(auto& histPair : oneSigmaHistMap[iSyst]){
             histPair.second->Write();
@@ -568,8 +579,66 @@ bool ND280Fitter::Fit(){
     PassIfInitialized(__METHOD_NAME__);
     _fitHasBeenDone_ = true;
 
-    LogInfo << "Calling Minimize, running: " << _minimization_settings_.algorithm << std::endl;
+    if(_selected_data_type_ == kAsimov){
 
+        LogWarning << "Asimov fit detected, applying slight shift on the prior parameters..." << std::endl;
+        TMatrixD* covarianceMatrix = this->GeneratePriorCovarianceMatrix();
+        for( int iPar = 0; iPar < _nb_fit_parameters_; iPar++ ) {
+
+            if(not _parameterFixedStatusList_[iPar]){
+                _minimizer_->SetVariable(
+                    iPar, _parameter_names_[iPar],
+                    _parameterPriorValues_[iPar] + _PRNG_->Gaus(0, 0.01*TMath::Sqrt((*covarianceMatrix)[iPar][iPar])),
+                    _parameterSteps_[iPar]
+                );
+            }
+
+        }
+
+        // Make sure all weights a applied
+        UpdateFitParameterValues(_minimizer_->X());
+        PropagateSystematics();
+        ComputeChi2();
+
+        WriteSamplePlots(GenericToolbox::mkdirTFile(_outputTDirectory_, "fit")); // just to control the first iteration...
+    }
+
+    auto* systPostFitDir = GenericToolbox::mkdirTFile(_outputTDirectory_, "prefit/parameters");
+
+    LogInfo << "Scanning parameters arround the prefit point..." << std::endl;
+    int paramaterOffset = 0;
+    for( size_t iParGroup = 0 ; iParGroup < _fitParametersGroupList_.size() ; iParGroup++ ){
+
+        auto* samplePostFitDir = GenericToolbox::mkdirTFile(systPostFitDir, _fitParametersGroupList_[iParGroup]->GetName());
+        samplePostFitDir->cd();
+
+        // SCAN
+        unsigned int nbSteps_ = 20;
+        auto* x = new double[nbSteps_] {};
+        auto* y = new double[nbSteps_] {};
+        GenericToolbox::mkdirTFile(samplePostFitDir, "scans")->cd();
+        for( size_t iPar = 0 ; iPar < _fitParametersGroupList_[iParGroup]->GetNpar() ; iPar++ ){
+
+            if(_parameterFixedStatusList_[paramaterOffset + iPar]) continue;
+
+            LogWarning << "Scanning parameter " << iPar;
+            LogWarning << " (" << _minimizer_->VariableName(iPar) << ")..." << std::endl;
+
+            bool isSuccess = _minimizer_->Scan(paramaterOffset + iPar, nbSteps_, x, y);
+
+            TGraph scanGraph(nbSteps_, x, y);
+            scanGraph.Write( (_fitParametersGroupList_[iParGroup]->GetParNames()[iPar] + "_TGraph").c_str() );
+
+        }
+        delete[] x;
+        delete[] y;
+        paramaterOffset += _fitParametersGroupList_[iParGroup]->GetNpar();
+
+    }
+    _outputTDirectory_->cd();
+
+
+    LogInfo << "Calling Minimize, running: " << _minimization_settings_.algorithm << std::endl;
     // Run the actual fitter:
     _fitHasConverged_ = _minimizer_->Minimize();
     _fitHasConverged_ = true;
@@ -623,12 +692,46 @@ void ND280Fitter::WritePostFitData(){
     GenericToolbox::convertTVectorDtoTH1D(chi2TotHistory, "chi2TotHistory")->Write("chi2TotHistory");
 
 
-    GenericToolbox::mkdirTFile(_outputTDirectory_, "postfit")->cd();
+    auto* postFitDir = GenericToolbox::mkdirTFile(_outputTDirectory_, "postfit");
+    this->WriteSamplePlots(postFitDir);
+    postFitDir->cd();
+
+    auto* systPostFitDir = GenericToolbox::mkdirTFile(postFitDir, "parameters");
+
+    LogInfo << "Scanning parameters arround the minimum..." << std::endl;
+    int paramaterOffset = 0;
+    for( size_t iParGroup = 0 ; iParGroup < _fitParametersGroupList_.size() ; iParGroup++ ){
+
+        auto* samplePostFitDir = GenericToolbox::mkdirTFile(systPostFitDir, _fitParametersGroupList_[iParGroup]->GetName());
+        samplePostFitDir->cd();
+
+        // SCAN
+        unsigned int nbSteps_ = 20;
+        auto* x = new double[nbSteps_] {};
+        auto* y = new double[nbSteps_] {};
+        GenericToolbox::mkdirTFile(samplePostFitDir, "scans")->cd();
+        for( size_t iPar = 0 ; iPar < _fitParametersGroupList_[iParGroup]->GetNpar() ; iPar++ ){
+
+            if(_parameterFixedStatusList_[paramaterOffset + iPar]) continue;
+
+            LogWarning << "Scanning parameter " << iPar;
+            LogWarning << " (" << _minimizer_->VariableName(iPar) << ")..." << std::endl;
+
+            bool isSuccess = _minimizer_->Scan(paramaterOffset + iPar, nbSteps_, x, y);
+
+            TGraph scanGraph(nbSteps_, x, y);
+            scanGraph.Write( (_fitParametersGroupList_[iParGroup]->GetParNames()[iPar] + "_TGraph").c_str() );
+
+        }
+        delete[] x;
+        delete[] y;
+
+        paramaterOffset += _fitParametersGroupList_[iParGroup]->GetNpar();
+
+    }
 
     LogInfo << "Writing postfit parameters..." << std::endl;
-
     const int nfree = _minimizer_->NFree();
-
     if(_minimizer_->X() != nullptr){
 
         double covarianceMatrixArray[_minimizer_->NDim() * _minimizer_->NDim()];
@@ -638,39 +741,34 @@ void ND280Fitter::WritePostFitData(){
         std::vector<double> parameterValueList(_minimizer_->X(),      _minimizer_->X()      + _minimizer_->NDim());
         std::vector<double> parameterErrorList(_minimizer_->Errors(), _minimizer_->Errors() + _minimizer_->NDim());
 
-        int paramaterOffset = 0;
-        for(const auto& anaFitParameters : _fitParametersGroupList_){
+        paramaterOffset = 0;
+        for( size_t iParGroup = 0 ; iParGroup < _fitParametersGroupList_.size() ; iParGroup++ ){
 
-            GenericToolbox::mkdirTFile(_outputTDirectory_, Form("postfit/systematics/%s", anaFitParameters->GetName().c_str()))->cd();
+            auto* samplePostFitDir = GenericToolbox::mkdirTFile(systPostFitDir, _fitParametersGroupList_[iParGroup]->GetName().c_str());
+            samplePostFitDir->cd();
 
-            auto* covMatrix = (TMatrixD*) anaFitParameters->GetCovMat()->Clone(); // just for the tempate template
-            for(int iComp = 0 ; iComp < anaFitParameters->GetNpar() ; iComp++){
-                for(int jComp = 0 ; jComp < anaFitParameters->GetNpar() ; jComp++){
+            auto* covMatrix = (TMatrixD*) _fitParametersGroupList_[iParGroup]->GetCovMat()->Clone(); // just for the tempate template
+            for(int iComp = 0 ; iComp < _fitParametersGroupList_[iParGroup]->GetNpar() ; iComp++){
+                for(int jComp = 0 ; jComp < _fitParametersGroupList_[iParGroup]->GetNpar() ; jComp++){
                     (*covMatrix)[iComp][jComp] = covarianceMatrix[paramaterOffset+iComp][paramaterOffset+jComp];
                 } // jComp
             } // iComp
             auto* corMatrix = GenericToolbox::convertToCorrelationMatrix((TMatrixD*) covMatrix);
-            auto* covMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) covMatrix, Form("Covariance_%s", anaFitParameters->GetName().c_str()));
-            auto* corMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D(corMatrix, Form("Correlation_%s", anaFitParameters->GetName().c_str()));
+            auto* covMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) covMatrix, Form("Covariance_%s", _fitParametersGroupList_[iParGroup]->GetName().c_str()));
+            auto* corMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D(corMatrix, Form("Correlation_%s", _fitParametersGroupList_[iParGroup]->GetName().c_str()));
 
             TH1D* histPostfitParametersCategory = new TH1D("histPostfitParameters","histPostfitParameters",
                                                           _nb_fit_parameters_,0, _nb_fit_parameters_);
             TH1D* histPostfitParametersError = new TH1D("histPostfitParametersError","histPostfitParametersError",
                                                        _nb_fit_parameters_,0, _nb_fit_parameters_);
 
-            for(int iPar = 0 ; iPar < anaFitParameters->GetNpar() ; ++iPar){
+            for(int iPar = 0 ; iPar < _fitParametersGroupList_[iParGroup]->GetNpar() ; ++iPar){
 
                 // Parameter Prior Value
-                histPostfitParametersCategory->SetBinContent(iPar+1, anaFitParameters->GetParPrior(iPar));
+                histPostfitParametersCategory->SetBinContent(iPar+1, parameterValueList[paramaterOffset + iPar]);
+                histPostfitParametersCategory->SetBinError(iPar+1, parameterErrorList[paramaterOffset + iPar] );
 
-                // Parameter Prior Error
-                if(anaFitParameters->HasCovMat()){
-                    histPostfitParametersCategory->SetBinError(iPar+1, std::sqrt((*anaFitParameters->GetCovMat())[iPar][iPar]));
-                    histPostfitParametersError->SetBinContent(iPar+1, std::sqrt((*anaFitParameters->GetCovMat())[iPar][iPar]));
-                }
-                else{
-                    histPostfitParametersCategory->SetBinError(iPar+1, 0);
-                }
+                histPostfitParametersError->SetBinContent(iPar+1, TMath::Sqrt((*covMatrix)[iPar][iPar]) );
 
                 // Fill Vectors
 //                vecPostfitParameters[parGlobalIndex -1] = anaFitParameters->GetParOriginal(iPar);
@@ -678,26 +776,31 @@ void ND280Fitter::WritePostFitData(){
 
                 // Labels
                 std::vector<std::string> vecBuffer;
-                anaFitParameters->GetParNames(vecBuffer);
+                _fitParametersGroupList_[iParGroup]->GetParNames(vecBuffer);
                 histPostfitParametersCategory->GetXaxis()->SetBinLabel(iPar+1, vecBuffer[iPar].c_str());
                 histPostfitParametersError   ->GetXaxis()->SetBinLabel(iPar+1, vecBuffer[iPar].c_str());
                 covMatrixTH2D                ->GetXaxis()->SetBinLabel(iPar+1, vecBuffer[iPar].c_str());
                 covMatrixTH2D                ->GetYaxis()->SetBinLabel(iPar+1, vecBuffer[iPar].c_str());
                 corMatrixTH2D                ->GetXaxis()->SetBinLabel(iPar+1, vecBuffer[iPar].c_str());
                 corMatrixTH2D                ->GetYaxis()->SetBinLabel(iPar+1, vecBuffer[iPar].c_str());
+
             }
 
-            histPostfitParametersCategory->Write();
-            histPostfitParametersError->Write();
-            covMatrix->Write("CovarianceMatrix");
-            corMatrix->Write("CorrelationMatrix");
-            covMatrixTH2D->Write("CovarianceMatrix_TH2D");
-            corMatrixTH2D->Write("CorrelationMatrix_TH2D");
+            histPostfitParametersCategory->Write("postFitParameters_TH1D");
+            histPostfitParametersError->Write("postFitErrors_TH1D");
+            covMatrix->Write("covarianceMatrix_TMatrixD");
+            corMatrix->Write("correlationMatrix_TMatrixD");
+            covMatrixTH2D->Write("covarianceMatrix_TH2D");
+            corMatrixTH2D->Write("correlationMatrix_TH2D");
 
-            paramaterOffset += anaFitParameters->GetNpar();
+            samplePostFitDir->cd();
+
+
+            paramaterOffset += _fitParametersGroupList_[iParGroup]->GetNpar();
         } // fit Parameters
 
-        covarianceMatrix.Write("covarianceMatrix");
+        systPostFitDir->cd();
+        covarianceMatrix.Write("covarianceMatrix_TMatrixDSym");
 
     }
 
@@ -751,8 +854,8 @@ void ND280Fitter::WriteSamplePlots(TDirectory* outputDir_) {
     auto* samplesDir = GenericToolbox::mkdirTFile(outputDir_, "samples");
     LogInfo << "Samples plots will be writen in: " << samplesDir->GetPath() << std::endl;
 
-    double maxD1Scale = 2000;
-//    double maxD1Scale = -1;
+//    double maxD1Scale = 2000;
+    double maxD1Scale = -1;
 
     // TODO: do the same thing for histograms
 
@@ -917,8 +1020,6 @@ void ND280Fitter::WriteSamplePlots(TDirectory* outputDir_) {
         // Cosmetics, Normalization and Write
         for(auto& histPair : tempHistMap){
 
-            LogTrace << " -> " << histPair.first << std::endl;
-
             auto pathElements = GenericToolbox::splitString(histPair.first, "/");
             std::string xVarName = pathElements[1]; // SampleName/Var/SplitVar/...
             std::string splitVarName;
@@ -1038,13 +1139,9 @@ void ND280Fitter::WriteSamplePlots(TDirectory* outputDir_) {
 
     for(auto& canvasFolderPair : canvasHandler){
 
-        LogDebug << "Processing canvas: " << canvasFolderPair.first << std::endl;
-
         int canvasIndex = 0;
         int iSlot       = 1;
         for(const auto& anaSample : _samplesList_){
-
-            LogTrace << "Processing plot for: " << anaSample->GetName() << std::endl;
 
             if(iSlot > nbXPlots*nbYPlots){
                 canvasIndex++;
@@ -1178,7 +1275,7 @@ void ND280Fitter::InitializeThreadsParameters(){
         _triggerReweightThreads_.clear();
         _triggerReFillMcHistogramsThreads_.clear();
         _stopThreads_ = false;
-        for( int iThread = 0 ; iThread < GlobalVariables::getNbThreads(); iThread++ ){
+        for( int iThread = 0 ; iThread < GlobalVariables::getNbThreads()-1 ; iThread++ ){
             _triggerReweightThreads_.push_back(false); // no emplace back for bools
             _triggerReFillMcHistogramsThreads_.push_back(false);
             _asyncFitThreads_.emplace_back(
@@ -1237,10 +1334,10 @@ void ND280Fitter::InitializeFitParameters(){
         _parameter_low_edges_.insert( _parameter_low_edges_.end(), anaParLowEdges.begin(), anaParLowEdges.end() );
         _parameter_high_edges_.insert( _parameter_high_edges_.end(), anaParHighEdges.begin(), anaParHighEdges.end() );
 
-        // Store the flags indicating whether a parameter is fixed (for all parameter types) in _fixParameterStatusList_:
+        // Store the flags indicating whether a parameter is fixed (for all parameter types) in _parameterFixedStatusList_:
         std::vector<bool> anaParFixedList;
         _fitParametersGroupList_[iGroup]->GetParFixed(anaParFixedList);
-        _fixParameterStatusList_.insert(_fixParameterStatusList_.end(), anaParFixedList.begin(), anaParFixedList.end());
+        _parameterFixedStatusList_.insert(_parameterFixedStatusList_.end(), anaParFixedList.begin(), anaParFixedList.end());
     }
 
     // Nothing to fit with zero fit parameters:
@@ -1308,7 +1405,7 @@ void ND280Fitter::InitializeFitter(){
             _parameterSteps_[iPar]
         );
 
-        if(_fixParameterStatusList_[iPar]){
+        if(_parameterFixedStatusList_[iPar]){
             _minimizer_->FixVariable(iPar);
         }
     }
@@ -1350,142 +1447,6 @@ void ND280Fitter::FixParameter(const std::string& par_name, const double& value)
                    << "Parameter " << par_name << " not found!" << std::endl;
     }
 }
-
-// Initializes the fit by setting up the fit parameters and creating the ROOT minimizer:
-void ND280Fitter::InitFitter(std::vector<AnaFitParameters*>& fitpara)
-{
-    // Vector of the different parameter types such as [template, flux, detector, cross section]:
-    _fitParametersGroupList_ = fitpara;
-
-    // Vectors holding the settings for the fit parameters (for all parameter types):
-    std::vector<double> par_step, par_low, par_high;
-    std::vector<bool> par_fixed;
-
-    // ROOT random number interface (seed of 0 means that seed is automatically computed based on time):
-    //TRandom3 rng(0);
-
-    // loop over all the different parameter types such as [template, flux, detector, cross section]:
-    for(std::size_t i = 0; i < _fitParametersGroupList_.size(); i++)
-    {
-        // m_npar is the number of total fit paramters:
-        _nb_fit_parameters_ += _fitParametersGroupList_[i]->GetNpar();
-
-        // Get names of all the different parameters (for all parameter types) and store them in par_names:
-        std::vector<std::string> vec0;
-        _fitParametersGroupList_[i]->GetParNames(vec0);
-        _parameter_names_.insert(_parameter_names_.end(), vec0.begin(), vec0.end());
-
-        // Get the priors for this parameter type (should be 1 unless decomp has been set to true in the .json config file) and store them in vec1:
-        std::vector<double> vec1, vec2;
-        _fitParametersGroupList_[i]->GetParPriors(vec1);
-
-        // If rng_template has been set to true in the .json config file, the template parameters will be randomized (around 1) according to a gaussian distribution:
-        if(_fitParametersGroupList_[i]->DoRNGstart())
-        {
-            LogInfo << "Randomizing start point for " << _fitParametersGroupList_[i]->GetName() << std::endl;
-            for(auto& p : vec1)
-                p += (p * _PRNG_->Gaus(0.0, 0.1));
-        }
-
-        // Store the prefit values (for all parameter types) in par_prefit:
-        _parameterPriorValues_.insert(_parameterPriorValues_.end(), vec1.begin(), vec1.end());
-
-        // Store the pars_step values (for all parameter types) and store them in _parameterSteps_:
-        _fitParametersGroupList_[i]->GetParSteps(vec1);
-        par_step.insert(par_step.end(), vec1.begin(), vec1.end());
-
-        // Store the lower and upper limits for the fit parameters (for all parameter types) in _parameter_low_edges_ and _parameter_high_edges_:
-        _fitParametersGroupList_[i]->GetParLimits(vec1, vec2);
-        par_low.insert(par_low.end(), vec1.begin(), vec1.end());
-        par_high.insert(par_high.end(), vec2.begin(), vec2.end());
-
-        // Store the flags indicating whether a parameter is fixed (for all parameter types) in _fixParameterStatusList_:
-        std::vector<bool> vec3;
-        _fitParametersGroupList_[i]->GetParFixed(vec3);
-        par_fixed.insert(par_fixed.end(), vec3.begin(), vec3.end());
-    }
-
-    // Nothing to fit with zero fit parameters:
-    if(_nb_fit_parameters_ == 0)
-    {
-        LogError << "No fit parameters were defined." << std::endl;
-        return;
-    }
-
-    // Print information about the minimizer settings specified in the .json config file:
-    std::cout << "===========================================" << std::endl;
-    std::cout << "           Initializing fitter             " << std::endl;
-    std::cout << "===========================================" << std::endl;
-
-    LogInfo   << "Minimizer settings..." << std::endl
-              << "Minimizer: "      << _minimization_settings_.minimizer    << std::endl
-              << "Algorithm: "      << _minimization_settings_.algorithm    << std::endl
-              << "Likelihood: "     << _minimization_settings_.likelihood   << std::endl
-              << "Strategy : "      << _minimization_settings_.strategy     << std::endl
-              << "Print Lvl: "      << _minimization_settings_.print_level  << std::endl
-              << "Tolerance: "      << _minimization_settings_.tolerance    << std::endl
-              << "Max Iterations: " << _minimization_settings_.max_iter     << std::endl
-              << "Max Fcn Calls : " << _minimization_settings_.max_fcn      << std::endl;
-
-    // Create ROOT minimizer of given minimizerType and algoType:
-    _minimizer_ = ROOT::Math::Factory::CreateMinimizer(_minimization_settings_.minimizer.c_str(),
-                                                       _minimization_settings_.algorithm.c_str());
-
-    // The ROOT Functor class is used to wrap multi-dimensional function objects, in this case the ND280Fitter::EvalFit function calculates and returns chi2_stat + chi2_sys + chi2_reg in each iteration of the fitter:
-    _functor_ = new ROOT::Math::Functor(this, &ND280Fitter::EvalFit, _nb_fit_parameters_);
-
-    _minimizer_->SetFunction(*_functor_);
-    _minimizer_->SetStrategy(_minimization_settings_.strategy);
-    _minimizer_->SetPrintLevel(_minimization_settings_.print_level);
-    _minimizer_->SetTolerance(_minimization_settings_.tolerance);
-    _minimizer_->SetMaxIterations(_minimization_settings_.max_iter);
-    _minimizer_->SetMaxFunctionCalls(_minimization_settings_.max_fcn);
-
-    for(int i = 0; i < _nb_fit_parameters_; ++i)
-    {
-        _minimizer_->SetVariable(i, _parameter_names_[i], _parameterPriorValues_[i], par_step[i]);
-        //_minimizer_->SetVariableLimits(i, _parameter_low_edges_[i], _parameter_high_edges_[i]);
-
-        if(par_fixed[i] == true)
-            _minimizer_->FixVariable(i);
-    }
-
-    LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
-              << "Number of free parameters   : " << _minimizer_->NFree() << std::endl
-              << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree()
-              << std::endl;
-
-    TH1D h_prefit("hist_prefit_par_all", "hist_prefit_par_all", _nb_fit_parameters_, 0,
-                  _nb_fit_parameters_);
-    TVectorD v_prefit_original(_nb_fit_parameters_);
-    TVectorD v_prefit_decomp(_nb_fit_parameters_);
-    TVectorD v_prefit_start(_nb_fit_parameters_, _parameterPriorValues_.data());
-
-    int num_par = 1;
-    for(int i = 0; i < _fitParametersGroupList_.size(); ++i)
-    {
-        TMatrixDSym* cov_mat = _fitParametersGroupList_[i]->GetCovMat();
-        for(int j = 0; j < _fitParametersGroupList_[i]->GetNpar(); ++j)
-        {
-            h_prefit.SetBinContent(num_par, _fitParametersGroupList_[i]->GetParPrior(j));
-            if(_fitParametersGroupList_[i]->HasCovMat())
-                h_prefit.SetBinError(num_par, std::sqrt((*cov_mat)[j][j]));
-            else
-                h_prefit.SetBinError(num_par, 0);
-
-            v_prefit_original[num_par-1] = _fitParametersGroupList_[i]->GetParOriginal(j);
-            v_prefit_decomp[num_par-1] = _fitParametersGroupList_[i]->GetParPrior(j);
-            num_par++;
-        }
-    }
-
-    _outputTDirectory_->cd();
-    h_prefit.Write();
-    v_prefit_original.Write("vec_prefit_original");
-    v_prefit_decomp.Write("vec_prefit_decomp");
-    v_prefit_start.Write("vec_prefit_start");
-}
-
 
 double ND280Fitter::EvalFit(const double* par){
 
@@ -1565,12 +1526,15 @@ void ND280Fitter::PropagateSystematics(){
        and not _disableMultiThread_
 //       and false // DISABLE FOR DEBUG
        ){
-        for(int iThread = 0 ; iThread < GlobalVariables::getNbThreads(); iThread++){
+
+        for(int iThread = 0 ; iThread < GlobalVariables::getNbThreads()-1; iThread++){
             // Start every waiting thread
             _triggerReweightThreads_[iThread] = true;
         }
 
-        for(int iThread = 0 ; iThread < GlobalVariables::getNbThreads(); iThread++){
+        this->ReWeightEvents(GlobalVariables::getNbThreads()-1); // last one performed by this thread
+
+        for(int iThread = 0 ; iThread < GlobalVariables::getNbThreads()-1; iThread++){
             // triggerReweight are set to false when the thread is finished
             while(_triggerReweightThreads_[iThread]){
                 // Disabled throttling -> slowing down otherwise
@@ -1622,12 +1586,16 @@ void ND280Fitter::PropagateSystematics(){
         and not _disableMultiThread_
        ){
         // Starting refill threads
-        for(int iThread = 0 ; iThread < GlobalVariables::getNbThreads(); iThread++){
+        for(int iThread = 0 ; iThread < GlobalVariables::getNbThreads()-1 ; iThread++){
             _triggerReFillMcHistogramsThreads_[iThread] = true;
         }
 
+        for( size_t iSample = 0 ; iSample < _samplesList_.size() ; iSample++ ){
+            _samplesList_[iSample]->FillMcHistograms(GlobalVariables::getNbThreads()-1);
+        }
+
         // Wait for threads to finish their jobs
-        for(int iThread = 0 ; iThread < GlobalVariables::getNbThreads(); iThread++){
+        for(int iThread = 0 ; iThread < GlobalVariables::getNbThreads()-1 ; iThread++){
             while(_triggerReFillMcHistogramsThreads_[iThread]){
                 // triggerReweight are set to false when the thread is finished
 //                std::this_thread::sleep_for(std::chrono::milliseconds(30));
@@ -1635,6 +1603,7 @@ void ND280Fitter::PropagateSystematics(){
         }
 
         // MERGE HISTOGRAMS
+        std::this_thread::sleep_for(std::chrono::milliseconds(10)); // make sure everybody has finished...
         for( size_t iSample = 0 ; iSample < _samplesList_.size() ; iSample++ ){
             _samplesList_[iSample]->MergeMcHistogramsThread();
         }
@@ -1750,6 +1719,7 @@ void ND280Fitter::ReWeightEvents(int iThread_){
 
             // lock (even if it's useless: for debug)
             while(currentEventPtr->GetIsBeingEdited()){
+                // THIS SHOULD NOT HAPPENED
                 LogAlert << "WAITING (more than 1 thread editing this event?)...." << std::endl;
             }
             currentEventPtr->SetIsBeingEdited(true);
@@ -1770,9 +1740,10 @@ void ND280Fitter::ReWeightEvents(int iThread_){
             } // jParam
 
             if(currentEventPtr->GetEvWght() < 0){
-                GlobalVariables::getThreadMutex().lock();
-                LogError <<  "Event#" << currentEventPtr->GetEvId() << ": " << GET_VAR_NAME_VALUE(currentEventPtr->GetEvWght()) << std::endl;
-                throw std::runtime_error("Event has a negative weight.");
+//                GlobalVariables::getThreadMutex().lock();
+//                LogError <<  "Event#" << currentEventPtr->GetEvId() << ": " << GET_VAR_NAME_VALUE(currentEventPtr->GetEvWght()) << std::endl;
+//                throw std::runtime_error("Event has a negative weight.");
+                currentEventPtr->SetEvWght(0);
             }
 
             // unlock

@@ -138,7 +138,9 @@ protected:
 
     TTree* m_data_tree;
 
-    std::vector<std::map<TH1D*, TH1D*>> _histThreadHandlers_;
+//    std::vector<std::map<TH1D*, TH1D*>> _histThreadHandlers_; // [iThread][iHist]
+    std::vector<std::vector<TH1D*>> _histThreadHandlers_; // [iThread][iHist]
+    std::vector<bool> debugThreadBools;
     TH1D* m_hmc_true;
     TH1D* m_hmc;
     TH1D* m_hpred;
@@ -150,7 +152,7 @@ protected:
     const std::string TAG = color::GREEN_STR + "[AnaSample]: " + color::RESET_STR;
     const std::string ERR = color::RED_STR + "[ERROR]: " + color::RESET_STR;
 
-    std::vector<std::map<TH1D*, TH1D*>> _histThreadHandlersSnap_;
+    std::vector<std::vector<TH1D*>> _histThreadHandlersSnap_;
     TH1D* m_hmc_true_snap;
     TH1D* m_hmc_snap;
     TH1D* m_hpred_snap;

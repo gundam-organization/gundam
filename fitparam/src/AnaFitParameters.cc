@@ -25,14 +25,10 @@ AnaFitParameters::AnaFitParameters()
 
 AnaFitParameters::~AnaFitParameters()
 {
-    if(eigen_decomp != nullptr)
-        delete eigen_decomp;
-    if(covariance != nullptr)
-        delete covariance;
-    if(covarianceI != nullptr)
-        delete covarianceI;
-    if(original_cov != nullptr)
-        delete original_cov;
+    delete eigen_decomp;
+    delete covariance;
+    delete covarianceI;
+    delete original_cov;
 }
 
 void AnaFitParameters::SetCovarianceMatrix(const TMatrixDSym& covmat, bool decompose)

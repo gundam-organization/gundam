@@ -8,6 +8,7 @@
 XsecDial::XsecDial(std::string dial_name)
     : m_name(std::move(dial_name))
 {
+    _useGraphEval_ = false;
     _isNormalizationDial_ = false;
     _isSplinesInTTree_    = false;
     Logger::setUserHeaderStr("[XsecDial]");
@@ -17,6 +18,7 @@ XsecDial::XsecDial(std::string  dial_name, const std::string& fname_binning,
                    const std::string& fname_splines)
     : m_name(std::move(dial_name))
 {
+    _useGraphEval_ = false;
     _isNormalizationDial_ = false;
     _isSplinesInTTree_    = false;
     Logger::setUserHeaderStr("[XsecDial]");
@@ -104,6 +106,7 @@ void XsecDial::ReadSplines(const std::string& fname_splines)
         // Hooking to the tree
         _interpolatedBinnedSplinesTTree_->SetBranchAddress("kinematicBin", &_splineBinBuffer_.kinematicBin);
         _interpolatedBinnedSplinesTTree_->SetBranchAddress("spline", &_splineBinBuffer_.splinePtr);
+        _interpolatedBinnedSplinesTTree_->SetBranchAddress("graph", &_splineBinBuffer_.graphHandler);
         for(int iSplitVar = 0 ; iSplitVar < int(_splineBinBuffer_.splitVarNameList.size()) ; iSplitVar++){
             _interpolatedBinnedSplinesTTree_->SetBranchAddress(
                 _splineBinBuffer_.splitVarNameList[iSplitVar].c_str(),
@@ -112,15 +115,27 @@ void XsecDial::ReadSplines(const std::string& fname_splines)
 
         // Copying splines in RAM
         auto ramBefore = GenericToolbox::getProcessMemoryUsage();
+        double Xmin, Xmax;
         for( int iEntry = 0 ; iEntry < _interpolatedBinnedSplinesTTree_->GetEntries() ; iEntry++ ){
 
             _interpolatedBinnedSplinesTTree_->GetEntry(iEntry);
 
             _splineBinBuffer_.entry = iEntry;
-            _splineBinBuffer_.splinePtr = (TSpline3*)_splineBinBuffer_.splinePtr->Clone();
+            _splineBinBuffer_.splinePtr = (TSpline3*) _splineBinBuffer_.splinePtr->Clone(); // refilling with copies
+            _splineBinBuffer_.graphHandler = (TGraph*) _splineBinBuffer_.graphHandler->Clone(); // refilling with copies
 
             // Cache for faster spline indexing
-            _splinePtrList_.emplace_back(_splineBinBuffer_.splinePtr);
+            _splinePtrList_.emplace_back(_splineBinBuffer_.splinePtr); // copying the pointer
+            _graphPtrList_.emplace_back(_splineBinBuffer_.graphHandler);
+
+            Xmin = _splineBinBuffer_.graphHandler->GetX()[0];
+            Xmax = _splineBinBuffer_.graphHandler->GetX()[0];
+            for( int iX = 1 ; iX < _splineBinBuffer_.graphHandler->GetN() ; iX++ ){
+                if( Xmin > _splineBinBuffer_.graphHandler->GetX()[iX] ) Xmin = _splineBinBuffer_.graphHandler->GetX()[iX];
+                if( Xmax < _splineBinBuffer_.graphHandler->GetX()[iX] ) Xmax = _splineBinBuffer_.graphHandler->GetX()[iX];
+            }
+            _graphBoundsList_.emplace_back(std::pair<double,double>(Xmin,Xmax));
+
             _splineBinList_.emplace_back(_splineBinBuffer_);
 //            _splineNameList_.emplace_back(_splineBinBuffer_.generateBinName());
 
@@ -279,31 +294,48 @@ double XsecDial::GetBoundedValue(int splineIndex_, double dialValue_){
 
         // wait for the cache to be filled if another thread is taking care of it
         while(splineCachePtr->isBeingEdited);
+        // Take the lock already to avoid another thread to update the cache while it's being computed
+        splineCachePtr->isBeingEdited = true;
 
         // This if scope might not be thread safe... If corruption happen, set "isBeingEdited" before
         if(splineCachePtr->cachedDialValue == dialValue_
 //           and false // disable cache for debug
            ){
+            splineCachePtr->isBeingEdited = false;
             // If the spline has already been calculated, return the cached value
             return splineCachePtr->cachedDialWeight;
         }
 
-        // Take the lock already to avoid another thread to update the cache while it's being computed
-        splineCachePtr->isBeingEdited = true;
-
-        TSpline3* currentSplinePtr = _splinePtrList_[splineIndex_]; // .at() or [] are slower
-
-        // Lower bound
-        if     (dialValue_ < std::max(m_limit_lo, currentSplinePtr->GetXmin()) ){
-            dialValue_ = std::max(m_limit_lo, currentSplinePtr->GetXmin());
+        if(_useGraphEval_) {
+            if( dialValue_ < _graphBoundsList_.at(splineIndex_).first ){
+                // Lower bound
+                dialWeight = _graphPtrList_.at(splineIndex_)->Eval(_graphBoundsList_.at(splineIndex_).first);
+            }
+            else if( dialValue_ > _graphBoundsList_.at(splineIndex_).second ){
+                // Higher bound
+                dialWeight = _graphPtrList_.at(splineIndex_)->Eval(_graphBoundsList_.at(splineIndex_).second);
+            }
+            else{
+                dialWeight = _graphPtrList_.at(splineIndex_)->Eval(dialValue_);
+            }
         }
-        // Higher bound
-        else if(dialValue_ > std::min(m_limit_hi, currentSplinePtr->GetXmax()) ){
-            dialValue_ = std::min(m_limit_hi, currentSplinePtr->GetXmax());
+        else {
+
+            TSpline3* currentSplinePtr = _splinePtrList_[splineIndex_]; // .at() or [] are slower when multiple indexes
+            if( dialValue_ < std::max(m_limit_lo, currentSplinePtr->GetXmin()) ){
+                // Lower bound
+                dialWeight = currentSplinePtr->Eval(std::max(m_limit_lo, currentSplinePtr->GetXmin()));
+            }
+            else if( dialValue_ > std::min(m_limit_hi, currentSplinePtr->GetXmax()) ){
+                // Higher bound
+                dialWeight = currentSplinePtr->Eval(std::min(m_limit_hi, currentSplinePtr->GetXmax()));
+            }
+            else{
+                dialWeight = currentSplinePtr->Eval(dialValue_);
+            }
+
         }
-//            GlobalVariables::getThreadMutex().lock(); // is Eval thread safe?
-        dialWeight = currentSplinePtr->Eval(dialValue_);
-//            GlobalVariables::getThreadMutex().unlock();
+
 
         splineCachePtr->cachedDialValue = dialValue_;
         splineCachePtr->cachedDialWeight = dialWeight;

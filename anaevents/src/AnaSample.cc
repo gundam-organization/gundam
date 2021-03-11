@@ -202,20 +202,25 @@ void AnaSample::MakeHistos()
 
     for(auto& histThread: _histThreadHandlers_){
         // histThread is a map<TH1D*, TH1D*> -> for example  histThread[m_hpred] = m_hpred for a given thread.
-        for(auto& histPair: histThread){
-            delete histPair.second;
+        for(auto& histList : histThread){
+            delete histList;
         }
     }
+
     _histThreadHandlers_.clear();
     _histThreadHandlers_.resize(0);
+    debugThreadBools.clear();
+    debugThreadBools.resize(0);
 
     if(GlobalVariables::getNbThreads() > 1){
         for( int iThread = 0 ; iThread < GlobalVariables::getNbThreads() ; iThread++ ){
-            _histThreadHandlers_.emplace_back(std::map<TH1D*, TH1D*>());
-            _histThreadHandlers_.back()[m_hpred] = (TH1D*) m_hpred->Clone();
-            _histThreadHandlers_.back()[m_hmc] = (TH1D*) m_hmc->Clone();
-            _histThreadHandlers_.back()[m_hmc_true] = (TH1D*) m_hmc_true->Clone();
-            _histThreadHandlers_.back()[m_hsig] = (TH1D*) m_hsig->Clone();
+            _histThreadHandlers_.emplace_back();
+            debugThreadBools.push_back(false);
+            _histThreadHandlers_.back().resize(4);
+            _histThreadHandlers_.back()[0] = (TH1D*) m_hpred->Clone();
+            _histThreadHandlers_.back()[1] = (TH1D*) m_hmc->Clone();
+            _histThreadHandlers_.back()[2] = (TH1D*) m_hmc_true->Clone();
+            _histThreadHandlers_.back()[3] = (TH1D*) m_hsig->Clone();
         }
     }
 
@@ -338,10 +343,10 @@ void AnaSample::FillMcHistograms(int iThread_){
     AnaEvent* anaEventPtr = nullptr;
 
     if(isMultiThreaded){
-        histPredPtr   = _histThreadHandlers_[iThread_][m_hpred];
-        histMcPtr     = _histThreadHandlers_[iThread_][m_hmc];
-        histMcTruePtr = _histThreadHandlers_[iThread_][m_hmc_true];
-        histSigPtr    = _histThreadHandlers_[iThread_][m_hsig];
+        histPredPtr   = _histThreadHandlers_[iThread_][0];
+        histMcPtr     = _histThreadHandlers_[iThread_][1];
+        histMcTruePtr = _histThreadHandlers_[iThread_][2];
+        histSigPtr    = _histThreadHandlers_[iThread_][3];
     }
     else{
         histPredPtr   = m_hpred;
@@ -427,6 +432,12 @@ void AnaSample::FillMcHistograms(int iThread_){
 void AnaSample::MergeMcHistogramsThread()
 {
 
+//    LogDebug << "Merging histogram threads of sample: " << this->GetName() << std::endl;
+
+    for(size_t iThread = 0; iThread < _histThreadHandlers_.size(); iThread++){
+        debugThreadBools[iThread] = false;
+    }
+
     m_hpred->Reset("ICESM");
     m_hmc->Reset("ICESM");
     m_hmc_true->Reset("ICESM");
@@ -439,19 +450,36 @@ void AnaSample::MergeMcHistogramsThread()
 
     for(size_t iThread = 0; iThread < _histThreadHandlers_.size(); iThread++)
     {
-        for(auto& histPair: _histThreadHandlers_[iThread]){
-            for( int iBin = 0 ; iBin <= histPair.first->GetNbinsX()+1 ; iBin++ ){
-                histPair.first->SetBinContent(
-                    iBin,
-                    histPair.first->GetBinContent(iBin)
-                    + histPair.second->GetBinContent(iBin)
-                    );
-            }
+//        LogAlert << "FILLING " << GET_VAR_NAME_VALUE(iThread) << std::endl;
+//        for(auto& histPair: _histThreadHandlers_[iThread]){
+//            for( int iBin = 0 ; iBin <= histPair.first->GetNbinsX()+1 ; iBin++ ){
+//                histPair.first->SetBinContent(
+//                    iBin,
+//                    histPair.first->GetBinContent(iBin)
+//                    + histPair.second->GetBinContent(iBin)
+//                    );
+//            }
+//        }
+
+        for( int iBin = 0 ; iBin <= m_hpred->GetNbinsX()+1 ; iBin++ ){
+            m_hpred->SetBinContent(iBin, m_hpred->GetBinContent(iBin) + _histThreadHandlers_[iThread][0]->GetBinContent(iBin));
         }
-//        m_hpred->Add(_histThreadHandlers_[iThread][m_hpred]);
-//        m_hmc->Add(_histThreadHandlers_[iThread][m_hmc]);
-//        m_hmc_true->Add(_histThreadHandlers_[iThread][m_hmc_true]);
-//        m_hsig->Add(_histThreadHandlers_[iThread][m_hsig]);
+        for( int iBin = 0 ; iBin <= m_hmc->GetNbinsX()+1 ; iBin++ ){
+            m_hmc->SetBinContent(iBin, m_hmc->GetBinContent(iBin) + _histThreadHandlers_[iThread][1]->GetBinContent(iBin));
+        }
+        for( int iBin = 0 ; iBin <= m_hmc_true->GetNbinsX()+1 ; iBin++ ){
+            m_hmc_true->SetBinContent(iBin, m_hmc_true->GetBinContent(iBin) + _histThreadHandlers_[iThread][2]->GetBinContent(iBin));
+        }
+        for( int iBin = 0 ; iBin <= m_hsig->GetNbinsX()+1 ; iBin++ ){
+            m_hsig->SetBinContent(iBin, m_hsig->GetBinContent(iBin) + _histThreadHandlers_[iThread][3]->GetBinContent(iBin));
+        }
+
+//        m_hpred->Add(_histThreadHandlers_[iThread][0]);
+//        m_hmc->Add(_histThreadHandlers_[iThread][1]);
+//        m_hmc_true->Add(_histThreadHandlers_[iThread][2]);
+//        m_hsig->Add(_histThreadHandlers_[iThread][3]);
+
+        debugThreadBools[iThread] = true;
     }
 
     m_hpred->Scale(m_norm);
@@ -827,12 +855,15 @@ void AnaSample::SaveHistogramsSnapshot(){
     m_hdata_snap = (TH1D*) m_hdata->Clone();
     m_hsig_snap = (TH1D*) m_hsig->Clone();
 
+    _histThreadHandlersSnap_.clear();
+    _histThreadHandlersSnap_.resize(0);
     for( size_t iThread = 0 ; iThread < _histThreadHandlers_.size() ; iThread++){
         _histThreadHandlersSnap_.emplace_back();
-        _histThreadHandlersSnap_[iThread][m_hmc_true] = (TH1D*) _histThreadHandlers_[iThread][m_hmc_true]->Clone();
-        _histThreadHandlersSnap_[iThread][m_hmc] = (TH1D*) _histThreadHandlers_[iThread][m_hmc]->Clone();
-        _histThreadHandlersSnap_[iThread][m_hpred] = (TH1D*) _histThreadHandlers_[iThread][m_hpred]->Clone();
-        _histThreadHandlersSnap_[iThread][m_hsig] = (TH1D*) _histThreadHandlers_[iThread][m_hsig]->Clone();
+        _histThreadHandlersSnap_[iThread].resize(_histThreadHandlers_[iThread].size());
+        _histThreadHandlersSnap_[iThread][0] = (TH1D*) _histThreadHandlers_[iThread][0]->Clone();
+        _histThreadHandlersSnap_[iThread][1] = (TH1D*) _histThreadHandlers_[iThread][1]->Clone();
+        _histThreadHandlersSnap_[iThread][2] = (TH1D*) _histThreadHandlers_[iThread][2]->Clone();
+        _histThreadHandlersSnap_[iThread][3] = (TH1D*) _histThreadHandlers_[iThread][3]->Clone();
     }
 
 //    LogInfo << "MC histograms saved." << std::endl;
@@ -843,32 +874,119 @@ void AnaSample::CompareHistogramsWithSnapshot(){
 
     LogWarning << "Comparing histograms with the snapshot..." << std::endl;
 
-    std::function<void(TH1D*, TH1D*)> compareHist = [](TH1D* hSnap_, TH1D* hCurrent_){
+    std::function<bool(TH1D*, TH1D*, bool)> histAreSame = [](TH1D* hSnap_, TH1D* hCurrent_, bool isSilent_ = false){
 
+        bool isSame = true;
         for( int iBin = 0 ; iBin <= hCurrent_->GetNbinsX()+1 ; iBin++ ){
             if(hSnap_->GetBinContent(iBin) != hCurrent_->GetBinContent(iBin)){
-                LogAlert << hCurrent_->GetName() << " (" << GET_VAR_NAME_VALUE(iBin) << "): ";
-                LogAlert << hSnap_->GetBinContent(iBin);
-                LogAlert << (hSnap_->GetBinContent(iBin) > hCurrent_->GetBinContent(iBin) ? " > ": " < ");
-                LogAlert << hCurrent_->GetBinContent(iBin) << std::endl;
+                if(not isSilent_){
+                    LogAlert << hCurrent_->GetName() << " (" << GET_VAR_NAME_VALUE(iBin) << "): ";
+                    LogAlert << hSnap_->GetBinContent(iBin);
+                    LogAlert << (hSnap_->GetBinContent(iBin) > hCurrent_->GetBinContent(iBin) ? " > ": " < ");
+                    LogAlert << hCurrent_->GetBinContent(iBin) << std::endl;
+                }
+                isSame = false;
             }
         }
+        return isSame;
 
     };
 
-    compareHist(m_hmc_true_snap, m_hmc_true);
-    compareHist(m_hmc_snap, m_hmc);
-    compareHist(m_hpred_snap, m_hpred);
-    compareHist(m_hdata_snap, m_hdata);
-    compareHist(m_hsig_snap, m_hsig);
+    histAreSame(m_hmc_true_snap, m_hmc_true, false);
+    histAreSame(m_hmc_snap, m_hmc, false);
+    histAreSame(m_hpred_snap, m_hpred, false);
+    histAreSame(m_hdata_snap, m_hdata, false);
+    histAreSame(m_hsig_snap, m_hsig, false);
 
+    bool threadHistAreSame = true;
     for( size_t iThread = 0 ; iThread < _histThreadHandlers_.size() ; iThread++){
         LogInfo << GET_VAR_NAME_VALUE(iThread) << std::endl;
-        compareHist(_histThreadHandlersSnap_[iThread][m_hmc_true], _histThreadHandlers_[iThread][m_hmc_true]);
-        compareHist(_histThreadHandlersSnap_[iThread][m_hmc], _histThreadHandlers_[iThread][m_hmc]);
-        compareHist(_histThreadHandlersSnap_[iThread][m_hpred], _histThreadHandlers_[iThread][m_hpred]);
-        compareHist(_histThreadHandlersSnap_[iThread][m_hsig], _histThreadHandlers_[iThread][m_hsig]);
+        if(
+               not histAreSame(_histThreadHandlersSnap_[iThread][0], _histThreadHandlers_[iThread][0], false)
+            or not histAreSame(_histThreadHandlersSnap_[iThread][1], _histThreadHandlers_[iThread][1], false)
+            or not histAreSame(_histThreadHandlersSnap_[iThread][2], _histThreadHandlers_[iThread][2], false)
+            or not histAreSame(_histThreadHandlersSnap_[iThread][3], _histThreadHandlers_[iThread][3], false)
+           ){
+            threadHistAreSame = false;
+        };
     }
+
+    if(threadHistAreSame){
+        // Checking who's missing?
+        TH1D* temp_pred = (TH1D*) m_hpred->Clone();
+        TH1D* temp_mc = (TH1D*) m_hmc->Clone();
+        TH1D* temp_mc_true = (TH1D*) m_hmc_true->Clone();
+        TH1D* temp_sig = (TH1D*) m_hsig->Clone();
+
+
+        int missingThreadId = -1;
+        for( size_t iMissingThread = 0 ; iMissingThread < _histThreadHandlers_.size() ; iMissingThread++){
+
+            temp_pred->Reset("ICESM");
+            temp_mc->Reset("ICESM");
+            temp_mc_true->Reset("ICESM");
+            temp_sig->Reset("ICESM");
+
+            for( size_t iThread = 0 ; iThread < _histThreadHandlers_.size() ; iThread++){
+
+                if(iMissingThread == iThread){
+                    continue;
+                }
+
+                for( int iBin = 0 ; iBin <= temp_pred->GetNbinsX()+1 ; iBin++ ){
+                    temp_pred->SetBinContent(
+                        iBin,
+                        temp_pred->GetBinContent(iBin)
+                        + _histThreadHandlers_[iThread][0]->GetBinContent(iBin)
+                    );
+                }
+
+                for( int iBin = 0 ; iBin <= temp_mc->GetNbinsX()+1 ; iBin++ ){
+                    temp_mc->SetBinContent(
+                        iBin,
+                        temp_mc->GetBinContent(iBin)
+                        + _histThreadHandlers_[iThread][1]->GetBinContent(iBin)
+                    );
+                }
+
+                for( int iBin = 0 ; iBin <= temp_mc_true->GetNbinsX()+1 ; iBin++ ){
+                    temp_mc_true->SetBinContent(
+                        iBin,
+                        temp_mc_true->GetBinContent(iBin)
+                        + _histThreadHandlers_[iThread][2]->GetBinContent(iBin)
+                    );
+                }
+
+                for( int iBin = 0 ; iBin <= temp_sig->GetNbinsX()+1 ; iBin++ ){
+                    temp_sig->SetBinContent(
+                        iBin,
+                        temp_sig->GetBinContent(iBin)
+                        + _histThreadHandlers_[iThread][3]->GetBinContent(iBin)
+                    );
+                }
+
+            }
+
+            temp_pred->Scale(m_norm);
+            temp_mc->Scale(m_norm);
+            temp_sig->Scale(m_norm);
+
+            // Check if the current hist are the same as the one we just built when intentionnaly skipping one...
+            if(    histAreSame(temp_mc_true, m_hmc_true, true)
+                or histAreSame(temp_mc, m_hmc, true)
+                or histAreSame(temp_pred, m_hpred, true)
+                or histAreSame(temp_sig, m_hsig, true)
+                ){
+                LogError << GET_VAR_NAME_VALUE(iMissingThread) << std::endl;
+                break;
+            }
+
+        }
+
+    }
+
+    GenericToolbox::printVector(debugThreadBools);
+
 
     LogInfo << "Format: snapshot -> current" << std::endl;
     LogInfo << "Comparison with the snapshot ended." << std::endl;

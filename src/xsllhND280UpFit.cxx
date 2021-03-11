@@ -164,23 +164,16 @@ int main(int argc, char** argv)
             exit(EXIT_FAILURE);
         }
         TFile* file_flux_cov = TFile::Open(options_parser.flux_cov.fname.c_str(), "READ");
-        //TH1D* nd_numu_bins_hist = (TH1D*)file_flux_cov->Get(parser.flux_cov.binning.c_str());
-        //TAxis* nd_numu_bins = nd_numu_bins_hist->GetXaxis();
 
-        //std::vector<double> enubins;
-        //enubins.push_back(nd_numu_bins -> GetBinLowEdge(1));
-        //for(int i = 0; i < nd_numu_bins -> GetNbins(); ++i)
-        //    enubins.push_back(nd_numu_bins -> GetBinUpEdge(i+1));
-
-        auto* cov_flux = (TMatrixDSym*)file_flux_cov -> Get(options_parser.flux_cov.matrix.c_str());
+        auto* cov_flux = (TMatrixDSym*) file_flux_cov -> Get(options_parser.flux_cov.matrix.c_str());
         if(cov_flux == nullptr){
             LogError << options_parser.flux_cov.fname << ": " << options_parser.flux_cov.matrix << " can't be opened." << std::endl;
             exit(EXIT_FAILURE);
         }
         file_flux_cov -> Close();
 
-        if(options_parser.flux_cov.rng_start)
-            flux_parameters.SetRNGstart();
+//        if(options_parser.flux_cov.rng_start)
+//            flux_parameters.SetRNGstart();
 
         flux_parameters.SetCovarianceMatrix(*cov_flux, options_parser.flux_cov.decompose);
         flux_parameters.SetThrow(options_parser.flux_cov.do_throw);
@@ -336,7 +329,6 @@ int main(int argc, char** argv)
             LogWarning  << "Fit has converged." << std::endl;
 
         fitter.WritePostFitData();
-        fitter.ScanParameters(100);
 
     }
     else{

@@ -170,11 +170,15 @@ private:
 
     std::string m_name;
 
+    bool _useGraphEval_;
+
     //std::vector<TGraph> v_graphs;
     std::vector<SplineBin> _splineBinList_;
     std::vector<std::string> v_splitVarNames;
     std::vector<TSpline3> v_splines;
     std::vector<TSpline3*> _splinePtrList_;
+    std::vector<TGraph*> _graphPtrList_;
+    std::vector<std::pair<double,double>> _graphBoundsList_;
     std::vector<std::string> _splineNameList_;
     std::vector<int> m_dimensions;
 
