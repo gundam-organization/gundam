@@ -421,7 +421,7 @@ void XsecDial::SetDimensions(const std::vector<int>& dim)
 
 void XsecDial::Print(bool print_bins) const
 {
-    LogWarning << "Name: " <<  m_name << std::endl
+    LogInfo << "Name: " <<  m_name << std::endl
              << "Nominal Dial Value: " << m_nominalDial << std::endl
              << "Prior: " << m_prior << std::endl
              << "Step: " << m_step << std::endl
@@ -432,42 +432,42 @@ void XsecDial::Print(bool print_bins) const
         std::function<std::string(int)> intToString = [](int elementInt_){return std::to_string(elementInt_);};
         if(not _applyOnlyOnMap_.empty())
         {
-            LogWarning << "ApplyOnlyOn: {";
+            LogInfo << "ApplyOnlyOn: {";
             for(const auto& applyCond : _applyOnlyOnMap_){
-                LogWarning << " \"" << applyCond.first << "\": [";
-                LogWarning << GenericToolbox::joinVectorString(
+                LogInfo << " \"" << applyCond.first << "\": [";
+                LogInfo << GenericToolbox::joinVectorString(
                     GenericToolbox::convertVectorType(applyCond.second, intToString), ", ");
-                LogWarning << "], ";
+                LogInfo << "], ";
             }
-            LogWarning << "}" << std::endl;
+            LogInfo << "}" << std::endl;
         }
         if(not _dontApplyOnMap_.empty()){
-            LogWarning << "DontApplyOn: {";
+            LogInfo << "DontApplyOn: {";
             for(const auto& applyCond : _dontApplyOnMap_){
-                LogWarning << " \"" << applyCond.first << "\": [";
-                LogWarning << GenericToolbox::joinVectorString(
+                LogInfo << " \"" << applyCond.first << "\": [";
+                LogInfo << GenericToolbox::joinVectorString(
                     GenericToolbox::convertVectorType(applyCond.second, intToString), ", ");
-                LogWarning << "], ";
+                LogInfo << "], ";
             }
-            LogWarning << "}" << std::endl;
+            LogInfo << "}" << std::endl;
         }
     }
     else{
         if(_isSplinesInTTree_){
-            LogWarning << "Nb of Splines: " << _splinePtrList_.size() << std::endl;
+            LogInfo << "Nb of Splines: " << _splinePtrList_.size() << std::endl;
         }
         else{
-            LogWarning << "Nb of Splines: " << v_splines.size() << std::endl;
+            LogInfo << "Nb of Splines: " << v_splines.size() << std::endl;
         }
     }
 
 
 
     if(not m_dimensions.empty()){
-        LogWarning << "Dimensions:";
+        LogInfo << "Dimensions:";
         for(const auto& dim : m_dimensions)
-            LogWarning << " " << dim;
-        LogWarning << std::endl;
+            LogInfo << " " << dim;
+        LogInfo << std::endl;
     }
 
     if(print_bins){

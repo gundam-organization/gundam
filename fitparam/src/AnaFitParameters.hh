@@ -43,6 +43,9 @@ public:
                                       RegMethod flag) const
     { return 0.0; }
 
+    virtual void Print();
+    virtual void PrintParameterInfo(int iPar_);
+
     void ThrowPar(std::vector<double>& param, const int seed = 0) const;
     double GetChi2(const std::vector<double>& params) const;
     void SetCovarianceMatrix(const TMatrixDSym& covmat, bool decompose = false);

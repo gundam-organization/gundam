@@ -1495,6 +1495,40 @@ void generateJsonConfigFile(){
                 applyOnlyOnMap["reaction"].emplace_back(__toReactionIndex__["CCQE"]);
                 applyConditionsList.emplace_back("reaction == " + std::to_string(__toReactionIndex__["CCQE"]));
             }
+
+            // TN344, Table 1
+            if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "Q2_norm_0")){
+                applyConditionsList.emplace_back("q2_true > 0");
+                applyConditionsList.emplace_back("q2_true < 0.05*1E6"); // q2_true is expressed in keV -> convert to GeV
+            }
+            else if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "Q2_norm_1")){
+                applyConditionsList.emplace_back("q2_true > 0.05*1E6");
+                applyConditionsList.emplace_back("q2_true < 0.10*1E6");
+            }
+            else if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "Q2_norm_2")){
+                applyConditionsList.emplace_back("q2_true > 0.10*1E6");
+                applyConditionsList.emplace_back("q2_true < 0.15*1E6");
+            }
+            else if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "Q2_norm_3")){
+                applyConditionsList.emplace_back("q2_true > 0.15*1E6");
+                applyConditionsList.emplace_back("q2_true < 0.20*1E6");
+            }
+            else if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "Q2_norm_4")){
+                applyConditionsList.emplace_back("q2_true > 0.20*1E6");
+                applyConditionsList.emplace_back("q2_true < 0.25*1E6");
+            }
+            else if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "Q2_norm_5")){
+                applyConditionsList.emplace_back("q2_true > 0.25*1E6");
+                applyConditionsList.emplace_back("q2_true < 0.50*1E6");
+            }
+            else if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "Q2_norm_6")){
+                applyConditionsList.emplace_back("q2_true > 0.50*1E6");
+                applyConditionsList.emplace_back("q2_true < 1.00*1E6");
+            }
+            else if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "Q2_norm_7")){
+                applyConditionsList.emplace_back("q2_true > 1.00*1E6");
+            }
+
             if(GenericToolbox::doesStringStartsWithSubstring(xsecSplineName, "CC_Misc")){
                 // CC_Misc - CCGamma, CCKaon, CCEta
                 // CC Misc Misc Spline 100% normalisation error on CC1γ, CC1K, CC1η.

@@ -40,6 +40,7 @@ class FitParameters : public AnaFitParameters
         unsigned int signal_id;
 
         const std::string TAG = color::GREEN_STR + "[FitParameters]: " + color::RESET_STR;
+
 };
 
 #endif

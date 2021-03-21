@@ -68,7 +68,6 @@ public:
     void PropagateSystematics();
     void ComputeChi2();
 
-    void InitFitter(std::vector<AnaFitParameters*>& fitpara);
     void FixParameter(const std::string& par_name, const double& value);
     void ParameterScans(const std::vector<int>& param_list, unsigned int nsteps);
 
@@ -95,12 +94,13 @@ private:
     void ReWeightEvents(int iThread_ = -1);
 
     // Internal
-    bool _isInitialized_{};
-    bool _fitHasBeenDone_{};
-    bool _fitHasConverged_{};
+    bool _isInitialized_{false};
+    bool _fitHasStarted_{false};
+    bool _fitHasBeenDone_{false};
+    bool _fitHasConverged_{false};
 
     // Options (Fitter)
-    bool _disableChi2Pulls_{};
+    bool _disableChi2Pulls_{false};
 
 
     // Options (Debug and Monitoring)
@@ -125,7 +125,7 @@ private:
     double _chi2RegBuffer_{};
 
     std::vector<std::string> _parameter_names_;
-    std::vector<bool> _parameterFixedStatusList_;
+    std::vector<bool> _fitParameterIsFixedList_;
     std::vector<double> _parameterPriorValues_;
     std::vector<double> _parameterSteps_;
     std::vector<double> _parameter_low_edges_;
@@ -133,6 +133,9 @@ private:
     std::vector<AnaFitParameters*> _fitParametersGroupList_;
     std::vector<AnaSample*> _samplesList_;
     std::vector<std::vector<double>> _newParametersList_;
+
+    std::vector<size_t> _fitParameterGhostList_;
+    std::map<size_t, size_t> _fitParameterDegeneracyList_; // [degeneratedPar] = fittedPar;
 
     std::vector<std::vector<std::vector<long long>>> _durationReweightParameters_; // [SystGroup][Thread][Iteration] = time
     std::map<int, std::vector<double>> _durationHistoryHandler_;

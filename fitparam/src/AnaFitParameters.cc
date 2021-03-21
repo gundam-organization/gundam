@@ -200,3 +200,15 @@ void AnaFitParameters::ThrowPar(std::vector<double>& param, const int seed) cons
 }
 
 void AnaFitParameters::SetParNames(std::vector<std::string>& vec) { pars_name = vec; }
+
+
+void AnaFitParameters::Print(){
+    LogInfo << m_name << ": " << std::endl;
+    for( size_t iPar = 0 ; iPar < pars_name.size() ; iPar++ ){
+        PrintParameterInfo(iPar);
+    }
+}
+
+void AnaFitParameters::PrintParameterInfo(int iPar_){
+    LogInfo << pars_name[iPar_] << std::endl;
+}

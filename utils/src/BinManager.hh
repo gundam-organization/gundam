@@ -25,6 +25,8 @@ class BinManager
         double GetBinWidth(const int i, const int d) const;
         unsigned int GetDimension() const;
         std::vector<double> GetBinVector(const double d) const;
+        std::vector<std::vector<int>>& GetBinNuTypeList() { return bin_nutype; };
+        std::vector<std::vector<int>>& GetBinBeamModeList() { return bin_beammode; };
         std::vector<std::vector<std::pair<double, double>>> GetEdgeVector() const { return bin_edges; };
         std::vector<std::pair<double, double>> GetEdgeVector(const int d) const { return bin_edges.at(d); };
         void Print() const;

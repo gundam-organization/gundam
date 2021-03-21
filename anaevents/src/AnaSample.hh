@@ -98,6 +98,7 @@ public:
     std::string GetDetBinning() const { return m_binning; }
     std::string GetAdditionalCuts() const { return m_additional_cuts; }
     std::vector<AnaEvent>& GetMcEvents() { return m_mc_events; }
+    size_t GetNbMcEvents() { return m_mc_events.size(); }
     std::vector<AnaEvent>& GetDataEvents() { return m_data_events; }
 
     // Return the const ref to avoid external modifications

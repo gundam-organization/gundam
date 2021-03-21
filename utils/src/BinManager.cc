@@ -289,6 +289,8 @@ void BinManager::Print() const
         {
             std::cout << std::setw(10) << bin_edges[d][i].first
                       << std::setw(10) << bin_edges[d][i].second;
+            std::cout << " / nutype: " << bin_nutype[d][i];
+            std::cout << " / beammode: " << bin_beammode[d][i];
         }
         std::cout << std::endl;
     }

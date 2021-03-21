@@ -102,6 +102,7 @@ void ND280Fitter::SetPrngSeed(int PRNG_seed_){
 void ND280Fitter::SetMinimizationSettings(const MinSettings& minimization_settings_){
     _minimization_settings_ = minimization_settings_;
     if(_minimizer_ != nullptr){
+        // If the fitter has already been initialized, set these parameters
         _minimizer_->SetStrategy(_minimization_settings_.strategy);
         _minimizer_->SetPrintLevel(_minimization_settings_.print_level);
         _minimizer_->SetTolerance(_minimization_settings_.tolerance);
@@ -188,6 +189,10 @@ void ND280Fitter::WritePrefitData(){
     }
 
     auto* preFitDir = GenericToolbox::mkdirTFile(_outputTDirectory_, "prefit");
+
+    /////////////////////////////
+    // Samples
+    /////////////////////////////
     this->WriteSamplePlots(preFitDir);
 
 
@@ -384,12 +389,28 @@ void ND280Fitter::MakeOneSigmaChecks(){
     for( int iSyst = 0 ; iSyst < _minimizer_->NDim() ; iSyst++ ){
 
         // If this parameter is fixed, then it won't be writen
-        if(_parameterFixedStatusList_[iSyst]){
+        if(_fitParameterIsFixedList_[iSyst]){
             LogTrace << "Skipping fixed parameter: " << iSyst << std::endl;
             continue;
         }
 
         LogInfo << "Running +1 sigma on: " << _parameter_names_[iSyst] << std::endl;
+        // which systematic is it?
+        int parCount = 0;
+        int parGroupIndex = -1;
+        int parIndex = -1;
+        for( size_t iParGroup = 0 ; iParGroup < _fitParametersGroupList_.size(); iParGroup++ ){
+            for( size_t iPar = 0 ; iPar < _fitParametersGroupList_[iParGroup]->GetNpar() ; iPar++ ){
+                if(parCount == iSyst){
+                    parIndex = iPar;
+                    parGroupIndex = iParGroup;
+                    break;
+                }
+                parCount++;
+            }
+            if(parIndex != -1) break;
+        }
+        _fitParametersGroupList_[parGroupIndex]->PrintParameterInfo(parIndex);
 
         // Create associated subdirectory
         auto* currentDir = GenericToolbox::mkdirTFile( oneSigmaDir, _parameter_names_[iSyst] );
@@ -416,7 +437,8 @@ void ND280Fitter::MakeOneSigmaChecks(){
         };
         int colorTick = 0;
 
-        bool parameterHasNoEffect = true;
+        bool parameterHasNoEffect = true;       // No need to fit this parameter since the samples give no response
+        bool parameterIsDegenerated = true;     // Don't fit with multiple parameters that affect the sample in the same way
 
         // Generate plots
         for( const auto& anaSample : _samplesList_){
@@ -444,6 +466,7 @@ void ND280Fitter::MakeOneSigmaChecks(){
                 oneSigmaHistMap[iSyst][tempHistName]->Fill( anaEvent->GetRecoD1(), anaEvent->GetEvWght() );
             }
 
+            // Is affected?
             bool isUnaffected = true;
             for(int iBin = 0 ; iBin <= oneSigmaHistMap[iSyst][tempHistName]->GetNbinsX() + 1 ; iBin++){
                 oneSigmaHistMap[iSyst][tempHistName]->SetBinContent(
@@ -492,9 +515,35 @@ void ND280Fitter::MakeOneSigmaChecks(){
         }
 
         if(parameterHasNoEffect){
-            LogAlert << "Parameter: \"" << _parameter_names_[iSyst] << "\" has no effect on the spectra, fixing it for the fit." << std::endl;
-            _parameterFixedStatusList_[iSyst] = true;
+            LogError << "Parameter: \"" << _parameter_names_[iSyst] << "\" has no effect on the samples, fixing it for the fit." << std::endl;
+            _fitParameterGhostList_.emplace_back(iSyst);
+            _fitParameterIsFixedList_[iSyst] = true;
             _minimizer_->FixVariable(iSyst);
+        }
+        else{
+            // Is degenerated?
+            for( size_t jSyst = 0 ; jSyst < iSyst ; jSyst++ ){
+                bool hasSameEffect = true;
+                for( const auto& anaSample : _samplesList_){
+                    std::string tempHistName = anaSample->GetName() + "/D1";
+                    for(int iBin = 0 ; iBin <= oneSigmaHistMap[iSyst][tempHistName]->GetNbinsX() + 1 ; iBin++){
+                        if( TMath::Abs(oneSigmaHistMap[jSyst][tempHistName]->GetBinContent(iBin) - oneSigmaHistMap[iSyst][tempHistName]->GetBinContent(iBin)) > 1E-6 ){
+                            hasSameEffect = false;
+                            break;
+                        }
+                    }
+                    if(not hasSameEffect) break;
+                }
+                if(hasSameEffect){
+                    LogError << _parameter_names_[iSyst] << " has the same effect as " << _parameter_names_[jSyst] << " on samples." << std::endl;
+                    LogError << "\"" << _parameter_names_[iSyst] << "\" will be fixed in the fit." << std::endl;
+                    _fitParameterDegeneracyList_[iSyst] = jSyst;
+                    _fitParameterIsFixedList_[iSyst] = true;
+                    _minimizer_->FixVariable(iSyst);
+                    break;
+                }
+
+            }
         }
 
         GenericToolbox::mkdirTFile(currentDir,"Histograms")->cd();
@@ -544,7 +593,7 @@ void ND280Fitter::MakeOneSigmaChecks(){
             delete canvas.second;
         }
 
-        LogDebug << "Comming back to 0 sigmas..." << std::endl;
+        LogDebug << "Coming back to 0 sigmas..." << std::endl;
         par[iSyst] = originalPar;
         UpdateFitParameterValues(par);
         PropagateSystematics();
@@ -577,7 +626,6 @@ bool ND280Fitter::Fit(){
 
     LogAlert << "Starting to fit." << std::endl;
     PassIfInitialized(__METHOD_NAME__);
-    _fitHasBeenDone_ = true;
 
     if(_selected_data_type_ == kAsimov){
 
@@ -585,7 +633,7 @@ bool ND280Fitter::Fit(){
         TMatrixD* covarianceMatrix = this->GeneratePriorCovarianceMatrix();
         for( int iPar = 0; iPar < _nb_fit_parameters_; iPar++ ) {
 
-            if(not _parameterFixedStatusList_[iPar]){
+            if(not _fitParameterIsFixedList_[iPar]){
                 _minimizer_->SetVariable(
                     iPar, _parameter_names_[iPar],
                     _parameterPriorValues_[iPar] + _PRNG_->Gaus(0, 0.01*TMath::Sqrt((*covarianceMatrix)[iPar][iPar])),
@@ -601,12 +649,45 @@ bool ND280Fitter::Fit(){
         ComputeChi2();
 
         WriteSamplePlots(GenericToolbox::mkdirTFile(_outputTDirectory_, "fit")); // just to control the first iteration...
+        
+    }
+
+    LogInfo << "List of all fit parameters: " << std::endl;
+    int paramaterOffset = 0;
+    for( size_t iParGroup = 0 ; iParGroup < _fitParametersGroupList_.size() ; iParGroup++ ){
+
+        LogInfo << "- " << _fitParametersGroupList_[iParGroup]->GetName() << ": " << std::endl;
+        for( size_t iPar = 0 ; iPar < _fitParametersGroupList_[iParGroup]->GetNpar() ; iPar++ ){
+
+            if(_fitParameterIsFixedList_[paramaterOffset + iPar]){
+
+//                _fitParametersGroupList_[iParGroup]->PrintParameterInfo(iPar);
+                LogAlert << _fitParametersGroupList_[iParGroup]->GetParNames()[iPar];
+                if(GenericToolbox::doesElementIsInVector(paramaterOffset + iPar, _fitParameterGhostList_)){
+                    LogAlert << " -> FIXED: No effect on the samples" << std::endl;
+                }
+                else if(GenericToolbox::doesKeyIsInMap(paramaterOffset + iPar, _fitParameterDegeneracyList_)){
+                    LogAlert << " -> FIXED: had same effect as parameter: "
+                             << _fitParametersGroupList_[iParGroup]->GetParNames()[_fitParameterDegeneracyList_[paramaterOffset + iPar]-paramaterOffset]
+                             << std::endl;
+                }
+                else{
+                    LogAlert << " -> FIXED" << std::endl;
+                }
+
+            }
+            else{
+                LogInfo << _fitParametersGroupList_[iParGroup]->GetParNames()[iPar] << std::endl;
+            }
+
+        }
+        paramaterOffset += _fitParametersGroupList_[iParGroup]->GetNpar();
     }
 
     auto* systPostFitDir = GenericToolbox::mkdirTFile(_outputTDirectory_, "prefit/parameters");
 
-    LogInfo << "Scanning parameters arround the prefit point..." << std::endl;
-    int paramaterOffset = 0;
+    LogWarning << "Scanning parameters arround the prefit point..." << std::endl;
+    paramaterOffset = 0;
     for( size_t iParGroup = 0 ; iParGroup < _fitParametersGroupList_.size() ; iParGroup++ ){
 
         auto* samplePostFitDir = GenericToolbox::mkdirTFile(systPostFitDir, _fitParametersGroupList_[iParGroup]->GetName());
@@ -619,7 +700,7 @@ bool ND280Fitter::Fit(){
         GenericToolbox::mkdirTFile(samplePostFitDir, "scans")->cd();
         for( size_t iPar = 0 ; iPar < _fitParametersGroupList_[iParGroup]->GetNpar() ; iPar++ ){
 
-            if(_parameterFixedStatusList_[paramaterOffset + iPar]) continue;
+            if(_fitParameterIsFixedList_[paramaterOffset + iPar]) continue;
 
             LogWarning << "Scanning parameter " << iPar;
             LogWarning << " (" << _minimizer_->VariableName(iPar) << ")..." << std::endl;
@@ -638,14 +719,13 @@ bool ND280Fitter::Fit(){
     _outputTDirectory_->cd();
 
 
-    LogInfo << "Calling Minimize, running: " << _minimization_settings_.algorithm << std::endl;
+    LogAlert << "Calling Minimize, running: " << _minimization_settings_.algorithm << std::endl;
     // Run the actual fitter:
+    _fitHasStarted_ = true;
     _fitHasConverged_ = _minimizer_->Minimize();
-    _fitHasConverged_ = true;
 
     if(not _fitHasConverged_){
-        LogError << "Fit did not converge while running " << _minimization_settings_.algorithm
-                 << std::endl;
+        LogError << "Fit did not converge while running " << _minimization_settings_.algorithm << std::endl;
         LogError << "Failed with status code: " << _minimizer_->Status() << std::endl;
     }
     else{
@@ -654,16 +734,19 @@ bool ND280Fitter::Fit(){
 
         LogInfo << "Calling HESSE." << std::endl;
         _fitHasConverged_ = _minimizer_->Hesse();
+
+        if(not _fitHasConverged_){
+            LogError  << "Hesse did not converge." << std::endl;
+            LogError  << "Failed with status code: " << _minimizer_->Status() << std::endl;
+        }
+        else{
+            LogInfo << "Hesse converged." << std::endl
+                    << "Status code: " << _minimizer_->Status() << std::endl;
+        }
+
     }
 
-    if(not _fitHasConverged_){
-        LogError  << "Hesse did not converge." << std::endl;
-        LogError  << "Failed with status code: " << _minimizer_->Status() << std::endl;
-    }
-    else{
-        LogInfo << "Hesse converged." << std::endl
-                << "Status code: " << _minimizer_->Status() << std::endl;
-    }
+    _fitHasBeenDone_ = true;
 
     LogWarning << "Fit has ended." << std::endl;
     return _fitHasConverged_;
@@ -698,7 +781,7 @@ void ND280Fitter::WritePostFitData(){
 
     auto* systPostFitDir = GenericToolbox::mkdirTFile(postFitDir, "parameters");
 
-    LogInfo << "Scanning parameters arround the minimum..." << std::endl;
+    LogInfo << "Scanning parameters around the minimum..." << std::endl;
     int paramaterOffset = 0;
     for( size_t iParGroup = 0 ; iParGroup < _fitParametersGroupList_.size() ; iParGroup++ ){
 
@@ -712,7 +795,7 @@ void ND280Fitter::WritePostFitData(){
         GenericToolbox::mkdirTFile(samplePostFitDir, "scans")->cd();
         for( size_t iPar = 0 ; iPar < _fitParametersGroupList_[iParGroup]->GetNpar() ; iPar++ ){
 
-            if(_parameterFixedStatusList_[paramaterOffset + iPar]) continue;
+            if(_fitParameterIsFixedList_[paramaterOffset + iPar]) continue;
 
             LogWarning << "Scanning parameter " << iPar;
             LogWarning << " (" << _minimizer_->VariableName(iPar) << ")..." << std::endl;
@@ -1334,10 +1417,10 @@ void ND280Fitter::InitializeFitParameters(){
         _parameter_low_edges_.insert( _parameter_low_edges_.end(), anaParLowEdges.begin(), anaParLowEdges.end() );
         _parameter_high_edges_.insert( _parameter_high_edges_.end(), anaParHighEdges.begin(), anaParHighEdges.end() );
 
-        // Store the flags indicating whether a parameter is fixed (for all parameter types) in _parameterFixedStatusList_:
+        // Store the flags indicating whether a parameter is fixed (for all parameter types) in _fitParameterIsFixedList_:
         std::vector<bool> anaParFixedList;
         _fitParametersGroupList_[iGroup]->GetParFixed(anaParFixedList);
-        _parameterFixedStatusList_.insert(_parameterFixedStatusList_.end(), anaParFixedList.begin(), anaParFixedList.end());
+        _fitParameterIsFixedList_.insert(_fitParameterIsFixedList_.end(), anaParFixedList.begin(), anaParFixedList.end());
     }
 
     // Nothing to fit with zero fit parameters:
@@ -1405,7 +1488,7 @@ void ND280Fitter::InitializeFitter(){
             _parameterSteps_[iPar]
         );
 
-        if(_parameterFixedStatusList_[iPar]){
+        if(_fitParameterIsFixedList_[iPar]){
             _minimizer_->FixVariable(iPar);
         }
     }
@@ -1455,7 +1538,7 @@ double ND280Fitter::EvalFit(const double* par){
     _printFitState_ = false;
 
     _nbFitCalls_++;
-    if(_nbFitCalls_ < 20 or _nbFitCalls_ % 100 == 0){
+    if( _fitHasStarted_ and (_nbFitCalls_ < 20 or _nbFitCalls_ % 100 == 0) ){
         _printFitState_ = true;
     }
 
@@ -1706,7 +1789,7 @@ void ND280Fitter::ReWeightEvents(int iThread_){
     // Looping over all events
     for( size_t iSample = 0; iSample < _samplesList_.size(); iSample++ ){
         currentSamplePtr = _samplesList_.at(iSample);
-        nEvents = currentSamplePtr->GetMcEvents().size();
+        nEvents = currentSamplePtr->GetNbMcEvents();
         for( size_t iEvent = 0; iEvent < nEvents ; iEvent++ ){
 
             if(isMultiThreaded){

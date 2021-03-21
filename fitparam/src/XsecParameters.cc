@@ -14,6 +14,45 @@ XsecParameters::XsecParameters(const std::string& name)
 
 XsecParameters::~XsecParameters() { ; }
 
+void XsecParameters::Print(){
+
+    LogInfo << m_name << std::endl;
+    for( size_t iDetector = 0 ; iDetector < v_detectors.size() ; iDetector++ ){
+        const int nDials = _dialsList_[iDetector].size();
+        for( size_t iDial = 0 ; iDial < nDials ; iDial++ ){
+            this->PrintParameterInfo(iDetector, iDial);
+        }
+    }
+
+}
+
+void XsecParameters::PrintParameterInfo(int iPar_){
+
+    int detectorIndex = -1;
+    int dialIndex     = -1;
+    int parOffset     = 0;
+    for( size_t iDetector = 0 ; iDetector < v_detectors.size() ; iDetector++ ){
+        const int nDials = _dialsList_[iDetector].size();
+        if( iPar_ < parOffset + nDials ){
+            detectorIndex = iDetector;
+            dialIndex     = iPar_ - parOffset;
+            break;
+        }
+        parOffset += nDials;
+    }
+
+    if( detectorIndex != -1 and dialIndex != -1 ){
+        this->PrintParameterInfo(detectorIndex, dialIndex);
+    }
+
+}
+
+void XsecParameters::PrintParameterInfo(int iDetector_, int iDial_){
+
+    _dialsList_[iDetector_][iDial_].Print();
+
+}
+
 void XsecParameters::InitEventMap(std::vector<AnaSample*>& samplesList_, int mode)
 {
     LogWarning << "Initializing Event Map..." << std::endl;
@@ -432,8 +471,8 @@ void XsecParameters::AddDetector(const std::string& detectorName_, const std::st
                 xsecDial.SetPrior(xsecDial.GetNominal());
             }
             else{
-//                xsecDial.SetPrior(dialConfig["prior"]);
-                xsecDial.SetPrior(xsecDial.GetNominal());
+                xsecDial.SetPrior(dialConfig["prior"]);
+//                xsecDial.SetPrior(xsecDial.GetNominal());
             }
 
             if(dialConfig.find("apply_only_on") != dialConfig.end()){

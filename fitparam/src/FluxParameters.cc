@@ -122,29 +122,32 @@ void FluxParameters::InitParameters()
 {
     unsigned int offset = 0;
     LogInfo << "Flux binning " << std::endl;
-    for(const auto& det : v_detectors)
-    {
-        LogInfo << "Detector: " << det << std::endl;
-        m_det_offset.insert(std::make_pair(det, offset));
-        //const int nbins = m_det_bins.at(det).size() - 1;
-        const int nbins = m_det_bm.at(det).GetNbins();
-        for(int i = 0; i < nbins; ++i)
-        {
-            pars_name.push_back(Form("%s_%s_%d", m_name.c_str(), det.c_str(), i));
+
+    for( size_t iDetector = 0 ; iDetector < v_detectors.size() ; iDetector++ ){
+        LogInfo << "Detector: "<< v_detectors[iDetector] << std::endl;
+        m_det_offset.insert(std::make_pair(v_detectors[iDetector], offset));
+        //const int nbins = m_det_bins.at(v_detectors[iDetector]).size() - 1;
+        const int nbins = m_det_bm.at(v_detectors[iDetector]).GetNbins();
+        for( int iBin = 0 ; iBin < nbins ; iBin++ ){
+            pars_name.emplace_back(
+                Form("%s_%s_%i",
+                     m_name.c_str(), v_detectors[iDetector].c_str(), iBin
+//                     , m_det_bm.at(v_detectors[iDetector]).GetBinNuTypeList()[iDetector][iBin]
+//                     , m_det_bm.at(v_detectors[iDetector]).GetBinBeamModeList()[iDetector][iBin]
+                     )
+                );
             pars_prior.push_back(1.0); // all weights are 1.0 a priori
             pars_step.push_back(0.1);
             pars_limlow.push_back(0.0);
             pars_limhigh.push_back(5.0);
             pars_fixed.push_back(false);
-
-            //std::cout << i << ": " << m_det_bins.at(det).at(i) << std::endl;
         }
-        //std::cout << nbins << ": " << m_det_bins.at(det).back() << std::endl;
 
-        m_det_bm.at(det).Print();
+        m_det_bm.at(v_detectors[iDetector]).Print();
         LogInfo << "Total " << nbins << " parameters at "
-                  << offset << " for " << det << std::endl;
+                << offset << " for " << v_detectors[iDetector] << std::endl;
         offset += nbins;
+
     }
 
     Npar = pars_name.size();
@@ -182,4 +185,49 @@ void FluxParameters::AddDetector(const std::string& det, const std::string& binn
     BinManager temp(binning_file, true);
     m_det_bm.emplace(std::make_pair(det, std::move(temp)));
     v_detectors.emplace_back(det);
+}
+
+void FluxParameters::Print() {
+
+    LogInfo << m_name << std::endl;
+    for( size_t iDetector = 0 ; iDetector < v_detectors.size() ; iDetector++ ){
+        LogInfo << "Detector: "<< v_detectors[iDetector] << std::endl;
+        const int nbins = m_det_bm.at(v_detectors[iDetector]).GetNbins();
+        for( int iBin = 0 ; iBin < nbins ; iBin++ ){
+            this->PrintParameterInfo(iDetector, iBin);
+        }
+    }
+
+}
+
+void FluxParameters::PrintParameterInfo(int iPar_) {
+
+    int detectorIndex = -1;
+    int binIndex = -1;
+    int parOffset     = 0;
+    for( size_t iDetector = 0 ; iDetector < v_detectors.size() ; iDetector++ ){
+        const int nbins = m_det_bm.at(v_detectors[iDetector]).GetNbins();
+        if( iPar_ < parOffset + nbins ){
+            detectorIndex = iDetector;
+            binIndex = iPar_ - parOffset;
+            break;
+        }
+        parOffset += nbins;
+    }
+
+    if( detectorIndex != -1 and binIndex != -1 ){
+        this->PrintParameterInfo(detectorIndex, binIndex);
+    }
+
+}
+
+void FluxParameters::PrintParameterInfo(int iDetector_, int iBin_){
+
+    LogInfo << "Parameter Index: " << m_det_offset[v_detectors[iDetector_]] + iBin_ << std::endl;
+    LogInfo << "Parameter Name: " << pars_name[m_det_offset[v_detectors[iDetector_]] + iBin_] << std::endl;
+    LogInfo << "Kinematic Bin: " << m_det_bm.at(v_detectors[iDetector_]).GetEdgeVector(iDetector_)[iBin_].first
+            << " - " << m_det_bm.at(v_detectors[iDetector_]).GetEdgeVector(iDetector_)[iBin_].second << std::endl;
+    LogInfo << "NuType: " << m_det_bm.at(v_detectors[iDetector_]).GetBinNuTypeList()[iDetector_][iBin_] << std::endl;
+    LogInfo << "BeamMode: " << m_det_bm.at(v_detectors[iDetector_]).GetBinBeamModeList()[iDetector_][iBin_] << std::endl;
+
 }

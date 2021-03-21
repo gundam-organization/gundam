@@ -22,6 +22,10 @@ public:
     explicit XsecParameters(const std::string& name = "par_xsec");
     ~XsecParameters() override;
 
+    void Print() override;
+    void PrintParameterInfo(int iPar_) override;
+    void PrintParameterInfo(int iDetector_, int iDial_);
+
     void InitEventMap(std::vector<AnaSample*>& samplesList_, int mode) override;
     void InitParameters() override;
     void ReWeight(AnaEvent* event, const std::string& detectorName, int nsample, int nevent, std::vector<double>& params) override;
