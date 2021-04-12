@@ -1,5 +1,6 @@
 #include "OptParser.hh"
 #include "Logger.h"
+#include "GenericToolbox.h"
 
 OptParser::OptParser()
 {
@@ -108,6 +109,30 @@ bool OptParser::ParseJSON(std::string json_file)
 
     }
 
+
+    if( j.find("sample_definitions_file") != j.end() )
+    {
+        LogDebug << "Reading sample definition from file: " << j["sample_definitions_file"] << std::endl;
+        if( not GenericToolbox::doesPathIsFile(j["sample_definitions_file"]) ){
+            LogError << "Could not find sample definition file." << std::endl;
+            throw std::runtime_error("Could not find file.");
+        }
+
+        std::fstream sampleFile;
+        sampleFile.open(j["sample_definitions_file"], std::ios::in);
+
+        json sampleJson;
+        sampleFile >> sampleJson;
+        j["samples"] = sampleJson["samples"];
+        sampleFile.close();
+    }
+
+    if( j["samples"].empty() ){
+        LogError << "No samples have been defined." << std::endl;
+        throw std::logic_error("No samples have been defined.");
+    }
+
+    LogDebug << "Reading " << j["samples"].size() << " sample definitions..." << std::endl;
     for(const auto& sample : j["samples"])
     {
         SampleOpt s;

@@ -26,7 +26,7 @@
 #include "ColorOutput.hh"
 #include "GlobalVariables.h"
 
-struct SplineBin{
+struct SplineBin {
 
     std::vector<std::string> splitVarNameList{};
     std::vector<int>         splitVarValueList{};
@@ -186,7 +186,7 @@ private:
 
     bool _isNormalizationDial_;
     bool _isSplinesInTTree_;
-    TTree* _interpolatedBinnedSplinesTTree_;
+    TTree* _interpolatedBinnedSplinesTTree_{};
 
     SplineBin _splineBinBuffer_;
     std::vector<std::vector<std::pair<double, double>>> _binEdgesList_;
