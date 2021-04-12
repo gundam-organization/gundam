@@ -89,8 +89,6 @@ int main(int argc, char** argv){
     pbar.SetRainbow();
     pbar.SetPrefix(std::string(LogInfo.getPrefixString() + "Reading Events "));
 
-    GenericToolbox::ProgressBar::enableRainbowProgressBar = true;
-
     // passing command line args to these global variables
     __argc__ = argc;
     __argv__ = argv;

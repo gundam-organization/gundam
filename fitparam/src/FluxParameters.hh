@@ -14,10 +14,10 @@ public:
     void PrintParameterInfo(int iPar_) override;
     void PrintParameterInfo(int iDetector_, int iBin_);
 
-    void InitParameters();
-    void InitEventMap(std::vector<AnaSample*>& sample, int mode);
+    void InitParameters() override;
+    void InitEventMap(std::vector<AnaSample*>& sample, int mode) override;
     void ReWeight(AnaEvent* event, const std::string& det, int nsample, int nevent,
-                  std::vector<double>& params);
+                  std::vector<double>& params) override;
     void AddDetector(const std::string& det, const std::vector<double>& bins);
     void AddDetector(const std::string& det, const std::string& binning_file);
     int GetBinIndex(const std::string& det, double enu);

@@ -167,7 +167,6 @@ std::string remindUsage(){
 }
 void resetParameters(){
 
-    GenericToolbox::ProgressBar::enableRainbowProgressBar = true;
     Logger::setUserHeaderStr("[xsllhGenWeightsFormater]");
 
     __pathJsonConfigFile__ = "";

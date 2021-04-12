@@ -237,7 +237,6 @@ void XsecParameters::InitEventMap(std::vector<AnaSample*>& samplesList_, int mod
         }
 
         std::string progressBarPrefix = LogWarning.getPrefixString() + "Associating events with splines";
-        GenericToolbox::ProgressBar::lastDisplayedPercentValue = -1;
         for( int iThread = 0 ; iThread < GlobalVariables::getNbThreads(); iThread++ ){
             while(threadsList[iThread].wait_for(std::chrono::milliseconds(33)) != std::future_status::ready){
                 GenericToolbox::displayProgressBar(*counterPtr, totalNbEvents, progressBarPrefix);
