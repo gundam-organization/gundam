@@ -1122,7 +1122,7 @@ void ND280Fitter::WriteSamplePlots(TDirectory* outputDir_) {
                 histPair.second->GetYaxis()->SetTitle("Counts/(100 MeV)");
                 histPair.second->GetXaxis()->SetRangeUser(histPair.second->GetXaxis()->GetXmin(),maxD1Scale);
             }
-            else{
+            else {
                 histPair.second->GetYaxis()->SetTitle("Counts");
             }
 
