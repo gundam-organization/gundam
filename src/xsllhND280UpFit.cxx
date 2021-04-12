@@ -114,8 +114,10 @@ int main(int argc, char** argv)
         {
             LogWarning << "Adding new sample to fit." << std::endl
                        << "Name: " << sample.name << std::endl
-                       << "CutB: " << sample.cut_branch << std::endl
                        << "Detector: " << sample.detector << std::endl
+                       << "Phase Space: " << GenericToolbox::parseVectorAsString(sample.fit_phase_space) << std::endl
+                       << "Binning file: " << sample.binning << std::endl
+                       << "CutB: " << sample.cut_branch << std::endl
                        << "Use Sample: " << std::boolalpha << sample.use_sample << std::endl;
 
             auto analysisSample = new AnaSample(sample, data_ttree);

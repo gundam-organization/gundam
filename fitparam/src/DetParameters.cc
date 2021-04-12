@@ -8,65 +8,56 @@ DetParameters::DetParameters(const std::string& name)
 
 DetParameters::~DetParameters() { ; }
 
-bool DetParameters::SetBinning(const std::string& file_name, std::vector<FitBin>& bins)
+bool DetParameters::SetBinning(AnaSample* sample_, std::vector<GeneralizedFitBin>& bins)
 {
-    std::ifstream fin(file_name, std::ios::in);
+    std::ifstream fin(sample_->GetDetBinning(), std::ios::in);
     if(!fin.is_open())
     {
         std::cerr << ERR << "In DetParameters::SetBinning()\n"
-                  << ERR << "Failed to open binning file: " << file_name << std::endl;
+                  << ERR << "Failed to open binning file: " << sample_->GetDetBinning() << std::endl;
         return false;
     }
-
     else
     {
         std::string line;
         while(getline(fin, line))
         {
             std::stringstream ss(line);
-            double D1_1, D1_2, D2_1, D2_2;
-            if(!(ss>>D2_1>>D2_2>>D1_1>>D1_2))
-            {
-                std::cout << WAR << "In DetParameters::SetBinning()\n"
-                          << WAR << "Bad line format: " << line << std::endl;
+            std::vector<double> lowEdges;
+            std::vector<double> highEdges;
+
+            double lowEdge, highEdge;
+            while( ss >> lowEdge >> highEdge ){
+                lowEdges.emplace_back( lowEdge );
+                highEdges.emplace_back( highEdge );
+            }
+
+            if( sample_->GetFitPhaseSpace().size() != lowEdges.size() ){
+                LogWarning << "Bad bin: \"" << line << "\"" << std::endl;
                 continue;
             }
-            bins.emplace_back(FitBin(D1_1, D1_2, D2_1, D2_2));
+
+            bins.emplace_back(GeneralizedFitBin(lowEdges, highEdges));
         }
         fin.close();
-
-//        std::cout << TAG << "Fit binning: \n";
-//        for(std::size_t i = 0; i < bins.size(); ++i)
-//        {
-//            std::cout << std::setw(3) << i
-//                      << std::setw(5) << bins[i].D2low
-//                      << std::setw(5) << bins[i].D2high
-//                      << std::setw(5) << bins[i].D1low
-//                      << std::setw(5) << bins[i].D1high << std::endl;
-//        }
 
         return true;
     }
 }
 
-int DetParameters::GetBinIndex(const int sam, double D1, double D2) const
+int DetParameters::GetBinIndex(const int sampleIndex_, const std::vector<double>& eventVarList_) const
 {
-    int bin = BADBIN;
-    const std::vector<FitBin> &temp_bins = m_sample_bins.at(sam);
+    const std::vector<GeneralizedFitBin> & sampleBinning = m_sample_bins.at(sampleIndex_);
 
-    for(int i = 0; i < temp_bins.size(); ++i)
-    {
-        if(D1 >= temp_bins[i].D1low && D1 < temp_bins[i].D1high &&
-           D2 >= temp_bins[i].D2low && D2 < temp_bins[i].D2high)
-        {
-            bin = i;
-            break;
+    for( size_t iBin = 0 ; iBin < sampleBinning.size() ; iBin++ ){
+        if( sampleBinning[iBin].isInBin(eventVarList_) ){
+            return iBin;
         }
     }
-    return bin;
+    return BADBIN;
 }
 
-void DetParameters::InitEventMap(std::vector<AnaSample*>& sample, int mode)
+void DetParameters::InitEventMap(std::vector<AnaSample*>& samplesList, int mode)
 {
     InitParameters();
     m_evmap.clear();
@@ -74,28 +65,40 @@ void DetParameters::InitEventMap(std::vector<AnaSample*>& sample, int mode)
     if(mode == 2)
         std::cout << TAG << "Not using detector reweighting." << std::endl;
 
-    for(std::size_t s = 0; s < sample.size(); ++s)
+    for(auto & sample : samplesList)
     {
         std::vector<int> sample_map;
-        for(int i = 0; i < sample[s]->GetN(); ++i)
+        for(int iEvent = 0; iEvent < sample->GetN(); ++iEvent)
         {
-            AnaEvent* ev = sample[s]->GetEvent(i);
-            double D1 = ev->GetRecoD1();
-            double D2 = ev->GetRecoD2();
-            int bin   = GetBinIndex(sample[s]->GetSampleID(), D1, D2);
+            AnaEvent* ev = sample->GetEvent(iEvent);
+
+            std::vector<double> eventVarBuffer(sample->GetFitPhaseSpace().size(),0);
+            for( size_t iVar = 0 ; iVar < sample->GetFitPhaseSpace().size() ; iVar++ ){
+                eventVarBuffer[iVar] = double(ev->GetEventVarFloat(sample->GetFitPhaseSpace()[iVar]));
+            }
+            int bin   = GetBinIndex(sample->GetSampleID(), eventVarBuffer);
+
 #ifndef NDEBUG
             if(bin == BADBIN)
             {
-                std::cout << WAR << m_name << ", Event: " << i << std::endl
-                          << WAR << "D1 = " << D1 << ", D2 = " << D2 << ", falls outside bin ranges." << std::endl
-                          << WAR << "This event will be ignored in the analysis." << std::endl;
+                std::cout << WAR << m_name << ", Event: " << iEvent << std::endl;
+                std::cout << WAR;
+                for( size_t iVar = 0 ; iVar < sample->GetFitPhaseSpace().size() ; iVar++ ){
+                    if( iVar != 0 ) std::cout << ", ";
+                    std::cout << sample->GetFitPhaseSpace()[iVar] << " = " << eventVarBuffer[iVar];
+                }
+                std::cout << ", falls outside bin ranges." << std::endl;
+                std::cout << WAR << "This event will be ignored in the analysis." << std::endl;
             }
 #endif
             // If event is signal let the c_i params handle the reweighting:
-            if(mode == 1 && ev->isSignalEvent())
+            if(mode == 1 and ev->isSignalEvent() ){
                 bin = PASSEVENT;
-            else if(mode == 2)
+            }
+            else if(mode == 2){
                 bin = PASSEVENT;
+            }
+
             sample_map.push_back(bin);
         }
         m_evmap.push_back(sample_map);
@@ -150,7 +153,7 @@ void DetParameters::InitParameters()
         const int nbins = m_sample_bins.at(sam).size();
         for(int i = 0; i < nbins; ++i)
         {
-            pars_name.push_back(Form("%s_sam%d_%d", m_name.c_str(), sam, i));
+            pars_name.emplace_back(Form("%s_sam%d_%d", m_name.c_str(), sam, i));
             pars_prior.push_back(1.0);
             pars_step.push_back(0.05);
             pars_limlow.push_back(0.0);
@@ -174,7 +177,7 @@ void DetParameters::InitParameters()
 
         int idx = eigen_decomp -> GetInfoFraction(m_info_frac);
         if(idx > Npar - m_nb_dropped_dof){
-            idx = Npar - m_nb_dropped_dof;
+            idx = int(Npar) - m_nb_dropped_dof;
         }
         for(int i = idx; i < Npar; ++i)
             pars_fixed[i] = true;
@@ -205,8 +208,8 @@ void DetParameters::AddDetector(const std::string& det, std::vector<AnaSample*>&
             m_sample_bins.emplace(std::make_pair(sample_id, sample->GetBinEdges()));
         else
         {
-            std::vector<FitBin> temp_vector;
-            if(SetBinning(sample->GetDetBinning(), temp_vector))
+            std::vector<GeneralizedFitBin> temp_vector;
+            if(SetBinning(sample, temp_vector))
             {
                 m_sample_bins.emplace(std::make_pair(sample_id, temp_vector));
             }

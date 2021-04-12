@@ -19,8 +19,8 @@
 #include "AnaEvent.hh"
 #include "ColorOutput.hh"
 #include "FitStructs.hh"
+#include "GeneralizedFitBin.h"
 #include "Likelihoods.hh"
-using xsllh::FitBin;
 
 enum DataType
 {
@@ -36,8 +36,8 @@ class AnaSample
 
 public:
 
-    AnaSample(int sample_id, const std::string& name, const std::string& detector,
-              const std::string& binning, TTree* t_data);
+    AnaSample(int sample_id, std::string  name, std::string  detector,
+              std::string  binning, TTree* t_data);
     AnaSample(const SampleOpt& sample, TTree* t_data);
     ~AnaSample();
 
@@ -66,8 +66,9 @@ public:
     // Function to map the Highland topology codes to consecutive integers:
     void SetTopologyHLCode(const std::vector<int>& HLTopologyCodes);
 
-    int GetBinIndex(const double D1, const double D2) const;
-    std::vector<FitBin> GetBinEdges() const { return m_bin_edges; }
+    int GetBinIndex(const std::vector<double>& eventVarList_) const;
+    int GetBinIndex(AnaEvent* event_) const;
+    std::vector<GeneralizedFitBin> GetBinEdges() const { return m_bin_edges; }
 
     void SetLLHFunction(const std::string& func_name);
     void SetDataType(DataType dataType_);
@@ -100,6 +101,7 @@ public:
     std::vector<AnaEvent>& GetMcEvents() { return m_mc_events; }
     size_t GetNbMcEvents() { return m_mc_events.size(); }
     std::vector<AnaEvent>& GetDataEvents() { return m_data_events; }
+    const std::vector<std::string>& GetFitPhaseSpace() const { return m_fit_phase_space; }
 
     // Return the const ref to avoid external modifications
     const TH1D& GetPredHisto() const { return *m_hpred; }
@@ -118,24 +120,25 @@ protected:
     DataType m_hdata_type;
 
     int m_sample_id;
-    int m_nbins;
+    int m_nbins{};
     double m_norm;
 
     std::string m_name;
     std::string m_detector;
     std::string m_binning;
     std::string m_additional_cuts;
-    double m_data_POT;
-    double m_mc_POT;
+    std::vector<std::string> m_fit_phase_space;
+    double m_data_POT{};
+    double m_mc_POT{};
     std::vector<AnaEvent> m_mc_events;
     std::vector<AnaEvent> m_mc_events_snap;
     std::vector<AnaEvent> m_data_events;
-    std::vector<FitBin> m_bin_edges;
+    std::vector<GeneralizedFitBin> m_bin_edges;
 
     // Mapping between Highland topology codes and consecutive integers
     std::map<int, int> topology_HL_code;
 
-    CalcLLHFunc* m_llh;
+    CalcLLHFunc* m_llh{};
 
     TTree* m_data_tree;
 
@@ -148,17 +151,17 @@ protected:
     TH1D* m_hdata;
     TH1D* m_hsig;
 
-    TTreeFormula* m_additional_cuts_formulae;
+    TTreeFormula* m_additional_cuts_formulae{};
 
     const std::string TAG = color::GREEN_STR + "[AnaSample]: " + color::RESET_STR;
     const std::string ERR = color::RED_STR + "[ERROR]: " + color::RESET_STR;
 
     std::vector<std::vector<TH1D*>> _histThreadHandlersSnap_;
-    TH1D* m_hmc_true_snap;
-    TH1D* m_hmc_snap;
-    TH1D* m_hpred_snap;
-    TH1D* m_hdata_snap;
-    TH1D* m_hsig_snap;
+    TH1D* m_hmc_true_snap{};
+    TH1D* m_hmc_snap{};
+    TH1D* m_hpred_snap{};
+    TH1D* m_hdata_snap{};
+    TH1D* m_hsig_snap{};
 
 
 

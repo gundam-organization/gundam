@@ -1,3 +1,5 @@
+#include <utility>
+
 #include "AnaSample.hh"
 #include "GlobalVariables.h"
 #include "Logger.h"
@@ -8,12 +10,12 @@
 using xsllh::FitBin;
 
 // ctor
-AnaSample::AnaSample(int sample_id, const std::string& name, const std::string& detector,
-                     const std::string& binning, TTree* t_data)
+AnaSample::AnaSample(int sample_id, std::string  name, std::string  detector,
+                     std::string  binning, TTree* t_data)
     : m_sample_id(sample_id)
-    , m_name(name)
-    , m_detector(detector)
-    , m_binning(binning)
+    , m_name(std::move(name))
+    , m_detector(std::move(detector))
+    , m_binning(std::move(binning))
     , m_data_tree(t_data)
     , m_norm(1.0)
 {
@@ -34,6 +36,7 @@ AnaSample::AnaSample(const SampleOpt& sample, TTree* t_data){
     m_detector = sample.detector;
     m_binning = sample.binning;
     m_additional_cuts = sample.additional_cuts;
+    m_fit_phase_space = sample.fit_phase_space;
     m_data_POT = sample.data_POT;
     m_mc_POT = sample.mc_POT;
     m_norm = 1.0;
@@ -72,12 +75,6 @@ void AnaSample::Reset() {
              << "Detector: " << m_detector << std::endl
              << "Bin edges: " << std::endl;
 
-//    for(const auto& bin : m_bin_edges)
-//    {
-//        std::cout << bin.D2low << " " << bin.D2high << " " << bin.D1low << " " << bin.D1high
-//                  << std::endl;
-//    }
-
     m_llh = new PoissonLLH;
 
     MakeHistos(); // with default binning
@@ -112,15 +109,27 @@ void AnaSample::SetBinning(const std::string& binning)
         while(std::getline(fin, line))
         {
             std::stringstream ss(line);
-            double D1_1, D1_2, D2_1, D2_2;
-            if(!(ss >> D2_1 >> D2_2 >> D1_1 >> D1_2))
-            {
-                LogError << "Bad line format: " << line << std::endl;
+            std::vector<double> lowEdges;
+            std::vector<double> highEdges;
+
+            double lowEdge, highEdge;
+            while( ss >> lowEdge >> highEdge ){
+                lowEdges.emplace_back( lowEdge );
+                highEdges.emplace_back( highEdge );
+            }
+
+            if( m_fit_phase_space.size() != lowEdges.size() ){
+                LogWarning << "Bad bin: \"" << line << "\"" << std::endl;
                 continue;
             }
-            m_bin_edges.emplace_back(FitBin(D1_1, D1_2, D2_1, D2_2));
+
+            m_bin_edges.emplace_back(GeneralizedFitBin(lowEdges, highEdges));
         }
         m_nbins = m_bin_edges.size();
+        if( m_nbins == 0 ){
+            LogError << "No bin has been defined for the sample \"" << m_name << "\"." << std::endl;
+            throw std::runtime_error("No bin has been defined for the sample.");
+        }
     }
 }
 
@@ -176,7 +185,7 @@ void AnaSample::ResetWeights()
 
 void AnaSample::PrintStats() const
 {
-    double mem_kb = sizeof(m_mc_events) * m_mc_events.size() / 1000.0;
+    double mem_kb = double(sizeof(m_mc_events) * m_mc_events.size()) / 1000.0;
     LogInfo << "Sample " << m_name << " ID = " << m_sample_id << std::endl;
     LogInfo << "Num of events = " << m_mc_events.size() << std::endl;
     LogInfo << "Memory used   = " << mem_kb << " kB." << std::endl;
@@ -240,17 +249,27 @@ void AnaSample::SetData(TObject* hdata)
     m_hdata->SetDirectory(nullptr);
 }
 
-int AnaSample::GetBinIndex(const double D1, const double D2) const
+int AnaSample::GetBinIndex(const std::vector<double>& eventVarList_) const
 {
-    for(int i = 0; i < m_bin_edges.size(); ++i)
-    {
-        if(D1 >= m_bin_edges[i].D1low && D1 < m_bin_edges[i].D1high && D2 >= m_bin_edges[i].D2low
-           && D2 < m_bin_edges[i].D2high)
-        {
-            return i;
+    if( eventVarList_.size() !=  m_fit_phase_space.size() ){
+        LogError << "The size of the event var list does not match the dimension of the fit binning." << std::endl;
+        throw std::logic_error("The size of the event var list does not match the dimension of the fit binning.");
+    }
+
+    for( size_t iBin = 0 ; iBin < m_bin_edges.size() ; iBin++ ){
+        if( m_bin_edges.at(iBin).isInBin(eventVarList_) ){
+            return iBin;
         }
     }
     return -1;
+}
+int AnaSample::GetBinIndex(AnaEvent* event_) const
+{
+    std::vector<double> eventVarBuffer(m_fit_phase_space.size(),0);
+    for( size_t iVar = 0 ; iVar < m_fit_phase_space.size() ; iVar++ ){
+        eventVarBuffer[iVar] = double(event_->GetEventVarFloat(m_fit_phase_space[iVar]));
+    }
+    return GetBinIndex(eventVarBuffer);
 }
 
 void AnaSample::FillEventHist(int datatype, bool stat_fluc){
@@ -301,10 +320,7 @@ void AnaSample::FillEventHist(DataType datatype, bool stat_fluc){
 
         int kinematicBinIndex;
         for( size_t iEvent = 0 ; iEvent < m_data_events.size() ; iEvent++ ){
-            kinematicBinIndex = this->GetBinIndex(
-                m_data_events[iEvent].GetRecoD1(), m_data_events[iEvent].GetRecoD2()
-            );
-
+            kinematicBinIndex = this->GetBinIndex( &m_data_events[iEvent] );
             if(kinematicBinIndex != -1) {
                 m_hdata->Fill(kinematicBinIndex + 0.5, m_data_events[iEvent].GetEvWght());
             }
@@ -380,22 +396,15 @@ void AnaSample::FillMcHistograms(int iThread_){
 
         // Wait if another thread is editing the binning
         while(anaEventPtr->GetIsBeingEdited());
+        anaEventPtr->SetIsBeingEdited(true);
         if(anaEventPtr->GetTrueBinIndex() == -1){
-            anaEventPtr->SetIsBeingEdited(true);
-            anaEventPtr->SetTrueBinIndex(
-                this->GetBinIndex(anaEventPtr->GetTrueD1(), anaEventPtr->GetTrueD2())
-                );
-            anaEventPtr->SetIsBeingEdited(false);
+            anaEventPtr->SetTrueBinIndex(this->GetBinIndex(anaEventPtr) );
         }
-        // Wait if another thread is editing the binning
-        while(anaEventPtr->GetIsBeingEdited());
         if(anaEventPtr->GetRecoBinIndex() == -1){
-            anaEventPtr->SetIsBeingEdited(true);
-            anaEventPtr->SetRecoBinIndex(
-                this->GetBinIndex(anaEventPtr->GetRecoD1(), anaEventPtr->GetRecoD2())
-                );
-            anaEventPtr->SetIsBeingEdited(false);
+            anaEventPtr->SetRecoBinIndex(this->GetBinIndex(anaEventPtr) );
+
         }
+        anaEventPtr->SetIsBeingEdited(false);
 
         if(anaEventPtr->GetEvWght() != anaEventPtr->GetEvWght()){
             GlobalVariables::getThreadMutex().lock();
@@ -626,31 +635,13 @@ double AnaSample::CalcLLH() const
     double chi2 = 0.;
 
     // Loop over all bins:
-//    std::vector<unsigned int> invalidBins;
     double buff;
     for(unsigned int i = 1; i <= nbins; ++i)
     {
         // Compute chi2 contribution from current bin (done in Likelihoods.hh):
         buff = (*m_llh)(exp_w[i], exp_w2[i], data[i]);
-//        if(buff != 0){
-//            invalidBins.emplace_back(i);
-//        }
         chi2 += buff;
     }
-
-//    if(not invalidBins.empty()){
-//        for( size_t iBin = 0 ; iBin < invalidBins.size() ; iBin++ ){
-//            LogError << invalidBins[iBin]
-//                     << "( D1<" << m_bin_edges[invalidBins[iBin]-1].D1low
-//                     << ", " << m_bin_edges[invalidBins[iBin]-1].D1high << "> "
-//                     << " D2<" << m_bin_edges[invalidBins[iBin]-1].D2low
-//                     << ", " << m_bin_edges[invalidBins[iBin]-1].D2high << "> )"
-//                     << ": " << exp_w[invalidBins[iBin]] << " - " << data[invalidBins[iBin]]
-//                     << " = " << exp_w[invalidBins[iBin]] - data[invalidBins[iBin]]
-//                     << std::endl;
-//        }
-//        exit(EXIT_FAILURE);
-//    }
 
     // Sum of the chi2 contributions for each bin is returned:
     return chi2;
@@ -796,8 +787,8 @@ void AnaSample::GetSampleBreakdown(TDirectory* dirout, const std::string& tag,
         int evt_topology = m_mc_events[i].GetTopology();
 
         compos[evt_topology]++;
-        int anybin_index_rec  = GetBinIndex(D1_rec, D2_rec);
-        int anybin_index_true = GetBinIndex(D1_true, D2_true);
+        int anybin_index_rec  = GetBinIndex(&m_mc_events[i]);
+        int anybin_index_true = GetBinIndex(&m_mc_events[i]);
 
         // Fill histogram for this topolgy with the current event:
         hAnybin_rec[topology_HL_code[evt_topology]].Fill(anybin_index_rec + 0.5, wght);

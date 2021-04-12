@@ -1,5 +1,5 @@
-#ifndef __DetParameters_hh__
-#define __DetParameters_hh__
+#ifndef XSLLHFITTER_DETPARAMETERS_HH
+#define XSLLHFITTER_DETPARAMETERS_HH
 
 #include <iomanip>
 #include <iostream>
@@ -7,26 +7,27 @@
 
 #include "AnaFitParameters.hh"
 #include "FitStructs.hh"
+#include "GeneralizedFitBin.h"
 
 class DetParameters : public AnaFitParameters
 {
 public:
-    DetParameters(const std::string& name);
-    ~DetParameters();
+    explicit DetParameters(const std::string& name);
+    ~DetParameters() override;
 
-    void InitParameters();
-    void InitEventMap(std::vector<AnaSample*>& sample, int mode);
-    int GetBinIndex(const int sam, double D1, double D2) const;
-    void ReWeight(AnaEvent* event, const std::string& det, int nsample, int nevent, std::vector<double>& params);
-    bool SetBinning(const std::string& file_name, std::vector<xsllh::FitBin>& bins);
+    void InitParameters() override;
+    void InitEventMap(std::vector<AnaSample*>& samplesList, int mode) override;
+    int GetBinIndex(int sampleIndex_, const std::vector<double>& eventVarList_) const;
+    void ReWeight(AnaEvent* event, const std::string& det, int nsample, int nevent, std::vector<double>& params) override;
+    bool SetBinning(AnaSample* sample_, std::vector<GeneralizedFitBin>& bins);
     void AddDetector(const std::string& det, std::vector<AnaSample*>& v_sample, bool match_bins);
 
 private:
-    std::map<int, std::vector<xsllh::FitBin>> m_sample_bins;
+    std::map<int, std::vector<GeneralizedFitBin>> m_sample_bins;
     std::map<int, int> m_sample_offset;
     std::vector<int> v_samples;
 
     const std::string TAG = color::GREEN_STR + "[DetParameters]: " + color::RESET_STR;
 };
 
-#endif
+#endif // XSLLHFITTER_DETPARAMETERS_HH

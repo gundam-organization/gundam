@@ -127,7 +127,7 @@ bool OptParser::ParseJSON(std::string json_file)
         sampleFile.close();
     }
 
-    if( j["samples"].empty() ){
+    if( j["samples"].empty() ) {
         LogError << "No samples have been defined." << std::endl;
         throw std::logic_error("No samples have been defined.");
     }
@@ -144,6 +144,8 @@ bool OptParser::ParseJSON(std::string json_file)
         if(sample.find("additional_cuts") != sample.end()) s.additional_cuts = sample["additional_cuts"].get<std::string>();
         if(sample.find("data_POT") != sample.end()) s.data_POT = sample["data_POT"].get<double>();
         if(sample.find("mc_POT") != sample.end()) s.mc_POT = sample["mc_POT"].get<double>();
+        s.fit_phase_space = {"D2Reco", "D1Reco"};
+        if(sample.find("fit_phase_space") != sample.end()) s.fit_phase_space = sample["fit_phase_space"].get<std::vector<std::string>>();
         samples.push_back(s);
     }
 

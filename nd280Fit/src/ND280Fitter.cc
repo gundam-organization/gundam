@@ -349,9 +349,9 @@ void ND280Fitter::MakeOneSigmaChecks(){
         std::vector<double> D1binning;
         auto bins = anaSample->GetBinEdges();
         for(const auto& bin : bins){
-            if(D1binning.empty()) D1binning.emplace_back(bin.D1low);
-            if(not GenericToolbox::doesElementIsInVector(bin.D1high, D1binning)){
-                D1binning.emplace_back(bin.D1high);
+            if( D1binning.empty() ) D1binning.emplace_back(bin.getBinLowEdge(1));
+            if(not GenericToolbox::doesElementIsInVector(bin.getBinHighEdge(1), D1binning)){
+                D1binning.emplace_back(bin.getBinHighEdge(1));
             }
         }
         std::sort(D1binning.begin(), D1binning.end());
@@ -1002,9 +1002,9 @@ void ND280Fitter::WriteSamplePlots(TDirectory* outputDir_) {
         std::vector<double> D1binning;
         auto bins = anaSample->GetBinEdges();
         for(const auto& bin : bins){
-            if(D1binning.empty()) D1binning.emplace_back(bin.D1low);
-            if(not GenericToolbox::doesElementIsInVector(bin.D1high, D1binning)){
-                D1binning.emplace_back(bin.D1high);
+            if(D1binning.empty()) D1binning.emplace_back(bin.getBinLowEdge(1));
+            if(not GenericToolbox::doesElementIsInVector(bin.getBinHighEdge(1), D1binning)){
+                D1binning.emplace_back(bin.getBinHighEdge(1));
             }
         }
         std::sort(D1binning.begin(), D1binning.end());
@@ -1021,9 +1021,9 @@ void ND280Fitter::WriteSamplePlots(TDirectory* outputDir_) {
         isSimpleBinning = true;
         std::vector<double> D2binning;
         for(const auto& bin : bins){
-            if(D2binning.empty()) D2binning.emplace_back(bin.D2low);
-            if(not GenericToolbox::doesElementIsInVector(bin.D2high, D2binning)){
-                D2binning.emplace_back(bin.D2high);
+            if(D2binning.empty()) D2binning.emplace_back(bin.getBinLowEdge(0));
+            if(not GenericToolbox::doesElementIsInVector(bin.getBinHighEdge(0), D2binning)){
+                D2binning.emplace_back(bin.getBinHighEdge(0));
             }
         }
         std::sort(D2binning.begin(), D2binning.end());

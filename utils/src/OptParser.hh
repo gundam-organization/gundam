@@ -16,14 +16,15 @@ using json = nlohmann::json;
 
 struct SampleOpt
 {
-    int cut_branch;
     bool use_sample;
+    int cut_branch;
+    double data_POT;
+    double mc_POT;
     std::string name;
     std::string detector;
     std::string binning;
     std::string additional_cuts;
-    double data_POT;
-    double mc_POT;
+    std::vector<std::string> fit_phase_space;
 };
 
 struct SignalDef
