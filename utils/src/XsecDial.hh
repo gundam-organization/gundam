@@ -60,6 +60,13 @@ struct SplineBin {
         out << "bin_" << kinematicBin;
         return out.str();
     }
+    int getSplitVarValue(const std::string& varName_){
+        for( int iSplitVar = 0 ; iSplitVar < int(splitVarNameList.size()) ; iSplitVar++ ){
+            if( splitVarNameList[iSplitVar] == varName_ ) return splitVarValueList[iSplitVar];
+        }
+        throw std::logic_error("NOT FOUND");
+        return -1;
+    }
     void addSplitVar(std::string splitVarName_, int splitValue_){
         splitVarNameList.emplace_back(splitVarName_);
         splitVarValueList.emplace_back(splitValue_);

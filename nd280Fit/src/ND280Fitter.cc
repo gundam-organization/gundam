@@ -944,7 +944,7 @@ void ND280Fitter::WriteSamplePlots(TDirectory* outputDir_) {
 
     // Select which canvas to plot
     std::vector<std::string> canvasSubFolderList;
-    canvasSubFolderList.emplace_back("Raw");
+    canvasSubFolderList.emplace_back("Raw"); // special case
     canvasSubFolderList.emplace_back("Raw/reactions");
     canvasSubFolderList.emplace_back("D1");             // varToPlot
     canvasSubFolderList.emplace_back("D1/reactions");   // varToPlot/splitHist
