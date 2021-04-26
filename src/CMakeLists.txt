@@ -1,3 +1,14 @@
+#xsllhDetCovGenerator
+add_executable(xsllhDetCovGenerator xsllhDetCovGenerator.cxx)
+
+set_target_properties(xsllhDetCovGenerator PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
+
+foreach(mod ${MODULES})
+    target_include_directories(xsllhDetCovGenerator PUBLIC ${CMAKE_SOURCE_DIR}/${mod}/src)
+    target_include_directories(xsllhDetCovGenerator PUBLIC ${CMAKE_SOURCE_DIR}/include)
+endforeach()
+
+
 #xsllhCalcXsec
 add_executable(xsllhCalcXsec xsllhCalcXsec.cxx)
 

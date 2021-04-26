@@ -164,7 +164,7 @@ int main(int argc, char** argv)
 
     // .json config file that will be parsed from the command line:
     std::string json_file;
-    std::string sampleDefConfigFilePath;
+    std::string sampleDefFile;
     int rebin_factor = 1;
 
     for(int iArg = 0 ; iArg < argc ; iArg++){
@@ -172,6 +172,16 @@ int main(int argc, char** argv)
             int jArg = iArg + 1;
             if (jArg < argc) {
                 json_file = std::string(argv[jArg]);
+            }
+            else {
+                LogError << "Give an argument after " << argv[iArg] << std::endl;
+                throw std::logic_error(std::string(argv[iArg]) + " : no argument found");
+            }
+        }
+        else if(std::string(argv[iArg]) == "-s"){
+            int jArg = iArg + 1;
+            if (jArg < argc) {
+                sampleDefFile = std::string(argv[jArg]);
             }
             else {
                 LogError << "Give an argument after " << argv[iArg] << std::endl;
@@ -237,10 +247,13 @@ int main(int argc, char** argv)
     // Number of samples:
     unsigned int num_cov_samples;
 
-    if(j.find("sample_definition_config") != j.end()) sampleDefConfigFilePath = j["sample_definition_config"].get<std::string>();
+    if( sampleDefFile.empty() and j.find("sample_definition_config") != j.end()){
+        sampleDefFile = j["sample_definition_config"].get<std::string>();
+    }
 
 
-    if(not sampleDefConfigFilePath.empty()){
+
+    if( not sampleDefFile.empty() ){
 
         if(j.find("sample_cuts") != j.end()){
             sampleCuts = j["sample_cuts"].get<std::vector<int>>();
@@ -266,10 +279,10 @@ int main(int argc, char** argv)
             LogWarning; GenericToolbox::printVector(sampleRebin);
         }
 
-        std::string input_dir = GenericToolbox::getFolderPathFromFilePath(sampleDefConfigFilePath) + "/";
+        std::string input_dir = GenericToolbox::getFolderPathFromFilePath(sampleDefFile) + "/";
         std::fstream configSampleDefinitionStream;
 
-        configSampleDefinitionStream.open(sampleDefConfigFilePath, std::ios::in);
+        configSampleDefinitionStream.open(sampleDefFile, std::ios::in);
         LogInfo << "Opening " << json_file << std::endl;
         if(not configSampleDefinitionStream.is_open())
         {
@@ -303,7 +316,7 @@ int main(int argc, char** argv)
 
             LogWarning << "Added sample: \"" << sampleList.back().name << "\"";
 
-            if(not sampleList.back().additional_cuts.empty()){
+            if( not sampleList.back().additional_cuts.empty() ){
                 LogWarning << "-> \"" << sampleList.back().additional_cuts << "\"";
                 cutFormulaList.back() = new TTreeFormula(
                     Form("additional_cuts_%i", int(cutFormulaList.size())),
@@ -325,7 +338,7 @@ int main(int argc, char** argv)
             cov_bin_manager.back().Print();
         }
     }
-    else{
+    else {
         // temp_cov_binning holds the binning text files for the different samples:
         std::map<std::string, std::string> temp_cov_binning = j["cov_sample_binning"];
 
@@ -394,7 +407,7 @@ int main(int argc, char** argv)
                     f_opt.num_samples = json_input_file["num_samples"];
                     f_opt.cuts        = json_input_file["cuts"].get<std::vector<int>>();
 
-                    if(not sampleDefConfigFilePath.empty()){
+                    if(not sampleDefFile.empty()){
                         for(size_t iSample = 0 ; iSample < sampleList.size() ; iSample++){
                             f_opt.samples.emplace(std::make_pair(iSample, sampleList[iSample].cut_branch));
                         }
@@ -410,7 +423,7 @@ int main(int argc, char** argv)
                             const int sam = std::stoi(kv.first);
 
                             // If the number of the current sample is less than or equal to the total number of samples, we add an entry to the samples map of the FileOptions struct f (this is a map between sample number and a vector containing the selection branch numbers of the Highland ROOT file):
-                            if(not sampleDefConfigFilePath.empty() and sam <= num_cov_samples)
+                            if(not sampleDefFile.empty() and sam <= num_cov_samples)
                                 f_opt.samples.emplace(std::make_pair(sam, kv.second));
 
                                 // If the nuber of the current sample is greater than the total number of samples, an error is thrown:
@@ -468,7 +481,7 @@ int main(int argc, char** argv)
                 if(json_input_file.find("cuts")         != json_input_file.end())
                     f_opt.cuts        = json_input_file["cuts"].get<std::vector<int>>();
 
-                if(not sampleDefConfigFilePath.empty()){
+                if(not sampleDefFile.empty()){
                     for(size_t iSample = 0 ; iSample < sampleList.size() ; iSample++){
                         f_opt.samples[iSample] = {sampleCuts[iSample]};
                     }
