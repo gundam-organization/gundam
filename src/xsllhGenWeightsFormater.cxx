@@ -740,7 +740,7 @@ void readGenWeightsFiles(){
 
         for( auto & systName : __listSystematicXsecSplineNames__){
 
-          // ROUGH PATCH
+          // ROUGH PATCHES
           if( systName == "MAQE" and __splineBinHandler__.getSplitVarValue("reaction") != 0 ){
             continue;
           }

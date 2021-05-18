@@ -27,8 +27,8 @@ class BinManager
         std::vector<double> GetBinVector(const double d) const;
         std::vector<std::vector<int>>& GetBinNuTypeList() { return bin_nutype; };
         std::vector<std::vector<int>>& GetBinBeamModeList() { return bin_beammode; };
-        std::vector<std::vector<std::pair<double, double>>> GetEdgeVector() const { return bin_edges; };
-        std::vector<std::pair<double, double>> GetEdgeVector(const int d) const { return bin_edges.at(d); };
+        std::vector<std::vector<std::pair<double, double>>> GetEdgeVector() const { return binList; };
+        std::vector<std::pair<double, double>> GetEdgeVector(const int d) const { return binList.at(d); };
         void Print() const;
         void MergeBins(unsigned int groupSize_, int dimIndexToRebin_ = -1);
 
@@ -39,7 +39,7 @@ class BinManager
         unsigned int nbins;
         unsigned int dimension;
         std::string fname_binning;
-        std::vector<std::vector<std::pair<double, double>>> bin_edges;
+        std::vector<std::vector<std::pair<double, double>>> binList;
         std::vector<std::vector<int>> bin_nutype;
         std::vector<std::vector<int>> bin_beammode;
 };

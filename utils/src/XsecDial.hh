@@ -140,7 +140,6 @@ public:
     std::map<std::string, std::vector<int>>* GetApplyOnlyOnMapPtr() { return &_applyOnlyOnMap_; };
     std::map<std::string, std::vector<int>>* GetDontApplyOnMapPtr() { return &_dontApplyOnMap_; };
     const std::string& GetApplyCondition() const;
-    TTreeFormula* GetApplyConditionFormulae() const;
     std::vector<TTreeFormula*>& getApplyConditionFormulaeList();
 
     std::vector<TSpline3*>& GetSplinePtrList(){ return _splinePtrList_; }

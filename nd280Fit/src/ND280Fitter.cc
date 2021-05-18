@@ -1333,7 +1333,6 @@ void ND280Fitter::InitializeThreadsParameters(){
         std::function<void(int)> asyncLoop = [this](int iThread_){
             while(not _stopThreads_){
                 // Pending state loop
-//                std::this_thread::sleep_for(std::chrono::microseconds(33)); // 30,000 fps cap
 
                 if(_triggerReweightThreads_.at(iThread_)){
                     this->ReWeightEvents(iThread_);
