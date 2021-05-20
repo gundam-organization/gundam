@@ -157,21 +157,24 @@ endif()
 #                            Specify Target Subdirs
 ################################################################################
 
+
+include_directories(include)
+
 set(MODULES
-  errprop
-  anaevents
-  fitparam
-  xsecfit
-  nd280Fit
-  utils
+        errprop
+        anaevents
+        fitparam
+        xsecfit
+        nd280Fit
+        utils
   )
 set(MODULETargets "")
 foreach(mod ${MODULES})
-  cmessage (STATUS "Configuring directory: ${mod}/src")
-  add_subdirectory(${mod}/src)
+  cmessage (STATUS "Configuring directory: src/${mod}")
+  add_subdirectory(src/${mod}/src)
 endforeach()
 
-add_subdirectory(src)
+add_subdirectory(src/applications)
 
 configure_file(cmake/build_setup.sh.in
   "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/setup.sh" @ONLY)
