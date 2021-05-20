@@ -157,21 +157,27 @@ endif()
 #                            Specify Target Subdirs
 ################################################################################
 
-
-include_directories(include)
-
-set(MODULES
+set( MODULES
         errprop
         anaevents
         fitparam
-        xsecfit
-        nd280Fit
+        fitter
         utils
-  )
-set(MODULETargets "")
+)
+#set(MODULETargets "")
+
+cmessage (STATUS "Setting up include directories...")
+include_directories( ${CMAKE_SOURCE_DIR}/include )
 foreach(mod ${MODULES})
-  cmessage (STATUS "Configuring directory: src/${mod}")
-  add_subdirectory(src/${mod})
+    cmessage (STATUS "Including headers from of ${mod}")
+    include_directories( ${CMAKE_SOURCE_DIR}/src/${mod}/include )
+endforeach()
+
+
+cmessage (STATUS "Configuring modules...")
+foreach(mod ${MODULES})
+    cmessage (STATUS "Configuring directory: src/${mod}")
+    add_subdirectory( src/${mod} )
 endforeach()
 
 add_subdirectory(src/applications)

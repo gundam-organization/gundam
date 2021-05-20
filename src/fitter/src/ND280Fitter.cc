@@ -5,7 +5,7 @@
 #include <TCanvas.h>
 #include <THStack.h>
 #include <iostream>
-#include "../../utils/include/GlobalVariables.h"
+#include "GlobalVariables.h"
 
 #define FIT_IT_TIME_POINT 10
 #define REWEIGHT_TIME_POINT 11

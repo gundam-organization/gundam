@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#include "../../utils/include/OptParser.hh"
+#include "OptParser.hh"
 #include <TDirectory.h>
 #include <TH1D.h>
 #include <TH2D.h>
@@ -19,7 +19,7 @@
 #include "AnaEvent.hh"
 #include "ColorOutput.hh"
 #include "FitStructs.hh"
-#include "../../utils/include/GeneralizedFitBin.h"
+#include "GeneralizedFitBin.h"
 #include "Likelihoods.hh"
 
 enum DataType

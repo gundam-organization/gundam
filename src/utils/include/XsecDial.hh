@@ -21,7 +21,7 @@
 #include "GenericToolbox.h"
 
 // This Project
-#include "../../anaevents/include/AnaEvent.hh"
+#include "AnaEvent.hh"
 #include "BinManager.hh"
 #include "ColorOutput.hh"
 #include "GlobalVariables.h"

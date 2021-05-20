@@ -24,10 +24,10 @@
 #include "Math/Functor.h"
 #include "Math/Minimizer.h"
 
-#include "../../fitparam/include/AnaFitParameters.hh"
-#include "../../anaevents/include/AnaSample.hh"
+#include "AnaFitParameters.hh"
+#include "AnaSample.hh"
 #include "ColorOutput.hh"
-#include "../../utils/include/OptParser.hh"
+#include "OptParser.hh"
 
 
 class ND280Fitter {

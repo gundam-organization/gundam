@@ -6,7 +6,7 @@
 #include "Logger.h"
 #include "TTreeFormula.h"
 #include <future>
-#include "../../utils/include/GlobalVariables.h"
+#include "GlobalVariables.h"
 
 AnaTreeMC::AnaTreeMC(const std::string& file_name, const std::string& tree_name, bool extra_var)
     : read_extra_var(extra_var)

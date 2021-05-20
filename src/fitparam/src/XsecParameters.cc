@@ -2,7 +2,7 @@
 #include "GenericToolbox.h"
 #include "Logger.h"
 #include <future>
-#include "../../utils/include/GlobalVariables.h"
+#include "GlobalVariables.h"
 
 XsecParameters::XsecParameters(const std::string& name)
 {

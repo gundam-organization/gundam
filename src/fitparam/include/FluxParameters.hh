@@ -2,7 +2,7 @@
 #define __FluxParameters_hh__
 
 #include "AnaFitParameters.hh"
-#include "../../utils/include/BinManager.hh"
+#include "BinManager.hh"
 
 class FluxParameters : public AnaFitParameters
 {

@@ -11,7 +11,7 @@
 #include <TGraph.h>
 
 #include "AnaFitParameters.hh"
-#include "../../utils/include/XsecDial.hh"
+#include "XsecDial.hh"
 
 #include "json.hpp"
 using json = nlohmann::json;

@@ -11,10 +11,10 @@
 #include <TMatrixTSym.h>
 using TMatrixDSym = TMatrixTSym<double>;
 
-#include "../../anaevents/include/AnaSample.hh"
+#include "AnaSample.hh"
 #include "ColorOutput.hh"
-#include "../../utils/include/EigenDecomp.hh"
-#include "../../utils/include/ToyThrower.hh"
+#include "EigenDecomp.hh"
+#include "ToyThrower.hh"
 
 // some error codes
 const int PASSEVENT = -1;

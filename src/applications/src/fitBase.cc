@@ -18,8 +18,8 @@ parameters defined in /fitparams/src/FitParameters
 #include <TCanvas.h>
 #include <TH1F.h>
 
-#include "../../fitparam/include/FitParameters.hh"
-#include "../../xsecfit/include/XsecFitter.hh"
+#include "FitParameters.hh"
+#include "../../fitter/include/XsecFitter.hh"
 #include "anyTreeMC.hh"
 #include "AnySample.hh"
 

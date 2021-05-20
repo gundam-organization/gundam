@@ -17,7 +17,7 @@
 #include "AnaSample.hh"
 #include "ColorOutput.hh"
 #include "ProgressBar.hh"
-#include "../../utils/include/OptParser.hh"
+#include "OptParser.hh"
 
 class AnaTreeMC
 {

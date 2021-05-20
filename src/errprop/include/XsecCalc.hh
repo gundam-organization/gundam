@@ -17,12 +17,12 @@
 #include <TMatrixT.h>
 #include <TVectorT.h>
 
-#include "../../utils/include/BinManager.hh"
+#include "BinManager.hh"
 #include "ColorOutput.hh"
 #include "FitObj.hh"
-#include "../../utils/include/OptParser.hh"
+#include "OptParser.hh"
 #include "ProgressBar.hh"
-#include "../../utils/include/ToyThrower.hh"
+#include "ToyThrower.hh"
 
 using TMatrixD    = TMatrixT<double>;
 using TMatrixDSym = TMatrixTSym<double>;
