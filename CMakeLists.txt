@@ -1,9 +1,10 @@
 cmake_minimum_required (VERSION 3.5 FATAL_ERROR)
 
 project(xsLLhFitter)
-set (xsLLhFitter_VERSION_MAJOR 0)
-set (xsLLhFitter_VERSION_MINOR 23)
+set (xsLLhFitter_VERSION_MAJOR 1)
+set (xsLLhFitter_VERSION_MINOR 0)
 set (xsLLhFitter_VERSION_REVISION 0)
+set (xsLLhFitter_VERSION_STRING "${xsLLhFitter_VERSION_MAJOR}.${xsLLhFitter_VERSION_MINOR}.${xsLLhFitter_VERSION_REVISION}")
 
 set(VERBOSE TRUE)
 set(CMAKE_SKIP_BUILD_RPATH TRUE)
@@ -152,6 +153,14 @@ elseif(${CMAKE_BUILD_TYPE} MATCHES Debug)
 endif()
 
 
+################################################################################
+# CMake Generated
+###############################################################################
+
+configure_file( ${CMAKE_SOURCE_DIR}/cmake/versionConfig.h.in ${CMAKE_BINARY_DIR}/generated/versionConfig.h )
+include_directories( ${CMAKE_BINARY_DIR}/generated/ )
+
+
 
 ################################################################################
 #                            Specify Target Subdirs
@@ -169,14 +178,14 @@ set( MODULES
 cmessage (STATUS "Setting up include directories...")
 include_directories( ${CMAKE_SOURCE_DIR}/include )
 foreach(mod ${MODULES})
-    cmessage (STATUS "Including headers from of ${mod}")
+    cmessage (STATUS "Including headers of module: ${mod}")
     include_directories( ${CMAKE_SOURCE_DIR}/src/${mod}/include )
 endforeach()
 
 
 cmessage (STATUS "Configuring modules...")
 foreach(mod ${MODULES})
-    cmessage (STATUS "Configuring directory: src/${mod}")
+    cmessage (STATUS "Adding cmake module: ${mod}")
     add_subdirectory( src/${mod} )
 endforeach()
 
@@ -187,4 +196,4 @@ configure_file(cmake/build_setup.sh.in
 install(FILES
   "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/setup.sh" DESTINATION ${CMAKE_INSTALL_PREFIX})
 
-
+cmessage( STATUS "Tagged Version ${xsLLhFitter_VERSION_STRING}" )
