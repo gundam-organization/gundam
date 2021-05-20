@@ -22,14 +22,14 @@ the appropriate systematic parameters methods.
 #include <TCanvas.h>
 #include <TH1F.h>
 
-#include "../fitparam/include/FluxParameters.hh"
+#include "../../fitparam/include/FluxParameters.hh"
 #include "FluxParameters_norm.hh"
-#include "../fitparam/include/DetParameters.hh"
+#include "../../fitparam/include/DetParameters.hh"
 #include "FSIParameters.hh"
 #include "NuclFSIParameters.hh"
-#include "../fitparam/include/XsecParameters.hh"
-#include "../fitparam/include/FitParameters.hh"
-#include "../xsecfit/include/XsecFitter.hh"
+#include "../../fitparam/include/XsecParameters.hh"
+#include "../../fitparam/include/FitParameters.hh"
+#include "../../xsecfit/include/XsecFitter.hh"
 #include "anyTreeMC.hh"
 #include "AnySample.hh"
 

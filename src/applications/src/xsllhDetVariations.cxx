@@ -19,7 +19,7 @@
 
 #include <GenericToolbox.h>
 #include <Logger.h>
-#include "../utils/include/OptParser.hh"
+#include "../../utils/include/OptParser.hh"
 #include <TFormula.h>
 #include <TLeaf.h>
 #include <TTreeFormula.h>
@@ -27,7 +27,7 @@
 #include "json.hpp"
 using json = nlohmann::json;
 
-#include "../utils/include/BinManager.hh"
+#include "../../utils/include/BinManager.hh"
 #include "ColorOutput.hh"
 #include "GenericToolbox.h"
 #include "GenericToolboxRootExt.h"

@@ -16,12 +16,12 @@
 #include "TTree.h"
 
 // This project
-#include "../utils/include/XsecDial.hh"
+#include "../../utils/include/XsecDial.hh"
 #include <FitStructs.hh>
 #include <TGraph.h>
 #include <TSpline.h>
 #include <future>
-#include "../utils/include/GlobalVariables.h"
+#include "../../utils/include/GlobalVariables.h"
 
 // Submodules
 #include "Logger.h"

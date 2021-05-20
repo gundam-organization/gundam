@@ -7,7 +7,7 @@
 #include "Logger.h"
 #include "json.hpp"
 
-#include "xsllhDetCovGenerator.h"
+#include "../include/xsllhDetCovGenerator.h"
 
 int main( int argc, char** argv ){
 

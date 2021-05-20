@@ -1,5 +1,5 @@
 #xsllhDetCovGenerator
-add_executable(xsllhDetCovGenerator xsllhDetCovGenerator.cxx)
+add_executable(xsllhDetCovGenerator src/xsllhDetCovGenerator.cxx)
 
 set_target_properties(xsllhDetCovGenerator PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
@@ -10,7 +10,7 @@ endforeach()
 
 
 #xsllhCalcXsec
-add_executable(xsllhCalcXsec xsllhCalcXsec.cxx)
+add_executable(xsllhCalcXsec src/xsllhCalcXsec.cxx)
 
 set_target_properties(xsllhCalcXsec PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
@@ -26,7 +26,7 @@ endforeach()
 
 
 # xsllhND280UpFit.cxx
-add_executable(xsllhND280UpFit xsllhND280UpFit.cxx)
+add_executable(xsllhND280UpFit src/xsllhND280UpFit.cxx)
 
 set_target_properties(xsllhND280UpFit PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
@@ -42,8 +42,8 @@ endforeach()
 
 
 #xsllhDetVariations
-add_executable(xsllhDetVar xsllhDetVariations.cxx)
-add_executable(xsllhGetDetParCov xsllhGetDetParCov.cxx)
+add_executable(xsllhDetVar src/xsllhDetVariations.cxx)
+add_executable(xsllhGetDetParCov src/xsllhGetDetParCov.cxx)
 
 set_target_properties(xsllhDetVar PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 set_target_properties(xsllhGetDetParCov PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
@@ -62,7 +62,7 @@ foreach(mod ${MODULETargets})
 endforeach()
 
 #xsllhFit
-add_executable(xsllhFit xsllhFit.cxx)
+add_executable(xsllhFit src/xsllhFit.cxx)
 
 set_target_properties(xsllhFit PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
@@ -77,7 +77,7 @@ foreach(mod ${MODULETargets})
 endforeach()
 
 #xsllhPlot
-add_executable(xsllhPlot xsllhPlot.cxx)
+add_executable(xsllhPlot src/xsllhPlot.cxx)
 
 set_target_properties(xsllhPlot PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
@@ -92,7 +92,7 @@ foreach(mod ${MODULETargets})
 endforeach()
 
 #xsllhTreeConvert
-add_executable(xsllhTreeConvert xsllhTreeConvert.cxx)
+add_executable(xsllhTreeConvert src/xsllhTreeConvert.cxx)
 
 set_target_properties(xsllhTreeConvert PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
@@ -107,7 +107,7 @@ foreach(mod ${MODULETargets})
 endforeach()
 
 #xsllhGenWeightsBinner
-add_executable(xsllhGenWeightsBinner xsllhGenWeightsBinner.cxx)
+add_executable(xsllhGenWeightsBinner src/xsllhGenWeightsBinner.cxx)
 
 set_target_properties(xsllhGenWeightsBinner PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
@@ -122,7 +122,7 @@ foreach(mod ${MODULETargets})
 endforeach()
 
 #xsllhGenWeightsFormater
-add_executable(xsllhGenWeightsFormater xsllhGenWeightsFormater.cxx)
+add_executable(xsllhGenWeightsFormater src/xsllhGenWeightsFormater.cxx)
 
 set_target_properties(xsllhGenWeightsFormater PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
@@ -137,7 +137,7 @@ foreach(mod ${MODULETargets})
 endforeach()
 
 #xsllhUnitTests
-add_executable(xsllhUnitTest xsllhUnitTests.cxx)
+add_executable(xsllhUnitTest src/xsllhUnitTests.cxx)
 
 set_target_properties(xsllhUnitTest PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
@@ -152,7 +152,7 @@ foreach(mod ${MODULETargets})
 endforeach()
 
 #xsllhXseCov
-add_executable(xsllhXsecCov xsllhXsecCov.cxx)
+add_executable(xsllhXsecCov src/xsllhXsecCov.cxx)
 
 set_target_properties(xsllhXsecCov PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 

@@ -9,7 +9,7 @@
 #include <unistd.h>
 
 #include "ColorOutput.hh"
-#include "../errprop/include/XsecCalc.hh"
+#include "../../errprop/include/XsecCalc.hh"
 
 int main(int argc, char** argv)
 {

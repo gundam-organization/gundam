@@ -6,15 +6,15 @@
 #include <string>
 #include <unistd.h>
 
-#include "../anaevents/include/AnaSample.hh"
-#include "../anaevents/include/AnaTreeMC.hh"
+#include "../../anaevents/include/AnaSample.hh"
+#include "../../anaevents/include/AnaTreeMC.hh"
 #include "ColorOutput.hh"
-#include "../fitparam/include/DetParameters.hh"
-#include "../fitparam/include/FitParameters.hh"
-#include "../fitparam/include/FluxParameters.hh"
-#include "../utils/include/OptParser.hh"
-#include "../xsecfit/include/XsecFitter.hh"
-#include "../fitparam/include/XsecParameters.hh"
+#include "../../fitparam/include/DetParameters.hh"
+#include "../../fitparam/include/FitParameters.hh"
+#include "../../fitparam/include/FluxParameters.hh"
+#include "../../utils/include/OptParser.hh"
+#include "../../xsecfit/include/XsecFitter.hh"
+#include "../../fitparam/include/XsecParameters.hh"
 
 int main(int argc, char** argv)
 {
