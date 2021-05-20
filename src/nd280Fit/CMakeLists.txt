@@ -1,5 +1,5 @@
-set(SRCFILES ND280Fitter.cc)
-set(HEADERS ND280Fitter.hh)
+set(SRCFILES src/ND280Fitter.cc)
+set(HEADERS include/ND280Fitter.hh)
 
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)
   add_library(nd280Fit STATIC ${SRCFILES})

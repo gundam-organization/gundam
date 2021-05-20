@@ -7,7 +7,7 @@
 
 #include "AnaFitParameters.hh"
 #include "FitStructs.hh"
-#include "GeneralizedFitBin.h"
+#include "../../utils/include/GeneralizedFitBin.h"
 
 class DetParameters : public AnaFitParameters
 {

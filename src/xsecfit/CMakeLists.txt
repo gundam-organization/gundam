@@ -1,5 +1,5 @@
-set(SRCFILES XsecFitter.cc)
-set(HEADERS XsecFitter.hh)
+set(SRCFILES src/XsecFitter.cc)
+set(HEADERS include/XsecFitter.hh)
 
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)
   add_library(xsecfit STATIC ${SRCFILES})

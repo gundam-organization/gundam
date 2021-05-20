@@ -1,4 +1,4 @@
-#include "NuclearParameters.hh"
+#include "../include/NuclearParameters.hh"
 
 NuclearParameters::NuclearParameters(const std::string& name)
 {

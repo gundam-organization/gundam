@@ -17,15 +17,15 @@
 
 using TMatrixDSym = TMatrixTSym<double>;
 
-#include "AnaSample.hh"
-#include "AnaTreeMC.hh"
-#include "BinManager.hh"
+#include "../../anaevents/include/AnaSample.hh"
+#include "../../anaevents/include/AnaTreeMC.hh"
+#include "../../utils/include/BinManager.hh"
 #include "ColorOutput.hh"
-#include "DetParameters.hh"
-#include "FitParameters.hh"
-#include "FluxParameters.hh"
-#include "OptParser.hh"
-#include "XsecParameters.hh"
+#include "../../fitparam/include/DetParameters.hh"
+#include "../../fitparam/include/FitParameters.hh"
+#include "../../fitparam/include/FluxParameters.hh"
+#include "../../utils/include/OptParser.hh"
+#include "../../fitparam/include/XsecParameters.hh"
 
 class FitObj
 {

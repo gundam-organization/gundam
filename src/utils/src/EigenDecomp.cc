@@ -1,4 +1,4 @@
-#include "EigenDecomp.hh"
+#include "../include/EigenDecomp.hh"
 
 EigenDecomp::EigenDecomp(const TMatrixD& cov, Method flag)
     : npar(cov.GetNrows())

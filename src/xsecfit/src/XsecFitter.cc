@@ -1,4 +1,4 @@
-#include "XsecFitter.hh"
+#include "../include/XsecFitter.hh"
 
 XsecFitter::XsecFitter(TDirectory* dirout, const int seed, const int num_threads)
     : rng(new TRandom3(seed))

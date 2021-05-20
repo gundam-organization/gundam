@@ -21,10 +21,10 @@
 #include "json.hpp"
 using json = nlohmann::json;
 
-#include "BinManager.hh"
-#include "CalcChisq.hh"
+#include "../utils/include/BinManager.hh"
+#include "../utils/include/CalcChisq.hh"
 #include "ColorOutput.hh"
-#include "PlotStyle.hh"
+#include "../utils/include/PlotStyle.hh"
 
 int main(int argc, char** argv)
 {

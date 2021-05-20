@@ -1,11 +1,11 @@
-#include "ND280Fitter.hh"
+#include "../include/ND280Fitter.hh"
 #include "GenericToolbox.h"
 #include "GenericToolboxRootExt.h"
 #include "Logger.h"
 #include <TCanvas.h>
 #include <THStack.h>
 #include <iostream>
-#include <GlobalVariables.h>
+#include "../../utils/include/GlobalVariables.h"
 
 #define FIT_IT_TIME_POINT 10
 #define REWEIGHT_TIME_POINT 11

@@ -1,4 +1,4 @@
-#include "FitParameters.hh"
+#include "../include/FitParameters.hh"
 using xsllh::FitBin;
 
 FitParameters::FitParameters(const std::string& par_name)

@@ -2,7 +2,7 @@
 // Created by Adrien BLANCHET on 11/02/2021.
 //
 
-#include "GlobalVariables.h"
+#include "../include/GlobalVariables.h"
 
 // INIT
 int GlobalVariables::_nbThreads_ = 1;

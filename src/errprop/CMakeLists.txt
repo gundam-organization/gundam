@@ -1,5 +1,5 @@
-set(SRCFILES FitObj.cc XsecCalc.cc)
-set(HEADERS FitObj.hh XsecCalc.hh)
+set(SRCFILES src/FitObj.cc src/XsecCalc.cc)
+set(HEADERS include/FitObj.hh include/XsecCalc.hh)
 
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)
   add_library(errprop STATIC ${SRCFILES})

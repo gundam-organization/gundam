@@ -4,7 +4,7 @@
 
 #include <stdexcept>
 
-#include "GeneralizedFitBin.h"
+#include "../include/GeneralizedFitBin.h"
 #include "Logger.h"
 
 GeneralizedFitBin::GeneralizedFitBin()

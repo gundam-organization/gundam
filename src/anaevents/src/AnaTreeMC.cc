@@ -1,12 +1,12 @@
 // This is the code that actually reads in the MC tree and fills the event info.
 // The tree should be produced by feeding a HL2 microtree into the treeconvert macro.
 
-#include "AnaTreeMC.hh"
+#include "../include/AnaTreeMC.hh"
 #include "GenericToolbox.h"
 #include "Logger.h"
 #include "TTreeFormula.h"
 #include <future>
-#include "GlobalVariables.h"
+#include "../../utils/include/GlobalVariables.h"
 
 AnaTreeMC::AnaTreeMC(const std::string& file_name, const std::string& tree_name, bool extra_var)
     : read_extra_var(extra_var)

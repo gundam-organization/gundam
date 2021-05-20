@@ -1,4 +1,4 @@
-#include "DetParameters.hh"
+#include "../include/DetParameters.hh"
 using xsllh::FitBin;
 
 DetParameters::DetParameters(const std::string& name)

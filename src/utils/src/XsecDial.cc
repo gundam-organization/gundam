@@ -1,7 +1,7 @@
 #include <utility>
 
 
-#include "XsecDial.hh"
+#include "../include/XsecDial.hh"
 #include "Logger.h"
 
 

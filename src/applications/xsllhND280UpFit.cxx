@@ -7,17 +7,17 @@
 
 #include <Logger.h>
 
-#include <AnaFitParameters.hh>
-#include <AnaSample.hh>
-#include <AnaTreeMC.hh>
+#include "../fitparam/include/AnaFitParameters.hh"
+#include "../anaevents/include/AnaSample.hh"
+#include "../anaevents/include/AnaTreeMC.hh"
 
-#include <DetParameters.hh>
-#include <FluxParameters.hh>
-#include <OptParser.hh>
-#include <ND280Fitter.hh>
-#include <XsecParameters.hh>
+#include "../fitparam/include/DetParameters.hh"
+#include "../fitparam/include/FluxParameters.hh"
+#include "../utils/include/OptParser.hh"
+#include "../nd280Fit/include/ND280Fitter.hh"
+#include "../fitparam/include/XsecParameters.hh"
 
-#include <GlobalVariables.h>
+#include "../utils/include/GlobalVariables.h"
 
 #include <GenericToolbox.h>
 #include <GenericToolboxRootExt.h>

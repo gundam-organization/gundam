@@ -1,4 +1,4 @@
-#include "BinManager.hh"
+#include "../include/BinManager.hh"
 #include "Logger.h"
 #include "GenericToolbox.h"
 

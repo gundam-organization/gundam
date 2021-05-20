@@ -1,28 +1,28 @@
 set(SRCFILES
-        BinManager.cc
-        CalcChisq.cc
-        EigenDecomp.cc
-        OptParser.cc
-        PlotStyle.cc
-        ToyThrower.cc
-        XsecDial.cc
-        GlobalVariables.cc
-        GeneralizedFitBin.cc
-        DataBinSet.cpp
-        DataBin.cpp
+        src/BinManager.cc
+        src/CalcChisq.cc
+        src/EigenDecomp.cc
+        src/OptParser.cc
+        src/PlotStyle.cc
+        src/ToyThrower.cc
+        src/XsecDial.cc
+        src/GlobalVariables.cc
+        src/GeneralizedFitBin.cc
+        src/DataBinSet.cpp
+        src/DataBin.cpp
         )
 set(HEADERS
-        BinManager.hh
-        CalcChisq.hh
-        EigenDecomp.hh
-        OptParser.hh
-        PlotStyle.hh
-        ToyThrower.hh
-        XsecDial.hh
-        GlobalVariables.h
-        GeneralizedFitBin.h
-        DataBin.h
-        DataBinSet.h
+        include/BinManager.hh
+        include/CalcChisq.hh
+        include/EigenDecomp.hh
+        include/OptParser.hh
+        include/PlotStyle.hh
+        include/ToyThrower.hh
+        include/XsecDial.hh
+        include/GlobalVariables.h
+        include/GeneralizedFitBin.h
+        include/DataBin.h
+        include/DataBinSet.h
         )
 
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)

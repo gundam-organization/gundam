@@ -1,4 +1,4 @@
-#include "CalcChisq.hh"
+#include "../include/CalcChisq.hh"
 
 CalcChisq::CalcChisq()
     : npar(0)

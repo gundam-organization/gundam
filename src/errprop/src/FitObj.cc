@@ -1,4 +1,4 @@
-#include "FitObj.hh"
+#include "../include/FitObj.hh"
 
 FitObj::FitObj(const std::string& json_config, const std::string& event_tree_name,
                bool is_true_tree, bool read_data_file)

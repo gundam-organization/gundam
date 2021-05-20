@@ -1,4 +1,4 @@
-#include "ToyThrower.hh"
+#include "../include/ToyThrower.hh"
 
 ToyThrower::ToyThrower(int nrows, unsigned int seed)
     : npar(nrows), force_limit(100)

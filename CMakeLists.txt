@@ -171,7 +171,7 @@ set(MODULES
 set(MODULETargets "")
 foreach(mod ${MODULES})
   cmessage (STATUS "Configuring directory: src/${mod}")
-  add_subdirectory(src/${mod}/src)
+  add_subdirectory(src/${mod})
 endforeach()
 
 add_subdirectory(src/applications)

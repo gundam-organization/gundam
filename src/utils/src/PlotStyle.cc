@@ -1,4 +1,4 @@
-#include "PlotStyle.hh"
+#include "../include/PlotStyle.hh"
 
 GlobalStyle::GlobalStyle()
     : custom_style("xsllh_style", "Super xsllh Style")

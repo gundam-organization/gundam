@@ -10,7 +10,7 @@
 
 #include "AnaFitParameters.hh"
 #include "FitStructs.hh"
-#include "OptParser.hh"
+#include "../../utils/include/OptParser.hh"
 
 class FitParameters : public AnaFitParameters
 {

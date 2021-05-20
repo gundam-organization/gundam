@@ -1,4 +1,4 @@
-#include "FluxParameters.hh"
+#include "../include/FluxParameters.hh"
 #include "Logger.h"
 
 FluxParameters::FluxParameters(const std::string& name)

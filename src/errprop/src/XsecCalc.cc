@@ -1,4 +1,4 @@
-#include "XsecCalc.hh"
+#include "../include/XsecCalc.hh"
 using json = nlohmann::json;
 
 XsecCalc::XsecCalc(const std::string& json_config, const std::string& cli_filename)
