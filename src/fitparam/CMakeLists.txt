@@ -1,7 +1,10 @@
-set(SRCFILES src/AnaFitParameters.cc src/DetParameters.cc src/FitParameters.cc
-        src/FluxParameters.cc src/XsecParameters.cc)
-set(HEADERS include/AnaFitParameters.hh include/DetParameters.hh include/FitParameters.hh
-        include/FluxParameters.hh include/XsecParameters.hh)
+set(SRCFILES
+        src/AnaFitParameters.cc
+        src/DetParameters.cc
+        src/FitParameters.cc
+        src/FluxParameters.cc
+        src/XsecParameters.cc
+        )
 
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)
   add_library(fitparam STATIC ${SRCFILES})

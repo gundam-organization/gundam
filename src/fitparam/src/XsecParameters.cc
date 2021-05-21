@@ -323,13 +323,7 @@ void XsecParameters::ReWeight(AnaEvent* event, const std::string& detectorName, 
   double currentDialWeight;
   DialCache* dialCachePtr;
 
-  LogTrace << GET_VAR_NAME_VALUE(event->GetEvId()) << std::endl;
   for( size_t iDial = 0 ; iDial < detectorDialListPtr->size() ; iDial++ ){
-
-    LogTrace << GET_VAR_NAME_VALUE(detectorDialListPtr->at(iDial).GetName()) << std::endl;
-    LogTrace << GET_VAR_NAME_VALUE(eventDialSplineIndexCache->at(iDial)) << std::endl;
-
-
 
     if(eventDialSplineIndexCache->at(iDial) < 0){
       // Skip this event (norm dial are also set to -1 index if they should not be applied)
@@ -349,8 +343,6 @@ void XsecParameters::ReWeight(AnaEvent* event, const std::string& detectorName, 
       currentDialWeight = dialCachePtr->cachedWeight; // get from cache
     }
     else{
-
-      LogTrace << "OK" << std::endl;
 
       // make other threads wait
       dialCachePtr->isBeingEdited = true;
