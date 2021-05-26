@@ -7,12 +7,20 @@
 
 #include "GenericToolbox.h"
 
-ENUM_EXPANDER(
-  PropagationMethod, -1,
-  Invalid,
-  ReWeight,
-  ResponseMatrix
-);
+#include "DataBin.h"
+
+
+namespace DialType{
+  ENUM_EXPANDER(
+    DialType, -1,
+    Invalid,
+    Normalization, // response = dial
+    Spline,        // response = spline(dial)
+    Graph,         // response = graphInterpol(dial)
+    Other
+  );
+}
+
 
 
 class Dial {
@@ -21,15 +29,24 @@ public:
   Dial();
   virtual ~Dial();
 
-  void reset();
+  virtual void reset();
 
-  double evalDial(const double& parameterValue_);
+  void setApplyConditionBin(const DataBin &applyConditionBin);
 
-private:
-  double _lastEvalDial_;
-  double _lastEvalParameter_;
+  virtual void initialize();
 
-  PropagationMethod _propagationMethod_{Invalid};
+  virtual std::string getSummary();
+  double evalResponse(const double& parameterValue_);
+  virtual void updateResponseCache(const double& parameterValue_) = 0;
+
+protected:
+  // Parameters
+  DataBin _applyConditionBin_;
+  DialType::DialType _dialType_{DialType::Invalid};
+
+  // Internals
+  double _dialResponseCache_;
+  double _dialParameterCache_;
 
 };
 

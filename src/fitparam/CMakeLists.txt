@@ -4,10 +4,13 @@ set(SRCFILES
         src/FitParameters.cc
         src/FluxParameters.cc
         src/XsecParameters.cc
+
         src/FitParameterSet.cpp
         src/FitParameter.cpp
-        src/Dial.cpp
         src/DialSet.cpp
+        src/Dial.cpp
+        src/NormalizationDial.cpp
+        src/SplineDial.cpp
         )
 
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)

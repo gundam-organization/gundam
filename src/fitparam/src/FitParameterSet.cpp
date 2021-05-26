@@ -113,13 +113,13 @@ void FitParameterSet::initialize() {
     }
   }
 
-  nlohmann::json parameterDefinitions = JsonUtils::fetchValue<nlohmann::json>(_jsonConfig_, "parameterDefinitions");
+  nlohmann::json dialSetDefinitions = JsonUtils::fetchValue<nlohmann::json>(_jsonConfig_, "dialSetDefinitions");
   for( int iPararmeter = 0 ; iPararmeter < _covarianceMatrix_->GetNcols() ; iPararmeter++ ){
     _parameterList_.emplace_back();
     _parameterList_.back().setParameterIndex(iPararmeter);
     _parameterList_.back().setName(_parameterNamesList_->At(iPararmeter)->GetName());
     _parameterList_.back().setParameterValue((*_parameterPriorList_)[iPararmeter]);
-    _parameterList_.back().setParameterDefinitionsConfig(parameterDefinitions);
+    _parameterList_.back().setParameterDefinitionsConfig(dialSetDefinitions);
     _parameterList_.back().initialize();
   }
 

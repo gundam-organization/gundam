@@ -95,7 +95,7 @@ bool DataBin::isVariableSet(const std::string& variableName_){
 }
 std::string DataBin::generateSummary() const{
   std::stringstream ss;
-  if( _edgesList_.empty() ) ss << "undefined bin." << std::endl;
+  if( _edgesList_.empty() ) ss << "undefined bin.";
   else{
     for( size_t iEdge = 0 ; iEdge < _edgesList_.size() ; iEdge++ ){
       if( iEdge != 0 ) ss << ", ";

@@ -168,3 +168,7 @@ void DataBinSet::addBinContent(int binIndex_, double weight_) {
   }
   _binContent_.at(binIndex_) += weight_;
 }
+
+const std::vector<DataBin> &DataBinSet::getBinsList() const {
+  return _binsList_;
+}

@@ -25,6 +25,8 @@ public:
   // Management
   void addBinContent(int binIndex_, double weight_);
 
+  const std::vector<DataBin> &getBinsList() const;
+
   // Misc
   std::string generateSummary() const;
 

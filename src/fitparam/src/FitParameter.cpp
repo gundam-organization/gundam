@@ -23,6 +23,13 @@ void FitParameter::reset() {
 
 void FitParameter::initialize() {
 
+  for( const auto& json : _parameterDefinitionsConfig_ ){
+    _dialSetList_.emplace_back();
+    _dialSetList_.back().setDialSetConfig(json);
+    _dialSetList_.back().setParameterIndex(_parameterIndex_);
+    _dialSetList_.back().initialize();
+  }
+
 }
 
 void FitParameter::setParameterDefinitionsConfig(const nlohmann::json &jsonConfig) {

@@ -7,8 +7,10 @@
 
 #include "string"
 #include "vector"
+#include "json.hpp"
 
 #include "GenericToolbox.h"
+
 #include "Dial.h"
 
 
@@ -20,9 +22,23 @@ public:
 
   void reset();
 
+  void setParameterIndex(int parameterIndex);
+  void setDialSetConfig(const nlohmann::json &dialSetConfig);
+
+  void initialize();
+
+
 private:
-  std::string _name_; // ie detector name
-  std::vector<Dial> _dialList_;
+  // Parameters
+  nlohmann::json _dialSetConfig_;
+  int _parameterIndex_{-1};
+  std::string _parameterName_;
+
+  // Internals
+  std::string _name_;             // ie detector name (or data set)
+  double _parameterNominalValue_; // parameter with which the MC has produced the data set
+  std::vector<Dial*> _dialList_;
+  DialType::DialType _globalDialType_;
 
 };
 
