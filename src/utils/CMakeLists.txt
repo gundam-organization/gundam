@@ -10,6 +10,7 @@ set(SRCFILES
         src/GeneralizedFitBin.cc
         src/DataBinSet.cpp
         src/DataBin.cpp
+        src/JsonUtils.cpp
         )
 set(HEADERS
         include/BinManager.hh
@@ -23,6 +24,7 @@ set(HEADERS
         include/GeneralizedFitBin.h
         include/DataBin.h
         include/DataBinSet.h
+        include/JsonUtils.h
         )
 
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)

@@ -520,7 +520,6 @@ void XsecParameters::AddDetector(const std::string& detectorName_, const std::st
 void XsecParameters::SetEnableZeroWeightFenceGate(bool enableZeroWeightFenceGate_){
   _enableZeroWeightFenceGate_ = enableZeroWeightFenceGate_;
 }
-
 int XsecParameters::GetDetectorIndex(const std::string& detectorName_){
   int detectorIndex = GenericToolbox::findElementIndex(detectorName_, v_detectors);
   if(detectorIndex == -1){
@@ -529,7 +528,6 @@ int XsecParameters::GetDetectorIndex(const std::string& detectorName_){
   }
   return detectorIndex;
 }
-
 std::vector<XsecDial> XsecParameters::GetDetectorDials(const std::string& detectorName_){
   return _dialsList_.at(GetDetectorIndex(detectorName_));
 }
