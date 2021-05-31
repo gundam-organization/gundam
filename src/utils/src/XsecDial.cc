@@ -120,13 +120,15 @@ void XsecDial::ReadSplines(const std::string& fname_splines)
 
       _interpolatedBinnedSplinesTTree_->GetEntry(iEntry);
 
+      _splinePtrList_.emplace_back((TSpline3*) _splineBinBuffer_.splinePtr->Clone()); // copying the pointer
+      _graphPtrList_.emplace_back((TGraph*) _splineBinBuffer_.graphHandler->Clone());
+
       _splineBinBuffer_.entry = iEntry;
-      _splineBinBuffer_.splinePtr = (TSpline3*) _splineBinBuffer_.splinePtr->Clone(); // refilling with copies
-      _splineBinBuffer_.graphHandler = (TGraph*) _splineBinBuffer_.graphHandler->Clone(); // refilling with copies
+//      _splineBinBuffer_.splinePtr = (TSpline3*) _splineBinBuffer_.splinePtr->Clone(); // refilling with copies
+//      _splineBinBuffer_.graphHandler = (TGraph*) _splineBinBuffer_.graphHandler->Clone(); // refilling with copies
 
       // Cache for faster spline indexing
-      _splinePtrList_.emplace_back(_splineBinBuffer_.splinePtr); // copying the pointer
-      _graphPtrList_.emplace_back(_splineBinBuffer_.graphHandler);
+//      _splinePtrList_.emplace_back(_splineBinBuffer_.splinePtr); // copying the pointer
 
       Xmin = _splineBinBuffer_.graphHandler->GetX()[0];
       Xmax = _splineBinBuffer_.graphHandler->GetX()[0];
@@ -347,6 +349,17 @@ double XsecDial::GetBoundedValue(int splineIndex_, double dialValue_){
       else{
         dialWeight = currentSplinePtr->Eval(dialValue_);
       }
+
+//      if(m_name == "SF_PBTwkDial_C12"){
+//        LogFatal << GET_VAR_NAME_VALUE(currentSplinePtr) << std::endl;
+//        if(gDirectory->IsWritable() and gDirectory->Get(Form("sp_%i_TSpline3", splineIndex_)) == nullptr){
+//          currentSplinePtr->SetTitle(Form("sp_%i_TSpline3", splineIndex_));
+//          currentSplinePtr->Write(Form("sp_%i_TSpline3", splineIndex_));
+//        }
+//        LogFatal << GET_VAR_NAME_VALUE(splineIndex_) << std::endl;
+//        LogFatal << GET_VAR_NAME_VALUE(dialValue_) << std::endl;
+//        LogFatal << GET_VAR_NAME_VALUE(dialWeight) << std::endl;
+//      }
 
     }
 

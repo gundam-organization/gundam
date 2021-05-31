@@ -402,7 +402,6 @@ void AnaSample::FillMcHistograms(int iThread_){
         }
         if(anaEventPtr->GetRecoBinIndex() == -1){
             anaEventPtr->SetRecoBinIndex(this->GetBinIndex(anaEventPtr) );
-
         }
         anaEventPtr->SetIsBeingEdited(false);
 
