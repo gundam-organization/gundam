@@ -50,7 +50,7 @@ void DialSet::initialize() {
     throw std::logic_error("_dialSetConfig_ is not set.");
   }
 
-  _name_ = JsonUtils::fetchValue<std::string>(_dialSetConfig_, "detectorName");
+  _name_ = JsonUtils::fetchValue<std::string>(_dialSetConfig_, "applyOnDataSets");
 
   std::string enumStr;
   int enumIndex;
@@ -200,5 +200,13 @@ void DialSet::initialize() {
   }
 
 
+
+}
+
+const std::string &DialSet::getName() const {
+  return _name_;
+}
+
+void DialSet::reweightEvent(AnaEvent *eventPtr_) {
 
 }

@@ -951,7 +951,7 @@ int main(int argc, char** argv)
     // Size of coavariance and correlation matrices (will be updated below):
     unsigned int num_elements = 0;
 
-    // Initialize the covariance and correlation matrices (symmetric ROOT matrices):
+    // initialize the covariance and correlation matrices (symmetric ROOT matrices):
     TMatrixTSym<double> cov_mat(num_elements);
     TMatrixTSym<double> cor_mat(num_elements);
 

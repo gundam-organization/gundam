@@ -19,40 +19,40 @@ using json = nlohmann::json;
 class XsecParameters : public AnaFitParameters
 {
 public:
-    explicit XsecParameters(const std::string& name = "par_xsec");
-    ~XsecParameters() override;
+  explicit XsecParameters(const std::string& name = "par_xsec");
+  ~XsecParameters() override;
 
-    void Print() override;
-    void PrintParameterInfo(int iPar_) override;
-    void PrintParameterInfo(int iDetector_, int iDial_);
+  void Print() override;
+  void PrintParameterInfo(int iPar_) override;
+  void PrintParameterInfo(int iDetector_, int iDial_);
 
-    void InitEventMap(std::vector<AnaSample*>& samplesList_, int mode) override;
-    void InitParameters() override;
-    void ReWeight(AnaEvent* event, const std::string& detectorName, int nsample, int nevent, std::vector<double>& params) override;
-    void AddDetector(const std::string& detectorName_, const std::string& configFilePath_);
+  void InitEventMap(std::vector<AnaSample*>& samplesList_, int mode) override;
+  void InitParameters() override;
+  void ReWeight(AnaEvent* event, const std::string& detectorName, int nsample, int nevent, std::vector<double>& params) override;
+  void AddDetector(const std::string& detectorName_, const std::string& configFilePath_);
 
-    void SetEnableZeroWeightFenceGate(bool enableZeroWeightFenceGate_);
+  void SetEnableZeroWeightFenceGate(bool enableZeroWeightFenceGate_);
 
-    int GetDetectorIndex(const std::string& detectorName_);
-    std::vector<XsecDial> GetDetectorDials(const std::string& detectorName_);
+  int GetDetectorIndex(const std::string& detectorName_);
+  std::vector<XsecDial> GetDetectorDials(const std::string& detectorName_);
 
 
 private:
 
-    std::vector<std::vector<std::vector<int>>> _eventDialSplineIndexList_; // [iSample][iEvent][iDial] = Spline index
-    std::vector<std::vector<XsecDial>> _dialsList_;
-    std::vector<std::string> v_detectors;
-    std::vector<int> v_offsets;
+  std::vector<std::vector<std::vector<int>>> _eventDialSplineIndexList_; // [iSample][iEvent][iDial] = Spline index
+  std::vector<std::vector<XsecDial>> _dialsList_;
+  std::vector<std::string> v_detectors;
+  std::vector<int> v_offsets;
 
-    typedef struct{
-        bool isBeingEdited;
-        double fitParameterValue;
-        double cachedWeight;
-    } DialCache;
+  struct DialCache{
+    bool isBeingEdited{false};
+    double fitParameterValue{std::numeric_limits<double>::quiet_NaN()};
+    double cachedWeight{std::numeric_limits<double>::quiet_NaN()};
+  } ;
 
-    std::vector<DialCache> _dialCacheWeight_;
+  std::vector<std::map<size_t, DialCache>> _dialCacheWeight_;
 
-    bool _enableZeroWeightFenceGate_;
+  bool _enableZeroWeightFenceGate_;
 
 };
 

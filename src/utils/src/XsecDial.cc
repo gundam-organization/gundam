@@ -274,7 +274,8 @@ double XsecDial::GetSplineValue(int index, double dial_value) const
 
 double XsecDial::GetBoundedValue(int splineIndex_, double dialValue_){
 
-  LogTrace << GET_VAR_NAME_VALUE(splineIndex_) << std::endl;
+//  LogTrace << GET_VAR_NAME_VALUE(m_name) << std::endl;
+//  LogTrace << GET_VAR_NAME_VALUE(splineIndex_) << std::endl;
 
   // Output default
   double dialWeight = 1;
@@ -335,7 +336,7 @@ double XsecDial::GetBoundedValue(int splineIndex_, double dialValue_){
     else {
 
       TSpline3* currentSplinePtr = _splinePtrList_[splineIndex_]; // .at() or [] are slower when multiple indexes
-      if( dialValue_ < std::max(m_limit_lo, currentSplinePtr->GetXmin()) ){
+      if     ( dialValue_ < std::max(m_limit_lo, currentSplinePtr->GetXmin()) ){
         // Lower bound
         dialWeight = currentSplinePtr->Eval(std::max(m_limit_lo, currentSplinePtr->GetXmin()));
       }

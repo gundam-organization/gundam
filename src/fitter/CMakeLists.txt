@@ -1,9 +1,9 @@
 set(SRCFILES
-        src/ND280Fitter.cc
+        src/FitterEngine.cpp
         src/XsecFitter.cc
         )
 set(HEADERS
-        include/ND280Fitter.hh
+        include/FitterEngine.h
         include/XsecFitter.hh
         )
 

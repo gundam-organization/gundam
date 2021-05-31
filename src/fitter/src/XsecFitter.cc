@@ -435,7 +435,7 @@ void XsecFitter::GenerateToyData(int toy_type, bool stat_fluc)
 // Loops over all samples and all bins therein, then resets event weights based on current fit parameter values, updates m_hpred, m_hmc, m_hmc_true and m_hsig histograms accordingly and computes the chi2 value which is returned:
 double XsecFitter::FillSamples(std::vector<std::vector<double>>& new_pars, int datatype)
 {
-    // Initialize chi2 variable which will be updated below and then returned:
+    // initialize chi2 variable which will be updated below and then returned:
     double chi2      = 0.0;
 
     // If the output_chi2 flag is true the chi2 contributions from the different samples are printed:
@@ -478,7 +478,7 @@ double XsecFitter::FillSamples(std::vector<std::vector<double>>& new_pars, int d
             // Get ith event (which contains the event information such as topology, reaction, truth/reco variables, event weights, etc.):
             AnaEvent* ev = m_samples[s]->GetEvent(i);
 
-            // Reset the event weight to the original one from Highland:
+            // reset the event weight to the original one from Highland:
             ev->ResetEvWght();
 
             // Loop over all the different parameter types such as [template, flux, detector, cross section]:
@@ -490,7 +490,7 @@ double XsecFitter::FillSamples(std::vector<std::vector<double>>& new_pars, int d
             }
         }
 
-        // Reset m_hpred, m_hmc, m_hmc_true and m_hsig and then fill them with the updated events:
+        // reset m_hpred, m_hmc, m_hmc_true and m_hsig and then fill them with the updated events:
         m_samples[s]->FillEventHist(datatype);
 
         // Compute chi2 for the current sample (done with AnaSample::CalcLLH):
@@ -576,7 +576,7 @@ double XsecFitter::CalcLikelihood(const double* par)
         }
     }
 
-    // Reset event weights based on current fit parameter values, update m_hpred, m_hmc, m_hmc_true and m_hsig histograms accordingly and compute the chi2_stat value:
+    // reset event weights based on current fit parameter values, update m_hpred, m_hmc, m_hmc_true and m_hsig histograms accordingly and compute the chi2_stat value:
     double chi2_stat = FillSamples(new_pars, kMC);
 
     // The different chi2 values for the current iteration of the fitter are stored in the corresponding vectors:

@@ -11,6 +11,7 @@
 #include "GenericToolbox.h"
 
 #include "DialSet.h"
+#include "AnaEvent.hh"
 
 class FitParameter {
 
@@ -30,6 +31,9 @@ public:
   const std::string &getName() const;
   double getParameterValue() const;
 
+  void selectDialSet(const std::string& dataSetName_);
+  void reweightEvent(AnaEvent* eventPtr_);
+
 
 private:
   // Parameters
@@ -39,7 +43,9 @@ private:
   nlohmann::json _parameterDefinitionsConfig_;
 
   // Internals
+  DialSet* _currentDialSetPtr_{nullptr};
   std::vector<DialSet> _dialSetList_; // one dial set per detector
+
 };
 
 

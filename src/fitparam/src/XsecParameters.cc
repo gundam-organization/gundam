@@ -220,6 +220,7 @@ void XsecParameters::InitEventMap(std::vector<AnaSample*>& samplesList_, int mod
           }
 
           eventDialsIndexListPtr->at(iDial) = splineIndex;
+          _dialCacheWeight_.at(iDial)[splineIndex] = DialCache();
 
         } // iDial
 
@@ -274,9 +275,6 @@ void XsecParameters::InitParameters()
       pars_fixed.push_back(false);
 
       _dialCacheWeight_.emplace_back();
-      _dialCacheWeight_.back().isBeingEdited = false;
-      _dialCacheWeight_.back().fitParameterValue = std::numeric_limits<double>::quiet_NaN();
-      _dialCacheWeight_.back().cachedWeight = std::numeric_limits<double>::quiet_NaN();
 
       LogInfo << "Added " << v_detectors[detectorIndex] << "_" << xsecDial.GetName()
               << std::endl;
@@ -330,22 +328,22 @@ void XsecParameters::ReWeight(AnaEvent* event, const std::string& detectorName, 
       continue;
     }
 
-    dialCachePtr = &_dialCacheWeight_.at(iDial + v_offsets.at(detectorIndex));
+    dialCachePtr = &_dialCacheWeight_.at(iDial + v_offsets.at(detectorIndex))[eventDialSplineIndexCache->at(iDial)];
 
     // wait if this re-weight value is being edited
-    while(dialCachePtr->isBeingEdited);
+    while( dialCachePtr->isBeingEdited );
 
     if(
-      dialCachePtr->fitParameterValue == params.at(iDial + v_offsets.at(detectorIndex))
-      and dialCachePtr->cachedWeight == dialCachePtr->cachedWeight // IS NOT A NAN
-//            and false // DISABLE CACHE for debug
+          dialCachePtr->fitParameterValue == params.at(iDial + v_offsets.at(detectorIndex))
+      and dialCachePtr->cachedWeight      == dialCachePtr->cachedWeight // IS NOT A NAN
+//      and false                                                         // DISABLE CACHE for debug
       ){
       currentDialWeight = dialCachePtr->cachedWeight; // get from cache
     }
     else{
 
       // make other threads wait
-      dialCachePtr->isBeingEdited = true;
+      dialCachePtr->isBeingEdited     = true;
       dialCachePtr->fitParameterValue = params.at(iDial + v_offsets.at(detectorIndex));
 
       // Then the dial has to affect the event (spline or normalization)

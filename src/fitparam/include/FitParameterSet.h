@@ -41,12 +41,15 @@ public:
 
   void initialize();
 
+  std::vector<FitParameter> &getParameterList();
+
 private:
   // User parameters
   nlohmann::json _jsonConfig_;
 
   // Internals
   bool _isInitialized_{false};
+  std::vector<FitParameter> _parameterList_;
 
   // JSON
   std::string _name_;
@@ -55,7 +58,6 @@ private:
   TMatrixDSym* _covarianceMatrix_{nullptr};
   TVectorD* _parameterPriorList_{nullptr};
   TObjArray* _parameterNamesList_{nullptr};
-  std::vector<FitParameter> _parameterList_;
 
 };
 

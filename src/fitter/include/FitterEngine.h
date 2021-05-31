@@ -7,10 +7,6 @@
 #include <sstream>
 #include <string>
 
-#ifdef _OPENMP
-#include <omp.h>
-#endif
-
 #include <TFile.h>
 #include <TGraph.h>
 #include <TMath.h>
@@ -28,16 +24,17 @@
 #include "AnaSample.hh"
 #include "ColorOutput.hh"
 #include "OptParser.hh"
+#include "FitParameterSet.h"
 
 
-class ND280Fitter {
+class FitterEngine {
 
 public:
 
-    ND280Fitter();
-    ~ND280Fitter();
+    FitterEngine();
+    ~FitterEngine();
 
-    void Reset();
+    void reset();
 
     // Pre-initialization Methods
     void SetOutputTDirectory(TDirectory* output_tdirectory_);
@@ -52,7 +49,7 @@ public:
     void SetAnaSamplesList(std::vector<AnaSample*> AnaSample_list_);
     void SetSelectedDataType(int selected_data_type_);
 
-    void Initialize();
+    void initialize();
 
     // Post-initialization Methods
     void WritePrefitData();
@@ -163,6 +160,10 @@ private:
     std::vector<bool> _triggerReFillMcHistogramsThreads_;
     std::vector<std::future<void>> _asyncFitThreads_;
     std::vector<std::vector<std::vector<TH1D*>>> _histThreadHandlers_;
+
+
+    // WIP
+    std::vector<FitParameterSet> _fitParameterSetList_;
 
 };
 

@@ -631,7 +631,7 @@ double AnaSample::CalcLLH() const
     // Array of the number of measured events in data in each bin:
     double* data   = m_hdata->GetArray();
 
-    // Initialize chi2 variable which will be updated below and then returned:
+    // initialize chi2 variable which will be updated below and then returned:
     double chi2 = 0.;
 
     // Loop over all bins:

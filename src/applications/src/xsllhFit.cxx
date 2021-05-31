@@ -286,7 +286,7 @@ int main(int argc, char** argv)
     xsecfit.SetZeroSyst(parser.zero_syst);
     xsecfit.SetSaveEvents(parser.save_events);
 
-    // Initialize fitter with fitpara vector (vector of AnaFitParameters objects):
+    // initialize fitter with fitpara vector (vector of AnaFitParameters objects):
     xsecfit.InitFitter(fitpara);
     std::cout << TAG << "Fitter initialised." << std::endl;
 

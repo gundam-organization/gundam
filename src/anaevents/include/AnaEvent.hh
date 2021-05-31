@@ -8,9 +8,11 @@
 
 #include <TMath.h>
 #include "TLeaf.h"
+#include "TTree.h"
 
 #include "Logger.h"
 #include "GenericToolbox.h"
+
 
 #include <FitStructs.hh>
 

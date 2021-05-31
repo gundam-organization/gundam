@@ -12,6 +12,7 @@
 #include "GenericToolbox.h"
 
 #include "Dial.h"
+#include "AnaEvent.hh"
 
 
 class DialSet {
@@ -27,6 +28,9 @@ public:
 
   void initialize();
 
+  const std::string &getName() const;
+
+  void reweightEvent(AnaEvent* eventPtr_);
 
 private:
   // Parameters

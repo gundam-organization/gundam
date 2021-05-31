@@ -15,6 +15,7 @@ FitParameter::~FitParameter() {
 }
 
 void FitParameter::reset() {
+  _currentDialSetPtr_ = nullptr;
   _dialSetList_.clear();
   _parameterDefinitionsConfig_ = nlohmann::json();
   _parameterValue_ = 0;
@@ -51,6 +52,37 @@ const std::string &FitParameter::getName() const {
 double FitParameter::getParameterValue() const {
   return _parameterValue_;
 }
+
+void FitParameter::selectDialSet(const std::string &dataSetName_) {
+
+  _currentDialSetPtr_ = nullptr;
+  for( auto& dialSet : _dialSetList_ ){
+    if( dialSet.getName() == dataSetName_ ){
+      _currentDialSetPtr_ = &dialSet;
+      return;
+    }
+  }
+
+  // If not found, find general dialSet
+  for( auto& dialSet : _dialSetList_ ){
+    if( dialSet.getName().empty() or dialSet.getName() == "*" ){
+      _currentDialSetPtr_ = &dialSet;
+      return;
+    }
+  }
+
+}
+void FitParameter::reweightEvent(AnaEvent *eventPtr_) {
+
+  if( _currentDialSetPtr_ == nullptr ){
+    return;
+  }
+
+  _currentDialSetPtr_->reweightEvent(eventPtr_);
+
+}
+
+
 
 
 

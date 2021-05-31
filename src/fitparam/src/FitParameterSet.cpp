@@ -126,5 +126,9 @@ void FitParameterSet::initialize() {
   _isInitialized_ = true;
 }
 
+std::vector<FitParameter> &FitParameterSet::getParameterList() {
+  return _parameterList_;
+}
+
 
 
