@@ -5,10 +5,15 @@
 #include "FitParameterSet.h"
 #include "JsonUtils.h"
 
+#include "GenericToolbox.h"
+#include "GenericToolboxRootExt.h"
 #include "Logger.h"
 
-FitParameterSet::FitParameterSet() {
+LoggerInit([](){
   Logger::setUserHeaderStr("[FitParameterSet]");
+} )
+
+FitParameterSet::FitParameterSet() {
   this->reset();
 }
 FitParameterSet::~FitParameterSet() {
@@ -62,6 +67,8 @@ void FitParameterSet::initialize() {
     throw std::runtime_error("Could not find: covarianceMatrixTObjectPath");
   }
 
+  _correlationMatrix_ = GenericToolbox::convertToSymmetricMatrix(GenericToolbox::convertToCorrelationMatrix((TMatrixD*) _covarianceMatrix_));
+
   LogInfo << "Parameter set \"" << _name_ << "\" is handling " << _covarianceMatrix_->GetNcols() << " parameters." << std::endl;
 
   // Optional parameters:
@@ -106,20 +113,23 @@ void FitParameterSet::initialize() {
     }
   }
   else{
-    LogDebug << "No parameterNameTObjArray provided, default values." << std::endl;
+    LogDebug << "No parameterNameTObjArray provided, parameters will be referenced with their index." << std::endl;
     _parameterNamesList_ = new TObjArray(_covarianceMatrix_->GetNrows());
     for( int iPar = 0 ; iPar < _parameterPriorList_->GetNrows() ; iPar++ ){
       _parameterNamesList_->Add(new TNamed("", ""));
     }
   }
 
-  nlohmann::json dialSetDefinitions = JsonUtils::fetchValue<nlohmann::json>(_jsonConfig_, "dialSetDefinitions");
+  std::vector<nlohmann::json> dialSetDefinitions = JsonUtils::fetchValue<std::vector<nlohmann::json>>(_jsonConfig_, "dialSetDefinitions");
+
   for( int iPararmeter = 0 ; iPararmeter < _covarianceMatrix_->GetNcols() ; iPararmeter++ ){
     _parameterList_.emplace_back();
     _parameterList_.back().setParameterIndex(iPararmeter);
     _parameterList_.back().setName(_parameterNamesList_->At(iPararmeter)->GetName());
     _parameterList_.back().setParameterValue((*_parameterPriorList_)[iPararmeter]);
-    _parameterList_.back().setParameterDefinitionsConfig(dialSetDefinitions);
+    _parameterList_.back().setPriorValue((*_parameterPriorList_)[iPararmeter]);
+    _parameterList_.back().setStdDevValue((*_covarianceMatrix_)[iPararmeter][iPararmeter]);
+    _parameterList_.back().setDialSetConfigs(dialSetDefinitions);
     _parameterList_.back().initialize();
   }
 
@@ -130,5 +140,49 @@ std::vector<FitParameter> &FitParameterSet::getParameterList() {
   return _parameterList_;
 }
 
+void FitParameterSet::reweightEvent(AnaEvent *eventPtr_) {
+  this->passIfInitialized(__METHOD_NAME__);
+
+  double totalWeight = 1;
+
+  for( auto& parameter : _parameterList_ ){
+    if( parameter.getCurrentDialSetPtr() == nullptr ) continue;
+
+    int dialIndex = parameter.getCurrentDialSetPtr()->getDialIndex(eventPtr_);
+    if( dialIndex == -1 ) continue;
+
+    totalWeight *= parameter.getCurrentDialSetPtr()->getDialList().at( dialIndex )->evalResponse( parameter.getParameterValue() );
+  }
+
+  eventPtr_->AddEvWght(totalWeight);
+}
+
+void FitParameterSet::passIfInitialized(const std::string &methodName_) const {
+  if( not _isInitialized_ ){
+    LogError << "Can't do \"" << methodName_ << "\" while not initialized." << std::endl;
+    throw std::logic_error("class not initialized");
+  }
+}
+
+std::string FitParameterSet::getSummary() {
+  std::stringstream ss;
+
+  ss << __CLASS_NAME__ << ": " << this << std::endl;
+  ss << GET_VAR_NAME_VALUE(_isInitialized_) << std::endl;
+  ss << GET_VAR_NAME_VALUE(_name_) << std::endl;
+  ss << GET_VAR_NAME_VALUE(_covarianceMatrix_->GetNrows()) << std::endl;
+  ss << GET_VAR_NAME_VALUE(_parameterList_.size()) << std::endl;
+  ss << GET_VAR_NAME_VALUE(_isEnabled_);
+
+  if( not _parameterList_.empty() ){
+    ss << std::endl << "Parameters:";
+    for( int iPar = 0 ; iPar < _covarianceMatrix_->GetNrows() ; iPar++ ){
+      ss << std::endl << GenericToolbox::indentString(_parameterList_.at(iPar).getSummary(), 2);
+    }
+  }
+
+
+  return ss.str();
+}
 
 

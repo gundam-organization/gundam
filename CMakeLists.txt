@@ -78,9 +78,9 @@ else()
     #message(WARNING "You are using an untested compiler.")
 endif()
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-option(CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ langauge (-std=gnu++11)." OFF)
+option(CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ langauge (-std=gnu++14)." OFF)
 option(CXX_MARCH_FLAG "Enable cpu architecture specific optimzations." OFF)
 option(CXX_WARNINGS "Enable most C++ warning flags." ON)
 option(COLOR_OUTPUT "Enable colored terminal output." ON)
@@ -124,6 +124,9 @@ endif()
 ################################################################################
 
 # SubModules
+
+## Add the CmdLineParser
+include_directories(submodules/simple-cpp-cmd-line-parser/include)
 
 ## Add the GenericToolbox
 include_directories(submodules/cpp-generic-toolbox/include)

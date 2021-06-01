@@ -9,8 +9,11 @@
 #include "stdexcept"
 #include "sstream"
 
-DataBin::DataBin() {
+LoggerInit([](){
   Logger::setUserHeaderStr("[DataBin]");
+} )
+
+DataBin::DataBin() {
   reset();
 }
 DataBin::~DataBin() {
@@ -63,7 +66,7 @@ void DataBin::addBinEdge(const std::string &variableName_, double lowEdge_, doub
 
   this->addBinEdge(lowEdge_, highEdge_);
 }
-bool DataBin::isInBin(const std::vector<double>& valuesList_){
+bool DataBin::isInBin(const std::vector<double>& valuesList_) const{
   if( valuesList_.size() != _edgesList_.size() ){
     LogError << "Provided " << GET_VAR_NAME_VALUE(valuesList_.size()) << " does not match " << GET_VAR_NAME_VALUE(_edgesList_.size()) << std::endl;
     throw std::logic_error("Values list size does not match the bin edge list size.");
@@ -76,7 +79,7 @@ bool DataBin::isInBin(const std::vector<double>& valuesList_){
   }
   return true;
 }
-bool DataBin::isBetweenEdges(const std::string& variableName_, double value_){
+bool DataBin::isBetweenEdges(const std::string& variableName_, double value_) const {
   if( not this->isVariableSet(variableName_) ){
     LogError << "variableName_ = " << variableName_ << " is not set." << std::endl;
     throw std::logic_error("variableName_ not set.");
@@ -84,17 +87,28 @@ bool DataBin::isBetweenEdges(const std::string& variableName_, double value_){
   int varIndex = GenericToolbox::findElementIndex(variableName_, _variableNameList_);
   this->isBetweenEdges(varIndex, value_);
 }
+bool DataBin::isEventInBin(AnaEvent *eventPtr_) const {
+
+  for( size_t iVar = 0 ; iVar < _edgesList_.size() ; iVar++ ){
+    if( not this->isBetweenEdges(iVar, eventPtr_->GetEventVarAsDouble( _variableNameList_.at(iVar) )) ){
+      return false;
+    }
+  }
+  return true;
+}
 
 // Misc
-bool DataBin::isVariableSet(const std::string& variableName_){
+bool DataBin::isVariableSet(const std::string& variableName_) const{
   if( _isLowMemoryUsageMode_ ){
     LogError << "Can't fetch variable name while in low memory mode. (var name is not stored)" << std::endl;
     throw std::logic_error("can't fetch var name while _isLowMemoryUsageMode_");
   }
   return GenericToolbox::findElementIndex(variableName_, _variableNameList_) != -1;
 }
-std::string DataBin::generateSummary() const{
+std::string DataBin::getSummary() const{
   std::stringstream ss;
+  ss << "DataBin: ";
+
   if( _edgesList_.empty() ) ss << "undefined bin.";
   else{
     for( size_t iEdge = 0 ; iEdge < _edgesList_.size() ; iEdge++ ){
@@ -113,7 +127,7 @@ std::string DataBin::generateSummary() const{
 }
 
 // Protected
-bool DataBin::isBetweenEdges(size_t varIndex_, double value_){
+bool DataBin::isBetweenEdges(size_t varIndex_, double value_) const{
 
   if( varIndex_ >= _edgesList_.size() ){
     LogError << "Provided " << GET_VAR_NAME_VALUE(varIndex_) << " is invalid: " << GET_VAR_NAME_VALUE(_edgesList_.size()) << std::endl;

@@ -49,10 +49,12 @@ void getUserParameters();
 
 void monitorRAMPoint(std::string pointTitle_);
 
+LoggerInit([](){
+  Logger::setUserHeaderStr("[xsllhND280UpFit.cxx]");
+} )
+
 int main(int argc, char** argv)
 {
-    Logger::setUserHeaderStr("[xsllhND280UpFit.cxx]");
-
     // RAM Monitoring
     __ramBaseline__ = GenericToolbox::getProcessMemoryUsage();
     __memoryMonitorList__.emplace_back("RAM baseline: "+GenericToolbox::parseSizeUnits(__ramBaseline__));

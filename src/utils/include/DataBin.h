@@ -9,6 +9,9 @@
 #include "vector"
 #include "string"
 
+#include "AnaEvent.hh"
+
+
 class DataBin {
 
 public:
@@ -30,15 +33,16 @@ public:
   // Management
   void addBinEdge(double lowEdge_, double highEdge_);
   void addBinEdge(const std::string& variableName_, double lowEdge_, double highEdge_);
-  bool isInBin(const std::vector<double>& valuesList_);
-  bool isBetweenEdges(const std::string& variableName_, double value_);
+  bool isInBin(const std::vector<double>& valuesList_) const;
+  bool isBetweenEdges(const std::string& variableName_, double value_) const;
+  bool isEventInBin(AnaEvent* eventPtr_) const;
 
   // Misc
-  bool isVariableSet(const std::string& variableName_);
-  std::string generateSummary() const;
+  bool isVariableSet(const std::string& variableName_) const;
+  std::string getSummary() const;
 
 protected:
-  bool isBetweenEdges(size_t varIndex_, double value_);
+  bool isBetweenEdges(size_t varIndex_, double value_) const;
 
 private:
   bool _isLowMemoryUsageMode_{false};
@@ -47,6 +51,5 @@ private:
   std::vector<std::pair<double, double>> _edgesList_{};
 
 };
-
 
 #endif //XSLLHFITTER_DATABIN_H

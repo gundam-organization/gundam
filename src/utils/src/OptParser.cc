@@ -2,9 +2,12 @@
 #include "Logger.h"
 #include "GenericToolbox.h"
 
+LoggerInit([](){
+  Logger::setUserHeaderStr("[OptParser]");
+} )
+
 OptParser::OptParser()
 {
-    Logger::setUserHeaderStr("[OptParser]");
     xsLLh_env = std::string(std::getenv("XSLLHFITTER"));
 
     if(xsLLh_env.empty())

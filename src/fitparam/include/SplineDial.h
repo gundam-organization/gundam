@@ -13,6 +13,8 @@ class SplineDial : public Dial {
 
 public:
 
+  SplineDial();
+
   void reset() override;
 
   void setSplinePtr(TSpline3 *splinePtr);

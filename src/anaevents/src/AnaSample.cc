@@ -9,6 +9,10 @@
 
 using xsllh::FitBin;
 
+LoggerInit([](){
+  Logger::setUserHeaderStr("[AnaSample]");
+} )
+
 // ctor
 AnaSample::AnaSample(int sample_id, std::string  name, std::string  detector,
                      std::string  binning, TTree* t_data)
@@ -55,8 +59,6 @@ AnaSample::AnaSample(const SampleOpt& sample, TTree* t_data){
 
 // Private constructor
 void AnaSample::Reset() {
-
-    Logger::setUserHeaderStr("[AnaSample]");
 
     if(m_data_tree != nullptr){
         m_additional_cuts_formulae = new TTreeFormula(

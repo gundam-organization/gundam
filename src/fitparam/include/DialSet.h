@@ -8,6 +8,7 @@
 #include "string"
 #include "vector"
 #include "json.hpp"
+#include "memory"
 
 #include "GenericToolbox.h"
 
@@ -28,9 +29,13 @@ public:
 
   void initialize();
 
-  const std::string &getName() const;
+  // Getters
+  std::vector<std::shared_ptr<Dial>> &getDialList();
+  const std::vector<std::string> &getDataSetNameList() const;
 
-  void reweightEvent(AnaEvent* eventPtr_);
+  // Core
+  int getDialIndex(AnaEvent* eventPtr_);
+  std::string getSummary() const;
 
 private:
   // Parameters
@@ -39,10 +44,14 @@ private:
   std::string _parameterName_;
 
   // Internals
-  std::string _name_;             // ie detector name (or data set)
+  std::vector<std::string> _dataSetNameList_;
   double _parameterNominalValue_; // parameter with which the MC has produced the data set
-  std::vector<Dial*> _dialList_;
+  std::vector<std::shared_ptr<Dial>> _dialList_;
   DialType::DialType _globalDialType_;
+
+  // Caches
+  std::vector<AnaEvent*> _cachedEventPtrList_;
+  std::vector<Dial*> _cachedDialPtrList_;
 
 };
 

@@ -75,11 +75,11 @@ char **__argv__;
 std::string __jsonConfigPath__;
 int __fgd_id__;
 
+LoggerInit([](){
+  Logger::setUserHeaderStr("[xsTreeConvert.cxx]");
+} )
 
 int main(int argc, char** argv){
-
-    Logger::setUserHeaderStr("[xsTreeConvert]");
-//    Logger::setEnableColors(false);
 
     LogInfo << "-------------------------------------------------" << std::endl;
     LogInfo << "Welcome to the Super-xsLLh Tree Converter." << std::endl;

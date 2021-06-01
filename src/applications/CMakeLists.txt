@@ -12,6 +12,7 @@ set( APPLICATION_LIST
         xsllhPlot
         xsllhUnitTests
         xsllhXsecCov
+        xsllhFitter
 )
 
 foreach( app ${APPLICATION_LIST} )

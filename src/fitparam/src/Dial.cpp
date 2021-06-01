@@ -8,8 +8,12 @@
 
 #include "Dial.h"
 
-Dial::Dial() {
+
+LoggerInit([](){
   Logger::setUserHeaderStr("[Dial]");
+} )
+
+Dial::Dial() {
   this->reset();
 }
 Dial::~Dial() {
@@ -36,7 +40,7 @@ void Dial::initialize() {
 
 std::string Dial::getSummary(){
   std::stringstream ss;
-  ss << DialType::DialTypeEnumNamespace::toString(_dialType_) << ": " << _applyConditionBin_.generateSummary();
+  ss << DialType::DialTypeEnumNamespace::toString(_dialType_) << ": " << _applyConditionBin_.getSummary();
   return ss.str();
 }
 double Dial::evalResponse(const double &parameterValue_) {
@@ -48,5 +52,9 @@ double Dial::evalResponse(const double &parameterValue_) {
   this->updateResponseCache(parameterValue_); // specified in the corresponding dial class
 
   return _dialResponseCache_;
+}
+
+const DataBin &Dial::getApplyConditionBin() const {
+  return _applyConditionBin_;
 }
 

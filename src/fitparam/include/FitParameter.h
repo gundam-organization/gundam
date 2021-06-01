@@ -24,23 +24,31 @@ public:
   void setName(const std::string &name);
   void setParameterIndex(int parameterIndex);
   void setParameterValue(double parameterValue);
-  void setParameterDefinitionsConfig(const nlohmann::json &jsonConfig);
+  void setPriorValue(double priorValue);
+  void setStdDevValue(double stdDevValue);
+  void setDialSetConfigs(const std::vector<nlohmann::json> &jsonConfigList);
 
   void initialize();
 
+  int getParameterIndex() const;
+
   const std::string &getName() const;
   double getParameterValue() const;
+  DialSet *getCurrentDialSetPtr() const;
 
   void selectDialSet(const std::string& dataSetName_);
   void reweightEvent(AnaEvent* eventPtr_);
+  std::string getSummary();
 
 
 private:
   // Parameters
   std::string _name_;
   int _parameterIndex_{-1}; // to get the right definition in the json config (in case "name" is not specified)
-  double _parameterValue_;
-  nlohmann::json _parameterDefinitionsConfig_;
+  double _parameterValue_{};
+  double _priorValue_{};
+  double _stdDevValue_{};
+  nlohmann::json _dialDefinitionsList_;
 
   // Internals
   DialSet* _currentDialSetPtr_{nullptr};

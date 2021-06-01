@@ -18,6 +18,7 @@
 #include "Logger.h"
 
 #include "FitParameter.h"
+#include "AnaEvent.hh"
 
 
 
@@ -37,11 +38,20 @@ public:
 
   void reset();
 
+  // Setters
   void setJsonConfig(const nlohmann::json &jsonConfig);
 
   void initialize();
 
+  // Getters
   std::vector<FitParameter> &getParameterList();
+
+  // Core
+  void reweightEvent(AnaEvent* eventPtr_);
+  std::string getSummary();
+
+protected:
+  void passIfInitialized(const std::string& methodName_) const;
 
 private:
   // User parameters
@@ -53,9 +63,10 @@ private:
 
   // JSON
   std::string _name_;
-  bool _isEnabled_;
+  bool _isEnabled_{};
   TFile* _covarianceMatrixFile_{nullptr};
   TMatrixDSym* _covarianceMatrix_{nullptr};
+  TMatrixDSym* _correlationMatrix_{nullptr};
   TVectorD* _parameterPriorList_{nullptr};
   TObjArray* _parameterNamesList_{nullptr};
 

@@ -314,6 +314,26 @@ public:
     Float_t& GetEventVarFloat(const std::string& varName_) {
         return _floatValuesList_.at(GetFloatIndex(varName_));
     }
+    double GetEventVarAsDouble(const std::string& varName_){
+
+      int index;
+
+      index = GenericToolbox::findElementIndex(varName_, *_floatNameListPtr_);
+      if( index != -1 ) return _floatValuesList_.at(index);
+
+      index = GenericToolbox::findElementIndex(varName_, *_intNameListPtr_);
+      if( index != -1 ) return _intValuesList_.at(index);
+
+      LogFatal << "Could not find variable \"" << varName_ << "\" in both int and float lists." << std::endl;
+      LogFatal << "Available floats are: ";
+      GenericToolbox::printVector(*_floatNameListPtr_);
+      LogFatal << std::endl;
+      LogFatal << "Available ints are: ";
+      GenericToolbox::printVector(*_intNameListPtr_);
+      LogFatal << std::endl;
+      throw std::logic_error("Could not find variable");
+
+    }
 
     // Deprecated
     Int_t GetEventVar(const std::string& var) {

@@ -4,6 +4,9 @@
 #include "../include/XsecDial.hh"
 #include "Logger.h"
 
+LoggerInit([](){
+  Logger::setUserHeaderStr("[XsecDial]");
+} )
 
 XsecDial::XsecDial(std::string dial_name)
   : m_name(std::move(dial_name))
@@ -11,7 +14,6 @@ XsecDial::XsecDial(std::string dial_name)
   _useGraphEval_ = false;
   _isNormalizationDial_ = false;
   _isSplinesInTTree_    = false;
-  Logger::setUserHeaderStr("[XsecDial]");
 }
 
 XsecDial::XsecDial(std::string  dial_name, const std::string& fname_binning,
@@ -21,7 +23,6 @@ XsecDial::XsecDial(std::string  dial_name, const std::string& fname_binning,
   _useGraphEval_ = false;
   _isNormalizationDial_ = false;
   _isSplinesInTTree_    = false;
-  Logger::setUserHeaderStr("[XsecDial]");
   SetBinning(fname_binning);
   ReadSplines(fname_splines);
 }

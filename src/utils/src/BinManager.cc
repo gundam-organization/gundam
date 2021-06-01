@@ -2,16 +2,18 @@
 #include "Logger.h"
 #include "GenericToolbox.h"
 
+LoggerInit([](){
+  Logger::setUserHeaderStr("[BinManager]");
+} )
+
 BinManager::BinManager()
   : dimension(0), nbins(0)
 {
-  Logger::setUserHeaderStr("[BinManager]");
 }
 
 BinManager::BinManager(const std::string& filename, bool UseNutypeBeammode)
   : dimension(0), nbins(0), fname_binning(filename)
 {
-  Logger::setUserHeaderStr("[BinManager]");
   SetBinning(fname_binning, UseNutypeBeammode);
 }
 

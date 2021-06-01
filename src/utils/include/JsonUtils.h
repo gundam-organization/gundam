@@ -12,8 +12,15 @@
 
 namespace JsonUtils {
 
+  nlohmann::json readConfigFile(const std::string& configFilePath_);
+
   template<class T> auto fetchValue(const nlohmann::json& jsonConfig_, const std::string& optionName_) -> T;
   template<class T> auto fetchValue(const nlohmann::json& jsonConfig_, const std::string& optionName_, const T& defaultValue_) -> T;
+
+  class Loader{
+  public:
+    Loader();
+  };
 
 };
 
@@ -21,8 +28,7 @@ namespace JsonUtils {
 template<class T> auto JsonUtils::fetchValue(const nlohmann::json& jsonConfig_, const std::string& optionName_) -> T{
   auto jsonEntry = jsonConfig_.find(optionName_);
   if( jsonEntry == jsonConfig_.end() ){
-    std::cout << "Could not find json entry: name" << std::endl;
-    throw std::runtime_error("Could not find json entry: name");
+    throw std::runtime_error("Could not find json entry: " + optionName_);
   }
   return jsonEntry->template get<T>();
 }

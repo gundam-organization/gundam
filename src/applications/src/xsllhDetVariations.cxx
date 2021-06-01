@@ -142,10 +142,12 @@ void initCutDictionnary();
 void mapTreeConverterEntries();
 bool buildTreeSyncCache();
 
+LoggerInit([](){
+  Logger::setUserHeaderStr("[xsDetVariation]");
+} )
+
 int main(int argc, char** argv)
 {
-
-    Logger::setUserHeaderStr("[xsDetVariation]");
     initCutDictionnary();
 
     // Define colors and strings for info and error messages:

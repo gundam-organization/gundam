@@ -4,12 +4,15 @@
 #include <future>
 #include "GlobalVariables.h"
 
+LoggerInit([](){
+  Logger::setUserHeaderStr("[XsecParameters]");
+} )
+
 XsecParameters::XsecParameters(const std::string& name)
 {
   m_name = name;
   Npar = 0;
   _enableZeroWeightFenceGate_ = false;
-  Logger::setUserHeaderStr("[XsecParameters]");
 }
 
 XsecParameters::~XsecParameters() { ; }

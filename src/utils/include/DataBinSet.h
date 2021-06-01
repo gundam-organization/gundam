@@ -26,12 +26,17 @@ public:
   void addBinContent(int binIndex_, double weight_);
 
   const std::vector<DataBin> &getBinsList() const;
+  const std::string &getFilePath() const;
 
   // Misc
-  std::string generateSummary() const;
+  std::string getSummary() const;
+
+  // Globals
+  static void setVerbosity(int maxLogLevel_);
 
 private:
   std::string _name_;
+  std::string _filePath_;
   std::vector<DataBin> _binsList_{};
   std::vector<double> _binContent_{};
 

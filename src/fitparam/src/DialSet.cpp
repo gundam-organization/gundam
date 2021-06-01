@@ -24,12 +24,13 @@ DialSet::~DialSet() {
 }
 
 void DialSet::reset() {
-  _name_ = "";
-  for( auto& dial : _dialList_ ) delete dial;
+  _dataSetNameList_.clear();
   _dialList_.clear();
   _dialSetConfig_ = nlohmann::json();
   _parameterIndex_ = -1;
   _parameterName_ = "";
+  _cachedEventPtrList_.clear();
+  _cachedDialPtrList_.clear();
 }
 
 void DialSet::setDialSetConfig(const nlohmann::json &dialSetConfig) {
@@ -50,7 +51,13 @@ void DialSet::initialize() {
     throw std::logic_error("_dialSetConfig_ is not set.");
   }
 
-  _name_ = JsonUtils::fetchValue<std::string>(_dialSetConfig_, "applyOnDataSets");
+  _dataSetNameList_ = JsonUtils::fetchValue<std::vector<std::string>>(
+    _dialSetConfig_, "applyOnDataSets", std::vector<std::string>()
+    );
+  if( _dataSetNameList_.empty() ){
+    _dataSetNameList_.emplace_back("*");
+  }
+  else { }
 
   std::string enumStr;
   int enumIndex;
@@ -77,14 +84,18 @@ void DialSet::initialize() {
 
     DataBinSet binning;
     binning.setName("parameterBinning");
+    DataBinSet::setVerbosity(static_cast<int>(Logger::LogLevel::ERROR)); // only print errors if any
     binning.readBinningDefinition(parameterBinningPath);
+    DataBinSet::setVerbosity(static_cast<int>(Logger::getMaxLogLevel())); // take back the log level with this instance
     if( _parameterIndex_ >= binning.getBinsList().size() ){
       LogError << "Can't fetch parameter index #" << _parameterIndex_ << " while binning size is: " << binning.getBinsList().size() << std::endl;
       throw std::runtime_error("Can't fetch parameter index.");
     }
-    _dialList_.emplace_back( new NormalizationDial() );
-    _dialList_.back()->setApplyConditionBin(binning.getBinsList().at(_parameterIndex_));
-    _dialList_.back()->initialize();
+
+    auto* dialPtr = new NormalizationDial();
+    dialPtr->setApplyConditionBin( binning.getBinsList().at( _parameterIndex_ ) );
+    dialPtr->initialize();
+    _dialList_.emplace_back( std::shared_ptr<NormalizationDial>(dialPtr) );
   }
   else{
 
@@ -121,7 +132,7 @@ void DialSet::initialize() {
         dialsType = static_cast<DialType::DialType>(enumIndex);
       }
       if( dialsType == DialType::Normalization ){
-        _dialList_.emplace_back( new NormalizationDial() );
+        _dialList_.emplace_back(std::make_shared<NormalizationDial>() );
       }
       else if( dialsType == DialType::Spline or dialsType == DialType::Graph ){
         std::string binningFilePath = JsonUtils::fetchValue<std::string>(dialsDefinition, "binningFilePath");
@@ -180,10 +191,10 @@ void DialSet::initialize() {
             dialBin.addBinEdge(splitVarNameList.at(iSplitVar), splitVarValueList.at(iSplitVar), splitVarValueList.at(iSplitVar));
           }
           if      ( dialsType == DialType::Spline ){
-            auto* splineDialPtr = new SplineDial();
-            splineDialPtr->setSplinePtr(splinePtr);
-            splineDialPtr->setApplyConditionBin(dialBin);
-            _dialList_.emplace_back( splineDialPtr );
+            _dialList_.emplace_back(std::make_shared<SplineDial>() );
+            _dialList_.back()->setApplyConditionBin(dialBin);
+            auto splineDialCast = std::dynamic_pointer_cast<SplineDial>(_dialList_.back());
+            splineDialCast->setSplinePtr(splinePtr);
           }
           else if( dialsType == DialType::Graph ){
             // TODO
@@ -203,10 +214,33 @@ void DialSet::initialize() {
 
 }
 
-const std::string &DialSet::getName() const {
-  return _name_;
+const std::vector<std::string> &DialSet::getDataSetNameList() const {
+  return _dataSetNameList_;
+}
+std::vector<std::shared_ptr<Dial>> &DialSet::getDialList() {
+  return _dialList_;
 }
 
-void DialSet::reweightEvent(AnaEvent *eventPtr_) {
+int DialSet::getDialIndex(AnaEvent *eventPtr_) {
 
+  int index = 0;
+  for( const auto& dial : _dialList_ ){
+    if( dial->getApplyConditionBin().isEventInBin(eventPtr_) ){
+      return index;
+    }
+    index++;
+  }
+
+  return -1;
 }
+std::string DialSet::getSummary() const {
+  std::stringstream ss;
+  ss << "DialSets applied on datasets: " << GenericToolbox::parseVectorAsString(_dataSetNameList_);
+
+  for( const auto& dialPtr: _dialList_ ){
+    ss << std::endl << GenericToolbox::indentString(dialPtr->getSummary(), 2);
+  }
+
+  return ss.str();
+}
+

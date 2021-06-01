@@ -6,8 +6,13 @@
 
 #include "Logger.h"
 
+LoggerInit([](){ Logger::setUserHeaderStr("[SplineDial]"); } )
+
+SplineDial::SplineDial() {
+  this->reset();
+}
+
 void SplineDial::reset() {
-  Logger::setUserHeaderStr("[SplineDial]");
   Dial::reset();
   _splinePtr_ = nullptr;
 }
@@ -33,7 +38,3 @@ void SplineDial::updateResponseCache(const double &parameterValue_) {
 void SplineDial::setSplinePtr(TSpline3 *splinePtr) {
   _splinePtr_ = splinePtr;
 }
-
-
-
-

@@ -11,8 +11,11 @@
 #include "GenericToolbox.h"
 #include "Logger.h"
 
-DataBinSet::DataBinSet() {
+LoggerInit([](){
   Logger::setUserHeaderStr("[DataBinSet]");
+} )
+
+DataBinSet::DataBinSet() {
   this->reset();
 }
 DataBinSet::~DataBinSet() { this->reset(); }
@@ -24,6 +27,7 @@ void DataBinSet::reset() {
 void DataBinSet::readBinningDefinition(const std::string &filePath_) {
 
   LogInfo << "Reading binning definition from: \"" << filePath_ << "\"" << std::endl;
+  _filePath_ = filePath_;
 
   if( not GenericToolbox::doesPathIsFile(filePath_) ){
     LogError << GET_VAR_NAME_VALUE(filePath_) << ": file not found." << std::endl;
@@ -64,7 +68,7 @@ void DataBinSet::readBinningDefinition(const std::string &filePath_) {
 
       for( size_t iElement = 1 ; iElement < lineElements.size() ; iElement++ ){
 
-        if( lineElements.at(iElement) == expectedVariableList.back() ){
+        if( not expectedVariableList.empty() and lineElements.at(iElement) == expectedVariableList.back() ){
           if( expectedVariableIsRangeList.back() == true ){
             LogError << "Same variable appear more than 2 times: " << GenericToolbox::parseVectorAsString(lineElements) << std::endl;
             throw std::runtime_error("Invalid bin definition line.");
@@ -113,10 +117,10 @@ void DataBinSet::readBinningDefinition(const std::string &filePath_) {
       }
 
       size_t iElement = 0;
+      _binsList_.emplace_back();
+      _binContent_.emplace_back(0);
       for( size_t iVar = 0; iVar < expectedVariableList.size() ; iVar++ ){
 
-        _binsList_.emplace_back();
-        _binContent_.emplace_back(0);
         if( expectedVariableIsRangeList.at(iVar) ){
           _binsList_.back().addBinEdge(
             expectedVariableList[iVar],
@@ -144,14 +148,15 @@ void DataBinSet::readBinningDefinition(const std::string &filePath_) {
 
 }
 
-std::string DataBinSet::generateSummary() const{
+std::string DataBinSet::getSummary() const{
   std::stringstream ss;
-  ss << __CLASS_NAME__ << ": " << this << std::endl;
-  if( not _name_.empty() ) ss << GET_VAR_NAME_VALUE(_name_) << std::endl;
-  ss << "Holding " << _binsList_.size() << " bins." << std::endl;
+  ss << "DataBinSet";
+  if( not _name_.empty() ) ss << "(" << _name_ << ")";
+  ss << ": holding " << _binsList_.size() << " bins.";
+
   if( not _binsList_.empty() ){
-    for( const auto& bin : _binsList_ ){
-      ss << "  " << bin.generateSummary() << std::endl;
+    for( size_t iBin = 0 ; iBin < _binsList_.size() ; iBin++ ){
+      ss << std::endl << GenericToolbox::indentString( "#" + std::to_string(iBin) + ": " + _binsList_.at(iBin).getSummary(), 2);
     }
   }
   return ss.str();
@@ -171,4 +176,12 @@ void DataBinSet::addBinContent(int binIndex_, double weight_) {
 
 const std::vector<DataBin> &DataBinSet::getBinsList() const {
   return _binsList_;
+}
+
+const std::string &DataBinSet::getFilePath() const {
+  return _filePath_;
+}
+
+void DataBinSet::setVerbosity(int maxLogLevel_) {
+  Logger::setMaxLogLevel(maxLogLevel_);
 }

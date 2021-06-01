@@ -35,6 +35,8 @@ public:
 
   virtual void initialize();
 
+  const DataBin &getApplyConditionBin() const;
+
   virtual std::string getSummary();
   double evalResponse(const double& parameterValue_);
   virtual void updateResponseCache(const double& parameterValue_) = 0;
@@ -45,8 +47,8 @@ protected:
   DialType::DialType _dialType_{DialType::Invalid};
 
   // Internals
-  double _dialResponseCache_;
-  double _dialParameterCache_;
+  double _dialResponseCache_{};
+  double _dialParameterCache_{};
 
 };
 

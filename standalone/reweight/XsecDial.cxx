@@ -1,17 +1,17 @@
 #include "XsecDial.h"
 #include "Logger.h"
 
+
+
 XsecDial::XsecDial(const std::string& dial_name)
     : m_name(dial_name), TAG("\033[92m[XsecDial]: \033[0m")
 {
-    Logger::setUserHeaderStr("[XsecDial]");
 }
 
 XsecDial::XsecDial(const std::string& dial_name, const std::string& fname_binning,
                    const std::string& fname_splines)
     : m_name(dial_name), TAG("\033[92m[XsecDial]: \033[0m")
 {
-    Logger::setUserHeaderStr("[XsecDial]");
     SetBinning(fname_binning);
     ReadSplines(fname_splines);
 }

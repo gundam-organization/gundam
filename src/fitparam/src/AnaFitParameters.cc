@@ -3,6 +3,10 @@
 #include "GenericToolboxRootExt.h"
 #include "Logger.h"
 
+LoggerInit([](){
+  Logger::setUserHeaderStr("[AnaFitParameters]");
+} )
+
 AnaFitParameters::AnaFitParameters()
     : m_name("")
     , Npar(0)
@@ -20,7 +24,6 @@ AnaFitParameters::AnaFitParameters()
     , covarianceI(nullptr)
     , original_cov(nullptr)
 {
-    Logger::setUserHeaderStr("[AnaFitParameters]");
 }
 
 AnaFitParameters::~AnaFitParameters()

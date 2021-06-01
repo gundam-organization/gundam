@@ -109,6 +109,9 @@ void generateJsonConfigFile();
 double convertToAbsoluteVariation(std::string parName_, double relativeDeviationParamValue_);
 bool doesParamHasRelativeXScale(std::string& systName_);
 
+LoggerInit([](){
+  Logger::setUserHeaderStr("[xsllhGenWeightsFormater]");
+} )
 
 /****************************/
 //! MAIN
@@ -166,8 +169,6 @@ std::string remindUsage(){
 
 }
 void resetParameters(){
-
-  Logger::setUserHeaderStr("[xsllhGenWeightsFormater]");
 
   __pathJsonConfigFile__ = "";
   __pathCovarianceMatrixFile__ = "";

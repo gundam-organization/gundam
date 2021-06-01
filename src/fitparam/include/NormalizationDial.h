@@ -9,6 +9,9 @@
 
 class NormalizationDial : public Dial {
 
+public:
+  NormalizationDial();
+
   void reset() override;
   void initialize() override;
 

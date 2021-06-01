@@ -11,10 +11,11 @@
 #define REWEIGHT_TIME_POINT 11
 #define FILL_TIME_POINT 12
 
+LoggerInit([](){
+  Logger::setUserHeaderStr("[FitterEngine]");
+} )
 
 FitterEngine::FitterEngine() {
-
-  Logger::setUserHeaderStr("[FitterEngine]");
 
   // Memory allocation
   _PRNG_ = new TRandom3();
