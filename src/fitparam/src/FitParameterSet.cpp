@@ -24,10 +24,17 @@ void FitParameterSet::reset() {
 
   _isInitialized_ = false;
 
-  delete _covarianceMatrix_; _covarianceMatrix_ = nullptr;
-  delete _covarianceMatrixFile_; _covarianceMatrixFile_ = nullptr;
-
   _jsonConfig_ = nlohmann::json();
+  if(_covarianceMatrixFile_ != nullptr){
+    _covarianceMatrixFile_->Close(); // should delete every attached pointer
+  }
+
+  _covarianceMatrixFile_ = nullptr;
+  _covarianceMatrix_ = nullptr;
+  _correlationMatrix_ = nullptr;
+  _parameterPriorList_ = nullptr;
+  _parameterNamesList_ = nullptr;
+
   _parameterList_.clear();
 
 }
@@ -165,7 +172,7 @@ void FitParameterSet::passIfInitialized(const std::string &methodName_) const {
   }
 }
 
-std::string FitParameterSet::getSummary() {
+std::string FitParameterSet::getSummary() const {
   std::stringstream ss;
 
   ss << "FitParameterSet: " << _name_ << " -> initialized=" << _isInitialized_ << ", enabled=" << _isEnabled_;
@@ -178,8 +185,6 @@ std::string FitParameterSet::getSummary() {
       }
     }
   }
-
-
 
   return ss.str();
 }

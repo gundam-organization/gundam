@@ -48,7 +48,7 @@ public:
 
   // Core
   void reweightEvent(AnaEvent* eventPtr_);
-  std::string getSummary();
+  std::string getSummary() const ;
 
 protected:
   void passIfInitialized(const std::string& methodName_) const;

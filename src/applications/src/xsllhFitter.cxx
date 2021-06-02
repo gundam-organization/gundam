@@ -31,14 +31,17 @@ int main(int argc, char** argv){
   auto configFilePath = clParser.getOptionVal<std::string>("config-file");
   auto jsonConfig = JsonUtils::readConfigFile(configFilePath);
 
-  FitParameterSet parameterSet;
-  parameterSet.setJsonConfig(jsonConfig["fitParameterSets"][0]);
-  parameterSet.initialize();
-  LogInfo << parameterSet.getSummary() << std::endl;
+  std::vector<FitParameterSet> parameterSetList;
+  for( const auto& parameterSetConfig : jsonConfig["fitParameterSets"] ){
+    LogTrace << "emplace_back..." << std::endl;
+    parameterSetList.emplace_back();
+    LogTrace << "emplace_back... END" << std::endl;
+    parameterSetList.back().setJsonConfig(parameterSetConfig);
+    parameterSetList.back().initialize();
+  }
 
-  FitParameterSet parameterSetXsec;
-  parameterSetXsec.setJsonConfig(jsonConfig["fitParameterSets"][1]);
-  parameterSetXsec.initialize();
-  LogInfo << parameterSetXsec.getSummary() << std::endl;
+  for( const auto& parameterSet : parameterSetList ){
+    LogInfo << parameterSet.getSummary() << std::endl;
+  }
 
 }
