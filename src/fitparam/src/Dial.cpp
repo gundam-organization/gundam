@@ -13,6 +13,18 @@ LoggerInit([](){
   Logger::setUserHeaderStr("[Dial]");
 } )
 
+
+
+DialType::DialType DialType::toDialType(const std::string& dialStr_){
+  int enumIndex = DialTypeEnumNamespace::toEnumInt("DialType::" + dialStr_);
+  if( enumIndex == DialTypeEnumNamespace::enumOffSet - 1 ){
+    LogError << "\"" << dialStr_ << "\" unrecognized  dial type. " << std::endl;
+    LogError << "Expecting: { " << DialTypeEnumNamespace::enumNamesAgregate << " }" << std::endl;
+    throw std::runtime_error("Unrecognized  dial type.");
+  }
+  return static_cast<DialType>(enumIndex);
+}
+
 Dial::Dial() {
   this->reset();
 }

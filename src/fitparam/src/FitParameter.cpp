@@ -28,6 +28,30 @@ void FitParameter::reset() {
   _parameterValue_ = std::numeric_limits<double>::quiet_NaN();
   _priorValue_     = std::numeric_limits<double>::quiet_NaN();
   _stdDevValue_    = std::numeric_limits<double>::quiet_NaN();
+  _dialsWorkingDirectory_ = ".";
+  _isEnabled_ = true;
+}
+
+void FitParameter::setDialSetConfigs(const std::vector<nlohmann::json> &jsonConfigList) {
+  _dialDefinitionsList_ = jsonConfigList;
+}
+void FitParameter::setParameterIndex(int parameterIndex) {
+  _parameterIndex_ = parameterIndex;
+}
+void FitParameter::setName(const std::string &name) {
+  _name_ = name;
+}
+void FitParameter::setParameterValue(double parameterValue) {
+  _parameterValue_ = parameterValue;
+}
+void FitParameter::setPriorValue(double priorValue) {
+  _priorValue_ = priorValue;
+}
+void FitParameter::setStdDevValue(double stdDevValue) {
+  _stdDevValue_ = stdDevValue;
+}
+void FitParameter::setEnableDialSetsSummary(bool enableDialSetsSummary) {
+  _enableDialSetsSummary_ = enableDialSetsSummary;
 }
 
 void FitParameter::initialize() {
@@ -53,36 +77,30 @@ void FitParameter::initialize() {
     throw std::logic_error("_dialDefinitionsList_ is not set.");
   }
 
-  LogDebug << "Initializing FitParameter #" << _parameterIndex_;
-  if( not _name_.empty() ) LogDebug << " (" << _name_ << ")";
-  LogDebug << std::endl;
+  LogDebug << "Initializing Parameter " << getTitle() << std::endl;
 
   for( const auto& dialDefinitionConfig : _dialDefinitionsList_ ){
     _dialSetList_.emplace_back();
     _dialSetList_.back().setParameterIndex(_parameterIndex_);
+    _dialSetList_.back().setParameterName(_name_);
     _dialSetList_.back().setDialSetConfig(dialDefinitionConfig);
+    _dialSetList_.back().setWorkingDirectory(_dialsWorkingDirectory_);
     _dialSetList_.back().initialize();
   }
 
-}
+  // Check if no dials is actually defined -> disable the parameter in that case
+  bool dialSetAreAllDisabled = true;
+  for( const auto& dialSet : _dialSetList_ ){
+    if( dialSet.isEnabled() ){
+      dialSetAreAllDisabled = false;
+      break;
+    }
+  }
+  if( dialSetAreAllDisabled ){
+    LogWarning << "Parameter " << getTitle() << " has no dials: disabled." << std::endl;
+    _isEnabled_ = false;
+  }
 
-void FitParameter::setDialSetConfigs(const std::vector<nlohmann::json> &jsonConfigList) {
-  _dialDefinitionsList_ = jsonConfigList;
-}
-void FitParameter::setParameterIndex(int parameterIndex) {
-  _parameterIndex_ = parameterIndex;
-}
-void FitParameter::setName(const std::string &name) {
-  _name_ = name;
-}
-void FitParameter::setParameterValue(double parameterValue) {
-  _parameterValue_ = parameterValue;
-}
-void FitParameter::setPriorValue(double priorValue) {
-  _priorValue_ = priorValue;
-}
-void FitParameter::setStdDevValue(double stdDevValue) {
-  _stdDevValue_ = stdDevValue;
 }
 
 const std::string &FitParameter::getName() const {
@@ -136,17 +154,29 @@ std::string FitParameter::getSummary() {
 
   ss << "#" << _parameterIndex_;
   if( not _name_.empty() ) ss << " (" << _name_ << ")";
-  ss << ": " << GET_VAR_NAME_VALUE(_priorValue_);
-  ss << ", " << GET_VAR_NAME_VALUE(_stdDevValue_);
-  ss << ", " << GET_VAR_NAME_VALUE(_parameterValue_);
+  ss << ": value=" << _parameterValue_;
+  ss << ", prior=" << _priorValue_;
+  ss << ", stdDev=" << _stdDevValue_;
+  ss << ", isEnabled=" << _isEnabled_;
 
-  if( not _dialSetList_.empty() ){
-    ss << std::endl << "DialSets:";
+  if( _enableDialSetsSummary_ ){
+    ss << ":";
     for( const auto& dialSet : _dialSetList_ ){
       ss << std::endl << GenericToolbox::indentString(dialSet.getSummary(), 2);
     }
   }
 
+  return ss.str();
+}
+
+void FitParameter::setDialsWorkingDirectory(const std::string &dialsWorkingDirectory) {
+  _dialsWorkingDirectory_ = dialsWorkingDirectory;
+}
+
+std::string FitParameter::getTitle() {
+  std::stringstream ss;
+  ss << "#" << _parameterIndex_;
+  if( _name_.empty() ) ss << "(" << _name_ << ")";
   return ss.str();
 }
 

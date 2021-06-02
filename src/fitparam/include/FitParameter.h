@@ -27,19 +27,22 @@ public:
   void setPriorValue(double priorValue);
   void setStdDevValue(double stdDevValue);
   void setDialSetConfigs(const std::vector<nlohmann::json> &jsonConfigList);
+  void setEnableDialSetsSummary(bool enableDialSetsSummary);
+  void setDialsWorkingDirectory(const std::string &dialsWorkingDirectory);
 
   void initialize();
 
+  // Getters
   int getParameterIndex() const;
-
   const std::string &getName() const;
   double getParameterValue() const;
   DialSet *getCurrentDialSetPtr() const;
 
+  // Core
   void selectDialSet(const std::string& dataSetName_);
   void reweightEvent(AnaEvent* eventPtr_);
   std::string getSummary();
-
+  std::string getTitle();
 
 private:
   // Parameters
@@ -49,6 +52,9 @@ private:
   double _priorValue_{};
   double _stdDevValue_{};
   nlohmann::json _dialDefinitionsList_;
+  bool _enableDialSetsSummary_;
+  std::string _dialsWorkingDirectory_;
+  bool _isEnabled_{true};
 
   // Internals
   DialSet* _currentDialSetPtr_{nullptr};

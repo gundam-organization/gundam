@@ -25,27 +25,41 @@ public:
   void reset();
 
   void setParameterIndex(int parameterIndex);
+  void setParameterName(const std::string &parameterName);
   void setDialSetConfig(const nlohmann::json &dialSetConfig);
+  void setWorkingDirectory(const std::string &workingDirectory);
 
   void initialize();
 
   // Getters
+  bool isEnabled() const;
   std::vector<std::shared_ptr<Dial>> &getDialList();
   const std::vector<std::string> &getDataSetNameList() const;
+
 
   // Core
   int getDialIndex(AnaEvent* eventPtr_);
   std::string getSummary() const;
+
+protected:
+  void initializeNormDialsWithBinning(const std::string& binningFilePath_ );
+  nlohmann::json fetchDialsDefinition(const nlohmann::json &definitionsList_);
 
 private:
   // Parameters
   nlohmann::json _dialSetConfig_;
   int _parameterIndex_{-1};
   std::string _parameterName_;
+  std::string _workingDirectory_{"."};
 
   // Internals
+  bool _enableDialsSummary_{false};
+  bool _isEnabled_{true};
+  double _parameterNominalValue_{}; // parameter with which the MC has produced the data set
   std::vector<std::string> _dataSetNameList_;
-  double _parameterNominalValue_; // parameter with which the MC has produced the data set
+  // shared pointers are needed since we want to make vectors of DialSets.
+  // .emplace_back() method is calling delete which is calling reset(), and this one has to delete the content of
+  // every pointers. It means the new copied DialSet will handle Dial ptr which have already been deleted.
   std::vector<std::shared_ptr<Dial>> _dialList_;
   DialType::DialType _globalDialType_;
 

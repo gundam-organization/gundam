@@ -5,6 +5,8 @@
 #ifndef XSLLHFITTER_DIAL_H
 #define XSLLHFITTER_DIAL_H
 
+#include "string"
+
 #include "GenericToolbox.h"
 
 #include "DataBin.h"
@@ -19,6 +21,8 @@ namespace DialType{
     Graph,         // response = graphInterpol(dial)
     Other
   );
+
+  DialType toDialType(const std::string& dialStr_);
 }
 
 

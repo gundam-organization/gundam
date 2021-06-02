@@ -36,4 +36,9 @@ int main(int argc, char** argv){
   parameterSet.initialize();
   LogInfo << parameterSet.getSummary() << std::endl;
 
+  FitParameterSet parameterSetXsec;
+  parameterSetXsec.setJsonConfig(jsonConfig["fitParameterSets"][1]);
+  parameterSetXsec.initialize();
+  LogInfo << parameterSetXsec.getSummary() << std::endl;
+
 }
