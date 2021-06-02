@@ -53,6 +53,9 @@ void FitParameter::setStdDevValue(double stdDevValue) {
 void FitParameter::setEnableDialSetsSummary(bool enableDialSetsSummary) {
   _enableDialSetsSummary_ = enableDialSetsSummary;
 }
+void FitParameter::setDialsWorkingDirectory(const std::string &dialsWorkingDirectory) {
+  _dialsWorkingDirectory_ = dialsWorkingDirectory;
+}
 
 void FitParameter::initialize() {
 
@@ -149,7 +152,7 @@ void FitParameter::reweightEvent(AnaEvent *eventPtr_) {
 
 }
 
-std::string FitParameter::getSummary() {
+std::string FitParameter::getSummary() const {
   std::stringstream ss;
 
   ss << "#" << _parameterIndex_;
@@ -168,23 +171,10 @@ std::string FitParameter::getSummary() {
 
   return ss.str();
 }
-
-void FitParameter::setDialsWorkingDirectory(const std::string &dialsWorkingDirectory) {
-  _dialsWorkingDirectory_ = dialsWorkingDirectory;
-}
-
-std::string FitParameter::getTitle() {
+std::string FitParameter::getTitle() const {
   std::stringstream ss;
   ss << "#" << _parameterIndex_;
   if( _name_.empty() ) ss << "(" << _name_ << ")";
   return ss.str();
 }
-
-
-
-
-
-
-
-
 

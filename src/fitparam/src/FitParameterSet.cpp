@@ -48,7 +48,7 @@ void FitParameterSet::initialize() {
 
   _isEnabled_ = JsonUtils::fetchValue<bool>(_jsonConfig_, "isEnabled");
   if( not _isEnabled_ ){
-    LogWarning << _name_ << " parameters are disabled. Skipping config parsing..." << std::endl;
+    LogWarning << _name_ << " parameters are disabled." << std::endl;
     return;
   }
 
@@ -168,19 +168,17 @@ void FitParameterSet::passIfInitialized(const std::string &methodName_) const {
 std::string FitParameterSet::getSummary() {
   std::stringstream ss;
 
-  ss << __CLASS_NAME__ << ": " << this << std::endl;
-  ss << GET_VAR_NAME_VALUE(_isInitialized_) << std::endl;
-  ss << GET_VAR_NAME_VALUE(_name_) << std::endl;
-  ss << GET_VAR_NAME_VALUE(_covarianceMatrix_->GetNrows()) << std::endl;
-  ss << GET_VAR_NAME_VALUE(_parameterList_.size()) << std::endl;
-  ss << GET_VAR_NAME_VALUE(_isEnabled_);
+  ss << "FitParameterSet: " << _name_ << " -> initialized=" << _isInitialized_ << ", enabled=" << _isEnabled_;
 
-  if( not _parameterList_.empty() ){
-    ss << std::endl << "Parameters:";
-    for( int iPar = 0 ; iPar < _covarianceMatrix_->GetNrows() ; iPar++ ){
-      ss << std::endl << GenericToolbox::indentString(_parameterList_.at(iPar).getSummary(), 2);
+  if(_isInitialized_ and _isEnabled_){
+    ss << ", nbParameters: " << _parameterList_.size() << "(defined)/" << _covarianceMatrix_->GetNrows() << "(covariance)";
+    if( not _parameterList_.empty() ){
+      for( const auto& parameter : _parameterList_ ){
+        ss << std::endl << GenericToolbox::indentString(parameter.getSummary(), 2);
+      }
     }
   }
+
 
 
   return ss.str();

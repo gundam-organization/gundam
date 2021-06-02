@@ -41,8 +41,8 @@ public:
   // Core
   void selectDialSet(const std::string& dataSetName_);
   void reweightEvent(AnaEvent* eventPtr_);
-  std::string getSummary();
-  std::string getTitle();
+  std::string getSummary() const;
+  std::string getTitle() const;
 
 private:
   // Parameters

@@ -17,11 +17,6 @@ namespace JsonUtils {
   template<class T> auto fetchValue(const nlohmann::json& jsonConfig_, const std::string& optionName_) -> T;
   template<class T> auto fetchValue(const nlohmann::json& jsonConfig_, const std::string& optionName_, const T& defaultValue_) -> T;
 
-  class Loader{
-  public:
-    Loader();
-  };
-
 };
 
 

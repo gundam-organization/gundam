@@ -15,8 +15,12 @@
 #include "NormalizationDial.h"
 #include "SplineDial.h"
 
-DialSet::DialSet() {
+LoggerInit([](){
   Logger::setUserHeaderStr("[DialSet]");
+})
+
+
+DialSet::DialSet() {
   this->reset();
 }
 DialSet::~DialSet() {
@@ -71,27 +75,111 @@ void DialSet::initialize() {
   }
 
   // Dials are directly defined with a binning file?
-  std::string parameterBinningPath = JsonUtils::fetchValue<std::string>(_dialSetConfig_, "parametersBinningPath", "");
-  if( not parameterBinningPath.empty() ){
-    initializeNormDialsWithBinning(parameterBinningPath);
-    return;
+  if( initializeNormDialsWithBinning() ){ LogDebug << "DialSet initialised with binning definition." << std::endl;  }
+  // Dials are individually defined?
+  else if( initializeDialsWithDefinition() ) { LogDebug << "DialSet initialised with config definition." << std::endl; }
+  // Dials definition not found?
+  else{
+    LogWarning << "Could not fetch dials definition for parameter: #" << _parameterIndex_;
+    if( not _parameterName_.empty() ) LogWarning << " (" << _parameterName_ << ")";
+    LogWarning << std::endl << "Disabling dialSet." << std::endl;
+    _isEnabled_ = false;
   }
 
-  // Dials are individually defined?
+}
+
+bool DialSet::isEnabled() const {
+  return _isEnabled_;
+}
+const std::vector<std::string> &DialSet::getDataSetNameList() const {
+  return _dataSetNameList_;
+}
+std::vector<std::shared_ptr<Dial>> &DialSet::getDialList() {
+  return _dialList_;
+}
+
+int DialSet::getDialIndex(AnaEvent *eventPtr_) {
+
+  int index = 0;
+  for( const auto& dial : _dialList_ ){
+    if( dial->getApplyConditionBin().isEventInBin(eventPtr_) ){
+      return index;
+    }
+    index++;
+  }
+
+  return -1;
+}
+std::string DialSet::getSummary() const {
+  std::stringstream ss;
+  ss << "DialSets applied on datasets: " << GenericToolbox::parseVectorAsString(_dataSetNameList_);
+
+  if( _enableDialsSummary_ ){
+    for( const auto& dialPtr: _dialList_ ){
+      ss << std::endl << GenericToolbox::indentString(dialPtr->getSummary(), 2);
+    }
+  }
+
+  return ss.str();
+}
+
+void DialSet::setWorkingDirectory(const std::string &workingDirectory) {
+  _workingDirectory_ = workingDirectory;
+}
+
+void DialSet::setParameterName(const std::string &parameterName) {
+  _parameterName_ = parameterName;
+}
+
+
+bool DialSet::initializeNormDialsWithBinning() {
+
+  std::string parameterBinningPath = JsonUtils::fetchValue<std::string>(_dialSetConfig_, "parametersBinningPath", "");
+  if( parameterBinningPath.empty() ){ return false; }
+
+  LogTrace << "Initializing dials with binning file..." << std::endl;
+
+  DataBinSet binning;
+  binning.setName("parameterBinning");
+  DataBinSet::setVerbosity(static_cast<int>(Logger::LogLevel::ERROR)); // only print errors if any
+  binning.readBinningDefinition(_workingDirectory_ + "/" + parameterBinningPath);
+  DataBinSet::setVerbosity(static_cast<int>(Logger::getMaxLogLevel())); // take back the log level with this instance
+  if( _parameterIndex_ >= binning.getBinsList().size() ){
+    LogError << "Can't fetch parameter index #" << _parameterIndex_ << " while binning size is: " << binning.getBinsList().size() << std::endl;
+    throw std::runtime_error("Can't fetch parameter index.");
+  }
+
+  auto* dialPtr = new NormalizationDial();
+  dialPtr->setApplyConditionBin( binning.getBinsList().at( _parameterIndex_ ) );
+  dialPtr->initialize();
+  _dialList_.emplace_back( std::shared_ptr<NormalizationDial>(dialPtr) );
+
+  return true;
+}
+nlohmann::json DialSet::fetchDialsDefinition(const nlohmann::json &definitionsList_) {
+
+  for(size_t iDial = 0 ; iDial < definitionsList_.size() ; iDial++ ){
+    if( _parameterName_.empty() ){
+      if( _parameterIndex_ == iDial ){
+        return definitionsList_.at(iDial);
+      }
+    }
+    else if( _parameterName_ == JsonUtils::fetchValue<std::string>(definitionsList_.at(iDial), "parameterName", "") ){
+      return definitionsList_.at(iDial);
+    }
+  }
+
+  return nlohmann::json();
+}
+bool DialSet::initializeDialsWithDefinition() {
   nlohmann::json dialsDefinition = fetchDialsDefinition(JsonUtils::fetchValue<nlohmann::json>(_dialSetConfig_, "dialsDefinitions"));
   if( dialsDefinition.empty() ){
-    LogAlert << "Could not fetch dialsDefinition associated with parameter: ";
-    if( _parameterName_.empty() ) LogAlert << "#" << _parameterIndex_ << std::endl;
-    else LogAlert << "\"" << _parameterName_ << "\"" << std::endl;
-
-    _isEnabled_ = false;
-    return;
+    return false;
   }
   else if( JsonUtils::fetchValue<bool>(dialsDefinition, "isEnabled", true) ){
-
     // Fetch dial type
     DialType::DialType dialsType = _globalDialType_;
-    dialTypeStr = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsType");
+    std::string dialTypeStr = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsType");
     if( not dialTypeStr.empty() ){
       dialsType = DialType::toDialType(dialTypeStr);
     }
@@ -170,8 +258,8 @@ void DialSet::initialize() {
 
     }
     else {
-      LogError << "dialsType is invalid" << std::endl;
-      throw std::logic_error("dialsType is invalid");
+      LogError << "dialsType is not supported yet: " << dialTypeStr << "(" << dialsType << ")" << std::endl;
+      throw std::logic_error("dialsType is not supported");
     }
 
   }
@@ -179,85 +267,6 @@ void DialSet::initialize() {
     LogDebug << "DialSet is disabled." << std::endl;
   }
 
-}
-
-const std::vector<std::string> &DialSet::getDataSetNameList() const {
-  return _dataSetNameList_;
-}
-std::vector<std::shared_ptr<Dial>> &DialSet::getDialList() {
-  return _dialList_;
-}
-
-int DialSet::getDialIndex(AnaEvent *eventPtr_) {
-
-  int index = 0;
-  for( const auto& dial : _dialList_ ){
-    if( dial->getApplyConditionBin().isEventInBin(eventPtr_) ){
-      return index;
-    }
-    index++;
-  }
-
-  return -1;
-}
-std::string DialSet::getSummary() const {
-  std::stringstream ss;
-  ss << "DialSets applied on datasets: " << GenericToolbox::parseVectorAsString(_dataSetNameList_);
-
-  if( _enableDialsSummary_ ){
-    for( const auto& dialPtr: _dialList_ ){
-      ss << std::endl << GenericToolbox::indentString(dialPtr->getSummary(), 2);
-    }
-  }
-
-  return ss.str();
-}
-
-void DialSet::setWorkingDirectory(const std::string &workingDirectory) {
-  _workingDirectory_ = workingDirectory;
-}
-
-void DialSet::setParameterName(const std::string &parameterName) {
-  _parameterName_ = parameterName;
-}
-
-
-void DialSet::initializeNormDialsWithBinning(const std::string& binningFilePath_ ){
-
-  LogDebug << "" << std::endl;
-
-  DataBinSet binning;
-  binning.setName("parameterBinning");
-  DataBinSet::setVerbosity(static_cast<int>(Logger::LogLevel::ERROR)); // only print errors if any
-  binning.readBinningDefinition(_workingDirectory_ + "/" + binningFilePath_);
-  DataBinSet::setVerbosity(static_cast<int>(Logger::getMaxLogLevel())); // take back the log level with this instance
-  if( _parameterIndex_ >= binning.getBinsList().size() ){
-    LogError << "Can't fetch parameter index #" << _parameterIndex_ << " while binning size is: " << binning.getBinsList().size() << std::endl;
-    throw std::runtime_error("Can't fetch parameter index.");
-  }
-
-  auto* dialPtr = new NormalizationDial();
-  dialPtr->setApplyConditionBin( binning.getBinsList().at( _parameterIndex_ ) );
-  dialPtr->initialize();
-  _dialList_.emplace_back( std::shared_ptr<NormalizationDial>(dialPtr) );
-}
-nlohmann::json DialSet::fetchDialsDefinition(const nlohmann::json &definitionsList_) {
-
-  for(size_t iDial = 0 ; iDial < definitionsList_.size() ; iDial++ ){
-    if( _parameterName_.empty() ){
-      if( _parameterIndex_ == iDial ){
-        return definitionsList_.at(iDial);
-      }
-    }
-    else if( _parameterName_ == JsonUtils::fetchValue<std::string>(definitionsList_.at(iDial), "parameterName", "") ){
-      return definitionsList_.at(iDial);
-    }
-  }
-
-  return nlohmann::json();
-}
-
-bool DialSet::isEnabled() const {
-  return _isEnabled_;
+  return true;
 }
 

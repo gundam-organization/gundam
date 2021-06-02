@@ -42,7 +42,8 @@ public:
   std::string getSummary() const;
 
 protected:
-  void initializeNormDialsWithBinning(const std::string& binningFilePath_ );
+  bool initializeNormDialsWithBinning();
+  bool initializeDialsWithDefinition();
   nlohmann::json fetchDialsDefinition(const nlohmann::json &definitionsList_);
 
 private:
