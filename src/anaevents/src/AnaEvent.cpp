@@ -199,8 +199,12 @@ Int_t &AnaEvent::GetEventVarInt(const std::string &varName_) {
 Float_t &AnaEvent::GetEventVarFloat(const std::string &varName_)  {
   return _floatValuesList_.at(GetFloatIndex(varName_));
 }
-void AnaEvent::AddEvWght(double val) { _eventWeight_ *= val; }
-void AnaEvent::ResetEvWght() { _eventWeight_ = *_weightMCPtr_; }
+void AnaEvent::AddEvWght(double val) {
+  _eventWeight_ *= val;
+}
+void AnaEvent::ResetEvWght() {
+  _eventWeight_ = *_weightMCPtr_;
+}
 
 // Misc
 void AnaEvent::Print() {

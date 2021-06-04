@@ -19,6 +19,12 @@ else(CMAKE_BUILD_TYPE MATCHES RELEASE)
   add_library(fitparam SHARED ${SRCFILES})
 endif()
 
+# Dependencies
+target_link_libraries( fitparam
+        anaevents
+        xslfutils
+)
+
 set_target_properties(fitparam PROPERTIES VERSION
   "${xsLLhFitter_VERSION_MAJOR}.${xsLLhFitter_VERSION_MINOR}.${xsLLhFitter_VERSION_REVISION}")
 set_target_properties(fitparam PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
