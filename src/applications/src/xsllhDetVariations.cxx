@@ -113,7 +113,7 @@ struct AdditionalCutParser{
     void initializeFormula(){
 
         if(cutString.empty()){
-            LogFatal << "Can't initialize formula: cutString is empty." << std::endl;
+            LogFatal << "Can't generateFormula formula: cutString is empty." << std::endl;
             exit(EXIT_FAILURE);
         }
 
@@ -953,7 +953,7 @@ int main(int argc, char** argv)
     // Size of coavariance and correlation matrices (will be updated below):
     unsigned int num_elements = 0;
 
-    // initialize the covariance and correlation matrices (symmetric ROOT matrices):
+    // generateFormula the covariance and correlation matrices (symmetric ROOT matrices):
     TMatrixTSym<double> cov_mat(num_elements);
     TMatrixTSym<double> cor_mat(num_elements);
 

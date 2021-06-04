@@ -14,6 +14,7 @@ SplineDial::SplineDial() {
 
 void SplineDial::reset() {
   Dial::reset();
+  _dialType_ = DialType::Spline;
   _splinePtr_ = nullptr;
 }
 

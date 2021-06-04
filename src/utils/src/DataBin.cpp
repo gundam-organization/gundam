@@ -23,7 +23,6 @@ DataBin::~DataBin() {
 }
 
 void DataBin::reset() {
-  _isInitialized_ = false;
   _edgesList_.clear();
   _variableNameList_.clear();
   _isLowMemoryUsageMode_ = false;
@@ -58,33 +57,6 @@ void DataBin::addBinEdge(const std::string &variableName_, double lowEdge_, doub
   this->addBinEdge(lowEdge_, highEdge_);
 }
 
-// Init
-void DataBin::initialize() {
-
-  _formulaStr_ = generateFormulaStr(false);
-  _treeFormulaStr_ = generateFormulaStr(true);
-
-  delete _formula_; _formula_ = new TFormula(_formulaStr_.c_str(), _formulaStr_.c_str());
-
-  // For treeFormula we need a fake tree to compile the formula
-  std::vector<std::string> varNameList;
-  for( size_t iEdge = 0 ; iEdge < _edgesList_.size() ; iEdge++ ){
-    std::string nameCandidate;
-    if( not _variableNameList_.empty() ){
-      // Careful: array might be defined
-      nameCandidate = GenericToolbox::splitString(_variableNameList_.at(iEdge), "[")[0];
-    }
-    else{
-      nameCandidate = "var" + std::to_string(iEdge);
-    }
-    if( not GenericToolbox::doesElementIsInVector(nameCandidate, varNameList) ){
-      varNameList.emplace_back(nameCandidate);
-    }
-  }
-  delete _treeFormula_; _treeFormula_ = GenericToolbox::createTreeFormulaWithoutTree(_treeFormulaStr_, varNameList);
-
-  _isInitialized_ = true;
-}
 
 // Getters
 bool DataBin::isLowMemoryUsageMode() const {
@@ -106,19 +78,14 @@ const std::string &DataBin::getTreeFormulaStr() const {
   return _treeFormulaStr_;
 }
 TFormula *DataBin::getFormula() const {
-  return _formula_;
+  return _formula_.get();
 }
 TTreeFormula *DataBin::getTreeFormula() const {
-  return _treeFormula_;
+  return _treeFormula_.get();
 }
 
 // Management
 bool DataBin::isInBin(const std::vector<double>& valuesList_) const{
-  if( not _isInitialized_ ){
-    LogError << "Can't do isInBin while not initialized." << std::endl;
-    throw std::logic_error("Can't do isInBin while not initialized.");
-  }
-
   if( valuesList_.size() != _edgesList_.size() ){
     LogError << "Provided " << GET_VAR_NAME_VALUE(valuesList_.size()) << " does not match " << GET_VAR_NAME_VALUE(_edgesList_.size()) << std::endl;
     throw std::logic_error("Values list size does not match the bin edge list size.");
@@ -132,10 +99,6 @@ bool DataBin::isInBin(const std::vector<double>& valuesList_) const{
   return true;
 }
 bool DataBin::isBetweenEdges(const std::string& variableName_, double value_) const {
-  if( not _isInitialized_ ){
-    LogError << "Can't do isBetweenEdges while not initialized." << std::endl;
-    throw std::logic_error("Can't do isBetweenEdges while not initialized.");
-  }
   if( not this->isVariableSet(variableName_) ){
     LogError << "variableName_ = " << variableName_ << " is not set." << std::endl;
     throw std::logic_error("variableName_ not set.");
@@ -144,10 +107,6 @@ bool DataBin::isBetweenEdges(const std::string& variableName_, double value_) co
   this->isBetweenEdges(varIndex, value_);
 }
 bool DataBin::isEventInBin(AnaEvent *eventPtr_) const {
-  if( not _isInitialized_ ){
-    LogError << "Can't do isEventInBin while not initialized." << std::endl;
-    throw std::logic_error("Can't do isEventInBin while not initialized.");
-  }
   for( size_t iVar = 0 ; iVar < _edgesList_.size() ; iVar++ ){
     if( not this->isBetweenEdges(iVar, eventPtr_->GetEventVarAsDouble( _variableNameList_.at(iVar) )) ){
       return false;
@@ -168,11 +127,59 @@ std::string DataBin::getSummary() const{
   std::stringstream ss;
   ss << "DataBin: ";
 
-  if( not _isInitialized_ ) ss << "Not initialized.";
+  if( _edgesList_.empty() ) ss << "Not set.";
   else{
-    ss << "\"" << _treeFormulaStr_ << "\"";
+
+    if( _treeFormula_ != nullptr ){
+      ss << "\"" << _treeFormula_->GetExpFormula() << "\"";
+    }
+    else{
+      ss << "\"";
+      for( size_t iEdge = 0 ; iEdge < _edgesList_.size() ; iEdge++ ){
+        if( iEdge != 0 ) ss << ", ";
+        if( not _variableNameList_.empty() ){
+          ss << _variableNameList_[iEdge] << ": ";
+        }
+        ss << "[" << _edgesList_.at(iEdge).first;
+        if( _edgesList_.at(iEdge).first != _edgesList_.at(iEdge).second ){
+          ss << ", " << _edgesList_.at(iEdge).second;
+          ss << "[";
+        }
+        else{
+          ss << "]";
+        }
+      }
+      ss << "\"";
+    }
   }
   return ss.str();
+}
+void DataBin::generateFormula() {
+
+  _formulaStr_ = generateFormulaStr(false);
+  _formula_ = std::make_shared<TFormula>(_formulaStr_.c_str(), _formulaStr_.c_str());
+
+}
+void DataBin::generateTreeFormula() {
+
+  _treeFormulaStr_ = generateFormulaStr(true);
+  // For treeFormula we need a fake tree to compile the formula
+  std::vector<std::string> varNameList;
+  for( size_t iEdge = 0 ; iEdge < _edgesList_.size() ; iEdge++ ){
+    std::string nameCandidate;
+    if( not _variableNameList_.empty() ){
+      // Careful: array might be defined
+      nameCandidate = GenericToolbox::splitString(_variableNameList_.at(iEdge), "[")[0];
+    }
+    else{
+      nameCandidate = "var" + std::to_string(iEdge);
+    }
+    if( not GenericToolbox::doesElementIsInVector(nameCandidate, varNameList) ){
+      varNameList.emplace_back(nameCandidate);
+    }
+  }
+  _treeFormula_ = std::shared_ptr<TTreeFormula>(GenericToolbox::createTreeFormulaWithoutTree(_treeFormulaStr_, varNameList));
+
 }
 
 // Protected

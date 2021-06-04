@@ -238,7 +238,7 @@ bool DialSet::initializeDialsWithDefinition() {
       LogDebug << "Reading dials in \"" << dialsTFile->GetName() << "\"" << std::endl;
       for( Long64_t iSpline = 0 ; iSpline < nSplines ; iSpline++ ){
         dialsTTree->GetEntry(iSpline);
-        auto dialBin = binList.at(kinematicBin);
+        auto dialBin = binList.at(kinematicBin); // copy
         dialBin.setIsZeroWideRangesTolerated(true);
         for( size_t iSplitVar = 0 ; iSplitVar < splitVarNameList.size() ; iSplitVar++ ){
           dialBin.addBinEdge(splitVarNameList.at(iSplitVar), splitVarValueList.at(iSplitVar), splitVarValueList.at(iSplitVar));

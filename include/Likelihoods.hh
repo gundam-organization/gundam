@@ -25,7 +25,7 @@ public:
     // Compute the standard Poisson likelihood (chi2_stat contribution from a certain sample and bin) based on the number of MC predicted (mc) and the number of data events (data):
     double operator()(double mc, double w2, double data)
     {
-        // initialize chi2 variable which will be updated below and then returned:
+        // generateFormula chi2 variable which will be updated below and then returned:
         double chi2 = 0.0;
 
         // If number of MC predicted events is greater than zero, we calculate the statistical chi2 according to 2 * (N_pred - N_data + N_data * log(N_data/N_pred)):

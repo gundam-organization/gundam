@@ -144,7 +144,6 @@ void DataBinSet::readBinningDefinition(const std::string &filePath_) {
         }
 
       }
-      _binsList_.back().initialize();
 
     }
   }

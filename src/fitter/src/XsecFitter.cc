@@ -435,7 +435,7 @@ void XsecFitter::GenerateToyData(int toy_type, bool stat_fluc)
 // Loops over all samples and all bins therein, then resets event weights based on current fit parameter values, updates m_hpred, m_hmc, m_hmc_true and m_hsig histograms accordingly and computes the chi2 value which is returned:
 double XsecFitter::FillSamples(std::vector<std::vector<double>>& new_pars, int datatype)
 {
-    // initialize chi2 variable which will be updated below and then returned:
+    // generateFormula chi2 variable which will be updated below and then returned:
     double chi2      = 0.0;
 
     // If the output_chi2 flag is true the chi2 contributions from the different samples are printed:

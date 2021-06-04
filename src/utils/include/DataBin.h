@@ -30,7 +30,6 @@ public:
   void addBinEdge(const std::string& variableName_, double lowEdge_, double highEdge_);
 
   // Init
-  void initialize();
 
   // Getters
   bool isLowMemoryUsageMode() const;
@@ -39,9 +38,7 @@ public:
   const std::vector<std::pair<double, double>> &getEdgesList() const;
   const std::string &getFormulaStr() const;
   const std::string &getTreeFormulaStr() const;
-
   TFormula *getFormula() const;
-
   TTreeFormula *getTreeFormula() const;
 
   // Management
@@ -52,23 +49,23 @@ public:
   // Misc
   bool isVariableSet(const std::string& variableName_) const;
   std::string getSummary() const;
-
+  void generateFormula();
+  void generateTreeFormula();
 
 protected:
   std::string generateFormulaStr(bool varNamesAsTreeFormula_);
   bool isBetweenEdges(size_t varIndex_, double value_) const;
 
 private:
-  bool _isInitialized_{false};
   bool _isLowMemoryUsageMode_{false};
   bool _isZeroWideRangesTolerated_{false};
   std::vector<std::string> _variableNameList_{};
   std::vector<std::pair<double, double>> _edgesList_{};
 
   std::string _formulaStr_;
-  TFormula* _formula_{nullptr};
+  std::shared_ptr<TFormula> _formula_;
   std::string _treeFormulaStr_;
-  TTreeFormula* _treeFormula_{nullptr};
+  std::shared_ptr<TTreeFormula> _treeFormula_;
 
 };
 
