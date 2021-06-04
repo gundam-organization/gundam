@@ -9,6 +9,9 @@
 #include "vector"
 #include "string"
 
+#include <TFormula.h>
+#include <TTreeFormula.h>
+
 #include "AnaEvent.hh"
 
 
@@ -23,16 +26,25 @@ public:
   // Setters
   void setIsLowMemoryUsageMode(bool isLowMemoryUsageMode_);
   void setIsZeroWideRangesTolerated(bool isZeroWideRangesTolerated_); // make it explicit! -> double precision might not be enough if you play with long int
+  void addBinEdge(double lowEdge_, double highEdge_);
+  void addBinEdge(const std::string& variableName_, double lowEdge_, double highEdge_);
+
+  // Init
+  void initialize();
 
   // Getters
   bool isLowMemoryUsageMode() const;
   bool isZeroWideRangesTolerated() const;
   const std::vector<std::string> &getVariableNameList() const;
   const std::vector<std::pair<double, double>> &getEdgesList() const;
+  const std::string &getFormulaStr() const;
+  const std::string &getTreeFormulaStr() const;
+
+  TFormula *getFormula() const;
+
+  TTreeFormula *getTreeFormula() const;
 
   // Management
-  void addBinEdge(double lowEdge_, double highEdge_);
-  void addBinEdge(const std::string& variableName_, double lowEdge_, double highEdge_);
   bool isInBin(const std::vector<double>& valuesList_) const;
   bool isBetweenEdges(const std::string& variableName_, double value_) const;
   bool isEventInBin(AnaEvent* eventPtr_) const;
@@ -41,14 +53,22 @@ public:
   bool isVariableSet(const std::string& variableName_) const;
   std::string getSummary() const;
 
+
 protected:
+  std::string generateFormulaStr(bool varNamesAsTreeFormula_);
   bool isBetweenEdges(size_t varIndex_, double value_) const;
 
 private:
+  bool _isInitialized_{false};
   bool _isLowMemoryUsageMode_{false};
   bool _isZeroWideRangesTolerated_{false};
   std::vector<std::string> _variableNameList_{};
   std::vector<std::pair<double, double>> _edgesList_{};
+
+  std::string _formulaStr_;
+  TFormula* _formula_{nullptr};
+  std::string _treeFormulaStr_;
+  TTreeFormula* _treeFormula_{nullptr};
 
 };
 

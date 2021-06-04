@@ -36,7 +36,7 @@ void Dial::reset() {
   _dialResponseCache_ = std::nan("Unset");
   _dialParameterCache_ = std::nan("Unset");
   _applyConditionBin_ = DataBin();
-  _dialType_   = DialType::Invalid;
+  _dialType_ = DialType::Invalid;
 }
 
 void Dial::setApplyConditionBin(const DataBin &applyConditionBin) {

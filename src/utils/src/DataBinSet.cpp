@@ -24,6 +24,10 @@ void DataBinSet::reset() {
   _binsList_.clear();
 }
 
+// Setters
+void DataBinSet::setName(const std::string &name) {
+  _name_ = name;
+}
 void DataBinSet::readBinningDefinition(const std::string &filePath_) {
 
   LogInfo << "Reading binning definition from: \"" << filePath_ << "\"" << std::endl;
@@ -140,6 +144,7 @@ void DataBinSet::readBinningDefinition(const std::string &filePath_) {
         }
 
       }
+      _binsList_.back().initialize();
 
     }
   }
@@ -162,9 +167,6 @@ std::string DataBinSet::getSummary() const{
   return ss.str();
 }
 
-void DataBinSet::setName(const std::string &name) {
-  _name_ = name;
-}
 
 void DataBinSet::addBinContent(int binIndex_, double weight_) {
   if( binIndex_ < 0 or binIndex_ >= _binsList_.size() ){
