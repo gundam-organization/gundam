@@ -17,6 +17,8 @@ LoggerInit([](){
 
 FitterEngine::FitterEngine() {
 
+  ROOT::EnableImplicitMT();
+
   // Memory allocation
   _PRNG_ = new TRandom3();
   gRandom = _PRNG_;
@@ -309,9 +311,16 @@ void FitterEngine::MakeOneSigmaChecks(){
 
   LogInfo << "Copying current parameters..." << std::endl;
   auto* par = new double[_minimizer_->NDim()];
-  for(unsigned int iPar = 0 ; iPar < _minimizer_->NDim() ; iPar++){
-    par[iPar] = _minimizer_->X()[iPar];
+  if( _minimizer_->X() != nullptr ){
+    for(unsigned int iPar = 0 ; iPar < _minimizer_->NDim() ; iPar++){
+      par[iPar] = _minimizer_->X()[iPar];
+    }
   }
+  else{
+    LogError << "Could not fetch minimizer's parameter values" << std::endl;
+    throw std::runtime_error("Could not fetch minimizer's parameter values");
+  }
+
 
   // Make sure all weights a applied
   LogInfo << "Re-computing weights..." << std::endl;

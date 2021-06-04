@@ -314,7 +314,7 @@ int main(int argc, char** argv)
     fitter.SetSaveEventTree(options_parser.save_events);
 
     xsec_parameters.SetEnableZeroWeightFenceGate(true);
-  fitter.initialize();
+    fitter.initialize();
     fitter.WritePrefitData();
     if(not __skipOneSigmaChecks__) fitter.MakeOneSigmaChecks();
     xsec_parameters.SetEnableZeroWeightFenceGate(false);

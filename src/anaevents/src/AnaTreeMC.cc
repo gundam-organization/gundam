@@ -13,27 +13,27 @@ LoggerInit([](){
 } )
 
 AnaTreeMC::AnaTreeMC(const std::string& file_name, const std::string& tree_name, bool extra_var)
-    : read_extra_var(extra_var)
+  : read_extra_var(extra_var)
 {
-    fChain = new TChain(tree_name.c_str());
-    fChain->Add(file_name.c_str());
-    _file_name_ = file_name;
-    SetBranches();
+  fChain = new TChain(tree_name.c_str());
+  fChain->Add(file_name.c_str());
+  _file_name_ = file_name;
+  SetBranches();
 }
 
 AnaTreeMC::~AnaTreeMC()
 {
-    if(fChain != nullptr)
-        delete fChain->GetCurrentFile();
+  if(fChain != nullptr)
+    delete fChain->GetCurrentFile();
 }
 
 long int AnaTreeMC::GetEntry(long int entry) const
 {
-    // Read contents of entry.
-    if(fChain == nullptr)
-        return -1;
-    else
-        return fChain->GetEntry(entry);
+  // Read contents of entry.
+  if(fChain == nullptr)
+    return -1;
+  else
+    return fChain->GetEntry(entry);
 }
 
 void AnaTreeMC::SetBranches()
@@ -65,108 +65,108 @@ void AnaTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples,
                           const std::vector<SignalDef>& v_signal,
                           const bool evt_type)
 {
-    if(fChain == nullptr || ana_samples.empty()){
-        return;
+  if(fChain == nullptr || ana_samples.empty()){
+    return;
+  }
+
+
+  AnaEvent eventHolder;
+  auto* enabledIntLeafs = new std::vector<std::string>(*eventHolder.GetIntVarNameListPtr());
+  auto* enabledFloatLeafs = new std::vector<std::string>(*eventHolder.GetFloatVarNameListPtr());
+
+  std::vector<TTreeFormula*> additionalCutsList;
+  LogInfo << "Scanning additional cuts..." << std::endl;
+  for(size_t iSample = 0 ; iSample < ana_samples.size() ; iSample++){
+
+    if(ana_samples[iSample]->GetAdditionalCuts().empty()){
+      additionalCutsList.emplace_back(nullptr);
+      continue; // no additional cuts
     }
 
+    LogInfo << "\"" << ana_samples[iSample]->GetAdditionalCuts() << "\" -> \""
+            << ana_samples[iSample]->GetName() << "\""
+            << std::endl;
+    additionalCutsList.emplace_back(
+      new TTreeFormula(
+        Form("additional_cuts_%i", int(iSample)),
+        ana_samples[iSample]->GetAdditionalCuts().c_str(),
+        fChain
+      )
+    );
 
-    AnaEvent eventHolder;
-    auto* enabledIntLeafs = new std::vector<std::string>(*eventHolder.GetIntVarNameListPtr());
-    auto* enabledFloatLeafs = new std::vector<std::string>(*eventHolder.GetFloatVarNameListPtr());
+    for(int iPar = 0 ; iPar < additionalCutsList.back()->GetNcodes() ; iPar++){
+      if(std::string(additionalCutsList.back()->GetLeaf(iPar)->GetTypeName()) == "Int_t"){
+        if(not GenericToolbox::doesElementIsInVector(additionalCutsList.back()->GetLeaf(iPar)->GetName(), *enabledIntLeafs)){
+          enabledIntLeafs->emplace_back(additionalCutsList.back()->GetLeaf(iPar)->GetName());
+        }
+      }
+      else if(std::string(additionalCutsList.back()->GetLeaf(iPar)->GetTypeName()) == "Float_t"){
+        if(not GenericToolbox::doesElementIsInVector(additionalCutsList.back()->GetLeaf(iPar)->GetName(), *enabledFloatLeafs)){
+          enabledFloatLeafs->emplace_back(additionalCutsList.back()->GetLeaf(iPar)->GetName());
+        }
+      }
+    }
+    additionalCutsList.back()->SetTree(fChain);
+  }
 
-    std::vector<TTreeFormula*> additionalCutsList;
-    LogInfo << "Scanning additional cuts..." << std::endl;
+  LogDebug << "The following ints leafs will be stored in memory:" << std::endl;
+  GenericToolbox::printVector(*enabledIntLeafs);
+  eventHolder.SetIntVarNameListPtr(enabledIntLeafs);
+
+  LogDebug << "The following floats leafs will be stored in memory:" << std::endl;
+  GenericToolbox::printVector(*enabledFloatLeafs);
+  eventHolder.SetFloatVarNameListPtr(enabledFloatLeafs);
+
+  // Claiming memory and mapping events
+  LogInfo << "Performing topology cuts on samples and claiming memory..." << std::endl;
+  std::string progressTitle = LogWarning.getPrefixString() + "Claiming memory and mapping events...";
+  int totalNbEventsToLoad = 0;
+  for( int jEntry = 0 ; jEntry < fChain->GetEntries() ; jEntry++ ) {
+
+    GenericToolbox::displayProgressBar(jEntry, fChain->GetEntries(), progressTitle);
+    fChain->GetEntry(jEntry);
+
     for(size_t iSample = 0 ; iSample < ana_samples.size() ; iSample++){
 
-        if(ana_samples[iSample]->GetAdditionalCuts().empty()){
-            additionalCutsList.emplace_back(nullptr);
-            continue; // no additional cuts
+      if(ana_samples[iSample]->GetSampleID() == fChain->GetLeaf("cut_branch")->GetValue(0)){
+
+        fChain->SetNotify(additionalCutsList[iSample]);
+        bool doEventPassCut = true;
+        for(int jInstance = 0; jInstance < additionalCutsList[iSample]->GetNdata(); jInstance++) {
+          if ( additionalCutsList[iSample]->EvalInstance(jInstance) == 0 ) {
+            doEventPassCut = false;
+            break;
+          }
         }
 
-        LogInfo << "\"" << ana_samples[iSample]->GetAdditionalCuts() << "\" -> \""
-                << ana_samples[iSample]->GetName() << "\""
-                << std::endl;
-        additionalCutsList.emplace_back(
-            new TTreeFormula(
-                Form("additional_cuts_%i", int(iSample)),
-                ana_samples[iSample]->GetAdditionalCuts().c_str(),
-                fChain
-            )
-        );
-
-        for(int iPar = 0 ; iPar < additionalCutsList.back()->GetNcodes() ; iPar++){
-            if(std::string(additionalCutsList.back()->GetLeaf(iPar)->GetTypeName()) == "Int_t"){
-                if(not GenericToolbox::doesElementIsInVector(additionalCutsList.back()->GetLeaf(iPar)->GetName(), *enabledIntLeafs)){
-                    enabledIntLeafs->emplace_back(additionalCutsList.back()->GetLeaf(iPar)->GetName());
-                }
-            }
-            else if(std::string(additionalCutsList.back()->GetLeaf(iPar)->GetTypeName()) == "Float_t"){
-                if(not GenericToolbox::doesElementIsInVector(additionalCutsList.back()->GetLeaf(iPar)->GetName(), *enabledFloatLeafs)){
-                    enabledFloatLeafs->emplace_back(additionalCutsList.back()->GetLeaf(iPar)->GetName());
-                }
-            }
-        }
-        additionalCutsList.back()->SetTree(fChain);
-    }
-
-    LogDebug << "The following ints leafs will be stored in memory:" << std::endl;
-    GenericToolbox::printVector(*enabledIntLeafs);
-    eventHolder.SetIntVarNameListPtr(enabledIntLeafs);
-
-    LogDebug << "The following floats leafs will be stored in memory:" << std::endl;
-    GenericToolbox::printVector(*enabledFloatLeafs);
-    eventHolder.SetFloatVarNameListPtr(enabledFloatLeafs);
-
-    // Claiming memory and mapping events
-    LogInfo << "Performing topology cuts on samples and claiming memory..." << std::endl;
-    std::string progressTitle = LogWarning.getPrefixString() + "Claiming memory and mapping events...";
-    int totalNbEventsToLoad = 0;
-    for( int jEntry = 0 ; jEntry < fChain->GetEntries() ; jEntry++ ) {
-
-        GenericToolbox::displayProgressBar(jEntry, fChain->GetEntries(), progressTitle);
-        fChain->GetEntry(jEntry);
-
-        for(size_t iSample = 0 ; iSample < ana_samples.size() ; iSample++){
-
-            if(ana_samples[iSample]->GetSampleID() == fChain->GetLeaf("cut_branch")->GetValue(0)){
-
-                fChain->SetNotify(additionalCutsList[iSample]);
-                bool doEventPassCut = true;
-                for(int jInstance = 0; jInstance < additionalCutsList[iSample]->GetNdata(); jInstance++) {
-                    if ( additionalCutsList[iSample]->EvalInstance(jInstance) == 0 ) {
-                        doEventPassCut = false;
-                        break;
-                    }
-                }
-
-                if(doEventPassCut){
-                    eventHolder.SetEventId(jEntry);
-                    ana_samples[iSample]->AddEvent(eventHolder); // copy constructor of eventHolder
-                    // Re-hook to make the member ptr point toward the copied data container addresses
+        if(doEventPassCut){
+          eventHolder.SetEventId(jEntry);
+          ana_samples[iSample]->AddEvent(eventHolder); // copy constructor of eventHolder
+          // Re-hook to make the member ptr point toward the copied data container addresses
 //                    ana_samples[iSample]->GetEventList().back().HookIntMembers();
 //                    ana_samples[iSample]->GetEventList().back().HookFloatMembers();
-                    totalNbEventsToLoad++;
-                }
-
-            }
+          totalNbEventsToLoad++;
         }
-    } // jEntry
 
-    auto* counterPtr = new int();
-
-    // Will be used externally:
-    GlobalVariables::getChainList().resize(GlobalVariables::getNbThreads());
-    if(GlobalVariables::getNbThreads() > 1){
-        for( int iThread = 0 ; iThread < GlobalVariables::getNbThreads() ; iThread++ ){
-            GlobalVariables::getChainList().at(iThread) = new TChain(fChain->GetName());
-            GlobalVariables::getChainList().at(iThread)->Add(_file_name_.c_str());
-        }
+      }
     }
-    else{
-        GlobalVariables::getChainList().at(0) = fChain;
-    }
+  } // jEntry
 
-    std::vector<TChain*>* chainListPtr = &GlobalVariables::getChainList();
+  auto* counterPtr = new int();
+
+  // Will be used externally:
+  GlobalVariables::getChainList().resize(GlobalVariables::getNbThreads());
+  if(GlobalVariables::getNbThreads() > 1){
+    for( int iThread = 0 ; iThread < GlobalVariables::getNbThreads() ; iThread++ ){
+      GlobalVariables::getChainList().at(iThread) = new TChain(fChain->GetName());
+      GlobalVariables::getChainList().at(iThread)->Add(_file_name_.c_str());
+    }
+  }
+  else{
+    GlobalVariables::getChainList().at(0) = fChain;
+  }
+
+  std::vector<TChain*>* chainListPtr = &GlobalVariables::getChainList();
 //    if(GlobalVariables::getNbThreads() > 1){
 //        chainListPtr = new std::vector<TChain*>();
 //        for( int iThread = 0 ; iThread < GlobalVariables::getNbThreads() ; iThread++ ){
@@ -175,125 +175,127 @@ void AnaTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples,
 //        }
 //    }
 
-    std::function<void(int)> fillEvents = [counterPtr, chainListPtr, ana_samples, additionalCutsList, this](int iThread_){
+  std::function<void(int)> fillEvents = [counterPtr, chainListPtr, ana_samples, additionalCutsList, this](int iThread_){
 
-        GlobalVariables::getThreadMutex().lock();
-        bool isMultiThreaded = (iThread_ != -1);
-        TChain* threadChain = fChain; // Single thread
+//    TFile* buffer = TFile::Open("buffer.root", "RECREATE");
+
+    GlobalVariables::getThreadMutex().lock();
+    bool isMultiThreaded = (iThread_ != -1);
+    TChain* threadChain = fChain; // Single thread
+    if(isMultiThreaded){
+      threadChain = chainListPtr->at(iThread_);
+    }
+    std::string progressBarPrefix;
+    AnaEvent* eventPtr;
+    GlobalVariables::getThreadMutex().unlock();
+
+    for(size_t iSample = 0 ; iSample < ana_samples.size() ; iSample++){
+
+      if(not isMultiThreaded){
+        progressBarPrefix = LogWarning.getPrefixString() + "Fill sample: " + ana_samples.at(iSample)->GetName();
+      }
+
+      for(int iEvent = 0 ; iEvent < ana_samples.at(iSample)->GetN() ; iEvent++){
         if(isMultiThreaded){
-            threadChain = chainListPtr->at(iThread_);
+          if(iEvent%GlobalVariables::getNbThreads() != iThread_){
+            continue; // skip
+          }
+          else{
+            GlobalVariables::getThreadMutex().lock();
+            (*counterPtr)++;
+            GlobalVariables::getThreadMutex().unlock();
+          }
         }
-        std::string progressBarPrefix;
-        AnaEvent* eventPtr;
-        GlobalVariables::getThreadMutex().unlock();
-
-        for(size_t iSample = 0 ; iSample < ana_samples.size() ; iSample++){
-
-            if(not isMultiThreaded){
-                progressBarPrefix = LogWarning.getPrefixString() + "Fill sample: " + ana_samples.at(iSample)->GetName();
-            }
-
-            for(int iEvent = 0 ; iEvent < ana_samples.at(iSample)->GetN() ; iEvent++){
-                if(isMultiThreaded){
-                    if(iEvent%GlobalVariables::getNbThreads() != iThread_){
-                        continue; // skip
-                    }
-                    else{
-                        GlobalVariables::getThreadMutex().lock();
-                        (*counterPtr)++;
-                        GlobalVariables::getThreadMutex().unlock();
-                    }
-                }
-                else{
-                    GenericToolbox::displayProgressBar(iEvent, ana_samples.at(iSample)->GetN(), progressBarPrefix);
-                }
-                eventPtr = ana_samples.at(iSample)->GetEvent(iEvent);
-
-                while(eventPtr->GetIsBeingEdited());
-                if(eventPtr->GetTreeEventHasBeenDumped()) continue;
-
-                eventPtr->SetIsBeingEdited(true);
-                threadChain->GetEntry(eventPtr->GetEvId());
-                eventPtr->DumpTreeEntryContent(threadChain); // Here is the most time consuming part
-                eventPtr->SetIsBeingEdited(false);
-            }
-
+        else{
+          GenericToolbox::displayProgressBar(iEvent, ana_samples.at(iSample)->GetN(), progressBarPrefix);
         }
+        eventPtr = ana_samples.at(iSample)->GetEvent(iEvent);
 
-    };
+        while(eventPtr->GetIsBeingEdited());
+        if(eventPtr->GetTreeEventHasBeenDumped()) continue;
 
-    LogInfo << "Reading events from input file (" << fChain->GetEntries() << ")..." << std::endl;
-    if(GlobalVariables::getNbThreads() > 1){
-        std::vector<std::future<void>> threadsList;
-        for( int iThread = 0 ; iThread < GlobalVariables::getNbThreads(); iThread++ ){
-            threadsList.emplace_back(
-                std::async( std::launch::async, std::bind(fillEvents, iThread) )
-                );
-        }
+        eventPtr->SetIsBeingEdited(true);
+        threadChain->GetEntry(eventPtr->GetEvId());
+        eventPtr->DumpTreeEntryContent(threadChain); // Here is the most time consuming part
+        eventPtr->SetIsBeingEdited(false);
+      }
 
-        std::string progressBarPrefix = LogWarning.getPrefixString() + "Reading events...";
-        for( int iThread = 0 ; iThread < GlobalVariables::getNbThreads(); iThread++ ){
-            while(threadsList[iThread].wait_for(std::chrono::milliseconds(33)) != std::future_status::ready){
-                GenericToolbox::displayProgressBar(*counterPtr, totalNbEventsToLoad, progressBarPrefix);
-            }
-            threadsList[iThread].get();
-        }
+    }
 
-        //! This can lead to segfault crash while the TFile is being closed... -> intentional memory leak as a workarround
+  };
+
+  LogInfo << "Reading events from input file (" << fChain->GetEntries() << ")..." << std::endl;
+  if(GlobalVariables::getNbThreads() > 1){
+    std::vector<std::future<void>> threadsList;
+    for( int iThread = 0 ; iThread < GlobalVariables::getNbThreads(); iThread++ ){
+      threadsList.emplace_back(
+        std::async( std::launch::async, std::bind(fillEvents, iThread) )
+      );
+    }
+
+    std::string progressBarPrefix = LogWarning.getPrefixString() + "Reading events...";
+    for( int iThread = 0 ; iThread < GlobalVariables::getNbThreads(); iThread++ ){
+      while(threadsList[iThread].wait_for(std::chrono::milliseconds(33)) != std::future_status::ready){
+        GenericToolbox::displayProgressBar(*counterPtr, totalNbEventsToLoad, progressBarPrefix);
+      }
+      threadsList[iThread].get();
+    }
+
+    //! This can lead to segfault crash while the TFile is being closed... -> intentional memory leak as a workarround
 //        LogDebug << "Deleting TChains..." << std::endl;
 //        for( int iThread = 0 ; iThread < GlobalVariables::getNbThreads() ; iThread++ ){
 //            LogTrace << "Deleting: chainListPtr->at(" << GET_VAR_NAME_VALUE(iThread) << ")..." << std::endl;
 //            delete chainListPtr->at(iThread);
 //        }
 //        delete chainListPtr;
-    }
-    else{
-        fillEvents(-1);
-    }
+  }
+  else{
+    fillEvents(-1);
+  }
 
-    LogDebug << "Reading input tree ended." << std::endl;
+  LogDebug << "Reading input tree ended." << std::endl;
 
 
-    LogInfo << "Process signals type..." << std::endl;
-    for(size_t iSample = 0 ; iSample < ana_samples.size() ; iSample++){
-        for(int iEvent = 0 ; iEvent < ana_samples[iSample]->GetN() ; iEvent++){
-            int signal_type = 0;
+  LogInfo << "Process signals type..." << std::endl;
+  for(size_t iSample = 0 ; iSample < ana_samples.size() ; iSample++){
+    for(int iEvent = 0 ; iEvent < ana_samples[iSample]->GetN() ; iEvent++){
+      int signal_type = 0;
 
-            // Loop over all sets of temlate parameters as defined in the .json config file in the "template_par" entry for this detector:
-            for(const auto& sd : v_signal)
-            {
-                bool sig_passed = true;
+      // Loop over all sets of temlate parameters as defined in the .json config file in the "template_par" entry for this detector:
+      for(const auto& sd : v_signal)
+      {
+        bool sig_passed = true;
 
-                // Loop over all the different signal definitions for this set of template parameters (e.g. topology, target, nutype, etc.):
-                for(const auto& kv : sd.definition)
-                {
-                    bool var_passed = false;
+        // Loop over all the different signal definitions for this set of template parameters (e.g. topology, target, nutype, etc.):
+        for(const auto& kv : sd.definition)
+        {
+          bool var_passed = false;
 
-                    // Loop over all the values for the current signal definition (e.g. all the different topology integers):
-                    for(const auto& val : kv.second)
-                    {
-                        if(ana_samples[iSample]->GetEvent(iEvent)->GetEventVar(kv.first) == val)
-                            var_passed = true;
-                    }
-                    sig_passed = sig_passed && var_passed;
-                }
-                if(sig_passed)
-                {
-                    ana_samples[iSample]->GetEvent(iEvent)->SetSignalType(signal_type);
-                    ana_samples[iSample]->GetEvent(iEvent)->SetSignalEvent();
-                    break;
-                }
-                signal_type++;
-            }
+          // Loop over all the values for the current signal definition (e.g. all the different topology integers):
+          for(const auto& val : kv.second)
+          {
+            if(ana_samples[iSample]->GetEvent(iEvent)->GetEventVar(kv.first) == val)
+              var_passed = true;
+          }
+          sig_passed = sig_passed && var_passed;
         }
+        if(sig_passed)
+        {
+          ana_samples[iSample]->GetEvent(iEvent)->SetSignalType(signal_type);
+          ana_samples[iSample]->GetEvent(iEvent)->SetSignalEvent();
+          break;
+        }
+        signal_type++;
+      }
     }
+  }
 
-    LogInfo << "Printing sample stats..." << std::endl;
-    for(auto& sample : ana_samples)
-        sample->PrintStats();
+  LogInfo << "Printing sample stats..." << std::endl;
+  for(auto& sample : ana_samples)
+    sample->PrintStats();
 
-    for(auto& additionalCuts : additionalCutsList){
-        delete additionalCuts;
-    }
+  for(auto& additionalCuts : additionalCutsList){
+    delete additionalCuts;
+  }
 
 }
