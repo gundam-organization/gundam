@@ -27,12 +27,12 @@
 #include "FitParameterSet.h"
 
 
-class FitterEngine {
+class ND280Fitter {
 
 public:
 
-    FitterEngine();
-    ~FitterEngine();
+    ND280Fitter();
+    ~ND280Fitter();
 
     void reset();
 

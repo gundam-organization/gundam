@@ -4,6 +4,8 @@
 
 #include "string"
 
+#include "yaml-cpp/yaml.h"
+
 #include "CmdLineParser.h"
 #include "Logger.h"
 
@@ -27,9 +29,13 @@ int main(int argc, char** argv){
 
   LogInfo << "Provided arguments: " << std::endl;
   LogInfo << clParser.getValueSummary() << std::endl << std::endl;
+  LogInfo << clParser.dumpConfigAsJsonStr() << std::endl;
 
   auto configFilePath = clParser.getOptionVal<std::string>("config-file");
   auto jsonConfig = JsonUtils::readConfigFile(configFilePath);
+
+  YAML::Node node = YAML::LoadFile(configFilePath);
+  std::cout << "YAML DUMP: " << YAML::Dump(node) << std::endl;
 
   std::vector<FitParameterSet> parameterSetList;
   for( const auto& parameterSetConfig : jsonConfig["fitParameterSets"] ){

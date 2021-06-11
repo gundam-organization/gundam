@@ -512,14 +512,21 @@ void AnaSample::FillDataEventList(){
 
   if(m_hdata_type == kAsimov){
     LogDebug << "Filling data events (Asimov)..." << std::endl;
+    m_data_events.clear();
+    m_data_events.resize(m_mc_events.size());
     for( size_t iEvent = 0 ; iEvent < m_mc_events.size() ; iEvent++ ){
-      m_data_events.push_back(AnaEvent(m_mc_events[iEvent])); // Copy
-      m_data_events.back().HookIntMembers();
-      m_data_events.back().HookFloatMembers();
-      m_data_events.back().SetAnaEventType(AnaEventType::AnaEventType::DATA);
+      m_data_events.at(iEvent) = (m_mc_events[iEvent]); // Copy
+      m_data_events.at(iEvent).HookIntMembers();
+      m_data_events.at(iEvent).HookFloatMembers();
+      m_data_events.at(iEvent).SetAnaEventType(AnaEventType::AnaEventType::DATA);
     }
   }
   else{
+    if( m_data_tree == nullptr ){
+      LogError << "Can't fill data events since TTree is not specified" << std::endl;
+      throw std::logic_error("m_data_tree == nullptr");
+    }
+
     LogDebug << "Filling data events..." << std::endl;
     Long64_t nbEntries = m_data_tree->GetEntries();
 
@@ -552,7 +559,6 @@ void AnaSample::FillDataEventList(){
 
       m_data_events.back().SetEventId(iEntry);
       m_data_events.back().DumpTreeEntryContent(m_data_tree);
-//      m_data_events.back().LoadTreeEntry(<#initializer#>, m_data_tree, 0);
 
     }
   }

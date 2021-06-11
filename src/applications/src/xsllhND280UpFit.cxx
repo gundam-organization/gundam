@@ -14,7 +14,7 @@
 #include "DetParameters.hh"
 #include "FluxParameters.hh"
 #include "OptParser.hh"
-#include "FitterEngine.h"
+#include "ND280Fitter.h"
 #include "XsecParameters.hh"
 
 #include "GlobalVariables.h"
@@ -122,7 +122,7 @@ int main(int argc, char** argv)
                        << "CutB: " << sample.cut_branch << std::endl
                        << "Use Sample: " << std::boolalpha << sample.use_sample << std::endl;
 
-            auto analysisSample = new AnaSample(sample, data_ttree);
+            auto* analysisSample = new AnaSample(sample, data_ttree);
 
             analysisSample->SetLLHFunction(options_parser.min_settings.likelihood);
             analysisSampleList.emplace_back(analysisSample);
@@ -299,7 +299,7 @@ int main(int argc, char** argv)
     GenericToolbox::mkdirTFile(output_tfile, "fitter");
 
     //Instantiate fitter obj
-    FitterEngine fitter;
+    ND280Fitter fitter;
 
     fitter.SetOutputTDirectory(output_tfile->GetDirectory("fitter"));
     fitter.SetPrngSeed(__PRNG_seed__);

@@ -1,5 +1,6 @@
 cmake_minimum_required (VERSION 3.5 FATAL_ERROR)
 
+# Configure CMake project
 project(xsLLhFitter)
 set (xsLLhFitter_VERSION_MAJOR 1)
 set (xsLLhFitter_VERSION_MINOR 0)
@@ -32,11 +33,14 @@ endif()
 
 cmessage(STATUS "CMAKE_BUILD_TYPE: \"${CMAKE_BUILD_TYPE}\"")
 
+
 ################################################################################
 #                            Check Dependencies
 ################################################################################
 
-##################################  ROOT  ######################################
+set( LINK_LIBARY_LIST "" )
+
+# ROOT
 if ( NOT DEFINED ENV{ROOTSYS} )
   cmessage(FATAL_ERROR "$ROOTSYS is not defined, please set up root first.")
 else()
@@ -62,7 +66,59 @@ cmessage(STATUS "[ROOT]: root-config --version: ${ROOT_VERSION}")
 cmessage(STATUS "[ROOT]: root-config --cflags: ${ROOT_CXX_FLAGS}")
 cmessage(STATUS "[ROOT]: root-config --libs: ${ROOT_LD_FLAGS}")
 
-################################## COMPILER ####################################
+# YAML-CPP
+find_package( yaml-cpp REQUIRED )
+if( yaml-cpp_FOUND )
+    cmessage(STATUS "yaml-cpp has been found.")
+    include_directories( ${YAML_CPP_INCLUDE_DIR} )
+#    target_link_libraries( OptionParserExample ${YAML_CPP_LIBRARIES} )
+    list(APPEND LINK_LIBARY_LIST ${YAML_CPP_LIBRARIES})
+endif()
+
+
+################################################################################
+#                       SubModules
+################################################################################
+
+# SubModules
+
+## Add the CmdLineParser
+include_directories(submodules/simple-cpp-cmd-line-parser/include)
+if( yaml-cpp_FOUND )
+    add_definitions( -D CMDLINEPARSER_YAML_CPP_ENABLED=1 )
+endif()
+
+## Add the GenericToolbox
+include_directories(submodules/cpp-generic-toolbox/include)
+add_definitions( -D PROGRESS_BAR_ENABLE_RAINBOW=1 )
+add_definitions( -D PROGRESS_BAR_FILL_TAG="\\\"T2K\#"\\\" )
+
+## Add the Logger
+include_directories(submodules/simple-cpp-logger/include)
+
+add_definitions( -D LOGGER_MAX_LOG_LEVEL_PRINTED=6 )
+add_definitions( -D LOGGER_PREFIX_LEVEL=3 )
+add_definitions( -D LOGGER_ENABLE_COLORS=1 )
+add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=1 )
+add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {USER_HEADER} {FILELINE}"\\\" )
+
+if(${CMAKE_BUILD_TYPE} MATCHES Release)
+    add_definitions( -D LOGGER_MAX_LOG_LEVEL_PRINTED=6 )
+    add_definitions( -D LOGGER_PREFIX_LEVEL=0 )
+    add_definitions( -D LOGGER_ENABLE_COLORS=1 )
+    add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=1 )
+elseif(${CMAKE_BUILD_TYPE} MATCHES Debug)
+    add_definitions( -D LOGGER_MAX_LOG_LEVEL_PRINTED=6 )
+    add_definitions( -D LOGGER_PREFIX_LEVEL=3 )
+    add_definitions( -D LOGGER_ENABLE_COLORS=1 )
+    add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=1 )
+    add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {USER_HEADER} {FILELINE}"\\\" )
+endif()
+
+
+################################################################################
+#                            Compiler Setup
+################################################################################
 
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.8.5)
@@ -78,7 +134,7 @@ else()
     #message(WARNING "You are using an untested compiler.")
 endif()
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 option(CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ langauge (-std=gnu++14)." OFF)
 option(CXX_MARCH_FLAG "Enable cpu architecture specific optimzations." OFF)
@@ -118,43 +174,6 @@ if(VERBOSE)
   cmessage (STATUS "C++ Release flags : ${CMAKE_CXX_FLAGS_RELEASE}")
   cmessage (STATUS "C++ Debug flags   : ${CMAKE_CXX_FLAGS_DEBUG}")
 endif()
-
-################################################################################
-#                       Specify Include Directories
-################################################################################
-
-# SubModules
-
-## Add the CmdLineParser
-include_directories(submodules/simple-cpp-cmd-line-parser/include)
-
-## Add the GenericToolbox
-include_directories(submodules/cpp-generic-toolbox/include)
-add_definitions( -D PROGRESS_BAR_ENABLE_RAINBOW=1 )
-add_definitions( -D PROGRESS_BAR_FILL_TAG="\\\"T2K\#"\\\" )
-
-## Add the Logger
-include_directories(submodules/simple-cpp-logger/include)
-
-add_definitions( -D LOGGER_MAX_LOG_LEVEL_PRINTED=6 )
-add_definitions( -D LOGGER_PREFIX_LEVEL=3 )
-add_definitions( -D LOGGER_ENABLE_COLORS=1 )
-add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=1 )
-add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {USER_HEADER} {FILELINE}"\\\" )
-
-if(${CMAKE_BUILD_TYPE} MATCHES Release)
-    add_definitions( -D LOGGER_MAX_LOG_LEVEL_PRINTED=6 )
-    add_definitions( -D LOGGER_PREFIX_LEVEL=0 )
-    add_definitions( -D LOGGER_ENABLE_COLORS=1 )
-    add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=1 )
-elseif(${CMAKE_BUILD_TYPE} MATCHES Debug)
-    add_definitions( -D LOGGER_MAX_LOG_LEVEL_PRINTED=6 )
-    add_definitions( -D LOGGER_PREFIX_LEVEL=3 )
-    add_definitions( -D LOGGER_ENABLE_COLORS=1 )
-    add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=1 )
-    add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {USER_HEADER} {FILELINE}"\\\" )
-endif()
-
 
 ################################################################################
 # CMake Generated

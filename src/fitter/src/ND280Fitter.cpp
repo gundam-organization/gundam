@@ -1,4 +1,4 @@
-#include "../include/FitterEngine.h"
+#include "../include/ND280Fitter.h"
 #include "GenericToolbox.h"
 #include "GenericToolboxRootExt.h"
 #include "Logger.h"
@@ -12,10 +12,10 @@
 #define FILL_TIME_POINT 12
 
 LoggerInit([](){
-  Logger::setUserHeaderStr("[FitterEngine]");
+  Logger::setUserHeaderStr("[ND280Fitter]");
 } )
 
-FitterEngine::FitterEngine() {
+ND280Fitter::ND280Fitter() {
 
   ROOT::EnableImplicitMT();
 
@@ -33,7 +33,7 @@ FitterEngine::FitterEngine() {
 
 }
 
-FitterEngine::~FitterEngine()
+ND280Fitter::~ND280Fitter()
 {
   reset();
 
@@ -41,7 +41,7 @@ FitterEngine::~FitterEngine()
 
 }
 
-void FitterEngine::reset(){
+void ND280Fitter::reset(){
 
   // Internals
   _isInitialized_     = false;
@@ -99,13 +99,13 @@ void FitterEngine::reset(){
 
 }
 
-void FitterEngine::SetOutputTDirectory(TDirectory* output_tdirectory_) {
+void ND280Fitter::SetOutputTDirectory(TDirectory* output_tdirectory_) {
   _outputTDirectory_ = output_tdirectory_;
 }
-void FitterEngine::SetPrngSeed(int PRNG_seed_){
+void ND280Fitter::SetPrngSeed(int PRNG_seed_){
   _PRNG_seed_ = PRNG_seed_;
 }
-void FitterEngine::SetMinimizationSettings(const MinSettings& minimization_settings_){
+void ND280Fitter::SetMinimizationSettings(const MinSettings& minimization_settings_){
   _minimization_settings_ = minimization_settings_;
   if(_minimizer_ != nullptr){
     // If the fitter has already been initialized, set these parameters
@@ -116,36 +116,36 @@ void FitterEngine::SetMinimizationSettings(const MinSettings& minimization_setti
     _minimizer_->SetMaxFunctionCalls(_minimization_settings_.max_fcn);
   }
 }
-void FitterEngine::SetDisableSystFit(bool disable_syst_fit_) {
+void ND280Fitter::SetDisableSystFit(bool disable_syst_fit_) {
   _disableChi2Pulls_ = disable_syst_fit_;
 }
-void FitterEngine::SetSaveEventTree(bool save_event_tree_){ _saveEventTree_ = save_event_tree_;
+void ND280Fitter::SetSaveEventTree(bool save_event_tree_){ _saveEventTree_ = save_event_tree_;
 }
-void FitterEngine::SetSaveFitParams(bool save_fit_params_){
+void ND280Fitter::SetSaveFitParams(bool save_fit_params_){
   _saveFitParameters_ = save_fit_params_;
 }
-void FitterEngine::SetApplyStatisticalFluctuationsOnSamples(bool apply_statistical_fluctuations_on_samples_){
+void ND280Fitter::SetApplyStatisticalFluctuationsOnSamples(bool apply_statistical_fluctuations_on_samples_){
   _apply_statistical_fluctuations_on_samples_ = apply_statistical_fluctuations_on_samples_;
 }
-void FitterEngine::SetSaveFitParamsFrequency(int save_fit_params_frequency_){
+void ND280Fitter::SetSaveFitParamsFrequency(int save_fit_params_frequency_){
   _saveFitParamsFrequency_ = save_fit_params_frequency_;
 }
-void FitterEngine::SetAnaFitParametersList(std::vector<AnaFitParameters*> AnaFitParameters_list_){
+void ND280Fitter::SetAnaFitParametersList(std::vector<AnaFitParameters*> AnaFitParameters_list_){
   _fitParametersGroupList_ = std::move(AnaFitParameters_list_);
 }
-void FitterEngine::SetAnaSamplesList(std::vector<AnaSample*> AnaSample_list_){
+void ND280Fitter::SetAnaSamplesList(std::vector<AnaSample*> AnaSample_list_){
   _samplesList_   = AnaSample_list_;
   _nbTotalEvents_ = 0;
   for(const auto& anaSample : _samplesList_){
     _nbTotalEvents_ += anaSample->GetN();
   }
 }
-void FitterEngine::SetSelectedDataType(int selected_data_type_){
+void ND280Fitter::SetSelectedDataType(int selected_data_type_){
   _selected_data_type_ = static_cast<DataType>(selected_data_type_);
 }
 
 
-void FitterEngine::initialize(){
+void ND280Fitter::initialize(){
 
   LogWarning << "ND280 Fitter is initializing..." << std::endl;
   PassIfNotInitialized(__METHOD_NAME__);
@@ -184,7 +184,7 @@ void FitterEngine::initialize(){
 }
 
 
-void FitterEngine::WritePrefitData(){
+void ND280Fitter::WritePrefitData(){
 
   LogInfo << "Writing prefit data..." << std::endl;
   PassIfInitialized(__METHOD_NAME__);
@@ -293,7 +293,7 @@ void FitterEngine::WritePrefitData(){
   _outputTDirectory_->cd();
 
 }
-void FitterEngine::MakeOneSigmaChecks(){
+void ND280Fitter::MakeOneSigmaChecks(){
 
   LogInfo << "Making one sigma checks..." << std::endl;
   PassIfInitialized(__METHOD_NAME__);
@@ -635,7 +635,7 @@ void FitterEngine::MakeOneSigmaChecks(){
   LogInfo << "Make one sigma check just ended." << std::endl;
 
 }
-bool FitterEngine::Fit(){
+bool ND280Fitter::Fit(){
 
   LogAlert << "Starting to fit." << std::endl;
   PassIfInitialized(__METHOD_NAME__);
@@ -765,7 +765,7 @@ bool FitterEngine::Fit(){
   return _fitHasConverged_;
 
 }
-void FitterEngine::WritePostFitData(){
+void ND280Fitter::WritePostFitData(){
 
   LogWarning << "Writing postfit data..." << std::endl;
   PassIfInitialized(__METHOD_NAME__);
@@ -915,7 +915,7 @@ void FitterEngine::WritePostFitData(){
   _outputTDirectory_->cd();
 
 }
-void FitterEngine::ScanParameters(unsigned int nbSteps_){
+void ND280Fitter::ScanParameters(unsigned int nbSteps_){
 
   auto* x = new double[nbSteps_] {};
   auto* y = new double[nbSteps_] {};
@@ -943,7 +943,7 @@ void FitterEngine::ScanParameters(unsigned int nbSteps_){
 
 }
 
-void FitterEngine::WriteSamplePlots(TDirectory* outputDir_) {
+void ND280Fitter::WriteSamplePlots(TDirectory* outputDir_) {
 
   LogWarning << "Generating sample plots." << std::endl;
 
@@ -1337,7 +1337,7 @@ void FitterEngine::WriteSamplePlots(TDirectory* outputDir_) {
 }
 
 
-void FitterEngine::InitializeThreadsParameters(){
+void ND280Fitter::InitializeThreadsParameters(){
 
   if(GlobalVariables::getNbThreads() > 1){
 
@@ -1381,7 +1381,7 @@ void FitterEngine::InitializeThreadsParameters(){
   }
 
 }
-void FitterEngine::InitializeFitParameters(){
+void ND280Fitter::InitializeFitParameters(){
 
   LogWarning << "Initializing the fit parameters..." << std::endl;
 
@@ -1445,7 +1445,7 @@ void FitterEngine::InitializeFitParameters(){
   this->PropagateSystematics();
 
 }
-void FitterEngine::InitializeDataSamples(){
+void ND280Fitter::InitializeDataSamples(){
 
   LogWarning << "Initializing data samples..." << std::endl;
 
@@ -1463,7 +1463,7 @@ void FitterEngine::InitializeDataSamples(){
     }
   }
 }
-void FitterEngine::InitializeFitter(){
+void ND280Fitter::InitializeFitter(){
 
   // Print information about the minimizer settings specified in the .json config file:
   LogWarning << "Initializing the fitter..." << std::endl;
@@ -1482,8 +1482,8 @@ void FitterEngine::InitializeFitter(){
   _minimizer_ = ROOT::Math::Factory::CreateMinimizer(_minimization_settings_.minimizer.c_str(),
                                                      _minimization_settings_.algorithm.c_str());
 
-  // The ROOT Functor class is used to wrap multi-dimensional function objects, in this case the FitterEngine::EvalFit function calculates and returns chi2_stat + chi2_sys + chi2_reg in each iteration of the fitter:
-  _functor_ = new ROOT::Math::Functor(this, &FitterEngine::EvalFit, _nb_fit_parameters_);
+  // The ROOT Functor class is used to wrap multi-dimensional function objects, in this case the ND280Fitter::EvalFit function calculates and returns chi2_stat + chi2_sys + chi2_reg in each iteration of the fitter:
+  _functor_ = new ROOT::Math::Functor(this, &ND280Fitter::EvalFit, _nb_fit_parameters_);
 
   _minimizer_->SetFunction(*_functor_);
   _minimizer_->SetStrategy(_minimization_settings_.strategy);
@@ -1512,20 +1512,20 @@ void FitterEngine::InitializeFitter(){
 
 }
 
-void FitterEngine::PassIfInitialized(const std::string& method_name_) const{
+void ND280Fitter::PassIfInitialized(const std::string& method_name_) const{
   if(not _isInitialized_){
     LogFatal << "Can't do " << method_name_ << " while not initialized." << std::endl;
     throw std::logic_error("Can't do " + method_name_ + " while not initialized.");
   }
 }
-void FitterEngine::PassIfNotInitialized(const std::string& method_name_) const{
+void ND280Fitter::PassIfNotInitialized(const std::string& method_name_) const{
   if(_isInitialized_){
     LogFatal << "Can't do " << method_name_ << " while already initialized." << std::endl;
     throw std::logic_error("Can't do " + method_name_ + " while already initialized.");
   }
 }
 
-void FitterEngine::FixParameter(const std::string& par_name, const double& value)
+void ND280Fitter::FixParameter(const std::string& par_name, const double& value)
 {
   auto iter = std::find(_parameter_names_.begin(), _parameter_names_.end(), par_name);
   if(iter != _parameter_names_.end())
@@ -1538,12 +1538,12 @@ void FitterEngine::FixParameter(const std::string& par_name, const double& value
   }
   else
   {
-    LogError << "In function FitterEngine::FixParameter()\n"
+    LogError << "In function ND280Fitter::FixParameter()\n"
              << "Parameter " << par_name << " not found!" << std::endl;
   }
 }
 
-double FitterEngine::EvalFit(const double* par){
+double ND280Fitter::EvalFit(const double* par){
 
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(FIT_IT_TIME_POINT);
 
@@ -1582,7 +1582,7 @@ double FitterEngine::EvalFit(const double* par){
   return _chi2Buffer_;
 
 }
-void FitterEngine::UpdateFitParameterValues(const double* par){
+void ND280Fitter::UpdateFitParameterValues(const double* par){
 
   ////////////////////////////////
   // Update fit parameter values for Minuit array (par)
@@ -1614,7 +1614,7 @@ void FitterEngine::UpdateFitParameterValues(const double* par){
   }
 
 }
-void FitterEngine::PropagateSystematics(){
+void ND280Fitter::PropagateSystematics(){
 
   // Time monitoring
   for(size_t jGroup = 0 ; jGroup < _fitParametersGroupList_.size() ; jGroup++){
@@ -1734,7 +1734,7 @@ void FitterEngine::PropagateSystematics(){
   }
 
 }
-void FitterEngine::ComputeChi2(){
+void ND280Fitter::ComputeChi2(){
 
   ////////////////////////////////
   // Compute chi2 stat
@@ -1795,7 +1795,7 @@ void FitterEngine::ComputeChi2(){
 }
 
 // Multi-thread compatible methods
-void FitterEngine::ReWeightEvents(int iThread_){
+void ND280Fitter::ReWeightEvents(int iThread_){
 
   AnaEvent* currentEventPtr;
   AnaSample* currentSamplePtr;
@@ -1889,7 +1889,7 @@ void FitterEngine::ReWeightEvents(int iThread_){
 }
 
 
-void FitterEngine::ParameterScans(const std::vector<int>& param_list, unsigned int nsteps)
+void ND280Fitter::ParameterScans(const std::vector<int>& param_list, unsigned int nsteps)
 {
   LogInfo << "Performing parameter scans..." << std::endl;
 
@@ -1918,7 +1918,7 @@ void FitterEngine::ParameterScans(const std::vector<int>& param_list, unsigned i
   delete[] y;
 }
 
-void FitterEngine::SaveEventHist(int fititer, bool is_final)
+void ND280Fitter::SaveEventHist(int fititer, bool is_final)
 {
   for(int s = 0; s < _samplesList_.size(); s++)
   {
@@ -1932,7 +1932,7 @@ void FitterEngine::SaveEventHist(int fititer, bool is_final)
     _samplesList_[s]->Write(_outputTDirectory_, ss.str(), fititer);
   }
 }
-void FitterEngine::SaveParams(const std::vector<std::vector<double>>& new_pars)
+void ND280Fitter::SaveParams(const std::vector<std::vector<double>>& new_pars)
 {
   std::vector<double> temp_vec;
   for(size_t i = 0; i < _fitParametersGroupList_.size(); i++)
@@ -1959,7 +1959,7 @@ void FitterEngine::SaveParams(const std::vector<std::vector<double>>& new_pars)
   TVectorD root_vec(temp_vec.size(), &temp_vec[0]);
   root_vec.Write(Form("vec_par_all_iter%d", _nbFitCalls_));
 }
-void FitterEngine::SaveResults(const std::vector<std::vector<double>>& par_results,
+void ND280Fitter::SaveResults(const std::vector<std::vector<double>>& par_results,
                               const std::vector<std::vector<double>>& par_errors)
 {
   for(std::size_t i = 0; i < _fitParametersGroupList_.size(); i++)
@@ -2015,7 +2015,7 @@ void FitterEngine::SaveResults(const std::vector<std::vector<double>>& par_resul
   }
 }
 
-TMatrixD* FitterEngine::GeneratePriorCovarianceMatrix(){
+TMatrixD* ND280Fitter::GeneratePriorCovarianceMatrix(){
 
   std::vector<TMatrixD*> matrix_category_list;
   int nb_dof = 0;
@@ -2038,7 +2038,7 @@ TMatrixD* FitterEngine::GeneratePriorCovarianceMatrix(){
   return covMatrix;
 
 }
-TMatrixD* FitterEngine::GeneratePosteriorCovarianceMatrix(){
+TMatrixD* ND280Fitter::GeneratePosteriorCovarianceMatrix(){
 
   auto* covMatrix = new TMatrixD(_minimizer_->NDim(), _minimizer_->NDim() );
   _minimizer_->GetCovMatrix( covMatrix->GetMatrixArray() );
