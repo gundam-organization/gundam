@@ -39,11 +39,11 @@ public:
   // Setters
   void setJsonConfig(const nlohmann::json &jsonConfig);
 
+  // Init
   void initialize();
 
   // Getters
   const std::vector<FitParameter> &getParameterList() const;
-
   const std::string &getName() const;
 
   // Core

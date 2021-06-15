@@ -35,6 +35,8 @@ public:
   std::vector<std::shared_ptr<Dial>> &getDialList();
   const std::vector<std::string> &getDataSetNameList() const;
 
+  TFormula *getApplyConditionFormula() const;
+
 
   // Core
   std::string getSummary() const;
@@ -50,6 +52,8 @@ private:
   int _parameterIndex_{-1};
   std::string _parameterName_;
   std::string _workingDirectory_{"."};
+  std::string _applyConditionStr_;
+  TFormula* _applyConditionFormula_{nullptr};
 
   // Internals
   bool _enableDialsSummary_{false};

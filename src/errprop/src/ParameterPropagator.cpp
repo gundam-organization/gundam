@@ -68,6 +68,7 @@ void ParameterPropagator::initialize() {
     _parameterSetsList_.emplace_back();
     _parameterSetsList_.back().setJsonConfig(parameterSetConfig);
     _parameterSetsList_.back().initialize();
+    LogInfo << _parameterSetsList_.back().getSummary() << std::endl;
   }
 
   LogTrace << "Samples..." << std::endl;
@@ -225,6 +226,16 @@ void ParameterPropagator::fillEventDialCaches(int iThread_){
             // This parameter does not apply on this sample
             continue;
           }
+
+          if( currentDialSetPtr->getApplyConditionFormula() != nullptr ){
+
+            if( eventPtr->evalFormula(currentDialSetPtr->getApplyConditionFormula()) == 0 ){
+              continue; // SKIP
+            }
+            else{ /* OK! */ }
+
+          }
+
           for( auto& dial : currentDialSetPtr->getDialList() ){
             if( eventPtr->isInBin( dial->getApplyConditionBin() ) ){
               eventPtr->getDialCachePtr()->at(&parSet).at(iPar) = dial.get();

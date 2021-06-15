@@ -52,7 +52,8 @@ void Dial::initialize() {
 
 std::string Dial::getSummary(){
   std::stringstream ss;
-  ss << DialType::DialTypeEnumNamespace::toString(_dialType_) << ": " << _applyConditionBin_.getSummary();
+  ss << DialType::DialTypeEnumNamespace::toString(_dialType_);
+  if( not _applyConditionBin_.getEdgesList().empty() ) ss << ": " << _applyConditionBin_.getSummary();
   return ss.str();
 }
 double Dial::evalResponse(const double &parameterValue_) {

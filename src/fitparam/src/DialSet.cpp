@@ -6,7 +6,8 @@
 #include "TTree.h"
 
 #include "Logger.h"
-
+#include "GenericToolbox.h"
+#include "GenericToolboxRootExt.h"
 
 #include "DialSet.h"
 #include "JsonUtils.h"
@@ -102,7 +103,11 @@ std::vector<std::shared_ptr<Dial>> &DialSet::getDialList() {
 
 std::string DialSet::getSummary() const {
   std::stringstream ss;
-  ss << "DialSets applied on datasets: " << GenericToolbox::parseVectorAsString(_dataSetNameList_);
+  ss << "DialSet: Datasets: " << GenericToolbox::parseVectorAsString(_dataSetNameList_);
+
+  if( not _applyConditionStr_.empty() ) {
+    ss << " / applyCondition:\"" << _applyConditionStr_ << "\"";
+  }
 
   if( _enableDialsSummary_ ){
     for( const auto& dialPtr: _dialList_ ){
@@ -172,6 +177,16 @@ bool DialSet::initializeDialsWithDefinition() {
     std::string dialTypeStr = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsType");
     if( not dialTypeStr.empty() ){
       dialsType = DialType::toDialType(dialTypeStr);
+    }
+
+    _applyConditionStr_ = JsonUtils::fetchValue(dialsDefinition, "applyCondition", std::string(""));
+    if( not _applyConditionStr_.empty() ){
+      LogWarning << "Found apply condition: " << _applyConditionStr_ << std::endl;
+      _applyConditionFormula_ = new TFormula("_applyConditionFormula_", _applyConditionStr_.c_str());
+      if( not _applyConditionFormula_->IsValid() ){
+        LogError << _applyConditionStr_ << ": could not be parsed as formula expression" << std::endl;
+        throw std::runtime_error("invalid formula expression");
+      }
     }
 
     if( dialsType == DialType::Normalization ){
@@ -258,5 +273,9 @@ bool DialSet::initializeDialsWithDefinition() {
   }
 
   return true;
+}
+
+TFormula *DialSet::getApplyConditionFormula() const {
+  return _applyConditionFormula_;
 }
 

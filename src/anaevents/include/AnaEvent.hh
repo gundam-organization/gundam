@@ -123,8 +123,9 @@ public:
   Float_t& GetEvWghtMC()   { return *_weightMCPtr_; }
 
   // Interfaces
-  bool isInBin( const DataBin& dataBin_);
+  bool isInBin( const DataBin& dataBin_) const;
   std::map<FitParameterSet *, std::vector<Dial *>> *getDialCachePtr();
+  double evalFormula(TFormula* formulaPtr_) const;
 
   // Deprecated
   Int_t GetEventVar(const std::string& var);

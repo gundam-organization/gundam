@@ -53,8 +53,4 @@ int main(int argc, char** argv){
 
   parProp.initialize();
 
-  for( const auto& parameterSet : parProp.getParameterSetsList() ){
-    LogInfo << parameterSet.getSummary() << std::endl;
-  }
-
 }

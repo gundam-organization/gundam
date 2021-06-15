@@ -271,7 +271,7 @@ void AnaEvent::ResetFloatContainer() {
 }
 
 // Interfaces
-bool AnaEvent::isInBin( const DataBin& dataBin_) {
+bool AnaEvent::isInBin( const DataBin& dataBin_) const {
 
   for( const auto& varName : dataBin_.getVariableNameList() ){
     if( not dataBin_.isBetweenEdges(varName, this->GetEventVarAsDouble(varName)) ){
@@ -288,6 +288,18 @@ std::map<FitParameterSet *, std::vector<Dial *>>* AnaEvent::getDialCachePtr() {
 // Deprecated
 Int_t AnaEvent::GetEventVar(const std::string &var) {
   return GetEventVarInt(var);
+}
+
+double AnaEvent::evalFormula(TFormula *formulaPtr_) const {
+  if( formulaPtr_ == nullptr ){
+    LogError << GET_VAR_NAME_VALUE(formulaPtr_) << std::endl;
+    throw std::runtime_error("nullptr");
+  }
+
+  for( int iPar = 0 ; iPar < formulaPtr_->GetNpar() ; iPar++ ){
+    formulaPtr_->SetParameter(iPar, this->GetEventVarAsDouble(formulaPtr_->GetParName(iPar)));
+  }
+  return formulaPtr_->Eval(0);
 }
 
 
