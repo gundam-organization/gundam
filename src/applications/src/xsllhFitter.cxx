@@ -10,7 +10,8 @@
 #include "Logger.h"
 
 #include "JsonUtils.h"
-#include "FitParameterSet.h"
+#include "ParameterPropagator.h"
+#include "GlobalVariables.h"
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[xsllhFitter.cxx]");
@@ -21,6 +22,7 @@ int main(int argc, char** argv){
 
   clParser.addTriggerOption("dry-run", {"--dry-run", "-d"},"Perform the full sequence of initialization, but don't do the actual fit.");
   clParser.addOption("config-file", {"-c", "--config-file"}, "Specify path to the fitter config file");
+  clParser.addOption("nb-threads", {"-t", "--nb-threads"}, "Specify nb of parallel threads");
 
   LogInfo << "Usage: " << std::endl;
   LogInfo << clParser.getConfigSummary() << std::endl << std::endl;
@@ -32,21 +34,26 @@ int main(int argc, char** argv){
   LogInfo << clParser.dumpConfigAsJsonStr() << std::endl;
 
   auto configFilePath = clParser.getOptionVal<std::string>("config-file");
-  auto jsonConfig = JsonUtils::readConfigFile(configFilePath);
 
-  YAML::Node node = YAML::LoadFile(configFilePath);
-  std::cout << "YAML DUMP: " << YAML::Dump(node) << std::endl;
+  int nThreads = 1;
+  if( clParser.isOptionTriggered("nb-threads") ) nThreads = clParser.getOptionVal<int>("nb-threads");
+  GlobalVariables::setNbThreads(nThreads);
 
-  std::vector<FitParameterSet> parameterSetList;
-  for( const auto& parameterSetConfig : jsonConfig["fitParameterSets"] ){
-    LogTrace << "emplace_back..." << std::endl;
-    parameterSetList.emplace_back();
-    LogTrace << "emplace_back... END" << std::endl;
-    parameterSetList.back().setJsonConfig(parameterSetConfig);
-    parameterSetList.back().initialize();
-  }
+  LogInfo << "Reading config file: " << configFilePath << std::endl;
+  auto jsonConfig = JsonUtils::readConfigFile(configFilePath); // works with yaml
 
-  for( const auto& parameterSet : parameterSetList ){
+  ParameterPropagator parProp;
+  parProp.setParameterSetConfig(JsonUtils::fetchValue<nlohmann::json>(jsonConfig, "fitParameterSets"));
+  parProp.setSamplesConfig(JsonUtils::fetchValue<nlohmann::json>(jsonConfig, "samples"));
+
+  TFile* f = TFile::Open(JsonUtils::fetchValue<std::string>(jsonConfig, "mc_file").c_str(), "READ");
+  parProp.setDataTree( f->Get<TTree>("selectedEvents") );
+
+  parProp.setMcFilePath(JsonUtils::fetchValue<std::string>(jsonConfig, "mc_file"));
+
+  parProp.initialize();
+
+  for( const auto& parameterSet : parProp.getParameterSetsList() ){
     LogInfo << parameterSet.getSummary() << std::endl;
   }
 

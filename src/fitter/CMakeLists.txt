@@ -1,10 +1,12 @@
 set(SRCFILES
         src/ND280Fitter.cpp
         src/XsecFitter.cc
+        src/FitterEngine.cpp
         )
 set(HEADERS
         include/ND280Fitter.h
         include/XsecFitter.hh
+        include/FitterEngine.h
         )
 
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)

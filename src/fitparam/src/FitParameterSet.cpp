@@ -41,6 +41,10 @@ void FitParameterSet::reset() {
 
 void FitParameterSet::setJsonConfig(const nlohmann::json &jsonConfig) {
   _jsonConfig_ = jsonConfig;
+  while(_jsonConfig_.is_string()){
+    // forward
+    _jsonConfig_ = JsonUtils::readConfigFile(_jsonConfig_.get<std::string>());
+  }
 }
 
 void FitParameterSet::initialize() {
@@ -50,7 +54,7 @@ void FitParameterSet::initialize() {
     throw std::logic_error("json config not set");
   }
 
-  _name_ = JsonUtils::fetchValue<std::string>(_jsonConfig_, "name");
+  _name_ = JsonUtils::fetchValue<std::string>(_jsonConfig_, "name", "");
   LogInfo << "Initializing parameter set: " << _name_ << std::endl;
 
   _isEnabled_ = JsonUtils::fetchValue<bool>(_jsonConfig_, "isEnabled");
@@ -144,34 +148,23 @@ void FitParameterSet::initialize() {
   _isInitialized_ = true;
 }
 
-std::vector<FitParameter> &FitParameterSet::getParameterList() {
+
+// Getters
+const std::vector<FitParameter> &FitParameterSet::getParameterList() const {
   return _parameterList_;
 }
 
-void FitParameterSet::reweightEvent(AnaEvent *eventPtr_) {
-  this->passIfInitialized(__METHOD_NAME__);
 
-  double totalWeight = 1;
-
-  for( auto& parameter : _parameterList_ ){
-    if( parameter.getCurrentDialSetPtr() == nullptr ) continue;
-
-    int dialIndex = parameter.getCurrentDialSetPtr()->getDialIndex(eventPtr_);
-    if( dialIndex == -1 ) continue;
-
-    totalWeight *= parameter.getCurrentDialSetPtr()->getDialList().at( dialIndex )->evalResponse( parameter.getParameterValue() );
-  }
-
-  eventPtr_->AddEvWght(totalWeight);
+// Core
+size_t FitParameterSet::getNbParameters() const {
+  return _parameterList_.size();
+}
+FitParameter& FitParameterSet::getFitParameter( size_t iPar_ ){
+  return _parameterList_.at(iPar_);
 }
 
-void FitParameterSet::passIfInitialized(const std::string &methodName_) const {
-  if( not _isInitialized_ ){
-    LogError << "Can't do \"" << methodName_ << "\" while not initialized." << std::endl;
-    throw std::logic_error("class not initialized");
-  }
-}
 
+// Misc
 std::string FitParameterSet::getSummary() const {
   std::stringstream ss;
 
@@ -189,4 +182,16 @@ std::string FitParameterSet::getSummary() const {
   return ss.str();
 }
 
+
+// Protected
+void FitParameterSet::passIfInitialized(const std::string &methodName_) const {
+  if( not _isInitialized_ ){
+    LogError << "Can't do \"" << methodName_ << "\" while not initialized." << std::endl;
+    throw std::logic_error("class not initialized");
+  }
+}
+
+const std::string &FitParameterSet::getName() const {
+  return _name_;
+}
 

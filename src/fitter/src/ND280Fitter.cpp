@@ -1602,17 +1602,6 @@ void ND280Fitter::UpdateFitParameterValues(const double* par){
     }
   }
 
-  return;
-
-  // WIP
-  size_t iParIndex = 0;
-  for( auto& fitParameterSet : _fitParameterSetList_ ){
-    for( auto& fitParameter : fitParameterSet.getParameterList() ){
-      fitParameter.setParameterValue(par[iParIndex]);
-      iParIndex++;
-    }
-  }
-
 }
 void ND280Fitter::PropagateSystematics(){
 
@@ -1807,33 +1796,6 @@ void ND280Fitter::ReWeightEvents(int iThread_){
     GlobalVariables::getThreadMutex().lock();
     GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(10000+(iThread_+1)); // Claim memory (avoid seg fault)
     GlobalVariables::getThreadMutex().unlock();
-  }
-
-
-  // WIP
-  if(false){
-
-    for( auto& sample : _samplesList_ ){
-
-
-
-      for( auto& fitParameterSet : _fitParameterSetList_ ){
-        for( auto& fitParameter : fitParameterSet.getParameterList() ){
-          fitParameter.selectDialSet(currentSamplePtr->GetDetector());
-        }
-      }
-
-      for( auto& event : sample->GetMcEvents() ){
-        for( auto& fitParameterSet : _fitParameterSetList_ ){
-          for( auto& fitParameter : fitParameterSet.getParameterList() ){
-            fitParameter.reweightEvent(&event);
-          }
-        }
-      }
-
-    }
-
-
   }
 
   // Looping over all events

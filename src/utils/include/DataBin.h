@@ -12,8 +12,6 @@
 #include <TFormula.h>
 #include <TTreeFormula.h>
 
-#include "AnaEvent.hh"
-
 
 class DataBin {
 
@@ -44,7 +42,6 @@ public:
   // Management
   bool isInBin(const std::vector<double>& valuesList_) const;
   bool isBetweenEdges(const std::string& variableName_, double value_) const;
-  bool isEventInBin(AnaEvent* eventPtr_) const;
 
   // Misc
   bool isVariableSet(const std::string& variableName_) const;

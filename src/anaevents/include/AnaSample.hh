@@ -36,12 +36,16 @@ class AnaSample
 
 public:
 
+    AnaSample();
     AnaSample(int sample_id, std::string  name, std::string  detector,
               std::string  binning, TTree* t_data);
     AnaSample(const SampleOpt& sample, TTree* t_data);
     ~AnaSample();
 
-    void Reset();
+    void setupWithJsonConfig(const nlohmann::json& config_);
+    void setDataTree(TTree* dataTree_);
+
+    void Initialize();
 
     int GetN() const;
     AnaEvent* GetEvent(int evnum);
@@ -119,9 +123,9 @@ protected:
 
     DataType m_hdata_type;
 
-    int m_sample_id;
+    int m_sample_id{-1};
     int m_nbins{};
-    double m_norm;
+    double m_norm{1.0};
 
     std::string m_name;
     std::string m_detector;
@@ -138,18 +142,18 @@ protected:
     // Mapping between Highland topology codes and consecutive integers
     std::map<int, int> topology_HL_code;
 
-    CalcLLHFunc* m_llh{};
+    CalcLLHFunc* m_llh{nullptr};
 
-    TTree* m_data_tree;
+    TTree* m_data_tree{nullptr};
 
 //    std::vector<std::map<TH1D*, TH1D*>> _histThreadHandlers_; // [iThread][iHist]
     std::vector<std::vector<TH1D*>> _histThreadHandlers_; // [iThread][iHist]
     std::vector<bool> debugThreadBools;
-    TH1D* m_hmc_true;
-    TH1D* m_hmc;
-    TH1D* m_hpred;
-    TH1D* m_hdata;
-    TH1D* m_hsig;
+    TH1D* m_hmc_true{nullptr};
+    TH1D* m_hmc{nullptr};
+    TH1D* m_hpred{nullptr};
+    TH1D* m_hdata{nullptr};
+    TH1D* m_hsig{nullptr};
 
     TTreeFormula* m_additional_cuts_formulae{};
 

@@ -4,6 +4,8 @@
 
 #include "stdexcept"
 
+#include "yaml-cpp/yaml.h"
+
 #include "GenericToolbox.h"
 #include "Logger.h"
 
@@ -20,16 +22,31 @@ nlohmann::json JsonUtils::readConfigFile(const std::string& configFilePath_){
     throw std::runtime_error("file not found.");
   }
 
-  std::fstream fs;
-  fs.open(configFilePath_, std::ios::in);
-
-  if( not fs.is_open() ) {
-    LogError << "\"" << configFilePath_ << "\": could not read file." << std::endl;
-    throw std::runtime_error("file not readable.");
-  }
-
   nlohmann::json output;
-  fs >> output;
+
+  if( GenericToolbox::doesFilePathHasExtension(configFilePath_, "yml") or GenericToolbox::doesFilePathHasExtension(configFilePath_,"yaml") ){
+    LogDebug << "YAML input file detected" << std::endl;
+
+    YAML::Node node = YAML::LoadFile(configFilePath_);
+    YAML::Emitter emitter;
+    emitter << YAML::DoubleQuoted << YAML::Flow << YAML::BeginSeq << node;
+    std::string asJsonStr = std::string(emitter.c_str() + 1);
+    GenericToolbox::replaceSubstringInsideInputString(asJsonStr, "\"true\"", "true");
+    GenericToolbox::replaceSubstringInsideInputString(asJsonStr, "\"false\"", "false");
+    output = nlohmann::json::parse(asJsonStr);
+  }
+  else{
+    std::fstream fs;
+    fs.open(configFilePath_, std::ios::in);
+
+    if( not fs.is_open() ) {
+      LogError << "\"" << configFilePath_ << "\": could not read file." << std::endl;
+      throw std::runtime_error("file not readable.");
+    }
+
+
+    fs >> output;
+  }
 
   return output;
 }

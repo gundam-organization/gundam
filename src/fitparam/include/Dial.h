@@ -40,6 +40,7 @@ public:
   virtual void initialize();
 
   const DataBin &getApplyConditionBin() const;
+  DialType::DialType getDialType() const;
 
   virtual std::string getSummary();
   double evalResponse(const double& parameterValue_);

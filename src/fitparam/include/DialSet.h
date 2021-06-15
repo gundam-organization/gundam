@@ -13,7 +13,6 @@
 #include "GenericToolbox.h"
 
 #include "Dial.h"
-#include "AnaEvent.hh"
 
 
 class DialSet {
@@ -38,7 +37,6 @@ public:
 
 
   // Core
-  int getDialIndex(AnaEvent* eventPtr_);
   std::string getSummary() const;
 
 protected:
@@ -63,10 +61,6 @@ private:
   // every pointers. It means the new copied DialSet will handle Dial ptr which have already been deleted.
   std::vector<std::shared_ptr<Dial>> _dialList_;
   DialType::DialType _globalDialType_;
-
-  // Caches
-  std::vector<AnaEvent*> _cachedEventPtrList_;
-  std::vector<Dial*> _cachedDialPtrList_;
 
 };
 

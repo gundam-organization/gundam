@@ -33,8 +33,6 @@ void DialSet::reset() {
   _dialSetConfig_ = nlohmann::json();
   _parameterIndex_ = -1;
   _parameterName_ = "";
-  _cachedEventPtrList_.clear();
-  _cachedDialPtrList_.clear();
   _enableDialsSummary_ = false;
   _isEnabled_ = true;
   _workingDirectory_ = ".";
@@ -42,6 +40,10 @@ void DialSet::reset() {
 
 void DialSet::setDialSetConfig(const nlohmann::json &dialSetConfig) {
   _dialSetConfig_ = dialSetConfig;
+  while( _dialSetConfig_.is_string() ){
+    // forward
+    _dialSetConfig_ = JsonUtils::readConfigFile(_dialSetConfig_.get<std::string>());
+  }
 }
 void DialSet::setParameterIndex(int parameterIndex) {
   _parameterIndex_ = parameterIndex;
@@ -98,18 +100,6 @@ std::vector<std::shared_ptr<Dial>> &DialSet::getDialList() {
   return _dialList_;
 }
 
-int DialSet::getDialIndex(AnaEvent *eventPtr_) {
-
-  int index = 0;
-  for( const auto& dial : _dialList_ ){
-    if( dial->getApplyConditionBin().isEventInBin(eventPtr_) ){
-      return index;
-    }
-    index++;
-  }
-
-  return -1;
-}
 std::string DialSet::getSummary() const {
   std::stringstream ss;
   ss << "DialSets applied on datasets: " << GenericToolbox::parseVectorAsString(_dataSetNameList_);

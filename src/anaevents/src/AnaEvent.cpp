@@ -270,11 +270,30 @@ void AnaEvent::ResetFloatContainer() {
   HookFloatMembers();
 }
 
+// Interfaces
+bool AnaEvent::isInBin( const DataBin& dataBin_) {
+
+  for( const auto& varName : dataBin_.getVariableNameList() ){
+    if( not dataBin_.isBetweenEdges(varName, this->GetEventVarAsDouble(varName)) ){
+      return false;
+    }
+  }
+  return true;
+
+}
+std::map<FitParameterSet *, std::vector<Dial *>>* AnaEvent::getDialCachePtr() {
+  return &_dialCache_;
+}
 
 // Deprecated
 Int_t AnaEvent::GetEventVar(const std::string &var) {
   return GetEventVarInt(var);
 }
+
+
+
+
+
 
 
 

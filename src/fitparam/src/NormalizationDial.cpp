@@ -6,6 +6,10 @@
 
 #include "NormalizationDial.h"
 
+LoggerInit([](){
+  Logger::setUserHeaderStr("[NormalizationDial]");
+})
+
 NormalizationDial::NormalizationDial() {
   this->reset();
 }

@@ -18,8 +18,6 @@
 #include "Logger.h"
 
 #include "FitParameter.h"
-#include "AnaEvent.hh"
-
 
 
 /*
@@ -44,11 +42,16 @@ public:
   void initialize();
 
   // Getters
-  std::vector<FitParameter> &getParameterList();
+  const std::vector<FitParameter> &getParameterList() const;
+
+  const std::string &getName() const;
 
   // Core
-  void reweightEvent(AnaEvent* eventPtr_);
-  std::string getSummary() const ;
+  size_t getNbParameters() const;
+  FitParameter& getFitParameter( size_t iPar_ );
+
+  // Misc
+  std::string getSummary() const;
 
 protected:
   void passIfInitialized(const std::string& methodName_) const;

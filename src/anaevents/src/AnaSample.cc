@@ -6,6 +6,7 @@
 #include "GenericToolbox.h"
 #include "GenericToolboxRootExt.h"
 #include "TTreeFormula.h"
+#include "JsonUtils.h"
 
 using xsllh::FitBin;
 
@@ -14,6 +15,9 @@ LoggerInit([](){
 } )
 
 // ctor
+AnaSample::AnaSample() {
+
+}
 AnaSample::AnaSample(int sample_id, std::string  name, std::string  detector,
                      std::string  binning, TTree* t_data)
   : m_sample_id(sample_id)
@@ -23,14 +27,7 @@ AnaSample::AnaSample(int sample_id, std::string  name, std::string  detector,
   , m_data_tree(t_data)
   , m_norm(1.0)
 {
-
-  m_hpred    = nullptr;
-  m_hmc      = nullptr;
-  m_hmc_true = nullptr;
-  m_hsig     = nullptr;
-  m_hdata    = nullptr;
-
-  Reset();
+  Initialize();
 }
 
 AnaSample::AnaSample(const SampleOpt& sample, TTree* t_data){
@@ -43,22 +40,31 @@ AnaSample::AnaSample(const SampleOpt& sample, TTree* t_data){
   m_fit_phase_space = sample.fit_phase_space;
   m_data_POT = sample.data_POT;
   m_mc_POT = sample.mc_POT;
-  m_norm = 1.0;
-
-  m_hpred    = nullptr;
-  m_hmc      = nullptr;
-  m_hmc_true = nullptr;
-  m_hsig     = nullptr;
-  m_hdata    = nullptr;
 
   m_data_tree = t_data;
 
-  this->Reset();
+  this->Initialize();
+
+}
+
+void AnaSample::setupWithJsonConfig(const json &config_) {
+
+  m_name = JsonUtils::fetchValue<std::string>(config_, "name");
+  m_detector = JsonUtils::fetchValue<std::string>(config_, "detector");
+  m_binning = JsonUtils::fetchValue<std::string>(config_, "binning");
+  m_additional_cuts = JsonUtils::fetchValue<std::string>(config_, "selectionCuts");
+  m_data_POT = std::stod(JsonUtils::fetchValue<std::string>(config_, "dataNorm"));
+  m_mc_POT = std::stod(JsonUtils::fetchValue<std::string>(config_, "mcNorm"));
+  m_sample_id = std::stoi(JsonUtils::fetchValue<std::string>(config_, "cutBranch"));
+
+  m_fit_phase_space = {"D2Reco", "D1Reco"};
+
+  m_data_tree = nullptr; // to be set, the call Initialize();
 
 }
 
 // Private constructor
-void AnaSample::Reset() {
+void AnaSample::Initialize() {
 
   if(m_data_tree != nullptr){
     m_additional_cuts_formulae = new TTreeFormula(
@@ -87,11 +93,15 @@ void AnaSample::Reset() {
 
 AnaSample::~AnaSample()
 {
-  delete m_hpred;
-  delete m_hmc;
-  delete m_hmc_true;
-  delete m_hsig;
-  delete m_hdata;
+//  delete m_hpred;
+//  delete m_hmc;
+//  delete m_hmc_true;
+//  delete m_hsig;
+//  delete m_hdata;
+}
+
+void AnaSample::setDataTree(TTree* dataTree_){
+  m_data_tree = dataTree_;
 }
 
 void AnaSample::SetBinning(const std::string& binning)
@@ -679,7 +689,7 @@ double AnaSample::CalcChi2() const
     double exp = m_hpred->GetBinContent(j);
     if(exp > 0.0)
     {
-      // added when external fake datasets (you cannot reweight when simply 0)
+      // added when external fake datasets (you cannot propagateOnSamples when simply 0)
       // this didn't happen when all from same MC since if exp=0 then obs =0
 
       chi2 += 2 * (exp - obs);
@@ -1006,4 +1016,8 @@ void AnaSample::CompareMcEventsWeightsWithSnapshot()
   LogInfo << "Comparison with the snapshot ended." << std::endl;
 
 }
+
+
+
+
 

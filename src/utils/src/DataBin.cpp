@@ -104,15 +104,7 @@ bool DataBin::isBetweenEdges(const std::string& variableName_, double value_) co
     throw std::logic_error("variableName_ not set.");
   }
   int varIndex = GenericToolbox::findElementIndex(variableName_, _variableNameList_);
-  this->isBetweenEdges(varIndex, value_);
-}
-bool DataBin::isEventInBin(AnaEvent *eventPtr_) const {
-  for( size_t iVar = 0 ; iVar < _edgesList_.size() ; iVar++ ){
-    if( not this->isBetweenEdges(iVar, eventPtr_->GetEventVarAsDouble( _variableNameList_.at(iVar) )) ){
-      return false;
-    }
-  }
-  return true;
+  return this->isBetweenEdges(varIndex, value_);
 }
 
 // Misc

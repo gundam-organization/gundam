@@ -69,4 +69,7 @@ double Dial::evalResponse(const double &parameterValue_) {
 const DataBin &Dial::getApplyConditionBin() const {
   return _applyConditionBin_;
 }
+DialType::DialType Dial::getDialType() const {
+  return _dialType_;
+}
 

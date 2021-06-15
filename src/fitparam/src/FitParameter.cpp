@@ -21,7 +21,6 @@ FitParameter::~FitParameter() {
 }
 
 void FitParameter::reset() {
-  _currentDialSetPtr_ = nullptr;
   _dialSetList_.clear();
   _dialDefinitionsList_ = nlohmann::json();
   _parameterIndex_ = -1;
@@ -34,6 +33,10 @@ void FitParameter::reset() {
 
 void FitParameter::setDialSetConfigs(const std::vector<nlohmann::json> &jsonConfigList) {
   _dialDefinitionsList_ = jsonConfigList;
+  while( _dialDefinitionsList_.is_string() ){
+    // forward
+    _dialDefinitionsList_ = JsonUtils::readConfigFile(_dialDefinitionsList_.get<std::string>());
+  }
 }
 void FitParameter::setParameterIndex(int parameterIndex) {
   _parameterIndex_ = parameterIndex;
@@ -112,44 +115,28 @@ const std::string &FitParameter::getName() const {
 double FitParameter::getParameterValue() const {
   return _parameterValue_;
 }
-DialSet *FitParameter::getCurrentDialSetPtr() const {
-  return _currentDialSetPtr_;
-}
 int FitParameter::getParameterIndex() const {
   return _parameterIndex_;
 }
 
-void FitParameter::selectDialSet(const std::string &dataSetName_) {
-
-  _currentDialSetPtr_ = nullptr;
+DialSet* FitParameter::findDialSet(const std::string& dataSetName_){
   for( auto& dialSet : _dialSetList_ ){
-    int dialIndex = GenericToolbox::doesElementIsInVector(dataSetName_, dialSet.getDataSetNameList());
-    if( dialIndex != -1 ){
-      _currentDialSetPtr_ = &dialSet;
-      return;
+    if( GenericToolbox::doesElementIsInVector(dataSetName_, dialSet.getDataSetNameList()) ){
+      return &dialSet;
     }
   }
 
   // If not found, find general dialSet
   for( auto& dialSet : _dialSetList_ ){
-    if(    GenericToolbox::doesElementIsInVector("", dialSet.getDataSetNameList())
+    if( GenericToolbox::doesElementIsInVector("", dialSet.getDataSetNameList())
         or GenericToolbox::doesElementIsInVector("*", dialSet.getDataSetNameList())
       ){
-      _currentDialSetPtr_ = &dialSet;
-      return;
+      return &dialSet;
     }
   }
 
-}
-void FitParameter::reweightEvent(AnaEvent *eventPtr_) {
-
-  if( _currentDialSetPtr_ == nullptr ){
-    return;
-  }
-  int index = _currentDialSetPtr_->getDialIndex(eventPtr_);
-  if( index == -1 ) return;
-  eventPtr_->AddEvWght(_currentDialSetPtr_->getDialList().at(index )->evalResponse(_parameterValue_ ));
-
+  // If no general dialSet found, this parameter does not apply on this dataSet
+  return nullptr;
 }
 
 std::string FitParameter::getSummary() const {

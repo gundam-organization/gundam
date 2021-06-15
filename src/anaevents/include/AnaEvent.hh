@@ -11,18 +11,23 @@
 #include "TTree.h"
 #include "TROOT.h"
 #include "TTreeFormula.h"
+#include <TChain.h>
 
 #include "Logger.h"
 #include "GenericToolbox.h"
 
-#include <FitStructs.hh>
-#include <TChain.h>
+#include "FitParameterSet.h"
+#include "Dial.h"
+#include "DataBin.h"
+#include "DataBinSet.h"
 
 
 namespace AnaEventType{
   ENUM_EXPANDER(
     AnaEventType, -1,
-    Undefined, MC, DATA
+    Undefined,
+    MC,
+    DATA
   )
 };
 
@@ -117,6 +122,10 @@ public:
   Float_t& GetQ2Reco()     { return *_q2RecoPtr_; }
   Float_t& GetEvWghtMC()   { return *_weightMCPtr_; }
 
+  // Interfaces
+  bool isInBin( const DataBin& dataBin_);
+  std::map<FitParameterSet *, std::vector<Dial *>> *getDialCachePtr();
+
   // Deprecated
   Int_t GetEventVar(const std::string& var);
 
@@ -171,6 +180,9 @@ private:
   Float_t* _q2TruePtr_;
   Float_t* _q2RecoPtr_;
   Float_t* _weightMCPtr_;
+
+  // Cache
+  std::map<FitParameterSet*, std::vector<Dial*>> _dialCache_; // _dialCache_[fitParSetPtr][ParIndex] = correspondingDialPtr;
 
 };
 

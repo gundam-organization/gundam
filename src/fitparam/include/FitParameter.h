@@ -11,7 +11,6 @@
 #include "GenericToolbox.h"
 
 #include "DialSet.h"
-#include "AnaEvent.hh"
 
 class FitParameter {
 
@@ -36,11 +35,9 @@ public:
   int getParameterIndex() const;
   const std::string &getName() const;
   double getParameterValue() const;
-  DialSet *getCurrentDialSetPtr() const;
 
   // Core
-  void selectDialSet(const std::string& dataSetName_);
-  void reweightEvent(AnaEvent* eventPtr_);
+  DialSet* findDialSet(const std::string& dataSetName_);
   std::string getSummary() const;
   std::string getTitle() const;
 
@@ -57,7 +54,6 @@ private:
   bool _isEnabled_{true};
 
   // Internals
-  DialSet* _currentDialSetPtr_{nullptr};
   std::vector<DialSet> _dialSetList_; // one dial set per detector
 
 };
