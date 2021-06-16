@@ -1,13 +1,13 @@
 set(SRCFILES
   src/FitObj.cc
   src/XsecCalc.cc
-  src/ParameterPropagator.cpp
+        src/Propagator.cpp
 )
 
 set(HEADERS
   include/FitObj.hh
   include/XsecCalc.hh
-        include/ParameterPropagator.h
+        include/Propagator.h
 )
 
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)

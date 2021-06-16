@@ -4,6 +4,7 @@ set( SRCFILES
         src/AnaSample.cc
         src/AnaTreeMC.cc
         src/AnaEvent.cpp
+        src/SamplePlotGenerator.cpp
         )
 
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)

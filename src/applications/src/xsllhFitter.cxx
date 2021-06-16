@@ -10,7 +10,7 @@
 #include "Logger.h"
 
 #include "JsonUtils.h"
-#include "ParameterPropagator.h"
+#include "Propagator.h"
 #include "GlobalVariables.h"
 
 LoggerInit([](){
@@ -42,7 +42,7 @@ int main(int argc, char** argv){
   LogInfo << "Reading config file: " << configFilePath << std::endl;
   auto jsonConfig = JsonUtils::readConfigFile(configFilePath); // works with yaml
 
-  ParameterPropagator parProp;
+  Propagator parProp;
   parProp.setParameterSetConfig(JsonUtils::fetchValue<nlohmann::json>(jsonConfig, "fitParameterSets"));
   parProp.setSamplesConfig(JsonUtils::fetchValue<nlohmann::json>(jsonConfig, "samples"));
 

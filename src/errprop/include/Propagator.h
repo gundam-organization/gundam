@@ -2,8 +2,8 @@
 // Created by Adrien BLANCHET on 11/06/2021.
 //
 
-#ifndef XSLLHFITTER_PARAMETERPROPAGATOR_H
-#define XSLLHFITTER_PARAMETERPROPAGATOR_H
+#ifndef XSLLHFITTER_PROPAGATOR_H
+#define XSLLHFITTER_PROPAGATOR_H
 
 #include "vector"
 #include "future"
@@ -13,11 +13,11 @@
 #include "FitParameterSet.h"
 #include "AnaSample.hh"
 
-class ParameterPropagator {
+class Propagator {
 
 public:
-  ParameterPropagator();
-  virtual ~ParameterPropagator();
+  Propagator();
+  virtual ~Propagator();
 
   // Initialize
   void reset();
@@ -82,4 +82,4 @@ private:
 };
 
 
-#endif //XSLLHFITTER_PARAMETERPROPAGATOR_H
+#endif //XSLLHFITTER_PROPAGATOR_H

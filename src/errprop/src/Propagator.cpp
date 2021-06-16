@@ -8,7 +8,7 @@
 #include "GenericToolbox.h"
 
 #include "JsonUtils.h"
-#include "ParameterPropagator.h"
+#include "Propagator.h"
 #include "GlobalVariables.h"
 #include "Dial.h"
 #include "FitParameterSet.h"
@@ -17,13 +17,13 @@
 #include "SplineDial.h"
 
 LoggerInit([](){
-  Logger::setUserHeaderStr("[ParameterPropagator]");
+  Logger::setUserHeaderStr("[Propagator]");
 })
 
-ParameterPropagator::ParameterPropagator() { this->reset(); }
-ParameterPropagator::~ParameterPropagator() { this->reset(); }
+Propagator::Propagator() { this->reset(); }
+Propagator::~Propagator() { this->reset(); }
 
-void ParameterPropagator::reset() {
+void Propagator::reset() {
   _isInitialized_ = false;
   _parameterSetsList_.clear();
   _nbThreads_ = 1;
@@ -37,7 +37,7 @@ void ParameterPropagator::reset() {
   _stopThreads_ = false;
 }
 
-void ParameterPropagator::setParameterSetConfig(const json &parameterSetConfig) {
+void Propagator::setParameterSetConfig(const json &parameterSetConfig) {
   _parameterSetsConfig_ = parameterSetConfig;
   while( _parameterSetsConfig_.is_string() ){
     // forward json definition in external files
@@ -45,7 +45,7 @@ void ParameterPropagator::setParameterSetConfig(const json &parameterSetConfig) 
     _parameterSetsConfig_ = JsonUtils::readConfigFile(_parameterSetsConfig_.get<std::string>());
   }
 }
-void ParameterPropagator::setSamplesConfig(const json &samplesConfig) {
+void Propagator::setSamplesConfig(const json &samplesConfig) {
   _samplesConfig_ = samplesConfig;
   while( _samplesConfig_.is_string() ){
     // forward json definition in external files
@@ -53,14 +53,14 @@ void ParameterPropagator::setSamplesConfig(const json &samplesConfig) {
     _samplesConfig_ = JsonUtils::readConfigFile(_samplesConfig_.get<std::string>());
   }
 }
-void ParameterPropagator::setDataTree(TTree *dataTree_) {
+void Propagator::setDataTree(TTree *dataTree_) {
   dataTree = dataTree_;
 }
-void ParameterPropagator::setMcFilePath(const std::string &mcFilePath) {
+void Propagator::setMcFilePath(const std::string &mcFilePath) {
   mc_file_path = mcFilePath;
 }
 
-void ParameterPropagator::initialize() {
+void Propagator::initialize() {
   LogWarning << __METHOD_NAME__ << std::endl;
 
   LogTrace << "Parameters..." << std::endl;
@@ -101,11 +101,11 @@ void ParameterPropagator::initialize() {
   _isInitialized_ = true;
 }
 
-const std::vector<FitParameterSet> &ParameterPropagator::getParameterSetsList() const {
+const std::vector<FitParameterSet> &Propagator::getParameterSetsList() const {
   return _parameterSetsList_;
 }
 
-void ParameterPropagator::propagateParametersOnSamples() {
+void Propagator::propagateParametersOnSamples() {
   LogDebug << __METHOD_NAME__ << std::endl;
 
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(1);
@@ -125,7 +125,7 @@ void ParameterPropagator::propagateParametersOnSamples() {
 
   LogTrace << "Reweight took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(1) << std::endl;
 }
-void ParameterPropagator::fillSampleHistograms(){
+void Propagator::fillSampleHistograms(){
   LogDebug << __METHOD_NAME__ << std::endl;
 
   // dispatch the job on each thread
@@ -148,7 +148,7 @@ void ParameterPropagator::fillSampleHistograms(){
 
 
 // Protected
-void ParameterPropagator::initializeThreads() {
+void Propagator::initializeThreads() {
 
   _nbThreads_ = GlobalVariables::getNbThreads();
   if( _nbThreads_ == 1 ){
@@ -190,7 +190,7 @@ void ParameterPropagator::initializeThreads() {
   }
 
 }
-void ParameterPropagator::initializeCaches() {
+void Propagator::initializeCaches() {
   LogInfo << __METHOD_NAME__ << std::endl;
 
   for( auto& sample : _samplesList_ ){
@@ -205,7 +205,7 @@ void ParameterPropagator::initializeCaches() {
 
 
 }
-void ParameterPropagator::fillEventDialCaches(){
+void Propagator::fillEventDialCaches(){
   LogInfo << __METHOD_NAME__ << std::endl;
 
   // dispatch the job on each thread
@@ -223,7 +223,7 @@ void ParameterPropagator::fillEventDialCaches(){
 
 }
 
-void ParameterPropagator::fillEventDialCaches(int iThread_){
+void Propagator::fillEventDialCaches(int iThread_){
 
   DialSet* parameterDialSetPtr;
   AnaEvent* eventPtr;
@@ -271,7 +271,7 @@ void ParameterPropagator::fillEventDialCaches(int iThread_){
   } // sample
 
 }
-void ParameterPropagator::propagateParametersOnSamples(int iThread_) {
+void Propagator::propagateParametersOnSamples(int iThread_) {
   AnaEvent* eventPtr;
   double weight;
 
