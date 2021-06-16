@@ -37,6 +37,7 @@ void Dial::reset() {
   _dialParameterCache_ = std::nan("Unset");
   _applyConditionBin_ = DataBin();
   _dialType_ = DialType::Invalid;
+  _mutexPtr_ = std::make_shared<std::mutex>();
 }
 
 void Dial::setApplyConditionBin(const DataBin &applyConditionBin) {
@@ -57,12 +58,16 @@ std::string Dial::getSummary(){
   return ss.str();
 }
 double Dial::evalResponse(const double &parameterValue_) {
+
+  _mutexPtr_->lock(); // don't fetch the cache at the same time
   if( _dialParameterCache_ == parameterValue_ ){
+    _mutexPtr_->unlock();
     return _dialResponseCache_;
   }
 
   _dialParameterCache_ = parameterValue_;
   this->updateResponseCache(parameterValue_); // specified in the corresponding dial class
+  _mutexPtr_->unlock();
 
   return _dialResponseCache_;
 }

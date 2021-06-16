@@ -83,6 +83,9 @@ TFormula *DataBin::getFormula() const {
 TTreeFormula *DataBin::getTreeFormula() const {
   return _treeFormula_.get();
 }
+size_t DataBin::getNbEdges() const{
+  return _edgesList_.size();
+}
 
 // Management
 bool DataBin::isInBin(const std::vector<double>& valuesList_) const{
@@ -105,6 +108,24 @@ bool DataBin::isBetweenEdges(const std::string& variableName_, double value_) co
   }
   int varIndex = GenericToolbox::findElementIndex(variableName_, _variableNameList_);
   return this->isBetweenEdges(varIndex, value_);
+}
+bool DataBin::isBetweenEdges(size_t varIndex_, double value_) const{
+
+  if( varIndex_ >= _edgesList_.size() ){
+    LogError << "Provided " << GET_VAR_NAME_VALUE(varIndex_) << " is invalid: " << GET_VAR_NAME_VALUE(_edgesList_.size()) << std::endl;
+    throw std::runtime_error("varIndex out of range.");
+  }
+
+  const auto* edgePairPtr = &_edgesList_.at(varIndex_);
+
+  if( edgePairPtr->first == edgePairPtr->second ){
+    return edgePairPtr->first == value_;
+  }
+
+  if( edgePairPtr->first <= value_  and value_ < edgePairPtr->second ){
+    return true;
+  }
+  return false;
 }
 
 // Misc
@@ -213,21 +234,4 @@ std::string DataBin::generateFormulaStr(bool varNamesAsTreeFormula_) {
 
   return ss.str();
 }
-bool DataBin::isBetweenEdges(size_t varIndex_, double value_) const{
 
-  if( varIndex_ >= _edgesList_.size() ){
-    LogError << "Provided " << GET_VAR_NAME_VALUE(varIndex_) << " is invalid: " << GET_VAR_NAME_VALUE(_edgesList_.size()) << std::endl;
-    throw std::runtime_error("varIndex out of range.");
-  }
-
-  const auto* edgePairPtr = &_edgesList_.at(varIndex_);
-
-  if( edgePairPtr->first == edgePairPtr->second ){
-    return edgePairPtr->first == value_;
-  }
-
-  if( edgePairPtr->first <= value_  and value_ < edgePairPtr->second ){
-    return true;
-  }
-  return false;
-}

@@ -689,7 +689,7 @@ double AnaSample::CalcChi2() const
     double exp = m_hpred->GetBinContent(j);
     if(exp > 0.0)
     {
-      // added when external fake datasets (you cannot propagateOnSamples when simply 0)
+      // added when external fake datasets (you cannot propagateOnSampleEvents when simply 0)
       // this didn't happen when all from same MC since if exp=0 then obs =0
 
       chi2 += 2 * (exp - obs);

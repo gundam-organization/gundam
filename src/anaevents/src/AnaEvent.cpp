@@ -273,13 +273,17 @@ void AnaEvent::ResetFloatContainer() {
 // Interfaces
 bool AnaEvent::isInBin( const DataBin& dataBin_) const {
 
-  for( const auto& varName : dataBin_.getVariableNameList() ){
-    if( not dataBin_.isBetweenEdges(varName, this->GetEventVarAsDouble(varName)) ){
+  if( dataBin_.isLowMemoryUsageMode() ){
+    LogError << "Can't check if in bin if the dataBin has not variable names attached to each edges." << std::endl;
+    throw std::runtime_error("dataBin_.isLowMemoryUsageMode()");
+  }
+
+  for( size_t iEdge = 0 ; iEdge < dataBin_.getNbEdges() ; iEdge++ ){
+    if( not dataBin_.isBetweenEdges(iEdge, this->GetEventVarAsDouble(dataBin_.getVariableNameList().at(iEdge)) ) ){
       return false;
     }
   }
   return true;
-
 }
 std::map<FitParameterSet *, std::vector<Dial *>>* AnaEvent::getDialCachePtr() {
   return &_dialCache_;

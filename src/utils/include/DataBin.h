@@ -39,9 +39,13 @@ public:
   TFormula *getFormula() const;
   TTreeFormula *getTreeFormula() const;
 
+  // Non-native Getters
+  size_t getNbEdges() const;
+
   // Management
   bool isInBin(const std::vector<double>& valuesList_) const;
   bool isBetweenEdges(const std::string& variableName_, double value_) const;
+  bool isBetweenEdges(size_t varIndex_, double value_) const;
 
   // Misc
   bool isVariableSet(const std::string& variableName_) const;
@@ -51,7 +55,6 @@ public:
 
 protected:
   std::string generateFormulaStr(bool varNamesAsTreeFormula_);
-  bool isBetweenEdges(size_t varIndex_, double value_) const;
 
 private:
   bool _isLowMemoryUsageMode_{false};

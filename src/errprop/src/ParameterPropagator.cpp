@@ -95,6 +95,8 @@ void ParameterPropagator::initialize() {
 
   fillEventDialCaches();
   propagateParametersOnSamples();
+  fillSampleHistograms();
+  fillSampleHistograms();
 
   _isInitialized_ = true;
 }
@@ -106,24 +108,42 @@ const std::vector<FitParameterSet> &ParameterPropagator::getParameterSetsList() 
 void ParameterPropagator::propagateParametersOnSamples() {
   LogDebug << __METHOD_NAME__ << std::endl;
 
-  LogTrace << "Reweight..." << std::endl;
-
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(1);
 
   // dispatch the job on each thread
   for( int iThread = 0 ; iThread < _nbThreads_-1 ; iThread++ ){
-    _threadTriggersList_.at(iThread).propagateOnSamples = true; // triggering the workers
+    _threadTriggersList_.at(iThread).propagateOnSampleEvents = true; // triggering the workers
   }
   // last thread is always this one
   this->propagateParametersOnSamples(_nbThreads_-1);
 
   for( int iThread = 0 ; iThread < _nbThreads_-1 ; iThread++ ){
-    while( _threadTriggersList_.at(iThread).propagateOnSamples ){
+    while( _threadTriggersList_.at(iThread).propagateOnSampleEvents ){
       // wait
     }
   }
 
-  LogTrace << "took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(1) << std::endl;
+  LogTrace << "Reweight took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(1) << std::endl;
+}
+void ParameterPropagator::fillSampleHistograms(){
+  LogDebug << __METHOD_NAME__ << std::endl;
+
+  // dispatch the job on each thread
+  for( int iThread = 0 ; iThread < _nbThreads_-1 ; iThread++ ){
+    _threadTriggersList_.at(iThread).fillSampleHistograms = true; // triggering the workers
+  }
+  // last thread is always this one
+  for( auto& sample : _samplesList_ ){
+    sample.FillMcHistograms( _nbThreads_ - 1 );
+  }
+
+  for( int iThread = 0 ; iThread < _nbThreads_-1 ; iThread++ ){
+    while( _threadTriggersList_.at(iThread).fillSampleHistograms ){
+      // wait
+    }
+  }
+
+  LogTrace << "Histogram fill took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(1) << std::endl;
 }
 
 
@@ -141,13 +161,19 @@ void ParameterPropagator::initializeThreads() {
     while(not _stopThreads_){
       // Pending state loop
 
-      if     ( _threadTriggersList_.at(iThread_).propagateOnSamples ){
+      if     ( _threadTriggersList_.at(iThread_).propagateOnSampleEvents ){
         this->propagateParametersOnSamples(iThread_);
-        _threadTriggersList_.at(iThread_).propagateOnSamples = false; // toggle off the trigger
+        _threadTriggersList_.at(iThread_).propagateOnSampleEvents = false; // toggle off the trigger
       }
       else if( _threadTriggersList_.at(iThread_).fillDialCaches ){
         this->fillEventDialCaches(iThread_);
         _threadTriggersList_.at(iThread_).fillDialCaches = false;
+      }
+      else if( _threadTriggersList_.at(iThread_).fillSampleHistograms ){
+        for( auto& sample : _samplesList_ ){
+          sample.FillMcHistograms(iThread_);
+        }
+        _threadTriggersList_.at(iThread_).fillSampleHistograms = false;
       }
 
       // Add other jobs there
@@ -199,55 +225,46 @@ void ParameterPropagator::fillEventDialCaches(){
 
 void ParameterPropagator::fillEventDialCaches(int iThread_){
 
-  DialSet* currentDialSetPtr;
+  DialSet* parameterDialSetPtr;
   AnaEvent* eventPtr;
 
   for( auto& sample : _samplesList_ ){
 
     int nEvents = sample.GetN();
     std::stringstream ss;
-    ss << "Filling cache: " << sample.GetName();
-    GenericToolbox::resetLastDisplayedValue();
+    ss << "Filling dial cache for sample: \"" << sample.GetName() << "\"";
     for( int iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
       if( iEvent % _nbThreads_ != iThread_ ){
         continue;
       }
-      if( iThread_ == 0 ){
+
+      if( iThread_ == _nbThreads_-1 ){
         GenericToolbox::displayProgressBar(iEvent, nEvents, ss.str());
       }
 
       eventPtr = sample.GetEvent(iEvent);
 
-      for( auto& parSet : _parameterSetsList_ ){
-        for( size_t iPar = 0 ; iPar < parSet.getNbParameters() ; iPar++ ){
+      for( auto& parSetPair : *eventPtr->getDialCachePtr() ){
+        for( size_t iPar = 0 ; iPar < parSetPair.first->getNbParameters() ; iPar++ ){
 
-          currentDialSetPtr = parSet.getFitParameter(iPar).findDialSet(sample.GetDetector());
-          if( currentDialSetPtr == nullptr ){
-            // This parameter does not apply on this sample
-            continue;
+          parameterDialSetPtr = parSetPair.first->getFitParameter(iPar).findDialSet(sample.GetDetector());
+
+          // If a formula is defined
+          if( parameterDialSetPtr->getApplyConditionFormula() != nullptr
+              and eventPtr->evalFormula(parameterDialSetPtr->getApplyConditionFormula()) == 0
+          ){
+            continue; // SKIP
           }
 
-          if( currentDialSetPtr->getApplyConditionFormula() != nullptr ){
-
-            if( eventPtr->evalFormula(currentDialSetPtr->getApplyConditionFormula()) == 0 ){
-              continue; // SKIP
-            }
-            else{ /* OK! */ }
-
-          }
-
-          for( auto& dial : currentDialSetPtr->getDialList() ){
+          for( const auto& dial : parameterDialSetPtr->getDialList() ){
             if( eventPtr->isInBin( dial->getApplyConditionBin() ) ){
-              eventPtr->getDialCachePtr()->at(&parSet).at(iPar) = dial.get();
-              break;
+              parSetPair.second.at(iPar) = dial.get();
+              break; // ok, next parameter
             }
           } // dial
 
-        }// par
-
-      } // parSet
-
-
+        }
+      }
 
     } // event
 
@@ -284,6 +301,10 @@ void ParameterPropagator::propagateParametersOnSamples(int iThread_) {
         }
 
         // TODO: check if weight cap
+        if( weight == 0 ){
+          LogError << "0" << std::endl;
+          throw std::runtime_error("0 weight");
+        }
 
         eventPtr->AddEvWght(weight);
 

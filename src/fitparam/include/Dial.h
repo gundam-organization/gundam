@@ -6,6 +6,8 @@
 #define XSLLHFITTER_DIAL_H
 
 #include "string"
+#include "mutex"
+#include "memory"
 
 #include "GenericToolbox.h"
 
@@ -54,6 +56,8 @@ protected:
   // Internals
   double _dialResponseCache_{};
   double _dialParameterCache_{};
+
+  std::shared_ptr<std::mutex> _mutexPtr_;
 
 };
 

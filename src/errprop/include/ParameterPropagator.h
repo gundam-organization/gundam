@@ -39,6 +39,7 @@ public:
 
   // Core
   void propagateParametersOnSamples();
+  void fillSampleHistograms();
 
 protected:
   void initializeThreads();
@@ -46,7 +47,6 @@ protected:
 
   // multi-threaded
   void fillEventDialCaches();
-
 
   void propagateParametersOnSamples(int iThread_);
   void fillEventDialCaches(int iThread_);
@@ -67,7 +67,8 @@ private:
   bool _stopThreads_{false};
 
   struct ThreadTriggers{
-    bool propagateOnSamples{false};
+    bool fillSampleHistograms{false};
+    bool propagateOnSampleEvents{false};
     bool fillDialCaches{false};
   };
   std::vector<ThreadTriggers> _threadTriggersList_;
