@@ -20,16 +20,21 @@ public:
   void reset();
 
   // Setters
-  void setSaveTDirectory(TDirectory *saveTDirectory_);
   void setConfig(const nlohmann::json &config);
 
   // Init
   void initialize();
 
-  void saveSamplePlots(TDirectory *saveTDirectory_, const std::vector<AnaSample> &sampleList_);
+  // Getters
+  std::map<std::string, TH1D *> getBufferHistogramList() const; // copies of the maps (not the ptr)
+  std::map<std::string, TCanvas *> getBufferCanvasList() const;
+
+  // Core
+  void generateSamplePlots(const std::vector<AnaSample> &sampleList_, TDirectory *saveTDirectory_ = nullptr);
+  void generateSampleHistograms(const std::vector<AnaSample> &sampleList_, TDirectory *saveTDirectory_ = nullptr);
+  void generateCanvas(const std::map<std::string, std::map<std::string, std::vector<TH1D*>>>& histsToStack_, TDirectory *saveTDirectory_ = nullptr);
 
 private:
-  TDirectory* _saveTDirectory_{nullptr};
   nlohmann::json _config_;
 
   // Internals
@@ -37,6 +42,9 @@ private:
   nlohmann::json _canvasParameters_;
   nlohmann::json _histogramsDefinition_;
   std::vector<Color_t> defaultColorWheel;
+  std::map<std::string, TH1D*> _bufferHistogramList_;
+  std::map<std::string, std::map<std::string, std::vector<TH1D*>>> _histsToStack_;
+  std::map<std::string, TCanvas*> _bufferCanvasList_;
 
 
 };

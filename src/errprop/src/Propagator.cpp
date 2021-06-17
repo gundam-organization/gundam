@@ -118,8 +118,9 @@ void Propagator::initialize() {
   fillSampleHistograms(); // for benchmark
 
   auto* f = TFile::Open("test.root", "RECREATE");
-  _samplePlotGenerator_.saveSamplePlots(f->GetDirectory(""), _samplesList_);
+  _samplePlotGenerator_.generateSamplePlots(_samplesList_, f->GetDirectory(""));
   f->Close();
+  LogTrace << "Closed" << std::endl;
 
   _isInitialized_ = true;
 }
