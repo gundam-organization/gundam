@@ -31,6 +31,7 @@ nlohmann::json JsonUtils::readConfigFile(const std::string& configFilePath_){
     YAML::Emitter emitter;
     emitter << YAML::DoubleQuoted << YAML::Flow << YAML::BeginSeq << node;
     std::string asJsonStr = std::string(emitter.c_str() + 1);
+    LogTrace << asJsonStr << std::endl;
     GenericToolbox::replaceSubstringInsideInputString(asJsonStr, "\"true\"", "true");
     GenericToolbox::replaceSubstringInsideInputString(asJsonStr, "\"false\"", "false");
     output = nlohmann::json::parse(asJsonStr);

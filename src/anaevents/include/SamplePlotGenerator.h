@@ -26,11 +26,17 @@ public:
   // Init
   void initialize();
 
-  void saveSamplePlots(const std::vector<AnaSample*>& _sampleList_);
+  void saveSamplePlots(TDirectory *saveTDirectory_, const std::vector<AnaSample> &sampleList_);
 
 private:
   TDirectory* _saveTDirectory_{nullptr};
   nlohmann::json _config_;
+
+  // Internals
+  nlohmann::json _varDictionary_;
+  nlohmann::json _canvasParameters_;
+  nlohmann::json _histogramsDefinition_;
+  std::vector<Color_t> defaultColorWheel;
 
 
 };

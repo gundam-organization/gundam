@@ -12,6 +12,7 @@
 
 #include "FitParameterSet.h"
 #include "AnaSample.hh"
+#include "SamplePlotGenerator.h"
 
 class Propagator {
 
@@ -25,6 +26,8 @@ public:
   // Setters
   void setParameterSetConfig(const json &parameterSetConfig);
   void setSamplesConfig(const json &samplesConfig);
+
+  void setSamplePlotGeneratorConfig(const json &samplePlotGeneratorConfig);
 
   // test
   void setDataTree(TTree *dataTree_);
@@ -54,11 +57,13 @@ protected:
 private:
   nlohmann::json _parameterSetsConfig_;
   nlohmann::json _samplesConfig_;
+  nlohmann::json _samplePlotGeneratorConfig_;
 
   // Internals
   bool _isInitialized_{false};
   std::vector<FitParameterSet> _parameterSetsList_;
   std::vector<AnaSample> _samplesList_;
+  SamplePlotGenerator _samplePlotGenerator_;
 
   // Threads
   std::vector<std::future<void>> _threadsList_;

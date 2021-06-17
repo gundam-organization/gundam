@@ -45,6 +45,7 @@ int main(int argc, char** argv){
   Propagator parProp;
   parProp.setParameterSetConfig(JsonUtils::fetchValue<nlohmann::json>(jsonConfig, "fitParameterSets"));
   parProp.setSamplesConfig(JsonUtils::fetchValue<nlohmann::json>(jsonConfig, "samples"));
+  parProp.setSamplePlotGeneratorConfig(JsonUtils::fetchValue<nlohmann::json>(jsonConfig, "samplePlotGenerator"));
 
   TFile* f = TFile::Open(JsonUtils::fetchValue<std::string>(jsonConfig, "mc_file").c_str(), "READ");
   parProp.setDataTree( f->Get<TTree>("selectedEvents") );

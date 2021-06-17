@@ -53,6 +53,14 @@ void Propagator::setSamplesConfig(const json &samplesConfig) {
     _samplesConfig_ = JsonUtils::readConfigFile(_samplesConfig_.get<std::string>());
   }
 }
+void Propagator::setSamplePlotGeneratorConfig(const json &samplePlotGeneratorConfig) {
+  _samplePlotGeneratorConfig_ = samplePlotGeneratorConfig;
+  while( _samplePlotGeneratorConfig_.is_string() ){
+    // forward json definition in external files
+    LogDebug << "Forwarding config with file: " << _samplesConfig_.get<std::string>() << std::endl;
+    _samplePlotGeneratorConfig_ = JsonUtils::readConfigFile(_samplePlotGeneratorConfig_.get<std::string>());
+  }
+}
 void Propagator::setDataTree(TTree *dataTree_) {
   dataTree = dataTree_;
 }
@@ -88,7 +96,16 @@ void Propagator::initialize() {
   for( auto& sample : _samplesList_ ) samplePtrList.emplace_back(&sample);
   selected_events_AnaTreeMC.GetEvents(samplePtrList, buf, false);
 
+//  for( auto& sample : _samplesList_ ){
+//    for( auto& event : sample.GetEventList() ){
+//      LogInfo << GET_VAR_NAME_VALUE(event.GetEventVarInt("reaction")) << std::endl;
+//    }
+//  }
+
   LogTrace << "Other..." << std::endl;
+  _samplePlotGenerator_.setConfig(_samplePlotGeneratorConfig_);
+  _samplePlotGenerator_.initialize();
+
 
   initializeThreads();
   initializeCaches();
@@ -97,6 +114,10 @@ void Propagator::initialize() {
   propagateParametersOnSamples();
   fillSampleHistograms();
   fillSampleHistograms();
+
+  auto* f = TFile::Open("test.root", "RECREATE");
+  _samplePlotGenerator_.saveSamplePlots(f->GetDirectory(""), _samplesList_);
+  f->Close();
 
   _isInitialized_ = true;
 }
@@ -314,4 +335,6 @@ void Propagator::propagateParametersOnSamples(int iThread_) {
   } // sample
 
 }
+
+
 

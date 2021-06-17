@@ -76,7 +76,7 @@ public:
 
     void SetLLHFunction(const std::string& func_name);
     void SetDataType(DataType dataType_);
-    DataType GetDataType() { return m_hdata_type; }
+    DataType GetDataType() const { return m_hdata_type; }
 
     double CalcLLH() const;
     double CalcChi2() const;
@@ -103,6 +103,7 @@ public:
     std::string GetDetBinning() const { return m_binning; }
     std::string GetAdditionalCuts() const { return m_additional_cuts; }
     std::vector<AnaEvent>& GetMcEvents() { return m_mc_events; }
+    const std::vector<AnaEvent>& GetConstMcEvents() const { return m_mc_events; }
     size_t GetNbMcEvents() { return m_mc_events.size(); }
     std::vector<AnaEvent>& GetDataEvents() { return m_data_events; }
     const std::vector<std::string>& GetFitPhaseSpace() const { return m_fit_phase_space; }

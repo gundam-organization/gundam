@@ -193,10 +193,10 @@ int AnaEvent::GetIntIndex(const std::string &intName_, bool throwIfNotFound_) co
   }
   return index;
 }
-Int_t &AnaEvent::GetEventVarInt(const std::string &varName_) {
+Int_t AnaEvent::GetEventVarInt(const std::string &varName_) const {
   return _intValuesList_.at(GetIntIndex(varName_));
 }
-Float_t &AnaEvent::GetEventVarFloat(const std::string &varName_)  {
+Float_t AnaEvent::GetEventVarFloat(const std::string &varName_) const {
   return _floatValuesList_.at(GetFloatIndex(varName_));
 }
 void AnaEvent::AddEvWght(double val) {

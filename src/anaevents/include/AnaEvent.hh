@@ -71,12 +71,13 @@ public:
   std::vector<std::string>* GetIntVarNameListPtr(){ return _intNameListPtr_; }
   std::vector<std::string>* GetFloatVarNameListPtr(){ return _floatNameListPtr_; }
   double& GetEvWght()     { return _eventWeight_; }
+  double GetEventWeight() const { return _eventWeight_; }
 
   // Core
   int GetIntIndex(const std::string& intName_, bool throwIfNotFound_ = true) const;
   int GetFloatIndex(const std::string& floatName_, bool throwIfNotFound_ = true) const;
-  Int_t& GetEventVarInt(const std::string& varName_);
-  Float_t& GetEventVarFloat(const std::string& varName_);
+  Int_t GetEventVarInt(const std::string& varName_) const;
+  Float_t GetEventVarFloat(const std::string& varName_) const;
   double GetEventVarAsDouble(const std::string& varName_) const;
   void AddEvWght(double val);
   void ResetEvWght();
