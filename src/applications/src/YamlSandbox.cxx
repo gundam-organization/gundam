@@ -53,6 +53,8 @@ int main(int argc, char** argv){
   auto covarianceMatrixFilePath = YamlUtils::fetchValue(fluxSyst, "covarianceMatrixFilePath", "");
   LogTrace << GET_VAR_NAME_VALUE(covarianceMatrixFilePath) << std::endl;
 
+  LogInfo << YamlUtils::toJson(n).dump() << std::endl;
+
 }
 
 

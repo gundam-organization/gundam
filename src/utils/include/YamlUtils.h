@@ -8,11 +8,13 @@
 #include "string"
 #include "iostream"
 
+#include "json.hpp"
 #include "yaml-cpp/yaml.h"
 
 namespace YamlUtils {
 
   YAML::Node readConfigFile(const std::string& configFilePath_);
+  nlohmann::json toJson(const YAML::Node& yamlConfig_);
 
   template<class T> auto fetchValue(const YAML::Node& yamlConfig_, const std::string& keyName_) -> T;
   template<class T> auto fetchValue(const YAML::Node& yamlConfig_, const std::string& keyName_, const T& defaultValue_) -> T;

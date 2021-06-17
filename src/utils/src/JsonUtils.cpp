@@ -10,6 +10,7 @@
 #include "Logger.h"
 
 #include "JsonUtils.h"
+#include "YamlUtils.h"
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[JsonUtils]");
@@ -27,13 +28,8 @@ nlohmann::json JsonUtils::readConfigFile(const std::string& configFilePath_){
   if( GenericToolbox::doesFilePathHasExtension(configFilePath_, "yml") or GenericToolbox::doesFilePathHasExtension(configFilePath_,"yaml") ){
     LogDebug << "YAML input file detected" << std::endl;
 
-    YAML::Node node = YAML::LoadFile(configFilePath_);
-    YAML::Emitter emitter;
-    emitter << YAML::DoubleQuoted << YAML::Flow << YAML::BeginSeq << node;
-    std::string asJsonStr = std::string(emitter.c_str() + 1);
-    GenericToolbox::replaceSubstringInsideInputString(asJsonStr, "\"true\"", "true");
-    GenericToolbox::replaceSubstringInsideInputString(asJsonStr, "\"false\"", "false");
-    output = nlohmann::json::parse(asJsonStr);
+    auto yaml = YamlUtils::readConfigFile(configFilePath_);
+    output = YamlUtils::toJson(yaml);
   }
   else{
     std::fstream fs;

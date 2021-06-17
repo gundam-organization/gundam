@@ -53,9 +53,9 @@ void AnaSample::setupWithJsonConfig(const json &config_) {
   m_detector = JsonUtils::fetchValue<std::string>(config_, "detector");
   m_binning = JsonUtils::fetchValue<std::string>(config_, "binning");
   m_additional_cuts = JsonUtils::fetchValue<std::string>(config_, "selectionCuts");
-  m_data_POT = std::stod(JsonUtils::fetchValue<std::string>(config_, "dataNorm"));
-  m_mc_POT = std::stod(JsonUtils::fetchValue<std::string>(config_, "mcNorm"));
-  m_sample_id = std::stoi(JsonUtils::fetchValue<std::string>(config_, "cutBranch"));
+  m_data_POT = JsonUtils::fetchValue<double>(config_, "dataNorm");
+  m_mc_POT = JsonUtils::fetchValue<double>(config_, "mcNorm");
+  m_sample_id = JsonUtils::fetchValue<int>(config_, "cutBranch");
 
   m_fit_phase_space = {"D2Reco", "D1Reco"};
 

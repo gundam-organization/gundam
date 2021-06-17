@@ -229,10 +229,10 @@ void SamplePlotGenerator::saveSamplePlots(TDirectory *saveTDirectory_, const std
                   }
 
                   // Look for the value we want
-                  auto valDict = JsonUtils::fetchEntry(varDict["dictionary"], "value", std::to_string(splitValue));
+                  auto valDict = JsonUtils::fetchEntry(varDict["dictionary"], "value", splitValue);
 
                   valueTitle = JsonUtils::fetchValue(valDict, "title", valueTitle);
-                  valueColor = std::stoi(JsonUtils::fetchValue(valDict, "color", std::to_string(unsetSplitValueColor)));
+                  valueColor = JsonUtils::fetchValue(valDict, "color", unsetSplitValueColor);
                   if( valueColor == unsetSplitValueColor ) unsetSplitValueColor++; // increment for the next ones
 
                 }
