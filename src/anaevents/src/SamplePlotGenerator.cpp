@@ -81,10 +81,29 @@ void SamplePlotGenerator::saveSamplePlots(TDirectory *saveTDirectory_, const std
     sampleCounter++;
 
     short unsetSplitValueColor = kGray; // will increment if needed
+    std::vector<std::string> varToPlotFoldersList; // List of plotted vars
     for( const auto& histDef : _histogramsDefinition_ ){
 
+      // Parameters
       std::string varToPlot = JsonUtils::fetchValue<std::string>(histDef, "varToPlot");
+      std::string varToPlotPrefix = JsonUtils::fetchValue(histDef, "prefix", "");
+      LogWarning << GET_VAR_NAME_VALUE(varToPlot) << " -> " << GET_VAR_NAME_VALUE(varToPlotPrefix) << std::endl;
       std::vector<std::string> splitVars = JsonUtils::fetchValue(histDef, "splitVars", std::vector<std::string>{""});
+      bool rescaleAsBinWidth = JsonUtils::fetchValue(histDef, "rescaleAsBinWidth", true);
+      double rescaleBinFactor = JsonUtils::fetchValue(histDef, "rescaleBinFactor", 1.);
+
+      // Check if the varToPlot has not already been plotted
+      std::string folderCandidate = varToPlot + varToPlotPrefix;
+      if( not GenericToolbox::doesElementIsInVector(folderCandidate, varToPlotFoldersList) ){
+        varToPlotFoldersList.emplace_back(folderCandidate);
+      }
+      else{
+        int index = 2;
+        while( GenericToolbox::doesElementIsInVector(folderCandidate + "_" + std::to_string(index), varToPlotFoldersList) ){
+          index++;
+        }
+        varToPlotFoldersList.emplace_back(folderCandidate + "_" + std::to_string(index));
+      }
 
       for( const auto& splitVar : splitVars ){
 
@@ -92,13 +111,13 @@ void SamplePlotGenerator::saveSamplePlots(TDirectory *saveTDirectory_, const std
 
         std::stringstream ssHistPath;
         ssHistPath << sample.GetName() << "/";
-        ssHistPath << varToPlot << "/";
+        ssHistPath << varToPlotFoldersList.back() << "/";
+
         if( not splitVar.empty() ){
           ssHistPath << splitVar << "/";
           for( const auto& event : sample.GetConstMcEvents() ){
             int splitValue = event.GetEventVarInt(splitVar);
             if( not GenericToolbox::doesElementIsInVector(splitValue, splitVarValues) ){
-              LogDebug << GET_VAR_NAME_VALUE(splitValue) << std::endl;
               splitVarValues.emplace_back(splitValue);
             }
           }
@@ -141,7 +160,7 @@ void SamplePlotGenerator::saveSamplePlots(TDirectory *saveTDirectory_, const std
 
                 int dimIndex = GenericToolbox::findElementIndex(varToPlot, sample.GetFitPhaseSpace());
                 if( dimIndex == -1 ){
-                  LogDebug << "Can't useSampleBinning since \"" << varToPlot
+                  LogError << "Can't useSampleBinning since \"" << varToPlot
                            << "\" is not a dimension of the sample \"" << sample.GetName()
                            << "\": " << GenericToolbox::parseVectorAsString(sample.GetFitPhaseSpace()) << std::endl;
                   continue; // skip this sample
@@ -160,6 +179,10 @@ void SamplePlotGenerator::saveSamplePlots(TDirectory *saveTDirectory_, const std
                   histPath.c_str(), histType.c_str(),int(xLowBinEdges.size())-1, &xLowBinEdges[0]
                 );
                 histogramList[histPath]->GetXaxis()->SetTitle( varToPlot.c_str() );
+                std::string yTitle = "Counts";
+                if( rescaleAsBinWidth ) yTitle += " (/bin width)";
+                if( rescaleBinFactor != 1. ) yTitle += "*" + std::to_string(rescaleBinFactor);
+                histogramList[histPath]->GetYaxis()->SetTitle( yTitle.c_str() );
 
               }
               else{
@@ -179,16 +202,6 @@ void SamplePlotGenerator::saveSamplePlots(TDirectory *saveTDirectory_, const std
 
               }
 
-              // Normalize by bin width
-              for( int iBin = 0 ; iBin <= histogramList[histPath]->GetNbinsX()+1 ; iBin++ ){
-                histogramList[histPath]->SetBinContent(
-                  iBin,
-                  (
-                    histogramList[histPath]->GetBinContent(iBin) / histogramList[histPath]->GetBinWidth(iBin)
-                  )
-                );
-              }
-
               if( histType == "mc" ){
                 histogramList[histPath]->Scale( sample.GetNorm() );
               }
@@ -196,6 +209,19 @@ void SamplePlotGenerator::saveSamplePlots(TDirectory *saveTDirectory_, const std
                 // Asimov is just MC, so it should be normalized the same way as MC
                 histogramList[histPath]->Scale( sample.GetNorm() );
               }
+
+              // Normalize by bin width
+              for( int iBin = 0 ; iBin <= histogramList[histPath]->GetNbinsX()+1 ; iBin++ ){
+                double binContent = histogramList[histPath]->GetBinContent(iBin); // this is the real number of counts
+                double errorFraction = TMath::Sqrt(binContent)/binContent; // error fraction will not change with renorm of bin width
+
+                if( rescaleAsBinWidth ) binContent /= histogramList[histPath]->GetBinWidth(iBin);
+                if( rescaleBinFactor != 1. ) binContent *= rescaleBinFactor;
+                histogramList[histPath]->SetBinContent( iBin, binContent );
+                histogramList[histPath]->SetBinError( iBin, binContent*errorFraction );
+              }
+
+
 
 
             } // varToPlot is not Raw?
@@ -220,7 +246,7 @@ void SamplePlotGenerator::saveSamplePlots(TDirectory *saveTDirectory_, const std
                 std::string valueTitle = splitVar + " = " + std::to_string(splitValue);
                 short valueColor = defaultColorWheel[splitValueIndex % defaultColorWheel.size() ];
 
-                auto varDict = JsonUtils::fetchEntry(_varDictionary_, "name", splitVar); // does the cosmetic pars are configured?
+                auto varDict = JsonUtils::fetchMatchingEntry(_varDictionary_, "name", splitVar); // does the cosmetic pars are configured?
                 if( not varDict.empty() ){
 
                   if( varDict["dictionary"].is_null() ){
@@ -229,7 +255,7 @@ void SamplePlotGenerator::saveSamplePlots(TDirectory *saveTDirectory_, const std
                   }
 
                   // Look for the value we want
-                  auto valDict = JsonUtils::fetchEntry(varDict["dictionary"], "value", splitValue);
+                  auto valDict = JsonUtils::fetchMatchingEntry(varDict["dictionary"], "value", splitValue);
 
                   valueTitle = JsonUtils::fetchValue(valDict, "title", valueTitle);
                   valueColor = JsonUtils::fetchValue(valDict, "color", unsetSplitValueColor);
