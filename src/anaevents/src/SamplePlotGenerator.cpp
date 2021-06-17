@@ -74,9 +74,8 @@ void SamplePlotGenerator::saveSamplePlots(TDirectory *saveTDirectory_, const std
   LogInfo << "Samples plots will be writen in: " << saveTDirectory_->GetPath() << std::endl;
   int sampleCounter = -1;
 
-  // Generating histograms
   std::map<std::string, TH1D*> histogramList;
-
+  std::map<std::string, TCanvas*> canvasList;
   for( const auto& sample : sampleList_ ){
     sampleCounter++;
 
@@ -87,7 +86,6 @@ void SamplePlotGenerator::saveSamplePlots(TDirectory *saveTDirectory_, const std
       // Parameters
       std::string varToPlot = JsonUtils::fetchValue<std::string>(histDef, "varToPlot");
       std::string varToPlotPrefix = JsonUtils::fetchValue(histDef, "prefix", "");
-      LogWarning << GET_VAR_NAME_VALUE(varToPlot) << " -> " << GET_VAR_NAME_VALUE(varToPlotPrefix) << std::endl;
       std::vector<std::string> splitVars = JsonUtils::fetchValue(histDef, "splitVars", std::vector<std::string>{""});
       bool rescaleAsBinWidth = JsonUtils::fetchValue(histDef, "rescaleAsBinWidth", true);
       double rescaleBinFactor = JsonUtils::fetchValue(histDef, "rescaleBinFactor", 1.);
@@ -140,7 +138,7 @@ void SamplePlotGenerator::saveSamplePlots(TDirectory *saveTDirectory_, const std
             if( // don't build data histogram in those cases
                 histType == "data" and
                 ( not splitVar.empty()  // don't use split var for data
-                  or not JsonUtils::fetchValue(histDef, "noData", false) // explicitly no data
+                  or JsonUtils::fetchValue(histDef, "noData", false) // explicitly no data
                 )
               ){
               continue;
@@ -191,17 +189,23 @@ void SamplePlotGenerator::saveSamplePlots(TDirectory *saveTDirectory_, const std
               }
 
               // Fill the histogram
+              const std::vector<AnaEvent>* eventList;
+              if( histType == "mc" ){
+                eventList = &sample.GetConstMcEvents();
+              }
+              else if( histType == "data"){
+                eventList = &sample.GetConstDataEvents();
+              }
               for( const auto& event : sample.GetConstMcEvents() ){
-
                 if( // Condition to fill:
                     splitVar.empty() // no split var: every event in the hist
                     or event.GetEventVarInt(splitVar) == splitValue // it's the corresponding splitValue
                     ){
                   histogramList[histPath]->Fill( event.GetEventVarAsDouble(varToPlot), event.GetEventWeight() );
                 }
-
               }
 
+              // Scaling
               if( histType == "mc" ){
                 histogramList[histPath]->Scale( sample.GetNorm() );
               }

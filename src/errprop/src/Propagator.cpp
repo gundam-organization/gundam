@@ -96,11 +96,6 @@ void Propagator::initialize() {
   for( auto& sample : _samplesList_ ) samplePtrList.emplace_back(&sample);
   selected_events_AnaTreeMC.GetEvents(samplePtrList, buf, false);
 
-//  for( auto& sample : _samplesList_ ){
-//    for( auto& event : sample.GetEventList() ){
-//      LogInfo << GET_VAR_NAME_VALUE(event.GetEventVarInt("reaction")) << std::endl;
-//    }
-//  }
 
   LogTrace << "Other..." << std::endl;
   _samplePlotGenerator_.setConfig(_samplePlotGeneratorConfig_);
@@ -112,8 +107,15 @@ void Propagator::initialize() {
 
   fillEventDialCaches();
   propagateParametersOnSamples();
-  fillSampleHistograms();
-  fillSampleHistograms();
+
+  for( auto& sample : _samplesList_ ){
+    sample.FillEventHist(
+      DataType::kAsimov,
+      false
+    );
+  }
+
+  fillSampleHistograms(); // for benchmark
 
   auto* f = TFile::Open("test.root", "RECREATE");
   _samplePlotGenerator_.saveSamplePlots(f->GetDirectory(""), _samplesList_);
@@ -148,6 +150,8 @@ void Propagator::propagateParametersOnSamples() {
 }
 void Propagator::fillSampleHistograms(){
   LogDebug << __METHOD_NAME__ << std::endl;
+
+  GenericToolbox::getElapsedTimeSinceLastCallStr(1);
 
   // dispatch the job on each thread
   for( int iThread = 0 ; iThread < _nbThreads_-1 ; iThread++ ){
