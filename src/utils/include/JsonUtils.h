@@ -43,7 +43,7 @@ template<class T> nlohmann::json JsonUtils::fetchEntry(const nlohmann::json& jso
     std::cout << "key: " << optionKey_ << std::endl;
     std::cout << "value: " << optionValue_ << std::endl;
     std::cout << "dump: " << jsonConfig_.dump() << std::endl;
-    throw std::runtime_error("JsonUtils::fetchEntry: jsonConfig_ is not an array.");
+    throw std::runtime_error("JsonUtils::fetchMatchingEntry: jsonConfig_ is not an array.");
   }
 
   for( const auto& jsonEntry : jsonConfig_ ){

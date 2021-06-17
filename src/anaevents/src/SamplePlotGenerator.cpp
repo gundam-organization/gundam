@@ -231,8 +231,6 @@ void SamplePlotGenerator::saveSamplePlots(TDirectory *saveTDirectory_, const std
                   // Look for the value we want
                   auto valDict = JsonUtils::fetchEntry(varDict["dictionary"], "value", std::to_string(splitValue));
 
-                  LogTrace << "dump dict: " << varDict["dictionary"] << std::endl;
-                  LogTrace << "dump test: " << valDict.dump() << std::endl;
                   valueTitle = JsonUtils::fetchValue(valDict, "title", valueTitle);
                   valueColor = std::stoi(JsonUtils::fetchValue(valDict, "color", std::to_string(unsetSplitValueColor)));
                   if( valueColor == unsetSplitValueColor ) unsetSplitValueColor++; // increment for the next ones

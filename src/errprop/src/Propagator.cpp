@@ -164,6 +164,10 @@ void Propagator::fillSampleHistograms(){
     }
   }
 
+  for( auto& sample : _samplesList_ ){
+    sample.MergeMcHistogramsThread();
+  }
+
   LogTrace << "Histogram fill took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(1) << std::endl;
 }
 

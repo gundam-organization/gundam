@@ -13,6 +13,7 @@ set( APPLICATION_LIST
         xsllhUnitTests
         xsllhXsecCov
         xsllhFitter
+        YamlSandbox
 )
 
 foreach( app ${APPLICATION_LIST} )

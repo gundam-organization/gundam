@@ -11,6 +11,7 @@ set(SRCFILES
         src/DataBinSet.cpp
         src/DataBin.cpp
         src/JsonUtils.cpp
+        src/YamlUtils.cpp
         )
 set(HEADERS
         include/BinManager.hh
@@ -25,6 +26,8 @@ set(HEADERS
         include/DataBin.h
         include/DataBinSet.h
         include/JsonUtils.h
+        include/YamlUtils.h
+        include/YamlUtils.impl.h
         )
 
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)
