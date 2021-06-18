@@ -12,7 +12,7 @@
 
 #include "FitParameterSet.h"
 #include "AnaSample.hh"
-#include "SamplePlotGenerator.h"
+#include "PlotGenerator.h"
 
 class Propagator {
 
@@ -63,7 +63,7 @@ private:
   bool _isInitialized_{false};
   std::vector<FitParameterSet> _parameterSetsList_;
   std::vector<AnaSample> _samplesList_;
-  SamplePlotGenerator _samplePlotGenerator_;
+  PlotGenerator _plotGenerator_;
 
   // Threads
   std::vector<std::future<void>> _threadsList_;

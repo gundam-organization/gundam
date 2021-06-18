@@ -35,6 +35,8 @@ public:
   int getParameterIndex() const;
   const std::string &getName() const;
   double getParameterValue() const;
+  double getStdDevValue() const;
+  double getPriorValue() const;
 
   // Core
   DialSet* findDialSet(const std::string& dataSetName_);

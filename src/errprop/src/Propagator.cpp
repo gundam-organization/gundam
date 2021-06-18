@@ -6,6 +6,7 @@
 #include "vector"
 
 #include "GenericToolbox.h"
+#include "GenericToolboxRootExt.h"
 
 #include "JsonUtils.h"
 #include "Propagator.h"
@@ -98,8 +99,8 @@ void Propagator::initialize() {
 
 
   LogTrace << "Other..." << std::endl;
-  _samplePlotGenerator_.setConfig(_samplePlotGeneratorConfig_);
-  _samplePlotGenerator_.initialize();
+  _plotGenerator_.setConfig(_samplePlotGeneratorConfig_);
+  _plotGenerator_.initialize();
 
 
   initializeThreads();
@@ -118,7 +119,24 @@ void Propagator::initialize() {
   fillSampleHistograms(); // for benchmark
 
   auto* f = TFile::Open("test.root", "RECREATE");
-  _samplePlotGenerator_.generateSamplePlots(_samplesList_, f->GetDirectory(""));
+  _plotGenerator_.generateSamplePlots(_samplesList_, GenericToolbox::mkdirTFile(f, "prefit"));
+
+  auto refHistList = _plotGenerator_.getHistsToStack();
+  // +1 sigma
+  for( auto& parSet : _parameterSetsList_ ){
+    for( auto& par : parSet.getParameterList() ){
+      par.setParameterValue( par.getPriorValue() + par.getStdDevValue() );
+      LogInfo << "+1 sigma on " << parSet.getName() + "/" + par.getTitle() << " -> " << par.getParameterValue() << std::endl;
+      propagateParametersOnSamples();
+      fillSampleHistograms();
+      _plotGenerator_.generateSamplePlots(_samplesList_, GenericToolbox::mkdirTFile(f, "oneSigma/" + parSet.getName() + "/" + par.getTitle() + "/hist"));
+      auto oneSigmaHistList = _plotGenerator_.getHistsToStack();
+      _plotGenerator_.generateComparisonPlots(oneSigmaHistList, refHistList, GenericToolbox::mkdirTFile(f, "oneSigma/" + parSet.getName() + "/" + par.getTitle() ));
+//      break;
+    }
+    break;
+  }
+
   f->Close();
   LogTrace << "Closed" << std::endl;
 

@@ -43,7 +43,7 @@ public:
   void initialize();
 
   // Getters
-  const std::vector<FitParameter> &getParameterList() const;
+  std::vector<FitParameter> &getParameterList();
   const std::string &getName() const;
 
   // Core

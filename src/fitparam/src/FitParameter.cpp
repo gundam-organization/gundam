@@ -118,6 +118,12 @@ double FitParameter::getParameterValue() const {
 int FitParameter::getParameterIndex() const {
   return _parameterIndex_;
 }
+double FitParameter::getStdDevValue() const {
+  return _stdDevValue_;
+}
+double FitParameter::getPriorValue() const {
+  return _priorValue_;
+}
 
 DialSet* FitParameter::findDialSet(const std::string& dataSetName_){
   for( auto& dialSet : _dialSetList_ ){
@@ -161,7 +167,7 @@ std::string FitParameter::getSummary() const {
 std::string FitParameter::getTitle() const {
   std::stringstream ss;
   ss << "#" << _parameterIndex_;
-  if( _name_.empty() ) ss << "(" << _name_ << ")";
+  if( not _name_.empty() ) ss << "(" << _name_ << ")";
   return ss.str();
 }
 

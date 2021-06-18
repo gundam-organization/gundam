@@ -137,7 +137,7 @@ void FitParameterSet::initialize() {
     _parameterList_.back().setName(_parameterNamesList_->At(iPararmeter)->GetName());
     _parameterList_.back().setParameterValue((*_parameterPriorList_)[iPararmeter]);
     _parameterList_.back().setPriorValue((*_parameterPriorList_)[iPararmeter]);
-    _parameterList_.back().setStdDevValue((*_covarianceMatrix_)[iPararmeter][iPararmeter]);
+    _parameterList_.back().setStdDevValue(TMath::Sqrt((*_covarianceMatrix_)[iPararmeter][iPararmeter]));
     _parameterList_.back().setDialSetConfigs(JsonUtils::fetchValue<std::vector<nlohmann::json>>(_jsonConfig_, "dialSetDefinitions"));
     _parameterList_.back().setDialsWorkingDirectory(JsonUtils::fetchValue<std::string>(_jsonConfig_, "dialSetWorkingDirectory", "."));
     _parameterList_.back().setEnableDialSetsSummary(JsonUtils::fetchValue<bool>(_jsonConfig_, "printDialSetsSummary", false));
@@ -150,7 +150,7 @@ void FitParameterSet::initialize() {
 
 
 // Getters
-const std::vector<FitParameter> &FitParameterSet::getParameterList() const {
+std::vector<FitParameter> &FitParameterSet::getParameterList() {
   return _parameterList_;
 }
 
