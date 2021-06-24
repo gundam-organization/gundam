@@ -14,6 +14,7 @@
 #include "GenericToolboxRootExt.h"
 
 #include "JsonUtils.h"
+#include "GlobalVariables.h"
 #include "PlotGenerator.h"
 
 LoggerInit([](){
@@ -149,11 +150,27 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
 
       // Filling the selected histograms
       LogTrace << "Filling the selected histograms for: " << sample.GetName() << " / " << (isData ? "data": "mc")  << std::endl;
-      for( const auto& event : *eventListPtr ){
-        for( auto& hist : histPtrToFillList ){
-          hist->fillFunction(hist->histPtr ,&event);
+      GenericToolbox::getElapsedTimeSinceLastCallStr(999);
+      int nThreads = GlobalVariables::getNbThreads();
+      std::function<void(int)> fillJob = [eventListPtr, histPtrToFillList, nThreads]( int iThread ){
+        int iEvent = -1;
+        int iHist = -1;
+        for( const auto& event : *eventListPtr ){
+          iEvent++;
+          if( iEvent % nThreads != iThread ) continue; // faster -> but needs a thread lock
+          iHist = -1;
+          for( auto& hist : histPtrToFillList ){
+            iHist++;
+//            if( iHist % nThreads != iThread ) continue;
+            hist->fillFunction(hist->histPtr ,&event);
+          }
         }
-      }
+      };
+
+      GlobalVariables::getThreadPool().addJob("fillJob", fillJob);
+      GlobalVariables::getThreadPool().runJob("fillJob");
+      GlobalVariables::getThreadPool().removeJob("fillJob");
+      LogTrace << "Fill took: " << GenericToolbox::parseTimeUnit(GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(999)) << std::endl;
 
     } // isData loop
 
@@ -551,6 +568,7 @@ void PlotGenerator::readHistogramsConfig() {
 
           for( bool isData: {false, true} ){
             histDefBase.isData = isData;
+            bool buildFillFunction = false;
 
             if( histDefBase.isData and
                 ( not histDefBase.splitVarName.empty()
@@ -601,15 +619,7 @@ void PlotGenerator::readHistogramsConfig() {
               }
 
               // Hist fill function
-              auto splitVarValue = histDefBase.splitVarValue;
-              auto varToPlot = histDefBase.varToPlot;
-              auto splitVarName = histDefBase.splitVarName;
-              histDefBase.fillFunction =
-                [ splitVarValue, varToPlot, splitVarName ](TH1D* hist_, const AnaEvent* event_){
-                  if( splitVarName.empty() or event_->GetEventVarInt(splitVarName) == splitVarValue){
-                    hist_->Fill(event_->GetEventVarAsDouble(varToPlot), event_->GetEventWeight());
-                  }
-                };
+              buildFillFunction = true; // build Later
 
             } // not Raw?
 
@@ -671,6 +681,21 @@ void PlotGenerator::readHistogramsConfig() {
 
             // Config DONE
             _histHolderList_.emplace_back(histDefBase);
+            if( buildFillFunction ){
+              _histHolderList_.back().fillMutexPtr = new std::mutex();
+              auto splitVarValue = _histHolderList_.back().splitVarValue;
+              auto varToPlot = _histHolderList_.back().varToPlot;
+              auto splitVarName = _histHolderList_.back().splitVarName;
+              auto* mutexPtr = _histHolderList_.back().fillMutexPtr;
+              _histHolderList_.back().fillFunction =
+                [ mutexPtr, splitVarValue, varToPlot, splitVarName ](TH1D* hist_, const AnaEvent* event_){
+                  if( splitVarName.empty() or event_->GetEventVarInt(splitVarName) == splitVarValue){
+                    mutexPtr->lock();
+                    hist_->Fill(event_->GetEventVarAsDouble(varToPlot), event_->GetEventWeight());
+                    mutexPtr->unlock();
+                  }
+                };
+            }
 
           } // isData
         } // splitValue

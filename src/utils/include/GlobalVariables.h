@@ -11,25 +11,29 @@
 #include <TTree.h>
 #include <TChain.h>
 
+#include "ThreadPool.h"
+
 class GlobalVariables{
 
 public:
 
-    // Setters
-    static void setNbThreads(int nbThreads_);
+  // Setters
+  static void setNbThreads(int nbThreads_);
 
-    // Getters
-    static const int& getNbThreads();
-    static std::mutex& getThreadMutex();
-    static std::map<std::string, bool>& getBoolMap();
-    static std::vector<TChain*>& getChainList();
+  // Getters
+  static const int& getNbThreads();
+  static std::mutex& getThreadMutex();
+  static std::map<std::string, bool>& getBoolMap();
+  static std::vector<TChain*>& getChainList();
+  static ThreadPool &getThreadPool();
 
 private:
 
-    static int _nbThreads_;
-    static std::mutex _threadMutex_;
-    static std::map<std::string, bool> _boolMap_;
-    static std::vector<TChain*> _chainList_;
+  static int _nbThreads_;
+  static std::mutex _threadMutex_;
+  static std::map<std::string, bool> _boolMap_;
+  static std::vector<TChain*> _chainList_;
+  static ThreadPool _threadPool_;
 
 };
 

@@ -95,12 +95,12 @@ void Propagator::initialize() {
     }
   }
 
-  AnaTreeMC selected_events_AnaTreeMC(mc_file_path, "selectedEvents");
+  AnaTreeMC* selected_events_AnaTreeMC = new AnaTreeMC(mc_file_path, "selectedEvents"); // trouble while deleting... > need to check
   LogInfo << "Reading and collecting events..." << std::endl;
   std::vector<SignalDef> buf;
   std::vector<AnaSample*> samplePtrList;
   for( auto& sample : _samplesList_ ) samplePtrList.emplace_back(&sample);
-  selected_events_AnaTreeMC.GetEvents(samplePtrList, buf, false);
+  selected_events_AnaTreeMC->GetEvents(samplePtrList, buf, false);
 
 
   LogTrace << "Other..." << std::endl;
@@ -121,9 +121,8 @@ void Propagator::initialize() {
     );
   }
 
-  LogTrace << "INIT" << std::endl;
-
   _isInitialized_ = true;
+  LogTrace << "OK LEAVING INIT" << std::endl;
 }
 
 
@@ -143,18 +142,20 @@ void Propagator::propagateParametersOnSamples() {
 
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(1);
 
-  // dispatch the job on each thread
-  for( int iThread = 0 ; iThread < _nbThreads_-1 ; iThread++ ){
-    _threadTriggersList_.at(iThread).propagateOnSampleEvents = true; // triggering the workers
-  }
-  // last thread is always this one
-  this->propagateParametersOnSamples(_nbThreads_-1);
+  GlobalVariables::getThreadPool().runJob("propagateParametersOnSamples");
 
-  for( int iThread = 0 ; iThread < _nbThreads_-1 ; iThread++ ){
-    while( _threadTriggersList_.at(iThread).propagateOnSampleEvents ){
-      // wait
-    }
-  }
+//  // dispatch the job on each thread
+//  for( int iThread = 0 ; iThread < _nbThreads_-1 ; iThread++ ){
+//    _threadTriggersList_.at(iThread).propagateOnSampleEvents = true; // triggering the workers
+//  }
+//  // last thread is always this one
+//  this->propagateParametersOnSamples(_nbThreads_-1);
+//
+//  for( int iThread = 0 ; iThread < _nbThreads_-1 ; iThread++ ){
+//    while( _threadTriggersList_.at(iThread).propagateOnSampleEvents ){
+//      // wait
+//    }
+//  }
 
   LogTrace << "Reweight took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(1) << std::endl;
 }
@@ -200,6 +201,15 @@ void Propagator::initializeThreads() {
   if( _nbThreads_ == 1 ){
     return;
   }
+
+  std::function<void(int)> fillEventDialCacheFct = [this](int iThread){
+    this->fillEventDialCaches(iThread);
+  };
+  GlobalVariables::getThreadPool().addJob("fillEventDialCaches", fillEventDialCacheFct);
+  std::function<void(int)> propagateParametersOnSamplesFct = [this](int iThread){
+    this->propagateParametersOnSamples(iThread);
+  };
+  GlobalVariables::getThreadPool().addJob("propagateParametersOnSamples", propagateParametersOnSamplesFct);
 
   _threadTriggersList_.resize(_nbThreads_-1);
 
@@ -254,18 +264,20 @@ void Propagator::initializeCaches() {
 void Propagator::fillEventDialCaches(){
   LogInfo << __METHOD_NAME__ << std::endl;
 
-  // dispatch the job on each thread
-  for( int iThread = 0 ; iThread < _nbThreads_-1 ; iThread++ ){
-    _threadTriggersList_.at(iThread).fillDialCaches = true; // triggering the workers
-  }
-  // first thread is always this one
-  this->fillEventDialCaches(_nbThreads_-1);
+  GlobalVariables::getThreadPool().runJob("fillEventDialCaches");
 
-  for( int iThread = 0 ; iThread < _nbThreads_-1 ; iThread++ ){
-    while ( _threadTriggersList_.at(iThread).fillDialCaches ){
-      // wait triggering the workers
-    }
-  }
+//  // dispatch the job on each thread
+//  for( int iThread = 0 ; iThread < _nbThreads_-1 ; iThread++ ){
+//    _threadTriggersList_.at(iThread).fillDialCaches = true; // triggering the workers
+//  }
+//  // first thread is always this one
+//  this->fillEventDialCaches(_nbThreads_-1);
+//
+//  for( int iThread = 0 ; iThread < _nbThreads_-1 ; iThread++ ){
+//    while ( _threadTriggersList_.at(iThread).fillDialCaches ){
+//      // wait triggering the workers
+//    }
+//  }
 
 }
 
@@ -352,8 +364,6 @@ void Propagator::propagateParametersOnSamples(int iThread_) {
           }
 
         }
-
-
 
         eventPtr->AddEvWght(weight);
 

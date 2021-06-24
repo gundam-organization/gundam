@@ -22,6 +22,7 @@ struct HistHolder{
   // Data
   bool isData{false};
   const AnaSample* samplePtr{nullptr};
+  std::mutex* fillMutexPtr{nullptr};
   std::function<void(TH1D*, const AnaEvent*)> fillFunction;
 
   // X axis
