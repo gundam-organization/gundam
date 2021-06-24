@@ -8,9 +8,12 @@
 
 #include "CmdLineParser.h"
 #include "Logger.h"
+#include "GenericToolbox.h"
+#include "GenericToolboxRootExt.h"
 
 #include "JsonUtils.h"
 #include "Propagator.h"
+#include "FitterEngine.h"
 #include "GlobalVariables.h"
 
 LoggerInit([](){
@@ -42,16 +45,18 @@ int main(int argc, char** argv){
   LogInfo << "Reading config file: " << configFilePath << std::endl;
   auto jsonConfig = JsonUtils::readConfigFile(configFilePath); // works with yaml
 
-  Propagator parProp;
-  parProp.setParameterSetConfig(JsonUtils::fetchValue<nlohmann::json>(jsonConfig, "fitParameterSets"));
-  parProp.setSamplesConfig(JsonUtils::fetchValue<nlohmann::json>(jsonConfig, "samples"));
-  parProp.setSamplePlotGeneratorConfig(JsonUtils::fetchValue<nlohmann::json>(jsonConfig, "samplePlotGenerator"));
+  TFile* out = TFile::Open("outTest.root", "RECREATE");
 
-  TFile* f = TFile::Open(JsonUtils::fetchValue<std::string>(jsonConfig, "mc_file").c_str(), "READ");
-  parProp.setDataTree( f->Get<TTree>("selectedEvents") );
+  FitterEngine fitter;
+  fitter.setConfig(jsonConfig);
+  fitter.setSaveDir(GenericToolbox::mkdirTFile(out, "fitter"));
+  fitter.initialize();
 
-  parProp.setMcFilePath(JsonUtils::fetchValue<std::string>(jsonConfig, "mc_file"));
+  fitter.generateSamplePlots("prefit");
+  fitter.generateOneSigmaPlots();
 
-  parProp.initialize();
+  LogDebug << "Closing output file: " << out->GetName() << std::endl;
+  out->Close();
+  LogDebug << "Closed." << std::endl;
 
 }

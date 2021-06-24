@@ -23,8 +23,6 @@ struct HistHolder{
   bool isData{false};
   const AnaSample* samplePtr{nullptr};
   std::function<void(TH1D*, const AnaEvent*)> fillFunction;
-  int varToPlotIndex{-1}; // cache
-  int splitVarIndex{-1}; // cache
 
   // X axis
   std::string varToPlot;
@@ -78,8 +76,8 @@ public:
   std::map<std::string, TCanvas *> getBufferCanvasList() const;
 
   // Core
-  void generateSamplePlots(TDirectory *saveDir_);
-  void generateSampleHistograms(TDirectory *saveDir_);
+  void generateSamplePlots(TDirectory *saveDir_ = nullptr);
+  void generateSampleHistograms(TDirectory *saveDir_ = nullptr);
   void generateCanvas(const std::vector<HistHolder> &histHolderList_, TDirectory *saveDir_ = nullptr, bool stackHist_ = true);
 
   void generateComparisonPlots(const std::vector<HistHolder> &histsToStackOther_, const std::vector<HistHolder> &histsToStackReference_, TDirectory *saveDir_ = nullptr);

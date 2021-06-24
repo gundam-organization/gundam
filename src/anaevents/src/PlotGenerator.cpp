@@ -97,7 +97,6 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
   }
 
   // Create histograms
-  LogTrace << "Create histograms" << std::endl;
   for( auto& histDef : _histHolderList_ ){
 
     TH1D* hist;
@@ -119,7 +118,6 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
   }
 
   // Fill histograms
-  LogTrace << "Fill histograms" << std::endl;
   for( const auto& sample : *_sampleListPtr_ ){
 
     // Data sets:
@@ -162,7 +160,6 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
   } // sample
 
   // Post-processing (norm, color)
-  LogTrace << "Post-processing (norm, color)" << std::endl;
   for( auto& histDefPair : _histHolderList_ ){
 
     if( not histDefPair.isData or histDefPair.samplePtr->GetDataType() == kAsimov ){
@@ -181,6 +178,8 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
       histDefPair.histPtr->SetDrawOption("EP");
     }
 
+    histDefPair.histPtr->GetXaxis()->SetTitle(histDefPair.xTitle.c_str());
+    histDefPair.histPtr->GetYaxis()->SetTitle(histDefPair.yTitle.c_str());
 
     histDefPair.histPtr->SetLineWidth(2);
     histDefPair.histPtr->SetLineColor(histDefPair.histColor);
@@ -193,9 +192,8 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
 
   // Saving
   if( saveDir_ != nullptr ){
-    LogDebug << "Writing generated histograms..." << std::endl;
     for( auto& histDefPair : _histHolderList_ ){
-      LogDebug << "Writing histogram: " << histDefPair.histPtr->GetName() << " in " << histDefPair.folderPath << std::endl;
+//      LogDebug << "Writing histogram: " << histDefPair.histPtr->GetName() << " in " << histDefPair.folderPath << std::endl;
       GenericToolbox::mkdirTFile( saveDir_, histDefPair.folderPath )->cd();
       histDefPair.histPtr->Write( histDefPair.histName.c_str() );
       saveDir_->cd();

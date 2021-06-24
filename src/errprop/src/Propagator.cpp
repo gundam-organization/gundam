@@ -28,6 +28,7 @@ void Propagator::reset() {
   _isInitialized_ = false;
   _parameterSetsList_.clear();
   _nbThreads_ = 1;
+  _saveDir_ = nullptr;
 
   _stopThreads_ = true;
   for( auto& thread : _threadsList_ ){
@@ -38,6 +39,10 @@ void Propagator::reset() {
   _stopThreads_ = false;
 }
 
+
+void Propagator::setSaveDir(TDirectory *saveDir) {
+  _saveDir_ = saveDir;
+}
 void Propagator::setParameterSetConfig(const json &parameterSetConfig) {
   _parameterSetsConfig_ = parameterSetConfig;
   while( _parameterSetsConfig_.is_string() ){
@@ -103,7 +108,6 @@ void Propagator::initialize() {
   _plotGenerator_.setSampleListPtr( &_samplesList_ );
   _plotGenerator_.initialize();
 
-
   initializeThreads();
   initializeCaches();
 
@@ -117,38 +121,18 @@ void Propagator::initialize() {
     );
   }
 
-  fillSampleHistograms(); // for benchmark
-
-  auto* f = TFile::Open("test.root", "RECREATE");
-  _plotGenerator_.generateSamplePlots(GenericToolbox::mkdirTFile(f, "prefit"));
-
-  auto refHistList = _plotGenerator_.getHistHolderList(); // current buffer
-  // +1 sigma
-  for( auto& parSet : _parameterSetsList_ ){
-    for( auto& par : parSet.getParameterList() ){
-      par.setParameterValue( par.getPriorValue() + par.getStdDevValue() );
-      LogInfo << "+1 sigma on " << parSet.getName() + "/" + par.getTitle() << " -> " << par.getParameterValue() << std::endl;
-      propagateParametersOnSamples();
-      fillSampleHistograms();
-      _plotGenerator_.generateSamplePlots(
-        GenericToolbox::mkdirTFile(f, "oneSigma/" + parSet.getName() + "/" + par.getTitle() + "/hist"));
-      auto oneSigmaHistList = _plotGenerator_.getHistHolderList();
-      _plotGenerator_.generateComparisonPlots(oneSigmaHistList, refHistList, GenericToolbox::mkdirTFile(f, "oneSigma/" + parSet.getName() + "/" + par.getTitle() ));
-//      break;
-    }
-    break;
-  }
-
-  LogTrace << "Closing output file..." << std::endl;
-  f->Close();
-  LogTrace << "Closed" << std::endl;
+  LogTrace << "INIT" << std::endl;
 
   _isInitialized_ = true;
 }
 
-const std::vector<FitParameterSet> &Propagator::getParameterSetsList() const {
+std::vector<FitParameterSet> &Propagator::getParameterSetsList() {
   return _parameterSetsList_;
 }
+PlotGenerator &Propagator::getPlotGenerator() {
+  return _plotGenerator_;
+}
+
 
 void Propagator::propagateParametersOnSamples() {
   LogDebug << __METHOD_NAME__ << std::endl;
@@ -372,6 +356,3 @@ void Propagator::propagateParametersOnSamples(int iThread_) {
   } // sample
 
 }
-
-
-

@@ -1482,7 +1482,7 @@ void ND280Fitter::InitializeFitter(){
   _minimizer_ = ROOT::Math::Factory::CreateMinimizer(_minimization_settings_.minimizer.c_str(),
                                                      _minimization_settings_.algorithm.c_str());
 
-  // The ROOT Functor class is used to wrap multi-dimensional function objects, in this case the ND280Fitter::EvalFit function calculates and returns chi2_stat + chi2_sys + chi2_reg in each iteration of the fitter:
+  // The ROOT Functor class is used to wrap multi-dimensional function objects, in this case the ND280Fitter::evalFit function calculates and returns chi2_stat + chi2_sys + chi2_reg in each iteration of the fitter:
   _functor_ = new ROOT::Math::Functor(this, &ND280Fitter::EvalFit, _nb_fit_parameters_);
 
   _minimizer_->SetFunction(*_functor_);

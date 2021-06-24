@@ -24,21 +24,21 @@ public:
   void reset();
 
   // Setters
+  void setSaveDir(TDirectory *saveDir);
   void setParameterSetConfig(const json &parameterSetConfig);
   void setSamplesConfig(const json &samplesConfig);
-
   void setSamplePlotGeneratorConfig(const json &samplePlotGeneratorConfig);
 
-  // test
+  //! TODO: GET RID OF THOSE TEST METHOD
   void setDataTree(TTree *dataTree_);
-
   void setMcFilePath(const std::string &mcFilePath);
 
   // Init
   void initialize();
 
   // Getters
-  const std::vector<FitParameterSet> &getParameterSetsList() const;
+  std::vector<FitParameterSet> &getParameterSetsList();
+  PlotGenerator &getPlotGenerator();
 
   // Core
   void propagateParametersOnSamples();
@@ -55,6 +55,8 @@ protected:
   void fillEventDialCaches(int iThread_);
 
 private:
+  // Parameters
+  TDirectory* _saveDir_{nullptr};
   nlohmann::json _parameterSetsConfig_;
   nlohmann::json _samplesConfig_;
   nlohmann::json _samplePlotGeneratorConfig_;
