@@ -74,6 +74,9 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveSubDirPath_){
       LogInfo << "+1 sigma on " << parSet.getName() + "/" + par.getTitle() << " -> " << par.getParameterValue() << std::endl;
       _propagator_.propagateParametersOnSamples();
       _propagator_.fillSampleHistograms();
+      for( auto& sample : _propagator_.getSamplesList() ){
+        LogDebug << sample.GetName() << ": LLH = " << sample.CalcLLH() << std::endl;
+      }
 
       std::string savePath = saveSubDirPath_;
       if( not savePath.empty() ) savePath += "/";
@@ -86,6 +89,7 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveSubDirPath_){
       auto oneSigmaHistList = _propagator_.getPlotGenerator().getHistHolderList();
       _propagator_.getPlotGenerator().generateComparisonPlots( oneSigmaHistList, refHistList, saveDir );
       par.setParameterValue( currentParValue );
+      _propagator_.propagateParametersOnSamples();
 
       // Since those were not saved, delete manually
       for( auto& hist : oneSigmaHistList ){ delete hist.histPtr; }

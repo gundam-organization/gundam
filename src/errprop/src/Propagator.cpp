@@ -126,6 +126,10 @@ void Propagator::initialize() {
   _isInitialized_ = true;
 }
 
+
+std::vector<AnaSample> &Propagator::getSamplesList() {
+  return _samplesList_;
+}
 std::vector<FitParameterSet> &Propagator::getParameterSetsList() {
   return _parameterSetsList_;
 }
@@ -338,15 +342,18 @@ void Propagator::propagateParametersOnSamples(int iThread_) {
           if( dialPtr == nullptr ) continue;
 
           // No need to recast dialPtr as a NormDial or whatever, it will automatically fetch the right method
-          weight = dialPtr->evalResponse( parSetDialCache.first->getFitParameter(iPar).getParameterValue() );
+          weight *= dialPtr->evalResponse( parSetDialCache.first->getFitParameter(iPar).getParameterValue() );
+
+          // TODO: check if weight cap
+          if( weight <= 0 ){
+            LogError << GET_VAR_NAME_VALUE(iPar) << std::endl;
+            LogError << GET_VAR_NAME_VALUE(weight) << std::endl;
+            throw std::runtime_error("<0 weight");
+          }
 
         }
 
-        // TODO: check if weight cap
-        if( weight == 0 ){
-          LogError << "0" << std::endl;
-          throw std::runtime_error("0 weight");
-        }
+
 
         eventPtr->AddEvWght(weight);
 

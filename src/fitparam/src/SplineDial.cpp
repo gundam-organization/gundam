@@ -34,6 +34,7 @@ std::string SplineDial::getSummary() {
 }
 void SplineDial::updateResponseCache(const double &parameterValue_) {
   _dialResponseCache_ = _splinePtr_->Eval(parameterValue_);
+//  LogTrace << this << ": " << GET_VAR_NAME_VALUE(_dialResponseCache_) << std::endl;
 }
 
 void SplineDial::setSplinePtr(TSpline3 *splinePtr) {

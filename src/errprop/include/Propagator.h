@@ -37,6 +37,7 @@ public:
   void initialize();
 
   // Getters
+  std::vector<AnaSample> &getSamplesList();
   std::vector<FitParameterSet> &getParameterSetsList();
   PlotGenerator &getPlotGenerator();
 
