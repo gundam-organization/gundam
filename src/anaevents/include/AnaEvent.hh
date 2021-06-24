@@ -74,10 +74,14 @@ public:
   double GetEventWeight() const { return _eventWeight_; }
 
   // Core
+  int GetGlobalIndex(const std::string& varName_, bool throwIfNotFound_ = true) const;
   int GetIntIndex(const std::string& intName_, bool throwIfNotFound_ = true) const;
   int GetFloatIndex(const std::string& floatName_, bool throwIfNotFound_ = true) const;
+  Int_t GetEventVarInt(int varIndex_) const;
   Int_t GetEventVarInt(const std::string& varName_) const;
+  Float_t GetEventVarFloat(int varIndex_) const;
   Float_t GetEventVarFloat(const std::string& varName_) const;
+  double GetEventVarAsDouble(int varGlobalIndex_) const; // varGlobalIndex_ = intIndexes, then floatIndexes
   double GetEventVarAsDouble(const std::string& varName_) const;
   void AddEvWght(double val);
   void ResetEvWght();

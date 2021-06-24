@@ -10,6 +10,52 @@
 
 #include "AnaSample.hh"
 
+struct HistHolder{
+  // Hist
+  TH1D* histPtr{nullptr};
+
+  // Path
+  std::string folderPath;
+  std::string histName;
+  std::string histTitle;
+
+  // Data
+  bool isData{false};
+  const AnaSample* samplePtr{nullptr};
+  std::function<void(TH1D*, const AnaEvent*)> fillFunction;
+  int varToPlotIndex{-1}; // cache
+  int splitVarIndex{-1}; // cache
+
+  // X axis
+  std::string varToPlot;
+  std::string prefix;
+  std::string xTitle;
+  double xMin;
+  double xMax;
+  std::vector<double> xEdges;
+
+  // Y axis
+  std::string yTitle;
+
+  // sub-Histogram
+  std::string splitVarName;
+  int splitVarValue;
+
+  // display Properties
+  bool rescaleAsBinWidth{true};
+  double rescaleBinFactor{1.};
+  short histColor;
+};
+
+struct CanvasHolder{
+  int canvasHeight = 700;
+  int canvasWidth = 1200;
+  int canvasNbXplots = 3;
+  int canvasNbYplots = 2;
+};
+
+
+
 class PlotGenerator {
 
 public:
@@ -21,41 +67,39 @@ public:
 
   // Setters
   void setConfig(const nlohmann::json &config);
+  void setSampleListPtr(const std::vector<AnaSample> *sampleListPtr_);
 
   // Init
   void initialize();
 
   // Getters
-  std::map<std::string, TH1D *> getBufferHistogramList() const; // copies of the maps (not the ptr)
+  const std::vector<HistHolder> &getHistHolderList() const;
+
   std::map<std::string, TCanvas *> getBufferCanvasList() const;
-  std::map<std::string, std::map<std::string, std::vector<TH1D *>>> getHistsToStack() const;
-  std::map<std::string, std::map<std::string, std::vector<TH1D *>>> getCompHistsToStack() const;
 
   // Core
-  void generateSamplePlots(const std::vector<AnaSample> &sampleList_, TDirectory *saveTDirectory_ = nullptr);
-  void generateSampleHistograms(const std::vector<AnaSample> &sampleList_, TDirectory *saveDir_ = nullptr);
-  void generateCanvas(const std::map<std::string, std::map<std::string, std::vector<TH1D*>>>& histsToStack_, TDirectory *saveDir_ = nullptr, bool stackHist_ = true);
+  void generateSamplePlots(TDirectory *saveDir_);
+  void generateSampleHistograms(TDirectory *saveDir_);
+  void generateCanvas(const std::vector<HistHolder> &histHolderList_, TDirectory *saveDir_ = nullptr, bool stackHist_ = true);
 
-  void generateComparisonPlots(
-    const std::map<std::string, std::map<std::string, std::vector<TH1D *>>> &histsToStackOther_,
-    const std::map<std::string, std::map<std::string, std::vector<TH1D *>>> &histsToStackReference_,
-    TDirectory *saveDir_ = nullptr);
-  void generateComparisonHistograms(
-    const std::map<std::string, std::map<std::string, std::vector<TH1D *>>> &histsToStackOther_,
-    const std::map<std::string, std::map<std::string, std::vector<TH1D *>>> &histsToStackReference_,
-    TDirectory *saveDir_ = nullptr);
+  void generateComparisonPlots(const std::vector<HistHolder> &histsToStackOther_, const std::vector<HistHolder> &histsToStackReference_, TDirectory *saveDir_ = nullptr);
+  void generateComparisonHistograms(const std::vector<HistHolder> &histList_, const std::vector<HistHolder> &refHistsList_, TDirectory *saveDir_ = nullptr);
+
+protected:
+  void readHistogramsConfig();
 
 private:
   nlohmann::json _config_;
+  const std::vector<AnaSample>* _sampleListPtr_;
 
   // Internals
   nlohmann::json _varDictionary_;
   nlohmann::json _canvasParameters_;
   nlohmann::json _histogramsDefinition_;
   std::vector<Color_t> defaultColorWheel;
-  std::map<std::string, TH1D*> _bufferHistogramList_;
-  std::map<std::string, std::map<std::string, std::vector<TH1D*>>> _histsToStack_;
-  std::map<std::string, std::map<std::string, std::vector<TH1D*>>> _compHistsToStack_;
+
+  std::vector<HistHolder> _histHolderList_;
+  std::vector<HistHolder> _comparisonHistHolderList_;
   std::map<std::string, TCanvas*> _bufferCanvasList_;
 
 

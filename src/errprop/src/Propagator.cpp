@@ -100,6 +100,7 @@ void Propagator::initialize() {
 
   LogTrace << "Other..." << std::endl;
   _plotGenerator_.setConfig(_samplePlotGeneratorConfig_);
+  _plotGenerator_.setSampleListPtr( &_samplesList_ );
   _plotGenerator_.initialize();
 
 
@@ -119,9 +120,9 @@ void Propagator::initialize() {
   fillSampleHistograms(); // for benchmark
 
   auto* f = TFile::Open("test.root", "RECREATE");
-  _plotGenerator_.generateSamplePlots(_samplesList_, GenericToolbox::mkdirTFile(f, "prefit"));
+  _plotGenerator_.generateSamplePlots(GenericToolbox::mkdirTFile(f, "prefit"));
 
-  auto refHistList = _plotGenerator_.getHistsToStack();
+  auto refHistList = _plotGenerator_.getHistHolderList(); // current buffer
   // +1 sigma
   for( auto& parSet : _parameterSetsList_ ){
     for( auto& par : parSet.getParameterList() ){
@@ -129,14 +130,16 @@ void Propagator::initialize() {
       LogInfo << "+1 sigma on " << parSet.getName() + "/" + par.getTitle() << " -> " << par.getParameterValue() << std::endl;
       propagateParametersOnSamples();
       fillSampleHistograms();
-      _plotGenerator_.generateSamplePlots(_samplesList_, GenericToolbox::mkdirTFile(f, "oneSigma/" + parSet.getName() + "/" + par.getTitle() + "/hist"));
-      auto oneSigmaHistList = _plotGenerator_.getHistsToStack();
+      _plotGenerator_.generateSamplePlots(
+        GenericToolbox::mkdirTFile(f, "oneSigma/" + parSet.getName() + "/" + par.getTitle() + "/hist"));
+      auto oneSigmaHistList = _plotGenerator_.getHistHolderList();
       _plotGenerator_.generateComparisonPlots(oneSigmaHistList, refHistList, GenericToolbox::mkdirTFile(f, "oneSigma/" + parSet.getName() + "/" + par.getTitle() ));
 //      break;
     }
     break;
   }
 
+  LogTrace << "Closing output file..." << std::endl;
   f->Close();
   LogTrace << "Closed" << std::endl;
 
@@ -177,9 +180,16 @@ void Propagator::fillSampleHistograms(){
     _threadTriggersList_.at(iThread).fillSampleHistograms = true; // triggering the workers
   }
   // last thread is always this one
+
   for( auto& sample : _samplesList_ ){
-    sample.FillMcHistograms( _nbThreads_ - 1 );
+    if( _nbThreads_ > 1 ) {
+      sample.FillMcHistograms(_nbThreads_ - 1);
+    }
+    else{
+      sample.FillMcHistograms();
+    }
   }
+
 
   for( int iThread = 0 ; iThread < _nbThreads_-1 ; iThread++ ){
     while( _threadTriggersList_.at(iThread).fillSampleHistograms ){

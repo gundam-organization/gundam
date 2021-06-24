@@ -124,26 +124,7 @@ void AnaEvent::DumpTreeEntryContent(TTree *tree_) {
   _treeEventHasBeenDumped_ = true;
 
 }
-double AnaEvent::GetEventVarAsDouble(const std::string &varName_) const {
 
-  int index;
-
-  index = GenericToolbox::findElementIndex(varName_, *_floatNameListPtr_);
-  if( index != -1 ) return _floatValuesList_.at(index);
-
-  index = GenericToolbox::findElementIndex(varName_, *_intNameListPtr_);
-  if( index != -1 ) return _intValuesList_.at(index);
-
-  LogFatal << "Could not find variable \"" << varName_ << "\" in both int and float lists." << std::endl;
-  LogFatal << "Available floats are: ";
-  GenericToolbox::printVector(*_floatNameListPtr_);
-  LogFatal << std::endl;
-  LogFatal << "Available ints are: ";
-  GenericToolbox::printVector(*_intNameListPtr_);
-  LogFatal << std::endl;
-  throw std::logic_error("Could not find variable");
-
-}
 void AnaEvent::HookIntMembers() {
   // Hooking ptr members for faster access
   // CAVEAT: all these vars have to be in _intNameListPtr_
@@ -171,16 +152,30 @@ void AnaEvent::HookFloatMembers() {
 }
 
 // Core
-int AnaEvent::GetFloatIndex(const std::string &floatName_, bool throwIfNotFound_) const  {
-  int index = GenericToolbox::findElementIndex(floatName_, *_floatNameListPtr_);
-  if(throwIfNotFound_ and index == -1){
-    LogFatal << "Could not find float \"" << floatName_ << "\" in _floatNameListPtr_." << std::endl;
-    LogFatal << "Available floats are: ";
-    GenericToolbox::printVector(*_floatNameListPtr_);
-    LogFatal << std::endl;
-    throw std::logic_error("Could not find float");
+int AnaEvent::GetGlobalIndex(const std::string& varName_, bool throwIfNotFound_) const{
+  int index;
+
+  // Int ?
+  index = this->GetIntIndex(varName_, false);
+  if( index != -1 ){
+    return index;
   }
-  return index;
+
+  // Float ?
+  index = this->GetFloatIndex(varName_, false);
+  if( index != -1 ){
+    index += int(_intNameListPtr_->size()); // shift
+    return index;
+  }
+
+  if( not throwIfNotFound_ ){
+    return -1;
+  }
+
+  LogError << "Can't get global index of var \"" << varName_ << "\" in both int and float list:" << std::endl
+  << "int: " << GenericToolbox::parseVectorAsString(*_intNameListPtr_) << std::endl
+  << "float: " << GenericToolbox::parseVectorAsString(*_floatNameListPtr_) << std::endl;
+  throw std::runtime_error("Can't fetch index");
 }
 int AnaEvent::GetIntIndex(const std::string &intName_, bool throwIfNotFound_) const {
   int index = GenericToolbox::findElementIndex(intName_, *_intNameListPtr_);
@@ -193,12 +188,83 @@ int AnaEvent::GetIntIndex(const std::string &intName_, bool throwIfNotFound_) co
   }
   return index;
 }
+int AnaEvent::GetFloatIndex(const std::string &floatName_, bool throwIfNotFound_) const  {
+  int index = GenericToolbox::findElementIndex(floatName_, *_floatNameListPtr_);
+  if(throwIfNotFound_ and index == -1){
+    LogFatal << "Could not find float \"" << floatName_ << "\" in _floatNameListPtr_." << std::endl;
+    LogFatal << "Available floats are: ";
+    GenericToolbox::printVector(*_floatNameListPtr_);
+    LogFatal << std::endl;
+    throw std::logic_error("Could not find float");
+  }
+  return index;
+}
+
 Int_t AnaEvent::GetEventVarInt(const std::string &varName_) const {
-  return _intValuesList_.at(GetIntIndex(varName_));
+  return this->GetEventVarInt(GetIntIndex(varName_));
+}
+Int_t AnaEvent::GetEventVarInt(int varIndex_) const{
+  if( varIndex_ >= 0 and varIndex_ < _intValuesList_.size()){
+    return _intValuesList_.at(varIndex_);
+  }
+  else{
+    LogError << __METHOD_NAME__ << ": Invalid "
+             << GET_VAR_NAME_VALUE(varIndex_)
+             << "(size: " << _intValuesList_.size() << ")" << std::endl;
+    throw std::runtime_error("Invalid index");
+  }
 }
 Float_t AnaEvent::GetEventVarFloat(const std::string &varName_) const {
-  return _floatValuesList_.at(GetFloatIndex(varName_));
+  return this->GetEventVarFloat(GetFloatIndex(varName_));
 }
+Float_t AnaEvent::GetEventVarFloat(int varIndex_) const{
+  if( varIndex_ >= 0 and varIndex_ < _floatValuesList_.size()){
+    return _floatValuesList_.at(varIndex_);
+  }
+  else{
+    LogError << __METHOD_NAME__ << ": Invalid "
+             << GET_VAR_NAME_VALUE(varIndex_)
+             << "(size: " << _floatValuesList_.size() << ")" << std::endl;
+    throw std::runtime_error("Invalid index");
+  }
+}
+double AnaEvent::GetEventVarAsDouble(int varGlobalIndex_) const{
+  if( varGlobalIndex_ < 0 ){
+    LogError << "Invalid global index: " << varGlobalIndex_ << std::endl;
+    throw std::runtime_error("invalid index");
+  }
+
+  // Int ?
+  if( varGlobalIndex_ < _intNameListPtr_->size() ){
+    return _intValuesList_.at(varGlobalIndex_);
+  }
+
+  // Float ?
+  varGlobalIndex_ -= int(_intNameListPtr_->size());
+  if( varGlobalIndex_ < _floatNameListPtr_->size() ){
+    return _floatValuesList_.at(varGlobalIndex_);
+  }
+
+  LogError << "Invalid global index: " << varGlobalIndex_ << " -> "
+           << GET_VAR_NAME_VALUE((_intNameListPtr_->size() + _floatNameListPtr_->size())) << std::endl;
+  throw std::runtime_error("invalid index");
+}
+double AnaEvent::GetEventVarAsDouble(const std::string &varName_) const {
+//  return this->GetEventVarAsDouble(this->GetGlobalIndex(varName_));
+  int index;
+
+  index = GenericToolbox::findElementIndex(varName_, *_floatNameListPtr_);
+  if( index != -1 ) return _floatValuesList_.at(index);
+
+  index = GenericToolbox::findElementIndex(varName_, *_intNameListPtr_);
+  if( index != -1 ) return _intValuesList_.at(index);
+
+  LogError << "Can't get global index of var \"" << varName_ << "\" in both int and float list:" << std::endl
+           << "int: " << GenericToolbox::parseVectorAsString(*_intNameListPtr_) << std::endl
+           << "float: " << GenericToolbox::parseVectorAsString(*_floatNameListPtr_) << std::endl;
+  throw std::runtime_error("Can't fetch index");
+}
+
 void AnaEvent::AddEvWght(double val) {
   _eventWeight_ *= val;
 }
