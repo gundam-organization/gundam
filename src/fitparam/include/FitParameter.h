@@ -20,6 +20,7 @@ public:
 
   void reset();
 
+  void setIsFixed(bool isFixed);
   void setName(const std::string &name);
   void setParameterIndex(int parameterIndex);
   void setParameterValue(double parameterValue);
@@ -32,6 +33,7 @@ public:
   void initialize();
 
   // Getters
+  bool isFixed() const;
   int getParameterIndex() const;
   const std::string &getName() const;
   double getParameterValue() const;
@@ -54,6 +56,7 @@ private:
   bool _enableDialSetsSummary_;
   std::string _dialsWorkingDirectory_;
   bool _isEnabled_{true};
+  bool _isFixed_{false};
 
   // Internals
   std::vector<DialSet> _dialSetList_; // one dial set per detector

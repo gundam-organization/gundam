@@ -29,10 +29,15 @@ public:
 
   void initialize();
 
-  void generateSamplePlots(const std::string& saveSubDirPath_ = "");
-  void generateOneSigmaPlots(const std::string& saveSubDirPath_ = "");
+  void generateSamplePlots(const std::string& saveDir_ = "");
+  void generateOneSigmaPlots(const std::string& saveDir_ = "");
 
-  double evalFit(const double* par);
+  void scanParameters(int nbSteps_, const std::string& saveDir_ = "");
+  void scanParameter(int iPar, int nbSteps_, const std::string& saveDir_ = "");
+
+  void fit();
+  void updateChi2Cache();
+  double evalFit(const double* parArray_);
 
 protected:
   void initializePropagator();
@@ -44,10 +49,17 @@ private:
   nlohmann::json _config_;
 
   // Internals
+  int _nbFitCalls_{0};
   Propagator _propagator_;
-  int _nb_fit_parameters_;
+  int _nbFitParameters_;
   std::shared_ptr<ROOT::Math::Minimizer> _minimizer_{nullptr};
   std::shared_ptr<ROOT::Math::Functor> _functor_{nullptr};
+
+  // Buffers
+  double _chi2Buffer_;
+  double _chi2StatBuffer_;
+  double _chi2PullsBuffer_;
+  double _chi2RegBuffer_;
 
 };
 

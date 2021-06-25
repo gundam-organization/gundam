@@ -46,3 +46,11 @@ nlohmann::json JsonUtils::readConfigFile(const std::string& configFilePath_){
 
   return output;
 }
+
+nlohmann::json JsonUtils::fetchSubEntry(const nlohmann::json& jsonConfig_, const std::vector<std::string>& keyPath_){
+  nlohmann::json output = jsonConfig_;
+  for( const auto& key : keyPath_ ){
+    output = JsonUtils::fetchValue<nlohmann::json>(output, key);
+  }
+  return output;
+}

@@ -29,8 +29,12 @@ void FitParameter::reset() {
   _stdDevValue_    = std::numeric_limits<double>::quiet_NaN();
   _dialsWorkingDirectory_ = ".";
   _isEnabled_ = true;
+  _isFixed_ = false;
 }
 
+void FitParameter::setIsFixed(bool isFixed) {
+  _isFixed_ = isFixed;
+}
 void FitParameter::setDialSetConfigs(const std::vector<nlohmann::json> &jsonConfigList) {
   _dialDefinitionsList_ = jsonConfigList;
   while( _dialDefinitionsList_.is_string() ){
@@ -109,6 +113,9 @@ void FitParameter::initialize() {
 
 }
 
+bool FitParameter::isFixed() const {
+  return _isFixed_;
+}
 const std::string &FitParameter::getName() const {
   return _name_;
 }

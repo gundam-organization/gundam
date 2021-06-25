@@ -1392,7 +1392,7 @@ void ND280Fitter::InitializeFitParameters(){
 
     _durationReweightParameters_[iGroup].resize(GlobalVariables::getNbThreads());
 
-    // _nb_fit_parameters_ is the number of total fit paramters:
+    // _nbFitParameters_ is the number of total fit paramters:
     _nb_fit_parameters_ += _fitParametersGroupList_[iGroup]->GetNpar();
 
     // Get names of all the different parameters (for all parameter types) and store them in par_names:

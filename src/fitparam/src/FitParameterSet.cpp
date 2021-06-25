@@ -77,6 +77,12 @@ void FitParameterSet::initialize() {
       << " in " << _covarianceMatrixFile_->GetPath() << std::endl;
     throw std::runtime_error("Could not find: covarianceMatrixTObjectPath");
   }
+  LogWarning << "Computing inverse of the covariance matrix: " << _covarianceMatrix_->GetNcols() << "x" << _covarianceMatrix_->GetNrows() << std::endl;
+  _inverseCovarianceMatrix_ = GenericToolbox::convertToSymmetricMatrix(
+    GenericToolbox::invertMatrixSVD(
+      (TMatrixD*) _covarianceMatrix_
+    )["inverse_covariance_matrix"]
+  );
 
   _correlationMatrix_ = GenericToolbox::convertToSymmetricMatrix(GenericToolbox::convertToCorrelationMatrix((TMatrixD*) _covarianceMatrix_));
 
@@ -161,6 +167,33 @@ size_t FitParameterSet::getNbParameters() const {
 }
 FitParameter& FitParameterSet::getFitParameter( size_t iPar_ ){
   return _parameterList_.at(iPar_);
+}
+double FitParameterSet::getChi2() const{
+  double chi2 = 0;
+
+  if( not _isEnabled_ ){
+    return chi2;
+  }
+
+  if( _inverseCovarianceMatrix_ == nullptr ){
+    LogError << GET_VAR_NAME_VALUE(_inverseCovarianceMatrix_) << std::endl;
+    throw std::runtime_error("inverse matrix not set");
+  }
+
+  for(int iPar = 0; iPar < _inverseCovarianceMatrix_->GetNrows(); iPar++)
+  {
+    if( _parameterList_.at(iPar).isFixed() ) continue;
+    for(int jPar = 0; jPar < _inverseCovarianceMatrix_->GetNrows(); jPar++)
+    {
+      if( _parameterList_.at(jPar).isFixed() ) continue;
+      chi2
+        +=  (_parameterList_[iPar].getParameterValue() - _parameterList_[iPar].getPriorValue())
+          * (_parameterList_[jPar].getParameterValue() - _parameterList_[jPar].getPriorValue())
+          * (*_inverseCovarianceMatrix_)(iPar, jPar);
+    }
+  }
+
+  return chi2;
 }
 
 

@@ -72,6 +72,9 @@ void PlotGenerator::initialize() {
 const std::vector<HistHolder> &PlotGenerator::getHistHolderList() const {
   return _histHolderList_;
 }
+const std::vector<HistHolder> &PlotGenerator::getComparisonHistHolderList() const {
+  return _comparisonHistHolderList_;
+}
 std::map<std::string, TCanvas *> PlotGenerator::getBufferCanvasList() const {
   return _bufferCanvasList_;
 }
@@ -690,9 +693,8 @@ void PlotGenerator::readHistogramsConfig() {
               _histHolderList_.back().fillFunction =
                 [ mutexPtr, splitVarValue, varToPlot, splitVarName ](TH1D* hist_, const AnaEvent* event_){
                   if( splitVarName.empty() or event_->GetEventVarInt(splitVarName) == splitVarValue){
-                    mutexPtr->lock();
+                    std::lock_guard<std::mutex> g(*mutexPtr);
                     hist_->Fill(event_->GetEventVarAsDouble(varToPlot), event_->GetEventWeight());
-                    mutexPtr->unlock();
                   }
                 };
             }

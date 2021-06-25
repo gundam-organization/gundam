@@ -44,7 +44,9 @@ void Propagator::reset() {
 
 }
 
-
+void Propagator::setShowTimeStats(bool showTimeStats) {
+  _showTimeStats_ = showTimeStats;
+}
 void Propagator::setSaveDir(TDirectory *saveDir) {
   _saveDir_ = saveDir;
 }
@@ -143,19 +145,14 @@ PlotGenerator &Propagator::getPlotGenerator() {
 
 
 void Propagator::propagateParametersOnSamples() {
-  LogDebug << __METHOD_NAME__ << std::endl;
-
-  GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(1);
+  if( _showTimeStats_ ) GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
   GlobalVariables::getThreadPool().runJob("Propagator::propagateParametersOnSamples");
-
-  LogTrace << "Reweight took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(1) << std::endl;
+  if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
 }
 void Propagator::fillSampleHistograms(){
-  LogDebug << __METHOD_NAME__ << std::endl;
-
-  GenericToolbox::getElapsedTimeSinceLastCallStr(1);
+  if( _showTimeStats_ ) GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
   GlobalVariables::getThreadPool().runJob("Propagator::fillSampleHistograms");
-  LogTrace << "Histogram fill took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(1) << std::endl;
+  if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
 }
 
 

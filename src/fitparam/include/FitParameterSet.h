@@ -49,6 +49,7 @@ public:
   // Core
   size_t getNbParameters() const;
   FitParameter& getFitParameter( size_t iPar_ );
+  double getChi2() const;
 
   // Misc
   std::string getSummary() const;
@@ -69,6 +70,7 @@ private:
   bool _isEnabled_{};
   TFile* _covarianceMatrixFile_{nullptr};
   TMatrixDSym* _covarianceMatrix_{nullptr};
+  TMatrixDSym* _inverseCovarianceMatrix_{nullptr};
   TMatrixDSym* _correlationMatrix_{nullptr};
   TVectorD* _parameterPriorList_{nullptr};
   TObjArray* _parameterNamesList_{nullptr};

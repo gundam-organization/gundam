@@ -3,6 +3,8 @@
 //
 
 #include <Math/Factory.h>
+#include "TGraph.h"
+
 #include "Logger.h"
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
@@ -24,7 +26,8 @@ void FitterEngine::reset() {
   _propagator_.reset();
   _minimizer_.reset();
   _functor_.reset();
-  _nb_fit_parameters_ = 0;
+  _nbFitParameters_ = 0;
+  _nbFitCalls_ = 0;
 }
 
 void FitterEngine::setSaveDir(TDirectory *saveDir) {
@@ -42,22 +45,22 @@ void FitterEngine::initialize() {
   }
 
   initializePropagator();
-//  initializeMinimizer();
+  initializeMinimizer();
 
 }
 
-void FitterEngine::generateSamplePlots(const std::string& saveSubDirPath_){
+void FitterEngine::generateSamplePlots(const std::string& saveDir_){
 
   LogInfo << __METHOD_NAME__ << std::endl;
 
   _propagator_.propagateParametersOnSamples();
   _propagator_.fillSampleHistograms();
   _propagator_.getPlotGenerator().generateSamplePlots(
-    GenericToolbox::mkdirTFile(_saveDir_, saveSubDirPath_ )
+    GenericToolbox::mkdirTFile(_saveDir_, saveDir_ )
     );
 
 }
-void FitterEngine::generateOneSigmaPlots(const std::string& saveSubDirPath_){
+void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
 
   _propagator_.propagateParametersOnSamples();
   _propagator_.fillSampleHistograms();
@@ -67,18 +70,23 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveSubDirPath_){
   auto refHistList = _propagator_.getPlotGenerator().getHistHolderList(); // current buffer
 
   // +1 sigma
+  int iPar = -1;
   for( auto& parSet : _propagator_.getParameterSetsList() ){
     for( auto& par : parSet.getParameterList() ){
+      iPar++;
+
+      if( _minimizer_->IsFixedVariable(iPar) ){
+        LogInfo << "Not processing fixed parameter: " << parSet.getName() + "/" + par.getTitle() << std::endl;
+        continue;
+      }
+
       double currentParValue = par.getParameterValue();
       par.setParameterValue( currentParValue + par.getStdDevValue() );
       LogInfo << "+1 sigma on " << parSet.getName() + "/" + par.getTitle() << " -> " << par.getParameterValue() << std::endl;
       _propagator_.propagateParametersOnSamples();
       _propagator_.fillSampleHistograms();
-      for( auto& sample : _propagator_.getSamplesList() ){
-        LogDebug << sample.GetName() << ": LLH = " << sample.CalcLLH() << std::endl;
-      }
 
-      std::string savePath = saveSubDirPath_;
+      std::string savePath = saveDir_;
       if( not savePath.empty() ) savePath += "/";
       savePath += "oneSigma/" + parSet.getName() + "/" + par.getTitle();
       auto* saveDir = GenericToolbox::mkdirTFile(_saveDir_, savePath );
@@ -90,6 +98,23 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveSubDirPath_){
       _propagator_.getPlotGenerator().generateComparisonPlots( oneSigmaHistList, refHistList, saveDir );
       par.setParameterValue( currentParValue );
       _propagator_.propagateParametersOnSamples();
+
+      const auto& compHistList = _propagator_.getPlotGenerator().getComparisonHistHolderList();
+      bool isAffected = false;
+      for( const auto& compHist : compHistList ){
+        for( int iBin = 1 ; iBin <= compHist.histPtr->GetNbinsX() ; iBin++ ){
+          if( TMath::Abs( compHist.histPtr->GetBinContent(iBin) ) > 0.1 ){ // 0.1 % do decide if
+            isAffected = true;
+            break;
+          }
+        }
+        if( isAffected ) break;
+      }
+      if( not isAffected ){
+        LogWarning << parSet.getName() + "/" + par.getTitle() << " has no effect on the sample. Fixing in the fit." << std::endl;
+        _minimizer_->FixVariable(iPar);
+        par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
+      }
 
       // Since those were not saved, delete manually
       for( auto& hist : oneSigmaHistList ){ delete hist.histPtr; }
@@ -105,8 +130,103 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveSubDirPath_){
 
 }
 
-double FitterEngine::evalFit(const double* par){
-  return 0;
+void FitterEngine::scanParameters(int nbSteps_, const std::string &saveDir_) {
+  LogInfo << "Performing parameter scans..." << std::endl;
+  for( int iPar = 0 ; iPar < _minimizer_->NDim() ; iPar++ ){
+    this->scanParameter(iPar, nbSteps_, saveDir_);
+  } // iPar
+}
+void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &saveDir_) {
+
+  //Internally Scan performs steps-1, so add one to actually get the number of steps
+  //we ask for.
+  unsigned int adj_steps = nbSteps_+1;
+  auto* x = new double[adj_steps] {};
+  auto* y = new double[adj_steps] {};
+
+  LogInfo << "Scanning fit parameter #" << iPar
+          << " (" << _minimizer_->VariableName(iPar) << ")." << std::endl;
+
+  bool success = _minimizer_->Scan(iPar, adj_steps, x, y);
+
+  if( not success ){
+    LogError << "Parameter scan failed." << std::endl;
+  }
+
+  TGraph scanGraph(nbSteps_, x, y);
+
+  std::stringstream ss;
+  ss << GenericToolbox::replaceSubstringInString(_minimizer_->VariableName(iPar), "/", "_");
+  ss << "_TGraph";
+
+  scanGraph.SetTitle(_minimizer_->VariableName(iPar).c_str());
+
+  if( _saveDir_ != nullptr ){
+    GenericToolbox::mkdirTFile(_saveDir_, saveDir_)->cd();
+    scanGraph.Write( ss.str().c_str() );
+  }
+
+  delete[] x;
+  delete[] y;
+}
+
+void FitterEngine::fit(){
+
+
+
+}
+void FitterEngine::updateChi2Cache(){
+
+  ////////////////////////////////
+  // Compute chi2 stat
+  ////////////////////////////////
+  _chi2StatBuffer_ = 0; // reset
+  double buffer;
+  for( const auto& sample : _propagator_.getSamplesList() ){
+
+    //buffer = _samplesList_.at(sampleContainer)->CalcChi2();
+    buffer = sample.CalcLLH();
+    //buffer = _samplesList_.at(sampleContainer)->CalcEffLLH();
+
+    _chi2StatBuffer_ += buffer;
+  }
+
+
+  ////////////////////////////////
+  // Compute the penalty terms
+  ////////////////////////////////
+  _chi2PullsBuffer_ = 0;
+  _chi2RegBuffer_ = 0;
+  for( auto& parSet : _propagator_.getParameterSetsList() ){
+    _chi2PullsBuffer_ += parSet.getChi2();
+  }
+
+  _chi2Buffer_ = _chi2StatBuffer_ + _chi2PullsBuffer_ + _chi2RegBuffer_;
+
+}
+double FitterEngine::evalFit(const double* parArray_){
+
+  GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+  _nbFitCalls_++;
+
+  // Update fit parameter values:
+  int iPar = -1;
+  for( auto& parSet : _propagator_.getParameterSetsList() ){
+    for( auto& par : parSet.getParameterList() ){
+      iPar++;
+      par.setParameterValue( parArray_[iPar] );
+    }
+  }
+
+  _propagator_.propagateParametersOnSamples();
+  _propagator_.fillSampleHistograms();
+
+  // Compute the Chi2
+  updateChi2Cache();
+
+  LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
+
+  return _chi2Buffer_;
 }
 
 
@@ -127,17 +247,16 @@ void FitterEngine::initializePropagator(){
   _propagator_.initialize();
 
   LogTrace << "Counting parameters" << std::endl;
-  _nb_fit_parameters_ = 0;
+  _nbFitParameters_ = 0;
   for( const auto& parSet : _propagator_.getParameterSetsList() ){
-    _nb_fit_parameters_ += int(parSet.getNbParameters());
+    _nbFitParameters_ += int(parSet.getNbParameters());
   }
-  LogTrace << GET_VAR_NAME_VALUE(_nb_fit_parameters_) << std::endl;
+  LogTrace << GET_VAR_NAME_VALUE(_nbFitParameters_) << std::endl;
 
 }
 void FitterEngine::initializeMinimizer(){
 
-  auto minimizationConfig = JsonUtils::fetchValue<nlohmann::json>(_config_, "fitterSettings");
-  minimizationConfig = JsonUtils::fetchValue<nlohmann::json>(minimizationConfig, "minimizerSettings");
+  auto minimizationConfig = JsonUtils::fetchSubEntry(_config_, {"fitterSettings", "minimizerSettings"});
 
   _minimizer_ = std::shared_ptr<ROOT::Math::Minimizer>(
     ROOT::Math::Factory::CreateMinimizer(
@@ -148,7 +267,7 @@ void FitterEngine::initializeMinimizer(){
 
   _functor_ = std::shared_ptr<ROOT::Math::Functor>(
     new ROOT::Math::Functor(
-      this, &FitterEngine::evalFit, _nb_fit_parameters_
+      this, &FitterEngine::evalFit, _nbFitParameters_
       )
   );
 

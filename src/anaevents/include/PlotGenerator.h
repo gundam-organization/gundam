@@ -73,7 +73,7 @@ public:
 
   // Getters
   const std::vector<HistHolder> &getHistHolderList() const;
-
+  const std::vector<HistHolder> &getComparisonHistHolderList() const;
   std::map<std::string, TCanvas *> getBufferCanvasList() const;
 
   // Core

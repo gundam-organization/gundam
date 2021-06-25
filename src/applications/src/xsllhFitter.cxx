@@ -52,8 +52,11 @@ int main(int argc, char** argv){
   fitter.setSaveDir(GenericToolbox::mkdirTFile(out, "fitter"));
   fitter.initialize();
 
-  fitter.generateSamplePlots("prefit");
+  fitter.generateSamplePlots("prefit/samples");
   fitter.generateOneSigmaPlots();
+  fitter.scanParameters(10, "prefit/scan");
+
+  fitter.fit();
 
   LogDebug << "Closing output file: " << out->GetName() << std::endl;
   out->Close();

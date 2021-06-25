@@ -24,6 +24,7 @@ public:
   void reset();
 
   // Setters
+  void setShowTimeStats(bool showTimeStats);
   void setSaveDir(TDirectory *saveDir);
   void setParameterSetConfig(const json &parameterSetConfig);
   void setSamplesConfig(const json &samplesConfig);
@@ -57,6 +58,7 @@ protected:
 
 private:
   // Parameters
+  bool _showTimeStats_{false};
   TDirectory* _saveDir_{nullptr};
   nlohmann::json _parameterSetsConfig_;
   nlohmann::json _samplesConfig_;

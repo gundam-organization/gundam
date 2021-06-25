@@ -152,8 +152,6 @@ void AnaTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples,
     }
   } // jEntry
 
-  auto* counterPtr = new int();
-
   // Will be used externally:
   GlobalVariables::getChainList().resize(GlobalVariables::getNbThreads());
   if(GlobalVariables::getNbThreads() > 1){
@@ -167,17 +165,8 @@ void AnaTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples,
   }
 
   std::vector<TChain*>* chainListPtr = &GlobalVariables::getChainList();
-//    if(GlobalVariables::getNbThreads() > 1){
-//        chainListPtr = new std::vector<TChain*>();
-//        for( int iThread = 0 ; iThread < GlobalVariables::getNbThreads() ; iThread++ ){
-//            chainListPtr->emplace_back(new TChain(fChain->GetName()));
-//            chainListPtr->back()->Add(_file_name_.c_str());
-//        }
-//    }
 
-  std::function<void(int)> fillEvents = [counterPtr, chainListPtr, ana_samples, additionalCutsList, this](int iThread_){
-
-//    TFile* buffer = TFile::Open("buffer.root", "RECREATE");
+  std::function<void(int)> fillEvents = [chainListPtr, ana_samples, additionalCutsList, this](int iThread_){
 
     GlobalVariables::getThreadMutex().lock();
     bool isMultiThreaded = (iThread_ != -1);
@@ -191,24 +180,18 @@ void AnaTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples,
 
     for(size_t iSample = 0 ; iSample < ana_samples.size() ; iSample++){
 
-      if(not isMultiThreaded){
-        progressBarPrefix = LogWarning.getPrefixString() + "Fill sample: " + ana_samples.at(iSample)->GetName();
-      }
+      progressBarPrefix = LogWarning.getPrefixString() + "Fill sample: " + ana_samples.at(iSample)->GetName();
 
       for(int iEvent = 0 ; iEvent < ana_samples.at(iSample)->GetN() ; iEvent++){
-        if(isMultiThreaded){
-          if(iEvent%GlobalVariables::getNbThreads() != iThread_){
-            continue; // skip
-          }
-          else{
-            GlobalVariables::getThreadMutex().lock();
-            (*counterPtr)++;
-            GlobalVariables::getThreadMutex().unlock();
-          }
+
+        if( iEvent%GlobalVariables::getNbThreads() != iThread_ ){
+          continue;
         }
-        else{
+
+        if( iThread_+1 == GlobalVariables::getNbThreads() ){
           GenericToolbox::displayProgressBar(iEvent, ana_samples.at(iSample)->GetN(), progressBarPrefix);
         }
+
         eventPtr = ana_samples.at(iSample)->GetEvent(iEvent);
 
         while(eventPtr->GetIsBeingEdited());
@@ -220,38 +203,18 @@ void AnaTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples,
         eventPtr->SetIsBeingEdited(false);
       }
 
+      if( iThread_+1 == GlobalVariables::getNbThreads() ){
+        GenericToolbox::displayProgressBar(ana_samples.at(iSample)->GetN(), ana_samples.at(iSample)->GetN(), progressBarPrefix);
+      }
+
     }
 
   };
 
   LogInfo << "Reading events from input file (" << fChain->GetEntries() << ")..." << std::endl;
-  if(GlobalVariables::getNbThreads() > 1){
-    std::vector<std::future<void>> threadsList;
-    for( int iThread = 0 ; iThread < GlobalVariables::getNbThreads(); iThread++ ){
-      threadsList.emplace_back(
-        std::async( std::launch::async, std::bind(fillEvents, iThread) )
-      );
-    }
-
-    std::string progressBarPrefix = LogWarning.getPrefixString() + "Reading events...";
-    for( int iThread = 0 ; iThread < GlobalVariables::getNbThreads(); iThread++ ){
-      while(threadsList[iThread].wait_for(std::chrono::milliseconds(33)) != std::future_status::ready){
-        GenericToolbox::displayProgressBar(*counterPtr, totalNbEventsToLoad, progressBarPrefix);
-      }
-      threadsList[iThread].get();
-    }
-
-    //! This can lead to segfault crash while the TFile is being closed... -> intentional memory leak as a workarround
-//        LogDebug << "Deleting TChains..." << std::endl;
-//        for( int iThread = 0 ; iThread < GlobalVariables::getNbThreads() ; iThread++ ){
-//            LogTrace << "Deleting: chainListPtr->at(" << GET_VAR_NAME_VALUE(iThread) << ")..." << std::endl;
-//            delete chainListPtr->at(iThread);
-//        }
-//        delete chainListPtr;
-  }
-  else{
-    fillEvents(-1);
-  }
+  GlobalVariables::getThreadPool().addJob("fillMCEvents", fillEvents);
+  GlobalVariables::getThreadPool().runJob("fillMCEvents");
+  GlobalVariables::getThreadPool().removeJob("fillMCEvents");
 
   LogDebug << "Reading input tree ended." << std::endl;
 
