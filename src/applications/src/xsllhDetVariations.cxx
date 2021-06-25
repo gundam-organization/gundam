@@ -30,7 +30,7 @@ using json = nlohmann::json;
 #include "BinManager.hh"
 #include "ColorOutput.hh"
 #include "GenericToolbox.h"
-#include "GenericToolboxRootExt.h"
+#include "GenericToolbox.Root.h"
 #include "ProgressBar.hh"
 
 // Structure that holds the options and the binning for a file specified in the .json config file:

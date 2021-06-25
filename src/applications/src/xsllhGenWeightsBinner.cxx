@@ -15,7 +15,7 @@
 
 #include <FitStructs.hh>
 #include <GenericToolbox.h>
-#include <GenericToolboxRootExt.h>
+#include <GenericToolbox.Root.h>
 #include <fstream>
 
 //! Global Variables

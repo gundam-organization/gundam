@@ -1,6 +1,6 @@
 #include "../include/AnaFitParameters.hh"
 #include "GenericToolbox.h"
-#include "GenericToolboxRootExt.h"
+#include "GenericToolbox.Root.h"
 #include "Logger.h"
 
 LoggerInit([](){

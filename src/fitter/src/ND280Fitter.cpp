@@ -1,6 +1,6 @@
 #include "../include/ND280Fitter.h"
 #include "GenericToolbox.h"
-#include "GenericToolboxRootExt.h"
+#include "GenericToolbox.Root.h"
 #include "Logger.h"
 #include <TCanvas.h>
 #include <THStack.h>

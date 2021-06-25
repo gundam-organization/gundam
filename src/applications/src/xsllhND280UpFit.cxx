@@ -20,7 +20,7 @@
 #include "GlobalVariables.h"
 
 #include <GenericToolbox.h>
-#include <GenericToolboxRootExt.h>
+#include <GenericToolbox.Root.h>
 
 
 //! Global Variables

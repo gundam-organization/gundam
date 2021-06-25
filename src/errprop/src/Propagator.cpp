@@ -6,7 +6,7 @@
 #include "vector"
 
 #include "GenericToolbox.h"
-#include "GenericToolboxRootExt.h"
+#include "GenericToolbox.Root.h"
 
 #include "JsonUtils.h"
 #include "Propagator.h"

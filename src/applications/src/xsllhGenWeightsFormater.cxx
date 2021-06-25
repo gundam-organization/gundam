@@ -26,7 +26,7 @@
 // Submodules
 #include "Logger.h"
 #include "GenericToolbox.h"
-#include "GenericToolboxRootExt.h"
+#include "GenericToolbox.Root.h"
 
 /****************************/
 //! Globals
