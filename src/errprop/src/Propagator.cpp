@@ -27,16 +27,21 @@ Propagator::~Propagator() { this->reset(); }
 void Propagator::reset() {
   _isInitialized_ = false;
   _parameterSetsList_.clear();
-  _nbThreads_ = 1;
   _saveDir_ = nullptr;
 
-  _stopThreads_ = true;
-  for( auto& thread : _threadsList_ ){
-    thread.get();
+  std::vector<std::string> jobNameRemoveList;
+  for( const auto& jobName : GlobalVariables::getThreadPool().getJobNameList() ){
+    if(jobName == "Propagator::fillEventDialCaches"
+    or jobName == "Propagator::propagateParametersOnSamples"
+    or jobName == "Propagator::fillSampleHistograms"
+      ){
+      jobNameRemoveList.emplace_back(jobName);
+    }
   }
-  _threadTriggersList_.clear();
-  _threadsList_.clear();
-  _stopThreads_ = false;
+  for( const auto& jobName : jobNameRemoveList ){
+    GlobalVariables::getThreadPool().removeJob(jobName);
+  }
+
 }
 
 
@@ -141,21 +146,7 @@ void Propagator::propagateParametersOnSamples() {
   LogDebug << __METHOD_NAME__ << std::endl;
 
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(1);
-
-  GlobalVariables::getThreadPool().runJob("propagateParametersOnSamples");
-
-//  // dispatch the job on each thread
-//  for( int iThread = 0 ; iThread < _nbThreads_-1 ; iThread++ ){
-//    _threadTriggersList_.at(iThread).propagateOnSampleEvents = true; // triggering the workers
-//  }
-//  // last thread is always this one
-//  this->propagateParametersOnSamples(_nbThreads_-1);
-//
-//  for( int iThread = 0 ; iThread < _nbThreads_-1 ; iThread++ ){
-//    while( _threadTriggersList_.at(iThread).propagateOnSampleEvents ){
-//      // wait
-//    }
-//  }
+  GlobalVariables::getThreadPool().runJob("Propagator::propagateParametersOnSamples");
 
   LogTrace << "Reweight took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(1) << std::endl;
 }
@@ -163,33 +154,7 @@ void Propagator::fillSampleHistograms(){
   LogDebug << __METHOD_NAME__ << std::endl;
 
   GenericToolbox::getElapsedTimeSinceLastCallStr(1);
-
-  // dispatch the job on each thread
-  for( int iThread = 0 ; iThread < _nbThreads_-1 ; iThread++ ){
-    _threadTriggersList_.at(iThread).fillSampleHistograms = true; // triggering the workers
-  }
-  // last thread is always this one
-
-  for( auto& sample : _samplesList_ ){
-    if( _nbThreads_ > 1 ) {
-      sample.FillMcHistograms(_nbThreads_ - 1);
-    }
-    else{
-      sample.FillMcHistograms();
-    }
-  }
-
-
-  for( int iThread = 0 ; iThread < _nbThreads_-1 ; iThread++ ){
-    while( _threadTriggersList_.at(iThread).fillSampleHistograms ){
-      // wait
-    }
-  }
-
-  for( auto& sample : _samplesList_ ){
-    sample.MergeMcHistogramsThread();
-  }
-
+  GlobalVariables::getThreadPool().runJob("Propagator::fillSampleHistograms");
   LogTrace << "Histogram fill took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(1) << std::endl;
 }
 
@@ -197,53 +162,28 @@ void Propagator::fillSampleHistograms(){
 // Protected
 void Propagator::initializeThreads() {
 
-  _nbThreads_ = GlobalVariables::getNbThreads();
-  if( _nbThreads_ == 1 ){
-    return;
-  }
-
   std::function<void(int)> fillEventDialCacheFct = [this](int iThread){
     this->fillEventDialCaches(iThread);
   };
-  GlobalVariables::getThreadPool().addJob("fillEventDialCaches", fillEventDialCacheFct);
+  GlobalVariables::getThreadPool().addJob("Propagator::fillEventDialCaches", fillEventDialCacheFct);
+
   std::function<void(int)> propagateParametersOnSamplesFct = [this](int iThread){
     this->propagateParametersOnSamples(iThread);
   };
-  GlobalVariables::getThreadPool().addJob("propagateParametersOnSamples", propagateParametersOnSamplesFct);
+  GlobalVariables::getThreadPool().addJob("Propagator::propagateParametersOnSamples", propagateParametersOnSamplesFct);
 
-  _threadTriggersList_.resize(_nbThreads_-1);
-
-  std::function<void(int)> asyncLoop = [this](int iThread_){
-    while(not _stopThreads_){
-      // Pending state loop
-
-      if     ( _threadTriggersList_.at(iThread_).propagateOnSampleEvents ){
-        this->propagateParametersOnSamples(iThread_);
-        _threadTriggersList_.at(iThread_).propagateOnSampleEvents = false; // toggle off the trigger
-      }
-      else if( _threadTriggersList_.at(iThread_).fillDialCaches ){
-        this->fillEventDialCaches(iThread_);
-        _threadTriggersList_.at(iThread_).fillDialCaches = false;
-      }
-      else if( _threadTriggersList_.at(iThread_).fillSampleHistograms ){
-        for( auto& sample : _samplesList_ ){
-          sample.FillMcHistograms(iThread_);
-        }
-        _threadTriggersList_.at(iThread_).fillSampleHistograms = false;
-      }
-
-      // Add other jobs there
+  std::function<void(int)> fillSampleHistogramsFct = [this](int iThread){
+    for( auto& sample : _samplesList_ ){
+      sample.FillMcHistograms(iThread);
     }
-    _propagatorMutex_.lock();
-    LogDebug << "Thread " << iThread_ << " will end now." << std::endl;
-    _propagatorMutex_.unlock();
   };
-
-  for( int iThread = 0 ; iThread < _nbThreads_-1 ; iThread++ ){
-    _threadsList_.emplace_back(
-      std::async( std::launch::async, std::bind(asyncLoop, iThread) )
-    );
-  }
+  std::function<void()> fillSampleHistogramsPostParallelFct = [this](){
+    for( auto& sample : _samplesList_ ){
+      sample.MergeMcHistogramsThread();
+    }
+  };
+  GlobalVariables::getThreadPool().addJob("Propagator::fillSampleHistograms", fillSampleHistogramsFct);
+  GlobalVariables::getThreadPool().setPostParallelJob("Propagator::fillSampleHistograms", fillSampleHistogramsPostParallelFct);
 
 }
 void Propagator::initializeCaches() {
@@ -259,26 +199,10 @@ void Propagator::initializeCaches() {
     } // event
   } // sample
 
-
 }
 void Propagator::fillEventDialCaches(){
   LogInfo << __METHOD_NAME__ << std::endl;
-
-  GlobalVariables::getThreadPool().runJob("fillEventDialCaches");
-
-//  // dispatch the job on each thread
-//  for( int iThread = 0 ; iThread < _nbThreads_-1 ; iThread++ ){
-//    _threadTriggersList_.at(iThread).fillDialCaches = true; // triggering the workers
-//  }
-//  // first thread is always this one
-//  this->fillEventDialCaches(_nbThreads_-1);
-//
-//  for( int iThread = 0 ; iThread < _nbThreads_-1 ; iThread++ ){
-//    while ( _threadTriggersList_.at(iThread).fillDialCaches ){
-//      // wait triggering the workers
-//    }
-//  }
-
+  GlobalVariables::getThreadPool().runJob("Propagator::fillEventDialCaches");
 }
 
 void Propagator::fillEventDialCaches(int iThread_){
@@ -292,11 +216,11 @@ void Propagator::fillEventDialCaches(int iThread_){
     std::stringstream ss;
     ss << "Filling dial cache for sample: \"" << sample.GetName() << "\"";
     for( int iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
-      if( iEvent % _nbThreads_ != iThread_ ){
+      if( iEvent % GlobalVariables::getNbThreads() != iThread_ ){
         continue;
       }
 
-      if( iThread_ == _nbThreads_-1 ){
+      if( iThread_ == GlobalVariables::getNbThreads()-1 ){
         GenericToolbox::displayProgressBar(iEvent, nEvents, ss.str());
       }
 
@@ -337,7 +261,7 @@ void Propagator::propagateParametersOnSamples(int iThread_) {
     int nEvents = sample.GetN();
     for( int iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
 
-      if( iEvent % _nbThreads_ != iThread_ ){
+      if( iEvent % GlobalVariables::getNbThreads() != iThread_ ){
         continue;
       }
 

@@ -68,21 +68,6 @@ private:
   std::vector<AnaSample> _samplesList_;
   PlotGenerator _plotGenerator_;
 
-  // Threads
-  std::vector<std::future<void>> _threadsList_;
-  int _nbThreads_{1};
-  std::mutex _propagatorMutex_;
-  bool _stopThreads_{false};
-
-  struct ThreadTriggers{
-    bool fillSampleHistograms{false};
-    bool propagateOnSampleEvents{false};
-    bool fillDialCaches{false};
-  };
-  std::vector<ThreadTriggers> _threadTriggersList_;
-
-
-
   // TEST
   TTree* dataTree{nullptr};
   std::string mc_file_path;
