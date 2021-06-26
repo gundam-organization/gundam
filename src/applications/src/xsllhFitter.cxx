@@ -31,6 +31,7 @@ int main(int argc, char** argv){
   clParser.addTriggerOption("dry-run", {"--dry-run", "-d"},"Perform the full sequence of initialization, but don't do the actual fit.");
   clParser.addOption("config-file", {"-c", "--config-file"}, "Specify path to the fitter config file");
   clParser.addOption("nb-threads", {"-t", "--nb-threads"}, "Specify nb of parallel threads");
+  clParser.addOption("output-file", {"-o", "--out-file"}, "Specify the output file");
 
   LogInfo << "Usage: " << std::endl;
   LogInfo << clParser.getConfigSummary() << std::endl << std::endl;
@@ -49,6 +50,8 @@ int main(int argc, char** argv){
 
   bool isDryRun = clParser.isOptionTriggered("dry-run");
 
+  std::string outFileName = configFilePath + ".root";
+  if( clParser.isOptionTriggered("output-file") ) outFileName = clParser.getOptionVal<std::string>("output-file");
 
   ///////////////////////////////
   // Initialize the fitter:
@@ -56,7 +59,7 @@ int main(int argc, char** argv){
   LogInfo << "Reading config file: " << configFilePath << std::endl;
   auto jsonConfig = JsonUtils::readConfigFile(configFilePath); // works with yaml
 
-  TFile* out = TFile::Open("outTest.root", "RECREATE");
+  TFile* out = TFile::Open(outFileName.c_str(), "RECREATE");
 
   FitterEngine fitter;
   fitter.setConfig(JsonUtils::fetchSubEntry(jsonConfig, {"fitterEngineConfig"}));

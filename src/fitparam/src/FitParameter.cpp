@@ -180,7 +180,8 @@ std::string FitParameter::getSummary() const {
 }
 std::string FitParameter::getTitle() const {
   std::stringstream ss;
-  ss << "#" << _parameterIndex_ << _name_;
+  ss << "#" << _parameterIndex_;
+  if( not _name_.empty() ) ss << "_" << _name_;
   return ss.str();
 }
 

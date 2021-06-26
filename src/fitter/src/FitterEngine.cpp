@@ -86,7 +86,7 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
 
       double currentParValue = par.getParameterValue();
       par.setParameterValue( currentParValue + par.getStdDevValue() );
-      LogInfo << "(" << iPar+1 << "/" << _nbFitParameters_ << ")+1 sigma on " << parSet.getName() + "/" + par.getTitle()
+      LogInfo << "(" << iPar+1 << "/" << _nbFitParameters_ << ") +1 sigma on " << parSet.getName() + "/" + par.getTitle()
       << " -> " << par.getParameterValue() << std::endl;
       _propagator_.propagateParametersOnSamples();
       _propagator_.fillSampleHistograms();
@@ -176,8 +176,29 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
 }
 
 void FitterEngine::fit(){
+  LogAlert << __METHOD_NAME__ << std::endl;
 
+  bool _fitHasConverged_ = _minimizer_->Minimize();
+  if( _fitHasConverged_ ){
+    LogInfo << "Fit converged." << std::endl
+            << "Status code: " << _minimizer_->Status() << std::endl;
 
+    LogInfo << "Calling HESSE." << std::endl;
+    _fitHasConverged_ = _minimizer_->Hesse();
+
+    if(not _fitHasConverged_){
+      LogError  << "Hesse did not converge." << std::endl;
+      LogError  << "Failed with status code: " << _minimizer_->Status() << std::endl;
+    }
+    else{
+      LogInfo << "Hesse converged." << std::endl
+              << "Status code: " << _minimizer_->Status() << std::endl;
+    }
+
+  }
+  else{
+    LogError << "Did not converged." << std::endl;
+  }
 
 }
 void FitterEngine::updateChi2Cache(){
@@ -229,7 +250,12 @@ double FitterEngine::evalFit(const double* parArray_){
   // Compute the Chi2
   updateChi2Cache();
 
+  LogDebug.clearLine();
   LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
+  LogDebug << GET_VAR_NAME_VALUE(_chi2Buffer_) << std::endl;
+  LogDebug << GET_VAR_NAME_VALUE(_chi2StatBuffer_) << std::endl;
+  LogDebug << GET_VAR_NAME_VALUE(_chi2PullsBuffer_) << std::endl;
+  LogDebug.moveTerminalCursorBack(4);
 
   return _chi2Buffer_;
 }
