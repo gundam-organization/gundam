@@ -15,6 +15,10 @@ else(CMAKE_BUILD_TYPE MATCHES RELEASE)
   add_library(fitter SHARED ${SRCFILES})
 endif()
 
+target_link_libraries( fitter
+        errprop
+        )
+
 set_target_properties(
         fitter PROPERTIES VERSION
         "${xsLLhFitter_VERSION_MAJOR}.${xsLLhFitter_VERSION_MINOR}.${xsLLhFitter_VERSION_REVISION}"

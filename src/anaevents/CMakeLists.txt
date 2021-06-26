@@ -13,6 +13,10 @@ else(CMAKE_BUILD_TYPE MATCHES RELEASE)
   add_library(anaevents SHARED ${SRCFILES})
 endif()
 
+target_link_libraries( anaevents
+        xslfutils
+        )
+
 set_target_properties(
         anaevents PROPERTIES VERSION
         "${xsLLhFitter_VERSION_MAJOR}.${xsLLhFitter_VERSION_MINOR}.${xsLLhFitter_VERSION_REVISION}")

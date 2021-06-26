@@ -1,13 +1,13 @@
 set(SRCFILES
   src/FitObj.cc
   src/XsecCalc.cc
-        src/Propagator.cpp
+  src/Propagator.cpp
 )
 
 set(HEADERS
   include/FitObj.hh
   include/XsecCalc.hh
-        include/Propagator.h
+  include/Propagator.h
 )
 
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)
@@ -15,6 +15,11 @@ if(CMAKE_BUILD_TYPE MATCHES DEBUG)
 else(CMAKE_BUILD_TYPE MATCHES RELEASE)
   add_library(errprop SHARED ${SRCFILES})
 endif()
+
+target_link_libraries( errprop
+        fitparam
+        anaevents
+        )
 
 set_target_properties(errprop PROPERTIES VERSION
   "${xsLLhFitter_VERSION_MAJOR}.${xsLLhFitter_VERSION_MINOR}.${xsLLhFitter_VERSION_REVISION}")

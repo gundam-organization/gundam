@@ -35,12 +35,13 @@ void FitParameter::reset() {
 void FitParameter::setIsFixed(bool isFixed) {
   _isFixed_ = isFixed;
 }
-void FitParameter::setDialSetConfigs(const std::vector<nlohmann::json> &jsonConfigList) {
-  _dialDefinitionsList_ = jsonConfigList;
-  while( _dialDefinitionsList_.is_string() ){
-    // forward
-    _dialDefinitionsList_ = JsonUtils::readConfigFile(_dialDefinitionsList_.get<std::string>());
+void FitParameter::setDialSetConfig(const nlohmann::json &jsonConfig_) {
+  auto jsonConfig = jsonConfig_;
+  while( jsonConfig.is_string() ){
+    LogWarning << "Forwarding FitParameterSet config to: \"" << jsonConfig.get<std::string>() << "\"..." << std::endl;
+    jsonConfig = JsonUtils::readConfigFile(jsonConfig.get<std::string>());
   }
+  _dialDefinitionsList_ = jsonConfig.get<std::vector<nlohmann::json>>();
 }
 void FitParameter::setParameterIndex(int parameterIndex) {
   _parameterIndex_ = parameterIndex;
@@ -113,6 +114,9 @@ void FitParameter::initialize() {
 
 }
 
+bool FitParameter::isEnabled() const {
+  return _isEnabled_;
+}
 bool FitParameter::isFixed() const {
   return _isFixed_;
 }
@@ -130,6 +134,9 @@ double FitParameter::getStdDevValue() const {
 }
 double FitParameter::getPriorValue() const {
   return _priorValue_;
+}
+const std::vector<DialSet> &FitParameter::getDialSetList() const {
+  return _dialSetList_;
 }
 
 DialSet* FitParameter::findDialSet(const std::string& dataSetName_){
@@ -173,8 +180,7 @@ std::string FitParameter::getSummary() const {
 }
 std::string FitParameter::getTitle() const {
   std::stringstream ss;
-  ss << "#" << _parameterIndex_;
-  if( not _name_.empty() ) ss << "(" << _name_ << ")";
+  ss << "#" << _parameterIndex_ << _name_;
   return ss.str();
 }
 

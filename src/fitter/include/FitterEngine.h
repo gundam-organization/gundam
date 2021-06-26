@@ -22,13 +22,17 @@ public:
   FitterEngine();
   virtual ~FitterEngine();
 
+  // Reset
   void reset();
 
+  // Setters
   void setSaveDir(TDirectory *saveDir);
-  void setConfig(const json &config);
+  void setConfig(const json &config_);
 
+  // Init
   void initialize();
 
+  // Core
   void generateSamplePlots(const std::string& saveDir_ = "");
   void generateOneSigmaPlots(const std::string& saveDir_ = "");
 

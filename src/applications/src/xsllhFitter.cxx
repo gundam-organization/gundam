@@ -21,6 +21,11 @@ LoggerInit([](){
 } )
 
 int main(int argc, char** argv){
+
+
+  ///////////////////////////////
+  // Read Command Line Args:
+  /////////////////////////////
   CmdLineParser clParser;
 
   clParser.addTriggerOption("dry-run", {"--dry-run", "-d"},"Perform the full sequence of initialization, but don't do the actual fit.");
@@ -42,21 +47,34 @@ int main(int argc, char** argv){
   if( clParser.isOptionTriggered("nb-threads") ) nThreads = clParser.getOptionVal<int>("nb-threads");
   GlobalVariables::setNbThreads(nThreads);
 
+  bool isDryRun = clParser.isOptionTriggered("dry-run");
+
+
+  ///////////////////////////////
+  // Initialize the fitter:
+  /////////////////////////////
   LogInfo << "Reading config file: " << configFilePath << std::endl;
   auto jsonConfig = JsonUtils::readConfigFile(configFilePath); // works with yaml
 
   TFile* out = TFile::Open("outTest.root", "RECREATE");
 
   FitterEngine fitter;
-  fitter.setConfig(jsonConfig);
+  fitter.setConfig(JsonUtils::fetchSubEntry(jsonConfig, {"fitterEngineConfig"}));
   fitter.setSaveDir(GenericToolbox::mkdirTFile(out, "fitter"));
   fitter.initialize();
 
-  fitter.generateSamplePlots("prefit/samples");
-  fitter.generateOneSigmaPlots();
-  fitter.scanParameters(10, "prefit/scan");
 
-  fitter.fit();
+  ///////////////////////////////
+  // Run the fitter:
+  /////////////////////////////
+  if( JsonUtils::fetchValue(jsonConfig, "generateSamplePlots", true) ) fitter.generateSamplePlots("prefit/samples");
+  if( JsonUtils::fetchValue(jsonConfig, "generateOneSigmaPlots", true) ) fitter.generateOneSigmaPlots();
+  if( JsonUtils::fetchValue(jsonConfig, "scanParameters", true) )fitter.scanParameters(10, "prefit/scan");
+
+  if( not isDryRun and JsonUtils::fetchValue(jsonConfig, "fit", true) ){
+    fitter.fit();
+  }
+
 
   LogDebug << "Closing output file: " << out->GetName() << std::endl;
   out->Close();

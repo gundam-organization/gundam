@@ -42,7 +42,7 @@ void FitParameterSet::reset() {
 void FitParameterSet::setJsonConfig(const nlohmann::json &jsonConfig) {
   _jsonConfig_ = jsonConfig;
   while(_jsonConfig_.is_string()){
-    // forward
+    LogWarning << "Forwarding FitParameterSet config to: \"" << _jsonConfig_.get<std::string>() << "\"..." << std::endl;
     _jsonConfig_ = JsonUtils::readConfigFile(_jsonConfig_.get<std::string>());
   }
 }
@@ -137,6 +137,7 @@ void FitParameterSet::initialize() {
     }
   }
 
+  LogDebug << "Initializing parameters..." << std::endl;
   for( int iPararmeter = 0 ; iPararmeter < _covarianceMatrix_->GetNcols() ; iPararmeter++ ){
     _parameterList_.emplace_back();
     _parameterList_.back().setParameterIndex(iPararmeter);
@@ -144,8 +145,8 @@ void FitParameterSet::initialize() {
     _parameterList_.back().setParameterValue((*_parameterPriorList_)[iPararmeter]);
     _parameterList_.back().setPriorValue((*_parameterPriorList_)[iPararmeter]);
     _parameterList_.back().setStdDevValue(TMath::Sqrt((*_covarianceMatrix_)[iPararmeter][iPararmeter]));
-    _parameterList_.back().setDialSetConfigs(JsonUtils::fetchValue<std::vector<nlohmann::json>>(_jsonConfig_, "dialSetDefinitions"));
-    _parameterList_.back().setDialsWorkingDirectory(JsonUtils::fetchValue<std::string>(_jsonConfig_, "dialSetWorkingDirectory", "."));
+    _parameterList_.back().setDialSetConfig(JsonUtils::fetchValue<nlohmann::json>(_jsonConfig_, "dialSetDefinitions"));
+    _parameterList_.back().setDialsWorkingDirectory(JsonUtils::fetchValue<std::string>(_jsonConfig_, "dialSetWorkingDirectory", "./"));
     _parameterList_.back().setEnableDialSetsSummary(JsonUtils::fetchValue<bool>(_jsonConfig_, "printDialSetsSummary", false));
 
     _parameterList_.back().initialize();
@@ -156,6 +157,12 @@ void FitParameterSet::initialize() {
 
 
 // Getters
+bool FitParameterSet::isEnabled() const {
+  return _isEnabled_;
+}
+const std::string &FitParameterSet::getName() const {
+  return _name_;
+}
 std::vector<FitParameter> &FitParameterSet::getParameterList() {
   return _parameterList_;
 }
@@ -223,8 +230,3 @@ void FitParameterSet::passIfInitialized(const std::string &methodName_) const {
     throw std::logic_error("class not initialized");
   }
 }
-
-const std::string &FitParameterSet::getName() const {
-  return _name_;
-}
-

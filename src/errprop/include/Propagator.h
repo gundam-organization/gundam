@@ -26,9 +26,7 @@ public:
   // Setters
   void setShowTimeStats(bool showTimeStats);
   void setSaveDir(TDirectory *saveDir);
-  void setParameterSetConfig(const json &parameterSetConfig);
-  void setSamplesConfig(const json &samplesConfig);
-  void setSamplePlotGeneratorConfig(const json &samplePlotGeneratorConfig);
+  void setConfig(const json &config);
 
   //! TODO: GET RID OF THOSE TEST METHOD
   void setDataTree(TTree *dataTree_);
@@ -60,9 +58,7 @@ private:
   // Parameters
   bool _showTimeStats_{false};
   TDirectory* _saveDir_{nullptr};
-  nlohmann::json _parameterSetsConfig_;
-  nlohmann::json _samplesConfig_;
-  nlohmann::json _samplePlotGeneratorConfig_;
+  nlohmann::json _config_;
 
   // Internals
   bool _isInitialized_{false};

@@ -5,7 +5,6 @@ set(SRCFILES
         src/OptParser.cc
         src/PlotStyle.cc
         src/ToyThrower.cc
-        src/XsecDial.cc
         src/GlobalVariables.cc
         src/GeneralizedFitBin.cc
         src/DataBinSet.cpp
@@ -20,7 +19,6 @@ set(HEADERS
         include/OptParser.hh
         include/PlotStyle.hh
         include/ToyThrower.hh
-        include/XsecDial.hh
         include/GlobalVariables.h
         include/GeneralizedFitBin.h
         include/DataBin.h
@@ -35,6 +33,10 @@ if(CMAKE_BUILD_TYPE MATCHES DEBUG)
 else(CMAKE_BUILD_TYPE MATCHES RELEASE)
   add_library(xslfutils SHARED ${SRCFILES})
 endif()
+
+target_link_libraries( xslfutils
+        ${LINK_LIBARY_LIST}
+        )
 
 set_target_properties(xslfutils PROPERTIES VERSION
   "${xsLLhFitter_VERSION_MAJOR}.${xsLLhFitter_VERSION_MINOR}.${xsLLhFitter_VERSION_REVISION}")

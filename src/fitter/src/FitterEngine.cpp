@@ -33,8 +33,12 @@ void FitterEngine::reset() {
 void FitterEngine::setSaveDir(TDirectory *saveDir) {
   _saveDir_ = saveDir;
 }
-void FitterEngine::setConfig(const json &config) {
-  _config_ = config;
+void FitterEngine::setConfig(const nlohmann::json &config_) {
+  _config_ = config_;
+  while( _config_.is_string() ){
+    LogWarning << "Forwarding " << __CLASS_NAME__ << " config: \"" << _config_.get<std::string>() << "\"" << std::endl;
+    _config_ = JsonUtils::readConfigFile(_config_.get<std::string>());
+  }
 }
 
 void FitterEngine::initialize() {
@@ -82,7 +86,8 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
 
       double currentParValue = par.getParameterValue();
       par.setParameterValue( currentParValue + par.getStdDevValue() );
-      LogInfo << "+1 sigma on " << parSet.getName() + "/" + par.getTitle() << " -> " << par.getParameterValue() << std::endl;
+      LogInfo << "(" << iPar+1 << "/" << _nbFitParameters_ << ")+1 sigma on " << parSet.getName() + "/" + par.getTitle()
+      << " -> " << par.getParameterValue() << std::endl;
       _propagator_.propagateParametersOnSamples();
       _propagator_.fillSampleHistograms();
 
@@ -232,9 +237,7 @@ double FitterEngine::evalFit(const double* parArray_){
 
 void FitterEngine::initializePropagator(){
 
-  _propagator_.setParameterSetConfig(JsonUtils::fetchValue<nlohmann::json>(_config_, "fitParameterSets"));
-  _propagator_.setSamplesConfig(JsonUtils::fetchValue<nlohmann::json>(_config_, "samples"));
-  _propagator_.setSamplePlotGeneratorConfig(JsonUtils::fetchValue<nlohmann::json>(_config_, "samplePlotGenerator"));
+  _propagator_.setConfig(JsonUtils::fetchValue<json>(_config_, "propagatorConfig"));
 
   TFile* f = TFile::Open(JsonUtils::fetchValue<std::string>(_config_, "mc_file").c_str(), "READ");
   _propagator_.setDataTree( f->Get<TTree>("selectedEvents") );
@@ -256,7 +259,8 @@ void FitterEngine::initializePropagator(){
 }
 void FitterEngine::initializeMinimizer(){
 
-  auto minimizationConfig = JsonUtils::fetchSubEntry(_config_, {"fitterSettings", "minimizerSettings"});
+  auto minimizationConfig = JsonUtils::fetchSubEntry(_config_, {"minimizerConfig"});
+  if( minimizationConfig.is_string() ){ minimizationConfig = JsonUtils::readConfigFile(minimizationConfig.get<std::string>()); }
 
   _minimizer_ = std::shared_ptr<ROOT::Math::Minimizer>(
     ROOT::Math::Factory::CreateMinimizer(

@@ -26,19 +26,21 @@ public:
   void setParameterValue(double parameterValue);
   void setPriorValue(double priorValue);
   void setStdDevValue(double stdDevValue);
-  void setDialSetConfigs(const std::vector<nlohmann::json> &jsonConfigList);
+  void setDialSetConfig(const nlohmann::json &jsonConfig_);
   void setEnableDialSetsSummary(bool enableDialSetsSummary);
   void setDialsWorkingDirectory(const std::string &dialsWorkingDirectory);
 
   void initialize();
 
   // Getters
+  bool isEnabled() const;
   bool isFixed() const;
   int getParameterIndex() const;
   const std::string &getName() const;
   double getParameterValue() const;
   double getStdDevValue() const;
   double getPriorValue() const;
+  const std::vector<DialSet> &getDialSetList() const;
 
   // Core
   DialSet* findDialSet(const std::string& dataSetName_);

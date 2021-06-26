@@ -216,7 +216,6 @@ bool DialSet::initializeDialsWithDefinition() {
       Int_t kinematicBin;
       TSpline3* splinePtr = nullptr;
       TGraph* graphPtr = nullptr;
-      std::vector<Int_t> splitVarValueList;
 
       // searching for additional split var
       std::vector<std::string> splitVarNameList;
@@ -227,11 +226,13 @@ bool DialSet::initializeDialsWithDefinition() {
                and leafName != "graph"
           ){
           splitVarNameList.emplace_back(leafName);
-          splitVarValueList.emplace_back(0); // claiming memory here since emplace_back() performs auto re-allocation
         }
       }
 
       // Hooking to the tree
+      std::vector<Int_t> splitVarValueList(splitVarNameList.size(), 0);
+      std::vector<std::pair<int, int>> splitVarBoundariesList(splitVarNameList.size(), std::pair<int, int>());
+      std::vector<std::vector<int>> splitVarValuesList(splitVarNameList.size(), std::vector<int>());
       dialsTTree->SetBranchAddress("kinematicBin", &kinematicBin);
       if( dialsType == DialType::Spline ) dialsTTree->SetBranchAddress("spline", &splinePtr);
       if( dialsType == DialType::Graph ) dialsTTree->SetBranchAddress("graph", &graphPtr);
@@ -246,6 +247,15 @@ bool DialSet::initializeDialsWithDefinition() {
         auto dialBin = binList.at(kinematicBin); // copy
         dialBin.setIsZeroWideRangesTolerated(true);
         for( size_t iSplitVar = 0 ; iSplitVar < splitVarNameList.size() ; iSplitVar++ ){
+          if( splitVarBoundariesList.at(iSplitVar).second < splitVarValueList.at(iSplitVar) or iSpline == 0 ){
+            splitVarBoundariesList.at(iSplitVar).second = splitVarValueList.at(iSplitVar);
+          }
+          if( splitVarBoundariesList.at(iSplitVar).first > splitVarValueList.at(iSplitVar) or iSpline == 0 ){
+            splitVarBoundariesList.at(iSplitVar).first = splitVarValueList.at(iSplitVar);
+          }
+          if( not GenericToolbox::doesElementIsInVector(splitVarValueList.at(iSplitVar), splitVarValuesList.at(iSplitVar)) ){
+            splitVarValuesList.at(iSplitVar).emplace_back(splitVarValueList.at(iSplitVar));
+          }
           dialBin.addBinEdge(splitVarNameList.at(iSplitVar), splitVarValueList.at(iSplitVar), splitVarValueList.at(iSplitVar));
         }
         if      ( dialsType == DialType::Spline ){
@@ -257,11 +267,57 @@ bool DialSet::initializeDialsWithDefinition() {
         else if( dialsType == DialType::Graph ){
           // TODO
         }
-      }
+      } // iSpline
 
       dialsTFile->Close();
 
-    }
+      if( _applyConditionFormula_ == nullptr ) {
+        // Create additional selection for helping the dial indexing
+        std::vector<std::string> splitVarFormulaConditionList;
+        for (size_t iSplitVar = 0; iSplitVar < splitVarNameList.size(); iSplitVar++) {
+
+          // searching for gaps in the int values
+          std::vector<std::pair<int, int>> excludedBands;
+          for (int intVal = splitVarBoundariesList.at(iSplitVar).first + 1;
+               intVal < splitVarBoundariesList.at(iSplitVar).second; intVal++) {
+            if (not GenericToolbox::doesElementIsInVector(intVal, splitVarValuesList.at(iSplitVar))) {
+              if (excludedBands.empty() or intVal - 1 != excludedBands.back().second) {
+                excludedBands.emplace_back(std::pair<int, int>(intVal, intVal));
+              } else {
+                excludedBands.back().second = intVal;
+              }
+            }
+          }
+
+          std::stringstream ss;
+          ss << "[" << splitVarNameList.at(iSplitVar) << "] >= " << splitVarBoundariesList.at(iSplitVar).first;
+          ss << " && [" << splitVarNameList.at(iSplitVar) << "] <= " << splitVarBoundariesList.at(iSplitVar).second;
+          if (not excludedBands.empty()) {
+            for (auto &exclBand : excludedBands) {
+              if (exclBand.first == exclBand.second) {
+                // NOT THE VALUE
+                ss << " && [" << splitVarNameList.at(iSplitVar) << "] != " << exclBand.first;
+              } else {
+                // NOT IN THE BAND
+                ss << " && [" << splitVarNameList.at(iSplitVar) << "] <= " << exclBand.first;
+                ss << " && [" << splitVarNameList.at(iSplitVar) << "] >= " << exclBand.second;
+              }
+            }
+          }
+
+          splitVarFormulaConditionList.emplace_back(ss.str());
+        } // SplitVar
+
+        std::string addFormulaCondition = GenericToolbox::joinVectorString(splitVarFormulaConditionList, " && ");
+        _applyConditionFormula_ = new TFormula("_applyConditionFormula_", addFormulaCondition.c_str());
+        if( not _applyConditionFormula_->IsValid() ){
+          LogError << "\"" << addFormulaCondition << "\"" << ": could not be parsed as formula expression" << std::endl;
+          _applyConditionFormula_->Print("ALL");
+          throw std::runtime_error("invalid formula expression");
+        }
+
+      } // Formula ?
+    } // Spline ? Graph ?
     else {
       LogError << "dialsType is not supported yet: " << dialTypeStr << "(" << dialsType << ")" << std::endl;
       throw std::logic_error("dialsType is not supported");

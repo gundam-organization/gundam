@@ -50,30 +50,15 @@ void Propagator::setShowTimeStats(bool showTimeStats) {
 void Propagator::setSaveDir(TDirectory *saveDir) {
   _saveDir_ = saveDir;
 }
-void Propagator::setParameterSetConfig(const json &parameterSetConfig) {
-  _parameterSetsConfig_ = parameterSetConfig;
-  while( _parameterSetsConfig_.is_string() ){
-    // forward json definition in external files
-    LogDebug << "Forwarding config with file: " << _parameterSetsConfig_.get<std::string>() << std::endl;
-    _parameterSetsConfig_ = JsonUtils::readConfigFile(_parameterSetsConfig_.get<std::string>());
+void Propagator::setConfig(const json &config) {
+  _config_ = config;
+  while( _config_.is_string() ){
+    LogWarning << "Forwarding " << __CLASS_NAME__ << " config: \"" << _config_.get<std::string>() << "\"" << std::endl;
+    _config_ = JsonUtils::readConfigFile(_config_.get<std::string>());
   }
 }
-void Propagator::setSamplesConfig(const json &samplesConfig) {
-  _samplesConfig_ = samplesConfig;
-  while( _samplesConfig_.is_string() ){
-    // forward json definition in external files
-    LogDebug << "Forwarding config with file: " << _samplesConfig_.get<std::string>() << std::endl;
-    _samplesConfig_ = JsonUtils::readConfigFile(_samplesConfig_.get<std::string>());
-  }
-}
-void Propagator::setSamplePlotGeneratorConfig(const json &samplePlotGeneratorConfig) {
-  _samplePlotGeneratorConfig_ = samplePlotGeneratorConfig;
-  while( _samplePlotGeneratorConfig_.is_string() ){
-    // forward json definition in external files
-    LogDebug << "Forwarding config with file: " << _samplesConfig_.get<std::string>() << std::endl;
-    _samplePlotGeneratorConfig_ = JsonUtils::readConfigFile(_samplePlotGeneratorConfig_.get<std::string>());
-  }
-}
+
+// To get rid of
 void Propagator::setDataTree(TTree *dataTree_) {
   dataTree = dataTree_;
 }
@@ -85,7 +70,9 @@ void Propagator::initialize() {
   LogWarning << __METHOD_NAME__ << std::endl;
 
   LogTrace << "Parameters..." << std::endl;
-  for( const auto& parameterSetConfig : _parameterSetsConfig_ ){
+  auto parameterSetListConfig = JsonUtils::fetchValue<json>(_config_, "parameterSetListConfig");
+  if( parameterSetListConfig.is_string() ) parameterSetListConfig = JsonUtils::readConfigFile(parameterSetListConfig.get<std::string>());
+  for( const auto& parameterSetConfig : parameterSetListConfig ){
     _parameterSetsList_.emplace_back();
     _parameterSetsList_.back().setJsonConfig(parameterSetConfig);
     _parameterSetsList_.back().initialize();
@@ -93,7 +80,9 @@ void Propagator::initialize() {
   }
 
   LogTrace << "Samples..." << std::endl;
-  for( const auto& sampleConfig : _samplesConfig_ ){
+  auto samplesConfig = JsonUtils::fetchValue<json>(_config_, "samplesConfig");
+  if( samplesConfig.is_string() ) samplesConfig = JsonUtils::readConfigFile(samplesConfig.get<std::string>());
+  for( const auto& sampleConfig : samplesConfig ){
     if( JsonUtils::fetchValue(sampleConfig, "isEnabled", true) ){
       _samplesList_.emplace_back();
       _samplesList_.back().setupWithJsonConfig(sampleConfig);
@@ -111,7 +100,9 @@ void Propagator::initialize() {
 
 
   LogTrace << "Other..." << std::endl;
-  _plotGenerator_.setConfig(_samplePlotGeneratorConfig_);
+  auto plotGeneratorConfig = JsonUtils::fetchValue<json>(_config_, "plotGeneratorConfig");
+  if( plotGeneratorConfig.is_string() ) parameterSetListConfig = JsonUtils::readConfigFile(plotGeneratorConfig.get<std::string>());
+  _plotGenerator_.setConfig(plotGeneratorConfig);
   _plotGenerator_.setSampleListPtr( &_samplesList_ );
   _plotGenerator_.initialize();
 
@@ -207,47 +198,104 @@ void Propagator::fillEventDialCaches(int iThread_){
   DialSet* parameterDialSetPtr;
   AnaEvent* eventPtr;
 
-  for( auto& sample : _samplesList_ ){
 
-    int nEvents = sample.GetN();
-    std::stringstream ss;
-    ss << "Filling dial cache for sample: \"" << sample.GetName() << "\"";
-    for( int iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
-      if( iEvent % GlobalVariables::getNbThreads() != iThread_ ){
-        continue;
-      }
+  for( auto& parSet : _parameterSetsList_ ){
+    if( not parSet.isEnabled() ){ continue; }
+    int iPar = -1;
+    for( auto& par : parSet.getParameterList() ){
+      iPar++;
+      if( not par.isEnabled() ){ continue; }
 
-      if( iThread_ == GlobalVariables::getNbThreads()-1 ){
-        GenericToolbox::displayProgressBar(iEvent, nEvents, ss.str());
-      }
+      for( auto& sample : _samplesList_ ) {
+        int nEvents = sample.GetN();
+        if (nEvents == 0) continue;
 
-      eventPtr = sample.GetEvent(iEvent);
+        // selecting the dialSet of the sample
+        parameterDialSetPtr = par.findDialSet(sample.GetDetector());
+        if (parameterDialSetPtr->getDialList().empty()) {
+          continue;
+        }
 
-      for( auto& parSetPair : *eventPtr->getDialCachePtr() ){
-        for( size_t iPar = 0 ; iPar < parSetPair.first->getNbParameters() ; iPar++ ){
+        // Indexing the variables
+        eventPtr = sample.GetEvent(0);
+        const auto &firstDial = parameterDialSetPtr->getDialList()[0];
+        std::vector<int> varIndexList(firstDial->getApplyConditionBin().getVariableNameList().size(), 0);
+        std::vector<bool> isIntList(firstDial->getApplyConditionBin().getVariableNameList().size(), true);
+        for (size_t iVar = 0; iVar < firstDial->getApplyConditionBin().getVariableNameList().size(); iVar++) {
+          varIndexList.at(iVar) = (eventPtr->GetIntIndex(
+            firstDial->getApplyConditionBin().getVariableNameList().at(iVar), false));
+          if (varIndexList.at(iVar) == -1) {
+            isIntList.at(iVar) = true;
+            varIndexList.at(iVar) = (eventPtr->GetFloatIndex(
+              firstDial->getApplyConditionBin().getVariableNameList().at(iVar), false));
+          }
+        }
 
-          parameterDialSetPtr = parSetPair.first->getFitParameter(iPar).findDialSet(sample.GetDetector());
+        std::stringstream ss;
+        ss << LogWarning.getPrefixString() << "Indexing event dials: " << parSet.getName() << "/" << par.getTitle() << " -> " << sample.GetName();
+        if( iThread_ == GlobalVariables::getNbThreads()-1 ){
+          GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+        }
 
-          // If a formula is defined
-          if( parameterDialSetPtr->getApplyConditionFormula() != nullptr
+        for (int iEvent = 0; iEvent < nEvents; iEvent++) {
+
+          if (iEvent % GlobalVariables::getNbThreads() != iThread_) {
+            continue;
+          }
+          if (iThread_ == GlobalVariables::getNbThreads() - 1) {
+            GenericToolbox::displayProgressBar(iEvent, nEvents, ss.str());
+          }
+
+          eventPtr = sample.GetEvent(iEvent);
+          if (eventPtr->getDialCachePtr()->at(&parSet).at(iPar) != nullptr) {
+            // already set
+            continue;
+          }
+
+          if (parameterDialSetPtr->getApplyConditionFormula() != nullptr
               and eventPtr->evalFormula(parameterDialSetPtr->getApplyConditionFormula()) == 0
-          ){
+            ) {
             continue; // SKIP
           }
 
-          for( const auto& dial : parameterDialSetPtr->getDialList() ){
-            if( eventPtr->isInBin( dial->getApplyConditionBin() ) ){
-              parSetPair.second.at(iPar) = dial.get();
-              break; // ok, next parameter
+          for (const auto &dial : parameterDialSetPtr->getDialList()) {
+            bool isInBin = true;
+            for (size_t iVar = 0; iVar < varIndexList.size(); iVar++) {
+              if (isIntList.at(iVar)) {
+                if (
+                  not dial->getApplyConditionBin().isBetweenEdges(
+                    iVar, eventPtr->GetEventVarInt(varIndexList.at(iVar)))
+                    ){
+                  isInBin = false;
+                  break; // next dial
+                }
+              }
+              else {
+                if (
+                  not dial->getApplyConditionBin().isBetweenEdges(
+                    iVar, eventPtr->GetEventVarFloat(varIndexList.at(iVar)))
+                    ) {
+                  isInBin = false;
+                  break; // next dial
+                }
+              }
+            }
+            if (isInBin) {
+              eventPtr->getDialCachePtr()->at(&parSet).at(iPar) = dial.get();
+              break; // found
             }
           } // dial
 
+        } // iEvent
+
+        if (iThread_ == GlobalVariables::getNbThreads() - 1) {
+          GenericToolbox::displayProgressBar(nEvents, nEvents, ss.str());
+          LogTrace << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
         }
       }
+    } // par
+} // parSet
 
-    } // event
-
-  } // sample
 
 }
 void Propagator::propagateParametersOnSamples(int iThread_) {

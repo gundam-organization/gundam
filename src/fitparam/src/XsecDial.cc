@@ -215,9 +215,9 @@ int XsecDial::GetSplineIndex(AnaEvent* eventPtr_, SplineBin* eventSplineBinPtr_)
   eventSplineBinPtr_->kinematicBin = -1;
   for(size_t iBin = 0; iBin < _binEdgesList_.size(); iBin++){
     if(    eventPtr_->GetRecoD1() >= _binEdgesList_[iBin][1].first
-           and eventPtr_->GetRecoD1() <  _binEdgesList_[iBin][1].second
-           and eventPtr_->GetRecoD2() >= _binEdgesList_[iBin][0].first
-           and eventPtr_->GetRecoD2() <  _binEdgesList_[iBin][0].second
+       and eventPtr_->GetRecoD1() <  _binEdgesList_[iBin][1].second
+       and eventPtr_->GetRecoD2() >= _binEdgesList_[iBin][0].first
+       and eventPtr_->GetRecoD2() <  _binEdgesList_[iBin][0].second
       ) {
       eventSplineBinPtr_->kinematicBin = iBin;
       break;

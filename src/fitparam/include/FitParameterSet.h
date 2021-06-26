@@ -43,8 +43,9 @@ public:
   void initialize();
 
   // Getters
-  std::vector<FitParameter> &getParameterList();
+  bool isEnabled() const;
   const std::string &getName() const;
+  std::vector<FitParameter> &getParameterList();
 
   // Core
   size_t getNbParameters() const;
