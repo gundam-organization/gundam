@@ -166,7 +166,12 @@ const std::string &FitParameterSet::getName() const {
 std::vector<FitParameter> &FitParameterSet::getParameterList() {
   return _parameterList_;
 }
-
+const std::vector<FitParameter> &FitParameterSet::getParameterList() const{
+  return _parameterList_;
+}
+TMatrixDSym *FitParameterSet::getCovarianceMatrix() const {
+  return _covarianceMatrix_;
+}
 
 // Core
 size_t FitParameterSet::getNbParameters() const {
@@ -230,3 +235,4 @@ void FitParameterSet::passIfInitialized(const std::string &methodName_) const {
     throw std::logic_error("class not initialized");
   }
 }
+

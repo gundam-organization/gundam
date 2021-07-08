@@ -20,8 +20,10 @@ FitterEngine::FitterEngine() { this->reset(); }
 FitterEngine::~FitterEngine() { this->reset(); }
 
 void FitterEngine::reset() {
+  _fitIsDone_ = false;
   _saveDir_ = nullptr;
   _config_.clear();
+  _chi2History_.clear();
 
   _propagator_.reset();
   _minimizer_.reset();
@@ -94,11 +96,7 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
       iPar++;
 
       std::string tag;
-      if( _minimizer_->IsFixedVariable(iPar) ){
-        tag += "_FIXED";
-//        LogInfo << "Not processing fixed parameter: " << parSet.getName() + "/" + par.getTitle() << std::endl;
-//        continue;
-      }
+      if( _minimizer_->IsFixedVariable(iPar) ){ tag += "_FIXED"; }
 
       double currentParValue = par.getParameterValue();
       par.setParameterValue( currentParValue + par.getStdDevValue() );
@@ -122,21 +120,6 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
       _propagator_.fillSampleHistograms();
 
       const auto& compHistList = _propagator_.getPlotGenerator().getComparisonHistHolderList();
-//      bool isAffected = false;
-//      for( const auto& compHist : compHistList ){
-//        for( int iBin = 1 ; iBin <= compHist.histPtr->GetNbinsX() ; iBin++ ){
-//          if( TMath::Abs( compHist.histPtr->GetBinContent(iBin) ) > 0.1 ){ // 0.1 % do decide if
-//            isAffected = true;
-//            break;
-//          }
-//        }
-//        if( isAffected ) break;
-//      }
-//      if( not isAffected ){
-//        LogWarning << parSet.getName() + "/" + par.getTitle() << " has no effect on the sample. Fixing in the fit." << std::endl;
-//        _minimizer_->FixVariable(iPar);
-//        par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
-//      }
 
       // Since those were not saved, delete manually
       for( auto& hist : oneSigmaHistList ){ delete hist.histPtr; }
@@ -232,9 +215,46 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
   delete[] y;
 }
 
-void FitterEngine::fit(){
-  LogAlert << __METHOD_NAME__ << std::endl;
+void FitterEngine::throwParameters(){
+  LogInfo << __METHOD_NAME__ << std::endl;
 
+  int iPar = 0;
+  for( auto& parSet : _propagator_.getParameterSetsList() ){
+    for( auto& par : parSet.getParameterList() ){
+      if( par.isEnabled() and not par.isFixed() ){
+        par.setParameterValue( par.getPriorValue() + _prng_.Gaus(0, par.getStdDevValue()) );
+        _minimizer_->SetVariableValue( iPar, par.getParameterValue() );
+      }
+    }
+    iPar++;
+  }
+
+  _propagator_.propagateParametersOnSamples();
+  _propagator_.fillSampleHistograms();
+
+}
+
+void FitterEngine::fit(){
+  LogWarning << __METHOD_NAME__ << std::endl;
+
+  for( const auto& parSet : _propagator_.getParameterSetsList() ){
+    LogWarning << parSet.getName() << ": " << parSet.getNbParameters() << " parameters" << std::endl;
+    for( const auto& par : parSet.getParameterList() ){
+      if( par.isEnabled() ){
+        if( par.isFixed() ){
+          LogAlert << "\033[41m" << parSet.getName() << "/" << par.getTitle() << ": FIXED - Prior: " << par.getParameterValue() <<  "\033[0m" << std::endl;
+        }
+        else if( not par.isEnabled() ){
+          LogInfo << "\033[40m" << parSet.getName() << "/" << par.getTitle() << ": Disabled" <<  "\033[0m" << std::endl;
+        }
+        else{
+          LogInfo << parSet.getName() << "/" << par.getTitle() << " - Prior: " << par.getParameterValue() << std::endl;
+        }
+      }
+    }
+  }
+
+  _fitUnderGoing_ = true;
   bool _fitHasConverged_ = _minimizer_->Minimize();
   if( _fitHasConverged_ ){
     LogInfo << "Fit converged." << std::endl
@@ -259,6 +279,8 @@ void FitterEngine::fit(){
 
   LogDebug << _convergenceMonitor_.generateMonitorString(); // lasting printout
 
+  _fitUnderGoing_ = false;
+  _fitIsDone_ = true;
 }
 void FitterEngine::updateChi2Cache(){
 
@@ -309,23 +331,102 @@ double FitterEngine::evalFit(const double* parArray_){
   // Compute the Chi2
   updateChi2Cache();
 
-  _convergenceMonitor_.setHeaderString(__METHOD_NAME__ + " took: " + GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__));
-  _convergenceMonitor_.getVariable("Total").addQuantity(_chi2Buffer_);
-  _convergenceMonitor_.getVariable("Stat").addQuantity(_chi2StatBuffer_);
-  _convergenceMonitor_.getVariable("Syst").addQuantity(_chi2PullsBuffer_);
-  LogDebug << _convergenceMonitor_.generateMonitorString(true);
+  if( _fitUnderGoing_ ){
+    std::stringstream ss;
+    ss << __METHOD_NAME__ << ": call #" << _nbFitCalls_ << std::endl;
+    ss << "Computation time: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__);
+    _convergenceMonitor_.setHeaderString(ss.str());
+    _convergenceMonitor_.getVariable("Total").addQuantity(_chi2Buffer_);
+    _convergenceMonitor_.getVariable("Stat").addQuantity(_chi2StatBuffer_);
+    _convergenceMonitor_.getVariable("Syst").addQuantity(_chi2PullsBuffer_);
+    LogDebug << _convergenceMonitor_.generateMonitorString(true);
 
-
-//  LogDebug.clearLine();
-//  LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
-//  LogDebug << GET_VAR_NAME_VALUE(_chi2Buffer_) << std::endl;
-//  LogDebug << GET_VAR_NAME_VALUE(_chi2StatBuffer_) << std::endl;
-//  LogDebug << GET_VAR_NAME_VALUE(_chi2PullsBuffer_) << std::endl;
-//  LogDebug.moveTerminalCursorBack(4);
+    // Fill History
+    _chi2History_["Total"].emplace_back(_chi2Buffer_);
+    _chi2History_["Stat"].emplace_back(_chi2StatBuffer_);
+    _chi2History_["Syst"].emplace_back(_chi2PullsBuffer_);
+  }
 
   return _chi2Buffer_;
 }
 
+void FitterEngine::writePostFitData() {
+  LogInfo << __METHOD_NAME__ << std::endl;
+
+  if( not _fitIsDone_ ){
+    LogError << "Can't do " << __METHOD_NAME__ << " while fit has not been called." << std::endl;
+    throw std::logic_error("Can't do " + __METHOD_NAME__ + " while fit has not been called.");
+  }
+
+  if( _saveDir_ != nullptr ){
+    auto* postFitDir = GenericToolbox::mkdirTFile(_saveDir_, "postFit");
+
+    GenericToolbox::mkdirTFile(postFitDir, "chi2")->cd();
+    GenericToolbox::convertTVectorDtoTH1D(_chi2History_["Total"], "#chi^{2}(Total) - Converging history")->Write("chi2TotalHistory");
+    GenericToolbox::convertTVectorDtoTH1D(_chi2History_["Stat"], "#chi^{2}(Stat) - Converging history")->Write("chi2StatHistory");
+    GenericToolbox::convertTVectorDtoTH1D(_chi2History_["Syst"], "#chi^{2}(Syst) - Converging history")->Write("chi2PullsHistory");
+
+    this->generateSamplePlots("postFit/samples");
+
+    auto* errorDir = GenericToolbox::mkdirTFile(postFitDir, "errors");
+//    const unsigned int nfree = _minimizer_->NFree();
+    if(_minimizer_->X() != nullptr){
+      double covarianceMatrixArray[_minimizer_->NDim() * _minimizer_->NDim()];
+      _minimizer_->GetCovMatrix(covarianceMatrixArray);
+      TMatrixDSym fitterCovarianceMatrix(_minimizer_->NDim(), covarianceMatrixArray);
+
+      std::vector<double> parameterValueList(_minimizer_->X(),      _minimizer_->X()      + _minimizer_->NDim());
+      std::vector<double> parameterErrorList(_minimizer_->Errors(), _minimizer_->Errors() + _minimizer_->NDim());
+
+      int parameterIndexOffset = 0;
+      for( const auto& parSet : _propagator_.getParameterSetsList() ){
+
+        if( not parSet.isEnabled() ){
+          continue;
+        }
+
+        auto* parSetDir = GenericToolbox::mkdirTFile(errorDir, parSet.getName());
+
+        auto* covMatrix = new TMatrixD(parSet.getParameterList().size(), parSet.getParameterList().size());
+        for( const auto& parRow : parSet.getParameterList() ){
+          for( const auto& parCol : parSet.getParameterList() ){
+            (*covMatrix)[ parRow.getParameterIndex() ][ parCol.getParameterIndex() ] =
+              fitterCovarianceMatrix[parameterIndexOffset + parRow.getParameterIndex() ][parameterIndexOffset + parCol.getParameterIndex() ];
+          } // par Y
+        } // par X
+        auto* covMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) covMatrix, Form("Covariance_%s_TH2D", parSet.getName().c_str()));
+
+        auto* corMatrix = GenericToolbox::convertToCorrelationMatrix((TMatrixD*) covMatrix);
+        auto* corMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D(corMatrix, Form("Correlation_%s_TH2D", parSet.getName().c_str()));
+
+        GenericToolbox::mkdirTFile(parSetDir, "matrices")->cd();
+        covMatrix->Write(Form("Covariance_TMatrixD", parSet.getName().c_str()));
+        covMatrixTH2D->Write(Form("Covariance_TH2D", parSet.getName().c_str()));
+        corMatrix->Write(Form("Correlation_TMatrixD", parSet.getName().c_str()));
+        corMatrixTH2D->Write(Form("Correlation_TH2D", parSet.getName().c_str()));
+
+        // Parameters
+        GenericToolbox::mkdirTFile(parSetDir, "values")->cd();
+        auto* postFitErrorHist = new TH1D("postFitErrors_TH1D", "postFitErrors_TH1D", parSet.getNbParameters(), 0, parSet.getNbParameters());
+        auto* preFitErrorHist = new TH1D("preFitErrors_TH1D", "preFitErrors_TH1D", parSet.getNbParameters(), 0, parSet.getNbParameters());
+        for( const auto& par : parSet.getParameterList() ){
+          postFitErrorHist->GetXaxis()->SetBinLabel(1 + par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
+          postFitErrorHist->SetBinContent( 1 + par.getParameterIndex(), parameterValueList.at( parameterIndexOffset + par.getParameterIndex() ));
+          postFitErrorHist->SetBinError( 1 + par.getParameterIndex(), parameterErrorList.at( parameterIndexOffset + par.getParameterIndex() ));
+
+          preFitErrorHist->GetXaxis()->SetBinLabel(1 + par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
+          preFitErrorHist->SetBinContent( 1 + par.getParameterIndex(), par.getPriorValue() );
+          preFitErrorHist->SetBinError( 1 + par.getParameterIndex(), par.getStdDevValue() );
+        }
+        postFitErrorHist->Write();
+        preFitErrorHist->Write();
+
+        parameterIndexOffset += int(parSet.getNbParameters());
+      } // parSet
+    } // minimizer valid?
+  } // save dir?
+
+}
 
 void FitterEngine::initializePropagator(){
 
@@ -334,11 +435,6 @@ void FitterEngine::initializePropagator(){
   TFile* f = TFile::Open(JsonUtils::fetchValue<std::string>(_config_, "mc_file").c_str(), "READ");
   _propagator_.setDataTree( f->Get<TTree>("selectedEvents") );
   _propagator_.setMcFilePath(JsonUtils::fetchValue<std::string>(_config_, "mc_file"));
-
-  if( _saveDir_ != nullptr ){
-    _propagator_.setSaveDir(GenericToolbox::mkdirTFile(_saveDir_, "propagator"));
-  }
-
   _propagator_.initialize();
 
   LogTrace << "Counting parameters" << std::endl;

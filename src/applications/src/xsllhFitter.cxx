@@ -67,6 +67,7 @@ int main(int argc, char** argv){
   fitter.initialize();
 
   fitter.fixGhostParameters();
+  fitter.throwParameters();
 
   ///////////////////////////////
   // Run the fitter:
@@ -79,6 +80,7 @@ int main(int argc, char** argv){
     fitter.fit();
   }
 
+  fitter.writePostFitData();
 
   LogDebug << "Closing output file: " << out->GetName() << std::endl;
   out->Close();

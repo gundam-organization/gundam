@@ -46,6 +46,8 @@ public:
   bool isEnabled() const;
   const std::string &getName() const;
   std::vector<FitParameter> &getParameterList();
+  const std::vector<FitParameter> &getParameterList() const;
+  TMatrixDSym *getCovarianceMatrix() const;
 
   // Core
   size_t getNbParameters() const;

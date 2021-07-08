@@ -42,9 +42,15 @@ public:
   void scanParameters(int nbSteps_, const std::string& saveDir_ = "");
   void scanParameter(int iPar, int nbSteps_, const std::string& saveDir_ = "");
 
+  void throwParameters();
+
   void fit();
   void updateChi2Cache();
   double evalFit(const double* parArray_);
+
+  void writePostFitData();
+
+
 
 protected:
   void initializePropagator();
@@ -56,17 +62,22 @@ private:
   nlohmann::json _config_;
 
   // Internals
+  bool _fitIsDone_{false};
+  bool _fitUnderGoing_{false};
   int _nbFitCalls_{0};
-  Propagator _propagator_;
   int _nbFitParameters_;
+  Propagator _propagator_;
   std::shared_ptr<ROOT::Math::Minimizer> _minimizer_{nullptr};
   std::shared_ptr<ROOT::Math::Functor> _functor_{nullptr};
+  TRandom3 _prng_;
 
   // Buffers
   double _chi2Buffer_;
   double _chi2StatBuffer_;
   double _chi2PullsBuffer_;
   double _chi2RegBuffer_;
+
+  std::map<std::string, std::vector<double>> _chi2History_;
 
   GenericToolbox::VariablesMonitor _convergenceMonitor_;
 
