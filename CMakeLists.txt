@@ -27,6 +27,10 @@ elseif(NOT DEFINED CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE DEBUG)
 endif()
 
+if(NOT DEFINED USE_STATIC_LINKS)
+    set(USE_STATIC_LINKS 0)
+endif()
+
 if(NOT DEFINED ENV{XSLLHFITTER})
   cmessage(FATAL_ERROR "$XSLLHFITTER is not defined, please source the package setup.sh before building.")
 endif()

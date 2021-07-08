@@ -212,9 +212,9 @@ void AnaTreeMC::GetEvents(std::vector<AnaSample*>& ana_samples,
   };
 
   LogInfo << "Reading events from input file (" << fChain->GetEntries() << ")..." << std::endl;
-  GlobalVariables::getThreadPool().addJob("fillMCEvents", fillEvents);
-  GlobalVariables::getThreadPool().runJob("fillMCEvents");
-  GlobalVariables::getThreadPool().removeJob("fillMCEvents");
+  GlobalVariables::getParallelWorker().addJob("fillMCEvents", fillEvents);
+  GlobalVariables::getParallelWorker().runJob("fillMCEvents");
+  GlobalVariables::getParallelWorker().removeJob("fillMCEvents");
 
   LogDebug << "Reading input tree ended." << std::endl;
 

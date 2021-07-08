@@ -30,7 +30,7 @@ void Propagator::reset() {
   _saveDir_ = nullptr;
 
   std::vector<std::string> jobNameRemoveList;
-  for( const auto& jobName : GlobalVariables::getThreadPool().getJobNameList() ){
+  for( const auto& jobName : GlobalVariables::getParallelWorker().getJobNameList() ){
     if(jobName == "Propagator::fillEventDialCaches"
     or jobName == "Propagator::propagateParametersOnSamples"
     or jobName == "Propagator::fillSampleHistograms"
@@ -39,7 +39,7 @@ void Propagator::reset() {
     }
   }
   for( const auto& jobName : jobNameRemoveList ){
-    GlobalVariables::getThreadPool().removeJob(jobName);
+    GlobalVariables::getParallelWorker().removeJob(jobName);
   }
 
 }
@@ -137,12 +137,12 @@ PlotGenerator &Propagator::getPlotGenerator() {
 
 void Propagator::propagateParametersOnSamples() {
   if( _showTimeStats_ ) GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-  GlobalVariables::getThreadPool().runJob("Propagator::propagateParametersOnSamples");
+  GlobalVariables::getParallelWorker().runJob("Propagator::propagateParametersOnSamples");
   if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
 }
 void Propagator::fillSampleHistograms(){
   if( _showTimeStats_ ) GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-  GlobalVariables::getThreadPool().runJob("Propagator::fillSampleHistograms");
+  GlobalVariables::getParallelWorker().runJob("Propagator::fillSampleHistograms");
   if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
 }
 
@@ -153,12 +153,12 @@ void Propagator::initializeThreads() {
   std::function<void(int)> fillEventDialCacheFct = [this](int iThread){
     this->fillEventDialCaches(iThread);
   };
-  GlobalVariables::getThreadPool().addJob("Propagator::fillEventDialCaches", fillEventDialCacheFct);
+  GlobalVariables::getParallelWorker().addJob("Propagator::fillEventDialCaches", fillEventDialCacheFct);
 
   std::function<void(int)> propagateParametersOnSamplesFct = [this](int iThread){
     this->propagateParametersOnSamples(iThread);
   };
-  GlobalVariables::getThreadPool().addJob("Propagator::propagateParametersOnSamples", propagateParametersOnSamplesFct);
+  GlobalVariables::getParallelWorker().addJob("Propagator::propagateParametersOnSamples", propagateParametersOnSamplesFct);
 
   std::function<void(int)> fillSampleHistogramsFct = [this](int iThread){
     for( auto& sample : _samplesList_ ){
@@ -170,8 +170,8 @@ void Propagator::initializeThreads() {
       sample.MergeMcHistogramsThread();
     }
   };
-  GlobalVariables::getThreadPool().addJob("Propagator::fillSampleHistograms", fillSampleHistogramsFct);
-  GlobalVariables::getThreadPool().setPostParallelJob("Propagator::fillSampleHistograms", fillSampleHistogramsPostParallelFct);
+  GlobalVariables::getParallelWorker().addJob("Propagator::fillSampleHistograms", fillSampleHistogramsFct);
+  GlobalVariables::getParallelWorker().setPostParallelJob("Propagator::fillSampleHistograms", fillSampleHistogramsPostParallelFct);
 
 }
 void Propagator::initializeCaches() {
@@ -190,7 +190,7 @@ void Propagator::initializeCaches() {
 }
 void Propagator::fillEventDialCaches(){
   LogInfo << __METHOD_NAME__ << std::endl;
-  GlobalVariables::getThreadPool().runJob("Propagator::fillEventDialCaches");
+  GlobalVariables::getParallelWorker().runJob("Propagator::fillEventDialCaches");
 }
 
 void Propagator::fillEventDialCaches(int iThread_){
@@ -225,7 +225,7 @@ void Propagator::fillEventDialCaches(int iThread_){
           varIndexList.at(iVar) = (eventPtr->GetIntIndex(
             firstDial->getApplyConditionBin().getVariableNameList().at(iVar), false));
           if (varIndexList.at(iVar) == -1) {
-            isIntList.at(iVar) = true;
+            isIntList.at(iVar) = false;
             varIndexList.at(iVar) = (eventPtr->GetFloatIndex(
               firstDial->getApplyConditionBin().getVariableNameList().at(iVar), false));
           }
@@ -237,6 +237,7 @@ void Propagator::fillEventDialCaches(int iThread_){
           GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
         }
 
+        int nbDialsSet = 0;
         for (int iEvent = 0; iEvent < nEvents; iEvent++) {
 
           if (iEvent % GlobalVariables::getNbThreads() != iThread_) {
@@ -282,6 +283,12 @@ void Propagator::fillEventDialCaches(int iThread_){
             }
             if (isInBin) {
               eventPtr->getDialCachePtr()->at(&parSet).at(iPar) = dial.get();
+//              eventPtr->Print();
+//              LogDebug << GenericToolbox::parseVectorAsString(firstDial->getApplyConditionBin().getVariableNameList()) << std::endl;
+//              LogDebug << GenericToolbox::parseVectorAsString(varIndexList) << std::endl;
+//              LogDebug << GenericToolbox::parseVectorAsString(isIntList) << std::endl;
+//              exit(0);
+              nbDialsSet++;
               break; // found
             }
           } // dial
@@ -290,9 +297,9 @@ void Propagator::fillEventDialCaches(int iThread_){
 
         if (iThread_ == GlobalVariables::getNbThreads() - 1) {
           GenericToolbox::displayProgressBar(nEvents, nEvents, ss.str());
-          LogTrace << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
+//          LogTrace << sample.GetName() << ": " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << " " << GET_VAR_NAME_VALUE(nbDialsSet) << std::endl;
         }
-      }
+      } // sample
     } // par
 } // parSet
 

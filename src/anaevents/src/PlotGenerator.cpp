@@ -152,8 +152,6 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
       }
 
       // Filling the selected histograms
-      LogTrace << "Filling the selected histograms for: " << sample.GetName() << " / " << (isData ? "data": "mc")  << std::endl;
-      GenericToolbox::getElapsedTimeSinceLastCallStr(999);
       int nThreads = GlobalVariables::getNbThreads();
       std::function<void(int)> fillJob = [eventListPtr, histPtrToFillList, nThreads]( int iThread ){
         int iEvent = -1;
@@ -170,10 +168,9 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
         }
       };
 
-      GlobalVariables::getThreadPool().addJob("fillJob", fillJob);
-      GlobalVariables::getThreadPool().runJob("fillJob");
-      GlobalVariables::getThreadPool().removeJob("fillJob");
-      LogTrace << "Fill took: " << GenericToolbox::parseTimeUnit(GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(999)) << std::endl;
+      GlobalVariables::getParallelWorker().addJob("fillJob", fillJob);
+      GlobalVariables::getParallelWorker().runJob("fillJob");
+      GlobalVariables::getParallelWorker().removeJob("fillJob");
 
     } // isData loop
 

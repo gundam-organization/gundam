@@ -12,7 +12,7 @@
 #include <TChain.h>
 
 #include "GenericToolbox.h"
-#include "GenericToolbox.ThreadPool.h"
+#include "GenericToolbox.ParallelWorker.h"
 
 class GlobalVariables{
 
@@ -26,7 +26,7 @@ public:
   static std::mutex& getThreadMutex();
   static std::map<std::string, bool>& getBoolMap();
   static std::vector<TChain*>& getChainList();
-  static GenericToolbox::ThreadPool &getThreadPool();
+  static GenericToolbox::ParallelWorker &getParallelWorker();
 
 private:
 
@@ -34,7 +34,7 @@ private:
   static std::mutex _threadMutex_;
   static std::map<std::string, bool> _boolMap_;
   static std::vector<TChain*> _chainList_;
-  static GenericToolbox::ThreadPool _threadPool_;
+  static GenericToolbox::ParallelWorker _threadPool_;
 
 };
 

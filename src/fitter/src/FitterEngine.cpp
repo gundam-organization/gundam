@@ -28,6 +28,8 @@ void FitterEngine::reset() {
   _functor_.reset();
   _nbFitParameters_ = 0;
   _nbFitCalls_ = 0;
+
+  _convergenceMonitor_.reset();
 }
 
 void FitterEngine::setSaveDir(TDirectory *saveDir) {
@@ -50,6 +52,18 @@ void FitterEngine::initialize() {
 
   initializePropagator();
   initializeMinimizer();
+
+  _convergenceMonitor_.addDisplayedQuantity("VarName");
+  _convergenceMonitor_.addDisplayedQuantity("LastAddedValue");
+  _convergenceMonitor_.addDisplayedQuantity("SlopePerCall");
+
+  _convergenceMonitor_.getQuantity("VarName").title = "Chi2";
+  _convergenceMonitor_.getQuantity("LastAddedValue").title = "Current Value";
+  _convergenceMonitor_.getQuantity("SlopePerCall").title = "Avg. Slope /call";
+
+  _convergenceMonitor_.addVariable("Total");
+  _convergenceMonitor_.addVariable("Stat");
+  _convergenceMonitor_.addVariable("Syst");
 
 }
 
@@ -79,9 +93,11 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
     for( auto& par : parSet.getParameterList() ){
       iPar++;
 
+      std::string tag;
       if( _minimizer_->IsFixedVariable(iPar) ){
-        LogInfo << "Not processing fixed parameter: " << parSet.getName() + "/" + par.getTitle() << std::endl;
-        continue;
+        tag += "_FIXED";
+//        LogInfo << "Not processing fixed parameter: " << parSet.getName() + "/" + par.getTitle() << std::endl;
+//        continue;
       }
 
       double currentParValue = par.getParameterValue();
@@ -93,7 +109,7 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
 
       std::string savePath = saveDir_;
       if( not savePath.empty() ) savePath += "/";
-      savePath += "oneSigma/" + parSet.getName() + "/" + par.getTitle();
+      savePath += "oneSigma/" + parSet.getName() + "/" + par.getTitle() + tag;
       auto* saveDir = GenericToolbox::mkdirTFile(_saveDir_, savePath );
       saveDir->cd();
 
@@ -103,23 +119,24 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
       _propagator_.getPlotGenerator().generateComparisonPlots( oneSigmaHistList, refHistList, saveDir );
       par.setParameterValue( currentParValue );
       _propagator_.propagateParametersOnSamples();
+      _propagator_.fillSampleHistograms();
 
       const auto& compHistList = _propagator_.getPlotGenerator().getComparisonHistHolderList();
-      bool isAffected = false;
-      for( const auto& compHist : compHistList ){
-        for( int iBin = 1 ; iBin <= compHist.histPtr->GetNbinsX() ; iBin++ ){
-          if( TMath::Abs( compHist.histPtr->GetBinContent(iBin) ) > 0.1 ){ // 0.1 % do decide if
-            isAffected = true;
-            break;
-          }
-        }
-        if( isAffected ) break;
-      }
-      if( not isAffected ){
-        LogWarning << parSet.getName() + "/" + par.getTitle() << " has no effect on the sample. Fixing in the fit." << std::endl;
-        _minimizer_->FixVariable(iPar);
-        par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
-      }
+//      bool isAffected = false;
+//      for( const auto& compHist : compHistList ){
+//        for( int iBin = 1 ; iBin <= compHist.histPtr->GetNbinsX() ; iBin++ ){
+//          if( TMath::Abs( compHist.histPtr->GetBinContent(iBin) ) > 0.1 ){ // 0.1 % do decide if
+//            isAffected = true;
+//            break;
+//          }
+//        }
+//        if( isAffected ) break;
+//      }
+//      if( not isAffected ){
+//        LogWarning << parSet.getName() + "/" + par.getTitle() << " has no effect on the sample. Fixing in the fit." << std::endl;
+//        _minimizer_->FixVariable(iPar);
+//        par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
+//      }
 
       // Since those were not saved, delete manually
       for( auto& hist : oneSigmaHistList ){ delete hist.histPtr; }
@@ -135,6 +152,46 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
 
 }
 
+void FitterEngine::fixGhostParameters(){
+  LogInfo << __METHOD_NAME__ << std::endl;
+
+  _propagator_.propagateParametersOnSamples();
+  _propagator_.fillSampleHistograms();
+  updateChi2Cache();
+
+  double baseChi2Stat = _chi2StatBuffer_;
+
+  // +1 sigma
+  int iPar = -1;
+  for( auto& parSet : _propagator_.getParameterSetsList() ){
+    for( auto& par : parSet.getParameterList() ){
+      iPar++;
+
+      double currentParValue = par.getParameterValue();
+      par.setParameterValue( currentParValue + par.getStdDevValue() );
+      LogInfo << "(" << iPar+1 << "/" << _nbFitParameters_ << ") +1 sigma on " << parSet.getName() + "/" + par.getTitle()
+              << " -> " << par.getParameterValue() << std::endl;
+      _propagator_.propagateParametersOnSamples();
+      _propagator_.fillSampleHistograms();
+
+      // Compute the Chi2
+      updateChi2Cache();
+
+      double deltaChi2 = _chi2StatBuffer_ - baseChi2Stat;
+      LogDebug << GET_VAR_NAME_VALUE(deltaChi2) << std::endl;
+
+      if( std::fabs(deltaChi2) < 1E-6 ){
+        LogWarning << parSet.getName() + "/" + par.getTitle() << " has no effect on the sample. Fixing in the fit." << std::endl;
+        _minimizer_->FixVariable(iPar);
+        par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
+      }
+
+      par.setParameterValue( currentParValue );
+      _propagator_.propagateParametersOnSamples();
+
+    }
+  }
+}
 void FitterEngine::scanParameters(int nbSteps_, const std::string &saveDir_) {
   LogInfo << "Performing parameter scans..." << std::endl;
   for( int iPar = 0 ; iPar < _minimizer_->NDim() ; iPar++ ){
@@ -200,6 +257,8 @@ void FitterEngine::fit(){
     LogError << "Did not converged." << std::endl;
   }
 
+  LogDebug << _convergenceMonitor_.generateMonitorString(); // lasting printout
+
 }
 void FitterEngine::updateChi2Cache(){
 
@@ -250,12 +309,19 @@ double FitterEngine::evalFit(const double* parArray_){
   // Compute the Chi2
   updateChi2Cache();
 
-  LogDebug.clearLine();
-  LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
-  LogDebug << GET_VAR_NAME_VALUE(_chi2Buffer_) << std::endl;
-  LogDebug << GET_VAR_NAME_VALUE(_chi2StatBuffer_) << std::endl;
-  LogDebug << GET_VAR_NAME_VALUE(_chi2PullsBuffer_) << std::endl;
-  LogDebug.moveTerminalCursorBack(4);
+  _convergenceMonitor_.setHeaderString(__METHOD_NAME__ + " took: " + GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__));
+  _convergenceMonitor_.getVariable("Total").addQuantity(_chi2Buffer_);
+  _convergenceMonitor_.getVariable("Stat").addQuantity(_chi2StatBuffer_);
+  _convergenceMonitor_.getVariable("Syst").addQuantity(_chi2PullsBuffer_);
+  LogDebug << _convergenceMonitor_.generateMonitorString(true);
+
+
+//  LogDebug.clearLine();
+//  LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
+//  LogDebug << GET_VAR_NAME_VALUE(_chi2Buffer_) << std::endl;
+//  LogDebug << GET_VAR_NAME_VALUE(_chi2StatBuffer_) << std::endl;
+//  LogDebug << GET_VAR_NAME_VALUE(_chi2PullsBuffer_) << std::endl;
+//  LogDebug.moveTerminalCursorBack(4);
 
   return _chi2Buffer_;
 }

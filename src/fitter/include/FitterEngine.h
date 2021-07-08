@@ -14,6 +14,8 @@
 #include "Math/Minimizer.h"
 #include "json.hpp"
 
+#include "GenericToolbox.VariablesMonitor.h"
+
 #include "Propagator.h"
 
 class FitterEngine {
@@ -36,6 +38,7 @@ public:
   void generateSamplePlots(const std::string& saveDir_ = "");
   void generateOneSigmaPlots(const std::string& saveDir_ = "");
 
+  void fixGhostParameters();
   void scanParameters(int nbSteps_, const std::string& saveDir_ = "");
   void scanParameter(int iPar, int nbSteps_, const std::string& saveDir_ = "");
 
@@ -64,6 +67,8 @@ private:
   double _chi2StatBuffer_;
   double _chi2PullsBuffer_;
   double _chi2RegBuffer_;
+
+  GenericToolbox::VariablesMonitor _convergenceMonitor_;
 
 };
 

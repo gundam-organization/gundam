@@ -7,11 +7,17 @@ set( SRCFILES
         src/PlotGenerator.cpp
         )
 
-if(CMAKE_BUILD_TYPE MATCHES DEBUG)
+if( USE_STATIC_LINKS STREQUAL "1" )
   add_library(anaevents STATIC ${SRCFILES})
-else(CMAKE_BUILD_TYPE MATCHES RELEASE)
+else()
   add_library(anaevents SHARED ${SRCFILES})
 endif()
+
+#if(CMAKE_BUILD_TYPE MATCHES DEBUG)
+#  add_library(anaevents STATIC ${SRCFILES})
+#else(CMAKE_BUILD_TYPE MATCHES RELEASE)
+#  add_library(anaevents SHARED ${SRCFILES})
+#endif()
 
 target_link_libraries( anaevents
         xslfutils

@@ -10,11 +10,17 @@ set(HEADERS
   include/Propagator.h
 )
 
-if(CMAKE_BUILD_TYPE MATCHES DEBUG)
+if( USE_STATIC_LINKS STREQUAL "1" )
   add_library(errprop STATIC ${SRCFILES})
-else(CMAKE_BUILD_TYPE MATCHES RELEASE)
+else()
   add_library(errprop SHARED ${SRCFILES})
 endif()
+
+#if(CMAKE_BUILD_TYPE MATCHES DEBUG)
+#  add_library(errprop STATIC ${SRCFILES})
+#else(CMAKE_BUILD_TYPE MATCHES RELEASE)
+#  add_library(errprop SHARED ${SRCFILES})
+#endif()
 
 target_link_libraries( errprop
         fitparam

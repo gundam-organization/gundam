@@ -28,11 +28,17 @@ set(HEADERS
         include/YamlUtils.impl.h
         )
 
-if(CMAKE_BUILD_TYPE MATCHES DEBUG)
+if( USE_STATIC_LINKS STREQUAL "1" )
   add_library(xslfutils STATIC ${SRCFILES})
-else(CMAKE_BUILD_TYPE MATCHES RELEASE)
+else()
   add_library(xslfutils SHARED ${SRCFILES})
 endif()
+
+#if(CMAKE_BUILD_TYPE MATCHES DEBUG)
+#  add_library(xslfutils STATIC ${SRCFILES})
+#else(CMAKE_BUILD_TYPE MATCHES RELEASE)
+#  add_library(xslfutils SHARED ${SRCFILES})
+#endif()
 
 target_link_libraries( xslfutils
         ${LINK_LIBARY_LIST}

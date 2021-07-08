@@ -14,11 +14,17 @@ set(SRCFILES
         src/SplineDial.cpp
         )
 
-if(CMAKE_BUILD_TYPE MATCHES DEBUG)
+if( USE_STATIC_LINKS STREQUAL "1" )
   add_library(fitparam STATIC ${SRCFILES})
-else(CMAKE_BUILD_TYPE MATCHES RELEASE)
+else()
   add_library(fitparam SHARED ${SRCFILES})
 endif()
+#
+#if(CMAKE_BUILD_TYPE MATCHES DEBUG)
+#  add_library(fitparam STATIC ${SRCFILES})
+#else(CMAKE_BUILD_TYPE MATCHES RELEASE)
+#  add_library(fitparam SHARED ${SRCFILES})
+#endif()
 
 # Dependencies
 target_link_libraries( fitparam

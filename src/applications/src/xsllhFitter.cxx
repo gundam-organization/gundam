@@ -66,12 +66,13 @@ int main(int argc, char** argv){
   fitter.setSaveDir(GenericToolbox::mkdirTFile(out, "fitter"));
   fitter.initialize();
 
+  fitter.fixGhostParameters();
 
   ///////////////////////////////
   // Run the fitter:
   /////////////////////////////
   if( JsonUtils::fetchValue(jsonConfig, "generateSamplePlots", true) ) fitter.generateSamplePlots("prefit/samples");
-  if( JsonUtils::fetchValue(jsonConfig, "generateOneSigmaPlots", true) ) fitter.generateOneSigmaPlots();
+  if( JsonUtils::fetchValue(jsonConfig, "generateOneSigmaPlots", false) ) fitter.generateOneSigmaPlots();
   if( JsonUtils::fetchValue(jsonConfig, "scanParameters", true) )fitter.scanParameters(10, "prefit/scan");
 
   if( not isDryRun and JsonUtils::fetchValue(jsonConfig, "fit", true) ){
