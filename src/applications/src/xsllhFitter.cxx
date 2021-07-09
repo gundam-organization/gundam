@@ -67,7 +67,7 @@ int main(int argc, char** argv){
   fitter.initialize();
 
   fitter.fixGhostParameters();
-  fitter.throwParameters();
+//  fitter.throwParameters();
 
   ///////////////////////////////
   // Run the fitter:

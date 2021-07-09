@@ -15,6 +15,7 @@ GenericToolbox::ParallelWorker GlobalVariables::_threadPool_;
 void GlobalVariables::setNbThreads(int nbThreads_){
   _nbThreads_ = nbThreads_;
   _threadPool_.reset();
+  _threadPool_.setCheckHardwareCurrency(false);
   _threadPool_.setNThreads(_nbThreads_);
   _threadPool_.initialize();
 }

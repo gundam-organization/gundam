@@ -41,7 +41,7 @@ public:
   PlotGenerator &getPlotGenerator();
 
   // Core
-  void propagateParametersOnSamples();
+  void propagateParametersOnEvents();
   void fillSampleHistograms();
 
 protected:

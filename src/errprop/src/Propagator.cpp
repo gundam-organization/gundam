@@ -32,7 +32,7 @@ void Propagator::reset() {
   std::vector<std::string> jobNameRemoveList;
   for( const auto& jobName : GlobalVariables::getParallelWorker().getJobNameList() ){
     if(jobName == "Propagator::fillEventDialCaches"
-    or jobName == "Propagator::propagateParametersOnSamples"
+    or jobName == "Propagator::propagateParametersOnEvents"
     or jobName == "Propagator::fillSampleHistograms"
       ){
       jobNameRemoveList.emplace_back(jobName);
@@ -91,7 +91,7 @@ void Propagator::initialize() {
     }
   }
 
-  AnaTreeMC* selected_events_AnaTreeMC = new AnaTreeMC(mc_file_path, "selectedEvents"); // trouble while deleting... > need to check
+  auto* selected_events_AnaTreeMC = new AnaTreeMC(mc_file_path, "selectedEvents"); // trouble while deleting... > need to check
   LogInfo << "Reading and collecting events..." << std::endl;
   std::vector<SignalDef> buf;
   std::vector<AnaSample*> samplePtrList;
@@ -110,13 +110,34 @@ void Propagator::initialize() {
   initializeCaches();
 
   fillEventDialCaches();
-  propagateParametersOnSamples();
+
+  if( JsonUtils::fetchValue<json>(_config_, "throwParameters", false) ){
+    LogWarning << "Throwing parameters..." << std::endl;
+    for( auto& parSet : _parameterSetsList_ ){
+      auto thrownPars = GenericToolbox::throwCorrelatedParameters(GenericToolbox::getCholeskyMatrix(parSet.getCovarianceMatrix()));
+      for( auto& par : parSet.getParameterList() ){
+        par.setParameterValue( par.getPriorValue() + thrownPars.at(par.getParameterIndex()) );
+        LogDebug << parSet.getName() << "/" << par.getTitle() << ": thrown = " << par.getParameterValue() << std::endl;
+      }
+    }
+  }
+
+
+  propagateParametersOnEvents();
 
   for( auto& sample : _samplesList_ ){
     sample.FillEventHist(
       DataType::kAsimov,
       false
     );
+  }
+
+  if( JsonUtils::fetchValue<json>(_config_, "throwParameters", false) ){
+    for( auto& parSet : _parameterSetsList_ ){
+      for( auto& par : parSet.getParameterList() ){
+        par.setParameterValue( par.getPriorValue() );
+      }
+    }
   }
 
   _isInitialized_ = true;
@@ -135,9 +156,9 @@ PlotGenerator &Propagator::getPlotGenerator() {
 }
 
 
-void Propagator::propagateParametersOnSamples() {
+void Propagator::propagateParametersOnEvents() {
   if( _showTimeStats_ ) GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-  GlobalVariables::getParallelWorker().runJob("Propagator::propagateParametersOnSamples");
+  GlobalVariables::getParallelWorker().runJob("Propagator::propagateParametersOnEvents");
   if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
 }
 void Propagator::fillSampleHistograms(){
@@ -158,7 +179,7 @@ void Propagator::initializeThreads() {
   std::function<void(int)> propagateParametersOnSamplesFct = [this](int iThread){
     this->propagateParametersOnSamples(iThread);
   };
-  GlobalVariables::getParallelWorker().addJob("Propagator::propagateParametersOnSamples", propagateParametersOnSamplesFct);
+  GlobalVariables::getParallelWorker().addJob("Propagator::propagateParametersOnEvents", propagateParametersOnSamplesFct);
 
   std::function<void(int)> fillSampleHistogramsFct = [this](int iThread){
     for( auto& sample : _samplesList_ ){
@@ -334,9 +355,11 @@ void Propagator::propagateParametersOnSamples(int iThread_) {
 
           // TODO: check if weight cap
           if( weight <= 0 ){
-            LogError << GET_VAR_NAME_VALUE(iPar) << std::endl;
-            LogError << GET_VAR_NAME_VALUE(weight) << std::endl;
-            throw std::runtime_error("<0 weight");
+            weight = 0;
+            break;
+//            LogError << GET_VAR_NAME_VALUE(iPar) << std::endl;
+//            LogError << GET_VAR_NAME_VALUE(weight) << std::endl;
+//            throw std::runtime_error("<0 weight");
           }
 
         }

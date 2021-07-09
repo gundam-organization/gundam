@@ -73,7 +73,7 @@ void FitterEngine::generateSamplePlots(const std::string& saveDir_){
 
   LogInfo << __METHOD_NAME__ << std::endl;
 
-  _propagator_.propagateParametersOnSamples();
+  _propagator_.propagateParametersOnEvents();
   _propagator_.fillSampleHistograms();
   _propagator_.getPlotGenerator().generateSamplePlots(
     GenericToolbox::mkdirTFile(_saveDir_, saveDir_ )
@@ -82,7 +82,7 @@ void FitterEngine::generateSamplePlots(const std::string& saveDir_){
 }
 void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
 
-  _propagator_.propagateParametersOnSamples();
+  _propagator_.propagateParametersOnEvents();
   _propagator_.fillSampleHistograms();
   _propagator_.getPlotGenerator().generateSamplePlots();
 
@@ -102,7 +102,7 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
       par.setParameterValue( currentParValue + par.getStdDevValue() );
       LogInfo << "(" << iPar+1 << "/" << _nbFitParameters_ << ") +1 sigma on " << parSet.getName() + "/" + par.getTitle()
       << " -> " << par.getParameterValue() << std::endl;
-      _propagator_.propagateParametersOnSamples();
+      _propagator_.propagateParametersOnEvents();
       _propagator_.fillSampleHistograms();
 
       std::string savePath = saveDir_;
@@ -116,7 +116,7 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
       auto oneSigmaHistList = _propagator_.getPlotGenerator().getHistHolderList();
       _propagator_.getPlotGenerator().generateComparisonPlots( oneSigmaHistList, refHistList, saveDir );
       par.setParameterValue( currentParValue );
-      _propagator_.propagateParametersOnSamples();
+      _propagator_.propagateParametersOnEvents();
       _propagator_.fillSampleHistograms();
 
       const auto& compHistList = _propagator_.getPlotGenerator().getComparisonHistHolderList();
@@ -138,7 +138,7 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
 void FitterEngine::fixGhostParameters(){
   LogInfo << __METHOD_NAME__ << std::endl;
 
-  _propagator_.propagateParametersOnSamples();
+  _propagator_.propagateParametersOnEvents();
   _propagator_.fillSampleHistograms();
   updateChi2Cache();
 
@@ -154,23 +154,22 @@ void FitterEngine::fixGhostParameters(){
       par.setParameterValue( currentParValue + par.getStdDevValue() );
       LogInfo << "(" << iPar+1 << "/" << _nbFitParameters_ << ") +1 sigma on " << parSet.getName() + "/" + par.getTitle()
               << " -> " << par.getParameterValue() << std::endl;
-      _propagator_.propagateParametersOnSamples();
+      _propagator_.propagateParametersOnEvents();
       _propagator_.fillSampleHistograms();
 
       // Compute the Chi2
       updateChi2Cache();
 
       double deltaChi2 = _chi2StatBuffer_ - baseChi2Stat;
-      LogDebug << GET_VAR_NAME_VALUE(deltaChi2) << std::endl;
 
       if( std::fabs(deltaChi2) < 1E-6 ){
-        LogWarning << parSet.getName() + "/" + par.getTitle() << " has no effect on the sample. Fixing in the fit." << std::endl;
+        LogAlert << parSet.getName() + "/" + par.getTitle() << ": Δχ² = " << deltaChi2 << " < " << 1E-6 << ", fixing parameter." << std::endl;
         _minimizer_->FixVariable(iPar);
         par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
       }
 
       par.setParameterValue( currentParValue );
-      _propagator_.propagateParametersOnSamples();
+      _propagator_.propagateParametersOnEvents();
 
     }
   }
@@ -229,7 +228,7 @@ void FitterEngine::throwParameters(){
     iPar++;
   }
 
-  _propagator_.propagateParametersOnSamples();
+  _propagator_.propagateParametersOnEvents();
   _propagator_.fillSampleHistograms();
 
 }
@@ -325,7 +324,7 @@ double FitterEngine::evalFit(const double* parArray_){
     }
   }
 
-  _propagator_.propagateParametersOnSamples();
+  _propagator_.propagateParametersOnEvents();
   _propagator_.fillSampleHistograms();
 
   // Compute the Chi2
@@ -374,6 +373,7 @@ void FitterEngine::writePostFitData() {
       double covarianceMatrixArray[_minimizer_->NDim() * _minimizer_->NDim()];
       _minimizer_->GetCovMatrix(covarianceMatrixArray);
       TMatrixDSym fitterCovarianceMatrix(_minimizer_->NDim(), covarianceMatrixArray);
+      TH2D* fitterCovarianceMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) &fitterCovarianceMatrix, "fitterCovarianceMatrixTH2D");
 
       std::vector<double> parameterValueList(_minimizer_->X(),      _minimizer_->X()      + _minimizer_->NDim());
       std::vector<double> parameterErrorList(_minimizer_->Errors(), _minimizer_->Errors() + _minimizer_->NDim());
@@ -399,6 +399,16 @@ void FitterEngine::writePostFitData() {
         auto* corMatrix = GenericToolbox::convertToCorrelationMatrix((TMatrixD*) covMatrix);
         auto* corMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D(corMatrix, Form("Correlation_%s_TH2D", parSet.getName().c_str()));
 
+        for( const auto& par : parSet.getParameterList() ){
+          covMatrixTH2D->GetXaxis()->SetBinLabel(1+par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
+          covMatrixTH2D->GetYaxis()->SetBinLabel(1+par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
+          corMatrixTH2D->GetXaxis()->SetBinLabel(1+par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
+          corMatrixTH2D->GetYaxis()->SetBinLabel(1+par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
+
+          fitterCovarianceMatrixTH2D->GetXaxis()->SetBinLabel(1+parameterIndexOffset+par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
+          fitterCovarianceMatrixTH2D->GetYaxis()->SetBinLabel(1+parameterIndexOffset+par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
+        }
+
         GenericToolbox::mkdirTFile(parSetDir, "matrices")->cd();
         covMatrix->Write(Form("Covariance_TMatrixD", parSet.getName().c_str()));
         covMatrixTH2D->Write(Form("Covariance_TH2D", parSet.getName().c_str()));
@@ -407,22 +417,56 @@ void FitterEngine::writePostFitData() {
 
         // Parameters
         GenericToolbox::mkdirTFile(parSetDir, "values")->cd();
-        auto* postFitErrorHist = new TH1D("postFitErrors_TH1D", "postFitErrors_TH1D", parSet.getNbParameters(), 0, parSet.getNbParameters());
-        auto* preFitErrorHist = new TH1D("preFitErrors_TH1D", "preFitErrors_TH1D", parSet.getNbParameters(), 0, parSet.getNbParameters());
+        auto* postFitErrorHist = new TH1D("postFitErrors_TH1D", "Post-fit Errors", parSet.getNbParameters(), 0, parSet.getNbParameters());
+        auto* preFitErrorHist = new TH1D("preFitErrors_TH1D", "Pre-fit Errors", parSet.getNbParameters(), 0, parSet.getNbParameters());
         for( const auto& par : parSet.getParameterList() ){
-          postFitErrorHist->GetXaxis()->SetBinLabel(1 + par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
+          postFitErrorHist->GetXaxis()->SetBinLabel(1 + par.getParameterIndex(), par.getTitle().c_str());
           postFitErrorHist->SetBinContent( 1 + par.getParameterIndex(), parameterValueList.at( parameterIndexOffset + par.getParameterIndex() ));
           postFitErrorHist->SetBinError( 1 + par.getParameterIndex(), parameterErrorList.at( parameterIndexOffset + par.getParameterIndex() ));
 
-          preFitErrorHist->GetXaxis()->SetBinLabel(1 + par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
+          preFitErrorHist->GetXaxis()->SetBinLabel(1 + par.getParameterIndex(), par.getTitle().c_str());
           preFitErrorHist->SetBinContent( 1 + par.getParameterIndex(), par.getPriorValue() );
           preFitErrorHist->SetBinError( 1 + par.getParameterIndex(), par.getStdDevValue() );
         }
+
+        preFitErrorHist->SetFillColor(kRed-9);
+//        preFitErrorHist->SetFillColorAlpha(kRed-9, 0.5);
+//        preFitErrorHist->SetFillStyle(4050); // 50 % opaque ?
+        preFitErrorHist->SetMarkerStyle(kFullDotLarge);
+        preFitErrorHist->SetMarkerColor(kRed-3);
+        preFitErrorHist->SetTitle("Pre-fit Errors");
+
+        postFitErrorHist->SetLineColor(9);
+        postFitErrorHist->SetLineWidth(2);
+        postFitErrorHist->SetMarkerColor(9);
+        postFitErrorHist->SetMarkerStyle(kFullDotLarge);
+        postFitErrorHist->SetTitle("Post-fit Errors");
+
+        auto* errorsCanvas = new TCanvas("fitConstraints", Form("Fit Constraints for %s", parSet.getName().c_str()), 800, 600);
+        errorsCanvas->cd();
+        preFitErrorHist->Draw("E2");
+        errorsCanvas->Update(); // otherwise does not display...
+        postFitErrorHist->Draw("E SAME");
+
+//        auto* legend = gPad->BuildLegend();
+        gPad->SetGridx();
+        gPad->SetGridy();
+
+        preFitErrorHist->SetTitle(Form("Pre-fit/Post-fit Comparison for %s", parSet.getName().c_str()));
+        errorsCanvas->Write("fitConstraints_TCanvas");
+
+        preFitErrorHist->SetTitle(Form("Pre-fit Errors of %s", parSet.getName().c_str()));
+        postFitErrorHist->SetTitle(Form("Post-fit Errors of %s", parSet.getName().c_str()));
         postFitErrorHist->Write();
         preFitErrorHist->Write();
 
+
         parameterIndexOffset += int(parSet.getNbParameters());
       } // parSet
+
+      errorDir->cd();
+      fitterCovarianceMatrix.Write("fitterCovarianceMatrix_TMatrixDSym");
+      fitterCovarianceMatrixTH2D->Write("fitterCovarianceMatrix_TH2D");
     } // minimizer valid?
   } // save dir?
 
