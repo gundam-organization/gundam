@@ -66,7 +66,7 @@ int main(int argc, char** argv){
   fitter.setSaveDir(GenericToolbox::mkdirTFile(out, "fitter"));
   fitter.initialize();
 
-  fitter.fixGhostParameters();
+  if( JsonUtils::fetchValue(jsonConfig, "fixGhostParameters", true) ) fitter.fixGhostParameters();
 //  fitter.throwParameters();
 
   ///////////////////////////////
@@ -78,9 +78,8 @@ int main(int argc, char** argv){
 
   if( not isDryRun and JsonUtils::fetchValue(jsonConfig, "fit", true) ){
     fitter.fit();
+    fitter.writePostFitData();
   }
-
-  fitter.writePostFitData();
 
   LogDebug << "Closing output file: " << out->GetName() << std::endl;
   out->Close();

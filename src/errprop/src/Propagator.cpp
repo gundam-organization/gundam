@@ -141,7 +141,6 @@ void Propagator::initialize() {
   }
 
   _isInitialized_ = true;
-  LogTrace << "OK LEAVING INIT" << std::endl;
 }
 
 
@@ -183,12 +182,14 @@ void Propagator::initializeThreads() {
 
   std::function<void(int)> fillSampleHistogramsFct = [this](int iThread){
     for( auto& sample : _samplesList_ ){
-      sample.FillMcHistograms(iThread);
+      sample.FillMcHistograms(GlobalVariables::getNbThreads() == 1 ? -1 : iThread);
     }
   };
   std::function<void()> fillSampleHistogramsPostParallelFct = [this](){
-    for( auto& sample : _samplesList_ ){
-      sample.MergeMcHistogramsThread();
+    if(GlobalVariables::getNbThreads() != 1){
+      for( auto& sample : _samplesList_ ){
+        sample.MergeMcHistogramsThread();
+      }
     }
   };
   GlobalVariables::getParallelWorker().addJob("Propagator::fillSampleHistograms", fillSampleHistogramsFct);
@@ -218,7 +219,6 @@ void Propagator::fillEventDialCaches(int iThread_){
 
   DialSet* parameterDialSetPtr;
   AnaEvent* eventPtr;
-
 
   for( auto& parSet : _parameterSetsList_ ){
     if( not parSet.isEnabled() ){ continue; }

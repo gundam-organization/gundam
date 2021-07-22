@@ -8,7 +8,8 @@ set (xsLLhFitter_VERSION_REVISION 0)
 set (xsLLhFitter_VERSION_STRING "${xsLLhFitter_VERSION_MAJOR}.${xsLLhFitter_VERSION_MINOR}.${xsLLhFitter_VERSION_REVISION}")
 
 set(VERBOSE TRUE)
-set(CMAKE_SKIP_BUILD_RPATH TRUE)
+#set(CMAKE_MACOSX_RPATH 1)
+#set(CMAKE_SKIP_BUILD_RPATH TRUE)
 include(${CMAKE_SOURCE_DIR}/cmake/cmessage.cmake)
 
 #Changes default install path to be a subdirectory of the build dir.
@@ -73,7 +74,7 @@ cmessage(STATUS "[ROOT]: root-config --libs: ${ROOT_LD_FLAGS}")
 # YAML-CPP
 find_package( yaml-cpp REQUIRED )
 if( yaml-cpp_FOUND )
-    cmessage(STATUS "yaml-cpp has been found.")
+    cmessage(STATUS "yaml-cpp has been found: ${YAML_CPP_INCLUDE_DIR}")
     include_directories( ${YAML_CPP_INCLUDE_DIR} )
 #    target_link_libraries( OptionParserExample ${YAML_CPP_LIBRARIES} )
     list(APPEND LINK_LIBARY_LIST ${YAML_CPP_LIBRARIES})

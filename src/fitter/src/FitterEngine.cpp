@@ -164,13 +164,15 @@ void FitterEngine::fixGhostParameters(){
 
       if( std::fabs(deltaChi2) < 1E-6 ){
         LogAlert << parSet.getName() + "/" + par.getTitle() << ": Δχ² = " << deltaChi2 << " < " << 1E-6 << ", fixing parameter." << std::endl;
+//        LogDebug << GET_VAR_NAME_VALUE(_chi2StatBuffer_) << std::endl;
+//        LogDebug << GET_VAR_NAME_VALUE(_chi2PullsBuffer_) << std::endl;
+//        LogDebug << GET_VAR_NAME_VALUE(baseChi2Stat) << std::endl;
         _minimizer_->FixVariable(iPar);
         par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
       }
 
       par.setParameterValue( currentParValue );
       _propagator_.propagateParametersOnEvents();
-
     }
   }
 }
@@ -230,7 +232,6 @@ void FitterEngine::throwParameters(){
 
   _propagator_.propagateParametersOnEvents();
   _propagator_.fillSampleHistograms();
-
 }
 
 void FitterEngine::fit(){
@@ -289,7 +290,6 @@ void FitterEngine::updateChi2Cache(){
   _chi2StatBuffer_ = 0; // reset
   double buffer;
   for( const auto& sample : _propagator_.getSamplesList() ){
-
     //buffer = _samplesList_.at(sampleContainer)->CalcChi2();
     buffer = sample.CalcLLH();
     //buffer = _samplesList_.at(sampleContainer)->CalcEffLLH();
