@@ -46,6 +46,12 @@ nlohmann::json JsonUtils::readConfigFile(const std::string& configFilePath_){
 
   return output;
 }
+void JsonUtils::forwardConfig(nlohmann::json& config_, const std::string& className_){
+  while( config_.is_string() ){
+    LogWarning << "Forwarding " << (className_.empty()? "": className_ + " ") << "config: \"" << config_.get<std::string>() << "\"" << std::endl;
+    config_ = JsonUtils::readConfigFile(config_.get<std::string>());
+  }
+}
 
 nlohmann::json JsonUtils::fetchSubEntry(const nlohmann::json& jsonConfig_, const std::vector<std::string>& keyPath_){
   nlohmann::json output = jsonConfig_;

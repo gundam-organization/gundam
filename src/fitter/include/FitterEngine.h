@@ -29,7 +29,7 @@ public:
 
   // Setters
   void setSaveDir(TDirectory *saveDir);
-  void setConfig(const json &config_);
+  void setConfig(const nlohmann::json &config_);
 
   // Init
   void initialize();
