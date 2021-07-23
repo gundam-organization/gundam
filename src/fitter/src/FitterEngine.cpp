@@ -526,6 +526,7 @@ void FitterEngine::initializeMinimizer(){
         par.getParameterValue(),
         0.01
       );
+//      _minimizer_->SetVariableLimits(); // TODO: IMPLEMENT SetVariableLimits
     } // par
   } // parSet
 

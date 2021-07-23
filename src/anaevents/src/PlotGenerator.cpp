@@ -27,6 +27,8 @@ PlotGenerator::~PlotGenerator() { this->reset(); }
 
 void PlotGenerator::reset() {
 
+  gStyle->SetOptStat(0);
+
   defaultColorWheel = {
     kGreen-3, kTeal+3, kAzure+7,
     kCyan-2, kBlue-7, kBlue+2,
@@ -45,7 +47,7 @@ void PlotGenerator::setConfig(const nlohmann::json &config) {
   }
 }
 void PlotGenerator::setSampleListPtr(const std::vector<AnaSample> *sampleListPtr_) {
-  PlotGenerator::_sampleListPtr_ = sampleListPtr_;
+  _sampleListPtr_ = sampleListPtr_;
 }
 
 void PlotGenerator::initialize() {

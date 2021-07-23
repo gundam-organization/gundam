@@ -16,15 +16,10 @@ else()
   add_library(errprop SHARED ${SRCFILES})
 endif()
 
-#if(CMAKE_BUILD_TYPE MATCHES DEBUG)
-#  add_library(errprop STATIC ${SRCFILES})
-#else(CMAKE_BUILD_TYPE MATCHES RELEASE)
-#  add_library(errprop SHARED ${SRCFILES})
-#endif()
-
 target_link_libraries( errprop
         fitparam
         anaevents
+        fitsamples
         )
 
 set_target_properties(errprop PROPERTIES VERSION

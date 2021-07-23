@@ -8,8 +8,8 @@ set (xsLLhFitter_VERSION_REVISION 0)
 set (xsLLhFitter_VERSION_STRING "${xsLLhFitter_VERSION_MAJOR}.${xsLLhFitter_VERSION_MINOR}.${xsLLhFitter_VERSION_REVISION}")
 
 set(VERBOSE TRUE)
-#set(CMAKE_MACOSX_RPATH 1)
-#set(CMAKE_SKIP_BUILD_RPATH TRUE)
+set(CMAKE_MACOSX_RPATH 1)
+set(CMAKE_SKIP_BUILD_RPATH TRUE)
 include(${CMAKE_SOURCE_DIR}/cmake/cmessage.cmake)
 
 #Changes default install path to be a subdirectory of the build dir.
@@ -195,7 +195,7 @@ set( MODULES
         fitparam
         fitter
         utils
-        samples
+        fitsamples
 )
 #set(MODULETargets "")
 

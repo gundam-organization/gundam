@@ -13,6 +13,7 @@
 #include "FitParameterSet.h"
 #include "AnaSample.hh"
 #include "PlotGenerator.h"
+#include "FitSampleSet.h"
 
 class Propagator {
 
@@ -64,6 +65,7 @@ private:
   bool _isInitialized_{false};
   std::vector<FitParameterSet> _parameterSetsList_;
   std::vector<AnaSample> _samplesList_;
+  FitSampleSet _fitSampleSet_;
   PlotGenerator _plotGenerator_;
 
   // TEST

@@ -79,6 +79,16 @@ void Propagator::initialize() {
     LogInfo << _parameterSetsList_.back().getSummary() << std::endl;
   }
 
+  LogDebug << "FitSampleSet..." << std::endl;
+  auto fitSampleSetConfig = JsonUtils::fetchValue(_config_, "fitSampleSetConfig", nlohmann::json());
+  if( not fitSampleSetConfig.empty() ){
+    // CURRENTLY IMPLEMENTING...
+
+    _fitSampleSet_.setConfig(fitSampleSetConfig);
+    _fitSampleSet_.initialize();
+
+  }
+
   LogTrace << "Samples..." << std::endl;
   auto samplesConfig = JsonUtils::fetchValue<json>(_config_, "samplesConfig");
   if( samplesConfig.is_string() ) samplesConfig = JsonUtils::readConfigFile(samplesConfig.get<std::string>());
@@ -105,6 +115,37 @@ void Propagator::initialize() {
   _plotGenerator_.setConfig(plotGeneratorConfig);
   _plotGenerator_.setSampleListPtr( &_samplesList_ );
   _plotGenerator_.initialize();
+
+  if( not fitSampleSetConfig.empty() ){
+    // WORK IN PROGRESS...
+
+    LogInfo << "Polling the requested leaves to load in memory..." << std::endl;
+    for( auto& dataSet : _fitSampleSet_.getDataSetList() ){
+      std::vector<std::string> requestedLeafNameList;
+      for( auto& parSet : _parameterSetsList_ ){
+        for( auto& par : parSet.getParameterList() ){
+
+          auto* dialSetPtr = par.findDialSet( dataSet.getName() );
+          if( dialSetPtr == nullptr ) continue;
+
+          if( dialSetPtr->getApplyConditionFormula() != nullptr ){
+            for( int iPar = 0 ; iPar < dialSetPtr->getApplyConditionFormula()->GetNpar() ; iPar++ ){
+              dataSet.addRequestedLeafName(dialSetPtr->getApplyConditionFormula()->GetParName(iPar));
+            }
+          }
+
+          for( auto& dial : dialSetPtr->getDialList() ){
+            for( auto& var : dial->getApplyConditionBin().getVariableNameList() ){
+              dataSet.addRequestedLeafName(var);
+            } // var
+          } // dial
+
+        } // par
+      } // parSet
+
+      LogTrace << GET_VAR_NAME_VALUE(GenericToolbox::parseVectorAsString(requestedLeafNameList)) << std::endl;
+    } // dataSets
+  }
 
   initializeThreads();
   initializeCaches();
