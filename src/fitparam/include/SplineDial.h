@@ -1,5 +1,5 @@
 //
-// Created by Adrien BLANCHET on 26/05/2021.
+// Created by Nadrino on 26/05/2021.
 //
 
 #ifndef XSLLHFITTER_SPLINEDIAL_H

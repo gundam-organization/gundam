@@ -1,5 +1,5 @@
 //
-// Created by Adrien BLANCHET on 22/07/2021.
+// Created by Nadrino on 22/07/2021.
 //
 
 #ifndef XSLLHFITTER_DATASET_H
@@ -7,6 +7,9 @@
 
 #include <TChain.h>
 #include "json.hpp"
+
+#include "PhysicsEvent.h"
+
 
 class DataSet {
 
@@ -23,9 +26,13 @@ public:
 
   bool isEnabled() const;
   const std::string &getName() const;
-  const std::shared_ptr<TChain> &getMcChain() const;
-  const std::shared_ptr<TChain> &getDataChain() const;
+  std::shared_ptr<TChain> &getMcChain();
+  std::shared_ptr<TChain> &getDataChain();
+  const std::vector<std::string> &getEnabledLeafNameList() const;
+  const std::vector<std::string> &getMcFilePathList() const;
+  const std::vector<std::string> &getDataFilePathList() const;
 
+  // Misc
   void print();
 
 protected:

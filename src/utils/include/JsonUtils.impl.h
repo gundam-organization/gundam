@@ -1,5 +1,5 @@
 //
-// Created by Adrien BLANCHET on 22/05/2021.
+// Created by Nadrino on 22/05/2021.
 //
 
 #ifndef XSLLHFITTER_JSONUTILS_IMPL_H

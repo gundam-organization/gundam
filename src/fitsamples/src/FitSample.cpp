@@ -1,5 +1,5 @@
 //
-// Created by Adrien BLANCHET on 22/07/2021.
+// Created by Nadrino on 22/07/2021.
 //
 
 #include "GenericToolbox.h"
@@ -25,7 +25,7 @@ void FitSample::reset() {
   _binning_.reset();
 
   _selectionCuts_ = "";
-  _selectionCutsTreeFormula_ = nullptr;
+  _selectedDataSets_.clear();
 
   _mcNorm_ = 1;
   _mcEventList_.clear();
@@ -43,10 +43,7 @@ void FitSample::setConfig(const nlohmann::json &config_) {
 void FitSample::initialize() {
   LogWarning << __METHOD_NAME__ << std::endl;
 
-  if( _config_.empty() ){
-    LogError << GET_VAR_NAME_VALUE(_config_.empty()) << std::endl;
-    throw std::logic_error(GET_VAR_NAME_VALUE(_config_.empty()));
-  }
+  LogAssert(not _config_.empty(), GET_VAR_NAME_VALUE(_config_.empty()));
 
   _name_ = JsonUtils::fetchValue<std::string>(_config_, "name");
   _isEnabled_ = JsonUtils::fetchValue(_config_, "isEnabled", true);
@@ -76,19 +73,33 @@ void FitSample::initialize() {
   _dataNorm_ = JsonUtils::fetchValue(_config_, "dataNorm", _dataNorm_);
 }
 
-void FitSample::fillEventsList(const std::vector<DataSet> &dataSetList_) {
-
-  for( const auto& dataSet : dataSetList_){
-
-    if( not dataSet.isEnabled() ){ continue; }
-    if( not _selectedDataSets_.empty()
-        and not GenericToolbox::doesElementIsInVector(dataSet.getName(), _selectedDataSets_) ){
-      // skip
-      continue;
-    }
-
-
-
-  }
-
+bool FitSample::isEnabled() const {
+  return _isEnabled_;
 }
+const std::string &FitSample::getName() const {
+  return _name_;
+}
+const std::string &FitSample::getSelectionCutsStr() const {
+  return _selectionCuts_;
+}
+std::vector<PhysicsEvent> &FitSample::getMcEventList() {
+  return _mcEventList_;
+}
+std::vector<PhysicsEvent> &FitSample::getDataEventList() {
+  return _dataEventList_;
+}
+
+
+bool FitSample::isDataSetValid(const std::string& dataSetName_){
+  if( _selectedDataSets_.empty() ) return true;
+  for( auto& dataSetName : _selectedDataSets_){
+    if( dataSetName == "*" or dataSetName == dataSetName_ ){
+      return true;
+    }
+  }
+  return false;
+}
+
+
+
+

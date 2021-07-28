@@ -1,5 +1,5 @@
 //
-// Created by Adrien BLANCHET on 22/07/2021.
+// Created by Nadrino on 22/07/2021.
 //
 
 #include "GenericToolbox.h"
@@ -31,7 +31,9 @@ void DataSet::setConfig(const nlohmann::json &config_) {
   JsonUtils::forwardConfig(_config_, __CLASS_NAME__);
 }
 void DataSet::addRequestedLeafName(const std::string& leafName_){
-  if( not GenericToolbox::doesElementIsInVector(leafName_, _enabledLeafNameList_) ){
+  if( not leafName_.empty() and not GenericToolbox::doesElementIsInVector(leafName_, _enabledLeafNameList_) ){
+    LogThrowIf( _mcChain_->GetLeaf(leafName_.c_str()) == nullptr,
+                "\"" << leafName_ << "\" not defined in the TChain of dataSet: " << _name_ );
     _enabledLeafNameList_.emplace_back(leafName_);
   }
 }
@@ -82,11 +84,20 @@ bool DataSet::isEnabled() const {
 const std::string &DataSet::getName() const {
   return _name_;
 }
-const std::shared_ptr<TChain> &DataSet::getMcChain() const {
+std::shared_ptr<TChain> &DataSet::getMcChain() {
   return _mcChain_;
 }
-const std::shared_ptr<TChain> &DataSet::getDataChain() const {
+std::shared_ptr<TChain> &DataSet::getDataChain() {
   return _dataChain_;
+}
+const std::vector<std::string> &DataSet::getEnabledLeafNameList() const {
+  return _enabledLeafNameList_;
+}
+const std::vector<std::string> &DataSet::getMcFilePathList() const {
+  return _mcFilePathList_;
+}
+const std::vector<std::string> &DataSet::getDataFilePathList() const {
+  return _dataFilePathList_;
 }
 
 
@@ -103,10 +114,10 @@ void DataSet::print() {
   }
 
   if( _dataFilePathList_.empty() ){
-    LogInfo << "No Data files loaded." << std::endl;
+    LogInfo << "No External files loaded." << std::endl;
   }
   else{
-    LogInfo << "List of Data files:" << std::endl;
+    LogInfo << "List of External files:" << std::endl;
     for( const auto& filePath : _dataFilePathList_ ){
       LogInfo << filePath << std::endl;
     }
@@ -138,4 +149,5 @@ void DataSet::initializeChains() {
   }
 
 }
+
 

@@ -1,5 +1,5 @@
 //
-// Created by Adrien BLANCHET on 11/02/2021.
+// Created by Nadrino on 11/02/2021.
 //
 
 #ifndef XSLLHFITTER_GLOBALVARIABLES_H

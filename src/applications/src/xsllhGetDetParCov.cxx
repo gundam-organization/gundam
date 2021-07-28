@@ -1,5 +1,5 @@
 //
-// Created by Adrien BLANCHET on 18/11/2020.
+// Created by Nadrino on 18/11/2020.
 //
 
 #include "Logger.h"

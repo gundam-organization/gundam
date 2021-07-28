@@ -1,5 +1,5 @@
 //
-// Created by Adrien BLANCHET on 16/06/2021.
+// Created by Nadrino on 16/06/2021.
 //
 
 #include "string"
@@ -40,8 +40,8 @@ void PlotGenerator::reset() {
 
 }
 
-void PlotGenerator::setConfig(const nlohmann::json &config) {
-  _config_ = config;
+void PlotGenerator::setConfig(const nlohmann::json &config_) {
+  _config_ = config_;
   while( _config_.is_string() ){
     _config_ = JsonUtils::readConfigFile(_config_.get<std::string>());
   }
@@ -58,17 +58,13 @@ void PlotGenerator::initialize() {
     throw std::logic_error("_sampleListPtr_ not set.");
   }
 
-  if( _config_.empty() ){
-    LogError << "_config_ not set." << std::endl;
-    throw std::logic_error("_config_ not set.");
-  }
+  LogAssert(not _config_.empty(), "Can't read config: empty");
 
   _varDictionary_ = JsonUtils::fetchValue(_config_, "varDictionnaries", nlohmann::json());
   _canvasParameters_ = JsonUtils::fetchValue(_config_, "canvasParameters", nlohmann::json());
   _histogramsDefinition_ = JsonUtils::fetchValue(_config_, "histogramsDefinition", nlohmann::json());
 
-  this->readHistogramsConfig();
-
+  this->defineHistogramHolders();
 }
 
 const std::vector<HistHolder> &PlotGenerator::getHistHolderList() const {
@@ -252,7 +248,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
         // we are searching for data
         if( not histHolder.isData ) continue;
 
-        // canvasPath may have the trailing splitVar -> need to check the beginning of the path with the Data hist
+        // canvasPath may have the trailing splitVar -> need to check the beginning of the path with the External hist
         if( not GenericToolbox::doesStringStartsWithSubstring(canvasPath, buildCanvasPath(&histHolder)) ) continue;
 
         // same sample?
@@ -374,7 +370,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
       // Draw the data hist on top
       if (dataSampleHist != nullptr) {
         std::string originalTitle = dataSampleHist->GetTitle(); // title can be used for figuring out the type of the histogram
-        dataSampleHist->SetTitle("Data");
+        dataSampleHist->SetTitle("External");
         if ( firstHistToPlot != nullptr ) {
           dataSampleHist->Draw("EPSAME");
         } else {
@@ -520,7 +516,29 @@ void PlotGenerator::generateComparisonHistograms(const std::vector<HistHolder> &
 
 }
 
-void PlotGenerator::readHistogramsConfig() {
+std::vector<std::string> PlotGenerator::fetchRequestedLeafNames(){
+  LogAssert(not _config_.empty(), "Config not set, can't call " << __METHOD_NAME__);
+
+  std::vector<std::string> varNameList;
+  _histogramsDefinition_ = JsonUtils::fetchValue(_config_, "histogramsDefinition", nlohmann::json());
+  for( const auto& histConfig : _histogramsDefinition_ ){
+    auto varToPlot = JsonUtils::fetchValue<std::string>(histConfig, "varToPlot");
+    if( varToPlot != "Raw" and not GenericToolbox::doesElementIsInVector(varToPlot, varNameList) ){
+      varNameList.emplace_back(varToPlot);
+    }
+
+    auto splitVars = JsonUtils::fetchValue(histConfig, "splitVars", std::vector<std::string>{""});
+    for( const auto& splitVar : splitVars ){
+      if( not splitVar.empty() and not GenericToolbox::doesElementIsInVector(splitVar, varNameList) ){
+        varNameList.emplace_back(splitVar);
+      }
+    }
+  }
+
+  return varNameList;
+}
+
+void PlotGenerator::defineHistogramHolders() {
   _histHolderList_.clear();
 
   HistHolder histDefBase;
@@ -636,7 +654,7 @@ void PlotGenerator::readHistogramsConfig() {
             // Colors / Title (legend) / Name
             if( histDefBase.isData ){
               histDefBase.histName = "Data_TH1D";
-              histDefBase.histTitle = "Data";
+              histDefBase.histTitle = "External";
               histDefBase.histColor = kBlack;
             }
             else{

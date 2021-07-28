@@ -1,5 +1,5 @@
 //
-// Created by Adrien BLANCHET on 19/05/2021.
+// Created by Nadrino on 19/05/2021.
 //
 
 #ifndef XSLLHFITTER_DATABINSET_H

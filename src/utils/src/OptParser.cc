@@ -210,11 +210,11 @@ int OptParser::StringToEnum(const std::string& s) const
 void OptParser::PrintOptions(bool short_list) const
 {
     LogInfo << "Printing parsed options..."
-    << std::endl << "Data   File : " << fname_data
+    << std::endl << "External   File : " << fname_data
     << std::endl << "MC     File : " << fname_mc
     << std::endl << "Output File : " << fname_output
     << std::endl << "Fit Type : " << fit_type
-    << std::endl << "Data POT : " << data_POT
+    << std::endl << "External POT : " << data_POT
     << std::endl << "MC   POT : " << mc_POT
     << std::endl << "RNG Seed : " << rng_seed
     << std::endl << "N Threads: " << num_threads

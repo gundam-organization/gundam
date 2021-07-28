@@ -1,5 +1,5 @@
 //
-// Created by Adrien BLANCHET on 12/04/2021.
+// Created by Nadrino on 12/04/2021.
 //
 
 #include <stdexcept>

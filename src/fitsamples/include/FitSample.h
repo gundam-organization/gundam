@@ -1,5 +1,5 @@
 //
-// Created by Adrien BLANCHET on 22/07/2021.
+// Created by Nadrino on 22/07/2021.
 //
 
 #ifndef XSLLHFITTER_FITSAMPLE_H
@@ -27,7 +27,16 @@ public:
   void setConfig(const nlohmann::json &config_);
 
   void initialize();
-  void fillEventsList(const std::vector<DataSet>& dataSetList_);
+
+  bool isEnabled() const;
+
+  const std::string &getName() const;
+  const std::string &getSelectionCutsStr() const;
+  std::vector<PhysicsEvent> &getMcEventList();
+  std::vector<PhysicsEvent> &getDataEventList();
+
+  bool isDataSetValid(const std::string& dataSetName_);
+
 
 private:
   nlohmann::json _config_;
@@ -39,7 +48,6 @@ private:
   DataBinSet _binning_;
 
   std::string _selectionCuts_;
-  std::shared_ptr<TTreeFormula> _selectionCutsTreeFormula_{nullptr};
   std::vector<std::string> _selectedDataSets_;
 
   double _mcNorm_{1};

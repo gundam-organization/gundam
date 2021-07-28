@@ -1,5 +1,5 @@
 //
-// Created by Adrien BLANCHET on 17/06/2021.
+// Created by Nadrino on 17/06/2021.
 //
 
 #include "Logger.h"

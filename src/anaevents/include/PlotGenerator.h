@@ -1,5 +1,5 @@
 //
-// Created by Adrien BLANCHET on 16/06/2021.
+// Created by Nadrino on 16/06/2021.
 //
 
 #ifndef XSLLHFITTER_PLOTGENERATOR_H
@@ -44,6 +44,9 @@ struct HistHolder{
   bool rescaleAsBinWidth{true};
   double rescaleBinFactor{1.};
   short histColor;
+
+  // Flags
+  bool isBaseSplitHist{false};
 };
 
 struct CanvasHolder{
@@ -65,7 +68,7 @@ public:
   void reset();
 
   // Setters
-  void setConfig(const nlohmann::json &config);
+  void setConfig(const nlohmann::json &config_);
   void setSampleListPtr(const std::vector<AnaSample> *sampleListPtr_);
 
   // Init
@@ -84,8 +87,13 @@ public:
   void generateComparisonPlots(const std::vector<HistHolder> &histsToStackOther_, const std::vector<HistHolder> &histsToStackReference_, TDirectory *saveDir_ = nullptr);
   void generateComparisonHistograms(const std::vector<HistHolder> &histList_, const std::vector<HistHolder> &refHistsList_, TDirectory *saveDir_ = nullptr);
 
+  // Misc
+  std::vector<std::string> fetchRequestedLeafNames();
+
+
 protected:
-  void readHistogramsConfig();
+  void defineHistogramHolders();
+
 
 private:
   nlohmann::json _config_;

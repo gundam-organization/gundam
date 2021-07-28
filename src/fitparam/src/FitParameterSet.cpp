@@ -1,5 +1,5 @@
 //
-// Created by Adrien BLANCHET on 21/05/2021.
+// Created by Nadrino on 21/05/2021.
 //
 
 #include "FitParameterSet.h"

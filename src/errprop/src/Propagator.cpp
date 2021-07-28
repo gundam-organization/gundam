@@ -1,5 +1,5 @@
 //
-// Created by Adrien BLANCHET on 11/06/2021.
+// Created by Nadrino on 11/06/2021.
 //
 
 #include <AnaTreeMC.hh>
@@ -126,7 +126,7 @@ void Propagator::initialize() {
         for( auto& par : parSet.getParameterList() ){
 
           auto* dialSetPtr = par.findDialSet( dataSet.getName() );
-          if( dialSetPtr == nullptr ) continue;
+          if( dialSetPtr == nullptr ){ continue; }
 
           if( dialSetPtr->getApplyConditionFormula() != nullptr ){
             for( int iPar = 0 ; iPar < dialSetPtr->getApplyConditionFormula()->GetNpar() ; iPar++ ){
@@ -143,8 +143,18 @@ void Propagator::initialize() {
         } // par
       } // parSet
 
-      LogTrace << GET_VAR_NAME_VALUE(GenericToolbox::parseVectorAsString(requestedLeafNameList)) << std::endl;
+      auto varListRequestedByPlotGen = _plotGenerator_.fetchRequestedLeafNames();
+      for( const auto& varName : varListRequestedByPlotGen ){
+        dataSet.addRequestedLeafName(varName);
+      }
+
+      LogInfo << "Dataset \"" << dataSet.getName() << "\" will load the selected branches: "
+      << GenericToolbox::parseVectorAsString(dataSet.getEnabledLeafNameList()) << std::endl;
     } // dataSets
+
+    _fitSampleSet_.loadPhysicsEvents();
+
+    exit(EXIT_SUCCESS);
   }
 
   initializeThreads();

@@ -135,7 +135,16 @@ else()
     #message(WARNING "You are using an untested compiler.")
 endif()
 
+# Fix behavior of CMAKE_CXX_STANDARD when targeting macOS.
+#if (POLICY CMP0025)
+#    cmake_policy(SET CMP0025 NEW)
+#endif ()
+#set(CMAKE_CXX_STANDARD 14)
+
 set(CMAKE_CXX_STANDARD 11)
+
+
+
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 option(CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ langauge (-std=gnu++14)." OFF)
 option(CXX_MARCH_FLAG "Enable cpu architecture specific optimzations." OFF)
