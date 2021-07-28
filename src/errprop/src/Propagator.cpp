@@ -121,9 +121,13 @@ void Propagator::initialize() {
 
     LogInfo << "Polling the requested leaves to load in memory..." << std::endl;
     for( auto& dataSet : _fitSampleSet_.getDataSetList() ){
-      std::vector<std::string> requestedLeafNameList;
+
+      // parSet
       for( auto& parSet : _parameterSetsList_ ){
+        if( not parSet.isEnabled() ) continue;
+
         for( auto& par : parSet.getParameterList() ){
+          if( not par.isEnabled() ) continue;
 
           auto* dialSetPtr = par.findDialSet( dataSet.getName() );
           if( dialSetPtr == nullptr ){ continue; }
@@ -139,17 +143,15 @@ void Propagator::initialize() {
               dataSet.addRequestedLeafName(var);
             } // var
           } // dial
-
         } // par
       } // parSet
 
+      // plotGen
       auto varListRequestedByPlotGen = _plotGenerator_.fetchRequestedLeafNames();
       for( const auto& varName : varListRequestedByPlotGen ){
         dataSet.addRequestedLeafName(varName);
       }
 
-      LogInfo << "Dataset \"" << dataSet.getName() << "\" will load the selected branches: "
-      << GenericToolbox::parseVectorAsString(dataSet.getEnabledLeafNameList()) << std::endl;
     } // dataSets
 
     _fitSampleSet_.loadPhysicsEvents();

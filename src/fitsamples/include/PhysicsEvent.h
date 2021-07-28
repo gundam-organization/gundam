@@ -21,13 +21,34 @@ public:
   void reset();
 
   void setLeafNameListPtr(const std::vector<std::string> *leafNameListPtr);
+  void setDataSetIndex(int dataSetIndex_);
+  void setEntryIndex(Long64_t entryIndex_);
+  void setTreeWeight(double treeWeight);
+  void setNominalWeight(double nominalWeight);
+  void setEventWeight(double eventWeight);
 
-  void hookToTree(TTree* tree_);
+  void hookToTree(TTree* tree_, bool throwIfLeafNotFound_ = true);
 
-  Int_t fetchIntValue( const std::string& leafName_ );
+  int getDataSetIndex() const;
 
-  std::string getSummary();
-  void print();
+  Long64_t getEntryIndex() const;
+
+  double getTreeWeight() const;
+  double getNominalWeight() const;
+  double getEventWeight() const;
+
+  void addEventWeight(double weight_);
+  void resetEventWeight();
+
+  int findVarIndex(const std::string& leafName_, bool throwIfNotFound_ = true);
+  template<typename T> auto fetchValue(const std::string& leafName_, size_t arrayIndex_ = 0) -> T;
+  double getVarAsDouble(const std::string& leafName_, size_t arrayIndex_ = 0);
+
+  std::string getSummary() const;
+  void print() const;
+
+  // Stream operator
+  friend std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p );
 
 private:
 
@@ -35,8 +56,11 @@ private:
   const std::vector<std::string>* _commonLeafNameListPtr_{nullptr};
   std::vector<GenericToolbox::LeafHolder> _leafContentList_;
 
-  // Weight carriers
-  double _mcWeight_{1};
+
+  // Extra variables
+  int _dataSetIndex_{-1};
+  Long64_t _entryIndex_{-1};
+  double _treeWeight_{1};
   double _nominalWeight_{1};
   double _eventWeight_{1};
 

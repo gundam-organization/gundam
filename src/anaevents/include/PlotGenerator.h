@@ -88,6 +88,8 @@ public:
   void generateComparisonHistograms(const std::vector<HistHolder> &histList_, const std::vector<HistHolder> &refHistsList_, TDirectory *saveDir_ = nullptr);
 
   // Misc
+  std::vector<std::string> fetchListOfVarToPlot();
+  std::vector<std::string> fetchListOfSplitVarNames();
   std::vector<std::string> fetchRequestedLeafNames();
 
 

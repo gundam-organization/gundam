@@ -34,6 +34,7 @@ public:
   const std::string &getSelectionCutsStr() const;
   std::vector<PhysicsEvent> &getMcEventList();
   std::vector<PhysicsEvent> &getDataEventList();
+  const DataBinSet &getBinning() const;
 
   bool isDataSetValid(const std::string& dataSetName_);
 

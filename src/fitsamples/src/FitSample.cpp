@@ -53,6 +53,10 @@ void FitSample::initialize() {
   }
 
   _binning_.readBinningDefinition( JsonUtils::fetchValue<std::string>(_config_, "binning") );
+  for( const auto& bin : _binning_.getBinsList() ){
+    LogTrace << bin.getSummary() << std::endl;
+  }
+
   _mcHistogram_ = std::shared_ptr<TH1D>(
     new TH1D(
       Form("%s_MC_bins", _name_.c_str()), Form("%s_MC_bins", _name_.c_str()),
@@ -88,6 +92,9 @@ std::vector<PhysicsEvent> &FitSample::getMcEventList() {
 std::vector<PhysicsEvent> &FitSample::getDataEventList() {
   return _dataEventList_;
 }
+const DataBinSet &FitSample::getBinning() const {
+  return _binning_;
+}
 
 
 bool FitSample::isDataSetValid(const std::string& dataSetName_){
@@ -99,7 +106,6 @@ bool FitSample::isDataSetValid(const std::string& dataSetName_){
   }
   return false;
 }
-
 
 
 

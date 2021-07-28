@@ -21,7 +21,7 @@ void DataSet::reset() {
   _isEnabled_ = false;
 
   _name_ = "";
-  _enabledLeafNameList_.clear();
+  _requestedLeafNameList_.clear();
   _mcFilePathList_.clear();
   _dataFilePathList_.clear();
 }
@@ -31,11 +31,19 @@ void DataSet::setConfig(const nlohmann::json &config_) {
   JsonUtils::forwardConfig(_config_, __CLASS_NAME__);
 }
 void DataSet::addRequestedLeafName(const std::string& leafName_){
-  if( not leafName_.empty() and not GenericToolbox::doesElementIsInVector(leafName_, _enabledLeafNameList_) ){
+  if( not leafName_.empty() and not GenericToolbox::doesElementIsInVector(leafName_, _requestedLeafNameList_) ){
     LogThrowIf( _mcChain_->GetLeaf(leafName_.c_str()) == nullptr,
-                "\"" << leafName_ << "\" not defined in the TChain of dataSet: " << _name_ );
-    _enabledLeafNameList_.emplace_back(leafName_);
+                "\"" << leafName_ << "\" not defined in the MC TChain of dataSet: " << _name_ );
+    _requestedLeafNameList_.emplace_back(leafName_);
   }
+}
+void DataSet::addRequestedMandatoryLeafName(const std::string& leafName_){
+  if( not leafName_.empty() and not GenericToolbox::doesElementIsInVector(leafName_, _requestedMandatoryLeafNameList_) ){
+    LogThrowIf( _dataChain_ != nullptr and _dataChain_->GetLeaf(leafName_.c_str()) == nullptr,
+                "\"" << leafName_ << "\" not defined in the Data TChain of dataSet: " << _name_ );
+    _requestedMandatoryLeafNameList_.emplace_back(leafName_);
+  }
+  this->addRequestedLeafName(leafName_);
 }
 
 void DataSet::initialize() {
@@ -55,22 +63,30 @@ void DataSet::initialize() {
   _name_ = JsonUtils::fetchValue<std::string>(_config_, "name");
   LogDebug << "Initializing dataset: \"" << _name_ << "\"" << std::endl;
 
-  auto mcConfig = JsonUtils::fetchValue(_config_, "mc", nlohmann::json());
-  if( not mcConfig.empty() ){
-    _mcTreeName_ = JsonUtils::fetchValue<std::string>(mcConfig, "tree");
-    auto fileList = JsonUtils::fetchValue(mcConfig, "filePathList", nlohmann::json());
-    for( const auto& file: fileList ){
-      _mcFilePathList_.emplace_back(file.get<std::string>());
+  {
+    auto mcConfig = JsonUtils::fetchValue(_config_, "mc", nlohmann::json());
+    if( not mcConfig.empty() ){
+      _mcTreeName_ = JsonUtils::fetchValue<std::string>(mcConfig, "tree");
+      auto fileList = JsonUtils::fetchValue(mcConfig, "filePathList", nlohmann::json());
+      for( const auto& file: fileList ){
+        _mcFilePathList_.emplace_back(file.get<std::string>());
+      }
     }
+    _mcNominalWeightLeafName_ = JsonUtils::fetchValue(mcConfig, "nominalWeightLeafName", _mcNominalWeightLeafName_);
+    _mcActiveLeafNameList_.emplace_back(_mcNominalWeightLeafName_);
   }
 
-  auto dataConfig = JsonUtils::fetchValue(_config_, "data", nlohmann::json());
-  if( not dataConfig.empty() ){
-    _dataTreeName_ = JsonUtils::fetchValue<std::string>(dataConfig, "tree");
-    auto fileList = JsonUtils::fetchValue(dataConfig, "filePathList", nlohmann::json());
-    for( const auto& file: fileList ){
-      _dataFilePathList_.emplace_back(file.get<std::string>());
+  {
+    auto dataConfig = JsonUtils::fetchValue(_config_, "data", nlohmann::json());
+    if( not dataConfig.empty() ){
+      _dataTreeName_ = JsonUtils::fetchValue<std::string>(dataConfig, "tree");
+      auto fileList = JsonUtils::fetchValue(dataConfig, "filePathList", nlohmann::json());
+      for( const auto& file: fileList ){
+        _dataFilePathList_.emplace_back(file.get<std::string>());
+      }
     }
+    _dataNominalWeightLeafName_ = JsonUtils::fetchValue(dataConfig, "nominalWeightLeafName", _dataNominalWeightLeafName_);
+    _dataActiveLeafNameList_.emplace_back(_dataNominalWeightLeafName_);
   }
 
   this->initializeChains();
@@ -90,8 +106,23 @@ std::shared_ptr<TChain> &DataSet::getMcChain() {
 std::shared_ptr<TChain> &DataSet::getDataChain() {
   return _dataChain_;
 }
-const std::vector<std::string> &DataSet::getEnabledLeafNameList() const {
-  return _enabledLeafNameList_;
+std::vector<std::string> &DataSet::getMcActiveLeafNameList() {
+  return _mcActiveLeafNameList_;
+}
+std::vector<std::string> &DataSet::getDataActiveLeafNameList() {
+  return _dataActiveLeafNameList_;
+}
+const std::string &DataSet::getMcNominalWeightLeafName() const {
+  return _mcNominalWeightLeafName_;
+}
+const std::string &DataSet::getDataNominalWeightLeafName() const {
+  return _dataNominalWeightLeafName_;
+}
+const std::vector<std::string> &DataSet::getRequestedLeafNameList() const {
+  return _requestedLeafNameList_;
+}
+const std::vector<std::string> &DataSet::getRequestedMandatoryLeafNameList() const {
+  return _requestedMandatoryLeafNameList_;
 }
 const std::vector<std::string> &DataSet::getMcFilePathList() const {
   return _mcFilePathList_;

@@ -77,7 +77,9 @@ void FitSampleSet::loadPhysicsEvents() {
   LogThrowIf(_dataEventType_ == DataEventType::Unset, "dataEventType not set.");
   LogInfo << "Data events type is set to: " << DataEventTypeEnumNamespace::toString(_dataEventType_) << std::endl;
 
+  int dataSetIndex = -1;
   for( auto& dataSet : _dataSetList_ ){
+    dataSetIndex++;
 
     std::vector<FitSample*> samplesToFillList;
     std::vector<TTreeFormula*> sampleCutFormulaList;
@@ -103,23 +105,57 @@ void FitSampleSet::loadPhysicsEvents() {
     }
     LogInfo << "Dataset \"" << dataSet.getName() << "\" will populate samples: " << GenericToolbox::parseVectorAsString(samplesNames) << std::endl;
 
+    LogInfo << "Fetching mandatory leaves..." << std::endl;
+    for( size_t iSample = 0 ; iSample < samplesToFillList.size() ; iSample++ ){
+      // Fit phase space
+      for( const auto& bin : samplesToFillList[iSample]->getBinning().getBinsList() ){
+        for( const auto& var : bin.getVariableNameList() ){
+          dataSet.addRequestedMandatoryLeafName(var);
+        }
+      }
+//        // Cuts // ACTUALLY NOT NECESSARY SINCE THE SELECTION IS DONE INDEPENDENTLY
+//        for( int iPar = 0 ; iPar < sampleCutFormulaList.at(iSample)->GetNpar() ; iPar++ ){
+//          dataSet.addRequestedMandatoryLeafName(sampleCutFormulaList.at(iSample)->GetParName(iPar));
+//        }
+    }
+
+    LogInfo << "List of requested leaves: " << GenericToolbox::parseVectorAsString(dataSet.getRequestedLeafNameList()) << std::endl;
+    LogInfo << "List of mandatory leaves: " << GenericToolbox::parseVectorAsString(dataSet.getRequestedMandatoryLeafNameList()) << std::endl;
+
+
     for( bool isData : {false, true} ){
       TChain* chainPtr{nullptr};
+      std::vector<std::string>* activeLeafNameListPtr;
 
       if( isData and _dataEventType_ == DataEventType::Asimov ){ continue; }
 
       if( isData ){
         LogInfo << "Reading data files..." << std::endl;
         chainPtr = dataSet.getDataChain().get();
+        activeLeafNameListPtr = &dataSet.getDataActiveLeafNameList();
       }
       else{
         LogInfo << "Reading MC files..." << std::endl;
         chainPtr = dataSet.getMcChain().get();
+        activeLeafNameListPtr = &dataSet.getMcActiveLeafNameList();
       }
 
       if( chainPtr == nullptr or chainPtr->GetEntries() == 0 ){
         continue;
       }
+
+      LogInfo << "Checking the availability of requested leaves..." << std::endl;
+      for( auto& requestedLeaf : dataSet.getRequestedLeafNameList() ){
+        if( not isData or GenericToolbox::doesElementIsInVector(requestedLeaf, dataSet.getRequestedMandatoryLeafNameList()) ){
+          LogThrowIf(chainPtr->GetLeaf(requestedLeaf.c_str()) == nullptr,
+                     "Could not find leaf \"" << requestedLeaf << "\" in TChain");
+        }
+
+        if( chainPtr->GetLeaf(requestedLeaf.c_str()) != nullptr ){
+          activeLeafNameListPtr->emplace_back(requestedLeaf);
+        }
+      }
+      LogInfo << "List of leaves which will be loaded in RAM: " << GenericToolbox::parseVectorAsString(*activeLeafNameListPtr) << std::endl;
 
       LogInfo << "Performing event selection of samples with " << (isData?"data": "mc") << " files..." << std::endl;
       for( auto& sample : samplesToFillList ){
@@ -150,9 +186,8 @@ void FitSampleSet::loadPhysicsEvents() {
             if( sampleCutFormulaList.at(iSample)->EvalInstance(jInstance) != 0 ){
               eventIsInSamplesList.at(iEvent).at(iSample) = true;
               sampleNbOfEvents.at(iSample)++;
-            }
-          }
-
+            } // if passes the cut
+          } // jInstance
         } // iSample
       } // iEvent
 
@@ -160,13 +195,14 @@ void FitSampleSet::loadPhysicsEvents() {
       << GenericToolbox::parseVectorAsString(sampleNbOfEvents) << std::endl;
 
 
-      // If we don't do this, the events will be resized while being in multithread
+      // The following lines are necessary since the events might get resized while being in multithread
       // Because std::vector is insuring continuous memory allocation, a resize sometimes
       // lead to the full moving of a vector memory. This is not thread safe, so better ensure
-      // the vector won't have to do this.
+      // the vector won't have to do this by allocating the right event size.
       PhysicsEvent eventBuf;
-      eventBuf.setLeafNameListPtr(&dataSet.getEnabledLeafNameList());
-      eventBuf.hookToTree(chainPtr);
+      eventBuf.setLeafNameListPtr(activeLeafNameListPtr);
+      eventBuf.hookToTree(chainPtr, not isData);
+      eventBuf.setDataSetIndex(dataSetIndex);
       chainPtr->GetEntry(0);
       // Now the eventBuffer has the right size in memory
 
@@ -191,14 +227,13 @@ void FitSampleSet::loadPhysicsEvents() {
         threadChain = (TChain*) chainPtr->Clone();
 
         Long64_t nEvents = threadChain->GetEntries();
-        PhysicsEvent eventBuffer;
-        eventBuffer.setLeafNameListPtr(&dataSet.getEnabledLeafNameList());
-        eventBuffer.hookToTree(threadChain);
+        PhysicsEvent eventBufThread(eventBuf);
+        eventBufThread.hookToTree(threadChain, not isData);
         GenericToolbox::disableUnhookedBranches(threadChain);
 
         auto threadSampleIndexOffsetList = sampleIndexOffsetList;
 
-        std::string progressTitle = LogWarning.getPrefixString() + "Reading selected events";
+        std::string progressTitle = LogInfo.getPrefixString() + "Reading selected events";
         for( Long64_t iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
           if( iEvent % GlobalVariables::getNbThreads() != iThread_ ){ continue; }
           if( iThread_ == 0 ) GenericToolbox::displayProgressBar(iEvent, nEvents, progressTitle);
@@ -213,10 +248,11 @@ void FitSampleSet::loadPhysicsEvents() {
           if( skipEvent ) continue;
 
           threadChain->GetEntry(iEvent);
+          eventBufThread.setEntryIndex(iEvent);
 
           for( size_t iSample = 0 ; iSample < samplesToFillList.size() ; iSample++ ){
             if( eventIsInSamplesList.at(iEvent).at(iSample) ){
-              sampleEventListPtrToFill.at(iSample)->at(threadSampleIndexOffsetList.at(iSample)++) = PhysicsEvent(eventBuffer); // copy
+              sampleEventListPtrToFill.at(iSample)->at(threadSampleIndexOffsetList.at(iSample)++) = PhysicsEvent(eventBufThread); // copy
             }
           }
         }
@@ -231,9 +267,25 @@ void FitSampleSet::loadPhysicsEvents() {
       GlobalVariables::getParallelWorker().removeJob(__METHOD_NAME__);
 
       LogInfo << "Events have been loaded for " << ( isData ? "data": "mc" )
-      << "with dataset: " << dataSet.getName() << std::endl;
+      << " with dataset: " << dataSet.getName() << std::endl;
+
+      std::string nominalWeightLeafStr = isData ? dataSet.getDataNominalWeightLeafName(): dataSet.getMcNominalWeightLeafName();
+      if( not nominalWeightLeafStr.empty() ){
+        LogInfo << "Copying events nominal weight..." << std::endl;
+        int iEvt = 0;
+        for( auto* eventList : sampleEventListPtrToFill ){
+          for( auto& event : *eventList ){
+            event.setTreeWeight(event.getVarAsDouble(nominalWeightLeafStr));
+            event.setNominalWeight(event.getTreeWeight());
+            event.resetEventWeight();
+            if(iEvt++ < 10) LogTrace << event << std::endl;
+          }
+        }
+      }
 
     } // isData
+
+
 
   } // data Set
 
@@ -253,9 +305,13 @@ void FitSampleSet::loadPhysicsEvents() {
   }
 
   for( auto& sample : _fitSampleList_ ){
-    LogInfo << "Total events loaded in \"" << sample.getName() << "\": "
-    << sample.getMcEventList().size() << "(mc) / "
-    << sample.getDataEventList().size() << "(data)" << std::endl;
+    LogInfo << "Total events loaded in \"" << sample.getName() << "\":" << std::endl
+    << "-> mc: " << sample.getMcEventList().size() << "("
+    << GenericToolbox::parseSizeUnits(sizeof(sample.getMcEventList()) * sample.getMcEventList().size())
+    << ")" << std::endl
+    << "-> data: " << sample.getDataEventList().size() << "("
+    << GenericToolbox::parseSizeUnits(sizeof(sample.getDataEventList()) * sample.getDataEventList().size())
+    << ")" << std::endl;
   }
 
 }

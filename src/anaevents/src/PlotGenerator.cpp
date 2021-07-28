@@ -516,8 +516,8 @@ void PlotGenerator::generateComparisonHistograms(const std::vector<HistHolder> &
 
 }
 
-std::vector<std::string> PlotGenerator::fetchRequestedLeafNames(){
-  LogAssert(not _config_.empty(), "Config not set, can't call " << __METHOD_NAME__);
+std::vector<std::string> PlotGenerator::fetchListOfVarToPlot(){
+  LogThrowIf(_config_.empty(), "Config not set, can't call " << __METHOD_NAME__);
 
   std::vector<std::string> varNameList;
   _histogramsDefinition_ = JsonUtils::fetchValue(_config_, "histogramsDefinition", nlohmann::json());
@@ -526,7 +526,15 @@ std::vector<std::string> PlotGenerator::fetchRequestedLeafNames(){
     if( varToPlot != "Raw" and not GenericToolbox::doesElementIsInVector(varToPlot, varNameList) ){
       varNameList.emplace_back(varToPlot);
     }
+  }
+  return varNameList;
+}
+std::vector<std::string> PlotGenerator::fetchListOfSplitVarNames(){
+  LogThrowIf(_config_.empty(), "Config not set, can't call " << __METHOD_NAME__);
 
+  std::vector<std::string> varNameList;
+  _histogramsDefinition_ = JsonUtils::fetchValue(_config_, "histogramsDefinition", nlohmann::json());
+  for( const auto& histConfig : _histogramsDefinition_ ){
     auto splitVars = JsonUtils::fetchValue(histConfig, "splitVars", std::vector<std::string>{""});
     for( const auto& splitVar : splitVars ){
       if( not splitVar.empty() and not GenericToolbox::doesElementIsInVector(splitVar, varNameList) ){
@@ -534,7 +542,18 @@ std::vector<std::string> PlotGenerator::fetchRequestedLeafNames(){
       }
     }
   }
+  return varNameList;
+}
+std::vector<std::string> PlotGenerator::fetchRequestedLeafNames(){
+  LogAssert(not _config_.empty(), "Config not set, can't call " << __METHOD_NAME__);
 
+  std::vector<std::string> varNameList;
+  auto varToPlotList = this->fetchListOfVarToPlot();
+  auto splitVarNameList = this->fetchListOfSplitVarNames();
+
+  varNameList.reserve( varToPlotList.size() + splitVarNameList.size() ); // preallocate memory
+  varNameList.insert( varNameList.end(), varToPlotList.begin(), varToPlotList.end() );
+  varNameList.insert( varNameList.end(), splitVarNameList.begin(), splitVarNameList.end() );
   return varNameList;
 }
 
