@@ -25,7 +25,7 @@ void FitSample::reset() {
   _binning_.reset();
 
   _selectionCuts_ = "";
-  _selectedDataSets_.clear();
+  _dataSetsSelections_.clear();
 
   _mcNorm_ = 1;
   _mcEventList_.clear();
@@ -53,9 +53,9 @@ void FitSample::initialize() {
   }
 
   _binning_.readBinningDefinition( JsonUtils::fetchValue<std::string>(_config_, "binning") );
-  for( const auto& bin : _binning_.getBinsList() ){
-    LogTrace << bin.getSummary() << std::endl;
-  }
+//  for( const auto& bin : _binning_.getBinsList() ){
+//    LogTrace << bin.getSummary() << std::endl;
+//  }
 
   _mcHistogram_ = std::shared_ptr<TH1D>(
     new TH1D(
@@ -71,7 +71,7 @@ void FitSample::initialize() {
   );
 
   _selectionCuts_ = JsonUtils::fetchValue(_config_, "selectionCuts", _selectionCuts_);
-  _selectedDataSets_ = JsonUtils::fetchValue(_config_, "dataSets", _selectedDataSets_);
+  _dataSetsSelections_ = JsonUtils::fetchValue(_config_, "dataSets", _dataSetsSelections_);
 
   _mcNorm_ = JsonUtils::fetchValue(_config_, "mcNorm", _mcNorm_);
   _dataNorm_ = JsonUtils::fetchValue(_config_, "dataNorm", _dataNorm_);
@@ -95,17 +95,53 @@ std::vector<PhysicsEvent> &FitSample::getDataEventList() {
 const DataBinSet &FitSample::getBinning() const {
   return _binning_;
 }
+const std::vector<size_t> & FitSample::getDataSetIndexList() const {
+  return _dataSetIndexList_;
+}
+const std::vector<size_t> &FitSample::getMcEventOffSetList() const {
+  return _mcEventOffSetList_;
+}
+const std::vector<size_t> &FitSample::getMcEventNbList() const {
+  return _mcEventNbList_;
+}
+const std::vector<size_t> &FitSample::getDataEventOffSetList() const {
+  return _dataEventOffSetList_;
+}
+const std::vector<size_t> &FitSample::getDataEventNbList() const {
+  return _dataEventNbList_;
+}
 
 
 bool FitSample::isDataSetValid(const std::string& dataSetName_){
-  if( _selectedDataSets_.empty() ) return true;
-  for( auto& dataSetName : _selectedDataSets_){
+  if( _dataSetsSelections_.empty() ) return true;
+  for( auto& dataSetName : _dataSetsSelections_){
     if( dataSetName == "*" or dataSetName == dataSetName_ ){
       return true;
     }
   }
   return false;
 }
-
+void FitSample::reserveMemoryForMcEvents(size_t nbEvents_, size_t dataSetIndex_, const PhysicsEvent& eventBuffer_) {
+  if( GenericToolbox::doesElementIsInVector(dataSetIndex_, _dataSetIndexList_) ){
+    LogThrowIf(_dataSetIndexList_.back() != dataSetIndex_,"Dataset has already been filled");
+  }
+  else{
+    _dataSetIndexList_.emplace_back(dataSetIndex_);
+  }
+  _mcEventOffSetList_.emplace_back(_mcEventList_.size());
+  _mcEventNbList_.emplace_back(nbEvents_);
+  _mcEventList_.resize(_mcEventOffSetList_.back() + _mcEventNbList_.back(), eventBuffer_);
+}
+void FitSample::reserveMemoryForDataEvents(size_t nbEvents_, size_t dataSetIndex_, const PhysicsEvent& eventBuffer_){
+  if( GenericToolbox::doesElementIsInVector(dataSetIndex_, _dataSetIndexList_) ){
+    LogThrowIf(_dataSetIndexList_.back() != dataSetIndex_,"Dataset has already been filled");
+  }
+  else{
+    _dataSetIndexList_.emplace_back(dataSetIndex_);
+  }
+  _dataEventOffSetList_.emplace_back(_dataEventList_.size());
+  _dataEventNbList_.emplace_back(nbEvents_);
+  _dataEventList_.resize(_dataEventOffSetList_.back() + _dataEventNbList_.back(), eventBuffer_);
+}
 
 

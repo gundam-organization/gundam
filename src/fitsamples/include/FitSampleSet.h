@@ -32,6 +32,8 @@ public:
 
   void initialize();
 
+  DataEventType getDataEventType() const;
+
   std::vector<FitSample> &getFitSampleList();
   std::vector<DataSet> &getDataSetList();
 

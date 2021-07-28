@@ -21,6 +21,7 @@ endif()
 
 target_link_libraries( fitsamples
         xslfutils
+        fitparam
         )
 
 set_target_properties(

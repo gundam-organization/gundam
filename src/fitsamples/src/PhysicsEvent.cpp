@@ -43,6 +43,25 @@ void PhysicsEvent::setEventWeight(double eventWeight) {
   _eventWeight_ = eventWeight;
 }
 
+int PhysicsEvent::getDataSetIndex() const {
+  return _dataSetIndex_;
+}
+Long64_t PhysicsEvent::getEntryIndex() const {
+  return _entryIndex_;
+}
+double PhysicsEvent::getTreeWeight() const {
+  return _treeWeight_;
+}
+double PhysicsEvent::getNominalWeight() const {
+  return _nominalWeight_;
+}
+double PhysicsEvent::getEventWeight() const {
+  return _eventWeight_;
+}
+std::map<FitParameterSet *, std::vector<Dial *>>* PhysicsEvent::getDialCachePtr() {
+  return &_dialCache_;
+}
+
 void PhysicsEvent::hookToTree(TTree* tree_, bool throwIfLeafNotFound_){
   LogThrowIf(_commonLeafNameListPtr_ == nullptr, "_commonLeafNameListPtr_ is not set.");
 
@@ -69,22 +88,6 @@ void PhysicsEvent::hookToTree(TTree* tree_, bool throwIfLeafNotFound_){
 
 }
 
-int PhysicsEvent::getDataSetIndex() const {
-  return _dataSetIndex_;
-}
-Long64_t PhysicsEvent::getEntryIndex() const {
-  return _entryIndex_;
-}
-double PhysicsEvent::getTreeWeight() const {
-  return _treeWeight_;
-}
-double PhysicsEvent::getNominalWeight() const {
-  return _nominalWeight_;
-}
-double PhysicsEvent::getEventWeight() const {
-  return _eventWeight_;
-}
-
 void PhysicsEvent::addEventWeight(double weight_){
   _eventWeight_ *= weight_;
 }
@@ -92,7 +95,7 @@ void PhysicsEvent::resetEventWeight(){
   _eventWeight_ = _nominalWeight_;
 }
 
-int PhysicsEvent::findVarIndex(const std::string& leafName_, bool throwIfNotFound_){
+int PhysicsEvent::findVarIndex(const std::string& leafName_, bool throwIfNotFound_) const{
   LogThrowIf(_commonLeafNameListPtr_ == nullptr, "Can't " << __METHOD_NAME__ << " while _commonLeafNameListPtr_ is empty.");
   for( size_t iLeaf = 0 ; iLeaf < _leafContentList_.size() ; iLeaf++ ){
     if( _commonLeafNameListPtr_->at(iLeaf) == leafName_ ){
@@ -108,9 +111,21 @@ template<typename T> auto PhysicsEvent::fetchValue(const std::string &leafName_,
   int index = this->findVarIndex(leafName_, true);
   return _leafContentList_.at(index).template getVariable<T>(arrayIndex_);
 }
-double PhysicsEvent::getVarAsDouble(const std::string& leafName_, size_t arrayIndex_){
+double PhysicsEvent::getVarAsDouble(const std::string& leafName_, size_t arrayIndex_) const{
   int index = this->findVarIndex(leafName_, true);
-  return _leafContentList_.at(index).getVariableAsDouble(arrayIndex_);
+  return this->getVarAsDouble(index, arrayIndex_);
+}
+double PhysicsEvent::getVarAsDouble(int varIndex_, size_t arrayIndex_) const{
+  return _leafContentList_.at(varIndex_).getVariableAsDouble(arrayIndex_);
+}
+double PhysicsEvent::evalFormula(TFormula* formulaPtr_, std::vector<int>* indexDict_) const{
+  LogThrowIf(formulaPtr_ == nullptr, GET_VAR_NAME_VALUE(formulaPtr_));
+
+  for( int iPar = 0 ; iPar < formulaPtr_->GetNpar() ; iPar++ ){
+    if(indexDict_ == nullptr){ formulaPtr_->SetParameter(iPar, this->getVarAsDouble(formulaPtr_->GetParName(iPar))); }
+    else                     { formulaPtr_->SetParameter(iPar, this->getVarAsDouble(indexDict_->at(iPar))); }
+  }
+  return formulaPtr_->Eval(0);
 }
 
 std::string PhysicsEvent::getSummary() const {
@@ -133,6 +148,9 @@ std::string PhysicsEvent::getSummary() const {
   ss << std::endl << GET_VAR_NAME_VALUE(_treeWeight_);
   ss << std::endl << GET_VAR_NAME_VALUE(_nominalWeight_);
   ss << std::endl << GET_VAR_NAME_VALUE(_eventWeight_);
+  for( const auto& dialCachePair : _dialCache_ ){
+    ss << std::endl << dialCachePair.first->getName() << ": " << GenericToolbox::parseVectorAsString(dialCachePair.second);
+  }
   return ss.str();
 }
 void PhysicsEvent::print() const {

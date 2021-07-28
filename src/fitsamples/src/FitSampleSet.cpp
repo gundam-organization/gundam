@@ -64,6 +64,9 @@ void FitSampleSet::initialize() {
   _isInitialized_ = true;
 }
 
+DataEventType FitSampleSet::getDataEventType() const {
+  return _dataEventType_;
+}
 std::vector<FitSample> &FitSampleSet::getFitSampleList() {
   return _fitSampleList_;
 }
@@ -172,7 +175,6 @@ void FitSampleSet::loadPhysicsEvents() {
         chainPtr->SetNotify(sampleCutFormulaList.back()); // TODO: to be replaced -> may not work when multiple files are loaded
 //        sampleCutFormulaList.back()->Notify();
       }
-
       Long64_t nEvents = chainPtr->GetEntries();
       // for each event, which sample is active?
       std::vector<std::vector<bool>> eventIsInSamplesList(nEvents, std::vector<bool>(samplesToFillList.size(), false));
@@ -211,12 +213,14 @@ void FitSampleSet::loadPhysicsEvents() {
       for( size_t iSample = 0 ; iSample < sampleNbOfEvents.size() ; iSample++ ){
         if( isData ){
           sampleEventListPtrToFill.at(iSample) = &samplesToFillList.at(iSample)->getDataEventList();
+          sampleIndexOffsetList.at(iSample) = sampleEventListPtrToFill.at(iSample)->size();
+          samplesToFillList.at(iSample)->reserveMemoryForDataEvents(sampleNbOfEvents.at(iSample), dataSetIndex, eventBuf);
         }
         else{
           sampleEventListPtrToFill.at(iSample) = &samplesToFillList.at(iSample)->getMcEventList();
+          sampleIndexOffsetList.at(iSample) = sampleEventListPtrToFill.at(iSample)->size();
+          samplesToFillList.at(iSample)->reserveMemoryForMcEvents(sampleNbOfEvents.at(iSample), dataSetIndex, eventBuf);
         }
-        sampleIndexOffsetList.at(iSample) = sampleEventListPtrToFill.at(iSample)->size();
-        sampleEventListPtrToFill.at(iSample)->resize(sampleIndexOffsetList.at(iSample) + sampleNbOfEvents.at(iSample), eventBuf);
       }
 
       // Fill function
@@ -278,7 +282,7 @@ void FitSampleSet::loadPhysicsEvents() {
             event.setTreeWeight(event.getVarAsDouble(nominalWeightLeafStr));
             event.setNominalWeight(event.getTreeWeight());
             event.resetEventWeight();
-            if(iEvt++ < 10) LogTrace << event << std::endl;
+//            if(iEvt++ < 10) LogTrace << event << std::endl;
           }
         }
       }
@@ -315,4 +319,5 @@ void FitSampleSet::loadPhysicsEvents() {
   }
 
 }
+
 

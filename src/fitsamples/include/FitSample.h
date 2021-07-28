@@ -36,8 +36,15 @@ public:
   std::vector<PhysicsEvent> &getDataEventList();
   const DataBinSet &getBinning() const;
 
-  bool isDataSetValid(const std::string& dataSetName_);
+  const std::vector<size_t> & getDataSetIndexList() const;
+  const std::vector<size_t> &getMcEventOffSetList() const;
+  const std::vector<size_t> &getMcEventNbList() const;
+  const std::vector<size_t> &getDataEventOffSetList() const;
+  const std::vector<size_t> &getDataEventNbList() const;
 
+  bool isDataSetValid(const std::string& dataSetName_);
+  void reserveMemoryForMcEvents(size_t nbEvents_, size_t dataSetIndex_, const PhysicsEvent& eventBuffer_);
+  void reserveMemoryForDataEvents(size_t nbEvents_, size_t dataSetIndex_, const PhysicsEvent& eventBuffer_);
 
 private:
   nlohmann::json _config_;
@@ -49,7 +56,14 @@ private:
   DataBinSet _binning_;
 
   std::string _selectionCuts_;
-  std::vector<std::string> _selectedDataSets_;
+  std::vector<std::string> _dataSetsSelections_;
+
+  // DataSet Internals
+  std::vector<size_t> _dataSetIndexList_;
+  std::vector<size_t> _mcEventOffSetList_;  // for each dataSet
+  std::vector<size_t> _mcEventNbList_;      // for each dataSet
+  std::vector<size_t> _dataEventOffSetList_;  // for each dataSet
+  std::vector<size_t> _dataEventNbList_;      // for each dataSet
 
   double _mcNorm_{1};
   std::vector<PhysicsEvent> _mcEventList_;
