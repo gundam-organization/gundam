@@ -5,6 +5,7 @@ set( SRCFILES
         src/FitSample.cpp
         src/DataSet.cpp
         src/PhysicsEvent.cpp
+        src/SampleElement.cpp
         )
 
 if( USE_STATIC_LINKS STREQUAL "1" )
@@ -22,6 +23,7 @@ endif()
 target_link_libraries( fitsamples
         xslfutils
         fitparam
+        anaevents
         )
 
 set_target_properties(

@@ -13,6 +13,7 @@
 
 #include "GenericToolbox.Root.LeafHolder.h"
 
+#include "AnaEvent.hh"
 #include "FitParameterSet.h"
 #include "Dial.h"
 
@@ -32,6 +33,7 @@ public:
   void setTreeWeight(double treeWeight);
   void setNominalWeight(double nominalWeight);
   void setEventWeight(double eventWeight);
+  void setSampleBinIndex(int sampleBinIndex);
 
   // GETTERS
   int getDataSetIndex() const;
@@ -39,6 +41,7 @@ public:
   double getTreeWeight() const;
   double getNominalWeight() const;
   double getEventWeight() const;
+  int getSampleBinIndex() const;
   std::map<FitParameterSet *, std::vector<Dial *>>* getDialCachePtr();
 
   // CORE
@@ -59,6 +62,7 @@ public:
   // Misc
   std::string getSummary() const;
   void print() const;
+  bool isSame(AnaEvent& anaEvent_) const;
 
   // Stream operator
   friend std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p );
@@ -76,6 +80,7 @@ private:
   double _treeWeight_{1};
   double _nominalWeight_{1};
   double _eventWeight_{1};
+  int _sampleBinIndex_{-1};
 
   // Caches
   std::map<FitParameterSet*, std::vector<Dial*>> _dialCache_; // _dialCache_[fitParSetPtr][ParIndex] = correspondingDialPtr;

@@ -32,16 +32,21 @@ public:
 
   void initialize();
 
-  DataEventType getDataEventType() const;
+  // Post init
+  void loadPhysicsEvents();
 
+  DataEventType getDataEventType() const;
   std::vector<FitSample> &getFitSampleList();
   std::vector<DataSet> &getDataSetList();
 
-  // Core
-  void loadPhysicsEvents();
+  // Parallel
+  void updateSampleEventBinIndexes() const;
+  void updateSampleBinEventList() const;
+  void updateSampleHistograms() const;
 
 private:
   bool _isInitialized_{false};
+  bool _showTimeStats_{true};
   nlohmann::json _config_;
   DataEventType _dataEventType_{DataEventType::Unset};
 

@@ -16,12 +16,14 @@ PhysicsEvent::~PhysicsEvent() { this->reset(); }
 void PhysicsEvent::reset() {
   _commonLeafNameListPtr_ = nullptr;
   _leafContentList_.clear();
-  _dataSetIndex_=-1;
 
   // Weight carriers
+  _dataSetIndex_=-1;
+  _entryIndex_=-1;
   _treeWeight_ = 1;
   _nominalWeight_ = 1;
   _eventWeight_ = 1;
+  _sampleBinIndex_ = -1;
 }
 
 void PhysicsEvent::setLeafNameListPtr(const std::vector<std::string> *leafNameListPtr) {
@@ -42,6 +44,9 @@ void PhysicsEvent::setNominalWeight(double nominalWeight) {
 void PhysicsEvent::setEventWeight(double eventWeight) {
   _eventWeight_ = eventWeight;
 }
+void PhysicsEvent::setSampleBinIndex(int sampleBinIndex) {
+  _sampleBinIndex_ = sampleBinIndex;
+}
 
 int PhysicsEvent::getDataSetIndex() const {
   return _dataSetIndex_;
@@ -57,6 +62,9 @@ double PhysicsEvent::getNominalWeight() const {
 }
 double PhysicsEvent::getEventWeight() const {
   return _eventWeight_;
+}
+int PhysicsEvent::getSampleBinIndex() const {
+  return _sampleBinIndex_;
 }
 std::map<FitParameterSet *, std::vector<Dial *>>* PhysicsEvent::getDialCachePtr() {
   return &_dialCache_;
@@ -148,13 +156,65 @@ std::string PhysicsEvent::getSummary() const {
   ss << std::endl << GET_VAR_NAME_VALUE(_treeWeight_);
   ss << std::endl << GET_VAR_NAME_VALUE(_nominalWeight_);
   ss << std::endl << GET_VAR_NAME_VALUE(_eventWeight_);
+  ss << std::endl << GET_VAR_NAME_VALUE(_sampleBinIndex_);
   for( const auto& dialCachePair : _dialCache_ ){
     ss << std::endl << dialCachePair.first->getName() << ": " << GenericToolbox::parseVectorAsString(dialCachePair.second);
+//    for( size_t iDial = 0 ; iDial < dialCachePair.second.size() ; iDial++ ){
+//      ss << std::endl << iDial << " -> " << dialCachePair.second.at(iDial);
+//    }
   }
   return ss.str();
 }
 void PhysicsEvent::print() const {
   LogInfo << *this << std::endl;
+}
+bool PhysicsEvent::isSame(AnaEvent& anaEvent_) const{
+
+  bool isSame = true;
+  for( const auto& varName : *_commonLeafNameListPtr_ ){
+    int anaIndex = anaEvent_.GetGlobalIndex(varName);
+    if( anaIndex == -1 ) continue;
+    if(this->getVarAsDouble(varName) != anaEvent_.GetEventVarAsDouble(varName) ){
+      isSame = false;
+      LogError << GET_VAR_NAME_VALUE(varName) << std::endl;
+      break;
+    }
+  }
+
+//  for( auto& parSetPair : _dialCache_ ){
+//    if( not GenericToolbox::doesKeyIsInMap(parSetPair.first, *anaEvent_.getDialCachePtr()) ){
+//      LogError << "PARSET NOT FOUND" << GET_VAR_NAME_VALUE(parSetPair.first->getName()) << std::endl;
+//      isSame = false;
+//      break;
+//    }
+//
+//    for( size_t iPar = 0 ; iPar < parSetPair.second.size() ; iPar++ ){
+//      if( parSetPair.second.at(iPar) != anaEvent_.getDialCachePtr()->at(parSetPair.first).at(iPar) ){
+//        LogError << GET_VAR_NAME_VALUE(parSetPair.first->getName()) << " -> " << iPar << std::endl;
+//        isSame = false;
+//        break;
+//      }
+//    }
+//
+//    if( not isSame ) break;
+//  }
+//
+//  if( _eventWeight_ != anaEvent_.GetEventWeight() ){
+//    LogError << "WEIGHT" << std::endl;
+//    isSame = false;
+//  }
+
+  if( _sampleBinIndex_ != anaEvent_.GetRecoBinIndex() ){
+    LogError << "BIN" << std::endl;
+    isSame = false;
+  }
+
+  if(not isSame){
+    this->print();
+    anaEvent_.Print();
+  }
+
+  return isSame;
 }
 
 std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p ){

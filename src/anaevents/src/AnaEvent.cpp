@@ -273,9 +273,9 @@ void AnaEvent::ResetEvWght() {
 }
 
 // Misc
-void AnaEvent::Print() {
+void AnaEvent::Print() const{
 
-  LogInfo << "Event ID: " << m_evid << std::endl;
+  LogInfo << " ** Event ID: " << m_evid << std::endl;
 
   LogInfo << "List of Int_t: {" << std::endl;
   for(size_t iInt = 0 ; iInt < _intNameListPtr_->size() ; iInt++){
@@ -290,6 +290,12 @@ void AnaEvent::Print() {
     LogInfo << "  \"" << (*_floatNameListPtr_)[iFloat] << "\": " << _floatValuesList_[GetFloatIndex((*_floatNameListPtr_)[iFloat])];
   }
   LogInfo << std::endl << "}" << std::endl;
+
+  LogWarning << GET_VAR_NAME_VALUE(_eventWeight_) << std::endl;
+  LogWarning << GET_VAR_NAME_VALUE(_recoBinIndex_) << std::endl;
+  for( const auto& dialCachePair : _dialCache_ ){
+    LogInfo << dialCachePair.first << ": " << GenericToolbox::parseVectorAsString(dialCachePair.second) << std::endl;
+  }
 
 }
 

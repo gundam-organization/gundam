@@ -44,7 +44,7 @@ void FitSampleSet::initialize() {
     JsonUtils::fetchValue<std::string>(_config_, "dataEventType"), true
     );
 
-  LogDebug << "Loading datasets..." << std::endl;
+  LogInfo << "Initializing input datasets..." << std::endl;
   auto dataSetListConfig = JsonUtils::fetchValue(_config_, "dataSetList", nlohmann::json());
   LogAssert(not dataSetListConfig.empty(), "No dataSet specified." << std::endl);
   for( const auto& dataSetConfig : dataSetListConfig ){
@@ -53,13 +53,50 @@ void FitSampleSet::initialize() {
     _dataSetList_.back().initialize();
   }
 
-  LogDebug << "Defining samples..." << std::endl;
+  LogInfo << "Reading samples definition..." << std::endl;
   auto fitSampleListConfig = JsonUtils::fetchValue(_config_, "fitSampleList", nlohmann::json());
   for( const auto& fitSampleConfig: fitSampleListConfig ){
     _fitSampleList_.emplace_back();
     _fitSampleList_.back().setConfig(fitSampleConfig);
     _fitSampleList_.back().initialize();
   }
+
+  LogInfo << "Creating parallelisable jobs" << std::endl;
+
+  // Fill the bin index inside of each event
+  std::function<void(int)> updateSampleEventBinIndexesFct = [this](int iThread){
+    for( auto& sample : _fitSampleList_ ){
+      sample.getMcContainer().updateEventBinIndexes(iThread);
+      sample.getDataContainer().updateEventBinIndexes(iThread);
+    }
+  };
+  GlobalVariables::getParallelWorker().addJob("FitSampleSet::updateSampleEventBinIndexes", updateSampleEventBinIndexesFct);
+
+  // Fill bin event caches
+  std::function<void(int)> updateSampleBinEventListFct = [this](int iThread){
+    for( auto& sample : _fitSampleList_ ){
+      sample.getMcContainer().updateBinEventList(iThread);
+      sample.getDataContainer().updateBinEventList(iThread);
+    }
+  };
+  GlobalVariables::getParallelWorker().addJob("FitSampleSet::updateSampleBinEventList", updateSampleBinEventListFct);
+
+
+  // Histogram fills
+  std::function<void(int)> refillMcHistogramsFct = [this](int iThread){
+    for( auto& sample : _fitSampleList_ ){
+      sample.getMcContainer().refillHistogram(iThread);
+      sample.getDataContainer().refillHistogram(iThread);
+    }
+  };
+  std::function<void()> rescaleMcHistogramsFct = [this](){
+    for( auto& sample : _fitSampleList_ ){
+      sample.getMcContainer().rescaleHistogram();
+      sample.getDataContainer().rescaleHistogram();
+    }
+  };
+  GlobalVariables::getParallelWorker().addJob("FitSampleSet::updateSampleHistograms", refillMcHistogramsFct);
+  GlobalVariables::getParallelWorker().setPostParallelJob("FitSampleSet::updateSampleHistograms", rescaleMcHistogramsFct);
 
   _isInitialized_ = true;
 }
@@ -83,6 +120,8 @@ void FitSampleSet::loadPhysicsEvents() {
   int dataSetIndex = -1;
   for( auto& dataSet : _dataSetList_ ){
     dataSetIndex++;
+
+    LogInfo << "Reading dataSet: " << dataSet.getName() << std::endl;
 
     std::vector<FitSample*> samplesToFillList;
     std::vector<TTreeFormula*> sampleCutFormulaList;
@@ -125,12 +164,12 @@ void FitSampleSet::loadPhysicsEvents() {
     LogInfo << "List of requested leaves: " << GenericToolbox::parseVectorAsString(dataSet.getRequestedLeafNameList()) << std::endl;
     LogInfo << "List of mandatory leaves: " << GenericToolbox::parseVectorAsString(dataSet.getRequestedMandatoryLeafNameList()) << std::endl;
 
-
     for( bool isData : {false, true} ){
       TChain* chainPtr{nullptr};
       std::vector<std::string>* activeLeafNameListPtr;
 
       if( isData and _dataEventType_ == DataEventType::Asimov ){ continue; }
+      LogDebug << GET_VAR_NAME_VALUE(isData) << std::endl;
 
       if( isData ){
         LogInfo << "Reading data files..." << std::endl;
@@ -160,7 +199,7 @@ void FitSampleSet::loadPhysicsEvents() {
       }
       LogInfo << "List of leaves which will be loaded in RAM: " << GenericToolbox::parseVectorAsString(*activeLeafNameListPtr) << std::endl;
 
-      LogInfo << "Performing event selection of samples with " << (isData?"data": "mc") << " files..." << std::endl;
+      LogInfo << "Performing event selection of samples with " << (isData? "data": "mc") << " files..." << std::endl;
       for( auto& sample : samplesToFillList ){
         sampleCutFormulaList.emplace_back(
           new TTreeFormula(
@@ -212,19 +251,22 @@ void FitSampleSet::loadPhysicsEvents() {
       std::vector< std::vector<PhysicsEvent>* > sampleEventListPtrToFill(samplesToFillList.size(), nullptr);
       for( size_t iSample = 0 ; iSample < sampleNbOfEvents.size() ; iSample++ ){
         if( isData ){
-          sampleEventListPtrToFill.at(iSample) = &samplesToFillList.at(iSample)->getDataEventList();
+          sampleEventListPtrToFill.at(iSample) = &samplesToFillList.at(iSample)->getDataContainer().eventList;
           sampleIndexOffsetList.at(iSample) = sampleEventListPtrToFill.at(iSample)->size();
-          samplesToFillList.at(iSample)->reserveMemoryForDataEvents(sampleNbOfEvents.at(iSample), dataSetIndex, eventBuf);
+          samplesToFillList.at(iSample)->getDataContainer().reserveEventMemory(dataSetIndex, sampleNbOfEvents.at(iSample),
+                                                                               eventBuf);
         }
         else{
-          sampleEventListPtrToFill.at(iSample) = &samplesToFillList.at(iSample)->getMcEventList();
+          sampleEventListPtrToFill.at(iSample) = &samplesToFillList.at(iSample)->getMcContainer().eventList;
           sampleIndexOffsetList.at(iSample) = sampleEventListPtrToFill.at(iSample)->size();
-          samplesToFillList.at(iSample)->reserveMemoryForMcEvents(sampleNbOfEvents.at(iSample), dataSetIndex, eventBuf);
+          samplesToFillList.at(iSample)->getMcContainer().reserveEventMemory(dataSetIndex, sampleNbOfEvents.at(iSample),
+                                                                               eventBuf);
         }
       }
 
       // Fill function
       ROOT::EnableImplicitMT();
+      std::mutex eventOffSetMutex;
       auto fillFunction = [&](int iThread_){
 
         TChain* threadChain;
@@ -235,7 +277,8 @@ void FitSampleSet::loadPhysicsEvents() {
         eventBufThread.hookToTree(threadChain, not isData);
         GenericToolbox::disableUnhookedBranches(threadChain);
 
-        auto threadSampleIndexOffsetList = sampleIndexOffsetList;
+//        auto threadSampleIndexOffsetList = sampleIndexOffsetList;
+        size_t sampleEventIndex;
 
         std::string progressTitle = LogInfo.getPrefixString() + "Reading selected events";
         for( Long64_t iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
@@ -256,7 +299,11 @@ void FitSampleSet::loadPhysicsEvents() {
 
           for( size_t iSample = 0 ; iSample < samplesToFillList.size() ; iSample++ ){
             if( eventIsInSamplesList.at(iEvent).at(iSample) ){
-              sampleEventListPtrToFill.at(iSample)->at(threadSampleIndexOffsetList.at(iSample)++) = PhysicsEvent(eventBufThread); // copy
+              eventOffSetMutex.lock();
+              sampleEventIndex = sampleIndexOffsetList.at(iSample)++;
+//              if(iSample==0) LogTrace << GET_VAR_NAME_VALUE(iThread_) << " -> " << sampleEventIndex << " -> " << iEvent << std::endl;
+              eventOffSetMutex.unlock();
+              sampleEventListPtrToFill.at(iSample)->at(sampleEventIndex) = PhysicsEvent(eventBufThread); // copy
             }
           }
         }
@@ -288,19 +335,30 @@ void FitSampleSet::loadPhysicsEvents() {
       }
 
     } // isData
-
-
-
   } // data Set
+
+  LogInfo << "Sorting events in list" << std::endl;
+  for( auto& sample : _fitSampleList_ ){
+    std::function<bool(const PhysicsEvent&, const PhysicsEvent&)> sortFunction = [](const PhysicsEvent& a, const PhysicsEvent& b){
+      // Does a goes before b ?
+      // Dataset index:
+      if( a.getDataSetIndex() != b.getDataSetIndex() ) return ( a.getDataSetIndex() < b.getDataSetIndex() );
+      // Event index
+      if( a.getEntryIndex() != b.getEntryIndex() ) return ( a.getEntryIndex() < b.getEntryIndex() );
+      return false;
+    };
+    auto p = GenericToolbox::getSortPermutation(sample.getMcContainer().eventList, sortFunction);
+    sample.getMcContainer().eventList = GenericToolbox::applyPermutation(sample.getMcContainer().eventList, p);
+  }
 
   if( _dataEventType_ == DataEventType::Asimov ){
     LogWarning << "Asimov data selected: copying MC events..." << std::endl;
     for( auto& sample : _fitSampleList_ ){
       LogInfo << "Copying MC events in sample \"" << sample.getName() << "\"" << std::endl;
-      auto& dataEventList = sample.getDataEventList();
+      auto& dataEventList = sample.getDataContainer().eventList;
       LogThrowIf(not dataEventList.empty(), "Can't fill Asimov data, dataEventList is not empty.");
 
-      auto& mcEventList = sample.getMcEventList();
+      auto& mcEventList = sample.getMcContainer().eventList;
       dataEventList.resize(mcEventList.size());
       for( size_t iEvent = 0 ; iEvent < dataEventList.size() ; iEvent++ ){
         dataEventList[iEvent] = mcEventList[iEvent];
@@ -310,14 +368,26 @@ void FitSampleSet::loadPhysicsEvents() {
 
   for( auto& sample : _fitSampleList_ ){
     LogInfo << "Total events loaded in \"" << sample.getName() << "\":" << std::endl
-    << "-> mc: " << sample.getMcEventList().size() << "("
-    << GenericToolbox::parseSizeUnits(sizeof(sample.getMcEventList()) * sample.getMcEventList().size())
-    << ")" << std::endl
-    << "-> data: " << sample.getDataEventList().size() << "("
-    << GenericToolbox::parseSizeUnits(sizeof(sample.getDataEventList()) * sample.getDataEventList().size())
-    << ")" << std::endl;
+    << "-> mc: " << sample.getMcContainer().eventList.size() << std::endl
+    << "-> data: " << sample.getDataContainer().eventList.size() << std::endl;
   }
 
+}
+
+void FitSampleSet::updateSampleEventBinIndexes() const{
+  if( _showTimeStats_ ) GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+  GlobalVariables::getParallelWorker().runJob("FitSampleSet::updateSampleEventBinIndexes");
+  if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
+}
+void FitSampleSet::updateSampleBinEventList() const{
+  if( _showTimeStats_ ) GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+  GlobalVariables::getParallelWorker().runJob("FitSampleSet::updateSampleBinEventList");
+  if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
+}
+void FitSampleSet::updateSampleHistograms() const {
+  if( _showTimeStats_ ) GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+  GlobalVariables::getParallelWorker().runJob("FitSampleSet::updateSampleHistograms");
+  if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
 }
 
 

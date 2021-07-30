@@ -184,20 +184,78 @@ void Propagator::initialize() {
   }
 
   if( not fitSampleSetConfig.empty() ){
+
+    LogInfo << "Set the current MC prior weights as nominal weight..." << std::endl;
+    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+      for( auto& event : sample.getMcContainer().eventList ){
+        event.setNominalWeight(event.getEventWeight());
+      }
+    }
+
     if( _fitSampleSet_.getDataEventType() == DataEventType::Asimov ){
       LogInfo << "Propagating prior weights on data Asimov events..." << std::endl;
       for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-        int nEvents = int(sample.getMcEventList().size());
+        sample.getDataContainer().histScale = sample.getMcContainer().histScale;
+        int nEvents = int(sample.getMcContainer().eventList.size());
         for( int iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
-          sample.getDataEventList().at(iEvent).setNominalWeight(
-            sample.getMcEventList().at(iEvent).getNominalWeight()
+          sample.getDataContainer().eventList.at(iEvent).setNominalWeight(
+            sample.getMcContainer().eventList.at(iEvent).getNominalWeight()
             );
-          sample.getDataEventList().at(iEvent).resetEventWeight();
+          sample.getDataContainer().eventList.at(iEvent).resetEventWeight();
         }
       }
     }
 
-    // FILL SAMPLES
+    LogInfo << "Filling samples event bin cache..." << std::endl;
+    _fitSampleSet_.updateSampleEventBinIndexes();
+    _fitSampleSet_.updateSampleBinEventList();
+    _fitSampleSet_.updateSampleHistograms();
+
+    // Now the data won't be refilled each time
+    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+      sample.getDataContainer().isLocked = true;
+    }
+
+    _fitSampleSet_.updateSampleHistograms(); // time?
+    _fitSampleSet_.updateSampleHistograms(); // time?
+    _fitSampleSet_.updateSampleHistograms(); // time?
+
+    auto* fTest = TFile::Open("fTest.root", "RECREATE");
+    int eventIndex = 0;
+    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+      GenericToolbox::mkdirTFile(fTest, "new")->cd();
+      sample.getMcContainer().histogram->Write(Form("MC_%s", sample.getName().c_str()));
+      LogDebug << sample.getName() << std::endl;
+//      for( auto& event : sample.getMcContainer().eventList ){
+//        if( eventIndex > 10) break;
+//        eventIndex++;
+//        LogTrace << event << std::endl;
+//      }
+    }
+
+    LogTrace << "****************************" << std::endl;
+
+//    eventIndex = 0;
+    for( auto& sample : _samplesList_ ){
+      GenericToolbox::mkdirTFile(fTest, "old")->cd();
+      sample.GetMCHisto().Write(Form("MC_%s", sample.GetName().c_str()));
+//      for( auto& event : sample.GetEventList() ){
+//        if( eventIndex > 10) break;
+//        eventIndex++;
+//        event.Print();
+//      }
+    }
+    fTest->Close();
+
+    for( size_t iSample = 0 ; iSample < _fitSampleSet_.getFitSampleList().size() ; iSample++ ){
+      auto* eventList = &_fitSampleSet_.getFitSampleList().at(iSample).getMcContainer().eventList;
+      auto* avaEventList = &_samplesList_.at(iSample).GetEventList();
+      for( size_t iEvent = 0 ; iEvent < eventList->size() ; iEvent++ ){
+        if( not eventList->at(iEvent).isSame(avaEventList->at(iEvent)) ){
+          throw std::runtime_error("NOT SAME");
+        }
+      }
+    }
 
     exit(EXIT_SUCCESS);
   }
@@ -281,7 +339,7 @@ void Propagator::initializeCaches() {
 
 
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    for( auto& event : sample.getMcEventList() ){
+    for( auto& event : sample.getMcContainer().eventList ){
       for( auto& parSet : _parameterSetsList_ ){
         auto* dialCache = event.getDialCachePtr();
         (*dialCache)[&parSet] = std::vector<Dial*>(parSet.getNbParameters(), nullptr);
@@ -408,7 +466,7 @@ void Propagator::fillEventDialCaches(int iThread_){
   } // parSet
 
 
-  if (iThread_ == GlobalVariables::getNbThreads() - 1)LogTrace << "New samples" << std::endl;
+  if (iThread_ == GlobalVariables::getNbThreads() - 1) LogTrace << "New samples" << std::endl;
   for( auto& parSet : _parameterSetsList_ ){
     if( not parSet.isEnabled() ){ continue; }
     int iPar = -1;
@@ -458,7 +516,7 @@ void Propagator::fillEventDialCaches(int iThread_){
         }
 
         for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-          if( not GenericToolbox::doesElementIsInVector(iDataSet, sample.getDataSetIndexList()) ){
+          if( not GenericToolbox::doesElementIsInVector(iDataSet, sample.getMcContainer().dataSetIndexList ) ){
             continue;
           }
 
@@ -466,8 +524,8 @@ void Propagator::fillEventDialCaches(int iThread_){
           ss << LogWarning.getPrefixString() << parSet.getName() << "/" << par.getTitle() << " -> " << sample.getName();
 //          ss << "Indexing event dials: " << parSet.getName() << "/" << par.getTitle() << " -> " << sample.getName();
 
-          int nEvents = int(sample.getMcEventNbList().at(iDataSet));
-          for (int iEvent = int(sample.getMcEventOffSetList().at(iDataSet)); iEvent < nEvents; iEvent++) {
+          int nEvents = int(sample.getMcContainer().eventNbList.at(iDataSet));
+          for (int iEvent = int(sample.getMcContainer().eventOffSetList.at(iDataSet)); iEvent < nEvents; iEvent++) {
 
             if (iEvent % GlobalVariables::getNbThreads() != iThread_) {
               continue;
@@ -476,15 +534,26 @@ void Propagator::fillEventDialCaches(int iThread_){
               GenericToolbox::displayProgressBar(iEvent, nEvents, ss.str());
             }
 
-            evPtr = &sample.getMcEventList().at(iEvent);
+            evPtr = &sample.getMcContainer().eventList.at(iEvent);
             if (evPtr->getDialCachePtr()->at(&parSet).at(iPar) != nullptr) {
               // already set
               continue;
             }
 
+//            if( evPtr->getEntryIndex() == 6 and par.getName() == "Q2_norm_1" ){
+//              evPtr->print();
+//              if (dialSet->getApplyConditionFormula() != nullptr
+//              and evPtr->evalFormula(dialSet->getApplyConditionFormula(), &varIndexFormulaList) == 0
+//              ) {
+//                LogError << GET_VAR_NAME_VALUE(dialSet->getApplyConditionFormula()->GetExpFormula()) << std::endl;
+////                LogError << GET_VAR_NAME_VALUE(evPtr->fetchValue<Float_t>("q2_true")) << std::endl;
+//                LogError << "LOL: " << GET_VAR_NAME_VALUE(evPtr->getVarAsDouble("q2_true")) << std::endl;
+//                continue; // SKIP
+//              }
+//            }
             if (dialSet->getApplyConditionFormula() != nullptr
-                and evPtr->evalFormula(dialSet->getApplyConditionFormula(), &varIndexFormulaList) == 0
-              ) {
+            and evPtr->evalFormula(dialSet->getApplyConditionFormula(), &varIndexFormulaList) == 0
+            ) {
               continue; // SKIP
             }
 
@@ -560,13 +629,13 @@ void Propagator::propagateParametersOnSamples(int iThread_) {
 
   PhysicsEvent* evPtr;
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    int nEvents = int(sample.getMcEventList().size());
+    int nEvents = int(sample.getMcContainer().eventList.size());
     for( int iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
       if( iEvent % GlobalVariables::getNbThreads() != iThread_ ){
         continue;
       }
 
-      evPtr = &sample.getMcEventList().at(iEvent);
+      evPtr = &sample.getMcContainer().eventList.at(iEvent);
       evPtr->resetEventWeight();
 
       // Loop over the parSet that are cached (missing ones won't apply on this event anyway)
@@ -592,7 +661,7 @@ void Propagator::propagateParametersOnSamples(int iThread_) {
         evPtr->addEventWeight(weight);
 
       } // parSetCache
-    }
-  }
+    } // event
+  } // sample
 
 }

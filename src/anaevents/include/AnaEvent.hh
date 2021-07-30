@@ -87,7 +87,7 @@ public:
   void ResetEvWght();
 
   // Misc
-  void Print();
+  void Print() const;
 
   // Old: Direct Access Setters
   void SetTopology(Int_t val)   { *_topologyPtr_ = val; }

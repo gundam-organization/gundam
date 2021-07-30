@@ -13,10 +13,12 @@
 #include "json.hpp"
 
 #include "DataSet.h"
-#include "PhysicsEvent.h"
+#include "SampleElement.h"
 #include "DataBinSet.h"
 
+
 class FitSample {
+
 
 public:
   FitSample();
@@ -24,54 +26,38 @@ public:
 
   void reset();
 
+  // SETTERS
   void setConfig(const nlohmann::json &config_);
 
+  // INIT
   void initialize();
 
+  // GETTERS
   bool isEnabled() const;
-
   const std::string &getName() const;
   const std::string &getSelectionCutsStr() const;
-  std::vector<PhysicsEvent> &getMcEventList();
-  std::vector<PhysicsEvent> &getDataEventList();
   const DataBinSet &getBinning() const;
+  SampleElement &getMcContainer();
+  SampleElement &getDataContainer();
 
-  const std::vector<size_t> & getDataSetIndexList() const;
-  const std::vector<size_t> &getMcEventOffSetList() const;
-  const std::vector<size_t> &getMcEventNbList() const;
-  const std::vector<size_t> &getDataEventOffSetList() const;
-  const std::vector<size_t> &getDataEventNbList() const;
-
+  // Misc
   bool isDataSetValid(const std::string& dataSetName_);
-  void reserveMemoryForMcEvents(size_t nbEvents_, size_t dataSetIndex_, const PhysicsEvent& eventBuffer_);
-  void reserveMemoryForDataEvents(size_t nbEvents_, size_t dataSetIndex_, const PhysicsEvent& eventBuffer_);
 
 private:
+  // Yaml
   nlohmann::json _config_;
-
-  // internals
   bool _isEnabled_{false};
   std::string _name_;
-
-  DataBinSet _binning_;
-
   std::string _selectionCuts_;
   std::vector<std::string> _dataSetsSelections_;
-
-  // DataSet Internals
-  std::vector<size_t> _dataSetIndexList_;
-  std::vector<size_t> _mcEventOffSetList_;  // for each dataSet
-  std::vector<size_t> _mcEventNbList_;      // for each dataSet
-  std::vector<size_t> _dataEventOffSetList_;  // for each dataSet
-  std::vector<size_t> _dataEventNbList_;      // for each dataSet
-
   double _mcNorm_{1};
-  std::vector<PhysicsEvent> _mcEventList_;
-  std::shared_ptr<TH1D> _mcHistogram_{nullptr};
-
   double _dataNorm_{1};
-  std::vector<PhysicsEvent> _dataEventList_;
-  std::shared_ptr<TH1D> _dataHistogram_{nullptr};
+
+  // Internals
+  DataBinSet _binning_;
+  SampleElement _mcContainer_;
+  SampleElement _dataContainer_;
+  std::vector<size_t> _dataSetIndexList_;
 
 };
 
