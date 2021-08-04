@@ -15,9 +15,13 @@
 #include "DataBinSet.h"
 #include "PhysicsEvent.h"
 
+
 class SampleElement{
 
 public:
+
+  SampleElement();
+  virtual ~SampleElement();
 
   // Events
   std::vector<PhysicsEvent> eventList;

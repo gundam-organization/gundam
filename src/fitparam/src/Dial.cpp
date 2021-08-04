@@ -66,10 +66,10 @@ double Dial::evalResponse(const double &parameterValue_) {
     return _dialResponseCache_;
   }
 
-  LogTrace << this << " < " << _dialParameterCache_ << " -> " << _dialResponseCache_ << std::endl;
+//  LogTrace << this << " < " << _dialParameterCache_ << " -> " << _dialResponseCache_ << std::endl;
   _dialParameterCache_ = parameterValue_;
   this->updateResponseCache(parameterValue_); // specified in the corresponding dial class
-  LogTrace << this << " > " << _dialParameterCache_ << " -> " << _dialResponseCache_ << std::endl;
+//  LogTrace << this << " > " << _dialParameterCache_ << " -> " << _dialResponseCache_ << std::endl;
   _mutexPtr_->unlock();
 
   return _dialResponseCache_;

@@ -247,14 +247,22 @@ PlotGenerator &Propagator::getPlotGenerator() {
 
 
 void Propagator::propagateParametersOnSamples() {
-  if( _showTimeStats_ ) GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+//  if( _showTimeStats_ ){
+    GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+//  }
   GlobalVariables::getParallelWorker().runJob("Propagator::propagateParametersOnSamples");
-  if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
+  weightPropagationTime = GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__);
+  if( _showTimeStats_ ) {
+    LogDebug << __METHOD_NAME__ << " took: " << weightPropagationTime << std::endl;
+  }
 }
 void Propagator::fillSampleHistograms(){
-  if( _showTimeStats_ ) GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+//  if( _showTimeStats_ ) {
+    GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+//  }
   GlobalVariables::getParallelWorker().runJob("Propagator::fillSampleHistograms");
-  if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
+  fillPropagationTime = GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__);
+  if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << fillPropagationTime << std::endl;
 }
 
 
@@ -612,10 +620,12 @@ void Propagator::propagateParametersOnSamples(int iThread_) {
   }
   else{
     PhysicsEvent* evPtr;
+    Dial* dialPtr;
+    int nThreads = GlobalVariables::getNbThreads();
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
       int nEvents = int(sample.getMcContainer().eventList.size());
       for( int iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
-        if( iEvent % GlobalVariables::getNbThreads() != iThread_ ){
+        if( iEvent % nThreads != iThread_ ){
           continue;
         }
 
@@ -628,7 +638,7 @@ void Propagator::propagateParametersOnSamples(int iThread_) {
           weight = 1;
           for( size_t iPar = 0 ; iPar < parSetDialCache.first->getNbParameters() ; iPar++ ){
 
-            Dial* dialPtr = parSetDialCache.second.at(iPar);
+            dialPtr = parSetDialCache.second.at(iPar);
             if( dialPtr == nullptr ) continue;
 
             // No need to recast dialPtr as a NormDial or whatever, it will automatically fetch the right method

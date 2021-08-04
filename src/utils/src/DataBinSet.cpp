@@ -42,7 +42,7 @@ void DataBinSet::readBinningDefinition(const std::string &filePath_) {
   std::vector<std::string> expectedVariableList;
   std::vector<std::string> expectedVariableTitleList;
   std::vector<bool> expectedVariableIsRangeList;
-  int nbExpectedValues;
+  int nbExpectedValues{0};
 
   for( const auto& line : lines ){
 
@@ -113,7 +113,7 @@ void DataBinSet::readBinningDefinition(const std::string &filePath_) {
     }
     else{
 
-      if( lineElements.size() != nbExpectedValues ){
+      if( int(lineElements.size()) != nbExpectedValues ){
         LogError << "(" << GET_VAR_NAME_VALUE(lineElements.size()) << ") != (" << GET_VAR_NAME_VALUE(lineElements.size()) << ")" << std::endl;
         LogError << "Expected: " << GenericToolbox::parseVectorAsString(expectedVariableTitleList) << std::endl;
         LogError << "Got: " << GenericToolbox::parseVectorAsString(lineElements) << std::endl;

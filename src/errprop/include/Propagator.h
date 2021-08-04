@@ -73,6 +73,10 @@ private:
   TTree* dataTree{nullptr};
   std::string mc_file_path;
 
+public:
+  std::string weightPropagationTime;
+  std::string fillPropagationTime;
+
 };
 
 

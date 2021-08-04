@@ -329,7 +329,9 @@ double FitterEngine::evalFit(const double* parArray_){
   if( _fitUnderGoing_ ){
     std::stringstream ss;
     ss << __METHOD_NAME__ << ": call #" << _nbFitCalls_ << std::endl;
-    ss << "Computation time: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__);
+    ss << "Computation time: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
+    ss << GET_VAR_NAME_VALUE(_propagator_.weightPropagationTime) << std::endl;
+    ss << GET_VAR_NAME_VALUE(_propagator_.fillPropagationTime);
     _convergenceMonitor_.setHeaderString(ss.str());
     _convergenceMonitor_.getVariable("Total").addQuantity(_chi2Buffer_);
     _convergenceMonitor_.getVariable("Stat").addQuantity(_chi2StatBuffer_);

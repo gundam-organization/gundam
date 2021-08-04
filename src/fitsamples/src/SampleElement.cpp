@@ -3,6 +3,7 @@
 //
 
 #include "Logger.h"
+#include "GenericToolbox.h"
 
 #include "GlobalVariables.h"
 #include "SampleElement.h"
@@ -11,6 +12,9 @@ LoggerInit([](){
   Logger::setUserHeaderStr("[SampleElement]");
 })
 
+
+SampleElement::SampleElement() = default;
+SampleElement::~SampleElement() = default;
 
 void SampleElement::reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const PhysicsEvent &eventBuffer_) {
   LogThrowIf(isLocked, "Can't " << __METHOD_NAME__ << " while locked");
@@ -23,12 +27,10 @@ void SampleElement::reserveEventMemory(size_t dataSetIndex_, size_t nEvents, con
 void SampleElement::updateEventBinIndexes(int iThread_){
   if( isLocked ) return;
   int nBins = int(binning.getBinsList().size());
+  std::string progressTitle = LogInfo.getPrefixString() + "Finding bin index for each event...";
   for( size_t iEvent = 0 ; iEvent < eventList.size() ; iEvent++ ){
     if( iThread_ != -1 and iEvent % GlobalVariables::getNbThreads() != iThread_ ) continue;
-    if( iThread_ <= 0 ){
-      DisplayProgressBar(iEvent, eventList.size(),
-                         LogInfo.getPrefixString() << "Finding bin index for each event...");
-    }
+    if( iThread_ <= 0 ){ GenericToolbox::displayProgressBar(iEvent, eventList.size(), progressTitle); }
 
     auto& event = eventList.at(iEvent);
     for( int iBin = 0 ; iBin < nBins ; iBin++ ){
@@ -47,8 +49,7 @@ void SampleElement::updateEventBinIndexes(int iThread_){
     } // Bin
   } // Event
   if( iThread_ <= 0 ){
-    DisplayProgressBar(eventList.size(), eventList.size(),
-                       LogInfo.getPrefixString() << "Finding bin index for each event...");
+    GenericToolbox::displayProgressBar(eventList.size(), eventList.size(), progressTitle);
   }
 }
 void SampleElement::updateBinEventList(int iThread_) {
@@ -94,4 +95,3 @@ void SampleElement::rescaleHistogram() {
   if( isLocked ) return;
   if(histScale != 1) histogram->Scale(histScale);
 }
-
