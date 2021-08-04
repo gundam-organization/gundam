@@ -9,6 +9,7 @@
 #include "TDirectory.h"
 
 #include "AnaSample.hh"
+#include "FitSampleSet.h"
 
 struct HistHolder{
   // Hist
@@ -21,9 +22,11 @@ struct HistHolder{
 
   // Data
   bool isData{false};
-  const AnaSample* samplePtr{nullptr};
+  const AnaSample* anaSamplePtr{nullptr};
+  const FitSample* fitSamplePtr{nullptr};
   std::mutex* fillMutexPtr{nullptr};
-  std::function<void(TH1D*, const AnaEvent*)> fillFunction;
+  std::function<void(TH1D*, const AnaEvent*)> fillFunctionAnaSample;
+  std::function<void(TH1D*, const PhysicsEvent*)> fillFunctionFitSample;
 
   // X axis
   std::string varToPlot;
@@ -70,9 +73,11 @@ public:
   // Setters
   void setConfig(const nlohmann::json &config_);
   void setSampleListPtr(const std::vector<AnaSample> *sampleListPtr_);
+  void setFitSampleSetPtr(const FitSampleSet *fitSampleSetPtr);
 
   // Init
   void initialize();
+  void defineHistogramHolders();
 
   // Getters
   const std::vector<HistHolder> &getHistHolderList() const;
@@ -92,14 +97,10 @@ public:
   std::vector<std::string> fetchListOfSplitVarNames();
   std::vector<std::string> fetchRequestedLeafNames();
 
-
-protected:
-  void defineHistogramHolders();
-
-
 private:
   nlohmann::json _config_;
-  const std::vector<AnaSample>* _sampleListPtr_;
+  const std::vector<AnaSample>* _sampleListPtr_{nullptr};
+  const FitSampleSet* _fitSampleSetPtr_{nullptr};
 
   // Internals
   nlohmann::json _varDictionary_;

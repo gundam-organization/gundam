@@ -115,10 +115,6 @@ int PhysicsEvent::findVarIndex(const std::string& leafName_, bool throwIfNotFoun
   }
   return -1;
 }
-template<typename T> auto PhysicsEvent::fetchValue(const std::string &leafName_, size_t arrayIndex_) -> T {
-  int index = this->findVarIndex(leafName_, true);
-  return _leafContentList_.at(index).template getVariable<T>(arrayIndex_);
-}
 double PhysicsEvent::getVarAsDouble(const std::string& leafName_, size_t arrayIndex_) const{
   int index = this->findVarIndex(leafName_, true);
   return this->getVarAsDouble(index, arrayIndex_);

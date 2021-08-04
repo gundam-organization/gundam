@@ -37,6 +37,7 @@ public:
 
   // Getters
   DataEventType getDataEventType() const;
+  const std::vector<FitSample> &getFitSampleList() const;
   std::vector<FitSample> &getFitSampleList();
   std::vector<DataSet> &getDataSetList();
 

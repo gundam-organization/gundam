@@ -111,6 +111,9 @@ void FitSampleSet::initialize() {
 DataEventType FitSampleSet::getDataEventType() const {
   return _dataEventType_;
 }
+const std::vector<FitSample> &FitSampleSet::getFitSampleList() const {
+  return _fitSampleList_;
+}
 std::vector<FitSample> &FitSampleSet::getFitSampleList() {
   return _fitSampleList_;
 }

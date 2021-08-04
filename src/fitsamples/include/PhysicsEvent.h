@@ -54,7 +54,8 @@ public:
 
   // Fetch var
   int findVarIndex(const std::string& leafName_, bool throwIfNotFound_ = true) const;
-  template<typename T> auto fetchValue(const std::string& leafName_, size_t arrayIndex_ = 0) -> T;
+  template<typename T> auto getVarValue(const std::string& leafName_, size_t arrayIndex_ = 0) const -> T;
+  template<typename T> auto getVariable(const std::string& leafName_, size_t arrayIndex_ = 0) -> T&;
   double getVarAsDouble(const std::string& leafName_, size_t arrayIndex_ = 0) const;
   double getVarAsDouble(int varIndex_, size_t arrayIndex_ = 0) const;
   double evalFormula(TFormula* formulaPtr_, std::vector<int>* indexDict_ = nullptr) const;
@@ -86,6 +87,17 @@ private:
   std::map<FitParameterSet*, std::vector<Dial*>> _dialCache_; // _dialCache_[fitParSetPtr][ParIndex] = correspondingDialPtr;
 
 };
+
+
+// TEMPLATES IMPLEMENTATION
+template<typename T> auto PhysicsEvent::getVarValue(const std::string &leafName_, size_t arrayIndex_) const -> T {
+  int index = this->findVarIndex(leafName_, true);
+  return _leafContentList_.at(index).template getVariable<T>(arrayIndex_);
+}
+template<typename T> auto PhysicsEvent::getVariable(const std::string& leafName_, size_t arrayIndex_) -> T&{
+  int index = this->findVarIndex(leafName_, true);
+  return _leafContentList_.at(index).template getVariable<T>(arrayIndex_);
+}
 
 
 #endif //XSLLHFITTER_PHYSICSEVENT_H

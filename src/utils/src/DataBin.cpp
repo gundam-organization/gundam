@@ -71,6 +71,11 @@ const std::vector<std::string> &DataBin::getVariableNameList() const {
 const std::vector<std::pair<double, double>> &DataBin::getEdgesList() const {
   return _edgesList_;
 }
+const std::pair<double, double>& DataBin::getVarEdges( const std::string& varName_ ) const{
+  int varIndex = GenericToolbox::findElementIndex(varName_, _variableNameList_);
+  LogThrowIf(varIndex == -1, varName_ << " not found in: " << GenericToolbox::parseVectorAsString(_variableNameList_));
+  return _edgesList_.at(varIndex);
+}
 const std::string &DataBin::getFormulaStr() const {
   return _formulaStr_;
 }

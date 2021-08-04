@@ -34,6 +34,7 @@ public:
   bool isZeroWideRangesTolerated() const;
   const std::vector<std::string> &getVariableNameList() const;
   const std::vector<std::pair<double, double>> &getEdgesList() const;
+  const std::pair<double, double>& getVarEdges( const std::string& varName_ ) const;
   const std::string &getFormulaStr() const;
   const std::string &getTreeFormulaStr() const;
   TFormula *getFormula() const;

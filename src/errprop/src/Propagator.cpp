@@ -82,43 +82,38 @@ void Propagator::initialize() {
   LogDebug << "FitSampleSet..." << std::endl;
   auto fitSampleSetConfig = JsonUtils::fetchValue(_config_, "fitSampleSetConfig", nlohmann::json());
   if( not fitSampleSetConfig.empty() ){
-    // CURRENTLY IMPLEMENTING...
-
     _fitSampleSet_.setConfig(fitSampleSetConfig);
     _fitSampleSet_.initialize();
-
   }
-
-  LogTrace << "Samples..." << std::endl;
-  auto samplesConfig = JsonUtils::fetchValue<json>(_config_, "samplesConfig");
-  if( samplesConfig.is_string() ) samplesConfig = JsonUtils::readConfigFile(samplesConfig.get<std::string>());
-  for( const auto& sampleConfig : samplesConfig ){
-    if( JsonUtils::fetchValue(sampleConfig, "isEnabled", true) ){
-      _samplesList_.emplace_back();
-      _samplesList_.back().setupWithJsonConfig(sampleConfig);
-      _samplesList_.back().setDataTree(dataTree);
-      _samplesList_.back().Initialize();
+  else{
+    LogTrace << "Samples..." << std::endl;
+    auto samplesConfig = JsonUtils::fetchValue<json>(_config_, "samplesConfig");
+    if( samplesConfig.is_string() ) samplesConfig = JsonUtils::readConfigFile(samplesConfig.get<std::string>());
+    for( const auto& sampleConfig : samplesConfig ){
+      if( JsonUtils::fetchValue(sampleConfig, "isEnabled", true) ){
+        _samplesList_.emplace_back();
+        _samplesList_.back().setupWithJsonConfig(sampleConfig);
+        _samplesList_.back().setDataTree(dataTree);
+        _samplesList_.back().Initialize();
+      }
     }
+
+    auto* selected_events_AnaTreeMC = new AnaTreeMC(mc_file_path, "selectedEvents"); // trouble while deleting... > need to check
+    LogInfo << "Reading and collecting events..." << std::endl;
+    std::vector<SignalDef> buf;
+    std::vector<AnaSample*> samplePtrList;
+    for( auto& sample : _samplesList_ ) samplePtrList.emplace_back(&sample);
+    selected_events_AnaTreeMC->GetEvents(samplePtrList, buf, false);
   }
 
-  auto* selected_events_AnaTreeMC = new AnaTreeMC(mc_file_path, "selectedEvents"); // trouble while deleting... > need to check
-  LogInfo << "Reading and collecting events..." << std::endl;
-  std::vector<SignalDef> buf;
-  std::vector<AnaSample*> samplePtrList;
-  for( auto& sample : _samplesList_ ) samplePtrList.emplace_back(&sample);
-  selected_events_AnaTreeMC->GetEvents(samplePtrList, buf, false);
 
-
-  LogTrace << "Other..." << std::endl;
+  LogTrace << "Initializing the PlotGenerator" << std::endl;
   auto plotGeneratorConfig = JsonUtils::fetchValue<json>(_config_, "plotGeneratorConfig");
   if( plotGeneratorConfig.is_string() ) parameterSetListConfig = JsonUtils::readConfigFile(plotGeneratorConfig.get<std::string>());
   _plotGenerator_.setConfig(plotGeneratorConfig);
-  _plotGenerator_.setSampleListPtr( &_samplesList_ );
   _plotGenerator_.initialize();
 
   if( not _fitSampleSet_.empty() ){
-    // WORK IN PROGRESS...
-
     LogInfo << "Polling the requested leaves to load in memory..." << std::endl;
     for( auto& dataSet : _fitSampleSet_.getDataSetList() ){
 
@@ -155,7 +150,13 @@ void Propagator::initialize() {
     } // dataSets
 
     _fitSampleSet_.loadPhysicsEvents();
+    _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
   }
+  else{
+    // OLD SAMPLES
+    _plotGenerator_.setSampleListPtr( &_samplesList_ );
+  }
+  _plotGenerator_.defineHistogramHolders();
 
   initializeThreads();
   initializeCaches();
