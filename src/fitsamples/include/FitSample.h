@@ -37,6 +37,8 @@ public:
   const std::string &getName() const;
   const std::string &getSelectionCutsStr() const;
   const DataBinSet &getBinning() const;
+  const SampleElement &getMcContainer() const;
+  const SampleElement &getDataContainer() const;
   SampleElement &getMcContainer();
   SampleElement &getDataContainer();
 

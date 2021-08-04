@@ -55,25 +55,13 @@ void FitterEngine::initialize() {
   initializePropagator();
   initializeMinimizer();
 
-  _convergenceMonitor_.addDisplayedQuantity("VarName");
-  _convergenceMonitor_.addDisplayedQuantity("LastAddedValue");
-  _convergenceMonitor_.addDisplayedQuantity("SlopePerCall");
-
-  _convergenceMonitor_.getQuantity("VarName").title = "Chi2";
-  _convergenceMonitor_.getQuantity("LastAddedValue").title = "Current Value";
-  _convergenceMonitor_.getQuantity("SlopePerCall").title = "Avg. Slope /call";
-
-  _convergenceMonitor_.addVariable("Total");
-  _convergenceMonitor_.addVariable("Stat");
-  _convergenceMonitor_.addVariable("Syst");
-
 }
 
 void FitterEngine::generateSamplePlots(const std::string& saveDir_){
 
   LogInfo << __METHOD_NAME__ << std::endl;
 
-  _propagator_.propagateParametersOnEvents();
+  _propagator_.propagateParametersOnSamples();
   _propagator_.fillSampleHistograms();
   _propagator_.getPlotGenerator().generateSamplePlots(
     GenericToolbox::mkdirTFile(_saveDir_, saveDir_ )
@@ -82,7 +70,7 @@ void FitterEngine::generateSamplePlots(const std::string& saveDir_){
 }
 void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
 
-  _propagator_.propagateParametersOnEvents();
+  _propagator_.propagateParametersOnSamples();
   _propagator_.fillSampleHistograms();
   _propagator_.getPlotGenerator().generateSamplePlots();
 
@@ -102,7 +90,7 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
       par.setParameterValue( currentParValue + par.getStdDevValue() );
       LogInfo << "(" << iPar+1 << "/" << _nbFitParameters_ << ") +1 sigma on " << parSet.getName() + "/" + par.getTitle()
       << " -> " << par.getParameterValue() << std::endl;
-      _propagator_.propagateParametersOnEvents();
+      _propagator_.propagateParametersOnSamples();
       _propagator_.fillSampleHistograms();
 
       std::string savePath = saveDir_;
@@ -116,7 +104,7 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
       auto oneSigmaHistList = _propagator_.getPlotGenerator().getHistHolderList();
       _propagator_.getPlotGenerator().generateComparisonPlots( oneSigmaHistList, refHistList, saveDir );
       par.setParameterValue( currentParValue );
-      _propagator_.propagateParametersOnEvents();
+      _propagator_.propagateParametersOnSamples();
       _propagator_.fillSampleHistograms();
 
       const auto& compHistList = _propagator_.getPlotGenerator().getComparisonHistHolderList();
@@ -138,10 +126,11 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
 void FitterEngine::fixGhostParameters(){
   LogInfo << __METHOD_NAME__ << std::endl;
 
-  _propagator_.propagateParametersOnEvents();
+  _propagator_.propagateParametersOnSamples();
   _propagator_.fillSampleHistograms();
   updateChi2Cache();
 
+  LogDebug << "Reference χ² = " << _chi2StatBuffer_ << std::endl;
   double baseChi2Stat = _chi2StatBuffer_;
 
   // +1 sigma
@@ -154,7 +143,7 @@ void FitterEngine::fixGhostParameters(){
       par.setParameterValue( currentParValue + par.getStdDevValue() );
       LogInfo << "(" << iPar+1 << "/" << _nbFitParameters_ << ") +1 sigma on " << parSet.getName() + "/" + par.getTitle()
               << " -> " << par.getParameterValue() << std::endl;
-      _propagator_.propagateParametersOnEvents();
+      _propagator_.propagateParametersOnSamples();
       _propagator_.fillSampleHistograms();
 
       // Compute the Chi2
@@ -172,7 +161,7 @@ void FitterEngine::fixGhostParameters(){
       }
 
       par.setParameterValue( currentParValue );
-      _propagator_.propagateParametersOnEvents();
+      _propagator_.propagateParametersOnSamples();
     }
   }
 }
@@ -230,7 +219,7 @@ void FitterEngine::throwParameters(){
     iPar++;
   }
 
-  _propagator_.propagateParametersOnEvents();
+  _propagator_.propagateParametersOnSamples();
   _propagator_.fillSampleHistograms();
 }
 
@@ -289,13 +278,20 @@ void FitterEngine::updateChi2Cache(){
   ////////////////////////////////
   _chi2StatBuffer_ = 0; // reset
   double buffer;
-  for( const auto& sample : _propagator_.getSamplesList() ){
-    //buffer = _samplesList_.at(sampleContainer)->CalcChi2();
-    buffer = sample.CalcLLH();
-    //buffer = _samplesList_.at(sampleContainer)->CalcEffLLH();
 
-    _chi2StatBuffer_ += buffer;
+  if( not _propagator_.getFitSampleSet().empty() ){
+    _chi2StatBuffer_ = _propagator_.getFitSampleSet().evalLikelihood();
   }
+  else {
+    for( const auto& sample : _propagator_.getSamplesList() ){
+      //buffer = _samplesList_.at(sampleContainer)->CalcChi2();
+      buffer = sample.CalcLLH();
+      //buffer = _samplesList_.at(sampleContainer)->CalcEffLLH();
+
+      _chi2StatBuffer_ += buffer;
+    }
+  }
+
 
 
   ////////////////////////////////
@@ -324,7 +320,7 @@ double FitterEngine::evalFit(const double* parArray_){
     }
   }
 
-  _propagator_.propagateParametersOnEvents();
+  _propagator_.propagateParametersOnSamples();
   _propagator_.fillSampleHistograms();
 
   // Compute the Chi2
@@ -473,6 +469,7 @@ void FitterEngine::writePostFitData() {
 }
 
 void FitterEngine::initializePropagator(){
+  LogDebug << __METHOD_NAME__ << std::endl;
 
   _propagator_.setConfig(JsonUtils::fetchValue<json>(_config_, "propagatorConfig"));
 
@@ -481,15 +478,14 @@ void FitterEngine::initializePropagator(){
   _propagator_.setMcFilePath(JsonUtils::fetchValue<std::string>(_config_, "mc_file"));
   _propagator_.initialize();
 
-  LogTrace << "Counting parameters" << std::endl;
+}
+void FitterEngine::initializeMinimizer(){
+  LogDebug << __METHOD_NAME__ << std::endl;
+
   _nbFitParameters_ = 0;
   for( const auto& parSet : _propagator_.getParameterSetsList() ){
     _nbFitParameters_ += int(parSet.getNbParameters());
   }
-  LogTrace << GET_VAR_NAME_VALUE(_nbFitParameters_) << std::endl;
-
-}
-void FitterEngine::initializeMinimizer(){
 
   auto minimizationConfig = JsonUtils::fetchSubEntry(_config_, {"minimizerConfig"});
   if( minimizationConfig.is_string() ){ minimizationConfig = JsonUtils::readConfigFile(minimizationConfig.get<std::string>()); }
@@ -534,5 +530,17 @@ void FitterEngine::initializeMinimizer(){
           << "Number of free parameters   : " << _minimizer_->NFree() << std::endl
           << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree()
           << std::endl;
+
+  _convergenceMonitor_.addDisplayedQuantity("VarName");
+  _convergenceMonitor_.addDisplayedQuantity("LastAddedValue");
+  _convergenceMonitor_.addDisplayedQuantity("SlopePerCall");
+
+  _convergenceMonitor_.getQuantity("VarName").title = "Chi2";
+  _convergenceMonitor_.getQuantity("LastAddedValue").title = "Current Value";
+  _convergenceMonitor_.getQuantity("SlopePerCall").title = "Avg. Slope /call";
+
+  _convergenceMonitor_.addVariable("Total");
+  _convergenceMonitor_.addVariable("Stat");
+  _convergenceMonitor_.addVariable("Syst");
 
 }

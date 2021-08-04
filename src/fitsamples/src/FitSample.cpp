@@ -57,6 +57,8 @@ void FitSample::initialize() {
   _dataNorm_ = JsonUtils::fetchValue(_config_, "dataNorm", _dataNorm_);
   _binning_.readBinningDefinition( JsonUtils::fetchValue<std::string>(_config_, "binning") );
 
+  TH1::SetDefaultSumw2(true);
+
   _mcContainer_.binning = _binning_;
   _mcContainer_.histScale = _dataNorm_/_mcNorm_;
   _mcContainer_.perBinEventPtrList.resize(_binning_.getBinsList().size());
@@ -88,6 +90,12 @@ const std::string &FitSample::getSelectionCutsStr() const {
 }
 const DataBinSet &FitSample::getBinning() const {
   return _binning_;
+}
+const SampleElement &FitSample::getMcContainer() const {
+  return _mcContainer_;
+}
+const SampleElement &FitSample::getDataContainer() const {
+  return _dataContainer_;
 }
 SampleElement &FitSample::getMcContainer() {
   return _mcContainer_;

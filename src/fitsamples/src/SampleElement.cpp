@@ -22,11 +22,14 @@ void SampleElement::reserveEventMemory(size_t dataSetIndex_, size_t nEvents, con
 }
 void SampleElement::updateEventBinIndexes(int iThread_){
   if( isLocked ) return;
-  std::string progressTitle = LogInfo.getPrefixString() + "Finding bin index for each event...";
   int nBins = int(binning.getBinsList().size());
   for( size_t iEvent = 0 ; iEvent < eventList.size() ; iEvent++ ){
     if( iThread_ != -1 and iEvent % GlobalVariables::getNbThreads() != iThread_ ) continue;
-    if( iThread_ <= 0 ) GenericToolbox::displayProgressBar(iEvent, eventList.size(), progressTitle);
+    if( iThread_ <= 0 ){
+      DisplayProgressBar(iEvent, eventList.size(),
+                         LogInfo.getPrefixString() << "Finding bin index for each event...");
+    }
+
     auto& event = eventList.at(iEvent);
     for( int iBin = 0 ; iBin < nBins ; iBin++ ){
       auto& bin = binning.getBinsList().at(iBin);
@@ -43,6 +46,10 @@ void SampleElement::updateEventBinIndexes(int iThread_){
       }
     } // Bin
   } // Event
+  if( iThread_ <= 0 ){
+    DisplayProgressBar(eventList.size(), eventList.size(),
+                       LogInfo.getPrefixString() << "Finding bin index for each event...");
+  }
 }
 void SampleElement::updateBinEventList(int iThread_) {
   if( isLocked ) return;
@@ -64,6 +71,7 @@ void SampleElement::updateBinEventList(int iThread_) {
       }
     } // event
   } // hist bin
+  if( iThread_ <= 0 ) GenericToolbox::displayProgressBar(nBins, nBins, progressTitle);
 }
 void SampleElement::refillHistogram(int iThread_){
   if( isLocked ) return;
@@ -72,9 +80,14 @@ void SampleElement::refillHistogram(int iThread_){
   for(int iBin = 0 ; iBin < nBins ; iBin++){
     if( iThread_ != -1 and iBin % GlobalVariables::getNbThreads() != iThread_ ) continue;
     histogram->SetBinContent(iBin+1, 0);
+    histogram->SetBinError(iBin+1, 0);
     for( auto* eventPtr : perBinEventPtrList.at(iBin)){
       histogram->AddBinContent(iBin+1, eventPtr->getEventWeight());
+// https://root-forum.cern.ch/t/bin-errors-with-addbincontent-and-sumw2/19465/4
+//      histogram->SetBinContent(iBin+1,
+//                               histogram->GetBinContent(iBin+1) + eventPtr->getEventWeight());
     }
+    histogram->SetBinError(iBin+1, TMath::Sqrt(histogram->GetBinContent(iBin+1)));
   }
 }
 void SampleElement::rescaleHistogram() {

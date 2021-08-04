@@ -100,7 +100,7 @@ void PhysicsEvent::addEventWeight(double weight_){
   _eventWeight_ *= weight_;
 }
 void PhysicsEvent::resetEventWeight(){
-  _eventWeight_ = _nominalWeight_;
+  _eventWeight_ = _treeWeight_;
 }
 
 int PhysicsEvent::findVarIndex(const std::string& leafName_, bool throwIfNotFound_) const{
@@ -205,7 +205,7 @@ bool PhysicsEvent::isSame(AnaEvent& anaEvent_) const{
 //  }
 
   if( _sampleBinIndex_ != anaEvent_.GetRecoBinIndex() ){
-    LogError << "BIN" << std::endl;
+//    LogError << "BIN" << std::endl;
     isSame = false;
   }
 

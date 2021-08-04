@@ -35,9 +35,14 @@ public:
   // Post init
   void loadPhysicsEvents();
 
+  // Getters
   DataEventType getDataEventType() const;
   std::vector<FitSample> &getFitSampleList();
   std::vector<DataSet> &getDataSetList();
+
+  //Core
+  bool empty() const;
+  double evalLikelihood() const;
 
   // Parallel
   void updateSampleEventBinIndexes() const;
@@ -46,12 +51,14 @@ public:
 
 private:
   bool _isInitialized_{false};
-  bool _showTimeStats_{true};
+  bool _showTimeStats_{false};
   nlohmann::json _config_;
   DataEventType _dataEventType_{DataEventType::Unset};
 
   std::vector<FitSample> _fitSampleList_;
   std::vector<DataSet> _dataSetList_;
+
+  std::shared_ptr<CalcLLHFunc> _likelihoodFunctionPtr_{nullptr};
 
 };
 

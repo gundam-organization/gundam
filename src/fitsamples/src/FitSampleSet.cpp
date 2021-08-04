@@ -3,6 +3,7 @@
 //
 
 #include <TROOT.h>
+#include <Likelihoods.hh>
 #include "json.hpp"
 
 #include "Logger.h"
@@ -22,9 +23,13 @@ FitSampleSet::FitSampleSet() { this->reset(); }
 FitSampleSet::~FitSampleSet() { this->reset(); }
 
 void FitSampleSet::reset() {
-
-  _config_.clear();
   _isInitialized_ = false;
+  _config_.clear();
+
+  _likelihoodFunctionPtr_ = nullptr;
+  _fitSampleList_.clear();
+  _dataSetList_.clear();
+  _dataEventType_ = DataEventType::Unset;
 }
 
 void FitSampleSet::setConfig(const nlohmann::json &config) {
@@ -98,6 +103,8 @@ void FitSampleSet::initialize() {
   GlobalVariables::getParallelWorker().addJob("FitSampleSet::updateSampleHistograms", refillMcHistogramsFct);
   GlobalVariables::getParallelWorker().setPostParallelJob("FitSampleSet::updateSampleHistograms", rescaleMcHistogramsFct);
 
+  _likelihoodFunctionPtr_ = std::shared_ptr<PoissonLLH>(new PoissonLLH);
+
   _isInitialized_ = true;
 }
 
@@ -109,6 +116,29 @@ std::vector<FitSample> &FitSampleSet::getFitSampleList() {
 }
 std::vector<DataSet> &FitSampleSet::getDataSetList() {
   return _dataSetList_;
+}
+
+bool FitSampleSet::empty() const {
+  return _fitSampleList_.empty();
+}
+double FitSampleSet::evalLikelihood() const{
+  LogThrowIf(not _isInitialized_, "Can't " << __METHOD_NAME__ << " while not initialized.");
+
+  double llh = 0.;
+  for( auto& sample : _fitSampleList_ ){
+    double sampleLlh = 0;
+    for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+//      LogDebug << GET_VAR_NAME_VALUE(sample.getMcContainer().histogram->GetBinContent(iBin)) << std::endl;
+//      LogDebug << GET_VAR_NAME_VALUE(sample.getDataContainer().histogram->GetBinContent(iBin)) << std::endl;
+      sampleLlh += (*_likelihoodFunctionPtr_)(
+        sample.getMcContainer().histogram->GetBinContent(iBin),
+        sample.getMcContainer().histogram->GetBinError(iBin),
+        sample.getDataContainer().histogram->GetBinContent(iBin));
+    }
+    llh += sampleLlh;
+  }
+
+  return llh;
 }
 
 void FitSampleSet::loadPhysicsEvents() {
@@ -309,7 +339,7 @@ void FitSampleSet::loadPhysicsEvents() {
         }
         if( iThread_ == 0 ) GenericToolbox::displayProgressBar(nEvents, nEvents, progressTitle);
 
-        delete threadChain;
+//        delete threadChain;
       };
 
       LogInfo << "Copying selected events to RAM..." << std::endl;
@@ -337,19 +367,19 @@ void FitSampleSet::loadPhysicsEvents() {
     } // isData
   } // data Set
 
-  LogInfo << "Sorting events in list" << std::endl;
-  for( auto& sample : _fitSampleList_ ){
-    std::function<bool(const PhysicsEvent&, const PhysicsEvent&)> sortFunction = [](const PhysicsEvent& a, const PhysicsEvent& b){
-      // Does a goes before b ?
-      // Dataset index:
-      if( a.getDataSetIndex() != b.getDataSetIndex() ) return ( a.getDataSetIndex() < b.getDataSetIndex() );
-      // Event index
-      if( a.getEntryIndex() != b.getEntryIndex() ) return ( a.getEntryIndex() < b.getEntryIndex() );
-      return false;
-    };
-    auto p = GenericToolbox::getSortPermutation(sample.getMcContainer().eventList, sortFunction);
-    sample.getMcContainer().eventList = GenericToolbox::applyPermutation(sample.getMcContainer().eventList, p);
-  }
+//  LogInfo << "Sorting events in list" << std::endl;
+//  for( auto& sample : _fitSampleList_ ){
+//    std::function<bool(const PhysicsEvent&, const PhysicsEvent&)> sortFunction = [](const PhysicsEvent& a, const PhysicsEvent& b){
+//      // Does a goes before b ?
+//      // Dataset index:
+//      if( a.getDataSetIndex() != b.getDataSetIndex() ) return ( a.getDataSetIndex() < b.getDataSetIndex() );
+//      // Event index
+//      if( a.getEntryIndex() != b.getEntryIndex() ) return ( a.getEntryIndex() < b.getEntryIndex() );
+//      return false;
+//    };
+//    auto p = GenericToolbox::getSortPermutation(sample.getMcContainer().eventList, sortFunction);
+//    sample.getMcContainer().eventList = GenericToolbox::applyPermutation(sample.getMcContainer().eventList, p);
+//  }
 
   if( _dataEventType_ == DataEventType::Asimov ){
     LogWarning << "Asimov data selected: copying MC events..." << std::endl;

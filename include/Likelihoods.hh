@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 
+#include "TMath.h"
+
 class CalcLLHFunc
 {
 public:

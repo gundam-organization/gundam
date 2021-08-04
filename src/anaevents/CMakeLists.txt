@@ -4,7 +4,6 @@ set( SRCFILES
         src/AnaSample.cc
         src/AnaTreeMC.cc
         src/AnaEvent.cpp
-        src/PlotGenerator.cpp
         )
 
 if( USE_STATIC_LINKS STREQUAL "1" )

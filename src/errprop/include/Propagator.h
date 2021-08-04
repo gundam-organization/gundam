@@ -37,12 +37,13 @@ public:
   void initialize();
 
   // Getters
+  FitSampleSet &getFitSampleSet();
   std::vector<AnaSample> &getSamplesList();
   std::vector<FitParameterSet> &getParameterSetsList();
   PlotGenerator &getPlotGenerator();
 
   // Core
-  void propagateParametersOnEvents();
+  void propagateParametersOnSamples();
   void fillSampleHistograms();
 
 protected:
