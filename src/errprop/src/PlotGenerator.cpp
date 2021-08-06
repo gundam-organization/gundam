@@ -515,12 +515,12 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
         std::function<void(int)> fillJob = [&]( int iThread ){
           int iEvent = -1;
           int iHist = -1;
+          std::string pBarTitle;
+          if( iThread == 0 ) pBarTitle = LogDebug.getPrefixString() + "Filling histograms of sample \"" + sample.getName() + "\"";
           for( const auto& event : *eventListPtr ){
             iEvent++;
             if( iEvent % nThreads != iThread ) continue; // faster -> but needs a thread lock
-            if( iThread == 0 ){
-              DisplayProgressBar(iEvent, eventListPtr->size(), LogDebug.getPrefixString() << "Filling histograms of sample \"" << sample.getName() << "\"");
-            }
+            if( iThread == 0 ){ GenericToolbox::displayProgressBar(iEvent, eventListPtr->size(), pBarTitle); }
             iHist = -1;
             for( auto& hist : histPtrToFillList ){
               iHist++;
@@ -528,9 +528,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
               hist->fillFunctionFitSample(hist->histPtr , &event);
             }
           } // event
-          if( iThread == 0 ){
-            DisplayProgressBar(eventListPtr->size(), eventListPtr->size(), LogDebug.getPrefixString() << "Filling histograms of sample \"" << sample.getName() << "\"");
-          }
+          if( iThread == 0 ){ GenericToolbox::displayProgressBar(eventListPtr->size(), eventListPtr->size(), pBarTitle); }
         };
 
         GlobalVariables::getParallelWorker().addJob("fillJob", fillJob);

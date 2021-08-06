@@ -23,6 +23,8 @@ public:
   SampleElement();
   virtual ~SampleElement();
 
+  std::string name;
+
   // Events
   std::vector<PhysicsEvent> eventList;
 

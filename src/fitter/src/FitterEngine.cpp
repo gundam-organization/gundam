@@ -61,8 +61,8 @@ void FitterEngine::generateSamplePlots(const std::string& saveDir_){
 
   LogInfo << __METHOD_NAME__ << std::endl;
 
+  _propagator_.preventRfPropagation(); // Making sure since we need the weight of each event
   _propagator_.propagateParametersOnSamples();
-  _propagator_.fillSampleHistograms();
   _propagator_.getPlotGenerator().generateSamplePlots(
     GenericToolbox::mkdirTFile(_saveDir_, saveDir_ )
     );
@@ -70,8 +70,8 @@ void FitterEngine::generateSamplePlots(const std::string& saveDir_){
 }
 void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
 
+  _propagator_.preventRfPropagation(); // Making sure since we need the weight of each event
   _propagator_.propagateParametersOnSamples();
-  _propagator_.fillSampleHistograms();
   _propagator_.getPlotGenerator().generateSamplePlots();
 
   _saveDir_->cd(); // to put this hist somewhere
@@ -91,7 +91,6 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
       LogInfo << "(" << iPar+1 << "/" << _nbFitParameters_ << ") +1 sigma on " << parSet.getName() + "/" + par.getTitle()
       << " -> " << par.getParameterValue() << std::endl;
       _propagator_.propagateParametersOnSamples();
-      _propagator_.fillSampleHistograms();
 
       std::string savePath = saveDir_;
       if( not savePath.empty() ) savePath += "/";
@@ -105,7 +104,6 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
       _propagator_.getPlotGenerator().generateComparisonPlots( oneSigmaHistList, refHistList, saveDir );
       par.setParameterValue( currentParValue );
       _propagator_.propagateParametersOnSamples();
-      _propagator_.fillSampleHistograms();
 
       const auto& compHistList = _propagator_.getPlotGenerator().getComparisonHistHolderList();
 
@@ -126,8 +124,7 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
 void FitterEngine::fixGhostParameters(){
   LogInfo << __METHOD_NAME__ << std::endl;
 
-  _propagator_.propagateParametersOnSamples();
-  _propagator_.fillSampleHistograms();
+  _propagator_.allowRfPropagation(); // since we don't need the weight of each event (only the Chi2 value)
   updateChi2Cache();
 
   LogDebug << "Reference χ² = " << _chi2StatBuffer_ << std::endl;
@@ -143,10 +140,7 @@ void FitterEngine::fixGhostParameters(){
       par.setParameterValue( currentParValue + par.getStdDevValue() );
       LogInfo << "(" << iPar+1 << "/" << _nbFitParameters_ << ") +1 sigma on " << parSet.getName() + "/" + par.getTitle()
               << " -> " << par.getParameterValue() << std::endl;
-      _propagator_.propagateParametersOnSamples();
-      _propagator_.fillSampleHistograms();
 
-      // Compute the Chi2
       updateChi2Cache();
 
       double deltaChi2 = _chi2StatBuffer_ - baseChi2Stat;
@@ -161,9 +155,11 @@ void FitterEngine::fixGhostParameters(){
       }
 
       par.setParameterValue( currentParValue );
-      _propagator_.propagateParametersOnSamples();
     }
   }
+
+  updateChi2Cache(); // comeback to old values
+  _propagator_.preventRfPropagation();
 }
 void FitterEngine::scanParameters(int nbSteps_, const std::string &saveDir_) {
   LogInfo << "Performing parameter scans..." << std::endl;
@@ -182,6 +178,7 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
   LogInfo << "Scanning fit parameter #" << iPar
           << " (" << _minimizer_->VariableName(iPar) << ")." << std::endl;
 
+  _propagator_.allowRfPropagation();
   bool success = _minimizer_->Scan(iPar, adj_steps, x, y);
 
   if( not success ){
@@ -200,6 +197,7 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
     GenericToolbox::mkdirTFile(_saveDir_, saveDir_)->cd();
     scanGraph.Write( ss.str().c_str() );
   }
+  _propagator_.preventRfPropagation();
 
   delete[] x;
   delete[] y;
@@ -219,8 +217,8 @@ void FitterEngine::throwParameters(){
     iPar++;
   }
 
+  _propagator_.preventRfPropagation(); // Making sure since we need the weight of each event
   _propagator_.propagateParametersOnSamples();
-  _propagator_.fillSampleHistograms();
 }
 
 void FitterEngine::fit(){
@@ -242,6 +240,8 @@ void FitterEngine::fit(){
       }
     }
   }
+
+  _propagator_.allowRfPropagation(); // if RF are setup -> a lot faster
 
   _fitUnderGoing_ = true;
   bool _fitHasConverged_ = _minimizer_->Minimize();
@@ -268,10 +268,16 @@ void FitterEngine::fit(){
 
   LogDebug << _convergenceMonitor_.generateMonitorString(); // lasting printout
 
+  _propagator_.preventRfPropagation(); // since we need the weight of each event
+  _propagator_.propagateParametersOnSamples();
+
   _fitUnderGoing_ = false;
   _fitIsDone_ = true;
 }
 void FitterEngine::updateChi2Cache(){
+
+  // Propagate on histograms
+  _propagator_.propagateParametersOnSamples();
 
   ////////////////////////////////
   // Compute chi2 stat
@@ -291,8 +297,6 @@ void FitterEngine::updateChi2Cache(){
       _chi2StatBuffer_ += buffer;
     }
   }
-
-
 
   ////////////////////////////////
   // Compute the penalty terms
@@ -320,29 +324,31 @@ double FitterEngine::evalFit(const double* parArray_){
     }
   }
 
-  _propagator_.propagateParametersOnSamples();
-  _propagator_.fillSampleHistograms();
-
   // Compute the Chi2
   updateChi2Cache();
 
-  if( _fitUnderGoing_ ){
+  if( _fitUnderGoing_ and _convergenceMonitor_.isGenerateMonitorStringOk() ){
     std::stringstream ss;
     ss << __METHOD_NAME__ << ": call #" << _nbFitCalls_ << std::endl;
     ss << "Computation time: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
-    ss << GET_VAR_NAME_VALUE(_propagator_.weightPropagationTime) << std::endl;
-    ss << GET_VAR_NAME_VALUE(_propagator_.fillPropagationTime);
+    if( not _propagator_.isUseResponseFunctions() ){
+      ss << GET_VAR_NAME_VALUE(_propagator_.weightPropagationTime) << std::endl;
+      ss << GET_VAR_NAME_VALUE(_propagator_.fillPropagationTime);
+    }
+    else{
+      ss << GET_VAR_NAME_VALUE(_propagator_.applyRfTime);
+    }
     _convergenceMonitor_.setHeaderString(ss.str());
     _convergenceMonitor_.getVariable("Total").addQuantity(_chi2Buffer_);
     _convergenceMonitor_.getVariable("Stat").addQuantity(_chi2StatBuffer_);
     _convergenceMonitor_.getVariable("Syst").addQuantity(_chi2PullsBuffer_);
     LogDebug << _convergenceMonitor_.generateMonitorString(true);
-
-    // Fill History
-    _chi2History_["Total"].emplace_back(_chi2Buffer_);
-    _chi2History_["Stat"].emplace_back(_chi2StatBuffer_);
-    _chi2History_["Syst"].emplace_back(_chi2PullsBuffer_);
   }
+
+  // Fill History
+  _chi2History_["Total"].emplace_back(_chi2Buffer_);
+  _chi2History_["Stat"].emplace_back(_chi2StatBuffer_);
+  _chi2History_["Syst"].emplace_back(_chi2PullsBuffer_);
 
   return _chi2Buffer_;
 }
@@ -474,6 +480,7 @@ void FitterEngine::initializePropagator(){
   LogDebug << __METHOD_NAME__ << std::endl;
 
   _propagator_.setConfig(JsonUtils::fetchValue<json>(_config_, "propagatorConfig"));
+  _propagator_.setSaveDir(_saveDir_);
 
   TFile* f = TFile::Open(JsonUtils::fetchValue<std::string>(_config_, "mc_file").c_str(), "READ");
   _propagator_.setDataTree( f->Get<TTree>("selectedEvents") );

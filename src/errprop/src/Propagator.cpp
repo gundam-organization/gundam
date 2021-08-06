@@ -32,8 +32,9 @@ void Propagator::reset() {
   std::vector<std::string> jobNameRemoveList;
   for( const auto& jobName : GlobalVariables::getParallelWorker().getJobNameList() ){
     if(jobName == "Propagator::fillEventDialCaches"
-    or jobName == "Propagator::propagateParametersOnSamples"
-    or jobName == "Propagator::fillSampleHistograms"
+    or jobName == "Propagator::reweightSampleEvents"
+    or jobName == "Propagator::refillSampleHistograms"
+    or jobName == "Propagator::applyResponseFunctions"
       ){
       jobNameRemoveList.emplace_back(jobName);
     }
@@ -42,6 +43,8 @@ void Propagator::reset() {
     GlobalVariables::getParallelWorker().removeJob(jobName);
   }
 
+  _responseFunctionsSamplesMcHistogram_.clear();
+  _nominalSamplesMcHistogram_.clear();
 }
 
 void Propagator::setShowTimeStats(bool showTimeStats) {
@@ -175,7 +178,7 @@ void Propagator::initialize() {
   }
 
   LogInfo << "Propagating prior parameters on events..." << std::endl;
-  propagateParametersOnSamples();
+  reweightSampleEvents();
 
   if( not fitSampleSetConfig.empty() ){
 
@@ -202,14 +205,20 @@ void Propagator::initialize() {
       }
     }
 
-    LogInfo << "Filling samples event bin cache..." << std::endl;
-    _fitSampleSet_.updateSampleEventBinIndexes();
+    LogInfo << "Filling up sample bin caches..." << std::endl;
     _fitSampleSet_.updateSampleBinEventList();
+
+    LogInfo << "Filling up sample histograms..." << std::endl;
     _fitSampleSet_.updateSampleHistograms();
 
     // Now the data won't be refilled each time
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
       sample.getDataContainer().isLocked = true;
+    }
+
+    _useResponseFunctions_ = JsonUtils::fetchValue<json>(_config_, "useResponseFunctions", false);
+    if( _useResponseFunctions_ ){
+      this->makeResponseFunctions();
     }
   }
   else{
@@ -232,6 +241,9 @@ void Propagator::initialize() {
   _isInitialized_ = true;
 }
 
+bool Propagator::isUseResponseFunctions() const {
+  return _useResponseFunctions_;
+}
 FitSampleSet &Propagator::getFitSampleSet() {
   return _fitSampleSet_;
 }
@@ -246,23 +258,49 @@ PlotGenerator &Propagator::getPlotGenerator() {
 }
 
 
-void Propagator::propagateParametersOnSamples() {
-//  if( _showTimeStats_ ){
-    GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-//  }
-  GlobalVariables::getParallelWorker().runJob("Propagator::propagateParametersOnSamples");
+void Propagator::propagateParametersOnSamples(){
+
+  if(not _useResponseFunctions_ or not _isRfPropagationEnabled_ ){
+    reweightSampleEvents();
+    refillSampleHistograms();
+  }
+  else{
+    applyResponseFunctions();
+  }
+
+}
+void Propagator::reweightSampleEvents() {
+  GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+  GlobalVariables::getParallelWorker().runJob("Propagator::reweightSampleEvents");
   weightPropagationTime = GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__);
   if( _showTimeStats_ ) {
     LogDebug << __METHOD_NAME__ << " took: " << weightPropagationTime << std::endl;
   }
 }
-void Propagator::fillSampleHistograms(){
-//  if( _showTimeStats_ ) {
-    GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-//  }
-  GlobalVariables::getParallelWorker().runJob("Propagator::fillSampleHistograms");
+void Propagator::refillSampleHistograms(){
+  GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+  GlobalVariables::getParallelWorker().runJob("Propagator::refillSampleHistograms");
   fillPropagationTime = GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__);
   if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << fillPropagationTime << std::endl;
+}
+void Propagator::applyResponseFunctions(){
+  GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+  GlobalVariables::getParallelWorker().runJob("Propagator::applyResponseFunctions");
+  applyRfTime = GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__);
+  if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << fillPropagationTime << std::endl;
+}
+
+void Propagator::preventRfPropagation(){
+  if(_isRfPropagationEnabled_){
+    LogInfo << "Parameters propagation using Response Function is now disabled." << std::endl;
+    _isRfPropagationEnabled_ = false;
+  }
+}
+void Propagator::allowRfPropagation(){
+  if(not _isRfPropagationEnabled_){
+    LogWarning << "Parameters propagation using Response Function is now ENABLED." << std::endl;
+    _isRfPropagationEnabled_ = true;
+  }
 }
 
 
@@ -274,12 +312,12 @@ void Propagator::initializeThreads() {
   };
   GlobalVariables::getParallelWorker().addJob("Propagator::fillEventDialCaches", fillEventDialCacheFct);
 
-  std::function<void(int)> propagateParametersOnSamplesFct = [this](int iThread){
-    this->propagateParametersOnSamples(iThread);
+  std::function<void(int)> reweightSampleEventsFct = [this](int iThread){
+    this->reweightSampleEvents(iThread);
   };
-  GlobalVariables::getParallelWorker().addJob("Propagator::propagateParametersOnSamples", propagateParametersOnSamplesFct);
+  GlobalVariables::getParallelWorker().addJob("Propagator::reweightSampleEvents", reweightSampleEventsFct);
 
-  std::function<void(int)> fillSampleHistogramsFct = [this](int iThread){
+  std::function<void(int)> refillSampleHistogramsFct = [this](int iThread){
     if( _fitSampleSet_.empty() ){
       for( auto& sample : _samplesList_ ){
         sample.FillMcHistograms(GlobalVariables::getNbThreads() == 1 ? -1 : iThread);
@@ -291,9 +329,8 @@ void Propagator::initializeThreads() {
         sample.getDataContainer().refillHistogram(iThread);
       }
     }
-
   };
-  std::function<void()> fillSampleHistogramsPostParallelFct = [this](){
+  std::function<void()> refillSampleHistogramsPostParallelFct = [this](){
     if( _fitSampleSet_.empty() ){
       if(GlobalVariables::getNbThreads() != 1){
         for( auto& sample : _samplesList_ ){
@@ -308,8 +345,13 @@ void Propagator::initializeThreads() {
       }
     }
   };
-  GlobalVariables::getParallelWorker().addJob("Propagator::fillSampleHistograms", fillSampleHistogramsFct);
-  GlobalVariables::getParallelWorker().setPostParallelJob("Propagator::fillSampleHistograms", fillSampleHistogramsPostParallelFct);
+  GlobalVariables::getParallelWorker().addJob("Propagator::refillSampleHistograms", refillSampleHistogramsFct);
+  GlobalVariables::getParallelWorker().setPostParallelJob("Propagator::refillSampleHistograms", refillSampleHistogramsPostParallelFct);
+
+  std::function<void(int)> applyResponseFunctionsFct = [this](int iThread){
+    this->applyResponseFunctions(iThread);
+  };
+  GlobalVariables::getParallelWorker().addJob("Propagator::applyResponseFunctions", applyResponseFunctionsFct);
 
 }
 void Propagator::initializeCaches() {
@@ -341,6 +383,155 @@ void Propagator::fillEventDialCaches(){
   GlobalVariables::getParallelWorker().runJob("Propagator::fillEventDialCaches");
 }
 
+void Propagator::makeResponseFunctions(){
+  LogWarning << __METHOD_NAME__ << std::endl;
+
+  this->preventRfPropagation(); // make sure, not yet setup
+
+  for( auto& parSet : _parameterSetsList_ ){
+    for( auto& par : parSet.getParameterList() ){
+      par.setParameterValue(par.getPriorValue());
+    }
+  }
+  this->propagateParametersOnSamples();
+
+  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    _nominalSamplesMcHistogram_[&sample] = std::shared_ptr<TH1D>((TH1D*) sample.getMcContainer().histogram->Clone());
+  }
+
+  for( auto& parSet : _parameterSetsList_ ){
+    for( auto& par : parSet.getParameterList() ){
+      LogInfo << "Make RF for " << parSet.getName() << "/" << par.getTitle() << std::endl;
+      par.setParameterValue(par.getPriorValue() + par.getStdDevValue());
+
+      this->propagateParametersOnSamples();
+
+      for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+        _responseFunctionsSamplesMcHistogram_[&sample].emplace_back(std::shared_ptr<TH1D>((TH1D*) sample.getMcContainer().histogram->Clone()) );
+        GenericToolbox::transformBinContent(_responseFunctionsSamplesMcHistogram_[&sample].back().get(), [&](TH1D* h_, int b_){
+          h_->SetBinContent(
+            b_,
+            (h_->GetBinContent(b_)/_nominalSamplesMcHistogram_[&sample]->GetBinContent(b_))-1);
+          h_->SetBinError(b_,0);
+        });
+      }
+
+      par.setParameterValue(par.getPriorValue());
+    }
+  }
+  this->propagateParametersOnSamples(); // back to nominal
+
+  // WRITE
+  if( _saveDir_ != nullptr ){
+    auto* rfDir = GenericToolbox::mkdirTFile(_saveDir_, "RF");
+    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+      GenericToolbox::mkdirTFile(rfDir, "nominal")->cd();
+      _nominalSamplesMcHistogram_[&sample]->Write(Form("nominal_%s", sample.getName().c_str()));
+
+      int iPar = -1;
+      auto* devDir = GenericToolbox::mkdirTFile(rfDir, "deviation");
+      for( auto& parSet : _parameterSetsList_ ){
+        auto* parSetDir = GenericToolbox::mkdirTFile(devDir, parSet.getName());
+        for( auto& par : parSet.getParameterList() ){
+          iPar++;
+          GenericToolbox::mkdirTFile(parSetDir, par.getTitle())->cd();
+          _responseFunctionsSamplesMcHistogram_[&sample].at(iPar)->Write(Form("dev_%s", sample.getName().c_str()));
+        }
+      }
+    }
+    _saveDir_->cd();
+  }
+
+  LogInfo << "RF built" << std::endl;
+}
+
+void Propagator::reweightSampleEvents(int iThread_) {
+  double weight;
+
+  if( _fitSampleSet_.empty() ){
+    AnaEvent* eventPtr;
+    for( auto& sample : _samplesList_ ){
+      int nEvents = sample.GetN();
+      for( int iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
+
+        if( iEvent % GlobalVariables::getNbThreads() != iThread_ ){
+          continue;
+        }
+
+        eventPtr = sample.GetEvent(iEvent);
+        eventPtr->ResetEvWght();
+
+        // Loop over the parSet that are cached (missing ones won't apply on this event anyway)
+        for( auto& parSetDialCache : *eventPtr->getDialCachePtr() ){
+
+          weight = 1;
+          for( size_t iPar = 0 ; iPar < parSetDialCache.first->getNbParameters() ; iPar++ ){
+
+            Dial* dialPtr = parSetDialCache.second.at(iPar);
+            if( dialPtr == nullptr ) continue;
+
+            // No need to recast dialPtr as a NormDial or whatever, it will automatically fetch the right method
+            weight *= dialPtr->evalResponse( parSetDialCache.first->getFitParameter(iPar).getParameterValue() );
+
+            // TODO: check if weight cap
+            if( weight <= 0 ){
+              weight = 0;
+              break;
+              //            LogError << GET_VAR_NAME_VALUE(iPar) << std::endl;
+              //            LogError << GET_VAR_NAME_VALUE(weight) << std::endl;
+              //            throw std::runtime_error("<0 weight");
+            }
+
+          }
+
+          eventPtr->AddEvWght(weight);
+
+        } // parSetCache
+
+      } // event
+    } // sample
+  }
+  else{
+    PhysicsEvent* evPtr;
+    Dial* dialPtr;
+    int nThreads = GlobalVariables::getNbThreads();
+    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+      int nEvents = int(sample.getMcContainer().eventList.size());
+      for( int iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
+        if( iEvent % nThreads != iThread_ ){
+          continue;
+        }
+
+        evPtr = &sample.getMcContainer().eventList.at(iEvent);
+        evPtr->resetEventWeight();
+
+        // Loop over the parSet that are cached (missing ones won't apply on this event anyway)
+        for( auto& parSetDialCache : *evPtr->getDialCachePtr() ){
+
+          weight = 1;
+          for( size_t iPar = 0 ; iPar < parSetDialCache.first->getNbParameters() ; iPar++ ){
+
+            dialPtr = parSetDialCache.second.at(iPar);
+            if( dialPtr == nullptr ) continue;
+
+            // No need to recast dialPtr as a NormDial or whatever, it will automatically fetch the right method
+            weight *= dialPtr->evalResponse( parSetDialCache.first->getFitParameter(iPar).getParameterValue() );
+
+            // TODO: check if weight cap
+            if( weight <= 0 ){
+              weight = 0;
+              break;
+            }
+
+          }
+
+          evPtr->addEventWeight(weight);
+
+        } // parSetCache
+      } // event
+    } // sample
+  }
+}
 void Propagator::fillEventDialCaches(int iThread_){
 
   DialSet* parameterDialSetPtr;
@@ -572,90 +763,56 @@ void Propagator::fillEventDialCaches(int iThread_){
   }
 
 }
-void Propagator::propagateParametersOnSamples(int iThread_) {
-  double weight;
+void Propagator::applyResponseFunctions(int iThread_){
 
-  if( _fitSampleSet_.empty() ){
-    AnaEvent* eventPtr;
-    for( auto& sample : _samplesList_ ){
-      int nEvents = sample.GetN();
-      for( int iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
-
-        if( iEvent % GlobalVariables::getNbThreads() != iThread_ ){
-          continue;
-        }
-
-        eventPtr = sample.GetEvent(iEvent);
-        eventPtr->ResetEvWght();
-
-        // Loop over the parSet that are cached (missing ones won't apply on this event anyway)
-        for( auto& parSetDialCache : *eventPtr->getDialCachePtr() ){
-
-          weight = 1;
-          for( size_t iPar = 0 ; iPar < parSetDialCache.first->getNbParameters() ; iPar++ ){
-
-            Dial* dialPtr = parSetDialCache.second.at(iPar);
-            if( dialPtr == nullptr ) continue;
-
-            // No need to recast dialPtr as a NormDial or whatever, it will automatically fetch the right method
-            weight *= dialPtr->evalResponse( parSetDialCache.first->getFitParameter(iPar).getParameterValue() );
-
-            // TODO: check if weight cap
-            if( weight <= 0 ){
-              weight = 0;
-              break;
-              //            LogError << GET_VAR_NAME_VALUE(iPar) << std::endl;
-              //            LogError << GET_VAR_NAME_VALUE(weight) << std::endl;
-              //            throw std::runtime_error("<0 weight");
-            }
-
-          }
-
-          eventPtr->AddEvWght(weight);
-
-        } // parSetCache
-
-      } // event
-    } // sample
+  TH1D* histBuffer{nullptr};
+  TH1D* nominalHistBuffer{nullptr};
+  TH1D* rfHistBuffer{nullptr};
+  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    histBuffer = sample.getMcContainer().histogram.get();
+    nominalHistBuffer = _nominalSamplesMcHistogram_[&sample].get();
+    for( int iBin = 1 ; iBin <= histBuffer->GetNbinsX() ; iBin++ ){
+      if( iBin % GlobalVariables::getNbThreads() != iThread_ ) continue;
+      histBuffer->SetBinContent(iBin, nominalHistBuffer->GetBinContent(iBin));
+    }
   }
-  else{
-    PhysicsEvent* evPtr;
-    Dial* dialPtr;
-    int nThreads = GlobalVariables::getNbThreads();
-    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-      int nEvents = int(sample.getMcContainer().eventList.size());
-      for( int iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
-        if( iEvent % nThreads != iThread_ ){
-          continue;
+
+  int iPar = -1;
+  for( auto& parSet : _parameterSetsList_ ){
+    for( auto& par : parSet.getParameterList() ){
+      iPar++;
+      double xSigmaPar = par.getDistanceFromNominal();
+      if( xSigmaPar == 0 ) continue;
+
+      for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+        histBuffer = sample.getMcContainer().histogram.get();
+        nominalHistBuffer = _nominalSamplesMcHistogram_[&sample].get();
+        rfHistBuffer = _responseFunctionsSamplesMcHistogram_[&sample].at(iPar).get();
+
+        for( int iBin = 1 ; iBin <= histBuffer->GetNbinsX() ; iBin++ ){
+          if( iBin % GlobalVariables::getNbThreads() != iThread_ ) continue;
+          histBuffer->SetBinContent(
+            iBin,
+            histBuffer->GetBinContent(iBin) * ( 1 + xSigmaPar * rfHistBuffer->GetBinContent(iBin) )
+          );
         }
-
-        evPtr = &sample.getMcContainer().eventList.at(iEvent);
-        evPtr->resetEventWeight();
-
-        // Loop over the parSet that are cached (missing ones won't apply on this event anyway)
-        for( auto& parSetDialCache : *evPtr->getDialCachePtr() ){
-
-          weight = 1;
-          for( size_t iPar = 0 ; iPar < parSetDialCache.first->getNbParameters() ; iPar++ ){
-
-            dialPtr = parSetDialCache.second.at(iPar);
-            if( dialPtr == nullptr ) continue;
-
-            // No need to recast dialPtr as a NormDial or whatever, it will automatically fetch the right method
-            weight *= dialPtr->evalResponse( parSetDialCache.first->getFitParameter(iPar).getParameterValue() );
-
-            // TODO: check if weight cap
-            if( weight <= 0 ){
-              weight = 0;
-              break;
-            }
-
-          }
-
-          evPtr->addEventWeight(weight);
-
-        } // parSetCache
-      } // event
-    } // sample
+      }
+    }
   }
+
+  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    histBuffer = sample.getMcContainer().histogram.get();
+    nominalHistBuffer = _nominalSamplesMcHistogram_[&sample].get();
+    for( int iBin = 1 ; iBin <= histBuffer->GetNbinsX() ; iBin++ ){
+      if( iBin % GlobalVariables::getNbThreads() != iThread_ ) continue;
+      histBuffer->SetBinError(iBin, TMath::Sqrt(histBuffer->GetBinContent(iBin)));
+//      if( iThread_ == 0 ){
+//        LogTrace << GET_VAR_NAME_VALUE(iBin)
+//        << " / " << GET_VAR_NAME_VALUE(histBuffer->GetBinContent(iBin))
+//        << " / " << GET_VAR_NAME_VALUE(nominalHistBuffer->GetBinContent(iBin))
+//        << std::endl;
+//      }
+    }
+  }
+
 }

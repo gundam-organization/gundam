@@ -139,6 +139,9 @@ const std::vector<DialSet> &FitParameter::getDialSetList() const {
   return _dialSetList_;
 }
 
+double FitParameter::getDistanceFromNominal() const{
+  return (_parameterValue_ - _priorValue_) / _stdDevValue_;
+}
 DialSet* FitParameter::findDialSet(const std::string& dataSetName_){
   for( auto& dialSet : _dialSetList_ ){
     if( GenericToolbox::doesElementIsInVector(dataSetName_, dialSet.getDataSetNameList()) ){

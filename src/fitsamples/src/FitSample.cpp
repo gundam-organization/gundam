@@ -59,6 +59,7 @@ void FitSample::initialize() {
 
   TH1::SetDefaultSumw2(true);
 
+  _mcContainer_.name = "MC_" + _name_;
   _mcContainer_.binning = _binning_;
   _mcContainer_.histScale = _dataNorm_/_mcNorm_;
   _mcContainer_.perBinEventPtrList.resize(_binning_.getBinsList().size());
@@ -69,6 +70,7 @@ void FitSample::initialize() {
     )
   );
 
+  _dataContainer_.name = "Data_" + _name_;
   _dataContainer_.binning = _binning_;
   _dataContainer_.perBinEventPtrList.resize(_binning_.getBinsList().size());
   _dataContainer_.histogram = std::shared_ptr<TH1D>(

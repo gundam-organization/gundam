@@ -384,6 +384,9 @@ void FitSampleSet::loadPhysicsEvents() {
 //    sample.getMcContainer().eventList = GenericToolbox::applyPermutation(sample.getMcContainer().eventList, p);
 //  }
 
+  LogInfo << "Filling samples event bin cache..." << std::endl;
+  this->updateSampleEventBinIndexes();
+
   if( _dataEventType_ == DataEventType::Asimov ){
     LogWarning << "Asimov data selected: copying MC events..." << std::endl;
     for( auto& sample : _fitSampleList_ ){

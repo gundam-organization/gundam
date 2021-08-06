@@ -43,6 +43,7 @@ public:
   const std::vector<DialSet> &getDialSetList() const;
 
   // Core
+  double getDistanceFromNominal() const; // in unit of sigmas
   DialSet* findDialSet(const std::string& dataSetName_);
   std::string getSummary() const;
   std::string getTitle() const;

@@ -37,6 +37,7 @@ public:
   void initialize();
 
   // Getters
+  bool isUseResponseFunctions() const;
   FitSampleSet &getFitSampleSet();
   std::vector<AnaSample> &getSamplesList();
   std::vector<FitParameterSet> &getParameterSetsList();
@@ -44,17 +45,25 @@ public:
 
   // Core
   void propagateParametersOnSamples();
-  void fillSampleHistograms();
+  void reweightSampleEvents();
+  void refillSampleHistograms();
+  void applyResponseFunctions();
+
+  // Switches
+  void preventRfPropagation();
+  void allowRfPropagation();
 
 protected:
   void initializeThreads();
   void initializeCaches();
 
-  // multi-threaded
   void fillEventDialCaches();
+  void makeResponseFunctions();
 
-  void propagateParametersOnSamples(int iThread_);
+  // multi-threaded
+  void reweightSampleEvents(int iThread_);
   void fillEventDialCaches(int iThread_);
+  void applyResponseFunctions(int iThread_);
 
 private:
   // Parameters
@@ -64,10 +73,16 @@ private:
 
   // Internals
   bool _isInitialized_{false};
+  bool _useResponseFunctions_{false};
+  bool _isRfPropagationEnabled_{false};
   std::vector<FitParameterSet> _parameterSetsList_;
   std::vector<AnaSample> _samplesList_;
   FitSampleSet _fitSampleSet_;
   PlotGenerator _plotGenerator_;
+
+  // Response functions
+  std::map<FitSample*, std::shared_ptr<TH1D>> _nominalSamplesMcHistogram_;
+  std::map<FitSample*, std::vector<std::shared_ptr<TH1D>>> _responseFunctionsSamplesMcHistogram_;
 
   // TEST
   TTree* dataTree{nullptr};
@@ -76,6 +91,7 @@ private:
 public:
   std::string weightPropagationTime;
   std::string fillPropagationTime;
+  std::string applyRfTime;
 
 };
 

@@ -27,11 +27,9 @@ void SampleElement::reserveEventMemory(size_t dataSetIndex_, size_t nEvents, con
 void SampleElement::updateEventBinIndexes(int iThread_){
   if( isLocked ) return;
   int nBins = int(binning.getBinsList().size());
-  std::string progressTitle = LogInfo.getPrefixString() + "Finding bin index for each event...";
+  if(iThread_ <= 0) LogInfo << "Finding bin indexes for \"" << name << "\"..." << std::endl;
   for( size_t iEvent = 0 ; iEvent < eventList.size() ; iEvent++ ){
     if( iThread_ != -1 and iEvent % GlobalVariables::getNbThreads() != iThread_ ) continue;
-    if( iThread_ <= 0 ){ GenericToolbox::displayProgressBar(iEvent, eventList.size(), progressTitle); }
-
     auto& event = eventList.at(iEvent);
     for( int iBin = 0 ; iBin < nBins ; iBin++ ){
       auto& bin = binning.getBinsList().at(iBin);
@@ -48,17 +46,13 @@ void SampleElement::updateEventBinIndexes(int iThread_){
       }
     } // Bin
   } // Event
-  if( iThread_ <= 0 ){
-    GenericToolbox::displayProgressBar(eventList.size(), eventList.size(), progressTitle);
-  }
 }
 void SampleElement::updateBinEventList(int iThread_) {
   if( isLocked ) return;
-  std::string progressTitle = LogInfo.getPrefixString() + "Filling bin event cache...";
   int nBins = int(perBinEventPtrList.size());
+  if(iThread_ <= 0) LogInfo << "Filling bin event cache for \"" << name << "\"..." << std::endl;
   for( int iBin = 0 ; iBin < nBins ; iBin++ ){
     if( iThread_ != -1 and iBin % GlobalVariables::getNbThreads() != iThread_ ) continue;
-    if( iThread_ <= 0 ) GenericToolbox::displayProgressBar(iBin, nBins, progressTitle);
     auto& thisBinEventList = perBinEventPtrList.at(iBin);
     // Counting first (otherwise the memory allocation will keep moving data around)
     size_t count = 0;
@@ -72,7 +66,6 @@ void SampleElement::updateBinEventList(int iThread_) {
       }
     } // event
   } // hist bin
-  if( iThread_ <= 0 ) GenericToolbox::displayProgressBar(nBins, nBins, progressTitle);
 }
 void SampleElement::refillHistogram(int iThread_){
   if( isLocked ) return;
