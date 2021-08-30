@@ -169,7 +169,8 @@ void Propagator::initialize() {
   if( JsonUtils::fetchValue<json>(_config_, "throwParameters", false) ){
     LogWarning << "Throwing parameters..." << std::endl;
     for( auto& parSet : _parameterSetsList_ ){
-      auto thrownPars = GenericToolbox::throwCorrelatedParameters(GenericToolbox::getCholeskyMatrix(parSet.getCovarianceMatrix()));
+      auto thrownPars = GenericToolbox::throwCorrelatedParameters(GenericToolbox::getCholeskyMatrix(
+        parSet.getOriginalCovarianceMatrix()));
       for( auto& par : parSet.getParameterList() ){
         par.setParameterValue( par.getPriorValue() + thrownPars.at(par.getParameterIndex()) );
         LogDebug << parSet.getName() << "/" << par.getTitle() << ": thrown = " << par.getParameterValue() << std::endl;

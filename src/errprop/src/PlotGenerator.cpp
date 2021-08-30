@@ -446,7 +446,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
     return;
   }
 
-  auto* lastDir = gDirectory;
+  auto* lastDir = GenericToolbox::getCurrentTDirectory();
   if(saveDir_ != nullptr ){
     saveDir_->cd();
     LogInfo << "Samples plots will be writen in: " << saveDir_->GetPath() << std::endl;
@@ -648,7 +648,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
 
 }
 void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList_, TDirectory *saveDir_, bool stackHist_){
-  auto *lastDir = gDirectory;
+  auto *lastDir = GenericToolbox::getCurrentTDirectory();
   if (saveDir_ != nullptr) {
     saveDir_->cd();
     LogInfo << "Samples plots will be writen in: " << saveDir_->GetPath() << std::endl;
@@ -1026,7 +1026,7 @@ void PlotGenerator::generateComparisonPlots(
 }
 void PlotGenerator::generateComparisonHistograms(const std::vector<HistHolder> &histList_, const std::vector<HistHolder> &refHistsList_, TDirectory *saveDir_) {
 
-  auto* curDir = gDirectory;
+  auto* curDir = GenericToolbox::getCurrentTDirectory();
 
   if(saveDir_ != nullptr){
     saveDir_->cd();

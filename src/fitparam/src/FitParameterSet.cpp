@@ -29,9 +29,10 @@ void FitParameterSet::reset() {
     _covarianceMatrixFile_->Close(); // should delete every attached pointer
   }
 
+  _maxEigenFraction_ = 1;
   _covarianceMatrixFile_ = nullptr;
-  _covarianceMatrix_ = nullptr;
-  _correlationMatrix_ = nullptr;
+  _originalCovarianceMatrix_ = nullptr;
+  _originalCorrelationMatrix_ = nullptr;
   _parameterPriorList_ = nullptr;
   _parameterNamesList_ = nullptr;
 
@@ -63,30 +64,7 @@ void FitParameterSet::initialize() {
     return;
   }
 
-  _covarianceMatrixFile_ = TFile::Open(JsonUtils::fetchValue<std::string>(_jsonConfig_, "covarianceMatrixFilePath").c_str());
-  if( not _covarianceMatrixFile_->IsOpen() ){
-    LogError << "Could not open: _covarianceMatrixFile_: " << _covarianceMatrixFile_->GetPath() << std::endl;
-    throw std::runtime_error("Could not open: _covarianceMatrixFile_");
-  }
-
-  _covarianceMatrix_ = (TMatrixDSym*) _covarianceMatrixFile_->Get(
-    JsonUtils::fetchValue<std::string>(_jsonConfig_, "covarianceMatrixTMatrixD").c_str()
-    );
-  if( _covarianceMatrix_ == nullptr ){
-    LogError << "Could not find: " << JsonUtils::fetchValue<std::string>(_jsonConfig_, "covarianceMatrixTObjectPath")
-      << " in " << _covarianceMatrixFile_->GetPath() << std::endl;
-    throw std::runtime_error("Could not find: covarianceMatrixTObjectPath");
-  }
-  LogWarning << "Computing inverse of the covariance matrix: " << _covarianceMatrix_->GetNcols() << "x" << _covarianceMatrix_->GetNrows() << std::endl;
-  _inverseCovarianceMatrix_ = GenericToolbox::convertToSymmetricMatrix(
-    GenericToolbox::invertMatrixSVD(
-      (TMatrixD*) _covarianceMatrix_
-    )["inverse_covariance_matrix"]
-  );
-
-  _correlationMatrix_ = GenericToolbox::convertToSymmetricMatrix(GenericToolbox::convertToCorrelationMatrix((TMatrixD*) _covarianceMatrix_));
-
-  LogInfo << "Parameter set \"" << _name_ << "\" is handling " << _covarianceMatrix_->GetNcols() << " parameters." << std::endl;
+  this->readCovarianceMatrix();
 
   // Optional parameters:
   std::string pathBuffer;
@@ -101,16 +79,17 @@ void FitParameterSet::initialize() {
       LogError << "Could not find \"" << pathBuffer << "\" into \"" << _covarianceMatrixFile_->GetName() << "\"" << std::endl;
       throw std::runtime_error("TObject not found.");
     }
-    else if( _parameterPriorList_->GetNrows() != _covarianceMatrix_->GetNrows() ){
-      LogError << GET_VAR_NAME_VALUE(_parameterPriorList_->GetNrows() != _covarianceMatrix_->GetNrows()) << std::endl;
+    else if(_parameterPriorList_->GetNrows() != _originalCovarianceMatrix_->GetNrows() ){
+      LogError << GET_VAR_NAME_VALUE(_parameterPriorList_->GetNrows() != _originalCovarianceMatrix_->GetNrows()) << std::endl;
       throw std::runtime_error("TObject size mismatch.");
     }
   }
   else{
     LogDebug << "No parameterPriorTVectorD provided, all parameter prior are set to 1." << std::endl;
-    _parameterPriorList_ = new TVectorT<double>(_covarianceMatrix_->GetNrows());
+    _parameterPriorList_ = new TVectorT<double>(_originalCovarianceMatrix_->GetNrows());
     for( int iPar = 0 ; iPar < _parameterPriorList_->GetNrows() ; iPar++ ){
       (*_parameterPriorList_)[iPar] = 1;
+      if( _useEigenDecompInFit_ ) (*_originalParValues_)[iPar] = 1;
     }
   }
 
@@ -124,32 +103,44 @@ void FitParameterSet::initialize() {
       LogError << "Could not find \"" << pathBuffer << "\" into \"" << _covarianceMatrixFile_->GetName() << "\"" << std::endl;
       throw std::runtime_error("TObject not found.");
     }
-    else if( _parameterNamesList_->GetSize() != _covarianceMatrix_->GetNrows() ){
-      LogError << GET_VAR_NAME_VALUE(_parameterNamesList_->GetSize() != _covarianceMatrix_->GetNrows()) << std::endl;
+    else if(_parameterNamesList_->GetSize() != _originalCovarianceMatrix_->GetNrows() ){
+      LogError << GET_VAR_NAME_VALUE(_parameterNamesList_->GetSize() != _originalCovarianceMatrix_->GetNrows()) << std::endl;
       throw std::runtime_error("TObject size mismatch.");
     }
   }
   else{
     LogDebug << "No parameterNameTObjArray provided, parameters will be referenced with their index." << std::endl;
-    _parameterNamesList_ = new TObjArray(_covarianceMatrix_->GetNrows());
+    _parameterNamesList_ = new TObjArray(_originalCovarianceMatrix_->GetNrows());
     for( int iPar = 0 ; iPar < _parameterPriorList_->GetNrows() ; iPar++ ){
       _parameterNamesList_->Add(new TNamed("", ""));
     }
   }
 
   LogDebug << "Initializing parameters..." << std::endl;
-  for( int iPararmeter = 0 ; iPararmeter < _covarianceMatrix_->GetNcols() ; iPararmeter++ ){
+  for(int iParameter = 0 ; iParameter < _originalCovarianceMatrix_->GetNcols() ; iParameter++ ){
     _parameterList_.emplace_back();
-    _parameterList_.back().setParameterIndex(iPararmeter);
-    _parameterList_.back().setName(_parameterNamesList_->At(iPararmeter)->GetName());
-    _parameterList_.back().setParameterValue((*_parameterPriorList_)[iPararmeter]);
-    _parameterList_.back().setPriorValue((*_parameterPriorList_)[iPararmeter]);
-    _parameterList_.back().setStdDevValue(TMath::Sqrt((*_covarianceMatrix_)[iPararmeter][iPararmeter]));
+    _parameterList_.back().setParameterIndex(iParameter);
+    _parameterList_.back().setName(_parameterNamesList_->At(iParameter)->GetName());
+    _parameterList_.back().setParameterValue((*_parameterPriorList_)[iParameter]);
+    _parameterList_.back().setPriorValue((*_parameterPriorList_)[iParameter]);
+    _parameterList_.back().setStdDevValue(TMath::Sqrt((*_originalCovarianceMatrix_)[iParameter][iParameter]));
     _parameterList_.back().setDialSetConfig(JsonUtils::fetchValue<nlohmann::json>(_jsonConfig_, "dialSetDefinitions"));
     _parameterList_.back().setDialsWorkingDirectory(JsonUtils::fetchValue<std::string>(_jsonConfig_, "dialSetWorkingDirectory", "./"));
     _parameterList_.back().setEnableDialSetsSummary(JsonUtils::fetchValue<bool>(_jsonConfig_, "printDialSetsSummary", false));
 
     _parameterList_.back().initialize();
+  }
+
+
+  if( _useEigenDecompInFit_ ){
+    _originalParValues_ = std::shared_ptr<TVectorD>(new TVectorD(_parameterPriorList_->GetNrows()));
+    for( int iPar = 0 ; iPar < _parameterPriorList_->GetNrows() ; iPar++ ){
+      (*_originalParValues_)[iPar] = _parameterList_.at(iPar).getParameterValue();
+    }
+    propagateOriginalToEigen();
+    _eigenParPriorValues_ = std::shared_ptr<TVectorD>( (TVectorD*) _eigenParValues_->Clone() );
+    LogTrace << "EIGEN VAL IS NOW:" << std::endl;
+    _eigenParValues_->Print();
   }
 
   _isInitialized_ = true;
@@ -169,8 +160,8 @@ std::vector<FitParameter> &FitParameterSet::getParameterList() {
 const std::vector<FitParameter> &FitParameterSet::getParameterList() const{
   return _parameterList_;
 }
-TMatrixDSym *FitParameterSet::getCovarianceMatrix() const {
-  return _covarianceMatrix_;
+TMatrixDSym *FitParameterSet::getOriginalCovarianceMatrix() const {
+  return _originalCovarianceMatrix_;
 }
 
 // Core
@@ -192,22 +183,72 @@ double FitParameterSet::getChi2() const{
     throw std::runtime_error("inverse matrix not set");
   }
 
-  for(int iPar = 0; iPar < _inverseCovarianceMatrix_->GetNrows(); iPar++)
-  {
-    if( _parameterList_.at(iPar).isFixed() ) continue;
-    for(int jPar = 0; jPar < _inverseCovarianceMatrix_->GetNrows(); jPar++)
-    {
-      if( _parameterList_.at(jPar).isFixed() ) continue;
-      chi2
-        +=  (_parameterList_[iPar].getParameterValue() - _parameterList_[iPar].getPriorValue())
-          * (_parameterList_[jPar].getParameterValue() - _parameterList_[jPar].getPriorValue())
-          * (*_inverseCovarianceMatrix_)(iPar, jPar);
+  if( _useEigenDecompInFit_ ){
+    for( int iEigen = 0 ; iEigen < _nbEnabledEigen_ ; iEigen++ ){
+      chi2 += TMath::Sq( (*_eigenParValues_)[iEigen] - (*_eigenParPriorValues_)[iEigen] )/(*_eigenValues_)[iEigen];
+    }
+  }
+  else{
+    for(int iPar = 0; iPar < _inverseCovarianceMatrix_->GetNrows(); iPar++) {
+//      if( _parameterList_.at(iPar).isFixed() ) continue;
+      for(int jPar = 0; jPar < _inverseCovarianceMatrix_->GetNrows(); jPar++)
+      {
+//        if( _parameterList_.at(jPar).isFixed() ) continue;
+        chi2
+          +=  (_parameterList_[iPar].getParameterValue() - _parameterList_[iPar].getPriorValue())
+              * (_parameterList_[jPar].getParameterValue() - _parameterList_[jPar].getPriorValue())
+              * (*_inverseCovarianceMatrix_)(iPar, jPar);
+      }
     }
   }
 
   return chi2;
 }
 
+
+// Eigen
+bool FitParameterSet::isUseEigenDecompInFit() const {
+  return _useEigenDecompInFit_;
+}
+int FitParameterSet::getNbEnabledEigenParameters() const {
+  return _nbEnabledEigen_;
+}
+double FitParameterSet::getEigenParameter(int iPar_) const{
+  return (*_eigenParValues_)[iPar_];
+}
+double FitParameterSet::getEigenSigma(int iPar_) const{
+  return TMath::Sqrt((*_eigenValues_)[iPar_]);
+}
+void FitParameterSet::setEigenParameter( int iPar_, double value_ ){
+  LogThrowIf(_eigenParValues_ == nullptr, "_eigenParValues_ not set.");
+  (*_eigenParValues_)[iPar_] = value_;
+}
+const TMatrixD* FitParameterSet::getInvertedEigenVectors() const{
+  return _invertedEigenVectors_.get();
+}
+const TMatrixD* FitParameterSet::getEigenVectors() const{
+  return _eigenVectors_.get();
+}
+void FitParameterSet::propagateEigenToOriginal(){
+//  LogTrace << "orig before: " << std::endl;
+//  _originalParValues_->Print();
+//  LogTrace << "eigen: " << std::endl;
+//  _eigenParValues_->Print();
+  (*_originalParValues_) = (*_eigenParValues_);
+  (*_originalParValues_) *= (*_invertedEigenVectors_);
+
+//  LogTrace << "orig after: " << std::endl;
+//  _originalParValues_->Print();
+
+  for( int iOrig = 0 ; iOrig < _originalParValues_->GetNrows() ; iOrig++ ){
+    if( _parameterList_.at(iOrig).isFixed() ) continue;
+    _parameterList_.at(iOrig).setParameterValue((*_originalParValues_)[iOrig]);
+  }
+}
+void FitParameterSet::propagateOriginalToEigen(){
+  (*_eigenParValues_) = (*_originalParValues_);
+  (*_eigenParValues_) *= (*_eigenVectors_);
+}
 
 // Misc
 std::string FitParameterSet::getSummary() const {
@@ -216,7 +257,7 @@ std::string FitParameterSet::getSummary() const {
   ss << "FitParameterSet: " << _name_ << " -> initialized=" << _isInitialized_ << ", enabled=" << _isEnabled_;
 
   if(_isInitialized_ and _isEnabled_){
-    ss << ", nbParameters: " << _parameterList_.size() << "(defined)/" << _covarianceMatrix_->GetNrows() << "(covariance)";
+    ss << ", nbParameters: " << _parameterList_.size() << "(defined)/" << _originalCovarianceMatrix_->GetNrows() << "(covariance)";
     if( not _parameterList_.empty() ){
       for( const auto& parameter : _parameterList_ ){
         ss << std::endl << GenericToolbox::indentString(parameter.getSummary(), 2);
@@ -235,4 +276,120 @@ void FitParameterSet::passIfInitialized(const std::string &methodName_) const {
     throw std::logic_error("class not initialized");
   }
 }
+void FitParameterSet::readCovarianceMatrix(){
+
+  _covarianceMatrixFile_ = TFile::Open(JsonUtils::fetchValue<std::string>(_jsonConfig_, "covarianceMatrixFilePath").c_str());
+  if( not _covarianceMatrixFile_->IsOpen() ){
+    LogError << "Could not open: _covarianceMatrixFile_: " << _covarianceMatrixFile_->GetPath() << std::endl;
+    throw std::runtime_error("Could not open: _covarianceMatrixFile_");
+  }
+
+  _originalCovarianceMatrix_ = (TMatrixDSym*) _covarianceMatrixFile_->Get(
+    JsonUtils::fetchValue<std::string>(_jsonConfig_, "covarianceMatrixTMatrixD").c_str()
+  );
+  if(_originalCovarianceMatrix_ == nullptr ){
+    LogError << "Could not find: " << JsonUtils::fetchValue<std::string>(_jsonConfig_, "covarianceMatrixTMatrixD")
+             << " in " << _covarianceMatrixFile_->GetPath() << std::endl;
+    throw std::runtime_error("Could not find: covarianceMatrixTObjectPath");
+  }
+
+  _originalCorrelationMatrix_ = std::shared_ptr<TMatrixDSym>(
+    GenericToolbox::convertToSymmetricMatrix(GenericToolbox::convertToCorrelationMatrix((TMatrixD*) _originalCovarianceMatrix_))
+    );
+
+  _useEigenDecompInFit_ = JsonUtils::fetchValue(_jsonConfig_ , "useEigenDecompInFit", false);
+  _maxEigenFraction_ = JsonUtils::fetchValue(_jsonConfig_ , "maxEigenFraction", double(1.));
+  if( _maxEigenFraction_ != 1 ){
+    LogInfo << "Max eigen fraction set to: " << _maxEigenFraction_*100 << "%" << std::endl;
+    _useEigenDecompInFit_ = true;
+  }
+
+  LogWarning << "Computing inverse of the covariance matrix: " << _originalCovarianceMatrix_->GetNcols() << "x" << _originalCovarianceMatrix_->GetNrows() << std::endl;
+  if( not _useEigenDecompInFit_ ){
+    LogDebug << "Using default matrix inversion..." << std::endl;
+    _inverseCovarianceMatrix_ = std::shared_ptr<TMatrixDSym>((TMatrixDSym*)(_originalCovarianceMatrix_->Clone()));
+    _inverseCovarianceMatrix_->Invert();
+  }
+  else{
+    LogDebug << "Using eigen decomposition..." << std::endl;
+    _eigenDecomp_ = std::shared_ptr<TMatrixDSymEigen>(new TMatrixDSymEigen(*_originalCovarianceMatrix_));
+
+    _eigenValues_ = std::shared_ptr<TVectorD>( (TVectorD*) _eigenDecomp_->GetEigenValues().Clone() );
+    _eigenVectors_ = std::shared_ptr<TMatrixD>( (TMatrixD*) _eigenDecomp_->GetEigenVectors().Clone() );
+
+    auto *eigVDec = new TMatrixDSymEigen(*GenericToolbox::convertToSymmetricMatrix(_eigenVectors_.get()));
+//    eigVDec->GetEigenValues().Print();
+
+    _invertedEigenVectors_ = std::shared_ptr<TMatrixD>( (TMatrixD*) _eigenVectors_->Clone() );
+    _invertedEigenVectors_->Invert();
+
+    auto* idTest = (TMatrixD*) _eigenVectors_->Clone();
+    (*idTest) *= (*_invertedEigenVectors_);
+//    idTest->Print();
+
+    auto* vecTest = new TVectorD(_invertedEigenVectors_->GetNrows());
+    for( int i = 0 ; i < vecTest->GetNrows() ; i++ ){
+      (*vecTest)[i] = 1;
+    }
+    vecTest->Print();
+
+    (*vecTest) *= (*_eigenVectors_); // orig -> eigen
+    vecTest->Print();
+
+    (*vecTest) *= (*_invertedEigenVectors_); // eigen -> orig
+    vecTest->Print(); // should be 1
+
+    double eigenCumulative = 0;
+    _nbEnabledEigen_ = 0;
+    double eigenTotal = _eigenValues_->Sum();
+
+    _inverseCovarianceMatrix_ = std::shared_ptr<TMatrixDSym>(new TMatrixDSym(_originalCovarianceMatrix_->GetNrows()));
+    _effectiveCovarianceMatrix_ = std::shared_ptr<TMatrixDSym>(new TMatrixDSym(_originalCovarianceMatrix_->GetNrows()));
+    _projectorMatrix_ = std::shared_ptr<TMatrixDSym>(new TMatrixDSym(_originalCovarianceMatrix_->GetNrows()));
+
+    for (int iEigen = 0; iEigen < _eigenValues_->GetNrows(); iEigen++) {
+
+      eigenCumulative += (*_eigenValues_)[iEigen];
+      if( eigenCumulative / eigenTotal > _maxEigenFraction_ ){
+        eigenCumulative -= (*_eigenValues_)[iEigen]; // not included
+        break;
+      }
+      _nbEnabledEigen_++;
+
+      for(int iDof = 0 ; iDof < _originalCovarianceMatrix_->GetNrows() ; iDof++ ){
+        for(int jDof = 0 ; jDof < _originalCovarianceMatrix_->GetNcols() ; jDof++ ){
+          (*_projectorMatrix_)[iDof][jDof]
+            +=   (*_eigenVectors_)[iDof][iEigen]
+                 * (*_eigenVectors_)[jDof][iEigen];
+
+          (*_inverseCovarianceMatrix_)[iDof][jDof]
+            += (1. / (*_eigenValues_)[iEigen] )
+               * (*_eigenVectors_)[iDof][iEigen]
+               * (*_eigenVectors_)[jDof][iEigen];
+
+          (*_effectiveCovarianceMatrix_)[iDof][jDof]
+            += (*_eigenValues_)[iEigen]
+               * (*_eigenVectors_)[iDof][iEigen]
+               * (*_eigenVectors_)[jDof][iEigen];
+        }
+      }
+
+    } // iEigen
+
+    LogWarning << "Eigen decomposition with " << _nbEnabledEigen_ << " / " << _eigenValues_->GetNrows() << " vectors" << std::endl;
+    if(_nbEnabledEigen_ != _eigenValues_->GetNrows() ){
+      LogInfo << "Max eigen fraction set to " << _maxEigenFraction_*100 << "%" << std::endl;
+      LogInfo << "Fraction taken: " << eigenCumulative / eigenTotal*100 << "%" << std::endl;
+    }
+
+    _originalParValues_ = std::shared_ptr<TVectorD>( new TVectorD(_originalCovarianceMatrix_->GetNrows()) );
+    _eigenParValues_ = std::shared_ptr<TVectorD>( new TVectorD(_originalCovarianceMatrix_->GetNrows()) );
+
+  }
+
+  LogInfo << "Parameter set \"" << _name_ << "\" is handling " << _originalCovarianceMatrix_->GetNcols() << " parameters." << std::endl;
+
+
+}
+
 

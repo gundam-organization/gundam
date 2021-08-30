@@ -65,7 +65,8 @@ private:
   bool _fitIsDone_{false};
   bool _fitUnderGoing_{false};
   int _nbFitCalls_{0};
-  int _nbFitParameters_;
+  int _nbFitParameters_{0};
+  int _nbParameters_{0};
   Propagator _propagator_;
   std::shared_ptr<ROOT::Math::Minimizer> _minimizer_{nullptr};
   std::shared_ptr<ROOT::Math::Functor> _functor_{nullptr};
