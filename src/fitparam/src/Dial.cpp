@@ -60,21 +60,21 @@ std::string Dial::getSummary(){
 }
 double Dial::evalResponse(const double &parameterValue_) {
 
-  _mutexPtr_->lock(); // don't fetch the cache at the same time
   if( _dialParameterCache_ == parameterValue_ ){
-    _mutexPtr_->unlock();
+    while( _isEditingCache_ ){ std::this_thread::sleep_for(std::chrono::nanoseconds(10)); }
     return _dialResponseCache_;
   }
-
-//  LogTrace << this << " < " << _dialParameterCache_ << " -> " << _dialResponseCache_ << std::endl;
+  _isEditingCache_ = true;
   _dialParameterCache_ = parameterValue_;
-  this->updateResponseCache(parameterValue_); // specified in the corresponding dial class
-//  LogTrace << this << " > " << _dialParameterCache_ << " -> " << _dialResponseCache_ << std::endl;
-  _mutexPtr_->unlock();
+  this->fillResponseCache(parameterValue_); // specified in the corresponding dial class
+  _isEditingCache_ = false;
 
   return _dialResponseCache_;
 }
 
+double Dial::getDialResponseCache() const{
+  return _dialResponseCache_;
+}
 const DataBin &Dial::getApplyConditionBin() const {
   return _applyConditionBin_;
 }

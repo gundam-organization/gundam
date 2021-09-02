@@ -66,6 +66,8 @@ void FitParameterSet::initialize() {
 
   this->readCovarianceMatrix();
 
+  _useOnlyOneParameterPerEvent_ = JsonUtils::fetchValue<bool>(_jsonConfig_, "useOnlyOneParameterPerEvent", false);
+
   // Optional parameters:
   std::string pathBuffer;
 
@@ -139,8 +141,8 @@ void FitParameterSet::initialize() {
     }
     propagateOriginalToEigen();
     _eigenParPriorValues_ = std::shared_ptr<TVectorD>( (TVectorD*) _eigenParValues_->Clone() );
-    LogTrace << "EIGEN VAL IS NOW:" << std::endl;
-    _eigenParValues_->Print();
+//    LogTrace << "EIGEN VAL IS NOW:" << std::endl;
+//    _eigenParValues_->Print();
   }
 
   _isInitialized_ = true;
@@ -311,8 +313,11 @@ void FitParameterSet::readCovarianceMatrix(){
     _inverseCovarianceMatrix_->Invert();
   }
   else{
-    LogDebug << "Using eigen decomposition..." << std::endl;
+    LogInfo << "Using eigen decomposition..." << std::endl;
+
+    LogDebug << "Computing the eigen vectors / values..." << std::endl;
     _eigenDecomp_ = std::shared_ptr<TMatrixDSymEigen>(new TMatrixDSymEigen(*_originalCovarianceMatrix_));
+    LogDebug << "Eigen decomposition done." << std::endl;
 
     _eigenValues_ = std::shared_ptr<TVectorD>( (TVectorD*) _eigenDecomp_->GetEigenValues().Clone() );
     _eigenVectors_ = std::shared_ptr<TMatrixD>( (TMatrixD*) _eigenDecomp_->GetEigenVectors().Clone() );
@@ -323,21 +328,21 @@ void FitParameterSet::readCovarianceMatrix(){
     _invertedEigenVectors_ = std::shared_ptr<TMatrixD>( (TMatrixD*) _eigenVectors_->Clone() );
     _invertedEigenVectors_->Invert();
 
-    auto* idTest = (TMatrixD*) _eigenVectors_->Clone();
-    (*idTest) *= (*_invertedEigenVectors_);
-//    idTest->Print();
-
-    auto* vecTest = new TVectorD(_invertedEigenVectors_->GetNrows());
-    for( int i = 0 ; i < vecTest->GetNrows() ; i++ ){
-      (*vecTest)[i] = 1;
-    }
-    vecTest->Print();
-
-    (*vecTest) *= (*_eigenVectors_); // orig -> eigen
-    vecTest->Print();
-
-    (*vecTest) *= (*_invertedEigenVectors_); // eigen -> orig
-    vecTest->Print(); // should be 1
+//    auto* idTest = (TMatrixD*) _eigenVectors_->Clone();
+//    (*idTest) *= (*_invertedEigenVectors_);
+////    idTest->Print();
+//
+//    auto* vecTest = new TVectorD(_invertedEigenVectors_->GetNrows());
+//    for( int i = 0 ; i < vecTest->GetNrows() ; i++ ){
+//      (*vecTest)[i] = 1;
+//    }
+//    vecTest->Print();
+//
+//    (*vecTest) *= (*_eigenVectors_); // orig -> eigen
+//    vecTest->Print();
+//
+//    (*vecTest) *= (*_invertedEigenVectors_); // eigen -> orig
+//    vecTest->Print(); // should be 1
 
     double eigenCumulative = 0;
     _nbEnabledEigen_ = 0;
@@ -390,6 +395,10 @@ void FitParameterSet::readCovarianceMatrix(){
   LogInfo << "Parameter set \"" << _name_ << "\" is handling " << _originalCovarianceMatrix_->GetNcols() << " parameters." << std::endl;
 
 
+}
+
+bool FitParameterSet::isUseOnlyOneParameterPerEvent() const {
+  return _useOnlyOneParameterPerEvent_;
 }
 
 

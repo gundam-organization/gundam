@@ -40,7 +40,7 @@ public:
   double getParameterValue() const;
   double getStdDevValue() const;
   double getPriorValue() const;
-  const std::vector<DialSet> &getDialSetList() const;
+  std::vector<DialSet> &getDialSetList();
 
   // Core
   double getDistanceFromNominal() const; // in unit of sigmas

@@ -15,7 +15,8 @@ public:
   void reset() override;
   void initialize() override;
 
-  void updateResponseCache(const double& parameterValue_) override;
+protected:
+  void fillResponseCache(const double& parameterValue_) override;
 
 };
 

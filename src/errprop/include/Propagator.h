@@ -93,6 +93,9 @@ public:
   std::string fillPropagationTime;
   std::string applyRfTime;
 
+  long long nbWeightProp = 0;
+  long long cumulatedWeightPropTime = 0;
+
 };
 
 

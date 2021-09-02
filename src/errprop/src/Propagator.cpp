@@ -166,6 +166,50 @@ void Propagator::initialize() {
 
   fillEventDialCaches();
 
+//  LogInfo << "Freeing up memory..." << std::endl;
+//  GenericToolbox::getProcessMemoryUsageDiffSinceLastCall();
+//  auto postInitRequestedLeaves = _plotGenerator_.fetchRequestedLeafNames();
+//  std::vector<std::vector<std::string>*> dataSetLeavesListPtr;
+//  std::map<std::vector<std::string>*, std::vector<size_t>> leavesToRemoveMap;
+//  for( auto& dataSet : _fitSampleSet_.getDataSetList() ){
+//    dataSetLeavesListPtr.emplace_back(&dataSet.getMcActiveLeafNameList());
+//    dataSetLeavesListPtr.emplace_back(&dataSet.getDataActiveLeafNameList());
+//  }
+//  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+//    std::vector<std::string> *currentLeafList{nullptr};
+//    for( auto& event : sample.getMcContainer().eventList ){
+//      if( currentLeafList != event.getCommonLeafNameListPtr() ){
+//        for( auto& listPtr : dataSetLeavesListPtr ){
+//          if( listPtr == event.getCommonLeafNameListPtr() ){
+//            currentLeafList = listPtr;
+//          }
+//        }
+//        leavesToRemoveMap[currentLeafList].clear();
+//        for( size_t iLeaf = 0 ; iLeaf < currentLeafList->size() ; iLeaf++ ){
+//          if( not GenericToolbox::doesElementIsInVector(currentLeafList->at(iLeaf), postInitRequestedLeaves) ){
+//            leavesToRemoveMap[currentLeafList].emplace_back(iLeaf);
+//          }
+//        }
+//        // IN DECREASING ORDER
+//        std::sort(leavesToRemoveMap[currentLeafList].rbegin(), leavesToRemoveMap[currentLeafList].rend());   // note: reverse iterators
+//        LogTrace << "varToDeleteIndexList = " << GenericToolbox::parseVectorAsString(leavesToRemoveMap[currentLeafList]) << std::endl;
+//      }
+//
+//      for( auto& varIndexToDelete : leavesToRemoveMap[currentLeafList] ){
+//        event.deleteLeaf(varIndexToDelete);
+//      }
+//    }
+//  }
+//  for( auto& pair : leavesToRemoveMap ){
+//    LogTrace << GenericToolbox::parseVectorAsString(*pair.first) << std::endl;
+//    for( auto& removeIndex : pair.second ){
+//      pair.first->erase(pair.first->begin()+int(removeIndex));
+//    }
+//    LogTrace << GenericToolbox::parseVectorAsString(*pair.first) << std::endl;
+//  }
+//  leavesToRemoveMap.clear();
+//  LogDebug << GenericToolbox::parseSizeUnits(-GenericToolbox::getProcessMemoryUsageDiffSinceLastCall()) << std::endl;
+
   if( JsonUtils::fetchValue<json>(_config_, "throwParameters", false) ){
     LogWarning << "Throwing parameters..." << std::endl;
     for( auto& parSet : _parameterSetsList_ ){
@@ -273,7 +317,9 @@ void Propagator::propagateParametersOnSamples(){
 void Propagator::reweightSampleEvents() {
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
   GlobalVariables::getParallelWorker().runJob("Propagator::reweightSampleEvents");
-  weightPropagationTime = GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__);
+  nbWeightProp += 1;
+  cumulatedWeightPropTime += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+  weightPropagationTime = GenericToolbox::parseTimeUnit(cumulatedWeightPropTime / nbWeightProp);
   if( _showTimeStats_ ) {
     LogDebug << __METHOD_NAME__ << " took: " << weightPropagationTime << std::endl;
   }
@@ -293,13 +339,13 @@ void Propagator::applyResponseFunctions(){
 
 void Propagator::preventRfPropagation(){
   if(_isRfPropagationEnabled_){
-    LogInfo << "Parameters propagation using Response Function is now disabled." << std::endl;
+//    LogInfo << "Parameters propagation using Response Function is now disabled." << std::endl;
     _isRfPropagationEnabled_ = false;
   }
 }
 void Propagator::allowRfPropagation(){
   if(not _isRfPropagationEnabled_){
-    LogWarning << "Parameters propagation using Response Function is now ENABLED." << std::endl;
+//    LogWarning << "Parameters propagation using Response Function is now ENABLED." << std::endl;
     _isRfPropagationEnabled_ = true;
   }
 }
@@ -367,7 +413,6 @@ void Propagator::initializeCaches() {
       } // parSet
     } // event
   } // sample
-
 
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
     for( auto& event : sample.getMcContainer().eventList ){
@@ -449,6 +494,7 @@ void Propagator::makeResponseFunctions(){
 void Propagator::reweightSampleEvents(int iThread_) {
   double weight;
 
+  // OLD
   if( _fitSampleSet_.empty() ){
     AnaEvent* eventPtr;
     for( auto& sample : _samplesList_ ){
@@ -493,12 +539,14 @@ void Propagator::reweightSampleEvents(int iThread_) {
     } // sample
   }
   else{
+    // NEW
     PhysicsEvent* evPtr;
-    Dial* dialPtr;
+    size_t parIndex;
     int nThreads = GlobalVariables::getNbThreads();
+    int iEvent;
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
       int nEvents = int(sample.getMcContainer().eventList.size());
-      for( int iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
+      for( iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
         if( iEvent % nThreads != iThread_ ){
           continue;
         }
@@ -507,20 +555,25 @@ void Propagator::reweightSampleEvents(int iThread_) {
         evPtr->resetEventWeight();
 
         // Loop over the parSet that are cached (missing ones won't apply on this event anyway)
-        for( auto& parSetDialCache : *evPtr->getDialCachePtr() ){
+        for( auto& parSetDialCache : evPtr->getDialCache() ){
 
           weight = 1;
-          for( size_t iPar = 0 ; iPar < parSetDialCache.first->getNbParameters() ; iPar++ ){
+          parIndex = -1;
 
-            dialPtr = parSetDialCache.second.at(iPar);
-            if( dialPtr == nullptr ) continue;
+          for( parIndex = 0 ; parIndex < parSetDialCache.second.size() ; parIndex++ ){
+            if( parSetDialCache.second.at(parIndex) == nullptr ) continue;
 
             // No need to recast dialPtr as a NormDial or whatever, it will automatically fetch the right method
-            weight *= dialPtr->evalResponse( parSetDialCache.first->getFitParameter(iPar).getParameterValue() );
+            weight *= parSetDialCache.second.at(parIndex)->evalResponse(
+              parSetDialCache.first->getFitParameter(parIndex).getParameterValue()
+              );
 
-            // TODO: check if weight cap
             if( weight <= 0 ){
               weight = 0;
+              break;
+            }
+
+            if( parSetDialCache.first->isUseOnlyOneParameterPerEvent() ){
               break;
             }
 
@@ -647,6 +700,7 @@ void Propagator::fillEventDialCaches(int iThread_){
   }
   else{
     PhysicsEvent* evPtr{nullptr};
+    std::vector<Dial *>* evParSetDialList{nullptr};
     if (iThread_ == GlobalVariables::getNbThreads() - 1) LogTrace << "New samples" << std::endl;
     for( auto& parSet : _parameterSetsList_ ){
       if( not parSet.isEnabled() ){ continue; }
@@ -716,22 +770,19 @@ void Propagator::fillEventDialCaches(int iThread_){
               }
 
               evPtr = &sample.getMcContainer().eventList.at(iEvent);
-              if (evPtr->getDialCachePtr()->at(&parSet).at(iPar) != nullptr) {
+              evParSetDialList = &evPtr->getDialCachePtr()->at(&parSet);
+              if (evParSetDialList->at(iPar) != nullptr) {
                 // already set
                 continue;
               }
+//              else if( parSet.isUseOnlyOneParameterPerEvent() ){
+//                bool skip = false;
+//                for( auto& dialPtr : *evParSetDialList ){
+//                  if( dialPtr != nullptr ){ skip = true; break; }
+//                }
+//                if( skip ) continue;
+//              }
 
-              //            if( evPtr->getEntryIndex() == 6 and par.getName() == "Q2_norm_1" ){
-              //              evPtr->print();
-              //              if (dialSet->getApplyConditionFormula() != nullptr
-              //              and evPtr->evalFormula(dialSet->getApplyConditionFormula(), &varIndexFormulaList) == 0
-              //              ) {
-              //                LogError << GET_VAR_NAME_VALUE(dialSet->getApplyConditionFormula()->GetExpFormula()) << std::endl;
-              ////                LogError << GET_VAR_NAME_VALUE(evPtr->fetchValue<Float_t>("q2_true")) << std::endl;
-              //                LogError << "LOL: " << GET_VAR_NAME_VALUE(evPtr->getVarAsDouble("q2_true")) << std::endl;
-              //                continue; // SKIP
-              //              }
-              //            }
               if (dialSet->getApplyConditionFormula() != nullptr
               and evPtr->evalFormula(dialSet->getApplyConditionFormula(), &varIndexFormulaList) == 0
               ) {
@@ -747,7 +798,7 @@ void Propagator::fillEventDialCaches(int iThread_){
                   }
                 }
                 if (isInBin) {
-                  evPtr->getDialCachePtr()->at(&parSet).at(iPar) = dial.get();
+                  evParSetDialList->at(iPar) = dial.get();
                   //LogTrace << *evPtr << std::endl;
                   break; // found
                 }

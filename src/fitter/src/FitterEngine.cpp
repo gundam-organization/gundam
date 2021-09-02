@@ -82,39 +82,40 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
   int iPar = -1;
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 
-    for( auto& par : parSet.getParameterList() ){
-      iPar++;
+    if( not parSet.isUseEigenDecompInFit() ){
+      for( auto& par : parSet.getParameterList() ){
+        iPar++;
 
-      std::string tag;
-      if( par.isFixed() ){ tag += "_FIXED"; }
+        std::string tag;
+        if( par.isFixed() ){ tag += "_FIXED"; }
 
-      double currentParValue = par.getParameterValue();
-      par.setParameterValue( currentParValue + par.getStdDevValue() );
-      LogInfo << "(" << iPar+1 << "/" << _nbParameters_ << ") +1 sigma on " << parSet.getName() + "/" + par.getTitle()
-              << " -> " << par.getParameterValue() << std::endl;
-      _propagator_.propagateParametersOnSamples();
+        double currentParValue = par.getParameterValue();
+        par.setParameterValue( currentParValue + par.getStdDevValue() );
+        LogInfo << "(" << iPar+1 << "/" << _nbParameters_ << ") +1 sigma on " << parSet.getName() + "/" + par.getTitle()
+                << " -> " << par.getParameterValue() << std::endl;
+        _propagator_.propagateParametersOnSamples();
 
-      std::string savePath = saveDir_;
-      if( not savePath.empty() ) savePath += "/";
-      savePath += "oneSigma/" + parSet.getName() + "/" + par.getTitle() + tag;
-      auto* saveDir = GenericToolbox::mkdirTFile(_saveDir_, savePath );
-      saveDir->cd();
+        std::string savePath = saveDir_;
+        if( not savePath.empty() ) savePath += "/";
+        savePath += "oneSigma/" + parSet.getName() + "/" + par.getTitle() + tag;
+        auto* saveDir = GenericToolbox::mkdirTFile(_saveDir_, savePath );
+        saveDir->cd();
 
-      _propagator_.getPlotGenerator().generateSamplePlots();
+        _propagator_.getPlotGenerator().generateSamplePlots();
 
-      auto oneSigmaHistList = _propagator_.getPlotGenerator().getHistHolderList();
-      _propagator_.getPlotGenerator().generateComparisonPlots( oneSigmaHistList, refHistList, saveDir );
-      par.setParameterValue( currentParValue );
-      _propagator_.propagateParametersOnSamples();
+        auto oneSigmaHistList = _propagator_.getPlotGenerator().getHistHolderList();
+        _propagator_.getPlotGenerator().generateComparisonPlots( oneSigmaHistList, refHistList, saveDir );
+        par.setParameterValue( currentParValue );
+        _propagator_.propagateParametersOnSamples();
 
-      const auto& compHistList = _propagator_.getPlotGenerator().getComparisonHistHolderList();
+        const auto& compHistList = _propagator_.getPlotGenerator().getComparisonHistHolderList();
 
-      // Since those were not saved, delete manually
-      for( auto& hist : oneSigmaHistList ){ delete hist.histPtr; }
-      oneSigmaHistList.clear();
+        // Since those were not saved, delete manually
+        for( auto& hist : oneSigmaHistList ){ delete hist.histPtr; }
+        oneSigmaHistList.clear();
+      }
     }
-
-    if( parSet.isUseEigenDecompInFit() ){
+    else{
       for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
         double currentParValue = parSet.getEigenParameter(iEigen);
         parSet.setEigenParameter(iEigen, currentParValue + parSet.getEigenSigma(iEigen));
@@ -167,6 +168,12 @@ void FitterEngine::fixGhostParameters(){
   // +1 sigma
   int iPar = -1;
   for( auto& parSet : _propagator_.getParameterSetsList() ){
+
+    if( parSet.isUseEigenDecompInFit() ){
+      LogWarning << "Skipping " << parSet.getName() << " since eigen decomposition will be used." << std::endl;
+      continue;
+    }
+
     for( auto& par : parSet.getParameterList() ){
       iPar++;
 
@@ -428,6 +435,8 @@ void FitterEngine::writePostFitData() {
       TMatrixDSym fitterCovarianceMatrix(_minimizer_->NDim(), covarianceMatrixArray);
       TH2D* fitterCovarianceMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) &fitterCovarianceMatrix, "fitterCovarianceMatrixTH2D");
 
+      LogInfo << "Fitter covariance matrix is " << fitterCovarianceMatrix.GetNrows() << "x" << fitterCovarianceMatrix.GetNcols() << std::endl;
+
       std::vector<double> parameterValueList(_minimizer_->X(),      _minimizer_->X()      + _minimizer_->NDim());
       std::vector<double> parameterErrorList(_minimizer_->Errors(), _minimizer_->Errors() + _minimizer_->NDim());
 
@@ -435,13 +444,16 @@ void FitterEngine::writePostFitData() {
       for( const auto& parSet : _propagator_.getParameterSetsList() ){
 
         if( not parSet.isEnabled() ){
+          LogWarning << "Skipping disabled parameter set: " << parSet.getName() << std::endl;
           continue;
         }
 
+        LogInfo << "Extracting post-fit errors of parameter set: " << parSet.getName() << std::endl;
         auto* parSetDir = GenericToolbox::mkdirTFile(errorDir, parSet.getName());
 
         TMatrixD* covMatrix;
         if( not parSet.isUseEigenDecompInFit() ) {
+          LogDebug << "Extracting parameters..." << std::endl;
           covMatrix = new TMatrixD(parSet.getParameterList().size(), parSet.getParameterList().size());
           for (const auto &parRow: parSet.getParameterList()) {
             for (const auto &parCol: parSet.getParameterList()) {
@@ -452,6 +464,8 @@ void FitterEngine::writePostFitData() {
           } // par X
         }
         else{
+          LogDebug << "Extracting eigen parameters..." << std::endl;
+
           covMatrix = new TMatrixD(parSet.getNbEnabledEigenParameters(), parSet.getNbEnabledEigenParameters());
           for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
             for( int jEigen = 0 ; jEigen < parSet.getNbEnabledEigenParameters() ; jEigen++ ){
@@ -463,6 +477,7 @@ void FitterEngine::writePostFitData() {
           auto* corMatrix = GenericToolbox::convertToCorrelationMatrix((TMatrixD*) covMatrix);
           auto* corMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D(corMatrix, Form("Correlation_Eigen_%s_TH2D", parSet.getName().c_str()));
 
+          LogDebug << "Applying labels on eigen histograms..." << std::endl;
           for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
             covMatrixTH2D->GetXaxis()->SetBinLabel(1+iEigen, (parSet.getName() + "/eigen_#" + std::to_string(iEigen)).c_str());
             covMatrixTH2D->GetYaxis()->SetBinLabel(1+iEigen, (parSet.getName() + "/eigen_#" + std::to_string(iEigen)).c_str());
@@ -479,6 +494,7 @@ void FitterEngine::writePostFitData() {
           corMatrix->Write("Correlation_Eigen_TMatrixD");
           corMatrixTH2D->Write("Correlation_Eigen_TH2D");
 
+          LogDebug << "Converting eigen to original parameters..." << std::endl;
           auto* originalCovMatrix = new TMatrixD(parSet.getParameterList().size(), parSet.getParameterList().size());
           for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
             for( int jEigen = 0 ; jEigen < parSet.getNbEnabledEigenParameters() ; jEigen++ ){
@@ -486,7 +502,6 @@ void FitterEngine::writePostFitData() {
             }
           }
 
-//          (*originalCovMatrix) = (*parSet.getInvertedEigenVectors()) * (*originalCovMatrix) * (*parSet.getEigenVectors());
           (*originalCovMatrix) = (*parSet.getEigenVectors()) * (*originalCovMatrix) * (*parSet.getInvertedEigenVectors());
 
           covMatrix = originalCovMatrix;
@@ -497,6 +512,7 @@ void FitterEngine::writePostFitData() {
         auto* corMatrix = GenericToolbox::convertToCorrelationMatrix((TMatrixD*) covMatrix);
         auto* corMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D(corMatrix, Form("Correlation_%s_TH2D", parSet.getName().c_str()));
 
+        LogDebug << "Applying labels on histograms..." << std::endl;
         for( const auto& par : parSet.getParameterList() ){
           covMatrixTH2D->GetXaxis()->SetBinLabel(1+par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
           covMatrixTH2D->GetYaxis()->SetBinLabel(1+par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
@@ -540,7 +556,7 @@ void FitterEngine::writePostFitData() {
         postFitErrorHist->SetMarkerStyle(kFullDotLarge);
         postFitErrorHist->SetTitle("Post-fit Errors");
 
-        auto* errorsCanvas = new TCanvas("fitConstraints", Form("Fit Constraints for %s", parSet.getName().c_str()), 800, 600);
+        auto* errorsCanvas = new TCanvas(Form("Fit Constraints for %s", parSet.getName().c_str()), Form("Fit Constraints for %s", parSet.getName().c_str()), 800, 600);
         errorsCanvas->cd();
         preFitErrorHist->Draw("E2");
         errorsCanvas->Update(); // otherwise does not display...
@@ -582,9 +598,10 @@ void FitterEngine::initializePropagator(){
   _propagator_.setConfig(JsonUtils::fetchValue<json>(_config_, "propagatorConfig"));
   _propagator_.setSaveDir(_saveDir_);
 
-  TFile* f = TFile::Open(JsonUtils::fetchValue<std::string>(_config_, "mc_file").c_str(), "READ");
-  _propagator_.setDataTree( f->Get<TTree>("selectedEvents") );
-  _propagator_.setMcFilePath(JsonUtils::fetchValue<std::string>(_config_, "mc_file"));
+//  TFile* f = TFile::Open(JsonUtils::fetchValue<std::string>(_config_, "mc_file").c_str(), "READ");
+//  _propagator_.setDataTree( f->Get<TTree>("selectedEvents") );
+//  _propagator_.setMcFilePath(JsonUtils::fetchValue<std::string>(_config_, "mc_file"));
+
   _propagator_.initialize();
 
 }
@@ -648,7 +665,7 @@ void FitterEngine::initializeMinimizer(){
     else{
       for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
         iPar++;
-        LogTrace << GET_VAR_NAME_VALUE(iPar) << " is eigen: " << parSet.getEigenParameter(iEigen) << std::endl;
+//        LogTrace << GET_VAR_NAME_VALUE(iPar) << " is eigen: " << parSet.getEigenParameter(iEigen) << std::endl;
         _minimizer_->SetVariable(
           iPar,
           parSet.getName() + "/eigen_#" + std::to_string(iPar),

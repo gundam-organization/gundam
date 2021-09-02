@@ -135,7 +135,7 @@ double FitParameter::getStdDevValue() const {
 double FitParameter::getPriorValue() const {
   return _priorValue_;
 }
-const std::vector<DialSet> &FitParameter::getDialSetList() const {
+std::vector<DialSet> &FitParameter::getDialSetList() {
   return _dialSetList_;
 }
 

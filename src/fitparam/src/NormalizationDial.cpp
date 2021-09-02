@@ -14,7 +14,7 @@ NormalizationDial::NormalizationDial() {
   this->reset();
 }
 
-void NormalizationDial::updateResponseCache(const double &parameterValue_) {
+void NormalizationDial::fillResponseCache(const double &parameterValue_) {
   // Normalization dial: y = x
   _dialResponseCache_ = _dialParameterCache_;
 }

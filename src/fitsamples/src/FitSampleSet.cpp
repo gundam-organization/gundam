@@ -312,6 +312,7 @@ void FitSampleSet::loadPhysicsEvents() {
 
 //        auto threadSampleIndexOffsetList = sampleIndexOffsetList;
         size_t sampleEventIndex;
+        const std::vector<DataBin>* binsListPtr;
 
         std::string progressTitle = LogInfo.getPrefixString() + "Reading selected events";
         for( Long64_t iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
@@ -332,16 +333,39 @@ void FitSampleSet::loadPhysicsEvents() {
 
           for( size_t iSample = 0 ; iSample < samplesToFillList.size() ; iSample++ ){
             if( eventIsInSamplesList.at(iEvent).at(iSample) ){
+
+              // Has valid bin?
+              binsListPtr = &samplesToFillList.at(iSample)->getBinning().getBinsList();
+              for( size_t iBin = 0 ; iBin < binsListPtr->size() ; iBin++ ){
+                auto& bin = binsListPtr->at(iBin);
+                bool isInBin = true;
+                for( size_t iVar = 0 ; iVar < bin.getVariableNameList().size() ; iVar++ ){
+                  if( not bin.isBetweenEdges(iVar, eventBufThread.getVarAsDouble(bin.getVariableNameList().at(iVar))) ){
+                    isInBin = false;
+                    break;
+                  }
+                } // Var
+                if( isInBin ){
+                  eventBufThread.setSampleBinIndex(int(iBin));
+                  break;
+                }
+              } // Bin
+
+              if( eventBufThread.getSampleBinIndex() == -1 ){
+                LogTrace << "NOT FOUND" << std::endl;
+                // Invalid bin
+                break;
+              }
+
               eventOffSetMutex.lock();
               sampleEventIndex = sampleIndexOffsetList.at(iSample)++;
-//              if(iSample==0) LogTrace << GET_VAR_NAME_VALUE(iThread_) << " -> " << sampleEventIndex << " -> " << iEvent << std::endl;
               eventOffSetMutex.unlock();
+
               sampleEventListPtrToFill.at(iSample)->at(sampleEventIndex) = PhysicsEvent(eventBufThread); // copy
             }
           }
         }
         if( iThread_ == 0 ) GenericToolbox::displayProgressBar(nEvents, nEvents, progressTitle);
-
 //        delete threadChain;
       };
 
@@ -349,6 +373,11 @@ void FitSampleSet::loadPhysicsEvents() {
       GlobalVariables::getParallelWorker().addJob(__METHOD_NAME__, fillFunction);
       GlobalVariables::getParallelWorker().runJob(__METHOD_NAME__);
       GlobalVariables::getParallelWorker().removeJob(__METHOD_NAME__);
+
+      LogInfo << "Shrinking event lists..." << std::endl;
+      for( size_t iSample = 0 ; iSample < samplesToFillList.size() ; iSample++ ){
+        samplesToFillList.at(iSample)->getMcContainer().shrinkEventList(sampleIndexOffsetList.at(iSample));
+      }
 
       LogInfo << "Events have been loaded for " << ( isData ? "data": "mc" )
       << " with dataset: " << dataSet.getName() << std::endl;
@@ -384,8 +413,8 @@ void FitSampleSet::loadPhysicsEvents() {
 //    sample.getMcContainer().eventList = GenericToolbox::applyPermutation(sample.getMcContainer().eventList, p);
 //  }
 
-  LogInfo << "Filling samples event bin cache..." << std::endl;
-  this->updateSampleEventBinIndexes();
+//  LogInfo << "Filling samples event bin cache..." << std::endl;
+//  this->updateSampleEventBinIndexes();
 
   if( _dataEventType_ == DataEventType::Asimov ){
     LogWarning << "Asimov data selected: copying MC events..." << std::endl;

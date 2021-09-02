@@ -22,7 +22,10 @@ public:
   void initialize() override;
 
   std::string getSummary() override;
-  void updateResponseCache(const double &parameterValue_) override;
+
+protected:
+  void fillResponseCache(const double &parameterValue_) override;
+
 
 private:
   TSpline3* _splinePtr_{nullptr};

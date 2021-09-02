@@ -16,6 +16,7 @@ PhysicsEvent::~PhysicsEvent() { this->reset(); }
 void PhysicsEvent::reset() {
   _commonLeafNameListPtr_ = nullptr;
   _leafContentList_.clear();
+  _dialCache_.clear();
 
   // Weight carriers
   _dataSetIndex_=-1;
@@ -65,6 +66,9 @@ double PhysicsEvent::getEventWeight() const {
 }
 int PhysicsEvent::getSampleBinIndex() const {
   return _sampleBinIndex_;
+}
+std::map<FitParameterSet *, std::vector<Dial *>>& PhysicsEvent::getDialCache(){
+  return _dialCache_;
 }
 std::map<FitParameterSet *, std::vector<Dial *>>* PhysicsEvent::getDialCachePtr() {
   return &_dialCache_;
@@ -212,8 +216,16 @@ bool PhysicsEvent::isSame(AnaEvent& anaEvent_) const{
 
   return isSame;
 }
+void PhysicsEvent::deleteLeaf(size_t index_){
+  _leafContentList_.erase(_leafContentList_.begin() + index_);
+  _leafContentList_.shrink_to_fit();
+}
 
 std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p ){
   o << p.getSummary();
   return o;
+}
+
+const std::vector<std::string> *PhysicsEvent::getCommonLeafNameListPtr() const {
+  return _commonLeafNameListPtr_;
 }

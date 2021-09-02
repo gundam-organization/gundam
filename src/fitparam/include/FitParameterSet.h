@@ -45,6 +45,9 @@ public:
 
   // Getters
   bool isEnabled() const;
+
+  bool isUseOnlyOneParameterPerEvent() const;
+
   const std::string &getName() const;
   std::vector<FitParameter> &getParameterList();
   const std::vector<FitParameter> &getParameterList() const;
@@ -94,6 +97,7 @@ private:
 
   int _nbEnabledEigen_{0};
   bool _useEigenDecompInFit_{false};
+  bool _useOnlyOneParameterPerEvent_{false};
   std::shared_ptr<TMatrixDSymEigen> _eigenDecomp_{nullptr};
   std::shared_ptr<TVectorD> _eigenValues_{nullptr};
   std::shared_ptr<TMatrixD> _eigenVectors_{nullptr};

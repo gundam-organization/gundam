@@ -42,7 +42,10 @@ public:
   double getNominalWeight() const;
   double getEventWeight() const;
   int getSampleBinIndex() const;
+  std::map<FitParameterSet *, std::vector<Dial *>>& getDialCache();
   std::map<FitParameterSet *, std::vector<Dial *>>* getDialCachePtr();
+
+  const std::vector<std::string> *getCommonLeafNameListPtr() const;
 
   // CORE
   // Filling up
@@ -64,6 +67,7 @@ public:
   std::string getSummary() const;
   void print() const;
   bool isSame(AnaEvent& anaEvent_) const;
+  void deleteLeaf(size_t index_);
 
   // Stream operator
   friend std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p );

@@ -42,6 +42,7 @@ public:
 
   // Methods
   void reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const PhysicsEvent &eventBuffer_);
+  void shrinkEventList(size_t newTotalSize_);
   void updateEventBinIndexes(int iThread_ = -1);
   void updateBinEventList(int iThread_ = -1);
   void refillHistogram(int iThread_ = -1);

@@ -24,10 +24,23 @@ void SampleElement::reserveEventMemory(size_t dataSetIndex_, size_t nEvents, con
   eventNbList.emplace_back(nEvents);
   eventList.resize(eventOffSetList.back()+eventNbList.back(), eventBuffer_);
 }
+void SampleElement::shrinkEventList(size_t newTotalSize_){
+  LogThrowIf(isLocked, "Can't " << __METHOD_NAME__ << " while locked");
+  if( eventNbList.empty() and newTotalSize_ == 0 ) return;
+  LogThrowIf(eventList.size() < newTotalSize_,
+             "Can't shrink since eventList is too small: " << GET_VAR_NAME_VALUE(newTotalSize_)
+             << " > " << GET_VAR_NAME_VALUE(eventList.size()));
+  LogThrowIf(not eventNbList.empty() and eventNbList.back() < (eventList.size() - newTotalSize_), "Can't shrink since eventList of the last dataSet is too small.");
+  LogDebug << "Shrinking " << eventList.size() << " to " << newTotalSize_ << "..." << std::endl;
+  eventNbList.back() -= (eventList.size() - newTotalSize_);
+  eventList.resize(newTotalSize_);
+  eventList.shrink_to_fit();
+}
 void SampleElement::updateEventBinIndexes(int iThread_){
   if( isLocked ) return;
   int nBins = int(binning.getBinsList().size());
   if(iThread_ <= 0) LogInfo << "Finding bin indexes for \"" << name << "\"..." << std::endl;
+  int toDelete = 0;
   for( size_t iEvent = 0 ; iEvent < eventList.size() ; iEvent++ ){
     if( iThread_ != -1 and iEvent % GlobalVariables::getNbThreads() != iThread_ ) continue;
     auto& event = eventList.at(iEvent);
@@ -45,7 +58,14 @@ void SampleElement::updateEventBinIndexes(int iThread_){
         break;
       }
     } // Bin
+
+    if( event.getSampleBinIndex() == -1 ){
+      toDelete++;
+    }
+
   } // Event
+
+//  LogTrace << iThread_ << " -> unbinned events: " << toDelete << std::endl;
 }
 void SampleElement::updateBinEventList(int iThread_) {
   if( isLocked ) return;

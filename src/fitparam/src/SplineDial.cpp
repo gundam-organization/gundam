@@ -32,7 +32,7 @@ std::string SplineDial::getSummary() {
   ss << ": spline(" << _splinePtr_ << ")";
   return ss.str();
 }
-void SplineDial::updateResponseCache(const double &parameterValue_) {
+void SplineDial::fillResponseCache(const double &parameterValue_) {
   _dialResponseCache_ = _splinePtr_->Eval(parameterValue_);
 //  LogTrace << this << ": " << GET_VAR_NAME_VALUE(_dialResponseCache_) << std::endl;
 }
