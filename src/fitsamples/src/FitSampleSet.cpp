@@ -314,6 +314,11 @@ void FitSampleSet::loadPhysicsEvents() {
         size_t sampleEventIndex;
         const std::vector<DataBin>* binsListPtr;
 
+        // Loop vars
+        int iBin{0};
+        size_t iVar{0};
+        size_t iSample{0};
+
         std::string progressTitle = LogInfo.getPrefixString() + "Reading selected events";
         for( Long64_t iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
           if( iEvent % GlobalVariables::getNbThreads() != iThread_ ){ continue; }
@@ -331,15 +336,15 @@ void FitSampleSet::loadPhysicsEvents() {
           threadChain->GetEntry(iEvent);
           eventBufThread.setEntryIndex(iEvent);
 
-          for( size_t iSample = 0 ; iSample < samplesToFillList.size() ; iSample++ ){
+          for( iSample = 0 ; iSample < samplesToFillList.size() ; iSample++ ){
             if( eventIsInSamplesList.at(iEvent).at(iSample) ){
 
               // Has valid bin?
               binsListPtr = &samplesToFillList.at(iSample)->getBinning().getBinsList();
-              for( size_t iBin = 0 ; iBin < binsListPtr->size() ; iBin++ ){
+              for( iBin = 0 ; iBin < binsListPtr->size() ; iBin++ ){
                 auto& bin = binsListPtr->at(iBin);
                 bool isInBin = true;
-                for( size_t iVar = 0 ; iVar < bin.getVariableNameList().size() ; iVar++ ){
+                for( iVar = 0 ; iVar < bin.getVariableNameList().size() ; iVar++ ){
                   if( not bin.isBetweenEdges(iVar, eventBufThread.getVarAsDouble(bin.getVariableNameList().at(iVar))) ){
                     isInBin = false;
                     break;

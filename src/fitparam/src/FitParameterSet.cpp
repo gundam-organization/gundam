@@ -185,24 +185,24 @@ double FitParameterSet::getChi2() const{
     throw std::runtime_error("inverse matrix not set");
   }
 
-  if( _useEigenDecompInFit_ ){
-    for( int iEigen = 0 ; iEigen < _nbEnabledEigen_ ; iEigen++ ){
-      chi2 += TMath::Sq( (*_eigenParValues_)[iEigen] - (*_eigenParPriorValues_)[iEigen] )/(*_eigenValues_)[iEigen];
-    }
-  }
-  else{
+//  if( _useEigenDecompInFit_ ){
+//    for( int iEigen = 0 ; iEigen < _nbEnabledEigen_ ; iEigen++ ){
+//      chi2 += TMath::Sq( (*_eigenParValues_)[iEigen] - (*_eigenParPriorValues_)[iEigen] )/(*_eigenValues_)[iEigen];
+//    }
+//  }
+//  else{
     for(int iPar = 0; iPar < _inverseCovarianceMatrix_->GetNrows(); iPar++) {
-//      if( _parameterList_.at(iPar).isFixed() ) continue;
+      if( _parameterList_.at(iPar).isFixed() ) continue;
       for(int jPar = 0; jPar < _inverseCovarianceMatrix_->GetNrows(); jPar++)
       {
-//        if( _parameterList_.at(jPar).isFixed() ) continue;
+        if( _parameterList_.at(jPar).isFixed() ) continue;
         chi2
           +=  (_parameterList_[iPar].getParameterValue() - _parameterList_[iPar].getPriorValue())
               * (_parameterList_[jPar].getParameterValue() - _parameterList_[jPar].getPriorValue())
               * (*_inverseCovarianceMatrix_)(iPar, jPar);
       }
     }
-  }
+//  }
 
   return chi2;
 }
@@ -232,16 +232,8 @@ const TMatrixD* FitParameterSet::getEigenVectors() const{
   return _eigenVectors_.get();
 }
 void FitParameterSet::propagateEigenToOriginal(){
-//  LogTrace << "orig before: " << std::endl;
-//  _originalParValues_->Print();
-//  LogTrace << "eigen: " << std::endl;
-//  _eigenParValues_->Print();
   (*_originalParValues_) = (*_eigenParValues_);
   (*_originalParValues_) *= (*_invertedEigenVectors_);
-
-//  LogTrace << "orig after: " << std::endl;
-//  _originalParValues_->Print();
-
   for( int iOrig = 0 ; iOrig < _originalParValues_->GetNrows() ; iOrig++ ){
     if( _parameterList_.at(iOrig).isFixed() ) continue;
     _parameterList_.at(iOrig).setParameterValue((*_originalParValues_)[iOrig]);

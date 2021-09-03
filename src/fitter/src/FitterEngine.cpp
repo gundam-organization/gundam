@@ -82,8 +82,7 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
   int iPar = -1;
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 
-    if( not parSet.isUseEigenDecompInFit() ){
-      for( auto& par : parSet.getParameterList() ){
+    for( auto& par : parSet.getParameterList() ){
         iPar++;
 
         std::string tag;
@@ -114,8 +113,8 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
         for( auto& hist : oneSigmaHistList ){ delete hist.histPtr; }
         oneSigmaHistList.clear();
       }
-    }
-    else{
+
+    if( parSet.isUseEigenDecompInFit() ){
       for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
         double currentParValue = parSet.getEigenParameter(iEigen);
         parSet.setEigenParameter(iEigen, currentParValue + parSet.getEigenSigma(iEigen));
@@ -169,10 +168,10 @@ void FitterEngine::fixGhostParameters(){
   int iPar = -1;
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 
-    if( parSet.isUseEigenDecompInFit() ){
-      LogWarning << "Skipping " << parSet.getName() << " since eigen decomposition will be used." << std::endl;
-      continue;
-    }
+//    if( parSet.isUseEigenDecompInFit() ){
+//      LogWarning << "Skipping " << parSet.getName() << " since eigen decomposition will be used." << std::endl;
+//      continue;
+//    }
 
     for( auto& par : parSet.getParameterList() ){
       iPar++;
@@ -193,7 +192,7 @@ void FitterEngine::fixGhostParameters(){
         //        LogDebug << GET_VAR_NAME_VALUE(_chi2StatBuffer_) << std::endl;
         //        LogDebug << GET_VAR_NAME_VALUE(_chi2PullsBuffer_) << std::endl;
         //        LogDebug << GET_VAR_NAME_VALUE(baseChi2Stat) << std::endl;
-        _minimizer_->FixVariable(iPar);
+        if( not parSet.isUseEigenDecompInFit() ) _minimizer_->FixVariable(iPar);
         par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
       }
 
@@ -382,11 +381,11 @@ double FitterEngine::evalFit(const double* parArray_){
     ss << __METHOD_NAME__ << ": call #" << _nbFitCalls_ << std::endl;
     ss << "Computation time: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
     if( not _propagator_.isUseResponseFunctions() ){
-      ss << GET_VAR_NAME_VALUE(_propagator_.weightPropagationTime) << std::endl;
-      ss << GET_VAR_NAME_VALUE(_propagator_.fillPropagationTime);
+      ss << GET_VAR_NAME_VALUE(_propagator_.weightProp) << std::endl;
+      ss << GET_VAR_NAME_VALUE(_propagator_.fillProp);
     }
     else{
-      ss << GET_VAR_NAME_VALUE(_propagator_.applyRfTime);
+      ss << GET_VAR_NAME_VALUE(_propagator_.applyRf);
     }
     _convergenceMonitor_.setHeaderString(ss.str());
     _convergenceMonitor_.getVariable("Total").addQuantity(_chi2Buffer_);
@@ -394,10 +393,10 @@ double FitterEngine::evalFit(const double* parArray_){
     _convergenceMonitor_.getVariable("Syst").addQuantity(_chi2PullsBuffer_);
 
     if( _nbFitCalls_ == 1 ){
-      std::cout << _convergenceMonitor_.generateMonitorString();
+      LogInfo << _convergenceMonitor_.generateMonitorString();
     }
     else{
-      std::cout << _convergenceMonitor_.generateMonitorString(true);
+      LogInfo << _convergenceMonitor_.generateMonitorString(true);
     }
   }
 

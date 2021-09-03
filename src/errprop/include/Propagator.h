@@ -53,6 +53,8 @@ public:
   void preventRfPropagation();
   void allowRfPropagation();
 
+  // Monitor
+
 protected:
   void initializeThreads();
   void initializeCaches();
@@ -89,9 +91,18 @@ private:
   std::string mc_file_path;
 
 public:
-  std::string weightPropagationTime;
-  std::string fillPropagationTime;
-  std::string applyRfTime;
+  struct CycleTimer{
+    long long counts{0};
+    long long cumulated{0};
+    friend std::ostream& operator<< (std::ostream& stream, const CycleTimer& timer_) {
+      stream << GenericToolbox::parseTimeUnit(timer_.cumulated / timer_.counts);
+      return stream;
+    }
+  };
+
+  CycleTimer weightProp;
+  CycleTimer fillProp;
+  CycleTimer applyRf;
 
   long long nbWeightProp = 0;
   long long cumulatedWeightPropTime = 0;

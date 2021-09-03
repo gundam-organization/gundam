@@ -317,24 +317,17 @@ void Propagator::propagateParametersOnSamples(){
 void Propagator::reweightSampleEvents() {
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
   GlobalVariables::getParallelWorker().runJob("Propagator::reweightSampleEvents");
-  nbWeightProp += 1;
-  cumulatedWeightPropTime += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-  weightPropagationTime = GenericToolbox::parseTimeUnit(cumulatedWeightPropTime / nbWeightProp);
-  if( _showTimeStats_ ) {
-    LogDebug << __METHOD_NAME__ << " took: " << weightPropagationTime << std::endl;
-  }
+  weightProp.counts++; weightProp.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 }
 void Propagator::refillSampleHistograms(){
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
   GlobalVariables::getParallelWorker().runJob("Propagator::refillSampleHistograms");
-  fillPropagationTime = GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__);
-  if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << fillPropagationTime << std::endl;
+  fillProp.counts++; fillProp.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 }
 void Propagator::applyResponseFunctions(){
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
   GlobalVariables::getParallelWorker().runJob("Propagator::applyResponseFunctions");
-  applyRfTime = GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__);
-  if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << fillPropagationTime << std::endl;
+  applyRf.counts++; applyRf.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 }
 
 void Propagator::preventRfPropagation(){
@@ -737,7 +730,6 @@ void Propagator::fillEventDialCaches(int iThread_){
           // CAVEAT: assuming every dial share the same ApplyConditionBin variable names!!! -> May need to change this in the future
           const auto &firstDial = dialSet->getDialList().at(0);
           std::vector<int> varIndexList(firstDial->getApplyConditionBin().getVariableNameList().size(), 0);
-
 
           for (size_t iVar = 0; iVar < firstDial->getApplyConditionBin().getVariableNameList().size(); iVar++) {
             varIndexList.at(iVar) = GenericToolbox::findElementIndex(
