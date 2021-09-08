@@ -173,33 +173,31 @@ size_t FitParameterSet::getNbParameters() const {
 FitParameter& FitParameterSet::getFitParameter( size_t iPar_ ){
   return _parameterList_.at(iPar_);
 }
-double FitParameterSet::getChi2() const{
-  double chi2 = 0;
+double FitParameterSet::getChi2() const {
 
-  if( not _isEnabled_ ){
-    return chi2;
-  }
+  if (not _isEnabled_) { return 0; }
 
-  if( _inverseCovarianceMatrix_ == nullptr ){
+  if (_inverseCovarianceMatrix_ == nullptr) {
     LogError << GET_VAR_NAME_VALUE(_inverseCovarianceMatrix_) << std::endl;
     throw std::runtime_error("inverse matrix not set");
   }
 
+  double chi2 = 0;
+
 //  if( _useEigenDecompInFit_ ){
 //    for( int iEigen = 0 ; iEigen < _nbEnabledEigen_ ; iEigen++ ){
-//      chi2 += TMath::Sq( (*_eigenParValues_)[iEigen] - (*_eigenParPriorValues_)[iEigen] )/(*_eigenValues_)[iEigen];
+//      chi2 += std::pow( (*_eigenParValues_)[iEigen] - (*_eigenParPriorValues_)[iEigen], 2 )/(*_eigenValues_)[iEigen];
 //    }
 //  }
 //  else{
-    for(int iPar = 0; iPar < _inverseCovarianceMatrix_->GetNrows(); iPar++) {
-      if( _parameterList_.at(iPar).isFixed() ) continue;
-      for(int jPar = 0; jPar < _inverseCovarianceMatrix_->GetNrows(); jPar++)
-      {
-        if( _parameterList_.at(jPar).isFixed() ) continue;
-        chi2
-          +=  (_parameterList_[iPar].getParameterValue() - _parameterList_[iPar].getPriorValue())
-              * (_parameterList_[jPar].getParameterValue() - _parameterList_[jPar].getPriorValue())
-              * (*_inverseCovarianceMatrix_)(iPar, jPar);
+    double iDelta, jDelta;
+    for (int iPar = 0; iPar < _inverseCovarianceMatrix_->GetNrows(); iPar++) {
+      iDelta = (_parameterList_[iPar].getParameterValue() - _parameterList_[iPar].getPriorValue());
+      for (int jPar = 0; jPar < _inverseCovarianceMatrix_->GetNrows(); jPar++) {
+        jDelta = iDelta;
+        jDelta *= (_parameterList_[jPar].getParameterValue() - _parameterList_[jPar].getPriorValue());
+        jDelta *= (*_inverseCovarianceMatrix_)(iPar, jPar);
+        chi2 += jDelta;
       }
     }
 //  }

@@ -66,7 +66,6 @@ int main(int argc, char** argv){
   fitter.setSaveDir(GenericToolbox::mkdirTFile(out, "fitter"));
   fitter.initialize();
 
-  if( JsonUtils::fetchValue(jsonConfig, "fixGhostParameters", true) ) fitter.fixGhostParameters();
 //  fitter.throwParameters();
 
   ///////////////////////////////
@@ -80,6 +79,8 @@ int main(int argc, char** argv){
     fitter.fit();
     fitter.writePostFitData();
   }
+
+  if( JsonUtils::fetchValue(jsonConfig, "scanParameters", true) ) fitter.scanParameters(10, "postfit/scan");
 
   LogDebug << "Closing output file: " << out->GetName() << std::endl;
   out->Close();

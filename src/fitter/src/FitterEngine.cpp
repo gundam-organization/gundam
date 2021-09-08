@@ -56,6 +56,8 @@ void FitterEngine::initialize() {
   initializePropagator();
   initializeMinimizer();
 
+  this->fixGhostParameters();
+
 }
 
 void FitterEngine::generateSamplePlots(const std::string& saveDir_){
@@ -166,6 +168,7 @@ void FitterEngine::fixGhostParameters(){
 
   // +1 sigma
   int iPar = -1;
+  int iFitPar = -1;
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 
 //    if( parSet.isUseEigenDecompInFit() ){
@@ -175,12 +178,13 @@ void FitterEngine::fixGhostParameters(){
 
     for( auto& par : parSet.getParameterList() ){
       iPar++;
+      if( not parSet.isUseEigenDecompInFit() ) iFitPar++;
 
       if( par.isFixed() ) continue;
 
       double currentParValue = par.getParameterValue();
       par.setParameterValue( currentParValue + par.getStdDevValue() );
-      LogInfo << "(" << iPar+1 << "/" << _nbFitParameters_ << ") +1 sigma on " << parSet.getName() + "/" + par.getTitle()
+      LogInfo << "(" << iPar+1 << "/" << _nbParameters_ << ") +1 sigma on " << parSet.getName() + "/" + par.getTitle()
               << " -> " << par.getParameterValue() << std::endl;
 
       updateChi2Cache();
@@ -189,14 +193,15 @@ void FitterEngine::fixGhostParameters(){
 
       if( std::fabs(deltaChi2) < 1E-6 ){
         LogAlert << parSet.getName() + "/" + par.getTitle() << ": Δχ² = " << deltaChi2 << " < " << 1E-6 << ", fixing parameter." << std::endl;
-        //        LogDebug << GET_VAR_NAME_VALUE(_chi2StatBuffer_) << std::endl;
-        //        LogDebug << GET_VAR_NAME_VALUE(_chi2PullsBuffer_) << std::endl;
-        //        LogDebug << GET_VAR_NAME_VALUE(baseChi2Stat) << std::endl;
-        if( not parSet.isUseEigenDecompInFit() ) _minimizer_->FixVariable(iPar);
         par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
+        if( not parSet.isUseEigenDecompInFit() ) { _minimizer_->FixVariable(iFitPar); }
       }
 
       par.setParameterValue( currentParValue );
+    }
+
+    if( parSet.isUseEigenDecompInFit() ){
+      iFitPar += parSet.getNbEnabledEigenParameters();
     }
   }
 
@@ -266,32 +271,61 @@ void FitterEngine::throwParameters(){
 void FitterEngine::fit(){
   LogWarning << __METHOD_NAME__ << std::endl;
 
+  LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
+          << "Number of free parameters   : " << _minimizer_->NFree() << std::endl
+          << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree()
+          << std::endl;
+
+  LogWarning << "-----------------------------" << std::endl;
+  LogWarning << "Summary of the fit parameters" << std::endl;
+  LogWarning << "-----------------------------" << std::endl;
+  int iFitPar = -1;
   for( const auto& parSet : _propagator_.getParameterSetsList() ){
-    LogWarning << parSet.getName() << ": " << parSet.getNbParameters() << " parameters" << std::endl;
-    for( const auto& par : parSet.getParameterList() ){
-      if( par.isEnabled() ){
-        if( par.isFixed() ){
-          LogAlert << "\033[41m" << parSet.getName() << "/" << par.getTitle() << ": FIXED - Prior: " << par.getParameterValue() <<  "\033[0m" << std::endl;
-        }
-        else if( not par.isEnabled() ){
-          LogInfo << "\033[40m" << parSet.getName() << "/" << par.getTitle() << ": Disabled" <<  "\033[0m" << std::endl;
+    if( not parSet.isUseEigenDecompInFit() ){
+      LogWarning << parSet.getName() << ": " << parSet.getNbParameters() << " parameters" << std::endl;
+      Logger::setIndentStr("├─ ");
+      for( const auto& par : parSet.getParameterList() ){
+        iFitPar++;
+        if( par.isEnabled() ){
+          if( par.isFixed() ){
+            LogInfo << "\033[41m" << "#" << iFitPar << " -> " << parSet.getName() << "/" << par.getTitle() << ": FIXED - Prior: " << par.getParameterValue() <<  "\033[0m" << std::endl;
+          }
+          else{
+            LogInfo << "#" << iFitPar << " -> " << parSet.getName() << "/" << par.getTitle() << " - Prior: " << par.getParameterValue() << std::endl;
+          }
         }
         else{
-          LogInfo << parSet.getName() << "/" << par.getTitle() << " - Prior: " << par.getParameterValue() << std::endl;
+          LogInfo << "\033[43m" << "#" << iFitPar << " -> " << parSet.getName() << "/" << par.getTitle() << ": Disabled" <<  "\033[0m" << std::endl;
         }
       }
+      Logger::setIndentStr("");
+    }
+    else{
+      LogWarning << parSet.getName() << ": " << parSet.getNbEnabledEigenParameters() << " eigen parameters" << std::endl;
+      Logger::setIndentStr("├─ ");
+      for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
+        iFitPar++;
+        LogInfo << "#" << iFitPar << " -> " << parSet.getName() << "/eigen_#" << iEigen << " - Prior: " << parSet.getEigenParameter(iEigen) << std::endl;
+      }
+      Logger::setIndentStr("");
     }
   }
 
   _propagator_.allowRfPropagation(); // if RF are setup -> a lot faster
 
+
+  LogWarning << "-------------------" << std::endl;
+  LogWarning << "Calling minimize..." << std::endl;
+  LogWarning << "-------------------" << std::endl;
   _fitUnderGoing_ = true;
   bool _fitHasConverged_ = _minimizer_->Minimize();
   if( _fitHasConverged_ ){
-    LogInfo << "Fit converged." << std::endl
+    LogInfo << "Fit converged!" << std::endl
             << "Status code: " << _minimizer_->Status() << std::endl;
 
-    LogInfo << "Calling HESSE." << std::endl;
+    LogWarning << "-------------------" << std::endl;
+    LogWarning << "Calling HESSE..." << std::endl;
+    LogWarning << "-------------------" << std::endl;
     _fitHasConverged_ = _minimizer_->Hesse();
 
     if(not _fitHasConverged_){
@@ -427,7 +461,7 @@ void FitterEngine::writePostFitData() {
     this->generateSamplePlots("postFit/samples");
 
     auto* errorDir = GenericToolbox::mkdirTFile(postFitDir, "errors");
-//    const unsigned int nfree = _minimizer_->NFree();
+    const unsigned int nfree = _minimizer_->NFree();
     if(_minimizer_->X() != nullptr){
       double covarianceMatrixArray[_minimizer_->NDim() * _minimizer_->NDim()];
       _minimizer_->GetCovMatrix(covarianceMatrixArray);
@@ -461,6 +495,13 @@ void FitterEngine::writePostFitData() {
                                                                                           parCol.getParameterIndex()];
             } // par Y
           } // par X
+
+          for( const auto& par : parSet.getParameterList() ) {
+            fitterCovarianceMatrixTH2D->GetXaxis()->SetBinLabel(1 + parameterIndexOffset + par.getParameterIndex(),
+                                                                (parSet.getName() + "/" + par.getTitle()).c_str());
+            fitterCovarianceMatrixTH2D->GetYaxis()->SetBinLabel(1 + parameterIndexOffset + par.getParameterIndex(),
+                                                                (parSet.getName() + "/" + par.getTitle()).c_str());
+          }
         }
         else{
           LogDebug << "Extracting eigen parameters..." << std::endl;
@@ -501,7 +542,16 @@ void FitterEngine::writePostFitData() {
             }
           }
 
-          (*originalCovMatrix) = (*parSet.getEigenVectors()) * (*originalCovMatrix) * (*parSet.getInvertedEigenVectors());
+//          (*originalCovMatrix) = (*parSet.getEigenVectors()) * (*originalCovMatrix) * (*parSet.getInvertedEigenVectors());
+          (*originalCovMatrix) = (*parSet.getInvertedEigenVectors()) * (*originalCovMatrix) * (*parSet.getEigenVectors());
+
+          for( int iBin = 0 ; iBin < originalCovMatrix->GetNrows() ; iBin++ ){
+            for( int jBin = 0 ; jBin < originalCovMatrix->GetNcols() ; jBin++ ){
+              if( parSet.getParameterList().at(iBin).isFixed() or parSet.getParameterList().at(jBin).isFixed() ){
+                (*originalCovMatrix)[iBin][jBin] = 0;
+              }
+            }
+          }
 
           covMatrix = originalCovMatrix;
 
@@ -517,11 +567,9 @@ void FitterEngine::writePostFitData() {
           covMatrixTH2D->GetYaxis()->SetBinLabel(1+par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
           corMatrixTH2D->GetXaxis()->SetBinLabel(1+par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
           corMatrixTH2D->GetYaxis()->SetBinLabel(1+par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
-
-          fitterCovarianceMatrixTH2D->GetXaxis()->SetBinLabel(1+parameterIndexOffset+par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
-          fitterCovarianceMatrixTH2D->GetYaxis()->SetBinLabel(1+parameterIndexOffset+par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
         }
 
+        LogTrace << "Writing cov matrices..." << std::endl;
         GenericToolbox::mkdirTFile(parSetDir, "matrices")->cd();
         covMatrix->Write("Covariance_TMatrixD");
         covMatrixTH2D->Write("Covariance_TH2D");
@@ -529,6 +577,7 @@ void FitterEngine::writePostFitData() {
         corMatrixTH2D->Write("Correlation_TH2D");
 
         // Parameters
+        LogTrace << "Generating parameter plots..." << std::endl;
         GenericToolbox::mkdirTFile(parSetDir, "values")->cd();
         auto* postFitErrorHist = new TH1D("postFitErrors_TH1D", "Post-fit Errors", parSet.getNbParameters(), 0, parSet.getNbParameters());
         auto* preFitErrorHist = new TH1D("preFitErrors_TH1D", "Pre-fit Errors", parSet.getNbParameters(), 0, parSet.getNbParameters());
@@ -542,6 +591,7 @@ void FitterEngine::writePostFitData() {
           preFitErrorHist->SetBinError( 1 + par.getParameterIndex(), par.getStdDevValue() );
         }
 
+        LogTrace << "Cosmetics..." << std::endl;
         preFitErrorHist->SetFillColor(kRed-9);
 //        preFitErrorHist->SetFillColorAlpha(kRed-9, 0.5);
 //        preFitErrorHist->SetFillStyle(4050); // 50 % opaque ?
@@ -612,7 +662,7 @@ void FitterEngine::initializeMinimizer(){
   for( const auto& parSet : _propagator_.getParameterSetsList() ){
     _nbParameters_ += int(parSet.getNbParameters());
     if( not parSet.isUseEigenDecompInFit() ){
-      _nbFitParameters_ = _nbParameters_;
+      _nbFitParameters_ += int(parSet.getNbParameters());
     }
     else{
       _nbFitParameters_ += parSet.getNbEnabledEigenParameters();
@@ -675,11 +725,6 @@ void FitterEngine::initializeMinimizer(){
     }
 
   } // parSet
-
-  LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
-          << "Number of free parameters   : " << _minimizer_->NFree() << std::endl
-          << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree()
-          << std::endl;
 
   _convergenceMonitor_.addDisplayedQuantity("VarName");
   _convergenceMonitor_.addDisplayedQuantity("LastAddedValue");

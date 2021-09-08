@@ -61,7 +61,7 @@ std::string Dial::getSummary(){
 double Dial::evalResponse(const double &parameterValue_) {
 
   if( _dialParameterCache_ == parameterValue_ ){
-    while( _isEditingCache_ ){ std::this_thread::sleep_for(std::chrono::nanoseconds(10)); }
+    while( _isEditingCache_ ){ std::this_thread::sleep_for(std::chrono::nanoseconds(1)); }
     return _dialResponseCache_;
   }
   _isEditingCache_ = true;
