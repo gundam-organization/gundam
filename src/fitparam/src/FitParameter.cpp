@@ -67,6 +67,8 @@ void FitParameter::setDialsWorkingDirectory(const std::string &dialsWorkingDirec
 
 void FitParameter::initialize() {
 
+  LogTrace << GET_VAR_NAME_VALUE(this) << std::endl;
+
   if     ( _priorValue_ == std::numeric_limits<double>::quiet_NaN() ){
     LogError << "_priorValue_ is not set." << std::endl;
     throw std::logic_error("_priorValue_ is not set.");
@@ -96,6 +98,7 @@ void FitParameter::initialize() {
     _dialSetList_.back().setParameterName(_name_);
     _dialSetList_.back().setDialSetConfig(dialDefinitionConfig);
     _dialSetList_.back().setWorkingDirectory(_dialsWorkingDirectory_);
+    _dialSetList_.back().setAssociatedParameterReference(this);
     _dialSetList_.back().initialize();
   }
 

@@ -38,30 +38,31 @@ public:
   virtual void reset();
 
   void setApplyConditionBin(const DataBin &applyConditionBin);
+  void setAssociatedParameterReference(void *associatedParameterReference);
 
   virtual void initialize();
 
-  bool isCacheValid() const;
   double getDialResponseCache() const;
   const DataBin &getApplyConditionBin() const;
   DialType::DialType getDialType() const;
+  void *getAssociatedParameterReference() const;
 
   virtual std::string getSummary();
   double evalResponse(const double& parameterValue_);
+  double evalResponse();
 
 protected:
-  virtual void fillResponseCache(const double& parameterValue_) = 0;
+  virtual void fillResponseCache() = 0;
 
   // Parameters
   DataBin _applyConditionBin_;
   DialType::DialType _dialType_{DialType::Invalid};
+  void* _associatedParameterReference_{nullptr};
 
   // Internals
   bool _isEditingCache_{false};
   double _dialResponseCache_{};
   double _dialParameterCache_{};
-
-  std::shared_ptr<std::mutex> _mutexPtr_;
 
 };
 

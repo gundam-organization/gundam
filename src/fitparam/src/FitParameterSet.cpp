@@ -119,6 +119,7 @@ void FitParameterSet::initialize() {
   }
 
   LogDebug << "Initializing parameters..." << std::endl;
+  _parameterList_.reserve(_originalCovarianceMatrix_->GetNcols()); // need to keep the memory at the same place -> FitParameter* will be used
   for(int iParameter = 0 ; iParameter < _originalCovarianceMatrix_->GetNcols() ; iParameter++ ){
     _parameterList_.emplace_back();
     _parameterList_.back().setParameterIndex(iParameter);

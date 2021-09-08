@@ -7,6 +7,7 @@
 #include "Logger.h"
 
 #include "Dial.h"
+#include "FitParameter.h"
 
 
 LoggerInit([](){
@@ -38,11 +39,14 @@ void Dial::reset() {
   _dialParameterCache_ = std::nan("Unset");
   _applyConditionBin_ = DataBin();
   _dialType_ = DialType::Invalid;
-  _mutexPtr_ = std::make_shared<std::mutex>();
+  _associatedParameterReference_ = nullptr;
 }
 
 void Dial::setApplyConditionBin(const DataBin &applyConditionBin) {
   _applyConditionBin_ = applyConditionBin;
+}
+void Dial::setAssociatedParameterReference(void *associatedParameterReference) {
+  _associatedParameterReference_ = associatedParameterReference;
 }
 
 void Dial::initialize() {
@@ -66,10 +70,17 @@ double Dial::evalResponse(const double &parameterValue_) {
   }
   _isEditingCache_ = true;
   _dialParameterCache_ = parameterValue_;
-  this->fillResponseCache(parameterValue_); // specified in the corresponding dial class
+  this->fillResponseCache(); // specified in the corresponding dial class
   _isEditingCache_ = false;
 
   return _dialResponseCache_;
+}
+double Dial::evalResponse(){
+  if( _associatedParameterReference_ == nullptr ){
+    LogError << "_associatedParameterReference_ is not set." << std::endl;
+    throw std::logic_error("_associatedParameterReference_ is not set.");
+  }
+  return this->evalResponse( static_cast<FitParameter *>(_associatedParameterReference_)->getParameterValue() );
 }
 
 double Dial::getDialResponseCache() const{
@@ -81,4 +92,6 @@ const DataBin &Dial::getApplyConditionBin() const {
 DialType::DialType Dial::getDialType() const {
   return _dialType_;
 }
-
+void *Dial::getAssociatedParameterReference() const {
+  return _associatedParameterReference_;
+}

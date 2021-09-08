@@ -42,8 +42,9 @@ public:
   double getNominalWeight() const;
   double getEventWeight() const;
   int getSampleBinIndex() const;
-  std::map<FitParameterSet *, std::vector<Dial *>>& getDialCache();
-  std::map<FitParameterSet *, std::vector<Dial *>>* getDialCachePtr();
+//  std::map<FitParameterSet *, std::vector<Dial *>>& getDialCache();
+//  std::map<FitParameterSet *, std::vector<Dial *>>* getDialCachePtr();
+  std::vector<Dial *> &getRawDialPtrList();
 
   const std::vector<std::string> *getCommonLeafNameListPtr() const;
 
@@ -54,6 +55,7 @@ public:
   // Weight
   void addEventWeight(double weight_);
   void resetEventWeight();
+  void reweightUsingDialCache();
 
   // Fetch var
   int findVarIndex(const std::string& leafName_, bool throwIfNotFound_ = true) const;
@@ -88,7 +90,8 @@ private:
   int _sampleBinIndex_{-1};
 
   // Caches
-  std::map<FitParameterSet*, std::vector<Dial*>> _dialCache_; // _dialCache_[fitParSetPtr][ParIndex] = correspondingDialPtr;
+//  std::map<FitParameterSet*, std::vector<Dial*>> _dialCache_; // _dialCache_[fitParSetPtr][ParIndex] = correspondingDialPtr;
+  std::vector<Dial*> _rawDialPtrList_;
 
 };
 

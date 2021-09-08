@@ -10,6 +10,8 @@
 #include "json.hpp"
 #include "memory"
 
+#include "TFormula.h"
+
 #include "GenericToolbox.h"
 
 #include "Dial.h"
@@ -27,6 +29,8 @@ public:
   void setParameterName(const std::string &parameterName);
   void setDialSetConfig(const nlohmann::json &dialSetConfig);
   void setWorkingDirectory(const std::string &workingDirectory);
+
+  void setAssociatedParameterReference(void *associatedParameterReference);
 
   void initialize();
 
@@ -54,6 +58,7 @@ private:
   std::string _workingDirectory_{"."};
   std::string _applyConditionStr_;
   TFormula* _applyConditionFormula_{nullptr};
+  void* _associatedParameterReference_{nullptr};
 
   // Internals
   bool _enableDialsSummary_{false};

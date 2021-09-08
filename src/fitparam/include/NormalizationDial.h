@@ -16,7 +16,7 @@ public:
   void initialize() override;
 
 protected:
-  void fillResponseCache(const double& parameterValue_) override;
+  void fillResponseCache() override;
 
 };
 

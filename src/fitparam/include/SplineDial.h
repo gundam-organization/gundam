@@ -24,7 +24,7 @@ public:
   std::string getSummary() override;
 
 protected:
-  void fillResponseCache(const double &parameterValue_) override;
+  void fillResponseCache() override;
 
 
 private:

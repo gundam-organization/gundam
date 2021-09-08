@@ -16,7 +16,8 @@ PhysicsEvent::~PhysicsEvent() { this->reset(); }
 void PhysicsEvent::reset() {
   _commonLeafNameListPtr_ = nullptr;
   _leafContentList_.clear();
-  _dialCache_.clear();
+//  _dialCache_.clear();
+  _rawDialPtrList_.clear();
 
   // Weight carriers
   _dataSetIndex_=-1;
@@ -67,12 +68,12 @@ double PhysicsEvent::getEventWeight() const {
 int PhysicsEvent::getSampleBinIndex() const {
   return _sampleBinIndex_;
 }
-std::map<FitParameterSet *, std::vector<Dial *>>& PhysicsEvent::getDialCache(){
-  return _dialCache_;
-}
-std::map<FitParameterSet *, std::vector<Dial *>>* PhysicsEvent::getDialCachePtr() {
-  return &_dialCache_;
-}
+//std::map<FitParameterSet *, std::vector<Dial *>>& PhysicsEvent::getDialCache(){
+//  return _dialCache_;
+//}
+//std::map<FitParameterSet *, std::vector<Dial *>>* PhysicsEvent::getDialCachePtr() {
+//  return &_dialCache_;
+//}
 
 void PhysicsEvent::hookToTree(TTree* tree_, bool throwIfLeafNotFound_){
   LogThrowIf(_commonLeafNameListPtr_ == nullptr, "_commonLeafNameListPtr_ is not set.");
@@ -105,6 +106,13 @@ void PhysicsEvent::addEventWeight(double weight_){
 }
 void PhysicsEvent::resetEventWeight(){
   _eventWeight_ = _treeWeight_;
+}
+void PhysicsEvent::reweightUsingDialCache(){
+  this->resetEventWeight();
+  for( auto& dial : _rawDialPtrList_ ){
+    if( dial == nullptr ) break;
+    this->addEventWeight( dial->evalResponse() );
+  }
 }
 
 int PhysicsEvent::findVarIndex(const std::string& leafName_, bool throwIfNotFound_) const{
@@ -157,12 +165,16 @@ std::string PhysicsEvent::getSummary() const {
   ss << std::endl << GET_VAR_NAME_VALUE(_nominalWeight_);
   ss << std::endl << GET_VAR_NAME_VALUE(_eventWeight_);
   ss << std::endl << GET_VAR_NAME_VALUE(_sampleBinIndex_);
-  for( const auto& dialCachePair : _dialCache_ ){
-    ss << std::endl << dialCachePair.first->getName() << ": " << GenericToolbox::parseVectorAsString(dialCachePair.second);
+
+  if( not _rawDialPtrList_.empty() ){
+    ss << std::endl << "Dials: " << GenericToolbox::parseVectorAsString(_rawDialPtrList_);
+  }
+//  for( const auto& dialCachePair : _dialCache_ ){
+//    ss << std::endl << dialCachePair.first->getName() << ": " << GenericToolbox::parseVectorAsString(dialCachePair.second);
 //    for( size_t iDial = 0 ; iDial < dialCachePair.second.size() ; iDial++ ){
 //      ss << std::endl << iDial << " -> " << dialCachePair.second.at(iDial);
 //    }
-  }
+//  }
   return ss.str();
 }
 void PhysicsEvent::print() const {
@@ -228,4 +240,8 @@ std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p ){
 
 const std::vector<std::string> *PhysicsEvent::getCommonLeafNameListPtr() const {
   return _commonLeafNameListPtr_;
+}
+
+std::vector<Dial *> &PhysicsEvent::getRawDialPtrList() {
+  return _rawDialPtrList_;
 }
