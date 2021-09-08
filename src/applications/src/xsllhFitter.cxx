@@ -77,7 +77,7 @@ int main(int argc, char** argv){
 
   if( not isDryRun and JsonUtils::fetchValue(jsonConfig, "fit", true) ){
     fitter.fit();
-    fitter.writePostFitData();
+    if( fitter.isFitHasConverged() ) fitter.writePostFitData();
   }
 
   if( JsonUtils::fetchValue(jsonConfig, "scanParameters", true) ) fitter.scanParameters(10, "postfit/scan");

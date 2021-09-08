@@ -34,6 +34,8 @@ public:
   // Init
   void initialize();
 
+  bool isFitHasConverged() const;
+
   // Core
   void generateSamplePlots(const std::string& saveDir_ = "");
   void generateOneSigmaPlots(const std::string& saveDir_ = "");
@@ -64,6 +66,8 @@ private:
   // Internals
   bool _fitIsDone_{false};
   bool _fitUnderGoing_{false};
+  bool _fitHasConverged_{false};
+
   int _nbFitCalls_{0};
   int _nbFitParameters_{0};
   int _nbParameters_{0};

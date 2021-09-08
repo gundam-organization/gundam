@@ -171,38 +171,55 @@ void FitterEngine::fixGhostParameters(){
   int iFitPar = -1;
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 
-//    if( parSet.isUseEigenDecompInFit() ){
-//      LogWarning << "Skipping " << parSet.getName() << " since eigen decomposition will be used." << std::endl;
-//      continue;
-//    }
-
-    for( auto& par : parSet.getParameterList() ){
-      iPar++;
-      if( not parSet.isUseEigenDecompInFit() ) iFitPar++;
-
-      if( par.isFixed() ) continue;
-
-      double currentParValue = par.getParameterValue();
-      par.setParameterValue( currentParValue + par.getStdDevValue() );
-      LogInfo << "(" << iPar+1 << "/" << _nbParameters_ << ") +1 sigma on " << parSet.getName() + "/" + par.getTitle()
-              << " -> " << par.getParameterValue() << std::endl;
-
-      updateChi2Cache();
-
-      double deltaChi2 = _chi2StatBuffer_ - baseChi2Stat;
-
-      if( std::fabs(deltaChi2) < 1E-6 ){
-        LogAlert << parSet.getName() + "/" + par.getTitle() << ": Δχ² = " << deltaChi2 << " < " << 1E-6 << ", fixing parameter." << std::endl;
-        par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
-        if( not parSet.isUseEigenDecompInFit() ) { _minimizer_->FixVariable(iFitPar); }
-      }
-
-      par.setParameterValue( currentParValue );
-    }
-
     if( parSet.isUseEigenDecompInFit() ){
-      iFitPar += parSet.getNbEnabledEigenParameters();
+      for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
+        iPar++;
+        iFitPar++;
+
+        double currentParValue = parSet.getEigenParameter(iEigen);
+        parSet.setEigenParameter(iEigen, currentParValue + parSet.getEigenSigma(iEigen));
+        parSet.propagateEigenToOriginal();
+
+        LogInfo << "(" << iFitPar+1 << "/" << _nbFitParameters_ << ") +1 sigma on " << parSet.getName() + "/eigen_#" + std::to_string(iEigen)
+                << " -> " << parSet.getEigenParameter(iEigen) << std::endl;
+        updateChi2Cache();
+
+        double deltaChi2 = _chi2StatBuffer_ - baseChi2Stat;
+        if( std::fabs(deltaChi2) < 1E-6 ){
+          LogAlert << parSet.getName() + "/eigen_#" + std::to_string(iEigen) << ": Δχ² = " << deltaChi2 << " < " << 1E-6 << ", fixing parameter." << std::endl;
+          _minimizer_->FixVariable(iFitPar);
+        }
+
+        parSet.setEigenParameter(iEigen, currentParValue);
+        parSet.propagateEigenToOriginal();
+      }
     }
+    else{
+      for( auto& par : parSet.getParameterList() ){
+        iPar++;
+        if( not parSet.isUseEigenDecompInFit() ) iFitPar++;
+
+        if( par.isFixed() ) continue;
+
+        double currentParValue = par.getParameterValue();
+        par.setParameterValue( currentParValue + par.getStdDevValue() );
+        LogInfo << "(" << iFitPar+1 << "/" << _nbFitParameters_ << ") +1 sigma on " << parSet.getName() + "/" + par.getTitle()
+                << " -> " << par.getParameterValue() << std::endl;
+
+        updateChi2Cache();
+
+        double deltaChi2 = _chi2StatBuffer_ - baseChi2Stat;
+
+        if( std::fabs(deltaChi2) < 1E-6 ){
+          LogAlert << parSet.getName() + "/" + par.getTitle() << ": Δχ² = " << deltaChi2 << " < " << 1E-6 << ", fixing parameter." << std::endl;
+          par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
+          if( not parSet.isUseEigenDecompInFit() ) { _minimizer_->FixVariable(iFitPar); }
+        }
+
+        par.setParameterValue( currentParValue );
+      }
+    }
+
   }
 
   updateChi2Cache(); // comeback to old values
@@ -318,14 +335,14 @@ void FitterEngine::fit(){
   LogWarning << "Calling minimize..." << std::endl;
   LogWarning << "-------------------" << std::endl;
   _fitUnderGoing_ = true;
-  bool _fitHasConverged_ = _minimizer_->Minimize();
+  _fitHasConverged_ = _minimizer_->Minimize();
   if( _fitHasConverged_ ){
     LogInfo << "Fit converged!" << std::endl
             << "Status code: " << _minimizer_->Status() << std::endl;
 
-    LogWarning << "-------------------" << std::endl;
+    LogWarning << "----------------" << std::endl;
     LogWarning << "Calling HESSE..." << std::endl;
-    LogWarning << "-------------------" << std::endl;
+    LogWarning << "----------------" << std::endl;
     _fitHasConverged_ = _minimizer_->Hesse();
 
     if(not _fitHasConverged_){
@@ -738,4 +755,8 @@ void FitterEngine::initializeMinimizer(){
   _convergenceMonitor_.addVariable("Stat");
   _convergenceMonitor_.addVariable("Syst");
 
+}
+
+bool FitterEngine::isFitHasConverged() const {
+  return _fitHasConverged_;
 }
