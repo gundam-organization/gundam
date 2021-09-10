@@ -50,6 +50,9 @@ void FitParameter::setName(const std::string &name) {
   _name_ = name;
 }
 void FitParameter::setParameterValue(double parameterValue) {
+  if( _isFixed_ and _parameterValue_ != parameterValue ){
+    LogDebug << "CHANGING FIXED " << getTitle() << ": " << _parameterValue_ << " -> " << parameterValue << std::endl;
+  }
   _parameterValue_ = parameterValue;
 }
 void FitParameter::setPriorValue(double priorValue) {
@@ -63,6 +66,12 @@ void FitParameter::setEnableDialSetsSummary(bool enableDialSetsSummary) {
 }
 void FitParameter::setDialsWorkingDirectory(const std::string &dialsWorkingDirectory) {
   _dialsWorkingDirectory_ = dialsWorkingDirectory;
+}
+void FitParameter::setMinValue(double minValue) {
+  _minValue_ = minValue;
+}
+void FitParameter::setMaxValue(double maxValue) {
+  _maxValue_ = maxValue;
 }
 
 void FitParameter::initialize() {
@@ -141,6 +150,12 @@ double FitParameter::getPriorValue() const {
 }
 std::vector<DialSet> &FitParameter::getDialSetList() {
   return _dialSetList_;
+}
+double FitParameter::getMinValue() const {
+  return _minValue_;
+}
+double FitParameter::getMaxValue() const {
+  return _maxValue_;
 }
 
 double FitParameter::getDistanceFromNominal() const{

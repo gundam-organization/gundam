@@ -29,6 +29,8 @@ public:
   void setDialSetConfig(const nlohmann::json &jsonConfig_);
   void setEnableDialSetsSummary(bool enableDialSetsSummary);
   void setDialsWorkingDirectory(const std::string &dialsWorkingDirectory);
+  void setMinValue(double minValue);
+  void setMaxValue(double maxValue);
 
   void initialize();
 
@@ -41,6 +43,8 @@ public:
   double getStdDevValue() const;
   double getPriorValue() const;
   std::vector<DialSet> &getDialSetList();
+  double getMinValue() const;
+  double getMaxValue() const;
 
   // Core
   double getDistanceFromNominal() const; // in unit of sigmas
@@ -55,6 +59,8 @@ private:
   double _parameterValue_{};
   double _priorValue_{};
   double _stdDevValue_{};
+  double _minValue_{std::nan("UNSET")};
+  double _maxValue_{std::nan("UNSET")};
   nlohmann::json _dialDefinitionsList_;
   bool _enableDialSetsSummary_;
   std::string _dialsWorkingDirectory_;

@@ -68,6 +68,12 @@ void FitParameterSet::initialize() {
 
   _useOnlyOneParameterPerEvent_ = JsonUtils::fetchValue<bool>(_jsonConfig_, "useOnlyOneParameterPerEvent", false);
 
+  if( _jsonConfig_.find("parameterLimits") != _jsonConfig_.end() ){
+    auto parLimits = JsonUtils::fetchValue(_jsonConfig_, "parameterLimits", nlohmann::json());
+    _globalParameterMinValue_ = JsonUtils::fetchValue(parLimits, "minValue", std::nan("UNSET"));
+    _globalParameterMaxValue_ = JsonUtils::fetchValue(parLimits, "maxValue", std::nan("UNSET"));
+  }
+
   // Optional parameters:
   std::string pathBuffer;
 
@@ -130,6 +136,13 @@ void FitParameterSet::initialize() {
     _parameterList_.back().setDialSetConfig(JsonUtils::fetchValue<nlohmann::json>(_jsonConfig_, "dialSetDefinitions"));
     _parameterList_.back().setDialsWorkingDirectory(JsonUtils::fetchValue<std::string>(_jsonConfig_, "dialSetWorkingDirectory", "./"));
     _parameterList_.back().setEnableDialSetsSummary(JsonUtils::fetchValue<bool>(_jsonConfig_, "printDialSetsSummary", false));
+
+    if( _globalParameterMinValue_ == _globalParameterMinValue_ ){
+      _parameterList_.back().setMinValue(_globalParameterMinValue_);
+    }
+    if( _globalParameterMaxValue_ == _globalParameterMaxValue_ ){
+      _parameterList_.back().setMaxValue(_globalParameterMaxValue_);
+    }
 
     _parameterList_.back().initialize();
   }
@@ -196,10 +209,10 @@ double FitParameterSet::getChi2() const {
 //  else{
     double iDelta, jDelta;
     for (int iPar = 0; iPar < _inverseCovarianceMatrix_->GetNrows(); iPar++) {
-      if( _parameterList_[iPar].isFixed() or not _parameterList_[iPar].isEnabled() ) continue;
+//      if( _parameterList_[iPar].isFixed() or not _parameterList_[iPar].isEnabled() ) continue;
       iDelta = (_parameterList_[iPar].getParameterValue() - _parameterList_[iPar].getPriorValue());
       for (int jPar = 0; jPar < _inverseCovarianceMatrix_->GetNrows(); jPar++) {
-        if( _parameterList_[iPar].isFixed() or not _parameterList_[iPar].isEnabled() ) continue;
+//        if( _parameterList_[iPar].isFixed() or not _parameterList_[iPar].isEnabled() ) continue;
         jDelta = iDelta;
         jDelta *= (_parameterList_[jPar].getParameterValue() - _parameterList_[jPar].getPriorValue());
         jDelta *= (*_inverseCovarianceMatrix_)(iPar, jPar);

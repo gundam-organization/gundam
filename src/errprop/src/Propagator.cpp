@@ -61,54 +61,42 @@ void Propagator::setConfig(const json &config) {
   }
 }
 
-// To get rid of
-void Propagator::setDataTree(TTree *dataTree_) {
-  dataTree = dataTree_;
-}
-void Propagator::setMcFilePath(const std::string &mcFilePath) {
-  mc_file_path = mcFilePath;
-}
-
 void Propagator::initialize() {
   LogWarning << __METHOD_NAME__ << std::endl;
 
   LogTrace << "Parameters..." << std::endl;
   auto parameterSetListConfig = JsonUtils::fetchValue<json>(_config_, "parameterSetListConfig");
   if( parameterSetListConfig.is_string() ) parameterSetListConfig = JsonUtils::readConfigFile(parameterSetListConfig.get<std::string>());
+  int nPars = 0;
   _parameterSetsList_.reserve(parameterSetListConfig.size()); // make sure the objects aren't moved in RAM ( since FitParameter* will be used )
   for( const auto& parameterSetConfig : parameterSetListConfig ){
     _parameterSetsList_.emplace_back();
     _parameterSetsList_.back().setJsonConfig(parameterSetConfig);
     _parameterSetsList_.back().initialize();
+    nPars += _parameterSetsList_.back().getNbParameters();
     LogInfo << _parameterSetsList_.back().getSummary() << std::endl;
+  }
+
+  _globalCovarianceMatrix_ = std::shared_ptr<TMatrixD>( new TMatrixD(nPars, nPars) );
+  int iParOffset = 0;
+  for( const auto& parSet : _parameterSetsList_ ){
+    if( not parSet.isEnabled() ) continue;
+    for( int iCov = 0 ; iCov < parSet.getOriginalCovarianceMatrix()->GetNrows() ; iCov++ ){
+      for( int jCov = 0 ; jCov < parSet.getOriginalCovarianceMatrix()->GetNcols() ; jCov++ ){
+        (*_globalCovarianceMatrix_)[iParOffset+iCov][iParOffset+jCov] = (*parSet.getOriginalCovarianceMatrix())[iCov][jCov];
+      }
+    }
+    iParOffset += parSet.getOriginalCovarianceMatrix()->GetNrows();
+  }
+  if( _saveDir_ != nullptr ){
+    _saveDir_->cd();
+    _globalCovarianceMatrix_->Write("_globalCovarianceMatrix_");
   }
 
   LogDebug << "FitSampleSet..." << std::endl;
   auto fitSampleSetConfig = JsonUtils::fetchValue(_config_, "fitSampleSetConfig", nlohmann::json());
-  if( not fitSampleSetConfig.empty() ){
-    _fitSampleSet_.setConfig(fitSampleSetConfig);
-    _fitSampleSet_.initialize();
-  }
-  else{
-    LogTrace << "Samples..." << std::endl;
-    auto samplesConfig = JsonUtils::fetchValue<json>(_config_, "samplesConfig");
-    if( samplesConfig.is_string() ) samplesConfig = JsonUtils::readConfigFile(samplesConfig.get<std::string>());
-    for( const auto& sampleConfig : samplesConfig ){
-      if( JsonUtils::fetchValue(sampleConfig, "isEnabled", true) ){
-        _samplesList_.emplace_back();
-        _samplesList_.back().setupWithJsonConfig(sampleConfig);
-        _samplesList_.back().setDataTree(dataTree);
-        _samplesList_.back().Initialize();
-      }
-    }
-
-    auto* selected_events_AnaTreeMC = new AnaTreeMC(mc_file_path, "selectedEvents"); // trouble while deleting... > need to check
-    LogInfo << "Reading and collecting events..." << std::endl;
-    std::vector<SignalDef> buf;
-    std::vector<AnaSample*> samplePtrList;
-    for( auto& sample : _samplesList_ ) samplePtrList.emplace_back(&sample);
-    selected_events_AnaTreeMC->GetEvents(samplePtrList, buf, false);
-  }
+  _fitSampleSet_.setConfig(fitSampleSetConfig);
+  _fitSampleSet_.initialize();
 
 
   LogTrace << "Initializing the PlotGenerator" << std::endl;
@@ -117,49 +105,43 @@ void Propagator::initialize() {
   _plotGenerator_.setConfig(plotGeneratorConfig);
   _plotGenerator_.initialize();
 
-  if( not _fitSampleSet_.empty() ){
-    LogInfo << "Polling the requested leaves to load in memory..." << std::endl;
-    for( auto& dataSet : _fitSampleSet_.getDataSetList() ){
+  LogInfo << "Polling the requested leaves to load in memory..." << std::endl;
+  for( auto& dataSet : _fitSampleSet_.getDataSetList() ){
 
-      // parSet
-      for( auto& parSet : _parameterSetsList_ ){
-        if( not parSet.isEnabled() ) continue;
+    // parSet
+    for( auto& parSet : _parameterSetsList_ ){
+      if( not parSet.isEnabled() ) continue;
 
-        for( auto& par : parSet.getParameterList() ){
-          if( not par.isEnabled() ) continue;
+      for( auto& par : parSet.getParameterList() ){
+        if( not par.isEnabled() ) continue;
 
-          auto* dialSetPtr = par.findDialSet( dataSet.getName() );
-          if( dialSetPtr == nullptr ){ continue; }
+        auto* dialSetPtr = par.findDialSet( dataSet.getName() );
+        if( dialSetPtr == nullptr ){ continue; }
 
-          if( dialSetPtr->getApplyConditionFormula() != nullptr ){
-            for( int iPar = 0 ; iPar < dialSetPtr->getApplyConditionFormula()->GetNpar() ; iPar++ ){
-              dataSet.addRequestedLeafName(dialSetPtr->getApplyConditionFormula()->GetParName(iPar));
-            }
+        if( dialSetPtr->getApplyConditionFormula() != nullptr ){
+          for( int iPar = 0 ; iPar < dialSetPtr->getApplyConditionFormula()->GetNpar() ; iPar++ ){
+            dataSet.addRequestedLeafName(dialSetPtr->getApplyConditionFormula()->GetParName(iPar));
           }
+        }
 
-          for( auto& dial : dialSetPtr->getDialList() ){
-            for( auto& var : dial->getApplyConditionBin().getVariableNameList() ){
-              dataSet.addRequestedLeafName(var);
-            } // var
-          } // dial
-        } // par
-      } // parSet
+        for( auto& dial : dialSetPtr->getDialList() ){
+          for( auto& var : dial->getApplyConditionBin().getVariableNameList() ){
+            dataSet.addRequestedLeafName(var);
+          } // var
+        } // dial
+      } // par
+    } // parSet
 
-      // plotGen
-      auto varListRequestedByPlotGen = _plotGenerator_.fetchRequestedLeafNames();
-      for( const auto& varName : varListRequestedByPlotGen ){
-        dataSet.addRequestedLeafName(varName);
-      }
+    // plotGen
+    auto varListRequestedByPlotGen = _plotGenerator_.fetchRequestedLeafNames();
+    for( const auto& varName : varListRequestedByPlotGen ){
+      dataSet.addRequestedLeafName(varName);
+    }
 
-    } // dataSets
+  } // dataSets
 
-    _fitSampleSet_.loadPhysicsEvents();
-    _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
-  }
-  else{
-    // OLD SAMPLES
-    _plotGenerator_.setSampleListPtr( &_samplesList_ );
-  }
+  _fitSampleSet_.loadPhysicsEvents();
+  _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
   _plotGenerator_.defineHistogramHolders();
 
   initializeThreads();
@@ -182,55 +164,42 @@ void Propagator::initialize() {
   LogInfo << "Propagating prior parameters on events..." << std::endl;
   reweightSampleEvents();
 
-  if( not fitSampleSetConfig.empty() ){
-
-    LogInfo << "Set the current MC prior weights as nominal weight..." << std::endl;
-    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-      for( auto& event : sample.getMcContainer().eventList ){
-        event.setNominalWeight(event.getEventWeight());
-      }
-    }
-
-    if( _fitSampleSet_.getDataEventType() == DataEventType::Asimov ){
-      LogInfo << "Propagating prior weights on data Asimov events..." << std::endl;
-      for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-        sample.getDataContainer().histScale = sample.getMcContainer().histScale;
-        int nEvents = int(sample.getMcContainer().eventList.size());
-        for( int iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
-          // Since no reweight is applied on data samples, the nominal weight should be the default one
-          sample.getDataContainer().eventList.at(iEvent).setTreeWeight(
-            sample.getMcContainer().eventList.at(iEvent).getNominalWeight()
-            );
-          sample.getDataContainer().eventList.at(iEvent).resetEventWeight();
-          sample.getDataContainer().eventList.at(iEvent).setNominalWeight(sample.getDataContainer().eventList.at(iEvent).getEventWeight());
-        }
-      }
-    }
-
-    LogInfo << "Filling up sample bin caches..." << std::endl;
-    _fitSampleSet_.updateSampleBinEventList();
-
-    LogInfo << "Filling up sample histograms..." << std::endl;
-    _fitSampleSet_.updateSampleHistograms();
-
-    // Now the data won't be refilled each time
-    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-      sample.getDataContainer().isLocked = true;
-    }
-
-    _useResponseFunctions_ = JsonUtils::fetchValue<json>(_config_, "useResponseFunctions", false);
-    if( _useResponseFunctions_ ){
-      this->makeResponseFunctions();
+  LogInfo << "Set the current MC prior weights as nominal weight..." << std::endl;
+  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    for( auto& event : sample.getMcContainer().eventList ){
+      event.setNominalWeight(event.getEventWeight());
     }
   }
-  else{
-    for( auto& sample : _samplesList_ ){
-      sample.FillEventHist(
-        DataType::kAsimov,
-        false
+
+  if( _fitSampleSet_.getDataEventType() == DataEventType::Asimov ){
+    LogInfo << "Propagating prior weights on data Asimov events..." << std::endl;
+    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+      sample.getDataContainer().histScale = sample.getMcContainer().histScale;
+      int nEvents = int(sample.getMcContainer().eventList.size());
+      for( int iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
+        // Since no reweight is applied on data samples, the nominal weight should be the default one
+        sample.getDataContainer().eventList.at(iEvent).setTreeWeight(
+          sample.getMcContainer().eventList.at(iEvent).getNominalWeight()
         );
+        sample.getDataContainer().eventList.at(iEvent).resetEventWeight();
+        sample.getDataContainer().eventList.at(iEvent).setNominalWeight(sample.getDataContainer().eventList.at(iEvent).getEventWeight());
+      }
     }
   }
+
+  LogInfo << "Filling up sample bin caches..." << std::endl;
+  _fitSampleSet_.updateSampleBinEventList();
+
+  LogInfo << "Filling up sample histograms..." << std::endl;
+  _fitSampleSet_.updateSampleHistograms();
+
+  // Now the data won't be refilled each time
+  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    sample.getDataContainer().isLocked = true;
+  }
+
+  _useResponseFunctions_ = JsonUtils::fetchValue<json>(_config_, "useResponseFunctions", false);
+  if( _useResponseFunctions_ ){ this->makeResponseFunctions(); }
 
   if( JsonUtils::fetchValue<json>(_config_, "throwParameters", false) ){
     for( auto& parSet : _parameterSetsList_ ){
@@ -248,9 +217,6 @@ bool Propagator::isUseResponseFunctions() const {
 }
 FitSampleSet &Propagator::getFitSampleSet() {
   return _fitSampleSet_;
-}
-std::vector<AnaSample> &Propagator::getSamplesList() {
-  return _samplesList_;
 }
 std::vector<FitParameterSet> &Propagator::getParameterSetsList() {
   return _parameterSetsList_;
@@ -318,31 +284,15 @@ void Propagator::initializeThreads() {
   GlobalVariables::getParallelWorker().addJob("Propagator::reweightSampleEvents", reweightSampleEventsFct);
 
   std::function<void(int)> refillSampleHistogramsFct = [this](int iThread){
-    if( _fitSampleSet_.empty() ){
-      for( auto& sample : _samplesList_ ){
-        sample.FillMcHistograms(GlobalVariables::getNbThreads() == 1 ? -1 : iThread);
-      }
-    }
-    else{
-      for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-        sample.getMcContainer().refillHistogram(iThread);
-        sample.getDataContainer().refillHistogram(iThread);
-      }
+    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+      sample.getMcContainer().refillHistogram(iThread);
+      sample.getDataContainer().refillHistogram(iThread);
     }
   };
   std::function<void()> refillSampleHistogramsPostParallelFct = [this](){
-    if( _fitSampleSet_.empty() ){
-      if(GlobalVariables::getNbThreads() != 1){
-        for( auto& sample : _samplesList_ ){
-          sample.MergeMcHistogramsThread();
-        }
-      }
-    }
-    else{
-      for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-        sample.getMcContainer().rescaleHistogram();
-        sample.getDataContainer().rescaleHistogram();
-      }
+    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+      sample.getMcContainer().rescaleHistogram();
+      sample.getDataContainer().rescaleHistogram();
     }
   };
   GlobalVariables::getParallelWorker().addJob("Propagator::refillSampleHistograms", refillSampleHistogramsFct);
@@ -356,16 +306,6 @@ void Propagator::initializeThreads() {
 }
 void Propagator::initializeCaches() {
   LogInfo << __METHOD_NAME__ << std::endl;
-
-  for( auto& sample : _samplesList_ ){
-    int nEvents = sample.GetN();
-    for( int iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
-      for( auto& parSet : _parameterSetsList_ ){
-        auto* dialCache = sample.GetEvent(iEvent)->getDialCachePtr();
-        (*dialCache)[&parSet] = std::vector<Dial*>(parSet.getNbParameters(), nullptr);
-      } // parSet
-    } // event
-  } // sample
 
   size_t preSize;
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
@@ -452,269 +392,99 @@ void Propagator::makeResponseFunctions(){
 void Propagator::reweightSampleEvents(int iThread_) {
   double weight;
 
-  // OLD
-  if( _fitSampleSet_.empty() ){
-    AnaEvent* eventPtr;
-    for( auto& sample : _samplesList_ ){
-      int nEvents = sample.GetN();
-      for( int iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
+  int nThreads = GlobalVariables::getNbThreads();
+  int iEvent;
+  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    int nEvents = int(sample.getMcContainer().eventList.size());
+    for( iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
+      if( iEvent % nThreads != iThread_ ){
+        continue;
+      }
+      sample.getMcContainer().eventList.at(iEvent).reweightUsingDialCache();
+    } // event
+  } // sample
 
-        if( iEvent % GlobalVariables::getNbThreads() != iThread_ ){
-          continue;
-        }
-
-        eventPtr = sample.GetEvent(iEvent);
-        eventPtr->ResetEvWght();
-
-        // Loop over the parSet that are cached (missing ones won't apply on this event anyway)
-        for( auto& parSetDialCache : *eventPtr->getDialCachePtr() ){
-
-          weight = 1;
-          for( size_t iPar = 0 ; iPar < parSetDialCache.first->getNbParameters() ; iPar++ ){
-
-            Dial* dialPtr = parSetDialCache.second.at(iPar);
-            if( dialPtr == nullptr ) continue;
-
-            // No need to recast dialPtr as a NormDial or whatever, it will automatically fetch the right method
-            weight *= dialPtr->evalResponse( parSetDialCache.first->getFitParameter(iPar).getParameterValue() );
-
-            // TODO: check if weight cap
-            if( weight <= 0 ){
-              weight = 0;
-              break;
-              //            LogError << GET_VAR_NAME_VALUE(iPar) << std::endl;
-              //            LogError << GET_VAR_NAME_VALUE(weight) << std::endl;
-              //            throw std::runtime_error("<0 weight");
-            }
-
-          }
-
-          eventPtr->AddEvWght(weight);
-
-        } // parSetCache
-
-      } // event
-    } // sample
-  }
-  else{
-    // NEW
-    int nThreads = GlobalVariables::getNbThreads();
-    int iEvent;
-    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-      int nEvents = int(sample.getMcContainer().eventList.size());
-      for( iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
-        if( iEvent % nThreads != iThread_ ){
-          continue;
-        }
-        sample.getMcContainer().eventList.at(iEvent).reweightUsingDialCache();
-      } // event
-    } // sample
-  }
 }
 void Propagator::fillEventDialCaches(int iThread_){
 
   DialSet* parameterDialSetPtr;
+  PhysicsEvent* evPtr{nullptr};
+  std::vector<Dial *>* evParSetDialList{nullptr};
+  auto& dataSetList = _fitSampleSet_.getDataSetList();
+  size_t iEvent, nEvents;
+  size_t iDialSet, iDial;
+  size_t iVar;
+  size_t eventDialOffset;
+  DialSet* dialSetPtr;
+  const DataBin* applyConditionBinPtr;
+  for( size_t iDataSet = 0 ; iDataSet < dataSetList.size() ; iDataSet++ ){
 
-  if( _fitSampleSet_.empty() ){
-    AnaEvent* eventPtr{nullptr};
-    if (iThread_ == GlobalVariables::getNbThreads() - 1) LogTrace << "Old samples" << std::endl;
+    std::map<FitParameterSet*, std::vector<DialSet*>> dialSetPtrMap;
     for( auto& parSet : _parameterSetsList_ ){
       if( not parSet.isEnabled() ){ continue; }
-      int iPar = -1;
       for( auto& par : parSet.getParameterList() ){
-        iPar++;
         if( not par.isEnabled() ){ continue; }
+        dialSetPtr = par.findDialSet( dataSetList.at(iDataSet).getName());
+        if( dialSetPtr != nullptr and not dialSetPtr->getDialList().empty() ){
+          dialSetPtrMap[&parSet].emplace_back( dialSetPtr );
+        }
+      }
+    }
 
-        for( auto& sample : _samplesList_ ) {
-          int nEvents = sample.GetN();
-          if (nEvents == 0) continue;
+    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+      if( not GenericToolbox::doesElementIsInVector(iDataSet, sample.getMcContainer().dataSetIndexList) ){ continue; }
 
-          // selecting the dialSet of the sample
-          parameterDialSetPtr = par.findDialSet(sample.GetDetector());
-          if (parameterDialSetPtr->getDialList().empty()) {
-            continue;
-          }
+      std::stringstream ss;
+      ss << LogWarning.getPrefixString() << sample.getName();
 
-          // Indexing the variables
-          eventPtr = sample.GetEvent(0);
-          const auto &firstDial = parameterDialSetPtr->getDialList()[0];
-          std::vector<int> varIndexList(firstDial->getApplyConditionBin().getVariableNameList().size(), 0);
-          std::vector<bool> isIntList(firstDial->getApplyConditionBin().getVariableNameList().size(), true);
-          for (size_t iVar = 0; iVar < firstDial->getApplyConditionBin().getVariableNameList().size(); iVar++) {
-            varIndexList.at(iVar) = (eventPtr->GetIntIndex(
-              firstDial->getApplyConditionBin().getVariableNameList().at(iVar), false));
-            if (varIndexList.at(iVar) == -1) {
-              isIntList.at(iVar) = false;
-              varIndexList.at(iVar) = (eventPtr->GetFloatIndex(
-                firstDial->getApplyConditionBin().getVariableNameList().at(iVar), false));
-            }
-          }
-
-          std::stringstream ss;
-          ss << LogWarning.getPrefixString() << "Indexing event dials: " << parSet.getName() << "/" << par.getTitle() << " -> " << sample.GetName();
-          if( iThread_ == GlobalVariables::getNbThreads()-1 ){
-            GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-          }
-
-          int nbDialsSet = 0;
-          for (int iEvent = 0; iEvent < nEvents; iEvent++) {
-
-            if (iEvent % GlobalVariables::getNbThreads() != iThread_) {
-              continue;
-            }
-            if (iThread_ == GlobalVariables::getNbThreads() - 1) {
-              GenericToolbox::displayProgressBar(iEvent, nEvents, ss.str());
-            }
-
-            eventPtr = sample.GetEvent(iEvent);
-            if (eventPtr->getDialCachePtr()->at(&parSet).at(iPar) != nullptr) {
-              // already set
-              continue;
-            }
-
-            if (parameterDialSetPtr->getApplyConditionFormula() != nullptr
-            and eventPtr->evalFormula(parameterDialSetPtr->getApplyConditionFormula()) == 0
-            ) {
-              continue; // SKIP
-            }
-
-            for (const auto &dial : parameterDialSetPtr->getDialList()) {
-              bool isInBin = true;
-              for (size_t iVar = 0; iVar < varIndexList.size(); iVar++) {
-                if (isIntList.at(iVar)) {
-                  if (
-                    not dial->getApplyConditionBin().isBetweenEdges(
-                      iVar, eventPtr->GetEventVarInt(varIndexList.at(iVar)))
-                      ){
-                    isInBin = false;
-                    break; // next dial
-                  }
-                }
-                else {
-                  if (
-                    not dial->getApplyConditionBin().isBetweenEdges(
-                      iVar, eventPtr->GetEventVarFloat(varIndexList.at(iVar)))
-                      ) {
-                    isInBin = false;
-                    break; // next dial
-                  }
-                }
-              }
-              if (isInBin) {
-                eventPtr->getDialCachePtr()->at(&parSet).at(iPar) = dial.get();
-                //              eventPtr->Print();
-                //              LogDebug << GenericToolbox::parseVectorAsString(firstDial->getApplyConditionBin().getVariableNameList()) << std::endl;
-                //              LogDebug << GenericToolbox::parseVectorAsString(varIndexList) << std::endl;
-                //              LogDebug << GenericToolbox::parseVectorAsString(isIntList) << std::endl;
-                //              exit(0);
-                nbDialsSet++;
-                break; // found
-              }
-            } // dial
-
-          } // iEvent
-
-          if (iThread_ == GlobalVariables::getNbThreads() - 1) {
-            GenericToolbox::displayProgressBar(nEvents, nEvents, ss.str());
-            //          LogTrace << sample.GetName() << ": " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << " " << GET_VAR_NAME_VALUE(nbDialsSet) << std::endl;
-          }
-        } // sample
-
-      } // par
-    } // parSet
-  }
-  else{
-    PhysicsEvent* evPtr{nullptr};
-    std::vector<Dial *>* evParSetDialList{nullptr};
-    if (iThread_ == GlobalVariables::getNbThreads() - 1) LogTrace << "New samples" << std::endl;
-
-    {
-      auto& dataSetList = _fitSampleSet_.getDataSetList();
-      size_t iEvent, nEvents;
-      size_t iDialSet, iDial;
-      size_t iVar;
-      size_t eventDialOffset;
-      DialSet* dialSetPtr;
-      const DataBin* applyConditionBinPtr;
-      for( size_t iDataSet = 0 ; iDataSet < dataSetList.size() ; iDataSet++ ){
-
-        std::map<FitParameterSet*, std::vector<DialSet*>> dialSetPtrMap;
-        for( auto& parSet : _parameterSetsList_ ){
-          if( not parSet.isEnabled() ){ continue; }
-          for( auto& par : parSet.getParameterList() ){
-            if( not par.isEnabled() ){ continue; }
-            dialSetPtr = par.findDialSet( dataSetList.at(iDataSet).getName());
-            if( dialSetPtr != nullptr and not dialSetPtr->getDialList().empty() ){
-//              dialSetPtrList.emplace_back(dialSet);
-              dialSetPtrMap[&parSet].emplace_back( dialSetPtr );
-            }
-          }
+      nEvents = sample.getMcContainer().eventNbList.at(iDataSet);
+      for( iEvent = sample.getMcContainer().eventOffSetList.at(iDataSet) ; iEvent < nEvents ; iEvent++ ){
+        if (iEvent % GlobalVariables::getNbThreads() != iThread_) {
+          continue;
+        }
+        if (iThread_ == GlobalVariables::getNbThreads() - 1) {
+          GenericToolbox::displayProgressBar(iEvent, nEvents, ss.str());
         }
 
-        for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-          if( not GenericToolbox::doesElementIsInVector(iDataSet, sample.getMcContainer().dataSetIndexList) ){ continue; }
+        evPtr = &sample.getMcContainer().eventList.at(iEvent);
 
-          std::stringstream ss;
-          ss << LogWarning.getPrefixString() << sample.getName();
+        eventDialOffset = 0;
+        for( auto& dialSetPair : dialSetPtrMap ){
+          for( iDialSet = 0 ; iDialSet < dialSetPair.second.size() ; iDialSet++ ){
+            dialSetPtr = dialSetPair.second.at(iDialSet);
 
-          nEvents = sample.getMcContainer().eventNbList.at(iDataSet);
-          for( iEvent = sample.getMcContainer().eventOffSetList.at(iDataSet) ; iEvent < nEvents ; iEvent++ ){
-            if (iEvent % GlobalVariables::getNbThreads() != iThread_) {
+            if( dialSetPtr->getApplyConditionFormula() != nullptr
+                and evPtr->evalFormula(dialSetPtr->getApplyConditionFormula()) == 0
+              ){
               continue;
             }
-            if (iThread_ == GlobalVariables::getNbThreads() - 1) {
-              GenericToolbox::displayProgressBar(iEvent, nEvents, ss.str());
+
+            bool isInBin = false;
+            for( iDial = 0 ; iDial < dialSetPtr->getDialList().size(); iDial++ ){
+              applyConditionBinPtr = &dialSetPtr->getDialList().at(iDial)->getApplyConditionBin();
+              isInBin = true;
+
+              for( iVar = 0 ; iVar < applyConditionBinPtr->getVariableNameList().size() ; iVar++ ){
+                if( not applyConditionBinPtr->isBetweenEdges(iVar, evPtr->getVarAsDouble(applyConditionBinPtr->getVariableNameList().at(iVar) ) )){
+                  isInBin = false;
+                  break;
+                }
+              }
+              if( isInBin ){
+                evPtr->getRawDialPtrList().at(eventDialOffset++) = dialSetPtr->getDialList().at(iDial).get();
+                break;
+              }
+            } // iDial
+
+            if( isInBin and dialSetPair.first->isUseOnlyOneParameterPerEvent() ){
+              break; // leave iDialSet / enabled parameters loop
             }
 
-            evPtr = &sample.getMcContainer().eventList.at(iEvent);
-
-            eventDialOffset = 0;
-            for( auto& dialSetPair : dialSetPtrMap ){
-              for( iDialSet = 0 ; iDialSet < dialSetPair.second.size() ; iDialSet++ ){
-                dialSetPtr = dialSetPair.second.at(iDialSet);
-
-                if( dialSetPtr->getApplyConditionFormula() != nullptr
-                    and evPtr->evalFormula(dialSetPtr->getApplyConditionFormula()) == 0
-                  ){
-                  continue;
-                }
-
-                bool isInBin = false;
-                for( iDial = 0 ; iDial < dialSetPtr->getDialList().size(); iDial++ ){
-                  applyConditionBinPtr = &dialSetPtr->getDialList().at(iDial)->getApplyConditionBin();
-                  isInBin = true;
-
-                  for( iVar = 0 ; iVar < applyConditionBinPtr->getVariableNameList().size() ; iVar++ ){
-                    if( not applyConditionBinPtr->isBetweenEdges(iVar, evPtr->getVarAsDouble(applyConditionBinPtr->getVariableNameList().at(iVar) ) )){
-                      isInBin = false;
-                      break;
-                    }
-                  }
-                  if( isInBin ){
-                    evPtr->getRawDialPtrList().at(eventDialOffset++) = dialSetPtr->getDialList().at(iDial).get();
-                    break;
-                  }
-                } // iDial
-
-                if( isInBin and dialSetPair.first->isUseOnlyOneParameterPerEvent() ){
-                  break; // leave iDialSet / enabled parameters loop
-                }
-
-              } // iDialSet / Enabled-parameter
-            } // ParSet / DialSet Pairs
-
-//            if (iThread_ == GlobalVariables::getNbThreads() - 1){
-//              LogTrace << GenericToolbox::parseVectorAsString(evPtr->getRawDialPtrList()) << std::endl;
-//              for( auto& dial : evPtr->getRawDialPtrList() ){
-//                if( dial == nullptr ) break;
-//                LogTrace << static_cast<FitParameter*>(dial->getAssociatedParameterReference())->getTitle() << std::endl;
-//              }
-//            }
-          } // iEvent
-        } // iSample
-      } // iDataSet
-    }
-  }
+          } // iDialSet / Enabled-parameter
+        } // ParSet / DialSet Pairs
+      } // iEvent
+    } // iSample
+  } // iDataSet
 
 }
 void Propagator::applyResponseFunctions(int iThread_){

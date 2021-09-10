@@ -79,7 +79,7 @@ int main(int argc, char** argv){
     LogInfo << "Throwing parameters on Pre-fit MC..." << std::endl;
     fitter.throwParameters( JsonUtils::fetchValue(jsonConfig, "throwMcBeforeFitGain", 1.) );
     fitter.updateChi2Cache();
-    LogInfo << "Chi2 after MC thrown: " << fitter.getChi2StatBuffer() << std::endl;
+    LogInfo << "Chi2 stat after MC thrown: " << fitter.getChi2StatBuffer() << std::endl;
   }
   if( JsonUtils::fetchValue(jsonConfig, "generateSamplePlots", true) ) fitter.generateSamplePlots("preFit/samples");
 

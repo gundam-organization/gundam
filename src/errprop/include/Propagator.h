@@ -29,17 +29,12 @@ public:
   void setSaveDir(TDirectory *saveDir);
   void setConfig(const json &config);
 
-  //! TODO: GET RID OF THOSE TEST METHOD
-  void setDataTree(TTree *dataTree_);
-  void setMcFilePath(const std::string &mcFilePath);
-
   // Init
   void initialize();
 
   // Getters
   bool isUseResponseFunctions() const;
   FitSampleSet &getFitSampleSet();
-  std::vector<AnaSample> &getSamplesList();
   std::vector<FitParameterSet> &getParameterSetsList();
   PlotGenerator &getPlotGenerator();
   const json &getConfig() const;
@@ -79,17 +74,14 @@ private:
   bool _useResponseFunctions_{false};
   bool _isRfPropagationEnabled_{false};
   std::vector<FitParameterSet> _parameterSetsList_;
-  std::vector<AnaSample> _samplesList_;
   FitSampleSet _fitSampleSet_;
   PlotGenerator _plotGenerator_;
+  std::shared_ptr<TMatrixD> _globalCovarianceMatrix_;
 
-  // Response functions
+  // Response functions (WIP)
   std::map<FitSample*, std::shared_ptr<TH1D>> _nominalSamplesMcHistogram_;
   std::map<FitSample*, std::vector<std::shared_ptr<TH1D>>> _responseFunctionsSamplesMcHistogram_;
 
-  // TEST
-  TTree* dataTree{nullptr};
-  std::string mc_file_path;
 
 public:
   struct CycleTimer{

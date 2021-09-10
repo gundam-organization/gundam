@@ -125,14 +125,11 @@ bool FitSampleSet::empty() const {
   return _fitSampleList_.empty();
 }
 double FitSampleSet::evalLikelihood() const{
-  LogThrowIf(not _isInitialized_, "Can't " << __METHOD_NAME__ << " while not initialized.");
 
   double llh = 0.;
   for( auto& sample : _fitSampleList_ ){
     double sampleLlh = 0;
     for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-//      LogDebug << GET_VAR_NAME_VALUE(sample.getMcContainer().histogram->GetBinContent(iBin)) << std::endl;
-//      LogDebug << GET_VAR_NAME_VALUE(sample.getDataContainer().histogram->GetBinContent(iBin)) << std::endl;
       sampleLlh += (*_likelihoodFunctionPtr_)(
         sample.getMcContainer().histogram->GetBinContent(iBin),
         sample.getMcContainer().histogram->GetBinError(iBin),

@@ -93,6 +93,9 @@ private:
   TVectorD* _parameterPriorList_{nullptr};
   TObjArray* _parameterNamesList_{nullptr};
 
+  double _globalParameterMinValue_{std::nan("UNSET")};
+  double _globalParameterMaxValue_{std::nan("UNSET")};
+
 
   int _nbEnabledEigen_{0};
   bool _useEigenDecompInFit_{false};

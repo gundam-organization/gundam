@@ -64,7 +64,7 @@ protected:
 private:
   // Parameters
   TDirectory* _saveDir_{nullptr};
-  nlohmann::json _config_;
+  nlohmann::json _config_{};
 
   // Internals
   bool _fitIsDone_{false};
@@ -74,16 +74,16 @@ private:
   int _nbFitCalls_{0};
   int _nbFitParameters_{0};
   int _nbParameters_{0};
-  Propagator _propagator_;
+  Propagator _propagator_{};
   std::shared_ptr<ROOT::Math::Minimizer> _minimizer_{nullptr};
   std::shared_ptr<ROOT::Math::Functor> _functor_{nullptr};
   TRandom3 _prng_;
 
   // Buffers
-  double _chi2Buffer_;
-  double _chi2StatBuffer_;
-  double _chi2PullsBuffer_;
-  double _chi2RegBuffer_;
+  double _chi2Buffer_{0};
+  double _chi2StatBuffer_{0};
+  double _chi2PullsBuffer_{0};
+  double _chi2RegBuffer_{0};
 
   std::map<std::string, std::vector<double>> _chi2History_;
 
