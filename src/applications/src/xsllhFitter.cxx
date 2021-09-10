@@ -66,21 +66,32 @@ int main(int argc, char** argv){
   fitter.setSaveDir(GenericToolbox::mkdirTFile(out, "fitter"));
   fitter.initialize();
 
-//  fitter.throwParameters();
+  ///////////////////////////////
+  // Pre-fit:
+  /////////////////////////////
+
+  // LLH Visual Scan
+  if( JsonUtils::fetchValue(jsonConfig, "generateOneSigmaPlots", false) ) fitter.generateOneSigmaPlots("preFit");
+  if( JsonUtils::fetchValue(jsonConfig, "scanParameters", true) ) fitter.scanParameters(10, "preFit/scan");
+
+  // State before the fit
+  if( JsonUtils::fetchValue(jsonConfig, "throwMcBeforeFit", false) ){
+    LogInfo << "Throwing parameters on Pre-fit MC..." << std::endl;
+    fitter.throwParameters( JsonUtils::fetchValue(jsonConfig, "throwMcBeforeFitGain", 1.) );
+    fitter.updateChi2Cache();
+    LogInfo << "Chi2 after MC thrown: " << fitter.getChi2StatBuffer() << std::endl;
+  }
+  if( JsonUtils::fetchValue(jsonConfig, "generateSamplePlots", true) ) fitter.generateSamplePlots("preFit/samples");
 
   ///////////////////////////////
   // Run the fitter:
   /////////////////////////////
-  if( JsonUtils::fetchValue(jsonConfig, "generateSamplePlots", true) ) fitter.generateSamplePlots("prefit/samples");
-  if( JsonUtils::fetchValue(jsonConfig, "generateOneSigmaPlots", false) ) fitter.generateOneSigmaPlots();
-  if( JsonUtils::fetchValue(jsonConfig, "scanParameters", true) )fitter.scanParameters(10, "prefit/scan");
-
   if( not isDryRun and JsonUtils::fetchValue(jsonConfig, "fit", true) ){
     fitter.fit();
     if( fitter.isFitHasConverged() ) fitter.writePostFitData();
   }
 
-  if( JsonUtils::fetchValue(jsonConfig, "scanParameters", true) ) fitter.scanParameters(10, "postfit/scan");
+  if( JsonUtils::fetchValue(jsonConfig, "scanParameters", true) ) fitter.scanParameters(10, "postFit/scan");
 
   LogDebug << "Closing output file: " << out->GetName() << std::endl;
   out->Close();

@@ -69,11 +69,11 @@ void FitParameter::initialize() {
 
   LogTrace << GET_VAR_NAME_VALUE(this) << std::endl;
 
-  if     ( _priorValue_ == std::numeric_limits<double>::quiet_NaN() ){
+  if     ( _priorValue_     == std::numeric_limits<double>::quiet_NaN() ){
     LogError << "_priorValue_ is not set." << std::endl;
     throw std::logic_error("_priorValue_ is not set.");
   }
-  else if( _stdDevValue_ == std::numeric_limits<double>::quiet_NaN() ){
+  else if( _stdDevValue_    == std::numeric_limits<double>::quiet_NaN() ){
     LogError << "_stdDevValue_ is not set." << std::endl;
     throw std::logic_error("_stdDevValue_ is not set.");
   }
@@ -92,6 +92,7 @@ void FitParameter::initialize() {
 
   LogDebug << "Initializing Parameter " << getTitle() << std::endl;
 
+  _dialSetList_.reserve(_dialDefinitionsList_.size());
   for( const auto& dialDefinitionConfig : _dialDefinitionsList_ ){
     _dialSetList_.emplace_back();
     _dialSetList_.back().setParameterIndex(_parameterIndex_);

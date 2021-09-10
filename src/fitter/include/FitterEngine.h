@@ -31,10 +31,14 @@ public:
   void setSaveDir(TDirectory *saveDir);
   void setConfig(const nlohmann::json &config_);
 
+
   // Init
   void initialize();
 
+  // Getters
   bool isFitHasConverged() const;
+  double getChi2Buffer() const;
+  double getChi2StatBuffer() const;
 
   // Core
   void generateSamplePlots(const std::string& saveDir_ = "");
@@ -43,8 +47,7 @@ public:
   void fixGhostParameters();
   void scanParameters(int nbSteps_, const std::string& saveDir_ = "");
   void scanParameter(int iPar, int nbSteps_, const std::string& saveDir_ = "");
-
-  void throwParameters();
+  void throwParameters(double gain_ = 1);
 
   void fit();
   void updateChi2Cache();

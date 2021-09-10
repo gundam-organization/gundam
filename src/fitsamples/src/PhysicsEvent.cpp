@@ -16,7 +16,6 @@ PhysicsEvent::~PhysicsEvent() { this->reset(); }
 void PhysicsEvent::reset() {
   _commonLeafNameListPtr_ = nullptr;
   _leafContentList_.clear();
-//  _dialCache_.clear();
   _rawDialPtrList_.clear();
 
   // Weight carriers
@@ -68,12 +67,6 @@ double PhysicsEvent::getEventWeight() const {
 int PhysicsEvent::getSampleBinIndex() const {
   return _sampleBinIndex_;
 }
-//std::map<FitParameterSet *, std::vector<Dial *>>& PhysicsEvent::getDialCache(){
-//  return _dialCache_;
-//}
-//std::map<FitParameterSet *, std::vector<Dial *>>* PhysicsEvent::getDialCachePtr() {
-//  return &_dialCache_;
-//}
 
 void PhysicsEvent::hookToTree(TTree* tree_, bool throwIfLeafNotFound_){
   LogThrowIf(_commonLeafNameListPtr_ == nullptr, "_commonLeafNameListPtr_ is not set.");
@@ -169,12 +162,6 @@ std::string PhysicsEvent::getSummary() const {
   if( not _rawDialPtrList_.empty() ){
     ss << std::endl << "Dials: " << GenericToolbox::parseVectorAsString(_rawDialPtrList_);
   }
-//  for( const auto& dialCachePair : _dialCache_ ){
-//    ss << std::endl << dialCachePair.first->getName() << ": " << GenericToolbox::parseVectorAsString(dialCachePair.second);
-//    for( size_t iDial = 0 ; iDial < dialCachePair.second.size() ; iDial++ ){
-//      ss << std::endl << iDial << " -> " << dialCachePair.second.at(iDial);
-//    }
-//  }
   return ss.str();
 }
 void PhysicsEvent::print() const {
@@ -193,31 +180,7 @@ bool PhysicsEvent::isSame(AnaEvent& anaEvent_) const{
     }
   }
 
-//  for( auto& parSetPair : _dialCache_ ){
-//    if( not GenericToolbox::doesKeyIsInMap(parSetPair.first, *anaEvent_.getDialCachePtr()) ){
-//      LogError << "PARSET NOT FOUND" << GET_VAR_NAME_VALUE(parSetPair.first->getName()) << std::endl;
-//      isSame = false;
-//      break;
-//    }
-//
-//    for( size_t iPar = 0 ; iPar < parSetPair.second.size() ; iPar++ ){
-//      if( parSetPair.second.at(iPar) != anaEvent_.getDialCachePtr()->at(parSetPair.first).at(iPar) ){
-//        LogError << GET_VAR_NAME_VALUE(parSetPair.first->getName()) << " -> " << iPar << std::endl;
-//        isSame = false;
-//        break;
-//      }
-//    }
-//
-//    if( not isSame ) break;
-//  }
-//
-//  if( _eventWeight_ != anaEvent_.GetEventWeight() ){
-//    LogError << "WEIGHT" << std::endl;
-//    isSame = false;
-//  }
-
   if( _sampleBinIndex_ != anaEvent_.GetRecoBinIndex() ){
-//    LogError << "BIN" << std::endl;
     isSame = false;
   }
 
@@ -228,7 +191,7 @@ bool PhysicsEvent::isSame(AnaEvent& anaEvent_) const{
 
   return isSame;
 }
-void PhysicsEvent::deleteLeaf(size_t index_){
+void PhysicsEvent::deleteLeaf(long index_){
   _leafContentList_.erase(_leafContentList_.begin() + index_);
   _leafContentList_.shrink_to_fit();
 }

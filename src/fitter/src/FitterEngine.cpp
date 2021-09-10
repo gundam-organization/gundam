@@ -60,6 +60,16 @@ void FitterEngine::initialize() {
 
 }
 
+bool FitterEngine::isFitHasConverged() const {
+  return _fitHasConverged_;
+}
+double FitterEngine::getChi2Buffer() const {
+  return _chi2Buffer_;
+}
+double FitterEngine::getChi2StatBuffer() const {
+  return _chi2StatBuffer_;
+}
+
 void FitterEngine::generateSamplePlots(const std::string& saveDir_){
 
   LogInfo << __METHOD_NAME__ << std::endl;
@@ -77,12 +87,17 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
   _propagator_.propagateParametersOnSamples();
   _propagator_.getPlotGenerator().generateSamplePlots();
 
-  _saveDir_->cd(); // to put this hist somewhere
+  GenericToolbox::mkdirTFile(_saveDir_, saveDir_)->cd();
   auto refHistList = _propagator_.getPlotGenerator().getHistHolderList(); // current buffer
 
   // +1 sigma
   int iPar = -1;
   for( auto& parSet : _propagator_.getParameterSetsList() ){
+
+    if( JsonUtils::fetchValue(parSet.getJsonConfig(), "disableOneSigmaPlots", false) ){
+      LogWarning << "disableOneSigmaPlots: +1 sigma plots disabled for \"" << parSet.getName() << "\"" << std::endl;
+      continue;
+    }
 
     for( auto& par : parSet.getParameterList() ){
         iPar++;
@@ -100,6 +115,7 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
         if( not savePath.empty() ) savePath += "/";
         savePath += "oneSigma/" + parSet.getName() + "/" + par.getTitle() + tag;
         auto* saveDir = GenericToolbox::mkdirTFile(_saveDir_, savePath );
+        LogTrace << GET_VAR_NAME_VALUE(savePath) << std::endl;
         saveDir->cd();
 
         _propagator_.getPlotGenerator().generateSamplePlots();
@@ -181,12 +197,17 @@ void FitterEngine::fixGhostParameters(){
         parSet.propagateEigenToOriginal();
 
         LogInfo << "(" << iFitPar+1 << "/" << _nbFitParameters_ << ") +1 sigma on " << parSet.getName() + "/eigen_#" + std::to_string(iEigen)
-                << " -> " << parSet.getEigenParameter(iEigen) << std::endl;
+                << " -> " << parSet.getEigenParameter(iEigen);
         updateChi2Cache();
 
         double deltaChi2 = _chi2StatBuffer_ - baseChi2Stat;
-        if( std::fabs(deltaChi2) < 1E-6 ){
-          LogAlert << parSet.getName() + "/eigen_#" + std::to_string(iEigen) << ": Δχ² = " << deltaChi2 << " < " << 1E-6 << ", fixing parameter." << std::endl;
+        LogInfo << ": Δχ² = " << std::fabs(deltaChi2) << std::endl;
+
+        if( std::fabs(deltaChi2) < JsonUtils::fetchValue(_config_, "ghostParameterDeltaChi2Threshold", 1E-6) ){
+          LogAlert << parSet.getName() + "/eigen_#" + std::to_string(iEigen)
+          << ": Δχ² = " << deltaChi2 << " < "
+          << JsonUtils::fetchValue(_config_, "ghostParameterDeltaChi2Threshold", 1E-6)
+          << ", fixing parameter." << std::endl;
           _minimizer_->FixVariable(iFitPar);
         }
 
@@ -204,14 +225,17 @@ void FitterEngine::fixGhostParameters(){
         double currentParValue = par.getParameterValue();
         par.setParameterValue( currentParValue + par.getStdDevValue() );
         LogInfo << "(" << iFitPar+1 << "/" << _nbFitParameters_ << ") +1 sigma on " << parSet.getName() + "/" + par.getTitle()
-                << " -> " << par.getParameterValue() << std::endl;
+                << " -> " << par.getParameterValue();
 
         updateChi2Cache();
-
         double deltaChi2 = _chi2StatBuffer_ - baseChi2Stat;
 
-        if( std::fabs(deltaChi2) < 1E-6 ){
-          LogAlert << parSet.getName() + "/" + par.getTitle() << ": Δχ² = " << deltaChi2 << " < " << 1E-6 << ", fixing parameter." << std::endl;
+        LogInfo << ": Δχ² = " << std::fabs(deltaChi2) << std::endl;
+
+        if( std::fabs(deltaChi2) < JsonUtils::fetchValue(_config_, "ghostParameterDeltaChi2Threshold", 1E-6) ){
+          LogAlert << parSet.getName() + "/" + par.getTitle() << ": Δχ² = " << deltaChi2
+          << " < " << JsonUtils::fetchValue(_config_, "ghostParameterDeltaChi2Threshold", 1E-6)
+          << ", fixing parameter." << std::endl;
           par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
           if( not parSet.isUseEigenDecompInFit() ) { _minimizer_->FixVariable(iFitPar); }
         }
@@ -267,18 +291,28 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
   delete[] y;
 }
 
-void FitterEngine::throwParameters(){
+void FitterEngine::throwParameters(double gain_) {
   LogInfo << __METHOD_NAME__ << std::endl;
 
-  int iPar = 0;
+  // TODO: IMPLEMENT CHOLESKY DECOMP
+  int iPar = -1;
   for( auto& parSet : _propagator_.getParameterSetsList() ){
-    for( auto& par : parSet.getParameterList() ){
-      if( par.isEnabled() and not par.isFixed() ){
-        par.setParameterValue( par.getPriorValue() + _prng_.Gaus(0, par.getStdDevValue()) );
-        _minimizer_->SetVariableValue( iPar, par.getParameterValue() );
+    if( not parSet.isUseEigenDecompInFit() ){
+      for( auto& par : parSet.getParameterList() ){
+        iPar++;
+        if( par.isEnabled() and not par.isFixed() ){
+          par.setParameterValue( par.getPriorValue() + gain_ * _prng_.Gaus(0, par.getStdDevValue()) );
+          _minimizer_->SetVariableValue( iPar, par.getParameterValue() );
+        }
       }
     }
-    iPar++;
+    else{
+      for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
+        iPar++;
+        // placeholder
+      }
+    }
+
   }
 
   _propagator_.preventRfPropagation(); // Making sure since we need the weight of each event
@@ -755,8 +789,4 @@ void FitterEngine::initializeMinimizer(){
   _convergenceMonitor_.addVariable("Stat");
   _convergenceMonitor_.addVariable("Syst");
 
-}
-
-bool FitterEngine::isFitHasConverged() const {
-  return _fitHasConverged_;
 }

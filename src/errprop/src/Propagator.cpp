@@ -258,6 +258,9 @@ std::vector<FitParameterSet> &Propagator::getParameterSetsList() {
 PlotGenerator &Propagator::getPlotGenerator() {
   return _plotGenerator_;
 }
+const json &Propagator::getConfig() const {
+  return _config_;
+}
 
 
 void Propagator::propagateParametersOnSamples(){

@@ -45,13 +45,12 @@ public:
 
   // Getters
   bool isEnabled() const;
-
   bool isUseOnlyOneParameterPerEvent() const;
-
   const std::string &getName() const;
   std::vector<FitParameter> &getParameterList();
   const std::vector<FitParameter> &getParameterList() const;
   TMatrixDSym *getOriginalCovarianceMatrix() const;
+  const nlohmann::json &getJsonConfig() const;
 
   // Core
   size_t getNbParameters() const;

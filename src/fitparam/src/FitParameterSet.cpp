@@ -166,6 +166,9 @@ const std::vector<FitParameter> &FitParameterSet::getParameterList() const{
 TMatrixDSym *FitParameterSet::getOriginalCovarianceMatrix() const {
   return _originalCovarianceMatrix_;
 }
+const nlohmann::json &FitParameterSet::getJsonConfig() const {
+  return _jsonConfig_;
+}
 
 // Core
 size_t FitParameterSet::getNbParameters() const {

@@ -69,7 +69,7 @@ public:
   std::string getSummary() const;
   void print() const;
   bool isSame(AnaEvent& anaEvent_) const;
-  void deleteLeaf(size_t index_);
+  void deleteLeaf(long index_);
 
   // Stream operator
   friend std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p );

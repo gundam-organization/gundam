@@ -42,6 +42,7 @@ public:
   std::vector<AnaSample> &getSamplesList();
   std::vector<FitParameterSet> &getParameterSetsList();
   PlotGenerator &getPlotGenerator();
+  const json &getConfig() const;
 
   // Core
   void propagateParametersOnSamples();
