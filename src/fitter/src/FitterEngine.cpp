@@ -245,7 +245,7 @@ void FitterEngine::fixGhostParameters(){
           par.setParameterValue( currentParValue );
         }
 
-        if( par.isFixed() or not par.isEnabled() ){
+        if( par.isFixed() ){
           _minimizer_->FixVariable(iFitPar);
         }
 
@@ -744,6 +744,7 @@ void FitterEngine::initializeMinimizer(){
         if(par.getMaxValue() == par.getMaxValue()) _minimizer_->SetVariableUpperLimit(iPar, par.getMaxValue());
         _minimizer_->SetVariableValue(iPar, par.getParameterValue());
         _minimizer_->SetVariableStepSize(iPar, par.getStdDevValue()*0.01);
+        if( not par.isEnabled() or par.isFixed() ) _minimizer_->FixVariable(iPar);
       } // par
     }
     else{

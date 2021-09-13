@@ -41,10 +41,7 @@ void DialSet::reset() {
 
 void DialSet::setDialSetConfig(const nlohmann::json &dialSetConfig) {
   _dialSetConfig_ = dialSetConfig;
-  while( _dialSetConfig_.is_string() ){
-    // forward
-    _dialSetConfig_ = JsonUtils::readConfigFile(_dialSetConfig_.get<std::string>());
-  }
+  JsonUtils::forwardConfig(_dialSetConfig_);
 }
 void DialSet::setParameterIndex(int parameterIndex) {
   _parameterIndex_ = parameterIndex;
@@ -60,6 +57,7 @@ void DialSet::setAssociatedParameterReference(void *associatedParameterReference
 }
 
 void DialSet::initialize() {
+  LogTrace << __METHOD_NAME__ << std::endl;
 
   // Sanity checks
   if( _parameterName_.empty() and _parameterIndex_ == -1 ){
@@ -173,7 +171,11 @@ bool DialSet::initializeNormDialsWithBinning() {
 }
 bool DialSet::initializeDialsWithDefinition() {
 
-  nlohmann::json dialsDefinition = fetchDialsDefinition(JsonUtils::fetchValue<nlohmann::json>(_dialSetConfig_, "dialsDefinitions"));
+  nlohmann::json dialsDefinition = _dialSetConfig_;
+  if( JsonUtils::doKeyExist(dialsDefinition, "dialsDefinitions") ){
+    // Fetch the dialSet corresponding to the selected parameter
+    dialsDefinition = this->fetchDialsDefinition(JsonUtils::fetchValue<nlohmann::json>(_dialSetConfig_, "dialsDefinitions"));
+  }
   if( dialsDefinition.empty() ){ return false; }
   if( not JsonUtils::fetchValue<bool>(dialsDefinition, "isEnabled", true) ){
     LogDebug << "DialSet is disabled." << std::endl;

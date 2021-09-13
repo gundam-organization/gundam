@@ -149,8 +149,22 @@ void FitParameterSet::initialize() {
     _parameterList_.back().setParameterValue((*_parameterPriorList_)[iParameter]);
     _parameterList_.back().setPriorValue((*_parameterPriorList_)[iParameter]);
     _parameterList_.back().setStdDevValue(TMath::Sqrt((*_originalCovarianceMatrix_)[iParameter][iParameter]));
-    _parameterList_.back().setDialSetConfig(JsonUtils::fetchValue<nlohmann::json>(_jsonConfig_, "dialSetDefinitions"));
     _parameterList_.back().setDialsWorkingDirectory(JsonUtils::fetchValue<std::string>(_jsonConfig_, "dialSetWorkingDirectory", "./"));
+
+    // OLD:
+    _parameterList_.back().setDialSetConfig(JsonUtils::fetchValue<nlohmann::json>(_jsonConfig_, "dialSetDefinitions"));
+
+    if( JsonUtils::doKeyExist(_jsonConfig_, "parameterDefinitions") ){
+      auto parsConfig = JsonUtils::fetchValue<nlohmann::json>(_jsonConfig_, "parameterDefinitions");
+      JsonUtils::forwardConfig(parsConfig);
+      auto parConfig = JsonUtils::fetchMatchingEntry(parsConfig, "parameterName", std::string(_parameterNamesList_->At(iParameter)->GetName()));
+      if( parConfig.empty() ){
+        // try with par index
+        parConfig = JsonUtils::fetchMatchingEntry(parsConfig, "parameterIndex", iParameter);
+      }
+      _parameterList_.back().setParameterDefinitionConfig(parConfig);
+    }
+
     _parameterList_.back().setEnableDialSetsSummary(JsonUtils::fetchValue<bool>(_jsonConfig_, "printDialSetsSummary", false));
 
     if( _globalParameterMinValue_ == _globalParameterMinValue_ ){

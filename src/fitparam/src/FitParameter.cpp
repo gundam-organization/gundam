@@ -43,6 +43,11 @@ void FitParameter::setDialSetConfig(const nlohmann::json &jsonConfig_) {
   }
   _dialDefinitionsList_ = jsonConfig.get<std::vector<nlohmann::json>>();
 }
+void FitParameter::setParameterDefinitionConfig(const nlohmann::json &config_){
+  _parameterConfig_ = config_;
+  JsonUtils::forwardConfig(_parameterConfig_);
+  LogTrace << GET_VAR_NAME_VALUE(_parameterConfig_.dump()) << std::endl;
+}
 void FitParameter::setParameterIndex(int parameterIndex) {
   _parameterIndex_ = parameterIndex;
 }
@@ -78,29 +83,20 @@ void FitParameter::initialize() {
 
   LogTrace << GET_VAR_NAME_VALUE(this) << std::endl;
 
-  if     ( _priorValue_     == std::numeric_limits<double>::quiet_NaN() ){
-    LogError << "_priorValue_ is not set." << std::endl;
-    throw std::logic_error("_priorValue_ is not set.");
-  }
-  else if( _stdDevValue_    == std::numeric_limits<double>::quiet_NaN() ){
-    LogError << "_stdDevValue_ is not set." << std::endl;
-    throw std::logic_error("_stdDevValue_ is not set.");
-  }
-  else if( _parameterValue_ == std::numeric_limits<double>::quiet_NaN() ){
-    LogError << "_parameterValue_ is not set." << std::endl;
-    throw std::logic_error("_parameterValue_ is not set.");
-  }
-  else if( _parameterIndex_ == -1 ){
-    LogError << "_parameterIndex_ is not set." << std::endl;
-    throw std::logic_error("_parameterIndex_ is not set.");
-  }
-  else if( _dialDefinitionsList_.empty() ){
-    LogError << "_dialDefinitionsList_ is not set." << std::endl;
-    throw std::logic_error("_dialDefinitionsList_ is not set.");
-  }
+  LogThrowIf(_priorValue_ == std::numeric_limits<double>::quiet_NaN(), "Prior value is not set.");
+  LogThrowIf(_stdDevValue_ == std::numeric_limits<double>::quiet_NaN(), "Std dev value is not set.");
+  LogThrowIf(_parameterValue_ == std::numeric_limits<double>::quiet_NaN(), "Parameter value is not set.");
+  LogThrowIf(_parameterIndex_ == -1, "Parameter index is not set.");
 
   LogDebug << "Initializing Parameter " << getTitle() << std::endl;
 
+  if( not _parameterConfig_.empty() ){
+    _isEnabled_ = JsonUtils::fetchValue(_parameterConfig_, "isEnabled", true);
+    if( not _isEnabled_ ) return;
+    _dialDefinitionsList_ = JsonUtils::fetchValue(_parameterConfig_, "dialSetDefinitions", _dialDefinitionsList_);
+  }
+
+  LogDebug << "Defining associated dials..." << std::endl;
   _dialSetList_.reserve(_dialDefinitionsList_.size());
   for( const auto& dialDefinitionConfig : _dialDefinitionsList_ ){
     _dialSetList_.emplace_back();

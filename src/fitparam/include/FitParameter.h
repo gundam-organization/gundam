@@ -27,6 +27,7 @@ public:
   void setPriorValue(double priorValue);
   void setStdDevValue(double stdDevValue);
   void setDialSetConfig(const nlohmann::json &jsonConfig_);
+  void setParameterDefinitionConfig(const nlohmann::json &config_);
   void setEnableDialSetsSummary(bool enableDialSetsSummary);
   void setDialsWorkingDirectory(const std::string &dialsWorkingDirectory);
   void setMinValue(double minValue);
@@ -61,6 +62,7 @@ private:
   double _stdDevValue_{};
   double _minValue_{std::nan("UNSET")};
   double _maxValue_{std::nan("UNSET")};
+  nlohmann::json _parameterConfig_;
   nlohmann::json _dialDefinitionsList_;
   bool _enableDialSetsSummary_;
   std::string _dialsWorkingDirectory_;
