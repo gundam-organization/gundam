@@ -91,6 +91,8 @@ private:
   TFile* _covarianceMatrixFile_{nullptr};
   TMatrixDSym* _originalCovarianceMatrix_{nullptr};
   TVectorD* _parameterPriorList_{nullptr};
+  TVectorD* _parameterLowerBoundsList_{nullptr};
+  TVectorD* _parameterUpperBoundsList_{nullptr};
   TObjArray* _parameterNamesList_{nullptr};
 
   double _globalParameterMinValue_{std::nan("UNSET")};

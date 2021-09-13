@@ -743,7 +743,7 @@ void FitterEngine::initializeMinimizer(){
         if(par.getMinValue() == par.getMinValue()){ _minimizer_->SetVariableLowerLimit(iPar, par.getMinValue()); }
         if(par.getMaxValue() == par.getMaxValue()) _minimizer_->SetVariableUpperLimit(iPar, par.getMaxValue());
         _minimizer_->SetVariableValue(iPar, par.getParameterValue());
-        _minimizer_->SetVariableStepSize(iPar, 0.01);
+        _minimizer_->SetVariableStepSize(iPar, par.getStdDevValue()*0.01);
       } // par
     }
     else{

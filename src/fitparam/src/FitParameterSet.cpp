@@ -101,6 +101,22 @@ void FitParameterSet::initialize() {
     }
   }
 
+  pathBuffer = JsonUtils::fetchValue<std::string>(_jsonConfig_, "parameterLowerBoundsTVectorD", "");
+  if( not pathBuffer.empty() ){
+    _parameterLowerBoundsList_ = (TVectorT<double>*) _covarianceMatrixFile_->Get(pathBuffer.c_str());
+    LogThrowIf(_parameterLowerBoundsList_ == nullptr, "Could not fetch parameterLowerBoundsTVectorD: \"" << pathBuffer)
+    LogThrowIf(_parameterLowerBoundsList_->GetNrows() != _originalCovarianceMatrix_->GetNrows(),
+               "parameterLowerBoundsTVectorD \"" << pathBuffer << "\" have not the right size.")
+  }
+
+  pathBuffer = JsonUtils::fetchValue<std::string>(_jsonConfig_, "parameterUpperBoundsTVectorD", "");
+  if( not pathBuffer.empty() ){
+    _parameterUpperBoundsList_ = (TVectorT<double>*) _covarianceMatrixFile_->Get(pathBuffer.c_str());
+    LogThrowIf(_parameterUpperBoundsList_ == nullptr, "Could not fetch parameterUpperBoundsTVectorD: \"" << pathBuffer)
+    LogThrowIf(_parameterUpperBoundsList_->GetNrows() != _originalCovarianceMatrix_->GetNrows(),
+               "parameterUpperBoundsTVectorD \"" << pathBuffer << "\" have not the right size.")
+  }
+
   // parameterNameTObjArray
   pathBuffer = JsonUtils::fetchValue<std::string>(_jsonConfig_, "parameterNameTObjArray", "");
   if(not pathBuffer.empty()){
@@ -142,6 +158,13 @@ void FitParameterSet::initialize() {
     }
     if( _globalParameterMaxValue_ == _globalParameterMaxValue_ ){
       _parameterList_.back().setMaxValue(_globalParameterMaxValue_);
+    }
+
+    if( _parameterLowerBoundsList_ != nullptr ){
+      _parameterList_.back().setMinValue((*_parameterLowerBoundsList_)[iParameter]);
+    }
+    if( _parameterUpperBoundsList_ != nullptr ){
+      _parameterList_.back().setMaxValue((*_parameterUpperBoundsList_)[iParameter]);
     }
 
     _parameterList_.back().initialize();

@@ -33,7 +33,9 @@ std::string SplineDial::getSummary() {
   return ss.str();
 }
 void SplineDial::fillResponseCache() {
-  _dialResponseCache_ = _splinePtr_->Eval(_dialParameterCache_);
+  if     ( _dialParameterCache_ < _splinePtr_->GetXmin() ) _dialResponseCache_ = _splinePtr_->Eval(_splinePtr_->GetXmin());
+  else if( _dialParameterCache_ > _splinePtr_->GetXmax() ) _dialResponseCache_ = _splinePtr_->Eval(_splinePtr_->GetXmax());
+  else                                                     _dialResponseCache_ = _splinePtr_->Eval(_dialParameterCache_);
 }
 
 void SplineDial::setSplinePtr(TSpline3 *splinePtr) {
