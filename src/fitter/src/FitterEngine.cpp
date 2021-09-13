@@ -348,7 +348,7 @@ void FitterEngine::fit(){
       for( const auto& par : parSet.getParameterList() ){
         iFitPar++;
         if( par.isEnabled() ){
-          if( par.isFixed() ){
+          if( _minimizer_->IsFixedVariable(iFitPar) ){
             LogInfo << "\033[41m" << "#" << iFitPar << " -> " << parSet.getName() << "/" << par.getTitle() << ": FIXED - Prior: " << par.getParameterValue() <<  "\033[0m" << std::endl;
           }
           else{
@@ -366,7 +366,14 @@ void FitterEngine::fit(){
       Logger::setIndentStr("├─ ");
       for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
         iFitPar++;
-        LogInfo << "#" << iFitPar << " -> " << parSet.getName() << "/eigen_#" << iEigen << " - Prior: " << parSet.getEigenParameter(iEigen) << std::endl;
+        if( _minimizer_->IsFixedVariable(iFitPar) ) {
+          LogInfo << "\033[41m" << "#" << iFitPar << " -> " << parSet.getName() << "/eigen_#" << iEigen << ": FIXED - Prior: "
+                  << parSet.getEigenParameter(iEigen) << "\033[0m" << std::endl;
+        }
+        else{
+          LogInfo << "#" << iFitPar << " -> " << parSet.getName() << "/eigen_#" << iEigen << " - Prior: "
+                  << parSet.getEigenParameter(iEigen) << std::endl;
+        }
       }
       Logger::setIndentStr("");
     }
