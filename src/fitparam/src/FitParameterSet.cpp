@@ -47,6 +47,9 @@ void FitParameterSet::setJsonConfig(const nlohmann::json &jsonConfig) {
     _jsonConfig_ = JsonUtils::readConfigFile(_jsonConfig_.get<std::string>());
   }
 }
+void FitParameterSet::setSaveDir(TDirectory* saveDir_){
+  _saveDir_ = saveDir_;
+}
 
 void FitParameterSet::initialize() {
 
@@ -57,6 +60,10 @@ void FitParameterSet::initialize() {
 
   _name_ = JsonUtils::fetchValue<std::string>(_jsonConfig_, "name", "");
   LogInfo << "Initializing parameter set: " << _name_ << std::endl;
+
+  if( _saveDir_ != nullptr ){
+    _saveDir_ = GenericToolbox::mkdirTFile(_saveDir_, _name_);
+  }
 
   _isEnabled_ = JsonUtils::fetchValue<bool>(_jsonConfig_, "isEnabled");
   if( not _isEnabled_ ){
@@ -152,7 +159,9 @@ void FitParameterSet::initialize() {
     _parameterList_.back().setDialsWorkingDirectory(JsonUtils::fetchValue<std::string>(_jsonConfig_, "dialSetWorkingDirectory", "./"));
 
     // OLD:
-    _parameterList_.back().setDialSetConfig(JsonUtils::fetchValue<nlohmann::json>(_jsonConfig_, "dialSetDefinitions"));
+    if( JsonUtils::doKeyExist(_jsonConfig_, "dialSetDefinitions") ){
+      _parameterList_.back().setDialSetConfig(JsonUtils::fetchValue<nlohmann::json>(_jsonConfig_, "dialSetDefinitions"));
+    }
 
     if( JsonUtils::doKeyExist(_jsonConfig_, "parameterDefinitions") ){
       auto parsConfig = JsonUtils::fetchValue<nlohmann::json>(_jsonConfig_, "parameterDefinitions");
@@ -186,12 +195,15 @@ void FitParameterSet::initialize() {
 
 
   if( _useEigenDecompInFit_ ){
+    LogDebug << "Initializing eigen objects..." << std::endl;
     _originalParValues_ = std::shared_ptr<TVectorD>(new TVectorD(_parameterPriorList_->GetNrows()));
     for( int iPar = 0 ; iPar < _parameterPriorList_->GetNrows() ; iPar++ ){
       (*_originalParValues_)[iPar] = _parameterList_.at(iPar).getParameterValue();
     }
     propagateOriginalToEigen();
     _eigenParPriorValues_ = std::shared_ptr<TVectorD>( (TVectorD*) _eigenParValues_->Clone() );
+    _eigenParStepSize_ = std::shared_ptr<TVectorD>(new TVectorD(_eigenParValues_->GetNrows()));
+    _eigenParFixedList_.resize( _eigenParStepSize_->GetNrows(), false );
   }
 
   _isInitialized_ = true;
@@ -276,6 +288,21 @@ void FitParameterSet::setEigenParameter( int iPar_, double value_ ){
   LogThrowIf(_eigenParValues_ == nullptr, "_eigenParValues_ not set.");
   (*_eigenParValues_)[iPar_] = value_;
 }
+void FitParameterSet::setEigenParStepSize( int iPar_, double step_ ){
+  LogThrowIf(_eigenParStepSize_ == nullptr, "_eigenParStepSize_ not set.");
+  (*_eigenParStepSize_)[iPar_] = step_;
+}
+void FitParameterSet::setEigenParIsFixed( int iPar_, bool isFixed_ ){
+  _eigenParFixedList_[iPar_] = isFixed_;
+}
+
+bool FitParameterSet::isEigenParFixed( int iPar_ ){
+  return _eigenParFixedList_[iPar_];
+}
+double FitParameterSet::getEigenParStepSize( int iPar_ ){
+  return (*_eigenParStepSize_)[iPar_];
+}
+
 const TMatrixD* FitParameterSet::getInvertedEigenVectors() const{
   return _invertedEigenVectors_.get();
 }
@@ -336,6 +363,12 @@ void FitParameterSet::readCovarianceMatrix(){
     LogError << "Could not find: " << JsonUtils::fetchValue<std::string>(_jsonConfig_, "covarianceMatrixTMatrixD")
              << " in " << _covarianceMatrixFile_->GetPath() << std::endl;
     throw std::runtime_error("Could not find: covarianceMatrixTObjectPath");
+  }
+
+  if( _saveDir_ != nullptr ){
+    _saveDir_->cd();
+    _originalCovarianceMatrix_->Write("CovarianceMatrix_TMatrixDSym");
+    GenericToolbox::convertToCorrelationMatrix((TMatrixD*)_originalCovarianceMatrix_)->Write("CorrelationMatrix_TMatrixD");
   }
 
   _originalCorrelationMatrix_ = std::shared_ptr<TMatrixDSym>(

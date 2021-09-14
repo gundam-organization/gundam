@@ -72,6 +72,7 @@ void Propagator::initialize() {
   for( const auto& parameterSetConfig : parameterSetListConfig ){
     _parameterSetsList_.emplace_back();
     _parameterSetsList_.back().setJsonConfig(parameterSetConfig);
+    _parameterSetsList_.back().setSaveDir(GenericToolbox::mkdirTFile(_saveDir_, "ParameterSets"));
     _parameterSetsList_.back().initialize();
     nPars += _parameterSetsList_.back().getNbParameters();
     LogInfo << _parameterSetsList_.back().getSummary() << std::endl;

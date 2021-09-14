@@ -39,6 +39,7 @@ public:
 
   // Setters
   void setJsonConfig(const nlohmann::json &jsonConfig);
+  void setSaveDir(TDirectory* saveDir_);
 
   // Init
   void initialize();
@@ -58,11 +59,17 @@ public:
   double getChi2() const;
 
   // Eigen decomposition
+  void setEigenParameter( int iPar_, double value_ );
+  void setEigenParStepSize( int iPar_, double step_ );
+  void setEigenParIsFixed( int iPar_, bool isFixed_ );
+
+  bool isEigenParFixed( int iPar_ );
+  double getEigenParStepSize( int iPar_ );
+
   bool isUseEigenDecompInFit() const;
   int getNbEnabledEigenParameters() const;
   double getEigenParameterValue(int iPar_) const;
   double getEigenSigma(int iPar_) const;
-  void setEigenParameter( int iPar_, double value_ );
   const TMatrixD* getInvertedEigenVectors() const;
   const TMatrixD* getEigenVectors() const;
   void propagateEigenToOriginal();
@@ -83,6 +90,7 @@ private:
   // Internals
   bool _isInitialized_{false};
   std::vector<FitParameter> _parameterList_;
+  TDirectory* _saveDir_{nullptr};
 
   // JSON
   std::string _name_;
@@ -115,6 +123,8 @@ private:
   std::shared_ptr<TVectorD> _eigenParValues_;
   std::shared_ptr<TVectorD> _originalParValues_;
   std::shared_ptr<TVectorD> _eigenParPriorValues_;
+  std::shared_ptr<TVectorD> _eigenParStepSize_;
+  std::vector<bool> _eigenParFixedList_;
 
 };
 

@@ -32,6 +32,7 @@ public:
   void setDialsWorkingDirectory(const std::string &dialsWorkingDirectory);
   void setMinValue(double minValue);
   void setMaxValue(double maxValue);
+  void setStepSize(double stepSize);
 
   void initialize();
 
@@ -46,6 +47,7 @@ public:
   std::vector<DialSet> &getDialSetList();
   double getMinValue() const;
   double getMaxValue() const;
+  double getStepSize() const;
 
   // Core
   double getDistanceFromNominal() const; // in unit of sigmas
@@ -62,6 +64,7 @@ private:
   double _stdDevValue_{};
   double _minValue_{std::nan("UNSET")};
   double _maxValue_{std::nan("UNSET")};
+  double _stepSize_{std::nan("UNSET")};
   nlohmann::json _parameterConfig_;
   nlohmann::json _dialDefinitionsList_;
   bool _enableDialSetsSummary_;

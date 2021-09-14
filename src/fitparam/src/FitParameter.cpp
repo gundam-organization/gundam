@@ -46,7 +46,6 @@ void FitParameter::setDialSetConfig(const nlohmann::json &jsonConfig_) {
 void FitParameter::setParameterDefinitionConfig(const nlohmann::json &config_){
   _parameterConfig_ = config_;
   JsonUtils::forwardConfig(_parameterConfig_);
-  LogTrace << GET_VAR_NAME_VALUE(_parameterConfig_.dump()) << std::endl;
 }
 void FitParameter::setParameterIndex(int parameterIndex) {
   _parameterIndex_ = parameterIndex;
@@ -55,9 +54,9 @@ void FitParameter::setName(const std::string &name) {
   _name_ = name;
 }
 void FitParameter::setParameterValue(double parameterValue) {
-  if( _isFixed_ and _parameterValue_ != parameterValue ){
-    LogDebug << "CHANGING FIXED " << getTitle() << ": " << _parameterValue_ << " -> " << parameterValue << std::endl;
-  }
+//  if( _isFixed_ and _parameterValue_ != parameterValue ){
+//    LogDebug << "CHANGING FIXED " << getTitle() << ": " << _parameterValue_ << " -> " << parameterValue << std::endl;
+//  }
   _parameterValue_ = parameterValue;
 }
 void FitParameter::setPriorValue(double priorValue) {
@@ -78,6 +77,9 @@ void FitParameter::setMinValue(double minValue) {
 void FitParameter::setMaxValue(double maxValue) {
   _maxValue_ = maxValue;
 }
+void FitParameter::setStepSize(double stepSize) {
+  _stepSize_ = stepSize;
+}
 
 void FitParameter::initialize() {
 
@@ -90,9 +92,14 @@ void FitParameter::initialize() {
 
   LogDebug << "Initializing Parameter " << getTitle() << std::endl;
 
+  _stepSize_ = _stdDevValue_ * 0.01; // default
+
   if( not _parameterConfig_.empty() ){
     _isEnabled_ = JsonUtils::fetchValue(_parameterConfig_, "isEnabled", true);
-    if( not _isEnabled_ ) return;
+    if( not _isEnabled_ ) {
+      LogDebug << getTitle() << " is marked as not Enabled." << std::endl;
+      return;
+    }
     _dialDefinitionsList_ = JsonUtils::fetchValue(_parameterConfig_, "dialSetDefinitions", _dialDefinitionsList_);
   }
 
@@ -153,6 +160,10 @@ double FitParameter::getMinValue() const {
 double FitParameter::getMaxValue() const {
   return _maxValue_;
 }
+double FitParameter::getStepSize() const {
+  return _stepSize_;
+}
+
 
 double FitParameter::getDistanceFromNominal() const{
   return (_parameterValue_ - _priorValue_) / _stdDevValue_;

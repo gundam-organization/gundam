@@ -58,7 +58,9 @@ public:
 
 
 protected:
+  void rescaleParametersStepSize();
   void initializeMinimizer(bool doReleaseFixed_ = false);
+
 
 
 private:
@@ -85,7 +87,8 @@ private:
   double _chi2PullsBuffer_{0};
   double _chi2RegBuffer_{0};
 
-  std::map<std::string, std::vector<double>> _chi2History_;
+  TTree* _chi2HistoryTree_{nullptr};
+//  std::map<std::string, std::vector<double>> _chi2History_;
 
   GenericToolbox::VariablesMonitor _convergenceMonitor_;
   GenericToolbox::CycleTimer _evalFitAvgTimer_;
