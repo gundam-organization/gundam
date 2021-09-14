@@ -10,6 +10,8 @@
 
 #include "json.hpp"
 
+#include "GenericToolbox.CycleTimer.h"
+
 #include "FitParameterSet.h"
 #include "AnaSample.hh"
 #include "PlotGenerator.h"
@@ -84,18 +86,9 @@ private:
 
 
 public:
-  struct CycleTimer{
-    long long counts{0};
-    long long cumulated{0};
-    friend std::ostream& operator<< (std::ostream& stream, const CycleTimer& timer_) {
-      stream << GenericToolbox::parseTimeUnit(timer_.cumulated / timer_.counts);
-      return stream;
-    }
-  };
-
-  CycleTimer weightProp;
-  CycleTimer fillProp;
-  CycleTimer applyRf;
+  GenericToolbox::CycleTimer weightProp;
+  GenericToolbox::CycleTimer fillProp;
+  GenericToolbox::CycleTimer applyRf;
 
   long long nbWeightProp = 0;
   long long cumulatedWeightPropTime = 0;

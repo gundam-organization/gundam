@@ -393,30 +393,12 @@ void FitSampleSet::loadPhysicsEvents() {
             event.setTreeWeight(event.getVarAsDouble(nominalWeightLeafStr));
             event.setNominalWeight(event.getTreeWeight());
             event.resetEventWeight();
-//            if(iEvt++ < 10) LogTrace << event << std::endl;
           }
         }
       }
 
     } // isData
   } // data Set
-
-//  LogInfo << "Sorting events in list" << std::endl;
-//  for( auto& sample : _fitSampleList_ ){
-//    std::function<bool(const PhysicsEvent&, const PhysicsEvent&)> sortFunction = [](const PhysicsEvent& a, const PhysicsEvent& b){
-//      // Does a goes before b ?
-//      // Dataset index:
-//      if( a.getDataSetIndex() != b.getDataSetIndex() ) return ( a.getDataSetIndex() < b.getDataSetIndex() );
-//      // Event index
-//      if( a.getEntryIndex() != b.getEntryIndex() ) return ( a.getEntryIndex() < b.getEntryIndex() );
-//      return false;
-//    };
-//    auto p = GenericToolbox::getSortPermutation(sample.getMcContainer().eventList, sortFunction);
-//    sample.getMcContainer().eventList = GenericToolbox::applyPermutation(sample.getMcContainer().eventList, p);
-//  }
-
-//  LogInfo << "Filling samples event bin cache..." << std::endl;
-//  this->updateSampleEventBinIndexes();
 
   if( _dataEventType_ == DataEventType::Asimov ){
     LogWarning << "Asimov data selected: copying MC events..." << std::endl;

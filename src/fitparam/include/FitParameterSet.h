@@ -60,7 +60,7 @@ public:
   // Eigen decomposition
   bool isUseEigenDecompInFit() const;
   int getNbEnabledEigenParameters() const;
-  double getEigenParameter(int iPar_) const;
+  double getEigenParameterValue(int iPar_) const;
   double getEigenSigma(int iPar_) const;
   void setEigenParameter( int iPar_, double value_ );
   const TMatrixD* getInvertedEigenVectors() const;

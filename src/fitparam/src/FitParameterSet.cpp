@@ -192,8 +192,6 @@ void FitParameterSet::initialize() {
     }
     propagateOriginalToEigen();
     _eigenParPriorValues_ = std::shared_ptr<TVectorD>( (TVectorD*) _eigenParValues_->Clone() );
-//    LogTrace << "EIGEN VAL IS NOW:" << std::endl;
-//    _eigenParValues_->Print();
   }
 
   _isInitialized_ = true;
@@ -238,18 +236,17 @@ double FitParameterSet::getChi2() const {
 
   double chi2 = 0;
 
+  // EIGEN MATRIX PULLS ARE NOT WORKING
 //  if( _useEigenDecompInFit_ ){
-//    for( int iEigen = 0 ; iEigen < _nbEnabledEigen_ ; iEigen++ ){
+//    for( int iEigen = 0 ; iEigen < _eigenParValues_->GetNrows() ; iEigen++ ){
 //      chi2 += std::pow( (*_eigenParValues_)[iEigen] - (*_eigenParPriorValues_)[iEigen], 2 )/(*_eigenValues_)[iEigen];
 //    }
 //  }
 //  else{
     double iDelta, jDelta;
     for (int iPar = 0; iPar < _inverseCovarianceMatrix_->GetNrows(); iPar++) {
-//      if( _parameterList_[iPar].isFixed() or not _parameterList_[iPar].isEnabled() ) continue;
       iDelta = (_parameterList_[iPar].getParameterValue() - _parameterList_[iPar].getPriorValue());
       for (int jPar = 0; jPar < _inverseCovarianceMatrix_->GetNrows(); jPar++) {
-//        if( _parameterList_[iPar].isFixed() or not _parameterList_[iPar].isEnabled() ) continue;
         jDelta = iDelta;
         jDelta *= (_parameterList_[jPar].getParameterValue() - _parameterList_[jPar].getPriorValue());
         jDelta *= (*_inverseCovarianceMatrix_)(iPar, jPar);
@@ -269,7 +266,7 @@ bool FitParameterSet::isUseEigenDecompInFit() const {
 int FitParameterSet::getNbEnabledEigenParameters() const {
   return _nbEnabledEigen_;
 }
-double FitParameterSet::getEigenParameter(int iPar_) const{
+double FitParameterSet::getEigenParameterValue(int iPar_) const{
   return (*_eigenParValues_)[iPar_];
 }
 double FitParameterSet::getEigenSigma(int iPar_) const{

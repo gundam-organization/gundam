@@ -15,6 +15,7 @@
 #include "json.hpp"
 
 #include "GenericToolbox.VariablesMonitor.h"
+#include "GenericToolbox.CycleTimer.h"
 
 #include "Propagator.h"
 
@@ -56,10 +57,9 @@ public:
   void writePostFitData();
 
 
-
 protected:
-  void initializePropagator();
-  void initializeMinimizer();
+  void initializeMinimizer(bool doReleaseFixed_ = false);
+
 
 private:
   // Parameters
@@ -88,6 +88,7 @@ private:
   std::map<std::string, std::vector<double>> _chi2History_;
 
   GenericToolbox::VariablesMonitor _convergenceMonitor_;
+  GenericToolbox::CycleTimer _evalFitAvgTimer_;
 
 };
 
