@@ -375,9 +375,9 @@ void FitterEngine::throwParameters(double gain_) {
 void FitterEngine::fit(){
   LogWarning << __METHOD_NAME__ << std::endl;
 
-  LogWarning << "-----------------------------" << std::endl;
+  LogWarning << "─────────────────────────────" << std::endl;
   LogWarning << "Summary of the fit parameters" << std::endl;
-  LogWarning << "-----------------------------" << std::endl;
+  LogWarning << "─────────────────────────────" << std::endl;
   int iFitPar = -1;
   for( const auto& parSet : _propagator_.getParameterSetsList() ){
     if( not parSet.isUseEigenDecompInFit() ){
@@ -425,9 +425,9 @@ void FitterEngine::fit(){
   _propagator_.allowRfPropagation(); // if RF are setup -> a lot faster
   updateChi2Cache();
 
-  LogWarning << "-------------------" << std::endl;
+  LogWarning << "───────────────────" << std::endl;
   LogWarning << "Calling minimize..." << std::endl;
-  LogWarning << "-------------------" << std::endl;
+  LogWarning << "───────────────────" << std::endl;
   _fitUnderGoing_ = true;
   _fitHasConverged_ = _minimizer_->Minimize();
   int nbMinimizeCalls = _nbFitCalls_;
@@ -442,17 +442,21 @@ void FitterEngine::fit(){
     LogInfo << "Releasing constraints for HESSE..." << std::endl;
     initializeMinimizer(true);
 
-    LogWarning << "----------------" << std::endl;
+    LogWarning << "────────────────" << std::endl;
     LogWarning << "Calling HESSE..." << std::endl;
-    LogWarning << "----------------" << std::endl;
+    LogWarning << "────────────────" << std::endl;
+    LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
+            << "Number of free parameters   : " << _minimizer_->NFree() << std::endl
+            << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree()
+            << std::endl;
     _fitHasConverged_ = _minimizer_->Hesse();
     LogInfo << "Hesse ended after " << _nbFitCalls_ - nbMinimizeCalls << " calls." << std::endl;
 
-    LogDebug << "Extracting Hessian matrix..." << std::endl;
-    double hessianArray[_minimizer_->NDim() * _minimizer_->NDim()];
-    _minimizer_->GetHessianMatrix(hessianArray);
-    TMatrixDSym hessianMatrix(int(_minimizer_->NDim()), hessianArray);
-    hessianMatrix.Write("hessianMatrix");
+//    LogDebug << "Extracting Hessian matrix..." << std::endl;
+//    double hessianArray[_minimizer_->NDim() * _minimizer_->NDim()];
+//    _minimizer_->GetHessianMatrix(hessianArray);
+//    TMatrixDSym hessianMatrix(int(_minimizer_->NDim()), hessianArray);
+//    hessianMatrix.Write("hessianMatrix");
 //    LogDebug << "Decomposing Hessian matrix..." << std::endl;
 //    TMatrixDSymEigen hessianDecomp(hessianMatrix);
 //    hessianDecomp.GetEigenValues().Print();
@@ -699,7 +703,7 @@ void FitterEngine::writePostFitData() {
 
         preFitErrorHist->GetXaxis()->SetBinLabel(1 + par.getParameterIndex(), par.getTitle().c_str());
         preFitErrorHist->SetBinContent( 1 + par.getParameterIndex(), par.getPriorValue() );
-        preFitErrorHist->SetBinError( 1 + par.getParameterIndex(), par.getStdDevValue() );
+        if(par.isEnabled()) preFitErrorHist->SetBinError( 1 + par.getParameterIndex(), par.getStdDevValue() );
       }
 
       LogTrace << "Cosmetics..." << std::endl;
@@ -844,7 +848,7 @@ void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
         _minimizer_->SetVariableValue(iPar, par.getParameterValue());
         _minimizer_->SetVariableStepSize(iPar, par.getStepSize());
 
-        if( not doReleaseFixed_ ){
+        if( not doReleaseFixed_ or not JsonUtils::fetchValue(parSet.getJsonConfig(), "releaseFixedParametersOnHesse", true) ){
           if( not par.isEnabled() or par.isFixed() ) _minimizer_->FixVariable(iPar);
         }
       } // par
