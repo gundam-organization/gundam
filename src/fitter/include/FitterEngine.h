@@ -42,8 +42,8 @@ public:
   double getChi2StatBuffer() const;
 
   // Core
-  void generateSamplePlots(const std::string& saveDir_ = "");
-  void generateOneSigmaPlots(const std::string& saveDir_ = "");
+  void generateSamplePlots(const std::string& savePath_ = "");
+  void generateOneSigmaPlots(const std::string& savePath_ = "");
 
   void fixGhostParameters();
   void scanParameters(int nbSteps_, const std::string& saveDir_ = "");
@@ -67,6 +67,7 @@ private:
   // Parameters
   TDirectory* _saveDir_{nullptr};
   nlohmann::json _config_{};
+  nlohmann::json _minimizerConfig_{};
 
   // Internals
   bool _fitIsDone_{false};

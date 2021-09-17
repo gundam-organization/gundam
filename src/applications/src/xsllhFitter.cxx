@@ -63,7 +63,7 @@ int main(int argc, char** argv){
 
   FitterEngine fitter;
   fitter.setConfig(JsonUtils::fetchSubEntry(jsonConfig, {"fitterEngineConfig"}));
-  fitter.setSaveDir(GenericToolbox::mkdirTFile(out, "fitter"));
+  fitter.setSaveDir(GenericToolbox::mkdirTFile(out, "FitterEngine"));
   fitter.initialize();
 
   ///////////////////////////////

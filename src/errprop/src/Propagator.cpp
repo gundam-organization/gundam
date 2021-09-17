@@ -91,7 +91,7 @@ void Propagator::initialize() {
   }
   if( _saveDir_ != nullptr ){
     _saveDir_->cd();
-    _globalCovarianceMatrix_->Write("_globalCovarianceMatrix_");
+    _globalCovarianceMatrix_->Write("globalCovarianceMatrix_TMatrixD");
   }
 
   LogDebug << "FitSampleSet..." << std::endl;
@@ -199,7 +199,7 @@ void Propagator::initialize() {
     sample.getDataContainer().isLocked = true;
   }
 
-  _useResponseFunctions_ = JsonUtils::fetchValue<json>(_config_, "useResponseFunctions", false);
+  _useResponseFunctions_ = JsonUtils::fetchValue<json>(_config_, "DEV_useResponseFunctions", false);
   if( _useResponseFunctions_ ){ this->makeResponseFunctions(); }
 
   if( JsonUtils::fetchValue<json>(_config_, "throwParameters", false) ){

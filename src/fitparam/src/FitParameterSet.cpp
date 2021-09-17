@@ -257,8 +257,10 @@ double FitParameterSet::getChi2() const {
 //  else{
     double iDelta, jDelta;
     for (int iPar = 0; iPar < _inverseCovarianceMatrix_->GetNrows(); iPar++) {
+      if( not _parameterList_[iPar].isEnabled() ) continue;
       iDelta = (_parameterList_[iPar].getParameterValue() - _parameterList_[iPar].getPriorValue());
       for (int jPar = 0; jPar < _inverseCovarianceMatrix_->GetNrows(); jPar++) {
+        if( not _parameterList_[jPar].isEnabled() ) continue;
         jDelta = iDelta;
         jDelta *= (_parameterList_[jPar].getParameterValue() - _parameterList_[jPar].getPriorValue());
         jDelta *= (*_inverseCovarianceMatrix_)(iPar, jPar);

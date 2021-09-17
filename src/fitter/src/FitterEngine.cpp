@@ -52,7 +52,7 @@ void FitterEngine::initialize() {
   LogThrowIf(_config_.empty(), "Config is not set.");
 
   _propagator_.setConfig(JsonUtils::fetchValue<json>(_config_, "propagatorConfig"));
-  _propagator_.setSaveDir(_saveDir_);
+  _propagator_.setSaveDir(GenericToolbox::mkdirTFile(_saveDir_, "Propagator"));
   _propagator_.initialize();
 
   _nbFitParameters_ = 0;
@@ -83,7 +83,7 @@ void FitterEngine::initialize() {
   _convergenceMonitor_.addVariable("Syst");
 
   if( _saveDir_ != nullptr ){
-    _saveDir_->cd();
+    GenericToolbox::mkdirTFile(_saveDir_, "fit")->cd();
     _chi2HistoryTree_ = new TTree("chi2History", "chi2History");
     _chi2HistoryTree_->Branch("nbFitCalls", &_nbFitCalls_);
     _chi2HistoryTree_->Branch("chi2Total", &_chi2Buffer_);
@@ -105,24 +105,24 @@ double FitterEngine::getChi2StatBuffer() const {
   return _chi2StatBuffer_;
 }
 
-void FitterEngine::generateSamplePlots(const std::string& saveDir_){
+void FitterEngine::generateSamplePlots(const std::string& savePath_){
 
   LogInfo << __METHOD_NAME__ << std::endl;
 
   _propagator_.preventRfPropagation(); // Making sure since we need the weight of each event
   _propagator_.propagateParametersOnSamples();
   _propagator_.getPlotGenerator().generateSamplePlots(
-    GenericToolbox::mkdirTFile(_saveDir_, saveDir_ )
+    GenericToolbox::mkdirTFile(_saveDir_, savePath_ )
     );
 
 }
-void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
+void FitterEngine::generateOneSigmaPlots(const std::string& savePath_){
 
   _propagator_.preventRfPropagation(); // Making sure since we need the weight of each event
   _propagator_.propagateParametersOnSamples();
   _propagator_.getPlotGenerator().generateSamplePlots();
 
-  GenericToolbox::mkdirTFile(_saveDir_, saveDir_)->cd();
+  GenericToolbox::mkdirTFile(_saveDir_, savePath_)->cd();
   auto refHistList = _propagator_.getPlotGenerator().getHistHolderList(); // current buffer
 
   // +1 sigma
@@ -137,6 +137,8 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
     for( auto& par : parSet.getParameterList() ){
         iPar++;
 
+        if( not par.isEnabled() ) continue;
+
         std::string tag;
         if( par.isFixed() ){ tag += "_FIXED"; }
 
@@ -146,7 +148,7 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
                 << " -> " << par.getParameterValue() << std::endl;
         _propagator_.propagateParametersOnSamples();
 
-        std::string savePath = saveDir_;
+        std::string savePath = savePath_;
         if( not savePath.empty() ) savePath += "/";
         savePath += "oneSigma/" + parSet.getName() + "/" + par.getTitle() + tag;
         auto* saveDir = GenericToolbox::mkdirTFile(_saveDir_, savePath );
@@ -176,7 +178,7 @@ void FitterEngine::generateOneSigmaPlots(const std::string& saveDir_){
         parSet.propagateEigenToOriginal();
         _propagator_.propagateParametersOnSamples();
 
-        std::string savePath = saveDir_;
+        std::string savePath = savePath_;
         if( not savePath.empty() ) savePath += "/";
         savePath += "oneSigma/" + parSet.getName() + "/eigen_#" + std::to_string(iEigen);
         auto* saveDir = GenericToolbox::mkdirTFile(_saveDir_, savePath );
@@ -439,20 +441,97 @@ void FitterEngine::fit(){
     LogInfo << "Fit converged!" << std::endl
             << "Status code: " << _minimizer_->Status() << std::endl;
 
-    LogInfo << "Releasing constraints for HESSE..." << std::endl;
-    initializeMinimizer(true);
+    LogInfo << "Evaluating post-fit errors..." << std::endl;
 
-    LogWarning << "────────────────" << std::endl;
-    LogWarning << "Calling HESSE..." << std::endl;
-    LogWarning << "────────────────" << std::endl;
-    LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
-            << "Number of free parameters   : " << _minimizer_->NFree() << std::endl
-            << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree()
-            << std::endl;
-    _fitHasConverged_ = _minimizer_->Hesse();
-    LogInfo << "Hesse ended after " << _nbFitCalls_ - nbMinimizeCalls << " calls." << std::endl;
+    std::string errorAlgo = JsonUtils::fetchValue(_minimizerConfig_, "errors", "Hesse");
+    if( errorAlgo == "Minos" ){
 
-//    LogDebug << "Extracting Hessian matrix..." << std::endl;
+      // Put back at minimum
+      iFitPar = -1;
+      LogInfo << "Releasing parameters for error evaluation..." << std::endl;
+      for( auto& parSet : _propagator_.getParameterSetsList() ){
+
+        if( not JsonUtils::fetchValue(parSet.getJsonConfig(), "releaseFixedParametersOnHesse", true) ){
+          continue;
+        }
+
+        if( not parSet.isUseEigenDecompInFit() ){
+          for( auto& par : parSet.getParameterList() ){
+            if( par.isFixed() ){
+              LogDebug << "Releasing " << parSet.getName() << "/" << par.getTitle() << std::endl;
+              par.setIsFixed(false);
+              _minimizer_->ReleaseVariable(iFitPar++);
+            }
+
+          }
+        }
+        else{
+          for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
+            LogDebug << "Releasing " << parSet.getName() << "/eigen_#" << iEigen << std::endl;
+            _minimizer_->ReleaseVariable(iFitPar++);
+            parSet.setEigenParIsFixed(iEigen, false);
+          }
+        }
+
+      }
+
+      LogWarning << "────────────────" << std::endl;
+      LogWarning << "Calling MINOS..." << std::endl;
+      LogWarning << "────────────────" << std::endl;
+
+      double errLow, errHigh;
+      _minimizer_->SetPrintLevel(0);
+      for( iFitPar = 0 ; iFitPar < _minimizer_->NDim() ; iFitPar++ ){
+        if( _minimizer_->IsFixedVariable(iFitPar) ) continue;
+        LogDebug << "Evaluating: " << _minimizer_->VariableName(iFitPar) << "..." << std::endl;
+        bool isOk = _minimizer_->GetMinosError(iFitPar, errLow, errHigh);
+        Logger::moveTerminalCursorBack(1, true);
+        if( isOk ){
+          LogInfo << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh << std::endl;
+        }
+        else{
+          LogError << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh << " - MINOS returned an error: "
+//          << _minimizer_->MinosStatus()
+          << std::endl;
+        }
+      }
+
+      // Put back at minimum
+      iFitPar = -1;
+      for( auto& parSet : _propagator_.getParameterSetsList() ){
+
+        if( not parSet.isUseEigenDecompInFit() ){
+          for( auto& par : parSet.getParameterList() ){
+            iFitPar++;
+            par.setParameterValue(_minimizer_->X()[iFitPar]);
+          }
+        }
+        else{
+          for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
+            iFitPar++;
+            parSet.setEigenParameter(iEigen, _minimizer_->X()[iFitPar]);
+          }
+          parSet.propagateEigenToOriginal();
+        }
+
+      }
+      updateChi2Cache();
+    } // Minos
+    else if( errorAlgo == "Hesse" ){
+      LogInfo << "Releasing constraints for HESSE..." << std::endl;
+      initializeMinimizer(true);
+
+      LogWarning << "────────────────" << std::endl;
+      LogWarning << "Calling HESSE..." << std::endl;
+      LogWarning << "────────────────" << std::endl;
+      LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
+              << "Number of free parameters   : " << _minimizer_->NFree() << std::endl
+              << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree()
+              << std::endl;
+      _fitHasConverged_ = _minimizer_->Hesse();
+      LogInfo << "Hesse ended after " << _nbFitCalls_ - nbMinimizeCalls << " calls." << std::endl;
+
+      //    LogDebug << "Extracting Hessian matrix..." << std::endl;
 //    double hessianArray[_minimizer_->NDim() * _minimizer_->NDim()];
 //    _minimizer_->GetHessianMatrix(hessianArray);
 //    TMatrixDSym hessianMatrix(int(_minimizer_->NDim()), hessianArray);
@@ -460,6 +539,7 @@ void FitterEngine::fit(){
 //    LogDebug << "Decomposing Hessian matrix..." << std::endl;
 //    TMatrixDSymEigen hessianDecomp(hessianMatrix);
 //    hessianDecomp.GetEigenValues().Print();
+    }
 
     if(not _fitHasConverged_){
       LogError  << "Hesse did not converge." << std::endl;
@@ -813,13 +893,13 @@ void FitterEngine::rescaleParametersStepSize(){
 void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
   LogDebug << __METHOD_NAME__ << std::endl;
 
-  auto minimizationConfig = JsonUtils::fetchSubEntry(_config_, {"minimizerConfig"});
-  if( minimizationConfig.is_string() ){ minimizationConfig = JsonUtils::readConfigFile(minimizationConfig.get<std::string>()); }
+  _minimizerConfig_ = JsonUtils::fetchSubEntry(_config_, {"minimizerConfig"});
+  if( _minimizerConfig_.is_string() ){ _minimizerConfig_ = JsonUtils::readConfigFile(_minimizerConfig_.get<std::string>()); }
 
   _minimizer_ = std::shared_ptr<ROOT::Math::Minimizer>(
     ROOT::Math::Factory::CreateMinimizer(
-      JsonUtils::fetchValue<std::string>(minimizationConfig, "minimizer"),
-      JsonUtils::fetchValue<std::string>(minimizationConfig, "algorithm")
+      JsonUtils::fetchValue<std::string>(_minimizerConfig_, "minimizer"),
+      JsonUtils::fetchValue<std::string>(_minimizerConfig_, "algorithm")
     )
   );
 
@@ -830,11 +910,11 @@ void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
   );
 
   _minimizer_->SetFunction(*_functor_);
-  _minimizer_->SetStrategy(JsonUtils::fetchValue<int>(minimizationConfig, "strategy"));
-  _minimizer_->SetPrintLevel(JsonUtils::fetchValue<int>(minimizationConfig, "print_level"));
-  _minimizer_->SetTolerance(JsonUtils::fetchValue<double>(minimizationConfig, "tolerance"));
-  _minimizer_->SetMaxIterations(JsonUtils::fetchValue<unsigned int>(minimizationConfig, "max_iter"));
-  _minimizer_->SetMaxFunctionCalls(JsonUtils::fetchValue<unsigned int>(minimizationConfig, "max_fcn"));
+  _minimizer_->SetStrategy(JsonUtils::fetchValue<int>(_minimizerConfig_, "strategy"));
+  _minimizer_->SetPrintLevel(JsonUtils::fetchValue<int>(_minimizerConfig_, "print_level"));
+  _minimizer_->SetTolerance(JsonUtils::fetchValue<double>(_minimizerConfig_, "tolerance"));
+  _minimizer_->SetMaxIterations(JsonUtils::fetchValue<unsigned int>(_minimizerConfig_, "max_iter"));
+  _minimizer_->SetMaxFunctionCalls(JsonUtils::fetchValue<unsigned int>(_minimizerConfig_, "max_fcn"));
 
   int iPar = -1;
   for( auto& parSet : _propagator_.getParameterSetsList() ){

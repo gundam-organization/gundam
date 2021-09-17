@@ -36,6 +36,9 @@ void SplineDial::fillResponseCache() {
   if     ( _dialParameterCache_ < _splinePtr_->GetXmin() ) _dialResponseCache_ = _splinePtr_->Eval(_splinePtr_->GetXmin());
   else if( _dialParameterCache_ > _splinePtr_->GetXmax() ) _dialResponseCache_ = _splinePtr_->Eval(_splinePtr_->GetXmax());
   else                                                     _dialResponseCache_ = _splinePtr_->Eval(_dialParameterCache_);
+  if( _dialResponseCache_ <= 0 ){
+    LogError << GET_VAR_NAME_VALUE(_dialResponseCache_) << std::endl;
+  }
 }
 
 void SplineDial::setSplinePtr(TSpline3 *splinePtr) {
