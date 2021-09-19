@@ -63,8 +63,8 @@ public:
   void setEigenParStepSize( int iPar_, double step_ );
   void setEigenParIsFixed( int iPar_, bool isFixed_ );
 
-  bool isEigenParFixed( int iPar_ );
-  double getEigenParStepSize( int iPar_ );
+  bool isEigenParFixed( int iPar_ ) const;
+  double getEigenParStepSize( int iPar_ ) const;
 
   bool isUseEigenDecompInFit() const;
   int getNbEnabledEigenParameters() const;

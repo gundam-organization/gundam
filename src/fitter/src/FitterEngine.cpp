@@ -650,189 +650,199 @@ double FitterEngine::evalFit(const double* parArray_){
 void FitterEngine::writePostFitData() {
   LogInfo << __METHOD_NAME__ << std::endl;
 
-  if( not _fitIsDone_ ){
-    LogError << "Can't do " << __METHOD_NAME__ << " while fit has not been called." << std::endl;
-    throw std::logic_error("Can't do " + __METHOD_NAME__ + " while fit has not been called.");
+  LogThrowIf(not _fitIsDone_, "Can't do " << __METHOD_NAME__ << " while fit has not been called.")
+
+  if( _saveDir_ == nullptr ){
+    LogError << "_saveDir_ not set, won't save post fit data." << std::endl;
+    return;
   }
 
-  if( _saveDir_ != nullptr ){
-    auto* postFitDir = GenericToolbox::mkdirTFile(_saveDir_, "postFit");
+  auto* postFitDir = GenericToolbox::mkdirTFile(_saveDir_, "postFit");
 
-    this->generateSamplePlots("postFit/samples");
+  this->generateSamplePlots("postFit/samples");
 
-    auto* errorDir = GenericToolbox::mkdirTFile(postFitDir, "errors");
+  auto* errorDir = GenericToolbox::mkdirTFile(postFitDir, "errors");
 
-    double covarianceMatrixArray[_minimizer_->NDim() * _minimizer_->NDim()];
-    _minimizer_->GetCovMatrix(covarianceMatrixArray);
-    TMatrixDSym fitterCovarianceMatrix(int(_minimizer_->NDim()), covarianceMatrixArray);
-    TH2D* fitterCovarianceMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) &fitterCovarianceMatrix, "fitterCovarianceMatrixTH2D");
+  double covarianceMatrixArray[_minimizer_->NDim() * _minimizer_->NDim()];
+  _minimizer_->GetCovMatrix(covarianceMatrixArray);
+  TMatrixDSym fitterCovarianceMatrix(int(_minimizer_->NDim()), covarianceMatrixArray);
+  TH2D* fitterCovarianceMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) &fitterCovarianceMatrix, "fitterCovarianceMatrixTH2D");
 
-    LogInfo << "Fitter covariance matrix is " << fitterCovarianceMatrix.GetNrows() << "x" << fitterCovarianceMatrix.GetNcols() << std::endl;
+  LogInfo << "Fitter covariance matrix is " << fitterCovarianceMatrix.GetNrows() << "x" << fitterCovarianceMatrix.GetNcols() << std::endl;
 
-    int parameterIndexOffset = 0;
-    for( const auto& parSet : _propagator_.getParameterSetsList() ){
+  int parameterIndexOffset = 0;
+  for( const auto& parSet : _propagator_.getParameterSetsList() ){
 
-      if( not parSet.isEnabled() ){
-        LogWarning << "Skipping disabled parameter set: " << parSet.getName() << std::endl;
-        continue;
+    if( not parSet.isEnabled() ){
+      LogWarning << "Skipping disabled parameter set: " << parSet.getName() << std::endl;
+      continue;
+    }
+
+    LogInfo << "Extracting post-fit errors of parameter set: " << parSet.getName() << std::endl;
+    auto* parSetDir = GenericToolbox::mkdirTFile(errorDir, parSet.getName());
+
+    TMatrixD* covMatrix;
+    if( not parSet.isUseEigenDecompInFit() ) {
+      LogDebug << "Extracting parameters..." << std::endl;
+      covMatrix = new TMatrixD(int(parSet.getParameterList().size()), int(parSet.getParameterList().size()));
+      for (const auto &parRow: parSet.getParameterList()) {
+        for (const auto &parCol: parSet.getParameterList()) {
+          (*covMatrix)[parRow.getParameterIndex()][parCol.getParameterIndex()] =
+            fitterCovarianceMatrix[parameterIndexOffset + parRow.getParameterIndex()][parameterIndexOffset +
+                                                                                      parCol.getParameterIndex()];
+        } // par Y
+      } // par X
+
+      for( const auto& par : parSet.getParameterList() ) {
+        fitterCovarianceMatrixTH2D->GetXaxis()->SetBinLabel(1 + parameterIndexOffset + par.getParameterIndex(),
+                                                            (parSet.getName() + "/" + par.getTitle()).c_str());
+        fitterCovarianceMatrixTH2D->GetYaxis()->SetBinLabel(1 + parameterIndexOffset + par.getParameterIndex(),
+                                                            (parSet.getName() + "/" + par.getTitle()).c_str());
       }
+    }
+    else{
+      LogDebug << "Extracting eigen parameters..." << std::endl;
 
-      LogInfo << "Extracting post-fit errors of parameter set: " << parSet.getName() << std::endl;
-      auto* parSetDir = GenericToolbox::mkdirTFile(errorDir, parSet.getName());
-
-      TMatrixD* covMatrix;
-      if( not parSet.isUseEigenDecompInFit() ) {
-        LogDebug << "Extracting parameters..." << std::endl;
-        covMatrix = new TMatrixD(int(parSet.getParameterList().size()), int(parSet.getParameterList().size()));
-        for (const auto &parRow: parSet.getParameterList()) {
-          for (const auto &parCol: parSet.getParameterList()) {
-            (*covMatrix)[parRow.getParameterIndex()][parCol.getParameterIndex()] =
-              fitterCovarianceMatrix[parameterIndexOffset + parRow.getParameterIndex()][parameterIndexOffset +
-                                                                                        parCol.getParameterIndex()];
-          } // par Y
-        } // par X
-
-        for( const auto& par : parSet.getParameterList() ) {
-          fitterCovarianceMatrixTH2D->GetXaxis()->SetBinLabel(1 + parameterIndexOffset + par.getParameterIndex(),
-                                                              (parSet.getName() + "/" + par.getTitle()).c_str());
-          fitterCovarianceMatrixTH2D->GetYaxis()->SetBinLabel(1 + parameterIndexOffset + par.getParameterIndex(),
-                                                              (parSet.getName() + "/" + par.getTitle()).c_str());
-        }
-      }
-      else{
-        LogDebug << "Extracting eigen parameters..." << std::endl;
-
-        covMatrix = new TMatrixD(parSet.getNbEnabledEigenParameters(), parSet.getNbEnabledEigenParameters());
-        for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
-          for( int jEigen = 0 ; jEigen < parSet.getNbEnabledEigenParameters() ; jEigen++ ){
-            (*covMatrix)[iEigen][jEigen] = fitterCovarianceMatrix[parameterIndexOffset + iEigen][parameterIndexOffset + jEigen];
-          }
-        }
-
-        auto* covMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) covMatrix, Form("Covariance_Eigen_%s_TH2D", parSet.getName().c_str()));
-        auto* corMatrix = GenericToolbox::convertToCorrelationMatrix((TMatrixD*) covMatrix);
-        auto* corMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D(corMatrix, Form("Correlation_Eigen_%s_TH2D", parSet.getName().c_str()));
-
-        LogDebug << "Applying labels on eigen histograms..." << std::endl;
-        for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
-          covMatrixTH2D->GetXaxis()->SetBinLabel(1+iEigen, (parSet.getName() + "/eigen_#" + std::to_string(iEigen)).c_str());
-          covMatrixTH2D->GetYaxis()->SetBinLabel(1+iEigen, (parSet.getName() + "/eigen_#" + std::to_string(iEigen)).c_str());
-          corMatrixTH2D->GetXaxis()->SetBinLabel(1+iEigen, (parSet.getName() + "/eigen_#" + std::to_string(iEigen)).c_str());
-          corMatrixTH2D->GetYaxis()->SetBinLabel(1+iEigen, (parSet.getName() + "/eigen_#" + std::to_string(iEigen)).c_str());
-
-          fitterCovarianceMatrixTH2D->GetXaxis()->SetBinLabel(1+parameterIndexOffset+iEigen, (parSet.getName() + "/eigen_#" + std::to_string(iEigen)).c_str());
-          fitterCovarianceMatrixTH2D->GetYaxis()->SetBinLabel(1+parameterIndexOffset+iEigen, (parSet.getName() + "/eigen_#" + std::to_string(iEigen)).c_str());
-        }
-
-        GenericToolbox::mkdirTFile(parSetDir, "matrices")->cd();
-        covMatrix->Write("Covariance_Eigen_TMatrixD");
-        covMatrixTH2D->Write("Covariance_Eigen_TH2D");
-        corMatrix->Write("Correlation_Eigen_TMatrixD");
-        corMatrixTH2D->Write("Correlation_Eigen_TH2D");
-
-        LogDebug << "Converting eigen to original parameters..." << std::endl;
-        auto* originalCovMatrix = new TMatrixD(int(parSet.getParameterList().size()), int(parSet.getParameterList().size()));
-        for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
-          for( int jEigen = 0 ; jEigen < parSet.getNbEnabledEigenParameters() ; jEigen++ ){
-            (*originalCovMatrix)[iEigen][jEigen] = (*covMatrix)[iEigen][jEigen];
-          }
-        }
-
-        (*originalCovMatrix) = (*parSet.getInvertedEigenVectors()) * (*originalCovMatrix) * (*parSet.getEigenVectors());
-
-        for( int iBin = 0 ; iBin < originalCovMatrix->GetNrows() ; iBin++ ){
-          for( int jBin = 0 ; jBin < originalCovMatrix->GetNcols() ; jBin++ ){
-            if( parSet.getParameterList().at(iBin).isFixed() or parSet.getParameterList().at(jBin).isFixed() ){
-              (*originalCovMatrix)[iBin][jBin] = 0;
+      covMatrix = new TMatrixD(parSet.getNbEnabledEigenParameters(), parSet.getNbEnabledEigenParameters());
+      for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
+        for( int jEigen = 0 ; jEigen < parSet.getNbEnabledEigenParameters() ; jEigen++ ){
+          if( parSet.isEigenParFixed(iEigen) or parSet.isEigenParFixed(jEigen) ){
+            if( iEigen == jEigen ){
+              (*covMatrix)[iEigen][jEigen] = parSet.getEigenSigma(iEigen)*parSet.getEigenSigma(iEigen);
+            }
+            else{
+              (*covMatrix)[iEigen][jEigen] = 0;
             }
           }
+          else{
+            (*covMatrix)[iEigen][jEigen] = fitterCovarianceMatrix[parameterIndexOffset + iEigen][parameterIndexOffset + jEigen];
+          }
+
         }
-
-        covMatrix = originalCovMatrix;
-
       }
 
-      auto* covMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) covMatrix, Form("Covariance_%s_TH2D", parSet.getName().c_str()));
+      auto* covMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) covMatrix, Form("Covariance_Eigen_%s_TH2D", parSet.getName().c_str()));
       auto* corMatrix = GenericToolbox::convertToCorrelationMatrix((TMatrixD*) covMatrix);
-      auto* corMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D(corMatrix, Form("Correlation_%s_TH2D", parSet.getName().c_str()));
+      auto* corMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D(corMatrix, Form("Correlation_Eigen_%s_TH2D", parSet.getName().c_str()));
 
-      LogDebug << "Applying labels on histograms..." << std::endl;
-      for( const auto& par : parSet.getParameterList() ){
-        covMatrixTH2D->GetXaxis()->SetBinLabel(1+par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
-        covMatrixTH2D->GetYaxis()->SetBinLabel(1+par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
-        corMatrixTH2D->GetXaxis()->SetBinLabel(1+par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
-        corMatrixTH2D->GetYaxis()->SetBinLabel(1+par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
+      LogDebug << "Applying labels on eigen histograms..." << std::endl;
+      for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
+        covMatrixTH2D->GetXaxis()->SetBinLabel(1+iEigen, (parSet.getName() + "/eigen_#" + std::to_string(iEigen)).c_str());
+        covMatrixTH2D->GetYaxis()->SetBinLabel(1+iEigen, (parSet.getName() + "/eigen_#" + std::to_string(iEigen)).c_str());
+        corMatrixTH2D->GetXaxis()->SetBinLabel(1+iEigen, (parSet.getName() + "/eigen_#" + std::to_string(iEigen)).c_str());
+        corMatrixTH2D->GetYaxis()->SetBinLabel(1+iEigen, (parSet.getName() + "/eigen_#" + std::to_string(iEigen)).c_str());
+
+        fitterCovarianceMatrixTH2D->GetXaxis()->SetBinLabel(1+parameterIndexOffset+iEigen, (parSet.getName() + "/eigen_#" + std::to_string(iEigen)).c_str());
+        fitterCovarianceMatrixTH2D->GetYaxis()->SetBinLabel(1+parameterIndexOffset+iEigen, (parSet.getName() + "/eigen_#" + std::to_string(iEigen)).c_str());
       }
 
-      LogTrace << "Writing cov matrices..." << std::endl;
       GenericToolbox::mkdirTFile(parSetDir, "matrices")->cd();
-      covMatrix->Write("Covariance_TMatrixD");
-      covMatrixTH2D->Write("Covariance_TH2D");
-      corMatrix->Write("Correlation_TMatrixD");
-      corMatrixTH2D->Write("Correlation_TH2D");
+      covMatrix->Write("Covariance_Eigen_TMatrixD");
+      covMatrixTH2D->Write("Covariance_Eigen_TH2D");
+      corMatrix->Write("Correlation_Eigen_TMatrixD");
+      corMatrixTH2D->Write("Correlation_Eigen_TH2D");
 
-      // Parameters
-      LogTrace << "Generating parameter plots..." << std::endl;
-      GenericToolbox::mkdirTFile(parSetDir, "values")->cd();
-      auto* postFitErrorHist = new TH1D("postFitErrors_TH1D", "Post-fit Errors", parSet.getNbParameters(), 0, parSet.getNbParameters());
-      auto* preFitErrorHist = new TH1D("preFitErrors_TH1D", "Pre-fit Errors", parSet.getNbParameters(), 0, parSet.getNbParameters());
-      for( const auto& par : parSet.getParameterList() ){
-        postFitErrorHist->GetXaxis()->SetBinLabel(1 + par.getParameterIndex(), par.getTitle().c_str());
-        postFitErrorHist->SetBinContent( 1 + par.getParameterIndex(), par.getParameterValue());
-        postFitErrorHist->SetBinError( 1 + par.getParameterIndex(), TMath::Sqrt((*covMatrix)[par.getParameterIndex()][par.getParameterIndex()]));
-
-        preFitErrorHist->GetXaxis()->SetBinLabel(1 + par.getParameterIndex(), par.getTitle().c_str());
-        preFitErrorHist->SetBinContent( 1 + par.getParameterIndex(), par.getPriorValue() );
-        if(par.isEnabled()) preFitErrorHist->SetBinError( 1 + par.getParameterIndex(), par.getStdDevValue() );
+      LogDebug << "Converting eigen to original parameters..." << std::endl;
+      auto* originalCovMatrix = new TMatrixD(int(parSet.getParameterList().size()), int(parSet.getParameterList().size()));
+      for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
+        for( int jEigen = 0 ; jEigen < parSet.getNbEnabledEigenParameters() ; jEigen++ ){
+          (*originalCovMatrix)[iEigen][jEigen] = (*covMatrix)[iEigen][jEigen];
+        }
       }
 
-      LogTrace << "Cosmetics..." << std::endl;
-      preFitErrorHist->SetFillColor(kRed-9);
+      (*originalCovMatrix) = (*parSet.getInvertedEigenVectors()) * (*originalCovMatrix) * (*parSet.getEigenVectors());
+
+      for( int iBin = 0 ; iBin < originalCovMatrix->GetNrows() ; iBin++ ){
+        for( int jBin = 0 ; jBin < originalCovMatrix->GetNcols() ; jBin++ ){
+          if( parSet.getParameterList().at(iBin).isFixed() or parSet.getParameterList().at(jBin).isFixed() ){
+            (*originalCovMatrix)[iBin][jBin] = 0;
+          }
+        }
+      }
+
+      covMatrix = originalCovMatrix;
+
+    }
+
+    auto* covMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) covMatrix, Form("Covariance_%s_TH2D", parSet.getName().c_str()));
+    auto* corMatrix = GenericToolbox::convertToCorrelationMatrix((TMatrixD*) covMatrix);
+    auto* corMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D(corMatrix, Form("Correlation_%s_TH2D", parSet.getName().c_str()));
+
+    LogDebug << "Applying labels on histograms..." << std::endl;
+    for( const auto& par : parSet.getParameterList() ){
+      covMatrixTH2D->GetXaxis()->SetBinLabel(1+par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
+      covMatrixTH2D->GetYaxis()->SetBinLabel(1+par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
+      corMatrixTH2D->GetXaxis()->SetBinLabel(1+par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
+      corMatrixTH2D->GetYaxis()->SetBinLabel(1+par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
+    }
+
+    LogTrace << "Writing cov matrices..." << std::endl;
+    GenericToolbox::mkdirTFile(parSetDir, "matrices")->cd();
+    covMatrix->Write("Covariance_TMatrixD");
+    covMatrixTH2D->Write("Covariance_TH2D");
+    corMatrix->Write("Correlation_TMatrixD");
+    corMatrixTH2D->Write("Correlation_TH2D");
+
+    // Parameters
+    LogTrace << "Generating parameter plots..." << std::endl;
+    GenericToolbox::mkdirTFile(parSetDir, "values")->cd();
+    auto* postFitErrorHist = new TH1D("postFitErrors_TH1D", "Post-fit Errors", parSet.getNbParameters(), 0, parSet.getNbParameters());
+    auto* preFitErrorHist = new TH1D("preFitErrors_TH1D", "Pre-fit Errors", parSet.getNbParameters(), 0, parSet.getNbParameters());
+    for( const auto& par : parSet.getParameterList() ){
+      postFitErrorHist->GetXaxis()->SetBinLabel(1 + par.getParameterIndex(), par.getTitle().c_str());
+      postFitErrorHist->SetBinContent( 1 + par.getParameterIndex(), par.getParameterValue());
+      postFitErrorHist->SetBinError( 1 + par.getParameterIndex(), TMath::Sqrt((*covMatrix)[par.getParameterIndex()][par.getParameterIndex()]));
+
+      preFitErrorHist->GetXaxis()->SetBinLabel(1 + par.getParameterIndex(), par.getTitle().c_str());
+      preFitErrorHist->SetBinContent( 1 + par.getParameterIndex(), par.getPriorValue() );
+      if(par.isEnabled()) preFitErrorHist->SetBinError( 1 + par.getParameterIndex(), par.getStdDevValue() );
+    }
+
+    LogTrace << "Cosmetics..." << std::endl;
+    preFitErrorHist->SetFillColor(kRed-9);
 //        preFitErrorHist->SetFillColorAlpha(kRed-9, 0.5);
 //        preFitErrorHist->SetFillStyle(4050); // 50 % opaque ?
-      preFitErrorHist->SetMarkerStyle(kFullDotLarge);
-      preFitErrorHist->SetMarkerColor(kRed-3);
-      preFitErrorHist->SetTitle("Pre-fit Errors");
+    preFitErrorHist->SetMarkerStyle(kFullDotLarge);
+    preFitErrorHist->SetMarkerColor(kRed-3);
+    preFitErrorHist->SetTitle("Pre-fit Errors");
 
-      postFitErrorHist->SetLineColor(9);
-      postFitErrorHist->SetLineWidth(2);
-      postFitErrorHist->SetMarkerColor(9);
-      postFitErrorHist->SetMarkerStyle(kFullDotLarge);
-      postFitErrorHist->SetTitle("Post-fit Errors");
+    postFitErrorHist->SetLineColor(9);
+    postFitErrorHist->SetLineWidth(2);
+    postFitErrorHist->SetMarkerColor(9);
+    postFitErrorHist->SetMarkerStyle(kFullDotLarge);
+    postFitErrorHist->SetTitle("Post-fit Errors");
 
-      auto* errorsCanvas = new TCanvas(Form("Fit Constraints for %s", parSet.getName().c_str()), Form("Fit Constraints for %s", parSet.getName().c_str()), 800, 600);
-      errorsCanvas->cd();
-      preFitErrorHist->Draw("E2");
-      errorsCanvas->Update(); // otherwise does not display...
-      postFitErrorHist->Draw("E SAME");
+    auto* errorsCanvas = new TCanvas(Form("Fit Constraints for %s", parSet.getName().c_str()), Form("Fit Constraints for %s", parSet.getName().c_str()), 800, 600);
+    errorsCanvas->cd();
+    preFitErrorHist->Draw("E2");
+    errorsCanvas->Update(); // otherwise does not display...
+    postFitErrorHist->Draw("E SAME");
 
 //        auto* legend = gPad->BuildLegend();
-      gPad->SetGridx();
-      gPad->SetGridy();
+    gPad->SetGridx();
+    gPad->SetGridy();
 
-      preFitErrorHist->SetTitle(Form("Pre-fit/Post-fit Comparison for %s", parSet.getName().c_str()));
-      errorsCanvas->Write("fitConstraints_TCanvas");
+    preFitErrorHist->SetTitle(Form("Pre-fit/Post-fit Comparison for %s", parSet.getName().c_str()));
+    errorsCanvas->Write("fitConstraints_TCanvas");
 
-      preFitErrorHist->SetTitle(Form("Pre-fit Errors of %s", parSet.getName().c_str()));
-      postFitErrorHist->SetTitle(Form("Post-fit Errors of %s", parSet.getName().c_str()));
-      postFitErrorHist->Write();
-      preFitErrorHist->Write();
+    preFitErrorHist->SetTitle(Form("Pre-fit Errors of %s", parSet.getName().c_str()));
+    postFitErrorHist->SetTitle(Form("Post-fit Errors of %s", parSet.getName().c_str()));
+    postFitErrorHist->Write();
+    preFitErrorHist->Write();
 
 
-      if( not parSet.isUseEigenDecompInFit() ){
-        parameterIndexOffset += int(parSet.getNbParameters());
-      }
-      else{
-        parameterIndexOffset += parSet.getNbEnabledEigenParameters();
-      }
+    if( not parSet.isUseEigenDecompInFit() ){
+      parameterIndexOffset += int(parSet.getNbParameters());
+    }
+    else{
+      parameterIndexOffset += parSet.getNbEnabledEigenParameters();
+    }
 
-    } // parSet
+  } // parSet
 
-    errorDir->cd();
-    fitterCovarianceMatrix.Write("fitterCovarianceMatrix_TMatrixDSym");
-    fitterCovarianceMatrixTH2D->Write("fitterCovarianceMatrix_TH2D");
-
-  } // save dir?
+  errorDir->cd();
+  fitterCovarianceMatrix.Write("fitterCovarianceMatrix_TMatrixDSym");
+  fitterCovarianceMatrixTH2D->Write("fitterCovarianceMatrix_TH2D");
 
 }
 
@@ -940,14 +950,9 @@ void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
                                   parSet.getEigenParameterValue(iEigen),
                                   parSet.getEigenParStepSize(iEigen)
         );
-        if( not doReleaseFixed_ ){
-
+        if( not doReleaseFixed_ or not JsonUtils::fetchValue(parSet.getJsonConfig(), "releaseFixedParametersOnHesse", true) ){
           if( parSet.isEigenParFixed(iEigen) ) {
-            LogDebug << "FIXED: " << _minimizer_->VariableName(iPar) << std::endl;
             _minimizer_->FixVariable(iPar);
-          }
-          else{
-            LogDebug << "NOT FIXED: " << _minimizer_->VariableName(iPar) << std::endl;
           }
         }
       }

@@ -298,10 +298,10 @@ void FitParameterSet::setEigenParIsFixed( int iPar_, bool isFixed_ ){
   _eigenParFixedList_[iPar_] = isFixed_;
 }
 
-bool FitParameterSet::isEigenParFixed( int iPar_ ){
+bool FitParameterSet::isEigenParFixed( int iPar_ ) const{
   return _eigenParFixedList_[iPar_];
 }
-double FitParameterSet::getEigenParStepSize( int iPar_ ){
+double FitParameterSet::getEigenParStepSize( int iPar_ ) const{
   return (*_eigenParStepSize_)[iPar_];
 }
 
