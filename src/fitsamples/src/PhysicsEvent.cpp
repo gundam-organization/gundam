@@ -130,13 +130,13 @@ double PhysicsEvent::getVarAsDouble(int varIndex_, size_t arrayIndex_) const{
 double PhysicsEvent::evalFormula(TFormula* formulaPtr_, std::vector<int>* indexDict_) const{
   LogThrowIf(formulaPtr_ == nullptr, GET_VAR_NAME_VALUE(formulaPtr_));
 
-  auto* parArray = new double[formulaPtr_->GetNpar()];
+  std::vector<double> parArray(formulaPtr_->GetNpar());
   for( int iPar = 0 ; iPar < formulaPtr_->GetNpar() ; iPar++ ){
     if(indexDict_ == nullptr){ parArray[iPar] = this->getVarAsDouble(formulaPtr_->GetParName(iPar)); }
     else                     { parArray[iPar] = this->getVarAsDouble(indexDict_->at(iPar)); }
   }
 
-  return formulaPtr_->EvalPar(nullptr, parArray);
+  return formulaPtr_->EvalPar(nullptr, &parArray[0]);
 }
 
 std::string PhysicsEvent::getSummary() const {
