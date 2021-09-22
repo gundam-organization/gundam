@@ -887,6 +887,10 @@ void FitterEngine::rescaleParametersStepSize(){
     for( auto& par : parSet.getParameterList() ){
       iFitPar++;
 
+      if( not par.isEnabled() ){
+        continue;
+      }
+
       double currentParValue = par.getParameterValue();
       par.setParameterValue( currentParValue + par.getStdDevValue() );
 

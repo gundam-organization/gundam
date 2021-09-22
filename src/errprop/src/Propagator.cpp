@@ -394,13 +394,17 @@ void Propagator::reweightSampleEvents(int iThread_) {
   double weight;
 
   int nThreads = GlobalVariables::getNbThreads();
+  if(iThread_ == -1){
+    // force single thread
+    nThreads = 1;
+    iThread_ = 0;
+  }
+
   int iEvent;
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
     int nEvents = int(sample.getMcContainer().eventList.size());
     for( iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
-      if( iEvent % nThreads != iThread_ ){
-        continue;
-      }
+      if( iEvent % nThreads != iThread_ ){ continue; }
       sample.getMcContainer().eventList.at(iEvent).reweightUsingDialCache();
     } // event
   } // sample
@@ -454,10 +458,10 @@ void Propagator::fillEventDialCaches(int iThread_){
           for( iDialSet = 0 ; iDialSet < dialSetPair.second.size() ; iDialSet++ ){
             dialSetPtr = dialSetPair.second.at(iDialSet);
 
-            if( dialSetPtr->getApplyConditionFormula() != nullptr
-                and evPtr->evalFormula(dialSetPtr->getApplyConditionFormula()) == 0
-              ){
-              continue;
+            if( dialSetPtr->getApplyConditionFormula() != nullptr ){
+              if( evPtr->evalFormula(dialSetPtr->getApplyConditionFormula()) == 0 ){
+                continue;
+              }
             }
 
             bool isInBin = false;
