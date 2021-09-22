@@ -315,7 +315,6 @@ void FitParameterSet::propagateEigenToOriginal(){
   (*_originalParValues_) = (*_eigenParValues_);
   (*_originalParValues_) *= (*_invertedEigenVectors_);
   for( int iOrig = 0 ; iOrig < _originalParValues_->GetNrows() ; iOrig++ ){
-    if( _parameterList_.at(iOrig).isFixed() ) continue;
     _parameterList_.at(iOrig).setParameterValue((*_originalParValues_)[iOrig]);
   }
 }

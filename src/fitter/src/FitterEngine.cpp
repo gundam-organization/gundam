@@ -317,7 +317,7 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
   auto* y = new double[adj_steps] {};
 
   LogInfo << "Scanning fit parameter #" << iPar
-          << " (" << _minimizer_->VariableName(iPar) << ")." << std::endl;
+          << ": " << _minimizer_->VariableName(iPar) << std::endl;
 
   _propagator_.allowRfPropagation();
   bool success = _minimizer_->Scan(iPar, adj_steps, x, y);
@@ -481,18 +481,45 @@ void FitterEngine::fit(){
 
       double errLow, errHigh;
       _minimizer_->SetPrintLevel(0);
-      for( iFitPar = 0 ; iFitPar < _minimizer_->NDim() ; iFitPar++ ){
-        if( _minimizer_->IsFixedVariable(iFitPar) ) continue;
-        LogDebug << "Evaluating: " << _minimizer_->VariableName(iFitPar) << "..." << std::endl;
-        bool isOk = _minimizer_->GetMinosError(iFitPar, errLow, errHigh);
-        Logger::moveTerminalCursorBack(1, true);
-        if( isOk ){
-          LogInfo << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh << std::endl;
+
+      iFitPar = -1;
+      for( auto& parSet : _propagator_.getParameterSetsList() ){
+        if( JsonUtils::fetchValue(parSet.getJsonConfig(), "skipMinos", false) ){
+          LogWarning << "Minos error evaluation is disabled for parSet: " << parSet.getName() << std::endl;
+          continue;
+        }
+
+        if( not parSet.isUseEigenDecompInFit() ){
+          for( auto& par : parSet.getParameterList() ){
+            iFitPar++;
+            if( _minimizer_->IsFixedVariable(iFitPar) ) continue;
+            LogDebug << "Evaluating: " << _minimizer_->VariableName(iFitPar) << "..." << std::endl;
+            bool isOk = _minimizer_->GetMinosError(iFitPar, errLow, errHigh);
+            if( isOk ){
+              LogInfo << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh << std::endl;
+            }
+            else{
+              LogError << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh << " - MINOS returned an error: "
+                       //          << _minimizer_->MinosStatus()
+                       << std::endl;
+            }
+          }
         }
         else{
-          LogError << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh << " - MINOS returned an error: "
-//          << _minimizer_->MinosStatus()
-          << std::endl;
+          for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
+            iFitPar++;
+            if( _minimizer_->IsFixedVariable(iFitPar) ) continue;
+            LogDebug << "Evaluating: " << _minimizer_->VariableName(iFitPar) << "..." << std::endl;
+            bool isOk = _minimizer_->GetMinosError(iFitPar, errLow, errHigh);
+            if( isOk ){
+              LogInfo << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh << std::endl;
+            }
+            else{
+              LogError << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh << " - MINOS returned an error: "
+                       //          << _minimizer_->MinosStatus()
+                       << std::endl;
+            }
+          }
         }
       }
 
@@ -946,7 +973,7 @@ void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
     else{
       for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
         iPar++;
-        _minimizer_->SetVariable( iPar,parSet.getName() + "/eigen_#" + std::to_string(iPar),
+        _minimizer_->SetVariable( iPar,parSet.getName() + "/eigen_#" + std::to_string(iEigen),
                                   parSet.getEigenParameterValue(iEigen),
                                   parSet.getEigenParStepSize(iEigen)
         );
