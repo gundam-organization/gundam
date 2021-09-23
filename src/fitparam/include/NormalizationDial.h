@@ -15,6 +15,8 @@ public:
   void reset() override;
   void initialize() override;
 
+  double evalResponse(const double& parameterValue_) override;
+
 protected:
   void fillResponseCache() override;
 

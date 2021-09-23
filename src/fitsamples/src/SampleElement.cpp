@@ -69,15 +69,22 @@ void SampleElement::updateEventBinIndexes(int iThread_){
 }
 void SampleElement::updateBinEventList(int iThread_) {
   if( isLocked ) return;
-  int nBins = int(perBinEventPtrList.size());
+
   if(iThread_ <= 0) LogInfo << "Filling bin event cache for \"" << name << "\"..." << std::endl;
-  for( int iBin = 0 ; iBin < nBins ; iBin++ ){
-    if( iThread_ != -1 and iBin % GlobalVariables::getNbThreads() != iThread_ ) continue;
-    auto& thisBinEventList = perBinEventPtrList.at(iBin);
-    // Counting first (otherwise the memory allocation will keep moving data around)
-    size_t count = 0;
+  int nBins = int(perBinEventPtrList.size());
+  int nbThreads = GlobalVariables::getNbThreads();
+  if( iThread_ == -1 ){
+    nbThreads = 1;
+    iThread_ = 0;
+  }
+
+  int iBin = iThread_;
+  size_t count;
+  while( iBin < nBins ){
+    count = 0;
     for( auto& event : eventList ){ if( event.getSampleBinIndex() == iBin ){ count++; } }
-    thisBinEventList.resize(count); // allocate once
+    std::vector<PhysicsEvent*> thisBinEventList(count, nullptr);
+
     // Now filling the event indexes
     size_t index = 0;
     for( auto& event : eventList ){
@@ -85,23 +92,37 @@ void SampleElement::updateBinEventList(int iThread_) {
         thisBinEventList.at(index++) = &event;
       }
     } // event
-  } // hist bin
+
+    GlobalVariables::getThreadMutex().lock();
+    // BETTER TO MAKE SURE THE MEMORY IS NOT MOVED WHILE FILLING UP
+    perBinEventPtrList.at(iBin) = thisBinEventList;
+    GlobalVariables::getThreadMutex().unlock();
+
+    iBin += nbThreads;
+  }
 }
 void SampleElement::refillHistogram(int iThread_){
   if( isLocked ) return;
-//  histogram->Reset();
+
+  int nbThreads = GlobalVariables::getNbThreads();
+  if( iThread_ == -1 ){
+    nbThreads = 1;
+    iThread_ = 0;
+  }
+
+  // Size = Nbins + 2 overflow (0 and last)
+  auto* binContentArray = histogram->GetArray();
+
+  int iBin = iThread_;
   int nBins = int(perBinEventPtrList.size());
-  for(int iBin = 0 ; iBin < nBins ; iBin++){
-    if( iThread_ != -1 and iBin % GlobalVariables::getNbThreads() != iThread_ ) continue;
-    histogram->SetBinContent(iBin+1, 0);
-    histogram->SetBinError(iBin+1, 0);
+  while( iBin < nBins ){
+    binContentArray[iBin+1] = 0;
     for( auto* eventPtr : perBinEventPtrList.at(iBin)){
-      histogram->AddBinContent(iBin+1, eventPtr->getEventWeight());
-// https://root-forum.cern.ch/t/bin-errors-with-addbincontent-and-sumw2/19465/4
-//      histogram->SetBinContent(iBin+1,
-//                               histogram->GetBinContent(iBin+1) + eventPtr->getEventWeight());
+      binContentArray[iBin+1] += eventPtr->getEventWeight();
     }
-    histogram->SetBinError(iBin+1, TMath::Sqrt(histogram->GetBinContent(iBin+1)));
+    histogram->SetBinError(iBin+1, TMath::Sqrt(binContentArray[iBin+1]));
+
+    iBin += nbThreads;
   }
 }
 void SampleElement::rescaleHistogram() {

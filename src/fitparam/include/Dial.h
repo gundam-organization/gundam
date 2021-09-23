@@ -48,7 +48,7 @@ public:
   void *getAssociatedParameterReference() const;
 
   virtual std::string getSummary();
-  double evalResponse(const double& parameterValue_);
+  virtual double evalResponse(const double& parameterValue_);
   double evalResponse();
 
 protected:

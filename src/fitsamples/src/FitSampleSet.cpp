@@ -336,8 +336,12 @@ void FitSampleSet::loadPhysicsEvents() {
           for( iSample = 0 ; iSample < samplesToFillList.size() ; iSample++ ){
             if( eventIsInSamplesList.at(iEvent).at(iSample) ){
 
+              // Reset bin index of the buffer
+              eventBufThread.setSampleBinIndex(-1);
+
               // Has valid bin?
               binsListPtr = &samplesToFillList.at(iSample)->getBinning().getBinsList();
+
               for( iBin = 0 ; iBin < binsListPtr->size() ; iBin++ ){
                 auto& bin = binsListPtr->at(iBin);
                 bool isInBin = true;
@@ -354,7 +358,6 @@ void FitSampleSet::loadPhysicsEvents() {
               } // Bin
 
               if( eventBufThread.getSampleBinIndex() == -1 ){
-                LogTrace << "NOT FOUND" << std::endl;
                 // Invalid bin
                 break;
               }
