@@ -103,7 +103,7 @@ void PhysicsEvent::resetEventWeight(){
 void PhysicsEvent::reweightUsingDialCache(){
   this->resetEventWeight();
   for( auto& dial : _rawDialPtrList_ ){
-    if( dial == nullptr ) break;
+    if( dial == nullptr ) return;
     this->addEventWeight( dial->evalResponse() );
   }
 }

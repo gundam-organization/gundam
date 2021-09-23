@@ -400,8 +400,6 @@ void Propagator::makeResponseFunctions(){
 }
 
 void Propagator::reweightSampleEvents(int iThread_) {
-  double weight;
-
   int nThreads = GlobalVariables::getNbThreads();
   if(iThread_ == -1){
     // force single thread
@@ -409,14 +407,16 @@ void Propagator::reweightSampleEvents(int iThread_) {
     iThread_ = 0;
   }
 
-  int iEvent;
+  int nEvents;
+  std::vector<PhysicsEvent>* evList{nullptr};
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    int nEvents = int(sample.getMcContainer().eventList.size());
-    for( iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
-      if( iEvent % nThreads != iThread_ ){ continue; }
-      sample.getMcContainer().eventList.at(iEvent).reweightUsingDialCache();
-    } // event
-  } // sample
+    evList = &sample.getMcContainer().eventList;
+    nEvents = int(evList->size());
+    while( iThread_ < nEvents ){
+      (*evList)[iThread_].reweightUsingDialCache();
+      iThread_ += nThreads;
+    }
+  }
 
 }
 void Propagator::fillEventDialCaches(int iThread_){
@@ -451,8 +451,8 @@ void Propagator::fillEventDialCaches(int iThread_){
       std::stringstream ss;
       ss << LogWarning.getPrefixString() << sample.getName();
 
-      nEvents = sample.getMcContainer().eventNbList.at(iDataSet);
-      for( iEvent = sample.getMcContainer().eventOffSetList.at(iDataSet) ; iEvent < nEvents ; iEvent++ ){
+      nEvents = sample.getMcContainer().eventNbList[iDataSet];
+      for( iEvent = sample.getMcContainer().eventOffSetList[iDataSet] ; iEvent < nEvents ; iEvent++ ){
         if (iEvent % GlobalVariables::getNbThreads() != iThread_) {
           continue;
         }
@@ -460,12 +460,12 @@ void Propagator::fillEventDialCaches(int iThread_){
           GenericToolbox::displayProgressBar(iEvent, nEvents, ss.str());
         }
 
-        evPtr = &sample.getMcContainer().eventList.at(iEvent);
+        evPtr = &sample.getMcContainer().eventList[iEvent];
 
         eventDialOffset = 0;
         for( auto& dialSetPair : dialSetPtrMap ){
           for( iDialSet = 0 ; iDialSet < dialSetPair.second.size() ; iDialSet++ ){
-            dialSetPtr = dialSetPair.second.at(iDialSet);
+            dialSetPtr = dialSetPair.second[iDialSet];
 
             if( dialSetPtr->getApplyConditionFormula() != nullptr ){
               if( evPtr->evalFormula(dialSetPtr->getApplyConditionFormula()) == 0 ){
@@ -475,17 +475,17 @@ void Propagator::fillEventDialCaches(int iThread_){
 
             bool isInBin = false;
             for( iDial = 0 ; iDial < dialSetPtr->getDialList().size(); iDial++ ){
-              applyConditionBinPtr = &dialSetPtr->getDialList().at(iDial)->getApplyConditionBin();
+              applyConditionBinPtr = &dialSetPtr->getDialList()[iDial]->getApplyConditionBin();
               isInBin = true;
 
               for( iVar = 0 ; iVar < applyConditionBinPtr->getVariableNameList().size() ; iVar++ ){
-                if( not applyConditionBinPtr->isBetweenEdges(iVar, evPtr->getVarAsDouble(applyConditionBinPtr->getVariableNameList().at(iVar) ) )){
+                if( not applyConditionBinPtr->isBetweenEdges(iVar, evPtr->getVarAsDouble(applyConditionBinPtr->getVariableNameList()[iVar] ) )){
                   isInBin = false;
                   break;
                 }
               }
               if( isInBin ){
-                evPtr->getRawDialPtrList().at(eventDialOffset++) = dialSetPtr->getDialList().at(iDial).get();
+                evPtr->getRawDialPtrList()[eventDialOffset++] = dialSetPtr->getDialList()[iDial].get();
                 break;
               }
             } // iDial
@@ -525,7 +525,7 @@ void Propagator::applyResponseFunctions(int iThread_){
       for( auto& sample : _fitSampleSet_.getFitSampleList() ){
         histBuffer = sample.getMcContainer().histogram.get();
         nominalHistBuffer = _nominalSamplesMcHistogram_[&sample].get();
-        rfHistBuffer = _responseFunctionsSamplesMcHistogram_[&sample].at(iPar).get();
+        rfHistBuffer = _responseFunctionsSamplesMcHistogram_[&sample][iPar].get();
 
         for( int iBin = 1 ; iBin <= histBuffer->GetNbinsX() ; iBin++ ){
           if( iBin % GlobalVariables::getNbThreads() != iThread_ ) continue;
