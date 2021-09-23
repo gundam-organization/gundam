@@ -68,6 +68,7 @@ public:
   void print() const;
   bool isSame(AnaEvent& anaEvent_) const;
   void deleteLeaf(long index_);
+  void trimDialCache();
 
   // Stream operator
   friend std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p );

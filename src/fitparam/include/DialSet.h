@@ -38,8 +38,8 @@ public:
   bool isEnabled() const;
   std::vector<std::shared_ptr<Dial>> &getDialList();
   const std::vector<std::string> &getDataSetNameList() const;
-
   TFormula *getApplyConditionFormula() const;
+  void *getAssociatedParameterReference();
 
 
   // Core

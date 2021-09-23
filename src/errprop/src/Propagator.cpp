@@ -150,6 +150,15 @@ void Propagator::initialize() {
 
   fillEventDialCaches();
 
+  // TEMP: trim dial cache
+  LogDebug << "Trimming event dial cache..." << std::endl;
+  for( auto& sample: _fitSampleSet_.getFitSampleList() ){
+    for( auto& event : sample.getMcContainer().eventList ){
+      event.trimDialCache();
+    }
+  }
+
+
   if( JsonUtils::fetchValue<json>(_config_, "throwParameters", false) ){
     LogWarning << "Throwing parameters..." << std::endl;
     for( auto& parSet : _parameterSetsList_ ){

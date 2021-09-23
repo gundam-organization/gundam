@@ -100,6 +100,7 @@ void FitParameter::initialize() {
       LogDebug << getTitle() << " is marked as not Enabled." << std::endl;
       return;
     }
+    _priorValue_ = JsonUtils::fetchValue(_parameterConfig_, "priorValue", _priorValue_);
     _dialDefinitionsList_ = JsonUtils::fetchValue(_parameterConfig_, "dialSetDefinitions", _dialDefinitionsList_);
   }
 

@@ -545,8 +545,8 @@ void FitterEngine::fit(){
       updateChi2Cache();
     } // Minos
     else if( errorAlgo == "Hesse" ){
-      LogInfo << "Releasing constraints for HESSE..." << std::endl;
-      initializeMinimizer(true);
+//      LogInfo << "Releasing constraints for HESSE..." << std::endl;
+//      initializeMinimizer(true);
 
       LogWarning << "────────────────" << std::endl;
       LogWarning << "Calling HESSE..." << std::endl;
@@ -822,7 +822,25 @@ void FitterEngine::writePostFitData() {
 
       preFitErrorHist->GetXaxis()->SetBinLabel(1 + par.getParameterIndex(), par.getTitle().c_str());
       preFitErrorHist->SetBinContent( 1 + par.getParameterIndex(), par.getPriorValue() );
-      if(par.isEnabled()) preFitErrorHist->SetBinError( 1 + par.getParameterIndex(), par.getStdDevValue() );
+      if( par.isEnabled() and not par.isFixed() ){
+
+        double priorFraction = TMath::Sqrt((*covMatrix)[par.getParameterIndex()][par.getParameterIndex()]) / par.getStdDevValue();
+
+        std::stringstream ss;
+
+        if( priorFraction < 1E-2 ) ss << GenericToolbox::ColorCodes::yellowBackGround;
+        if( priorFraction > 1 ) ss << GenericToolbox::ColorCodes::redBackGround;
+
+        ss << "Postfit error of \"" << parSet.getName() << "/" << par.getTitle() << "\": "
+        << TMath::Sqrt((*covMatrix)[par.getParameterIndex()][par.getParameterIndex()])
+        << " (" << priorFraction * 100
+        << "% of the prior)" << GenericToolbox::ColorCodes::resetColor
+        << std::endl;
+
+        LogInfo << ss.str();
+
+        preFitErrorHist->SetBinError( 1 + par.getParameterIndex(), par.getStdDevValue() );
+      }
     }
 
     LogTrace << "Cosmetics..." << std::endl;

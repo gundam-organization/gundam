@@ -197,6 +197,15 @@ void PhysicsEvent::deleteLeaf(long index_){
   _leafContentList_.erase(_leafContentList_.begin() + index_);
   _leafContentList_.shrink_to_fit();
 }
+void PhysicsEvent::trimDialCache(){
+  size_t newSize{0};
+  for( auto& dial : _rawDialPtrList_ ){
+    if( dial == nullptr ) break;
+    newSize++;
+  }
+  _rawDialPtrList_.resize(newSize);
+  _rawDialPtrList_.shrink_to_fit();
+}
 
 std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p ){
   o << p.getSummary();
