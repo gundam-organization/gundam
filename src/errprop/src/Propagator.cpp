@@ -407,14 +407,16 @@ void Propagator::reweightSampleEvents(int iThread_) {
     iThread_ = 0;
   }
 
+  int iEvent;
   int nEvents;
   std::vector<PhysicsEvent>* evList{nullptr};
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
     evList = &sample.getMcContainer().eventList;
+    iEvent = iThread_;
     nEvents = int(evList->size());
-    while( iThread_ < nEvents ){
+    while( iEvent < nEvents ){
       (*evList)[iThread_].reweightUsingDialCache();
-      iThread_ += nThreads;
+      iEvent += nThreads;
     }
   }
 
