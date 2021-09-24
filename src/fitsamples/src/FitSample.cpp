@@ -40,7 +40,6 @@ void FitSample::setConfig(const nlohmann::json &config_) {
 }
 
 void FitSample::initialize() {
-  LogWarning << __METHOD_NAME__ << std::endl;
 
   LogAssert(not _config_.empty(), GET_VAR_NAME_VALUE(_config_.empty()));
 
@@ -50,6 +49,8 @@ void FitSample::initialize() {
     LogWarning << "\"" << _name_ << "\" is disabled." << std::endl;
     return;
   }
+
+  LogInfo << "Initializing FitSample: " << _name_ << std::endl;
 
   _selectionCuts_ = JsonUtils::fetchValue(_config_, "selectionCuts", _selectionCuts_);
   _dataSetsSelections_ = JsonUtils::fetchValue(_config_, "dataSets", _dataSetsSelections_);

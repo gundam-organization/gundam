@@ -71,6 +71,9 @@ private:
   std::vector<std::shared_ptr<Dial>> _dialList_;
   DialType::DialType _globalDialType_;
 
+public:
+  static bool _verboseMode_;
+
 };
 
 

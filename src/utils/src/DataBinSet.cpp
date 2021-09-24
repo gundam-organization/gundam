@@ -13,6 +13,7 @@
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[DataBinSet]");
+  Logger::setMaxLogLevel(Logger::LogLevel::INFO);
 } )
 
 DataBinSet::DataBinSet() {
@@ -30,7 +31,7 @@ void DataBinSet::setName(const std::string &name) {
 }
 void DataBinSet::readBinningDefinition(const std::string &filePath_) {
 
-  LogInfo << "Reading binning definition from: \"" << filePath_ << "\"" << std::endl;
+  LogDebug << "Reading binning definition from: \"" << filePath_ << "\"" << std::endl;
   _filePath_ = filePath_;
 
   if( not GenericToolbox::doesPathIsFile(filePath_) ){
@@ -148,7 +149,7 @@ void DataBinSet::readBinningDefinition(const std::string &filePath_) {
     }
   }
 
-  LogInfo << _binsList_.size() << " bins have been defined." << std::endl;
+  LogDebug << _binsList_.size() << " bins have been defined." << std::endl;
 
 }
 

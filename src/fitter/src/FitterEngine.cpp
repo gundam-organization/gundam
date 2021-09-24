@@ -917,7 +917,7 @@ void FitterEngine::rescaleParametersStepSize(){
       double deltaChi2 = _chi2Buffer_ - baseChi2;
       double deltaChi2Pulls = _chi2PullsBuffer_ - baseChi2Pull;
       double stepSize = par.getStdDevValue() * 0.01 * TMath::Sqrt(deltaChi2Pulls)/TMath::Sqrt(deltaChi2);
-      LogInfo << "Step size of " << parSet.getName() + "/" + par.getTitle() << " -> " << stepSize << std::endl;
+      LogInfo << "Step size of " << parSet.getName() + "/" + par.getTitle() << " -> σ x " << 0.01 << " x " << TMath::Sqrt(deltaChi2Pulls)/TMath::Sqrt(deltaChi2) << std::endl;
 
       par.setStepSize( stepSize );
       par.setParameterValue( currentParValue );
@@ -936,7 +936,7 @@ void FitterEngine::rescaleParametersStepSize(){
         double deltaChi2 = _chi2Buffer_ - baseChi2;
         double deltaChi2Pulls = _chi2PullsBuffer_ - baseChi2Pull;
         double stepSize = parSet.getEigenSigma(iEigen) * 0.01 * TMath::Sqrt(deltaChi2Pulls)/TMath::Sqrt(deltaChi2);
-        LogInfo << "Step size of " << parSet.getName() + "/eigen_#" << iEigen << " -> " << stepSize << std::endl;
+        LogInfo << "Step size of " << parSet.getName() + "/eigen_#" << iEigen << " -> σ x " << 0.01 << " x " << TMath::Sqrt(deltaChi2Pulls)/TMath::Sqrt(deltaChi2) << std::endl;
 
         parSet.setEigenParStepSize(iEigen, stepSize);
         parSet.setEigenParameter(iEigen, currentParValue);

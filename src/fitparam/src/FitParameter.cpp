@@ -54,9 +54,6 @@ void FitParameter::setName(const std::string &name) {
   _name_ = name;
 }
 void FitParameter::setParameterValue(double parameterValue) {
-//  if( _isFixed_ and _parameterValue_ != parameterValue ){
-//    LogDebug << "CHANGING FIXED " << getTitle() << ": " << _parameterValue_ << " -> " << parameterValue << std::endl;
-//  }
   _parameterValue_ = parameterValue;
 }
 void FitParameter::setPriorValue(double priorValue) {
@@ -83,28 +80,23 @@ void FitParameter::setStepSize(double stepSize) {
 
 void FitParameter::initialize() {
 
-  LogTrace << GET_VAR_NAME_VALUE(this) << std::endl;
-
+  LogThrowIf(_parameterIndex_ == -1, "Parameter index is not set.");
   LogThrowIf(_priorValue_ == std::numeric_limits<double>::quiet_NaN(), "Prior value is not set.");
   LogThrowIf(_stdDevValue_ == std::numeric_limits<double>::quiet_NaN(), "Std dev value is not set.");
   LogThrowIf(_parameterValue_ == std::numeric_limits<double>::quiet_NaN(), "Parameter value is not set.");
-  LogThrowIf(_parameterIndex_ == -1, "Parameter index is not set.");
-
-  LogDebug << "Initializing Parameter " << getTitle() << std::endl;
 
   _stepSize_ = _stdDevValue_ * 0.01; // default
 
   if( not _parameterConfig_.empty() ){
     _isEnabled_ = JsonUtils::fetchValue(_parameterConfig_, "isEnabled", true);
     if( not _isEnabled_ ) {
-      LogDebug << getTitle() << " is marked as not Enabled." << std::endl;
+      LogWarning << getTitle() << " is marked as not Enabled." << std::endl;
       return;
     }
     _priorValue_ = JsonUtils::fetchValue(_parameterConfig_, "priorValue", _priorValue_);
     _dialDefinitionsList_ = JsonUtils::fetchValue(_parameterConfig_, "dialSetDefinitions", _dialDefinitionsList_);
   }
 
-  LogDebug << "Defining associated dials..." << std::endl;
   _dialSetList_.reserve(_dialDefinitionsList_.size());
   for( const auto& dialDefinitionConfig : _dialDefinitionsList_ ){
     _dialSetList_.emplace_back();
@@ -125,7 +117,7 @@ void FitParameter::initialize() {
     }
   }
   if( dialSetAreAllDisabled ){
-    LogWarning << "Parameter " << getTitle() << " has no dials: disabled." << std::endl;
+    LogError << "Parameter " << getTitle() << " has no dials: disabled." << std::endl;
     _isEnabled_ = false;
   }
 

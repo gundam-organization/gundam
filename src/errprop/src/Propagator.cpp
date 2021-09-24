@@ -407,32 +407,41 @@ void Propagator::reweightSampleEvents(int iThread_) {
     iThread_ = 0;
   }
 
-//  int iEvent;
-//  int nEvents;
-//  std::vector<PhysicsEvent>* evList{nullptr};
-//  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-//    evList = &sample.getMcContainer().eventList;
-//    iEvent = iThread_;
-//    nEvents = int(evList->size());
-//    while( iEvent < nEvents ){
-//      (*evList)[iThread_].reweightUsingDialCache();
-//      iEvent += nThreads;
-//    }
-//  }
+  //! Warning: everything you modify here, may significantly slow down the fitter
 
-  PhysicsEvent* evPtr{nullptr};
-  PhysicsEvent* evLastPtr{nullptr};
+  // This loop is slightly faster that the next one (~1% faster)
+  // Memory needed: 2*32bits(int) + 64bits(ptr)
+  // 3 write per sample
+  // 1 write per event
+  int iEvent;
+  int nEvents;
+  std::vector<PhysicsEvent>* evList{nullptr};
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    if( sample.getMcContainer().eventList.empty() ) continue;
-    evPtr = &sample.getMcContainer().eventList[iThread_];
-    evLastPtr = &sample.getMcContainer().eventList.back();
-
-    while( evPtr <= evLastPtr ){
-      if( evPtr == nullptr ) break;
-      evPtr->reweightUsingDialCache();
-      evPtr += nThreads;
+    evList = &sample.getMcContainer().eventList;
+    iEvent = iThread_;
+    nEvents = int(evList->size());
+    while( iEvent < nEvents ){
+      (*evList)[iEvent].reweightUsingDialCache();
+      iEvent += nThreads;
     }
   }
+
+//  // Slower loop
+//  // Memory: 2*64bits
+//  // per sample: 1 read, 2 writes (each requires to fetch the event array multiple times)
+//  // 1 write per event
+//  PhysicsEvent* evPtr{nullptr};
+//  PhysicsEvent* evLastPtr{nullptr};
+//  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+//    if( sample.getMcContainer().eventList.empty() ) continue;
+//    evPtr = &sample.getMcContainer().eventList[iThread_];
+//    evLastPtr = &sample.getMcContainer().eventList.back();
+//
+//    while( evPtr <= evLastPtr ){
+//      evPtr->reweightUsingDialCache();
+//      evPtr += nThreads;
+//    }
+//  }
 
 }
 void Propagator::fillEventDialCaches(int iThread_){

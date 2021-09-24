@@ -16,8 +16,11 @@
 #include "NormalizationDial.h"
 #include "SplineDial.h"
 
+bool DialSet::_verboseMode_{false};
+
 LoggerInit([](){
   Logger::setUserHeaderStr("[DialSet]");
+  if( not DialSet::_verboseMode_ ) Logger::setMaxLogLevel(Logger::LogLevel::INFO);
 })
 
 

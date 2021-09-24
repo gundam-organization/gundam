@@ -14,6 +14,7 @@
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[JsonUtils]");
+  Logger::setMaxLogLevel(Logger::LogLevel::INFO);
 } )
 
 namespace JsonUtils{
@@ -27,8 +28,6 @@ namespace JsonUtils{
     nlohmann::json output;
 
     if( GenericToolbox::doesFilePathHasExtension(configFilePath_, "yml") or GenericToolbox::doesFilePathHasExtension(configFilePath_,"yaml") ){
-      LogDebug << "YAML input file detected" << std::endl;
-
       auto yaml = YamlUtils::readConfigFile(configFilePath_);
       output = YamlUtils::toJson(yaml);
     }
@@ -49,7 +48,7 @@ namespace JsonUtils{
   }
   void forwardConfig(nlohmann::json& config_, const std::string& className_){
     while( config_.is_string() ){
-      LogWarning << "Forwarding " << (className_.empty()? "": className_ + " ") << "config: \"" << config_.get<std::string>() << "\"" << std::endl;
+      LogDebug << "Forwarding " << (className_.empty()? "": className_ + " ") << "config: \"" << config_.get<std::string>() << "\"" << std::endl;
       config_ = JsonUtils::readConfigFile(config_.get<std::string>());
     }
   }
