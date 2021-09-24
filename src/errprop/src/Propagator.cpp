@@ -407,16 +407,29 @@ void Propagator::reweightSampleEvents(int iThread_) {
     iThread_ = 0;
   }
 
-  int iEvent;
-  int nEvents;
-  std::vector<PhysicsEvent>* evList{nullptr};
+//  int iEvent;
+//  int nEvents;
+//  std::vector<PhysicsEvent>* evList{nullptr};
+//  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+//    evList = &sample.getMcContainer().eventList;
+//    iEvent = iThread_;
+//    nEvents = int(evList->size());
+//    while( iEvent < nEvents ){
+//      (*evList)[iThread_].reweightUsingDialCache();
+//      iEvent += nThreads;
+//    }
+//  }
+
+  PhysicsEvent* evPtr{nullptr};
+  PhysicsEvent* evLastPtr{nullptr};
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    evList = &sample.getMcContainer().eventList;
-    iEvent = iThread_;
-    nEvents = int(evList->size());
-    while( iEvent < nEvents ){
-      (*evList)[iThread_].reweightUsingDialCache();
-      iEvent += nThreads;
+    evPtr = &sample.getMcContainer().eventList[iThread_];
+    evLastPtr = &sample.getMcContainer().eventList.back();
+
+    while( evPtr < evLastPtr ){
+      if( evPtr == nullptr ) break;
+      evPtr->reweightUsingDialCache();
+      evPtr += nThreads;
     }
   }
 
