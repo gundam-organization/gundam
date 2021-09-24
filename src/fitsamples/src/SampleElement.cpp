@@ -110,6 +110,8 @@ void SampleElement::refillHistogram(int iThread_){
     iThread_ = 0;
   }
 
+  // Faster that pointer shifter. -> would be slower if refillHistogram is handled by the propagator
+
   // Size = Nbins + 2 overflow (0 and last)
   auto* binContentArray = histogram->GetArray();
 
@@ -120,8 +122,7 @@ void SampleElement::refillHistogram(int iThread_){
     for( auto* eventPtr : perBinEventPtrList.at(iBin)){
       binContentArray[iBin+1] += eventPtr->getEventWeight();
     }
-    histogram->SetBinError(iBin+1, TMath::Sqrt(binContentArray[iBin+1]));
-
+    histogram->GetSumw2()->GetArray()[iBin+1] = TMath::Sqrt(binContentArray[iBin+1]);
     iBin += nbThreads;
   }
 }

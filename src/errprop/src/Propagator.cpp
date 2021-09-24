@@ -423,10 +423,11 @@ void Propagator::reweightSampleEvents(int iThread_) {
   PhysicsEvent* evPtr{nullptr};
   PhysicsEvent* evLastPtr{nullptr};
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    if( sample.getMcContainer().eventList.empty() ) continue;
     evPtr = &sample.getMcContainer().eventList[iThread_];
     evLastPtr = &sample.getMcContainer().eventList.back();
 
-    while( evPtr < evLastPtr ){
+    while( evPtr <= evLastPtr ){
       if( evPtr == nullptr ) break;
       evPtr->reweightUsingDialCache();
       evPtr += nThreads;
