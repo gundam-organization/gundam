@@ -1,6 +1,9 @@
 # Directories
 test/
 build/
+site/
+# inputs
+cmake-build-debug/
 
 # Misc Files
 *.root
@@ -9,6 +12,7 @@ build/
 *.nfs0*
 *.png
 *.ps
+*.pdf
 *.tar
 *.zip
 

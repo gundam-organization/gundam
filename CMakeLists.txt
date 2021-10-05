@@ -1,15 +1,15 @@
-cmake_minimum_required (VERSION 2.8 FATAL_ERROR)
+cmake_minimum_required (VERSION 3.5 FATAL_ERROR)
 
-project (xsLLhFitter)
-
-set (xsLLhFitter_VERSION_MAJOR 0)
-set (xsLLhFitter_VERSION_MINOR 1) #The q+1'th letter of the alphabet
+# Configure CMake project
+project(xsLLhFitter)
+set (xsLLhFitter_VERSION_MAJOR 1)
+set (xsLLhFitter_VERSION_MINOR 0)
 set (xsLLhFitter_VERSION_REVISION 0)
+set (xsLLhFitter_VERSION_STRING "${xsLLhFitter_VERSION_MAJOR}.${xsLLhFitter_VERSION_MINOR}.${xsLLhFitter_VERSION_REVISION}")
 
-set (VERBOSE TRUE)
-
-set (CMAKE_SKIP_BUILD_RPATH TRUE)
-
+set(VERBOSE TRUE)
+set(CMAKE_MACOSX_RPATH 1)
+set(CMAKE_SKIP_BUILD_RPATH TRUE)
 include(${CMAKE_SOURCE_DIR}/cmake/cmessage.cmake)
 
 #Changes default install path to be a subdirectory of the build dir.
@@ -22,26 +22,32 @@ endif()
 
 cmessage(STATUS "CMAKE_INSTALL_PREFIX: \"${CMAKE_INSTALL_PREFIX}\"")
 
-
 if(CMAKE_BUILD_TYPE STREQUAL "")
   set(CMAKE_BUILD_TYPE DEBUG)
 elseif(NOT DEFINED CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE DEBUG)
 endif()
 
-if(NOT DEFINED ENV{XSLLHFITTER})
-  cmessage(FATAL_ERROR "$XSLLHFITTER is not defined, please source the package setup.sh before building.")
+if(NOT DEFINED USE_STATIC_LINKS)
+    set(USE_STATIC_LINKS 0)
 endif()
 
+#if(NOT DEFINED ENV{XSLLHFITTER})
+#  cmessage(FATAL_ERROR "$XSLLHFITTER is not defined, please source the package setup.sh before building.")
+#endif()
+
 cmessage(STATUS "CMAKE_BUILD_TYPE: \"${CMAKE_BUILD_TYPE}\"")
+
 
 ################################################################################
 #                            Check Dependencies
 ################################################################################
 
-##################################  ROOT  ######################################
+set( LINK_LIBARY_LIST "" )
+
+# ROOT
 if ( NOT DEFINED ENV{ROOTSYS} )
-  cmessage (FATAL_ERROR "$ROOTSYS is not defined, please set up root first.")
+  cmessage(FATAL_ERROR "$ROOTSYS is not defined, please set up root first.")
 else()
   cmessage(STATUS "Using ROOT installed at $ENV{ROOTSYS}")
   set(CMAKE_ROOTSYS $ENV{ROOTSYS})
@@ -51,7 +57,7 @@ endif()
 if (USEROOTCMAKE)
   include ($ENV{ROOTSYS}/etc/cmake/FindROOT.cmake)
   if ( NOT ROOT_FOUND )
-    cmessage (FATAL_ERROR "[ROOT]: FindROOT.cmake could not be found, or did not execute as expected is ROOT installed in $ROOTSYS = $ENV{ROOTSYS}?")
+    cmessage(FATAL_ERROR "[ROOT]: FindROOT.cmake could not be found, or did not execute as expected is ROOT installed in $ROOTSYS = $ENV{ROOTSYS}?")
   endif()
 else()
   cmessage(STATUS "Including local GENERATE_ROOT_DICTIONARY implementation.")
@@ -61,50 +67,166 @@ endif()
 execute_process (COMMAND root-config --cflags OUTPUT_VARIABLE ROOT_CXX_FLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
 execute_process (COMMAND root-config --libs OUTPUT_VARIABLE ROOT_LD_FLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
 execute_process (COMMAND root-config --version OUTPUT_VARIABLE ROOT_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
-cmessage ( STATUS "[ROOT]: root-config --version: " ${ROOT_VERSION})
-cmessage ( STATUS "[ROOT]: root-config --cflags: " ${ROOT_CXX_FLAGS} )
-cmessage ( STATUS "[ROOT]: root-config --libs: " ${ROOT_LD_FLAGS} )
+cmessage(STATUS "[ROOT]: root-config --version: ${ROOT_VERSION}")
+cmessage(STATUS "[ROOT]: root-config --cflags: ${ROOT_CXX_FLAGS}")
+cmessage(STATUS "[ROOT]: root-config --libs: ${ROOT_LD_FLAGS}")
 
-################################## COMPILER ####################################
+# YAML-CPP
+find_package( yaml-cpp REQUIRED )
+if( yaml-cpp_FOUND )
+    cmessage(STATUS "yaml-cpp has been found: ${YAML_CPP_INCLUDE_DIR}")
+    include_directories( ${YAML_CPP_INCLUDE_DIR} )
+#    target_link_libraries( OptionParserExample ${YAML_CPP_LIBRARIES} )
+    list(APPEND LINK_LIBARY_LIST ${YAML_CPP_LIBRARIES})
+endif()
 
-set(CXX_WARNINGS "-Wall -Wno-unused-variable -Wno-sign-compare -Wno-unused-function -Wno-unused-but-set-variable -Wno-reorder")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 ${ROOT_CXX_FLAGS} ${CXX_WARNINGS} ")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fPIC -O3 ${ROOT_CXX_FLAGS} ${CXX_WARNINGS} ")
 
-if(CMAKE_BUILD_TYPE MATCHES DEBUG)
-  set(CURRENT_CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS_DEBUG})
-elseif(CMAKE_BUILD_TYPE MATCHES RELEASE)
-  set(CURRENT_CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS_RELEASE})
+################################################################################
+#                       SubModules
+################################################################################
+
+# SubModules
+
+## Add the CmdLineParser
+include_directories(submodules/simple-cpp-cmd-line-parser/include)
+if( yaml-cpp_FOUND )
+    add_definitions( -D CMDLINEPARSER_YAML_CPP_ENABLED=1 )
+endif()
+
+## Add the GenericToolbox
+include_directories(submodules/cpp-generic-toolbox/include)
+add_definitions( -D PROGRESS_BAR_ENABLE_RAINBOW=1 )
+add_definitions( -D PROGRESS_BAR_FILL_TAG="\\\"T2K\#"\\\" )
+
+## Add the Logger
+include_directories(submodules/simple-cpp-logger/include)
+
+
+if(${CMAKE_BUILD_TYPE} MATCHES Release)
+    add_definitions( -D LOGGER_MAX_LOG_LEVEL_PRINTED=6 )
+    add_definitions( -D LOGGER_PREFIX_LEVEL=3 )
+    add_definitions( -D LOGGER_ENABLE_COLORS=1 )
+    add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=1 )
+    add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {USER_HEADER}"\\\" )
 else()
-  cmessage(FATAL_ERROR "[ERROR]: Unknown CMAKE_BUILD_TYPE (\"${CMAKE_BUILD_TYPE}\"): Should be \"DEBUG\" or \"RELEASE\".")
+    add_definitions( -D LOGGER_MAX_LOG_LEVEL_PRINTED=6 )
+    add_definitions( -D LOGGER_PREFIX_LEVEL=3 )
+    add_definitions( -D LOGGER_ENABLE_COLORS=1 )
+    add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=1 )
+    add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {USER_HEADER} {FILELINE}"\\\" )
 endif()
 
-if (VERBOSE)
-  cmessage (STATUS "C++ Compiler      : " ${CXX_COMPILER_NAME})
-  cmessage (STATUS "    Release flags : " ${CMAKE_CXX_FLAGS_RELEASE})
-  cmessage (STATUS "    Debug flags   : " ${CMAKE_CXX_FLAGS_DEBUG})
-  cmessage (STATUS "    Link Flags    : " ${CMAKE_LINK_FLAGS})
+
+################################################################################
+#                            Compiler Setup
+################################################################################
+
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.8.5)
+        cmessage(STATUS "Detected GCC version: ${CMAKE_CXX_COMPILER_VERSION}")
+        cmessage(FATAL_ERROR "GCC version must be at least 4.8.5")
+    endif()
+elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 3.3)
+        cmessage(STATUS "Detected Clang version: ${CMAKE_CXX_COMPILER_VERSION}")
+        cmessage(FATAL_ERROR "Clang version must be at least 3.3")
+    endif()
+else()
+    #message(WARNING "You are using an untested compiler.")
 endif()
+
+# Fix behavior of CMAKE_CXX_STANDARD when targeting macOS.
+#if (POLICY CMP0025)
+#    cmake_policy(SET CMP0025 NEW)
+#endif ()
+#set(CMAKE_CXX_STANDARD 14)
+
+set(CMAKE_CXX_STANDARD 11)
+
+
+
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+option(CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ langauge (-std=gnu++14)." OFF)
+option(CXX_MARCH_FLAG "Enable cpu architecture specific optimzations." OFF)
+option(CXX_WARNINGS "Enable most C++ warning flags." ON)
+option(COLOR_OUTPUT "Enable colored terminal output." ON)
+option(TTYCHECK "Enable check if output is being sent to terminal/TTY." ON)
+
+include(FindOpenMP)
+if(OPENMP_FOUND)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+else()
+    cmessage(STATUS "OpenMP not found. Threading not available.")
+endif()
+
+if(CXX_MARCH_FLAG)
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native")
+endif()
+
+if(CXX_WARNINGS)
+#    set(CXX_WARNING_FLAGS "-Wall -Wno-unused-variable -Wno-sign-compare -Wno-unused-function -Wno-unused-but-set-variable -Wno-reorder")
+    set(CXX_WARNING_FLAGS "-Wall -Wno-unused-variable -Wno-sign-compare -Wno-unused-function -Wformat=0 -Wno-reorder")
+endif()
+
+if(NOT COLOR_OUTPUT)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNOCOLOR")
+endif()
+
+if(TTYCHECK)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DTTYCHECK")
+endif()
+
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${ROOT_CXX_FLAGS} ${CXX_WARNING_FLAGS}")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fPIC ${ROOT_CXX_FLAGS} ${CXX_WARNING_FLAGS}")
+
+if(VERBOSE)
+  cmessage (STATUS "C++ Compiler      : ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
+  cmessage (STATUS "C++ Release flags : ${CMAKE_CXX_FLAGS_RELEASE}")
+  cmessage (STATUS "C++ Debug flags   : ${CMAKE_CXX_FLAGS_DEBUG}")
+endif()
+
+################################################################################
+# CMake Generated
+###############################################################################
+
+configure_file( ${CMAKE_SOURCE_DIR}/cmake/versionConfig.h.in ${CMAKE_BINARY_DIR}/generated/versionConfig.h )
+include_directories( ${CMAKE_BINARY_DIR}/generated/ )
+
+
 
 ################################################################################
 #                            Specify Target Subdirs
 ################################################################################
 
-set(MODULES
-  anaevents
-  fitparam
-  xsecfit
-  utils
-  )
-set(MODULETargets "")
+set( MODULES
+        errprop
+        anaevents
+        fitparam
+        fitter
+        utils
+        fitsamples
+)
+#set(MODULETargets "")
+
+cmessage (STATUS "Setting up include directories...")
+include_directories( ${CMAKE_SOURCE_DIR}/include )
 foreach(mod ${MODULES})
-  cmessage (STATUS "Configuring directory: ${mod}/src")
-  add_subdirectory(${mod}/src)
+    cmessage (STATUS "Including headers of module: ${mod}")
+    include_directories( ${CMAKE_SOURCE_DIR}/src/${mod}/include )
 endforeach()
 
-add_subdirectory(src)
+
+cmessage (STATUS "Configuring modules...")
+foreach(mod ${MODULES})
+    cmessage (STATUS "Adding cmake module: ${mod}")
+    add_subdirectory( src/${mod} )
+endforeach()
+
+add_subdirectory(src/applications)
 
 configure_file(cmake/build_setup.sh.in
   "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/setup.sh" @ONLY)
 install(FILES
   "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/setup.sh" DESTINATION ${CMAKE_INSTALL_PREFIX})
+
+cmessage( STATUS "Tagged Version ${xsLLhFitter_VERSION_STRING}" )

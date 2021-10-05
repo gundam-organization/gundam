@@ -1,177 +1,173 @@
-# likelihoodFitter
+# Super-xsllhFitter (ND280UpFit branch)
 
-/*! \mainpage Overview
+## Introduction
 
- \section intro_sec Introduction
-This is the first commit and first documentation for the xsLLhFitter package. This file is designed to be read by doxygen and converted into documentation. To do this you can run doxygen on Doxyfile.dxy. In the future I'll use the lancs doxygen server.
+The goal of the Super-xsllhFitter is to provide a general purpose likelihood-based fit framework for performing sentivity studies for the upgraded ND280.
 
-For questions/comments/complaints/rants drop me an email: s.dolan@physics.ox.ac.uk
+The code is under very active development and to give some kind of stability, it is recommended you checkout/download a tagged version of the fitter.
 
-The idea of this package is to provide a tool that is as generic as possible to allow xsec analysers to try xsec extraction using a likelihood fit. The current state of the code and documentation is very much work in progress and is really not ready for general use. However, if you're desperate or fancy helping with development then read on!
+This document is currently all about the code for the fitter. For anything related to the principles behind the fitter, browse any of the following technotes: TN214, TN261, TN263, TN287, TN337, TN338.
 
-This document is currently all about the code for the fitter. For anything related to the principles behind the fitter, have a read of TN214, TN261, TN263 and TN287.
+## Installation
 
- \section install_sec Installation
+There are several requirements for building the fitter:
+- GCC 4.8.5+ or Clang 3.3+ (a C++11 enabled compiler)
+- CMake 3.5+
+- ROOT 5 or 6
 
- \subsection install_gmake Hand-spun gmake
-Before doing anything make sure you have root sourced. Next check the fitter out into some working area (cvs co xsLLhFitter -assuming you have your CVSROOT set to the ND280 repo). Change directory to the root of the fitter (/some/path/xsLLhFitter) and do the following:
+ROOT needs either Minuit or Minuit2 and optionally the MathMore package enabled to perform the minimization. The recommendation is to have both Minuit and Minuit2 enabled. In addition it is highly recommended to have a working OpenMP installation to take advantage of parallelism when running the code.
 
-$ make init
+To checkout a tagged version of the code using git:
 
-This creates softlinks in the ./include folder
+```bash
+git clone https://gitlab.com/cuddandr/xsLLhFitter.git
+git tag # find your suitable tag
+git checkout -b remotes/origin/ND280UpFit <tag>
+```
 
-$ make all
+This setup guide assumes that you've already set the following env variables.
 
-This will compile the fitter, leaving an exe called ccqefit.exe in /fitter/root/dir/bin
+```bash
+export REPO_DIR="/folder/path/where/your/store/your/git/repository"
+export BUILD_DIR="/folder/path/where/your/store/your/build/files"
+export INSTALL_DIR="/folder/path/where/your/store/your/installed/bin/files"
+```
 
-You can use make clean if you run into problems and need to start again
+In this guide `$REPO_DIR/xsllhFitter` is where the source code is placed, in `$BUILD_DIR/xsllhFitter` there will be your Makefiles and finally `$INSTALL_DIR/xsllhFitter` will contain the folders `bin` `lib`.
 
- \subsection install_cmake CMake
+Before building the code, you need to source the setup script.
 
-The only external dependency of the package is ROOT. Set up the ROOT environment
-before attempting to build by:
+```bash
+source $REPO_DIR/xsllhFitter/setup.sh
+```
 
-    $ source /path/to/ROOT/bin/thisroot.sh
+The first time this script is run it will notify you that it cannot find the build setup script, this is normal. The fitter is designed to be built in a build directory specified by the user and is configured using CMake.
 
-Then source the package setup script.
+To build (with default settings):
 
-    $ source /path/to/xsLLhFitter/setup.sh
+```bash
+cd $BUILD_DIR/xsLLhFitter
+cmake \
+      -DCMAKE_INSTALL_PREFIX:PATH=$INSTALL_DIR/xsLLhFitter \
+      -D CMAKE_BUILD_TYPE=RELEASE \
+      $REPO_DIR/xsLLhFitter/.
+```
 
-  this may take a few minutes to complete as it will check for CMake and download
-  and build the one from ND280Repo if it doesn't exist on your system.
-  The first time this script is run it will notify you that it cannot find the
-  build setup script, this is normal.
+The default build is `DEBUG`, which compiles the libraries statically and includes debugging symbols. The other build type is `RELEASE`, which can be enabled by either calling cmake with `-DCMAKE_BUILD_TYPE=RELEASE` or by using the ccmake command. The `RELEASE` build enables compiler optimizations, disables debug symbols, and builds/links the libraries as shared objects. Other options can be passed to CMake by using `-DOPTION_NAME=VALUE` when invoking cmake, or by using ccmake.
 
-To build:
+There are a few extra options to configure the build. The default option is listed in brackets:
+- CMAKE_CXX_EXTENSIONS [OFF]: Enable GNU extensions to C++ language (-std=gnu++11)
+- CXX_MARCH_FLAG [OFF]: Enable cpu architecture specific optimizations
+- CXX_WARNINGS [ON]: Enable most C++ warning flags
+- COLOR_OUTPUT [ON]: Enable colored terminal output
 
-    [1] $ mkdir build; cd build;
-    [2] $ cmake ../
-    [3] $ make install -j
-    [4] $ source $(uname)/setup.sh
+### CMake Finding Incorrect Compiler
 
-and you should be done. The default build is `DEBUG`, which compiles the libraries
-statically and includes debugging symbols. If [2] is replaced by
-`cmake -DCMAKE_BUILD_TYPE=RELEASE ../` then debugging symbols will be turned off,
-some compiler optimisations turned on and libraries will be build, and linked,
-as shared objects.
+CMake may not find the correct compiler when there are multiple available. If this is the case, set the compiler manually by either passing the `-DCMAKE_CXX_COMPILER` and `-DCMAKE_C_COMPILER` variables when configuring or exporting the `CC` and `CXX` variables before configuring. All previous build files will need to be deleted for cmake to reconfigure properly. For example:
 
-For future setups, the setup.sh in the package root will source the one installed
-alongside the executables and libraries and is the only setup this package needs.
-It will also source the ROOT installation used at configure time, so manual re-sourcing
-or setup script wrapping to include ROOT is not neccessary.
+```bash
+$ cmake -DCMAKE_CXX_COMPILER=/path/to/compiler/executable -DCMAKE_C_COMPILER=/path/to/compiler/executable ../
+```
 
- \subsubsection install_cmake_notes CMake Notes:
+Or by exporting shell variables:
 
-  * Unfortunately the default ROOT CMake script is provided broken on a number of
-    versions of ROOT. We will provide patches for the latest ND280 supported ROOT
-    version, but there are numerous ROOTTalk posts about the specific problems
-    and fixes for each problem.
+```bash
+$ export CC=/path/to/compiler/executable
+$ export CXX=/path/to/compiler/executable
+$ cmake ..
+```
 
- \section gettingstarted_sec Getting Started
+For future use, the root setup.sh script will perform all the necessary setup to run the fitter. Once configured with CMake, only the `make install` step needs to be performed if the code needs to be rebuilt/recompiled.
 
-I've provided enough sample input files for you to have a go at running the fitter with detector and most model systematics. This section will walk you through how to do this and explain the basic general use of the fitter along the way.  This section will not really cover generating your own inputs for the fitter or plotting the results nicely.
+## Running the Code
 
-The example is an Asimov (fake data==MC) 1D fit to extract a CC0Pi+Np(N>0) differential xsec in dpt bins (stored as D2 in the binning).
+The Super-xsllh Fitter is built to be a framework of tools which are designed to work together. There are the tools that produce inputs in the correct format, the main fit program, the error propagation, and a number of scripts which may or may not be useful. In addition, there is a set of programs designed to run T2KReWeight and produce splines which is currently not included in this repository.
 
-\subsection inpputs_subsec Inputs
+Good luck.
 
-The most important file is /src/ccqefit.cc. This is equivalent (although currently nowhere near as general) as the macros you may use to run xsTools. It takes inputs from you needed for fitting (e.g where are your data/MC/binning/covariance matrices/splines, what are your samples/POTs/regularisations etc.) and then sets up and runs a MINUIT based likelihood fitter.
+## xsllhFit
 
-The first couple of lines of ccqefit takes the location of the MC (fsel), fake data, the covariance matrices for detector and flux systematics, the binning and the default output file. It then takes the POT of the MC and fake data (so the MC can be scaled appropriately), the random seed and the regularisation strength.
+This program performs the minimization and fit to the data/MC producing a set of best-fit parameters and best-fit covariance matrix.
 
-As it stands, every time you change any of these in ccqefit.cc you'll need to recompile (make from root dir) but this headache is avoided by also allowing most of these options to be taken as command line arguments. Run the fitter as ccqefit.exe -h to see the tags you need to specify.
+It is designed to be run with a JSON configuration file. The usage of the command is as follows:
+```bash
+$ xsllhFit [-n] [-h] -j </path/to/config.json>
+```
+The `-j` flag is required and is config file for the fit. The `-n` flag does a "dry-run" of the fit where it is initialized, but the minimization is not performed. The `-h` displays the help output and available options.
 
-Now we've chosen some inputs to the fitter the code loads these in. There're a couple of bits of hard coding here that are described in the comments. If you're using the example files or currently don't care about systematics then you don't need to change any of this. If you do want to add your own systematics and the comments in the code don't make sense then let me know and I can help.
+### Configuration file
 
-\subsection samples_subsec Samples
+Examples in the repository. Full description coming soon.
 
-This takes up to around line 450 where we specify our samples. A sample is an event selection that characterises a particular final state topology which will have a particular detector acceptance. For example if you’re looking for just one muon from an FGD vertex then you’d probably want a sample where you see the muon in the TPC and a sample where you see the muon in the FGD. You can’t put these together since the smearing matrices (map from reco->truth of some variable) and efficiency corrections will be quite different for each. Samples can also be used to include sidebands (AKA control regions) in the fit. Samples must always be mutually exclusive so we don’t double count events.
-
-Samples are stored in the class AnySample which requires a number, a name and binning edges (derived from your binning input). The number should be the cutBranch leaf stored in the input tree (more on this later) which would normally correspond to the HL2 branch the sample comes from.
-
-There is no need to specify what sample corresponds to what type of signal or background since in the fitter all samples are treated identically. The fitter will `know’ what type of events the sample characterises since the sample will be effected much more by reweighting some background (or signal) than others.
-
-\subsection fittersettigns_subsec Setting up the fitter
-
-Below the section on samples (c. L500) the mode of the fitter are chosen. Parameters to fit must be pushed_back into the vector of AnaFitParameters called fitpara. In the ccqefit example all but the fit parameters (rather than the systematic –or nuisance- parameters) are commented out.
-
-If you want to uncomment the detector, xsec and pion FSI (not nucleon FSI!) parameters you should be able to (but the fit will take much longer).
-
-On line 600 the frequency of saving the fitter status in the output file is chosen (xsecfit.SetSaveMode). Here 1 corresponds to save once in every 10000 MINUIT calls. Then just below the fitter is finally set going (xsecfit.Fit). The fitter can be ran in one of three modes. Mode 3 is for extracting fit results whilst mode one is for making a stats only pulls study whilst mode 1 is for systematic pull studies. In the current incarnation of the fitter modes 1 and 3 are untested.
-
-\subsection outsideccqefit_subsec Settings beyond ccqefit.cc
-
-To configure the fitter for a new analysis the vast majority of changes only need to be to ccqefit. In the long run the ONLY changes should be to ccqefit. However, at the moment this isn’t quite the case.
-
-The most important non ccqefit setting is the signal definition i.e. what it is that you’re actually trying to measure. This is set in /fitparam/src/FitParameters.cc around line 100. There is a comment in the code above the if statement and an example. Typically you’ll set a signal using the ‘reaction` variable. This will typically be a category from HL2, in the example case it’s the mectopology category.  You can also add phase space cuts to your signal definition.
-
-\subsection runningfitter_subsec Running the fitter
-
-You’re now ready to run the fitter! Make sure everything is compiled and head to /bin. Then run ./ccqefit.exe and watch far too much output appear on your screen. An output file will be produced as specified in ccqefit (or by a –o tag to the exe if you prefer). There will also be an output txt file but ignore this for the moment, this is used for regularisation studies. The fit result (parameter values and errors) can be found by scrolling up a little, past the large correlation matrices printed to screen.
-
-The output root file first contains the distribution of events from each sample and reaction (elements of your category) in your chosen binning (reco and true) from the MC. It also contains the distribution of events in “AnyBins” which is just the distribution in the global bin number of the fitter (i.e. 2D binning collapsed into 1D). In this example only D2 is used (it’s dpt) D1 has only one bin that covers it’s entire phase space. In this way we use the 2D fitter to do a 1D fit.
-
-After this there’re histograms called things like evhist_sam0_iter0_... These are binned in global bin number and contain the data mc and fit (pred) results at iter 0. Since MINUIT hasn’t been called yet pred==MC and since this is an Asimov fit MC==data so these will all be the same.
-
-Under this is the chi2 reported by MINUIT and the fit result (the fitted value of each parameter) and error.
-
-Next is once again the distribution of events in each sample and reaction but this time the fitted result rather than what was in the MC.
-
-Finally the ``evhist_pred’’ histograms appear again but this time for the final MINUIT iteration (they’re actually listed twice, once with the iteration number and once with finalIter but these should be identical – this is just needed for my xsec drawing macro to work). If the fit is working then these should be similar to the evhist_sam0_iter0_data from earlier but since this example is an Asimov fit nothing should have actually moved.
-
-And that’s it. The fitter has ran and you’ve got some results out. How to plot these results in a way that makes them easy to interpret and and how to create your own inputs for the fitter will be covered in the next sections.
-
-
-\section plotting_sec Drawing the results
-There’s a macro to do this in /macros called calcXsecWithErrors for the example files this will work out the box. To make the overall result work for a new analysis you should only have to change the signal definition around line 144 and 149 and the pot of your MC on line 185. This is assuming you have less than 10 samples
-
-The macro is just for testing as it stands and is certainly not a very good drawing tool.
-
-The macro can be compiled in root (.L calcXsecWithErrors.cc+) and ran with calcXsecWithErrors(…). The arguments are the MC file location (e.g. inputs/NeutAirInputTree.root), the fit result file (e.g. bin/outfilename.root), the fake data filename (same as the MC in the example), the output root file name to store the plots in and finally the POT ratio between data and MC (1 in the example).
-
-The output file will contain some histograms and canvases. If there’s an _T then an efficiency correction has been applied (with the exclusion of xsecCanv since a cross section will always have to have had an efficiency correction applied). In general red is the fit result, green is fake data and blue is MC.
-
-Signal Comp (or SigComp_T) contains the truth result of the fit. How close the red is to the green (regardless of the blue) is a good measure of how well the fit is doing. Since the example is an Asimov fit all three should look the same.
-
-All Sample Comp contains the reco result of the fit. The green is what is actually measured in the detector. This is what the fit actually sees and fits so here the red should really be close to the green. If it’s not then there’s either something wrong with the fitter or your binning is too small compared to detector smearing effects.
-
-AllTruthAndRec shows the previous two canvases together.
-
-xsecCanv shows the overall flux integrated cross section extrapolated from the fit. This is just a scale factor and normalisation of bin width away from SigComp_T.
-
-The error bars are just the propagated error bars from the fit results. If you included all systematics, validated that your error are Gaussian and ran MINUIT in HESSE or MINOS mode (not documented here yet) then the error bars on the cross section are only missing the additional errors due to the efficiency correction.
-
-
-
-\section inputs_sec Inputs to the fitter
-\subsection treeconvert_subsec treeConvert.cc
-This very simple macro converts HL2 microtrees into the format needed for the fitter to work whilst allowing reweighting events and making additional cuts to test the fitter. The macro stores the analysis variables along with the proton and muon kinematic variables. If you want to look at pions then you’ll need to either replace the proton variables or add more information. This has a lot of hard coding and will need to be modified for any analysis that doesn’t use the numuCCZeroPi HL2 package. You’ll need to change the nbranches, accumToCut, when to use mom by range and, if you want to reweight the signal, the signal definition.
-
-treeConvert.cc can be compiled with root (.L treeConvert.cc+) and ran as follows:
-treeConvert(“path/to/HL2/microtree.root”, “default”, “truth”, “/path/to/output/tree.root”,  1.0, 0, 0, “varNameInHL2defaultTreeToStoreAsD1Rec”, “varNameInHL2defaultTreeToStoreAsD1True”, “varNameInHL2truthTreeToStoreAsD1TrueT” , “varNameInHL2defaultTreeToStoreAsD2Rec”, “varNameInHL2defaultTreeToStoreAsD2True”, “varNameInHL2truthTreeToStoreAsD2TrueT”)
-
-More instructions will be in future update.
-
-\subsection calcdetcov_subsec calcCovMat.C
-This macro (and the _fine version) are needed to calculate detector covariance matrices from HL2. If you have uniform binning then HL2 drawing tools can do this quicker and better. If you don’t have uniform binning I don’t think it can. If I’m wrong then please let me know! To make this work you should only have to change the binning section of the code. You’ll also need to tell ccqefit.cc where to find the binning for the coarse cov mat binning.
-
-All the macro does is calculate the covariance after throwing detector systematics in some chosen binning. The result is a covariance matrix (one with absolute values and one with relative values).
-
-More instructions will be in future update.
-
-\subsection calcdetcov_subsec genResponse
-The genResponce_dpt macro and script to run it uses xsTools neat reweighting functions to calculate response functions (pretty much the same as splines) for the fitter. To use this you’ll need to edit the macro to use your variable and your binning in addition to pointing the macro at your nd280 flux file. You’ll also have to have xsTools libraries sourced and used the appropriate xsTools macro to create reweight files.  You’ll have to edit the for loop to cover your samples (/HL2 cut branches) and relevant analysis category.
-
-You’ll also need to edit the script to point to your HL2 microtree you want to reweight and the path to the reweight files as well as only looping over the correct samples (topo) and category (reac).
-
-This will be made more general in the future. If you need it now and can’t understand what’s been done then drop me an email.
-
-More instructions will be in future update.
-
-\section adapting_sec Adapting the fitter to your analysis
-
-You’ll need to tell the fitter about your chosen reaction category if it isn’t mectopology. This is done in anaevents/src/AnySample. You should change nreac and names in the method GetSampleBreakdown to describe your category.
-
-If you are adding a different set of xsec or FSI systematics you’ll need to add the covariance matrices for them into ccqefit.cc but this also requires some hard coding outside of ccqefit.cc. In this case have a look at fitparam/src/XsecParameters.cc or fitparam/src/FSIParameters.cc. You’ll need to specify the steps and upper and lower limits of each parameter whilst also editing the for loops in StoreResponceFunctions to suit your samples and reactions.
-
- */
+## xsllhCalcXsec
+
+This program performs the error propgation and cross-section calculation using the post-fit file from `xsllhFit`.
+
+It is designed to be run with a JSON configuration file, and has CLI options which override certain options in the configure file. The usage of the command is as follows:
+```bash
+$ xsllhCalcXsec [-i,o,n,p,m,t,h] -j </path/to/config.json>
+USAGE: xsllhCalcXsec
+OPTIONS:
+-j : JSON input
+-i : Input file (overrides JSON config)
+-o : Output file (overrides JSON config)
+-n : Number of toys (overrides JSON config)
+-p : Use prefit covariance for error bands
+-m : Use mean of toys for covariance calculation
+-t : Save toys in output file
+-h : Print this usage guide
+```
+The `-j` flag is required and is the config file for the error propagation. The other flags are optional and take priority over the same options in the configure file if applicable.
+
+### Configuration file
+
+Examples in the repository. Full description coming soon.
+
+## xsllhTreeConvert
+
+This program provides a base for translating event trees into the format expected by the fit code. This has basic support for HighLAND2 files, but still may require analysis specific tweaks. The "flattree" for the fit contains a small set of variables for both selected and true events.
+
+It is designed to be run with a JSON configuration file. The usage of the command is as follows:
+```bash
+$ xsllhTreeConvert -j </path/to/config.json>
+```
+The `-j` flag is required and is the config file for the fit. Currently there are no other options; all settings are specified in the configure file.
+
+### Configuration file
+
+Examples in the repository. Full description coming soon.
+
+## xsllhDetVariations
+
+This program performs the calculation of the detector covariance for HighLAND2 files. The `all_syst` tree must be enabled in HighLAND2 along with the systematic variations to be included in the covariance matrix.
+
+It is designed to be run with a JSON configuration file. The usage of the command is as follows:
+```bash
+$ xsllhDetVar -j </path/to/config.json>
+```
+The `-j` flag is required and is the config file for the fit. Currently there are no other options; all settings are specified in the configure file.
+
+### Configuration file
+
+Examples in the repository. Full description coming soon.
+
+## xsllhXsecCov
+
+This program translates a text file containing the cross-section covariance matrix into a ROOT file for the fit.
+
+It is designed to be run using a series of command line options. The usage of the command is as follows:
+```bash
+$ xsllhXsecCov
+USAGE: xsllhXsecCov -i </path/to/cov.txt>
+OPTIONS
+-i : Input xsec file (.txt)
+-o : Output ROOT filename
+-m : Covariance matrix name
+-b : Add value to diagonal
+-r : Parameter mask
+-C : Calculate correlation matrix
+-I : Build INGRID covariance
+-S : Store as TMatrixT
+-h : Display this help message
+```
+The `-i` flag is required and is the cross-section covariance in a text file. The rest of the options are optional. The lowercase options take required parameters while the uppercase options are simple flags.
