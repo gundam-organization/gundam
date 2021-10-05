@@ -37,7 +37,7 @@ An example configuration file can be found in the repository. This is a descript
 
 ### Overview
 
-The HighLAND files are loaded and the kinematic variables and event weights are read for each toy and systematic and used to build a covariance matrix. First a set of histograms to hold the toys and average are initialize based on the `cov_sample_binning` and the options for each file are read in from the configuration file. The files are looped over and all the toys in a given file are processed and the events are placed into the appropriate sample histogram. Finally the covariance and correlation matrix are calculated from the toys, and the distribution of the toys for each covariance sample are saved in the ROOT file.
+The HighLAND files are loaded and the kinematic variables and event weights are read for each toy and systematic and used to build a covariance matrix. First a set of histograms to hold the toys and average are generateFormula based on the `cov_sample_binning` and the options for each file are read in from the configuration file. The files are looped over and all the toys in a given file are processed and the events are placed into the appropriate sample histogram. Finally the covariance and correlation matrix are calculated from the toys, and the distribution of the toys for each covariance sample are saved in the ROOT file.
 
 The binning for each sample uses the `BinManager` class to process the binning files and perform the indexing. When defining the variables to use for the covariance matrix, the variables must be in the same order as the binning file.
 
