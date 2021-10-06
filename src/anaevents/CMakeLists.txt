@@ -24,7 +24,7 @@ target_link_libraries( anaevents
 
 set_target_properties(
         anaevents PROPERTIES VERSION
-        "${xsLLhFitter_VERSION_MAJOR}.${xsLLhFitter_VERSION_MINOR}.${xsLLhFitter_VERSION_REVISION}")
+        "${gundam_VERSION_MAJOR}.${gundam_VERSION_MINOR}.${gundam_VERSION_REVISION}")
 set_target_properties(anaevents PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
 install(TARGETS anaevents DESTINATION lib)

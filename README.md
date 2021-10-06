@@ -1,12 +1,51 @@
-# Super-xsllhFitter (ND280UpFit branch)
+# GUNDAM — 風をあつめて
+
+![](./resources/images/banner.jpg)
+
+GUNDAM, for *Generic fitter for Upgraded Near Detector Analysis Methods*, is a suite
+of applications which aims at performing various statistical analysis with different
+purposes and setups. 
+
+The main framework offers a code structure which is capable of  handling parameters/errors
+propagation on a model and compare to experimental data. As an example, GUNDAM includes
+a likelihood-based fitter which was initially designed  to reproduce T2K's BANFF fit as
+a proof of concept.
+
+The applications are intended to be fully configurable with a set of YAML/JSON files, as
+the philosophy of this project is to avoid users having to put their hands into the code
+for each study. A lot of time and efforts are usually invested by various working groups
+to debug and optimize pieces of codes which does generic tasks. As GUNDAM is designed for
+maximize flexibility to accommodate various physics works, it allows to share optimizations
+and debugging for every project at once.
+
+## How do I get setup?
+
+### Compiling the code
+
+### Gathering inputs
+
+## Lineage
+
+GUNDAM was born as a fork of the *xsllhFitter* project which was developped and used by
+the cross-section working group of T2K. The original project can be found on *gitlab*:
+[https://gitlab.com/cuddandr/xsLLhFitter/-/tree/master](https://gitlab.com/cuddandr/xsLLhFitter/-/tree/master).
+
+GUNDAM has originally been developed as an alternative fitter to perform T2K oscillation
+analysis, and provide an expandable base on which the future studies with the *Upgraded
+ND280 Detectors*.
+
+# OLD DESCRIPTIONS:
 
 ## Introduction
 
-The goal of the Super-xsllhFitter is to provide a general purpose likelihood-based fit framework for performing sentivity studies for the upgraded ND280.
+The goal of the Super-xsllhFitter is to provide a general purpose likelihood-based fit framework
+for performing sentivity studies for the upgraded ND280.
 
-The code is under very active development and to give some kind of stability, it is recommended you checkout/download a tagged version of the fitter.
+The code is under very active development and to give some kind of stability, it is recommended
+you checkout/download a tagged version of the fitter.
 
-This document is currently all about the code for the fitter. For anything related to the principles behind the fitter, browse any of the following technotes: TN214, TN261, TN263, TN287, TN337, TN338.
+This document is currently all about the code for the fitter. For anything related to the principles
+behind the fitter, browse any of the following technotes: TN214, TN261, TN263, TN287, TN337, TN338.
 
 ## Installation
 

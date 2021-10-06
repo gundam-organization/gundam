@@ -12,7 +12,7 @@ set( APPLICATION_LIST
         xsllhPlot
         xsllhUnitTests
         xsllhXsecCov
-        xsllhFitter
+        gundamFitter
         YamlSandbox
 )
 

@@ -17,7 +17,7 @@
 #include "GlobalVariables.h"
 
 LoggerInit([](){
-  Logger::setUserHeaderStr("[xsllhFitter.cxx]");
+  Logger::setUserHeaderStr("[gundamFitter.cxx]");
 } )
 
 int main(int argc, char** argv){

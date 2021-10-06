@@ -28,7 +28,7 @@ target_link_libraries( fitsamples
 
 set_target_properties(
         fitsamples PROPERTIES VERSION
-        "${xsLLhFitter_VERSION_MAJOR}.${xsLLhFitter_VERSION_MINOR}.${xsLLhFitter_VERSION_REVISION}")
+        "${gundam_VERSION_MAJOR}.${gundam_VERSION_MINOR}.${gundam_VERSION_REVISION}")
 set_target_properties(fitsamples PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
 install(TARGETS fitsamples DESTINATION lib)

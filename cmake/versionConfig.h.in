@@ -2,10 +2,10 @@
 #define VERSION_CONFIG_H
 
 // define your version_libinterface
-#define VERSION_STR @xsLLhFitter_VERSION_STRING@
+#define VERSION_STR @gundam_VERSION_STRING@
 
 const char* getVersionStr(){
-  return @xsLLhFitter_VERSION_STRING@;
+  return @gundam_VERSION_STRING@;
 }
 
 #endif // VERSION_CONFIG_H

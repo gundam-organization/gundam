@@ -33,7 +33,7 @@ target_link_libraries( fitparam
 )
 
 set_target_properties(fitparam PROPERTIES VERSION
-  "${xsLLhFitter_VERSION_MAJOR}.${xsLLhFitter_VERSION_MINOR}.${xsLLhFitter_VERSION_REVISION}")
+  "${gundam_VERSION_MAJOR}.${gundam_VERSION_MINOR}.${gundam_VERSION_REVISION}")
 set_target_properties(fitparam PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
 install(TARGETS fitparam DESTINATION lib)

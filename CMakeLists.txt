@@ -1,11 +1,11 @@
 cmake_minimum_required (VERSION 3.5 FATAL_ERROR)
 
 # Configure CMake project
-project(xsLLhFitter)
-set (xsLLhFitter_VERSION_MAJOR 1)
-set (xsLLhFitter_VERSION_MINOR 0)
-set (xsLLhFitter_VERSION_REVISION 0)
-set (xsLLhFitter_VERSION_STRING "${xsLLhFitter_VERSION_MAJOR}.${xsLLhFitter_VERSION_MINOR}.${xsLLhFitter_VERSION_REVISION}")
+project(gundam)
+set (gundam_VERSION_MAJOR 1)
+set (gundam_VERSION_MINOR 0)
+set (gundam_VERSION_REVISION 0)
+set (gundam_VERSION_STRING "${gundam_VERSION_MAJOR}.${gundam_VERSION_MINOR}.${gundam_VERSION_REVISION}")
 
 set(VERBOSE TRUE)
 set(CMAKE_MACOSX_RPATH 1)
@@ -229,4 +229,4 @@ configure_file(cmake/build_setup.sh.in
 install(FILES
   "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/setup.sh" DESTINATION ${CMAKE_INSTALL_PREFIX})
 
-cmessage( STATUS "Tagged Version ${xsLLhFitter_VERSION_STRING}" )
+cmessage( STATUS "Tagged Version ${gundam_VERSION_STRING}" )
