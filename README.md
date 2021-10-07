@@ -18,21 +18,133 @@ to debug and optimize pieces of codes which does generic tasks. As GUNDAM is des
 maximize flexibility to accommodate various physics works, it allows to share optimizations
 and debugging for every project at once.
 
+## Showcase
+
+![](./resources/images/samplesExample.png)
+![](./resources/images/postFitCorrExample.png)
+
+
 ## How do I get setup?
+
+### Prerequisites
+
+There are several requirements for building the fitter:
+- GCC 4.8.5+ or Clang 3.3+ (a C++11 enabled compiler)
+- CMake 3.5+
+- [ROOT 6](https://github.com/root-project/root)
+- [JSON for Modern C++](https://github.com/nlohmann/json)
+- [yaml-cpp](https://github.com/jbeder/yaml-cpp)
+
+### Shell setup
+
+In this guide, it is assumed you have already defined the following bash environment
+variables:
+
+- `$REPO_DIR`: the path to the folder where your git projects are stored. This guide
+will download this repo into the subdirectory `$REPO_DIR/gundam`.
+
+- `$BUILD_DIR`: the path where the binaries are built. As for the previous variables,
+this guide will work under `$BUILD_DIR/gundam`.
+
+- `$INSTALL_DIR`: the path where the binaries are installed and used by the shell.
+Same here: this guide will work under `$INSTALL_DIR/gundam`.
+
+As an example, here is how I personally define those variables. This script is executed
+in the `$HOME/.bash_profile` on macOS or `$HOME/.bashrc` on Linux, as they can be used
+for other projects as well.
+
+```bash
+export INSTALL_DIR="$HOME/Documents/Work/Install/"
+export BUILD_DIR="$HOME/Documents/Work/Build/"
+export REPO_DIR="$HOME/Documents/Work/Repositories/"
+```
+
+If it's the first time you define those, don't forget to `mkdir`!
+
+```bash
+mkdir -p $INSTALL_DIR
+mkdir -p $BUILD_DIR
+mkdir -p $REPO_DIR
+```
+
+### Cloning repository
+
+```bash
+cd $REPO_DIR
+git clone https://github.com/nadrino/gundam.git
+cd $REPO_DIR/gundam
+```
+
+As a user, it is recommended for you to check out the latest tagged version of this
+repository:
+
+```bash
+git checkout $(git describe --tags `git rev-list --tags --max-count=1`)
+```
+
+GUNDAM depends on additional libraries which are included as submodules of this git
+project. It is necessary to download those:
+
+```bash
+git submodule update --init --recursive
+```
+
+### Updating your repository
+
+Pull the latest version on github with the following commands:
+
+```bash
+cd $REPO_DIR/gundam
+git pull
+git submodule update --remote
+cd -
+```
 
 ### Compiling the code
 
+Let's create the Build and Install folder:
+
+```bash
+mkdir -p $BUILD_DIR/gundam
+mkdir -p $INSTALL_DIR/gundam
+```
+
+Now let's generate binaries:
+
+```bash
+cd $BUILD_DIR/gundam
+cmake \
+  -DCMAKE_INSTALL_PREFIX:PATH=$INSTALL_DIR/gundam \
+  -D CMAKE_BUILD_TYPE=Release \
+  $REPO_DIR/gundam/.
+make -j 4 install
+```
+
+If you did get there without error, congratulations! Now GUNDAM is installed on you machine :-D.
+
+To access the executables from anywhere, you have to update you `$PATH` and `$LD_LIBRARY_PATH`
+variables:
+
+```bash
+export PATH="$INSTALL_DIR/gundam/bin:$PATH"
+export LD_LIBRARY_PATH="$INSTALL_DIR/gundam/lib:$LD_LIBRARY_PATH"
+```
+
+
 ### Gathering inputs
+
+## I want to contribute!
 
 ## Lineage
 
 GUNDAM was born as a fork of the *xsllhFitter* project which was developped and used by
 the cross-section working group of T2K. The original project can be found on *gitlab*:
-[https://gitlab.com/cuddandr/xsLLhFitter/-/tree/master](https://gitlab.com/cuddandr/xsLLhFitter/-/tree/master).
+[https://gitlab.com/cuddandr/xsLLhFitter](https://gitlab.com/cuddandr/xsLLhFitter).
 
 GUNDAM has originally been developed as an alternative fitter to perform T2K oscillation
 analysis, and provide an expandable base on which the future studies with the *Upgraded
 ND280 Detectors*.
+
 
 # OLD DESCRIPTIONS:
 
