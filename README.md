@@ -4,7 +4,10 @@
 
 GUNDAM, for *Generic fitter for Upgraded Near Detector Analysis Methods*, is a suite
 of applications which aims at performing various statistical analysis with different
-purposes and setups. 
+purposes and setups. It has been developed as a fork of 
+[xsllhFitter](https://gitlab.com/cuddandr/xsLLhFitter), in the context of the Upgrade
+of ND280 for the T2K neutrino experiment.
+
 
 The main framework offers a code structure which is capable of  handling parameters/errors
 propagation on a model and compare to experimental data. As an example, GUNDAM includes
