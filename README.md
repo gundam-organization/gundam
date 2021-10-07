@@ -24,7 +24,14 @@ and debugging for every project at once.
 ## Showcase
 
 ![](./resources/images/samplesExample.png)
+
+<details>
+  <summary><b>Spoiler: More Screenshots</b></summary>
+
 ![](./resources/images/postFitCorrExample.png)
+
+</details>
+
 
 
 ## How do I get setup?
@@ -100,6 +107,7 @@ Pull the latest version on github with the following commands:
 cd $REPO_DIR/gundam
 git pull
 git submodule update --remote
+git checkout $(git describe --tags `git rev-list --tags --max-count=1`)
 cd -
 ```
 
