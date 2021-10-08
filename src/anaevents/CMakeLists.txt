@@ -19,7 +19,7 @@ endif()
 #endif()
 
 target_link_libraries( anaevents
-        xslfutils
+        GundamUtils
         )
 
 set_target_properties(

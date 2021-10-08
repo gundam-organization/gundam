@@ -1,6 +1,6 @@
 #include <utility>
 
-#include "../include/AnaSample.hh"
+#include "AnaSample.hh"
 #include "GlobalVariables.h"
 #include "Logger.h"
 #include "GenericToolbox.h"
