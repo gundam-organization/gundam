@@ -199,12 +199,12 @@ include_directories( ${CMAKE_BINARY_DIR}/generated/ )
 ################################################################################
 
 set( MODULES
-        errprop
-        anaevents
-        fitparam
-        fitter
-        utils
-        fitsamples
+    errprop
+    anaevents
+    fitparam
+    fitter
+    utils
+    fitsamples
 )
 #set(MODULETargets "")
 
@@ -219,10 +219,10 @@ endforeach()
 cmessage (STATUS "Configuring modules...")
 foreach(mod ${MODULES})
     cmessage (STATUS "Adding cmake module: ${mod}")
-    add_subdirectory( src/${mod} )
+    add_subdirectory( ${CMAKE_SOURCE_DIR}/src/${mod} )
 endforeach()
 
-add_subdirectory(src/applications)
+add_subdirectory( ${CMAKE_SOURCE_DIR}/src/applications )
 
 configure_file(cmake/build_setup.sh.in
   "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/setup.sh" @ONLY)
