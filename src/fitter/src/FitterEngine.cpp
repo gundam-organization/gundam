@@ -493,9 +493,12 @@ void FitterEngine::fit(){
           for( auto& par : parSet.getParameterList() ){
             iFitPar++;
             if( _minimizer_->IsFixedVariable(iFitPar) ) continue;
+
             LogInfo << "Evaluating: " << _minimizer_->VariableName(iFitPar) << "..." << std::endl;
             bool isOk = _minimizer_->GetMinosError(iFitPar, errLow, errHigh);
+#if ROOT_VERSION_CODE >= ROOT_VERSION(6,23,02)
             LogWarning << minosStatusCodeStr.at(_minimizer_->MinosStatus()) << std::endl;
+#endif
             if( isOk ){
               LogInfo << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh << std::endl;
             }
@@ -509,15 +512,18 @@ void FitterEngine::fit(){
           for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
             iFitPar++;
             if( _minimizer_->IsFixedVariable(iFitPar) ) continue;
-            LogDebug << "Evaluating: " << _minimizer_->VariableName(iFitPar) << "..." << std::endl;
+
+            LogInfo << "Evaluating: " << _minimizer_->VariableName(iFitPar) << "..." << std::endl;
             bool isOk = _minimizer_->GetMinosError(iFitPar, errLow, errHigh);
+#if ROOT_VERSION_CODE >= ROOT_VERSION(6,23,02)
+            LogWarning << minosStatusCodeStr.at(_minimizer_->MinosStatus()) << std::endl;
+#endif
             if( isOk ){
               LogInfo << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh << std::endl;
             }
             else{
-              LogError << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh << " - MINOS returned an error: "
-                       //          << _minimizer_->MinosStatus()
-                       << std::endl;
+              LogError << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh
+              << " - MINOS returned an error." << std::endl;
             }
           }
         }

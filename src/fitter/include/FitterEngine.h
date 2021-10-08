@@ -111,13 +111,13 @@ private:
       { -1, "status = -1    : Minimize wasn't called before"}
   };
   const std::map<int, std::string> minosStatusCodeStr{
-      { 0, "status = 0    : OK" },
+      { 0, "status = 0    : last MINOS run was succesfull" },
       { 1, "status = 1    : Maximum number of function calls exceeded when running for lower error"},
       { 2, "status = 2    : maximum number of function calls exceeded when running for upper error"},
       { 3, "status = 3    : new minimum found when running for lower error"},
       { 4, "status = 4    : new minimum found when running for upper error"},
       { 5, "status = 5    : any other failure"},
-      { -1, "status = -1    : Unknown error?"}
+      { -1, "status = -1   : Minos is not run"}
   };
 
 };
