@@ -113,7 +113,7 @@ private:
   std::shared_ptr<TMatrixDSymEigen> _eigenDecomp_{nullptr};
   std::shared_ptr<TVectorD> _eigenValues_{nullptr};
   std::shared_ptr<TMatrixD> _eigenVectors_{nullptr};
-  std::shared_ptr<TMatrixD> _invertedEigenVectors_{nullptr};
+  std::shared_ptr<TMatrixD> _eigenVectorsInv_{nullptr};
   std::shared_ptr<TMatrixDSym> _projectorMatrix_{nullptr};
   std::shared_ptr<TMatrixDSym> _inverseCovarianceMatrix_{nullptr};
   std::shared_ptr<TMatrixDSym> _originalCorrelationMatrix_{nullptr};

@@ -68,7 +68,7 @@ void FitterEngine::initialize() {
   }
 
   this->rescaleParametersStepSize();
-  if( JsonUtils::fetchValue(_config_, "fixGhostParameters", true) ) this->fixGhostParameters();
+  if( JsonUtils::fetchValue(_config_, "fixGhostFitParameters", false) ) this->fixGhostFitParameters();
 
   _convergenceMonitor_.addDisplayedQuantity("VarName");
   _convergenceMonitor_.addDisplayedQuantity("LastAddedValue");
@@ -210,7 +210,7 @@ void FitterEngine::generateOneSigmaPlots(const std::string& savePath_){
 
 }
 
-void FitterEngine::fixGhostParameters(){
+void FitterEngine::fixGhostFitParameters(){
   LogInfo << __METHOD_NAME__ << std::endl;
 
   _propagator_.allowRfPropagation(); // since we don't need the weight of each event (only the Chi2 value)
@@ -224,8 +224,8 @@ void FitterEngine::fixGhostParameters(){
   std::stringstream ssPrint;
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 
-    if( not JsonUtils::fetchValue(parSet.getJsonConfig(), "fixGhostParameters", true) ) {
-      LogWarning << "Skipping \"" << parSet.getName() << "\" as fixGhostParameters is set to false" << std::endl;
+    if( not JsonUtils::fetchValue(parSet.getJsonConfig(), "fixGhostFitParameters", true) ) {
+      LogWarning << "Skipping \"" << parSet.getName() << "\" as fixGhostFitParameters is set to false" << std::endl;
       if( not parSet.isUseEigenDecompInFit() ) iFitPar += parSet.getNbParameters();
       else iFitPar += parSet.getNbEnabledEigenParameters();
       continue;
@@ -435,16 +435,16 @@ void FitterEngine::fit(){
   int nbMinimizeCalls = _nbFitCalls_;
   LogInfo << _convergenceMonitor_.generateMonitorString(); // lasting printout
   LogInfo << "Minimization ended after " << nbMinimizeCalls << " calls." << std::endl;
+  LogWarning << "Status code: " << minuitStatusCodeStr.at(_minimizer_->Status()) << std::endl;
   _chi2HistoryTree_->Write();
 
   if( _fitHasConverged_ ){
-    LogInfo << "Fit converged!" << std::endl
-            << "Status code: " << _minimizer_->Status() << std::endl;
+    LogInfo << "Fit converged!" << std::endl;
 
     LogInfo << "Evaluating post-fit errors..." << std::endl;
 
     std::string errorAlgo = JsonUtils::fetchValue(_minimizerConfig_, "errors", "Hesse");
-    if( errorAlgo == "Minos" ){
+    if     ( errorAlgo == "Minos" ){
 
       // Put back at minimum
       iFitPar = -1;
@@ -493,15 +493,15 @@ void FitterEngine::fit(){
           for( auto& par : parSet.getParameterList() ){
             iFitPar++;
             if( _minimizer_->IsFixedVariable(iFitPar) ) continue;
-            LogDebug << "Evaluating: " << _minimizer_->VariableName(iFitPar) << "..." << std::endl;
+            LogInfo << "Evaluating: " << _minimizer_->VariableName(iFitPar) << "..." << std::endl;
             bool isOk = _minimizer_->GetMinosError(iFitPar, errLow, errHigh);
+            LogWarning << minosStatusCodeStr.at(_minimizer_->MinosStatus()) << std::endl;
             if( isOk ){
               LogInfo << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh << std::endl;
             }
             else{
-              LogError << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh << " - MINOS returned an error: "
-                       //          << _minimizer_->MinosStatus()
-                       << std::endl;
+              LogError << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh
+              << " - MINOS returned an error." << std::endl;
             }
           }
         }
@@ -557,25 +557,17 @@ void FitterEngine::fit(){
               << std::endl;
       _fitHasConverged_ = _minimizer_->Hesse();
       LogInfo << "Hesse ended after " << _nbFitCalls_ - nbMinimizeCalls << " calls." << std::endl;
+      LogWarning << "HESSE status code: " << hesseStatusCodeStr.at(_minimizer_->Status()) << std::endl;
 
-      //    LogDebug << "Extracting Hessian matrix..." << std::endl;
-//    double hessianArray[_minimizer_->NDim() * _minimizer_->NDim()];
-//    _minimizer_->GetHessianMatrix(hessianArray);
-//    TMatrixDSym hessianMatrix(int(_minimizer_->NDim()), hessianArray);
-//    hessianMatrix.Write("hessianMatrix");
-//    LogDebug << "Decomposing Hessian matrix..." << std::endl;
-//    TMatrixDSymEigen hessianDecomp(hessianMatrix);
-//    hessianDecomp.GetEigenValues().Print();
+      if(not _fitHasConverged_){
+        LogError  << "Hesse did not converge." << std::endl;
+      }
+      else{
+        LogInfo << "Hesse converged." << std::endl;
+      }
+
     }
 
-    if(not _fitHasConverged_){
-      LogError  << "Hesse did not converge." << std::endl;
-      LogError  << "Failed with status code: " << _minimizer_->Status() << std::endl;
-    }
-    else{
-      LogInfo << "Hesse converged." << std::endl
-              << "Status code: " << _minimizer_->Status() << std::endl;
-    }
     LogDebug << _convergenceMonitor_.generateMonitorString(); // lasting printout
   }
   else{

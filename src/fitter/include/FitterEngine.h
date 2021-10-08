@@ -45,7 +45,7 @@ public:
   void generateSamplePlots(const std::string& savePath_ = "");
   void generateOneSigmaPlots(const std::string& savePath_ = "");
 
-  void fixGhostParameters();
+  void fixGhostFitParameters();
   void scanParameters(int nbSteps_, const std::string& saveDir_ = "");
   void scanParameter(int iPar, int nbSteps_, const std::string& saveDir_ = "");
   void throwParameters(double gain_ = 1);
@@ -93,6 +93,32 @@ private:
 
   GenericToolbox::VariablesMonitor _convergenceMonitor_;
   GenericToolbox::CycleTimer _evalFitAvgTimer_;
+
+  const std::map<int, std::string> minuitStatusCodeStr{
+      { 0, "status = 0    : OK" },
+      { 1, "status = 1    : Covariance was mad  epos defined"},
+      { 2, "status = 2    : Hesse is invalid"},
+      { 3, "status = 3    : Edm is above max"},
+      { 4, "status = 4    : Reached call limit"},
+      { 5, "status = 5    : Any other failure"},
+      { -1, "status = -1    : Unknown error?"}
+  };
+  const std::map<int, std::string> hesseStatusCodeStr{
+      { 0, "status = 0    : OK" },
+      { 1, "status = 1    : Hesse failed"},
+      { 2, "status = 2    : Matrix inversion failed"},
+      { 3, "status = 3    : Matrix is not pos defined"},
+      { -1, "status = -1    : Minimize wasn't called before"}
+  };
+  const std::map<int, std::string> minosStatusCodeStr{
+      { 0, "status = 0    : OK" },
+      { 1, "status = 1    : Maximum number of function calls exceeded when running for lower error"},
+      { 2, "status = 2    : maximum number of function calls exceeded when running for upper error"},
+      { 3, "status = 3    : new minimum found when running for lower error"},
+      { 4, "status = 4    : new minimum found when running for upper error"},
+      { 5, "status = 5    : any other failure"},
+      { -1, "status = -1    : Unknown error?"}
+  };
 
 };
 

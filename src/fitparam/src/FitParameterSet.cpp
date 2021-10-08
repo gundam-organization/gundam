@@ -306,14 +306,14 @@ double FitParameterSet::getEigenParStepSize( int iPar_ ) const{
 }
 
 const TMatrixD* FitParameterSet::getInvertedEigenVectors() const{
-  return _invertedEigenVectors_.get();
+  return _eigenVectorsInv_.get();
 }
 const TMatrixD* FitParameterSet::getEigenVectors() const{
   return _eigenVectors_.get();
 }
 void FitParameterSet::propagateEigenToOriginal(){
   (*_originalParValues_) = (*_eigenParValues_);
-  (*_originalParValues_) *= (*_invertedEigenVectors_);
+  (*_originalParValues_) *= (*_eigenVectorsInv_);
   for( int iOrig = 0 ; iOrig < _originalParValues_->GetNrows() ; iOrig++ ){
     _parameterList_.at(iOrig).setParameterValue((*_originalParValues_)[iOrig]);
   }
@@ -398,28 +398,7 @@ void FitParameterSet::readCovarianceMatrix(){
 
     _eigenValues_ = std::shared_ptr<TVectorD>( (TVectorD*) _eigenDecomp_->GetEigenValues().Clone() );
     _eigenVectors_ = std::shared_ptr<TMatrixD>( (TMatrixD*) _eigenDecomp_->GetEigenVectors().Clone() );
-
-    auto *eigVDec = new TMatrixDSymEigen(*GenericToolbox::convertToSymmetricMatrix(_eigenVectors_.get()));
-//    eigVDec->GetEigenValues().Print();
-
-    _invertedEigenVectors_ = std::shared_ptr<TMatrixD>( (TMatrixD*) _eigenVectors_->Clone() );
-    _invertedEigenVectors_->Invert();
-
-//    auto* idTest = (TMatrixD*) _eigenVectors_->Clone();
-//    (*idTest) *= (*_invertedEigenVectors_);
-////    idTest->Print();
-//
-//    auto* vecTest = new TVectorD(_invertedEigenVectors_->GetNrows());
-//    for( int i = 0 ; i < vecTest->GetNrows() ; i++ ){
-//      (*vecTest)[i] = 1;
-//    }
-//    vecTest->Print();
-//
-//    (*vecTest) *= (*_eigenVectors_); // orig -> eigen
-//    vecTest->Print();
-//
-//    (*vecTest) *= (*_invertedEigenVectors_); // eigen -> orig
-//    vecTest->Print(); // should be 1
+    _eigenVectorsInv_ = std::shared_ptr<TMatrixD>(new TMatrixD(TMatrixD::kTransposed, *_eigenVectors_) );
 
     double eigenCumulative = 0;
     _nbEnabledEigen_ = 0;
