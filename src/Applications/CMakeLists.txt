@@ -5,7 +5,6 @@ set( APPLICATION_LIST
         xsllhFit
         xsllhTreeConvert
         xsllhGenWeightsFormater
-        xsllhDetCovGenerator
         xsllhGetDetParCov
         xsllhCalcXsec
         xsllhDetVariations
@@ -13,6 +12,7 @@ set( APPLICATION_LIST
         xsllhUnitTests
         xsllhXsecCov
         gundamFitter
+        gundamFlatTreeConverter
         YamlSandbox
 )
 

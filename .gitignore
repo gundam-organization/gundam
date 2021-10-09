@@ -4,6 +4,7 @@ build/
 site/
 # inputs
 cmake-build-debug/
+workDir/
 
 # Misc Files
 *.root
