@@ -134,7 +134,7 @@ void FitParameterSet::initialize() {
       LogError << "Could not find \"" << pathBuffer << "\" into \"" << _covarianceMatrixFile_->GetName() << "\"" << std::endl;
       throw std::runtime_error("TObject not found.");
     }
-    else if(_parameterNamesList_->GetSize() != _originalCovarianceMatrix_->GetNrows() ){
+    else if(_parameterNamesList_->GetEntries() != _originalCovarianceMatrix_->GetNrows() ){
       LogError << GET_VAR_NAME_VALUE(_parameterNamesList_->GetSize() != _originalCovarianceMatrix_->GetNrows()) << std::endl;
       throw std::runtime_error("TObject size mismatch.");
     }
