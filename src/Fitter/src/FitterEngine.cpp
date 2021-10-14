@@ -693,6 +693,9 @@ void FitterEngine::writePostFitData() {
   TMatrixDSym fitterCovarianceMatrix(int(_minimizer_->NDim()), covarianceMatrixArray);
   TH2D* fitterCovarianceMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) &fitterCovarianceMatrix, "fitterCovarianceMatrixTH2D");
 
+  auto* fitterCorrelationMatrix = (TMatrixDSym *) GenericToolbox::convertToCorrelationMatrix((TMatrixD*) &fitterCovarianceMatrix);
+  TH2D* fitterCorrelationMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) fitterCorrelationMatrix, "fitterCorrelationMatrixTH2D");
+
   LogInfo << "Fitter covariance matrix is " << fitterCovarianceMatrix.GetNrows() << "x" << fitterCovarianceMatrix.GetNcols() << std::endl;
 
   int parameterIndexOffset = 0;
@@ -722,6 +725,10 @@ void FitterEngine::writePostFitData() {
         fitterCovarianceMatrixTH2D->GetXaxis()->SetBinLabel(1 + parameterIndexOffset + par.getParameterIndex(),
                                                             (parSet.getName() + "/" + par.getTitle()).c_str());
         fitterCovarianceMatrixTH2D->GetYaxis()->SetBinLabel(1 + parameterIndexOffset + par.getParameterIndex(),
+                                                            (parSet.getName() + "/" + par.getTitle()).c_str());
+        fitterCorrelationMatrixTH2D->GetXaxis()->SetBinLabel(1 + parameterIndexOffset + par.getParameterIndex(),
+                                                            (parSet.getName() + "/" + par.getTitle()).c_str());
+        fitterCorrelationMatrixTH2D->GetYaxis()->SetBinLabel(1 + parameterIndexOffset + par.getParameterIndex(),
                                                             (parSet.getName() + "/" + par.getTitle()).c_str());
       }
     }
@@ -759,6 +766,8 @@ void FitterEngine::writePostFitData() {
 
         fitterCovarianceMatrixTH2D->GetXaxis()->SetBinLabel(1+parameterIndexOffset+iEigen, (parSet.getName() + "/eigen_#" + std::to_string(iEigen)).c_str());
         fitterCovarianceMatrixTH2D->GetYaxis()->SetBinLabel(1+parameterIndexOffset+iEigen, (parSet.getName() + "/eigen_#" + std::to_string(iEigen)).c_str());
+        fitterCorrelationMatrixTH2D->GetXaxis()->SetBinLabel(1+parameterIndexOffset+iEigen, (parSet.getName() + "/eigen_#" + std::to_string(iEigen)).c_str());
+        fitterCorrelationMatrixTH2D->GetYaxis()->SetBinLabel(1+parameterIndexOffset+iEigen, (parSet.getName() + "/eigen_#" + std::to_string(iEigen)).c_str());
       }
 
       GenericToolbox::mkdirTFile(parSetDir, "matrices")->cd();
@@ -886,6 +895,8 @@ void FitterEngine::writePostFitData() {
   errorDir->cd();
   fitterCovarianceMatrix.Write("fitterCovarianceMatrix_TMatrixDSym");
   fitterCovarianceMatrixTH2D->Write("fitterCovarianceMatrix_TH2D");
+  fitterCorrelationMatrix->Write("fitterCorrelationMatrix_TMatrixDSym");
+  fitterCorrelationMatrixTH2D->Write("fitterCorrelationMatrix_TH2D");
 
 }
 
