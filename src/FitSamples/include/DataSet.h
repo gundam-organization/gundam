@@ -27,27 +27,25 @@ public:
 
   bool isEnabled() const;
   const std::string &getName() const;
-  std::shared_ptr<TChain> &getMcChain();
-  std::shared_ptr<TChain> &getDataChain();
   std::vector<std::string> &getMcActiveLeafNameList();
   std::vector<std::string> &getDataActiveLeafNameList();
-  const std::string &getMcNominalWeightLeafName() const;
-  const std::string &getDataNominalWeightLeafName() const;
+  const std::string &getMcNominalWeightFormulaStr() const;
   const std::vector<std::string> &getRequestedLeafNameList() const;
   const std::vector<std::string> &getRequestedMandatoryLeafNameList() const;
   const std::vector<std::string> &getMcFilePathList() const;
   const std::vector<std::string> &getDataFilePathList() const;
 
   // Misc
+  TChain* buildChain(bool isData_);
+  TChain* buildMcChain();
+  TChain* buildDataChain();
   void print();
-
-protected:
-  void initializeChains();
 
 private:
   nlohmann::json _config_;
 
   // internals
+  bool _isInitialized_{false};
   bool _isEnabled_{false};
   std::string _name_;
 
@@ -55,17 +53,13 @@ private:
   std::vector<std::string> _requestedMandatoryLeafNameList_; // Mandatory variables for data (sample binning, cuts, nominal weight if set)
 
   std::string _mcTreeName_;
-  std::string _mcNominalWeightLeafName_;
+  std::string _mcNominalWeightFormulaStr_{"1"};
   std::vector<std::string> _mcActiveLeafNameList_;
   std::vector<std::string> _mcFilePathList_;
-  std::shared_ptr<TChain> _mcChain_{nullptr};
 
   std::string _dataTreeName_;
-  std::string _dataNominalWeightLeafName_;
   std::vector<std::string> _dataActiveLeafNameList_;
   std::vector<std::string> _dataFilePathList_;
-  std::shared_ptr<TChain> _dataChain_{nullptr};
-
 
 };
 

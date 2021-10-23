@@ -161,9 +161,15 @@ void FitSampleSet::loadPhysicsEvents() {
       continue;
     }
 
-    LogThrowIf(dataSet.getMcChain() == nullptr, "No MC files are available for dataset: " << dataSet.getName());
-    LogThrowIf(dataSet.getDataChain() == nullptr and _dataEventType_ == DataEventType::DataFiles,
+    auto* chainBuf = dataSet.buildMcChain();
+    LogThrowIf(chainBuf == nullptr, "No MC files are available for dataset: " << dataSet.getName());
+    delete chainBuf;
+
+    chainBuf = dataSet.buildDataChain();
+    LogThrowIf(chainBuf == nullptr and _dataEventType_ == DataEventType::DataFiles,
                "Can't define sample \"" << dataSet.getName() << "\" while in non-Asimov-like fit and no Data files are available" );
+
+    delete chainBuf;
 
     for( auto& sample : _fitSampleList_ ){
       if( not sample.isEnabled() ) continue;
@@ -195,6 +201,7 @@ void FitSampleSet::loadPhysicsEvents() {
     LogInfo << "List of mandatory leaves: " << GenericToolbox::parseVectorAsString(dataSet.getRequestedMandatoryLeafNameList()) << std::endl;
 
     for( bool isData : {false, true} ){
+
       TChain* chainPtr{nullptr};
       std::vector<std::string>* activeLeafNameListPtr;
 
@@ -203,12 +210,12 @@ void FitSampleSet::loadPhysicsEvents() {
 
       if( isData ){
         LogInfo << "Reading data files..." << std::endl;
-        chainPtr = dataSet.getDataChain().get();
+        chainPtr = dataSet.buildDataChain();
         activeLeafNameListPtr = &dataSet.getDataActiveLeafNameList();
       }
       else{
         LogInfo << "Reading MC files..." << std::endl;
-        chainPtr = dataSet.getMcChain().get();
+        chainPtr = dataSet.buildMcChain();
         activeLeafNameListPtr = &dataSet.getMcActiveLeafNameList();
       }
 
@@ -276,12 +283,7 @@ void FitSampleSet::loadPhysicsEvents() {
       LogInfo << "Claiming memory for additional events in samples: "
       << GenericToolbox::parseVectorAsString(sampleNbOfEvents) << std::endl;
 
-
-      LogDebug << "Enabling only needed branches for event loading..." << std::endl;
-      chainPtr->SetBranchStatus("*", false);
-      for( auto& activeLeafName : *activeLeafNameListPtr ){
-        chainPtr->SetBranchStatus(activeLeafName.c_str(), true);
-      }
+      chainPtr->SetBranchStatus("*", true);
 
       // The following lines are necessary since the events might get resized while being in multithread
       // Because std::vector is insuring continuous memory allocation, a resize sometimes
@@ -293,6 +295,7 @@ void FitSampleSet::loadPhysicsEvents() {
       eventBuf.setDataSetIndex(dataSetIndex);
       chainPtr->GetEntry(0);
       // Now the eventBuffer has the right size in memory
+      delete chainPtr; // not used anymore
 
       std::vector<size_t> sampleIndexOffsetList(samplesToFillList.size(), 0);
       std::vector< std::vector<PhysicsEvent>* > sampleEventListPtrToFill(samplesToFillList.size(), nullptr);
@@ -317,12 +320,31 @@ void FitSampleSet::loadPhysicsEvents() {
       auto fillFunction = [&](int iThread_){
 
         TChain* threadChain;
-        threadChain = (TChain*) chainPtr->Clone();
+        TTreeFormula* threadNominalWeightFormula{nullptr};
+
+        threadChain = isData ? dataSet.buildDataChain() : dataSet.buildMcChain();
+        threadChain->SetBranchStatus("*", true);
+
+        if( not isData and not dataSet.getMcNominalWeightFormulaStr().empty() ){
+          threadNominalWeightFormula = new TTreeFormula(
+              Form("NominalWeightFormula%i", iThread_),
+              dataSet.getMcNominalWeightFormulaStr().c_str(),
+              threadChain
+              );
+          threadChain->SetNotify(threadNominalWeightFormula);
+        }
+
 
         Long64_t nEvents = threadChain->GetEntries();
         PhysicsEvent eventBufThread(eventBuf);
         eventBufThread.hookToTree(threadChain, not isData);
         GenericToolbox::disableUnhookedBranches(threadChain);
+        if( threadNominalWeightFormula != nullptr ){
+          for( int iLeaf = 0 ; iLeaf < threadNominalWeightFormula->GetNcodes() ; iLeaf++ ){
+            threadChain->SetBranchStatus(threadNominalWeightFormula->GetLeaf(iLeaf)->GetName(), true);
+          }
+        }
+
 
 //        auto threadSampleIndexOffsetList = sampleIndexOffsetList;
         size_t sampleEventIndex;
@@ -350,6 +372,13 @@ void FitSampleSet::loadPhysicsEvents() {
           threadChain->GetEntry(iEvent);
           eventBufThread.setEntryIndex(iEvent);
 
+          if( threadNominalWeightFormula != nullptr ){
+            eventBufThread.setTreeWeight(threadNominalWeightFormula->EvalInstance());
+            if( eventBufThread.getTreeWeight() == 0 ) continue;
+            eventBufThread.setNominalWeight(eventBufThread.getTreeWeight());
+            eventBufThread.resetEventWeight();
+          }
+
           for( iSample = 0 ; iSample < samplesToFillList.size() ; iSample++ ){
             if( eventIsInSamplesList.at(iEvent).at(iSample) ){
 
@@ -374,7 +403,7 @@ void FitSampleSet::loadPhysicsEvents() {
                 }
               } // Bin
 
-              if( eventBufThread.getSampleBinIndex() == -1 ){
+              if( eventBufThread.getSampleBinIndex() == -1 ) {
                 // Invalid bin
                 break;
               }
@@ -388,7 +417,8 @@ void FitSampleSet::loadPhysicsEvents() {
           }
         }
         if( iThread_ == 0 ) GenericToolbox::displayProgressBar(nEvents, nEvents, progressTitle);
-//        delete threadChain;
+        delete threadChain;
+        delete threadNominalWeightFormula;
       };
 
       LogInfo << "Copying selected events to RAM..." << std::endl;
@@ -403,19 +433,6 @@ void FitSampleSet::loadPhysicsEvents() {
 
       LogInfo << "Events have been loaded for " << ( isData ? "data": "mc" )
       << " with dataset: " << dataSet.getName() << std::endl;
-
-      std::string nominalWeightLeafStr = isData ? dataSet.getDataNominalWeightLeafName(): dataSet.getMcNominalWeightLeafName();
-      if( not nominalWeightLeafStr.empty() ){
-        LogInfo << "Copying events nominal weight..." << std::endl;
-        int iEvt = 0;
-        for( auto* eventList : sampleEventListPtrToFill ){
-          for( auto& event : *eventList ){
-            event.setTreeWeight(event.getVarAsDouble(nominalWeightLeafStr));
-            event.setNominalWeight(event.getTreeWeight());
-            event.resetEventWeight();
-          }
-        }
-      }
 
     } // isData
   } // data Set

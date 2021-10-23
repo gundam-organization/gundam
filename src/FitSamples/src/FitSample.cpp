@@ -73,6 +73,7 @@ void FitSample::initialize() {
       int(_binning_.getBinsList().size()), 0, int(_binning_.getBinsList().size())
     )
   );
+  _mcContainer_.histogram->SetDirectory(nullptr);
 
   _dataContainer_.name = "Data_" + _name_;
   _dataContainer_.binning = _binning_;
@@ -83,6 +84,7 @@ void FitSample::initialize() {
       int(_binning_.getBinsList().size()), 0, int(_binning_.getBinsList().size())
     )
   );
+  _dataContainer_.histogram->SetDirectory(nullptr);
 }
 
 bool FitSample::isEnabled() const {

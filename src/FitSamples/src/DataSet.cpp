@@ -17,6 +17,7 @@ DataSet::DataSet() { this->reset(); }
 DataSet::~DataSet() { this->reset(); }
 
 void DataSet::reset() {
+  _isInitialized_ = false;
   _config_.clear();
   _isEnabled_ = false;
 
@@ -24,6 +25,8 @@ void DataSet::reset() {
   _requestedLeafNameList_.clear();
   _mcFilePathList_.clear();
   _dataFilePathList_.clear();
+
+  _mcNominalWeightFormulaStr_ = "1";
 }
 
 void DataSet::setConfig(const nlohmann::json &config_) {
@@ -33,15 +36,11 @@ void DataSet::setConfig(const nlohmann::json &config_) {
 void DataSet::addRequestedLeafName(const std::string& leafName_){
   LogThrowIf(leafName_.empty(), "no leaf name provided.")
   if( not GenericToolbox::doesElementIsInVector(leafName_, _requestedLeafNameList_) ){
-    LogThrowIf( _mcChain_->GetLeaf(leafName_.c_str()) == nullptr,
-                "\"" << leafName_ << "\" not defined in the MC TChain of dataSet: " << _name_ );
     _requestedLeafNameList_.emplace_back(leafName_);
   }
 }
 void DataSet::addRequestedMandatoryLeafName(const std::string& leafName_){
   if( not leafName_.empty() and not GenericToolbox::doesElementIsInVector(leafName_, _requestedMandatoryLeafNameList_) ){
-    LogThrowIf( _dataChain_ != nullptr and _dataChain_->GetLeaf(leafName_.c_str()) == nullptr,
-                "\"" << leafName_ << "\" not defined in the Data TChain of dataSet: " << _name_ );
     _requestedMandatoryLeafNameList_.emplace_back(leafName_);
   }
   this->addRequestedLeafName(leafName_);
@@ -73,8 +72,10 @@ void DataSet::initialize() {
         _mcFilePathList_.emplace_back(file.get<std::string>());
       }
     }
-    _mcNominalWeightLeafName_ = JsonUtils::fetchValue(mcConfig, "nominalWeightLeafName", _mcNominalWeightLeafName_);
-    if(not _mcNominalWeightLeafName_.empty()) _mcActiveLeafNameList_.emplace_back(_mcNominalWeightLeafName_);
+
+    // override: nominalWeightLeafName is deprecated
+    _mcNominalWeightFormulaStr_ = JsonUtils::fetchValue(mcConfig, "nominalWeightLeafName", _mcNominalWeightFormulaStr_);
+    _mcNominalWeightFormulaStr_ = JsonUtils::fetchValue(mcConfig, "nominalWeightFormula", _mcNominalWeightFormulaStr_);
   }
 
   {
@@ -86,12 +87,11 @@ void DataSet::initialize() {
         _dataFilePathList_.emplace_back(file.get<std::string>());
       }
     }
-    _dataNominalWeightLeafName_ = JsonUtils::fetchValue(dataConfig, "nominalWeightLeafName", _dataNominalWeightLeafName_);
-    _dataActiveLeafNameList_.emplace_back(_dataNominalWeightLeafName_);
   }
 
-  this->initializeChains();
   this->print();
+
+  _isInitialized_ = true;
 }
 
 
@@ -101,23 +101,14 @@ bool DataSet::isEnabled() const {
 const std::string &DataSet::getName() const {
   return _name_;
 }
-std::shared_ptr<TChain> &DataSet::getMcChain() {
-  return _mcChain_;
-}
-std::shared_ptr<TChain> &DataSet::getDataChain() {
-  return _dataChain_;
-}
 std::vector<std::string> &DataSet::getMcActiveLeafNameList() {
   return _mcActiveLeafNameList_;
 }
 std::vector<std::string> &DataSet::getDataActiveLeafNameList() {
   return _dataActiveLeafNameList_;
 }
-const std::string &DataSet::getMcNominalWeightLeafName() const {
-  return _mcNominalWeightLeafName_;
-}
-const std::string &DataSet::getDataNominalWeightLeafName() const {
-  return _dataNominalWeightLeafName_;
+const std::string &DataSet::getMcNominalWeightFormulaStr() const {
+  return _mcNominalWeightFormulaStr_;
 }
 const std::vector<std::string> &DataSet::getRequestedLeafNameList() const {
   return _requestedLeafNameList_;
@@ -132,7 +123,37 @@ const std::vector<std::string> &DataSet::getDataFilePathList() const {
   return _dataFilePathList_;
 }
 
-
+TChain* DataSet::buildChain(bool isData_){
+  LogThrowIf(not _isInitialized_, "Can't do " << __METHOD_NAME__ << " while not init.")
+  TChain* out{nullptr};
+  if( not isData_ and not _mcFilePathList_.empty() ){
+    out = new TChain(_mcTreeName_.c_str());
+    for( const auto& file: _mcFilePathList_){
+      if( not GenericToolbox::doesTFileIsValid(file, {_mcTreeName_}) ){
+        LogError << "Invalid file: " << file << std::endl;
+        throw std::runtime_error("Invalid file.");
+      }
+      out->Add(file.c_str());
+    }
+  }
+  else if( isData_ and not _dataFilePathList_.empty() ){
+    out = new TChain(_dataTreeName_.c_str());
+    for( const auto& file: _dataFilePathList_){
+      if( not GenericToolbox::doesTFileIsValid(file, {_dataTreeName_}) ){
+        LogError << "Invalid file: " << file << std::endl;
+        throw std::runtime_error("Invalid file.");
+      }
+      out->Add(file.c_str());
+    }
+  }
+  return out;
+}
+TChain* DataSet::buildMcChain(){
+  return buildChain(false);
+}
+TChain* DataSet::buildDataChain(){
+  return buildChain(true);
+}
 void DataSet::print() {
   LogInfo << _name_ << std::endl;
   if( _mcFilePathList_.empty() ){
@@ -143,6 +164,7 @@ void DataSet::print() {
     for( const auto& filePath : _mcFilePathList_ ){
       LogInfo << filePath << std::endl;
     }
+    LogInfo << GET_VAR_NAME_VALUE(_mcNominalWeightFormulaStr_) << std::endl;
   }
 
   if( _dataFilePathList_.empty() ){
@@ -155,31 +177,3 @@ void DataSet::print() {
     }
   }
 }
-
-void DataSet::initializeChains() {
-
-  if( not _mcFilePathList_.empty() ){
-    _mcChain_ = std::shared_ptr<TChain>(new TChain(_mcTreeName_.c_str()));
-    for( const auto& file: _mcFilePathList_){
-      if( not GenericToolbox::doesTFileIsValid(file, {_mcTreeName_}) ){
-        LogError << "Invalid file: " << file << std::endl;
-        throw std::runtime_error("Invalid file.");
-      }
-      _mcChain_->Add(file.c_str());
-    }
-  }
-
-  if( not _dataFilePathList_.empty() ){
-    _dataChain_ = std::shared_ptr<TChain>(new TChain(_dataTreeName_.c_str()));
-    for( const auto& file: _dataFilePathList_){
-      if( not GenericToolbox::doesTFileIsValid(file, {_dataTreeName_}) ){
-        LogError << "Invalid file: " << file << std::endl;
-        throw std::runtime_error("Invalid file.");
-      }
-      _dataChain_->Add(file.c_str());
-    }
-  }
-
-}
-
-
