@@ -227,9 +227,11 @@ void FitSampleSet::loadPhysicsEvents() {
           activeLeafNameListPtr->emplace_back(requestedLeaf);
         }
       }
-      LogInfo << "List of leaves which will be loaded in RAM: " << GenericToolbox::parseVectorAsString(*activeLeafNameListPtr) << std::endl;
+      LogInfo << "List of leaves which will be loaded in RAM: "
+      << GenericToolbox::parseVectorAsString(*activeLeafNameListPtr) << std::endl;
 
       LogInfo << "Performing event selection of samples with " << (isData? "data": "mc") << " files..." << std::endl;
+      chainPtr->SetBranchStatus("*", true);
       for( auto& sample : samplesToFillList ){
         sampleCutFormulaList.emplace_back(
           new TTreeFormula(
@@ -244,6 +246,15 @@ void FitSampleSet::loadPhysicsEvents() {
         chainPtr->SetNotify(sampleCutFormulaList.back()); // TODO: to be replaced -> may not work when multiple files are loaded
 //        sampleCutFormulaList.back()->Notify();
       }
+
+      LogDebug << "Enabling only needed branches for sample selection..." << std::endl;
+      chainPtr->SetBranchStatus("*", false);
+      for( auto* sampleFormula : sampleCutFormulaList ){
+        for( int iLeaf = 0 ; iLeaf < sampleFormula->GetNcodes() ; iLeaf++ ){
+          chainPtr->SetBranchStatus(sampleFormula->GetLeaf(iLeaf)->GetName(), true);
+        }
+      }
+
       Long64_t nEvents = chainPtr->GetEntries();
       // for each event, which sample is active?
       std::vector<std::vector<bool>> eventIsInSamplesList(nEvents, std::vector<bool>(samplesToFillList.size(), false));
@@ -265,6 +276,12 @@ void FitSampleSet::loadPhysicsEvents() {
       LogInfo << "Claiming memory for additional events in samples: "
       << GenericToolbox::parseVectorAsString(sampleNbOfEvents) << std::endl;
 
+
+      LogDebug << "Enabling only needed branches for event loading..." << std::endl;
+      chainPtr->SetBranchStatus("*", false);
+      for( auto& activeLeafName : *activeLeafNameListPtr ){
+        chainPtr->SetBranchStatus(activeLeafName.c_str(), true);
+      }
 
       // The following lines are necessary since the events might get resized while being in multithread
       // Because std::vector is insuring continuous memory allocation, a resize sometimes

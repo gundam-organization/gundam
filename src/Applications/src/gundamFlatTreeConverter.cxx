@@ -11,14 +11,22 @@
 #include "gundamFlatTreeConverter.h"
 
 LoggerInit([]{
-  Logger::setUserHeaderStr("[gundamFlatTreeConverter.cxx]");
+  Logger::setUserHeaderStr("[FlatTreeConverter]");
 })
 
 int main( int argc, char** argv ){
 
   CmdLineParser clp(argc, argv);
-  clp.addOption("config-file", {"-c", "--config"}, "Provide YAML/Json configuration file.", 1);
+  clp.addOption("config-file", {"-c"}, "Provide YAML/Json configuration file.", 1);
+  clp.addOption("output-file-path", {"-o"}, "Set output file path.", 1);
+
+  LogInfo << "Available options: " << std::endl;
+  LogInfo << clp.getConfigSummary() << std::endl;
+
   clp.parseCmdLine();
+
+  LogWarning << "Command line options:" << std::endl;
+  LogWarning << clp.getValueSummary() << std::endl;
 
   auto configFilePath = clp.getOptionVal<std::string>("config-file");
 

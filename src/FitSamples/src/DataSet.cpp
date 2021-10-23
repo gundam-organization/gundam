@@ -31,7 +31,8 @@ void DataSet::setConfig(const nlohmann::json &config_) {
   JsonUtils::forwardConfig(_config_, __CLASS_NAME__);
 }
 void DataSet::addRequestedLeafName(const std::string& leafName_){
-  if( not leafName_.empty() and not GenericToolbox::doesElementIsInVector(leafName_, _requestedLeafNameList_) ){
+  LogThrowIf(leafName_.empty(), "no leaf name provided.")
+  if( not GenericToolbox::doesElementIsInVector(leafName_, _requestedLeafNameList_) ){
     LogThrowIf( _mcChain_->GetLeaf(leafName_.c_str()) == nullptr,
                 "\"" << leafName_ << "\" not defined in the MC TChain of dataSet: " << _name_ );
     _requestedLeafNameList_.emplace_back(leafName_);
@@ -73,7 +74,7 @@ void DataSet::initialize() {
       }
     }
     _mcNominalWeightLeafName_ = JsonUtils::fetchValue(mcConfig, "nominalWeightLeafName", _mcNominalWeightLeafName_);
-    _mcActiveLeafNameList_.emplace_back(_mcNominalWeightLeafName_);
+    if(not _mcNominalWeightLeafName_.empty()) _mcActiveLeafNameList_.emplace_back(_mcNominalWeightLeafName_);
   }
 
   {
