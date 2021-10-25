@@ -30,6 +30,8 @@ public:
 
   void setConfig(const nlohmann::json &config);
 
+  void addEventByEventDialLeafName(const std::string& leafName_);
+
   void initialize();
 
   // Post init
@@ -60,6 +62,8 @@ private:
   std::vector<DataSet> _dataSetList_;
 
   std::shared_ptr<CalcLLHFunc> _likelihoodFunctionPtr_{nullptr};
+
+  std::vector<std::string> _eventByEventDialLeafList_;
 
 };
 

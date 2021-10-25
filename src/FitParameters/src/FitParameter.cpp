@@ -81,8 +81,8 @@ void FitParameter::setStepSize(double stepSize) {
 void FitParameter::initialize() {
 
   LogThrowIf(_parameterIndex_ == -1, "Parameter index is not set.");
-  LogThrowIf(_priorValue_ == std::numeric_limits<double>::quiet_NaN(), "Prior value is not set.");
-  LogThrowIf(_stdDevValue_ == std::numeric_limits<double>::quiet_NaN(), "Std dev value is not set.");
+  LogThrowIf(_priorValue_     == std::numeric_limits<double>::quiet_NaN(), "Prior value is not set.");
+  LogThrowIf(_stdDevValue_    == std::numeric_limits<double>::quiet_NaN(), "Std dev value is not set.");
   LogThrowIf(_parameterValue_ == std::numeric_limits<double>::quiet_NaN(), "Parameter value is not set.");
 
   _stepSize_ = _stdDevValue_ * 0.01; // default

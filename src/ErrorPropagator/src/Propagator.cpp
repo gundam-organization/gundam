@@ -119,17 +119,23 @@ void Propagator::initialize() {
         auto* dialSetPtr = par.findDialSet( dataSet.getName() );
         if( dialSetPtr == nullptr ){ continue; }
 
-        if( dialSetPtr->getApplyConditionFormula() != nullptr ){
-          for( int iPar = 0 ; iPar < dialSetPtr->getApplyConditionFormula()->GetNpar() ; iPar++ ){
-            dataSet.addRequestedLeafName(dialSetPtr->getApplyConditionFormula()->GetParName(iPar));
+        if( not dialSetPtr->getDialLeafName().empty() ){
+          dataSet.addRequestedLeafName(dialSetPtr->getDialLeafName());
+        }
+        else{
+          if( dialSetPtr->getApplyConditionFormula() != nullptr ){
+            for( int iPar = 0 ; iPar < dialSetPtr->getApplyConditionFormula()->GetNpar() ; iPar++ ){
+              dataSet.addRequestedLeafName(dialSetPtr->getApplyConditionFormula()->GetParName(iPar));
+            }
           }
+
+          for( auto& dial : dialSetPtr->getDialList() ){
+            for( auto& var : dial->getApplyConditionBin().getVariableNameList() ){
+              dataSet.addRequestedLeafName(var);
+            } // var
+          } // dial
         }
 
-        for( auto& dial : dialSetPtr->getDialList() ){
-          for( auto& var : dial->getApplyConditionBin().getVariableNameList() ){
-            dataSet.addRequestedLeafName(var);
-          } // var
-        } // dial
       } // par
     } // parSet
 
@@ -455,6 +461,8 @@ void Propagator::fillEventDialCaches(int iThread_){
   size_t iVar;
   size_t eventDialOffset;
   DialSet* dialSetPtr;
+  TGraph* grPtr;
+  SplineDial* spDialPtr;
   const DataBin* applyConditionBinPtr;
   for( size_t iDataSet = 0 ; iDataSet < dataSetList.size() ; iDataSet++ ){
 
@@ -464,7 +472,7 @@ void Propagator::fillEventDialCaches(int iThread_){
       for( auto& par : parSet.getParameterList() ){
         if( not par.isEnabled() ){ continue; }
         dialSetPtr = par.findDialSet( dataSetList.at(iDataSet).getName());
-        if( dialSetPtr != nullptr and not dialSetPtr->getDialList().empty() ){
+        if( dialSetPtr != nullptr and ( not dialSetPtr->getDialList().empty() or not dialSetPtr->getDialLeafName().empty() ) ){
           dialSetPtrMap[&parSet].emplace_back( dialSetPtr );
         }
       }
@@ -496,6 +504,20 @@ void Propagator::fillEventDialCaches(int iThread_){
               if( evPtr->evalFormula(dialSetPtr->getApplyConditionFormula()) == 0 ){
                 continue;
               }
+            }
+
+            if( not dialSetPtr->getDialLeafName().empty() ){
+              grPtr = (TGraph*)evPtr->getVariable<std::shared_ptr<TClonesArray>>(dialSetPtr->getDialLeafName())->At(0);
+              if(grPtr->GetN() > 1){
+                GlobalVariables::getThreadMutex().lock();
+                dialSetPtr->getDialList().emplace_back(new SplineDial());
+                spDialPtr = ((SplineDial*)dialSetPtr->getDialList().back().get());
+                GlobalVariables::getThreadMutex().unlock();
+                spDialPtr->setSplinePtr( new TSpline3(Form("%x", spDialPtr), grPtr) );
+                spDialPtr->setAssociatedParameterReference(dialSetPtr->getAssociatedParameterReference());
+                evPtr->getRawDialPtrList()[eventDialOffset++] = spDialPtr;
+              }
+              continue;
             }
 
             bool isInBin = false;

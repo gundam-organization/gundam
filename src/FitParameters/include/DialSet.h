@@ -40,6 +40,7 @@ public:
   const std::vector<std::string> &getDataSetNameList() const;
   TFormula *getApplyConditionFormula() const;
   void *getAssociatedParameterReference();
+  const std::string &getDialLeafName() const;
 
 
   // Core
@@ -59,6 +60,7 @@ private:
   std::string _applyConditionStr_;
   TFormula* _applyConditionFormula_{nullptr};
   void* _associatedParameterReference_{nullptr};
+  std::string _dialLeafName_{};
 
   // Internals
   bool _enableDialsSummary_{false};

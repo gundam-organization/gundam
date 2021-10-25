@@ -30,6 +30,8 @@ void FitSampleSet::reset() {
   _fitSampleList_.clear();
   _dataSetList_.clear();
   _dataEventType_ = DataEventType::Unset;
+
+  _eventByEventDialLeafList_.clear();
 }
 
 void FitSampleSet::setConfig(const nlohmann::json &config) {
@@ -37,6 +39,12 @@ void FitSampleSet::setConfig(const nlohmann::json &config) {
   while( _config_.is_string() ){
     LogWarning << "Forwarding " << __CLASS_NAME__ << " config: \"" << _config_.get<std::string>() << "\"" << std::endl;
     _config_ = JsonUtils::readConfigFile(_config_.get<std::string>());
+  }
+}
+
+void FitSampleSet::addEventByEventDialLeafName(const std::string& leafName_){
+  if( not GenericToolbox::doesElementIsInVector(leafName_, _eventByEventDialLeafList_) ){
+    _eventByEventDialLeafList_.emplace_back(leafName_);
   }
 }
 
@@ -250,8 +258,9 @@ void FitSampleSet::loadPhysicsEvents() {
         LogThrowIf(sampleCutFormulaList.back()->GetNdim() == 0,
                    "\"" << sample->getSelectionCutsStr() << "\" could not be parsed by the TChain");
 
-        chainPtr->SetNotify(sampleCutFormulaList.back()); // TODO: to be replaced -> may not work when multiple files are loaded
-//        sampleCutFormulaList.back()->Notify();
+        // The TChain will notify the formula that it has to update leaves addresses while swaping TFile
+        // Although will have to notify manually since multiple formula are used
+        chainPtr->SetNotify(sampleCutFormulaList.back());
       }
 
       LogDebug << "Enabling only needed branches for sample selection..." << std::endl;
@@ -264,26 +273,33 @@ void FitSampleSet::loadPhysicsEvents() {
 
       Long64_t nEvents = chainPtr->GetEntries();
       // for each event, which sample is active?
-      std::vector<std::vector<bool>> eventIsInSamplesList(nEvents, std::vector<bool>(samplesToFillList.size(), false));
+      std::vector<std::vector<bool>> eventIsInSamplesList(nEvents, std::vector<bool>(samplesToFillList.size(), true));
       std::vector<size_t> sampleNbOfEvents(samplesToFillList.size(), 0);
       std::string progressTitle = LogWarning.getPrefixString() + "Performing event selection";
+      TFile* lastFilePtr{nullptr};
       for( Long64_t iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
         GenericToolbox::displayProgressBar(iEvent, nEvents, progressTitle);
         chainPtr->GetEntry(iEvent);
+
+        if( lastFilePtr != chainPtr->GetCurrentFile() ){
+          lastFilePtr = chainPtr->GetCurrentFile();
+          // update leaves (if a new file has been reached, not doing that makes it crash)
+          for( auto& sampleCutFormula : sampleCutFormulaList ){ sampleCutFormula->Notify(); }
+        }
+
         for( size_t iSample = 0 ; iSample < sampleCutFormulaList.size() ; iSample++ ){
-          for(int jInstance = 0; jInstance < sampleCutFormulaList.at(iSample)->GetNdata(); jInstance++){
-            if( sampleCutFormulaList.at(iSample)->EvalInstance(jInstance) != 0 ){
-              eventIsInSamplesList.at(iEvent).at(iSample) = true;
-              sampleNbOfEvents.at(iSample)++;
-            } // if passes the cut
-          } // jInstance
+//          sampleCutFormulaList.at(iSample)->Notify(); // update leaves (if a new file has been reached, not doing that makes it crash)
+          for(int jInstance = 0; jInstance < sampleCutFormulaList.at(iSample)->GetNdata(); jInstance++) {
+            if (sampleCutFormulaList.at(iSample)->EvalInstance(jInstance) == 0) {
+              // if it doesn't passes the cut
+              eventIsInSamplesList.at(iEvent).at(iSample) = false;
+              break;
+            }
+          } // Formula Instances
+          if( eventIsInSamplesList.at(iEvent).at(iSample) ){ sampleNbOfEvents.at(iSample)++; }
         } // iSample
       } // iEvent
 
-      LogInfo << "Claiming memory for additional events in samples: "
-      << GenericToolbox::parseVectorAsString(sampleNbOfEvents) << std::endl;
-
-      chainPtr->SetBranchStatus("*", true);
 
       // The following lines are necessary since the events might get resized while being in multithread
       // Because std::vector is insuring continuous memory allocation, a resize sometimes
@@ -291,14 +307,18 @@ void FitSampleSet::loadPhysicsEvents() {
       // the vector won't have to do this by allocating the right event size.
       PhysicsEvent eventBuf;
       eventBuf.setLeafNameListPtr(activeLeafNameListPtr);
-      eventBuf.hookToTree(chainPtr, not isData);
       eventBuf.setDataSetIndex(dataSetIndex);
-      chainPtr->GetEntry(0);
+      chainPtr->SetBranchStatus("*", true);
+      eventBuf.hookToTree(chainPtr, not isData);
+      chainPtr->GetEntry(0); // memory is claimed -> eventBuf has the right size
       // Now the eventBuffer has the right size in memory
       delete chainPtr; // not used anymore
 
+      LogInfo << "Claiming memory for additional events in samples: "
+              << GenericToolbox::parseVectorAsString(sampleNbOfEvents) << std::endl;
       std::vector<size_t> sampleIndexOffsetList(samplesToFillList.size(), 0);
       std::vector< std::vector<PhysicsEvent>* > sampleEventListPtrToFill(samplesToFillList.size(), nullptr);
+
       for( size_t iSample = 0 ; iSample < sampleNbOfEvents.size() ; iSample++ ){
         if( isData ){
           sampleEventListPtrToFill.at(iSample) = &samplesToFillList.at(iSample)->getDataContainer().eventList;
