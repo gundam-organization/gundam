@@ -148,13 +148,17 @@ void Propagator::initialize() {
   } // dataSets
 
   _fitSampleSet_.loadPhysicsEvents();
-  _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
-  _plotGenerator_.defineHistogramHolders();
 
   initializeThreads();
   initializeCaches();
 
   fillEventDialCaches();
+
+  _fitSampleSet_.loadAsimovData();
+
+  _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
+  _plotGenerator_.defineHistogramHolders();
+
 
   // TEMP: trim dial cache
   LogDebug << "Trimming event dial cache..." << std::endl;
@@ -516,6 +520,7 @@ void Propagator::fillEventDialCaches(int iThread_){
                 spDialPtr->setSplinePtr( new TSpline3(Form("%x", spDialPtr), grPtr) );
                 spDialPtr->setAssociatedParameterReference(dialSetPtr->getAssociatedParameterReference());
                 evPtr->getRawDialPtrList()[eventDialOffset++] = spDialPtr;
+//                evPtr->deleteLeaf(evPtr->findVarIndex(dialSetPtr->getDialLeafName()));
               }
               continue;
             }

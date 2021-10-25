@@ -186,15 +186,18 @@ void PlotGenerator::defineHistogramHolders() {
 
                   // User defined color?
                   auto varDict = JsonUtils::fetchMatchingEntry(_varDictionary_, "name", splitVar); // does the cosmetic pars are configured?
+                  auto dictEntries = varDict["dictionary"];
+                  JsonUtils::forwardConfig(dictEntries);
+
                   if( not varDict.empty() ){
 
-                    if( varDict["dictionary"].is_null() ){
+                    if( dictEntries.is_null() ){
                       LogError << R"(Could not find "dictionary" key in JSON config for var: ")" << splitVar << "\"" << std::endl;
                       throw std::runtime_error("dictionary not found, by variable name found in JSON.");
                     }
 
                     // Look for the value we want
-                    auto valDict = JsonUtils::fetchMatchingEntry(varDict["dictionary"], "value", splitValue);
+                    auto valDict = JsonUtils::fetchMatchingEntry(dictEntries, "value", splitValue);
 
                     histDefBase.histTitle = JsonUtils::fetchValue(valDict, "title", histDefBase.histTitle);
                     histDefBase.histColor = JsonUtils::fetchValue(valDict, "color", unsetSplitValueColor);
@@ -368,15 +371,17 @@ void PlotGenerator::defineHistogramHolders() {
 
                   // User defined color?
                   auto varDict = JsonUtils::fetchMatchingEntry(_varDictionary_, "name", splitVar); // does the cosmetic pars are configured?
+                  auto dictEntries = varDict["dictionary"];
+                  JsonUtils::forwardConfig(dictEntries);
                   if( not varDict.empty() ){
 
-                    if( varDict["dictionary"].is_null() ){
+                    if( dictEntries.is_null() ){
                       LogError << R"(Could not find "dictionary" key in JSON config for var: ")" << splitVar << "\"" << std::endl;
                       throw std::runtime_error("dictionary not found, by variable name found in JSON.");
                     }
 
                     // Look for the value we want
-                    auto valDict = JsonUtils::fetchMatchingEntry(varDict["dictionary"], "value", splitValue);
+                    auto valDict = JsonUtils::fetchMatchingEntry(dictEntries, "value", splitValue);
 
                     histDefBase.histTitle = JsonUtils::fetchValue(valDict, "title", histDefBase.histTitle);
                     histDefBase.histColor = JsonUtils::fetchValue(valDict, "color", unsetSplitValueColor);

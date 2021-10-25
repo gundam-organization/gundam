@@ -49,6 +49,7 @@ public:
   // CORE
   // Filling up
   void hookToTree(TTree* tree_, bool throwIfLeafNotFound_ = true);
+  void clonePointerLeaves();
 
   // Weight
   void addEventWeight(double weight_);

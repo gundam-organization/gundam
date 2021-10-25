@@ -93,6 +93,11 @@ void PhysicsEvent::hookToTree(TTree* tree_, bool throwIfLeafNotFound_){
   }
 
 }
+void PhysicsEvent::clonePointerLeaves(){
+  for( auto& leaf : _leafContentList_ ){
+    leaf.clonePointerLeaves();
+  }
+}
 
 void PhysicsEvent::addEventWeight(double weight_){
   _eventWeight_ *= weight_;
@@ -194,6 +199,7 @@ bool PhysicsEvent::isSame(AnaEvent& anaEvent_) const{
   return isSame;
 }
 void PhysicsEvent::deleteLeaf(long index_){
+  // UNTESTED
   _leafContentList_.erase(_leafContentList_.begin() + index_);
   _leafContentList_.shrink_to_fit();
 }

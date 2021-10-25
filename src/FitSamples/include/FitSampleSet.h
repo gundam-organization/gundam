@@ -36,6 +36,7 @@ public:
 
   // Post init
   void loadPhysicsEvents();
+  void loadAsimovData();
 
   // Getters
   DataEventType getDataEventType() const;

@@ -320,17 +320,18 @@ void FitSampleSet::loadPhysicsEvents() {
       std::vector< std::vector<PhysicsEvent>* > sampleEventListPtrToFill(samplesToFillList.size(), nullptr);
 
       for( size_t iSample = 0 ; iSample < sampleNbOfEvents.size() ; iSample++ ){
+        LogDebug << "Claiming memory for sample #" << iSample << std::endl;
         if( isData ){
           sampleEventListPtrToFill.at(iSample) = &samplesToFillList.at(iSample)->getDataContainer().eventList;
           sampleIndexOffsetList.at(iSample) = sampleEventListPtrToFill.at(iSample)->size();
           samplesToFillList.at(iSample)->getDataContainer().reserveEventMemory(dataSetIndex, sampleNbOfEvents.at(iSample),
-                                                                               eventBuf);
+                                                                               PhysicsEvent());
         }
         else{
           sampleEventListPtrToFill.at(iSample) = &samplesToFillList.at(iSample)->getMcContainer().eventList;
           sampleIndexOffsetList.at(iSample) = sampleEventListPtrToFill.at(iSample)->size();
           samplesToFillList.at(iSample)->getMcContainer().reserveEventMemory(dataSetIndex, sampleNbOfEvents.at(iSample),
-                                                                               eventBuf);
+                                                                               PhysicsEvent());
         }
       }
 
@@ -428,11 +429,14 @@ void FitSampleSet::loadPhysicsEvents() {
                 break;
               }
 
+//              sampleEventIndex = sampleIndexOffsetList.at(iSample);
+//              sampleEventListPtrToFill.at(iSample)->at(sampleEventIndex) = eventBufThread; // copy
+
               eventOffSetMutex.lock();
               sampleEventIndex = sampleIndexOffsetList.at(iSample)++;
-              eventOffSetMutex.unlock();
-
               sampleEventListPtrToFill.at(iSample)->at(sampleEventIndex) = PhysicsEvent(eventBufThread); // copy
+              sampleEventListPtrToFill.at(iSample)->at(sampleEventIndex).clonePointerLeaves(); // make sure the pointer leaves aren't pointing toward the TTree basket
+              eventOffSetMutex.unlock();
             }
           }
         }
@@ -457,6 +461,13 @@ void FitSampleSet::loadPhysicsEvents() {
     } // isData
   } // data Set
 
+  for( auto& sample : _fitSampleList_ ){
+    LogInfo << "Total events loaded from file in \"" << sample.getName() << "\":" << std::endl
+    << "-> mc: " << sample.getMcContainer().eventList.size() << " / data: " << sample.getDataContainer().eventList.size() << std::endl;
+  }
+
+}
+void FitSampleSet::loadAsimovData(){
   if( _dataEventType_ == DataEventType::Asimov ){
     LogWarning << "Asimov data selected: copying MC events..." << std::endl;
     for( auto& sample : _fitSampleList_ ){
@@ -471,13 +482,6 @@ void FitSampleSet::loadPhysicsEvents() {
       }
     }
   }
-
-  for( auto& sample : _fitSampleList_ ){
-    LogInfo << "Total events loaded in \"" << sample.getName() << "\":" << std::endl
-    << "-> mc: " << sample.getMcContainer().eventList.size() << std::endl
-    << "-> data: " << sample.getDataContainer().eventList.size() << std::endl;
-  }
-
 }
 
 void FitSampleSet::updateSampleEventBinIndexes() const{
