@@ -284,7 +284,10 @@ void FitSampleSet::loadPhysicsEvents() {
         if( lastFilePtr != chainPtr->GetCurrentFile() ){
           lastFilePtr = chainPtr->GetCurrentFile();
           // update leaves (if a new file has been reached, not doing that makes it crash)
-          for( auto& sampleCutFormula : sampleCutFormulaList ){ sampleCutFormula->Notify(); }
+          for( auto& sampleCutFormula : sampleCutFormulaList ){
+            chainPtr->SetNotify(sampleCutFormula);
+            sampleCutFormula->Notify();
+          }
         }
 
         for( size_t iSample = 0 ; iSample < sampleCutFormulaList.size() ; iSample++ ){
