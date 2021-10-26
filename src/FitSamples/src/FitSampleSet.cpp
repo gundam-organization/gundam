@@ -286,7 +286,7 @@ void FitSampleSet::loadPhysicsEvents() {
           // update leaves (if a new file has been reached, not doing that makes it crash)
           for( auto& sampleCutFormula : sampleCutFormulaList ){
             chainPtr->SetNotify(sampleCutFormula);
-            sampleCutFormula->Notify();
+//            sampleCutFormula->Notify();
           }
         }
 
