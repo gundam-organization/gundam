@@ -8,7 +8,7 @@
 #include <TChain.h>
 #include "json.hpp"
 
-#include "PhysicsEvent.h"
+#include <FitSampleSet.h>
 
 
 class DataSet {
@@ -35,6 +35,9 @@ public:
   const std::vector<std::string> &getMcFilePathList() const;
   const std::vector<std::string> &getDataFilePathList() const;
 
+  // Core
+  void load(FitSampleSet* sampleSetPtr_, const std::vector<FitParameterSet>* parSetList_);
+
   // Misc
   TChain* buildChain(bool isData_);
   TChain* buildMcChain();
@@ -47,6 +50,7 @@ private:
   // internals
   bool _isInitialized_{false};
   bool _isEnabled_{false};
+  int _dataSetIndex_{-1};
   std::string _name_;
 
   std::vector<std::string> _requestedLeafNameList_;

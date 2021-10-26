@@ -10,7 +10,6 @@
 #include "GenericToolbox.h"
 
 #include "FitSample.h"
-#include "DataSet.h"
 #include "FitParameterSet.h"
 
 ENUM_EXPANDER(
@@ -36,14 +35,12 @@ public:
   void initialize();
 
   // Post init
-  void loadPhysicsEvents(std::vector<FitParameterSet>* fitParSetListPtr_ = nullptr);
   void loadAsimovData();
 
   // Getters
   DataEventType getDataEventType() const;
   const std::vector<FitSample> &getFitSampleList() const;
   std::vector<FitSample> &getFitSampleList();
-  std::vector<DataSet> &getDataSetList();
 
   //Core
   bool empty() const;
@@ -61,7 +58,6 @@ private:
   DataEventType _dataEventType_{DataEventType::Unset};
 
   std::vector<FitSample> _fitSampleList_;
-  std::vector<DataSet> _dataSetList_;
 
   std::shared_ptr<CalcLLHFunc> _likelihoodFunctionPtr_{nullptr};
 

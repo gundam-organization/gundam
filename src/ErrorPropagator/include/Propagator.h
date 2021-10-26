@@ -16,6 +16,7 @@
 #include "AnaSample.hh"
 #include "PlotGenerator.h"
 #include "FitSampleSet.h"
+#include "DataSet.h"
 
 class Propagator {
 
@@ -75,9 +76,10 @@ private:
   bool _isInitialized_{false};
   bool _useResponseFunctions_{false};
   bool _isRfPropagationEnabled_{false};
-  std::vector<FitParameterSet> _parameterSetsList_;
   FitSampleSet _fitSampleSet_;
   PlotGenerator _plotGenerator_;
+  std::vector<FitParameterSet> _parameterSetsList_;
+  std::vector<DataSet> _dataSetList_;
   std::shared_ptr<TMatrixD> _globalCovarianceMatrix_;
 
   // Response functions (WIP)

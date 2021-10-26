@@ -99,15 +99,23 @@ void Propagator::initialize() {
   _fitSampleSet_.setConfig(fitSampleSetConfig);
   _fitSampleSet_.initialize();
 
-
   LogTrace << "Initializing the PlotGenerator" << std::endl;
   auto plotGeneratorConfig = JsonUtils::fetchValue<json>(_config_, "plotGeneratorConfig");
   if( plotGeneratorConfig.is_string() ) parameterSetListConfig = JsonUtils::readConfigFile(plotGeneratorConfig.get<std::string>());
   _plotGenerator_.setConfig(plotGeneratorConfig);
   _plotGenerator_.initialize();
 
+  LogInfo << "Initializing input datasets..." << std::endl;
+  auto dataSetListConfig = JsonUtils::fetchValue(_config_, "dataSetList", nlohmann::json());
+  LogAssert(not dataSetListConfig.empty(), "No dataSet specified." << std::endl);
+  for( const auto& dataSetConfig : dataSetListConfig ){
+    _dataSetList_.emplace_back();
+    _dataSetList_.back().setConfig(dataSetConfig);
+    _dataSetList_.back().initialize();
+  }
+
   LogInfo << "Polling the requested leaves to load in memory..." << std::endl;
-  for( auto& dataSet : _fitSampleSet_.getDataSetList() ){
+  for( auto& dataSet : _dataSetList_ ){
 
     // parSet
     for( auto& parSet : _parameterSetsList_ ){
@@ -145,14 +153,19 @@ void Propagator::initialize() {
       dataSet.addRequestedLeafName(varName);
     }
 
+    dataSet.load(&_fitSampleSet_, &_parameterSetsList_);
+
   } // dataSets
 
-  _fitSampleSet_.loadPhysicsEvents();
+  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    LogInfo << "Total events loaded from file in \"" << sample.getName() << "\":" << std::endl
+            << "-> mc: " << sample.getMcContainer().eventList.size() << " / data: " << sample.getDataContainer().eventList.size() << std::endl;
+  }
 
   initializeThreads();
-  initializeCaches();
 
-  fillEventDialCaches();
+//  initializeCaches();
+//  fillEventDialCaches();
 
   _fitSampleSet_.loadAsimovData();
 
