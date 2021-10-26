@@ -462,7 +462,7 @@ void FitSampleSet::loadPhysicsEvents() {
   }
 
 }
-void FitSampleSet::loadAsimovData(){
+void FitSampleSet::loadAsimovData(std::vector<FitParameterSet>* fitParSetListPtr_){
   if( _dataEventType_ == DataEventType::Asimov ){
     LogWarning << "Asimov data selected: copying MC events..." << std::endl;
     for( auto& sample : _fitSampleList_ ){

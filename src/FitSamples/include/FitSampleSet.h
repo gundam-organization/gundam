@@ -11,6 +11,7 @@
 
 #include "FitSample.h"
 #include "DataSet.h"
+#include "FitParameterSet.h"
 
 ENUM_EXPANDER(
   DataEventType, -1,
@@ -35,7 +36,7 @@ public:
   void initialize();
 
   // Post init
-  void loadPhysicsEvents();
+  void loadPhysicsEvents(std::vector<FitParameterSet>* fitParSetListPtr_ = nullptr);
   void loadAsimovData();
 
   // Getters
