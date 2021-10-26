@@ -4,6 +4,7 @@
 
 #include <TROOT.h>
 #include <Likelihoods.hh>
+#include <TTreeFormulaManager.h>
 #include "json.hpp"
 
 #include "Logger.h"
@@ -247,6 +248,7 @@ void FitSampleSet::loadPhysicsEvents() {
 
       LogInfo << "Performing event selection of samples with " << (isData? "data": "mc") << " files..." << std::endl;
       chainPtr->SetBranchStatus("*", true);
+      TTreeFormulaManager formulaManager;
       for( auto& sample : samplesToFillList ){
         sampleCutFormulaList.emplace_back(
           new TTreeFormula(
@@ -260,8 +262,10 @@ void FitSampleSet::loadPhysicsEvents() {
 
         // The TChain will notify the formula that it has to update leaves addresses while swaping TFile
         // Although will have to notify manually since multiple formula are used
-        chainPtr->SetNotify(sampleCutFormulaList.back());
+//        chainPtr->SetNotify(sampleCutFormulaList.back());
+        formulaManager.Add(sampleCutFormulaList.back());
       }
+      chainPtr->SetNotify(&formulaManager);
 
       LogDebug << "Enabling only needed branches for sample selection..." << std::endl;
       chainPtr->SetBranchStatus("*", false);
