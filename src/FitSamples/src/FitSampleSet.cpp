@@ -281,8 +281,8 @@ void FitSampleSet::loadPhysicsEvents() {
         GenericToolbox::displayProgressBar(iEvent, nEvents, progressTitle);
         chainPtr->GetEntry(iEvent);
 
-        if( lastFilePtr != chainPtr->GetCurrentFile() ){
-          lastFilePtr = chainPtr->GetCurrentFile();
+//        if( lastFilePtr != chainPtr->GetCurrentFile() ){
+//          lastFilePtr = chainPtr->GetCurrentFile();
           // update leaves (if a new file has been reached, not doing that makes it crash)
           for( auto& sampleCutFormula : sampleCutFormulaList ){
             LogTrace << GET_VAR_NAME_VALUE(lastFilePtr) << std::endl;
@@ -290,7 +290,7 @@ void FitSampleSet::loadPhysicsEvents() {
             LogTrace << "chain notify" << std::endl;
             sampleCutFormula->Notify();
           }
-        }
+//        }
 
         for( size_t iSample = 0 ; iSample < sampleCutFormulaList.size() ; iSample++ ){
 //          sampleCutFormulaList.at(iSample)->Notify(); // update leaves (if a new file has been reached, not doing that makes it crash)
