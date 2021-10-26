@@ -150,7 +150,7 @@ double FitSampleSet::evalLikelihood() const{
   return llh;
 }
 
-void FitSampleSet::loadPhysicsEvents() {
+void FitSampleSet::loadPhysicsEvents(std::vector<FitParameterSet>* fitParSetListPtr_) {
   LogWarning << __METHOD_NAME__ << std::endl;
 
   LogThrowIf(_dataEventType_ == DataEventType::Unset, "dataEventType not set.");
@@ -462,7 +462,7 @@ void FitSampleSet::loadPhysicsEvents() {
   }
 
 }
-void FitSampleSet::loadAsimovData(std::vector<FitParameterSet>* fitParSetListPtr_){
+void FitSampleSet::loadAsimovData(){
   if( _dataEventType_ == DataEventType::Asimov ){
     LogWarning << "Asimov data selected: copying MC events..." << std::endl;
     for( auto& sample : _fitSampleList_ ){
