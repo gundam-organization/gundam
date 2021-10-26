@@ -261,8 +261,6 @@ void FitSampleSet::loadPhysicsEvents() {
                    "\"" << sample->getSelectionCutsStr() << "\" could not be parsed by the TChain");
 
         // The TChain will notify the formula that it has to update leaves addresses while swaping TFile
-        // Although will have to notify manually since multiple formula are used
-//        chainPtr->SetNotify(sampleCutFormulaList.back());
         formulaManager.Add(sampleCutFormulaList.back());
       }
       chainPtr->SetNotify(&formulaManager);
@@ -285,19 +283,7 @@ void FitSampleSet::loadPhysicsEvents() {
         GenericToolbox::displayProgressBar(iEvent, nEvents, progressTitle);
         chainPtr->GetEntry(iEvent);
 
-//        if( lastFilePtr != chainPtr->GetCurrentFile() ){
-//          lastFilePtr = chainPtr->GetCurrentFile();
-          // update leaves (if a new file has been reached, not doing that makes it crash)
-//          for( auto& sampleCutFormula : sampleCutFormulaList ){
-//            LogTrace << GET_VAR_NAME_VALUE(lastFilePtr) << std::endl;
-//            chainPtr->SetNotify(sampleCutFormula);
-//            LogTrace << "chain notify" << std::endl;
-//            sampleCutFormula->Notify();
-//          }
-//        }
-
         for( size_t iSample = 0 ; iSample < sampleCutFormulaList.size() ; iSample++ ){
-//          sampleCutFormulaList.at(iSample)->Notify(); // update leaves (if a new file has been reached, not doing that makes it crash)
           for(int jInstance = 0; jInstance < sampleCutFormulaList.at(iSample)->GetNdata(); jInstance++) {
             if (sampleCutFormulaList.at(iSample)->EvalInstance(jInstance) == 0) {
               // if it doesn't passes the cut
