@@ -285,8 +285,10 @@ void FitSampleSet::loadPhysicsEvents() {
           lastFilePtr = chainPtr->GetCurrentFile();
           // update leaves (if a new file has been reached, not doing that makes it crash)
           for( auto& sampleCutFormula : sampleCutFormulaList ){
+            LogTrace << GET_VAR_NAME_VALUE(lastFilePtr) << std::endl;
             chainPtr->SetNotify(sampleCutFormula);
-//            sampleCutFormula->Notify();
+            LogTrace << "chain notify" << std::endl;
+            sampleCutFormula->Notify();
           }
         }
 
