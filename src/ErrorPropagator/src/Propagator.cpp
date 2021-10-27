@@ -107,54 +107,24 @@ void Propagator::initialize() {
 
   LogInfo << "Initializing input datasets..." << std::endl;
   auto dataSetListConfig = JsonUtils::fetchValue(_config_, "dataSetList", nlohmann::json());
+  if( dataSetListConfig.empty() ){
+    // Old config files
+    dataSetListConfig = JsonUtils::fetchValue<nlohmann::json>(_fitSampleSet_.getConfig(), "dataSetList");
+    LogAlert << "DEPRECATED CONFIG OPTION: " << "dataSetList should now be located in the Propagator config." << std::endl;
+  }
   LogAssert(not dataSetListConfig.empty(), "No dataSet specified." << std::endl);
+  int iDataSet{0};
   for( const auto& dataSetConfig : dataSetListConfig ){
     _dataSetList_.emplace_back();
     _dataSetList_.back().setConfig(dataSetConfig);
+    _dataSetList_.back().setDataSetIndex(iDataSet++);
     _dataSetList_.back().initialize();
   }
 
-  LogInfo << "Polling the requested leaves to load in memory..." << std::endl;
+  LogInfo << "Loading datasets..." << std::endl;
   for( auto& dataSet : _dataSetList_ ){
-
-    // parSet
-    for( auto& parSet : _parameterSetsList_ ){
-      if( not parSet.isEnabled() ) continue;
-
-      for( auto& par : parSet.getParameterList() ){
-        if( not par.isEnabled() ) continue;
-
-        auto* dialSetPtr = par.findDialSet( dataSet.getName() );
-        if( dialSetPtr == nullptr ){ continue; }
-
-        if( not dialSetPtr->getDialLeafName().empty() ){
-          dataSet.addRequestedLeafName(dialSetPtr->getDialLeafName());
-        }
-        else{
-          if( dialSetPtr->getApplyConditionFormula() != nullptr ){
-            for( int iPar = 0 ; iPar < dialSetPtr->getApplyConditionFormula()->GetNpar() ; iPar++ ){
-              dataSet.addRequestedLeafName(dialSetPtr->getApplyConditionFormula()->GetParName(iPar));
-            }
-          }
-
-          for( auto& dial : dialSetPtr->getDialList() ){
-            for( auto& var : dial->getApplyConditionBin().getVariableNameList() ){
-              dataSet.addRequestedLeafName(var);
-            } // var
-          } // dial
-        }
-
-      } // par
-    } // parSet
-
-    // plotGen
-    auto varListRequestedByPlotGen = _plotGenerator_.fetchRequestedLeafNames();
-    for( const auto& varName : varListRequestedByPlotGen ){
-      dataSet.addRequestedLeafName(varName);
-    }
-
+    dataSet.fetchRequestedLeaves(&_plotGenerator_);
     dataSet.load(&_fitSampleSet_, &_parameterSetsList_);
-
   } // dataSets
 
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
@@ -163,10 +133,6 @@ void Propagator::initialize() {
   }
 
   initializeThreads();
-
-//  initializeCaches();
-//  fillEventDialCaches();
-
   _fitSampleSet_.loadAsimovData();
 
   _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
@@ -306,11 +272,6 @@ void Propagator::allowRfPropagation(){
 // Protected
 void Propagator::initializeThreads() {
 
-  std::function<void(int)> fillEventDialCacheFct = [this](int iThread){
-    this->fillEventDialCaches(iThread);
-  };
-  GlobalVariables::getParallelWorker().addJob("Propagator::fillEventDialCaches", fillEventDialCacheFct);
-
   std::function<void(int)> reweightSampleEventsFct = [this](int iThread){
     this->reweightSampleEvents(iThread);
   };
@@ -336,28 +297,6 @@ void Propagator::initializeThreads() {
   };
   GlobalVariables::getParallelWorker().addJob("Propagator::applyResponseFunctions", applyResponseFunctionsFct);
 
-}
-void Propagator::initializeCaches() {
-  LogInfo << __METHOD_NAME__ << std::endl;
-
-  size_t preSize;
-  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    for( auto& event : sample.getMcContainer().eventList ){
-
-      preSize = 0;
-      for( auto& parSet : _parameterSetsList_ ){
-        if( parSet.isUseOnlyOneParameterPerEvent() ){ preSize += 1; }
-        else{ preSize += parSet.getNbParameters(); }
-      }
-      event.getRawDialPtrList().resize(preSize);
-
-    } // event
-  } // sample
-
-}
-void Propagator::fillEventDialCaches(){
-  LogInfo << __METHOD_NAME__ << std::endl;
-  GlobalVariables::getParallelWorker().runJob("Propagator::fillEventDialCaches");
 }
 
 void Propagator::makeResponseFunctions(){
@@ -465,105 +404,6 @@ void Propagator::reweightSampleEvents(int iThread_) {
 //      evPtr += nThreads;
 //    }
 //  }
-
-}
-void Propagator::fillEventDialCaches(int iThread_){
-
-  DialSet* parameterDialSetPtr;
-  PhysicsEvent* evPtr{nullptr};
-  std::vector<Dial *>* evParSetDialList{nullptr};
-  auto& dataSetList = _fitSampleSet_.getDataSetList();
-  size_t iEvent, nEvents;
-  size_t iDialSet, iDial;
-  size_t iVar;
-  size_t eventDialOffset;
-  DialSet* dialSetPtr;
-  TGraph* grPtr;
-  SplineDial* spDialPtr;
-  const DataBin* applyConditionBinPtr;
-  for( size_t iDataSet = 0 ; iDataSet < dataSetList.size() ; iDataSet++ ){
-
-    std::map<FitParameterSet*, std::vector<DialSet*>> dialSetPtrMap;
-    for( auto& parSet : _parameterSetsList_ ){
-      if( not parSet.isEnabled() ){ continue; }
-      for( auto& par : parSet.getParameterList() ){
-        if( not par.isEnabled() ){ continue; }
-        dialSetPtr = par.findDialSet( dataSetList.at(iDataSet).getName());
-        if( dialSetPtr != nullptr and ( not dialSetPtr->getDialList().empty() or not dialSetPtr->getDialLeafName().empty() ) ){
-          dialSetPtrMap[&parSet].emplace_back( dialSetPtr );
-        }
-      }
-    }
-
-    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-      if( not GenericToolbox::doesElementIsInVector(iDataSet, sample.getMcContainer().dataSetIndexList) ){ continue; }
-
-      std::stringstream ss;
-      ss << LogWarning.getPrefixString() << sample.getName();
-
-      nEvents = sample.getMcContainer().eventNbList[iDataSet];
-      for( iEvent = sample.getMcContainer().eventOffSetList[iDataSet] ; iEvent < nEvents ; iEvent++ ){
-        if (iEvent % GlobalVariables::getNbThreads() != iThread_) {
-          continue;
-        }
-        if (iThread_ == GlobalVariables::getNbThreads() - 1) {
-          GenericToolbox::displayProgressBar(iEvent, nEvents, ss.str());
-        }
-
-        evPtr = &sample.getMcContainer().eventList[iEvent];
-
-        eventDialOffset = 0;
-        for( auto& dialSetPair : dialSetPtrMap ){
-          for( iDialSet = 0 ; iDialSet < dialSetPair.second.size() ; iDialSet++ ){
-            dialSetPtr = dialSetPair.second[iDialSet];
-
-            if( dialSetPtr->getApplyConditionFormula() != nullptr ){
-              if( evPtr->evalFormula(dialSetPtr->getApplyConditionFormula()) == 0 ){
-                continue;
-              }
-            }
-
-            if( not dialSetPtr->getDialLeafName().empty() ){
-              grPtr = (TGraph*)evPtr->getVariable<std::shared_ptr<TClonesArray>>(dialSetPtr->getDialLeafName())->At(0);
-              if(grPtr->GetN() > 1){
-                GlobalVariables::getThreadMutex().lock();
-                dialSetPtr->getDialList().emplace_back(new SplineDial());
-                spDialPtr = ((SplineDial*)dialSetPtr->getDialList().back().get());
-                GlobalVariables::getThreadMutex().unlock();
-                spDialPtr->setSplinePtr( new TSpline3(Form("%x", spDialPtr), grPtr) );
-                spDialPtr->setAssociatedParameterReference(dialSetPtr->getAssociatedParameterReference());
-                evPtr->getRawDialPtrList()[eventDialOffset++] = spDialPtr;
-//                evPtr->deleteLeaf(evPtr->findVarIndex(dialSetPtr->getDialLeafName()));
-              }
-              continue;
-            }
-
-            bool isInBin = false;
-            for( iDial = 0 ; iDial < dialSetPtr->getDialList().size(); iDial++ ){
-              applyConditionBinPtr = &dialSetPtr->getDialList()[iDial]->getApplyConditionBin();
-              isInBin = true;
-
-              for( iVar = 0 ; iVar < applyConditionBinPtr->getVariableNameList().size() ; iVar++ ){
-                if( not applyConditionBinPtr->isBetweenEdges(iVar, evPtr->getVarAsDouble(applyConditionBinPtr->getVariableNameList()[iVar] ) )){
-                  isInBin = false;
-                  break;
-                }
-              }
-              if( isInBin ){
-                evPtr->getRawDialPtrList()[eventDialOffset++] = dialSetPtr->getDialList()[iDial].get();
-                break;
-              }
-            } // iDial
-
-            if( isInBin and dialSetPair.first->isUseOnlyOneParameterPerEvent() ){
-              break; // leave iDialSet / enabled parameters loop
-            }
-
-          } // iDialSet / Enabled-parameter
-        } // ParSet / DialSet Pairs
-      } // iEvent
-    } // iSample
-  } // iDataSet
 
 }
 void Propagator::applyResponseFunctions(int iThread_){

@@ -2,14 +2,11 @@
 // Created by Nadrino on 22/07/2021.
 //
 
-#include <TROOT.h>
-#include <Likelihoods.hh>
 #include <TTreeFormulaManager.h>
 #include "json.hpp"
 
 #include "Logger.h"
 #include "GenericToolbox.h"
-#include "GenericToolbox.Root.h"
 
 #include "JsonUtils.h"
 #include "GlobalVariables.h"
@@ -117,6 +114,9 @@ const std::vector<FitSample> &FitSampleSet::getFitSampleList() const {
 std::vector<FitSample> &FitSampleSet::getFitSampleList() {
   return _fitSampleList_;
 }
+const nlohmann::json &FitSampleSet::getConfig() const {
+  return _config_;
+}
 
 bool FitSampleSet::empty() const {
   return _fitSampleList_.empty();
@@ -143,14 +143,16 @@ void FitSampleSet::loadAsimovData(){
     LogWarning << "Asimov data selected: copying MC events..." << std::endl;
     for( auto& sample : _fitSampleList_ ){
       LogInfo << "Copying MC events in sample \"" << sample.getName() << "\"" << std::endl;
-      auto& dataEventList = sample.getDataContainer().eventList;
-      LogThrowIf(not dataEventList.empty(), "Can't fill Asimov data, dataEventList is not empty.");
 
-      auto& mcEventList = sample.getMcContainer().eventList;
-      dataEventList.resize(mcEventList.size());
-      for( size_t iEvent = 0 ; iEvent < dataEventList.size() ; iEvent++ ){
-        dataEventList[iEvent] = mcEventList[iEvent];
-      }
+      sample.getDataContainer().eventList = sample.getMcContainer().eventList;
+
+//      auto& dataEventList = sample.getDataContainer().eventList;
+//      LogThrowIf(not dataEventList.empty(), "Can't fill Asimov data, dataEventList is not empty.");
+//      auto& mcEventList = sample.getMcContainer().eventList;
+//      dataEventList.resize(mcEventList.size());
+//      for( size_t iEvent = 0 ; iEvent < dataEventList.size() ; iEvent++ ){
+//        dataEventList[iEvent] = mcEventList[iEvent];
+//      }
     }
   }
 }

@@ -16,7 +16,7 @@
 #include "AnaSample.hh"
 #include "PlotGenerator.h"
 #include "FitSampleSet.h"
-#include "DataSet.h"
+#include "DataSetLoader.h"
 
 class Propagator {
 
@@ -56,14 +56,11 @@ public:
 
 protected:
   void initializeThreads();
-  void initializeCaches();
 
-  void fillEventDialCaches();
   void makeResponseFunctions();
 
   // multi-threaded
   void reweightSampleEvents(int iThread_);
-  void fillEventDialCaches(int iThread_);
   void applyResponseFunctions(int iThread_);
 
 private:
@@ -79,7 +76,7 @@ private:
   FitSampleSet _fitSampleSet_;
   PlotGenerator _plotGenerator_;
   std::vector<FitParameterSet> _parameterSetsList_;
-  std::vector<DataSet> _dataSetList_;
+  std::vector<DataSetLoader> _dataSetList_;
   std::shared_ptr<TMatrixD> _globalCovarianceMatrix_;
 
   // Response functions (WIP)

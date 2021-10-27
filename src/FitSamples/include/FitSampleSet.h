@@ -11,6 +11,7 @@
 
 #include "FitSample.h"
 #include "FitParameterSet.h"
+#include "Likelihoods.hh"
 
 ENUM_EXPANDER(
   DataEventType, -1,
@@ -41,6 +42,8 @@ public:
   DataEventType getDataEventType() const;
   const std::vector<FitSample> &getFitSampleList() const;
   std::vector<FitSample> &getFitSampleList();
+
+  const nlohmann::json &getConfig() const;
 
   //Core
   bool empty() const;

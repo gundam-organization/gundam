@@ -2,26 +2,34 @@
 // Created by Nadrino on 22/07/2021.
 //
 
-#ifndef XSLLHFITTER_DATASET_H
-#define XSLLHFITTER_DATASET_H
+#ifndef GUNDAM_DATASETLOADER_H
+#define GUNDAM_DATASETLOADER_H
+
+#include "vector"
+#include "string"
 
 #include <TChain.h>
 #include "json.hpp"
 
+#include "FitParameterSet.h"
 #include <FitSampleSet.h>
+#include "PlotGenerator.h"
 
 
-class DataSet {
+class DataSetLoader {
 
 public:
-  DataSet();
-  virtual ~DataSet();
+  DataSetLoader();
+  virtual ~DataSetLoader();
 
   void reset();
 
   void setConfig(const nlohmann::json &config_);
-  void addRequestedLeafName(const std::string& leafName_); // some variables might not be present in data TChain (true vars)
-  void addRequestedMandatoryLeafName(const std::string& leafName_); // specify which var should be present in data TChain
+  void setDataSetIndex(int dataSetIndex);
+
+  void addLeafRequestedForIndexing(const std::string& leafName_);
+  void addLeafStorageRequestedForData(const std::string& leafName_);
+  void addLeafStorageRequestedForMc(const std::string& leafName_);
 
   void initialize();
 
@@ -30,19 +38,26 @@ public:
   std::vector<std::string> &getMcActiveLeafNameList();
   std::vector<std::string> &getDataActiveLeafNameList();
   const std::string &getMcNominalWeightFormulaStr() const;
-  const std::vector<std::string> &getRequestedLeafNameList() const;
-  const std::vector<std::string> &getRequestedMandatoryLeafNameList() const;
   const std::vector<std::string> &getMcFilePathList() const;
   const std::vector<std::string> &getDataFilePathList() const;
 
   // Core
-  void load(FitSampleSet* sampleSetPtr_, const std::vector<FitParameterSet>* parSetList_);
+  void load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSet>* parSetList_);
 
   // Misc
   TChain* buildChain(bool isData_);
   TChain* buildMcChain();
   TChain* buildDataChain();
   void print();
+
+  void fetchRequestedLeaves(std::vector<FitParameterSet>* parSetList_);
+  void fetchRequestedLeaves(FitSampleSet* sampleSetPtr_);
+  void fetchRequestedLeaves(PlotGenerator* plotGenPtr_);
+
+protected:
+  std::vector<FitSample*> buildListOfSamplesToFill(FitSampleSet* sampleSetPtr_);
+  std::vector<std::vector<bool>> makeEventSelection(std::vector<FitSample*>& samplesToFillList, bool loadData_);
+
 
 private:
   nlohmann::json _config_;
@@ -53,8 +68,9 @@ private:
   int _dataSetIndex_{-1};
   std::string _name_;
 
-  std::vector<std::string> _requestedLeafNameList_;
-  std::vector<std::string> _requestedMandatoryLeafNameList_; // Mandatory variables for data (sample binning, cuts, nominal weight if set)
+  std::vector<std::string> _leavesRequestedForIndexing_;
+  std::vector<std::string> _leavesStorageRequestedForData_;
+  std::vector<std::string> _leavesStorageRequestedForMc_;
 
   std::string _mcTreeName_;
   std::string _mcNominalWeightFormulaStr_{"1"};
@@ -68,4 +84,4 @@ private:
 };
 
 
-#endif //XSLLHFITTER_DATASET_H
+#endif //GUNDAM_DATASETLOADER_H
