@@ -29,6 +29,7 @@ void PhysicsEvent::reset() {
 
 void PhysicsEvent::setLeafNameListPtr(const std::vector<std::string> *leafNameListPtr) {
   _commonLeafNameListPtr_ = leafNameListPtr;
+  _leafContentList_.resize(_commonLeafNameListPtr_->size());
 }
 void PhysicsEvent::setDataSetIndex(int dataSetIndex_) {
   _dataSetIndex_ = dataSetIndex_;
@@ -67,6 +68,16 @@ double PhysicsEvent::getEventWeight() const {
 int PhysicsEvent::getSampleBinIndex() const {
   return _sampleBinIndex_;
 }
+const GenericToolbox::LeafHolder& PhysicsEvent::getLeafHolder(std::string leafName_) const{
+  int index = this->findVarIndex(leafName_, true);
+  return this->getLeafHolder(index);
+}
+const GenericToolbox::LeafHolder& PhysicsEvent::getLeafHolder(int index_) const{
+  return _leafContentList_[index_];
+}
+const std::vector<GenericToolbox::LeafHolder> &PhysicsEvent::getLeafContentList() const {
+  return _leafContentList_;
+}
 
 void PhysicsEvent::hookToTree(TTree* tree_, bool throwIfLeafNotFound_){
   LogThrowIf(_commonLeafNameListPtr_ == nullptr, "_commonLeafNameListPtr_ is not set.");
@@ -96,6 +107,12 @@ void PhysicsEvent::hookToTree(TTree* tree_, bool throwIfLeafNotFound_){
 void PhysicsEvent::clonePointerLeaves(){
   for( auto& leaf : _leafContentList_ ){
     leaf.clonePointerLeaves();
+  }
+}
+void PhysicsEvent::copyOnlyExistingLeaves(const PhysicsEvent& other_){
+  LogThrowIf(_commonLeafNameListPtr_ == nullptr, "_commonLeafNameListPtr_ not set")
+  for( size_t iLeaf = 0 ; iLeaf < _commonLeafNameListPtr_->size() ; iLeaf++ ){
+    _leafContentList_[iLeaf] = other_.getLeafHolder((*_commonLeafNameListPtr_)[iLeaf]);
   }
 }
 
@@ -225,3 +242,4 @@ const std::vector<std::string> *PhysicsEvent::getCommonLeafNameListPtr() const {
 std::vector<Dial *> &PhysicsEvent::getRawDialPtrList() {
   return _rawDialPtrList_;
 }
+

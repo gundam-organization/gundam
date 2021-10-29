@@ -10,7 +10,8 @@
 #include "GenericToolbox.h"
 
 #include "FitSample.h"
-#include "DataSet.h"
+#include "FitParameterSet.h"
+#include "Likelihoods.hh"
 
 ENUM_EXPANDER(
   DataEventType, -1,
@@ -35,14 +36,14 @@ public:
   void initialize();
 
   // Post init
-  void loadPhysicsEvents();
   void loadAsimovData();
 
   // Getters
   DataEventType getDataEventType() const;
   const std::vector<FitSample> &getFitSampleList() const;
   std::vector<FitSample> &getFitSampleList();
-  std::vector<DataSet> &getDataSetList();
+
+  const nlohmann::json &getConfig() const;
 
   //Core
   bool empty() const;
@@ -60,7 +61,6 @@ private:
   DataEventType _dataEventType_{DataEventType::Unset};
 
   std::vector<FitSample> _fitSampleList_;
-  std::vector<DataSet> _dataSetList_;
 
   std::shared_ptr<CalcLLHFunc> _likelihoodFunctionPtr_{nullptr};
 

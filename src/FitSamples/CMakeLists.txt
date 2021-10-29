@@ -4,7 +4,6 @@ set( SRCFILES
         src/SampleElement.cpp
         src/FitSampleSet.cpp
         src/FitSample.cpp
-        src/DataSet.cpp
         src/PhysicsEvent.cpp
         )
 

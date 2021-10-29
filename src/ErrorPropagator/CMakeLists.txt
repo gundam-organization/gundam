@@ -3,6 +3,7 @@ set(SRCFILES
   src/XsecCalc.cc
   src/Propagator.cpp
   src/PlotGenerator.cpp
+        src/DataSetLoader.cpp
 )
 
 set(HEADERS
@@ -10,6 +11,7 @@ set(HEADERS
   include/XsecCalc.hh
   include/Propagator.h
   include/PlotGenerator.h
+        include/DataSetLoader.h
 )
 
 if( USE_STATIC_LINKS STREQUAL "1" )

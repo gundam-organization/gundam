@@ -43,6 +43,9 @@ public:
   double getEventWeight() const;
   int getSampleBinIndex() const;
   std::vector<Dial *> &getRawDialPtrList();
+  const GenericToolbox::LeafHolder& getLeafHolder(std::string leafName_) const;
+  const GenericToolbox::LeafHolder& getLeafHolder(int index_) const;
+  const std::vector<GenericToolbox::LeafHolder> &getLeafContentList() const;
 
   const std::vector<std::string> *getCommonLeafNameListPtr() const;
 
@@ -50,6 +53,7 @@ public:
   // Filling up
   void hookToTree(TTree* tree_, bool throwIfLeafNotFound_ = true);
   void clonePointerLeaves();
+  void copyOnlyExistingLeaves(const PhysicsEvent& other_);
 
   // Weight
   void addEventWeight(double weight_);
