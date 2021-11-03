@@ -14,7 +14,7 @@
 #include "GlobalVariables.h"
 
 LoggerInit([](){
-  Logger::setUserHeaderStr("[DataSet]");
+  Logger::setUserHeaderStr("[DataSetLoader]");
 })
 
 DataSetLoader::DataSetLoader() { this->reset(); }
