@@ -72,16 +72,15 @@ cmessage(STATUS "[ROOT]: root-config --cflags: ${ROOT_CXX_FLAGS}")
 cmessage(STATUS "[ROOT]: root-config --libs: ${ROOT_LD_FLAGS}")
 
 # YAML-CPP
-find_package( yaml-cpp REQUIRED )
-if( yaml-cpp_FOUND )
-    if( "${YAML_CPP_INCLUDE_DIR}" STREQUAL "" )
-        cmessage(FATAL_ERROR "YAML_CPP_INCLUDE_DIR variable is empty.")
-    endif()
-    cmessage(STATUS "yaml-cpp has been found: ${YAML_CPP_INCLUDE_DIR}")
-    include_directories( ${YAML_CPP_INCLUDE_DIR} )
-#    target_link_libraries( OptionParserExample ${YAML_CPP_LIBRARIES} )
-    list(APPEND LINK_LIBARY_LIST ${YAML_CPP_LIBRARIES})
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+find_package( YAMLCPP REQUIRED )
+if( "${YAMLCPP_INCLUDE_DIR}" STREQUAL "" )
+    cmessage(FATAL_ERROR "YAMLCPP_INCLUDE_DIR variable is empty.")
 endif()
+cmessage(STATUS "yaml-cpp has been found: ${YAMLCPP_INCLUDE_DIR}")
+include_directories( ${YAMLCPP_INCLUDE_DIR} )
+#    target_link_libraries( OptionParserExample ${YAMLCPP_LIBRARIES} )
+list(APPEND LINK_LIBARY_LIST ${YAMLCPP_LIBRARIES})
 
 
 ################################################################################
