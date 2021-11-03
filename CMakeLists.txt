@@ -73,7 +73,7 @@ cmessage(STATUS "[ROOT]: root-config --libs: ${ROOT_LD_FLAGS}")
 
 # YAML-CPP
 find_package( yaml-cpp REQUIRED )
-if( YAML_CPP_FOUND )
+if( yaml-cpp_FOUND )
     if( "${YAML_CPP_INCLUDE_DIR}" STREQUAL "" )
         cmessage(FATAL_ERROR "YAML_CPP_INCLUDE_DIR variable is empty.")
     endif()
