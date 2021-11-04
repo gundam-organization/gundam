@@ -12,6 +12,9 @@ set(CMAKE_MACOSX_RPATH 1)
 set(CMAKE_SKIP_BUILD_RPATH TRUE)
 include(${CMAKE_SOURCE_DIR}/cmake/cmessage.cmake)
 
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+
 #Changes default install path to be a subdirectory of the build dir.
 #Can set build dir at configure time with -DCMAKE_INSTALL_PREFIX=/install/path
 if(CMAKE_INSTALL_PREFIX STREQUAL "" OR CMAKE_INSTALL_PREFIX STREQUAL "/usr/local")
@@ -72,15 +75,15 @@ cmessage(STATUS "[ROOT]: root-config --cflags: ${ROOT_CXX_FLAGS}")
 cmessage(STATUS "[ROOT]: root-config --libs: ${ROOT_LD_FLAGS}")
 
 # YAML-CPP
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 find_package( YAMLCPP REQUIRED )
-if( "${YAMLCPP_INCLUDE_DIR}" STREQUAL "" )
-    cmessage(FATAL_ERROR "YAMLCPP_INCLUDE_DIR variable is empty.")
+if( NOT YAMLCPP_FOUND )
+    cmessage(FATAL_ERROR "yaml-cpp library not found.")
 endif()
-cmessage(STATUS "yaml-cpp has been found: ${YAMLCPP_INCLUDE_DIR}")
+cmessage(STATUS "yaml-cpp include directory: ${YAMLCPP_INCLUDE_DIR}")
+cmessage(STATUS "yaml-cpp library directory: ${YAMLCPP_LIBRARY}")
 include_directories( ${YAMLCPP_INCLUDE_DIR} )
-#    target_link_libraries( OptionParserExample ${YAMLCPP_LIBRARIES} )
-list(APPEND LINK_LIBARY_LIST ${YAMLCPP_LIBRARIES})
+#    target_link_libraries( OptionParserExample ${YAMLCPP_LIBRARY} )
+list(APPEND LINK_LIBARY_LIST ${YAMLCPP_LIBRARY})
 
 
 ################################################################################
@@ -91,7 +94,7 @@ list(APPEND LINK_LIBARY_LIST ${YAMLCPP_LIBRARIES})
 
 ## Add the CmdLineParser
 include_directories(submodules/simple-cpp-cmd-line-parser/include)
-if( yaml-cpp_FOUND )
+if( YAMLCPP_FOUND )
     add_definitions( -D CMDLINEPARSER_YAML_CPP_ENABLED=1 )
 endif()
 
