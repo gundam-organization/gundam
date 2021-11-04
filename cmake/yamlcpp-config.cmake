@@ -12,14 +12,9 @@
 # to tell CMake where yaml-cpp is.
 
 cmessage(STATUS "Looking for yaml-cpp library...")
-if( YAMLCPP_INSTALL_DIR STREQUAL "" )
-    cmessage(STATUS "User provided YAMLCPP_INSTALL_DIR=${YAMLCPP_INSTALL_DIR}")
-endif()
-
-# attempt to find static library first if this is set
-if(YAMLCPP_STATIC_LIBRARY)
-    set(YAMLCPP_STATIC libyaml-cpp.a)
-endif()
+#if( YAMLCPP_INSTALL_DIR STREQUAL "" )
+#    cmessage(STATUS "User provided YAMLCPP_INSTALL_DIR=${YAMLCPP_INSTALL_DIR}")
+#endif()
 
 # find the yaml-cpp include directory
 find_path(YAMLCPP_INCLUDE_DIR yaml-cpp/yaml.h
@@ -36,8 +31,13 @@ find_path(YAMLCPP_INCLUDE_DIR yaml-cpp/yaml.h
         ${YAMLCPP_INSTALL_DIR}/include/)
 
 # find the yaml-cpp library
+set(YAMLCPP_LIB_FILE libyaml-cpp.so)
+# attempt to find static library first if this is set
+if( YAMLCPP_STATIC_LIBRARY )
+    set(YAMLCPP_LIB_FILE libyaml-cpp.a)
+endif()
 find_library(YAMLCPP_LIBRARY
-        NAMES ${YAMLCPP_STATIC} yaml-cpp
+        NAMES ${YAMLCPP_LIB_FILE} yaml-cpp
         PATH_SUFFIXES lib64 lib
         PATHS ~/Library/Frameworks
         /Library/Frameworks
