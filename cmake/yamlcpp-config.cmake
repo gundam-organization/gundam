@@ -11,7 +11,10 @@
 # If yaml-cpp is not installed in a standard path, you can use the YAMLCPP_INSTALL_DIR CMake variable
 # to tell CMake where yaml-cpp is.
 
-cmessage(STATUS "INSIDE YAMLCPP CONFIG YAMLCPP_INSTALL_DIR=${YAMLCPP_INSTALL_DIR}")
+cmessage(STATUS "Looking for yaml-cpp library...")
+if( YAMLCPP_INSTALL_DIR STREQUAL "" )
+    cmessage(STATUS "User provided YAMLCPP_INSTALL_DIR=${YAMLCPP_INSTALL_DIR}")
+endif()
 
 # attempt to find static library first if this is set
 if(YAMLCPP_STATIC_LIBRARY)
