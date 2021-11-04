@@ -274,7 +274,9 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
       Long64_t nEvents = threadChain->GetEntries();
       PhysicsEvent eventBuffer;
       eventBuffer.setLeafNameListPtr(&_leavesRequestedForIndexing_);
+      eventOffSetMutex.lock();
       eventBuffer.hookToTree(threadChain, not isData);
+      eventOffSetMutex.unlock();
 
       PhysicsEvent* eventPtr{nullptr};
 
