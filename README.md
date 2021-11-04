@@ -158,6 +158,10 @@ cmake \
 
 where `$YAMLCPP_INSTALL_DIR` is pointing to the folder containing `include`, `lib`, etc...
 
+##### On CCLyon:
+```bash
+export YAMLCPP_INSTALL_DIR=/sps/t2k/common/software/install/yaml-cpp
+```
 
 ### Gathering inputs
 
