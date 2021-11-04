@@ -122,7 +122,7 @@ bool OptParser::ParseJSON(std::string json_file)
         }
 
         std::fstream sampleFile;
-        sampleFile.open(j["sample_definitions_file"], std::ios::in);
+        sampleFile.open(std::string(j["sample_definitions_file"]), std::ios::in);
 
         json sampleJson;
         sampleFile >> sampleJson;
