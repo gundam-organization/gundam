@@ -145,18 +145,18 @@ export LD_LIBRARY_PATH="$INSTALL_DIR/gundam/lib:$LD_LIBRARY_PATH"
 
 #### CMake can't find yaml-cpp
 
-As cmake is searching for the yaml-cpp libs with a .cmake file, it might not be able to find
-it on its own. To help cmake, you can specify the folder where the .cmake file is located:
+Sometimes cmake can't find the yaml-cpp library on its own. You can
+help it by providing the argument YAMLCPP_INSTALL_DIR:
 
 ```bash
 cmake \
   -DCMAKE_INSTALL_PREFIX:PATH=$INSTALL_DIR/gundam \
   -D CMAKE_BUILD_TYPE=Release \
-  -D yaml-cpp_DIR=$YAML_INSTALL_DIR/share/cmake/yaml-cpp \
+  -D YAMLCPP_INSTALL_DIR=$YAMLCPP_INSTALL_DIR \
   $REPO_DIR/gundam/.
 ```
 
-where `$YAML_INSTALL_DIR` is pointing to the folder containing `include`, `lib`, etc...
+where `$YAMLCPP_INSTALL_DIR` is pointing to the folder containing `include`, `lib`, etc...
 
 
 ### Gathering inputs
