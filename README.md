@@ -64,9 +64,10 @@ in the `$HOME/.bash_profile` on macOS or `$HOME/.bashrc` on Linux, as they can b
 for other projects as well.
 
 ```bash
-export INSTALL_DIR="$HOME/Documents/Work/Install/"
-export BUILD_DIR="$HOME/Documents/Work/Build/"
-export REPO_DIR="$HOME/Documents/Work/Repositories/"
+export WORK_DIR="$HOME/Documents/Work"
+export INSTALL_DIR="$WORK_DIR/Install/"
+export BUILD_DIR="$WORK_DIR/Build/"
+export REPO_DIR="$WORK_DIR/Repositories/"
 ```
 
 If it's the first time you define those, don't forget to `mkdir`!
