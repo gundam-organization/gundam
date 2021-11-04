@@ -193,7 +193,8 @@ int main(int argc, char** argv){
             if(file.find("flist") != file.end())
             {
                 // Text file containing all files to be read in:
-                std::ifstream in(file["flist"]);
+                std::string pathBuf = std::string( file["flist"] );
+                std::ifstream in(pathBuf);
                 std::string filename;
 
                 // Loop over lines of text file with the file list and add contents to the v_files vector:

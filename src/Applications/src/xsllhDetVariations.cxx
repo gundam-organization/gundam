@@ -393,7 +393,8 @@ int main(int argc, char** argv)
             if(json_input_file.find("flist") != json_input_file.end())
             {
                 // Text file containing all files to be read in:
-                std::ifstream in(json_input_file["flist"]);
+                std::string pathBuf = std::string(json_input_file["flist"]);
+                std::ifstream in(pathBuf);
                 std::string filename;
 
                 // Loop over lines of text file with the file list and add contents to the v_files vector:

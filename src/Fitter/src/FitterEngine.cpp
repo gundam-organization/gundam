@@ -644,6 +644,7 @@ double FitterEngine::evalFit(const double* parArray_){
     ss << __METHOD_NAME__ << ": call #" << _nbFitCalls_ << std::endl;
     ss << "Avg χ² computation time: " << _evalFitAvgTimer_ << std::endl;
     if( not _propagator_.isUseResponseFunctions() ){
+      ss << "├─ Current RAM: " << GenericToolbox::parseSizeUnits(GenericToolbox::getProcessMemoryUsage()) << std::endl;
       ss << "├─ Avg time to propagate weights: " << _propagator_.weightProp << std::endl;
       ss << "├─ Avg time to fill histograms: " << _propagator_.fillProp;
     }
