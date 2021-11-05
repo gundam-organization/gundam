@@ -45,6 +45,12 @@ There are several requirements for building the fitter:
 - [JSON for Modern C++](https://github.com/nlohmann/json)
 - [yaml-cpp](https://github.com/jbeder/yaml-cpp)
 
+### Compiling on CCLyon?
+
+![](./resources/guides/images/cc_in2p3_logo.png)
+
+[Click here for the compilation guide on CCLyon](./resources/guides/installOnCCLyon.md)
+
 ### Shell setup
 
 In this guide, it is assumed you have already defined the following bash environment
@@ -144,25 +150,7 @@ export LD_LIBRARY_PATH="$INSTALL_DIR/gundam/lib:$LD_LIBRARY_PATH"
 
 ### Common Issues
 
-#### CMake can't find yaml-cpp
 
-Sometimes cmake can't find the yaml-cpp library on its own. You can
-help it by providing the argument YAMLCPP_INSTALL_DIR:
-
-```bash
-cmake \
-  -DCMAKE_INSTALL_PREFIX:PATH=$INSTALL_DIR/gundam \
-  -D CMAKE_BUILD_TYPE=Release \
-  -D YAMLCPP_INSTALL_DIR=$YAMLCPP_INSTALL_DIR \
-  $REPO_DIR/gundam/.
-```
-
-where `$YAMLCPP_INSTALL_DIR` is pointing to the folder containing `include`, `lib`, etc...
-
-##### On CCLyon:
-```bash
-export YAMLCPP_INSTALL_DIR=/sps/t2k/common/software/install/yaml-cpp
-```
 
 ### Gathering inputs
 
