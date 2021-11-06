@@ -11,7 +11,7 @@ workDir/
 *~
 *.d
 *.nfs0*
-*.png
+# *.png
 *.ps
 *.pdf
 *.tar

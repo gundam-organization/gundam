@@ -220,7 +220,7 @@ bool DialSet::initializeDialsWithDefinition() {
       _dialLeafName_ = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialLeafName");
     }
     else{
-      std::string binningFilePath = JsonUtils::fetchValue<std::string>(dialsDefinition, "binningFilePath");
+      auto binningFilePath = JsonUtils::fetchValue<std::string>(dialsDefinition, "binningFilePath");
 
       DataBinSet binning;
       binning.setName("dialsBinning");
