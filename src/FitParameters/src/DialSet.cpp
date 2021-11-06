@@ -216,8 +216,42 @@ bool DialSet::initializeDialsWithDefinition() {
   }
   else if( dialsType == DialType::Spline or dialsType == DialType::Graph ){
 
-    if( JsonUtils::doKeyExist(dialsDefinition, "dialLeafName") ){
+    if     ( JsonUtils::doKeyExist(dialsDefinition, "dialLeafName") ){
       _dialLeafName_ = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialLeafName");
+    }
+    else if( JsonUtils::doKeyExist(dialsDefinition, "binningFilePath") ){
+      auto binningFilePath = JsonUtils::fetchValue<std::string>(dialsDefinition, "binningFilePath");
+      DataBinSet binning;
+      binning.setName(binningFilePath);
+      binning.readBinningDefinition(_workingDirectory_ + "/" + binningFilePath);
+
+      auto binList = binning.getBinsList();
+
+      std::string filePath = _workingDirectory_ + "/" + JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsFilePath");
+      LogThrowIf(not GenericToolbox::doesTFileIsValid(filePath), "Could not open: " << filePath)
+      TFile* dialsTFile = TFile::Open(filePath.c_str());
+      LogThrowIf(dialsTFile==nullptr, "Could not open: " << filePath)
+
+      auto* dialsList = dialsTFile->Get<TObjArray>(JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsList").c_str());
+      LogThrowIf(dialsList==nullptr, "Could not find dialsList: " << JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsList"))
+
+      LogThrowIf(dialsList->GetSize() != binList.size(), "Number of dials (" << dialsList->GetSize() << ") don't match the number of bins " << binList.size() << "")
+
+      for( int iBin = 0 ; iBin < binList.size() ; iBin++ ){
+        if      ( dialsType == DialType::Spline ){
+          auto* dialPtr = new SplineDial();
+          dialPtr->setApplyConditionBin(binList.at(iBin));
+          dialPtr->setSplinePtr((TSpline3*) dialsList->At(iBin)->Clone());
+          dialPtr->setAssociatedParameterReference(_associatedParameterReference_);
+          dialPtr->initialize();
+          _dialList_.emplace_back(std::make_shared<SplineDial>(*dialPtr) );
+        }
+        else if( dialsType == DialType::Graph ){
+          // TODO
+        }
+      }
+
+      dialsTFile->Close();
     }
     else{
       auto binningFilePath = JsonUtils::fetchValue<std::string>(dialsDefinition, "binningFilePath");

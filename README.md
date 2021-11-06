@@ -47,6 +47,9 @@ There are several requirements for building the fitter:
 
 ### Compiling on macOS?
 
+[TO BE DONE](./resources/guides/.md)
+
+![](./resources/guides/images/macOsLogo.png)
 
 
 ### Compiling on CCLyon?

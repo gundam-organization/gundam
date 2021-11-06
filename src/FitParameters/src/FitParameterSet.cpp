@@ -134,10 +134,6 @@ void FitParameterSet::initialize() {
       LogError << "Could not find \"" << pathBuffer << "\" into \"" << _covarianceMatrixFile_->GetName() << "\"" << std::endl;
       throw std::runtime_error("TObject not found.");
     }
-    else if(_parameterNamesList_->GetSize() != _originalCovarianceMatrix_->GetNrows() ){
-      LogError << GET_VAR_NAME_VALUE(_parameterNamesList_->GetSize() != _originalCovarianceMatrix_->GetNrows()) << std::endl;
-      throw std::runtime_error("TObject size mismatch.");
-    }
   }
   else{
     LogDebug << "No parameterNameTObjArray provided, parameters will be referenced with their index." << std::endl;
@@ -159,12 +155,9 @@ void FitParameterSet::initialize() {
 
     _parameterList_.back().setDialsWorkingDirectory(JsonUtils::fetchValue<std::string>(_jsonConfig_, "dialSetWorkingDirectory", "./"));
 
-    // OLD:
-    if( JsonUtils::doKeyExist(_jsonConfig_, "dialSetDefinitions") ){
-      _parameterList_.back().setDialSetConfig(JsonUtils::fetchValue<nlohmann::json>(_jsonConfig_, "dialSetDefinitions"));
-    }
 
     if( JsonUtils::doKeyExist(_jsonConfig_, "parameterDefinitions") ){
+      // Alternative 1: define parameters then dials
       auto parsConfig = JsonUtils::fetchValue<nlohmann::json>(_jsonConfig_, "parameterDefinitions");
       JsonUtils::forwardConfig(parsConfig);
       auto parConfig = JsonUtils::fetchMatchingEntry(parsConfig, "parameterName", std::string(_parameterNamesList_->At(iParameter)->GetName()));
@@ -173,6 +166,10 @@ void FitParameterSet::initialize() {
         parConfig = JsonUtils::fetchMatchingEntry(parsConfig, "parameterIndex", iParameter);
       }
       _parameterList_.back().setParameterDefinitionConfig(parConfig);
+    }
+    else if( JsonUtils::doKeyExist(_jsonConfig_, "dialSetDefinitions") ){
+      // Alternative 2: define dials then parameters
+      _parameterList_.back().setDialSetConfig(JsonUtils::fetchValue<nlohmann::json>(_jsonConfig_, "dialSetDefinitions"));
     }
 
     _parameterList_.back().setEnableDialSetsSummary(JsonUtils::fetchValue<bool>(_jsonConfig_, "printDialSetsSummary", false));
