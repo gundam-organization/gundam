@@ -21,34 +21,52 @@ if( YAMLCPP_STATIC_LIBRARY )
     set(YAMLCPP_LIB_FILE libyaml-cpp.a)
 endif()
 
-# find the yaml-cpp include directory
-find_path(YAMLCPP_INCLUDE_DIR yaml-cpp/yaml.h
-        PATH_SUFFIXES include
-        PATHS
-        ${YAMLCPP_INSTALL_DIR}/include/
-        ~/Library/Frameworks/yaml-cpp/include/
-        /Library/Frameworks/yaml-cpp/include/
-        /usr/local/include/
-        /usr/include/
-        /sw/yaml-cpp/         # Fink
-        /opt/local/yaml-cpp/  # DarwinPorts
-        /opt/csw/yaml-cpp/    # Blastwave
-        /opt/yaml-cpp/)
+if( YAMLCPP_INSTALL_DIR )
+    # find the yaml-cpp include directory
+    find_path(YAMLCPP_INCLUDE_DIR yaml-cpp/yaml.h
+            PATH_SUFFIXES include
+            PATHS
+            ${YAMLCPP_INSTALL_DIR}/include/
+            )
 
-# find the yaml-cpp library
-find_library(YAMLCPP_LIBRARY
-        NAMES ${YAMLCPP_STATIC} yaml-cpp
-        PATH_SUFFIXES lib64 lib
-        PATHS
-        ${YAMLCPP_INSTALL_DIR}/lib
-        ~/Library/Frameworks
-        /Library/Frameworks
-        /usr/local
-        /usr
-        /sw
-        /opt/local
-        /opt/csw
-        /opt)
+    # find the yaml-cpp library
+    find_library(YAMLCPP_LIBRARY
+            NAMES ${YAMLCPP_STATIC} yaml-cpp
+            PATH_SUFFIXES lib64 lib
+            PATHS
+            ${YAMLCPP_INSTALL_DIR}/lib
+            ${YAMLCPP_INSTALL_DIR}/lib64
+            )
+else()
+    # find the yaml-cpp include directory
+    find_path(YAMLCPP_INCLUDE_DIR yaml-cpp/yaml.h
+            PATH_SUFFIXES include
+            PATHS
+            ~/Library/Frameworks/yaml-cpp/include/
+            /Library/Frameworks/yaml-cpp/include/
+            /usr/local/include/
+            /usr/include/
+            /sw/yaml-cpp/         # Fink
+            /opt/local/yaml-cpp/  # DarwinPorts
+            /opt/csw/yaml-cpp/    # Blastwave
+            /opt/yaml-cpp/)
+
+    # find the yaml-cpp library
+    find_library(YAMLCPP_LIBRARY
+            NAMES ${YAMLCPP_STATIC} yaml-cpp
+            PATH_SUFFIXES lib64 lib
+            PATHS
+            ~/Library/Frameworks
+            /Library/Frameworks
+            /usr/local
+            /usr
+            /sw
+            /opt/local
+            /opt/csw
+            /opt)
+endif()
+
+
 
 # handle the QUIETLY and REQUIRED arguments and set YAMLCPP_FOUND to TRUE if all listed variables are TRUE
 include(FindPackageHandleStandardArgs)
