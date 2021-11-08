@@ -58,10 +58,11 @@ void SplineDial::fillResponseCache() {
   if     ( _dialParameterCache_ < _splinePtr_->GetXmin() ) _dialResponseCache_ = _splinePtr_->Eval(_splinePtr_->GetXmin());
   else if( _dialParameterCache_ > _splinePtr_->GetXmax() ) _dialResponseCache_ = _splinePtr_->Eval(_splinePtr_->GetXmax());
   else                                                     _dialResponseCache_ = _splinePtr_->Eval(_dialParameterCache_);
-  if( _dialResponseCache_ <= 0 ){
-    LogError << this << "(" << _dialParameterCache_ << ") = " << _dialResponseCache_ << std::endl;
-    throw std::runtime_error("negative dial response");
-  }
+  LogThrowIf( _dialResponseCache_ <= 0,
+      "Negative dial response: dial(" << _dialParameterCache_ << ") = " << _dialResponseCache_
+      << std::endl << "Dial is defined in between: [" << _splinePtr_->GetXmin() << ", " << _splinePtr_->GetXmax() << "]" << std::endl
+      << ( _associatedParameterReference_ != nullptr ? "Parameter: " + static_cast<FitParameter *>(_associatedParameterReference_)->getName() : "" )
+      )
 }
 
 void SplineDial::setSplinePtr(TSpline3 *splinePtr) {

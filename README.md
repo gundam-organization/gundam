@@ -45,11 +45,25 @@ There are several requirements for building the fitter:
 - [JSON for Modern C++](https://github.com/nlohmann/json)
 - [yaml-cpp](https://github.com/jbeder/yaml-cpp)
 
+### Compiling on macOS?
+
+[TO BE DONE](./resources/guides/.md)
+
+![](./resources/guides/images/macOsLogo.png)
+
+
 ### Compiling on CCLyon?
+
+[Click here for the compilation guide on CCLyon](./resources/guides/installOnCCLyon.md)
 
 ![](./resources/guides/images/cc_in2p3_logo.png)
 
-[Click here for the compilation guide on CCLyon](./resources/guides/installOnCCLyon.md)
+
+### Compiling on LXPLUS?
+
+[TO BE DONE](./resources/guides/.md)
+
+![](./resources/guides/images/lxplusLogo.png)
 
 ### Shell setup
 
