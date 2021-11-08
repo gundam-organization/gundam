@@ -23,10 +23,24 @@ endif()
 
 if( YAMLCPP_INSTALL_DIR )
     # find the yaml-cpp include directory
-    cmessage(STATUS YAML VAR IS SET)
-    set(YAMLCPP_INCLUDE_DIR ${YAMLCPP_INSTALL_DIR}/include)
-    set(YAMLCPP_LIBRARY     ${YAMLCPP_INSTALL_DIR}/lib/libyaml-cpp.so)
+    cmessage(STATUS "YAMLCPP_INSTALL_DIR has been set to: ${YAMLCPP_INSTALL_DIR}")
+
+    # find the yaml-cpp include directory
+    find_path(YAMLCPP_INCLUDE_DIR yaml-cpp/yaml.h
+            PATH_SUFFIXES include
+            HINTS ${YAMLCPP_INSTALL_DIR}
+            NO_DEFAULT_PATH
+            )
+
+    # find the yaml-cpp library
+    find_library(YAMLCPP_LIBRARY
+            NAMES ${YAMLCPP_STATIC} yaml-cpp
+            PATH_SUFFIXES lib64 lib
+            HINTS ${YAMLCPP_INSTALL_DIR}
+            NO_DEFAULT_PATH
+            )
 else()
+    cmessage(STATUS "Looking for the include and lib folders in the system...")
     # find the yaml-cpp include directory
     find_path(YAMLCPP_INCLUDE_DIR yaml-cpp/yaml.h
             PATH_SUFFIXES include
