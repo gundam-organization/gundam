@@ -20,7 +20,7 @@ target_link_libraries( GundamFitter
 
 set_target_properties(
         GundamFitter PROPERTIES VERSION
-        "${gundam_VERSION_MAJOR}.${gundam_VERSION_MINOR}.${gundam_VERSION_REVISION}"
+        "${gundam_VERSION_MAJOR}.${gundam_VERSION_MINOR}.${gundam_VERSION_REVISION}${gundam_VERSION_TAG}"
 )
 
 set_target_properties(
