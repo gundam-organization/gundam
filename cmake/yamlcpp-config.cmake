@@ -12,6 +12,7 @@
 # to tell CMake where yaml-cpp is.
 
 cmessage(STATUS "Looking for yaml-cpp library...")
+cmessage(STATUS " -> To manually select yaml-cpp: -D YAMLCPP_INSTALL_DIR=/path/to/yaml-cpp/install )")
 #if( YAMLCPP_INSTALL_DIR STREQUAL "" )
 #    cmessage(STATUS "User provided YAMLCPP_INSTALL_DIR=${YAMLCPP_INSTALL_DIR}")
 #endif()
@@ -23,7 +24,7 @@ endif()
 
 if( YAMLCPP_INSTALL_DIR )
     # find the yaml-cpp include directory
-    cmessage(STATUS "YAMLCPP_INSTALL_DIR has been set to: ${YAMLCPP_INSTALL_DIR}")
+    cmessage(STATUS "Custom yaml-cpp path has been set: ${YAMLCPP_INSTALL_DIR}")
 
     # find the yaml-cpp include directory
     find_path(YAMLCPP_INCLUDE_DIR yaml-cpp/yaml.h

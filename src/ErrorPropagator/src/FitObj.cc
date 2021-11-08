@@ -230,7 +230,9 @@ void FitObj::ReweightEvents(const std::vector<double>& input_par)
     {
         const unsigned int num_events = samples[s]->GetN();
         const std::string det(samples[s]->GetDetector());
+#ifdef _OPENMP
 #pragma omp parallel for num_threads(m_threads)
+#endif
         for(unsigned int i = 0; i < num_events; ++i)
         {
             AnaEvent* ev = samples[s]->GetEvent(i);
