@@ -19,6 +19,7 @@ option(YAMLCPP_DIR "Set custom path to yaml-cpp lib" "" )
 set(VERBOSE TRUE)
 #set(CMAKE_MACOSX_RPATH 0)
 #set(CMAKE_SKIP_BUILD_RPATH TRUE)
+set(CMAKE_SKIP_RPATH TRUE)
 include(${CMAKE_SOURCE_DIR}/cmake/cmessage.cmake)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
