@@ -36,6 +36,7 @@ public:
 
   // Getters
   bool isEnabled() const;
+  const nlohmann::json &getDialSetConfig() const;
   std::vector<std::shared_ptr<Dial>> &getDialList();
   const std::vector<std::string> &getDataSetNameList() const;
   TFormula *getApplyConditionFormula() const;

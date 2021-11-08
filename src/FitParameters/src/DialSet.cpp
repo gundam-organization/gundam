@@ -104,6 +104,9 @@ void DialSet::initialize() {
 bool DialSet::isEnabled() const {
   return _isEnabled_;
 }
+const nlohmann::json &DialSet::getDialSetConfig() const {
+  return _dialSetConfig_;
+}
 const std::vector<std::string> &DialSet::getDataSetNameList() const {
   return _dataSetNameList_;
 }
@@ -242,6 +245,11 @@ bool DialSet::initializeDialsWithDefinition() {
           auto* dialPtr = new SplineDial();
           dialPtr->setApplyConditionBin(binList.at(iBin));
           dialPtr->setSplinePtr((TSpline3*) dialsList->At(iBin)->Clone());
+          if( JsonUtils::doKeyExist(dialsDefinition, "minimunSplineResponse") ){
+            dialPtr->setMinimumSplineResponse(
+                JsonUtils::fetchValue<double>(dialsDefinition, "minimunSplineResponse")
+                    );
+          }
           dialPtr->setAssociatedParameterReference(_associatedParameterReference_);
           dialPtr->initialize();
           _dialList_.emplace_back(std::make_shared<SplineDial>(*dialPtr) );
