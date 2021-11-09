@@ -130,3 +130,10 @@ void SampleElement::rescaleHistogram() {
   if( isLocked ) return;
   if(histScale != 1) histogram->Scale(histScale);
 }
+
+void SampleElement::print() const{
+  LogInfo << "SampleElement: " << name << std::endl;
+  LogInfo << " - " << "Nb bins: " << binning.getBinsList().size() << std::endl;
+  LogInfo << " - " << "Nb events: " << eventList.size() << std::endl;
+  LogInfo << " - " << "Hist rescale: " << histScale << std::endl;
+}

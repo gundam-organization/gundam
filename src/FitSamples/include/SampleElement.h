@@ -48,6 +48,8 @@ public:
   void rescaleHistogram();
 
   // debug
+  void print() const;
+
   bool debugTrigger{false};
 
 };
