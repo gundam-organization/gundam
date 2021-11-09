@@ -411,7 +411,9 @@ void XsecFitter::GenerateToyData(int toy_type, bool stat_fluc)
     {
         const unsigned int N  = m_samples[s]->GetN();
         const std::string det = m_samples[s]->GetDetector();
+#ifdef _OPENMP
 #pragma omp parallel for num_threads(m_threads)
+#endif
         for(unsigned int i = 0; i < N; ++i)
         {
             AnaEvent* ev = m_samples[s]->GetEvent(i);
@@ -472,7 +474,9 @@ double XsecFitter::FillSamples(std::vector<std::vector<double>>& new_pars, int d
         const std::string det         = m_samples[s]->GetDetector();
 
         // Loop over all events in the current sample (this loop will be divided amongst the different __nb_threads__):
+#ifdef _OPENMP
 #pragma omp parallel for num_threads(m_threads)
+#endif
         for(unsigned int i = 0; i < num_events; ++i)
         {
             // Get ith event (which contains the event information such as topology, reaction, truth/reco variables, event weights, etc.):

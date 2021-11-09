@@ -18,6 +18,7 @@ public:
   void reset() override;
 
   void setSplinePtr(TSpline3 *splinePtr);
+  void setMinimumSplineResponse(double minimumSplineResponse);
 
   void initialize() override;
 
@@ -28,6 +29,10 @@ protected:
 
 
 private:
+  bool _throwIfResponseIsNegative_{true};
+  bool _fastEval_{false};
+  double _minimumSplineResponse_{std::nan("unset")};
+
   TSpline3* _splinePtr_{nullptr};
 
 };

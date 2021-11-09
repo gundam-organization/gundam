@@ -2,6 +2,8 @@
 // Created by Nadrino on 26/05/2021.
 //
 
+#include "TFile.h"
+
 #include <FitParameter.h>
 #include "SplineDial.h"
 
@@ -55,16 +57,33 @@ std::string SplineDial::getSummary() {
   return ss.str();
 }
 void SplineDial::fillResponseCache() {
+
   if     ( _dialParameterCache_ < _splinePtr_->GetXmin() ) _dialResponseCache_ = _splinePtr_->Eval(_splinePtr_->GetXmin());
   else if( _dialParameterCache_ > _splinePtr_->GetXmax() ) _dialResponseCache_ = _splinePtr_->Eval(_splinePtr_->GetXmax());
-  else                                                     _dialResponseCache_ = _splinePtr_->Eval(_dialParameterCache_);
-  LogThrowIf( _dialResponseCache_ <= 0,
+  else   { _dialResponseCache_ = _splinePtr_->Eval(_dialParameterCache_); }
+
+  // Checks
+  if( _minimumSplineResponse_ == _minimumSplineResponse_ and _dialResponseCache_ < _minimumSplineResponse_ ){
+    _dialResponseCache_ = _minimumSplineResponse_;
+  }
+
+  if( _throwIfResponseIsNegative_ and _dialResponseCache_ < 0 ){
+
+    auto* f = TFile::Open(Form("badDial_%x.root", this), "RECREATE");
+    f->WriteObject(_splinePtr_, _splinePtr_->GetName());
+    f->Close();
+
+    LogThrow(
       "Negative dial response: dial(" << _dialParameterCache_ << ") = " << _dialResponseCache_
       << std::endl << "Dial is defined in between: [" << _splinePtr_->GetXmin() << ", " << _splinePtr_->GetXmax() << "]" << std::endl
       << ( _associatedParameterReference_ != nullptr ? "Parameter: " + static_cast<FitParameter *>(_associatedParameterReference_)->getName() : "" )
       )
+  }
 }
 
 void SplineDial::setSplinePtr(TSpline3 *splinePtr) {
   _splinePtr_ = splinePtr;
+}
+void SplineDial::setMinimumSplineResponse(double minimumSplineResponse) {
+  _minimumSplineResponse_ = minimumSplineResponse;
 }

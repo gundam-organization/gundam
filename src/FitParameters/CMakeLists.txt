@@ -33,7 +33,7 @@ target_link_libraries( GundamFitParameters
 )
 
 set_target_properties(GundamFitParameters PROPERTIES VERSION
-  "${gundam_VERSION_MAJOR}.${gundam_VERSION_MINOR}.${gundam_VERSION_REVISION}")
+  "${gundam_VERSION_MAJOR}.${gundam_VERSION_MINOR}.${gundam_VERSION_REVISION}${gundam_VERSION_TAG}")
 set_target_properties(GundamFitParameters PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
 install(TARGETS GundamFitParameters DESTINATION lib)
