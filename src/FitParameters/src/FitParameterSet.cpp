@@ -256,8 +256,6 @@ double FitParameterSet::getChi2() const {
     }
   }
 
-  LogTrace << "chi2 pull \"" << _name_ << "\": " << chi2 << std::endl;
-
   return chi2;
 }
 
