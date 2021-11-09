@@ -239,33 +239,22 @@ double FitParameterSet::getChi2() const {
 
   if (not _isEnabled_) { return 0; }
 
-  if (_inverseCovarianceMatrix_ == nullptr) {
-    LogError << GET_VAR_NAME_VALUE(_inverseCovarianceMatrix_) << std::endl;
-    throw std::runtime_error("inverse matrix not set");
-  }
+  LogThrowIf(_inverseCovarianceMatrix_ == nullptr, GET_VAR_NAME_VALUE(_inverseCovarianceMatrix_))
 
   double chi2 = 0;
 
-  // EIGEN MATRIX PULLS ARE NOT WORKING
-//  if( _useEigenDecompInFit_ ){
-//    for( int iEigen = 0 ; iEigen < _eigenParValues_->GetNrows() ; iEigen++ ){
-//      chi2 += std::pow( (*_eigenParValues_)[iEigen] - (*_eigenParPriorValues_)[iEigen], 2 )/(*_eigenValues_)[iEigen];
-//    }
-//  }
-//  else{
-    double iDelta, jDelta;
-    for (int iPar = 0; iPar < _inverseCovarianceMatrix_->GetNrows(); iPar++) {
-      if( not _parameterList_[iPar].isEnabled() ) continue;
-      iDelta = (_parameterList_[iPar].getParameterValue() - _parameterList_[iPar].getPriorValue());
-      for (int jPar = 0; jPar < _inverseCovarianceMatrix_->GetNrows(); jPar++) {
-        if( not _parameterList_[jPar].isEnabled() ) continue;
-        jDelta = iDelta;
-        jDelta *= (_parameterList_[jPar].getParameterValue() - _parameterList_[jPar].getPriorValue());
-        jDelta *= (*_inverseCovarianceMatrix_)(iPar, jPar);
-        chi2 += jDelta;
-      }
+  double iDelta, jDelta;
+  for (int iPar = 0; iPar < _inverseCovarianceMatrix_->GetNrows(); iPar++) {
+    if( not _parameterList_[iPar].isEnabled() ) continue;
+    iDelta = (_parameterList_[iPar].getParameterValue() - _parameterList_[iPar].getPriorValue());
+    for (int jPar = 0; jPar < _inverseCovarianceMatrix_->GetNrows(); jPar++) {
+      if( not _parameterList_[jPar].isEnabled() ) continue;
+      jDelta = iDelta;
+      jDelta *= (_parameterList_[jPar].getParameterValue() - _parameterList_[jPar].getPriorValue());
+      jDelta *= (*_inverseCovarianceMatrix_)(iPar, jPar);
+      chi2 += jDelta;
     }
-//  }
+  }
 
   return chi2;
 }

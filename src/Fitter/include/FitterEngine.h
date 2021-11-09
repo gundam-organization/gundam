@@ -87,6 +87,7 @@ private:
   double _chi2StatBuffer_{0};
   double _chi2PullsBuffer_{0};
   double _chi2RegBuffer_{0};
+  double _parStepScale_{0.1};
 
   TTree* _chi2HistoryTree_{nullptr};
 //  std::map<std::string, std::vector<double>> _chi2History_;
