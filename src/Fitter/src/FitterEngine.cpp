@@ -941,7 +941,7 @@ void FitterEngine::rescaleParametersStepSize(){
         double stepSize = parSet.getEigenSigma(iEigen) * _parStepScale_ * TMath::Sqrt(deltaChi2Pulls)/TMath::Sqrt(deltaChi2);
         LogInfo << "Step size of " << parSet.getName() + "/eigen_#" << iEigen
         << " -> σ x " << _parStepScale_ << " x " << TMath::Sqrt(deltaChi2Pulls)/TMath::Sqrt(deltaChi2)
-        << " -> Δχ² = " << deltaChi2 << " = " << deltaChi2 - deltaChi2Pulls << "(stat) + " << deltaChi2Pulls << "(pulls)" << std::endl << std::endl;
+        << " -> Δχ² = " << deltaChi2 << " = " << deltaChi2 - deltaChi2Pulls << "(stat) + " << deltaChi2Pulls << "(pulls)" << std::endl;
 
         parSet.setEigenParStepSize(iEigen, stepSize);
         parSet.setEigenParameter(iEigen, currentParValue);
