@@ -516,9 +516,10 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
         }
 
         int iHistCache{0};
+        std::string pBarTitle;
         for( auto& histPtrToFill : histPtrToFillList ){
           if( not histPtrToFill->isBinCacheBuilt ){
-            std::string pBarTitle = "Building event cache for hist: " + histPtrToFill->histName;
+            pBarTitle = "Building event cache for sample " + sample.getName() + (isData?" (data)":" (mc)");
             GenericToolbox::displayProgressBar(iHistCache++, histPtrToFillList.size(), pBarTitle);
             histPtrToFill->_binEventPtrList_.resize(histPtrToFill->histPtr->GetNbinsX());
             int iBin{-1};
@@ -534,6 +535,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
             histPtrToFill->isBinCacheBuilt = true;
           }
         }
+        if(not pBarTitle.empty())GenericToolbox::displayProgressBar(histPtrToFillList.size(), histPtrToFillList.size(), pBarTitle);
 
         // Filling the selected histograms
         int nThreads = GlobalVariables::getNbThreads();
