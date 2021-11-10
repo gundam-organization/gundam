@@ -36,8 +36,8 @@ private:
   bool _fastEval_{false};
   double _minimumSplineResponse_{std::nan("unset")};
 
-  TSpline3* _splinePtr_{nullptr};
-//  std::shared_ptr<TSpline3> _splinePtr_{nullptr};
+//  TSpline3* _splinePtr_{nullptr};
+  std::shared_ptr<TSpline3> _splinePtr_{nullptr};
 
 };
 
