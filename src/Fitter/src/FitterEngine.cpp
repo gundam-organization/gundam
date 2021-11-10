@@ -391,10 +391,10 @@ void FitterEngine::fit(){
         iFitPar++;
         if( par.isEnabled() ){
           if( _minimizer_->IsFixedVariable(iFitPar) ){
-            LogInfo << "\033[41m" << "#" << iFitPar << " -> " << parSet.getName() << "/" << par.getTitle() << ": FIXED - Prior: " << par.getParameterValue() <<  "\033[0m" << std::endl;
+            LogInfo << "\033[41m" << "#" << iFitPar << " -> " << parSet.getName() << "/" << par.getTitle() << ": FIXED - Prior: " << par.getParameterValue() << " ± " << par.getStdDevValue() <<  "\033[0m" << std::endl;
           }
           else{
-            LogInfo << "#" << iFitPar << " -> " << parSet.getName() << "/" << par.getTitle() << " - Prior: " << par.getParameterValue() << std::endl;
+            LogInfo << "#" << iFitPar << " -> " << parSet.getName() << "/" << par.getTitle() << " - Prior: " << par.getParameterValue() << " ± " << par.getStdDevValue() << std::endl;
           }
         }
         else{
@@ -410,11 +410,11 @@ void FitterEngine::fit(){
         iFitPar++;
         if( _minimizer_->IsFixedVariable(iFitPar) ) {
           LogInfo << "\033[41m" << "#" << iFitPar << " -> " << parSet.getName() << "/eigen_#" << iEigen << ": FIXED - Prior: "
-                  << parSet.getEigenParameterValue(iEigen) << "\033[0m" << std::endl;
+                  << parSet.getEigenParameterValue(iEigen) << " ± " << parSet.getEigenSigma(iEigen) << "\033[0m" << std::endl;
         }
         else{
           LogInfo << "#" << iFitPar << " -> " << parSet.getName() << "/eigen_#" << iEigen << " - Prior: "
-                  << parSet.getEigenParameterValue(iEigen) << std::endl;
+                  << parSet.getEigenParameterValue(iEigen) << " ± " << parSet.getEigenSigma(iEigen) << std::endl;
         }
       }
       Logger::setIndentStr("");

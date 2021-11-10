@@ -40,4 +40,4 @@ function(cmessage)
 endfunction()
 
 
-cmessage(STATUS "Done!")
+cmessage(STATUS "Colored messages setup.")

@@ -5,6 +5,8 @@
 #ifndef XSLLHFITTER_SPLINEDIAL_H
 #define XSLLHFITTER_SPLINEDIAL_H
 
+#include "memory"
+
 #include "TSpline.h"
 
 #include "Dial.h"
@@ -17,7 +19,8 @@ public:
 
   void reset() override;
 
-  void setSplinePtr(TSpline3 *splinePtr);
+  void setSplinePtr(TSpline3 *splinePtrToClone_);
+  void setSplinePtr(const std::shared_ptr<TSpline3>& spline_);
   void setMinimumSplineResponse(double minimumSplineResponse);
 
   void initialize() override;
@@ -33,7 +36,7 @@ private:
   bool _fastEval_{false};
   double _minimumSplineResponse_{std::nan("unset")};
 
-  TSpline3* _splinePtr_{nullptr};
+  std::shared_ptr<TSpline3> _splinePtr_{nullptr};
 
 };
 

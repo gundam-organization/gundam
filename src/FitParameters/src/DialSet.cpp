@@ -244,7 +244,7 @@ bool DialSet::initializeDialsWithDefinition() {
         if      ( dialsType == DialType::Spline ){
           auto* dialPtr = new SplineDial();
           dialPtr->setApplyConditionBin(binList.at(iBin));
-          dialPtr->setSplinePtr((TSpline3*) dialsList->At(iBin)->Clone());
+          dialPtr->setSplinePtr((TSpline3*) dialsList->At(iBin));
           if( JsonUtils::doKeyExist(dialsDefinition, "minimunSplineResponse") ){
             dialPtr->setMinimumSplineResponse(
                 JsonUtils::fetchValue<double>(dialsDefinition, "minimunSplineResponse")
@@ -330,7 +330,7 @@ bool DialSet::initializeDialsWithDefinition() {
         if      ( dialsType == DialType::Spline ){
           auto* dialPtr = new SplineDial();
           dialPtr->setApplyConditionBin(dialBin);
-          dialPtr->setSplinePtr((TSpline3*) splinePtr->Clone());
+          dialPtr->setSplinePtr((TSpline3*) splinePtr);
           dialPtr->setAssociatedParameterReference(_associatedParameterReference_);
           dialPtr->initialize();
           _dialList_.emplace_back(std::make_shared<SplineDial>(*dialPtr) );

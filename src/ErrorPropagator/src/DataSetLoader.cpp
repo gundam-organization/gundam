@@ -378,7 +378,7 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
                     dialSetPtr->getDialList().emplace_back(new SplineDial());
                     spDialPtr = ((SplineDial*)dialSetPtr->getDialList().back().get());
                     eventOffSetMutex.unlock();
-                    spDialPtr->setSplinePtr( new TSpline3(Form("%x", spDialPtr), grPtr) );
+                    spDialPtr->setSplinePtr( std::shared_ptr<TSpline3>(new TSpline3(Form("%x", spDialPtr), grPtr)) );
                     spDialPtr->setAssociatedParameterReference(dialSetPtr->getAssociatedParameterReference());
                     if( JsonUtils::doKeyExist(dialSetPtr->getDialSetConfig(), "minimunSplineResponse") ){
                       spDialPtr->setMinimumSplineResponse(JsonUtils::fetchValue<double>(dialSetPtr->getDialSetConfig(), "minimunSplineResponse"));
