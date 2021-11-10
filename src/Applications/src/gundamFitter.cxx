@@ -93,8 +93,8 @@ int main(int argc, char** argv){
   }
 
 
-  LogDebug << "Closing output file: " << out->GetName() << std::endl;
+  LogWarning << "Closing output file \"" << out->GetName() << "\"..." << std::endl;
   out->Close();
-  LogDebug << "Closed." << std::endl;
+  LogInfo << "Closed." << std::endl;
 
 }

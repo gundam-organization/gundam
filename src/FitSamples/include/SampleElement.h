@@ -47,6 +47,8 @@ public:
   void refillHistogram(int iThread_ = -1);
   void rescaleHistogram();
 
+  double getSumWeights() const;
+
   // debug
   void print() const;
 

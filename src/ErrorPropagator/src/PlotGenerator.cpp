@@ -63,12 +63,14 @@ void PlotGenerator::initialize() {
   _histogramsDefinition_ = JsonUtils::fetchValue(_config_, "histogramsDefinition", nlohmann::json());
 }
 void PlotGenerator::defineHistogramHolders() {
+  LogWarning << __METHOD_NAME__ << std::endl;
   _histHolderList_.clear();
 
   HistHolder histDefBase;
   int sampleCounter = -1;
   if( _fitSampleSetPtr_ != nullptr ){
     for( const auto& sample : _fitSampleSetPtr_->getFitSampleList() ){
+      LogInfo << "Defining histograms for sample: \"" << sample.getName() << "\"" << std::endl;
       sampleCounter++;
       histDefBase.fitSamplePtr = &sample;
       short unsetSplitValueColor = kGray; // will increment if needed
@@ -225,13 +227,13 @@ void PlotGenerator::defineHistogramHolders() {
                 auto varToPlot = _histHolderList_.back().varToPlot;
                 auto splitVarName = _histHolderList_.back().splitVarName;
                 auto* mutexPtr = _histHolderList_.back().fillMutexPtr;
-                _histHolderList_.back().fillFunctionFitSample =
-                  [ mutexPtr, splitVarValue, varToPlot, splitVarName ](TH1D* hist_, const PhysicsEvent* event_){
-                  if( splitVarName.empty() or event_->getVarValue<int>(splitVarName) == splitVarValue){
-                    std::lock_guard<std::mutex> g(*mutexPtr);
-                    hist_->Fill(event_->getVarAsDouble(varToPlot), event_->getEventWeight());
-                  }
-                };
+//                _histHolderList_.back().fillFunctionFitSample =
+//                  [ mutexPtr, splitVarValue, varToPlot, splitVarName ](TH1D* hist_, const PhysicsEvent* event_){
+//                  if( splitVarName.empty() or event_->getVarValue<int>(splitVarName) == splitVarValue){
+//                    std::lock_guard<std::mutex> g(*mutexPtr);
+//                    hist_->Fill(event_->getVarAsDouble(varToPlot), event_->getEventWeight());
+//                  }
+//                };
               }
 
             } // isData
@@ -437,12 +439,9 @@ std::map<std::string, TCanvas *> PlotGenerator::getBufferCanvasList() const {
 }
 
 void PlotGenerator::generateSamplePlots(TDirectory *saveDir_) {
-
-  LogWarning << "Generating sample plots..." << std::endl;
-
+  LogInfo << "Generating sample plots..." << std::endl;
   this->generateSampleHistograms(GenericToolbox::mkdirTFile(saveDir_, "histograms"));
   this->generateCanvas(_histHolderList_, GenericToolbox::mkdirTFile(saveDir_, "canvas"));
-
 }
 void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
 
@@ -454,7 +453,6 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
   auto* lastDir = GenericToolbox::getCurrentTDirectory();
   if(saveDir_ != nullptr ){
     saveDir_->cd();
-    LogInfo << "Samples plots will be writen in: " << saveDir_->GetPath() << std::endl;
   }
 
   // Create histograms
@@ -1043,11 +1041,10 @@ void PlotGenerator::generateComparisonPlots(
   const std::vector<HistHolder> &histsToStackReference_,
   TDirectory *saveDir_){
 
-  LogWarning << "Generating comparison plots..." << std::endl;
+  LogInfo << "Generating comparison plots..." << std::endl;
 
   this->generateComparisonHistograms(histsToStackOther_, histsToStackReference_, GenericToolbox::mkdirTFile(saveDir_, "histograms"));
   this->generateCanvas(_comparisonHistHolderList_, GenericToolbox::mkdirTFile(saveDir_, "canvas"), false);
-
 }
 void PlotGenerator::generateComparisonHistograms(const std::vector<HistHolder> &histList_, const std::vector<HistHolder> &refHistsList_, TDirectory *saveDir_) {
 
@@ -1055,7 +1052,6 @@ void PlotGenerator::generateComparisonHistograms(const std::vector<HistHolder> &
 
   if(saveDir_ != nullptr){
     saveDir_->cd();
-    LogInfo << "Comparison histograms will be writen in: " << saveDir_->GetPath() << std::endl;
   }
   _comparisonHistHolderList_.clear();
 

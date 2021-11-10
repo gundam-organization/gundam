@@ -230,26 +230,40 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
     // DIALS
     DialSet* dialSetPtr;
     std::map<FitParameterSet*, std::vector<DialSet*>> dialSetPtrMap;
-    for( auto& parSet : *parSetList_ ){
-      if( not parSet.isEnabled() ){ continue; }
-      for( auto& par : parSet.getParameterList() ){
-        if( not par.isEnabled() ){ continue; }
-        dialSetPtr = par.findDialSet( _name_ );
-        if( dialSetPtr != nullptr and ( not dialSetPtr->getDialList().empty() or not dialSetPtr->getDialLeafName().empty() ) ){
 
+    // If is data -> NO DIAL!!
+    if( not isData ){
+      for( auto& parSet : *parSetList_ ){
+        if( not parSet.isEnabled() ){ continue; }
+        for( auto& par : parSet.getParameterList() ){
+          if( not par.isEnabled() ){ continue; }
+          dialSetPtr = par.findDialSet( _name_ );
 
-          // Filling var indexes:
-          for( auto& dial : dialSetPtr->getDialList() ){
-            std::vector<int> varIndexes;
-            for( const auto& var : dial->getApplyConditionBin().getVariableNameList() ){
-              varIndexes.emplace_back(GenericToolbox::findElementIndex(var, _leavesRequestedForIndexing_));
+          if( dialSetPtr != nullptr and ( not dialSetPtr->getDialList().empty() or not dialSetPtr->getDialLeafName().empty() ) ){
+
+            // Filling var indexes:
+            for( auto& dial : dialSetPtr->getDialList() ){
+              std::vector<int> varIndexes;
+              for( const auto& var : dial->getApplyConditionBin().getVariableNameList() ){
+                varIndexes.emplace_back(GenericToolbox::findElementIndex(var, _leavesRequestedForIndexing_));
+              }
+              dial->getApplyConditionBin().setEventVarIndexCache(varIndexes);
             }
-            dial->getApplyConditionBin().setEventVarIndexCache(varIndexes);
+
+            // Reserve memory for additional dials (those on a tree leaf)
+            if( not dialSetPtr->getDialLeafName().empty() ){
+              size_t dialSize{0};
+              for( unsigned long sampleNbOfEvent : sampleNbOfEvents ){ dialSize += sampleNbOfEvent; }
+              dialSetPtr->getDialList().resize(dialSize, std::make_shared<SplineDial>());
+            }
+
+            // Add the dialSet to the list
+            dialSetPtrMap[&parSet].emplace_back( dialSetPtr );
           }
-          dialSetPtrMap[&parSet].emplace_back( dialSetPtr );
         }
       }
     }
+
 
     // Fill function
     ROOT::EnableImplicitMT();
@@ -291,6 +305,7 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
       PhysicsEvent* eventPtr{nullptr};
 
       size_t sampleEventIndex;
+      int globalEventIndex{-1};
       const std::vector<DataBin>* binsListPtr;
 
       // Loop vars
@@ -358,6 +373,7 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
             // OK, now we have a valid fit bin. Let's claim an index.
             eventOffSetMutex.lock();
             sampleEventIndex = sampleIndexOffsetList.at(iSample)++;
+            globalEventIndex++;
             eventOffSetMutex.unlock();
 
             eventPtr = &sampleEventListPtrToFill.at(iSample)->at(sampleEventIndex);
@@ -371,70 +387,66 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
             eventPtr->resetEventWeight();
 
             // Now the event is ready. Let's index the dials:
-            eventDialOffset = 0;
-            for( auto& dialSetPair : dialSetPtrMap ){
-              for( iDialSet = 0 ; iDialSet < dialSetPair.second.size() ; iDialSet++ ){
-                dialSetPtr = dialSetPair.second[iDialSet];
+            if( not isData ){
+              eventDialOffset = 0;
+              for( auto& dialSetPair : dialSetPtrMap ){
+                for( iDialSet = 0 ; iDialSet < dialSetPair.second.size() ; iDialSet++ ){
+                  dialSetPtr = dialSetPair.second[iDialSet];
 
-                if( dialSetPtr->getApplyConditionFormula() != nullptr ){
-                  if( eventBuffer.evalFormula(dialSetPtr->getApplyConditionFormula()) == 0 ){
+                  if( dialSetPtr->getApplyConditionFormula() != nullptr ){
+                    if( eventBuffer.evalFormula(dialSetPtr->getApplyConditionFormula()) == 0 ){
+                      continue;
+                    }
+                  }
+
+                  if( not dialSetPtr->getDialLeafName().empty() ){
+                    grPtr = (TGraph*) eventBuffer.getVariable<std::shared_ptr<TClonesArray>>(dialSetPtr->getDialLeafName())->At(0);
+                    if(grPtr->GetN() > 1){
+                      spDialPtr = (SplineDial*) dialSetPtr->getDialList()[globalEventIndex].get();
+                      spDialPtr->setAssociatedParameterReference(dialSetPtr->getAssociatedParameterReference());
+                      if( JsonUtils::doKeyExist(dialSetPtr->getDialSetConfig(), "minimunSplineResponse") ){
+                        spDialPtr->setMinimumSplineResponse(JsonUtils::fetchValue<double>(dialSetPtr->getDialSetConfig(), "minimunSplineResponse"));
+                      }
+                      spDialPtr->createSpline( grPtr );
+                      // Adding dial in the event
+                      eventPtr->getRawDialPtrList()[eventDialOffset++] = spDialPtr;
+                    }
                     continue;
                   }
-                }
 
-                if( not dialSetPtr->getDialLeafName().empty() ){
-                  grPtr = (TGraph*) eventBuffer.getVariable<std::shared_ptr<TClonesArray>>(dialSetPtr->getDialLeafName())->At(0);
-                  if(grPtr->GetN() > 1){
-                    eventOffSetMutex.lock();
-                    // DEFINE A NEW DIAL!
-                    dialSetPtr->getDialList().emplace_back(new SplineDial());
-                    spDialPtr = ((SplineDial*)dialSetPtr->getDialList().back().get());
-                    eventOffSetMutex.unlock();
-                    spDialPtr->createSpline( grPtr );
-                    spDialPtr->setAssociatedParameterReference(dialSetPtr->getAssociatedParameterReference());
-                    if( JsonUtils::doKeyExist(dialSetPtr->getDialSetConfig(), "minimunSplineResponse") ){
-                      spDialPtr->setMinimumSplineResponse(JsonUtils::fetchValue<double>(dialSetPtr->getDialSetConfig(), "minimunSplineResponse"));
+                  bool isInBin = false;
+                  for( iDial = 0 ; iDial < dialSetPtr->getDialList().size(); iDial++ ){
+                    // ----------> SLOW PART
+                    isInBin = true;
+                    applyConditionBinPtr = &dialSetPtr->getDialList()[iDial]->getApplyConditionBin();
+                    for( iVar = 0 ; iVar < applyConditionBinPtr->getEdgesList().size() ; iVar++ ){
+                      if( not applyConditionBinPtr->isBetweenEdges(
+                          applyConditionBinPtr->getEdgesList()[iVar],
+                          eventBuffer.getVarAsDouble(applyConditionBinPtr->getEventVarIndexCache()[iVar] )
+                      )){
+                        isInBin = false;
+                        break;
+                      }
                     }
-                    // Adding dial in the event
-                    eventPtr->getRawDialPtrList()[eventDialOffset++] = spDialPtr;
-                  }
-                  continue;
-                }
-
-                bool isInBin = false;
-                for( iDial = 0 ; iDial < dialSetPtr->getDialList().size(); iDial++ ){
-                  // ----------> SLOW PART
-                  isInBin = true;
-                  applyConditionBinPtr = &dialSetPtr->getDialList()[iDial]->getApplyConditionBin();
-                  for( iVar = 0 ; iVar < applyConditionBinPtr->getEdgesList().size() ; iVar++ ){
-                    if( not applyConditionBinPtr->isBetweenEdges(
-                        applyConditionBinPtr->getEdgesList()[iVar],
-                        eventBuffer.getVarAsDouble(applyConditionBinPtr->getEventVarIndexCache()[iVar] )
-                        )){
-                      isInBin = false;
+                    // <------------------
+                    if( isInBin ){
+                      // OK, so fill the dial ptr in the storage event
+                      eventPtr->getRawDialPtrList()[eventDialOffset++] = dialSetPtr->getDialList()[iDial].get();
                       break;
                     }
+                  } // iDial
+
+                  if( isInBin and dialSetPair.first->isUseOnlyOneParameterPerEvent() ){
+                    break; // leave iDialSet / enabled parameters loop
                   }
-                  // <------------------
-                  if( isInBin ){
-                    // OK, so fill the dial ptr in the storage event
-                    eventPtr->getRawDialPtrList()[eventDialOffset++] = dialSetPtr->getDialList()[iDial].get();
-                    break;
-                  }
-                } // iDial
 
-                if( isInBin and dialSetPair.first->isUseOnlyOneParameterPerEvent() ){
-                  break; // leave iDialSet / enabled parameters loop
-                }
+                } // iDialSet / Enabled-parameter
+              } // ParSet / DialSet Pairs
 
-              } // iDialSet / Enabled-parameter
-            } // ParSet / DialSet Pairs
-
-            // Resize the dialRef list
-            eventOffSetMutex.lock();
-            eventPtr->getRawDialPtrList().resize(eventDialOffset);
-            eventPtr->getRawDialPtrList().shrink_to_fit();
-            eventOffSetMutex.unlock();
+              // Resize the dialRef list
+              eventPtr->getRawDialPtrList().resize(eventDialOffset);
+              eventPtr->getRawDialPtrList().shrink_to_fit();
+            }
 
           } // event has passed the selection?
         } // samples
