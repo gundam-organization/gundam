@@ -2,8 +2,8 @@
 // Created by Nadrino on 22/07/2021.
 //
 
-#ifndef XSLLHFITTER_PHYSICSEVENT_H
-#define XSLLHFITTER_PHYSICSEVENT_H
+#ifndef GUNDAM_PHYSICSEVENT_H
+#define GUNDAM_PHYSICSEVENT_H
 
 #include "vector"
 #include "string"
@@ -66,6 +66,8 @@ public:
   template<typename T> auto getVariable(const std::string& leafName_, size_t arrayIndex_ = 0) -> T&;
   double getVarAsDouble(const std::string& leafName_, size_t arrayIndex_ = 0) const;
   double getVarAsDouble(int varIndex_, size_t arrayIndex_ = 0) const;
+
+  // Eval
   double evalFormula(TFormula* formulaPtr_, std::vector<int>* indexDict_ = nullptr) const;
 
   // Misc
@@ -110,4 +112,4 @@ template<typename T> auto PhysicsEvent::getVariable(const std::string& leafName_
 }
 
 
-#endif //XSLLHFITTER_PHYSICSEVENT_H
+#endif //GUNDAM_PHYSICSEVENT_H

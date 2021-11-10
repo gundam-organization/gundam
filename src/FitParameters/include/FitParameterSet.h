@@ -2,8 +2,8 @@
 // Created by Nadrino on 21/05/2021.
 //
 
-#ifndef XSLLHFITTER_FITPARAMETERSET_H
-#define XSLLHFITTER_FITPARAMETERSET_H
+#ifndef GUNDAM_FITPARAMETERSET_H
+#define GUNDAM_FITPARAMETERSET_H
 
 #include "vector"
 #include "string"
@@ -129,4 +129,4 @@ private:
 };
 
 
-#endif //XSLLHFITTER_FITPARAMETERSET_H
+#endif //GUNDAM_FITPARAMETERSET_H

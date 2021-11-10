@@ -2,8 +2,8 @@
 // Created by Nadrino on 16/06/2021.
 //
 
-#ifndef XSLLHFITTER_PLOTGENERATOR_H
-#define XSLLHFITTER_PLOTGENERATOR_H
+#ifndef GUNDAM_PLOTGENERATOR_H
+#define GUNDAM_PLOTGENERATOR_H
 
 #include "json.hpp"
 #include "TDirectory.h"
@@ -116,4 +116,4 @@ private:
 };
 
 
-#endif //XSLLHFITTER_PLOTGENERATOR_H
+#endif //GUNDAM_PLOTGENERATOR_H

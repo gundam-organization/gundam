@@ -81,11 +81,12 @@ void SplineDial::fillResponseCache() {
   }
 }
 
-void SplineDial::setSplinePtr(TSpline3 *splinePtrToClone_) {
-  _splinePtr_ = std::shared_ptr<TSpline3>(splinePtrToClone_);
+void SplineDial::copySpline(const TSpline3* splinePtr_){
+  _splinePtr_ = std::make_shared<TSpline3>(*splinePtr_);
 }
-void SplineDial::setSplinePtr(const std::shared_ptr<TSpline3>& spline_){
-  _splinePtr_ = spline_;
+void SplineDial::createSpline(TGraph* grPtr_){
+  LogThrowIf(_splinePtr_!=nullptr, "Spline already set.")
+  _splinePtr_ = std::make_shared<TSpline3>(TSpline3(grPtr_->GetName(), grPtr_));
 }
 void SplineDial::setMinimumSplineResponse(double minimumSplineResponse) {
   _minimumSplineResponse_ = minimumSplineResponse;

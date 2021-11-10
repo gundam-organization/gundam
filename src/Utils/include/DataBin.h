@@ -2,8 +2,8 @@
 // Created by Nadrino on 19/05/2021.
 //
 
-#ifndef XSLLHFITTER_DATABIN_H
-#define XSLLHFITTER_DATABIN_H
+#ifndef GUNDAM_DATABIN_H
+#define GUNDAM_DATABIN_H
 
 #include <utility>
 #include "vector"
@@ -27,6 +27,8 @@ public:
   void addBinEdge(double lowEdge_, double highEdge_);
   void addBinEdge(const std::string& variableName_, double lowEdge_, double highEdge_);
 
+  void setEventVarIndexCache(const std::vector<int> &eventVarIndexCache);
+
   // Init
 
   // Getters
@@ -39,6 +41,7 @@ public:
   const std::string &getTreeFormulaStr() const;
   TFormula *getFormula() const;
   TTreeFormula *getTreeFormula() const;
+  const std::vector<int> &getEventVarIndexCache() const;
 
   // Non-native Getters
   size_t getNbEdges() const;
@@ -47,6 +50,7 @@ public:
   bool isInBin(const std::vector<double>& valuesList_) const;
   bool isBetweenEdges(const std::string& variableName_, double value_) const;
   bool isBetweenEdges(size_t varIndex_, double value_) const;
+  bool isBetweenEdges(const std::pair<double,double>& edges_, double value_) const;
 
   // Misc
   bool isVariableSet(const std::string& variableName_) const;
@@ -68,6 +72,8 @@ private:
   std::string _treeFormulaStr_;
   std::shared_ptr<TTreeFormula> _treeFormula_;
 
+  std::vector<int> _eventVarIndexCache_{};
+
 };
 
-#endif //XSLLHFITTER_DATABIN_H
+#endif //GUNDAM_DATABIN_H

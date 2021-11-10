@@ -2,8 +2,8 @@
 // Created by Nadrino on 11/06/2021.
 //
 
-#ifndef XSLLHFITTER_PROPAGATOR_H
-#define XSLLHFITTER_PROPAGATOR_H
+#ifndef GUNDAM_PROPAGATOR_H
+#define GUNDAM_PROPAGATOR_H
 
 #include "vector"
 #include "future"
@@ -95,4 +95,4 @@ public:
 };
 
 
-#endif //XSLLHFITTER_PROPAGATOR_H
+#endif //GUNDAM_PROPAGATOR_H

@@ -2,8 +2,8 @@
 // Created by Nadrino on 19/05/2021.
 //
 
-#ifndef XSLLHFITTER_DATABINSET_H
-#define XSLLHFITTER_DATABINSET_H
+#ifndef GUNDAM_DATABINSET_H
+#define GUNDAM_DATABINSET_H
 
 #include "vector"
 #include "string"
@@ -43,4 +43,4 @@ private:
 };
 
 
-#endif //XSLLHFITTER_DATABINSET_H
+#endif //GUNDAM_DATABINSET_H

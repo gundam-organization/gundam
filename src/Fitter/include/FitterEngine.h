@@ -2,8 +2,8 @@
 // Created by Nadrino on 11/06/2021.
 //
 
-#ifndef XSLLHFITTER_FITTERENGINE_H
-#define XSLLHFITTER_FITTERENGINE_H
+#ifndef GUNDAM_FITTERENGINE_H
+#define GUNDAM_FITTERENGINE_H
 
 #include "string"
 #include "vector"
@@ -124,4 +124,4 @@ private:
 };
 
 
-#endif //XSLLHFITTER_FITTERENGINE_H
+#endif //GUNDAM_FITTERENGINE_H
