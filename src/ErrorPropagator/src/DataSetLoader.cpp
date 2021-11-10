@@ -181,9 +181,9 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
         if(eventIsInSamplesList[iEvent][iSample]) sampleNbOfEvents[iSample]++;
       }
     }
-    LogInfo << "Events passing selection cuts:" << std::endl;
+    LogWarning << "Events passing selection cuts:" << std::endl;
     for( size_t iSample = 0 ; iSample < samplesToFillList.size() ; iSample++ ){
-      LogInfo << " - \"" << samplesToFillList.at(iSample)->getName() << "\": " << sampleNbOfEvents[iSample] << std::endl;
+      LogInfo << "- \"" << samplesToFillList.at(iSample)->getName() << "\": " << sampleNbOfEvents[iSample] << std::endl;
     }
 
     LogInfo << "Claiming memory for event storage..." << std::endl;

@@ -129,11 +129,6 @@ void Propagator::initialize() {
 
   _fitSampleSet_.loadAsimovData();
 
-  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    LogInfo << "Sum of event weights in \"" << sample.getName() << "\":" << std::endl
-            << "-> mc: " << sample.getMcContainer().getSumWeights() << " / data: " << sample.getDataContainer().getSumWeights() << std::endl;
-  }
-
   _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
   _plotGenerator_.defineHistogramHolders();
 
@@ -176,6 +171,12 @@ void Propagator::initialize() {
         sample.getDataContainer().eventList.at(iEvent).setNominalWeight(sample.getDataContainer().eventList.at(iEvent).getEventWeight());
       }
     }
+  }
+
+  LogWarning << "Sample breakdown:" << std::endl;
+  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    LogInfo << "Sum of event weights in \"" << sample.getName() << "\":" << std::endl
+            << "-> mc: " << sample.getMcContainer().getSumWeights() << " / data: " << sample.getDataContainer().getSumWeights() << std::endl;
   }
 
   LogInfo << "Filling up sample bin caches..." << std::endl;

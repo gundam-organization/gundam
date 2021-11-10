@@ -703,17 +703,13 @@ void FitterEngine::writePostFitData() {
   int parameterIndexOffset = 0;
   for( const auto& parSet : _propagator_.getParameterSetsList() ){
 
-    if( not parSet.isEnabled() ){
-      LogWarning << "Skipping disabled parameter set: " << parSet.getName() << std::endl;
-      continue;
-    }
+    if( not parSet.isEnabled() ){ continue; }
 
     LogInfo << "Extracting post-fit errors of parameter set: " << parSet.getName() << std::endl;
     auto* parSetDir = GenericToolbox::mkdirTFile(errorDir, parSet.getName());
 
     TMatrixD* covMatrix;
     if( not parSet.isUseEigenDecompInFit() ) {
-      LogDebug << "Extracting parameters..." << std::endl;
       covMatrix = new TMatrixD(int(parSet.getParameterList().size()), int(parSet.getParameterList().size()));
       for (const auto &parRow: parSet.getParameterList()) {
         for (const auto &parCol: parSet.getParameterList()) {
@@ -731,7 +727,6 @@ void FitterEngine::writePostFitData() {
       }
     }
     else{
-      LogDebug << "Extracting eigen parameters..." << std::endl;
 
       covMatrix = new TMatrixD(parSet.getNbEnabledEigenParameters(), parSet.getNbEnabledEigenParameters());
       for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
@@ -755,7 +750,6 @@ void FitterEngine::writePostFitData() {
       auto* corMatrix = GenericToolbox::convertToCorrelationMatrix((TMatrixD*) covMatrix);
       auto* corMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D(corMatrix, Form("Correlation_Eigen_%s_TH2D", parSet.getName().c_str()));
 
-      LogDebug << "Applying labels on eigen histograms..." << std::endl;
       for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
         covMatrixTH2D->GetXaxis()->SetBinLabel(1+iEigen, (parSet.getName() + "/eigen_#" + std::to_string(iEigen)).c_str());
         covMatrixTH2D->GetYaxis()->SetBinLabel(1+iEigen, (parSet.getName() + "/eigen_#" + std::to_string(iEigen)).c_str());
@@ -772,7 +766,6 @@ void FitterEngine::writePostFitData() {
       corMatrix->Write("Correlation_Eigen_TMatrixD");
       corMatrixTH2D->Write("Correlation_Eigen_TH2D");
 
-      LogDebug << "Converting eigen to original parameters..." << std::endl;
       auto* originalCovMatrix = new TMatrixD(int(parSet.getParameterList().size()), int(parSet.getParameterList().size()));
       for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
         for( int jEigen = 0 ; jEigen < parSet.getNbEnabledEigenParameters() ; jEigen++ ){
@@ -798,7 +791,6 @@ void FitterEngine::writePostFitData() {
     auto* corMatrix = GenericToolbox::convertToCorrelationMatrix((TMatrixD*) covMatrix);
     auto* corMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D(corMatrix, Form("Correlation_%s_TH2D", parSet.getName().c_str()));
 
-    LogDebug << "Applying labels on histograms..." << std::endl;
     for( const auto& par : parSet.getParameterList() ){
       covMatrixTH2D->GetXaxis()->SetBinLabel(1+par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
       covMatrixTH2D->GetYaxis()->SetBinLabel(1+par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
@@ -806,7 +798,6 @@ void FitterEngine::writePostFitData() {
       corMatrixTH2D->GetYaxis()->SetBinLabel(1+par.getParameterIndex(), (parSet.getName() + "/" + par.getTitle()).c_str());
     }
 
-    LogTrace << "Writing cov matrices..." << std::endl;
     GenericToolbox::mkdirTFile(parSetDir, "matrices")->cd();
     covMatrix->Write("Covariance_TMatrixD");
     covMatrixTH2D->Write("Covariance_TH2D");
@@ -814,7 +805,6 @@ void FitterEngine::writePostFitData() {
     corMatrixTH2D->Write("Correlation_TH2D");
 
     // Parameters
-    LogTrace << "Generating parameter plots..." << std::endl;
     GenericToolbox::mkdirTFile(parSetDir, "values")->cd();
     auto* postFitErrorHist = new TH1D("postFitErrors_TH1D", "Post-fit Errors", parSet.getNbParameters(), 0, parSet.getNbParameters());
     auto* preFitErrorHist = new TH1D("preFitErrors_TH1D", "Pre-fit Errors", parSet.getNbParameters(), 0, parSet.getNbParameters());
@@ -846,7 +836,6 @@ void FitterEngine::writePostFitData() {
       }
     }
 
-    LogTrace << "Cosmetics..." << std::endl;
     preFitErrorHist->SetFillColor(kRed-9);
 //        preFitErrorHist->SetFillColorAlpha(kRed-9, 0.5);
 //        preFitErrorHist->SetFillStyle(4050); // 50 % opaque ?
