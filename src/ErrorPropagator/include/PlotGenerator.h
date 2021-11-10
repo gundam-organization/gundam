@@ -50,6 +50,11 @@ struct HistHolder{
 
   // Flags
   bool isBaseSplitHist{false};
+
+  // Caches
+  bool isBinCacheBuilt{false};
+  std::vector<std::vector<const PhysicsEvent*>> _binEventPtrList_;
+
 };
 
 struct CanvasHolder{

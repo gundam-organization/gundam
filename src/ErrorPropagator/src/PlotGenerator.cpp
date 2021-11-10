@@ -515,6 +515,26 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
           }
         }
 
+        int iHistCache{0};
+        for( auto& histPtrToFill : histPtrToFillList ){
+          if( not histPtrToFill->isBinCacheBuilt ){
+            std::string pBarTitle = "Building event cache for hist: " + histPtrToFill->histName;
+            GenericToolbox::displayProgressBar(iHistCache++, histPtrToFillList.size(), pBarTitle);
+            histPtrToFill->_binEventPtrList_.resize(histPtrToFill->histPtr->GetNbinsX());
+            int iBin{-1};
+            for( const auto& event : *eventListPtr ){
+              if( histPtrToFill->splitVarName.empty() or event.getVarValue<int>(histPtrToFill->splitVarName) == histPtrToFill->splitVarValue){
+                iBin = histPtrToFill->histPtr->FindBin(event.getVarAsDouble(histPtrToFill->varToPlot));
+                if( iBin > 0 and iBin <= histPtrToFill->histPtr->GetNbinsX() ){
+                  // so it's a valid bin!
+                  histPtrToFill->_binEventPtrList_[iBin-1].emplace_back(&event);
+                }
+              }
+            }
+            histPtrToFill->isBinCacheBuilt = true;
+          }
+        }
+
         // Filling the selected histograms
         int nThreads = GlobalVariables::getNbThreads();
         std::function<void(int)> fillJob = [&]( int iThread ){
@@ -522,18 +542,16 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
           int iHist = -1;
           std::string pBarTitle;
           if( iThread == 0 ) pBarTitle = LogDebug.getPrefixString() + "Filling histograms of sample \"" + sample.getName() + "\"";
-          for( const auto& event : *eventListPtr ){
-            iEvent++;
-            if( iEvent % nThreads != iThread ) continue; // faster -> but needs a thread lock
-            if( iThread == 0 ){ GenericToolbox::displayProgressBar(iEvent, eventListPtr->size(), pBarTitle); }
-            iHist = -1;
-            for( auto& hist : histPtrToFillList ){
-              iHist++;
-              //            if( iHist % nThreads != iThread ) continue;
-              hist->fillFunctionFitSample(hist->histPtr , &event);
+
+          for( auto& hist : histPtrToFillList ){
+            for( int iBin = iThread+1 ; iBin <= hist->histPtr->GetNbinsX() ; iBin += nThreads ){
+              hist->histPtr->SetBinContent(iBin, 0);
+              for( auto* evtPtr : hist->_binEventPtrList_[iBin-1] ){
+                hist->histPtr->AddBinContent(iBin, evtPtr->getEventWeight());
+              }
+              hist->histPtr->SetBinError(iBin, TMath::Sqrt(hist->histPtr->GetBinContent(iBin)));
             }
-          } // event
-          if( iThread == 0 ){ GenericToolbox::displayProgressBar(eventListPtr->size(), eventListPtr->size(), pBarTitle); }
+          }
         };
 
         GlobalVariables::getParallelWorker().addJob("fillJob", fillJob);
