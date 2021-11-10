@@ -635,7 +635,7 @@ std::vector<std::vector<bool>> DataSetLoader::makeEventSelection(std::vector<Fit
   Long64_t nEvents = chainPtr->GetEntries();
   // for each event, which sample is active?
   std::vector<std::vector<bool>> eventIsInSamplesList(nEvents, std::vector<bool>(samplesToFillList.size(), true));
-  std::string progressTitle = LogWarning.getPrefixString() + "Performing event selection";
+  std::string progressTitle = LogInfo.getPrefixString() + "Reading input dataset";
   TFile* lastFilePtr{nullptr};
   for( Long64_t iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
     GenericToolbox::displayProgressBar(iEvent, nEvents, progressTitle);
