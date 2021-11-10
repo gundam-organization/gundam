@@ -186,7 +186,7 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
       LogInfo << " - \"" << samplesToFillList.at(iSample)->getName() << "\": " << sampleNbOfEvents[iSample] << std::endl;
     }
 
-    LogInfo << "Claiming memory event storage..." << std::endl;
+    LogInfo << "Claiming memory for event storage..." << std::endl;
     // The following lines are necessary since the events might get resized while being in multithread
     // Because std::vector is insuring continuous memory allocation, a resize sometimes
     // lead to the full moving of a vector memory. This is not thread safe, so better ensure
