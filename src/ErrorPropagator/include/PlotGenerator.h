@@ -102,6 +102,9 @@ public:
   std::vector<std::string> fetchListOfSplitVarNames();
   std::vector<std::string> fetchRequestedLeafNames();
 
+protected:
+  void buildEventBinCache(const std::vector<HistHolder *> &histPtrToFillList, const std::vector<PhysicsEvent> *eventListPtr, bool isData_);
+
 private:
   nlohmann::json _config_;
   const std::vector<AnaSample>* _sampleListPtr_{nullptr};

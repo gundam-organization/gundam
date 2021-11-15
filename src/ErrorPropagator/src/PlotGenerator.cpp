@@ -444,6 +444,7 @@ void PlotGenerator::generateSamplePlots(TDirectory *saveDir_) {
   this->generateCanvas(_histHolderList_, GenericToolbox::mkdirTFile(saveDir_, "canvas"));
 }
 void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
+  LogWarning << __METHOD_NAME__ << std::endl;
 
   if( _histogramsDefinition_.empty() ){
     LogError << "No histogram has been defined." << std::endl;
@@ -497,7 +498,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
 
           // which hist should be filled?
           for( auto& histDef : _histHolderList_ ){
-            if(histDef.isData and histDef.fitSamplePtr == &sample and histDef.fillFunctionFitSample ){
+            if(histDef.isData and histDef.fitSamplePtr == &sample ){
               histPtrToFillList.emplace_back( &histDef );
             }
           }
@@ -507,33 +508,21 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
 
           // which hist should be filled?
           for( auto& histDef : _histHolderList_ ){
-            if(not histDef.isData and histDef.fitSamplePtr == &sample and histDef.fillFunctionFitSample ){
+            if(not histDef.isData and histDef.fitSamplePtr == &sample ){
               histPtrToFillList.emplace_back( &histDef );
             }
           }
         }
 
-        int iHistCache{0};
-        std::string pBarTitle;
         for( auto& histPtrToFill : histPtrToFillList ){
           if( not histPtrToFill->isBinCacheBuilt ){
-            pBarTitle = "Building event cache for sample " + sample.getName() + (isData?" (data)":" (mc)");
-            GenericToolbox::displayProgressBar(iHistCache++, histPtrToFillList.size(), pBarTitle);
-            histPtrToFill->_binEventPtrList_.resize(histPtrToFill->histPtr->GetNbinsX());
-            int iBin{-1};
-            for( const auto& event : *eventListPtr ){
-              if( histPtrToFill->splitVarName.empty() or event.getVarValue<int>(histPtrToFill->splitVarName) == histPtrToFill->splitVarValue){
-                iBin = histPtrToFill->histPtr->FindBin(event.getVarAsDouble(histPtrToFill->varToPlot));
-                if( iBin > 0 and iBin <= histPtrToFill->histPtr->GetNbinsX() ){
-                  // so it's a valid bin!
-                  histPtrToFill->_binEventPtrList_[iBin-1].emplace_back(&event);
-                }
-              }
-            }
-            histPtrToFill->isBinCacheBuilt = true;
+            // If any, launch rebuild cache
+            LogInfo << "Build event bin cache for sample \"" << sample.getName() << "\"" << std::endl;
+            this->buildEventBinCache(histPtrToFillList, eventListPtr, isData);
+            break; // all caches done at once
           }
         }
-        if(not pBarTitle.empty())GenericToolbox::displayProgressBar(histPtrToFillList.size(), histPtrToFillList.size(), pBarTitle);
+
 
         // Filling the selected histograms
         int nThreads = GlobalVariables::getNbThreads();
@@ -1171,4 +1160,39 @@ std::vector<std::string> PlotGenerator::fetchRequestedLeafNames(){
   varNameList.insert( varNameList.end(), varToPlotList.begin(), varToPlotList.end() );
   varNameList.insert( varNameList.end(), splitVarNameList.begin(), splitVarNameList.end() );
   return varNameList;
+}
+
+void PlotGenerator::buildEventBinCache(const std::vector<HistHolder *> &histPtrToFillList, const std::vector<PhysicsEvent> *eventListPtr, bool isData_) {
+
+  std::function<void(int)> fillEventHistCache = [&](int iThread_){
+    int iHistCache{-1};
+    std::string pBarTitle;
+    for( auto& histPtrToFill : histPtrToFillList ){
+      iHistCache++;
+
+      if( iHistCache % GlobalVariables::getNbThreads() != iThread_ ) continue;
+
+      if( not histPtrToFill->isBinCacheBuilt ){
+
+        histPtrToFill->_binEventPtrList_.resize(histPtrToFill->histPtr->GetNbinsX());
+        int iBin{-1};
+        for( const auto& event : *eventListPtr ){
+          if( histPtrToFill->splitVarName.empty() or event.getVarValue<int>(histPtrToFill->splitVarName) == histPtrToFill->splitVarValue){
+            if( histPtrToFill->varToPlot == "Raw" ) iBin = event.getSampleBinIndex();
+            else iBin = histPtrToFill->histPtr->FindBin(event.getVarAsDouble(histPtrToFill->varToPlot));
+            if( iBin > 0 and iBin <= histPtrToFill->histPtr->GetNbinsX() ){
+              // so it's a valid bin!
+              histPtrToFill->_binEventPtrList_[iBin-1].emplace_back(&event);
+            }
+          }
+        }
+        histPtrToFill->isBinCacheBuilt = true;
+      }
+    }
+  };
+
+  GlobalVariables::getParallelWorker().addJob("fillEventHistCache", fillEventHistCache);
+  GlobalVariables::getParallelWorker().runJob("fillEventHistCache");
+  GlobalVariables::getParallelWorker().removeJob("fillEventHistCache");
+
 }
