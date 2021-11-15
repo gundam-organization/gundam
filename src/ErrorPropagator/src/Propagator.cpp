@@ -127,26 +127,10 @@ void Propagator::initialize() {
     dataSet.load(&_fitSampleSet_, &_parameterSetsList_);
   } // dataSets
 
-  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    LogInfo << "Total events loaded from file in \"" << sample.getName() << "\":" << std::endl
-            << "-> mc: " << sample.getMcContainer().eventList.size() << " / data: " << sample.getDataContainer().eventList.size() << std::endl;
-  }
-
-  initializeThreads();
   _fitSampleSet_.loadAsimovData();
 
   _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
   _plotGenerator_.defineHistogramHolders();
-
-
-  // TEMP: trim dial cache
-  LogDebug << "Trimming event dial cache..." << std::endl;
-  for( auto& sample: _fitSampleSet_.getFitSampleList() ){
-    for( auto& event : sample.getMcContainer().eventList ){
-      event.trimDialCache();
-    }
-  }
-
 
   if( JsonUtils::fetchValue<json>(_config_, "throwParameters", false) ){
     LogWarning << "Throwing parameters..." << std::endl;
@@ -159,6 +143,9 @@ void Propagator::initialize() {
       }
     }
   }
+
+  LogInfo << "Initializing threads..." << std::endl;
+  initializeThreads();
 
   LogInfo << "Propagating prior parameters on events..." << std::endl;
   reweightSampleEvents();
@@ -184,6 +171,12 @@ void Propagator::initialize() {
         sample.getDataContainer().eventList.at(iEvent).setNominalWeight(sample.getDataContainer().eventList.at(iEvent).getEventWeight());
       }
     }
+  }
+
+  LogWarning << "Sample breakdown:" << std::endl;
+  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    LogInfo << "Sum of event weights in \"" << sample.getName() << "\":" << std::endl
+            << "-> mc: " << sample.getMcContainer().getSumWeights() << " / data: " << sample.getDataContainer().getSumWeights() << std::endl;
   }
 
   LogInfo << "Filling up sample bin caches..." << std::endl;
@@ -296,6 +289,8 @@ void Propagator::initializeThreads() {
     this->applyResponseFunctions(iThread);
   };
   GlobalVariables::getParallelWorker().addJob("Propagator::applyResponseFunctions", applyResponseFunctionsFct);
+
+  GlobalVariables::getParallelWorker().setCpuTimeSaverIsEnabled(false);
 
 }
 

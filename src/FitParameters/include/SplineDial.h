@@ -2,8 +2,10 @@
 // Created by Nadrino on 26/05/2021.
 //
 
-#ifndef XSLLHFITTER_SPLINEDIAL_H
-#define XSLLHFITTER_SPLINEDIAL_H
+#ifndef GUNDAM_SPLINEDIAL_H
+#define GUNDAM_SPLINEDIAL_H
+
+#include "memory"
 
 #include "TSpline.h"
 
@@ -17,7 +19,8 @@ public:
 
   void reset() override;
 
-  void setSplinePtr(TSpline3 *splinePtr);
+  void copySpline(const TSpline3* splinePtr_);
+  void createSpline(TGraph* grPtr_);
   void setMinimumSplineResponse(double minimumSplineResponse);
 
   void initialize() override;
@@ -33,9 +36,10 @@ private:
   bool _fastEval_{false};
   double _minimumSplineResponse_{std::nan("unset")};
 
-  TSpline3* _splinePtr_{nullptr};
+//  TSpline3* _splinePtr_{nullptr};
+  std::shared_ptr<TSpline3> _splinePtr_{nullptr};
 
 };
 
 
-#endif //XSLLHFITTER_SPLINEDIAL_H
+#endif //GUNDAM_SPLINEDIAL_H

@@ -70,7 +70,8 @@ void SplineDial::fillResponseCache() {
   if( _throwIfResponseIsNegative_ and _dialResponseCache_ < 0 ){
 
     auto* f = TFile::Open(Form("badDial_%x.root", this), "RECREATE");
-    f->WriteObject(_splinePtr_, _splinePtr_->GetName());
+//    f->WriteObject(_splinePtr_, _splinePtr_->GetName());
+    f->WriteObject(_splinePtr_.get(), _splinePtr_->GetName());
     f->Close();
 
     LogThrow(
@@ -81,8 +82,13 @@ void SplineDial::fillResponseCache() {
   }
 }
 
-void SplineDial::setSplinePtr(TSpline3 *splinePtr) {
-  _splinePtr_ = splinePtr;
+void SplineDial::copySpline(const TSpline3* splinePtr_){
+//  _splinePtr_ = (TSpline3*) splinePtr_->Clone();
+  _splinePtr_ = std::make_shared<TSpline3>(*splinePtr_);
+}
+void SplineDial::createSpline(TGraph* grPtr_){
+//  _splinePtr_ = new TSpline3(grPtr_->GetName(), grPtr_);
+  _splinePtr_ = std::make_shared<TSpline3>(TSpline3(grPtr_->GetName(), grPtr_));
 }
 void SplineDial::setMinimumSplineResponse(double minimumSplineResponse) {
   _minimumSplineResponse_ = minimumSplineResponse;

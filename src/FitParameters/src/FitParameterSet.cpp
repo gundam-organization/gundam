@@ -239,20 +239,18 @@ double FitParameterSet::getChi2() const {
 
   if (not _isEnabled_) { return 0; }
 
-  if (_inverseCovarianceMatrix_ == nullptr) {
-    LogError << GET_VAR_NAME_VALUE(_inverseCovarianceMatrix_) << std::endl;
-    throw std::runtime_error("inverse matrix not set");
-  }
+  LogThrowIf(_inverseCovarianceMatrix_ == nullptr, GET_VAR_NAME_VALUE(_inverseCovarianceMatrix_))
 
   double chi2 = 0;
 
-  // EIGEN MATRIX PULLS ARE NOT WORKING
+  // EIGEN DECOMP NOT VALID?? Why?
 //  if( _useEigenDecompInFit_ ){
-//    for( int iEigen = 0 ; iEigen < _eigenParValues_->GetNrows() ; iEigen++ ){
-//      chi2 += std::pow( (*_eigenParValues_)[iEigen] - (*_eigenParPriorValues_)[iEigen], 2 )/(*_eigenValues_)[iEigen];
+//    for( int iEigen = 0 ; iEigen < _nbEnabledEigen_ ; iEigen++ ){
+//      chi2 += TMath::Sq((*_eigenParValues_)[iEigen] - (*_eigenParPriorValues_)[iEigen]) / (*_eigenValues_)[iEigen];
 //    }
 //  }
-//  else{
+//  else
+  {
     double iDelta, jDelta;
     for (int iPar = 0; iPar < _inverseCovarianceMatrix_->GetNrows(); iPar++) {
       if( not _parameterList_[iPar].isEnabled() ) continue;
@@ -265,7 +263,7 @@ double FitParameterSet::getChi2() const {
         chi2 += jDelta;
       }
     }
-//  }
+  }
 
   return chi2;
 }
@@ -370,8 +368,8 @@ void FitParameterSet::readCovarianceMatrix(){
     GenericToolbox::convertToCorrelationMatrix((TMatrixD*)_originalCovarianceMatrix_)->Write("CorrelationMatrix_TMatrixD");
   }
 
-  _originalCorrelationMatrix_ = std::shared_ptr<TMatrixDSym>(
-    GenericToolbox::convertToSymmetricMatrix(GenericToolbox::convertToCorrelationMatrix((TMatrixD*) _originalCovarianceMatrix_))
+  _originalCorrelationMatrix_ = std::shared_ptr<TMatrixD>(
+    GenericToolbox::convertToCorrelationMatrix((TMatrixD*) _originalCovarianceMatrix_)
     );
 
   _useEigenDecompInFit_ = JsonUtils::fetchValue(_jsonConfig_ , "useEigenDecompInFit", false);
@@ -384,7 +382,7 @@ void FitParameterSet::readCovarianceMatrix(){
   LogWarning << "Computing inverse of the covariance matrix: " << _originalCovarianceMatrix_->GetNcols() << "x" << _originalCovarianceMatrix_->GetNrows() << std::endl;
   if( not _useEigenDecompInFit_ ){
     LogDebug << "Using default matrix inversion..." << std::endl;
-    _inverseCovarianceMatrix_ = std::shared_ptr<TMatrixDSym>((TMatrixDSym*)(_originalCovarianceMatrix_->Clone()));
+    _inverseCovarianceMatrix_ = std::shared_ptr<TMatrixD>((TMatrixD*)(_originalCovarianceMatrix_->Clone()));
     _inverseCovarianceMatrix_->Invert();
   }
   else{
@@ -394,46 +392,58 @@ void FitParameterSet::readCovarianceMatrix(){
     _eigenDecomp_ = std::shared_ptr<TMatrixDSymEigen>(new TMatrixDSymEigen(*_originalCovarianceMatrix_));
     LogDebug << "Eigen decomposition done." << std::endl;
 
-    _eigenValues_ = std::shared_ptr<TVectorD>( (TVectorD*) _eigenDecomp_->GetEigenValues().Clone() );
-    _eigenVectors_ = std::shared_ptr<TMatrixD>( (TMatrixD*) _eigenDecomp_->GetEigenVectors().Clone() );
+    _eigenValues_     = std::shared_ptr<TVectorD>( (TVectorD*) _eigenDecomp_->GetEigenValues().Clone() );
+    _eigenValuesInv_  = std::shared_ptr<TVectorD>( (TVectorD*) _eigenDecomp_->GetEigenValues().Clone() );
+    _eigenVectors_    = std::shared_ptr<TMatrixD>( (TMatrixD*) _eigenDecomp_->GetEigenVectors().Clone() );
     _eigenVectorsInv_ = std::shared_ptr<TMatrixD>(new TMatrixD(TMatrixD::kTransposed, *_eigenVectors_) );
 
     double eigenCumulative = 0;
     _nbEnabledEigen_ = 0;
     double eigenTotal = _eigenValues_->Sum();
 
-    _inverseCovarianceMatrix_ = std::shared_ptr<TMatrixDSym>(new TMatrixDSym(_originalCovarianceMatrix_->GetNrows()));
-    _effectiveCovarianceMatrix_ = std::shared_ptr<TMatrixDSym>(new TMatrixDSym(_originalCovarianceMatrix_->GetNrows()));
-    _projectorMatrix_ = std::shared_ptr<TMatrixDSym>(new TMatrixDSym(_originalCovarianceMatrix_->GetNrows()));
+    _inverseCovarianceMatrix_   = std::shared_ptr<TMatrixD>(new TMatrixD(_originalCovarianceMatrix_->GetNrows(),_originalCovarianceMatrix_->GetNrows()));
+    _effectiveCovarianceMatrix_ = std::shared_ptr<TMatrixD>(new TMatrixD(_originalCovarianceMatrix_->GetNrows(),_originalCovarianceMatrix_->GetNrows()));
+    _projectorMatrix_           = std::shared_ptr<TMatrixD>(new TMatrixD(_originalCovarianceMatrix_->GetNrows(),_originalCovarianceMatrix_->GetNrows()));
+
+    auto* eigenState = new TVectorD(_eigenValues_->GetNrows());
 
     for (int iEigen = 0; iEigen < _eigenValues_->GetNrows(); iEigen++) {
 
+      (*_eigenValuesInv_)[iEigen] = 1./(*_eigenValues_)[iEigen];
+      (*eigenState)[iEigen] = 1.;
+
       eigenCumulative += (*_eigenValues_)[iEigen];
-      if( eigenCumulative / eigenTotal > _maxEigenFraction_ ){
+      if( _maxEigenFraction_ != 1 and eigenCumulative / eigenTotal > _maxEigenFraction_ ){
         eigenCumulative -= (*_eigenValues_)[iEigen]; // not included
+        (*_eigenValues_)[iEigen] = 0;
+        (*_eigenValuesInv_)[iEigen] = 0;
+        (*eigenState)[iEigen] = 0;
         break;
       }
       _nbEnabledEigen_++;
 
-      for(int iDof = 0 ; iDof < _originalCovarianceMatrix_->GetNrows() ; iDof++ ){
-        for(int jDof = 0 ; jDof < _originalCovarianceMatrix_->GetNcols() ; jDof++ ){
-          (*_projectorMatrix_)[iDof][jDof]
-            +=   (*_eigenVectors_)[iDof][iEigen]
-                 * (*_eigenVectors_)[jDof][iEigen];
-
-          (*_inverseCovarianceMatrix_)[iDof][jDof]
-            += (1. / (*_eigenValues_)[iEigen] )
-               * (*_eigenVectors_)[iDof][iEigen]
-               * (*_eigenVectors_)[jDof][iEigen];
-
-          (*_effectiveCovarianceMatrix_)[iDof][jDof]
-            += (*_eigenValues_)[iEigen]
-               * (*_eigenVectors_)[iDof][iEigen]
-               * (*_eigenVectors_)[jDof][iEigen];
-        }
-      }
-
     } // iEigen
+
+    TMatrixD* eigenStateMatrix    = GenericToolbox::makeDiagonalMatrix(eigenState);
+    TMatrixD* diagMatrix    = GenericToolbox::makeDiagonalMatrix(_eigenValues_.get());
+    TMatrixD* diagInvMatrix = GenericToolbox::makeDiagonalMatrix(_eigenValuesInv_.get());
+
+    (*_projectorMatrix_) =  (*_eigenVectors_);
+    (*_projectorMatrix_) *= (*eigenStateMatrix);
+    (*_projectorMatrix_) *= (*_eigenVectorsInv_);
+
+    (*_inverseCovarianceMatrix_) =  (*_eigenVectors_);
+    (*_inverseCovarianceMatrix_) *= (*diagInvMatrix);
+    (*_inverseCovarianceMatrix_) *= (*_eigenVectorsInv_);
+
+    (*_effectiveCovarianceMatrix_) =  (*_eigenVectors_);
+    (*_effectiveCovarianceMatrix_) *= (*diagInvMatrix);
+    (*_effectiveCovarianceMatrix_) *= (*_eigenVectorsInv_);
+
+    delete eigenState;
+    delete eigenStateMatrix;
+    delete diagMatrix;
+    delete diagInvMatrix;
 
     LogWarning << "Eigen decomposition with " << _nbEnabledEigen_ << " / " << _eigenValues_->GetNrows() << " vectors" << std::endl;
     if(_nbEnabledEigen_ != _eigenValues_->GetNrows() ){
@@ -442,7 +452,7 @@ void FitParameterSet::readCovarianceMatrix(){
     }
 
     _originalParValues_ = std::shared_ptr<TVectorD>( new TVectorD(_originalCovarianceMatrix_->GetNrows()) );
-    _eigenParValues_ = std::shared_ptr<TVectorD>( new TVectorD(_originalCovarianceMatrix_->GetNrows()) );
+    _eigenParValues_    = std::shared_ptr<TVectorD>( new TVectorD(_originalCovarianceMatrix_->GetNrows()) );
 
   }
 

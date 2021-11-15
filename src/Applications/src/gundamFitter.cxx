@@ -89,12 +89,12 @@ int main(int argc, char** argv){
   if( not isDryRun and JsonUtils::fetchValue(jsonConfig, "fit", true) ){
     fitter.fit();
     if( fitter.isFitHasConverged() ) fitter.writePostFitData();
+    if( JsonUtils::fetchValue(jsonConfig, "scanParameters", true) ) fitter.scanParameters(10, "postFit/scan");
   }
 
-  if( JsonUtils::fetchValue(jsonConfig, "scanParameters", true) ) fitter.scanParameters(10, "postFit/scan");
 
-  LogDebug << "Closing output file: " << out->GetName() << std::endl;
+  LogWarning << "Closing output file \"" << out->GetName() << "\"..." << std::endl;
   out->Close();
-  LogDebug << "Closed." << std::endl;
+  LogInfo << "Closed." << std::endl;
 
 }

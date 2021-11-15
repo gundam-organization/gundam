@@ -89,6 +89,9 @@ double Dial::getDialResponseCache() const{
 const DataBin &Dial::getApplyConditionBin() const {
   return _applyConditionBin_;
 }
+DataBin &Dial::getApplyConditionBin() {
+  return _applyConditionBin_;
+}
 DialType::DialType Dial::getDialType() const {
   return _dialType_;
 }
