@@ -309,7 +309,9 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
       const std::vector<DataBin>* binsListPtr;
 
       // Loop vars
+      bool isEventInDialBin{true};
       int iBin{0};
+      int lastFailedBinVarIndex{-1};
       size_t iVar{0};
       size_t iSample{0};
       // Dials
@@ -407,37 +409,51 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
                       if( JsonUtils::doKeyExist(dialSetPtr->getDialSetConfig(), "minimunSplineResponse") ){
                         spDialPtr->setMinimumSplineResponse(JsonUtils::fetchValue<double>(dialSetPtr->getDialSetConfig(), "minimunSplineResponse"));
                       }
+                      eventOffSetMutex.lock();
                       spDialPtr->createSpline( grPtr );
+                      eventOffSetMutex.unlock();
                       // Adding dial in the event
                       eventPtr->getRawDialPtrList()[eventDialOffset++] = spDialPtr;
                     }
                     continue;
                   }
 
-                  bool isInBin = false;
+                  lastFailedBinVarIndex = -1;
+                  isEventInDialBin = true;
                   for( iDial = 0 ; iDial < dialSetPtr->getDialList().size(); iDial++ ){
                     // ----------> SLOW PART
-                    isInBin = true;
                     applyConditionBinPtr = &dialSetPtr->getDialList()[iDial]->getApplyConditionBin();
+
+                    if( lastFailedBinVarIndex != -1 ){
+                      if( not applyConditionBinPtr->isBetweenEdges(
+                          applyConditionBinPtr->getEdgesList()[lastFailedBinVarIndex],
+                          eventBuffer.getVarAsDouble(applyConditionBinPtr->getEventVarIndexCache()[lastFailedBinVarIndex] )
+                      )){
+                        continue;
+                        // NEXT DIAL! Don't check other bin variables
+                      }
+                    }
+
                     for( iVar = 0 ; iVar < applyConditionBinPtr->getEdgesList().size() ; iVar++ ){
+                      if( iVar == lastFailedBinVarIndex ) continue; // already checked if set
                       if( not applyConditionBinPtr->isBetweenEdges(
                           applyConditionBinPtr->getEdgesList()[iVar],
                           eventBuffer.getVarAsDouble(applyConditionBinPtr->getEventVarIndexCache()[iVar] )
                       )){
-                        isInBin = false;
+                        lastFailedBinVarIndex = int(iVar);
                         break;
+                        // NEXT DIAL! Don't check other bin variables
                       }
-                    }
+                    } // Bin var loop
                     // <------------------
-                    if( isInBin ){
-                      // OK, so fill the dial ptr in the storage event
-                      eventPtr->getRawDialPtrList()[eventDialOffset++] = dialSetPtr->getDialList()[iDial].get();
-                      break;
-                    }
+                    // OK, if reach this point so fill the dial ptr in the storage event and leave
+                    eventPtr->getRawDialPtrList()[eventDialOffset++] = dialSetPtr->getDialList()[iDial].get();
+                    break;
                   } // iDial
 
-                  if( isInBin and dialSetPair.first->isUseOnlyOneParameterPerEvent() ){
-                    break; // leave iDialSet / enabled parameters loop
+                  if( isEventInDialBin and dialSetPair.first->isUseOnlyOneParameterPerEvent() ){
+                    break;
+                    // leave iDialSet (ie loop over parameters of the ParSet)
                   }
 
                 } // iDialSet / Enabled-parameter

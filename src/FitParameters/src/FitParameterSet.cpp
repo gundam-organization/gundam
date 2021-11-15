@@ -243,6 +243,7 @@ double FitParameterSet::getChi2() const {
 
   double chi2 = 0;
 
+  // EIGEN DECOMP NOT VALID?? Why?
 //  if( _useEigenDecompInFit_ ){
 //    for( int iEigen = 0 ; iEigen < _nbEnabledEigen_ ; iEigen++ ){
 //      chi2 += TMath::Sq((*_eigenParValues_)[iEigen] - (*_eigenParPriorValues_)[iEigen]) / (*_eigenValues_)[iEigen];
