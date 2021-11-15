@@ -97,6 +97,7 @@ void PhysicsEvent::hookToTree(TTree* tree_, bool throwIfLeafNotFound_){
         buf.hookToTree(tree_, _commonLeafNameListPtr_->at(iLeaf));
       }
       catch (...) {
+        LogWarning << this->getSummary() << std::endl;
         continue;
       }
       _leafContentList_.emplace_back(buf);
@@ -138,6 +139,7 @@ int PhysicsEvent::findVarIndex(const std::string& leafName_, bool throwIfNotFoun
     }
   }
   if( throwIfNotFound_ ){
+    LogWarning << leafName_ << " not found in: " << GenericToolbox::parseVectorAsString(_leafContentList_) << std::endl;
     LogThrow(leafName_ << " not found in: " << GenericToolbox::parseVectorAsString(*_commonLeafNameListPtr_));
   }
   return -1;
