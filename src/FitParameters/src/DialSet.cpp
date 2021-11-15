@@ -74,7 +74,7 @@ void DialSet::initialize() {
 
   _dataSetNameList_ = JsonUtils::fetchValue<std::vector<std::string>>(
     _dialSetConfig_, "applyOnDataSets", std::vector<std::string>()
-    );
+  );
   if( _dataSetNameList_.empty() ){
     _dataSetNameList_.emplace_back("*");
   }
@@ -223,6 +223,7 @@ bool DialSet::initializeDialsWithDefinition() {
       _dialLeafName_ = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialLeafName");
     }
     else if( JsonUtils::doKeyExist(dialsDefinition, "binningFilePath") ){
+
       auto binningFilePath = JsonUtils::fetchValue<std::string>(dialsDefinition, "binningFilePath");
       DataBinSet binning;
       binning.setName(binningFilePath);
@@ -235,114 +236,109 @@ bool DialSet::initializeDialsWithDefinition() {
       TFile* dialsTFile = TFile::Open(filePath.c_str());
       LogThrowIf(dialsTFile==nullptr, "Could not open: " << filePath)
 
-      auto* dialsList = dialsTFile->Get<TObjArray>(JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsList").c_str());
-      LogThrowIf(dialsList==nullptr, "Could not find dialsList: " << JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsList"))
+      if ( JsonUtils::doKeyExist(dialsDefinition, "dialsList") ) {
+        auto* dialsList = dialsTFile->Get<TObjArray>(JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsList").c_str());
+        LogThrowIf(dialsList==nullptr, "Could not find dialsList: " << JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsList"))
 
-      LogThrowIf(dialsList->GetSize() != binList.size(), "Number of dials (" << dialsList->GetSize() << ") don't match the number of bins " << binList.size() << "")
+        LogThrowIf(dialsList->GetSize() != binList.size(), "Number of dials (" << dialsList->GetSize() << ") don't match the number of bins " << binList.size() << "")
 
-      for( int iBin = 0 ; iBin < binList.size() ; iBin++ ){
-        if      ( dialsType == DialType::Spline ){
-          auto* dialPtr = new SplineDial();
-          dialPtr->setApplyConditionBin(binList.at(iBin));
-          dialPtr->setSplinePtr((TSpline3*) dialsList->At(iBin)->Clone());
-          if( JsonUtils::doKeyExist(dialsDefinition, "minimunSplineResponse") ){
-            dialPtr->setMinimumSplineResponse(
+        for( int iBin = 0 ; iBin < binList.size() ; iBin++ ){
+          if      ( dialsType == DialType::Spline ){
+            auto* dialPtr = new SplineDial();
+            dialPtr->setApplyConditionBin(binList.at(iBin));
+            dialPtr->setSplinePtr((TSpline3*) dialsList->At(iBin)->Clone());
+            if( JsonUtils::doKeyExist(dialsDefinition, "minimunSplineResponse") ){
+              dialPtr->setMinimumSplineResponse(
                 JsonUtils::fetchValue<double>(dialsDefinition, "minimunSplineResponse")
-                    );
+              );
+            }
+            dialPtr->setAssociatedParameterReference(_associatedParameterReference_);
+            dialPtr->initialize();
+            _dialList_.emplace_back(std::make_shared<SplineDial>(*dialPtr) );
           }
-          dialPtr->setAssociatedParameterReference(_associatedParameterReference_);
-          dialPtr->initialize();
-          _dialList_.emplace_back(std::make_shared<SplineDial>(*dialPtr) );
+          else if( dialsType == DialType::Graph ){
+            // TODO
+          }
         }
-        else if( dialsType == DialType::Graph ){
-          // TODO
+
+        dialsTFile->Close();
+
+      }
+      else if ( JsonUtils::doKeyExist(dialsDefinition, "dialsTreePath") ) {
+        std::string objPath = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsTreePath");
+        auto* dialsTTree = (TTree*) dialsTFile->Get(objPath.c_str());
+        if( dialsTTree == nullptr ){
+          LogError << objPath << " within " << filePath << " could not be opened." << std::endl;
+          throw std::runtime_error("dialsTTree could not be opened.");
         }
-      }
 
-      dialsTFile->Close();
-    }
-    else{
-      auto binningFilePath = JsonUtils::fetchValue<std::string>(dialsDefinition, "binningFilePath");
+        Int_t kinematicBin;
+        TSpline3* splinePtr = nullptr;
+        TGraph* graphPtr = nullptr;
 
-      DataBinSet binning;
-      binning.setName("dialsBinning");
-      binning.readBinningDefinition(_workingDirectory_ + "/" + binningFilePath);
-      auto binList = binning.getBinsList();
-
-      std::string filePath = _workingDirectory_ + "/" + JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsFilePath");
-      TFile* dialsTFile = TFile::Open(filePath.c_str());
-      if( dialsTFile == nullptr ){
-        LogError << filePath << " could not be opened." << std::endl;
-        throw std::runtime_error("dialsTFile could not be opened.");
-      }
-      std::string objPath = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsTreePath");
-      auto* dialsTTree = (TTree*) dialsTFile->Get(objPath.c_str());
-      if( dialsTTree == nullptr ){
-        LogError << objPath << " within " << filePath << " could not be opened." << std::endl;
-        throw std::runtime_error("dialsTTree could not be opened.");
-      }
-
-      Int_t kinematicBin;
-      TSpline3* splinePtr = nullptr;
-      TGraph* graphPtr = nullptr;
-
-      // searching for additional split var
-      std::vector<std::string> splitVarNameList;
-      for( int iKey = 0 ; iKey < dialsTTree->GetListOfLeaves()->GetEntries() ; iKey++ ){
-        std::string leafName = dialsTTree->GetListOfLeaves()->At(iKey)->GetName();
-        if(    leafName != "kinematicBin"
-               and leafName != "spline"
-               and leafName != "graph"
-            ){
-          splitVarNameList.emplace_back(leafName);
+        // searching for additional split var
+        std::vector<std::string> splitVarNameList;
+        for( int iKey = 0 ; iKey < dialsTTree->GetListOfLeaves()->GetEntries() ; iKey++ ){
+          std::string leafName = dialsTTree->GetListOfLeaves()->At(iKey)->GetName();
+          if(leafName != "kinematicBin" and leafName != "spline" and leafName != "graph"){
+            splitVarNameList.emplace_back(leafName);
+          }
         }
-      }
 
-      // Hooking to the tree
-      std::vector<Int_t> splitVarValueList(splitVarNameList.size(), 0);
-      std::vector<std::pair<int, int>> splitVarBoundariesList(splitVarNameList.size(), std::pair<int, int>());
-      std::vector<std::vector<int>> splitVarValuesList(splitVarNameList.size(), std::vector<int>());
-      dialsTTree->SetBranchAddress("kinematicBin", &kinematicBin);
-      if( dialsType == DialType::Spline ) dialsTTree->SetBranchAddress("spline", &splinePtr);
-      if( dialsType == DialType::Graph ) dialsTTree->SetBranchAddress("graph", &graphPtr);
-      for( size_t iSplitVar = 0 ; iSplitVar < splitVarNameList.size() ; iSplitVar++ ){
-        dialsTTree->SetBranchAddress(splitVarNameList[iSplitVar].c_str(), &splitVarValueList[iSplitVar]);
-      }
-
-      Long64_t nSplines = dialsTTree->GetEntries();
-      LogDebug << "Reading dials in \"" << dialsTFile->GetName() << "\"" << std::endl;
-      for( Long64_t iSpline = 0 ; iSpline < nSplines ; iSpline++ ){
-        dialsTTree->GetEntry(iSpline);
-        auto dialBin = binList.at(kinematicBin); // copy
-        dialBin.setIsZeroWideRangesTolerated(true);
+        // Hooking to the tree
+        std::vector<Int_t> splitVarValueList(splitVarNameList.size(), 0);
+        std::vector<std::pair<int, int>> splitVarBoundariesList(splitVarNameList.size(), std::pair<int, int>());
+        std::vector<std::vector<int>> splitVarValuesList(splitVarNameList.size(), std::vector<int>());
+        dialsTTree->SetBranchAddress("kinematicBin", &kinematicBin);
+        if( dialsType == DialType::Spline ) dialsTTree->SetBranchAddress("spline", &splinePtr);
+        if( dialsType == DialType::Graph ) dialsTTree->SetBranchAddress("graph", &graphPtr);
         for( size_t iSplitVar = 0 ; iSplitVar < splitVarNameList.size() ; iSplitVar++ ){
-          if( splitVarBoundariesList.at(iSplitVar).second < splitVarValueList.at(iSplitVar) or iSpline == 0 ){
-            splitVarBoundariesList.at(iSplitVar).second = splitVarValueList.at(iSplitVar);
-          }
-          if( splitVarBoundariesList.at(iSplitVar).first > splitVarValueList.at(iSplitVar) or iSpline == 0 ){
-            splitVarBoundariesList.at(iSplitVar).first = splitVarValueList.at(iSplitVar);
-          }
-          if( not GenericToolbox::doesElementIsInVector(splitVarValueList.at(iSplitVar), splitVarValuesList.at(iSplitVar)) ){
-            splitVarValuesList.at(iSplitVar).emplace_back(splitVarValueList.at(iSplitVar));
-          }
-          dialBin.addBinEdge(splitVarNameList.at(iSplitVar), splitVarValueList.at(iSplitVar), splitVarValueList.at(iSplitVar));
+          dialsTTree->SetBranchAddress(splitVarNameList[iSplitVar].c_str(), &splitVarValueList[iSplitVar]);
         }
-        if      ( dialsType == DialType::Spline ){
-          auto* dialPtr = new SplineDial();
-          dialPtr->setApplyConditionBin(dialBin);
-          dialPtr->setSplinePtr((TSpline3*) splinePtr->Clone());
-          dialPtr->setAssociatedParameterReference(_associatedParameterReference_);
-          dialPtr->initialize();
-          _dialList_.emplace_back(std::make_shared<SplineDial>(*dialPtr) );
-        }
-        else if( dialsType == DialType::Graph ){
-          // TODO
-        }
-      } // iSpline
 
-      dialsTFile->Close();
+        Long64_t nSplines = dialsTTree->GetEntries();
+        LogDebug << "Reading dials in \"" << dialsTFile->GetName() << "\"" << std::endl;
+        for( Long64_t iSpline = 0 ; iSpline < nSplines ; iSpline++ ){
+          dialsTTree->GetEntry(iSpline);
+          auto dialBin = binList.at(kinematicBin); // copy
+          dialBin.setIsZeroWideRangesTolerated(true);
+          for( size_t iSplitVar = 0 ; iSplitVar < splitVarNameList.size() ; iSplitVar++ ){
+            if( splitVarBoundariesList.at(iSplitVar).second < splitVarValueList.at(iSplitVar) or iSpline == 0 ){
+              splitVarBoundariesList.at(iSplitVar).second = splitVarValueList.at(iSplitVar);
+            }
+            if( splitVarBoundariesList.at(iSplitVar).first > splitVarValueList.at(iSplitVar) or iSpline == 0 ){
+              splitVarBoundariesList.at(iSplitVar).first = splitVarValueList.at(iSplitVar);
+            }
+            if( not GenericToolbox::doesElementIsInVector(splitVarValueList.at(iSplitVar), splitVarValuesList.at(iSplitVar)) ){
+              splitVarValuesList.at(iSplitVar).emplace_back(splitVarValueList.at(iSplitVar));
+            }
+            dialBin.addBinEdge(splitVarNameList.at(iSplitVar), splitVarValueList.at(iSplitVar), splitVarValueList.at(iSplitVar));
+          }
+          if      ( dialsType == DialType::Spline ){
+            auto* dialPtr = new SplineDial();
+            dialPtr->setApplyConditionBin(dialBin);
+            dialPtr->setSplinePtr((TSpline3*) splinePtr->Clone());
+            dialPtr->setAssociatedParameterReference(_associatedParameterReference_);
+            dialPtr->initialize();
+            _dialList_.emplace_back(std::make_shared<SplineDial>(*dialPtr) );
+          }
+          else if( dialsType == DialType::Graph ){
+            // TODO
+          }
+        } // iSpline
+
+        dialsTFile->Close();
+
+      }
+
+
+      else{
+        LogError << "Neither dialsTreePath nor dialsList are provided..." << std::endl;
+      }
     }
-
+    else {
+      LogError << "The dial is neither even-by-event nor binned..." << std::endl;
+    }
   } // Spline ? Graph ?
   else {
     LogError << "dialsType is not supported yet: " << dialTypeStr << "(" << dialsType << ")" << std::endl;
@@ -351,6 +347,3 @@ bool DialSet::initializeDialsWithDefinition() {
 
   return true;
 }
-
-
-
