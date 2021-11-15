@@ -73,7 +73,7 @@ void DialSet::initialize() {
   }
 
   _dataSetNameList_ = JsonUtils::fetchValue<std::vector<std::string>>(
-    _dialSetConfig_, "applyOnDataSets", std::vector<std::string>()
+      _dialSetConfig_, "applyOnDataSets", std::vector<std::string>()
   );
   if( _dataSetNameList_.empty() ){
     _dataSetNameList_.emplace_back("*");
@@ -89,9 +89,9 @@ void DialSet::initialize() {
 
   // Dials are directly defined with a binning file?
   if( initializeNormDialsWithBinning() ){ LogDebug << "DialSet initialised with binning definition." << std::endl;  }
-  // Dials are individually defined?
+    // Dials are individually defined?
   else if( initializeDialsWithDefinition() ) { LogDebug << "DialSet initialised with config definition." << std::endl; }
-  // Dials definition not found?
+    // Dials definition not found?
   else{
     LogWarning << "Could not fetch dials definition for parameter: #" << _parameterIndex_;
     if( not _parameterName_.empty() ) LogWarning << " (" << _parameterName_ << ")";
@@ -196,7 +196,7 @@ bool DialSet::initializeDialsWithDefinition() {
 
   // Fetch dial type
   DialType::DialType dialsType = _globalDialType_;
-  std::string dialTypeStr = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsType");
+  auto dialTypeStr = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsType");
   if( not dialTypeStr.empty() ){
     dialsType = DialType::toDialType(dialTypeStr);
   }
@@ -242,14 +242,14 @@ bool DialSet::initializeDialsWithDefinition() {
 
         LogThrowIf(dialsList->GetSize() != binList.size(), "Number of dials (" << dialsList->GetSize() << ") don't match the number of bins " << binList.size() << "")
 
-      for( int iBin = 0 ; iBin < binList.size() ; iBin++ ){
-        if      ( dialsType == DialType::Spline ){
-          auto* dialPtr = new SplineDial();
-          dialPtr->setApplyConditionBin(binList.at(iBin));
-          dialPtr->copySpline((TSpline3*) dialsList->At(iBin));
-          if( JsonUtils::doKeyExist(dialsDefinition, "minimunSplineResponse") ){
-            dialPtr->setMinimumSplineResponse(
-                JsonUtils::fetchValue<double>(dialsDefinition, "minimunSplineResponse")
+        for( int iBin = 0 ; iBin < binList.size() ; iBin++ ){
+          if      ( dialsType == DialType::Spline ){
+            auto* dialPtr = new SplineDial();
+            dialPtr->setApplyConditionBin(binList.at(iBin));
+            dialPtr->copySpline((TSpline3*) dialsList->At(iBin));
+            if( JsonUtils::doKeyExist(dialsDefinition, "minimunSplineResponse") ){
+              dialPtr->setMinimumSplineResponse(
+                  JsonUtils::fetchValue<double>(dialsDefinition, "minimunSplineResponse")
               );
             }
             dialPtr->setAssociatedParameterReference(_associatedParameterReference_);
@@ -265,7 +265,7 @@ bool DialSet::initializeDialsWithDefinition() {
 
       }
       else if ( JsonUtils::doKeyExist(dialsDefinition, "dialsTreePath") ) {
-        std::string objPath = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsTreePath");
+        auto objPath = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsTreePath");
         auto* dialsTTree = (TTree*) dialsTFile->Get(objPath.c_str());
         if( dialsTTree == nullptr ){
           LogError << objPath << " within " << filePath << " could not be opened." << std::endl;
@@ -315,35 +315,18 @@ bool DialSet::initializeDialsWithDefinition() {
             dialBin.addBinEdge(splitVarNameList.at(iSplitVar), splitVarValueList.at(iSplitVar), splitVarValueList.at(iSplitVar));
           }
           if      ( dialsType == DialType::Spline ){
-            auto* dialPtr = new SplineDial();
-            dialPtr->setApplyConditionBin(dialBin);
-            dialPtr->setSplinePtr((TSpline3*) splinePtr->Clone());
-            dialPtr->setAssociatedParameterReference(_associatedParameterReference_);
-            dialPtr->initialize();
-            _dialList_.emplace_back(std::make_shared<SplineDial>(*dialPtr) );
+            _dialList_.emplace_back( std::make_shared<SplineDial>() );
+            _dialList_.back()->setApplyConditionBin(dialBin);
+            _dialList_.back()->setAssociatedParameterReference(_associatedParameterReference_);
+            dynamic_cast<SplineDial*>(_dialList_.back().get())->copySpline(splinePtr);
+            dynamic_cast<SplineDial*>(_dialList_.back().get())->initialize();
           }
           else if( dialsType == DialType::Graph ){
             // TODO
           }
-          dialBin.addBinEdge(splitVarNameList.at(iSplitVar), splitVarValueList.at(iSplitVar), splitVarValueList.at(iSplitVar));
-        }
-        if      ( dialsType == DialType::Spline ){
-          _dialList_.emplace_back( std::make_shared<SplineDial>() );
-          _dialList_.back()->setApplyConditionBin(dialBin);
-          _dialList_.back()->setAssociatedParameterReference(_associatedParameterReference_);
-          dynamic_cast<SplineDial*>(_dialList_.back().get())->copySpline(splinePtr);
-          dynamic_cast<SplineDial*>(_dialList_.back().get())->initialize();
-        }
-        else if( dialsType == DialType::Graph ){
-          // TODO
-        }
-      } // iSpline
-
-        dialsTFile->Close();
-
-      }
-
-
+          dialsTFile->Close();
+        } // iSpline (in TTree)
+      } // Splines in TTree
       else{
         LogError << "Neither dialsTreePath nor dialsList are provided..." << std::endl;
       }
