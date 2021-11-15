@@ -2,8 +2,8 @@
 // Created by Nadrino on 22/05/2021.
 //
 
-#ifndef XSLLHFITTER_JSONUTILS_H
-#define XSLLHFITTER_JSONUTILS_H
+#ifndef GUNDAM_JSONUTILS_H
+#define GUNDAM_JSONUTILS_H
 
 #include "string"
 #include "vector"
@@ -31,4 +31,4 @@ namespace JsonUtils {
 
 #include "JsonUtils.impl.h"
 
-#endif //XSLLHFITTER_JSONUTILS_H
+#endif //GUNDAM_JSONUTILS_H

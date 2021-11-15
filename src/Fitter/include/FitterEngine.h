@@ -2,8 +2,8 @@
 // Created by Nadrino on 11/06/2021.
 //
 
-#ifndef XSLLHFITTER_FITTERENGINE_H
-#define XSLLHFITTER_FITTERENGINE_H
+#ifndef GUNDAM_FITTERENGINE_H
+#define GUNDAM_FITTERENGINE_H
 
 #include "string"
 #include "vector"
@@ -87,6 +87,7 @@ private:
   double _chi2StatBuffer_{0};
   double _chi2PullsBuffer_{0};
   double _chi2RegBuffer_{0};
+  double _parStepScale_{0.1};
 
   TTree* _chi2HistoryTree_{nullptr};
 //  std::map<std::string, std::vector<double>> _chi2History_;
@@ -123,4 +124,4 @@ private:
 };
 
 
-#endif //XSLLHFITTER_FITTERENGINE_H
+#endif //GUNDAM_FITTERENGINE_H

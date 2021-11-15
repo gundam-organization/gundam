@@ -56,6 +56,9 @@ void DataBin::addBinEdge(const std::string &variableName_, double lowEdge_, doub
 
   this->addBinEdge(lowEdge_, highEdge_);
 }
+void DataBin::setEventVarIndexCache(const std::vector<int> &eventVarIndexCache) {
+  _eventVarIndexCache_ = eventVarIndexCache;
+}
 
 
 // Getters
@@ -91,6 +94,9 @@ TTreeFormula *DataBin::getTreeFormula() const {
 size_t DataBin::getNbEdges() const{
   return _edgesList_.size();
 }
+const std::vector<int> &DataBin::getEventVarIndexCache() const {
+  return _eventVarIndexCache_;
+}
 
 // Management
 bool DataBin::isInBin(const std::vector<double>& valuesList_) const{
@@ -121,16 +127,13 @@ bool DataBin::isBetweenEdges(size_t varIndex_, double value_) const{
     throw std::runtime_error("varIndex out of range.");
   }
 
-  const auto* edgePairPtr = &_edgesList_.at(varIndex_);
-
-  if( edgePairPtr->first == edgePairPtr->second ){
-    return edgePairPtr->first == value_;
-  }
-
-  if( edgePairPtr->first <= value_  and value_ < edgePairPtr->second ){
-    return true;
-  }
-  return false;
+  return this->isBetweenEdges(_edgesList_.at(varIndex_), value_);
+}
+bool DataBin::isBetweenEdges(const std::pair<double,double>& edges_, double value_) const{
+  if(edges_.first == edges_.second ){ return edges_.first == value_; }
+  if(edges_.first > value_){ return false; }
+  if(edges_.second <= value_){ return false; }
+  return true;
 }
 
 // Misc
@@ -239,4 +242,5 @@ std::string DataBin::generateFormulaStr(bool varNamesAsTreeFormula_) {
 
   return ss.str();
 }
+
 

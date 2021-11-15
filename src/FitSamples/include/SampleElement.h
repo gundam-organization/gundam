@@ -2,8 +2,8 @@
 // Created by Adrien BLANCHET on 30/07/2021.
 //
 
-#ifndef XSLLHFITTER_SAMPLEELEMENT_H
-#define XSLLHFITTER_SAMPLEELEMENT_H
+#ifndef GUNDAM_SAMPLEELEMENT_H
+#define GUNDAM_SAMPLEELEMENT_H
 
 #include "vector"
 #include "memory"
@@ -47,10 +47,14 @@ public:
   void refillHistogram(int iThread_ = -1);
   void rescaleHistogram();
 
+  double getSumWeights() const;
+
   // debug
+  void print() const;
+
   bool debugTrigger{false};
 
 };
 
 
-#endif //XSLLHFITTER_SAMPLEELEMENT_H
+#endif //GUNDAM_SAMPLEELEMENT_H

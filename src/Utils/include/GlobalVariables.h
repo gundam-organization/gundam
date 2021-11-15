@@ -2,8 +2,8 @@
 // Created by Nadrino on 11/02/2021.
 //
 
-#ifndef XSLLHFITTER_GLOBALVARIABLES_H
-#define XSLLHFITTER_GLOBALVARIABLES_H
+#ifndef GUNDAM_GLOBALVARIABLES_H
+#define GUNDAM_GLOBALVARIABLES_H
 
 #include <map>
 #include <mutex>

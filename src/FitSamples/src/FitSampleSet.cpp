@@ -100,7 +100,18 @@ void FitSampleSet::initialize() {
   GlobalVariables::getParallelWorker().addJob("FitSampleSet::updateSampleHistograms", refillMcHistogramsFct);
   GlobalVariables::getParallelWorker().setPostParallelJob("FitSampleSet::updateSampleHistograms", rescaleMcHistogramsFct);
 
-  _likelihoodFunctionPtr_ = std::shared_ptr<PoissonLLH>(new PoissonLLH);
+  std::string llhMethod = JsonUtils::fetchValue(_config_, "llhStatFunction", "PoissonLLH");
+  LogInfo << "Using \"" << llhMethod << "\" LLH function." << std::endl;
+  if( llhMethod == "PoissonLLH" ){
+    _likelihoodFunctionPtr_ = std::shared_ptr<PoissonLLH>(new PoissonLLH);
+  }
+  else if( llhMethod == "BarlowLLH" ){
+    _likelihoodFunctionPtr_ = std::shared_ptr<BarlowLLH>(new BarlowLLH);
+  }
+  else{
+    LogThrow("Unknown LLH Method: " << llhMethod)
+  }
+
 
   _isInitialized_ = true;
 }

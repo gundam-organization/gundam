@@ -17,6 +17,7 @@ void GlobalVariables::setNbThreads(int nbThreads_){
   _threadPool_.reset();
   _threadPool_.setCheckHardwareCurrency(false);
   _threadPool_.setNThreads(_nbThreads_);
+  _threadPool_.setCpuTimeSaverIsEnabled(true);
   _threadPool_.initialize();
 }
 

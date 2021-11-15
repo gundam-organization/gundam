@@ -2,8 +2,8 @@
 // Created by Nadrino on 22/07/2021.
 //
 
-#ifndef XSLLHFITTER_FITSAMPLESET_H
-#define XSLLHFITTER_FITSAMPLESET_H
+#ifndef GUNDAM_FITSAMPLESET_H
+#define GUNDAM_FITSAMPLESET_H
 
 #include "json.hpp"
 
@@ -69,4 +69,4 @@ private:
 };
 
 
-#endif //XSLLHFITTER_FITSAMPLESET_H
+#endif //GUNDAM_FITSAMPLESET_H

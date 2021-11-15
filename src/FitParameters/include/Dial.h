@@ -2,8 +2,8 @@
 // Created by Nadrino on 21/05/2021.
 //
 
-#ifndef XSLLHFITTER_DIAL_H
-#define XSLLHFITTER_DIAL_H
+#ifndef GUNDAM_DIAL_H
+#define GUNDAM_DIAL_H
 
 #include "string"
 #include "mutex"
@@ -44,6 +44,7 @@ public:
 
   double getDialResponseCache() const;
   const DataBin &getApplyConditionBin() const;
+  DataBin &getApplyConditionBin();
   DialType::DialType getDialType() const;
   void *getAssociatedParameterReference() const;
 
@@ -67,4 +68,4 @@ protected:
 };
 
 
-#endif //XSLLHFITTER_DIAL_H
+#endif //GUNDAM_DIAL_H

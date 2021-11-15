@@ -2,8 +2,8 @@
 // Created by Nadrino on 21/05/2021.
 //
 
-#ifndef XSLLHFITTER_DIALSET_H
-#define XSLLHFITTER_DIALSET_H
+#ifndef GUNDAM_DIALSET_H
+#define GUNDAM_DIALSET_H
 
 #include "string"
 #include "vector"
@@ -80,4 +80,4 @@ public:
 };
 
 
-#endif //XSLLHFITTER_DIALSET_H
+#endif //GUNDAM_DIALSET_H

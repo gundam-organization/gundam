@@ -2,8 +2,8 @@
 // Created by Nadrino on 16/06/2021.
 //
 
-#ifndef XSLLHFITTER_PLOTGENERATOR_H
-#define XSLLHFITTER_PLOTGENERATOR_H
+#ifndef GUNDAM_PLOTGENERATOR_H
+#define GUNDAM_PLOTGENERATOR_H
 
 #include "json.hpp"
 #include "TDirectory.h"
@@ -50,6 +50,11 @@ struct HistHolder{
 
   // Flags
   bool isBaseSplitHist{false};
+
+  // Caches
+  bool isBinCacheBuilt{false};
+  std::vector<std::vector<const PhysicsEvent*>> _binEventPtrList_;
+
 };
 
 struct CanvasHolder{
@@ -97,6 +102,9 @@ public:
   std::vector<std::string> fetchListOfSplitVarNames();
   std::vector<std::string> fetchRequestedLeafNames();
 
+protected:
+  void buildEventBinCache(const std::vector<HistHolder *> &histPtrToFillList, const std::vector<PhysicsEvent> *eventListPtr, bool isData_);
+
 private:
   nlohmann::json _config_;
   const std::vector<AnaSample>* _sampleListPtr_{nullptr};
@@ -116,4 +124,4 @@ private:
 };
 
 
-#endif //XSLLHFITTER_PLOTGENERATOR_H
+#endif //GUNDAM_PLOTGENERATOR_H

@@ -242,13 +242,13 @@ bool DialSet::initializeDialsWithDefinition() {
 
         LogThrowIf(dialsList->GetSize() != binList.size(), "Number of dials (" << dialsList->GetSize() << ") don't match the number of bins " << binList.size() << "")
 
-        for( int iBin = 0 ; iBin < binList.size() ; iBin++ ){
-          if      ( dialsType == DialType::Spline ){
-            auto* dialPtr = new SplineDial();
-            dialPtr->setApplyConditionBin(binList.at(iBin));
-            dialPtr->setSplinePtr((TSpline3*) dialsList->At(iBin)->Clone());
-            if( JsonUtils::doKeyExist(dialsDefinition, "minimunSplineResponse") ){
-              dialPtr->setMinimumSplineResponse(
+      for( int iBin = 0 ; iBin < binList.size() ; iBin++ ){
+        if      ( dialsType == DialType::Spline ){
+          auto* dialPtr = new SplineDial();
+          dialPtr->setApplyConditionBin(binList.at(iBin));
+          dialPtr->copySpline((TSpline3*) dialsList->At(iBin));
+          if( JsonUtils::doKeyExist(dialsDefinition, "minimunSplineResponse") ){
+            dialPtr->setMinimumSplineResponse(
                 JsonUtils::fetchValue<double>(dialsDefinition, "minimunSplineResponse")
               );
             }
@@ -325,7 +325,19 @@ bool DialSet::initializeDialsWithDefinition() {
           else if( dialsType == DialType::Graph ){
             // TODO
           }
-        } // iSpline
+          dialBin.addBinEdge(splitVarNameList.at(iSplitVar), splitVarValueList.at(iSplitVar), splitVarValueList.at(iSplitVar));
+        }
+        if      ( dialsType == DialType::Spline ){
+          _dialList_.emplace_back( std::make_shared<SplineDial>() );
+          _dialList_.back()->setApplyConditionBin(dialBin);
+          _dialList_.back()->setAssociatedParameterReference(_associatedParameterReference_);
+          dynamic_cast<SplineDial*>(_dialList_.back().get())->copySpline(splinePtr);
+          dynamic_cast<SplineDial*>(_dialList_.back().get())->initialize();
+        }
+        else if( dialsType == DialType::Graph ){
+          // TODO
+        }
+      } // iSpline
 
         dialsTFile->Close();
 

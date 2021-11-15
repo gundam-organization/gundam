@@ -2,8 +2,8 @@
 // Created by Nadrino on 17/06/2021.
 //
 
-#ifndef XSLLHFITTER_YAMLUTILS_IMPL_H
-#define XSLLHFITTER_YAMLUTILS_IMPL_H
+#ifndef GUNDAM_YAMLUTILS_IMPL_H
+#define GUNDAM_YAMLUTILS_IMPL_H
 
 #include "string"
 #include "iostream"
@@ -68,4 +68,4 @@ namespace YamlUtils {
 
 };
 
-#endif //XSLLHFITTER_YAMLUTILS_IMPL_H
+#endif //GUNDAM_YAMLUTILS_IMPL_H

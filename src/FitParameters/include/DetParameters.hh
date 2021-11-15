@@ -1,5 +1,5 @@
-#ifndef XSLLHFITTER_DETPARAMETERS_HH
-#define XSLLHFITTER_DETPARAMETERS_HH
+#ifndef GUNDAM_DETPARAMETERS_HH
+#define GUNDAM_DETPARAMETERS_HH
 
 #include <iomanip>
 #include <iostream>

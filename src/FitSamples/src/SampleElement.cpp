@@ -130,3 +130,15 @@ void SampleElement::rescaleHistogram() {
   if( isLocked ) return;
   if(histScale != 1) histogram->Scale(histScale);
 }
+
+double SampleElement::getSumWeights() const{
+  return std::accumulate(eventList.begin(), eventList.end(), double(0.),
+                         [](double sum_, const PhysicsEvent& ev_){ return sum_ + ev_.getEventWeight(); });
+}
+
+void SampleElement::print() const{
+  LogInfo << "SampleElement: " << name << std::endl;
+  LogInfo << " - " << "Nb bins: " << binning.getBinsList().size() << std::endl;
+  LogInfo << " - " << "Nb events: " << eventList.size() << std::endl;
+  LogInfo << " - " << "Hist rescale: " << histScale << std::endl;
+}

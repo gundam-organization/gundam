@@ -407,7 +407,7 @@ void ND280Fitter::MakeOneSigmaChecks(){
       continue;
     }
 
-    LogInfo << "Running +1 sigma on: " << _parameter_names_[iSyst] << std::endl;
+    LogInfo << "Running +1σ on: " << _parameter_names_[iSyst] << std::endl;
     // which systematic is it?
     int parCount = 0;
     int parGroupIndex = -1;

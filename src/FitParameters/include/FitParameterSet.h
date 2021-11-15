@@ -2,8 +2,8 @@
 // Created by Nadrino on 21/05/2021.
 //
 
-#ifndef XSLLHFITTER_FITPARAMETERSET_H
-#define XSLLHFITTER_FITPARAMETERSET_H
+#ifndef GUNDAM_FITPARAMETERSET_H
+#define GUNDAM_FITPARAMETERSET_H
 
 #include "vector"
 #include "string"
@@ -112,13 +112,15 @@ private:
   bool _useOnlyOneParameterPerEvent_{false};
   std::shared_ptr<TMatrixDSymEigen> _eigenDecomp_{nullptr};
   std::shared_ptr<TVectorD> _eigenValues_{nullptr};
+  std::shared_ptr<TVectorD> _eigenValuesInv_{nullptr};
   std::shared_ptr<TMatrixD> _eigenVectors_{nullptr};
   std::shared_ptr<TMatrixD> _eigenVectorsInv_{nullptr};
-  std::shared_ptr<TMatrixDSym> _projectorMatrix_{nullptr};
-  std::shared_ptr<TMatrixDSym> _inverseCovarianceMatrix_{nullptr};
-  std::shared_ptr<TMatrixDSym> _originalCorrelationMatrix_{nullptr};
-  std::shared_ptr<TMatrixDSym> _effectiveCovarianceMatrix_{nullptr};
-  std::shared_ptr<TMatrixDSym> _effectiveCorrelationMatrix_{nullptr};
+  std::shared_ptr<TMatrixD> _projectorMatrix_{nullptr};
+  std::shared_ptr<TMatrixD> _inverseCovarianceMatrix_{nullptr};
+  std::shared_ptr<TMatrixD> _effectiveCovarianceMatrix_{nullptr};
+
+  std::shared_ptr<TMatrixD> _originalCorrelationMatrix_{nullptr};
+  std::shared_ptr<TMatrixD> _effectiveCorrelationMatrix_{nullptr};
 
   std::shared_ptr<TVectorD> _eigenParValues_;
   std::shared_ptr<TVectorD> _originalParValues_;
@@ -129,4 +131,4 @@ private:
 };
 
 
-#endif //XSLLHFITTER_FITPARAMETERSET_H
+#endif //GUNDAM_FITPARAMETERSET_H
