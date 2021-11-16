@@ -96,8 +96,10 @@ private:
   std::string _name_;
   bool _isEnabled_{};
   double _maxEigenFraction_{1};
-  TFile* _covarianceMatrixFile_{nullptr};
-  TMatrixDSym* _originalCovarianceMatrix_{nullptr};
+
+  // Input file:
+  std::shared_ptr<TFile> _covarianceMatrixFile_{nullptr};
+  TMatrixDSym* _covarianceMatrix_{nullptr};
   TVectorD* _parameterPriorList_{nullptr};
   TVectorD* _parameterLowerBoundsList_{nullptr};
   TVectorD* _parameterUpperBoundsList_{nullptr};
@@ -106,7 +108,7 @@ private:
   double _globalParameterMinValue_{std::nan("UNSET")};
   double _globalParameterMaxValue_{std::nan("UNSET")};
 
-
+  // Eigen objects
   int _nbEnabledEigen_{0};
   bool _useEigenDecompInFit_{false};
   bool _useOnlyOneParameterPerEvent_{false};

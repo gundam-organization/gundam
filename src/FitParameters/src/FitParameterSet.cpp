@@ -31,7 +31,7 @@ void FitParameterSet::reset() {
 
   _maxEigenFraction_ = 1;
   _covarianceMatrixFile_ = nullptr;
-  _originalCovarianceMatrix_ = nullptr;
+  _covarianceMatrix_ = nullptr;
   _originalCorrelationMatrix_ = nullptr;
   _parameterPriorList_ = nullptr;
   _parameterNamesList_ = nullptr;
@@ -94,14 +94,14 @@ void FitParameterSet::initialize() {
       LogError << "Could not find \"" << pathBuffer << "\" into \"" << _covarianceMatrixFile_->GetName() << "\"" << std::endl;
       throw std::runtime_error("TObject not found.");
     }
-    else if(_parameterPriorList_->GetNrows() != _originalCovarianceMatrix_->GetNrows() ){
-      LogError << GET_VAR_NAME_VALUE(_parameterPriorList_->GetNrows() != _originalCovarianceMatrix_->GetNrows()) << std::endl;
+    else if(_parameterPriorList_->GetNrows() != _covarianceMatrix_->GetNrows() ){
+      LogError << GET_VAR_NAME_VALUE(_parameterPriorList_->GetNrows() != _covarianceMatrix_->GetNrows()) << std::endl;
       throw std::runtime_error("TObject size mismatch.");
     }
   }
   else{
     LogDebug << "No parameterPriorTVectorD provided, all parameter prior are set to 1." << std::endl;
-    _parameterPriorList_ = new TVectorT<double>(_originalCovarianceMatrix_->GetNrows());
+    _parameterPriorList_ = new TVectorT<double>(_covarianceMatrix_->GetNrows());
     for( int iPar = 0 ; iPar < _parameterPriorList_->GetNrows() ; iPar++ ){
       (*_parameterPriorList_)[iPar] = 1;
       if( _useEigenDecompInFit_ ) (*_originalParValues_)[iPar] = 1;
@@ -112,7 +112,7 @@ void FitParameterSet::initialize() {
   if( not pathBuffer.empty() ){
     _parameterLowerBoundsList_ = (TVectorT<double>*) _covarianceMatrixFile_->Get(pathBuffer.c_str());
     LogThrowIf(_parameterLowerBoundsList_ == nullptr, "Could not fetch parameterLowerBoundsTVectorD: \"" << pathBuffer)
-    LogThrowIf(_parameterLowerBoundsList_->GetNrows() != _originalCovarianceMatrix_->GetNrows(),
+    LogThrowIf(_parameterLowerBoundsList_->GetNrows() != _covarianceMatrix_->GetNrows(),
                "parameterLowerBoundsTVectorD \"" << pathBuffer << "\" have not the right size.")
   }
 
@@ -120,7 +120,7 @@ void FitParameterSet::initialize() {
   if( not pathBuffer.empty() ){
     _parameterUpperBoundsList_ = (TVectorT<double>*) _covarianceMatrixFile_->Get(pathBuffer.c_str());
     LogThrowIf(_parameterUpperBoundsList_ == nullptr, "Could not fetch parameterUpperBoundsTVectorD: \"" << pathBuffer)
-    LogThrowIf(_parameterUpperBoundsList_->GetNrows() != _originalCovarianceMatrix_->GetNrows(),
+    LogThrowIf(_parameterUpperBoundsList_->GetNrows() != _covarianceMatrix_->GetNrows(),
                "parameterUpperBoundsTVectorD \"" << pathBuffer << "\" have not the right size.")
   }
 
@@ -137,21 +137,21 @@ void FitParameterSet::initialize() {
   }
   else{
     LogDebug << "No parameterNameTObjArray provided, parameters will be referenced with their index." << std::endl;
-    _parameterNamesList_ = new TObjArray(_originalCovarianceMatrix_->GetNrows());
+    _parameterNamesList_ = new TObjArray(_covarianceMatrix_->GetNrows());
     for( int iPar = 0 ; iPar < _parameterPriorList_->GetNrows() ; iPar++ ){
       _parameterNamesList_->Add(new TNamed("", ""));
     }
   }
 
   LogDebug << "Initializing parameters..." << std::endl;
-  _parameterList_.reserve(_originalCovarianceMatrix_->GetNcols()); // need to keep the memory at the same place -> FitParameter* will be used
-  for(int iParameter = 0 ; iParameter < _originalCovarianceMatrix_->GetNcols() ; iParameter++ ){
+  _parameterList_.reserve(_covarianceMatrix_->GetNcols()); // need to keep the memory at the same place -> FitParameter* will be used
+  for(int iParameter = 0 ; iParameter < _covarianceMatrix_->GetNcols() ; iParameter++ ){
     _parameterList_.emplace_back();
     _parameterList_.back().setParameterIndex(iParameter);
     _parameterList_.back().setName(_parameterNamesList_->At(iParameter)->GetName());
     _parameterList_.back().setParameterValue((*_parameterPriorList_)[iParameter]);
     _parameterList_.back().setPriorValue((*_parameterPriorList_)[iParameter]);
-    _parameterList_.back().setStdDevValue(TMath::Sqrt((*_originalCovarianceMatrix_)[iParameter][iParameter]));
+    _parameterList_.back().setStdDevValue(TMath::Sqrt((*_covarianceMatrix_)[iParameter][iParameter]));
 
     _parameterList_.back().setDialsWorkingDirectory(JsonUtils::fetchValue<std::string>(_jsonConfig_, "dialSetWorkingDirectory", "./"));
 
@@ -222,7 +222,7 @@ const std::vector<FitParameter> &FitParameterSet::getParameterList() const{
   return _parameterList_;
 }
 TMatrixDSym *FitParameterSet::getOriginalCovarianceMatrix() const {
-  return _originalCovarianceMatrix_;
+  return _covarianceMatrix_;
 }
 const nlohmann::json &FitParameterSet::getJsonConfig() const {
   return _jsonConfig_;
@@ -326,7 +326,7 @@ std::string FitParameterSet::getSummary() const {
   ss << "FitParameterSet: " << _name_ << " -> initialized=" << _isInitialized_ << ", enabled=" << _isEnabled_;
 
   if(_isInitialized_ and _isEnabled_){
-    ss << ", nbParameters: " << _parameterList_.size() << "(defined)/" << _originalCovarianceMatrix_->GetNrows() << "(covariance)";
+    ss << ", nbParameters: " << _parameterList_.size() << "(defined)/" << _covarianceMatrix_->GetNrows() << "(covariance)";
     if( not _parameterList_.empty() ){
       for( const auto& parameter : _parameterList_ ){
         ss << std::endl << GenericToolbox::indentString(parameter.getSummary(), 2);
@@ -347,16 +347,16 @@ void FitParameterSet::passIfInitialized(const std::string &methodName_) const {
 }
 void FitParameterSet::readCovarianceMatrix(){
 
-  _covarianceMatrixFile_ = TFile::Open(JsonUtils::fetchValue<std::string>(_jsonConfig_, "covarianceMatrixFilePath").c_str());
+  _covarianceMatrixFile_ = std::shared_ptr<TFile>( TFile::Open(JsonUtils::fetchValue<std::string>(_jsonConfig_, "covarianceMatrixFilePath").c_str()) );
   if( not _covarianceMatrixFile_->IsOpen() ){
     LogError << "Could not open: _covarianceMatrixFile_: " << _covarianceMatrixFile_->GetPath() << std::endl;
     throw std::runtime_error("Could not open: _covarianceMatrixFile_");
   }
 
-  _originalCovarianceMatrix_ = (TMatrixDSym*) _covarianceMatrixFile_->Get(
+  _covarianceMatrix_ = (TMatrixDSym*) _covarianceMatrixFile_->Get(
     JsonUtils::fetchValue<std::string>(_jsonConfig_, "covarianceMatrixTMatrixD").c_str()
   );
-  if(_originalCovarianceMatrix_ == nullptr ){
+  if(_covarianceMatrix_ == nullptr ){
     LogError << "Could not find: " << JsonUtils::fetchValue<std::string>(_jsonConfig_, "covarianceMatrixTMatrixD")
              << " in " << _covarianceMatrixFile_->GetPath() << std::endl;
     throw std::runtime_error("Could not find: covarianceMatrixTObjectPath");
@@ -364,12 +364,12 @@ void FitParameterSet::readCovarianceMatrix(){
 
   if( _saveDir_ != nullptr ){
     _saveDir_->cd();
-    _originalCovarianceMatrix_->Write("CovarianceMatrix_TMatrixDSym");
-    GenericToolbox::convertToCorrelationMatrix((TMatrixD*)_originalCovarianceMatrix_)->Write("CorrelationMatrix_TMatrixD");
+    _covarianceMatrix_->Write("CovarianceMatrix_TMatrixDSym");
+    GenericToolbox::convertToCorrelationMatrix((TMatrixD*)_covarianceMatrix_)->Write("CorrelationMatrix_TMatrixD");
   }
 
   _originalCorrelationMatrix_ = std::shared_ptr<TMatrixD>(
-    GenericToolbox::convertToCorrelationMatrix((TMatrixD*) _originalCovarianceMatrix_)
+    GenericToolbox::convertToCorrelationMatrix((TMatrixD*) _covarianceMatrix_)
     );
 
   _useEigenDecompInFit_ = JsonUtils::fetchValue(_jsonConfig_ , "useEigenDecompInFit", false);
@@ -379,17 +379,17 @@ void FitParameterSet::readCovarianceMatrix(){
     _useEigenDecompInFit_ = true;
   }
 
-  LogWarning << "Computing inverse of the covariance matrix: " << _originalCovarianceMatrix_->GetNcols() << "x" << _originalCovarianceMatrix_->GetNrows() << std::endl;
+  LogWarning << "Computing inverse of the covariance matrix: " << _covarianceMatrix_->GetNcols() << "x" << _covarianceMatrix_->GetNrows() << std::endl;
   if( not _useEigenDecompInFit_ ){
     LogDebug << "Using default matrix inversion..." << std::endl;
-    _inverseCovarianceMatrix_ = std::shared_ptr<TMatrixD>((TMatrixD*)(_originalCovarianceMatrix_->Clone()));
+    _inverseCovarianceMatrix_ = std::shared_ptr<TMatrixD>((TMatrixD*)(_covarianceMatrix_->Clone()));
     _inverseCovarianceMatrix_->Invert();
   }
   else{
     LogInfo << "Using eigen decomposition..." << std::endl;
 
     LogDebug << "Computing the eigen vectors / values..." << std::endl;
-    _eigenDecomp_ = std::shared_ptr<TMatrixDSymEigen>(new TMatrixDSymEigen(*_originalCovarianceMatrix_));
+    _eigenDecomp_ = std::shared_ptr<TMatrixDSymEigen>(new TMatrixDSymEigen(*_covarianceMatrix_));
     LogDebug << "Eigen decomposition done." << std::endl;
 
     _eigenValues_     = std::shared_ptr<TVectorD>( (TVectorD*) _eigenDecomp_->GetEigenValues().Clone() );
@@ -401,9 +401,9 @@ void FitParameterSet::readCovarianceMatrix(){
     _nbEnabledEigen_ = 0;
     double eigenTotal = _eigenValues_->Sum();
 
-    _inverseCovarianceMatrix_   = std::shared_ptr<TMatrixD>(new TMatrixD(_originalCovarianceMatrix_->GetNrows(),_originalCovarianceMatrix_->GetNrows()));
-    _effectiveCovarianceMatrix_ = std::shared_ptr<TMatrixD>(new TMatrixD(_originalCovarianceMatrix_->GetNrows(),_originalCovarianceMatrix_->GetNrows()));
-    _projectorMatrix_           = std::shared_ptr<TMatrixD>(new TMatrixD(_originalCovarianceMatrix_->GetNrows(),_originalCovarianceMatrix_->GetNrows()));
+    _inverseCovarianceMatrix_   = std::shared_ptr<TMatrixD>(new TMatrixD(_covarianceMatrix_->GetNrows(), _covarianceMatrix_->GetNrows()));
+    _effectiveCovarianceMatrix_ = std::shared_ptr<TMatrixD>(new TMatrixD(_covarianceMatrix_->GetNrows(), _covarianceMatrix_->GetNrows()));
+    _projectorMatrix_           = std::shared_ptr<TMatrixD>(new TMatrixD(_covarianceMatrix_->GetNrows(), _covarianceMatrix_->GetNrows()));
 
     auto* eigenState = new TVectorD(_eigenValues_->GetNrows());
 
@@ -451,12 +451,12 @@ void FitParameterSet::readCovarianceMatrix(){
       LogInfo << "Fraction taken: " << eigenCumulative / eigenTotal*100 << "%" << std::endl;
     }
 
-    _originalParValues_ = std::shared_ptr<TVectorD>( new TVectorD(_originalCovarianceMatrix_->GetNrows()) );
-    _eigenParValues_    = std::shared_ptr<TVectorD>( new TVectorD(_originalCovarianceMatrix_->GetNrows()) );
+    _originalParValues_ = std::shared_ptr<TVectorD>( new TVectorD(_covarianceMatrix_->GetNrows()) );
+    _eigenParValues_    = std::shared_ptr<TVectorD>( new TVectorD(_covarianceMatrix_->GetNrows()) );
 
   }
 
-  LogInfo << "Parameter set \"" << _name_ << "\" is handling " << _originalCovarianceMatrix_->GetNcols() << " parameters." << std::endl;
+  LogInfo << "Parameter set \"" << _name_ << "\" is handling " << _covarianceMatrix_->GetNcols() << " parameters." << std::endl;
 
 
 }
