@@ -75,7 +75,7 @@ void FitParameterSet::initialize() {
 
   _useOnlyOneParameterPerEvent_ = JsonUtils::fetchValue<bool>(_jsonConfig_, "useOnlyOneParameterPerEvent", false);
 
-  if( _jsonConfig_.find("parameterLimits") != _jsonConfig_.end() ){
+  if( JsonUtils::doKeyExist(_jsonConfig_, "parameterLimits") ){
     auto parLimits = JsonUtils::fetchValue(_jsonConfig_, "parameterLimits", nlohmann::json());
     _globalParameterMinValue_ = JsonUtils::fetchValue(parLimits, "minValue", std::nan("UNSET"));
     _globalParameterMaxValue_ = JsonUtils::fetchValue(parLimits, "maxValue", std::nan("UNSET"));
