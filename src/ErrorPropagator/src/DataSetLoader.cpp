@@ -311,15 +311,9 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
         }
       }
 
-      if (not isData){
-        for( auto& leafName : _leavesRequestedForIndexing_ ){
-          threadChain->SetBranchStatus(leafName.c_str(), true);
-        }
-      }
-      else {
-        for( auto& leafName : _leavesStorageRequestedForData_ ){
-          threadChain->SetBranchStatus(leafName.c_str(), true);
-        }
+
+      for( auto& leafName : ( isData? _leavesStorageRequestedForData_: _leavesRequestedForIndexing_ ) ){
+        threadChain->SetBranchStatus(leafName.c_str(), true);
       }
 
       Long64_t nEvents = threadChain->GetEntries();
