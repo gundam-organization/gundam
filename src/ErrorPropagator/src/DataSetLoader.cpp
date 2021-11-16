@@ -295,7 +295,6 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
           threadChain->SetBranchStatus(threadNominalWeightFormula->GetLeaf(iLeaf)->GetName(), true);
         }
       }
-        
       else if (isData and not this->getDataNominalWeightFormulaStr().empty() ){
         LogWarning << "Will reweight data from nominalWeightLeafName = " << this->getDataNominalWeightFormulaStr() << std::endl;
         threadChain->SetBranchStatus("*", true);
@@ -311,15 +310,9 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
         }
       }
 
-      if (not isData){
-        for( auto& leafName : _leavesRequestedForIndexing_ ){
-          threadChain->SetBranchStatus(leafName.c_str(), true);
-        }
-      }
-      else {
-        for( auto& leafName : _leavesStorageRequestedForData_ ){
-          threadChain->SetBranchStatus(leafName.c_str(), true);
-        }
+
+      for( auto& leafName : ( isData? _leavesStorageRequestedForData_: _leavesRequestedForIndexing_ ) ){
+        threadChain->SetBranchStatus(leafName.c_str(), true);
       }
 
       Long64_t nEvents = threadChain->GetEntries();
