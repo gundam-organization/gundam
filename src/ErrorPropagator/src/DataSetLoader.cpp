@@ -295,7 +295,6 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
           threadChain->SetBranchStatus(threadNominalWeightFormula->GetLeaf(iLeaf)->GetName(), true);
         }
       }
-        
       else if (isData and not this->getDataNominalWeightFormulaStr().empty() ){
         LogWarning << "Will reweight data from nominalWeightLeafName = " << this->getDataNominalWeightFormulaStr() << std::endl;
         threadChain->SetBranchStatus("*", true);
