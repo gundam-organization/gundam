@@ -8,6 +8,7 @@
 #include "Logger.h"
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
+#include "GenericToolbox.RawDataArray.h"
 
 #include "JsonUtils.h"
 #include "FitterEngine.h"
@@ -978,8 +979,8 @@ void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
       for( auto& par : parSet.getParameterList()  ){
         iPar++;
         _minimizer_->SetVariable( iPar,parSet.getName() + "/" + par.getTitle(), par.getParameterValue(),par.getStepSize() );
-//        if(par.getMinValue() == par.getMinValue()){ _minimizer_->SetVariableLowerLimit(iPar, par.getMinValue()); }
-//        if(par.getMaxValue() == par.getMaxValue()){ _minimizer_->SetVariableUpperLimit(iPar, par.getMaxValue()); }
+        if(par.getMinValue() == par.getMinValue()){ _minimizer_->SetVariableLowerLimit(iPar, par.getMinValue()); }
+        if(par.getMaxValue() == par.getMaxValue()){ _minimizer_->SetVariableUpperLimit(iPar, par.getMaxValue()); }
         _minimizer_->SetVariableValue(iPar, par.getParameterValue());
         _minimizer_->SetVariableStepSize(iPar, par.getStepSize());
 

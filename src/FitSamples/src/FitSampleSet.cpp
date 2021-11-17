@@ -7,6 +7,7 @@
 
 #include "Logger.h"
 #include "GenericToolbox.h"
+#include "GenericToolbox.RawDataArray.h"
 
 #include "JsonUtils.h"
 #include "GlobalVariables.h"
@@ -133,7 +134,6 @@ bool FitSampleSet::empty() const {
   return _fitSampleList_.empty();
 }
 double FitSampleSet::evalLikelihood() const{
-
   double llh = 0.;
   for( auto& sample : _fitSampleList_ ){
     double sampleLlh = 0;
@@ -145,8 +145,76 @@ double FitSampleSet::evalLikelihood() const{
     }
     llh += sampleLlh;
   }
-
   return llh;
+}
+void FitSampleSet::writeSampleEvents(TDirectory* saveDir_) const{
+  LogWarning << __METHOD_NAME__ << std::endl;
+  LogThrowIf(saveDir_==nullptr, "Save dir is invalid")
+  LogThrowIf(empty(), "FitSampleSet is empty()")
+
+  for( auto& sample : _fitSampleList_ ){
+    LogInfo << "Writing sample: " << sample.getName() << std::endl;
+
+    for( bool isData : {false, true} ){
+      GenericToolbox::mkdirTFile(saveDir_, sample.getName())->cd();
+
+      auto* evListPtr = (isData? &sample.getDataContainer().eventList: &sample.getMcContainer().eventList);
+      if( evListPtr->empty() ) continue;
+
+      std::string treeName = (isData? "Data_TTree": "MC_TTree");
+      auto* tree = new TTree(treeName.c_str(), treeName.c_str());
+
+      GenericToolbox::RawDataArray privateMemberArr;
+      std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const PhysicsEvent&)>> leafDictionary;
+      leafDictionary["eventWeight/D"] =   [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getEventWeight()); };
+      leafDictionary["nominalWeight/D"] = [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getNominalWeight()); };
+      leafDictionary["treeWeight/D"] =    [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getTreeWeight()); };
+      leafDictionary["sampleBinIndex/I"]= [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getSampleBinIndex()); };
+      leafDictionary["dataSetIndex/I"] =  [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getDataSetIndex()); };
+      leafDictionary["entryIndex/L"] =    [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getEntryIndex()); };
+      std::string leavesDefStr;
+      for( auto& leafDef : leafDictionary ){
+        if( not leavesDefStr.empty() ) leavesDefStr += ":";
+        leavesDefStr += leafDef.first;
+        leafDef.second(privateMemberArr, (*evListPtr)[0]); // resize buffer
+      }
+      privateMemberArr.lockArraySize();
+      tree->Branch("Event", &privateMemberArr.getRawDataArray()[0], leavesDefStr.c_str());
+
+      GenericToolbox::RawDataArray loadedLeavesArr;
+      auto loadedLeavesDict = (*evListPtr)[0].generateLeavesDictionary();
+      std::vector<std::string> leafNamesList;
+      leavesDefStr = "";
+      for( auto& leafDef : loadedLeavesDict ){
+        if( not leavesDefStr.empty() ) leavesDefStr += ":";
+        leavesDefStr += leafDef.first;
+        leafNamesList.emplace_back(leafDef.first.substr(0,leafDef.first.find("[")).substr(0, leafDef.first.find("/")));
+        leafDef.second(loadedLeavesArr, (*evListPtr)[0].getLeafHolder(leafNamesList.back())); // resize buffer
+      }
+      loadedLeavesArr.lockArraySize();
+      LogDebug << GET_VAR_NAME_VALUE(leavesDefStr) << std::endl;
+      tree->Branch("Leaves", &loadedLeavesArr.getRawDataArray()[0], leavesDefStr.c_str());
+
+      int iLeaf;
+      for( int iEvent = 0 ; iEvent < evListPtr->size() ; iEvent++ ){
+        GenericToolbox::displayProgressBar(iEvent, evListPtr->size(), "Writing data...");
+
+        privateMemberArr.resetCurrentByteOffset();
+        for( auto& leafDef : leafDictionary ){ leafDef.second(privateMemberArr, (*evListPtr)[iEvent]); }
+
+        iLeaf = 0;
+        loadedLeavesArr.resetCurrentByteOffset();
+        for( auto& leafDef : loadedLeavesDict ){ leafDef.second(loadedLeavesArr, (*evListPtr)[iEvent].getLeafHolder(leafNamesList[iLeaf++])); }
+
+        tree->Fill();
+      }
+
+      tree->Write();
+    }
+
+  }
+
+  saveDir_->cd();
 }
 
 void FitSampleSet::loadAsimovData(){
@@ -154,16 +222,7 @@ void FitSampleSet::loadAsimovData(){
     LogWarning << "Asimov data selected: copying MC events..." << std::endl;
     for( auto& sample : _fitSampleList_ ){
       LogInfo << "Copying MC events in sample \"" << sample.getName() << "\"" << std::endl;
-
       sample.getDataContainer().eventList = sample.getMcContainer().eventList;
-
-//      auto& dataEventList = sample.getDataContainer().eventList;
-//      LogThrowIf(not dataEventList.empty(), "Can't fill Asimov data, dataEventList is not empty.");
-//      auto& mcEventList = sample.getMcContainer().eventList;
-//      dataEventList.resize(mcEventList.size());
-//      for( size_t iEvent = 0 ; iEvent < dataEventList.size() ; iEvent++ ){
-//        dataEventList[iEvent] = mcEventList[iEvent];
-//      }
     }
   }
 }

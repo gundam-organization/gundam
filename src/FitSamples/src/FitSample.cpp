@@ -44,6 +44,10 @@ void FitSample::initialize() {
   LogAssert(not _config_.empty(), GET_VAR_NAME_VALUE(_config_.empty()));
 
   _name_ = JsonUtils::fetchValue<std::string>(_config_, "name");
+  LogThrowIf(
+      GenericToolbox::doesStringContainsSubstring(_name_, "/"),
+      "Invalid sample name: \"" << _name_ << "\": should not have '/'.")
+
   _isEnabled_ = JsonUtils::fetchValue(_config_, "isEnabled", true);
   if( not _isEnabled_ ){
     LogWarning << "\"" << _name_ << "\" is disabled." << std::endl;
