@@ -29,6 +29,8 @@ int main(int argc, char** argv){
   CmdLineParser clParser;
 
   clParser.addTriggerOption("dry-run", {"--dry-run", "-d"},"Perform the full sequence of initialization, but don't do the actual fit.");
+  clParser.addTriggerOption("generateOneSigmaPlots", {"--one-sigma"}, "Generate one sigma plots");
+
   clParser.addOption("config-file", {"-c", "--config-file"}, "Specify path to the fitter config file");
   clParser.addOption("nb-threads", {"-t", "--nb-threads"}, "Specify nb of parallel threads");
   clParser.addOption("output-file", {"-o", "--out-file"}, "Specify the output file");
@@ -71,7 +73,7 @@ int main(int argc, char** argv){
   /////////////////////////////
 
   // LLH Visual Scan
-  if( JsonUtils::fetchValue(jsonConfig, "generateOneSigmaPlots", false) ) fitter.generateOneSigmaPlots("preFit");
+  if( clParser.isOptionTriggered("generateOneSigmaPlots") or JsonUtils::fetchValue(jsonConfig, "generateOneSigmaPlots", false) ) fitter.generateOneSigmaPlots("preFit");
   if( JsonUtils::fetchValue(jsonConfig, "scanParameters", true) ) fitter.scanParameters(10, "preFit/scan");
 
   // State before the fit

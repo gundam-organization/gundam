@@ -197,8 +197,6 @@ void FitSampleSet::writeSampleEvents(TDirectory* saveDir_) const{
 
       int iLeaf;
       for( int iEvent = 0 ; iEvent < evListPtr->size() ; iEvent++ ){
-        GenericToolbox::displayProgressBar(iEvent, evListPtr->size(), "Writing data...");
-
         privateMemberArr.resetCurrentByteOffset();
         for( auto& leafDef : leafDictionary ){ leafDef.second(privateMemberArr, (*evListPtr)[iEvent]); }
 

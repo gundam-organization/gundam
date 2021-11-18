@@ -13,7 +13,7 @@
 
 struct HistHolder{
   // Hist
-  TH1D* histPtr{nullptr};
+  std::shared_ptr<TH1D> histPtr{nullptr};
 
   // Path
   std::string folderPath;
@@ -85,13 +85,13 @@ public:
   void defineHistogramHolders();
 
   // Getters
-  const std::vector<HistHolder> &getHistHolderList() const;
+  const std::vector<HistHolder> &getHistHolderList(int cacheSlot_ = 0) const;
   const std::vector<HistHolder> &getComparisonHistHolderList() const;
-  std::map<std::string, TCanvas *> getBufferCanvasList() const;
+  std::map<std::string, std::shared_ptr<TCanvas>> getBufferCanvasList() const;
 
   // Core
-  void generateSamplePlots(TDirectory *saveDir_ = nullptr);
-  void generateSampleHistograms(TDirectory *saveDir_ = nullptr);
+  void generateSamplePlots(TDirectory *saveDir_ = nullptr, int cacheSlot_ = 0);
+  void generateSampleHistograms(TDirectory *saveDir_ = nullptr, int cacheSlot_ = 0);
   void generateCanvas(const std::vector<HistHolder> &histHolderList_, TDirectory *saveDir_ = nullptr, bool stackHist_ = true);
 
   void generateComparisonPlots(const std::vector<HistHolder> &histsToStackOther_, const std::vector<HistHolder> &histsToStackReference_, TDirectory *saveDir_ = nullptr);
@@ -116,9 +116,9 @@ private:
   nlohmann::json _histogramsDefinition_;
   std::vector<Color_t> defaultColorWheel;
 
-  std::vector<HistHolder> _histHolderList_;
+  std::vector<std::vector<HistHolder>> _histHolderCacheList_;
   std::vector<HistHolder> _comparisonHistHolderList_;
-  std::map<std::string, TCanvas*> _bufferCanvasList_;
+  std::map<std::string, std::shared_ptr<TCanvas>> _bufferCanvasList_;
 
 
 };
