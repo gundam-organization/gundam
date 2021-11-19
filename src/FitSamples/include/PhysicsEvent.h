@@ -78,7 +78,7 @@ public:
   bool isSame(AnaEvent& anaEvent_) const;
   void deleteLeaf(long index_);
   void trimDialCache();
-  std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const GenericToolbox::LeafHolder&)>> generateLeavesDictionary() const;
+  std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const GenericToolbox::LeafHolder&)>> generateLeavesDictionary(bool disableArrays_ = false) const;
 
   // Stream operator
   friend std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p );

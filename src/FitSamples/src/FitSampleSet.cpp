@@ -182,7 +182,7 @@ void FitSampleSet::writeSampleEvents(TDirectory* saveDir_) const{
       tree->Branch("Event", &privateMemberArr.getRawDataArray()[0], leavesDefStr.c_str());
 
       GenericToolbox::RawDataArray loadedLeavesArr;
-      auto loadedLeavesDict = (*evListPtr)[0].generateLeavesDictionary();
+      auto loadedLeavesDict = (*evListPtr)[0].generateLeavesDictionary(true);
       std::vector<std::string> leafNamesList;
       leavesDefStr = "";
       for( auto& leafDef : loadedLeavesDict ){

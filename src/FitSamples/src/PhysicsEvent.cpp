@@ -235,7 +235,7 @@ void PhysicsEvent::trimDialCache(){
   _rawDialPtrList_.resize(newSize);
   _rawDialPtrList_.shrink_to_fit();
 }
-std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const GenericToolbox::LeafHolder&)>> PhysicsEvent::generateLeavesDictionary() const{
+std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const GenericToolbox::LeafHolder&)>> PhysicsEvent::generateLeavesDictionary(bool disableArrays_) const{
   std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const GenericToolbox::LeafHolder&)>> out;
 
   for( auto& leafName : *_commonLeafNameListPtr_ ){
@@ -245,14 +245,22 @@ std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const Ge
     LogThrowIf( typeTag == 0 or typeTag == char(0xFF), leafName << " has an invalid leaf type." )
 
     std::string leafDefStr{leafName};
-    if(lH.getArraySize() > 1){ leafDefStr += "[" + std::to_string(lH.getArraySize()) + "]"; }
+    if(not disableArrays_ and lH.getArraySize() > 1){ leafDefStr += "[" + std::to_string(lH.getArraySize()) + "]"; }
     leafDefStr += "/";
     leafDefStr += typeTag;
-    out[leafDefStr] = [](GenericToolbox::RawDataArray& arr_, const GenericToolbox::LeafHolder& lH_){
-      for(size_t iIndex = 0 ; iIndex < lH_.getArraySize() ; iIndex++){
-        arr_.writeMemoryContent(lH_.getLeafDataAddress(iIndex).getPlaceHolderPtr()->getVariableAddress(), lH_.getVariableSize(iIndex));
-      }
-    };
+    if(not disableArrays_){
+      out[leafDefStr] = [](GenericToolbox::RawDataArray& arr_, const GenericToolbox::LeafHolder& lH_){
+        for(size_t iIndex = 0 ; iIndex < lH_.getArraySize() ; iIndex++){
+          arr_.writeMemoryContent(lH_.getLeafDataAddress(iIndex).getPlaceHolderPtr()->getVariableAddress(), lH_.getVariableSize(iIndex));
+        }
+      };
+    }
+    else{
+      out[leafDefStr] = [](GenericToolbox::RawDataArray& arr_, const GenericToolbox::LeafHolder& lH_){
+        arr_.writeMemoryContent(lH_.getLeafDataAddress().getPlaceHolderPtr()->getVariableAddress(), lH_.getVariableSize());
+      };
+    }
+
   }
   return out;
 }
