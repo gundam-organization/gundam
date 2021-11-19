@@ -8,6 +8,7 @@
 #include "Logger.h"
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
+#include "GenericToolbox.RawDataArray.h"
 
 #include "JsonUtils.h"
 #include "FitterEngine.h"
@@ -148,7 +149,7 @@ void FitterEngine::generateOneSigmaPlots(const std::string& savePath_){
 
       double currentParValue = par.getParameterValue();
       par.setParameterValue( currentParValue + par.getStdDevValue() );
-      LogWarning << "(" << iPar+1 << "/" << _nbParameters_ << ") +1σ on " << parSet.getName() + "/" + par.getTitle()
+      LogInfo << "(" << iPar+1 << "/" << _nbParameters_ << ") +1σ on " << parSet.getName() + "/" + par.getTitle()
               << " -> " << par.getParameterValue() << std::endl;
       _propagator_.propagateParametersOnSamples();
 
@@ -158,9 +159,9 @@ void FitterEngine::generateOneSigmaPlots(const std::string& savePath_){
       auto* saveDir = GenericToolbox::mkdirTFile(_saveDir_, savePath );
       saveDir->cd();
 
-      _propagator_.getPlotGenerator().generateSamplePlots();
+      _propagator_.getPlotGenerator().generateSampleHistograms(nullptr, 1);
 
-      auto oneSigmaHistList = _propagator_.getPlotGenerator().getHistHolderList();
+      auto oneSigmaHistList = _propagator_.getPlotGenerator().getHistHolderList(1);
       _propagator_.getPlotGenerator().generateComparisonPlots( oneSigmaHistList, refHistList, saveDir );
       par.setParameterValue( currentParValue );
       _propagator_.propagateParametersOnSamples();
@@ -177,7 +178,7 @@ void FitterEngine::generateOneSigmaPlots(const std::string& savePath_){
       for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
         double currentParValue = parSet.getEigenParameterValue(iEigen);
         parSet.setEigenParameter(iEigen, currentParValue + parSet.getEigenSigma(iEigen));
-        LogWarning << "(" << iEigen+1 << "/" << parSet.getNbEnabledEigenParameters() << ") +1σ on " << parSet.getName() + "/eigen_#" << iEigen
+        LogInfo << "(" << iEigen+1 << "/" << parSet.getNbEnabledEigenParameters() << ") +1σ on " << parSet.getName() + "/eigen_#" << iEigen
                 << " -> " << parSet.getEigenSigma(iEigen) << std::endl;
         parSet.propagateEigenToOriginal();
         _propagator_.propagateParametersOnSamples();
@@ -188,9 +189,9 @@ void FitterEngine::generateOneSigmaPlots(const std::string& savePath_){
         auto* saveDir = GenericToolbox::mkdirTFile(_saveDir_, savePath );
         saveDir->cd();
 
-        _propagator_.getPlotGenerator().generateSamplePlots();
+        _propagator_.getPlotGenerator().generateSampleHistograms(nullptr, 1);
 
-        auto oneSigmaHistList = _propagator_.getPlotGenerator().getHistHolderList();
+        auto oneSigmaHistList = _propagator_.getPlotGenerator().getHistHolderList(1);
         _propagator_.getPlotGenerator().generateComparisonPlots( oneSigmaHistList, refHistList, saveDir );
         parSet.setEigenParameter(iEigen, currentParValue);
         parSet.propagateEigenToOriginal();
@@ -199,7 +200,7 @@ void FitterEngine::generateOneSigmaPlots(const std::string& savePath_){
         const auto& compHistList = _propagator_.getPlotGenerator().getComparisonHistHolderList();
 
         // Since those were not saved, delete manually
-        for( auto& hist : oneSigmaHistList ){ delete hist.histPtr; }
+//        for( auto& hist : oneSigmaHistList ){ delete hist.histPtr; }
         oneSigmaHistList.clear();
       }
     }
@@ -209,7 +210,7 @@ void FitterEngine::generateOneSigmaPlots(const std::string& savePath_){
   _saveDir_->cd();
 
   // Since those were not saved, delete manually
-  for( auto& refHist : refHistList ){ delete refHist.histPtr; }
+//  for( auto& refHist : refHistList ){ delete refHist.histPtr; }
   refHistList.clear();
 
 }

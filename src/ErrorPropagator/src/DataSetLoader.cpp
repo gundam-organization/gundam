@@ -453,7 +453,6 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
                   }
 
                   lastFailedBinVarIndex = -1;
-                  isEventInDialBin = false;
                   for( iDial = 0 ; iDial < dialSetPtr->getDialList().size(); iDial++ ){
                     // ----------> SLOW PART
                     applyConditionBinPtr = &dialSetPtr->getDialList()[iDial]->getApplyConditionBin();
@@ -468,22 +467,26 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
                       }
                     }
 
+                    // Ok, lets give this dial a chance:
+                    isEventInDialBin = true;
+
                     for( iVar = 0 ; iVar < applyConditionBinPtr->getEdgesList().size() ; iVar++ ){
                       if( iVar == lastFailedBinVarIndex ) continue; // already checked if set
                       if( not applyConditionBinPtr->isBetweenEdges(
                           applyConditionBinPtr->getEdgesList()[iVar],
                           eventBuffer.getVarAsDouble(applyConditionBinPtr->getEventVarIndexCache()[iVar] )
                       )){
+                        isEventInDialBin = false;
                         lastFailedBinVarIndex = int(iVar);
                         break;
                         // NEXT DIAL! Don't check other bin variables
                       }
                     } // Bin var loop
                     // <------------------
-                    // OK, if reach this point so fill the dial ptr in the storage event and leave
-                    isEventInDialBin = true;
-                    eventPtr->getRawDialPtrList()[eventDialOffset++] = dialSetPtr->getDialList()[iDial].get();
-                    break;
+                    if( isEventInDialBin ) {
+                      eventPtr->getRawDialPtrList()[eventDialOffset++] = dialSetPtr->getDialList()[iDial].get();
+                      break;
+                    }
                   } // iDial
 
                   if( isEventInDialBin and dialSetPair.first->isUseOnlyOneParameterPerEvent() ){

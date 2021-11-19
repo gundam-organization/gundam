@@ -144,6 +144,10 @@ int PhysicsEvent::findVarIndex(const std::string& leafName_, bool throwIfNotFoun
   }
   return -1;
 }
+void* PhysicsEvent::getVariableAddress(const std::string& leafName_, size_t arrayIndex_){
+  int index = this->findVarIndex(leafName_, true);
+  return _leafContentList_.at(index).getVariableAddress(arrayIndex_);
+}
 double PhysicsEvent::getVarAsDouble(const std::string& leafName_, size_t arrayIndex_) const{
   int index = this->findVarIndex(leafName_, true);
   return this->getVarAsDouble(index, arrayIndex_);
@@ -230,6 +234,35 @@ void PhysicsEvent::trimDialCache(){
   }
   _rawDialPtrList_.resize(newSize);
   _rawDialPtrList_.shrink_to_fit();
+}
+std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const GenericToolbox::LeafHolder&)>> PhysicsEvent::generateLeavesDictionary(bool disableArrays_) const{
+  std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const GenericToolbox::LeafHolder&)>> out;
+
+  for( auto& leafName : *_commonLeafNameListPtr_ ){
+
+    const auto& lH = this->getLeafHolder(leafName);
+    char typeTag = lH.findOriginalVariableType();
+    LogThrowIf( typeTag == 0 or typeTag == char(0xFF), leafName << " has an invalid leaf type." )
+
+    std::string leafDefStr{leafName};
+    if(not disableArrays_ and lH.getArraySize() > 1){ leafDefStr += "[" + std::to_string(lH.getArraySize()) + "]"; }
+    leafDefStr += "/";
+    leafDefStr += typeTag;
+    if(not disableArrays_){
+      out[leafDefStr] = [](GenericToolbox::RawDataArray& arr_, const GenericToolbox::LeafHolder& lH_){
+        for(size_t iIndex = 0 ; iIndex < lH_.getArraySize() ; iIndex++){
+          arr_.writeMemoryContent(lH_.getLeafDataAddress(iIndex).getPlaceHolderPtr()->getVariableAddress(), lH_.getVariableSize(iIndex));
+        }
+      };
+    }
+    else{
+      out[leafDefStr] = [](GenericToolbox::RawDataArray& arr_, const GenericToolbox::LeafHolder& lH_){
+        arr_.writeMemoryContent(lH_.getLeafDataAddress().getPlaceHolderPtr()->getVariableAddress(), lH_.getVariableSize());
+      };
+    }
+
+  }
+  return out;
 }
 
 std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p ){

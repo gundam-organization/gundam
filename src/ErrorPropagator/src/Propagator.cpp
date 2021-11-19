@@ -150,6 +150,8 @@ void Propagator::initialize() {
   LogInfo << "Propagating prior parameters on events..." << std::endl;
   reweightSampleEvents();
 
+  _fitSampleSet_.writeSampleEvents(GenericToolbox::mkdirTFile(_saveDir_, "Events"));
+
   LogInfo << "Set the current MC prior weights as nominal weight..." << std::endl;
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
     for( auto& event : sample.getMcContainer().eventList ){

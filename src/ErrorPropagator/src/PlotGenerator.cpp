@@ -39,6 +39,7 @@ void PlotGenerator::reset() {
   _sampleListPtr_ = nullptr;
   _fitSampleSetPtr_ = nullptr;
 
+  _histHolderCacheList_.resize(1);
 }
 
 void PlotGenerator::setConfig(const nlohmann::json &config_) {
@@ -64,13 +65,13 @@ void PlotGenerator::initialize() {
 }
 void PlotGenerator::defineHistogramHolders() {
   LogWarning << __METHOD_NAME__ << std::endl;
-  _histHolderList_.clear();
+  _histHolderCacheList_[0].clear();
 
   HistHolder histDefBase;
   int sampleCounter = -1;
   if( _fitSampleSetPtr_ != nullptr ){
     for( const auto& sample : _fitSampleSetPtr_->getFitSampleList() ){
-      LogInfo << "Defining histograms for sample: \"" << sample.getName() << "\"" << std::endl;
+      LogInfo << "Defining holders for sample: \"" << sample.getName() << "\"" << std::endl;
       sampleCounter++;
       histDefBase.fitSamplePtr = &sample;
       short unsetSplitValueColor = kGray; // will increment if needed
@@ -135,8 +136,10 @@ void PlotGenerator::defineHistogramHolders() {
 
                 if( JsonUtils::fetchValue(histConfig, "useSampleBinning", false) ){
 
+                  std::string sampleObsBinning = JsonUtils::fetchValue(histConfig, "useSampleBinningOfObservable", histDefBase.varToPlot);
+
                   for( const auto& bin : sample.getBinning().getBinsList() ){
-                    const auto& edges = bin.getVarEdges(histDefBase.varToPlot);
+                    const auto& edges = bin.getVarEdges(sampleObsBinning);
                     for( const auto& edge : { edges.first, edges.second } )
                       if( ( histDefBase.xMin != histDefBase.xMin or histDefBase.xMin <= edge )
                       and ( histDefBase.xMax != histDefBase.xMax or histDefBase.xMax >= edge ) ){
@@ -220,13 +223,13 @@ void PlotGenerator::defineHistogramHolders() {
               }
 
               // Config DONE
-              _histHolderList_.emplace_back(histDefBase);
+              _histHolderCacheList_[0].emplace_back(histDefBase);
               if( buildFillFunction ){
-                _histHolderList_.back().fillMutexPtr = new std::mutex();
-                auto splitVarValue = _histHolderList_.back().splitVarValue;
-                auto varToPlot = _histHolderList_.back().varToPlot;
-                auto splitVarName = _histHolderList_.back().splitVarName;
-                auto* mutexPtr = _histHolderList_.back().fillMutexPtr;
+                _histHolderCacheList_[0].back().fillMutexPtr = new std::mutex();
+                auto splitVarValue = _histHolderCacheList_[0].back().splitVarValue;
+                auto varToPlot = _histHolderCacheList_[0].back().varToPlot;
+                auto splitVarName = _histHolderCacheList_[0].back().splitVarName;
+                auto* mutexPtr = _histHolderCacheList_[0].back().fillMutexPtr;
 //                _histHolderList_.back().fillFunctionFitSample =
 //                  [ mutexPtr, splitVarValue, varToPlot, splitVarName ](TH1D* hist_, const PhysicsEvent* event_){
 //                  if( splitVarName.empty() or event_->getVarValue<int>(splitVarName) == splitVarValue){
@@ -404,14 +407,14 @@ void PlotGenerator::defineHistogramHolders() {
               }
 
               // Config DONE
-              _histHolderList_.emplace_back(histDefBase);
+              _histHolderCacheList_[0].emplace_back(histDefBase);
               if( buildFillFunction ){
-                _histHolderList_.back().fillMutexPtr = new std::mutex();
-                auto splitVarValue = _histHolderList_.back().splitVarValue;
-                auto varToPlot = _histHolderList_.back().varToPlot;
-                auto splitVarName = _histHolderList_.back().splitVarName;
-                auto* mutexPtr = _histHolderList_.back().fillMutexPtr;
-                _histHolderList_.back().fillFunctionAnaSample =
+                _histHolderCacheList_[0].back().fillMutexPtr = new std::mutex();
+                auto splitVarValue = _histHolderCacheList_[0].back().splitVarValue;
+                auto varToPlot = _histHolderCacheList_[0].back().varToPlot;
+                auto splitVarName = _histHolderCacheList_[0].back().splitVarName;
+                auto* mutexPtr = _histHolderCacheList_[0].back().fillMutexPtr;
+                _histHolderCacheList_[0].back().fillFunctionAnaSample =
                   [ mutexPtr, splitVarValue, varToPlot, splitVarName ](TH1D* hist_, const AnaEvent* event_){
                   if( splitVarName.empty() or event_->GetEventVarInt(splitVarName) == splitVarValue){
                     std::lock_guard<std::mutex> g(*mutexPtr);
@@ -428,27 +431,37 @@ void PlotGenerator::defineHistogramHolders() {
   }
 }
 
-const std::vector<HistHolder> &PlotGenerator::getHistHolderList() const {
-  return _histHolderList_;
+const std::vector<HistHolder> &PlotGenerator::getHistHolderList(int cacheSlot_) const {
+  return _histHolderCacheList_[cacheSlot_];
 }
 const std::vector<HistHolder> &PlotGenerator::getComparisonHistHolderList() const {
   return _comparisonHistHolderList_;
 }
-std::map<std::string, TCanvas *> PlotGenerator::getBufferCanvasList() const {
+std::map<std::string, std::shared_ptr<TCanvas>> PlotGenerator::getBufferCanvasList() const {
   return _bufferCanvasList_;
 }
 
-void PlotGenerator::generateSamplePlots(TDirectory *saveDir_) {
+void PlotGenerator::generateSamplePlots(TDirectory *saveDir_, int cacheSlot_) {
   LogInfo << "Generating sample plots..." << std::endl;
-  this->generateSampleHistograms(GenericToolbox::mkdirTFile(saveDir_, "histograms"));
-  this->generateCanvas(_histHolderList_, GenericToolbox::mkdirTFile(saveDir_, "canvas"));
+  this->generateSampleHistograms(GenericToolbox::mkdirTFile(saveDir_, "histograms"), cacheSlot_);
+  this->generateCanvas(_histHolderCacheList_[cacheSlot_], GenericToolbox::mkdirTFile(saveDir_, "canvas"));
 }
-void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
+void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot_) {
   LogWarning << __METHOD_NAME__ << std::endl;
 
   if( _histogramsDefinition_.empty() ){
     LogError << "No histogram has been defined." << std::endl;
     return;
+  }
+  if( cacheSlot_ >= _histHolderCacheList_.size() ){
+    size_t oldSize = _histHolderCacheList_.size();
+    _histHolderCacheList_.resize(cacheSlot_+1);
+    for(size_t iSlot = oldSize ; iSlot < _histHolderCacheList_.size(); iSlot++){
+      _histHolderCacheList_[iSlot] = _histHolderCacheList_[0]; // inherit properties from the first one
+      for( auto& histDef : _histHolderCacheList_[iSlot] ){
+        histDef.histPtr = nullptr; // remove the pointer: hist will be recreated
+      }
+    }
   }
 
   auto* lastDir = GenericToolbox::getCurrentTDirectory();
@@ -457,31 +470,36 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
   }
 
   // Create histograms
-  for( auto& histDef : _histHolderList_ ){
+  int iHistCount = 0;
+  for( auto& histDef : _histHolderCacheList_[cacheSlot_] ){
 
-    TH1D* hist;
-    if( histDef.varToPlot == "Raw" ){
-      if( _fitSampleSetPtr_ != nullptr ){
-        if( histDef.isData ) hist = (TH1D*) histDef.fitSamplePtr->getDataContainer().histogram->Clone();
-        else hist = (TH1D*) histDef.fitSamplePtr->getMcContainer().histogram->Clone();
+    if( histDef.histPtr == nullptr ){
+      if( histDef.varToPlot == "Raw" ){
+        if( _fitSampleSetPtr_ != nullptr ){
+          if( histDef.isData ) histDef.histPtr = std::shared_ptr<TH1D>( (TH1D*) histDef.fitSamplePtr->getDataContainer().histogram->Clone() );
+          else histDef.histPtr = std::shared_ptr<TH1D>( (TH1D*) histDef.fitSamplePtr->getMcContainer().histogram->Clone() );
+        }
+        else{
+          if( histDef.isData ) histDef.histPtr = std::shared_ptr<TH1D>( (TH1D*) histDef.anaSamplePtr->GetDataHisto().Clone() );
+          else histDef.histPtr = std::shared_ptr<TH1D>( (TH1D*) histDef.anaSamplePtr->GetPredHisto().Clone() );
+        }
       }
       else{
-        if( histDef.isData ) hist = (TH1D*) histDef.anaSamplePtr->GetDataHisto().Clone();
-        else hist = (TH1D*) histDef.anaSamplePtr->GetPredHisto().Clone();
+        histDef.histPtr = std::shared_ptr<TH1D>( new TH1D(
+            histDef.histName.c_str(), histDef.histTitle.c_str(),
+            int(histDef.xEdges.size()) - 1, &histDef.xEdges[0]
+        ));
       }
 
+      histDef.histPtr->SetName(Form("%p", (void *) histDef.histPtr.get()));
+
+//      auto* dir = GenericToolbox::mkdirTFile(saveDir_, histDef.folderPath);
+//      histDef.histPtr->SetDirectory(dir); // memory handled by ROOT
+      histDef.histPtr->SetDirectory(nullptr); // memory handled by US
     }
     else{
-      hist = new TH1D(
-        histDef.histName.c_str(), histDef.histTitle.c_str(),
-        int(histDef.xEdges.size()) - 1, &histDef.xEdges[0]
-      );
+      histDef.histPtr->Reset();
     }
-
-    auto* dir = GenericToolbox::mkdirTFile(saveDir_, histDef.folderPath);
-    hist->SetDirectory(dir); // memory handled by ROOT
-
-    histDef.histPtr = hist;
   }
 
   // Fill histograms
@@ -497,7 +515,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
           eventListPtr = &sample.getDataContainer().eventList;
 
           // which hist should be filled?
-          for( auto& histDef : _histHolderList_ ){
+          for( auto& histDef : _histHolderCacheList_[cacheSlot_] ){
             if(histDef.isData and histDef.fitSamplePtr == &sample ){
               histPtrToFillList.emplace_back( &histDef );
             }
@@ -507,7 +525,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
           eventListPtr = &sample.getMcContainer().eventList;
 
           // which hist should be filled?
-          for( auto& histDef : _histHolderList_ ){
+          for( auto& histDef : _histHolderCacheList_[cacheSlot_] ){
             if(not histDef.isData and histDef.fitSamplePtr == &sample ){
               histPtrToFillList.emplace_back( &histDef );
             }
@@ -562,7 +580,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
           eventListPtr = &sample.GetConstDataEvents();
 
           // which hist should be filled?
-          for( auto& histDef : _histHolderList_ ){
+          for( auto& histDef : _histHolderCacheList_[cacheSlot_] ){
             if(histDef.isData and histDef.anaSamplePtr == &sample and histDef.fillFunctionAnaSample ){
               histPtrToFillList.emplace_back( &histDef );
             }
@@ -572,7 +590,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
           eventListPtr = &sample.GetConstMcEvents();
 
           // which hist should be filled?
-          for( auto& histDef : _histHolderList_ ){
+          for( auto& histDef : _histHolderCacheList_[cacheSlot_] ){
             if(not histDef.isData and histDef.anaSamplePtr == &sample and histDef.fillFunctionAnaSample ){
               histPtrToFillList.emplace_back( &histDef );
             }
@@ -591,7 +609,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
             for( auto& hist : histPtrToFillList ){
               iHist++;
               //            if( iHist % nThreads != iThread ) continue;
-              hist->fillFunctionAnaSample(hist->histPtr , &event);
+              hist->fillFunctionAnaSample(hist->histPtr.get() , &event);
             }
           }
         };
@@ -606,7 +624,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
   }
 
   // Post-processing (norm, color)
-  for( auto& histDefPair : _histHolderList_ ){
+  for( auto& histDefPair : _histHolderCacheList_[cacheSlot_] ){
 
     if( _fitSampleSetPtr_ != nullptr ){
       if( histDefPair.isData ){
@@ -648,8 +666,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
 
   // Saving
   if( saveDir_ != nullptr ){
-    for( auto& histDefPair : _histHolderList_ ){
-//      LogDebug << "Writing histogram: " << histDefPair.histPtr->GetName() << " in " << histDefPair.folderPath << std::endl;
+    for( auto& histDefPair : _histHolderCacheList_[cacheSlot_] ){
       GenericToolbox::mkdirTFile( saveDir_, histDefPair.folderPath )->cd();
       histDefPair.histPtr->Write( histDefPair.histName.c_str() );
       saveDir_->cd();
@@ -660,11 +677,10 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_) {
 
 }
 void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList_, TDirectory *saveDir_, bool stackHist_){
+  LogWarning << __METHOD_NAME__ << std::endl;
+
   auto *lastDir = GenericToolbox::getCurrentTDirectory();
-  if (saveDir_ != nullptr) {
-    saveDir_->cd();
-    LogInfo << "Samples plots will be writen in: " << saveDir_->GetPath() << std::endl;
-  }
+  if (saveDir_ != nullptr) { saveDir_->cd(); }
 
   auto buildCanvasPath = [](const HistHolder* hist_){
     std::stringstream ss;
@@ -726,7 +742,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
         std::string canvasName = "samples_n" + std::to_string(canvasIndex);
         std::string canvasPath = canvasFolderPath + canvasName;
         if (not GenericToolbox::doesKeyIsInMap(canvasPath, _bufferCanvasList_)) {
-          _bufferCanvasList_[canvasPath] = new TCanvas(canvasPath.c_str(), canvasPath.c_str(), canvasWidth, canvasHeight);
+          _bufferCanvasList_[canvasPath] = std::shared_ptr<TCanvas>( new TCanvas(canvasPath.c_str(), canvasPath.c_str(), canvasWidth, canvasHeight) );
           _bufferCanvasList_[canvasPath]->Divide(canvasNbXplots, canvasNbYplots);
         }
         _bufferCanvasList_[canvasPath]->cd(iSampleSlot);
@@ -736,7 +752,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
         std::vector<TH1D *> mcSampleHistList;
         double minYValue = 1;
         for( const auto* histHolder : histList.second ) {
-          TH1D* hist = histHolder->histPtr;
+          TH1D* hist = histHolder->histPtr.get();
           if ( histHolder->isData ) {
             dataSampleHist = hist;
           }
@@ -779,9 +795,9 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
                 mcSampleHistAccumulatorList[iHist]->GetYaxis()->SetRangeUser(minYValue,
                                                                              mcSampleHistAccumulatorList[iHist]->GetMaximum() *
                                                                              1.2);
-                mcSampleHistAccumulatorList[iHist]->Draw("HIST");
+                mcSampleHistAccumulatorList[iHist]->Draw("HIST GOFF");
               } else {
-                mcSampleHistAccumulatorList[iHist]->Draw("HISTSAME");
+                mcSampleHistAccumulatorList[iHist]->Draw("HISTSAME GOFF");
               }
             }
           } else {
@@ -791,16 +807,16 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
                 firstHistToPlot = mcHist;
                 if (mcSampleHistList.size() == 1) {
                   // only one: draw error bars
-                  mcHist->Draw("EP");
+                  mcHist->Draw("EP GOFF");
                 }
                 else {
                   // don't draw multiple error bars
-                  mcHist->Draw("HIST P");
+                  mcHist->Draw("HIST P GOFF");
                 }
               }
               else {
-                if (mcSampleHistList.size() == 1) { mcHist->Draw("EPSAME"); }
-                else { mcHist->Draw("HIST P SAME"); }
+                if (mcSampleHistList.size() == 1) { mcHist->Draw("EPSAME GOFF"); }
+                else { mcHist->Draw("HIST P SAME GOFF"); }
               }
             } // mcHist
           } // stack?
@@ -813,10 +829,10 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
           std::string originalTitle = dataSampleHist->GetTitle(); // title can be used for figuring out the type of the histogram
           dataSampleHist->SetTitle("External");
           if ( firstHistToPlot != nullptr ) {
-            dataSampleHist->Draw("EPSAME");
+            dataSampleHist->Draw("EPSAME GOFF");
           } else {
             firstHistToPlot = dataSampleHist;
-            dataSampleHist->Draw("EP");
+            dataSampleHist->Draw("EP GOFF");
           }
           dataSampleHist->SetTitle(originalTitle.c_str()); // restore
         }
@@ -836,12 +852,9 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
         firstHistToPlot->SetTitle( samplePtr->getName().c_str() ); // the actual displayed title
         gPad->SetGridx();
         gPad->SetGridy();
-
-        //      LogWarning << histsToStackPair.first << ": " << histList.first << " -> "
-        //                 << GenericToolbox::parseVectorAsString(histList.second) << std::endl;
       } // sample
 
-    }
+    } // Hist to stack
   }
   else{
     std::map<std::string, std::map<const AnaSample*, std::vector<const HistHolder*>>> histsToStackMap; // histsToStackMap[path][anaSamplePtr] = listOfTh1d
@@ -891,7 +904,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
         std::string canvasName = "samples_n" + std::to_string(canvasIndex);
         std::string canvasPath = canvasFolderPath + canvasName;
         if (not GenericToolbox::doesKeyIsInMap(canvasPath, _bufferCanvasList_)) {
-          _bufferCanvasList_[canvasPath] = new TCanvas(canvasPath.c_str(), canvasPath.c_str(), canvasWidth, canvasHeight);
+          _bufferCanvasList_[canvasPath] = std::shared_ptr<TCanvas>( new TCanvas(canvasPath.c_str(), canvasPath.c_str(), canvasWidth, canvasHeight) );
           _bufferCanvasList_[canvasPath]->Divide(canvasNbXplots, canvasNbYplots);
         }
         _bufferCanvasList_[canvasPath]->cd(iSampleSlot);
@@ -901,7 +914,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
         std::vector<TH1D *> mcSampleHistList;
         double minYValue = 1;
         for( const auto* histHolder : histList.second ) {
-          TH1D* hist = histHolder->histPtr;
+          TH1D* hist = histHolder->histPtr.get();
           if ( histHolder->isData ) {
             dataSampleHist = hist;
           }
@@ -944,9 +957,9 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
                 mcSampleHistAccumulatorList[iHist]->GetYaxis()->SetRangeUser(minYValue,
                                                                              mcSampleHistAccumulatorList[iHist]->GetMaximum() *
                                                                              1.2);
-                mcSampleHistAccumulatorList[iHist]->Draw("HIST");
+                mcSampleHistAccumulatorList[iHist]->Draw("HIST GOFF");
               } else {
-                mcSampleHistAccumulatorList[iHist]->Draw("HISTSAME");
+                mcSampleHistAccumulatorList[iHist]->Draw("HISTSAME GOFF");
               }
             }
           } else {
@@ -964,8 +977,8 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
                 }
               }
               else {
-                if (mcSampleHistList.size() == 1) { mcHist->Draw("EPSAME"); }
-                else { mcHist->Draw("HIST P SAME"); }
+                if (mcSampleHistList.size() == 1) { mcHist->Draw("EPSAME GOFF"); }
+                else { mcHist->Draw("HIST P SAME GOFF"); }
               }
             } // mcHist
           } // stack?
@@ -978,10 +991,10 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
           std::string originalTitle = dataSampleHist->GetTitle(); // title can be used for figuring out the type of the histogram
           dataSampleHist->SetTitle("External");
           if ( firstHistToPlot != nullptr ) {
-            dataSampleHist->Draw("EPSAME");
+            dataSampleHist->Draw("EPSAME GOFF");
           } else {
             firstHistToPlot = dataSampleHist;
-            dataSampleHist->Draw("EP");
+            dataSampleHist->Draw("EP GOFF");
           }
           dataSampleHist->SetTitle(originalTitle.c_str()); // restore
         }
@@ -1001,12 +1014,9 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
         firstHistToPlot->SetTitle( samplePtr->GetName().c_str() ); // the actual displayed title
         gPad->SetGridx();
         gPad->SetGridy();
-
-        //      LogWarning << histsToStackPair.first << ": " << histList.first << " -> "
-        //                 << GenericToolbox::parseVectorAsString(histList.second) << std::endl;
       } // sample
 
-    }
+    } // Hists to stack
   }
 
   // Write
@@ -1029,20 +1039,22 @@ void PlotGenerator::generateComparisonPlots(
   const std::vector<HistHolder> &histsToStackOther_,
   const std::vector<HistHolder> &histsToStackReference_,
   TDirectory *saveDir_){
-
-  LogInfo << "Generating comparison plots..." << std::endl;
-
   this->generateComparisonHistograms(histsToStackOther_, histsToStackReference_, GenericToolbox::mkdirTFile(saveDir_, "histograms"));
   this->generateCanvas(_comparisonHistHolderList_, GenericToolbox::mkdirTFile(saveDir_, "canvas"), false);
 }
 void PlotGenerator::generateComparisonHistograms(const std::vector<HistHolder> &histList_, const std::vector<HistHolder> &refHistsList_, TDirectory *saveDir_) {
+  LogWarning << __METHOD_NAME__ << std::endl;
 
   auto* curDir = GenericToolbox::getCurrentTDirectory();
 
   if(saveDir_ != nullptr){
     saveDir_->cd();
   }
-  _comparisonHistHolderList_.clear();
+
+  bool newHistHolder{false};
+  if( _comparisonHistHolderList_.empty() ) newHistHolder = true;
+  int iHistComp = -1;
+
 
   for( const auto& histHolder : histList_ ){
 
@@ -1065,23 +1077,35 @@ void PlotGenerator::generateComparisonHistograms(const std::vector<HistHolder> &
     }
     if( refHistHolderPtr == nullptr ) continue; // no available ref
 
-    _comparisonHistHolderList_.emplace_back( histHolder ); // copy
-    _comparisonHistHolderList_.back().histPtr = (TH1D*) histHolder.histPtr->Clone();
-    TH1D* compHistPtr = _comparisonHistHolderList_.back().histPtr;
+    iHistComp++;
+    if( newHistHolder ){
+      _comparisonHistHolderList_.emplace_back( histHolder ); // copy all variables
+      _comparisonHistHolderList_[iHistComp].histPtr = std::shared_ptr<TH1D>((TH1D*)histHolder.histPtr->Clone());
+      _comparisonHistHolderList_[iHistComp].histPtr->SetName(Form("%p", (void*) _comparisonHistHolderList_[iHistComp].histPtr.get()));
+    }
+    else{
+      _comparisonHistHolderList_[iHistComp].histPtr->Reset();
+    }
+    _comparisonHistHolderList_[iHistComp].folderPath = histHolder.folderPath;
+    _comparisonHistHolderList_[iHistComp].histPtr->SetDirectory(nullptr);
+
+    TH1D* compHistPtr = _comparisonHistHolderList_[iHistComp].histPtr.get();
 
     for( int iBin = 0 ; iBin <= compHistPtr->GetNbinsX()+1 ; iBin++ ){
 
       if( refHistHolderPtr->histPtr->GetBinContent(iBin) == 0 ){
         // no division by 0
         compHistPtr->SetBinContent( iBin, 0 );
+        compHistPtr->SetBinError( iBin, 0 );
       }
-
-      double binContent = compHistPtr->GetBinContent( iBin );
-      binContent /= refHistHolderPtr->histPtr->GetBinContent(iBin);
-      binContent -= 1;
-      binContent *= 100.;
-      compHistPtr->SetBinContent( iBin, binContent );
-      compHistPtr->SetBinError( iBin, histHolder.histPtr->GetBinError(iBin) / histHolder.histPtr->GetBinContent(iBin) * 100 );
+      else{
+        double binContent = histHolder.histPtr->GetBinContent( iBin );
+        binContent /= refHistHolderPtr->histPtr->GetBinContent(iBin);
+        binContent -= 1;
+        binContent *= 100.;
+        compHistPtr->SetBinContent( iBin, binContent );
+        compHistPtr->SetBinError( iBin, histHolder.histPtr->GetBinError(iBin) / histHolder.histPtr->GetBinContent(iBin) * 100 );
+      }
 
     } // iBin
     compHistPtr->GetYaxis()->SetTitle("Relative Deviation (%)");
@@ -1111,13 +1135,15 @@ void PlotGenerator::generateComparisonHistograms(const std::vector<HistHolder> &
     compHistPtr->GetYaxis()->SetRangeUser(Ymin, Ymax);
 
     if( saveDir_ != nullptr ){
-      GenericToolbox::mkdirTFile( saveDir_, _comparisonHistHolderList_.back().folderPath )->cd();
-      compHistPtr->Write( _comparisonHistHolderList_.back().histName.c_str() );
+      GenericToolbox::mkdirTFile( saveDir_, _comparisonHistHolderList_[iHistComp].folderPath )->cd();
+      compHistPtr->Write( _comparisonHistHolderList_[iHistComp].histName.c_str() );
       saveDir_->cd();
     }
-  }
+
+  } // histList_
 
   curDir->cd();
+
 
 }
 
