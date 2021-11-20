@@ -83,6 +83,37 @@ double Dial::evalResponse(){
   return this->evalResponse( static_cast<FitParameter *>(_associatedParameterReference_)->getParameterValue() );
 }
 
+void Dial::copySplineCache(TSpline3& splineBuffer_){
+  if( _responseSplineCache_ == nullptr ) this->buildResponseSplineCache();
+  splineBuffer_ = *_responseSplineCache_;
+}
+void Dial::buildResponseSplineCache(){
+  // overridable
+  double xmin = static_cast<FitParameter *>(_associatedParameterReference_)->getMinValue();
+  double xmax = static_cast<FitParameter *>(_associatedParameterReference_)->getMaxValue();
+  double prior = static_cast<FitParameter *>(_associatedParameterReference_)->getPriorValue();
+  double sigma = static_cast<FitParameter *>(_associatedParameterReference_)->getStdDevValue();
+
+  std::vector<double> xSigmaSteps = {-5, -3, -2, -1, -0.5,  0,  0.5,  1,  2,  3,  5};
+  for( size_t iStep = xSigmaSteps.size() ; iStep > 0 ; iStep-- ){
+    if( xmin == xmin and (prior + xSigmaSteps[iStep-1]*sigma) < xmin ){
+      xSigmaSteps.erase(xSigmaSteps.begin() + int(iStep)-1);
+    }
+    if( xmax == xmax and (prior + xSigmaSteps[iStep-1]*sigma) > xmax ){
+      xSigmaSteps.erase(xSigmaSteps.begin() + int(iStep)-1);
+    }
+  }
+
+  std::vector<double> yResponse(xSigmaSteps.size(), 0);
+
+  for( size_t iStep = 0 ; iStep < xSigmaSteps.size() ; iStep++ ){
+    yResponse[iStep] = this->evalResponse(prior + xSigmaSteps[iStep]*sigma);
+  }
+  _responseSplineCache_ = std::shared_ptr<TSpline3>(
+      new TSpline3(Form("%p", this), &xSigmaSteps[0], &yResponse[0], int(xSigmaSteps.size()))
+  );
+}
+
 double Dial::getDialResponseCache() const{
   return _dialResponseCache_;
 }

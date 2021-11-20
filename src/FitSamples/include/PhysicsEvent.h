@@ -44,6 +44,7 @@ public:
   double getEventWeight() const;
   int getSampleBinIndex() const;
   std::vector<Dial *> &getRawDialPtrList();
+  const std::vector<Dial *> &getRawDialPtrList() const;
   const GenericToolbox::LeafHolder& getLeafHolder(std::string leafName_) const;
   const GenericToolbox::LeafHolder& getLeafHolder(int index_) const;
   const std::vector<GenericToolbox::LeafHolder> &getLeafContentList() const;

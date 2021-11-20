@@ -156,10 +156,11 @@ void FitSampleSet::writeSampleEvents(TDirectory* saveDir_) const{
     LogInfo << "Writing sample: " << sample.getName() << std::endl;
 
     for( bool isData : {false, true} ){
-      GenericToolbox::mkdirTFile(saveDir_, sample.getName())->cd();
 
       auto* evListPtr = (isData? &sample.getDataContainer().eventList: &sample.getMcContainer().eventList);
       if( evListPtr->empty() ) continue;
+
+      GenericToolbox::mkdirTFile(saveDir_, sample.getName())->cd();
 
       std::string treeName = (isData? "Data_TTree": "MC_TTree");
       auto* tree = new TTree(treeName.c_str(), treeName.c_str());
@@ -192,7 +193,6 @@ void FitSampleSet::writeSampleEvents(TDirectory* saveDir_) const{
         leafDef.second(loadedLeavesArr, (*evListPtr)[0].getLeafHolder(leafNamesList.back())); // resize buffer
       }
       loadedLeavesArr.lockArraySize();
-      LogDebug << GET_VAR_NAME_VALUE(leavesDefStr) << std::endl;
       tree->Branch("Leaves", &loadedLeavesArr.getRawDataArray()[0], leavesDefStr.c_str());
 
       int iLeaf;

@@ -1,17 +1,19 @@
 set(SRCFILES
-  src/FitObj.cc
-  src/XsecCalc.cc
-  src/Propagator.cpp
-  src/PlotGenerator.cpp
+        src/FitObj.cc
+        src/XsecCalc.cc
+        src/Propagator.cpp
+        src/PlotGenerator.cpp
         src/DataSetLoader.cpp
+        src/EventTreeWriter.cpp
 )
 
 set(HEADERS
-  include/FitObj.hh
-  include/XsecCalc.hh
-  include/Propagator.h
-  include/PlotGenerator.h
+        include/FitObj.hh
+        include/XsecCalc.hh
+        include/Propagator.h
+        include/PlotGenerator.h
         include/DataSetLoader.h
+        include/EventTreeWriter.h
 )
 
 if( USE_STATIC_LINKS STREQUAL "1" )

@@ -17,6 +17,7 @@
 #include "PlotGenerator.h"
 #include "FitSampleSet.h"
 #include "DataSetLoader.h"
+#include "EventTreeWriter.h"
 
 class Propagator {
 
@@ -41,6 +42,8 @@ public:
   std::vector<FitParameterSet> &getParameterSetsList();
   PlotGenerator &getPlotGenerator();
   const json &getConfig() const;
+
+  const EventTreeWriter &getTreeWriter() const;
 
   // Core
   void propagateParametersOnSamples();
@@ -75,6 +78,7 @@ private:
   bool _isRfPropagationEnabled_{false};
   FitSampleSet _fitSampleSet_;
   PlotGenerator _plotGenerator_;
+  EventTreeWriter _treeWriter_;
   std::vector<FitParameterSet> _parameterSetsList_;
   std::vector<DataSetLoader> _dataSetList_;
   std::shared_ptr<TMatrixD> _globalCovarianceMatrix_;

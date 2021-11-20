@@ -777,8 +777,7 @@ void readGenWeightsFiles(){
 
               __splineBinHandler__.graphHandler = (TGraph*)newGraph->Clone();
               __splineBinHandler__.splinePtr
-                = new TSpline3(
-                __splineBinHandler__.graphHandler->GetName(), __splineBinHandler__.graphHandler );
+                = new TSpline3( __splineBinHandler__.graphHandler->GetName(), __splineBinHandler__.graphHandler );
 
               __mapOutSplineTTrees__[systName + "_Unbinned"]->Fill();
 

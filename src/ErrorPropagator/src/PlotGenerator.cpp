@@ -68,49 +68,67 @@ void PlotGenerator::defineHistogramHolders() {
   _histHolderCacheList_[0].clear();
 
   HistHolder histDefBase;
-  int sampleCounter = -1;
   if( _fitSampleSetPtr_ != nullptr ){
+
+    LogInfo << "Fetching appearing split vars..." << std::endl;
+    std::map<std::string, std::map<const FitSample*, std::vector<int>>> splitVarsDictionary;
+    for( const auto& histConfig : _histogramsDefinition_ ){
+      auto splitVars = JsonUtils::fetchValue(histConfig, "splitVars", std::vector<std::string>{""});
+      for( auto& splitVar : splitVars ){
+        if( not GenericToolbox::doesKeyIsInMap(splitVar, splitVarsDictionary) ){
+          for( const auto& sample : _fitSampleSetPtr_->getFitSampleList() ){
+            splitVarsDictionary[splitVar][&sample] = std::vector<int>();
+            if( splitVar.empty() ) splitVarsDictionary[splitVar][&sample].emplace_back(0); // placeholder for no split var
+          }
+        }
+      }
+    }
+
+    std::function<void(int)> fetchSplitVar = [&](int iThread_){
+      int iSample{-1};
+      int iHistDef;
+      for( const auto& sample : _fitSampleSetPtr_->getFitSampleList() ){
+        iSample++;
+        if( iSample % GlobalVariables::getNbThreads() != iThread_ ){ continue; }
+        for( const auto& event : sample.getMcContainer().eventList ){
+          for( auto& splitVarInstance: splitVarsDictionary ){
+            if(splitVarInstance.first.empty()) continue;
+            int splitValue = event.getVarValue<int>(splitVarInstance.first);
+            if( not GenericToolbox::doesElementIsInVector(splitValue, splitVarInstance.second[&sample]) ){
+              splitVarInstance.second[&sample].emplace_back(splitValue);
+            }
+          } // splitVarList
+        } // Event
+      } // Sample
+    };
+    GlobalVariables::getParallelWorker().addJob("fetchSplitVar", fetchSplitVar);
+    GlobalVariables::getParallelWorker().runJob("fetchSplitVar");
+    GlobalVariables::getParallelWorker().removeJob("fetchSplitVar");
+
+    int sampleCounter = -1;
     for( const auto& sample : _fitSampleSetPtr_->getFitSampleList() ){
       LogInfo << "Defining holders for sample: \"" << sample.getName() << "\"" << std::endl;
       sampleCounter++;
       histDefBase.fitSamplePtr = &sample;
       short unsetSplitValueColor = kGray; // will increment if needed
 
-      std::map<std::string, std::vector<int>> splitValuesList;
-
       // Definition of histograms
       for( const auto& histConfig : _histogramsDefinition_ ){
 
-        histDefBase.varToPlot = JsonUtils::fetchValue<std::string>(histConfig, "varToPlot");
-        histDefBase.prefix = JsonUtils::fetchValue(histConfig, "prefix", "");
+        histDefBase.varToPlot         = JsonUtils::fetchValue<std::string>(histConfig, "varToPlot");
+        histDefBase.prefix            = JsonUtils::fetchValue(histConfig, "prefix", "");
         histDefBase.rescaleAsBinWidth = JsonUtils::fetchValue(histConfig, "rescaleAsBinWidth", true);
-        histDefBase.rescaleBinFactor = JsonUtils::fetchValue(histConfig, "rescaleBinFactor", 1.);
+        histDefBase.rescaleBinFactor  = JsonUtils::fetchValue(histConfig, "rescaleBinFactor", 1.);
 
-        std::vector<std::string> splitVars = JsonUtils::fetchValue(histConfig, "splitVars", std::vector<std::string>{""});
+        auto splitVars = JsonUtils::fetchValue(histConfig, "splitVars", std::vector<std::string>{""});
 
         for( const auto& splitVar : splitVars ){
 
           histDefBase.splitVarName = splitVar;
 
-          // Fetch the appearing split vars in the sample
-          if( not GenericToolbox::doesKeyIsInMap(histDefBase.splitVarName, splitValuesList) ){
-            splitValuesList[histDefBase.splitVarName] = std::vector<int>();
-            if( histDefBase.splitVarName.empty() ){
-              splitValuesList[histDefBase.splitVarName].emplace_back(0); // just for the loop
-            }
-            else{
-              for( const auto& event : sample.getMcContainer().eventList ){
-                int splitValue = event.getVarValue<int>(histDefBase.splitVarName);
-                if( not GenericToolbox::doesElementIsInVector(splitValue, splitValuesList[histDefBase.splitVarName]) ){
-                  splitValuesList[histDefBase.splitVarName].emplace_back(splitValue);
-                }
-              }
-            }
-          }
-
           // Loop over split vars
           int splitValueIndex = -1;
-          for( const auto& splitValue : splitValuesList[histDefBase.splitVarName] ){
+          for( const auto& splitValue : splitVarsDictionary[histDefBase.splitVarName][&sample] ){
             splitValueIndex++;
             histDefBase.splitVarValue = splitValue;
 
@@ -230,13 +248,6 @@ void PlotGenerator::defineHistogramHolders() {
                 auto varToPlot = _histHolderCacheList_[0].back().varToPlot;
                 auto splitVarName = _histHolderCacheList_[0].back().splitVarName;
                 auto* mutexPtr = _histHolderCacheList_[0].back().fillMutexPtr;
-//                _histHolderList_.back().fillFunctionFitSample =
-//                  [ mutexPtr, splitVarValue, varToPlot, splitVarName ](TH1D* hist_, const PhysicsEvent* event_){
-//                  if( splitVarName.empty() or event_->getVarValue<int>(splitVarName) == splitVarValue){
-//                    std::lock_guard<std::mutex> g(*mutexPtr);
-//                    hist_->Fill(event_->getVarAsDouble(varToPlot), event_->getEventWeight());
-//                  }
-//                };
               }
 
             } // isData
@@ -248,6 +259,7 @@ void PlotGenerator::defineHistogramHolders() {
   else{
     // OLD SAMPLES
     LogThrowIf(_sampleListPtr_ == nullptr, "No samples has been set.");
+    int sampleCounter = -1;
     for( const auto& sample : *_sampleListPtr_ ){
       sampleCounter++;
       histDefBase.anaSamplePtr = &sample;

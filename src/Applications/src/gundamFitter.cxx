@@ -94,7 +94,6 @@ int main(int argc, char** argv){
     if( JsonUtils::fetchValue(jsonConfig, "scanParameters", true) ) fitter.scanParameters(10, "postFit/scan");
   }
 
-
   LogWarning << "Closing output file \"" << out->GetName() << "\"..." << std::endl;
   out->Close();
   LogInfo << "Closed." << std::endl;
