@@ -171,10 +171,10 @@ void FitterEngine::generateOneSigmaPlots(const std::string& savePath_){
 
       const auto& compHistList = _propagator_.getPlotGenerator().getComparisonHistHolderList();
 
-      // Since those were not saved, delete manually
-      // Don't delete? -> slower each time
-//      for( auto& hist : oneSigmaHistList ){ delete hist.histPtr; }
-      oneSigmaHistList.clear();
+//      // Since those were not saved, delete manually
+//      // Don't delete? -> slower each time
+////      for( auto& hist : oneSigmaHistList ){ delete hist.histPtr; }
+//      oneSigmaHistList.clear();
     }
 
     if( parSet.isUseEigenDecompInFit() ){

@@ -30,6 +30,7 @@ int main(int argc, char** argv){
 
   clParser.addTriggerOption("dry-run", {"--dry-run", "-d"},"Perform the full sequence of initialization, but don't do the actual fit.");
   clParser.addTriggerOption("generateOneSigmaPlots", {"--one-sigma"}, "Generate one sigma plots");
+  clParser.addTriggerOption("scanParameters", {"--scan"}, "Scan parameters");
 
   clParser.addOption("config-file", {"-c", "--config-file"}, "Specify path to the fitter config file");
   clParser.addOption("nb-threads", {"-t", "--nb-threads"}, "Specify nb of parallel threads");
@@ -74,7 +75,7 @@ int main(int argc, char** argv){
 
   // LLH Visual Scan
   if( clParser.isOptionTriggered("generateOneSigmaPlots") or JsonUtils::fetchValue(jsonConfig, "generateOneSigmaPlots", false) ) fitter.generateOneSigmaPlots("preFit");
-  if( JsonUtils::fetchValue(jsonConfig, "scanParameters", true) ) fitter.scanParameters(10, "preFit/scan");
+  if( clParser.isOptionTriggered("scanParameters") or JsonUtils::fetchValue(jsonConfig, "scanParameters", true) ) fitter.scanParameters(100, "preFit/scan");
 
   // State before the fit
   if( JsonUtils::fetchValue(jsonConfig, "throwMcBeforeFit", false) ){
@@ -91,7 +92,7 @@ int main(int argc, char** argv){
   if( not isDryRun and JsonUtils::fetchValue(jsonConfig, "fit", true) ){
     fitter.fit();
     if( fitter.isFitHasConverged() ) fitter.writePostFitData();
-    if( JsonUtils::fetchValue(jsonConfig, "scanParameters", true) ) fitter.scanParameters(10, "postFit/scan");
+    if( clParser.isOptionTriggered("scanParameters") or JsonUtils::fetchValue(jsonConfig, "scanParameters", true) ) fitter.scanParameters(10, "postFit/scan");
   }
 
   LogWarning << "Closing output file \"" << out->GetName() << "\"..." << std::endl;
