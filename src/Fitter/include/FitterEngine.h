@@ -41,6 +41,8 @@ public:
   double getChi2Buffer() const;
   double getChi2StatBuffer() const;
 
+  const Propagator &getPropagator() const;
+
   // Core
   void generateSamplePlots(const std::string& savePath_ = "");
   void generateOneSigmaPlots(const std::string& savePath_ = "");

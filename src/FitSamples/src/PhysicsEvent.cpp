@@ -277,4 +277,7 @@ const std::vector<std::string> *PhysicsEvent::getCommonLeafNameListPtr() const {
 std::vector<Dial *> &PhysicsEvent::getRawDialPtrList() {
   return _rawDialPtrList_;
 }
+const std::vector<Dial *> &PhysicsEvent::getRawDialPtrList() const{
+  return _rawDialPtrList_;
+}
 

@@ -90,6 +90,9 @@ void FitterEngine::initialize() {
     _chi2HistoryTree_->Branch("chi2Total", &_chi2Buffer_);
     _chi2HistoryTree_->Branch("chi2Stat", &_chi2StatBuffer_);
     _chi2HistoryTree_->Branch("chi2Pulls", &_chi2PullsBuffer_);
+
+    auto* dir = GenericToolbox::mkdirTFile(_saveDir_, "preFit/events");
+    _propagator_.getTreeWriter().writeSamples(dir);
   }
 
   this->initializeMinimizer();
@@ -168,10 +171,10 @@ void FitterEngine::generateOneSigmaPlots(const std::string& savePath_){
 
       const auto& compHistList = _propagator_.getPlotGenerator().getComparisonHistHolderList();
 
-      // Since those were not saved, delete manually
-      // Don't delete? -> slower each time
-//      for( auto& hist : oneSigmaHistList ){ delete hist.histPtr; }
-      oneSigmaHistList.clear();
+//      // Since those were not saved, delete manually
+//      // Don't delete? -> slower each time
+////      for( auto& hist : oneSigmaHistList ){ delete hist.histPtr; }
+//      oneSigmaHistList.clear();
     }
 
     if( parSet.isUseEigenDecompInFit() ){
@@ -441,7 +444,10 @@ void FitterEngine::fit(){
   LogInfo << _convergenceMonitor_.generateMonitorString(); // lasting printout
   LogInfo << "Minimization ended after " << nbMinimizeCalls << " calls." << std::endl;
   LogWarning << "Status code: " << minuitStatusCodeStr.at(_minimizer_->Status()) << std::endl;
-  _chi2HistoryTree_->Write();
+  if( _saveDir_ != nullptr ){
+    GenericToolbox::mkdirTFile(_saveDir_, "fit")->cd();
+    _chi2HistoryTree_->Write();
+  }
 
   if( _fitHasConverged_ ){
     LogInfo << "Fit converged!" << std::endl;
@@ -1006,4 +1012,8 @@ void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
 
   } // parSet
 
+}
+
+const Propagator &FitterEngine::getPropagator() const {
+  return _propagator_;
 }

@@ -150,7 +150,7 @@ void Propagator::initialize() {
   LogInfo << "Propagating prior parameters on events..." << std::endl;
   reweightSampleEvents();
 
-  _fitSampleSet_.writeSampleEvents(GenericToolbox::mkdirTFile(_saveDir_, "Events"));
+//  _fitSampleSet_.writeSampleEvents(GenericToolbox::mkdirTFile(_saveDir_, "Events"));
 
   LogInfo << "Set the current MC prior weights as nominal weight..." << std::endl;
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
@@ -202,6 +202,9 @@ void Propagator::initialize() {
       }
     }
   }
+
+  _treeWriter_.setFitSampleSetPtr(&_fitSampleSet_);
+  _treeWriter_.setParSetListPtr(&_parameterSetsList_);
 
   _isInitialized_ = true;
 }
@@ -455,4 +458,8 @@ void Propagator::applyResponseFunctions(int iThread_){
     }
   }
 
+}
+
+const EventTreeWriter &Propagator::getTreeWriter() const {
+  return _treeWriter_;
 }

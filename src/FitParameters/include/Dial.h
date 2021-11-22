@@ -9,6 +9,8 @@
 #include "mutex"
 #include "memory"
 
+#include "TSpline.h"
+
 #include "GenericToolbox.h"
 
 #include "DataBin.h"
@@ -52,6 +54,9 @@ public:
   virtual double evalResponse(const double& parameterValue_);
   double evalResponse();
 
+  void copySplineCache(TSpline3& splineBuffer_);
+  virtual void buildResponseSplineCache();
+
 protected:
   virtual void fillResponseCache() = 0;
 
@@ -64,6 +69,8 @@ protected:
   bool _isEditingCache_{false};
   double _dialResponseCache_{};
   double _dialParameterCache_{};
+
+  std::shared_ptr<TSpline3> _responseSplineCache_{nullptr};
 
 };
 
