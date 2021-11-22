@@ -98,6 +98,7 @@ void FitterEngine::initialize() {
   this->initializeMinimizer();
 
   _parStepScale_ = JsonUtils::fetchValue(_config_, "parStepScale", _parStepScale_);
+  LogInfo << "Using parameter step scale: " << _parStepScale_ << std::endl;
 
 }
 
@@ -325,7 +326,7 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
   auto* y = new double[adj_steps] {};
 
   LogInfo << "Scanning fit parameter #" << iPar
-          << ": " << _minimizer_->VariableName(iPar) << std::endl;
+          << ": " << _minimizer_->VariableName(iPar) << " / " << nbSteps_ << " steps..." << std::endl;
 
   _propagator_.allowRfPropagation();
   bool success = _minimizer_->Scan(iPar, adj_steps, x, y);
@@ -340,7 +341,9 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
   ss << GenericToolbox::replaceSubstringInString(_minimizer_->VariableName(iPar), "/", "_");
   ss << "_TGraph";
 
-  scanGraph.SetTitle(_minimizer_->VariableName(iPar).c_str());
+  scanGraph.SetTitle(_fitIsDone_ ? "Post-fit scan": "Pre-fit scan");
+  scanGraph.GetYaxis()->SetTitle("LLH");
+  scanGraph.GetYaxis()->SetTitle(_minimizer_->VariableName(iPar).c_str());
 
   if( _saveDir_ != nullptr ){
     GenericToolbox::mkdirTFile(_saveDir_, saveDir_)->cd();
