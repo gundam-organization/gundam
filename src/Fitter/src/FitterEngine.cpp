@@ -457,138 +457,143 @@ void FitterEngine::fit(){
 
     LogInfo << "Evaluating post-fit errors..." << std::endl;
 
-    std::string errorAlgo = JsonUtils::fetchValue(_minimizerConfig_, "errors", "Hesse");
-    if     ( errorAlgo == "Minos" ){
+    if( JsonUtils::fetchValue(_minimizerConfig_, "enablePostFitErrorFit", true) ){
+      std::string errorAlgo = JsonUtils::fetchValue(_minimizerConfig_, "errors", "Hesse");
+      if     ( errorAlgo == "Minos" ){
 
-      // Put back at minimum
-      iFitPar = -1;
-      LogInfo << "Releasing parameters for error evaluation..." << std::endl;
-      for( auto& parSet : _propagator_.getParameterSetsList() ){
+        // Put back at minimum
+        iFitPar = -1;
+        LogInfo << "Releasing parameters for error evaluation..." << std::endl;
+        for( auto& parSet : _propagator_.getParameterSetsList() ){
 
-        if( not JsonUtils::fetchValue(parSet.getJsonConfig(), "releaseFixedParametersOnHesse", true) ){
-          continue;
-        }
+          if( not JsonUtils::fetchValue(parSet.getJsonConfig(), "releaseFixedParametersOnHesse", true) ){
+            continue;
+          }
 
-        if( not parSet.isUseEigenDecompInFit() ){
-          for( auto& par : parSet.getParameterList() ){
-            if( par.isFixed() ){
-              LogDebug << "Releasing " << parSet.getName() << "/" << par.getTitle() << std::endl;
-              par.setIsFixed(false);
+          if( not parSet.isUseEigenDecompInFit() ){
+            for( auto& par : parSet.getParameterList() ){
+              if( par.isFixed() ){
+                LogDebug << "Releasing " << parSet.getName() << "/" << par.getTitle() << std::endl;
+                par.setIsFixed(false);
+                _minimizer_->ReleaseVariable(iFitPar++);
+              }
+
+            }
+          }
+          else{
+            for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
+              LogDebug << "Releasing " << parSet.getName() << "/eigen_#" << iEigen << std::endl;
               _minimizer_->ReleaseVariable(iFitPar++);
+              parSet.setEigenParIsFixed(iEigen, false);
             }
-
           }
+
         }
-        else{
-          for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
-            LogDebug << "Releasing " << parSet.getName() << "/eigen_#" << iEigen << std::endl;
-            _minimizer_->ReleaseVariable(iFitPar++);
-            parSet.setEigenParIsFixed(iEigen, false);
+
+        LogWarning << "────────────────" << std::endl;
+        LogWarning << "Calling MINOS..." << std::endl;
+        LogWarning << "────────────────" << std::endl;
+
+        double errLow, errHigh;
+        _minimizer_->SetPrintLevel(0);
+
+        iFitPar = -1;
+        for( auto& parSet : _propagator_.getParameterSetsList() ){
+          if( JsonUtils::fetchValue(parSet.getJsonConfig(), "skipMinos", false) ){
+            LogWarning << "Minos error evaluation is disabled for parSet: " << parSet.getName() << std::endl;
+            continue;
           }
-        }
 
-      }
+          if( not parSet.isUseEigenDecompInFit() ){
+            for( auto& par : parSet.getParameterList() ){
+              iFitPar++;
+              if( _minimizer_->IsFixedVariable(iFitPar) ) continue;
 
-      LogWarning << "────────────────" << std::endl;
-      LogWarning << "Calling MINOS..." << std::endl;
-      LogWarning << "────────────────" << std::endl;
-
-      double errLow, errHigh;
-      _minimizer_->SetPrintLevel(0);
-
-      iFitPar = -1;
-      for( auto& parSet : _propagator_.getParameterSetsList() ){
-        if( JsonUtils::fetchValue(parSet.getJsonConfig(), "skipMinos", false) ){
-          LogWarning << "Minos error evaluation is disabled for parSet: " << parSet.getName() << std::endl;
-          continue;
-        }
-
-        if( not parSet.isUseEigenDecompInFit() ){
-          for( auto& par : parSet.getParameterList() ){
-            iFitPar++;
-            if( _minimizer_->IsFixedVariable(iFitPar) ) continue;
-
-            LogInfo << "Evaluating: " << _minimizer_->VariableName(iFitPar) << "..." << std::endl;
-            bool isOk = _minimizer_->GetMinosError(iFitPar, errLow, errHigh);
+              LogInfo << "Evaluating: " << _minimizer_->VariableName(iFitPar) << "..." << std::endl;
+              bool isOk = _minimizer_->GetMinosError(iFitPar, errLow, errHigh);
 #if ROOT_VERSION_CODE >= ROOT_VERSION(6,23,02)
-            LogWarning << minosStatusCodeStr.at(_minimizer_->MinosStatus()) << std::endl;
+              LogWarning << minosStatusCodeStr.at(_minimizer_->MinosStatus()) << std::endl;
 #endif
-            if( isOk ){
-              LogInfo << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh << std::endl;
-            }
-            else{
-              LogError << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh
-                       << " - MINOS returned an error." << std::endl;
+              if( isOk ){
+                LogInfo << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh << std::endl;
+              }
+              else{
+                LogError << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh
+                         << " - MINOS returned an error." << std::endl;
+              }
             }
           }
-        }
-        else{
-          for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
-            iFitPar++;
-            if( _minimizer_->IsFixedVariable(iFitPar) ) continue;
+          else{
+            for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
+              iFitPar++;
+              if( _minimizer_->IsFixedVariable(iFitPar) ) continue;
 
-            LogInfo << "Evaluating: " << _minimizer_->VariableName(iFitPar) << "..." << std::endl;
-            bool isOk = _minimizer_->GetMinosError(iFitPar, errLow, errHigh);
+              LogInfo << "Evaluating: " << _minimizer_->VariableName(iFitPar) << "..." << std::endl;
+              bool isOk = _minimizer_->GetMinosError(iFitPar, errLow, errHigh);
 #if ROOT_VERSION_CODE >= ROOT_VERSION(6,23,02)
-            LogWarning << minosStatusCodeStr.at(_minimizer_->MinosStatus()) << std::endl;
+              LogWarning << minosStatusCodeStr.at(_minimizer_->MinosStatus()) << std::endl;
 #endif
-            if( isOk ){
-              LogInfo << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh << std::endl;
+              if( isOk ){
+                LogInfo << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh << std::endl;
+              }
+              else{
+                LogError << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh
+                         << " - MINOS returned an error." << std::endl;
+              }
             }
-            else{
-              LogError << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh
-                       << " - MINOS returned an error." << std::endl;
+          }
+        }
+
+        // Put back at minimum
+        iFitPar = -1;
+        for( auto& parSet : _propagator_.getParameterSetsList() ){
+
+          if( not parSet.isUseEigenDecompInFit() ){
+            for( auto& par : parSet.getParameterList() ){
+              iFitPar++;
+              par.setParameterValue(_minimizer_->X()[iFitPar]);
             }
           }
-        }
-      }
-
-      // Put back at minimum
-      iFitPar = -1;
-      for( auto& parSet : _propagator_.getParameterSetsList() ){
-
-        if( not parSet.isUseEigenDecompInFit() ){
-          for( auto& par : parSet.getParameterList() ){
-            iFitPar++;
-            par.setParameterValue(_minimizer_->X()[iFitPar]);
+          else{
+            for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
+              iFitPar++;
+              parSet.setEigenParameter(iEigen, _minimizer_->X()[iFitPar]);
+            }
+            parSet.propagateEigenToOriginal();
           }
-        }
-        else{
-          for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
-            iFitPar++;
-            parSet.setEigenParameter(iEigen, _minimizer_->X()[iFitPar]);
-          }
-          parSet.propagateEigenToOriginal();
-        }
 
-      }
-      updateChi2Cache();
-    } // Minos
-    else if( errorAlgo == "Hesse" ){
+        }
+        updateChi2Cache();
+      } // Minos
+      else if( errorAlgo == "Hesse" ){
 //      LogInfo << "Releasing constraints for HESSE..." << std::endl;
 //      initializeMinimizer(true);
 
-      LogWarning << "────────────────" << std::endl;
-      LogWarning << "Calling HESSE..." << std::endl;
-      LogWarning << "────────────────" << std::endl;
-      LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
-              << "Number of free parameters   : " << _minimizer_->NFree() << std::endl
-              << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree()
-              << std::endl;
-      _fitHasConverged_ = _minimizer_->Hesse();
-      LogInfo << "Hesse ended after " << _nbFitCalls_ - nbMinimizeCalls << " calls." << std::endl;
-      LogWarning << "HESSE status code: " << hesseStatusCodeStr.at(_minimizer_->Status()) << std::endl;
+        LogWarning << "────────────────" << std::endl;
+        LogWarning << "Calling HESSE..." << std::endl;
+        LogWarning << "────────────────" << std::endl;
+        LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
+                << "Number of free parameters   : " << _minimizer_->NFree() << std::endl
+                << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree()
+                << std::endl;
+        _fitHasConverged_ = _minimizer_->Hesse();
+        LogInfo << "Hesse ended after " << _nbFitCalls_ - nbMinimizeCalls << " calls." << std::endl;
+        LogWarning << "HESSE status code: " << hesseStatusCodeStr.at(_minimizer_->Status()) << std::endl;
 
-      if(not _fitHasConverged_){
-        LogError  << "Hesse did not converge." << std::endl;
+        if(not _fitHasConverged_){
+          LogError  << "Hesse did not converge." << std::endl;
+        }
+        else{
+          LogInfo << "Hesse converged." << std::endl;
+        }
+
       }
       else{
-        LogInfo << "Hesse converged." << std::endl;
+        LogError << GET_VAR_NAME_VALUE(errorAlgo) << " not implemented." << std::endl;
       }
-
     }
 
-    LogDebug << _convergenceMonitor_.generateMonitorString(); // lasting printout
+    LogWarning << _convergenceMonitor_.generateMonitorString(); // lasting printout
   }
   else{
     LogError << "Did not converged." << std::endl;
