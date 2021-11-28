@@ -31,7 +31,8 @@ public:
   // Setters
   void setSaveDir(TDirectory *saveDir);
   void setConfig(const nlohmann::json &config_);
-
+  void setNbScanSteps(int nbScanSteps);
+  void setEnablePostFitScan(bool enablePostFitScan);
 
   // Init
   void initialize();
@@ -40,7 +41,6 @@ public:
   bool isFitHasConverged() const;
   double getChi2Buffer() const;
   double getChi2StatBuffer() const;
-
   const Propagator &getPropagator() const;
 
   // Core
@@ -48,8 +48,8 @@ public:
   void generateOneSigmaPlots(const std::string& savePath_ = "");
 
   void fixGhostFitParameters();
-  void scanParameters(int nbSteps_, const std::string& saveDir_ = "");
-  void scanParameter(int iPar, int nbSteps_, const std::string& saveDir_ = "");
+  void scanParameters(int nbSteps_ = -1, const std::string& saveDir_ = "");
+  void scanParameter(int iPar, int nbSteps_ = -1, const std::string& saveDir_ = "");
   void throwParameters(double gain_ = 1);
 
   void fit();
@@ -70,6 +70,8 @@ private:
   TDirectory* _saveDir_{nullptr};
   nlohmann::json _config_{};
   nlohmann::json _minimizerConfig_{};
+  int _nbScanSteps_{100};
+  bool _enablePostFitScan_{false};
 
   // Internals
   bool _fitIsDone_{false};

@@ -47,6 +47,14 @@ void FitterEngine::setConfig(const nlohmann::json &config_) {
     _config_ = JsonUtils::readConfigFile(_config_.get<std::string>());
   }
 }
+void FitterEngine::setNbScanSteps(int nbScanSteps) {
+  LogThrowIf(nbScanSteps < 0, "Can't provide negative value for _nbScanSteps_")
+  _nbScanSteps_ = nbScanSteps;
+}
+void FitterEngine::setEnablePostFitScan(bool enablePostFitScan) {
+  _enablePostFitScan_ = enablePostFitScan;
+}
+
 
 void FitterEngine::initialize() {
 
@@ -110,6 +118,9 @@ double FitterEngine::getChi2Buffer() const {
 }
 double FitterEngine::getChi2StatBuffer() const {
   return _chi2StatBuffer_;
+}
+const Propagator &FitterEngine::getPropagator() const {
+  return _propagator_;
 }
 
 void FitterEngine::generateSamplePlots(const std::string& savePath_){
@@ -319,6 +330,8 @@ void FitterEngine::scanParameters(int nbSteps_, const std::string &saveDir_) {
 }
 void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &saveDir_) {
 
+  if( nbSteps_ < 0 ){ nbSteps_ = _nbScanSteps_; }
+
   //Internally Scan performs steps-1, so add one to actually get the number of steps
   //we ask for.
   unsigned int adj_steps = nbSteps_+1;
@@ -454,6 +467,11 @@ void FitterEngine::fit(){
 
   if( _fitHasConverged_ ){
     LogInfo << "Fit converged!" << std::endl;
+
+    if( _enablePostFitScan_ ){
+      LogInfo << "Scanning parameters around the minimum point..." << std::endl;
+      this->scanParameters(-1, "postFit/scan");
+    }
 
     LogInfo << "Evaluating post-fit errors..." << std::endl;
 
@@ -1020,8 +1038,4 @@ void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
 
   } // parSet
 
-}
-
-const Propagator &FitterEngine::getPropagator() const {
-  return _propagator_;
 }
