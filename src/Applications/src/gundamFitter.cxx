@@ -28,9 +28,9 @@ int main(int argc, char** argv){
   LogInfo << greetings << std::endl;
   LogInfo << GenericToolbox::repeatString("─", int(greetings.size())) << std::endl << std::endl;
 
-  ///////////////////////////////
+  // --------------------------
   // Read Command Line Args:
-  /////////////////////////////
+  // --------------------------
   CmdLineParser clParser;
 
   clParser.addTriggerOption("dry-run", {"--dry-run", "-d"},"Perform the full sequence of initialization, but don't do the actual fit.");
@@ -65,9 +65,9 @@ int main(int argc, char** argv){
   int nbScanSteps = clParser.getOptionVal("scanParameters", 100);
   auto outFileName = clParser.getOptionVal("outputFile", configFilePath + ".root");
 
-  ///////////////////////////////
+  // --------------------------
   // Initialize the fitter:
-  /////////////////////////////
+  // --------------------------
   LogInfo << "Reading config file: " << configFilePath << std::endl;
   auto jsonConfig = JsonUtils::readConfigFile(configFilePath); // works with yaml
 
@@ -81,9 +81,9 @@ int main(int argc, char** argv){
   fitter.setEnablePostFitScan(enableParameterScan);
   fitter.initialize();
 
-  ///////////////////////////////
+  // --------------------------
   // Pre-fit:
-  /////////////////////////////
+  // --------------------------
 
   // LLH Visual Scan
   if( clParser.isOptionTriggered("generateOneSigmaPlots") or JsonUtils::fetchValue(jsonConfig, "generateOneSigmaPlots", false) ) fitter.generateOneSigmaPlots("preFit");
@@ -91,9 +91,9 @@ int main(int argc, char** argv){
 
   if( JsonUtils::fetchValue(jsonConfig, "generateSamplePlots", true) ) fitter.generateSamplePlots("preFit/samples");
 
-  ///////////////////////////////
+  // --------------------------
   // Run the fitter:
-  /////////////////////////////
+  // --------------------------
   if( not isDryRun and JsonUtils::fetchValue(jsonConfig, "fit", true) ){
     fitter.fit();
     if( fitter.isFitHasConverged() ) fitter.writePostFitData();
@@ -103,6 +103,9 @@ int main(int argc, char** argv){
   out->Close();
   LogInfo << "Closed." << std::endl;
 
+  // --------------------------
+  // Goodbye:
+  // --------------------------
   std::string goodbyeStr = "\u3042\u308a\u304c\u3068\u3046\u3054\u3056\u3044\u307e\u3057\u305f\uff01";
   LogInfo << std::endl << GenericToolbox::repeatString("─", int(goodbyeStr.size())) << std::endl;
   LogInfo << GenericToolbox::makeRainbowString(goodbyeStr, false) << std::endl;
