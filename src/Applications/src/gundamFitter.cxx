@@ -84,13 +84,6 @@ int main(int argc, char** argv){
   if( clParser.isOptionTriggered("generateOneSigmaPlots") or JsonUtils::fetchValue(jsonConfig, "generateOneSigmaPlots", false) ) fitter.generateOneSigmaPlots("preFit");
   if( clParser.isOptionTriggered("scanParameters") or JsonUtils::fetchValue(jsonConfig, "scanParameters", true) ) fitter.scanParameters(nbScanSteps, "preFit/scan");
 
-  // State before the fit
-  if( JsonUtils::fetchValue(jsonConfig, "throwMcBeforeFit", false) ){
-    LogInfo << "Throwing parameters on Pre-fit MC..." << std::endl;
-    fitter.throwMcParameters(JsonUtils::fetchValue(jsonConfig, "throwMcBeforeFitGain", 1.));
-    fitter.updateChi2Cache();
-    LogInfo << "Chi2 stat after MC thrown: " << fitter.getChi2StatBuffer() << std::endl;
-  }
   if( JsonUtils::fetchValue(jsonConfig, "generateSamplePlots", true) ) fitter.generateSamplePlots("preFit/samples");
 
   ///////////////////////////////
