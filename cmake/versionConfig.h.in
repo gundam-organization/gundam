@@ -1,11 +1,14 @@
 #ifndef VERSION_CONFIG_H
 #define VERSION_CONFIG_H
 
-// define your version_libinterface
-#define VERSION_STR @gundam_VERSION_STRING@
+#include <string>
 
-const char* getVersionStr(){
-  return @gundam_VERSION_STRING@;
+// define your version_libinterface
+#define VERSION_STR "@gundam_VERSION_STRING@"
+
+
+std::string getVersionStr(){
+  return VERSION_STR;
 }
 
 #endif // VERSION_CONFIG_H
