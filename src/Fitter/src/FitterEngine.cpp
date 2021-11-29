@@ -461,7 +461,6 @@ void FitterEngine::fit(){
   LogInfo << "Minimization ended after " << nbMinimizeCalls << " calls." << std::endl;
   LogWarning << "Status code: " << minuitStatusCodeStr.at(_minimizer_->Status()) << std::endl;
   LogWarning << "Covariance matrix status code: " << covMatrixStatusCodeStr.at(_minimizer_->CovMatrixStatus()) << std::endl;
-  LogWarning << GET_VAR_NAME_VALUE(_minimizer_->IsValidError()) << std::endl;
   if( _saveDir_ != nullptr ){
     GenericToolbox::mkdirTFile(_saveDir_, "fit")->cd();
     _chi2HistoryTree_->Write();
@@ -600,6 +599,7 @@ void FitterEngine::fit(){
         LogInfo << "Hesse ended after " << _nbFitCalls_ - nbMinimizeCalls << " calls." << std::endl;
         LogWarning << "HESSE status code: " << hesseStatusCodeStr.at(_minimizer_->Status()) << std::endl;
         LogWarning << "Covariance matrix status code: " << covMatrixStatusCodeStr.at(_minimizer_->CovMatrixStatus()) << std::endl;
+        LogWarning << "Did minuit performed a detailed error validation? " << GET_VAR_NAME_VALUE(_minimizer_->IsValidError()) << std::endl;
 
         if(not _fitHasConverged_){
           LogError  << "Hesse did not converge." << std::endl;
