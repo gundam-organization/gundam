@@ -409,7 +409,7 @@ void FitterEngine::fit(){
 
   if( JsonUtils::fetchValue(_config_, "throwMcBeforeFit", false) ){
     LogInfo << "Throwing MC parameters (uncorrelated) away from their prior..." << std::endl;
-    double throwGain = JsonUtils::fetchValue(_config_, "throwMcBeforeFitGain", 1);
+    double throwGain = JsonUtils::fetchValue(_config_, "throwMcBeforeFitGain", 1.);
     LogInfo << "Throw gain set to: " << throwGain << std::endl;
     this->throwMcParameters(throwGain);
   }
