@@ -50,13 +50,17 @@ public:
   void fixGhostFitParameters();
   void scanParameters(int nbSteps_ = -1, const std::string& saveDir_ = "");
   void scanParameter(int iPar, int nbSteps_ = -1, const std::string& saveDir_ = "");
-  void throwParameters(double gain_ = 1);
+  void throwMcParameters(double gain_ = 1);
 
   void fit();
   void updateChi2Cache();
   double evalFit(const double* parArray_);
 
   void writePostFitData();
+
+  // utils
+  double fetchCurrentParameterValue(int iFitPar_); // minuit don't have such a getter
+  void updateParameterValue(int iFitPar_, double parameterValue_);
 
 
 protected:

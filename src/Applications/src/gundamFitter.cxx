@@ -87,7 +87,7 @@ int main(int argc, char** argv){
   // State before the fit
   if( JsonUtils::fetchValue(jsonConfig, "throwMcBeforeFit", false) ){
     LogInfo << "Throwing parameters on Pre-fit MC..." << std::endl;
-    fitter.throwParameters( JsonUtils::fetchValue(jsonConfig, "throwMcBeforeFitGain", 1.) );
+    fitter.throwMcParameters(JsonUtils::fetchValue(jsonConfig, "throwMcBeforeFitGain", 1.));
     fitter.updateChi2Cache();
     LogInfo << "Chi2 stat after MC thrown: " << fitter.getChi2StatBuffer() << std::endl;
   }

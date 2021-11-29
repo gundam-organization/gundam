@@ -332,6 +332,8 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
 
   if( nbSteps_ < 0 ){ nbSteps_ = _nbScanSteps_; }
 
+  double originalParValue = fetchCurrentParameterValue(iPar);
+
   //Internally Scan performs steps-1, so add one to actually get the number of steps
   //we ask for.
   unsigned int adj_steps = nbSteps_+1;
@@ -364,11 +366,15 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
   }
   _propagator_.preventRfPropagation();
 
+  _minimizer_->SetVariableValue(iPar, originalParValue);
+  this->updateParameterValue(iPar, originalParValue);
+  updateChi2Cache();
+
   delete[] x;
   delete[] y;
 }
 
-void FitterEngine::throwParameters(double gain_) {
+void FitterEngine::throwMcParameters(double gain_) {
   LogInfo << __METHOD_NAME__ << std::endl;
 
   // TODO: IMPLEMENT CHOLESKY DECOMP
@@ -400,6 +406,13 @@ void FitterEngine::throwParameters(double gain_) {
 
 void FitterEngine::fit(){
   LogWarning << __METHOD_NAME__ << std::endl;
+
+  if( JsonUtils::fetchValue(_config_, "throwMcBeforeFit", false) ){
+    LogInfo << "Throwing MC parameters (uncorrelated) away from their prior..." << std::endl;
+    double throwGain = JsonUtils::fetchValue(_config_, "throwMcBeforeFitGain", 1);
+    LogInfo << "Throw gain set to: " << throwGain << std::endl;
+    this->throwMcParameters(throwGain);
+  }
 
   LogWarning << "─────────────────────────────" << std::endl;
   LogWarning << "Summary of the fit parameters" << std::endl;
@@ -917,6 +930,38 @@ void FitterEngine::writePostFitData() {
   fitterCovarianceMatrix.Write("fitterCovarianceMatrix_TMatrixDSym");
   fitterCovarianceMatrixTH2D->Write("fitterCovarianceMatrix_TH2D");
 
+}
+
+double FitterEngine::fetchCurrentParameterValue(int iFitPar_) {
+  int iFitPar = 0;
+  for( const auto& parSet : _propagator_.getParameterSetsList() ){
+    if( not parSet.isUseEigenDecompInFit() ){
+      for( const auto& par : parSet.getParameterList() ){
+        if( iFitPar++ == iFitPar_ ) return par.getParameterValue();
+      }
+    }
+    else{
+      for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
+        if( iFitPar++ == iFitPar_ ) return parSet.getEigenParameterValue(iEigen);
+      }
+    }
+  }
+  return std::nan("parameter not found");
+}
+void FitterEngine::updateParameterValue(int iFitPar_, double parameterValue_) {
+  int iFitPar = 0;
+  for( auto& parSet : _propagator_.getParameterSetsList() ){
+    if( not parSet.isUseEigenDecompInFit() ){
+      for( auto& par : parSet.getParameterList() ){
+        if( iFitPar++ == iFitPar_ ) par.setParameterValue(parameterValue_);
+      }
+    }
+    else{
+      for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
+        if( iFitPar++ == iFitPar_ ) parSet.setEigenParameter(iEigen, parameterValue_);
+      }
+    }
+  }
 }
 
 void FitterEngine::rescaleParametersStepSize(){

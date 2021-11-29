@@ -132,7 +132,7 @@ void Propagator::initialize() {
   _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
   _plotGenerator_.defineHistogramHolders();
 
-  if( JsonUtils::fetchValue<json>(_config_, "throwParameters", false) ){
+  if( JsonUtils::fetchValue<json>(_config_, "throwMcParameters", false) ){
     LogWarning << "Throwing parameters..." << std::endl;
     for( auto& parSet : _parameterSetsList_ ){
       auto thrownPars = GenericToolbox::throwCorrelatedParameters(GenericToolbox::getCholeskyMatrix(
@@ -195,7 +195,7 @@ void Propagator::initialize() {
   _useResponseFunctions_ = JsonUtils::fetchValue<json>(_config_, "DEV_useResponseFunctions", false);
   if( _useResponseFunctions_ ){ this->makeResponseFunctions(); }
 
-  if( JsonUtils::fetchValue<json>(_config_, "throwParameters", false) ){
+  if( JsonUtils::fetchValue<json>(_config_, "throwMcParameters", false) ){
     for( auto& parSet : _parameterSetsList_ ){
       for( auto& par : parSet.getParameterList() ){
         par.setParameterValue( par.getPriorValue() );
