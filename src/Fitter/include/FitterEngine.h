@@ -125,6 +125,13 @@ private:
       { -1, "status = -1   : Minos is not run"}
   };
 
+  // 0 not calculated 1 approximated 2 made pos def , 3 accurate
+  const std::map<int, std::string> covMatrixStatusCodeStr{
+      { 0, "status = 0    : not calculated" },
+      { 1, "status = 1    : approximated"},
+      { 2, "status = 2    : made pos def"},
+      { 3, "status = 3    : accurate"}
+  };
 };
 
 
