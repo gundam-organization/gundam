@@ -106,10 +106,10 @@ void Propagator::initialize() {
   _plotGenerator_.initialize();
 
   LogInfo << "Initializing input datasets..." << std::endl;
-  auto dataSetListConfig = JsonUtils::fetchValue(_config_, "dataSetList", nlohmann::json());
+  auto dataSetListConfig = JsonUtils::getForwardedConfig(_config_, "dataSetList");
   if( dataSetListConfig.empty() ){
     // Old config files
-    dataSetListConfig = JsonUtils::fetchValue<nlohmann::json>(_fitSampleSet_.getConfig(), "dataSetList");
+    dataSetListConfig = JsonUtils::getForwardedConfig(_fitSampleSet_.getConfig(), "dataSetList");;
     LogAlert << "DEPRECATED CONFIG OPTION: " << "dataSetList should now be located in the Propagator config." << std::endl;
   }
   LogAssert(not dataSetListConfig.empty(), "No dataSet specified." << std::endl);
