@@ -46,6 +46,13 @@ namespace JsonUtils{
 
     return output;
   }
+  nlohmann::json getForwardedConfig(const nlohmann::json& config_, const std::string& keyName_){
+    auto outConfig = JsonUtils::fetchValue<nlohmann::json>(config_, keyName_);
+    while( outConfig.is_string() ){
+      outConfig = JsonUtils::readConfigFile(outConfig.get<std::string>());
+    }
+    return outConfig;
+  }
   void forwardConfig(nlohmann::json& config_, const std::string& className_){
     while( config_.is_string() ){
       LogDebug << "Forwarding " << (className_.empty()? "": className_ + " ") << "config: \"" << config_.get<std::string>() << "\"" << std::endl;
