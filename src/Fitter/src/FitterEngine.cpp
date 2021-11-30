@@ -390,17 +390,25 @@ void FitterEngine::throwMcParameters(double gain_) {
 
     if( not parSet.isEnableThrowMcBeforeFit() ){
       LogWarning << "\"" << parSet.getName() << "\" has marked disabled throwMcBeforeFit: skipping." << std::endl;
-      if( not parSet.isUseEigenDecompInFit() ) iPar += int(parSet.getParameterList().size());
-      else iPar += int(parSet.getNbEnabledEigenParameters());
-      continue;
+//      if( not parSet.isUseEigenDecompInFit() ) iPar += int(parSet.getParameterList().size());
+//      else iPar += int(parSet.getNbEnabledEigenParameters());
+//      continue;
+    }
+    else{
+      LogWarning << "Throwing uncorrelated parameters for \"" << parSet.getName() << "\"" << std::endl;
     }
 
-    LogInfo << "Throwing uncorrelated parameters for \"" << parSet.getName() << "\"" << std::endl;
+
     if( not parSet.isUseEigenDecompInFit() ){
       for( auto& par : parSet.getParameterList() ){
         iPar++;
+        if( not parSet.isEnableThrowMcBeforeFit() ) continue;
         if( not _minimizer_->IsFixedVariable(iPar) ){
-          par.setParameterValue( par.getPriorValue() + gain_ * _prng_.Gaus(0, par.getStdDevValue()) );
+          LogInfo << "Throwing par " << par.getTitle() << ": " << par.getParameterValue();
+          par.setParameterValue(
+              par.getPriorValue()
+              + gain_ * _prng_.Gaus(0, par.getStdDevValue()) );
+          LogInfo << " → " << par.getParameterValue() << std::endl;
           _minimizer_->SetVariableValue( iPar, par.getParameterValue() );
         }
       }
@@ -408,7 +416,17 @@ void FitterEngine::throwMcParameters(double gain_) {
     else{
       for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
         iPar++;
+        if( not parSet.isEnableThrowMcBeforeFit() ) continue;
         if( not _minimizer_->IsFixedVariable(iPar) ){
+          LogInfo << "Throwing eigen #" << iEigen << ": " << parSet.getEigenParameterValue(iEigen);
+          parSet.setEigenParameter(
+              iEigen,
+              parSet.getEigenParameterValue(iEigen)
+              + gain_ * _prng_.Gaus(0, parSet.getEigenSigma(iEigen) )
+          );
+          LogInfo << " → " << parSet.getEigenParameterValue(iEigen) << std::endl;
+          _minimizer_->SetVariableValue( iPar, parSet.getEigenParameterValue(iEigen) );
+
           // placeholder
         }
       }

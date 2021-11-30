@@ -82,6 +82,9 @@ int main(int argc, char** argv){
   fitter.setEnablePostFitScan(enableParameterScan);
   fitter.initialize();
 
+  fitter.updateChi2Cache();
+  LogInfo << "Initial χ² = " << fitter.getChi2Buffer() << std::endl;
+
 
   // --------------------------
   // Pre-fit:
