@@ -27,9 +27,8 @@ public:
 
   void setParameterIndex(int parameterIndex);
   void setParameterName(const std::string &parameterName);
-  void setDialSetConfig(const nlohmann::json &dialSetConfig);
+  void setConfig(const nlohmann::json &config_);
   void setWorkingDirectory(const std::string &workingDirectory);
-
   void setAssociatedParameterReference(void *associatedParameterReference);
 
   void initialize();
@@ -42,6 +41,7 @@ public:
   TFormula *getApplyConditionFormula() const;
   void *getAssociatedParameterReference();
   const std::string &getDialLeafName() const;
+  double getMinimumSplineResponse() const;
 
 
   // Core
@@ -54,7 +54,7 @@ protected:
 
 private:
   // Parameters
-  nlohmann::json _dialSetConfig_;
+  nlohmann::json _config_;
   int _parameterIndex_{-1};
   std::string _parameterName_;
   std::string _workingDirectory_{"."};
@@ -73,6 +73,8 @@ private:
   // every pointers. It means the new copied DialSet will handle Dial ptr which have already been deleted.
   std::vector<std::shared_ptr<Dial>> _dialList_;
   DialType::DialType _globalDialType_;
+
+  double _minimumSplineResponse_{std::nan("unset")};
 
 public:
   static bool _verboseMode_;

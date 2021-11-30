@@ -34,7 +34,7 @@ DialSet::~DialSet() {
 void DialSet::reset() {
   _dataSetNameList_.clear();
   _dialList_.clear();
-  _dialSetConfig_ = nlohmann::json();
+  _config_ = nlohmann::json();
   _parameterIndex_ = -1;
   _parameterName_ = "";
   _enableDialsSummary_ = false;
@@ -42,9 +42,9 @@ void DialSet::reset() {
   _workingDirectory_ = ".";
 }
 
-void DialSet::setDialSetConfig(const nlohmann::json &dialSetConfig) {
-  _dialSetConfig_ = dialSetConfig;
-  JsonUtils::forwardConfig(_dialSetConfig_);
+void DialSet::setConfig(const nlohmann::json &config_) {
+  _config_ = config_;
+  JsonUtils::forwardConfig(_config_);
 }
 void DialSet::setParameterIndex(int parameterIndex) {
   _parameterIndex_ = parameterIndex;
@@ -67,22 +67,23 @@ void DialSet::initialize() {
     LogError << "_parameterIndex_ is not set." << std::endl;
     throw std::logic_error("_parameterIndex_ is not set.");
   }
-  else if( _dialSetConfig_.empty() ){
+  else if( _config_.empty() ){
     LogError << "_dialSetConfig_ is not set." << std::endl;
     throw std::logic_error("_dialSetConfig_ is not set.");
   }
 
   _dataSetNameList_ = JsonUtils::fetchValue<std::vector<std::string>>(
-      _dialSetConfig_, "applyOnDataSets", std::vector<std::string>()
+      _config_, "applyOnDataSets", std::vector<std::string>()
   );
   if( _dataSetNameList_.empty() ){
     _dataSetNameList_.emplace_back("*");
   }
   else { }
 
-  _enableDialsSummary_ = JsonUtils::fetchValue<bool>(_dialSetConfig_, "printDialsSummary", false);
+  _minimumSplineResponse_ = JsonUtils::fetchValue(_config_, "minimumSplineResponse", _minimumSplineResponse_);
+  _enableDialsSummary_ = JsonUtils::fetchValue<bool>(_config_, "printDialsSummary", false);
 
-  std::string dialTypeStr = JsonUtils::fetchValue<std::string>(_dialSetConfig_, "dialType", "");
+  std::string dialTypeStr = JsonUtils::fetchValue<std::string>(_config_, "dialType", "");
   if( not dialTypeStr.empty() ){
     _globalDialType_ = DialType::toDialType(dialTypeStr);
   }
@@ -105,7 +106,7 @@ bool DialSet::isEnabled() const {
   return _isEnabled_;
 }
 const nlohmann::json &DialSet::getDialSetConfig() const {
-  return _dialSetConfig_;
+  return _config_;
 }
 const std::vector<std::string> &DialSet::getDataSetNameList() const {
   return _dataSetNameList_;
@@ -122,6 +123,10 @@ void *DialSet::getAssociatedParameterReference() {
 const std::string &DialSet::getDialLeafName() const {
   return _dialLeafName_;
 }
+double DialSet::getMinimumSplineResponse() const {
+  return _minimumSplineResponse_;
+}
+
 
 std::string DialSet::getSummary() const {
   std::stringstream ss;
@@ -158,7 +163,7 @@ nlohmann::json DialSet::fetchDialsDefinition(const nlohmann::json &definitionsLi
 
 bool DialSet::initializeNormDialsWithBinning() {
 
-  std::string parameterBinningPath = JsonUtils::fetchValue<std::string>(_dialSetConfig_, "parametersBinningPath", "");
+  std::string parameterBinningPath = JsonUtils::fetchValue<std::string>(_config_, "parametersBinningPath", "");
   if( parameterBinningPath.empty() ){ return false; }
 
   LogTrace << "Initializing dials with binning file..." << std::endl;
@@ -183,10 +188,10 @@ bool DialSet::initializeNormDialsWithBinning() {
 }
 bool DialSet::initializeDialsWithDefinition() {
 
-  nlohmann::json dialsDefinition = _dialSetConfig_;
+  nlohmann::json dialsDefinition = _config_;
   if( JsonUtils::doKeyExist(dialsDefinition, "dialsDefinitions") ){
     // Fetch the dialSet corresponding to the selected parameter
-    dialsDefinition = this->fetchDialsDefinition(JsonUtils::fetchValue<nlohmann::json>(_dialSetConfig_, "dialsDefinitions"));
+    dialsDefinition = this->fetchDialsDefinition(JsonUtils::fetchValue<nlohmann::json>(_config_, "dialsDefinitions"));
   }
   if( dialsDefinition.empty() ){ return false; }
   if( not JsonUtils::fetchValue<bool>(dialsDefinition, "isEnabled", true) ){
