@@ -120,7 +120,7 @@ void EventTreeWriter::writeEvents(TDirectory *saveDir_, const std::string& treeN
 
 
   int iLeaf;
-  int iPar;
+  int iPar{0};
   std::string progressTitle = LogInfo.getPrefixString() + "Writing " + treeName_;
   int iEvent{-1}; int nEvents = int(eventList_.size());
   for( auto& event : eventList_ ){

@@ -387,8 +387,11 @@ void FitterEngine::throwMcParameters(double gain_) {
   // TODO: IMPLEMENT CHOLESKY DECOMP
   int iPar = -1;
   for( auto& parSet : _propagator_.getParameterSetsList() ){
+
     if( not parSet.isEnableThrowMcBeforeFit() ){
       LogWarning << "\"" << parSet.getName() << "\" has marked disabled throwMcBeforeFit: skipping." << std::endl;
+      if( not parSet.isUseEigenDecompInFit() ) iPar += int(parSet.getParameterList().size());
+      else iPar += int(parSet.getNbEnabledEigenParameters());
       continue;
     }
 
