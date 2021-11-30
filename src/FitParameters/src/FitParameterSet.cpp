@@ -24,7 +24,7 @@ void FitParameterSet::reset() {
 
   _isInitialized_ = false;
 
-  _jsonConfig_ = nlohmann::json();
+  _config_ = nlohmann::json();
   if(_covarianceMatrixFile_ != nullptr){
     _covarianceMatrixFile_->Close(); // should delete every attached pointer
   }
@@ -40,11 +40,11 @@ void FitParameterSet::reset() {
 
 }
 
-void FitParameterSet::setJsonConfig(const nlohmann::json &jsonConfig) {
-  _jsonConfig_ = jsonConfig;
-  while(_jsonConfig_.is_string()){
-    LogWarning << "Forwarding FitParameterSet config to: \"" << _jsonConfig_.get<std::string>() << "\"..." << std::endl;
-    _jsonConfig_ = JsonUtils::readConfigFile(_jsonConfig_.get<std::string>());
+void FitParameterSet::setConfig(const nlohmann::json &config_) {
+  _config_ = config_;
+  while(_config_.is_string()){
+    LogWarning << "Forwarding FitParameterSet config to: \"" << _config_.get<std::string>() << "\"..." << std::endl;
+    _config_ = JsonUtils::readConfigFile(_config_.get<std::string>());
   }
 }
 void FitParameterSet::setSaveDir(TDirectory* saveDir_){
@@ -53,19 +53,19 @@ void FitParameterSet::setSaveDir(TDirectory* saveDir_){
 
 void FitParameterSet::initialize() {
 
-  if( _jsonConfig_.empty() ){
+  if( _config_.empty() ){
     LogError << "Json config not set" << std::endl;
     throw std::logic_error("json config not set");
   }
 
-  _name_ = JsonUtils::fetchValue<std::string>(_jsonConfig_, "name", "");
+  _name_ = JsonUtils::fetchValue<std::string>(_config_, "name", "");
   LogInfo << "Initializing parameter set: " << _name_ << std::endl;
 
   if( _saveDir_ != nullptr ){
     _saveDir_ = GenericToolbox::mkdirTFile(_saveDir_, _name_);
   }
 
-  _isEnabled_ = JsonUtils::fetchValue<bool>(_jsonConfig_, "isEnabled");
+  _isEnabled_ = JsonUtils::fetchValue<bool>(_config_, "isEnabled");
   if( not _isEnabled_ ){
     LogWarning << _name_ << " parameters are disabled." << std::endl;
     return;
@@ -73,10 +73,10 @@ void FitParameterSet::initialize() {
 
   this->readCovarianceMatrix();
 
-  _useOnlyOneParameterPerEvent_ = JsonUtils::fetchValue<bool>(_jsonConfig_, "useOnlyOneParameterPerEvent", false);
+  _useOnlyOneParameterPerEvent_ = JsonUtils::fetchValue<bool>(_config_, "useOnlyOneParameterPerEvent", false);
 
-  if( JsonUtils::doKeyExist(_jsonConfig_, "parameterLimits") ){
-    auto parLimits = JsonUtils::fetchValue(_jsonConfig_, "parameterLimits", nlohmann::json());
+  if( JsonUtils::doKeyExist(_config_, "parameterLimits") ){
+    auto parLimits = JsonUtils::fetchValue(_config_, "parameterLimits", nlohmann::json());
     _globalParameterMinValue_ = JsonUtils::fetchValue(parLimits, "minValue", std::nan("UNSET"));
     _globalParameterMaxValue_ = JsonUtils::fetchValue(parLimits, "maxValue", std::nan("UNSET"));
   }
@@ -85,7 +85,7 @@ void FitParameterSet::initialize() {
   std::string pathBuffer;
 
   // parameterPriorTVectorD
-  pathBuffer = JsonUtils::fetchValue<std::string>(_jsonConfig_, "parameterPriorTVectorD", "");
+  pathBuffer = JsonUtils::fetchValue<std::string>(_config_, "parameterPriorTVectorD", "");
   if(not pathBuffer.empty()){
     LogDebug << "Reading provided parameterPriorTVectorD..." << std::endl;
     _parameterPriorList_ = (TVectorT<double>*) _covarianceMatrixFile_->Get(pathBuffer.c_str());
@@ -108,7 +108,7 @@ void FitParameterSet::initialize() {
     }
   }
 
-  pathBuffer = JsonUtils::fetchValue<std::string>(_jsonConfig_, "parameterLowerBoundsTVectorD", "");
+  pathBuffer = JsonUtils::fetchValue<std::string>(_config_, "parameterLowerBoundsTVectorD", "");
   if( not pathBuffer.empty() ){
     _parameterLowerBoundsList_ = (TVectorT<double>*) _covarianceMatrixFile_->Get(pathBuffer.c_str());
     LogThrowIf(_parameterLowerBoundsList_ == nullptr, "Could not fetch parameterLowerBoundsTVectorD: \"" << pathBuffer)
@@ -116,7 +116,7 @@ void FitParameterSet::initialize() {
                "parameterLowerBoundsTVectorD \"" << pathBuffer << "\" have not the right size.")
   }
 
-  pathBuffer = JsonUtils::fetchValue<std::string>(_jsonConfig_, "parameterUpperBoundsTVectorD", "");
+  pathBuffer = JsonUtils::fetchValue<std::string>(_config_, "parameterUpperBoundsTVectorD", "");
   if( not pathBuffer.empty() ){
     _parameterUpperBoundsList_ = (TVectorT<double>*) _covarianceMatrixFile_->Get(pathBuffer.c_str());
     LogThrowIf(_parameterUpperBoundsList_ == nullptr, "Could not fetch parameterUpperBoundsTVectorD: \"" << pathBuffer)
@@ -125,7 +125,7 @@ void FitParameterSet::initialize() {
   }
 
   // parameterNameTObjArray
-  pathBuffer = JsonUtils::fetchValue<std::string>(_jsonConfig_, "parameterNameTObjArray", "");
+  pathBuffer = JsonUtils::fetchValue<std::string>(_config_, "parameterNameTObjArray", "");
   if(not pathBuffer.empty()){
     LogDebug << "Reading provided parameterNameTObjArray..." << std::endl;
     _parameterNamesList_ = (TObjArray*) _covarianceMatrixFile_->Get(pathBuffer.c_str());
@@ -153,12 +153,12 @@ void FitParameterSet::initialize() {
     _parameterList_.back().setPriorValue((*_parameterPriorList_)[iParameter]);
     _parameterList_.back().setStdDevValue(TMath::Sqrt((*_covarianceMatrix_)[iParameter][iParameter]));
 
-    _parameterList_.back().setDialsWorkingDirectory(JsonUtils::fetchValue<std::string>(_jsonConfig_, "dialSetWorkingDirectory", "./"));
+    _parameterList_.back().setDialsWorkingDirectory(JsonUtils::fetchValue<std::string>(_config_, "dialSetWorkingDirectory", "./"));
 
 
-    if( JsonUtils::doKeyExist(_jsonConfig_, "parameterDefinitions") ){
+    if( JsonUtils::doKeyExist(_config_, "parameterDefinitions") ){
       // Alternative 1: define parameters then dials
-      auto parsConfig = JsonUtils::fetchValue<nlohmann::json>(_jsonConfig_, "parameterDefinitions");
+      auto parsConfig = JsonUtils::fetchValue<nlohmann::json>(_config_, "parameterDefinitions");
       JsonUtils::forwardConfig(parsConfig);
       auto parConfig = JsonUtils::fetchMatchingEntry(parsConfig, "parameterName", std::string(_parameterNamesList_->At(iParameter)->GetName()));
       if( parConfig.empty() ){
@@ -167,12 +167,12 @@ void FitParameterSet::initialize() {
       }
       _parameterList_.back().setParameterDefinitionConfig(parConfig);
     }
-    else if( JsonUtils::doKeyExist(_jsonConfig_, "dialSetDefinitions") ){
+    else if( JsonUtils::doKeyExist(_config_, "dialSetDefinitions") ){
       // Alternative 2: define dials then parameters
-      _parameterList_.back().setDialSetConfig(JsonUtils::fetchValue<nlohmann::json>(_jsonConfig_, "dialSetDefinitions"));
+      _parameterList_.back().setDialSetConfig(JsonUtils::fetchValue<nlohmann::json>(_config_, "dialSetDefinitions"));
     }
 
-    _parameterList_.back().setEnableDialSetsSummary(JsonUtils::fetchValue<bool>(_jsonConfig_, "printDialSetsSummary", false));
+    _parameterList_.back().setEnableDialSetsSummary(JsonUtils::fetchValue<bool>(_config_, "printDialSetsSummary", false));
 
     if( _globalParameterMinValue_ == _globalParameterMinValue_ ){
       _parameterList_.back().setMinValue(_globalParameterMinValue_);
@@ -204,6 +204,8 @@ void FitParameterSet::initialize() {
     _eigenParFixedList_.resize( _eigenParStepSize_->GetNrows(), false );
   }
 
+  _enableThrowMcBeforeFit_ = JsonUtils::fetchValue(_config_, "enableThrowMcBeforeFit", _enableThrowMcBeforeFit_);
+
   _isInitialized_ = true;
 }
 
@@ -211,6 +213,9 @@ void FitParameterSet::initialize() {
 // Getters
 bool FitParameterSet::isEnabled() const {
   return _isEnabled_;
+}
+bool FitParameterSet::isEnableThrowMcBeforeFit() const {
+  return _enableThrowMcBeforeFit_;
 }
 const std::string &FitParameterSet::getName() const {
   return _name_;
@@ -224,8 +229,8 @@ const std::vector<FitParameter> &FitParameterSet::getParameterList() const{
 TMatrixDSym *FitParameterSet::getOriginalCovarianceMatrix() const {
   return _covarianceMatrix_;
 }
-const nlohmann::json &FitParameterSet::getJsonConfig() const {
-  return _jsonConfig_;
+const nlohmann::json &FitParameterSet::getConfig() const {
+  return _config_;
 }
 
 // Core
@@ -347,17 +352,17 @@ void FitParameterSet::passIfInitialized(const std::string &methodName_) const {
 }
 void FitParameterSet::readCovarianceMatrix(){
 
-  _covarianceMatrixFile_ = std::shared_ptr<TFile>( TFile::Open(JsonUtils::fetchValue<std::string>(_jsonConfig_, "covarianceMatrixFilePath").c_str()) );
+  _covarianceMatrixFile_ = std::shared_ptr<TFile>( TFile::Open(JsonUtils::fetchValue<std::string>(_config_, "covarianceMatrixFilePath").c_str()) );
   if( not _covarianceMatrixFile_->IsOpen() ){
     LogError << "Could not open: _covarianceMatrixFile_: " << _covarianceMatrixFile_->GetPath() << std::endl;
     throw std::runtime_error("Could not open: _covarianceMatrixFile_");
   }
 
   _covarianceMatrix_ = (TMatrixDSym*) _covarianceMatrixFile_->Get(
-    JsonUtils::fetchValue<std::string>(_jsonConfig_, "covarianceMatrixTMatrixD").c_str()
+    JsonUtils::fetchValue<std::string>(_config_, "covarianceMatrixTMatrixD").c_str()
   );
   if(_covarianceMatrix_ == nullptr ){
-    LogError << "Could not find: " << JsonUtils::fetchValue<std::string>(_jsonConfig_, "covarianceMatrixTMatrixD")
+    LogError << "Could not find: " << JsonUtils::fetchValue<std::string>(_config_, "covarianceMatrixTMatrixD")
              << " in " << _covarianceMatrixFile_->GetPath() << std::endl;
     throw std::runtime_error("Could not find: covarianceMatrixTObjectPath");
   }
@@ -372,8 +377,8 @@ void FitParameterSet::readCovarianceMatrix(){
     GenericToolbox::convertToCorrelationMatrix((TMatrixD*) _covarianceMatrix_)
     );
 
-  _useEigenDecompInFit_ = JsonUtils::fetchValue(_jsonConfig_ , "useEigenDecompInFit", false);
-  _maxEigenFraction_ = JsonUtils::fetchValue(_jsonConfig_ , "maxEigenFraction", double(1.));
+  _useEigenDecompInFit_ = JsonUtils::fetchValue(_config_ , "useEigenDecompInFit", false);
+  _maxEigenFraction_ = JsonUtils::fetchValue(_config_ , "maxEigenFraction", double(1.));
   if( _maxEigenFraction_ != 1 ){
     LogInfo << "Max eigen fraction set to: " << _maxEigenFraction_*100 << "%" << std::endl;
     _useEigenDecompInFit_ = true;
@@ -464,5 +469,6 @@ void FitParameterSet::readCovarianceMatrix(){
 bool FitParameterSet::isUseOnlyOneParameterPerEvent() const {
   return _useOnlyOneParameterPerEvent_;
 }
+
 
 

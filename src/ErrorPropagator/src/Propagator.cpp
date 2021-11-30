@@ -71,7 +71,7 @@ void Propagator::initialize() {
   _parameterSetsList_.reserve(parameterSetListConfig.size()); // make sure the objects aren't moved in RAM ( since FitParameter* will be used )
   for( const auto& parameterSetConfig : parameterSetListConfig ){
     _parameterSetsList_.emplace_back();
-    _parameterSetsList_.back().setJsonConfig(parameterSetConfig);
+    _parameterSetsList_.back().setConfig(parameterSetConfig);
     _parameterSetsList_.back().setSaveDir(GenericToolbox::mkdirTFile(_saveDir_, "ParameterSets"));
     _parameterSetsList_.back().initialize();
     nPars += _parameterSetsList_.back().getNbParameters();

@@ -76,7 +76,10 @@ void FitterEngine::initialize() {
     }
   }
 
+  _parStepScale_ = JsonUtils::fetchValue(_config_, "parStepScale", _parStepScale_);
+  LogInfo << "Using parameter step scale: " << _parStepScale_ << std::endl;
   this->rescaleParametersStepSize();
+
   if( JsonUtils::fetchValue(_config_, "fixGhostFitParameters", false) ) this->fixGhostFitParameters();
 
   _convergenceMonitor_.addDisplayedQuantity("VarName");
@@ -103,10 +106,14 @@ void FitterEngine::initialize() {
     _propagator_.getTreeWriter().writeSamples(dir);
   }
 
-  this->initializeMinimizer();
+  if( JsonUtils::fetchValue(_config_, "throwMcBeforeFit", false) ){
+    LogInfo << "Throwing MC parameters (uncorrelated) away from their prior..." << std::endl;
+    double throwGain = JsonUtils::fetchValue(_config_, "throwMcBeforeFitGain", 1.);
+    LogInfo << "Throw gain set to: " << throwGain << std::endl;
+    this->throwMcParameters(throwGain);
+  }
 
-  _parStepScale_ = JsonUtils::fetchValue(_config_, "parStepScale", _parStepScale_);
-  LogInfo << "Using parameter step scale: " << _parStepScale_ << std::endl;
+  this->initializeMinimizer();
 
 }
 
@@ -149,7 +156,7 @@ void FitterEngine::generateOneSigmaPlots(const std::string& savePath_){
 
     if( not parSet.isEnabled() ) continue;
 
-    if( JsonUtils::fetchValue(parSet.getJsonConfig(), "disableOneSigmaPlots", false) ){
+    if( JsonUtils::fetchValue(parSet.getConfig(), "disableOneSigmaPlots", false) ){
       LogDebug << "+1σ plots disabled for \"" << parSet.getName() << "\"" << std::endl;
       continue;
     }
@@ -244,7 +251,7 @@ void FitterEngine::fixGhostFitParameters(){
   std::stringstream ssPrint;
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 
-    if( not JsonUtils::fetchValue(parSet.getJsonConfig(), "fixGhostFitParameters", true) ) {
+    if( not JsonUtils::fetchValue(parSet.getConfig(), "fixGhostFitParameters", true) ) {
       LogWarning << "Skipping \"" << parSet.getName() << "\" as fixGhostFitParameters is set to false" << std::endl;
       if( not parSet.isUseEigenDecompInFit() ) iFitPar += parSet.getNbParameters();
       else iFitPar += parSet.getNbEnabledEigenParameters();
@@ -380,6 +387,12 @@ void FitterEngine::throwMcParameters(double gain_) {
   // TODO: IMPLEMENT CHOLESKY DECOMP
   int iPar = -1;
   for( auto& parSet : _propagator_.getParameterSetsList() ){
+    if( not parSet.isEnableThrowMcBeforeFit() ){
+      LogWarning << "\"" << parSet.getName() << "\" has marked disabled throwMcBeforeFit: skipping." << std::endl;
+      continue;
+    }
+
+    LogInfo << "Throwing uncorrelated parameters for \"" << parSet.getName() << "\"" << std::endl;
     if( not parSet.isUseEigenDecompInFit() ){
       for( auto& par : parSet.getParameterList() ){
         iPar++;
@@ -406,13 +419,6 @@ void FitterEngine::throwMcParameters(double gain_) {
 
 void FitterEngine::fit(){
   LogWarning << __METHOD_NAME__ << std::endl;
-
-  if( JsonUtils::fetchValue(_config_, "throwMcBeforeFit", false) ){
-    LogInfo << "Throwing MC parameters (uncorrelated) away from their prior..." << std::endl;
-    double throwGain = JsonUtils::fetchValue(_config_, "throwMcBeforeFitGain", 1.);
-    LogInfo << "Throw gain set to: " << throwGain << std::endl;
-    this->throwMcParameters(throwGain);
-  }
 
   LogWarning << "─────────────────────────────" << std::endl;
   LogWarning << "Summary of the fit parameters" << std::endl;
@@ -498,7 +504,7 @@ void FitterEngine::fit(){
         LogInfo << "Releasing parameters for error evaluation..." << std::endl;
         for( auto& parSet : _propagator_.getParameterSetsList() ){
 
-          if( not JsonUtils::fetchValue(parSet.getJsonConfig(), "releaseFixedParametersOnHesse", true) ){
+          if( not JsonUtils::fetchValue(parSet.getConfig(), "releaseFixedParametersOnHesse", true) ){
             continue;
           }
 
@@ -531,7 +537,7 @@ void FitterEngine::fit(){
 
         iFitPar = -1;
         for( auto& parSet : _propagator_.getParameterSetsList() ){
-          if( JsonUtils::fetchValue(parSet.getJsonConfig(), "skipMinos", false) ){
+          if( JsonUtils::fetchValue(parSet.getConfig(), "skipMinos", false) ){
             LogWarning << "Minos error evaluation is disabled for parSet: " << parSet.getName() << std::endl;
             continue;
           }
@@ -1064,7 +1070,7 @@ void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
         _minimizer_->SetVariableValue(iPar, par.getParameterValue());
         _minimizer_->SetVariableStepSize(iPar, par.getStepSize());
 
-        if( not doReleaseFixed_ or not JsonUtils::fetchValue(parSet.getJsonConfig(), "releaseFixedParametersOnHesse", true) ){
+        if( not doReleaseFixed_ or not JsonUtils::fetchValue(parSet.getConfig(), "releaseFixedParametersOnHesse", true) ){
           if( not par.isEnabled() or par.isFixed() ) _minimizer_->FixVariable(iPar);
         }
       } // par
@@ -1076,7 +1082,7 @@ void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
                                   parSet.getEigenParameterValue(iEigen),
                                   parSet.getEigenParStepSize(iEigen)
         );
-        if( not doReleaseFixed_ or not JsonUtils::fetchValue(parSet.getJsonConfig(), "releaseFixedParametersOnHesse", true) ){
+        if( not doReleaseFixed_ or not JsonUtils::fetchValue(parSet.getConfig(), "releaseFixedParametersOnHesse", true) ){
           if( parSet.isEigenParFixed(iEigen) ) {
             _minimizer_->FixVariable(iPar);
           }

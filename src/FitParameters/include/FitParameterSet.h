@@ -38,7 +38,7 @@ public:
   void reset();
 
   // Setters
-  void setJsonConfig(const nlohmann::json &jsonConfig);
+  void setConfig(const nlohmann::json &config_);
   void setSaveDir(TDirectory* saveDir_);
 
   // Init
@@ -46,12 +46,15 @@ public:
 
   // Getters
   bool isEnabled() const;
+
+  bool isEnableThrowMcBeforeFit() const;
+
   bool isUseOnlyOneParameterPerEvent() const;
   const std::string &getName() const;
   std::vector<FitParameter> &getParameterList();
   const std::vector<FitParameter> &getParameterList() const;
   TMatrixDSym *getOriginalCovarianceMatrix() const;
-  const nlohmann::json &getJsonConfig() const;
+  const nlohmann::json &getConfig() const;
 
   // Core
   size_t getNbParameters() const;
@@ -85,7 +88,7 @@ protected:
 
 private:
   // User parameters
-  nlohmann::json _jsonConfig_;
+  nlohmann::json _config_;
 
   // Internals
   bool _isInitialized_{false};
@@ -95,6 +98,7 @@ private:
   // JSON
   std::string _name_;
   bool _isEnabled_{};
+  bool _enableThrowMcBeforeFit_{true};
   double _maxEigenFraction_{1};
 
   // Input file:

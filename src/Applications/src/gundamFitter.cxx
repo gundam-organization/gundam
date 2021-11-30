@@ -65,6 +65,7 @@ int main(int argc, char** argv){
   int nbScanSteps = clParser.getOptionVal("scanParameters", 100);
   auto outFileName = clParser.getOptionVal("outputFile", configFilePath + ".root");
 
+
   // --------------------------
   // Initialize the fitter:
   // --------------------------
@@ -81,6 +82,7 @@ int main(int argc, char** argv){
   fitter.setEnablePostFitScan(enableParameterScan);
   fitter.initialize();
 
+
   // --------------------------
   // Pre-fit:
   // --------------------------
@@ -89,7 +91,9 @@ int main(int argc, char** argv){
   if( clParser.isOptionTriggered("generateOneSigmaPlots") or JsonUtils::fetchValue(jsonConfig, "generateOneSigmaPlots", false) ) fitter.generateOneSigmaPlots("preFit");
   if( clParser.isOptionTriggered("scanParameters") or JsonUtils::fetchValue(jsonConfig, "scanParameters", true) ) fitter.scanParameters(nbScanSteps, "preFit/scan");
 
+  // Plot generators
   if( JsonUtils::fetchValue(jsonConfig, "generateSamplePlots", true) ) fitter.generateSamplePlots("preFit/samples");
+
 
   // --------------------------
   // Run the fitter:
