@@ -385,39 +385,45 @@ void FitterEngine::throwMcParameters(double gain_) {
   LogInfo << __METHOD_NAME__ << std::endl;
 
   // TODO: IMPLEMENT CHOLESKY DECOMP
-  int iPar = -1;
+  int iFitPar = -1;
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 
     if( not parSet.isEnableThrowMcBeforeFit() ){
       LogWarning << "\"" << parSet.getName() << "\" has marked disabled throwMcBeforeFit: skipping." << std::endl;
-//      if( not parSet.isUseEigenDecompInFit() ) iPar += int(parSet.getParameterList().size());
-//      else iPar += int(parSet.getNbEnabledEigenParameters());
-//      continue;
+      if( not parSet.isUseEigenDecompInFit() ) iFitPar += int(parSet.getParameterList().size());
+      else iFitPar += int(parSet.getNbEnabledEigenParameters());
+      continue;
     }
     else{
-      LogWarning << "Throwing uncorrelated parameters for \"" << parSet.getName() << "\"" << std::endl;
+      LogWarning << "Throwing correlated parameters for \"" << parSet.getName() << "\"" << std::endl;
     }
 
 
     if( not parSet.isUseEigenDecompInFit() ){
+
+      auto throws = GenericToolbox::throwCorrelatedParameters(
+          GenericToolbox::getCholeskyMatrix(parSet.getOriginalCovarianceMatrix())
+      );
+
+      int iPar{-1};
       for( auto& par : parSet.getParameterList() ){
-        iPar++;
-        if( not parSet.isEnableThrowMcBeforeFit() ) continue;
-        if( not _minimizer_->IsFixedVariable(iPar) ){
+        iFitPar++; iPar++;
+
+        if( not _minimizer_->IsFixedVariable(iFitPar) ){
           LogInfo << "Throwing par " << par.getTitle() << ": " << par.getParameterValue();
           par.setParameterValue(
               par.getPriorValue()
-              + gain_ * _prng_.Gaus(0, par.getStdDevValue()) );
+              + gain_ * throws[iPar] );
           LogInfo << " → " << par.getParameterValue() << std::endl;
-          _minimizer_->SetVariableValue( iPar, par.getParameterValue() );
+          _minimizer_->SetVariableValue(iFitPar, par.getParameterValue() );
         }
       }
     }
     else{
       for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
-        iPar++;
+        iFitPar++;
         if( not parSet.isEnableThrowMcBeforeFit() ) continue;
-        if( not _minimizer_->IsFixedVariable(iPar) ){
+        if( not _minimizer_->IsFixedVariable(iFitPar) ){
           LogInfo << "Throwing eigen #" << iEigen << ": " << parSet.getEigenParameterValue(iEigen);
           parSet.setEigenParameter(
               iEigen,
@@ -425,7 +431,7 @@ void FitterEngine::throwMcParameters(double gain_) {
               + gain_ * _prng_.Gaus(0, parSet.getEigenSigma(iEigen) )
           );
           LogInfo << " → " << parSet.getEigenParameterValue(iEigen) << std::endl;
-          _minimizer_->SetVariableValue( iPar, parSet.getEigenParameterValue(iEigen) );
+          _minimizer_->SetVariableValue(iFitPar, parSet.getEigenParameterValue(iEigen) );
 
           // placeholder
         }
