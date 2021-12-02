@@ -259,9 +259,9 @@ bool DialSet::initializeDialsWithDefinition() {
             auto* dialPtr = new SplineDial();
             dialPtr->setApplyConditionBin(binList.at(iBin));
             dialPtr->copySpline((TSpline3*) dialsList->At(iBin));
-            if( JsonUtils::doKeyExist(dialsDefinition, "minimunSplineResponse") ){
+            if( JsonUtils::doKeyExist(dialsDefinition, "minimumSplineResponse") ){
               dialPtr->setMinimumSplineResponse(
-                  JsonUtils::fetchValue<double>(dialsDefinition, "minimunSplineResponse")
+                  JsonUtils::fetchValue<double>(dialsDefinition, "minimumSplineResponse")
               );
             }
             dialPtr->setAssociatedParameterReference(_associatedParameterReference_);
