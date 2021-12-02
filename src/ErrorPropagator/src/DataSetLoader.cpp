@@ -107,7 +107,10 @@ void DataSetLoader::initialize() {
         _dataFilePathList_.emplace_back(file.get<std::string>());
       }
     }
+
+    // override: nominalWeightLeafName is deprecated
     _dataNominalWeightFormulaStr_ = JsonUtils::fetchValue(dataConfig, "nominalWeightLeafName", _dataNominalWeightFormulaStr_);
+    _dataNominalWeightFormulaStr_ = JsonUtils::fetchValue(dataConfig, "nominalWeightFormula", _dataNominalWeightFormulaStr_);
 
   }
 
@@ -296,7 +299,6 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
         }
       }
       else if (isData and not this->getDataNominalWeightFormulaStr().empty() ){
-        LogWarning << "Will reweight data from nominalWeightLeafName = " << this->getDataNominalWeightFormulaStr() << std::endl;
         threadChain->SetBranchStatus("*", true);
         threadNominalWeightFormula = new TTreeFormula(
             Form("NominalWeightFormula%i", iThread_),
@@ -320,15 +322,12 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
   
       isData ? eventBuffer.setLeafNameListPtr(&_leavesStorageRequestedForData_): eventBuffer.setLeafNameListPtr(&_leavesRequestedForIndexing_);
 
-      //eventBuffer.setLeafNameListPtr(&_leavesRequestedForIndexing_);
       eventOffSetMutex.lock();
       eventBuffer.hookToTree(threadChain, true);
       eventOffSetMutex.unlock();
 
       PhysicsEvent* eventPtr{nullptr};
-      
-      //if (isData) LogWarning << "Here" << std::endl;
-        
+              
       size_t sampleEventIndex;
       int globalEventIndex{-1};
       const std::vector<DataBin>* binsListPtr;
@@ -352,8 +351,6 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
         if(iEntry % GlobalVariables::getNbThreads() != iThread_ ){ continue; }
         if( iThread_ == 0 ) GenericToolbox::displayProgressBar(iEntry, nEvents, progressTitle);
         
-        //if (isData) LogWarning << "Here" << std::endl;
-
         bool skipEvent = true;
         for( bool isInSample : eventIsInSamplesList.at(iEntry) ){
           if( isInSample ){
@@ -370,8 +367,6 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
           if( eventBuffer.getTreeWeight() == 0 ) continue; // skip this event
         }
         
-        //if (isData) LogWarning << "Here" << std::endl;
-
         for( iSample = 0 ; iSample < samplesToFillList.size() ; iSample++ ){
           if( eventIsInSamplesList.at(iEntry).at(iSample) ){
 
@@ -400,7 +395,6 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
               // Invalid bin -> next sample
               break;
             }
-            //if (isData && iEntry%1000 == 0) LogWarning << "iEntry = " << iEntry << std::endl << eventBuffer.getSummary() << std::endl;
 
             // OK, now we have a valid fit bin. Let's claim an index.
             eventOffSetMutex.lock();
@@ -517,8 +511,7 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
 
     LogInfo << "Shrinking event lists..." << std::endl;
     for( size_t iSample = 0 ; iSample < samplesToFillList.size() ; iSample++ ){
-      if (not isData) samplesToFillList.at(iSample)->getMcContainer().shrinkEventList(sampleIndexOffsetList.at(iSample));
-      if (isData) samplesToFillList.at(iSample)->getDataContainer().shrinkEventList(sampleIndexOffsetList.at(iSample));
+      isData ? samplesToFillList.at(iSample)->getDataContainer().shrinkEventList(sampleIndexOffsetList.at(iSample)) : samplesToFillList.at(iSample)->getMcContainer().shrinkEventList(sampleIndexOffsetList.at(iSample));
     }
 
     LogInfo << "Events have been loaded for " << ( isData ? "data": "mc" )
