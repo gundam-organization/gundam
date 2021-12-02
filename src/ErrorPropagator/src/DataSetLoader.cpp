@@ -260,6 +260,7 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
             // Reserve memory for additional dials (those on a tree leaf)
             if( not dialSetPtr->getDialLeafName().empty() ){
               dialSetPtr->getDialList().resize(chainPtr->GetEntries(), nullptr);
+              LogTrace << par.getTitle() << " -> " << GET_VAR_NAME_VALUE(dialSetPtr->getMinimumSplineResponse()) << std::endl;
               for( size_t iDial = dialSetPtr->getCurrentDialOffset() ; iDial < dialSetPtr->getDialList().size() ; iDial++ ){
                 dialSetPtr->getDialList()[iDial] = std::make_shared<SplineDial>();
                 ((SplineDial*)dialSetPtr->getDialList()[iDial].get())->setAssociatedParameterReference(&par);

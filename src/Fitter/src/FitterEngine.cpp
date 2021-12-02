@@ -392,6 +392,18 @@ void FitterEngine::throwMcParameters(double gain_) {
       LogWarning << "\"" << parSet.getName() << "\" has marked disabled throwMcBeforeFit: skipping." << std::endl;
       if( not parSet.isUseEigenDecompInFit() ) iFitPar += int(parSet.getParameterList().size());
       else iFitPar += int(parSet.getNbEnabledEigenParameters());
+
+      for(auto& entry : JsonUtils::fetchValue(parSet.getConfig(), "moveMcParBeforeFit", std::vector<nlohmann::json>())){
+        int parIndex = JsonUtils::fetchValue<int>(entry, "parIndex");
+        double pushVal =
+            parSet.getParameterList()[parIndex].getParameterValue()
+            + parSet.getParameterList()[parIndex].getStdDevValue()
+              * JsonUtils::fetchValue<double>(entry, "nbSigmaAway");
+
+        LogWarning << "Pushing #" << parIndex << " to " << pushVal << std::endl;
+        parSet.getParameterList()[parIndex].setParameterValue( pushVal );
+      }
+
       continue;
     }
     else{
