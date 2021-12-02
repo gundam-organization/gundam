@@ -196,7 +196,15 @@ std::string PhysicsEvent::getSummary() const {
   ss << std::endl << GET_VAR_NAME_VALUE(_sampleBinIndex_);
 
   if( not _rawDialPtrList_.empty() ){
-    ss << std::endl << "Dials: " << GenericToolbox::parseVectorAsString(_rawDialPtrList_);
+    ss << std::endl << "Dials: ";
+    for( auto* dialPtr : _rawDialPtrList_ ){
+      ss << std::endl << dialPtr << ": " << ( (FitParameter*) dialPtr->getAssociatedParameterReference() )->getTitle();
+      ss << "(" << ( (FitParameter*) dialPtr->getAssociatedParameterReference() )->getParameterValue() << ")";
+      ss << "/" << dialPtr->getSummary() << " = " << dialPtr->getDialResponseCache();
+    }
+  }
+  else{
+    ss << "No cached dials." << std::endl;
   }
   return ss.str();
 }

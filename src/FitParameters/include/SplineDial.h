@@ -26,6 +26,10 @@ public:
   void initialize() override;
 
   std::string getSummary() override;
+  const TSpline3* getSplinePtr() const;
+
+  // Debug
+  void writeSpline(const std::string &fileName_ = "") const;
 
 protected:
   void fillResponseCache() override;
@@ -33,11 +37,11 @@ protected:
 
 private:
   bool _throwIfResponseIsNegative_{true};
-  bool _fastEval_{false};
   double _minimumSplineResponse_{std::nan("unset")};
 
-//  TSpline3* _splinePtr_{nullptr};
-  std::shared_ptr<TSpline3> _splinePtr_{nullptr};
+  TSpline3 _spline_;
+
+  // DEBUG
 
 };
 

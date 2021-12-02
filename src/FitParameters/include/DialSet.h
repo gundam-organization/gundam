@@ -30,6 +30,7 @@ public:
   void setConfig(const nlohmann::json &config_);
   void setWorkingDirectory(const std::string &workingDirectory);
   void setAssociatedParameterReference(void *associatedParameterReference);
+  void setCurrentDialOffset(size_t currentDialOffset);
 
   void initialize();
 
@@ -42,6 +43,7 @@ public:
   void *getAssociatedParameterReference();
   const std::string &getDialLeafName() const;
   double getMinimumSplineResponse() const;
+  size_t getCurrentDialOffset() const;
 
 
   // Core
@@ -73,6 +75,7 @@ private:
   // every pointers. It means the new copied DialSet will handle Dial ptr which have already been deleted.
   std::vector<std::shared_ptr<Dial>> _dialList_;
   DialType::DialType _globalDialType_;
+  size_t _currentDialOffset_{0};
 
   double _minimumSplineResponse_{std::nan("unset")};
 

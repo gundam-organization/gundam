@@ -35,6 +35,7 @@ Dial::~Dial() {
 }
 
 void Dial::reset() {
+  _isInitialized_ = false;
   _dialResponseCache_ = std::nan("Unset");
   _dialParameterCache_ = std::nan("Unset");
   _applyConditionBin_ = DataBin();
@@ -56,13 +57,22 @@ void Dial::initialize() {
   }
 }
 
+bool Dial::isInitialized() const {
+  return _isInitialized_;
+}
 std::string Dial::getSummary(){
   std::stringstream ss;
+  if( _associatedParameterReference_ != nullptr ){
+    ss << ((FitParameter*) _associatedParameterReference_)->getTitle();
+    ss << "(" << ((FitParameter*) _associatedParameterReference_)->getParameterValue() << ")";
+    ss << "/";
+  }
   ss << DialType::DialTypeEnumNamespace::toString(_dialType_);
-  if( not _applyConditionBin_.getEdgesList().empty() ) ss << ": " << _applyConditionBin_.getSummary();
+  if( not _applyConditionBin_.getEdgesList().empty() ) ss << ":b{" << _applyConditionBin_.getSummary() << "}";
   return ss.str();
 }
 double Dial::evalResponse(const double &parameterValue_) {
+  LogThrowIf(not _isInitialized_, "Can't eval response while dial is not initialized")
 
   if( _dialParameterCache_ == parameterValue_ ){
     while( _isEditingCache_ ){ std::this_thread::sleep_for(std::chrono::nanoseconds(1)); }
@@ -129,3 +139,4 @@ DialType::DialType Dial::getDialType() const {
 void *Dial::getAssociatedParameterReference() const {
   return _associatedParameterReference_;
 }
+

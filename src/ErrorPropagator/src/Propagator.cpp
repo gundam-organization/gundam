@@ -129,28 +129,23 @@ void Propagator::initialize() {
 
   _fitSampleSet_.loadAsimovData();
 
-  _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
-  _plotGenerator_.defineHistogramHolders();
-
-  if( JsonUtils::fetchValue<json>(_config_, "throwMcParameters", false) ){
-    LogWarning << "Throwing parameters..." << std::endl;
-    for( auto& parSet : _parameterSetsList_ ){
-      auto thrownPars = GenericToolbox::throwCorrelatedParameters(GenericToolbox::getCholeskyMatrix(
-        parSet.getOriginalCovarianceMatrix()));
-      for( auto& par : parSet.getParameterList() ){
-        par.setParameterValue( par.getPriorValue() + thrownPars.at(par.getParameterIndex()) );
-        LogDebug << parSet.getName() << "/" << par.getTitle() << ": thrown = " << par.getParameterValue() << std::endl;
-      }
-    }
-  }
-
   LogInfo << "Initializing threads..." << std::endl;
   initializeThreads();
 
   LogInfo << "Propagating prior parameters on events..." << std::endl;
   reweightSampleEvents();
 
-//  _fitSampleSet_.writeSampleEvents(GenericToolbox::mkdirTFile(_saveDir_, "Events"));
+  if( JsonUtils::fetchValue<json>(_config_, "throwAsimovFitParameters", false) ){
+    LogWarning << "Throwing parameters..." << std::endl;
+    for( auto& parSet : _parameterSetsList_ ){
+      auto thrownPars = GenericToolbox::throwCorrelatedParameters(GenericToolbox::getCholeskyMatrix(
+          parSet.getOriginalCovarianceMatrix()));
+      for( auto& par : parSet.getParameterList() ){
+        par.setParameterValue( par.getPriorValue() + thrownPars.at(par.getParameterIndex()) );
+        LogDebug << parSet.getName() << "/" << par.getTitle() << ": thrown = " << par.getParameterValue() << std::endl;
+      }
+    }
+  }
 
   LogInfo << "Set the current MC prior weights as nominal weight..." << std::endl;
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
@@ -167,7 +162,7 @@ void Propagator::initialize() {
       for( int iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
         // Since no reweight is applied on data samples, the nominal weight should be the default one
         sample.getDataContainer().eventList.at(iEvent).setTreeWeight(
-          sample.getMcContainer().eventList.at(iEvent).getNominalWeight()
+            sample.getMcContainer().eventList.at(iEvent).getNominalWeight()
         );
         sample.getDataContainer().eventList.at(iEvent).resetEventWeight();
         sample.getDataContainer().eventList.at(iEvent).setNominalWeight(sample.getDataContainer().eventList.at(iEvent).getEventWeight());
@@ -180,6 +175,17 @@ void Propagator::initialize() {
     LogInfo << "Sum of event weights in \"" << sample.getName() << "\":" << std::endl
             << "-> mc: " << sample.getMcContainer().getSumWeights() << " / data: " << sample.getDataContainer().getSumWeights() << std::endl;
   }
+
+  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    for( auto& event : sample.getMcContainer().eventList ){
+      if( event.getEntryIndex() == 348660 ){
+        LogTrace << event << std::endl;
+      }
+    }
+  }
+
+  _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
+  _plotGenerator_.defineHistogramHolders();
 
   LogInfo << "Filling up sample bin caches..." << std::endl;
   _fitSampleSet_.updateSampleBinEventList();
@@ -195,7 +201,7 @@ void Propagator::initialize() {
   _useResponseFunctions_ = JsonUtils::fetchValue<json>(_config_, "DEV_useResponseFunctions", false);
   if( _useResponseFunctions_ ){ this->makeResponseFunctions(); }
 
-  if( JsonUtils::fetchValue<json>(_config_, "throwMcParameters", false) ){
+  if( JsonUtils::fetchValue<json>(_config_, "throwAsimovFitParameters", false) ){
     for( auto& parSet : _parameterSetsList_ ){
       for( auto& par : parSet.getParameterList() ){
         par.setParameterValue( par.getPriorValue() );

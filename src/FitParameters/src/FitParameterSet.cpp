@@ -127,7 +127,7 @@ void FitParameterSet::initialize() {
   // parameterNameTObjArray
   pathBuffer = JsonUtils::fetchValue<std::string>(_config_, "parameterNameTObjArray", "");
   if(not pathBuffer.empty()){
-    LogDebug << "Reading provided parameterNameTObjArray..." << std::endl;
+    LogInfo << "Reading provided parameterNameTObjArray..." << std::endl;
     _parameterNamesList_ = (TObjArray*) _covarianceMatrixFile_->Get(pathBuffer.c_str());
     // Sanity checks
     if( _parameterNamesList_ == nullptr ){
@@ -136,14 +136,14 @@ void FitParameterSet::initialize() {
     }
   }
   else{
-    LogDebug << "No parameterNameTObjArray provided, parameters will be referenced with their index." << std::endl;
+    LogInfo << "No parameterNameTObjArray provided, parameters will be referenced with their index." << std::endl;
     _parameterNamesList_ = new TObjArray(_covarianceMatrix_->GetNrows());
     for( int iPar = 0 ; iPar < _parameterPriorList_->GetNrows() ; iPar++ ){
       _parameterNamesList_->Add(new TNamed("", ""));
     }
   }
 
-  LogDebug << "Initializing parameters..." << std::endl;
+  LogInfo << "Initializing fit parameters..." << std::endl;
   _parameterList_.reserve(_covarianceMatrix_->GetNcols()); // need to keep the memory at the same place -> FitParameter* will be used
   for(int iParameter = 0 ; iParameter < _covarianceMatrix_->GetNcols() ; iParameter++ ){
     _parameterList_.emplace_back();

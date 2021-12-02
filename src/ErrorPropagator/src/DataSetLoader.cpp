@@ -189,7 +189,7 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
     }
     LogWarning << "Events passing selection cuts:" << std::endl;
     for( size_t iSample = 0 ; iSample < samplesToFillList.size() ; iSample++ ){
-      LogInfo << "- \"" << samplesToFillList.at(iSample)->getName() << "\": " << sampleNbOfEvents[iSample] << std::endl;
+      LogInfo << "- \"" << samplesToFillList[iSample]->getName() << "\": " << sampleNbOfEvents[iSample] << std::endl;
     }
 
     LogInfo << "Claiming memory for event storage..." << std::endl;
@@ -215,20 +215,20 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
     }
     eventTemplate.getRawDialPtrList().resize(dialCacheSize);
 
-    std::vector<size_t> sampleIndexOffsetList(samplesToFillList.size(), 0);
+    std::vector<std::atomic<size_t>> sampleIndexOffsetList(samplesToFillList.size());
     std::vector< std::vector<PhysicsEvent>* > sampleEventListPtrToFill(samplesToFillList.size(), nullptr);
 
     for( size_t iSample = 0 ; iSample < sampleNbOfEvents.size() ; iSample++ ){
       if( isData ){
-        sampleEventListPtrToFill.at(iSample) = &samplesToFillList.at(iSample)->getDataContainer().eventList;
-        sampleIndexOffsetList.at(iSample) = sampleEventListPtrToFill.at(iSample)->size();
-        samplesToFillList.at(iSample)->getDataContainer().reserveEventMemory(_dataSetIndex_, sampleNbOfEvents.at(iSample),
+        sampleEventListPtrToFill[iSample] = &samplesToFillList[iSample]->getDataContainer().eventList;
+        sampleIndexOffsetList[iSample] = sampleEventListPtrToFill[iSample]->size();
+        samplesToFillList[iSample]->getDataContainer().reserveEventMemory(_dataSetIndex_, sampleNbOfEvents[iSample],
                                                                              eventTemplate);
       }
       else{
-        sampleEventListPtrToFill.at(iSample) = &samplesToFillList.at(iSample)->getMcContainer().eventList;
-        sampleIndexOffsetList.at(iSample) = sampleEventListPtrToFill.at(iSample)->size();
-        samplesToFillList.at(iSample)->getMcContainer().reserveEventMemory(_dataSetIndex_, sampleNbOfEvents.at(iSample),
+        sampleEventListPtrToFill[iSample] = &samplesToFillList[iSample]->getMcContainer().eventList;
+        sampleIndexOffsetList[iSample] = sampleEventListPtrToFill[iSample]->size();
+        samplesToFillList[iSample]->getMcContainer().reserveEventMemory(_dataSetIndex_, sampleNbOfEvents[iSample],
                                                                            eventTemplate);
       }
     }
@@ -239,6 +239,7 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
 
     // If is data -> NO DIAL!!
     if( not isData ){
+      LogInfo << "Claiming memory for additional dials..." << std::endl;
       for( auto& parSet : *parSetList_ ){
         if( not parSet.isEnabled() ){ continue; }
         for( auto& par : parSet.getParameterList() ){
@@ -258,9 +259,12 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
 
             // Reserve memory for additional dials (those on a tree leaf)
             if( not dialSetPtr->getDialLeafName().empty() ){
-              size_t dialSize{0};
-              for( unsigned long sampleNbOfEvent : sampleNbOfEvents ){ dialSize += sampleNbOfEvent; }
-              dialSetPtr->getDialList().resize(dialSize, std::make_shared<SplineDial>());
+              dialSetPtr->getDialList().resize(chainPtr->GetEntries(), nullptr);
+              for( size_t iDial = dialSetPtr->getCurrentDialOffset() ; iDial < dialSetPtr->getDialList().size() ; iDial++ ){
+                dialSetPtr->getDialList()[iDial] = std::make_shared<SplineDial>();
+                ((SplineDial*)dialSetPtr->getDialList()[iDial].get())->setAssociatedParameterReference(&par);
+                ((SplineDial*)dialSetPtr->getDialList()[iDial].get())->setMinimumSplineResponse(dialSetPtr->getMinimumSplineResponse());
+              }
             }
 
             // Add the dialSet to the list
@@ -270,11 +274,17 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
       }
     }
 
-
     // Fill function
-    ROOT::EnableImplicitMT();
+//    ROOT::EnableImplicitMT();
+    ROOT::EnableImplicitMT(GlobalVariables::getNbThreads());
     std::mutex eventOffSetMutex;
     auto fillFunction = [&](int iThread_){
+
+      int nThreads = GlobalVariables::getNbThreads();
+      if( iThread_ == -1 ){
+        iThread_ = 0;
+        nThreads = 1;
+      }
 
       TChain* threadChain;
       TTreeFormula* threadNominalWeightFormula{nullptr};
@@ -318,7 +328,9 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
       Long64_t nEvents = threadChain->GetEntries();
       PhysicsEvent eventBuffer;
   
-      isData ? eventBuffer.setLeafNameListPtr(&_leavesStorageRequestedForData_): eventBuffer.setLeafNameListPtr(&_leavesRequestedForIndexing_);
+      isData ?
+        eventBuffer.setLeafNameListPtr(&_leavesStorageRequestedForData_):
+        eventBuffer.setLeafNameListPtr(&_leavesRequestedForIndexing_);
 
       //eventBuffer.setLeafNameListPtr(&_leavesRequestedForIndexing_);
       eventOffSetMutex.lock();
@@ -327,10 +339,8 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
 
       PhysicsEvent* eventPtr{nullptr};
       
-      //if (isData) LogWarning << "Here" << std::endl;
-        
       size_t sampleEventIndex;
-      int globalEventIndex{-1};
+      int threadDialIndex;
       const std::vector<DataBin>* binsListPtr;
 
       // Loop vars
@@ -347,15 +357,24 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
       SplineDial* spDialPtr;
       const DataBin* applyConditionBinPtr;
 
+      Long64_t nEventPerThread = nEvents/Long64_t(nThreads);
+      Long64_t iEnd = nEvents;
+      Long64_t iStart = Long64_t(iThread_)*nEventPerThread;
+      if( iThread_+1 != nThreads ) iEnd = (Long64_t(iThread_)+1)*nEventPerThread;
+      Long64_t iGlobal = 0;
+
+      threadChain->LoadTree(iStart);
+
       std::string progressTitle = LogInfo.getPrefixString() + "Reading selected events";
-      for(Long64_t iEntry = 0 ; iEntry < nEvents ; iEntry++ ){
-        if(iEntry % GlobalVariables::getNbThreads() != iThread_ ){ continue; }
-        if( iThread_ == 0 ) GenericToolbox::displayProgressBar(iEntry, nEvents, progressTitle);
-        
-        //if (isData) LogWarning << "Here" << std::endl;
+      for(Long64_t iEntry = iStart ; iEntry < iEnd ; iEntry++ ){
+
+        if( iThread_ == 0 ){
+          GenericToolbox::displayProgressBar(iGlobal, nEvents, progressTitle);
+          iGlobal += nThreads;
+        }
 
         bool skipEvent = true;
-        for( bool isInSample : eventIsInSamplesList.at(iEntry) ){
+        for( bool isInSample : eventIsInSamplesList[iEntry] ){
           if( isInSample ){
             skipEvent = false;
             break;
@@ -367,25 +386,23 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
 
         if( threadNominalWeightFormula != nullptr ){
           eventBuffer.setTreeWeight(threadNominalWeightFormula->EvalInstance());
-          if( eventBuffer.getTreeWeight() == 0 ) continue; // skip this event
+          if( eventBuffer.getTreeWeight() == 0 ){ continue; } // skip this event
         }
-        
-        //if (isData) LogWarning << "Here" << std::endl;
 
         for( iSample = 0 ; iSample < samplesToFillList.size() ; iSample++ ){
-          if( eventIsInSamplesList.at(iEntry).at(iSample) ){
+          if( eventIsInSamplesList[iEntry][iSample] ){
 
             // Reset bin index of the buffer
             eventBuffer.setSampleBinIndex(-1);
 
             // Has valid bin?
-            binsListPtr = &samplesToFillList.at(iSample)->getBinning().getBinsList();
+            binsListPtr = &samplesToFillList[iSample]->getBinning().getBinsList();
 
             for( iBin = 0 ; iBin < binsListPtr->size() ; iBin++ ){
-              auto& bin = binsListPtr->at(iBin);
+              auto& bin = (*binsListPtr)[iBin];
               bool isInBin = true;
               for( iVar = 0 ; iVar < bin.getVariableNameList().size() ; iVar++ ){
-                if( not bin.isBetweenEdges(iVar, eventBuffer.getVarAsDouble(bin.getVariableNameList().at(iVar))) ){
+                if( not bin.isBetweenEdges(iVar, eventBuffer.getVarAsDouble(bin.getVariableNameList()[iVar])) ){
                   isInBin = false;
                   break;
                 }
@@ -400,15 +417,13 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
               // Invalid bin -> next sample
               break;
             }
-            //if (isData && iEntry%1000 == 0) LogWarning << "iEntry = " << iEntry << std::endl << eventBuffer.getSummary() << std::endl;
 
             // OK, now we have a valid fit bin. Let's claim an index.
-            eventOffSetMutex.lock();
-            sampleEventIndex = sampleIndexOffsetList.at(iSample)++;
-            globalEventIndex++;
-            eventOffSetMutex.unlock();
+//            eventOffSetMutex.lock();
+            sampleEventIndex = sampleIndexOffsetList[iSample]++;
+//            eventOffSetMutex.unlock();
 
-            eventPtr = &sampleEventListPtrToFill.at(iSample)->at(sampleEventIndex);
+            eventPtr = &(*sampleEventListPtrToFill[iSample])[sampleEventIndex];
             // copy only necessary variables
             eventPtr->copyOnlyExistingLeaves(eventBuffer);
 
@@ -434,64 +449,71 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
                   }
 
                   if( not dialSetPtr->getDialLeafName().empty() ){
-                    grPtr = (TGraph*) eventBuffer.getVariable<std::shared_ptr<TClonesArray>>(dialSetPtr->getDialLeafName())->At(0);
+                    grPtr = (TGraph*) eventBuffer.getVariable<TClonesArray*>(dialSetPtr->getDialLeafName())->At(0);
                     if(grPtr->GetN() > 1){
-                      spDialPtr = (SplineDial*) dialSetPtr->getDialList()[globalEventIndex].get();
-                      spDialPtr->setAssociatedParameterReference(dialSetPtr->getAssociatedParameterReference());
-                      if( JsonUtils::doKeyExist(dialSetPtr->getDialSetConfig(), "minimunSplineResponse") ){
-                        spDialPtr->setMinimumSplineResponse(
-                            JsonUtils::fetchValue<double>(dialSetPtr->getDialSetConfig(), "minimunSplineResponse")
-                                );
-                      }
-                      eventOffSetMutex.lock();
+                      spDialPtr = (SplineDial*) dialSetPtr->getDialList()[iEntry].get();
+
+//                      eventOffSetMutex.lock();
                       spDialPtr->createSpline( grPtr );
-                      eventOffSetMutex.unlock();
+//                      eventOffSetMutex.unlock();
+
+                      spDialPtr->initialize();
                       // Adding dial in the event
                       eventPtr->getRawDialPtrList()[eventDialOffset++] = spDialPtr;
+
+                      if( iEntry == 348660 ){
+                        LogTrace << GET_VAR_NAME_VALUE(spDialPtr) << std::endl;
+                        spDialPtr->writeSpline("BEFORE.root");
+                        for( int iP = 0 ; iP < grPtr->GetN() ; iP++ ){
+                          LogDebug << iP << " -> Y = " << grPtr->GetY()[iP] << std::endl;
+//                          LogDebug << GET_VAR_NAME_VALUE(spDialPtr->evalResponse()) << std::endl;
+                        }
+                      } // iEntry
                     }
-                    continue;
                   }
+                  else{
+                    // Binned dial?
+                    lastFailedBinVarIndex = -1;
+                    for( iDial = 0 ; iDial < dialSetPtr->getDialList().size(); iDial++ ){
+                      // ----------> SLOW PART
+                      applyConditionBinPtr = &dialSetPtr->getDialList()[iDial]->getApplyConditionBin();
 
-                  lastFailedBinVarIndex = -1;
-                  for( iDial = 0 ; iDial < dialSetPtr->getDialList().size(); iDial++ ){
-                    // ----------> SLOW PART
-                    applyConditionBinPtr = &dialSetPtr->getDialList()[iDial]->getApplyConditionBin();
-
-                    if( lastFailedBinVarIndex != -1 ){
-                      if( not applyConditionBinPtr->isBetweenEdges(
-                          applyConditionBinPtr->getEdgesList()[lastFailedBinVarIndex],
-                          eventBuffer.getVarAsDouble(applyConditionBinPtr->getEventVarIndexCache()[lastFailedBinVarIndex] )
-                      )){
-                        continue;
-                        // NEXT DIAL! Don't check other bin variables
+                      if( lastFailedBinVarIndex != -1 ){
+                        if( not applyConditionBinPtr->isBetweenEdges(
+                            applyConditionBinPtr->getEdgesList()[lastFailedBinVarIndex],
+                            eventBuffer.getVarAsDouble(applyConditionBinPtr->getEventVarIndexCache()[lastFailedBinVarIndex] )
+                        )){
+                          continue;
+                          // NEXT DIAL! Don't check other bin variables
+                        }
                       }
-                    }
 
-                    // Ok, lets give this dial a chance:
-                    isEventInDialBin = true;
+                      // Ok, lets give this dial a chance:
+                      isEventInDialBin = true;
 
-                    for( iVar = 0 ; iVar < applyConditionBinPtr->getEdgesList().size() ; iVar++ ){
-                      if( iVar == lastFailedBinVarIndex ) continue; // already checked if set
-                      if( not applyConditionBinPtr->isBetweenEdges(
-                          applyConditionBinPtr->getEdgesList()[iVar],
-                          eventBuffer.getVarAsDouble(applyConditionBinPtr->getEventVarIndexCache()[iVar] )
-                      )){
-                        isEventInDialBin = false;
-                        lastFailedBinVarIndex = int(iVar);
+                      for( iVar = 0 ; iVar < applyConditionBinPtr->getEdgesList().size() ; iVar++ ){
+                        if( iVar == lastFailedBinVarIndex ) continue; // already checked if set
+                        if( not applyConditionBinPtr->isBetweenEdges(
+                            applyConditionBinPtr->getEdgesList()[iVar],
+                            eventBuffer.getVarAsDouble(applyConditionBinPtr->getEventVarIndexCache()[iVar] )
+                        )){
+                          isEventInDialBin = false;
+                          lastFailedBinVarIndex = int(iVar);
+                          break;
+                          // NEXT DIAL! Don't check other bin variables
+                        }
+                      } // Bin var loop
+                      // <------------------
+                      if( isEventInDialBin ) {
+                        eventPtr->getRawDialPtrList()[eventDialOffset++] = dialSetPtr->getDialList()[iDial].get();
                         break;
-                        // NEXT DIAL! Don't check other bin variables
                       }
-                    } // Bin var loop
-                    // <------------------
-                    if( isEventInDialBin ) {
-                      eventPtr->getRawDialPtrList()[eventDialOffset++] = dialSetPtr->getDialList()[iDial].get();
-                      break;
-                    }
-                  } // iDial
+                    } // iDial
 
-                  if( isEventInDialBin and dialSetPair.first->isUseOnlyOneParameterPerEvent() ){
-                    break;
-                    // leave iDialSet (ie loop over parameters of the ParSet)
+                    if( isEventInDialBin and dialSetPair.first->isUseOnlyOneParameterPerEvent() ){
+                      break;
+                      // leave iDialSet (ie loop over parameters of the ParSet)
+                    }
                   }
 
                 } // iDialSet / Enabled-parameter
@@ -517,8 +539,8 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
 
     LogInfo << "Shrinking event lists..." << std::endl;
     for( size_t iSample = 0 ; iSample < samplesToFillList.size() ; iSample++ ){
-      if (not isData) samplesToFillList.at(iSample)->getMcContainer().shrinkEventList(sampleIndexOffsetList.at(iSample));
-      if (isData) samplesToFillList.at(iSample)->getDataContainer().shrinkEventList(sampleIndexOffsetList.at(iSample));
+      if (not isData) samplesToFillList[iSample]->getMcContainer().shrinkEventList(sampleIndexOffsetList[iSample]);
+      if (isData) samplesToFillList[iSample]->getDataContainer().shrinkEventList(sampleIndexOffsetList[iSample]);
     }
 
     LogInfo << "Events have been loaded for " << ( isData ? "data": "mc" )
@@ -697,10 +719,10 @@ std::vector<std::vector<bool>> DataSetLoader::makeEventSelection(std::vector<Fit
     chainPtr->GetEntry(iEvent);
 
     for( size_t iSample = 0 ; iSample < sampleCutFormulaList.size() ; iSample++ ){
-      for(int jInstance = 0; jInstance < sampleCutFormulaList.at(iSample)->GetNdata(); jInstance++) {
-        if (sampleCutFormulaList.at(iSample)->EvalInstance(jInstance) == 0) {
+      for(int jInstance = 0; jInstance < sampleCutFormulaList[iSample]->GetNdata(); jInstance++) {
+        if (sampleCutFormulaList[iSample]->EvalInstance(jInstance) == 0) {
           // if it doesn't pass the cut
-          eventIsInSamplesList.at(iEvent).at(iSample) = false;
+          eventIsInSamplesList[iEvent][iSample] = false;
           break;
         }
       } // Formula Instances

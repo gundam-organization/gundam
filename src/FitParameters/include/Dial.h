@@ -44,6 +44,8 @@ public:
 
   virtual void initialize();
 
+  bool isInitialized() const;
+
   double getDialResponseCache() const;
   const DataBin &getApplyConditionBin() const;
   DataBin &getApplyConditionBin();
@@ -57,8 +59,9 @@ public:
   void copySplineCache(TSpline3& splineBuffer_);
   virtual void buildResponseSplineCache();
 
-protected:
   virtual void fillResponseCache() = 0;
+
+protected:
 
   // Parameters
   DataBin _applyConditionBin_;
@@ -66,10 +69,10 @@ protected:
   void* _associatedParameterReference_{nullptr};
 
   // Internals
+  bool _isInitialized_{false};
   bool _isEditingCache_{false};
   double _dialResponseCache_{};
   double _dialParameterCache_{};
-
   std::shared_ptr<TSpline3> _responseSplineCache_{nullptr};
 
 };

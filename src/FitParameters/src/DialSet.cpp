@@ -58,6 +58,10 @@ void DialSet::setParameterName(const std::string &parameterName) {
 void DialSet::setAssociatedParameterReference(void *associatedParameterReference) {
   _associatedParameterReference_ = associatedParameterReference;
 }
+void DialSet::setCurrentDialOffset(size_t currentDialOffset) {
+  _currentDialOffset_ = currentDialOffset;
+}
+
 
 void DialSet::initialize() {
   LogTrace << __METHOD_NAME__ << std::endl;
@@ -125,6 +129,9 @@ const std::string &DialSet::getDialLeafName() const {
 }
 double DialSet::getMinimumSplineResponse() const {
   return _minimumSplineResponse_;
+}
+size_t DialSet::getCurrentDialOffset() const {
+  return _currentDialOffset_;
 }
 
 
