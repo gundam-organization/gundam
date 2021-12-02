@@ -17,7 +17,8 @@ ENUM_EXPANDER(
   DataEventType, -1,
   Unset,
   Asimov,
-  DataFiles
+  DataFiles,
+  FakeData
 )
 
 

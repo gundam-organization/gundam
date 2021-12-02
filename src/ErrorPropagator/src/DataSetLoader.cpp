@@ -34,6 +34,7 @@ void DataSetLoader::reset() {
   _leavesStorageRequestedForMc_.clear();
 
   _mcNominalWeightFormulaStr_ = "1";
+  _fakeDataWeightFormulaStr_ = "1";
   _dataNominalWeightFormulaStr_ = "1";
 }
 
@@ -96,6 +97,10 @@ void DataSetLoader::initialize() {
     // override: nominalWeightLeafName is deprecated
     _mcNominalWeightFormulaStr_ = JsonUtils::fetchValue(mcConfig, "nominalWeightLeafName", _mcNominalWeightFormulaStr_);
     _mcNominalWeightFormulaStr_ = JsonUtils::fetchValue(mcConfig, "nominalWeightFormula", _mcNominalWeightFormulaStr_);
+    
+    // override: nominalWeightLeafName is deprecated
+    _fakeDataWeightFormulaStr_ = JsonUtils::fetchValue(mcConfig, "fakeDataWeightLeafName", _fakeDataWeightFormulaStr_);
+    _fakeDataWeightFormulaStr_ = JsonUtils::fetchValue(mcConfig, "fakeDataWeightFormula", _fakeDataWeightFormulaStr_);
   }
 
   {
@@ -134,6 +139,9 @@ std::vector<std::string> &DataSetLoader::getDataActiveLeafNameList() {
 }
 const std::string &DataSetLoader::getMcNominalWeightFormulaStr() const {
   return _mcNominalWeightFormulaStr_;
+}
+const std::string &DataSetLoader::getFakeDataWeightFormulaStr() const {
+  return _fakeDataWeightFormulaStr_;
 }
 const std::string &DataSetLoader::getDataNominalWeightFormulaStr() const {
   return _dataNominalWeightFormulaStr_;
