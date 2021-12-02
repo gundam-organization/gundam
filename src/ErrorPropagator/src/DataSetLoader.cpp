@@ -358,12 +358,14 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
       SplineDial* spDialPtr;
       const DataBin* applyConditionBinPtr;
 
+      // Try to read TTree the closest to sequentially possible
       Long64_t nEventPerThread = nEvents/Long64_t(nThreads);
       Long64_t iEnd = nEvents;
       Long64_t iStart = Long64_t(iThread_)*nEventPerThread;
       if( iThread_+1 != nThreads ) iEnd = (Long64_t(iThread_)+1)*nEventPerThread;
       Long64_t iGlobal = 0;
 
+      // Load the branches
       threadChain->LoadTree(iStart);
 
       std::string progressTitle = LogInfo.getPrefixString() + "Reading selected events";
