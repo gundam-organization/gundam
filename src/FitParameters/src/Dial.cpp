@@ -72,7 +72,7 @@ std::string Dial::getSummary(){
   return ss.str();
 }
 double Dial::evalResponse(const double &parameterValue_) {
-  LogThrowIf(not _isInitialized_, "Can't eval response while dial is not initialized")
+//  LogThrowIf(not _isInitialized_, "Can't eval response while dial is not initialized")
 
   if( _dialParameterCache_ == parameterValue_ ){
     while( _isEditingCache_ ){ std::this_thread::sleep_for(std::chrono::nanoseconds(1)); }

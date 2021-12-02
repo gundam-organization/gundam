@@ -62,7 +62,7 @@ std::string SplineDial::getSummary() {
   return ss.str();
 }
 void SplineDial::fillResponseCache() {
-  LogThrowIf(_spline_.GetXmin() == _spline_.GetXmax(), "Spline is not valid.")
+//  LogThrowIf(_spline_.GetXmin() == _spline_.GetXmax(), "Spline is not valid.")
 
 //  if     ( _dialParameterCache_ < _splinePtr_->GetXmin() ) _dialResponseCache_ = _splinePtr_->Eval(_splinePtr_->GetXmin());
   if     ( _dialParameterCache_ < _spline_.GetXmin() ) _dialResponseCache_ = _spline_.Eval(_spline_.GetXmin());
@@ -76,7 +76,7 @@ void SplineDial::fillResponseCache() {
     _dialResponseCache_ = _minimumSplineResponse_;
   }
 
-  if( _throwIfResponseIsNegative_ and _dialResponseCache_ < 0 ){
+  if( _dialResponseCache_ < 0 and _throwIfResponseIsNegative_ ){
 
     this->writeSpline();
 
