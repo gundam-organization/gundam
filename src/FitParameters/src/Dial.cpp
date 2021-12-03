@@ -51,10 +51,8 @@ void Dial::setAssociatedParameterReference(void *associatedParameterReference) {
 }
 
 void Dial::initialize() {
-  if( _dialType_ == DialType::Invalid ){
-    LogError << "_dialType_ is not set." << std::endl;
-    throw std::logic_error("_dialType_ is not set.");
-  }
+  LogThrowIf( _dialType_ == DialType::Invalid, "_dialType_ is not set." );
+  LogThrowIf( _associatedParameterReference_ == nullptr,  "Parameter not set");
 }
 
 bool Dial::isInitialized() const {

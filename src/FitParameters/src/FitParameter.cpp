@@ -30,6 +30,7 @@ void FitParameter::reset() {
   _dialsWorkingDirectory_ = ".";
   _isEnabled_ = true;
   _isFixed_ = false;
+  _parSetRef_ = nullptr;
 }
 
 void FitParameter::setIsFixed(bool isFixed) {
@@ -77,6 +78,9 @@ void FitParameter::setMaxValue(double maxValue) {
 void FitParameter::setStepSize(double stepSize) {
   _stepSize_ = stepSize;
 }
+void FitParameter::setParSetRef(void *parSetRef) {
+  _parSetRef_ = parSetRef;
+}
 
 void FitParameter::initialize() {
 
@@ -84,6 +88,7 @@ void FitParameter::initialize() {
   LogThrowIf(_priorValue_     == std::numeric_limits<double>::quiet_NaN(), "Prior value is not set.");
   LogThrowIf(_stdDevValue_    == std::numeric_limits<double>::quiet_NaN(), "Std dev value is not set.");
   LogThrowIf(_parameterValue_ == std::numeric_limits<double>::quiet_NaN(), "Parameter value is not set.");
+  LogThrowIf(_parSetRef_      == nullptr, "Parameter set ref is not set.")
 
   _stepSize_ = _stdDevValue_ * 0.01; // default
 
@@ -206,4 +211,5 @@ std::string FitParameter::getTitle() const {
   if( not _name_.empty() ) ss << "_" << _name_;
   return ss.str();
 }
+
 

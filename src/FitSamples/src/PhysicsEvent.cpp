@@ -198,9 +198,8 @@ std::string PhysicsEvent::getSummary() const {
   if( not _rawDialPtrList_.empty() ){
     ss << std::endl << "Dials: ";
     for( auto* dialPtr : _rawDialPtrList_ ){
-      ss << std::endl << dialPtr << ": " << ( (FitParameter*) dialPtr->getAssociatedParameterReference() )->getTitle();
-      ss << "(" << ( (FitParameter*) dialPtr->getAssociatedParameterReference() )->getParameterValue() << ")";
-      ss << "/" << dialPtr->getSummary() << " = " << dialPtr->getDialResponseCache();
+      ss << std::endl << dialPtr << ": ";
+      ss << dialPtr->getSummary() << " = " << dialPtr->getDialResponseCache();
     }
   }
   else{

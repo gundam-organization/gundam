@@ -147,6 +147,7 @@ void FitParameterSet::initialize() {
   _parameterList_.reserve(_covarianceMatrix_->GetNcols()); // need to keep the memory at the same place -> FitParameter* will be used
   for(int iParameter = 0 ; iParameter < _covarianceMatrix_->GetNcols() ; iParameter++ ){
     _parameterList_.emplace_back();
+    _parameterList_.back().setParSetRef(this);
     _parameterList_.back().setParameterIndex(iParameter);
     _parameterList_.back().setName(_parameterNamesList_->At(iParameter)->GetName());
     _parameterList_.back().setParameterValue((*_parameterPriorList_)[iParameter]);

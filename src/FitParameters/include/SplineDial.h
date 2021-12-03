@@ -31,6 +31,8 @@ public:
   // Debug
   void writeSpline(const std::string &fileName_ = "") const;
 
+  void fastEval();
+
 protected:
   void fillResponseCache() override;
 
@@ -40,6 +42,13 @@ private:
   double _minimumSplineResponse_{std::nan("unset")};
 
   TSpline3 _spline_;
+
+  struct FastSpliner{
+    double x, y, b, c, d, num;
+    double stepsize{-1};
+    int l;
+  };
+  FastSpliner fs;
 
   // DEBUG
 

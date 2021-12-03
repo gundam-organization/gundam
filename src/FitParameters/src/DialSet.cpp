@@ -15,6 +15,7 @@
 
 #include "NormalizationDial.h"
 #include "SplineDial.h"
+#include "GraphDial.h"
 
 bool DialSet::_verboseMode_{false};
 
@@ -212,6 +213,7 @@ bool DialSet::initializeDialsWithDefinition() {
   if( not dialTypeStr.empty() ){
     dialsType = DialType::toDialType(dialTypeStr);
   }
+  _globalDialType_ = dialsType;
 
   _applyConditionStr_ = JsonUtils::fetchValue(dialsDefinition, "applyCondition", std::string(""));
   if( not _applyConditionStr_.empty() ){
@@ -254,22 +256,31 @@ bool DialSet::initializeDialsWithDefinition() {
 
         LogThrowIf(dialsList->GetSize() != binList.size(), "Number of dials (" << dialsList->GetSize() << ") don't match the number of bins " << binList.size() << "")
 
+        double minSplineResponse = std::nan("unset");
+        if( JsonUtils::doKeyExist(dialsDefinition, "minimumSplineResponse") ){
+          minSplineResponse = JsonUtils::fetchValue<double>(dialsDefinition, "minimumSplineResponse");
+        }
+
         for( int iBin = 0 ; iBin < binList.size() ; iBin++ ){
           if      ( dialsType == DialType::Spline ){
-            auto* dialPtr = new SplineDial();
-            dialPtr->setApplyConditionBin(binList.at(iBin));
-            dialPtr->copySpline((TSpline3*) dialsList->At(iBin));
-            if( JsonUtils::doKeyExist(dialsDefinition, "minimumSplineResponse") ){
-              dialPtr->setMinimumSplineResponse(
-                  JsonUtils::fetchValue<double>(dialsDefinition, "minimumSplineResponse")
-              );
-            }
-            dialPtr->setAssociatedParameterReference(_associatedParameterReference_);
-            dialPtr->initialize();
-            _dialList_.emplace_back(std::make_shared<SplineDial>(*dialPtr) );
+            SplineDial s;
+            s.setAssociatedParameterReference(_associatedParameterReference_);
+            s.setApplyConditionBin(binList.at(iBin));
+            s.copySpline((TSpline3*) dialsList->At(iBin));
+            s.setMinimumSplineResponse(minSplineResponse);
+            s.initialize();
+            _dialList_.emplace_back( std::make_shared<SplineDial>(s) );
           }
           else if( dialsType == DialType::Graph ){
-            // TODO
+            GraphDial g;
+            g.setAssociatedParameterReference(_associatedParameterReference_);
+            g.setApplyConditionBin(binList.at(iBin));
+            g.setGraph(*(TGraph*) dialsList->At(iBin));
+            g.initialize();
+            _dialList_.emplace_back( std::make_shared<GraphDial>(g) );
+          }
+          else{
+            LogThrow("Should not be here???")
           }
         }
 
@@ -277,6 +288,7 @@ bool DialSet::initializeDialsWithDefinition() {
 
       }
       else if ( JsonUtils::doKeyExist(dialsDefinition, "dialsTreePath") ) {
+        // OLD
         auto objPath = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsTreePath");
         auto* dialsTTree = (TTree*) dialsTFile->Get(objPath.c_str());
         if( dialsTTree == nullptr ){
@@ -353,4 +365,8 @@ bool DialSet::initializeDialsWithDefinition() {
   }
 
   return true;
+}
+
+DialType::DialType DialSet::getGlobalDialType() const {
+  return _globalDialType_;
 }

@@ -45,6 +45,8 @@ public:
   double getMinimumSplineResponse() const;
   size_t getCurrentDialOffset() const;
 
+  DialType::DialType getGlobalDialType() const;
+
 
   // Core
   std::string getSummary() const;

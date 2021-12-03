@@ -12,6 +12,7 @@
 #include "DataSetLoader.h"
 #include "DialSet.h"
 #include "GlobalVariables.h"
+#include "GraphDial.h"
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[DataSetLoader]");
@@ -259,13 +260,28 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
 
             // Reserve memory for additional dials (those on a tree leaf)
             if( not dialSetPtr->getDialLeafName().empty() ){
-              dialSetPtr->getDialList().resize(chainPtr->GetEntries(), nullptr);
-              LogTrace << par.getTitle() << " -> " << GET_VAR_NAME_VALUE(dialSetPtr->getMinimumSplineResponse()) << std::endl;
-              for( size_t iDial = dialSetPtr->getCurrentDialOffset() ; iDial < dialSetPtr->getDialList().size() ; iDial++ ){
-                dialSetPtr->getDialList()[iDial] = std::make_shared<SplineDial>();
-                ((SplineDial*)dialSetPtr->getDialList()[iDial].get())->setAssociatedParameterReference(&par);
-                ((SplineDial*)dialSetPtr->getDialList()[iDial].get())->setMinimumSplineResponse(dialSetPtr->getMinimumSplineResponse());
+              dialSetPtr->getDialList().resize(chainPtr->GetEntries(), nullptr); // to optimize?
+
+
+              auto dialType = dialSetPtr->getGlobalDialType();
+              if( dialType == DialType::Spline ){
+                for( size_t iDial = dialSetPtr->getCurrentDialOffset() ; iDial < dialSetPtr->getDialList().size() ; iDial++ ){
+                  dialSetPtr->getDialList()[iDial] = std::make_shared<SplineDial>();
+                  ((SplineDial*)dialSetPtr->getDialList()[iDial].get())->setAssociatedParameterReference(&par);
+                  ((SplineDial*)dialSetPtr->getDialList()[iDial].get())->setMinimumSplineResponse(dialSetPtr->getMinimumSplineResponse());
+                }
               }
+              else if( dialType == DialType::Graph ){
+                for( size_t iDial = dialSetPtr->getCurrentDialOffset() ; iDial < dialSetPtr->getDialList().size() ; iDial++ ){
+                  dialSetPtr->getDialList()[iDial] = std::make_shared<GraphDial>();
+                  ((GraphDial*)dialSetPtr->getDialList()[iDial].get())->setAssociatedParameterReference(&par);
+                }
+              }
+              else{
+                LogThrow("Invalid dial type for event-by-event dial: " << DialType::DialTypeEnumNamespace::toString(dialType))
+              }
+
+
             }
 
             // Add the dialSet to the list
@@ -356,6 +372,7 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
       size_t iDialSet, iDial;
       TGraph* grPtr{nullptr};
       SplineDial* spDialPtr;
+      GraphDial* grDialPtr;
       const DataBin* applyConditionBinPtr;
 
       // Try to read TTree the closest to sequentially possible
@@ -454,24 +471,23 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
                   if( not dialSetPtr->getDialLeafName().empty() ){
                     grPtr = (TGraph*) eventBuffer.getVariable<TClonesArray*>(dialSetPtr->getDialLeafName())->At(0);
                     if(grPtr->GetN() > 1){
-                      spDialPtr = (SplineDial*) dialSetPtr->getDialList()[iEntry].get();
-
-//                      eventOffSetMutex.lock();
-                      spDialPtr->createSpline( grPtr );
-//                      eventOffSetMutex.unlock();
-
-                      spDialPtr->initialize();
-                      // Adding dial in the event
-                      eventPtr->getRawDialPtrList()[eventDialOffset++] = spDialPtr;
-
-                      if( iEntry == 348660 ){
-                        LogTrace << GET_VAR_NAME_VALUE(spDialPtr) << std::endl;
-                        spDialPtr->writeSpline("BEFORE.root");
-                        for( int iP = 0 ; iP < grPtr->GetN() ; iP++ ){
-                          LogDebug << iP << " -> Y = " << grPtr->GetY()[iP] << std::endl;
-//                          LogDebug << GET_VAR_NAME_VALUE(spDialPtr->evalResponse()) << std::endl;
-                        }
-                      } // iEntry
+                      if      ( dialSetPtr->getGlobalDialType() == DialType::Spline ){
+                        spDialPtr = (SplineDial*) dialSetPtr->getDialList()[iEntry].get();
+                        spDialPtr->createSpline( grPtr );
+                        spDialPtr->initialize();
+                        // Adding dial in the event
+                        eventPtr->getRawDialPtrList()[eventDialOffset++] = spDialPtr;
+                      }
+                      else if( dialSetPtr->getGlobalDialType() == DialType::Graph ){
+                        grDialPtr = (GraphDial*) dialSetPtr->getDialList()[iEntry].get();
+                        grDialPtr->setGraph(*grPtr);
+                        grDialPtr->initialize();
+                        // Adding dial in the event
+                        eventPtr->getRawDialPtrList()[eventDialOffset++] = grDialPtr;
+                      }
+                      else{
+                        LogThrow("Unsupported event-by-event dial: " << DialType::DialTypeEnumNamespace::toString(dialSetPtr->getGlobalDialType()))
+                      }
                     }
                   }
                   else{

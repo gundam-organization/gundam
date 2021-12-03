@@ -339,7 +339,7 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
 
   if( nbSteps_ < 0 ){ nbSteps_ = _nbScanSteps_; }
 
-  double originalParValue = fetchCurrentParameterValue(iPar);
+//  double originalParValue = fetchCurrentParameterValue(iPar);
 
   //Internally Scan performs steps-1, so add one to actually get the number of steps
   //we ask for.
@@ -373,9 +373,9 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
   }
   _propagator_.preventRfPropagation();
 
-  _minimizer_->SetVariableValue(iPar, originalParValue);
-  this->updateParameterValue(iPar, originalParValue);
-  updateChi2Cache();
+//  _minimizer_->SetVariableValue(iPar, originalParValue);
+//  this->updateParameterValue(iPar, originalParValue);
+//  updateChi2Cache();
 
   delete[] x;
   delete[] y;
@@ -1030,13 +1030,17 @@ void FitterEngine::rescaleParametersStepSize(){
         parSet.propagateEigenToOriginal();
 
         updateChi2Cache();
-
         double deltaChi2 = _chi2Buffer_ - baseChi2;
         double deltaChi2Pulls = _chi2PullsBuffer_ - baseChi2Pull;
-        double stepSize = parSet.getEigenSigma(iEigen) * _parStepScale_ * TMath::Sqrt(deltaChi2Pulls)/TMath::Sqrt(deltaChi2);
+
+//        double stepSize = TMath::Sqrt(deltaChi2Pulls)/TMath::Sqrt(deltaChi2);
+        double stepSize = 1./TMath::Sqrt(deltaChi2);
+
         LogInfo << "Step size of " << parSet.getName() + "/eigen_#" << iEigen
-                << " -> σ x " << _parStepScale_ << " x " << TMath::Sqrt(std::fabs(deltaChi2Pulls))/TMath::Sqrt(std::fabs(deltaChi2))
+                << " -> σ x " << _parStepScale_ << " x " << stepSize
                 << " -> Δχ² = " << deltaChi2 << " = " << deltaChi2 - deltaChi2Pulls << "(stat) + " << deltaChi2Pulls << "(pulls)" << std::endl;
+
+        stepSize *= parSet.getEigenSigma(iEigen) * _parStepScale_;
 
         parSet.setEigenParStepSize(iEigen, stepSize);
         parSet.setEigenParameter(iEigen, currentParValue);
@@ -1058,10 +1062,19 @@ void FitterEngine::rescaleParametersStepSize(){
 
         double deltaChi2 = _chi2Buffer_ - baseChi2;
         double deltaChi2Pulls = _chi2PullsBuffer_ - baseChi2Pull;
-        double stepSize = par.getStdDevValue() * _parStepScale_ * TMath::Sqrt(deltaChi2Pulls)/TMath::Sqrt(deltaChi2);
+
+        // Consider a parabolic approx:
+        // only rescale with X2 stat?
+//        double stepSize = TMath::Sqrt(deltaChi2Pulls)/TMath::Sqrt(deltaChi2);
+
+        // full rescale
+        double stepSize = 1./TMath::Sqrt(deltaChi2);
+
         LogInfo << "Step size of " << parSet.getName() + "/" + par.getTitle()
-                << " -> σ x " << _parStepScale_ << " x " << TMath::Sqrt(std::fabs(deltaChi2Pulls))/TMath::Sqrt(std::fabs(deltaChi2))
-                << " -> Δχ² = " << deltaChi2 << " = " << deltaChi2 - deltaChi2Pulls << "(stat) + " << deltaChi2Pulls << "(pulls)" << std::endl;
+            << " -> σ x " << _parStepScale_ << " x " << stepSize
+            << " -> Δχ² = " << deltaChi2 << " = " << deltaChi2 - deltaChi2Pulls << "(stat) + " << deltaChi2Pulls << "(pulls)" << std::endl;
+
+        stepSize *= par.getStdDevValue() * _parStepScale_;
 
         par.setStepSize( stepSize );
         par.setParameterValue( currentParValue );
