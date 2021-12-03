@@ -77,9 +77,12 @@ void FitterEngine::initialize() {
     }
   }
 
-  _parStepScale_ = JsonUtils::fetchValue(_config_, "parStepScale", _parStepScale_);
-  LogInfo << "Using parameter step scale: " << _parStepScale_ << std::endl;
-  this->rescaleParametersStepSize();
+  if( JsonUtils::fetchValue(_config_, "enableParStepRescale", true) ){
+    _parStepScale_ = JsonUtils::fetchValue(_config_, "parStepScale", _parStepScale_);
+    LogInfo << "Using parameter step scale: " << _parStepScale_ << std::endl;
+    this->rescaleParametersStepSize();
+  }
+
 
   if( JsonUtils::fetchValue(_config_, "fixGhostFitParameters", false) ) this->fixGhostFitParameters();
 
@@ -252,7 +255,7 @@ void FitterEngine::fixGhostFitParameters(){
   std::stringstream ssPrint;
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 
-    if( not JsonUtils::fetchValue(parSet.getConfig(), "fixGhostFitParameters", true) ) {
+    if( not JsonUtils::fetchValue(parSet.getConfig(), "fixGhostFitParameters", false) ) {
       LogWarning << "Skipping \"" << parSet.getName() << "\" as fixGhostFitParameters is set to false" << std::endl;
       if( not parSet.isUseEigenDecompInFit() ) iFitPar += parSet.getNbParameters();
       else iFitPar += parSet.getNbEnabledEigenParameters();
@@ -1074,11 +1077,14 @@ void FitterEngine::rescaleParametersStepSize(){
 
         LogInfo << "Step size of " << parSet.getName() + "/" + par.getTitle()
             << " -> σ x " << _parStepScale_ << " x " << stepSize
-            << " -> Δχ² = " << deltaChi2 << " = " << deltaChi2 - deltaChi2Pulls << "(stat) + " << deltaChi2Pulls << "(pulls)" << std::endl;
+            << " -> Δχ² = " << deltaChi2 << " = " << deltaChi2 - deltaChi2Pulls << "(stat) + " << deltaChi2Pulls << "(pulls)";
 
         stepSize *= par.getStdDevValue() * _parStepScale_;
 
         par.setStepSize( stepSize );
+        par.setParameterValue( currentParValue + stepSize );
+        updateChi2Cache();
+        LogInfo << " -> Δχ²(step) = " << _chi2Buffer_ - baseChi2 << std::endl;
         par.setParameterValue( currentParValue );
       }
     }

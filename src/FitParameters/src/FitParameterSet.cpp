@@ -153,6 +153,7 @@ void FitParameterSet::initialize() {
     _parameterList_.back().setParameterValue((*_parameterPriorList_)[iParameter]);
     _parameterList_.back().setPriorValue((*_parameterPriorList_)[iParameter]);
     _parameterList_.back().setStdDevValue(TMath::Sqrt((*_covarianceMatrix_)[iParameter][iParameter]));
+    _parameterList_.back().setStepSize(TMath::Sqrt((*_covarianceMatrix_)[iParameter][iParameter]));
 
     _parameterList_.back().setDialsWorkingDirectory(JsonUtils::fetchValue<std::string>(_config_, "dialSetWorkingDirectory", "./"));
 
@@ -202,6 +203,9 @@ void FitParameterSet::initialize() {
     propagateOriginalToEigen();
     _eigenParPriorValues_ = std::shared_ptr<TVectorD>( (TVectorD*) _eigenParValues_->Clone() );
     _eigenParStepSize_ = std::shared_ptr<TVectorD>(new TVectorD(_eigenParValues_->GetNrows()));
+    for( int iEigen = 0 ; iEigen < _eigenParValues_->GetNrows() ; iEigen++ ){
+      (*_eigenParStepSize_)[iEigen] = this->getEigenSigma(iEigen);
+    }
     _eigenParFixedList_.resize( _eigenParStepSize_->GetNrows(), false );
   }
 
