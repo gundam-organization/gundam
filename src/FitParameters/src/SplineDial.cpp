@@ -60,12 +60,12 @@ void SplineDial::fillResponseCache() {
   if     ( _dialParameterCache_ < _spline_.GetXmin() ) _dialResponseCache_ = _spline_.Eval(_spline_.GetXmin());
   else if( _dialParameterCache_ > _spline_.GetXmax() ) _dialResponseCache_ = _spline_.Eval(_spline_.GetXmax());
   else   {
-    if( fs.stepsize == -1 ){
+//    if( fs.stepsize == -1 ){
       _dialResponseCache_ = _spline_.Eval(_dialParameterCache_);
-    }
-    else{
-      fastEval();
-    }
+//    }
+//    else{
+//      fastEval();
+//    }
   }
 
   // Checks
