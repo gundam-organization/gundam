@@ -392,6 +392,8 @@ void FitterEngine::throwMcParameters(double gain_) {
   int iFitPar = -1;
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 
+    if(not parSet.isEnabled()) continue;
+
     if( not parSet.isEnableThrowMcBeforeFit() ){
       LogWarning << "\"" << parSet.getName() << "\" has marked disabled throwMcBeforeFit: skipping." << std::endl;
       if( not parSet.isUseEigenDecompInFit() ) iFitPar += int(parSet.getParameterList().size());
@@ -399,13 +401,29 @@ void FitterEngine::throwMcParameters(double gain_) {
 
       for(auto& entry : JsonUtils::fetchValue(parSet.getConfig(), "moveMcParBeforeFit", std::vector<nlohmann::json>())){
         int parIndex = JsonUtils::fetchValue<int>(entry, "parIndex");
-        double pushVal =
-            parSet.getParameterList()[parIndex].getParameterValue()
-            + parSet.getParameterList()[parIndex].getStdDevValue()
-              * JsonUtils::fetchValue<double>(entry, "nbSigmaAway");
 
-        LogWarning << "Pushing #" << parIndex << " to " << pushVal << std::endl;
-        parSet.getParameterList()[parIndex].setParameterValue( pushVal );
+        double pushVal;
+        if( parSet.isUseEigenDecompInFit() ){
+          pushVal =
+              parSet.getEigenParameterValue(parIndex)
+              + parSet.getEigenSigma(parIndex)
+                * JsonUtils::fetchValue<double>(entry, "nbSigmaAway");
+
+
+          LogWarning << "Pushing eigen_#" << parIndex << " to " << pushVal << std::endl;
+          parSet.setEigenParameter(parIndex, pushVal);
+        }
+        else{
+          pushVal =
+              parSet.getParameterList()[parIndex].getParameterValue()
+              + parSet.getParameterList()[parIndex].getStdDevValue()
+                * JsonUtils::fetchValue<double>(entry, "nbSigmaAway");
+
+
+          LogWarning << "Pushing #" << parIndex << " to " << pushVal << std::endl;
+          parSet.getParameterList()[parIndex].setParameterValue( pushVal );
+        }
+
       }
 
       continue;
@@ -532,8 +550,10 @@ void FitterEngine::fit(){
     LogInfo << "Fit converged!" << std::endl;
 
     if( _enablePostFitScan_ ){
+      _fitUnderGoing_ = false;
       LogInfo << "Scanning parameters around the minimum point..." << std::endl;
       this->scanParameters(-1, "postFit/scan");
+      _fitUnderGoing_ = true;
     }
 
     LogInfo << "Evaluating post-fit errors..." << std::endl;
@@ -799,6 +819,7 @@ void FitterEngine::writePostFitData() {
 
   LogInfo << "Fitter covariance matrix is " << fitterCovarianceMatrix.GetNrows() << "x" << fitterCovarianceMatrix.GetNcols() << std::endl;
 
+
   int parameterIndexOffset = 0;
   for( const auto& parSet : _propagator_.getParameterSetsList() ){
 
@@ -866,21 +887,17 @@ void FitterEngine::writePostFitData() {
       corMatrixTH2D->Write("Correlation_Eigen_TH2D");
 
       auto* originalCovMatrix = new TMatrixD(int(parSet.getParameterList().size()), int(parSet.getParameterList().size()));
-      for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
-        for( int jEigen = 0 ; jEigen < parSet.getNbEnabledEigenParameters() ; jEigen++ ){
-          (*originalCovMatrix)[iEigen][jEigen] = (*covMatrix)[iEigen][jEigen];
-        }
-      }
+//      for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
+//        for( int jEigen = 0 ; jEigen < parSet.getNbEnabledEigenParameters() ; jEigen++ ){
+//          (*originalCovMatrix)[iEigen][jEigen] = (*covMatrix)[iEigen][jEigen];
+//        }
+//      }
 
-      (*originalCovMatrix) = (*parSet.getInvertedEigenVectors()) * (*originalCovMatrix) * (*parSet.getEigenVectors());
+      (*originalCovMatrix) = (*parSet.getInvertedEigenVectors());
+      (*originalCovMatrix) *= (*covMatrix);
+      (*originalCovMatrix) *= (*parSet.getEigenVectors());
 
-      for( int iBin = 0 ; iBin < originalCovMatrix->GetNrows() ; iBin++ ){
-        for( int jBin = 0 ; jBin < originalCovMatrix->GetNcols() ; jBin++ ){
-          if( parSet.getParameterList().at(iBin).isFixed() or parSet.getParameterList().at(jBin).isFixed() ){
-            (*originalCovMatrix)[iBin][jBin] = 0;
-          }
-        }
-      }
+//      (*originalCovMatrix) = (*parSet.getInvertedEigenVectors()) * (*originalCovMatrix) * (*parSet.getEigenVectors());
 
       covMatrix = originalCovMatrix;
 
@@ -979,6 +996,21 @@ void FitterEngine::writePostFitData() {
   errorDir->cd();
   fitterCovarianceMatrix.Write("fitterCovarianceMatrix_TMatrixDSym");
   fitterCovarianceMatrixTH2D->Write("fitterCovarianceMatrix_TH2D");
+
+  double hessianMatrixArray[_minimizer_->NDim() * _minimizer_->NDim()];
+  _minimizer_->GetHessianMatrix(hessianMatrixArray);
+  TMatrixDSym fitterHessianMatrix(int(_minimizer_->NDim()), hessianMatrixArray);
+
+  LogInfo << "Decomposing Hessian matrix..." << std::endl;
+  auto decompHessian = TMatrixDSymEigen(fitterHessianMatrix);
+
+  fitterHessianMatrix.Write("fitterHessianMatrix_TMatrixDSym");
+  auto* fitterHessianMatrix_TH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*)&fitterHessianMatrix);
+  fitterHessianMatrix_TH2D->Write("fitterHessianMatrix_TH2D");
+
+  decompHessian.GetEigenValues().Write("fitterHessianEigen_TVectorD");
+  auto* fitterHessianEigen_TH1D = GenericToolbox::convertTVectorDtoTH1D(&decompHessian.GetEigenValues());
+  fitterHessianEigen_TH1D->Write("fitterHessianEigen_TH1D");
 
 }
 

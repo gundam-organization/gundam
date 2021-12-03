@@ -84,7 +84,7 @@ int main(int argc, char** argv){
 
   fitter.updateChi2Cache();
   LogInfo << "Initial χ² = " << fitter.getChi2Buffer() << std::endl;
-
+  LogInfo << "Initial χ²(stat) = " << fitter.getChi2StatBuffer() << std::endl;
 
   // --------------------------
   // Pre-fit:
