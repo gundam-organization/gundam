@@ -12,6 +12,7 @@
 
 #include "JsonUtils.h"
 #include "FitterEngine.h"
+#include "GlobalVariables.h"
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[FitterEngine]");
@@ -743,6 +744,7 @@ double FitterEngine::evalFit(const double* parArray_){
     ss << "Avg χ² computation time: " << _evalFitAvgTimer_ << std::endl;
     if( not _propagator_.isUseResponseFunctions() ){
       ss << "├─ Current RAM: " << GenericToolbox::parseSizeUnits(GenericToolbox::getProcessMemoryUsage()) << std::endl;
+//      if(GlobalVariables::isEnableDevMode()) ss << "├─ Avg time to update dial caches: " << _propagator_.dialUpdate << std::endl;
       ss << "├─ Avg time to propagate weights: " << _propagator_.weightProp << std::endl;
       ss << "├─ Avg time to fill histograms: " << _propagator_.fillProp;
     }
@@ -1083,7 +1085,9 @@ void FitterEngine::rescaleParametersStepSize(){
 
   }
 
+  LogInfo << "Reupdating chi2..." << std::endl;
   updateChi2Cache();
+  LogDebug << "END" << std::endl;
 
 }
 void FitterEngine::initializeMinimizer(bool doReleaseFixed_){

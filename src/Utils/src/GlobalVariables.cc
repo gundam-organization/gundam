@@ -5,6 +5,7 @@
 #include "GlobalVariables.h"
 
 // INIT
+bool GlobalVariables::_enableDevMode_{false};
 int GlobalVariables::_nbThreads_ = 1;
 std::mutex GlobalVariables::_threadMutex_;
 std::map<std::string, bool> GlobalVariables::_boolMap_;
@@ -21,6 +22,7 @@ void GlobalVariables::setNbThreads(int nbThreads_){
   _threadPool_.initialize();
 }
 
+bool GlobalVariables::isEnableDevMode(){ return _enableDevMode_; }
 const int& GlobalVariables::getNbThreads(){ return _nbThreads_; }
 std::mutex& GlobalVariables::getThreadMutex() { return _threadMutex_; }
 std::map<std::string, bool>& GlobalVariables::getBoolMap() { return _boolMap_; }

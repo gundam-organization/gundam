@@ -161,6 +161,9 @@ double FitParameter::getMaxValue() const {
 double FitParameter::getStepSize() const {
   return _stepSize_;
 }
+void *FitParameter::getParSetRef() const {
+  return _parSetRef_;
+}
 
 
 double FitParameter::getDistanceFromNominal() const{
@@ -211,5 +214,4 @@ std::string FitParameter::getTitle() const {
   if( not _name_.empty() ) ss << "_" << _name_;
   return ss.str();
 }
-
 

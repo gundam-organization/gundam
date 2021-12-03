@@ -196,9 +196,9 @@ std::string PhysicsEvent::getSummary() const {
   ss << std::endl << GET_VAR_NAME_VALUE(_sampleBinIndex_);
 
   if( not _rawDialPtrList_.empty() ){
-    ss << std::endl << "Dials: ";
+    ss << std::endl << "List of dials: ";
     for( auto* dialPtr : _rawDialPtrList_ ){
-      ss << std::endl << dialPtr << ": ";
+      ss << std::endl << "- ";
       ss << dialPtr->getSummary() << " = " << dialPtr->getDialResponseCache();
     }
   }

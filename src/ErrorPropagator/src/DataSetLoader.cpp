@@ -475,6 +475,7 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
                         spDialPtr = (SplineDial*) dialSetPtr->getDialList()[iEntry].get();
                         spDialPtr->createSpline( grPtr );
                         spDialPtr->initialize();
+                        spDialPtr->setIsReferenced(true);
                         // Adding dial in the event
                         eventPtr->getRawDialPtrList()[eventDialOffset++] = spDialPtr;
                       }
@@ -482,6 +483,7 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
                         grDialPtr = (GraphDial*) dialSetPtr->getDialList()[iEntry].get();
                         grDialPtr->setGraph(*grPtr);
                         grDialPtr->initialize();
+                        grDialPtr->setIsReferenced(true);
                         // Adding dial in the event
                         eventPtr->getRawDialPtrList()[eventDialOffset++] = grDialPtr;
                       }
@@ -524,6 +526,7 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
                       } // Bin var loop
                       // <------------------
                       if( isEventInDialBin ) {
+                        dialSetPtr->getDialList()[iDial]->setIsReferenced(true);
                         eventPtr->getRawDialPtrList()[eventDialOffset++] = dialSetPtr->getDialList()[iDial].get();
                         break;
                       }

@@ -33,6 +33,7 @@ void Propagator::reset() {
   for( const auto& jobName : GlobalVariables::getParallelWorker().getJobNameList() ){
     if(jobName == "Propagator::fillEventDialCaches"
     or jobName == "Propagator::reweightSampleEvents"
+    or jobName == "Propagator::updateDialResponses"
     or jobName == "Propagator::refillSampleHistograms"
     or jobName == "Propagator::applyResponseFunctions"
       ){
@@ -128,6 +129,11 @@ void Propagator::initialize() {
   } // dataSets
 
   _fitSampleSet_.loadAsimovData();
+
+//  if( GlobalVariables::isEnableDevMode() ){
+//    LogInfo << "Loading dials stack..." << std::endl;
+//    fillDialsStack();
+//  }
 
   LogInfo << "Initializing threads..." << std::endl;
   initializeThreads();
@@ -235,6 +241,7 @@ const json &Propagator::getConfig() const {
 void Propagator::propagateParametersOnSamples(){
 
   if(not _useResponseFunctions_ or not _isRfPropagationEnabled_ ){
+//    if(GlobalVariables::isEnableDevMode()) updateDialResponses();
     reweightSampleEvents();
     refillSampleHistograms();
   }
@@ -242,6 +249,11 @@ void Propagator::propagateParametersOnSamples(){
     applyResponseFunctions();
   }
 
+}
+void Propagator::updateDialResponses(){
+  GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+  GlobalVariables::getParallelWorker().runJob("Propagator::updateDialResponses");
+  dialUpdate.counts++; dialUpdate.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 }
 void Propagator::reweightSampleEvents() {
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
@@ -272,6 +284,21 @@ void Propagator::allowRfPropagation(){
   }
 }
 
+void Propagator::fillDialsStack(){
+  for( auto& parSet : _parameterSetsList_ ){
+    if( not parSet.isUseEigenDecompInFit() ){
+      for( auto& par : parSet.getParameterList() ){
+        for( auto& dialSet : par.getDialSetList() ){
+          if(dialSet.getGlobalDialType() == DialType::Normalization){ continue; } // no cache needed
+          for( auto& dial : dialSet.getDialList() ){
+            if(dial->isReferenced()) _dialsStack_.emplace_back(dial.get());
+          }
+        }
+      }
+    }
+  }
+}
+
 
 // Protected
 void Propagator::initializeThreads() {
@@ -280,6 +307,12 @@ void Propagator::initializeThreads() {
     this->reweightSampleEvents(iThread);
   };
   GlobalVariables::getParallelWorker().addJob("Propagator::reweightSampleEvents", reweightSampleEventsFct);
+
+  std::function<void(int)> updateDialResponsesFct = [this](int iThread){
+    this->updateDialResponses(iThread);
+  };
+  GlobalVariables::getParallelWorker().addJob("Propagator::updateDialResponses", updateDialResponsesFct);
+
 
   std::function<void(int)> refillSampleHistogramsFct = [this](int iThread){
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
@@ -367,6 +400,22 @@ void Propagator::makeResponseFunctions(){
   LogInfo << "RF built" << std::endl;
 }
 
+void Propagator::updateDialResponses(int iThread_){
+  int nThreads = GlobalVariables::getNbThreads();
+  if(iThread_ == -1){
+    // force single thread
+    nThreads = 1;
+    iThread_ = 0;
+  }
+  int iDial{0};
+  int nDials(int(_dialsStack_.size()));
+
+  while( iDial < nDials ){
+    _dialsStack_[iDial]->evalResponse();
+    iDial += nThreads;
+  }
+
+}
 void Propagator::reweightSampleEvents(int iThread_) {
   int nThreads = GlobalVariables::getNbThreads();
   if(iThread_ == -1){

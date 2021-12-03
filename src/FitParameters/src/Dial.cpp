@@ -8,6 +8,9 @@
 
 #include "Dial.h"
 #include "FitParameter.h"
+#include "FitParameterSet.h"
+#include "GlobalVariables.h"
+
 
 
 LoggerInit([](){
@@ -41,6 +44,7 @@ void Dial::reset() {
   _applyConditionBin_ = DataBin();
   _dialType_ = DialType::Invalid;
   _associatedParameterReference_ = nullptr;
+//  dialMutex = std::make_unique<std::mutex>();
 }
 
 void Dial::setApplyConditionBin(const DataBin &applyConditionBin) {
@@ -48,6 +52,9 @@ void Dial::setApplyConditionBin(const DataBin &applyConditionBin) {
 }
 void Dial::setAssociatedParameterReference(void *associatedParameterReference) {
   _associatedParameterReference_ = associatedParameterReference;
+}
+void Dial::setIsReferenced(bool isReferenced) {
+  _isReferenced_ = isReferenced;
 }
 
 void Dial::initialize() {
@@ -61,25 +68,29 @@ bool Dial::isInitialized() const {
 std::string Dial::getSummary(){
   std::stringstream ss;
   if( _associatedParameterReference_ != nullptr ){
-    ss << ((FitParameter*) _associatedParameterReference_)->getTitle();
+    ss << ((FitParameterSet*)((FitParameter*) _associatedParameterReference_)->getParSetRef())->getName();
+    ss << "/" << ((FitParameter*) _associatedParameterReference_)->getTitle();
     ss << "(" << ((FitParameter*) _associatedParameterReference_)->getParameterValue() << ")";
     ss << "/";
   }
-  ss << DialType::DialTypeEnumNamespace::toString(_dialType_);
+  ss << DialType::DialTypeEnumNamespace::toString(_dialType_, true);
   if( not _applyConditionBin_.getEdgesList().empty() ) ss << ":b{" << _applyConditionBin_.getSummary() << "}";
   return ss.str();
 }
-double Dial::evalResponse(const double &parameterValue_) {
-//  LogThrowIf(not _isInitialized_, "Can't eval response while dial is not initialized")
+bool Dial::isReferenced() const {
+  return _isReferenced_;
+}
+
+double Dial::evalResponse(double parameterValue_) {
 
   if( _dialParameterCache_ == parameterValue_ ){
-    while( _isEditingCache_ ){ std::this_thread::sleep_for(std::chrono::nanoseconds(1)); }
+    while( _isEditingCache_.atomicValue ){ }
     return _dialResponseCache_;
   }
-  _isEditingCache_ = true;
+  _isEditingCache_.atomicValue = true;
   _dialParameterCache_ = parameterValue_;
   this->fillResponseCache(); // specified in the corresponding dial class
-  _isEditingCache_ = false;
+  _isEditingCache_.atomicValue = false;
 
   return _dialResponseCache_;
 }
@@ -137,4 +148,5 @@ DialType::DialType Dial::getDialType() const {
 void *Dial::getAssociatedParameterReference() const {
   return _associatedParameterReference_;
 }
+
 

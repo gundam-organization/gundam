@@ -6,6 +6,7 @@
 #include "GenericToolbox.h"
 
 #include "GraphDial.h"
+#include "GlobalVariables.h"
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[GraphDial]");
@@ -34,31 +35,37 @@ std::string GraphDial::getSummary() {
   return ss.str();
 }
 
+
+//double GraphDial::evalResponse(const double &parameterValue_) {
+//  return _graph_.Eval(parameterValue_);
+//}
 void GraphDial::fillResponseCache() {
   if     (_dialParameterCache_ <= _graph_.GetX()[0])                { _dialResponseCache_ = _graph_.GetY()[0]; }
   else if(_dialParameterCache_ >= _graph_.GetX()[_graph_.GetN()-1]) { _dialResponseCache_ = _graph_.GetY()[_graph_.GetN() - 1]; }
   else{
-    for( iPt = 0 ; iPt < _graph_.GetN()-1 ; iPt++){
-      if(_dialParameterCache_ == _graph_.GetX()[iPt+1]){
-        _dialResponseCache_ = _graph_.GetY()[iPt+1];
-        break;
-      }
-      if(_dialParameterCache_ < _graph_.GetX()[iPt+1]){
-        // LOWEST MEMORY ALLOCATION:
-        _dialResponseCache_ =
-            _graph_.GetY()[iPt+1] +
-            (_dialParameterCache_ - _graph_.GetX()[iPt+1])
-            * (_graph_.GetY()[iPt+1] - _graph_.GetY()[iPt])/(_graph_.GetX()[iPt+1] - _graph_.GetX()[iPt]);
-        break;
-      }
-    }
-    if(iPt == _graph_.GetN()-1){
-      _graph_.Print();
-      LogThrow("Could not find matching point for " << GET_VAR_NAME_VALUE(_dialParameterCache_));
-    }
+    _dialResponseCache_ = _graph_.Eval(_dialParameterCache_);
+//    for( iPt = 0 ; iPt < _graph_.GetN()-1 ; iPt++){
+//      if(_dialParameterCache_ == _graph_.GetX()[iPt+1]){
+//        _dialResponseCache_ = _graph_.GetY()[iPt+1];
+//        break;
+//      }
+//      if(_dialParameterCache_ < _graph_.GetX()[iPt+1]){
+//        // LOWEST MEMORY ALLOCATION:
+//        _dialResponseCache_ =
+//            _graph_.GetY()[iPt+1] +
+//            (_dialParameterCache_ - _graph_.GetX()[iPt+1])
+//            * (_graph_.GetY()[iPt+1] - _graph_.GetY()[iPt])/(_graph_.GetX()[iPt+1] - _graph_.GetX()[iPt]);
+//        break;
+//      }
+//    }
+//    if(iPt == _graph_.GetN()-1){
+//      _graph_.Print();
+//      LogThrow("Could not find matching point for " << GET_VAR_NAME_VALUE(_dialParameterCache_));
+//    }
   }
 
   if(_dialResponseCache_ < 0){
+    GlobalVariables::getThreadMutex().lock();
     _graph_.Print();
     LogError << GET_VAR_NAME_VALUE(_dialParameterCache_) << " -> " << _dialResponseCache_ << std::endl;
     LogThrow("NEGATIVE GRAPH RESPONSE");
@@ -73,3 +80,4 @@ void GraphDial::setGraph(const TGraph &graph) {
   _graph_ = graph;
   _graph_.Sort();
 }
+

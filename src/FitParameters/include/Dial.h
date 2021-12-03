@@ -12,6 +12,7 @@
 #include "TSpline.h"
 
 #include "GenericToolbox.h"
+#include "GenericToolbox.Wrappers.h"
 
 #include "DataBin.h"
 
@@ -41,6 +42,7 @@ public:
 
   void setApplyConditionBin(const DataBin &applyConditionBin);
   void setAssociatedParameterReference(void *associatedParameterReference);
+  void setIsReferenced(bool isReferenced);
 
   virtual void initialize();
 
@@ -51,9 +53,10 @@ public:
   DataBin &getApplyConditionBin();
   DialType::DialType getDialType() const;
   void *getAssociatedParameterReference() const;
+  bool isReferenced() const;
 
   virtual std::string getSummary();
-  virtual double evalResponse(const double& parameterValue_);
+  virtual double evalResponse(double parameterValue_);
   double evalResponse();
 
   void copySplineCache(TSpline3& splineBuffer_);
@@ -70,7 +73,9 @@ protected:
 
   // Internals
   bool _isInitialized_{false};
-  bool _isEditingCache_{false};
+  GenericToolbox::AtomicWrapper<bool> _isEditingCache_{false};
+  bool _isReferenced_{false};
+  bool _useMirrorDial_{false}; // TODO
   double _dialResponseCache_{};
   double _dialParameterCache_{};
   std::shared_ptr<TSpline3> _responseSplineCache_{nullptr};

@@ -22,6 +22,7 @@ public:
   static void setNbThreads(int nbThreads_);
 
   // Getters
+  static bool isEnableDevMode();
   static const int& getNbThreads();
   static std::mutex& getThreadMutex();
   static std::map<std::string, bool>& getBoolMap();
@@ -30,6 +31,7 @@ public:
 
 private:
 
+  static bool _enableDevMode_;
   static int _nbThreads_;
   static std::mutex _threadMutex_;
   static std::map<std::string, bool> _boolMap_;

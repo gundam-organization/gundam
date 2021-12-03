@@ -20,6 +20,7 @@ public:
 
   void initialize() override;
 
+//  double evalResponse(const double &parameterValue_) override;
   void fillResponseCache() override;
 
   std::string getSummary() override;

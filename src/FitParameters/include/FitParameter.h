@@ -50,6 +50,8 @@ public:
   double getMaxValue() const;
   double getStepSize() const;
 
+  void *getParSetRef() const;
+
   // Core
   double getDistanceFromNominal() const; // in unit of sigmas
   DialSet* findDialSet(const std::string& dataSetName_);
