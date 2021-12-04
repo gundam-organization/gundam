@@ -17,7 +17,7 @@ LoggerInit([](){
 
 ND280Fitter::ND280Fitter() {
 
-  ROOT::EnableImplicitMT();
+  ROOT::EnableImplicitMT(GlobalVariables::getNbThreads());
 
   // Memory allocation
   _PRNG_ = new TRandom3();

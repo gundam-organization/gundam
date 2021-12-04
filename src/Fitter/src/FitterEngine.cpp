@@ -12,6 +12,7 @@
 
 #include "JsonUtils.h"
 #include "FitterEngine.h"
+#include "GlobalVariables.h"
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[FitterEngine]");
@@ -76,7 +77,13 @@ void FitterEngine::initialize() {
     }
   }
 
-  this->rescaleParametersStepSize();
+  if( JsonUtils::fetchValue(_config_, "enableParStepRescale", true) ){
+    _parStepScale_ = JsonUtils::fetchValue(_config_, "parStepScale", _parStepScale_);
+    LogInfo << "Using parameter step scale: " << _parStepScale_ << std::endl;
+    this->rescaleParametersStepSize();
+  }
+
+
   if( JsonUtils::fetchValue(_config_, "fixGhostFitParameters", false) ) this->fixGhostFitParameters();
 
   _convergenceMonitor_.addDisplayedQuantity("VarName");
@@ -105,8 +112,12 @@ void FitterEngine::initialize() {
 
   this->initializeMinimizer();
 
-  _parStepScale_ = JsonUtils::fetchValue(_config_, "parStepScale", _parStepScale_);
-  LogInfo << "Using parameter step scale: " << _parStepScale_ << std::endl;
+  if( JsonUtils::fetchValue(_config_, "throwMcBeforeFit", false) ){
+    LogInfo << "Throwing MC parameters (uncorrelated) away from their prior..." << std::endl;
+    double throwGain = JsonUtils::fetchValue(_config_, "throwMcBeforeFitGain", 1.);
+    LogInfo << "Throw gain set to: " << throwGain << std::endl;
+    this->throwMcParameters(throwGain);
+  }
 
 }
 
@@ -149,7 +160,7 @@ void FitterEngine::generateOneSigmaPlots(const std::string& savePath_){
 
     if( not parSet.isEnabled() ) continue;
 
-    if( JsonUtils::fetchValue(parSet.getJsonConfig(), "disableOneSigmaPlots", false) ){
+    if( JsonUtils::fetchValue(parSet.getConfig(), "disableOneSigmaPlots", false) ){
       LogDebug << "+1σ plots disabled for \"" << parSet.getName() << "\"" << std::endl;
       continue;
     }
@@ -244,7 +255,7 @@ void FitterEngine::fixGhostFitParameters(){
   std::stringstream ssPrint;
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 
-    if( not JsonUtils::fetchValue(parSet.getJsonConfig(), "fixGhostFitParameters", true) ) {
+    if( not JsonUtils::fetchValue(parSet.getConfig(), "fixGhostFitParameters", false) ) {
       LogWarning << "Skipping \"" << parSet.getName() << "\" as fixGhostFitParameters is set to false" << std::endl;
       if( not parSet.isUseEigenDecompInFit() ) iFitPar += parSet.getNbParameters();
       else iFitPar += parSet.getNbEnabledEigenParameters();
@@ -332,7 +343,7 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
 
   if( nbSteps_ < 0 ){ nbSteps_ = _nbScanSteps_; }
 
-  double originalParValue = fetchCurrentParameterValue(iPar);
+//  double originalParValue = fetchCurrentParameterValue(iPar);
 
   //Internally Scan performs steps-1, so add one to actually get the number of steps
   //we ask for.
@@ -366,9 +377,9 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
   }
   _propagator_.preventRfPropagation();
 
-  _minimizer_->SetVariableValue(iPar, originalParValue);
-  this->updateParameterValue(iPar, originalParValue);
-  updateChi2Cache();
+//  _minimizer_->SetVariableValue(iPar, originalParValue);
+//  this->updateParameterValue(iPar, originalParValue);
+//  updateChi2Cache();
 
   delete[] x;
   delete[] y;
@@ -378,21 +389,84 @@ void FitterEngine::throwMcParameters(double gain_) {
   LogInfo << __METHOD_NAME__ << std::endl;
 
   // TODO: IMPLEMENT CHOLESKY DECOMP
-  int iPar = -1;
+  int iFitPar = -1;
   for( auto& parSet : _propagator_.getParameterSetsList() ){
+
+    if(not parSet.isEnabled()) continue;
+
+    if( not parSet.isEnableThrowMcBeforeFit() ){
+      LogWarning << "\"" << parSet.getName() << "\" has marked disabled throwMcBeforeFit: skipping." << std::endl;
+      if( not parSet.isUseEigenDecompInFit() ) iFitPar += int(parSet.getParameterList().size());
+      else iFitPar += int(parSet.getNbEnabledEigenParameters());
+
+      for(auto& entry : JsonUtils::fetchValue(parSet.getConfig(), "moveMcParBeforeFit", std::vector<nlohmann::json>())){
+        int parIndex = JsonUtils::fetchValue<int>(entry, "parIndex");
+
+        double pushVal;
+        if( parSet.isUseEigenDecompInFit() ){
+          pushVal =
+              parSet.getEigenParameterValue(parIndex)
+              + parSet.getEigenSigma(parIndex)
+                * JsonUtils::fetchValue<double>(entry, "nbSigmaAway");
+
+
+          LogWarning << "Pushing eigen_#" << parIndex << " to " << pushVal << std::endl;
+          parSet.setEigenParameter(parIndex, pushVal);
+        }
+        else{
+          pushVal =
+              parSet.getParameterList()[parIndex].getParameterValue()
+              + parSet.getParameterList()[parIndex].getStdDevValue()
+                * JsonUtils::fetchValue<double>(entry, "nbSigmaAway");
+
+
+          LogWarning << "Pushing #" << parIndex << " to " << pushVal << std::endl;
+          parSet.getParameterList()[parIndex].setParameterValue( pushVal );
+        }
+
+      }
+
+      continue;
+    }
+    else{
+      LogWarning << "Throwing correlated parameters for \"" << parSet.getName() << "\"" << std::endl;
+    }
+
+
     if( not parSet.isUseEigenDecompInFit() ){
+
+      auto throws = GenericToolbox::throwCorrelatedParameters(
+          GenericToolbox::getCholeskyMatrix(parSet.getOriginalCovarianceMatrix())
+      );
+
+      int iPar{-1};
       for( auto& par : parSet.getParameterList() ){
-        iPar++;
-        if( not _minimizer_->IsFixedVariable(iPar) ){
-          par.setParameterValue( par.getPriorValue() + gain_ * _prng_.Gaus(0, par.getStdDevValue()) );
-          _minimizer_->SetVariableValue( iPar, par.getParameterValue() );
+        iFitPar++; iPar++;
+
+        if( not _minimizer_->IsFixedVariable(iFitPar) ){
+          LogInfo << "Throwing par " << par.getTitle() << ": " << par.getParameterValue();
+          par.setParameterValue(
+              par.getPriorValue()
+              + gain_ * throws[iPar] );
+          LogInfo << " → " << par.getParameterValue() << std::endl;
+          _minimizer_->SetVariableValue(iFitPar, par.getParameterValue() );
         }
       }
     }
     else{
       for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
-        iPar++;
-        if( not _minimizer_->IsFixedVariable(iPar) ){
+        iFitPar++;
+        if( not parSet.isEnableThrowMcBeforeFit() ) continue;
+        if( not _minimizer_->IsFixedVariable(iFitPar) ){
+          LogInfo << "Throwing eigen #" << iEigen << ": " << parSet.getEigenParameterValue(iEigen);
+          parSet.setEigenParameter(
+              iEigen,
+              parSet.getEigenParameterValue(iEigen)
+              + gain_ * _prng_.Gaus(0, parSet.getEigenSigma(iEigen) )
+          );
+          LogInfo << " → " << parSet.getEigenParameterValue(iEigen) << std::endl;
+          _minimizer_->SetVariableValue(iFitPar, parSet.getEigenParameterValue(iEigen) );
+
           // placeholder
         }
       }
@@ -406,13 +480,6 @@ void FitterEngine::throwMcParameters(double gain_) {
 
 void FitterEngine::fit(){
   LogWarning << __METHOD_NAME__ << std::endl;
-
-  if( JsonUtils::fetchValue(_config_, "throwMcBeforeFit", false) ){
-    LogInfo << "Throwing MC parameters (uncorrelated) away from their prior..." << std::endl;
-    double throwGain = JsonUtils::fetchValue(_config_, "throwMcBeforeFitGain", 1.);
-    LogInfo << "Throw gain set to: " << throwGain << std::endl;
-    this->throwMcParameters(throwGain);
-  }
 
   LogWarning << "─────────────────────────────" << std::endl;
   LogWarning << "Summary of the fit parameters" << std::endl;
@@ -483,8 +550,10 @@ void FitterEngine::fit(){
     LogInfo << "Fit converged!" << std::endl;
 
     if( _enablePostFitScan_ ){
+      _fitUnderGoing_ = false;
       LogInfo << "Scanning parameters around the minimum point..." << std::endl;
       this->scanParameters(-1, "postFit/scan");
+      _fitUnderGoing_ = true;
     }
 
     LogInfo << "Evaluating post-fit errors..." << std::endl;
@@ -498,7 +567,7 @@ void FitterEngine::fit(){
         LogInfo << "Releasing parameters for error evaluation..." << std::endl;
         for( auto& parSet : _propagator_.getParameterSetsList() ){
 
-          if( not JsonUtils::fetchValue(parSet.getJsonConfig(), "releaseFixedParametersOnHesse", true) ){
+          if( not JsonUtils::fetchValue(parSet.getConfig(), "releaseFixedParametersOnHesse", true) ){
             continue;
           }
 
@@ -531,7 +600,7 @@ void FitterEngine::fit(){
 
         iFitPar = -1;
         for( auto& parSet : _propagator_.getParameterSetsList() ){
-          if( JsonUtils::fetchValue(parSet.getJsonConfig(), "skipMinos", false) ){
+          if( JsonUtils::fetchValue(parSet.getConfig(), "skipMinos", false) ){
             LogWarning << "Minos error evaluation is disabled for parSet: " << parSet.getName() << std::endl;
             continue;
           }
@@ -698,6 +767,7 @@ double FitterEngine::evalFit(const double* parArray_){
     ss << "Avg χ² computation time: " << _evalFitAvgTimer_ << std::endl;
     if( not _propagator_.isUseResponseFunctions() ){
       ss << "├─ Current RAM: " << GenericToolbox::parseSizeUnits(GenericToolbox::getProcessMemoryUsage()) << std::endl;
+//      if(GlobalVariables::isEnableDevMode()) ss << "├─ Avg time to update dial caches: " << _propagator_.dialUpdate << std::endl;
       ss << "├─ Avg time to propagate weights: " << _propagator_.weightProp << std::endl;
       ss << "├─ Avg time to fill histograms: " << _propagator_.fillProp;
     }
@@ -748,6 +818,7 @@ void FitterEngine::writePostFitData() {
   TH2D* fitterCovarianceMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) &fitterCovarianceMatrix, "fitterCovarianceMatrixTH2D");
 
   LogInfo << "Fitter covariance matrix is " << fitterCovarianceMatrix.GetNrows() << "x" << fitterCovarianceMatrix.GetNcols() << std::endl;
+
 
   int parameterIndexOffset = 0;
   for( const auto& parSet : _propagator_.getParameterSetsList() ){
@@ -816,21 +887,17 @@ void FitterEngine::writePostFitData() {
       corMatrixTH2D->Write("Correlation_Eigen_TH2D");
 
       auto* originalCovMatrix = new TMatrixD(int(parSet.getParameterList().size()), int(parSet.getParameterList().size()));
-      for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
-        for( int jEigen = 0 ; jEigen < parSet.getNbEnabledEigenParameters() ; jEigen++ ){
-          (*originalCovMatrix)[iEigen][jEigen] = (*covMatrix)[iEigen][jEigen];
-        }
-      }
+//      for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
+//        for( int jEigen = 0 ; jEigen < parSet.getNbEnabledEigenParameters() ; jEigen++ ){
+//          (*originalCovMatrix)[iEigen][jEigen] = (*covMatrix)[iEigen][jEigen];
+//        }
+//      }
 
-      (*originalCovMatrix) = (*parSet.getInvertedEigenVectors()) * (*originalCovMatrix) * (*parSet.getEigenVectors());
+      (*originalCovMatrix) = (*parSet.getInvertedEigenVectors());
+      (*originalCovMatrix) *= (*covMatrix);
+      (*originalCovMatrix) *= (*parSet.getEigenVectors());
 
-      for( int iBin = 0 ; iBin < originalCovMatrix->GetNrows() ; iBin++ ){
-        for( int jBin = 0 ; jBin < originalCovMatrix->GetNcols() ; jBin++ ){
-          if( parSet.getParameterList().at(iBin).isFixed() or parSet.getParameterList().at(jBin).isFixed() ){
-            (*originalCovMatrix)[iBin][jBin] = 0;
-          }
-        }
-      }
+//      (*originalCovMatrix) = (*parSet.getInvertedEigenVectors()) * (*originalCovMatrix) * (*parSet.getEigenVectors());
 
       covMatrix = originalCovMatrix;
 
@@ -930,6 +997,21 @@ void FitterEngine::writePostFitData() {
   fitterCovarianceMatrix.Write("fitterCovarianceMatrix_TMatrixDSym");
   fitterCovarianceMatrixTH2D->Write("fitterCovarianceMatrix_TH2D");
 
+  double hessianMatrixArray[_minimizer_->NDim() * _minimizer_->NDim()];
+  _minimizer_->GetHessianMatrix(hessianMatrixArray);
+  TMatrixDSym fitterHessianMatrix(int(_minimizer_->NDim()), hessianMatrixArray);
+
+  LogInfo << "Decomposing Hessian matrix..." << std::endl;
+  auto decompHessian = TMatrixDSymEigen(fitterHessianMatrix);
+
+  fitterHessianMatrix.Write("fitterHessianMatrix_TMatrixDSym");
+  auto* fitterHessianMatrix_TH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*)&fitterHessianMatrix);
+  fitterHessianMatrix_TH2D->Write("fitterHessianMatrix_TH2D");
+
+  decompHessian.GetEigenValues().Write("fitterHessianEigen_TVectorD");
+  auto* fitterHessianEigen_TH1D = GenericToolbox::convertTVectorDtoTH1D(&decompHessian.GetEigenValues());
+  fitterHessianEigen_TH1D->Write("fitterHessianEigen_TH1D");
+
 }
 
 double FitterEngine::fetchCurrentParameterValue(int iFitPar_) {
@@ -975,28 +1057,6 @@ void FitterEngine::rescaleParametersStepSize(){
   int iFitPar = -1;
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 
-    for( auto& par : parSet.getParameterList() ){
-      iFitPar++;
-
-      if( not par.isEnabled() ){
-        continue;
-      }
-
-      double currentParValue = par.getParameterValue();
-      par.setParameterValue( currentParValue + par.getStdDevValue() );
-
-      updateChi2Cache();
-
-      double deltaChi2 = _chi2Buffer_ - baseChi2;
-      double deltaChi2Pulls = _chi2PullsBuffer_ - baseChi2Pull;
-      double stepSize = par.getStdDevValue() * _parStepScale_ * TMath::Sqrt(deltaChi2Pulls)/TMath::Sqrt(deltaChi2);
-      LogInfo << "Step size of " << parSet.getName() + "/" + par.getTitle()
-              << " -> σ x " << _parStepScale_ << " x " << TMath::Sqrt(std::fabs(deltaChi2Pulls))/TMath::Sqrt(std::fabs(deltaChi2))
-              << " -> Δχ² = " << deltaChi2 << " = " << deltaChi2 - deltaChi2Pulls << "(stat) + " << deltaChi2Pulls << "(pulls)" << std::endl;
-
-      par.setStepSize( stepSize );
-      par.setParameterValue( currentParValue );
-    }
 
     if( parSet.isUseEigenDecompInFit() ){
       for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
@@ -1007,23 +1067,65 @@ void FitterEngine::rescaleParametersStepSize(){
         parSet.propagateEigenToOriginal();
 
         updateChi2Cache();
-
         double deltaChi2 = _chi2Buffer_ - baseChi2;
         double deltaChi2Pulls = _chi2PullsBuffer_ - baseChi2Pull;
-        double stepSize = parSet.getEigenSigma(iEigen) * _parStepScale_ * TMath::Sqrt(deltaChi2Pulls)/TMath::Sqrt(deltaChi2);
+
+//        double stepSize = TMath::Sqrt(deltaChi2Pulls)/TMath::Sqrt(deltaChi2);
+        double stepSize = 1./TMath::Sqrt(deltaChi2);
+
         LogInfo << "Step size of " << parSet.getName() + "/eigen_#" << iEigen
-                << " -> σ x " << _parStepScale_ << " x " << TMath::Sqrt(std::fabs(deltaChi2Pulls))/TMath::Sqrt(std::fabs(deltaChi2))
+                << " -> σ x " << _parStepScale_ << " x " << stepSize
                 << " -> Δχ² = " << deltaChi2 << " = " << deltaChi2 - deltaChi2Pulls << "(stat) + " << deltaChi2Pulls << "(pulls)" << std::endl;
+
+        stepSize *= parSet.getEigenSigma(iEigen) * _parStepScale_;
 
         parSet.setEigenParStepSize(iEigen, stepSize);
         parSet.setEigenParameter(iEigen, currentParValue);
         parSet.propagateEigenToOriginal();
       }
     }
+    else{
+      for( auto& par : parSet.getParameterList() ){
+        iFitPar++;
+
+        if( not par.isEnabled() ){
+          continue;
+        }
+
+        double currentParValue = par.getParameterValue();
+        par.setParameterValue( currentParValue + par.getStdDevValue() );
+
+        updateChi2Cache();
+
+        double deltaChi2 = _chi2Buffer_ - baseChi2;
+        double deltaChi2Pulls = _chi2PullsBuffer_ - baseChi2Pull;
+
+        // Consider a parabolic approx:
+        // only rescale with X2 stat?
+//        double stepSize = TMath::Sqrt(deltaChi2Pulls)/TMath::Sqrt(deltaChi2);
+
+        // full rescale
+        double stepSize = 1./TMath::Sqrt(deltaChi2);
+
+        LogInfo << "Step size of " << parSet.getName() + "/" + par.getTitle()
+            << " -> σ x " << _parStepScale_ << " x " << stepSize
+            << " -> Δχ² = " << deltaChi2 << " = " << deltaChi2 - deltaChi2Pulls << "(stat) + " << deltaChi2Pulls << "(pulls)";
+
+        stepSize *= par.getStdDevValue() * _parStepScale_;
+
+        par.setStepSize( stepSize );
+        par.setParameterValue( currentParValue + stepSize );
+        updateChi2Cache();
+        LogInfo << " -> Δχ²(step) = " << _chi2Buffer_ - baseChi2 << std::endl;
+        par.setParameterValue( currentParValue );
+      }
+    }
 
   }
 
+  LogInfo << "Reupdating chi2..." << std::endl;
   updateChi2Cache();
+  LogDebug << "END" << std::endl;
 
 }
 void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
@@ -1064,7 +1166,7 @@ void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
         _minimizer_->SetVariableValue(iPar, par.getParameterValue());
         _minimizer_->SetVariableStepSize(iPar, par.getStepSize());
 
-        if( not doReleaseFixed_ or not JsonUtils::fetchValue(parSet.getJsonConfig(), "releaseFixedParametersOnHesse", true) ){
+        if( not doReleaseFixed_ or not JsonUtils::fetchValue(parSet.getConfig(), "releaseFixedParametersOnHesse", true) ){
           if( not par.isEnabled() or par.isFixed() ) _minimizer_->FixVariable(iPar);
         }
       } // par
@@ -1076,7 +1178,7 @@ void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
                                   parSet.getEigenParameterValue(iEigen),
                                   parSet.getEigenParStepSize(iEigen)
         );
-        if( not doReleaseFixed_ or not JsonUtils::fetchValue(parSet.getJsonConfig(), "releaseFixedParametersOnHesse", true) ){
+        if( not doReleaseFixed_ or not JsonUtils::fetchValue(parSet.getConfig(), "releaseFixedParametersOnHesse", true) ){
           if( parSet.isEigenParFixed(iEigen) ) {
             _minimizer_->FixVariable(iPar);
           }

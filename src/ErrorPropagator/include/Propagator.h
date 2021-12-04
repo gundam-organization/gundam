@@ -47,6 +47,7 @@ public:
 
   // Core
   void propagateParametersOnSamples();
+  void updateDialResponses();
   void reweightSampleEvents();
   void refillSampleHistograms();
   void applyResponseFunctions();
@@ -57,12 +58,16 @@ public:
 
   // Monitor
 
+  // Dev
+  void fillDialsStack();
+
 protected:
   void initializeThreads();
 
   void makeResponseFunctions();
 
   // multi-threaded
+  void updateDialResponses(int iThread_);
   void reweightSampleEvents(int iThread_);
   void applyResponseFunctions(int iThread_);
 
@@ -87,8 +92,12 @@ private:
   std::map<FitSample*, std::shared_ptr<TH1D>> _nominalSamplesMcHistogram_;
   std::map<FitSample*, std::vector<std::shared_ptr<TH1D>>> _responseFunctionsSamplesMcHistogram_;
 
+  // DEV
+  std::vector<Dial*> _dialsStack_;
+
 
 public:
+  GenericToolbox::CycleTimer dialUpdate;
   GenericToolbox::CycleTimer weightProp;
   GenericToolbox::CycleTimer fillProp;
   GenericToolbox::CycleTimer applyRf;

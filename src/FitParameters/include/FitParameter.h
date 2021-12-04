@@ -33,6 +33,7 @@ public:
   void setMinValue(double minValue);
   void setMaxValue(double maxValue);
   void setStepSize(double stepSize);
+  void setParSetRef(void *parSetRef);
 
   void initialize();
 
@@ -48,6 +49,8 @@ public:
   double getMinValue() const;
   double getMaxValue() const;
   double getStepSize() const;
+
+  void *getParSetRef() const;
 
   // Core
   double getDistanceFromNominal() const; // in unit of sigmas
@@ -71,6 +74,7 @@ private:
   std::string _dialsWorkingDirectory_;
   bool _isEnabled_{true};
   bool _isFixed_{false};
+  void* _parSetRef_{nullptr};
 
   // Internals
   std::vector<DialSet> _dialSetList_; // one dial set per detector

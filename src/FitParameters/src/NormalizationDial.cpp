@@ -26,9 +26,10 @@ void NormalizationDial::reset() {
 
 void NormalizationDial::initialize() {
   Dial::initialize();
+  _isInitialized_ = true;
 }
 
-double NormalizationDial::evalResponse(const double& parameterValue_){
+double NormalizationDial::evalResponse(double parameterValue_){
   return parameterValue_; // NO CACHE NEEDED :)
 }
 

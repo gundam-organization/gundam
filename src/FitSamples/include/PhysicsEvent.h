@@ -48,7 +48,6 @@ public:
   const GenericToolbox::LeafHolder& getLeafHolder(std::string leafName_) const;
   const GenericToolbox::LeafHolder& getLeafHolder(int index_) const;
   const std::vector<GenericToolbox::LeafHolder> &getLeafContentList() const;
-
   const std::vector<std::string> *getCommonLeafNameListPtr() const;
 
   // CORE
@@ -79,6 +78,7 @@ public:
   bool isSame(AnaEvent& anaEvent_) const;
   void deleteLeaf(long index_);
   void trimDialCache();
+  void addDialRefToCache(Dial* dialPtr_);
   std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const GenericToolbox::LeafHolder&)>> generateLeavesDictionary(bool disableArrays_ = false) const;
 
   // Stream operator

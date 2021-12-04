@@ -8,6 +8,9 @@
 
 #include "Dial.h"
 #include "FitParameter.h"
+#include "FitParameterSet.h"
+#include "GlobalVariables.h"
+
 
 
 LoggerInit([](){
@@ -35,11 +38,13 @@ Dial::~Dial() {
 }
 
 void Dial::reset() {
+  _isInitialized_ = false;
   _dialResponseCache_ = std::nan("Unset");
   _dialParameterCache_ = std::nan("Unset");
   _applyConditionBin_ = DataBin();
   _dialType_ = DialType::Invalid;
   _associatedParameterReference_ = nullptr;
+//  dialMutex = std::make_unique<std::mutex>();
 }
 
 void Dial::setApplyConditionBin(const DataBin &applyConditionBin) {
@@ -48,30 +53,44 @@ void Dial::setApplyConditionBin(const DataBin &applyConditionBin) {
 void Dial::setAssociatedParameterReference(void *associatedParameterReference) {
   _associatedParameterReference_ = associatedParameterReference;
 }
+void Dial::setIsReferenced(bool isReferenced) {
+  _isReferenced_ = isReferenced;
+}
 
 void Dial::initialize() {
-  if( _dialType_ == DialType::Invalid ){
-    LogError << "_dialType_ is not set." << std::endl;
-    throw std::logic_error("_dialType_ is not set.");
-  }
+  LogThrowIf( _dialType_ == DialType::Invalid, "_dialType_ is not set." );
+  LogThrowIf( _associatedParameterReference_ == nullptr,  "Parameter not set");
 }
 
+bool Dial::isInitialized() const {
+  return _isInitialized_;
+}
 std::string Dial::getSummary(){
   std::stringstream ss;
-  ss << DialType::DialTypeEnumNamespace::toString(_dialType_);
-  if( not _applyConditionBin_.getEdgesList().empty() ) ss << ": " << _applyConditionBin_.getSummary();
+  if( _associatedParameterReference_ != nullptr ){
+    ss << ((FitParameterSet*)((FitParameter*) _associatedParameterReference_)->getParSetRef())->getName();
+    ss << "/" << ((FitParameter*) _associatedParameterReference_)->getTitle();
+    ss << "(" << ((FitParameter*) _associatedParameterReference_)->getParameterValue() << ")";
+    ss << "/";
+  }
+  ss << DialType::DialTypeEnumNamespace::toString(_dialType_, true);
+  if( not _applyConditionBin_.getEdgesList().empty() ) ss << ":b{" << _applyConditionBin_.getSummary() << "}";
   return ss.str();
 }
-double Dial::evalResponse(const double &parameterValue_) {
+bool Dial::isReferenced() const {
+  return _isReferenced_;
+}
+
+double Dial::evalResponse(double parameterValue_) {
 
   if( _dialParameterCache_ == parameterValue_ ){
-    while( _isEditingCache_ ){ std::this_thread::sleep_for(std::chrono::nanoseconds(1)); }
+    while( _isEditingCache_.atomicValue ){ }
     return _dialResponseCache_;
   }
-  _isEditingCache_ = true;
+  _isEditingCache_.atomicValue = true;
   _dialParameterCache_ = parameterValue_;
   this->fillResponseCache(); // specified in the corresponding dial class
-  _isEditingCache_ = false;
+  _isEditingCache_.atomicValue = false;
 
   return _dialResponseCache_;
 }
@@ -129,3 +148,5 @@ DialType::DialType Dial::getDialType() const {
 void *Dial::getAssociatedParameterReference() const {
   return _associatedParameterReference_;
 }
+
+

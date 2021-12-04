@@ -33,6 +33,7 @@ void Propagator::reset() {
   for( const auto& jobName : GlobalVariables::getParallelWorker().getJobNameList() ){
     if(jobName == "Propagator::fillEventDialCaches"
     or jobName == "Propagator::reweightSampleEvents"
+    or jobName == "Propagator::updateDialResponses"
     or jobName == "Propagator::refillSampleHistograms"
     or jobName == "Propagator::applyResponseFunctions"
       ){
@@ -71,7 +72,7 @@ void Propagator::initialize() {
   _parameterSetsList_.reserve(parameterSetListConfig.size()); // make sure the objects aren't moved in RAM ( since FitParameter* will be used )
   for( const auto& parameterSetConfig : parameterSetListConfig ){
     _parameterSetsList_.emplace_back();
-    _parameterSetsList_.back().setJsonConfig(parameterSetConfig);
+    _parameterSetsList_.back().setConfig(parameterSetConfig);
     _parameterSetsList_.back().setSaveDir(GenericToolbox::mkdirTFile(_saveDir_, "ParameterSets"));
     _parameterSetsList_.back().initialize();
     nPars += _parameterSetsList_.back().getNbParameters();
@@ -129,20 +130,10 @@ void Propagator::initialize() {
 
   _fitSampleSet_.loadAsimovData();
 
-  _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
-  _plotGenerator_.defineHistogramHolders();
-
-  if( JsonUtils::fetchValue<json>(_config_, "throwMcParameters", false) ){
-    LogWarning << "Throwing parameters..." << std::endl;
-    for( auto& parSet : _parameterSetsList_ ){
-      auto thrownPars = GenericToolbox::throwCorrelatedParameters(GenericToolbox::getCholeskyMatrix(
-        parSet.getOriginalCovarianceMatrix()));
-      for( auto& par : parSet.getParameterList() ){
-        par.setParameterValue( par.getPriorValue() + thrownPars.at(par.getParameterIndex()) );
-        LogDebug << parSet.getName() << "/" << par.getTitle() << ": thrown = " << par.getParameterValue() << std::endl;
-      }
-    }
-  }
+//  if( GlobalVariables::isEnableDevMode() ){
+//    LogInfo << "Loading dials stack..." << std::endl;
+//    fillDialsStack();
+//  }
 
   LogInfo << "Initializing threads..." << std::endl;
   initializeThreads();
@@ -150,7 +141,17 @@ void Propagator::initialize() {
   LogInfo << "Propagating prior parameters on events..." << std::endl;
   reweightSampleEvents();
 
-//  _fitSampleSet_.writeSampleEvents(GenericToolbox::mkdirTFile(_saveDir_, "Events"));
+  if( JsonUtils::fetchValue<json>(_config_, "throwAsimovFitParameters", false) ){
+    LogWarning << "Throwing parameters..." << std::endl;
+    for( auto& parSet : _parameterSetsList_ ){
+      auto thrownPars = GenericToolbox::throwCorrelatedParameters(GenericToolbox::getCholeskyMatrix(
+          parSet.getOriginalCovarianceMatrix()));
+      for( auto& par : parSet.getParameterList() ){
+        par.setParameterValue( par.getPriorValue() + thrownPars.at(par.getParameterIndex()) );
+        LogDebug << parSet.getName() << "/" << par.getTitle() << ": thrown = " << par.getParameterValue() << std::endl;
+      }
+    }
+  }
 
   LogInfo << "Set the current MC prior weights as nominal weight..." << std::endl;
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
@@ -167,7 +168,7 @@ void Propagator::initialize() {
       for( int iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
         // Since no reweight is applied on data samples, the nominal weight should be the default one
         sample.getDataContainer().eventList.at(iEvent).setTreeWeight(
-          sample.getMcContainer().eventList.at(iEvent).getNominalWeight()
+            sample.getMcContainer().eventList.at(iEvent).getNominalWeight()
         );
         sample.getDataContainer().eventList.at(iEvent).resetEventWeight();
         sample.getDataContainer().eventList.at(iEvent).setNominalWeight(sample.getDataContainer().eventList.at(iEvent).getEventWeight());
@@ -180,6 +181,17 @@ void Propagator::initialize() {
     LogInfo << "Sum of event weights in \"" << sample.getName() << "\":" << std::endl
             << "-> mc: " << sample.getMcContainer().getSumWeights() << " / data: " << sample.getDataContainer().getSumWeights() << std::endl;
   }
+
+  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    for( auto& event : sample.getMcContainer().eventList ){
+      if( event.getEntryIndex() == 348660 ){
+        LogTrace << event << std::endl;
+      }
+    }
+  }
+
+  _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
+  _plotGenerator_.defineHistogramHolders();
 
   LogInfo << "Filling up sample bin caches..." << std::endl;
   _fitSampleSet_.updateSampleBinEventList();
@@ -195,7 +207,7 @@ void Propagator::initialize() {
   _useResponseFunctions_ = JsonUtils::fetchValue<json>(_config_, "DEV_useResponseFunctions", false);
   if( _useResponseFunctions_ ){ this->makeResponseFunctions(); }
 
-  if( JsonUtils::fetchValue<json>(_config_, "throwMcParameters", false) ){
+  if( JsonUtils::fetchValue<json>(_config_, "throwAsimovFitParameters", false) ){
     for( auto& parSet : _parameterSetsList_ ){
       for( auto& par : parSet.getParameterList() ){
         par.setParameterValue( par.getPriorValue() );
@@ -229,6 +241,7 @@ const json &Propagator::getConfig() const {
 void Propagator::propagateParametersOnSamples(){
 
   if(not _useResponseFunctions_ or not _isRfPropagationEnabled_ ){
+//    if(GlobalVariables::isEnableDevMode()) updateDialResponses();
     reweightSampleEvents();
     refillSampleHistograms();
   }
@@ -236,6 +249,11 @@ void Propagator::propagateParametersOnSamples(){
     applyResponseFunctions();
   }
 
+}
+void Propagator::updateDialResponses(){
+  GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+  GlobalVariables::getParallelWorker().runJob("Propagator::updateDialResponses");
+  dialUpdate.counts++; dialUpdate.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 }
 void Propagator::reweightSampleEvents() {
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
@@ -266,6 +284,21 @@ void Propagator::allowRfPropagation(){
   }
 }
 
+void Propagator::fillDialsStack(){
+  for( auto& parSet : _parameterSetsList_ ){
+    if( not parSet.isUseEigenDecompInFit() ){
+      for( auto& par : parSet.getParameterList() ){
+        for( auto& dialSet : par.getDialSetList() ){
+          if(dialSet.getGlobalDialType() == DialType::Normalization){ continue; } // no cache needed
+          for( auto& dial : dialSet.getDialList() ){
+            if(dial->isReferenced()) _dialsStack_.emplace_back(dial.get());
+          }
+        }
+      }
+    }
+  }
+}
+
 
 // Protected
 void Propagator::initializeThreads() {
@@ -274,6 +307,12 @@ void Propagator::initializeThreads() {
     this->reweightSampleEvents(iThread);
   };
   GlobalVariables::getParallelWorker().addJob("Propagator::reweightSampleEvents", reweightSampleEventsFct);
+
+  std::function<void(int)> updateDialResponsesFct = [this](int iThread){
+    this->updateDialResponses(iThread);
+  };
+  GlobalVariables::getParallelWorker().addJob("Propagator::updateDialResponses", updateDialResponsesFct);
+
 
   std::function<void(int)> refillSampleHistogramsFct = [this](int iThread){
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
@@ -361,6 +400,22 @@ void Propagator::makeResponseFunctions(){
   LogInfo << "RF built" << std::endl;
 }
 
+void Propagator::updateDialResponses(int iThread_){
+  int nThreads = GlobalVariables::getNbThreads();
+  if(iThread_ == -1){
+    // force single thread
+    nThreads = 1;
+    iThread_ = 0;
+  }
+  int iDial{0};
+  int nDials(int(_dialsStack_.size()));
+
+  while( iDial < nDials ){
+    _dialsStack_[iDial]->evalResponse();
+    iDial += nThreads;
+  }
+
+}
 void Propagator::reweightSampleEvents(int iThread_) {
   int nThreads = GlobalVariables::getNbThreads();
   if(iThread_ == -1){

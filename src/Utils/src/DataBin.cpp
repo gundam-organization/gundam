@@ -146,16 +146,14 @@ bool DataBin::isVariableSet(const std::string& variableName_) const{
 }
 std::string DataBin::getSummary() const{
   std::stringstream ss;
-  ss << "DataBin: ";
 
-  if( _edgesList_.empty() ) ss << "Not set.";
+  if( _edgesList_.empty() ) ss << "bin not set.";
   else{
 
     if( _treeFormula_ != nullptr ){
       ss << "\"" << _treeFormula_->GetExpFormula() << "\"";
     }
     else{
-      ss << "\"";
       for( size_t iEdge = 0 ; iEdge < _edgesList_.size() ; iEdge++ ){
         if( iEdge != 0 ) ss << ", ";
         if( not _variableNameList_.empty() ){
@@ -170,7 +168,6 @@ std::string DataBin::getSummary() const{
           ss << "]";
         }
       }
-      ss << "\"";
     }
   }
   return ss.str();

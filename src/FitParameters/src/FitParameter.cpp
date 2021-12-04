@@ -30,6 +30,7 @@ void FitParameter::reset() {
   _dialsWorkingDirectory_ = ".";
   _isEnabled_ = true;
   _isFixed_ = false;
+  _parSetRef_ = nullptr;
 }
 
 void FitParameter::setIsFixed(bool isFixed) {
@@ -77,6 +78,9 @@ void FitParameter::setMaxValue(double maxValue) {
 void FitParameter::setStepSize(double stepSize) {
   _stepSize_ = stepSize;
 }
+void FitParameter::setParSetRef(void *parSetRef) {
+  _parSetRef_ = parSetRef;
+}
 
 void FitParameter::initialize() {
 
@@ -84,6 +88,7 @@ void FitParameter::initialize() {
   LogThrowIf(_priorValue_     == std::numeric_limits<double>::quiet_NaN(), "Prior value is not set.");
   LogThrowIf(_stdDevValue_    == std::numeric_limits<double>::quiet_NaN(), "Std dev value is not set.");
   LogThrowIf(_parameterValue_ == std::numeric_limits<double>::quiet_NaN(), "Parameter value is not set.");
+  LogThrowIf(_parSetRef_      == nullptr, "Parameter set ref is not set.")
 
   _stepSize_ = _stdDevValue_ * 0.01; // default
 
@@ -102,7 +107,7 @@ void FitParameter::initialize() {
     _dialSetList_.emplace_back();
     _dialSetList_.back().setParameterIndex(_parameterIndex_);
     _dialSetList_.back().setParameterName(_name_);
-    _dialSetList_.back().setDialSetConfig(dialDefinitionConfig);
+    _dialSetList_.back().setConfig(dialDefinitionConfig);
     _dialSetList_.back().setWorkingDirectory(_dialsWorkingDirectory_);
     _dialSetList_.back().setAssociatedParameterReference(this);
     _dialSetList_.back().initialize();
@@ -155,6 +160,9 @@ double FitParameter::getMaxValue() const {
 }
 double FitParameter::getStepSize() const {
   return _stepSize_;
+}
+void *FitParameter::getParSetRef() const {
+  return _parSetRef_;
 }
 
 

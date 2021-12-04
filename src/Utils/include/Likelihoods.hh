@@ -14,88 +14,88 @@
 class CalcLLHFunc
 {
 public:
-    virtual ~CalcLLHFunc() {};
-    virtual double operator()(double mc, double w2, double data)
-    {
-        return 0.0;
-    }
+  virtual ~CalcLLHFunc() {};
+  virtual double operator()(double mc, double w2, double data)
+  {
+    return 0.0;
+  }
 };
 
 class PoissonLLH : public CalcLLHFunc
 {
 public:
-    // Compute the standard Poisson likelihood (chi2_stat contribution from a certain sample and bin) based on the number of MC predicted (mc) and the number of data events (data):
-    double operator()(double mc, double w2, double data)
+  // Compute the standard Poisson likelihood (chi2_stat contribution from a certain sample and bin) based on the number of MC predicted (mc) and the number of data events (data):
+  double operator()(double mc, double w2, double data)
+  {
+    // generateFormula chi2 variable which will be updated below and then returned:
+    double chi2 = 0.0;
+
+    // If number of MC predicted events is greater than zero, we calculate the statistical chi2 according to 2 * (N_pred - N_data + N_data * log(N_data/N_pred)):
+    if(mc > 0.0)
     {
-        // generateFormula chi2 variable which will be updated below and then returned:
-        double chi2 = 0.0;
-
-        // If number of MC predicted events is greater than zero, we calculate the statistical chi2 according to 2 * (N_pred - N_data + N_data * log(N_data/N_pred)):
-        if(mc > 0.0)
-        {
-            chi2 = 2 * (mc - data);
-            if(data > 0.0)
-                chi2 += 2 * data * TMath::Log(data / mc);
-        }
-
-        // If chi2 is greater or equal to zero, we return the value calculated above, otherwise zero is returned:
-        return (chi2 >= 0.0) ? chi2 : 0.0;
+      chi2 = 2 * (mc - data);
+      if(data > 0.0)
+        chi2 += 2 * data * TMath::Log(data / mc);
     }
+
+    // If chi2 is greater or equal to zero, we return the value calculated above, otherwise zero is returned:
+    return (chi2 >= 0.0) ? chi2 : 0.0;
+  }
 };
 
 class EffLLH : public CalcLLHFunc
 {
 public:
-    double operator()(double mc, double w2, double data)
-    {
-        // Effective LLH based on Tianlu's paper.
-        if(mc <= 0.0)
-            return 0.0;
+  double operator()(double mc, double w2, double data)
+  {
+    // Effective LLH based on Tianlu's paper.
+    if(mc <= 0.0)
+      return 0.0;
 
-        const double b = mc / w2;
-        const double a = (mc * b) + 1.0;
-        const double k = data;
+    const double b = mc / w2;
+    const double a = (mc * b) + 1.0;
+    const double k = data;
 
-        return -2 * (a * std::log(b) + std::lgamma(k + a) - std::lgamma(k + 1)
-               - ((k + a) * std::log1p(b)) - std::lgamma(a));
-    }
+    return -2 * (a * std::log(b) + std::lgamma(k + a) - std::lgamma(k + 1)
+                 - ((k + a) * std::log1p(b)) - std::lgamma(a));
+  }
 };
 
-class BarlowLLH : public CalcLLHFunc
-{
+class BarlowLLH : public CalcLLHFunc {
 public:
-    double operator()(double mc, double w2, double data)
-    {
-        // Solving for the quadratic equation,
-        // beta^2 + (mu * sigma^2 - 1)beta - data * sigma^2) = 0
-        // where sigma^2 is the relative variance.
-        double rel_var = w2 / (mc * mc);
-        double b       = (mc * rel_var) - 1;
-        double c       = 4 * data * rel_var;
+  double rel_var, b, c, beta, mc_hat, chi2;
 
-        double beta   = (-b + std::sqrt(b * b + c)) / 2.0;
-        double mc_hat = mc * beta;
+  double operator()(double mc_, double w2_, double data_) {
+    if(mc_ == data_ ) return 0;
+    // Solving for the quadratic equation,
+    // beta^2 + (mu * sigma^2 - 1)beta - data * sigma^2) = 0
+    // where sigma^2 is the relative variance.
+    rel_var = w2_ / (mc_ * mc_);
+    b       = (mc_ * rel_var) - 1;
+    c       = 4 * data_ * rel_var;
 
-        // Calculate the following LLH:
-        //-2lnL = 2 * beta*mc - data + data * ln(data / (beta*mc)) + (beta-1)^2 / sigma^2
-        // where sigma^2 is the same as above.
-        double chi2 = 0.0;
-        //if(data <= 0.0)
-        //{
-        //    chi2 = 2 * mc_hat;
-        //    chi2 += (beta - 1) * (beta - 1) / rel_var;
-        //}
-        if(mc_hat > 0.0)
-        {
-            chi2 = 2 * (mc_hat - data);
-            if(data > 0.0)
-                chi2 += 2 * data * std::log(data / mc_hat);
+    beta   = (-b + std::sqrt(b * b + c)) / 2.0;
+    mc_hat = mc_ * beta;
 
-            chi2 += (beta - 1) * (beta - 1) / rel_var;
-        }
+    // Calculate the following LLH:
+    //-2lnL = 2 * beta*mc - data + data * ln(data / (beta*mc)) + (beta-1)^2 / sigma^2
+    // where sigma^2 is the same as above.
+    chi2 = 0.0;
+    //if(data <= 0.0)
+    //{
+    //    chi2 = 2 * mc_hat;
+    //    chi2 += (beta - 1) * (beta - 1) / rel_var;
+    //}
+    if(mc_hat > 0.0) {
+      chi2 = 2 * (mc_hat - data_);
+      if(data_ > 0.0)
+        chi2 += 2 * data_ * std::log(data_ / mc_hat);
 
-        return (chi2 >= 0.0) ? chi2 : 0.0;
+      chi2 += (beta - 1) * (beta - 1) / rel_var;
     }
+
+    return (chi2 >= 0.0) ? chi2 : 0.0;
+  }
 };
 
 

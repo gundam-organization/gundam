@@ -78,6 +78,12 @@ const GenericToolbox::LeafHolder& PhysicsEvent::getLeafHolder(int index_) const{
 const std::vector<GenericToolbox::LeafHolder> &PhysicsEvent::getLeafContentList() const {
   return _leafContentList_;
 }
+std::vector<Dial *> &PhysicsEvent::getRawDialPtrList() {
+  return _rawDialPtrList_;
+}
+const std::vector<Dial *> &PhysicsEvent::getRawDialPtrList() const{
+  return _rawDialPtrList_;
+}
 
 void PhysicsEvent::hookToTree(TTree* tree_, bool throwIfLeafNotFound_){
   LogThrowIf(_commonLeafNameListPtr_ == nullptr, "_commonLeafNameListPtr_ is not set.");
@@ -190,7 +196,14 @@ std::string PhysicsEvent::getSummary() const {
   ss << std::endl << GET_VAR_NAME_VALUE(_sampleBinIndex_);
 
   if( not _rawDialPtrList_.empty() ){
-    ss << std::endl << "Dials: " << GenericToolbox::parseVectorAsString(_rawDialPtrList_);
+    ss << std::endl << "List of dials: ";
+    for( auto* dialPtr : _rawDialPtrList_ ){
+      ss << std::endl << "- ";
+      ss << dialPtr->getSummary() << " = " << dialPtr->getDialResponseCache();
+    }
+  }
+  else{
+    ss << "No cached dials." << std::endl;
   }
   return ss.str();
 }
@@ -235,6 +248,20 @@ void PhysicsEvent::trimDialCache(){
   _rawDialPtrList_.resize(newSize);
   _rawDialPtrList_.shrink_to_fit();
 }
+void PhysicsEvent::addDialRefToCache(Dial* dialPtr_){
+  if( dialPtr_ == nullptr ) return; // don't store null ptr
+
+  // fetch the next free slot:
+  for( auto& dial : _rawDialPtrList_ ){
+    if( dial == nullptr ){
+      dial = dialPtr_;
+      return;
+    }
+  }
+
+  // no new slot available:
+  _rawDialPtrList_.emplace_back(dialPtr_);
+}
 std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const GenericToolbox::LeafHolder&)>> PhysicsEvent::generateLeavesDictionary(bool disableArrays_) const{
   std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const GenericToolbox::LeafHolder&)>> out;
 
@@ -274,10 +301,4 @@ const std::vector<std::string> *PhysicsEvent::getCommonLeafNameListPtr() const {
   return _commonLeafNameListPtr_;
 }
 
-std::vector<Dial *> &PhysicsEvent::getRawDialPtrList() {
-  return _rawDialPtrList_;
-}
-const std::vector<Dial *> &PhysicsEvent::getRawDialPtrList() const{
-  return _rawDialPtrList_;
-}
 
