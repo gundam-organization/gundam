@@ -128,7 +128,7 @@ void Propagator::initialize() {
     dataSet.load(&_fitSampleSet_, &_parameterSetsList_);
   } // dataSets
 
-  _fitSampleSet_.loadAsimovData();
+  _fitSampleSet_.loadAsimovData(); // Copies MC events in data container for both Asimov and FakeData event types
 
 //  if( GlobalVariables::isEnableDevMode() ){
 //    LogInfo << "Loading dials stack..." << std::endl;
@@ -169,6 +169,22 @@ void Propagator::initialize() {
         // Since no reweight is applied on data samples, the nominal weight should be the default one
         sample.getDataContainer().eventList.at(iEvent).setTreeWeight(
             sample.getMcContainer().eventList.at(iEvent).getNominalWeight()
+        );
+        sample.getDataContainer().eventList.at(iEvent).resetEventWeight();
+        sample.getDataContainer().eventList.at(iEvent).setNominalWeight(sample.getDataContainer().eventList.at(iEvent).getEventWeight());
+      }
+    }
+  }
+
+  if( _fitSampleSet_.getDataEventType() == DataEventType::FakeData ){
+    LogInfo << "Propagating prior weights on data FakeData events..." << std::endl;
+    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+      sample.getDataContainer().histScale = sample.getMcContainer().histScale;
+      int nEvents = int(sample.getMcContainer().eventList.size());
+      for( int iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
+        // Apply FakeData weights
+        sample.getDataContainer().eventList.at(iEvent).setTreeWeight(
+          sample.getMcContainer().eventList.at(iEvent).getFakeDataWeight() * sample.getMcContainer().eventList.at(iEvent).getNominalWeight()
         );
         sample.getDataContainer().eventList.at(iEvent).resetEventWeight();
         sample.getDataContainer().eventList.at(iEvent).setNominalWeight(sample.getDataContainer().eventList.at(iEvent).getEventWeight());

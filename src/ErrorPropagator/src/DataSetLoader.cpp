@@ -35,6 +35,7 @@ void DataSetLoader::reset() {
   _leavesStorageRequestedForMc_.clear();
 
   _mcNominalWeightFormulaStr_ = "1";
+  _fakeDataWeightFormulaStr_ = "1";
   _dataNominalWeightFormulaStr_ = "1";
 }
 
@@ -97,6 +98,10 @@ void DataSetLoader::initialize() {
     // override: nominalWeightLeafName is deprecated
     _mcNominalWeightFormulaStr_ = JsonUtils::fetchValue(mcConfig, "nominalWeightLeafName", _mcNominalWeightFormulaStr_);
     _mcNominalWeightFormulaStr_ = JsonUtils::fetchValue(mcConfig, "nominalWeightFormula", _mcNominalWeightFormulaStr_);
+    
+    // override: nominalWeightLeafName is deprecated
+    _fakeDataWeightFormulaStr_ = JsonUtils::fetchValue(mcConfig, "fakeDataWeightLeafName", _fakeDataWeightFormulaStr_);
+    _fakeDataWeightFormulaStr_ = JsonUtils::fetchValue(mcConfig, "fakeDataWeightFormula", _fakeDataWeightFormulaStr_);
   }
 
   {
@@ -108,7 +113,10 @@ void DataSetLoader::initialize() {
         _dataFilePathList_.emplace_back(file.get<std::string>());
       }
     }
+
+    // override: nominalWeightLeafName is deprecated
     _dataNominalWeightFormulaStr_ = JsonUtils::fetchValue(dataConfig, "nominalWeightLeafName", _dataNominalWeightFormulaStr_);
+    _dataNominalWeightFormulaStr_ = JsonUtils::fetchValue(dataConfig, "nominalWeightFormula", _dataNominalWeightFormulaStr_);
 
   }
 
@@ -132,6 +140,9 @@ std::vector<std::string> &DataSetLoader::getDataActiveLeafNameList() {
 }
 const std::string &DataSetLoader::getMcNominalWeightFormulaStr() const {
   return _mcNominalWeightFormulaStr_;
+}
+const std::string &DataSetLoader::getFakeDataWeightFormulaStr() const {
+  return _fakeDataWeightFormulaStr_;
 }
 const std::string &DataSetLoader::getDataNominalWeightFormulaStr() const {
   return _dataNominalWeightFormulaStr_;
@@ -168,6 +179,11 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
       continue;
     }
 
+    if( isData and sampleSetPtr_->getDataEventType() == DataEventType::FakeData ){
+      // FakeData events will be loaded after the prior weight have been propagated on MC samples
+      continue;
+    }
+    
     TChain* chainPtr{nullptr};
     std::vector<std::string>* activeLeafNameListPtr;
 
@@ -305,11 +321,38 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
 
       TChain* threadChain;
       TTreeFormula* threadNominalWeightFormula{nullptr};
-
+      TTreeFormula* threadFakeDataWeightFormula{nullptr};
+      TList threadFormulas;
+    
       threadChain = isData ? this->buildDataChain() : this->buildMcChain();
       threadChain->SetBranchStatus("*", false);
-
-      if( not isData and not this->getMcNominalWeightFormulaStr().empty() ){
+      
+      if( not isData and not this->getMcNominalWeightFormulaStr().empty() and not this->getFakeDataWeightFormulaStr().empty() ){
+        threadChain->SetBranchStatus("*", true);
+        threadNominalWeightFormula = new TTreeFormula(
+            Form("NominalWeightFormula%i", iThread_),
+            this->getMcNominalWeightFormulaStr().c_str(),
+            threadChain
+        );
+        threadFakeDataWeightFormula = new TTreeFormula(
+            Form("FakeDataWeightFormula%i", iThread_),
+            this->getFakeDataWeightFormulaStr().c_str(),
+            threadChain
+        );
+        
+        threadFormulas.Add(threadNominalWeightFormula);
+        threadFormulas.Add(threadFakeDataWeightFormula);
+        
+        threadChain->SetNotify(&threadFormulas);
+        threadChain->SetBranchStatus("*", false);
+        for( int iLeaf = 0 ; iLeaf < threadNominalWeightFormula->GetNcodes() ; iLeaf++ ){
+          threadChain->SetBranchStatus(threadNominalWeightFormula->GetLeaf(iLeaf)->GetName(), true);
+        }
+        for( int iLeaf = 0 ; iLeaf < threadFakeDataWeightFormula->GetNcodes() ; iLeaf++ ){
+          threadChain->SetBranchStatus(threadFakeDataWeightFormula->GetLeaf(iLeaf)->GetName(), true);
+        }
+      }
+      else if( not isData and not this->getMcNominalWeightFormulaStr().empty() ){
         threadChain->SetBranchStatus("*", true);
         threadNominalWeightFormula = new TTreeFormula(
             Form("NominalWeightFormula%i", iThread_),
@@ -322,8 +365,21 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
           threadChain->SetBranchStatus(threadNominalWeightFormula->GetLeaf(iLeaf)->GetName(), true);
         }
       }
-      else if (isData and not this->getDataNominalWeightFormulaStr().empty() ){
-        LogWarning << "Will reweight data from nominalWeightLeafName = " << this->getDataNominalWeightFormulaStr() << std::endl;
+      else if (not isData and not this->getFakeDataWeightFormulaStr().empty() ){
+        threadChain->SetBranchStatus("*", true);
+        threadFakeDataWeightFormula = new TTreeFormula(
+            Form("FakeDataWeightFormula%i", iThread_),
+            this->getFakeDataWeightFormulaStr().c_str(),
+            threadChain
+        );
+        threadChain->SetNotify(threadFakeDataWeightFormula);
+        threadChain->SetBranchStatus("*", false);
+        for( int iLeaf = 0 ; iLeaf < threadFakeDataWeightFormula->GetNcodes() ; iLeaf++ ){
+          threadChain->SetBranchStatus(threadFakeDataWeightFormula->GetLeaf(iLeaf)->GetName(), true);
+        }
+      }
+      
+      if (isData and not this->getDataNominalWeightFormulaStr().empty() ){
         threadChain->SetBranchStatus("*", true);
         threadNominalWeightFormula = new TTreeFormula(
             Form("NominalWeightFormula%i", iThread_),
@@ -349,13 +405,12 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
         eventBuffer.setLeafNameListPtr(&_leavesStorageRequestedForData_):
         eventBuffer.setLeafNameListPtr(&_leavesRequestedForIndexing_);
 
-      //eventBuffer.setLeafNameListPtr(&_leavesRequestedForIndexing_);
       eventOffSetMutex.lock();
       eventBuffer.hookToTree(threadChain, true);
       eventOffSetMutex.unlock();
 
       PhysicsEvent* eventPtr{nullptr};
-      
+
       size_t sampleEventIndex;
       int threadDialIndex;
       const std::vector<DataBin>* binsListPtr;
@@ -386,6 +441,7 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
       threadChain->LoadTree(iStart);
 
       std::string progressTitle = LogInfo.getPrefixString() + "Reading selected events";
+
       for(Long64_t iEntry = iStart ; iEntry < iEnd ; iEntry++ ){
 
         if( iThread_ == 0 ){
@@ -407,6 +463,10 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
         if( threadNominalWeightFormula != nullptr ){
           eventBuffer.setTreeWeight(threadNominalWeightFormula->EvalInstance());
           if( eventBuffer.getTreeWeight() == 0 ){ continue; } // skip this event
+        }
+        
+        if( threadFakeDataWeightFormula != nullptr and sampleSetPtr_->getDataEventType() == DataEventType::FakeData ){
+          eventBuffer.setFakeDataWeight(threadFakeDataWeightFormula->EvalInstance());
         }
 
         for( iSample = 0 ; iSample < samplesToFillList.size() ; iSample++ ){
@@ -450,7 +510,8 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
             eventPtr->setEntryIndex(iEntry);
             eventPtr->setSampleBinIndex(eventBuffer.getSampleBinIndex());
             eventPtr->setTreeWeight(eventBuffer.getTreeWeight());
-            eventPtr->setNominalWeight(eventPtr->getTreeWeight());
+            eventPtr->setNominalWeight(eventBuffer.getTreeWeight());
+            eventPtr->setFakeDataWeight(eventBuffer.getFakeDataWeight());
             eventPtr->resetEventWeight();
 
             // Now the event is ready. Let's index the dials:
@@ -552,6 +613,7 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
       if( iThread_ == 0 ) GenericToolbox::displayProgressBar(nEvents, nEvents, progressTitle);
       delete threadChain;
       delete threadNominalWeightFormula;
+      delete threadFakeDataWeightFormula;
     };
 
     LogInfo << "Copying selected events to RAM..." << std::endl;
@@ -563,6 +625,7 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
     for( size_t iSample = 0 ; iSample < samplesToFillList.size() ; iSample++ ){
       if (not isData) samplesToFillList[iSample]->getMcContainer().shrinkEventList(sampleIndexOffsetList[iSample]);
       if (isData) samplesToFillList[iSample]->getDataContainer().shrinkEventList(sampleIndexOffsetList[iSample]);
+
     }
 
     LogInfo << "Events have been loaded for " << ( isData ? "data": "mc" )
@@ -614,6 +677,7 @@ void DataSetLoader::print() {
       LogInfo << filePath << std::endl;
     }
     LogInfo << GET_VAR_NAME_VALUE(_mcNominalWeightFormulaStr_) << std::endl;
+    LogInfo << GET_VAR_NAME_VALUE(_fakeDataWeightFormulaStr_) << std::endl;
   }
 
   if( _dataFilePathList_.empty() ){

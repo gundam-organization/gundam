@@ -24,6 +24,7 @@ void PhysicsEvent::reset() {
   _treeWeight_ = 1;
   _nominalWeight_ = 1;
   _eventWeight_ = 1;
+  _fakeDataWeight_ = 1;
   _sampleBinIndex_ = -1;
 }
 
@@ -46,6 +47,9 @@ void PhysicsEvent::setNominalWeight(double nominalWeight) {
 void PhysicsEvent::setEventWeight(double eventWeight) {
   _eventWeight_ = eventWeight;
 }
+void PhysicsEvent::setFakeDataWeight(double fakeDataWeight) {
+  _fakeDataWeight_ = fakeDataWeight;
+}
 void PhysicsEvent::setSampleBinIndex(int sampleBinIndex) {
   _sampleBinIndex_ = sampleBinIndex;
 }
@@ -64,6 +68,9 @@ double PhysicsEvent::getNominalWeight() const {
 }
 double PhysicsEvent::getEventWeight() const {
   return _eventWeight_;
+}
+double PhysicsEvent::getFakeDataWeight() const {
+  return _fakeDataWeight_;
 }
 int PhysicsEvent::getSampleBinIndex() const {
   return _sampleBinIndex_;
@@ -193,6 +200,7 @@ std::string PhysicsEvent::getSummary() const {
   ss << std::endl << GET_VAR_NAME_VALUE(_treeWeight_);
   ss << std::endl << GET_VAR_NAME_VALUE(_nominalWeight_);
   ss << std::endl << GET_VAR_NAME_VALUE(_eventWeight_);
+  ss << std::endl << GET_VAR_NAME_VALUE(_fakeDataWeight_);
   ss << std::endl << GET_VAR_NAME_VALUE(_sampleBinIndex_);
 
   if( not _rawDialPtrList_.empty() ){

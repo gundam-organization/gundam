@@ -216,8 +216,8 @@ void FitSampleSet::writeSampleEvents(TDirectory* saveDir_) const{
 }
 
 void FitSampleSet::loadAsimovData(){
-  if( _dataEventType_ == DataEventType::Asimov ){
-    LogWarning << "Asimov data selected: copying MC events..." << std::endl;
+  if( _dataEventType_ == DataEventType::Asimov || _dataEventType_ == DataEventType::FakeData ){
+    LogWarning << "Asimov or FakeData data type selected: copying MC events..." << std::endl;
     for( auto& sample : _fitSampleList_ ){
       LogInfo << "Copying MC events in sample \"" << sample.getName() << "\"" << std::endl;
       sample.getDataContainer().eventList = sample.getMcContainer().eventList;
