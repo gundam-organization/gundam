@@ -34,6 +34,7 @@ public:
   void setTreeWeight(double treeWeight);
   void setNominalWeight(double nominalWeight);
   void setEventWeight(double eventWeight);
+  void setFakeDataWeight(double fakeDataWeight);
   void setSampleBinIndex(int sampleBinIndex);
 
   // GETTERS
@@ -42,6 +43,7 @@ public:
   double getTreeWeight() const;
   double getNominalWeight() const;
   double getEventWeight() const;
+  double getFakeDataWeight() const;
   int getSampleBinIndex() const;
   std::vector<Dial *> &getRawDialPtrList();
   const std::vector<Dial *> &getRawDialPtrList() const;
@@ -97,6 +99,7 @@ private:
   double _treeWeight_{1};
   double _nominalWeight_{1};
   double _eventWeight_{1};
+  double _fakeDataWeight_{1};
   int _sampleBinIndex_{-1};
 
   // Caches
