@@ -90,6 +90,8 @@ public:
   std::map<std::string, std::shared_ptr<TCanvas>> getBufferCanvasList() const;
 
   // Core
+  bool isEmpty() const;
+
   void generateSamplePlots(TDirectory *saveDir_ = nullptr, int cacheSlot_ = 0);
   void generateSampleHistograms(TDirectory *saveDir_ = nullptr, int cacheSlot_ = 0);
   void generateCanvas(const std::vector<HistHolder> &histHolderList_, TDirectory *saveDir_ = nullptr, bool stackHist_ = true);

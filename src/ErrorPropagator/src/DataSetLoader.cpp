@@ -97,6 +97,11 @@ void DataSetLoader::initialize() {
     // override: nominalWeightLeafName is deprecated
     _mcNominalWeightFormulaStr_ = JsonUtils::fetchValue(mcConfig, "nominalWeightLeafName", _mcNominalWeightFormulaStr_);
     _mcNominalWeightFormulaStr_ = JsonUtils::fetchValue(mcConfig, "nominalWeightFormula", _mcNominalWeightFormulaStr_);
+
+    auto leavesForMcStorage = JsonUtils::fetchValue(mcConfig, "additionnalLeavesStorage", std::vector<std::string>());
+    for( auto& leafName: leavesForMcStorage ){
+      this->addLeafStorageRequestedForMc(leafName);
+    }
   }
 
   {
@@ -110,6 +115,10 @@ void DataSetLoader::initialize() {
     }
     _dataNominalWeightFormulaStr_ = JsonUtils::fetchValue(dataConfig, "nominalWeightLeafName", _dataNominalWeightFormulaStr_);
 
+    auto leavesForDataStorage = JsonUtils::fetchValue(dataConfig, "additionnalLeavesStorage", std::vector<std::string>());
+    for( auto& leafName: leavesForDataStorage ){
+      this->addLeafStorageRequestedForData(leafName);
+    }
   }
 
   this->print();
@@ -199,7 +208,9 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
     // lead to the full moving of a vector memory. This is not thread safe, so better ensure
     // the vector won't have to do this by allocating the right event size.
     PhysicsEvent eventTemplate;
-    isData ? eventTemplate.setLeafNameListPtr(&_leavesStorageRequestedForData_): eventTemplate.setLeafNameListPtr(&_leavesStorageRequestedForMc_);
+    isData ?
+      eventTemplate.setLeafNameListPtr(&_leavesStorageRequestedForData_):
+      eventTemplate.setLeafNameListPtr(&_leavesStorageRequestedForMc_);
     eventTemplate.setDataSetIndex(_dataSetIndex_);
     chainPtr->SetBranchStatus("*", true);
     eventTemplate.hookToTree(chainPtr, true);

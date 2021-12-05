@@ -58,7 +58,7 @@ void PlotGenerator::setFitSampleSetPtr(const FitSampleSet *fitSampleSetPtr) {
 void PlotGenerator::initialize() {
   LogWarning << __METHOD_NAME__ << std::endl;
 
-  LogThrowIf(_config_.empty(), "Config is not set.");
+//  LogThrowIf(_config_.empty(), "Config is not set.");
   _varDictionary_ = JsonUtils::fetchValue(_config_, "varDictionnaries", nlohmann::json());
   _canvasParameters_ = JsonUtils::fetchValue(_config_, "canvasParameters", nlohmann::json());
   _histogramsDefinition_ = JsonUtils::fetchValue(_config_, "histogramsDefinition", nlohmann::json());
@@ -453,6 +453,9 @@ std::map<std::string, std::shared_ptr<TCanvas>> PlotGenerator::getBufferCanvasLi
   return _bufferCanvasList_;
 }
 
+bool PlotGenerator::isEmpty() const{
+  return _histHolderCacheList_[0].empty();
+}
 void PlotGenerator::generateSamplePlots(TDirectory *saveDir_, int cacheSlot_) {
   LogInfo << "Generating sample plots..." << std::endl;
   this->generateSampleHistograms(GenericToolbox::mkdirTFile(saveDir_, "histograms"), cacheSlot_);
@@ -1160,7 +1163,7 @@ void PlotGenerator::generateComparisonHistograms(const std::vector<HistHolder> &
 }
 
 std::vector<std::string> PlotGenerator::fetchListOfVarToPlot(){
-  LogThrowIf(_config_.empty(), "Config not set, can't call " << __METHOD_NAME__);
+//  LogThrowIf(_config_.empty(), "Config not set, can't call " << __METHOD_NAME__);
 
   std::vector<std::string> varNameList;
   _histogramsDefinition_ = JsonUtils::fetchValue(_config_, "histogramsDefinition", nlohmann::json());
@@ -1173,7 +1176,7 @@ std::vector<std::string> PlotGenerator::fetchListOfVarToPlot(){
   return varNameList;
 }
 std::vector<std::string> PlotGenerator::fetchListOfSplitVarNames(){
-  LogThrowIf(_config_.empty(), "Config not set, can't call " << __METHOD_NAME__);
+//  LogThrowIf(_config_.empty(), "Config not set, can't call " << __METHOD_NAME__);
 
   std::vector<std::string> varNameList;
   _histogramsDefinition_ = JsonUtils::fetchValue(_config_, "histogramsDefinition", nlohmann::json());
@@ -1188,7 +1191,7 @@ std::vector<std::string> PlotGenerator::fetchListOfSplitVarNames(){
   return varNameList;
 }
 std::vector<std::string> PlotGenerator::fetchRequestedLeafNames(){
-  LogAssert(not _config_.empty(), "Config not set, can't call " << __METHOD_NAME__);
+//  LogAssert(not _config_.empty(), "Config not set, can't call " << __METHOD_NAME__);
 
   std::vector<std::string> varNameList;
   auto varToPlotList = this->fetchListOfVarToPlot();
