@@ -135,14 +135,19 @@ const Propagator &FitterEngine::getPropagator() const {
 }
 
 void FitterEngine::generateSamplePlots(const std::string& savePath_){
-
   LogInfo << __METHOD_NAME__ << std::endl;
 
   _propagator_.preventRfPropagation(); // Making sure since we need the weight of each event
   _propagator_.propagateParametersOnSamples();
-  _propagator_.getPlotGenerator().generateSamplePlots(
-      GenericToolbox::mkdirTFile(_saveDir_, savePath_ )
-  );
+
+  if( not _propagator_.getPlotGenerator().isEmpty() ){
+    _propagator_.getPlotGenerator().generateSamplePlots(
+        GenericToolbox::mkdirTFile(_saveDir_, savePath_ )
+    );
+  }
+  else{
+    LogWarning << "No histogram is defined in the PlotGenerator. Skipping..." << std::endl;
+  }
 
 }
 void FitterEngine::generateOneSigmaPlots(const std::string& savePath_){
@@ -997,6 +1002,7 @@ void FitterEngine::writePostFitData() {
   fitterCovarianceMatrix.Write("fitterCovarianceMatrix_TMatrixDSym");
   fitterCovarianceMatrixTH2D->Write("fitterCovarianceMatrix_TH2D");
 
+  LogInfo << "Fetching Hessian matrix..." << std::endl;
   double hessianMatrixArray[_minimizer_->NDim() * _minimizer_->NDim()];
   _minimizer_->GetHessianMatrix(hessianMatrixArray);
   TMatrixDSym fitterHessianMatrix(int(_minimizer_->NDim()), hessianMatrixArray);
@@ -1129,15 +1135,15 @@ void FitterEngine::rescaleParametersStepSize(){
 
 }
 void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
-  LogDebug << __METHOD_NAME__ << std::endl;
+  LogInfo << __METHOD_NAME__ << std::endl;
 
-  _minimizerConfig_ = JsonUtils::fetchSubEntry(_config_, {"minimizerConfig"});
+  _minimizerConfig_ = JsonUtils::fetchValue(_config_, "minimizerConfig", nlohmann::json());
   if( _minimizerConfig_.is_string() ){ _minimizerConfig_ = JsonUtils::readConfigFile(_minimizerConfig_.get<std::string>()); }
 
   _minimizer_ = std::shared_ptr<ROOT::Math::Minimizer>(
       ROOT::Math::Factory::CreateMinimizer(
-          JsonUtils::fetchValue<std::string>(_minimizerConfig_, "minimizer"),
-          JsonUtils::fetchValue<std::string>(_minimizerConfig_, "algorithm")
+          JsonUtils::fetchValue(_minimizerConfig_, "minimizer", "Minuit2"),
+          JsonUtils::fetchValue(_minimizerConfig_, "algorithm", "Migrad")
       )
   );
 
@@ -1148,11 +1154,11 @@ void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
   );
 
   _minimizer_->SetFunction(*_functor_);
-  _minimizer_->SetStrategy(JsonUtils::fetchValue<int>(_minimizerConfig_, "strategy"));
-  _minimizer_->SetPrintLevel(JsonUtils::fetchValue<int>(_minimizerConfig_, "print_level"));
-  _minimizer_->SetTolerance(JsonUtils::fetchValue<double>(_minimizerConfig_, "tolerance"));
-  _minimizer_->SetMaxIterations(JsonUtils::fetchValue<unsigned int>(_minimizerConfig_, "max_iter"));
-  _minimizer_->SetMaxFunctionCalls(JsonUtils::fetchValue<unsigned int>(_minimizerConfig_, "max_fcn"));
+  _minimizer_->SetStrategy(JsonUtils::fetchValue(_minimizerConfig_, "strategy", 1));
+  _minimizer_->SetPrintLevel(JsonUtils::fetchValue(_minimizerConfig_, "print_level", 2));
+  _minimizer_->SetTolerance(JsonUtils::fetchValue(_minimizerConfig_, "tolerance", 1E-4));
+  _minimizer_->SetMaxIterations(JsonUtils::fetchValue(_minimizerConfig_, "max_iter", (unsigned int)(500) ));
+  _minimizer_->SetMaxFunctionCalls(JsonUtils::fetchValue(_minimizerConfig_, "max_fcn", (unsigned int)(1E9)));
 
   int iPar = -1;
   for( auto& parSet : _propagator_.getParameterSetsList() ){
