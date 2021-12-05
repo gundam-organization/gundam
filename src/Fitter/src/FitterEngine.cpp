@@ -1002,6 +1002,7 @@ void FitterEngine::writePostFitData() {
   fitterCovarianceMatrix.Write("fitterCovarianceMatrix_TMatrixDSym");
   fitterCovarianceMatrixTH2D->Write("fitterCovarianceMatrix_TH2D");
 
+  LogInfo << "Fetching Hessian matrix..." << std::endl;
   double hessianMatrixArray[_minimizer_->NDim() * _minimizer_->NDim()];
   _minimizer_->GetHessianMatrix(hessianMatrixArray);
   TMatrixDSym fitterHessianMatrix(int(_minimizer_->NDim()), hessianMatrixArray);
