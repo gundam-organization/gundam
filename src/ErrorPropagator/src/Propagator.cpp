@@ -65,8 +65,8 @@ void Propagator::setConfig(const json &config) {
 void Propagator::initialize() {
   LogWarning << __METHOD_NAME__ << std::endl;
 
-  LogTrace << "Parameters..." << std::endl;
-  auto parameterSetListConfig = JsonUtils::fetchValue<json>(_config_, "parameterSetListConfig");
+  LogInfo << "Loading Parameters..." << std::endl;
+  auto parameterSetListConfig = JsonUtils::fetchValue(_config_, "parameterSetListConfig", nlohmann::json());
   if( parameterSetListConfig.is_string() ) parameterSetListConfig = JsonUtils::readConfigFile(parameterSetListConfig.get<std::string>());
   int nPars = 0;
   _parameterSetsList_.reserve(parameterSetListConfig.size()); // make sure the objects aren't moved in RAM ( since FitParameter* will be used )
@@ -101,7 +101,7 @@ void Propagator::initialize() {
   _fitSampleSet_.initialize();
 
   LogTrace << "Initializing the PlotGenerator" << std::endl;
-  auto plotGeneratorConfig = JsonUtils::fetchValue<json>(_config_, "plotGeneratorConfig");
+  auto plotGeneratorConfig = JsonUtils::fetchValue(_config_, "plotGeneratorConfig", nlohmann::json());
   if( plotGeneratorConfig.is_string() ) parameterSetListConfig = JsonUtils::readConfigFile(plotGeneratorConfig.get<std::string>());
   _plotGenerator_.setConfig(plotGeneratorConfig);
   _plotGenerator_.initialize();
@@ -198,6 +198,8 @@ void Propagator::initialize() {
             << "-> mc: " << sample.getMcContainer().getSumWeights() << " / data: " << sample.getDataContainer().getSumWeights() << std::endl;
   }
 
+
+  // DEV
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
     for( auto& event : sample.getMcContainer().eventList ){
       if( event.getEntryIndex() == 348660 ){
