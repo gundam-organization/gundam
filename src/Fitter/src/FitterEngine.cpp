@@ -1002,21 +1002,23 @@ void FitterEngine::writePostFitData() {
   fitterCovarianceMatrix.Write("fitterCovarianceMatrix_TMatrixDSym");
   fitterCovarianceMatrixTH2D->Write("fitterCovarianceMatrix_TH2D");
 
-  LogInfo << "Fetching Hessian matrix..." << std::endl;
-  double hessianMatrixArray[_minimizer_->NDim() * _minimizer_->NDim()];
-  _minimizer_->GetHessianMatrix(hessianMatrixArray);
-  TMatrixDSym fitterHessianMatrix(int(_minimizer_->NDim()), hessianMatrixArray);
+  if( JsonUtils::fetchValue(_config_, "decomposeHessianMatrix", false) ){
+    LogInfo << "Fetching Hessian matrix..." << std::endl;
+    double hessianMatrixArray[_minimizer_->NDim() * _minimizer_->NDim()];
+    _minimizer_->GetHessianMatrix(hessianMatrixArray);
+    TMatrixDSym fitterHessianMatrix(int(_minimizer_->NDim()), hessianMatrixArray);
 
-  LogInfo << "Decomposing Hessian matrix..." << std::endl;
-  auto decompHessian = TMatrixDSymEigen(fitterHessianMatrix);
+    LogInfo << "Decomposing Hessian matrix..." << std::endl;
+    auto decompHessian = TMatrixDSymEigen(fitterHessianMatrix);
 
-  fitterHessianMatrix.Write("fitterHessianMatrix_TMatrixDSym");
-  auto* fitterHessianMatrix_TH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*)&fitterHessianMatrix);
-  fitterHessianMatrix_TH2D->Write("fitterHessianMatrix_TH2D");
+    fitterHessianMatrix.Write("fitterHessianMatrix_TMatrixDSym");
+    auto* fitterHessianMatrix_TH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*)&fitterHessianMatrix);
+    fitterHessianMatrix_TH2D->Write("fitterHessianMatrix_TH2D");
 
-  decompHessian.GetEigenValues().Write("fitterHessianEigen_TVectorD");
-  auto* fitterHessianEigen_TH1D = GenericToolbox::convertTVectorDtoTH1D(&decompHessian.GetEigenValues());
-  fitterHessianEigen_TH1D->Write("fitterHessianEigen_TH1D");
+    decompHessian.GetEigenValues().Write("fitterHessianEigen_TVectorD");
+    auto* fitterHessianEigen_TH1D = GenericToolbox::convertTVectorDtoTH1D(&decompHessian.GetEigenValues());
+    fitterHessianEigen_TH1D->Write("fitterHessianEigen_TH1D");
+  }
 
 }
 
