@@ -4,6 +4,7 @@
 
 #include "Logger.h"
 
+#include "FitParameter.h"
 #include "NormalizationDial.h"
 
 LoggerInit([](){
@@ -26,10 +27,12 @@ void NormalizationDial::reset() {
 
 void NormalizationDial::initialize() {
   Dial::initialize();
+  LogThrowIf(_associatedParameterReference_ == nullptr, "Par reference not set.")
+  _priorValue_ = ( (FitParameter*) _associatedParameterReference_ )->getPriorValue();
   _isInitialized_ = true;
 }
 
 double NormalizationDial::evalResponse(double parameterValue_){
-  return parameterValue_; // NO CACHE NEEDED :)
+  return parameterValue_ * _priorValue_; // NO CACHE NEEDED ?
 }
 
