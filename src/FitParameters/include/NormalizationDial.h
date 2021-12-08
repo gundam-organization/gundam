@@ -21,7 +21,7 @@ protected:
   void fillResponseCache() override;
 
 private:
-  double _priorValue_{std::nan("unset")};
+//  double _priorValue_{std::nan("unset")};
 
 };
 
