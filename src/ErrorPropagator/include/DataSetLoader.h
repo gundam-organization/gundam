@@ -38,6 +38,7 @@ public:
   std::vector<std::string> &getMcActiveLeafNameList();
   std::vector<std::string> &getDataActiveLeafNameList();
   const std::string &getMcNominalWeightFormulaStr() const;
+  const std::string &getFakeDataWeightFormulaStr() const;
   const std::string &getDataNominalWeightFormulaStr() const;
   const std::vector<std::string> &getMcFilePathList() const;
   const std::vector<std::string> &getDataFilePathList() const;
@@ -75,6 +76,7 @@ private:
 
   std::string _mcTreeName_;
   std::string _mcNominalWeightFormulaStr_{"1"};
+  std::string _fakeDataWeightFormulaStr_{"1"};
   std::vector<std::string> _mcActiveLeafNameList_;
   std::vector<std::string> _mcFilePathList_;
 

@@ -299,7 +299,7 @@ bool DialSet::initializeDialsWithDefinition() {
         Int_t kinematicBin;
         TSpline3* splinePtr = nullptr;
         TGraph* graphPtr = nullptr;
-
+          
         // searching for additional split var
         std::vector<std::string> splitVarNameList;
         for( int iKey = 0 ; iKey < dialsTTree->GetListOfLeaves()->GetEntries() ; iKey++ ){
@@ -319,9 +319,9 @@ bool DialSet::initializeDialsWithDefinition() {
         for( size_t iSplitVar = 0 ; iSplitVar < splitVarNameList.size() ; iSplitVar++ ){
           dialsTTree->SetBranchAddress(splitVarNameList[iSplitVar].c_str(), &splitVarValueList[iSplitVar]);
         }
-
+        
         Long64_t nSplines = dialsTTree->GetEntries();
-        LogDebug << "Reading dials in \"" << dialsTFile->GetName() << "\"" << std::endl;
+        LogWarning << "Reading dials in \"" << dialsTFile->GetName() << "\"" << std::endl;
         for( Long64_t iSpline = 0 ; iSpline < nSplines ; iSpline++ ){
           dialsTTree->GetEntry(iSpline);
           auto dialBin = binList.at(kinematicBin); // copy
