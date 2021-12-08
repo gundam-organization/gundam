@@ -1079,7 +1079,7 @@ void FitterEngine::rescaleParametersStepSize(){
         double deltaChi2Pulls = _chi2PullsBuffer_ - baseChi2Pull;
 
 //        double stepSize = TMath::Sqrt(deltaChi2Pulls)/TMath::Sqrt(deltaChi2);
-        double stepSize = 1./TMath::Sqrt(deltaChi2);
+        double stepSize = 1./TMath::Sqrt(std::fabs(deltaChi2));
 
         LogInfo << "Step size of " << parSet.getName() + "/eigen_#" << iEigen
                 << " -> σ x " << _parStepScale_ << " x " << stepSize
@@ -1113,7 +1113,7 @@ void FitterEngine::rescaleParametersStepSize(){
 //        double stepSize = TMath::Sqrt(deltaChi2Pulls)/TMath::Sqrt(deltaChi2);
 
         // full rescale
-        double stepSize = 1./TMath::Sqrt(deltaChi2);
+        double stepSize = 1./TMath::Sqrt(std::fabs(deltaChi2));
 
         LogInfo << "Step size of " << parSet.getName() + "/" + par.getTitle()
             << " -> σ x " << _parStepScale_ << " x " << stepSize
