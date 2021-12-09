@@ -102,6 +102,8 @@ private:
 
   GenericToolbox::VariablesMonitor _convergenceMonitor_;
   GenericToolbox::CycleTimer _evalFitAvgTimer_;
+  GenericToolbox::CycleTimer _outEvalFitAvgTimer_;
+  GenericToolbox::CycleTimer _itSpeed_;
 
   const std::map<int, std::string> minuitStatusCodeStr{
       { 0, "status = 0    : OK" },
