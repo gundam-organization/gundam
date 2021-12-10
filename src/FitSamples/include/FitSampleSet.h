@@ -49,7 +49,6 @@ public:
   //Core
   bool empty() const;
   double evalLikelihood() const;
-  void writeSampleEvents(TDirectory* saveDir_) const;
 
   // Parallel
   void updateSampleEventBinIndexes() const;

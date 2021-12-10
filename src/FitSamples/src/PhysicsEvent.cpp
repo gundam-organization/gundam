@@ -182,7 +182,7 @@ double PhysicsEvent::evalFormula(TFormula* formulaPtr_, std::vector<int>* indexD
 
 std::string PhysicsEvent::getSummary() const {
   std::stringstream ss;
-  ss << typeid(this).name() << " :";
+  ss << "PhysicsEvent :";
   if( _leafContentList_.empty() ){
     ss << "empty";
   }

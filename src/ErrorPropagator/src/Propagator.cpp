@@ -95,12 +95,12 @@ void Propagator::initialize() {
     _globalCovarianceMatrix_->Write("globalCovarianceMatrix_TMatrixD");
   }
 
-  LogDebug << "FitSampleSet..." << std::endl;
+  LogInfo << "Initializing FitSampleSet" << std::endl;
   auto fitSampleSetConfig = JsonUtils::fetchValue(_config_, "fitSampleSetConfig", nlohmann::json());
   _fitSampleSet_.setConfig(fitSampleSetConfig);
   _fitSampleSet_.initialize();
 
-  LogTrace << "Initializing the PlotGenerator" << std::endl;
+  LogInfo << "Initializing the PlotGenerator" << std::endl;
   auto plotGeneratorConfig = JsonUtils::fetchValue(_config_, "plotGeneratorConfig", nlohmann::json());
   if( plotGeneratorConfig.is_string() ) parameterSetListConfig = JsonUtils::readConfigFile(plotGeneratorConfig.get<std::string>());
   _plotGenerator_.setConfig(plotGeneratorConfig);
@@ -113,7 +113,7 @@ void Propagator::initialize() {
     dataSetListConfig = JsonUtils::getForwardedConfig(_fitSampleSet_.getConfig(), "dataSetList");;
     LogAlert << "DEPRECATED CONFIG OPTION: " << "dataSetList should now be located in the Propagator config." << std::endl;
   }
-  LogAssert(not dataSetListConfig.empty(), "No dataSet specified." << std::endl);
+  LogThrowIf(dataSetListConfig.empty(), "No dataSet specified." << std::endl);
   int iDataSet{0};
   for( const auto& dataSetConfig : dataSetListConfig ){
     _dataSetList_.emplace_back();
@@ -141,18 +141,6 @@ void Propagator::initialize() {
   LogInfo << "Propagating prior parameters on events..." << std::endl;
   reweightSampleEvents();
 
-  if( JsonUtils::fetchValue<json>(_config_, "throwAsimovFitParameters", false) ){
-    LogWarning << "Throwing parameters..." << std::endl;
-    for( auto& parSet : _parameterSetsList_ ){
-      auto thrownPars = GenericToolbox::throwCorrelatedParameters(GenericToolbox::getCholeskyMatrix(
-          parSet.getOriginalCovarianceMatrix()));
-      for( auto& par : parSet.getParameterList() ){
-        par.setParameterValue( par.getPriorValue() + thrownPars.at(par.getParameterIndex()) );
-        LogDebug << parSet.getName() << "/" << par.getTitle() << ": thrown = " << par.getParameterValue() << std::endl;
-      }
-    }
-  }
-
   LogInfo << "Set the current MC prior weights as nominal weight..." << std::endl;
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
     for( auto& event : sample.getMcContainer().eventList ){
@@ -160,52 +148,57 @@ void Propagator::initialize() {
     }
   }
 
-  if( _fitSampleSet_.getDataEventType() == DataEventType::Asimov ){
-    LogInfo << "Propagating prior weights on data Asimov events..." << std::endl;
+  if(   _fitSampleSet_.getDataEventType() == DataEventType::Asimov
+    or _fitSampleSet_.getDataEventType() == DataEventType::FakeData
+  ){
+    LogInfo << "Propagating prior weights on data Asimov/FakeData events..." << std::endl;
+
+    if( JsonUtils::fetchValue<json>(_config_, "throwAsimovFitParameters", false) ){
+      LogWarning << "Throwing fit parameters for Asimov data..." << std::endl;
+      for( auto& parSet : _parameterSetsList_ ){
+        if( not parSet.isEnabled() ) continue;
+        parSet.throwFitParameters();
+      }
+      reweightSampleEvents();
+    }
+
+    double weightBuffer;
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
       sample.getDataContainer().histScale = sample.getMcContainer().histScale;
-      int nEvents = int(sample.getMcContainer().eventList.size());
+
+      auto* mcEventList = &sample.getMcContainer().eventList;
+      auto* dataEventList = &sample.getDataContainer().eventList;
+
+      int nEvents = int(mcEventList->size());
       for( int iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
         // Since no reweight is applied on data samples, the nominal weight should be the default one
-        sample.getDataContainer().eventList.at(iEvent).setTreeWeight(
-            sample.getMcContainer().eventList.at(iEvent).getNominalWeight()
-        );
-        sample.getDataContainer().eventList.at(iEvent).resetEventWeight();
-        sample.getDataContainer().eventList.at(iEvent).setNominalWeight(sample.getDataContainer().eventList.at(iEvent).getEventWeight());
-      }
-    }
-  }
+        weightBuffer = (*mcEventList)[iEvent].getEventWeight();
+        if( _fitSampleSet_.getDataEventType() == DataEventType::FakeData ){
+          weightBuffer *= (*mcEventList)[iEvent].getFakeDataWeight();
+        }
 
-  if( _fitSampleSet_.getDataEventType() == DataEventType::FakeData ){
-    LogInfo << "Propagating prior weights on data FakeData events..." << std::endl;
-    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-      sample.getDataContainer().histScale = sample.getMcContainer().histScale;
-      int nEvents = int(sample.getMcContainer().eventList.size());
-      for( int iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
-        // Apply FakeData weights
-        sample.getDataContainer().eventList.at(iEvent).setTreeWeight(
-          sample.getMcContainer().eventList.at(iEvent).getFakeDataWeight() * sample.getMcContainer().eventList.at(iEvent).getNominalWeight()
-        );
-        sample.getDataContainer().eventList.at(iEvent).resetEventWeight();
-        sample.getDataContainer().eventList.at(iEvent).setNominalWeight(sample.getDataContainer().eventList.at(iEvent).getEventWeight());
+        (*dataEventList)[iEvent].setTreeWeight(weightBuffer);
+        (*dataEventList)[iEvent].resetEventWeight();              // treeWeight -> eventWeight
+        (*dataEventList)[iEvent].setNominalWeight(weightBuffer);  // also on nominal (but irrelevant for data-like samples)
       }
     }
+
+    // Make sure MC event are back at their nominal value:
+    if( JsonUtils::fetchValue<json>(_config_, "throwAsimovFitParameters", false) ){
+      for( auto& parSet : _parameterSetsList_ ){
+        if( not parSet.isEnabled() ) continue;
+        parSet.moveFitParametersToPrior();
+      }
+      reweightSampleEvents();
+    }
+
   }
 
   LogWarning << "Sample breakdown:" << std::endl;
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
     LogInfo << "Sum of event weights in \"" << sample.getName() << "\":" << std::endl
-            << "-> mc: " << sample.getMcContainer().getSumWeights() << " / data: " << sample.getDataContainer().getSumWeights() << std::endl;
-  }
-
-
-  // DEV
-  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    for( auto& event : sample.getMcContainer().eventList ){
-      if( event.getEntryIndex() == 348660 ){
-        LogTrace << event << std::endl;
-      }
-    }
+            << "-> mc: " << sample.getMcContainer().getSumWeights()
+            << " / data: " << sample.getDataContainer().getSumWeights() << std::endl;
   }
 
   _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);

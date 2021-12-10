@@ -50,7 +50,6 @@ public:
   void fixGhostFitParameters();
   void scanParameters(int nbSteps_ = -1, const std::string& saveDir_ = "");
   void scanParameter(int iPar, int nbSteps_ = -1, const std::string& saveDir_ = "");
-  void throwMcParameters(double gain_ = 1);
 
   void fit();
   void updateChi2Cache();
@@ -86,6 +85,8 @@ private:
   int _nbFitParameters_{0};
   int _nbParameters_{0};
   Propagator _propagator_{};
+  std::string _minimizerType_{};
+  std::string _minimizerAlgo_{};
   std::shared_ptr<ROOT::Math::Minimizer> _minimizer_{nullptr};
   std::shared_ptr<ROOT::Math::Functor> _functor_{nullptr};
   TRandom3 _prng_;
@@ -95,22 +96,24 @@ private:
   double _chi2StatBuffer_{0};
   double _chi2PullsBuffer_{0};
   double _chi2RegBuffer_{0};
-  double _parStepScale_{0.1};
+  double _parStepGain_{0.1};
 
   TTree* _chi2HistoryTree_{nullptr};
 //  std::map<std::string, std::vector<double>> _chi2History_;
 
   GenericToolbox::VariablesMonitor _convergenceMonitor_;
   GenericToolbox::CycleTimer _evalFitAvgTimer_;
+  GenericToolbox::CycleTimer _outEvalFitAvgTimer_;
+  GenericToolbox::CycleTimer _itSpeed_;
 
   const std::map<int, std::string> minuitStatusCodeStr{
-      { 0, "status = 0    : OK" },
-      { 1, "status = 1    : Covariance was mad  epos defined"},
-      { 2, "status = 2    : Hesse is invalid"},
-      { 3, "status = 3    : Edm is above max"},
-      { 4, "status = 4    : Reached call limit"},
-      { 5, "status = 5    : Any other failure"},
-      { -1, "status = -1    : Unknown error?"}
+      { 0 , "status = 0    : OK" },
+      { 1 , "status = 1    : Covariance was mad  epos defined"},
+      { 2 , "status = 2    : Hesse is invalid"},
+      { 3 , "status = 3    : Edm is above max"},
+      { 4 , "status = 4    : Reached call limit"},
+      { 5 , "status = 5    : Any other failure"},
+      { -1, "status = -1   : Unknown error?"}
   };
   const std::map<int, std::string> hesseStatusCodeStr{
       { 0, "status = 0    : OK" },

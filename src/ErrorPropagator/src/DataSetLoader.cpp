@@ -83,7 +83,7 @@ void DataSetLoader::initialize() {
   }
 
   _name_ = JsonUtils::fetchValue<std::string>(_config_, "name");
-  LogDebug << "Initializing dataset: \"" << _name_ << "\"" << std::endl;
+  LogInfo << "Initializing dataset: \"" << _name_ << "\"" << std::endl;
 
   {
     auto mcConfig = JsonUtils::fetchValue(_config_, "mc", nlohmann::json());
@@ -196,8 +196,6 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
     
     TChain* chainPtr{nullptr};
     std::vector<std::string>* activeLeafNameListPtr;
-
-    LogDebug << GET_VAR_NAME_VALUE(isData) << std::endl;
 
     isData ? LogInfo << "Reading data files..." << std::endl : LogInfo << "Reading MC files..." << std::endl;
     isData ? chainPtr = this->buildDataChain() : chainPtr = this->buildMcChain();

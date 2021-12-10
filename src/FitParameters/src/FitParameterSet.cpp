@@ -4,6 +4,7 @@
 
 #include "FitParameterSet.h"
 #include "JsonUtils.h"
+#include "GlobalVariables.h"
 
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
@@ -35,6 +36,7 @@ void FitParameterSet::reset() {
   _originalCorrelationMatrix_ = nullptr;
   _parameterPriorList_ = nullptr;
   _parameterNamesList_ = nullptr;
+  _choleskyMatrix_ = nullptr;
 
   _parameterList_.clear();
 
@@ -209,7 +211,7 @@ void FitParameterSet::initialize() {
     _eigenParFixedList_.resize( _eigenParStepSize_->GetNrows(), false );
   }
 
-  _enableThrowMcBeforeFit_ = JsonUtils::fetchValue(_config_, "enableThrowMcBeforeFit", _enableThrowMcBeforeFit_);
+  _throwMcBeforeFit_ = JsonUtils::fetchValue(_config_, "throwMcBeforeFit", _throwMcBeforeFit_);
 
   _isInitialized_ = true;
 }
@@ -220,7 +222,7 @@ bool FitParameterSet::isEnabled() const {
   return _isEnabled_;
 }
 bool FitParameterSet::isEnableThrowMcBeforeFit() const {
-  return _enableThrowMcBeforeFit_;
+  return _throwMcBeforeFit_;
 }
 const std::string &FitParameterSet::getName() const {
   return _name_;
@@ -256,6 +258,7 @@ double FitParameterSet::getChi2() const {
   // EIGEN DECOMP NOT VALID?? Why?
 //  if( _useEigenDecompInFit_ ){
 //    for( int iEigen = 0 ; iEigen < _nbEnabledEigen_ ; iEigen++ ){
+//      if( _eigenParFixedList_[iEigen] ) continue;
 //      chi2 += TMath::Sq((*_eigenParValues_)[iEigen] - (*_eigenParPriorValues_)[iEigen]) / (*_eigenValues_)[iEigen];
 //    }
 //  }
@@ -278,6 +281,65 @@ double FitParameterSet::getChi2() const {
   return chi2;
 }
 
+// Parameter throw
+void FitParameterSet::moveFitParametersToPrior(){
+  LogInfo << "Moving back fit parameters to their prior value..." << std::endl;
+
+  if( not _useEigenDecompInFit_ ){
+    for( auto& par : _parameterList_ ){
+      if( par.isFixed() ){ continue; }
+      par.setParameterValue(par.getPriorValue());
+    }
+  }
+  else{
+    for( int iEigen = 0 ; iEigen < _nbEnabledEigen_ ; iEigen++ ){
+      if( _eigenParFixedList_[iEigen] ){ continue; }
+      (*_eigenParValues_)[iEigen] = (*_eigenParPriorValues_)[iEigen];
+    }
+    this->propagateEigenToOriginal();
+  }
+
+}
+void FitParameterSet::throwFitParameters(double gain_){
+
+  if( _covarianceMatrix_ == nullptr ){
+    LogAlert << "Can't throw parameters with \"" << _name_ << "\" since no covariance matrix has been provided." << std::endl;
+    return;
+  }
+
+  if( not _useEigenDecompInFit_ ){
+    LogInfo << "Throwing parameters for " << _name_ << " using Cholesky matrix" << std::endl;
+
+    if( _choleskyMatrix_ == nullptr ){
+      LogInfo << "Generating Cholesky matrix..." << std::endl;
+      _choleskyMatrix_ = std::shared_ptr<TMatrixD>(
+          GenericToolbox::getCholeskyMatrix(_covarianceMatrix_)
+      );
+    }
+
+    auto throws = GenericToolbox::throwCorrelatedParameters(_choleskyMatrix_.get());
+    int iPar{0};
+    for( auto& par : _parameterList_ ){
+      if( par.isFixed() ){ LogWarning << "Parameter " << par.getTitle() << " is fixed. Not throwing" << std::endl; continue; }
+      LogInfo << "Throwing par " << par.getTitle() << ": " << par.getParameterValue();
+      par.setParameterValue( par.getPriorValue() + gain_ * throws[iPar++] );
+      LogInfo << " → " << par.getParameterValue() << std::endl;
+    }
+  }
+  else{
+    LogInfo << "Throwing eigen parameters for " << _name_ << std::endl;
+    for( int iEigen = 0 ; iEigen < _nbEnabledEigen_ ; iEigen++ ){
+
+      if( _eigenParFixedList_[iEigen] ){ LogWarning << "Eigen parameter #" << iEigen << " is fixed. Not throwing" << std::endl; continue; }
+
+      LogInfo << "Throwing eigen #" << iEigen << ": " << (*_eigenParValues_)[iEigen];
+      (*_eigenParValues_)[iEigen] = (*_eigenParPriorValues_)[iEigen] + gain_ * GlobalVariables::getPrng().Gaus(0, this->getEigenSigma(iEigen) );
+      LogInfo << " → " << (*_eigenParValues_)[iEigen] << std::endl;
+    }
+    this->propagateEigenToOriginal();
+  }
+
+}
 
 // Eigen
 bool FitParameterSet::isUseEigenDecompInFit() const {
