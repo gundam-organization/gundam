@@ -42,7 +42,6 @@ public:
   std::vector<FitParameterSet> &getParameterSetsList();
   PlotGenerator &getPlotGenerator();
   const json &getConfig() const;
-
   const EventTreeWriter &getTreeWriter() const;
 
   // Core

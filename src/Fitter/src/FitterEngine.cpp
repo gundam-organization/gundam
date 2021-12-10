@@ -78,12 +78,11 @@ void FitterEngine::initialize() {
     }
   }
 
-  if( JsonUtils::fetchValue(_config_, "enableParStepRescale", true) ){
-    _parStepScale_ = JsonUtils::fetchValue(_config_, "parStepScale", _parStepScale_);
-    LogInfo << "Using parameter step scale: " << _parStepScale_ << std::endl;
+  if( JsonUtils::fetchValue(_config_, "scaleParStepWithChi2Response", true) ){
+    _parStepGain_ = JsonUtils::fetchValue(_config_, "parStepGain", _parStepGain_);
+    LogInfo << "Using parameter step scale: " << _parStepGain_ << std::endl;
     this->rescaleParametersStepSize();
   }
-
 
   if( JsonUtils::fetchValue(_config_, "fixGhostFitParameters", false) ) this->fixGhostFitParameters();
 
@@ -91,7 +90,8 @@ void FitterEngine::initialize() {
   _convergenceMonitor_.addDisplayedQuantity("LastAddedValue");
   _convergenceMonitor_.addDisplayedQuantity("SlopePerCall");
 
-  _convergenceMonitor_.getQuantity("VarName").title = "Chi2";
+//  _convergenceMonitor_.getQuantity("VarName").title = "χ² value"; // special chars resize the box
+  _convergenceMonitor_.getQuantity("VarName").title = "Likelihood";
   _convergenceMonitor_.getQuantity("LastAddedValue").title = "Current Value";
   _convergenceMonitor_.getQuantity("SlopePerCall").title = "Avg. Slope /call";
 
@@ -111,14 +111,64 @@ void FitterEngine::initialize() {
     _propagator_.getTreeWriter().writeSamples(dir);
   }
 
-  this->initializeMinimizer();
-
   if( JsonUtils::fetchValue(_config_, "throwMcBeforeFit", false) ){
-    LogInfo << "Throwing MC parameters (uncorrelated) away from their prior..." << std::endl;
+    LogInfo << "Throwing correlated parameters of MC away from their prior..." << std::endl;
     double throwGain = JsonUtils::fetchValue(_config_, "throwMcBeforeFitGain", 1.);
-    LogInfo << "Throw gain set to: " << throwGain << std::endl;
-    this->throwMcParameters(throwGain);
-  }
+    LogInfo << "Throw gain form MC push set to: " << throwGain << std::endl;
+
+    for( auto& parSet : _propagator_.getParameterSetsList() ){
+
+      if(not parSet.isEnabled()) continue;
+
+      if( not parSet.isEnableThrowMcBeforeFit() ){
+        LogWarning << "\"" << parSet.getName() << "\" has marked disabled throwMcBeforeFit: skipping." << std::endl;
+        continue;
+      }
+
+      if( JsonUtils::doKeyExist(parSet.getConfig(), "customFitParThrow") ){
+        LogAlert << "Using custom mc parameter push for " << parSet.getName() << std::endl;
+        for(auto& entry : JsonUtils::fetchValue(parSet.getConfig(), "customFitParThrow", std::vector<nlohmann::json>())){
+          int parIndex = JsonUtils::fetchValue<int>(entry, "parIndex");
+
+          double pushVal;
+          if( parSet.isUseEigenDecompInFit() ){
+            pushVal =
+                parSet.getEigenParameterValue(parIndex)
+                + parSet.getEigenSigma(parIndex)
+                  * JsonUtils::fetchValue<double>(entry, "nbSigmaAway");
+
+            LogWarning << "Pushing eigen_#" << parIndex << ": " << parSet.getEigenParameterValue(parIndex) << " → " << pushVal << std::endl;
+            parSet.setEigenParameter(parIndex, pushVal);
+            parSet.propagateEigenToOriginal();
+//          _minimizer_->SetVariableValue(iFitPar + parIndex, parSet.getEigenParameterValue(parIndex) );
+          }
+          else{
+            pushVal =
+                parSet.getParameterList()[parIndex].getParameterValue()
+                + parSet.getParameterList()[parIndex].getStdDevValue()
+                  * JsonUtils::fetchValue<double>(entry, "nbSigmaAway");
+
+
+            LogWarning << "Pushing #" << parIndex << " to " << pushVal << std::endl;
+            parSet.getParameterList()[parIndex].setParameterValue( pushVal );
+//          _minimizer_->SetVariableValue(iFitPar + parIndex, parSet.getParameterList()[parIndex].getParameterValue() );
+          }
+
+        }
+        continue;
+      }
+      else{
+        LogAlert << "Throwing correlated parameters for " << parSet.getName() << std::endl;
+        parSet.throwFitParameters(throwGain);
+      }
+
+    } // parSet
+
+    _propagator_.preventRfPropagation(); // Making sure since we need the weight of each event
+    _propagator_.propagateParametersOnSamples();
+  } // throwMcBeforeFit
+
+  this->initializeMinimizer();
 
 }
 
@@ -403,99 +453,6 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
   delete[] y;
 }
 
-void FitterEngine::throwMcParameters(double gain_) {
-  LogInfo << __METHOD_NAME__ << std::endl;
-
-  // TODO: IMPLEMENT CHOLESKY DECOMP
-  int iFitPar = -1;
-  for( auto& parSet : _propagator_.getParameterSetsList() ){
-
-    if(not parSet.isEnabled()) continue;
-
-    if( not parSet.isEnableThrowMcBeforeFit() ){
-      LogWarning << "\"" << parSet.getName() << "\" has marked disabled throwMcBeforeFit: skipping." << std::endl;
-      if( not parSet.isUseEigenDecompInFit() ) iFitPar += int(parSet.getParameterList().size());
-      else iFitPar += int(parSet.getNbEnabledEigenParameters());
-
-      for(auto& entry : JsonUtils::fetchValue(parSet.getConfig(), "moveMcParBeforeFit", std::vector<nlohmann::json>())){
-        int parIndex = JsonUtils::fetchValue<int>(entry, "parIndex");
-
-        double pushVal;
-        if( parSet.isUseEigenDecompInFit() ){
-          pushVal =
-              parSet.getEigenParameterValue(parIndex)
-              + parSet.getEigenSigma(parIndex)
-                * JsonUtils::fetchValue<double>(entry, "nbSigmaAway");
-
-
-          LogWarning << "Pushing eigen_#" << parIndex << " to " << pushVal << std::endl;
-          parSet.setEigenParameter(parIndex, pushVal);
-        }
-        else{
-          pushVal =
-              parSet.getParameterList()[parIndex].getParameterValue()
-              + parSet.getParameterList()[parIndex].getStdDevValue()
-                * JsonUtils::fetchValue<double>(entry, "nbSigmaAway");
-
-
-          LogWarning << "Pushing #" << parIndex << " to " << pushVal << std::endl;
-          parSet.getParameterList()[parIndex].setParameterValue( pushVal );
-        }
-
-      }
-
-      continue;
-    }
-    else{
-      LogWarning << "Throwing correlated parameters for \"" << parSet.getName() << "\"" << std::endl;
-    }
-
-
-    if( not parSet.isUseEigenDecompInFit() ){
-
-      auto throws = GenericToolbox::throwCorrelatedParameters(
-          GenericToolbox::getCholeskyMatrix(parSet.getOriginalCovarianceMatrix())
-      );
-
-      int iPar{-1};
-      for( auto& par : parSet.getParameterList() ){
-        iFitPar++; iPar++;
-
-        if( not _minimizer_->IsFixedVariable(iFitPar) ){
-          LogInfo << "Throwing par " << par.getTitle() << ": " << par.getParameterValue();
-          par.setParameterValue(
-              par.getPriorValue()
-              + gain_ * throws[iPar] );
-          LogInfo << " → " << par.getParameterValue() << std::endl;
-          _minimizer_->SetVariableValue(iFitPar, par.getParameterValue() );
-        }
-      }
-    }
-    else{
-      for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
-        iFitPar++;
-        if( not parSet.isEnableThrowMcBeforeFit() ) continue;
-        if( not _minimizer_->IsFixedVariable(iFitPar) ){
-          LogInfo << "Throwing eigen #" << iEigen << ": " << parSet.getEigenParameterValue(iEigen);
-          parSet.setEigenParameter(
-              iEigen,
-              parSet.getEigenParameterValue(iEigen)
-              + gain_ * _prng_.Gaus(0, parSet.getEigenSigma(iEigen) )
-          );
-          LogInfo << " → " << parSet.getEigenParameterValue(iEigen) << std::endl;
-          _minimizer_->SetVariableValue(iFitPar, parSet.getEigenParameterValue(iEigen) );
-
-          // placeholder
-        }
-      }
-    }
-
-  }
-
-  _propagator_.preventRfPropagation(); // Making sure since we need the weight of each event
-  _propagator_.propagateParametersOnSamples();
-}
-
 void FitterEngine::fit(){
   LogWarning << __METHOD_NAME__ << std::endl;
 
@@ -557,8 +514,10 @@ void FitterEngine::fit(){
   int nbMinimizeCalls = _nbFitCalls_;
   LogInfo << _convergenceMonitor_.generateMonitorString(); // lasting printout
   LogInfo << "Minimization ended after " << nbMinimizeCalls << " calls." << std::endl;
-  LogWarning << "Status code: " << minuitStatusCodeStr.at(_minimizer_->Status()) << std::endl;
-  LogWarning << "Covariance matrix status code: " << covMatrixStatusCodeStr.at(_minimizer_->CovMatrixStatus()) << std::endl;
+  if(_minimizerAlgo_ == "Migrad") LogWarning << "Status code: " << minuitStatusCodeStr.at(_minimizer_->Status()) << std::endl;
+  else LogWarning << "Status code: " << _minimizer_->Status() << std::endl;
+  if(_minimizerAlgo_ == "Migrad") LogWarning << "Covariance matrix status code: " << covMatrixStatusCodeStr.at(_minimizer_->CovMatrixStatus()) << std::endl;
+  else LogWarning << "Covariance matrix status code: " << _minimizer_->CovMatrixStatus() << std::endl;
   if( _saveDir_ != nullptr ){
     GenericToolbox::mkdirTFile(_saveDir_, "fit")->cd();
     _chi2HistoryTree_->Write();
@@ -796,13 +755,13 @@ double FitterEngine::evalFit(const double* parArray_){
 
     std::stringstream ss;
     ss << __METHOD_NAME__ << ": call #" << _nbFitCalls_;
+    ss << std::endl << "Current RAM: " << GenericToolbox::parseSizeUnits(GenericToolbox::getProcessMemoryUsage());
     ss << std::endl << "Avg χ² computation time: " << _evalFitAvgTimer_;
     if( not _propagator_.isUseResponseFunctions() ){
       ss << std::endl << "├─ Current speed: " << (double)_itSpeed_.counts/(double)_itSpeed_.cumulated * 1E6 << " it/s";
-      ss << std::endl << "├─ Avg time for ROOT Minimizer: " << _outEvalFitAvgTimer_;
+      ss << std::endl << "├─ Avg time for " << _minimizerType_ << "/" << _minimizerAlgo_ << ": " << _outEvalFitAvgTimer_;
       ss << std::endl << "├─ Avg time to propagate weights: " << _propagator_.weightProp;
       ss << std::endl << "├─ Avg time to fill histograms: " << _propagator_.fillProp;
-      ss << std::endl << "Current RAM: " << GenericToolbox::parseSizeUnits(GenericToolbox::getProcessMemoryUsage());
     }
     else{
       ss << GET_VAR_NAME_VALUE(_propagator_.applyRf);
@@ -1179,7 +1138,7 @@ void FitterEngine::writePostFitData() {
                                     preFitErrorHist->GetXaxis()->GetXmax()
                                     );
     GenericToolbox::transformBinContent(&preFitErrorHistLine, [&](TH1D* h_, int b_){
-      h_->SetBinContent(b_, postFitErrorHist->GetBinContent(b_));
+      h_->SetBinContent(b_, preFitErrorHist->GetBinContent(b_));
     });
 
 
@@ -1269,10 +1228,10 @@ void FitterEngine::rescaleParametersStepSize(){
         double stepSize = 1./TMath::Sqrt(std::fabs(deltaChi2));
 
         LogInfo << "Step size of " << parSet.getName() + "/eigen_#" << iEigen
-                << " -> σ x " << _parStepScale_ << " x " << stepSize
+                << " -> σ x " << _parStepGain_ << " x " << stepSize
                 << " -> Δχ² = " << deltaChi2 << " = " << deltaChi2 - deltaChi2Pulls << "(stat) + " << deltaChi2Pulls << "(pulls)" << std::endl;
 
-        stepSize *= parSet.getEigenSigma(iEigen) * _parStepScale_;
+        stepSize *= parSet.getEigenSigma(iEigen) * _parStepGain_;
 
         parSet.setEigenParStepSize(iEigen, stepSize);
         parSet.setEigenParameter(iEigen, currentParValue);
@@ -1303,10 +1262,10 @@ void FitterEngine::rescaleParametersStepSize(){
         double stepSize = 1./TMath::Sqrt(std::fabs(deltaChi2));
 
         LogInfo << "Step size of " << parSet.getName() + "/" + par.getTitle()
-            << " -> σ x " << _parStepScale_ << " x " << stepSize
+            << " -> σ x " << _parStepGain_ << " x " << stepSize
             << " -> Δχ² = " << deltaChi2 << " = " << deltaChi2 - deltaChi2Pulls << "(stat) + " << deltaChi2Pulls << "(pulls)";
 
-        stepSize *= par.getStdDevValue() * _parStepScale_;
+        stepSize *= par.getStdDevValue() * _parStepGain_;
 
         par.setStepSize( stepSize );
         par.setParameterValue( currentParValue + stepSize );
@@ -1329,12 +1288,16 @@ void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
   _minimizerConfig_ = JsonUtils::fetchValue(_config_, "minimizerConfig", nlohmann::json());
   if( _minimizerConfig_.is_string() ){ _minimizerConfig_ = JsonUtils::readConfigFile(_minimizerConfig_.get<std::string>()); }
 
+  _minimizerType_ = JsonUtils::fetchValue(_minimizerConfig_, "minimizer", "Minuit2");
+  _minimizerAlgo_ = JsonUtils::fetchValue(_minimizerConfig_, "algorithm", "");
+
   _minimizer_ = std::shared_ptr<ROOT::Math::Minimizer>(
-      ROOT::Math::Factory::CreateMinimizer(
-          JsonUtils::fetchValue(_minimizerConfig_, "minimizer", "Minuit2"),
-          JsonUtils::fetchValue(_minimizerConfig_, "algorithm", "Migrad")
-      )
+      ROOT::Math::Factory::CreateMinimizer(_minimizerType_, _minimizerAlgo_)
   );
+
+  LogThrowIf(_minimizer_ == nullptr, "Could not create minimizer: " << _minimizerType_ << "/" << _minimizerAlgo_)
+
+  if( _minimizerAlgo_.empty() ) _minimizerAlgo_ = _minimizer_->Options().MinimizerAlgorithm();
 
   _functor_ = std::shared_ptr<ROOT::Math::Functor>(
       new ROOT::Math::Functor(

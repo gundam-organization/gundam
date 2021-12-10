@@ -61,6 +61,10 @@ public:
   FitParameter& getFitParameter( size_t iPar_ );
   double getChi2() const;
 
+  // Throw / Shifts
+  void moveFitParametersToPrior();
+  void throwFitParameters(double gain_ = 1);
+
   // Eigen decomposition
   void setEigenParameter( int iPar_, double value_ );
   void setEigenParStepSize( int iPar_, double step_ );
@@ -98,7 +102,7 @@ private:
   // JSON
   std::string _name_;
   bool _isEnabled_{};
-  bool _enableThrowMcBeforeFit_{true};
+  bool _throwMcBeforeFit_{true};
   double _maxEigenFraction_{1};
 
   // Input file:
@@ -127,6 +131,8 @@ private:
 
   std::shared_ptr<TMatrixD> _originalCorrelationMatrix_{nullptr};
   std::shared_ptr<TMatrixD> _effectiveCorrelationMatrix_{nullptr};
+
+  std::shared_ptr<TMatrixD> _choleskyMatrix_{nullptr};
 
   std::shared_ptr<TVectorD> _eigenParValues_;
   std::shared_ptr<TVectorD> _originalParValues_;
