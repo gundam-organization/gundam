@@ -158,22 +158,40 @@ void PlotGenerator::defineHistogramHolders() {
 
                   for( const auto& bin : sample.getBinning().getBinsList() ){
                     const auto& edges = bin.getVarEdges(sampleObsBinning);
-                    for( const auto& edge : { edges.first, edges.second } )
-                      if( ( histDefBase.xMin != histDefBase.xMin or histDefBase.xMin <= edge )
-                      and ( histDefBase.xMax != histDefBase.xMax or histDefBase.xMax >= edge ) ){
+                    for( const auto& edge : { edges.first, edges.second } ) {
+                      if ((histDefBase.xMin != histDefBase.xMin or histDefBase.xMin <= edge)
+                          and (histDefBase.xMax != histDefBase.xMax or histDefBase.xMax >= edge)) {
                         // either NaN or in bounds
-                        if( not GenericToolbox::doesElementIsInVector(edge, histDefBase.xEdges) ){
+                        if (not GenericToolbox::doesElementIsInVector(edge, histDefBase.xEdges)) {
                           histDefBase.xEdges.emplace_back(edge);
                         }
                       }
+                    }
                   }
                   if( histDefBase.xEdges.empty() ) continue; // skip
                   std::sort( histDefBase.xEdges.begin(), histDefBase.xEdges.end() ); // sort for ROOT
 
                 } // sample binning ?
+                else if( JsonUtils::doKeyExist(histConfig, "binningFile") ){
+                  DataBinSet b;
+                  b.readBinningDefinition(JsonUtils::fetchValue<std::string>(histConfig, "binningFile") );
+                  LogThrowIf(b.getBinVariables().size()!=1, "Binning should be defined with only one variable, here: " << GenericToolbox::parseVectorAsString(b.getBinVariables()))
+
+                  for(const auto& bin: b.getBinsList()){
+                    const auto& edges = bin.getVarEdges(b.getBinVariables()[0]);
+                    for( const auto& edge : { edges.first, edges.second } ) {
+                      if ((histDefBase.xMin != histDefBase.xMin or histDefBase.xMin <= edge)
+                          and (histDefBase.xMax != histDefBase.xMax or histDefBase.xMax >= edge)) {
+                        // either NaN or in bounds
+                        if (not GenericToolbox::doesElementIsInVector(edge, histDefBase.xEdges)) {
+                          histDefBase.xEdges.emplace_back(edge);
+                        }
+                      }
+                    }
+                  }
+                }
                 else{
-                  LogError << "Unsupported yet." << std::endl;
-                  throw std::logic_error("unsupported yet");
+                  LogThrow("Could not find the binning definition.")
                 }
 
                 // Hist fill function
