@@ -530,17 +530,42 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
                   }
 
                   if( not dialSetPtr->getDialLeafName().empty() ){
-                    grPtr = (TGraph*) eventBuffer.getVariable<TClonesArray*>(dialSetPtr->getDialLeafName())->At(0);
-                    if(grPtr->GetN() > 1){
-                      if      ( dialSetPtr->getGlobalDialType() == DialType::Spline ){
+                    if ( not strcmp(threadChain->GetLeaf(dialSetPtr->getDialLeafName().c_str())->GetTypeName(), "TClonesArray") ){
+                      grPtr = (TGraph*) eventBuffer.getVariable<TClonesArray*>(dialSetPtr->getDialLeafName())->At(0);
+                      if(grPtr->GetN() > 1){
+                        if      ( dialSetPtr->getGlobalDialType() == DialType::Spline ){
+                          spDialPtr = (SplineDial*) dialSetPtr->getDialList()[iEntry].get();
+                          spDialPtr->createSpline( grPtr );
+                          spDialPtr->initialize();
+                          spDialPtr->setIsReferenced(true);
+                          // Adding dial in the event
+                          eventPtr->getRawDialPtrList()[eventDialOffset++] = spDialPtr;
+                        }
+                        else if( dialSetPtr->getGlobalDialType() == DialType::Graph ){
+                          grDialPtr = (GraphDial*) dialSetPtr->getDialList()[iEntry].get();
+                          grDialPtr->setGraph(*grPtr);
+                          grDialPtr->initialize();
+                          grDialPtr->setIsReferenced(true);
+                          // Adding dial in the event
+                          eventPtr->getRawDialPtrList()[eventDialOffset++] = grDialPtr;
+                        }
+                        else{
+                          LogThrow("Unsupported event-by-event dial: " << DialType::DialTypeEnumNamespace::toString(dialSetPtr->getGlobalDialType()))
+                        }
+                      }
+                    }
+                    else if ( not strcmp(threadChain->GetLeaf(dialSetPtr->getDialLeafName().c_str())->GetTypeName(), "TGraph") ){
+                      grPtr = (TGraph*) eventBuffer.getVariable<TGraph*>(dialSetPtr->getDialLeafName());
+                      if ( dialSetPtr->getGlobalDialType() == DialType::Spline ){
                         spDialPtr = (SplineDial*) dialSetPtr->getDialList()[iEntry].get();
-                        spDialPtr->createSpline( grPtr );
+                        spDialPtr->createSpline(grPtr);
                         spDialPtr->initialize();
                         spDialPtr->setIsReferenced(true);
                         // Adding dial in the event
                         eventPtr->getRawDialPtrList()[eventDialOffset++] = spDialPtr;
+
                       }
-                      else if( dialSetPtr->getGlobalDialType() == DialType::Graph ){
+                      else if ( dialSetPtr->getGlobalDialType() == DialType::Graph ){
                         grDialPtr = (GraphDial*) dialSetPtr->getDialList()[iEntry].get();
                         grDialPtr->setGraph(*grPtr);
                         grDialPtr->initialize();
@@ -551,6 +576,9 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
                       else{
                         LogThrow("Unsupported event-by-event dial: " << DialType::DialTypeEnumNamespace::toString(dialSetPtr->getGlobalDialType()))
                       }
+                    }
+                    else{
+                      LogThrow("Unsupported event-by-event dial type: " << threadChain->GetLeaf(dialSetPtr->getDialLeafName().c_str())->GetTypeName() )
                     }
                   }
                   else{
