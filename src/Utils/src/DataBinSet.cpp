@@ -23,6 +23,7 @@ DataBinSet::~DataBinSet() { this->reset(); }
 
 void DataBinSet::reset() {
   _binsList_.clear();
+  _binVariables_.clear();
 }
 
 // Setters
@@ -89,6 +90,7 @@ void DataBinSet::readBinningDefinition(const std::string &filePath_) {
           }
 
           expectedVariableList.emplace_back( lineElements.at(iElement) );
+          if( not GenericToolbox::doesElementIsInVector(expectedVariableList.back(), _binVariables_) ) _binVariables_.emplace_back(expectedVariableList.back());
           expectedVariableIsRangeList.push_back(false);
           nbExpectedValues += 1;
         }
@@ -152,6 +154,9 @@ void DataBinSet::readBinningDefinition(const std::string &filePath_) {
   LogDebug << _binsList_.size() << " bins have been defined." << std::endl;
 
 }
+void DataBinSet::setVerbosity(int maxLogLevel_) {
+  Logger::setMaxLogLevel(maxLogLevel_);
+}
 
 std::string DataBinSet::getSummary() const{
   std::stringstream ss;
@@ -167,7 +172,6 @@ std::string DataBinSet::getSummary() const{
   return ss.str();
 }
 
-
 void DataBinSet::addBinContent(int binIndex_, double weight_) {
   if( binIndex_ < 0 or binIndex_ >= _binsList_.size() ){
     LogError << GET_VAR_NAME_VALUE(binIndex_) << " is out of range: " << GET_VAR_NAME_VALUE(_binsList_.size()) << std::endl;
@@ -179,11 +183,9 @@ void DataBinSet::addBinContent(int binIndex_, double weight_) {
 const std::vector<DataBin> &DataBinSet::getBinsList() const {
   return _binsList_;
 }
-
 const std::string &DataBinSet::getFilePath() const {
   return _filePath_;
 }
-
-void DataBinSet::setVerbosity(int maxLogLevel_) {
-  Logger::setMaxLogLevel(maxLogLevel_);
+const std::vector<std::string> &DataBinSet::getBinVariables() const {
+  return _binVariables_;
 }

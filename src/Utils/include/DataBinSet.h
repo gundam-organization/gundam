@@ -25,8 +25,10 @@ public:
   // Management
   void addBinContent(int binIndex_, double weight_);
 
+  // Getters
   const std::vector<DataBin> &getBinsList() const;
   const std::string &getFilePath() const;
+  const std::vector<std::string> &getBinVariables() const;
 
   // Misc
   std::string getSummary() const;
@@ -39,6 +41,7 @@ private:
   std::string _filePath_;
   std::vector<DataBin> _binsList_{};
   std::vector<double> _binContent_{};
+  std::vector<std::string> _binVariables_{};
 
 };
 
