@@ -658,7 +658,8 @@ void FitterEngine::fit(){
         LogInfo << "Hesse ended after " << _nbFitCalls_ - nbMinimizeCalls << " calls." << std::endl;
         LogWarning << "HESSE status code: " << hesseStatusCodeStr.at(_minimizer_->Status()) << std::endl;
         LogWarning << "Covariance matrix status code: " << covMatrixStatusCodeStr.at(_minimizer_->CovMatrixStatus()) << std::endl;
-//        LogWarning << "Did minuit performed a detailed error validation? " << GET_VAR_NAME_VALUE(_minimizer_->IsValidError()) << std::endl;
+
+        if( _minimizer_->CovMatrixStatus() == 2 ){ _isBadCovMat_ = true; }
 
         if(not _fitHasConverged_){
           LogError  << "Hesse did not converge." << std::endl;
@@ -724,13 +725,23 @@ double FitterEngine::evalFit(const double* parArray_){
     if( not parSet.isUseEigenDecompInFit() ){
       for( auto& par : parSet.getParameterList() ){
         iFitPar++;
-        par.setParameterValue( parArray_[iFitPar] );
+        if( not _useNormalizedFitSpace_ ){
+          par.setParameterValue( parArray_[iFitPar] );
+        }
+        else{
+          par.setParameterValue( FitParameterSet::toRealParValue(parArray_[iFitPar], par) );
+        }
       }
     }
     else{
       for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
         iFitPar++;
-        parSet.setEigenParameter(iEigen, parArray_[iFitPar]);
+        if( not _useNormalizedFitSpace_ ){
+          parSet.setEigenParameter(iEigen, parArray_[iFitPar]);
+        }
+        else{
+          parSet.setEigenParameter(iEigen, parSet.toRealEigenParValue(parArray_[iFitPar], iEigen));
+        }
       }
       parSet.propagateEigenToOriginal();
     }
@@ -810,6 +821,42 @@ void FitterEngine::writePostFitData() {
 
   TMatrixDSym totalCovMatrix(int(_minimizer_->NDim()));
   _minimizer_->GetCovMatrix(totalCovMatrix.GetMatrixArray());
+
+  if( _useNormalizedFitSpace_ ){
+    auto* totalCorrelationMatrix = GenericToolbox::convertToCorrelationMatrix((TMatrixD*) &totalCovMatrix);
+
+    // Convert the diagonal
+    int parameterIndexOffset = 0;
+    for( const auto& parSet : _propagator_.getParameterSetsList() ){
+      if( not parSet.isUseEigenDecompInFit() ){
+        int iPar = -1;
+        for( const auto& par : parSet.getParameterList() ){
+          iPar++;
+          double normedError = TMath::Sqrt(totalCovMatrix[parameterIndexOffset + iPar][parameterIndexOffset + iPar]);
+          double realError = FitParameterSet::toRealParRange(normedError, par);
+          totalCovMatrix[parameterIndexOffset + iPar][parameterIndexOffset + iPar] = realError*realError;
+        }
+        parameterIndexOffset += int(parSet.getNbParameters());
+      }
+      else{
+        for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
+          double normedError = TMath::Sqrt(totalCovMatrix[parameterIndexOffset + iEigen][parameterIndexOffset + iEigen]);
+          double realError = parSet.toRealEigenParRange(normedError, iEigen);
+          totalCovMatrix[parameterIndexOffset + iEigen][parameterIndexOffset + iEigen] = realError*realError;
+        }
+        parameterIndexOffset += parSet.getNbEnabledEigenParameters();
+      }
+    }
+
+    // Convert off-diagonal terms
+    for( int iRow = 0 ; iRow < totalCovMatrix.GetNrows() ; iRow++ ){
+      for( int iCol = 0 ; iCol < totalCovMatrix.GetNcols() ; iCol++ ){
+        if( iRow == iCol ) continue;
+        totalCovMatrix[iRow][iCol] = (*totalCorrelationMatrix)[iRow][iCol] * TMath::Sqrt(totalCovMatrix[iRow][iRow]) * TMath::Sqrt(totalCovMatrix[iCol][iCol]);
+      }
+    }
+  }
+
   GenericToolbox::writeInFile(matricesDir, BIND_VAR_REF_NAME(totalCovMatrix));
   TH2D* totalCovTH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) &totalCovMatrix);
   GenericToolbox::writeInFile(matricesDir, totalCovTH2D, "totalCovMatrix");
@@ -944,29 +991,6 @@ void FitterEngine::writePostFitData() {
   hessianMatrix *= invEigVectors;
   GenericToolbox::writeInFile(matricesDir, BIND_VAR_REF_NAME(hessianMatrix));
   GenericToolbox::writeInFile(matricesDir, GenericToolbox::convertTMatrixDtoTH2D(&hessianMatrix), "matricesDir");
-
-  if( JsonUtils::fetchValue(_config_, "decomposeHessianMatrix", false) ){
-    LogDebug << "Freeing memory..." << std::endl;
-    TMatrixDSym fitterHessianMatrix(int(_minimizer_->NDim()));
-    LogInfo << "Fetching Hessian matrix..." << std::endl;;
-    _minimizer_->GetHessianMatrix(fitterHessianMatrix.GetMatrixArray());
-
-    LogInfo << "Decomposing Hessian matrix..." << std::endl;
-    auto decompHessian = TMatrixDSymEigen(fitterHessianMatrix);
-
-    matricesDir->cd();
-    fitterHessianMatrix.Write("fitterHessianMatrix_TMatrixDSym");
-    auto* fitterHessianMatrix_TH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*)&fitterHessianMatrix);
-    fitterHessianMatrix_TH2D->Write("fitterHessianMatrix_TH2D");
-
-    decompHessian.GetEigenVectors().Write("fitterHessianEigenVector_TMatrixDSym");
-    auto* fitterHessianEigenVector_TH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*)&decompHessian.GetEigenVectors());
-    fitterHessianEigenVector_TH2D->Write("fitterHessianEigenVector_TH2D");
-
-    decompHessian.GetEigenValues().Write("fitterHessianEigen_TVectorD");
-    auto* fitterHessianEigen_TH1D = GenericToolbox::convertTVectorDtoTH1D(&decompHessian.GetEigenValues());
-    fitterHessianEigen_TH1D->Write("fitterHessianEigen_TH1D");
-  }
 
   LogInfo << "Fitter covariance matrix is " << totalCovMatrix.GetNrows() << "x" << totalCovMatrix.GetNcols() << std::endl;
   auto* errorDir = GenericToolbox::mkdirTFile(postFitDir, "errors");
@@ -1291,6 +1315,11 @@ void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
   _minimizerType_ = JsonUtils::fetchValue(_minimizerConfig_, "minimizer", "Minuit2");
   _minimizerAlgo_ = JsonUtils::fetchValue(_minimizerConfig_, "algorithm", "");
 
+  _useNormalizedFitSpace_ = JsonUtils::fetchValue(_minimizerConfig_, "useNormalizedFitSpace", false);
+  if(_useNormalizedFitSpace_){
+    LogAlert << "_useNormalizedFitSpace_ is ENABLED" << std::endl;
+  }
+
   _minimizer_ = std::shared_ptr<ROOT::Math::Minimizer>(
       ROOT::Math::Factory::CreateMinimizer(_minimizerType_, _minimizerAlgo_)
   );
@@ -1318,11 +1347,26 @@ void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
     if( not parSet.isUseEigenDecompInFit() ){
       for( auto& par : parSet.getParameterList()  ){
         iPar++;
-        _minimizer_->SetVariable( iPar,parSet.getName() + "/" + par.getTitle(), par.getParameterValue(),par.getStepSize() );
-        if(par.getMinValue() == par.getMinValue()){ _minimizer_->SetVariableLowerLimit(iPar, par.getMinValue()); }
-        if(par.getMaxValue() == par.getMaxValue()){ _minimizer_->SetVariableUpperLimit(iPar, par.getMaxValue()); }
-        _minimizer_->SetVariableValue(iPar, par.getParameterValue());
-        _minimizer_->SetVariableStepSize(iPar, par.getStepSize());
+        if(not _useNormalizedFitSpace_){
+          _minimizer_->SetVariable( iPar,parSet.getName() + "/" + par.getTitle(), par.getParameterValue(),par.getStepSize() );
+          if(par.getMinValue() == par.getMinValue()){ _minimizer_->SetVariableLowerLimit(iPar, par.getMinValue()); }
+          if(par.getMaxValue() == par.getMaxValue()){ _minimizer_->SetVariableUpperLimit(iPar, par.getMaxValue()); }
+          // Changing the boundaries, change the value/step size?
+          _minimizer_->SetVariableValue(iPar, par.getParameterValue());
+          _minimizer_->SetVariableStepSize(iPar, par.getStepSize());
+        }
+        else{
+          _minimizer_->SetVariable( iPar,parSet.getName() + "/" + par.getTitle(),
+                                    FitParameterSet::toNormalizedParValue(par.getParameterValue(), par),
+                                    FitParameterSet::toNormalizedParRange(par.getStepSize(), par)
+                                    );
+          if(par.getMinValue() == par.getMinValue()){ _minimizer_->SetVariableLowerLimit(iPar, FitParameterSet::toNormalizedParValue(par.getMinValue(), par)); }
+          if(par.getMaxValue() == par.getMaxValue()){ _minimizer_->SetVariableUpperLimit(iPar, FitParameterSet::toNormalizedParValue(par.getMaxValue(), par)); }
+          // Changing the boundaries, change the value/step size?
+          _minimizer_->SetVariableValue(iPar, FitParameterSet::toNormalizedParValue(par.getParameterValue(), par));
+          _minimizer_->SetVariableStepSize(iPar, FitParameterSet::toNormalizedParRange(par.getStepSize(), par));
+        }
+
 
         if( not doReleaseFixed_ or not JsonUtils::fetchValue(parSet.getConfig(), "releaseFixedParametersOnHesse", true) ){
           if( not par.isEnabled() or par.isFixed() ) _minimizer_->FixVariable(iPar);
@@ -1332,10 +1376,19 @@ void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
     else{
       for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
         iPar++;
-        _minimizer_->SetVariable( iPar,parSet.getName() + "/eigen_#" + std::to_string(iEigen),
-                                  parSet.getEigenParameterValue(iEigen),
-                                  parSet.getEigenParStepSize(iEigen)
-        );
+        if(not _useNormalizedFitSpace_){
+          _minimizer_->SetVariable( iPar,parSet.getName() + "/eigen_#" + std::to_string(iEigen),
+                                    parSet.getEigenParameterValue(iEigen),
+                                    parSet.getEigenParStepSize(iEigen)
+          );
+        }
+        else{
+          _minimizer_->SetVariable( iPar,parSet.getName() + "/eigen_#" + std::to_string(iEigen),
+                                    parSet.toNormalizedEigenParValue(parSet.getEigenParameterValue(iEigen),iEigen),
+                                    parSet.toNormalizedEigenParRange(parSet.getEigenParStepSize(iEigen), iEigen)
+          );
+        }
+
         if( not doReleaseFixed_ or not JsonUtils::fetchValue(parSet.getConfig(), "releaseFixedParametersOnHesse", true) ){
           if( parSet.isEigenParFixed(iEigen) ) {
             _minimizer_->FixVariable(iPar);

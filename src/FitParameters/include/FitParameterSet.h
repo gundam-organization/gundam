@@ -85,6 +85,16 @@ public:
   // Misc
   std::string getSummary() const;
 
+  static double toNormalizedParRange(double parRange, const FitParameter& par);
+  static double toNormalizedParValue(double parValue, const FitParameter& par);
+  static double toRealParValue(double normParValue, const FitParameter& par);
+  static double toRealParRange(double normParRange, const FitParameter& par);
+
+  double toNormalizedEigenParRange(double parRange, int parIndex) const;
+  double toNormalizedEigenParValue(double parValue, int parIndex) const;
+  double toRealEigenParValue(double normParValue, int parIndex) const;
+  double toRealEigenParRange(double normParRange, int parIndex) const;
+
 protected:
   void passIfInitialized(const std::string& methodName_) const;
 

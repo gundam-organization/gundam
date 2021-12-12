@@ -75,11 +75,13 @@ private:
   nlohmann::json _minimizerConfig_{};
   int _nbScanSteps_{100};
   bool _enablePostFitScan_{false};
+  bool _useNormalizedFitSpace_{false};
 
   // Internals
   bool _fitIsDone_{false};
   bool _fitUnderGoing_{false};
   bool _fitHasConverged_{false};
+  bool _isBadCovMat_{false};
 
   int _nbFitCalls_{0};
   int _nbFitParameters_{0};

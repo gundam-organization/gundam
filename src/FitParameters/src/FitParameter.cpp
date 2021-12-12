@@ -214,4 +214,3 @@ std::string FitParameter::getTitle() const {
   if( not _name_.empty() ) ss << "_" << _name_;
   return ss.str();
 }
-

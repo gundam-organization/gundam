@@ -409,6 +409,33 @@ std::string FitParameterSet::getSummary() const {
   return ss.str();
 }
 
+double FitParameterSet::toNormalizedParRange(double parRange, const FitParameter& par){
+  return (parRange)/par.getStdDevValue();
+}
+double FitParameterSet::toNormalizedParValue(double parValue, const FitParameter& par) {
+  return FitParameterSet::toNormalizedParRange(parValue - par.getPriorValue());
+}
+double FitParameterSet::toRealParRange(double normParRange, const FitParameter& par){
+  return normParRange*par.getStdDevValue();
+}
+double FitParameterSet::toRealParValue(double normParValue, const FitParameter& par) {
+  return normParValue*par.getStdDevValue() + par.getPriorValue();
+}
+
+
+double FitParameterSet::toNormalizedEigenParRange(double parRange, int parIndex) const{
+  return (parRange) / this->getEigenSigma(parIndex);
+}
+double FitParameterSet::toNormalizedEigenParValue(double parValue, int parIndex) const{
+  return this->toNormalizedEigenParRange(parValue - (*_eigenParPriorValues_)[parIndex], parIndex);
+}
+double FitParameterSet::toRealEigenParRange(double normParRange, int parIndex) const{
+  return normParRange * this->getEigenSigma(parIndex);
+}
+double FitParameterSet::toRealEigenParValue(double normParValue, int parIndex) const{
+  return normParValue*this->getEigenSigma(parIndex) + (*_eigenParPriorValues_)[parIndex];
+}
+
 
 // Protected
 void FitParameterSet::passIfInitialized(const std::string &methodName_) const {
