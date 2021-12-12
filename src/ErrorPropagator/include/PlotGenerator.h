@@ -47,6 +47,7 @@ struct HistHolder{
   bool rescaleAsBinWidth{true};
   double rescaleBinFactor{1.};
   short histColor;
+  short fillStyle{1001};
 
   // Flags
   bool isBaseSplitHist{false};
@@ -111,6 +112,7 @@ private:
   nlohmann::json _config_;
   const std::vector<AnaSample>* _sampleListPtr_{nullptr};
   const FitSampleSet* _fitSampleSetPtr_{nullptr};
+  int _maxLegendLength_{15};
 
   // Internals
   nlohmann::json _varDictionary_;

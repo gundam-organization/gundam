@@ -8,6 +8,7 @@
 
 #include "TCanvas.h"
 #include "TH1D.h"
+#include "TLegend.h"
 
 #include "Logger.h"
 #include "GenericToolbox.h"
@@ -210,8 +211,9 @@ void PlotGenerator::defineHistogramHolders() {
               // Colors / Title (legend) / Name
               if( histDefBase.isData ){
                 histDefBase.histName = "Data_TH1D";
-                histDefBase.histTitle = "External";
+                histDefBase.histTitle = "Data";
                 histDefBase.histColor = kBlack;
+                histDefBase.fillStyle = 1001;
               }
               else{
 
@@ -220,6 +222,7 @@ void PlotGenerator::defineHistogramHolders() {
                 if( histDefBase.splitVarName.empty() ){
                   histDefBase.histTitle = "Prediction";
                   histDefBase.histColor = defaultColorWheel[ sampleCounter % defaultColorWheel.size() ];
+                  histDefBase.fillStyle = 1001;
                 }
                 else{
                   histDefBase.histTitle = "Prediction (" + splitVar + " == " + std::to_string(splitValue) + ")";
@@ -241,6 +244,7 @@ void PlotGenerator::defineHistogramHolders() {
                     auto valDict = JsonUtils::fetchMatchingEntry(dictEntries, "value", splitValue);
 
                     histDefBase.histTitle = JsonUtils::fetchValue(valDict, "title", histDefBase.histTitle);
+                    histDefBase.fillStyle = JsonUtils::fetchValue(valDict, "fillStyle", short(1001));
                     histDefBase.histColor = JsonUtils::fetchValue(valDict, "color", unsetSplitValueColor);
                     if( histDefBase.histColor == unsetSplitValueColor ) unsetSplitValueColor++; // increment for the next ones
 
@@ -389,7 +393,7 @@ void PlotGenerator::defineHistogramHolders() {
               // Colors / Title (legend) / Name
               if( histDefBase.isData ){
                 histDefBase.histName = "Data_TH1D";
-                histDefBase.histTitle = "External";
+                histDefBase.histTitle = "Data";
                 histDefBase.histColor = kBlack;
               }
               else{
@@ -419,6 +423,7 @@ void PlotGenerator::defineHistogramHolders() {
                     auto valDict = JsonUtils::fetchMatchingEntry(dictEntries, "value", splitValue);
 
                     histDefBase.histTitle = JsonUtils::fetchValue(valDict, "title", histDefBase.histTitle);
+                    histDefBase.fillStyle = JsonUtils::fetchValue(valDict, "fillStyle", short(1001));
                     histDefBase.histColor = JsonUtils::fetchValue(valDict, "color", unsetSplitValueColor);
                     if( histDefBase.histColor == unsetSplitValueColor ) unsetSplitValueColor++; // increment for the next ones
 
@@ -695,6 +700,10 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
     histDefPair.histPtr->SetMarkerColor(histDefPair.histColor);
 
     histDefPair.histPtr->SetFillColor(histDefPair.histColor);
+    histDefPair.histPtr->SetFillStyle(1001);
+    if( histDefPair.fillStyle != short(1001) ){
+      histDefPair.histPtr->SetFillStyle(histDefPair.fillStyle);
+    }
   }
 
   // Saving
@@ -797,6 +806,14 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
 
         TH1D* firstHistToPlot{nullptr};
 
+        // Legend
+        double Xmax = 0.9;
+        double Ymax = 0.9;
+        double Xmin = 0.5;
+        double Ymin = Ymax - 0.04 * _maxLegendLength_;
+        auto* splitLegend = new TLegend(Xmin, Ymin, Xmax, Ymax); // ptr required to transfert ownership
+        int nLegend{0};
+
         // process mc part
         std::vector<TH1D *> mcSampleHistAccumulatorList;
         if (not mcSampleHistList.empty()) {
@@ -823,17 +840,35 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
             // Draw the stack
             int lastIndex = int(mcSampleHistAccumulatorList.size()) - 1;
             for (int iHist = lastIndex; iHist >= 0; iHist--) {
+
+              if( nLegend < _maxLegendLength_ - 1 ){
+                nLegend++;
+                splitLegend->AddEntry(mcSampleHistAccumulatorList[iHist], mcSampleHistAccumulatorList[iHist]->GetTitle(), "f");
+              }
+              else{
+                mcSampleHistAccumulatorList[iHist]->SetFillColor(kGray);
+                mcSampleHistAccumulatorList[iHist]->SetLineColor(kGray);
+                if( nLegend == _maxLegendLength_ - 1 ){
+                  nLegend++;
+                  splitLegend->AddEntry(mcSampleHistAccumulatorList[iHist], "others", "f");
+                }
+              }
+
               if ( firstHistToPlot == nullptr ) {
                 firstHistToPlot = mcSampleHistAccumulatorList[iHist];
                 mcSampleHistAccumulatorList[iHist]->GetYaxis()->SetRangeUser(minYValue,
                                                                              mcSampleHistAccumulatorList[iHist]->GetMaximum() *
                                                                              1.2);
                 mcSampleHistAccumulatorList[iHist]->Draw("HIST GOFF");
-              } else {
-                mcSampleHistAccumulatorList[iHist]->Draw("HISTSAME GOFF");
               }
+              else {
+                mcSampleHistAccumulatorList[iHist]->Draw("HIST SAME GOFF");
+              }
+
+
             }
-          } else {
+          }
+          else {
             // Just draw each hist on the same plot
             for (auto &mcHist : mcSampleHistList) {
               if ( firstHistToPlot == nullptr ) {
@@ -851,6 +886,11 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
                 if (mcSampleHistList.size() == 1) { mcHist->Draw("EPSAME GOFF"); }
                 else { mcHist->Draw("HIST P SAME GOFF"); }
               }
+
+              if( nLegend < _maxLegendLength_ - 1 ){
+                nLegend++;
+                splitLegend->AddEntry(mcHist, mcHist->GetTitle(), "lep");
+              }
             } // mcHist
           } // stack?
 
@@ -860,10 +900,12 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
         // Draw the data hist on top
         if (dataSampleHist != nullptr) {
           std::string originalTitle = dataSampleHist->GetTitle(); // title can be used for figuring out the type of the histogram
-          dataSampleHist->SetTitle("External");
+          dataSampleHist->SetTitle("Data");
+          splitLegend->AddEntry(dataSampleHist, dataSampleHist->GetTitle(), "lep"); nLegend++;
           if ( firstHistToPlot != nullptr ) {
             dataSampleHist->Draw("EPSAME GOFF");
-          } else {
+          }
+          else {
             firstHistToPlot = dataSampleHist;
             dataSampleHist->Draw("EP GOFF");
           }
@@ -875,12 +917,12 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
           continue;
         }
 
-        // Legend
-        double Xmax = 0.9;
-        double Ymax = 0.9;
-        double Xmin = 0.5;
-        double Ymin = Ymax - 0.04 * double(mcSampleHistList.size() + 1);
-        gPad->BuildLegend(Xmin, Ymin, Xmax, Ymax);
+        if(nLegend != _maxLegendLength_){
+          Ymin = Ymax - 0.04 * double(nLegend);
+          splitLegend->SetY1(Ymin);
+        }
+        gPad->cd();
+        splitLegend->Draw();
 
         firstHistToPlot->SetTitle( samplePtr->getName().c_str() ); // the actual displayed title
         gPad->SetGridx();
@@ -1022,7 +1064,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
         // Draw the data hist on top
         if (dataSampleHist != nullptr) {
           std::string originalTitle = dataSampleHist->GetTitle(); // title can be used for figuring out the type of the histogram
-          dataSampleHist->SetTitle("External");
+          dataSampleHist->SetTitle("Data");
           if ( firstHistToPlot != nullptr ) {
             dataSampleHist->Draw("EPSAME GOFF");
           } else {
@@ -1068,10 +1110,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
   lastDir->cd();
 }
 
-void PlotGenerator::generateComparisonPlots(
-  const std::vector<HistHolder> &histsToStackOther_,
-  const std::vector<HistHolder> &histsToStackReference_,
-  TDirectory *saveDir_){
+void PlotGenerator::generateComparisonPlots(const std::vector<HistHolder> &histsToStackOther_, const std::vector<HistHolder> &histsToStackReference_, TDirectory *saveDir_){
   this->generateComparisonHistograms(histsToStackOther_, histsToStackReference_, GenericToolbox::mkdirTFile(saveDir_, "histograms"));
   this->generateCanvas(_comparisonHistHolderList_, GenericToolbox::mkdirTFile(saveDir_, "canvas"), false);
 }

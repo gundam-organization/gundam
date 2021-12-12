@@ -19,19 +19,12 @@ public:
   void setGraph(const TGraph &graph);
 
   void initialize() override;
-
 //  double evalResponse(const double &parameterValue_) override;
   void fillResponseCache() override;
-
   std::string getSummary() override;
-
 
 private:
   TGraph _graph_;
-
-  // internals
-  int iPt;
-
 };
 
 
