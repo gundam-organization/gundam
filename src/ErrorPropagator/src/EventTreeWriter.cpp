@@ -2,11 +2,12 @@
 // Created by Adrien BLANCHET on 19/11/2021.
 //
 
+#include "EventTreeWriter.h"
+
 #include "Logger.h"
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
 
-#include "EventTreeWriter.h"
 
 
 LoggerInit([]{ Logger::setUserHeaderStr("[TreeWriter]"); })
@@ -122,8 +123,7 @@ void EventTreeWriter::writeEvents(TDirectory *saveDir_, const std::string& treeN
   int iLeaf;
   int iPar{0};
   std::string progressTitle = LogInfo.getPrefixString() + "Writing " + treeName_;
-  LogInfo << progressTitle << "..." << std::endl;
-  int iEvent{0}; int nEvents = int(eventList_.size());
+  size_t iEvent{0}; size_t nEvents = (eventList_.size());
   for( auto& event : eventList_ ){
     GenericToolbox::displayProgressBar(iEvent++,nEvents,progressTitle);
 
