@@ -5,6 +5,8 @@
 #ifndef GUNDAM_FITTERENGINE_H
 #define GUNDAM_FITTERENGINE_H
 
+#include "Propagator.h"
+
 #include "string"
 #include "vector"
 #include "memory"
@@ -17,7 +19,6 @@
 #include "GenericToolbox.VariablesMonitor.h"
 #include "GenericToolbox.CycleTimer.h"
 
-#include "Propagator.h"
 
 class FitterEngine {
 

@@ -2,6 +2,10 @@
 // Created by Nadrino on 11/06/2021.
 //
 
+#include "FitterEngine.h"
+#include "JsonUtils.h"
+#include "GlobalVariables.h"
+
 #include <Math/Factory.h>
 #include "TGraph.h"
 #include "TLegend.h"
@@ -9,11 +13,7 @@
 #include "Logger.h"
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
-#include "GenericToolbox.RawDataArray.h"
 
-#include "JsonUtils.h"
-#include "FitterEngine.h"
-#include "GlobalVariables.h"
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[FitterEngine]");
@@ -857,7 +857,7 @@ void FitterEngine::writePostFitData() {
       TH1D* lastAccumHist{nullptr};
       std::string progressTitle = LogWarning.getPrefixString() + "Accumulating eigen components...";
       for (int iEigen = decompFitterCovarianceMatrix.GetEigenValues().GetNrows()-1; iEigen >= 0; iEigen--) {
-//        GenericToolbox::displayProgressBar(decompFitterCovarianceMatrix.GetEigenValues().GetNrows()-iEigen, decompFitterCovarianceMatrix.GetEigenValues().GetNrows(), progressTitle);
+        GenericToolbox::displayProgressBar(decompFitterCovarianceMatrix.GetEigenValues().GetNrows()-iEigen, decompFitterCovarianceMatrix.GetEigenValues().GetNrows(), progressTitle);
         // iEigen = 0 -> biggest error contribution
         // Drawing in the back -> iEigen = 0 should be last in the accum plot
         if( lastAccumHist != nullptr ) eigenBreakdownAccum[iEigen] = *lastAccumHist;
