@@ -2,11 +2,11 @@
 // Created by Adrien BLANCHET on 19/11/2021.
 //
 
-#include "EventTreeWriter.h"
-
 #include "Logger.h"
-#include "GenericToolbox.Root.h"
 #include "GenericToolbox.h"
+#include "GenericToolbox.Root.h"
+
+#include "EventTreeWriter.h"
 
 
 LoggerInit([]{ Logger::setUserHeaderStr("[TreeWriter]"); })
@@ -34,7 +34,7 @@ void EventTreeWriter::writeSamples(TDirectory* saveDir_) const{
       auto* saveDir = GenericToolbox::mkdirTFile(saveDir_, sample.getName());
 
       std::string treeName = (isData ? "Data_TTree" : "MC_TTree");
-      writeEvents(saveDir, treeName, *evListPtr);
+      this->writeEvents(saveDir, treeName, *evListPtr);
 
     }
   }
@@ -122,10 +122,10 @@ void EventTreeWriter::writeEvents(TDirectory *saveDir_, const std::string& treeN
   int iLeaf;
   int iPar{0};
   std::string progressTitle = LogInfo.getPrefixString() + "Writing " + treeName_;
-  int iEvent{-1}; int nEvents = int(eventList_.size());
+  int iEvent{0}; int nEvents = int(eventList_.size());
+  GenericToolbox::ProgressBar::debugMode = true;
   for( auto& event : eventList_ ){
-    iEvent++;
-    GenericToolbox::displayProgressBar(iEvent,nEvents,progressTitle);
+    GenericToolbox::displayProgressBar(iEvent++,nEvents,progressTitle);
 
     privateMemberArr.resetCurrentByteOffset();
     for( auto& leafDef : leafDictionary ){ leafDef.second(privateMemberArr, event); }
