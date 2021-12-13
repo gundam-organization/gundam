@@ -76,6 +76,7 @@ public:
   bool isUseEigenDecompInFit() const;
   int getNbEnabledEigenParameters() const;
   double getEigenParameterValue(int iPar_) const;
+  double getEigenValue(int iPar_) const;
   double getEigenSigma(int iPar_) const;
   const TMatrixD* getInvertedEigenVectors() const;
   const TMatrixD* getEigenVectors() const;
@@ -113,6 +114,7 @@ private:
   std::string _name_;
   bool _isEnabled_{};
   bool _throwMcBeforeFit_{true};
+  int _maxNbEigenParameters_{-1};
   double _maxEigenFraction_{1};
 
   // Input file:
