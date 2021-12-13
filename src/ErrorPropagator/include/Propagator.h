@@ -10,14 +10,16 @@
 
 #include "json.hpp"
 
-#include "GenericToolbox.CycleTimer.h"
-
+#include "EventTreeWriter.h"
 #include "FitParameterSet.h"
 #include "AnaSample.hh"
 #include "PlotGenerator.h"
 #include "FitSampleSet.h"
 #include "DataSetLoader.h"
-#include "EventTreeWriter.h"
+
+#include "GenericToolbox.CycleTimer.h"
+
+
 
 class Propagator {
 
