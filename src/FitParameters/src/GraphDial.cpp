@@ -36,6 +36,7 @@ std::string GraphDial::getSummary() {
 }
 
 
+// disable cacahe?
 //double GraphDial::evalResponse(const double &parameterValue_) {
 //  return _graph_.Eval(parameterValue_);
 //}
@@ -44,24 +45,6 @@ void GraphDial::fillResponseCache() {
   else if(_dialParameterCache_ >= _graph_.GetX()[_graph_.GetN()-1]) { _dialResponseCache_ = _graph_.GetY()[_graph_.GetN() - 1]; }
   else{
     _dialResponseCache_ = _graph_.Eval(_dialParameterCache_);
-//    for( iPt = 0 ; iPt < _graph_.GetN()-1 ; iPt++){
-//      if(_dialParameterCache_ == _graph_.GetX()[iPt+1]){
-//        _dialResponseCache_ = _graph_.GetY()[iPt+1];
-//        break;
-//      }
-//      if(_dialParameterCache_ < _graph_.GetX()[iPt+1]){
-//        // LOWEST MEMORY ALLOCATION:
-//        _dialResponseCache_ =
-//            _graph_.GetY()[iPt+1] +
-//            (_dialParameterCache_ - _graph_.GetX()[iPt+1])
-//            * (_graph_.GetY()[iPt+1] - _graph_.GetY()[iPt])/(_graph_.GetX()[iPt+1] - _graph_.GetX()[iPt]);
-//        break;
-//      }
-//    }
-//    if(iPt == _graph_.GetN()-1){
-//      _graph_.Print();
-//      LogThrow("Could not find matching point for " << GET_VAR_NAME_VALUE(_dialParameterCache_));
-//    }
   }
 
   if(_dialResponseCache_ < 0){

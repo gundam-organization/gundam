@@ -551,16 +551,16 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
                         eventPtr->getRawDialPtrList()[eventDialOffset++] = spDialPtr;
                       }
                       else if( dialSetPtr->getGlobalDialType() == DialType::Graph ){
-                        grDialPtr = (GraphDial*) dialSetPtr->getDialList()[iEntry].get();
-                        grDialPtr->setGraph(*grPtr);
-                        grDialPtr->initialize();
-                        grDialPtr->setIsReferenced(true);
-                        // Adding dial in the event
-                        eventPtr->getRawDialPtrList()[eventDialOffset++] = grDialPtr;
-                      }
+                          grDialPtr = (GraphDial*) dialSetPtr->getDialList()[iEntry].get();
+                          grDialPtr->setGraph(*grPtr);
+                          grDialPtr->initialize();
+                          grDialPtr->setIsReferenced(true);
+                          // Adding dial in the event
+                          eventPtr->getRawDialPtrList()[eventDialOffset++] = grDialPtr;
+                        }
                       else{
-                        LogThrow("Unsupported event-by-event dial: " << DialType::DialTypeEnumNamespace::toString(dialSetPtr->getGlobalDialType()))
-                      }
+                          LogThrow("Unsupported event-by-event dial: " << DialType::DialTypeEnumNamespace::toString(dialSetPtr->getGlobalDialType()))
+                        }
                     }
                   }
                   else{
