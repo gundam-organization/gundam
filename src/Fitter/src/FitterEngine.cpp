@@ -857,7 +857,7 @@ void FitterEngine::writePostFitData() {
       TH1D* lastAccumHist{nullptr};
       std::string progressTitle = LogWarning.getPrefixString() + "Accumulating eigen components...";
       for (int iEigen = decompFitterCovarianceMatrix.GetEigenValues().GetNrows()-1; iEigen >= 0; iEigen--) {
-        GenericToolbox::displayProgressBar(decompFitterCovarianceMatrix.GetEigenValues().GetNrows()-iEigen, decompFitterCovarianceMatrix.GetEigenValues().GetNrows(), progressTitle);
+//        GenericToolbox::displayProgressBar(decompFitterCovarianceMatrix.GetEigenValues().GetNrows()-iEigen, decompFitterCovarianceMatrix.GetEigenValues().GetNrows(), progressTitle);
         // iEigen = 0 -> biggest error contribution
         // Drawing in the back -> iEigen = 0 should be last in the accum plot
         if( lastAccumHist != nullptr ) eigenBreakdownAccum[iEigen] = *lastAccumHist;
