@@ -122,10 +122,14 @@ void EventTreeWriter::writeEvents(TDirectory *saveDir_, const std::string& treeN
   int iLeaf;
   int iPar{0};
   std::string progressTitle = LogInfo.getPrefixString() + "Writing " + treeName_;
-  int iEvent{0}; int nEvents = int(eventList_.size());
+  int iEvent{-1}; int nEvents = int(eventList_.size());
   GenericToolbox::ProgressBar::debugMode = true;
   for( auto& event : eventList_ ){
-    GenericToolbox::displayProgressBar(iEvent++,nEvents,progressTitle);
+//    GenericToolbox::displayProgressBar(iEvent++,nEvents,progressTitle);
+    iEvent++;
+    if(GenericToolbox::showProgressBar(iEvent, nEvents) ){
+      std::cout << GenericToolbox::generateProgressBarStr(iEvent, nEvents, progressTitle);
+    }
 
     privateMemberArr.resetCurrentByteOffset();
     for( auto& leafDef : leafDictionary ){ leafDef.second(privateMemberArr, event); }
