@@ -4,6 +4,7 @@
 
 #include "Logger.h"
 
+#include "FitParameter.h"
 #include "NormalizationDial.h"
 
 LoggerInit([](){
@@ -30,6 +31,6 @@ void NormalizationDial::initialize() {
 }
 
 double NormalizationDial::evalResponse(double parameterValue_){
-  return parameterValue_; // NO CACHE NEEDED :)
+  return parameterValue_; // NO CACHE NEEDED ?
 }
 
