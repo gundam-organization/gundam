@@ -246,7 +246,7 @@ bool ToyThrower::IncompCholDecomp(const double tol, bool modify_cov)
         {
             for(int j = 0; j < npar; ++j)
             {
-                if(std::fabs(chol_mat(i,j)) < tol)
+                if(std::abs(chol_mat(i,j)) < tol)
                     chol_mat(i,j) = 0.0;
             }
         }
@@ -276,7 +276,7 @@ bool ToyThrower::IncompCholDecomp(const double tol, bool modify_cov)
 
             else
             {
-                if(std::fabs(chol_mat(j,i)) > tol)
+                if(std::abs(chol_mat(j,i)) > tol)
                     chol_mat(j,i) = sum / chol_mat(i,i);
                 else
                     chol_mat(j,i) = 0.0;
