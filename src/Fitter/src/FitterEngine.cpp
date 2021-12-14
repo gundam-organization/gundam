@@ -415,6 +415,7 @@ void FitterEngine::fixGhostFitParameters(){
 void FitterEngine::scanParameters(int nbSteps_, const std::string &saveDir_) {
   LogInfo << "Performing parameter scans..." << std::endl;
   for( int iPar = 0 ; iPar < _minimizer_->NDim() ; iPar++ ){
+    if( _minimizer_->IsFixedVariable(iPar) ) continue;
     this->scanParameter(iPar, nbSteps_, saveDir_);
   } // iPar
 }
