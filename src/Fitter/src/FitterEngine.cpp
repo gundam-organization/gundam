@@ -3,16 +3,19 @@
 //
 
 #include "FitterEngine.h"
+
 #include "JsonUtils.h"
 #include "GlobalVariables.h"
+
+#include "Logger.h"
+#include "GenericToolbox.Root.h"
+#include "GenericToolbox.h"
 
 #include <Math/Factory.h>
 #include "TGraph.h"
 #include "TLegend.h"
 
-#include "Logger.h"
-#include "GenericToolbox.h"
-#include "GenericToolbox.Root.h"
+#include <cmath>
 
 
 LoggerInit([]{

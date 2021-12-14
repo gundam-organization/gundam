@@ -2,20 +2,19 @@
 // Created by Nadrino on 01/06/2021.
 //
 
-#include "string"
+#include "versionConfig.h"
 
-#include "yaml-cpp/yaml.h"
+#include "FitterEngine.h"
+#include "JsonUtils.h"
+#include "GlobalVariables.h"
 
 #include "CmdLineParser.h"
 #include "Logger.h"
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
 
-#include "JsonUtils.h"
-#include "Propagator.h"
-#include "FitterEngine.h"
-#include "GlobalVariables.h"
-#include "versionConfig.h"
+#include <string>
+
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[gundamFitter.cxx]");
