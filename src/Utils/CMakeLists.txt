@@ -11,6 +11,7 @@ set(SRCFILES
         src/DataBin.cpp
         src/JsonUtils.cpp
         src/YamlUtils.cpp
+        src/GundamGreetings.cpp
         )
 set(HEADERS
         include/BinManager.hh
@@ -26,6 +27,7 @@ set(HEADERS
         include/JsonUtils.h
         include/YamlUtils.h
         include/YamlUtils.impl.h
+        include/GundamGreetings.h
         )
 
 if( USE_STATIC_LINKS STREQUAL "1" )

@@ -2,9 +2,10 @@
 // Created by Nadrino on 22/07/2021.
 //
 
+#include "PhysicsEvent.h"
+
 #include "Logger.h"
 
-#include "PhysicsEvent.h"
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[PhysicsEvent]");

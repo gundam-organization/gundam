@@ -7,6 +7,7 @@
 #include "FitterEngine.h"
 #include "JsonUtils.h"
 #include "GlobalVariables.h"
+#include "GundamGreetings.h"
 
 #include "CmdLineParser.h"
 #include "Logger.h"
@@ -22,10 +23,9 @@ LoggerInit([](){
 
 int main(int argc, char** argv){
 
-  std::string greetings = "Welcome to the GundamFitter v" + getVersionStr();
-  LogInfo << GenericToolbox::repeatString("─", int(greetings.size())) << std::endl;
-  LogInfo << greetings << std::endl;
-  LogInfo << GenericToolbox::repeatString("─", int(greetings.size())) << std::endl << std::endl;
+  GundamGreetings g;
+  g.setAppName("GundamFitter");
+  g.hello();
 
   // --------------------------
   // Read Command Line Args:
@@ -70,9 +70,32 @@ int main(int argc, char** argv){
   int nbScanSteps = clParser.getOptionVal("scanParameters", 100);
   auto outFileName = clParser.getOptionVal("outputFile", configFilePath + ".root");
 
-  LogWarning << "Creating output file: \"" << outFileName << "\"" << std::endl;
+  LogWarning << "Creating output file: \"" << outFileName << "\"..." << std::endl;
   TFile* out = TFile::Open(outFileName.c_str(), "RECREATE");
 
+
+  LogInfo << "Writing runtime parameters in output file..." << std::endl;
+
+  // Gundam version?
+  TNamed gundamVersionString("gundamVersion", getVersionStr().c_str());
+  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamFitter"), &gundamVersionString);
+
+  // Command line?
+  TNamed commandLineString("commandLine", clParser.getCommandLineString().c_str());
+  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamFitter"), &commandLineString);
+
+  // Config unfolded ?
+  auto unfoldedConfig = jsonConfig;
+  JsonUtils::unfoldConfig(unfoldedConfig);
+  std::stringstream ss;
+  ss << unfoldedConfig << std::endl;
+  TNamed unfoldedConfigString("unfoldedConfig", ss.str().c_str());
+  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamFitter"), &unfoldedConfigString);
+
+
+  LogInfo << "FitterEngine setup..." << std::endl;
+
+  // Fitter
   FitterEngine fitter;
   fitter.setConfig(JsonUtils::fetchSubEntry(jsonConfig, {"fitterEngineConfig"}));
   fitter.setSaveDir(GenericToolbox::mkdirTFile(out, "FitterEngine"));
@@ -111,8 +134,6 @@ int main(int argc, char** argv){
   // --------------------------
   // Goodbye:
   // --------------------------
-  std::string goodbyeStr = "\u3042\u308a\u304c\u3068\u3046\u3054\u3056\u3044\u307e\u3057\u305f\uff01";
-  LogInfo << std::endl << GenericToolbox::repeatString("─", int(goodbyeStr.size())) << std::endl;
-  LogInfo << GenericToolbox::makeRainbowString(goodbyeStr, false) << std::endl;
-  LogInfo << GenericToolbox::repeatString("─", int(goodbyeStr.size())) << std::endl;
+  g.goodbye();
+
 }

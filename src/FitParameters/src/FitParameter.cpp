@@ -98,7 +98,13 @@ void FitParameter::initialize() {
       LogWarning << getTitle() << " is marked as not Enabled." << std::endl;
       return;
     }
-    _priorValue_ = JsonUtils::fetchValue(_parameterConfig_, "priorValue", _priorValue_);
+
+    if( JsonUtils::doKeyExist(_parameterConfig_, "priorValue") ){
+      _priorValue_ = JsonUtils::fetchValue(_parameterConfig_, "priorValue", _priorValue_);
+      LogWarning << this->getTitle() << ": prior value override -> " << _priorValue_ << std::endl;
+      this->setParameterValue(_priorValue_);
+    }
+
     _dialDefinitionsList_ = JsonUtils::fetchValue(_parameterConfig_, "dialSetDefinitions", _dialDefinitionsList_);
   }
 
