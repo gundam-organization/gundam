@@ -152,7 +152,6 @@ void FitParameterSet::initialize() {
     _parameterList_.back().setParSetRef(this);
     _parameterList_.back().setParameterIndex(iParameter);
     _parameterList_.back().setName(_parameterNamesList_->At(iParameter)->GetName());
-    _parameterList_.back().setParameterValue((*_parameterPriorList_)[iParameter]);
     _parameterList_.back().setPriorValue((*_parameterPriorList_)[iParameter]);
     _parameterList_.back().setStdDevValue(TMath::Sqrt((*_covarianceMatrix_)[iParameter][iParameter]));
     _parameterList_.back().setStepSize(TMath::Sqrt((*_covarianceMatrix_)[iParameter][iParameter]));

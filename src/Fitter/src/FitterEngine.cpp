@@ -1156,7 +1156,6 @@ void FitterEngine::writePostFitData() {
 //        preFitErrorHist->SetFillStyle(4050); // 50 % opaque ?
     preFitErrorHist->SetMarkerStyle(kFullDotLarge);
     preFitErrorHist->SetMarkerColor(kRed-3);
-    preFitErrorHist->SetTitle("Pre-fit Errors");
     preFitErrorHist->SetTitle(Form("Pre-fit Errors of %s", parSet.getName().c_str()));
     preFitErrorHist->Write();
 
@@ -1164,7 +1163,6 @@ void FitterEngine::writePostFitData() {
     postFitErrorHist->SetLineWidth(2);
     postFitErrorHist->SetMarkerColor(9);
     postFitErrorHist->SetMarkerStyle(kFullDotLarge);
-    postFitErrorHist->SetTitle("Post-fit Errors");
     postFitErrorHist->SetTitle(Form("Post-fit Errors of %s", parSet.getName().c_str()));
     postFitErrorHist->Write();
 
