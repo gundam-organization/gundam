@@ -45,39 +45,19 @@ There are several requirements for building the fitter:
 - [JSON for Modern C++](https://github.com/nlohmann/json)
 - [yaml-cpp](https://github.com/jbeder/yaml-cpp)
 
-### Compiling on macOS?
-
-[TO BE DONE](./resources/guides/.md)
-
-![](./resources/guides/images/macOsLogo.png)
-
-
-### Compiling on CCLyon?
-
-[Click here for the compilation guide on CCLyon](./resources/guides/installOnCCLyon.md)
-
-![](./resources/guides/images/cc_in2p3_logo.png)
-
-
-### Compiling on LXPLUS?
-
-[TO BE DONE](./resources/guides/.md)
-
-![](./resources/guides/images/lxplusLogo.png)
-
 ### Shell setup
 
 In this guide, it is assumed you have already defined the following bash environment
 variables:
 
 - `$REPO_DIR`: the path to the folder where your git projects are stored. This guide
-will download this repo into the subdirectory `$REPO_DIR/gundam`.
+  will download this repo into the subdirectory `$REPO_DIR/gundam`.
 
 - `$BUILD_DIR`: the path where the binaries are built. As for the previous variables,
-this guide will work under `$BUILD_DIR/gundam`.
+  this guide will work under `$BUILD_DIR/gundam`.
 
 - `$INSTALL_DIR`: the path where the binaries are installed and used by the shell.
-Same here: this guide will work under `$INSTALL_DIR/gundam`.
+  Same here: this guide will work under `$INSTALL_DIR/gundam`.
 
 As an example, here is how I personally define those variables. This script is executed
 in the `$HOME/.bash_profile` on macOS or `$HOME/.bashrc` on Linux, as they can be used
@@ -132,41 +112,29 @@ git checkout $(git describe --tags `git rev-list --tags --max-count=1`)
 cd -
 ```
 
-### Compiling the code
 
-Let's create the Build and Install folder:
+### Compiling on macOS?
 
-```bash
-mkdir -p $BUILD_DIR/gundam
-mkdir -p $INSTALL_DIR/gundam
-```
+[Click here for the compilation guide on macOS](./resources/guides/installOnMacOs.md)
 
-Now let's generate binaries:
-
-```bash
-cd $BUILD_DIR/gundam
-cmake \
-  -DCMAKE_INSTALL_PREFIX:PATH=$INSTALL_DIR/gundam \
-  -D CMAKE_BUILD_TYPE=Release \
-  $REPO_DIR/gundam/.
-make -j 4 install
-```
-
-If you did get there without error, congratulations! Now GUNDAM is installed on you machine :-D.
-
-To access the executables from anywhere, you have to update you `$PATH` and `$LD_LIBRARY_PATH`
-variables:
-
-```bash
-export PATH="$INSTALL_DIR/gundam/bin:$PATH"
-export LD_LIBRARY_PATH="$INSTALL_DIR/gundam/lib:$LD_LIBRARY_PATH"
-```
-
-### Common Issues
+![](./resources/guides/images/macOsLogo.png)
 
 
+### Compiling on CCLyon?
 
-### Gathering inputs
+[Click here for the compilation guide on CCLyon](./resources/guides/installOnCCLyon.md)
+
+![](./resources/guides/images/cc_in2p3_logo.png)
+
+
+### Compiling on LXPLUS?
+
+[TO BE DONE](./resources/guides/.md)
+
+![](./resources/guides/images/lxplusLogo.png)
+
+
+### Input examples
 
 ## I want to contribute!
 
