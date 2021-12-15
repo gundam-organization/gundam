@@ -77,11 +77,11 @@ int main(int argc, char** argv){
   LogInfo << "Writing runtime parameters in output file..." << std::endl;
 
   // Gundam version?
-  TNamed gundamVersionString("gundamVersion_TNamed", getVersionStr().c_str());
+  TNamed gundamVersionString("gundamVersion", getVersionStr().c_str());
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamFitter"), &gundamVersionString);
 
   // Command line?
-  TNamed commandLineString("commandLine_TNamed", clParser.getCommandLineString().c_str());
+  TNamed commandLineString("commandLine", clParser.getCommandLineString().c_str());
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamFitter"), &commandLineString);
 
   // Config unfolded ?
@@ -89,7 +89,7 @@ int main(int argc, char** argv){
   JsonUtils::unfoldConfig(unfoldedConfig);
   std::stringstream ss;
   ss << unfoldedConfig << std::endl;
-  TNamed unfoldedConfigString("config_TNamed", ss.str().c_str());
+  TNamed unfoldedConfigString("unfoldedConfig", ss.str().c_str());
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamFitter"), &unfoldedConfigString);
 
 
