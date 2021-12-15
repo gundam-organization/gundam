@@ -12,7 +12,7 @@ set( APPLICATION_LIST
         xsllhUnitTests
         xsllhXsecCov
         gundamFitter
-        gundamFlatTreeConverter
+        gundamConfigUnfolder
         YamlSandbox
 )
 

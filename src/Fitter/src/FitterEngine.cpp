@@ -837,16 +837,20 @@ void FitterEngine::writePostFitData() {
   _minimizer_->GetCovMatrix(totalCovMatrix.GetMatrixArray());
 
   std::function<void(TDirectory*)> decomposeCovarianceMatrixFct = [&](TDirectory* outDir_){
-    GenericToolbox::writeInFile(outDir_, BIND_VAR_REF_NAME(totalCovMatrix));
+    GenericToolbox::writeInTFile(outDir_, BIND_VAR_REF_NAME(totalCovMatrix));
     TH2D* totalCovTH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) &totalCovMatrix);
-    GenericToolbox::writeInFile(outDir_, totalCovTH2D, "totalCovMatrix");
+    GenericToolbox::writeInTFile(outDir_, totalCovTH2D, "totalCovMatrix");
 
     LogInfo << "Eigen decomposition of the post-fit covariance matrix" << std::endl;
     TMatrixDSymEigen decompFitterCovarianceMatrix(totalCovMatrix);
-    GenericToolbox::writeInFile(outDir_, &decompFitterCovarianceMatrix.GetEigenVectors(), "totalCovEigenVectors");
-    GenericToolbox::writeInFile(outDir_, GenericToolbox::convertTMatrixDtoTH2D(&decompFitterCovarianceMatrix.GetEigenVectors()), "totalCovEigenVectors");
-    GenericToolbox::writeInFile(outDir_, &decompFitterCovarianceMatrix.GetEigenValues(), "totalCovEigenValues");
-    GenericToolbox::writeInFile(outDir_, GenericToolbox::convertTVectorDtoTH1D(&decompFitterCovarianceMatrix.GetEigenValues()), "totalCovEigenValues");
+    GenericToolbox::writeInTFile(outDir_, &decompFitterCovarianceMatrix.GetEigenVectors(), "totalCovEigenVectors");
+    GenericToolbox::writeInTFile(outDir_,
+                                 GenericToolbox::convertTMatrixDtoTH2D(&decompFitterCovarianceMatrix.GetEigenVectors()),
+                                 "totalCovEigenVectors");
+    GenericToolbox::writeInTFile(outDir_, &decompFitterCovarianceMatrix.GetEigenValues(), "totalCovEigenValues");
+    GenericToolbox::writeInTFile(outDir_,
+                                 GenericToolbox::convertTVectorDtoTH1D(&decompFitterCovarianceMatrix.GetEigenValues()),
+                                 "totalCovEigenValues");
 
     double conditioning = decompFitterCovarianceMatrix.GetEigenValues().Min()/decompFitterCovarianceMatrix.GetEigenValues().Max();
     LogWarning << "Post-fit error conditioning is: " << conditioning << std::endl;
@@ -879,8 +883,8 @@ void FitterEngine::writePostFitData() {
           eigenBreakdownHist.GetXaxis()->SetBinLabel(iPar + 1, _minimizer_->VariableName(iPar).c_str());
           eigenBreakdownAccum[iEigen].GetXaxis()->SetBinLabel(iPar + 1, _minimizer_->VariableName(iPar).c_str());
         }
-        GenericToolbox::writeInFile(GenericToolbox::mkdirTFile(outDir_, "eigenBreakdown"), &eigenBreakdownHist,
-                                    Form("eigen#%i", iEigen));
+        GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outDir_, "eigenBreakdown"), &eigenBreakdownHist,
+                                     Form("eigen#%i", iEigen));
 
         eigenBreakdownAccum[iEigen].Add(&eigenBreakdownHist);
         eigenBreakdownAccum[iEigen].SetLabelSize(0.02);
@@ -913,7 +917,7 @@ void FitterEngine::writePostFitData() {
       l.Draw();
       gPad->SetGridx();
       gPad->SetGridy();
-      GenericToolbox::writeInFile(outDir_, &accumPlot, "eigenBreakdown");
+      GenericToolbox::writeInTFile(outDir_, &accumPlot, "eigenBreakdown");
     }
 
 
@@ -941,7 +945,8 @@ void FitterEngine::writePostFitData() {
               *decompFitterCovarianceMatrix.GetEigenValues()[iEigen]
           );
         }
-        GenericToolbox::writeInFile(GenericToolbox::mkdirTFile(outDir_, "parBreakdown"), &parBreakdownHist, Form("par#%i", iPar));
+        GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outDir_, "parBreakdown"), &parBreakdownHist,
+                                     Form("par#%i", iPar));
 
         parBreakdownAccum[iPar].Add(&parBreakdownHist);
         parBreakdownAccum[iPar].SetLabelSize(0.02);
@@ -955,7 +960,7 @@ void FitterEngine::writePostFitData() {
         isFirst? parBreakdownAccum[iPar].Draw("HIST"): parBreakdownAccum[iPar].Draw("HIST SAME");
         isFirst = false;
       }
-      GenericToolbox::writeInFile(outDir_, &accumPlot, "parBreakdown");
+      GenericToolbox::writeInTFile(outDir_, &accumPlot, "parBreakdown");
     }
 
 
@@ -970,8 +975,8 @@ void FitterEngine::writePostFitData() {
     hessianMatrix += decompFitterCovarianceMatrix.GetEigenVectors();
     hessianMatrix *= diagonalMatrixInv;
     hessianMatrix *= invEigVectors;
-    GenericToolbox::writeInFile(outDir_, BIND_VAR_REF_NAME(hessianMatrix));
-    GenericToolbox::writeInFile(outDir_, GenericToolbox::convertTMatrixDtoTH2D(&hessianMatrix), "hessianMatrix");
+    GenericToolbox::writeInTFile(outDir_, BIND_VAR_REF_NAME(hessianMatrix));
+    GenericToolbox::writeInTFile(outDir_, GenericToolbox::convertTMatrixDtoTH2D(&hessianMatrix), "hessianMatrix");
   };
 
   if( _useNormalizedFitSpace_ ){
