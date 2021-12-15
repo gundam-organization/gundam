@@ -267,7 +267,7 @@ double FitParameters::CalcRegularisation(const std::vector<double>& params, doub
         if(flag == kL1Reg)
         {
             for(int i = offset; i < offset+nbins-1; ++i)
-                L_reg += std::fabs(params[i] - params[i+1]);
+                L_reg += std::abs(params[i] - params[i+1]);
         }
 
         else if(flag == kL2Reg)

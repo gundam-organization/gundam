@@ -5,19 +5,21 @@
 #ifndef GUNDAM_FITTERENGINE_H
 #define GUNDAM_FITTERENGINE_H
 
-#include "string"
-#include "vector"
-#include "memory"
+
+#include "Propagator.h"
+
+#include "GenericToolbox.VariablesMonitor.h"
+#include "GenericToolbox.CycleTimer.h"
 
 #include "TDirectory.h"
 #include "Math/Functor.h"
 #include "Math/Minimizer.h"
 #include "json.hpp"
 
-#include "GenericToolbox.VariablesMonitor.h"
-#include "GenericToolbox.CycleTimer.h"
+#include "string"
+#include "vector"
+#include "memory"
 
-#include "Propagator.h"
 
 class FitterEngine {
 

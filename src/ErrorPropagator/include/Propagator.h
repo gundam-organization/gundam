@@ -5,19 +5,21 @@
 #ifndef GUNDAM_PROPAGATOR_H
 #define GUNDAM_PROPAGATOR_H
 
-#include "vector"
-#include "future"
 
-#include "json.hpp"
+#include "DataSetLoader.h"
+#include "PlotGenerator.h"
+#include "EventTreeWriter.h"
+#include "FitSampleSet.h"
+#include "FitParameterSet.h"
+#include "AnaSample.hh"
 
 #include "GenericToolbox.CycleTimer.h"
 
-#include "FitParameterSet.h"
-#include "AnaSample.hh"
-#include "PlotGenerator.h"
-#include "FitSampleSet.h"
-#include "DataSetLoader.h"
-#include "EventTreeWriter.h"
+#include "json.hpp"
+
+#include <vector>
+#include <future>
+
 
 class Propagator {
 

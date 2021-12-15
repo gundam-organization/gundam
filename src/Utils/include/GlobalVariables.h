@@ -5,15 +5,15 @@
 #ifndef GUNDAM_GLOBALVARIABLES_H
 #define GUNDAM_GLOBALVARIABLES_H
 
-#include <map>
-#include <mutex>
+#include "GenericToolbox.ParallelWorker.h"
 
 #include <TTree.h>
 #include <TChain.h>
 #include <TRandom3.h>
 
-#include "GenericToolbox.h"
-#include "GenericToolbox.ParallelWorker.h"
+#include <map>
+#include <mutex>
+
 
 class GlobalVariables{
 

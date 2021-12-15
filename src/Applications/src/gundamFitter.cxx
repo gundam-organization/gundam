@@ -2,20 +2,19 @@
 // Created by Nadrino on 01/06/2021.
 //
 
-#include "string"
+#include "versionConfig.h"
 
-#include "yaml-cpp/yaml.h"
+#include "FitterEngine.h"
+#include "JsonUtils.h"
+#include "GlobalVariables.h"
 
 #include "CmdLineParser.h"
 #include "Logger.h"
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
 
-#include "JsonUtils.h"
-#include "Propagator.h"
-#include "FitterEngine.h"
-#include "GlobalVariables.h"
-#include "versionConfig.h"
+#include <string>
+
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[gundamFitter.cxx]");
@@ -60,17 +59,16 @@ int main(int argc, char** argv){
   GlobalVariables::setNbThreads(clParser.getOptionVal("nbThreads", 1));
   LogInfo << "Running the fitter with " << GlobalVariables::getNbThreads() << " parallel threads." << std::endl;
 
-  bool isDryRun = clParser.isOptionTriggered("dry-run");
-  bool enableParameterScan = clParser.isOptionTriggered("scanParameters");
-  int nbScanSteps = clParser.getOptionVal("scanParameters", 100);
-  auto outFileName = clParser.getOptionVal("outputFile", configFilePath + ".root");
-
-
   // --------------------------
   // Initialize the fitter:
   // --------------------------
   LogInfo << "Reading config file: " << configFilePath << std::endl;
   auto jsonConfig = JsonUtils::readConfigFile(configFilePath); // works with yaml
+
+  bool isDryRun = clParser.isOptionTriggered("dry-run");
+  bool enableParameterScan = clParser.isOptionTriggered("scanParameters") or JsonUtils::fetchValue(jsonConfig, "scanParameters", false);
+  int nbScanSteps = clParser.getOptionVal("scanParameters", 100);
+  auto outFileName = clParser.getOptionVal("outputFile", configFilePath + ".root");
 
   LogWarning << "Creating output file: \"" << outFileName << "\"" << std::endl;
   TFile* out = TFile::Open(outFileName.c_str(), "RECREATE");

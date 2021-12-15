@@ -2,18 +2,21 @@
 // Created by Nadrino on 11/06/2021.
 //
 
+#include "FitterEngine.h"
+
+#include "JsonUtils.h"
+#include "GlobalVariables.h"
+
+#include "Logger.h"
+#include "GenericToolbox.Root.h"
+#include "GenericToolbox.h"
+
 #include <Math/Factory.h>
 #include "TGraph.h"
 #include "TLegend.h"
 
-#include "Logger.h"
-#include "GenericToolbox.h"
-#include "GenericToolbox.Root.h"
-#include "GenericToolbox.RawDataArray.h"
+#include <cmath>
 
-#include "JsonUtils.h"
-#include "FitterEngine.h"
-#include "GlobalVariables.h"
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[FitterEngine]");
@@ -357,7 +360,7 @@ void FitterEngine::fixGhostFitParameters(){
         LogInfo.moveTerminalCursorBack(1);
         LogInfo << ssPrint.str() << std::endl;
 
-        if( std::fabs(deltaChi2Stat) < JsonUtils::fetchValue(_config_, "ghostParameterDeltaChi2Threshold", 1E-6) ){
+        if( std::abs(deltaChi2Stat) < JsonUtils::fetchValue(_config_, "ghostParameterDeltaChi2Threshold", 1E-6) ){
           parSet.setEigenParIsFixed(iEigen, true);
 
           ssPrint << " < " << JsonUtils::fetchValue(_config_, "ghostParameterDeltaChi2Threshold", 1E-6) << " -> " << "FIXED";
@@ -394,7 +397,7 @@ void FitterEngine::fixGhostFitParameters(){
           LogInfo.moveTerminalCursorBack(1);
           LogInfo << ssPrint.str() << std::endl;
 
-          if( std::fabs(deltaChi2Stat) < JsonUtils::fetchValue(_config_, "ghostParameterDeltaChi2Threshold", 1E-6) ){
+          if( std::abs(deltaChi2Stat) < JsonUtils::fetchValue(_config_, "ghostParameterDeltaChi2Threshold", 1E-6) ){
             par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
             ssPrint << " < " << JsonUtils::fetchValue(_config_, "ghostParameterDeltaChi2Threshold", 1E-6) << " -> " << "FIXED";
             LogInfo.moveTerminalCursorBack(1);
@@ -415,6 +418,7 @@ void FitterEngine::fixGhostFitParameters(){
 void FitterEngine::scanParameters(int nbSteps_, const std::string &saveDir_) {
   LogInfo << "Performing parameter scans..." << std::endl;
   for( int iPar = 0 ; iPar < _minimizer_->NDim() ; iPar++ ){
+    if( _minimizer_->IsFixedVariable(iPar) ) continue;
     this->scanParameter(iPar, nbSteps_, saveDir_);
   } // iPar
 }
@@ -1265,7 +1269,7 @@ void FitterEngine::rescaleParametersStepSize(){
         double deltaChi2Pulls = _chi2PullsBuffer_ - baseChi2Pull;
 
 //        double stepSize = TMath::Sqrt(deltaChi2Pulls)/TMath::Sqrt(deltaChi2);
-        double stepSize = 1./TMath::Sqrt(std::fabs(deltaChi2));
+        double stepSize = 1./TMath::Sqrt(std::abs(deltaChi2));
 
         LogInfo << "Step size of " << parSet.getName() + "/eigen_#" << iEigen
                 << " -> σ x " << _parStepGain_ << " x " << stepSize
@@ -1299,7 +1303,7 @@ void FitterEngine::rescaleParametersStepSize(){
 //        double stepSize = TMath::Sqrt(deltaChi2Pulls)/TMath::Sqrt(deltaChi2);
 
         // full rescale
-        double stepSize = 1./TMath::Sqrt(std::fabs(deltaChi2));
+        double stepSize = 1./TMath::Sqrt(std::abs(deltaChi2));
 
         LogInfo << "Step size of " << parSet.getName() + "/" + par.getTitle()
             << " -> σ x " << _parStepGain_ << " x " << stepSize
