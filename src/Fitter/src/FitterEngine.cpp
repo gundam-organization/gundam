@@ -513,17 +513,17 @@ void FitterEngine::fit(){
     }
   }
 
-  LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
-          << "Number of free parameters   : " << _minimizer_->NFree() << std::endl
-          << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree()
-          << std::endl;
-
   _propagator_.allowRfPropagation(); // if RF are setup -> a lot faster
   updateChi2Cache();
 
   LogWarning << "───────────────────" << std::endl;
   LogWarning << "Calling minimize..." << std::endl;
   LogWarning << "───────────────────" << std::endl;
+  LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
+          << "Number of free parameters   : " << _minimizer_->NFree() << std::endl
+          << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree()
+          << std::endl;
+  LogInfo << "Fit call offset: " << _nbFitCalls_ << std::endl;
   _fitUnderGoing_ = true;
   _fitHasConverged_ = _minimizer_->Minimize();
   int nbMinimizeCalls = _nbFitCalls_;
@@ -659,9 +659,6 @@ void FitterEngine::fit(){
         updateChi2Cache();
       } // Minos
       else if( errorAlgo == "Hesse" ){
-//      LogInfo << "Releasing constraints for HESSE..." << std::endl;
-//      initializeMinimizer(true);
-
         LogWarning << "────────────────" << std::endl;
         LogWarning << "Calling HESSE..." << std::endl;
         LogWarning << "────────────────" << std::endl;
@@ -669,6 +666,8 @@ void FitterEngine::fit(){
                 << "Number of free parameters   : " << _minimizer_->NFree() << std::endl
                 << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree()
                 << std::endl;
+        LogInfo << "Fit call offset: " << _nbFitCalls_ << std::endl;
+
         _fitHasConverged_ = _minimizer_->Hesse();
         LogInfo << "Hesse ended after " << _nbFitCalls_ - nbMinimizeCalls << " calls." << std::endl;
         LogWarning << "HESSE status code: " << hesseStatusCodeStr.at(_minimizer_->Status()) << std::endl;
@@ -854,7 +853,6 @@ void FitterEngine::writePostFitData() {
 
     if(true){
       LogInfo << "Eigen breakdown..." << std::endl;
-      LogDebug << "Memory claim" << std::endl;
       TH1D eigenBreakdownHist("eigenBreakdownHist", "eigenBreakdownHist",
                               int(_minimizer_->NDim()), -0.5, int(_minimizer_->NDim()) - 0.5);
       std::vector<TH1D> eigenBreakdownAccum(decompFitterCovarianceMatrix.GetEigenValues().GetNrows(), eigenBreakdownHist);
