@@ -87,6 +87,7 @@ void FitParameter::initialize() {
   LogThrowIf(_parameterIndex_ == -1, "Parameter index is not set.");
   LogThrowIf(_priorValue_     == std::numeric_limits<double>::quiet_NaN(), "Prior value is not set.");
   LogThrowIf(_stdDevValue_    == std::numeric_limits<double>::quiet_NaN(), "Std dev value is not set.");
+  LogThrowIf(_parameterValue_ == std::numeric_limits<double>::quiet_NaN(), "Parameter value is not set.");
   LogThrowIf(_parSetRef_      == nullptr, "Parameter set ref is not set.")
 
   _stepSize_ = _stdDevValue_ * 0.01; // default
@@ -97,13 +98,15 @@ void FitParameter::initialize() {
       LogWarning << getTitle() << " is marked as not Enabled." << std::endl;
       return;
     }
-    _priorValue_ = JsonUtils::fetchValue(_parameterConfig_, "priorValue", _priorValue_);
-    LogWarning << this->getTitle() << ": prior value override -> " << _priorValue_ << std::endl;
+
+    if( JsonUtils::doKeyExist(_parameterConfig_, "priorValue") ){
+      _priorValue_ = JsonUtils::fetchValue(_parameterConfig_, "priorValue", _priorValue_);
+      LogWarning << this->getTitle() << ": prior value override -> " << _priorValue_ << std::endl;
+      this->setParameterValue(_priorValue_);
+    }
+
     _dialDefinitionsList_ = JsonUtils::fetchValue(_parameterConfig_, "dialSetDefinitions", _dialDefinitionsList_);
   }
-
-  LogDebug << getTitle() << ": par value set to its prior:" << std::endl;
-  this->setParameterValue(_priorValue_);
 
   _dialSetList_.reserve(_dialDefinitionsList_.size());
   for( const auto& dialDefinitionConfig : _dialDefinitionsList_ ){
