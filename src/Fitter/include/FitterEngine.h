@@ -57,7 +57,7 @@ public:
   void updateChi2Cache();
   double evalFit(const double* parArray_);
 
-  void writePostFitData();
+  void writePostFitData(TDirectory* saveDir_);
 
   // utils
   double fetchCurrentParameterValue(int iFitPar_); // minuit don't have such a getter
@@ -81,7 +81,7 @@ private:
 
   // Internals
   bool _fitIsDone_{false};
-  bool _fitUnderGoing_{false};
+  bool _enableFitMonitor_{false};
   bool _fitHasConverged_{false};
   bool _isBadCovMat_{false};
 

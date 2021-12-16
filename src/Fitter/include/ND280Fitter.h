@@ -102,7 +102,6 @@ private:
 
     // Options (Debug and Monitoring)
     bool _saveFitParameters_{};
-    bool _saveEventTree_{};
     bool _disableMultiThread_{};
     bool _advancedTimeMonitoring_{};
 
@@ -110,7 +109,6 @@ private:
     bool _printFitState_{};
 
     int _PRNG_seed_{};
-    int _nb_threads_{};
     int _nb_fit_parameters_{};
     int _nbFitCalls_{};
     int _saveFitParamsFrequency_{};
@@ -154,7 +152,6 @@ private:
 
     // Multi-thread
     std::mutex _threadMutex_;
-    int _counterThread_{};
     bool _stopThreads_{};
     std::vector<bool> _triggerReweightThreads_;
     std::vector<bool> _triggerReFillMcHistogramsThreads_;
