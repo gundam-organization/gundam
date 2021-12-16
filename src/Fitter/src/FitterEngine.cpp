@@ -81,7 +81,7 @@ void FitterEngine::initialize() {
     }
   }
 
-  if( JsonUtils::fetchValue(_config_, "scaleParStepWithChi2Response", true) ){
+  if( JsonUtils::fetchValue(_config_, "scaleParStepWithChi2Response", false) ){
     _parStepGain_ = JsonUtils::fetchValue(_config_, "parStepGain", _parStepGain_);
     LogInfo << "Using parameter step scale: " << _parStepGain_ << std::endl;
     this->rescaleParametersStepSize();
@@ -471,9 +471,7 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
 void FitterEngine::fit(){
   LogWarning << __METHOD_NAME__ << std::endl;
 
-  LogWarning << "─────────────────────────────" << std::endl;
-  LogWarning << "Summary of the fit parameters" << std::endl;
-  LogWarning << "─────────────────────────────" << std::endl;
+  LogWarning << std::endl << GenericToolbox::addUpDownBars("Summary of the fit parameters:") << std::endl;
   int iFitPar = -1;
   for( const auto& parSet : _propagator_.getParameterSetsList() ){
     if( not parSet.isUseEigenDecompInFit() ){
@@ -668,15 +666,41 @@ void FitterEngine::fit(){
         updateChi2Cache();
       } // Minos
       else if( errorAlgo == "Hesse" ){
+
+        if( JsonUtils::fetchValue(_config_, "restoreStepSizeBeforeHesse", false) ){
+          LogWarning << "Restoring step size before HESSE..." << std::endl;
+          int iPar = -1;
+          for( auto& parSet : _propagator_.getParameterSetsList() ){
+
+            if( not parSet.isUseEigenDecompInFit() ){
+              for( auto& par : parSet.getParameterList()  ){
+                iPar++;
+                if(not _useNormalizedFitSpace_){ _minimizer_->SetVariableStepSize(iPar, par.getStepSize()); }
+                else{ _minimizer_->SetVariableStepSize(iPar, FitParameterSet::toNormalizedParRange(par.getStepSize(), par)); } // should be 1
+              } // par
+            }
+            else{
+              for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
+                iPar++;
+                if(not _useNormalizedFitSpace_){ _minimizer_->SetVariableStepSize(iPar, parSet.getEigenParStepSize(iEigen)); }
+                else{ _minimizer_->SetVariableStepSize(iPar, parSet.toNormalizedEigenParRange(parSet.getEigenParStepSize(iEigen), iEigen)); } // should be 1
+              }
+            }
+
+          } // parSet
+        }
+
         LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling HESSE...") << std::endl;
         LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
                 << "Number of free parameters   : " << _minimizer_->NFree() << std::endl
                 << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree()
                 << std::endl;
-        LogInfo << "Fit call offset: " << _nbFitCalls_ << std::endl;
+
+        nbFitCallOffset = _nbFitCalls_;
+        LogInfo << "Fit call offset: " << nbFitCallOffset << std::endl;
 
         _fitHasConverged_ = _minimizer_->Hesse();
-        LogInfo << "Hesse ended after " << _nbFitCalls_ - nbMinimizeCalls << " calls." << std::endl;
+        LogInfo << "Hesse ended after " << _nbFitCalls_ - nbFitCallOffset << " calls." << std::endl;
         LogWarning << "HESSE status code: " << hesseStatusCodeStr.at(_minimizer_->Status()) << std::endl;
         LogWarning << "Covariance matrix status code: " << covMatrixStatusCodeStr.at(_minimizer_->CovMatrixStatus()) << std::endl;
 

@@ -41,7 +41,6 @@ public:
     void SetPrngSeed(int PRNG_seed_);
     void SetMinimizationSettings(const MinSettings& minimization_settings_);
     void SetDisableSystFit(bool disable_syst_fit_);
-    void SetSaveEventTree(bool save_event_tree_);
     void SetSaveFitParams(bool save_fit_params_);
     void SetApplyStatisticalFluctuationsOnSamples(bool apply_statistical_fluctuations_on_samples_);
     void SetSaveFitParamsFrequency(int save_fit_params_frequency_);
