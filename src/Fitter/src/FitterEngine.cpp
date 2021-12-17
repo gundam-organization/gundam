@@ -81,7 +81,7 @@ void FitterEngine::initialize() {
     }
   }
 
-  if( JsonUtils::fetchValue(_config_, "scaleParStepWithChi2Response", true) ){
+  if( JsonUtils::fetchValue(_config_, "scaleParStepWithChi2Response", false) ){
     _parStepGain_ = JsonUtils::fetchValue(_config_, "parStepGain", _parStepGain_);
     LogInfo << "Using parameter step scale: " << _parStepGain_ << std::endl;
     this->rescaleParametersStepSize();
@@ -471,9 +471,7 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
 void FitterEngine::fit(){
   LogWarning << __METHOD_NAME__ << std::endl;
 
-  LogWarning << "─────────────────────────────" << std::endl;
-  LogWarning << "Summary of the fit parameters" << std::endl;
-  LogWarning << "─────────────────────────────" << std::endl;
+  LogWarning << std::endl << GenericToolbox::addUpDownBars("Summary of the fit parameters:") << std::endl;
   int iFitPar = -1;
   for( const auto& parSet : _propagator_.getParameterSetsList() ){
     if( not parSet.isUseEigenDecompInFit() ){
@@ -516,17 +514,19 @@ void FitterEngine::fit(){
   _propagator_.allowRfPropagation(); // if RF are setup -> a lot faster
   updateChi2Cache();
 
-  LogWarning << "───────────────────" << std::endl;
-  LogWarning << "Calling minimize..." << std::endl;
-  LogWarning << "───────────────────" << std::endl;
+  LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling minimize...") << std::endl;
   LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
           << "Number of free parameters   : " << _minimizer_->NFree() << std::endl
           << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree()
           << std::endl;
-  LogInfo << "Fit call offset: " << _nbFitCalls_ << std::endl;
-  _fitUnderGoing_ = true;
+
+  int nbFitCallOffset = _nbFitCalls_;
+  LogInfo << "Fit call offset: " << nbFitCallOffset << std::endl;
+  _enableFitMonitor_ = true;
   _fitHasConverged_ = _minimizer_->Minimize();
-  int nbMinimizeCalls = _nbFitCalls_;
+  _enableFitMonitor_ = false;
+  int nbMinimizeCalls = _nbFitCalls_ - nbFitCallOffset;
+
   LogInfo << _convergenceMonitor_.generateMonitorString(); // lasting printout
   LogInfo << "Minimization ended after " << nbMinimizeCalls << " calls." << std::endl;
   if(_minimizerAlgo_ == "Migrad") LogWarning << "Status code: " << minuitStatusCodeStr.at(_minimizer_->Status()) << std::endl;
@@ -540,16 +540,25 @@ void FitterEngine::fit(){
 
   if( _fitHasConverged_ ){
     LogInfo << "Fit converged!" << std::endl;
+    LogInfo << _convergenceMonitor_.generateMonitorString(); // lasting printout
+  }
+  else{
+    LogError << "Did not converged." << std::endl;
+    LogError << _convergenceMonitor_.generateMonitorString(); // lasting printout
+  }
 
-    if( _enablePostFitScan_ ){
-      _fitUnderGoing_ = false;
-      LogInfo << "Scanning parameters around the minimum point..." << std::endl;
-      this->scanParameters(-1, "postFit/scan");
-      _fitUnderGoing_ = true;
-    }
+  LogInfo << "Writing " << _minimizerType_ << "/" << _minimizerAlgo_ << " post-fit errors" << std::endl;
+  this->writePostFitData(GenericToolbox::mkdirTFile(_saveDir_, "postFit/" + _minimizerAlgo_));
 
+  if( _enablePostFitScan_ ){
+    LogInfo << "Scanning parameters around the minimum point..." << std::endl;
+    this->scanParameters(-1, "postFit/scan");
+  }
+
+  if( _fitHasConverged_ ){
     LogInfo << "Evaluating post-fit errors..." << std::endl;
 
+    _enableFitMonitor_ = true;
     if( JsonUtils::fetchValue(_minimizerConfig_, "enablePostFitErrorFit", true) ){
       std::string errorAlgo = JsonUtils::fetchValue(_minimizerConfig_, "errors", "Hesse");
       if     ( errorAlgo == "Minos" ){
@@ -583,9 +592,7 @@ void FitterEngine::fit(){
 
         }
 
-        LogWarning << "────────────────" << std::endl;
-        LogWarning << "Calling MINOS..." << std::endl;
-        LogWarning << "────────────────" << std::endl;
+        LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling MINOS...") << std::endl;
 
         double errLow, errHigh;
         _minimizer_->SetPrintLevel(0);
@@ -659,17 +666,41 @@ void FitterEngine::fit(){
         updateChi2Cache();
       } // Minos
       else if( errorAlgo == "Hesse" ){
-        LogWarning << "────────────────" << std::endl;
-        LogWarning << "Calling HESSE..." << std::endl;
-        LogWarning << "────────────────" << std::endl;
+
+        if( JsonUtils::fetchValue(_config_, "restoreStepSizeBeforeHesse", false) ){
+          LogWarning << "Restoring step size before HESSE..." << std::endl;
+          int iPar = -1;
+          for( auto& parSet : _propagator_.getParameterSetsList() ){
+
+            if( not parSet.isUseEigenDecompInFit() ){
+              for( auto& par : parSet.getParameterList()  ){
+                iPar++;
+                if(not _useNormalizedFitSpace_){ _minimizer_->SetVariableStepSize(iPar, par.getStepSize()); }
+                else{ _minimizer_->SetVariableStepSize(iPar, FitParameterSet::toNormalizedParRange(par.getStepSize(), par)); } // should be 1
+              } // par
+            }
+            else{
+              for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
+                iPar++;
+                if(not _useNormalizedFitSpace_){ _minimizer_->SetVariableStepSize(iPar, parSet.getEigenParStepSize(iEigen)); }
+                else{ _minimizer_->SetVariableStepSize(iPar, parSet.toNormalizedEigenParRange(parSet.getEigenParStepSize(iEigen), iEigen)); } // should be 1
+              }
+            }
+
+          } // parSet
+        }
+
+        LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling HESSE...") << std::endl;
         LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
                 << "Number of free parameters   : " << _minimizer_->NFree() << std::endl
                 << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree()
                 << std::endl;
-        LogInfo << "Fit call offset: " << _nbFitCalls_ << std::endl;
+
+        nbFitCallOffset = _nbFitCalls_;
+        LogInfo << "Fit call offset: " << nbFitCallOffset << std::endl;
 
         _fitHasConverged_ = _minimizer_->Hesse();
-        LogInfo << "Hesse ended after " << _nbFitCalls_ - nbMinimizeCalls << " calls." << std::endl;
+        LogInfo << "Hesse ended after " << _nbFitCalls_ - nbFitCallOffset << " calls." << std::endl;
         LogWarning << "HESSE status code: " << hesseStatusCodeStr.at(_minimizer_->Status()) << std::endl;
         LogWarning << "Covariance matrix status code: " << covMatrixStatusCodeStr.at(_minimizer_->CovMatrixStatus()) << std::endl;
 
@@ -677,28 +708,26 @@ void FitterEngine::fit(){
 
         if(not _fitHasConverged_){
           LogError  << "Hesse did not converge." << std::endl;
+          LogError << _convergenceMonitor_.generateMonitorString(); // lasting printout
         }
         else{
           LogInfo << "Hesse converged." << std::endl;
+          LogInfo << _convergenceMonitor_.generateMonitorString(); // lasting printout
         }
 
+        LogInfo << "Writing HESSE post-fit errors" << std::endl;
+        this->writePostFitData(GenericToolbox::mkdirTFile(_saveDir_, "postFit/Hesse"));
       }
       else{
         LogError << GET_VAR_NAME_VALUE(errorAlgo) << " not implemented." << std::endl;
       }
     }
-
-    LogWarning << _convergenceMonitor_.generateMonitorString(); // lasting printout
-  }
-  else{
-    LogError << "Did not converged." << std::endl;
-    LogError << _convergenceMonitor_.generateMonitorString(); // lasting printout
+    _enableFitMonitor_ = false;
   }
 
   _propagator_.preventRfPropagation(); // since we need the weight of each event
   _propagator_.propagateParametersOnSamples();
 
-  _fitUnderGoing_ = false;
   _fitIsDone_ = true;
 }
 void FitterEngine::updateChi2Cache(){
@@ -766,7 +795,7 @@ double FitterEngine::evalFit(const double* parArray_){
 
   _evalFitAvgTimer_.counts++; _evalFitAvgTimer_.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 
-  if( _convergenceMonitor_.isGenerateMonitorStringOk() and _fitUnderGoing_ ){
+  if(_convergenceMonitor_.isGenerateMonitorStringOk() and _enableFitMonitor_ ){
 
     if( _itSpeed_.counts != 0 ){
       _itSpeed_.counts = _nbFitCalls_ - _itSpeed_.counts; // how many cycles since last print
@@ -816,22 +845,15 @@ double FitterEngine::evalFit(const double* parArray_){
   return _chi2Buffer_;
 }
 
-void FitterEngine::writePostFitData() {
+void FitterEngine::writePostFitData(TDirectory* saveDir_) {
   LogInfo << __METHOD_NAME__ << std::endl;
 
-  LogThrowIf(not _fitIsDone_, "Can't do " << __METHOD_NAME__ << " while fit has not been called.")
-
-  if( _saveDir_ == nullptr ){
-    LogError << "_saveDir_ not set, won't save post fit data." << std::endl;
-    return;
-  }
-
-  auto* postFitDir = GenericToolbox::mkdirTFile(_saveDir_, "postFit");
+  LogThrowIf(saveDir_==nullptr, "Save dir not specified")
 
   this->generateSamplePlots("postFit/samples");
 
   LogInfo << "Extracting post-fit covariance matrix" << std::endl;
-  auto* matricesDir = GenericToolbox::mkdirTFile(postFitDir, "matrices");
+  auto* matricesDir = GenericToolbox::mkdirTFile(saveDir_, "matrices");
 
   TMatrixDSym totalCovMatrix(int(_minimizer_->NDim()));
   _minimizer_->GetCovMatrix(totalCovMatrix.GetMatrixArray());
@@ -1025,7 +1047,7 @@ void FitterEngine::writePostFitData() {
 
 
   LogInfo << "Fitter covariance matrix is " << totalCovMatrix.GetNrows() << "x" << totalCovMatrix.GetNcols() << std::endl;
-  auto* errorDir = GenericToolbox::mkdirTFile(postFitDir, "errors");
+  auto* errorDir = GenericToolbox::mkdirTFile(saveDir_, "errors");
 
   int parameterIndexOffset = 0;
   for( const auto& parSet : _propagator_.getParameterSetsList() ){
@@ -1336,10 +1358,7 @@ void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
   _minimizerType_ = JsonUtils::fetchValue(_minimizerConfig_, "minimizer", "Minuit2");
   _minimizerAlgo_ = JsonUtils::fetchValue(_minimizerConfig_, "algorithm", "");
 
-  _useNormalizedFitSpace_ = JsonUtils::fetchValue(_minimizerConfig_, "useNormalizedFitSpace", false);
-  if(_useNormalizedFitSpace_){
-    LogAlert << "_useNormalizedFitSpace_ is ENABLED" << std::endl;
-  }
+  _useNormalizedFitSpace_ = JsonUtils::fetchValue(_minimizerConfig_, "useNormalizedFitSpace", true);
 
   _minimizer_ = std::shared_ptr<ROOT::Math::Minimizer>(
       ROOT::Math::Factory::CreateMinimizer(_minimizerType_, _minimizerAlgo_)

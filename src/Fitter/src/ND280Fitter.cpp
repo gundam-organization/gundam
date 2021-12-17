@@ -68,7 +68,6 @@ void ND280Fitter::reset(){
   _outputTDirectory_ = nullptr; // not handle by this class
 
   _saveFitParameters_                         = false;
-  _saveEventTree_                             = true;
   _disableChi2Pulls_                          = false;
   _apply_statistical_fluctuations_on_samples_ = false;
 
@@ -118,8 +117,6 @@ void ND280Fitter::SetMinimizationSettings(const MinSettings& minimization_settin
 }
 void ND280Fitter::SetDisableSystFit(bool disable_syst_fit_) {
   _disableChi2Pulls_ = disable_syst_fit_;
-}
-void ND280Fitter::SetSaveEventTree(bool save_event_tree_){ _saveEventTree_ = save_event_tree_;
 }
 void ND280Fitter::SetSaveFitParams(bool save_fit_params_){
   _saveFitParameters_ = save_fit_params_;

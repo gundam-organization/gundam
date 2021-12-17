@@ -26,11 +26,10 @@ void GundamGreetings::setAppName(const std::string &appName) {
 void GundamGreetings::hello() {
   std::stringstream ss;
   ss << "Welcome to the "
-  << (_appName_.empty()? GenericToolbox::getExecutableName(): _appName_)
-  << " v" + getVersionStr();
-  LogInfo << GenericToolbox::repeatString("─", int(ss.str().size())) << std::endl;
-  LogInfo << ss.str() << std::endl;
-  LogInfo << GenericToolbox::repeatString("─", int(ss.str().size())) << std::endl << std::endl;
+     << (_appName_.empty() ? GenericToolbox::getExecutableName() : _appName_)
+     << " v" + getVersionStr();
+
+  LogInfo << GenericToolbox::addUpDownBars(ss.str()) << std::endl;
 }
 
 void GundamGreetings::goodbye() {

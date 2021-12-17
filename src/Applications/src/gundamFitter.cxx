@@ -124,7 +124,6 @@ int main(int argc, char** argv){
   // --------------------------
   if( not isDryRun and JsonUtils::fetchValue(jsonConfig, "fit", true) ){
     fitter.fit();
-    if( fitter.isFitHasConverged() ) fitter.writePostFitData();
   }
 
   LogWarning << "Closing output file \"" << out->GetName() << "\"..." << std::endl;
