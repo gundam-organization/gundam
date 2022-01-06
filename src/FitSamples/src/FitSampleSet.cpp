@@ -58,7 +58,11 @@ void FitSampleSet::initialize() {
 
   LogInfo << "Reading samples definition..." << std::endl;
   auto fitSampleListConfig = JsonUtils::fetchValue(_config_, "fitSampleList", nlohmann::json());
+  bool _isEnabled_{false};
+  
   for( const auto& fitSampleConfig: fitSampleListConfig ){
+    _isEnabled_ = JsonUtils::fetchValue(fitSampleConfig, "isEnabled", true);
+    if( not _isEnabled_ ) continue;
     _fitSampleList_.emplace_back();
     _fitSampleList_.back().setConfig(fitSampleConfig);
     _fitSampleList_.back().initialize();
