@@ -76,6 +76,7 @@ public:
   bool isUseEigenDecompInFit() const;
   int getNbEnabledEigenParameters() const;
   double getEigenParameterValue(int iPar_) const;
+  double getEigenValue(int iPar_) const;
   double getEigenSigma(int iPar_) const;
   const TMatrixD* getInvertedEigenVectors() const;
   const TMatrixD* getEigenVectors() const;
@@ -84,6 +85,16 @@ public:
 
   // Misc
   std::string getSummary() const;
+
+  static double toNormalizedParRange(double parRange, const FitParameter& par);
+  static double toNormalizedParValue(double parValue, const FitParameter& par);
+  static double toRealParValue(double normParValue, const FitParameter& par);
+  static double toRealParRange(double normParRange, const FitParameter& par);
+
+  double toNormalizedEigenParRange(double parRange, int parIndex) const;
+  double toNormalizedEigenParValue(double parValue, int parIndex) const;
+  double toRealEigenParValue(double normParValue, int parIndex) const;
+  double toRealEigenParRange(double normParRange, int parIndex) const;
 
 protected:
   void passIfInitialized(const std::string& methodName_) const;
@@ -103,6 +114,7 @@ private:
   std::string _name_;
   bool _isEnabled_{};
   bool _throwMcBeforeFit_{true};
+  int _maxNbEigenParameters_{-1};
   double _maxEigenFraction_{1};
 
   // Input file:

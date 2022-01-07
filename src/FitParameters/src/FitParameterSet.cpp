@@ -256,13 +256,13 @@ double FitParameterSet::getChi2() const {
   double chi2 = 0;
 
   // EIGEN DECOMP NOT VALID?? Why?
-//  if( _useEigenDecompInFit_ ){
-//    for( int iEigen = 0 ; iEigen < _nbEnabledEigen_ ; iEigen++ ){
-//      if( _eigenParFixedList_[iEigen] ) continue;
-//      chi2 += TMath::Sq((*_eigenParValues_)[iEigen] - (*_eigenParPriorValues_)[iEigen]) / (*_eigenValues_)[iEigen];
-//    }
-//  }
-//  else
+  if( _useEigenDecompInFit_ ){
+    for( int iEigen = 0 ; iEigen < _nbEnabledEigen_ ; iEigen++ ){
+      if( _eigenParFixedList_[iEigen] ) continue;
+      chi2 += TMath::Sq((*_eigenParValues_)[iEigen] - (*_eigenParPriorValues_)[iEigen]) / (*_eigenValues_)[iEigen];
+    }
+  }
+  else
   {
     double iDelta, jDelta;
     for (int iPar = 0; iPar < _inverseCovarianceMatrix_->GetNrows(); iPar++) {
@@ -351,6 +351,9 @@ int FitParameterSet::getNbEnabledEigenParameters() const {
 double FitParameterSet::getEigenParameterValue(int iPar_) const{
   return (*_eigenParValues_)[iPar_];
 }
+double FitParameterSet::getEigenValue(int iPar_) const{
+  return (*_eigenValues_)[iPar_];
+}
 double FitParameterSet::getEigenSigma(int iPar_) const{
   return TMath::Sqrt((*_eigenValues_)[iPar_]);
 }
@@ -381,14 +384,16 @@ const TMatrixD* FitParameterSet::getEigenVectors() const{
 }
 void FitParameterSet::propagateEigenToOriginal(){
   (*_originalParValues_) = (*_eigenParValues_);
-  (*_originalParValues_) *= (*_eigenVectorsInv_);
+//  (*_originalParValues_) *= (*_eigenVectorsInv_);
+  (*_originalParValues_) *= (*_eigenVectors_);
   for( int iOrig = 0 ; iOrig < _originalParValues_->GetNrows() ; iOrig++ ){
     _parameterList_.at(iOrig).setParameterValue((*_originalParValues_)[iOrig]);
   }
 }
 void FitParameterSet::propagateOriginalToEigen(){
   (*_eigenParValues_) = (*_originalParValues_);
-  (*_eigenParValues_) *= (*_eigenVectors_);
+//  (*_eigenParValues_) *= (*_eigenVectors_);
+  (*_eigenParValues_) *= (*_eigenVectorsInv_);
 }
 
 // Misc
@@ -407,6 +412,33 @@ std::string FitParameterSet::getSummary() const {
   }
 
   return ss.str();
+}
+
+double FitParameterSet::toNormalizedParRange(double parRange, const FitParameter& par){
+  return (parRange)/par.getStdDevValue();
+}
+double FitParameterSet::toNormalizedParValue(double parValue, const FitParameter& par) {
+  return FitParameterSet::toNormalizedParRange(parValue - par.getPriorValue(), par);
+}
+double FitParameterSet::toRealParRange(double normParRange, const FitParameter& par){
+  return normParRange*par.getStdDevValue();
+}
+double FitParameterSet::toRealParValue(double normParValue, const FitParameter& par) {
+  return normParValue*par.getStdDevValue() + par.getPriorValue();
+}
+
+
+double FitParameterSet::toNormalizedEigenParRange(double parRange, int parIndex) const{
+  return (parRange) / this->getEigenSigma(parIndex);
+}
+double FitParameterSet::toNormalizedEigenParValue(double parValue, int parIndex) const{
+  return this->toNormalizedEigenParRange(parValue - (*_eigenParPriorValues_)[parIndex], parIndex);
+}
+double FitParameterSet::toRealEigenParRange(double normParRange, int parIndex) const{
+  return normParRange * this->getEigenSigma(parIndex);
+}
+double FitParameterSet::toRealEigenParValue(double normParValue, int parIndex) const{
+  return normParValue*this->getEigenSigma(parIndex) + (*_eigenParPriorValues_)[parIndex];
 }
 
 
@@ -445,11 +477,18 @@ void FitParameterSet::readCovarianceMatrix(){
     );
 
   _useEigenDecompInFit_ = JsonUtils::fetchValue(_config_ , "useEigenDecompInFit", false);
-  _maxEigenFraction_ = JsonUtils::fetchValue(_config_ , "maxEigenFraction", double(1.));
-  if( _maxEigenFraction_ != 1 ){
-    LogInfo << "Max eigen fraction set to: " << _maxEigenFraction_*100 << "%" << std::endl;
-    _useEigenDecompInFit_ = true;
+  if( _useEigenDecompInFit_ ){
+    LogWarning << "Using eigen decomposition in fit." << std::endl;
+    _maxNbEigenParameters_ = JsonUtils::fetchValue(_config_ , "maxNbEigenParameters", -1);
+    if( _maxNbEigenParameters_ != -1 ){
+      LogInfo << "Maximum nb of eigen parameters is set to " << _maxNbEigenParameters_ << std::endl;
+    }
+    _maxEigenFraction_ = JsonUtils::fetchValue(_config_ , "maxEigenFraction", double(1.));
+    if( _maxEigenFraction_ != 1 ){
+      LogInfo << "Max eigen fraction set to: " << _maxEigenFraction_*100 << "%" << std::endl;
+    }
   }
+
 
   LogWarning << "Computing inverse of the covariance matrix: " << _covarianceMatrix_->GetNcols() << "x" << _covarianceMatrix_->GetNrows() << std::endl;
   if( not _useEigenDecompInFit_ ){
@@ -458,12 +497,9 @@ void FitParameterSet::readCovarianceMatrix(){
     _inverseCovarianceMatrix_->Invert();
   }
   else{
-    LogInfo << "Using eigen decomposition..." << std::endl;
+    LogInfo << "Decomposing covariance matrix..." << std::endl;
 
-    LogDebug << "Computing the eigen vectors / values..." << std::endl;
     _eigenDecomp_ = std::shared_ptr<TMatrixDSymEigen>(new TMatrixDSymEigen(*_covarianceMatrix_));
-    LogDebug << "Eigen decomposition done." << std::endl;
-
     _eigenValues_     = std::shared_ptr<TVectorD>( (TVectorD*) _eigenDecomp_->GetEigenValues().Clone() );
     _eigenValuesInv_  = std::shared_ptr<TVectorD>( (TVectorD*) _eigenDecomp_->GetEigenValues().Clone() );
     _eigenVectors_    = std::shared_ptr<TMatrixD>( (TMatrixD*) _eigenDecomp_->GetEigenVectors().Clone() );
@@ -485,7 +521,8 @@ void FitParameterSet::readCovarianceMatrix(){
       (*eigenState)[iEigen] = 1.;
 
       eigenCumulative += (*_eigenValues_)[iEigen];
-      if( _maxEigenFraction_ != 1 and eigenCumulative / eigenTotal > _maxEigenFraction_ ){
+      if(    ( _maxNbEigenParameters_ != -1 and iEigen >= _maxNbEigenParameters_ )
+          or ( _maxEigenFraction_ != 1      and eigenCumulative / eigenTotal > _maxEigenFraction_ ) ){
         eigenCumulative -= (*_eigenValues_)[iEigen]; // not included
         (*_eigenValues_)[iEigen] = 0;
         (*_eigenValuesInv_)[iEigen] = 0;

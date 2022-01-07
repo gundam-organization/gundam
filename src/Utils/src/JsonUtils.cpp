@@ -59,6 +59,22 @@ namespace JsonUtils{
       config_ = JsonUtils::readConfigFile(config_.get<std::string>());
     }
   }
+  void unfoldConfig(nlohmann::json& config_){
+    for( auto& entry : config_ ){
+      if( entry.is_string() and (
+             GenericToolbox::doesStringEndsWithSubstring(entry.get<std::string>(), ".yaml", true)
+          or GenericToolbox::doesStringEndsWithSubstring(entry.get<std::string>(), ".json", true)
+          ) ){
+        JsonUtils::forwardConfig(entry);
+        JsonUtils::unfoldConfig(config_); // remake the loop on the unfolder config
+        break; // don't touch anymore
+      }
+
+      if( entry.is_structured() ){
+        JsonUtils::unfoldConfig(entry);
+      }
+    }
+  }
 
   bool doKeyExist(const nlohmann::json& jsonConfig_, const std::string& keyName_){
     return jsonConfig_.find(keyName_) != jsonConfig_.end();

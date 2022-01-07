@@ -2,20 +2,19 @@
 // Created by Nadrino on 11/06/2021.
 //
 
+#include "Propagator.h"
+
+#include "FitParameterSet.h"
+#include "Dial.h"
+#include "JsonUtils.h"
+#include "GlobalVariables.h"
 #include <AnaTreeMC.hh>
-#include "vector"
 
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
 
-#include "JsonUtils.h"
-#include "Propagator.h"
-#include "GlobalVariables.h"
-#include "Dial.h"
-#include "FitParameterSet.h"
+#include <vector>
 
-#include "NormalizationDial.h"
-#include "SplineDial.h"
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[Propagator]");

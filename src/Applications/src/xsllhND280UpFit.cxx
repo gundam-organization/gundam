@@ -311,7 +311,6 @@ int main(int argc, char** argv)
 
     fitter.SetMinimizationSettings(options_parser.min_settings);
     fitter.SetDisableSystFit(options_parser.zero_syst);
-    fitter.SetSaveEventTree(options_parser.save_events);
 
     xsec_parameters.SetEnableZeroWeightFenceGate(true);
     fitter.initialize();

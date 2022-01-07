@@ -5,19 +5,21 @@
 #ifndef GUNDAM_FITTERENGINE_H
 #define GUNDAM_FITTERENGINE_H
 
-#include "string"
-#include "vector"
-#include "memory"
+
+#include "Propagator.h"
+
+#include "GenericToolbox.VariablesMonitor.h"
+#include "GenericToolbox.CycleTimer.h"
 
 #include "TDirectory.h"
 #include "Math/Functor.h"
 #include "Math/Minimizer.h"
 #include "json.hpp"
 
-#include "GenericToolbox.VariablesMonitor.h"
-#include "GenericToolbox.CycleTimer.h"
+#include "string"
+#include "vector"
+#include "memory"
 
-#include "Propagator.h"
 
 class FitterEngine {
 
@@ -55,7 +57,7 @@ public:
   void updateChi2Cache();
   double evalFit(const double* parArray_);
 
-  void writePostFitData();
+  void writePostFitData(TDirectory* saveDir_);
 
   // utils
   double fetchCurrentParameterValue(int iFitPar_); // minuit don't have such a getter
@@ -75,11 +77,13 @@ private:
   nlohmann::json _minimizerConfig_{};
   int _nbScanSteps_{100};
   bool _enablePostFitScan_{false};
+  bool _useNormalizedFitSpace_{false};
 
   // Internals
   bool _fitIsDone_{false};
-  bool _fitUnderGoing_{false};
+  bool _enableFitMonitor_{false};
   bool _fitHasConverged_{false};
+  bool _isBadCovMat_{false};
 
   int _nbFitCalls_{0};
   int _nbFitParameters_{0};

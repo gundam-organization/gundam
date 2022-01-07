@@ -575,6 +575,7 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
                         eventPtr->getRawDialPtrList()[eventDialOffset++] = spDialPtr;
 
                       }
+                      
                       else if ( dialSetPtr->getGlobalDialType() == DialType::Graph ){
                         grDialPtr = (GraphDial*) dialSetPtr->getDialList()[iEntry].get();
                         grDialPtr->setGraph(*grPtr);
@@ -583,9 +584,10 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
                         // Adding dial in the event
                         eventPtr->getRawDialPtrList()[eventDialOffset++] = grDialPtr;
                       }
+
                       else{
-                        LogThrow("Unsupported event-by-event dial: " << DialType::DialTypeEnumNamespace::toString(dialSetPtr->getGlobalDialType()))
-                      }
+                          LogThrow("Unsupported event-by-event dial: " << DialType::DialTypeEnumNamespace::toString(dialSetPtr->getGlobalDialType()))
+                        }
                     }
                     else{
                       LogThrow("Unsupported event-by-event dial type: " << threadChain->GetLeaf(dialSetPtr->getDialLeafName().c_str())->GetTypeName() )

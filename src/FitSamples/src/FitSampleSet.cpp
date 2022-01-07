@@ -117,7 +117,6 @@ void FitSampleSet::initialize() {
     LogThrow("Unknown LLH Method: " << llhMethod)
   }
 
-
   _isInitialized_ = true;
 }
 
