@@ -313,11 +313,11 @@ bool DialSet::initializeDialsWithDefinition() {
         std::vector<Int_t> splitVarValueList(splitVarNameList.size(), 0);
         std::vector<std::pair<int, int>> splitVarBoundariesList(splitVarNameList.size(), std::pair<int, int>());
         std::vector<std::vector<int>> splitVarValuesList(splitVarNameList.size(), std::vector<int>());
-        dialsTTree->SetBranchAddress("kinematicBin", &kinematicBin);
+        dialsTTree->SetBranchAddress("kinematicBin", &kinematicBin); 
         if( dialsType == DialType::Spline ) dialsTTree->SetBranchAddress("spline", &splinePtr);
         if( dialsType == DialType::Graph ) dialsTTree->SetBranchAddress("graph", &graphPtr);
         for( size_t iSplitVar = 0 ; iSplitVar < splitVarNameList.size() ; iSplitVar++ ){
-          dialsTTree->SetBranchAddress(splitVarNameList[iSplitVar].c_str(), &splitVarValueList[iSplitVar]);
+          dialsTTree->SetBranchAddress(splitVarNameList[iSplitVar].c_str(), &splitVarValueList[iSplitVar]); 
         }
         
         Long64_t nSplines = dialsTTree->GetEntries();
@@ -348,8 +348,8 @@ bool DialSet::initializeDialsWithDefinition() {
           else if( dialsType == DialType::Graph ){
             // TODO
           }
-          dialsTFile->Close();
         } // iSpline (in TTree)
+        dialsTFile->Close();
       } // Splines in TTree
       else{
         LogError << "Neither dialsTreePath nor dialsList are provided..." << std::endl;
