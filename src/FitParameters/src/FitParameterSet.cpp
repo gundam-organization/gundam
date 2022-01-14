@@ -267,9 +267,12 @@ double FitParameterSet::getChi2() const {
     double iDelta, jDelta;
     for (int iPar = 0; iPar < _inverseCovarianceMatrix_->GetNrows(); iPar++) {
       if( not _parameterList_[iPar].isEnabled() ) continue;
+      if( _parameterList_[iPar].getPriorType() == PriorType::Flat ) continue; // No penalty term for parameters with a flat prior
+
       iDelta = (_parameterList_[iPar].getParameterValue() - _parameterList_[iPar].getPriorValue());
       for (int jPar = 0; jPar < _inverseCovarianceMatrix_->GetNrows(); jPar++) {
         if( not _parameterList_[jPar].isEnabled() ) continue;
+        if( _parameterList_[jPar].getPriorType() == PriorType::Flat ) continue; // No penalty term for parameters with a flat prior
         jDelta = iDelta;
         jDelta *= (_parameterList_[jPar].getParameterValue() - _parameterList_[jPar].getPriorValue());
         jDelta *= (*_inverseCovarianceMatrix_)(iPar, jPar);

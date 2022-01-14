@@ -12,6 +12,17 @@
 
 #include "DialSet.h"
 
+namespace PriorType{
+  ENUM_EXPANDER(
+    PriorType, -1,
+    Gaussian,
+    Flat
+  );
+
+  PriorType toPriorType(const std::string& priorStr_);
+}
+
+
 class FitParameter {
 
 public:
@@ -40,6 +51,7 @@ public:
   // Getters
   bool isEnabled() const;
   bool isFixed() const;
+  PriorType::PriorType getPriorType() const;
   int getParameterIndex() const;
   const std::string &getName() const;
   double getParameterValue() const;
@@ -78,6 +90,9 @@ private:
 
   // Internals
   std::vector<DialSet> _dialSetList_; // one dial set per detector
+  
+  PriorType::PriorType _priorType_{PriorType::Gaussian};
+
 
 };
 
