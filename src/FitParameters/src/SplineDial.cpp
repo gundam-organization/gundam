@@ -67,7 +67,6 @@ void SplineDial::fillResponseCache() {
 //      fastEval();
 //    }
   }
-  _minimumSplineResponse_ = 0; // FOR DEBUG
   // Checks
   if( _minimumSplineResponse_ == _minimumSplineResponse_ and _dialResponseCache_ < _minimumSplineResponse_ ){
     _dialResponseCache_ = _minimumSplineResponse_;
