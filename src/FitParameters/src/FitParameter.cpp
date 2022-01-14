@@ -13,6 +13,16 @@ LoggerInit([](){
   Logger::setUserHeaderStr("[FitParameter]");
 } )
 
+PriorType::PriorType PriorType::toPriorType(const std::string& priorStr_){
+  int enumIndex = PriorTypeEnumNamespace::toEnumInt("PriorType::" + priorStr_);
+  if( enumIndex == PriorTypeEnumNamespace::enumOffSet - 1 ){
+    LogError << "\"" << priorStr_ << "\" unrecognized  prior type. " << std::endl;
+    LogError << "Expecting: { " << PriorTypeEnumNamespace::enumNamesAgregate << " }" << std::endl;
+    throw std::runtime_error("Unrecognized  prior type.");
+  }
+  return static_cast<PriorType>(enumIndex);
+}
+  
 FitParameter::FitParameter() {
   this->reset();
 }
@@ -31,6 +41,7 @@ void FitParameter::reset() {
   _isEnabled_ = true;
   _isFixed_ = false;
   _parSetRef_ = nullptr;
+  _priorType_ = PriorType::Gaussian;
 }
 
 void FitParameter::setIsFixed(bool isFixed) {
@@ -99,6 +110,12 @@ void FitParameter::initialize() {
       return;
     }
 
+    std::string priorTypeStr = JsonUtils::fetchValue<std::string>(_parameterConfig_, "priorType", "");
+    if( not priorTypeStr.empty() ){
+      _priorType_ = PriorType::toPriorType(priorTypeStr);
+     LogWarning << getTitle() << " will use a prior type: " << priorTypeStr << std::endl; 
+    }
+    
     if( JsonUtils::doKeyExist(_parameterConfig_, "priorValue") ){
       _priorValue_ = JsonUtils::fetchValue(_parameterConfig_, "priorValue", _priorValue_);
       LogWarning << this->getTitle() << ": prior value override -> " << _priorValue_ << std::endl;
@@ -154,6 +171,9 @@ double FitParameter::getStdDevValue() const {
 }
 double FitParameter::getPriorValue() const {
   return _priorValue_;
+}
+PriorType::PriorType FitParameter::getPriorType() const {
+  return _priorType_;
 }
 std::vector<DialSet> &FitParameter::getDialSetList() {
   return _dialSetList_;
