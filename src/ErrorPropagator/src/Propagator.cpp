@@ -240,6 +240,9 @@ FitSampleSet &Propagator::getFitSampleSet() {
 std::vector<FitParameterSet> &Propagator::getParameterSetsList() {
   return _parameterSetsList_;
 }
+std::vector<FitParameterSet> &Propagator::getParameterSetsList() const {
+  return _parameterSetsList_;
+}
 PlotGenerator &Propagator::getPlotGenerator() {
   return _plotGenerator_;
 }

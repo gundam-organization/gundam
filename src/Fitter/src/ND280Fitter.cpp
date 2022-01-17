@@ -1007,8 +1007,6 @@ void ND280Fitter::WriteSamplePlots(TDirectory* outputDir_) {
     tempHistMap[histNameBuffer]->SetTitle("Data");
 
     // Build the histograms binning (D1)
-    // TODO: check if a simple binning can be applied
-    bool isSimpleBinning = true;
     std::vector<double> D1binning;
     auto bins = anaSample->GetBinEdges();
     for(const auto& bin : bins){
