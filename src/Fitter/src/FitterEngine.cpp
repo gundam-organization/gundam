@@ -47,10 +47,7 @@ void FitterEngine::setSaveDir(TDirectory *saveDir) {
 }
 void FitterEngine::setConfig(const nlohmann::json &config_) {
   _config_ = config_;
-  while( _config_.is_string() ){
-    LogWarning << "Forwarding " << __CLASS_NAME__ << " config: \"" << _config_.get<std::string>() << "\"" << std::endl;
-    _config_ = JsonUtils::readConfigFile(_config_.get<std::string>());
-  }
+  JsonUtils::forwardConfig(_config_);
 }
 void FitterEngine::setNbScanSteps(int nbScanSteps) {
   LogThrowIf(nbScanSteps < 0, "Can't provide negative value for _nbScanSteps_")
@@ -184,7 +181,7 @@ double FitterEngine::getChi2Buffer() const {
 double FitterEngine::getChi2StatBuffer() const {
   return _chi2StatBuffer_;
 }
-const Propagator &FitterEngine::getPropagator() const {
+const Propagator FitterEngine::getPropagator() const {
   return _propagator_;
 }
 
@@ -354,8 +351,9 @@ void FitterEngine::fixGhostFitParameters(){
         deltaChi2Stat = _chi2StatBuffer_ - baseChi2Stat;
         deltaChi2Syst = _chi2PullsBuffer_ - baseChi2Syst;
         deltaChi2 = _chi2Buffer_ - baseChi2;
-        ssPrint << ": Δχ²(stat) = " << deltaChi2Stat << " / Δχ²(syst) = " << deltaChi2Syst;
-        ssPrint << ": Δχ² = " << deltaChi2;
+        ssPrint << ": Δχ²(stat) = " << deltaChi2Stat;
+//        ssPrint << " / Δχ²(syst) = " << deltaChi2Syst;
+//        ssPrint << ": Δχ² = " << deltaChi2;
 
         LogInfo.moveTerminalCursorBack(1);
         LogInfo << ssPrint.str() << std::endl;
@@ -391,8 +389,9 @@ void FitterEngine::fixGhostFitParameters(){
           deltaChi2Stat = _chi2StatBuffer_ - baseChi2Stat;
           deltaChi2Syst = _chi2PullsBuffer_ - baseChi2Syst;
           deltaChi2 = _chi2Buffer_ - baseChi2;
-          ssPrint << ": Δχ²(stat) = " << deltaChi2Stat << " / Δχ²(syst) = " << deltaChi2Syst;
-          ssPrint << ": Δχ² = " << deltaChi2;
+          ssPrint << ": Δχ²(stat) = " << deltaChi2Stat;
+//          ssPrint << " / Δχ²(syst) = " << deltaChi2Syst;
+//          ssPrint << ": Δχ² = " << deltaChi2;
 
           LogInfo.moveTerminalCursorBack(1);
           LogInfo << ssPrint.str() << std::endl;
@@ -1353,7 +1352,7 @@ void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
   LogInfo << __METHOD_NAME__ << std::endl;
 
   _minimizerConfig_ = JsonUtils::fetchValue(_config_, "minimizerConfig", nlohmann::json());
-  if( _minimizerConfig_.is_string() ){ _minimizerConfig_ = JsonUtils::readConfigFile(_minimizerConfig_.get<std::string>()); }
+  JsonUtils::forwardConfig(_minimizerConfig_);
 
   _minimizerType_ = JsonUtils::fetchValue(_minimizerConfig_, "minimizer", "Minuit2");
   _minimizerAlgo_ = JsonUtils::fetchValue(_minimizerConfig_, "algorithm", "");

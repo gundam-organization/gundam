@@ -197,7 +197,7 @@ void FitParameterSet::initialize() {
 
 
   if( _useEigenDecompInFit_ ){
-    LogDebug << "Initializing eigen objects..." << std::endl;
+    LogWarning << "Initializing eigen objects..." << std::endl;
     _originalParValues_ = std::shared_ptr<TVectorD>(new TVectorD(_parameterPriorList_->GetNrows()));
     for( int iPar = 0 ; iPar < _parameterPriorList_->GetNrows() ; iPar++ ){
       (*_originalParValues_)[iPar] = _parameterList_.at(iPar).getParameterValue();
@@ -502,7 +502,7 @@ void FitParameterSet::readCovarianceMatrix(){
   else{
     LogInfo << "Decomposing covariance matrix..." << std::endl;
 
-    _eigenDecomp_ = std::shared_ptr<TMatrixDSymEigen>(new TMatrixDSymEigen(*_covarianceMatrix_));
+    _eigenDecomp_     = std::shared_ptr<TMatrixDSymEigen>(new TMatrixDSymEigen(*_covarianceMatrix_));
     _eigenValues_     = std::shared_ptr<TVectorD>( (TVectorD*) _eigenDecomp_->GetEigenValues().Clone() );
     _eigenValuesInv_  = std::shared_ptr<TVectorD>( (TVectorD*) _eigenDecomp_->GetEigenValues().Clone() );
     _eigenVectors_    = std::shared_ptr<TMatrixD>( (TMatrixD*) _eigenDecomp_->GetEigenVectors().Clone() );

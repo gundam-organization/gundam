@@ -129,6 +129,7 @@ private:
   double _globalParameterMaxValue_{std::nan("UNSET")};
 
   // Eigen objects
+  std::vector<FitParameter> _eigenParameterList_;
   int _nbEnabledEigen_{0};
   bool _useEigenDecompInFit_{false};
   bool _useOnlyOneParameterPerEvent_{false};

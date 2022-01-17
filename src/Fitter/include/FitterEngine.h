@@ -7,6 +7,7 @@
 
 
 #include "Propagator.h"
+//#include "MinimizerInterface.h"
 
 #include "GenericToolbox.VariablesMonitor.h"
 #include "GenericToolbox.CycleTimer.h"
@@ -43,7 +44,7 @@ public:
   bool isFitHasConverged() const;
   double getChi2Buffer() const;
   double getChi2StatBuffer() const;
-  const Propagator &getPropagator() const;
+  const Propagator getPropagator() const;
 
   // Core
   void generateSamplePlots(const std::string& savePath_ = "");
@@ -88,7 +89,10 @@ private:
   int _nbFitCalls_{0};
   int _nbFitParameters_{0};
   int _nbParameters_{0};
+
   Propagator _propagator_{};
+//  MinimizerInterface _minimizerInterface_{};
+
   std::string _minimizerType_{};
   std::string _minimizerAlgo_{};
   std::shared_ptr<ROOT::Math::Minimizer> _minimizer_{nullptr};

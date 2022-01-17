@@ -2,11 +2,13 @@ set(SRCFILES
         src/ND280Fitter.cpp
         src/XsecFitter.cc
         src/FitterEngine.cpp
+#        src/MinimizerInterface.cpp
         )
 set(HEADERS
         include/ND280Fitter.h
         include/XsecFitter.hh
         include/FitterEngine.h
+#        include/MinimizerInterface.h
         )
 if( USE_STATIC_LINKS STREQUAL "1" )
   add_library(GundamFitter STATIC ${SRCFILES})

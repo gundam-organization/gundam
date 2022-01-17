@@ -42,6 +42,7 @@ public:
   bool isUseResponseFunctions() const;
   FitSampleSet &getFitSampleSet();
   std::vector<FitParameterSet> &getParameterSetsList();
+  const std::vector<FitParameterSet> &getParameterSetsList() const;
   PlotGenerator &getPlotGenerator();
   const json &getConfig() const;
   const EventTreeWriter &getTreeWriter() const;
