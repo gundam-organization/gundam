@@ -22,7 +22,7 @@ PriorType::PriorType PriorType::toPriorType(const std::string& priorStr_){
   }
   return static_cast<PriorType>(enumIndex);
 }
-  
+
 FitParameter::FitParameter() {
   this->reset();
 }

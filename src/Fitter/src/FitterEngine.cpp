@@ -351,8 +351,9 @@ void FitterEngine::fixGhostFitParameters(){
         deltaChi2Stat = _chi2StatBuffer_ - baseChi2Stat;
         deltaChi2Syst = _chi2PullsBuffer_ - baseChi2Syst;
         deltaChi2 = _chi2Buffer_ - baseChi2;
-        ssPrint << ": Δχ²(stat) = " << deltaChi2Stat << " / Δχ²(syst) = " << deltaChi2Syst;
-        ssPrint << ": Δχ² = " << deltaChi2;
+        ssPrint << ": Δχ²(stat) = " << deltaChi2Stat;
+//        ssPrint << " / Δχ²(syst) = " << deltaChi2Syst;
+//        ssPrint << ": Δχ² = " << deltaChi2;
 
         LogInfo.moveTerminalCursorBack(1);
         LogInfo << ssPrint.str() << std::endl;
@@ -388,8 +389,9 @@ void FitterEngine::fixGhostFitParameters(){
           deltaChi2Stat = _chi2StatBuffer_ - baseChi2Stat;
           deltaChi2Syst = _chi2PullsBuffer_ - baseChi2Syst;
           deltaChi2 = _chi2Buffer_ - baseChi2;
-          ssPrint << ": Δχ²(stat) = " << deltaChi2Stat << " / Δχ²(syst) = " << deltaChi2Syst;
-          ssPrint << ": Δχ² = " << deltaChi2;
+          ssPrint << ": Δχ²(stat) = " << deltaChi2Stat;
+//          ssPrint << " / Δχ²(syst) = " << deltaChi2Syst;
+//          ssPrint << ": Δχ² = " << deltaChi2;
 
           LogInfo.moveTerminalCursorBack(1);
           LogInfo << ssPrint.str() << std::endl;

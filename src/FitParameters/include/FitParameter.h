@@ -15,6 +15,7 @@
 namespace PriorType{
   ENUM_EXPANDER(
     PriorType, -1,
+    Unset,
     Gaussian,
     Flat
   );
