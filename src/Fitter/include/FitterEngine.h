@@ -7,7 +7,7 @@
 
 
 #include "Propagator.h"
-#include "MinimizerInterface.h"
+//#include "MinimizerInterface.h"
 
 #include "GenericToolbox.VariablesMonitor.h"
 #include "GenericToolbox.CycleTimer.h"
@@ -91,7 +91,7 @@ private:
   int _nbParameters_{0};
 
   Propagator _propagator_{};
-  MinimizerInterface _minimizerInterface_{};
+//  MinimizerInterface _minimizerInterface_{};
 
   std::string _minimizerType_{};
   std::string _minimizerAlgo_{};

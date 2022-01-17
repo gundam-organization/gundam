@@ -134,7 +134,7 @@ void MinimizerInterface::defineFitParameters(){
         }
 
 
-        if( not doReleaseFixed_ or not JsonUtils::fetchValue(parSet.getConfig(), "releaseFixedParametersOnHesse", true) ){
+        if( not JsonUtils::fetchValue(parSet.getConfig(), "releaseFixedParametersOnHesse", true) ){
           if( not par.isEnabled() or par.isFixed() ) _minimizer_->FixVariable(iPar);
         }
       } // par
@@ -155,7 +155,7 @@ void MinimizerInterface::defineFitParameters(){
           );
         }
 
-        if( not doReleaseFixed_ or not JsonUtils::fetchValue(parSet.getConfig(), "releaseFixedParametersOnHesse", true) ){
+        if( not JsonUtils::fetchValue(parSet.getConfig(), "releaseFixedParametersOnHesse", true) ){
           if( parSet.isEigenParFixed(iEigen) ) {
             _minimizer_->FixVariable(iPar);
           }

@@ -1026,7 +1026,7 @@ void ND280Fitter::WriteSamplePlots(TDirectory* outputDir_) {
 
     // Build the histograms binning (D2)
     // TODO: check if a simple binning can be applied
-    isSimpleBinning = true;
+    bool isSimpleBinning = true;
     std::vector<double> D2binning;
     for(const auto& bin : bins){
       if(D2binning.empty()) D2binning.emplace_back(bin.getBinLowEdge(0));
