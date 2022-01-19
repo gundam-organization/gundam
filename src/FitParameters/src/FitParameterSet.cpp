@@ -73,7 +73,17 @@ void FitParameterSet::initialize() {
     return;
   }
 
-  this->readCovarianceMatrix();
+  // TODO: check instead if "covarianceMatrixFilePath" is missing and get NumberOfParameters from the binning file
+  const TString covarianceMatrixFilePathName = JsonUtils::fetchValue<std::string>(_config_, "covarianceMatrixFilePath").c_str();
+  unsigned int NParameters;
+  if( covarianceMatrixFilePathName.EqualTo("None") ){
+    LogInfo << "Not using Covariance Matrix to constrain: " << _name_ << std::endl;
+    NParameters = JsonUtils::fetchValue<unsigned int>(_config_, "NumberOfParameters");
+  }
+  else{
+    this->readCovarianceMatrix();
+    NParameters = _covarianceMatrix_->GetNrows();
+  }
 
   _useOnlyOneParameterPerEvent_ = JsonUtils::fetchValue<bool>(_config_, "useOnlyOneParameterPerEvent", false);
 
@@ -103,7 +113,7 @@ void FitParameterSet::initialize() {
   }
   else{
     LogDebug << "No parameterPriorTVectorD provided, all parameter prior are set to 1." << std::endl;
-    _parameterPriorList_ = new TVectorT<double>(_covarianceMatrix_->GetNrows());
+    _parameterPriorList_ = new TVectorT<double>(NParameters);
     for( int iPar = 0 ; iPar < _parameterPriorList_->GetNrows() ; iPar++ ){
       (*_parameterPriorList_)[iPar] = 1;
       if( _useEigenDecompInFit_ ) (*_originalParValues_)[iPar] = 1;
@@ -139,23 +149,31 @@ void FitParameterSet::initialize() {
   }
   else{
     LogInfo << "No parameterNameTObjArray provided, parameters will be referenced with their index." << std::endl;
-    _parameterNamesList_ = new TObjArray(_covarianceMatrix_->GetNrows());
+    _parameterNamesList_ = new TObjArray(NParameters);
     for( int iPar = 0 ; iPar < _parameterPriorList_->GetNrows() ; iPar++ ){
       _parameterNamesList_->Add(new TNamed("", ""));
     }
   }
 
   LogInfo << "Initializing fit parameters..." << std::endl;
-  _parameterList_.reserve(_covarianceMatrix_->GetNcols()); // need to keep the memory at the same place -> FitParameter* will be used
-  for(int iParameter = 0 ; iParameter < _covarianceMatrix_->GetNcols() ; iParameter++ ){
+  _parameterList_.reserve(NParameters); // need to keep the memory at the same place -> FitParameter* will be used
+  for(int iParameter = 0 ; iParameter < NParameters ; iParameter++ ){
     _parameterList_.emplace_back();
     _parameterList_.back().setParSetRef(this);
     _parameterList_.back().setParameterIndex(iParameter);
     _parameterList_.back().setName(_parameterNamesList_->At(iParameter)->GetName());
     _parameterList_.back().setParameterValue((*_parameterPriorList_)[iParameter]);
     _parameterList_.back().setPriorValue((*_parameterPriorList_)[iParameter]);
-    _parameterList_.back().setStdDevValue(TMath::Sqrt((*_covarianceMatrix_)[iParameter][iParameter]));
-    _parameterList_.back().setStepSize(TMath::Sqrt((*_covarianceMatrix_)[iParameter][iParameter]));
+    if( not covarianceMatrixFilePathName.EqualTo("None") ){
+      _parameterList_.back().setStdDevValue(TMath::Sqrt((*_covarianceMatrix_)[iParameter][iParameter]));
+      _parameterList_.back().setStepSize(TMath::Sqrt((*_covarianceMatrix_)[iParameter][iParameter]));
+}
+    else{
+      // TODO: Don't set Standard Deviation at all if covariance matrix is missing
+      _parameterList_.back().setStdDevValue(9999.9);
+      double StepSize = JsonUtils::fetchValue<double>(_config_, "StepSize");
+      _parameterList_.back().setStepSize(StepSize);
+    }
 
     _parameterList_.back().setDialsWorkingDirectory(JsonUtils::fetchValue<std::string>(_config_, "dialSetWorkingDirectory", "./"));
 
@@ -251,7 +269,7 @@ double FitParameterSet::getChi2() const {
 
   if (not _isEnabled_) { return 0; }
 
-  LogThrowIf(_inverseCovarianceMatrix_ == nullptr, GET_VAR_NAME_VALUE(_inverseCovarianceMatrix_))
+  //LogThrowIf(_inverseCovarianceMatrix_ == nullptr, GET_VAR_NAME_VALUE(_inverseCovarianceMatrix_))
 
   double chi2 = 0;
 
@@ -265,18 +283,20 @@ double FitParameterSet::getChi2() const {
   else
   {
     double iDelta, jDelta;
-    for (int iPar = 0; iPar < _inverseCovarianceMatrix_->GetNrows(); iPar++) {
-      if( not _parameterList_[iPar].isEnabled() ) continue;
-      if( _parameterList_[iPar].getPriorType() == PriorType::Flat ) continue; // No penalty term for parameters with a flat prior
+    if( _inverseCovarianceMatrix_ != nullptr ){
+      for (int iPar = 0; iPar < _inverseCovarianceMatrix_->GetNrows(); iPar++) {
+        if( not _parameterList_[iPar].isEnabled() ) continue;
+        if( _parameterList_[iPar].getPriorType() == PriorType::Flat ) continue; // No penalty term for parameters with a flat prior
 
-      iDelta = (_parameterList_[iPar].getParameterValue() - _parameterList_[iPar].getPriorValue());
-      for (int jPar = 0; jPar < _inverseCovarianceMatrix_->GetNrows(); jPar++) {
-        if( not _parameterList_[jPar].isEnabled() ) continue;
-        if( _parameterList_[jPar].getPriorType() == PriorType::Flat ) continue; // No penalty term for parameters with a flat prior
-        jDelta = iDelta;
-        jDelta *= (_parameterList_[jPar].getParameterValue() - _parameterList_[jPar].getPriorValue());
-        jDelta *= (*_inverseCovarianceMatrix_)(iPar, jPar);
-        chi2 += jDelta;
+        iDelta = (_parameterList_[iPar].getParameterValue() - _parameterList_[iPar].getPriorValue());
+        for (int jPar = 0; jPar < _inverseCovarianceMatrix_->GetNrows(); jPar++) {
+          if( not _parameterList_[jPar].isEnabled() ) continue;
+          if( _parameterList_[jPar].getPriorType() == PriorType::Flat ) continue; // No penalty term for parameters with a flat prior
+          jDelta = iDelta;
+          jDelta *= (_parameterList_[jPar].getParameterValue() - _parameterList_[jPar].getPriorValue());
+          jDelta *= (*_inverseCovarianceMatrix_)(iPar, jPar);
+          chi2 += jDelta;
+        }
       }
     }
   }
@@ -406,7 +426,18 @@ std::string FitParameterSet::getSummary() const {
   ss << "FitParameterSet: " << _name_ << " -> initialized=" << _isInitialized_ << ", enabled=" << _isEnabled_;
 
   if(_isInitialized_ and _isEnabled_){
-    ss << ", nbParameters: " << _parameterList_.size() << "(defined)/" << _covarianceMatrix_->GetNrows() << "(covariance)";
+
+    // TODO: check instead if "covarianceMatrixFilePath" is missing and get NumberOfParameters from the binning file
+    const TString covarianceMatrixFilePathName = JsonUtils::fetchValue<std::string>(_config_, "covarianceMatrixFilePath").c_str();
+    unsigned int NParameters;
+    if( covarianceMatrixFilePathName.EqualTo("None") ){
+      NParameters = JsonUtils::fetchValue<unsigned int>(_config_, "NumberOfParameters");
+    }
+    else{
+      NParameters = _covarianceMatrix_->GetNrows();
+    }
+
+    ss << ", nbParameters: " << _parameterList_.size() << "(defined)/" << NParameters << "(covariance)";
     if( not _parameterList_.empty() ){
       for( const auto& parameter : _parameterList_ ){
         ss << std::endl << GenericToolbox::indentString(parameter.getSummary(), 2);
