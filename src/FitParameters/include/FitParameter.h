@@ -32,6 +32,7 @@ public:
 
   void reset();
 
+  void setIsEnabled(bool isEnabled);
   void setIsFixed(bool isFixed);
   void setName(const std::string &name);
   void setParameterIndex(int parameterIndex);
@@ -46,6 +47,9 @@ public:
   void setMaxValue(double maxValue);
   void setStepSize(double stepSize);
   void setParSetRef(void *parSetRef);
+
+  void setValueAtPrior();
+  void setCurrentValueAsPrior();
 
   void initialize();
 
@@ -70,6 +74,7 @@ public:
   DialSet* findDialSet(const std::string& dataSetName_);
   std::string getSummary() const;
   std::string getTitle() const;
+  std::string getFullTitle() const;
 
 private:
   // Parameters

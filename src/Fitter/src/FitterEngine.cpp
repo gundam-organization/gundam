@@ -57,7 +57,6 @@ void FitterEngine::setEnablePostFitScan(bool enablePostFitScan) {
   _enablePostFitScan_ = enablePostFitScan;
 }
 
-
 void FitterEngine::initialize() {
 
   LogThrowIf(_config_.empty(), "Config is not set.");
@@ -66,16 +65,9 @@ void FitterEngine::initialize() {
   _propagator_.setSaveDir(GenericToolbox::mkdirTFile(_saveDir_, "Propagator"));
   _propagator_.initialize();
 
-  _nbFitParameters_ = 0;
   _nbParameters_ = 0;
   for( const auto& parSet : _propagator_.getParameterSetsList() ){
     _nbParameters_ += int(parSet.getNbParameters());
-    if( not parSet.isUseEigenDecompInFit() ){
-      _nbFitParameters_ += int(parSet.getNbParameters());
-    }
-    else{
-      _nbFitParameters_ += parSet.getNbEnabledEigenParameters();
-    }
   }
 
   if( JsonUtils::fetchValue(_config_, "scaleParStepWithChi2Response", false) ){
@@ -126,32 +118,24 @@ void FitterEngine::initialize() {
       }
 
       if( JsonUtils::doKeyExist(parSet.getConfig(), "customFitParThrow") ){
+
         LogAlert << "Using custom mc parameter push for " << parSet.getName() << std::endl;
+
         for(auto& entry : JsonUtils::fetchValue(parSet.getConfig(), "customFitParThrow", std::vector<nlohmann::json>())){
+
           int parIndex = JsonUtils::fetchValue<int>(entry, "parIndex");
 
-          double pushVal;
+          auto& parList = parSet.getParameterList();
+          double pushVal =
+              parList[parIndex].getParameterValue()
+              + parList[parIndex].getStdDevValue()
+                * JsonUtils::fetchValue<double>(entry, "nbSigmaAway");
+
+          LogWarning << "Pushing #" << parIndex << " to " << pushVal << std::endl;
+          parList[parIndex].setParameterValue( pushVal );
+
           if( parSet.isUseEigenDecompInFit() ){
-            pushVal =
-                parSet.getEigenParameterValue(parIndex)
-                + parSet.getEigenSigma(parIndex)
-                  * JsonUtils::fetchValue<double>(entry, "nbSigmaAway");
-
-            LogWarning << "Pushing eigen_#" << parIndex << ": " << parSet.getEigenParameterValue(parIndex) << " → " << pushVal << std::endl;
-            parSet.setEigenParameter(parIndex, pushVal);
-            parSet.propagateEigenToOriginal();
-//          _minimizer_->SetVariableValue(iFitPar + parIndex, parSet.getEigenParameterValue(parIndex) );
-          }
-          else{
-            pushVal =
-                parSet.getParameterList()[parIndex].getParameterValue()
-                + parSet.getParameterList()[parIndex].getStdDevValue()
-                  * JsonUtils::fetchValue<double>(entry, "nbSigmaAway");
-
-
-            LogWarning << "Pushing #" << parIndex << " to " << pushVal << std::endl;
-            parSet.getParameterList()[parIndex].setParameterValue( pushVal );
-//          _minimizer_->SetVariableValue(iFitPar + parIndex, parSet.getParameterList()[parIndex].getParameterValue() );
+            parSet.propagateOriginalToEigen();
           }
 
         }
@@ -181,7 +165,7 @@ double FitterEngine::getChi2Buffer() const {
 double FitterEngine::getChi2StatBuffer() const {
   return _chi2StatBuffer_;
 }
-const Propagator FitterEngine::getPropagator() const {
+const Propagator& FitterEngine::getPropagator() const {
   return _propagator_;
 }
 
@@ -210,8 +194,32 @@ void FitterEngine::generateOneSigmaPlots(const std::string& savePath_){
   GenericToolbox::mkdirTFile(_saveDir_, savePath_)->cd();
   auto refHistList = _propagator_.getPlotGenerator().getHistHolderList(); // current buffer
 
+
+  auto makeOneSigmaPlotFct = [&](FitParameter& par_, const std::string& parSavePath_){
+    double currentParValue = par_.getParameterValue();
+    par_.setParameterValue( currentParValue + par_.getStdDevValue() );
+    LogInfo << "Processing " << parSavePath_ << " -> " << par_.getParameterValue() << std::endl;
+    _propagator_.propagateParametersOnSamples();
+
+    auto* saveDir = GenericToolbox::mkdirTFile(_saveDir_, parSavePath_ );
+    saveDir->cd();
+
+    _propagator_.getPlotGenerator().generateSampleHistograms(nullptr, 1);
+
+    auto oneSigmaHistList = _propagator_.getPlotGenerator().getHistHolderList(1);
+    _propagator_.getPlotGenerator().generateComparisonPlots( oneSigmaHistList, refHistList, saveDir );
+    par_.setParameterValue( currentParValue );
+    _propagator_.propagateParametersOnSamples();
+
+    const auto& compHistList = _propagator_.getPlotGenerator().getComparisonHistHolderList();
+
+//      // Since those were not saved, delete manually
+//      // Don't delete? -> slower each time
+////      for( auto& hist : oneSigmaHistList ){ delete hist.histPtr; }
+//      oneSigmaHistList.clear();
+  };
+
   // +1 sigma
-  int iPar = -1;
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 
     if( not parSet.isEnabled() ) continue;
@@ -222,68 +230,24 @@ void FitterEngine::generateOneSigmaPlots(const std::string& savePath_){
     }
 
     for( auto& par : parSet.getParameterList() ){
-      iPar++;
-
       if( not par.isEnabled() ) continue;
-
       std::string tag;
       if( par.isFixed() ){ tag += "_FIXED"; }
-
-      double currentParValue = par.getParameterValue();
-      par.setParameterValue( currentParValue + par.getStdDevValue() );
-      LogInfo << "(" << iPar+1 << "/" << _nbParameters_ << ") +1σ on " << parSet.getName() + "/" + par.getTitle()
-              << " -> " << par.getParameterValue() << std::endl;
-      _propagator_.propagateParametersOnSamples();
-
       std::string savePath = savePath_;
       if( not savePath.empty() ) savePath += "/";
-      savePath += "oneSigma/" + parSet.getName() + "/" + par.getTitle() + tag;
-      auto* saveDir = GenericToolbox::mkdirTFile(_saveDir_, savePath );
-      saveDir->cd();
-
-      _propagator_.getPlotGenerator().generateSampleHistograms(nullptr, 1);
-
-      auto oneSigmaHistList = _propagator_.getPlotGenerator().getHistHolderList(1);
-      _propagator_.getPlotGenerator().generateComparisonPlots( oneSigmaHistList, refHistList, saveDir );
-      par.setParameterValue( currentParValue );
-      _propagator_.propagateParametersOnSamples();
-
-      const auto& compHistList = _propagator_.getPlotGenerator().getComparisonHistHolderList();
-
-//      // Since those were not saved, delete manually
-//      // Don't delete? -> slower each time
-////      for( auto& hist : oneSigmaHistList ){ delete hist.histPtr; }
-//      oneSigmaHistList.clear();
+      savePath += "oneSigma/original/" + parSet.getName() + "/" + par.getTitle() + tag;
+      makeOneSigmaPlotFct(par, savePath);
     }
 
     if( parSet.isUseEigenDecompInFit() ){
-      for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
-        double currentParValue = parSet.getEigenParameterValue(iEigen);
-        parSet.setEigenParameter(iEigen, currentParValue + parSet.getEigenSigma(iEigen));
-        LogInfo << "(" << iEigen+1 << "/" << parSet.getNbEnabledEigenParameters() << ") +1σ on " << parSet.getName() + "/eigen_#" << iEigen
-                << " -> " << parSet.getEigenSigma(iEigen) << std::endl;
-        parSet.propagateEigenToOriginal();
-        _propagator_.propagateParametersOnSamples();
-
+      for( auto& eigenPar : parSet.getEigenParameterList() ){
+        if( not eigenPar.isEnabled() ) continue;
+        std::string tag;
+        if( eigenPar.isFixed() ){ tag += "_FIXED"; }
         std::string savePath = savePath_;
         if( not savePath.empty() ) savePath += "/";
-        savePath += "oneSigma/" + parSet.getName() + "/eigen_#" + std::to_string(iEigen);
-        auto* saveDir = GenericToolbox::mkdirTFile(_saveDir_, savePath );
-        saveDir->cd();
-
-        _propagator_.getPlotGenerator().generateSampleHistograms(nullptr, 1);
-
-        auto oneSigmaHistList = _propagator_.getPlotGenerator().getHistHolderList(1);
-        _propagator_.getPlotGenerator().generateComparisonPlots( oneSigmaHistList, refHistList, saveDir );
-        parSet.setEigenParameter(iEigen, currentParValue);
-        parSet.propagateEigenToOriginal();
-        _propagator_.propagateParametersOnSamples();
-
-        const auto& compHistList = _propagator_.getPlotGenerator().getComparisonHistHolderList();
-
-        // Since those were not saved, delete manually
-//        for( auto& hist : oneSigmaHistList ){ delete hist.histPtr; }
-        oneSigmaHistList.clear();
+        savePath += "oneSigma/eigen/" + parSet.getName() + "/" + eigenPar.getTitle() + tag;
+        makeOneSigmaPlotFct(eigenPar, savePath);
       }
     }
 
@@ -317,97 +281,45 @@ void FitterEngine::fixGhostFitParameters(){
 
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 
-    if( not JsonUtils::fetchValue(parSet.getConfig(), "fixGhostFitParameters", false) ) {
-      LogWarning << "Skipping \"" << parSet.getName() << "\" as fixGhostFitParameters is set to false" << std::endl;
-      if( not parSet.isUseEigenDecompInFit() ) iFitPar += parSet.getNbParameters();
-      else iFitPar += parSet.getNbEnabledEigenParameters();
-      continue;
-    }
-
     bool fixNextEigenPars{false};
-    if( parSet.isUseEigenDecompInFit() ){
-      for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
-        iFitPar++;
-        ssPrint.str("");
+    auto& parList = (parSet.isUseEigenDecompInFit() ? parSet.getEigenParameterList(): parSet.getParameterList());
+    for( auto& par : parList ){
+      ssPrint.str("");
 
-        if( fixNextEigenPars ){
-          LogInfo << GenericToolbox::ColorCodes::redBackGround << "Fixing next par" << "(" << iFitPar+1 << "/" << _nbFitParameters_
-          << ") +1σ on " << parSet.getName() + "/eigen_#" + std::to_string(iEigen) << " -> "
-          << parSet.getEigenParameterValue(iEigen) << GenericToolbox::ColorCodes::resetColor << std::endl;
-          parSet.setEigenParIsFixed(iEigen, true);
-          continue;
-        }
+      if( par.isEnabled() and not par.isFixed() ){
+        double currentParValue = par.getParameterValue();
+        par.setParameterValue( currentParValue + par.getStdDevValue() );
 
-        double currentParValue = parSet.getEigenParameterValue(iEigen);
-        parSet.setEigenParameter(iEigen, currentParValue + parSet.getEigenSigma(iEigen));
-        parSet.propagateEigenToOriginal();
-
-        ssPrint << "(" << iFitPar+1 << "/" << _nbFitParameters_ << ") +1σ on " << parSet.getName() + "/eigen_#" + std::to_string(iEigen)
-                << " -> " << parSet.getEigenParameterValue(iEigen);
+        ssPrint << "(" << par.getParameterIndex()+1 << "/" << parList.size() << ") +1σ on " << parSet.getName() + "/" + par.getTitle()
+                << " " << currentParValue << " -> " << par.getParameterValue();
         LogInfo << ssPrint.str() << "..." << std::endl;
 
         updateChi2Cache();
-
         deltaChi2Stat = _chi2StatBuffer_ - baseChi2Stat;
         deltaChi2Syst = _chi2PullsBuffer_ - baseChi2Syst;
         deltaChi2 = _chi2Buffer_ - baseChi2;
         ssPrint << ": Δχ²(stat) = " << deltaChi2Stat;
-//        ssPrint << " / Δχ²(syst) = " << deltaChi2Syst;
-//        ssPrint << ": Δχ² = " << deltaChi2;
 
         LogInfo.moveTerminalCursorBack(1);
         LogInfo << ssPrint.str() << std::endl;
 
         if( std::abs(deltaChi2Stat) < JsonUtils::fetchValue(_config_, "ghostParameterDeltaChi2Threshold", 1E-6) ){
-          parSet.setEigenParIsFixed(iEigen, true);
-
+          par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
           ssPrint << " < " << JsonUtils::fetchValue(_config_, "ghostParameterDeltaChi2Threshold", 1E-6) << " -> " << "FIXED";
           LogInfo.moveTerminalCursorBack(1);
           LogInfo << GenericToolbox::ColorCodes::redBackGround << ssPrint.str() << GenericToolbox::ColorCodes::resetColor << std::endl;
-
-          if( JsonUtils::fetchValue(_config_, "fixGhostEigenParmetersAfterFirstRejected", false) ) fixNextEigenPars = true;
         }
 
-        parSet.setEigenParameter(iEigen, currentParValue);
-        parSet.propagateEigenToOriginal();
+        par.setParameterValue( currentParValue );
       }
     }
-    else{
-      for( auto& par : parSet.getParameterList() ){
-        iFitPar++;
-        ssPrint.str("");
 
-        if( par.isEnabled() and not par.isFixed() ){
-          double currentParValue = par.getParameterValue();
-          par.setParameterValue( currentParValue + par.getStdDevValue() );
-
-          ssPrint << "(" << iFitPar+1 << "/" << _nbFitParameters_ << ") +1σ on " << parSet.getName() + "/" + par.getTitle()
-                  << " " << currentParValue << " -> " << par.getParameterValue();
-          LogInfo << ssPrint.str() << "..." << std::endl;
-
-          updateChi2Cache();
-          deltaChi2Stat = _chi2StatBuffer_ - baseChi2Stat;
-          deltaChi2Syst = _chi2PullsBuffer_ - baseChi2Syst;
-          deltaChi2 = _chi2Buffer_ - baseChi2;
-          ssPrint << ": Δχ²(stat) = " << deltaChi2Stat;
-//          ssPrint << " / Δχ²(syst) = " << deltaChi2Syst;
-//          ssPrint << ": Δχ² = " << deltaChi2;
-
-          LogInfo.moveTerminalCursorBack(1);
-          LogInfo << ssPrint.str() << std::endl;
-
-          if( std::abs(deltaChi2Stat) < JsonUtils::fetchValue(_config_, "ghostParameterDeltaChi2Threshold", 1E-6) ){
-            par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
-            ssPrint << " < " << JsonUtils::fetchValue(_config_, "ghostParameterDeltaChi2Threshold", 1E-6) << " -> " << "FIXED";
-            LogInfo.moveTerminalCursorBack(1);
-            LogInfo << GenericToolbox::ColorCodes::redBackGround << ssPrint.str() << GenericToolbox::ColorCodes::resetColor << std::endl;
-          }
-
-          par.setParameterValue( currentParValue );
-        }
-
-      }
+    if( not parSet.isUseEigenDecompInFit() ){
+      // Recompute inverse matrix for the fitter
+      // Eigen decomposed parSet don't need a new inversion since the matrix is diagonal
+      parSet.prepareFitParameters();
     }
+
 
   }
 
@@ -473,41 +385,31 @@ void FitterEngine::fit(){
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Summary of the fit parameters:") << std::endl;
   int iFitPar = -1;
   for( const auto& parSet : _propagator_.getParameterSetsList() ){
-    if( not parSet.isUseEigenDecompInFit() ){
-      LogWarning << parSet.getName() << ": " << parSet.getNbParameters() << " parameters" << std::endl;
-      Logger::setIndentStr("├─ ");
-      for( const auto& par : parSet.getParameterList() ){
-        iFitPar++;
-        if( par.isEnabled() ){
-          if( _minimizer_->IsFixedVariable(iFitPar) ){
-            LogInfo << "\033[41m" << "#" << iFitPar << " -> " << parSet.getName() << "/" << par.getTitle() << ": FIXED - Prior: " << par.getParameterValue() << " ± " << par.getStdDevValue() <<  "\033[0m" << std::endl;
-          }
-          else{
-            LogInfo << "#" << iFitPar << " -> " << parSet.getName() << "/" << par.getTitle() << " - Prior: " << par.getParameterValue() << " ± " << par.getStdDevValue() << std::endl;
-          }
+
+    auto& parList = parSet.getEffectiveParameterList();
+    LogWarning << parSet.getName() << ": " << parList.size() << " parameters" << std::endl;
+    Logger::setIndentStr("├─ ");
+    for( const auto& par : parList ){
+      iFitPar++;
+
+      std::stringstream ssTitle;
+      ssTitle << "#" << iFitPar << " -> " << parSet.getName() << "/" << par.getTitle();
+
+      if( not par.isEnabled() ){
+        LogInfo << "\033[43m" << ssTitle << ": Disabled" << "\033[0m" << std::endl;
+      }
+      else{
+        if( par.isFixed() ){
+          LogInfo << "\033[41m" << ssTitle << ": Fixed @ " << par.getParameterValue() << "\033[0m" << std::endl;
         }
         else{
-          LogInfo << "\033[43m" << "#" << iFitPar << " -> " << parSet.getName() << "/" << par.getTitle() << ": Disabled" <<  "\033[0m" << std::endl;
+          LogInfo << ssTitle << ": Starting @ " << par.getParameterValue() << " ± " << par.getStdDevValue() << "\033[0m" << std::endl;
         }
       }
-      Logger::setIndentStr("");
+
     }
-    else{
-      LogWarning << parSet.getName() << ": " << parSet.getNbEnabledEigenParameters() << " eigen parameters" << std::endl;
-      Logger::setIndentStr("├─ ");
-      for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
-        iFitPar++;
-        if( _minimizer_->IsFixedVariable(iFitPar) ) {
-          LogInfo << "\033[41m" << "#" << iFitPar << " -> " << parSet.getName() << "/eigen_#" << iEigen << ": FIXED - Prior: "
-                  << parSet.getEigenParameterValue(iEigen) << " ± " << parSet.getEigenSigma(iEigen) << "\033[0m" << std::endl;
-        }
-        else{
-          LogInfo << "#" << iFitPar << " -> " << parSet.getName() << "/eigen_#" << iEigen << " - Prior: "
-                  << parSet.getEigenParameterValue(iEigen) << " ± " << parSet.getEigenSigma(iEigen) << std::endl;
-        }
-      }
-      Logger::setIndentStr("");
-    }
+    Logger::setIndentStr("");
+
   }
 
   _propagator_.allowRfPropagation(); // if RF are setup -> a lot faster
@@ -561,132 +463,45 @@ void FitterEngine::fit(){
     if( JsonUtils::fetchValue(_minimizerConfig_, "enablePostFitErrorFit", true) ){
       std::string errorAlgo = JsonUtils::fetchValue(_minimizerConfig_, "errors", "Hesse");
       if     ( errorAlgo == "Minos" ){
-
-        // Put back at minimum
-        iFitPar = -1;
-        LogInfo << "Releasing parameters for error evaluation..." << std::endl;
-        for( auto& parSet : _propagator_.getParameterSetsList() ){
-
-          if( not JsonUtils::fetchValue(parSet.getConfig(), "releaseFixedParametersOnHesse", true) ){
-            continue;
-          }
-
-          if( not parSet.isUseEigenDecompInFit() ){
-            for( auto& par : parSet.getParameterList() ){
-              if( par.isFixed() ){
-                LogDebug << "Releasing " << parSet.getName() << "/" << par.getTitle() << std::endl;
-                par.setIsFixed(false);
-                _minimizer_->ReleaseVariable(iFitPar++);
-              }
-
-            }
-          }
-          else{
-            for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
-              LogDebug << "Releasing " << parSet.getName() << "/eigen_#" << iEigen << std::endl;
-              _minimizer_->ReleaseVariable(iFitPar++);
-              parSet.setEigenParIsFixed(iEigen, false);
-            }
-          }
-
-        }
-
         LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling MINOS...") << std::endl;
 
         double errLow, errHigh;
         _minimizer_->SetPrintLevel(0);
 
-        iFitPar = -1;
-        for( auto& parSet : _propagator_.getParameterSetsList() ){
-          if( JsonUtils::fetchValue(parSet.getConfig(), "skipMinos", false) ){
-            LogWarning << "Minos error evaluation is disabled for parSet: " << parSet.getName() << std::endl;
-            continue;
-          }
-
-          if( not parSet.isUseEigenDecompInFit() ){
-            for( auto& par : parSet.getParameterList() ){
-              iFitPar++;
-              if( _minimizer_->IsFixedVariable(iFitPar) ) continue;
-
-              LogInfo << "Evaluating: " << _minimizer_->VariableName(iFitPar) << "..." << std::endl;
-              bool isOk = _minimizer_->GetMinosError(iFitPar, errLow, errHigh);
+        for( int iFitPar = 0 ; iFitPar < _minimizer_->NDim() ; iFitPar++ ){
+          LogInfo << "Evaluating: " << _minimizer_->VariableName(iFitPar) << "..." << std::endl;
+          bool isOk = _minimizer_->GetMinosError(iFitPar, errLow, errHigh);
 #if ROOT_VERSION_CODE >= ROOT_VERSION(6,23,02)
-              LogWarning << minosStatusCodeStr.at(_minimizer_->MinosStatus()) << std::endl;
+          LogWarning << minosStatusCodeStr.at(_minimizer_->MinosStatus()) << std::endl;
 #endif
-              if( isOk ){
-                LogInfo << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh << std::endl;
-              }
-              else{
-                LogError << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh
-                         << " - MINOS returned an error." << std::endl;
-              }
-            }
+          if( isOk ){
+            LogInfo << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh << std::endl;
           }
           else{
-            for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
-              iFitPar++;
-              if( _minimizer_->IsFixedVariable(iFitPar) ) continue;
-
-              LogInfo << "Evaluating: " << _minimizer_->VariableName(iFitPar) << "..." << std::endl;
-              bool isOk = _minimizer_->GetMinosError(iFitPar, errLow, errHigh);
-#if ROOT_VERSION_CODE >= ROOT_VERSION(6,23,02)
-              LogWarning << minosStatusCodeStr.at(_minimizer_->MinosStatus()) << std::endl;
-#endif
-              if( isOk ){
-                LogInfo << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh << std::endl;
-              }
-              else{
-                LogError << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh
-                         << " - MINOS returned an error." << std::endl;
-              }
-            }
+            LogError << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh
+                     << " - MINOS returned an error." << std::endl;
           }
         }
 
         // Put back at minimum
-        iFitPar = -1;
-        for( auto& parSet : _propagator_.getParameterSetsList() ){
-
-          if( not parSet.isUseEigenDecompInFit() ){
-            for( auto& par : parSet.getParameterList() ){
-              iFitPar++;
-              par.setParameterValue(_minimizer_->X()[iFitPar]);
-            }
-          }
-          else{
-            for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
-              iFitPar++;
-              parSet.setEigenParameter(iEigen, _minimizer_->X()[iFitPar]);
-            }
-            parSet.propagateEigenToOriginal();
-          }
-
+        for( int iFitPar = 0 ; iFitPar < _minimizer_->NDim() ; iFitPar++ ){
+          _minimizerFitParameterPtr_[iFitPar]->setParameterValue(_minimizer_->X()[iFitPar]);
         }
+        for( auto& parSet : _propagator_.getParameterSetsList() ){
+          if( parSet.isUseEigenDecompInFit() ) parSet.propagateEigenToOriginal();
+        }
+
         updateChi2Cache();
       } // Minos
       else if( errorAlgo == "Hesse" ){
 
         if( JsonUtils::fetchValue(_config_, "restoreStepSizeBeforeHesse", false) ){
           LogWarning << "Restoring step size before HESSE..." << std::endl;
-          int iPar = -1;
-          for( auto& parSet : _propagator_.getParameterSetsList() ){
-
-            if( not parSet.isUseEigenDecompInFit() ){
-              for( auto& par : parSet.getParameterList()  ){
-                iPar++;
-                if(not _useNormalizedFitSpace_){ _minimizer_->SetVariableStepSize(iPar, par.getStepSize()); }
-                else{ _minimizer_->SetVariableStepSize(iPar, FitParameterSet::toNormalizedParRange(par.getStepSize(), par)); } // should be 1
-              } // par
-            }
-            else{
-              for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
-                iPar++;
-                if(not _useNormalizedFitSpace_){ _minimizer_->SetVariableStepSize(iPar, parSet.getEigenParStepSize(iEigen)); }
-                else{ _minimizer_->SetVariableStepSize(iPar, parSet.toNormalizedEigenParRange(parSet.getEigenParStepSize(iEigen), iEigen)); } // should be 1
-              }
-            }
-
-          } // parSet
+          for( int iFitPar = 0 ; iFitPar < _minimizer_->NDim() ; iFitPar++ ){
+            auto& par = *_minimizerFitParameterPtr_[iFitPar];
+            if(not _useNormalizedFitSpace_){ _minimizer_->SetVariableStepSize(iFitPar, par.getStepSize()); }
+            else{ _minimizer_->SetVariableStepSize(iFitPar, FitParameterSet::toNormalizedParRange(par.getStepSize(), par)); } // should be 1
+          }
         }
 
         LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling HESSE...") << std::endl;
@@ -762,31 +577,13 @@ double FitterEngine::evalFit(const double* parArray_){
   _nbFitCalls_++;
 
   // Update fit parameter values:
-  int iFitPar = -1;
+  int iFitPar{0};
+  for( auto* par : _minimizerFitParameterPtr_ ){
+    if( _useNormalizedFitSpace_ ) par->setParameterValue(FitParameterSet::toRealParValue(parArray_[iFitPar++], *par));
+    else par->setParameterValue(parArray_[iFitPar++]);
+  }
   for( auto& parSet : _propagator_.getParameterSetsList() ){
-    if( not parSet.isUseEigenDecompInFit() ){
-      for( auto& par : parSet.getParameterList() ){
-        iFitPar++;
-        if( not _useNormalizedFitSpace_ ){
-          par.setParameterValue( parArray_[iFitPar] );
-        }
-        else{
-          par.setParameterValue( FitParameterSet::toRealParValue(parArray_[iFitPar], par) );
-        }
-      }
-    }
-    else{
-      for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
-        iFitPar++;
-        if( not _useNormalizedFitSpace_ ){
-          parSet.setEigenParameter(iEigen, parArray_[iFitPar]);
-        }
-        else{
-          parSet.setEigenParameter(iEigen, parSet.toRealEigenParValue(parArray_[iFitPar], iEigen));
-        }
-      }
-      parSet.propagateEigenToOriginal();
-    }
+    if( parSet.isUseEigenDecompInFit() ) parSet.propagateEigenToOriginal();
   }
 
   // Compute the Chi2
@@ -1009,24 +806,14 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
     // Convert the diagonal
     int parameterIndexOffset = 0;
     for( const auto& parSet : _propagator_.getParameterSetsList() ){
-      if( not parSet.isUseEigenDecompInFit() ){
-        int iPar = -1;
-        for( const auto& par : parSet.getParameterList() ){
-          iPar++;
-          double normedError = TMath::Sqrt(totalCovMatrix[parameterIndexOffset + iPar][parameterIndexOffset + iPar]);
-          double realError = FitParameterSet::toRealParRange(normedError, par);
-          totalCovMatrix[parameterIndexOffset + iPar][parameterIndexOffset + iPar] = realError*realError;
-        }
-        parameterIndexOffset += int(parSet.getNbParameters());
+      int iPar = -1;
+      for( const auto& par : parSet.getEffectiveParameterList() ){
+        iPar++;
+        double normedError = TMath::Sqrt(totalCovMatrix[parameterIndexOffset + iPar][parameterIndexOffset + iPar]);
+        double realError = FitParameterSet::toRealParRange(normedError, par);
+        totalCovMatrix[parameterIndexOffset + iPar][parameterIndexOffset + iPar] = realError*realError;
       }
-      else{
-        for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
-          double normedError = TMath::Sqrt(totalCovMatrix[parameterIndexOffset + iEigen][parameterIndexOffset + iEigen]);
-          double realError = parSet.toRealEigenParRange(normedError, iEigen);
-          totalCovMatrix[parameterIndexOffset + iEigen][parameterIndexOffset + iEigen] = realError*realError;
-        }
-        parameterIndexOffset += parSet.getNbEnabledEigenParameters();
-      }
+      parameterIndexOffset += iPar+1;
     }
 
     // Convert off-diagonal terms
@@ -1047,6 +834,45 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
 
   LogInfo << "Fitter covariance matrix is " << totalCovMatrix.GetNrows() << "x" << totalCovMatrix.GetNcols() << std::endl;
   auto* errorDir = GenericToolbox::mkdirTFile(saveDir_, "errors");
+
+  LogInfo << "Extracting post-fit errors..." << std::endl;
+  for( const auto& parSet : _propagator_.getParameterSetsList() ){
+    if( not parSet.isEnabled() ){ continue; }
+
+    LogInfo << "Extracting post-fit errors of parameter set: " << parSet.getName() << std::endl;
+    auto* parSetDir = GenericToolbox::mkdirTFile(errorDir, parSet.getName());
+
+    const auto& parList = parSet.getEffectiveParameterList();
+    std::vector<int> minimizerIndexes(parList.size(), -1);
+    for( size_t iPar = 0 ; iPar < parList.size() ; iPar++ ){
+      minimizerIndexes[iPar] = GenericToolbox::findElementIndex((FitParameter*) &parList[iPar], _minimizerFitParameterPtr_);
+    }
+
+    auto* covMatrix = new TMatrixD(int(parList.size()), int(parList.size()));
+    for( int iPar = 0 ; iPar < int(parList.size()) ; iPar++ ){
+      for( int jPar = 0 ; jPar < int(parList.size()) ; jPar++ ){
+        if( minimizerIndexes[iPar] != -1 and minimizerIndexes[iPar] != -1 ){
+          // Then both i and j have been fitted -> take the value from the fitter
+          (*covMatrix)[iPar][jPar] = totalCovMatrix[minimizerIndexes[iPar]][minimizerIndexes[jPar]];
+        }
+        else{
+          // At least one of the 2 pars have not been fitted. Inheriting from the prior correlations
+          (*covMatrix)[iPar][jPar] = (*parSet.getPriorCorrelationMatrix())[iPar][jPar];
+          if( minimizerIndexes[iPar] == -1 ) (*covMatrix)[iPar][jPar] *= TMath::Sqrt((*parSet.getPriorCovarianceMatrix())[iPar][iPar]);
+          else                               (*covMatrix)[iPar][jPar] *= TMath::Sqrt((totalCovMatrix[minimizerIndexes[iPar]][minimizerIndexes[iPar]]));
+          if( minimizerIndexes[jPar] == -1 ) (*covMatrix)[iPar][jPar] *= TMath::Sqrt((*parSet.getPriorCovarianceMatrix())[jPar][jPar]);
+          else                               (*covMatrix)[iPar][jPar] *= TMath::Sqrt((totalCovMatrix[minimizerIndexes[jPar]][minimizerIndexes[jPar]]));
+        }
+
+      }
+    }
+
+    if( parSet.isUseEigenDecompInFit() ){
+
+    }
+
+  }
+
 
   int parameterIndexOffset = 0;
   for( const auto& parSet : _propagator_.getParameterSetsList() ){
@@ -1234,38 +1060,6 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
 
 }
 
-double FitterEngine::fetchCurrentParameterValue(int iFitPar_) {
-  int iFitPar = 0;
-  for( const auto& parSet : _propagator_.getParameterSetsList() ){
-    if( not parSet.isUseEigenDecompInFit() ){
-      for( const auto& par : parSet.getParameterList() ){
-        if( iFitPar++ == iFitPar_ ) return par.getParameterValue();
-      }
-    }
-    else{
-      for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
-        if( iFitPar++ == iFitPar_ ) return parSet.getEigenParameterValue(iEigen);
-      }
-    }
-  }
-  return std::nan("parameter not found");
-}
-void FitterEngine::updateParameterValue(int iFitPar_, double parameterValue_) {
-  int iFitPar = 0;
-  for( auto& parSet : _propagator_.getParameterSetsList() ){
-    if( not parSet.isUseEigenDecompInFit() ){
-      for( auto& par : parSet.getParameterList() ){
-        if( iFitPar++ == iFitPar_ ) par.setParameterValue(parameterValue_);
-      }
-    }
-    else{
-      for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
-        if( iFitPar++ == iFitPar_ ) parSet.setEigenParameter(iEigen, parameterValue_);
-      }
-    }
-  }
-}
-
 void FitterEngine::rescaleParametersStepSize(){
   LogDebug << __METHOD_NAME__ << std::endl;
 
@@ -1277,35 +1071,7 @@ void FitterEngine::rescaleParametersStepSize(){
   int iFitPar = -1;
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 
-
-    if( parSet.isUseEigenDecompInFit() ){
-      for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
-        iFitPar++;
-
-        double currentParValue = parSet.getEigenParameterValue(iEigen);
-        parSet.setEigenParameter(iEigen, currentParValue + parSet.getEigenSigma(iEigen));
-        parSet.propagateEigenToOriginal();
-
-        updateChi2Cache();
-        double deltaChi2 = _chi2Buffer_ - baseChi2;
-        double deltaChi2Pulls = _chi2PullsBuffer_ - baseChi2Pull;
-
-//        double stepSize = TMath::Sqrt(deltaChi2Pulls)/TMath::Sqrt(deltaChi2);
-        double stepSize = 1./TMath::Sqrt(std::abs(deltaChi2));
-
-        LogInfo << "Step size of " << parSet.getName() + "/eigen_#" << iEigen
-                << " -> σ x " << _parStepGain_ << " x " << stepSize
-                << " -> Δχ² = " << deltaChi2 << " = " << deltaChi2 - deltaChi2Pulls << "(stat) + " << deltaChi2Pulls << "(pulls)" << std::endl;
-
-        stepSize *= parSet.getEigenSigma(iEigen) * _parStepGain_;
-
-        parSet.setEigenParStepSize(iEigen, stepSize);
-        parSet.setEigenParameter(iEigen, currentParValue);
-        parSet.propagateEigenToOriginal();
-      }
-    }
-    else{
-      for( auto& par : parSet.getParameterList() ){
+    for( auto& par : parSet.getEffectiveParameterList() ){
         iFitPar++;
 
         if( not par.isEnabled() ){
@@ -1339,14 +1105,10 @@ void FitterEngine::rescaleParametersStepSize(){
         LogInfo << " -> Δχ²(step) = " << _chi2Buffer_ - baseChi2 << std::endl;
         par.setParameterValue( currentParValue );
       }
-    }
 
   }
 
-  LogInfo << "Reupdating chi2..." << std::endl;
   updateChi2Cache();
-  LogDebug << "END" << std::endl;
-
 }
 void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
   LogInfo << __METHOD_NAME__ << std::endl;
@@ -1362,10 +1124,19 @@ void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
   _minimizer_ = std::shared_ptr<ROOT::Math::Minimizer>(
       ROOT::Math::Factory::CreateMinimizer(_minimizerType_, _minimizerAlgo_)
   );
-
   LogThrowIf(_minimizer_ == nullptr, "Could not create minimizer: " << _minimizerType_ << "/" << _minimizerAlgo_)
 
   if( _minimizerAlgo_.empty() ) _minimizerAlgo_ = _minimizer_->Options().MinimizerAlgorithm();
+
+  LogWarning << "Fetching the effective number of fit parameters..." << std::endl;
+  for( auto& parSet : _propagator_.getParameterSetsList() ){
+    for( auto& par : parSet.getEffectiveParameterList() ){
+      if( par.isEnabled() and not par.isFixed() ) {
+        _minimizerFitParameterPtr_.emplace_back(&par);
+      }
+    }
+  }
+  _nbFitParameters_ = int(_minimizerFitParameterPtr_.size());
 
   _functor_ = std::shared_ptr<ROOT::Math::Functor>(
       new ROOT::Math::Functor(
@@ -1380,62 +1151,28 @@ void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
   _minimizer_->SetMaxIterations(JsonUtils::fetchValue(_minimizerConfig_, "max_iter", (unsigned int)(500) ));
   _minimizer_->SetMaxFunctionCalls(JsonUtils::fetchValue(_minimizerConfig_, "max_fcn", (unsigned int)(1E9)));
 
-  int iPar = -1;
-  for( auto& parSet : _propagator_.getParameterSetsList() ){
+  for( int iFitPar = 0 ; iFitPar < _nbFitParameters_ ; iFitPar++ ){
+    auto& fitPar = *_minimizerFitParameterPtr_[iFitPar];
 
-    if( not parSet.isUseEigenDecompInFit() ){
-      for( auto& par : parSet.getParameterList()  ){
-        iPar++;
-        if(not _useNormalizedFitSpace_){
-          _minimizer_->SetVariable( iPar,parSet.getName() + "/" + par.getTitle(), par.getParameterValue(),par.getStepSize() );
-          if(par.getMinValue() == par.getMinValue()){ _minimizer_->SetVariableLowerLimit(iPar, par.getMinValue()); }
-          if(par.getMaxValue() == par.getMaxValue()){ _minimizer_->SetVariableUpperLimit(iPar, par.getMaxValue()); }
-          // Changing the boundaries, change the value/step size?
-          _minimizer_->SetVariableValue(iPar, par.getParameterValue());
-          _minimizer_->SetVariableStepSize(iPar, par.getStepSize());
-        }
-        else{
-          _minimizer_->SetVariable( iPar,parSet.getName() + "/" + par.getTitle(),
-                                    FitParameterSet::toNormalizedParValue(par.getParameterValue(), par),
-                                    FitParameterSet::toNormalizedParRange(par.getStepSize(), par)
-                                    );
-          if(par.getMinValue() == par.getMinValue()){ _minimizer_->SetVariableLowerLimit(iPar, FitParameterSet::toNormalizedParValue(par.getMinValue(), par)); }
-          if(par.getMaxValue() == par.getMaxValue()){ _minimizer_->SetVariableUpperLimit(iPar, FitParameterSet::toNormalizedParValue(par.getMaxValue(), par)); }
-          // Changing the boundaries, change the value/step size?
-          _minimizer_->SetVariableValue(iPar, FitParameterSet::toNormalizedParValue(par.getParameterValue(), par));
-          _minimizer_->SetVariableStepSize(iPar, FitParameterSet::toNormalizedParRange(par.getStepSize(), par));
-        }
-
-
-        if( not doReleaseFixed_ or not JsonUtils::fetchValue(parSet.getConfig(), "releaseFixedParametersOnHesse", true) ){
-          if( not par.isEnabled() or par.isFixed() ) _minimizer_->FixVariable(iPar);
-        }
-      } // par
+    if( not _useNormalizedFitSpace_ ){
+      _minimizer_->SetVariable(iFitPar, fitPar.getFullTitle(),fitPar.getParameterValue(),fitPar.getStepSize());
+      if(fitPar.getMinValue() == fitPar.getMinValue()){ _minimizer_->SetVariableLowerLimit(iFitPar, fitPar.getMinValue()); }
+      if(fitPar.getMaxValue() == fitPar.getMaxValue()){ _minimizer_->SetVariableUpperLimit(iFitPar, fitPar.getMaxValue()); }
+      // Changing the boundaries, change the value/step size?
+      _minimizer_->SetVariableValue(iFitPar, fitPar.getParameterValue());
+      _minimizer_->SetVariableStepSize(iFitPar, fitPar.getStepSize());
     }
     else{
-      for( int iEigen = 0 ; iEigen < parSet.getNbEnabledEigenParameters() ; iEigen++ ){
-        iPar++;
-        if(not _useNormalizedFitSpace_){
-          _minimizer_->SetVariable( iPar,parSet.getName() + "/eigen_#" + std::to_string(iEigen),
-                                    parSet.getEigenParameterValue(iEigen),
-                                    parSet.getEigenParStepSize(iEigen)
-          );
-        }
-        else{
-          _minimizer_->SetVariable( iPar,parSet.getName() + "/eigen_#" + std::to_string(iEigen),
-                                    parSet.toNormalizedEigenParValue(parSet.getEigenParameterValue(iEigen),iEigen),
-                                    parSet.toNormalizedEigenParRange(parSet.getEigenParStepSize(iEigen), iEigen)
-          );
-        }
-
-        if( not doReleaseFixed_ or not JsonUtils::fetchValue(parSet.getConfig(), "releaseFixedParametersOnHesse", true) ){
-          if( parSet.isEigenParFixed(iEigen) ) {
-            _minimizer_->FixVariable(iPar);
-          }
-        }
-      }
+      _minimizer_->SetVariable( iFitPar,fitPar.getFullTitle(),
+                                FitParameterSet::toNormalizedParValue(fitPar.getParameterValue(), fitPar),
+                                FitParameterSet::toNormalizedParRange(fitPar.getStepSize(), fitPar)
+      );
+      if(fitPar.getMinValue() == fitPar.getMinValue()){ _minimizer_->SetVariableLowerLimit(iFitPar, FitParameterSet::toNormalizedParValue(fitPar.getMinValue(), fitPar)); }
+      if(fitPar.getMaxValue() == fitPar.getMaxValue()){ _minimizer_->SetVariableUpperLimit(iFitPar, FitParameterSet::toNormalizedParValue(fitPar.getMaxValue(), fitPar)); }
+      // Changing the boundaries, change the value/step size?
+      _minimizer_->SetVariableValue(iFitPar, FitParameterSet::toNormalizedParValue(fitPar.getParameterValue(), fitPar));
+      _minimizer_->SetVariableStepSize(iFitPar, FitParameterSet::toNormalizedParRange(fitPar.getStepSize(), fitPar));
     }
-
-  } // parSet
+  }
 
 }
