@@ -34,6 +34,7 @@ public:
 
   void setIsEnabled(bool isEnabled);
   void setIsFixed(bool isFixed);
+  void setIsEigen(bool isEigen);
   void setName(const std::string &name);
   void setParameterIndex(int parameterIndex);
   void setParameterValue(double parameterValue);
@@ -56,6 +57,7 @@ public:
   // Getters
   bool isEnabled() const;
   bool isFixed() const;
+  bool isEigen() const;
   PriorType::PriorType getPriorType() const;
   int getParameterIndex() const;
   const std::string &getName() const;
@@ -93,6 +95,8 @@ private:
   bool _isEnabled_{true};
   bool _isFixed_{false};
   void* _parSetRef_{nullptr};
+
+  bool _isEigen_{false};
 
   // Internals
   std::vector<DialSet> _dialSetList_; // one dial set per detector

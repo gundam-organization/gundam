@@ -51,6 +51,9 @@ void FitParameter::setIsEnabled(bool isEnabled){
 void FitParameter::setIsFixed(bool isFixed) {
   _isFixed_ = isFixed;
 }
+void FitParameter::setIsEigen(bool isEigen) {
+  _isEigen_ = isEigen;
+}
 void FitParameter::setDialSetConfig(const nlohmann::json &jsonConfig_) {
   auto jsonConfig = jsonConfig_;
   while( jsonConfig.is_string() ){
@@ -168,6 +171,9 @@ bool FitParameter::isEnabled() const {
 bool FitParameter::isFixed() const {
   return _isFixed_;
 }
+bool FitParameter::isEigen() const {
+  return _isEigen_;
+}
 const std::string &FitParameter::getName() const {
   return _name_;
 }
@@ -254,3 +260,4 @@ std::string FitParameter::getTitle() const {
 std::string FitParameter::getFullTitle() const{
   return ((FitParameterSet*) _parSetRef_)->getName() + "/" + this->getTitle();
 }
+

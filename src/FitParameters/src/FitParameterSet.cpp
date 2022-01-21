@@ -112,10 +112,13 @@ void FitParameterSet::prepareFitParameters(){
 
     for (int iEigen = 0; iEigen < _eigenValues_->GetNrows(); iEigen++) {
 
+      _eigenParameterList_[iEigen].setIsEigen(true);
       _eigenParameterList_[iEigen].setIsEnabled(true);
       _eigenParameterList_[iEigen].setIsFixed(false);
+      _eigenParameterList_[iEigen].setParSetRef(this);
       _eigenParameterList_[iEigen].setParameterIndex(iEigen);
-      _eigenParameterList_[iEigen].setStdDevValue((*_eigenValues_)[iEigen]);
+      _eigenParameterList_[iEigen].setStdDevValue(TMath::Sqrt((*_eigenValues_)[iEigen]));
+      _eigenParameterList_[iEigen].setStepSize(TMath::Sqrt((*_eigenValues_)[iEigen]));
       _eigenParameterList_[iEigen].setName("eigen");
 
       (*_eigenValuesInv_)[iEigen] = 1./(*_eigenValues_)[iEigen];
@@ -431,11 +434,11 @@ void FitParameterSet::readInputCovarianceMatrix(){
     GenericToolbox::mkdirTFile(_saveDir_, "inputs")->cd();
 
     ((TMatrixD*) _priorCovarianceMatrix_.get())->Write("CovarianceMatrix_TMatrixD");
-    GenericToolbox::convertToTH2D(_priorCovarianceMatrix_.get())->Write("CovarianceMatrix_TH2D");
+    GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) _priorCovarianceMatrix_.get())->Write("CovarianceMatrix_TH2D");
 
     auto* correlationMatrix = GenericToolbox::convertToCorrelationMatrix((TMatrixD*)_priorCovarianceMatrix_.get());
     correlationMatrix->Write("CorrelationMatrix_TMatrixD");
-    GenericToolbox::convertToTH2D(correlationMatrix)->Write("CorrelationMatrix_TH2D");
+    GenericToolbox::convertTMatrixDtoTH2D(correlationMatrix)->Write("CorrelationMatrix_TH2D");
   }
 
   // parameterPriorTVectorD

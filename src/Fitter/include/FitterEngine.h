@@ -85,6 +85,7 @@ private:
   int _nbFitParameters_{0};
   int _nbParameters_{0};
   std::vector<FitParameter*> _minimizerFitParameterPtr_;
+  std::vector<FitParameterSet*> _minimizerFitParameterSetPtr_;
 
   Propagator _propagator_{};
 //  MinimizerInterface _minimizerInterface_{};

@@ -253,6 +253,11 @@ const json &Propagator::getConfig() const {
 
 void Propagator::propagateParametersOnSamples(){
 
+  // Only real parameters are propagated on the specta -> need to convert the eigen to original
+  for( auto& parSet : _parameterSetsList_ ){
+    if( parSet.isUseEigenDecompInFit() ) parSet.propagateEigenToOriginal();
+  }
+
   if(not _useResponseFunctions_ or not _isRfPropagationEnabled_ ){
 //    if(GlobalVariables::isEnableDevMode()) updateDialResponses();
     reweightSampleEvents();
