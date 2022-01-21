@@ -8,6 +8,7 @@
 
 #include "JsonUtils.h"
 #include "FitParameter.h"
+#include "FitParameterSet.h"
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[FitParameter]");
@@ -44,8 +45,14 @@ void FitParameter::reset() {
   _priorType_ = PriorType::Gaussian;
 }
 
+void FitParameter::setIsEnabled(bool isEnabled){
+  _isEnabled_ = isEnabled;
+}
 void FitParameter::setIsFixed(bool isFixed) {
   _isFixed_ = isFixed;
+}
+void FitParameter::setIsEigen(bool isEigen) {
+  _isEigen_ = isEigen;
 }
 void FitParameter::setDialSetConfig(const nlohmann::json &jsonConfig_) {
   auto jsonConfig = jsonConfig_;
@@ -91,6 +98,13 @@ void FitParameter::setStepSize(double stepSize) {
 }
 void FitParameter::setParSetRef(void *parSetRef) {
   _parSetRef_ = parSetRef;
+}
+
+void FitParameter::setValueAtPrior(){
+  _parameterValue_ = _priorValue_;
+}
+void FitParameter::setCurrentValueAsPrior(){
+  _priorValue_ = _parameterValue_;
 }
 
 void FitParameter::initialize() {
@@ -156,6 +170,9 @@ bool FitParameter::isEnabled() const {
 }
 bool FitParameter::isFixed() const {
   return _isFixed_;
+}
+bool FitParameter::isEigen() const {
+  return _isEigen_;
 }
 const std::string &FitParameter::getName() const {
   return _name_;
@@ -240,3 +257,7 @@ std::string FitParameter::getTitle() const {
   if( not _name_.empty() ) ss << "_" << _name_;
   return ss.str();
 }
+std::string FitParameter::getFullTitle() const{
+  return ((FitParameterSet*) _parSetRef_)->getName() + "/" + this->getTitle();
+}
+

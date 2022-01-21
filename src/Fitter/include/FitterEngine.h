@@ -44,7 +44,7 @@ public:
   bool isFitHasConverged() const;
   double getChi2Buffer() const;
   double getChi2StatBuffer() const;
-  const Propagator getPropagator() const;
+  const Propagator& getPropagator() const;
 
   // Core
   void generateSamplePlots(const std::string& savePath_ = "");
@@ -59,11 +59,6 @@ public:
   double evalFit(const double* parArray_);
 
   void writePostFitData(TDirectory* saveDir_);
-
-  // utils
-  double fetchCurrentParameterValue(int iFitPar_); // minuit don't have such a getter
-  void updateParameterValue(int iFitPar_, double parameterValue_);
-
 
 protected:
   void rescaleParametersStepSize();
@@ -89,6 +84,8 @@ private:
   int _nbFitCalls_{0};
   int _nbFitParameters_{0};
   int _nbParameters_{0};
+  std::vector<FitParameter*> _minimizerFitParameterPtr_;
+  std::vector<FitParameterSet*> _minimizerFitParameterSetPtr_;
 
   Propagator _propagator_{};
 //  MinimizerInterface _minimizerInterface_{};
