@@ -64,18 +64,18 @@ void FitParameterSet::prepareFitParameters(){
   LogInfo << "Stripping the matrix from fixed/disabled parameters..." << std::endl;
   int nbFitParameters{0};
   for( const auto& par : _parameterList_ ){
-    if( par.isEnabled() and not par.isFixed() ) nbFitParameters++;
+    if( par.isEnabled() and not par.isFixed() and not par.isFree() ) nbFitParameters++;
   }
   LogInfo << "Effective nb parameters: " << nbFitParameters << std::endl;
 
   _strippedCovarianceMatrix_ = std::make_shared<TMatrixDSym>(nbFitParameters);
   int iStrippedPar = -1;
   for( int iPar = 0 ; iPar < int(_parameterList_.size()) ; iPar++ ){
-    if( not _parameterList_[iPar].isEnabled() or _parameterList_[iPar].isFixed() ) continue;
+    if( not _parameterList_[iPar].isEnabled() or _parameterList_[iPar].isFixed() or _parameterList_[iPar].isFree() ) continue;
     iStrippedPar++;
     int jStrippedPar = -1;
     for( int jPar = 0 ; jPar < int(_parameterList_.size()) ; jPar++ ){
-      if( not _parameterList_[jPar].isEnabled() or _parameterList_[jPar].isFixed() ) continue;
+      if( not _parameterList_[jPar].isEnabled() or _parameterList_[jPar].isFixed() or _parameterList_[jPar].isFree() ) continue;
       jStrippedPar++;
       (*_strippedCovarianceMatrix_)[iStrippedPar][jStrippedPar] = (*_priorCovarianceMatrix_)[iPar][jPar];
     }
@@ -588,7 +588,7 @@ void FitParameterSet::readInputParameterOptions(){
 void FitParameterSet::fillDeltaParameterList(){
   int iFit{0};
   for( const auto& par : _parameterList_ ){
-    if( par.isEnabled() and not par.isFixed() ){
+    if( par.isEnabled() and not par.isFixed() and not par.isFree() ){
       (*_deltaParameterList_)[iFit++] = par.getParameterValue() - par.getPriorValue();
     }
   }

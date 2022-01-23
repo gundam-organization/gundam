@@ -406,7 +406,9 @@ void FitterEngine::fit(){
           LogInfo << "\033[41m" << ssTitle.str() << ": Fixed @ " << par.getParameterValue() << "\033[0m" << std::endl;
         }
         else{
-          LogInfo << ssTitle.str() << ": Starting @ " << par.getParameterValue() << " ± " << par.getStdDevValue() << "\033[0m" << std::endl;
+          LogInfo << ssTitle.str() << ": Starting @ " << par.getParameterValue();
+          if( not par.isFree() ) LogInfo << " ± " << par.getStdDevValue();
+          LogInfo << "\033[0m" << std::endl;
         }
       }
 
@@ -868,7 +870,7 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
 
         LogInfo << ss.str();
 
-        preFitErrorHist->SetBinError( 1 + par.getParameterIndex(), par.getStdDevValue() );
+        if(not par.isFree()) preFitErrorHist->SetBinError( 1 + par.getParameterIndex(), par.getStdDevValue() );
       }
     }
 
