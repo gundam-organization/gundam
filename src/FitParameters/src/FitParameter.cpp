@@ -54,6 +54,9 @@ void FitParameter::setIsFixed(bool isFixed) {
 void FitParameter::setIsEigen(bool isEigen) {
   _isEigen_ = isEigen;
 }
+void FitParameter::setIsFree(bool isFree) {
+  _isFree_ = isFree;
+}
 void FitParameter::setDialSetConfig(const nlohmann::json &jsonConfig_) {
   auto jsonConfig = jsonConfig_;
   while( jsonConfig.is_string() ){
@@ -127,7 +130,8 @@ void FitParameter::initialize() {
     std::string priorTypeStr = JsonUtils::fetchValue<std::string>(_parameterConfig_, "priorType", "");
     if( not priorTypeStr.empty() ){
       _priorType_ = PriorType::toPriorType(priorTypeStr);
-     LogWarning << getTitle() << " will use a prior type: " << priorTypeStr << std::endl; 
+     LogWarning << getTitle() << " will use a prior type: " << priorTypeStr << std::endl;
+     if( _priorType_ == PriorType::Flat ){ _isFree_ = true; }
     }
     
     if( JsonUtils::doKeyExist(_parameterConfig_, "priorValue") ){
@@ -173,6 +177,9 @@ bool FitParameter::isFixed() const {
 }
 bool FitParameter::isEigen() const {
   return _isEigen_;
+}
+bool FitParameter::isFree() const {
+  return _isFree_;
 }
 const std::string &FitParameter::getName() const {
   return _name_;
@@ -260,4 +267,3 @@ std::string FitParameter::getTitle() const {
 std::string FitParameter::getFullTitle() const{
   return ((FitParameterSet*) _parSetRef_)->getName() + "/" + this->getTitle();
 }
-
