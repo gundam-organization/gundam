@@ -290,12 +290,19 @@ void FitterEngine::fixGhostFitParameters(){
     for( auto& par : parList ){
       ssPrint.str("");
 
+      ssPrint << "(" << par.getParameterIndex()+1 << "/" << parList.size() << ") +1σ on " << parSet.getName() + "/" + par.getTitle();
+
+      if( fixNextEigenPars ){
+        par.setIsFixed(true);
+        LogInfo << GenericToolbox::ColorCodes::redBackGround << ssPrint.str() << " -> FIXED AS NEXT EIGEN." << std::endl;
+        continue;
+      }
+
       if( par.isEnabled() and not par.isFixed() ){
         double currentParValue = par.getParameterValue();
         par.setParameterValue( currentParValue + par.getStdDevValue() );
 
-        ssPrint << "(" << par.getParameterIndex()+1 << "/" << parList.size() << ") +1σ on " << parSet.getName() + "/" + par.getTitle()
-                << " " << currentParValue << " -> " << par.getParameterValue();
+        ssPrint << " " << currentParValue << " -> " << par.getParameterValue();
         LogInfo << ssPrint.str() << "..." << std::endl;
 
         updateChi2Cache();
@@ -312,6 +319,10 @@ void FitterEngine::fixGhostFitParameters(){
           ssPrint << " < " << JsonUtils::fetchValue(_config_, "ghostParameterDeltaChi2Threshold", 1E-6) << " -> " << "FIXED";
           LogInfo.moveTerminalCursorBack(1);
           LogInfo << GenericToolbox::ColorCodes::redBackGround << ssPrint.str() << GenericToolbox::ColorCodes::resetColor << std::endl;
+
+          if( parSet.isUseEigenDecompInFit() and JsonUtils::fetchValue(_config_, "fixGhostEigenParmetersAfterFirstRejected", false) ){
+            fixNextEigenPars = true;
+          }
         }
 
         par.setParameterValue( currentParValue );
