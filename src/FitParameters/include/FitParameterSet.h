@@ -57,7 +57,7 @@ public:
   std::vector<FitParameter> &getParameterList();
   std::vector<FitParameter> &getEigenParameterList();
   const std::vector<FitParameter> &getParameterList() const;
-  TMatrixDSym *getOriginalCovarianceMatrix() const;
+  TMatrixDSym *getPriorCovarianceMatrix() const;
   const nlohmann::json &getConfig() const;
 
   const std::shared_ptr<TMatrixDSym> &getPriorCorrelationMatrix() const;
@@ -94,8 +94,10 @@ protected:
   void passIfInitialized(const std::string& methodName_) const;
 
   void initializeFromConfig();
-  void readInputCovarianceMatrix();
-  void readInputParameterOptions();
+  void readParameterDefinitionFile();
+  void readConfigOptions();
+
+  void defineParameters();
 
   void fillDeltaParameterList();
 
@@ -110,8 +112,11 @@ private:
 
   // JSON
   std::string _name_;
+  std::string _parameterDefinitionFilePath_{};
   bool _isEnabled_{};
   bool _throwMcBeforeFit_{true};
+  int _nbParameterDefinition_{-1};
+  double _nominalStepSize_{-1};
   int _maxNbEigenParameters_{-1};
   double _maxEigenFraction_{1};
 

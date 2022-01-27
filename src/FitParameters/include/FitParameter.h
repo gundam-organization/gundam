@@ -49,6 +49,7 @@ public:
   void setMaxValue(double maxValue);
   void setStepSize(double stepSize);
   void setParSetRef(void *parSetRef);
+  void setPriorType(PriorType::PriorType priorType);
 
   void setValueAtPrior();
   void setCurrentValueAsPrior();

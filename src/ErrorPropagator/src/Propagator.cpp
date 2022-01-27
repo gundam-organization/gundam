@@ -82,13 +82,13 @@ void Propagator::initialize() {
   int iParOffset = 0;
   for( const auto& parSet : _parameterSetsList_ ){
     if( not parSet.isEnabled() ) continue;
-    if( parSet.getOriginalCovarianceMatrix() != nullptr ){
-      for( int iCov = 0 ; iCov < parSet.getOriginalCovarianceMatrix()->GetNrows() ; iCov++ ){
-        for( int jCov = 0 ; jCov < parSet.getOriginalCovarianceMatrix()->GetNcols() ; jCov++ ){
-          (*_globalCovarianceMatrix_)[iParOffset+iCov][iParOffset+jCov] = (*parSet.getOriginalCovarianceMatrix())[iCov][jCov];
+    if(parSet.getPriorCovarianceMatrix() != nullptr ){
+      for(int iCov = 0 ; iCov < parSet.getPriorCovarianceMatrix()->GetNrows() ; iCov++ ){
+        for(int jCov = 0 ; jCov < parSet.getPriorCovarianceMatrix()->GetNcols() ; jCov++ ){
+          (*_globalCovarianceMatrix_)[iParOffset+iCov][iParOffset+jCov] = (*parSet.getPriorCovarianceMatrix())[iCov][jCov];
         }
       }
-      iParOffset += parSet.getOriginalCovarianceMatrix()->GetNrows();
+      iParOffset += parSet.getPriorCovarianceMatrix()->GetNrows();
     }
   }
   if( _saveDir_ != nullptr ){
