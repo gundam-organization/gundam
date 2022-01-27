@@ -12,9 +12,7 @@ LoggerInit([](){
   Logger::setUserHeaderStr("[AnaTreeMC]");
 } )
 
-AnaTreeMC::AnaTreeMC(const std::string& file_name, const std::string& tree_name, bool extra_var)
-  : read_extra_var(extra_var)
-{
+AnaTreeMC::AnaTreeMC(const std::string& file_name, const std::string& tree_name){
   fChain = new TChain(tree_name.c_str());
   fChain->Add(file_name.c_str());
   _file_name_ = file_name;

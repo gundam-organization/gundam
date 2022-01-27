@@ -8,6 +8,7 @@
 
 #include "JsonUtils.h"
 #include "FitParameter.h"
+#include "FitParameterSet.h"
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[FitParameter]");
@@ -44,8 +45,17 @@ void FitParameter::reset() {
   _priorType_ = PriorType::Gaussian;
 }
 
+void FitParameter::setIsEnabled(bool isEnabled){
+  _isEnabled_ = isEnabled;
+}
 void FitParameter::setIsFixed(bool isFixed) {
   _isFixed_ = isFixed;
+}
+void FitParameter::setIsEigen(bool isEigen) {
+  _isEigen_ = isEigen;
+}
+void FitParameter::setIsFree(bool isFree) {
+  _isFree_ = isFree;
 }
 void FitParameter::setDialSetConfig(const nlohmann::json &jsonConfig_) {
   auto jsonConfig = jsonConfig_;
@@ -93,6 +103,13 @@ void FitParameter::setParSetRef(void *parSetRef) {
   _parSetRef_ = parSetRef;
 }
 
+void FitParameter::setValueAtPrior(){
+  _parameterValue_ = _priorValue_;
+}
+void FitParameter::setCurrentValueAsPrior(){
+  _priorValue_ = _parameterValue_;
+}
+
 void FitParameter::initialize() {
 
   LogThrowIf(_parameterIndex_ == -1, "Parameter index is not set.");
@@ -101,19 +118,17 @@ void FitParameter::initialize() {
   LogThrowIf(_parameterValue_ == std::numeric_limits<double>::quiet_NaN(), "Parameter value is not set.");
   LogThrowIf(_parSetRef_      == nullptr, "Parameter set ref is not set.")
 
-  _stepSize_ = _stdDevValue_ * 0.01; // default
+  LogInfo << "Initializing parameter: \"" << this->getTitle() << "\"" << std::endl;
 
   if( not _parameterConfig_.empty() ){
     _isEnabled_ = JsonUtils::fetchValue(_parameterConfig_, "isEnabled", true);
-    if( not _isEnabled_ ) {
-      LogWarning << getTitle() << " is marked as not Enabled." << std::endl;
-      return;
-    }
+    if( not _isEnabled_ ) { return; }
 
     std::string priorTypeStr = JsonUtils::fetchValue<std::string>(_parameterConfig_, "priorType", "");
     if( not priorTypeStr.empty() ){
       _priorType_ = PriorType::toPriorType(priorTypeStr);
-     LogWarning << getTitle() << " will use a prior type: " << priorTypeStr << std::endl; 
+     LogWarning << "Prior type: " << priorTypeStr << std::endl;
+     if( _priorType_ == PriorType::Flat ){ _isFree_ = true; }
     }
     
     if( JsonUtils::doKeyExist(_parameterConfig_, "priorValue") ){
@@ -156,6 +171,12 @@ bool FitParameter::isEnabled() const {
 }
 bool FitParameter::isFixed() const {
   return _isFixed_;
+}
+bool FitParameter::isEigen() const {
+  return _isEigen_;
+}
+bool FitParameter::isFree() const {
+  return _isFree_;
 }
 const std::string &FitParameter::getName() const {
   return _name_;
@@ -239,4 +260,7 @@ std::string FitParameter::getTitle() const {
   ss << "#" << _parameterIndex_;
   if( not _name_.empty() ) ss << "_" << _name_;
   return ss.str();
+}
+std::string FitParameter::getFullTitle() const{
+  return ((FitParameterSet*) _parSetRef_)->getName() + "/" + this->getTitle();
 }

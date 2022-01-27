@@ -217,7 +217,7 @@ bool DialSet::initializeDialsWithDefinition() {
 
   _applyConditionStr_ = JsonUtils::fetchValue(dialsDefinition, "applyCondition", std::string(""));
   if( not _applyConditionStr_.empty() ){
-    LogWarning << "Found apply condition: " << _applyConditionStr_ << std::endl;
+    LogWarning << "Apply condition: " << _applyConditionStr_ << std::endl;
     _applyConditionFormula_ = new TFormula("_applyConditionFormula_", _applyConditionStr_.c_str());
     if( not _applyConditionFormula_->IsValid() ){
       LogError << _applyConditionStr_ << ": could not be parsed as formula expression" << std::endl;
