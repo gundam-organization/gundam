@@ -57,7 +57,6 @@ public:
   std::vector<FitParameter> &getParameterList();
   std::vector<FitParameter> &getEigenParameterList();
   const std::vector<FitParameter> &getParameterList() const;
-  TMatrixDSym *getPriorCovarianceMatrix() const;
   const nlohmann::json &getConfig() const;
 
   const std::shared_ptr<TMatrixDSym> &getPriorCorrelationMatrix() const;
