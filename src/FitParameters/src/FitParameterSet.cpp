@@ -94,6 +94,21 @@ void FitParameterSet::prepareFitParameters(){
     LogWarning << "Decomposing the stripped covariance matrix..." << std::endl;
     _eigenParameterList_.resize(_strippedCovarianceMatrix_->GetNrows());
 
+    _eigenDecomp_     = std::shared_ptr<TMatrixDSymEigen>(new TMatrixDSymEigen(*_strippedCovarianceMatrix_));
+
+    // Used for base swapping
+    _eigenValues_     = std::shared_ptr<TVectorD>( (TVectorD*) _eigenDecomp_->GetEigenValues().Clone() );
+    _eigenValuesInv_  = std::shared_ptr<TVectorD>( (TVectorD*) _eigenDecomp_->GetEigenValues().Clone() );
+    _eigenVectors_    = std::shared_ptr<TMatrixD>( (TMatrixD*) _eigenDecomp_->GetEigenVectors().Clone() );
+    _eigenVectorsInv_ = std::shared_ptr<TMatrixD>(new TMatrixD(TMatrixD::kTransposed, *_eigenVectors_) );
+
+    double eigenCumulative = 0;
+    _nbEnabledEigen_ = 0;
+    double eigenTotal = _eigenValues_->Sum();
+
+    _inverseStrippedCovarianceMatrix_ = std::shared_ptr<TMatrixD>(new TMatrixD(_strippedCovarianceMatrix_->GetNrows(), _strippedCovarianceMatrix_->GetNrows()));
+    _projectorMatrix_                 = std::shared_ptr<TMatrixD>(new TMatrixD(_strippedCovarianceMatrix_->GetNrows(), _strippedCovarianceMatrix_->GetNrows()));
+
     auto* eigenState = new TVectorD(_eigenValues_->GetNrows());
 
     for (int iEigen = 0; iEigen < _eigenValues_->GetNrows(); iEigen++) {
@@ -223,7 +238,7 @@ double FitParameterSet::getPenaltyChi2() {
       chi2 += TMath::Sq( (eigenPar.getParameterValue() - eigenPar.getPriorValue()) / eigenPar.getStdDevValue() ) ;
     }
   }
-  else if( _inverseCovarianceMatrix_ != nullptr ){
+  else if( _inverseStrippedCovarianceMatrix_ != nullptr ){
     // make delta vector
     this->fillDeltaParameterList();
 
@@ -355,7 +370,7 @@ std::string FitParameterSet::getSummary() const {
       NParameters = JsonUtils::fetchValue<unsigned int>(_config_, "NumberOfParameters");
     }
     else{
-      NParameters = _covarianceMatrix_->GetNrows();
+      NParameters = _priorCovarianceMatrix_->GetNrows();
     }
 
     ss << ", nbParameters: " << _parameterList_.size() << "(defined)/" << NParameters << "(covariance)";
@@ -577,14 +592,14 @@ void FitParameterSet::readInputParameterOptions(){
     _parameterList_[iParameter].setParSetRef(this);
     _parameterList_[iParameter].setParameterIndex(iParameter);
 
-    if( not covarianceMatrixFilePathName.EqualTo("None") ){
+    if( JsonUtils::fetchValue<std::string>(_config_, "covarianceMatrixFilePath") != "None" ){
       _parameterList_[iParameter].setStdDevValue(TMath::Sqrt((*_priorCovarianceMatrix_)[iParameter][iParameter]));
       _parameterList_[iParameter].setStepSize(TMath::Sqrt((*_priorCovarianceMatrix_)[iParameter][iParameter]));
     }
     else{
       // TODO: Don't set Standard Deviation at all if covariance matrix is missing
       _parameterList_.back().setStdDevValue(9999.9);
-      double StepSize = JsonUtils::fetchValue<double>(_config_, "StepSize");
+      auto StepSize = JsonUtils::fetchValue<double>(_config_, "StepSize");
       _parameterList_.back().setStepSize(StepSize);
     }
 
