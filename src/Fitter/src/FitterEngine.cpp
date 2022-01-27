@@ -881,9 +881,9 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
     tableLines.emplace_back(std::vector<std::string>{
         "Parameter"
         ,"Prior Value"
-        ,"Postfit Value"
-        ,"Prior σ"
-        ,"Postfit σ"
+        ,"Fit Value"
+        ,"Prior Err"
+        ,"Fit Err"
         ,"Constraint"
     });
 
