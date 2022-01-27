@@ -82,7 +82,7 @@ void FitParameterSet::prepareFitParameters(){
     }
   }
   _deltaParameterList_ = std::make_shared<TVectorD>(_strippedCovarianceMatrix_->GetNrows());
-
+  
   if( not _useEigenDecompInFit_ ){
     LogWarning << "Computing inverse of the stripped covariance matrix: "
                << _strippedCovarianceMatrix_->GetNcols() << "x"
@@ -93,21 +93,6 @@ void FitParameterSet::prepareFitParameters(){
   else {
     LogWarning << "Decomposing the stripped covariance matrix..." << std::endl;
     _eigenParameterList_.resize(_strippedCovarianceMatrix_->GetNrows());
-
-    _eigenDecomp_     = std::shared_ptr<TMatrixDSymEigen>(new TMatrixDSymEigen(*_strippedCovarianceMatrix_));
-
-    // Used for base swapping
-    _eigenValues_     = std::shared_ptr<TVectorD>( (TVectorD*) _eigenDecomp_->GetEigenValues().Clone() );
-    _eigenValuesInv_  = std::shared_ptr<TVectorD>( (TVectorD*) _eigenDecomp_->GetEigenValues().Clone() );
-    _eigenVectors_    = std::shared_ptr<TMatrixD>( (TMatrixD*) _eigenDecomp_->GetEigenVectors().Clone() );
-    _eigenVectorsInv_ = std::shared_ptr<TMatrixD>(new TMatrixD(TMatrixD::kTransposed, *_eigenVectors_) );
-
-    double eigenCumulative = 0;
-    _nbEnabledEigen_ = 0;
-    double eigenTotal = _eigenValues_->Sum();
-
-    _inverseStrippedCovarianceMatrix_ = std::shared_ptr<TMatrixD>(new TMatrixD(_strippedCovarianceMatrix_->GetNrows(), _strippedCovarianceMatrix_->GetNrows()));
-    _projectorMatrix_                 = std::shared_ptr<TMatrixD>(new TMatrixD(_strippedCovarianceMatrix_->GetNrows(), _strippedCovarianceMatrix_->GetNrows()));
 
     auto* eigenState = new TVectorD(_eigenValues_->GetNrows());
 
@@ -228,7 +213,7 @@ double FitParameterSet::getPenaltyChi2() {
 
   if (not _isEnabled_) { return 0; }
 
-  LogThrowIf(_inverseStrippedCovarianceMatrix_==nullptr, GET_VAR_NAME_VALUE(_inverseStrippedCovarianceMatrix_))
+  //LogThrowIf(_inverseCovarianceMatrix_ == nullptr, GET_VAR_NAME_VALUE(_inverseCovarianceMatrix_))
 
   double chi2 = 0;
 
@@ -238,7 +223,7 @@ double FitParameterSet::getPenaltyChi2() {
       chi2 += TMath::Sq( (eigenPar.getParameterValue() - eigenPar.getPriorValue()) / eigenPar.getStdDevValue() ) ;
     }
   }
-  else {
+  else if( _inverseCovarianceMatrix_ != nullptr ){
     // make delta vector
     this->fillDeltaParameterList();
 
@@ -362,7 +347,19 @@ std::string FitParameterSet::getSummary() const {
   ss << "FitParameterSet: " << _name_ << " -> initialized=" << _isInitialized_ << ", enabled=" << _isEnabled_;
 
   if(_isInitialized_ and _isEnabled_){
-    ss << ", nbParameters: " << _parameterList_.size() << "(defined)/" << _strippedCovarianceMatrix_->GetNrows() << "(covariance)";
+
+    // TODO: check instead if "covarianceMatrixFilePath" is missing and get NumberOfParameters from the binning file
+    const TString covarianceMatrixFilePathName = JsonUtils::fetchValue<std::string>(_config_, "covarianceMatrixFilePath").c_str();
+    unsigned int NParameters;
+    if( covarianceMatrixFilePathName.EqualTo("None") ){
+      NParameters = JsonUtils::fetchValue<unsigned int>(_config_, "NumberOfParameters");
+    }
+    else{
+      NParameters = _covarianceMatrix_->GetNrows();
+    }
+
+    ss << ", nbParameters: " << _parameterList_.size() << "(defined)/" << NParameters << "(covariance)";
+    
     if( not _parameterList_.empty() ){
 
       std::vector<std::vector<std::string>> tableLines;
@@ -580,13 +577,21 @@ void FitParameterSet::readInputParameterOptions(){
     _parameterList_[iParameter].setParSetRef(this);
     _parameterList_[iParameter].setParameterIndex(iParameter);
 
-    _parameterList_[iParameter].setStdDevValue(TMath::Sqrt((*_priorCovarianceMatrix_)[iParameter][iParameter]));
-    _parameterList_[iParameter].setStepSize(TMath::Sqrt((*_priorCovarianceMatrix_)[iParameter][iParameter]));
+    if( not covarianceMatrixFilePathName.EqualTo("None") ){
+      _parameterList_[iParameter].setStdDevValue(TMath::Sqrt((*_priorCovarianceMatrix_)[iParameter][iParameter]));
+      _parameterList_[iParameter].setStepSize(TMath::Sqrt((*_priorCovarianceMatrix_)[iParameter][iParameter]));
+    }
+    else{
+      // TODO: Don't set Standard Deviation at all if covariance matrix is missing
+      _parameterList_.back().setStdDevValue(9999.9);
+      double StepSize = JsonUtils::fetchValue<double>(_config_, "StepSize");
+      _parameterList_.back().setStepSize(StepSize);
+    }
 
     _parameterList_[iParameter].setName(_parameterNamesList_->At(iParameter)->GetName());
     _parameterList_[iParameter].setParameterValue((*_parameterPriorList_)[iParameter]);
     _parameterList_[iParameter].setPriorValue((*_parameterPriorList_)[iParameter]);
-
+    
     _parameterList_[iParameter].setDialsWorkingDirectory(JsonUtils::fetchValue<std::string>(_config_, "dialSetWorkingDirectory", "./"));
 
     if( JsonUtils::doKeyExist(_config_, "parameterDefinitions") ){
