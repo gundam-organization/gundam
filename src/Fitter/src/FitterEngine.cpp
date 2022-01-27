@@ -942,15 +942,15 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
     t.fillTable(tableLines);
     t.printTable();
 
-    if( not gStyle->GetCanvasPreferGL() ){
-      preFitErrorHist->SetFillColor(kRed-9);
-    }
-    else{
-      preFitErrorHist->SetFillColorAlpha(kRed-9, 0.7);
+    if(parSet_.getPriorCovarianceMatrix() != nullptr ){
+      if( not gStyle->GetCanvasPreferGL() ){
+        preFitErrorHist->SetFillColor(kRed-9);
+      }
+      else{
+        preFitErrorHist->SetFillColorAlpha(kRed-9, 0.7);
+      }
     }
 
-//        preFitErrorHist->SetFillColorAlpha(kRed-9, 0.5);
-//        preFitErrorHist->SetFillStyle(4050); // 50 % opaque ?
     preFitErrorHist->SetMarkerStyle(kFullDotLarge);
     preFitErrorHist->SetMarkerColor(kRed-3);
     preFitErrorHist->SetTitle(Form("Pre-fit Errors of %s", parSet_.getName().c_str()));

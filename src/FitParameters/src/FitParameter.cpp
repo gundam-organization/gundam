@@ -102,6 +102,9 @@ void FitParameter::setStepSize(double stepSize) {
 void FitParameter::setParSetRef(void *parSetRef) {
   _parSetRef_ = parSetRef;
 }
+void FitParameter::setPriorType(PriorType::PriorType priorType) {
+  _priorType_ = priorType;
+}
 
 void FitParameter::setValueAtPrior(){
   _parameterValue_ = _priorValue_;
