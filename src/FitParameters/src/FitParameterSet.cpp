@@ -206,9 +206,6 @@ std::vector<FitParameter> &FitParameterSet::getEigenParameterList(){
 const std::vector<FitParameter> &FitParameterSet::getParameterList() const{
   return _parameterList_;
 }
-TMatrixDSym *FitParameterSet::getPriorCovarianceMatrix() const {
-  return _priorCovarianceMatrix_.get();
-}
 const nlohmann::json &FitParameterSet::getConfig() const {
   return _config_;
 }
