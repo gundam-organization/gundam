@@ -39,6 +39,8 @@ void FitterEngine::reset() {
   _nbParameters_ = 0;
   _nbFitCalls_ = 0;
 
+  GenericToolbox::setT2kPalette();
+
   _convergenceMonitor_.reset();
 }
 
@@ -874,6 +876,17 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
     corMatrix->Write("Correlation_TMatrixD");
     corMatrixTH2D->Write("Correlation_TH2D");
 
+    // Table printout
+    std::vector<std::vector<std::string>> tableLines;
+    tableLines.emplace_back(std::vector<std::string>{
+        "Parameter"
+        ,"Prior Value"
+        ,"Postfit Value"
+        ,"Prior σ"
+        ,"Postfit σ"
+        ,"Constraint"
+    });
+
     // Parameters
     GenericToolbox::mkdirTFile(saveSubdir_, "values")->cd();
     auto* postFitErrorHist = new TH1D("postFitErrors_TH1D", "Post-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
@@ -894,17 +907,40 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
         if( priorFraction < 1E-2 ) ss << GenericToolbox::ColorCodes::yellowBackGround;
         if( priorFraction > 1 ) ss << GenericToolbox::ColorCodes::redBackGround;
 
-        ss << "Postfit error of \"" << par.getFullTitle() << "\": "
-           << TMath::Sqrt((*covMatrix_)[par.getParameterIndex()][par.getParameterIndex()])
-           << " (" << priorFraction * 100
-           << "% of the prior)" << GenericToolbox::ColorCodes::resetColor
-           << std::endl;
+        std::vector<std::string> lineValues(tableLines[0].size());
+        int valIndex{0};
+        lineValues[valIndex++] = par.getFullTitle();
 
-        LogInfo << ss.str();
+        lineValues[valIndex++] = std::to_string( par.getPriorValue() );
+        lineValues[valIndex++] = std::to_string( par.getParameterValue() );
+
+        lineValues[valIndex++] = std::to_string( par.getStdDevValue() );
+        lineValues[valIndex++] = std::to_string( TMath::Sqrt((*covMatrix_)[par.getParameterIndex()][par.getParameterIndex()]) );
+
+        std::string colorStr;
+
+        if( par.isFree() ){
+          lineValues[valIndex++] = "Unconstrained";
+          colorStr = GenericToolbox::ColorCodes::yellowBackGround;
+        }
+        else{
+          lineValues[valIndex++] = std::to_string( priorFraction*100 ) + " \%";
+          if( priorFraction > 1 ){ colorStr = GenericToolbox::ColorCodes::redBackGround; }
+        }
+
+        if( not colorStr.empty() ){
+          for( auto& line : lineValues ){ if(not line.empty()) line = colorStr + line + GenericToolbox::ColorCodes::resetColor; }
+        }
+
+        tableLines.emplace_back(lineValues);
 
         if(not par.isFree()) preFitErrorHist->SetBinError( 1 + par.getParameterIndex(), par.getStdDevValue() );
       }
     }
+
+    GenericToolbox::TablePrinter t;
+    t.fillTable(tableLines);
+    t.printTable();
 
     if( not gStyle->GetCanvasPreferGL() ){
       preFitErrorHist->SetFillColor(kRed-9);
