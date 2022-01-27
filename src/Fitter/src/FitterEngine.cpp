@@ -16,7 +16,7 @@
 #include "TLegend.h"
 
 #include <cmath>
-
+#include "GenericToolbox.TablePrinter.h"
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[FitterEngine]");
@@ -294,7 +294,7 @@ void FitterEngine::fixGhostFitParameters(){
 
       if( fixNextEigenPars ){
         par.setIsFixed(true);
-        LogInfo << GenericToolbox::ColorCodes::redBackGround << ssPrint.str() << " -> FIXED AS NEXT EIGEN." << std::endl;
+        LogInfo << GenericToolbox::ColorCodes::redBackGround << ssPrint.str() << " -> FIXED AS NEXT EIGEN." << GenericToolbox::ColorCodes::resetColor << std::endl;
         continue;
       }
 
@@ -397,34 +397,55 @@ void FitterEngine::fit(){
   LogWarning << __METHOD_NAME__ << std::endl;
 
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Summary of the fit parameters:") << std::endl;
+
   int iFitPar = -1;
   for( const auto& parSet : _propagator_.getParameterSetsList() ){
 
+    std::vector<std::vector<std::string>> tableLines;
+    tableLines.emplace_back(std::vector<std::string>{
+        "Title"
+        ,"Starting"
+        ,"Prior"
+        ,"StdDev"
+        ,"Min"
+        ,"Max"
+        ,"Status"
+    });
+
     auto& parList = parSet.getEffectiveParameterList();
     LogWarning << parSet.getName() << ": " << parList.size() << " parameters" << std::endl;
-    Logger::setIndentStr("├─ ");
+    if( parList.empty() ) continue;
+
     for( const auto& par : parList ){
       iFitPar++;
 
-      std::stringstream ssTitle;
-      ssTitle << "#" << iFitPar << " -> " << parSet.getName() << "/" << par.getTitle();
+      std::vector<std::string> lineValues(tableLines[0].size());
+      int valIndex{0};
+      lineValues[valIndex++] = par.getTitle();
+      lineValues[valIndex++] = std::to_string( par.getParameterValue() );
+      lineValues[valIndex++] = std::to_string( par.getPriorValue() );
+      lineValues[valIndex++] = std::to_string( par.getStdDevValue() );
 
-      if( not par.isEnabled() ){
-        LogInfo << "\033[43m" << ssTitle.str() << ": Disabled" << "\033[0m" << std::endl;
+      lineValues[valIndex++] = std::to_string( par.getMinValue() );
+      lineValues[valIndex++] = std::to_string( par.getMaxValue() );
+
+      std::string colorStr;
+
+      if( not par.isEnabled() ) { lineValues[valIndex++] = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackGround; }
+      else if( par.isFixed() )  { lineValues[valIndex++] = "Fixed";    colorStr = GenericToolbox::ColorCodes::redBackGround; }
+      else                      { lineValues[valIndex++] = PriorType::PriorTypeEnumNamespace::toString(par.getPriorType(), true) + " Prior"; }
+
+      for( auto& line : lineValues ){
+        if(not line.empty()) line = colorStr + line + GenericToolbox::ColorCodes::resetColor;
       }
-      else{
-        if( par.isFixed() ){
-          LogInfo << "\033[41m" << ssTitle.str() << ": Fixed @ " << par.getParameterValue() << "\033[0m" << std::endl;
-        }
-        else{
-          LogInfo << ssTitle.str() << ": Starting @ " << par.getParameterValue();
-          if( not par.isFree() ) LogInfo << " ± " << par.getStdDevValue();
-          LogInfo << "\033[0m" << std::endl;
-        }
-      }
+
+      tableLines.emplace_back(lineValues);
 
     }
-    Logger::setIndentStr("");
+
+    GenericToolbox::TablePrinter t;
+    t.fillTable(tableLines);
+    t.printTable();
 
   }
 
@@ -575,7 +596,7 @@ void FitterEngine::updateChi2Cache(){
   _chi2PullsBuffer_ = 0;
   _chi2RegBuffer_ = 0;
   for( auto& parSet : _propagator_.getParameterSetsList() ){
-    buffer = parSet.getChi2();
+    buffer = parSet.getPenaltyChi2();
     _chi2PullsBuffer_ += buffer;
   }
 
@@ -944,7 +965,7 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
   for( const auto& parSet : _propagator_.getParameterSetsList() ){
     if( not parSet.isEnabled() ){ continue; }
 
-    LogInfo << "Extracting post-fit errors of parameter set: " << parSet.getName() << std::endl;
+    LogWarning << "Extracting post-fit errors of parameter set: " << parSet.getName() << std::endl;
     auto* parSetDir = GenericToolbox::mkdirTFile(errorDir, parSet.getName());
 
     auto* parList = &parSet.getEffectiveParameterList();

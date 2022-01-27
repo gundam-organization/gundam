@@ -147,9 +147,9 @@ private:
   bool _isBeingEdited_;
   bool _treeEventHasBeenDumped_;
 
-  TChain* _chainPtr_{nullptr};
+//  TChain* _chainPtr_{nullptr};
   TTree* _singleEntryTree_{nullptr};
-  std::vector<TLeaf*> _leafList_;
+//  std::vector<TLeaf*> _leafList_;
 
   // Int_t containers
   std::vector<std::string>* _intNameListPtr_;     // same ptr can be used for every event -> save memory
