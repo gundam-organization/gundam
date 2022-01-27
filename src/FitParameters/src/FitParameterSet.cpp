@@ -8,6 +8,7 @@
 
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
+#include "GenericToolbox.TablePrinter.h"
 #include "Logger.h"
 
 LoggerInit([](){
@@ -223,7 +224,7 @@ const std::vector<FitParameter>& FitParameterSet::getEffectiveParameterList() co
 size_t FitParameterSet::getNbParameters() const {
   return _parameterList_.size();
 }
-double FitParameterSet::getChi2() {
+double FitParameterSet::getPenaltyChi2() {
 
   if (not _isEnabled_) { return 0; }
 
@@ -363,9 +364,46 @@ std::string FitParameterSet::getSummary() const {
   if(_isInitialized_ and _isEnabled_){
     ss << ", nbParameters: " << _parameterList_.size() << "(defined)/" << _strippedCovarianceMatrix_->GetNrows() << "(covariance)";
     if( not _parameterList_.empty() ){
-      for( const auto& parameter : _parameterList_ ){
-        ss << std::endl << GenericToolbox::indentString(parameter.getSummary(), 2);
+
+      std::vector<std::vector<std::string>> tableLines;
+      tableLines.emplace_back(std::vector<std::string>{
+        "Title",
+        "Prior",
+        "StdDev",
+//        "StepSize",
+        "Min",
+        "Max",
+        "Status"
+      });
+
+
+      for( const auto& par : _parameterList_ ){
+        std::vector<std::string> lineValues(tableLines[0].size());
+        lineValues[0] = par.getTitle();
+        lineValues[1] = std::to_string( par.getPriorValue() );
+        lineValues[2] = std::to_string( par.getStdDevValue() );
+//        lineValues[3] = std::to_string( par.getStepSize() );
+
+        lineValues[3] = std::to_string( par.getMinValue() );
+        lineValues[4] = std::to_string( par.getMaxValue() );
+
+        std::string colorStr;
+
+        if( not par.isEnabled() ) { lineValues.back() = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackGround; }
+        else if( par.isFixed() )  { lineValues.back() = "Fixed";    colorStr = GenericToolbox::ColorCodes::redBackGround; }
+        else if( par.isFree() )   { lineValues.back() = "Free"; }
+        else                      { lineValues.back() = "Fit"; }
+
+        for( auto& line : lineValues ){
+          if(not line.empty()) line = colorStr + line + GenericToolbox::ColorCodes::resetColor;
+        }
+
+        tableLines.emplace_back(lineValues);
       }
+
+      GenericToolbox::TablePrinter t;
+      t.fillTable(tableLines);
+      t.printTable();
     }
   }
 
@@ -514,6 +552,10 @@ void FitParameterSet::readInputParameterOptions(){
     auto parLimits = JsonUtils::fetchValue(_config_, "parameterLimits", nlohmann::json());
     _globalParameterMinValue_ = JsonUtils::fetchValue(parLimits, "minValue", std::nan("UNSET"));
     _globalParameterMaxValue_ = JsonUtils::fetchValue(parLimits, "maxValue", std::nan("UNSET"));
+  }
+
+  if( JsonUtils::doKeyExist(_config_, "enableParameterMask") ){
+
   }
 
   _useEigenDecompInFit_ = JsonUtils::fetchValue(_config_ , "useEigenDecompInFit", false);

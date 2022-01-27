@@ -69,7 +69,7 @@ public:
 
   // Core
   size_t getNbParameters() const;
-  double getChi2();
+  double getPenaltyChi2();
 
   // Throw / Shifts
   void moveFitParametersToPrior();
