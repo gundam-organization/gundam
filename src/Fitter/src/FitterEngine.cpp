@@ -16,7 +16,7 @@
 #include "TLegend.h"
 
 #include <cmath>
-
+#include "GenericToolbox.TablePrinter.h"
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[FitterEngine]");
@@ -38,6 +38,8 @@ void FitterEngine::reset() {
   _nbFitParameters_ = 0;
   _nbParameters_ = 0;
   _nbFitCalls_ = 0;
+
+  GenericToolbox::setT2kPalette();
 
   _convergenceMonitor_.reset();
 }
@@ -294,7 +296,7 @@ void FitterEngine::fixGhostFitParameters(){
 
       if( fixNextEigenPars ){
         par.setIsFixed(true);
-        LogInfo << GenericToolbox::ColorCodes::redBackGround << ssPrint.str() << " -> FIXED AS NEXT EIGEN." << std::endl;
+        LogInfo << GenericToolbox::ColorCodes::redBackGround << ssPrint.str() << " -> FIXED AS NEXT EIGEN." << GenericToolbox::ColorCodes::resetColor << std::endl;
         continue;
       }
 
@@ -397,34 +399,55 @@ void FitterEngine::fit(){
   LogWarning << __METHOD_NAME__ << std::endl;
 
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Summary of the fit parameters:") << std::endl;
+
   int iFitPar = -1;
   for( const auto& parSet : _propagator_.getParameterSetsList() ){
 
+    std::vector<std::vector<std::string>> tableLines;
+    tableLines.emplace_back(std::vector<std::string>{
+        "Title"
+        ,"Starting"
+        ,"Prior"
+        ,"StdDev"
+        ,"Min"
+        ,"Max"
+        ,"Status"
+    });
+
     auto& parList = parSet.getEffectiveParameterList();
     LogWarning << parSet.getName() << ": " << parList.size() << " parameters" << std::endl;
-    Logger::setIndentStr("├─ ");
+    if( parList.empty() ) continue;
+
     for( const auto& par : parList ){
       iFitPar++;
 
-      std::stringstream ssTitle;
-      ssTitle << "#" << iFitPar << " -> " << parSet.getName() << "/" << par.getTitle();
+      std::vector<std::string> lineValues(tableLines[0].size());
+      int valIndex{0};
+      lineValues[valIndex++] = par.getTitle();
+      lineValues[valIndex++] = std::to_string( par.getParameterValue() );
+      lineValues[valIndex++] = std::to_string( par.getPriorValue() );
+      lineValues[valIndex++] = std::to_string( par.getStdDevValue() );
 
-      if( not par.isEnabled() ){
-        LogInfo << "\033[43m" << ssTitle.str() << ": Disabled" << "\033[0m" << std::endl;
+      lineValues[valIndex++] = std::to_string( par.getMinValue() );
+      lineValues[valIndex++] = std::to_string( par.getMaxValue() );
+
+      std::string colorStr;
+
+      if( not par.isEnabled() ) { lineValues[valIndex++] = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackGround; }
+      else if( par.isFixed() )  { lineValues[valIndex++] = "Fixed";    colorStr = GenericToolbox::ColorCodes::redBackGround; }
+      else                      { lineValues[valIndex++] = PriorType::PriorTypeEnumNamespace::toString(par.getPriorType(), true) + " Prior"; }
+
+      for( auto& line : lineValues ){
+        if(not line.empty()) line = colorStr + line + GenericToolbox::ColorCodes::resetColor;
       }
-      else{
-        if( par.isFixed() ){
-          LogInfo << "\033[41m" << ssTitle.str() << ": Fixed @ " << par.getParameterValue() << "\033[0m" << std::endl;
-        }
-        else{
-          LogInfo << ssTitle.str() << ": Starting @ " << par.getParameterValue();
-          if( not par.isFree() ) LogInfo << " ± " << par.getStdDevValue();
-          LogInfo << "\033[0m" << std::endl;
-        }
-      }
+
+      tableLines.emplace_back(lineValues);
 
     }
-    Logger::setIndentStr("");
+
+    GenericToolbox::TablePrinter t;
+    t.fillTable(tableLines);
+    t.printTable();
 
   }
 
@@ -575,7 +598,7 @@ void FitterEngine::updateChi2Cache(){
   _chi2PullsBuffer_ = 0;
   _chi2RegBuffer_ = 0;
   for( auto& parSet : _propagator_.getParameterSetsList() ){
-    buffer = parSet.getChi2();
+    buffer = parSet.getPenaltyChi2();
     _chi2PullsBuffer_ += buffer;
   }
 
@@ -853,6 +876,17 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
     corMatrix->Write("Correlation_TMatrixD");
     corMatrixTH2D->Write("Correlation_TH2D");
 
+    // Table printout
+    std::vector<std::vector<std::string>> tableLines;
+    tableLines.emplace_back(std::vector<std::string>{
+        "Parameter"
+        ,"Prior Value"
+        ,"Fit Value"
+        ,"Prior Err"
+        ,"Fit Err"
+        ,"Constraint"
+    });
+
     // Parameters
     GenericToolbox::mkdirTFile(saveSubdir_, "values")->cd();
     auto* postFitErrorHist = new TH1D("postFitErrors_TH1D", "Post-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
@@ -873,17 +907,40 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
         if( priorFraction < 1E-2 ) ss << GenericToolbox::ColorCodes::yellowBackGround;
         if( priorFraction > 1 ) ss << GenericToolbox::ColorCodes::redBackGround;
 
-        ss << "Postfit error of \"" << par.getFullTitle() << "\": "
-           << TMath::Sqrt((*covMatrix_)[par.getParameterIndex()][par.getParameterIndex()])
-           << " (" << priorFraction * 100
-           << "% of the prior)" << GenericToolbox::ColorCodes::resetColor
-           << std::endl;
+        std::vector<std::string> lineValues(tableLines[0].size());
+        int valIndex{0};
+        lineValues[valIndex++] = par.getFullTitle();
 
-        LogInfo << ss.str();
+        lineValues[valIndex++] = std::to_string( par.getPriorValue() );
+        lineValues[valIndex++] = std::to_string( par.getParameterValue() );
+
+        lineValues[valIndex++] = std::to_string( par.getStdDevValue() );
+        lineValues[valIndex++] = std::to_string( TMath::Sqrt((*covMatrix_)[par.getParameterIndex()][par.getParameterIndex()]) );
+
+        std::string colorStr;
+
+        if( par.isFree() ){
+          lineValues[valIndex++] = "Unconstrained";
+          colorStr = GenericToolbox::ColorCodes::yellowBackGround;
+        }
+        else{
+          lineValues[valIndex++] = std::to_string( priorFraction*100 ) + " \%";
+          if( priorFraction > 1 ){ colorStr = GenericToolbox::ColorCodes::redBackGround; }
+        }
+
+        if( not colorStr.empty() ){
+          for( auto& line : lineValues ){ if(not line.empty()) line = colorStr + line + GenericToolbox::ColorCodes::resetColor; }
+        }
+
+        tableLines.emplace_back(lineValues);
 
         if(not par.isFree()) preFitErrorHist->SetBinError( 1 + par.getParameterIndex(), par.getStdDevValue() );
       }
     }
+
+    GenericToolbox::TablePrinter t;
+    t.fillTable(tableLines);
+    t.printTable();
 
     if( not gStyle->GetCanvasPreferGL() ){
       preFitErrorHist->SetFillColor(kRed-9);
@@ -944,7 +1001,7 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
   for( const auto& parSet : _propagator_.getParameterSetsList() ){
     if( not parSet.isEnabled() ){ continue; }
 
-    LogInfo << "Extracting post-fit errors of parameter set: " << parSet.getName() << std::endl;
+    LogWarning << "Extracting post-fit errors of parameter set: " << parSet.getName() << std::endl;
     auto* parSetDir = GenericToolbox::mkdirTFile(errorDir, parSet.getName());
 
     auto* parList = &parSet.getEffectiveParameterList();
