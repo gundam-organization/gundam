@@ -70,7 +70,7 @@ private:
   // Internals
   bool _enableDialsSummary_{false};
   bool _isEnabled_{true};
-  double _parameterNominalValue_{}; // parameter with which the MC has produced the data set
+//  double _parameterNominalValue_{}; // parameter with which the MC has produced the data set
   std::vector<std::string> _dataSetNameList_;
   // shared pointers are needed since we want to make vectors of DialSets.
   // .emplace_back() method is calling delete which is calling reset(), and this one has to delete the content of

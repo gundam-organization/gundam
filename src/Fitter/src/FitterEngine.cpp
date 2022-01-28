@@ -682,7 +682,7 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
   this->generateSamplePlots("postFit/samples");
 
   LogInfo << "Extracting post-fit covariance matrix" << std::endl;
-  auto* matricesDir = GenericToolbox::mkdirTFile(saveDir_, "matrices");
+  auto* matricesDir = GenericToolbox::mkdirTFile(saveDir_, "hessian");
 
   TMatrixDSym totalCovMatrix(int(_minimizer_->NDim()));
   _minimizer_->GetCovMatrix(totalCovMatrix.GetMatrixArray());
@@ -864,17 +864,43 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
     auto* corMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D(corMatrix, Form("Correlation_%s_TH2D", parSet_.getName().c_str()));
 
     for( const auto& par : parList_ ){
-      covMatrixTH2D->GetXaxis()->SetBinLabel(1+par.getParameterIndex(), par.getFullTitle().c_str());
-      covMatrixTH2D->GetYaxis()->SetBinLabel(1+par.getParameterIndex(), par.getFullTitle().c_str());
-      corMatrixTH2D->GetXaxis()->SetBinLabel(1+par.getParameterIndex(), par.getFullTitle().c_str());
-      corMatrixTH2D->GetYaxis()->SetBinLabel(1+par.getParameterIndex(), par.getFullTitle().c_str());
+      covMatrixTH2D->GetXaxis()->SetBinLabel(1+par.getParameterIndex(), par.getTitle().c_str());
+      covMatrixTH2D->GetYaxis()->SetBinLabel(1+par.getParameterIndex(), par.getTitle().c_str());
+      corMatrixTH2D->GetXaxis()->SetBinLabel(1+par.getParameterIndex(), par.getTitle().c_str());
+      corMatrixTH2D->GetYaxis()->SetBinLabel(1+par.getParameterIndex(), par.getTitle().c_str());
     }
+
+    auto* corMatrixCanvas = new TCanvas("host_TCanvas", "host_TCanvas", 1024, 1024);
+    corMatrixCanvas->cd();
+    corMatrixTH2D->GetXaxis()->SetLabelSize(0.03);
+    corMatrixTH2D->GetXaxis()->LabelsOption("v");
+    corMatrixTH2D->GetXaxis()->SetTitle("");
+    corMatrixTH2D->GetYaxis()->SetTitle("");
+    corMatrixTH2D->GetZaxis()->SetRangeUser(-1,1);
+    corMatrixTH2D->GetZaxis()->SetTitle("Correlation");
+    corMatrixTH2D->GetZaxis()->SetTitleOffset(1.1);
+    corMatrixTH2D->SetTitle(Form("Post-fit correlation matrix for %s", parSet_.getName().c_str()));
+    corMatrixTH2D->Draw("COLZ");
+
+    GenericToolbox::fixTH2display(corMatrixTH2D);
+    auto* pal = (TPaletteAxis*) corMatrixTH2D->GetListOfFunctions()->FindObject("palette");
+    // TPaletteAxis* pal = (TPaletteAxis*) histogram_->GetListOfFunctions()->At(0);
+    if(pal != nullptr){
+      pal->SetY1NDC(0.15);
+      pal->SetTitleOffset(2);
+      pal->Draw();
+    }
+    gPad->SetLeftMargin(0.15);
+    gPad->SetBottomMargin(0.15);
+
+    corMatrixTH2D->Draw("COLZ");
 
     GenericToolbox::mkdirTFile(saveSubdir_, "matrices")->cd();
     covMatrix_->Write("Covariance_TMatrixD");
     covMatrixTH2D->Write("Covariance_TH2D");
     corMatrix->Write("Correlation_TMatrixD");
     corMatrixTH2D->Write("Correlation_TH2D");
+    corMatrixCanvas->Write("Correlation_TCanvas");
 
     // Table printout
     std::vector<std::vector<std::string>> tableLines;
