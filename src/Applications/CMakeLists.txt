@@ -13,6 +13,7 @@ set( APPLICATION_LIST
         xsllhXsecCov
         gundamFitter
         gundamConfigUnfolder
+        gundamPlotExtractor
         YamlSandbox
 )
 
