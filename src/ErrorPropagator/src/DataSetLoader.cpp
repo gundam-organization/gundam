@@ -289,13 +289,17 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
               dialSetPtr->getDialList().resize(chainPtr->GetEntries(), nullptr); // to optimize?
 
               auto dialType = dialSetPtr->getGlobalDialType();
+              size_t nDials = dialSetPtr->getDialList().size();
+              std::string pTitle = Logger::getPrefixString() + "Claiming dial memory for " + par.getFullTitle();
               if( dialType == DialType::Spline ){
-                for( size_t iDial = dialSetPtr->getCurrentDialOffset() ; iDial < dialSetPtr->getDialList().size() ; iDial++ ){
+                for( size_t iDial = dialSetPtr->getCurrentDialOffset() ; iDial < nDials ; iDial++ ){
+                  GenericToolbox::displayProgressBar(iDial, nDials, pTitle);
                   dialSetPtr->getDialList()[iDial] = std::make_shared<SplineDial>();
                 }
               }
               else if( dialType == DialType::Graph ){
-                for( size_t iDial = dialSetPtr->getCurrentDialOffset() ; iDial < dialSetPtr->getDialList().size() ; iDial++ ){
+                for( size_t iDial = dialSetPtr->getCurrentDialOffset() ; iDial < nDials ; iDial++ ){
+                  GenericToolbox::displayProgressBar(iDial, nDials, pTitle);
                   dialSetPtr->getDialList()[iDial] = std::make_shared<GraphDial>();
                 }
               }
