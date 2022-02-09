@@ -14,7 +14,6 @@
 class SplineDial : public Dial {
 
 public:
-
   SplineDial();
 
   void reset() override;

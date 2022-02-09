@@ -12,20 +12,17 @@
 LoggerInit([](){ Logger::setUserHeaderStr("[SplineDial]"); } )
 
 
-SplineDial::SplineDial() { this->SplineDial::reset(); }
+SplineDial::SplineDial() : Dial(DialType::Spline) {
+  this->SplineDial::reset();
+}
 
 void SplineDial::reset() {
   this->Dial::reset();
-  _dialType_ = DialType::Spline;
   _spline_ = TSpline3();
 }
 
 void SplineDial::initialize() {
   this->Dial::initialize();
-  LogThrowIf(
-      _dialType_!=DialType::Spline,
-      "_dialType_ is not Spline: " << DialType::DialTypeEnumNamespace::toString(_dialType_)
-  )
   LogThrowIf(_spline_.GetXmin() == _spline_.GetXmax(), "Spline is not valid.")
 
   // check if prior is out of bounds:
@@ -104,7 +101,7 @@ void SplineDial::copySpline(const TSpline3* splinePtr_){
   _spline_ = *splinePtr_;
 }
 void SplineDial::createSpline(TGraph* grPtr_){
-//  LogThrowIf(_spline_.GetXmin() != _spline_.GetXmax(), "Spline already set")
+  LogThrowIf(_spline_.GetXmin() != _spline_.GetXmax(), "Spline already set")
   _spline_ = TSpline3(grPtr_->GetName(), grPtr_);
   fs.stepsize = (_spline_.GetXmax() - _spline_.GetXmin())/((double) grPtr_->GetN());
 }

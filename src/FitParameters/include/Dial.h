@@ -31,10 +31,11 @@ namespace DialType{
 
 class Dial {
 
-public:
-  Dial();
+protected:
+  Dial(DialType::DialType dialType_);
   virtual ~Dial();
 
+public:
   virtual void reset();
 
   void setApplyConditionBin(const DataBin &applyConditionBin);
@@ -43,8 +44,6 @@ public:
   void setUseMirrorDial(bool useMirrorDial);
   void setMirrorLowEdge(double mirrorLowEdge);
   void setMirrorRange(double mirrorRange);
-  void setDialType(DialType::DialType dialType);
-
   void setMinimumDialResponse(double minimumDialResponse);
 
   void copySplineCache(TSpline3& splineBuffer_);
@@ -68,10 +67,10 @@ public:
   virtual void fillResponseCache() = 0;
 
 protected:
+  const DialType::DialType _dialType_;
 
   // Parameters
   DataBin _applyConditionBin_;
-  DialType::DialType _dialType_{DialType::Invalid};
   void* _associatedParameterReference_{nullptr};
 
   // Internals

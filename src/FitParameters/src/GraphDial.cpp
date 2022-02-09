@@ -12,22 +12,17 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[GraphDial]");
 })
 
-GraphDial::GraphDial() {
+GraphDial::GraphDial() : Dial{DialType::Graph} {
   this->GraphDial::reset();
 }
 
 void GraphDial::reset() {
   this->Dial::reset();
-  _dialType_ = DialType::Graph;
   _graph_ = TGraph();
 }
 
 void GraphDial::initialize() {
   this->Dial::initialize();
-  LogThrowIf(
-      _dialType_!=DialType::Graph,
-      "_dialType_ is not Graph: " << DialType::DialTypeEnumNamespace::toString(_dialType_)
-  )
   LogThrowIf( _graph_.GetN() == 0 )
   _isInitialized_ = true;
 }

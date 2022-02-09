@@ -19,7 +19,7 @@ LoggerInit([](){
 } )
 
 
-Dial::Dial() { this->Dial::reset(); }
+Dial::Dial(DialType::DialType dialType_) : _dialType_{dialType_} {}
 Dial::~Dial() = default;
 
 void Dial::reset() {
@@ -27,10 +27,7 @@ void Dial::reset() {
   _dialResponseCache_ = std::nan("Unset");
   _dialParameterCache_ = std::nan("Unset");
   _applyConditionBin_ = DataBin();
-  _dialType_ = DialType::Invalid;
   _associatedParameterReference_ = nullptr;
-//  dialMutex = std::make_unique<std::mutex>();
-
   _useMirrorDial_ = false;
   _mirrorLowEdge_ = std::nan("unset");
   _mirrorRange_   = std::nan("unset");
@@ -56,9 +53,6 @@ void Dial::setMirrorRange(double mirrorRange) {
 }
 void Dial::setMinimumDialResponse(double minimumDialResponse) {
   _minimumDialResponse_ = minimumDialResponse;
-}
-void Dial::setDialType(DialType::DialType dialType) {
-  _dialType_ = dialType;
 }
 
 void Dial::copySplineCache(TSpline3& splineBuffer_){

@@ -141,7 +141,6 @@ std::string DialSet::getSummary() const {
   return ss.str();
 }
 void DialSet::applyGlobalParameters(Dial* dial_) const{
-//  dial_->setDialType(_globalDialType_); // should be defined by the host class
   dial_->setAssociatedParameterReference(_associatedParameterReference_);
   dial_->setMinimumDialResponse(_globalMinimumDialResponse_);
   dial_->setUseMirrorDial(_globalUseMirrorDial_);
@@ -201,7 +200,6 @@ bool DialSet::initializeNormDialsWithBinning() {
 
   NormalizationDial dial;
   this->applyGlobalParameters(&dial);
-  dial.setDialType(DialType::Normalization);
   dial.setApplyConditionBin( binning.getBinsList().at( _parameterIndex_ ) );
   dial.initialize();
   _dialList_.emplace_back( std::make_shared<NormalizationDial>(dial) );

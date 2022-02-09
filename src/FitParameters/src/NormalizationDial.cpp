@@ -11,7 +11,7 @@ LoggerInit([](){
   Logger::setUserHeaderStr("[NormalizationDial]");
 })
 
-NormalizationDial::NormalizationDial() {
+NormalizationDial::NormalizationDial() : Dial(DialType::Normalization) {
   this->NormalizationDial::reset();
 }
 
@@ -23,15 +23,10 @@ void NormalizationDial::fillResponseCache() {
 
 void NormalizationDial::reset() {
   Dial::reset();
-  _dialType_ = DialType::Normalization;
 }
 
 void NormalizationDial::initialize() {
   Dial::initialize();
-  LogThrowIf(
-      _dialType_!=DialType::Normalization,
-      "_dialType_ is not Normalization: " << DialType::DialTypeEnumNamespace::toString(_dialType_)
-      )
   _isInitialized_ = true;
 }
 
