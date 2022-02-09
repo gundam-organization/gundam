@@ -20,6 +20,9 @@
 class DialSet {
 
 public:
+  static bool _verboseMode_;
+
+public:
   DialSet();
   virtual ~DialSet();
 
@@ -44,14 +47,17 @@ public:
   const std::string &getDialLeafName() const;
   double getMinimumSplineResponse() const;
   size_t getCurrentDialOffset() const;
-
   DialType::DialType getGlobalDialType() const;
-
+  const Dial &getTemplateDial() const;
 
   // Core
   std::string getSummary() const;
+  void applyGlobalParameters(Dial* dial_) const;
+  void applyGlobalParameters(Dial& dial_) const;
 
 protected:
+  void readGlobals(const nlohmann::json &config_);
+
   bool initializeNormDialsWithBinning();
   bool initializeDialsWithDefinition();
   nlohmann::json fetchDialsDefinition(const nlohmann::json &definitionsList_);
@@ -63,26 +69,28 @@ private:
   std::string _parameterName_;
   std::string _workingDirectory_{"."};
   std::string _applyConditionStr_;
-  TFormula* _applyConditionFormula_{nullptr};
+  std::shared_ptr<TFormula> _applyConditionFormula_{nullptr};
   void* _associatedParameterReference_{nullptr};
-  std::string _dialLeafName_{};
 
   // Internals
   bool _enableDialsSummary_{false};
   bool _isEnabled_{true};
-//  double _parameterNominalValue_{}; // parameter with which the MC has produced the data set
   std::vector<std::string> _dataSetNameList_;
+//  double _parameterNominalValue_{}; // parameter with which the MC has produced the data set
+
   // shared pointers are needed since we want to make vectors of DialSets.
   // .emplace_back() method is calling delete which is calling reset(), and this one has to delete the content of
   // every pointers. It means the new copied DialSet will handle Dial ptr which have already been deleted.
   std::vector<std::shared_ptr<Dial>> _dialList_;
-  DialType::DialType _globalDialType_;
   size_t _currentDialOffset_{0};
 
-  double _minimumSplineResponse_{std::nan("unset")};
-
-public:
-  static bool _verboseMode_;
+  // globals
+  DialType::DialType _globalDialType_;
+  std::string _globalDialLeafName_{};
+  double _globalMinimumDialResponse_{std::nan("unset")};
+  bool _globalUseMirrorDial_{false};
+  double _mirrorLowEdge_{std::nan("unset")};
+  double _mirrorHighEdge_{std::nan("unset")};
 
 };
 

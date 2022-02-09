@@ -12,11 +12,12 @@ LoggerInit([](){
 })
 
 NormalizationDial::NormalizationDial() {
-  this->reset();
+  this->NormalizationDial::reset();
 }
 
 void NormalizationDial::fillResponseCache() {
   // Normalization dial: y = x
+  // Don't use _effectiveDialParameterValue_ since it doesn't make sense
   _dialResponseCache_ = _dialParameterCache_;
 }
 
@@ -27,6 +28,10 @@ void NormalizationDial::reset() {
 
 void NormalizationDial::initialize() {
   Dial::initialize();
+  LogThrowIf(
+      _dialType_!=DialType::Normalization,
+      "_dialType_ is not Normalization: " << DialType::DialTypeEnumNamespace::toString(_dialType_)
+      )
   _isInitialized_ = true;
 }
 

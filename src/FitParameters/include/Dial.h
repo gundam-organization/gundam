@@ -19,15 +19,12 @@
 
 namespace DialType{
   ENUM_EXPANDER(
-    DialType, -1,
-    Invalid,
-    Normalization, // response = dial
-    Spline,        // response = spline(dial)
-    Graph,         // response = graphInterpol(dial)
-    Other
-  );
-
-  DialType toDialType(const std::string& dialStr_);
+    DialType, -1
+    ,Invalid
+    ,Normalization // response = dial
+    ,Spline        // response = spline(dial)
+    ,Graph         // response = graphInterpol(dial)
+  )
 }
 
 
@@ -43,25 +40,31 @@ public:
   void setApplyConditionBin(const DataBin &applyConditionBin);
   void setAssociatedParameterReference(void *associatedParameterReference);
   void setIsReferenced(bool isReferenced);
+  void setUseMirrorDial(bool useMirrorDial);
+  void setMirrorLowEdge(double mirrorLowEdge);
+  void setMirrorRange(double mirrorRange);
+  void setDialType(DialType::DialType dialType);
+
+  void setMinimumDialResponse(double minimumDialResponse);
+
+  void copySplineCache(TSpline3& splineBuffer_);
 
   virtual void initialize();
 
   bool isInitialized() const;
-
+  bool isReferenced() const;
   double getDialResponseCache() const;
   const DataBin &getApplyConditionBin() const;
   DataBin &getApplyConditionBin();
   DialType::DialType getDialType() const;
   void *getAssociatedParameterReference() const;
-  bool isReferenced() const;
 
-  virtual std::string getSummary();
-  virtual double evalResponse(double parameterValue_);
+  void updateEffectiveDialParameter();
   double evalResponse();
 
-  void copySplineCache(TSpline3& splineBuffer_);
+  virtual double evalResponse(double parameterValue_);
+  virtual std::string getSummary();
   virtual void buildResponseSplineCache();
-
   virtual void fillResponseCache() = 0;
 
 protected:
@@ -75,10 +78,16 @@ protected:
   bool _isInitialized_{false};
   GenericToolbox::AtomicWrapper<bool> _isEditingCache_{false};
   bool _isReferenced_{false};
-  bool _useMirrorDial_{false}; // TODO
   double _dialResponseCache_{};
   double _dialParameterCache_{};
+  double _effectiveDialParameterValue_{}; // take into account internal transformations while using mirrored splines transformations
   std::shared_ptr<TSpline3> _responseSplineCache_{nullptr};
+
+  bool _useMirrorDial_{false};
+  double _mirrorLowEdge_{std::nan("unset")};
+  double _mirrorRange_{std::nan("unset")};
+
+  double _minimumDialResponse_{std::nan("unset")};
 
 };
 

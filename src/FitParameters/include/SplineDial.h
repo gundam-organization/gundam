@@ -21,7 +21,6 @@ public:
 
   void copySpline(const TSpline3* splinePtr_);
   void createSpline(TGraph* grPtr_);
-  void setMinimumSplineResponse(double minimumSplineResponse);
 
   void initialize() override;
 
@@ -39,7 +38,6 @@ protected:
 
 private:
   bool _throwIfResponseIsNegative_{true};
-  double _minimumSplineResponse_{std::nan("unset")};
 
   TSpline3 _spline_;
 
