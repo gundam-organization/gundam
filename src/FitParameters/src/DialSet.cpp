@@ -165,7 +165,7 @@ void DialSet::readGlobals(const nlohmann::json &config_){
   }
 
   // globals for _templateDial_
-  _globalMinDialResponse_ = JsonUtils::fetchValue(config_, std::vector<std::string>{"minDialResponse", "minimumSplineResponse"}, _globalMinDialResponse_);
+  _globalMinDialResponse_ = JsonUtils::fetchValue(config_, {{"minDialResponse"}, {"minimumSplineResponse"}}, _globalMinDialResponse_);
   _globalMaxDialResponse_ = JsonUtils::fetchValue(config_, "maxDialResponse", _globalMaxDialResponse_);
   _globalUseMirrorDial_       = JsonUtils::fetchValue(config_, "useMirrorDial", _globalUseMirrorDial_);
   if( _globalUseMirrorDial_ ){
@@ -352,7 +352,6 @@ bool DialSet::initializeDialsWithDefinition() {
   return true;
 }
 nlohmann::json DialSet::fetchDialsDefinition(const nlohmann::json &definitionsList_) {
-
   for(size_t iDial = 0 ; iDial < definitionsList_.size() ; iDial++ ){
     if( _parameterName_.empty() ){
       if( _parameterIndex_ == iDial ){
@@ -363,8 +362,7 @@ nlohmann::json DialSet::fetchDialsDefinition(const nlohmann::json &definitionsLi
       return definitionsList_.at(iDial);
     }
   }
-
-  return nlohmann::json();
+  return {};
 }
 
 
