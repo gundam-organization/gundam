@@ -459,7 +459,7 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
       // Load the branches
       threadChain->LoadTree(iStart);
 
-      std::string progressTitle = LogInfo.getPrefixString() + "Loading";
+      std::string progressTitle = LogInfo.getPrefixString() + "Loading and indexing";
 
       for(Long64_t iEntry = iStart ; iEntry < iEnd ; iEntry++ ){
 

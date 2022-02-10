@@ -964,8 +964,8 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
               postFitErrorHist->SetBinError( 1 + par.getParameterIndex(), TMath::Sqrt((*covMatrix_)[par.getParameterIndex()][par.getParameterIndex()]));
               preFitErrorHist->SetBinContent( 1 + par.getParameterIndex(), par.getPriorValue() );
 
-              if( par.isEnabled() and not par.isFixed() ){
-                if(not par.isFree()) preFitErrorHist->SetBinError( 1 + par.getParameterIndex(), par.getStdDevValue() );
+              if( par.isEnabled() and not par.isFixed() and not par.isFree() ){
+                preFitErrorHist->SetBinError( 1 + par.getParameterIndex(), par.getStdDevValue() );
               }
             }
             else{
@@ -981,7 +981,7 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
                       TMath::Sqrt((*covMatrix_)[par.getParameterIndex()][par.getParameterIndex()]), par
                   )
               );
-              if( par.isEnabled() and not par.isFixed() ){
+              if( par.isEnabled() and not par.isFixed() and not par.isFree() ){
                 preFitErrorHist->SetBinError( 1 + par.getParameterIndex(), 1 );
               }
             } // norm
