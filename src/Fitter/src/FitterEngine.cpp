@@ -863,7 +863,9 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
         auto* corMatrix = GenericToolbox::convertToCorrelationMatrix((TMatrixD*) covMatrix_);
         auto* corMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D(corMatrix, Form("Correlation_%s_TH2D", parSet_.getName().c_str()));
 
+        size_t maxLabelLength{0};
         for( const auto& par : parList_ ){
+          maxLabelLength = std::max(maxLabelLength, par.getTitle().size());
           covMatrixTH2D->GetXaxis()->SetBinLabel(1+par.getParameterIndex(), par.getTitle().c_str());
           covMatrixTH2D->GetYaxis()->SetBinLabel(1+par.getParameterIndex(), par.getTitle().c_str());
           corMatrixTH2D->GetXaxis()->SetBinLabel(1+par.getParameterIndex(), par.getTitle().c_str());
@@ -872,9 +874,10 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
 
         auto* corMatrixCanvas = new TCanvas("host_TCanvas", "host_TCanvas", 1024, 1024);
         corMatrixCanvas->cd();
-        corMatrixTH2D->GetXaxis()->SetLabelSize(0.03);
+        corMatrixTH2D->GetXaxis()->SetLabelSize(0.025);
         corMatrixTH2D->GetXaxis()->LabelsOption("v");
         corMatrixTH2D->GetXaxis()->SetTitle("");
+        corMatrixTH2D->GetYaxis()->SetLabelSize(0.025);
         corMatrixTH2D->GetYaxis()->SetTitle("");
         corMatrixTH2D->GetZaxis()->SetRangeUser(-1,1);
         corMatrixTH2D->GetZaxis()->SetTitle("Correlation");
@@ -890,8 +893,8 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
           pal->SetTitleOffset(2);
           pal->Draw();
         }
-        gPad->SetLeftMargin(0.15);
-        gPad->SetBottomMargin(0.15);
+        gPad->SetLeftMargin(0.1*(1 + maxLabelLength/15.));
+        gPad->SetBottomMargin(0.1*(1 + maxLabelLength/15.));
 
         corMatrixTH2D->Draw("COLZ");
 
@@ -952,15 +955,17 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
         auto makePrePostFitCompPlot = [&](TDirectory* saveDir_, bool isNorm_){
           saveDir_->cd();
 
+          size_t longestTitleSize{0};
           double minY{std::nan("unset")}, maxY{std::nan("unset")};
 
           auto* postFitErrorHist = new TH1D("postFitErrors_TH1D", "Post-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
           auto* preFitErrorHist = new TH1D("preFitErrors_TH1D", "Pre-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
 
           for( const auto& par : parList_ ){
+            longestTitleSize = std::max(longestTitleSize, par.getTitle().size());
+
             postFitErrorHist->GetXaxis()->SetBinLabel(1 + par.getParameterIndex(), par.getTitle().c_str());
             preFitErrorHist->GetXaxis()->SetBinLabel(1 + par.getParameterIndex(), par.getTitle().c_str());
-
 
             if(not isNorm_){
               postFitErrorHist->SetBinContent( 1 + par.getParameterIndex(), par.getParameterValue());
@@ -1014,6 +1019,8 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
           else{
             preFitErrorHist->GetYaxis()->SetTitle("Parameter values (normalized to the prior)");
           }
+          preFitErrorHist->GetXaxis()->SetLabelSize(0.03);
+          preFitErrorHist->GetXaxis()->LabelsOption("v");
 
           preFitErrorHist->SetTitle(Form("Pre-fit Errors of %s", parSet_.getName().c_str()));
           preFitErrorHist->Write();
@@ -1057,6 +1064,7 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
 
           gPad->SetGridx();
           gPad->SetGridy();
+          gPad->SetBottomMargin(0.1*(1 + longestTitleSize/15.));
 
           if( not isNorm_ ){ preFitErrorHist->SetTitle(Form("Pre-fit/Post-fit comparison for %s", parSet_.getName().c_str())); }
           else             { preFitErrorHist->SetTitle(Form("Pre-fit/Post-fit comparison for %s (normalized)", parSet_.getName().c_str())); }
