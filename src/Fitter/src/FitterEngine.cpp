@@ -952,12 +952,15 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
         auto makePrePostFitCompPlot = [&](TDirectory* saveDir_, bool isNorm_){
           saveDir_->cd();
 
+          double minY{std::nan("unset")}, maxY{std::nan("unset")};
+
           auto* postFitErrorHist = new TH1D("postFitErrors_TH1D", "Post-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
           auto* preFitErrorHist = new TH1D("preFitErrors_TH1D", "Pre-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
 
           for( const auto& par : parList_ ){
             postFitErrorHist->GetXaxis()->SetBinLabel(1 + par.getParameterIndex(), par.getTitle().c_str());
             preFitErrorHist->GetXaxis()->SetBinLabel(1 + par.getParameterIndex(), par.getTitle().c_str());
+
 
             if(not isNorm_){
               postFitErrorHist->SetBinContent( 1 + par.getParameterIndex(), par.getParameterValue());
@@ -985,6 +988,17 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
                 preFitErrorHist->SetBinError( 1 + par.getParameterIndex(), 1 );
               }
             } // norm
+
+            // boundaries Y
+            // -> init
+            if( minY != minY ) minY = preFitErrorHist->GetBinContent(1 + par.getParameterIndex());
+            if( maxY != maxY ) maxY = preFitErrorHist->GetBinContent(1 + par.getParameterIndex());
+
+            // -> push bounds?
+            minY = std::min(minY, preFitErrorHist->GetBinContent(1 + par.getParameterIndex()) - preFitErrorHist->GetBinError(1 + par.getParameterIndex()));
+            minY = std::min(minY, postFitErrorHist->GetBinContent(1 + par.getParameterIndex()) - postFitErrorHist->GetBinError(1 + par.getParameterIndex()));
+            maxY = std::max(maxY, preFitErrorHist->GetBinContent(1 + par.getParameterIndex()) + preFitErrorHist->GetBinError(1 + par.getParameterIndex()));
+            maxY = std::max(maxY, postFitErrorHist->GetBinContent(1 + par.getParameterIndex()) + postFitErrorHist->GetBinError(1 + par.getParameterIndex()));
           } // par
 
           if(parSet_.getPriorCovarianceMatrix() != nullptr ){
@@ -995,7 +1009,7 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
           preFitErrorHist->SetMarkerColor(kRed-3);
 
           if( not isNorm_ ){
-            preFitErrorHist->GetYaxis()->SetTitle("Error value");
+            preFitErrorHist->GetYaxis()->SetTitle("Parameter values (a.u.)");
           }
           else{
             preFitErrorHist->GetYaxis()->SetTitle("Error value (normalized to the prior)");
@@ -1018,6 +1032,11 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
           errorsCanvas->cd();
 
           preFitErrorHist->SetMarkerSize(0);
+
+          minY -= 0.1*(maxY-minY);
+          maxY += 0.1*(maxY-minY);
+          preFitErrorHist->GetYaxis()->SetRangeUser(minY, maxY);
+
           preFitErrorHist->Draw("E2");
 
           TH1D preFitErrorHistLine = TH1D("preFitErrorHistLine", "preFitErrorHistLine",
