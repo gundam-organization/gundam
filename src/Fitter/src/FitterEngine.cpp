@@ -1012,7 +1012,7 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
             preFitErrorHist->GetYaxis()->SetTitle("Parameter values (a.u.)");
           }
           else{
-            preFitErrorHist->GetYaxis()->SetTitle("Error value (normalized to the prior)");
+            preFitErrorHist->GetYaxis()->SetTitle("Parameter values (normalized to the prior)");
           }
 
           preFitErrorHist->SetTitle(Form("Pre-fit Errors of %s", parSet_.getName().c_str()));
