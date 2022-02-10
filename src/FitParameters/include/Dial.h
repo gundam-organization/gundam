@@ -32,7 +32,8 @@ namespace DialType{
 class Dial {
 
 protected:
-  Dial(DialType::DialType dialType_);
+  // Not supposed to define a bare Dial. Use the downcast instead
+  explicit Dial(DialType::DialType dialType_);
   virtual ~Dial();
 
 public:
@@ -44,9 +45,8 @@ public:
   void setUseMirrorDial(bool useMirrorDial);
   void setMirrorLowEdge(double mirrorLowEdge);
   void setMirrorRange(double mirrorRange);
-  void setMinimumDialResponse(double minimumDialResponse);
-
-  void copySplineCache(TSpline3& splineBuffer_);
+  void setMinDialResponse(double minDialResponse_);
+  void setMaxDialResponse(double maxDialResponse_);
 
   virtual void initialize();
 
@@ -60,6 +60,7 @@ public:
 
   void updateEffectiveDialParameter();
   double evalResponse();
+  void copySplineCache(TSpline3& splineBuffer_);
 
   virtual double evalResponse(double parameterValue_);
   virtual std::string getSummary();
@@ -80,13 +81,19 @@ protected:
   double _dialResponseCache_{};
   double _dialParameterCache_{};
   double _effectiveDialParameterValue_{}; // take into account internal transformations while using mirrored splines transformations
-  std::shared_ptr<TSpline3> _responseSplineCache_{nullptr};
 
+  // Response cap
+  double _minDialResponse_{std::nan("unset")};
+  double _maxDialResponse_{std::nan("unset")};
+
+  // Dial mirroring
   bool _useMirrorDial_{false};
   double _mirrorLowEdge_{std::nan("unset")};
   double _mirrorRange_{std::nan("unset")};
 
-  double _minimumDialResponse_{std::nan("unset")};
+
+  // Output
+  std::shared_ptr<TSpline3> _responseSplineCache_{nullptr}; // dial response as a spline
 
 };
 

@@ -79,9 +79,9 @@ void DialSet::initialize() {
   this->readGlobals(_config_);
 
   // Dials are directly defined with a binning file?
-  if     ( initializeNormDialsWithBinning() ){ LogInfo << "DialSet initialised with binning definition." << std::endl;  }
+  if     (initializeNormDialsWithParBinning() ){ LogInfo << "DialSet initialised with parameter binning definition." << std::endl;  }
   // Dials are individually defined?
-  else if( initializeDialsWithDefinition() ) { LogInfo << "DialSet initialised with config definition." << std::endl; }
+  else if( initializeDialsWithDefinition() )   { LogInfo << "DialSet initialised with config definition." << std::endl; }
   // Dials definition not found?
   else{
     LogWarning << "Could not fetch dials definition for parameter: #" << _parameterIndex_;
@@ -96,9 +96,6 @@ void DialSet::initialize() {
 bool DialSet::isEnabled() const {
   return _isEnabled_;
 }
-const nlohmann::json &DialSet::getDialSetConfig() const {
-  return _config_;
-}
 const std::vector<std::string> &DialSet::getDataSetNameList() const {
   return _dataSetNameList_;
 }
@@ -108,14 +105,8 @@ std::vector<std::shared_ptr<Dial>> &DialSet::getDialList() {
 TFormula *DialSet::getApplyConditionFormula() const {
   return _applyConditionFormula_.get();
 }
-void *DialSet::getAssociatedParameterReference() {
-  return _associatedParameterReference_;
-}
 const std::string &DialSet::getDialLeafName() const {
   return _globalDialLeafName_;
-}
-double DialSet::getMinimumSplineResponse() const {
-  return _globalMinimumDialResponse_;
 }
 size_t DialSet::getCurrentDialOffset() const {
   return _currentDialOffset_;
@@ -142,7 +133,8 @@ std::string DialSet::getSummary() const {
 }
 void DialSet::applyGlobalParameters(Dial* dial_) const{
   dial_->setAssociatedParameterReference(_associatedParameterReference_);
-  dial_->setMinimumDialResponse(_globalMinimumDialResponse_);
+  dial_->setMinDialResponse(_globalMinDialResponse_);
+  dial_->setMaxDialResponse(_globalMaxDialResponse_);
   dial_->setUseMirrorDial(_globalUseMirrorDial_);
   if(_globalUseMirrorDial_){
     dial_->setMirrorLowEdge(_mirrorLowEdge_);
@@ -173,15 +165,15 @@ void DialSet::readGlobals(const nlohmann::json &config_){
   }
 
   // globals for _templateDial_
-  _globalMinimumDialResponse_ = JsonUtils::fetchValue(config_, "minimumSplineResponse", _globalMinimumDialResponse_);
+  _globalMinDialResponse_ = JsonUtils::fetchValue(config_, std::vector<std::string>{"minDialResponse", "minimumSplineResponse"}, _globalMinDialResponse_);
+  _globalMaxDialResponse_ = JsonUtils::fetchValue(config_, "maxDialResponse", _globalMaxDialResponse_);
   _globalUseMirrorDial_       = JsonUtils::fetchValue(config_, "useMirrorDial", _globalUseMirrorDial_);
   if( _globalUseMirrorDial_ ){
     _mirrorLowEdge_ = JsonUtils::fetchValue(config_, "mirrorLowEdge", _mirrorLowEdge_);
     _mirrorHighEdge_ = JsonUtils::fetchValue(config_, "mirrorHighEdge", _mirrorHighEdge_);
   }
 }
-
-bool DialSet::initializeNormDialsWithBinning() {
+bool DialSet::initializeNormDialsWithParBinning() {
 
   auto parameterBinningPath = JsonUtils::fetchValue<std::string>(_config_, "parametersBinningPath", "");
   if( parameterBinningPath.empty() ){ return false; }
