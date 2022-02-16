@@ -44,6 +44,9 @@ public:
   // Init
   void initialize();
 
+  // Post-init
+  void prepareFitParameters(); // invert the matrices, and make sure fixed parameters are detached from correlations
+
   // Getters
   bool isEnabled() const;
 
@@ -52,32 +55,27 @@ public:
   bool isUseOnlyOneParameterPerEvent() const;
   const std::string &getName() const;
   std::vector<FitParameter> &getParameterList();
+  std::vector<FitParameter> &getEigenParameterList();
   const std::vector<FitParameter> &getParameterList() const;
-  TMatrixDSym *getOriginalCovarianceMatrix() const;
   const nlohmann::json &getConfig() const;
+
+  const std::shared_ptr<TMatrixDSym> &getPriorCorrelationMatrix() const;
+
+  const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const;
+
+  std::vector<FitParameter>& getEffectiveParameterList();
+  const std::vector<FitParameter>& getEffectiveParameterList() const;
 
   // Core
   size_t getNbParameters() const;
-  FitParameter& getFitParameter( size_t iPar_ );
-  double getChi2() const;
+  double getPenaltyChi2();
 
   // Throw / Shifts
   void moveFitParametersToPrior();
   void throwFitParameters(double gain_ = 1);
 
-  // Eigen decomposition
-  void setEigenParameter( int iPar_, double value_ );
-  void setEigenParStepSize( int iPar_, double step_ );
-  void setEigenParIsFixed( int iPar_, bool isFixed_ );
-
-  bool isEigenParFixed( int iPar_ ) const;
-  double getEigenParStepSize( int iPar_ ) const;
-
   bool isUseEigenDecompInFit() const;
   int getNbEnabledEigenParameters() const;
-  double getEigenParameterValue(int iPar_) const;
-  double getEigenValue(int iPar_) const;
-  double getEigenSigma(int iPar_) const;
   const TMatrixD* getInvertedEigenVectors() const;
   const TMatrixD* getEigenVectors() const;
   void propagateEigenToOriginal();
@@ -91,15 +89,16 @@ public:
   static double toRealParValue(double normParValue, const FitParameter& par);
   static double toRealParRange(double normParRange, const FitParameter& par);
 
-  double toNormalizedEigenParRange(double parRange, int parIndex) const;
-  double toNormalizedEigenParValue(double parValue, int parIndex) const;
-  double toRealEigenParValue(double normParValue, int parIndex) const;
-  double toRealEigenParRange(double normParRange, int parIndex) const;
-
 protected:
   void passIfInitialized(const std::string& methodName_) const;
 
-  void readCovarianceMatrix();
+  void initializeFromConfig();
+  void readParameterDefinitionFile();
+  void readConfigOptions();
+
+  void defineParameters();
+
+  void fillDeltaParameterList();
 
 private:
   // User parameters
@@ -112,18 +111,13 @@ private:
 
   // JSON
   std::string _name_;
+  std::string _parameterDefinitionFilePath_{};
   bool _isEnabled_{};
   bool _throwMcBeforeFit_{true};
+  int _nbParameterDefinition_{-1};
+  double _nominalStepSize_{-1};
   int _maxNbEigenParameters_{-1};
   double _maxEigenFraction_{1};
-
-  // Input file:
-  std::shared_ptr<TFile> _covarianceMatrixFile_{nullptr};
-  TMatrixDSym* _covarianceMatrix_{nullptr};
-  TVectorD* _parameterPriorList_{nullptr};
-  TVectorD* _parameterLowerBoundsList_{nullptr};
-  TVectorD* _parameterUpperBoundsList_{nullptr};
-  TObjArray* _parameterNamesList_{nullptr};
 
   double _globalParameterMinValue_{std::nan("UNSET")};
   double _globalParameterMaxValue_{std::nan("UNSET")};
@@ -132,25 +126,33 @@ private:
   int _nbEnabledEigen_{0};
   bool _useEigenDecompInFit_{false};
   bool _useOnlyOneParameterPerEvent_{false};
+  std::vector<FitParameter> _eigenParameterList_;
   std::shared_ptr<TMatrixDSymEigen> _eigenDecomp_{nullptr};
+
+
+  // Used for base swapping
   std::shared_ptr<TVectorD> _eigenValues_{nullptr};
   std::shared_ptr<TVectorD> _eigenValuesInv_{nullptr};
   std::shared_ptr<TMatrixD> _eigenVectors_{nullptr};
   std::shared_ptr<TMatrixD> _eigenVectorsInv_{nullptr};
+  std::shared_ptr<TVectorD> _eigenParBuffer_{nullptr};
+  std::shared_ptr<TVectorD> _originalParBuffer_{nullptr};
   std::shared_ptr<TMatrixD> _projectorMatrix_{nullptr};
-  std::shared_ptr<TMatrixD> _inverseCovarianceMatrix_{nullptr};
-  std::shared_ptr<TMatrixD> _effectiveCovarianceMatrix_{nullptr};
 
-  std::shared_ptr<TMatrixD> _originalCorrelationMatrix_{nullptr};
-  std::shared_ptr<TMatrixD> _effectiveCorrelationMatrix_{nullptr};
+
+  std::shared_ptr<TMatrixDSym> _priorCovarianceMatrix_{nullptr};        // matrix coming from the file
+  std::shared_ptr<TMatrixDSym> _priorCorrelationMatrix_{nullptr};        // matrix coming from the file
+  std::shared_ptr<TMatrixDSym> _strippedCovarianceMatrix_{nullptr};        // matrix stripped from fixed/freed parameters
+  std::shared_ptr<TMatrixD>    _inverseStrippedCovarianceMatrix_{nullptr}; // inverse matrix used for chi2
+
+  std::shared_ptr<TVectorD>  _parameterPriorList_{nullptr};
+  std::shared_ptr<TVectorD>  _parameterLowerBoundsList_{nullptr};
+  std::shared_ptr<TVectorD>  _parameterUpperBoundsList_{nullptr};
+  std::shared_ptr<TObjArray> _parameterNamesList_{nullptr};
+
+  std::shared_ptr<TVectorD>  _deltaParameterList_{nullptr}; // difference from prior
 
   std::shared_ptr<TMatrixD> _choleskyMatrix_{nullptr};
-
-  std::shared_ptr<TVectorD> _eigenParValues_;
-  std::shared_ptr<TVectorD> _originalParValues_;
-  std::shared_ptr<TVectorD> _eigenParPriorValues_;
-  std::shared_ptr<TVectorD> _eigenParStepSize_;
-  std::vector<bool> _eigenParFixedList_;
 
 };
 

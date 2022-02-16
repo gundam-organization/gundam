@@ -82,12 +82,14 @@ void Propagator::initialize() {
   int iParOffset = 0;
   for( const auto& parSet : _parameterSetsList_ ){
     if( not parSet.isEnabled() ) continue;
-    for( int iCov = 0 ; iCov < parSet.getOriginalCovarianceMatrix()->GetNrows() ; iCov++ ){
-      for( int jCov = 0 ; jCov < parSet.getOriginalCovarianceMatrix()->GetNcols() ; jCov++ ){
-        (*_globalCovarianceMatrix_)[iParOffset+iCov][iParOffset+jCov] = (*parSet.getOriginalCovarianceMatrix())[iCov][jCov];
+    if(parSet.getPriorCovarianceMatrix() != nullptr ){
+      for(int iCov = 0 ; iCov < parSet.getPriorCovarianceMatrix()->GetNrows() ; iCov++ ){
+        for(int jCov = 0 ; jCov < parSet.getPriorCovarianceMatrix()->GetNcols() ; jCov++ ){
+          (*_globalCovarianceMatrix_)[iParOffset+iCov][iParOffset+jCov] = (*parSet.getPriorCovarianceMatrix())[iCov][jCov];
+        }
       }
+      iParOffset += parSet.getPriorCovarianceMatrix()->GetNrows();
     }
-    iParOffset += parSet.getOriginalCovarianceMatrix()->GetNrows();
   }
   if( _saveDir_ != nullptr ){
     _saveDir_->cd();
@@ -240,6 +242,9 @@ FitSampleSet &Propagator::getFitSampleSet() {
 std::vector<FitParameterSet> &Propagator::getParameterSetsList() {
   return _parameterSetsList_;
 }
+const std::vector<FitParameterSet> &Propagator::getParameterSetsList() const {
+  return _parameterSetsList_;
+}
 PlotGenerator &Propagator::getPlotGenerator() {
   return _plotGenerator_;
 }
@@ -249,6 +254,11 @@ const json &Propagator::getConfig() const {
 
 
 void Propagator::propagateParametersOnSamples(){
+
+  // Only real parameters are propagated on the specta -> need to convert the eigen to original
+  for( auto& parSet : _parameterSetsList_ ){
+    if( parSet.isUseEigenDecompInFit() ) parSet.propagateEigenToOriginal();
+  }
 
   if(not _useResponseFunctions_ or not _isRfPropagationEnabled_ ){
 //    if(GlobalVariables::isEnableDevMode()) updateDialResponses();

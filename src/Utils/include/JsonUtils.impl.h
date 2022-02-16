@@ -5,11 +5,13 @@
 #ifndef GUNDAM_JSONUTILS_IMPL_H
 #define GUNDAM_JSONUTILS_IMPL_H
 
+#include "JsonUtils.h"
+
+#include "GenericToolbox.h"
+
 #include "string"
 #include "iostream"
 #include "json.hpp"
-
-#include "JsonUtils.h"
 
 namespace JsonUtils {
 
@@ -21,6 +23,14 @@ namespace JsonUtils {
     }
     return jsonEntry->template get<T>();
   }
+  template<class T> auto fetchValue(const nlohmann::json& jsonConfig_, const std::vector<std::string>& keyName_) -> T{
+    for( auto& keyName : keyName_){
+      if( JsonUtils::doKeyExist(jsonConfig_, keyName) ){
+        return JsonUtils::fetchValue<T>(jsonConfig_, keyName);
+      }
+    }
+    throw std::runtime_error("Could not find any json entry: " + GenericToolbox::parseVectorAsString(keyName_) + ":\n" + jsonConfig_.dump());
+  }
   template<class T> auto fetchValue(const nlohmann::json& jsonConfig_, const std::string& keyName_, const T& defaultValue_) -> T{
     try{
       T value = JsonUtils::fetchValue<T>(jsonConfig_, keyName_);
@@ -29,6 +39,17 @@ namespace JsonUtils {
     catch (...){
       return defaultValue_;
     }
+  }
+  template<class T> auto fetchValue(const nlohmann::json& jsonConfig_, const std::vector<std::string>& keyName_, const T& defaultValue_) -> T{
+    for( auto& keyName : keyName_ ){
+      try{
+        T value = JsonUtils::fetchValue<T>(jsonConfig_, keyName);
+        return value; // if nothing has gone wrong
+      }
+      catch (...){
+      }
+    }
+    return defaultValue_;
   }
   template<class T> nlohmann::json fetchMatchingEntry(const nlohmann::json& jsonConfig_, const std::string& keyName_, const T& keyValue_){
 
@@ -55,6 +76,9 @@ namespace JsonUtils {
   }
 
   template<std::size_t N> auto fetchValue(const nlohmann::json& jsonConfig_, const std::string& keyName_, const char (&defaultValue_)[N]) -> std::string{
+    return fetchValue(jsonConfig_, keyName_, std::string(defaultValue_));
+  }
+  template<std::size_t N> auto fetchValue(const nlohmann::json& jsonConfig_, const std::vector<std::string>& keyName_, const char (&defaultValue_)[N]) -> std::string{
     return fetchValue(jsonConfig_, keyName_, std::string(defaultValue_));
   }
   template<std::size_t N> nlohmann::json fetchMatchingEntry(const nlohmann::json& jsonConfig_, const std::string& keyName_, const char (&keyValue_)[N]){

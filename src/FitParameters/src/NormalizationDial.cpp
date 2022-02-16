@@ -11,18 +11,18 @@ LoggerInit([](){
   Logger::setUserHeaderStr("[NormalizationDial]");
 })
 
-NormalizationDial::NormalizationDial() {
-  this->reset();
+NormalizationDial::NormalizationDial() : Dial(DialType::Normalization) {
+  this->NormalizationDial::reset();
 }
 
 void NormalizationDial::fillResponseCache() {
   // Normalization dial: y = x
+  // Don't use _effectiveDialParameterValue_ since it doesn't make sense
   _dialResponseCache_ = _dialParameterCache_;
 }
 
 void NormalizationDial::reset() {
   Dial::reset();
-  _dialType_ = DialType::Normalization;
 }
 
 void NormalizationDial::initialize() {
