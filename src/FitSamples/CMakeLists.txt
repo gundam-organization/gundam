@@ -13,22 +13,16 @@ else()
   add_library(GundamFitSamples SHARED ${SRCFILES})
 endif()
 
-#if(CMAKE_BUILD_TYPE MATCHES DEBUG)
-#  add_library(samples STATIC ${SRCFILES})
-#else(CMAKE_BUILD_TYPE MATCHES RELEASE)
-#  add_library(samples SHARED ${SRCFILES})
-#endif()
-
-target_link_libraries( GundamFitSamples
+target_link_libraries( GundamFitSamples PUBLIC
         GundamUtils
         GundamFitParameters
         anaevents
+        ${ROOT_LIBRARIES}
         )
 
 set_target_properties(
         GundamFitSamples PROPERTIES VERSION
         "${gundam_VERSION_MAJOR}.${gundam_VERSION_MINOR}.${gundam_VERSION_REVISION}${gundam_VERSION_TAG}")
-set_target_properties(GundamFitSamples PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
 install(TARGETS GundamFitSamples DESTINATION lib)
 

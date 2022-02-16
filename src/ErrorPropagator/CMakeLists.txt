@@ -26,11 +26,11 @@ target_link_libraries( GundamErrorPropagator
         GundamFitParameters
         GundamFitSamples
         anaevents
+        ${ROOT_LIBRARIES}
         )
 
 set_target_properties(GundamErrorPropagator PROPERTIES VERSION
   "${gundam_VERSION_MAJOR}.${gundam_VERSION_MINOR}.${gundam_VERSION_REVISION}${gundam_VERSION_TAG}")
-set_target_properties(GundamErrorPropagator PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
 install(TARGETS GundamErrorPropagator DESTINATION lib)
 #Can uncomment this to install the headers... but is it really neccessary?
