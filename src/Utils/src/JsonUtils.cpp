@@ -79,6 +79,11 @@ namespace JsonUtils{
   bool doKeyExist(const nlohmann::json& jsonConfig_, const std::string& keyName_){
     return jsonConfig_.find(keyName_) != jsonConfig_.end();
   }
+  std::vector<std::string> ls(const nlohmann::json& jsonConfig_){
+    std::vector<std::string> out{};
+    for( const auto& entry : jsonConfig_.get<nlohmann::json::object_t>() ){ out.emplace_back(entry.first); }
+    return out;
+  }
   nlohmann::json fetchSubEntry(const nlohmann::json& jsonConfig_, const std::vector<std::string>& keyPath_){
     nlohmann::json output = jsonConfig_;
     for( const auto& key : keyPath_ ){

@@ -893,7 +893,7 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
           pal->SetTitleOffset(2);
           pal->Draw();
         }
-        gPad->SetLeftMargin(0.1*(1 + maxLabelLength/15.));
+        gPad->SetLeftMargin(0.1*(1 + maxLabelLength/20.));
         gPad->SetBottomMargin(0.1*(1 + maxLabelLength/15.));
 
         corMatrixTH2D->Draw("COLZ");

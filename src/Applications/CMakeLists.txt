@@ -14,6 +14,7 @@ set( APPLICATION_LIST
         gundamFitter
         gundamConfigUnfolder
         gundamPlotExtractor
+        gundamConfigCompare
         YamlSandbox
 )
 
