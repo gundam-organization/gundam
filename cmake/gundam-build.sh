@@ -73,6 +73,10 @@ while [ "x${1}" != "x" ]; do
             echo Clean the build area
             RUN_CLEAN="yes"
             ;;
+        ve*) # verbose
+            shift
+            export VERBOSE=true
+            ;;
         he*) # help
             echo gundam-build [force] [cmake] [clean] [help]
             echo "   force -- Force cmake to ignore the cache"
@@ -93,7 +97,7 @@ if [ ! -f CMakeCache.txt ]; then
 fi
 
 if [ ${RUN_CLEAN} = "yes" ]; then
-    VERBOSE=true make clean
+    make clean
     echo Source cleaned.
 fi
 
@@ -101,8 +105,8 @@ if [ ${ONLY_CMAKE} = "yes" ]; then
     exit 0
 fi
 
-VERBOSE=true make || exit 1
-VERBOSE=true make install || exit 1
+make || exit 1
+make install || exit 1
 
 echo "build:       " ${BUILD_LOCATION}
 echo "installation:" ${GUNDAM_INSTALL}
