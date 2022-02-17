@@ -57,7 +57,7 @@ else()
 endif()
 
 #If you want to try an use the terminally buggy ROOT CMake scripts
-find_package(ROOT REQUIRED
+find_package(ROOT
   COMPONENTS Geom Physics Matrix MathCore Tree RIO)
 if(ROOT_FOUND)
   include(${ROOT_USE_FILE})
@@ -80,9 +80,9 @@ else(ROOT_FOUND)
    cmessage(STATUS "[ROOT]: root-config --version: ${ROOT_VERSION}")
    cmessage(STATUS "[ROOT]: root-config --libs: ${ROOT_LIBRARIES}")
    cmessage(STATUS "[ROOT]: root-config --cflags: ${ROOT_CXX_FLAGS}")
-   cmessage(STATUS "[ROOT]: root-config --ldflags: ${ROOT_LD_FLAGS}")
-   add_compile_options(${ROOT_CXX_FLAGS})
-   add_link_options(${ROOT_LD_FLAGS})
+   cmessage(STATUS "[ROOT]: root-config --ldflags: ${ROOT_LINK_FLAGS}")
+   add_compile_options("SHELL:${ROOT_CXX_FLAGS}")
+   add_link_options("SHELL:${ROOT_LINK_FLAGS}")
 endif(ROOT_FOUND)
 
 # YAML-CPP
