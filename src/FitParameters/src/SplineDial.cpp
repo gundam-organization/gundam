@@ -67,14 +67,14 @@ void SplineDial::fillResponseCache() {
 //    }
   }
   // Checks
-  if( _minimumDialResponse_ == _minimumDialResponse_ and _dialResponseCache_ < _minimumDialResponse_ ){
-    _dialResponseCache_ = _minimumDialResponse_;
+  if(_minDialResponse_ == _minDialResponse_ and _dialResponseCache_ < _minDialResponse_ ){
+    _dialResponseCache_ = _minDialResponse_;
   }
 
   if( _dialResponseCache_ < 0 and _throwIfResponseIsNegative_ ){
     this->writeSpline();
     LogThrow(
-      "Negative dial response: dial(" << _effectiveDialParameterValue_ << ") = " << _dialResponseCache_
+      "Negative spline response: dial(" << _effectiveDialParameterValue_ << ") = " << _dialResponseCache_
       << std::endl << "Dial is defined in between: [" << _spline_.GetXmin() << ", " << _spline_.GetXmax() << "]" << std::endl
       << ( _associatedParameterReference_ != nullptr ? "Parameter: " + static_cast<FitParameter *>(_associatedParameterReference_)->getName() : "" )
       )

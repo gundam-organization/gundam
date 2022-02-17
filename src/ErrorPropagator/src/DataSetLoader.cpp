@@ -2,17 +2,22 @@
 // Created by Nadrino on 22/07/2021.
 //
 
-#include <TTreeFormulaManager.h>
-#include <SplineDial.h>
-#include "GenericToolbox.h"
-#include "GenericToolbox.Root.h"
-#include "Logger.h"
-
-#include "JsonUtils.h"
 #include "DataSetLoader.h"
+
 #include "DialSet.h"
 #include "GlobalVariables.h"
 #include "GraphDial.h"
+#include "SplineDial.h"
+#include "JsonUtils.h"
+
+#include "GenericToolbox.h"
+#include "GenericToolbox.Root.h"
+#include "GenericToolbox.VariablesMonitor.h"
+#include "Logger.h"
+
+#include <TTreeFormulaManager.h>
+#include "TTree.h"
+
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[DataSetLoader]");
@@ -447,15 +452,28 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
       if( iThread_+1 != nThreads ) iEnd = (Long64_t(iThread_)+1)*nEventPerThread;
       Long64_t iGlobal = 0;
 
+      // IO speed monitor
+      GenericToolbox::VariableMonitor readSpeed("bytes");
+      Int_t nBytes;
+
       // Load the branches
       threadChain->LoadTree(iStart);
 
-      std::string progressTitle = LogInfo.getPrefixString() + "Reading selected events";
+      std::string progressTitle = LogInfo.getPrefixString() + "Loading and indexing";
 
       for(Long64_t iEntry = iStart ; iEntry < iEnd ; iEntry++ ){
 
         if( iThread_ == 0 ){
-          GenericToolbox::displayProgressBar(iGlobal, nEvents, progressTitle);
+          if( GenericToolbox::showProgressBar(iGlobal, nEvents) ){
+            GenericToolbox::displayProgressBar(
+                iGlobal, nEvents,
+                progressTitle + " - "
+                + GenericToolbox::padString(GenericToolbox::parseSizeUnits(double(nThreads)*readSpeed.getTotalAccumulated()), 9)
+                + " ("
+                + GenericToolbox::padString(GenericToolbox::parseSizeUnits(double(nThreads)*readSpeed.evalTotalGrowthRate()), 9)
+                + "/s)"
+                );
+          }
           iGlobal += nThreads;
         }
 
@@ -468,7 +486,8 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
         }
         if( skipEvent ) continue;
 
-        threadChain->GetEntry(iEntry);
+        nBytes = threadChain->GetEntry(iEntry);
+        if( iThread_ == 0 ) readSpeed.addQuantity(nBytes);
 
         if( threadNominalWeightFormula != nullptr ){
           eventBuffer.setTreeWeight(threadNominalWeightFormula->EvalInstance());
@@ -836,14 +855,22 @@ std::vector<std::vector<bool>> DataSetLoader::makeEventSelection(std::vector<Fit
     }
   }
 
+  GenericToolbox::VariableMonitor readSpeed("bytes");
+
   Long64_t nEvents = chainPtr->GetEntries();
   // for each event, which sample is active?
   std::vector<std::vector<bool>> eventIsInSamplesList(nEvents, std::vector<bool>(samplesToFillList.size(), true));
   std::string progressTitle = LogInfo.getPrefixString() + "Reading input dataset";
   TFile* lastFilePtr{nullptr};
   for( Long64_t iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
-    GenericToolbox::displayProgressBar(iEvent, nEvents, progressTitle);
-    chainPtr->GetEntry(iEvent);
+    readSpeed.addQuantity(chainPtr->GetEntry(iEvent));
+    if( GenericToolbox::showProgressBar(iEvent, nEvents) ){
+      GenericToolbox::displayProgressBar(
+          iEvent, nEvents,progressTitle + " - " +
+          GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.evalTotalGrowthRate()), 8)
+          + "/s");
+    }
+
 
     for( size_t iSample = 0 ; iSample < sampleCutFormulaList.size() ; iSample++ ){
       for(int jInstance = 0; jInstance < sampleCutFormulaList[iSample]->GetNdata(); jInstance++) {

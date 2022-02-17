@@ -51,13 +51,11 @@ void Dial::setMirrorLowEdge(double mirrorLowEdge) {
 void Dial::setMirrorRange(double mirrorRange) {
   _mirrorRange_ = mirrorRange;
 }
-void Dial::setMinimumDialResponse(double minimumDialResponse) {
-  _minimumDialResponse_ = minimumDialResponse;
+void Dial::setMinDialResponse(double minDialResponse_) {
+  _minDialResponse_ = minDialResponse_;
 }
-
-void Dial::copySplineCache(TSpline3& splineBuffer_){
-  if( _responseSplineCache_ == nullptr ) this->buildResponseSplineCache();
-  splineBuffer_ = *_responseSplineCache_;
+void Dial::setMaxDialResponse(double maxDialResponse_) {
+  _maxDialResponse_ = maxDialResponse_;
 }
 
 void Dial::initialize() {
@@ -112,11 +110,12 @@ void Dial::updateEffectiveDialParameter(){
   }
 }
 double Dial::evalResponse(){
-  if( _associatedParameterReference_ == nullptr ){
-    LogError << "_associatedParameterReference_ is not set." << std::endl;
-    throw std::logic_error("_associatedParameterReference_ is not set.");
-  }
+  LogThrowIf(_associatedParameterReference_==nullptr, "_associatedParameterReference_ is not set.")
   return this->evalResponse( static_cast<FitParameter *>(_associatedParameterReference_)->getParameterValue() );
+}
+void Dial::copySplineCache(TSpline3& splineBuffer_){
+  if( _responseSplineCache_ == nullptr ) this->buildResponseSplineCache();
+  splineBuffer_ = *_responseSplineCache_;
 }
 
 // Virtual
@@ -130,8 +129,11 @@ double Dial::evalResponse(double parameterValue_) {
   _dialParameterCache_ = parameterValue_;
   this->updateEffectiveDialParameter();
   this->fillResponseCache(); // specified in the corresponding dial class
-  if( _minimumDialResponse_==_minimumDialResponse_ and _dialResponseCache_ < _minimumDialResponse_ ){
-    _dialResponseCache_ = _minimumDialResponse_;
+  if(_minDialResponse_ == _minDialResponse_ and _dialResponseCache_<_minDialResponse_ ){
+    _dialResponseCache_=_minDialResponse_;
+  }
+  else if(_maxDialResponse_==_maxDialResponse_ and _dialResponseCache_>_maxDialResponse_){
+    _dialResponseCache_=_maxDialResponse_;
   }
   _isEditingCache_.atomicValue = false;
 
@@ -175,5 +177,4 @@ void Dial::buildResponseSplineCache(){
       new TSpline3(Form("%p", this), &xSigmaSteps[0], &yResponse[0], int(xSigmaSteps.size()))
   );
 }
-
 

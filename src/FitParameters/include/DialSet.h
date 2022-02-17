@@ -39,13 +39,10 @@ public:
 
   // Getters
   bool isEnabled() const;
-  const nlohmann::json &getDialSetConfig() const;
   std::vector<std::shared_ptr<Dial>> &getDialList();
   const std::vector<std::string> &getDataSetNameList() const;
   TFormula *getApplyConditionFormula() const;
-  void *getAssociatedParameterReference();
   const std::string &getDialLeafName() const;
-  double getMinimumSplineResponse() const;
   size_t getCurrentDialOffset() const;
   DialType::DialType getGlobalDialType() const;
   const Dial &getTemplateDial() const;
@@ -57,8 +54,7 @@ public:
 
 protected:
   void readGlobals(const nlohmann::json &config_);
-
-  bool initializeNormDialsWithBinning();
+  bool initializeNormDialsWithParBinning();
   bool initializeDialsWithDefinition();
   nlohmann::json fetchDialsDefinition(const nlohmann::json &definitionsList_);
 
@@ -85,9 +81,10 @@ private:
   size_t _currentDialOffset_{0};
 
   // globals
-  DialType::DialType _globalDialType_;
+  DialType::DialType _globalDialType_{DialType::DialType_OVERFLOW};
   std::string _globalDialLeafName_{};
-  double _globalMinimumDialResponse_{std::nan("unset")};
+  double _globalMinDialResponse_{std::nan("unset")};
+  double _globalMaxDialResponse_{std::nan("unset")};
   bool _globalUseMirrorDial_{false};
   double _mirrorLowEdge_{std::nan("unset")};
   double _mirrorHighEdge_{std::nan("unset")};

@@ -15,7 +15,6 @@
 
 namespace JsonUtils {
 
-
   template<class T> auto fetchValue(const nlohmann::json& jsonConfig_, const std::string& keyName_) -> T{
     auto jsonEntry = jsonConfig_.find(keyName_);
     if( jsonEntry == jsonConfig_.end() ){
@@ -75,6 +74,7 @@ namespace JsonUtils {
     return nlohmann::json(); // .empty()
   }
 
+  // specialization
   template<std::size_t N> auto fetchValue(const nlohmann::json& jsonConfig_, const std::string& keyName_, const char (&defaultValue_)[N]) -> std::string{
     return fetchValue(jsonConfig_, keyName_, std::string(defaultValue_));
   }

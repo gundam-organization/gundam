@@ -9,9 +9,11 @@
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.h"
 
+#include "TStyle.h"
 #include "TDirectory.h"
 #include "TClass.h"
 #include "TKey.h"
+#include "TSystem.h"
 
 #include <cstdlib>
 
@@ -24,6 +26,7 @@ std::vector<std::string> outExtensions;
 int nPlots{0};
 
 void walkAndUnfoldTDirectory(TDirectory* dir_, const std::string &saveFolderPath_);
+void init();
 
 int main( int argc, char** argv ){
 
@@ -54,6 +57,7 @@ int main( int argc, char** argv ){
 
   auto* rootFile = GenericToolbox::openExistingTFile(rootFilePath);
 
+  init();
   walkAndUnfoldTDirectory(rootFile, outFolderPath);
 
   LogInfo << nPlots << " plots writen." << std::endl;
@@ -83,7 +87,19 @@ void walkAndUnfoldTDirectory(TDirectory* dir_, const std::string &saveFolderPath
           );
     }
     else if( classObj->InheritsFrom("TCanvas") ){
-      canObj = (TCanvas*) dir_->Get(dir_->GetListOfKeys()->At(iObj)->GetName());
+      canObj = dir_->Get<TCanvas>(dir_->GetListOfKeys()->At(iObj)->GetName());
+//      canObj->Draw();
+//      canObj->Update();
+////      canObj->GetWindowHeight()
+//
+//      bool WhileBool = true;
+//      while(WhileBool){
+//        gPad->Modified(); gPad->Update();
+//        gSystem->ProcessEvents();
+//        std::cout<<"Enter 0 to exit the macro. Enter 0 to stay in while loop: "<< std::endl;
+//        std::cin >> WhileBool;
+//      }
+
       GenericToolbox::mkdirPath(saveFolderPath_);
       nPlots++;
       for( auto& ext : outExtensions ){
@@ -95,6 +111,7 @@ void walkAndUnfoldTDirectory(TDirectory* dir_, const std::string &saveFolderPath
             );
 
         LogWarning << outPath << std::endl;
+        if( GenericToolbox::doesPathIsFile(outPath) ){ std::remove(outPath.c_str()); }
 
         GenericToolbox::muteRoot();
         canObj->SaveAs( outPath.c_str() );
@@ -104,4 +121,53 @@ void walkAndUnfoldTDirectory(TDirectory* dir_, const std::string &saveFolderPath
     }
   }
 
+}
+
+void init(){
+  gROOT->SetStyle("Plain");
+  gStyle->SetTitleBorderSize(0);
+  gStyle->SetStatFont(42);
+  gStyle->SetOptFit(1111);
+  gStyle->SetOptStat(0);
+
+  gStyle->SetLabelFont(42,"xyz");
+  gStyle->SetLabelSize(0.05,"xyz");
+  gStyle->SetLabelOffset(0.015,"x");
+  gStyle->SetLabelOffset(0.015,"y");
+
+  gStyle->SetTitleFont(42);
+  gStyle->SetTitleFontSize(0.06);
+  gStyle->SetLegendFont(42);
+
+  gStyle->SetTitleFont(42,"xyz");
+  gStyle->SetTitleSize(0.06,"xyz");
+  gStyle->SetTitleOffset(1.05,"x");
+  gStyle->SetTitleOffset(1.20,"y");
+
+  gStyle->SetStripDecimals(kFALSE);
+
+  gStyle->SetPadLeftMargin(0.16);
+  gStyle->SetPadBottomMargin(0.15);
+  gStyle->SetPadRightMargin(0.07);
+  gStyle->SetPadTopMargin(0.09);
+
+  // gStyle->SetStatW(0.35);
+  // gStyle->SetStatH(0.25);
+
+  gStyle->SetPadTickX(kTRUE);
+  gStyle->SetPadTickY(kTRUE);
+
+  gStyle->SetGridStyle(3);
+  gStyle->SetGridWidth(1);
+  gStyle->SetPadGridX(1);
+  gStyle->SetPadGridY(1);
+
+  //  gStyle->SetPalette(1);
+
+  gStyle->SetLineWidth(2);
+  gStyle->SetHistLineWidth(3);
+  gStyle->SetFuncWidth(3);
+  gStyle->SetFrameLineWidth(2);
+
+  gStyle->SetMarkerSize(1.2);
 }

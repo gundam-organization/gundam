@@ -296,7 +296,7 @@ void FitterEngine::fixGhostFitParameters(){
 
       if( fixNextEigenPars ){
         par.setIsFixed(true);
-        LogInfo << GenericToolbox::ColorCodes::redBackGround << ssPrint.str() << " -> FIXED AS NEXT EIGEN." << GenericToolbox::ColorCodes::resetColor << std::endl;
+        LogInfo << GenericToolbox::ColorCodes::redBackground << ssPrint.str() << " -> FIXED AS NEXT EIGEN." << GenericToolbox::ColorCodes::resetColor << std::endl;
         continue;
       }
 
@@ -320,7 +320,7 @@ void FitterEngine::fixGhostFitParameters(){
           par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
           ssPrint << " < " << JsonUtils::fetchValue(_config_, "ghostParameterDeltaChi2Threshold", 1E-6) << " -> " << "FIXED";
           LogInfo.moveTerminalCursorBack(1);
-          LogInfo << GenericToolbox::ColorCodes::redBackGround << ssPrint.str() << GenericToolbox::ColorCodes::resetColor << std::endl;
+          LogInfo << GenericToolbox::ColorCodes::redBackground << ssPrint.str() << GenericToolbox::ColorCodes::resetColor << std::endl;
 
           if( parSet.isUseEigenDecompInFit() and JsonUtils::fetchValue(_config_, "fixGhostEigenParmetersAfterFirstRejected", false) ){
             fixNextEigenPars = true;
@@ -433,8 +433,8 @@ void FitterEngine::fit(){
 
       std::string colorStr;
 
-      if( not par.isEnabled() ) { lineValues[valIndex++] = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackGround; }
-      else if( par.isFixed() )  { lineValues[valIndex++] = "Fixed";    colorStr = GenericToolbox::ColorCodes::redBackGround; }
+      if( not par.isEnabled() ) { lineValues[valIndex++] = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackground; }
+      else if( par.isFixed() )  { lineValues[valIndex++] = "Fixed";    colorStr = GenericToolbox::ColorCodes::redBackground; }
       else                      { lineValues[valIndex++] = PriorType::PriorTypeEnumNamespace::toString(par.getPriorType(), true) + " Prior"; }
 
       for( auto& line : lineValues ){
@@ -859,169 +859,223 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
   auto savePostFitObjFct =
       [&](const FitParameterSet& parSet_, const std::vector<FitParameter>& parList_, TMatrixD* covMatrix_, TDirectory* saveSubdir_){
 
-    auto* covMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) covMatrix_, Form("Covariance_%s_TH2D", parSet_.getName().c_str()));
-    auto* corMatrix = GenericToolbox::convertToCorrelationMatrix((TMatrixD*) covMatrix_);
-    auto* corMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D(corMatrix, Form("Correlation_%s_TH2D", parSet_.getName().c_str()));
+        auto* covMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) covMatrix_, Form("Covariance_%s_TH2D", parSet_.getName().c_str()));
+        auto* corMatrix = GenericToolbox::convertToCorrelationMatrix((TMatrixD*) covMatrix_);
+        auto* corMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D(corMatrix, Form("Correlation_%s_TH2D", parSet_.getName().c_str()));
 
-    for( const auto& par : parList_ ){
-      covMatrixTH2D->GetXaxis()->SetBinLabel(1+par.getParameterIndex(), par.getTitle().c_str());
-      covMatrixTH2D->GetYaxis()->SetBinLabel(1+par.getParameterIndex(), par.getTitle().c_str());
-      corMatrixTH2D->GetXaxis()->SetBinLabel(1+par.getParameterIndex(), par.getTitle().c_str());
-      corMatrixTH2D->GetYaxis()->SetBinLabel(1+par.getParameterIndex(), par.getTitle().c_str());
-    }
-
-    auto* corMatrixCanvas = new TCanvas("host_TCanvas", "host_TCanvas", 1024, 1024);
-    corMatrixCanvas->cd();
-    corMatrixTH2D->GetXaxis()->SetLabelSize(0.03);
-    corMatrixTH2D->GetXaxis()->LabelsOption("v");
-    corMatrixTH2D->GetXaxis()->SetTitle("");
-    corMatrixTH2D->GetYaxis()->SetTitle("");
-    corMatrixTH2D->GetZaxis()->SetRangeUser(-1,1);
-    corMatrixTH2D->GetZaxis()->SetTitle("Correlation");
-    corMatrixTH2D->GetZaxis()->SetTitleOffset(1.1);
-    corMatrixTH2D->SetTitle(Form("Post-fit correlation matrix for %s", parSet_.getName().c_str()));
-    corMatrixTH2D->Draw("COLZ");
-
-    GenericToolbox::fixTH2display(corMatrixTH2D);
-    auto* pal = (TPaletteAxis*) corMatrixTH2D->GetListOfFunctions()->FindObject("palette");
-    // TPaletteAxis* pal = (TPaletteAxis*) histogram_->GetListOfFunctions()->At(0);
-    if(pal != nullptr){
-      pal->SetY1NDC(0.15);
-      pal->SetTitleOffset(2);
-      pal->Draw();
-    }
-    gPad->SetLeftMargin(0.15);
-    gPad->SetBottomMargin(0.15);
-
-    corMatrixTH2D->Draw("COLZ");
-
-    GenericToolbox::mkdirTFile(saveSubdir_, "matrices")->cd();
-    covMatrix_->Write("Covariance_TMatrixD");
-    covMatrixTH2D->Write("Covariance_TH2D");
-    corMatrix->Write("Correlation_TMatrixD");
-    corMatrixTH2D->Write("Correlation_TH2D");
-    corMatrixCanvas->Write("Correlation_TCanvas");
-
-    // Table printout
-    std::vector<std::vector<std::string>> tableLines;
-    tableLines.emplace_back(std::vector<std::string>{
-        "Parameter"
-        ,"Prior Value"
-        ,"Fit Value"
-        ,"Prior Err"
-        ,"Fit Err"
-        ,"Constraint"
-    });
-
-    // Parameters
-    GenericToolbox::mkdirTFile(saveSubdir_, "values")->cd();
-    auto* postFitErrorHist = new TH1D("postFitErrors_TH1D", "Post-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
-    auto* preFitErrorHist = new TH1D("preFitErrors_TH1D", "Pre-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
-    for( const auto& par : parList_ ){
-      postFitErrorHist->GetXaxis()->SetBinLabel(1 + par.getParameterIndex(), par.getTitle().c_str());
-      postFitErrorHist->SetBinContent( 1 + par.getParameterIndex(), par.getParameterValue());
-      postFitErrorHist->SetBinError( 1 + par.getParameterIndex(), TMath::Sqrt((*covMatrix_)[par.getParameterIndex()][par.getParameterIndex()]));
-
-      preFitErrorHist->GetXaxis()->SetBinLabel(1 + par.getParameterIndex(), par.getTitle().c_str());
-      preFitErrorHist->SetBinContent( 1 + par.getParameterIndex(), par.getPriorValue() );
-      if( par.isEnabled() and not par.isFixed() ){
-
-        double priorFraction = TMath::Sqrt((*covMatrix_)[par.getParameterIndex()][par.getParameterIndex()]) / par.getStdDevValue();
-
-        std::stringstream ss;
-
-        if( priorFraction < 1E-2 ) ss << GenericToolbox::ColorCodes::yellowBackGround;
-        if( priorFraction > 1 ) ss << GenericToolbox::ColorCodes::redBackGround;
-
-        std::vector<std::string> lineValues(tableLines[0].size());
-        int valIndex{0};
-        lineValues[valIndex++] = par.getFullTitle();
-
-        lineValues[valIndex++] = std::to_string( par.getPriorValue() );
-        lineValues[valIndex++] = std::to_string( par.getParameterValue() );
-
-        lineValues[valIndex++] = std::to_string( par.getStdDevValue() );
-        lineValues[valIndex++] = std::to_string( TMath::Sqrt((*covMatrix_)[par.getParameterIndex()][par.getParameterIndex()]) );
-
-        std::string colorStr;
-
-        if( par.isFree() ){
-          lineValues[valIndex++] = "Unconstrained";
-          colorStr = GenericToolbox::ColorCodes::yellowBackGround;
-        }
-        else{
-          lineValues[valIndex++] = std::to_string( priorFraction*100 ) + " \%";
-          if( priorFraction > 1 ){ colorStr = GenericToolbox::ColorCodes::redBackGround; }
+        size_t maxLabelLength{0};
+        for( const auto& par : parList_ ){
+          maxLabelLength = std::max(maxLabelLength, par.getTitle().size());
+          covMatrixTH2D->GetXaxis()->SetBinLabel(1+par.getParameterIndex(), par.getTitle().c_str());
+          covMatrixTH2D->GetYaxis()->SetBinLabel(1+par.getParameterIndex(), par.getTitle().c_str());
+          corMatrixTH2D->GetXaxis()->SetBinLabel(1+par.getParameterIndex(), par.getTitle().c_str());
+          corMatrixTH2D->GetYaxis()->SetBinLabel(1+par.getParameterIndex(), par.getTitle().c_str());
         }
 
-        if( not colorStr.empty() ){
-          for( auto& line : lineValues ){ if(not line.empty()) line = colorStr + line + GenericToolbox::ColorCodes::resetColor; }
+        auto* corMatrixCanvas = new TCanvas("host_TCanvas", "host_TCanvas", 1024, 1024);
+        corMatrixCanvas->cd();
+        corMatrixTH2D->GetXaxis()->SetLabelSize(0.025);
+        corMatrixTH2D->GetXaxis()->LabelsOption("v");
+        corMatrixTH2D->GetXaxis()->SetTitle("");
+        corMatrixTH2D->GetYaxis()->SetLabelSize(0.025);
+        corMatrixTH2D->GetYaxis()->SetTitle("");
+        corMatrixTH2D->GetZaxis()->SetRangeUser(-1,1);
+        corMatrixTH2D->GetZaxis()->SetTitle("Correlation");
+        corMatrixTH2D->GetZaxis()->SetTitleOffset(1.1);
+        corMatrixTH2D->SetTitle(Form("Post-fit correlation matrix for %s", parSet_.getName().c_str()));
+        corMatrixTH2D->Draw("COLZ");
+
+        GenericToolbox::fixTH2display(corMatrixTH2D);
+        auto* pal = (TPaletteAxis*) corMatrixTH2D->GetListOfFunctions()->FindObject("palette");
+        // TPaletteAxis* pal = (TPaletteAxis*) histogram_->GetListOfFunctions()->At(0);
+        if(pal != nullptr){
+          pal->SetY1NDC(0.15);
+          pal->SetTitleOffset(2);
+          pal->Draw();
         }
+        gPad->SetLeftMargin(0.1*(1 + maxLabelLength/20.));
+        gPad->SetBottomMargin(0.1*(1 + maxLabelLength/15.));
 
-        tableLines.emplace_back(lineValues);
+        corMatrixTH2D->Draw("COLZ");
 
-        if(not par.isFree()) preFitErrorHist->SetBinError( 1 + par.getParameterIndex(), par.getStdDevValue() );
-      }
-    }
-
-    GenericToolbox::TablePrinter t;
-    t.fillTable(tableLines);
-    t.printTable();
-
-    if(parSet_.getPriorCovarianceMatrix() != nullptr ){
-      if( not gStyle->GetCanvasPreferGL() ){
-        preFitErrorHist->SetFillColor(kRed-9);
-      }
-      else{
-        preFitErrorHist->SetFillColorAlpha(kRed-9, 0.7);
-      }
-    }
-
-    preFitErrorHist->SetMarkerStyle(kFullDotLarge);
-    preFitErrorHist->SetMarkerColor(kRed-3);
-    preFitErrorHist->SetTitle(Form("Pre-fit Errors of %s", parSet_.getName().c_str()));
-    preFitErrorHist->Write();
-
-    postFitErrorHist->SetLineColor(9);
-    postFitErrorHist->SetLineWidth(2);
-    postFitErrorHist->SetMarkerColor(9);
-    postFitErrorHist->SetMarkerStyle(kFullDotLarge);
-    postFitErrorHist->SetTitle(Form("Post-fit Errors of %s", parSet_.getName().c_str()));
-    postFitErrorHist->Write();
-
-    auto* errorsCanvas = new TCanvas(
-        Form("Fit Constraints for %s", parSet_.getName().c_str()),
-        Form("Fit Constraints for %s", parSet_.getName().c_str()),
-        800, 600);
-    errorsCanvas->cd();
-
-    preFitErrorHist->SetMarkerSize(0);
-    preFitErrorHist->Draw("E2");
-
-    TH1D preFitErrorHistLine = TH1D("preFitErrorHistLine", "preFitErrorHistLine",
-                                    preFitErrorHist->GetNbinsX(),
-                                    preFitErrorHist->GetXaxis()->GetXmin(),
-                                    preFitErrorHist->GetXaxis()->GetXmax()
-    );
-    GenericToolbox::transformBinContent(&preFitErrorHistLine, [&](TH1D* h_, int b_){
-      h_->SetBinContent(b_, preFitErrorHist->GetBinContent(b_));
-    });
+        GenericToolbox::mkdirTFile(saveSubdir_, "matrices")->cd();
+        covMatrix_->Write("Covariance_TMatrixD");
+        covMatrixTH2D->Write("Covariance_TH2D");
+        corMatrix->Write("Correlation_TMatrixD");
+        corMatrixTH2D->Write("Correlation_TH2D");
+        corMatrixCanvas->Write("Correlation_TCanvas");
 
 
-    preFitErrorHistLine.SetLineColor(kRed-3);
-    preFitErrorHistLine.Draw("SAME");
+        // Table printout
+        std::vector<std::vector<std::string>> tableLines;
+        tableLines.emplace_back(std::vector<std::string>{
+            "Parameter"
+            ,"Prior Value"
+            ,"Fit Value"
+            ,"Prior Err"
+            ,"Fit Err"
+            ,"Constraint"
+        });
+        for( const auto& par : parList_ ){
+          if( par.isEnabled() and not par.isFixed() ){
+            double priorFraction = TMath::Sqrt((*covMatrix_)[par.getParameterIndex()][par.getParameterIndex()]) / par.getStdDevValue();
+            std::stringstream ss;
+            if( priorFraction < 1E-2 ) ss << GenericToolbox::ColorCodes::yellowBackground;
+            if( priorFraction > 1 ) ss << GenericToolbox::ColorCodes::redBackground;
+            std::vector<std::string> lineValues(tableLines[0].size());
+            int valIndex{0};
+            lineValues[valIndex++] = par.getFullTitle();
+            lineValues[valIndex++] = std::to_string( par.getPriorValue() );
+            lineValues[valIndex++] = std::to_string( par.getParameterValue() );
+            lineValues[valIndex++] = std::to_string( par.getStdDevValue() );
+            lineValues[valIndex++] = std::to_string( TMath::Sqrt((*covMatrix_)[par.getParameterIndex()][par.getParameterIndex()]) );
 
-    errorsCanvas->Update(); // otherwise does not display...
-    postFitErrorHist->Draw("E1 X0 SAME");
+            std::string colorStr;
+            if( par.isFree() ){
+              lineValues[valIndex++] = "Unconstrained";
+              colorStr = GenericToolbox::ColorCodes::yellowBackground;
+            }
+            else{
+              lineValues[valIndex++] = std::to_string( priorFraction*100 ) + " \%";
+              if( priorFraction > 1 ){ colorStr = GenericToolbox::ColorCodes::redBackground; }
+            }
 
-    gPad->SetGridx();
-    gPad->SetGridy();
+            if( not colorStr.empty() ){
+              for( auto& line : lineValues ){ if(not line.empty()) line = colorStr + line + GenericToolbox::ColorCodes::resetColor; }
+            }
 
-    preFitErrorHist->SetTitle(Form("Pre-fit/Post-fit Comparison for %s", parSet_.getName().c_str()));
-    errorsCanvas->Write("fitConstraints_TCanvas");
+            tableLines.emplace_back(lineValues);
+          }
+        }
+        GenericToolbox::TablePrinter t;
+        t.fillTable(tableLines);
+        t.printTable();
 
-  };
+        // Parameters plots
+        auto makePrePostFitCompPlot = [&](TDirectory* saveDir_, bool isNorm_){
+          saveDir_->cd();
 
+          size_t longestTitleSize{0};
+          double minY{std::nan("unset")}, maxY{std::nan("unset")};
+
+          auto* postFitErrorHist = new TH1D("postFitErrors_TH1D", "Post-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
+          auto* preFitErrorHist = new TH1D("preFitErrors_TH1D", "Pre-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
+
+          for( const auto& par : parList_ ){
+            longestTitleSize = std::max(longestTitleSize, par.getTitle().size());
+
+            postFitErrorHist->GetXaxis()->SetBinLabel(1 + par.getParameterIndex(), par.getTitle().c_str());
+            preFitErrorHist->GetXaxis()->SetBinLabel(1 + par.getParameterIndex(), par.getTitle().c_str());
+
+            if(not isNorm_){
+              postFitErrorHist->SetBinContent( 1 + par.getParameterIndex(), par.getParameterValue());
+              postFitErrorHist->SetBinError( 1 + par.getParameterIndex(), TMath::Sqrt((*covMatrix_)[par.getParameterIndex()][par.getParameterIndex()]));
+              preFitErrorHist->SetBinContent( 1 + par.getParameterIndex(), par.getPriorValue() );
+
+              if( par.isEnabled() and not par.isFixed() and not par.isFree() ){
+                preFitErrorHist->SetBinError( 1 + par.getParameterIndex(), par.getStdDevValue() );
+              }
+            }
+            else{
+              postFitErrorHist->SetBinContent(
+                  1 + par.getParameterIndex(),
+                  FitParameterSet::toNormalizedParValue(par.getParameterValue(), par)
+                  );
+              preFitErrorHist->SetBinContent( 1 + par.getParameterIndex(), 0 );
+
+              postFitErrorHist->SetBinError(
+                  1 + par.getParameterIndex(),
+                  FitParameterSet::toNormalizedParRange(
+                      TMath::Sqrt((*covMatrix_)[par.getParameterIndex()][par.getParameterIndex()]), par
+                  )
+              );
+              if( par.isEnabled() and not par.isFixed() and not par.isFree() ){
+                preFitErrorHist->SetBinError( 1 + par.getParameterIndex(), 1 );
+              }
+            } // norm
+
+            // boundaries Y
+            // -> init
+            if( minY != minY ) minY = preFitErrorHist->GetBinContent(1 + par.getParameterIndex());
+            if( maxY != maxY ) maxY = preFitErrorHist->GetBinContent(1 + par.getParameterIndex());
+
+            // -> push bounds?
+            minY = std::min(minY, preFitErrorHist->GetBinContent(1 + par.getParameterIndex()) - preFitErrorHist->GetBinError(1 + par.getParameterIndex()));
+            minY = std::min(minY, postFitErrorHist->GetBinContent(1 + par.getParameterIndex()) - postFitErrorHist->GetBinError(1 + par.getParameterIndex()));
+            maxY = std::max(maxY, preFitErrorHist->GetBinContent(1 + par.getParameterIndex()) + preFitErrorHist->GetBinError(1 + par.getParameterIndex()));
+            maxY = std::max(maxY, postFitErrorHist->GetBinContent(1 + par.getParameterIndex()) + postFitErrorHist->GetBinError(1 + par.getParameterIndex()));
+          } // par
+
+          if(parSet_.getPriorCovarianceMatrix() != nullptr ){
+            gStyle->GetCanvasPreferGL() ? preFitErrorHist->SetFillColorAlpha(kRed-9, 0.7) : preFitErrorHist->SetFillColor(kRed-9);
+          }
+
+          preFitErrorHist->SetMarkerStyle(kFullDotLarge);
+          preFitErrorHist->SetMarkerColor(kRed-3);
+
+          if( not isNorm_ ){
+            preFitErrorHist->GetYaxis()->SetTitle("Parameter values (a.u.)");
+          }
+          else{
+            preFitErrorHist->GetYaxis()->SetTitle("Parameter values (normalized to the prior)");
+          }
+          preFitErrorHist->GetXaxis()->SetLabelSize(0.03);
+          preFitErrorHist->GetXaxis()->LabelsOption("v");
+
+          preFitErrorHist->SetTitle(Form("Pre-fit Errors of %s", parSet_.getName().c_str()));
+          preFitErrorHist->Write();
+
+          postFitErrorHist->SetLineColor(9);
+          postFitErrorHist->SetLineWidth(2);
+          postFitErrorHist->SetMarkerColor(9);
+          postFitErrorHist->SetMarkerStyle(kFullDotLarge);
+          postFitErrorHist->SetTitle(Form("Post-fit Errors of %s", parSet_.getName().c_str()));
+          postFitErrorHist->Write();
+
+          auto* errorsCanvas = new TCanvas(
+              Form("Fit Constraints for %s", parSet_.getName().c_str()),
+              Form("Fit Constraints for %s", parSet_.getName().c_str()),
+              800, 600);
+          errorsCanvas->cd();
+
+          preFitErrorHist->SetMarkerSize(0);
+
+          minY -= 0.1*(maxY-minY);
+          maxY += 0.1*(maxY-minY);
+          preFitErrorHist->GetYaxis()->SetRangeUser(minY, maxY);
+
+          preFitErrorHist->Draw("E2");
+
+          TH1D preFitErrorHistLine = TH1D("preFitErrorHistLine", "preFitErrorHistLine",
+                                          preFitErrorHist->GetNbinsX(),
+                                          preFitErrorHist->GetXaxis()->GetXmin(),
+                                          preFitErrorHist->GetXaxis()->GetXmax()
+          );
+          GenericToolbox::transformBinContent(&preFitErrorHistLine, [&](TH1D* h_, int b_){
+            h_->SetBinContent(b_, preFitErrorHist->GetBinContent(b_));
+          });
+
+
+          preFitErrorHistLine.SetLineColor(kRed-3);
+          preFitErrorHistLine.Draw("SAME");
+
+          errorsCanvas->Update(); // otherwise does not display...
+          postFitErrorHist->Draw("E1 X0 SAME");
+
+          gPad->SetGridx();
+          gPad->SetGridy();
+          gPad->SetBottomMargin(0.1*(1 + longestTitleSize/15.));
+
+          if( not isNorm_ ){ preFitErrorHist->SetTitle(Form("Pre-fit/Post-fit comparison for %s", parSet_.getName().c_str())); }
+          else             { preFitErrorHist->SetTitle(Form("Pre-fit/Post-fit comparison for %s (normalized)", parSet_.getName().c_str())); }
+          errorsCanvas->Write("fitConstraints_TCanvas");
+
+        }; // makePrePostFitCompPlot
+
+        makePrePostFitCompPlot(GenericToolbox::mkdirTFile(saveSubdir_, "values"), false);
+        makePrePostFitCompPlot(GenericToolbox::mkdirTFile(saveSubdir_, "valuesNorm"), true);
+
+      }; // savePostFitObjFct
 
   LogInfo << "Extracting post-fit errors..." << std::endl;
   for( const auto& parSet : _propagator_.getParameterSetsList() ){
@@ -1094,39 +1148,39 @@ void FitterEngine::rescaleParametersStepSize(){
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 
     for( auto& par : parSet.getEffectiveParameterList() ){
-        iFitPar++;
+      iFitPar++;
 
-        if( not par.isEnabled() ){
-          continue;
-        }
+      if( not par.isEnabled() ){
+        continue;
+      }
 
-        double currentParValue = par.getParameterValue();
-        par.setParameterValue( currentParValue + par.getStdDevValue() );
+      double currentParValue = par.getParameterValue();
+      par.setParameterValue( currentParValue + par.getStdDevValue() );
 
-        updateChi2Cache();
+      updateChi2Cache();
 
-        double deltaChi2 = _chi2Buffer_ - baseChi2;
-        double deltaChi2Pulls = _chi2PullsBuffer_ - baseChi2Pull;
+      double deltaChi2 = _chi2Buffer_ - baseChi2;
+      double deltaChi2Pulls = _chi2PullsBuffer_ - baseChi2Pull;
 
-        // Consider a parabolic approx:
-        // only rescale with X2 stat?
+      // Consider a parabolic approx:
+      // only rescale with X2 stat?
 //        double stepSize = TMath::Sqrt(deltaChi2Pulls)/TMath::Sqrt(deltaChi2);
 
-        // full rescale
-        double stepSize = 1./TMath::Sqrt(std::abs(deltaChi2));
+      // full rescale
+      double stepSize = 1./TMath::Sqrt(std::abs(deltaChi2));
 
-        LogInfo << "Step size of " << parSet.getName() + "/" + par.getTitle()
-            << " -> σ x " << _parStepGain_ << " x " << stepSize
-            << " -> Δχ² = " << deltaChi2 << " = " << deltaChi2 - deltaChi2Pulls << "(stat) + " << deltaChi2Pulls << "(pulls)";
+      LogInfo << "Step size of " << parSet.getName() + "/" + par.getTitle()
+              << " -> σ x " << _parStepGain_ << " x " << stepSize
+              << " -> Δχ² = " << deltaChi2 << " = " << deltaChi2 - deltaChi2Pulls << "(stat) + " << deltaChi2Pulls << "(pulls)";
 
-        stepSize *= par.getStdDevValue() * _parStepGain_;
+      stepSize *= par.getStdDevValue() * _parStepGain_;
 
-        par.setStepSize( stepSize );
-        par.setParameterValue( currentParValue + stepSize );
-        updateChi2Cache();
-        LogInfo << " -> Δχ²(step) = " << _chi2Buffer_ - baseChi2 << std::endl;
-        par.setParameterValue( currentParValue );
-      }
+      par.setStepSize( stepSize );
+      par.setParameterValue( currentParValue + stepSize );
+      updateChi2Cache();
+      LogInfo << " -> Δχ²(step) = " << _chi2Buffer_ - baseChi2 << std::endl;
+      par.setParameterValue( currentParValue );
+    }
 
   }
 
