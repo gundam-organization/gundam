@@ -36,19 +36,13 @@ else()
   add_library(GundamUtils SHARED ${SRCFILES})
 endif()
 
-#if(CMAKE_BUILD_TYPE MATCHES DEBUG)
-#  add_library(GundamUtils STATIC ${SRCFILES})
-#else(CMAKE_BUILD_TYPE MATCHES RELEASE)
-#  add_library(GundamUtils SHARED ${SRCFILES})
-#endif()
-
-target_link_libraries( GundamUtils
-        ${LINK_LIBARY_LIST}
+target_link_libraries( GundamUtils PUBLIC
+        ${ROOT_LIBRARIES}
+        ${YAML_CPP_LIBRARIES}
         )
 
 set_target_properties(GundamUtils PROPERTIES VERSION
   "${gundam_VERSION_MAJOR}.${gundam_VERSION_MINOR}.${gundam_VERSION_REVISION}${gundam_VERSION_TAG}")
-set_target_properties(GundamUtils PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
 install(TARGETS GundamUtils DESTINATION lib)
 #Can uncomment this to install the headers... but is it really neccessary?
