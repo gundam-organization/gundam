@@ -109,7 +109,7 @@ if( "${YAML_CPP_INCLUDE_DIR} " STREQUAL " ")
         cmessage(FATAL_ERROR "empty YAMLCPP_INCLUDE_DIR returned.")
     endif()
     include_directories( ${YAMLCPP_INCLUDE_DIR} )
-    list(APPEND LINK_LIBARY_LIST ${YAMLCPP_LIBRARY})
+#    list(APPEND LINK_LIBARY_LIST ${YAMLCPP_LIBRARY})
 endif()
 
 ################################################################################
