@@ -90,10 +90,11 @@ find_package( YAMLCPP REQUIRED )
 if( NOT YAMLCPP_FOUND )
     cmessage(FATAL_ERROR "yaml-cpp library not found.")
 endif()
-include_directories( ${YAML_CPP_INCLUDE_DIR} )
-cmessage(STATUS "Custom yaml-cpp installation: ${YAMLCPP_DIR}")
-cmessage(STATUS "yaml-cpp include directory: ${YAML_CPP_INCLUDE_DIR}")
-cmessage(STATUS "yaml-cpp lib: ${YAML_CPP_LIBRARIES}")
+cmessage(STATUS " - yaml-cpp include directory: ${YAMLCPP_INCLUDE_DIR}")
+cmessage(STATUS " - yaml-cpp lib: ${YAMLCPP_LIBRARY}")
+include_directories( ${YAMLCPP_INCLUDE_DIR} )
+#    target_link_libraries( OptionParserExample ${YAMLCPP_LIBRARY} )
+list(APPEND LINK_LIBARY_LIST ${YAMLCPP_LIBRARY})
 
 ################################################################################
 #                       SubModules
