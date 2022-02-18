@@ -2,17 +2,22 @@
 // Created by Nadrino on 22/07/2021.
 //
 
-#include <TTreeFormulaManager.h>
-#include <SplineDial.h>
-#include "GenericToolbox.h"
-#include "GenericToolbox.Root.h"
-#include "Logger.h"
-
-#include "JsonUtils.h"
 #include "DataSetLoader.h"
+
 #include "DialSet.h"
 #include "GlobalVariables.h"
 #include "GraphDial.h"
+#include "SplineDial.h"
+#include "JsonUtils.h"
+
+#include "GenericToolbox.h"
+#include "GenericToolbox.Root.h"
+#include "GenericToolbox.VariablesMonitor.h"
+#include "Logger.h"
+
+#include <TTreeFormulaManager.h>
+#include "TTree.h"
+
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[DataSetLoader]");
@@ -98,7 +103,7 @@ void DataSetLoader::initialize() {
     // override: nominalWeightLeafName is deprecated
     _mcNominalWeightFormulaStr_ = JsonUtils::fetchValue(mcConfig, "nominalWeightLeafName", _mcNominalWeightFormulaStr_);
     _mcNominalWeightFormulaStr_ = JsonUtils::fetchValue(mcConfig, "nominalWeightFormula", _mcNominalWeightFormulaStr_);
-    
+
     // override: nominalWeightLeafName is deprecated
     _fakeDataWeightFormulaStr_ = JsonUtils::fetchValue(mcConfig, "fakeDataWeightLeafName", _fakeDataWeightFormulaStr_);
     _fakeDataWeightFormulaStr_ = JsonUtils::fetchValue(mcConfig, "fakeDataWeightFormula", _fakeDataWeightFormulaStr_);
@@ -193,7 +198,7 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
       // FakeData events will be loaded after the prior weight have been propagated on MC samples
       continue;
     }
-    
+
     TChain* chainPtr{nullptr};
     std::vector<std::string>* activeLeafNameListPtr;
 
@@ -224,8 +229,8 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
     // the vector won't have to do this by allocating the right event size.
     PhysicsEvent eventTemplate;
     isData ?
-      eventTemplate.setLeafNameListPtr(&_leavesStorageRequestedForData_):
-      eventTemplate.setLeafNameListPtr(&_leavesStorageRequestedForMc_);
+    eventTemplate.setLeafNameListPtr(&_leavesStorageRequestedForData_):
+    eventTemplate.setLeafNameListPtr(&_leavesStorageRequestedForMc_);
     eventTemplate.setDataSetIndex(_dataSetIndex_);
     chainPtr->SetBranchStatus("*", true);
     eventTemplate.hookToTree(chainPtr, true);
@@ -250,13 +255,13 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
         sampleEventListPtrToFill[iSample] = &samplesToFillList[iSample]->getDataContainer().eventList;
         sampleIndexOffsetList[iSample] = sampleEventListPtrToFill[iSample]->size();
         samplesToFillList[iSample]->getDataContainer().reserveEventMemory(_dataSetIndex_, sampleNbOfEvents[iSample],
-                                                                             eventTemplate);
+                                                                          eventTemplate);
       }
       else{
         sampleEventListPtrToFill[iSample] = &samplesToFillList[iSample]->getMcContainer().eventList;
         sampleIndexOffsetList[iSample] = sampleEventListPtrToFill[iSample]->size();
         samplesToFillList[iSample]->getMcContainer().reserveEventMemory(_dataSetIndex_, sampleNbOfEvents[iSample],
-                                                                           eventTemplate);
+                                                                        eventTemplate);
       }
     }
 
@@ -288,19 +293,19 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
             if( not dialSetPtr->getDialLeafName().empty() ){
               dialSetPtr->getDialList().resize(chainPtr->GetEntries(), nullptr); // to optimize?
 
-
               auto dialType = dialSetPtr->getGlobalDialType();
+              size_t nDials = dialSetPtr->getDialList().size();
+              std::string pTitle = Logger::getPrefixString() + "Claiming dial memory for " + par.getFullTitle();
               if( dialType == DialType::Spline ){
-                for( size_t iDial = dialSetPtr->getCurrentDialOffset() ; iDial < dialSetPtr->getDialList().size() ; iDial++ ){
+                for( size_t iDial = dialSetPtr->getCurrentDialOffset() ; iDial < nDials ; iDial++ ){
+                  GenericToolbox::displayProgressBar(iDial, nDials, pTitle);
                   dialSetPtr->getDialList()[iDial] = std::make_shared<SplineDial>();
-                  ((SplineDial*)dialSetPtr->getDialList()[iDial].get())->setAssociatedParameterReference(&par);
-                  ((SplineDial*)dialSetPtr->getDialList()[iDial].get())->setMinimumSplineResponse(dialSetPtr->getMinimumSplineResponse());
                 }
               }
               else if( dialType == DialType::Graph ){
-                for( size_t iDial = dialSetPtr->getCurrentDialOffset() ; iDial < dialSetPtr->getDialList().size() ; iDial++ ){
+                for( size_t iDial = dialSetPtr->getCurrentDialOffset() ; iDial < nDials ; iDial++ ){
+                  GenericToolbox::displayProgressBar(iDial, nDials, pTitle);
                   dialSetPtr->getDialList()[iDial] = std::make_shared<GraphDial>();
-                  ((GraphDial*)dialSetPtr->getDialList()[iDial].get())->setAssociatedParameterReference(&par);
                 }
               }
               else{
@@ -333,10 +338,10 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
       TTreeFormula* threadNominalWeightFormula{nullptr};
       TTreeFormula* threadFakeDataWeightFormula{nullptr};
       TList threadFormulas;
-    
+
       threadChain = isData ? this->buildDataChain() : this->buildMcChain();
       threadChain->SetBranchStatus("*", false);
-      
+
       if( not isData and not this->getMcNominalWeightFormulaStr().empty() and not this->getFakeDataWeightFormulaStr().empty() ){
         threadChain->SetBranchStatus("*", true);
         threadNominalWeightFormula = new TTreeFormula(
@@ -349,10 +354,10 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
             this->getFakeDataWeightFormulaStr().c_str(),
             threadChain
         );
-        
+
         threadFormulas.Add(threadNominalWeightFormula);
         threadFormulas.Add(threadFakeDataWeightFormula);
-        
+
         threadChain->SetNotify(&threadFormulas);
         threadChain->SetBranchStatus("*", false);
         for( int iLeaf = 0 ; iLeaf < threadNominalWeightFormula->GetNcodes() ; iLeaf++ ){
@@ -388,7 +393,7 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
           threadChain->SetBranchStatus(threadFakeDataWeightFormula->GetLeaf(iLeaf)->GetName(), true);
         }
       }
-      
+
       if (isData and not this->getDataNominalWeightFormulaStr().empty() ){
         threadChain->SetBranchStatus("*", true);
         threadNominalWeightFormula = new TTreeFormula(
@@ -410,10 +415,10 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
 
       Long64_t nEvents = threadChain->GetEntries();
       PhysicsEvent eventBuffer;
-  
+
       isData ?
-        eventBuffer.setLeafNameListPtr(&_leavesStorageRequestedForData_):
-        eventBuffer.setLeafNameListPtr(&_leavesRequestedForIndexing_);
+      eventBuffer.setLeafNameListPtr(&_leavesStorageRequestedForData_):
+      eventBuffer.setLeafNameListPtr(&_leavesRequestedForIndexing_);
 
       eventOffSetMutex.lock();
       eventBuffer.hookToTree(threadChain, true);
@@ -447,15 +452,28 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
       if( iThread_+1 != nThreads ) iEnd = (Long64_t(iThread_)+1)*nEventPerThread;
       Long64_t iGlobal = 0;
 
+      // IO speed monitor
+      GenericToolbox::VariableMonitor readSpeed("bytes");
+      Int_t nBytes;
+
       // Load the branches
       threadChain->LoadTree(iStart);
 
-      std::string progressTitle = LogInfo.getPrefixString() + "Reading selected events";
+      std::string progressTitle = LogInfo.getPrefixString() + "Loading and indexing";
 
       for(Long64_t iEntry = iStart ; iEntry < iEnd ; iEntry++ ){
 
         if( iThread_ == 0 ){
-          GenericToolbox::displayProgressBar(iGlobal, nEvents, progressTitle);
+          if( GenericToolbox::showProgressBar(iGlobal, nEvents) ){
+            GenericToolbox::displayProgressBar(
+                iGlobal, nEvents,
+                progressTitle + " - "
+                + GenericToolbox::padString(GenericToolbox::parseSizeUnits(double(nThreads)*readSpeed.getTotalAccumulated()), 9)
+                + " ("
+                + GenericToolbox::padString(GenericToolbox::parseSizeUnits(double(nThreads)*readSpeed.evalTotalGrowthRate()), 9)
+                + "/s)"
+                );
+          }
           iGlobal += nThreads;
         }
 
@@ -468,13 +486,14 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
         }
         if( skipEvent ) continue;
 
-        threadChain->GetEntry(iEntry);
+        nBytes = threadChain->GetEntry(iEntry);
+        if( iThread_ == 0 ) readSpeed.addQuantity(nBytes);
 
         if( threadNominalWeightFormula != nullptr ){
           eventBuffer.setTreeWeight(threadNominalWeightFormula->EvalInstance());
           if( eventBuffer.getTreeWeight() == 0 ){ continue; } // skip this event
         }
-        
+
         if( threadFakeDataWeightFormula != nullptr and sampleSetPtr_->getDataEventType() == DataEventType::FakeData ){
           eventBuffer.setFakeDataWeight(threadFakeDataWeightFormula->EvalInstance());
         }
@@ -540,11 +559,12 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
                   }
 
                   if( not dialSetPtr->getDialLeafName().empty() ){
-                    if ( not strcmp(threadChain->GetLeaf(dialSetPtr->getDialLeafName().c_str())->GetTypeName(), "TClonesArray") ){
+                    if     ( not strcmp(threadChain->GetLeaf(dialSetPtr->getDialLeafName().c_str())->GetTypeName(), "TClonesArray") ){
                       grPtr = (TGraph*) eventBuffer.getVariable<TClonesArray*>(dialSetPtr->getDialLeafName())->At(0);
                       if(grPtr->GetN() > 1){
-                        if      ( dialSetPtr->getGlobalDialType() == DialType::Spline ){
+                        if     ( dialSetPtr->getGlobalDialType() == DialType::Spline ){
                           spDialPtr = (SplineDial*) dialSetPtr->getDialList()[iEntry].get();
+                          dialSetPtr->applyGlobalParameters(spDialPtr);
                           spDialPtr->createSpline( grPtr );
                           spDialPtr->initialize();
                           spDialPtr->setIsReferenced(true);
@@ -553,6 +573,7 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
                         }
                         else if( dialSetPtr->getGlobalDialType() == DialType::Graph ){
                           grDialPtr = (GraphDial*) dialSetPtr->getDialList()[iEntry].get();
+                          dialSetPtr->applyGlobalParameters(grDialPtr);
                           grDialPtr->setGraph(*grPtr);
                           grDialPtr->initialize();
                           grDialPtr->setIsReferenced(true);
@@ -564,30 +585,29 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
                         }
                       }
                     }
-                    else if ( not strcmp(threadChain->GetLeaf(dialSetPtr->getDialLeafName().c_str())->GetTypeName(), "TGraph") ){
+                    else if( not strcmp(threadChain->GetLeaf(dialSetPtr->getDialLeafName().c_str())->GetTypeName(), "TGraph") ){
                       grPtr = (TGraph*) eventBuffer.getVariable<TGraph*>(dialSetPtr->getDialLeafName());
-                      if ( dialSetPtr->getGlobalDialType() == DialType::Spline ){
+                      if     ( dialSetPtr->getGlobalDialType() == DialType::Spline ){
                         spDialPtr = (SplineDial*) dialSetPtr->getDialList()[iEntry].get();
+                        dialSetPtr->applyGlobalParameters(spDialPtr);
                         spDialPtr->createSpline(grPtr);
                         spDialPtr->initialize();
                         spDialPtr->setIsReferenced(true);
                         // Adding dial in the event
                         eventPtr->getRawDialPtrList()[eventDialOffset++] = spDialPtr;
-
                       }
-                      
-                      else if ( dialSetPtr->getGlobalDialType() == DialType::Graph ){
+                      else if( dialSetPtr->getGlobalDialType() == DialType::Graph ){
                         grDialPtr = (GraphDial*) dialSetPtr->getDialList()[iEntry].get();
+                        dialSetPtr->applyGlobalParameters(grDialPtr);
                         grDialPtr->setGraph(*grPtr);
                         grDialPtr->initialize();
                         grDialPtr->setIsReferenced(true);
                         // Adding dial in the event
                         eventPtr->getRawDialPtrList()[eventDialOffset++] = grDialPtr;
                       }
-
                       else{
-                          LogThrow("Unsupported event-by-event dial: " << DialType::DialTypeEnumNamespace::toString(dialSetPtr->getGlobalDialType()))
-                        }
+                        LogThrow("Unsupported event-by-event dial: " << DialType::DialTypeEnumNamespace::toString(dialSetPtr->getGlobalDialType()))
+                      }
                     }
                     else{
                       LogThrow("Unsupported event-by-event dial type: " << threadChain->GetLeaf(dialSetPtr->getDialLeafName().c_str())->GetTypeName() )
@@ -835,14 +855,22 @@ std::vector<std::vector<bool>> DataSetLoader::makeEventSelection(std::vector<Fit
     }
   }
 
+  GenericToolbox::VariableMonitor readSpeed("bytes");
+
   Long64_t nEvents = chainPtr->GetEntries();
   // for each event, which sample is active?
   std::vector<std::vector<bool>> eventIsInSamplesList(nEvents, std::vector<bool>(samplesToFillList.size(), true));
   std::string progressTitle = LogInfo.getPrefixString() + "Reading input dataset";
   TFile* lastFilePtr{nullptr};
   for( Long64_t iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
-    GenericToolbox::displayProgressBar(iEvent, nEvents, progressTitle);
-    chainPtr->GetEntry(iEvent);
+    readSpeed.addQuantity(chainPtr->GetEntry(iEvent));
+    if( GenericToolbox::showProgressBar(iEvent, nEvents) ){
+      GenericToolbox::displayProgressBar(
+          iEvent, nEvents,progressTitle + " - " +
+          GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.evalTotalGrowthRate()), 8)
+          + "/s");
+    }
+
 
     for( size_t iSample = 0 ; iSample < sampleCutFormulaList.size() ; iSample++ ){
       for(int jInstance = 0; jInstance < sampleCutFormulaList[iSample]->GetNdata(); jInstance++) {

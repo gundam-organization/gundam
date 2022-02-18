@@ -12,18 +12,17 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[GraphDial]");
 })
 
-GraphDial::GraphDial() {
-  GraphDial::reset();
+GraphDial::GraphDial() : Dial{DialType::Graph} {
+  this->GraphDial::reset();
 }
 
 void GraphDial::reset() {
-  Dial::reset();
-  _dialType_ = DialType::Graph;
+  this->Dial::reset();
   _graph_ = TGraph();
 }
 
 void GraphDial::initialize() {
-  Dial::initialize();
+  this->Dial::initialize();
   LogThrowIf( _graph_.GetN() == 0 )
   _isInitialized_ = true;
 }
@@ -41,16 +40,16 @@ std::string GraphDial::getSummary() {
 //  return _graph_.Eval(parameterValue_);
 //}
 void GraphDial::fillResponseCache() {
-  if     (_dialParameterCache_ <= _graph_.GetX()[0])                { _dialResponseCache_ = _graph_.GetY()[0]; }
-  else if(_dialParameterCache_ >= _graph_.GetX()[_graph_.GetN()-1]) { _dialResponseCache_ = _graph_.GetY()[_graph_.GetN() - 1]; }
+  if     (_effectiveDialParameterValue_ <= _graph_.GetX()[0])                { _dialResponseCache_ = _graph_.GetY()[0]; }
+  else if(_effectiveDialParameterValue_ >= _graph_.GetX()[_graph_.GetN()-1]) { _dialResponseCache_ = _graph_.GetY()[_graph_.GetN() - 1]; }
   else{
-    _dialResponseCache_ = _graph_.Eval(_dialParameterCache_);
+    _dialResponseCache_ = _graph_.Eval(_effectiveDialParameterValue_);
   }
 
   if(_dialResponseCache_ < 0){
     GlobalVariables::getThreadMutex().lock();
     _graph_.Print();
-    LogError << GET_VAR_NAME_VALUE(_dialParameterCache_) << " -> " << _dialResponseCache_ << std::endl;
+    LogError << GET_VAR_NAME_VALUE(_effectiveDialParameterValue_) << " -> " << _dialResponseCache_ << std::endl;
     LogThrow("NEGATIVE GRAPH RESPONSE");
   }
 

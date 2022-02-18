@@ -27,7 +27,9 @@ namespace JsonUtils{
 
     nlohmann::json output;
 
-    if( GenericToolbox::doesFilePathHasExtension(configFilePath_, "yml") or GenericToolbox::doesFilePathHasExtension(configFilePath_,"yaml") ){
+    if( GenericToolbox::doesFilePathHasExtension(configFilePath_, "yml")
+     or GenericToolbox::doesFilePathHasExtension(configFilePath_,"yaml")
+     ){
       auto yaml = YamlUtils::readConfigFile(configFilePath_);
       output = YamlUtils::toJson(yaml);
     }
@@ -78,6 +80,11 @@ namespace JsonUtils{
 
   bool doKeyExist(const nlohmann::json& jsonConfig_, const std::string& keyName_){
     return jsonConfig_.find(keyName_) != jsonConfig_.end();
+  }
+  std::vector<std::string> ls(const nlohmann::json& jsonConfig_){
+    std::vector<std::string> out{};
+    for( const auto& entry : jsonConfig_.get<nlohmann::json::object_t>() ){ out.emplace_back(entry.first); }
+    return out;
   }
   nlohmann::json fetchSubEntry(const nlohmann::json& jsonConfig_, const std::vector<std::string>& keyPath_){
     nlohmann::json output = jsonConfig_;
