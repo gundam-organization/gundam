@@ -86,10 +86,7 @@ else(ROOT_FOUND)
 endif(ROOT_FOUND)
 
 # YAML-CPP
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(YAML_CPP REQUIRED yaml-cpp HINTS ${YAMLCPP_DIR} )
-
-#find_package( yaml-cpp REQUIRED HINTS ${YAMLCPP_DIR}/include )
+find_package( yaml-cpp REQUIRED HINTS ${YAMLCPP_DIR}/include )
 if(NOT yaml-cpp_FOUND)
     cmessage(FATAL_ERROR "yaml-cpp library not found.")
 endif()
@@ -98,6 +95,9 @@ cmessage(STATUS "Custom yaml-cpp installation: ${YAMLCPP_DIR}")
 cmessage(STATUS "yaml-cpp include directory: ${YAML_CPP_INCLUDE_DIR}")
 cmessage(STATUS "yaml-cpp lib: ${YAML_CPP_LIBRARIES}")
 if( "${YAML_CPP_INCLUDE_DIR} " STREQUAL " ")
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(YAML_CPP REQUIRED yaml-cpp )
+    cmessage(STATUS "yaml-cpp include directory: ${YAML_CPP_INCLUDE_DIR}")
     cmessage(FATAL_ERROR "empty YAML_CPP_INCLUDE_DIR returned.")
 endif()
 
