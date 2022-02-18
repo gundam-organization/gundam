@@ -90,13 +90,13 @@ find_package( yaml-cpp REQUIRED HINTS ${YAMLCPP_DIR} )
 if(NOT yaml-cpp_FOUND)
     cmessage(FATAL_ERROR "yaml-cpp library not found.")
 endif()
-if( "${YAML_CPP_INCLUDE_DIR} " STREQUAL " ")
-    cmessage(FATAL_ERROR "empty YAML_CPP_INCLUDE_DIR returned.")
-endif()
 include_directories( ${YAML_CPP_INCLUDE_DIR} )
 cmessage(STATUS "Custom yaml-cpp installation: ${YAMLCPP_DIR}")
 cmessage(STATUS "yaml-cpp include directory: ${YAML_CPP_INCLUDE_DIR}")
 cmessage(STATUS "yaml-cpp lib: ${YAML_CPP_LIBRARIES}")
+if( "${YAML_CPP_INCLUDE_DIR} " STREQUAL " ")
+    cmessage(FATAL_ERROR "empty YAML_CPP_INCLUDE_DIR returned.")
+endif()
 
 ################################################################################
 #                       SubModules
