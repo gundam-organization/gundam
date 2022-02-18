@@ -8,13 +8,13 @@
 # By default, the dynamic libraries of yaml-cpp will be found. To find the static ones instead,
 # you must set the YAMLCPP_STATIC_LIBRARY variable to TRUE before calling find_package(YamlCpp ...).
 #
-# If yaml-cpp is not installed in a standard path, you can use the YAMLCPP_INSTALL_DIR CMake variable
+# If yaml-cpp is not installed in a standard path, you can use the YAMLCPP_DIR CMake variable
 # to tell CMake where yaml-cpp is.
 
 cmessage(STATUS "Looking for yaml-cpp library...")
-cmessage(STATUS " -> To manually select yaml-cpp: -D YAMLCPP_INSTALL_DIR=/path/to/yaml-cpp/install )")
-#if( YAMLCPP_INSTALL_DIR STREQUAL "" )
-#    cmessage(STATUS "User provided YAMLCPP_INSTALL_DIR=${YAMLCPP_INSTALL_DIR}")
+cmessage(STATUS " -> To manually select yaml-cpp: -D YAMLCPP_DIR=/path/to/yaml-cpp/install )")
+#if( YAMLCPP_DIR STREQUAL "" )
+#    cmessage(STATUS "User provided YAMLCPP_DIR=${YAMLCPP_DIR}")
 #endif()
 
 # attempt to find static library first if this is set
@@ -22,14 +22,14 @@ if( YAMLCPP_STATIC_LIBRARY )
     set(YAMLCPP_LIB_FILE libyaml-cpp.a)
 endif()
 
-if( YAMLCPP_INSTALL_DIR )
+if( YAMLCPP_DIR )
     # find the yaml-cpp include directory
-    cmessage(STATUS "Custom yaml-cpp path has been set: ${YAMLCPP_INSTALL_DIR}")
+    cmessage(STATUS "Custom yaml-cpp path has been set: ${YAMLCPP_DIR}")
 
     # find the yaml-cpp include directory
     find_path(YAMLCPP_INCLUDE_DIR yaml-cpp/yaml.h
             PATH_SUFFIXES include
-            HINTS ${YAMLCPP_INSTALL_DIR}
+            HINTS ${YAMLCPP_DIR}
             NO_DEFAULT_PATH
             )
 
@@ -37,7 +37,7 @@ if( YAMLCPP_INSTALL_DIR )
     find_library(YAMLCPP_LIBRARY
             NAMES ${YAMLCPP_STATIC} yaml-cpp
             PATH_SUFFIXES lib64 lib
-            HINTS ${YAMLCPP_INSTALL_DIR}
+            HINTS ${YAMLCPP_DIR}
             NO_DEFAULT_PATH
             )
 else()
