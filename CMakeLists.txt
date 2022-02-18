@@ -14,7 +14,7 @@ option(CXX_WARNINGS "Enable most C++ warning flags." ON)
 option(COLOR_OUTPUT "Enable colored terminal output." ON)
 option(TTYCHECK "Enable check if output is being sent to terminal/TTY." ON)
 option(WITH_OPENMP "Build with OpenMP libraries" OFF )
-option(YAMLCPP_DIR "Set custom path to yaml-cpp lib" "" )
+option(YAMLCPP_DIR "Set custom path to yaml-cpp lib" OFF )
 option(ENABLE_DEV_MODE "Enable specific dev related printouts" OFF )
 
 set(VERBOSE TRUE)
