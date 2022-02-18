@@ -22,6 +22,7 @@ set(VERBOSE TRUE)
 include(${CMAKE_SOURCE_DIR}/cmake/cmessage.cmake)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 #Changes default install path to be a subdirectory of the build dir.
 #Should set the installation dir at configure time with
