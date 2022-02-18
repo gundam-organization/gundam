@@ -309,8 +309,8 @@ void FitterEngine::fixGhostFitParameters(){
 
         updateChi2Cache();
         deltaChi2Stat = _chi2StatBuffer_ - baseChi2Stat;
-        deltaChi2Syst = _chi2PullsBuffer_ - baseChi2Syst;
-        deltaChi2 = _chi2Buffer_ - baseChi2;
+//        deltaChi2Syst = _chi2PullsBuffer_ - baseChi2Syst;
+//        deltaChi2 = _chi2Buffer_ - baseChi2;
         ssPrint << ": Δχ²(stat) = " << deltaChi2Stat;
 
         LogInfo.moveTerminalCursorBack(1);
