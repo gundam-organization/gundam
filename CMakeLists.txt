@@ -14,15 +14,12 @@ option(CXX_WARNINGS "Enable most C++ warning flags." ON)
 option(COLOR_OUTPUT "Enable colored terminal output." ON)
 option(TTYCHECK "Enable check if output is being sent to terminal/TTY." ON)
 option(WITH_OPENMP "Build with OpenMP libraries" OFF )
-option(YAMLCPP_INSTALL_DIR "Set custom path to yaml-cpp lib" OFF )
+option(YAMLCPP_DIR "Set custom path to yaml-cpp lib" OFF )
 option(ENABLE_DEV_MODE "Enable specific dev related printouts" OFF )
 
 set(VERBOSE TRUE)
 
 include(${CMAKE_SOURCE_DIR}/cmake/cmessage.cmake)
-
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 #Changes default install path to be a subdirectory of the build dir.
 #Should set the installation dir at configure time with
@@ -89,15 +86,14 @@ else(ROOT_FOUND)
 endif(ROOT_FOUND)
 
 # YAML-CPP
-find_package( YAMLCPP REQUIRED )
-if( NOT YAMLCPP_FOUND )
+find_package( yaml-cpp REQUIRED HINTS ${YAMLCPP_DIR} )
+if(NOT yaml-cpp_FOUND)
     cmessage(FATAL_ERROR "yaml-cpp library not found.")
 endif()
-cmessage(STATUS " - yaml-cpp include directory: ${YAMLCPP_INCLUDE_DIR}")
-cmessage(STATUS " - yaml-cpp lib: ${YAMLCPP_LIBRARY}")
-include_directories( ${YAMLCPP_INCLUDE_DIR} )
-#    target_link_libraries( OptionParserExample ${YAMLCPP_LIBRARY} )
-list(APPEND LINK_LIBARY_LIST ${YAMLCPP_LIBRARY})
+include_directories( ${YAML_CPP_INCLUDE_DIR} )
+cmessage(STATUS "Custom yaml-cpp installation: ${YAMLCPP_DIR}")
+cmessage(STATUS "yaml-cpp include directory: ${YAML_CPP_INCLUDE_DIR}")
+cmessage(STATUS "yaml-cpp lib: ${YAML_CPP_LIBRARIES}")
 
 ################################################################################
 #                       SubModules
