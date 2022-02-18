@@ -279,9 +279,9 @@ void FitterEngine::fixGhostFitParameters(){
   // +1 sigma
   int iFitPar = -1;
   std::stringstream ssPrint;
-  double deltaChi2;
+//  double deltaChi2;
   double deltaChi2Stat;
-  double deltaChi2Syst;
+//  double deltaChi2Syst;
 
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 

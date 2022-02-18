@@ -178,12 +178,16 @@ bool DialSet::initializeNormDialsWithParBinning() {
   auto parameterBinningPath = JsonUtils::fetchValue<std::string>(_config_, "parametersBinningPath", "");
   if( parameterBinningPath.empty() ){ return false; }
 
+  if(not GenericToolbox::doesStringStartsWithSubstring(parameterBinningPath, "/")){
+    parameterBinningPath = _workingDirectory_ + "/" + parameterBinningPath;
+  }
+
   LogTrace << "Initializing dials with binning file..." << std::endl;
 
   DataBinSet binning;
   binning.setName("parameterBinning");
   DataBinSet::setVerbosity(static_cast<int>(Logger::LogLevel::ERROR)); // only print errors if any
-  binning.readBinningDefinition(_workingDirectory_ + "/" + parameterBinningPath);
+  binning.readBinningDefinition(parameterBinningPath);
   DataBinSet::setVerbosity(static_cast<int>(Logger::getMaxLogLevel())); // take back the log level with this instance
   if( _parameterIndex_ >= binning.getBinsList().size() ){
     LogError << "Can't fetch parameter index #" << _parameterIndex_ << " while binning size is: " << binning.getBinsList().size() << std::endl;
@@ -228,9 +232,11 @@ bool DialSet::initializeDialsWithDefinition() {
     else if( JsonUtils::doKeyExist(dialsDefinition, "binningFilePath") ){
 
       auto binningFilePath = JsonUtils::fetchValue<std::string>(dialsDefinition, "binningFilePath");
+      if(not GenericToolbox::doesStringStartsWithSubstring(binningFilePath, "/")){ binningFilePath = _workingDirectory_ + "/" + binningFilePath; }
+
       DataBinSet binning;
       binning.setName(binningFilePath);
-      binning.readBinningDefinition(_workingDirectory_ + "/" + binningFilePath);
+      binning.readBinningDefinition(binningFilePath);
 
       auto binList = binning.getBinsList();
 
