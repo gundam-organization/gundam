@@ -14,7 +14,7 @@
 #include <cstdlib>
 
 LoggerInit([]{
-Logger::setUserHeaderStr("[gundamPlotExtractor.cxx]");
+Logger::setUserHeaderStr("[gundamConfigCompare.cxx]");
 Logger::setPrefixFormat("{TIME} {USER_HEADER}");
 })
 
@@ -26,14 +26,13 @@ void compareConfigStage(const nlohmann::json& subConfig1, const nlohmann::json& 
 
 int main( int argc, char** argv ){
   GundamGreetings g;
-  g.setAppName("ConfigComparator");
+  g.setAppName("ConfigCompare");
   g.hello();
 
   CmdLineParser clp(argc, argv);
   clp.addOption("config-1", {"-c1"}, "Path to first config file.", 1);
   clp.addOption("config-2", {"-c2"}, "Path to second config file.", 1);
   clp.addOption("show-all-keys", {"-a"}, "Show all keys.", 0);
-
 
   clp.parseCmdLine();
 

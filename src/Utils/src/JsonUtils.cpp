@@ -27,7 +27,9 @@ namespace JsonUtils{
 
     nlohmann::json output;
 
-    if( GenericToolbox::doesFilePathHasExtension(configFilePath_, "yml") or GenericToolbox::doesFilePathHasExtension(configFilePath_,"yaml") ){
+    if( GenericToolbox::doesFilePathHasExtension(configFilePath_, "yml")
+     or GenericToolbox::doesFilePathHasExtension(configFilePath_,"yaml")
+     ){
       auto yaml = YamlUtils::readConfigFile(configFilePath_);
       output = YamlUtils::toJson(yaml);
     }
