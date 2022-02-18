@@ -86,8 +86,8 @@ else(ROOT_FOUND)
 endif(ROOT_FOUND)
 
 # YAML-CPP
-find_package( yaml-cpp REQUIRED HINTS ${YAMLCPP_DIR} )
-if(NOT yaml-cpp_FOUND)
+find_package( YAMLCPP REQUIRED )
+if( NOT YAMLCPP_FOUND )
     cmessage(FATAL_ERROR "yaml-cpp library not found.")
 endif()
 include_directories( ${YAML_CPP_INCLUDE_DIR} )
