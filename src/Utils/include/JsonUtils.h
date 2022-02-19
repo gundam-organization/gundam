@@ -21,7 +21,7 @@ namespace JsonUtils {
   std::vector<std::string> ls(const nlohmann::json& jsonConfig_);
   bool doKeyExist(const nlohmann::json& jsonConfig_, const std::string& keyName_);
   template<class T> auto fetchValue(const nlohmann::json& jsonConfig_, const std::string& keyName_) -> T;
-  template<class T> auto fetchValue(const nlohmann::json& jsonConfig_, const std::vector<std::string>& keyName_) -> T;
+  template<class T> auto fetchValue(const nlohmann::json& jsonConfig_, const std::vector<std::string>& keyNames_) -> T;
   template<class T> auto fetchValue(const nlohmann::json& jsonConfig_, const std::string& keyName_, const T& defaultValue_) -> T;
   template<class T> auto fetchValue(const nlohmann::json& jsonConfig_, const std::vector<std::string>& keyName_, const T& defaultValue_) -> T;
   template<class T> nlohmann::json fetchMatchingEntry(const nlohmann::json& jsonConfig_, const std::string& keyName_, const T& keyValue_);

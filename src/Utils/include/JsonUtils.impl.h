@@ -22,13 +22,13 @@ namespace JsonUtils {
     }
     return jsonEntry->template get<T>();
   }
-  template<class T> auto fetchValue(const nlohmann::json& jsonConfig_, const std::vector<std::string>& keyName_) -> T{
-    for( auto& keyName : keyName_){
+  template<class T> auto fetchValue(const nlohmann::json& jsonConfig_, const std::vector<std::string>& keyNames_) -> T{
+    for( auto& keyName : keyNames_){
       if( JsonUtils::doKeyExist(jsonConfig_, keyName) ){
         return JsonUtils::fetchValue<T>(jsonConfig_, keyName);
       }
     }
-    throw std::runtime_error("Could not find any json entry: " + GenericToolbox::parseVectorAsString(keyName_) + ":\n" + jsonConfig_.dump());
+    throw std::runtime_error("Could not find any json entry: " + GenericToolbox::parseVectorAsString(keyNames_) + ":\n" + jsonConfig_.dump());
   }
   template<class T> auto fetchValue(const nlohmann::json& jsonConfig_, const std::string& keyName_, const T& defaultValue_) -> T{
     try{
