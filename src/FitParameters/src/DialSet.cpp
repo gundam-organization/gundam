@@ -76,8 +76,6 @@ void DialSet::initialize() {
   }
   else { }
 
-  this->readGlobals(_config_);
-
   // Dials are directly defined with a binning file?
   if     (initializeNormDialsWithParBinning() ){ LogInfo << "DialSet initialised with parameter binning definition." << std::endl;  }
   // Dials are individually defined?
@@ -156,7 +154,103 @@ void DialSet::readGlobals(const nlohmann::json &config_){
     LogThrowIf(_globalDialType_==DialType::DialType_OVERFLOW, "Invalid dial type provided: " << dialTypeStr)
   }
 
-  _applyConditionStr_ = JsonUtils::fetchValue(config_, "applyCondition", _applyConditionStr_);
+  if     ( JsonUtils::doKeyExist(config_, "applyCondition") ){
+    _applyConditionStr_ = JsonUtils::fetchValue<std::string>(config_, "applyCondition");
+  }
+  else if( JsonUtils::doKeyExist(config_, "applyConditions") ){
+    std::vector<std::string> conditionsList;
+
+    for( auto& condEntry : JsonUtils::fetchValue<std::vector<nlohmann::json>>(config_, "applyConditions") ){
+      if( condEntry.is_string() ){
+        conditionsList.emplace_back(condEntry.get<std::string>());
+      }
+      else if( condEntry.is_structured() ){
+        auto expression = JsonUtils::fetchValue<std::string>(condEntry, {{"exp"}, {"expression"}, {"var"}, {"variable"}});
+        std::stringstream ssCondEntry;
+
+        // allowedRanges
+        {
+          auto allowedRanges = JsonUtils::fetchValue(condEntry, "allowedRanges", std::vector<std::pair<double,double>>());
+          if( not allowedRanges.empty() ){
+            std::vector<std::string> allowedRangesCond;
+            for( auto& allowedRange : allowedRanges ){
+              LogThrowIf(allowedRange.first >= allowedRange.second, "Invalid range bounds: min(" << allowedRange.first << ") max(" << allowedRange.second << ")" )
+              std::stringstream condSs;
+              condSs << "(" << expression << " >= " << allowedRange.first;
+              condSs << " && " << expression << " < " << allowedRange.second << ")";
+              allowedRangesCond.emplace_back(condSs.str());
+            }
+            ssCondEntry << GenericToolbox::joinVectorString(allowedRangesCond, " || ");
+          }
+        }
+
+        // allowedValues
+        {
+          auto allowedValues = JsonUtils::fetchValue(condEntry, "allowedValues", std::vector<double>());
+          if( not allowedValues.empty() ){
+            std::vector<std::string> allowedValuesCond;
+            for( auto& allowedValue : allowedValues ){
+              std::stringstream condSs;
+              condSs << expression << " == " << allowedValue;
+              allowedValuesCond.emplace_back(condSs.str());
+            }
+            if( not ssCondEntry.str().empty() ) ssCondEntry << " || "; // allowed regions are linked with "OR"
+            ssCondEntry << GenericToolbox::joinVectorString(allowedValuesCond, " || ");
+          }
+        }
+
+        auto excludedRanges = JsonUtils::fetchValue(condEntry, "excludedRanges", std::vector<std::pair<double,double>>());
+        auto excludedValues = JsonUtils::fetchValue(condEntry, "excludedValues", std::vector<int>());
+        if( not excludedRanges.empty() or not excludedValues.empty() ){
+          if( not ssCondEntry.str().empty() ){
+            // exclusion ranges are linked with &&: they are supposed to prevail
+            ssCondEntry.str("(" + ssCondEntry.str() + ")");
+            // after that no parenthesis needed since only && will be used
+          }
+
+          {
+            if( not excludedRanges.empty() ){
+              std::vector<std::string> excludedRangesCond;
+              for( auto& excludedRange : excludedRanges ){
+                LogThrowIf(excludedRange.first >= excludedRange.second, "Invalid range bounds: min(" << excludedRange.first << ") max(" << excludedRange.second << ")" )
+                std::stringstream condSs;
+                condSs << expression << " < " << excludedRange.first << " && ";
+                condSs << expression << " >= " << excludedRange.second;
+                excludedRangesCond.emplace_back(condSs.str());
+              }
+              if( not ssCondEntry.str().empty() ) ssCondEntry << " && "; // allowed regions are linked with "OR"
+              ssCondEntry << GenericToolbox::joinVectorString(excludedRangesCond, " && ");
+            }
+          }
+
+          {
+            if( not excludedValues.empty() ){
+              std::vector<std::string> excludedValuesCond;
+              for( auto& excludedValue : excludedValues ){
+                std::stringstream condSs;
+                condSs << expression << " == " << excludedValue;
+                excludedValuesCond.emplace_back(condSs.str());
+              }
+              if( not ssCondEntry.str().empty() ) ssCondEntry << " && "; // allowed regions are linked with "OR"
+              ssCondEntry << GenericToolbox::joinVectorString(excludedValuesCond, " && ");
+            }
+          }
+        }
+
+        LogThrowIf(ssCondEntry.str().empty(), "Could not parse condition entry: " << condEntry)
+        conditionsList.emplace_back(ssCondEntry.str());
+      }
+      else{
+        LogThrow("Could not recognise condition entry: " << condEntry);
+      }
+    }
+
+    LogThrowIf(conditionsList.empty(), "No apply condition was recognised.")
+    _applyConditionStr_ = "( ";
+    _applyConditionStr_ += GenericToolbox::joinVectorString(conditionsList, " ) && ( ");
+    _applyConditionStr_ += " )";
+  }
+
   if( not _applyConditionStr_.empty() ){
     LogWarning << "Apply condition: " << _applyConditionStr_ << std::endl;
     _applyConditionFormula_ = std::make_shared<TFormula>("_applyConditionFormula_", _applyConditionStr_.c_str());
@@ -178,6 +272,8 @@ bool DialSet::initializeNormDialsWithParBinning() {
   auto parameterBinningPath = JsonUtils::fetchValue<std::string>(_config_, "parametersBinningPath", "");
   if( parameterBinningPath.empty() ){ return false; }
 
+  this->readGlobals(_config_);
+
   if(not GenericToolbox::doesStringStartsWithSubstring(parameterBinningPath, "/")){
     parameterBinningPath = _workingDirectory_ + "/" + parameterBinningPath;
   }
@@ -189,10 +285,10 @@ bool DialSet::initializeNormDialsWithParBinning() {
   DataBinSet::setVerbosity(static_cast<int>(Logger::LogLevel::ERROR)); // only print errors if any
   binning.readBinningDefinition(parameterBinningPath);
   DataBinSet::setVerbosity(static_cast<int>(Logger::getMaxLogLevel())); // take back the log level with this instance
-  if( _parameterIndex_ >= binning.getBinsList().size() ){
-    LogError << "Can't fetch parameter index #" << _parameterIndex_ << " while binning size is: " << binning.getBinsList().size() << std::endl;
-    throw std::runtime_error("Can't fetch parameter index.");
-  }
+
+  LogThrowIf(_parameterIndex_ >= binning.getBinsList().size(),
+             "Can't fetch parameter index #" << _parameterIndex_ << " while binning size is: " << binning.getBinsList().size()
+             )
 
   NormalizationDial dial;
   this->applyGlobalParameters(&dial);
@@ -281,10 +377,7 @@ bool DialSet::initializeDialsWithDefinition() {
         // OLD
         auto objPath = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsTreePath");
         auto* dialsTTree = (TTree*) dialsTFile->Get(objPath.c_str());
-        if( dialsTTree == nullptr ){
-          LogError << objPath << " within " << filePath << " could not be opened." << std::endl;
-          throw std::runtime_error("dialsTTree could not be opened.");
-        }
+        LogThrowIf(dialsTTree== nullptr, objPath << " within " << filePath << " could not be opened.")
 
         Int_t kinematicBin;
         TSpline3* splinePtr = nullptr;

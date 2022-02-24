@@ -342,59 +342,60 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
       threadChain = isData ? this->buildDataChain() : this->buildMcChain();
       threadChain->SetBranchStatus("*", false);
 
-      if( not isData and not this->getMcNominalWeightFormulaStr().empty() and not this->getFakeDataWeightFormulaStr().empty() ){
-        threadChain->SetBranchStatus("*", true);
-        threadNominalWeightFormula = new TTreeFormula(
-            Form("NominalWeightFormula%i", iThread_),
-            this->getMcNominalWeightFormulaStr().c_str(),
-            threadChain
-        );
-        threadFakeDataWeightFormula = new TTreeFormula(
-            Form("FakeDataWeightFormula%i", iThread_),
-            this->getFakeDataWeightFormulaStr().c_str(),
-            threadChain
-        );
+      if( not isData ){
+        if     ( not this->getMcNominalWeightFormulaStr().empty() and not this->getFakeDataWeightFormulaStr().empty() ){
+          threadChain->SetBranchStatus("*", true);
+          threadNominalWeightFormula = new TTreeFormula(
+              Form("NominalWeightFormula%i", iThread_),
+              this->getMcNominalWeightFormulaStr().c_str(),
+              threadChain
+          );
+          threadFakeDataWeightFormula = new TTreeFormula(
+              Form("FakeDataWeightFormula%i", iThread_),
+              this->getFakeDataWeightFormulaStr().c_str(),
+              threadChain
+          );
 
-        threadFormulas.Add(threadNominalWeightFormula);
-        threadFormulas.Add(threadFakeDataWeightFormula);
+          threadFormulas.Add(threadNominalWeightFormula);
+          threadFormulas.Add(threadFakeDataWeightFormula);
 
-        threadChain->SetNotify(&threadFormulas);
-        threadChain->SetBranchStatus("*", false);
-        for( int iLeaf = 0 ; iLeaf < threadNominalWeightFormula->GetNcodes() ; iLeaf++ ){
-          threadChain->SetBranchStatus(threadNominalWeightFormula->GetLeaf(iLeaf)->GetName(), true);
+          threadChain->SetNotify(&threadFormulas);
+          threadChain->SetBranchStatus("*", false);
+          for( int iLeaf = 0 ; iLeaf < threadNominalWeightFormula->GetNcodes() ; iLeaf++ ){
+            threadChain->SetBranchStatus(threadNominalWeightFormula->GetLeaf(iLeaf)->GetName(), true);
+          }
+          for( int iLeaf = 0 ; iLeaf < threadFakeDataWeightFormula->GetNcodes() ; iLeaf++ ){
+            threadChain->SetBranchStatus(threadFakeDataWeightFormula->GetLeaf(iLeaf)->GetName(), true);
+          }
         }
-        for( int iLeaf = 0 ; iLeaf < threadFakeDataWeightFormula->GetNcodes() ; iLeaf++ ){
-          threadChain->SetBranchStatus(threadFakeDataWeightFormula->GetLeaf(iLeaf)->GetName(), true);
+        else if( not this->getMcNominalWeightFormulaStr().empty() ){
+          threadChain->SetBranchStatus("*", true);
+          threadNominalWeightFormula = new TTreeFormula(
+              Form("NominalWeightFormula%i", iThread_),
+              this->getMcNominalWeightFormulaStr().c_str(),
+              threadChain
+          );
+          threadChain->SetNotify(threadNominalWeightFormula);
+          threadChain->SetBranchStatus("*", false);
+          for( int iLeaf = 0 ; iLeaf < threadNominalWeightFormula->GetNcodes() ; iLeaf++ ){
+            threadChain->SetBranchStatus(threadNominalWeightFormula->GetLeaf(iLeaf)->GetName(), true);
+          }
+        }
+        else if( not this->getFakeDataWeightFormulaStr().empty() ){
+          threadChain->SetBranchStatus("*", true);
+          threadFakeDataWeightFormula = new TTreeFormula(
+              Form("FakeDataWeightFormula%i", iThread_),
+              this->getFakeDataWeightFormulaStr().c_str(),
+              threadChain
+          );
+          threadChain->SetNotify(threadFakeDataWeightFormula);
+          threadChain->SetBranchStatus("*", false);
+          for( int iLeaf = 0 ; iLeaf < threadFakeDataWeightFormula->GetNcodes() ; iLeaf++ ){
+            threadChain->SetBranchStatus(threadFakeDataWeightFormula->GetLeaf(iLeaf)->GetName(), true);
+          }
         }
       }
-      else if( not isData and not this->getMcNominalWeightFormulaStr().empty() ){
-        threadChain->SetBranchStatus("*", true);
-        threadNominalWeightFormula = new TTreeFormula(
-            Form("NominalWeightFormula%i", iThread_),
-            this->getMcNominalWeightFormulaStr().c_str(),
-            threadChain
-        );
-        threadChain->SetNotify(threadNominalWeightFormula);
-        threadChain->SetBranchStatus("*", false);
-        for( int iLeaf = 0 ; iLeaf < threadNominalWeightFormula->GetNcodes() ; iLeaf++ ){
-          threadChain->SetBranchStatus(threadNominalWeightFormula->GetLeaf(iLeaf)->GetName(), true);
-        }
-      }
-      else if (not isData and not this->getFakeDataWeightFormulaStr().empty() ){
-        threadChain->SetBranchStatus("*", true);
-        threadFakeDataWeightFormula = new TTreeFormula(
-            Form("FakeDataWeightFormula%i", iThread_),
-            this->getFakeDataWeightFormulaStr().c_str(),
-            threadChain
-        );
-        threadChain->SetNotify(threadFakeDataWeightFormula);
-        threadChain->SetBranchStatus("*", false);
-        for( int iLeaf = 0 ; iLeaf < threadFakeDataWeightFormula->GetNcodes() ; iLeaf++ ){
-          threadChain->SetBranchStatus(threadFakeDataWeightFormula->GetLeaf(iLeaf)->GetName(), true);
-        }
-      }
-
-      if (isData and not this->getDataNominalWeightFormulaStr().empty() ){
+      else if (not this->getDataNominalWeightFormulaStr().empty() ){
         threadChain->SetBranchStatus("*", true);
         threadNominalWeightFormula = new TTreeFormula(
             Form("NominalWeightFormula%i", iThread_),
