@@ -12,7 +12,6 @@
 #include "TSpline.h"
 
 #include "GenericToolbox.h"
-#include "GenericToolbox.Wrappers.h"
 
 #include "DataBin.h"
 
@@ -76,11 +75,12 @@ protected:
 
   // Internals
   bool _isInitialized_{false};
-  GenericToolbox::AtomicWrapper<bool> _isEditingCache_{false};
+  bool _isEditingCache_{false};
   bool _isReferenced_{false};
   double _dialResponseCache_{};
   double _dialParameterCache_{};
   double _effectiveDialParameterValue_{}; // take into account internal transformations while using mirrored splines transformations
+  std::shared_ptr<std::mutex> _evalLock_{};
 
   // Response cap
   double _minDialResponse_{std::nan("unset")};
