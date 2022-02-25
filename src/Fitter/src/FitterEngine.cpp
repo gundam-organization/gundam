@@ -437,9 +437,11 @@ void FitterEngine::fit(){
       else if( par.isFixed() )  { lineValues[valIndex++] = "Fixed";    colorStr = GenericToolbox::ColorCodes::redBackground; }
       else                      { lineValues[valIndex++] = PriorType::PriorTypeEnumNamespace::toString(par.getPriorType(), true) + " Prior"; }
 
+#ifndef NOCOLOR
       for( auto& line : lineValues ){
         if(not line.empty()) line = colorStr + line + GenericToolbox::ColorCodes::resetColor;
       }
+#endif
 
       tableLines.emplace_back(lineValues);
 
@@ -940,9 +942,11 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
               if( priorFraction > 1 ){ colorStr = GenericToolbox::ColorCodes::redBackground; }
             }
 
+#ifndef NOCOLOR
             if( not colorStr.empty() ){
               for( auto& line : lineValues ){ if(not line.empty()) line = colorStr + line + GenericToolbox::ColorCodes::resetColor; }
             }
+#endif
 
             tableLines.emplace_back(lineValues);
           }
