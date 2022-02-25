@@ -395,11 +395,11 @@ std::string FitParameterSet::getSummary() const {
         else if( par.isFree() )   { lineValues.back() = "Free"; }
         else                      { lineValues.back() = "Fit"; }
 
-        #ifndef NOCOLOR
+#ifndef NOCOLOR
         for( auto& line : lineValues ){
           if(not line.empty()) line = colorStr + line + GenericToolbox::ColorCodes::resetColor;
         }
-        #endif
+#endif
 
         tableLines.emplace_back(lineValues);
       }
@@ -662,6 +662,3 @@ const std::shared_ptr<TMatrixDSym> &FitParameterSet::getPriorCorrelationMatrix()
 const std::shared_ptr<TMatrixDSym> &FitParameterSet::getPriorCovarianceMatrix() const {
   return _priorCovarianceMatrix_;
 }
-
-
-
