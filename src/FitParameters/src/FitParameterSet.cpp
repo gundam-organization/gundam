@@ -84,7 +84,7 @@ void FitParameterSet::prepareFitParameters(){
     }
   }
   _deltaParameterList_ = std::make_shared<TVectorD>(_strippedCovarianceMatrix_->GetNrows());
-  
+
   if( not _useEigenDecompInFit_ ){
     LogWarning << "Computing inverse of the stripped covariance matrix: "
                << _strippedCovarianceMatrix_->GetNcols() << "x"
@@ -390,14 +390,16 @@ std::string FitParameterSet::getSummary() const {
 
         std::string colorStr;
 
-        if( not par.isEnabled() ) { lineValues.back() = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackGround; }
-        else if( par.isFixed() )  { lineValues.back() = "Fixed";    colorStr = GenericToolbox::ColorCodes::redBackGround; }
+        if( not par.isEnabled() ) { lineValues.back() = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackground; }
+        else if( par.isFixed() )  { lineValues.back() = "Fixed";    colorStr = GenericToolbox::ColorCodes::redBackground; }
         else if( par.isFree() )   { lineValues.back() = "Free"; }
         else                      { lineValues.back() = "Fit"; }
 
+#ifndef NOCOLOR
         for( auto& line : lineValues ){
           if(not line.empty()) line = colorStr + line + GenericToolbox::ColorCodes::resetColor;
         }
+#endif
 
         tableLines.emplace_back(lineValues);
       }
@@ -660,6 +662,3 @@ const std::shared_ptr<TMatrixDSym> &FitParameterSet::getPriorCorrelationMatrix()
 const std::shared_ptr<TMatrixDSym> &FitParameterSet::getPriorCovarianceMatrix() const {
   return _priorCovarianceMatrix_;
 }
-
-
-

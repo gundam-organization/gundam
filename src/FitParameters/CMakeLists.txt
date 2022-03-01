@@ -20,22 +20,16 @@ if( USE_STATIC_LINKS STREQUAL "1" )
 else()
   add_library(GundamFitParameters SHARED ${SRCFILES})
 endif()
-#
-#if(CMAKE_BUILD_TYPE MATCHES DEBUG)
-#  add_library(GundamFitParameters STATIC ${SRCFILES})
-#else(CMAKE_BUILD_TYPE MATCHES RELEASE)
-#  add_library(GundamFitParameters SHARED ${SRCFILES})
-#endif()
 
 # Dependencies
-target_link_libraries( GundamFitParameters
+target_link_libraries( GundamFitParameters PUBLIC
         anaevents
         GundamUtils
+        ${ROOT_LIBRARIES}
 )
 
 set_target_properties(GundamFitParameters PROPERTIES VERSION
   "${gundam_VERSION_MAJOR}.${gundam_VERSION_MINOR}.${gundam_VERSION_REVISION}${gundam_VERSION_TAG}")
-set_target_properties(GundamFitParameters PROPERTIES LINK_FLAGS ${ROOT_LD_FLAGS})
 
 install(TARGETS GundamFitParameters DESTINATION lib)
 #Can uncomment this to install the headers... but is it really neccessary?

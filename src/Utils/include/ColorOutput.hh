@@ -49,7 +49,13 @@ template<typename T>
 std::string ColorText(const T& text, unsigned int c)
 {
     std::stringstream ss;
-    ss << "\033[" << c << "m" << text << RESET_STR;
+#ifndef NOCOLOR
+    ss << "\033[" << c;
+#endif
+    ss << "m" << text;
+#ifndef NOCOLOR
+    ss << RESET_STR;
+#endif
     return ss.str();
 }
 
@@ -67,18 +73,20 @@ std::string RainbowText(const T& text)
     unsigned int char_per_color = std::ceil(text_str.length() / (rainbow_size * 1.0));
     for(const auto& c : text_str)
     {
-        #ifndef NOCOLOR
+#ifndef NOCOLOR
         if(char_count == char_per_color || char_count == 0)
         {
             ss << BOLD_STR << "\033[" << rainbow_code[i++] << "m";
             char_count = 0;
         }
-        #endif
+#endif
 
         ss << c;
         char_count++;
     }
+#ifndef NOCOLOR
     ss << RESET_STR;
+#endif
 
     return ss.str();
 }

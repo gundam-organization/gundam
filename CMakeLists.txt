@@ -4,7 +4,7 @@ cmake_minimum_required (VERSION 3.5 FATAL_ERROR)
 project(gundam)
 set (gundam_VERSION_MAJOR 1)
 set (gundam_VERSION_MINOR 3)
-set (gundam_VERSION_REVISION 3)
+set (gundam_VERSION_REVISION 4)
 set (gundam_VERSION_TAG "f") # f means forward -> include commits after a given release
 set (gundam_VERSION_STRING "${gundam_VERSION_MAJOR}.${gundam_VERSION_MINOR}.${gundam_VERSION_REVISION}${gundam_VERSION_TAG}")
 
@@ -14,25 +14,19 @@ option(CXX_WARNINGS "Enable most C++ warning flags." ON)
 option(COLOR_OUTPUT "Enable colored terminal output." ON)
 option(TTYCHECK "Enable check if output is being sent to terminal/TTY." ON)
 option(WITH_OPENMP "Build with OpenMP libraries" OFF )
-option(YAMLCPP_DIR "Set custom path to yaml-cpp lib" "" )
+option(YAMLCPP_DIR "Set custom path to yaml-cpp lib" OFF )
 option(ENABLE_DEV_MODE "Enable specific dev related printouts" OFF )
 
 set(VERBOSE TRUE)
-if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-else()
-    set(CMAKE_MACOSX_RPATH 0)
-    set(CMAKE_SKIP_BUILD_RPATH TRUE)
-    set(CMAKE_SKIP_RPATH TRUE)
-endif()
 
 include(${CMAKE_SOURCE_DIR}/cmake/cmessage.cmake)
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-
 #Changes default install path to be a subdirectory of the build dir.
-#Can set build dir at configure time with -DCMAKE_INSTALL_PREFIX=/install/path
-if(CMAKE_INSTALL_PREFIX STREQUAL "" OR CMAKE_INSTALL_PREFIX STREQUAL "/usr/local")
+#Should set the installation dir at configure time with
+#-DCMAKE_INSTALL_PREFIX=/install/path
+if(NOT DEFINED CMAKE_INSTALL_PREFIX
+    OR CMAKE_INSTALL_PREFIX STREQUAL ""
+    OR CMAKE_INSTALL_PREFIX STREQUAL "/usr/local")
   set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/${CMAKE_SYSTEM_NAME}")
 elseif(NOT DEFINED CMAKE_INSTALL_PREFIX)
   set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/${CMAKE_SYSTEM_NAME}")
@@ -40,31 +34,22 @@ endif()
 
 cmessage(STATUS "CMAKE_INSTALL_PREFIX: \"${CMAKE_INSTALL_PREFIX}\"")
 
-if(CMAKE_BUILD_TYPE STREQUAL "")
-  set(CMAKE_BUILD_TYPE DEBUG)
-elseif(NOT DEFINED CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE DEBUG)
+if(NOT DEFINED CMAKE_BUILD_TYPE
+    OR CMAKE_BUILD_TYPE STREQUAL "")
+  set(CMAKE_BUILD_TYPE Debug)
 endif()
+cmessage(STATUS "CMAKE_BUILD_TYPE: \"${CMAKE_BUILD_TYPE}\"")
 
 if(NOT DEFINED USE_STATIC_LINKS)
     set(USE_STATIC_LINKS 0)
 endif()
 
-#if(NOT DEFINED ENV{XSLLHFITTER})
-#  cmessage(FATAL_ERROR "$XSLLHFITTER is not defined, please source the package setup.sh before building.")
-#endif()
-
-cmessage(STATUS "CMAKE_BUILD_TYPE: \"${CMAKE_BUILD_TYPE}\"")
-
-
 ################################################################################
 #                            Check Dependencies
 ################################################################################
 
-set( LINK_LIBARY_LIST "" )
-
 # ROOT
-if ( NOT DEFINED ENV{ROOTSYS} )
+if(NOT DEFINED ENV{ROOTSYS} )
   cmessage(FATAL_ERROR "$ROOTSYS is not defined, please set up root first.")
 else()
   cmessage(STATUS "Using ROOT installed at $ENV{ROOTSYS}")
@@ -72,71 +57,114 @@ else()
 endif()
 
 #If you want to try an use the terminally buggy ROOT CMake scripts
-if (USEROOTCMAKE)
-  include ($ENV{ROOTSYS}/etc/cmake/FindROOT.cmake)
-  if ( NOT ROOT_FOUND )
-    cmessage(FATAL_ERROR "[ROOT]: FindROOT.cmake could not be found, or did not execute as expected is ROOT installed in $ROOTSYS = $ENV{ROOTSYS}?")
-  endif()
-else()
-  cmessage(STATUS "Including local GENERATE_ROOT_DICTIONARY implementation.")
-  include(${CMAKE_SOURCE_DIR}/cmake/GenROOTDictionary.cmake)
-endif()
-
-execute_process (COMMAND root-config --cflags OUTPUT_VARIABLE ROOT_CXX_FLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-execute_process (COMMAND root-config --libs OUTPUT_VARIABLE ROOT_LD_FLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-execute_process (COMMAND root-config --version OUTPUT_VARIABLE ROOT_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
-cmessage(STATUS "[ROOT]: root-config --version: ${ROOT_VERSION}")
-cmessage(STATUS "[ROOT]: root-config --cflags: ${ROOT_CXX_FLAGS}")
-cmessage(STATUS "[ROOT]: root-config --libs: ${ROOT_LD_FLAGS}")
+find_package(ROOT
+  COMPONENTS Geom Physics Matrix MathCore Tree RIO)
+if(ROOT_FOUND)
+  include(${ROOT_USE_FILE})
+  cmessage(STATUS "[ROOT]: ROOT package found ${ROOT_LIBRARIES}")
+else(ROOT_FOUND)
+   cmessage(STATUS "Including local GENERATE_ROOT_DICTIONARY implementation.")
+   include(${CMAKE_SOURCE_DIR}/cmake/GenROOTDictionary.cmake)
+   execute_process(COMMAND root-config --cflags
+     OUTPUT_VARIABLE ROOT_CXX_FLAGS
+     OUTPUT_STRIP_TRAILING_WHITESPACE)
+   execute_process(COMMAND root-config --libs
+     OUTPUT_VARIABLE ROOT_LIBRARIES
+     OUTPUT_STRIP_TRAILING_WHITESPACE)
+   execute_process(COMMAND root-config --version
+     OUTPUT_VARIABLE ROOT_VERSION
+     OUTPUT_STRIP_TRAILING_WHITESPACE)
+   execute_process (COMMAND root-config --ldflags
+     OUTPUT_VARIABLE ROOT_LINK_FLAGS
+     OUTPUT_STRIP_TRAILING_WHITESPACE)
+   cmessage(STATUS "[ROOT]: root-config --version: ${ROOT_VERSION}")
+   cmessage(STATUS "[ROOT]: root-config --libs: ${ROOT_LIBRARIES}")
+   cmessage(STATUS "[ROOT]: root-config --cflags: ${ROOT_CXX_FLAGS}")
+   cmessage(STATUS "[ROOT]: root-config --ldflags: ${ROOT_LINK_FLAGS}")
+   add_compile_options("SHELL:${ROOT_CXX_FLAGS}")
+   add_link_options("SHELL:${ROOT_LINK_FLAGS}")
+endif(ROOT_FOUND)
 
 # YAML-CPP
-find_package( YAMLCPP REQUIRED )
-if( NOT YAMLCPP_FOUND )
+find_package( yaml-cpp REQUIRED HINTS ${YAMLCPP_DIR} )
+if(NOT yaml-cpp_FOUND)
     cmessage(FATAL_ERROR "yaml-cpp library not found.")
 endif()
-cmessage(STATUS " - yaml-cpp include directory: ${YAMLCPP_INCLUDE_DIR}")
-cmessage(STATUS " - yaml-cpp lib: ${YAMLCPP_LIBRARY}")
-include_directories( ${YAMLCPP_INCLUDE_DIR} )
-#    target_link_libraries( OptionParserExample ${YAMLCPP_LIBRARY} )
-list(APPEND LINK_LIBARY_LIST ${YAMLCPP_LIBRARY})
-
+include_directories( ${YAML_CPP_INCLUDE_DIR} )
+cmessage(STATUS "Custom yaml-cpp installation: ${YAMLCPP_DIR}")
+cmessage(STATUS "yaml-cpp include directory: ${YAML_CPP_INCLUDE_DIR}")
+cmessage(STATUS "yaml-cpp lib: ${YAML_CPP_LIBRARIES}")
+if( "${YAML_CPP_INCLUDE_DIR} " STREQUAL " ")
+    # WORKAROUND FOR CCLYON (old cmake version/pkg)
+    set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+    set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+    set(YAMLCPP_INSTALL_DIR ${YAMLCPP_DIR})
+    find_package( YAMLCPP REQUIRED )
+    if( NOT YAMLCPP_FOUND )
+        cmessage(FATAL_ERROR "yaml-cpp library not found.")
+    endif()
+    cmessage(STATUS " - yaml-cpp include directory: ${YAMLCPP_INCLUDE_DIR}")
+    cmessage(STATUS " - yaml-cpp lib: ${YAMLCPP_LIBRARY}")
+    if( "${YAMLCPP_INCLUDE_DIR} " STREQUAL " ")
+        cmessage(FATAL_ERROR "empty YAMLCPP_INCLUDE_DIR returned.")
+    endif()
+    include_directories( ${YAMLCPP_INCLUDE_DIR} )
+#    list(APPEND LINK_LIBARY_LIST ${YAMLCPP_LIBRARY})
+endif()
 
 ################################################################################
 #                       SubModules
 ################################################################################
 
-# SubModules
+# SubModules: These are just adding the code directly, and not being compiled
+# as stand-alone projects.  This has the danger that it's not fully configured,
+# but should be OK
 
 ## Add the CmdLineParser
+# Reproduce needed parts of the simple-cpp-cmd-line-parser CMakeLists.txt
 include_directories(submodules/simple-cpp-cmd-line-parser/include)
-if( YAMLCPP_FOUND )
-    add_definitions( -D CMDLINEPARSER_YAML_CPP_ENABLED=1 )
+if(yaml-cpp_FOUND)
+    add_definitions( -DCMDLINEPARSER_YAML_CPP_ENABLED=1 )
 endif()
 
 ## Add the GenericToolbox
+# Reproduce needed parts of the cpp-generic-toolbox CMakeLists.txt
 include_directories(submodules/cpp-generic-toolbox/include)
-add_definitions( -D PROGRESS_BAR_ENABLE_RAINBOW=1 )
 add_definitions( -D PROGRESS_BAR_FILL_TAG="\\\"T2K\#"\\\" )
+if (COLOR_OUTPUT)
+  add_definitions( -D PROGRESS_BAR_ENABLE_RAINBOW=1 )
+else (COLOR_OUTPUT)
+  add_definitions( -D PROGRESS_BAR_ENABLE_RAINBOW=0 )
+endif (COLOR_OUTPUT)
 
 ## Add the Logger
+# Reproduce needed parts of the simple-cpp-logger CMakeLists.txt
 include_directories(submodules/simple-cpp-logger/include)
-
 if(${CMAKE_BUILD_TYPE} MATCHES Debug OR ${ENABLE_DEV_MODE})
     cmessage(STATUS "Logger set in dev mode.")
     add_definitions( -D LOGGER_MAX_LOG_LEVEL_PRINTED=6 )
     add_definitions( -D LOGGER_PREFIX_LEVEL=3 )
-    add_definitions( -D LOGGER_ENABLE_COLORS=1 )
-    add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=1 )
     add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {USER_HEADER} {FILELINE}"\\\" )
+    if (COLOR_OUTPUT) 
+      add_definitions( -D LOGGER_ENABLE_COLORS=0 )
+      add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=0 )
+    else (COLOR_OUTPUT)
+      add_definitions( -D LOGGER_ENABLE_COLORS=0 )
+      add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=0 )
+    endif (COLOR_OUTPUT)
 else()
     cmessage(STATUS "Logger set in release mode.")
     add_definitions( -D LOGGER_MAX_LOG_LEVEL_PRINTED=6 )
     add_definitions( -D LOGGER_PREFIX_LEVEL=3 )
-    add_definitions( -D LOGGER_ENABLE_COLORS=1 )
-    add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=1 )
     add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {USER_HEADER}"\\\" )
+    if (COLOR_OUTPUT) 
+      add_definitions( -D LOGGER_ENABLE_COLORS=0 )
+      add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=0 )
+    else (COLOR_OUTPUT)
+      add_definitions( -D LOGGER_ENABLE_COLORS=0 )
+      add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=0 )
+    endif (COLOR_OUTPUT)
 endif()
-
 
 ################################################################################
 #                            Compiler Setup
@@ -153,7 +181,7 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
         cmessage(FATAL_ERROR "Clang version must be at least 3.3")
     endif()
 else()
-    #message(WARNING "You are using an untested compiler.")
+  cmessage(WARNING "You are using an untested compiler.")
 endif()
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -163,34 +191,39 @@ if( WITH_OPENMP )
     include(FindOpenMP)
     if(OPENMP_FOUND)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-        cmessage(STATUS " - OpenMP include directory: ${OpenMP_CXX_INCLUDE_DIR}")
-        cmessage(STATUS " - OpenMP libs: ${OpenMP_CXX_LIB_NAMES}")
+        cmessage(STATUS "OpenMP include directory: ${OpenMP_CXX_INCLUDE_DIR}")
+        cmessage(STATUS "OpenMP libs: ${OpenMP_CXX_LIB_NAMES}")
     else()
         cmessage(ERROR "OpenMP not found.")
     endif()
 else()
-    cmessage(STATUS "Compiling without OpenMP (to enable it, add \"-D WITH_OPENMP\" )")
+    cmessage(STATUS "Compiling without OpenMP, enable with \"-D WITH_OPENMP\"")
 endif()
 
 if(CXX_MARCH_FLAG)
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native")
 endif()
 
+
 if(CXX_WARNINGS)
-#    set(CXX_WARNING_FLAGS "-Wall -Wno-unused-variable -Wno-sign-compare -Wno-unused-function -Wno-unused-but-set-variable -Wno-reorder")
-    set(CXX_WARNING_FLAGS "-Wall -Wno-unused-variable -Wno-sign-compare -Wno-unused-function -Wformat=0 -Wno-reorder")
+  add_compile_options(-Wall)
+  add_compile_options(-Wno-unused-variable)
+  add_compile_options(-Wno-sign-compare)
+  add_compile_options(-Wno-unused-function)
+  add_compile_options(-Wformat=0)
+  add_compile_options(-Wno-reorder)
 endif()
 
 if(NOT COLOR_OUTPUT)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNOCOLOR")
+  add_definitions(-DNOCOLOR)
 endif()
 
 if(TTYCHECK)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DTTYCHECK")
+  add_definitions(-DTTYCHECK)
 endif()
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${ROOT_CXX_FLAGS} ${CXX_WARNING_FLAGS}")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fPIC ${ROOT_CXX_FLAGS} ${CXX_WARNING_FLAGS}")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${CXX_WARNING_FLAGS}")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fPIC ${CXX_WARNING_FLAGS}")
 
 if(VERBOSE)
   cmessage (STATUS "C++ Compiler      : ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
@@ -205,8 +238,6 @@ endif()
 configure_file( ${CMAKE_SOURCE_DIR}/cmake/versionConfig.h.in ${CMAKE_BINARY_DIR}/generated/versionConfig.h )
 include_directories( ${CMAKE_BINARY_DIR}/generated/ )
 
-
-
 ################################################################################
 #                            Specify Target Subdirs
 ################################################################################
@@ -219,7 +250,10 @@ set( MODULES
         ErrorPropagator
         Fitter
 )
-#set(MODULETargets "")
+
+# Each module will add it's primary target to this and they will be
+# automatically added to the executables.
+set(MODULETargets "")
 
 cmessage (STATUS "Setting up include directories...")
 include_directories( ${CMAKE_SOURCE_DIR}/include )

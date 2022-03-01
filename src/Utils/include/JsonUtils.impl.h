@@ -15,7 +15,6 @@
 
 namespace JsonUtils {
 
-
   template<class T> auto fetchValue(const nlohmann::json& jsonConfig_, const std::string& keyName_) -> T{
     auto jsonEntry = jsonConfig_.find(keyName_);
     if( jsonEntry == jsonConfig_.end() ){
@@ -23,13 +22,13 @@ namespace JsonUtils {
     }
     return jsonEntry->template get<T>();
   }
-  template<class T> auto fetchValue(const nlohmann::json& jsonConfig_, const std::vector<std::string>& keyName_) -> T{
-    for( auto& keyName : keyName_){
+  template<class T> auto fetchValue(const nlohmann::json& jsonConfig_, const std::vector<std::string>& keyNames_) -> T{
+    for( auto& keyName : keyNames_){
       if( JsonUtils::doKeyExist(jsonConfig_, keyName) ){
         return JsonUtils::fetchValue<T>(jsonConfig_, keyName);
       }
     }
-    throw std::runtime_error("Could not find any json entry: " + GenericToolbox::parseVectorAsString(keyName_) + ":\n" + jsonConfig_.dump());
+    throw std::runtime_error("Could not find any json entry: " + GenericToolbox::parseVectorAsString(keyNames_) + ":\n" + jsonConfig_.dump());
   }
   template<class T> auto fetchValue(const nlohmann::json& jsonConfig_, const std::string& keyName_, const T& defaultValue_) -> T{
     try{
@@ -75,6 +74,7 @@ namespace JsonUtils {
     return nlohmann::json(); // .empty()
   }
 
+  // specialization
   template<std::size_t N> auto fetchValue(const nlohmann::json& jsonConfig_, const std::string& keyName_, const char (&defaultValue_)[N]) -> std::string{
     return fetchValue(jsonConfig_, keyName_, std::string(defaultValue_));
   }

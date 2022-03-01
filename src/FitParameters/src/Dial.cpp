@@ -19,7 +19,7 @@ LoggerInit([](){
 } )
 
 
-Dial::Dial(DialType::DialType dialType_) : _dialType_{dialType_} {}
+Dial::Dial(DialType::DialType dialType_) : _dialType_{dialType_}, _evalLock_{std::make_shared<std::mutex>()} {}
 Dial::~Dial() = default;
 
 void Dial::reset() {
@@ -51,13 +51,11 @@ void Dial::setMirrorLowEdge(double mirrorLowEdge) {
 void Dial::setMirrorRange(double mirrorRange) {
   _mirrorRange_ = mirrorRange;
 }
-void Dial::setMinimumDialResponse(double minimumDialResponse) {
-  _minimumDialResponse_ = minimumDialResponse;
+void Dial::setMinDialResponse(double minDialResponse_) {
+  _minDialResponse_ = minDialResponse_;
 }
-
-void Dial::copySplineCache(TSpline3& splineBuffer_){
-  if( _responseSplineCache_ == nullptr ) this->buildResponseSplineCache();
-  splineBuffer_ = *_responseSplineCache_;
+void Dial::setMaxDialResponse(double maxDialResponse_) {
+  _maxDialResponse_ = maxDialResponse_;
 }
 
 void Dial::initialize() {
@@ -112,28 +110,32 @@ void Dial::updateEffectiveDialParameter(){
   }
 }
 double Dial::evalResponse(){
-  if( _associatedParameterReference_ == nullptr ){
-    LogError << "_associatedParameterReference_ is not set." << std::endl;
-    throw std::logic_error("_associatedParameterReference_ is not set.");
-  }
+  LogThrowIf(_associatedParameterReference_==nullptr, "_associatedParameterReference_ is not set.")
   return this->evalResponse( static_cast<FitParameter *>(_associatedParameterReference_)->getParameterValue() );
+}
+void Dial::copySplineCache(TSpline3& splineBuffer_){
+  if( _responseSplineCache_ == nullptr ) this->buildResponseSplineCache();
+  splineBuffer_ = *_responseSplineCache_;
 }
 
 // Virtual
 double Dial::evalResponse(double parameterValue_) {
 
-  if( _dialParameterCache_ == parameterValue_ ){
-    while( _isEditingCache_.atomicValue ){ }
-    return _dialResponseCache_;
+  while( _dialParameterCache_ != parameterValue_ or _isEditingCache_ ){
+    std::lock_guard<std::mutex> g(*_evalLock_); // There can be only one.
+    if( _dialParameterCache_ == parameterValue_ ) break;        // stop if already updated
+
+    // Edit the cache
+    _isEditingCache_ = true;
+    _dialParameterCache_ = parameterValue_;
+    this->updateEffectiveDialParameter();
+    this->fillResponseCache(); // specified in the corresponding dial class
+    if     ( _minDialResponse_ == _minDialResponse_ and _dialResponseCache_<_minDialResponse_ ){ _dialResponseCache_=_minDialResponse_; }
+    else if( _maxDialResponse_ == _maxDialResponse_ and _dialResponseCache_>_maxDialResponse_ ){ _dialResponseCache_=_maxDialResponse_; }
+    _isEditingCache_ = false;
+
+    break; // All done, lock will be released
   }
-  _isEditingCache_.atomicValue = true;
-  _dialParameterCache_ = parameterValue_;
-  this->updateEffectiveDialParameter();
-  this->fillResponseCache(); // specified in the corresponding dial class
-  if( _minimumDialResponse_==_minimumDialResponse_ and _dialResponseCache_ < _minimumDialResponse_ ){
-    _dialResponseCache_ = _minimumDialResponse_;
-  }
-  _isEditingCache_.atomicValue = false;
 
   return _dialResponseCache_;
 }
@@ -175,5 +177,4 @@ void Dial::buildResponseSplineCache(){
       new TSpline3(Form("%p", this), &xSigmaSteps[0], &yResponse[0], int(xSigmaSteps.size()))
   );
 }
-
 
