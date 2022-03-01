@@ -143,7 +143,7 @@ double FitSampleSet::evalLikelihood() const{
     for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
       sampleLlh += (*_likelihoodFunctionPtr_)(
         sample.getMcContainer().histogram->GetBinContent(iBin),
-        sample.getMcContainer().histogram->GetBinError(iBin),
+        std::pow(sample.getMcContainer().histogram->GetBinError(iBin), 2),
         sample.getDataContainer().histogram->GetBinContent(iBin));
     }
     llh += sampleLlh;
