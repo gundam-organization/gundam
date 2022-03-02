@@ -336,7 +336,8 @@ bool DialSet::initializeDialsWithDefinition() {
 
       auto binList = binning.getBinsList();
 
-      std::string filePath = _workingDirectory_ + "/" + JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsFilePath");
+      std::string filePath = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsFilePath");
+      if(not GenericToolbox::doesStringStartsWithSubstring(filePath, "/")){ filePath = _workingDirectory_ + "/" + filePath; }
       LogThrowIf(not GenericToolbox::doesTFileIsValid(filePath), "Could not open: " << filePath)
       TFile* dialsTFile = TFile::Open(filePath.c_str());
       LogThrowIf(dialsTFile==nullptr, "Could not open: " << filePath)

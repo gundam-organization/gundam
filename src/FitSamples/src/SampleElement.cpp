@@ -122,7 +122,7 @@ void SampleElement::refillHistogram(int iThread_){
     for( auto* eventPtr : perBinEventPtrList.at(iBin)){
       binContentArray[iBin+1] += eventPtr->getEventWeight();
     }
-    histogram->GetSumw2()->GetArray()[iBin+1] = TMath::Sqrt(binContentArray[iBin+1]);
+    histogram->GetSumw2()->GetArray()[iBin+1] = binContentArray[iBin+1];
     iBin += nbThreads;
   }
 }

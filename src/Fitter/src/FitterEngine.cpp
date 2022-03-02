@@ -296,7 +296,14 @@ void FitterEngine::fixGhostFitParameters(){
 
       if( fixNextEigenPars ){
         par.setIsFixed(true);
-        LogInfo << GenericToolbox::ColorCodes::redBackground << ssPrint.str() << " -> FIXED AS NEXT EIGEN." << GenericToolbox::ColorCodes::resetColor << std::endl;
+#ifndef NOCOLOR
+        std::string red(GenericToolbox::ColorCodes::redBackground);
+        std::string rst(GenericToolbox::ColorCodes::resetColor);
+#else
+        std::string red;
+        std::string rst;
+#endif
+        LogInfo << red << ssPrint.str() << " -> FIXED AS NEXT EIGEN." << rst << std::endl;
         continue;
       }
 
@@ -320,7 +327,14 @@ void FitterEngine::fixGhostFitParameters(){
           par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
           ssPrint << " < " << JsonUtils::fetchValue(_config_, "ghostParameterDeltaChi2Threshold", 1E-6) << " -> " << "FIXED";
           LogInfo.moveTerminalCursorBack(1);
-          LogInfo << GenericToolbox::ColorCodes::redBackground << ssPrint.str() << GenericToolbox::ColorCodes::resetColor << std::endl;
+#ifndef NOCOLOR
+        std::string red(GenericToolbox::ColorCodes::redBackground);
+        std::string rst(GenericToolbox::ColorCodes::resetColor);
+#else
+        std::string red;
+        std::string rst;
+#endif
+          LogInfo << red << ssPrint.str() << rst << std::endl;
 
           if( parSet.isUseEigenDecompInFit() and JsonUtils::fetchValue(_config_, "fixGhostEigenParmetersAfterFirstRejected", false) ){
             fixNextEigenPars = true;
@@ -437,9 +451,11 @@ void FitterEngine::fit(){
       else if( par.isFixed() )  { lineValues[valIndex++] = "Fixed";    colorStr = GenericToolbox::ColorCodes::redBackground; }
       else                      { lineValues[valIndex++] = PriorType::PriorTypeEnumNamespace::toString(par.getPriorType(), true) + " Prior"; }
 
+#ifndef NOCOLOR
       for( auto& line : lineValues ){
         if(not line.empty()) line = colorStr + line + GenericToolbox::ColorCodes::resetColor;
       }
+#endif
 
       tableLines.emplace_back(lineValues);
 
@@ -920,8 +936,18 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
           if( par.isEnabled() and not par.isFixed() ){
             double priorFraction = TMath::Sqrt((*covMatrix_)[par.getParameterIndex()][par.getParameterIndex()]) / par.getStdDevValue();
             std::stringstream ss;
-            if( priorFraction < 1E-2 ) ss << GenericToolbox::ColorCodes::yellowBackground;
-            if( priorFraction > 1 ) ss << GenericToolbox::ColorCodes::redBackground;
+#ifndef NOCOLOR
+        std::string red(GenericToolbox::ColorCodes::redBackground);
+        std::string ylw(GenericToolbox::ColorCodes::yellowBackground);
+        std::string rst(GenericToolbox::ColorCodes::resetColor);
+#else
+        std::string red;
+        std::string ylw;
+        std::string rst;
+#endif
+
+            if( priorFraction < 1E-2 ) ss << ylw;
+            if( priorFraction > 1 ) ss << red;
             std::vector<std::string> lineValues(tableLines[0].size());
             int valIndex{0};
             lineValues[valIndex++] = par.getFullTitle();
@@ -940,9 +966,11 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
               if( priorFraction > 1 ){ colorStr = GenericToolbox::ColorCodes::redBackground; }
             }
 
+#ifndef NOCOLOR
             if( not colorStr.empty() ){
               for( auto& line : lineValues ){ if(not line.empty()) line = colorStr + line + GenericToolbox::ColorCodes::resetColor; }
             }
+#endif
 
             tableLines.emplace_back(lineValues);
           }
