@@ -109,6 +109,7 @@ if( "${YAML_CPP_INCLUDE_DIR} " STREQUAL " ")
         cmessage(FATAL_ERROR "empty YAMLCPP_INCLUDE_DIR returned.")
     endif()
     include_directories( ${YAMLCPP_INCLUDE_DIR} )
+    set(YAML_CPP_LIBRARIES ${YAMLCPP_LIBRARY})
 #    list(APPEND LINK_LIBARY_LIST ${YAMLCPP_LIBRARY})
 endif()
 
@@ -215,11 +216,11 @@ if(CXX_WARNINGS)
 endif()
 
 if(NOT COLOR_OUTPUT)
-  add_definitions(-DNOCOLOR)
+  add_definitions(-D NOCOLOR)
 endif()
 
 if(TTYCHECK)
-  add_definitions(-DTTYCHECK)
+  add_definitions(-D TTYCHECK)
 endif()
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${CXX_WARNING_FLAGS}")
