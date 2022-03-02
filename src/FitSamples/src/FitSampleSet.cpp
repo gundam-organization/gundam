@@ -113,7 +113,7 @@ void FitSampleSet::initialize() {
   else if( llhMethod == "BarlowLLH" ){
     _likelihoodFunctionPtr_ = std::shared_ptr<BarlowLLH>(new BarlowLLH);
   }
-  else if( llhMethod == "BarlowOA2020BugLLH" ){
+  else if( llhMethod == "BarlowLLH_OA2020_Bad" ){
     _likelihoodFunctionPtr_ = std::shared_ptr<BarlowOA2020BugLLH>(new BarlowOA2020BugLLH);
   }
   else{
