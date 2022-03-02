@@ -98,6 +98,42 @@ public:
   }
 };
 
+class BarlowOA2020BugLLH : public CalcLLHFunc {
+public:
+  double rel_var, b, c, beta, mc_hat, chi2;
+
+  double operator()(double mc_, double w2_, double data_) {
+    if(mc_ == data_ ) return 0;
+    // Solving for the quadratic equation,
+    // beta^2 + (mu * sigma^2 - 1)beta - data * sigma^2) = 0
+    // where sigma^2 is the relative variance.
+    rel_var = std::sqrt(w2_) / (mc_ * mc_);
+    b       = (mc_ * rel_var) - 1;
+    c       = 4 * data_ * rel_var;
+
+    beta   = (-b + std::sqrt(b * b + c)) / 2.0;
+    mc_hat = mc_ * beta;
+
+    // Calculate the following LLH:
+    //-2lnL = 2 * beta*mc - data + data * ln(data / (beta*mc)) + (beta-1)^2 / sigma^2
+    // where sigma^2 is the same as above.
+    chi2 = 0.0;
+    //if(data <= 0.0)
+    //{
+    //    chi2 = 2 * mc_hat;
+    //    chi2 += (beta - 1) * (beta - 1) / rel_var;
+    //}
+    if(mc_hat > 0.0) {
+      chi2 = 2 * (mc_hat - data_);
+      if(data_ > 0.0)
+        chi2 += 2 * data_ * std::log(data_ / mc_hat);
+
+      chi2 += (beta - 1) * (beta - 1) / rel_var;
+    }
+
+    return (chi2 >= 0.0) ? chi2 : 0.0;
+  }
+};
 
 class BarlowBeestonLLH : public CalcLLHFunc
 {
