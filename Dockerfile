@@ -18,7 +18,8 @@ ENV ROOTSYS /home/linuxbrew/.linuxbrew
 
 COPY . $GUNDIR/
 RUN cd  $GUNDIR && \
-    git submodule update --init --recursive && \
+    # sudo is required by github actions since git clone is done by root
+    sudo git submodule update --init --recursive && \
     mkdir build_doc && \
     mkdir install_doc && \
     cd $GUNDIR/build_doc && \
