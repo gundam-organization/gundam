@@ -18,6 +18,7 @@ ENV ROOTSYS /home/linuxbrew/.linuxbrew
 
 COPY . $GUNDIR/
 RUN cd  $GUNDIR && \
+    git submodule update --recursive && \
     mkdir build_doc && \
     mkdir install_doc && \
     cd $GUNDIR/build_doc && \
