@@ -4,8 +4,15 @@
 
 #include "Propagator.h"
 
+#ifdef GUNDAM_USING_CUDA
+#include "GPUInterpCachedWeights.h"
+#endif
+
 #include "FitParameterSet.h"
 #include "Dial.h"
+#include "SplineDial.h"
+#include "GraphDial.h"
+#include "NormalizationDial.h"
 #include "JsonUtils.h"
 #include "GlobalVariables.h"
 #include <AnaTreeMC.hh>
@@ -14,7 +21,7 @@
 #include "GenericToolbox.Root.h"
 
 #include <vector>
-
+#include <set>
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[Propagator]");
@@ -227,6 +234,13 @@ void Propagator::initialize() {
     }
   }
 
+#ifdef GUNDAM_USING_CUDA
+  // After all of the data has been loaded.  Specifically, this must be after
+  // the MC has been copied for the Asimov fit, or the "data" use the MC
+  // reweighting cache.
+  buildGPUCaches();
+#endif
+
   _treeWriter_.setFitSampleSetPtr(&_fitSampleSet_);
   _treeWriter_.setParSetListPtr(&_parameterSetsList_);
 
@@ -277,14 +291,24 @@ void Propagator::updateDialResponses(){
 }
 void Propagator::reweightSampleEvents() {
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-  GlobalVariables::getParallelWorker().runJob("Propagator::reweightSampleEvents");
-  weightProp.counts++; weightProp.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+  bool usedGPU = false;
+#ifdef GUNDAM_USING_CUDA
+  usedGPU = fillGPUCaches();
+#endif
+  if (!usedGPU) {
+      GlobalVariables::getParallelWorker().runJob(
+          "Propagator::reweightSampleEvents");
+  }
+  weightProp.counts++;
+  weightProp.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 }
+
 void Propagator::refillSampleHistograms(){
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
   GlobalVariables::getParallelWorker().runJob("Propagator::refillSampleHistograms");
   fillProp.counts++; fillProp.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 }
+
 void Propagator::applyResponseFunctions(){
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
   GlobalVariables::getParallelWorker().runJob("Propagator::applyResponseFunctions");
@@ -436,6 +460,196 @@ void Propagator::updateDialResponses(int iThread_){
   }
 
 }
+
+#ifdef GUNDAM_USING_CUDA
+bool Propagator::buildGPUCaches() {
+    LogInfo << "CDM%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%" << std::endl;
+    LogInfo << "Build the GPU Caches" << std::endl;
+
+    int events = 0;
+    int splines = 0;
+    int splinePoints = 0;
+    int uSplines = 0;
+    int uSplinePoints = 0;
+    int graphs = 0;
+    int graphPoints = 0;
+    int norms = 0;
+    std::set<const FitParameter*> usedParameters;
+    for(const FitSample& sample : getFitSampleSet().getFitSampleList() ){
+        LogInfo << "Sample " << sample.getName()
+                << " with " << sample.getMcContainer().eventList.size()
+                << " events" << std::endl;
+        for (const PhysicsEvent& event
+                 : sample.getMcContainer().eventList) {
+            ++events;
+            if (event.getSampleBinIndex() < 0) {
+                throw std::runtime_error("Caching event that isn't used");
+            }
+            for (const Dial* dial
+                     : event.getRawDialPtrList()) {
+                FitParameter* fp = static_cast<FitParameter*>(
+                    dial->getAssociatedParameterReference());
+                usedParameters.insert(fp);
+                const SplineDial* sDial
+                    = dynamic_cast<const SplineDial*>(dial);
+                if (sDial) {
+                    const TSpline3* s = sDial->getSplinePtr();
+                    if (!s) throw std::runtime_error("Null spline pointer");
+                    if (s->GetDelta() > 0) {
+                        ++uSplines;
+                        uSplinePoints += 2*s->GetNp();
+                    }
+                    ++splines;
+                    splinePoints += s->GetNp();
+                }
+                const GraphDial* gDial
+                    = dynamic_cast<const GraphDial*>(dial);
+                if (gDial) {
+                    ++graphs;
+                }
+                const NormalizationDial* nDial
+                    = dynamic_cast<const NormalizationDial*>(dial);
+                if (nDial) {
+                    ++norms;
+                }
+            }
+        }
+    }
+
+    int parameters = usedParameters.size();
+
+    LogInfo << "GPU Cache for " << events << " events --"
+            << " Par: " << parameters
+            << " Uniform splines: " << splines
+            << " (" << 1.0*splines/events << ")"
+            << " General Splines: " << uSplines
+            << " (" << 1.0*uSplines/events << ")"
+            << " G " << graphs << " (" << 1.0*graphs/events << ")"
+            << " N: " << norms <<" ("<< 1.0*norms/events <<")"
+            << std::endl;
+    if (splines > 0) {
+        LogInfo << "Uniform spline cache for "
+                << splinePoints << " control points --"
+                << " (" << 1.0*splinePoints/splines << " points per spline)"
+                << std::endl;
+    }
+    if (uSplines > 0) {
+        LogInfo << "General spline cache for "
+                << uSplinePoints << " control points --"
+                << " (" << 1.0*uSplinePoints/uSplines << " points per spline)"
+                << std::endl;
+    }
+    if (graphs > 0) {
+        LogInfo << "Graph cache for " << graphPoints << " control points --"
+                << " (" << 1.0*graphPoints/graphs << " points per graph)"
+                << std::endl;
+    }
+
+    // Try to allocate the GPU
+    if (!GPUInterp::CachedWeights::Get()) {
+#ifndef SKIP_GPU_CACHE
+        LogInfo << "Creating GPU spline cache" << std::endl;
+        GPUInterp::CachedWeights::Create(
+            events,parameters,norms,splines,splinePoints);
+#endif
+    }
+
+    // In case the GPU didn't get allocated.
+    if (!GPUInterp::CachedWeights::Get()) {
+        LogInfo << "No CachedWeights for GPU"
+                << std::endl;
+        return false;
+    }
+
+    int usedResults = 0; // Number of cached results that have been used up.
+    for(FitSample& sample : getFitSampleSet().getFitSampleList() ) {
+        LogInfo << "Fill GPU cache for " << sample.getName()
+                << " with " << sample.getMcContainer().eventList.size()
+                << " events" << std::endl;
+        for (PhysicsEvent& event
+                 : sample.getMcContainer().eventList) {
+            // The reduce index to save the result for this event.
+            int resultIndex = usedResults++;
+            event.setResultIndex(resultIndex);
+            event.setResultPointer(GPUInterp::CachedWeights::Get()
+                                   ->GetResultPointer(resultIndex));
+            GPUInterp::CachedWeights::Get()
+                ->SetInitialValue(resultIndex, event.getTreeWeight());
+            for (Dial* dial
+                     : event.getRawDialPtrList()) {
+                if (!dial->isReferenced()) continue;
+                FitParameter* fp = static_cast<FitParameter*>(
+                    dial->getAssociatedParameterReference());
+                std::map<const FitParameter*,int>::iterator parMapIt
+                    = _gpuParameterIndex_.find(fp);
+                if (parMapIt == _gpuParameterIndex_.end()) {
+                    _gpuParameterIndex_[fp] = _gpuParameterIndex_.size();
+                }
+                int parIndex = _gpuParameterIndex_[fp];
+                int dialUsed = 0;
+                if(dial->getDialType() == DialType::Normalization) {
+                    ++dialUsed;
+                    GPUInterp::CachedWeights::Get()
+                        ->ReserveNorm(resultIndex,parIndex);
+                }
+                SplineDial* sDial = dynamic_cast<SplineDial*>(dial);
+                if (sDial) {
+                    ++dialUsed;
+                    const TSpline3* s = sDial->getSplinePtr();
+                    if (!s) throw std::runtime_error("Null spline pointer");
+                    double xMin = s->GetXmin();
+                    double xMax = s->GetXmax();
+                    int NP = s->GetNp();
+                    int spline = GPUInterp::CachedWeights::Get()
+                        ->ReserveSpline(resultIndex,parIndex,
+                                        xMin,xMax,
+                                        NP);
+
+                    // BUG!!!! SUPER MAJOR CHEAT:  This is forcing all the
+                    // splines to have uniform control points.
+                    for (int i=0; i<NP; ++i) {
+                        double x = xMin + i*(xMax-xMin)/(NP-1);
+                        double y = s->Eval(x);
+                        GPUInterp::CachedWeights::Get()
+                            ->SetSplineKnot(spline,i, y);
+                    }
+
+                    if (sDial->getUseMirrorDial()) {
+                        double xLow = sDial->getMirrorLowEdge();
+                        double xHigh = xLow + sDial->getMirrorRange();
+                        GPUInterp::CachedWeights::Get()
+                            ->SetLowerMirror(parIndex,xLow);
+                        GPUInterp::CachedWeights::Get()
+                            ->SetUpperMirror(parIndex,xHigh);
+                    }
+                }
+                if (!dialUsed) throw std::runtime_error("Unused dial");
+            }
+        }
+    }
+
+    if (usedResults == GPUInterp::CachedWeights::Get()->GetResultCount()) {
+        return true;
+    }
+
+    LogInfo << "GPU Used Results:     " << usedResults << std::endl;
+    LogInfo << "GPU Expected Results: " <<
+        GPUInterp::CachedWeights::Get()->GetResultCount() << std::endl;
+    throw std::runtime_error("Probable problem putting parameters in cache");
+}
+
+bool Propagator::fillGPUCaches() {
+    GPUInterp::CachedWeights* gpu = GPUInterp::CachedWeights::Get();
+    if (!gpu) return false;
+    for (auto& par : _gpuParameterIndex_ ) {
+        gpu->SetParameter(par.second, par.first->getParameterValue());
+    }
+    gpu->UpdateResults();
+    return true;
+}
+#endif
+
+
 void Propagator::reweightSampleEvents(int iThread_) {
   int nThreads = GlobalVariables::getNbThreads();
   if(iThread_ == -1){
