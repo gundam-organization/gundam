@@ -56,6 +56,11 @@ public:
   DataBin &getApplyConditionBin();
   DialType::DialType getDialType() const;
   void *getAssociatedParameterReference() const;
+  double getAssociatedParameter() const;
+  int getAssociatedParameterIndex() const;
+  bool getUseMirrorDial() const {return _useMirrorDial_;}
+  double getMirrorLowEdge() const {return _mirrorLowEdge_;}
+  double getMirrorRange() const {return _mirrorRange_;}
 
   void updateEffectiveDialParameter();
   double evalResponse();
@@ -75,12 +80,11 @@ protected:
 
   // Internals
   bool _isInitialized_{false};
-  bool _isEditingCache_{false};
+  std::shared_ptr<std::mutex> _isEditingCache_;
   bool _isReferenced_{false};
   double _dialResponseCache_{};
   double _dialParameterCache_{};
   double _effectiveDialParameterValue_{}; // take into account internal transformations while using mirrored splines transformations
-  std::shared_ptr<std::mutex> _evalLock_{};
 
   // Response cap
   double _minDialResponse_{std::nan("unset")};
