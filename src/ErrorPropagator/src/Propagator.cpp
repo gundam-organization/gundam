@@ -463,7 +463,6 @@ void Propagator::updateDialResponses(int iThread_){
 
 #ifdef GUNDAM_USING_CUDA
 bool Propagator::buildGPUCaches() {
-    LogInfo << "CDM%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%" << std::endl;
     LogInfo << "Build the GPU Caches" << std::endl;
 
     int events = 0;
@@ -546,12 +545,11 @@ bool Propagator::buildGPUCaches() {
     }
 
     // Try to allocate the GPU
-    if (!GPUInterp::CachedWeights::Get()) {
-#ifndef SKIP_GPU_CACHE
+    if (!GPUInterp::CachedWeights::Get()
+        && GlobalVariables::getEnableEventWeightCache()) {
         LogInfo << "Creating GPU spline cache" << std::endl;
         GPUInterp::CachedWeights::Create(
             events,parameters,norms,splines,splinePoints);
-#endif
     }
 
     // In case the GPU didn't get allocated.
