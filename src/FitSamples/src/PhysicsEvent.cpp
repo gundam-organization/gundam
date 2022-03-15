@@ -6,6 +6,9 @@
 
 #include "Logger.h"
 
+#ifdef GUNDAM_USING_CUDA
+#include "GPUInterpCachedWeights.h"
+#endif
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[PhysicsEvent]");
@@ -41,6 +44,12 @@ void PhysicsEvent::setEntryIndex(Long64_t entryIndex_) {
 }
 void PhysicsEvent::setTreeWeight(double treeWeight) {
   _treeWeight_ = treeWeight;
+#ifdef GUNDAM_USING_CUDA
+  if (GPUInterp::CachedWeights::Get() && 0 <= _GPUResultIndex_) {
+      GPUInterp::CachedWeights::Get()->SetInitialValue(
+          _GPUResultIndex_, _treeWeight_);
+  }
+#endif
 }
 void PhysicsEvent::setNominalWeight(double nominalWeight) {
   _nominalWeight_ = nominalWeight;
@@ -67,8 +76,28 @@ double PhysicsEvent::getTreeWeight() const {
 double PhysicsEvent::getNominalWeight() const {
   return _nominalWeight_;
 }
+
+static int weightBrake = 100;
 double PhysicsEvent::getEventWeight() const {
-  return _eventWeight_;
+#ifdef GUNDAM_USING_CUDA
+    if (0 <= _GPUResultIndex_ && _GPUResult_) {
+#ifdef GPU_WEIGHT_DEBUG
+        if (_GPUResultIndex_ < 5) {
+            LogInfo << "getEventWeight is "
+                    << _eventWeight_
+                    << " and cached " << *_GPUResult_
+                    << std::endl;
+        }
+#endif
+        return *_GPUResult_;
+    }
+    if (weightBrake) {
+        LogInfo << "GPU cache not filled, using " << _eventWeight_
+                << std::endl;
+        --weightBrake;
+    }
+#endif
+    return _eventWeight_;
 }
 double PhysicsEvent::getFakeDataWeight() const {
   return _fakeDataWeight_;
@@ -141,7 +170,17 @@ void PhysicsEvent::reweightUsingDialCache(){
   this->resetEventWeight();
   for( auto& dial : _rawDialPtrList_ ){
     if( dial == nullptr ) return;
-    this->addEventWeight( dial->evalResponse() );
+    double response = dial->evalResponse();
+#ifdef CACHE_DEBUG
+    if (_GPUResultIndex_ < 5) {
+        std::cout << "PE dial "
+                  << " iEvt " << _GPUResultIndex_
+                  << " iPar " << dial->getAssociatedParameterIndex()
+                  << " = " << dial->getAssociatedParameter()
+                  << " --> " << response << std::endl;
+    }
+#endif
+    this->addEventWeight( response );
   }
 }
 
@@ -309,5 +348,3 @@ std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p ){
 const std::vector<std::string> *PhysicsEvent::getCommonLeafNameListPtr() const {
   return _commonLeafNameListPtr_;
 }
-
-
