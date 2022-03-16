@@ -187,7 +187,6 @@ void GPUInterp::CachedWeights::SetUpperMirror(int parIdx, double value) {
     fUpperMirror->at(parIdx) = value;
 }
 
-
 void GPUInterp::CachedWeights::SetLowerClamp(int parIdx, double value) {
     if (parIdx < 0) throw;
     if (GetParameterCount() <= parIdx) throw;
@@ -202,6 +201,26 @@ void GPUInterp::CachedWeights::SetUpperClamp(int parIdx, double value) {
 
 // Reserve space for another normalization parameter.
 int GPUInterp::CachedWeights::ReserveNorm(int resIndex, int parIndex) {
+    if (resIndex < 0) {
+        LOGGER << "Invalid result index"
+               << std::endl;
+        throw std::runtime_error("Negative result index");
+    }
+    if (GetResultCount() <= resIndex) {
+        LOGGER << "Invalid result index"
+               << std::endl;
+        throw std::runtime_error("Result index out of bounds");
+    }
+    if (parIndex < 0) {
+        LOGGER << "Invalid parameter index"
+               << std::endl;
+        throw std::runtime_error("Negative parameter index");
+    }
+    if (GetParameterCount() <= parIndex) {
+        LOGGER << "Invalid result index"
+               << std::endl;
+        throw std::runtime_error("Parameter index out of bounds");
+    }
     int newIndex = fNormsUsed++;
     if (fNormsUsed > fNormsReserved) {
         LOGGER << "Not enough space reserved for Norms"
@@ -217,6 +236,36 @@ int GPUInterp::CachedWeights::ReserveNorm(int resIndex, int parIndex) {
 // The knot values will still need to be set using set spline knot.
 int GPUInterp::CachedWeights::ReserveSpline(
     int resIndex, int parIndex, double low, double high, int points) {
+    if (resIndex < 0) {
+        LOGGER << "Invalid result index"
+               << std::endl;
+        throw std::runtime_error("Negative result index");
+    }
+    if (GetResultCount() <= resIndex) {
+        LOGGER << "Invalid result index"
+               << std::endl;
+        throw std::runtime_error("Result index out of bounds");
+    }
+    if (parIndex < 0) {
+        LOGGER << "Invalid parameter index"
+               << std::endl;
+        throw std::runtime_error("Negative parameter index");
+    }
+    if (GetParameterCount() <= parIndex) {
+        LOGGER << "Invalid result index"
+               << std::endl;
+        throw std::runtime_error("Parameter index out of bounds");
+    }
+    if (high <= low) {
+        LOGGER << "Invalid spline bounds"
+               << std::endl;
+        throw std::runtime_error("Invalid spline bounds");
+    }
+    if (points < 3) {
+        LOGGER << "Insufficient points in spline"
+               << std::endl;
+        throw std::runtime_error("Invalid number of spline points");
+    }
     int newIndex = fSplinesUsed++;
     if (fSplinesUsed > fSplinesReserved) {
         LOGGER << "Not enough space reserved for splines"
