@@ -123,10 +123,10 @@ GPUInterp::CachedWeights::CachedWeights(
               1.0);
     std::fill(fLowerClamp->hostPtr(),
               fLowerClamp->hostPtr() + GetParameterCount(),
-              std::numeric_limits<double>::lowest());
+              std::numeric_limits<float>::lowest());
     std::fill(fUpperClamp->hostPtr(),
               fUpperClamp->hostPtr() + GetParameterCount(),
-              std::numeric_limits<double>::max());
+              std::numeric_limits<float>::max());
 
 }
 
@@ -521,6 +521,8 @@ namespace {
     HEMI_KERNEL_FUNCTION(HEMISplinesKernel,
                          double* results,
                          const double* params,
+                         const float* lowerClamp,
+                         const float* upperClamp,
                          const float* knots,
                          const int* rIndex,
                          const short* pIndex,
@@ -532,6 +534,10 @@ namespace {
             double x = params[pIndex[i]];
             x = (x-knots[id0])*knots[id0+1];
             x = HEMIInterp(x, &knots[id0+2], id1-id0-2);
+            float lc = lowerClamp[pIndex[i]];
+            if (x < lc) x = lc;
+            float uc = upperClamp[pIndex[i]];
+            if (x > uc) x = uc;
             HEMIAtomicMult(&results[rIndex[i]], x);
 #ifndef HEMI_DEV_CODE
 #ifdef CACHE_DEBUG
@@ -596,6 +602,8 @@ void GPUInterp::CachedWeights::UpdateResults() {
 #ifdef FORCE_HOST_KERNEL
     splinesKernel(     fResults->hostPtr(),
                        fParameters->hostPtr(),
+                       fLowerClamp->hostPtr(),
+                       fUpperClamp->hostPtr(),
                        fSplineKnots->hostPtr(),
                        fSplineResult->hostPtr(),
                        fSplineParameter->hostPtr(),
@@ -606,6 +614,8 @@ void GPUInterp::CachedWeights::UpdateResults() {
     hemi::launch(splinesKernel,
                  fResults->writeOnlyPtr(),
                  fParameters->readOnlyPtr(),
+                 fLowerClamp->readOnlyPtr(),
+                 fUpperClamp->readOnlyPtr(),
                  fSplineKnots->readOnlyPtr(),
                  fSplineResult->readOnlyPtr(),
                  fSplineParameter->readOnlyPtr(),
