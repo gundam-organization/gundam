@@ -462,6 +462,40 @@ void Propagator::updateDialResponses(int iThread_){
 }
 
 #ifdef GUNDAM_USING_CUDA
+namespace {
+    int CalculateUniformSplinePoints(const TSpline3* s) {
+        if (!s) throw std::runtime_error("Null spline pointer");
+        int points = s->GetNp();
+        // Manage non-uniform splines by increasing the number of
+        // points based on the smallest interval size.
+        double step = -1;
+        for (int i = 1; i < points-1; ++i) {
+            double x;
+            double y;
+            s->GetKnot(i-1,x,y);
+            double d1 = x;
+            s->GetKnot(i,x,y);
+            d1 = x - d1;
+            double d2 = x;
+            s->GetKnot(i+1,x,y);
+            d2 = x - d2;
+            if (std::abs((d1-d2)/(d1+d2)) < 1E-6) continue;
+            if (step < 0.0) step = d1;
+            step = std::min(step,d1);
+            step = std::min(step,d2);
+        }
+        if (step > 0.0) {
+            // limit wild cases
+            int newPoints = (s->GetXmax()-s->GetXmin())/step;
+            if (newPoints > points) {
+                points = std::min(newPoints,3*points);
+                if (!(points%2)) ++points;
+            }
+        }
+        return points;
+    }
+}
+
 bool Propagator::buildGPUCaches() {
     LogInfo << "Build the GPU Caches" << std::endl;
 
@@ -494,12 +528,15 @@ bool Propagator::buildGPUCaches() {
                 if (sDial) {
                     const TSpline3* s = sDial->getSplinePtr();
                     if (!s) throw std::runtime_error("Null spline pointer");
-                    if (s->GetDelta() > 0) {
+                    int points = s->GetNp();
+                    int uPoints = CalculateUniformSplinePoints(s);
+                    if (uPoints > points) {
+                        uSplinePoints += uPoints;
                         ++uSplines;
-                        uSplinePoints += 2*s->GetNp();
+                        points = uPoints;
                     }
                     ++splines;
-                    splinePoints += s->GetNp();
+                    splinePoints += points;
                 }
                 const GraphDial* gDial
                     = dynamic_cast<const GraphDial*>(dial);
@@ -519,7 +556,7 @@ bool Propagator::buildGPUCaches() {
 
     LogInfo << "GPU Cache for " << events << " events --"
             << " Par: " << parameters
-            << " Uniform splines: " << splines
+            << " All splines: " << splines
             << " (" << 1.0*splines/events << ")"
             << " General Splines: " << uSplines
             << " (" << 1.0*uSplines/events << ")"
@@ -527,13 +564,13 @@ bool Propagator::buildGPUCaches() {
             << " N: " << norms <<" ("<< 1.0*norms/events <<")"
             << std::endl;
     if (splines > 0) {
-        LogInfo << "Uniform spline cache for "
+        LogInfo << "Spline cache for "
                 << splinePoints << " control points --"
                 << " (" << 1.0*splinePoints/splines << " points per spline)"
                 << std::endl;
     }
     if (uSplines > 0) {
-        LogInfo << "General spline cache for "
+        LogInfo << "General cache uses "
                 << uSplinePoints << " control points --"
                 << " (" << 1.0*uSplinePoints/uSplines << " points per spline)"
                 << std::endl;
@@ -597,14 +634,16 @@ bool Propagator::buildGPUCaches() {
                     if (!s) throw std::runtime_error("Null spline pointer");
                     double xMin = s->GetXmin();
                     double xMax = s->GetXmax();
-                    int NP = s->GetNp();
+                    int NP = CalculateUniformSplinePoints(s);
                     int spline = GPUInterp::CachedWeights::Get()
                         ->ReserveSpline(resultIndex,parIndex,
                                         xMin,xMax,
                                         NP);
 
-                    // BUG!!!! SUPER MAJOR CHEAT:  This is forcing all the
-                    // splines to have uniform control points.
+                    // SUPER MAJOR CHEAT: This is forcing all the splines to
+                    // have uniform control points with the number of steps
+                    // based on the smallest non-uniform step (only affects
+                    // non-uniform splines).
                     for (int i=0; i<NP; ++i) {
                         double x = xMin + i*(xMax-xMin)/(NP-1);
                         double y = s->Eval(x);
