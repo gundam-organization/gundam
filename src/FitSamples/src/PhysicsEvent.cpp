@@ -44,7 +44,7 @@ void PhysicsEvent::setEntryIndex(Long64_t entryIndex_) {
 }
 void PhysicsEvent::setTreeWeight(double treeWeight) {
   _treeWeight_ = treeWeight;
-#ifdef GUNDAM_USING_CUDA
+#ifdef CACHE_CHANGE_HERE_GUNDAM_USING_CUDA_SHOULD_BE_OFF
   if (GPUInterp::CachedWeights::Get() && 0 <= _GPUResultIndex_) {
       GPUInterp::CachedWeights::Get()->SetInitialValue(
           _GPUResultIndex_, _treeWeight_);
@@ -89,10 +89,25 @@ double PhysicsEvent::getEventWeight() const {
                     << std::endl;
         }
 #endif
+#define GPU_WEIGHT_SANITY_CHECK
+#ifdef GPU_WEIGHT_SANITY_CHECK
+        // This is surprisingly expensive, so turn off when not debugging.
+        double gv = GPUInterp::CachedWeights::Get()
+            ->GetInitialValue(_GPUResultIndex_);
+        double delta = std::abs(getTreeWeight() - gv)/getTreeWeight();
+        if (delta > 1.0E-6) {
+            LogInfo << "Problem with GPU initial value"
+                    << " " << getTreeWeight()
+                    << " " << gv
+                    << std::endl;
+            throw std::runtime_error("GPU initial weight problem");
+        }
+#endif
         return *_GPUResult_;
     }
     if (weightBrake) {
-        LogInfo << "GPU cache not filled, using " << _eventWeight_
+        LogInfo << "GPU cache expected, but not filled, so use "
+                << _eventWeight_
                 << std::endl;
         --weightBrake;
     }
