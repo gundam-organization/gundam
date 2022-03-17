@@ -143,6 +143,14 @@ void Propagator::initialize() {
 //    fillDialsStack();
 //  }
 
+#ifdef GUNDAM_USING_CUDA
+  // After all of the data has been loaded.  Specifically, this must be after
+  // the MC has been copied for the Asimov fit, or the "data" use the MC
+  // reweighting cache.  This must also be before the first use of
+  // reweightSampleEvents.
+  buildGPUCaches();
+#endif
+
   LogInfo << "Initializing threads..." << std::endl;
   initializeThreads();
 
@@ -181,6 +189,7 @@ void Propagator::initialize() {
       for( int iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
         // Since no reweight is applied on data samples, the nominal weight should be the default one
         weightBuffer = (*mcEventList)[iEvent].getEventWeight();
+
         if( _fitSampleSet_.getDataEventType() == DataEventType::FakeData ){
           weightBuffer *= (*mcEventList)[iEvent].getFakeDataWeight();
         }
@@ -233,13 +242,6 @@ void Propagator::initialize() {
       }
     }
   }
-
-#ifdef GUNDAM_USING_CUDA
-  // After all of the data has been loaded.  Specifically, this must be after
-  // the MC has been copied for the Asimov fit, or the "data" use the MC
-  // reweighting cache.
-  buildGPUCaches();
-#endif
 
   _treeWriter_.setFitSampleSetPtr(&_fitSampleSet_);
   _treeWriter_.setParSetListPtr(&_parameterSetsList_);
@@ -609,7 +611,7 @@ bool Propagator::buildGPUCaches() {
             event.setResultPointer(GPUInterp::CachedWeights::Get()
                                    ->GetResultPointer(resultIndex));
             GPUInterp::CachedWeights::Get()
-                ->SetInitialValue(resultIndex, event.getTreeWeight());
+                ->SetInitialValue(resultIndex,event.getTreeWeight());
             for (Dial* dial
                      : event.getRawDialPtrList()) {
                 if (!dial->isReferenced()) continue;
