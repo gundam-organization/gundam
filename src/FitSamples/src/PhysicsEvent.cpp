@@ -71,7 +71,6 @@ double PhysicsEvent::getNominalWeight() const {
   return _nominalWeight_;
 }
 
-static int weightBrake = 100;
 double PhysicsEvent::getEventWeight() const {
 #ifdef GUNDAM_USING_CUDA
     if (0 <= _GPUResultIndex_ && _GPUResult_) {
@@ -101,12 +100,6 @@ double PhysicsEvent::getEventWeight() const {
         }
 #endif
         return *_GPUResult_;
-    }
-    if (weightBrake) {
-        LogInfo << "GPU cache expected, but not filled, so use "
-                << _eventWeight_
-                << std::endl;
-        --weightBrake;
     }
 #endif
     return _eventWeight_;
@@ -183,15 +176,6 @@ void PhysicsEvent::reweightUsingDialCache(){
   for( auto& dial : _rawDialPtrList_ ){
     if( dial == nullptr ) return;
     double response = dial->evalResponse();
-#ifdef CACHE_DEBUG
-    if (_GPUResultIndex_ < 5) {
-        std::cout << "PE dial "
-                  << " iEvt " << _GPUResultIndex_
-                  << " iPar " << dial->getAssociatedParameterIndex()
-                  << " = " << dial->getAssociatedParameter()
-                  << " --> " << response << std::endl;
-    }
-#endif
     this->addEventWeight( response );
   }
 }
