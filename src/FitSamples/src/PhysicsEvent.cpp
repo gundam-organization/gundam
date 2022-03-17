@@ -44,12 +44,6 @@ void PhysicsEvent::setEntryIndex(Long64_t entryIndex_) {
 }
 void PhysicsEvent::setTreeWeight(double treeWeight) {
   _treeWeight_ = treeWeight;
-#ifdef CACHE_CHANGE_HERE_GUNDAM_USING_CUDA_SHOULD_BE_OFF
-  if (GPUInterp::CachedWeights::Get() && 0 <= _GPUResultIndex_) {
-      GPUInterp::CachedWeights::Get()->SetInitialValue(
-          _GPUResultIndex_, _treeWeight_);
-  }
-#endif
 }
 void PhysicsEvent::setNominalWeight(double nominalWeight) {
   _nominalWeight_ = nominalWeight;
@@ -89,9 +83,12 @@ double PhysicsEvent::getEventWeight() const {
                     << std::endl;
         }
 #endif
-#define GPU_WEIGHT_SANITY_CHECK
-#ifdef GPU_WEIGHT_SANITY_CHECK
-        // This is surprisingly expensive, so turn off when not debugging.
+#ifdef GPU_INITIAL_VALUE_SANITY_CHECK
+        // This is shockingly expensive, so turn off when not debugging.  The
+        // cost hasn't been tracked down, but there are two candidates.
+        // First, it might be triggering an extra GPU->CPU copy for the
+        // initial values.  Second, it could simply be dramatically increasing
+        // the number of CPU L1/L2/L3 cache misses.
         double gv = GPUInterp::CachedWeights::Get()
             ->GetInitialValue(_GPUResultIndex_);
         double delta = std::abs(getTreeWeight() - gv)/getTreeWeight();
