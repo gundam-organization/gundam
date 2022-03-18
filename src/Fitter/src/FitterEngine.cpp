@@ -22,6 +22,16 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[FitterEngine]");
 })
 
+#ifndef GUNDAM_BATCH
+#define GUNDAM_SIGMA "σ"
+#define GUNDAM_CHI2 "χ²"
+#define GUNDAM_DELTA "Δ"
+#else
+#define GUNDAM_SIGMA "sigma"
+#define GUNDAM_CHI2 "chi-squared"
+#define GUNDAM_DELTA "delta-"
+#endif
+
 FitterEngine::FitterEngine() { this->reset(); }
 FitterEngine::~FitterEngine() { this->reset(); }
 
@@ -271,7 +281,7 @@ void FitterEngine::fixGhostFitParameters(){
   _propagator_.allowRfPropagation(); // since we don't need the weight of each event (only the Chi2 value)
   updateChi2Cache();
 
-  LogDebug << "Reference χ² = " << _chi2StatBuffer_ << std::endl;
+  LogDebug << "Reference " << GUNDAM_CHI2 << " = " << _chi2StatBuffer_ << std::endl;
   double baseChi2 = _chi2Buffer_;
   double baseChi2Stat = _chi2StatBuffer_;
   double baseChi2Syst = _chi2PullsBuffer_;
@@ -292,7 +302,8 @@ void FitterEngine::fixGhostFitParameters(){
     for( auto& par : parList ){
       ssPrint.str("");
 
-      ssPrint << "(" << par.getParameterIndex()+1 << "/" << parList.size() << ") +1σ on " << parSet.getName() + "/" + par.getTitle();
+
+      ssPrint << "(" << par.getParameterIndex()+1 << "/" << parList.size() << ") +1" << GUNDAM_SIGMA << " on " << parSet.getName() + "/" + par.getTitle();
 
       if( fixNextEigenPars ){
         par.setIsFixed(true);
@@ -318,7 +329,8 @@ void FitterEngine::fixGhostFitParameters(){
         deltaChi2Stat = _chi2StatBuffer_ - baseChi2Stat;
 //        deltaChi2Syst = _chi2PullsBuffer_ - baseChi2Syst;
 //        deltaChi2 = _chi2Buffer_ - baseChi2;
-        ssPrint << ": Δχ²(stat) = " << deltaChi2Stat;
+
+        ssPrint << ": " << GUNDAM_DELTA << GUNDAM_CHI2 << " (stat) = " << deltaChi2Stat;
 
         LogInfo.moveTerminalCursorBack(1);
         LogInfo << ssPrint.str() << std::endl;
@@ -651,16 +663,31 @@ double FitterEngine::evalFit(const double* parArray_){
       GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("itSpeed");
     }
 
-
     std::stringstream ss;
     ss << __METHOD_NAME__ << ": call #" << _nbFitCalls_;
     ss << std::endl << "Current RAM: " << GenericToolbox::parseSizeUnits(GenericToolbox::getProcessMemoryUsage());
-    ss << std::endl << "Avg χ² computation time: " << _evalFitAvgTimer_;
+    ss << std::endl << "Avg " << GUNDAM_CHI2 << " computation time: " << _evalFitAvgTimer_;
     if( not _propagator_.isUseResponseFunctions() ){
-      ss << std::endl << "├─ Current speed: " << (double)_itSpeed_.counts/(double)_itSpeed_.cumulated * 1E6 << " it/s";
-      ss << std::endl << "├─ Avg time for " << _minimizerType_ << "/" << _minimizerAlgo_ << ": " << _outEvalFitAvgTimer_;
-      ss << std::endl << "├─ Avg time to propagate weights: " << _propagator_.weightProp;
-      ss << std::endl << "├─ Avg time to fill histograms: " << _propagator_.fillProp;
+      ss << std::endl;
+#ifndef GUNDAM_BATCH
+      ss << "├─";
+#endif
+      ss << " Current speed:                 " << (double)_itSpeed_.counts/(double)_itSpeed_.cumulated * 1E6 << " it/s";
+      ss << std::endl;
+#ifndef GUNDAM_BATCH
+      ss << "├─";
+#endif
+      ss << " Avg time for " << _minimizerType_ << "/" << _minimizerAlgo_ << ": " << _outEvalFitAvgTimer_;
+      ss << std::endl;
+#ifndef GUNDAM_BATCH
+      ss << "├─";
+#endif
+      ss << " Avg time to propagate weights: " << _propagator_.weightProp;
+      ss << std::endl;
+#ifndef GUNDAM_BATCH
+      ss << "├─";
+#endif
+      ss << " Avg time to fill histograms:   " << _propagator_.fillProp;
     }
     else{
       ss << GET_VAR_NAME_VALUE(_propagator_.applyRf);

@@ -17,7 +17,7 @@ option(WITH_OPENMP "Build with OpenMP libraries" OFF )
 option(WITH_CUDA "Build with CUDA (if available)" ON)
 option(YAMLCPP_DIR "Set custom path to yaml-cpp lib" OFF )
 option(ENABLE_DEV_MODE "Enable specific dev related printouts" OFF )
-option(BATCH_MODE "Build to run in a batch queue (affects output)" ON)
+option(BATCH_MODE "Build to run in a batch queue (affects output)" OFF)
 
 set(VERBOSE TRUE)
 
@@ -71,6 +71,12 @@ cmessage(STATUS "CMAKE_BUILD_TYPE: \"${CMAKE_BUILD_TYPE}\"")
 if(NOT DEFINED USE_STATIC_LINKS)
     set(USE_STATIC_LINKS 0)
 endif()
+
+if(BATCH_MODE)
+  set(COLOR_OUTPUT NO)
+  set(TTYCHECK NO)
+  add_definitions(-DGUNDAM_BATCH)
+endif(BATCH_MODE)
 
 ################################################################################
 #                            Check Dependencies
@@ -176,8 +182,12 @@ add_definitions( -D PROGRESS_BAR_FILL_TAG="\\\"T2K\#"\\\" )
 if (COLOR_OUTPUT)
   add_definitions( -D PROGRESS_BAR_ENABLE_RAINBOW=1 )
 else (COLOR_OUTPUT)
-  add_definitions( -D PROGRESS_BAR_ENABLE_RAINBOW=0 )
+  # add_definitions( -D PROGRESS_BAR_ENABLE_RAINBOW=0 )
+  add_definitions( -D CPP_GENERIC_TOOLBOX_NOCOLOR )
 endif (COLOR_OUTPUT)
+if (BATCH_MODE)
+  add_definitions( -D CPP_GENERIC_TOOLBOX_BATCH )
+endif(BATCH_MODE)
 
 ## Add the Logger
 # Reproduce needed parts of the simple-cpp-logger CMakeLists.txt
