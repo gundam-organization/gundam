@@ -71,6 +71,11 @@ public:
   virtual void buildResponseSplineCache();
   virtual void fillResponseCache() = 0;
 
+  // Debugging.  This is only meaningful when the GPU is filling the spline
+  // value cache (only filled during validation).
+  int getGPUSplineIndex() const {return _GPUSplineIndex_;}
+  void setGPUSplineIndex(int i) {_GPUSplineIndex_ = i;}
+  
 protected:
   const DialType::DialType _dialType_;
 
@@ -95,6 +100,9 @@ protected:
   double _mirrorLowEdge_{std::nan("unset")};
   double _mirrorRange_{std::nan("unset")};
 
+  // Debugging.  This is only meaningful when the GPU is filling the spline
+  // value cache (only filled during validation).
+  int _GPUSplineIndex_{-1};
 
   // Output
   std::shared_ptr<TSpline3> _responseSplineCache_{nullptr}; // dial response as a spline
