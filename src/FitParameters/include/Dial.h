@@ -58,6 +58,8 @@ public:
   void *getAssociatedParameterReference() const;
   double getAssociatedParameter() const;
   int getAssociatedParameterIndex() const;
+  double getMinDialResponse() const {return _minDialResponse_;}
+  double getMaxDialResponse() const {return _maxDialResponse_;}
   bool getUseMirrorDial() const {return _useMirrorDial_;}
   double getMirrorLowEdge() const {return _mirrorLowEdge_;}
   double getMirrorRange() const {return _mirrorRange_;}
@@ -75,7 +77,7 @@ public:
   // value cache (only filled during validation).
   int getGPUSplineIndex() const {return _GPUSplineIndex_;}
   void setGPUSplineIndex(int i) {_GPUSplineIndex_ = i;}
-  
+
 protected:
   const DialType::DialType _dialType_;
 
