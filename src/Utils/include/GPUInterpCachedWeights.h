@@ -162,13 +162,29 @@ public:
     /// trigger copying the results from the device if that is necessary.
     double GetParameter(int parIdx) const;
 
-    /// Set the parameter value for index i ib the host memory.  This will
-    /// invalidate the fParameters on the host device.
+    /// Set the parameter value for index i in the host memory.  This will
+    /// invalidate the fParameters on the device.
     void SetParameter(int parIdx, double value);
 
+
+    /// Get the lower (upper) bound of the mirroring region for parameter
+    /// index i in the host memory.
+    double GetLowerMirror(int parIdx);
+    double GetUpperMirror(int parIdx);
+
+    /// Set the lower (upper) bound of the mirroring region for parameter
+    /// index i in the host memory.  This will invalidate the mirrors on the
+    /// device.
     void SetLowerMirror(int parIdx, double value);
     void SetUpperMirror(int parIdx, double value);
 
+
+    /// Get the lower (upper) clamp for parameter index i in the host memory.
+    double GetLowerClamp(int parIdx);
+    double GetUpperClamp(int parIdx);
+
+    /// Set the lower (upper) clamp for parameter index i in the host memory.
+    /// This will invalidate the clamps on the device.
     void SetLowerClamp(int parIdx, double value);
     void SetUpperClamp(int parIdx, double value);
 
@@ -195,9 +211,43 @@ public:
     // that will be filled.
     void SetSplineKnot(int sIndex, int kIndex, double value);
 
+    // Get the index of the parameter for the spline at sIndex.
+    int GetSplineParameterIndex(int sIndex);
+
+    // Get the parameter value for the spline at sIndex.
+    double GetSplineParameter(int sIndex);
+
+    // Get the lower (upper) bound for the spline at sIndex.
+    double GetSplineLowerBound(int sIndex);
+    double GetSplineUpperBound(int sIndex);
+
+    // Get the lower (upper) clamp for the spline at sIndex.
+    double GetSplineLowerClamp(int sIndex);
+    double GetSplineUpperClamp(int sIndex);
+
+    // Get the number of knots in the spline at sIndex.
+    int GetSplineKnotCount(int sIndex);
+
+    // Get the function value for a knot in the spline at sIndex
+    double GetSplineKnot(int sIndex,int knot);
+
+    ////////////////////////////////////////////////////////////////////
+    // This section is for the validation methods.  They should mostly be
+    // NOOPs and should mostly not be called.
+#undef GPUINTERP_SLOW_VALIDATION /* Define to have slow validations */
+
+#ifdef GPUINTERP_SLOW_VALIDATION
+    double GetSplineValue(int sIndex);
+
+    /// An array of values for the result of each spline.  When this is
+    /// active, it is filled but the kernel, but only copied to the CPU if
+    /// it's access.  NOTE: Enabling this significantly slows the calculation
+    /// since it adds another large copy from the GPU.
+    std::unique_ptr<hemi::Array<double>> fSplineValue;
+#endif
+
 };
 
-#endif
 // An MIT Style License
 
 // Copyright (c) 2022 Clark McGrew
@@ -225,3 +275,4 @@ public:
 // c-basic-offset:4
 // compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:
+#endif
