@@ -467,10 +467,12 @@ void Propagator::updateDialResponses(int iThread_){
 namespace {
     int CalculateUniformSplinePoints(const TSpline3* s) {
         if (!s) throw std::runtime_error("Null spline pointer");
-        int points = s->GetNp();
+        const int points = s->GetNp();
+
         // Manage non-uniform splines by increasing the number of
         // points based on the smallest interval size.
-        double step = -1;
+        double minStep = 1E+20;
+        bool uniform = true;
         for (int i = 1; i < points-1; ++i) {
             double x;
             double y;
@@ -481,20 +483,36 @@ namespace {
             double d2 = x;
             s->GetKnot(i+1,x,y);
             d2 = x - d2;
-            if (std::abs((d1-d2)/(d1+d2)) < 1E-6) continue;
-            if (step < 0.0) step = d1;
-            step = std::min(step,d1);
-            step = std::min(step,d2);
+            if (std::abs((d1-d2)/(d1+d2)) > 1E-6) uniform=false;
+            minStep = std::min(minStep,d1);
+            minStep = std::min(minStep,d2);
         }
-        if (step > 0.0) {
-            // limit wild cases
-            int newPoints = (s->GetXmax()-s->GetXmin())/step;
-            if (newPoints > points) {
-                points = std::min(newPoints,3*points);
-                if (!(points%2)) ++points;
-            }
+
+        int newPoints = points;
+
+        if (!uniform) {
+            // This is a spline with non-uniform knot spacing.  Increase the
+            // number of knots used for this splines in the GPU calculation
+            int nP = 1 + (s->GetXmax()-s->GetXmin())/minStep;
+            newPoints = std::max(newPoints,nP);
         }
-        return points;
+
+#define GPUINTERP_SPLINE_OVERSAMPLING 15
+#ifdef  GPUINTERP_SPLINE_OVERSAMPLING
+#warning Propagator oversampling is enabled
+        // Possibly oversample the points.
+        newPoints = newPoints + (GPUINTERP_SPLINE_OVERSAMPLING-1)*(newPoints-1);
+#endif
+
+        // Protect against explosions.
+        newPoints = std::min(newPoints,300);
+
+        // Make sure there are an odd number of knots (this puts a
+        // knot at the middle of the spline where the nominal value
+        // usually resides.
+        if (!(newPoints%2)) ++newPoints;
+
+        return newPoints;
     }
 }
 
@@ -641,6 +659,25 @@ bool Propagator::buildGPUCaches() {
                         ->ReserveSpline(resultIndex,parIndex,
                                         xMin,xMax,
                                         NP);
+                    double lowerClamp = dial->getMinDialResponse();
+                    if (std::isfinite(lowerClamp)) {
+                        GPUInterp::CachedWeights::Get()
+                            ->SetLowerClamp(parIndex,lowerClamp);
+                    }
+                    double upperClamp = dial->getMaxDialResponse();
+                    if (std::isfinite(upperClamp)) {
+                        GPUInterp::CachedWeights::Get()
+                            ->SetUpperClamp(parIndex,upperClamp);
+                    }
+                    if (lowerClamp > upperClamp) {
+                        throw std::runtime_error(
+                            "lower and upper clamps reversed");
+                    }
+
+#ifdef GPUINTERP_SLOW_VALIDATION
+#warning GPUINTERP_SLOW_VALIDATION is being used in Propagator::buildGPUCaches
+                    sDial->setGPUSplineIndex(spline);
+#endif
 
                     // SUPER MAJOR CHEAT: This is forcing all the splines to
                     // have uniform control points with the number of steps
@@ -684,6 +721,10 @@ bool Propagator::fillGPUCaches() {
         gpu->SetParameter(par.second, par.first->getParameterValue());
     }
     gpu->UpdateResults();
+#ifdef GPUINTERP_SLOW_VALIDATION
+#warning GPUINTERP_SLOW_VALIDATION is being used in Propagator::fillGPUCaches
+    return false;
+#endif
     return true;
 }
 #endif
