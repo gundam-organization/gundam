@@ -602,16 +602,16 @@ bool Propagator::buildGPUCaches() {
     }
 
     // Try to allocate the GPU
-    if (!GPUInterp::CachedWeights::Get()
+    if (!Cache::EventWeights::Get()
         && GlobalVariables::getEnableEventWeightCache()) {
         LogInfo << "Creating GPU spline cache" << std::endl;
-        GPUInterp::CachedWeights::Create(
+        Cache::EventWeights::Create(
             events,parameters,norms,splines,splinePoints);
     }
 
     // In case the GPU didn't get allocated.
-    if (!GPUInterp::CachedWeights::Get()) {
-        LogInfo << "No CachedWeights for GPU"
+    if (!Cache::EventWeights::Get()) {
+        LogInfo << "No EventWeights for GPU"
                 << std::endl;
         return false;
     }
@@ -626,9 +626,9 @@ bool Propagator::buildGPUCaches() {
             // The reduce index to save the result for this event.
             int resultIndex = usedResults++;
             event.setResultIndex(resultIndex);
-            event.setResultPointer(GPUInterp::CachedWeights::Get()
+            event.setResultPointer(Cache::EventWeights::Get()
                                    ->GetResultPointer(resultIndex));
-            GPUInterp::CachedWeights::Get()
+            Cache::EventWeights::Get()
                 ->SetInitialValue(resultIndex,event.getTreeWeight());
             for (Dial* dial
                      : event.getRawDialPtrList()) {
@@ -644,7 +644,7 @@ bool Propagator::buildGPUCaches() {
                 int dialUsed = 0;
                 if(dial->getDialType() == DialType::Normalization) {
                     ++dialUsed;
-                    GPUInterp::CachedWeights::Get()
+                    Cache::EventWeights::Get()
                         ->ReserveNorm(resultIndex,parIndex);
                 }
                 SplineDial* sDial = dynamic_cast<SplineDial*>(dial);
@@ -655,18 +655,18 @@ bool Propagator::buildGPUCaches() {
                     double xMin = s->GetXmin();
                     double xMax = s->GetXmax();
                     int NP = CalculateUniformSplinePoints(s);
-                    int spline = GPUInterp::CachedWeights::Get()
+                    int spline = Cache::EventWeights::Get()
                         ->ReserveSpline(resultIndex,parIndex,
                                         xMin,xMax,
                                         NP);
                     double lowerClamp = dial->getMinDialResponse();
                     if (std::isfinite(lowerClamp)) {
-                        GPUInterp::CachedWeights::Get()
+                        Cache::EventWeights::Get()
                             ->SetLowerClamp(parIndex,lowerClamp);
                     }
                     double upperClamp = dial->getMaxDialResponse();
                     if (std::isfinite(upperClamp)) {
-                        GPUInterp::CachedWeights::Get()
+                        Cache::EventWeights::Get()
                             ->SetUpperClamp(parIndex,upperClamp);
                     }
                     if (lowerClamp > upperClamp) {
@@ -686,16 +686,16 @@ bool Propagator::buildGPUCaches() {
                     for (int i=0; i<NP; ++i) {
                         double x = xMin + i*(xMax-xMin)/(NP-1);
                         double y = s->Eval(x);
-                        GPUInterp::CachedWeights::Get()
+                        Cache::EventWeights::Get()
                             ->SetSplineKnot(spline,i, y);
                     }
 
                     if (sDial->getUseMirrorDial()) {
                         double xLow = sDial->getMirrorLowEdge();
                         double xHigh = xLow + sDial->getMirrorRange();
-                        GPUInterp::CachedWeights::Get()
+                        Cache::EventWeights::Get()
                             ->SetLowerMirror(parIndex,xLow);
-                        GPUInterp::CachedWeights::Get()
+                        Cache::EventWeights::Get()
                             ->SetUpperMirror(parIndex,xHigh);
                     }
                 }
@@ -704,18 +704,18 @@ bool Propagator::buildGPUCaches() {
         }
     }
 
-    if (usedResults == GPUInterp::CachedWeights::Get()->GetResultCount()) {
+    if (usedResults == Cache::EventWeights::Get()->GetResultCount()) {
         return true;
     }
 
     LogInfo << "GPU Used Results:     " << usedResults << std::endl;
     LogInfo << "GPU Expected Results: " <<
-        GPUInterp::CachedWeights::Get()->GetResultCount() << std::endl;
+        Cache::EventWeights::Get()->GetResultCount() << std::endl;
     throw std::runtime_error("Probable problem putting parameters in cache");
 }
 
 bool Propagator::fillGPUCaches() {
-    GPUInterp::CachedWeights* gpu = GPUInterp::CachedWeights::Get();
+    Cache::EventWeights* gpu = Cache::EventWeights::Get();
     if (!gpu) return false;
     for (auto& par : _gpuParameterIndex_ ) {
         gpu->SetParameter(par.second, par.first->getParameterValue());

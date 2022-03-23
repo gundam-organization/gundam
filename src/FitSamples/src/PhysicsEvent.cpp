@@ -94,7 +94,7 @@ double PhysicsEvent::getEventWeight() const {
             // copy for the initial values.  Second, it could simply be
             // dramatically increasing the number of CPU L1/L2/L3 cache
             // misses.
-            double gv = GPUInterp::CachedWeights::Get()
+            double gv = Cache::EventWeights::Get()
                 ->GetInitialValue(_GPUResultIndex_);
             double delta = std::abs(getTreeWeight() - gv)/getTreeWeight();
             if (delta > 1.0E-6) {
@@ -219,7 +219,7 @@ void PhysicsEvent::reweightUsingDialCache(){
     static long long int numDelta = 0;
     int sIndex = dial->getGPUSplineIndex();
     while (sIndex >= 0) {
-        GPUInterp::CachedWeights* gpu = GPUInterp::CachedWeights::Get();
+        Cache::EventWeights* gpu = Cache::EventWeights::Get();
         if (!gpu) {
             std::runtime_error("GPU spline index with null GPU pointer");
         }

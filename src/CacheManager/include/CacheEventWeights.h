@@ -1,5 +1,5 @@
-#ifndef GPUInterpCachedWeights_hxx_seen
-#define GPUInterpCachedWeights_hxx_seen
+#ifndef CacheEventWeights_hxx_seen
+#define CacheEventWeights_hxx_seen
 
 #include "hemi/array.h"
 
@@ -7,14 +7,14 @@
 #include <memory>
 #include <vector>
 
-namespace GPUInterp {
-    class CachedWeights;
+namespace Cache {
+    class EventWeights;
 };
 
 /// A class to calculate and cache a bunch of events weights.
-class GPUInterp::CachedWeights {
+class Cache::EventWeights {
 private:
-    static CachedWeights* fSingleton;  // You get one guess...
+    static EventWeights* fSingleton;  // You get one guess...
 
     /// The (approximate) amount of memory required on the GPU.
     std::size_t fTotalBytes;
@@ -78,14 +78,14 @@ private:
     std::unique_ptr<hemi::Array<float>> fSplineKnots;
 
 public:
-    static CachedWeights* Get() {return fSingleton;}
-    static CachedWeights* Create(std::size_t results,
+    static EventWeights* Get() {return fSingleton;}
+    static EventWeights* Create(std::size_t results,
                                  std::size_t parameters,
                                  std::size_t norms,
                                  std::size_t splines,
                                  std::size_t knots) {
         if (!fSingleton) {
-            fSingleton = new CachedWeights(
+            fSingleton = new EventWeights(
                 results,parameters,norms,splines,knots);
         }
         return fSingleton;
@@ -101,7 +101,7 @@ public:
     // results (typically a few per event).  The knots are the total number of
     // knots in all of the uniform splines (e.g. For 1000 splines with 7
     // knots for each spline, knots is 7000).
-    CachedWeights(std::size_t results,
+    EventWeights(std::size_t results,
                   std::size_t parameters,
                   std::size_t norms,
                   std::size_t splines,
@@ -109,7 +109,7 @@ public:
 
     // Deconstruct the class.  This should deallocate all the memory
     // everyplace.
-    ~CachedWeights();
+    ~EventWeights();
 
     /// Return the approximate allocated memory (e.g. on the GPU).
     std::size_t GetResidentMemory() const {return fTotalBytes;}

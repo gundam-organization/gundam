@@ -23,10 +23,10 @@ LoggerInit([](){
 #define LOGGER std::cout
 #endif
 
-GPUInterp::CachedWeights* GPUInterp::CachedWeights::fSingleton = nullptr;
+Cache::EventWeights* Cache::EventWeights::fSingleton = nullptr;
 
 // The constructor
-GPUInterp::CachedWeights::CachedWeights(
+Cache::EventWeights::EventWeights(
     std::size_t results, std::size_t parameters, std::size_t norms,
     std::size_t splines, std::size_t knots)
     : fTotalBytes(0), fResultCount(results), fParameterCount(parameters),
@@ -62,7 +62,7 @@ GPUInterp::CachedWeights::CachedWeights(
     fTotalBytes += (1+GetSplinesReserved())*sizeof(int);  // fSplineIndex
 
 #ifdef GPUINTERP_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in GPUInterp::CachedWeights::CachedWeights
+#warning Using SLOW VALIDATION in Cache::EventWeights::EventWeights
         // Add validation code for the spline calculation.  This can be rather
         // slow, so do not use if it is not required.
     fTotalBytes += GetSplinesReserved()*sizeof(double);
@@ -113,7 +113,7 @@ GPUInterp::CachedWeights::CachedWeights(
         fSplineIndex.reset(new hemi::Array<int>(1+GetSplinesReserved(),false));
 
 #ifdef GPUINTERP_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in GPUInterp::CachedWeights::CachedWeights
+#warning Using SLOW VALIDATION in Cache::EventWeights::EventWeights
         // Add validation code for the spline calculation.  This can be rather
         // slow, so do not use if it is not required.
         fSplineValue.reset(new hemi::Array<double>(GetSplinesReserved(),true));
@@ -146,100 +146,100 @@ GPUInterp::CachedWeights::CachedWeights(
 }
 
 // The destructor
-GPUInterp::CachedWeights::~CachedWeights() {}
+Cache::EventWeights::~EventWeights() {}
 
-double GPUInterp::CachedWeights::GetResult(int i) const {
+double Cache::EventWeights::GetResult(int i) const {
     if (i < 0) throw;
     if (GetResultCount() <= i) throw;
     return fResults->hostPtr()[i];
 }
 
-void GPUInterp::CachedWeights::SetResult(int i, double v) {
+void Cache::EventWeights::SetResult(int i, double v) {
     if (i < 0) throw;
     if (GetResultCount() <= i) throw;
     fResults->hostPtr()[i] = v;
 }
 
-double* GPUInterp::CachedWeights::GetResultPointer(int i) const {
+double* Cache::EventWeights::GetResultPointer(int i) const {
     if (i < 0) throw;
     if (GetResultCount() <= i) throw;
     return (fResults->hostPtr() + i);
 }
 
-double  GPUInterp::CachedWeights::GetInitialValue(int i) const {
+double  Cache::EventWeights::GetInitialValue(int i) const {
     if (i < 0) throw;
     if (GetResultCount() <= i) throw;
     return fInitialValues->hostPtr()[i];
 }
 
-void GPUInterp::CachedWeights::SetInitialValue(int i, double v) {
+void Cache::EventWeights::SetInitialValue(int i, double v) {
     if (i < 0) throw;
     if (GetResultCount() <= i) throw;
     fInitialValues->hostPtr()[i] = v;
 }
 
-double GPUInterp::CachedWeights::GetParameter(int parIdx) const {
+double Cache::EventWeights::GetParameter(int parIdx) const {
     if (parIdx < 0) throw;
     if (GetParameterCount() <= parIdx) throw;
     return fParameters->hostPtr()[parIdx];
 }
 
-void GPUInterp::CachedWeights::SetParameter(int parIdx, double value) {
+void Cache::EventWeights::SetParameter(int parIdx, double value) {
     if (parIdx < 0) throw;
     if (GetParameterCount() <= parIdx) throw;
     fParameters->hostPtr()[parIdx] = value;
 }
 
-double GPUInterp::CachedWeights::GetLowerMirror(int parIdx) {
+double Cache::EventWeights::GetLowerMirror(int parIdx) {
     if (parIdx < 0) throw;
     if (GetParameterCount() <= parIdx) throw;
     return fLowerMirror->at(parIdx);
 }
 
-void GPUInterp::CachedWeights::SetLowerMirror(int parIdx, double value) {
+void Cache::EventWeights::SetLowerMirror(int parIdx, double value) {
     if (parIdx < 0) throw;
     if (GetParameterCount() <= parIdx) throw;
     fLowerMirror->at(parIdx) = value;
 }
 
-double GPUInterp::CachedWeights::GetUpperMirror(int parIdx) {
+double Cache::EventWeights::GetUpperMirror(int parIdx) {
     if (parIdx < 0) throw;
     if (GetParameterCount() <= parIdx) throw;
     return fUpperMirror->at(parIdx);
 }
 
-void GPUInterp::CachedWeights::SetUpperMirror(int parIdx, double value) {
+void Cache::EventWeights::SetUpperMirror(int parIdx, double value) {
     if (parIdx < 0) throw;
     if (GetParameterCount() <= parIdx) throw;
     fUpperMirror->at(parIdx) = value;
 }
 
-double GPUInterp::CachedWeights::GetLowerClamp(int parIdx) {
+double Cache::EventWeights::GetLowerClamp(int parIdx) {
     if (parIdx < 0) throw;
     if (GetParameterCount() <= parIdx) throw;
     return fLowerClamp->hostPtr()[parIdx];
 }
 
-void GPUInterp::CachedWeights::SetLowerClamp(int parIdx, double value) {
+void Cache::EventWeights::SetLowerClamp(int parIdx, double value) {
     if (parIdx < 0) throw;
     if (GetParameterCount() <= parIdx) throw;
     fLowerClamp->hostPtr()[parIdx] = value;
 }
 
-double GPUInterp::CachedWeights::GetUpperClamp(int parIdx) {
+double Cache::EventWeights::GetUpperClamp(int parIdx) {
     if (parIdx < 0) throw;
     if (GetParameterCount() <= parIdx) throw;
     return fUpperClamp->hostPtr()[parIdx];
 }
 
-void GPUInterp::CachedWeights::SetUpperClamp(int parIdx, double value) {
+void Cache::EventWeights::SetUpperClamp(int parIdx, double value) {
     if (parIdx < 0) throw;
     if (GetParameterCount() <= parIdx) throw;
     fUpperClamp->hostPtr()[parIdx] = value;
 }
 
 // Reserve space for another normalization parameter.
-int GPUInterp::CachedWeights::ReserveNorm(int resIndex, int parIndex) {
+int Cache::EventWeights::ReserveNorm(int resIndex, int parIndex) {
     if (resIndex < 0) {
         LOGGER << "Invalid result index"
                << std::endl;
@@ -273,7 +273,7 @@ int GPUInterp::CachedWeights::ReserveNorm(int resIndex, int parIndex) {
 
 // Reserve space in the internal structures for spline with uniform knots.
 // The knot values will still need to be set using set spline knot.
-int GPUInterp::CachedWeights::ReserveSpline(
+int Cache::EventWeights::ReserveSpline(
     int resIndex, int parIndex, double low, double high, int points) {
     if (resIndex < 0) {
         LOGGER << "Invalid result index"
@@ -339,7 +339,7 @@ int GPUInterp::CachedWeights::ReserveSpline(
     return newIndex;
 }
 
-void GPUInterp::CachedWeights::SetSplineKnot(
+void Cache::EventWeights::SetSplineKnot(
     int sIndex, int kIndex, double value) {
     if (sIndex < 0) {
         LOGGER << "Requested spline index is negative"
@@ -366,7 +366,7 @@ void GPUInterp::CachedWeights::SetSplineKnot(
 }
 
 // A convenience function combining ReserveSpline and SetSplineKnot.
-int GPUInterp::CachedWeights::AddSpline(
+int Cache::EventWeights::AddSpline(
     int resIndex, int parIndex, double low, double high,
     double points[], int nPoints) {
     int newIndex = ReserveSpline(resIndex,parIndex,low,high,nPoints);
@@ -377,7 +377,7 @@ int GPUInterp::CachedWeights::AddSpline(
     return newIndex;
 }
 
-int GPUInterp::CachedWeights::GetSplineParameterIndex(int sIndex) {
+int Cache::EventWeights::GetSplineParameterIndex(int sIndex) {
     if (sIndex < 0) {
         throw std::runtime_error("Spline index invalid");
     }
@@ -387,12 +387,12 @@ int GPUInterp::CachedWeights::GetSplineParameterIndex(int sIndex) {
     return fSplineParameter->hostPtr()[sIndex];
 }
 
-double GPUInterp::CachedWeights::GetSplineParameter(int sIndex) {
+double Cache::EventWeights::GetSplineParameter(int sIndex) {
     int i = GetSplineParameterIndex(sIndex);
     return GetParameter(i);
 }
 
-int GPUInterp::CachedWeights::GetSplineKnotCount(int sIndex) {
+int Cache::EventWeights::GetSplineKnotCount(int sIndex) {
     if (sIndex < 0) {
         throw std::runtime_error("Spline index invalid");
     }
@@ -402,7 +402,7 @@ int GPUInterp::CachedWeights::GetSplineKnotCount(int sIndex) {
     return fSplineIndex->hostPtr()[sIndex+1]-fSplineIndex->hostPtr()[sIndex]-2;
 }
 
-double GPUInterp::CachedWeights::GetSplineLowerBound(int sIndex) {
+double Cache::EventWeights::GetSplineLowerBound(int sIndex) {
     if (sIndex < 0) {
         throw std::runtime_error("Spline index invalid");
     }
@@ -413,7 +413,7 @@ double GPUInterp::CachedWeights::GetSplineLowerBound(int sIndex) {
     return fSplineKnots->hostPtr()[knotsIndex];
 }
 
-double GPUInterp::CachedWeights::GetSplineUpperBound(int sIndex) {
+double Cache::EventWeights::GetSplineUpperBound(int sIndex) {
     if (sIndex < 0) {
         throw std::runtime_error("Spline index invalid");
     }
@@ -427,18 +427,18 @@ double GPUInterp::CachedWeights::GetSplineUpperBound(int sIndex) {
     return lower + (knotCount-1)/step;
 }
 
-double GPUInterp::CachedWeights::GetSplineLowerClamp(int sIndex) {
+double Cache::EventWeights::GetSplineLowerClamp(int sIndex) {
     int parIndex = GetSplineParameterIndex(sIndex);
     return GetLowerClamp(parIndex);
 }
 
-double GPUInterp::CachedWeights::GetSplineUpperClamp(int sIndex) {
+double Cache::EventWeights::GetSplineUpperClamp(int sIndex) {
     int parIndex = GetSplineParameterIndex(sIndex);
     return GetUpperClamp(parIndex);
 }
 
 
-double GPUInterp::CachedWeights::GetSplineKnot(int sIndex, int knot) {
+double Cache::EventWeights::GetSplineKnot(int sIndex, int knot) {
     if (sIndex < 0) {
         throw std::runtime_error("Spline index invalid");
     }
@@ -461,13 +461,13 @@ double GPUInterp::CachedWeights::GetSplineKnot(int sIndex, int knot) {
 // NOOPs and should mostly not be called.
 
 #ifdef GPUINTERP_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in GPUInterp::CachedWeights::GetSplineValue
+#warning Using SLOW VALIDATION in Cache::EventWeights::GetSplineValue
 // Get the intermediate spline result that is used to calculate an event
 // weight.  This can trigger a copy from the GPU to CPU, and must only be
 // enabled during validation.  Using this validation code also significantly
 // increases the amount of GPU memory required.  In a short sentence, "Do not
 // use this method."
-double GPUInterp::CachedWeights::GetSplineValue(int sIndex) {
+double Cache::EventWeights::GetSplineValue(int sIndex) {
     if (sIndex < 0) {
         throw std::runtime_error("GetSplineValue: Spline index invalid");
     }
@@ -714,7 +714,7 @@ namespace {
     HEMI_KERNEL_FUNCTION(HEMISplinesKernel,
                          double* results,
 #ifdef GPUINTERP_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in GPUInterp::CachedWeights::HEMISplinesKernel
+#warning Using SLOW VALIDATION in Cache::EventWeights::HEMISplinesKernel
                          // inputs/output for validation
                          double* splineValues,
 #endif
@@ -737,7 +737,7 @@ namespace {
             float uc = upperClamp[pIndex[i]];
             if (x > uc) x = uc;
 #ifdef GPUINTERP_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in GPUInterp::CachedWeights::HEMISplinesKernel
+#warning Using SLOW VALIDATION in Cache::EventWeights::HEMISplinesKernel
             splineValues[i] = x;
 #endif
             HEMIAtomicMult(&results[rIndex[i]], x);
@@ -757,7 +757,7 @@ namespace {
     }
 }
 
-void GPUInterp::CachedWeights::UpdateResults() {
+void Cache::EventWeights::UpdateResults() {
     for (int i = 0; i<GetParameterCount(); ++i) {
         double lm = fLowerMirror->at(i);
         double um = fUpperMirror->at(i);
@@ -804,7 +804,7 @@ void GPUInterp::CachedWeights::UpdateResults() {
 #ifdef FORCE_HOST_KERNEL
     splinesKernel(fResults->hostPtr(),
 #ifdef GPUINTERP_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in GPUInterp::CachedWeights::UpdateResults
+#warning Using SLOW VALIDATION in Cache::EventWeights::UpdateResults
                   fSplineValue->hostPtr(),
 #endif
                   fParameters->hostPtr(),
@@ -820,7 +820,7 @@ void GPUInterp::CachedWeights::UpdateResults() {
     hemi::launch(splinesKernel,
                  fResults->writeOnlyPtr(),
 #ifdef GPUINTERP_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in GPUInterp::CachedWeights::UpdateResults
+#warning Using SLOW VALIDATION in Cache::EventWeights::UpdateResults
                   fSplineValue->writeOnlyPtr(),
 #endif
                  fParameters->readOnlyPtr(),
