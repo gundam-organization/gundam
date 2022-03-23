@@ -1,4 +1,6 @@
-#include "CacheEventWeights.h"
+#include "CacheWeights.h"
+#include "WeightBase.h"
+#include "WeightCompactSpline.h"
 
 #include <algorithm>
 #include <iostream>
@@ -10,51 +12,24 @@
 #include <hemi/launch.h>
 #include <hemi/grid_stride_range.h>
 
-#define INSIDE_GUNDAM
-#ifdef INSIDE_GUNDAM
-#include <Logger.h>
-LoggerInit([](){
-  Logger::setUserHeaderStr("[GPU]");
-} )
-#define LOGGER LogInfo
-#endif
-
 #ifndef LOGGER
 #define LOGGER std::cout
 #endif
 
-Cache::EventWeights* Cache::EventWeights::fSingleton = nullptr;
-
 // The constructor
-Cache::EventWeights::EventWeights(
-    std::size_t results, std::size_t parameters, std::size_t norms,
+Cache::Weight::CompactSpline::CompactSpline(
+    Cache::Weights::Results& weights,
+    Cache::Weights::Parameters& parameters,
+    Cache::Weights::Clamps& lowerClamps,
+    Cache::Weights::Clamps& upperClamps,
     std::size_t splines, std::size_t knots)
-    : fTotalBytes(0), fResultCount(results), fParameterCount(parameters),
-      fNormsReserved(norms), fNormsUsed(0),
+    : Cache::Weight::Base(weights,parameters),
+      fLowerClamp(lowerClamps), fUpperClamp(upperClamps),
+      fTotalBytes(0),
       fSplinesReserved(splines), fSplinesUsed(0),
       fSplineKnotsReserved(knots), fSplineKnotsUsed(0) {
-    if (fResultCount<1) throw std::runtime_error("No results in weight cache");
-    if (fParameterCount<1) throw std::runtime_error("No parameters");
+
     fSplineKnotsReserved = 2*fSplinesReserved + fSplineKnotsReserved;
-
-    LOGGER << "Cached Weights: input parameter count: "
-           << GetParameterCount()
-           << std::endl;
-    fTotalBytes += GetParameterCount()*sizeof(double); // fParameters
-    fTotalBytes += GetParameterCount()*sizeof(float);  // fLowerClamp
-    fTotalBytes += GetParameterCount()*sizeof(float);  // fUpperclamp
-
-    LOGGER << "Cached Weights: output results: "
-           << GetResultCount()
-           << std::endl;
-    fTotalBytes += GetResultCount()*sizeof(double);   // fResults
-    fTotalBytes += GetResultCount()*sizeof(double);   // fInitialValues;
-
-    LOGGER << "Cached Weights: reserved Normalizations: "
-           << GetNormsReserved()
-           << std::endl;
-    fTotalBytes += GetNormsReserved()*sizeof(int);   // fNormResult
-    fTotalBytes += GetNormsReserved()*sizeof(short); // fNormParameter
 
     LOGGER << "Reserved Splines: " << GetSplinesReserved() << std::endl;
     fTotalBytes += GetSplinesReserved()*sizeof(int);      // fSplineResult
@@ -62,7 +37,7 @@ Cache::EventWeights::EventWeights(
     fTotalBytes += (1+GetSplinesReserved())*sizeof(int);  // fSplineIndex
 
 #ifdef GPUINTERP_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in Cache::EventWeights::EventWeights
+#warning Using SLOW VALIDATION in Cache::Weight::CompactSpline::CompactSpline
         // Add validation code for the spline calculation.  This can be rather
         // slow, so do not use if it is not required.
     fTotalBytes += GetSplinesReserved()*sizeof(double);
@@ -75,35 +50,6 @@ Cache::EventWeights::EventWeights(
               << " GB" << std::endl;
 
     try {
-        // The mirrors are only on the CPU, so use vectors.  Initialize with
-        // lowest and highest floating point values.
-        fLowerMirror.reset(new std::vector<double>(
-                               GetParameterCount(),
-                               std::numeric_limits<double>::lowest()));
-        fUpperMirror.reset(new std::vector<double>(
-                               GetParameterCount(),
-                               std::numeric_limits<double>::max()));
-
-        // Get CPU/GPU memory for the parameter values.  The mirroring is done
-        // to every entry, so its also done on the GPU.  The parameters are
-        // copied every iteration, so pin the CPU memory into the page set.
-        fParameters.reset(new hemi::Array<double>(GetParameterCount()));
-        fLowerClamp.reset(new hemi::Array<float>(GetParameterCount(),false));
-        fUpperClamp.reset(new hemi::Array<float>(GetParameterCount(),false));
-
-        // Get CPU/GPU memory for the results and thier initial values.  The
-        // results are copied every time, so pin the CPU memory into the page
-        // set.  The initial values are seldom changed, so they are not
-        // pinned.
-        fResults.reset(new hemi::Array<double>(GetResultCount(),true));
-        fInitialValues.reset(new hemi::Array<double>(GetResultCount(),false));
-
-        // Get the CPU/GPU memory for the normalization index tables.  These
-        // are copied once during initialization so do not pin the CPU memory
-        // into the page set.
-        fNormResult.reset(new hemi::Array<int>(GetNormsReserved(),false));
-        fNormParameter.reset(new hemi::Array<short>(GetNormsReserved(),false));
-
         // Get the CPU/GPU memory for the spline index tables.  These are
         // copied once during initialization so do not pin the CPU memory into
         // the page set.
@@ -113,7 +59,7 @@ Cache::EventWeights::EventWeights(
         fSplineIndex.reset(new hemi::Array<int>(1+GetSplinesReserved(),false));
 
 #ifdef GPUINTERP_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in Cache::EventWeights::EventWeights
+#warning Using SLOW VALIDATION in Cache::Weight::CompactSpline::CompactSpline
         // Add validation code for the spline calculation.  This can be rather
         // slow, so do not use if it is not required.
         fSplineValue.reset(new hemi::Array<double>(GetSplinesReserved(),true));
@@ -133,154 +79,22 @@ Cache::EventWeights::EventWeights(
     // Initialize the caches.  Don't try to zero everything since the
     // caches can be huge.
     fSplineIndex->hostPtr()[0] = 0;
-    std::fill(fInitialValues->hostPtr(),
-              fInitialValues->hostPtr() + fInitialValues->size(),
-              1.0);
-    std::fill(fLowerClamp->hostPtr(),
-              fLowerClamp->hostPtr() + GetParameterCount(),
-              std::numeric_limits<float>::lowest());
-    std::fill(fUpperClamp->hostPtr(),
-              fUpperClamp->hostPtr() + GetParameterCount(),
-              std::numeric_limits<float>::max());
 
 }
 
 // The destructor
-Cache::EventWeights::~EventWeights() {}
-
-double Cache::EventWeights::GetResult(int i) const {
-    if (i < 0) throw;
-    if (GetResultCount() <= i) throw;
-    return fResults->hostPtr()[i];
-}
-
-void Cache::EventWeights::SetResult(int i, double v) {
-    if (i < 0) throw;
-    if (GetResultCount() <= i) throw;
-    fResults->hostPtr()[i] = v;
-}
-
-double* Cache::EventWeights::GetResultPointer(int i) const {
-    if (i < 0) throw;
-    if (GetResultCount() <= i) throw;
-    return (fResults->hostPtr() + i);
-}
-
-double  Cache::EventWeights::GetInitialValue(int i) const {
-    if (i < 0) throw;
-    if (GetResultCount() <= i) throw;
-    return fInitialValues->hostPtr()[i];
-}
-
-void Cache::EventWeights::SetInitialValue(int i, double v) {
-    if (i < 0) throw;
-    if (GetResultCount() <= i) throw;
-    fInitialValues->hostPtr()[i] = v;
-}
-
-double Cache::EventWeights::GetParameter(int parIdx) const {
-    if (parIdx < 0) throw;
-    if (GetParameterCount() <= parIdx) throw;
-    return fParameters->hostPtr()[parIdx];
-}
-
-void Cache::EventWeights::SetParameter(int parIdx, double value) {
-    if (parIdx < 0) throw;
-    if (GetParameterCount() <= parIdx) throw;
-    fParameters->hostPtr()[parIdx] = value;
-}
-
-double Cache::EventWeights::GetLowerMirror(int parIdx) {
-    if (parIdx < 0) throw;
-    if (GetParameterCount() <= parIdx) throw;
-    return fLowerMirror->at(parIdx);
-}
-
-void Cache::EventWeights::SetLowerMirror(int parIdx, double value) {
-    if (parIdx < 0) throw;
-    if (GetParameterCount() <= parIdx) throw;
-    fLowerMirror->at(parIdx) = value;
-}
-
-double Cache::EventWeights::GetUpperMirror(int parIdx) {
-    if (parIdx < 0) throw;
-    if (GetParameterCount() <= parIdx) throw;
-    return fUpperMirror->at(parIdx);
-}
-
-void Cache::EventWeights::SetUpperMirror(int parIdx, double value) {
-    if (parIdx < 0) throw;
-    if (GetParameterCount() <= parIdx) throw;
-    fUpperMirror->at(parIdx) = value;
-}
-
-double Cache::EventWeights::GetLowerClamp(int parIdx) {
-    if (parIdx < 0) throw;
-    if (GetParameterCount() <= parIdx) throw;
-    return fLowerClamp->hostPtr()[parIdx];
-}
-
-void Cache::EventWeights::SetLowerClamp(int parIdx, double value) {
-    if (parIdx < 0) throw;
-    if (GetParameterCount() <= parIdx) throw;
-    fLowerClamp->hostPtr()[parIdx] = value;
-}
-
-double Cache::EventWeights::GetUpperClamp(int parIdx) {
-    if (parIdx < 0) throw;
-    if (GetParameterCount() <= parIdx) throw;
-    return fUpperClamp->hostPtr()[parIdx];
-}
-
-void Cache::EventWeights::SetUpperClamp(int parIdx, double value) {
-    if (parIdx < 0) throw;
-    if (GetParameterCount() <= parIdx) throw;
-    fUpperClamp->hostPtr()[parIdx] = value;
-}
-
-// Reserve space for another normalization parameter.
-int Cache::EventWeights::ReserveNorm(int resIndex, int parIndex) {
-    if (resIndex < 0) {
-        LOGGER << "Invalid result index"
-               << std::endl;
-        throw std::runtime_error("Negative result index");
-    }
-    if (GetResultCount() <= resIndex) {
-        LOGGER << "Invalid result index"
-               << std::endl;
-        throw std::runtime_error("Result index out of bounds");
-    }
-    if (parIndex < 0) {
-        LOGGER << "Invalid parameter index"
-               << std::endl;
-        throw std::runtime_error("Negative parameter index");
-    }
-    if (GetParameterCount() <= parIndex) {
-        LOGGER << "Invalid result index"
-               << std::endl;
-        throw std::runtime_error("Parameter index out of bounds");
-    }
-    int newIndex = fNormsUsed++;
-    if (fNormsUsed > fNormsReserved) {
-        LOGGER << "Not enough space reserved for Norms"
-                  << std::endl;
-        throw std::runtime_error("Not enough space reserved for results");
-    }
-    fNormResult->hostPtr()[newIndex] = resIndex;
-    fNormParameter->hostPtr()[newIndex] = parIndex;
-    return newIndex;
-}
+Cache::Weight::CompactSpline::~CompactSpline() {}
 
 // Reserve space in the internal structures for spline with uniform knots.
 // The knot values will still need to be set using set spline knot.
-int Cache::EventWeights::ReserveSpline(
+int Cache::Weight::CompactSpline::ReserveSpline(
     int resIndex, int parIndex, double low, double high, int points) {
     if (resIndex < 0) {
         LOGGER << "Invalid result index"
                << std::endl;
         throw std::runtime_error("Negative result index");
     }
-    if (GetResultCount() <= resIndex) {
+    if (fWeights.size() <= resIndex) {
         LOGGER << "Invalid result index"
                << std::endl;
         throw std::runtime_error("Result index out of bounds");
@@ -290,8 +104,8 @@ int Cache::EventWeights::ReserveSpline(
                << std::endl;
         throw std::runtime_error("Negative parameter index");
     }
-    if (GetParameterCount() <= parIndex) {
-        LOGGER << "Invalid result index"
+    if (fParameters.size() <= parIndex) {
+        LOGGER << "Invalid parameter index"
                << std::endl;
         throw std::runtime_error("Parameter index out of bounds");
     }
@@ -339,7 +153,7 @@ int Cache::EventWeights::ReserveSpline(
     return newIndex;
 }
 
-void Cache::EventWeights::SetSplineKnot(
+void Cache::Weight::CompactSpline::SetSplineKnot(
     int sIndex, int kIndex, double value) {
     if (sIndex < 0) {
         LOGGER << "Requested spline index is negative"
@@ -366,7 +180,7 @@ void Cache::EventWeights::SetSplineKnot(
 }
 
 // A convenience function combining ReserveSpline and SetSplineKnot.
-int Cache::EventWeights::AddSpline(
+int Cache::Weight::CompactSpline::AddSpline(
     int resIndex, int parIndex, double low, double high,
     double points[], int nPoints) {
     int newIndex = ReserveSpline(resIndex,parIndex,low,high,nPoints);
@@ -377,7 +191,7 @@ int Cache::EventWeights::AddSpline(
     return newIndex;
 }
 
-int Cache::EventWeights::GetSplineParameterIndex(int sIndex) {
+int Cache::Weight::CompactSpline::GetSplineParameterIndex(int sIndex) {
     if (sIndex < 0) {
         throw std::runtime_error("Spline index invalid");
     }
@@ -387,12 +201,18 @@ int Cache::EventWeights::GetSplineParameterIndex(int sIndex) {
     return fSplineParameter->hostPtr()[sIndex];
 }
 
-double Cache::EventWeights::GetSplineParameter(int sIndex) {
+double Cache::Weight::CompactSpline::GetSplineParameter(int sIndex) {
     int i = GetSplineParameterIndex(sIndex);
-    return GetParameter(i);
+    if (i<0) {
+        throw std::runtime_error("Spine parameter index out of bounds");
+    }
+    if (fParameters.size() <= i) {
+        throw std::runtime_error("Spine parameter index out of bounds");
+    }
+    return fParameters.hostPtr()[i];
 }
 
-int Cache::EventWeights::GetSplineKnotCount(int sIndex) {
+int Cache::Weight::CompactSpline::GetSplineKnotCount(int sIndex) {
     if (sIndex < 0) {
         throw std::runtime_error("Spline index invalid");
     }
@@ -402,7 +222,7 @@ int Cache::EventWeights::GetSplineKnotCount(int sIndex) {
     return fSplineIndex->hostPtr()[sIndex+1]-fSplineIndex->hostPtr()[sIndex]-2;
 }
 
-double Cache::EventWeights::GetSplineLowerBound(int sIndex) {
+double Cache::Weight::CompactSpline::GetSplineLowerBound(int sIndex) {
     if (sIndex < 0) {
         throw std::runtime_error("Spline index invalid");
     }
@@ -413,7 +233,7 @@ double Cache::EventWeights::GetSplineLowerBound(int sIndex) {
     return fSplineKnots->hostPtr()[knotsIndex];
 }
 
-double Cache::EventWeights::GetSplineUpperBound(int sIndex) {
+double Cache::Weight::CompactSpline::GetSplineUpperBound(int sIndex) {
     if (sIndex < 0) {
         throw std::runtime_error("Spline index invalid");
     }
@@ -427,18 +247,29 @@ double Cache::EventWeights::GetSplineUpperBound(int sIndex) {
     return lower + (knotCount-1)/step;
 }
 
-double Cache::EventWeights::GetSplineLowerClamp(int sIndex) {
-    int parIndex = GetSplineParameterIndex(sIndex);
-    return GetLowerClamp(parIndex);
+double Cache::Weight::CompactSpline::GetSplineLowerClamp(int sIndex) {
+    int i = GetSplineParameterIndex(sIndex);
+    if (i<0) {
+        throw std::runtime_error("Spine lower clamp index out of bounds");
+    }
+    if (fLowerClamp.size() <= i) {
+        throw std::runtime_error("Spine lower clamp index out of bounds");
+    }
+    return fLowerClamp.hostPtr()[i];
 }
 
-double Cache::EventWeights::GetSplineUpperClamp(int sIndex) {
-    int parIndex = GetSplineParameterIndex(sIndex);
-    return GetUpperClamp(parIndex);
+double Cache::Weight::CompactSpline::GetSplineUpperClamp(int sIndex) {
+    int i = GetSplineParameterIndex(sIndex);
+    if (i<0) {
+        throw std::runtime_error("Spine upper clamp index out of bounds");
+    }
+    if (fUpperClamp.size() <= i) {
+        throw std::runtime_error("Spine upper clamp index out of bounds");
+    }
+    return fUpperClamp.hostPtr()[i];
 }
 
-
-double Cache::EventWeights::GetSplineKnot(int sIndex, int knot) {
+double Cache::Weight::CompactSpline::GetSplineKnot(int sIndex, int knot) {
     if (sIndex < 0) {
         throw std::runtime_error("Spline index invalid");
     }
@@ -461,13 +292,13 @@ double Cache::EventWeights::GetSplineKnot(int sIndex, int knot) {
 // NOOPs and should mostly not be called.
 
 #ifdef GPUINTERP_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in Cache::EventWeights::GetSplineValue
+#warning Using SLOW VALIDATION in Cache::Weight::CompactSpline::GetSplineValue
 // Get the intermediate spline result that is used to calculate an event
 // weight.  This can trigger a copy from the GPU to CPU, and must only be
 // enabled during validation.  Using this validation code also significantly
 // increases the amount of GPU memory required.  In a short sentence, "Do not
 // use this method."
-double Cache::EventWeights::GetSplineValue(int sIndex) {
+double Cache::Weight::CompactSpline::GetSplineValue(int sIndex) {
     if (sIndex < 0) {
         throw std::runtime_error("GetSplineValue: Spline index invalid");
     }
@@ -482,6 +313,8 @@ double Cache::EventWeights::GetSplineValue(int sIndex) {
 
 // Define CACHE_DEBUG to get lots of output from the host
 #undef CACHE_DEBUG
+
+#include "CacheAtomicMult.h"
 
 namespace {
     // Interpolate one point.  This is the only place that changes when the
@@ -628,99 +461,18 @@ namespace {
 
 #define PRINT_STEP 3
 
-    /// Do an atomic multiplication on the GPU.  On the GPU this uses
-    /// compare-and-set.  On the CPU, this is just a multiplication (no
-    /// mutex, so not atomic).
-    HEMI_DEV_CALLABLE_INLINE
-    double HEMIAtomicMult(double* address, const double v) {
-#ifndef HEMI_DEV_CODE
-        // When this isn't CUDA use a simple multiplication.
-        double old = *address;
-        *address = *address * v;
-        return old;
-#else
-        // When using CUDA use atomic compare-and-set to do an atomic
-        // multiplication.  This only sets the result if the value at
-        // address_as_ull is equal to "assumed" after the multiplication.  The
-        // comparison is done with integers because of CUDA.  The return value
-        // of atomicCAS is the original value at address_as_ull, so if it's
-        // equal to "assumed", then nothing changed the value at the address
-        // while the multiplication was being done.  If something changed the
-        // value at the address "old" will not equal "assumed", and then retry
-        // the multiplication.
-        unsigned long long int* address_as_ull =
-            (unsigned long long int*)address;
-        unsigned long long int old = *address_as_ull;
-        unsigned long long int assumed;
-        do {
-            assumed = old;
-            old = atomicCAS(address_as_ull,
-                            assumed,
-                            __double_as_longlong(
-                                v *  __longlong_as_double(assumed)));
-            // Note: uses integer comparison to avoid hang in case of NaN
-            // (since NaN != NaN)
-        } while (assumed != old);
-        return __longlong_as_double(old);
-#endif
-    }
-
-    // A function to be used as the kernen on a CPU or GPU.  This must be
-    // valid CUDA.  This sets all of the results to a fixed value.
-    HEMI_KERNEL_FUNCTION(HEMISetKernel,
-                         double* results,
-                         const double* values,
-                         const int NP) {
-        for (int i : hemi::grid_stride_range(0,NP)) {
-            results[i] = values[i];
-#ifndef HEMI_DEV_CODE
-#ifdef CACHE_DEBUG
-            if (i < PRINT_STEP) {
-                LOGGER << "Set kernel result " << i << " to " << results[i]
-                       << std::endl;
-            }
-#endif
-#endif
-        }
-    }
-
-    // A function to be used as the kernen on a CPU or GPU.  This must be
-    // valid CUDA.  This accumulates the normalization parameters into the
-    // results.
-    HEMI_KERNEL_FUNCTION(HEMINormsKernel,
-                         double* results,
-                         const double* params,
-                         const int* rIndex,
-                         const short* pIndex,
-                         const int NP) {
-        for (int i : hemi::grid_stride_range(0,NP)) {
-            HEMIAtomicMult(&results[rIndex[i]], params[pIndex[i]]);
-#ifndef HEMI_DEV_CODE
-#ifdef CACHE_DEBUG
-            if (rIndex[i] < PRINT_STEP) {
-                LOGGER << "Norms kernel " << i
-                       << " iEvt " << rIndex[i]
-                       << " iPar " << pIndex[i]
-                       << " = " << params[pIndex[i]]
-                       << std::endl;
-            }
-#endif
-#endif
-        }
-    }
-
     // A function to be used as the kernel on either the CPU or GPU.  This
     // must be valid CUDA coda.
     HEMI_KERNEL_FUNCTION(HEMISplinesKernel,
                          double* results,
 #ifdef GPUINTERP_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in Cache::EventWeights::HEMISplinesKernel
+#warning Using SLOW VALIDATION in Cache::Weight::CompactSpline::HEMISplinesKernel
                          // inputs/output for validation
                          double* splineValues,
 #endif
                          const double* params,
-                         const float* lowerClamp,
-                         const float* upperClamp,
+                         const double* lowerClamp,
+                         const double* upperClamp,
                          const float* knots,
                          const int* rIndex,
                          const short* pIndex,
@@ -737,10 +489,10 @@ namespace {
             float uc = upperClamp[pIndex[i]];
             if (x > uc) x = uc;
 #ifdef GPUINTERP_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in Cache::EventWeights::HEMISplinesKernel
+#warning Using SLOW VALIDATION in Cache::Weight::CompactSpline::HEMISplinesKernel
             splineValues[i] = x;
 #endif
-            HEMIAtomicMult(&results[rIndex[i]], x);
+            CacheAtomicMult(&results[rIndex[i]], x);
 #ifndef HEMI_DEV_CODE
 #ifdef CACHE_DEBUG
             if (rIndex[i] < PRINT_STEP) {
@@ -757,59 +509,17 @@ namespace {
     }
 }
 
-void Cache::EventWeights::UpdateResults() {
-    for (int i = 0; i<GetParameterCount(); ++i) {
-        double lm = fLowerMirror->at(i);
-        double um = fUpperMirror->at(i);
-        double v = GetParameter(i);
-        // Mirror the input value at lm and um.
-        int brake = 20;
-        while (v < lm || v > um) {
-            if (v < lm) v = lm + (lm - v);
-            if (v > um) v = um - (v - um);
-            if (--brake < 1) throw;
-        }
-        SetParameter(i,v);
-    }
-
-    HEMISetKernel setKernel;
-#ifdef FORCE_HOST_KERNEL
-    setKernel(   fResults->hostPtr(),
-                 fInitialValues->hostPtr(),
-                 GetResultCount());
-#else
-    hemi::launch(setKernel,
-                 fResults->writeOnlyPtr(),
-                 fInitialValues->readOnlyPtr(),
-                 GetResultCount());
-#endif
-
-    HEMINormsKernel normsKernel;
-#ifdef FORCE_HOST_KERNEL
-    normsKernel(fResults->hostPtr(),
-                fParameters->hostPtr(),
-                fNormResult->hostPtr(),
-                fNormParameter->hostPtr(),
-                GetNormsUsed());
-#else
-    hemi::launch(normsKernel,
-                 fResults->writeOnlyPtr(),
-                 fParameters->readOnlyPtr(),
-                 fNormResult->readOnlyPtr(),
-                 fNormParameter->readOnlyPtr(),
-                 GetNormsUsed());
-#endif
-
+bool Cache::Weight::CompactSpline::Apply() {
     HEMISplinesKernel splinesKernel;
 #ifdef FORCE_HOST_KERNEL
-    splinesKernel(fResults->hostPtr(),
+    splinesKernel(fWeights.hostPtr(),
 #ifdef GPUINTERP_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in Cache::EventWeights::UpdateResults
+#warning Using SLOW VALIDATION in Cache::Weight::CompactSpline::Apply
                   fSplineValue->hostPtr(),
 #endif
-                  fParameters->hostPtr(),
-                  fLowerClamp->hostPtr(),
-                  fUpperClamp->hostPtr(),
+                  fParameters.hostPtr(),
+                  fLowerClamp.hostPtr(),
+                  fUpperClamp.hostPtr(),
                   fSplineKnots->hostPtr(),
                   fSplineResult->hostPtr(),
                   fSplineParameter->hostPtr(),
@@ -818,14 +528,14 @@ void Cache::EventWeights::UpdateResults() {
         );
 #else
     hemi::launch(splinesKernel,
-                 fResults->writeOnlyPtr(),
+                 fWeights.writeOnlyPtr(),
 #ifdef GPUINTERP_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in Cache::EventWeights::UpdateResults
-                  fSplineValue->writeOnlyPtr(),
+#warning Using SLOW VALIDATION in Cache::Weight::CompactSpline::Apply
+                 fSplineValue->writeOnlyPtr(),
 #endif
-                 fParameters->readOnlyPtr(),
-                 fLowerClamp->readOnlyPtr(),
-                 fUpperClamp->readOnlyPtr(),
+                 fParameters.readOnlyPtr(),
+                 fLowerClamp.readOnlyPtr(),
+                 fUpperClamp.readOnlyPtr(),
                  fSplineKnots->readOnlyPtr(),
                  fSplineResult->readOnlyPtr(),
                  fSplineParameter->readOnlyPtr(),
@@ -834,16 +544,12 @@ void Cache::EventWeights::UpdateResults() {
         );
 #endif
 
-    // A simple way to copy from the device.  This needs to be done since
-    // other places using the values are referencing the contents of the host
-    // array by address, and that won't trigger the copy.  The copy also isn't
-    // thread safe.
-    fResults->hostPtr();
-
 #ifdef GPUINTERP_SLOW_VALIDATION
 #warning Using SLOW VALIDATION and copying spine values
     fSplineValue->hostPtr();
 #endif
+
+    return true;
 }
 
 // An MIT Style License

@@ -1,5 +1,5 @@
-#ifndef CacheEventWeights_hxx_seen
-#define CacheEventWeights_hxx_seen
+#ifndef CacheWeights_hxx_seen
+#define CacheWeights_hxx_seen
 
 #include "hemi/array.h"
 
@@ -8,13 +8,21 @@
 #include <vector>
 
 namespace Cache {
-    class EventWeights;
+    class Weights;
+    namespace Weight {
+        class Base;
+    }
 };
 
 /// A class to calculate and cache a bunch of events weights.
-class Cache::EventWeights {
+class Cache::Weights {
+public:
+    typedef hemi::Array<double> Results;
+    typedef hemi::Array<double> Parameters;
+    typedef hemi::Array<double> Clamps;
+
 private:
-    static EventWeights* fSingleton;  // You get one guess...
+    static Weights* fSingleton;  // You get one guess...
 
     /// The (approximate) amount of memory required on the GPU.
     std::size_t fTotalBytes;
@@ -22,7 +30,7 @@ private:
     /// An array of the calculated results that will be copied out of the
     /// class.  This is copied from the GPU to the CPU once per iteration.
     std::size_t    fResultCount;
-    std::unique_ptr<hemi::Array<double>> fResults;
+    std::unique_ptr<Results> fResults;
 
     /// An array of the initial value for each result.  It's copied from the
     /// CPU to the GPU once at the beginning.
@@ -31,7 +39,7 @@ private:
     /// The parameter values to be calculated for.  This is copied from the
     /// CPU to the GPU once per iteration.
     std::size_t fParameterCount;
-    std::unique_ptr<hemi::Array<double>> fParameters;
+    std::unique_ptr<Parameters> fParameters;
 
     /// The value of the parameter can run from +inf to -inf, but will be
     /// mirrored to be between the upper and lower mirrors.  These copied from
@@ -41,56 +49,26 @@ private:
 
     /// The minimum and maximum value of the result for this parameter.  These
     ///  copied from the CPU to the GPU once, and are then constant.
-    std::unique_ptr<hemi::Array<float>> fLowerClamp;
-    std::unique_ptr<hemi::Array<float>> fUpperClamp;
+    std::unique_ptr<Clamps> fLowerClamp;
+    std::unique_ptr<Clamps> fUpperClamp;
 
-    ///////////////////////////////////////////////////////////////////////
-    /// An array of indices into the results that go for each normalization.
-    /// This is copied from the CPU to the GPU once, and is then constant.
-    std::size_t fNormsReserved;
-    std::size_t fNormsUsed;
-    std::unique_ptr<hemi::Array<int>> fNormResult;
-
-    /// An array of indices into the parameters that go for each
-    /// normalization.  This is copied from the CPU to the GPU once, and is
-    /// then constant.
-    std::unique_ptr<hemi::Array<short>> fNormParameter;
-
-    ///////////////////////////////////////////////////////////////////////
-    /// An array of indices into the results that go for each spline.
-    /// This is copied from the CPU to the GPU once, and is then constant.
-    std::size_t fSplinesReserved;
-    std::size_t fSplinesUsed;
-    std::unique_ptr<hemi::Array<int>> fSplineResult;
-
-    /// An array of indices into the parameters that go for each spline.  This
-    /// is copied from the CPU to the GPU once, and is then constant.
-    std::unique_ptr<hemi::Array<short>> fSplineParameter;
-
-    /// An array of indices for the first knot of each spline.  This is copied
-    /// from the CPU to the GPU once, and is then constant.
-    std::unique_ptr<hemi::Array<int>> fSplineIndex;
-
-    /// An array of the knots to calculate the splines.  This is copied from
-    /// the CPU to the GPU once, and is then constant.
-    std::size_t    fSplineKnotsReserved;
-    std::size_t    fSplineKnotsUsed;
-    std::unique_ptr<hemi::Array<float>> fSplineKnots;
+    std::array<std::unique_ptr<Cache::Weight::Base>,5> fWeights;
 
 public:
-    static EventWeights* Get() {return fSingleton;}
-    static EventWeights* Create(std::size_t results,
-                                 std::size_t parameters,
-                                 std::size_t norms,
-                                 std::size_t splines,
-                                 std::size_t knots) {
+    static Weights* Get() {return fSingleton;}
+    static Weights* Create(std::size_t results,
+                           std::size_t parameters,
+                           std::size_t norms,
+                           std::size_t splines,
+                           std::size_t knots) {
         if (!fSingleton) {
-            fSingleton = new EventWeights(
+            fSingleton = new Weights(
                 results,parameters,norms,splines,knots);
         }
         return fSingleton;
     }
 
+private:
     // Construct the class.  This should allocate all the memory on the host
     // and on the GPU.  The "results" are the total number of results to be
     // calculated (one result per event, often >1E+6).  The "parameters" are
@@ -101,16 +79,17 @@ public:
     // results (typically a few per event).  The knots are the total number of
     // knots in all of the uniform splines (e.g. For 1000 splines with 7
     // knots for each spline, knots is 7000).
-    EventWeights(std::size_t results,
-                  std::size_t parameters,
-                  std::size_t norms,
-                  std::size_t splines,
-                  std::size_t knots);
+    Weights(std::size_t results,
+            std::size_t parameters,
+            std::size_t norms,
+            std::size_t splines,
+            std::size_t knots);
 
     // Deconstruct the class.  This should deallocate all the memory
     // everyplace.
-    ~EventWeights();
+    ~Weights();
 
+public:
     /// Return the approximate allocated memory (e.g. on the GPU).
     std::size_t GetResidentMemory() const {return fTotalBytes;}
 
@@ -120,29 +99,9 @@ public:
     /// Return the number of results that are used, and will be returned.
     std::size_t GetResultCount() const {return fResultCount;}
 
-    /// Return the number of normalization parameters that are reserved
-    std::size_t GetNormsReserved() {return fNormsReserved;}
-
-    /// Return the number of normalization parameters that are used.
-    std::size_t GetNormsUsed() {return fNormsUsed;}
-
-    /// Return the number of parameters using a spline with uniform knots that
-    /// are reserved.
-    std::size_t GetSplinesReserved() {return fSplinesReserved;}
-
-    /// Return the number of parameters using a spline with uniform knots that
-    /// are used.
-    std::size_t GetSplinesUsed() {return fSplinesUsed;}
-
-    /// Return the number of elements reserved to hold knots.
-    std::size_t GetSplineKnotsReserved() const {return fSplineKnotsReserved;}
-
-    /// Return the number of elements currently used to hold knots.
-    std::size_t GetSplineKnotsUsed() const {return fSplineKnotsUsed;}
-
     /// Calculate the results and save them for later use.  This copies the
     /// results from the GPU to the CPU.
-    void UpdateResults();
+    virtual bool Apply();
 
     /// Get the result for index i from host memory.  This will trigger copying
     /// the results from the device if that is necessary.
@@ -166,7 +125,6 @@ public:
     /// invalidate the fParameters on the device.
     void SetParameter(int parIdx, double value);
 
-
     /// Get the lower (upper) bound of the mirroring region for parameter
     /// index i in the host memory.
     double GetLowerMirror(int parIdx);
@@ -177,7 +135,6 @@ public:
     /// device.
     void SetLowerMirror(int parIdx, double value);
     void SetUpperMirror(int parIdx, double value);
-
 
     /// Get the lower (upper) clamp for parameter index i in the host memory.
     double GetLowerClamp(int parIdx);
@@ -210,41 +167,6 @@ public:
     // ReserveSpline for the particular spline, and the kIndex is the knot
     // that will be filled.
     void SetSplineKnot(int sIndex, int kIndex, double value);
-
-    // Get the index of the parameter for the spline at sIndex.
-    int GetSplineParameterIndex(int sIndex);
-
-    // Get the parameter value for the spline at sIndex.
-    double GetSplineParameter(int sIndex);
-
-    // Get the lower (upper) bound for the spline at sIndex.
-    double GetSplineLowerBound(int sIndex);
-    double GetSplineUpperBound(int sIndex);
-
-    // Get the lower (upper) clamp for the spline at sIndex.
-    double GetSplineLowerClamp(int sIndex);
-    double GetSplineUpperClamp(int sIndex);
-
-    // Get the number of knots in the spline at sIndex.
-    int GetSplineKnotCount(int sIndex);
-
-    // Get the function value for a knot in the spline at sIndex
-    double GetSplineKnot(int sIndex,int knot);
-
-    ////////////////////////////////////////////////////////////////////
-    // This section is for the validation methods.  They should mostly be
-    // NOOPs and should mostly not be called.
-#undef GPUINTERP_SLOW_VALIDATION /* Define to have slow validations */
-
-#ifdef GPUINTERP_SLOW_VALIDATION
-    double GetSplineValue(int sIndex);
-
-    /// An array of values for the result of each spline.  When this is
-    /// active, it is filled but the kernel, but only copied to the CPU if
-    /// it's access.  NOTE: Enabling this significantly slows the calculation
-    /// since it adds another large copy from the GPU.
-    std::unique_ptr<hemi::Array<double>> fSplineValue;
-#endif
 
 };
 

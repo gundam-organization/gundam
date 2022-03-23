@@ -5,7 +5,7 @@
 #include "Propagator.h"
 
 #ifdef GUNDAM_USING_CUDA
-#include "CacheEventWeights.h"
+#include "CacheWeights.h"
 #endif
 
 #include "FitParameterSet.h"
@@ -602,16 +602,16 @@ bool Propagator::buildGPUCaches() {
     }
 
     // Try to allocate the GPU
-    if (!Cache::EventWeights::Get()
+    if (!Cache::Weights::Get()
         && GlobalVariables::getEnableEventWeightCache()) {
         LogInfo << "Creating GPU spline cache" << std::endl;
-        Cache::EventWeights::Create(
+        Cache::Weights::Create(
             events,parameters,norms,splines,splinePoints);
     }
 
     // In case the GPU didn't get allocated.
-    if (!Cache::EventWeights::Get()) {
-        LogInfo << "No EventWeights for GPU"
+    if (!Cache::Weights::Get()) {
+        LogInfo << "No Weights for GPU"
                 << std::endl;
         return false;
     }
@@ -626,9 +626,9 @@ bool Propagator::buildGPUCaches() {
             // The reduce index to save the result for this event.
             int resultIndex = usedResults++;
             event.setResultIndex(resultIndex);
-            event.setResultPointer(Cache::EventWeights::Get()
+            event.setResultPointer(Cache::Weights::Get()
                                    ->GetResultPointer(resultIndex));
-            Cache::EventWeights::Get()
+            Cache::Weights::Get()
                 ->SetInitialValue(resultIndex,event.getTreeWeight());
             for (Dial* dial
                      : event.getRawDialPtrList()) {
@@ -644,7 +644,7 @@ bool Propagator::buildGPUCaches() {
                 int dialUsed = 0;
                 if(dial->getDialType() == DialType::Normalization) {
                     ++dialUsed;
-                    Cache::EventWeights::Get()
+                    Cache::Weights::Get()
                         ->ReserveNorm(resultIndex,parIndex);
                 }
                 SplineDial* sDial = dynamic_cast<SplineDial*>(dial);
@@ -655,18 +655,18 @@ bool Propagator::buildGPUCaches() {
                     double xMin = s->GetXmin();
                     double xMax = s->GetXmax();
                     int NP = CalculateUniformSplinePoints(s);
-                    int spline = Cache::EventWeights::Get()
+                    int spline = Cache::Weights::Get()
                         ->ReserveSpline(resultIndex,parIndex,
                                         xMin,xMax,
                                         NP);
                     double lowerClamp = dial->getMinDialResponse();
                     if (std::isfinite(lowerClamp)) {
-                        Cache::EventWeights::Get()
+                        Cache::Weights::Get()
                             ->SetLowerClamp(parIndex,lowerClamp);
                     }
                     double upperClamp = dial->getMaxDialResponse();
                     if (std::isfinite(upperClamp)) {
-                        Cache::EventWeights::Get()
+                        Cache::Weights::Get()
                             ->SetUpperClamp(parIndex,upperClamp);
                     }
                     if (lowerClamp > upperClamp) {
@@ -686,16 +686,16 @@ bool Propagator::buildGPUCaches() {
                     for (int i=0; i<NP; ++i) {
                         double x = xMin + i*(xMax-xMin)/(NP-1);
                         double y = s->Eval(x);
-                        Cache::EventWeights::Get()
+                        Cache::Weights::Get()
                             ->SetSplineKnot(spline,i, y);
                     }
 
                     if (sDial->getUseMirrorDial()) {
                         double xLow = sDial->getMirrorLowEdge();
                         double xHigh = xLow + sDial->getMirrorRange();
-                        Cache::EventWeights::Get()
+                        Cache::Weights::Get()
                             ->SetLowerMirror(parIndex,xLow);
-                        Cache::EventWeights::Get()
+                        Cache::Weights::Get()
                             ->SetUpperMirror(parIndex,xHigh);
                     }
                 }
@@ -704,23 +704,23 @@ bool Propagator::buildGPUCaches() {
         }
     }
 
-    if (usedResults == Cache::EventWeights::Get()->GetResultCount()) {
+    if (usedResults == Cache::Weights::Get()->GetResultCount()) {
         return true;
     }
 
     LogInfo << "GPU Used Results:     " << usedResults << std::endl;
     LogInfo << "GPU Expected Results: " <<
-        Cache::EventWeights::Get()->GetResultCount() << std::endl;
+        Cache::Weights::Get()->GetResultCount() << std::endl;
     throw std::runtime_error("Probable problem putting parameters in cache");
 }
 
 bool Propagator::fillGPUCaches() {
-    Cache::EventWeights* gpu = Cache::EventWeights::Get();
+    Cache::Weights* gpu = Cache::Weights::Get();
     if (!gpu) return false;
     for (auto& par : _gpuParameterIndex_ ) {
         gpu->SetParameter(par.second, par.first->getParameterValue());
     }
-    gpu->UpdateResults();
+    gpu->Apply();
 #ifdef GPUINTERP_SLOW_VALIDATION
 #warning GPUINTERP_SLOW_VALIDATION is being used in Propagator::fillGPUCaches
     return false;
