@@ -836,8 +836,14 @@ void GPUInterp::CachedWeights::UpdateResults() {
 
     // A simple way to copy from the device.  This needs to be done since
     // other places using the values are referencing the contents of the host
-    // array by address, and that won't trigger the copy.
+    // array by address, and that won't trigger the copy.  The copy also isn't
+    // thread safe.
     fResults->hostPtr();
+
+#ifdef GPUINTERP_SLOW_VALIDATION
+#warning Using SLOW VALIDATION and copying spine values
+    fSplineValue->hostPtr();
+#endif
 }
 
 // An MIT Style License
