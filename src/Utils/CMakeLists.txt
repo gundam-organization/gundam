@@ -28,16 +28,7 @@ set(HEADERS
         include/YamlUtils.h
         include/YamlUtils.impl.h
         include/GundamGreetings.h
-        include/GPUInterpCachedWeights.h
         )
-
-if(CMAKE_CUDA_COMPILER)
-  cmessage(STATUS "CUDA utilities being compiled")
-  set(SRCFILES ${SRCFILES} src/GPUInterpCachedWeights.cu)
-else(CMAKE_CUDA_COMPILER)
-  cmessage(STATUS "CUDA utilities are not being compiled")
-  set(SRCFILES ${SRCFILES} src/GPUInterpCachedWeights.cpp)
-endif(CMAKE_CUDA_COMPILER)
 
 if( USE_STATIC_LINKS STREQUAL "1" )
   add_library(GundamUtils STATIC ${SRCFILES})

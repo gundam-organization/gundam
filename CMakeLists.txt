@@ -297,6 +297,7 @@ set( MODULES
         anaevents
         FitParameters
         FitSamples
+        CacheManager
         ErrorPropagator
         Fitter
 )
