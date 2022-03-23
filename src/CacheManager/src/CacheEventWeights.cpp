@@ -1,4 +1,4 @@
-#include "GPUInterpCachedWeights.h"
+#include "CacheEventWeights.h"
 
 #include <algorithm>
 #include <iostream>

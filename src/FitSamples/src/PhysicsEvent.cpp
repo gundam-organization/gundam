@@ -9,7 +9,7 @@
 #ifdef GUNDAM_USING_CUDA
 #if defined(GPUINTERP_SLOW_VALIDATION)||defined(GPU_INITIAL_VALUE_SANITY_CHECK)
 #warning GPUINTERP_SLOW_VALIDATION adding extra include files
-#include "GPUInterpCachedWeights.h"
+#include "CacheEventWeights.h"
 #include "SplineDial.h"
 #endif
 #endif

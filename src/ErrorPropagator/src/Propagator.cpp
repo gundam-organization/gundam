@@ -5,7 +5,7 @@
 #include "Propagator.h"
 
 #ifdef GUNDAM_USING_CUDA
-#include "GPUInterpCachedWeights.h"
+#include "CacheEventWeights.h"
 #endif
 
 #include "FitParameterSet.h"
