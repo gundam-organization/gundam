@@ -1,6 +1,6 @@
 # GUNDAM — 風をあつめて
 
-![](./resources/images/banner.jpg)
+![](./resources/images/banner2.png)
 
 GUNDAM, for *Generic fitter for Upgraded Near Detector Analysis Methods*, is a suite
 of applications which aims at performing various statistical analysis with different
