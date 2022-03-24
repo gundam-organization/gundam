@@ -73,7 +73,7 @@ public:
   virtual void buildResponseSplineCache();
   virtual void fillResponseCache() = 0;
 
-#ifdef GPUINTERP_SLOW_VALIDATION
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
   // Debugging.  This is only meaningful when the GPU is filling the spline
   // value cache (only filled during validation).  It's a nullptr otherwise,
   // or not included in the object.

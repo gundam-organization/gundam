@@ -138,7 +138,7 @@ public:
     // This section is for the validation methods.  They should mostly be
     // NOOPs and should mostly not be called.
 
-#ifdef GPUINTERP_SLOW_VALIDATION
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
     double* GetCachePointer(int sIndex);
 
     /// An array of values for the result of each spline.  When this is
