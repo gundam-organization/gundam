@@ -13,6 +13,7 @@ set(SRCFILES
         src/NormalizationDial.cpp
         src/SplineDial.cpp
         src/GraphDial.cpp
+        src/NestedDial.cpp
         )
 
 if( USE_STATIC_LINKS STREQUAL "1" )

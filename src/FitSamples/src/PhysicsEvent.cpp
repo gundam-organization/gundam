@@ -139,9 +139,17 @@ void PhysicsEvent::resetEventWeight(){
 }
 void PhysicsEvent::reweightUsingDialCache(){
   this->resetEventWeight();
+
+  // bare dials
   for( auto& dial : _rawDialPtrList_ ){
     if( dial == nullptr ) return;
     this->addEventWeight( dial->evalResponse() );
+  }
+
+  // nested dials
+  for( auto& nestedDialEntry : _nestedDialRefList_ ){
+    if( nestedDialEntry.first == nullptr ) return;
+    this->addEventWeight( nestedDialEntry.first->eval(nestedDialEntry.second) );
   }
 }
 
@@ -256,6 +264,15 @@ void PhysicsEvent::trimDialCache(){
   }
   _rawDialPtrList_.resize(newSize);
   _rawDialPtrList_.shrink_to_fit();
+
+  // nested dials
+  newSize = 0;
+  for( auto& nestedDial : _nestedDialRefList_ ){
+    if( nestedDial.first == nullptr ) break;
+    newSize++;
+  }
+  _nestedDialRefList_.resize(newSize);
+  _nestedDialRefList_.shrink_to_fit();
 }
 void PhysicsEvent::addDialRefToCache(Dial* dialPtr_){
   if( dialPtr_ == nullptr ) return; // don't store null ptr
@@ -270,6 +287,23 @@ void PhysicsEvent::addDialRefToCache(Dial* dialPtr_){
 
   // no new slot available:
   _rawDialPtrList_.emplace_back(dialPtr_);
+}
+void PhysicsEvent::addNestedDialRefToCache(NestedDial* nestedDialPtr_, const std::vector<Dial*>& dialPtrList_) {
+  if (nestedDialPtr_ == nullptr) return; // don't store null ptr
+
+  // fetch the next free slot:
+  for (auto &nestedDialEntry: _nestedDialRefList_) {
+    if (nestedDialEntry.first == nullptr) {
+      nestedDialEntry.first = nestedDialPtr_;
+      nestedDialEntry.second = dialPtrList_;
+      return;
+    }
+  }
+
+  // no new slot available:
+  _nestedDialRefList_.emplace_back();
+  _nestedDialRefList_.back().first = nestedDialPtr_;
+  _nestedDialRefList_.back().second = dialPtrList_;
 }
 std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const GenericToolbox::LeafHolder&)>> PhysicsEvent::generateLeavesDictionary(bool disableArrays_) const{
   std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const GenericToolbox::LeafHolder&)>> out;
