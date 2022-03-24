@@ -4,11 +4,15 @@
 #include "CacheWeights.h"
 #include "WeightBase.h"
 
+#include "SplineDial.h"
 #include "hemi/array.h"
+
+#include <TSpline.h>
 
 #include <cstdint>
 #include <memory>
 #include <vector>
+
 
 namespace Cache {
     namespace Weight {
@@ -20,11 +24,8 @@ namespace Cache {
 class Cache::Weight::CompactSpline:
     public Cache::Weight::Base {
 private:
-    Cache::Weights::Clamps& fLowerClamp;
-    Cache::Weights::Clamps& fUpperClamp;
-
-    /// The (approximate) amount of memory required on the GPU.
-    std::size_t fTotalBytes;
+    Cache::Parameters::Clamps& fLowerClamp;
+    Cache::Parameters::Clamps& fUpperClamp;
 
     ///////////////////////////////////////////////////////////////////////
     /// An array of indices into the results that go for each spline.
@@ -48,6 +49,10 @@ private:
     std::unique_ptr<hemi::Array<float>> fSplineKnots;
 
 public:
+    // A static method to return the number of knots that will be used by this
+    // spline.
+    static int FindPoints(const TSpline3* s);
+
     // Construct the class.  This should allocate all the memory on the host
     // and on the GPU.  The "results" are the total number of results to be
     // calculated (one result per event, often >1E+6).  The "parameters" are
@@ -59,9 +64,9 @@ public:
     // knots in all of the uniform splines (e.g. For 1000 splines with 7
     // knots for each spline, knots is 7000).
     CompactSpline(Cache::Weights::Results& results,
-                  Cache::Weights::Parameters& parameters,
-                  Cache::Weights::Clamps& lowerClamps,
-                  Cache::Weights::Clamps& upperClamps,
+                  Cache::Parameters::Values& parameters,
+                  Cache::Parameters::Clamps& lowerClamps,
+                  Cache::Parameters::Clamps& upperClamps,
                   std::size_t splines,
                   std::size_t knots);
 
@@ -92,12 +97,6 @@ public:
     int ReserveSpline(int resIndex, int parIndex,
                       double low, double high, int points);
 
-    // Add a new spline with uniform knot spacing to calculate a result. This
-    // returns the index of the new spline, and fills the internal tables.
-    int AddSpline(int resIndex, int parIndex,
-                  double low, double high,
-                  double points[], int nPoints);
-
     // Set a knot for a spline with uniform spacing.  This takes the index of
     // the spline that this spline will fill and the index of the control
     // point to be filled in that spline.  This can only be used after
@@ -105,6 +104,10 @@ public:
     // ReserveSpline for the particular spline, and the kIndex is the knot
     // that will be filled.
     void SetSplineKnot(int sIndex, int kIndex, double value);
+
+    /// Add a spline for the dial.  This may modify the dial if debugging is
+    /// enabled.  This uses ReserveSpline and SetSplineKnot.
+    void AddSpline(int resultIndex, int parIndex, SplineDial* dial);
 
     // Get the index of the parameter for the spline at sIndex.
     int GetSplineParameterIndex(int sIndex);
@@ -129,10 +132,9 @@ public:
     ////////////////////////////////////////////////////////////////////
     // This section is for the validation methods.  They should mostly be
     // NOOPs and should mostly not be called.
-#undef GPUINTERP_SLOW_VALIDATION /* Define to have slow validations */
 
 #ifdef GPUINTERP_SLOW_VALIDATION
-    double GetSplineValue(int sIndex);
+    double* GetCachePointer(int sIndex);
 
     /// An array of values for the result of each spline.  When this is
     /// active, it is filled but the kernel, but only copied to the CPU if

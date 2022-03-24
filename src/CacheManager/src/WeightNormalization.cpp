@@ -17,14 +17,16 @@
 // The constructor
 Cache::Weight::Normalization::Normalization(
     Cache::Weights::Results& weights,
-    Cache::Weights::Parameters& parameters,
+    Cache::Parameters::Values& parameters,
     std::size_t norms)
-    : Cache::Weight::Base(weights,parameters),
-      fTotalBytes(0),fNormsReserved(norms), fNormsUsed(0) {
+    : Cache::Weight::Base("normalization",weights,parameters),
+      fNormsReserved(norms), fNormsUsed(0) {
 
     LOGGER << "Cached Weights: reserved Normalizations: "
            << GetNormsReserved()
            << std::endl;
+    if (GetNormsReserved() < 1) return;
+
     fTotalBytes += GetNormsReserved()*sizeof(int);   // fNormResult
     fTotalBytes += GetNormsReserved()*sizeof(short); // fNormParameter
 
@@ -111,6 +113,7 @@ namespace {
 }
 
 bool Cache::Weight::Normalization::Apply() {
+    if (GetNormsUsed() < 1) return false;
     HEMINormsKernel normsKernel;
 #ifdef FORCE_HOST_KERNEL
     normsKernel(fWeights.hostPtr(),

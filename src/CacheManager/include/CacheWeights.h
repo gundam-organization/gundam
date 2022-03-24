@@ -1,6 +1,8 @@
 #ifndef CacheWeights_hxx_seen
 #define CacheWeights_hxx_seen
 
+#include "CacheParameters.h"
+
 #include "hemi/array.h"
 
 #include <cstdint>
@@ -18,11 +20,12 @@ namespace Cache {
 class Cache::Weights {
 public:
     typedef hemi::Array<double> Results;
-    typedef hemi::Array<double> Parameters;
-    typedef hemi::Array<double> Clamps;
 
 private:
-    static Weights* fSingleton;  // You get one guess...
+    // Save the event weight cache reference for later use
+    Cache::Parameters::Values& fParameters;
+    Cache::Parameters::Clamps& fLowerClamp;
+    Cache::Parameters::Clamps& fUpperClamp;
 
     /// The (approximate) amount of memory required on the GPU.
     std::size_t fTotalBytes;
@@ -36,39 +39,14 @@ private:
     /// CPU to the GPU once at the beginning.
     std::unique_ptr<hemi::Array<double>> fInitialValues;
 
-    /// The parameter values to be calculated for.  This is copied from the
-    /// CPU to the GPU once per iteration.
-    std::size_t fParameterCount;
-    std::unique_ptr<Parameters> fParameters;
-
-    /// The value of the parameter can run from +inf to -inf, but will be
-    /// mirrored to be between the upper and lower mirrors.  These copied from
-    /// the CPU to the GPU once, and are then constant.
-    std::unique_ptr<std::vector<double>> fLowerMirror;
-    std::unique_ptr<std::vector<double>> fUpperMirror;
-
-    /// The minimum and maximum value of the result for this parameter.  These
-    ///  copied from the CPU to the GPU once, and are then constant.
-    std::unique_ptr<Clamps> fLowerClamp;
-    std::unique_ptr<Clamps> fUpperClamp;
-
-    std::array<std::unique_ptr<Cache::Weight::Base>,5> fWeights;
+    /// An array of pointers to objects that will calculate the weights
+    /// (e.g. WeightNormalization and WeightUniformSpline).  The objects are
+    /// NOT owned by this array (they are owned by a unique_ptr's elsewyr in
+    /// the code), but pointers are needed for efficiency.
+    int fWeightCalculators{0};
+    std::array<Cache::Weight::Base*,5> fWeightCalculator;
 
 public:
-    static Weights* Get() {return fSingleton;}
-    static Weights* Create(std::size_t results,
-                           std::size_t parameters,
-                           std::size_t norms,
-                           std::size_t splines,
-                           std::size_t knots) {
-        if (!fSingleton) {
-            fSingleton = new Weights(
-                results,parameters,norms,splines,knots);
-        }
-        return fSingleton;
-    }
-
-private:
     // Construct the class.  This should allocate all the memory on the host
     // and on the GPU.  The "results" are the total number of results to be
     // calculated (one result per event, often >1E+6).  The "parameters" are
@@ -79,25 +57,28 @@ private:
     // results (typically a few per event).  The knots are the total number of
     // knots in all of the uniform splines (e.g. For 1000 splines with 7
     // knots for each spline, knots is 7000).
-    Weights(std::size_t results,
-            std::size_t parameters,
-            std::size_t norms,
-            std::size_t splines,
-            std::size_t knots);
+    Weights(Cache::Parameters::Values& parameters,
+            Cache::Parameters::Clamps& lowerClamp,
+            Cache::Parameters::Clamps& upperClamp,
+            std::size_t results);
 
     // Deconstruct the class.  This should deallocate all the memory
     // everyplace.
     ~Weights();
 
-public:
+    Results& GetWeights() {return *fResults;}
+
     /// Return the approximate allocated memory (e.g. on the GPU).
     std::size_t GetResidentMemory() const {return fTotalBytes;}
 
-    /// Return the number of independent parameters.
-    std::size_t GetParameterCount() const {return fParameterCount;}
-
     /// Return the number of results that are used, and will be returned.
     std::size_t GetResultCount() const {return fResultCount;}
+
+    int AddWeightCalculator(Cache::Weight::Base* v) {
+        int index = fWeightCalculators++;
+        fWeightCalculator.at(index) = v;
+        return index;
+    }
 
     /// Calculate the results and save them for later use.  This copies the
     /// results from the GPU to the CPU.
@@ -116,58 +97,6 @@ public:
     /// Get/Set the initial value for result i.
     double  GetInitialValue(int i) const;
     void SetInitialValue(int i, double v);
-
-    /// Get the parameter value for index i from host memory.  This will
-    /// trigger copying the results from the device if that is necessary.
-    double GetParameter(int parIdx) const;
-
-    /// Set the parameter value for index i in the host memory.  This will
-    /// invalidate the fParameters on the device.
-    void SetParameter(int parIdx, double value);
-
-    /// Get the lower (upper) bound of the mirroring region for parameter
-    /// index i in the host memory.
-    double GetLowerMirror(int parIdx);
-    double GetUpperMirror(int parIdx);
-
-    /// Set the lower (upper) bound of the mirroring region for parameter
-    /// index i in the host memory.  This will invalidate the mirrors on the
-    /// device.
-    void SetLowerMirror(int parIdx, double value);
-    void SetUpperMirror(int parIdx, double value);
-
-    /// Get the lower (upper) clamp for parameter index i in the host memory.
-    double GetLowerClamp(int parIdx);
-    double GetUpperClamp(int parIdx);
-
-    /// Set the lower (upper) clamp for parameter index i in the host memory.
-    /// This will invalidate the clamps on the device.
-    void SetLowerClamp(int parIdx, double value);
-    void SetUpperClamp(int parIdx, double value);
-
-    /// Add a normalization parameter.
-    int ReserveNorm(int resIndex, int parIndex);
-
-    // Reserve space for a spline with uniform knot spacing.  This updates the
-    // parameter index and data index arrays.  It returns the index for the
-    // new spline.
-    int ReserveSpline(int resIndex, int parIndex,
-                      double low, double high, int points);
-
-    // Add a new spline with uniform knot spacing to calculate a result. This
-    // returns the index of the new spline, and fills the internal tables.
-    int AddSpline(int resIndex, int parIndex,
-                  double low, double high,
-                  double points[], int nPoints);
-
-    // Set a knot for a spline with uniform spacing.  This takes the index of
-    // the spline that this spline will fill and the index of the control
-    // point to be filled in that spline.  This can only be used after
-    // ReserveSpline has been called.  The sIndex is the value returned by
-    // ReserveSpline for the particular spline, and the kIndex is the knot
-    // that will be filled.
-    void SetSplineKnot(int sIndex, int kIndex, double value);
-
 };
 
 // An MIT Style License

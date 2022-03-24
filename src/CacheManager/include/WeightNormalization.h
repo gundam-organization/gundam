@@ -18,8 +18,6 @@ namespace Cache {
 /// A class to apply a normalization to the cached event weights.
 class Cache::Weight::Normalization: public Cache::Weight::Base {
 private:
-    /// The (approximate) amount of memory required on the GPU.
-    std::size_t fTotalBytes;
 
     ///////////////////////////////////////////////////////////////////////
     /// An array of indices into the results that go for each normalization.
@@ -39,7 +37,7 @@ public:
     // and on the GPU.  The normalizations are applied to the event weights
     // which are managed by the Weights class.
     Normalization(Cache::Weights::Results& weights,
-                  Cache::Weights::Parameters& parameters,
+                  Cache::Parameters::Values& parameters,
               std::size_t norms);
 
     // Deconstruct the class.  This should deallocate all the memory

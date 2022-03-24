@@ -19,22 +19,24 @@
 // The constructor
 Cache::Weight::CompactSpline::CompactSpline(
     Cache::Weights::Results& weights,
-    Cache::Weights::Parameters& parameters,
-    Cache::Weights::Clamps& lowerClamps,
-    Cache::Weights::Clamps& upperClamps,
+    Cache::Parameters::Values& parameters,
+    Cache::Parameters::Clamps& lowerClamps,
+    Cache::Parameters::Clamps& upperClamps,
     std::size_t splines, std::size_t knots)
-    : Cache::Weight::Base(weights,parameters),
+    : Cache::Weight::Base("compactSpline",weights,parameters),
       fLowerClamp(lowerClamps), fUpperClamp(upperClamps),
-      fTotalBytes(0),
       fSplinesReserved(splines), fSplinesUsed(0),
       fSplineKnotsReserved(knots), fSplineKnotsUsed(0) {
 
-    fSplineKnotsReserved = 2*fSplinesReserved + fSplineKnotsReserved;
+    LOGGER << "Reserved " << GetName() << " Splines: "
+           << GetSplinesReserved() << std::endl;
+    if (GetSplinesReserved() < 1) return;
 
-    LOGGER << "Reserved Splines: " << GetSplinesReserved() << std::endl;
     fTotalBytes += GetSplinesReserved()*sizeof(int);      // fSplineResult
     fTotalBytes += GetSplinesReserved()*sizeof(short);    // fSplineParameter
     fTotalBytes += (1+GetSplinesReserved())*sizeof(int);  // fSplineIndex
+
+    fSplineKnotsReserved = 2*fSplinesReserved + fSplineKnotsReserved;
 
 #ifdef GPUINTERP_SLOW_VALIDATION
 #warning Using SLOW VALIDATION in Cache::Weight::CompactSpline::CompactSpline
@@ -79,11 +81,33 @@ Cache::Weight::CompactSpline::CompactSpline(
     // Initialize the caches.  Don't try to zero everything since the
     // caches can be huge.
     fSplineIndex->hostPtr()[0] = 0;
-
 }
 
 // The destructor
 Cache::Weight::CompactSpline::~CompactSpline() {}
+
+int Cache::Weight::CompactSpline::FindPoints(const TSpline3* s) {
+    return 2*s->GetNp() + 1; // Oversample for now!
+}
+
+void Cache::Weight::CompactSpline::AddSpline(int resultIndex,
+                                             int parIndex,
+                                             SplineDial* sDial) {
+    const TSpline3* s = sDial->getSplinePtr();
+    int NP = Cache::Weight::CompactSpline::FindPoints(s);
+    double xMin = s->GetXmin();
+    double xMax = s->GetXmax();
+    int sIndex = ReserveSpline(resultIndex,parIndex,xMin,xMax,NP);
+#ifdef GPUINTERP_SLOW_VALIDATION
+#warning Using SLOW VALIDATION in Cache::Weight::CompactSpline::AddSpline
+    sDial->setGPUCachePointer(GetCachePointer(sIndex));
+#endif
+    for (int i=0; i<NP; ++i) {
+        double x = xMin + i*(xMax-xMin)/(NP-1);
+        double y = s->Eval(x);
+        SetSplineKnot(sIndex,i,y);
+    }
+}
 
 // Reserve space in the internal structures for spline with uniform knots.
 // The knot values will still need to be set using set spline knot.
@@ -177,18 +201,6 @@ void Cache::Weight::CompactSpline::SetSplineKnot(
         std::runtime_error("Invalid control point being set");
     }
     fSplineKnots->hostPtr()[knotIndex] = value;
-}
-
-// A convenience function combining ReserveSpline and SetSplineKnot.
-int Cache::Weight::CompactSpline::AddSpline(
-    int resIndex, int parIndex, double low, double high,
-    double points[], int nPoints) {
-    int newIndex = ReserveSpline(resIndex,parIndex,low,high,nPoints);
-    int knotIndex = fSplineIndex->hostPtr()[newIndex] + 2;
-    for (int p = 0; p<nPoints; ++p) {
-        fSplineKnots->hostPtr()[knotIndex+p] = points[p];
-    }
-    return newIndex;
 }
 
 int Cache::Weight::CompactSpline::GetSplineParameterIndex(int sIndex) {
@@ -298,7 +310,7 @@ double Cache::Weight::CompactSpline::GetSplineKnot(int sIndex, int knot) {
 // enabled during validation.  Using this validation code also significantly
 // increases the amount of GPU memory required.  In a short sentence, "Do not
 // use this method."
-double Cache::Weight::CompactSpline::GetSplineValue(int sIndex) {
+double* Cache::Weight::CompactSpline::GetCachePointer(int sIndex) {
     if (sIndex < 0) {
         throw std::runtime_error("GetSplineValue: Spline index invalid");
     }
@@ -307,7 +319,7 @@ double Cache::Weight::CompactSpline::GetSplineValue(int sIndex) {
     }
     // This can trigger a *slow* copy of the spline values from the GPU to the
     // CPU.
-    return fSplineValue->hostPtr()[sIndex];
+    return fSplineValue->hostPtr() + sIndex;
 }
 #endif
 
@@ -510,6 +522,7 @@ namespace {
 }
 
 bool Cache::Weight::CompactSpline::Apply() {
+    if (GetSplinesUsed() < 1) return false;
     HEMISplinesKernel splinesKernel;
 #ifdef FORCE_HOST_KERNEL
     splinesKernel(fWeights.hostPtr(),

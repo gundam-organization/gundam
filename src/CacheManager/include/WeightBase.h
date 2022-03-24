@@ -2,8 +2,11 @@
 #define WeightBase_hxx_seen
 
 #include "CacheWeights.h"
+#include "CacheParameters.h"
 
 #include "hemi/array.h"
+
+#include <string>
 
 namespace Cache {
     namespace Weight {
@@ -17,9 +20,10 @@ public:
     // Construct the class.  This should allocate all the memory on the host
     // and on the GPU.  The normalizations are applied to the event weights
     // which are managed by the EventWeights class.
-    Base(Cache::Weights::Results& weights,
-         Cache::Weights::Parameters& parameters)
-        : fWeights(weights), fParameters(parameters) {}
+    Base(std::string name,
+         Cache::Weights::Results& weights,
+         Cache::Parameters::Values& parameters)
+        : fName(name), fWeights(weights), fParameters(parameters) {}
 
     // Deconstruct the class.  This should deallocate all the memory
     // everyplace.
@@ -29,13 +33,23 @@ public:
     /// to modify the weights cache.
     virtual bool Apply() = 0;
 
+    std::size_t GetResidentMemory() {return fTotalBytes;}
+
+    std::string GetName() {return fName;}
+
 protected:
+
+    // The name of the weight calculator.
+    std::string fName;
 
     // Save the event weight cache reference for later use
     Cache::Weights::Results& fWeights;
 
     // Save the parameter cache reference for later use
-    Cache::Weights::Parameters& fParameters;
+    Cache::Parameters::Values& fParameters;
+
+    std::size_t fTotalBytes{0};
+
 };
 
 // An MIT Style License
