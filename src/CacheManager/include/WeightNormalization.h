@@ -15,7 +15,9 @@ namespace Cache {
     }
 }
 
-/// A class to apply a normalization to the cached event weights.
+/// A class apply a normalization parameter to the cached event weights.  This
+/// will be used in Cache::Weights to run the GPU for this type of
+/// reweighting.
 class Cache::Weight::Normalization: public Cache::Weight::Base {
 private:
 

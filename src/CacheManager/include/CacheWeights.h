@@ -16,7 +16,9 @@ namespace Cache {
     }
 };
 
-/// A class to calculate and cache a bunch of events weights.
+/// A class to calculate and cache a bunch of events weights.  This is where
+/// the actual calculation is controled for the GPU.  It's used by the cache
+/// manager when the GPU needs to be fired up.
 class Cache::Weights {
 public:
     typedef hemi::Array<double> Results;

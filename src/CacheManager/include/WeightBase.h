@@ -14,7 +14,9 @@ namespace Cache {
     }
 }
 
-/// A base class to apply a weight to the cached event weights.
+/// A base class for the weight calculators.  This holds the pointer to the
+/// weights being accumulated, the input parameter values, and the name of the
+/// weight calculator.
 class Cache::Weight::Base {
 public:
     // Construct the class.  This should allocate all the memory on the host

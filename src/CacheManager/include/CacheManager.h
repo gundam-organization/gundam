@@ -17,20 +17,24 @@ namespace Cache {
 
 class FitParameter;
 
+/// Manage the cache calculations on the GPU.  This will work even when there
+/// isn't a GPU, but it's really slow on the CPU.  This is a singleton.
 class Cache::Manager {
 public:
     // Get the pointer to the cache manager.  This will be a nullptr if the
     // cache is not being used.
     static Manager* Get() {return fSingleton;}
 
-    // Fill the cache for the current iteration.
+    // Fill the cache for the current iteration.  This needs to be called
+    // before the cached weights can be used.  This is used in Propagator.cpp.
     static bool Fill();
 
-    // Build the cache and load it into the device.
+    // Build the cache and load it into the device.  This is used in
+    // Propagator.cpp to fill the constants needed to for the calculations.
     static bool Build(FitSampleSet& sampleList);
 
-    Cache::Parameters& GetParameterCache() {return *fParameterCache;}
-    Cache::Weights& GetWeightsCache() {return *fWeightsCache;}
+    /// Return the approximate allocated memory (e.g. on the GPU).
+    std::size_t GetResidentMemory() const {return fTotalBytes;}
 
 private:
     // This is a singleton, so the constructor is private.
@@ -48,7 +52,8 @@ private:
 
     // Determine the type of spline cache to use.  The possible results are
     // "compactSpline", "uniformSpline", "generalSpline", or
-    // "this-cannot-happen".
+    // "this-cannot-happen".  This is used to determine which cache is used
+    // for each event.
     static std::string SplineType(const TSpline3* s);
 
     /// Declare all of the actual GPU caches here.  There is one GPU, so this
@@ -72,13 +77,16 @@ private:
     /// The cache for the general splines (really compact splines for now).
     std::unique_ptr<Cache::Weight::CompactSpline> fGeneralSplines;
 
+    // The rough size of all of the caches.
     std::size_t fTotalBytes;
 
 public:
     ~Manager();
 
-    /// Return the approximate allocated memory (e.g. on the GPU).
-    std::size_t GetResidentMemory() const {return fTotalBytes;}
+    // Provide "internal" references to the GPU cache.  This is used in the
+    // implementation, and should be ignored by most people.
+    Cache::Parameters& GetParameterCache() {return *fParameterCache;}
+    Cache::Weights& GetWeightsCache() {return *fWeightsCache;}
 
 };
 

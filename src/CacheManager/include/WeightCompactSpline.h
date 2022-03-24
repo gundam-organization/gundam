@@ -20,7 +20,12 @@ namespace Cache {
     }
 }
 
-/// A class to calculate and cache a bunch of events weights.
+/// A class apply a splined weight parameter to the cached event weights.
+/// This will be used in Cache::Weights to run the GPU for this type of
+/// reweighting.  This spline is controlled by the value at uniformly spaced
+/// knots.  If COMPACT_SPLINE_MONOTONIC is defined at compile time, this will
+/// use a monotonic spline.  Otherwise, this uses the average slope
+/// (e.g. basically uses Catmul-Rom).
 class Cache::Weight::CompactSpline:
     public Cache::Weight::Base {
 private:

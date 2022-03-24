@@ -13,6 +13,8 @@ namespace Cache {
 
 class FitParameter;
 
+/// A cache to hold the function parameter values, and the clamp values on the
+/// output weights.  This also manages any mirroring that needs to be done.
 class Cache::Parameters {
 public:
     typedef hemi::Array<double> Values;
@@ -23,6 +25,7 @@ public:
 
     ~Parameters();
 
+    /// The arrays of values mirrored on the CPU and GPU (e.g. hemi arrays).
     Values& GetParameters() {return *fParameters;}
     Clamps& GetLowerClamps() {return *fLowerClamp;}
     Clamps& GetUpperClamps() {return *fUpperClamp;}

@@ -419,8 +419,7 @@ namespace {
         float m2 = 0.5*(d21+d32);
         float m3 = 0.5*(d32+d43);
 
-#undef USE_MONOTONIC_SPLINE
-#ifdef USE_MONOTONIC_SPLINE
+#ifdef COMPACT_SPLINE_MONOTONIC
         #warning Using a MONOTONIC spline
         float d54 = points[d54_1] - points[d54_0];
         float m4 = 0.5*(d43+d54);
