@@ -50,6 +50,4 @@ private:
   // DEBUG
 
 };
-
-
 #endif //GUNDAM_SPLINEDIAL_H

@@ -73,10 +73,13 @@ public:
   virtual void buildResponseSplineCache();
   virtual void fillResponseCache() = 0;
 
+#ifdef GPUINTERP_SLOW_VALIDATION
   // Debugging.  This is only meaningful when the GPU is filling the spline
-  // value cache (only filled during validation).
-  int getGPUSplineIndex() const {return _GPUSplineIndex_;}
-  void setGPUSplineIndex(int i) {_GPUSplineIndex_ = i;}
+  // value cache (only filled during validation).  It's a nullptr otherwise,
+  // or not included in the object.
+  double* getGPUCachePointer() const {return _GPUCachePointer_;}
+  void setGPUCachePointer(double* v) {_GPUCachePointer_=v;}
+#endif
 
 protected:
   const DialType::DialType _dialType_;
@@ -104,12 +107,10 @@ protected:
 
   // Debugging.  This is only meaningful when the GPU is filling the spline
   // value cache (only filled during validation).
-  int _GPUSplineIndex_{-1};
+  double* _GPUCachePointer_{nullptr};
 
   // Output
   std::shared_ptr<TSpline3> _responseSplineCache_{nullptr}; // dial response as a spline
 
 };
-
-
 #endif //GUNDAM_DIAL_H
