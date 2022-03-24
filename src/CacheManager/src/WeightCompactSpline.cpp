@@ -87,7 +87,7 @@ Cache::Weight::CompactSpline::CompactSpline(
 Cache::Weight::CompactSpline::~CompactSpline() {}
 
 int Cache::Weight::CompactSpline::FindPoints(const TSpline3* s) {
-    return 2*s->GetNp() + 1; // Oversample for now!
+    return s->GetNp();
 }
 
 void Cache::Weight::CompactSpline::AddSpline(int resultIndex,
