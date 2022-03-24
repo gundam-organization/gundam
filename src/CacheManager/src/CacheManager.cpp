@@ -322,8 +322,8 @@ bool Cache::Manager::Fill() {
             par.second, par.first->getParameterValue());
     }
     cache->GetWeightsCache().Apply();
-#ifdef GPUINTERP_SLOW_VALIDATION
-#warning GPUINTERP_SLOW_VALIDATION is being used in Cache::Manager::Fill()
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
+#warning CACHE_MANAGER_SLOW_VALIDATION is being used in Cache::Manager::Fill()
     return false;
 #endif
     return true;

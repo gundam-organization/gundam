@@ -70,8 +70,8 @@ double PhysicsEvent::getNominalWeight() const {
 double PhysicsEvent::getEventWeight() const {
 #ifdef GUNDAM_USING_CUDA
     if (0 <= _GPUResultIndex_ && _GPUResult_) {
-#ifdef GPUINTERP_SLOW_VALIDATION
-#warning GPUINTERP_SLOW_VALIDATION used in PhysicsEvent::getEventWeight
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
+#warning CACHE_MANAGER_SLOW_VALIDATION used in PhysicsEvent::getEventWeight
         do {
             static double maxDelta = 1.0E-20;
             static double sumDelta = 0.0;
@@ -177,8 +177,8 @@ void PhysicsEvent::reweightUsingDialCache(){
   for( auto& dial : _rawDialPtrList_ ){
     if( dial == nullptr ) return;
     double response = dial->evalResponse();
-#ifdef GPUINTERP_SLOW_VALIDATION
-#warning GPUINTERP_SLOW_VALIDATION used in PhysicsEvent::reweightUsingDialCache
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
+#warning CACHE_MANAGER_SLOW_VALIDATION used in PhysicsEvent::reweightUsingDialCache
     static double maxDelta = 1E-20; // Exclude zero...
     static double sumDelta = 0.0;
     static long long int numDelta = 0;

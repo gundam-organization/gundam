@@ -38,7 +38,7 @@ Cache::Weight::CompactSpline::CompactSpline(
 
     fSplineKnotsReserved = 2*fSplinesReserved + fSplineKnotsReserved;
 
-#ifdef GPUINTERP_SLOW_VALIDATION
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning Using SLOW VALIDATION in Cache::Weight::CompactSpline::CompactSpline
         // Add validation code for the spline calculation.  This can be rather
         // slow, so do not use if it is not required.
@@ -60,7 +60,7 @@ Cache::Weight::CompactSpline::CompactSpline(
             new hemi::Array<short>(GetSplinesReserved(),false));
         fSplineIndex.reset(new hemi::Array<int>(1+GetSplinesReserved(),false));
 
-#ifdef GPUINTERP_SLOW_VALIDATION
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning Using SLOW VALIDATION in Cache::Weight::CompactSpline::CompactSpline
         // Add validation code for the spline calculation.  This can be rather
         // slow, so do not use if it is not required.
@@ -98,7 +98,7 @@ void Cache::Weight::CompactSpline::AddSpline(int resultIndex,
     double xMin = s->GetXmin();
     double xMax = s->GetXmax();
     int sIndex = ReserveSpline(resultIndex,parIndex,xMin,xMax,NP);
-#ifdef GPUINTERP_SLOW_VALIDATION
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning Using SLOW VALIDATION in Cache::Weight::CompactSpline::AddSpline
     sDial->setGPUCachePointer(GetCachePointer(sIndex));
 #endif
@@ -303,7 +303,7 @@ double Cache::Weight::CompactSpline::GetSplineKnot(int sIndex, int knot) {
 // This section is for the validation methods.  They should mostly be
 // NOOPs and should mostly not be called.
 
-#ifdef GPUINTERP_SLOW_VALIDATION
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning Using SLOW VALIDATION in Cache::Weight::CompactSpline::GetSplineValue
 // Get the intermediate spline result that is used to calculate an event
 // weight.  This can trigger a copy from the GPU to CPU, and must only be
@@ -477,7 +477,7 @@ namespace {
     // must be valid CUDA coda.
     HEMI_KERNEL_FUNCTION(HEMISplinesKernel,
                          double* results,
-#ifdef GPUINTERP_SLOW_VALIDATION
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning Using SLOW VALIDATION in Cache::Weight::CompactSpline::HEMISplinesKernel
                          // inputs/output for validation
                          double* splineValues,
@@ -500,7 +500,7 @@ namespace {
             if (x < lc) x = lc;
             float uc = upperClamp[pIndex[i]];
             if (x > uc) x = uc;
-#ifdef GPUINTERP_SLOW_VALIDATION
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning Using SLOW VALIDATION in Cache::Weight::CompactSpline::HEMISplinesKernel
             splineValues[i] = x;
 #endif
@@ -526,7 +526,7 @@ bool Cache::Weight::CompactSpline::Apply() {
     HEMISplinesKernel splinesKernel;
 #ifdef FORCE_HOST_KERNEL
     splinesKernel(fWeights.hostPtr(),
-#ifdef GPUINTERP_SLOW_VALIDATION
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning Using SLOW VALIDATION in Cache::Weight::CompactSpline::Apply
                   fSplineValue->hostPtr(),
 #endif
@@ -542,7 +542,7 @@ bool Cache::Weight::CompactSpline::Apply() {
 #else
     hemi::launch(splinesKernel,
                  fWeights.writeOnlyPtr(),
-#ifdef GPUINTERP_SLOW_VALIDATION
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning Using SLOW VALIDATION in Cache::Weight::CompactSpline::Apply
                  fSplineValue->writeOnlyPtr(),
 #endif
@@ -557,7 +557,7 @@ bool Cache::Weight::CompactSpline::Apply() {
         );
 #endif
 
-#ifdef GPUINTERP_SLOW_VALIDATION
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning Using SLOW VALIDATION and copying spine values
     fSplineValue->hostPtr();
 #endif
