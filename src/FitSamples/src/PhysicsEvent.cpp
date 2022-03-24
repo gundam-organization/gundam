@@ -6,14 +6,6 @@
 
 #include "Logger.h"
 
-#ifdef GUNDAM_USING_CUDA
-#if defined(GPUINTERP_SLOW_VALIDATION)||defined(GPU_INITIAL_VALUE_SANITY_CHECK)
-#warning GPUINTERP_SLOW_VALIDATION adding extra include files
-#include "CacheEventWeights.h"
-#include "SplineDial.h"
-#endif
-#endif
-
 LoggerInit([](){
   Logger::setUserHeaderStr("[PhysicsEvent]");
 })
@@ -78,35 +70,8 @@ double PhysicsEvent::getNominalWeight() const {
 double PhysicsEvent::getEventWeight() const {
 #ifdef GUNDAM_USING_CUDA
     if (0 <= _GPUResultIndex_ && _GPUResult_) {
-#ifdef GPU_WEIGHT_DEBUG
-        if (_GPUResultIndex_ < 5) {
-            LogInfo << "getEventWeight is "
-                    << _eventWeight_
-                    << " and cached " << *_GPUResult_
-                    << std::endl;
-        }
-#endif
-#ifdef GPU_INITIAL_VALUE_SANITY_CHECK
-        {
-            // This is shockingly expensive, so turn off when not debugging.
-            // The cost hasn't been tracked down, but there are two
-            // candidates.  First, it might be triggering an extra GPU->CPU
-            // copy for the initial values.  Second, it could simply be
-            // dramatically increasing the number of CPU L1/L2/L3 cache
-            // misses.
-            double gv = Cache::EventWeights::Get()
-                ->GetInitialValue(_GPUResultIndex_);
-            double delta = std::abs(getTreeWeight() - gv)/getTreeWeight();
-            if (delta > 1.0E-6) {
-                LogInfo << "Problem with GPU initial value"
-                        << " " << getTreeWeight()
-                        << " " << gv
-                        << std::endl;
-                throw std::runtime_error("GPU initial weight problem");
-            }
-        }
-#endif
 #ifdef GPUINTERP_SLOW_VALIDATION
+#warning GPUINTERP_SLOW_VALIDATION used in PhysicsEvent::getEventWeight
         do {
             static double maxDelta = 1.0E-20;
             static double sumDelta = 0.0;
@@ -217,12 +182,7 @@ void PhysicsEvent::reweightUsingDialCache(){
     static double maxDelta = 1E-20; // Exclude zero...
     static double sumDelta = 0.0;
     static long long int numDelta = 0;
-    int sIndex = dial->getGPUSplineIndex();
-    while (sIndex >= 0) {
-        Cache::EventWeights* gpu = Cache::EventWeights::Get();
-        if (!gpu) {
-            std::runtime_error("GPU spline index with null GPU pointer");
-        }
+    while (dial->getGPUCachePointer()) {
         if (!std::isfinite(response)) {
             LogWarning << "Dial response is not finite" << std::endl;
             break;
@@ -231,7 +191,7 @@ void PhysicsEvent::reweightUsingDialCache(){
             LogWarning << "Dial response is negative" << std::endl;
             break;
         }
-        double splineResponse = gpu->GetSplineValue(sIndex);
+        double splineResponse = *dial->getGPUCachePointer();
         if (!std::isfinite(splineResponse)) {
             LogWarning << "GPU spline response is not finite" << std::endl;
             std::runtime_error("GPU Spline response is not finite");
@@ -252,32 +212,6 @@ void PhysicsEvent::reweightUsingDialCache(){
                     << " Dial: " << response
                     << " delta: " << delta
                     << std::endl;
-            std::cout << dial->getSummary() << std::endl;
-            const SplineDial* s = dynamic_cast<const SplineDial*>(dial);
-            LogInfo << "Dial:"
-                      << " L: " << s->getSplinePtr()->GetXmin()
-                      << " U: " << s->getSplinePtr()->GetXmax()
-                      << " N: " << s->getSplinePtr()->GetNp()
-                      << " V: "
-                      << s->getSplinePtr()->Eval(
-                          gpu->GetSplineParameter(sIndex))
-                      << std::endl;
-            LogInfo << "GPU:"
-                      << " P: " << gpu->GetSplineParameter(sIndex)
-                      << " L: " << gpu->GetSplineLowerBound(sIndex)
-                      << " U: " << gpu->GetSplineUpperBound(sIndex)
-                      << " N: " << gpu->GetSplineKnotCount(sIndex)
-                      << std::endl;
-            double xDiff = gpu->GetSplineLowerBound(sIndex)
-                - s->getSplinePtr()->GetXmin();
-            if (std::abs(xDiff) > 0.000001) {
-                throw std::runtime_error("Spline lower bound error");
-            }
-            xDiff = gpu->GetSplineUpperBound(sIndex)
-                - s->getSplinePtr()->GetXmax();
-            if (std::abs(xDiff) > 0.000001) {
-                throw std::runtime_error("Spline upper bound error");
-            }
             LogInfo << "Maximum Dial to spline value delta: "<< maxDelta
                     << " Average value delta: "<< sumDelta/numDelta
                     << std::endl;
