@@ -407,14 +407,14 @@ namespace {
         if (ix<0) ix=0;
         if (2*ix+5>dim) ix = dim/2 - 2;
 
-        double fx = x-ix;
-        double fxx = fx*fx;
-        double fxxx = fx*fxx;
+        const double fx = x-ix;
+        const double fxx = fx*fx;
+        const double fxxx = fx*fxx;
 
-        double p1 = points[2*ix];
-        double m1 = points[2*ix+1]*step;
-        double p2 = points[2*ix+2];
-        double m2 = points[2*ix+3]*step;
+        const double p1 = points[2*ix];
+        const double m1 = points[2*ix+1]*step;
+        const double p2 = points[2*ix+2];
+        const double m2 = points[2*ix+3]*step;
 
         // Cubic spline with the points and slopes.
         double v = (p1*(2.0*fxxx-3.0*fxx+1.0) + m1*(fxxx-2.0*fxx+fx)
