@@ -15,7 +15,6 @@
 
 #include "DataBin.h"
 
-
 namespace DialType{
   ENUM_EXPANDER(
     DialType, -1
@@ -25,8 +24,6 @@ namespace DialType{
     ,Graph         // response = graphInterpol(dial)
   )
 }
-
-
 
 class Dial {
 
@@ -77,6 +74,8 @@ public:
   // Debugging.  This is only meaningful when the GPU is filling the spline
   // value cache (only filled during validation).  It's a nullptr otherwise,
   // or not included in the object.
+  std::string getGPUCacheName() const {return _GPUCacheName_;}
+  void setGPUCacheName(std::string s) {_GPUCacheName_ = s;}
   double* getGPUCachePointer() const {return _GPUCachePointer_;}
   void setGPUCachePointer(double* v) {_GPUCachePointer_=v;}
 #endif
@@ -105,9 +104,12 @@ protected:
   double _mirrorLowEdge_{std::nan("unset")};
   double _mirrorRange_{std::nan("unset")};
 
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
   // Debugging.  This is only meaningful when the GPU is filling the spline
   // value cache (only filled during validation).
+  std::string _GPUCacheName_{"unset"};
   double* _GPUCachePointer_{nullptr};
+#endif
 
   // Output
   std::shared_ptr<TSpline3> _responseSplineCache_{nullptr}; // dial response as a spline

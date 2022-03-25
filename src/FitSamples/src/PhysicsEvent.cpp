@@ -180,9 +180,10 @@ void PhysicsEvent::reweightUsingDialCache(){
     double response = dial->evalResponse();
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning CACHE_MANAGER_SLOW_VALIDATION used in PhysicsEvent::reweightUsingDialCache
-    static double maxDelta = 1E-20; // Exclude zero...
-    static double sumDelta = 0.0;
-    static long long int numDelta = 0;
+    static std::map<std::string,double> maxDelta; // Exclude zero...
+    static std::map<std::string,double> sumDelta;
+    static std::map<std::string,long long int> numDelta;
+    static int deltaTrials = 0;
     const SplineDial* sDial = dynamic_cast<const SplineDial*>(dial);
     while (sDial) {
         if (!dial->getGPUCachePointer()) {
@@ -197,36 +198,45 @@ void PhysicsEvent::reweightUsingDialCache(){
             LogWarning << "Dial response is negative" << std::endl;
             break;
         }
-        double splineResponse = *dial->getGPUCachePointer();
-        if (!std::isfinite(splineResponse)) {
-            LogWarning << "GPU spline response is not finite" << std::endl;
-            std::runtime_error("GPU Spline response is not finite");
+        double cacheResponse = *dial->getGPUCachePointer();
+        std::string cacheName = dial->getGPUCacheName();
+        if (!std::isfinite(cacheResponse)) {
+            LogWarning << "GPU cache response is not finite" << std::endl;
+            std::runtime_error("GPU cache response is not finite");
         }
-        if (splineResponse < 0) {
-            LogWarning << "GPU spline response is negative" << std::endl;
+        if (cacheResponse < 0) {
+            LogWarning << "GPU cache response is negative" << std::endl;
         }
-        double avg = 0.5*(std::abs(splineResponse)+std::abs(response));
+        double avg = 0.5*(std::abs(cacheResponse)+std::abs(response));
         if (avg < 1.0) avg = 1.0;
-        double delta = std::abs(splineResponse-response)/avg;
-        sumDelta += delta;
-        ++numDelta;
-        if (numDelta < 0) throw std::runtime_error("Validation wrap around");
-        if (delta > maxDelta) {
-            maxDelta = delta;
+        double delta = std::abs(cacheResponse-response)/avg;
+        sumDelta[cacheName] += delta;
+        ++numDelta[cacheName];
+        if (numDelta[cacheName] < 0) {
+            throw std::runtime_error("Validation wrap around");
+        }
+        if (delta > maxDelta[cacheName]) {
+            maxDelta[cacheName] = delta;
             LogInfo << "VALIDATION: Increase GPU and Dial max delta"
-                    << " GPU: " << splineResponse
+                    << " GPU (" << cacheName << ") : " << cacheResponse
                     << " Dial: " << response
                     << " delta: " << delta
                     << std::endl;
-            LogInfo << "Maximum Dial to spline value delta: "<< maxDelta
-                    << " Average value delta: "<< sumDelta/numDelta
+            LogInfo << "Maximum Dial to cache value delta: "
+                    << maxDelta[cacheName]
+                    << " Average value delta: "
+                    << sumDelta[cacheName]/numDelta[cacheName]
                     << std::endl;
         }
 
-        if ((numDelta % 10000000) == 0) {
-            LogInfo << "VALIDATION: Average spline delta: " << sumDelta/numDelta
-                    << " Maximum " << maxDelta
-                    << std::endl;
+        if ((deltaTrials++ % 1000000) == 0) {
+            for (auto maxD : maxDelta) {
+                std::string name = maxD.first;
+                LogInfo << "VALIDATION: Average cache delta for"
+                        << " " << name << ": " << sumDelta[name]/numDelta[name]
+                        << " Maximum: " << maxDelta[name]
+                        << std::endl;
+            }
         }
 
         break;

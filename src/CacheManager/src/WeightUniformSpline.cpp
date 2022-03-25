@@ -104,6 +104,7 @@ void Cache::Weight::UniformSpline::AddSpline(int resultIndex,
     int sIndex = ReserveSpline(resultIndex,parIndex,xMin,xMax,NP);
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning Using SLOW VALIDATION in Cache::Weight::UniformSpline::AddSpline
+    sDial->setGPUCacheName(GetName());
     sDial->setGPUCachePointer(GetCachePointer(sIndex));
 #endif
     for (int i=0; i<NP; ++i) {
