@@ -97,6 +97,13 @@ find_package(ROOT
 if(ROOT_FOUND)
   cmessage(STATUS "[ROOT]: ROOT found")
   include(${ROOT_USE_FILE})
+  cmessage(STATUS "[ROOT]: ROOT package found ${ROOT_LIBRARIES}")
+  if (NOT ROOT_minuit2_FOUND)
+    # Minuit2 wasn't found, but make really sure before giving up.
+    execute_process (COMMAND root-config --has-minuit2
+      OUTPUT_VARIABLE ROOT_minuit2_FOUND
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+  endif(NOT ROOT_minuit2_found)
 else(ROOT_FOUND)
    cmessage(STATUS "Including local GENERATE_ROOT_DICTIONARY implementation.")
    include(${CMAKE_SOURCE_DIR}/cmake/GenROOTDictionary.cmake)
@@ -124,6 +131,7 @@ else(ROOT_FOUND)
 endif(ROOT_FOUND)
 
 if (NOT ROOT_minuit2_FOUND)
+  cmessage(STATUS "[ROOT]:Rebuild root using -Dminuit2=on in the cmake command")
   cmessage(FATAL_ERROR "[ROOT]: minuit2 is required")
 endif(NOT ROOT_minuit2_FOUND)
 

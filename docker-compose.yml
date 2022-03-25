@@ -1,0 +1,13 @@
+version: '3.4'
+
+services:
+  gundam:
+    build:
+      target: base
+      context: .
+    environment:
+      - GUNDIR=/home/linuxbrew/gundam
+      - ROOTSYS=/home/linuxbrew/.linuxbrew
+
+    volumes:
+      - .:/home/linuxbrew/gundam
