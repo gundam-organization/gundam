@@ -19,7 +19,7 @@ LoggerInit([](){
 
 Cache::Parameters::Parameters(std::size_t parameters)
 : fParameterCount{parameters} {
-    LogInfo << "Cached Manager: input parameter count: "
+    LogInfo << "Cached Parameters -- input parameter count: "
             << GetParameterCount()
             << std::endl;
     fTotalBytes += GetParameterCount()*sizeof(double); // fParameters
@@ -44,7 +44,7 @@ Cache::Parameters::Parameters(std::size_t parameters)
         fUpperClamp.reset(new hemi::Array<double>(GetParameterCount(),false));
     }
     catch (...) {
-        LogInfo << "Failed to allocate memory, so stopping" << std::endl;
+        LogError << "Failed to allocate memory, so stopping" << std::endl;
         throw std::runtime_error("Not enough memory available");
     }
 

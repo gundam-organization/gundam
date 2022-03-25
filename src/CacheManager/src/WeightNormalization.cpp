@@ -10,9 +10,10 @@
 #include <hemi/launch.h>
 #include <hemi/grid_stride_range.h>
 
-#ifndef LOGGER
-#define LOGGER std::cout
-#endif
+#include "Logger.h"
+LoggerInit([](){
+  Logger::setUserHeaderStr("[Cache]");
+})
 
 // The constructor
 Cache::Weight::Normalization::Normalization(
@@ -22,7 +23,7 @@ Cache::Weight::Normalization::Normalization(
     : Cache::Weight::Base("normalization",weights,parameters),
       fNormsReserved(norms), fNormsUsed(0) {
 
-    LOGGER << "Cached Weights: reserved Normalizations: "
+    LogInfo << "Cached Weights: reserved Normalizations: "
            << GetNormsReserved()
            << std::endl;
     if (GetNormsReserved() < 1) return;
@@ -30,7 +31,7 @@ Cache::Weight::Normalization::Normalization(
     fTotalBytes += GetNormsReserved()*sizeof(int);   // fNormResult
     fTotalBytes += GetNormsReserved()*sizeof(short); // fNormParameter
 
-    LOGGER << "Approximate Memory Size: " << fTotalBytes/1E+9
+    LogInfo << "Approximate Memory Size: " << fTotalBytes/1E+9
            << " GB" << std::endl;
 
     try {
@@ -41,7 +42,7 @@ Cache::Weight::Normalization::Normalization(
         fNormParameter.reset(new hemi::Array<short>(GetNormsReserved(),false));
     }
     catch (std::bad_alloc&) {
-        LOGGER << "Failed to allocate memory, so stopping" << std::endl;
+        LogError << "Failed to allocate memory, so stopping" << std::endl;
         throw std::runtime_error("Not enough memory available");
     }
 
@@ -53,28 +54,28 @@ Cache::Weight::Normalization::~Normalization() {}
 // Reserve space for another normalization parameter.
 int Cache::Weight::Normalization::ReserveNorm(int resIndex, int parIndex) {
     if (resIndex < 0) {
-        LOGGER << "Invalid result index"
+        LogError << "Invalid result index"
                << std::endl;
         throw std::runtime_error("Negative result index");
     }
     if (fWeights.size() <= resIndex) {
-        LOGGER << "Invalid result index"
+        LogError << "Invalid result index"
                << std::endl;
         throw std::runtime_error("Result index out of bounds");
     }
     if (parIndex < 0) {
-        LOGGER << "Invalid parameter index"
+        LogError << "Invalid parameter index"
                << std::endl;
         throw std::runtime_error("Negative parameter index");
     }
     if (fParameters.size() <= parIndex) {
-        LOGGER << "Invalid parameter index"
+        LogError << "Invalid parameter index"
                << std::endl;
         throw std::runtime_error("Parameter index out of bounds");
     }
     int newIndex = fNormsUsed++;
     if (fNormsUsed > fNormsReserved) {
-        LOGGER << "Not enough space reserved for Norms"
+        LogError << "Not enough space reserved for Norms"
                   << std::endl;
         throw std::runtime_error("Not enough space reserved for results");
     }
@@ -100,7 +101,7 @@ namespace {
 #ifndef HEMI_DEV_CODE
 #ifdef CACHE_DEBUG
             if (rIndex[i] < PRINT_STEP) {
-                LOGGER << "Norms kernel " << i
+                std::cout << "Norms kernel " << i
                        << " iEvt " << rIndex[i]
                        << " iPar " << pIndex[i]
                        << " = " << params[pIndex[i]]

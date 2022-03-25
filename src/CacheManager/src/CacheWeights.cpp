@@ -12,9 +12,10 @@
 #include <hemi/launch.h>
 #include <hemi/grid_stride_range.h>
 
-#ifndef LOGGER
-#define LOGGER std::cout
-#endif
+#include "Logger.h"
+LoggerInit([](){
+  Logger::setUserHeaderStr("[Cache]");
+})
 
 // The constructor
 Cache::Weights::Weights(
@@ -26,14 +27,14 @@ Cache::Weights::Weights(
       fTotalBytes(0), fResultCount(results) {
     if (fResultCount<1) throw std::runtime_error("No results in weight cache");
 
-    LOGGER << "Cached Weights: output results: "
+    LogInfo << "Cached Weights -- output results reserved: "
            << GetResultCount()
            << std::endl;
     fTotalBytes += GetResultCount()*sizeof(double);   // fResults
     fTotalBytes += GetResultCount()*sizeof(double);   // fInitialValues;
 
-    LOGGER << "Approximate Memory Size: " << fTotalBytes/1E+9
-              << " GB" << std::endl;
+    LogInfo << "Cached Weights -- approximate memory size: " << fTotalBytes/1E+9
+            << " GB" << std::endl;
 
     try {
         // Get CPU/GPU memory for the results and thier initial values.  The
@@ -45,7 +46,7 @@ Cache::Weights::Weights(
 
     }
     catch (std::bad_alloc&) {
-        LOGGER << "Failed to allocate memory, so stopping" << std::endl;
+        LogError << "Failed to allocate memory, so stopping" << std::endl;
         throw std::runtime_error("Not enough memory available");
     }
 
@@ -106,8 +107,8 @@ namespace {
 #ifndef HEMI_DEV_CODE
 #ifdef CACHE_DEBUG
             if (i < PRINT_STEP) {
-                LOGGER << "Set kernel result " << i << " to " << results[i]
-                       << std::endl;
+                std::cout << "Set kernel result " << i << " to " << results[i]
+                          << std::endl;
             }
 #endif
 #endif

@@ -5,6 +5,7 @@
 #include "WeightNormalization.h"
 #include "WeightCompactSpline.h"
 #include "WeightUniformSpline.h"
+#include "WeightGeneralSpline.h"
 
 #include "FitSampleSet.h"
 
@@ -76,7 +77,7 @@ private:
     std::unique_ptr<Cache::Weight::UniformSpline> fUniformSplines;
 
     /// The cache for the general splines (really compact splines for now).
-    std::unique_ptr<Cache::Weight::CompactSpline> fGeneralSplines;
+    std::unique_ptr<Cache::Weight::GeneralSpline> fGeneralSplines;
 
     // The rough size of all of the caches.
     std::size_t fTotalBytes;

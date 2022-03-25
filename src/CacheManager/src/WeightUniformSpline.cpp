@@ -12,9 +12,10 @@
 #include <hemi/launch.h>
 #include <hemi/grid_stride_range.h>
 
-#ifndef LOGGER
-#define LOGGER std::cout
-#endif
+#include "Logger.h"
+LoggerInit([](){
+  Logger::setUserHeaderStr("[Cache]");
+})
 
 // The constructor
 Cache::Weight::UniformSpline::UniformSpline(
@@ -28,7 +29,7 @@ Cache::Weight::UniformSpline::UniformSpline(
       fSplinesReserved(splines), fSplinesUsed(0),
       fSplineKnotsReserved(knots), fSplineKnotsUsed(0) {
 
-    LOGGER << "Reserved " << GetName() << " Splines: "
+    LogInfo << "Reserved " << GetName() << " Splines: "
            << GetSplinesReserved() << std::endl;
     if (GetSplinesReserved() < 1) return;
 
@@ -45,11 +46,14 @@ Cache::Weight::UniformSpline::UniformSpline(
     fTotalBytes += GetSplinesReserved()*sizeof(double);
 #endif
 
-    LOGGER << "Reserved Spline Knots: " << GetSplineKnotsReserved()<< std::endl;
+    LogInfo << "Reserved " << GetName()
+            << " Spline Knots: " << GetSplineKnotsReserved()
+            << std::endl;
     fTotalBytes += GetSplineKnotsReserved()*sizeof(float);  // fSpineKnots
 
-    LOGGER << "Approximate Memory Size: " << fTotalBytes/1E+9
-              << " GB" << std::endl;
+    LogInfo << "Approximate Memory Size for " << GetName()
+            << ": " << fTotalBytes/1E+9
+            << " GB" << std::endl;
 
     try {
         // Get the CPU/GPU memory for the spline index tables.  These are
@@ -74,7 +78,7 @@ Cache::Weight::UniformSpline::UniformSpline(
             new hemi::Array<float>(GetSplineKnotsReserved(),false));
     }
     catch (std::bad_alloc&) {
-        LOGGER << "Failed to allocate memory, so stopping" << std::endl;
+        LogError << "Failed to allocate memory, so stopping" << std::endl;
         throw std::runtime_error("Not enough memory available");
     }
 
@@ -115,45 +119,45 @@ void Cache::Weight::UniformSpline::AddSpline(int resultIndex,
 int Cache::Weight::UniformSpline::ReserveSpline(
     int resIndex, int parIndex, double low, double high, int points) {
     if (resIndex < 0) {
-        LOGGER << "Invalid result index"
+        LogError << "Invalid result index"
                << std::endl;
         throw std::runtime_error("Negative result index");
     }
     if (fWeights.size() <= resIndex) {
-        LOGGER << "Invalid result index"
+        LogError << "Invalid result index"
                << std::endl;
         throw std::runtime_error("Result index out of bounds");
     }
     if (parIndex < 0) {
-        LOGGER << "Invalid parameter index"
+        LogError << "Invalid parameter index"
                << std::endl;
         throw std::runtime_error("Negative parameter index");
     }
     if (fParameters.size() <= parIndex) {
-        LOGGER << "Invalid parameter index"
+        LogError << "Invalid parameter index"
                << std::endl;
         throw std::runtime_error("Parameter index out of bounds");
     }
     if (high <= low) {
-        LOGGER << "Invalid spline bounds"
+        LogError << "Invalid spline bounds"
                << std::endl;
         throw std::runtime_error("Invalid spline bounds");
     }
     if (points < 3) {
-        LOGGER << "Insufficient points in spline"
+        LogError << "Insufficient points in spline"
                << std::endl;
         throw std::runtime_error("Invalid number of spline points");
     }
     int newIndex = fSplinesUsed++;
     if (fSplinesUsed > fSplinesReserved) {
-        LOGGER << "Not enough space reserved for splines"
+        LogError << "Not enough space reserved for splines"
                   << std::endl;
         throw std::runtime_error("Not enough space reserved for splines");
     }
     fSplineResult->hostPtr()[newIndex] = resIndex;
     fSplineParameter->hostPtr()[newIndex] = parIndex;
     if (fSplineIndex->hostPtr()[newIndex] != fSplineKnotsUsed) {
-        LOGGER << "Last spline knot index should be at old end of splines"
+        LogError << "Last spline knot index should be at old end of splines"
                   << std::endl;
         throw std::runtime_error("Problem with control indices");
     }
@@ -161,7 +165,7 @@ int Cache::Weight::UniformSpline::ReserveSpline(
     fSplineKnotsUsed += 2; // Space for the upper and lower bound
     fSplineKnotsUsed += 2*points; // Space for the knots.
     if (fSplineKnotsUsed > fSplineKnotsReserved) {
-        LOGGER << "Not enough space reserved for spline knots"
+        LogError << "Not enough space reserved for spline knots"
                << std::endl;
         throw std::runtime_error("Not enough space reserved for spline knots");
     }
@@ -187,23 +191,23 @@ void Cache::Weight::UniformSpline::SetSplineKnot(
 void Cache::Weight::UniformSpline::SetSplineKnotValue(
     int sIndex, int kIndex, double value) {
     if (sIndex < 0) {
-        LOGGER << "Requested spline index is negative"
+        LogError << "Requested spline index is negative"
                   << std::endl;
         std::runtime_error("Invalid control point being set");
     }
     if (GetSplinesUsed() <= sIndex) {
-        LOGGER << "Requested spline index is to large"
+        LogError << "Requested spline index is to large"
                   << std::endl;
         std::runtime_error("Invalid control point being set");
     }
     if (kIndex < 0) {
-        LOGGER << "Requested control point index is negative"
+        LogError << "Requested control point index is negative"
                   << std::endl;
         std::runtime_error("Invalid control point being set");
     }
     int knotIndex = fSplineIndex->hostPtr()[sIndex] + 2 + 2*kIndex;
     if (fSplineIndex->hostPtr()[sIndex+1] <= knotIndex) {
-        LOGGER << "Requested control point index is two large"
+        LogError << "Requested control point index is two large"
                   << std::endl;
         std::runtime_error("Invalid control point being set");
     }
@@ -213,23 +217,23 @@ void Cache::Weight::UniformSpline::SetSplineKnotValue(
 void Cache::Weight::UniformSpline::SetSplineKnotSlope(
     int sIndex, int kIndex, double slope) {
     if (sIndex < 0) {
-        LOGGER << "Requested spline index is negative"
+        LogError << "Requested spline index is negative"
                   << std::endl;
         std::runtime_error("Invalid control point being set");
     }
     if (GetSplinesUsed() <= sIndex) {
-        LOGGER << "Requested spline index is to large"
+        LogError << "Requested spline index is to large"
                   << std::endl;
         std::runtime_error("Invalid control point being set");
     }
     if (kIndex < 0) {
-        LOGGER << "Requested control point index is negative"
+        LogError << "Requested control point index is negative"
                   << std::endl;
         std::runtime_error("Invalid control point being set");
     }
     int knotIndex = fSplineIndex->hostPtr()[sIndex] + 2 + 2*kIndex;
     if (fSplineIndex->hostPtr()[sIndex+1] <= knotIndex) {
-        LOGGER << "Requested control point index is two large"
+        LogError << "Requested control point index is two large"
                   << std::endl;
         std::runtime_error("Invalid control point being set");
     }
@@ -445,7 +449,7 @@ namespace {
 #ifdef CACHE_DEBUG
             int dim = id1-id0-2;
             if (rIndex[i] < PRINT_STEP) {
-                LOGGER << "Splines kernel " << i
+                std::cout << "Splines kernel " << i
                        << " iEvt " << rIndex[i]
                        << " iPar " << pIndex[i]
                        << " = " << params[pIndex[i]]
@@ -456,7 +460,7 @@ namespace {
                        << " d: " << dim
                        << std::endl;
                 for (int k = 0; k < dim/2; ++k) {
-                    LOGGER << "        " << k
+                    std::cout << "        " << k
                            << " x: " << knots[id0] + k*s
                            << " y: " << knots[id0+2+2*k]
                            << " m: " << knots[id0+2+2*k+1]
