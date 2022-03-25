@@ -106,9 +106,11 @@ public:
     // ReserveSpline has been called.  The sIndex is the value returned by
     // ReserveSpline for the particular spline, and the kIndex is the knot
     // that will be filled.
+    void SetSplineKnotPlace(int sIndex, int kIndex, double place);
     void SetSplineKnotValue(int sIndex, int kIndex, double value);
     void SetSplineKnotSlope(int sIndex, int kIndex, double slope);
-    void SetSplineKnot(int sIndex, int kIndex, double value, double slope);
+    void SetSplineKnot(int sIndex, int kIndex,
+                       double place, double value, double slope);
 
     /// Add a spline for the dial.  This may modify the dial if debugging is
     /// enabled.  This uses ReserveSpline and SetSplineKnot.
@@ -132,6 +134,7 @@ public:
     int GetSplineKnotCount(int sIndex);
 
     // Get the function value for a knot in the spline at sIndex
+    double GetSplineKnotPlace(int sIndex,int knot);
     double GetSplineKnotValue(int sIndex,int knot);
     double GetSplineKnotSlope(int sIndex,int knot);
 
