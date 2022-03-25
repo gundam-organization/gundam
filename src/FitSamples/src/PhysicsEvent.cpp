@@ -3,6 +3,7 @@
 //
 
 #include "PhysicsEvent.h"
+#include "SplineDial.h"
 
 #include "Logger.h"
 
@@ -182,7 +183,12 @@ void PhysicsEvent::reweightUsingDialCache(){
     static double maxDelta = 1E-20; // Exclude zero...
     static double sumDelta = 0.0;
     static long long int numDelta = 0;
-    while (dial->getGPUCachePointer()) {
+    const SplineDial* sDial = dynamic_cast<const SplineDial*>(dial);
+    while (sDial) {
+        if (!dial->getGPUCachePointer()) {
+            LogWarning << "SplineDial without cache" << std::endl;
+            break;
+        }
         if (!std::isfinite(response)) {
             LogWarning << "Dial response is not finite" << std::endl;
             break;
