@@ -1,4 +1,5 @@
 set(SRCFILES
+  src/CacheManager.cpp
   )
 set(HEADERS
   include/CacheManager.h
@@ -19,7 +20,6 @@ if(CMAKE_CUDA_COMPILER)
   set(SRCFILES ${SRCFILES} src/WeightGeneralSpline.cu)
   set(SRCFILES ${SRCFILES} src/CacheParameters.cu)
   set(SRCFILES ${SRCFILES} src/CacheWeights.cu)
-  set(SRCFILES ${SRCFILES} src/CacheManager.cu)
 else(CMAKE_CUDA_COMPILER)
   cmessage(STATUS "CUDA utilities are not being compiled")
   set(SRCFILES ${SRCFILES} src/WeightNormalization.cpp)
@@ -28,7 +28,6 @@ else(CMAKE_CUDA_COMPILER)
   set(SRCFILES ${SRCFILES} src/WeightGeneralSpline.cpp)
   set(SRCFILES ${SRCFILES} src/CacheParameters.cpp)
   set(SRCFILES ${SRCFILES} src/CacheWeights.cpp)
-  set(SRCFILES ${SRCFILES} src/CacheManager.cpp)
 endif(CMAKE_CUDA_COMPILER)
 
 if( USE_STATIC_LINKS STREQUAL "1" )
