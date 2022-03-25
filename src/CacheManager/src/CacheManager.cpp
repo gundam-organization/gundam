@@ -21,7 +21,7 @@ Cache::Manager* Cache::Manager::fSingleton = nullptr;
 std::map<const FitParameter*, int> Cache::Manager::ParameterMap;
 
 std::string Cache::Manager::SplineType(const TSpline3* s) {
-    return std::string("compactSpline");
+    return std::string("uniformSpline");
 }
 
 Cache::Manager::Manager(int results, int parameters,
@@ -57,7 +57,7 @@ Cache::Manager::Manager(int results, int parameters,
         fWeightsCache->AddWeightCalculator(fCompactSplines.get());
         fTotalBytes += fCompactSplines->GetResidentMemory();
 
-        fUniformSplines.reset(new Cache::Weight::CompactSpline(
+        fUniformSplines.reset(new Cache::Weight::UniformSpline(
                                   fWeightsCache->GetWeights(),
                                   fParameterCache->GetParameters(),
                                   fParameterCache->GetLowerClamps(),
@@ -125,7 +125,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
                     else if (splineType == "uniformSpline") {
                         ++uniformSplines;
                         // For now!
-                        uniformPoints += Cache::Weight::CompactSpline::FindPoints(s);
+                        uniformPoints += Cache::Weight::UniformSpline::FindPoints(s);
                     }
                     else if (splineType == "generalSpline") {
                         ++generalSplines;
