@@ -1,11 +1,15 @@
 #ifndef CacheManager_h_seen
 #define CacheManager_h_seen
 
+#include "CacheParameters.h"
+
 #include "CacheWeights.h"
 #include "WeightNormalization.h"
 #include "WeightCompactSpline.h"
 #include "WeightUniformSpline.h"
 #include "WeightGeneralSpline.h"
+
+#include "CacheIndexedSums.h"
 
 #include "FitSampleSet.h"
 
@@ -44,7 +48,8 @@ private:
             int norms,
             int compactSplines, int compactPoints,
             int uniformSplines, int uniformPoints,
-            int generalSplines, int generalPoints);
+            int generalSplines, int generalPoints,
+            int histBins);
 
     static Manager* fSingleton;  // You get one guess...
 
@@ -79,6 +84,9 @@ private:
     /// The cache for the general splines (really compact splines for now).
     std::unique_ptr<Cache::Weight::GeneralSpline> fGeneralSplines;
 
+    /// The cache for the summed histgram weights
+    std::unique_ptr<Cache::IndexedSums> fHistogramsCache;
+
     // The rough size of all of the caches.
     std::size_t fTotalBytes;
 
@@ -88,8 +96,8 @@ public:
     // Provide "internal" references to the GPU cache.  This is used in the
     // implementation, and should be ignored by most people.
     Cache::Parameters& GetParameterCache() {return *fParameterCache;}
-    Cache::Weights& GetWeightsCache() {return *fWeightsCache;}
-
+    Cache::Weights&    GetWeightsCache() {return *fWeightsCache;}
+    Cache::IndexedSums& GetHistogramsCache() {return *fHistogramsCache;}
 };
 
 // An MIT Style License

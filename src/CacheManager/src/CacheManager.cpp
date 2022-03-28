@@ -1,4 +1,11 @@
 #include "CacheManager.h"
+#include "CacheParameters.h"
+#include "CacheWeights.h"
+#include "WeightNormalization.h"
+#include "WeightCompactSpline.h"
+#include "WeightUniformSpline.h"
+#include "WeightGeneralSpline.h"
+#include "CacheIndexedSums.h"
 
 #include "FitParameterSet.h"
 #include "Dial.h"
@@ -48,7 +55,8 @@ Cache::Manager::Manager(int results, int parameters,
                         int norms,
                         int compactSplines, int compactPoints,
                         int uniformSplines, int uniformPoints,
-                        int generalSplines, int generalPoints) {
+                        int generalSplines, int generalPoints,
+                        int histBins) {
     LogInfo << "Creating cache manager" << std::endl;
 
     try {
@@ -95,6 +103,10 @@ Cache::Manager::Manager(int results, int parameters,
                                   generalSplines, generalPoints));
         fWeightsCache->AddWeightCalculator(fGeneralSplines.get());
         fTotalBytes += fGeneralSplines->GetResidentMemory();
+
+        fHistogramsCache.reset(new Cache::IndexedSums(
+                                  fWeightsCache->GetWeights(),
+                                  histBins));
     }
     catch (...) {
         LogError << "Failed to allocate memory, so stopping" << std::endl;
@@ -180,8 +192,18 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
         }
     }
 
-    int parameters = usedParameters.size();
+    // Count the total number of histogram cells.
+    int histCells = 0;
+    for(const FitSample& sample : sampleList.getFitSampleList() ){
+        if (!sample.getMcContainer().histogram) continue;
+        int cells = sample.getMcContainer().histogram->GetNcells();
+        LogInfo << "Add histogram for " << sample.getName()
+                << " with " << cells
+                << " cells (includes under/over-flows)" << std::endl;
+        histCells += cells;
+    }
 
+    int parameters = usedParameters.size();
     LogInfo << "Cache for " << events << " events --"
             << " using " << parameters << " parameters"
             << std::endl;
@@ -199,6 +221,9 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
             << std::endl;
     LogInfo << "    Normalizations: " << norms
             <<" ("<< 1.0*norms/events <<" per event)"
+            << std::endl;
+    LogInfo << "    Histogram bins: " << histCells
+            << " (" << 1.0*events/histCells << " events per bin)"
             << std::endl;
 
     if (compactSplines > 0) {
@@ -235,7 +260,8 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
                                  norms,
                                  compactSplines,compactPoints,
                                  uniformSplines,uniformPoints,
-                                 generalSplines,generalPoints);
+                                 generalSplines,generalPoints,
+                                 histCells);
     }
 
     // In case the cache isn't allocated (usually because it's turned off on
@@ -246,6 +272,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
         return false;
     }
 
+    // Add the dials to the cache.
     int usedResults = 0; // Number of cached results that have been used up.
     for(FitSample& sample : sampleList.getFitSampleList() ) {
         LogInfo << "Fill cache for " << sample.getName()
@@ -343,17 +370,49 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
         }
     }
 
-    if (usedResults == Cache::Manager::Get()
+    // Error checking!
+    if (usedResults != Cache::Manager::Get()
         ->GetWeightsCache().GetResultCount()) {
-        return true;
+        LogError << "Cache Manager -- used Results:     "
+                 << usedResults << std::endl;
+        LogError << "Cache Manager -- expected Results: "
+                 << Cache::Manager::Get()->GetWeightsCache().GetResultCount()
+                 << std::endl;
+        throw std::runtime_error("Probable problem putting dials in cache");
     }
 
-    LogError << "Cache Manager -- used Results:     "
-             << usedResults << std::endl;
-    LogError << "Cache Manager -- expected Results: "
-             << Cache::Manager::Get()->GetWeightsCache().GetResultCount()
-             << std::endl;
-    throw std::runtime_error("Probable problem putting parameters in cache");
+    // Add this histogram cells to the cache.
+    int nextHist = 0;
+    for(FitSample& sample : sampleList.getFitSampleList() ) {
+        LogInfo << "Fill cache for " << sample.getName()
+                << " with " << sample.getMcContainer().eventList.size()
+                << " events" << std::endl;
+        std::shared_ptr<TH1> hist(sample.getMcContainer().histogram);
+        if (!hist) {
+            throw std::runtime_error("missing sample histogram");
+        }
+        int thisHist = nextHist;
+        sample.getMcContainer().setCacheManagerIndex(thisHist);
+        int cells = hist->GetNcells();
+        nextHist += cells;
+        for (PhysicsEvent& event
+                 : sample.getMcContainer().eventList) {
+            int eventIndex = event.getResultIndex();
+            int cellIndex = event.getSampleBinIndex();
+            if (cellIndex < 0 || cells <= cellIndex) {
+                throw std::runtime_error("Histogram bin out of range");
+            }
+            int theEntry = thisHist + cellIndex;
+            Cache::Manager::Get()->GetHistogramsCache()
+                .SetEventIndex(eventIndex,theEntry);
+        }
+    }
+
+    if (histCells != nextHist) {
+        throw std::runtime_error("Histogram cells are missing");
+    }
+
+    return true;
 }
 
 bool Cache::Manager::Fill() {
@@ -364,6 +423,7 @@ bool Cache::Manager::Fill() {
             par.second, par.first->getParameterValue());
     }
     cache->GetWeightsCache().Apply();
+    cache->GetHistogramsCache().Apply();
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning CACHE_MANAGER_SLOW_VALIDATION is being used in Cache::Manager::Fill()
     return false;
