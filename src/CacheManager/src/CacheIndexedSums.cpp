@@ -72,7 +72,7 @@ double Cache::IndexedSums::GetSum(int i) const {
 // Define CACHE_DEBUG to get lots of output from the host
 #undef CACHE_DEBUG
 
-#include "CacheAtomicMult.h"
+#include "CacheAtomicAdd.h"
 
 namespace {
     // A function to be used as the kernen on a CPU or GPU.  This must be
@@ -94,7 +94,7 @@ namespace {
                          const int NP) {
         for (int i : hemi::grid_stride_range(0,NP)) {
 #ifdef HEMI_DEV_CODE
-            atomicAdd(sums[indexes[i]],inputs[i]);
+            CacheAtomicAdd(&sums[indexes[i]],inputs[i]);
 #else
             sums[indexes[i]] += inputs[i];
 #endif
@@ -132,7 +132,7 @@ bool Cache::IndexedSums::Apply() {
     // other places using the values are referencing the contents of the host
     // array by address, and that won't trigger the copy.  The copy also isn't
     // thread safe.
-    fSums->hostPtr();
+    // fSums->hostPtr();
 
     return true;
 }
