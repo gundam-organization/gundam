@@ -156,7 +156,6 @@ void SampleElement::refillHistogram(int iThread_){
 #endif
     binContentArray[iBin+1] = content;
     histogram->GetSumw2()->GetArray()[iBin+1] = content;
-    double newContent = content;
     iBin += nbThreads;
   }
 }
