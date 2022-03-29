@@ -424,6 +424,7 @@ bool Cache::Manager::Fill() {
     }
     cache->GetWeightsCache().Apply();
     cache->GetHistogramsCache().Apply();
+    cache->GetHistogramsCache().GetSum(0);
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning CACHE_MANAGER_SLOW_VALIDATION is being used in Cache::Manager::Fill()
     return false;
