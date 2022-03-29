@@ -5,6 +5,9 @@
 #include "PhysicsEvent.h"
 #include "SplineDial.h"
 
+#include "CacheManager.h"
+#include "CacheWeights.h"
+
 #include "Logger.h"
 
 LoggerInit([](){
@@ -101,6 +104,15 @@ double PhysicsEvent::getEventWeight() const {
                        << std::endl;
         } while(false);
 #endif
+        if (_GPUResultValid_ && !(*_GPUResultValid_)) {
+            // This is slow, but will make sure that the cached result is
+            // updated when the GPU changes.  The values pointed to by
+            // _GPUResult_ and _GPUResultValid_ are inside of the weights
+            // cache (a bit of evil coding here), and are updated by the
+            // cache.
+            return Cache::Manager::Get()
+                ->GetWeightsCache().GetResultFast(_GPUResultIndex_);
+        }
         return *_GPUResult_;
     }
 #endif

@@ -56,6 +56,7 @@ public:
   // Set the result index.
   void setResultIndex(int i) {_GPUResultIndex_ = i;}
   void setResultPointer(double* v) {_GPUResult_ = v;}
+  void setResultValidPointer(bool* v) {_GPUResultValid_ = v;}
   int getResultIndex() {return _GPUResultIndex_;}
   double* getResultPointer() {return _GPUResult_;}
 #endif
@@ -113,6 +114,7 @@ private:
 #ifdef GUNDAM_USING_CUDA
   int _GPUResultIndex_{-1};
   double* _GPUResult_{nullptr};
+  bool* _GPUResultValid_{nullptr};
 #endif
 
   // Caches

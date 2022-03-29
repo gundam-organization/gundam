@@ -37,6 +37,9 @@ private:
     std::size_t    fResultCount;
     std::unique_ptr<Results> fResults;
 
+    // Cache of whether the result values in memory are valid.
+    bool fResultsValid;
+
     /// An array of the initial value for each result.  It's copied from the
     /// CPU to the GPU once at the beginning.
     std::unique_ptr<hemi::Array<double>> fInitialValues;
@@ -88,8 +91,10 @@ public:
 
     /// Get the result for index i from host memory.  This will trigger copying
     /// the results from the device if that is necessary.
-    double GetResult(int i) const;
-    double* GetResultPointer(int i) const;
+    double GetResult(int i);
+    double GetResultFast(int i);  // No checks
+    double* GetResultPointer(int i);
+    bool* GetResultValidPointer();
 
     /// Set the result for index i in the host memory.  The results are NEVER
     /// copied to the device, so this will be overwritten as soon as the
@@ -97,7 +102,7 @@ public:
     void SetResult(int i, double v);
 
     /// Get/Set the initial value for result i.
-    double  GetInitialValue(int i) const;
+    double  GetInitialValue(int i);
     void SetInitialValue(int i, double v);
 };
 

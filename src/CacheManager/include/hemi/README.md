@@ -347,3 +347,11 @@ License and Copyright
 Copyright 2012-2015, NVIDIA Corporation
 
 Licensed under the BSD License. Please see the LICENSE file included with the HEMI source code.
+
+MODIFICATIONS FROM DISTRIBUTION
+===============================
+
+The following modifications have been made to the version provided by NVIDIA
+
+ - A mutex has been added to allow copyDeviceToHost to be thread safe on the host.  This means that methods like hostPtr() are thread safe.  The mutex is used by default, but can be disabled by defining HEMI_DISABLE_THREADS before including hemi/array.h
+ 

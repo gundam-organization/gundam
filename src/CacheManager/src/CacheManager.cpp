@@ -259,6 +259,9 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
             event.setResultPointer(Cache::Manager::Get()
                                    ->GetWeightsCache()
                                    .GetResultPointer(resultIndex));
+            event.setResultValidPointer(Cache::Manager::Get()
+                                        ->GetWeightsCache()
+                                        .GetResultValidPointer());
             Cache::Manager::Get()
                 ->GetWeightsCache()
                 .SetInitialValue(resultIndex,event.getTreeWeight());

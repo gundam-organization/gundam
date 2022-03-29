@@ -60,10 +60,16 @@ Cache::Weights::Weights(
 // The destructor
 Cache::Weights::~Weights() {}
 
-double Cache::Weights::GetResult(int i) const {
+double Cache::Weights::GetResult(int i) {
     if (i < 0) throw;
     if (GetResultCount() <= i) throw;
+    fResultsValid = true;
     return fResults->hostPtr()[i];
+}
+
+double Cache::Weights::GetResultFast(int i) {
+    fResultsValid = true;
+    return fResults->readOnlyHostPtr()[i];
 }
 
 void Cache::Weights::SetResult(int i, double v) {
@@ -72,13 +78,17 @@ void Cache::Weights::SetResult(int i, double v) {
     fResults->hostPtr()[i] = v;
 }
 
-double* Cache::Weights::GetResultPointer(int i) const {
+double* Cache::Weights::GetResultPointer(int i) {
     if (i < 0) throw;
     if (GetResultCount() <= i) throw;
     return (fResults->hostPtr() + i);
 }
 
-double  Cache::Weights::GetInitialValue(int i) const {
+bool* Cache::Weights::GetResultValidPointer() {
+    return &fResultsValid;
+}
+
+double  Cache::Weights::GetInitialValue(int i) {
     if (i < 0) throw;
     if (GetResultCount() <= i) throw;
     return fInitialValues->hostPtr()[i];
@@ -134,11 +144,14 @@ bool Cache::Weights::Apply() {
         fWeightCalculator.at(i)->Apply();
     }
 
+    // Mark the results has having changed.
+    fResultsValid = false;
+
     // A simple way to copy from the device.  This needs to be done since
     // other places using the values are referencing the contents of the host
     // array by address, and that won't trigger the copy.  The copy also isn't
     // thread safe.
-    fResults->hostPtr();
+    // fResults->hostPtr();
 
     return true;
 }

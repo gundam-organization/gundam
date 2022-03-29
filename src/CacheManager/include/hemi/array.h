@@ -1,7 +1,7 @@
 ///////////////////////////////////////////////////////////////////////////////
-// 
+//
 // "Hemi" CUDA Portable C/C++ Utilities
-// 
+//
 // Copyright 2012-2015 NVIDIA Corporation
 //
 // License: BSD License, see LICENSE file in Hemi home directory
@@ -9,13 +9,14 @@
 // The home for Hemi is https://github.com/harrism/hemi
 //
 ///////////////////////////////////////////////////////////////////////////////
-// Please see the file README.md (https://github.com/harrism/hemi/README.md) 
+// Please see the file README.md (https://github.com/harrism/hemi/README.md)
 // for full documentation and discussion.
 ///////////////////////////////////////////////////////////////////////////////
 #pragma once
 
 #include "hemi/hemi.h"
 #include <cstring>
+#include <mutex>
 
 #ifdef HEMI_ARRAY_DEBUG
 #include <iostream>
@@ -37,6 +38,12 @@
 #endif
 
 namespace hemi {
+#ifndef HEMI_DISABLE_THREADS
+     inline std::mutex& deviceLock() {
+          static std::mutex lock;
+          return lock;
+     }
+#endif
 
      template <typename T> class Array; // forward decl
 
@@ -46,12 +53,12 @@ namespace hemi {
      };
 
      template <typename T>
-          class Array 
+          class Array
      {
      public:
           // Construct the an array of "n" objects of class "T".object.
-     Array(size_t n, bool usePinned=true) : 
-          nSize(n), 
+     Array(size_t n, bool usePinned=true) :
+          nSize(n),
                hPtr(0),
                dPtr(0),
                isForeignHostPtr(false),
@@ -59,13 +66,13 @@ namespace hemi {
                isHostAlloced(false),
                isDeviceAlloced(false),
                isHostValid(false),
-               isDeviceValid(false) 
+               isDeviceValid(false)
           {
           }
 
           // Use a pre-allocated host pointer (use carefully!)
-     Array(T *hostMem, size_t n) : 
-          nSize(n), 
+     Array(T *hostMem, size_t n) :
+          nSize(n),
                hPtr(hostMem),
                dPtr(0),
                isForeignHostPtr(true),
@@ -73,12 +80,12 @@ namespace hemi {
                isHostAlloced(true),
                isDeviceAlloced(false),
                isHostValid(true),
-               isDeviceValid(false) 
+               isDeviceValid(false)
           {
           }
 
-          ~Array() 
-          {           
+          ~Array()
+          {
                deallocateDevice();
                if (!isForeignHostPtr)
                     deallocateHost();
@@ -101,9 +108,9 @@ namespace hemi {
           void copyToHost(T *other, size_t n) const
           {
                assert(isHostAlloced);
-               assert(n <= nSize);            
+               assert(n <= nSize);
                memcpy(other, readOnlyHostPtr(), n * sizeof(T));
-          }            
+          }
 
 #ifndef HEMI_CUDA_DISABLE
           void copyFromDevice(const T *other, size_t n)
@@ -113,7 +120,7 @@ namespace hemi {
                     deallocateDevice();
                     nSize = n;
                }
-               checkCuda( cudaMemcpy(writeOnlyDevicePtr(), other, 
+               checkCuda( cudaMemcpy(writeOnlyDevicePtr(), other,
                                      nSize * sizeof(T),
                                      cudaMemcpyDeviceToDevice) );
           }
@@ -122,7 +129,7 @@ namespace hemi {
           {
                assert(isDeviceAlloced);
                assert(n <= nSize);
-               checkCuda( cudaMemcpy(other, readOnlyDevicePtr(), 
+               checkCuda( cudaMemcpy(other, readOnlyDevicePtr(),
                                      nSize * sizeof(T),
                                      cudaMemcpyDeviceToDevice) );
           }
@@ -132,8 +139,8 @@ namespace hemi {
 
           // R/W pointer access: Decide if the host or device pointer is needed
           // using hostPtr() or devicePtr().
-          T* ptr(Location loc = HEMI_ARRAY_DEFAULT_LOCATION) 
-          { 
+          T* ptr(Location loc = HEMI_ARRAY_DEFAULT_LOCATION)
+          {
                if (loc == host) return hostPtr();
                else return devicePtr();
           }
@@ -193,7 +200,7 @@ namespace hemi {
 
           // Write-only: Decide if the host or the device is being accessed.
           // Ignore validity of existing data.
-          T* writeOnlyPtr(Location loc = HEMI_ARRAY_DEFAULT_LOCATION) 
+          T* writeOnlyPtr(Location loc = HEMI_ARRAY_DEFAULT_LOCATION)
           {
                if (loc == host) return writeOnlyHostPtr();
                else return writeOnlyDevicePtr();
@@ -227,9 +234,9 @@ namespace hemi {
 
           bool            isForeignHostPtr;
           bool            isPinned;
-        
+
           mutable bool    isHostAlloced;
-          mutable bool    isDeviceAlloced;        
+          mutable bool    isDeviceAlloced;
 
           mutable bool    isHostValid;
           mutable bool    isDeviceValid;
@@ -246,17 +253,17 @@ namespace hemi {
                }
                else
 #endif
-                    hPtr = new T[nSize];    
-                
+                    hPtr = new T[nSize];
+
                isHostAlloced = true;
                isHostValid = false;
 
           }
-        
+
           void allocateDevice() const
           {
 #ifndef HEMI_CUDA_DISABLE
-               HEMI_ARRAY_OUTPUT("allocateDevice");             
+               HEMI_ARRAY_OUTPUT("allocateDevice");
                assert(!isDeviceAlloced);
                checkCuda( cudaMalloc((void**)&dPtr, nSize * sizeof(T)) );
                isDeviceAlloced = true;
@@ -268,7 +275,7 @@ namespace hemi {
           {
                assert(!isForeignHostPtr);
                if (isHostAlloced) {
-                    HEMI_ARRAY_OUTPUT("deallocateHost");             
+                    HEMI_ARRAY_OUTPUT("deallocateHost");
 #ifndef HEMI_CUDA_DISABLE
                     if (isPinned) {
                          HEMI_ARRAY_OUTPUT("deallocateHost was pinned");
@@ -287,7 +294,7 @@ namespace hemi {
           {
 #ifndef HEMI_CUDA_DISABLE
                if (isDeviceAlloced) {
-                    HEMI_ARRAY_OUTPUT("deallocateDevice");             
+                    HEMI_ARRAY_OUTPUT("deallocateDevice");
                     checkCuda( cudaFree(dPtr) );
                     isDeviceAlloced = false;
                     isDeviceValid   = false;
@@ -301,9 +308,9 @@ namespace hemi {
                assert(isHostAlloced);
                if (!isDeviceAlloced) allocateDevice();
                HEMI_ARRAY_OUTPUT("copyHostToDevice");
-               checkCuda( cudaMemcpy(dPtr, 
-                                     hPtr, 
-                                     nSize * sizeof(T), 
+               checkCuda( cudaMemcpy(dPtr,
+                                     hPtr,
+                                     nSize * sizeof(T),
                                      cudaMemcpyHostToDevice) );
                isDeviceValid = true;
 #endif
@@ -312,16 +319,22 @@ namespace hemi {
           void copyDeviceToHost() const
           {
 #ifndef HEMI_CUDA_DISABLE
+#ifndef HEMI_DISABLE_THREADS
+               std::lock_guard<std::mutex> guard(deviceLock());
+#endif
                assert(isDeviceAlloced);
                if (!isHostAlloced) allocateHost();
+#ifndef HEMI_DISABLE_THREADS
+               if (isHostValid) return; // done while waiting for lock
+#endif
                HEMI_ARRAY_OUTPUT("copyDeviceToHost");
-               checkCuda( cudaMemcpy(hPtr, 
-                                     dPtr, 
-                                     nSize * sizeof(T), 
+               checkCuda( cudaMemcpy(hPtr,
+                                     dPtr,
+                                     nSize * sizeof(T),
                                      cudaMemcpyDeviceToHost) );
                isHostValid = true;
 #endif
           }
-        
+
      };
-} 
+}
