@@ -30,6 +30,7 @@ Cache::Weights::Weights(
     LogInfo << "Cached Weights -- output results reserved: "
            << GetResultCount()
            << std::endl;
+    fTotalBytes = 0;
     fTotalBytes += GetResultCount()*sizeof(double);   // fResults
     fTotalBytes += GetResultCount()*sizeof(double);   // fInitialValues;
 

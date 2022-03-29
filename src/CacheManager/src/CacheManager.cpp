@@ -51,7 +51,7 @@ std::string Cache::Manager::SplineType(const TSpline3* s) {
     return std::string("uniformSpline");
 }
 
-Cache::Manager::Manager(int results, int parameters,
+Cache::Manager::Manager(int events, int parameters,
                         int norms,
                         int compactSplines, int compactPoints,
                         int uniformSplines, int uniformPoints,
@@ -59,6 +59,7 @@ Cache::Manager::Manager(int results, int parameters,
                         int histBins) {
     LogInfo << "Creating cache manager" << std::endl;
 
+    fTotalBytes = 0;
     try {
         fParameterCache.reset(new Cache::Parameters(parameters));
         fTotalBytes += fParameterCache->GetResidentMemory();
@@ -67,7 +68,7 @@ Cache::Manager::Manager(int results, int parameters,
             new Cache::Weights(fParameterCache->GetParameters(),
                                fParameterCache->GetLowerClamps(),
                                fParameterCache->GetUpperClamps(),
-                               results));
+                               events));
         fTotalBytes += fWeightsCache->GetResidentMemory();
 
         fNormalizations.reset(new Cache::Weight::Normalization(
@@ -107,6 +108,8 @@ Cache::Manager::Manager(int results, int parameters,
         fHistogramsCache.reset(new Cache::IndexedSums(
                                   fWeightsCache->GetWeights(),
                                   histBins));
+        fTotalBytes += fHistogramsCache->GetResidentMemory();
+
     }
     catch (...) {
         LogError << "Failed to allocate memory, so stopping" << std::endl;
@@ -114,9 +117,9 @@ Cache::Manager::Manager(int results, int parameters,
     }
 
     LogInfo << "Approximate cache manager size for"
-            << " " << results << " results:"
+            << " " << events << " events:"
             << " " << GetResidentMemory()/1E+9 << " GB "
-            << " (" << GetResidentMemory()/results << " bytes per result)"
+            << " (" << GetResidentMemory()/events << " bytes per event)"
             << std::endl;
 }
 
@@ -231,6 +234,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
                 << compactPoints << " control points --"
                 << " (" << 1.0*compactPoints/compactSplines
                 << " points per spline)"
+                << " for " << compactSplines << " splines"
                 << std::endl;
     }
     if (uniformSplines > 0) {
@@ -238,13 +242,15 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
                 << uniformPoints << " control points --"
                 << " (" << 1.0*uniformPoints/uniformSplines
                 << " points per spline)"
+                << " for " << uniformSplines << " splines"
                 << std::endl;
     }
     if (generalSplines > 0) {
         LogInfo << "    General spline cache uses "
                 << generalPoints << " control points --"
-                << " (" << 1.0*generalPoints/uniformSplines
+                << " (" << 1.0*generalPoints/generalSplines
                 << " points per spline)"
+                << " for " << generalSplines << " splines"
                 << std::endl;
     }
     if (graphs > 0) {

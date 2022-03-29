@@ -22,6 +22,8 @@ Cache::Parameters::Parameters(std::size_t parameters)
     LogInfo << "Cached Parameters -- input parameter count: "
             << GetParameterCount()
             << std::endl;
+
+    fTotalBytes = 0;
     fTotalBytes += GetParameterCount()*sizeof(double); // fParameters
     fTotalBytes += GetParameterCount()*sizeof(double);  // fLowerClamp
     fTotalBytes += GetParameterCount()*sizeof(double);  // fUpperclamp
