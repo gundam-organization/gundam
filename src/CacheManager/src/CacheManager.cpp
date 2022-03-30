@@ -437,6 +437,13 @@ bool Cache::Manager::Fill() {
     return true;
 }
 
+int Cache::Manager::ParameterIndex(const FitParameter* fp) {
+    std::map<const FitParameter*,int>::iterator parMapIt
+        = Cache::Manager::ParameterMap.find(fp);
+    if (parMapIt == Cache::Manager::ParameterMap.end()) return -1;
+    return parMapIt->second;
+}
+
 // An MIT Style License
 
 // Copyright (c) 2022 Clark McGrew

@@ -39,6 +39,10 @@ public:
     // Propagator.cpp to fill the constants needed to for the calculations.
     static bool Build(FitSampleSet& sampleList);
 
+    /// This returns the index of the parameter in the cache.  If the
+    /// parameter isn't defined, this will return a negative value.
+    static int ParameterIndex(const FitParameter* fp);
+
     /// Return the approximate allocated memory (e.g. on the GPU).
     std::size_t GetResidentMemory() const {return fTotalBytes;}
 
