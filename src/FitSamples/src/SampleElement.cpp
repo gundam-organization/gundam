@@ -128,12 +128,14 @@ void SampleElement::refillHistogram(int iThread_){
   int nBins = int(perBinEventPtrList.size());
   while( iBin < nBins ){
     double content = 0.0;
-#ifdef GUNDAM_USING_CUDA
-    if (0 <= histIndex) {
-        content = cache->GetHistogramsCache().GetSum(histIndex+iBin);
+    if (histIndex < 0) {
+        for( auto* eventPtr : perBinEventPtrList.at(iBin)){
+            content += eventPtr->getEventWeight();
+        }
     }
+    else {
+        content = cache->GetHistogramsCache().GetSum(histIndex+iBin);
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
-    {
         double slowValue = 0.0;
         for( auto* eventPtr : perBinEventPtrList.at(iBin)){
             slowValue += eventPtr->getEventWeight();
@@ -142,16 +144,12 @@ void SampleElement::refillHistogram(int iThread_){
         if (delta > 1E-6) {
             LogInfo << "Bin mismatch " << histIndex
                     << " " << iBin
+                    << " " << name
                     << " " << slowValue
                     << " " << content
                     << " " << delta
                     << std::endl;
         }
-    }
-#endif
-#else
-    for( auto* eventPtr : perBinEventPtrList.at(iBin)){
-        content += eventPtr->getEventWeight();
     }
 #endif
     binContentArray[iBin+1] = content;

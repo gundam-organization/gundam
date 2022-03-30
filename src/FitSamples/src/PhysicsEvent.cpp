@@ -74,6 +74,15 @@ double PhysicsEvent::getNominalWeight() const {
 double PhysicsEvent::getEventWeight() const {
 #ifdef GUNDAM_USING_CUDA
     if (0 <= _GPUResultIndex_ && _GPUResult_) {
+        if (_GPUResultValid_ && !(*_GPUResultValid_)) {
+            // This is slow, but will make sure that the cached result is
+            // updated when the GPU changes.  The values pointed to by
+            // _GPUResult_ and _GPUResultValid_ are inside of the weights
+            // cache (a bit of evil coding here), and are updated by the
+            // cache.
+            Cache::Manager::Get()
+                ->GetWeightsCache().GetResult(_GPUResultIndex_);
+        }
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning CACHE_MANAGER_SLOW_VALIDATION used in PhysicsEvent::getEventWeight
         do {
@@ -104,15 +113,12 @@ double PhysicsEvent::getEventWeight() const {
                        << std::endl;
         } while(false);
 #endif
-        if (_GPUResultValid_ && !(*_GPUResultValid_)) {
-            // This is slow, but will make sure that the cached result is
-            // updated when the GPU changes.  The values pointed to by
-            // _GPUResult_ and _GPUResultValid_ are inside of the weights
-            // cache (a bit of evil coding here), and are updated by the
-            // cache.
-            return Cache::Manager::Get()
-                ->GetWeightsCache().GetResultFast(_GPUResultIndex_);
-        }
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
+#warning CACHE_MANAGER_SLOW_VALIDATION force CPU _eventWeight
+        // When the slow validation is running, the "CPU" event weight is
+        // calculated after Cache::Manager::Fill
+        return _eventWeight_;
+#endif
         return *_GPUResult_;
     }
 #endif
@@ -190,8 +196,14 @@ void PhysicsEvent::reweightUsingDialCache(){
   for( auto& dial : _rawDialPtrList_ ){
     if( dial == nullptr ) return;
     double response = dial->evalResponse();
+    this->addEventWeight( response );
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning CACHE_MANAGER_SLOW_VALIDATION used in PhysicsEvent::reweightUsingDialCache
+#warning CACHE_MANAGER_SLOW_VALIDATION in PhysicsEvent::reweightUsingDialCache
+    /////////////////////////////////////////////////////////////////
+    // The internal GPU values for the splines are made available during slow
+    // validation, but are never used in the CPU calculation.  This code here
+    // is checking that the GPU value for the spline agrees with the direct
+    // dial calculation of the spline.
     static std::map<std::string,double> maxDelta; // Exclude zero...
     static std::map<std::string,double> sumDelta;
     static std::map<std::string,long long int> numDelta;
@@ -254,7 +266,6 @@ void PhysicsEvent::reweightUsingDialCache(){
         break;
     }
 #endif
-    this->addEventWeight( response );
   }
 }
 
