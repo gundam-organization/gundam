@@ -14,6 +14,10 @@ namespace Cache {
     }
 }
 
+// Do a definition here to "trick" nvcc which doesn't like the type to be
+// typedef'ed
+#define WEIGHT_BUFFER_FLOAT double
+
 /// A base class for the weight calculators.  This holds the pointer to the
 /// weights being accumulated, the input parameter values, and the name of the
 /// weight calculator.

@@ -49,7 +49,7 @@ Cache::Weight::CompactSpline::CompactSpline(
     LogInfo << "Reserved " << GetName()
             << " Spline Knots: " << GetSplineKnotsReserved()
             << std::endl;
-    fTotalBytes += GetSplineKnotsReserved()*sizeof(float);  // fSpineKnots
+    fTotalBytes += GetSplineKnotsReserved()*sizeof(WEIGHT_BUFFER_FLOAT);  // fSpineKnots
 
 
     LogInfo << "Approximate Memory Size for " << GetName()
@@ -76,7 +76,7 @@ Cache::Weight::CompactSpline::CompactSpline(
         // during initialization so do not pin the CPU memory into the page
         // set.
         fSplineKnots.reset(
-            new hemi::Array<float>(GetSplineKnotsReserved(),false));
+            new hemi::Array<WEIGHT_BUFFER_FLOAT>(GetSplineKnotsReserved(),false));
     }
     catch (std::bad_alloc&) {
         LogError << "Failed to allocate memory, so stopping" << std::endl;
@@ -348,7 +348,7 @@ namespace {
     // input value of 2.1 results in the linear interpolation between element
     // [2] and element [3], or "(1.0-0.1)*p[2] + 0.1*p[3])".
     HEMI_DEV_CALLABLE_INLINE
-    float HEMIInterp(double x, const float* points, int dim) {
+    WEIGHT_BUFFER_FLOAT HEMIInterp(double x, const WEIGHT_BUFFER_FLOAT* points, int dim) {
 #undef USE_LINEAR_INTERPOLATION
 #ifdef USE_LINEAR_INTERPOLATION
 #error Linear interpolation requested
@@ -360,10 +360,10 @@ namespace {
         // Get the remainder for the "index".  If the input index is less than
         // zero or greater than kPointSize-1, this is the distance from the
         // boundary.
-        float fx = x-ix;
-        float ffx = 1.0-fx;
+        WEIGHT_BUFFER_FLOAT fx = x-ix;
+        WEIGHT_BUFFER_FLOAT ffx = 1.0-fx;
 
-        float v = ffx*points[ix] + fx*points[ix+1];
+        WEIGHT_BUFFER_FLOAT v = ffx*points[ix] + fx*points[ix+1];
 #endif
 #define USE_SPLINE_INTERPOLATION
 #ifdef USE_SPLINE_INTERPOLATION
@@ -404,31 +404,31 @@ namespace {
         int d54_1 = d54_0+1;          // p5
 
         // Find the points to use.
-        float p2 = points[d32_0];
-        float p3 = points[d32_1];
+        WEIGHT_BUFFER_FLOAT p2 = points[d32_0];
+        WEIGHT_BUFFER_FLOAT p3 = points[d32_1];
 
         // Get the remainder for the "index".  If the input index is less than
         // zero or greater than kPointSize-1, this is the distance from the
         // boundary.
-        float fx = x-d32_0;
-        float fxx = fx*fx;
-        float fxxx = fx*fxx;
+        WEIGHT_BUFFER_FLOAT fx = x-d32_0;
+        WEIGHT_BUFFER_FLOAT fxx = fx*fx;
+        WEIGHT_BUFFER_FLOAT fxxx = fx*fxx;
 
         // Get the values of the deltas
-        // float d10 = points[IX(i,d10_1)] - points[IX(i,d10_0)];
-        float d21 = points[d21_1] - points[d21_0];
-        float d32 = p3-p2;
-        float d43 = points[d43_1] - points[d43_0];
+        // WEIGHT_BUFFER_FLOAT d10 = points[IX(i,d10_1)] - points[IX(i,d10_0)];
+        WEIGHT_BUFFER_FLOAT d21 = points[d21_1] - points[d21_0];
+        WEIGHT_BUFFER_FLOAT d32 = p3-p2;
+        WEIGHT_BUFFER_FLOAT d43 = points[d43_1] - points[d43_0];
 
         // Find the raw slopes at each point
-        // float m1 = 0.5*(d10+d21);
-        float m2 = 0.5*(d21+d32);
-        float m3 = 0.5*(d32+d43);
+        // WEIGHT_BUFFER_FLOAT m1 = 0.5*(d10+d21);
+        WEIGHT_BUFFER_FLOAT m2 = 0.5*(d21+d32);
+        WEIGHT_BUFFER_FLOAT m3 = 0.5*(d32+d43);
 
 #ifdef COMPACT_SPLINE_MONOTONIC
         #warning Using a MONOTONIC spline
-        float d54 = points[d54_1] - points[d54_0];
-        float m4 = 0.5*(d43+d54);
+        WEIGHT_BUFFER_FLOAT d54 = points[d54_1] - points[d54_0];
+        WEIGHT_BUFFER_FLOAT m4 = 0.5*(d43+d54);
 
         // Deal with cusp points and flat areas.
         // if (d21*d10 < 0.0) m1 = 0.0;
@@ -437,16 +437,16 @@ namespace {
         if (d54*d43 <= 0.0) m4 = 0.0;
 
         // Find the alphas and betas
-        // float a0 = (d10>0) ? m0/d21: 0;
-        // float b0 = (d10>0) ? m1/d21: 0;
-        // float a1 = (d21>0) ? m1/d21: 0;
-        float b1 = (d21>0) ? m2/d21: 0;
-        float a2 = (d32>0) ? m2/d32: 0;
-        float b2 = (d32>0) ? m3/d32: 0;
-        float a3 = (d43>0) ? m3/d43: 0;
-        float b3 = (d43>0) ? m4/d43: 0;
-        // float a4 = (d54>0) ? m4/d54: 0;
-        // float b4 = (d54>0) ? m5/d54: 0;
+        // WEIGHT_BUFFER_FLOAT a0 = (d10>0) ? m0/d21: 0;
+        // WEIGHT_BUFFER_FLOAT b0 = (d10>0) ? m1/d21: 0;
+        // WEIGHT_BUFFER_FLOAT a1 = (d21>0) ? m1/d21: 0;
+        WEIGHT_BUFFER_FLOAT b1 = (d21>0) ? m2/d21: 0;
+        WEIGHT_BUFFER_FLOAT a2 = (d32>0) ? m2/d32: 0;
+        WEIGHT_BUFFER_FLOAT b2 = (d32>0) ? m3/d32: 0;
+        WEIGHT_BUFFER_FLOAT a3 = (d43>0) ? m3/d43: 0;
+        WEIGHT_BUFFER_FLOAT b3 = (d43>0) ? m4/d43: 0;
+        // WEIGHT_BUFFER_FLOAT a4 = (d54>0) ? m4/d54: 0;
+        // WEIGHT_BUFFER_FLOAT b4 = (d54>0) ? m5/d54: 0;
 
         // Find places where can only be piecewise monotonic.
         // if (b0 <= 0) m1 = 0.0;
@@ -490,7 +490,7 @@ namespace {
                          const double* params,
                          const double* lowerClamp,
                          const double* upperClamp,
-                         const float* knots,
+                         const WEIGHT_BUFFER_FLOAT* knots,
                          const int* rIndex,
                          const short* pIndex,
                          const int* sIndex,
@@ -501,9 +501,9 @@ namespace {
             double x = params[pIndex[i]];
             x = (x-knots[id0])*knots[id0+1];
             x = HEMIInterp(x, &knots[id0+2], id1-id0-2);
-            float lc = lowerClamp[pIndex[i]];
+            WEIGHT_BUFFER_FLOAT lc = lowerClamp[pIndex[i]];
             if (x < lc) x = lc;
-            float uc = upperClamp[pIndex[i]];
+            WEIGHT_BUFFER_FLOAT uc = upperClamp[pIndex[i]];
             if (x > uc) x = uc;
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning Using SLOW VALIDATION in Cache::Weight::CompactSpline::HEMISplinesKernel

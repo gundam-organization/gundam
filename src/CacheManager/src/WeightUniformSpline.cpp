@@ -49,7 +49,7 @@ Cache::Weight::UniformSpline::UniformSpline(
     LogInfo << "Reserved " << GetName()
             << " Spline Knots: " << GetSplineKnotsReserved()
             << std::endl;
-    fTotalBytes += GetSplineKnotsReserved()*sizeof(float);  // fSpineKnots
+    fTotalBytes += GetSplineKnotsReserved()*sizeof(WEIGHT_BUFFER_FLOAT);  // fSpineKnots
 
     LogInfo << "Approximate Memory Size for " << GetName()
             << ": " << fTotalBytes/1E+9
@@ -75,7 +75,7 @@ Cache::Weight::UniformSpline::UniformSpline(
         // during initialization so do not pin the CPU memory into the page
         // set.
         fSplineKnots.reset(
-            new hemi::Array<float>(GetSplineKnotsReserved(),false));
+            new hemi::Array<WEIGHT_BUFFER_FLOAT>(GetSplineKnotsReserved(),false));
     }
     catch (std::bad_alloc&) {
         LogError << "Failed to allocate memory, so stopping" << std::endl;
@@ -401,7 +401,7 @@ namespace {
     // input value of 2.1 results in the linear interpolation between element
     // [2] and element [3], or "(1.0-0.1)*p[2] + 0.1*p[3])".
     HEMI_DEV_CALLABLE_INLINE
-    float HEMIInterp(double x, double step, const float* points, int dim) {
+    WEIGHT_BUFFER_FLOAT HEMIInterp(double x, double step, const WEIGHT_BUFFER_FLOAT* points, int dim) {
         // Get the integer part
         int ix = x;
         if (ix<0) ix=0;
@@ -435,7 +435,7 @@ namespace {
                          const double* params,
                          const double* lowerClamp,
                          const double* upperClamp,
-                         const float* knots,
+                         const WEIGHT_BUFFER_FLOAT* knots,
                          const int* rIndex,
                          const short* pIndex,
                          const int* sIndex,
@@ -470,9 +470,9 @@ namespace {
             }
 #endif
 #endif
-            const float lc = lowerClamp[pIndex[i]];
+            const WEIGHT_BUFFER_FLOAT lc = lowerClamp[pIndex[i]];
             if (v < lc) v = lc;
-            const float uc = upperClamp[pIndex[i]];
+            const WEIGHT_BUFFER_FLOAT uc = upperClamp[pIndex[i]];
             if (v > uc) v = uc;
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning Using SLOW VALIDATION in Cache::Weight::UniformSpline::HEMISplinesKernel

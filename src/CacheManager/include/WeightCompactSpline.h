@@ -51,7 +51,7 @@ private:
     /// the CPU to the GPU once, and is then constant.
     std::size_t    fSplineKnotsReserved;
     std::size_t    fSplineKnotsUsed;
-    std::unique_ptr<hemi::Array<float>> fSplineKnots;
+    std::unique_ptr<hemi::Array<WEIGHT_BUFFER_FLOAT>> fSplineKnots;
 
 public:
     // A static method to return the number of knots that will be used by this

@@ -431,7 +431,9 @@ bool Cache::Manager::Fill() {
     cache->GetWeightsCache().Apply();
     cache->GetHistogramsCache().Apply();
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning CACHE_MANAGER_SLOW_VALIDATION is being used in Cache::Manager::Fill()
+#warning CACHE_MANAGER_SLOW_VALIDATION in Cache::Manager::Fill()
+    // Returning false means that the event weights will also be calculated
+    // using the CPU.
     return false;
 #endif
     return true;
