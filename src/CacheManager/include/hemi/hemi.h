@@ -26,6 +26,10 @@
 // device execution on systems with CUDA installed.
 // #define HEMI_CUDA_DISABLE
 
+#ifdef HEMI_CUDA_DISABLE
+#warning HEMI: HEMI_CUDA_DISABLED is defined so CUDA usage is disabled
+#endif
+
 #if !defined(HEMI_CUDA_DISABLE) && defined(__CUDACC__) // CUDA compiler
 
   #define HEMI_CUDA_COMPILER              // to detect CUDACC compilation

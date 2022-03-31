@@ -19,7 +19,9 @@
 #include <assert.h>
 
 #ifndef HEMI_CUDA_COMPILER
+#ifndef HEMI_CUDA_DISABLE
 #define HEMI_CUDA_DISABLE
+#endif
 #endif
 
 namespace hemi {
