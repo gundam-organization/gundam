@@ -150,8 +150,8 @@ void SampleElement::refillHistogram(int iThread_){
                     << " " << delta
                     << std::endl;
         }
-    }
 #endif
+    }
     binContentArray[iBin+1] = content;
     histogram->GetSumw2()->GetArray()[iBin+1] = content;
     iBin += nbThreads;
