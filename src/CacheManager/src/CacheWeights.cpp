@@ -128,17 +128,12 @@ namespace {
 }
 
 bool Cache::Weights::Apply() {
+
     HEMISetKernel setKernel;
-#ifdef FORCE_HOST_KERNEL
-    setKernel(   fResults->hostPtr(),
-                 fInitialValues->hostPtr(),
-                 GetResultCount());
-#else
     hemi::launch(setKernel,
                  fResults->writeOnlyPtr(),
                  fInitialValues->readOnlyPtr(),
                  GetResultCount());
-#endif
 
     for (int i=0; i<fWeightCalculators; ++i) {
         if (!fWeightCalculator.at(i)) continue;

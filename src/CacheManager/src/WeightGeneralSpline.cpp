@@ -551,23 +551,8 @@ namespace {
 
 bool Cache::Weight::GeneralSpline::Apply() {
     if (GetSplinesUsed() < 1) return false;
+
     HEMISplinesKernel splinesKernel;
-#ifdef FORCE_HOST_KERNEL
-    splinesKernel(fWeights.hostPtr(),
-#ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in Cache::Weight::GeneralSpline::Apply
-                  fSplineValue->hostPtr(),
-#endif
-                  fParameters.hostPtr(),
-                  fLowerClamp.hostPtr(),
-                  fUpperClamp.hostPtr(),
-                  fSplineKnots->hostPtr(),
-                  fSplineResult->hostPtr(),
-                  fSplineParameter->hostPtr(),
-                  fSplineIndex->hostPtr(),
-                  GetSplinesUsed()
-        );
-#else
     hemi::launch(splinesKernel,
                  fWeights.writeOnlyPtr(),
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
@@ -583,7 +568,6 @@ bool Cache::Weight::GeneralSpline::Apply() {
                  fSplineIndex->readOnlyPtr(),
                  GetSplinesUsed()
         );
-#endif
 
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning Using SLOW VALIDATION and copying spine values

@@ -115,21 +115,15 @@ namespace {
 
 bool Cache::Weight::Normalization::Apply() {
     if (GetNormsUsed() < 1) return false;
+
     HEMINormsKernel normsKernel;
-#ifdef FORCE_HOST_KERNEL
-    normsKernel(fWeights.hostPtr(),
-                fParameters.hostPtr(),
-                fNormResult->hostPtr(),
-                fNormParameter->hostPtr(),
-                GetNormsUsed());
-#else
     hemi::launch(normsKernel,
                  fWeights.writeOnlyPtr(),
                  fParameters.readOnlyPtr(),
                  fNormResult->readOnlyPtr(),
                  fNormParameter->readOnlyPtr(),
                  GetNormsUsed());
-#endif
+
     return true;
 }
 

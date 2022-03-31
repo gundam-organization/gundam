@@ -104,29 +104,19 @@ namespace {
 }
 
 bool Cache::IndexedSums::Apply() {
+
     HEMIResetKernel resetKernel;
-#ifdef FORCE_HOST_KERNEL
-    resetKernel(   fSums->hostPtr(), 0.0, fSums->size());
-#else
     hemi::launch(resetKernel,
                  fSums->writeOnlyPtr(),
                  0.0,
                  fSums->size());
-#endif
 
     HEMIIndexedSumKernel indexedSumKernel;
-#ifdef FORCE_HOST_KERNEL
-    indexedSumKernel(fSums->hostPtr(),
-                     fEventWeights.hostPtr(),
-                     fIndexes->hostPtr(),
-                     fEventWeights.size());
-#else
     hemi::launch(indexedSumKernel,
                  fSums->writeOnlyPtr(),
                  fEventWeights.readOnlyPtr(),
                  fIndexes->readOnlyPtr(),
                  fEventWeights.size());
-#endif
 
     // A simple way to copy from the device.  This needs to be done since
     // other places using the values are referencing the contents of the host
