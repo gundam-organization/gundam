@@ -143,6 +143,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
         LogInfo << "Sample " << sample.getName()
                 << " with " << sample.getMcContainer().eventList.size()
                 << " events" << std::endl;
+        std::map<std::string, int> useCount;
         for (const PhysicsEvent& event
                  : sample.getMcContainer().eventList) {
             ++events;
@@ -154,6 +155,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
                 FitParameter* fp = static_cast<FitParameter*>(
                     dial->getAssociatedParameterReference());
                 usedParameters.insert(fp);
+                ++useCount[fp->getFullTitle()];
                 const SplineDial* sDial
                     = dynamic_cast<const SplineDial*>(dial);
                 if (sDial) {
@@ -193,6 +195,17 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
                 }
             }
         }
+#define DUMP_USED_PARAMETERS
+#ifdef DUMP_USED_PARAMETERS
+        for (auto& used : useCount) {
+            LogInfo << sample.getName()
+                    << " used " << used.first
+                    << " " << used.second
+                    << " times"
+                    << std::endl;
+        }
+#endif
+
     }
 
     // Count the total number of histogram cells.
@@ -424,6 +437,23 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
 bool Cache::Manager::Fill() {
     Cache::Manager* cache = Cache::Manager::Get();
     if (!cache) return false;
+#define DUMP_FILL_INPUT_PARAMETERS
+#ifdef DUMP_FILL_INPUT_PARAMETERS
+    do {
+        static bool printed = false;
+        if (printed) break;
+        printed = true;
+        for (auto& par : Cache::Manager::ParameterMap ) {
+            // This produces a crazy amount of output.
+            LogInfo << "FILL: " << par.second
+                    << "/" << Cache::Manager::ParameterMap.size()
+                    << " " << par.first->isEnabled()
+                    << " " << par.first->getParameterValue()
+                    << " (" << par.first->getFullTitle() << ")"
+                    << std::endl;
+        }
+    } while(false);
+#endif
     for (auto& par : Cache::Manager::ParameterMap ) {
         cache->GetParameterCache().SetParameter(
             par.second, par.first->getParameterValue());
