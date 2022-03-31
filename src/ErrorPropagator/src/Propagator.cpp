@@ -293,6 +293,28 @@ void Propagator::updateDialResponses(){
   dialUpdate.counts++; dialUpdate.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 }
 void Propagator::reweightSampleEvents() {
+#define DUMP_PARAMETERS
+#ifdef DUMP_PARAMETERS
+    do {
+        static bool printed = false;
+        if (printed) break;
+        printed = true;
+        // This produces a crazy amount of output.
+        int iPar = 0;
+        for (auto& parSet : _parameterSetsList_) {
+            for ( auto& par : parSet.getParameterList()) {
+                LogInfo << "DUMP: " << iPar++
+                        << " " << par.isEnabled()
+                        << " " << par.getParameterValue()
+                        << " (" << par.getFullTitle() << ")";
+                if (Cache::Manager::ParameterIndex(&par) < 0) {
+                    LogInfo << " not used";
+                }
+                LogInfo << std::endl;
+            }
+        }
+    } while (false);
+#endif
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
   bool usedGPU = false;
 #ifdef GUNDAM_USING_CUDA
