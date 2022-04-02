@@ -40,7 +40,7 @@ public:
     // which are managed by the Weights class.
     Normalization(Cache::Weights::Results& weights,
                   Cache::Parameters::Values& parameters,
-              std::size_t norms);
+                  std::size_t norms);
 
     // Deconstruct the class.  This should deallocate all the memory
     // everyplace.

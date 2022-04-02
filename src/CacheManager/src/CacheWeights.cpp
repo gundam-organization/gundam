@@ -143,10 +143,14 @@ bool Cache::Weights::Apply() {
     // Mark the results has having changed.
     fResultsValid = false;
 
-    // A simple way to copy from the device.  This needs to be done since
-    // other places using the values are referencing the contents of the host
-    // array by address, and that won't trigger the copy.  The copy also isn't
-    // thread safe.
+    // Synchronization prevents the GPU from running in parallel with the CPU,
+    // so it can make the whole program a little slower.  In practice, the
+    // synchronization doesn't slow things down in GUNDAM.  The suspicion is
+    // that it's because the CPU almost immediately uses the results, and the
+    // sync prevents a small amount of mutex locking.
+    hemi::deviceSynchronize();
+
+    // A simple way to force a copy from the device.
     // fResults->hostPtr();
 
     return true;
