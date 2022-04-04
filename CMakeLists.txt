@@ -165,6 +165,12 @@ endif()
 
 if (WITH_CUDA)
   add_definitions( -DGUNDAM_USING_CUDA )
+
+  # uncomment to enable the slow validations (NEVER during productions
+  # or normal running).  These are whole code validations and are
+  # extremely slow.
+  # add_definitions( -DCACHE_MANAGER_SLOW_VALIDATION)
+
   cmessage(STATUS "Enable GPU support (compiled, but only used if CUDA enabled)")
 endif()
 

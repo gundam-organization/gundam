@@ -447,7 +447,7 @@ namespace {
     // input value of 2.1 results in the linear interpolation between element
     // [2] and element [3], or "(1.0-0.1)*p[2] + 0.1*p[3])".
     HEMI_DEV_CALLABLE_INLINE
-    WEIGHT_BUFFER_FLOAT HEMIInterp(int ix, double x, const WEIGHT_BUFFER_FLOAT* points, int dim) {
+    double HEMIInterp(int ix, double x, const WEIGHT_BUFFER_FLOAT* points, int dim) {
         double x1 = points[3*ix+2];
         double x2 = points[3*(ix+1)+2];
         double step = x2-x1;
@@ -536,9 +536,9 @@ namespace {
             }
 #endif
 #endif
-            const WEIGHT_BUFFER_FLOAT lc = lowerClamp[pIndex[i]];
+            const double lc = lowerClamp[pIndex[i]];
             if (v < lc) v = lc;
-            const WEIGHT_BUFFER_FLOAT uc = upperClamp[pIndex[i]];
+            const double uc = upperClamp[pIndex[i]];
             if (v > uc) v = uc;
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning Using SLOW VALIDATION in Cache::Weight::GeneralSpline::HEMISplinesKernel
