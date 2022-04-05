@@ -12,6 +12,7 @@ set(SRCFILES
         src/JsonUtils.cpp
         src/YamlUtils.cpp
         src/GundamGreetings.cpp
+        src/ApplyCondition.cpp
         )
 set(HEADERS
         include/BinManager.hh
@@ -28,6 +29,7 @@ set(HEADERS
         include/YamlUtils.h
         include/YamlUtils.impl.h
         include/GundamGreetings.h
+        include/ApplyCondition.h
         )
 
 if( USE_STATIC_LINKS STREQUAL "1" )
