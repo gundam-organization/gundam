@@ -371,42 +371,143 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
 
   //Internally Scan performs steps-1, so add one to actually get the number of steps
   //we ask for.
-  unsigned int adj_steps = nbSteps_+1;
-  auto* x = new double[adj_steps] {};
-  auto* y = new double[adj_steps] {};
 
-  LogInfo << "Scanning fit parameter #" << iPar
-          << ": " << _minimizer_->VariableName(iPar) << " / " << nbSteps_ << " steps..." << std::endl;
+  if( false ){
+    unsigned int adj_steps = nbSteps_+1;
+    auto* x = new double[adj_steps] {};
+    auto* y = new double[adj_steps] {};
 
-  _propagator_.allowRfPropagation();
-  bool success = _minimizer_->Scan(iPar, adj_steps, x, y);
+    LogInfo << "Scanning fit parameter #" << iPar
+            << ": " << _minimizer_->VariableName(iPar) << " / " << nbSteps_ << " steps..." << std::endl;
 
-  if( not success ){
-    LogError << "Parameter scan failed." << std::endl;
+    _propagator_.allowRfPropagation();
+    bool success = _minimizer_->Scan(iPar, adj_steps, x, y);
+
+    if( not success ){
+      LogError << "Parameter scan failed." << std::endl;
+    }
+
+    TGraph scanGraph(nbSteps_, x, y);
+
+    std::stringstream ss;
+    ss << GenericToolbox::replaceSubstringInString(_minimizer_->VariableName(iPar), "/", "_");
+    ss << "_TGraph";
+
+    scanGraph.SetTitle(_fitIsDone_ ? "Post-fit scan": "Pre-fit scan");
+    scanGraph.GetYaxis()->SetTitle("LLH");
+    scanGraph.GetXaxis()->SetTitle(_minimizer_->VariableName(iPar).c_str());
+
+    if( _saveDir_ != nullptr ){
+      GenericToolbox::mkdirTFile(_saveDir_, saveDir_)->cd();
+      scanGraph.Write( ss.str().c_str() );
+    }
+
+    delete[] x;
+    delete[] y;
+  }
+  else{
+
+    std::vector<double> parPoints(nbSteps_+1,0);
+    std::vector<double> totalLlhPoints(nbSteps_+1,0);
+    std::vector<double> statLlhPoints(nbSteps_+1,0);
+    std::vector<double> penaltyLlhPoints(nbSteps_+1,0);
+
+    std::vector<std::vector<double>> sampleLlhPoints(_propagator_.getFitSampleSet().getFitSampleList().size(), std::vector<double>(nbSteps_+1,0));
+
+
+    std::stringstream ssPbar;
+    ssPbar << LogInfo.getPrefixString() << "Scanning fit parameter #" << iPar
+                << ": " << _minimizer_->VariableName(iPar) << " / " << nbSteps_ << " steps...";
+
+    double range = 3 * _minimizerFitParameterPtr_[iPar]->getStdDevValue();
+    double origVal = _minimizerFitParameterPtr_[iPar]->getParameterValue();
+
+    int offSet{0};
+    for( int iPt = 0 ; iPt < nbSteps_+1 ; iPt++ ){
+      GenericToolbox::displayProgressBar(iPt, nbSteps_, ssPbar.str());
+
+      double newVal = origVal - range + double(iPt-offSet)/(nbSteps_-1)*( 2 * range );
+
+      if( offSet == 0 and newVal > origVal ){
+        newVal = origVal;
+        offSet = 1;
+      }
+
+      _minimizerFitParameterPtr_[iPar]->setParameterValue(newVal);
+      this->updateChi2Cache();
+      parPoints[iPt] = _minimizerFitParameterPtr_[iPar]->getParameterValue();
+      totalLlhPoints[iPt] = _chi2Buffer_;
+      statLlhPoints[iPt] = _chi2StatBuffer_;
+      penaltyLlhPoints[iPt] = _chi2PullsBuffer_;
+
+      for( int iSample = 0 ; iSample < _propagator_.getFitSampleSet().getFitSampleList().size() ; iSample++ ){
+        sampleLlhPoints[iSample][iPt] = _propagator_.getFitSampleSet().evalLikelihood(_propagator_.getFitSampleSet().getFitSampleList()[iSample]);
+      }
+
+    }
+
+
+    _minimizerFitParameterPtr_[iPar]->setParameterValue(origVal);
+
+    std::stringstream ss;
+    ss << GenericToolbox::replaceSubstringInString(_minimizer_->VariableName(iPar), "/", "_");
+    ss << "_TGraph";
+
+    {
+      TGraph totalLlhGraph(nbSteps_+1, &parPoints[0], &totalLlhPoints[0]);
+      totalLlhGraph.SetTitle(Form("Total LLH Scan (%s)", _fitIsDone_ ? "post-fit": "pre-fit"));
+      totalLlhGraph.GetYaxis()->SetTitle("LLH value");
+      totalLlhGraph.GetXaxis()->SetTitle(_minimizer_->VariableName(iPar).c_str());
+      if( _saveDir_ != nullptr ){
+        GenericToolbox::mkdirTFile(_saveDir_, saveDir_ + "/totalLlh" )->cd();
+        totalLlhGraph.Write( ss.str().c_str() );
+      }
+    }
+
+    {
+      TGraph statLlhGraph(nbSteps_+1, &parPoints[0], &statLlhPoints[0]);
+      statLlhGraph.SetTitle(Form("Stat LLH Scan (%s)", _fitIsDone_ ? "post-fit": "pre-fit"));
+      statLlhGraph.GetYaxis()->SetTitle("Stat LLH value");
+      statLlhGraph.GetXaxis()->SetTitle(_minimizer_->VariableName(iPar).c_str());
+      if( _saveDir_ != nullptr ){
+        GenericToolbox::mkdirTFile(_saveDir_, saveDir_ + "/statLlh" )->cd();
+        statLlhGraph.Write( ss.str().c_str() );
+      }
+    }
+    {
+      TGraph penaltyLlhGraph(nbSteps_+1, &parPoints[0], &penaltyLlhPoints[0]);
+      penaltyLlhGraph.SetTitle(Form("Penalty LLH Scan (%s)", _fitIsDone_ ? "post-fit": "pre-fit"));
+      penaltyLlhGraph.GetYaxis()->SetTitle("Penalty LLH value");
+      penaltyLlhGraph.GetXaxis()->SetTitle(_minimizer_->VariableName(iPar).c_str());
+      if( _saveDir_ != nullptr ){
+        GenericToolbox::mkdirTFile(_saveDir_, saveDir_ + "/penaltyLlh" )->cd();
+        penaltyLlhGraph.Write( ss.str().c_str() );
+      }
+    }
+
+    {
+      for( int iSample = 0 ; iSample < _propagator_.getFitSampleSet().getFitSampleList().size() ; iSample++ ){
+        std::string sampleName = _propagator_.getFitSampleSet().getFitSampleList()[iSample].getName();
+        TGraph penaltyLlhGraph(nbSteps_+1, &parPoints[0], &sampleLlhPoints[iSample][0]);
+        penaltyLlhGraph.SetTitle(Form("Stat LLH Scan of sample \"%s\" (%s)", sampleName.c_str(),_fitIsDone_ ? "post-fit": "pre-fit"));
+        penaltyLlhGraph.GetYaxis()->SetTitle("Stat LLH value");
+        penaltyLlhGraph.GetXaxis()->SetTitle(_minimizer_->VariableName(iPar).c_str());
+        if( _saveDir_ != nullptr ){
+          GenericToolbox::mkdirTFile(_saveDir_, saveDir_ + "/statLlh/" + sampleName )->cd();
+          penaltyLlhGraph.Write( ss.str().c_str() );
+        }
+      }
+
+    }
+
   }
 
-  TGraph scanGraph(nbSteps_, x, y);
-
-  std::stringstream ss;
-  ss << GenericToolbox::replaceSubstringInString(_minimizer_->VariableName(iPar), "/", "_");
-  ss << "_TGraph";
-
-  scanGraph.SetTitle(_fitIsDone_ ? "Post-fit scan": "Pre-fit scan");
-  scanGraph.GetYaxis()->SetTitle("LLH");
-  scanGraph.GetYaxis()->SetTitle(_minimizer_->VariableName(iPar).c_str());
-
-  if( _saveDir_ != nullptr ){
-    GenericToolbox::mkdirTFile(_saveDir_, saveDir_)->cd();
-    scanGraph.Write( ss.str().c_str() );
-  }
   _propagator_.preventRfPropagation();
 
 //  _minimizer_->SetVariableValue(iPar, originalParValue);
 //  this->updateParameterValue(iPar, originalParValue);
 //  updateChi2Cache();
 
-  delete[] x;
-  delete[] y;
 }
 
 void FitterEngine::fit(){
