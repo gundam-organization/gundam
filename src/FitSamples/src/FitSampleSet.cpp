@@ -142,16 +142,19 @@ bool FitSampleSet::empty() const {
 double FitSampleSet::evalLikelihood() const{
   double llh = 0.;
   for( auto& sample : _fitSampleList_ ){
-    double sampleLlh = 0;
-    for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-      sampleLlh += (*_likelihoodFunctionPtr_)(
-        sample.getMcContainer().histogram->GetBinContent(iBin),
-        std::pow(sample.getMcContainer().histogram->GetBinError(iBin), 2),
-        sample.getDataContainer().histogram->GetBinContent(iBin));
-    }
-    llh += sampleLlh;
+    llh += this->evalLikelihood(sample);
   }
   return llh;
+}
+double FitSampleSet::evalLikelihood(const FitSample& sample_) const{
+  double sampleLlh = 0;
+  for( int iBin = 1 ; iBin <= sample_.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+    sampleLlh += (*_likelihoodFunctionPtr_)(
+        sample_.getMcContainer().histogram->GetBinContent(iBin),
+        std::pow(sample_.getMcContainer().histogram->GetBinError(iBin), 2),
+        sample_.getDataContainer().histogram->GetBinContent(iBin));
+  }
+  return sampleLlh;
 }
 
 void FitSampleSet::loadAsimovData(){
