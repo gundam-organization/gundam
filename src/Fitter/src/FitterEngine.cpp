@@ -84,7 +84,6 @@ void FitterEngine::initialize() {
   _convergenceMonitor_.addDisplayedQuantity("LastAddedValue");
   _convergenceMonitor_.addDisplayedQuantity("SlopePerCall");
 
-//  _convergenceMonitor_.getQuantity("VarName").title = "χ² value"; // special chars resize the box
   _convergenceMonitor_.getQuantity("VarName").title = "Likelihood";
   _convergenceMonitor_.getQuantity("LastAddedValue").title = "Current Value";
   _convergenceMonitor_.getQuantity("SlopePerCall").title = "Avg. Slope /call";
@@ -489,7 +488,6 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
     parPoints[iPt] = _minimizerFitParameterPtr_[iPar]->getParameterValue();
 
     for( auto& scanEntry : scanDataDict ){ scanEntry.yPoints[iPt] = scanEntry.evalY(); }
-
   }
 
 
