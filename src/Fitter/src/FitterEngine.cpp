@@ -156,6 +156,8 @@ void FitterEngine::initialize() {
 
   this->initializeMinimizer();
 
+  _scanConfig_ = ScanConfig( JsonUtils::fetchValue(_config_, "scanConfig", nlohmann::json()) );
+
 }
 
 bool FitterEngine::isFitHasConverged() const {
@@ -365,141 +367,147 @@ void FitterEngine::scanParameters(int nbSteps_, const std::string &saveDir_) {
 }
 void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &saveDir_) {
 
-  if( nbSteps_ < 0 ){ nbSteps_ = _nbScanSteps_; }
+  std::pair<double, double> parameterSigmaRange{-3, 3};
 
-//  double originalParValue = fetchCurrentParameterValue(iPar);
+  if( nbSteps_ < 0 ){ nbSteps_ = _scanConfig_.getNbPoints(); }
 
-  //Internally Scan performs steps-1, so add one to actually get the number of steps
-  //we ask for.
+  std::vector<double> parPoints(nbSteps_+1,0);
 
-  if( false ){
-    unsigned int adj_steps = nbSteps_+1;
-    auto* x = new double[adj_steps] {};
-    auto* y = new double[adj_steps] {};
+  std::stringstream ssPbar;
+  ssPbar << LogInfo.getPrefixString() << "Scanning fit parameter #" << iPar
+         << ": " << _minimizer_->VariableName(iPar) << " / " << nbSteps_ << " steps...";
+  GenericToolbox::displayProgressBar(0, nbSteps_, ssPbar.str());
 
-    LogInfo << "Scanning fit parameter #" << iPar
-            << ": " << _minimizer_->VariableName(iPar) << " / " << nbSteps_ << " steps..." << std::endl;
+  scanDataDict.clear();
+  if( JsonUtils::fetchValue(_scanConfig_.getVarsConfig(), "llh", true) ){
+    auto& scanEntry = scanDataDict.emplace_back();
+    scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
+    scanEntry.folder = "llh";
+    scanEntry.title = "Total Likelihood Scan";
+    scanEntry.yTitle = "LLH value";
+    scanEntry.evalY = [this](){ return this->_chi2Buffer_; };
+  }
+  if( JsonUtils::fetchValue(_scanConfig_.getVarsConfig(), "llhPenalty", true) ){
+    auto& scanEntry = scanDataDict.emplace_back();
+    scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
+    scanEntry.folder = "llhPenalty";
+    scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
+    scanEntry.title = "Penalty Likelihood Scan";
+    scanEntry.yTitle = "Penalty LLH value";
+    scanEntry.evalY = [this](){ return this->_chi2PullsBuffer_; };
+  }
+  if( JsonUtils::fetchValue(_scanConfig_.getVarsConfig(), "llhStat", true) ){
+    auto& scanEntry = scanDataDict.emplace_back();
+    scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
+    scanEntry.folder = "llhStat";
+    scanEntry.title = "Stat Likelihood Scan";
+    scanEntry.yTitle = "Stat LLH value";
+    scanEntry.evalY = [this](){ return this->_chi2StatBuffer_; };
+  }
+  if( JsonUtils::fetchValue(_scanConfig_.getVarsConfig(), "llhStatPerSample", false) ){
+    for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
+      auto& scanEntry = scanDataDict.emplace_back();
+      scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
+      scanEntry.folder = "llhStat/" + sample.getName() + "/";
+      scanEntry.title = Form("Stat Likelihood Scan of sample \"%s\"", sample.getName().c_str());
+      scanEntry.yTitle = "Stat LLH value";
+      auto* samplePtr = &sample;
+      scanEntry.evalY = [this, samplePtr](){ return _propagator_.getFitSampleSet().evalLikelihood(*samplePtr); };
+    }
+  }
+  if( JsonUtils::fetchValue(_scanConfig_.getVarsConfig(), "llhStatPerSamplePerBin", false) ){
+    for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
+      for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+        auto& scanEntry = scanDataDict.emplace_back();
+        scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
+        scanEntry.folder = "llhStat/" + sample.getName() + "/bin_" + std::to_string(iBin);
+        scanEntry.title = Form(R"(Stat LLH Scan of sample "%s", bin #%d "%s")",
+                               sample.getName().c_str(),
+                               iBin,
+                               sample.getBinning().getBinsList()[iBin-1].getSummary().c_str());
+        scanEntry.yTitle = "Stat LLH value";
+        auto* samplePtr = &sample;
+        scanEntry.evalY = [this, samplePtr, iBin](){ return (*_propagator_.getFitSampleSet().getLikelihoodFunctionPtr())(
+            samplePtr->getMcContainer().histogram->GetBinContent(iBin),
+            std::pow(samplePtr->getMcContainer().histogram->GetBinError(iBin), 2),
+            samplePtr->getDataContainer().histogram->GetBinContent(iBin)
+        );
+        };
+      }
+    }
+  }
+  if( JsonUtils::fetchValue(_scanConfig_.getVarsConfig(), "weightPerSample", false) ){
+    for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
+      auto& scanEntry = scanDataDict.emplace_back();
+      scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
+      scanEntry.folder = "weight/" + sample.getName();
+      scanEntry.title = Form("MC event weight scan of sample \"%s\"", sample.getName().c_str());
+      scanEntry.yTitle = "Total MC event weight";
+      auto* samplePtr = &sample;
+      scanEntry.evalY = [samplePtr](){ return samplePtr->getMcContainer().getSumWeights(); };
+    }
+  }
+  if( JsonUtils::fetchValue(_scanConfig_.getVarsConfig(), "weightPerSamplePerBin", false) ){
+    for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
+      for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+        auto& scanEntry = scanDataDict.emplace_back();
+        scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
+        scanEntry.folder = "weight/" + sample.getName() + "/bin_" + std::to_string(iBin);
+        scanEntry.title = Form(R"(MC event weight scan of sample "%s", bin #%d "%s")",
+                               sample.getName().c_str(),
+                               iBin,
+                               sample.getBinning().getBinsList()[iBin-1].getSummary().c_str());
+        scanEntry.yTitle = "Total MC event weight";
+        auto* samplePtr = &sample;
+        scanEntry.evalY = [samplePtr, iBin](){ return samplePtr->getMcContainer().histogram->GetBinContent(iBin); };
+      }
+    }
+  }
 
-    _propagator_.allowRfPropagation();
-    bool success = _minimizer_->Scan(iPar, adj_steps, x, y);
 
-    if( not success ){
-      LogError << "Parameter scan failed." << std::endl;
+  double origVal = _minimizerFitParameterPtr_[iPar]->getParameterValue();
+  double lowBound = origVal + _scanConfig_.getParameterSigmaRange().first * _minimizerFitParameterPtr_[iPar]->getStdDevValue();
+  double highBound = origVal + _scanConfig_.getParameterSigmaRange().second * _minimizerFitParameterPtr_[iPar]->getStdDevValue();
+
+  if( _scanConfig_.isUseParameterLimits() ){
+    lowBound = std::max(lowBound, _minimizerFitParameterPtr_[iPar]->getMinValue());
+    highBound = std::min(highBound, _minimizerFitParameterPtr_[iPar]->getMaxValue());
+  }
+
+  int offSet{0};
+  for( int iPt = 0 ; iPt < nbSteps_+1 ; iPt++ ){
+    GenericToolbox::displayProgressBar(iPt, nbSteps_, ssPbar.str());
+
+    double newVal = lowBound + double(iPt-offSet)/(nbSteps_-1)*( highBound - lowBound );
+    if( offSet == 0 and newVal > origVal ){
+      newVal = origVal;
+      offSet = 1;
     }
 
-    TGraph scanGraph(nbSteps_, x, y);
+    _minimizerFitParameterPtr_[iPar]->setParameterValue(newVal);
+    this->updateChi2Cache();
+    parPoints[iPt] = _minimizerFitParameterPtr_[iPar]->getParameterValue();
 
-    std::stringstream ss;
-    ss << GenericToolbox::replaceSubstringInString(_minimizer_->VariableName(iPar), "/", "_");
-    ss << "_TGraph";
+    for( auto& scanEntry : scanDataDict ){ scanEntry.yPoints[iPt] = scanEntry.evalY(); }
 
-    scanGraph.SetTitle(_fitIsDone_ ? "Post-fit scan": "Pre-fit scan");
-    scanGraph.GetYaxis()->SetTitle("LLH");
+  }
+
+
+  _minimizerFitParameterPtr_[iPar]->setParameterValue(origVal);
+
+  std::stringstream ss;
+  ss << GenericToolbox::replaceSubstringInString(_minimizer_->VariableName(iPar), "/", "_");
+  ss << "_TGraph";
+
+  for( auto& scanEntry : scanDataDict ){
+    TGraph scanGraph(int(parPoints.size()), &parPoints[0], &scanEntry.yPoints[0]);
+    scanGraph.SetTitle(scanEntry.title.c_str());
+    scanGraph.GetYaxis()->SetTitle(scanEntry.yTitle.c_str());
     scanGraph.GetXaxis()->SetTitle(_minimizer_->VariableName(iPar).c_str());
-
     if( _saveDir_ != nullptr ){
-      GenericToolbox::mkdirTFile(_saveDir_, saveDir_)->cd();
+      GenericToolbox::mkdirTFile(_saveDir_, saveDir_ + "/" + scanEntry.folder )->cd();
       scanGraph.Write( ss.str().c_str() );
     }
-
-    delete[] x;
-    delete[] y;
-  }
-  else{
-
-    std::vector<double> parPoints(nbSteps_+1,0);
-    std::vector<double> totalLlhPoints(nbSteps_+1,0);
-    std::vector<double> statLlhPoints(nbSteps_+1,0);
-    std::vector<double> penaltyLlhPoints(nbSteps_+1,0);
-
-    std::vector<std::vector<double>> sampleLlhPoints(_propagator_.getFitSampleSet().getFitSampleList().size(), std::vector<double>(nbSteps_+1,0));
-
-
-    std::stringstream ssPbar;
-    ssPbar << LogInfo.getPrefixString() << "Scanning fit parameter #" << iPar
-                << ": " << _minimizer_->VariableName(iPar) << " / " << nbSteps_ << " steps...";
-
-    double range = 3 * _minimizerFitParameterPtr_[iPar]->getStdDevValue();
-    double origVal = _minimizerFitParameterPtr_[iPar]->getParameterValue();
-
-    int offSet{0};
-    for( int iPt = 0 ; iPt < nbSteps_+1 ; iPt++ ){
-      GenericToolbox::displayProgressBar(iPt, nbSteps_, ssPbar.str());
-
-      double newVal = origVal - range + double(iPt-offSet)/(nbSteps_-1)*( 2 * range );
-
-      if( offSet == 0 and newVal > origVal ){
-        newVal = origVal;
-        offSet = 1;
-      }
-
-      _minimizerFitParameterPtr_[iPar]->setParameterValue(newVal);
-      this->updateChi2Cache();
-      parPoints[iPt] = _minimizerFitParameterPtr_[iPar]->getParameterValue();
-      totalLlhPoints[iPt] = _chi2Buffer_;
-      statLlhPoints[iPt] = _chi2StatBuffer_;
-      penaltyLlhPoints[iPt] = _chi2PullsBuffer_;
-
-      for( int iSample = 0 ; iSample < _propagator_.getFitSampleSet().getFitSampleList().size() ; iSample++ ){
-        sampleLlhPoints[iSample][iPt] = _propagator_.getFitSampleSet().evalLikelihood(_propagator_.getFitSampleSet().getFitSampleList()[iSample]);
-      }
-
-    }
-
-
-    _minimizerFitParameterPtr_[iPar]->setParameterValue(origVal);
-
-    std::stringstream ss;
-    ss << GenericToolbox::replaceSubstringInString(_minimizer_->VariableName(iPar), "/", "_");
-    ss << "_TGraph";
-
-    {
-      TGraph totalLlhGraph(nbSteps_+1, &parPoints[0], &totalLlhPoints[0]);
-      totalLlhGraph.SetTitle(Form("Total LLH Scan (%s)", _fitIsDone_ ? "post-fit": "pre-fit"));
-      totalLlhGraph.GetYaxis()->SetTitle("LLH value");
-      totalLlhGraph.GetXaxis()->SetTitle(_minimizer_->VariableName(iPar).c_str());
-      if( _saveDir_ != nullptr ){
-        GenericToolbox::mkdirTFile(_saveDir_, saveDir_ + "/totalLlh" )->cd();
-        totalLlhGraph.Write( ss.str().c_str() );
-      }
-    }
-
-    {
-      TGraph statLlhGraph(nbSteps_+1, &parPoints[0], &statLlhPoints[0]);
-      statLlhGraph.SetTitle(Form("Stat LLH Scan (%s)", _fitIsDone_ ? "post-fit": "pre-fit"));
-      statLlhGraph.GetYaxis()->SetTitle("Stat LLH value");
-      statLlhGraph.GetXaxis()->SetTitle(_minimizer_->VariableName(iPar).c_str());
-      if( _saveDir_ != nullptr ){
-        GenericToolbox::mkdirTFile(_saveDir_, saveDir_ + "/statLlh" )->cd();
-        statLlhGraph.Write( ss.str().c_str() );
-      }
-    }
-    {
-      TGraph penaltyLlhGraph(nbSteps_+1, &parPoints[0], &penaltyLlhPoints[0]);
-      penaltyLlhGraph.SetTitle(Form("Penalty LLH Scan (%s)", _fitIsDone_ ? "post-fit": "pre-fit"));
-      penaltyLlhGraph.GetYaxis()->SetTitle("Penalty LLH value");
-      penaltyLlhGraph.GetXaxis()->SetTitle(_minimizer_->VariableName(iPar).c_str());
-      if( _saveDir_ != nullptr ){
-        GenericToolbox::mkdirTFile(_saveDir_, saveDir_ + "/penaltyLlh" )->cd();
-        penaltyLlhGraph.Write( ss.str().c_str() );
-      }
-    }
-
-    {
-      for( int iSample = 0 ; iSample < _propagator_.getFitSampleSet().getFitSampleList().size() ; iSample++ ){
-        std::string sampleName = _propagator_.getFitSampleSet().getFitSampleList()[iSample].getName();
-        TGraph penaltyLlhGraph(nbSteps_+1, &parPoints[0], &sampleLlhPoints[iSample][0]);
-        penaltyLlhGraph.SetTitle(Form("Stat LLH Scan of sample \"%s\" (%s)", sampleName.c_str(),_fitIsDone_ ? "post-fit": "pre-fit"));
-        penaltyLlhGraph.GetYaxis()->SetTitle("Stat LLH value");
-        penaltyLlhGraph.GetXaxis()->SetTitle(_minimizer_->VariableName(iPar).c_str());
-        if( _saveDir_ != nullptr ){
-          GenericToolbox::mkdirTFile(_saveDir_, saveDir_ + "/statLlh/" + sampleName )->cd();
-          penaltyLlhGraph.Write( ss.str().c_str() );
-        }
-      }
-
-    }
-
   }
 
   _propagator_.preventRfPropagation();
