@@ -8,6 +8,7 @@
 
 #include "Propagator.h"
 //#include "MinimizerInterface.h"
+#include "ScanConfig.h"
 
 #include "GenericToolbox.VariablesMonitor.h"
 #include "GenericToolbox.CycleTimer.h"
@@ -95,6 +96,8 @@ private:
   std::shared_ptr<ROOT::Math::Minimizer> _minimizer_{nullptr};
   std::shared_ptr<ROOT::Math::Functor> _functor_{nullptr};
   TRandom3 _prng_;
+
+  ScanConfig _scanConfig_;
 
   // Buffers
   double _chi2Buffer_{0};

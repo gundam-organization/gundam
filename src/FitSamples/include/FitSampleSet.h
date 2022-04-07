@@ -43,8 +43,8 @@ public:
   DataEventType getDataEventType() const;
   const std::vector<FitSample> &getFitSampleList() const;
   std::vector<FitSample> &getFitSampleList();
-
   const nlohmann::json &getConfig() const;
+  const std::shared_ptr<CalcLLHFunc> &getLikelihoodFunctionPtr() const;
 
   //Core
   bool empty() const;

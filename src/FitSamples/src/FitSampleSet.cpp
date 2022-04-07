@@ -3,6 +3,8 @@
 //
 
 #include <TTreeFormulaManager.h>
+
+#include <memory>
 #include "json.hpp"
 
 #include "Logger.h"
@@ -108,13 +110,13 @@ void FitSampleSet::initialize() {
   std::string llhMethod = JsonUtils::fetchValue(_config_, "llhStatFunction", "PoissonLLH");
   LogInfo << "Using \"" << llhMethod << "\" LLH function." << std::endl;
   if( llhMethod == "PoissonLLH" ){
-    _likelihoodFunctionPtr_ = std::shared_ptr<PoissonLLH>(new PoissonLLH);
+    _likelihoodFunctionPtr_ = std::make_shared<PoissonLLH>();
   }
   else if( llhMethod == "BarlowLLH" ){
-    _likelihoodFunctionPtr_ = std::shared_ptr<BarlowLLH>(new BarlowLLH);
+    _likelihoodFunctionPtr_ = std::make_shared<BarlowLLH>();
   }
   else if( llhMethod == "BarlowLLH_OA2020_Bad" ){
-    _likelihoodFunctionPtr_ = std::shared_ptr<BarlowOA2020BugLLH>(new BarlowOA2020BugLLH);
+    _likelihoodFunctionPtr_ = std::make_shared<BarlowOA2020BugLLH>();
   }
   else{
     LogThrow("Unknown LLH Method: " << llhMethod)
@@ -134,6 +136,9 @@ std::vector<FitSample> &FitSampleSet::getFitSampleList() {
 }
 const nlohmann::json &FitSampleSet::getConfig() const {
   return _config_;
+}
+const std::shared_ptr<CalcLLHFunc> &FitSampleSet::getLikelihoodFunctionPtr() const {
+  return _likelihoodFunctionPtr_;
 }
 
 bool FitSampleSet::empty() const {
