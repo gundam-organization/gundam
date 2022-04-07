@@ -5,7 +5,7 @@ RUN sudo apt-get update && \
     sudo apt-get install build-essential curl cmake file git ruby-full locales -y
 
 # install ROOT & yaml-cpp
-RUN brew install root  && \
+RUN brew update && brew install root  && \
     brew install yaml-cpp
 
 ENV GUNDIR /home/linuxbrew/gundam
