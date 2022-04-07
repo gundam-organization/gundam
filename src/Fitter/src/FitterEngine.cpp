@@ -378,20 +378,12 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
          << ": " << _minimizer_->VariableName(iPar) << " / " << nbSteps_ << " steps...";
   GenericToolbox::displayProgressBar(0, nbSteps_, ssPbar.str());
 
-  struct ScanData{
-    std::string folder{};
-    std::string title{};
-    std::string yTitle{};
-    std::vector<double> yPoints{};
-    std::function<double()> evalY{};
-  };
-  std::vector<ScanData> scanDataDict;
-
+  scanDataDict.clear();
   if( JsonUtils::fetchValue(_scanConfig_.getVarsConfig(), "llh", true) ){
     auto& scanEntry = scanDataDict.emplace_back();
     scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
     scanEntry.folder = "llh";
-    scanEntry.title = Form("Total LLH Scan (%s)", _fitIsDone_ ? "post-fit": "pre-fit");
+    scanEntry.title = "Total Likelihood Scan";
     scanEntry.yTitle = "LLH value";
     scanEntry.evalY = [this](){ return this->_chi2Buffer_; };
   }
@@ -400,7 +392,7 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
     scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
     scanEntry.folder = "llhPenalty";
     scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
-    scanEntry.title = Form("Penalty LLH Scan (%s)", _fitIsDone_ ? "post-fit": "pre-fit");
+    scanEntry.title = "Penalty Likelihood Scan";
     scanEntry.yTitle = "Penalty LLH value";
     scanEntry.evalY = [this](){ return this->_chi2PullsBuffer_; };
   }
@@ -408,7 +400,7 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
     auto& scanEntry = scanDataDict.emplace_back();
     scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
     scanEntry.folder = "llhStat";
-    scanEntry.title = Form("Stat LLH Scan (%s)", _fitIsDone_ ? "post-fit": "pre-fit");
+    scanEntry.title = "Stat Likelihood Scan";
     scanEntry.yTitle = "Stat LLH value";
     scanEntry.evalY = [this](){ return this->_chi2StatBuffer_; };
   }
@@ -417,7 +409,7 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
       auto& scanEntry = scanDataDict.emplace_back();
       scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
       scanEntry.folder = "llhStat/" + sample.getName() + "/";
-      scanEntry.title = Form("Stat LLH Scan of sample \"%s\" (%s)", sample.getName().c_str(),_fitIsDone_ ? "post-fit": "pre-fit");
+      scanEntry.title = Form("Stat Likelihood Scan of sample \"%s\"", sample.getName().c_str());
       scanEntry.yTitle = "Stat LLH value";
       auto* samplePtr = &sample;
       scanEntry.evalY = [this, samplePtr](){ return _propagator_.getFitSampleSet().evalLikelihood(*samplePtr); };
@@ -429,15 +421,17 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
         auto& scanEntry = scanDataDict.emplace_back();
         scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
         scanEntry.folder = "llhStat/" + sample.getName() + "/bin_" + std::to_string(iBin);
-        scanEntry.title = Form("Stat LLH Scan of sample \"%s\", bin #%d (%s)", sample.getName().c_str(), iBin, _fitIsDone_ ? "post-fit": "pre-fit");
-        LogDebug << scanEntry.title << std::endl;
+        scanEntry.title = Form(R"(Stat LLH Scan of sample "%s", bin #%d "%s")",
+                               sample.getName().c_str(),
+                               iBin,
+                               sample.getBinning().getBinsList()[iBin-1].getSummary().c_str());
         scanEntry.yTitle = "Stat LLH value";
         auto* samplePtr = &sample;
         scanEntry.evalY = [this, samplePtr, iBin](){ return (*_propagator_.getFitSampleSet().getLikelihoodFunctionPtr())(
             samplePtr->getMcContainer().histogram->GetBinContent(iBin),
             std::pow(samplePtr->getMcContainer().histogram->GetBinError(iBin), 2),
             samplePtr->getDataContainer().histogram->GetBinContent(iBin)
-            );
+        );
         };
       }
     }
@@ -447,13 +441,28 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
       auto& scanEntry = scanDataDict.emplace_back();
       scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
       scanEntry.folder = "weight/" + sample.getName();
-      scanEntry.title = Form("MC event weight scan of sample \"%s\" (%s)", sample.getName().c_str(), _fitIsDone_ ? "post-fit": "pre-fit");
+      scanEntry.title = Form("MC event weight scan of sample \"%s\"", sample.getName().c_str());
       scanEntry.yTitle = "Total MC event weight";
       auto* samplePtr = &sample;
       scanEntry.evalY = [samplePtr](){ return samplePtr->getMcContainer().getSumWeights(); };
     }
   }
-
+  if( JsonUtils::fetchValue(_scanConfig_.getVarsConfig(), "weightPerSamplePerBin", false) ){
+    for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
+      for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+        auto& scanEntry = scanDataDict.emplace_back();
+        scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
+        scanEntry.folder = "weight/" + sample.getName() + "/bin_" + std::to_string(iBin);
+        scanEntry.title = Form(R"(MC event weight scan of sample "%s", bin #%d "%s")",
+                               sample.getName().c_str(),
+                               iBin,
+                               sample.getBinning().getBinsList()[iBin-1].getSummary().c_str());
+        scanEntry.yTitle = "Total MC event weight";
+        auto* samplePtr = &sample;
+        scanEntry.evalY = [samplePtr, iBin](){ return samplePtr->getMcContainer().histogram->GetBinContent(iBin); };
+      }
+    }
+  }
 
 
   double origVal = _minimizerFitParameterPtr_[iPar]->getParameterValue();

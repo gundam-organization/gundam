@@ -147,6 +147,17 @@ private:
       { 2, "status = 2    : made pos def"},
       { 3, "status = 3    : accurate"}
   };
+
+
+  struct ScanData{
+    std::string folder{};
+    std::string title{};
+    std::string yTitle{};
+    std::vector<double> yPoints{};
+    std::function<double()> evalY{};
+  };
+  std::vector<ScanData> scanDataDict;
+
 };
 
 
