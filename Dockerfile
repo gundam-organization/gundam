@@ -17,6 +17,7 @@ COPY --from=base $GUNDIR $GUNDIR
 ENV ROOTSYS /home/linuxbrew/.linuxbrew
 
 COPY . $GUNDIR/
+SHELL ["/bin/bash", "-c"]
 
 # sudo is required by github actions since git clone is done by root
 RUN cd $GUNDIR && \
