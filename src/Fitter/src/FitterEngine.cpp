@@ -419,7 +419,8 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
       scanEntry.folder = "llhStat/" + sample.getName() + "/";
       scanEntry.title = Form("Stat LLH Scan of sample \"%s\" (%s)", sample.getName().c_str(),_fitIsDone_ ? "post-fit": "pre-fit");
       scanEntry.yTitle = "Stat LLH value";
-      scanEntry.evalY = [this, sample](){ return _propagator_.getFitSampleSet().evalLikelihood(sample); };
+      auto* samplePtr = &sample;
+      scanEntry.evalY = [this, samplePtr](){ return _propagator_.getFitSampleSet().evalLikelihood(*samplePtr); };
     }
   }
   if( JsonUtils::fetchValue(_scanConfig_.getVarsConfig(), "llhStatPerSamplePerBin", false) ){
@@ -431,10 +432,11 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
         scanEntry.title = Form("Stat LLH Scan of sample \"%s\", bin #%d (%s)", sample.getName().c_str(), iBin, _fitIsDone_ ? "post-fit": "pre-fit");
         LogDebug << scanEntry.title << std::endl;
         scanEntry.yTitle = "Stat LLH value";
-        scanEntry.evalY = [this, sample, iBin](){ return (*_propagator_.getFitSampleSet().getLikelihoodFunctionPtr())(
-            sample.getMcContainer().histogram->GetBinContent(iBin),
-            std::pow(sample.getMcContainer().histogram->GetBinError(iBin), 2),
-            sample.getDataContainer().histogram->GetBinContent(iBin)
+        auto* samplePtr = &sample;
+        scanEntry.evalY = [this, samplePtr, iBin](){ return (*_propagator_.getFitSampleSet().getLikelihoodFunctionPtr())(
+            samplePtr->getMcContainer().histogram->GetBinContent(iBin),
+            std::pow(samplePtr->getMcContainer().histogram->GetBinError(iBin), 2),
+            samplePtr->getDataContainer().histogram->GetBinContent(iBin)
             );
         };
       }
@@ -447,7 +449,8 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
       scanEntry.folder = "weight/" + sample.getName();
       scanEntry.title = Form("MC event weight scan of sample \"%s\" (%s)", sample.getName().c_str(), _fitIsDone_ ? "post-fit": "pre-fit");
       scanEntry.yTitle = "Total MC event weight";
-      scanEntry.evalY = [sample](){ return sample.getMcContainer().getSumWeights(); };
+      auto* samplePtr = &sample;
+      scanEntry.evalY = [samplePtr](){ return samplePtr->getMcContainer().getSumWeights(); };
     }
   }
 
