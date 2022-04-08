@@ -463,7 +463,6 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
     }
   }
 
-
   double origVal = _minimizerFitParameterPtr_[iPar]->getParameterValue();
   double lowBound = origVal + _scanConfig_.getParameterSigmaRange().first * _minimizerFitParameterPtr_[iPar]->getStdDevValue();
   double highBound = origVal + _scanConfig_.getParameterSigmaRange().second * _minimizerFitParameterPtr_[iPar]->getStdDevValue();

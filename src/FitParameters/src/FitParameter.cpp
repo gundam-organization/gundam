@@ -127,7 +127,7 @@ void FitParameter::initialize() {
     _isEnabled_ = JsonUtils::fetchValue(_parameterConfig_, "isEnabled", true);
     if( not _isEnabled_ ) { return; }
 
-    std::string priorTypeStr = JsonUtils::fetchValue<std::string>(_parameterConfig_, "priorType", "");
+    auto priorTypeStr = JsonUtils::fetchValue(_parameterConfig_, "priorType", "");
     if( not priorTypeStr.empty() ){
       _priorType_ = PriorType::toPriorType(priorTypeStr);
      LogWarning << "Prior type: " << priorTypeStr << std::endl;
@@ -138,6 +138,14 @@ void FitParameter::initialize() {
       _priorValue_ = JsonUtils::fetchValue(_parameterConfig_, "priorValue", _priorValue_);
       LogWarning << this->getTitle() << ": prior value override -> " << _priorValue_ << std::endl;
       this->setParameterValue(_priorValue_);
+    }
+
+    if( JsonUtils::doKeyExist(_parameterConfig_, "parameterLimits") ){
+      std::pair<double, double> limits{std::nan(""), std::nan("")};
+      limits = JsonUtils::fetchValue(_parameterConfig_, "parameterLimits", limits);
+      LogWarning << "Overriding parameter limits: [" << limits.first << ", " << limits.second << "]." << std::endl;
+      this->setMinValue(limits.first);
+      this->setMaxValue(limits.second);
     }
 
     _dialDefinitionsList_ = JsonUtils::fetchValue(_parameterConfig_, "dialSetDefinitions", _dialDefinitionsList_);
