@@ -7,6 +7,7 @@
 #include "Logger.h"
 
 #include "Dial.h"
+#include "DialSet.h"
 #include "FitParameter.h"
 #include "FitParameterSet.h"
 #include "GlobalVariables.h"
@@ -56,7 +57,13 @@ void Dial::setMinDialResponse(double minDialResponse_) {
 void Dial::setMaxDialResponse(double maxDialResponse_) {
   _maxDialResponse_ = maxDialResponse_;
 }
-
+void Dial::setOwner(const DialSet* dialSetPtr) {
+    _ownerDialSetReference_ = dialSetPtr;
+}
+const DialSet* Dial::getOwner() const {
+    LogThrowIf(!_ownerDialSetReference_,"Invalid owning DialSet");
+    return _ownerDialSetReference_;
+}
 void Dial::initialize() {
   LogThrowIf( _dialType_ == DialType::Invalid, "_dialType_ is not set." );
   LogThrowIf( _associatedParameterReference_ == nullptr,  "Parameter not set");
@@ -181,4 +188,3 @@ void Dial::buildResponseSplineCache(){
       new TSpline3(Form("%p", this), &xSigmaSteps[0], &yResponse[0], int(xSigmaSteps.size()))
   );
 }
-

@@ -65,7 +65,7 @@ private:
     // "compactSpline", "uniformSpline", "generalSpline", or
     // "this-cannot-happen".  This is used to determine which cache is used
     // for each event.
-    static std::string SplineType(const TSpline3* s);
+    static std::string SplineType(const SplineDial* dial);
 
     /// Declare all of the actual GPU caches here.  There is one GPU, so this
     /// is the ONE place that everything is collected together.

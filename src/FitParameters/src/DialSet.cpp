@@ -103,6 +103,9 @@ std::vector<std::shared_ptr<Dial>> &DialSet::getDialList() {
 TFormula *DialSet::getApplyConditionFormula() const {
   return _applyConditionFormula_.get();
 }
+const std::string &DialSet::getDialSubType() const {
+  return _globalDialSubType_;
+}
 const std::string &DialSet::getDialLeafName() const {
   return _globalDialLeafName_;
 }
@@ -129,7 +132,8 @@ std::string DialSet::getSummary() const {
 
   return ss.str();
 }
-void DialSet::applyGlobalParameters(Dial* dial_) const{
+void DialSet::applyGlobalParameters(Dial* dial_) const {
+  dial_->setOwner(this);
   dial_->setAssociatedParameterReference(_associatedParameterReference_);
   dial_->setMinDialResponse(_globalMinDialResponse_);
   dial_->setMaxDialResponse(_globalMaxDialResponse_);
@@ -321,6 +325,12 @@ bool DialSet::initializeDialsWithDefinition() {
   }
   else if( _globalDialType_ == DialType::Spline or _globalDialType_ == DialType::Graph ){
 
+
+    if ( JsonUtils::doKeyExist(dialsDefinition, "dialSubType") ) {
+        _globalDialSubType_ =  JsonUtils::fetchValue<std::string>(
+            dialsDefinition, "dialSubType");
+    }
+
     if     ( JsonUtils::doKeyExist(dialsDefinition, "dialLeafName") ){
       _globalDialLeafName_ = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialLeafName");
       // nothing to do here, the dials list will be filled while reading the datasets
@@ -344,9 +354,10 @@ bool DialSet::initializeDialsWithDefinition() {
 
       if      ( JsonUtils::doKeyExist(dialsDefinition, "dialsList") ) {
         auto* dialsList = dialsTFile->Get<TObjArray>(JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsList").c_str());
-        LogThrowIf(dialsList==nullptr, "Could not find dialsList: " << JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsList"))
+        LogThrowIf(dialsList==nullptr, "Could not find dialsList: " << JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsList"));
 
-        LogThrowIf(dialsList->GetSize() != binList.size(), "Number of dials (" << dialsList->GetSize() << ") don't match the number of bins " << binList.size() << "")
+        LogThrowIf(dialsList->GetSize() != binList.size(), "Number of dials (" << dialsList->GetSize() << ") don't match the number of bins "
+                   << binList.size() << "");
 
         for( int iBin = 0 ; iBin < binList.size() ; iBin++ ){
           if     ( _globalDialType_ == DialType::Spline ){
@@ -382,7 +393,7 @@ bool DialSet::initializeDialsWithDefinition() {
         Int_t kinematicBin;
         TSpline3* splinePtr = nullptr;
         TGraph* graphPtr = nullptr;
-          
+
         // searching for additional split var
         std::vector<std::string> splitVarNameList;
         for( int iKey = 0 ; iKey < dialsTTree->GetListOfLeaves()->GetEntries() ; iKey++ ){
@@ -396,13 +407,13 @@ bool DialSet::initializeDialsWithDefinition() {
         std::vector<Int_t> splitVarValueList(splitVarNameList.size(), 0);
         std::vector<std::pair<int, int>> splitVarBoundariesList(splitVarNameList.size(), std::pair<int, int>());
         std::vector<std::vector<int>> splitVarValuesList(splitVarNameList.size(), std::vector<int>());
-        dialsTTree->SetBranchAddress("kinematicBin", &kinematicBin); 
+        dialsTTree->SetBranchAddress("kinematicBin", &kinematicBin);
         if( _globalDialType_ == DialType::Spline ) dialsTTree->SetBranchAddress("spline", &splinePtr);
         if( _globalDialType_ == DialType::Graph ) dialsTTree->SetBranchAddress("graph", &graphPtr);
         for( size_t iSplitVar = 0 ; iSplitVar < splitVarNameList.size() ; iSplitVar++ ){
-          dialsTTree->SetBranchAddress(splitVarNameList[iSplitVar].c_str(), &splitVarValueList[iSplitVar]); 
+          dialsTTree->SetBranchAddress(splitVarNameList[iSplitVar].c_str(), &splitVarValueList[iSplitVar]);
         }
-        
+
         Long64_t nSplines = dialsTTree->GetEntries();
         LogWarning << "Reading dials in \"" << dialsTFile->GetName() << "\"" << std::endl;
         for( Long64_t iSpline = 0 ; iSpline < nSplines ; iSpline++ ){
@@ -445,7 +456,8 @@ bool DialSet::initializeDialsWithDefinition() {
     }
   } // Spline ? Graph ?
   else {
-    LogError << "dialsType is not supported yet: " << DialType::DialTypeEnumNamespace::toString(_globalDialType_) << "(" << _globalDialType_ << ")" << std::endl;
+    LogError << "dialsType is not supported yet: " << DialType::DialTypeEnumNamespace::toString(_globalDialType_)
+             << "(" << _globalDialType_ << ")" << std::endl;
     throw std::logic_error("dialsType is not supported");
   }
 
@@ -464,6 +476,3 @@ nlohmann::json DialSet::fetchDialsDefinition(const nlohmann::json &definitionsLi
   }
   return {};
 }
-
-
-

@@ -43,6 +43,7 @@ public:
   const std::vector<std::string> &getDataSetNameList() const;
   TFormula *getApplyConditionFormula() const;
   const std::string &getDialLeafName() const;
+  const std::string &getDialSubType() const;
   size_t getCurrentDialOffset() const;
   DialType::DialType getGlobalDialType() const;
   const Dial &getTemplateDial() const;
@@ -82,6 +83,7 @@ private:
 
   // globals
   DialType::DialType _globalDialType_{DialType::DialType_OVERFLOW};
+  std::string _globalDialSubType_{};
   std::string _globalDialLeafName_{};
   double _globalMinDialResponse_{std::nan("unset")};
   double _globalMaxDialResponse_{std::nan("unset")};

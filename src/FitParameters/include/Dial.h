@@ -25,6 +25,8 @@ namespace DialType{
   )
 }
 
+class DialSet;
+
 class Dial {
 
 protected:
@@ -43,6 +45,7 @@ public:
   void setMirrorRange(double mirrorRange);
   void setMinDialResponse(double minDialResponse_);
   void setMaxDialResponse(double maxDialResponse_);
+  void setOwner(const DialSet* dialSetPtr);
 
   virtual void initialize();
 
@@ -52,6 +55,8 @@ public:
   const DataBin &getApplyConditionBin() const;
   DataBin &getApplyConditionBin();
   DialType::DialType getDialType() const;
+  const DialSet* getOwner() const;
+
   void *getAssociatedParameterReference() const;
   double getAssociatedParameter() const;
   int getAssociatedParameterIndex() const;
@@ -82,6 +87,8 @@ public:
 
 protected:
   const DialType::DialType _dialType_;
+  // The DialSet that owns this dial.  The dial DOES NOT OWN THIS POINTER
+  const DialSet* _ownerDialSetReference_{nullptr};
 
   // Parameters
   DataBin _applyConditionBin_;

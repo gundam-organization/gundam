@@ -28,11 +28,14 @@ LoggerInit([](){
 Cache::Manager* Cache::Manager::fSingleton = nullptr;
 std::map<const FitParameter*, int> Cache::Manager::ParameterMap;
 
-std::string Cache::Manager::SplineType(const TSpline3* s) {
+std::string Cache::Manager::SplineType(const SplineDial* dial) {
+    const TSpline3* s = dial->getSplinePtr();
+    if (!s) throw std::runtime_error("Null spline pointer");
     const int points = s->GetNp();
 
-    // Manage non-uniform splines by increasing the number of
-    // points based on the smallest interval size.
+    // Check if the spline has uniformly spaced knots.  There is a flag for
+    // this is TSpline3, but it's not uniformly (or ever) filled correctly.
+    bool uniform = true;
     for (int i = 1; i < points-1; ++i) {
         double x;
         double y;
@@ -44,10 +47,15 @@ std::string Cache::Manager::SplineType(const TSpline3* s) {
         s->GetKnot(i+1,x,y);
         d2 = x - d2;
         if (std::abs((d1-d2)/(d1+d2)) > 1E-6) {
-            return std::string("generalSpline");
+            uniform = false;
+            break;
         }
     }
 
+    std::string subType = dial->getOwner()->getDialSubType();
+
+    if (!uniform) return std::string("generalSpline");
+    if (subType == "compact") return std::string("compactSpline");
     return std::string("uniformSpline");
 }
 
@@ -159,9 +167,9 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
                 const SplineDial* sDial
                     = dynamic_cast<const SplineDial*>(dial);
                 if (sDial) {
+                    std::string splineType = Cache::Manager::SplineType(sDial);
                     const TSpline3* s = sDial->getSplinePtr();
                     if (!s) throw std::runtime_error("Null spline pointer");
-                    std::string splineType = Cache::Manager::SplineType(s);
                     if (splineType == "compactSpline") {
                         ++compactSplines;
                         compactPoints
@@ -359,10 +367,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
                 SplineDial* sDial = dynamic_cast<SplineDial*>(dial);
                 if (sDial) {
                     ++dialUsed;
-                    const TSpline3* s = sDial->getSplinePtr();
-                    if (!s) throw std::runtime_error("Null spline pointer");
-                    std::string splineType = Cache::Manager::SplineType(s);
-                    int spline = -1;
+                    std::string splineType = Cache::Manager::SplineType(sDial);
                     if (splineType == "compactSpline") {
                         Cache::Manager::Get()
                             ->fCompactSplines
