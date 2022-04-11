@@ -379,7 +379,8 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
 
   scanDataDict.clear();
   if( JsonUtils::fetchValue(_scanConfig_.getVarsConfig(), "llh", true) ){
-    auto& scanEntry = scanDataDict.emplace_back(FitterEngine::ScanData());
+    scanDataDict.emplace_back();
+    auto& scanEntry = scanDataDict.back();
     scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
     scanEntry.folder = "llh";
     scanEntry.title = "Total Likelihood Scan";
@@ -387,7 +388,8 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
     scanEntry.evalY = [this](){ return this->_chi2Buffer_; };
   }
   if( JsonUtils::fetchValue(_scanConfig_.getVarsConfig(), "llhPenalty", true) ){
-    auto& scanEntry = scanDataDict.emplace_back(FitterEngine::ScanData());
+    scanDataDict.emplace_back();
+    auto& scanEntry = scanDataDict.back();
     scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
     scanEntry.folder = "llhPenalty";
     scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
@@ -396,7 +398,8 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
     scanEntry.evalY = [this](){ return this->_chi2PullsBuffer_; };
   }
   if( JsonUtils::fetchValue(_scanConfig_.getVarsConfig(), "llhStat", true) ){
-    auto& scanEntry = scanDataDict.emplace_back(FitterEngine::ScanData());
+    scanDataDict.emplace_back();
+    auto& scanEntry = scanDataDict.back();
     scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
     scanEntry.folder = "llhStat";
     scanEntry.title = "Stat Likelihood Scan";
@@ -405,7 +408,8 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
   }
   if( JsonUtils::fetchValue(_scanConfig_.getVarsConfig(), "llhStatPerSample", false) ){
     for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
-      auto& scanEntry = scanDataDict.emplace_back(FitterEngine::ScanData());
+      scanDataDict.emplace_back();
+      auto& scanEntry = scanDataDict.back();
       scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
       scanEntry.folder = "llhStat/" + sample.getName() + "/";
       scanEntry.title = Form("Stat Likelihood Scan of sample \"%s\"", sample.getName().c_str());
@@ -417,7 +421,8 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
   if( JsonUtils::fetchValue(_scanConfig_.getVarsConfig(), "llhStatPerSamplePerBin", false) ){
     for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
       for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-        auto& scanEntry = scanDataDict.emplace_back(FitterEngine::ScanData());
+        scanDataDict.emplace_back();
+        auto& scanEntry = scanDataDict.back();
         scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
         scanEntry.folder = "llhStat/" + sample.getName() + "/bin_" + std::to_string(iBin);
         scanEntry.title = Form(R"(Stat LLH Scan of sample "%s", bin #%d "%s")",
@@ -437,7 +442,8 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
   }
   if( JsonUtils::fetchValue(_scanConfig_.getVarsConfig(), "weightPerSample", false) ){
     for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
-      auto& scanEntry = scanDataDict.emplace_back(FitterEngine::ScanData());
+      scanDataDict.emplace_back();
+      auto& scanEntry = scanDataDict.back();
       scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
       scanEntry.folder = "weight/" + sample.getName();
       scanEntry.title = Form("MC event weight scan of sample \"%s\"", sample.getName().c_str());
@@ -449,7 +455,8 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
   if( JsonUtils::fetchValue(_scanConfig_.getVarsConfig(), "weightPerSamplePerBin", false) ){
     for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
       for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-        auto& scanEntry = scanDataDict.emplace_back(FitterEngine::ScanData());
+        scanDataDict.emplace_back();
+        auto& scanEntry = scanDataDict.back();
         scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
         scanEntry.folder = "weight/" + sample.getName() + "/bin_" + std::to_string(iBin);
         scanEntry.title = Form(R"(MC event weight scan of sample "%s", bin #%d "%s")",
