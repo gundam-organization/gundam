@@ -121,160 +121,166 @@ void PlotGenerator::defineHistogramHolders() {
         histDefBase.rescaleAsBinWidth = JsonUtils::fetchValue(histConfig, "rescaleAsBinWidth", true);
         histDefBase.rescaleBinFactor  = JsonUtils::fetchValue(histConfig, "rescaleBinFactor", 1.);
 
-        auto splitVars = JsonUtils::fetchValue(histConfig, "splitVars", std::vector<std::string>{""});
+        if( GenericToolbox::splitString(histDefBase.varToPlot, ":").size() >= 2 ){
+          LogAlert << "Skipping 2D plot def: " << histDefBase.varToPlot << std::endl;
+          continue;
+        }
+        else{
+          auto splitVars = JsonUtils::fetchValue(histConfig, "splitVars", std::vector<std::string>{""});
 
-        for( const auto& splitVar : splitVars ){
+          for( const auto& splitVar : splitVars ){
 
-          histDefBase.splitVarName = splitVar;
+            histDefBase.splitVarName = splitVar;
 
-          // Loop over split vars
-          int splitValueIndex = -1;
-          for( const auto& splitValue : splitVarsDictionary[histDefBase.splitVarName][&sample] ){
-            splitValueIndex++;
-            histDefBase.splitVarValue = splitValue;
+            // Loop over split vars
+            int splitValueIndex = -1;
+            for( const auto& splitValue : splitVarsDictionary[histDefBase.splitVarName][&sample] ){
+              splitValueIndex++;
+              histDefBase.splitVarValue = splitValue;
 
-            for( bool isData: {false, true} ){
-              histDefBase.isData = isData;
-              bool buildFillFunction = false;
+              for( bool isData: {false, true} ){
+                histDefBase.isData = isData;
+                bool buildFillFunction = false;
 
-              if( histDefBase.isData and
-              ( not histDefBase.splitVarName.empty()
-              or JsonUtils::fetchValue(histConfig, "noData", false)
-              ) ){
-                continue;
-              }
+                if( histDefBase.isData and
+                    ( not histDefBase.splitVarName.empty()
+                      or JsonUtils::fetchValue(histConfig, "noData", false)
+                    ) ){
+                  continue;
+                }
 
-              if( histDefBase.varToPlot != "Raw" ){
-                // Then filling the histo is needed
+                if( histDefBase.varToPlot != "Raw" ){
+                  // Then filling the histo is needed
 
-                // Binning
-                histDefBase.xEdges.clear();
+                  // Binning
+                  histDefBase.xEdges.clear();
 
-                histDefBase.xMin = JsonUtils::fetchValue(histConfig, "xMin", std::nan("nan"));;
-                histDefBase.xMax = JsonUtils::fetchValue(histConfig, "xMax", std::nan("nan"));
+                  histDefBase.xMin = JsonUtils::fetchValue(histConfig, "xMin", std::nan("nan"));;
+                  histDefBase.xMax = JsonUtils::fetchValue(histConfig, "xMax", std::nan("nan"));
 
-                if( JsonUtils::fetchValue(histConfig, "useSampleBinning", false) ){
+                  if( JsonUtils::fetchValue(histConfig, "useSampleBinning", false) ){
 
-                  std::string sampleObsBinning = JsonUtils::fetchValue(histConfig, "useSampleBinningOfObservable", histDefBase.varToPlot);
+                    std::string sampleObsBinning = JsonUtils::fetchValue(histConfig, "useSampleBinningOfObservable", histDefBase.varToPlot);
 
-                  for( const auto& bin : sample.getBinning().getBinsList() ){
-                    const auto& edges = bin.getVarEdges(sampleObsBinning);
-                    for( const auto& edge : { edges.first, edges.second } ) {
-                      if ((histDefBase.xMin != histDefBase.xMin or histDefBase.xMin <= edge)
-                          and (histDefBase.xMax != histDefBase.xMax or histDefBase.xMax >= edge)) {
-                        // either NaN or in bounds
-                        if (not GenericToolbox::doesElementIsInVector(edge, histDefBase.xEdges)) {
-                          histDefBase.xEdges.emplace_back(edge);
+                    for( const auto& bin : sample.getBinning().getBinsList() ){
+                      const auto& edges = bin.getVarEdges(sampleObsBinning);
+                      for( const auto& edge : { edges.first, edges.second } ) {
+                        if ((histDefBase.xMin != histDefBase.xMin or histDefBase.xMin <= edge)
+                            and (histDefBase.xMax != histDefBase.xMax or histDefBase.xMax >= edge)) {
+                          // either NaN or in bounds
+                          if (not GenericToolbox::doesElementIsInVector(edge, histDefBase.xEdges)) {
+                            histDefBase.xEdges.emplace_back(edge);
+                          }
+                        }
+                      }
+                    }
+                    if( histDefBase.xEdges.empty() ) continue; // skip
+                    std::sort( histDefBase.xEdges.begin(), histDefBase.xEdges.end() ); // sort for ROOT
+
+                  } // sample binning ?
+                  else if( JsonUtils::doKeyExist(histConfig, "binningFile") ){
+                    DataBinSet b;
+                    b.readBinningDefinition(JsonUtils::fetchValue<std::string>(histConfig, "binningFile") );
+                    LogThrowIf(b.getBinVariables().size()!=1, "Binning should be defined with only one variable, here: " << GenericToolbox::parseVectorAsString(b.getBinVariables()))
+
+                    for(const auto& bin: b.getBinsList()){
+                      const auto& edges = bin.getVarEdges(b.getBinVariables()[0]);
+                      for( const auto& edge : { edges.first, edges.second } ) {
+                        if ((histDefBase.xMin != histDefBase.xMin or histDefBase.xMin <= edge)
+                            and (histDefBase.xMax != histDefBase.xMax or histDefBase.xMax >= edge)) {
+                          // either NaN or in bounds
+                          if (not GenericToolbox::doesElementIsInVector(edge, histDefBase.xEdges)) {
+                            histDefBase.xEdges.emplace_back(edge);
+                          }
                         }
                       }
                     }
                   }
-                  if( histDefBase.xEdges.empty() ) continue; // skip
-                  std::sort( histDefBase.xEdges.begin(), histDefBase.xEdges.end() ); // sort for ROOT
-
-                } // sample binning ?
-                else if( JsonUtils::doKeyExist(histConfig, "binningFile") ){
-                  DataBinSet b;
-                  b.readBinningDefinition(JsonUtils::fetchValue<std::string>(histConfig, "binningFile") );
-                  LogThrowIf(b.getBinVariables().size()!=1, "Binning should be defined with only one variable, here: " << GenericToolbox::parseVectorAsString(b.getBinVariables()))
-
-                  for(const auto& bin: b.getBinsList()){
-                    const auto& edges = bin.getVarEdges(b.getBinVariables()[0]);
-                    for( const auto& edge : { edges.first, edges.second } ) {
-                      if ((histDefBase.xMin != histDefBase.xMin or histDefBase.xMin <= edge)
-                          and (histDefBase.xMax != histDefBase.xMax or histDefBase.xMax >= edge)) {
-                        // either NaN or in bounds
-                        if (not GenericToolbox::doesElementIsInVector(edge, histDefBase.xEdges)) {
-                          histDefBase.xEdges.emplace_back(edge);
-                        }
-                      }
-                    }
+                  else{
+                    LogThrow("Could not find the binning definition.")
                   }
+
+                  // Hist fill function
+                  buildFillFunction = true; // build Later
+
+                } // not Raw?
+
+                histDefBase.xTitle = JsonUtils::fetchValue(histConfig, "xTitle", histDefBase.varToPlot);
+                histDefBase.yTitle = JsonUtils::fetchValue(histConfig, "yTitle", "");
+                if( histDefBase.yTitle.empty() ){
+                  histDefBase.yTitle = "Counts";
+                  if( histDefBase.rescaleAsBinWidth ) histDefBase.yTitle += " (/bin width)";
+                  if( histDefBase.rescaleBinFactor != 1. ) histDefBase.yTitle += "*" + std::to_string(histDefBase.rescaleBinFactor);
                 }
-                else{
-                  LogThrow("Could not find the binning definition.")
-                }
 
-                // Hist fill function
-                buildFillFunction = true; // build Later
-
-              } // not Raw?
-
-              histDefBase.xTitle = JsonUtils::fetchValue(histConfig, "xTitle", histDefBase.varToPlot);
-              histDefBase.yTitle = JsonUtils::fetchValue(histConfig, "yTitle", "");
-              if( histDefBase.yTitle.empty() ){
-                histDefBase.yTitle = "Counts";
-                if( histDefBase.rescaleAsBinWidth ) histDefBase.yTitle += " (/bin width)";
-                if( histDefBase.rescaleBinFactor != 1. ) histDefBase.yTitle += "*" + std::to_string(histDefBase.rescaleBinFactor);
-              }
-
-              // Colors / Title (legend) / Name
-              if( histDefBase.isData ){
-                histDefBase.histName = "Data_TH1D";
-                histDefBase.histTitle = "Data";
-                histDefBase.histColor = kBlack;
-                histDefBase.fillStyle = 1001;
-              }
-              else{
-
-                histDefBase.histName = "MC_TH1D";
-
-                if( histDefBase.splitVarName.empty() ){
-                  histDefBase.histTitle = "Prediction";
-                  histDefBase.histColor = defaultColorWheel[ sampleCounter % defaultColorWheel.size() ];
+                // Colors / Title (legend) / Name
+                if( histDefBase.isData ){
+                  histDefBase.histName = "Data_TH1D";
+                  histDefBase.histTitle = "Data";
+                  histDefBase.histColor = kBlack;
                   histDefBase.fillStyle = 1001;
                 }
                 else{
-                  histDefBase.histTitle = "Prediction (" + splitVar + " == " + std::to_string(splitValue) + ")";
-                  histDefBase.histColor = defaultColorWheel[ splitValueIndex % defaultColorWheel.size() ];
+                  histDefBase.histName = "MC_TH1D";
 
-                  // User defined color?
-                  auto varDict = JsonUtils::fetchMatchingEntry(_varDictionary_, "name", splitVar); // does the cosmetic pars are configured?
-                  auto dictEntries = varDict["dictionary"];
-                  JsonUtils::forwardConfig(dictEntries);
+                  if( histDefBase.splitVarName.empty() ){
+                    histDefBase.histTitle = "Prediction";
+                    histDefBase.histColor = defaultColorWheel[ sampleCounter % defaultColorWheel.size() ];
+                    histDefBase.fillStyle = 1001;
+                  }
+                  else{
+                    histDefBase.histTitle = "Prediction (" + splitVar + " == " + std::to_string(splitValue) + ")";
+                    histDefBase.histColor = defaultColorWheel[ splitValueIndex % defaultColorWheel.size() ];
 
-                  if( not varDict.empty() ){
+                    // User defined color?
+                    auto varDict = JsonUtils::fetchMatchingEntry(_varDictionary_, "name", splitVar); // does the cosmetic pars are configured?
+                    auto dictEntries = varDict["dictionary"];
+                    JsonUtils::forwardConfig(dictEntries);
 
-                    if( dictEntries.is_null() ){
-                      LogError << R"(Could not find "dictionary" key in JSON config for var: ")" << splitVar << "\"" << std::endl;
-                      throw std::runtime_error("dictionary not found, by variable name found in JSON.");
-                    }
+                    if( not varDict.empty() ){
 
-                    // Look for the value we want
-                    auto valDict = JsonUtils::fetchMatchingEntry(dictEntries, "value", splitValue);
+                      if( dictEntries.is_null() ){
+                        LogError << R"(Could not find "dictionary" key in JSON config for var: ")" << splitVar << "\"" << std::endl;
+                        throw std::runtime_error("dictionary not found, by variable name found in JSON.");
+                      }
 
-                    histDefBase.histTitle = JsonUtils::fetchValue(valDict, "title", histDefBase.histTitle);
-                    histDefBase.fillStyle = JsonUtils::fetchValue(valDict, "fillStyle", short(1001));
-                    histDefBase.histColor = JsonUtils::fetchValue(valDict, "color", unsetSplitValueColor);
-                    if( histDefBase.histColor == unsetSplitValueColor ) unsetSplitValueColor++; // increment for the next ones
+                      // Look for the value we want
+                      auto valDict = JsonUtils::fetchMatchingEntry(dictEntries, "value", splitValue);
 
-                  } // var dict?
+                      histDefBase.histTitle = JsonUtils::fetchValue(valDict, "title", histDefBase.histTitle);
+                      histDefBase.fillStyle = JsonUtils::fetchValue(valDict, "fillStyle", short(1001));
+                      histDefBase.histColor = JsonUtils::fetchValue(valDict, "color", unsetSplitValueColor);
+                      if( histDefBase.histColor == unsetSplitValueColor ) unsetSplitValueColor++; // increment for the next ones
 
-                } // splitVar ?
+                    } // var dict?
 
-              } // isData?
+                  } // splitVar ?
 
-              // Config DONE : creating save path
-              histDefBase.folderPath = sample.getName();
-              histDefBase.folderPath += "/" + histDefBase.varToPlot;
-              if( not histDefBase.splitVarName.empty() ){
-                histDefBase.folderPath += "/" + histDefBase.splitVarName;
-                histDefBase.folderPath += "/" + std::to_string(histDefBase.splitVarValue);
-              }
+                } // isData?
 
-              // Config DONE
-              _histHolderCacheList_[0].emplace_back(histDefBase);
-              if( buildFillFunction ){
-                _histHolderCacheList_[0].back().fillMutexPtr = new std::mutex();
-                auto splitVarValue = _histHolderCacheList_[0].back().splitVarValue;
-                auto varToPlot = _histHolderCacheList_[0].back().varToPlot;
-                auto splitVarName = _histHolderCacheList_[0].back().splitVarName;
-                auto* mutexPtr = _histHolderCacheList_[0].back().fillMutexPtr;
-              }
+                // Config DONE : creating save path
+                histDefBase.folderPath = sample.getName();
+                histDefBase.folderPath += "/" + histDefBase.varToPlot;
+                if( not histDefBase.splitVarName.empty() ){
+                  histDefBase.folderPath += "/" + histDefBase.splitVarName;
+                  histDefBase.folderPath += "/" + std::to_string(histDefBase.splitVarValue);
+                }
 
-            } // isData
-          } // splitValue
-        } // splitVar
+                // Config DONE
+                _histHolderCacheList_[0].emplace_back(histDefBase);
+                if( buildFillFunction ){
+                  _histHolderCacheList_[0].back().fillMutexPtr = new std::mutex();
+                  auto splitVarValue = _histHolderCacheList_[0].back().splitVarValue;
+                  auto varToPlot = _histHolderCacheList_[0].back().varToPlot;
+                  auto splitVarName = _histHolderCacheList_[0].back().splitVarName;
+                  auto* mutexPtr = _histHolderCacheList_[0].back().fillMutexPtr;
+                }
+
+              } // isData
+            } // splitValue
+          } // splitVar
+        }
+
       } // histDef
     }
   }
@@ -1226,7 +1232,7 @@ std::vector<std::string> PlotGenerator::fetchListOfVarToPlot(){
   _histogramsDefinition_ = JsonUtils::fetchValue(_config_, "histogramsDefinition", nlohmann::json());
   for( const auto& histConfig : _histogramsDefinition_ ){
     auto varToPlot = JsonUtils::fetchValue<std::string>(histConfig, "varToPlot");
-    if( varToPlot != "Raw" and not GenericToolbox::doesElementIsInVector(varToPlot, varNameList) ){
+    if( varToPlot != "Raw" and not GenericToolbox::doesElementIsInVector(varToPlot, varNameList) and GenericToolbox::splitString(varToPlot, ":").size() < 2 ){
       varNameList.emplace_back(varToPlot);
     }
   }
