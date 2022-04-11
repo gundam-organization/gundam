@@ -361,11 +361,11 @@ void Propagator::fillDialsStack(){
           if(dialSet.getGlobalDialType() == DialType::Normalization){ continue; } // no cache needed
           for( auto& dial : dialSet.getDialList() ){
             if(dial->isReferenced()) _dialsStack_.emplace_back(dial.get());
-          }
-        }
-      }
+          } // dial
+        } // dialSet
+      } // par
     }
-  }
+  } // parSet
 }
 
 

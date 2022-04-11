@@ -93,7 +93,7 @@ private:
   double _stepSize_{std::nan("UNSET")};
   nlohmann::json _parameterConfig_;
   nlohmann::json _dialDefinitionsList_;
-  bool _enableDialSetsSummary_;
+  bool _enableDialSetsSummary_{false};
   std::string _dialsWorkingDirectory_;
   bool _isEnabled_{true};
   bool _isFixed_{false};

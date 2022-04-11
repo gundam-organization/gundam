@@ -8,6 +8,7 @@
 
 #include "Propagator.h"
 //#include "MinimizerInterface.h"
+#include "ScanConfig.h"
 
 #include "GenericToolbox.VariablesMonitor.h"
 #include "GenericToolbox.CycleTimer.h"
@@ -96,6 +97,8 @@ private:
   std::shared_ptr<ROOT::Math::Functor> _functor_{nullptr};
   TRandom3 _prng_;
 
+  ScanConfig _scanConfig_;
+
   // Buffers
   double _chi2Buffer_{0};
   double _chi2StatBuffer_{0};
@@ -144,6 +147,17 @@ private:
       { 2, "status = 2    : made pos def"},
       { 3, "status = 3    : accurate"}
   };
+
+
+  struct ScanData{
+    std::string folder{};
+    std::string title{};
+    std::string yTitle{};
+    std::vector<double> yPoints{};
+    std::function<double()> evalY{};
+  };
+  std::vector<ScanData> scanDataDict;
+
 };
 
 

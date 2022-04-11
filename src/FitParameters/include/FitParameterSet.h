@@ -19,6 +19,7 @@
 #include "Logger.h"
 
 #include "FitParameter.h"
+#include "NestedDial.h"
 
 
 /*
@@ -58,11 +59,8 @@ public:
   std::vector<FitParameter> &getEigenParameterList();
   const std::vector<FitParameter> &getParameterList() const;
   const nlohmann::json &getConfig() const;
-
   const std::shared_ptr<TMatrixDSym> &getPriorCorrelationMatrix() const;
-
   const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const;
-
   std::vector<FitParameter>& getEffectiveParameterList();
   const std::vector<FitParameter>& getEffectiveParameterList() const;
 
@@ -107,6 +105,7 @@ private:
   // Internals
   bool _isInitialized_{false};
   std::vector<FitParameter> _parameterList_;
+  std::vector<NestedDial> _nestedDialList_;
   TDirectory* _saveDir_{nullptr};
 
   // JSON

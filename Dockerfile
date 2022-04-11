@@ -5,7 +5,7 @@ RUN sudo apt-get update && \
     sudo apt-get install build-essential curl cmake file git ruby-full locales -y
 
 # install ROOT & yaml-cpp
-RUN brew install root  && \
+RUN brew update && brew install root  && \
     brew install yaml-cpp
 
 ENV GUNDIR /home/linuxbrew/gundam
@@ -17,8 +17,11 @@ COPY --from=base $GUNDIR $GUNDIR
 ENV ROOTSYS /home/linuxbrew/.linuxbrew
 
 COPY . $GUNDIR/
-RUN cd  $GUNDIR && \
-    # sudo is required by github actions since git clone is done by root
+SHELL ["/bin/bash", "-c"]
+
+# sudo is required by github actions since git clone is done by root
+RUN cd $GUNDIR && \
+    source /home/linuxbrew/.linuxbrew/bin/thisroot.sh && \
     sudo git submodule update --init --recursive && \
     mkdir build_doc && \
     mkdir install_doc && \

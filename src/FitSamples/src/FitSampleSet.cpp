@@ -3,6 +3,8 @@
 //
 
 #include <TTreeFormulaManager.h>
+
+#include <memory>
 #include "json.hpp"
 
 #include "Logger.h"
@@ -108,13 +110,13 @@ void FitSampleSet::initialize() {
   std::string llhMethod = JsonUtils::fetchValue(_config_, "llhStatFunction", "PoissonLLH");
   LogInfo << "Using \"" << llhMethod << "\" LLH function." << std::endl;
   if( llhMethod == "PoissonLLH" ){
-    _likelihoodFunctionPtr_ = std::shared_ptr<PoissonLLH>(new PoissonLLH);
+    _likelihoodFunctionPtr_ = std::make_shared<PoissonLLH>();
   }
   else if( llhMethod == "BarlowLLH" ){
-    _likelihoodFunctionPtr_ = std::shared_ptr<BarlowLLH>(new BarlowLLH);
+    _likelihoodFunctionPtr_ = std::make_shared<BarlowLLH>();
   }
   else if( llhMethod == "BarlowLLH_OA2020_Bad" ){
-    _likelihoodFunctionPtr_ = std::shared_ptr<BarlowOA2020BugLLH>(new BarlowOA2020BugLLH);
+    _likelihoodFunctionPtr_ = std::make_shared<BarlowOA2020BugLLH>();
   }
   else{
     LogThrow("Unknown LLH Method: " << llhMethod)
@@ -135,6 +137,9 @@ std::vector<FitSample> &FitSampleSet::getFitSampleList() {
 const nlohmann::json &FitSampleSet::getConfig() const {
   return _config_;
 }
+const std::shared_ptr<CalcLLHFunc> &FitSampleSet::getLikelihoodFunctionPtr() const {
+  return _likelihoodFunctionPtr_;
+}
 
 bool FitSampleSet::empty() const {
   return _fitSampleList_.empty();
@@ -142,16 +147,19 @@ bool FitSampleSet::empty() const {
 double FitSampleSet::evalLikelihood() const{
   double llh = 0.;
   for( auto& sample : _fitSampleList_ ){
-    double sampleLlh = 0;
-    for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-      sampleLlh += (*_likelihoodFunctionPtr_)(
-        sample.getMcContainer().histogram->GetBinContent(iBin),
-        std::pow(sample.getMcContainer().histogram->GetBinError(iBin), 2),
-        sample.getDataContainer().histogram->GetBinContent(iBin));
-    }
-    llh += sampleLlh;
+    llh += this->evalLikelihood(sample);
   }
   return llh;
+}
+double FitSampleSet::evalLikelihood(const FitSample& sample_) const{
+  double sampleLlh = 0;
+  for( int iBin = 1 ; iBin <= sample_.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+    sampleLlh += (*_likelihoodFunctionPtr_)(
+        sample_.getMcContainer().histogram->GetBinContent(iBin),
+        std::pow(sample_.getMcContainer().histogram->GetBinError(iBin), 2),
+        sample_.getDataContainer().histogram->GetBinContent(iBin));
+  }
+  return sampleLlh;
 }
 
 void FitSampleSet::loadAsimovData(){
