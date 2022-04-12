@@ -28,7 +28,7 @@ private:
     std::unique_ptr<hemi::Array<double>> fSums;
 
     /// The (approximate) amount of memory required on the GPU.
-    std::size_t fTotalBytes;
+    std::size_t fTotalBytes{};
 
 public:
     IndexedSums(Cache::Weights::Results& eventWeight,

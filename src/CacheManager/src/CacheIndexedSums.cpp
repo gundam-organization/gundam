@@ -4,6 +4,7 @@
 #include <iostream>
 #include <exception>
 #include <cmath>
+#include <memory>
 
 #include <hemi/hemi_error.h>
 #include <hemi/launch.h>
@@ -28,7 +29,7 @@ Cache::IndexedSums::IndexedSums(Cache::Weights::Results& inputs,
     fTotalBytes += fEventWeights.size()*sizeof(short);   // fIndexes;
 
     LogInfo << "Cached IndexedSums -- approximate memory size: "
-            << fTotalBytes/1E+6
+            << double(fTotalBytes)/1E+6
             << " MB" << std::endl;
 
     try {
@@ -36,8 +37,8 @@ Cache::IndexedSums::IndexedSums(Cache::Weights::Results& inputs,
         // results are copied every time, so pin the CPU memory into the page
         // set.  The initial values are seldom changed, so they are not
         // pinned.
-        fSums.reset(new hemi::Array<double>(bins,true));
-        fIndexes.reset(new hemi::Array<short>(fEventWeights.size(),false));
+        fSums = std::make_unique<hemi::Array<double>>(bins,true);
+        fIndexes = std::make_unique<hemi::Array<short>>(fEventWeights.size(),false);
 
     }
     catch (std::bad_alloc&) {
@@ -53,7 +54,7 @@ Cache::IndexedSums::IndexedSums(Cache::Weights::Results& inputs,
 }
 
 // The destructor
-Cache::IndexedSums::~IndexedSums() {}
+Cache::IndexedSums::~IndexedSums() = default;
 
 void Cache::IndexedSums::SetEventIndex(int event, int bin) {
     if (event < 0) throw;
