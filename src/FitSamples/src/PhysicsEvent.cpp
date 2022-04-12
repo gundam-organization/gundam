@@ -5,8 +5,10 @@
 #include "PhysicsEvent.h"
 #include "SplineDial.h"
 
+#ifdef GUNDAM_USING_CUDA
 #include "CacheManager.h"
 #include "CacheWeights.h"
+#endif
 
 #include "Logger.h"
 
