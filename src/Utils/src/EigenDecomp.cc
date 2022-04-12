@@ -5,8 +5,8 @@ EigenDecomp::EigenDecomp(const TMatrixD& cov, Method flag)
     , decomp_method(flag)
     , eigen_vectors(nullptr)
     , eigen_vectorsI(nullptr)
-    , eigen_covmat(nullptr)
     , eigen_values(nullptr)
+    , eigen_covmat(nullptr)
 {
     SetupDecomp(cov);
 }
@@ -16,25 +16,18 @@ EigenDecomp::EigenDecomp(const TMatrixDSym& cov, Method flag)
     , decomp_method(flag)
     , eigen_vectors(nullptr)
     , eigen_vectorsI(nullptr)
-    , eigen_covmat(nullptr)
     , eigen_values(nullptr)
+    , eigen_covmat(nullptr)
 {
     SetupDecomp(cov);
 }
 
 EigenDecomp::~EigenDecomp()
 {
-    if(eigen_vectors != nullptr)
-        delete eigen_vectors;
-
-    if(eigen_vectorsI != nullptr)
-        delete eigen_vectorsI;
-
-    if(eigen_values != nullptr)
-        delete eigen_values;
-
-    if(eigen_covmat != nullptr)
-        delete eigen_covmat;
+  delete eigen_vectors;
+  delete eigen_vectorsI;
+  delete eigen_values;
+  delete eigen_covmat;
 }
 
 template<typename Matrix>

@@ -14,7 +14,7 @@ class BinManager
 {
     public:
         BinManager();
-        BinManager(const std::string& filename, bool UseNutypeBeammode=false);
+        BinManager(std::string  filename, bool UseNutypeBeammode=false);
         BinManager(const BinManager& source_);
 
         int GetNbins() const;
