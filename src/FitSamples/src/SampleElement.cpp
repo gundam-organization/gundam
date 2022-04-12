@@ -117,12 +117,6 @@ void SampleElement::refillHistogram(int iThread_){
   // Faster that pointer shifter. -> would be slower if refillHistogram is
   // handled by the propagator
 
-  int histIndex = -1;
-#ifdef GUNDAM_USING_CUDA
-  Cache::Manager* cache = Cache::Manager::Get();
-  if (cache) histIndex = getCacheManagerIndex();
-#endif
-
   // Size = Nbins + 2 overflow (0 and last)
   auto* binContentArray = histogram->GetArray();
 
@@ -157,7 +151,6 @@ void SampleElement::refillHistogram(int iThread_){
                     << " " << delta
                     << std::endl;
         }
-#endif
 #endif
     }
     binContentArray[iBin+1] = content;
