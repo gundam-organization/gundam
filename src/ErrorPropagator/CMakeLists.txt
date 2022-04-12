@@ -25,6 +25,7 @@ endif()
 target_link_libraries( GundamErrorPropagator
         GundamFitParameters
         GundamFitSamples
+        GundamCache
         anaevents
         ${ROOT_LIBRARIES}
         )

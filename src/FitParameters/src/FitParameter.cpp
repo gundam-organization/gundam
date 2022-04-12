@@ -133,7 +133,7 @@ void FitParameter::initialize() {
      LogWarning << "Prior type: " << priorTypeStr << std::endl;
      if( _priorType_ == PriorType::Flat ){ _isFree_ = true; }
     }
-    
+
     if( JsonUtils::doKeyExist(_parameterConfig_, "priorValue") ){
       _priorValue_ = JsonUtils::fetchValue(_parameterConfig_, "priorValue", _priorValue_);
       LogWarning << this->getTitle() << ": prior value override -> " << _priorValue_ << std::endl;

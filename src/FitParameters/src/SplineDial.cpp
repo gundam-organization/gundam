@@ -112,11 +112,9 @@ const TSpline3* SplineDial::getSplinePtr() const {
 
 void SplineDial::writeSpline(const std::string &fileName_) const{
   TFile* f;
-  if(fileName_.empty()) f = TFile::Open(Form("badDial_%x.root", this), "RECREATE");
+  if(fileName_.empty()) f = TFile::Open(Form("badDial_%p.root", this), "RECREATE");
   else                  f = TFile::Open(fileName_.c_str(), "RECREATE");
 
   f->WriteObject(&_spline_, _spline_.GetName());
   f->Close();
 }
-
-

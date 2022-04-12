@@ -8,6 +8,8 @@
 #include "GlobalVariables.h"
 #include "SampleElement.h"
 
+#include "CacheManager.h"
+
 LoggerInit([](){
   Logger::setUserHeaderStr("[SampleElement]");
 })
@@ -110,7 +112,14 @@ void SampleElement::refillHistogram(int iThread_){
     iThread_ = 0;
   }
 
-  // Faster that pointer shifter. -> would be slower if refillHistogram is handled by the propagator
+  // Faster that pointer shifter. -> would be slower if refillHistogram is
+  // handled by the propagator
+
+  int histIndex = -1;
+#ifdef GUNDAM_USING_CUDA
+  Cache::Manager* cache = Cache::Manager::Get();
+  if (cache) histIndex = getCacheManagerIndex();
+#endif
 
   // Size = Nbins + 2 overflow (0 and last)
   auto* binContentArray = histogram->GetArray();
@@ -118,11 +127,33 @@ void SampleElement::refillHistogram(int iThread_){
   int iBin = iThread_;
   int nBins = int(perBinEventPtrList.size());
   while( iBin < nBins ){
-    binContentArray[iBin+1] = 0;
-    for( auto* eventPtr : perBinEventPtrList.at(iBin)){
-      binContentArray[iBin+1] += eventPtr->getEventWeight();
+    double content = 0.0;
+    if (histIndex < 0) {
+        for( auto* eventPtr : perBinEventPtrList.at(iBin)){
+            content += eventPtr->getEventWeight();
+        }
     }
-    histogram->GetSumw2()->GetArray()[iBin+1] = binContentArray[iBin+1];
+    else {
+        content = cache->GetHistogramsCache().GetSum(histIndex+iBin);
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
+        double slowValue = 0.0;
+        for( auto* eventPtr : perBinEventPtrList.at(iBin)){
+            slowValue += eventPtr->getEventWeight();
+        }
+        double delta = std::abs(slowValue-content);
+        if (delta > 1E-6) {
+            LogInfo << "Bin mismatch " << histIndex
+                    << " " << iBin
+                    << " " << name
+                    << " " << slowValue
+                    << " " << content
+                    << " " << delta
+                    << std::endl;
+        }
+#endif
+    }
+    binContentArray[iBin+1] = content;
+    histogram->GetSumw2()->GetArray()[iBin+1] = content;
     iBin += nbThreads;
   }
 }
@@ -135,6 +166,9 @@ double SampleElement::getSumWeights() const{
   return std::accumulate(eventList.begin(), eventList.end(), double(0.),
                          [](double sum_, const PhysicsEvent& ev_){ return sum_ + ev_.getEventWeight(); });
 }
+
+int SampleElement::getCacheManagerIndex() const {return cacheManagerIndex;}
+void SampleElement::setCacheManagerIndex(int i) {cacheManagerIndex = i;}
 
 void SampleElement::print() const{
   LogInfo << "SampleElement: " << name << std::endl;

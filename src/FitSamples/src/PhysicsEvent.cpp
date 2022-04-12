@@ -3,9 +3,12 @@
 //
 
 #include "PhysicsEvent.h"
+#include "SplineDial.h"
+
+#include "CacheManager.h"
+#include "CacheWeights.h"
 
 #include "Logger.h"
-
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[PhysicsEvent]");
@@ -67,8 +70,59 @@ double PhysicsEvent::getTreeWeight() const {
 double PhysicsEvent::getNominalWeight() const {
   return _nominalWeight_;
 }
+
 double PhysicsEvent::getEventWeight() const {
-  return _eventWeight_;
+#ifdef GUNDAM_USING_CUDA
+    if (0 <= _GPUResultIndex_ && _GPUResult_) {
+        if (_GPUResultValid_ && !(*_GPUResultValid_)) {
+            // This is slow, but will make sure that the cached result is
+            // updated when the GPU changes.  The values pointed to by
+            // _GPUResult_ and _GPUResultValid_ are inside of the weights
+            // cache (a bit of evil coding here), and are updated by the
+            // cache.
+            Cache::Manager::Get()
+                ->GetWeightsCache().GetResult(_GPUResultIndex_);
+        }
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
+#warning CACHE_MANAGER_SLOW_VALIDATION used in PhysicsEvent::getEventWeight
+        do {
+            static double maxDelta = 1.0E-20;
+            static double sumDelta = 0.0;
+            static long long int numDelta = 0;
+            double res = *_GPUResult_;
+            double avg = 0.5*(std::abs(res) + std::abs(_eventWeight_));
+            if (avg < getTreeWeight()) avg = getTreeWeight();
+            double delta = std::abs(res - _eventWeight_);
+            delta /= avg;
+            sumDelta += delta;
+            ++numDelta;
+            if (numDelta < 0) throw std::runtime_error("validation wrap");
+            maxDelta = std::max(maxDelta,delta);
+            if ((numDelta % 1000000) == 0) {
+                LogInfo << "VALIDATION: Average event weight delta: "
+                        << sumDelta/numDelta
+                        << " Maximum: " << maxDelta
+                        << std::endl;
+            }
+            if (maxDelta < 1E-5) break;
+            if (delta < maxDelta) break;
+            LogWarning << "WARNING: Event weight difference: " << delta
+                       << " Cache: " << res
+                       << " Dial: " << _eventWeight_
+                       << " Tree: " << getTreeWeight()
+                       << std::endl;
+        } while(false);
+#endif
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
+#warning CACHE_MANAGER_SLOW_VALIDATION force CPU _eventWeight
+        // When the slow validation is running, the "CPU" event weight is
+        // calculated after Cache::Manager::Fill
+        return _eventWeight_;
+#endif
+        return *_GPUResult_;
+    }
+#endif
+    return _eventWeight_;
 }
 double PhysicsEvent::getFakeDataWeight() const {
   return _fakeDataWeight_;
@@ -143,7 +197,77 @@ void PhysicsEvent::reweightUsingDialCache(){
   // bare dials
   for( auto& dial : _rawDialPtrList_ ){
     if( dial == nullptr ) return;
-    this->addEventWeight( dial->evalResponse() );
+    double response = dial->evalResponse();
+    this->addEventWeight( response );
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
+#warning CACHE_MANAGER_SLOW_VALIDATION in PhysicsEvent::reweightUsingDialCache
+    /////////////////////////////////////////////////////////////////
+    // The internal GPU values for the splines are made available during slow
+    // validation, but are never used in the CPU calculation.  This code here
+    // is checking that the GPU value for the spline agrees with the direct
+    // dial calculation of the spline.
+    static std::map<std::string,double> maxDelta; // Exclude zero...
+    static std::map<std::string,double> sumDelta;
+    static std::map<std::string,long long int> numDelta;
+    static int deltaTrials = 0;
+    const SplineDial* sDial = dynamic_cast<const SplineDial*>(dial);
+    while (sDial) {
+        if (!dial->getGPUCachePointer()) {
+            LogWarning << "SplineDial without cache" << std::endl;
+            break;
+        }
+        if (!std::isfinite(response)) {
+            LogWarning << "Dial response is not finite" << std::endl;
+            break;
+        }
+        if (response < 0) {
+            LogWarning << "Dial response is negative" << std::endl;
+            break;
+        }
+        double cacheResponse = *dial->getGPUCachePointer();
+        std::string cacheName = dial->getGPUCacheName();
+        if (!std::isfinite(cacheResponse)) {
+            LogWarning << "GPU cache response is not finite" << std::endl;
+            std::runtime_error("GPU cache response is not finite");
+        }
+        if (cacheResponse < 0) {
+            LogWarning << "GPU cache response is negative" << std::endl;
+        }
+        double avg = 0.5*(std::abs(cacheResponse)+std::abs(response));
+        if (avg < 1.0) avg = 1.0;
+        double delta = std::abs(cacheResponse-response)/avg;
+        sumDelta[cacheName] += delta;
+        ++numDelta[cacheName];
+        if (numDelta[cacheName] < 0) {
+            throw std::runtime_error("Validation wrap around");
+        }
+        if (delta > maxDelta[cacheName]) {
+            maxDelta[cacheName] = delta;
+            LogInfo << "VALIDATION: Increase GPU and Dial max delta"
+                    << " GPU (" << cacheName << ") : " << cacheResponse
+                    << " Dial: " << response
+                    << " delta: " << delta
+                    << std::endl;
+            LogInfo << "Maximum Dial to cache value delta: "
+                    << maxDelta[cacheName]
+                    << " Average value delta: "
+                    << sumDelta[cacheName]/numDelta[cacheName]
+                    << std::endl;
+        }
+
+        if ((deltaTrials++ % 1000000) == 0) {
+            for (auto maxD : maxDelta) {
+                std::string name = maxD.first;
+                LogInfo << "VALIDATION: Average cache delta for"
+                        << " " << name << ": " << sumDelta[name]/numDelta[name]
+                        << " Maximum: " << maxDelta[name]
+                        << std::endl;
+            }
+        }
+
+        break;
+    }
+#endif
   }
 
   // nested dials
@@ -343,5 +467,3 @@ std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p ){
 const std::vector<std::string> *PhysicsEvent::getCommonLeafNameListPtr() const {
   return _commonLeafNameListPtr_;
 }
-
-

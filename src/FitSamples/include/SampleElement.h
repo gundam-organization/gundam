@@ -38,6 +38,7 @@ public:
   std::vector<std::vector<PhysicsEvent*>> perBinEventPtrList;
   double histScale{1};
   bool isLocked{false};
+  int cacheManagerIndex{-1};
 
   // Methods
   void reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const PhysicsEvent &eventBuffer_);
@@ -49,6 +50,9 @@ public:
 
   double getSumWeights() const;
 
+  int getCacheManagerIndex() const;
+  void setCacheManagerIndex(int i);
+  
   // debug
   void print() const;
 

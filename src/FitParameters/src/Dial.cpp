@@ -7,11 +7,10 @@
 #include "Logger.h"
 
 #include "Dial.h"
+#include "DialSet.h"
 #include "FitParameter.h"
 #include "FitParameterSet.h"
 #include "GlobalVariables.h"
-
-
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[Dial]");
@@ -19,7 +18,8 @@ LoggerInit([](){
 } )
 
 
-Dial::Dial(DialType::DialType dialType_) : _dialType_{dialType_}, _evalLock_{std::make_shared<std::mutex>()} {}
+Dial::Dial(DialType::DialType dialType_)
+: _dialType_{dialType_}, _isEditingCache_{std::make_shared<std::mutex>()} {}
 Dial::~Dial() = default;
 
 void Dial::reset() {
@@ -57,7 +57,13 @@ void Dial::setMinDialResponse(double minDialResponse_) {
 void Dial::setMaxDialResponse(double maxDialResponse_) {
   _maxDialResponse_ = maxDialResponse_;
 }
-
+void Dial::setOwner(const DialSet* dialSetPtr) {
+    _ownerDialSetReference_ = dialSetPtr;
+}
+const DialSet* Dial::getOwner() const {
+    LogThrowIf(!_ownerDialSetReference_,"Invalid owning DialSet");
+    return _ownerDialSetReference_;
+}
 void Dial::initialize() {
   LogThrowIf( _dialType_ == DialType::Invalid, "_dialType_ is not set." );
   LogThrowIf( _associatedParameterReference_ == nullptr,  "Parameter not set");
@@ -90,6 +96,14 @@ DialType::DialType Dial::getDialType() const {
 void *Dial::getAssociatedParameterReference() const {
   return _associatedParameterReference_;
 }
+double Dial::getAssociatedParameter() const {
+    return static_cast<const FitParameter *>(_associatedParameterReference_)
+        ->getParameterValue();
+}
+int Dial::getAssociatedParameterIndex() const {
+    return static_cast<const FitParameter *>(_associatedParameterReference_)
+        ->getParameterIndex();
+}
 
 void Dial::updateEffectiveDialParameter(){
   _effectiveDialParameterValue_ = _dialParameterCache_;
@@ -120,19 +134,16 @@ void Dial::copySplineCache(TSpline3& splineBuffer_){
 
 // Virtual
 double Dial::evalResponse(double parameterValue_) {
-
-  while( _dialParameterCache_ != parameterValue_ or _isEditingCache_ ){
-    std::lock_guard<std::mutex> g(*_evalLock_); // There can be only one.
+  while( _dialParameterCache_ != parameterValue_) {
+    std::lock_guard<std::mutex> g(*_isEditingCache_); // There can be only one.
     if( _dialParameterCache_ == parameterValue_ ) break;        // stop if already updated
 
     // Edit the cache
-    _isEditingCache_ = true;
     _dialParameterCache_ = parameterValue_;
     this->updateEffectiveDialParameter();
     this->fillResponseCache(); // specified in the corresponding dial class
     if     ( _minDialResponse_ == _minDialResponse_ and _dialResponseCache_<_minDialResponse_ ){ _dialResponseCache_=_minDialResponse_; }
     else if( _maxDialResponse_ == _maxDialResponse_ and _dialResponseCache_>_maxDialResponse_ ){ _dialResponseCache_=_maxDialResponse_; }
-    _isEditingCache_ = false;
 
     break; // All done, lock will be released
   }
@@ -177,4 +188,3 @@ void Dial::buildResponseSplineCache(){
       new TSpline3(Form("%p", this), &xSigmaSteps[0], &yResponse[0], int(xSigmaSteps.size()))
   );
 }
-

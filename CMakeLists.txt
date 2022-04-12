@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.5 FATAL_ERROR)
+cmake_minimum_required (VERSION 3.12 FATAL_ERROR)
 
 # Configure CMake project
 project(gundam)
@@ -14,10 +14,38 @@ option(CXX_WARNINGS "Enable most C++ warning flags." ON)
 option(COLOR_OUTPUT "Enable colored terminal output." ON)
 option(TTYCHECK "Enable check if output is being sent to terminal/TTY." ON)
 option(WITH_OPENMP "Build with OpenMP libraries" OFF )
+option(WITH_CUDA "Build with CUDA (if available)" ON)
 option(YAMLCPP_DIR "Set custom path to yaml-cpp lib" OFF )
 option(ENABLE_DEV_MODE "Enable specific dev related printouts" OFF )
+option(BATCH_MODE "Build to run in a batch queue (affects output)" OFF)
 
 set(VERBOSE TRUE)
+
+# Check for the availability of CUDA
+if(WITH_CUDA)
+  include(CheckLanguage)
+  check_language(CUDA)
+  if(CMAKE_CUDA_COMPILER)
+    message("-- CUDA support enabled")
+    enable_language(CUDA)
+    if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+      # The default is taken from the CUDAARCHS environment variable.  If it
+      # isn't set, then set it to the earliest non-deprecated architecture
+      #    2022: architectures before 52 are deprecated.
+      if (${CMAKE_VERSION} VERSION_GREATER_EQUAL 3.23)
+        # After cmake 3.23, this can be set to all or all-major
+        set(CMAKE_CUDA_ARCHITECTURES all)
+      else()
+        set(CMAKE_CUDA_ARCHITECTURES 52)
+      endif()
+    endif()
+    message("-- CUDA compilation architectures: \"${CMAKE_CUDA_ARCHITECTURES}\"")
+  else()
+    message("-- CUDA support requested, but not supported by this environment")
+  endif(CMAKE_CUDA_COMPILER)
+else()
+  message("-- CUDA support disabled")
+endif(WITH_CUDA)
 
 include(${CMAKE_SOURCE_DIR}/cmake/cmessage.cmake)
 
@@ -44,6 +72,12 @@ if(NOT DEFINED USE_STATIC_LINKS)
     set(USE_STATIC_LINKS 0)
 endif()
 
+if(BATCH_MODE)
+  set(COLOR_OUTPUT NO)
+  set(TTYCHECK NO)
+  add_definitions(-DGUNDAM_BATCH)
+endif(BATCH_MODE)
+
 ################################################################################
 #                            Check Dependencies
 ################################################################################
@@ -58,20 +92,18 @@ endif()
 
 #If you want to try an use the terminally buggy ROOT CMake scripts
 find_package(ROOT
-  COMPONENTS Geom Physics Matrix MathCore Tree RIO)
+  REQUIRED COMPONENTS Geom Physics Matrix MathCore Tree RIO
+  OPTIONAL_COMPONENTS Minuit2)
 if(ROOT_FOUND)
+  cmessage(STATUS "[ROOT]: ROOT found")
   include(${ROOT_USE_FILE})
   cmessage(STATUS "[ROOT]: ROOT package found ${ROOT_LIBRARIES}")
-  # Minuit2 check
-  execute_process (COMMAND root-config --has-minuit2
-          OUTPUT_VARIABLE ROOT_HAS_MINUIT2
-          )
-  if (ROOT_HAS_MINUIT2 MATCHES yes)
-      cmessage(STATUS "[ROOT]: has minuit2: ${ROOT_HAS_MINUIT2}")
-  else(ROOT_HAS_MINUIT2 MATCHES yes)
-      cmessage(STATUS "[ROOT]: has minuit2: ${ROOT_HAS_MINUIT2}")
-      cmessage(FATAL_ERROR "ROOT doesn't have minuit2. Use -Dminuit2=1 to rebuild ROOT.")
-  endif(ROOT_HAS_MINUIT2 MATCHES yes)
+  if (NOT ROOT_minuit2_FOUND)
+    # Minuit2 wasn't found, but make really sure before giving up.
+    execute_process (COMMAND root-config --has-minuit2
+      OUTPUT_VARIABLE ROOT_minuit2_FOUND
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+  endif(NOT ROOT_minuit2_found)
 else(ROOT_FOUND)
    cmessage(STATUS "Including local GENERATE_ROOT_DICTIONARY implementation.")
    include(${CMAKE_SOURCE_DIR}/cmake/GenROOTDictionary.cmake)
@@ -87,6 +119,9 @@ else(ROOT_FOUND)
    execute_process (COMMAND root-config --ldflags
      OUTPUT_VARIABLE ROOT_LINK_FLAGS
      OUTPUT_STRIP_TRAILING_WHITESPACE)
+   execute_process (COMMAND root-config --has-minuit2
+     OUTPUT_VARIABLE ROOT_minuit2_FOUND
+     OUTPUT_STRIP_TRAILING_WHITESPACE)
    cmessage(STATUS "[ROOT]: root-config --version: ${ROOT_VERSION}")
    cmessage(STATUS "[ROOT]: root-config --libs: ${ROOT_LIBRARIES}")
    cmessage(STATUS "[ROOT]: root-config --cflags: ${ROOT_CXX_FLAGS}")
@@ -94,6 +129,11 @@ else(ROOT_FOUND)
    add_compile_options("SHELL:${ROOT_CXX_FLAGS}")
    add_link_options("SHELL:${ROOT_LINK_FLAGS}")
 endif(ROOT_FOUND)
+
+if (NOT ROOT_minuit2_FOUND)
+  cmessage(STATUS "[ROOT]:Rebuild root using -Dminuit2=on in the cmake command")
+  cmessage(FATAL_ERROR "[ROOT]: minuit2 is required")
+endif(NOT ROOT_minuit2_FOUND)
 
 # YAML-CPP
 find_package( yaml-cpp REQUIRED HINTS ${YAMLCPP_DIR} )
@@ -123,6 +163,17 @@ if( "${YAML_CPP_INCLUDE_DIR} " STREQUAL " ")
 #    list(APPEND LINK_LIBARY_LIST ${YAMLCPP_LIBRARY})
 endif()
 
+if (WITH_CUDA)
+  add_definitions( -DGUNDAM_USING_CUDA )
+
+  # uncomment to enable the slow validations (NEVER during productions
+  # or normal running).  These are whole code validations and are
+  # extremely slow.
+  # add_definitions( -DCACHE_MANAGER_SLOW_VALIDATION)
+
+  cmessage(STATUS "Enable GPU support (compiled, but only used if CUDA enabled)")
+endif()
+
 ################################################################################
 #                       SubModules
 ################################################################################
@@ -145,8 +196,12 @@ add_definitions( -D PROGRESS_BAR_FILL_TAG="\\\"T2K\#"\\\" )
 if (COLOR_OUTPUT)
   add_definitions( -D PROGRESS_BAR_ENABLE_RAINBOW=1 )
 else (COLOR_OUTPUT)
-  add_definitions( -D PROGRESS_BAR_ENABLE_RAINBOW=0 )
+  # add_definitions( -D PROGRESS_BAR_ENABLE_RAINBOW=0 )
+  add_definitions( -D CPP_GENERIC_TOOLBOX_NOCOLOR )
 endif (COLOR_OUTPUT)
+if (BATCH_MODE)
+  add_definitions( -D CPP_GENERIC_TOOLBOX_BATCH )
+endif(BATCH_MODE)
 
 ## Add the Logger
 # Reproduce needed parts of the simple-cpp-logger CMakeLists.txt
@@ -215,14 +270,14 @@ if(CXX_MARCH_FLAG)
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native")
 endif()
 
-
 if(CXX_WARNINGS)
+  cmessage(STATUS "Enable CXX warnings")
   add_compile_options(-Wall)
   add_compile_options(-Wno-unused-variable)
   add_compile_options(-Wno-sign-compare)
   add_compile_options(-Wno-unused-function)
-  add_compile_options(-Wformat=0)
-  add_compile_options(-Wno-reorder)
+  # add_compile_options(-Wformat=0)
+  # add_compile_options(-Wno-reorder)
 endif()
 
 if(NOT COLOR_OUTPUT)
@@ -233,14 +288,12 @@ if(TTYCHECK)
   add_definitions(-D TTYCHECK)
 endif()
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${CXX_WARNING_FLAGS}")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fPIC ${CXX_WARNING_FLAGS}")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Og")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fPIC -g")
 
-if(VERBOSE)
-  cmessage (STATUS "C++ Compiler      : ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
-  cmessage (STATUS "C++ Release flags : ${CMAKE_CXX_FLAGS_RELEASE}")
-  cmessage (STATUS "C++ Debug flags   : ${CMAKE_CXX_FLAGS_DEBUG}")
-endif()
+cmessage (STATUS "C++ Compiler      : ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
+cmessage (STATUS "C++ Release flags : ${CMAKE_CXX_FLAGS_RELEASE}")
+cmessage (STATUS "C++ Debug flags   : ${CMAKE_CXX_FLAGS_DEBUG}")
 
 ################################################################################
 # CMake Generated
@@ -258,6 +311,7 @@ set( MODULES
         anaevents
         FitParameters
         FitSamples
+        CacheManager
         ErrorPropagator
         Fitter
 )

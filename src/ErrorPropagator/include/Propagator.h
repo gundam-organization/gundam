@@ -18,8 +18,8 @@
 #include "json.hpp"
 
 #include <vector>
+#include <map>
 #include <future>
-
 
 class Propagator {
 
@@ -97,6 +97,21 @@ private:
   // DEV
   std::vector<Dial*> _dialsStack_;
 
+#ifdef GUNDAM_USING_CUDA
+  // Build the precalculated caches.  This is only relevant when using a GPU
+  // and must be done after the data sets are loaded.  This returns true if
+  // the cache is built.
+  bool buildGPUCaches();
+
+  // Prefill the caches using a GPU (if available).  If the GPU is not
+  // available, then this is a NOP.  This copies the fit parameter values into
+  // the GPU, triggers the appropriate kernel(s), and copies the results into
+  // a CPU based cache.  This returns true if the cache is filled.
+  bool fillGPUCaches();
+
+  // A map of parameters to the indices that got used by the GPU.
+  std::map<const FitParameter*, int> _gpuParameterIndex_;
+#endif
 
 public:
   GenericToolbox::CycleTimer dialUpdate;
