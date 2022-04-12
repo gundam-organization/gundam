@@ -53,6 +53,15 @@ public:
   const std::vector<GenericToolbox::LeafHolder> &getLeafContentList() const;
   const std::vector<std::string> *getCommonLeafNameListPtr() const;
 
+#ifdef GUNDAM_USING_CUDA
+  // Set the result index.
+  void setResultIndex(int i) {_GPUResultIndex_ = i;}
+  void setResultPointer(double* v) {_GPUResult_ = v;}
+  void setResultValidPointer(bool* v) {_GPUResultValid_ = v;}
+  int getResultIndex() {return _GPUResultIndex_;}
+  double* getResultPointer() {return _GPUResult_;}
+#endif
+
   // CORE
   // Filling up
   void hookToTree(TTree* tree_, bool throwIfLeafNotFound_ = true);
@@ -103,6 +112,12 @@ private:
   double _eventWeight_{1};
   double _fakeDataWeight_{1};
   int _sampleBinIndex_{-1};
+
+#ifdef GUNDAM_USING_CUDA
+  int _GPUResultIndex_{-1};
+  double* _GPUResult_{nullptr};
+  bool* _GPUResultValid_{nullptr};
+#endif
 
   // Caches
   std::vector<Dial*> _rawDialPtrList_{};

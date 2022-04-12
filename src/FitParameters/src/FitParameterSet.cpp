@@ -64,7 +64,7 @@ void FitParameterSet::prepareFitParameters(){
 
   if( _priorCovarianceMatrix_ == nullptr ){ return; } // nothing to do
 
-  LogInfo << "Stripping the matrix from fixed/disabled parameters..." << std::endl;
+  LogInfo << "Stripping the matrix from fixed/disabled parameters in set: " << getName() << std::endl;
   int nbFitParameters{0};
   for( const auto& par : _parameterList_ ){
     if( par.isEnabled() and not par.isFixed() and not par.isFree() ) nbFitParameters++;
@@ -93,7 +93,7 @@ void FitParameterSet::prepareFitParameters(){
     _inverseStrippedCovarianceMatrix_->Invert();
   }
   else {
-    LogWarning << "Decomposing the stripped covariance matrix..." << std::endl;
+    LogWarning << "Decomposing the stripped covariance matrix in set: " << getName() << std::endl;
     _eigenParameterList_.resize(_strippedCovarianceMatrix_->GetNrows());
 
     _eigenDecomp_     = std::shared_ptr<TMatrixDSymEigen>(new TMatrixDSymEigen(*_strippedCovarianceMatrix_));
@@ -250,7 +250,7 @@ double FitParameterSet::getPenaltyChi2() {
 
 // Parameter throw
 void FitParameterSet::moveFitParametersToPrior(){
-  LogInfo << "Moving back fit parameters to their prior value..." << std::endl;
+  LogInfo << "Moving back fit parameters to their prior value in set: " << getName() << std::endl;
 
   if( not _useEigenDecompInFit_ ){
     for( auto& par : _parameterList_ ){
@@ -275,7 +275,7 @@ void FitParameterSet::throwFitParameters(double gain_){
     LogInfo << "Throwing parameters for " << _name_ << " using Cholesky matrix" << std::endl;
 
     if( _choleskyMatrix_ == nullptr ){
-      LogInfo << "Generating Cholesky matrix..." << std::endl;
+      LogInfo << "Generating Cholesky matrix in set: " << getName() << std::endl;
       _choleskyMatrix_ = std::shared_ptr<TMatrixD>(
           GenericToolbox::getCholeskyMatrix(_strippedCovarianceMatrix_.get())
       );
@@ -590,7 +590,7 @@ void FitParameterSet::readConfigOptions(){
 
 }
 void FitParameterSet::defineParameters(){
-  LogInfo << "Defining parameters..." << std::endl;
+  LogInfo << "Defining parameters in set: " << getName() << std::endl;
   _parameterList_.resize(_nbParameterDefinition_);
   for(int iParameter = 0 ; iParameter < _nbParameterDefinition_ ; iParameter++ ){
 

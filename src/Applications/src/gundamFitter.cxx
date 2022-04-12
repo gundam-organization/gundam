@@ -33,6 +33,7 @@ int main(int argc, char** argv){
   CmdLineParser clParser;
 
   clParser.addTriggerOption("dry-run", {"--dry-run", "-d"},"Perform the full sequence of initialization, but don't do the actual fit.");
+  clParser.addTriggerOption("cache", {"-C", "--no-cache"}, "Disable the event weight cache");
   clParser.addTriggerOption("generateOneSigmaPlots", {"--one-sigma"}, "Generate one sigma plots");
 
   clParser.addOption("configFile", {"-c", "--config-file"}, "Specify path to the fitter config file");
@@ -52,6 +53,15 @@ int main(int argc, char** argv){
   LogInfo << "Provided arguments: " << std::endl;
   LogInfo << clParser.getValueSummary() << std::endl << std::endl;
   LogInfo << clParser.dumpConfigAsJsonStr() << std::endl;
+
+  if (clParser.isOptionTriggered("cache")) {
+      LogInfo << "Event weight cache is disabled" << std::endl;
+      GlobalVariables::setEnableEventWeightCache(false);
+  }
+  else {
+      LogInfo << "Event weight cache is enabled" << std::endl;
+      GlobalVariables::setEnableEventWeightCache(true);
+  }
 
   auto configFilePath = clParser.getOptionVal("configFile", "");
   LogThrowIf(configFilePath.empty(), "Config file not provided.");

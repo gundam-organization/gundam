@@ -53,7 +53,7 @@ void XsecDial::SetApplyCondition(std::string applyCondition_){
   for(size_t iThread = 0 ; iThread < GlobalVariables::getChainList().size() ; iThread++){
     _applyConditionFormulaeList_.emplace_back(
       new TTreeFormula(
-        Form("apply_conditions_%s_%i", m_name.c_str(), iThread),
+        Form("apply_conditions_%s_%li", m_name.c_str(), iThread),
         _applyCondition_.c_str(),
         GlobalVariables::getChainList().at(iThread)
       )

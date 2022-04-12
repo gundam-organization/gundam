@@ -18,7 +18,6 @@
 #include <TTreeFormulaManager.h>
 #include "TTree.h"
 
-
 LoggerInit([](){
   Logger::setUserHeaderStr("[DataSetLoader]");
 })
@@ -686,7 +685,6 @@ void DataSetLoader::load(FitSampleSet* sampleSetPtr_, std::vector<FitParameterSe
     for( size_t iSample = 0 ; iSample < samplesToFillList.size() ; iSample++ ){
       if (not isData) samplesToFillList[iSample]->getMcContainer().shrinkEventList(sampleIndexOffsetList[iSample]);
       if (isData) samplesToFillList[iSample]->getDataContainer().shrinkEventList(sampleIndexOffsetList[iSample]);
-
     }
 
     LogInfo << "Events have been loaded for " << ( isData ? "data": "mc" )
