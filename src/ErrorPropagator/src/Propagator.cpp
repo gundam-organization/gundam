@@ -38,11 +38,11 @@ void Propagator::reset() {
   std::vector<std::string> jobNameRemoveList;
   for( const auto& jobName : GlobalVariables::getParallelWorker().getJobNameList() ){
     if(jobName == "Propagator::fillEventDialCaches"
-    or jobName == "Propagator::reweightSampleEvents"
-    or jobName == "Propagator::updateDialResponses"
-    or jobName == "Propagator::refillSampleHistograms"
-    or jobName == "Propagator::applyResponseFunctions"
-      ){
+       or jobName == "Propagator::reweightSampleEvents"
+       or jobName == "Propagator::updateDialResponses"
+       or jobName == "Propagator::refillSampleHistograms"
+       or jobName == "Propagator::applyResponseFunctions"
+        ){
       jobNameRemoveList.emplace_back(jobName);
     }
   }
@@ -158,7 +158,7 @@ void Propagator::initialize() {
   reweightSampleEvents();
 
   LogInfo << "Set the current MC prior weights as nominal weight..."
-                        << std::endl;
+          << std::endl;
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
     for( auto& event : sample.getMcContainer().eventList ){
       event.setNominalWeight(event.getEventWeight());
@@ -166,8 +166,8 @@ void Propagator::initialize() {
   }
 
   if(   _fitSampleSet_.getDataEventType() == DataEventType::Asimov
-    or _fitSampleSet_.getDataEventType() == DataEventType::FakeData
-  ){
+        or _fitSampleSet_.getDataEventType() == DataEventType::FakeData
+      ){
     LogInfo << "Propagating prior weights on data Asimov/FakeData events..." << std::endl;
 
     if( JsonUtils::fetchValue<json>(_config_, "throwAsimovFitParameters", false) ){
@@ -293,36 +293,37 @@ void Propagator::updateDialResponses(){
   dialUpdate.counts++; dialUpdate.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 }
 void Propagator::reweightSampleEvents() {
+  bool usedGPU{false};
 #ifdef GUNDAM_USING_CUDA
 #define DUMP_PARAMETERS
 #ifdef DUMP_PARAMETERS
-    do {
-        static bool printed = false;
-        if (printed) break;
-        printed = true;
-        // This produces a crazy amount of output.
-        int iPar = 0;
-        for (auto& parSet : _parameterSetsList_) {
-            for ( auto& par : parSet.getParameterList()) {
-                LogInfo << "DUMP: " << iPar++
-                        << " " << par.isEnabled()
-                        << " " << par.getParameterValue()
-                        << " (" << par.getFullTitle() << ")";
-                if (Cache::Manager::ParameterIndex(&par) < 0) {
-                    LogInfo << " not used";
-                }
-                LogInfo << std::endl;
-            }
+  do {
+    static bool printed = false;
+    if (printed) break;
+    printed = true;
+    // This produces a crazy amount of output.
+    int iPar = 0;
+    for (auto& parSet : _parameterSetsList_) {
+      for ( auto& par : parSet.getParameterList()) {
+        LogInfo << "DUMP: " << iPar++
+                << " " << par.isEnabled()
+                << " " << par.getParameterValue()
+                << " (" << par.getFullTitle() << ")";
+        if (Cache::Manager::ParameterIndex(&par) < 0) {
+          LogInfo << " not used";
         }
-    } while (false);
+        LogInfo << std::endl;
+      }
+    }
+  } while (false);
 #endif
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-  bool usedGPU = false;
   usedGPU = Cache::Manager::Fill();
-#else
-  GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-  GlobalVariables::getParallelWorker().runJob("Propagator::reweightSampleEvents");
 #endif
+  if( not usedGPU ){
+    GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+    GlobalVariables::getParallelWorker().runJob("Propagator::reweightSampleEvents");
+  }
   weightProp.counts++;
   weightProp.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 }
@@ -433,8 +434,8 @@ void Propagator::makeResponseFunctions(){
         _responseFunctionsSamplesMcHistogram_[&sample].emplace_back(std::shared_ptr<TH1D>((TH1D*) sample.getMcContainer().histogram->Clone()) );
         GenericToolbox::transformBinContent(_responseFunctionsSamplesMcHistogram_[&sample].back().get(), [&](TH1D* h_, int b_){
           h_->SetBinContent(
-            b_,
-            (h_->GetBinContent(b_)/_nominalSamplesMcHistogram_[&sample]->GetBinContent(b_))-1);
+              b_,
+              (h_->GetBinContent(b_)/_nominalSamplesMcHistogram_[&sample]->GetBinContent(b_))-1);
           h_->SetBinError(b_,0);
         });
       }
@@ -559,8 +560,8 @@ void Propagator::applyResponseFunctions(int iThread_){
         for( int iBin = 1 ; iBin <= histBuffer->GetNbinsX() ; iBin++ ){
           if( iBin % GlobalVariables::getNbThreads() != iThread_ ) continue;
           histBuffer->SetBinContent(
-            iBin,
-            histBuffer->GetBinContent(iBin) * ( 1 + xSigmaPar * rfHistBuffer->GetBinContent(iBin) )
+              iBin,
+              histBuffer->GetBinContent(iBin) * ( 1 + xSigmaPar * rfHistBuffer->GetBinContent(iBin) )
           );
         }
       }
