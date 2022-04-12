@@ -8,7 +8,9 @@
 #include "GlobalVariables.h"
 #include "SampleElement.h"
 
+#ifdef GUNDAM_USING_CUDA
 #include "CacheManager.h"
+#endif
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[SampleElement]");
@@ -115,12 +117,18 @@ void SampleElement::refillHistogram(int iThread_){
   // Faster that pointer shifter. -> would be slower if refillHistogram is
   // handled by the propagator
 
+  int histIndex = -1;
+#ifdef GUNDAM_USING_CUDA
+  Cache::Manager* cache = Cache::Manager::Get();
+  if (cache) histIndex = getCacheManagerIndex();
+#endif
+
   // Size = Nbins + 2 overflow (0 and last)
   auto* binContentArray = histogram->GetArray();
 
   int iBin = iThread_;
   int nBins = int(perBinEventPtrList.size());
-  
+
 #ifdef GUNDAM_USING_CUDA
   int histIndex = -1;
   Cache::Manager* cache = Cache::Manager::Get();
@@ -133,7 +141,7 @@ void SampleElement::refillHistogram(int iThread_){
         }
     }
     else {
-      content = cache->GetHistogramsCache().GetSum(histIndex+iBin);
+        content = cache->GetHistogramsCache().GetSum(histIndex+iBin);
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
         double slowValue = 0.0;
         for( auto* eventPtr : perBinEventPtrList.at(iBin)){
@@ -149,6 +157,7 @@ void SampleElement::refillHistogram(int iThread_){
                     << " " << delta
                     << std::endl;
         }
+#endif
 #endif
     }
     binContentArray[iBin+1] = content;
