@@ -293,6 +293,7 @@ void Propagator::updateDialResponses(){
   dialUpdate.counts++; dialUpdate.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 }
 void Propagator::reweightSampleEvents() {
+#ifdef GUNDAM_USING_CUDA
 #define DUMP_PARAMETERS
 #ifdef DUMP_PARAMETERS
     do {
@@ -317,13 +318,11 @@ void Propagator::reweightSampleEvents() {
 #endif
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
   bool usedGPU = false;
-#ifdef GUNDAM_USING_CUDA
   usedGPU = Cache::Manager::Fill();
+#else
+  GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+  GlobalVariables::getParallelWorker().runJob("Propagator::reweightSampleEvents");
 #endif
-  if (!usedGPU) {
-      GlobalVariables::getParallelWorker().runJob(
-          "Propagator::reweightSampleEvents");
-  }
   weightProp.counts++;
   weightProp.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 }

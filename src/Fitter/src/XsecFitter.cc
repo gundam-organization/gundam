@@ -1,18 +1,18 @@
 #include "XsecFitter.hh"
 
 XsecFitter::XsecFitter(TDirectory* dirout, const int seed, const int num_threads)
-    : rng(new TRandom3(seed))
-    , m_fitter(nullptr)
+    : m_fitter(nullptr)
     , m_fcn(nullptr)
+    , rng(new TRandom3(seed))
     , m_dir(dirout)
     , m_save(false)
     , m_save_events(true)
     , m_zerosyst(false)
-    , m_freq(10000)
-    , m_threads(num_threads)
     , m_potratio(1.0)
+    , m_threads(num_threads)
     , m_npar(0)
     , m_calls(0)
+    , m_freq(10000)
 {
     gRandom = rng;
 
@@ -448,9 +448,6 @@ double XsecFitter::FillSamples(std::vector<std::vector<double>>& new_pars, int d
        || (m_calls > 1001 && m_calls % 1000 == 0))
         output_chi2 = true;
 
-    // par_offset stores the number of fit parameters for all parameter types:
-    unsigned int par_offset = 0;
-
     // Loop over all the different parameter types such as [template, flux, detector, cross section]:
     for(int i = 0; i < m_fitpara.size(); ++i)
     {
@@ -459,9 +456,6 @@ double XsecFitter::FillSamples(std::vector<std::vector<double>>& new_pars, int d
         {
             new_pars[i] = m_fitpara[i]->GetOriginalParameters(new_pars[i]);
         }
-
-        // Update number of fit parameters as we loop through the different parameter types:
-        par_offset += m_fitpara[i]->GetNpar();
     }
 
     // Loop over the different selection samples defined in the .json config file:

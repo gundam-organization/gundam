@@ -22,13 +22,24 @@ else()
   add_library(GundamErrorPropagator SHARED ${SRCFILES})
 endif()
 
-target_link_libraries( GundamErrorPropagator
-        GundamFitParameters
-        GundamFitSamples
-        GundamCache
-        anaevents
-        ${ROOT_LIBRARIES}
-        )
+
+
+if( WITH_CUDA )
+  target_link_libraries( GundamErrorPropagator
+          GundamFitParameters
+          GundamFitSamples
+          GundamCache
+          anaevents
+          ${ROOT_LIBRARIES}
+          )
+else()
+  target_link_libraries( GundamErrorPropagator
+          GundamFitParameters
+          GundamFitSamples
+          anaevents
+          ${ROOT_LIBRARIES}
+          )
+endif()
 
 set_target_properties(GundamErrorPropagator PROPERTIES VERSION
   "${gundam_VERSION_MAJOR}.${gundam_VERSION_MINOR}.${gundam_VERSION_REVISION}${gundam_VERSION_TAG}")

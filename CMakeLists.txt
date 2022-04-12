@@ -14,40 +14,42 @@ option(CXX_WARNINGS "Enable most C++ warning flags." ON)
 option(COLOR_OUTPUT "Enable colored terminal output." ON)
 option(TTYCHECK "Enable check if output is being sent to terminal/TTY." ON)
 option(WITH_OPENMP "Build with OpenMP libraries" OFF )
-option(WITH_CUDA "Build with CUDA (if available)" ON)
+option(WITH_CUDA "Build with CUDA (if available)" OFF)
 option(YAMLCPP_DIR "Set custom path to yaml-cpp lib" OFF )
 option(ENABLE_DEV_MODE "Enable specific dev related printouts" OFF )
 option(BATCH_MODE "Build to run in a batch queue (affects output)" OFF)
 
 set(VERBOSE TRUE)
 
-# Check for the availability of CUDA
-if(WITH_CUDA)
-  include(CheckLanguage)
-  check_language(CUDA)
-  if(CMAKE_CUDA_COMPILER)
-    message("-- CUDA support enabled")
-    enable_language(CUDA)
-    if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-      # The default is taken from the CUDAARCHS environment variable.  If it
-      # isn't set, then set it to the earliest non-deprecated architecture
-      #    2022: architectures before 52 are deprecated.
-      if (${CMAKE_VERSION} VERSION_GREATER_EQUAL 3.23)
-        # After cmake 3.23, this can be set to all or all-major
-        set(CMAKE_CUDA_ARCHITECTURES all)
-      else()
-        set(CMAKE_CUDA_ARCHITECTURES 52)
-      endif()
-    endif()
-    message("-- CUDA compilation architectures: \"${CMAKE_CUDA_ARCHITECTURES}\"")
-  else()
-    message("-- CUDA support requested, but not supported by this environment")
-  endif(CMAKE_CUDA_COMPILER)
-else()
-  message("-- CUDA support disabled")
-endif(WITH_CUDA)
 
 include(${CMAKE_SOURCE_DIR}/cmake/cmessage.cmake)
+
+
+# Check for the availability of CUDA
+if(WITH_CUDA)
+    include(CheckLanguage)
+    check_language(CUDA)
+    if(CMAKE_CUDA_COMPILER)
+        cmessage(STATUS "CUDA support enabled")
+        enable_language(CUDA)
+        if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+            # The default is taken from the CUDAARCHS environment variable.  If it
+            # isn't set, then set it to the earliest non-deprecated architecture
+            #    2022: architectures before 52 are deprecated.
+            if (${CMAKE_VERSION} VERSION_GREATER_EQUAL 3.23)
+                # After cmake 3.23, this can be set to all or all-major
+                set(CMAKE_CUDA_ARCHITECTURES all)
+            else()
+                set(CMAKE_CUDA_ARCHITECTURES 52)
+            endif()
+        endif()
+        cmessage(STATUS "CUDA compilation architectures: \"${CMAKE_CUDA_ARCHITECTURES}\"")
+    else()
+        cmessage(FATAL_ERROR "CUDA support requested, but not supported by this environment")
+    endif(CMAKE_CUDA_COMPILER)
+else()
+    cmessage(STATUS "CUDA support disabled")
+endif(WITH_CUDA)
 
 #Changes default install path to be a subdirectory of the build dir.
 #Should set the installation dir at configure time with
