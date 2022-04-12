@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <memory>
 #include <vector>
+#include "array"
 
 namespace Cache {
     class Weights;

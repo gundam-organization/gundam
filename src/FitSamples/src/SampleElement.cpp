@@ -115,18 +115,17 @@ void SampleElement::refillHistogram(int iThread_){
   // Faster that pointer shifter. -> would be slower if refillHistogram is
   // handled by the propagator
 
-  int histIndex = -1;
-#ifdef GUNDAM_USING_CUDA
-  Cache::Manager* cache = Cache::Manager::Get();
-  if (cache) histIndex = getCacheManagerIndex();
-#endif
-
   // Size = Nbins + 2 overflow (0 and last)
   auto* binContentArray = histogram->GetArray();
 
   int iBin = iThread_;
   int nBins = int(perBinEventPtrList.size());
-  while( iBin < nBins ){
+  
+#ifdef GUNDAM_USING_CUDA
+  int histIndex = -1;
+  Cache::Manager* cache = Cache::Manager::Get();
+  if (cache) histIndex = getCacheManagerIndex();
+  while( iBin < nBins ) {
     double content = 0.0;
     if (histIndex < 0) {
         for( auto* eventPtr : perBinEventPtrList.at(iBin)){
@@ -134,7 +133,7 @@ void SampleElement::refillHistogram(int iThread_){
         }
     }
     else {
-        content = cache->GetHistogramsCache().GetSum(histIndex+iBin);
+      content = cache->GetHistogramsCache().GetSum(histIndex+iBin);
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
         double slowValue = 0.0;
         for( auto* eventPtr : perBinEventPtrList.at(iBin)){
@@ -156,6 +155,16 @@ void SampleElement::refillHistogram(int iThread_){
     histogram->GetSumw2()->GetArray()[iBin+1] = content;
     iBin += nbThreads;
   }
+#else
+  while( iBin < nBins ) {
+    binContentArray[iBin + 1] = 0;
+    for (auto *eventPtr: perBinEventPtrList.at(iBin)) {
+      binContentArray[iBin + 1] += eventPtr->getEventWeight();
+    }
+    histogram->GetSumw2()->GetArray()[iBin + 1] = binContentArray[iBin + 1];
+    iBin += nbThreads;
+  }
+#endif
 }
 void SampleElement::rescaleHistogram() {
   if( isLocked ) return;
