@@ -46,6 +46,7 @@ public:
   double getChi2Buffer() const;
   double getChi2StatBuffer() const;
   const Propagator& getPropagator() const;
+  Propagator& getPropagator();
 
   // Core
   void generateSamplePlots(const std::string& savePath_ = "");

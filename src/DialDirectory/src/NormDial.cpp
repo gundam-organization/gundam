@@ -4,5 +4,5 @@
 
 #include "NormDial.h"
 
-NormDial::NormDial() = default;
+NormDial::NormDial() : DialBase(Norm) {};
 NormDial::~NormDial() = default;

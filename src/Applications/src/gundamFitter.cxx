@@ -40,8 +40,10 @@ int main(int argc, char** argv){
   clParser.addOption("nbThreads", {"-t", "--nb-threads"}, "Specify nb of parallel threads");
   clParser.addOption("outputFile", {"-o", "--out-file"}, "Specify the output file");
   clParser.addOption("scanParameters", {"--scan"}, "Enable parameter scan before and after the fit");
+  clParser.addOption("toyFit", {"--toy"}, "Run a toy fit");
 
   clParser.getOptionPtr("scanParameters")->setAllowEmptyValue(true); // --scan can be followed or not by the number of steps
+  clParser.getOptionPtr("toyFit")->setAllowEmptyValue(true); // --toy can be followed or not by the number of steps
 
   LogInfo << "Usage: " << std::endl;
   LogInfo << clParser.getConfigSummary() << std::endl << std::endl;
@@ -78,8 +80,16 @@ int main(int argc, char** argv){
   bool isDryRun = clParser.isOptionTriggered("dry-run");
   bool enableParameterScan = clParser.isOptionTriggered("scanParameters") or JsonUtils::fetchValue(jsonConfig, "scanParameters", false);
   int nbScanSteps = clParser.getOptionVal("scanParameters", 100);
-  auto outFileName = clParser.getOptionVal("outputFile", configFilePath + ".root");
 
+  bool isToyFit = clParser.isOptionTriggered("toyFit");
+  int iToyFit = clParser.getOptionVal("toyFit", -1);
+
+  std::string outFileName = configFilePath;
+  if( isToyFit ){
+    outFileName += "_toyFit";
+    if( iToyFit != -1 ){ outFileName += "_" + std::to_string(iToyFit); }
+  }
+  outFileName = clParser.getOptionVal("outputFile", outFileName + ".root");
   LogWarning << "Creating output file: \"" << outFileName << "\"..." << std::endl;
   TFile* out = TFile::Open(outFileName.c_str(), "RECREATE");
 
@@ -111,6 +121,9 @@ int main(int argc, char** argv){
   fitter.setSaveDir(GenericToolbox::mkdirTFile(out, "FitterEngine"));
   fitter.setNbScanSteps(nbScanSteps);
   fitter.setEnablePostFitScan(enableParameterScan);
+
+  if( isToyFit ){ fitter.getPropagator().setThrowAsimovToyParameters(true); }
+
   fitter.initialize();
 
   fitter.updateChi2Cache();

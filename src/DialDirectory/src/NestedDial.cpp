@@ -4,6 +4,5 @@
 
 #include "NestedDial.h"
 
-NestedDial::NestedDial() {}
-NestedDial::~NestedDial() {
-}
+NestedDial::NestedDial() : DialBase(Nested) {}
+NestedDial::~NestedDial() = default;

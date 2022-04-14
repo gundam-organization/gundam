@@ -57,15 +57,18 @@ void Propagator::reset() {
 void Propagator::setShowTimeStats(bool showTimeStats) {
   _showTimeStats_ = showTimeStats;
 }
-void Propagator::setSaveDir(TDirectory *saveDir) {
-  _saveDir_ = saveDir;
-}
 void Propagator::setConfig(const json &config) {
   _config_ = config;
   while( _config_.is_string() ){
     LogWarning << "Forwarding " << __CLASS_NAME__ << " config: \"" << _config_.get<std::string>() << "\"" << std::endl;
     _config_ = JsonUtils::readConfigFile(_config_.get<std::string>());
   }
+}
+void Propagator::setSaveDir(TDirectory *saveDir) {
+  _saveDir_ = saveDir;
+}
+void Propagator::setThrowAsimovToyParameters(bool throwAsimovToyParameters) {
+  _throwAsimovToyParameters_ = throwAsimovToyParameters;
 }
 
 void Propagator::initialize() {
@@ -113,6 +116,8 @@ void Propagator::initialize() {
   if( plotGeneratorConfig.is_string() ) parameterSetListConfig = JsonUtils::readConfigFile(plotGeneratorConfig.get<std::string>());
   _plotGenerator_.setConfig(plotGeneratorConfig);
   _plotGenerator_.initialize();
+
+  _throwAsimovToyParameters_ = JsonUtils::fetchValue<json>(_config_, "throwAsimovFitParameters", _throwAsimovToyParameters_);
 
   LogInfo << "Initializing input datasets..." << std::endl;
   auto dataSetListConfig = JsonUtils::getForwardedConfig(_config_, "dataSetList");
@@ -170,11 +175,13 @@ void Propagator::initialize() {
       ){
     LogInfo << "Propagating prior weights on data Asimov/FakeData events..." << std::endl;
 
-    if( JsonUtils::fetchValue<json>(_config_, "throwAsimovFitParameters", false) ){
+    if( _throwAsimovToyParameters_ ){
       LogWarning << "Throwing fit parameters for Asimov data..." << std::endl;
       for( auto& parSet : _parameterSetsList_ ){
         if( not parSet.isEnabled() ) continue;
+        if( not parSet.isEnabledThrowToyParameters() ) continue;
         parSet.throwFitParameters();
+        std::cout << parSet.getSummary() << std::endl;
       }
       reweightSampleEvents();
     }
@@ -202,7 +209,7 @@ void Propagator::initialize() {
     }
 
     // Make sure MC event are back at their nominal value:
-    if( JsonUtils::fetchValue<json>(_config_, "throwAsimovFitParameters", false) ){
+    if( _throwAsimovToyParameters_ ){
       for( auto& parSet : _parameterSetsList_ ){
         if( not parSet.isEnabled() ) continue;
         parSet.moveFitParametersToPrior();

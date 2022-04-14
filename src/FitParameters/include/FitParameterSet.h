@@ -50,9 +50,7 @@ public:
 
   // Getters
   bool isEnabled() const;
-
-  bool isEnableThrowMcBeforeFit() const;
-
+  bool isEnabledThrowToyParameters() const;
   bool isUseOnlyOneParameterPerEvent() const;
   const std::string &getName() const;
   std::vector<FitParameter> &getParameterList();
@@ -112,7 +110,6 @@ private:
   std::string _name_;
   std::string _parameterDefinitionFilePath_{};
   bool _isEnabled_{};
-  bool _throwMcBeforeFit_{true};
   int _nbParameterDefinition_{-1};
   double _nominalStepSize_{-1};
   int _maxNbEigenParameters_{-1};
@@ -128,6 +125,9 @@ private:
   std::vector<FitParameter> _eigenParameterList_;
   std::shared_ptr<TMatrixDSymEigen> _eigenDecomp_{nullptr};
 
+  // Toy throwing
+  bool _enabledThrowToyParameters_{true};
+  std::shared_ptr<TVectorD> _throwEnabledList_{nullptr};
 
   // Used for base swapping
   std::shared_ptr<TVectorD> _eigenValues_{nullptr};

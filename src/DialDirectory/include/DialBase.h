@@ -25,13 +25,14 @@ class DialBase {
 protected:
   // Not supposed to define a bare Dial. Use the downcast instead
   explicit DialBase(DialType dialType_);
-  virtual ~DialBase();
 
 public:
+  virtual ~DialBase();
+
   double evalResponse();
 
 private:
-  const DialType _dialType_{Unset};
+  const DialType _dialType_;
   std::shared_ptr<std::mutex> _evalMutex_{nullptr};
 
 
