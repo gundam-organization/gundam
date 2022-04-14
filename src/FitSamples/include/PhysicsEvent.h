@@ -53,15 +53,6 @@ public:
   const std::vector<GenericToolbox::LeafHolder> &getLeafContentList() const;
   const std::vector<std::string> *getCommonLeafNameListPtr() const;
 
-#ifdef GUNDAM_USING_CUDA
-  // Set the result index.
-  void setResultIndex(int i) {_GPUResultIndex_ = i;}
-  void setResultPointer(double* v) {_GPUResult_ = v;}
-  void setResultValidPointer(bool* v) {_GPUResultValid_ = v;}
-  int getResultIndex() {return _GPUResultIndex_;}
-  double* getResultPointer() {return _GPUResult_;}
-#endif
-
   // CORE
   // Filling up
   void hookToTree(TTree* tree_, bool throwIfLeafNotFound_ = true);
@@ -114,9 +105,21 @@ private:
   int _sampleBinIndex_{-1};
 
 #ifdef GUNDAM_USING_CUDA
-  int _GPUResultIndex_{-1};
-  double* _GPUResult_{nullptr};
-  bool* _GPUResultValid_{nullptr};
+public:
+  void setCacheManagerIndex(int i) {_CacheManagerIndex_ = i;}
+  int  getCacheManagerIndex() {return _CacheManagerIndex_;}
+  void setCacheManagerValuePointer(const double* v) {_CacheManagerValue_ = v;}
+  void setCacheManagerValidPointer(const bool* v) {_CacheManagerValid_ = v;}
+  void setCacheManagerUpdatePointer(void (*p)()) {_CacheManagerUpdate_ = p;}
+private:
+  // An "opaque" index into the cache that is used to simplify bookkeeping.
+  int _CacheManagerIndex_{-1};
+  // A pointer to the cached result.
+  const double* _CacheManagerValue_{nullptr};
+  // A pointer to the cache validity flag.
+  const bool* _CacheManagerValid_{nullptr};
+  // A pointer to a callback to force the cache to be updated.
+  void (*_CacheManagerUpdate_)(){nullptr};
 #endif
 
   // Caches

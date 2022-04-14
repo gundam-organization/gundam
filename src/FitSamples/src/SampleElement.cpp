@@ -8,10 +8,6 @@
 #include "GlobalVariables.h"
 #include "SampleElement.h"
 
-#ifdef GUNDAM_USING_CUDA
-#include "CacheManager.h"
-#endif
-
 LoggerInit([](){
   Logger::setUserHeaderStr("[SampleElement]");
 })
@@ -124,18 +120,21 @@ void SampleElement::refillHistogram(int iThread_){
   int nBins = int(perBinEventPtrList.size());
 
 #ifdef GUNDAM_USING_CUDA
-  int histIndex = -1;
-  Cache::Manager* cache = Cache::Manager::Get();
-  if (cache) histIndex = getCacheManagerIndex();
+  if (_CacheManagerValue_) {
+      if (_CacheManagerValid_ && !(*_CacheManagerValid_)) {
+          // This is slowish, but will make sure that the cached result is
+          // updated when the cache has changed.  The values pointed to by
+          // _CacheManagerResult_ and _CacheManagerValid_ are inside
+          // of the weights cache (a bit of evil coding here), and are
+          // updated by the cache.  The update is triggered by
+          // _CacheManagerUpdate().
+          if (_CacheManagerUpdate_) (*_CacheManagerUpdate_)();
+      }
+  }
   while( iBin < nBins ) {
     double content = 0.0;
-    if (histIndex < 0) {
-        for( auto* eventPtr : perBinEventPtrList.at(iBin)){
-            content += eventPtr->getEventWeight();
-        }
-    }
-    else {
-        content = cache->GetHistogramsCache().GetSum(histIndex+iBin);
+    if (_CacheManagerValue_ && 0 <= _CacheManagerIndex_) {
+        content = _CacheManagerValue_[_CacheManagerIndex_+iBin];
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
         double slowValue = 0.0;
         for( auto* eventPtr : perBinEventPtrList.at(iBin)){
@@ -143,7 +142,7 @@ void SampleElement::refillHistogram(int iThread_){
         }
         double delta = std::abs(slowValue-content);
         if (delta > 1E-6) {
-            LogInfo << "Bin mismatch " << histIndex
+            LogInfo << "VALIDATION: Bin mismatch " << _CacheManagerIndex_
                     << " " << iBin
                     << " " << name
                     << " " << slowValue
@@ -152,6 +151,11 @@ void SampleElement::refillHistogram(int iThread_){
                     << std::endl;
         }
 #endif
+    }
+    else {
+        for( auto* eventPtr : perBinEventPtrList.at(iBin)){
+            content += eventPtr->getEventWeight();
+        }
     }
     binContentArray[iBin+1] = content;
     histogram->GetSumw2()->GetArray()[iBin+1] = content;
@@ -177,9 +181,6 @@ double SampleElement::getSumWeights() const{
   return std::accumulate(eventList.begin(), eventList.end(), double(0.),
                          [](double sum_, const PhysicsEvent& ev_){ return sum_ + ev_.getEventWeight(); });
 }
-
-int SampleElement::getCacheManagerIndex() const {return cacheManagerIndex;}
-void SampleElement::setCacheManagerIndex(int i) {cacheManagerIndex = i;}
 
 void SampleElement::print() const{
   LogInfo << "SampleElement: " << name << std::endl;
