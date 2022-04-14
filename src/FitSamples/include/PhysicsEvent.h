@@ -17,7 +17,7 @@
 #include "AnaEvent.hh"
 #include "FitParameterSet.h"
 #include "Dial.h"
-#include "NestedDial.h"
+#include "NestedDialTest.h"
 
 
 class PhysicsEvent {
@@ -91,7 +91,7 @@ public:
   void deleteLeaf(long index_);
   void trimDialCache();
   void addDialRefToCache(Dial* dialPtr_);
-  void addNestedDialRefToCache(NestedDial* nestedDialPtr_, const std::vector<Dial*>& dialPtrList_ = std::vector<Dial*>{});
+  void addNestedDialRefToCache(NestedDialTest* nestedDialPtr_, const std::vector<Dial*>& dialPtrList_ = std::vector<Dial*>{});
   std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const GenericToolbox::LeafHolder&)>> generateLeavesDictionary(bool disableArrays_ = false) const;
 
   // Stream operator
@@ -121,7 +121,7 @@ private:
 
   // Caches
   std::vector<Dial*> _rawDialPtrList_{};
-  std::vector<std::pair<NestedDial*, std::vector<Dial*>>> _nestedDialRefList_{};
+  std::vector<std::pair<NestedDialTest*, std::vector<Dial*>>> _nestedDialRefList_{};
 
 };
 

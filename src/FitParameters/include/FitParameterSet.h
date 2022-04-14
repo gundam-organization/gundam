@@ -19,7 +19,7 @@
 #include "Logger.h"
 
 #include "FitParameter.h"
-#include "NestedDial.h"
+#include "NestedDialTest.h"
 
 
 /*
@@ -105,7 +105,7 @@ private:
   // Internals
   bool _isInitialized_{false};
   std::vector<FitParameter> _parameterList_;
-  std::vector<NestedDial> _nestedDialList_;
+  std::vector<NestedDialTest> _nestedDialList_;
   TDirectory* _saveDir_{nullptr};
 
   // JSON
