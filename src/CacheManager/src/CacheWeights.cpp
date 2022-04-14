@@ -148,7 +148,7 @@ bool Cache::Weights::Apply() {
     // synchronization doesn't slow things down in GUNDAM.  The suspicion is
     // that it's because the CPU almost immediately uses the results, and the
     // sync prevents a small amount of mutex locking.
-    hemi::deviceSynchronize();
+    // hemi::deviceSynchronize();
 
     // A simple way to force a copy from the device.
     // fResults->hostPtr();

@@ -309,13 +309,15 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
                  : sample.getMcContainer().eventList) {
             // The reduce index to save the result for this event.
             int resultIndex = usedResults++;
-            event.setResultIndex(resultIndex);
-            event.setResultPointer(Cache::Manager::Get()
-                                   ->GetWeightsCache()
-                                   .GetResultPointer(resultIndex));
-            event.setResultValidPointer(Cache::Manager::Get()
-                                        ->GetWeightsCache()
-                                        .GetResultValidPointer());
+            event.setCacheManagerIndex(resultIndex);
+            event.setCacheManagerValuePointer(Cache::Manager::Get()
+                                              ->GetWeightsCache()
+                                              .GetResultPointer(resultIndex));
+            event.setCacheManagerValidPointer(Cache::Manager::Get()
+                                              ->GetWeightsCache()
+                                              .GetResultValidPointer());
+            event.setCacheManagerUpdatePointer(
+                [](){Cache::Manager::Get()->GetWeightsCache().GetResult(0);});
             Cache::Manager::Get()
                 ->GetWeightsCache()
                 .SetInitialValue(resultIndex,event.getTreeWeight());
@@ -417,11 +419,19 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
         }
         int thisHist = nextHist;
         sample.getMcContainer().setCacheManagerIndex(thisHist);
+        sample.getMcContainer().setCacheManagerValuePointer(
+            Cache::Manager::Get()->GetHistogramsCache()
+            .GetSumsPointer());
+        sample.getMcContainer().setCacheManagerValidPointer(
+            Cache::Manager::Get()->GetHistogramsCache()
+            .GetSumsValidPointer());
+        sample.getMcContainer().setCacheManagerUpdatePointer(
+            [](){Cache::Manager::Get()->GetHistogramsCache().GetSum(0);});
         int cells = hist->GetNcells();
         nextHist += cells;
         for (PhysicsEvent& event
                  : sample.getMcContainer().eventList) {
-            int eventIndex = event.getResultIndex();
+            int eventIndex = event.getCacheManagerIndex();
             int cellIndex = event.getSampleBinIndex();
             if (cellIndex < 0 || cells <= cellIndex) {
                 throw std::runtime_error("Histogram bin out of range");
@@ -465,6 +475,7 @@ bool Cache::Manager::Fill() {
     }
     cache->GetWeightsCache().Apply();
     cache->GetHistogramsCache().Apply();
+
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning CACHE_MANAGER_SLOW_VALIDATION in Cache::Manager::Fill()
     // Returning false means that the event weights will also be calculated
