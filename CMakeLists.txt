@@ -21,9 +21,7 @@ option(BATCH_MODE "Build to run in a batch queue (affects output)" OFF)
 
 set(VERBOSE TRUE)
 
-
 include(${CMAKE_SOURCE_DIR}/cmake/cmessage.cmake)
-
 
 # Check for the availability of CUDA
 if(WITH_CUDA)
@@ -33,9 +31,10 @@ if(WITH_CUDA)
         cmessage(STATUS "CUDA support enabled")
         enable_language(CUDA)
         if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-            # The default is taken from the CUDAARCHS environment variable.  If it
-            # isn't set, then set it to the earliest non-deprecated architecture
-            #    2022: architectures before 52 are deprecated.
+            # The default is taken from the CUDAARCHS environment
+            # variable.  If it isn't set, then set it to the earliest
+            # non-deprecated architecture.
+            #   2022: architectures before 52 are deprecated.
             if (${CMAKE_VERSION} VERSION_GREATER_EQUAL 3.23)
                 # After cmake 3.23, this can be set to all or all-major
                 set(CMAKE_CUDA_ARCHITECTURES all)
@@ -44,16 +43,14 @@ if(WITH_CUDA)
             endif()
         endif()
         cmessage(STATUS "CUDA compilation architectures: \"${CMAKE_CUDA_ARCHITECTURES}\"")
-    else()
-        cmessage(FATAL_ERROR "CUDA support requested, but not supported by this environment")
     endif(CMAKE_CUDA_COMPILER)
 else()
     cmessage(STATUS "CUDA support disabled")
 endif(WITH_CUDA)
 
-#Changes default install path to be a subdirectory of the build dir.
-#Should set the installation dir at configure time with
-#-DCMAKE_INSTALL_PREFIX=/install/path
+# Changes default install path to be a subdirectory of the build dir.
+# Should set the installation dir at configure time with
+# -DCMAKE_INSTALL_PREFIX=/install/path
 if(NOT DEFINED CMAKE_INSTALL_PREFIX
     OR CMAKE_INSTALL_PREFIX STREQUAL ""
     OR CMAKE_INSTALL_PREFIX STREQUAL "/usr/local")
@@ -105,7 +102,7 @@ if(ROOT_FOUND)
     execute_process (COMMAND root-config --has-minuit2
       OUTPUT_VARIABLE ROOT_minuit2_FOUND
       OUTPUT_STRIP_TRAILING_WHITESPACE)
-  endif(NOT ROOT_minuit2_found)
+  endif(NOT ROOT_minuit2_FOUND)
 else(ROOT_FOUND)
    cmessage(STATUS "Including local GENERATE_ROOT_DICTIONARY implementation.")
    include(${CMAKE_SOURCE_DIR}/cmake/GenROOTDictionary.cmake)
@@ -171,9 +168,13 @@ if (WITH_CUDA)
   # uncomment to enable the slow validations (NEVER during productions
   # or normal running).  These are whole code validations and are
   # extremely slow.
-  # add_definitions( -DCACHE_MANAGER_SLOW_VALIDATION)
+  if (CACHE_MANAGER_SLOW_VALIDATION)
+    cmessage(STATUS "Using slow validation for debugging")
+    cmessage(WARNING "Using slow validation so runs will be very slow")
+    add_definitions( -DCACHE_MANAGER_SLOW_VALIDATION)
+  endif (CACHE_MANAGER_SLOW_VALIDATION)
 
-  cmessage(STATUS "Enable GPU support (compiled, but only used if CUDA enabled)")
+  cmessage(STATUS "Enable GPU support (compiled, but only used when CUDA enabled)")
 endif()
 
 ################################################################################
@@ -311,24 +312,12 @@ include_directories( ${CMAKE_BINARY_DIR}/generated/ )
 set( MODULES
         Utils
         anaevents
+        CacheManager
         FitParameters
         FitSamples
-        CacheManager
         ErrorPropagator
         Fitter
 )
-
-# Each module will add it's primary target to this and they will be
-# automatically added to the executables.
-set(MODULETargets "")
-
-cmessage (STATUS "Setting up include directories...")
-include_directories( ${CMAKE_SOURCE_DIR}/include )
-foreach(mod ${MODULES})
-    cmessage (STATUS "Including headers of module: ${mod}")
-    include_directories( ${CMAKE_SOURCE_DIR}/src/${mod}/include )
-endforeach()
-
 
 cmessage (STATUS "Configuring modules...")
 foreach(mod ${MODULES})
@@ -340,7 +329,7 @@ add_subdirectory( ${CMAKE_SOURCE_DIR}/src/Applications )
 
 configure_file(cmake/build_setup.sh.in
   "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/setup.sh" @ONLY)
-install(FILES
-  "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/setup.sh" DESTINATION ${CMAKE_INSTALL_PREFIX})
+install(FILES "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/setup.sh"
+  DESTINATION ${CMAKE_INSTALL_PREFIX})
 
 cmessage( STATUS "Tagged Version ${gundam_VERSION_STRING}" )

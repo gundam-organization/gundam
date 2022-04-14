@@ -13,6 +13,9 @@ else()
   add_library(GundamFitSamples SHARED ${SRCFILES})
 endif()
 
+target_include_directories(GundamFitSamples PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
 target_link_libraries( GundamFitSamples PUBLIC
         GundamUtils
         GundamFitParameters
@@ -26,4 +29,3 @@ set_target_properties(
 
 install(TARGETS GundamFitSamples DESTINATION lib)
 
-set(MODULETargets ${MODULETargets} GundamFitSamples PARENT_SCOPE)
