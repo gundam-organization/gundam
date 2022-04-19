@@ -348,25 +348,9 @@ namespace {
     // input value of 2.1 results in the linear interpolation between element
     // [2] and element [3], or "(1.0-0.1)*p[2] + 0.1*p[3])".
     HEMI_DEV_CALLABLE_INLINE
-    double HEMIInterp(double x, const WEIGHT_BUFFER_FLOAT* points, int dim) {
-#undef USE_LINEAR_INTERPOLATION
-#ifdef USE_LINEAR_INTERPOLATION
-#error Linear interpolation requested
-        // Get the integer part and bound it to a valid index.
-        int ix = x;
-        if (ix < 0) ix = 0;
-        if (ix > dim-2) ix = dim-2;
+    double HEMIInterp(double x, double low, double step,
+                      const WEIGHT_BUFFER_FLOAT* points, int dim) {
 
-        // Get the remainder for the "index".  If the input index is less than
-        // zero or greater than kPointSize-1, this is the distance from the
-        // boundary.
-        const double fx = x-ix;
-        const double ffx = 1.0-fx;
-
-        const double v = ffx*points[ix] + fx*points[ix+1];
-#endif
-#define USE_SPLINE_INTERPOLATION
-#ifdef USE_SPLINE_INTERPOLATION
         // Interpolate between p2 and p3
         // ix-2 ix-1 ix
         // p0   p1   p2---p3   p4   p5
@@ -376,7 +360,8 @@ namespace {
         //     b0   b1   b2   b3   b4
 
         // Get the integer part
-        int ix = x;
+        const double xx = (x-low)/step;
+        int ix = xx;
 
         // Calculate the indices of the two points to calculate d10
         // int d10_0 = ix-2;             // p0
@@ -410,7 +395,7 @@ namespace {
         // Get the remainder for the "index".  If the input index is less than
         // zero or greater than kPointSize-1, this is the distance from the
         // boundary.
-        const double fx = x-d32_0;
+        const double fx = xx-d32_0;
         const double fxx = fx*fx;
         const double fxxx = fx*fxx;
 
@@ -473,7 +458,21 @@ namespace {
         const double v = (p2*(2.0*fxxx-3.0*fxx+1.0) + m2*(fxxx-2.0*fxx+fx)
                     + p3*(3.0*fxx-2.0*fxxx) + m3*(fxxx-fxx));
 
-#endif
+
+        return v;
+    }
+
+    // Calculate the spline value.
+    HEMI_DEV_CALLABLE_INLINE
+    double HEMICompactSpline(const double x, double low, double step,
+                             const double lowerClamp, double upperClamp,
+                             const WEIGHT_BUFFER_FLOAT* knots, const int dim) {
+
+        double v = HEMIInterp(x, low, step, knots, dim);
+
+        if (v < lowerClamp) v = lowerClamp;
+        if (v > upperClamp) v = upperClamp;
+
         return v;
     }
 
@@ -499,18 +498,22 @@ namespace {
         for (int i : hemi::grid_stride_range(0,NP)) {
             const int id0 = sIndex[i];
             const int id1 = sIndex[i+1];
-            double x = params[pIndex[i]];
-            x = (x-knots[id0])*knots[id0+1];
-            x = HEMIInterp(x, &knots[id0+2], id1-id0-2);
-            double lc = lowerClamp[pIndex[i]];
-            if (x < lc) x = lc;
-            double uc = upperClamp[pIndex[i]];
-            if (x > uc) x = uc;
+            const int dim = id1-id0-2;
+            const double x = params[pIndex[i]];
+            const double lowBound = knots[id0];
+            const double step = 1.0/knots[id0+1];
+            const double lClamp = lowerClamp[pIndex[i]];
+            const double uClamp = upperClamp[pIndex[i]];
+
+            double v = HEMICompactSpline(x, lowBound, step,
+                                         lClamp, uClamp,
+                                         &knots[id0+2],dim);
+
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning Using SLOW VALIDATION in Cache::Weight::CompactSpline::HEMISplinesKernel
-            splineValues[i] = x;
+            splineValues[i] = v;
 #endif
-            CacheAtomicMult(&results[rIndex[i]], x);
+            CacheAtomicMult(&results[rIndex[i]], v);
 #ifndef HEMI_DEV_CODE
 #ifdef CACHE_DEBUG
             if (rIndex[i] < PRINT_STEP) {

@@ -447,7 +447,8 @@ namespace {
     // input value of 2.1 results in the linear interpolation between element
     // [2] and element [3], or "(1.0-0.1)*p[2] + 0.1*p[3])".
     HEMI_DEV_CALLABLE_INLINE
-    double HEMIInterp(int ix, double x, const WEIGHT_BUFFER_FLOAT* points, int dim) {
+    double HEMIInterp(int ix, double x,
+                      const WEIGHT_BUFFER_FLOAT* points, int dim) {
         double x1 = points[3*ix+2];
         double x2 = points[3*(ix+1)+2];
         double step = x2-x1;
@@ -464,6 +465,42 @@ namespace {
         // Cubic spline with the points and slopes.
         double v = (p1*(2.0*fxxx-3.0*fxx+1.0) + m1*(fxxx-2.0*fxx+fx)
                     + p2*(3.0*fxx-2.0*fxxx) + m2*(fxxx-fxx));
+
+        return v;
+    }
+
+    // Calculate the spline value.
+    HEMI_DEV_CALLABLE_INLINE
+    double HEMIGeneralSpline(const double x,
+                             const double lowerClamp, double upperClamp,
+                             const WEIGHT_BUFFER_FLOAT* knots, const int dim) {
+        int ix = 0;
+
+        const double lowBound = knots[0];
+        const double step = 1.0/knots[1];
+
+        // Check to find a point that is less than x.
+        const int knotCount = (dim-2)/3;
+        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 1
+        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 2
+        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 3
+        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 4
+        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 5
+        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 6
+        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 7
+        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 8
+        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 9
+        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 10
+        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 11
+        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 12
+        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 13
+        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 14
+        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 15
+
+        double v = HEMIInterp(ix, x, knots, dim);
+
+        if (v < lowerClamp) v = lowerClamp;
+        if (v > upperClamp) v = upperClamp;
 
         return v;
     }
@@ -488,58 +525,18 @@ namespace {
         for (int i : hemi::grid_stride_range(0,NP)) {
             const int id0 = sIndex[i];
             const int id1 = sIndex[i+1];
-            const int dim = (id1-id0-2)/3;
+            const int dim = id1-id0;
             const double x = params[pIndex[i]];
+            const double lClamp = lowerClamp[pIndex[i]];
+            const double uClamp = upperClamp[pIndex[i]];
+
 #ifndef HEMI_DEV_CODE
             if (dim>15) std::runtime_error("To many bins in spline");
 #endif
-            int ix = 0;
-            // Check to find a point that is less than x.
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 1
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 2
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 3
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 4
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 5
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 6
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 7
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 8
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 9
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 10
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 11
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 12
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 13
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 14
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 15
 
-            const double s = 1.0/knots[id0+1];
-            double v = HEMIInterp(ix, x, &knots[id0+2], dim);
-#ifndef HEMI_DEV_CODE
-#ifdef CACHE_DEBUG
-            if (i < PRINT_STEP) {
-                std::cout << "Splines kernel " << i
-                          << " iEvt " << rIndex[i]
-                          << " iPar " << pIndex[i]
-                          << " = " << x
-                          << " m " << knots[id0] << " d "  << knots[id0+1]
-                          << " (" << x << "," << ix << ")"
-                          << " --> " << v
-                          << " s: " << s
-                          << " d: " << dim
-                          << std::endl;
-                for (int k = 0; k < dim; ++k) {
-                    std::cout << "        " << k
-                              << " x: " << knots[id0+2+3*k+2]
-                              << " y: " << knots[id0+2+3*k]
-                              << " m: " << knots[id0+2+3*k+1]
-                              << std::endl;
-                }
-            }
-#endif
-#endif
-            const double lc = lowerClamp[pIndex[i]];
-            if (v < lc) v = lc;
-            const double uc = upperClamp[pIndex[i]];
-            if (v > uc) v = uc;
+            double v = HEMIGeneralSpline(x, lClamp,uClamp,
+                                         &knots[id0],dim);
+
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning Using SLOW VALIDATION in Cache::Weight::GeneralSpline::HEMISplinesKernel
             splineValues[i] = v;

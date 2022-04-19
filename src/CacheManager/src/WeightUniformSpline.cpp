@@ -401,24 +401,43 @@ namespace {
     // input value of 2.1 results in the linear interpolation between element
     // [2] and element [3], or "(1.0-0.1)*p[2] + 0.1*p[3])".
     HEMI_DEV_CALLABLE_INLINE
-    double HEMIInterp(double x, double step, const WEIGHT_BUFFER_FLOAT* points, int dim) {
+    double HEMIInterp(double x, double low, double step,
+                      const WEIGHT_BUFFER_FLOAT* points, int dim) {
         // Get the integer part
-        int ix = x;
+        const double xx = (x-low)/step;
+        int ix = xx;
         if (ix<0) ix=0;
-        if (2*ix+5>dim) ix = dim/2 - 2;
+        if (2*ix+7>dim) ix = (dim-2)/2 - 2 ;
 
-        const double fx = x-ix;
+        const double fx = xx-ix;
         const double fxx = fx*fx;
         const double fxxx = fx*fxx;
 
-        const double p1 = points[2*ix];
-        const double m1 = points[2*ix+1]*step;
-        const double p2 = points[2*ix+2];
-        const double m2 = points[2*ix+3]*step;
+        const double p1 = points[2+2*ix];
+        const double m1 = points[2+2*ix+1]*step;
+        const double p2 = points[2+2*ix+2];
+        const double m2 = points[2+2*ix+3]*step;
 
         // Cubic spline with the points and slopes.
         double v = (p1*(2.0*fxxx-3.0*fxx+1.0) + m1*(fxxx-2.0*fxx+fx)
                     + p2*(3.0*fxx-2.0*fxxx) + m2*(fxxx-fxx));
+
+        return v;
+    }
+
+    // Calculate the spline value.
+    HEMI_DEV_CALLABLE_INLINE
+    double HEMIUniformSpline(const double x,
+                             const double lowerClamp, double upperClamp,
+                             const WEIGHT_BUFFER_FLOAT* knots, const int dim) {
+
+        const double low = knots[0];
+        const double step = 1.0/knots[1];
+
+        double v = HEMIInterp(x, low, step, knots, dim);
+
+        if (v < lowerClamp) v = lowerClamp;
+        if (v > upperClamp) v = upperClamp;
 
         return v;
     }
@@ -443,9 +462,14 @@ namespace {
         for (int i : hemi::grid_stride_range(0,NP)) {
             const int id0 = sIndex[i];
             const int id1 = sIndex[i+1];
-            const double x = (params[pIndex[i]]-knots[id0])*knots[id0+1];
-            const double s = 1.0/knots[id0+1];
-            double v = HEMIInterp(x, s, &knots[id0+2], id1-id0-2);
+            const int dim = id1-id0;
+            const double x = params[pIndex[i]];
+            const double lClamp = lowerClamp[pIndex[i]];
+            const double uClamp = upperClamp[pIndex[i]];
+
+            double v = HEMIUniformSpline(x,
+                                         lClamp, uClamp,
+                                         &knots[id0],dim);
 #ifndef HEMI_DEV_CODE
 #ifdef CACHE_DEBUG
             int dim = id1-id0-2;
@@ -470,14 +494,12 @@ namespace {
             }
 #endif
 #endif
-            const double lc = lowerClamp[pIndex[i]];
-            if (v < lc) v = lc;
-            const double uc = upperClamp[pIndex[i]];
-            if (v > uc) v = uc;
+
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in Cache::Weight::UniformSpline::HEMISplinesKernel
+#warning Use SLOW VALIDATION in Cache::Weight::UniformSpline::HEMISplinesKernel
             splineValues[i] = v;
 #endif
+
             CacheAtomicMult(&results[rIndex[i]], v);
         }
     }
