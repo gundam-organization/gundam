@@ -68,12 +68,15 @@ void Cache::IndexedSums::SetEventIndex(int event, int bin) {
 double Cache::IndexedSums::GetSum(int i) {
     if (i < 0) throw;
     if (fSums->size() <= i) throw;
-    fSumsValid = true;
-    return fSums->hostPtr()[i];
+    // This odd ordering is to make sure the thread-safe hostPtr update
+    // finishes before the sum is set to be valid.  The use of isfinite is to
+    // make sure that the optimizer doesn't reorder the statements.
+    double value = fSums->hostPtr()[i];
+    if (std::isfinite(value)) fSumsValid = true;
+    return value;
 }
 
 const double* Cache::IndexedSums::GetSumsPointer() {
-    fSumsValid = true;
     return fSums->hostPtr();
 }
 
