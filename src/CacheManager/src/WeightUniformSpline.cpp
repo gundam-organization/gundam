@@ -470,23 +470,24 @@ namespace {
             double v = HEMIUniformSpline(x,
                                          lClamp, uClamp,
                                          &knots[id0],dim);
-#ifndef HEMI_DEV_CODE
 #ifdef CACHE_DEBUG
-            int dim = id1-id0-2;
+#ifndef HEMI_DEV_CODE
             if (rIndex[i] < PRINT_STEP) {
-                LogInfo << "CACHE_DEBUG: Splines kernel " << i
-                       << " iEvt " << rIndex[i]
-                       << " iPar " << pIndex[i]
-                       << " = " << params[pIndex[i]]
-                       << " m " << knots[id0] << " d "  << knots[id0+1]
-                       << " (" << x << ")"
-                       << " --> " << v
-                       << " s: " << s
-                       << " d: " << dim
+                double step = 1.0/knots[id0+1];
+                LogInfo << "CACHE_DEBUG: uniform " << i
+                        << " iEvt " << rIndex[i]
+                        << " iPar " << pIndex[i]
+                        << " = " << params[pIndex[i]]
+                        << " m " << knots[id0] << " d "  << knots[id0+1]
+                        << " s " << step
+                        << " --> " << v
+                        << " l: " << lClamp
+                        << " u: " << uClamp
+                        << " d: " << dim
                        << std::endl;
-                for (int k = 0; k < dim/2; ++k) {
+                for (int k = 0; k < (dim-2)/2; ++k) {
                     LogInfo << "CACHE_DEBUG:     " << k
-                           << " x: " << knots[id0] + k*s
+                           << " x: " << knots[id0] + k*step
                            << " y: " << knots[id0+2+2*k]
                            << " m: " << knots[id0+2+2*k+1]
                            << std::endl;

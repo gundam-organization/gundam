@@ -429,7 +429,7 @@ double* Cache::Weight::GeneralSpline::GetCachePointer(int sIndex) {
 
 // Define CACHE_DEBUG to get lots of output from the host
 #undef CACHE_DEBUG
-#define PRINT_STEP 4
+#define PRINT_STEP 3
 
 #include "CacheAtomicMult.h"
 
@@ -449,18 +449,18 @@ namespace {
     HEMI_DEV_CALLABLE_INLINE
     double HEMIInterp(int ix, double x,
                       const WEIGHT_BUFFER_FLOAT* points, int dim) {
-        double x1 = points[3*ix+2];
-        double x2 = points[3*(ix+1)+2];
+        double x1 = points[2+3*ix+2];
+        double x2 = points[2+3*(ix+1)+2];
         double step = x2-x1;
 
         double fx = (x - x1)/step;
         double fxx = fx*fx;
         double fxxx = fx*fxx;
 
-        double p1 = points[3*ix];
-        double m1 = points[3*ix+1]*step;
-        double p2 = points[3*(ix+1)];
-        double m2 = points[3*(ix+1)+1]*step;
+        double p1 = points[2+3*ix];
+        double m1 = points[2+3*ix+1]*step;
+        double p2 = points[2+3*(ix+1)];
+        double m2 = points[2+3*(ix+1)+1]*step;
 
         // Cubic spline with the points and slopes.
         double v = (p1*(2.0*fxxx-3.0*fxx+1.0) + m1*(fxxx-2.0*fxx+fx)
@@ -522,6 +522,11 @@ namespace {
                          const short* pIndex,
                          const int* sIndex,
                          const int NP) {
+#ifdef CACHE_DEBUG
+#ifndef HEMI_DEV_CODE
+        int printStep = 0;
+#endif
+#endif
         for (int i : hemi::grid_stride_range(0,NP)) {
             const int id0 = sIndex[i];
             const int id1 = sIndex[i+1];
@@ -536,6 +541,32 @@ namespace {
 
             double v = HEMIGeneralSpline(x, lClamp,uClamp,
                                          &knots[id0],dim);
+
+#ifdef CACHE_DEBUG
+#ifndef HEMI_DEV_CODE
+            if (printStep++ < PRINT_STEP) {
+                double step = 1.0/knots[id0+1];
+                LogInfo << "CACHE_DEBUG: general " << i
+                        << " iEvt " << rIndex[i]
+                        << " iPar " << pIndex[i]
+                        << " = " << params[pIndex[i]]
+                        << " m " << knots[id0] << " d "  << knots[id0+1]
+                        << " s " << step
+                        << " --> " << v
+                        << " l: " << lClamp
+                        << " u: " << uClamp
+                        << " d: " << dim
+                       << std::endl;
+                for (int k = 0; k < (dim-2)/3; ++k) {
+                    LogInfo << "CACHE_DEBUG:     " << k
+                           << " x: " << knots[id0+2+3*k+2]
+                           << " y: " << knots[id0+2+3*k]
+                           << " m: " << knots[id0+2+3*k+1]
+                           << std::endl;
+                }
+            }
+#endif
+#endif
 
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning Using SLOW VALIDATION in Cache::Weight::GeneralSpline::HEMISplinesKernel
