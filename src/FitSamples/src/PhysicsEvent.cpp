@@ -255,14 +255,15 @@ void PhysicsEvent::reweightUsingDialCache(){
         if (delta > maxDelta[sumName]) {
             maxDelta[sumName] = delta;
             LogInfo << "VALIDATION: Increase GPU and Dial max delta"
-                    << " GPU (" << cacheName << ") : " << cacheResponse
+                    << " GPU (" << cacheName << "-" << sumName << "): "
+                    << cacheResponse
                     << " Dial: " << response
                     << " delta: " << delta
                     << " par: " << dial->getAssociatedParameter()
                     << " name: " << parName
                     << std::endl;
             LogInfo << "VALIDATION: Maximum Dial ("
-                    << sumName << ") delta: "
+                    << cacheName << "-" << sumName << "): "
                     << maxDelta[sumName]
                     << " Average value delta: "
                     << sumDelta[sumName]/numDelta[sumName]
