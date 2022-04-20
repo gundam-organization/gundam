@@ -384,27 +384,23 @@ double* Cache::Weight::UniformSpline::GetCachePointer(int sIndex) {
 #undef CACHE_DEBUG
 #define PRINT_STEP 3
 
-
 #include "CacheAtomicMult.h"
 
 namespace {
-    // Interpolate one point.  This is the only place that changes when the
-    // interpolation method changes.  This accepts a normalized "x" value, and
-    // an array of control points with "dim" entries..  The control points
-    // will be at (0, 1.0, 2.0, ... , dim-1).  The input variable "x" must be
-    // a "floating point" index. If the index "x" is out of range, then this
-    // turns into a linear extrapolation of the boundary points (try to avoid
-    // that).
-    //
-    // Example: If the control points have dim of 5, the index "x" must be
-    // greater than zero, and less than 5.  Assuming linear interpolation, an
-    // input value of 2.1 results in the linear interpolation between element
-    // [2] and element [3], or "(1.0-0.1)*p[2] + 0.1*p[3])".
+    // Interpolate one point.  This takes the "index" of the point in the
+    // data, the parameter value (that made the index), the buffer of data for
+    // this spline, and the number of data elements in the spline data.
+    // The input data is arrange as
+    // data[0] -- spline lower bound (not used)
+    // data[1] -- spline inverse step (not used)
+    // data[2+2*n+0] -- The function value for knot n
+    // data[2+2*n+1] -- The function slope for knot n
     HEMI_DEV_CALLABLE_INLINE
-    double HEMIInterp(double x, double low, double step,
-                      const WEIGHT_BUFFER_FLOAT* points, int dim) {
+    double HEMIUniformInterp(const double x,
+                             const WEIGHT_BUFFER_FLOAT* data, int dim) {
         // Get the integer part
-        const double xx = (x-low)/step;
+        const double step = 1.0/data[1];
+        const double xx = (x-data[0])/step;
         int ix = xx;
         if (ix<0) ix=0;
         if (2*ix+7>dim) ix = (dim-2)/2 - 2 ;
@@ -413,10 +409,10 @@ namespace {
         const double fxx = fx*fx;
         const double fxxx = fx*fxx;
 
-        const double p1 = points[2+2*ix];
-        const double m1 = points[2+2*ix+1]*step;
-        const double p2 = points[2+2*ix+2];
-        const double m2 = points[2+2*ix+3]*step;
+        const double p1 = data[2+2*ix];
+        const double m1 = data[2+2*ix+1]*step;
+        const double p2 = data[2+2*ix+2];
+        const double m2 = data[2+2*ix+3]*step;
 
         // Cubic spline with the points and slopes.
         double v = (p1*(2.0*fxxx-3.0*fxx+1.0) + m1*(fxxx-2.0*fxx+fx)
@@ -431,10 +427,7 @@ namespace {
                              const double lowerClamp, double upperClamp,
                              const WEIGHT_BUFFER_FLOAT* knots, const int dim) {
 
-        const double low = knots[0];
-        const double step = 1.0/knots[1];
-
-        double v = HEMIInterp(x, low, step, knots, dim);
+        double v = HEMIUniformInterp(x, knots, dim);
 
         if (v < lowerClamp) v = lowerClamp;
         if (v > upperClamp) v = upperClamp;
@@ -470,6 +463,7 @@ namespace {
             double v = HEMIUniformSpline(x,
                                          lClamp, uClamp,
                                          &knots[id0],dim);
+
 #ifdef CACHE_DEBUG
 #ifndef HEMI_DEV_CODE
             if (rIndex[i] < PRINT_STEP) {

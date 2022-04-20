@@ -434,33 +434,31 @@ double* Cache::Weight::GeneralSpline::GetCachePointer(int sIndex) {
 #include "CacheAtomicMult.h"
 
 namespace {
-    // Interpolate one point.  This is the only place that changes when the
-    // interpolation method changes.  This accepts a normalized "x" value, and
-    // an array of control points with "dim" entries..  The control points
-    // will be at (0, 1.0, 2.0, ... , dim-1).  The input variable "x" must be
-    // a "floating point" index. If the index "x" is out of range, then this
-    // turns into a linear extrapolation of the boundary points (try to avoid
-    // that).
-    //
-    // Example: If the control points have dim of 5, the index "x" must be
-    // greater than zero, and less than 5.  Assuming linear interpolation, an
-    // input value of 2.1 results in the linear interpolation between element
-    // [2] and element [3], or "(1.0-0.1)*p[2] + 0.1*p[3])".
+    // Interpolate one point.  This takes the "index" of the point in the
+    // data, the parameter value (that made the index), the buffer of data for
+    // this spline, and the number of data elements in the spline data.
+    // The input data is arrange as
+    // data[0] -- spline lower bound (not used)
+    // data[1] -- spline inverse step (not used)
+    // data[2+3*n+0] -- The function value for knot n
+    // data[2+3*n+1] -- The function slope for knot n
+    // data[2+3*n+2] -- The point for knot n
     HEMI_DEV_CALLABLE_INLINE
-    double HEMIInterp(int ix, double x,
-                      const WEIGHT_BUFFER_FLOAT* points, int dim) {
-        double x1 = points[2+3*ix+2];
-        double x2 = points[2+3*(ix+1)+2];
+    double HEMIGeneralInterp(const int ix, const double x,
+                             const WEIGHT_BUFFER_FLOAT* data,
+                             const int dim) {
+        double x1 = data[2+3*ix+2];
+        double x2 = data[2+3*(ix+1)+2];
         double step = x2-x1;
 
         double fx = (x - x1)/step;
         double fxx = fx*fx;
         double fxxx = fx*fxx;
 
-        double p1 = points[2+3*ix];
-        double m1 = points[2+3*ix+1]*step;
-        double p2 = points[2+3*(ix+1)];
-        double m2 = points[2+3*(ix+1)+1]*step;
+        double p1 = data[2+3*ix];
+        double m1 = data[2+3*ix+1]*step;
+        double p2 = data[2+3*(ix+1)];
+        double m2 = data[2+3*(ix+1)+1]*step;
 
         // Cubic spline with the points and slopes.
         double v = (p1*(2.0*fxxx-3.0*fxx+1.0) + m1*(fxxx-2.0*fxx+fx)
@@ -497,7 +495,7 @@ namespace {
         if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 14
         if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 15
 
-        double v = HEMIInterp(ix, x, knots, dim);
+        double v = HEMIGeneralInterp(ix, x, knots, dim);
 
         if (v < lowerClamp) v = lowerClamp;
         if (v > upperClamp) v = upperClamp;

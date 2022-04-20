@@ -335,33 +335,32 @@ double* Cache::Weight::CompactSpline::GetCachePointer(int sIndex) {
 #include "CacheAtomicMult.h"
 
 namespace {
-    // Interpolate one point.  This is the only place that changes when the
-    // interpolation method changes.  This accepts a normalized "x" value, and
-    // an array of control points with "dim" entries..  The control points
-    // will be at (0, 1.0, 2.0, ... , dim-1).  The input variable "x" must be
-    // a "floating point" index. If the index "x" is out of range, then this
-    // turns into a linear extrapolation of the boundary points (try to avoid
-    // that).
-    //
-    // Example: If the control points have dim of 5, the index "x" must be
-    // greater than zero, and less than 5.  Assuming linear interpolation, an
-    // input value of 2.1 results in the linear interpolation between element
-    // [2] and element [3], or "(1.0-0.1)*p[2] + 0.1*p[3])".
+    // Interpolate one point.  This takes the "index" of the point in the
+    // data, the parameter value (that made the index), the buffer of data for
+    // this spline, and the number of data elements in the spline data.
+    // The input data is arrange as
+    // data[0] -- spline lower bound (not used)
+    // data[1] -- spline inverse step (not used)
+    // data[2+2*n+0] -- The function value for knot n
     HEMI_DEV_CALLABLE_INLINE
-    double HEMIInterp(double x, double low, double step,
-                      const WEIGHT_BUFFER_FLOAT* points, int dim) {
+    double HEMICompactInterp(const double x,
+                             const WEIGHT_BUFFER_FLOAT* data,
+                             const int dim) {
 
         // Interpolate between p2 and p3
-        // ix-2 ix-1 ix
+        // ix-2 ix-1 ix   ix+1 ix+2 ix+3
         // p0   p1   p2---p3   p4   p5
         //   d10  d21  d32  d43  d54
         // m0| |m1| |m2| |m3| |m4| |m5
         //  a0 ||a1 ||a2 ||a3 ||a4 ||a5
         //     b0   b1   b2   b3   b4
 
+        const double low = data[0];
+        const double step = 1.0/data[1];
+
         // Get the integer part
         const double xx = (x-low)/step;
-        int ix = xx;
+        const int ix = xx;
 
         // Calculate the indices of the two points to calculate d10
         // int d10_0 = ix-2;             // p0
@@ -389,8 +388,8 @@ namespace {
         int d54_1 = d54_0+1;          // p5
 
         // Find the points to use.
-        const double p2 = points[d32_0];
-        const double p3 = points[d32_1];
+        const double p2 = data[2+d32_0];
+        const double p3 = data[2+d32_1];
 
         // Get the remainder for the "index".  If the input index is less than
         // zero or greater than kPointSize-1, this is the distance from the
@@ -400,10 +399,9 @@ namespace {
         const double fxxx = fx*fxx;
 
         // Get the values of the deltas
-        // double d10 = points[IX(i,d10_1)] - points[IX(i,d10_0)];
-        const double d21 = points[d21_1] - points[d21_0];
+        const double d21 = data[2+d21_1] - data[2+d21_0];
         const double d32 = p3-p2;
-        const double d43 = points[d43_1] - points[d43_0];
+        const double d43 = data[2+d43_1] - data[2+d43_0];
 
         // Find the raw slopes at each point
         // double m1 = 0.5*(d10+d21);
@@ -413,7 +411,7 @@ namespace {
 #define COMPACT_SPLINE_MONOTONIC
 #ifdef COMPACT_SPLINE_MONOTONIC
 #warning Using a MONOTONIC spline
-        const double d54 = points[d54_1] - points[d54_0];
+        const double d54 = data[2+d54_1] - data[2+d54_0];
         double m4 = 0.5*(d43+d54);
 
         // Deal with cusp points and flat areas.
@@ -468,7 +466,7 @@ namespace {
                              const double lowerClamp, double upperClamp,
                              const WEIGHT_BUFFER_FLOAT* knots, const int dim) {
 
-        double v = HEMIInterp(x, low, step, knots, dim);
+        double v = HEMICompactInterp(x, knots, dim);
 
         if (v < lowerClamp) v = lowerClamp;
         if (v > upperClamp) v = upperClamp;
