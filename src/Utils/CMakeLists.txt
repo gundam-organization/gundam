@@ -32,6 +32,9 @@ set(HEADERS
         include/GundamGreetings.h
         include/ApplyCondition.h
         include/ScanConfig.h
+        include/CalculateMonotonicSpline.h
+        include/CalculateUniformSpline.h
+        include/CalculateGeneralSpline.h
         )
 
 if( USE_STATIC_LINKS STREQUAL "1" )
