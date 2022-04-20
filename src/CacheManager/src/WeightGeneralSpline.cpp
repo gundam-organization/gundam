@@ -431,77 +431,10 @@ double* Cache::Weight::GeneralSpline::GetCachePointer(int sIndex) {
 #undef CACHE_DEBUG
 #define PRINT_STEP 3
 
+#include "CalculateGeneralSpline.h"
 #include "CacheAtomicMult.h"
 
 namespace {
-    // Interpolate one point.  This takes the "index" of the point in the
-    // data, the parameter value (that made the index), the buffer of data for
-    // this spline, and the number of data elements in the spline data.
-    // The input data is arrange as
-    // data[0] -- spline lower bound (not used)
-    // data[1] -- spline inverse step (not used)
-    // data[2+3*n+0] -- The function value for knot n
-    // data[2+3*n+1] -- The function slope for knot n
-    // data[2+3*n+2] -- The point for knot n
-    HEMI_DEV_CALLABLE_INLINE
-    double HEMIGeneralInterp(const int ix, const double x,
-                             const WEIGHT_BUFFER_FLOAT* data,
-                             const int dim) {
-        double x1 = data[2+3*ix+2];
-        double x2 = data[2+3*(ix+1)+2];
-        double step = x2-x1;
-
-        double fx = (x - x1)/step;
-        double fxx = fx*fx;
-        double fxxx = fx*fxx;
-
-        double p1 = data[2+3*ix];
-        double m1 = data[2+3*ix+1]*step;
-        double p2 = data[2+3*(ix+1)];
-        double m2 = data[2+3*(ix+1)+1]*step;
-
-        // Cubic spline with the points and slopes.
-        double v = (p1*(2.0*fxxx-3.0*fxx+1.0) + m1*(fxxx-2.0*fxx+fx)
-                    + p2*(3.0*fxx-2.0*fxxx) + m2*(fxxx-fxx));
-
-        return v;
-    }
-
-    // Calculate the spline value.
-    HEMI_DEV_CALLABLE_INLINE
-    double HEMIGeneralSpline(const double x,
-                             const double lowerClamp, double upperClamp,
-                             const WEIGHT_BUFFER_FLOAT* knots, const int dim) {
-        int ix = 0;
-
-        const double lowBound = knots[0];
-        const double step = 1.0/knots[1];
-
-        // Check to find a point that is less than x.
-        const int knotCount = (dim-2)/3;
-        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 1
-        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 2
-        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 3
-        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 4
-        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 5
-        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 6
-        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 7
-        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 8
-        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 9
-        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 10
-        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 11
-        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 12
-        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 13
-        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 14
-        if (x > knots[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 15
-
-        double v = HEMIGeneralInterp(ix, x, knots, dim);
-
-        if (v < lowerClamp) v = lowerClamp;
-        if (v > upperClamp) v = upperClamp;
-
-        return v;
-    }
 
     // A function to be used as the kernel on either the CPU or GPU.  This
     // must be valid CUDA coda.
@@ -537,8 +470,8 @@ namespace {
             if (dim>15) std::runtime_error("To many bins in spline");
 #endif
 
-            double v = HEMIGeneralSpline(x, lClamp,uClamp,
-                                         &knots[id0],dim);
+            double v = CalculateGeneralSpline(x, lClamp,uClamp,
+                                              &knots[id0],dim);
 
 #ifdef CACHE_DEBUG
 #ifndef HEMI_DEV_CODE
