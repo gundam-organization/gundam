@@ -9,6 +9,10 @@
 
 #include "Logger.h"
 
+#include "CalculateMonotonicSpline.h"
+#include "CalculateUniformSpline.h"
+#include "CalculateGeneralSpline.h"
+
 LoggerInit([](){ Logger::setUserHeaderStr("[SplineDial]"); } )
 
 
@@ -23,29 +27,38 @@ void SplineDial::reset() {
 
 void SplineDial::initialize() {
   this->Dial::initialize();
-  LogThrowIf(_spline_.GetXmin() == _spline_.GetXmax(), "Spline is not valid.")
+  LogThrowIf(_spline_.GetXmin() == _spline_.GetXmax(), "Spline is not valid.");
+
+  _isInitialized_ = true;
+  if (!_associatedParameterReference_) {
+      LogInfo << "Dial without an associated parameter: " << std::endl;
+      return;
+  }
 
   // check if prior is out of bounds:
-  if( _associatedParameterReference_ != nullptr ){
-    if(
-        static_cast<FitParameter*>(_associatedParameterReference_)->getPriorValue() < _spline_.GetXmin()
-      or static_cast<FitParameter*>(_associatedParameterReference_)->getPriorValue() > _spline_.GetXmax()
-    ){
+  FitParameter* associatedParameter
+      = static_cast<FitParameter*>(_associatedParameterReference_);
+  const double priorValue = associatedParameter->getPriorValue();
+  if(priorValue < _spline_.GetXmin()  or priorValue > _spline_.GetXmax()) {
       LogError << "Prior value of parameter \""
-      << static_cast<FitParameter*>(_associatedParameterReference_)->getTitle()
-      << "\" = " << static_cast<FitParameter*>(_associatedParameterReference_)->getPriorValue()
-      << " is out of the spline bounds: " <<  _spline_.GetXmin() << " < X < " << _spline_.GetXmax()
-      << std::endl;
+               << associatedParameter->getTitle()
+               << "\" = " << priorValue
+               << " is out of the spline bounds: "
+               <<  _spline_.GetXmin() << " < X < " << _spline_.GetXmax()
+               << std::endl;
       throw std::logic_error("Prior is out of the spline bounds.");
-    }
+  }
 
-    _effectiveDialParameterValue_ = static_cast<FitParameter*>(_associatedParameterReference_)->getPriorValue();
-    try{ fillResponseCache(); }
-    catch(...){
+  _effectiveDialParameterValue_ = priorValue;
+
+  fillSplineData();
+
+  try{ fillResponseCache(); }
+  catch(...){
       LogError << "Error while evaluating spline response at the prior value: d(" << _effectiveDialParameterValue_ << ") = " << _dialResponseCache_ << std::endl;
       throw std::logic_error("error eval spline response");
-    }
   }
+
   _isInitialized_ = true;
 }
 
@@ -54,18 +67,65 @@ std::string SplineDial::getSummary() {
   ss << Dial::getSummary();
   return ss.str();
 }
+
+SplineDial::Subtype SplineDial::getSplineType() const {
+    return _splineType_;
+}
+
+const std::vector<double>& SplineDial::getSplineData() const {
+    return _splineData_;
+}
+
 void SplineDial::fillResponseCache() {
 
   if     ( _effectiveDialParameterValue_ < _spline_.GetXmin() ) _dialResponseCache_ = _spline_.Eval(_spline_.GetXmin());
   else if( _effectiveDialParameterValue_ > _spline_.GetXmax() ) _dialResponseCache_ = _spline_.Eval(_spline_.GetXmax());
   else   {
 //    if( fs.stepsize == -1 ){
-      _dialResponseCache_ = _spline_.Eval(_effectiveDialParameterValue_);
+      do {
+          if (_splineType_ == SplineDial::Uniform) {
+              _dialResponseCache_ = CalculateUniformSpline(
+                  _effectiveDialParameterValue_, -1E20, 1E20,
+                  _splineData_.data(), _splineData_.size());
+              break;
+          }
+          if (_splineType_ == SplineDial::General) {
+              _dialResponseCache_ = CalculateGeneralSpline(
+                  _effectiveDialParameterValue_, -1E20, 1E20,
+                  _splineData_.data(), _splineData_.size());
+              break;
+          }
+          if (_splineType_ == SplineDial::Monotonic) {
+              _dialResponseCache_ = CalculateMonotonicSpline(
+                  _effectiveDialParameterValue_, -1E20, 1E20,
+                  _splineData_.data(), _splineData_.size());
+              break;
+          }
+          LogThrow("Must have a spline type defined");
+      } while (false);
 //    }
 //    else{
 //      fastEval();
 //    }
   }
+
+  // #define SPLINE_DIAL_SLOW_VALIDATION
+  #ifdef SPLINE_DIAL_SLOW_VALIDATION
+  #error Remove this to compile with validation.
+  do {
+      double testVal = _spline_.Eval(_effectiveDialParameterValue_);
+      double avg = std::abs(testVal);
+      if (avg < 1.0) avg = 1.0;
+      double delta = std::abs(testVal-_dialResponseCache_)/avg;
+      if (delta < 1E-6) continue;
+      LogInfo << "Bad spline value in SplineDial: " << delta
+              << " " << testVal
+              << " " << _dialResponseCache_
+              << std::endl;
+      LogThrow("Bad spline value");
+  } while (false);
+  #endif
+
   // Checks
   if(_minDialResponse_ == _minDialResponse_ and _dialResponseCache_ < _minDialResponse_ ){
     _dialResponseCache_ = _minDialResponse_;
@@ -80,6 +140,7 @@ void SplineDial::fillResponseCache() {
       )
   }
 }
+
 void SplineDial::fastEval(){
 //Function takes a spline with equidistant knots and the number of steps
   //between knots to evaluate the spline at some position 'pos'.
@@ -100,6 +161,7 @@ void SplineDial::copySpline(const TSpline3* splinePtr_){
   LogThrowIf(_spline_.GetXmin() != _spline_.GetXmax(), "Spline already set")
   _spline_ = *splinePtr_;
 }
+
 void SplineDial::createSpline(TGraph* grPtr_){
   LogThrowIf(_spline_.GetXmin() != _spline_.GetXmax(), "Spline already set")
   _spline_ = TSpline3(grPtr_->GetName(), grPtr_);
@@ -117,4 +179,77 @@ void SplineDial::writeSpline(const std::string &fileName_) const{
 
   f->WriteObject(&_spline_, _spline_.GetName());
   f->Close();
+}
+
+void SplineDial::fillSplineData() {
+    // Check if the spline has uniformly spaced knots.  There is a flag for
+    // this is TSpline3, but it's not uniformly (or ever) filled correctly.
+    bool uniform = true;
+    for (int i = 1; i < _spline_.GetNp()-1; ++i) {
+        double x;
+        double y;
+        _spline_.GetKnot(i-1,x,y);
+        double d1 = x;
+        _spline_.GetKnot(i,x,y);
+        d1 = x - d1;
+        double d2 = x;
+        _spline_.GetKnot(i+1,x,y);
+        d2 = x - d2;
+        if (std::abs((d1-d2)/(d1+d2)) > 1E-6) {
+            uniform = false;
+            break;
+        }
+    }
+
+    std::string subType = getOwner()->getDialSubType();
+
+    do {
+        if (subType == "natural" && fillNaturalSpline(uniform)) break;
+        if (subType == "monotonic" && fillMonotonicSpline(uniform)) break;
+        fillNaturalSpline(uniform);
+    } while(false);
+
+}
+
+bool SplineDial::fillMonotonicSpline(bool uniformKnots) {
+    // A monotonic spline has been explicitly requested
+    if (!uniformKnots) {
+        LogInfo<< "A non uniform monotonic spline dial was requested"
+               << ", but when uniform knots are required"
+               << std::endl;
+        return false;
+    }
+    _splineType_ = SplineDial::Monotonic;
+
+    // Copy the spline data into local storage.
+    _splineData_.push_back(_spline_.GetXmin());
+    _splineData_.push_back((_spline_.GetNp()-1.0)
+                           /(_spline_.GetXmax()-_spline_.GetXmin()));
+    for (int i = 0; i < _spline_.GetNp(); ++i) {
+        double x;
+        double y;
+        _spline_.GetKnot(i,x,y);
+        _splineData_.push_back(y);
+    }
+    return true;
+}
+
+bool SplineDial::fillNaturalSpline(bool uniformKnots) {
+    if (uniformKnots) _splineType_ = SplineDial::Uniform;
+    else _splineType_ = SplineDial::General;
+
+    // Copy the spline data into local storage.
+    _splineData_.push_back(_spline_.GetXmin());
+    _splineData_.push_back((_spline_.GetNp()-1.0)
+                           /(_spline_.GetXmax()-_spline_.GetXmin()));
+    for (int i = 0; i < _spline_.GetNp(); ++i) {
+        double x;
+        double y;
+        _spline_.GetKnot(i,x,y);
+        _splineData_.push_back(y);
+         _splineData_.push_back(_spline_.Derivative(x));
+         if (_splineType_ == SplineDial::Uniform) continue;
+        _splineData_.push_back(x);
+    }
+    return true;
 }
