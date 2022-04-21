@@ -13,7 +13,7 @@
 #define DEVICE_CALLABLE_INLINE __host__ __device__ inline
 #else
 // This is used for a non-cuda compiler
-#define DEVICE_CALLABLE_INLINE /* __host__ __device__ */ inline
+#define DEVICE_CALLABLE_INLINE /* __host__ __device__ inline */
 #endif
 #endif
 
