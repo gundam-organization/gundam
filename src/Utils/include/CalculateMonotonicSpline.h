@@ -103,7 +103,7 @@ namespace {
 
 #define COMPACT_SPLINE_MONOTONIC
 #ifdef COMPACT_SPLINE_MONOTONIC
-#warning Using a MONOTONIC spline
+// #warning Using a MONOTONIC spline
         const double d54 = data[2+d54_1] - data[2+d54_0];
         double m4 = 0.5*(d43+d54);
 
