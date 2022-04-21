@@ -1,6 +1,7 @@
 #ifndef CALCULATE_UNIFORM_SPLINE_H_SEEN
 // Calculate a spline with uniformly space knots.  This adds a function that
-// can be called from CPU (with c++), or a GPU (with CUDA).
+// can be called from CPU (with c++), or a GPU (with CUDA).  This is much
+// faster than TSpline3.
 
 // Wrap the CUDA compiler attributes into a definition.  When this is compiled
 // with a CUDA compiler __CUDACC__ will be defined.  In that case, the code
@@ -26,11 +27,13 @@
 // Place in a private name space so it plays nicely with CUDA
 namespace {
     // Interpolate one point using a spline with uniformly spaced knots.  This
-    // takes the "index" of the point in the data, the parameter value (that
-    // made the index), a minimum and maximum output value, the buffer of data
-    // for this spline, and the number of data elements in the spline data.
-    // The input data is arrange as
-
+    // is much faster than TSpline3 (about fifty times faster, but careful,
+    // controlled, benchmarking was not done).  This takes the "index" of the
+    // point in the data, the parameter value (that made the index), a minimum
+    // and maximum output value, the buffer of data for this spline, and the
+    // number of data elements in the spline data.  The input data is arrange
+    // as
+    //
     // data[0] -- spline lower bound (not used)
     // data[1] -- spline inverse step (not used)
     // data[2+2*n+0] -- The function value for knot n
