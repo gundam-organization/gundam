@@ -50,7 +50,7 @@ public:
   size_t getCurrentDialOffset() const;
   DialType::DialType getGlobalDialType() const;
   const Dial &getTemplateDial() const;
-  const FitParameter* getAssociatedParameterReference() const { return _associatedParameterReference_; }
+  const FitParameter* getOwnerFitParameter() const { return _associatedParameterReference_; }
 
   double getMinDialResponse() const;
   double getMaxDialResponse() const;

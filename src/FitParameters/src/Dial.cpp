@@ -36,15 +36,15 @@ void Dial::setIsReferenced(bool isReferenced) {
   _isReferenced_ = isReferenced;
 }
 void Dial::setOwner(const DialSet* dialSetPtr) {
-  _ownerDialSetReference_ = dialSetPtr;
+  _ownerDialSet_ = dialSetPtr;
 }
 const DialSet* Dial::getOwner() const {
-  LogThrowIf(!_ownerDialSetReference_,"Invalid owning DialSet");
-  return _ownerDialSetReference_;
+  LogThrowIf(!_ownerDialSet_, "Invalid owning DialSet");
+  return _ownerDialSet_;
 }
 void Dial::initialize() {
   LogThrowIf( _dialType_ == DialType::Invalid, "_dialType_ is not set." );
-  LogThrowIf( _ownerDialSetReference_ == nullptr, "Owner not set.")
+  LogThrowIf(_ownerDialSet_ == nullptr, "Owner not set.")
 }
 
 bool Dial::isReferenced() const {
@@ -65,29 +65,29 @@ DialType::DialType Dial::getDialType() const {
   return _dialType_;
 }
 double Dial::getAssociatedParameter() const {
-  return _ownerDialSetReference_->getAssociatedParameterReference()->getParameterValue();
+  return _ownerDialSet_->getOwnerFitParameter()->getParameterValue();
 }
 
 void Dial::updateEffectiveDialParameter(){
   _effectiveDialParameterValue_ = _dialParameterCache_;
-  if( _ownerDialSetReference_->isGlobalUseMirrorDial() ){
+  if( _ownerDialSet_->isGlobalUseMirrorDial() ){
     _effectiveDialParameterValue_ = std::abs(std::fmod(
-        _dialParameterCache_ - _ownerDialSetReference_->getMirrorLowEdge(),
-        2 * _ownerDialSetReference_->getMirrorRange()
+        _dialParameterCache_ - _ownerDialSet_->getMirrorLowEdge(),
+        2 * _ownerDialSet_->getMirrorRange()
     ));
 
-    if( _effectiveDialParameterValue_ > _ownerDialSetReference_->getMirrorRange() ){
+    if(_effectiveDialParameterValue_ > _ownerDialSet_->getMirrorRange() ){
       // odd pattern  -> mirrored -> decreasing effective X while increasing parameter
-      _effectiveDialParameterValue_ -= 2 * _ownerDialSetReference_->getMirrorRange();
+      _effectiveDialParameterValue_ -= 2 * _ownerDialSet_->getMirrorRange();
       _effectiveDialParameterValue_ = -_effectiveDialParameterValue_;
     }
 
     // re-apply the offset
-    _effectiveDialParameterValue_ += _ownerDialSetReference_->getMirrorLowEdge();
+    _effectiveDialParameterValue_ += _ownerDialSet_->getMirrorLowEdge();
   }
 }
 double Dial::evalResponse(){
-  return this->evalResponse( _ownerDialSetReference_->getAssociatedParameterReference()->getParameterValue() );
+  return this->evalResponse(_ownerDialSet_->getOwnerFitParameter()->getParameterValue() );
 }
 //void Dial::copySplineCache(TSpline3& splineBuffer_){
 //  if( _responseSplineCache_ == nullptr ) this->buildResponseSplineCache();
@@ -110,16 +110,16 @@ double Dial::evalResponse(double parameterValue_) {
   _dialParameterCache_ = parameterValue_;
   this->updateEffectiveDialParameter();
   this->fillResponseCache(); // specified in the corresponding dial class
-  if     ( _ownerDialSetReference_->getMinDialResponse() == _ownerDialSetReference_->getMinDialResponse() and _dialResponseCache_<_ownerDialSetReference_->getMinDialResponse() ){ _dialResponseCache_=_ownerDialSetReference_->getMinDialResponse(); }
-  else if( _ownerDialSetReference_->getMaxDialResponse() == _ownerDialSetReference_->getMaxDialResponse() and _dialResponseCache_>_ownerDialSetReference_->getMaxDialResponse() ){ _dialResponseCache_=_ownerDialSetReference_->getMaxDialResponse(); }
+  if     (_ownerDialSet_->getMinDialResponse() == _ownerDialSet_->getMinDialResponse() and _dialResponseCache_ < _ownerDialSet_->getMinDialResponse() ){ _dialResponseCache_=_ownerDialSet_->getMinDialResponse(); }
+  else if(_ownerDialSet_->getMaxDialResponse() == _ownerDialSet_->getMaxDialResponse() and _dialResponseCache_ > _ownerDialSet_->getMaxDialResponse() ){ _dialResponseCache_=_ownerDialSet_->getMaxDialResponse(); }
 
   return _dialResponseCache_;
 }
 std::string Dial::getSummary(){
   std::stringstream ss;
-  ss << ((FitParameterSet*) _ownerDialSetReference_->getAssociatedParameterReference()->getParSetRef())->getName();
-  ss << "/" << _ownerDialSetReference_->getAssociatedParameterReference()->getTitle();
-  ss << "(" << _ownerDialSetReference_->getAssociatedParameterReference()->getParameterValue() << ")";
+  ss << ((FitParameterSet*) _ownerDialSet_->getOwnerFitParameter()->getParSetRef())->getName();
+  ss << "/" << _ownerDialSet_->getOwnerFitParameter()->getTitle();
+  ss << "(" << _ownerDialSet_->getOwnerFitParameter()->getParameterValue() << ")";
   ss << "/";
   ss << DialType::DialTypeEnumNamespace::toString(_dialType_, true);
   if( _applyConditionBin_ != nullptr and not _applyConditionBin_->getEdgesList().empty() ) ss << ":b{" << _applyConditionBin_->getSummary() << "}";

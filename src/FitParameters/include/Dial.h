@@ -52,7 +52,6 @@ public:
   DialType::DialType getDialType() const;
   const DialSet* getOwner() const;
 
-  void *getAssociatedParameterReference() const;
   double getAssociatedParameter() const;
 
   void updateEffectiveDialParameter();
@@ -65,9 +64,11 @@ public:
   virtual void fillResponseCache() = 0;
 
 protected:
-  const DialType::DialType _dialType_;
+  //! KEEP THE MEMBER AS LIGHT AS POSSIBLE!!
+
+  const DialType::DialType _dialType_; // Defines the
   // The DialSet that owns this dial.  The dial DOES NOT OWN THIS POINTER
-  const DialSet* _ownerDialSetReference_{nullptr};
+  const DialSet* _ownerDialSet_{nullptr};
 
   // Parameters
   std::shared_ptr<DataBin> _applyConditionBin_{nullptr};
