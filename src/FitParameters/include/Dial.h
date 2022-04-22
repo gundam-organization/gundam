@@ -52,7 +52,6 @@ public:
   DialType::DialType getDialType() const;
   const DialSet* getOwner() const;
 
-  void *getAssociatedParameterReference() const;
   double getAssociatedParameter() const;
 
   void updateEffectiveDialParameter();
