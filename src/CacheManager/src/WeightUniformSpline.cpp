@@ -94,31 +94,8 @@ int Cache::Weight::UniformSpline::FindPoints(const TSpline3* s) {
     return s->GetNp();
 }
 
-void Cache::Weight::UniformSpline::AddSpline(int resultIndex,
-                                             int parIndex,
-                                             SplineDial* sDial) {
-    const TSpline3* s = sDial->getSplinePtr();
-    int NP = Cache::Weight::UniformSpline::FindPoints(s);
-    double xMin = s->GetXmin();
-    double xMax = s->GetXmax();
-    int sIndex = ReserveSpline(resultIndex,parIndex,xMin,xMax,NP);
-#ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in Cache::Weight::UniformSpline::AddSpline
-    sDial->setCacheManagerName(GetName());
-    sDial->setCacheManagerValuePointer(GetCachePointer(sIndex));
-#endif
-    for (int i=0; i<NP; ++i) {
-        double x = xMin + i*(xMax-xMin)/(NP-1);
-        double y = s->Eval(x);
-        double m = s->Derivative(x);
-        SetSplineKnot(sIndex,i,y,m);
-    }
-}
-
-// Reserve space in the internal structures for spline with uniform knots.
-// The knot values will still need to be set using set spline knot.
-int Cache::Weight::UniformSpline::ReserveSpline(
-    int resIndex, int parIndex, double low, double high, int points) {
+void Cache::Weight::UniformSpline::AddSpline(int resIndex, int parIndex,
+                                            SplineDial* sDial) {
     if (resIndex < 0) {
         LogError << "Invalid result index"
                << std::endl;
@@ -139,12 +116,8 @@ int Cache::Weight::UniformSpline::ReserveSpline(
                << std::endl;
         throw std::runtime_error("Parameter index out of bounds");
     }
-    if (high <= low) {
-        LogError << "Invalid spline bounds"
-               << std::endl;
-        throw std::runtime_error("Invalid spline bounds");
-    }
-    if (points < 3) {
+    int points = sDial->getSplineData().size();
+    if (points < 8) {
         LogError << "Insufficient points in spline"
                << std::endl;
         throw std::runtime_error("Invalid number of spline points");
@@ -163,82 +136,22 @@ int Cache::Weight::UniformSpline::ReserveSpline(
         throw std::runtime_error("Problem with control indices");
     }
     int knotIndex = fSplineKnotsUsed;
-    fSplineKnotsUsed += 2; // Space for the upper and lower bound
-    fSplineKnotsUsed += 2*points; // Space for the knots.
+    fSplineKnotsUsed += points;
     if (fSplineKnotsUsed > fSplineKnotsReserved) {
         LogError << "Not enough space reserved for spline knots"
                << std::endl;
         throw std::runtime_error("Not enough space reserved for spline knots");
     }
     fSplineIndex->hostPtr()[newIndex+1] = fSplineKnotsUsed;
-    // Save values needed to calculate the spline offset index.  If the input
-    // value is x, the index is
-    // v = (x-CD[dataIndex])*CD[dataIndex+1].
-    // i = v;
-    // v = v - i;
-    double invStep =  1.0*(points-1.0)/(high-low);
-    fSplineKnots->hostPtr()[knotIndex] = low;
-    fSplineKnots->hostPtr()[knotIndex+1] = invStep;
+    for (std::size_t i = 0; i<sDial->getSplineData().size(); ++i) {
+        fSplineKnots->hostPtr()[knotIndex+i] = sDial->getSplineData().at(i);
+    }
 
-    return newIndex;
-}
-
-void Cache::Weight::UniformSpline::SetSplineKnot(
-    int sIndex, int kIndex, double value, double slope) {
-    SetSplineKnotValue(sIndex,kIndex,value);
-    SetSplineKnotSlope(sIndex,kIndex,slope);
-}
-
-void Cache::Weight::UniformSpline::SetSplineKnotValue(
-    int sIndex, int kIndex, double value) {
-    if (sIndex < 0) {
-        LogError << "Requested spline index is negative"
-                  << std::endl;
-        std::runtime_error("Invalid control point being set");
-    }
-    if (GetSplinesUsed() <= sIndex) {
-        LogError << "Requested spline index is to large"
-                  << std::endl;
-        std::runtime_error("Invalid control point being set");
-    }
-    if (kIndex < 0) {
-        LogError << "Requested control point index is negative"
-                  << std::endl;
-        std::runtime_error("Invalid control point being set");
-    }
-    int knotIndex = fSplineIndex->hostPtr()[sIndex] + 2 + 2*kIndex;
-    if (fSplineIndex->hostPtr()[sIndex+1] <= knotIndex) {
-        LogError << "Requested control point index is two large"
-                  << std::endl;
-        std::runtime_error("Invalid control point being set");
-    }
-    fSplineKnots->hostPtr()[knotIndex] = value;
-}
-
-void Cache::Weight::UniformSpline::SetSplineKnotSlope(
-    int sIndex, int kIndex, double slope) {
-    if (sIndex < 0) {
-        LogError << "Requested spline index is negative"
-                  << std::endl;
-        std::runtime_error("Invalid control point being set");
-    }
-    if (GetSplinesUsed() <= sIndex) {
-        LogError << "Requested spline index is to large"
-                  << std::endl;
-        std::runtime_error("Invalid control point being set");
-    }
-    if (kIndex < 0) {
-        LogError << "Requested control point index is negative"
-                  << std::endl;
-        std::runtime_error("Invalid control point being set");
-    }
-    int knotIndex = fSplineIndex->hostPtr()[sIndex] + 2 + 2*kIndex;
-    if (fSplineIndex->hostPtr()[sIndex+1] <= knotIndex) {
-        LogError << "Requested control point index is two large"
-                  << std::endl;
-        std::runtime_error("Invalid control point being set");
-    }
-    fSplineKnots->hostPtr()[knotIndex+1] = slope;
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
+#warning Using SLOW VALIDATION in Cache::Weight::UniformSpline::AddSpline
+    sDial->setCacheManagerName(GetName());
+    sDial->setCacheManagerValuePointer(GetCachePointer(newIndex));
+#endif
 }
 
 int Cache::Weight::UniformSpline::GetSplineParameterIndex(int sIndex) {
