@@ -17,6 +17,8 @@
 #include "Dial.h"
 
 
+class FitParameter;
+
 class DialSet {
 
 public:
@@ -32,7 +34,7 @@ public:
   void setParameterName(const std::string &parameterName);
   void setConfig(const nlohmann::json &config_);
   void setWorkingDirectory(const std::string &workingDirectory);
-  void setAssociatedParameterReference(void *associatedParameterReference);
+  void setAssociatedParameterReference(FitParameter* associatedParameterReference);
   void setCurrentDialOffset(size_t currentDialOffset);
 
   void initialize();
@@ -48,6 +50,15 @@ public:
   size_t getCurrentDialOffset() const;
   DialType::DialType getGlobalDialType() const;
   const Dial &getTemplateDial() const;
+  const FitParameter* getAssociatedParameterReference() const { return _associatedParameterReference_; }
+
+  double getMinDialResponse() const;
+  double getMaxDialResponse() const;
+  bool isGlobalUseMirrorDial() const;
+  double getMirrorLowEdge() const;
+  double getMirrorHighEdge() const;
+
+  double getMirrorRange() const;
 
   // Core
   std::string getSummary() const;
@@ -68,7 +79,7 @@ private:
   std::string _workingDirectory_{"."};
   std::string _applyConditionStr_;
   std::shared_ptr<TFormula> _applyConditionFormula_{nullptr};
-  void* _associatedParameterReference_{nullptr};
+  const FitParameter* _associatedParameterReference_{nullptr};
 
   // Internals
   bool _enableDialsSummary_{false};
@@ -86,11 +97,12 @@ private:
   DialType::DialType _globalDialType_{DialType::DialType_OVERFLOW};
   std::string _globalDialSubType_{};
   std::string _globalDialLeafName_{};
-  double _globalMinDialResponse_{std::nan("unset")};
-  double _globalMaxDialResponse_{std::nan("unset")};
+  double _minDialResponse_{std::nan("unset")};
+  double _maxDialResponse_{std::nan("unset")};
   bool _globalUseMirrorDial_{false};
   double _mirrorLowEdge_{std::nan("unset")};
   double _mirrorHighEdge_{std::nan("unset")};
+  double _mirrorRange_{std::nan("unset")};
 
 };
 

@@ -27,7 +27,6 @@ void NormalizationDial::reset() {
 
 void NormalizationDial::initialize() {
   Dial::initialize();
-  _isInitialized_ = true;
 }
 
 double NormalizationDial::evalResponse(double parameterValue_){
