@@ -112,6 +112,12 @@ void DataSetLoader::initialize() {
       this->addLeafStorageRequestedForMc(leafName);
     }
 
+    if( JsonUtils::doKeyExist(_config_, "toyParameters") ){
+      LogAlert << "TOY PARAMETERS CONFIG LEFT TO IMPLEMENT" << std::endl;
+
+      auto toysConf = JsonUtils::fetchValue(_config_, "toyParameters", nlohmann::json());
+    }
+
   }
 
   {

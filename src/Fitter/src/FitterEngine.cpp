@@ -123,7 +123,7 @@ void FitterEngine::initialize() {
 
       if(not parSet.isEnabled()) continue;
 
-      if( not parSet.isEnableThrowMcBeforeFit() ){
+      if( not parSet.isEnabledThrowToyParameters() ){
         LogWarning << "\"" << parSet.getName() << "\" has marked disabled throwMcBeforeFit: skipping." << std::endl;
         continue;
       }
@@ -179,6 +179,9 @@ double FitterEngine::getChi2StatBuffer() const {
   return _chi2StatBuffer_;
 }
 const Propagator& FitterEngine::getPropagator() const {
+  return _propagator_;
+}
+Propagator& FitterEngine::getPropagator() {
   return _propagator_;
 }
 

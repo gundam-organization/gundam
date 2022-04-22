@@ -244,7 +244,7 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
         cmessage(STATUS "Detected GCC version: ${CMAKE_CXX_COMPILER_VERSION}")
         cmessage(FATAL_ERROR "GCC version must be at least 4.8.5")
     endif()
-elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
     if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 3.3)
         cmessage(STATUS "Detected Clang version: ${CMAKE_CXX_COMPILER_VERSION}")
         cmessage(FATAL_ERROR "Clang version must be at least 3.3")
@@ -317,6 +317,7 @@ set( MODULES
         FitSamples
         ErrorPropagator
         Fitter
+        DialDirectory
 )
 
 cmessage (STATUS "Configuring modules...")

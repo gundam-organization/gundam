@@ -2,8 +2,8 @@
 // Created by Adrien BLANCHET on 22/03/2022.
 //
 
-#ifndef GUNDAM_NESTEDDIAL_H
-#define GUNDAM_NESTEDDIAL_H
+#ifndef GUNDAM_NESTEDDIALTEST_H
+#define GUNDAM_NESTEDDIALTEST_H
 
 #include "Dial.h"
 
@@ -15,11 +15,11 @@
 #include "vector"
 #include "string"
 
-class NestedDial {
+class NestedDialTest {
 
 public:
-  NestedDial();
-  virtual ~NestedDial();
+  NestedDialTest();
+  virtual ~NestedDialTest();
 
   void setConfig(const nlohmann::json& config_);
 
@@ -48,4 +48,4 @@ private:
 };
 
 
-#endif //GUNDAM_NESTEDDIAL_H
+#endif //GUNDAM_NESTEDDIALTEST_H

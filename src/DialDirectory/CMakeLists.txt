@@ -1,0 +1,40 @@
+set( LIB_NAME GundamDialDirectory )
+
+set( SRCFILES
+        src/DialDirectory.cpp
+        src/DialCollection.cpp
+        src/DialBase.cpp
+        src/NormDial.cpp
+        src/NestedDial.cpp
+)
+
+set( HEADERS
+        include/DialDirectory.h
+        include/DialCollection.h
+        include/DialBase.h
+        include/NormDial.h
+        include/NestedDial.h
+)
+
+if( USE_STATIC_LINKS STREQUAL "1" )
+  add_library(${LIB_NAME} STATIC ${SRCFILES})
+else()
+  add_library(${LIB_NAME} SHARED ${SRCFILES})
+endif()
+
+
+target_link_libraries( ${LIB_NAME}
+        GundamFitParameters
+        ${ROOT_LIBRARIES}
+        )
+
+
+
+set_target_properties(${LIB_NAME} PROPERTIES VERSION
+  "${gundam_VERSION_MAJOR}.${gundam_VERSION_MINOR}.${gundam_VERSION_REVISION}${gundam_VERSION_TAG}")
+
+install(TARGETS ${LIB_NAME} DESTINATION lib)
+#Can uncomment this to install the headers... but is it really neccessary?
+# install(FILES ${HEADERS} DESTINATION include)
+
+set(MODULETargets ${MODULETargets} GundamErrorPropagator PARENT_SCOPE)
