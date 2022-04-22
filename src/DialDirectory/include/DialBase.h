@@ -7,6 +7,7 @@
 
 #include "GenericToolbox.h"
 
+#include "mutex"
 #include "vector"
 
 ENUM_EXPANDER( DialType, -1
