@@ -155,14 +155,6 @@ std::string DialSet::getSummary() const {
 }
 void DialSet::applyGlobalParameters(Dial* dial_) const {
   dial_->setOwner(this);
-//  dial_->setAssociatedParameterReference(_associatedParameterReference_);
-//  dial_->setMinDialResponse(_minDialResponse_);
-//  dial_->setMaxDialResponse(_maxDialResponse_);
-//  dial_->setUseMirrorDial(_globalUseMirrorDial_);
-//  if(_globalUseMirrorDial_){
-//    dial_->setMirrorLowEdge(_mirrorLowEdge_);
-//    dial_->setMirrorRange(_mirrorHighEdge_ - _mirrorLowEdge_);
-//  }
 }
 void DialSet::applyGlobalParameters(Dial& dial_) const{
   this->applyGlobalParameters(&dial_);
@@ -318,6 +310,7 @@ bool DialSet::initializeNormDialsWithParBinning() {
              )
 
   NormalizationDial dial;
+  dial.setOwner(this);
   this->applyGlobalParameters(&dial);
   dial.setApplyConditionBin( binning.getBinsList().at( _parameterIndex_ ) );
   dial.initialize();
@@ -343,6 +336,7 @@ bool DialSet::initializeDialsWithDefinition() {
   if( _globalDialType_ == DialType::Normalization ){
     NormalizationDial dial;
     this->applyGlobalParameters(&dial);
+    dial.setOwner(this);
     dial.initialize();
     _dialList_.emplace_back( std::make_shared<NormalizationDial>(dial) );
   }
