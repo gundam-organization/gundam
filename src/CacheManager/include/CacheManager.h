@@ -5,7 +5,7 @@
 
 #include "CacheWeights.h"
 #include "WeightNormalization.h"
-#include "WeightCompactSpline.h"
+#include "WeightMonotonicSpline.h"
 #include "WeightUniformSpline.h"
 #include "WeightGeneralSpline.h"
 
@@ -79,8 +79,8 @@ private:
     /// The cache for the normalizations
     std::unique_ptr<Cache::Weight::Normalization> fNormalizations;
 
-    /// The cache for the compact splines
-    std::unique_ptr<Cache::Weight::CompactSpline> fCompactSplines;
+    /// The cache for the monotonic splines
+    std::unique_ptr<Cache::Weight::MonotonicSpline> fMonotonicSplines;
 
     /// The cache for the uniform splines (really compact splines for now).
     std::unique_ptr<Cache::Weight::UniformSpline> fUniformSplines;

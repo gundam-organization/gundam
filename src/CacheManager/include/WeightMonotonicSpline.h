@@ -1,5 +1,5 @@
-#ifndef CacheCompactSpline_hxx_seen
-#define CacheCompactSpline_hxx_seen
+#ifndef CacheMonotonicSpline_hxx_seen
+#define CacheMonotonicSpline_hxx_seen
 
 #include "CacheWeights.h"
 #include "WeightBase.h"
@@ -16,17 +16,17 @@
 
 namespace Cache {
     namespace Weight {
-        class CompactSpline;
+        class MonotonicSpline;
     }
 }
 
 /// A class apply a splined weight parameter to the cached event weights.
 /// This will be used in Cache::Weights to run the GPU for this type of
 /// reweighting.  This spline is controlled by the value at uniformly spaced
-/// knots.  If COMPACT_SPLINE_MONOTONIC is defined at compile time, this will
+/// knots.  If COMPACT_SPLINE_AVERAGE is defined at compile time, this will
 /// use a monotonic spline.  Otherwise, this uses the average slope
 /// (e.g. basically uses Catmul-Rom).
-class Cache::Weight::CompactSpline:
+class Cache::Weight::MonotonicSpline:
     public Cache::Weight::Base {
 private:
     Cache::Parameters::Clamps& fLowerClamp;
@@ -68,7 +68,7 @@ public:
     // results (typically a few per event).  The knots are the total number of
     // knots in all of the uniform splines (e.g. For 1000 splines with 7
     // knots for each spline, knots is 7000).
-    CompactSpline(Cache::Weights::Results& results,
+    MonotonicSpline(Cache::Weights::Results& results,
                   Cache::Parameters::Values& parameters,
                   Cache::Parameters::Clamps& lowerClamps,
                   Cache::Parameters::Clamps& upperClamps,
@@ -77,7 +77,7 @@ public:
 
     // Deconstruct the class.  This should deallocate all the memory
     // everyplace.
-    virtual ~CompactSpline();
+    virtual ~MonotonicSpline();
 
     // Apply the kernel to the event weights.
     virtual bool Apply();

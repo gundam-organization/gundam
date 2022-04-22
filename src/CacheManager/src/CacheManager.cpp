@@ -2,7 +2,7 @@
 #include "CacheParameters.h"
 #include "CacheWeights.h"
 #include "WeightNormalization.h"
-#include "WeightCompactSpline.h"
+#include "WeightMonotonicSpline.h"
 #include "WeightUniformSpline.h"
 #include "WeightGeneralSpline.h"
 #include "CacheIndexedSums.h"
@@ -86,14 +86,14 @@ Cache::Manager::Manager(int events, int parameters,
         fWeightsCache->AddWeightCalculator(fNormalizations.get());
         fTotalBytes += fNormalizations->GetResidentMemory();
 
-        fCompactSplines.reset(new Cache::Weight::CompactSpline(
+        fMonotonicSplines.reset(new Cache::Weight::MonotonicSpline(
                                   fWeightsCache->GetWeights(),
                                   fParameterCache->GetParameters(),
                                   fParameterCache->GetLowerClamps(),
                                   fParameterCache->GetUpperClamps(),
                                   compactSplines, compactPoints));
-        fWeightsCache->AddWeightCalculator(fCompactSplines.get());
-        fTotalBytes += fCompactSplines->GetResidentMemory();
+        fWeightsCache->AddWeightCalculator(fMonotonicSplines.get());
+        fTotalBytes += fMonotonicSplines->GetResidentMemory();
 
         fUniformSplines.reset(new Cache::Weight::UniformSpline(
                                   fWeightsCache->GetWeights(),
@@ -168,12 +168,18 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
                     = dynamic_cast<const SplineDial*>(dial);
                 if (sDial) {
                     std::string splineType = Cache::Manager::SplineType(sDial);
+                    if (sDial->getSplineType() == SplineDial::Monotonic
+                        && splineType != "compactSpline") LogThrow("Bad mono");
+                    if (sDial->getSplineType() == SplineDial::Uniform
+                        && splineType != "uniformSpline") LogThrow("Bad unif");
+                    if (sDial->getSplineType() == SplineDial::General
+                        && splineType != "generalSpline") LogThrow("Bad gene");
                     const TSpline3* s = sDial->getSplinePtr();
                     if (!s) throw std::runtime_error("Null spline pointer");
                     if (splineType == "compactSpline") {
                         ++compactSplines;
                         compactPoints
-                            += Cache::Weight::CompactSpline::FindPoints(s);
+                            += Cache::Weight::MonotonicSpline::FindPoints(s);
                     }
                     else if (splineType == "uniformSpline") {
                         ++uniformSplines;
@@ -231,7 +237,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
     LogInfo << "Cache for " << events << " events --"
             << " using " << parameters << " parameters"
             << std::endl;
-    LogInfo << "    Compact splines: " << compactSplines
+    LogInfo << "    Monotonic splines: " << compactSplines
             << " (" << 1.0*compactSplines/events << " per event)"
             << std::endl;
     LogInfo << "    Uniform Splines: " << uniformSplines
@@ -251,7 +257,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
             << std::endl;
 
     if (compactSplines > 0) {
-        LogInfo << "    Compact spline cache uses "
+        LogInfo << "    Monotonic spline cache uses "
                 << compactPoints << " control points --"
                 << " (" << 1.0*compactPoints/compactSplines
                 << " points per spline)"
@@ -372,7 +378,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
                     std::string splineType = Cache::Manager::SplineType(sDial);
                     if (splineType == "compactSpline") {
                         Cache::Manager::Get()
-                            ->fCompactSplines
+                            ->fMonotonicSplines
                             ->AddSpline(resultIndex,parIndex,sDial);
                     }
                     else if (splineType == "uniformSpline") {
