@@ -56,7 +56,7 @@ void DialSet::setWorkingDirectory(const std::string &workingDirectory) {
 void DialSet::setParameterName(const std::string &parameterName) {
   _parameterName_ = parameterName;
 }
-void DialSet::setAssociatedParameterReference(void *associatedParameterReference) {
+void DialSet::setAssociatedParameterReference(FitParameter* associatedParameterReference) {
   _associatedParameterReference_ = associatedParameterReference;
 }
 void DialSet::setCurrentDialOffset(size_t currentDialOffset) {
@@ -118,6 +118,24 @@ size_t DialSet::getCurrentDialOffset() const {
 DialType::DialType DialSet::getGlobalDialType() const {
   return _globalDialType_;
 }
+double DialSet::getMinDialResponse() const {
+  return _minDialResponse_;
+}
+double DialSet::getMaxDialResponse() const {
+  return _maxDialResponse_;
+}
+bool DialSet::isGlobalUseMirrorDial() const {
+  return _globalUseMirrorDial_;
+}
+double DialSet::getMirrorLowEdge() const {
+  return _mirrorLowEdge_;
+}
+double DialSet::getMirrorHighEdge() const {
+  return _mirrorHighEdge_;
+}
+double DialSet::getMirrorRange() const {
+  return _mirrorRange_;
+}
 
 std::string DialSet::getSummary() const {
   std::stringstream ss;
@@ -137,14 +155,14 @@ std::string DialSet::getSummary() const {
 }
 void DialSet::applyGlobalParameters(Dial* dial_) const {
   dial_->setOwner(this);
-  dial_->setAssociatedParameterReference(_associatedParameterReference_);
-  dial_->setMinDialResponse(_globalMinDialResponse_);
-  dial_->setMaxDialResponse(_globalMaxDialResponse_);
-  dial_->setUseMirrorDial(_globalUseMirrorDial_);
-  if(_globalUseMirrorDial_){
-    dial_->setMirrorLowEdge(_mirrorLowEdge_);
-    dial_->setMirrorRange(_mirrorHighEdge_ - _mirrorLowEdge_);
-  }
+//  dial_->setAssociatedParameterReference(_associatedParameterReference_);
+//  dial_->setMinDialResponse(_minDialResponse_);
+//  dial_->setMaxDialResponse(_maxDialResponse_);
+//  dial_->setUseMirrorDial(_globalUseMirrorDial_);
+//  if(_globalUseMirrorDial_){
+//    dial_->setMirrorLowEdge(_mirrorLowEdge_);
+//    dial_->setMirrorRange(_mirrorHighEdge_ - _mirrorLowEdge_);
+//  }
 }
 void DialSet::applyGlobalParameters(Dial& dial_) const{
   this->applyGlobalParameters(&dial_);
@@ -266,12 +284,14 @@ void DialSet::readGlobals(const nlohmann::json &config_){
   }
 
   // globals for _templateDial_
-  _globalMinDialResponse_ = JsonUtils::fetchValue(config_, {{"minDialResponse"}, {"minimumSplineResponse"}}, _globalMinDialResponse_);
-  _globalMaxDialResponse_ = JsonUtils::fetchValue(config_, "maxDialResponse", _globalMaxDialResponse_);
+  _minDialResponse_ = JsonUtils::fetchValue(config_, {{"minDialResponse"}, {"minimumSplineResponse"}}, _minDialResponse_);
+  _maxDialResponse_ = JsonUtils::fetchValue(config_, "maxDialResponse", _maxDialResponse_);
   _globalUseMirrorDial_       = JsonUtils::fetchValue(config_, "useMirrorDial", _globalUseMirrorDial_);
   if( _globalUseMirrorDial_ ){
     _mirrorLowEdge_ = JsonUtils::fetchValue(config_, "mirrorLowEdge", _mirrorLowEdge_);
     _mirrorHighEdge_ = JsonUtils::fetchValue(config_, "mirrorHighEdge", _mirrorHighEdge_);
+    _mirrorRange_ = _mirrorHighEdge_ - _mirrorHighEdge_;
+    LogThrowIf(_mirrorRange_ < 0, GET_VAR_NAME_VALUE(_mirrorHighEdge_) << " < " << GET_VAR_NAME_VALUE(_mirrorLowEdge_))
   }
 }
 bool DialSet::initializeNormDialsWithParBinning() {

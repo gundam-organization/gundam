@@ -26,27 +26,24 @@ void SplineDial::initialize() {
   LogThrowIf(_spline_.GetXmin() == _spline_.GetXmax(), "Spline is not valid.")
 
   // check if prior is out of bounds:
-  if( _associatedParameterReference_ != nullptr ){
-    if(
-        static_cast<FitParameter*>(_associatedParameterReference_)->getPriorValue() < _spline_.GetXmin()
-      or static_cast<FitParameter*>(_associatedParameterReference_)->getPriorValue() > _spline_.GetXmax()
-    ){
-      LogError << "Prior value of parameter \""
-      << static_cast<FitParameter*>(_associatedParameterReference_)->getTitle()
-      << "\" = " << static_cast<FitParameter*>(_associatedParameterReference_)->getPriorValue()
-      << " is out of the spline bounds: " <<  _spline_.GetXmin() << " < X < " << _spline_.GetXmax()
-      << std::endl;
-      throw std::logic_error("Prior is out of the spline bounds.");
-    }
-
-    _effectiveDialParameterValue_ = static_cast<FitParameter*>(_associatedParameterReference_)->getPriorValue();
-    try{ fillResponseCache(); }
-    catch(...){
-      LogError << "Error while evaluating spline response at the prior value: d(" << _effectiveDialParameterValue_ << ") = " << _dialResponseCache_ << std::endl;
-      throw std::logic_error("error eval spline response");
-    }
+  if(
+      _ownerDialSetReference_->getAssociatedParameterReference()->getPriorValue() < _spline_.GetXmin()
+    or _ownerDialSetReference_->getAssociatedParameterReference()->getPriorValue() > _spline_.GetXmax()
+  ){
+    LogError << "Prior value of parameter \""
+    << _ownerDialSetReference_->getAssociatedParameterReference()->getTitle()
+    << "\" = " << _ownerDialSetReference_->getAssociatedParameterReference()->getPriorValue()
+    << " is out of the spline bounds: " <<  _spline_.GetXmin() << " < X < " << _spline_.GetXmax()
+    << std::endl;
+    throw std::logic_error("Prior is out of the spline bounds.");
   }
-  _isInitialized_ = true;
+
+  _effectiveDialParameterValue_ = _ownerDialSetReference_->getAssociatedParameterReference()->getPriorValue();
+  try{ fillResponseCache(); }
+  catch(...){
+    LogError << "Error while evaluating spline response at the prior value: d(" << _effectiveDialParameterValue_ << ") = " << _dialResponseCache_ << std::endl;
+    throw std::logic_error("error eval spline response");
+  }
 }
 
 std::string SplineDial::getSummary() {
@@ -66,9 +63,10 @@ void SplineDial::fillResponseCache() {
 //      fastEval();
 //    }
   }
+
   // Checks
-  if(_minDialResponse_ == _minDialResponse_ and _dialResponseCache_ < _minDialResponse_ ){
-    _dialResponseCache_ = _minDialResponse_;
+  if(_ownerDialSetReference_->getMinDialResponse() == _ownerDialSetReference_->getMinDialResponse() and _dialResponseCache_ < _ownerDialSetReference_->getMinDialResponse() ){
+    _dialResponseCache_ = _ownerDialSetReference_->getMinDialResponse();
   }
 
   if( _dialResponseCache_ < 0 and _throwIfResponseIsNegative_ ){
@@ -76,8 +74,7 @@ void SplineDial::fillResponseCache() {
     LogThrow(
       "Negative spline response: dial(" << _effectiveDialParameterValue_ << ") = " << _dialResponseCache_
       << std::endl << "Dial is defined in between: [" << _spline_.GetXmin() << ", " << _spline_.GetXmax() << "]" << std::endl
-      << ( _associatedParameterReference_ != nullptr ? "Parameter: " + static_cast<FitParameter *>(_associatedParameterReference_)->getName() : "" )
-      )
+      << "Parameter: " + _ownerDialSetReference_->getAssociatedParameterReference()->getName() )
   }
 }
 void SplineDial::fastEval(){

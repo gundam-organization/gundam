@@ -313,11 +313,11 @@ set( MODULES
         Utils
         anaevents
         CacheManager
+        DialDirectory
         FitParameters
         FitSamples
         ErrorPropagator
         Fitter
-        DialDirectory
 )
 
 cmessage (STATUS "Configuring modules...")
