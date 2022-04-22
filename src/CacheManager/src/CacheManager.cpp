@@ -160,8 +160,8 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
             }
             for (const Dial* dial
                      : event.getRawDialPtrList()) {
-                FitParameter* fp = static_cast<FitParameter*>(
-                    dial->getAssociatedParameterReference());
+                const FitParameter* fp
+                    = dial->getOwner()->getAssociatedParameterReference();
                 usedParameters.insert(fp);
                 ++useCount[fp->getFullTitle()];
                 const SplineDial* sDial
@@ -330,8 +330,8 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
             for (Dial* dial
                      : event.getRawDialPtrList()) {
                 if (!dial->isReferenced()) continue;
-                FitParameter* fp = static_cast<FitParameter*>(
-                    dial->getAssociatedParameterReference());
+                const FitParameter* fp =
+                    dial->getOwner()->getAssociatedParameterReference();
                 std::map<const FitParameter*,int>::iterator parMapIt
                     = Cache::Manager::ParameterMap.find(fp);
                 if (parMapIt == Cache::Manager::ParameterMap.end()) {
