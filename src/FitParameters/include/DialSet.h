@@ -57,7 +57,6 @@ public:
   bool isGlobalUseMirrorDial() const;
   double getMirrorLowEdge() const;
   double getMirrorHighEdge() const;
-
   double getMirrorRange() const;
 
   // Core
