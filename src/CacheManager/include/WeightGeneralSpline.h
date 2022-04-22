@@ -94,26 +94,8 @@ public:
     /// Return the number of elements currently used to hold knots.
     std::size_t GetSplineKnotsUsed() const {return fSplineKnotsUsed;}
 
-    // Reserve space for a spline with uniform knot spacing.  This updates the
-    // parameter index and data index arrays.  It returns the index for the
-    // new spline.
-    int ReserveSpline(int resIndex, int parIndex,
-                      double low, double high, int points);
-
-    // Set a knot for a spline with uniform spacing.  This takes the index of
-    // the spline that this spline will fill and the index of the control
-    // point to be filled in that spline.  This can only be used after
-    // ReserveSpline has been called.  The sIndex is the value returned by
-    // ReserveSpline for the particular spline, and the kIndex is the knot
-    // that will be filled.
-    void SetSplineKnotPlace(int sIndex, int kIndex, double place);
-    void SetSplineKnotValue(int sIndex, int kIndex, double value);
-    void SetSplineKnotSlope(int sIndex, int kIndex, double slope);
-    void SetSplineKnot(int sIndex, int kIndex,
-                       double place, double value, double slope);
-
     /// Add a spline for the dial.  This may modify the dial if debugging is
-    /// enabled.  This uses ReserveSpline and SetSplineKnot.
+    /// enabled.
     void AddSpline(int resultIndex, int parIndex, SplineDial* dial);
 
     // Get the index of the parameter for the spline at sIndex.

@@ -37,6 +37,8 @@ Cache::Weight::UniformSpline::UniformSpline(
     fTotalBytes += GetSplinesReserved()*sizeof(short);    // fSplineParameter
     fTotalBytes += (1+GetSplinesReserved())*sizeof(int);  // fSplineIndex
 
+    // Calculate the space needed to store the spline data.  This needs
+    // to know how the spline data is packed for CalculateUniformSpline.
     fSplineKnotsReserved = 2*fSplinesReserved + 2*fSplineKnotsReserved;
 
 #ifdef CACHE_MANAGER_SLOW_VALIDATION

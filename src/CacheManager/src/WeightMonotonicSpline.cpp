@@ -95,30 +95,9 @@ int Cache::Weight::MonotonicSpline::FindPoints(const TSpline3* s) {
     return s->GetNp();
 }
 
-void Cache::Weight::MonotonicSpline::AddSpline(int resultIndex,
-                                             int parIndex,
-                                             SplineDial* sDial) {
-    const TSpline3* s = sDial->getSplinePtr();
-    int NP = Cache::Weight::MonotonicSpline::FindPoints(s);
-    const double xMin = s->GetXmin();
-    const double xMax = s->GetXmax();
-    int sIndex = ReserveSpline(resultIndex,parIndex,xMin,xMax,NP);
-#ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in Cache::Weight::MonotonicSpline::AddSpline
-    sDial->setCacheManagerName(GetName());
-    sDial->setCacheManagerValuePointer(GetCachePointer(sIndex));
-#endif
-    for (int i=0; i<NP; ++i) {
-        const double x = xMin + i*(xMax-xMin)/(NP-1);
-        const double y = s->Eval(x);
-        SetSplineKnot(sIndex,i,y);
-    }
-}
-
-// Reserve space in the internal structures for spline with uniform knots.
-// The knot values will still need to be set using set spline knot.
-int Cache::Weight::MonotonicSpline::ReserveSpline(
-    int resIndex, int parIndex, double low, double high, int points) {
+void Cache::Weight::MonotonicSpline::AddSpline(int resIndex,
+                                               int parIndex,
+                                               SplineDial* sDial) {
     if (resIndex < 0) {
         LogError << "Invalid result index"
                << std::endl;
@@ -139,12 +118,7 @@ int Cache::Weight::MonotonicSpline::ReserveSpline(
                << std::endl;
         throw std::runtime_error("Parameter index out of bounds");
     }
-    if (high <= low) {
-        LogError << "Invalid spline bounds"
-               << std::endl;
-        throw std::runtime_error("Invalid spline bounds");
-    }
-    if (points < 3) {
+    if (sDial->getSplineData().size() < 5) {
         LogError << "Insufficient points in spline"
                << std::endl;
         throw std::runtime_error("Invalid number of spline points");
@@ -163,24 +137,22 @@ int Cache::Weight::MonotonicSpline::ReserveSpline(
         throw std::runtime_error("Problem with control indices");
     }
     int knotIndex = fSplineKnotsUsed;
-    fSplineKnotsUsed += 2; // Space for the upper and lower bound
-    fSplineKnotsUsed += points; // Space for the knots.
+    fSplineKnotsUsed += sDial->getSplineData().size();
     if (fSplineKnotsUsed > fSplineKnotsReserved) {
         LogError << "Not enough space reserved for spline knots"
                << std::endl;
         throw std::runtime_error("Not enough space reserved for spline knots");
     }
     fSplineIndex->hostPtr()[newIndex+1] = fSplineKnotsUsed;
-    // Save values needed to calculate the spline offset index.  If the input
-    // value is x, the index is
-    // v = (x-CD[dataIndex])*CD[dataIndex+1].
-    // i = v;
-    // v = v - i;
-    const double invStep =  1.0*(points-1.0)/(high-low);
-    fSplineKnots->hostPtr()[knotIndex] = low;
-    fSplineKnots->hostPtr()[knotIndex+1] = invStep;
+    for (std::size_t i = 0; i<sDial->getSplineData().size(); ++i) {
+        fSplineKnots->hostPtr()[knotIndex+i] = sDial->getSplineData().at(i);
+    }
 
-    return newIndex;
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
+#warning Using SLOW VALIDATION in Cache::Weight::MonotonicSpline::AddSpline
+    sDial->setCacheManagerName(GetName());
+    sDial->setCacheManagerValuePointer(GetCachePointer(newIndex));
+#endif
 }
 
 void Cache::Weight::MonotonicSpline::SetSplineKnot(

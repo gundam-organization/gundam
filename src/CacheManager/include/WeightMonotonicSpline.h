@@ -96,12 +96,6 @@ public:
     /// Return the number of elements currently used to hold knots.
     std::size_t GetSplineKnotsUsed() const {return fSplineKnotsUsed;}
 
-    // Reserve space for a spline with uniform knot spacing.  This updates the
-    // parameter index and data index arrays.  It returns the index for the
-    // new spline.
-    int ReserveSpline(int resIndex, int parIndex,
-                      double low, double high, int points);
-
     // Set a knot for a spline with uniform spacing.  This takes the index of
     // the spline that this spline will fill and the index of the control
     // point to be filled in that spline.  This can only be used after
