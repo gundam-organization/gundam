@@ -4,7 +4,7 @@
 
 #include "TFile.h"
 
-#include <FitParameter.h>
+#include "FitParameter.h"
 #include "SplineDial.h"
 
 #include "Logger.h"

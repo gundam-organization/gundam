@@ -44,6 +44,7 @@ public:
   TFormula *getApplyConditionFormula() const;
   const std::string &getDialLeafName() const;
   const std::string &getDialSubType() const;
+  const std::string &getParameterName() const;
   size_t getCurrentDialOffset() const;
   DialType::DialType getGlobalDialType() const;
   const Dial &getTemplateDial() const;

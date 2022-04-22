@@ -104,8 +104,8 @@ void Cache::Weight::UniformSpline::AddSpline(int resultIndex,
     int sIndex = ReserveSpline(resultIndex,parIndex,xMin,xMax,NP);
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning Using SLOW VALIDATION in Cache::Weight::UniformSpline::AddSpline
-    sDial->setGPUCacheName(GetName());
-    sDial->setGPUCachePointer(GetCachePointer(sIndex));
+    sDial->setCacheManagerName(GetName());
+    sDial->setCacheManagerValuePointer(GetCachePointer(sIndex));
 #endif
     for (int i=0; i<NP; ++i) {
         double x = xMin + i*(xMax-xMin)/(NP-1);
@@ -450,7 +450,7 @@ namespace {
 #ifdef CACHE_DEBUG
             int dim = id1-id0-2;
             if (rIndex[i] < PRINT_STEP) {
-                std::cout << "Splines kernel " << i
+                LogInfo << "CACHE_DEBUG: Splines kernel " << i
                        << " iEvt " << rIndex[i]
                        << " iPar " << pIndex[i]
                        << " = " << params[pIndex[i]]
@@ -461,7 +461,7 @@ namespace {
                        << " d: " << dim
                        << std::endl;
                 for (int k = 0; k < dim/2; ++k) {
-                    std::cout << "        " << k
+                    LogInfo << "CACHE_DEBUG:     " << k
                            << " x: " << knots[id0] + k*s
                            << " y: " << knots[id0+2+2*k]
                            << " m: " << knots[id0+2+2*k+1]

@@ -94,6 +94,9 @@ void DialSet::initialize() {
 bool DialSet::isEnabled() const {
   return _isEnabled_;
 }
+const std::string& DialSet::getParameterName() const {
+  return _parameterName_;
+}
 const std::vector<std::string> &DialSet::getDataSetNameList() const {
   return _dataSetNameList_;
 }

@@ -75,16 +75,6 @@ public:
   virtual void buildResponseSplineCache();
   virtual void fillResponseCache() = 0;
 
-#ifdef CACHE_MANAGER_SLOW_VALIDATION
-  // Debugging.  This is only meaningful when the GPU is filling the spline
-  // value cache (only filled during validation).  It's a nullptr otherwise,
-  // or not included in the object.
-  std::string getGPUCacheName() const {return _GPUCacheName_;}
-  void setGPUCacheName(std::string s) {_GPUCacheName_ = s;}
-  double* getGPUCachePointer() const {return _GPUCachePointer_;}
-  void setGPUCachePointer(double* v) {_GPUCachePointer_=v;}
-#endif
-
 protected:
   const DialType::DialType _dialType_;
   // The DialSet that owns this dial.  The dial DOES NOT OWN THIS POINTER
@@ -111,11 +101,29 @@ protected:
   double _mirrorLowEdge_{std::nan("unset")};
   double _mirrorRange_{std::nan("unset")};
 
-#ifdef CACHE_MANAGER_SLOW_VALIDATION
+#ifdef GUNDAM_USING_CUDA
   // Debugging.  This is only meaningful when the GPU is filling the spline
   // value cache (only filled during validation).
-  std::string _GPUCacheName_{"unset"};
-  double* _GPUCachePointer_{nullptr};
+public:
+  void setCacheManagerName(std::string s) {_CacheManagerName_ = s;}
+  void setCacheManagerIndex(int i) {_CacheManagerIndex_ = i;}
+  void setCacheManagerValuePointer(double* v) {_CacheManagerValue_ = v;}
+  void setCacheManagerValidPointer(bool* v) {_CacheManagerValid_ = v;}
+  std::string getCacheManagerName() {return _CacheManagerName_;}
+  int  getCacheManagerIndex() {return _CacheManagerIndex_;}
+  const double* getCacheManagerValuePointer() {return _CacheManagerValue_;}
+  const bool* getCacheManagerValidPointer() {return _CacheManagerValid_;}
+  void (*getCacheManagerUpdatePointer())() {return _CacheManagerUpdate_;}
+private:
+  std::string _CacheManagerName_{"unset"};
+  // An "opaque" index into the cache that is used to simplify bookkeeping.
+  int _CacheManagerIndex_{-1};
+  // A pointer to the cached result.
+  double* _CacheManagerValue_{nullptr};
+  // A pointer to the cache validity flag.
+  bool* _CacheManagerValid_{nullptr};
+  // A pointer to a callback to force the cache to be updated.
+  void (*_CacheManagerUpdate_)(){nullptr};
 #endif
 
   // Output

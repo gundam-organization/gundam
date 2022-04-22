@@ -40,6 +40,11 @@ else()
   add_library(GundamUtils SHARED ${SRCFILES})
 endif()
 
+# Make sure the current directories are available for the later
+# compilation.
+target_include_directories( GundamUtils PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
 target_link_libraries( GundamUtils PUBLIC
         ${ROOT_LIBRARIES}
         ${YAML_CPP_LIBRARIES}
@@ -52,4 +57,3 @@ install(TARGETS GundamUtils DESTINATION lib)
 #Can uncomment this to install the headers... but is it really neccessary?
 # install(FILES ${HEADERS} DESTINATION include)
 
-set(MODULETargets ${MODULETargets} GundamUtils PARENT_SCOPE)

@@ -11,7 +11,7 @@
 #     help  -- This message
 #
 
-# Check that the source root directory is defined.  
+# Check that the source root directory is defined.
 if [ ${#GUNDAM_ROOT} == 0 ]; then
     echo GUNDAM is not setup yet.
     echo You can also run cmake and make by hand...
@@ -51,6 +51,7 @@ fi
 
 ONLY_CMAKE="no"
 RUN_CLEAN="no"
+DEFINES="-DCMAKE_INSTALL_PREFIX=${GUNDAM_INSTALL}"
 while [ "x${1}" != "x" ]; do
     case ${1} in
         fo*) # force
@@ -63,7 +64,7 @@ while [ "x${1}" != "x" ]; do
 	        rm -rf CMakeFiles
             fi
             ;;
-        cm*) # cmake 
+        cm*) # cmake
             shift
             echo Only run CMAKE.  Do not compile.
             ONLY_CMAKE="yes"
@@ -85,6 +86,11 @@ while [ "x${1}" != "x" ]; do
             echo "   help  -- This message"
             exit 0
             ;;
+        -*) # Add definitions
+            echo Add $1
+            DEFINES="${DEFINES} ${1}"
+            shift
+            ;;
         *)
             shift
             break
@@ -93,10 +99,12 @@ while [ "x${1}" != "x" ]; do
 done
 
 if [ ! -f CMakeCache.txt ]; then
-    cmake -DCMAKE_INSTALL_PREFIX=${GUNDAM_INSTALL} ${GUNDAM_ROOT}
+    echo cmake ${DEFINES} ${GUNDAM_ROOT}
+    cmake ${DEFINES} ${GUNDAM_ROOT}
 fi
 
 if [ ${RUN_CLEAN} = "yes" ]; then
+    echo make clean
     make clean
     echo Source cleaned.
 fi
@@ -105,9 +113,10 @@ if [ ${ONLY_CMAKE} = "yes" ]; then
     exit 0
 fi
 
-make || exit 1
+echo make -j1
+make -j1 || exit 1
+echo make install
 make install || exit 1
 
 echo "build:       " ${BUILD_LOCATION}
 echo "installation:" ${GUNDAM_INSTALL}
-
