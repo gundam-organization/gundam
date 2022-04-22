@@ -117,6 +117,11 @@ void SplineDial::fillResponseCache() {
       double avg = std::abs(testVal);
       if (avg < 1.0) avg = 1.0;
       double delta = std::abs(testVal-_dialResponseCache_)/avg;
+      LogInfo << "VALIDATION: spline"
+              << " " << testVal
+              << " " << _dialResponseCache_
+              << " " << delta
+              << std::endl;
       if (delta < 1E-6) continue;
       LogInfo << "Bad spline value in SplineDial: " << delta
               << " " << testVal
@@ -223,8 +228,8 @@ bool SplineDial::fillMonotonicSpline(bool uniformKnots) {
 
     // Copy the spline data into local storage.
     _splineData_.push_back(_spline_.GetXmin());
-    _splineData_.push_back((_spline_.GetNp()-1.0)
-                           /(_spline_.GetXmax()-_spline_.GetXmin()));
+    _splineData_.push_back((_spline_.GetXmax()-_spline_.GetXmin())
+                           /(_spline_.GetNp()-1.0));
     for (int i = 0; i < _spline_.GetNp(); ++i) {
         double x;
         double y;
@@ -240,8 +245,8 @@ bool SplineDial::fillNaturalSpline(bool uniformKnots) {
 
     // Copy the spline data into local storage.
     _splineData_.push_back(_spline_.GetXmin());
-    _splineData_.push_back((_spline_.GetNp()-1.0)
-                           /(_spline_.GetXmax()-_spline_.GetXmin()));
+    _splineData_.push_back((_spline_.GetXmax()-_spline_.GetXmin())
+                           /(_spline_.GetNp()-1.0));
     for (int i = 0; i < _spline_.GetNp(); ++i) {
         double x;
         double y;

@@ -45,7 +45,7 @@ namespace {
                                   const int dim) {
 
         // Get the integer part
-        const double step = 1.0/data[1];
+        const double step = data[1];
         const double xx = (x-data[0])/step;
         int ix = xx;
         if (ix<0) ix=0;

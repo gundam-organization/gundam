@@ -49,7 +49,7 @@ namespace {
         //     b0   b1   b2   b3   b4
 
         const double low = data[0];
-        const double step = 1.0/data[1];
+        const double step = data[1];
 
         // Get the integer part
         const double xx = (x-low)/step;
