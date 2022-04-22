@@ -31,9 +31,10 @@ public:
   void reset();
 
   // Setters
-  void setShowTimeStats(bool showTimeStats);
-  void setSaveDir(TDirectory *saveDir);
   void setConfig(const json &config);
+  void setSaveDir(TDirectory *saveDir);
+  void setShowTimeStats(bool showTimeStats);
+  void setThrowAsimovToyParameters(bool throwAsimovToyParameters);
 
   // Init
   void initialize();
@@ -80,6 +81,7 @@ private:
   nlohmann::json _config_;
 
   // Internals
+  bool _throwAsimovToyParameters_{false};
   bool _isInitialized_{false};
   bool _useResponseFunctions_{false};
   bool _isRfPropagationEnabled_{false};

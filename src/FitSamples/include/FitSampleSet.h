@@ -18,7 +18,8 @@ ENUM_EXPANDER(
   Unset,
   Asimov,
   DataFiles,
-  FakeData
+  FakeData,
+  ToyAsimov
 )
 
 

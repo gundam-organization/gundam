@@ -56,8 +56,6 @@ void FitParameterSet::initialize() {
   // Make the matrix inversion
   this->prepareFitParameters();
 
-  _throwMcBeforeFit_ = JsonUtils::fetchValue(_config_, "throwMcBeforeFit", _throwMcBeforeFit_);
-
   _isInitialized_ = true;
 }
 void FitParameterSet::prepareFitParameters(){
@@ -188,8 +186,8 @@ void FitParameterSet::prepareFitParameters(){
 bool FitParameterSet::isEnabled() const {
   return _isEnabled_;
 }
-bool FitParameterSet::isEnableThrowMcBeforeFit() const {
-  return _throwMcBeforeFit_;
+bool FitParameterSet::isEnabledThrowToyParameters() const {
+  return _enabledThrowToyParameters_;
 }
 const std::string &FitParameterSet::getName() const {
   return _name_;
@@ -282,12 +280,14 @@ void FitParameterSet::throwFitParameters(double gain_){
     }
 
     auto throws = GenericToolbox::throwCorrelatedParameters(_choleskyMatrix_.get());
-    int iPar{0};
+    int iPar{-1};
     for( auto& par : _parameterList_ ){
-      if( not par.isEnabled() ) LogWarning << "Parameter " << par.getTitle() << " is disabled. Not throwing" << std::endl; continue;
+      iPar++;
+      if( _throwEnabledList_ != nullptr and (*_throwEnabledList_)[iPar] != 1 ){ LogWarning << "Parameter " << par.getTitle() << " is marked as non-throwing." << std::endl; continue; }
+      if( not par.isEnabled() ){ LogWarning << "Parameter " << par.getTitle() << " is disabled. Not throwing" << std::endl; continue; }
       if( par.isFixed() ){ LogWarning << "Parameter " << par.getTitle() << " is fixed. Not throwing" << std::endl; continue; }
       LogInfo << "Throwing par " << par.getTitle() << ": " << par.getParameterValue();
-      par.setParameterValue( par.getPriorValue() + gain_ * throws[iPar++] );
+      par.setParameterValue( par.getPriorValue() + gain_ * throws[iPar] );
       LogInfo << " → " << par.getParameterValue() << std::endl;
     }
   }
@@ -369,6 +369,7 @@ std::string FitParameterSet::getSummary() const {
       std::vector<std::vector<std::string>> tableLines;
       tableLines.emplace_back(std::vector<std::string>{
         "Title",
+        "Value",
         "Prior",
         "StdDev",
 //        "StepSize",
@@ -380,13 +381,15 @@ std::string FitParameterSet::getSummary() const {
 
       for( const auto& par : _parameterList_ ){
         std::vector<std::string> lineValues(tableLines[0].size());
-        lineValues[0] = par.getTitle();
-        lineValues[1] = std::to_string( par.getPriorValue() );
-        lineValues[2] = std::to_string( par.getStdDevValue() );
-//        lineValues[3] = std::to_string( par.getStepSize() );
+        int idx{0};
+        lineValues[idx++] = par.getTitle();
+        lineValues[idx++] = std::to_string( par.getParameterValue() );
+        lineValues[idx++] = std::to_string( par.getPriorValue() );
+        lineValues[idx++] = std::to_string( par.getStdDevValue() );
+//        lineValues[idx++] = std::to_string( par.getStepSize() );
 
-        lineValues[3] = std::to_string( par.getMinValue() );
-        lineValues[4] = std::to_string( par.getMaxValue() );
+        lineValues[idx++] = std::to_string( par.getMinValue() );
+        lineValues[idx++] = std::to_string( par.getMaxValue() );
 
         std::string colorStr;
 
@@ -539,6 +542,16 @@ void FitParameterSet::readParameterDefinitionFile(){
     LogThrowIf(_parameterUpperBoundsList_->GetNrows() != _nbParameterDefinition_,
                 "Parameter prior list don't have the same size(" << _parameterUpperBoundsList_->GetNrows()
                                                                  << ") as cov matrix(" << _nbParameterDefinition_ << ")" );
+  }
+
+  _enabledThrowToyParameters_ = JsonUtils::fetchValue(_config_, "enabledThrowToyParameters", _enabledThrowToyParameters_);
+  strBuffer = JsonUtils::fetchValue<std::string>(_config_, "throwEnabledList", "");
+  if( not strBuffer.empty() ){
+    LogInfo << "Reading provided throwEnabledList: \"" << strBuffer << "\"" << std::endl;
+
+    objBuffer = parDefFile->Get(strBuffer.c_str());
+    LogThrowIf(objBuffer == nullptr, "Can't find \"" << strBuffer << "\" in " << parDefFile->GetPath())
+    _throwEnabledList_ = std::shared_ptr<TVectorD>((TVectorD*) objBuffer->Clone());
   }
 
   parDefFile->Close();

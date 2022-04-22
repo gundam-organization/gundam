@@ -24,7 +24,6 @@ void GraphDial::reset() {
 void GraphDial::initialize() {
   this->Dial::initialize();
   LogThrowIf( _graph_.GetN() == 0 )
-  _isInitialized_ = true;
 }
 
 std::string GraphDial::getSummary() {
@@ -57,7 +56,6 @@ void GraphDial::fillResponseCache() {
 
 void GraphDial::setGraph(const TGraph &graph) {
   LogThrowIf(_graph_.GetN() != 0, "Graph already set.")
-  LogThrowIf(_isInitialized_, "GraphDial already initialized")
   LogThrowIf(graph.GetN() == 0, "Invalid input graph")
   _graph_ = graph;
   _graph_.Sort();

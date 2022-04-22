@@ -438,7 +438,7 @@ void PhysicsEvent::addDialRefToCache(Dial* dialPtr_){
   // no new slot available:
   _rawDialPtrList_.emplace_back(dialPtr_);
 }
-void PhysicsEvent::addNestedDialRefToCache(NestedDial* nestedDialPtr_, const std::vector<Dial*>& dialPtrList_) {
+void PhysicsEvent::addNestedDialRefToCache(NestedDialTest* nestedDialPtr_, const std::vector<Dial*>& dialPtrList_) {
   if (nestedDialPtr_ == nullptr) return; // don't store null ptr
 
   // fetch the next free slot:
