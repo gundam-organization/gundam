@@ -16,8 +16,6 @@
 #include "Logger.h"
 #include "GenericToolbox.h"
 
-#include "FitParameterSet.h"
-#include "Dial.h"
 #include "DataBin.h"
 #include "DataBinSet.h"
 
@@ -31,6 +29,8 @@ namespace AnaEventType{
   )
 };
 
+class FitParameterSet;
+class Dial;
 
 class AnaEvent
 {

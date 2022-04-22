@@ -27,6 +27,9 @@ private:
     // The accumulated weights for each histogram bin.
     std::unique_ptr<hemi::Array<double>> fSums;
 
+    // Cache of whether the result values in memory are valid.
+    bool fSumsValid;
+
     /// The (approximate) amount of memory required on the GPU.
     std::size_t fTotalBytes{};
 
@@ -53,7 +56,14 @@ public:
 
     /// Get the sum for index i from host memory.  This might trigger a copy
     /// from the device if that is necessary.
-    double GetSum(int i) const;
+    double GetSum(int i);
+
+    /// The pointer to the array of sums on the host.
+    const double* GetSumsPointer();
+
+    /// A pointer to the validity flag.
+    bool* GetSumsValidPointer();
+
 };
 
 // An MIT Style License

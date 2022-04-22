@@ -105,8 +105,8 @@ void Cache::Weight::CompactSpline::AddSpline(int resultIndex,
     int sIndex = ReserveSpline(resultIndex,parIndex,xMin,xMax,NP);
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning Using SLOW VALIDATION in Cache::Weight::CompactSpline::AddSpline
-    sDial->setGPUCacheName(GetName());
-    sDial->setGPUCachePointer(GetCachePointer(sIndex));
+    sDial->setCacheManagerName(GetName());
+    sDial->setCacheManagerValuePointer(GetCachePointer(sIndex));
 #endif
     for (int i=0; i<NP; ++i) {
         const double x = xMin + i*(xMax-xMin)/(NP-1);
@@ -548,6 +548,7 @@ bool Cache::Weight::CompactSpline::Apply() {
         );
 
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
+    // This MUST be done for slow validation.
 #warning Using SLOW VALIDATION and copying spine values
     fSplineValue->hostPtr();
 #endif

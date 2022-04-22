@@ -12,6 +12,10 @@ else()
   add_library(anaevents SHARED ${SRCFILES})
 endif()
 
+# Make sure the current directories are available for the later
+# compilation.
+target_include_directories(anaevents PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
 target_link_libraries( anaevents PUBLIC
   GundamUtils
   ${ROOT_LIBRARIES}
@@ -23,4 +27,3 @@ set_target_properties(
 
 install(TARGETS anaevents DESTINATION lib)
 
-set(MODULETargets ${MODULETargets} anaevents PARENT_SCOPE)

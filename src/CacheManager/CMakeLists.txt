@@ -1,4 +1,3 @@
-
 if( WITH_CUDA )
   set(SRCFILES
           src/CacheManager.cpp
@@ -41,7 +40,14 @@ if( WITH_CUDA )
     add_library(GundamCache SHARED ${SRCFILES})
   endif()
 
+  # Make sure the current directories are available for the later
+  # compilation.
+  target_include_directories( GundamCache PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
   target_link_libraries( GundamCache PUBLIC
+          GundamFitParameters
+          GundamFitSamples
           ${ROOT_LIBRARIES}
           )
 
@@ -50,7 +56,4 @@ if( WITH_CUDA )
 
   install(TARGETS GundamCache DESTINATION lib)
 
-  set(MODULETargets ${MODULETargets} GundamCache PARENT_SCOPE)
-
 endif()
-

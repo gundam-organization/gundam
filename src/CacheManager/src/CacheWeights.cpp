@@ -64,13 +64,21 @@ Cache::Weights::~Weights() {}
 double Cache::Weights::GetResult(int i) {
     if (i < 0) throw;
     if (GetResultCount() <= i) throw;
-    fResultsValid = true;
-    return fResults->hostPtr()[i];
+    // This odd ordering is to make sure the thread-safe hostPtr update
+    // finishes before the result is set to be valid.  The use of isfinite is
+    // to make sure that the optimizer doesn't reorder the statements.
+    double value = fResults->hostPtr()[i];
+    if (std::isfinite(value)) fResultsValid = true;
+    return value;
 }
 
 double Cache::Weights::GetResultFast(int i) {
-    fResultsValid = true;
-    return fResults->readOnlyHostPtr()[i];
+    // This odd ordering is to make sure the thread-safe hostPtr update
+    // finishes before the result is set to be valid.  The use of isfinite is
+    // to make sure that the optimizer doesn't reorder the statements.
+    double value = fResults->hostPtr()[i];
+    if (std::isfinite(value)) fResultsValid = true;
+    return value;
 }
 
 void Cache::Weights::SetResult(int i, double v) {
@@ -148,7 +156,7 @@ bool Cache::Weights::Apply() {
     // synchronization doesn't slow things down in GUNDAM.  The suspicion is
     // that it's because the CPU almost immediately uses the results, and the
     // sync prevents a small amount of mutex locking.
-    hemi::deviceSynchronize();
+    // hemi::deviceSynchronize();
 
     // A simple way to force a copy from the device.
     // fResults->hostPtr();

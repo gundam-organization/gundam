@@ -38,7 +38,6 @@ public:
   std::vector<std::vector<PhysicsEvent*>> perBinEventPtrList;
   double histScale{1};
   bool isLocked{false};
-  int cacheManagerIndex{-1};
 
   // Methods
   void reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const PhysicsEvent &eventBuffer_);
@@ -50,13 +49,28 @@ public:
 
   double getSumWeights() const;
 
-  int getCacheManagerIndex() const;
-  void setCacheManagerIndex(int i);
-  
   // debug
   void print() const;
 
   bool debugTrigger{false};
+
+#ifdef GUNDAM_USING_CUDA
+public:
+  void setCacheManagerIndex(int i) {_CacheManagerIndex_ = i;}
+  int  getCacheManagerIndex() {return _CacheManagerIndex_;}
+  void setCacheManagerValuePointer(const double* v) {_CacheManagerValue_ = v;}
+  void setCacheManagerValidPointer(const bool* v) {_CacheManagerValid_ = v;}
+  void setCacheManagerUpdatePointer(void (*p)()) {_CacheManagerUpdate_ = p;}
+private:
+  // An "opaque" index into the cache that is used to simplify bookkeeping.
+  int _CacheManagerIndex_{-1};
+  // A pointer to the cached result.
+  const double* _CacheManagerValue_{nullptr};
+  // A pointer to the cache validity flag.
+  const bool* _CacheManagerValid_{nullptr};
+  // A pointer to a callback to force the cache to be updated.
+  void (*_CacheManagerUpdate_)(){nullptr};
+#endif
 
 };
 

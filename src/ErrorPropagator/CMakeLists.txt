@@ -22,7 +22,8 @@ else()
   add_library(GundamErrorPropagator SHARED ${SRCFILES})
 endif()
 
-
+target_include_directories(GundamErrorPropagator PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 if( WITH_CUDA )
   target_link_libraries( GundamErrorPropagator
@@ -48,4 +49,3 @@ install(TARGETS GundamErrorPropagator DESTINATION lib)
 #Can uncomment this to install the headers... but is it really neccessary?
 # install(FILES ${HEADERS} DESTINATION include)
 
-set(MODULETargets ${MODULETargets} GundamErrorPropagator PARENT_SCOPE)
