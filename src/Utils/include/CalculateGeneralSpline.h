@@ -79,8 +79,13 @@ namespace {
         const double m2 = data[2+3*(ix+1)+1]*step;
 
         // Cubic spline with the points and slopes.
-        double v = (p1*(2.0*fxxx-3.0*fxx+1.0) + m1*(fxxx-2.0*fxx+fx)
-                    + p2*(3.0*fxx-2.0*fxxx) + m2*(fxxx-fxx));
+        // double v = p1*(2.0*fxxx-3.0*fxx+1.0) + m1*(fxxx-2.0*fxx+fx)
+        //         + p2*(3.0*fxx-2.0*fxxx) + m2*(fxxx-fxx));
+
+        // A more numerically stable calculation
+        const double t = 3.0*fxx-2.0*fxxx;
+        double v = p1 - p1*t + m1*(fxxx-2.0*fxx+fx)
+                    + p2*t + m2*(fxxx-fxx);
 
         if (v < lowerBound) v = lowerBound;
         if (v > upperBound) v = upperBound;

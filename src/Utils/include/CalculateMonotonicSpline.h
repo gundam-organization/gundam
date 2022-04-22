@@ -146,8 +146,13 @@ namespace {
 #endif
 
         // Cubic spline with the points and slopes.
-        double v = (p2*(2.0*fxxx-3.0*fxx+1.0) + m2*(fxxx-2.0*fxx+fx)
-                    + p3*(3.0*fxx-2.0*fxxx) + m3*(fxxx-fxx));
+        // double v = p2*(2.0*fxxx-3.0*fxx+1.0) + m2*(fxxx-2.0*fxx+fx)
+        //         + p3*(3.0*fxx-2.0*fxxx) + m3*(fxxx-fxx));
+
+        // A more numerically stable calculation
+        const double t = 3.0*fxx-2.0*fxxx;
+        double v = p2 - p2*t + m2*(fxxx-2.0*fxx+fx)
+                    + p3*t + m3*(fxxx-fxx);
 
         if (v < lowerBound) v = lowerBound;
         if (v > upperBound) v = upperBound;
