@@ -70,7 +70,7 @@ double Dial::getAssociatedParameter() const {
 
 void Dial::updateEffectiveDialParameter(){
   _effectiveDialParameterValue_ = _dialParameterCache_;
-  if( _ownerDialSet_->isGlobalUseMirrorDial() ){
+  if( _ownerDialSet_->useMirrorDial() ){
     _effectiveDialParameterValue_ = std::abs(std::fmod(
         _dialParameterCache_ - _ownerDialSet_->getMirrorLowEdge(),
         2 * _ownerDialSet_->getMirrorRange()

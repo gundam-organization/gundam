@@ -124,7 +124,7 @@ double DialSet::getMinDialResponse() const {
 double DialSet::getMaxDialResponse() const {
   return _maxDialResponse_;
 }
-bool DialSet::isGlobalUseMirrorDial() const {
+bool DialSet::useMirrorDial() const {
   return _globalUseMirrorDial_;
 }
 double DialSet::getMirrorLowEdge() const {

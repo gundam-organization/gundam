@@ -54,7 +54,7 @@ public:
 
   double getMinDialResponse() const;
   double getMaxDialResponse() const;
-  bool isGlobalUseMirrorDial() const;
+  bool useMirrorDial() const;
   double getMirrorLowEdge() const;
   double getMirrorHighEdge() const;
   double getMirrorRange() const;
