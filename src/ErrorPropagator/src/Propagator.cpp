@@ -302,7 +302,6 @@ void Propagator::updateDialResponses(){
 void Propagator::reweightSampleEvents() {
   bool usedGPU{false};
 #ifdef GUNDAM_USING_CUDA
-#define DUMP_PARAMETERS
 #ifdef DUMP_PARAMETERS
   do {
     static bool printed = false;
