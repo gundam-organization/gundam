@@ -20,6 +20,9 @@ public:
     typedef hemi::Array<double> Values;
     typedef hemi::Array<double> Clamps;
 
+    // Returns true if this is compiled with a CUDA compiler
+    static bool UsingCUDA();
+
     // This is a singleton, so the constructor is private.
     Parameters(std::size_t parameters);
 

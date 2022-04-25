@@ -43,6 +43,9 @@ public:
     /// parameter isn't defined, this will return a negative value.
     static int ParameterIndex(const FitParameter* fp);
 
+    /// Return true if a GPU is available.
+    static bool HasCUDA();
+
     /// Return the approximate allocated memory (e.g. on the GPU).
     std::size_t GetResidentMemory() const {return fTotalBytes;}
 

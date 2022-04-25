@@ -131,6 +131,10 @@ Cache::Manager::Manager(int events, int parameters,
             << std::endl;
 }
 
+bool Cache::Manager::HasCUDA() {
+    return Cache::Parameters::UsingCUDA();
+}
+
 bool Cache::Manager::Build(FitSampleSet& sampleList) {
     LogInfo << "Build the cache for Cache::Manager" << std::endl;
 
@@ -289,6 +293,10 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
     // Try to allocate the GPU
     if (!Cache::Manager::Get()
         && GlobalVariables::getEnableEventWeightCache()) {
+        if (!Cache::Manager::HasCUDA()) {
+            LogWarning("Creating Cache::Manager without a GPU");
+        }
+
         fSingleton = new Manager(events,parameters,
                                  norms,
                                  compactSplines,compactPoints,
