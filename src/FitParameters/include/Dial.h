@@ -79,7 +79,7 @@ protected:
   double _dialParameterCache_{};
   double _effectiveDialParameterValue_{}; // take into account internal transformations while using mirrored splines transformations
 
-#ifdef GUNDAM_USING_CUDA
+#ifdef GUNDAM_USING_CACHE_MANAGER
   // Debugging.  This is only meaningful when the GPU is filling the spline
   // value cache (only filled during validation).
 public:

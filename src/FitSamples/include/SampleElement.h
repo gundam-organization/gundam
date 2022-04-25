@@ -54,7 +54,7 @@ public:
 
   bool debugTrigger{false};
 
-#ifdef GUNDAM_USING_CUDA
+#ifdef GUNDAM_USING_CACHE_MANAGER
 public:
   void setCacheManagerIndex(int i) {_CacheManagerIndex_ = i;}
   int  getCacheManagerIndex() {return _CacheManagerIndex_;}

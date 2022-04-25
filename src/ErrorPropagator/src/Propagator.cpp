@@ -4,7 +4,7 @@
 
 #include "Propagator.h"
 
-#ifdef GUNDAM_USING_CUDA
+#ifdef GUNDAM_USING_CACHE_MANAGER
 #include "CacheManager.h"
 #endif
 
@@ -148,7 +148,7 @@ void Propagator::initialize() {
 //    fillDialsStack();
 //  }
 
-#ifdef GUNDAM_USING_CUDA
+#ifdef GUNDAM_USING_CACHE_MANAGER
   // After all of the data has been loaded.  Specifically, this must be after
   // the MC has been copied for the Asimov fit, or the "data" use the MC
   // reweighting cache.  This must also be before the first use of
@@ -301,7 +301,7 @@ void Propagator::updateDialResponses(){
 }
 void Propagator::reweightSampleEvents() {
   bool usedGPU{false};
-#ifdef GUNDAM_USING_CUDA
+#ifdef GUNDAM_USING_CACHE_MANAGER
 #ifdef DUMP_PARAMETERS
   do {
     static bool printed = false;

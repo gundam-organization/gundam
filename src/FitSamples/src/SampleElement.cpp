@@ -119,7 +119,7 @@ void SampleElement::refillHistogram(int iThread_){
   int iBin = iThread_;
   int nBins = int(perBinEventPtrList.size());
 
-#ifdef GUNDAM_USING_CUDA
+#ifdef GUNDAM_USING_CACHE_MANAGER
   if (_CacheManagerValue_) {
       if (_CacheManagerValid_ && !(*_CacheManagerValid_)) {
           // This is slowish, but will make sure that the cached result is

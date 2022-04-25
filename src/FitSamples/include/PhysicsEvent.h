@@ -104,7 +104,7 @@ private:
   double _fakeDataWeight_{1};
   int _sampleBinIndex_{-1};
 
-#ifdef GUNDAM_USING_CUDA
+#ifdef GUNDAM_USING_CACHE_MANAGER
 public:
   void setCacheManagerIndex(int i) {_CacheManagerIndex_ = i;}
   int  getCacheManagerIndex() {return _CacheManagerIndex_;}
