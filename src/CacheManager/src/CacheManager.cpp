@@ -292,7 +292,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
 
     // Try to allocate the GPU
     if (!Cache::Manager::Get()
-        && GlobalVariables::getEnableEventWeightCache()) {
+        && GlobalVariables::getEnableCacheManager()) {
         if (!Cache::Manager::HasCUDA()) {
             LogWarning("Creating Cache::Manager without a GPU");
         }

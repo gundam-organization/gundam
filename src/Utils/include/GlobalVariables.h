@@ -22,7 +22,7 @@ public:
   // Setters
   static void setNbThreads(int nbThreads_);
   static void setPrngSeed(ULong_t seed_);
-  static void setEnableEventWeightCache(bool enable = true);
+  static void setEnableCacheManager(bool enable = true);
 
   // Getters
   static bool isEnableDevMode();
@@ -32,7 +32,7 @@ public:
   static std::vector<TChain*>& getChainList();
   static GenericToolbox::ParallelWorker &getParallelWorker();
   static TRandom3& getPrng();
-  static bool getEnableEventWeightCache();
+  static bool getEnableCacheManager();
 
 private:
 
@@ -43,7 +43,7 @@ private:
   static std::vector<TChain*> _chainList_;
   static GenericToolbox::ParallelWorker _threadPool_;
   static TRandom3 _prng_;
-  static bool _enableEventWeightCache_;
+  static bool _enableCacheManager_;
 
 };
 
