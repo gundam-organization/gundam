@@ -54,12 +54,12 @@ private:
   // The type of spline that should be used for this dial.
   Subtype _splineType_;
 
-  struct FastSpliner{
-    double x, y, b, c, d, num;
-    double stepsize{-1};
-    int l;
-  };
-  FastSpliner fs;
+//  struct FastSpliner{
+//    double x, y, b, c, d, num;
+//    double stepsize{-1};
+//    int l;
+//  };
+//  FastSpliner fs;
 
   // A block of data to calculate the spline values.  This can be copied to
   // the Cache::Manager and lets the same spline calculation be used here and

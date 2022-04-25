@@ -31,18 +31,18 @@ void SplineDial::initialize() {
 
   // check if prior is out of bounds:
   if(
-      _ownerDialSetReference_->getAssociatedParameterReference()->getPriorValue() < _spline_.GetXmin()
-    or _ownerDialSetReference_->getAssociatedParameterReference()->getPriorValue() > _spline_.GetXmax()
+      _ownerDialSet_->getOwnerFitParameter()->getPriorValue() < _spline_.GetXmin()
+      or _ownerDialSet_->getOwnerFitParameter()->getPriorValue() > _spline_.GetXmax()
   ){
     LogError << "Prior value of parameter \""
-    << _ownerDialSetReference_->getAssociatedParameterReference()->getTitle()
-    << "\" = " << _ownerDialSetReference_->getAssociatedParameterReference()->getPriorValue()
+             << _ownerDialSet_->getOwnerFitParameter()->getTitle()
+             << "\" = " << _ownerDialSet_->getOwnerFitParameter()->getPriorValue()
     << " is out of the spline bounds: " <<  _spline_.GetXmin() << " < X < " << _spline_.GetXmax()
     << std::endl;
     throw std::logic_error("Prior is out of the spline bounds.");
   }
 
-  _effectiveDialParameterValue_ = _ownerDialSetReference_->getAssociatedParameterReference()->getPriorValue();
+  _effectiveDialParameterValue_ = _ownerDialSet_->getOwnerFitParameter()->getPriorValue();
 
   fillSplineData();
 
@@ -72,32 +72,28 @@ void SplineDial::fillResponseCache() {
   if     ( _effectiveDialParameterValue_ < _spline_.GetXmin() ) _dialResponseCache_ = _spline_.Eval(_spline_.GetXmin());
   else if( _effectiveDialParameterValue_ > _spline_.GetXmax() ) _dialResponseCache_ = _spline_.Eval(_spline_.GetXmax());
   else   {
-//    if( fs.stepsize == -1 ){
-      do {
-          if (_splineType_ == SplineDial::Uniform) {
-              _dialResponseCache_ = CalculateUniformSpline(
-                  _effectiveDialParameterValue_, -1E20, 1E20,
-                  _splineData_.data(), _splineData_.size());
-              break;
-          }
-          if (_splineType_ == SplineDial::General) {
-              _dialResponseCache_ = CalculateGeneralSpline(
-                  _effectiveDialParameterValue_, -1E20, 1E20,
-                  _splineData_.data(), _splineData_.size());
-              break;
-          }
-          if (_splineType_ == SplineDial::Monotonic) {
-              _dialResponseCache_ = CalculateMonotonicSpline(
-                  _effectiveDialParameterValue_, -1E20, 1E20,
-                  _splineData_.data(), _splineData_.size());
-              break;
-          }
-          LogThrow("Must have a spline type defined");
-      } while (false);
-//    }
-//    else{
-//      fastEval();
-//    }
+#ifdef USE_INCOMPATIBLE_SPLINES
+    _dialResponseCache_ = _spline_.Eval(_effectiveDialParameterValue_);
+#else
+    if (_splineType_ == SplineDial::Uniform) {
+        _dialResponseCache_ = CalculateUniformSpline(
+            _effectiveDialParameterValue_, -1E20, 1E20,
+            _splineData_.data(), _splineData_.size());
+    }
+    else if (_splineType_ == SplineDial::General) {
+        _dialResponseCache_ = CalculateGeneralSpline(
+            _effectiveDialParameterValue_, -1E20, 1E20,
+            _splineData_.data(), _splineData_.size());
+    }
+    else if (_splineType_ == SplineDial::Monotonic) {
+        _dialResponseCache_ = CalculateMonotonicSpline(
+            _effectiveDialParameterValue_, -1E20, 1E20,
+            _splineData_.data(), _splineData_.size());
+    }
+    else {
+        LogThrow("Must have a spline type defined");
+    }
+#endif
   }
 
   // #define SPLINE_DIAL_SLOW_VALIDATION
@@ -123,8 +119,8 @@ void SplineDial::fillResponseCache() {
   #endif
 
   // Checks
-  if(_ownerDialSetReference_->getMinDialResponse() == _ownerDialSetReference_->getMinDialResponse() and _dialResponseCache_ < _ownerDialSetReference_->getMinDialResponse() ){
-    _dialResponseCache_ = _ownerDialSetReference_->getMinDialResponse();
+  if(_ownerDialSet_->getMinDialResponse() == _ownerDialSet_->getMinDialResponse() and _dialResponseCache_ < _ownerDialSet_->getMinDialResponse() ){
+    _dialResponseCache_ = _ownerDialSet_->getMinDialResponse();
   }
 
   if( _dialResponseCache_ < 0 and _throwIfResponseIsNegative_ ){
@@ -132,25 +128,28 @@ void SplineDial::fillResponseCache() {
     LogThrow(
       "Negative spline response: dial(" << _effectiveDialParameterValue_ << ") = " << _dialResponseCache_
       << std::endl << "Dial is defined in between: [" << _spline_.GetXmin() << ", " << _spline_.GetXmax() << "]" << std::endl
-      << "Parameter: " + _ownerDialSetReference_->getAssociatedParameterReference()->getName() )
+      << "Parameter: " + _ownerDialSet_->getOwnerFitParameter()->getName() )
   }
 }
 
+#ifdef ENABLE_SPLINE_DIAL_FAST_EVAL
 void SplineDial::fastEval(){
-//Function takes a spline with equidistant knots and the number of steps
-  //between knots to evaluate the spline at some position 'pos'.
-  fs.l = int((_effectiveDialParameterValue_ - _spline_.GetXmin()) / fs.stepsize) + 1;
+    //Function takes a spline with equidistant knots and the number of steps
+    //between knots to evaluate the spline at some position 'pos'.
+    fs.l = int((_effectiveDialParameterValue_ - _spline_.GetXmin())
+               / fs.stepsize) + 1;
 
-  _spline_.GetCoeff(fs.l, fs.x, fs.y, fs.b, fs.c, fs.d);
-  fs.num = _effectiveDialParameterValue_ - fs.x;
-
-  if (fs.num < 0){
-    fs.l -= 1;
     _spline_.GetCoeff(fs.l, fs.x, fs.y, fs.b, fs.c, fs.d);
     fs.num = _effectiveDialParameterValue_ - fs.x;
-  }
-  _dialResponseCache_ = (fs.y + fs.num * fs.b + fs.num * fs.num * fs.c + fs.num * fs.num * fs.num * fs.d);
+
+    if (fs.num < 0){
+        fs.l -= 1;
+        _spline_.GetCoeff(fs.l, fs.x, fs.y, fs.b, fs.c, fs.d);
+        fs.num = _effectiveDialParameterValue_ - fs.x;
+    }
+    _dialResponseCache_ = (fs.y + fs.num * fs.b + fs.num * fs.num * fs.c + fs.num * fs.num * fs.num * fs.d);
 }
+#endif
 
 void SplineDial::copySpline(const TSpline3* splinePtr_){
   LogThrowIf(_spline_.GetXmin() != _spline_.GetXmax(), "Spline already set")
@@ -160,7 +159,7 @@ void SplineDial::copySpline(const TSpline3* splinePtr_){
 void SplineDial::createSpline(TGraph* grPtr_){
   LogThrowIf(_spline_.GetXmin() != _spline_.GetXmax(), "Spline already set")
   _spline_ = TSpline3(grPtr_->GetName(), grPtr_);
-  fs.stepsize = (_spline_.GetXmax() - _spline_.GetXmin())/((double) grPtr_->GetN());
+//  fs.stepsize = (_spline_.GetXmax() - _spline_.GetXmin())/((double) grPtr_->GetN());
 }
 
 const TSpline3* SplineDial::getSplinePtr() const {

@@ -164,8 +164,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
             }
             for (const Dial* dial
                      : event.getRawDialPtrList()) {
-                const FitParameter* fp
-                    = dial->getOwner()->getAssociatedParameterReference();
+                const FitParameter* fp = dial->getOwner()->getOwnerFitParameter();
                 usedParameters.insert(fp);
                 ++useCount[fp->getFullTitle()];
                 const SplineDial* sDial
@@ -338,8 +337,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
             for (Dial* dial
                      : event.getRawDialPtrList()) {
                 if (!dial->isReferenced()) continue;
-                const FitParameter* fp =
-                    dial->getOwner()->getAssociatedParameterReference();
+                const FitParameter* fp = dial->getOwner()->getOwnerFitParameter();
                 std::map<const FitParameter*,int>::iterator parMapIt
                     = Cache::Manager::ParameterMap.find(fp);
                 if (parMapIt == Cache::Manager::ParameterMap.end()) {
@@ -347,7 +345,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
                         = Cache::Manager::ParameterMap.size();
                 }
                 int parIndex = Cache::Manager::ParameterMap[fp];
-                if (dial->getOwner()->isGlobalUseMirrorDial()) {
+                if (dial->getOwner()->useMirrorDial()) {
                     double xLow = dial->getOwner()->getMirrorLowEdge();
                     double xHigh = xLow + dial->getOwner()->getMirrorRange();
                     Cache::Manager::Get()
