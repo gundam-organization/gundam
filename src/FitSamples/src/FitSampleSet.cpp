@@ -168,6 +168,12 @@ void FitSampleSet::copyMcEventListToDataContainer(){
     );
   }
 }
+void FitSampleSet::clearMcContainers(){
+  for( auto& sample : _fitSampleList_ ){
+    LogInfo << "Clearing event list for \"" << sample.getName() << "\"" << std::endl;
+    sample.getMcContainer().eventList.clear();
+  }
+}
 
 void FitSampleSet::updateSampleEventBinIndexes() const{
   if( _showTimeStats_ ) GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);

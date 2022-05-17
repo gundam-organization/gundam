@@ -163,12 +163,12 @@ void Propagator::initialize() {
 
     // Copies MC events in data container for both Asimov and FakeData event types
     _fitSampleSet_.copyMcEventListToDataContainer();
+    _fitSampleSet_.clearMcContainers();
   }
 
-  // Filling the (remaining) mc containers
+  // Filling the mc containers
   for( auto& dataSet : _dataSetList_ ){
     if( not dataSet.isEnabled() ) continue;
-    if( dataSet.getSelectedDataEntry() == "Asimov" ){ continue; } // already loaded
     auto& dispenser = dataSet.getMcDispenser();
     dispenser.setSampleSetPtrToLoad(&_fitSampleSet_);
     dispenser.setPlotGenPtr(&_plotGenerator_);
@@ -198,61 +198,6 @@ void Propagator::initialize() {
   // reweightMcEvents.
   Cache::Manager::Build(getFitSampleSet());
 #endif
-
-
-
-
-//  if(    _fitSampleSet_.getDataEventType() == DataEventType::Asimov
-//      or _fitSampleSet_.getDataEventType() == DataEventType::FakeData
-//      or _fitSampleSet_.getDataEventType() == DataEventType::ToyAsimov
-//      ){
-//    LogInfo << "Propagating prior weights on data Asimov/FakeData events..." << std::endl;
-//
-//    if( _throwAsimovToyParameters_ ){
-//      LogWarning << "Throwing fit parameters for Asimov data..." << std::endl;
-//      for( auto& parSet : _parameterSetsList_ ){
-//        if( not parSet.isEnabled() ) continue;
-//        if( not parSet.isEnabledThrowToyParameters() ) continue;
-//        parSet.throwFitParameters();
-//        std::cout << parSet.getSummary() << std::endl;
-//      }
-//      reweightMcEvents(); // this function reweight only MC data?
-//    }
-//
-//    double weightBuffer;
-//    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-//      sample.getDataContainer().histScale = sample.getMcContainer().histScale;
-//
-//      auto* mcEventList = &sample.getMcContainer().eventList;
-//      auto* dataEventList = &sample.getDataContainer().eventList;
-//
-//      int nEvents = int(mcEventList->size());
-//      for( int iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
-//        // Since no reweight is applied on data samples, the nominal weight should be the default one
-//        weightBuffer = (*mcEventList)[iEvent].getEventWeight();
-//
-//        if( _fitSampleSet_.getDataEventType() == DataEventType::FakeData ){
-//          weightBuffer *= (*mcEventList)[iEvent].getFakeDataWeight();
-//        }
-//
-//        (*dataEventList)[iEvent].setTreeWeight(weightBuffer);
-//        (*dataEventList)[iEvent].resetEventWeight();              // treeWeight -> eventWeight
-//        (*dataEventList)[iEvent].setNominalWeight(weightBuffer);  // also on nominal (but irrelevant for data-like samples)
-//      }
-//    }
-//
-//    // Make sure MC event are back at their nominal value:
-//    if( _throwAsimovToyParameters_ ){
-//      for( auto& parSet : _parameterSetsList_ ){
-//        if( not parSet.isEnabled() ) continue;
-//        parSet.moveFitParametersToPrior();
-//      }
-//      reweightMcEvents();
-//    }
-//
-//    // Copies MC events in data container for both Asimov and FakeData event types
-//    _fitSampleSet_.copyMcEventListToDataContainer();
-//  }
 
   LogWarning << "Sample breakdown:" << std::endl;
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){

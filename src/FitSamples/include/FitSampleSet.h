@@ -30,6 +30,7 @@ public:
 
   // Post init
   void copyMcEventListToDataContainer();
+  void clearMcContainers();
 
   // Getters
   const std::vector<FitSample> &getFitSampleList() const;

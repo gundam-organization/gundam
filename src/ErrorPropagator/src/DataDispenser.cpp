@@ -339,7 +339,6 @@ void DataDispenser::preAllocateMemory(){
       for( auto& par : parSet.getParameterList() ){
         if( not par.isEnabled() ){ continue; }
         dialSetPtr = par.findDialSet( _owner_->getName() );
-
         if( dialSetPtr != nullptr and ( not dialSetPtr->getDialList().empty() or not dialSetPtr->getDialLeafName().empty() ) ){
 
           // Filling var indexes:
@@ -398,7 +397,7 @@ void DataDispenser::readAndFill(){
 
     if( not _parameters_.nominalWeightFormulaStr.empty() ){
       threadChain->SetBranchStatus("*", true);
-      LogInfo << "Using nominal weight formula: \"" << _parameters_.nominalWeightFormulaStr << "\"" << std::endl;
+      if(iThread_ == 0) LogInfo << "Nominal weight: \"" << _parameters_.nominalWeightFormulaStr << "\"" << std::endl;
       threadNominalWeightFormula = new TTreeFormula(
           Form("NominalWeightFormula%i", iThread_),
           _parameters_.nominalWeightFormulaStr.c_str(),
