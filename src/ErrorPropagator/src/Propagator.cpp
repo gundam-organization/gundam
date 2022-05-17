@@ -141,9 +141,15 @@ void Propagator::initialize() {
 
   // First start with the data:
   bool usedMcContainer{false};
+  bool allAsimov{true};
   for( auto& dataSet : _dataSetList_ ){
     if( not dataSet.isEnabled() ) continue;
     auto& dispenser = dataSet.getSelectedDataDispenser();
+
+    if( dataSet.getSelectedDataEntry() != "Asimov" ){
+      allAsimov = false;
+      LogAlert << "NOT ASIMOV" << std::endl;
+    }
 
     LogInfo << "Reading data set: " << dataSet.getName() << std::endl;
     LogInfo << "Reading data entry: " << dataSet.getSelectedDataEntry() << std::endl;
@@ -163,17 +169,20 @@ void Propagator::initialize() {
 
     // Copies MC events in data container for both Asimov and FakeData event types
     _fitSampleSet_.copyMcEventListToDataContainer();
-    _fitSampleSet_.clearMcContainers();
+    if(not allAsimov) _fitSampleSet_.clearMcContainers();
   }
 
-  // Filling the mc containers
-  for( auto& dataSet : _dataSetList_ ){
-    if( not dataSet.isEnabled() ) continue;
-    auto& dispenser = dataSet.getMcDispenser();
-    dispenser.setSampleSetPtrToLoad(&_fitSampleSet_);
-    dispenser.setPlotGenPtr(&_plotGenerator_);
-    dispenser.setParSetPtrToLoad(&_parameterSetsList_);
-    dispenser.load();
+  if( not allAsimov ){
+    // reload everything
+    // Filling the mc containers
+    for( auto& dataSet : _dataSetList_ ){
+      if( not dataSet.isEnabled() ) continue;
+      auto& dispenser = dataSet.getMcDispenser();
+      dispenser.setSampleSetPtrToLoad(&_fitSampleSet_);
+      dispenser.setPlotGenPtr(&_plotGenerator_);
+      dispenser.setParSetPtrToLoad(&_parameterSetsList_);
+      dispenser.load();
+    }
   }
 
   LogInfo << "Propagating prior parameters on events..." << std::endl;

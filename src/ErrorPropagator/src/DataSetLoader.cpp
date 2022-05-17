@@ -51,7 +51,7 @@ void DataSetLoader::initialize() {
 
   _mcDispenser_.setOwner(this);
   _mcDispenser_.setConfig(JsonUtils::fetchValue<nlohmann::json>(_config_, "mc"));
-  _mcDispenser_.getConfigParameters().name = "asimov";
+  _mcDispenser_.getConfigParameters().name = "Asimov";
   _mcDispenser_.getConfigParameters().useMcContainer = true;
   _mcDispenser_.initialize();
 
