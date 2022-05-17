@@ -38,7 +38,7 @@ void Propagator::reset() {
   std::vector<std::string> jobNameRemoveList;
   for( const auto& jobName : GlobalVariables::getParallelWorker().getJobNameList() ){
     if(jobName == "Propagator::fillEventDialCaches"
-       or jobName == "Propagator::reweightSampleEvents"
+       or jobName == "Propagator::reweightMcEvents"
        or jobName == "Propagator::updateDialResponses"
        or jobName == "Propagator::refillSampleHistograms"
        or jobName == "Propagator::applyResponseFunctions"
@@ -135,13 +135,56 @@ void Propagator::initialize() {
     _dataSetList_.back().initialize();
   }
 
-  LogInfo << "Loading datasets..." << std::endl;
-  for( auto& dataSet : _dataSetList_ ){
-    dataSet.fetchRequestedLeaves(&_plotGenerator_);
-    dataSet.load(&_fitSampleSet_, &_parameterSetsList_);
-  } // dataSets
+  LogInfo << "Initializing propagation threads..." << std::endl;
+  initializeThreads();
+  GlobalVariables::getParallelWorker().setCpuTimeSaverIsEnabled(true);
 
-  _fitSampleSet_.loadAsimovData(); // Copies MC events in data container for both Asimov and FakeData event types
+  // First start with the data:
+  bool usedMcContainer{false};
+  for( auto& dataSet : _dataSetList_ ){
+    if( not dataSet.isEnabled() ) continue;
+    auto& dispenser = dataSet.getSelectedDataDispenser();
+
+    LogInfo << "Reading data set: " << dataSet.getName() << std::endl;
+    LogInfo << "Reading data entry: " << dataSet.getSelectedDataEntry() << std::endl;
+
+    dispenser.setSampleSetPtrToLoad(&_fitSampleSet_);
+    dispenser.setPlotGenPtr(&_plotGenerator_);
+    if( dispenser.getConfigParameters().useMcContainer ){
+      usedMcContainer = true;
+      dispenser.setParSetPtrToLoad(&_parameterSetsList_);
+    }
+    dispenser.load();
+  }
+
+  if( usedMcContainer ){
+    LogInfo << "Propagating prior parameters on events..." << std::endl;
+    this->reweightMcEvents();
+
+    // Copies MC events in data container for both Asimov and FakeData event types
+    _fitSampleSet_.copyMcEventListToDataContainer();
+  }
+
+  // Filling the (remaining) mc containers
+  for( auto& dataSet : _dataSetList_ ){
+    if( not dataSet.isEnabled() ) continue;
+    if( dataSet.getSelectedDataEntry() == "Asimov" ){ continue; } // already loaded
+    auto& dispenser = dataSet.getMcDispenser();
+    dispenser.setSampleSetPtrToLoad(&_fitSampleSet_);
+    dispenser.setPlotGenPtr(&_plotGenerator_);
+    dispenser.setParSetPtrToLoad(&_parameterSetsList_);
+    dispenser.load();
+  }
+
+  LogInfo << "Propagating prior parameters on events..." << std::endl;
+  this->reweightMcEvents();
+
+  LogInfo << "Set the current MC prior weights as nominal weight..." << std::endl;
+  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    for( auto& event : sample.getMcContainer().eventList ){
+      event.setNominalWeight(event.getEventWeight());
+    }
+  }
 
 //  if( GlobalVariables::isEnableDevMode() ){
 //    LogInfo << "Loading dials stack..." << std::endl;
@@ -152,72 +195,64 @@ void Propagator::initialize() {
   // After all of the data has been loaded.  Specifically, this must be after
   // the MC has been copied for the Asimov fit, or the "data" use the MC
   // reweighting cache.  This must also be before the first use of
-  // reweightSampleEvents.
+  // reweightMcEvents.
   Cache::Manager::Build(getFitSampleSet());
 #endif
 
-  LogInfo << "Initializing threads..." << std::endl;
-  initializeThreads();
 
-  LogInfo << "Propagating prior parameters on events..." << std::endl;
-  reweightSampleEvents();
 
-  LogInfo << "Set the current MC prior weights as nominal weight..."
-          << std::endl;
-  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    for( auto& event : sample.getMcContainer().eventList ){
-      event.setNominalWeight(event.getEventWeight());
-    }
-  }
 
-  if(   _fitSampleSet_.getDataEventType() == DataEventType::Asimov
-        or _fitSampleSet_.getDataEventType() == DataEventType::FakeData
-      ){
-    LogInfo << "Propagating prior weights on data Asimov/FakeData events..." << std::endl;
-
-    if( _throwAsimovToyParameters_ ){
-      LogWarning << "Throwing fit parameters for Asimov data..." << std::endl;
-      for( auto& parSet : _parameterSetsList_ ){
-        if( not parSet.isEnabled() ) continue;
-        if( not parSet.isEnabledThrowToyParameters() ) continue;
-        parSet.throwFitParameters();
-        std::cout << parSet.getSummary() << std::endl;
-      }
-      reweightSampleEvents();
-    }
-
-    double weightBuffer;
-    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-      sample.getDataContainer().histScale = sample.getMcContainer().histScale;
-
-      auto* mcEventList = &sample.getMcContainer().eventList;
-      auto* dataEventList = &sample.getDataContainer().eventList;
-
-      int nEvents = int(mcEventList->size());
-      for( int iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
-        // Since no reweight is applied on data samples, the nominal weight should be the default one
-        weightBuffer = (*mcEventList)[iEvent].getEventWeight();
-
-        if( _fitSampleSet_.getDataEventType() == DataEventType::FakeData ){
-          weightBuffer *= (*mcEventList)[iEvent].getFakeDataWeight();
-        }
-
-        (*dataEventList)[iEvent].setTreeWeight(weightBuffer);
-        (*dataEventList)[iEvent].resetEventWeight();              // treeWeight -> eventWeight
-        (*dataEventList)[iEvent].setNominalWeight(weightBuffer);  // also on nominal (but irrelevant for data-like samples)
-      }
-    }
-
-    // Make sure MC event are back at their nominal value:
-    if( _throwAsimovToyParameters_ ){
-      for( auto& parSet : _parameterSetsList_ ){
-        if( not parSet.isEnabled() ) continue;
-        parSet.moveFitParametersToPrior();
-      }
-      reweightSampleEvents();
-    }
-
-  }
+//  if(    _fitSampleSet_.getDataEventType() == DataEventType::Asimov
+//      or _fitSampleSet_.getDataEventType() == DataEventType::FakeData
+//      or _fitSampleSet_.getDataEventType() == DataEventType::ToyAsimov
+//      ){
+//    LogInfo << "Propagating prior weights on data Asimov/FakeData events..." << std::endl;
+//
+//    if( _throwAsimovToyParameters_ ){
+//      LogWarning << "Throwing fit parameters for Asimov data..." << std::endl;
+//      for( auto& parSet : _parameterSetsList_ ){
+//        if( not parSet.isEnabled() ) continue;
+//        if( not parSet.isEnabledThrowToyParameters() ) continue;
+//        parSet.throwFitParameters();
+//        std::cout << parSet.getSummary() << std::endl;
+//      }
+//      reweightMcEvents(); // this function reweight only MC data?
+//    }
+//
+//    double weightBuffer;
+//    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+//      sample.getDataContainer().histScale = sample.getMcContainer().histScale;
+//
+//      auto* mcEventList = &sample.getMcContainer().eventList;
+//      auto* dataEventList = &sample.getDataContainer().eventList;
+//
+//      int nEvents = int(mcEventList->size());
+//      for( int iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
+//        // Since no reweight is applied on data samples, the nominal weight should be the default one
+//        weightBuffer = (*mcEventList)[iEvent].getEventWeight();
+//
+//        if( _fitSampleSet_.getDataEventType() == DataEventType::FakeData ){
+//          weightBuffer *= (*mcEventList)[iEvent].getFakeDataWeight();
+//        }
+//
+//        (*dataEventList)[iEvent].setTreeWeight(weightBuffer);
+//        (*dataEventList)[iEvent].resetEventWeight();              // treeWeight -> eventWeight
+//        (*dataEventList)[iEvent].setNominalWeight(weightBuffer);  // also on nominal (but irrelevant for data-like samples)
+//      }
+//    }
+//
+//    // Make sure MC event are back at their nominal value:
+//    if( _throwAsimovToyParameters_ ){
+//      for( auto& parSet : _parameterSetsList_ ){
+//        if( not parSet.isEnabled() ) continue;
+//        parSet.moveFitParametersToPrior();
+//      }
+//      reweightMcEvents();
+//    }
+//
+//    // Copies MC events in data container for both Asimov and FakeData event types
+//    _fitSampleSet_.copyMcEventListToDataContainer();
+//  }
 
   LogWarning << "Sample breakdown:" << std::endl;
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
@@ -249,10 +284,14 @@ void Propagator::initialize() {
         par.setParameterValue( par.getPriorValue() );
       }
     }
+    propagateParametersOnSamples();
   }
 
   _treeWriter_.setFitSampleSetPtr(&_fitSampleSet_);
   _treeWriter_.setParSetListPtr(&_parameterSetsList_);
+
+  // Propagator needs to be fast
+  GlobalVariables::getParallelWorker().setCpuTimeSaverIsEnabled(false);
 
   _isInitialized_ = true;
 }
@@ -286,7 +325,7 @@ void Propagator::propagateParametersOnSamples(){
 
   if(not _useResponseFunctions_ or not _isRfPropagationEnabled_ ){
 //    if(GlobalVariables::isEnableDevMode()) updateDialResponses();
-    reweightSampleEvents();
+    reweightMcEvents();
     refillSampleHistograms();
   }
   else{
@@ -299,7 +338,7 @@ void Propagator::updateDialResponses(){
   GlobalVariables::getParallelWorker().runJob("Propagator::updateDialResponses");
   dialUpdate.counts++; dialUpdate.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 }
-void Propagator::reweightSampleEvents() {
+void Propagator::reweightMcEvents() {
   bool usedGPU{false};
 #ifdef GUNDAM_USING_CUDA
 #define DUMP_PARAMETERS
@@ -329,7 +368,7 @@ void Propagator::reweightSampleEvents() {
 #endif
   if( not usedGPU ){
     GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-    GlobalVariables::getParallelWorker().runJob("Propagator::reweightSampleEvents");
+    GlobalVariables::getParallelWorker().runJob("Propagator::reweightMcEvents");
   }
   weightProp.counts++;
   weightProp.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
@@ -379,10 +418,10 @@ void Propagator::fillDialsStack(){
 // Protected
 void Propagator::initializeThreads() {
 
-  std::function<void(int)> reweightSampleEventsFct = [this](int iThread){
-    this->reweightSampleEvents(iThread);
+  std::function<void(int)> reweightMcEventsFct = [this](int iThread){
+    this->reweightMcEvents(iThread);
   };
-  GlobalVariables::getParallelWorker().addJob("Propagator::reweightSampleEvents", reweightSampleEventsFct);
+  GlobalVariables::getParallelWorker().addJob("Propagator::reweightMcEvents", reweightMcEventsFct);
 
   std::function<void(int)> updateDialResponsesFct = [this](int iThread){
     this->updateDialResponses(iThread);
@@ -409,9 +448,6 @@ void Propagator::initializeThreads() {
     this->applyResponseFunctions(iThread);
   };
   GlobalVariables::getParallelWorker().addJob("Propagator::applyResponseFunctions", applyResponseFunctionsFct);
-
-  GlobalVariables::getParallelWorker().setCpuTimeSaverIsEnabled(false);
-
 }
 
 void Propagator::makeResponseFunctions(){
@@ -493,7 +529,7 @@ void Propagator::updateDialResponses(int iThread_){
 
 }
 
-void Propagator::reweightSampleEvents(int iThread_) {
+void Propagator::reweightMcEvents(int iThread_) {
   int nThreads = GlobalVariables::getNbThreads();
   if(iThread_ == -1){
     // force single thread

@@ -5,6 +5,7 @@ set(SRCFILES
         src/PlotGenerator.cpp
         src/DataSetLoader.cpp
         src/EventTreeWriter.cpp
+        src/DataDispenser.cpp
 )
 
 set(HEADERS
@@ -14,6 +15,7 @@ set(HEADERS
         include/PlotGenerator.h
         include/DataSetLoader.h
         include/EventTreeWriter.h
+        include/DataDispenser.h
 )
 
 if( USE_STATIC_LINKS STREQUAL "1" )

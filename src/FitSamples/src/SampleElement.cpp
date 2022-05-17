@@ -31,7 +31,7 @@ void SampleElement::shrinkEventList(size_t newTotalSize_){
              "Can't shrink since eventList is too small: " << GET_VAR_NAME_VALUE(newTotalSize_)
              << " > " << GET_VAR_NAME_VALUE(eventList.size()));
   LogThrowIf(not eventNbList.empty() and eventNbList.back() < (eventList.size() - newTotalSize_), "Can't shrink since eventList of the last dataSet is too small.");
-  LogDebug << "Shrinking " << eventList.size() << " to " << newTotalSize_ << "..." << std::endl;
+  LogInfo << "-> Shrinking " << eventList.size() << " to " << newTotalSize_ << "..." << std::endl;
   eventNbList.back() -= (eventList.size() - newTotalSize_);
   eventList.resize(newTotalSize_);
   eventList.shrink_to_fit();

@@ -29,7 +29,6 @@ public:
   void reset();
 
   // SETTERS
-  void setLeafNameListPtr(const std::vector<std::string> *leafNameListPtr);
   void setDataSetIndex(int dataSetIndex_);
   void setEntryIndex(Long64_t entryIndex_);
   void setTreeWeight(double treeWeight);
@@ -37,6 +36,7 @@ public:
   void setEventWeight(double eventWeight);
   void setFakeDataWeight(double fakeDataWeight);
   void setSampleBinIndex(int sampleBinIndex);
+  void setCommonLeafNameListPtr(const std::shared_ptr<std::vector<std::string>>& commonLeafNameListPtr_);
 
   // GETTERS
   int getDataSetIndex() const;
@@ -48,14 +48,14 @@ public:
   int getSampleBinIndex() const;
   std::vector<Dial *> &getRawDialPtrList();
   const std::vector<Dial *> &getRawDialPtrList() const;
-  const GenericToolbox::LeafHolder& getLeafHolder(std::string leafName_) const;
+  const GenericToolbox::LeafHolder& getLeafHolder(const std::string &leafName_) const;
   const GenericToolbox::LeafHolder& getLeafHolder(int index_) const;
   const std::vector<GenericToolbox::LeafHolder> &getLeafContentList() const;
-  const std::vector<std::string> *getCommonLeafNameListPtr() const;
+  const std::shared_ptr<std::vector<std::string>>& getCommonLeafNameListPtr() const;
 
   // CORE
   // Filling up
-  void hookToTree(TTree* tree_, bool throwIfLeafNotFound_ = true);
+  void hookToTree(TTree* tree_, bool throwIfLeafNotFound_ = true, const std::map<std::string,std::string>& leafDict_={});
   void clonePointerLeaves();
   void copyOnlyExistingLeaves(const PhysicsEvent& other_);
 
@@ -91,7 +91,7 @@ public:
 private:
 
   // TTree related members
-  const std::vector<std::string>* _commonLeafNameListPtr_{nullptr};
+  std::shared_ptr<std::vector<std::string>> _commonLeafNameListPtr_{nullptr};
   std::vector<GenericToolbox::LeafHolder> _leafContentList_;
 
 

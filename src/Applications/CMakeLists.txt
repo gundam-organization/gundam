@@ -1,6 +1,14 @@
 # Applications
 
 set( APPLICATION_LIST
+        # GUNDAM apps
+        gundamFitter
+        gundamConfigUnfolder
+        gundamPlotExtractor
+        gundamConfigCompare
+        gundamFitCompare
+
+        # Old xsllhFitter tools
         xsllhND280UpFit
         xsllhFit
         xsllhTreeConvert
@@ -11,11 +19,9 @@ set( APPLICATION_LIST
         xsllhPlot
         xsllhUnitTests
         xsllhXsecCov
-        gundamFitter
-        gundamConfigUnfolder
-        gundamPlotExtractor
-        gundamConfigCompare
-        YamlSandbox
+
+        # Others
+        Sandbox
 )
 
 foreach( app ${APPLICATION_LIST} )

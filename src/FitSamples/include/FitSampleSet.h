@@ -13,15 +13,6 @@
 #include "FitParameterSet.h"
 #include "Likelihoods.hh"
 
-ENUM_EXPANDER(
-  DataEventType, -1,
-  Unset,
-  Asimov,
-  DataFiles,
-  FakeData,
-  ToyAsimov
-)
-
 
 class FitSampleSet {
 
@@ -38,10 +29,9 @@ public:
   void initialize();
 
   // Post init
-  void loadAsimovData();
+  void copyMcEventListToDataContainer();
 
   // Getters
-  DataEventType getDataEventType() const;
   const std::vector<FitSample> &getFitSampleList() const;
   std::vector<FitSample> &getFitSampleList();
   const nlohmann::json &getConfig() const;
@@ -61,7 +51,6 @@ private:
   bool _isInitialized_{false};
   bool _showTimeStats_{false};
   nlohmann::json _config_;
-  DataEventType _dataEventType_{DataEventType::Unset};
 
   std::vector<FitSample> _fitSampleList_;
 

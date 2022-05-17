@@ -51,7 +51,7 @@ public:
   // Core
   void propagateParametersOnSamples();
   void updateDialResponses();
-  void reweightSampleEvents();
+  void reweightMcEvents();
   void refillSampleHistograms();
   void applyResponseFunctions();
 
@@ -71,7 +71,7 @@ protected:
 
   // multi-threaded
   void updateDialResponses(int iThread_);
-  void reweightSampleEvents(int iThread_);
+  void reweightMcEvents(int iThread_);
   void applyResponseFunctions(int iThread_);
 
 private:

@@ -33,9 +33,10 @@ class Dial {
 protected:
   // Not supposed to define a bare Dial. Use the downcast instead
   explicit Dial(DialType::DialType dialType_);
-  virtual ~Dial();
 
 public:
+  virtual ~Dial();
+
   virtual void reset();
 
   void setApplyConditionBin(const DataBin &applyConditionBin);

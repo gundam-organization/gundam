@@ -29,7 +29,6 @@ void FitSampleSet::reset() {
 
   _likelihoodFunctionPtr_ = nullptr;
   _fitSampleList_.clear();
-  _dataEventType_ = DataEventType::Unset;
 
   _eventByEventDialLeafList_.clear();
 }
@@ -53,10 +52,10 @@ void FitSampleSet::initialize() {
 
   LogAssert(not _config_.empty(), "_config_ is not set." << std::endl);
 
-  _dataEventType_ = DataEventTypeEnumNamespace::toEnum(
-    JsonUtils::fetchValue<std::string>(_config_, "dataEventType"), true
-    );
-  LogInfo << "Data events type is set to: " << DataEventTypeEnumNamespace::toString(_dataEventType_) << std::endl;
+//  _dataEventType_ = DataEventTypeEnumNamespace::toEnum(
+//    JsonUtils::fetchValue<std::string>(_config_, "dataEventType"), true
+//    );
+//  LogInfo << "Data events type is set to: " << DataEventTypeEnumNamespace::toString(_dataEventType_) << std::endl;
 
   LogInfo << "Reading samples definition..." << std::endl;
   auto fitSampleListConfig = JsonUtils::fetchValue(_config_, "fitSampleList", nlohmann::json());
@@ -125,9 +124,6 @@ void FitSampleSet::initialize() {
   _isInitialized_ = true;
 }
 
-DataEventType FitSampleSet::getDataEventType() const {
-  return _dataEventType_;
-}
 const std::vector<FitSample> &FitSampleSet::getFitSampleList() const {
   return _fitSampleList_;
 }
@@ -162,13 +158,14 @@ double FitSampleSet::evalLikelihood(const FitSample& sample_) const{
   return sampleLlh;
 }
 
-void FitSampleSet::loadAsimovData(){
-  if( _dataEventType_ == DataEventType::Asimov || _dataEventType_ == DataEventType::FakeData ){
-    LogWarning << "Asimov or FakeData data type selected: copying MC events..." << std::endl;
-    for( auto& sample : _fitSampleList_ ){
-      LogInfo << "Copying MC events in sample \"" << sample.getName() << "\"" << std::endl;
-      sample.getDataContainer().eventList = sample.getMcContainer().eventList;
-    }
+void FitSampleSet::copyMcEventListToDataContainer(){
+  for( auto& sample : _fitSampleList_ ){
+    LogInfo << "Copying MC events in sample \"" << sample.getName() << "\"" << std::endl;
+    sample.getDataContainer().eventList.insert(
+        std::end(sample.getDataContainer().eventList),
+        std::begin(sample.getMcContainer().eventList),
+        std::end(sample.getMcContainer().eventList)
+    );
   }
 }
 

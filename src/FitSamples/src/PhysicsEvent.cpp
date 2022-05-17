@@ -31,8 +31,8 @@ void PhysicsEvent::reset() {
   _sampleBinIndex_ = -1;
 }
 
-void PhysicsEvent::setLeafNameListPtr(const std::vector<std::string> *leafNameListPtr) {
-  _commonLeafNameListPtr_ = leafNameListPtr;
+void PhysicsEvent::setCommonLeafNameListPtr(const std::shared_ptr<std::vector<std::string>>& commonLeafNameListPtr_){
+  _commonLeafNameListPtr_ = commonLeafNameListPtr_;
   _leafContentList_.resize(_commonLeafNameListPtr_->size());
 }
 void PhysicsEvent::setDataSetIndex(int dataSetIndex_) {
@@ -134,7 +134,7 @@ double PhysicsEvent::getFakeDataWeight() const {
 int PhysicsEvent::getSampleBinIndex() const {
   return _sampleBinIndex_;
 }
-const GenericToolbox::LeafHolder& PhysicsEvent::getLeafHolder(std::string leafName_) const{
+const GenericToolbox::LeafHolder& PhysicsEvent::getLeafHolder(const std::string &leafName_) const{
   int index = this->findVarIndex(leafName_, true);
   return this->getLeafHolder(index);
 }
@@ -151,22 +151,31 @@ const std::vector<Dial *> &PhysicsEvent::getRawDialPtrList() const{
   return _rawDialPtrList_;
 }
 
-void PhysicsEvent::hookToTree(TTree* tree_, bool throwIfLeafNotFound_){
+void PhysicsEvent::hookToTree(TTree* tree_, bool throwIfLeafNotFound_, const std::map<std::string,std::string>& leafDict_){
   LogThrowIf(_commonLeafNameListPtr_ == nullptr, "_commonLeafNameListPtr_ is not set.");
 
   _leafContentList_.clear();
+  std::string strBuf;
 
   if(throwIfLeafNotFound_){
     _leafContentList_.resize(_commonLeafNameListPtr_->size());
     for( size_t iLeaf = 0 ; iLeaf < _commonLeafNameListPtr_->size() ; iLeaf++ ){
-      _leafContentList_.at(iLeaf).hookToTree(tree_, _commonLeafNameListPtr_->at(iLeaf));
+      strBuf = _commonLeafNameListPtr_->at(iLeaf);
+      if( GenericToolbox::doesKeyIsInMap(strBuf, leafDict_)){
+        strBuf = leafDict_.at(_commonLeafNameListPtr_->at(iLeaf));
+      }
+      _leafContentList_.at(iLeaf).hookToTree(tree_, strBuf);
     }
   }
   else{
     GenericToolbox::LeafHolder buf;
     for( size_t iLeaf = 0 ; iLeaf < _commonLeafNameListPtr_->size() ; iLeaf++ ){
+      strBuf = _commonLeafNameListPtr_->at(iLeaf);
+      if( GenericToolbox::doesKeyIsInMap(strBuf, leafDict_)){
+        strBuf = leafDict_.at(_commonLeafNameListPtr_->at(iLeaf));
+      }
       try{
-        buf.hookToTree(tree_, _commonLeafNameListPtr_->at(iLeaf));
+        buf.hookToTree(tree_, strBuf);
       }
       catch (...) {
         LogWarning << this->getSummary() << std::endl;
@@ -365,7 +374,8 @@ std::string PhysicsEvent::getSummary() const {
     ss << std::endl << "List of dials: ";
     for( auto* dialPtr : _rawDialPtrList_ ){
       ss << std::endl << "- ";
-      ss << dialPtr->getSummary() << " = " << dialPtr->getDialResponseCache();
+      if( dialPtr != nullptr ) ss << dialPtr->getSummary() << " = " << dialPtr->getDialResponseCache();
+      else ss << "nullptr";
     }
   }
   else{
@@ -489,6 +499,6 @@ std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p ){
   return o;
 }
 
-const std::vector<std::string> *PhysicsEvent::getCommonLeafNameListPtr() const {
+const std::shared_ptr<std::vector<std::string>>& PhysicsEvent::getCommonLeafNameListPtr() const {
   return _commonLeafNameListPtr_;
 }

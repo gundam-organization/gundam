@@ -7,7 +7,7 @@ the T2K computing group, i.e. you can access the SPS storage: `ls /sps/t2k/`.
 
 ## Environment Setup
 
-The following bash commands can be set in a single bash file you can load
+The following bash commands can be set in a single bash file you can readAndFill
 each time you login.
 
 Let's first make sure we have a not-too-old compiler. Here an example with 
