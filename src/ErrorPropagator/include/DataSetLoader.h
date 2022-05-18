@@ -35,9 +35,11 @@ public:
   int getDataSetIndex() const;
 
   const std::string &getSelectedDataEntry() const;
+  const std::string &getToyDataEntry() const;
 
   DataDispenser &getMcDispenser();
   DataDispenser &getSelectedDataDispenser();
+  DataDispenser &getToyDataDispenser();
   std::map<std::string, DataDispenser> &getDataDispenserDict();
 
 private:
@@ -48,7 +50,8 @@ private:
   bool _isEnabled_{false};
   int _dataSetIndex_{-1};
   std::string _name_;
-  std::string _selectedDataEntry_;
+  std::string _selectedDataEntry_{"Asimov"};
+  std::string _selectedToyEntry_{"Asimov"};
 
   DataDispenser _mcDispenser_;
   std::map<std::string, DataDispenser> _dataDispenserDict_;

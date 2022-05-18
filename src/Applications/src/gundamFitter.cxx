@@ -87,7 +87,9 @@ int main(int argc, char** argv){
   std::string outFileName = configFilePath;
   if( isToyFit ){
     outFileName += "_toyFit";
-    if( iToyFit != -1 ){ outFileName += "_" + std::to_string(iToyFit); }
+    if( iToyFit != -1 ){
+      outFileName += "_" + std::to_string(iToyFit);
+    }
   }
   outFileName = clParser.getOptionVal("outputFile", outFileName + ".root");
   LogWarning << "Creating output file: \"" << outFileName << "\"..." << std::endl;
@@ -122,7 +124,10 @@ int main(int argc, char** argv){
   fitter.setNbScanSteps(nbScanSteps);
   fitter.setEnablePostFitScan(enableParameterScan);
 
-  if( isToyFit ){ fitter.getPropagator().setThrowAsimovToyParameters(true); }
+  if( isToyFit ){
+    fitter.getPropagator().setThrowAsimovToyParameters(true);
+    fitter.getPropagator().setIThrow(iToyFit);
+  }
 
   fitter.initialize();
 

@@ -26,6 +26,7 @@ struct DataDispenserParameters{
   std::vector<std::string> filePathList{};
   std::map<std::string, std::string> overrideLeafDict{};
   std::vector<std::string> additionalLeavesStorage{};
+  int iThrow{-1};
 };
 struct DataDispenserCache{
   std::vector<FitSample*> samplesToFillList{};

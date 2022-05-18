@@ -5,20 +5,23 @@
 #ifndef GUNDAM_PHYSICSEVENT_H
 #define GUNDAM_PHYSICSEVENT_H
 
-#include <GenericToolbox.RawDataArray.h>
-#include "vector"
-#include "string"
-#include "map"
-#include "TTree.h"
-#include "TFormula.h"
 
-#include "GenericToolbox.Root.LeafHolder.h"
 
+#include "TreeEventBuffer.h"
 #include "AnaEvent.hh"
 #include "FitParameterSet.h"
 #include "Dial.h"
 #include "NestedDialTest.h"
 
+#include <GenericToolbox.RawDataArray.h>
+#include "GenericToolbox.AnyType.h"
+
+#include "TTree.h"
+#include "TFormula.h"
+
+#include "vector"
+#include "string"
+#include "map"
 
 class PhysicsEvent {
 
@@ -48,14 +51,16 @@ public:
   int getSampleBinIndex() const;
   std::vector<Dial *> &getRawDialPtrList();
   const std::vector<Dial *> &getRawDialPtrList() const;
-  const GenericToolbox::LeafHolder& getLeafHolder(const std::string &leafName_) const;
-  const GenericToolbox::LeafHolder& getLeafHolder(int index_) const;
-  const std::vector<GenericToolbox::LeafHolder> &getLeafContentList() const;
+  const std::vector<GenericToolbox::AnyType>& getLeafHolder(const std::string &leafName_) const;
+  const std::vector<GenericToolbox::AnyType>& getLeafHolder(int index_) const;
+  const std::vector<std::vector<GenericToolbox::AnyType>> &getLeafContentList() const;
   const std::shared_ptr<std::vector<std::string>>& getCommonLeafNameListPtr() const;
+
+  std::vector<std::vector<GenericToolbox::AnyType>> &getLeafContentList();
 
   // CORE
   // Filling up
-  void hookToTree(TTree* tree_, bool throwIfLeafNotFound_ = true, const std::map<std::string,std::string>& leafDict_={});
+//  void hookToTree(TTree* tree_, bool throwIfLeafNotFound_ = true, const std::map<std::string,std::string>& leafDict_={});
   void clonePointerLeaves();
   void copyOnlyExistingLeaves(const PhysicsEvent& other_);
 
@@ -83,7 +88,10 @@ public:
   void trimDialCache();
   void addDialRefToCache(Dial* dialPtr_);
   void addNestedDialRefToCache(NestedDialTest* nestedDialPtr_, const std::vector<Dial*>& dialPtrList_ = std::vector<Dial*>{});
-  std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const GenericToolbox::LeafHolder&)>> generateLeavesDictionary(bool disableArrays_ = false) const;
+  std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>> generateLeavesDictionary(bool disableArrays_ = false) const;
+
+  void copyData(const std::vector<std::pair<const std::vector<GenericToolbox::AnyType>*, int>>& dict_);
+  std::vector<std::pair<const std::vector<GenericToolbox::AnyType>*, int>> generateDict(const TreeEventBuffer& h_, const std::map<std::string, std::string>& leafDict_={});
 
   // Stream operator
   friend std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p );
@@ -92,8 +100,7 @@ private:
 
   // TTree related members
   std::shared_ptr<std::vector<std::string>> _commonLeafNameListPtr_{nullptr};
-  std::vector<GenericToolbox::LeafHolder> _leafContentList_;
-
+  std::vector<std::vector<GenericToolbox::AnyType>> _leafContentList_;
 
   // Extra variables
   int _dataSetIndex_{-1};
@@ -132,11 +139,11 @@ private:
 // TEMPLATES IMPLEMENTATION
 template<typename T> auto PhysicsEvent::getVarValue(const std::string &leafName_, size_t arrayIndex_) const -> T {
   int index = this->findVarIndex(leafName_, true);
-  return _leafContentList_.at(index).template getVariable<T>(arrayIndex_);
+  return _leafContentList_[index][arrayIndex_].template getValue<T>();
 }
 template<typename T> auto PhysicsEvent::getVariable(const std::string& leafName_, size_t arrayIndex_) -> T&{
   int index = this->findVarIndex(leafName_, true);
-  return _leafContentList_.at(index).template getVariable<T>(arrayIndex_);
+  return _leafContentList_[index][arrayIndex_].template getValue<T>();
 }
 
 

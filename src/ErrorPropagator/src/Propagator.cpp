@@ -70,6 +70,9 @@ void Propagator::setSaveDir(TDirectory *saveDir) {
 void Propagator::setThrowAsimovToyParameters(bool throwAsimovToyParameters) {
   _throwAsimovToyParameters_ = throwAsimovToyParameters;
 }
+void Propagator::setIThrow(int iThrow) {
+  _iThrow_ = iThrow;
+}
 
 void Propagator::initialize() {
   LogWarning << __METHOD_NAME__ << std::endl;
@@ -144,15 +147,14 @@ void Propagator::initialize() {
   bool allAsimov{true};
   for( auto& dataSet : _dataSetList_ ){
     if( not dataSet.isEnabled() ) continue;
-    auto& dispenser = dataSet.getSelectedDataDispenser();
-
-    if( dataSet.getSelectedDataEntry() != "Asimov" ){
-      allAsimov = false;
-      LogAlert << "NOT ASIMOV" << std::endl;
+    DataDispenser& dispenser = dataSet.getSelectedDataDispenser();
+    if( _throwAsimovToyParameters_ ) {
+      dispenser = dataSet.getToyDataDispenser();
+      dispenser.getConfigParameters().iThrow = _iThrow_;
     }
 
-    LogInfo << "Reading data set: " << dataSet.getName() << std::endl;
-    LogInfo << "Reading data entry: " << dataSet.getSelectedDataEntry() << std::endl;
+    if( dispenser.getConfigParameters().name != "Asimov" ){ allAsimov = false; }
+    LogInfo << "Reading data set: " << dataSet.getName() << "/" << dispenser.getConfigParameters().name << std::endl;
 
     dispenser.setSampleSetPtrToLoad(&_fitSampleSet_);
     dispenser.setPlotGenPtr(&_plotGenerator_);
@@ -164,17 +166,25 @@ void Propagator::initialize() {
   }
 
   if( usedMcContainer ){
+    if( _throwAsimovToyParameters_ ){
+      for( auto& parSet : _parameterSetsList_ ){
+        if( parSet.isEnabledThrowToyParameters() and parSet.getPriorCovarianceMatrix() != nullptr ){
+          parSet.throwFitParameters();
+        }
+      }
+    }
+
     LogInfo << "Propagating prior parameters on events..." << std::endl;
     this->reweightMcEvents();
 
     // Copies MC events in data container for both Asimov and FakeData event types
     _fitSampleSet_.copyMcEventListToDataContainer();
-    if(not allAsimov) _fitSampleSet_.clearMcContainers();
   }
 
   if( not allAsimov ){
     // reload everything
     // Filling the mc containers
+    _fitSampleSet_.clearMcContainers();
     for( auto& dataSet : _dataSetList_ ){
       if( not dataSet.isEnabled() ) continue;
       auto& dispenser = dataSet.getMcDispenser();

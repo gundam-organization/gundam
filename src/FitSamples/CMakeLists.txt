@@ -5,6 +5,7 @@ set( SRCFILES
         src/FitSampleSet.cpp
         src/FitSample.cpp
         src/PhysicsEvent.cpp
+        src/TreeEventBuffer.cpp
         )
 
 if( USE_STATIC_LINKS STREQUAL "1" )

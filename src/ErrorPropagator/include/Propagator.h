@@ -36,6 +36,8 @@ public:
   void setShowTimeStats(bool showTimeStats);
   void setThrowAsimovToyParameters(bool throwAsimovToyParameters);
 
+  void setIThrow(int iThrow);
+
   // Init
   void initialize();
 
@@ -82,6 +84,7 @@ private:
 
   // Internals
   bool _throwAsimovToyParameters_{false};
+  int _iThrow_{-1};
   bool _isInitialized_{false};
   bool _useResponseFunctions_{false};
   bool _isRfPropagationEnabled_{false};

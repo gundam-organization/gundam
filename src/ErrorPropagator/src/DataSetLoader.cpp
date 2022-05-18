@@ -46,6 +46,7 @@ void DataSetLoader::initialize() {
 
   _name_ = JsonUtils::fetchValue<std::string>(_config_, "name");
   _selectedDataEntry_ = JsonUtils::fetchValue<std::string>(_config_, "selectedDataEntry", "Asimov");
+  _selectedToyEntry_ = JsonUtils::fetchValue<std::string>(_config_, "selectedToyEntry", "Asimov");
   _isEnabled_ = JsonUtils::fetchValue(_config_, "isEnabled", true);
   if( not _isEnabled_ ){ LogWarning << "\"" << _name_ << "\" is disabled." << std::endl; return; }
 
@@ -97,10 +98,16 @@ DataDispenser &DataSetLoader::getMcDispenser() {
 DataDispenser &DataSetLoader::getSelectedDataDispenser(){
   return _dataDispenserDict_[_selectedDataEntry_];
 }
+DataDispenser &DataSetLoader::getToyDataDispenser(){
+  return _dataDispenserDict_[_selectedToyEntry_];
+}
 std::map<std::string, DataDispenser> &DataSetLoader::getDataDispenserDict() {
   return _dataDispenserDict_;
 }
 
 const std::string &DataSetLoader::getSelectedDataEntry() const {
   return _selectedDataEntry_;
+}
+const std::string &DataSetLoader::getToyDataEntry() const {
+  return _selectedToyEntry_;
 }
