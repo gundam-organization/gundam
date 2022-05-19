@@ -47,9 +47,8 @@ void DataDispenser::readConfig(){
   if( JsonUtils::doKeyExist(_config_, "overrideLeafDict") ){
     _parameters_.overrideLeafDict.clear();
     for( auto& entry : JsonUtils::fetchValue<nlohmann::json>(_config_, "overrideLeafDict") ){
-      _parameters_.overrideLeafDict[entry["var"]] = entry["toyVar"];
+      _parameters_.overrideLeafDict[entry["eventVar"]] = entry["leafVar"];
     }
-    LogDebug << GenericToolbox::parseMapAsString(_parameters_.overrideLeafDict) << std::endl;
   }
 
 }
@@ -172,19 +171,20 @@ void DataDispenser::buildSampleToFillList(){
           << std::endl;
 }
 void DataDispenser::doEventSelection(){
+  LogWarning << "Performing event selection..." << std::endl;
   TChain* chainPtr{nullptr};
 
-  LogDebug << "Opening files..." << std::endl;
+  LogInfo << "Opening files..." << std::endl;
   chainPtr = this->generateChain();
   LogThrowIf(chainPtr == nullptr, "Can't open TChain.");
   LogThrowIf(chainPtr->GetEntries() == 0, "TChain is empty.");
 
-  LogDebug << "Defining selection formulas..." << std::endl;
+  LogInfo << "Defining selection formulas..." << std::endl;
   TTreeFormulaManager formulaManager; // TTreeFormulaManager handles the notification of multiple TTreeFormula for one TTChain
   std::vector<TTreeFormula*> sampleCutFormulaList;
   chainPtr->SetBranchStatus("*", true); // enabling every branch to define formula
   for( auto& sample : _cache_.samplesToFillList ){
-    LogDebug << "  Sample \"" << sample->getName() << "\": \"" << sample->getSelectionCutsStr() << "\"" << std::endl;
+    LogInfo << "-> Sample \"" << sample->getName() << "\": \"" << sample->getSelectionCutsStr() << "\"" << std::endl;
     sampleCutFormulaList.emplace_back(
         new TTreeFormula(
             sample->getName().c_str(),
@@ -200,15 +200,15 @@ void DataDispenser::doEventSelection(){
   }
   chainPtr->SetNotify(&formulaManager);
 
-  LogDebug << "Enabling required branches..." << std::endl;
+  LogInfo << "Enabling required branches..." << std::endl;
   chainPtr->SetBranchStatus("*", false);
   for( auto* sampleFormula : sampleCutFormulaList ){
     for( int iLeaf = 0 ; iLeaf < sampleFormula->GetNcodes() ; iLeaf++ ){
-      chainPtr->SetBranchStatus(sampleFormula->GetLeaf(iLeaf)->GetName(), true);
+      sampleFormula->GetLeaf(iLeaf)->GetBranch()->SetStatus(true);
     }
   }
 
-  LogDebug << "Performing event selection..." << std::endl;
+  LogInfo << "Performing event selection..." << std::endl;
   GenericToolbox::VariableMonitor readSpeed("bytes");
   Long64_t nEvents = chainPtr->GetEntries();
   // for each event, which sample is active?
@@ -239,7 +239,7 @@ void DataDispenser::doEventSelection(){
   chainPtr->SetNotify(nullptr);
   delete chainPtr;
 
-  LogDebug << "Counting requested event slots for each samples..." << std::endl;
+  LogInfo << "Counting requested event slots for each samples..." << std::endl;
   _cache_.sampleNbOfEvents.resize(_cache_.samplesToFillList.size(), 0);
   for( size_t iEvent = 0 ; iEvent < _cache_.eventIsInSamplesList.size() ; iEvent++ ){
     for(size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
@@ -343,17 +343,17 @@ void DataDispenser::preAllocateMemory(){
   tBuf.setLeafNameList(leafVar);
   tBuf.hookToTree(chainPtr);
 
-  PhysicsEvent eventTemplate;
-  eventTemplate.setDataSetIndex(_owner_->getDataSetIndex());
-  eventTemplate.setCommonLeafNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.leavesRequestedForStorage));
-  auto copyDict = eventTemplate.generateDict(tBuf, _parameters_.overrideLeafDict);
-  eventTemplate.copyData(copyDict);
+  PhysicsEvent eventPlaceholder;
+  eventPlaceholder.setDataSetIndex(_owner_->getDataSetIndex());
+  eventPlaceholder.setCommonLeafNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.leavesRequestedForStorage));
+  auto copyDict = eventPlaceholder.generateDict(tBuf, _parameters_.overrideLeafDict);
+  eventPlaceholder.copyData(copyDict);
   if( _parSetListPtrToLoad_ != nullptr ){
     size_t dialCacheSize = 0;
     for( auto& parSet : *_parSetListPtrToLoad_ ){
       parSet.isUseOnlyOneParameterPerEvent() ? dialCacheSize++: dialCacheSize += parSet.getNbParameters();
     }
-    eventTemplate.getRawDialPtrList().resize(dialCacheSize);
+    eventPlaceholder.getRawDialPtrList().resize(dialCacheSize);
   }
 
   _cache_.sampleIndexOffsetList.resize(_cache_.samplesToFillList.size());
@@ -364,7 +364,7 @@ void DataDispenser::preAllocateMemory(){
 
     _cache_.sampleEventListPtrToFill[iSample] = &container->eventList;
     _cache_.sampleIndexOffsetList[iSample] = _cache_.sampleEventListPtrToFill[iSample]->size();
-    container->reserveEventMemory(_owner_->getDataSetIndex(), _cache_.sampleNbOfEvents[iSample], eventTemplate);
+    container->reserveEventMemory(_owner_->getDataSetIndex(), _cache_.sampleNbOfEvents[iSample], eventPlaceholder);
   }
 
   // DIALS
@@ -446,7 +446,7 @@ void DataDispenser::readAndFill(){
       threadChain->SetBranchStatus("*", false);
       // Enabling needed branches for evaluating formulas
       for( int iLeaf = 0 ; iLeaf < threadNominalWeightFormula->GetNcodes() ; iLeaf++ ){
-        threadChain->SetBranchStatus(threadNominalWeightFormula->GetLeaf(iLeaf)->GetName(), true);
+        threadNominalWeightFormula->GetLeaf(iLeaf)->GetBranch()->SetStatus(true);
       }
     }
 

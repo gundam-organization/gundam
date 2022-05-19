@@ -515,11 +515,12 @@ std::vector<std::pair<const std::vector<GenericToolbox::AnyType>*, int>> Physics
     strBuf = leafName;
     if( GenericToolbox::doesKeyIsInMap(leafName, leafDict_) ){
       std::vector<std::string> argBuf;
+      strBuf = leafDict_.at(leafName);
       strBuf = GenericToolbox::stripBracket(strBuf, '[', ']', false, &argBuf);
       if     ( argBuf.size() == 1 ){ out.back().second = std::stoi(argBuf[0]); }
       else if( argBuf.size() > 1 ){ LogThrow("No support for multi-dim array."); }
     }
-    out.back().first = &h_.getLeafContent(leafName).getLeafDataList();
+    out.back().first = &h_.getLeafContent(strBuf).getLeafDataList();
   }
   return out;
 }

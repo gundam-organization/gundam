@@ -13,7 +13,11 @@ void TreeEventBuffer::hookToTree(TTree* tree_){
   _leafContentList_.resize(_leafNameList_.size());
   int iLeaf{0};
   for( auto& leafName : _leafNameList_ ){
-    tree_->SetBranchStatus(leafName.c_str(), true);
+    TLeaf* l = tree_->GetLeaf(leafName.c_str());
+    if(l==nullptr) throw std::logic_error("Could not find leaf: " + leafName);
+    std::cout << "HOOK: " << leafName << std::endl;
+    l->GetBranch()->SetStatus(true);
+//    tree_->SetBranchStatus(tree_->GetLeaf(leafName.c_str())->GetBranch()->GetName(), true);
     _leafContentList_[iLeaf++].hookToTree(tree_, leafName);
   }
 }
