@@ -3,9 +3,9 @@ cmake_minimum_required (VERSION 3.12 FATAL_ERROR)
 # Configure CMake project
 project(gundam)
 set (gundam_VERSION_MAJOR 1)
-set (gundam_VERSION_MINOR 3)
-set (gundam_VERSION_REVISION 5)
-set (gundam_VERSION_TAG "f") # f means forward -> include commits after a given release
+set (gundam_VERSION_MINOR 4)
+set (gundam_VERSION_REVISION 0)
+set (gundam_VERSION_TAG "") # f means forward -> include commits after a given release
 set (gundam_VERSION_STRING "${gundam_VERSION_MAJOR}.${gundam_VERSION_MINOR}.${gundam_VERSION_REVISION}${gundam_VERSION_TAG}")
 
 option(CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ langauge (-std=gnu++14)." OFF)
@@ -316,6 +316,7 @@ set( MODULES
         DialDirectory
         FitParameters
         FitSamples
+        DatasetManager
         ErrorPropagator
         Fitter
 )

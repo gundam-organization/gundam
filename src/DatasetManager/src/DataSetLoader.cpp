@@ -2,7 +2,7 @@
 // Created by Nadrino on 22/07/2021.
 //
 
-#include "DataSetLoader.h"
+#include "DatasetLoader.h"
 
 #include "DialSet.h"
 #include "GlobalVariables.h"
@@ -22,25 +22,25 @@ LoggerInit([](){
   Logger::setUserHeaderStr("[DataSetLoader]");
 })
 
-DataSetLoader::DataSetLoader() { this->reset(); }
-DataSetLoader::~DataSetLoader(){ this->reset(); }
+DatasetLoader::DatasetLoader() { this->reset(); }
+DatasetLoader::~DatasetLoader(){ this->reset(); }
 
-void DataSetLoader::reset() {
+void DatasetLoader::reset() {
   _isInitialized_ = false;
   _config_.clear();
   _isEnabled_ = false;
   _name_ = "";
 }
 
-void DataSetLoader::setConfig(const nlohmann::json &config_) {
+void DatasetLoader::setConfig(const nlohmann::json &config_) {
   _config_ = config_;
   JsonUtils::forwardConfig(_config_, __CLASS_NAME__);
 }
-void DataSetLoader::setDataSetIndex(int dataSetIndex) {
+void DatasetLoader::setDataSetIndex(int dataSetIndex) {
   _dataSetIndex_ = dataSetIndex;
 }
 
-void DataSetLoader::initialize() {
+void DatasetLoader::initialize() {
   LogWarning << "Initializing data set loader..." << std::endl;
   LogThrowIf(_config_.empty(), "Config not set.");
 
@@ -82,32 +82,32 @@ void DataSetLoader::initialize() {
   _isInitialized_ = true;
 }
 
-bool DataSetLoader::isEnabled() const {
+bool DatasetLoader::isEnabled() const {
   return _isEnabled_;
 }
-const std::string &DataSetLoader::getName() const {
+const std::string &DatasetLoader::getName() const {
   return _name_;
 }
-int DataSetLoader::getDataSetIndex() const {
+int DatasetLoader::getDataSetIndex() const {
   return _dataSetIndex_;
 }
 
-DataDispenser &DataSetLoader::getMcDispenser() {
+DataDispenser &DatasetLoader::getMcDispenser() {
   return _mcDispenser_;
 }
-DataDispenser &DataSetLoader::getSelectedDataDispenser(){
+DataDispenser &DatasetLoader::getSelectedDataDispenser(){
   return _dataDispenserDict_[_selectedDataEntry_];
 }
-DataDispenser &DataSetLoader::getToyDataDispenser(){
+DataDispenser &DatasetLoader::getToyDataDispenser(){
   return _dataDispenserDict_[_selectedToyEntry_];
 }
-std::map<std::string, DataDispenser> &DataSetLoader::getDataDispenserDict() {
+std::map<std::string, DataDispenser> &DatasetLoader::getDataDispenserDict() {
   return _dataDispenserDict_;
 }
 
-const std::string &DataSetLoader::getSelectedDataEntry() const {
+const std::string &DatasetLoader::getSelectedDataEntry() const {
   return _selectedDataEntry_;
 }
-const std::string &DataSetLoader::getToyDataEntry() const {
+const std::string &DatasetLoader::getToyDataEntry() const {
   return _selectedToyEntry_;
 }

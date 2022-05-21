@@ -15,7 +15,7 @@
 #include "vector"
 #include "map"
 
-class DataSetLoader;
+class DatasetLoader;
 
 struct DataDispenserParameters{
   bool useMcContainer{false}; // define the container to fill -> could get rid of it?
@@ -57,7 +57,7 @@ public:
   virtual ~DataDispenser();
 
   void setConfig(const nlohmann::json &config);
-  void setOwner(DataSetLoader* owner_);
+  void setOwner(DatasetLoader* owner_);
 
   void readConfig();
   void initialize();
@@ -86,7 +86,7 @@ protected:
 
 private:
   // Args
-  DataSetLoader* _owner_{nullptr};
+  DatasetLoader* _owner_{nullptr};
   nlohmann::json _config_{};
 
   // To be loaded

@@ -17,11 +17,11 @@
 #include "string"
 
 
-class DataSetLoader {
+class DatasetLoader {
 
 public:
-  DataSetLoader();
-  virtual ~DataSetLoader();
+  DatasetLoader();
+  virtual ~DatasetLoader();
 
   void reset();
 

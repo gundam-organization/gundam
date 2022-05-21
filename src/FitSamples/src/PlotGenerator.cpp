@@ -2,21 +2,21 @@
 // Created by Nadrino on 16/06/2021.
 //
 
-#include "string"
-#include "vector"
-#include "sstream"
-
-#include "TCanvas.h"
-#include "TH1D.h"
-#include "TLegend.h"
+#include "JsonUtils.h"
+#include "GlobalVariables.h"
+#include "PlotGenerator.h"
 
 #include "Logger.h"
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
 
-#include "JsonUtils.h"
-#include "GlobalVariables.h"
-#include "PlotGenerator.h"
+#include "TCanvas.h"
+#include "TH1D.h"
+#include "TLegend.h"
+
+#include "string"
+#include "vector"
+#include "sstream"
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[PlotGenerator]");

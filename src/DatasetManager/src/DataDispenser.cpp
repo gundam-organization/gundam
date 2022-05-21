@@ -6,7 +6,7 @@
 #include "GlobalVariables.h"
 #include "SplineDial.h"
 #include "GraphDial.h"
-#include "DataSetLoader.h"
+#include "DatasetLoader.h"
 #include "JsonUtils.h"
 #include "TreeEventBuffer.h"
 
@@ -32,7 +32,7 @@ void DataDispenser::setConfig(const json &config) {
   _config_ = config;
   JsonUtils::forwardConfig(_config_, __CLASS_NAME__);
 }
-void DataDispenser::setOwner(DataSetLoader* owner_){
+void DataDispenser::setOwner(DatasetLoader* owner_){
   _owner_ = owner_;
 }
 

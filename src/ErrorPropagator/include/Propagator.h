@@ -6,7 +6,7 @@
 #define GUNDAM_PROPAGATOR_H
 
 
-#include "DataSetLoader.h"
+#include "DatasetLoader.h"
 #include "PlotGenerator.h"
 #include "EventTreeWriter.h"
 #include "FitSampleSet.h"
@@ -92,7 +92,7 @@ private:
   PlotGenerator _plotGenerator_;
   EventTreeWriter _treeWriter_;
   std::vector<FitParameterSet> _parameterSetsList_;
-  std::vector<DataSetLoader> _dataSetList_;
+  std::vector<DatasetLoader> _dataSetList_;
   std::shared_ptr<TMatrixD> _globalCovarianceMatrix_;
 
   // Response functions (WIP)
