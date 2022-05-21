@@ -180,11 +180,11 @@ void Propagator::initialize() {
     // Copies MC events in data container for both Asimov and FakeData event types
     _fitSampleSet_.copyMcEventListToDataContainer();
 
-    LogWarning << "Current sample breakdown:" << std::endl;
-    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-      LogInfo << "Sum of event weights in \"" << sample.getName() << "\":" << std::endl
-              << "-> mc: " << sample.getMcContainer().getSumWeights()
-              << " / data: " << sample.getDataContainer().getSumWeights() << std::endl;
+    // back to prior
+    if( _throwAsimovToyParameters_ ){
+      for( auto& parSet : _parameterSetsList_ ){
+        parSet.moveFitParametersToPrior();
+      }
     }
   }
 
