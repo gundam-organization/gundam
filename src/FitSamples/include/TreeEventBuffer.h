@@ -20,10 +20,13 @@ public:
 
   void setLeafNameList(const std::vector<std::string> &leafNameList);
 
-  void hookToTree(TTree* tree_);
+  void hook(TTree* tree_);
 
   const std::vector<GenericToolbox::LeafHolder> &getLeafContentList() const;
+
+  int fetchLeafIndex(const std::string& leafName_) const;
   const GenericToolbox::LeafHolder& getLeafContent(const std::string& leafName_) const;
+  std::string getSummary();
 
 private:
   std::vector<std::string> _leafNameList_;

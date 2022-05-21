@@ -73,6 +73,7 @@ public:
   int findVarIndex(const std::string& leafName_, bool throwIfNotFound_ = true) const;
   template<typename T> auto getVarValue(const std::string& leafName_, size_t arrayIndex_ = 0) const -> T;
   template<typename T> auto getVariable(const std::string& leafName_, size_t arrayIndex_ = 0) -> T&;
+  template<typename T> auto getVariablePtr(const std::string& leafName_, size_t arrayIndex_ = 0) -> T*;
   void* getVariableAddress(const std::string& leafName_, size_t arrayIndex_ = 0);
   double getVarAsDouble(const std::string& leafName_, size_t arrayIndex_ = 0) const;
   double getVarAsDouble(int varIndex_, size_t arrayIndex_ = 0) const;
@@ -90,8 +91,9 @@ public:
   void addNestedDialRefToCache(NestedDialTest* nestedDialPtr_, const std::vector<Dial*>& dialPtrList_ = std::vector<Dial*>{});
   std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>> generateLeavesDictionary(bool disableArrays_ = false) const;
 
-  void copyData(const std::vector<std::pair<const std::vector<GenericToolbox::AnyType>*, int>>& dict_);
-  std::vector<std::pair<const std::vector<GenericToolbox::AnyType>*, int>> generateDict(const TreeEventBuffer& h_, const std::map<std::string, std::string>& leafDict_={});
+  void copyData(const std::vector<std::pair<const GenericToolbox::LeafHolder*, int>>& dict_, bool disableArrayStorage_=false);
+  std::vector<std::pair<const GenericToolbox::LeafHolder*, int>> generateDict(const TreeEventBuffer& h_, const std::map<std::string, std::string>& leafDict_={});
+  void copyLeafContent(const PhysicsEvent& ref_);
 
   // Stream operator
   friend std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p );

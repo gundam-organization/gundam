@@ -16,6 +16,8 @@
 #include "Logger.h"
 
 #include "TTreeFormulaManager.h"
+#include "TChain.h"
+#include "TChainElement.h"
 
 #include "sstream"
 
@@ -204,7 +206,7 @@ void DataDispenser::doEventSelection(){
   chainPtr->SetBranchStatus("*", false);
   for( auto* sampleFormula : sampleCutFormulaList ){
     for( int iLeaf = 0 ; iLeaf < sampleFormula->GetNcodes() ; iLeaf++ ){
-      sampleFormula->GetLeaf(iLeaf)->GetBranch()->SetStatus(true);
+      chainPtr->SetBranchStatus(sampleFormula->GetLeaf(iLeaf)->GetBranch()->GetName(), true);
     }
   }
 
@@ -341,13 +343,13 @@ void DataDispenser::preAllocateMemory(){
   }
   TreeEventBuffer tBuf;
   tBuf.setLeafNameList(leafVar);
-  tBuf.hookToTree(chainPtr);
+  tBuf.hook(chainPtr);
 
   PhysicsEvent eventPlaceholder;
   eventPlaceholder.setDataSetIndex(_owner_->getDataSetIndex());
   eventPlaceholder.setCommonLeafNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.leavesRequestedForStorage));
   auto copyDict = eventPlaceholder.generateDict(tBuf, _parameters_.overrideLeafDict);
-  eventPlaceholder.copyData(copyDict);
+  eventPlaceholder.copyData(copyDict, true);
   if( _parSetListPtrToLoad_ != nullptr ){
     size_t dialCacheSize = 0;
     for( auto& parSet : *_parSetListPtrToLoad_ ){
@@ -429,7 +431,8 @@ void DataDispenser::readAndFill(){
 
     TChain* threadChain{this->generateChain()};
     TTreeFormula* threadNominalWeightFormula{nullptr};
-    TList threadFormulas;
+    TList objToNotify;
+    threadChain->SetNotify(&objToNotify);
 
     threadChain->SetBranchStatus("*", false);
 
@@ -441,12 +444,13 @@ void DataDispenser::readAndFill(){
           _parameters_.nominalWeightFormulaStr.c_str(),
           threadChain
           );
-      threadFormulas.Add(threadNominalWeightFormula);
-      threadChain->SetNotify(&threadFormulas);
+      LogThrowIf(threadNominalWeightFormula->GetNdim() == 0,
+                 "\"" <<  _parameters_.nominalWeightFormulaStr << "\" could not be parsed by the TChain");
+      objToNotify.Add(threadNominalWeightFormula);
       threadChain->SetBranchStatus("*", false);
       // Enabling needed branches for evaluating formulas
       for( int iLeaf = 0 ; iLeaf < threadNominalWeightFormula->GetNcodes() ; iLeaf++ ){
-        threadNominalWeightFormula->GetLeaf(iLeaf)->GetBranch()->SetStatus(true);
+        threadChain->SetBranchStatus(threadNominalWeightFormula->GetLeaf(iLeaf)->GetBranch()->GetName(), true);
       }
     }
 
@@ -461,14 +465,14 @@ void DataDispenser::readAndFill(){
     }
     tEventBuffer.setLeafNameList(leafVar);
     eventOffSetMutex.lock();
-    tEventBuffer.hookToTree(threadChain);
+    tEventBuffer.hook(threadChain);
     eventOffSetMutex.unlock();
 
     PhysicsEvent eventBuffer;
     eventBuffer.setDataSetIndex(_owner_->getDataSetIndex());
     eventBuffer.setCommonLeafNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.leavesRequestedForIndexing));
     auto copyDict = eventBuffer.generateDict(tEventBuffer, _parameters_.overrideLeafDict);
-    eventBuffer.copyData(copyDict); // resize array obj
+    eventBuffer.copyData(copyDict, true); // resize array obj
 
     PhysicsEvent evStore;
     evStore.setDataSetIndex(_owner_->getDataSetIndex());
@@ -505,12 +509,12 @@ void DataDispenser::readAndFill(){
     if( iThread_+1 != nThreads ) iEnd = (Long64_t(iThread_)+1)*nEventPerThread;
     Long64_t iGlobal = 0;
 
+    // Load the branches
+    threadChain->LoadTree(iStart);
+
     // IO speed monitor
     GenericToolbox::VariableMonitor readSpeed("bytes");
     Int_t nBytes;
-
-    // Load the branches
-    threadChain->LoadTree(iStart);
 
     std::string progressTitle = LogInfo.getPrefixString() + "Loading and indexing";
 
@@ -536,12 +540,53 @@ void DataDispenser::readAndFill(){
       }
       if( skipEvent ) continue;
 
+//      threadChain->GetStatus()->Print();
+//      for( int iElm=0 ;iElm <  threadChain->GetStatus()->GetEntries() ; iElm++ ){
+//        auto* ce = (TChainElement*) threadChain->GetStatus()->At(iElm);
+//        LogWarning << ce->GetName() << " -> " << ce->GetStatus() << std::endl;
+//      }
+//
+//      for( int iBranch = 0 ; iBranch < threadChain->GetListOfLeaves()->GetEntries() ; iBranch++ ){
+//        auto* l = threadChain->GetLeaf(threadChain->GetListOfLeaves()->At(iBranch)->GetName());
+//        if( l == nullptr ) continue;
+//        if( threadChain->GetBranchStatus(l->GetBranch()->GetName()) == 1 ){
+//          LogTrace << std::string(l->GetFullName()) << " -> " << l->GetValuePointer() << " ? ";
+//          if( tEventBuffer.fetchLeafIndex(l->GetName()) == -1 ){
+//            LogTrace << "NO" << std::endl;
+//          }
+//          else{
+//            LogTrace << (int*) &(tEventBuffer.getLeafContent(l->GetName()).getByteBuffer()[0]) << std::endl;
+//          }
+//        }
+//      }
+
+//      LogDebug<< "ENTRY?" << std::endl;
       nBytes = threadChain->GetEntry(iEntry);
+//      LogDebug << tEventBuffer.getSummary() << std::endl;
+//      eventBuffer.copyData(copyDict, true);
+//      LogDebug << eventBuffer << std::endl;
+//      LogThrow("")
       if( iThread_ == 0 ) readSpeed.addQuantity(nBytes);
 
       if( threadNominalWeightFormula != nullptr ){
         eventBuffer.setTreeWeight(threadNominalWeightFormula->EvalInstance());
-        if( eventBuffer.getTreeWeight() == 0 ){ continue; } // skip this event
+        if( eventBuffer.getTreeWeight() == 0 ){
+//          LogTrace << std::endl << "DONT PASS CUT:" << threadNominalWeightFormula->GetExpFormula() << std::endl;
+//          for( int iLeaf = 0 ; iLeaf < threadNominalWeightFormula->GetNcodes() ; iLeaf++ ){
+//            LogDebug << "branch:" << threadNominalWeightFormula->GetLeaf(iLeaf)->GetFullName();
+//            for( int i=0 ; i < threadNominalWeightFormula->GetLeaf(iLeaf)->GetNdata(); i++){
+//              LogDebug << " -> " << threadNominalWeightFormula->GetLeaf(iLeaf)->GetValue(i);
+//            }
+//            LogDebug << std::endl;
+//            LogThrowIf(not threadChain->GetBranchStatus(threadNominalWeightFormula->GetLeaf(iLeaf)->GetBranch()->GetName()),
+//                       threadNominalWeightFormula->GetLeaf(iLeaf)->GetBranch()->GetName() << "DISABLE?")
+////            threadChain->SetBranchStatus(threadNominalWeightFormula->GetLeaf(iLeaf)->GetBranch()->GetName(), true);
+//          }
+//          LogWarning << threadNominalWeightFormula->EvalInstance() << std::endl;
+//          eventBuffer.copyData(copyDict, true);
+//          LogThrow(eventBuffer)
+          continue;
+        } // skip this event
       }
 
       for( iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
@@ -551,7 +596,7 @@ void DataDispenser::readAndFill(){
           eventBuffer.setSampleBinIndex(-1);
 
           // Getting loaded data in tEventBuffer
-          eventBuffer.copyData(copyDict);
+          eventBuffer.copyData(copyDict, true);
 
           // Has valid bin?
           binsListPtr = &_cache_.samplesToFillList[iSample]->getBinning().getBinsList();
@@ -582,7 +627,7 @@ void DataDispenser::readAndFill(){
           eventOffSetMutex.unlock();
 
           eventPtr = &(*_cache_.sampleEventListPtrToFill[iSample])[sampleEventIndex];
-          eventPtr->copyData(copyStoreDict);
+          eventPtr->copyData(copyStoreDict, true); // buffer has the right size already
 
           eventPtr->setEntryIndex(iEntry);
           eventPtr->setSampleBinIndex(eventBuffer.getSampleBinIndex());
