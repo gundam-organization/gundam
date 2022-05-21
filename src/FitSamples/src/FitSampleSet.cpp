@@ -41,12 +41,6 @@ void FitSampleSet::setConfig(const nlohmann::json &config) {
   }
 }
 
-void FitSampleSet::addEventByEventDialLeafName(const std::string& leafName_){
-  if( not GenericToolbox::doesElementIsInVector(leafName_, _eventByEventDialLeafList_) ){
-    _eventByEventDialLeafList_.emplace_back(leafName_);
-  }
-}
-
 void FitSampleSet::initialize() {
   LogWarning << __METHOD_NAME__ << std::endl;
 

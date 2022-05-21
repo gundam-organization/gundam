@@ -10,9 +10,6 @@
 
 #include "FitParameterSet.h"
 #include "Dial.h"
-#include "SplineDial.h"
-#include "GraphDial.h"
-#include "NormalizationDial.h"
 #include "JsonUtils.h"
 #include "GlobalVariables.h"
 #include <AnaTreeMC.hh>
@@ -20,8 +17,8 @@
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
 
+#include <memory>
 #include <vector>
-#include <set>
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[Propagator]");
@@ -91,7 +88,7 @@ void Propagator::initialize() {
     LogInfo << _parameterSetsList_.back().getSummary() << std::endl;
   }
 
-  _globalCovarianceMatrix_ = std::shared_ptr<TMatrixD>( new TMatrixD(nPars, nPars) );
+  _globalCovarianceMatrix_ = std::make_shared<TMatrixD>( nPars, nPars );
   int iParOffset = 0;
   for( const auto& parSet : _parameterSetsList_ ){
     if( not parSet.isEnabled() ) continue;
@@ -126,10 +123,10 @@ void Propagator::initialize() {
   auto dataSetListConfig = JsonUtils::getForwardedConfig(_config_, "dataSetList");
   if( dataSetListConfig.empty() ){
     // Old config files
-    dataSetListConfig = JsonUtils::getForwardedConfig(_fitSampleSet_.getConfig(), "dataSetList");;
+    dataSetListConfig = JsonUtils::getForwardedConfig(_fitSampleSet_.getConfig(), "dataSetList");
     LogAlert << "DEPRECATED CONFIG OPTION: " << "dataSetList should now be located in the Propagator config." << std::endl;
   }
-  LogThrowIf(dataSetListConfig.empty(), "No dataSet specified." << std::endl);
+  LogThrowIf(dataSetListConfig.empty(), "No dataSet specified." << std::endl)
   int iDataSet{0};
   for( const auto& dataSetConfig : dataSetListConfig ){
     _dataSetList_.emplace_back();
@@ -243,6 +240,7 @@ void Propagator::initialize() {
 
   // Now the data won't be refilled each time
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    if( _throwAsimovToyParameters_ ){ sample.getDataContainer().throwStatError(); }
     sample.getDataContainer().isLocked = true;
   }
 

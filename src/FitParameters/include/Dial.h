@@ -5,16 +5,18 @@
 #ifndef GUNDAM_DIAL_H
 #define GUNDAM_DIAL_H
 
-#include "string"
-#include "mutex"
-#include "memory"
 
-#include "TSpline.h"
+#include "DataBin.h"
 
 #include "GenericToolbox.h"
 #include "GenericToolbox.OrderedLock.h"
 
-#include "DataBin.h"
+#include "TSpline.h"
+
+#include "string"
+#include "mutex"
+#include "memory"
+
 
 namespace DialType{
   ENUM_EXPANDER(

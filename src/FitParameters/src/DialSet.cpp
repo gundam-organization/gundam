@@ -2,20 +2,20 @@
 // Created by Nadrino on 21/05/2021.
 //
 
-#include "TFile.h"
-#include "TTree.h"
+#include "DialSet.h"
+#include "JsonUtils.h"
+#include "DataBinSet.h"
+#include "NormalizationDial.h"
+#include "SplineDial.h"
+#include "GraphDial.h"
 
 #include "Logger.h"
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
 
-#include "DialSet.h"
-#include "JsonUtils.h"
-#include "DataBinSet.h"
+#include "TFile.h"
+#include "TTree.h"
 
-#include "NormalizationDial.h"
-#include "SplineDial.h"
-#include "GraphDial.h"
 
 bool DialSet::_verboseMode_{false};
 

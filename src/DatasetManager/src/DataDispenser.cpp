@@ -155,7 +155,7 @@ void DataDispenser::buildSampleToFillList(){
 
   for( auto& sample : _sampleSetPtrToLoad_->getFitSampleList() ){
     if( not sample.isEnabled() ) continue;
-    if( sample.isDataSetValid(_owner_->getName()) ){
+    if(sample.isDatasetValid(_owner_->getName()) ){
       _cache_.samplesToFillList.emplace_back(&sample);
     }
   }

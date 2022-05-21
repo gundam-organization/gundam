@@ -2,15 +2,15 @@
 // Created by Nadrino on 21/05/2021.
 //
 
-#include "sstream"
-
-#include "Logger.h"
-
 #include "Dial.h"
 #include "DialSet.h"
 #include "FitParameter.h"
 #include "FitParameterSet.h"
 #include "GlobalVariables.h"
+
+#include "Logger.h"
+
+#include "sstream"
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[Dial]");

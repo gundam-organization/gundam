@@ -24,8 +24,6 @@ public:
 
   void setConfig(const nlohmann::json &config);
 
-  void addEventByEventDialLeafName(const std::string& leafName_);
-
   void initialize();
 
   // Post init

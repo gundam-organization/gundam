@@ -5,17 +5,16 @@
 #ifndef GUNDAM_DIALSET_H
 #define GUNDAM_DIALSET_H
 
-#include "string"
-#include "vector"
-#include "json.hpp"
-#include "memory"
-
-#include "TFormula.h"
+#include "Dial.h"
 
 #include "GenericToolbox.h"
 
-#include "Dial.h"
+#include "TFormula.h"
+#include "json.hpp"
 
+#include "string"
+#include "vector"
+#include "memory"
 
 class FitParameter;
 
