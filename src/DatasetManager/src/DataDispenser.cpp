@@ -8,11 +8,10 @@
 #include "GraphDial.h"
 #include "DatasetLoader.h"
 #include "JsonUtils.h"
-#include "TreeEventBuffer.h"
 
+#include "GenericToolbox.Root.TreeEventBuffer.h"
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.VariablesMonitor.h"
-#include "GenericToolbox.AnyType.h"
 #include "Logger.h"
 
 #include "TTreeFormulaManager.h"
@@ -341,7 +340,7 @@ void DataDispenser::preAllocateMemory(){
       leafVar.back() = GenericToolbox::stripBracket(leafVar.back(), '[', ']');
     }
   }
-  TreeEventBuffer tBuf;
+  GenericToolbox::TreeEventBuffer tBuf;
   tBuf.setLeafNameList(leafVar);
   tBuf.hook(chainPtr);
 
@@ -454,7 +453,7 @@ void DataDispenser::readAndFill(){
       }
     }
 
-    TreeEventBuffer tEventBuffer;
+    GenericToolbox::TreeEventBuffer tEventBuffer;
     std::vector<std::string> leafVar;
     for( auto& eventVar : _cache_.leavesRequestedForIndexing){
       leafVar.emplace_back(eventVar);
@@ -633,7 +632,6 @@ void DataDispenser::readAndFill(){
           eventPtr->setSampleBinIndex(eventBuffer.getSampleBinIndex());
           eventPtr->setTreeWeight(eventBuffer.getTreeWeight());
           eventPtr->setNominalWeight(eventBuffer.getTreeWeight());
-          eventPtr->setFakeDataWeight(eventBuffer.getFakeDataWeight());
           eventPtr->resetEventWeight();
 
           // Now the event is ready. Let's index the dials:

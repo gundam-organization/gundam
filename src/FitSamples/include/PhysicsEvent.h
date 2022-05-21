@@ -7,12 +7,13 @@
 
 
 
-#include "TreeEventBuffer.h"
 #include "AnaEvent.hh"
 #include "FitParameterSet.h"
 #include "Dial.h"
 #include "NestedDialTest.h"
 
+#include "GenericToolbox.Root.TreeEventBuffer.h"
+#include "GenericToolbox.Root.LeafHolder.h"
 #include <GenericToolbox.RawDataArray.h>
 #include "GenericToolbox.AnyType.h"
 
@@ -60,8 +61,6 @@ public:
 
   // CORE
   // Filling up
-//  void hookToTree(TTree* tree_, bool throwIfLeafNotFound_ = true, const std::map<std::string,std::string>& leafDict_={});
-  void clonePointerLeaves();
   void copyOnlyExistingLeaves(const PhysicsEvent& other_);
 
   // Weight
@@ -82,36 +81,39 @@ public:
   double evalFormula(TFormula* formulaPtr_, std::vector<int>* indexDict_ = nullptr) const;
 
   // Misc
-  std::string getSummary() const;
   void print() const;
   bool isSame(AnaEvent& anaEvent_) const;
-  void deleteLeaf(long index_);
   void trimDialCache();
-  void addDialRefToCache(Dial* dialPtr_);
-  void addNestedDialRefToCache(NestedDialTest* nestedDialPtr_, const std::vector<Dial*>& dialPtrList_ = std::vector<Dial*>{});
+  std::string getSummary() const;
   std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>> generateLeavesDictionary(bool disableArrays_ = false) const;
 
   void copyData(const std::vector<std::pair<const GenericToolbox::LeafHolder*, int>>& dict_, bool disableArrayStorage_=false);
-  std::vector<std::pair<const GenericToolbox::LeafHolder*, int>> generateDict(const TreeEventBuffer& h_, const std::map<std::string, std::string>& leafDict_={});
+  std::vector<std::pair<const GenericToolbox::LeafHolder*, int>> generateDict(const GenericToolbox::TreeEventBuffer& h_, const std::map<std::string, std::string>& leafDict_={});
   void copyLeafContent(const PhysicsEvent& ref_);
 
   // Stream operator
   friend std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p );
 
+  // DEV
+  void addNestedDialRefToCache(NestedDialTest* nestedDialPtr_, const std::vector<Dial*>& dialPtrList_ = std::vector<Dial*>{});
+
 private:
-
-  // TTree related members
-  std::shared_ptr<std::vector<std::string>> _commonLeafNameListPtr_{nullptr};
-  std::vector<std::vector<GenericToolbox::AnyType>> _leafContentList_;
-
-  // Extra variables
+  // Context variables
   int _dataSetIndex_{-1};
   Long64_t _entryIndex_{-1};
   double _treeWeight_{1};
   double _nominalWeight_{1};
   double _eventWeight_{1};
-  double _fakeDataWeight_{1};
   int _sampleBinIndex_{-1};
+
+  // Data storage variables
+  std::shared_ptr<std::vector<std::string>> _commonLeafNameListPtr_{nullptr};
+  std::vector<std::vector<GenericToolbox::AnyType>> _leafContentList_;
+
+  // Cache variables
+  std::vector<Dial*> _rawDialPtrList_{};
+  std::vector<std::pair<NestedDialTest*, std::vector<Dial*>>> _nestedDialRefList_{};
+
 
 #ifdef GUNDAM_USING_CUDA
 public:
@@ -131,9 +133,6 @@ private:
   void (*_CacheManagerUpdate_)(){nullptr};
 #endif
 
-  // Caches
-  std::vector<Dial*> _rawDialPtrList_{};
-  std::vector<std::pair<NestedDialTest*, std::vector<Dial*>>> _nestedDialRefList_{};
 
 };
 

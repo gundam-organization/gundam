@@ -28,7 +28,6 @@ void PhysicsEvent::reset() {
   _treeWeight_ = 1;
   _nominalWeight_ = 1;
   _eventWeight_ = 1;
-  _fakeDataWeight_ = 1;
   _sampleBinIndex_ = -1;
 }
 
@@ -50,9 +49,6 @@ void PhysicsEvent::setNominalWeight(double nominalWeight) {
 }
 void PhysicsEvent::setEventWeight(double eventWeight) {
   _eventWeight_ = eventWeight;
-}
-void PhysicsEvent::setFakeDataWeight(double fakeDataWeight) {
-  _fakeDataWeight_ = fakeDataWeight;
 }
 void PhysicsEvent::setSampleBinIndex(int sampleBinIndex) {
   _sampleBinIndex_ = sampleBinIndex;
@@ -129,9 +125,6 @@ double PhysicsEvent::getEventWeight() const {
 #endif
     return _eventWeight_;
 }
-double PhysicsEvent::getFakeDataWeight() const {
-  return _fakeDataWeight_;
-}
 int PhysicsEvent::getSampleBinIndex() const {
   return _sampleBinIndex_;
 }
@@ -155,41 +148,6 @@ const std::vector<Dial *> &PhysicsEvent::getRawDialPtrList() const{
   return _rawDialPtrList_;
 }
 
-//void PhysicsEvent::hookToTree(TTree* tree_, bool throwIfLeafNotFound_, const std::map<std::string,std::string>& leafDict_){
-////  LogThrowIf(_commonLeafNameListPtr_ == nullptr, "_commonLeafNameListPtr_ is not set.");
-////
-////  _leafContentList_.clear();
-////  std::string strBuf;
-////  std::vector<std::string> argList;
-////
-////  for( size_t iLeaf = 0 ; iLeaf < _commonLeafNameListPtr_->size() ; iLeaf++ ){
-////    strBuf = _commonLeafNameListPtr_->at(iLeaf);
-////    if( GenericToolbox::doesKeyIsInMap(strBuf, leafDict_)){
-////      strBuf = leafDict_.at(_commonLeafNameListPtr_->at(iLeaf));
-////    }
-////    argList.clear();
-////    strBuf = GenericToolbox::stripBracket(strBuf, '[', ']', true, &argList);
-////
-////    GenericToolbox::LeafHolder buf;
-////    if(throwIfLeafNotFound_){
-////      buf.hook(tree_, strBuf);
-////    }
-////    else{
-////      try{ buf.hook(tree_, strBuf); }
-////      catch (...) {
-////        LogWarning << this->getSummary() << std::endl;
-////        continue;
-////      }
-////    }
-////
-////    _leafContentList_.emplace_back(buf);
-////  }
-//}
-void PhysicsEvent::clonePointerLeaves(){
-  for( auto& leaf : _leafContentList_ ){
-//    leaf.clonePointerLeaves();
-  }
-}
 void PhysicsEvent::copyOnlyExistingLeaves(const PhysicsEvent& other_){
   LogThrowIf(_commonLeafNameListPtr_ == nullptr, "_commonLeafNameListPtr_ not set")
   for( size_t iLeaf = 0 ; iLeaf < _commonLeafNameListPtr_->size() ; iLeaf++ ){
@@ -358,7 +316,6 @@ std::string PhysicsEvent::getSummary() const {
   ss << std::endl << GET_VAR_NAME_VALUE(_treeWeight_);
   ss << std::endl << GET_VAR_NAME_VALUE(_nominalWeight_);
   ss << std::endl << GET_VAR_NAME_VALUE(_eventWeight_);
-  ss << std::endl << GET_VAR_NAME_VALUE(_fakeDataWeight_);
   ss << std::endl << GET_VAR_NAME_VALUE(_sampleBinIndex_);
 
   if( _leafContentList_.empty() ){ ss << std::endl << "LeafContent: { empty }"; }
@@ -416,11 +373,6 @@ bool PhysicsEvent::isSame(AnaEvent& anaEvent_) const{
 
   return isSame;
 }
-void PhysicsEvent::deleteLeaf(long index_){
-  // UNTESTED
-  _leafContentList_.erase(_leafContentList_.begin() + index_);
-  _leafContentList_.shrink_to_fit();
-}
 void PhysicsEvent::trimDialCache(){
   size_t newSize{0};
   for( auto& dial : _rawDialPtrList_ ){
@@ -438,20 +390,6 @@ void PhysicsEvent::trimDialCache(){
   }
   _nestedDialRefList_.resize(newSize);
   _nestedDialRefList_.shrink_to_fit();
-}
-void PhysicsEvent::addDialRefToCache(Dial* dialPtr_){
-  if( dialPtr_ == nullptr ) return; // don't store null ptr
-
-  // fetch the next free slot:
-  for( auto& dial : _rawDialPtrList_ ){
-    if( dial == nullptr ){
-      dial = dialPtr_;
-      return;
-    }
-  }
-
-  // no new slot available:
-  _rawDialPtrList_.emplace_back(dialPtr_);
 }
 void PhysicsEvent::addNestedDialRefToCache(NestedDialTest* nestedDialPtr_, const std::vector<Dial*>& dialPtrList_) {
   if (nestedDialPtr_ == nullptr) return; // don't store null ptr
@@ -513,7 +451,7 @@ void PhysicsEvent::copyData(const std::vector<std::pair<const GenericToolbox::Le
     }
   }
 }
-std::vector<std::pair<const GenericToolbox::LeafHolder*, int>> PhysicsEvent::generateDict(const TreeEventBuffer& h_, const std::map<std::string, std::string>& leafDict_){
+std::vector<std::pair<const GenericToolbox::LeafHolder*, int>> PhysicsEvent::generateDict(const GenericToolbox::TreeEventBuffer& h_, const std::map<std::string, std::string>& leafDict_){
   std::vector<std::pair<const GenericToolbox::LeafHolder*, int>> out;
   out.reserve(_commonLeafNameListPtr_->size());
   std::string strBuf;

@@ -5,7 +5,6 @@ set( SRCFILES
         src/FitSampleSet.cpp
         src/FitSample.cpp
         src/PhysicsEvent.cpp
-        src/TreeEventBuffer.cpp
         src/PlotGenerator.cpp
         )
 
