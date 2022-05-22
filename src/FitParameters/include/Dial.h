@@ -41,19 +41,20 @@ public:
 
   virtual void reset();
 
-  void setApplyConditionBin(const DataBin &applyConditionBin);
+  void setApplyConditionBin(DataBin *applyConditionBin);
   void setIsReferenced(bool isReferenced);
   void setOwner(const DialSet* dialSetPtr);
 
   virtual void initialize();
 
+  // const getters
   bool isReferenced() const;
   double getDialResponseCache() const;
-  const DataBin* getApplyConditionBinPtr() const{ return _applyConditionBin_.get(); }
-  const DataBin &getApplyConditionBin() const;
-  DataBin &getApplyConditionBin();
+  const DataBin* getApplyConditionBinPtr() const;
   DialType::DialType getDialType() const;
   const DialSet* getOwner() const;
+
+  DataBin* getApplyConditionBinPtr();
 
   double getAssociatedParameter() const;
 
@@ -74,7 +75,7 @@ protected:
   const DialSet* _ownerDialSet_{nullptr};
 
   // Parameters
-  std::shared_ptr<DataBin> _applyConditionBin_{nullptr};
+  DataBin* _applyConditionBin_{nullptr};
 
   // Internals
   bool _isEditingCache_{false};

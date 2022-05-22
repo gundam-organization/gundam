@@ -280,7 +280,7 @@ void DataDispenser::fetchRequestedLeaves(){
 
           for( auto& dial : dialSetPtr->getDialList() ){
             if( dial->getApplyConditionBinPtr() != nullptr ){
-              for( auto& var : dial->getApplyConditionBin().getVariableNameList() ){
+              for( auto& var : dial->getApplyConditionBinPtr()->getVariableNameList() ){
                 this->addLeafRequestedForIndexing(var);
               } // var
             }
@@ -383,10 +383,10 @@ void DataDispenser::preAllocateMemory(){
           for( auto& dial : dialSetPtr->getDialList() ){
             if( dial->getApplyConditionBinPtr() != nullptr ){
               std::vector<int> varIndexes;
-              for( const auto& var : dial->getApplyConditionBin().getVariableNameList() ){
+              for( const auto& var : dial->getApplyConditionBinPtr()->getVariableNameList() ){
                 varIndexes.emplace_back(GenericToolbox::findElementIndex(var, _cache_.leavesRequestedForIndexing));
               }
-              dial->getApplyConditionBin().setEventVarIndexCache(varIndexes);
+              dial->getApplyConditionBinPtr()->setEventVarIndexCache(varIndexes);
             }
           }
 
@@ -708,7 +708,7 @@ void DataDispenser::readAndFill(){
                 lastFailedBinVarIndex = -1;
                 for( iDial = 0 ; iDial < dialSetPtr->getDialList().size(); iDial++ ){
                   // ----------> SLOW PART
-                  applyConditionBinPtr = &dialSetPtr->getDialList()[iDial]->getApplyConditionBin();
+                  applyConditionBinPtr = dialSetPtr->getDialList()[iDial]->getApplyConditionBinPtr();
 
                   if( applyConditionBinPtr != nullptr and lastFailedBinVarIndex != -1 ){
                     if( not applyConditionBinPtr->isBetweenEdges(

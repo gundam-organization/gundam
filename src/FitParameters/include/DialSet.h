@@ -6,6 +6,7 @@
 #define GUNDAM_DIALSET_H
 
 #include "Dial.h"
+#include "DataBinSet.h"
 
 #include "GenericToolbox.h"
 
@@ -101,6 +102,8 @@ private:
   double _mirrorLowEdge_{std::nan("unset")};
   double _mirrorHighEdge_{std::nan("unset")};
   double _mirrorRange_{std::nan("unset")};
+
+  std::vector<DataBinSet> _binningCacheList_;
 
 };
 
