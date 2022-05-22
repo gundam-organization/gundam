@@ -708,7 +708,7 @@ void DataDispenser::readAndFill(){
                 lastFailedBinVarIndex = -1;
                 for( iDial = 0 ; iDial < dialSetPtr->getDialList().size(); iDial++ ){
                   // ----------> SLOW PART
-                  applyConditionBinPtr = dialSetPtr->getDialList()[iDial]->getApplyConditionBinPtr();
+                  applyConditionBinPtr = &dialSetPtr->getDialList()[iDial]->getApplyConditionBin();
 
                   if( applyConditionBinPtr != nullptr and lastFailedBinVarIndex != -1 ){
                     if( not applyConditionBinPtr->isBetweenEdges(
