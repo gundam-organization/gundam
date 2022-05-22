@@ -21,7 +21,6 @@ public:
 
   // Setters
   static void setNbThreads(int nbThreads_);
-  static void setPrngSeed(ULong_t seed_);
   static void setEnableEventWeightCache(bool enable = true);
 
   // Getters
@@ -31,7 +30,6 @@ public:
   static std::map<std::string, bool>& getBoolMap();
   static std::vector<TChain*>& getChainList();
   static GenericToolbox::ParallelWorker &getParallelWorker();
-  static TRandom3& getPrng();
   static bool getEnableEventWeightCache();
 
 private:
@@ -42,7 +40,6 @@ private:
   static std::map<std::string, bool> _boolMap_;
   static std::vector<TChain*> _chainList_;
   static GenericToolbox::ParallelWorker _threadPool_;
-  static std::unique_ptr<TRandom3> _prng_;
   static bool _enableEventWeightCache_;
 
 };
