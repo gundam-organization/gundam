@@ -150,7 +150,7 @@ TChain *DataDispenser::generateChain() {
   return out;
 }
 void DataDispenser::buildSampleToFillList(){
-  LogInfo << "Fetching samples to fill..." << std::endl;
+  LogWarning << "Fetching samples to fill..." << std::endl;
 
   for( auto& sample : _sampleSetPtrToLoad_->getFitSampleList() ){
     if( not sample.isEnabled() ) continue;
@@ -167,7 +167,7 @@ void DataDispenser::buildSampleToFillList(){
   LogInfo << "Selected samples are: " << std::endl
           << GenericToolbox::iterableToString(
               _cache_.samplesToFillList,
-              [](const FitSample *samplePtr){ return samplePtr->getName(); }
+              [](const FitSample *samplePtr){ return "\""+samplePtr->getName()+"\""; }
               )
           << std::endl;
 }
@@ -317,8 +317,8 @@ void DataDispenser::fetchRequestedLeaves(){
     this->addLeafRequestedForStorage(additionalLeaf);
   }
 
-  LogInfo << "Vars requested for indexing: " << GenericToolbox::parseVectorAsString(_cache_.leavesRequestedForIndexing) << std::endl;
-  LogInfo << "Vars requested for storage: " << GenericToolbox::parseVectorAsString(_cache_.leavesRequestedForStorage) << std::endl;
+  LogInfo << "Vars requested for indexing: " << GenericToolbox::parseVectorAsString(_cache_.leavesRequestedForIndexing, true) << std::endl;
+  LogInfo << "Vars requested for storage: " << GenericToolbox::parseVectorAsString(_cache_.leavesRequestedForStorage, true) << std::endl;
 }
 void DataDispenser::preAllocateMemory(){
   LogInfo << "Pre-allocating memory..." << std::endl;

@@ -36,15 +36,15 @@ void Dial::setIsReferenced(bool isReferenced) {
   _isReferenced_ = isReferenced;
 }
 void Dial::setOwner(const DialSet* dialSetPtr) {
-  _ownerDialSet_ = dialSetPtr;
+  _owner_ = dialSetPtr;
 }
 const DialSet* Dial::getOwner() const {
-  LogThrowIf(!_ownerDialSet_, "Invalid owning DialSet");
-  return _ownerDialSet_;
+  LogThrowIf(!_owner_, "Invalid owning DialSet");
+  return _owner_;
 }
 void Dial::initialize() {
   LogThrowIf( _dialType_ == DialType::Invalid, "_dialType_ is not set." );
-  LogThrowIf(_ownerDialSet_ == nullptr, "Owner not set.")
+  LogThrowIf(_owner_ == nullptr, "Owner not set.")
 }
 
 bool Dial::isReferenced() const {
@@ -59,29 +59,29 @@ DialType::DialType Dial::getDialType() const {
   return _dialType_;
 }
 double Dial::getAssociatedParameter() const {
-  return _ownerDialSet_->getOwnerFitParameter()->getParameterValue();
+  return _owner_->getOwner()->getParameterValue();
 }
 
 void Dial::updateEffectiveDialParameter(){
   _effectiveDialParameterValue_ = _dialParameterCache_;
-  if( _ownerDialSet_->useMirrorDial() ){
+  if( _owner_->useMirrorDial() ){
     _effectiveDialParameterValue_ = std::abs(std::fmod(
-        _dialParameterCache_ - _ownerDialSet_->getMirrorLowEdge(),
-        2 * _ownerDialSet_->getMirrorRange()
+        _dialParameterCache_ - _owner_->getMirrorLowEdge(),
+        2 * _owner_->getMirrorRange()
     ));
 
-    if(_effectiveDialParameterValue_ > _ownerDialSet_->getMirrorRange() ){
+    if(_effectiveDialParameterValue_ > _owner_->getMirrorRange() ){
       // odd pattern  -> mirrored -> decreasing effective X while increasing parameter
-      _effectiveDialParameterValue_ -= 2 * _ownerDialSet_->getMirrorRange();
+      _effectiveDialParameterValue_ -= 2 * _owner_->getMirrorRange();
       _effectiveDialParameterValue_ = -_effectiveDialParameterValue_;
     }
 
     // re-apply the offset
-    _effectiveDialParameterValue_ += _ownerDialSet_->getMirrorLowEdge();
+    _effectiveDialParameterValue_ += _owner_->getMirrorLowEdge();
   }
 }
 double Dial::evalResponse(){
-  return this->evalResponse(_ownerDialSet_->getOwnerFitParameter()->getParameterValue() );
+  return this->evalResponse(_owner_->getOwner()->getParameterValue() );
 }
 //void Dial::copySplineCache(TSpline3& splineBuffer_){
 //  if( _responseSplineCache_ == nullptr ) this->buildResponseSplineCache();
@@ -104,16 +104,16 @@ double Dial::evalResponse(double parameterValue_) {
   _dialParameterCache_ = parameterValue_;
   this->updateEffectiveDialParameter();
   this->fillResponseCache(); // specified in the corresponding dial class
-  if     (_ownerDialSet_->getMinDialResponse() == _ownerDialSet_->getMinDialResponse() and _dialResponseCache_ < _ownerDialSet_->getMinDialResponse() ){ _dialResponseCache_=_ownerDialSet_->getMinDialResponse(); }
-  else if(_ownerDialSet_->getMaxDialResponse() == _ownerDialSet_->getMaxDialResponse() and _dialResponseCache_ > _ownerDialSet_->getMaxDialResponse() ){ _dialResponseCache_=_ownerDialSet_->getMaxDialResponse(); }
+  if     (_owner_->getMinDialResponse() == _owner_->getMinDialResponse() and _dialResponseCache_ < _owner_->getMinDialResponse() ){ _dialResponseCache_=_owner_->getMinDialResponse(); }
+  else if(_owner_->getMaxDialResponse() == _owner_->getMaxDialResponse() and _dialResponseCache_ > _owner_->getMaxDialResponse() ){ _dialResponseCache_=_owner_->getMaxDialResponse(); }
 
   return _dialResponseCache_;
 }
 std::string Dial::getSummary(){
   std::stringstream ss;
-  ss << ((FitParameterSet*) _ownerDialSet_->getOwnerFitParameter()->getParSetRef())->getName();
-  ss << "/" << _ownerDialSet_->getOwnerFitParameter()->getTitle();
-  ss << "(" << _ownerDialSet_->getOwnerFitParameter()->getParameterValue() << ")";
+  ss << ((FitParameterSet*) _owner_->getOwner()->getParSetRef())->getName();
+  ss << "/" << _owner_->getOwner()->getTitle();
+  ss << "(" << _owner_->getOwner()->getParameterValue() << ")";
   ss << "/";
   ss << DialType::DialTypeEnumNamespace::toString(_dialType_, true);
   if( _applyConditionBin_ != nullptr and not _applyConditionBin_->getEdgesList().empty() ) ss << ":b{" << _applyConditionBin_->getSummary() << "}";

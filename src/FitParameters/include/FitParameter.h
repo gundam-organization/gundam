@@ -5,12 +5,13 @@
 #ifndef GUNDAM_FITPARAMETER_H
 #define GUNDAM_FITPARAMETER_H
 
+#include "DialSet.h"
+
+#include "GenericToolbox.h"
+
 #include "vector"
 #include "string"
 #include "json.hpp"
-#include "GenericToolbox.h"
-
-#include "DialSet.h"
 
 namespace PriorType{
   ENUM_EXPANDER(

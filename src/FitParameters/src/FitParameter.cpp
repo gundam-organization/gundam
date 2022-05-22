@@ -154,11 +154,8 @@ void FitParameter::initialize() {
   _dialSetList_.reserve(_dialDefinitionsList_.size());
   for( const auto& dialDefinitionConfig : _dialDefinitionsList_ ){
     _dialSetList_.emplace_back();
-    _dialSetList_.back().setParameterIndex(_parameterIndex_);
-    _dialSetList_.back().setParameterName(_name_);
+    _dialSetList_.back().setOwner(this);
     _dialSetList_.back().setConfig(dialDefinitionConfig);
-    _dialSetList_.back().setWorkingDirectory(_dialsWorkingDirectory_);
-    _dialSetList_.back().setAssociatedParameterReference(this);
     _dialSetList_.back().initialize();
   }
 
