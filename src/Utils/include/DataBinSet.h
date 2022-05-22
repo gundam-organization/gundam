@@ -21,6 +21,7 @@ public:
   // Setter
   void setName(const std::string &name);
   void readBinningDefinition(const std::string& filePath_);
+  void addBin(const DataBin& bin_);
 
   // Management
   void addBinContent(int binIndex_, double weight_);
@@ -29,6 +30,8 @@ public:
   const std::vector<DataBin> &getBinsList() const;
   const std::string &getFilePath() const;
   const std::vector<std::string> &getBinVariables() const;
+
+  std::vector<DataBin> &getBinsList();
 
   // Misc
   std::string getSummary() const;

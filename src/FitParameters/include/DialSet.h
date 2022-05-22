@@ -5,17 +5,17 @@
 #ifndef GUNDAM_DIALSET_H
 #define GUNDAM_DIALSET_H
 
-#include "string"
-#include "vector"
-#include "json.hpp"
-#include "memory"
-
-#include "TFormula.h"
+#include "Dial.h"
+#include "DataBinSet.h"
 
 #include "GenericToolbox.h"
 
-#include "Dial.h"
+#include "TFormula.h"
+#include "json.hpp"
 
+#include "string"
+#include "vector"
+#include "memory"
 
 class FitParameter;
 
@@ -89,7 +89,7 @@ private:
   // shared pointers are needed since we want to make vectors of DialSets.
   // .emplace_back() method is calling delete which is calling reset(), and this one has to delete the content of
   // every pointers. It means the new copied DialSet will handle Dial ptr which have already been deleted.
-  std::vector<std::shared_ptr<Dial>> _dialList_;
+  std::vector<std::shared_ptr<Dial>> _dialList_{};
   size_t _currentDialOffset_{0};
 
   // globals
@@ -102,6 +102,8 @@ private:
   double _mirrorLowEdge_{std::nan("unset")};
   double _mirrorHighEdge_{std::nan("unset")};
   double _mirrorRange_{std::nan("unset")};
+
+  std::vector<DataBinSet> _binningCacheList_;
 
 };
 

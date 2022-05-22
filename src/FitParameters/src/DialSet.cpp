@@ -2,20 +2,20 @@
 // Created by Nadrino on 21/05/2021.
 //
 
-#include "TFile.h"
-#include "TTree.h"
+#include "DialSet.h"
+#include "JsonUtils.h"
+#include "DataBinSet.h"
+#include "NormalizationDial.h"
+#include "SplineDial.h"
+#include "GraphDial.h"
 
 #include "Logger.h"
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
 
-#include "DialSet.h"
-#include "JsonUtils.h"
-#include "DataBinSet.h"
+#include "TFile.h"
+#include "TTree.h"
 
-#include "NormalizationDial.h"
-#include "SplineDial.h"
-#include "GraphDial.h"
 
 bool DialSet::_verboseMode_{false};
 
@@ -307,12 +307,15 @@ bool DialSet::initializeNormDialsWithParBinning() {
 
   LogThrowIf(_parameterIndex_ >= binning.getBinsList().size(),
              "Can't fetch parameter index #" << _parameterIndex_ << " while binning size is: " << binning.getBinsList().size()
-             )
+             );
+
+  _binningCacheList_.emplace_back();
+  _binningCacheList_.back().addBin(binning.getBinsList()[_parameterIndex_]);
 
   NormalizationDial dial;
   dial.setOwner(this);
   this->applyGlobalParameters(&dial);
-  dial.setApplyConditionBin( binning.getBinsList().at( _parameterIndex_ ) );
+  dial.setApplyConditionBin( &_binningCacheList_.back().getBinsList()[0] );
   dial.initialize();
   _dialList_.emplace_back( std::make_shared<NormalizationDial>(dial) );
 
@@ -357,11 +360,9 @@ bool DialSet::initializeDialsWithDefinition() {
       auto binningFilePath = JsonUtils::fetchValue<std::string>(dialsDefinition, "binningFilePath");
       if(not GenericToolbox::doesStringStartsWithSubstring(binningFilePath, "/")){ binningFilePath = _workingDirectory_ + "/" + binningFilePath; }
 
-      DataBinSet binning;
-      binning.setName(binningFilePath);
-      binning.readBinningDefinition(binningFilePath);
-
-      auto binList = binning.getBinsList();
+      _binningCacheList_.emplace_back();
+      _binningCacheList_.back().setName(binningFilePath);
+      _binningCacheList_.back().readBinningDefinition(binningFilePath);
 
       std::string filePath = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsFilePath");
       if(not GenericToolbox::doesStringStartsWithSubstring(filePath, "/")){ filePath = _workingDirectory_ + "/" + filePath; }
@@ -373,14 +374,14 @@ bool DialSet::initializeDialsWithDefinition() {
         auto* dialsList = dialsTFile->Get<TObjArray>(JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsList").c_str());
         LogThrowIf(dialsList==nullptr, "Could not find dialsList: " << JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsList"));
 
-        LogThrowIf(dialsList->GetSize() != binList.size(), "Number of dials (" << dialsList->GetSize() << ") don't match the number of bins "
-                   << binList.size() << "");
+        LogThrowIf(dialsList->GetSize() != _binningCacheList_.back().getBinsList().size(), "Number of dials (" << dialsList->GetSize() << ") don't match the number of bins "
+                   << _binningCacheList_.back().getBinsList().size() << "");
 
-        for( int iBin = 0 ; iBin < binList.size() ; iBin++ ){
+        for( int iBin = 0 ; iBin < _binningCacheList_.back().getBinsList().size() ; iBin++ ){
           if     ( _globalDialType_ == DialType::Spline ){
             SplineDial s;
             this->applyGlobalParameters(&s);
-            s.setApplyConditionBin(binList[iBin]);
+            s.setApplyConditionBin(&_binningCacheList_.back().getBinsList()[iBin]);
             s.copySpline((TSpline3*) dialsList->At(iBin));
             s.initialize();
             _dialList_.emplace_back( std::make_shared<SplineDial>(s) );
@@ -388,7 +389,7 @@ bool DialSet::initializeDialsWithDefinition() {
           else if( _globalDialType_ == DialType::Graph ){
             GraphDial g;
             this->applyGlobalParameters(&g);
-            g.setApplyConditionBin(binList[iBin]);
+            g.setApplyConditionBin(&_binningCacheList_.back().getBinsList()[iBin]);
             g.setGraph(*(TGraph*) dialsList->At(iBin));
             g.initialize();
             _dialList_.emplace_back( std::make_shared<GraphDial>(g) );
@@ -435,8 +436,8 @@ bool DialSet::initializeDialsWithDefinition() {
         LogWarning << "Reading dials in \"" << dialsTFile->GetName() << "\"" << std::endl;
         for( Long64_t iSpline = 0 ; iSpline < nSplines ; iSpline++ ){
           dialsTTree->GetEntry(iSpline);
-          auto dialBin = binList.at(kinematicBin); // copy
-          dialBin.setIsZeroWideRangesTolerated(true);
+          auto* dialBin = &_binningCacheList_.back().getBinsList()[kinematicBin];
+          dialBin->setIsZeroWideRangesTolerated(true);
           for( size_t iSplitVar = 0 ; iSplitVar < splitVarNameList.size() ; iSplitVar++ ){
             if( splitVarBoundariesList.at(iSplitVar).second < splitVarValueList.at(iSplitVar) or iSpline == 0 ){
               splitVarBoundariesList.at(iSplitVar).second = splitVarValueList.at(iSplitVar);
@@ -447,7 +448,7 @@ bool DialSet::initializeDialsWithDefinition() {
             if( not GenericToolbox::doesElementIsInVector(splitVarValueList.at(iSplitVar), splitVarValuesList.at(iSplitVar)) ){
               splitVarValuesList.at(iSplitVar).emplace_back(splitVarValueList.at(iSplitVar));
             }
-            dialBin.addBinEdge(splitVarNameList.at(iSplitVar), splitVarValueList.at(iSplitVar), splitVarValueList.at(iSplitVar));
+            dialBin->addBinEdge(splitVarNameList.at(iSplitVar), splitVarValueList.at(iSplitVar), splitVarValueList.at(iSplitVar));
           }
           if      ( _globalDialType_ == DialType::Spline ){
             SplineDial s;

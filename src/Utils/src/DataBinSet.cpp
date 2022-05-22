@@ -154,6 +154,10 @@ void DataBinSet::readBinningDefinition(const std::string &filePath_) {
   LogDebug << _binsList_.size() << " bins have been defined." << std::endl;
 
 }
+void DataBinSet::addBin(const DataBin& bin_){
+  _binsList_.emplace_back(bin_);
+  _binContent_.emplace_back(0);
+}
 void DataBinSet::setVerbosity(int maxLogLevel_) {
   Logger::setMaxLogLevel(maxLogLevel_);
 }
@@ -188,4 +192,8 @@ const std::string &DataBinSet::getFilePath() const {
 }
 const std::vector<std::string> &DataBinSet::getBinVariables() const {
   return _binVariables_;
+}
+
+std::vector<DataBin> &DataBinSet::getBinsList(){
+  return _binsList_;
 }

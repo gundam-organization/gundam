@@ -3,20 +3,20 @@
 //
 
 #include "FitterEngine.h"
-
 #include "JsonUtils.h"
 #include "GlobalVariables.h"
 
 #include "Logger.h"
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.h"
+#include "GenericToolbox.TablePrinter.h"
 
 #include <Math/Factory.h>
 #include "TGraph.h"
 #include "TLegend.h"
 
 #include <cmath>
-#include "GenericToolbox.TablePrinter.h"
+
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[FitterEngine]");
@@ -103,13 +103,6 @@ void FitterEngine::initialize() {
   _convergenceMonitor_.addVariable("Syst");
 
   if( _saveDir_ != nullptr ){
-    GenericToolbox::mkdirTFile(_saveDir_, "fit")->cd();
-    _chi2HistoryTree_ = new TTree("chi2History", "chi2History");
-    _chi2HistoryTree_->Branch("nbFitCalls", &_nbFitCalls_);
-    _chi2HistoryTree_->Branch("chi2Total", &_chi2Buffer_);
-    _chi2HistoryTree_->Branch("chi2Stat", &_chi2StatBuffer_);
-    _chi2HistoryTree_->Branch("chi2Pulls", &_chi2PullsBuffer_);
-
     auto* dir = GenericToolbox::mkdirTFile(_saveDir_, "preFit/events");
     _propagator_.getTreeWriter().writeSamples(dir);
   }
@@ -539,6 +532,13 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
 
 void FitterEngine::fit(){
   LogWarning << __METHOD_NAME__ << std::endl;
+
+  GenericToolbox::mkdirTFile(_saveDir_, "fit")->cd();
+  _chi2HistoryTree_ = new TTree("chi2History", "chi2History");
+  _chi2HistoryTree_->Branch("nbFitCalls", &_nbFitCalls_);
+  _chi2HistoryTree_->Branch("chi2Total", &_chi2Buffer_);
+  _chi2HistoryTree_->Branch("chi2Stat", &_chi2StatBuffer_);
+  _chi2HistoryTree_->Branch("chi2Pulls", &_chi2PullsBuffer_);
 
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Summary of the fit parameters:") << std::endl;
 

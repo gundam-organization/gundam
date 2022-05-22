@@ -5,6 +5,7 @@ set( SRCFILES
         src/FitSampleSet.cpp
         src/FitSample.cpp
         src/PhysicsEvent.cpp
+        src/PlotGenerator.cpp
         )
 
 if( USE_STATIC_LINKS STREQUAL "1" )

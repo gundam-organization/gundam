@@ -23,7 +23,7 @@
 
 
 /*
- * FitParameterSet is a class which aims at handling a set of parameters bond together with a covariance matrix
+ * \class FitParameterSet is a class which aims at handling a set of parameters bond together with a covariance matrix
  * User parameters:
  * - Covariance matrix (dim N)
  * - N Fit Parameters (handing dials)

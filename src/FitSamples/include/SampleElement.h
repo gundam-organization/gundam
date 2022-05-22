@@ -5,14 +5,14 @@
 #ifndef GUNDAM_SAMPLEELEMENT_H
 #define GUNDAM_SAMPLEELEMENT_H
 
-#include "vector"
-#include "memory"
-#include "string"
+#include "DataBinSet.h"
+#include "PhysicsEvent.h"
 
 #include "TH1D.h"
 
-#include "DataBinSet.h"
-#include "PhysicsEvent.h"
+#include "vector"
+#include "memory"
+#include "string"
 
 
 class SampleElement{
@@ -46,6 +46,8 @@ public:
   void updateBinEventList(int iThread_ = -1);
   void refillHistogram(int iThread_ = -1);
   void rescaleHistogram();
+
+  void throwStatError();
 
   double getSumWeights() const;
 

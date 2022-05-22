@@ -42,6 +42,7 @@ int main( int argc, char** argv ){
   ){
     LogError << "Missing options. Reminding usage..." << std::endl;
     LogInfo << clp.getConfigSummary() << std::endl;
+    exit(EXIT_FAILURE);
   }
 
   LogInfo << "Reading config..." << std::endl;

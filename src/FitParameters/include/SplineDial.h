@@ -37,7 +37,6 @@ protected:
 
 private:
   bool _throwIfResponseIsNegative_{true};
-
   TSpline3 _spline_;
 
 //  struct FastSpliner{

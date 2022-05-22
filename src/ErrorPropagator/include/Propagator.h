@@ -6,7 +6,7 @@
 #define GUNDAM_PROPAGATOR_H
 
 
-#include "DataSetLoader.h"
+#include "DatasetLoader.h"
 #include "PlotGenerator.h"
 #include "EventTreeWriter.h"
 #include "FitSampleSet.h"
@@ -36,6 +36,8 @@ public:
   void setShowTimeStats(bool showTimeStats);
   void setThrowAsimovToyParameters(bool throwAsimovToyParameters);
 
+  void setIThrow(int iThrow);
+
   // Init
   void initialize();
 
@@ -51,7 +53,7 @@ public:
   // Core
   void propagateParametersOnSamples();
   void updateDialResponses();
-  void reweightSampleEvents();
+  void reweightMcEvents();
   void refillSampleHistograms();
   void applyResponseFunctions();
 
@@ -71,7 +73,7 @@ protected:
 
   // multi-threaded
   void updateDialResponses(int iThread_);
-  void reweightSampleEvents(int iThread_);
+  void reweightMcEvents(int iThread_);
   void applyResponseFunctions(int iThread_);
 
 private:
@@ -82,6 +84,7 @@ private:
 
   // Internals
   bool _throwAsimovToyParameters_{false};
+  int _iThrow_{-1};
   bool _isInitialized_{false};
   bool _useResponseFunctions_{false};
   bool _isRfPropagationEnabled_{false};
@@ -89,7 +92,7 @@ private:
   PlotGenerator _plotGenerator_;
   EventTreeWriter _treeWriter_;
   std::vector<FitParameterSet> _parameterSetsList_;
-  std::vector<DataSetLoader> _dataSetList_;
+  std::vector<DatasetLoader> _dataSetList_;
   std::shared_ptr<TMatrixD> _globalCovarianceMatrix_;
 
   // Response functions (WIP)

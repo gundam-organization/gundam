@@ -2,15 +2,15 @@
 // Created by Nadrino on 21/05/2021.
 //
 
-#include "sstream"
-
-#include "Logger.h"
-
 #include "Dial.h"
 #include "DialSet.h"
 #include "FitParameter.h"
 #include "FitParameterSet.h"
 #include "GlobalVariables.h"
+
+#include "Logger.h"
+
+#include "sstream"
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[Dial]");
@@ -29,8 +29,8 @@ void Dial::reset() {
   _applyConditionBin_ = nullptr;
 }
 
-void Dial::setApplyConditionBin(const DataBin &applyConditionBin) {
-  _applyConditionBin_ = std::make_shared<DataBin>(applyConditionBin);
+void Dial::setApplyConditionBin(DataBin *applyConditionBin) {
+  _applyConditionBin_ = applyConditionBin;
 }
 void Dial::setIsReferenced(bool isReferenced) {
   _isReferenced_ = isReferenced;
@@ -53,14 +53,8 @@ bool Dial::isReferenced() const {
 double Dial::getDialResponseCache() const{
   return _dialResponseCache_;
 }
-const DataBin &Dial::getApplyConditionBin() const {
-  LogThrowIf(_applyConditionBin_ == nullptr, "_applyConditionBin_ not set.")
-  return *_applyConditionBin_;
-}
-DataBin &Dial::getApplyConditionBin() {
-  LogThrowIf(_applyConditionBin_ == nullptr, "_applyConditionBin_ not set.")
-  return *_applyConditionBin_;
-}
+const DataBin* Dial::getApplyConditionBinPtr() const{ return _applyConditionBin_; }
+DataBin* Dial::getApplyConditionBinPtr(){ return _applyConditionBin_; }
 DialType::DialType Dial::getDialType() const {
   return _dialType_;
 }
