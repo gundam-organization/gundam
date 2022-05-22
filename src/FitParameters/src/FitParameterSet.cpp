@@ -296,7 +296,7 @@ void FitParameterSet::throwFitParameters(double gain_){
     for( auto& eigenPar : _eigenParameterList_ ){
       if( eigenPar.isFixed() ){ LogWarning << "Eigen parameter #" << eigenPar.getParameterIndex() << " is fixed. Not throwing" << std::endl; continue; }
       eigenPar.setParameterValue(
-          eigenPar.getPriorValue() + gain_ * GlobalVariables::getPrng().Gaus(0, eigenPar.getStdDevValue())
+          eigenPar.getPriorValue() + gain_ * gRandom->Gaus(0, eigenPar.getStdDevValue())
           );
     }
     this->propagateEigenToOriginal();

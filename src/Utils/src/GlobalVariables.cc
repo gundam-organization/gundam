@@ -3,6 +3,13 @@
 //
 
 #include "GlobalVariables.h"
+#include "Logger.h"
+
+#include "TRandom3.h"
+
+LoggerInit([]{
+  Logger::setUserHeaderStr("[GlobalVariables]");
+})
 
 // INIT
 bool GlobalVariables::_enableDevMode_{false};
@@ -11,7 +18,7 @@ std::mutex GlobalVariables::_threadMutex_;
 std::map<std::string, bool> GlobalVariables::_boolMap_;
 std::vector<TChain*> GlobalVariables::_chainList_;
 GenericToolbox::ParallelWorker GlobalVariables::_threadPool_;
-TRandom3 GlobalVariables::_prng_;
+std::unique_ptr<TRandom3> GlobalVariables::_prng_{new TRandom3(time(nullptr))};
 bool GlobalVariables::_enableEventWeightCache_{true};
 
 void GlobalVariables::setNbThreads(int nbThreads_){
@@ -21,9 +28,6 @@ void GlobalVariables::setNbThreads(int nbThreads_){
   _threadPool_.setNThreads(_nbThreads_);
   _threadPool_.setCpuTimeSaverIsEnabled(true);
   _threadPool_.initialize();
-}
-void GlobalVariables::setPrngSeed(ULong_t seed_){
-  _prng_.SetSeed(seed_);
 }
 void GlobalVariables::setEnableEventWeightCache(bool enable) {_enableEventWeightCache_ = enable;}
 bool GlobalVariables::getEnableEventWeightCache() {return _enableEventWeightCache_;}
@@ -36,5 +40,5 @@ GenericToolbox::ParallelWorker &GlobalVariables::getParallelWorker() {
   return _threadPool_;
 }
 TRandom3& GlobalVariables::getPrng(){
-  return _prng_;
+  return *_prng_;
 }

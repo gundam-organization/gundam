@@ -3,7 +3,6 @@
 //
 
 #include "versionConfig.h"
-
 #include "FitterEngine.h"
 #include "JsonUtils.h"
 #include "GlobalVariables.h"
@@ -11,7 +10,6 @@
 
 #include "CmdLineParser.h"
 #include "Logger.h"
-#include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
 
 #include <string>
@@ -27,6 +25,7 @@ int main(int argc, char** argv){
   g.setAppName("GundamFitter");
   g.hello();
 
+
   // --------------------------
   // Read Command Line Args:
   // --------------------------
@@ -41,6 +40,7 @@ int main(int argc, char** argv){
   clParser.addOption("outputFile", {"-o", "--out-file"}, "Specify the output file");
   clParser.addOption("scanParameters", {"--scan"}, "Enable parameter scan before and after the fit");
   clParser.addOption("toyFit", {"--toy"}, "Run a toy fit");
+  clParser.addOption("randomSeed", {"-s", "--seed"}, "Set random seed");
 
   clParser.getOptionPtr("scanParameters")->setAllowEmptyValue(true); // --scan can be followed or not by the number of steps
   clParser.getOptionPtr("toyFit")->setAllowEmptyValue(true); // --toy can be followed or not by the number of steps
@@ -55,6 +55,16 @@ int main(int argc, char** argv){
   LogInfo << "Provided arguments: " << std::endl;
   LogInfo << clParser.getValueSummary() << std::endl << std::endl;
   LogInfo << clParser.dumpConfigAsJsonStr() << std::endl;
+
+  if( clParser.isOptionTriggered("randomSeed") ){
+    LogAlert << "Using user-specified random seed: " << clParser.getOptionVal<ULong_t>("randomSeed") << std::endl;
+    gRandom->SetSeed(clParser.getOptionVal<ULong_t>("randomSeed"));
+  }
+  else{
+    ULong_t seed = time(nullptr);
+    LogInfo << "Using \"time(nullptr)\" random seed: " << seed << std::endl;
+    gRandom->SetSeed(seed);
+  }
 
   if (clParser.isOptionTriggered("cache")) {
       LogInfo << "Event weight cache is disabled" << std::endl;
