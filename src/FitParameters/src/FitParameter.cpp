@@ -121,8 +121,6 @@ void FitParameter::initialize() {
   LogThrowIf(_parameterValue_ == std::numeric_limits<double>::quiet_NaN(), "Parameter value is not set.");
   LogThrowIf(_parSetRef_      == nullptr, "Parameter set ref is not set.")
 
-  LogInfo << "Initializing parameter: \"" << this->getTitle() << "\"" << std::endl;
-
   if( not _parameterConfig_.empty() ){
     _isEnabled_ = JsonUtils::fetchValue(_parameterConfig_, "isEnabled", true);
     if( not _isEnabled_ ) { return; }
@@ -130,7 +128,6 @@ void FitParameter::initialize() {
     auto priorTypeStr = JsonUtils::fetchValue(_parameterConfig_, "priorType", "");
     if( not priorTypeStr.empty() ){
       _priorType_ = PriorType::toPriorType(priorTypeStr);
-     LogWarning << "Prior type: " << priorTypeStr << std::endl;
      if( _priorType_ == PriorType::Flat ){ _isFree_ = true; }
     }
 

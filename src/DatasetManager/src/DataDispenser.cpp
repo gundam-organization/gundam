@@ -317,8 +317,8 @@ void DataDispenser::fetchRequestedLeaves(){
     this->addLeafRequestedForStorage(additionalLeaf);
   }
 
-  LogInfo << "Vars requested for indexing: " << GenericToolbox::parseVectorAsString(_cache_.leavesRequestedForIndexing, true) << std::endl;
-  LogInfo << "Vars requested for storage: " << GenericToolbox::parseVectorAsString(_cache_.leavesRequestedForStorage, true) << std::endl;
+  LogInfo << "Vars requested for indexing: " << GenericToolbox::parseVectorAsString(_cache_.leavesRequestedForIndexing, false) << std::endl;
+  LogInfo << "Vars requested for storage: " << GenericToolbox::parseVectorAsString(_cache_.leavesRequestedForStorage, false) << std::endl;
 }
 void DataDispenser::preAllocateMemory(){
   LogInfo << "Pre-allocating memory..." << std::endl;

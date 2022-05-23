@@ -62,9 +62,9 @@ void DialSet::initialize() {
   else { }
 
   // Dials are directly defined with a binning file?
-  if     (initializeNormDialsWithParBinning() ){ LogInfo << "DialSet initialised with parameter binning definition." << std::endl;  }
+  if     (initializeNormDialsWithParBinning() ){ /* LogInfo << "DialSet initialised with parameter binning definition." << std::endl; */  }
   // Dials are individually defined?
-  else if( initializeDialsWithDefinition() )   { LogInfo << "DialSet initialised with config definition." << std::endl; }
+  else if( initializeDialsWithDefinition() )   { /* LogInfo << "DialSet initialised with config definition." << std::endl; */ }
   // Dials definition not found?
   else{
     LogWarning << "Could not fetch dials definition for parameter: #" << _owner_->getParameterIndex();
@@ -245,7 +245,7 @@ void DialSet::readGlobals(const nlohmann::json &config_){
   }
 
   if( not _applyConditionStr_.empty() ){
-    LogWarning << "Apply condition: " << _applyConditionStr_ << std::endl;
+//    LogWarning << "Apply condition: " << _applyConditionStr_ << std::endl;
     _applyConditionFormula_ = std::make_shared<TFormula>("_applyConditionFormula_", _applyConditionStr_.c_str());
     LogThrowIf(not _applyConditionFormula_->IsValid(),
                "\"" << _applyConditionStr_ << "\": could not be parsed as formula expression.")
@@ -268,8 +268,6 @@ bool DialSet::initializeNormDialsWithParBinning() {
   if( parameterBinningPath.empty() ){ return false; }
 
   this->readGlobals(_config_);
-
-  LogTrace << "Initializing dials with binning file..." << std::endl;
 
   DataBinSet binning;
   binning.setName("parameterBinning");
