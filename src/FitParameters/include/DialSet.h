@@ -5,8 +5,9 @@
 #ifndef GUNDAM_DIALSET_H
 #define GUNDAM_DIALSET_H
 
-#include "Dial.h"
+#include "DialWrapper.h"
 #include "DataBinSet.h"
+#include "GlobalVariables.h"
 
 #include "GenericToolbox.h"
 
@@ -16,6 +17,7 @@
 #include "string"
 #include "vector"
 #include "memory"
+
 
 class FitParameter;
 
@@ -37,7 +39,7 @@ public:
 
   // Getters
   bool isEnabled() const;
-  std::vector<std::shared_ptr<Dial>> &getDialList();
+  std::vector<DialWrapper> &getDialList();
   const std::vector<std::string> &getDataSetNameList() const;
   TFormula *getApplyConditionFormula() const;
   const std::string &getDialLeafName() const;
@@ -76,10 +78,8 @@ private:
   bool _enableDialsSummary_{false};
   std::vector<std::string> _dataSetNameList_;
 
-  // shared pointers are needed since we want to make vectors of DialSets.
-  // .emplace_back() method is calling delete which is calling reset(), and this one has to delete the content of
-  // every pointers. It means the new copied DialSet will handle Dial ptr which have already been deleted.
-  std::vector<std::shared_ptr<Dial>> _dialList_{};
+//  std::vector<DialWrapper<Dial>> _dialList_{};
+  std::vector<DialWrapper> _dialList_{};
 
   // globals
   DialType::DialType _globalDialType_{DialType::DialType_OVERFLOW};

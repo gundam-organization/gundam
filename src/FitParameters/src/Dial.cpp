@@ -4,7 +4,6 @@
 
 #include "Dial.h"
 #include "DialSet.h"
-#include "FitParameter.h"
 #include "FitParameterSet.h"
 #include "GlobalVariables.h"
 
@@ -18,8 +17,7 @@ LoggerInit([](){
 } )
 
 
-Dial::Dial(DialType::DialType dialType_)
-    : _dialType_{dialType_}, _evalDialLock_{std::make_shared<std::mutex>()} {}
+Dial::Dial(DialType::DialType dialType_) : _dialType_{dialType_} {}
 Dial::~Dial() = default;
 
 void Dial::reset() {
@@ -39,11 +37,11 @@ void Dial::setOwner(const DialSet* dialSetPtr) {
   _owner_ = dialSetPtr;
 }
 const DialSet* Dial::getOwner() const {
-  LogThrowIf(!_owner_, "Invalid owning DialSet");
+  LogThrowIf(!_owner_, "Invalid owning DialSet")
   return _owner_;
 }
 void Dial::initialize() {
-  LogThrowIf( _dialType_ == DialType::Invalid, "_dialType_ is not set." );
+  LogThrowIf( _dialType_ == DialType::Invalid, "_dialType_ is not set." )
   LogThrowIf(_owner_ == nullptr, "Owner not set.")
 }
 
@@ -91,13 +89,31 @@ double Dial::evalResponse(){
 // Virtual
 double Dial::evalResponse(double parameterValue_) {
 
+//  if( _isEditingCache_ ){
+//    while( _isEditingCache_ ){  }
+//    return _dialResponseCache_;
+//  }
+//
+//  if( _dialParameterCache_ == parameterValue_ ) return _dialResponseCache_; // stop if already updated by another threads
+//
+//  // Edit the cache
+//  _isEditingCache_ = true;
+//  _dialParameterCache_ = parameterValue_;
+//  this->updateEffectiveDialParameter();
+//  this->fillResponseCache(); // specified in the corresponding dial class
+//  if     (_owner_->getMinDialResponse() == _owner_->getMinDialResponse() and _dialResponseCache_ < _owner_->getMinDialResponse() ){ _dialResponseCache_=_owner_->getMinDialResponse(); }
+//  else if(_owner_->getMaxDialResponse() == _owner_->getMaxDialResponse() and _dialResponseCache_ > _owner_->getMaxDialResponse() ){ _dialResponseCache_=_owner_->getMaxDialResponse(); }
+//
+//  return _dialResponseCache_;
+
+
   // Check if all is already up-to-date
   if( not _isEditingCache_ and _dialParameterCache_ == parameterValue_ ){
     return _dialResponseCache_;
   }
 
   // If we reach this point, we either need to compute the response or wait for another thread to make the update.
-  std::lock_guard<std::mutex> g(*_evalDialLock_); // There can be only one.
+  std::lock_guard<std::mutex> g(_evalDialLock_); // There can be only one.
   if( _dialParameterCache_ == parameterValue_ ) return _dialResponseCache_; // stop if already updated by another threads
 
   // Edit the cache
@@ -111,7 +127,7 @@ double Dial::evalResponse(double parameterValue_) {
 }
 std::string Dial::getSummary(){
   std::stringstream ss;
-  ss << ((FitParameterSet*) _owner_->getOwner()->getParSetRef())->getName();
+  ss << _owner_->getOwner()->getOwner()->getName(); // parSet name
   ss << "/" << _owner_->getOwner()->getTitle();
   ss << "(" << _owner_->getOwner()->getParameterValue() << ")";
   ss << "/";

@@ -13,6 +13,14 @@
 
 #include <map>
 #include <mutex>
+#include <memory>
+
+
+template <class T> class NoCopyWrapper: public T{
+public:
+  NoCopyWrapper() = default;
+  NoCopyWrapper(const NoCopyWrapper&){}
+};
 
 
 class GlobalVariables{

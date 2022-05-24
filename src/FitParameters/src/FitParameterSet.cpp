@@ -116,7 +116,7 @@ void FitParameterSet::prepareFitParameters(){
       _eigenParameterList_[iEigen].setIsEigen(true);
       _eigenParameterList_[iEigen].setIsEnabled(true);
       _eigenParameterList_[iEigen].setIsFixed(false);
-      _eigenParameterList_[iEigen].setParSetRef(this);
+      _eigenParameterList_[iEigen].setOwner(this);
       _eigenParameterList_[iEigen].setParameterIndex(iEigen);
       _eigenParameterList_[iEigen].setStdDevValue(TMath::Sqrt((*_eigenValues_)[iEigen]));
       _eigenParameterList_[iEigen].setStepSize(TMath::Sqrt((*_eigenValues_)[iEigen]));
@@ -607,7 +607,7 @@ void FitParameterSet::defineParameters(){
   _parameterList_.resize(_nbParameterDefinition_);
   for(int iParameter = 0 ; iParameter < _nbParameterDefinition_ ; iParameter++ ){
 
-    _parameterList_[iParameter].setParSetRef(this);
+    _parameterList_[iParameter].setOwner(this);
     _parameterList_[iParameter].setParameterIndex(iParameter);
 
     if( _priorCovarianceMatrix_ != nullptr ){

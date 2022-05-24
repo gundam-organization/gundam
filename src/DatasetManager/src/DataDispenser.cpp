@@ -395,10 +395,10 @@ void DataDispenser::preAllocateMemory(){
 
             auto dialType = dialSetPtr->getGlobalDialType();
             if     ( dialType == DialType::Spline ){
-              std::generate_n(std::back_inserter(dialSetPtr->getDialList()), chainPtr->GetEntries(), []{ return std::make_shared<SplineDial>(); });
+              dialSetPtr->getDialList().resize(chainPtr->GetEntries(), DialWrapper(SplineDial()));
             }
             else if( dialType == DialType::Graph ){
-              std::generate_n(std::back_inserter(dialSetPtr->getDialList()), chainPtr->GetEntries(), []{ return std::make_shared<GraphDial>(); });
+              dialSetPtr->getDialList().resize(chainPtr->GetEntries(), DialWrapper(GraphDial()));
             }
             else{
               LogThrow("Invalid dial type for event-by-event dial: " << DialType::DialTypeEnumNamespace::toString(dialType))

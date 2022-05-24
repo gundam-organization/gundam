@@ -82,7 +82,7 @@ bool DialSet::isEnabled() const {
 const std::vector<std::string> &DialSet::getDataSetNameList() const {
   return _dataSetNameList_;
 }
-std::vector<std::shared_ptr<Dial>> &DialSet::getDialList() {
+std::vector<DialWrapper> &DialSet::getDialList() {
   return _dialList_;
 }
 TFormula *DialSet::getApplyConditionFormula() const {
@@ -288,7 +288,7 @@ bool DialSet::initializeNormDialsWithParBinning() {
   this->applyGlobalParameters(&dial);
   dial.setApplyConditionBin( &_binningCacheList_.back().getBinsList()[0] );
   dial.initialize();
-  _dialList_.emplace_back( std::make_shared<NormalizationDial>(dial) );
+  _dialList_.emplace_back( std::make_unique<NormalizationDial>(dial) );
 
   return true;
 }
@@ -312,7 +312,7 @@ bool DialSet::initializeDialsWithDefinition() {
     this->applyGlobalParameters(&dial);
     dial.setOwner(this);
     dial.initialize();
-    _dialList_.emplace_back( std::make_shared<NormalizationDial>(dial) );
+    _dialList_.emplace_back( std::make_unique<NormalizationDial>(dial) );
   }
   else if( _globalDialType_ == DialType::Spline or _globalDialType_ == DialType::Graph ){
     if     ( JsonUtils::doKeyExist(dialsDefinition, "dialLeafName") ){
@@ -346,7 +346,7 @@ bool DialSet::initializeDialsWithDefinition() {
             s.setApplyConditionBin(&_binningCacheList_.back().getBinsList()[iBin]);
             s.copySpline((TSpline3*) dialsList->At(iBin));
             s.initialize();
-            _dialList_.emplace_back( std::make_shared<SplineDial>(s) );
+            _dialList_.emplace_back( std::make_unique<SplineDial>(s) );
           }
           else if( _globalDialType_ == DialType::Graph ){
             GraphDial g;
@@ -354,7 +354,7 @@ bool DialSet::initializeDialsWithDefinition() {
             g.setApplyConditionBin(&_binningCacheList_.back().getBinsList()[iBin]);
             g.setGraph(*(TGraph*) dialsList->At(iBin));
             g.initialize();
-            _dialList_.emplace_back( std::make_shared<GraphDial>(g) );
+            _dialList_.emplace_back( std::make_unique<GraphDial>(g) );
           }
           else{
             LogThrow("Should not be here???")
@@ -418,7 +418,7 @@ bool DialSet::initializeDialsWithDefinition() {
             s.setApplyConditionBin(dialBin);
             s.copySpline(splinePtr);
             s.initialize();
-            _dialList_.emplace_back( std::make_shared<SplineDial>(s) );
+            _dialList_.emplace_back( std::make_unique<SplineDial>(s) );
           }
           else if( _globalDialType_ == DialType::Graph ){
             LogThrow("TTree loading of DialType::Graph not implemented.")
