@@ -2,13 +2,13 @@
 using json = nlohmann::json;
 
 XsecCalc::XsecCalc(const std::string& json_config, const std::string& cli_filename)
-    : num_toys(0)
+    : toy_thrower(nullptr)
+    , postfit_cov(nullptr)
+    , postfit_cor(nullptr)
+    , num_toys(0)
     , rng_seed(0)
     , num_signals(0)
     , total_signal_bins(0)
-    , postfit_cov(nullptr)
-    , postfit_cor(nullptr)
-    , toy_thrower(nullptr)
 {
     std::cout << TAG << "Reading error propagation options." << std::endl;
     std::fstream f;

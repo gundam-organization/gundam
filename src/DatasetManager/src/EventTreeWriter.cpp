@@ -9,7 +9,6 @@
 #include "GenericToolbox.Root.h"
 
 
-
 LoggerInit([]{ Logger::setUserHeaderStr("[TreeWriter]"); })
 
 EventTreeWriter::EventTreeWriter() = default;
@@ -134,13 +133,13 @@ void EventTreeWriter::writeEvents(TDirectory *saveDir_, const std::string& treeN
     loadedLeavesArr.resetCurrentByteOffset();
     for( auto& leafDef : loadedLeavesDict ){ leafDef.second(loadedLeavesArr, event.getLeafHolder(leafNamesList[iLeaf++])); }
 
-    if( _writeDials_ ){
-      for( auto& spline : responseSplineList ){ *spline = flatSplinesList[iPar]; } // by default
-      for( auto* dialPtr : event.getRawDialPtrList() ){
-        iPar = GenericToolbox::findElementIndex(dialPtr->getAssociatedParameterReference(), parReferences);
-        dialPtr->copySplineCache(*responseSplineList[iPar]);
-      }
-    }
+//    if( _writeDials_ ){
+//      for( auto& spline : responseSplineList ){ *spline = flatSplinesList[iPar]; } // by default
+//      for( auto* dialPtr : event.getRawDialPtrList() ){
+//        iPar = GenericToolbox::findElementIndex(dialPtr->getAssociatedParameterReference(), parReferences);
+//        dialPtr->copySplineCache(*responseSplineList[iPar]);
+//      }
+//    }
 
     tree->Fill();
   }

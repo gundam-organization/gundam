@@ -2,11 +2,14 @@
 // Created by Adrien BLANCHET on 30/07/2021.
 //
 
+#include "GlobalVariables.h"
+#include "SampleElement.h"
+
 #include "Logger.h"
 #include "GenericToolbox.h"
 
-#include "GlobalVariables.h"
-#include "SampleElement.h"
+#include "TRandom.h"
+
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[SampleElement]");
@@ -31,7 +34,7 @@ void SampleElement::shrinkEventList(size_t newTotalSize_){
              "Can't shrink since eventList is too small: " << GET_VAR_NAME_VALUE(newTotalSize_)
              << " > " << GET_VAR_NAME_VALUE(eventList.size()));
   LogThrowIf(not eventNbList.empty() and eventNbList.back() < (eventList.size() - newTotalSize_), "Can't shrink since eventList of the last dataSet is too small.");
-  LogDebug << "Shrinking " << eventList.size() << " to " << newTotalSize_ << "..." << std::endl;
+  LogInfo << "-> Shrinking " << eventList.size() << " to " << newTotalSize_ << "..." << std::endl;
   eventNbList.back() -= (eventList.size() - newTotalSize_);
   eventList.resize(newTotalSize_);
   eventList.shrink_to_fit();
@@ -95,7 +98,7 @@ void SampleElement::updateBinEventList(int iThread_) {
 
     GlobalVariables::getThreadMutex().lock();
     // BETTER TO MAKE SURE THE MEMORY IS NOT MOVED WHILE FILLING UP
-    perBinEventPtrList.at(iBin) = thisBinEventList;
+    perBinEventPtrList[iBin] = thisBinEventList;
     GlobalVariables::getThreadMutex().unlock();
 
     iBin += nbThreads;
@@ -110,25 +113,82 @@ void SampleElement::refillHistogram(int iThread_){
     iThread_ = 0;
   }
 
-  // Faster that pointer shifter. -> would be slower if refillHistogram is handled by the propagator
+  // Faster that pointer shifter. -> would be slower if refillHistogram is
+  // handled by the propagator
 
   // Size = Nbins + 2 overflow (0 and last)
   auto* binContentArray = histogram->GetArray();
 
   int iBin = iThread_;
   int nBins = int(perBinEventPtrList.size());
-  while( iBin < nBins ){
-    binContentArray[iBin+1] = 0;
-    for( auto* eventPtr : perBinEventPtrList.at(iBin)){
-      binContentArray[iBin+1] += eventPtr->getEventWeight();
+
+#ifdef GUNDAM_USING_CUDA
+  if (_CacheManagerValue_) {
+      if (_CacheManagerValid_ && !(*_CacheManagerValid_)) {
+          // This is slowish, but will make sure that the cached result is
+          // updated when the cache has changed.  The values pointed to by
+          // _CacheManagerResult_ and _CacheManagerValid_ are inside
+          // of the weights cache (a bit of evil coding here), and are
+          // updated by the cache.  The update is triggered by
+          // _CacheManagerUpdate().
+          if (_CacheManagerUpdate_) (*_CacheManagerUpdate_)();
+      }
+  }
+  while( iBin < nBins ) {
+    double content = 0.0;
+    if (_CacheManagerValue_ && 0 <= _CacheManagerIndex_) {
+        content = _CacheManagerValue_[_CacheManagerIndex_+iBin];
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
+        double slowValue = 0.0;
+        for( auto* eventPtr : perBinEventPtrList.at(iBin)){
+            slowValue += eventPtr->getEventWeight();
+        }
+        double delta = std::abs(slowValue-content);
+        if (delta > 1E-6) {
+            LogInfo << "VALIDATION: Bin mismatch " << _CacheManagerIndex_
+                    << " " << iBin
+                    << " " << name
+                    << " " << slowValue
+                    << " " << content
+                    << " " << delta
+                    << std::endl;
+        }
+#endif
     }
-    histogram->GetSumw2()->GetArray()[iBin+1] = binContentArray[iBin+1];
+    else {
+        for( auto* eventPtr : perBinEventPtrList.at(iBin)){
+            content += eventPtr->getEventWeight();
+        }
+    }
+    binContentArray[iBin+1] = content;
+    histogram->GetSumw2()->GetArray()[iBin+1] = content;
     iBin += nbThreads;
   }
+#else
+  while( iBin < nBins ) {
+    binContentArray[iBin + 1] = 0;
+    for (auto *eventPtr: perBinEventPtrList[iBin]) {
+      binContentArray[iBin + 1] += eventPtr->getEventWeight();
+    }
+    histogram->GetSumw2()->GetArray()[iBin + 1] = binContentArray[iBin + 1];
+    iBin += nbThreads;
+  }
+#endif
 }
 void SampleElement::rescaleHistogram() {
   if( isLocked ) return;
   if(histScale != 1) histogram->Scale(histScale);
+}
+
+void SampleElement::throwStatError(){
+  int nCounts;
+  for( int iBin = 1 ; iBin <= histogram->GetNbinsX() ; iBin++ ){
+    nCounts = gRandom->Poisson(histogram->GetBinContent(iBin));
+    for (auto *eventPtr: perBinEventPtrList[iBin-1]) {
+      eventPtr->setEventWeight(eventPtr->getEventWeight()*((double)nCounts/histogram->GetBinContent(iBin)));
+    }
+    histogram->SetBinContent(iBin, nCounts);
+  }
 }
 
 double SampleElement::getSumWeights() const{

@@ -11,6 +11,7 @@ class NormalizationDial : public Dial {
 
 public:
   NormalizationDial();
+  std::unique_ptr<Dial> clone() const override { return std::make_unique<NormalizationDial>(*this); }
 
   void reset() override;
   void initialize() override;
@@ -20,8 +21,6 @@ public:
 protected:
   void fillResponseCache() override;
 
-private:
-//  double _priorValue_{std::nan("unset")};
 
 };
 

@@ -19,10 +19,11 @@
 #include "Logger.h"
 
 #include "FitParameter.h"
+#include "NestedDialTest.h"
 
 
 /*
- * FitParameterSet is a class which aims at handling a set of parameters bond together with a covariance matrix
+ * \class FitParameterSet is a class which aims at handling a set of parameters bond together with a covariance matrix
  * User parameters:
  * - Covariance matrix (dim N)
  * - N Fit Parameters (handing dials)
@@ -49,20 +50,15 @@ public:
 
   // Getters
   bool isEnabled() const;
-
-  bool isEnableThrowMcBeforeFit() const;
-
+  bool isEnabledThrowToyParameters() const;
   bool isUseOnlyOneParameterPerEvent() const;
   const std::string &getName() const;
   std::vector<FitParameter> &getParameterList();
   std::vector<FitParameter> &getEigenParameterList();
   const std::vector<FitParameter> &getParameterList() const;
   const nlohmann::json &getConfig() const;
-
   const std::shared_ptr<TMatrixDSym> &getPriorCorrelationMatrix() const;
-
   const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const;
-
   std::vector<FitParameter>& getEffectiveParameterList();
   const std::vector<FitParameter>& getEffectiveParameterList() const;
 
@@ -107,13 +103,13 @@ private:
   // Internals
   bool _isInitialized_{false};
   std::vector<FitParameter> _parameterList_;
+  std::vector<NestedDialTest> _nestedDialList_;
   TDirectory* _saveDir_{nullptr};
 
   // JSON
   std::string _name_;
   std::string _parameterDefinitionFilePath_{};
   bool _isEnabled_{};
-  bool _throwMcBeforeFit_{true};
   int _nbParameterDefinition_{-1};
   double _nominalStepSize_{-1};
   int _maxNbEigenParameters_{-1};
@@ -129,6 +125,9 @@ private:
   std::vector<FitParameter> _eigenParameterList_;
   std::shared_ptr<TMatrixDSymEigen> _eigenDecomp_{nullptr};
 
+  // Toy throwing
+  bool _enabledThrowToyParameters_{true};
+  std::shared_ptr<TVectorD> _throwEnabledList_{nullptr};
 
   // Used for base swapping
   std::shared_ptr<TVectorD> _eigenValues_{nullptr};

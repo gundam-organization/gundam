@@ -5,11 +5,14 @@
 #ifndef GUNDAM_EVENTTREEWRITER_H
 #define GUNDAM_EVENTTREEWRITER_H
 
-#include <TDirectory.h>
-
 #include "FitSampleSet.h"
 #include "FitParameterSet.h"
 #include "PhysicsEvent.h"
+
+#include <TDirectory.h>
+
+#include <vector>
+#include <string>
 
 class EventTreeWriter {
 

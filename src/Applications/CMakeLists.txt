@@ -1,6 +1,14 @@
 # Applications
 
 set( APPLICATION_LIST
+        # GUNDAM apps
+        gundamFitter
+        gundamConfigUnfolder
+        gundamPlotExtractor
+        gundamConfigCompare
+        gundamFitCompare
+
+        # Old xsllhFitter tools
         xsllhND280UpFit
         xsllhFit
         xsllhTreeConvert
@@ -11,21 +19,14 @@ set( APPLICATION_LIST
         xsllhPlot
         xsllhUnitTests
         xsllhXsecCov
-        gundamFitter
-        gundamConfigUnfolder
-        gundamPlotExtractor
-        gundamConfigCompare
-        YamlSandbox
-)
 
-include_directories(./include)
+        # Others
+        Sandbox
+)
 
 foreach( app ${APPLICATION_LIST} )
     cmessage( STATUS "Defining app: ${app}" )
     add_executable( ${app} src/${app}.cxx)
-    target_link_libraries(${app} ${ROOT_LIBRARIES} ${YAMLCPP_LIBRARY})
-    foreach(mod ${MODULETargets})
-        target_link_libraries(${app} ${mod})
-    endforeach()
+    target_link_libraries(${app}  GundamFitter)
     install( TARGETS ${app} DESTINATION bin )
 endforeach()

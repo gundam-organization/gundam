@@ -3,24 +3,34 @@
 //
 
 #include "FitterEngine.h"
-
 #include "JsonUtils.h"
 #include "GlobalVariables.h"
 
 #include "Logger.h"
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.h"
+#include "GenericToolbox.TablePrinter.h"
 
 #include <Math/Factory.h>
 #include "TGraph.h"
 #include "TLegend.h"
 
 #include <cmath>
-#include "GenericToolbox.TablePrinter.h"
+
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[FitterEngine]");
 })
+
+#ifndef GUNDAM_BATCH
+#define GUNDAM_SIGMA "σ"
+#define GUNDAM_CHI2 "χ²"
+#define GUNDAM_DELTA "Δ"
+#else
+#define GUNDAM_SIGMA "sigma"
+#define GUNDAM_CHI2 "chi-squared"
+#define GUNDAM_DELTA "delta-"
+#endif
 
 FitterEngine::FitterEngine() { this->reset(); }
 FitterEngine::~FitterEngine() { this->reset(); }
@@ -84,7 +94,6 @@ void FitterEngine::initialize() {
   _convergenceMonitor_.addDisplayedQuantity("LastAddedValue");
   _convergenceMonitor_.addDisplayedQuantity("SlopePerCall");
 
-//  _convergenceMonitor_.getQuantity("VarName").title = "χ² value"; // special chars resize the box
   _convergenceMonitor_.getQuantity("VarName").title = "Likelihood";
   _convergenceMonitor_.getQuantity("LastAddedValue").title = "Current Value";
   _convergenceMonitor_.getQuantity("SlopePerCall").title = "Avg. Slope /call";
@@ -94,13 +103,6 @@ void FitterEngine::initialize() {
   _convergenceMonitor_.addVariable("Syst");
 
   if( _saveDir_ != nullptr ){
-    GenericToolbox::mkdirTFile(_saveDir_, "fit")->cd();
-    _chi2HistoryTree_ = new TTree("chi2History", "chi2History");
-    _chi2HistoryTree_->Branch("nbFitCalls", &_nbFitCalls_);
-    _chi2HistoryTree_->Branch("chi2Total", &_chi2Buffer_);
-    _chi2HistoryTree_->Branch("chi2Stat", &_chi2StatBuffer_);
-    _chi2HistoryTree_->Branch("chi2Pulls", &_chi2PullsBuffer_);
-
     auto* dir = GenericToolbox::mkdirTFile(_saveDir_, "preFit/events");
     _propagator_.getTreeWriter().writeSamples(dir);
   }
@@ -114,7 +116,7 @@ void FitterEngine::initialize() {
 
       if(not parSet.isEnabled()) continue;
 
-      if( not parSet.isEnableThrowMcBeforeFit() ){
+      if( not parSet.isEnabledThrowToyParameters() ){
         LogWarning << "\"" << parSet.getName() << "\" has marked disabled throwMcBeforeFit: skipping." << std::endl;
         continue;
       }
@@ -156,6 +158,8 @@ void FitterEngine::initialize() {
 
   this->initializeMinimizer();
 
+  _scanConfig_ = ScanConfig( JsonUtils::fetchValue(_config_, "scanConfig", nlohmann::json()) );
+
 }
 
 bool FitterEngine::isFitHasConverged() const {
@@ -168,6 +172,9 @@ double FitterEngine::getChi2StatBuffer() const {
   return _chi2StatBuffer_;
 }
 const Propagator& FitterEngine::getPropagator() const {
+  return _propagator_;
+}
+Propagator& FitterEngine::getPropagator() {
   return _propagator_;
 }
 
@@ -271,7 +278,7 @@ void FitterEngine::fixGhostFitParameters(){
   _propagator_.allowRfPropagation(); // since we don't need the weight of each event (only the Chi2 value)
   updateChi2Cache();
 
-  LogDebug << "Reference χ² = " << _chi2StatBuffer_ << std::endl;
+  LogDebug << "Reference " << GUNDAM_CHI2 << " = " << _chi2StatBuffer_ << std::endl;
   double baseChi2 = _chi2Buffer_;
   double baseChi2Stat = _chi2StatBuffer_;
   double baseChi2Syst = _chi2PullsBuffer_;
@@ -292,7 +299,8 @@ void FitterEngine::fixGhostFitParameters(){
     for( auto& par : parList ){
       ssPrint.str("");
 
-      ssPrint << "(" << par.getParameterIndex()+1 << "/" << parList.size() << ") +1σ on " << parSet.getName() + "/" + par.getTitle();
+
+      ssPrint << "(" << par.getParameterIndex()+1 << "/" << parList.size() << ") +1" << GUNDAM_SIGMA << " on " << parSet.getName() + "/" + par.getTitle();
 
       if( fixNextEigenPars ){
         par.setIsFixed(true);
@@ -318,7 +326,8 @@ void FitterEngine::fixGhostFitParameters(){
         deltaChi2Stat = _chi2StatBuffer_ - baseChi2Stat;
 //        deltaChi2Syst = _chi2PullsBuffer_ - baseChi2Syst;
 //        deltaChi2 = _chi2Buffer_ - baseChi2;
-        ssPrint << ": Δχ²(stat) = " << deltaChi2Stat;
+
+        ssPrint << ": " << GUNDAM_DELTA << GUNDAM_CHI2 << " (stat) = " << deltaChi2Stat;
 
         LogInfo.moveTerminalCursorBack(1);
         LogInfo << ssPrint.str() << std::endl;
@@ -365,52 +374,171 @@ void FitterEngine::scanParameters(int nbSteps_, const std::string &saveDir_) {
 }
 void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &saveDir_) {
 
-  if( nbSteps_ < 0 ){ nbSteps_ = _nbScanSteps_; }
+  std::pair<double, double> parameterSigmaRange{-3, 3};
 
-//  double originalParValue = fetchCurrentParameterValue(iPar);
+  if( nbSteps_ < 0 ){ nbSteps_ = _scanConfig_.getNbPoints(); }
 
-  //Internally Scan performs steps-1, so add one to actually get the number of steps
-  //we ask for.
-  unsigned int adj_steps = nbSteps_+1;
-  auto* x = new double[adj_steps] {};
-  auto* y = new double[adj_steps] {};
+  std::vector<double> parPoints(nbSteps_+1,0);
 
-  LogInfo << "Scanning fit parameter #" << iPar
-          << ": " << _minimizer_->VariableName(iPar) << " / " << nbSteps_ << " steps..." << std::endl;
+  std::stringstream ssPbar;
+  ssPbar << LogInfo.getPrefixString() << "Scanning fit parameter #" << iPar
+         << ": " << _minimizer_->VariableName(iPar) << " / " << nbSteps_ << " steps...";
+  GenericToolbox::displayProgressBar(0, nbSteps_, ssPbar.str());
 
-  _propagator_.allowRfPropagation();
-  bool success = _minimizer_->Scan(iPar, adj_steps, x, y);
-
-  if( not success ){
-    LogError << "Parameter scan failed." << std::endl;
+  scanDataDict.clear();
+  if( JsonUtils::fetchValue(_scanConfig_.getVarsConfig(), "llh", true) ){
+    scanDataDict.emplace_back();
+    auto& scanEntry = scanDataDict.back();
+    scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
+    scanEntry.folder = "llh";
+    scanEntry.title = "Total Likelihood Scan";
+    scanEntry.yTitle = "LLH value";
+    scanEntry.evalY = [this](){ return this->_chi2Buffer_; };
+  }
+  if( JsonUtils::fetchValue(_scanConfig_.getVarsConfig(), "llhPenalty", true) ){
+    scanDataDict.emplace_back();
+    auto& scanEntry = scanDataDict.back();
+    scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
+    scanEntry.folder = "llhPenalty";
+    scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
+    scanEntry.title = "Penalty Likelihood Scan";
+    scanEntry.yTitle = "Penalty LLH value";
+    scanEntry.evalY = [this](){ return this->_chi2PullsBuffer_; };
+  }
+  if( JsonUtils::fetchValue(_scanConfig_.getVarsConfig(), "llhStat", true) ){
+    scanDataDict.emplace_back();
+    auto& scanEntry = scanDataDict.back();
+    scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
+    scanEntry.folder = "llhStat";
+    scanEntry.title = "Stat Likelihood Scan";
+    scanEntry.yTitle = "Stat LLH value";
+    scanEntry.evalY = [this](){ return this->_chi2StatBuffer_; };
+  }
+  if( JsonUtils::fetchValue(_scanConfig_.getVarsConfig(), "llhStatPerSample", false) ){
+    for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
+      scanDataDict.emplace_back();
+      auto& scanEntry = scanDataDict.back();
+      scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
+      scanEntry.folder = "llhStat/" + sample.getName() + "/";
+      scanEntry.title = Form("Stat Likelihood Scan of sample \"%s\"", sample.getName().c_str());
+      scanEntry.yTitle = "Stat LLH value";
+      auto* samplePtr = &sample;
+      scanEntry.evalY = [this, samplePtr](){ return _propagator_.getFitSampleSet().evalLikelihood(*samplePtr); };
+    }
+  }
+  if( JsonUtils::fetchValue(_scanConfig_.getVarsConfig(), "llhStatPerSamplePerBin", false) ){
+    for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
+      for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+        scanDataDict.emplace_back();
+        auto& scanEntry = scanDataDict.back();
+        scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
+        scanEntry.folder = "llhStat/" + sample.getName() + "/bin_" + std::to_string(iBin);
+        scanEntry.title = Form(R"(Stat LLH Scan of sample "%s", bin #%d "%s")",
+                               sample.getName().c_str(),
+                               iBin,
+                               sample.getBinning().getBinsList()[iBin-1].getSummary().c_str());
+        scanEntry.yTitle = "Stat LLH value";
+        auto* samplePtr = &sample;
+        scanEntry.evalY = [this, samplePtr, iBin](){ return (*_propagator_.getFitSampleSet().getLikelihoodFunctionPtr())(
+            samplePtr->getMcContainer().histogram->GetBinContent(iBin),
+            std::pow(samplePtr->getMcContainer().histogram->GetBinError(iBin), 2),
+            samplePtr->getDataContainer().histogram->GetBinContent(iBin)
+        );
+        };
+      }
+    }
+  }
+  if( JsonUtils::fetchValue(_scanConfig_.getVarsConfig(), "weightPerSample", false) ){
+    for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
+      scanDataDict.emplace_back();
+      auto& scanEntry = scanDataDict.back();
+      scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
+      scanEntry.folder = "weight/" + sample.getName();
+      scanEntry.title = Form("MC event weight scan of sample \"%s\"", sample.getName().c_str());
+      scanEntry.yTitle = "Total MC event weight";
+      auto* samplePtr = &sample;
+      scanEntry.evalY = [samplePtr](){ return samplePtr->getMcContainer().getSumWeights(); };
+    }
+  }
+  if( JsonUtils::fetchValue(_scanConfig_.getVarsConfig(), "weightPerSamplePerBin", false) ){
+    for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
+      for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+        scanDataDict.emplace_back();
+        auto& scanEntry = scanDataDict.back();
+        scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
+        scanEntry.folder = "weight/" + sample.getName() + "/bin_" + std::to_string(iBin);
+        scanEntry.title = Form(R"(MC event weight scan of sample "%s", bin #%d "%s")",
+                               sample.getName().c_str(),
+                               iBin,
+                               sample.getBinning().getBinsList()[iBin-1].getSummary().c_str());
+        scanEntry.yTitle = "Total MC event weight";
+        auto* samplePtr = &sample;
+        scanEntry.evalY = [samplePtr, iBin](){ return samplePtr->getMcContainer().histogram->GetBinContent(iBin); };
+      }
+    }
   }
 
-  TGraph scanGraph(nbSteps_, x, y);
+  double origVal = _minimizerFitParameterPtr_[iPar]->getParameterValue();
+  double lowBound = origVal + _scanConfig_.getParameterSigmaRange().first * _minimizerFitParameterPtr_[iPar]->getStdDevValue();
+  double highBound = origVal + _scanConfig_.getParameterSigmaRange().second * _minimizerFitParameterPtr_[iPar]->getStdDevValue();
+
+  if( _scanConfig_.isUseParameterLimits() ){
+    lowBound = std::max(lowBound, _minimizerFitParameterPtr_[iPar]->getMinValue());
+    highBound = std::min(highBound, _minimizerFitParameterPtr_[iPar]->getMaxValue());
+  }
+
+  int offSet{0};
+  for( int iPt = 0 ; iPt < nbSteps_+1 ; iPt++ ){
+    GenericToolbox::displayProgressBar(iPt, nbSteps_, ssPbar.str());
+
+    double newVal = lowBound + double(iPt-offSet)/(nbSteps_-1)*( highBound - lowBound );
+    if( offSet == 0 and newVal > origVal ){
+      newVal = origVal;
+      offSet = 1;
+    }
+
+    _minimizerFitParameterPtr_[iPar]->setParameterValue(newVal);
+    this->updateChi2Cache();
+    parPoints[iPt] = _minimizerFitParameterPtr_[iPar]->getParameterValue();
+
+    for( auto& scanEntry : scanDataDict ){ scanEntry.yPoints[iPt] = scanEntry.evalY(); }
+  }
+
+
+  _minimizerFitParameterPtr_[iPar]->setParameterValue(origVal);
 
   std::stringstream ss;
   ss << GenericToolbox::replaceSubstringInString(_minimizer_->VariableName(iPar), "/", "_");
   ss << "_TGraph";
 
-  scanGraph.SetTitle(_fitIsDone_ ? "Post-fit scan": "Pre-fit scan");
-  scanGraph.GetYaxis()->SetTitle("LLH");
-  scanGraph.GetYaxis()->SetTitle(_minimizer_->VariableName(iPar).c_str());
-
-  if( _saveDir_ != nullptr ){
-    GenericToolbox::mkdirTFile(_saveDir_, saveDir_)->cd();
-    scanGraph.Write( ss.str().c_str() );
+  for( auto& scanEntry : scanDataDict ){
+    TGraph scanGraph(int(parPoints.size()), &parPoints[0], &scanEntry.yPoints[0]);
+    scanGraph.SetTitle(scanEntry.title.c_str());
+    scanGraph.GetYaxis()->SetTitle(scanEntry.yTitle.c_str());
+    scanGraph.GetXaxis()->SetTitle(_minimizer_->VariableName(iPar).c_str());
+    if( _saveDir_ != nullptr ){
+      GenericToolbox::mkdirTFile(_saveDir_, saveDir_ + "/" + scanEntry.folder )->cd();
+      scanGraph.Write( ss.str().c_str() );
+    }
   }
+
   _propagator_.preventRfPropagation();
 
 //  _minimizer_->SetVariableValue(iPar, originalParValue);
 //  this->updateParameterValue(iPar, originalParValue);
 //  updateChi2Cache();
 
-  delete[] x;
-  delete[] y;
 }
 
 void FitterEngine::fit(){
   LogWarning << __METHOD_NAME__ << std::endl;
+
+  GenericToolbox::mkdirTFile(_saveDir_, "fit")->cd();
+  _chi2HistoryTree_ = new TTree("chi2History", "chi2History");
+  _chi2HistoryTree_->Branch("nbFitCalls", &_nbFitCalls_);
+  _chi2HistoryTree_->Branch("chi2Total", &_chi2Buffer_);
+  _chi2HistoryTree_->Branch("chi2Stat", &_chi2StatBuffer_);
+  _chi2HistoryTree_->Branch("chi2Pulls", &_chi2PullsBuffer_);
 
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Summary of the fit parameters:") << std::endl;
 
@@ -651,16 +779,31 @@ double FitterEngine::evalFit(const double* parArray_){
       GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("itSpeed");
     }
 
-
     std::stringstream ss;
     ss << __METHOD_NAME__ << ": call #" << _nbFitCalls_;
     ss << std::endl << "Current RAM: " << GenericToolbox::parseSizeUnits(GenericToolbox::getProcessMemoryUsage());
-    ss << std::endl << "Avg χ² computation time: " << _evalFitAvgTimer_;
+    ss << std::endl << "Avg " << GUNDAM_CHI2 << " computation time: " << _evalFitAvgTimer_;
     if( not _propagator_.isUseResponseFunctions() ){
-      ss << std::endl << "├─ Current speed: " << (double)_itSpeed_.counts/(double)_itSpeed_.cumulated * 1E6 << " it/s";
-      ss << std::endl << "├─ Avg time for " << _minimizerType_ << "/" << _minimizerAlgo_ << ": " << _outEvalFitAvgTimer_;
-      ss << std::endl << "├─ Avg time to propagate weights: " << _propagator_.weightProp;
-      ss << std::endl << "├─ Avg time to fill histograms: " << _propagator_.fillProp;
+      ss << std::endl;
+#ifndef GUNDAM_BATCH
+      ss << "├─";
+#endif
+      ss << " Current speed:                 " << (double)_itSpeed_.counts/(double)_itSpeed_.cumulated * 1E6 << " it/s";
+      ss << std::endl;
+#ifndef GUNDAM_BATCH
+      ss << "├─";
+#endif
+      ss << " Avg time for " << _minimizerType_ << "/" << _minimizerAlgo_ << ": " << _outEvalFitAvgTimer_;
+      ss << std::endl;
+#ifndef GUNDAM_BATCH
+      ss << "├─";
+#endif
+      ss << " Avg time to propagate weights: " << _propagator_.weightProp;
+      ss << std::endl;
+#ifndef GUNDAM_BATCH
+      ss << "├─";
+#endif
+      ss << " Avg time to fill histograms:   " << _propagator_.fillProp;
     }
     else{
       ss << GET_VAR_NAME_VALUE(_propagator_.applyRf);

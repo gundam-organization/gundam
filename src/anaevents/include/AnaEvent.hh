@@ -16,8 +16,6 @@
 #include "Logger.h"
 #include "GenericToolbox.h"
 
-#include "FitParameterSet.h"
-#include "Dial.h"
 #include "DataBin.h"
 #include "DataBinSet.h"
 
@@ -31,6 +29,8 @@ namespace AnaEventType{
   )
 };
 
+class FitParameterSet;
+class Dial;
 
 class AnaEvent
 {
@@ -144,8 +144,8 @@ private:
   AnaEventType::AnaEventType _anaEventType_;
 
   // Multi-thread security
-  bool _isBeingEdited_;
-  bool _treeEventHasBeenDumped_;
+  bool _isBeingEdited_{};
+  bool _treeEventHasBeenDumped_{};
 
 //  TChain* _chainPtr_{nullptr};
   TTree* _singleEntryTree_{nullptr};
@@ -161,31 +161,31 @@ private:
   std::vector<std::string>  _defaultFloatNameList_;   // here for memory management if the ptr is not manually assigned
   std::vector<Float_t> _floatValuesList_;
 
-  bool m_signal;     //flag if signal event
-  bool m_true_evt;   //flag if true event
-  long int m_evid;   //unique event id
-  int _trueBinIndex_;
-  int _recoBinIndex_;
+  bool m_signal{};     //flag if signal event
+  bool m_true_evt{};   //flag if true event
+  long int m_evid{};   //unique event id
+  int _trueBinIndex_{};
+  int _recoBinIndex_{};
 
-  double _eventWeight_;
+  double _eventWeight_{};
 
-  Int_t* _flavorPtr_;     //flavor of neutrino (numu, etc.)
-  Int_t* _beamModePtr_;   //Forward horn current (+1) or reverse horn current (-1)
-  Int_t* _topologyPtr_;   //final state topology type
-  Int_t* _reactionPtr_;   //event interaction mode
-  Int_t* _targetPtr_;     //target nuclei
-  Int_t* _samplePtr_;     //sample type (aka cutBranch)
-  Int_t* _sigTypePtr_;    //signal definition
+  Int_t* _flavorPtr_{};     //flavor of neutrino (numu, etc.)
+  Int_t* _beamModePtr_{};   //Forward horn current (+1) or reverse horn current (-1)
+  Int_t* _topologyPtr_{};   //final state topology type
+  Int_t* _reactionPtr_{};   //event interaction mode
+  Int_t* _targetPtr_{};     //target nuclei
+  Int_t* _samplePtr_{};     //sample type (aka cutBranch)
+  Int_t* _sigTypePtr_{};    //signal definition
 
-  Float_t* _enuTruePtr_;
-  Float_t* _enuRecoPtr_;
-  Float_t* _d1TruePtr_;
-  Float_t* _d1RecoPtr_;
-  Float_t* _d2TruePtr_;
-  Float_t* _d2RecoPtr_;
-  Float_t* _q2TruePtr_;
-  Float_t* _q2RecoPtr_;
-  Float_t* _weightMCPtr_;
+  Float_t* _enuTruePtr_{};
+  Float_t* _enuRecoPtr_{};
+  Float_t* _d1TruePtr_{};
+  Float_t* _d1RecoPtr_{};
+  Float_t* _d2TruePtr_{};
+  Float_t* _d2RecoPtr_{};
+  Float_t* _q2TruePtr_{};
+  Float_t* _q2RecoPtr_{};
+  Float_t* _weightMCPtr_{};
 
   // Cache
   std::map<FitParameterSet*, std::vector<Dial*>> _dialCache_; // _dialCache_[fitParSetPtr][ParIndex] = correspondingDialPtr;

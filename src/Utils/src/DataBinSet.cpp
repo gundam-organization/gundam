@@ -32,7 +32,6 @@ void DataBinSet::setName(const std::string &name) {
 }
 void DataBinSet::readBinningDefinition(const std::string &filePath_) {
 
-  LogDebug << "Reading binning definition from: \"" << filePath_ << "\"" << std::endl;
   _filePath_ = filePath_;
 
   if( not GenericToolbox::doesPathIsFile(filePath_) ){
@@ -106,9 +105,6 @@ void DataBinSet::readBinningDefinition(const std::string &filePath_) {
           expectedVariableTitleList.back() += " (point)";
         }
       }
-
-      LogDebug << "Defined edges for variables: " << GenericToolbox::parseVectorAsString(expectedVariableTitleList) << std::endl;
-
     }
     else if( expectedVariableList.empty() ){
       LogError << "Can't fill bin info while variables have not been set" << std::endl;
@@ -150,9 +146,10 @@ void DataBinSet::readBinningDefinition(const std::string &filePath_) {
 
     }
   }
-
-  LogDebug << _binsList_.size() << " bins have been defined." << std::endl;
-
+}
+void DataBinSet::addBin(const DataBin& bin_){
+  _binsList_.emplace_back(bin_);
+  _binContent_.emplace_back(0);
 }
 void DataBinSet::setVerbosity(int maxLogLevel_) {
   Logger::setMaxLogLevel(maxLogLevel_);
@@ -188,4 +185,8 @@ const std::string &DataBinSet::getFilePath() const {
 }
 const std::vector<std::string> &DataBinSet::getBinVariables() const {
   return _binVariables_;
+}
+
+std::vector<DataBin> &DataBinSet::getBinsList(){
+  return _binsList_;
 }

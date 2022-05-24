@@ -56,15 +56,13 @@ void FitParameterSet::initialize() {
   // Make the matrix inversion
   this->prepareFitParameters();
 
-  _throwMcBeforeFit_ = JsonUtils::fetchValue(_config_, "throwMcBeforeFit", _throwMcBeforeFit_);
-
   _isInitialized_ = true;
 }
 void FitParameterSet::prepareFitParameters(){
 
   if( _priorCovarianceMatrix_ == nullptr ){ return; } // nothing to do
 
-  LogInfo << "Stripping the matrix from fixed/disabled parameters..." << std::endl;
+  LogInfo << "Stripping the matrix from fixed/disabled parameters in set: " << getName() << std::endl;
   int nbFitParameters{0};
   for( const auto& par : _parameterList_ ){
     if( par.isEnabled() and not par.isFixed() and not par.isFree() ) nbFitParameters++;
@@ -93,7 +91,7 @@ void FitParameterSet::prepareFitParameters(){
     _inverseStrippedCovarianceMatrix_->Invert();
   }
   else {
-    LogWarning << "Decomposing the stripped covariance matrix..." << std::endl;
+    LogWarning << "Decomposing the stripped covariance matrix in set: " << getName() << std::endl;
     _eigenParameterList_.resize(_strippedCovarianceMatrix_->GetNrows());
 
     _eigenDecomp_     = std::shared_ptr<TMatrixDSymEigen>(new TMatrixDSymEigen(*_strippedCovarianceMatrix_));
@@ -118,7 +116,7 @@ void FitParameterSet::prepareFitParameters(){
       _eigenParameterList_[iEigen].setIsEigen(true);
       _eigenParameterList_[iEigen].setIsEnabled(true);
       _eigenParameterList_[iEigen].setIsFixed(false);
-      _eigenParameterList_[iEigen].setParSetRef(this);
+      _eigenParameterList_[iEigen].setOwner(this);
       _eigenParameterList_[iEigen].setParameterIndex(iEigen);
       _eigenParameterList_[iEigen].setStdDevValue(TMath::Sqrt((*_eigenValues_)[iEigen]));
       _eigenParameterList_[iEigen].setStepSize(TMath::Sqrt((*_eigenValues_)[iEigen]));
@@ -188,8 +186,8 @@ void FitParameterSet::prepareFitParameters(){
 bool FitParameterSet::isEnabled() const {
   return _isEnabled_;
 }
-bool FitParameterSet::isEnableThrowMcBeforeFit() const {
-  return _throwMcBeforeFit_;
+bool FitParameterSet::isEnabledThrowToyParameters() const {
+  return _enabledThrowToyParameters_;
 }
 const std::string &FitParameterSet::getName() const {
   return _name_;
@@ -250,7 +248,7 @@ double FitParameterSet::getPenaltyChi2() {
 
 // Parameter throw
 void FitParameterSet::moveFitParametersToPrior(){
-  LogInfo << "Moving back fit parameters to their prior value..." << std::endl;
+  LogInfo << "Moving back fit parameters to their prior value in set: " << getName() << std::endl;
 
   if( not _useEigenDecompInFit_ ){
     for( auto& par : _parameterList_ ){
@@ -275,19 +273,21 @@ void FitParameterSet::throwFitParameters(double gain_){
     LogInfo << "Throwing parameters for " << _name_ << " using Cholesky matrix" << std::endl;
 
     if( _choleskyMatrix_ == nullptr ){
-      LogInfo << "Generating Cholesky matrix..." << std::endl;
+      LogInfo << "Generating Cholesky matrix in set: " << getName() << std::endl;
       _choleskyMatrix_ = std::shared_ptr<TMatrixD>(
           GenericToolbox::getCholeskyMatrix(_strippedCovarianceMatrix_.get())
       );
     }
 
     auto throws = GenericToolbox::throwCorrelatedParameters(_choleskyMatrix_.get());
-    int iPar{0};
+    int iPar{-1};
     for( auto& par : _parameterList_ ){
-      if( not par.isEnabled() ) LogWarning << "Parameter " << par.getTitle() << " is disabled. Not throwing" << std::endl; continue;
+      iPar++;
+      if( _throwEnabledList_ != nullptr and (*_throwEnabledList_)[iPar] != 1 ){ LogWarning << "Parameter " << par.getTitle() << " is marked as non-throwing." << std::endl; continue; }
+      if( not par.isEnabled() ){ LogWarning << "Parameter " << par.getTitle() << " is disabled. Not throwing" << std::endl; continue; }
       if( par.isFixed() ){ LogWarning << "Parameter " << par.getTitle() << " is fixed. Not throwing" << std::endl; continue; }
       LogInfo << "Throwing par " << par.getTitle() << ": " << par.getParameterValue();
-      par.setParameterValue( par.getPriorValue() + gain_ * throws[iPar++] );
+      par.setParameterValue( par.getPriorValue() + gain_ * throws[iPar] );
       LogInfo << " → " << par.getParameterValue() << std::endl;
     }
   }
@@ -296,7 +296,7 @@ void FitParameterSet::throwFitParameters(double gain_){
     for( auto& eigenPar : _eigenParameterList_ ){
       if( eigenPar.isFixed() ){ LogWarning << "Eigen parameter #" << eigenPar.getParameterIndex() << " is fixed. Not throwing" << std::endl; continue; }
       eigenPar.setParameterValue(
-          eigenPar.getPriorValue() + gain_ * GlobalVariables::getPrng().Gaus(0, eigenPar.getStdDevValue())
+          eigenPar.getPriorValue() + gain_ * gRandom->Gaus(0, eigenPar.getStdDevValue())
           );
     }
     this->propagateEigenToOriginal();
@@ -369,6 +369,7 @@ std::string FitParameterSet::getSummary() const {
       std::vector<std::vector<std::string>> tableLines;
       tableLines.emplace_back(std::vector<std::string>{
         "Title",
+        "Value",
         "Prior",
         "StdDev",
 //        "StepSize",
@@ -380,13 +381,15 @@ std::string FitParameterSet::getSummary() const {
 
       for( const auto& par : _parameterList_ ){
         std::vector<std::string> lineValues(tableLines[0].size());
-        lineValues[0] = par.getTitle();
-        lineValues[1] = std::to_string( par.getPriorValue() );
-        lineValues[2] = std::to_string( par.getStdDevValue() );
-//        lineValues[3] = std::to_string( par.getStepSize() );
+        int idx{0};
+        lineValues[idx++] = par.getTitle();
+        lineValues[idx++] = std::to_string( par.getParameterValue() );
+        lineValues[idx++] = std::to_string( par.getPriorValue() );
+        lineValues[idx++] = std::to_string( par.getStdDevValue() );
+//        lineValues[idx++] = std::to_string( par.getStepSize() );
 
-        lineValues[3] = std::to_string( par.getMinValue() );
-        lineValues[4] = std::to_string( par.getMaxValue() );
+        lineValues[idx++] = std::to_string( par.getMinValue() );
+        lineValues[idx++] = std::to_string( par.getMaxValue() );
 
         std::string colorStr;
 
@@ -541,6 +544,16 @@ void FitParameterSet::readParameterDefinitionFile(){
                                                                  << ") as cov matrix(" << _nbParameterDefinition_ << ")" );
   }
 
+  _enabledThrowToyParameters_ = JsonUtils::fetchValue(_config_, "enabledThrowToyParameters", _enabledThrowToyParameters_);
+  strBuffer = JsonUtils::fetchValue<std::string>(_config_, "throwEnabledList", "");
+  if( not strBuffer.empty() ){
+    LogInfo << "Reading provided throwEnabledList: \"" << strBuffer << "\"" << std::endl;
+
+    objBuffer = parDefFile->Get(strBuffer.c_str());
+    LogThrowIf(objBuffer == nullptr, "Can't find \"" << strBuffer << "\" in " << parDefFile->GetPath())
+    _throwEnabledList_ = std::shared_ptr<TVectorD>((TVectorD*) objBuffer->Clone());
+  }
+
   parDefFile->Close();
 }
 void FitParameterSet::readConfigOptions(){
@@ -590,11 +603,11 @@ void FitParameterSet::readConfigOptions(){
 
 }
 void FitParameterSet::defineParameters(){
-  LogInfo << "Defining parameters..." << std::endl;
+  LogInfo << "Defining parameters in set: " << getName() << std::endl;
   _parameterList_.resize(_nbParameterDefinition_);
   for(int iParameter = 0 ; iParameter < _nbParameterDefinition_ ; iParameter++ ){
 
-    _parameterList_[iParameter].setParSetRef(this);
+    _parameterList_[iParameter].setOwner(this);
     _parameterList_[iParameter].setParameterIndex(iParameter);
 
     if( _priorCovarianceMatrix_ != nullptr ){

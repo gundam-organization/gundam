@@ -42,7 +42,7 @@ public:
   SampleElement &getDataContainer();
 
   // Misc
-  bool isDataSetValid(const std::string& dataSetName_);
+  bool isDatasetValid(const std::string& datasetName_);
 
 private:
   // Yaml
@@ -50,7 +50,7 @@ private:
   bool _isEnabled_{false};
   std::string _name_;
   std::string _selectionCuts_;
-  std::vector<std::string> _dataSetsSelections_;
+  std::vector<std::string> _enabledDatasetList_;
   double _mcNorm_{1};
   double _dataNorm_{1};
 

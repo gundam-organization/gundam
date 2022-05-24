@@ -5,14 +5,14 @@
 #ifndef GUNDAM_SAMPLEELEMENT_H
 #define GUNDAM_SAMPLEELEMENT_H
 
-#include "vector"
-#include "memory"
-#include "string"
+#include "DataBinSet.h"
+#include "PhysicsEvent.h"
 
 #include "TH1D.h"
 
-#include "DataBinSet.h"
-#include "PhysicsEvent.h"
+#include "vector"
+#include "memory"
+#include "string"
 
 
 class SampleElement{
@@ -47,12 +47,32 @@ public:
   void refillHistogram(int iThread_ = -1);
   void rescaleHistogram();
 
+  void throwStatError();
+
   double getSumWeights() const;
 
   // debug
   void print() const;
 
   bool debugTrigger{false};
+
+#ifdef GUNDAM_USING_CUDA
+public:
+  void setCacheManagerIndex(int i) {_CacheManagerIndex_ = i;}
+  int  getCacheManagerIndex() {return _CacheManagerIndex_;}
+  void setCacheManagerValuePointer(const double* v) {_CacheManagerValue_ = v;}
+  void setCacheManagerValidPointer(const bool* v) {_CacheManagerValid_ = v;}
+  void setCacheManagerUpdatePointer(void (*p)()) {_CacheManagerUpdate_ = p;}
+private:
+  // An "opaque" index into the cache that is used to simplify bookkeeping.
+  int _CacheManagerIndex_{-1};
+  // A pointer to the cached result.
+  const double* _CacheManagerValue_{nullptr};
+  // A pointer to the cache validity flag.
+  const bool* _CacheManagerValid_{nullptr};
+  // A pointer to a callback to force the cache to be updated.
+  void (*_CacheManagerUpdate_)(){nullptr};
+#endif
 
 };
 

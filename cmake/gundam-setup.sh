@@ -71,7 +71,7 @@ ___gundam_target () {
             compiler_machine=$(uname -s)-$(uname -m)
             ;;
     esac
-    target="${target}-${compiler}-${compiler_version}-${compiler_machine}"
+    target="${target}-${compiler}_${compiler_version}-${compiler_machine}"
     echo $target
 }
 

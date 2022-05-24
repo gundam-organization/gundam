@@ -5,6 +5,7 @@ set( SRCFILES
         src/FitSampleSet.cpp
         src/FitSample.cpp
         src/PhysicsEvent.cpp
+        src/PlotGenerator.cpp
         )
 
 if( USE_STATIC_LINKS STREQUAL "1" )
@@ -12,6 +13,9 @@ if( USE_STATIC_LINKS STREQUAL "1" )
 else()
   add_library(GundamFitSamples SHARED ${SRCFILES})
 endif()
+
+target_include_directories(GundamFitSamples PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 target_link_libraries( GundamFitSamples PUBLIC
         GundamUtils
@@ -26,4 +30,3 @@ set_target_properties(
 
 install(TARGETS GundamFitSamples DESTINATION lib)
 
-set(MODULETargets ${MODULETargets} GundamFitSamples PARENT_SCOPE)

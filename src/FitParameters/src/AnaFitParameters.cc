@@ -8,8 +8,8 @@ LoggerInit([](){
 } )
 
 AnaFitParameters::AnaFitParameters()
-    : m_name("")
-    , Npar(0)
+    : Npar(0)
+    , m_name("")
     , m_rng_start(false)
     , m_do_throw(false)
     , m_decompose(false)

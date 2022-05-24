@@ -5,12 +5,13 @@
 #ifndef GUNDAM_FITPARAMETER_H
 #define GUNDAM_FITPARAMETER_H
 
+#include "DialSet.h"
+
+#include "GenericToolbox.h"
+
 #include "vector"
 #include "string"
 #include "json.hpp"
-#include "GenericToolbox.h"
-
-#include "DialSet.h"
 
 namespace PriorType{
   ENUM_EXPANDER(
@@ -23,6 +24,7 @@ namespace PriorType{
   PriorType toPriorType(const std::string& priorStr_);
 }
 
+class FitParameterSet;
 
 class FitParameter {
 
@@ -48,7 +50,7 @@ public:
   void setMinValue(double minValue);
   void setMaxValue(double maxValue);
   void setStepSize(double stepSize);
-  void setParSetRef(void *parSetRef);
+  void setOwner(const FitParameterSet *owner_);
   void setPriorType(PriorType::PriorType priorType);
 
   void setValueAtPrior();
@@ -72,7 +74,7 @@ public:
   double getMaxValue() const;
   double getStepSize() const;
 
-  void *getParSetRef() const;
+  const FitParameterSet *getOwner() const;
 
   // Core
   double getDistanceFromNominal() const; // in unit of sigmas
@@ -82,6 +84,8 @@ public:
   std::string getFullTitle() const;
 
 private:
+  const FitParameterSet* _owner_{nullptr};
+
   // Parameters
   std::string _name_;
   int _parameterIndex_{-1}; // to get the right definition in the json config (in case "name" is not specified)
@@ -93,11 +97,10 @@ private:
   double _stepSize_{std::nan("UNSET")};
   nlohmann::json _parameterConfig_;
   nlohmann::json _dialDefinitionsList_;
-  bool _enableDialSetsSummary_;
+  bool _enableDialSetsSummary_{false};
   std::string _dialsWorkingDirectory_;
   bool _isEnabled_{true};
   bool _isFixed_{false};
-  void* _parSetRef_{nullptr};
 
   bool _isEigen_{false};
   bool _isFree_{false};

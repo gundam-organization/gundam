@@ -2,14 +2,18 @@
 // Created by Nadrino on 22/07/2021.
 //
 
-#include "chrono"
+#include "FitSample.h"
+
+#include <memory>
+#include "GlobalVariables.h"
+#include "JsonUtils.h"
 
 #include "GenericToolbox.h"
 #include "Logger.h"
 
-#include "JsonUtils.h"
-#include "GlobalVariables.h"
-#include "FitSample.h"
+#include "vector"
+#include "string"
+
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[FitSample]");
@@ -25,7 +29,7 @@ void FitSample::reset() {
   _isEnabled_ = false;
   _name_ = "";
   _selectionCuts_ = "";
-  _dataSetsSelections_.clear();
+  _enabledDatasetList_.clear();
   _mcNorm_ = 1;
   _dataNorm_ = 1;
 
@@ -41,7 +45,7 @@ void FitSample::setConfig(const nlohmann::json &config_) {
 
 void FitSample::initialize() {
 
-  LogAssert(not _config_.empty(), GET_VAR_NAME_VALUE(_config_.empty()));
+  LogAssert(not _config_.empty(), GET_VAR_NAME_VALUE(_config_.empty()))
 
   _name_ = JsonUtils::fetchValue<std::string>(_config_, "name");
   LogThrowIf(
@@ -57,10 +61,7 @@ void FitSample::initialize() {
   LogInfo << "Initializing FitSample: " << _name_ << std::endl;
 
   _selectionCuts_ = JsonUtils::fetchValue(_config_, "selectionCuts", _selectionCuts_);
-
-  if( not _selectionCuts_.empty() ) LogInfo << "Selection cut is: \"" << _selectionCuts_.c_str() << "\"" << std::endl;
-
-  _dataSetsSelections_ = JsonUtils::fetchValue(_config_, "dataSets", _dataSetsSelections_);
+  _enabledDatasetList_ = JsonUtils::fetchValue(_config_, std::vector<std::string>{"datasets", "dataSets"}, _enabledDatasetList_);
   _mcNorm_ = JsonUtils::fetchValue(_config_, "mcNorm", _mcNorm_);
   _dataNorm_ = JsonUtils::fetchValue(_config_, "dataNorm", _dataNorm_);
   _binning_.readBinningDefinition( JsonUtils::fetchValue<std::string>(_config_, "binning") );
@@ -71,22 +72,18 @@ void FitSample::initialize() {
   _mcContainer_.binning = _binning_;
   _mcContainer_.histScale = _dataNorm_/_mcNorm_;
   _mcContainer_.perBinEventPtrList.resize(_binning_.getBinsList().size());
-  _mcContainer_.histogram = std::shared_ptr<TH1D>(
-    new TH1D(
+  _mcContainer_.histogram = std::make_shared<TH1D>(
       Form("%s_MC_bins", _name_.c_str()), Form("%s_MC_bins", _name_.c_str()),
       int(_binning_.getBinsList().size()), 0, int(_binning_.getBinsList().size())
-    )
   );
   _mcContainer_.histogram->SetDirectory(nullptr);
 
   _dataContainer_.name = "Data_" + _name_;
   _dataContainer_.binning = _binning_;
   _dataContainer_.perBinEventPtrList.resize(_binning_.getBinsList().size());
-  _dataContainer_.histogram = std::shared_ptr<TH1D>(
-    new TH1D(
+  _dataContainer_.histogram = std::make_shared<TH1D>(
       Form("%s_Data_bins", _name_.c_str()), Form("%s_Data_bins", _name_.c_str()),
       int(_binning_.getBinsList().size()), 0, int(_binning_.getBinsList().size())
-    )
   );
   _dataContainer_.histogram->SetDirectory(nullptr);
 }
@@ -116,11 +113,10 @@ SampleElement &FitSample::getDataContainer() {
   return _dataContainer_;
 }
 
-
-bool FitSample::isDataSetValid(const std::string& dataSetName_){
-  if( _dataSetsSelections_.empty() ) return true;
-  for( auto& dataSetName : _dataSetsSelections_){
-    if( dataSetName == "*" or dataSetName == dataSetName_ ){
+bool FitSample::isDatasetValid(const std::string& datasetName_){
+  if( _enabledDatasetList_.empty() ) return true;
+  for( auto& dataSetName : _enabledDatasetList_){
+    if( dataSetName == "*" or dataSetName == datasetName_ ){
       return true;
     }
   }

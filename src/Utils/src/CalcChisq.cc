@@ -1,9 +1,9 @@
 #include "CalcChisq.hh"
 
 CalcChisq::CalcChisq()
-    : npar(0)
+    : did_invert(false)
     , tol(1E-100)
-    , did_invert(false)
+    , npar(0)
     , cov_mat(nullptr)
     , inv_mat(nullptr)
 {

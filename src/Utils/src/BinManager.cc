@@ -1,3 +1,5 @@
+#include <utility>
+
 #include "BinManager.hh"
 #include "Logger.h"
 #include "GenericToolbox.h"
@@ -7,12 +9,12 @@ LoggerInit([](){
 } )
 
 BinManager::BinManager()
-  : dimension(0), nbins(0)
+  : nbins(0), dimension(0)
 {
 }
 
-BinManager::BinManager(const std::string& filename, bool UseNutypeBeammode)
-  : dimension(0), nbins(0), fname_binning(filename)
+BinManager::BinManager(std::string  filename, bool UseNutypeBeammode)
+  : nbins(0), dimension(0), fname_binning(std::move(filename))
 {
   SetBinning(fname_binning, UseNutypeBeammode);
 }

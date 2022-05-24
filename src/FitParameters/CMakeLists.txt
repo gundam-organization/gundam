@@ -13,6 +13,7 @@ set(SRCFILES
         src/NormalizationDial.cpp
         src/SplineDial.cpp
         src/GraphDial.cpp
+        src/NestedDialTest.cpp
         )
 
 if( USE_STATIC_LINKS STREQUAL "1" )
@@ -20,6 +21,9 @@ if( USE_STATIC_LINKS STREQUAL "1" )
 else()
   add_library(GundamFitParameters SHARED ${SRCFILES})
 endif()
+
+target_include_directories(GundamFitParameters PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # Dependencies
 target_link_libraries( GundamFitParameters PUBLIC
@@ -35,4 +39,3 @@ install(TARGETS GundamFitParameters DESTINATION lib)
 #Can uncomment this to install the headers... but is it really neccessary?
 # install(FILES ${HEADERS} DESTINATION include)
 
-set(MODULETargets ${MODULETargets} GundamFitParameters PARENT_SCOPE)

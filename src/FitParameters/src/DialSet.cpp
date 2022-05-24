@@ -2,26 +2,26 @@
 // Created by Nadrino on 21/05/2021.
 //
 
-#include "TFile.h"
-#include "TTree.h"
+#include "DialSet.h"
+#include "JsonUtils.h"
+#include "DataBinSet.h"
+#include "NormalizationDial.h"
+#include "SplineDial.h"
+#include "GraphDial.h"
+#include "FitParameter.h"
 
 #include "Logger.h"
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
 
-#include "DialSet.h"
-#include "JsonUtils.h"
-#include "DataBinSet.h"
+#include "TFile.h"
+#include "TTree.h"
 
-#include "NormalizationDial.h"
-#include "SplineDial.h"
-#include "GraphDial.h"
 
 bool DialSet::_verboseMode_{false};
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[DialSet]");
-  if( not DialSet::_verboseMode_ ) Logger::setMaxLogLevel(Logger::LogLevel::INFO);
 })
 
 
@@ -33,39 +33,24 @@ DialSet::~DialSet() {
 }
 
 void DialSet::reset() {
+  _owner_ = nullptr;
   _dataSetNameList_.clear();
   _dialList_.clear();
   _config_ = nlohmann::json();
-  _parameterIndex_ = -1;
-  _parameterName_ = "";
   _enableDialsSummary_ = false;
   _isEnabled_ = true;
-  _workingDirectory_ = ".";
 }
 
+void DialSet::setOwner(const FitParameter* owner_){
+  _owner_ = owner_;
+}
 void DialSet::setConfig(const nlohmann::json &config_) {
   _config_ = config_;
   JsonUtils::forwardConfig(_config_);
 }
-void DialSet::setParameterIndex(int parameterIndex) {
-  _parameterIndex_ = parameterIndex;
-}
-void DialSet::setWorkingDirectory(const std::string &workingDirectory) {
-  _workingDirectory_ = workingDirectory;
-}
-void DialSet::setParameterName(const std::string &parameterName) {
-  _parameterName_ = parameterName;
-}
-void DialSet::setAssociatedParameterReference(void *associatedParameterReference) {
-  _associatedParameterReference_ = associatedParameterReference;
-}
-void DialSet::setCurrentDialOffset(size_t currentDialOffset) {
-  _currentDialOffset_ = currentDialOffset;
-}
 
 void DialSet::initialize() {
-//  LogThrowIf(_parameterName_.empty(), "Parameter name not set for dial set.")
-  LogThrowIf(_parameterIndex_==-1, "Parameter index not set for dial set.")
+  LogThrowIf(_owner_==nullptr, "Owner address not set.")
   LogThrowIf(_config_.empty(), "Config not set for dial set.")
 
   _dataSetNameList_ = JsonUtils::fetchValue<std::vector<std::string>>(
@@ -77,13 +62,13 @@ void DialSet::initialize() {
   else { }
 
   // Dials are directly defined with a binning file?
-  if     (initializeNormDialsWithParBinning() ){ LogInfo << "DialSet initialised with parameter binning definition." << std::endl;  }
+  if     (initializeNormDialsWithParBinning() ){ /* LogInfo << "DialSet initialised with parameter binning definition." << std::endl; */  }
   // Dials are individually defined?
-  else if( initializeDialsWithDefinition() )   { LogInfo << "DialSet initialised with config definition." << std::endl; }
+  else if( initializeDialsWithDefinition() )   { /* LogInfo << "DialSet initialised with config definition." << std::endl; */ }
   // Dials definition not found?
   else{
-    LogWarning << "Could not fetch dials definition for parameter: #" << _parameterIndex_;
-    if( not _parameterName_.empty() ) LogWarning << " (" << _parameterName_ << ")";
+    LogWarning << "Could not fetch dials definition for parameter: #" << _owner_->getParameterIndex();
+    if( not _owner_->getName().empty() ) LogWarning << " (" << _owner_->getName() << ")";
     LogWarning << std::endl << "Disabling dialSet." << std::endl;
     _isEnabled_ = false;
   }
@@ -97,7 +82,7 @@ bool DialSet::isEnabled() const {
 const std::vector<std::string> &DialSet::getDataSetNameList() const {
   return _dataSetNameList_;
 }
-std::vector<std::shared_ptr<Dial>> &DialSet::getDialList() {
+std::vector<DialWrapper> &DialSet::getDialList() {
   return _dialList_;
 }
 TFormula *DialSet::getApplyConditionFormula() const {
@@ -106,11 +91,26 @@ TFormula *DialSet::getApplyConditionFormula() const {
 const std::string &DialSet::getDialLeafName() const {
   return _globalDialLeafName_;
 }
-size_t DialSet::getCurrentDialOffset() const {
-  return _currentDialOffset_;
-}
 DialType::DialType DialSet::getGlobalDialType() const {
   return _globalDialType_;
+}
+double DialSet::getMinDialResponse() const {
+  return _minDialResponse_;
+}
+double DialSet::getMaxDialResponse() const {
+  return _maxDialResponse_;
+}
+bool DialSet::useMirrorDial() const {
+  return _useMirrorDial_;
+}
+double DialSet::getMirrorLowEdge() const {
+  return _mirrorLowEdge_;
+}
+double DialSet::getMirrorHighEdge() const {
+  return _mirrorHighEdge_;
+}
+double DialSet::getMirrorRange() const {
+  return _mirrorRange_;
 }
 
 std::string DialSet::getSummary() const {
@@ -129,15 +129,8 @@ std::string DialSet::getSummary() const {
 
   return ss.str();
 }
-void DialSet::applyGlobalParameters(Dial* dial_) const{
-  dial_->setAssociatedParameterReference(_associatedParameterReference_);
-  dial_->setMinDialResponse(_globalMinDialResponse_);
-  dial_->setMaxDialResponse(_globalMaxDialResponse_);
-  dial_->setUseMirrorDial(_globalUseMirrorDial_);
-  if(_globalUseMirrorDial_){
-    dial_->setMirrorLowEdge(_mirrorLowEdge_);
-    dial_->setMirrorRange(_mirrorHighEdge_ - _mirrorLowEdge_);
-  }
+void DialSet::applyGlobalParameters(Dial* dial_) const {
+  dial_->setOwner(this);
 }
 void DialSet::applyGlobalParameters(Dial& dial_) const{
   this->applyGlobalParameters(&dial_);
@@ -252,19 +245,22 @@ void DialSet::readGlobals(const nlohmann::json &config_){
   }
 
   if( not _applyConditionStr_.empty() ){
-    LogWarning << "Apply condition: " << _applyConditionStr_ << std::endl;
+//    LogWarning << "Apply condition: " << _applyConditionStr_ << std::endl;
     _applyConditionFormula_ = std::make_shared<TFormula>("_applyConditionFormula_", _applyConditionStr_.c_str());
     LogThrowIf(not _applyConditionFormula_->IsValid(),
                "\"" << _applyConditionStr_ << "\": could not be parsed as formula expression.")
   }
 
-  // globals for _templateDial_
-  _globalMinDialResponse_ = JsonUtils::fetchValue(config_, {{"minDialResponse"}, {"minimumSplineResponse"}}, _globalMinDialResponse_);
-  _globalMaxDialResponse_ = JsonUtils::fetchValue(config_, "maxDialResponse", _globalMaxDialResponse_);
-  _globalUseMirrorDial_       = JsonUtils::fetchValue(config_, "useMirrorDial", _globalUseMirrorDial_);
-  if( _globalUseMirrorDial_ ){
+
+  _minDialResponse_ = JsonUtils::fetchValue(config_, {{"minDialResponse"}, {"minimumSplineResponse"}}, _minDialResponse_);
+  _maxDialResponse_ = JsonUtils::fetchValue(config_, "maxDialResponse", _maxDialResponse_);
+
+  _useMirrorDial_   = JsonUtils::fetchValue(config_, "useMirrorDial", _useMirrorDial_);
+  if( _useMirrorDial_ ){
     _mirrorLowEdge_ = JsonUtils::fetchValue(config_, "mirrorLowEdge", _mirrorLowEdge_);
     _mirrorHighEdge_ = JsonUtils::fetchValue(config_, "mirrorHighEdge", _mirrorHighEdge_);
+    _mirrorRange_ = _mirrorHighEdge_ - _mirrorLowEdge_;
+    LogThrowIf(_mirrorRange_ < 0, GET_VAR_NAME_VALUE(_mirrorHighEdge_) << " < " << GET_VAR_NAME_VALUE(_mirrorLowEdge_))
   }
 }
 bool DialSet::initializeNormDialsWithParBinning() {
@@ -274,27 +270,26 @@ bool DialSet::initializeNormDialsWithParBinning() {
 
   this->readGlobals(_config_);
 
-  if(not GenericToolbox::doesStringStartsWithSubstring(parameterBinningPath, "/")){
-    parameterBinningPath = _workingDirectory_ + "/" + parameterBinningPath;
-  }
-
-  LogTrace << "Initializing dials with binning file..." << std::endl;
-
   DataBinSet binning;
   binning.setName("parameterBinning");
   DataBinSet::setVerbosity(static_cast<int>(Logger::LogLevel::ERROR)); // only print errors if any
   binning.readBinningDefinition(parameterBinningPath);
   DataBinSet::setVerbosity(static_cast<int>(Logger::getMaxLogLevel())); // take back the log level with this instance
 
-  LogThrowIf(_parameterIndex_ >= binning.getBinsList().size(),
-             "Can't fetch parameter index #" << _parameterIndex_ << " while binning size is: " << binning.getBinsList().size()
-             )
+  LogThrowIf(
+      _owner_->getParameterIndex() >= binning.getBinsList().size(),
+      "Can't fetch parameter index #" << _owner_->getParameterIndex() << " while binning size is: " << binning.getBinsList().size()
+      )
+
+  _binningCacheList_.emplace_back();
+  _binningCacheList_.back().addBin(binning.getBinsList().at(_owner_->getParameterIndex()));
 
   NormalizationDial dial;
+  dial.setOwner(this);
   this->applyGlobalParameters(&dial);
-  dial.setApplyConditionBin( binning.getBinsList().at( _parameterIndex_ ) );
+  dial.setApplyConditionBin( &_binningCacheList_.back().getBinsList()[0] );
   dial.initialize();
-  _dialList_.emplace_back( std::make_shared<NormalizationDial>(dial) );
+  _dialList_.emplace_back( std::make_unique<NormalizationDial>(dial) );
 
   return true;
 }
@@ -316,11 +311,11 @@ bool DialSet::initializeDialsWithDefinition() {
   if( _globalDialType_ == DialType::Normalization ){
     NormalizationDial dial;
     this->applyGlobalParameters(&dial);
+    dial.setOwner(this);
     dial.initialize();
-    _dialList_.emplace_back( std::make_shared<NormalizationDial>(dial) );
+    _dialList_.emplace_back( std::make_unique<NormalizationDial>(dial) );
   }
   else if( _globalDialType_ == DialType::Spline or _globalDialType_ == DialType::Graph ){
-
     if     ( JsonUtils::doKeyExist(dialsDefinition, "dialLeafName") ){
       _globalDialLeafName_ = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialLeafName");
       // nothing to do here, the dials list will be filled while reading the datasets
@@ -328,42 +323,39 @@ bool DialSet::initializeDialsWithDefinition() {
     else if( JsonUtils::doKeyExist(dialsDefinition, "binningFilePath") ){
 
       auto binningFilePath = JsonUtils::fetchValue<std::string>(dialsDefinition, "binningFilePath");
-      if(not GenericToolbox::doesStringStartsWithSubstring(binningFilePath, "/")){ binningFilePath = _workingDirectory_ + "/" + binningFilePath; }
 
-      DataBinSet binning;
-      binning.setName(binningFilePath);
-      binning.readBinningDefinition(binningFilePath);
-
-      auto binList = binning.getBinsList();
+      _binningCacheList_.emplace_back();
+      _binningCacheList_.back().setName(binningFilePath);
+      _binningCacheList_.back().readBinningDefinition(binningFilePath);
 
       std::string filePath = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsFilePath");
-      if(not GenericToolbox::doesStringStartsWithSubstring(filePath, "/")){ filePath = _workingDirectory_ + "/" + filePath; }
       LogThrowIf(not GenericToolbox::doesTFileIsValid(filePath), "Could not open: " << filePath)
       TFile* dialsTFile = TFile::Open(filePath.c_str());
       LogThrowIf(dialsTFile==nullptr, "Could not open: " << filePath)
 
       if      ( JsonUtils::doKeyExist(dialsDefinition, "dialsList") ) {
         auto* dialsList = dialsTFile->Get<TObjArray>(JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsList").c_str());
-        LogThrowIf(dialsList==nullptr, "Could not find dialsList: " << JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsList"))
+        LogThrowIf(dialsList==nullptr, "Could not find dialsList: " << JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsList"));
 
-        LogThrowIf(dialsList->GetSize() != binList.size(), "Number of dials (" << dialsList->GetSize() << ") don't match the number of bins " << binList.size() << "")
+        LogThrowIf(dialsList->GetSize() != _binningCacheList_.back().getBinsList().size(), "Number of dials (" << dialsList->GetSize() << ") don't match the number of bins "
+                   << _binningCacheList_.back().getBinsList().size() << "");
 
-        for( int iBin = 0 ; iBin < binList.size() ; iBin++ ){
+        for( int iBin = 0 ; iBin < _binningCacheList_.back().getBinsList().size() ; iBin++ ){
           if     ( _globalDialType_ == DialType::Spline ){
             SplineDial s;
             this->applyGlobalParameters(&s);
-            s.setApplyConditionBin(binList[iBin]);
+            s.setApplyConditionBin(&_binningCacheList_.back().getBinsList()[iBin]);
             s.copySpline((TSpline3*) dialsList->At(iBin));
             s.initialize();
-            _dialList_.emplace_back( std::make_shared<SplineDial>(s) );
+            _dialList_.emplace_back( std::make_unique<SplineDial>(s) );
           }
           else if( _globalDialType_ == DialType::Graph ){
             GraphDial g;
             this->applyGlobalParameters(&g);
-            g.setApplyConditionBin(binList[iBin]);
+            g.setApplyConditionBin(&_binningCacheList_.back().getBinsList()[iBin]);
             g.setGraph(*(TGraph*) dialsList->At(iBin));
             g.initialize();
-            _dialList_.emplace_back( std::make_shared<GraphDial>(g) );
+            _dialList_.emplace_back( std::make_unique<GraphDial>(g) );
           }
           else{
             LogThrow("Should not be here???")
@@ -382,7 +374,7 @@ bool DialSet::initializeDialsWithDefinition() {
         Int_t kinematicBin;
         TSpline3* splinePtr = nullptr;
         TGraph* graphPtr = nullptr;
-          
+
         // searching for additional split var
         std::vector<std::string> splitVarNameList;
         for( int iKey = 0 ; iKey < dialsTTree->GetListOfLeaves()->GetEntries() ; iKey++ ){
@@ -396,19 +388,19 @@ bool DialSet::initializeDialsWithDefinition() {
         std::vector<Int_t> splitVarValueList(splitVarNameList.size(), 0);
         std::vector<std::pair<int, int>> splitVarBoundariesList(splitVarNameList.size(), std::pair<int, int>());
         std::vector<std::vector<int>> splitVarValuesList(splitVarNameList.size(), std::vector<int>());
-        dialsTTree->SetBranchAddress("kinematicBin", &kinematicBin); 
+        dialsTTree->SetBranchAddress("kinematicBin", &kinematicBin);
         if( _globalDialType_ == DialType::Spline ) dialsTTree->SetBranchAddress("spline", &splinePtr);
         if( _globalDialType_ == DialType::Graph ) dialsTTree->SetBranchAddress("graph", &graphPtr);
         for( size_t iSplitVar = 0 ; iSplitVar < splitVarNameList.size() ; iSplitVar++ ){
-          dialsTTree->SetBranchAddress(splitVarNameList[iSplitVar].c_str(), &splitVarValueList[iSplitVar]); 
+          dialsTTree->SetBranchAddress(splitVarNameList[iSplitVar].c_str(), &splitVarValueList[iSplitVar]);
         }
-        
+
         Long64_t nSplines = dialsTTree->GetEntries();
         LogWarning << "Reading dials in \"" << dialsTFile->GetName() << "\"" << std::endl;
         for( Long64_t iSpline = 0 ; iSpline < nSplines ; iSpline++ ){
           dialsTTree->GetEntry(iSpline);
-          auto dialBin = binList.at(kinematicBin); // copy
-          dialBin.setIsZeroWideRangesTolerated(true);
+          auto* dialBin = &_binningCacheList_.back().getBinsList()[kinematicBin];
+          dialBin->setIsZeroWideRangesTolerated(true);
           for( size_t iSplitVar = 0 ; iSplitVar < splitVarNameList.size() ; iSplitVar++ ){
             if( splitVarBoundariesList.at(iSplitVar).second < splitVarValueList.at(iSplitVar) or iSpline == 0 ){
               splitVarBoundariesList.at(iSplitVar).second = splitVarValueList.at(iSplitVar);
@@ -419,7 +411,7 @@ bool DialSet::initializeDialsWithDefinition() {
             if( not GenericToolbox::doesElementIsInVector(splitVarValueList.at(iSplitVar), splitVarValuesList.at(iSplitVar)) ){
               splitVarValuesList.at(iSplitVar).emplace_back(splitVarValueList.at(iSplitVar));
             }
-            dialBin.addBinEdge(splitVarNameList.at(iSplitVar), splitVarValueList.at(iSplitVar), splitVarValueList.at(iSplitVar));
+            dialBin->addBinEdge(splitVarNameList.at(iSplitVar), splitVarValueList.at(iSplitVar), splitVarValueList.at(iSplitVar));
           }
           if      ( _globalDialType_ == DialType::Spline ){
             SplineDial s;
@@ -427,7 +419,7 @@ bool DialSet::initializeDialsWithDefinition() {
             s.setApplyConditionBin(dialBin);
             s.copySpline(splinePtr);
             s.initialize();
-            _dialList_.emplace_back( std::make_shared<SplineDial>(s) );
+            _dialList_.emplace_back( std::make_unique<SplineDial>(s) );
           }
           else if( _globalDialType_ == DialType::Graph ){
             LogThrow("TTree loading of DialType::Graph not implemented.")
@@ -445,7 +437,8 @@ bool DialSet::initializeDialsWithDefinition() {
     }
   } // Spline ? Graph ?
   else {
-    LogError << "dialsType is not supported yet: " << DialType::DialTypeEnumNamespace::toString(_globalDialType_) << "(" << _globalDialType_ << ")" << std::endl;
+    LogError << "dialsType is not supported yet: " << DialType::DialTypeEnumNamespace::toString(_globalDialType_)
+             << "(" << _globalDialType_ << ")" << std::endl;
     throw std::logic_error("dialsType is not supported");
   }
 
@@ -453,17 +446,14 @@ bool DialSet::initializeDialsWithDefinition() {
 }
 nlohmann::json DialSet::fetchDialsDefinition(const nlohmann::json &definitionsList_) {
   for(size_t iDial = 0 ; iDial < definitionsList_.size() ; iDial++ ){
-    if( _parameterName_.empty() ){
-      if( _parameterIndex_ == iDial ){
+    if( _owner_->getName().empty() ){
+      if( _owner_->getParameterIndex() == iDial ){
         return definitionsList_.at(iDial);
       }
     }
-    else if( _parameterName_ == JsonUtils::fetchValue<std::string>(definitionsList_.at(iDial), "parameterName", "") ){
+    else if( _owner_->getName() == JsonUtils::fetchValue<std::string>(definitionsList_.at(iDial), "parameterName", "") ){
       return definitionsList_.at(iDial);
     }
   }
   return {};
 }
-
-
-

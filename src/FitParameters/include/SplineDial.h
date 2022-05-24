@@ -5,16 +5,19 @@
 #ifndef GUNDAM_SPLINEDIAL_H
 #define GUNDAM_SPLINEDIAL_H
 
-#include "memory"
+#include "Dial.h"
 
 #include "TSpline.h"
 
-#include "Dial.h"
+#include "memory"
+#include "string"
+
 
 class SplineDial : public Dial {
 
 public:
   SplineDial();
+  std::unique_ptr<Dial> clone() const override { return std::make_unique<SplineDial>(*this); }
 
   void reset() override;
 
@@ -29,7 +32,7 @@ public:
   // Debug
   void writeSpline(const std::string &fileName_ = "") const;
 
-  void fastEval();
+//  void fastEval();
 
 protected:
   void fillResponseCache() override;
@@ -37,19 +40,16 @@ protected:
 
 private:
   bool _throwIfResponseIsNegative_{true};
-
   TSpline3 _spline_;
 
-  struct FastSpliner{
-    double x, y, b, c, d, num;
-    double stepsize{-1};
-    int l;
-  };
-  FastSpliner fs;
+//  struct FastSpliner{
+//    double x, y, b, c, d, num;
+//    double stepsize{-1};
+//    int l;
+//  };
+//  FastSpliner fs;
 
   // DEBUG
 
 };
-
-
 #endif //GUNDAM_SPLINEDIAL_H

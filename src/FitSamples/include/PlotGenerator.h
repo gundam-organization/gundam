@@ -5,11 +5,21 @@
 #ifndef GUNDAM_PLOTGENERATOR_H
 #define GUNDAM_PLOTGENERATOR_H
 
-#include "json.hpp"
-#include "TDirectory.h"
-
 #include "AnaSample.hh"
 #include "FitSampleSet.h"
+#include "PhysicsEvent.h"
+
+#include "json.hpp"
+#include "TDirectory.h"
+#include "TH1D.h"
+
+#include "memory"
+#include "vector"
+#include "functional"
+#include "mutex"
+#include "string"
+#include "map"
+
 
 struct HistHolder{
   // Hist

@@ -3,6 +3,8 @@
 //
 
 #include <TTreeFormulaManager.h>
+
+#include <memory>
 #include "json.hpp"
 
 #include "Logger.h"
@@ -27,7 +29,6 @@ void FitSampleSet::reset() {
 
   _likelihoodFunctionPtr_ = nullptr;
   _fitSampleList_.clear();
-  _dataEventType_ = DataEventType::Unset;
 
   _eventByEventDialLeafList_.clear();
 }
@@ -40,21 +41,15 @@ void FitSampleSet::setConfig(const nlohmann::json &config) {
   }
 }
 
-void FitSampleSet::addEventByEventDialLeafName(const std::string& leafName_){
-  if( not GenericToolbox::doesElementIsInVector(leafName_, _eventByEventDialLeafList_) ){
-    _eventByEventDialLeafList_.emplace_back(leafName_);
-  }
-}
-
 void FitSampleSet::initialize() {
   LogWarning << __METHOD_NAME__ << std::endl;
 
   LogAssert(not _config_.empty(), "_config_ is not set." << std::endl);
 
-  _dataEventType_ = DataEventTypeEnumNamespace::toEnum(
-    JsonUtils::fetchValue<std::string>(_config_, "dataEventType"), true
-    );
-  LogInfo << "Data events type is set to: " << DataEventTypeEnumNamespace::toString(_dataEventType_) << std::endl;
+//  _dataEventType_ = DataEventTypeEnumNamespace::toEnum(
+//    JsonUtils::fetchValue<std::string>(_config_, "dataEventType"), true
+//    );
+//  LogInfo << "Data events type is set to: " << DataEventTypeEnumNamespace::toString(_dataEventType_) << std::endl;
 
   LogInfo << "Reading samples definition..." << std::endl;
   auto fitSampleListConfig = JsonUtils::fetchValue(_config_, "fitSampleList", nlohmann::json());
@@ -108,13 +103,13 @@ void FitSampleSet::initialize() {
   std::string llhMethod = JsonUtils::fetchValue(_config_, "llhStatFunction", "PoissonLLH");
   LogInfo << "Using \"" << llhMethod << "\" LLH function." << std::endl;
   if( llhMethod == "PoissonLLH" ){
-    _likelihoodFunctionPtr_ = std::shared_ptr<PoissonLLH>(new PoissonLLH);
+    _likelihoodFunctionPtr_ = std::make_shared<PoissonLLH>();
   }
   else if( llhMethod == "BarlowLLH" ){
-    _likelihoodFunctionPtr_ = std::shared_ptr<BarlowLLH>(new BarlowLLH);
+    _likelihoodFunctionPtr_ = std::make_shared<BarlowLLH>();
   }
   else if( llhMethod == "BarlowLLH_OA2020_Bad" ){
-    _likelihoodFunctionPtr_ = std::shared_ptr<BarlowOA2020BugLLH>(new BarlowOA2020BugLLH);
+    _likelihoodFunctionPtr_ = std::make_shared<BarlowOA2020BugLLH>();
   }
   else{
     LogThrow("Unknown LLH Method: " << llhMethod)
@@ -123,9 +118,6 @@ void FitSampleSet::initialize() {
   _isInitialized_ = true;
 }
 
-DataEventType FitSampleSet::getDataEventType() const {
-  return _dataEventType_;
-}
 const std::vector<FitSample> &FitSampleSet::getFitSampleList() const {
   return _fitSampleList_;
 }
@@ -135,6 +127,9 @@ std::vector<FitSample> &FitSampleSet::getFitSampleList() {
 const nlohmann::json &FitSampleSet::getConfig() const {
   return _config_;
 }
+const std::shared_ptr<CalcLLHFunc> &FitSampleSet::getLikelihoodFunctionPtr() const {
+  return _likelihoodFunctionPtr_;
+}
 
 bool FitSampleSet::empty() const {
   return _fitSampleList_.empty();
@@ -142,25 +137,35 @@ bool FitSampleSet::empty() const {
 double FitSampleSet::evalLikelihood() const{
   double llh = 0.;
   for( auto& sample : _fitSampleList_ ){
-    double sampleLlh = 0;
-    for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-      sampleLlh += (*_likelihoodFunctionPtr_)(
-        sample.getMcContainer().histogram->GetBinContent(iBin),
-        std::pow(sample.getMcContainer().histogram->GetBinError(iBin), 2),
-        sample.getDataContainer().histogram->GetBinContent(iBin));
-    }
-    llh += sampleLlh;
+    llh += this->evalLikelihood(sample);
   }
   return llh;
 }
+double FitSampleSet::evalLikelihood(const FitSample& sample_) const{
+  double sampleLlh = 0;
+  for( int iBin = 1 ; iBin <= sample_.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+    sampleLlh += (*_likelihoodFunctionPtr_)(
+        sample_.getMcContainer().histogram->GetBinContent(iBin),
+        std::pow(sample_.getMcContainer().histogram->GetBinError(iBin), 2),
+        sample_.getDataContainer().histogram->GetBinContent(iBin));
+  }
+  return sampleLlh;
+}
 
-void FitSampleSet::loadAsimovData(){
-  if( _dataEventType_ == DataEventType::Asimov || _dataEventType_ == DataEventType::FakeData ){
-    LogWarning << "Asimov or FakeData data type selected: copying MC events..." << std::endl;
-    for( auto& sample : _fitSampleList_ ){
-      LogInfo << "Copying MC events in sample \"" << sample.getName() << "\"" << std::endl;
-      sample.getDataContainer().eventList = sample.getMcContainer().eventList;
-    }
+void FitSampleSet::copyMcEventListToDataContainer(){
+  for( auto& sample : _fitSampleList_ ){
+    LogInfo << "Copying MC events in sample \"" << sample.getName() << "\"" << std::endl;
+    sample.getDataContainer().eventList.insert(
+        std::end(sample.getDataContainer().eventList),
+        std::begin(sample.getMcContainer().eventList),
+        std::end(sample.getMcContainer().eventList)
+    );
+  }
+}
+void FitSampleSet::clearMcContainers(){
+  for( auto& sample : _fitSampleList_ ){
+    LogInfo << "Clearing event list for \"" << sample.getName() << "\"" << std::endl;
+    sample.getMcContainer().eventList.clear();
   }
 }
 

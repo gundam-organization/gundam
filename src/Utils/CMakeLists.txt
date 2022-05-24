@@ -12,6 +12,8 @@ set(SRCFILES
         src/JsonUtils.cpp
         src/YamlUtils.cpp
         src/GundamGreetings.cpp
+        src/ApplyCondition.cpp
+        src/ScanConfig.cpp
         )
 set(HEADERS
         include/BinManager.hh
@@ -28,6 +30,8 @@ set(HEADERS
         include/YamlUtils.h
         include/YamlUtils.impl.h
         include/GundamGreetings.h
+        include/ApplyCondition.h
+        include/ScanConfig.h
         )
 
 if( USE_STATIC_LINKS STREQUAL "1" )
@@ -35,6 +39,11 @@ if( USE_STATIC_LINKS STREQUAL "1" )
 else()
   add_library(GundamUtils SHARED ${SRCFILES})
 endif()
+
+# Make sure the current directories are available for the later
+# compilation.
+target_include_directories( GundamUtils PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 target_link_libraries( GundamUtils PUBLIC
         ${ROOT_LIBRARIES}
@@ -48,4 +57,3 @@ install(TARGETS GundamUtils DESTINATION lib)
 #Can uncomment this to install the headers... but is it really neccessary?
 # install(FILES ${HEADERS} DESTINATION include)
 
-set(MODULETargets ${MODULETargets} GundamUtils PARENT_SCOPE)

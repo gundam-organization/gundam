@@ -6,7 +6,7 @@
 #define GUNDAM_PROPAGATOR_H
 
 
-#include "DataSetLoader.h"
+#include "DatasetLoader.h"
 #include "PlotGenerator.h"
 #include "EventTreeWriter.h"
 #include "FitSampleSet.h"
@@ -18,8 +18,8 @@
 #include "json.hpp"
 
 #include <vector>
+#include <map>
 #include <future>
-
 
 class Propagator {
 
@@ -31,9 +31,12 @@ public:
   void reset();
 
   // Setters
-  void setShowTimeStats(bool showTimeStats);
-  void setSaveDir(TDirectory *saveDir);
   void setConfig(const json &config);
+  void setSaveDir(TDirectory *saveDir);
+  void setShowTimeStats(bool showTimeStats);
+  void setThrowAsimovToyParameters(bool throwAsimovToyParameters);
+
+  void setIThrow(int iThrow);
 
   // Init
   void initialize();
@@ -50,7 +53,7 @@ public:
   // Core
   void propagateParametersOnSamples();
   void updateDialResponses();
-  void reweightSampleEvents();
+  void reweightMcEvents();
   void refillSampleHistograms();
   void applyResponseFunctions();
 
@@ -70,7 +73,7 @@ protected:
 
   // multi-threaded
   void updateDialResponses(int iThread_);
-  void reweightSampleEvents(int iThread_);
+  void reweightMcEvents(int iThread_);
   void applyResponseFunctions(int iThread_);
 
 private:
@@ -80,6 +83,8 @@ private:
   nlohmann::json _config_;
 
   // Internals
+  bool _throwAsimovToyParameters_{false};
+  int _iThrow_{-1};
   bool _isInitialized_{false};
   bool _useResponseFunctions_{false};
   bool _isRfPropagationEnabled_{false};
@@ -87,8 +92,12 @@ private:
   PlotGenerator _plotGenerator_;
   EventTreeWriter _treeWriter_;
   std::vector<FitParameterSet> _parameterSetsList_;
-  std::vector<DataSetLoader> _dataSetList_;
+  std::vector<DatasetLoader> _dataSetList_;
   std::shared_ptr<TMatrixD> _globalCovarianceMatrix_;
+
+  // Monitoring
+  bool _showEventBreakdown_{true};
+  bool _showEventBreakdownBeforePrior_{true};
 
   // Response functions (WIP)
   std::map<FitSample*, std::shared_ptr<TH1D>> _nominalSamplesMcHistogram_;
@@ -97,6 +106,21 @@ private:
   // DEV
   std::vector<Dial*> _dialsStack_;
 
+#ifdef GUNDAM_USING_CUDA
+  // Build the precalculated caches.  This is only relevant when using a GPU
+  // and must be done after the data sets are loaded.  This returns true if
+  // the cache is built.
+  bool buildGPUCaches();
+
+  // Prefill the caches using a GPU (if available).  If the GPU is not
+  // available, then this is a NOP.  This copies the fit parameter values into
+  // the GPU, triggers the appropriate kernel(s), and copies the results into
+  // a CPU based cache.  This returns true if the cache is filled.
+  bool fillGPUCaches();
+
+  // A map of parameters to the indices that got used by the GPU.
+  std::map<const FitParameter*, int> _gpuParameterIndex_;
+#endif
 
 public:
   GenericToolbox::CycleTimer dialUpdate;

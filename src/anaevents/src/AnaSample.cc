@@ -21,11 +21,11 @@ AnaSample::AnaSample() {
 AnaSample::AnaSample(int sample_id, std::string  name, std::string  detector,
                      std::string  binning, TTree* t_data)
   : m_sample_id(sample_id)
+  , m_norm(1.0)
   , m_name(std::move(name))
   , m_detector(std::move(detector))
   , m_binning(std::move(binning))
   , m_data_tree(t_data)
-  , m_norm(1.0)
 {
   Initialize();
 }
