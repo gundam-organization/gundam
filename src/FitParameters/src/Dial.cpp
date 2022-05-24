@@ -123,6 +123,7 @@ double Dial::evalResponse(double parameterValue_) {
   if     (_owner_->getMinDialResponse() == _owner_->getMinDialResponse() and _dialResponseCache_ < _owner_->getMinDialResponse() ){ _dialResponseCache_=_owner_->getMinDialResponse(); }
   else if(_owner_->getMaxDialResponse() == _owner_->getMaxDialResponse() and _dialResponseCache_ > _owner_->getMaxDialResponse() ){ _dialResponseCache_=_owner_->getMaxDialResponse(); }
 
+  LogThrowIf( _dialResponseCache_ != _dialResponseCache_, "NaN weight returned:" << std::endl << this->getSummary())
   return _dialResponseCache_;
 }
 std::string Dial::getSummary(){
@@ -133,6 +134,7 @@ std::string Dial::getSummary(){
   ss << "/";
   ss << DialType::DialTypeEnumNamespace::toString(_dialType_, true);
   if( _applyConditionBin_ != nullptr and not _applyConditionBin_->getEdgesList().empty() ) ss << ":b{" << _applyConditionBin_->getSummary() << "}";
+  ss << " dial(" << _effectiveDialParameterValue_ << ") = " << _dialResponseCache_;
   return ss.str();
 }
 //void Dial::buildResponseSplineCache(){
