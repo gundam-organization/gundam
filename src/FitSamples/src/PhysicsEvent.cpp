@@ -286,7 +286,7 @@ int PhysicsEvent::findVarIndex(const std::string& leafName_, bool throwIfNotFoun
 }
 void* PhysicsEvent::getVariableAddress(const std::string& leafName_, size_t arrayIndex_){
   int index = this->findVarIndex(leafName_, true);
-  return _leafContentList_[index][arrayIndex_].getPlaceHolderPtr().get();
+  return _leafContentList_[index][arrayIndex_].getPlaceHolderPtr();
 }
 double PhysicsEvent::getVarAsDouble(const std::string& leafName_, size_t arrayIndex_) const{
   int index = this->findVarIndex(leafName_, true);
