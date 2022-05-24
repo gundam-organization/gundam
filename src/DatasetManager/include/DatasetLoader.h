@@ -34,6 +34,8 @@ public:
   const std::string &getName() const;
   int getDataSetIndex() const;
 
+  bool isShowSelectedEventCount() const;
+
   const std::string &getSelectedDataEntry() const;
   const std::string &getToyDataEntry() const;
 
@@ -48,6 +50,7 @@ private:
   // internals
   bool _isInitialized_{false};
   bool _isEnabled_{false};
+  bool _showSelectedEventCount_{true};
   int _dataSetIndex_{-1};
   std::string _name_;
   std::string _selectedDataEntry_{"Asimov"};

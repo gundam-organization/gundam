@@ -252,13 +252,15 @@ void DataDispenser::doEventSelection(){
     }
   }
 
-  LogWarning << "Events passing selection cuts:" << std::endl;
-  t.reset();
-  t.setColTitles({{"Sample"}, {"# of events"}});
-  for(size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
-    t.addTableLine({{"\""+_cache_.samplesToFillList[iSample]->getName()+"\""}, std::to_string(_cache_.sampleNbOfEvents[iSample])});
+  if( _owner_->isShowSelectedEventCount() ){
+    LogWarning << "Events passing selection cuts:" << std::endl;
+    t.reset();
+    t.setColTitles({{"Sample"}, {"# of events"}});
+    for(size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
+      t.addTableLine({{"\""+_cache_.samplesToFillList[iSample]->getName()+"\""}, std::to_string(_cache_.sampleNbOfEvents[iSample])});
+    }
+    t.printTable();
   }
-  t.printTable();
 
 }
 void DataDispenser::fetchRequestedLeaves(){

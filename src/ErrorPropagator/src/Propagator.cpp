@@ -57,10 +57,7 @@ void Propagator::setShowTimeStats(bool showTimeStats) {
 }
 void Propagator::setConfig(const json &config) {
   _config_ = config;
-  while( _config_.is_string() ){
-    LogWarning << "Forwarding " << __CLASS_NAME__ << " config: \"" << _config_.get<std::string>() << "\"" << std::endl;
-    _config_ = JsonUtils::readConfigFile(_config_.get<std::string>());
-  }
+  JsonUtils::forwardConfig(_config_);
 }
 void Propagator::setSaveDir(TDirectory *saveDir) {
   _saveDir_ = saveDir;
@@ -74,6 +71,10 @@ void Propagator::setIThrow(int iThrow) {
 
 void Propagator::initialize() {
   LogWarning << __METHOD_NAME__ << std::endl;
+
+  // Monitoring parameters
+  _showEventBreakdown_ = JsonUtils::fetchValue(_config_, "showEventBreakdown", _showEventBreakdown_);
+  _showEventBreakdownBeforePrior_ = JsonUtils::fetchValue(_config_, "showEventBreakdownBeforePrior", _showEventBreakdownBeforePrior_);
 
   LogInfo << "Loading Parameters..." << std::endl;
   auto parameterSetListConfig = JsonUtils::fetchValue(_config_, "parameterSetListConfig", nlohmann::json());
@@ -163,6 +164,19 @@ void Propagator::initialize() {
     dispenser.load();
   }
 
+  if( allAsimov and _showEventBreakdownBeforePrior_ ){
+    LogWarning << "Sample breakdown BEFORE PARAMETER PRIOR REWEIGHT:" << std::endl;
+    GenericToolbox::TablePrinter t;
+    t.setColTitles({{"Sample"},{"MC"},{"Data"}});
+    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+      t.addTableLine({{"\""+sample.getName()+"\""},
+                      std::to_string(sample.getMcContainer().getSumWeights()),
+                      std::to_string(sample.getDataContainer().getSumWeights())
+                     });
+    }
+    t.printTable();
+  }
+
   if( usedMcContainer ){
     if( _throwAsimovToyParameters_ ){
       for( auto& parSet : _parameterSetsList_ ){
@@ -198,6 +212,19 @@ void Propagator::initialize() {
       dispenser.setParSetPtrToLoad(&_parameterSetsList_);
       dispenser.load();
     }
+
+    if( _showEventBreakdownBeforePrior_ ){
+      LogWarning << "Sample breakdown BEFORE PARAMETER PRIOR REWEIGHT:" << std::endl;
+      GenericToolbox::TablePrinter t;
+      t.setColTitles({{"Sample"},{"MC"},{"Data"}});
+      for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+        t.addTableLine({{"\""+sample.getName()+"\""},
+                        std::to_string(sample.getMcContainer().getSumWeights()),
+                        std::to_string(sample.getDataContainer().getSumWeights())
+                       });
+      }
+      t.printTable();
+    }
   }
 
   LogInfo << "Propagating prior parameters on events..." << std::endl;
@@ -223,17 +250,18 @@ void Propagator::initialize() {
   Cache::Manager::Build(getFitSampleSet());
 #endif
 
-  LogWarning << "Sample breakdown:" << std::endl;
-  GenericToolbox::TablePrinter t;
-  t.setColTitles({{"Sample"},{"MC"},{"Data"}});
-  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    t.addTableLine({
-      {"\""+sample.getName()+"\""},
-      std::to_string(sample.getMcContainer().getSumWeights()),
-      std::to_string(sample.getDataContainer().getSumWeights())
-    });
+  if( _showEventBreakdown_ ){
+    LogWarning << "Sample breakdown:" << std::endl;
+    GenericToolbox::TablePrinter t;
+    t.setColTitles({{"Sample"},{"MC"},{"Data"}});
+    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+      t.addTableLine({{"\""+sample.getName()+"\""},
+                         std::to_string(sample.getMcContainer().getSumWeights()),
+                         std::to_string(sample.getDataContainer().getSumWeights())
+                     });
+    }
+    t.printTable();
   }
-  t.printTable();
 
   _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
   _plotGenerator_.defineHistogramHolders();

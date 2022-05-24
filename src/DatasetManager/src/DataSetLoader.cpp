@@ -50,6 +50,8 @@ void DatasetLoader::initialize() {
   _isEnabled_ = JsonUtils::fetchValue(_config_, "isEnabled", true);
   if( not _isEnabled_ ){ LogWarning << "\"" << _name_ << "\" is disabled." << std::endl; return; }
 
+  _showSelectedEventCount_ = JsonUtils::fetchValue(_config_, "showSelectedEventCount", _showSelectedEventCount_);
+
   _mcDispenser_.setOwner(this);
   _mcDispenser_.setConfig(JsonUtils::fetchValue<nlohmann::json>(_config_, "mc"));
   _mcDispenser_.getConfigParameters().name = "Asimov";
@@ -110,4 +112,8 @@ const std::string &DatasetLoader::getSelectedDataEntry() const {
 }
 const std::string &DatasetLoader::getToyDataEntry() const {
   return _selectedToyEntry_;
+}
+
+bool DatasetLoader::isShowSelectedEventCount() const {
+  return _showSelectedEventCount_;
 }
