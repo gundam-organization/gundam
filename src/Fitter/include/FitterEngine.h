@@ -83,6 +83,8 @@ private:
   bool _fitHasConverged_{false};
   bool _isBadCovMat_{false};
 
+  long long int _monitorRefreshRateInMs_{500};
+  
   int _nbFitCalls_{0};
   int _nbFitParameters_{0};
   int _nbParameters_{0};
