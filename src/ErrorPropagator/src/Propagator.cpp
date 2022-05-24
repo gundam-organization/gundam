@@ -16,6 +16,7 @@
 
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
+#include "GenericToolbox.TablePrinter.h"
 
 #include <memory>
 #include <vector>
@@ -223,11 +224,16 @@ void Propagator::initialize() {
 #endif
 
   LogWarning << "Sample breakdown:" << std::endl;
+  GenericToolbox::TablePrinter t;
+  t.setColTitles({{"Sample"},{"MC"},{"Data"}});
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    LogInfo << "Sum of event weights in \"" << sample.getName() << "\":" << std::endl
-            << "-> mc: " << sample.getMcContainer().getSumWeights()
-            << " / data: " << sample.getDataContainer().getSumWeights() << std::endl;
+    t.addTableLine({
+      {"\""+sample.getName()+"\""},
+      std::to_string(sample.getMcContainer().getSumWeights()),
+      std::to_string(sample.getDataContainer().getSumWeights())
+    });
   }
+  t.printTable();
 
   _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
   _plotGenerator_.defineHistogramHolders();

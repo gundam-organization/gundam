@@ -184,8 +184,11 @@ void DataDispenser::doEventSelection(){
   TTreeFormulaManager formulaManager; // TTreeFormulaManager handles the notification of multiple TTreeFormula for one TTChain
   std::vector<TTreeFormula*> sampleCutFormulaList;
   chainPtr->SetBranchStatus("*", true); // enabling every branch to define formula
+
+  GenericToolbox::TablePrinter t;
+  t.setColTitles({{"Sample"}, {"Selection Cut"}});
   for( auto& sample : _cache_.samplesToFillList ){
-    LogInfo << "-> Sample \"" << sample->getName() << "\": \"" << sample->getSelectionCutsStr() << "\"" << std::endl;
+    t.addTableLine({{"\""+sample->getName()+"\""}, {"\""+sample->getSelectionCutsStr()+"\""}});
     sampleCutFormulaList.emplace_back(
         new TTreeFormula(
             sample->getName().c_str(),
@@ -200,6 +203,7 @@ void DataDispenser::doEventSelection(){
     formulaManager.Add(sampleCutFormulaList.back());
   }
   chainPtr->SetNotify(&formulaManager);
+  t.printTable();
 
   LogInfo << "Enabling required branches..." << std::endl;
   chainPtr->SetBranchStatus("*", false);
@@ -249,9 +253,12 @@ void DataDispenser::doEventSelection(){
   }
 
   LogWarning << "Events passing selection cuts:" << std::endl;
+  t.reset();
+  t.setColTitles({{"Sample"}, {"# of events"}});
   for(size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
-    LogInfo << "- \"" << _cache_.samplesToFillList[iSample]->getName() << "\": " << _cache_.sampleNbOfEvents[iSample] << std::endl;
+    t.addTableLine({{"\""+_cache_.samplesToFillList[iSample]->getName()+"\""}, std::to_string(_cache_.sampleNbOfEvents[iSample])});
   }
+  t.printTable();
 
 }
 void DataDispenser::fetchRequestedLeaves(){
