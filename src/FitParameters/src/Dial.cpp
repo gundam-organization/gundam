@@ -13,7 +13,6 @@
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[Dial]");
-  Logger::setMaxLogLevel(LogDebug);
 } )
 
 

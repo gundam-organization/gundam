@@ -86,7 +86,7 @@ private:
   std::string _globalDialLeafName_{};
   double _minDialResponse_{std::nan("unset")};
   double _maxDialResponse_{std::nan("unset")};
-  bool _globalUseMirrorDial_{false};
+  bool _useMirrorDial_{false};
   double _mirrorLowEdge_{std::nan("unset")};
   double _mirrorHighEdge_{std::nan("unset")};
   double _mirrorRange_{std::nan("unset")};

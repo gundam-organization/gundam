@@ -101,7 +101,7 @@ double DialSet::getMaxDialResponse() const {
   return _maxDialResponse_;
 }
 bool DialSet::useMirrorDial() const {
-  return _globalUseMirrorDial_;
+  return _useMirrorDial_;
 }
 double DialSet::getMirrorLowEdge() const {
   return _mirrorLowEdge_;
@@ -251,14 +251,15 @@ void DialSet::readGlobals(const nlohmann::json &config_){
                "\"" << _applyConditionStr_ << "\": could not be parsed as formula expression.")
   }
 
-  // globals for _templateDial_
+
   _minDialResponse_ = JsonUtils::fetchValue(config_, {{"minDialResponse"}, {"minimumSplineResponse"}}, _minDialResponse_);
   _maxDialResponse_ = JsonUtils::fetchValue(config_, "maxDialResponse", _maxDialResponse_);
-  _globalUseMirrorDial_       = JsonUtils::fetchValue(config_, "useMirrorDial", _globalUseMirrorDial_);
-  if( _globalUseMirrorDial_ ){
+
+  _useMirrorDial_   = JsonUtils::fetchValue(config_, "useMirrorDial", _useMirrorDial_);
+  if( _useMirrorDial_ ){
     _mirrorLowEdge_ = JsonUtils::fetchValue(config_, "mirrorLowEdge", _mirrorLowEdge_);
     _mirrorHighEdge_ = JsonUtils::fetchValue(config_, "mirrorHighEdge", _mirrorHighEdge_);
-    _mirrorRange_ = _mirrorHighEdge_ - _mirrorHighEdge_;
+    _mirrorRange_ = _mirrorHighEdge_ - _mirrorLowEdge_;
     LogThrowIf(_mirrorRange_ < 0, GET_VAR_NAME_VALUE(_mirrorHighEdge_) << " < " << GET_VAR_NAME_VALUE(_mirrorLowEdge_))
   }
 }
