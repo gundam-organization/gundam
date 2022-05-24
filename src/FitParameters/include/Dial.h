@@ -10,7 +10,7 @@
 #include "GlobalVariables.h"
 
 #include "GenericToolbox.h"
-#include "GenericToolbox.OrderedLock.h"
+#include "GenericToolbox.Wrappers.h"
 
 #include "TSpline.h"
 
@@ -83,7 +83,7 @@ protected:
 
   // Internals
   bool _isEditingCache_{false};
-  NoCopyWrapper<std::mutex> _evalDialLock_;
+  GenericToolbox::NoCopyWrapper<std::mutex> _evalDialLock_;
   bool _isReferenced_{false};
   double _dialResponseCache_{};
   double _dialParameterCache_{};
