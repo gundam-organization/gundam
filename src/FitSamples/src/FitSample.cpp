@@ -61,9 +61,6 @@ void FitSample::initialize() {
   LogInfo << "Initializing FitSample: " << _name_ << std::endl;
 
   _selectionCuts_ = JsonUtils::fetchValue(_config_, "selectionCuts", _selectionCuts_);
-
-  if( not _selectionCuts_.empty() ) LogInfo << "Selection cut is: \"" << _selectionCuts_.c_str() << "\"" << std::endl;
-
   _enabledDatasetList_ = JsonUtils::fetchValue(_config_, std::vector<std::string>{"datasets", "dataSets"}, _enabledDatasetList_);
   _mcNorm_ = JsonUtils::fetchValue(_config_, "mcNorm", _mcNorm_);
   _dataNorm_ = JsonUtils::fetchValue(_config_, "dataNorm", _dataNorm_);

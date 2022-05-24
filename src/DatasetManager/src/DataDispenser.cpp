@@ -150,7 +150,7 @@ TChain *DataDispenser::generateChain() {
   return out;
 }
 void DataDispenser::buildSampleToFillList(){
-  LogInfo << "Fetching samples to fill..." << std::endl;
+  LogWarning << "Fetching samples to fill..." << std::endl;
 
   for( auto& sample : _sampleSetPtrToLoad_->getFitSampleList() ){
     if( not sample.isEnabled() ) continue;
@@ -167,7 +167,7 @@ void DataDispenser::buildSampleToFillList(){
   LogInfo << "Selected samples are: " << std::endl
           << GenericToolbox::iterableToString(
               _cache_.samplesToFillList,
-              [](const FitSample *samplePtr){ return samplePtr->getName(); }
+              [](const FitSample *samplePtr){ return "\""+samplePtr->getName()+"\""; }
               )
           << std::endl;
 }
@@ -184,8 +184,11 @@ void DataDispenser::doEventSelection(){
   TTreeFormulaManager formulaManager; // TTreeFormulaManager handles the notification of multiple TTreeFormula for one TTChain
   std::vector<TTreeFormula*> sampleCutFormulaList;
   chainPtr->SetBranchStatus("*", true); // enabling every branch to define formula
+
+  GenericToolbox::TablePrinter t;
+  t.setColTitles({{"Sample"}, {"Selection Cut"}});
   for( auto& sample : _cache_.samplesToFillList ){
-    LogInfo << "-> Sample \"" << sample->getName() << "\": \"" << sample->getSelectionCutsStr() << "\"" << std::endl;
+    t.addTableLine({{"\""+sample->getName()+"\""}, {"\""+sample->getSelectionCutsStr()+"\""}});
     sampleCutFormulaList.emplace_back(
         new TTreeFormula(
             sample->getName().c_str(),
@@ -200,6 +203,7 @@ void DataDispenser::doEventSelection(){
     formulaManager.Add(sampleCutFormulaList.back());
   }
   chainPtr->SetNotify(&formulaManager);
+  t.printTable();
 
   LogInfo << "Enabling required branches..." << std::endl;
   chainPtr->SetBranchStatus("*", false);
@@ -248,9 +252,14 @@ void DataDispenser::doEventSelection(){
     }
   }
 
-  LogWarning << "Events passing selection cuts:" << std::endl;
-  for(size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
-    LogInfo << "- \"" << _cache_.samplesToFillList[iSample]->getName() << "\": " << _cache_.sampleNbOfEvents[iSample] << std::endl;
+  if( _owner_->isShowSelectedEventCount() ){
+    LogWarning << "Events passing selection cuts:" << std::endl;
+    t.reset();
+    t.setColTitles({{"Sample"}, {"# of events"}});
+    for(size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
+      t.addTableLine({{"\""+_cache_.samplesToFillList[iSample]->getName()+"\""}, std::to_string(_cache_.sampleNbOfEvents[iSample])});
+    }
+    t.printTable();
   }
 
 }
@@ -317,8 +326,8 @@ void DataDispenser::fetchRequestedLeaves(){
     this->addLeafRequestedForStorage(additionalLeaf);
   }
 
-  LogInfo << "Vars requested for indexing: " << GenericToolbox::parseVectorAsString(_cache_.leavesRequestedForIndexing) << std::endl;
-  LogInfo << "Vars requested for storage: " << GenericToolbox::parseVectorAsString(_cache_.leavesRequestedForStorage) << std::endl;
+  LogInfo << "Vars requested for indexing: " << GenericToolbox::parseVectorAsString(_cache_.leavesRequestedForIndexing, false) << std::endl;
+  LogInfo << "Vars requested for storage: " << GenericToolbox::parseVectorAsString(_cache_.leavesRequestedForStorage, false) << std::endl;
 }
 void DataDispenser::preAllocateMemory(){
   LogInfo << "Pre-allocating memory..." << std::endl;
@@ -395,10 +404,10 @@ void DataDispenser::preAllocateMemory(){
 
             auto dialType = dialSetPtr->getGlobalDialType();
             if     ( dialType == DialType::Spline ){
-              std::generate_n(std::back_inserter(dialSetPtr->getDialList()), chainPtr->GetEntries(), []{ return std::make_shared<SplineDial>(); });
+              dialSetPtr->getDialList().resize(chainPtr->GetEntries(), DialWrapper(SplineDial()));
             }
             else if( dialType == DialType::Graph ){
-              std::generate_n(std::back_inserter(dialSetPtr->getDialList()), chainPtr->GetEntries(), []{ return std::make_shared<GraphDial>(); });
+              dialSetPtr->getDialList().resize(chainPtr->GetEntries(), DialWrapper(GraphDial()));
             }
             else{
               LogThrow("Invalid dial type for event-by-event dial: " << DialType::DialTypeEnumNamespace::toString(dialType))

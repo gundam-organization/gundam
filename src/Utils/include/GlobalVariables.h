@@ -13,6 +13,7 @@
 
 #include <map>
 #include <mutex>
+#include <memory>
 
 
 class GlobalVariables{
@@ -21,7 +22,6 @@ public:
 
   // Setters
   static void setNbThreads(int nbThreads_);
-  static void setPrngSeed(ULong_t seed_);
   static void setEnableEventWeightCache(bool enable = true);
 
   // Getters
@@ -31,7 +31,6 @@ public:
   static std::map<std::string, bool>& getBoolMap();
   static std::vector<TChain*>& getChainList();
   static GenericToolbox::ParallelWorker &getParallelWorker();
-  static TRandom3& getPrng();
   static bool getEnableEventWeightCache();
 
 private:
@@ -42,9 +41,8 @@ private:
   static std::map<std::string, bool> _boolMap_;
   static std::vector<TChain*> _chainList_;
   static GenericToolbox::ParallelWorker _threadPool_;
-  static TRandom3 _prng_;
   static bool _enableEventWeightCache_;
 
 };
 
-#endif // XSLLHFITTER_GLOBALVARIABLES_H
+#endif

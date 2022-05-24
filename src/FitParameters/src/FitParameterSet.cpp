@@ -116,7 +116,7 @@ void FitParameterSet::prepareFitParameters(){
       _eigenParameterList_[iEigen].setIsEigen(true);
       _eigenParameterList_[iEigen].setIsEnabled(true);
       _eigenParameterList_[iEigen].setIsFixed(false);
-      _eigenParameterList_[iEigen].setParSetRef(this);
+      _eigenParameterList_[iEigen].setOwner(this);
       _eigenParameterList_[iEigen].setParameterIndex(iEigen);
       _eigenParameterList_[iEigen].setStdDevValue(TMath::Sqrt((*_eigenValues_)[iEigen]));
       _eigenParameterList_[iEigen].setStepSize(TMath::Sqrt((*_eigenValues_)[iEigen]));
@@ -296,7 +296,7 @@ void FitParameterSet::throwFitParameters(double gain_){
     for( auto& eigenPar : _eigenParameterList_ ){
       if( eigenPar.isFixed() ){ LogWarning << "Eigen parameter #" << eigenPar.getParameterIndex() << " is fixed. Not throwing" << std::endl; continue; }
       eigenPar.setParameterValue(
-          eigenPar.getPriorValue() + gain_ * GlobalVariables::getPrng().Gaus(0, eigenPar.getStdDevValue())
+          eigenPar.getPriorValue() + gain_ * gRandom->Gaus(0, eigenPar.getStdDevValue())
           );
     }
     this->propagateEigenToOriginal();
@@ -607,7 +607,7 @@ void FitParameterSet::defineParameters(){
   _parameterList_.resize(_nbParameterDefinition_);
   for(int iParameter = 0 ; iParameter < _nbParameterDefinition_ ; iParameter++ ){
 
-    _parameterList_[iParameter].setParSetRef(this);
+    _parameterList_[iParameter].setOwner(this);
     _parameterList_[iParameter].setParameterIndex(iParameter);
 
     if( _priorCovarianceMatrix_ != nullptr ){

@@ -5,8 +5,9 @@
 #ifndef GUNDAM_DIALSET_H
 #define GUNDAM_DIALSET_H
 
-#include "Dial.h"
+#include "DialWrapper.h"
 #include "DataBinSet.h"
+#include "GlobalVariables.h"
 
 #include "GenericToolbox.h"
 
@@ -16,6 +17,7 @@
 #include "string"
 #include "vector"
 #include "memory"
+
 
 class FitParameter;
 
@@ -30,27 +32,19 @@ public:
 
   void reset();
 
-  void setParameterIndex(int parameterIndex);
-  void setParameterName(const std::string &parameterName);
+  void setOwner(const FitParameter* owner_);
   void setConfig(const nlohmann::json &config_);
-  void setWorkingDirectory(const std::string &workingDirectory);
-  void setAssociatedParameterReference(FitParameter* associatedParameterReference);
-  void setCurrentDialOffset(size_t currentDialOffset);
 
   void initialize();
 
   // Getters
   bool isEnabled() const;
-  std::vector<std::shared_ptr<Dial>> &getDialList();
+  std::vector<DialWrapper> &getDialList();
   const std::vector<std::string> &getDataSetNameList() const;
   TFormula *getApplyConditionFormula() const;
   const std::string &getDialLeafName() const;
-  const std::string &getDialSubType() const;
-  const std::string &getParameterName() const;
-  size_t getCurrentDialOffset() const;
   DialType::DialType getGlobalDialType() const;
-  const Dial &getTemplateDial() const;
-  const FitParameter* getOwnerFitParameter() const { return _associatedParameterReference_; }
+  const FitParameter* getOwner() const { return _owner_; }
 
   double getMinDialResponse() const;
   double getMaxDialResponse() const;
@@ -71,30 +65,24 @@ protected:
   nlohmann::json fetchDialsDefinition(const nlohmann::json &definitionsList_);
 
 private:
+  // owner
+  const FitParameter* _owner_{nullptr};
+
   // Parameters
   nlohmann::json _config_;
-  int _parameterIndex_{-1};
-  std::string _parameterName_;
-  std::string _workingDirectory_{"."};
+  bool _isEnabled_{true};
   std::string _applyConditionStr_;
   std::shared_ptr<TFormula> _applyConditionFormula_{nullptr};
-  const FitParameter* _associatedParameterReference_{nullptr};
 
   // Internals
   bool _enableDialsSummary_{false};
-  bool _isEnabled_{true};
   std::vector<std::string> _dataSetNameList_;
-//  double _parameterNominalValue_{}; // parameter with which the MC has produced the data set
 
-  // shared pointers are needed since we want to make vectors of DialSets.
-  // .emplace_back() method is calling delete which is calling reset(), and this one has to delete the content of
-  // every pointers. It means the new copied DialSet will handle Dial ptr which have already been deleted.
-  std::vector<std::shared_ptr<Dial>> _dialList_{};
-  size_t _currentDialOffset_{0};
+//  std::vector<DialWrapper<Dial>> _dialList_{};
+  std::vector<DialWrapper> _dialList_{};
 
   // globals
   DialType::DialType _globalDialType_{DialType::DialType_OVERFLOW};
-  std::string _globalDialSubType_{};
   std::string _globalDialLeafName_{};
   double _minDialResponse_{std::nan("unset")};
   double _maxDialResponse_{std::nan("unset")};

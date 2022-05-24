@@ -7,9 +7,10 @@
 
 
 #include "DataBin.h"
+#include "GlobalVariables.h"
 
 #include "GenericToolbox.h"
-#include "GenericToolbox.OrderedLock.h"
+#include "GenericToolbox.Wrappers.h"
 
 #include "TSpline.h"
 
@@ -28,7 +29,9 @@ namespace DialType{
   )
 }
 
-class DialSet;
+class DialSet; // owner
+//template <class T>  class DialWrapper;
+class DialWrapper;
 
 class Dial {
 
@@ -38,6 +41,7 @@ protected:
 
 public:
   virtual ~Dial();
+  virtual std::unique_ptr<Dial> clone() const = 0;
 
   virtual void reset();
 
@@ -72,14 +76,14 @@ protected:
 
   const DialType::DialType _dialType_; // Defines the
   // The DialSet that owns this dial.  The dial DOES NOT OWN THIS POINTER
-  const DialSet* _ownerDialSet_{nullptr};
+  const DialSet* _owner_{nullptr};
 
   // Parameters
   DataBin* _applyConditionBin_{nullptr};
 
   // Internals
   bool _isEditingCache_{false};
-  std::shared_ptr<std::mutex> _evalDialLock_{nullptr};
+  GenericToolbox::NoCopyWrapper<std::mutex> _evalDialLock_;
   bool _isReferenced_{false};
   double _dialResponseCache_{};
   double _dialParameterCache_{};

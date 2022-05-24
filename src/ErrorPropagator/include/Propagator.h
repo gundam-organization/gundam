@@ -95,6 +95,10 @@ private:
   std::vector<DatasetLoader> _dataSetList_;
   std::shared_ptr<TMatrixD> _globalCovarianceMatrix_;
 
+  // Monitoring
+  bool _showEventBreakdown_{true};
+  bool _showEventBreakdownBeforePrior_{true};
+
   // Response functions (WIP)
   std::map<FitSample*, std::shared_ptr<TH1D>> _nominalSamplesMcHistogram_;
   std::map<FitSample*, std::vector<std::shared_ptr<TH1D>>> _responseFunctionsSamplesMcHistogram_;

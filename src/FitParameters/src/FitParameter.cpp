@@ -2,13 +2,14 @@
 // Created by Nadrino on 21/05/2021.
 //
 
-#include "sstream"
+#include "FitParameter.h"
+#include "FitParameterSet.h"
+#include "JsonUtils.h"
 
 #include "Logger.h"
 
-#include "JsonUtils.h"
-#include "FitParameter.h"
-#include "FitParameterSet.h"
+#include "sstream"
+
 
 LoggerInit([](){
   Logger::setUserHeaderStr("[FitParameter]");
@@ -41,7 +42,7 @@ void FitParameter::reset() {
   _dialsWorkingDirectory_ = ".";
   _isEnabled_ = true;
   _isFixed_ = false;
-  _parSetRef_ = nullptr;
+  _owner_ = nullptr;
   _priorType_ = PriorType::Gaussian;
 }
 
@@ -99,8 +100,8 @@ void FitParameter::setMaxValue(double maxValue) {
 void FitParameter::setStepSize(double stepSize) {
   _stepSize_ = stepSize;
 }
-void FitParameter::setParSetRef(void *parSetRef) {
-  _parSetRef_ = parSetRef;
+void FitParameter::setOwner(const FitParameterSet* owner_) {
+  _owner_ = owner_;
 }
 void FitParameter::setPriorType(PriorType::PriorType priorType) {
   _priorType_ = priorType;
@@ -115,13 +116,11 @@ void FitParameter::setCurrentValueAsPrior(){
 
 void FitParameter::initialize() {
 
-  LogThrowIf(_parameterIndex_ == -1, "Parameter index is not set.");
-  LogThrowIf(_priorValue_     == std::numeric_limits<double>::quiet_NaN(), "Prior value is not set.");
-  LogThrowIf(_stdDevValue_    == std::numeric_limits<double>::quiet_NaN(), "Std dev value is not set.");
-  LogThrowIf(_parameterValue_ == std::numeric_limits<double>::quiet_NaN(), "Parameter value is not set.");
-  LogThrowIf(_parSetRef_      == nullptr, "Parameter set ref is not set.")
-
-  LogInfo << "Initializing parameter: \"" << this->getTitle() << "\"" << std::endl;
+  LogThrowIf(_parameterIndex_ == -1, "Parameter index is not set.")
+  LogThrowIf(_priorValue_     == std::numeric_limits<double>::quiet_NaN(), "Prior value is not set.")
+  LogThrowIf(_stdDevValue_    == std::numeric_limits<double>::quiet_NaN(), "Std dev value is not set.")
+  LogThrowIf(_parameterValue_ == std::numeric_limits<double>::quiet_NaN(), "Parameter value is not set.")
+  LogThrowIf(_owner_ == nullptr, "Parameter set ref is not set.")
 
   if( not _parameterConfig_.empty() ){
     _isEnabled_ = JsonUtils::fetchValue(_parameterConfig_, "isEnabled", true);
@@ -130,7 +129,6 @@ void FitParameter::initialize() {
     auto priorTypeStr = JsonUtils::fetchValue(_parameterConfig_, "priorType", "");
     if( not priorTypeStr.empty() ){
       _priorType_ = PriorType::toPriorType(priorTypeStr);
-     LogWarning << "Prior type: " << priorTypeStr << std::endl;
      if( _priorType_ == PriorType::Flat ){ _isFree_ = true; }
     }
 
@@ -154,11 +152,8 @@ void FitParameter::initialize() {
   _dialSetList_.reserve(_dialDefinitionsList_.size());
   for( const auto& dialDefinitionConfig : _dialDefinitionsList_ ){
     _dialSetList_.emplace_back();
-    _dialSetList_.back().setParameterIndex(_parameterIndex_);
-    _dialSetList_.back().setParameterName(_name_);
+    _dialSetList_.back().setOwner(this);
     _dialSetList_.back().setConfig(dialDefinitionConfig);
-    _dialSetList_.back().setWorkingDirectory(_dialsWorkingDirectory_);
-    _dialSetList_.back().setAssociatedParameterReference(this);
     _dialSetList_.back().initialize();
   }
 
@@ -219,8 +214,8 @@ double FitParameter::getMaxValue() const {
 double FitParameter::getStepSize() const {
   return _stepSize_;
 }
-void *FitParameter::getParSetRef() const {
-  return _parSetRef_;
+const FitParameterSet *FitParameter::getOwner() const {
+  return _owner_;
 }
 
 
@@ -273,5 +268,5 @@ std::string FitParameter::getTitle() const {
   return ss.str();
 }
 std::string FitParameter::getFullTitle() const{
-  return ((FitParameterSet*) _parSetRef_)->getName() + "/" + this->getTitle();
+  return ((FitParameterSet*) _owner_)->getName() + "/" + this->getTitle();
 }

@@ -15,6 +15,7 @@ public:
   GraphDial();
 
   void reset() override;
+  std::unique_ptr<Dial> clone() const override { return std::make_unique<GraphDial>(*this); }
 
   void setGraph(const TGraph &graph);
 

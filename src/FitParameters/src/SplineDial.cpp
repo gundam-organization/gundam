@@ -27,18 +27,18 @@ void SplineDial::initialize() {
 
   // check if prior is out of bounds:
   if(
-      _ownerDialSet_->getOwnerFitParameter()->getPriorValue() < _spline_.GetXmin()
-      or _ownerDialSet_->getOwnerFitParameter()->getPriorValue() > _spline_.GetXmax()
+      _owner_->getOwner()->getPriorValue() < _spline_.GetXmin()
+      or _owner_->getOwner()->getPriorValue() > _spline_.GetXmax()
   ){
     LogError << "Prior value of parameter \""
-             << _ownerDialSet_->getOwnerFitParameter()->getTitle()
-             << "\" = " << _ownerDialSet_->getOwnerFitParameter()->getPriorValue()
+             << _owner_->getOwner()->getTitle()
+             << "\" = " << _owner_->getOwner()->getPriorValue()
     << " is out of the spline bounds: " <<  _spline_.GetXmin() << " < X < " << _spline_.GetXmax()
     << std::endl;
     throw std::logic_error("Prior is out of the spline bounds.");
   }
 
-  _effectiveDialParameterValue_ = _ownerDialSet_->getOwnerFitParameter()->getPriorValue();
+  _effectiveDialParameterValue_ = _owner_->getOwner()->getPriorValue();
   try{ fillResponseCache(); }
   catch(...){
     LogError << "Error while evaluating spline response at the prior value: d(" << _effectiveDialParameterValue_ << ") = " << _dialResponseCache_ << std::endl;
@@ -60,8 +60,8 @@ void SplineDial::fillResponseCache() {
   }
 
   // Checks
-  if(_ownerDialSet_->getMinDialResponse() == _ownerDialSet_->getMinDialResponse() and _dialResponseCache_ < _ownerDialSet_->getMinDialResponse() ){
-    _dialResponseCache_ = _ownerDialSet_->getMinDialResponse();
+  if(_owner_->getMinDialResponse() == _owner_->getMinDialResponse() and _dialResponseCache_ < _owner_->getMinDialResponse() ){
+    _dialResponseCache_ = _owner_->getMinDialResponse();
   }
 
   if( _dialResponseCache_ < 0 and _throwIfResponseIsNegative_ ){
@@ -69,7 +69,7 @@ void SplineDial::fillResponseCache() {
     LogThrow(
       "Negative spline response: dial(" << _effectiveDialParameterValue_ << ") = " << _dialResponseCache_
       << std::endl << "Dial is defined in between: [" << _spline_.GetXmin() << ", " << _spline_.GetXmax() << "]" << std::endl
-      << "Parameter: " + _ownerDialSet_->getOwnerFitParameter()->getName() )
+      << "Parameter: " + _owner_->getOwner()->getName() )
   }
 }
 //void SplineDial::fastEval(){
