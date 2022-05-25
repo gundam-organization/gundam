@@ -122,7 +122,9 @@ double Dial::evalResponse(double parameterValue_) {
   if     (_owner_->getMinDialResponse() == _owner_->getMinDialResponse() and _dialResponseCache_ < _owner_->getMinDialResponse() ){ _dialResponseCache_=_owner_->getMinDialResponse(); }
   else if(_owner_->getMaxDialResponse() == _owner_->getMaxDialResponse() and _dialResponseCache_ > _owner_->getMaxDialResponse() ){ _dialResponseCache_=_owner_->getMaxDialResponse(); }
 
+#ifdef ENABLE_DEV_MODE
   LogThrowIf( _dialResponseCache_ != _dialResponseCache_, "NaN weight returned:" << std::endl << this->getSummary())
+#endif
   return _dialResponseCache_;
 }
 std::string Dial::getSummary(){
