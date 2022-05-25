@@ -26,6 +26,7 @@ namespace DialType{
     ,Normalization // response = dial
     ,Spline        // response = spline(dial)
     ,Graph         // response = graphInterpol(dial)
+    ,GraphLin         // response = graph Linear Interpol(dial)
   )
 }
 

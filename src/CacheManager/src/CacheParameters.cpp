@@ -4,6 +4,7 @@
 #include "Dial.h"
 #include "SplineDial.h"
 #include "GraphDial.h"
+#include "GraphDialLin.h"
 #include "NormalizationDial.h"
 #include "GlobalVariables.h"
 

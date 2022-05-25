@@ -13,6 +13,7 @@ set(SRCFILES
         src/NormalizationDial.cpp
         src/SplineDial.cpp
         src/GraphDial.cpp
+        src/GraphDialLin.cpp
         src/NestedDialTest.cpp
         )
 

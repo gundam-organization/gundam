@@ -7,6 +7,7 @@
 #include "DialSet.h"
 #include "GlobalVariables.h"
 #include "GraphDial.h"
+#include "GraphDialLin.h"
 #include "SplineDial.h"
 #include "JsonUtils.h"
 

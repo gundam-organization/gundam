@@ -108,6 +108,9 @@ void FitSampleSet::initialize() {
   else if( llhMethod == "BarlowLLH" ){
     _likelihoodFunctionPtr_ = std::make_shared<BarlowLLH>();
   }
+  else if( llhMethod == "BarlowLLH_Fix_Weight" ){
+    _likelihoodFunctionPtr_ = std::make_shared<BarlowLLHFixWeight>();
+  }
   else if( llhMethod == "BarlowLLH_OA2020_Bad" ){
     _likelihoodFunctionPtr_ = std::make_shared<BarlowOA2020BugLLH>();
   }
@@ -147,7 +150,8 @@ double FitSampleSet::evalLikelihood(const FitSample& sample_) const{
     sampleLlh += (*_likelihoodFunctionPtr_)(
         sample_.getMcContainer().histogram->GetBinContent(iBin),
         std::pow(sample_.getMcContainer().histogram->GetBinError(iBin), 2),
-        sample_.getDataContainer().histogram->GetBinContent(iBin));
+        sample_.getDataContainer().histogram->GetBinContent(iBin)),
+        std::pow(sample_.getDataContainer().histogram->GetBinError(iBin), 2);
   }
   return sampleLlh;
 }

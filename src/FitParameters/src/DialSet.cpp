@@ -8,6 +8,7 @@
 #include "NormalizationDial.h"
 #include "SplineDial.h"
 #include "GraphDial.h"
+#include "GraphDialLin.h"
 #include "FitParameter.h"
 
 #include "Logger.h"
@@ -315,7 +316,7 @@ bool DialSet::initializeDialsWithDefinition() {
     dial.initialize();
     _dialList_.emplace_back( std::make_unique<NormalizationDial>(dial) );
   }
-  else if( _globalDialType_ == DialType::Spline or _globalDialType_ == DialType::Graph ){
+  else if( _globalDialType_ == DialType::Spline or _globalDialType_ == DialType::Graph or _globalDialType_ == DialType::GraphLin ){
     if     ( JsonUtils::doKeyExist(dialsDefinition, "dialLeafName") ){
       _globalDialLeafName_ = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialLeafName");
       // nothing to do here, the dials list will be filled while reading the datasets
@@ -356,6 +357,14 @@ bool DialSet::initializeDialsWithDefinition() {
             g.setGraph(*(TGraph*) dialsList->At(iBin));
             g.initialize();
             _dialList_.emplace_back( std::make_unique<GraphDial>(g) );
+          }
+          else if( _globalDialType_ == DialType::GraphLin ){
+            GraphDialLin gLin;
+            this->applyGlobalParameters(&gLin);
+            gLin.setApplyConditionBin(&_binningCacheList_.back().getBinsList()[iBin]);
+            gLin.setGraph(*(TGraph*) dialsList->At(iBin));
+            gLin.initialize();
+            _dialList_.emplace_back( std::make_unique<GraphDialLin>(gLin) );
           }
           else{
             LogThrow("Should not be here???")

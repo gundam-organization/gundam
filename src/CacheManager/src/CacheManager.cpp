@@ -11,6 +11,8 @@
 #include "Dial.h"
 #include "SplineDial.h"
 #include "GraphDial.h"
+#include "GraphDialLin.h"
+
 #include "NormalizationDial.h"
 #include "GlobalVariables.h"
 
@@ -142,6 +144,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
     int generalSplines = 0;
     int generalPoints = 0;
     int graphs = 0;
+    int graphsLin = 0;
     int graphPoints = 0;
     int norms = 0;
     Cache::Manager::ParameterMap.clear();
@@ -195,6 +198,11 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
                 if (gDial) {
                     ++graphs;
                 }
+                const GraphDialLin* gDialLin
+                    = dynamic_cast<const GraphDialLin*>(dial);
+                if (gDialLin) {
+                    ++graphsLin;
+                }
                 const NormalizationDial* nDial
                     = dynamic_cast<const NormalizationDial*>(dial);
                 if (nDial) {
@@ -241,6 +249,9 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
             << std::endl;
     LogInfo << "    Graphs: " << graphs
             << " (" << 1.0*graphs/events << " per event)"
+            << std::endl;
+    LogInfo << "    GraphsLin: " << graphsLin
+            << " (" << 1.0*graphsLin/events << " per event)"
             << std::endl;
     LogInfo << "    Normalizations: " << norms
             <<" ("<< 1.0*norms/events <<" per event)"

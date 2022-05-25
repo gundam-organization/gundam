@@ -6,6 +6,7 @@
 #include "GlobalVariables.h"
 #include "SplineDial.h"
 #include "GraphDial.h"
+#include "GraphDialLin.h"
 #include "DatasetLoader.h"
 #include "JsonUtils.h"
 
@@ -409,6 +410,9 @@ void DataDispenser::preAllocateMemory(){
             else if( dialType == DialType::Graph ){
               dialSetPtr->getDialList().resize(chainPtr->GetEntries(), DialWrapper(GraphDial()));
             }
+            else if( dialType == DialType::GraphLin ){
+              dialSetPtr->getDialList().resize(chainPtr->GetEntries(), DialWrapper(GraphDialLin()));
+            }
             else{
               LogThrow("Invalid dial type for event-by-event dial: " << DialType::DialTypeEnumNamespace::toString(dialType))
             }
@@ -507,6 +511,7 @@ void DataDispenser::readAndFill(){
     TGraph* grPtr{nullptr};
     SplineDial* spDialPtr;
     GraphDial* grDialPtr;
+    GraphDialLin* grLinDialPtr;
     const DataBin* applyConditionBinPtr;
 
     // Try to read TTree the closest to sequentially possible
@@ -679,6 +684,15 @@ void DataDispenser::readAndFill(){
                       // Adding dial in the event
                       eventPtr->getRawDialPtrList()[eventDialOffset++] = grDialPtr;
                     }
+                    else if( dialSetPtr->getGlobalDialType() == DialType::GraphLin ){
+                      grLinDialPtr = (GraphDialLin*) dialSetPtr->getDialList()[iEntry].get();
+                      dialSetPtr->applyGlobalParameters(grLinDialPtr);
+                      grLinDialPtr->setGraph(*grPtr);
+                      grLinDialPtr->initialize();
+                      grLinDialPtr->setIsReferenced(true);
+                      // Adding dial in the event
+                      eventPtr->getRawDialPtrList()[eventDialOffset++] = grLinDialPtr;
+                    }
                     else{
                       LogThrow("Unsupported event-by-event dial: " << DialType::DialTypeEnumNamespace::toString(dialSetPtr->getGlobalDialType()))
                     }
@@ -703,6 +717,15 @@ void DataDispenser::readAndFill(){
                     grDialPtr->setIsReferenced(true);
                     // Adding dial in the event
                     eventPtr->getRawDialPtrList()[eventDialOffset++] = grDialPtr;
+                  }
+                  else if( dialSetPtr->getGlobalDialType() == DialType::GraphLin ){
+                    grLinDialPtr = (GraphDialLin*) dialSetPtr->getDialList()[iEntry].get();
+                    dialSetPtr->applyGlobalParameters(grLinDialPtr);
+                    grLinDialPtr->setGraph(*grPtr);
+                    grLinDialPtr->initialize();
+                    grLinDialPtr->setIsReferenced(true);
+                    // Adding dial in the event
+                    eventPtr->getRawDialPtrList()[eventDialOffset++] = grLinDialPtr;
                   }
                   else{
                     LogThrow("Unsupported event-by-event dial: " << DialType::DialTypeEnumNamespace::toString(dialSetPtr->getGlobalDialType()))
