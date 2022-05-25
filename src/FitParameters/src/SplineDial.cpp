@@ -55,16 +55,9 @@ void SplineDial::fillResponseCache() {
 
   if     ( _effectiveDialParameterValue_ < _spline_.GetXmin() ) _dialResponseCache_ = _spline_.Eval(_spline_.GetXmin());
   else if( _effectiveDialParameterValue_ > _spline_.GetXmax() ) _dialResponseCache_ = _spline_.Eval(_spline_.GetXmax());
-  else   {
-    _dialResponseCache_ = _spline_.Eval(_effectiveDialParameterValue_);
-  }
+  else   { _dialResponseCache_ = _spline_.Eval(_effectiveDialParameterValue_); }
 
-  // Checks
-  if(_owner_->getMinDialResponse() == _owner_->getMinDialResponse() and _dialResponseCache_ < _owner_->getMinDialResponse() ){
-    _dialResponseCache_ = _owner_->getMinDialResponse();
-  }
-
-  if( _dialResponseCache_ < 0 and _throwIfResponseIsNegative_ ){
+  if( _throwIfResponseIsNegative_ and _dialResponseCache_ < 0 ){
     this->writeSpline();
     LogThrow(
       "Negative spline response: dial(" << _effectiveDialParameterValue_ << ") = " << _dialResponseCache_
