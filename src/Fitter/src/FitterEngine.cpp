@@ -93,17 +93,39 @@ void FitterEngine::initialize() {
   if( _chi2Buffer_ != 0 ){
     LogDebug << "Check asimov: " << std::endl;
     for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
+      LogDebug << sample.getName() << std::endl;
+      size_t nDiff{0};
       for( size_t iEvent = 0 ; iEvent < sample.getMcContainer().eventList.size() ; iEvent++ ){
         auto& mcEvent = sample.getMcContainer().eventList[iEvent];
         auto& dataEvent = sample.getDataContainer().eventList[iEvent];
-        if( mcEvent.getEventWeight() != dataEvent.getEventWeight() ){
-          LogDebug << mcEvent.getEventWeight() << " => " << dataEvent.getEventWeight() << std::endl;
+        if( nDiff<15 and mcEvent.getEventWeight() != dataEvent.getEventWeight() ){
+          nDiff++;
+          LogDebug
+          << mcEvent.getEventWeight() << " => " << dataEvent.getEventWeight()
+          << " / diff: " << mcEvent.getEventWeight() - dataEvent.getEventWeight() << std::endl;
         }
       }
     }
   }
 
   if( JsonUtils::fetchValue(_config_, "fixGhostFitParameters", false) ) this->fixGhostFitParameters();
+
+  this->updateChi2Cache();
+  LogDebug << "Check asimov AGAIN: " << std::endl;
+  for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
+    LogDebug << sample.getName() << std::endl;
+    size_t nDiff{0};
+    for( size_t iEvent = 0 ; iEvent < sample.getMcContainer().eventList.size() ; iEvent++ ){
+      auto& mcEvent = sample.getMcContainer().eventList[iEvent];
+      auto& dataEvent = sample.getDataContainer().eventList[iEvent];
+      if( nDiff<15 and mcEvent.getEventWeight() != dataEvent.getEventWeight() ){
+        nDiff++;
+        LogDebug << iEvent
+            << ": " << mcEvent.getEventWeight() << " => " << dataEvent.getEventWeight()
+            << " / diff: " << mcEvent.getEventWeight() - dataEvent.getEventWeight() << std::endl;
+      }
+    }
+  }
 
   _convergenceMonitor_.addDisplayedQuantity("VarName");
   _convergenceMonitor_.addDisplayedQuantity("LastAddedValue");
