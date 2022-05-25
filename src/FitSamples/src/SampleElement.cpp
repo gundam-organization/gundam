@@ -195,6 +195,10 @@ double SampleElement::getSumWeights() const{
   return std::accumulate(eventList.begin(), eventList.end(), double(0.),
                          [](double sum_, const PhysicsEvent& ev_){ return sum_ + ev_.getEventWeight(); });
 }
+size_t SampleElement::getNbBinnedEvents() const{
+  return std::accumulate(eventList.begin(), eventList.end(), size_t(0.),
+                         [](size_t sum_, const PhysicsEvent& ev_){ return sum_ + (ev_.getSampleBinIndex() != -1); });
+}
 
 void SampleElement::print() const{
   LogInfo << "SampleElement: " << name << std::endl;

@@ -50,6 +50,7 @@ public:
   void throwStatError();
 
   double getSumWeights() const;
+  size_t getNbBinnedEvents() const;
 
   // debug
   void print() const;

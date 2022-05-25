@@ -253,9 +253,11 @@ void Propagator::initialize() {
   if( _showEventBreakdown_ ){
     LogWarning << "Sample breakdown:" << std::endl;
     GenericToolbox::TablePrinter t;
-    t.setColTitles({{"Sample"},{"MC"},{"Data"}});
+    t.setColTitles({{"Sample"},{"MC (# binned event)"},{"Data (# binned event)"}, {"MC (weighted)"}, {"Data (weighted)"}});
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
       t.addTableLine({{"\""+sample.getName()+"\""},
+                         std::to_string(sample.getMcContainer().getNbBinnedEvents()),
+                         std::to_string(sample.getDataContainer().getNbBinnedEvents()),
                          std::to_string(sample.getMcContainer().getSumWeights()),
                          std::to_string(sample.getDataContainer().getSumWeights())
                      });
