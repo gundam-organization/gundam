@@ -88,6 +88,21 @@ void FitterEngine::initialize() {
     this->rescaleParametersStepSize();
   }
 
+  this->updateChi2Cache();
+  LogDebug << GET_VAR_NAME_VALUE(_chi2Buffer_) << std::endl;
+  if( _chi2Buffer_ != 0 ){
+    LogDebug << "Check asimov: " << std::endl;
+    for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
+      for( size_t iEvent = 0 ; iEvent < sample.getMcContainer().eventList.size() ; iEvent++ ){
+        auto& mcEvent = sample.getMcContainer().eventList[iEvent];
+        auto& dataEvent = sample.getDataContainer().eventList[iEvent];
+        if( mcEvent.getEventWeight() != dataEvent.getEventWeight() ){
+          LogDebug << mcEvent.getEventWeight() << " => " << dataEvent.getEventWeight() << std::endl;
+        }
+      }
+    }
+  }
+
   if( JsonUtils::fetchValue(_config_, "fixGhostFitParameters", false) ) this->fixGhostFitParameters();
 
   _convergenceMonitor_.addDisplayedQuantity("VarName");
