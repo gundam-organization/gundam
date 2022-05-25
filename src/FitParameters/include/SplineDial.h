@@ -26,20 +26,18 @@ public:
 
   void initialize() override;
 
-  std::string getSummary() override;
   const TSpline3* getSplinePtr() const;
+  std::string getSummary() override;
 
   // Debug
-  void writeSpline(const std::string &fileName_ = "") const;
+  void writeSpline(const std::string &fileName_ = "") const override;
 
 //  void fastEval();
 
 protected:
   void fillResponseCache() override;
 
-
 private:
-  bool _throwIfResponseIsNegative_{true};
   TSpline3 _spline_;
 
 //  struct FastSpliner{
