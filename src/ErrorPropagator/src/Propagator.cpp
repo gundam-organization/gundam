@@ -251,11 +251,58 @@ void Propagator::initialize() {
 #endif
 
   if( _showEventBreakdown_ ){
+    {
+      // STAGED MASK
+      LogWarning << "Staged event breakdown:" << std::endl;
+      std::vector<std::vector<double>> stageBreakdownList(
+          _fitSampleSet_.getFitSampleList().size(),
+          std::vector<double>(_parameterSetsList_.size()+1, 0)
+      ); // [iSample][iStage]
+      std::vector<std::string> stageTitles;
+      stageTitles.emplace_back("Sample");
+      stageTitles.emplace_back("No reweight");
+      for( auto& parSet : _parameterSetsList_ ){
+        stageTitles.emplace_back("+ " + parSet.getName());
+      }
+
+      int iStage{0};
+      for( auto& parSet : _parameterSetsList_ ){ parSet.setMaskedForPropagation(true); }
+      this->reweightMcEvents();
+      for( size_t iSample = 0 ; iSample < _fitSampleSet_.getFitSampleList().size() ; iSample++ ){
+        stageBreakdownList[iSample][iStage] = _fitSampleSet_.getFitSampleList()[iSample].getMcContainer().getSumWeights();
+      }
+
+      for( auto& parSet : _parameterSetsList_ ){
+        parSet.setMaskedForPropagation(false);
+        this->reweightMcEvents();
+        iStage++;
+        for( size_t iSample = 0 ; iSample < _fitSampleSet_.getFitSampleList().size() ; iSample++ ){
+          stageBreakdownList[iSample][iStage] = _fitSampleSet_.getFitSampleList()[iSample].getMcContainer().getSumWeights();
+        }
+      }
+
+      GenericToolbox::TablePrinter t;
+      t.setColTitles(stageTitles);
+      for( size_t iSample = 0 ; iSample < _fitSampleSet_.getFitSampleList().size() ; iSample++ ) {
+        std::vector<std::string> tableLine;
+        tableLine.emplace_back("\""+_fitSampleSet_.getFitSampleList()[iSample].getName()+"\"");
+        for( iStage = 0 ; iStage < stageBreakdownList[iSample].size() ; iStage++ ){
+          tableLine.emplace_back( std::to_string(stageBreakdownList[iSample][iStage]) );
+        }
+        t.addTableLine(tableLine);
+      }
+      t.printTable();
+    }
+
+
+
     LogWarning << "Sample breakdown:" << std::endl;
     GenericToolbox::TablePrinter t;
-    t.setColTitles({{"Sample"},{"MC"},{"Data"}});
+    t.setColTitles({{"Sample"},{"MC (# binned event)"},{"Data (# binned event)"}, {"MC (weighted)"}, {"Data (weighted)"}});
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
       t.addTableLine({{"\""+sample.getName()+"\""},
+                         std::to_string(sample.getMcContainer().getNbBinnedEvents()),
+                         std::to_string(sample.getDataContainer().getNbBinnedEvents()),
                          std::to_string(sample.getMcContainer().getSumWeights()),
                          std::to_string(sample.getDataContainer().getSumWeights())
                      });

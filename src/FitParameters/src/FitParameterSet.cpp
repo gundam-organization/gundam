@@ -47,6 +47,9 @@ void FitParameterSet::setConfig(const nlohmann::json &config_) {
 void FitParameterSet::setSaveDir(TDirectory* saveDir_){
   _saveDir_ = saveDir_;
 }
+void FitParameterSet::setMaskedForPropagation(bool maskedForPropagation) {
+  _maskedForPropagation_ = maskedForPropagation;
+}
 
 void FitParameterSet::initialize() {
 
@@ -191,6 +194,9 @@ bool FitParameterSet::isEnabledThrowToyParameters() const {
 }
 const std::string &FitParameterSet::getName() const {
   return _name_;
+}
+bool FitParameterSet::isMaskedForPropagation() const {
+  return _maskedForPropagation_;
 }
 
 std::vector<FitParameter> &FitParameterSet::getParameterList() {
@@ -675,3 +681,4 @@ const std::shared_ptr<TMatrixDSym> &FitParameterSet::getPriorCorrelationMatrix()
 const std::shared_ptr<TMatrixDSym> &FitParameterSet::getPriorCovarianceMatrix() const {
   return _priorCovarianceMatrix_;
 }
+

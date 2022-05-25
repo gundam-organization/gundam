@@ -53,14 +53,16 @@ public:
 
   // const getters
   bool isReferenced() const;
+  bool isMasked() const;
   double getDialResponseCache() const;
-  const DataBin* getApplyConditionBinPtr() const;
+  double getAssociatedParameter() const;
   DialType::DialType getDialType() const;
+  const DataBin* getApplyConditionBinPtr() const;
   const DialSet* getOwner() const;
 
+  // getters
   DataBin* getApplyConditionBinPtr();
 
-  double getAssociatedParameter() const;
 
   void updateEffectiveDialParameter();
   double evalResponse();
@@ -70,12 +72,12 @@ public:
   virtual std::string getSummary();
 //  virtual void buildResponseSplineCache();
   virtual void fillResponseCache() = 0;
+  virtual void writeSpline(const std::string &fileName_ = "") const { return; }
+
 
 protected:
   //! KEEP THE MEMBER AS LIGHT AS POSSIBLE!!
-
   const DialType::DialType _dialType_; // Defines the
-  // The DialSet that owns this dial.  The dial DOES NOT OWN THIS POINTER
   const DialSet* _owner_{nullptr};
 
   // Parameters
@@ -85,6 +87,7 @@ protected:
   bool _isEditingCache_{false};
   GenericToolbox::NoCopyWrapper<std::mutex> _evalDialLock_;
   bool _isReferenced_{false};
+  bool _throwIfResponseIsNegative_{true};
   double _dialResponseCache_{};
   double _dialParameterCache_{};
   double _effectiveDialParameterValue_{}; // take into account internal transformations while using mirrored splines transformations

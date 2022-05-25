@@ -548,51 +548,12 @@ void DataDispenser::readAndFill(){
       }
       if( skipEvent ) continue;
 
-//      threadChain->GetStatus()->Print();
-//      for( int iElm=0 ;iElm <  threadChain->GetStatus()->GetEntries() ; iElm++ ){
-//        auto* ce = (TChainElement*) threadChain->GetStatus()->At(iElm);
-//        LogWarning << ce->GetName() << " -> " << ce->GetStatus() << std::endl;
-//      }
-//
-//      for( int iBranch = 0 ; iBranch < threadChain->GetListOfLeaves()->GetEntries() ; iBranch++ ){
-//        auto* l = threadChain->GetLeaf(threadChain->GetListOfLeaves()->At(iBranch)->GetName());
-//        if( l == nullptr ) continue;
-//        if( threadChain->GetBranchStatus(l->GetBranch()->GetName()) == 1 ){
-//          LogTrace << std::string(l->GetFullName()) << " -> " << l->GetValuePointer() << " ? ";
-//          if( tEventBuffer.fetchLeafIndex(l->GetName()) == -1 ){
-//            LogTrace << "NO" << std::endl;
-//          }
-//          else{
-//            LogTrace << (int*) &(tEventBuffer.getLeafContent(l->GetName()).getByteBuffer()[0]) << std::endl;
-//          }
-//        }
-//      }
-
-//      LogDebug<< "ENTRY?" << std::endl;
       nBytes = threadChain->GetEntry(iEntry);
-//      LogDebug << tEventBuffer.getSummary() << std::endl;
-//      eventBuffer.copyData(copyDict, true);
-//      LogDebug << eventBuffer << std::endl;
-//      LogThrow("")
       if( iThread_ == 0 ) readSpeed.addQuantity(nBytes);
 
       if( threadNominalWeightFormula != nullptr ){
         eventBuffer.setTreeWeight(threadNominalWeightFormula->EvalInstance());
         if( eventBuffer.getTreeWeight() == 0 ){
-//          LogTrace << std::endl << "DONT PASS CUT:" << threadNominalWeightFormula->GetExpFormula() << std::endl;
-//          for( int iLeaf = 0 ; iLeaf < threadNominalWeightFormula->GetNcodes() ; iLeaf++ ){
-//            LogDebug << "branch:" << threadNominalWeightFormula->GetLeaf(iLeaf)->GetFullName();
-//            for( int i=0 ; i < threadNominalWeightFormula->GetLeaf(iLeaf)->GetNdata(); i++){
-//              LogDebug << " -> " << threadNominalWeightFormula->GetLeaf(iLeaf)->GetValue(i);
-//            }
-//            LogDebug << std::endl;
-//            LogThrowIf(not threadChain->GetBranchStatus(threadNominalWeightFormula->GetLeaf(iLeaf)->GetBranch()->GetName()),
-//                       threadNominalWeightFormula->GetLeaf(iLeaf)->GetBranch()->GetName() << "DISABLE?")
-////            threadChain->SetBranchStatus(threadNominalWeightFormula->GetLeaf(iLeaf)->GetBranch()->GetName(), true);
-//          }
-//          LogWarning << threadNominalWeightFormula->EvalInstance() << std::endl;
-//          eventBuffer.copyData(copyDict, true);
-//          LogThrow(eventBuffer)
           continue;
         } // skip this event
       }

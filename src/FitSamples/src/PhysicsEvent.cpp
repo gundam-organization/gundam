@@ -166,10 +166,10 @@ void PhysicsEvent::reweightUsingDialCache(){
 
   // bare dials
   for( auto& dial : _rawDialPtrList_ ){
-    if( dial == nullptr ) return;
-    double response = dial->evalResponse();
-    this->addEventWeight( response );
+    if( dial == nullptr or dial->isMasked() ) return;
+    this->addEventWeight( dial->evalResponse() );
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
+    double response = dial->evalResponse();
 #warning CACHE_MANAGER_SLOW_VALIDATION in PhysicsEvent::reweightUsingDialCache
     /////////////////////////////////////////////////////////////////
     // The internal GPU values for the splines are made available during slow
@@ -262,10 +262,10 @@ void PhysicsEvent::reweightUsingDialCache(){
   }
 
   // nested dials
-  for( auto& nestedDialEntry : _nestedDialRefList_ ){
-    if( nestedDialEntry.first == nullptr ) return;
-    this->addEventWeight( nestedDialEntry.first->eval(nestedDialEntry.second) );
-  }
+//  for( auto& nestedDialEntry : _nestedDialRefList_ ){
+//    if( nestedDialEntry.first == nullptr ) return;
+//    this->addEventWeight( nestedDialEntry.first->eval(nestedDialEntry.second) );
+//  }
 }
 
 int PhysicsEvent::findVarIndex(const std::string& leafName_, bool throwIfNotFound_) const{

@@ -47,16 +47,19 @@ void Dial::initialize() {
 bool Dial::isReferenced() const {
   return _isReferenced_;
 }
+bool Dial::isMasked() const{
+  return (_owner_->getOwner()->getOwner()->isMaskedForPropagation());
+}
 double Dial::getDialResponseCache() const{
   return _dialResponseCache_;
+}
+double Dial::getAssociatedParameter() const {
+  return _owner_->getOwner()->getParameterValue();
 }
 const DataBin* Dial::getApplyConditionBinPtr() const{ return _applyConditionBin_; }
 DataBin* Dial::getApplyConditionBinPtr(){ return _applyConditionBin_; }
 DialType::DialType Dial::getDialType() const {
   return _dialType_;
-}
-double Dial::getAssociatedParameter() const {
-  return _owner_->getOwner()->getParameterValue();
 }
 
 void Dial::updateEffectiveDialParameter(){
@@ -87,25 +90,6 @@ double Dial::evalResponse(){
 
 // Virtual
 double Dial::evalResponse(double parameterValue_) {
-
-//  if( _isEditingCache_ ){
-//    while( _isEditingCache_ ){  }
-//    return _dialResponseCache_;
-//  }
-//
-//  if( _dialParameterCache_ == parameterValue_ ) return _dialResponseCache_; // stop if already updated by another threads
-//
-//  // Edit the cache
-//  _isEditingCache_ = true;
-//  _dialParameterCache_ = parameterValue_;
-//  this->updateEffectiveDialParameter();
-//  this->fillResponseCache(); // specified in the corresponding dial class
-//  if     (_owner_->getMinDialResponse() == _owner_->getMinDialResponse() and _dialResponseCache_ < _owner_->getMinDialResponse() ){ _dialResponseCache_=_owner_->getMinDialResponse(); }
-//  else if(_owner_->getMaxDialResponse() == _owner_->getMaxDialResponse() and _dialResponseCache_ > _owner_->getMaxDialResponse() ){ _dialResponseCache_=_owner_->getMaxDialResponse(); }
-//
-//  return _dialResponseCache_;
-
-
   // Check if all is already up-to-date
   if( not _isEditingCache_ and _dialParameterCache_ == parameterValue_ ){
     return _dialResponseCache_;
@@ -119,10 +103,24 @@ double Dial::evalResponse(double parameterValue_) {
   _dialParameterCache_ = parameterValue_;
   this->updateEffectiveDialParameter();
   this->fillResponseCache(); // specified in the corresponding dial class
+
+  // Cap checks
   if     (_owner_->getMinDialResponse() == _owner_->getMinDialResponse() and _dialResponseCache_ < _owner_->getMinDialResponse() ){ _dialResponseCache_=_owner_->getMinDialResponse(); }
   else if(_owner_->getMaxDialResponse() == _owner_->getMaxDialResponse() and _dialResponseCache_ > _owner_->getMaxDialResponse() ){ _dialResponseCache_=_owner_->getMaxDialResponse(); }
 
+  if( _throwIfResponseIsNegative_ and _dialResponseCache_ < 0 ){
+    this->writeSpline();
+    LogError << this->getSummary() << std::endl;
+    LogThrow("Negative response.")
+//    LogThrow(
+//        "Negative spline response: dial(" << _effectiveDialParameterValue_ << ") = " << _dialResponseCache_
+//                                          << std::endl << "Dial is defined in between: [" << _spline_.GetXmin() << ", " << _spline_.GetXmax() << "]" << std::endl
+//                                          << "Parameter: " + _owner_->getOwner()->getName() )
+  }
+
+#ifdef ENABLE_DEV_MODE
   LogThrowIf( _dialResponseCache_ != _dialResponseCache_, "NaN weight returned:" << std::endl << this->getSummary())
+#endif
   return _dialResponseCache_;
 }
 std::string Dial::getSummary(){
@@ -162,3 +160,6 @@ std::string Dial::getSummary(){
 //      new TSpline3(Form("%p", this), &xSigmaSteps[0], &yResponse[0], int(xSigmaSteps.size()))
 //  );
 //}
+
+
+

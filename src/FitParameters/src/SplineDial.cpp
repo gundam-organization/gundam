@@ -52,25 +52,9 @@ std::string SplineDial::getSummary() {
   return ss.str();
 }
 void SplineDial::fillResponseCache() {
-
   if     ( _effectiveDialParameterValue_ < _spline_.GetXmin() ) _dialResponseCache_ = _spline_.Eval(_spline_.GetXmin());
   else if( _effectiveDialParameterValue_ > _spline_.GetXmax() ) _dialResponseCache_ = _spline_.Eval(_spline_.GetXmax());
-  else   {
-    _dialResponseCache_ = _spline_.Eval(_effectiveDialParameterValue_);
-  }
-
-  // Checks
-  if(_owner_->getMinDialResponse() == _owner_->getMinDialResponse() and _dialResponseCache_ < _owner_->getMinDialResponse() ){
-    _dialResponseCache_ = _owner_->getMinDialResponse();
-  }
-
-  if( _dialResponseCache_ < 0 and _throwIfResponseIsNegative_ ){
-    this->writeSpline();
-    LogThrow(
-      "Negative spline response: dial(" << _effectiveDialParameterValue_ << ") = " << _dialResponseCache_
-      << std::endl << "Dial is defined in between: [" << _spline_.GetXmin() << ", " << _spline_.GetXmax() << "]" << std::endl
-      << "Parameter: " + _owner_->getOwner()->getName() )
-  }
+  else   { _dialResponseCache_ = _spline_.Eval(_effectiveDialParameterValue_); }
 }
 //void SplineDial::fastEval(){
 ////Function takes a spline with equidistant knots and the number of steps
@@ -89,11 +73,11 @@ void SplineDial::fillResponseCache() {
 //}
 
 void SplineDial::copySpline(const TSpline3* splinePtr_){
-//  LogThrowIf(_spline_.GetXmin() != _spline_.GetXmax(), "Spline already set")
+  LogThrowIf(_spline_.GetXmin() != _spline_.GetXmax(), "Spline already set")
   _spline_ = *splinePtr_;
 }
 void SplineDial::createSpline(TGraph* grPtr_){
-//  LogThrowIf(_spline_.GetXmin() != _spline_.GetXmax(), "Spline already set")
+  LogThrowIf(_spline_.GetXmin() != _spline_.GetXmax(), "Spline already set")
   _spline_ = TSpline3(grPtr_->GetName(), grPtr_);
 //  fs.stepsize = (_spline_.GetXmax() - _spline_.GetXmin())/((double) grPtr_->GetN());
 }
