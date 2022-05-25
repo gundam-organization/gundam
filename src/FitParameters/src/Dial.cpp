@@ -87,25 +87,6 @@ double Dial::evalResponse(){
 
 // Virtual
 double Dial::evalResponse(double parameterValue_) {
-
-//  if( _isEditingCache_ ){
-//    while( _isEditingCache_ ){  }
-//    return _dialResponseCache_;
-//  }
-//
-//  if( _dialParameterCache_ == parameterValue_ ) return _dialResponseCache_; // stop if already updated by another threads
-//
-//  // Edit the cache
-//  _isEditingCache_ = true;
-//  _dialParameterCache_ = parameterValue_;
-//  this->updateEffectiveDialParameter();
-//  this->fillResponseCache(); // specified in the corresponding dial class
-//  if     (_owner_->getMinDialResponse() == _owner_->getMinDialResponse() and _dialResponseCache_ < _owner_->getMinDialResponse() ){ _dialResponseCache_=_owner_->getMinDialResponse(); }
-//  else if(_owner_->getMaxDialResponse() == _owner_->getMaxDialResponse() and _dialResponseCache_ > _owner_->getMaxDialResponse() ){ _dialResponseCache_=_owner_->getMaxDialResponse(); }
-//
-//  return _dialResponseCache_;
-
-
   // Check if all is already up-to-date
   if( not _isEditingCache_ and _dialParameterCache_ == parameterValue_ ){
     return _dialResponseCache_;
@@ -164,3 +145,9 @@ std::string Dial::getSummary(){
 //      new TSpline3(Form("%p", this), &xSigmaSteps[0], &yResponse[0], int(xSigmaSteps.size()))
 //  );
 //}
+
+
+
+bool Dial::isMasked() const{
+  return (_owner_->getOwner()->getOwner()->isMaskedForPropagation());
+}

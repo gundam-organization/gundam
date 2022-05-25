@@ -71,11 +71,11 @@ public:
 //  virtual void buildResponseSplineCache();
   virtual void fillResponseCache() = 0;
 
+  bool isMasked() const;
+
 protected:
   //! KEEP THE MEMBER AS LIGHT AS POSSIBLE!!
-
   const DialType::DialType _dialType_; // Defines the
-  // The DialSet that owns this dial.  The dial DOES NOT OWN THIS POINTER
   const DialSet* _owner_{nullptr};
 
   // Parameters
