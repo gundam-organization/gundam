@@ -162,12 +162,11 @@ void PhysicsEvent::resetEventWeight(){
   _eventWeight_ = _treeWeight_;
 }
 void PhysicsEvent::reweightUsingDialCache(){
-  this->resetEventWeight();
 
-  // bare dials
-  for( auto& dial : _rawDialPtrList_ ){
-    if( dial == nullptr or dial->isMasked() ) return;
-    this->addEventWeight( dial->evalResponse() );
+  _eventWeight_ = std::accumulate(
+    _rawDialPtrList_.begin(), _rawDialPtrList_.end(), _treeWeight_,
+    [](double weight_, auto& dial){
+      if( dial == nullptr or dial->isMasked() ) return weight_;
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
     double response = dial->evalResponse();
 #warning CACHE_MANAGER_SLOW_VALIDATION in PhysicsEvent::reweightUsingDialCache
@@ -259,7 +258,108 @@ void PhysicsEvent::reweightUsingDialCache(){
         break;
     }
 #endif
-  }
+      return weight_ * dial->evalResponse();
+    }
+  );
+
+//  this->resetEventWeight();
+//  // bare dials
+//  for( auto& dial : _rawDialPtrList_ ){
+//    if( dial == nullptr ) return;
+//    if( dial->isMasked() ) continue;
+//    this->addEventWeight( dial->evalResponse() );
+//#ifdef CACHE_MANAGER_SLOW_VALIDATION
+//    double response = dial->evalResponse();
+//#warning CACHE_MANAGER_SLOW_VALIDATION in PhysicsEvent::reweightUsingDialCache
+//    /////////////////////////////////////////////////////////////////
+//    // The internal GPU values for the splines are made available during slow
+//    // validation, but are never used in the CPU calculation.  This code here
+//    // is checking that the GPU value for the spline agrees with the direct
+//    // dial calculation of the spline.
+//    static std::map<std::string,double> maxDelta;
+//    static std::map<std::string,double> sumDelta;
+//    static std::map<std::string,double> sum2Delta;
+//    static std::map<std::string,long long int> numDelta;
+//    static int deltaTrials = 0;
+//    const SplineDial* sDial = dynamic_cast<const SplineDial*>(dial);
+//    while (sDial) {
+//        if (!dial->getCacheManagerValuePointer()) {
+//            LogWarning << "VALIDATION: SplineDial without cache" << std::endl;
+//            break;
+//        }
+//        // This only compiles with slow validation, and the cache validity
+//        // is managed elsewhere.
+//        if (!std::isfinite(response)) {
+//            LogWarning << "VALIDATION: Dial response is not finite" << std::endl;
+//            break;
+//        }
+//        if (response < 0) {
+//            LogWarning << "VALIDATION: Dial response is negative" << std::endl;
+//            break;
+//        }
+//        double cacheResponse = *dial->getCacheManagerValuePointer();
+//        std::string cacheName = dial->getCacheManagerName();
+//        std::string parName = dial->getOwner()->getParameterName();
+//        std::string sumName = parName;
+//        if (!std::isfinite(cacheResponse)) {
+//            LogError << "GPU cache response is not finite" << std::endl;
+//            std::runtime_error("GPU cache response is not finite");
+//        }
+//        if (cacheResponse < 0) {
+//            LogWarning << "VALIDATION: GPU cache response is negative" << std::endl;
+//        }
+//        double avg = 0.5*(std::abs(cacheResponse)+std::abs(response));
+//        if (avg < 1.0) avg = 1.0;
+//        double delta = std::abs(cacheResponse-response)/avg;
+//        sumDelta[sumName] += delta;
+//        sum2Delta[sumName] += delta*delta;
+//        ++numDelta[sumName];
+//        if (numDelta[sumName] < 0) {
+//            LogError << "Wrap around during validation" << std::endl;
+//            throw std::runtime_error("Validation wrap around");
+//        }
+//        if (delta > maxDelta[sumName]) {
+//            maxDelta[sumName] = delta;
+//            LogInfo << "VALIDATION: Increase GPU and Dial max delta"
+//                    << " GPU (" << cacheName << ") : " << cacheResponse
+//                    << " Dial: " << response
+//                    << " delta: " << delta
+//                    << " par: " << dial->getAssociatedParameter()
+//                    << " name: " << parName
+//                    << std::endl;
+//            LogInfo << "VALIDATION: Maximum Dial ("
+//                    << sumName << ") delta: "
+//                    << maxDelta[sumName]
+//                    << " Average value delta: "
+//                    << sumDelta[sumName]/numDelta[sumName]
+//                    << " +/- "
+//                    << std::sqrt(
+//                        sum2Delta[sumName]/numDelta[sumName]
+//                        - sumDelta[sumName]*sumDelta[sumName]
+//                        /numDelta[sumName]/numDelta[sumName])
+//                    << std::endl;
+//        }
+//
+//        if ((deltaTrials++ % 1000000) == 0) {
+//            for (auto maxD : maxDelta) {
+//                std::string name = maxD.first;
+//                LogInfo << "VALIDATION: Average cache delta for"
+//                        << " " << name << ": "
+//                        << sumDelta[name]/numDelta[name]
+//                        << " +/- "
+//                        << std::sqrt(
+//                            sum2Delta[name]/numDelta[name]
+//                            - sumDelta[name]*sumDelta[name]
+//                            /numDelta[name]/numDelta[name])
+//                        << " Maximum: " << maxDelta[name]
+//                        << std::endl;
+//            }
+//        }
+//
+//        break;
+//    }
+//#endif
+//  }
 
   // nested dials
 //  for( auto& nestedDialEntry : _nestedDialRefList_ ){
@@ -293,8 +393,23 @@ double PhysicsEvent::getVarAsDouble(const std::string& leafName_, size_t arrayIn
   return this->getVarAsDouble(index, arrayIndex_);
 }
 double PhysicsEvent::getVarAsDouble(int varIndex_, size_t arrayIndex_) const{
-  return _leafContentList_[varIndex_][arrayIndex_].getValueAsDouble();
+  if( _varToDoubleCache_.empty() ) return _leafContentList_[varIndex_][arrayIndex_].getValueAsDouble();
+  else{
+    // if using double cache:
+    if( _varToDoubleCache_[varIndex_][arrayIndex_] == _varToDoubleCache_[varIndex_][arrayIndex_] ) return _varToDoubleCache_[varIndex_][arrayIndex_];
+    else _varToDoubleCache_[varIndex_][arrayIndex_] = _leafContentList_[varIndex_][arrayIndex_].getValueAsDouble();
+    return _varToDoubleCache_[varIndex_][arrayIndex_];
+  }
 }
+const GenericToolbox::AnyType& PhysicsEvent::getVar(int varIndex_, size_t arrayIndex_) const{
+  return _leafContentList_[varIndex_][arrayIndex_];
+}
+void PhysicsEvent::fillBuffer(const std::vector<int>& indexList_, std::vector<double>& buffer_) const{
+  buffer_.resize(indexList_.size()); double* slot = &buffer_[0];
+  std::for_each(indexList_.begin(), indexList_.end(), [&](auto& index){ *(slot++) = this->getVarAsDouble(index); });
+}
+
+
 double PhysicsEvent::evalFormula(TFormula* formulaPtr_, std::vector<int>* indexDict_) const{
   LogThrowIf(formulaPtr_ == nullptr, GET_VAR_NAME_VALUE(formulaPtr_));
 
@@ -450,6 +565,7 @@ void PhysicsEvent::copyData(const std::vector<std::pair<const GenericToolbox::Le
       dict_[iLeaf].first->copyToAny(_leafContentList_[iLeaf][0], dict_[iLeaf].second);
     }
   }
+  this->invalidateVarToDoubleCache();
 }
 std::vector<std::pair<const GenericToolbox::LeafHolder*, int>> PhysicsEvent::generateDict(const GenericToolbox::TreeEventBuffer& h_, const std::map<std::string, std::string>& leafDict_){
   std::vector<std::pair<const GenericToolbox::LeafHolder*, int>> out;
@@ -475,6 +591,18 @@ void PhysicsEvent::copyLeafContent(const PhysicsEvent& ref_){
 //  for( size_t iLeaf = 0 ; iLeaf < _commonLeafNameListPtr_->size() ; iLeaf++ ){
 //    _leafContentList_[iLeaf] = ref_.getLeafContentList()[iLeaf];
 //  }
+}
+void PhysicsEvent::resizeVarToDoubleCache(){
+  _varToDoubleCache_.reserve(_leafContentList_.size());
+  for( auto& leaf: _leafContentList_ ){
+    _varToDoubleCache_.emplace_back(std::vector<double>(leaf.size(), std::nan("unset")));
+  }
+  this->invalidateVarToDoubleCache();
+}
+void PhysicsEvent::invalidateVarToDoubleCache(){
+  std::for_each(_varToDoubleCache_.begin(), _varToDoubleCache_.end(),
+                [](auto& varArray)
+                { std::for_each( varArray.begin(), varArray.end(), [](auto& var){ var = std::nan("unset"); }); });
 }
 
 std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p ){

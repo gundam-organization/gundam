@@ -77,17 +77,6 @@ void FitterEngine::initialize() {
   _propagator_.setSaveDir(GenericToolbox::mkdirTFile(_saveDir_, "Propagator"));
   _propagator_.initialize();
 
-  _nbParameters_ = 0;
-  for( const auto& parSet : _propagator_.getParameterSetsList() ){
-    _nbParameters_ += int(parSet.getNbParameters());
-  }
-
-  if( JsonUtils::fetchValue(_config_, "scaleParStepWithChi2Response", false) ){
-    _parStepGain_ = JsonUtils::fetchValue(_config_, "parStepGain", _parStepGain_);
-    LogInfo << "Using parameter step scale: " << _parStepGain_ << std::endl;
-    this->rescaleParametersStepSize();
-  }
-
   this->updateChi2Cache();
   LogDebug << GET_VAR_NAME_VALUE(_chi2Buffer_) << std::endl;
   if( _chi2Buffer_ != 0 ){
@@ -101,11 +90,23 @@ void FitterEngine::initialize() {
         if( nDiff<15 and mcEvent.getEventWeight() != dataEvent.getEventWeight() ){
           nDiff++;
           LogDebug
-          << mcEvent.getEventWeight() << " => " << dataEvent.getEventWeight()
-          << " / diff: " << mcEvent.getEventWeight() - dataEvent.getEventWeight() << std::endl;
+              << mcEvent.getEventWeight() << " => " << dataEvent.getEventWeight()
+              << " / diff: " << mcEvent.getEventWeight() - dataEvent.getEventWeight() << std::endl;
         }
       }
     }
+  }
+//  LogThrow("debug")
+
+  _nbParameters_ = 0;
+  for( const auto& parSet : _propagator_.getParameterSetsList() ){
+    _nbParameters_ += int(parSet.getNbParameters());
+  }
+
+  if( JsonUtils::fetchValue(_config_, "scaleParStepWithChi2Response", false) ){
+    _parStepGain_ = JsonUtils::fetchValue(_config_, "parStepGain", _parStepGain_);
+    LogInfo << "Using parameter step scale: " << _parStepGain_ << std::endl;
+    this->rescaleParametersStepSize();
   }
 
   if( JsonUtils::fetchValue(_config_, "fixGhostFitParameters", false) ) this->fixGhostFitParameters();

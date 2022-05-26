@@ -97,7 +97,6 @@ private:
 
   // Monitoring
   bool _showEventBreakdown_{true};
-  bool _showEventBreakdownBeforePrior_{true};
 
   // Response functions (WIP)
   std::map<FitSample*, std::shared_ptr<TH1D>> _nominalSamplesMcHistogram_;

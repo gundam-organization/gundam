@@ -74,7 +74,6 @@ void Propagator::initialize() {
 
   // Monitoring parameters
   _showEventBreakdown_ = JsonUtils::fetchValue(_config_, "showEventBreakdown", _showEventBreakdown_);
-  _showEventBreakdownBeforePrior_ = JsonUtils::fetchValue(_config_, "showEventBreakdownBeforePrior", _showEventBreakdownBeforePrior_);
 
   LogInfo << "Loading Parameters..." << std::endl;
   auto parameterSetListConfig = JsonUtils::fetchValue(_config_, "parameterSetListConfig", nlohmann::json());
@@ -164,19 +163,6 @@ void Propagator::initialize() {
     dispenser.load();
   }
 
-  if( allAsimov and _showEventBreakdownBeforePrior_ ){
-    LogWarning << "Sample breakdown BEFORE PARAMETER PRIOR REWEIGHT:" << std::endl;
-    GenericToolbox::TablePrinter t;
-    t.setColTitles({{"Sample"},{"MC"},{"Data"}});
-    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-      t.addTableLine({{"\""+sample.getName()+"\""},
-                      std::to_string(sample.getMcContainer().getSumWeights()),
-                      std::to_string(sample.getDataContainer().getSumWeights())
-                     });
-    }
-    t.printTable();
-  }
-
   if( usedMcContainer ){
     if( _throwAsimovToyParameters_ ){
       for( auto& parSet : _parameterSetsList_ ){
@@ -190,6 +176,7 @@ void Propagator::initialize() {
     this->reweightMcEvents();
 
     // Copies MC events in data container for both Asimov and FakeData event types
+    LogWarning << "Copying loaded mc-like event to data container..." << std::endl;
     _fitSampleSet_.copyMcEventListToDataContainer();
 
     // back to prior
@@ -212,19 +199,24 @@ void Propagator::initialize() {
       dispenser.setParSetPtrToLoad(&_parameterSetsList_);
       dispenser.load();
     }
-
-    if( _showEventBreakdownBeforePrior_ ){
-      LogWarning << "Sample breakdown BEFORE PARAMETER PRIOR REWEIGHT:" << std::endl;
-      GenericToolbox::TablePrinter t;
-      t.setColTitles({{"Sample"},{"MC"},{"Data"}});
-      for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-        t.addTableLine({{"\""+sample.getName()+"\""},
-                        std::to_string(sample.getMcContainer().getSumWeights()),
-                        std::to_string(sample.getDataContainer().getSumWeights())
-                       });
+  }
+  else{
+    LogDebug << "Check asimov: " << std::endl;
+    for( auto& sample : this->getFitSampleSet().getFitSampleList() ){
+      LogDebug << sample.getName() << std::endl;
+      size_t nDiff{0};
+      for( size_t iEvent = 0 ; iEvent < sample.getMcContainer().eventList.size() ; iEvent++ ){
+        auto& mcEvent = sample.getMcContainer().eventList[iEvent];
+        auto& dataEvent = sample.getDataContainer().eventList[iEvent];
+        if( nDiff<15 and mcEvent.getEventWeight() != dataEvent.getEventWeight() ){
+          nDiff++;
+          LogDebug
+              << mcEvent.getEventWeight() << " => " << dataEvent.getEventWeight()
+              << " / diff: " << mcEvent.getEventWeight() - dataEvent.getEventWeight() << std::endl;
+        }
       }
-      t.printTable();
     }
+//    LogThrow("debug")
   }
 
   LogInfo << "Propagating prior parameters on events..." << std::endl;
@@ -593,18 +585,33 @@ void Propagator::reweightMcEvents(int iThread_) {
   // Memory needed: 2*32bits(int) + 64bits(ptr)
   // 3 write per sample
   // 1 write per event
-  int iEvent;
-  int nEvents;
-  std::vector<PhysicsEvent>* evList{nullptr};
-  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    evList = &sample.getMcContainer().eventList;
-    iEvent = iThread_;
-    nEvents = int(evList->size());
-    while( iEvent < nEvents ){
-      (*evList)[iEvent].reweightUsingDialCache();
-      iEvent += nThreads;
+//  int iEvent;
+//  int nEvents;
+//  std::vector<PhysicsEvent>* evList{nullptr};
+//  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+//    evList = &sample.getMcContainer().eventList;
+//    iEvent = iThread_;
+//    nEvents = int(evList->size());
+//    while( iEvent < nEvents ){
+//      (*evList)[iEvent].reweightUsingDialCache();
+//      iEvent += nThreads;
+//    }
+//  }
+
+  long n;
+  std::vector<PhysicsEvent>* eList;
+  std::for_each(
+    _fitSampleSet_.getFitSampleList().begin(), _fitSampleSet_.getFitSampleList().end(),
+    [&](auto& s){
+      eList = &s.getMcContainer().eventList;
+      n = long(eList->size())/nThreads + 1;
+      std::for_each(
+          eList->begin()+(iThread_ * n),
+          (iThread_+1!=nThreads? eList->begin()+((iThread_+1) * n): eList->end()),
+          [&](auto& e){ e.reweightUsingDialCache(); }
+          );
     }
-  }
+  );
 
 //  // Slower loop
 //  // Memory: 2*64bits
