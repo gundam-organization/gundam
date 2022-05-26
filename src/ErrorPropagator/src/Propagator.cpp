@@ -222,10 +222,42 @@ void Propagator::initialize() {
   LogInfo << "Propagating prior parameters on events..." << std::endl;
   this->reweightMcEvents();
 
+  LogDebug << "Check asimov: " << std::endl;
+  for( auto& sample : this->getFitSampleSet().getFitSampleList() ){
+    LogDebug << sample.getName() << std::endl;
+    size_t nDiff{0};
+    for( size_t iEvent = 0 ; iEvent < sample.getMcContainer().eventList.size() ; iEvent++ ){
+      auto& mcEvent = sample.getMcContainer().eventList[iEvent];
+      auto& dataEvent = sample.getDataContainer().eventList[iEvent];
+      if( nDiff<15 and mcEvent.getEventWeight() != dataEvent.getEventWeight() ){
+        nDiff++;
+        LogDebug
+            << mcEvent.getEventWeight() << " => " << dataEvent.getEventWeight()
+            << " / diff: " << mcEvent.getEventWeight() - dataEvent.getEventWeight() << std::endl;
+      }
+    }
+  }
+
   LogInfo << "Set the current MC prior weights as nominal weight..." << std::endl;
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
     for( auto& event : sample.getMcContainer().eventList ){
       event.setNominalWeight(event.getEventWeight());
+    }
+  }
+
+  LogDebug << "Check asimov: " << std::endl;
+  for( auto& sample : this->getFitSampleSet().getFitSampleList() ){
+    LogDebug << sample.getName() << std::endl;
+    size_t nDiff{0};
+    for( size_t iEvent = 0 ; iEvent < sample.getMcContainer().eventList.size() ; iEvent++ ){
+      auto& mcEvent = sample.getMcContainer().eventList[iEvent];
+      auto& dataEvent = sample.getDataContainer().eventList[iEvent];
+      if( nDiff<15 and mcEvent.getEventWeight() != dataEvent.getEventWeight() ){
+        nDiff++;
+        LogDebug
+            << mcEvent.getEventWeight() << " => " << dataEvent.getEventWeight()
+            << " / diff: " << mcEvent.getEventWeight() - dataEvent.getEventWeight() << std::endl;
+      }
     }
   }
 
@@ -580,24 +612,6 @@ void Propagator::reweightMcEvents(int iThread_) {
   }
 
   //! Warning: everything you modify here, may significantly slow down the fitter
-
-  // This loop is slightly faster that the next one (~1% faster)
-  // Memory needed: 2*32bits(int) + 64bits(ptr)
-  // 3 write per sample
-  // 1 write per event
-//  int iEvent;
-//  int nEvents;
-//  std::vector<PhysicsEvent>* evList{nullptr};
-//  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-//    evList = &sample.getMcContainer().eventList;
-//    iEvent = iThread_;
-//    nEvents = int(evList->size());
-//    while( iEvent < nEvents ){
-//      (*evList)[iEvent].reweightUsingDialCache();
-//      iEvent += nThreads;
-//    }
-//  }
-
   long nToProcess;
   long offset;
   std::vector<PhysicsEvent>* eList;
@@ -615,24 +629,6 @@ void Propagator::reweightMcEvents(int iThread_) {
           );
     }
   );
-
-//  // Slower loop
-//  // Memory: 2*64bits
-//  // per sample: 1 read, 2 writes (each requires to fetch the event array multiple times)
-//  // 1 write per event
-//  PhysicsEvent* evPtr{nullptr};
-//  PhysicsEvent* evLastPtr{nullptr};
-//  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-//    if( sample.getMcContainer().eventList.empty() ) continue;
-//    evPtr = &sample.getMcContainer().eventList[iThread_];
-//    evLastPtr = &sample.getMcContainer().eventList.back();
-//
-//    while( evPtr <= evLastPtr ){
-//      evPtr->reweightUsingDialCache();
-//      evPtr += nThreads;
-//    }
-//  }
-
 }
 void Propagator::applyResponseFunctions(int iThread_){
 

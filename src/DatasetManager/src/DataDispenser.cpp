@@ -165,13 +165,6 @@ void DataDispenser::buildSampleToFillList(){
     LogInfo << "No sample selected." << std::endl;
     return;
   }
-
-  LogInfo << "Selected samples are: " << std::endl
-          << GenericToolbox::iterableToString(
-              _cache_.samplesToFillList,
-              [](const FitSample *samplePtr){ return "\""+samplePtr->getName()+"\""; }
-              )
-          << std::endl;
 }
 void DataDispenser::doEventSelection(){
   LogWarning << "Performing event selection..." << std::endl;

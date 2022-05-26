@@ -84,23 +84,12 @@ void SampleElement::updateBinEventList(int iThread_) {
   int iBin = iThread_;
   size_t count;
   while( iBin < nBins ){
-//    count = 0;
-//    for( auto& event : eventList ){ if( event.getSampleBinIndex() == iBin ){ count++; } }
     count = std::count_if(eventList.begin(), eventList.end(), [&](auto& e) {return e.getSampleBinIndex() == iBin;});
-//    std::vector<PhysicsEvent*> thisBinEventList(count, nullptr);
     perBinEventPtrList[iBin].resize(count, nullptr);
 
     // Now filling the event indexes
     size_t index = 0;
     std::for_each(eventList.begin(), eventList.end(), [&](auto& e){ if(e.getSampleBinIndex() == iBin){ perBinEventPtrList[iBin][index++] = &e; } });
-//    for( auto& event : eventList ){
-//      if( event.getSampleBinIndex() == iBin ){ perBinEventPtrList[iBin][index++] = &event; }
-//    } // event
-
-//    GlobalVariables::getThreadMutex().lock();
-    // BETTER TO MAKE SURE THE MEMORY IS NOT MOVED WHILE FILLING UP
-//    perBinEventPtrList[iBin] = thisBinEventList;
-//    GlobalVariables::getThreadMutex().unlock();
 
     iBin += nbThreads;
   }
