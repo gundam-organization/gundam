@@ -604,9 +604,10 @@ void Propagator::reweightMcEvents(int iThread_) {
   std::for_each(
     _fitSampleSet_.getFitSampleList().begin(), _fitSampleSet_.getFitSampleList().end(),
     [&](auto& s){
+      if( s.getMcContainer().eventList.empty() ) return;
       nToProcess = long(s.getMcContainer().eventList.size())/nThreads;
-      offset = long(s.getMcContainer().eventList.size())%nThreads + iThread_*nToProcess;
-      if( iThread_==0 ) nToProcess += long(s.getMcContainer().eventList.size())%nThreads;
+      offset = iThread_*nToProcess;
+      if( iThread_+1==nThreads ) nToProcess += long(s.getMcContainer().eventList.size())%nThreads;
       std::for_each(
           s.getMcContainer().eventList.begin()+offset,
           s.getMcContainer().eventList.begin()+offset+nToProcess,
