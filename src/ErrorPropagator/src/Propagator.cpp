@@ -607,8 +607,9 @@ void Propagator::reweightMcEvents(int iThread_) {
       nToProcess = long(s.getMcContainer().eventList.size())/nThreads;
       offset = long(s.getMcContainer().eventList.size())%nThreads + iThread_*nToProcess;
       if( iThread_==0 ) nToProcess += long(s.getMcContainer().eventList.size())%nThreads;
-      std::for_each_n(
-          s.getMcContainer().eventList.begin()+offset, nToProcess,
+      std::for_each(
+          s.getMcContainer().eventList.begin()+offset,
+          s.getMcContainer().eventList.begin()+offset+nToProcess,
           [&](auto& e){ e.reweightUsingDialCache(); }
           );
     }
