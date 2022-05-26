@@ -598,16 +598,17 @@ void Propagator::reweightMcEvents(int iThread_) {
 //    }
 //  }
 
-  long n;
+  long nToProcess;
+  long offset;
   std::vector<PhysicsEvent>* eList;
   std::for_each(
     _fitSampleSet_.getFitSampleList().begin(), _fitSampleSet_.getFitSampleList().end(),
     [&](auto& s){
-      eList = &s.getMcContainer().eventList;
-      n = long(eList->size())/nThreads + 1;
-      std::for_each(
-          eList->begin()+(iThread_ * n),
-          (iThread_+1!=nThreads? eList->begin()+((iThread_+1) * n): eList->end()),
+      nToProcess = long(s.getMcContainer().eventList.size())/nThreads;
+      offset = long(s.getMcContainer().eventList.size())%nThreads + iThread_*nToProcess;
+      if( iThread_==0 ) nToProcess += long(s.getMcContainer().eventList.size())%nThreads;
+      std::for_each_n(
+          s.getMcContainer().eventList.begin()+offset, nToProcess,
           [&](auto& e){ e.reweightUsingDialCache(); }
           );
     }
