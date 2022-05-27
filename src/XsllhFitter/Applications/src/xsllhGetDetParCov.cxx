@@ -4,7 +4,7 @@
 
 #include "Logger.h"
 #include <fstream>
-#include <json.hpp>
+#include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
 // User parameters
@@ -74,7 +74,7 @@ void getUserParameters(){
     }
 
     // Sanity check
-    const std::string XSLLHFITTER = std::getenv("XSLLHFITTER");
+    const std::string XSLLHFITTER = std::getenv("XSLLHFITTER")? std::getenv("XSLLHFITTER"): "";;
     if(XSLLHFITTER.empty()){
         LogError << "Environment variable \"XSLLHFITTER\" not set." << std::endl
                  << "Cannot determine source tree location." << std::endl;

@@ -18,7 +18,7 @@
 #include "TStyle.h"
 #include "TTree.h"
 
-#include "json.hpp"
+#include "nlohmann/json.hpp"
 using json = nlohmann::json;
 
 #include "BinManager.hh"
@@ -35,7 +35,7 @@ int main(int argc, char** argv)
               << TAG << color::RainbowText("Welcome to the Super-xsLLh Plot Maker.\n")
               << TAG << color::RainbowText("Initializing the plotting machinery...") << std::endl;
 
-    const std::string xslf_env = std::getenv("XSLLHFITTER");
+    const std::string xslf_env = std::getenv("XSLLHFITTER")? std::getenv("XSLLHFITTER"): "";
     if(xslf_env.empty())
     {
         std::cerr << ERR << "Environment variable \"XSLLHFITTER\" not set." << std::endl

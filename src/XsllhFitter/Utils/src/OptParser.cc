@@ -8,7 +8,7 @@ LoggerInit([](){
 
 OptParser::OptParser()
 {
-    xsLLh_env = std::string(std::getenv("XSLLHFITTER"));
+    xsLLh_env = std::getenv("XSLLHFITTER")? std::getenv("XSLLHFITTER"): "";
 
     if(xsLLh_env.empty())
     {

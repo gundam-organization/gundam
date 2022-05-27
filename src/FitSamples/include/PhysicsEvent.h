@@ -5,11 +5,6 @@
 #ifndef GUNDAM_PHYSICSEVENT_H
 #define GUNDAM_PHYSICSEVENT_H
 
-
-#ifdef WITH_XSLLHFITTER
-#include "AnaEvent.hh"
-#endif
-
 #include "FitParameterSet.h"
 #include "Dial.h"
 #include "NestedDialTest.h"
@@ -100,11 +95,6 @@ public:
 
   // DEV
   void addNestedDialRefToCache(NestedDialTest* nestedDialPtr_, const std::vector<Dial*>& dialPtrList_ = std::vector<Dial*>{});
-
-#ifdef WITH_XSLLHFITTER
-  // OLD
-  bool isSame(AnaEvent& anaEvent_) const;
-#endif
 
 private:
   // Context variables

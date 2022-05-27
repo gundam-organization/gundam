@@ -13,7 +13,7 @@
 #include "AnaFitParameters.h"
 #include "XsecDial.hh"
 
-#include "json.hpp"
+#include "nlohmann/json.hpp"
 using json = nlohmann::json;
 
 class XsecParameters : public AnaFitParameters

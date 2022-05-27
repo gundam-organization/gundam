@@ -14,7 +14,7 @@
 #include <TTree.h>
 #include <TLeaf.h>
 
-#include "json.hpp"
+#include "nlohmann/json.hpp"
 using json = nlohmann::json;
 
 #include "ColorOutput.hh"
@@ -583,7 +583,7 @@ void getUserParameters(){
 
     LogInfo << "Sanity check" << std::endl;
 
-    const std::string XSLLHFITTER = std::getenv("XSLLHFITTER");
+    const std::string XSLLHFITTER = std::getenv("XSLLHFITTER")? std::getenv("XSLLHFITTER"): "";;
     if(XSLLHFITTER.empty()){
         LogError << "Environment variable \"XSLLHFITTER\" not set." << std::endl;
         LogError << "Cannot determine source tree location." << std::endl;

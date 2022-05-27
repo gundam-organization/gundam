@@ -431,7 +431,7 @@ void XsecParameters::AddDetector(const std::string& detectorName_, const std::st
   json j;
   f >> j;
 
-  std::string input_dir = std::string(std::getenv("XSLLHFITTER"))
+  std::string input_dir = (std::getenv("XSLLHFITTER")? std::getenv("XSLLHFITTER"): "")
                           + j["input_dir"].get<std::string>();
   LogInfo << "Adding the following dials." << std::endl;
 

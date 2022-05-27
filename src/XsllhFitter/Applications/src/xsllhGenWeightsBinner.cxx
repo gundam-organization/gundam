@@ -567,7 +567,7 @@ void getUserParameters(){
 
     LogWarning << "Sanity check" << std::endl;
 
-    const std::string XSLLHFITTER = std::getenv("XSLLHFITTER");
+    const std::string XSLLHFITTER = std::getenv("XSLLHFITTER")? std::getenv("XSLLHFITTER"): "";;
     if(XSLLHFITTER.empty()){
 
         LogError << "Environment variable \"XSLLHFITTER\" not set." << std::endl

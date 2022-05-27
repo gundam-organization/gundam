@@ -8,22 +8,19 @@ set(HEADERS
   )
       
 if( USE_STATIC_LINKS STREQUAL "1" )
-  add_library(xsllhFitter STATIC ${SRCFILES})
+  add_library(XsllhFitter STATIC ${SRCFILES})
 else()
-  add_library(xsllhFitter SHARED ${SRCFILES})
+  add_library(XsllhFitter SHARED ${SRCFILES})
 endif()
 
-target_include_directories(xsllhFitter PUBLIC
+target_include_directories(XsllhFitter PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-target_link_libraries( xsllhFitter PUBLIC
-        GundamErrorPropagator
-        ${ROOT_LIBRARIES}
-        )
+target_link_libraries( XsllhFitter PUBLIC  XsllhFitterErrProp ${ROOT_LIBRARIES} )
 
-#set_target_properties( xsllhFitter PROPERTIES VERSION "${GUNDAM_VERSION_STRING}" )
+#set_target_properties( XsllhFitter PROPERTIES VERSION "${GUNDAM_VERSION_STRING}" )
 
-install(TARGETS xsllhFitter DESTINATION lib)
+install(TARGETS XsllhFitter DESTINATION lib)
 #Can uncomment this to install the headers... but is it really neccessary?
 # install(FILES ${HEADERS} DESTINATION include)
 

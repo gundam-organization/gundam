@@ -40,10 +40,6 @@ void PlotGenerator::reset() {
   _fitSampleSetPtr_ = nullptr;
 
   _histHolderCacheList_.resize(1);
-
-#ifdef WITH_XSLLHFITTER
-  _sampleListPtr_ = nullptr;
-#endif
 }
 
 void PlotGenerator::setConfig(const nlohmann::json &config_) {
@@ -285,194 +281,7 @@ void PlotGenerator::defineHistogramHolders() {
     }
   }
   else{
-#ifdef WITH_XSLLHFITTER
-    // OLD SAMPLES
-    LogThrowIf(_sampleListPtr_ == nullptr, "No samples has been set.");
-    int sampleCounter = -1;
-    for( const auto& sample : *_sampleListPtr_ ){
-      sampleCounter++;
-      histDefBase.anaSamplePtr = &sample;
-      short unsetSplitValueColor = kGray; // will increment if needed
-
-      std::map<std::string, std::vector<int>> splitValuesList;
-
-      // Definition of histograms
-      for( const auto& histConfig : _histogramsDefinition_ ){
-
-        histDefBase.varToPlot = JsonUtils::fetchValue<std::string>(histConfig, "varToPlot");
-        histDefBase.prefix = JsonUtils::fetchValue(histConfig, "prefix", "");
-        histDefBase.rescaleAsBinWidth = JsonUtils::fetchValue(histConfig, "rescaleAsBinWidth", true);
-        histDefBase.rescaleBinFactor = JsonUtils::fetchValue(histConfig, "rescaleBinFactor", 1.);
-
-        std::vector<std::string> splitVars = JsonUtils::fetchValue(histConfig, "splitVars", std::vector<std::string>{""});
-
-        for( const auto& splitVar : splitVars ){
-
-          histDefBase.splitVarName = splitVar;
-
-          // Fetch the appearing split vars in the sample
-          if( not GenericToolbox::doesKeyIsInMap(histDefBase.splitVarName, splitValuesList) ){
-            splitValuesList[histDefBase.splitVarName] = std::vector<int>();
-            if( histDefBase.splitVarName.empty() ){
-              splitValuesList[histDefBase.splitVarName].emplace_back(0); // just for the loop
-            }
-            else{
-              for( const auto& event : sample.GetConstMcEvents() ){
-                int splitValue = event.GetEventVarInt(histDefBase.splitVarName);
-                if( not GenericToolbox::doesElementIsInVector(splitValue, splitValuesList[histDefBase.splitVarName]) ){
-                  splitValuesList[histDefBase.splitVarName].emplace_back(splitValue);
-                }
-              }
-            }
-          }
-
-          // Loop over split vars
-          int splitValueIndex = -1;
-          for( const auto& splitValue : splitValuesList[histDefBase.splitVarName] ){
-            splitValueIndex++;
-            histDefBase.splitVarValue = splitValue;
-
-            for( bool isData: {false, true} ){
-              histDefBase.isData = isData;
-              bool buildFillFunction = false;
-
-              if( histDefBase.isData and
-              ( not histDefBase.splitVarName.empty()
-              or JsonUtils::fetchValue(histConfig, "noData", false)
-              ) ){
-                continue;
-              }
-
-              if( histDefBase.varToPlot != "Raw" ){
-                // Then filling the histo is needed
-
-                // Binning
-                histDefBase.xEdges.clear();
-
-                histDefBase.xMin = JsonUtils::fetchValue(histConfig, "xMin", std::nan("nan"));;
-                histDefBase.xMax = JsonUtils::fetchValue(histConfig, "xMax", std::nan("nan"));
-
-                if( JsonUtils::fetchValue(histConfig, "useSampleBinning", false) ){
-
-                  int dimIndex = GenericToolbox::findElementIndex(histDefBase.varToPlot, sample.GetFitPhaseSpace());
-                  if( dimIndex == -1 ){
-                    LogWarning << "Can't useSampleBinning since \"" << histDefBase.varToPlot
-                    << "\" is not a dimension of the sample \"" << sample.GetName()
-                    << "\": " << GenericToolbox::parseVectorAsString(sample.GetFitPhaseSpace()) << std::endl;
-                    continue; // skip this sample
-                  }
-
-                  // Creating binning
-                  for( const auto& bin : sample.GetBinEdges() ){
-                    auto edges = { bin.getBinLowEdge(dimIndex), bin.getBinHighEdge(dimIndex) };
-                    for( const auto& edge : edges ){
-                      if( ( histDefBase.xMin != histDefBase.xMin or histDefBase.xMin <= edge )
-                      and ( histDefBase.xMax != histDefBase.xMax or histDefBase.xMax >= edge ) ){
-                        // either NaN or in bounds
-                        if( not GenericToolbox::doesElementIsInVector(edge, histDefBase.xEdges) ){
-                          histDefBase.xEdges.emplace_back(edge);
-                        }
-                      }
-                    }
-                  }
-                  if( histDefBase.xEdges.empty() ) continue; // skip
-                  std::sort( histDefBase.xEdges.begin(), histDefBase.xEdges.end() ); // sort for ROOT
-
-                } // sample binning ?
-                else{
-                  LogError << "Unsupported yet." << std::endl;
-                  throw std::logic_error("unsupported yet");
-                }
-
-                // Hist fill function
-                buildFillFunction = true; // build Later
-
-              } // not Raw?
-
-              histDefBase.xTitle = JsonUtils::fetchValue(histConfig, "xTitle", histDefBase.varToPlot);
-              histDefBase.yTitle = JsonUtils::fetchValue(histConfig, "yTitle", "");
-              if( histDefBase.yTitle.empty() ){
-                histDefBase.yTitle = "Counts";
-                if( histDefBase.rescaleAsBinWidth ) histDefBase.yTitle += " (/bin width)";
-                if( histDefBase.rescaleBinFactor != 1. ) histDefBase.yTitle += "*" + std::to_string(histDefBase.rescaleBinFactor);
-              }
-
-              // Colors / Title (legend) / Name
-              if( histDefBase.isData ){
-                histDefBase.histName = "Data_TH1D";
-                histDefBase.histTitle = "Data";
-                histDefBase.histColor = kBlack;
-              }
-              else{
-
-                histDefBase.histName = "MC_TH1D";
-
-                if( histDefBase.splitVarName.empty() ){
-                  histDefBase.histTitle = "Prediction";
-                  histDefBase.histColor = defaultColorWheel[ sampleCounter % defaultColorWheel.size() ];
-                }
-                else{
-                  histDefBase.histTitle = "Prediction (" + splitVar + " == " + std::to_string(splitValue) + ")";
-                  histDefBase.histColor = defaultColorWheel[ splitValueIndex % defaultColorWheel.size() ];
-
-                  // User defined color?
-                  auto varDict = JsonUtils::fetchMatchingEntry(_varDictionary_, "name", splitVar); // does the cosmetic pars are configured?
-                  auto dictEntries = varDict["dictionary"];
-                  JsonUtils::forwardConfig(dictEntries);
-                  if( not varDict.empty() ){
-
-                    if( dictEntries.is_null() ){
-                      LogError << R"(Could not find "dictionary" key in JSON config for var: ")" << splitVar << "\"" << std::endl;
-                      throw std::runtime_error("dictionary not found, by variable name found in JSON.");
-                    }
-
-                    // Look for the value we want
-                    auto valDict = JsonUtils::fetchMatchingEntry(dictEntries, "value", splitValue);
-
-                    histDefBase.histTitle = JsonUtils::fetchValue(valDict, "title", histDefBase.histTitle);
-                    histDefBase.fillStyle = JsonUtils::fetchValue(valDict, "fillStyle", short(1001));
-                    histDefBase.histColor = JsonUtils::fetchValue(valDict, "color", unsetSplitValueColor);
-                    if( histDefBase.histColor == unsetSplitValueColor ) unsetSplitValueColor++; // increment for the next ones
-
-                  } // var dict?
-
-                } // splitVar ?
-
-              } // isData?
-
-              // Config DONE : creating save path
-              histDefBase.folderPath = sample.GetName();
-              histDefBase.folderPath += "/" + histDefBase.varToPlot;
-              if( not histDefBase.splitVarName.empty() ){
-                histDefBase.folderPath += "/" + histDefBase.splitVarName;
-                histDefBase.folderPath += "/" + std::to_string(histDefBase.splitVarValue);
-              }
-
-              // Config DONE
-              _histHolderCacheList_[0].emplace_back(histDefBase);
-              if( buildFillFunction ){
-                _histHolderCacheList_[0].back().fillMutexPtr = new std::mutex();
-                auto splitVarValue = _histHolderCacheList_[0].back().splitVarValue;
-                auto varToPlot = _histHolderCacheList_[0].back().varToPlot;
-                auto splitVarName = _histHolderCacheList_[0].back().splitVarName;
-                auto* mutexPtr = _histHolderCacheList_[0].back().fillMutexPtr;
-                _histHolderCacheList_[0].back().fillFunctionAnaSample =
-                  [ mutexPtr, splitVarValue, varToPlot, splitVarName ](TH1D* hist_, const AnaEvent* event_){
-                  if( splitVarName.empty() or event_->GetEventVarInt(splitVarName) == splitVarValue){
-                    std::lock_guard<std::mutex> g(*mutexPtr);
-                    hist_->Fill(event_->GetEventVarAsDouble(varToPlot), event_->GetEventWeight());
-                  }
-                };
-              }
-
-            } // isData
-          } // splitValue
-        } // splitVar
-      } // histDef
-    } // sample
-#else
     LogThrow("No sample has been set.");
-#endif
   }
 }
 
@@ -528,12 +337,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
           else histDef.histPtr = std::shared_ptr<TH1D>( (TH1D*) histDef.fitSamplePtr->getMcContainer().histogram->Clone() );
         }
         else{
-#ifdef WITH_XSLLHFITTER
-          if( histDef.isData ) histDef.histPtr = std::shared_ptr<TH1D>( (TH1D*) histDef.anaSamplePtr->GetDataHisto().Clone() );
-          else histDef.histPtr = std::shared_ptr<TH1D>( (TH1D*) histDef.anaSamplePtr->GetPredHisto().Clone() );
-#else
           LogThrow("Samples not set.")
-#endif
         }
       }
       else{
@@ -621,62 +425,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
     } // sample
   }
   else{
-#ifdef WITH_XSLLHFITTER
-    for( const auto& sample : *_sampleListPtr_ ){
-      // Data sets:
-      for( bool isData : { false, true } ){
-
-        const std::vector<AnaEvent>* eventListPtr;
-        std::vector<HistHolder*> histPtrToFillList;
-
-        if( isData ){
-          eventListPtr = &sample.GetConstDataEvents();
-
-          // which hist should be filled?
-          for( auto& histDef : _histHolderCacheList_[cacheSlot_] ){
-            if(histDef.isData and histDef.anaSamplePtr == &sample and histDef.fillFunctionAnaSample ){
-              histPtrToFillList.emplace_back( &histDef );
-            }
-          }
-        }
-        else{
-          eventListPtr = &sample.GetConstMcEvents();
-
-          // which hist should be filled?
-          for( auto& histDef : _histHolderCacheList_[cacheSlot_] ){
-            if(not histDef.isData and histDef.anaSamplePtr == &sample and histDef.fillFunctionAnaSample ){
-              histPtrToFillList.emplace_back( &histDef );
-            }
-          }
-        }
-
-        // Filling the selected histograms
-        int nThreads = GlobalVariables::getNbThreads();
-        std::function<void(int)> fillJob = [eventListPtr, histPtrToFillList, nThreads]( int iThread ){
-          int iEvent = -1;
-          int iHist = -1;
-          for( const auto& event : *eventListPtr ){
-            iEvent++;
-            if( iEvent % nThreads != iThread ) continue; // faster -> but needs a thread lock
-            iHist = -1;
-            for( auto& hist : histPtrToFillList ){
-              iHist++;
-              //            if( iHist % nThreads != iThread ) continue;
-              hist->fillFunctionAnaSample(hist->histPtr.get() , &event);
-            }
-          }
-        };
-
-        LogDebug << "Filling histograms..." << std::endl;
-        GlobalVariables::getParallelWorker().addJob("fillJob", fillJob);
-        GlobalVariables::getParallelWorker().runJob("fillJob");
-        GlobalVariables::getParallelWorker().removeJob("fillJob");
-
-      } // isData loop
-    } // sample
-#else
     LogThrow("Samples not set.")
-#endif
   }
 
   // Post-processing (norm, color)
@@ -691,13 +440,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
       }
     }
     else{
-#ifdef WITH_XSLLHFITTER
-      if( not histDefPair.isData or histDefPair.anaSamplePtr->GetDataType() == kAsimov ){
-        histDefPair.histPtr->Scale( histDefPair.anaSamplePtr->GetNorm() );
-      }
-#else
       LogThrow("Samples not set.")
-#endif
     }
 
     for(int iBin = 0 ; iBin <= histDefPair.histPtr->GetNbinsX() + 1 ; iBin++ ){
@@ -954,170 +697,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
     } // Hist to stack
   }
   else{
-#ifdef WITH_XSLLHFITTER
-    std::map<std::string, std::map<const AnaSample*, std::vector<const HistHolder*>>> histsToStackMap; // histsToStackMap[path][anaSamplePtr] = listOfTh1d
-    for( auto& histHolder : histHolderList_ ){
-      if( histHolder.isData ) continue; // data associated to each later
-      histsToStackMap[buildCanvasPath(&histHolder)][histHolder.anaSamplePtr].emplace_back(&histHolder );
-    }
-
-    // Now search for the associated data hist
-    for( auto& histsSamples : histsToStackMap ){
-      const std::string& canvasPath = histsSamples.first;
-      for( auto& histsToStack : histsSamples.second ){
-        for( auto& histHolder : histHolderList_ ){
-          const AnaSample* samplePtr = histsToStack.first;
-
-          // we are searching for data
-          if( not histHolder.isData ) continue;
-
-          // canvasPath may have the trailing splitVar -> need to check the beginning of the path with the External hist
-          if( not GenericToolbox::doesStringStartsWithSubstring(canvasPath, buildCanvasPath(&histHolder)) ) continue;
-
-          // same sample?
-          if( samplePtr != histHolder.anaSamplePtr ) continue;
-
-          histsToStack.second.emplace_back( &histHolder );
-          break; // no need to check for more
-        }
-
-      }
-    }
-
-    // Canvas builder
-    for ( const auto &histsToStackPair : histsToStackMap ) {
-      const std::string canvasFolderPath = histsToStackPair.first;
-
-      int canvasIndex = 0;
-      int iSampleSlot = 0;
-      for (const auto &histList : histsToStackPair.second) {
-        const AnaSample* samplePtr = histList.first;
-        iSampleSlot++;
-
-        if (iSampleSlot > canvasNbXplots * canvasNbYplots) {
-          canvasIndex++;
-          iSampleSlot = 1;
-        }
-
-        std::string canvasName = "samples_n" + std::to_string(canvasIndex);
-        std::string canvasPath = canvasFolderPath + canvasName;
-        if (not GenericToolbox::doesKeyIsInMap(canvasPath, _bufferCanvasList_)) {
-          _bufferCanvasList_[canvasPath] = std::shared_ptr<TCanvas>( new TCanvas(canvasPath.c_str(), canvasPath.c_str(), canvasWidth, canvasHeight) );
-          _bufferCanvasList_[canvasPath]->Divide(canvasNbXplots, canvasNbYplots);
-        }
-        _bufferCanvasList_[canvasPath]->cd(iSampleSlot);
-
-        // separating histograms
-        TH1D *dataSampleHist{nullptr};
-        std::vector<TH1D *> mcSampleHistList;
-        double minYValue = 1;
-        for( const auto* histHolder : histList.second ) {
-          TH1D* hist = histHolder->histPtr.get();
-          if ( histHolder->isData ) {
-            dataSampleHist = hist;
-          }
-          else {
-            mcSampleHistList.emplace_back(hist);
-            minYValue = std::min(minYValue, hist->GetMinimum(0));
-          }
-        }
-
-        TH1D* firstHistToPlot{nullptr};
-
-        // process mc part
-        std::vector<TH1D *> mcSampleHistAccumulatorList;
-        if (not mcSampleHistList.empty()) {
-
-          if (stackHist_) {
-            // Sorting histograms by norm (lowest stat first)
-            std::function<bool(TH1D *, TH1D *)> aGoesFirst = [](TH1D *histA_, TH1D *histB_) {
-              return (histA_->Integral(histA_->FindBin(0), histA_->FindBin(histA_->GetXaxis()->GetXmax()))
-              < histB_->Integral(histB_->FindBin(0), histB_->FindBin(histB_->GetXaxis()->GetXmax())));
-            };
-            auto p = GenericToolbox::getSortPermutation(mcSampleHistList, aGoesFirst);
-            mcSampleHistList = GenericToolbox::applyPermutation(mcSampleHistList, p);
-
-            // Stacking histograms
-            TH1D *histPileBuffer = nullptr;
-            for (auto &hist : mcSampleHistList) {
-              mcSampleHistAccumulatorList.emplace_back((TH1D *) hist->Clone()); // inheriting cosmetics as well
-              if (histPileBuffer != nullptr) {
-                mcSampleHistAccumulatorList.back()->Add(histPileBuffer);
-              }
-              histPileBuffer = mcSampleHistAccumulatorList.back();
-            }
-
-            // Draw the stack
-            int lastIndex = int(mcSampleHistAccumulatorList.size()) - 1;
-            for (int iHist = lastIndex; iHist >= 0; iHist--) {
-              if ( firstHistToPlot == nullptr ) {
-                firstHistToPlot = mcSampleHistAccumulatorList[iHist];
-                mcSampleHistAccumulatorList[iHist]->GetYaxis()->SetRangeUser(minYValue,
-                                                                             mcSampleHistAccumulatorList[iHist]->GetMaximum() *
-                                                                             1.2);
-                mcSampleHistAccumulatorList[iHist]->Draw("HIST GOFF");
-              } else {
-                mcSampleHistAccumulatorList[iHist]->Draw("HISTSAME GOFF");
-              }
-            }
-          } else {
-            // Just draw each hist on the same plot
-            for (auto &mcHist : mcSampleHistList) {
-              if ( firstHistToPlot == nullptr ) {
-                firstHistToPlot = mcHist;
-                if (mcSampleHistList.size() == 1) {
-                  // only one: draw error bars
-                  mcHist->Draw("EP");
-                }
-                else {
-                  // don't draw multiple error bars
-                  mcHist->Draw("HIST P");
-                }
-              }
-              else {
-                if (mcSampleHistList.size() == 1) { mcHist->Draw("EPSAME GOFF"); }
-                else { mcHist->Draw("HIST P SAME GOFF"); }
-              }
-            } // mcHist
-          } // stack?
-
-
-        } // mcHistList empty?
-
-        // Draw the data hist on top
-        if (dataSampleHist != nullptr) {
-          std::string originalTitle = dataSampleHist->GetTitle(); // title can be used for figuring out the type of the histogram
-          dataSampleHist->SetTitle("Data");
-          if ( firstHistToPlot != nullptr ) {
-            dataSampleHist->Draw("EPSAME GOFF");
-          } else {
-            firstHistToPlot = dataSampleHist;
-            dataSampleHist->Draw("EP GOFF");
-          }
-          dataSampleHist->SetTitle(originalTitle.c_str()); // restore
-        }
-
-        if( firstHistToPlot == nullptr ){
-          // Nothing to plot here
-          continue;
-        }
-
-        // Legend
-        double Xmax = 0.9;
-        double Ymax = 0.9;
-        double Xmin = 0.5;
-        double Ymin = Ymax - 0.04 * double(mcSampleHistList.size() + 1);
-        gPad->BuildLegend(Xmin, Ymin, Xmax, Ymax);
-
-        firstHistToPlot->SetTitle( samplePtr->GetName().c_str() ); // the actual displayed title
-        gPad->SetGridx();
-        gPad->SetGridy();
-      } // sample
-
-    } // Hists to stack
-#else
     LogThrow("Samples not set.")
-#endif
   }
 
   // Write
@@ -1320,9 +900,3 @@ void PlotGenerator::buildEventBinCache(const std::vector<HistHolder *> &histPtrT
   GlobalVariables::getParallelWorker().removeJob("fillEventHistCache");
 
 }
-
-#ifdef WITH_XSLLHFITTER
-void PlotGenerator::setSampleListPtr(const std::vector<AnaSample> *sampleListPtr_) {
-  _sampleListPtr_ = sampleListPtr_;
-}
-#endif

@@ -20,7 +20,7 @@ XsecCalc::XsecCalc(const std::string& json_config, const std::string& cli_filena
     f >> j;
 
     std::string input_dir
-        = std::string(std::getenv("XSLLHFITTER")) + j["input_dir"].get<std::string>();
+        = (std::getenv("XSLLHFITTER")? std::getenv("XSLLHFITTER"): "") + j["input_dir"].get<std::string>();
 
     if(cli_filename.empty())
         input_file = input_dir + j["input_fit_file"].get<std::string>();
@@ -694,7 +694,7 @@ void XsecCalc::SaveDataEvents(TFile* output)
     f >> j;
 
     std::string input_dir
-        = std::string(std::getenv("XSLLHFITTER")) + j["input_dir"].get<std::string>();
+        = (std::getenv("XSLLHFITTER")? std::getenv("XSLLHFITTER"): "") + j["input_dir"].get<std::string>();
 
     std::string true_events_config = input_dir + j["tru_config"].get<std::string>();
     FitObj fake_data_events(true_events_config, "trueEvents", true, true);

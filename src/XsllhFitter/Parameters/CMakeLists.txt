@@ -18,8 +18,8 @@ target_include_directories(XsllhFitterParameters PUBLIC
 
 # Dependencies
 target_link_libraries( XsllhFitterParameters PUBLIC
-        anaevents
-        GundamUtils
+        XsllhFitterAnaevents
+        XsllhFitterUtils
         ${ROOT_LIBRARIES}
 )
 

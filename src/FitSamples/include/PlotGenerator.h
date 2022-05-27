@@ -7,9 +7,6 @@
 
 #include "FitSampleSet.h"
 #include "PhysicsEvent.h"
-#ifdef WITH_XSLLHFITTER
-#include "AnaSample.hh"
-#endif
 
 #include "nlohmann/json.hpp"
 #include "TDirectory.h"
@@ -65,12 +62,6 @@ struct HistHolder{
   // Caches
   bool isBinCacheBuilt{false};
   std::vector<std::vector<const PhysicsEvent*>> _binEventPtrList_;
-
-  // Old
-#ifdef WITH_XSLLHFITTER
-  const AnaSample* anaSamplePtr{nullptr};
-  std::function<void(TH1D*, const AnaEvent*)> fillFunctionAnaSample;
-#endif
 };
 
 struct CanvasHolder{
@@ -119,11 +110,6 @@ public:
   std::vector<std::string> fetchListOfSplitVarNames();
   std::vector<std::string> fetchRequestedLeafNames();
 
-  // Old
-#ifdef WITH_XSLLHFITTER
-  void setSampleListPtr(const std::vector<AnaSample> *sampleListPtr_);
-#endif
-
 protected:
   void buildEventBinCache(const std::vector<HistHolder *> &histPtrToFillList, const std::vector<PhysicsEvent> *eventListPtr, bool isData_);
 
@@ -141,10 +127,6 @@ private:
   std::vector<std::vector<HistHolder>> _histHolderCacheList_;
   std::vector<HistHolder> _comparisonHistHolderList_;
   std::map<std::string, std::shared_ptr<TCanvas>> _bufferCanvasList_;
-
-#ifdef WITH_XSLLHFITTER
-  const std::vector<AnaSample>* _sampleListPtr_{nullptr};
-#endif
 
 };
 

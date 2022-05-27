@@ -26,7 +26,7 @@ int main(int argc, char** argv)
               << TAG << color::RainbowText("Welcome to the Super-xsLLhFitter.\n")
               << TAG << color::RainbowText("Initializing the fit machinery...") << std::endl;
 
-    const std::string xslf_env = std::getenv("XSLLHFITTER");
+    const std::string xslf_env = std::getenv("XSLLHFITTER")? std::getenv("XSLLHFITTER"): "";;
     if(xslf_env.empty())
     {
         std::cerr << ERR << "Environment variable \"XSLLHFITTER\" not set." << std::endl

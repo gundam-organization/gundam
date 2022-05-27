@@ -24,7 +24,6 @@
 #include "AnaSample.hh"
 #include "ColorOutput.hh"
 #include "OptParser.hh"
-#include "FitParameterSet.h"
 
 
 class ND280Fitter {
@@ -156,10 +155,6 @@ private:
     std::vector<bool> _triggerReFillMcHistogramsThreads_;
     std::vector<std::future<void>> _asyncFitThreads_;
     std::vector<std::vector<std::vector<TH1D*>>> _histThreadHandlers_;
-
-
-    // WIP
-    std::vector<FitParameterSet> _fitParameterSetList_;
 
 };
 

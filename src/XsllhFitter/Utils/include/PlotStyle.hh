@@ -20,7 +20,7 @@
 #include "TStyle.h"
 #include "TTree.h"
 
-#include "json.hpp"
+#include "nlohmann/json.hpp"
 using json = nlohmann::json;
 
 #include "ColorOutput.hh"

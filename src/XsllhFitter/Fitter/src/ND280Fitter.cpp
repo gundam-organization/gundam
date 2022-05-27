@@ -92,10 +92,6 @@ void ND280Fitter::reset(){
 
   _parameter_names_.clear();
   _parameterPriorValues_.clear();
-
-  // WIP
-  _fitParameterSetList_.clear();
-
 }
 
 void ND280Fitter::SetOutputTDirectory(TDirectory* output_tdirectory_) {

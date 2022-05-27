@@ -1,13 +1,11 @@
 set(SRCFILES
         src/FitObj.cc
         src/XsecCalc.cc
-        src/Propagator.cpp
 )
 
 set(HEADERS
         include/FitObj.hh
         include/XsecCalc.hh
-        include/Propagator.h
 )
 
 if( USE_STATIC_LINKS STREQUAL "1" )
@@ -16,27 +14,9 @@ else()
   add_library(XsllhFitterErrProp SHARED ${SRCFILES})
 endif()
 
-target_include_directories(XsllhFitterErrProp PUBLIC
-  ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(XsllhFitterErrProp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-if( WITH_CUDA )
-  target_link_libraries( XsllhFitterErrProp
-          GundamFitParameters
-          GundamFitSamples
-          GundamDatasetManager
-          GundamCache
-          anaevents
-          ${ROOT_LIBRARIES}
-          )
-else()
-  target_link_libraries( XsllhFitterErrProp
-          GundamFitParameters
-          GundamFitSamples
-          GundamDatasetManager
-          anaevents
-          ${ROOT_LIBRARIES}
-          )
-endif()
+target_link_libraries( XsllhFitterErrProp XsllhFitterAnaevents XsllhFitterParameters ${ROOT_LIBRARIES} )
 
 #set_target_properties(XsllhFitterErrProp PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")
 

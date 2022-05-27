@@ -19,7 +19,7 @@ option(YAMLCPP_DIR "Set custom path to yaml-cpp lib" OFF )
 option(ENABLE_DEV_MODE "Enable specific dev related printouts" OFF )
 option(BATCH_MODE "Build to run in a batch queue (affects output)" OFF)
 option(BUILD_DOC "Build documentation" OFF)
-option(WITH_XSLLHFITTER "Build old xsllhFitter apps/libraries" OFF)
+option(WITH_XSLLHFITTER "Build old xsllhFitter apps/libraries" ON)
 
 set(VERBOSE TRUE)
 
@@ -318,11 +318,11 @@ set( MODULES
 )
 
 if(WITH_XSLLHFITTER)
-    list(APPEND MODULES XsllhFitter/Utils)
-    list(APPEND MODULES XsllhFitter/Parameters)
-    list(APPEND MODULES XsllhFitter/Anaevents)
-    list(APPEND MODULES XsllhFitter/ErrProp)
-    list(APPEND MODULES XsllhFitter/Fitter)
+    list( APPEND MODULES XsllhFitter/Utils )
+    list( APPEND MODULES XsllhFitter/Parameters )
+    list( APPEND MODULES XsllhFitter/Anaevents )
+    list( APPEND MODULES XsllhFitter/ErrProp )
+    list( APPEND MODULES XsllhFitter/Fitter )
 endif()
 
 cmessage (STATUS "Configuring modules...")

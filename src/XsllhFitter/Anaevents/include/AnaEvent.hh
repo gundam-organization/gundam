@@ -1,10 +1,8 @@
 #ifndef __AnaEvent_hh__
 #define __AnaEvent_hh__
 
-#include <iostream>
-#include <mutex>
-#include <vector>
-#include <map>
+#include "Logger.h"
+#include "GenericToolbox.h"
 
 #include <TMath.h>
 #include "TLeaf.h"
@@ -12,13 +10,12 @@
 #include "TROOT.h"
 #include "TTreeFormula.h"
 #include <TChain.h>
+#include "TFormula.h"
 
-#include "Logger.h"
-#include "GenericToolbox.h"
-
-#include "DataBin.h"
-#include "DataBinSet.h"
-
+#include <iostream>
+#include <mutex>
+#include <vector>
+#include <map>
 
 namespace AnaEventType{
   ENUM_EXPANDER(
@@ -128,7 +125,6 @@ public:
   Float_t& GetEvWghtMC()   { return *_weightMCPtr_; }
 
   // Interfaces
-  bool isInBin( const DataBin& dataBin_) const;
   std::map<FitParameterSet *, std::vector<Dial *>> *getDialCachePtr();
   double evalFormula(TFormula* formulaPtr_) const;
 
