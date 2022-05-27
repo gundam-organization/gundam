@@ -19,7 +19,7 @@ option(YAMLCPP_DIR "Set custom path to yaml-cpp lib" OFF )
 option(ENABLE_DEV_MODE "Enable specific dev related printouts" OFF )
 option(BATCH_MODE "Build to run in a batch queue (affects output)" OFF)
 option(BUILD_DOC "Build documentation" OFF)
-option(WITH_XSLLHFITTER "Build old xsllhFitter apps/libraries" ON)
+option(WITH_XSLLHFITTER "Build old xsllhFitter apps/libraries" OFF)
 
 set(VERBOSE TRUE)
 
