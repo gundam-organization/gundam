@@ -5,7 +5,7 @@
 #include <TTreeFormulaManager.h>
 
 #include <memory>
-#include "json.hpp"
+#include "nlohmann/json.hpp"
 
 #include "Logger.h"
 #include "GenericToolbox.h"

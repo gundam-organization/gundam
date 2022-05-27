@@ -6,8 +6,10 @@
 #define GUNDAM_PHYSICSEVENT_H
 
 
-
+#ifdef WITH_XSLLHFITTER
 #include "AnaEvent.hh"
+#endif
+
 #include "FitParameterSet.h"
 #include "Dial.h"
 #include "NestedDialTest.h"
@@ -83,7 +85,6 @@ public:
 
   // Misc
   void print() const;
-  bool isSame(AnaEvent& anaEvent_) const;
   void trimDialCache();
   std::string getSummary() const;
   std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>> generateLeavesDictionary(bool disableArrays_ = false) const;
@@ -99,6 +100,11 @@ public:
 
   // DEV
   void addNestedDialRefToCache(NestedDialTest* nestedDialPtr_, const std::vector<Dial*>& dialPtrList_ = std::vector<Dial*>{});
+
+#ifdef WITH_XSLLHFITTER
+  // OLD
+  bool isSame(AnaEvent& anaEvent_) const;
+#endif
 
 private:
   // Context variables

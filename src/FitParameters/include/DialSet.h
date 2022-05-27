@@ -12,7 +12,7 @@
 #include "GenericToolbox.h"
 
 #include "TFormula.h"
-#include "json.hpp"
+#include "nlohmann/json.hpp"
 
 #include "string"
 #include "vector"

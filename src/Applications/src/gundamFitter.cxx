@@ -2,8 +2,8 @@
 // Created by Nadrino on 01/06/2021.
 //
 
-#include "versionConfig.h"
 #include "FitterEngine.h"
+#include "VersionConfig.h"
 #include "JsonUtils.h"
 #include "GlobalVariables.h"
 #include "GundamGreetings.h"
@@ -109,7 +109,7 @@ int main(int argc, char** argv){
   LogInfo << "Writing runtime parameters in output file..." << std::endl;
 
   // Gundam version?
-  TNamed gundamVersionString("gundamVersion", getVersionStr().c_str());
+  TNamed gundamVersionString("gundamVersion", GundamVersionConfig::getVersionStr().c_str());
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamFitter"), &gundamVersionString);
 
   // Command line?

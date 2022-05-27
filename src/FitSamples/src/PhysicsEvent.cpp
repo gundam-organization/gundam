@@ -464,30 +464,6 @@ std::string PhysicsEvent::getSummary() const {
 void PhysicsEvent::print() const {
   LogInfo << *this << std::endl;
 }
-bool PhysicsEvent::isSame(AnaEvent& anaEvent_) const{
-
-  bool isSame = true;
-  for( const auto& varName : *_commonLeafNameListPtr_ ){
-    int anaIndex = anaEvent_.GetGlobalIndex(varName);
-    if( anaIndex == -1 ) continue;
-    if(this->getVarAsDouble(varName) != anaEvent_.GetEventVarAsDouble(varName) ){
-      isSame = false;
-      LogError << GET_VAR_NAME_VALUE(varName) << std::endl;
-      break;
-    }
-  }
-
-  if( _sampleBinIndex_ != anaEvent_.GetRecoBinIndex() ){
-    isSame = false;
-  }
-
-  if(not isSame){
-    this->print();
-    anaEvent_.Print();
-  }
-
-  return isSame;
-}
 void PhysicsEvent::trimDialCache(){
   size_t newSize{0};
   for( auto& dial : _rawDialPtrList_ ){
@@ -613,3 +589,30 @@ std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p ){
 const std::shared_ptr<std::vector<std::string>>& PhysicsEvent::getCommonLeafNameListPtr() const {
   return _commonLeafNameListPtr_;
 }
+
+#ifdef WITH_XSLLHFITTER
+bool PhysicsEvent::isSame(AnaEvent& anaEvent_) const{
+
+  bool isSame = true;
+  for( const auto& varName : *_commonLeafNameListPtr_ ){
+    int anaIndex = anaEvent_.GetGlobalIndex(varName);
+    if( anaIndex == -1 ) continue;
+    if(this->getVarAsDouble(varName) != anaEvent_.GetEventVarAsDouble(varName) ){
+      isSame = false;
+      LogError << GET_VAR_NAME_VALUE(varName) << std::endl;
+      break;
+    }
+  }
+
+  if( _sampleBinIndex_ != anaEvent_.GetRecoBinIndex() ){
+    isSame = false;
+  }
+
+  if(not isSame){
+    this->print();
+    anaEvent_.Print();
+  }
+
+  return isSame;
+}
+#endif

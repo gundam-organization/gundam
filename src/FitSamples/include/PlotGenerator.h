@@ -5,11 +5,13 @@
 #ifndef GUNDAM_PLOTGENERATOR_H
 #define GUNDAM_PLOTGENERATOR_H
 
-#include "AnaSample.hh"
 #include "FitSampleSet.h"
 #include "PhysicsEvent.h"
+#ifdef WITH_XSLLHFITTER
+#include "AnaSample.hh"
+#endif
 
-#include "json.hpp"
+#include "nlohmann/json.hpp"
 #include "TDirectory.h"
 #include "TH1D.h"
 
@@ -32,10 +34,8 @@ struct HistHolder{
 
   // Data
   bool isData{false};
-  const AnaSample* anaSamplePtr{nullptr};
   const FitSample* fitSamplePtr{nullptr};
   std::mutex* fillMutexPtr{nullptr};
-  std::function<void(TH1D*, const AnaEvent*)> fillFunctionAnaSample;
   std::function<void(TH1D*, const PhysicsEvent*)> fillFunctionFitSample;
 
   // X axis
@@ -66,6 +66,11 @@ struct HistHolder{
   bool isBinCacheBuilt{false};
   std::vector<std::vector<const PhysicsEvent*>> _binEventPtrList_;
 
+  // Old
+#ifdef WITH_XSLLHFITTER
+  const AnaSample* anaSamplePtr{nullptr};
+  std::function<void(TH1D*, const AnaEvent*)> fillFunctionAnaSample;
+#endif
 };
 
 struct CanvasHolder{
@@ -88,7 +93,6 @@ public:
 
   // Setters
   void setConfig(const nlohmann::json &config_);
-  void setSampleListPtr(const std::vector<AnaSample> *sampleListPtr_);
   void setFitSampleSetPtr(const FitSampleSet *fitSampleSetPtr);
 
   // Init
@@ -115,12 +119,16 @@ public:
   std::vector<std::string> fetchListOfSplitVarNames();
   std::vector<std::string> fetchRequestedLeafNames();
 
+  // Old
+#ifdef WITH_XSLLHFITTER
+  void setSampleListPtr(const std::vector<AnaSample> *sampleListPtr_);
+#endif
+
 protected:
   void buildEventBinCache(const std::vector<HistHolder *> &histPtrToFillList, const std::vector<PhysicsEvent> *eventListPtr, bool isData_);
 
 private:
   nlohmann::json _config_;
-  const std::vector<AnaSample>* _sampleListPtr_{nullptr};
   const FitSampleSet* _fitSampleSetPtr_{nullptr};
   int _maxLegendLength_{15};
 
@@ -134,6 +142,9 @@ private:
   std::vector<HistHolder> _comparisonHistHolderList_;
   std::map<std::string, std::shared_ptr<TCanvas>> _bufferCanvasList_;
 
+#ifdef WITH_XSLLHFITTER
+  const std::vector<AnaSample>* _sampleListPtr_{nullptr};
+#endif
 
 };
 

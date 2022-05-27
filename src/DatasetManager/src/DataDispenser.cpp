@@ -27,7 +27,7 @@ LoggerInit([]{
 DataDispenser::DataDispenser() = default;
 DataDispenser::~DataDispenser() = default;
 
-void DataDispenser::setConfig(const json &config) {
+void DataDispenser::setConfig(const nlohmann::json &config) {
   _config_ = config;
   JsonUtils::forwardConfig(_config_, __CLASS_NAME__);
 }

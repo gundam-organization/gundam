@@ -37,10 +37,13 @@ void PlotGenerator::reset() {
   };
 
   _config_.clear();
-  _sampleListPtr_ = nullptr;
   _fitSampleSetPtr_ = nullptr;
 
   _histHolderCacheList_.resize(1);
+
+#ifdef WITH_XSLLHFITTER
+  _sampleListPtr_ = nullptr;
+#endif
 }
 
 void PlotGenerator::setConfig(const nlohmann::json &config_) {
@@ -48,9 +51,6 @@ void PlotGenerator::setConfig(const nlohmann::json &config_) {
   while( _config_.is_string() ){
     _config_ = JsonUtils::readConfigFile(_config_.get<std::string>());
   }
-}
-void PlotGenerator::setSampleListPtr(const std::vector<AnaSample> *sampleListPtr_) {
-  _sampleListPtr_ = sampleListPtr_;
 }
 void PlotGenerator::setFitSampleSetPtr(const FitSampleSet *fitSampleSetPtr) {
   _fitSampleSetPtr_ = fitSampleSetPtr;
@@ -285,6 +285,7 @@ void PlotGenerator::defineHistogramHolders() {
     }
   }
   else{
+#ifdef WITH_XSLLHFITTER
     // OLD SAMPLES
     LogThrowIf(_sampleListPtr_ == nullptr, "No samples has been set.");
     int sampleCounter = -1;
@@ -469,6 +470,9 @@ void PlotGenerator::defineHistogramHolders() {
         } // splitVar
       } // histDef
     } // sample
+#else
+    LogThrow("No sample has been set.");
+#endif
   }
 }
 
@@ -524,8 +528,12 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
           else histDef.histPtr = std::shared_ptr<TH1D>( (TH1D*) histDef.fitSamplePtr->getMcContainer().histogram->Clone() );
         }
         else{
+#ifdef WITH_XSLLHFITTER
           if( histDef.isData ) histDef.histPtr = std::shared_ptr<TH1D>( (TH1D*) histDef.anaSamplePtr->GetDataHisto().Clone() );
           else histDef.histPtr = std::shared_ptr<TH1D>( (TH1D*) histDef.anaSamplePtr->GetPredHisto().Clone() );
+#else
+          LogThrow("Samples not set.")
+#endif
         }
       }
       else{
@@ -613,6 +621,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
     } // sample
   }
   else{
+#ifdef WITH_XSLLHFITTER
     for( const auto& sample : *_sampleListPtr_ ){
       // Data sets:
       for( bool isData : { false, true } ){
@@ -665,6 +674,9 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
 
       } // isData loop
     } // sample
+#else
+    LogThrow("Samples not set.")
+#endif
   }
 
   // Post-processing (norm, color)
@@ -679,9 +691,13 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
       }
     }
     else{
+#ifdef WITH_XSLLHFITTER
       if( not histDefPair.isData or histDefPair.anaSamplePtr->GetDataType() == kAsimov ){
         histDefPair.histPtr->Scale( histDefPair.anaSamplePtr->GetNorm() );
       }
+#else
+      LogThrow("Samples not set.")
+#endif
     }
 
     for(int iBin = 0 ; iBin <= histDefPair.histPtr->GetNbinsX() + 1 ; iBin++ ){
@@ -938,6 +954,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
     } // Hist to stack
   }
   else{
+#ifdef WITH_XSLLHFITTER
     std::map<std::string, std::map<const AnaSample*, std::vector<const HistHolder*>>> histsToStackMap; // histsToStackMap[path][anaSamplePtr] = listOfTh1d
     for( auto& histHolder : histHolderList_ ){
       if( histHolder.isData ) continue; // data associated to each later
@@ -1098,6 +1115,9 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
       } // sample
 
     } // Hists to stack
+#else
+    LogThrow("Samples not set.")
+#endif
   }
 
   // Write
@@ -1300,3 +1320,9 @@ void PlotGenerator::buildEventBinCache(const std::vector<HistHolder *> &histPtrT
   GlobalVariables::getParallelWorker().removeJob("fillEventHistCache");
 
 }
+
+#ifdef WITH_XSLLHFITTER
+void PlotGenerator::setSampleListPtr(const std::vector<AnaSample> *sampleListPtr_) {
+  _sampleListPtr_ = sampleListPtr_;
+}
+#endif

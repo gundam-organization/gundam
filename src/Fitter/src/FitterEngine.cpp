@@ -73,7 +73,7 @@ void FitterEngine::initialize() {
 
   LogThrowIf(_config_.empty(), "Config is not set.");
 
-  _propagator_.setConfig(JsonUtils::fetchValue<json>(_config_, "propagatorConfig"));
+  _propagator_.setConfig(JsonUtils::fetchValue<nlohmann::json>(_config_, "propagatorConfig"));
   _propagator_.setSaveDir(GenericToolbox::mkdirTFile(_saveDir_, "Propagator"));
   _propagator_.initialize();
 

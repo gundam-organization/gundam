@@ -10,7 +10,7 @@
 #include "memory"
 #include <TH1D.h>
 #include <TTreeFormula.h>
-#include "json.hpp"
+#include "nlohmann/json.hpp"
 
 #include "SampleElement.h"
 #include "DataBinSet.h"
