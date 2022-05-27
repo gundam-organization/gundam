@@ -75,7 +75,7 @@ void Propagator::initialize() {
   // Monitoring parameters
   _showEventBreakdown_ = JsonUtils::fetchValue(_config_, "showEventBreakdown", _showEventBreakdown_);
 
-  LogInfo << "Loading Parameters..." << std::endl;
+  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing parameters...") << std::endl;
   auto parameterSetListConfig = JsonUtils::fetchValue(_config_, "parameterSetListConfig", nlohmann::json());
   if( parameterSetListConfig.is_string() ) parameterSetListConfig = JsonUtils::readConfigFile(parameterSetListConfig.get<std::string>());
   int nPars = 0;
@@ -107,12 +107,12 @@ void Propagator::initialize() {
     _globalCovarianceMatrix_->Write("globalCovarianceMatrix_TMatrixD");
   }
 
-  LogInfo << "Initializing FitSampleSet" << std::endl;
+  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing samples...") << std::endl;
   auto fitSampleSetConfig = JsonUtils::fetchValue(_config_, "fitSampleSetConfig", nlohmann::json());
   _fitSampleSet_.setConfig(fitSampleSetConfig);
   _fitSampleSet_.initialize();
 
-  LogInfo << "Initializing the PlotGenerator" << std::endl;
+  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the plot generator") << std::endl;
   auto plotGeneratorConfig = JsonUtils::fetchValue(_config_, "plotGeneratorConfig", nlohmann::json());
   if( plotGeneratorConfig.is_string() ) parameterSetListConfig = JsonUtils::readConfigFile(plotGeneratorConfig.get<std::string>());
   _plotGenerator_.setConfig(plotGeneratorConfig);
@@ -120,7 +120,7 @@ void Propagator::initialize() {
 
   _throwAsimovToyParameters_ = JsonUtils::fetchValue<json>(_config_, "throwAsimovFitParameters", _throwAsimovToyParameters_);
 
-  LogInfo << "Initializing input datasets..." << std::endl;
+  LogInfo << std::endl << GenericToolbox::addUpDownBars("Loading datasets...") << std::endl;
   auto dataSetListConfig = JsonUtils::getForwardedConfig(_config_, "dataSetList");
   if( dataSetListConfig.empty() ){
     // Old config files
@@ -200,64 +200,32 @@ void Propagator::initialize() {
       dispenser.load();
     }
   }
-  else{
-    LogDebug << "Check asimov: " << std::endl;
-    for( auto& sample : this->getFitSampleSet().getFitSampleList() ){
-      LogDebug << sample.getName() << std::endl;
-      size_t nDiff{0};
-      for( size_t iEvent = 0 ; iEvent < sample.getMcContainer().eventList.size() ; iEvent++ ){
-        auto& mcEvent = sample.getMcContainer().eventList[iEvent];
-        auto& dataEvent = sample.getDataContainer().eventList[iEvent];
-        if( nDiff<15 and mcEvent.getEventWeight() != dataEvent.getEventWeight() ){
-          nDiff++;
-          LogDebug
-              << mcEvent.getEventWeight() << " => " << dataEvent.getEventWeight()
-              << " / diff: " << mcEvent.getEventWeight() - dataEvent.getEventWeight() << std::endl;
-        }
-      }
-    }
-//    LogThrow("debug")
-  }
+//  else{
+//    LogDebug << "Check asimov: " << std::endl;
+//    for( auto& sample : this->getFitSampleSet().getFitSampleList() ){
+//      LogDebug << sample.getName() << std::endl;
+//      size_t nDiff{0};
+//      for( size_t iEvent = 0 ; iEvent < sample.getMcContainer().eventList.size() ; iEvent++ ){
+//        auto& mcEvent = sample.getMcContainer().eventList[iEvent];
+//        auto& dataEvent = sample.getDataContainer().eventList[iEvent];
+//        if( nDiff<15 and mcEvent.getEventWeight() != dataEvent.getEventWeight() ){
+//          nDiff++;
+//          LogDebug
+//              << mcEvent.getEventWeight() << " => " << dataEvent.getEventWeight()
+//              << " / diff: " << mcEvent.getEventWeight() - dataEvent.getEventWeight() << std::endl;
+//        }
+//      }
+//    }
+////    LogThrow("debug")
+//  }
 
   LogInfo << "Propagating prior parameters on events..." << std::endl;
   this->reweightMcEvents();
-
-  LogDebug << "Check asimov: " << std::endl;
-  for( auto& sample : this->getFitSampleSet().getFitSampleList() ){
-    LogDebug << sample.getName() << std::endl;
-    size_t nDiff{0};
-    for( size_t iEvent = 0 ; iEvent < sample.getMcContainer().eventList.size() ; iEvent++ ){
-      auto& mcEvent = sample.getMcContainer().eventList[iEvent];
-      auto& dataEvent = sample.getDataContainer().eventList[iEvent];
-      if( nDiff<15 and mcEvent.getEventWeight() != dataEvent.getEventWeight() ){
-        nDiff++;
-        LogDebug
-            << mcEvent.getEventWeight() << " => " << dataEvent.getEventWeight()
-            << " / diff: " << mcEvent.getEventWeight() - dataEvent.getEventWeight() << std::endl;
-      }
-    }
-  }
 
   LogInfo << "Set the current MC prior weights as nominal weight..." << std::endl;
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
     for( auto& event : sample.getMcContainer().eventList ){
       event.setNominalWeight(event.getEventWeight());
-    }
-  }
-
-  LogDebug << "Check asimov: " << std::endl;
-  for( auto& sample : this->getFitSampleSet().getFitSampleList() ){
-    LogDebug << sample.getName() << std::endl;
-    size_t nDiff{0};
-    for( size_t iEvent = 0 ; iEvent < sample.getMcContainer().eventList.size() ; iEvent++ ){
-      auto& mcEvent = sample.getMcContainer().eventList[iEvent];
-      auto& dataEvent = sample.getDataContainer().eventList[iEvent];
-      if( nDiff<15 and mcEvent.getEventWeight() != dataEvent.getEventWeight() ){
-        nDiff++;
-        LogDebug
-            << mcEvent.getEventWeight() << " => " << dataEvent.getEventWeight()
-            << " / diff: " << mcEvent.getEventWeight() - dataEvent.getEventWeight() << std::endl;
-      }
     }
   }
 

@@ -563,7 +563,6 @@ void FitParameterSet::readParameterDefinitionFile(){
   parDefFile->Close();
 }
 void FitParameterSet::readConfigOptions(){
-  LogInfo << __METHOD_NAME__ << std::endl;
 
   _nbParameterDefinition_ = JsonUtils::fetchValue(_config_, "numberOfParameters", _nbParameterDefinition_);
   _nominalStepSize_ = JsonUtils::fetchValue(_config_, "nominalStepSize", _nominalStepSize_);

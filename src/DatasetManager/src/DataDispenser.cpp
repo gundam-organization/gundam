@@ -112,7 +112,7 @@ void DataDispenser::load(){
     LogInfo << GenericToolbox::parseMapAsString(_parameters_.overrideLeafDict) << std::endl;
   }
 
-  LogInfo << "Data will be read from: " << GenericToolbox::parseVectorAsString(_parameters_.filePathList, true) << std::endl;
+  LogInfo << "Data will be extracted from: " << GenericToolbox::parseVectorAsString(_parameters_.filePathList, true) << std::endl;
 
   this->doEventSelection();
   this->fetchRequestedLeaves();
