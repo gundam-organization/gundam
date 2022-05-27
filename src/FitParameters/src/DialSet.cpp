@@ -88,6 +88,9 @@ std::vector<DialWrapper> &DialSet::getDialList() {
 TFormula *DialSet::getApplyConditionFormula() const {
   return _applyConditionFormula_.get();
 }
+const std::string &DialSet::getDialSubType() const {
+  return _globalDialSubType_;
+}
 const std::string &DialSet::getDialLeafName() const {
   return _globalDialLeafName_;
 }
@@ -316,6 +319,11 @@ bool DialSet::initializeDialsWithDefinition() {
     _dialList_.emplace_back( std::make_unique<NormalizationDial>(dial) );
   }
   else if( _globalDialType_ == DialType::Spline or _globalDialType_ == DialType::Graph ){
+
+    if ( JsonUtils::doKeyExist(dialsDefinition, "dialSubType") ) {
+      _globalDialSubType_ =  JsonUtils::fetchValue<std::string>(dialsDefinition, "dialSubType");
+    }
+
     if     ( JsonUtils::doKeyExist(dialsDefinition, "dialLeafName") ){
       _globalDialLeafName_ = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialLeafName");
       // nothing to do here, the dials list will be filled while reading the datasets
