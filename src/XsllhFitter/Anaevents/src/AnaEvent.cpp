@@ -10,9 +10,9 @@
 #include "AnaEvent.hh"
 
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[AnaEvent]");
-})
+});
 
 
 AnaEvent::AnaEvent(){

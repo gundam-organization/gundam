@@ -20,9 +20,9 @@
 #include <memory>
 #include <vector>
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[Propagator]");
-})
+});
 
 Propagator::Propagator() { this->reset(); }
 Propagator::~Propagator() { this->reset(); }

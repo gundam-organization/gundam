@@ -79,6 +79,7 @@ if(BATCH_MODE)
   add_definitions(-DGUNDAM_BATCH)
 endif(BATCH_MODE)
 
+
 ################################################################################
 #                            Check Dependencies
 ################################################################################
@@ -179,6 +180,7 @@ if (WITH_CUDA)
   cmessage(STATUS "Enable GPU support (compiled, but only used when CUDA enabled)")
 endif()
 
+
 ################################################################################
 #                       SubModules
 ################################################################################
@@ -231,6 +233,7 @@ else()
     add_definitions( -D LOGGER_ENABLE_COLORS=1 )
     add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=1 )
 endif()
+
 
 ################################################################################
 #                            Compiler Setup
@@ -295,12 +298,42 @@ cmessage (STATUS "C++ Compiler      : ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPI
 cmessage (STATUS "C++ Release flags : ${CMAKE_CXX_FLAGS_RELEASE}")
 cmessage (STATUS "C++ Debug flags   : ${CMAKE_CXX_FLAGS_DEBUG}")
 
+
 ################################################################################
 # CMake Generated
 ###############################################################################
 
 configure_file( ${CMAKE_SOURCE_DIR}/cmake/VersionConfig.h.in ${CMAKE_BINARY_DIR}/generated/VersionConfig.h )
 include_directories( ${CMAKE_BINARY_DIR}/generated/ )
+
+
+################################################################################
+# Doxygen
+###############################################################################
+
+if( BUILD_DOC )
+    # check if Doxygen is installed
+    find_package(Doxygen)
+    if (DOXYGEN_FOUND)
+        # set input and output files
+        set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/doxygen/Doxygen.in)
+        set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
+
+        # request to configure the file
+        configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
+        message("Doxygen build started")
+
+        # note the option ALL which allows to build the docs together with the application
+        add_custom_target( doc ALL
+                COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
+                WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+                COMMENT "Generating API documentation with Doxygen"
+                VERBATIM )
+    else (DOXYGEN_FOUND)
+        message("Doxygen need to be installed to generate the doxygen documentation")
+    endif (DOXYGEN_FOUND)
+endif()
+
 
 ################################################################################
 #                            Specify Target Subdirs
@@ -341,29 +374,6 @@ configure_file(cmake/build_setup.sh.in
   "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/setup.sh" @ONLY)
 install(FILES "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/setup.sh"
   DESTINATION ${CMAKE_INSTALL_PREFIX})
-
-if( BUILD_DOC )
-    # check if Doxygen is installed
-    find_package(Doxygen)
-    if (DOXYGEN_FOUND)
-        # set input and output files
-        set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/doxygen/Doxygen.in)
-        set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
-
-        # request to configure the file
-        configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
-        message("Doxygen build started")
-
-        # note the option ALL which allows to build the docs together with the application
-        add_custom_target( doc_doxygen ALL
-                COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
-                WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-                COMMENT "Generating API documentation with Doxygen"
-                VERBATIM )
-    else (DOXYGEN_FOUND)
-        message("Doxygen need to be installed to generate the doxygen documentation")
-    endif (DOXYGEN_FOUND)
-endif()
 
 cmessage( STATUS "Tagged Version ${GUNDAM_VERSION_STRING}" )
 

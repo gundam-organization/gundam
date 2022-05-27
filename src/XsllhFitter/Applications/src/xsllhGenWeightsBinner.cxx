@@ -94,9 +94,9 @@ double convertToAbsoluteVariation(std::string parName_, double relativeDeviation
 
 bool doesParamHasRelativeXScale(std::string& systName_);
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[xsllhGenWeightsBinner.cxx]");
-} )
+} );
 
 int main(int argc, char** argv) {
     __argc__ = argc;

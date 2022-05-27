@@ -13,7 +13,7 @@
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[GundamGreetings]");
-})
+});
 
 GundamGreetings::GundamGreetings() = default;
 GundamGreetings::~GundamGreetings() = default;

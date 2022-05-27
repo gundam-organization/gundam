@@ -10,9 +10,9 @@
 
 using xsllh::FitBin;
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[AnaSample]");
-} )
+} );
 
 // ctor
 AnaSample::AnaSample() {

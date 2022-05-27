@@ -9,7 +9,7 @@
 
 #include "Logger.h"
 
-LoggerInit([](){ Logger::setUserHeaderStr("[SplineDial]"); } )
+LoggerInit([]{ Logger::setUserHeaderStr("[SplineDial]"); } );
 
 
 SplineDial::SplineDial() : Dial(DialType::Spline) {

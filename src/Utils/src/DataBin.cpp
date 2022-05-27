@@ -11,9 +11,9 @@
 
 #include "DataBin.h"
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[DataBin]");
-} )
+} );
 
 DataBin::DataBin() {
   reset();

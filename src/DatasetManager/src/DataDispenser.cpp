@@ -22,7 +22,7 @@
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[DataDispenser]");
-})
+});
 
 DataDispenser::DataDispenser() = default;
 DataDispenser::~DataDispenser() = default;

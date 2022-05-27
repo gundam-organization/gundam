@@ -11,9 +11,9 @@
 #include "sstream"
 
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[FitParameter]");
-} )
+});
 
 PriorType::PriorType PriorType::toPriorType(const std::string& priorStr_){
   int enumIndex = PriorTypeEnumNamespace::toEnumInt("PriorType::" + priorStr_);

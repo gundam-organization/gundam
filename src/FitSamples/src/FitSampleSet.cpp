@@ -16,9 +16,9 @@
 #include "FitSampleSet.h"
 
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[FitSampleSet]");
-})
+});
 
 FitSampleSet::FitSampleSet() { this->reset(); }
 FitSampleSet::~FitSampleSet() { this->reset(); }

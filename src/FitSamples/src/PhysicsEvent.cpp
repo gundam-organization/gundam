@@ -10,9 +10,9 @@
 
 #include <cmath>
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[PhysicsEvent]");
-})
+});
 
 PhysicsEvent::PhysicsEvent() { this->reset(); }
 PhysicsEvent::~PhysicsEvent() { this->reset(); }

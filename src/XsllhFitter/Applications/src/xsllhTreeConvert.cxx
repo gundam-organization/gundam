@@ -75,9 +75,9 @@ char **__argv__;
 std::string __jsonConfigPath__;
 int __fgd_id__;
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[xsTreeConvert.cxx]");
-} )
+} );
 
 int main(int argc, char** argv){
 

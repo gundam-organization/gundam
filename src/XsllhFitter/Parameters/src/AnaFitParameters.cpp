@@ -3,9 +3,9 @@
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[AnaFitParameters]");
-} )
+} );
 
 AnaFitParameters::AnaFitParameters()
     : Npar(0)

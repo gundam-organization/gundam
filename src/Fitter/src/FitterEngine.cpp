@@ -20,7 +20,7 @@
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[FitterEngine]");
-})
+});
 
 #ifndef GUNDAM_BATCH
 #define GUNDAM_SIGMA "σ"

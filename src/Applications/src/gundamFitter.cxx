@@ -15,9 +15,9 @@
 #include <string>
 
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[gundamFitter.cxx]");
-} )
+});
 
 int main(int argc, char** argv){
 

@@ -18,9 +18,9 @@
 #include "vector"
 #include "sstream"
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[PlotGenerator]");
-})
+});
 
 
 PlotGenerator::PlotGenerator() { this->reset(); }

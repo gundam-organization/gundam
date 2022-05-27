@@ -2,9 +2,9 @@
 #include "Logger.h"
 #include "GenericToolbox.h"
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[OptParser]");
-} )
+} );
 
 OptParser::OptParser()
 {

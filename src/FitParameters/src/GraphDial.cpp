@@ -10,7 +10,7 @@
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[GraphDial]");
-})
+});
 
 GraphDial::GraphDial() : Dial{DialType::Graph} {
   this->GraphDial::reset();

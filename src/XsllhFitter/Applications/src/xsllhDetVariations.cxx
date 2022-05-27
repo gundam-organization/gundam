@@ -142,9 +142,9 @@ void initCutDictionnary();
 void mapTreeConverterEntries();
 bool buildTreeSyncCache();
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[xsDetVariation]");
-} )
+} );
 
 int main(int argc, char** argv)
 {

@@ -11,9 +11,9 @@
 #include "TRandom.h"
 
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[SampleElement]");
-})
+});
 
 
 SampleElement::SampleElement() = default;

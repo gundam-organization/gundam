@@ -11,9 +11,9 @@
 #include "GenericToolbox.TablePrinter.h"
 #include "Logger.h"
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[FitParameterSet]");
-} )
+} );
 
 FitParameterSet::FitParameterSet() {
   this->reset();

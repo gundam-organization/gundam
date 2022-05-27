@@ -8,9 +8,9 @@
 #include <future>
 #include "GlobalVariables.h"
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[AnaTreeMC]");
-} )
+} );
 
 AnaTreeMC::AnaTreeMC(const std::string& file_name, const std::string& tree_name){
   fChain = new TChain(tree_name.c_str());

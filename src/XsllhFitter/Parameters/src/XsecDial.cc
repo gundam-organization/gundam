@@ -4,9 +4,9 @@
 #include "XsecDial.hh"
 #include "Logger.h"
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[XsecDial]");
-} )
+} );
 
 XsecDial::XsecDial(std::string dial_name)
   : m_name(std::move(dial_name))

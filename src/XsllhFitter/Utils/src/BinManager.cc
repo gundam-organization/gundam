@@ -4,9 +4,9 @@
 #include "Logger.h"
 #include "GenericToolbox.h"
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[BinManager]");
-} )
+} );
 
 BinManager::BinManager()
   : nbins(0), dimension(0)

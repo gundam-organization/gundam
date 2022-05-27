@@ -11,9 +11,9 @@
 #define REWEIGHT_TIME_POINT 11
 #define FILL_TIME_POINT 12
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[ND280Fitter]");
-} )
+} );
 
 ND280Fitter::ND280Fitter() {
 

@@ -49,9 +49,9 @@ void getUserParameters();
 
 void monitorRAMPoint(std::string pointTitle_);
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[xsllhND280UpFit.cxx]");
-} )
+} );
 
 int main(int argc, char** argv)
 {

@@ -1,9 +1,9 @@
 #include "FluxParameters.h"
 #include "Logger.h"
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[FluxParameters]");
-} )
+} );
 
 FluxParameters::FluxParameters(const std::string& name)
 {

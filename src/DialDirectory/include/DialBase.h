@@ -36,8 +36,6 @@ private:
   const DialType _dialType_;
   std::shared_ptr<std::mutex> _evalMutex_{nullptr};
 
-
-
 };
 
 

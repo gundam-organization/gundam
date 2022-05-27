@@ -34,9 +34,9 @@ void resetParameters();
 void getUserParameters();
 void readJsonConfigFile();
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[xsllhGetDetParCov.cxx]");
-} )
+} );
 
 int main(int argc, char** argv){
 

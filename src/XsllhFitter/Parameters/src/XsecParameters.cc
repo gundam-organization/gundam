@@ -4,9 +4,9 @@
 #include <future>
 #include "GlobalVariables.h"
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[XsecParameters]");
-} )
+} );
 
 XsecParameters::XsecParameters(const std::string& name)
 {

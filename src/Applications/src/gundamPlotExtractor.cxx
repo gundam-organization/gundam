@@ -20,7 +20,7 @@
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[gundamPlotExtractor.cxx]");
-})
+});
 
 std::vector<std::string> outExtensions;
 int nPlots{0};
