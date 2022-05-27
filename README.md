@@ -1,4 +1,4 @@
-# GUNDAM — 風をあつめて
+# GUNDAM — 風をあつめて 
 
 ![](./resources/images/banner2.png)
 
