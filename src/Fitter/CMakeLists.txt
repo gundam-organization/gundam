@@ -1,11 +1,7 @@
 set(SRCFILES
-  src/ND280Fitter.cpp
-  src/XsecFitter.cc
   src/FitterEngine.cpp
   )
 set(HEADERS
-  include/ND280Fitter.h
-  include/XsecFitter.hh
   include/FitterEngine.h
   )
       
@@ -19,14 +15,11 @@ target_include_directories(GundamFitter PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 target_link_libraries( GundamFitter PUBLIC
-        GundamErrorPropagator
+        GundamPropagator
         ${ROOT_LIBRARIES}
         )
 
-set_target_properties(
-        GundamFitter PROPERTIES VERSION
-        "${gundam_VERSION_MAJOR}.${gundam_VERSION_MINOR}.${gundam_VERSION_REVISION}${gundam_VERSION_TAG}"
-)
+#set_target_properties( GundamFitter PROPERTIES VERSION "${GUNDAM_VERSION_STRING}" )
 
 install(TARGETS GundamFitter DESTINATION lib)
 #Can uncomment this to install the headers... but is it really neccessary?

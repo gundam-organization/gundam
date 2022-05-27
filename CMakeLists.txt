@@ -1,12 +1,12 @@
 cmake_minimum_required (VERSION 3.12 FATAL_ERROR)
 
 # Configure CMake project
-project(gundam)
-set (gundam_VERSION_MAJOR 1)
-set (gundam_VERSION_MINOR 4)
-set (gundam_VERSION_REVISION 0)
-set (gundam_VERSION_TAG "f") # f means forward -> include commits after a given release
-set (gundam_VERSION_STRING "${gundam_VERSION_MAJOR}.${gundam_VERSION_MINOR}.${gundam_VERSION_REVISION}${gundam_VERSION_TAG}")
+project(GUNDAM)
+set (GUNDAM_VERSION_MAJOR 1)
+set (GUNDAM_VERSION_MINOR 4)
+set (GUNDAM_VERSION_REVISION 0)
+set (GUNDAM_VERSION_TAG "f") # f means forward -> include commits after a given release
+set (GUNDAM_VERSION_STRING "${GUNDAM_VERSION_MAJOR}.${GUNDAM_VERSION_MINOR}.${GUNDAM_VERSION_REVISION}${GUNDAM_VERSION_TAG}")
 
 option(CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ langauge (-std=gnu++14)." OFF)
 option(CXX_MARCH_FLAG "Enable cpu architecture specific optimzations." OFF)
@@ -18,6 +18,8 @@ option(WITH_CUDA "Build with CUDA (if available)" OFF)
 option(YAMLCPP_DIR "Set custom path to yaml-cpp lib" OFF )
 option(ENABLE_DEV_MODE "Enable specific dev related printouts" OFF )
 option(BATCH_MODE "Build to run in a batch queue (affects output)" OFF)
+option(BUILD_DOC "Build documentation" OFF)
+option(WITH_XSLLHFITTER "Build old xsllhFitter apps/libraries" OFF)
 
 set(VERBOSE TRUE)
 
@@ -76,6 +78,7 @@ if(BATCH_MODE)
   set(TTYCHECK NO)
   add_definitions(-DGUNDAM_BATCH)
 endif(BATCH_MODE)
+
 
 ################################################################################
 #                            Check Dependencies
@@ -177,6 +180,7 @@ if (WITH_CUDA)
   cmessage(STATUS "Enable GPU support (compiled, but only used when CUDA enabled)")
 endif()
 
+
 ################################################################################
 #                       SubModules
 ################################################################################
@@ -229,6 +233,7 @@ else()
     add_definitions( -D LOGGER_ENABLE_COLORS=1 )
     add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=1 )
 endif()
+
 
 ################################################################################
 #                            Compiler Setup
@@ -293,12 +298,42 @@ cmessage (STATUS "C++ Compiler      : ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPI
 cmessage (STATUS "C++ Release flags : ${CMAKE_CXX_FLAGS_RELEASE}")
 cmessage (STATUS "C++ Debug flags   : ${CMAKE_CXX_FLAGS_DEBUG}")
 
+
 ################################################################################
 # CMake Generated
 ###############################################################################
 
-configure_file( ${CMAKE_SOURCE_DIR}/cmake/versionConfig.h.in ${CMAKE_BINARY_DIR}/generated/versionConfig.h )
+configure_file( ${CMAKE_SOURCE_DIR}/cmake/VersionConfig.h.in ${CMAKE_BINARY_DIR}/generated/VersionConfig.h )
 include_directories( ${CMAKE_BINARY_DIR}/generated/ )
+
+
+################################################################################
+# Doxygen
+###############################################################################
+
+if( BUILD_DOC )
+    # check if Doxygen is installed
+    find_package(Doxygen)
+    if (DOXYGEN_FOUND)
+        # set input and output files
+        set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/doxygen/Doxygen.in)
+        set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
+
+        # request to configure the file
+        configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
+        message("Doxygen build started")
+
+        # note the option ALL which allows to build the docs together with the application
+        add_custom_target( doc ALL
+                COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
+                WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+                COMMENT "Generating API documentation with Doxygen"
+                VERBATIM )
+    else (DOXYGEN_FOUND)
+        message("Doxygen need to be installed to generate the doxygen documentation")
+    endif (DOXYGEN_FOUND)
+endif()
+
 
 ################################################################################
 #                            Specify Target Subdirs
@@ -306,15 +341,22 @@ include_directories( ${CMAKE_BINARY_DIR}/generated/ )
 
 set( MODULES
         Utils
-        anaevents
         CacheManager
         DialDirectory
         FitParameters
         FitSamples
         DatasetManager
-        ErrorPropagator
+        Propagator
         Fitter
 )
+
+if(WITH_XSLLHFITTER)
+    list( APPEND MODULES XsllhFitter/Utils )
+    list( APPEND MODULES XsllhFitter/Parameters )
+    list( APPEND MODULES XsllhFitter/Anaevents )
+    list( APPEND MODULES XsllhFitter/ErrProp )
+    list( APPEND MODULES XsllhFitter/Fitter )
+endif()
 
 cmessage (STATUS "Configuring modules...")
 foreach(mod ${MODULES})
@@ -324,9 +366,15 @@ endforeach()
 
 add_subdirectory( ${CMAKE_SOURCE_DIR}/src/Applications )
 
+if(WITH_XSLLHFITTER)
+    add_subdirectory( ${CMAKE_SOURCE_DIR}/src/XsllhFitter/Applications )
+endif()
+
 configure_file(cmake/build_setup.sh.in
   "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/setup.sh" @ONLY)
 install(FILES "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/setup.sh"
   DESTINATION ${CMAKE_INSTALL_PREFIX})
 
-cmessage( STATUS "Tagged Version ${gundam_VERSION_STRING}" )
+cmessage( STATUS "Tagged Version ${GUNDAM_VERSION_STRING}" )
+
+

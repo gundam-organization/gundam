@@ -11,10 +11,10 @@
 #include "GenericToolbox.h"
 #include "Logger.h"
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[DataBinSet]");
   Logger::setMaxLogLevel(Logger::LogLevel::INFO);
-} )
+} );
 
 DataBinSet::DataBinSet() {
   this->reset();

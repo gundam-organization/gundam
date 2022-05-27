@@ -9,7 +9,7 @@
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[GlobalVariables]");
-})
+});
 
 // INIT
 bool GlobalVariables::_enableDevMode_{false};

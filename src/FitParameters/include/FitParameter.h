@@ -11,7 +11,7 @@
 
 #include "vector"
 #include "string"
-#include "json.hpp"
+#include "nlohmann/json.hpp"
 
 namespace PriorType{
   ENUM_EXPANDER(

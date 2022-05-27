@@ -5,7 +5,7 @@
 #include <TTreeFormulaManager.h>
 
 #include <memory>
-#include "json.hpp"
+#include "nlohmann/json.hpp"
 
 #include "Logger.h"
 #include "GenericToolbox.h"
@@ -16,9 +16,9 @@
 #include "FitSampleSet.h"
 
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[FitSampleSet]");
-})
+});
 
 FitSampleSet::FitSampleSet() { this->reset(); }
 FitSampleSet::~FitSampleSet() { this->reset(); }

@@ -22,12 +22,12 @@
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[DataDispenser]");
-})
+});
 
 DataDispenser::DataDispenser() = default;
 DataDispenser::~DataDispenser() = default;
 
-void DataDispenser::setConfig(const json &config) {
+void DataDispenser::setConfig(const nlohmann::json &config) {
   _config_ = config;
   JsonUtils::forwardConfig(_config_, __CLASS_NAME__);
 }
@@ -112,6 +112,8 @@ void DataDispenser::load(){
     LogInfo << GenericToolbox::parseMapAsString(_parameters_.overrideLeafDict) << std::endl;
   }
 
+  LogInfo << "Data will be extracted from: " << GenericToolbox::parseVectorAsString(_parameters_.filePathList, true) << std::endl;
+
   this->doEventSelection();
   this->fetchRequestedLeaves();
   this->preAllocateMemory();
@@ -163,13 +165,6 @@ void DataDispenser::buildSampleToFillList(){
     LogInfo << "No sample selected." << std::endl;
     return;
   }
-
-  LogInfo << "Selected samples are: " << std::endl
-          << GenericToolbox::iterableToString(
-              _cache_.samplesToFillList,
-              [](const FitSample *samplePtr){ return "\""+samplePtr->getName()+"\""; }
-              )
-          << std::endl;
 }
 void DataDispenser::doEventSelection(){
   LogWarning << "Performing event selection..." << std::endl;
@@ -427,6 +422,10 @@ void DataDispenser::preAllocateMemory(){
 void DataDispenser::readAndFill(){
   LogWarning << "Reading data set and loading..." << std::endl;
 
+  if( not _parameters_.nominalWeightFormulaStr.empty() ){
+    LogInfo << "Nominal weight: \"" << _parameters_.nominalWeightFormulaStr << "\"" << std::endl;
+  }
+
   ROOT::EnableImplicitMT(GlobalVariables::getNbThreads());
   std::mutex eventOffSetMutex;
   auto fillFunction = [&](int iThread_){
@@ -446,7 +445,6 @@ void DataDispenser::readAndFill(){
 
     if( not _parameters_.nominalWeightFormulaStr.empty() ){
       threadChain->SetBranchStatus("*", true);
-      if(iThread_ == 0) LogInfo << "Nominal weight: \"" << _parameters_.nominalWeightFormulaStr << "\"" << std::endl;
       threadNominalWeightFormula = new TTreeFormula(
           Form("NominalWeightFormula%i", iThread_),
           _parameters_.nominalWeightFormulaStr.c_str(),
@@ -481,6 +479,7 @@ void DataDispenser::readAndFill(){
     eventBuffer.setCommonLeafNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.leavesRequestedForIndexing));
     auto copyDict = eventBuffer.generateDict(tEventBuffer, _parameters_.overrideLeafDict);
     eventBuffer.copyData(copyDict, true); // resize array obj
+    eventBuffer.resizeVarToDoubleCache();
 
     PhysicsEvent evStore;
     evStore.setDataSetIndex(_owner_->getDataSetIndex());
@@ -497,7 +496,8 @@ void DataDispenser::readAndFill(){
     // Loop vars
     bool isEventInDialBin{true};
     int iBin{0};
-    int lastFailedBinVarIndex{-1};
+    int lastFailedBinVarIndex{-1}; int lastEventVarIndex{-1};
+    const std::pair<double, double>* lastEdges{nullptr};
     size_t iVar{0};
     size_t iSample{0};
     // Dials
@@ -524,7 +524,7 @@ void DataDispenser::readAndFill(){
     GenericToolbox::VariableMonitor readSpeed("bytes");
     Int_t nBytes;
 
-    std::string progressTitle = LogInfo.getPrefixString() + "Loading and indexing";
+    std::string progressTitle = LogInfo.getPrefixString();
 
     for(Long64_t iEntry = iStart ; iEntry < iEnd ; iEntry++ ){
 
@@ -532,7 +532,7 @@ void DataDispenser::readAndFill(){
         if( GenericToolbox::showProgressBar(iGlobal, nEvents) ){
           GenericToolbox::displayProgressBar(
               iGlobal, nEvents,
-              progressTitle + " - "
+              progressTitle
               + GenericToolbox::padString(GenericToolbox::parseSizeUnits(double(nThreads)*readSpeed.getTotalAccumulated()), 9)
               + " ("
               + GenericToolbox::padString(GenericToolbox::parseSizeUnits(double(nThreads)*readSpeed.evalTotalGrowthRate()), 9)
@@ -619,6 +619,7 @@ void DataDispenser::readAndFill(){
               }
 
               if( not dialSetPtr->getDialLeafName().empty() ){
+                // Event-by-event dial?
                 if     ( not strcmp(threadChain->GetLeaf(dialSetPtr->getDialLeafName().c_str())->GetTypeName(), "TClonesArray") ){
                   grPtr = (TGraph*) eventBuffer.getVariable<TClonesArray*>(dialSetPtr->getDialLeafName())->At(0);
                   if(grPtr->GetN() > 1){
@@ -677,33 +678,31 @@ void DataDispenser::readAndFill(){
                 // Binned dial?
                 lastFailedBinVarIndex = -1;
                 for( iDial = 0 ; iDial < dialSetPtr->getDialList().size(); iDial++ ){
-                  // ----------> SLOW PART
-                  applyConditionBinPtr = dialSetPtr->getDialList()[iDial]->getApplyConditionBinPtr();
-
-                  if( applyConditionBinPtr != nullptr and lastFailedBinVarIndex != -1 ){
-                    if( not applyConditionBinPtr->isBetweenEdges(
-                        applyConditionBinPtr->getEdgesList()[lastFailedBinVarIndex],
-                        eventBuffer.getVarAsDouble(applyConditionBinPtr->getEventVarIndexCache()[lastFailedBinVarIndex] )
-                    )){
-                      continue;
-                      // NEXT DIAL! Don't check other bin variables
-                    }
-                  }
-
-                  // Ok, lets give this dial a chance:
+                  // Let's give this dial a chance:
                   isEventInDialBin = true;
 
-                  if( applyConditionBinPtr != nullptr ){
+                  // ----------> SLOW PART -> check the bin
+                  if( (applyConditionBinPtr = dialSetPtr->getDialList()[iDial]->getApplyConditionBinPtr()) != nullptr ){
+                    if( lastFailedBinVarIndex != -1 // if the last bin failed, this is not -1
+                        and applyConditionBinPtr->getEventVarIndexCache()[lastFailedBinVarIndex] == lastEventVarIndex // make sure this new bin-edges point to the same variable
+                    ){
+                      if( *lastEdges == applyConditionBinPtr->getEdgesList()[lastFailedBinVarIndex] ){ continue; } // same bin-edges! no need to check again!
+                      else{ lastEdges = &applyConditionBinPtr->getEdgesList()[lastFailedBinVarIndex]; }
+                      if( not DataBin::isBetweenEdges( *lastEdges, eventBuffer.getVarAsDouble(lastEventVarIndex) )){
+                        continue;
+                        // NEXT DIAL! Don't check other bin variables
+                      }
+                    }
+
+                    // Check for the others
                     for( iVar = 0 ; iVar < applyConditionBinPtr->getEdgesList().size() ; iVar++ ){
                       if( iVar == lastFailedBinVarIndex ) continue; // already checked if set
-                      if( not applyConditionBinPtr->isBetweenEdges(
-                          applyConditionBinPtr->getEdgesList()[iVar],
-                          eventBuffer.getVarAsDouble(applyConditionBinPtr->getEventVarIndexCache()[iVar] )
-                      )){
+                      lastEventVarIndex = applyConditionBinPtr->getEventVarIndexCache()[iVar];
+                      lastEdges = &applyConditionBinPtr->getEdgesList()[iVar];
+                      if( not DataBin::isBetweenEdges( *lastEdges,  eventBuffer.getVarAsDouble( lastEventVarIndex ) )){
                         isEventInDialBin = false;
                         lastFailedBinVarIndex = int(iVar);
-                        break;
-                        // NEXT DIAL! Don't check other bin variables
+                        break; // NEXT DIAL! Don't check other bin variables
                       }
                     } // Bin var loop
                   }
@@ -737,6 +736,7 @@ void DataDispenser::readAndFill(){
     delete threadNominalWeightFormula;
   };
 
+  LogWarning << "Loading and indexing..." << std::endl;
   GlobalVariables::getParallelWorker().addJob(__METHOD_NAME__, fillFunction);
   GlobalVariables::getParallelWorker().runJob(__METHOD_NAME__);
   GlobalVariables::getParallelWorker().removeJob(__METHOD_NAME__);

@@ -16,7 +16,7 @@
 #include "TDirectory.h"
 #include "Math/Functor.h"
 #include "Math/Minimizer.h"
-#include "json.hpp"
+#include "nlohmann/json.hpp"
 
 #include "string"
 #include "vector"

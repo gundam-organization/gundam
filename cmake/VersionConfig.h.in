@@ -1,0 +1,13 @@
+#ifndef VERSION_CONFIG_H
+#define VERSION_CONFIG_H
+
+#include <string>
+
+// define your version_libinterface
+#define VERSION_STR "@GUNDAM_VERSION_STRING@"
+
+namespace GundamVersionConfig{
+  inline std::string getVersionStr(){ return VERSION_STR; }
+}
+
+#endif // VERSION_CONFIG_H

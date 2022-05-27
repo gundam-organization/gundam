@@ -20,9 +20,9 @@
 
 bool DialSet::_verboseMode_{false};
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[DialSet]");
-})
+});
 
 
 DialSet::DialSet() {

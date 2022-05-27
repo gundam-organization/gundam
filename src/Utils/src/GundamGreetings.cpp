@@ -3,8 +3,7 @@
 //
 
 #include "GundamGreetings.h"
-
-#include "versionConfig.h"
+#include "VersionConfig.h"
 
 #include "Logger.h"
 #include "GenericToolbox.h"
@@ -14,7 +13,7 @@
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[GundamGreetings]");
-})
+});
 
 GundamGreetings::GundamGreetings() = default;
 GundamGreetings::~GundamGreetings() = default;
@@ -27,7 +26,7 @@ void GundamGreetings::hello() {
   std::stringstream ss;
   ss << "Welcome to the "
      << (_appName_.empty() ? GenericToolbox::getExecutableName() : _appName_)
-     << " v" + getVersionStr();
+     << " v" + GundamVersionConfig::getVersionStr();
 
   LogInfo << GenericToolbox::addUpDownBars(ss.str()) << std::endl;
 }

@@ -12,9 +12,9 @@
 
 #include "Logger.h"
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[Cache]");
-})
+});
 
 // The constructor
 Cache::IndexedSums::IndexedSums(Cache::Weights::Results& inputs,

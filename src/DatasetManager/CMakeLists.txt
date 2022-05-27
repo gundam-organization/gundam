@@ -25,8 +25,7 @@ target_link_libraries( GundamDatasetManager
         ${ROOT_LIBRARIES}
         )
 
-set_target_properties(GundamDatasetManager PROPERTIES VERSION
-  "${gundam_VERSION_MAJOR}.${gundam_VERSION_MINOR}.${gundam_VERSION_REVISION}${gundam_VERSION_TAG}")
+#set_target_properties(GundamDatasetManager PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")
 
 install(TARGETS GundamDatasetManager DESTINATION lib)
 #Can uncomment this to install the headers... but is it really neccessary?

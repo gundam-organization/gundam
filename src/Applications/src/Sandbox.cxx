@@ -10,7 +10,7 @@
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[Sandbox]");
-})
+});
 
 class Base{
 public:

@@ -8,7 +8,7 @@
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[NestedDial]");
-})
+});
 
 NestedDialTest::NestedDialTest() = default;
 NestedDialTest::~NestedDialTest() = default;

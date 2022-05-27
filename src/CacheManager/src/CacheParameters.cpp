@@ -13,9 +13,9 @@
 #include <vector>
 #include <set>
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[Cache]");
-})
+});
 
 Cache::Parameters::Parameters(std::size_t parameters)
 : fParameterCount{parameters} {

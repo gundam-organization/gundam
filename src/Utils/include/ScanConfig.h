@@ -5,7 +5,7 @@
 #ifndef GUNDAM_SCANCONFIG_H
 #define GUNDAM_SCANCONFIG_H
 
-#include "json.hpp"
+#include "nlohmann/json.hpp"
 
 #include "utility"
 

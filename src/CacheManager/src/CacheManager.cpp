@@ -21,9 +21,9 @@
 #include <set>
 
 #include "Logger.h"
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[Cache]");
-})
+});
 
 Cache::Manager* Cache::Manager::fSingleton = nullptr;
 std::map<const FitParameter*, int> Cache::Manager::ParameterMap;

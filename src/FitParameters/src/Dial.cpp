@@ -11,9 +11,9 @@
 
 #include "sstream"
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[Dial]");
-} )
+});
 
 
 Dial::Dial(DialType::DialType dialType_) : _dialType_{dialType_} {}

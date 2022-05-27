@@ -15,9 +15,9 @@
 #include "string"
 
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[FitSample]");
-})
+});
 
 
 FitSample::FitSample() { this->reset(); }

@@ -7,9 +7,9 @@
 #include "FitParameter.h"
 #include "NormalizationDial.h"
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[NormalizationDial]");
-})
+});
 
 NormalizationDial::NormalizationDial() : Dial(DialType::Normalization) {
   this->NormalizationDial::reset();

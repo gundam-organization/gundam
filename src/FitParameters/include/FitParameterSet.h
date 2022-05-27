@@ -8,7 +8,7 @@
 #include "vector"
 #include "string"
 
-#include "json.hpp"
+#include "nlohmann/json.hpp"
 #include "TMatrixDSym.h"
 #include "TVectorT.h"
 #include "TFile.h"

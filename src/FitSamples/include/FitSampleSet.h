@@ -5,7 +5,7 @@
 #ifndef GUNDAM_FITSAMPLESET_H
 #define GUNDAM_FITSAMPLESET_H
 
-#include "json.hpp"
+#include "nlohmann/json.hpp"
 
 #include "GenericToolbox.h"
 

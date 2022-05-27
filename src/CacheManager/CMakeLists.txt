@@ -51,8 +51,7 @@ if( WITH_CUDA )
           ${ROOT_LIBRARIES}
           )
 
-  set_target_properties(GundamCache PROPERTIES VERSION
-          "${gundam_VERSION_MAJOR}.${gundam_VERSION_MINOR}.${gundam_VERSION_REVISION}${gundam_VERSION_TAG}")
+#  set_target_properties(GundamCache PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")
 
   install(TARGETS GundamCache DESTINATION lib)
 

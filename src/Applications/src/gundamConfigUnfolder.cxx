@@ -15,7 +15,7 @@
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[gundamConfigForwarder.cxx]");
-})
+});
 
 int main( int argc, char** argv ){
 
