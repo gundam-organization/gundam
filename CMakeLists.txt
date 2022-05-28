@@ -352,6 +352,7 @@ set( MODULES
 )
 
 if(WITH_CACHE_MANAGER)
+    cmessage (STATUS "Adding cmake module: CacheManager")
     list( APPEND MODULES CacheManager )
 endif()
 
@@ -368,11 +369,6 @@ foreach(mod ${MODULES})
     cmessage (STATUS "Adding cmake module: ${mod}")
     add_subdirectory( ${CMAKE_SOURCE_DIR}/src/${mod} )
 endforeach()
-
-if (WITH_CACHE_MANAGER)
-  cmessage (STATUS "Adding cmake module: CacheManager")
-  add_subdirectory(${CMAKE_SOURCE_DIR}/src/CacheManager)
-endif (WITH_CACHE_MANAGER)
 
 add_subdirectory( ${CMAKE_SOURCE_DIR}/src/Applications )
 
