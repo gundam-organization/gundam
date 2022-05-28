@@ -2,16 +2,18 @@
 // Created by Nadrino on 26/05/2021.
 //
 
-#include "TFile.h"
 
 #include "FitParameter.h"
 #include "SplineDial.h"
-
-#include "Logger.h"
-
+#ifndef USE_TSPLINE3_EVAL
 #include "CalculateMonotonicSpline.h"
 #include "CalculateUniformSpline.h"
 #include "CalculateGeneralSpline.h"
+#endif
+
+#include "Logger.h"
+
+#include "TFile.h"
 
 LoggerInit([](){ Logger::setUserHeaderStr("[SplineDial]"); } );
 
@@ -19,7 +21,6 @@ LoggerInit([](){ Logger::setUserHeaderStr("[SplineDial]"); } );
 SplineDial::SplineDial() : Dial(DialType::Spline) {
   this->SplineDial::reset();
 }
-
 void SplineDial::reset() {
   this->Dial::reset();
   _spline_ = TSpline3();
@@ -44,7 +45,9 @@ void SplineDial::initialize() {
 
   _effectiveDialParameterValue_ = _owner_->getOwner()->getPriorValue();
 
+#ifndef USE_TSPLINE3_EVAL
   fillSplineData();
+#endif
 
   try{ fillResponseCache(); }
   catch(...){
@@ -58,20 +61,26 @@ std::string SplineDial::getSummary() {
   ss << Dial::getSummary();
   return ss.str();
 }
-
-SplineDial::Subtype SplineDial::getSplineType() const {
-    return _splineType_;
+void SplineDial::copySpline(const TSpline3* splinePtr_){
+  LogThrowIf(_spline_.GetXmin() != _spline_.GetXmax(), "Spline already set")
+  _spline_ = *splinePtr_;
 }
-
-const std::vector<double>& SplineDial::getSplineData() const {
-    return _splineData_;
+void SplineDial::createSpline(TGraph* grPtr_){
+  LogThrowIf(_spline_.GetXmin() != _spline_.GetXmax(), "Spline already set")
+  _spline_ = TSpline3(grPtr_->GetName(), grPtr_);
+#ifdef ENABLE_SPLINE_DIAL_FAST_EVAL
+  fs.stepsize = (_spline_.GetXmax() - _spline_.GetXmin())/((double) grPtr_->GetN());
+#endif
+}
+const TSpline3* SplineDial::getSplinePtr() const {
+  return &_spline_;
 }
 
 void SplineDial::fillResponseCache() {
   if     ( _effectiveDialParameterValue_ < _spline_.GetXmin() ) _dialResponseCache_ = _spline_.Eval(_spline_.GetXmin());
   else if( _effectiveDialParameterValue_ > _spline_.GetXmax() ) _dialResponseCache_ = _spline_.Eval(_spline_.GetXmax());
   else   {
-#ifdef USE_INCOMPATIBLE_SPLINES
+#ifdef USE_TSPLINE3_EVAL
     _dialResponseCache_ = _spline_.Eval(_effectiveDialParameterValue_);
 #else
     if (_splineType_ == SplineDial::Uniform) {
@@ -117,7 +126,14 @@ void SplineDial::fillResponseCache() {
   } while (false);
   #endif
 }
+void SplineDial::writeSpline(const std::string &fileName_) const{
+  TFile* f;
+  if(fileName_.empty()) f = TFile::Open(Form("badDial_%p.root", this), "RECREATE");
+  else                  f = TFile::Open(fileName_.c_str(), "RECREATE");
 
+  f->WriteObject(&_spline_, _spline_.GetName());
+  f->Close();
+}
 #ifdef ENABLE_SPLINE_DIAL_FAST_EVAL
 void SplineDial::fastEval(){
     //Function takes a spline with equidistant knots and the number of steps
@@ -137,30 +153,13 @@ void SplineDial::fastEval(){
 }
 #endif
 
-void SplineDial::copySpline(const TSpline3* splinePtr_){
-  LogThrowIf(_spline_.GetXmin() != _spline_.GetXmax(), "Spline already set")
-  _spline_ = *splinePtr_;
+#ifndef USE_TSPLINE3_EVAL
+const std::vector<double>& SplineDial::getSplineData() const {
+  return _splineData_;
 }
-
-void SplineDial::createSpline(TGraph* grPtr_){
-  LogThrowIf(_spline_.GetXmin() != _spline_.GetXmax(), "Spline already set")
-  _spline_ = TSpline3(grPtr_->GetName(), grPtr_);
-//  fs.stepsize = (_spline_.GetXmax() - _spline_.GetXmin())/((double) grPtr_->GetN());
+SplineDial::Subtype SplineDial::getSplineType() const {
+  return _splineType_;
 }
-
-const TSpline3* SplineDial::getSplinePtr() const {
-  return &_spline_;
-}
-
-void SplineDial::writeSpline(const std::string &fileName_) const{
-  TFile* f;
-  if(fileName_.empty()) f = TFile::Open(Form("badDial_%p.root", this), "RECREATE");
-  else                  f = TFile::Open(fileName_.c_str(), "RECREATE");
-
-  f->WriteObject(&_spline_, _spline_.GetName());
-  f->Close();
-}
-
 void SplineDial::fillSplineData() {
     // Check if the spline has uniformly spaced knots.  There is a flag for
     // this is TSpline3, but it's not uniformly (or ever) filled correctly.
@@ -190,7 +189,6 @@ void SplineDial::fillSplineData() {
     } while(false);
 
 }
-
 bool SplineDial::fillMonotonicSpline(bool uniformKnots) {
     // A monotonic spline has been explicitly requested
     if (!uniformKnots) {
@@ -213,7 +211,6 @@ bool SplineDial::fillMonotonicSpline(bool uniformKnots) {
     }
     return true;
 }
-
 bool SplineDial::fillNaturalSpline(bool uniformKnots) {
     if (uniformKnots) _splineType_ = SplineDial::Uniform;
     else _splineType_ = SplineDial::General;
@@ -233,3 +230,4 @@ bool SplineDial::fillNaturalSpline(bool uniformKnots) {
     }
     return true;
 }
+#endif

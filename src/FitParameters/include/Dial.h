@@ -30,7 +30,6 @@ namespace DialType{
 }
 
 class DialSet; // owner
-//template <class T>  class DialWrapper;
 class DialWrapper;
 
 class Dial {
