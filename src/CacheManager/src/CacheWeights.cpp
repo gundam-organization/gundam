@@ -1,6 +1,5 @@
 #include "CacheWeights.h"
-#include "WeightNormalization.h"
-#include "WeightCompactSpline.h"
+#include "WeightBase.h"
 
 #include <algorithm>
 #include <iostream>

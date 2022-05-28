@@ -22,7 +22,7 @@ public:
 
   // Setters
   static void setNbThreads(int nbThreads_);
-  static void setEnableEventWeightCache(bool enable = true);
+  static void setEnableCacheManager(bool enable = true);
 
   // Getters
   static bool isEnableDevMode();
@@ -31,7 +31,7 @@ public:
   static std::map<std::string, bool>& getBoolMap();
   static std::vector<TChain*>& getChainList();
   static GenericToolbox::ParallelWorker &getParallelWorker();
-  static bool getEnableEventWeightCache();
+  static bool getEnableCacheManager();
 
 private:
 
@@ -41,7 +41,7 @@ private:
   static std::map<std::string, bool> _boolMap_;
   static std::vector<TChain*> _chainList_;
   static GenericToolbox::ParallelWorker _threadPool_;
-  static bool _enableEventWeightCache_;
+  static bool _enableCacheManager_;
 
 };
 

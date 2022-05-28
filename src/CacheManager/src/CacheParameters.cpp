@@ -17,6 +17,14 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[Cache]");
 });
 
+bool Cache::Parameters::UsingCUDA() {
+#ifdef __CUDACC__
+    return true;
+#else
+    return false;
+#endif
+}
+
 Cache::Parameters::Parameters(std::size_t parameters)
 : fParameterCount{parameters} {
     LogInfo << "Cached Parameters -- input parameter count: "
