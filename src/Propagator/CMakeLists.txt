@@ -15,7 +15,7 @@ endif()
 target_include_directories( GundamPropagator PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-if( WITH_CUDA )
+if( WITH_CACHE_MANAGER )
   target_link_libraries(  GundamPropagator
           GundamFitParameters
           GundamFitSamples

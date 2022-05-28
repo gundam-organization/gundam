@@ -343,7 +343,6 @@ endif()
 
 set( MODULES
         Utils
-        CacheManager
         DialDirectory
         FitParameters
         FitSamples
@@ -351,6 +350,10 @@ set( MODULES
         Propagator
         Fitter
 )
+
+if(WITH_CACHE_MANAGER)
+    list( APPEND MODULES CacheManager )
+endif()
 
 if(WITH_XSLLHFITTER)
     list( APPEND MODULES XsllhFitter/Utils )
