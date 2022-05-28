@@ -5,19 +5,20 @@
 #ifndef GUNDAM_FITSAMPLE_H
 #define GUNDAM_FITSAMPLE_H
 
-#include "vector"
-#include "string"
-#include "memory"
-#include <TH1D.h>
-#include <TTreeFormula.h>
-#include "nlohmann/json.hpp"
 
 #include "SampleElement.h"
 #include "DataBinSet.h"
 
+#include "nlohmann/json.hpp"
+#include <TH1D.h>
+#include <TTreeFormula.h>
+
+#include "vector"
+#include "string"
+#include "memory"
+
 
 class FitSample {
-
 
 public:
   FitSample();

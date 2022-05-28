@@ -25,10 +25,7 @@ endif()
 target_include_directories(${LIB_NAME} PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-target_link_libraries( ${LIB_NAME}
-        GundamFitParameters
-        ${ROOT_LIBRARIES}
-        )
+target_link_libraries( ${LIB_NAME} GundamFitParameters ${ROOT_LIBRARIES} )
 
 
 

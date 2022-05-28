@@ -34,9 +34,9 @@ int main(int argc, char** argv){
   CmdLineParser clParser;
 
   clParser.addTriggerOption("dry-run", {"--dry-run", "-d"},"Perform the full sequence of initialization, but don't do the actual fit.");
-  clParser.addOption("cache", {"-C", "--cache-enabled"}, "Enable the event weight cache");
   clParser.addTriggerOption("generateOneSigmaPlots", {"--one-sigma"}, "Generate one sigma plots");
 
+  clParser.addOption("cache", {"-C", "--cache-enabled"}, "Enable the event weight cache");
   clParser.addOption("configFile", {"-c", "--config-file"}, "Specify path to the fitter config file");
   clParser.addOption("nbThreads", {"-t", "--nb-threads"}, "Specify nb of parallel threads");
   clParser.addOption("outputFile", {"-o", "--out-file"}, "Specify the output file");
