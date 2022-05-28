@@ -112,10 +112,6 @@ double Dial::evalResponse(double parameterValue_) {
     this->writeSpline();
     LogError << this->getSummary() << std::endl;
     LogThrow("Negative response.")
-//    LogThrow(
-//        "Negative spline response: dial(" << _effectiveDialParameterValue_ << ") = " << _dialResponseCache_
-//                                          << std::endl << "Dial is defined in between: [" << _spline_.GetXmin() << ", " << _spline_.GetXmax() << "]" << std::endl
-//                                          << "Parameter: " + _owner_->getOwner()->getName() )
   }
 
 #ifdef ENABLE_DEV_MODE

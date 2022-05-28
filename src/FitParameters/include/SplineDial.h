@@ -12,6 +12,7 @@
 #include "memory"
 #include "string"
 
+#define USE_TSPLINE3_EVAL
 
 class SplineDial : public Dial {
 
@@ -32,35 +33,40 @@ public:
   // Debug
   void writeSpline(const std::string &fileName_ = "") const override;
 
-//  void fastEval();
-
-  typedef enum {
-       Undefined,  // Fall back to using plain old TSpline3
-       Monotonic,  // Use a monotonic cubic spline (only uses function value)
-       Uniform,    // Use a cubic spline with uniformly spaced knots
-       General,    // A general cubic spline
-  } Subtype;
-
-  Subtype getSplineType() const;
-
-  const std::vector<double>& getSplineData() const;
+#ifdef ENABLE_SPLINE_DIAL_FAST_EVAL
+  void fastEval();
+#endif
 
 protected:
   void fillResponseCache() override;
 
-private:
   // The representation of the spline read from a root input file.
   TSpline3 _spline_;
 
+#ifdef ENABLE_SPLINE_DIAL_FAST_EVAL
+  struct FastSpliner{
+    double x, y, b, c, d, num;
+    double stepsize{-1};
+    int l;
+  };
+  FastSpliner fs;
+#endif
+
+#ifndef USE_TSPLINE3_EVAL
+public:
+  typedef enum {
+    Undefined,  // Fall back to using plain old TSpline3
+    Monotonic,  // Use a monotonic cubic spline (only uses function value)
+    Uniform,    // Use a cubic spline with uniformly spaced knots
+    General,    // A general cubic spline
+  } Subtype;
+
+  Subtype getSplineType() const;
+  const std::vector<double>& getSplineData() const;
+
+protected:
   // The type of spline that should be used for this dial.
   Subtype _splineType_;
-
-//  struct FastSpliner{
-//    double x, y, b, c, d, num;
-//    double stepsize{-1};
-//    int l;
-//  };
-//  FastSpliner fs;
 
   // A block of data to calculate the spline values.  This can be copied to
   // the Cache::Manager and lets the same spline calculation be used here and
@@ -82,6 +88,7 @@ private:
   // General if it is false.  The knots are not checked to make sure they are
   // actually uniform.
   bool fillNaturalSpline(bool uniformKnots);
+#endif
 
   // DEBUG
 
