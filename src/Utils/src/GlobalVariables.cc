@@ -18,7 +18,8 @@ std::mutex GlobalVariables::_threadMutex_;
 std::map<std::string, bool> GlobalVariables::_boolMap_;
 std::vector<TChain*> GlobalVariables::_chainList_;
 GenericToolbox::ParallelWorker GlobalVariables::_threadPool_;
-bool GlobalVariables::_enableEventWeightCache_{true};
+
+bool GlobalVariables::_enableCacheManager_{true};
 
 void GlobalVariables::setNbThreads(int nbThreads_){
   _nbThreads_ = nbThreads_;
@@ -28,9 +29,9 @@ void GlobalVariables::setNbThreads(int nbThreads_){
   _threadPool_.setCpuTimeSaverIsEnabled(true);
   _threadPool_.initialize();
 }
-void GlobalVariables::setEnableEventWeightCache(bool enable) {_enableEventWeightCache_ = enable;}
 
-bool GlobalVariables::getEnableEventWeightCache() {return _enableEventWeightCache_;}
+void GlobalVariables::setEnableCacheManager(bool enable) {_enableCacheManager_ = enable;}
+bool GlobalVariables::getEnableCacheManager() {return _enableCacheManager_;}
 bool GlobalVariables::isEnableDevMode(){ return _enableDevMode_; }
 const int& GlobalVariables::getNbThreads(){ return _nbThreads_; }
 std::mutex& GlobalVariables::getThreadMutex() { return _threadMutex_; }

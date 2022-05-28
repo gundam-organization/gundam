@@ -104,7 +104,7 @@ private:
   // DEV
   std::vector<Dial*> _dialsStack_;
 
-#ifdef GUNDAM_USING_CUDA
+#ifdef GUNDAM_USING_CACHE_MANAGER
   // Build the precalculated caches.  This is only relevant when using a GPU
   // and must be done after the data sets are loaded.  This returns true if
   // the cache is built.

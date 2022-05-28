@@ -5,7 +5,7 @@
 
 #include "CacheWeights.h"
 #include "WeightNormalization.h"
-#include "WeightCompactSpline.h"
+#include "WeightMonotonicSpline.h"
 #include "WeightUniformSpline.h"
 #include "WeightGeneralSpline.h"
 
@@ -43,6 +43,9 @@ public:
     /// parameter isn't defined, this will return a negative value.
     static int ParameterIndex(const FitParameter* fp);
 
+    /// Return true if a GPU is available.
+    static bool HasCUDA();
+
     /// Return the approximate allocated memory (e.g. on the GPU).
     std::size_t GetResidentMemory() const {return fTotalBytes;}
 
@@ -79,8 +82,8 @@ private:
     /// The cache for the normalizations
     std::unique_ptr<Cache::Weight::Normalization> fNormalizations;
 
-    /// The cache for the compact splines
-    std::unique_ptr<Cache::Weight::CompactSpline> fCompactSplines;
+    /// The cache for the monotonic splines
+    std::unique_ptr<Cache::Weight::MonotonicSpline> fMonotonicSplines;
 
     /// The cache for the uniform splines (really compact splines for now).
     std::unique_ptr<Cache::Weight::UniformSpline> fUniformSplines;

@@ -17,6 +17,9 @@ set(HEADERS
         include/YamlUtils.impl.h
         include/GundamGreetings.h
         include/ScanConfig.h
+        include/CalculateMonotonicSpline.h
+        include/CalculateUniformSpline.h
+        include/CalculateGeneralSpline.h
         )
 
 if( USE_STATIC_LINKS STREQUAL "1" )

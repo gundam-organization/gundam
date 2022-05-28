@@ -14,7 +14,8 @@ option(CXX_WARNINGS "Enable most C++ warning flags." ON)
 option(COLOR_OUTPUT "Enable colored terminal output." ON)
 option(TTYCHECK "Enable check if output is being sent to terminal/TTY." ON)
 option(WITH_OPENMP "Build with OpenMP libraries" OFF )
-option(WITH_CUDA "Build with CUDA (if available)" OFF)
+option(WITH_CACHE_MANAGER "Build with precalculated weight cache" OFF)
+option(DISABLE_CUDA "Disable CUDA language check (enable for testing only)" OFF)
 option(YAMLCPP_DIR "Set custom path to yaml-cpp lib" OFF )
 option(ENABLE_DEV_MODE "Enable specific dev related printouts" OFF )
 option(BATCH_MODE "Build to run in a batch queue (affects output)" OFF)
@@ -26,7 +27,10 @@ set(VERBOSE TRUE)
 include(${CMAKE_SOURCE_DIR}/cmake/cmessage.cmake)
 
 # Check for the availability of CUDA
-if(WITH_CUDA)
+if(DISABLE_CUDA)
+    cmessage(STATUS "WARNING: CUDA support is disabled")
+    cmessage(WARNING "WARNING: CUDA support disabled")
+else()
     include(CheckLanguage)
     check_language(CUDA)
     if(CMAKE_CUDA_COMPILER)
@@ -46,9 +50,7 @@ if(WITH_CUDA)
         endif()
         cmessage(STATUS "CUDA compilation architectures: \"${CMAKE_CUDA_ARCHITECTURES}\"")
     endif(CMAKE_CUDA_COMPILER)
-else()
-    cmessage(STATUS "CUDA support disabled")
-endif(WITH_CUDA)
+endif(DISABLE_CUDA)
 
 # Changes default install path to be a subdirectory of the build dir.
 # Should set the installation dir at configure time with
@@ -165,8 +167,8 @@ if( "${YAML_CPP_INCLUDE_DIR} " STREQUAL " ")
 #    list(APPEND LINK_LIBARY_LIST ${YAMLCPP_LIBRARY})
 endif()
 
-if (WITH_CUDA)
-  add_definitions( -DGUNDAM_USING_CUDA )
+if (WITH_CACHE_MANAGER)
+  add_definitions( -DGUNDAM_USING_CACHE_MANAGER)
 
   # uncomment to enable the slow validations (NEVER during productions
   # or normal running).  These are whole code validations and are
@@ -196,7 +198,7 @@ if(yaml-cpp_FOUND)
     add_definitions( -DCMDLINEPARSER_YAML_CPP_ENABLED=1 )
 endif()
 
-## Add the GenericToolbox
+## Add the GenericToolbox²
 # Reproduce needed parts of the cpp-generic-toolbox CMakeLists.txt
 include_directories(submodules/cpp-generic-toolbox/include)
 add_definitions( -D PROGRESS_BAR_FILL_TAG="\\\"T2K\#"\\\" )
@@ -291,7 +293,7 @@ if(TTYCHECK)
   add_definitions(-D TTYCHECK)
 endif()
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Og")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O2")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fPIC -g")
 
 cmessage (STATUS "C++ Compiler      : ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
@@ -364,6 +366,11 @@ foreach(mod ${MODULES})
     add_subdirectory( ${CMAKE_SOURCE_DIR}/src/${mod} )
 endforeach()
 
+if (WITH_CACHE_MANAGER)
+  cmessage (STATUS "Adding cmake module: CacheManager")
+  add_subdirectory(${CMAKE_SOURCE_DIR}/src/CacheManager)
+endif (WITH_CACHE_MANAGER)
+
 add_subdirectory( ${CMAKE_SOURCE_DIR}/src/Applications )
 
 if(WITH_XSLLHFITTER)
@@ -376,5 +383,3 @@ install(FILES "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/setup.sh"
   DESTINATION ${CMAKE_INSTALL_PREFIX})
 
 cmessage( STATUS "Tagged Version ${GUNDAM_VERSION_STRING}" )
-
-

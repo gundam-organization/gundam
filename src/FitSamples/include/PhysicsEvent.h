@@ -113,7 +113,7 @@ private:
   std::vector<Dial*> _rawDialPtrList_{};
   std::vector<std::pair<NestedDialTest*, std::vector<Dial*>>> _nestedDialRefList_{};
   mutable std::vector<std::vector<double>> _varToDoubleCache_{};
-#ifdef GUNDAM_USING_CUDA
+#ifdef GUNDAM_USING_CACHE_MANAGER
 public:
   void setCacheManagerIndex(int i) {_CacheManagerIndex_ = i;}
   int  getCacheManagerIndex() {return _CacheManagerIndex_;}

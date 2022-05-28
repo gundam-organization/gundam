@@ -103,7 +103,7 @@ void SampleElement::refillHistogram(int iThread_){
     iThread_ = 0;
   }
 
-#ifdef GUNDAM_USING_CUDA
+#ifdef GUNDAM_USING_CACHE_MANAGER
   // Size = Nbins + 2 overflow (0 and last)
   auto* binContentArray = histogram->GetArray();
   int iBin = iThread_;
