@@ -2,6 +2,8 @@
 
 ![](./resources/images/banner2.png)
 
+[![GitHub release](https://img.shields.io/github/release/nadrino/gundam.svg)](https://github.com/nadrino/gundam/releases/)
+
 GUNDAM, for *Generic fitter for Upgraded Near Detector Analysis Methods*, is a suite
 of applications which aims at performing various statistical analysis with different
 purposes and setups. It has been developed as a fork of 
