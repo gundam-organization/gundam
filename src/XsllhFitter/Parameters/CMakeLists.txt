@@ -7,7 +7,7 @@ set(SRCFILES
         src/XsecDial.cc
         )
 
-if( USE_STATIC_LINKS STREQUAL "1" )
+if( USE_STATIC_LINKS )
   add_library(XsllhFitterParameters STATIC ${SRCFILES})
 else()
   add_library(XsllhFitterParameters SHARED ${SRCFILES})

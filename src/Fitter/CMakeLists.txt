@@ -5,7 +5,7 @@ set(HEADERS
   include/FitterEngine.h
   )
       
-if( USE_STATIC_LINKS STREQUAL "1" )
+if( USE_STATIC_LINKS )
   add_library(GundamFitter STATIC ${SRCFILES})
 else()
   add_library(GundamFitter SHARED ${SRCFILES})

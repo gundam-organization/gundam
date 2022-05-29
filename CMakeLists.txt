@@ -21,6 +21,7 @@ option(ENABLE_DEV_MODE "Enable specific dev related printouts" OFF )
 option(BATCH_MODE "Build to run in a batch queue (affects output)" OFF)
 option(BUILD_DOC "Build documentation" OFF)
 option(WITH_XSLLHFITTER "Build old xsllhFitter apps/libraries" OFF)
+option(USE_STATIC_LINKS "Library build in static mod" OFF)
 
 set(VERBOSE TRUE)
 
@@ -71,9 +72,6 @@ if(NOT DEFINED CMAKE_BUILD_TYPE
 endif()
 cmessage(STATUS "CMAKE_BUILD_TYPE: \"${CMAKE_BUILD_TYPE}\"")
 
-if(NOT DEFINED USE_STATIC_LINKS)
-    set(USE_STATIC_LINKS 0)
-endif()
 
 if(BATCH_MODE)
   set(COLOR_OUTPUT NO)
@@ -326,7 +324,7 @@ if( BUILD_DOC )
         message("Doxygen build started")
 
         # note the option ALL which allows to build the docs together with the application
-        add_custom_target( doc ALL
+        add_custom_target( doxygen ALL
                 COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
                 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
                 COMMENT "Generating API documentation with Doxygen"

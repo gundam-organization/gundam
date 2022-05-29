@@ -8,7 +8,7 @@ set(HEADERS
         include/XsecCalc.hh
 )
 
-if( USE_STATIC_LINKS STREQUAL "1" )
+if( USE_STATIC_LINKS )
   add_library(XsllhFitterErrProp STATIC ${SRCFILES})
 else()
   add_library(XsllhFitterErrProp SHARED ${SRCFILES})

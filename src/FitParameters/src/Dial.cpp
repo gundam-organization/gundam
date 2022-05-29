@@ -16,6 +16,9 @@ LoggerInit([]{
 });
 
 
+bool Dial::enableMaskCheck{false};
+
+
 Dial::Dial(DialType::DialType dialType_) : _dialType_{dialType_} {}
 Dial::~Dial() = default;
 

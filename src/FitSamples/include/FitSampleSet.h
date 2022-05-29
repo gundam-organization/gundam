@@ -5,13 +5,15 @@
 #ifndef GUNDAM_FITSAMPLESET_H
 #define GUNDAM_FITSAMPLESET_H
 
-#include "nlohmann/json.hpp"
-
-#include "GenericToolbox.h"
-
 #include "FitSample.h"
 #include "FitParameterSet.h"
 #include "Likelihoods.hh"
+
+#include "GenericToolbox.h"
+#include "nlohmann/json.hpp"
+
+#include "string"
+#include "vector"
 
 
 class FitSampleSet {
@@ -52,9 +54,7 @@ private:
   nlohmann::json _config_;
 
   std::vector<FitSample> _fitSampleList_;
-
   std::shared_ptr<CalcLLHFunc> _likelihoodFunctionPtr_{nullptr};
-
   std::vector<std::string> _eventByEventDialLeafList_;
 
 };

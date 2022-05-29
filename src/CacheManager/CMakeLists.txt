@@ -33,7 +33,7 @@ else(CMAKE_CUDA_COMPILER)
   set(SRCFILES ${SRCFILES} src/CacheIndexedSums.cpp)
 endif(CMAKE_CUDA_COMPILER)
 
-if( USE_STATIC_LINKS STREQUAL "1" )
+if( USE_STATIC_LINKS )
   add_library(GundamCache STATIC ${SRCFILES})
 else()
   add_library(GundamCache SHARED ${SRCFILES})
@@ -44,11 +44,7 @@ endif()
 target_include_directories( GundamCache PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-target_link_libraries( GundamCache PUBLIC
-        GundamFitParameters
-        GundamFitSamples
-        ${ROOT_LIBRARIES}
-        )
+target_link_libraries( GundamCache PUBLIC GundamFitParameters GundamFitSamples ${ROOT_LIBRARIES} )
 
 #  set_target_properties(GundamCache PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")
 

@@ -2,23 +2,22 @@
 // Created by Nadrino on 22/07/2021.
 //
 
-#include <TTreeFormulaManager.h>
 
-#include <memory>
-#include "nlohmann/json.hpp"
-
-#include "Logger.h"
-#include "GenericToolbox.h"
-#include "GenericToolbox.RawDataArray.h"
 
 #include "JsonUtils.h"
 #include "GlobalVariables.h"
 #include "FitSampleSet.h"
 
+#include "Logger.h"
+#include "GenericToolbox.h"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[FitSampleSet]");
-});
+#include "nlohmann/json.hpp"
+#include <TTreeFormulaManager.h>
+
+#include <memory>
+
+
+LoggerInit([]{ Logger::setUserHeaderStr("[FitSampleSet]"); });
 
 FitSampleSet::FitSampleSet() { this->reset(); }
 FitSampleSet::~FitSampleSet() { this->reset(); }

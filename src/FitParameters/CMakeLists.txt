@@ -9,7 +9,7 @@ set(SRCFILES
         src/NestedDialTest.cpp
         )
 
-if( USE_STATIC_LINKS STREQUAL "1" )
+if( USE_STATIC_LINKS )
   add_library(GundamFitParameters STATIC ${SRCFILES})
 else()
   add_library(GundamFitParameters SHARED ${SRCFILES})
@@ -19,10 +19,7 @@ target_include_directories(GundamFitParameters PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # Dependencies
-target_link_libraries( GundamFitParameters PUBLIC
-        GundamUtils
-        ${ROOT_LIBRARIES}
-)
+target_link_libraries( GundamFitParameters PUBLIC GundamUtils ${ROOT_LIBRARIES} )
 
 #set_target_properties(GundamFitParameters PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")
 

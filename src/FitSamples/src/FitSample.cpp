@@ -3,8 +3,6 @@
 //
 
 #include "FitSample.h"
-
-#include <memory>
 #include "GlobalVariables.h"
 #include "JsonUtils.h"
 
@@ -13,6 +11,7 @@
 
 #include "vector"
 #include "string"
+#include <memory>
 
 
 LoggerInit([]{
