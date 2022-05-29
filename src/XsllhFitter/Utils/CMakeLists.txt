@@ -18,7 +18,7 @@ set(HEADERS
         include/GeneralizedFitBin.h
         )
 
-if( USE_STATIC_LINKS STREQUAL "1" )
+if( USE_STATIC_LINKS )
   add_library(XsllhFitterUtils STATIC ${SRCFILES})
 else()
   add_library(XsllhFitterUtils SHARED ${SRCFILES})

@@ -20,8 +20,6 @@ namespace PriorType{
     Gaussian,
     Flat
   );
-
-  PriorType toPriorType(const std::string& priorStr_);
 }
 
 class FitParameterSet;

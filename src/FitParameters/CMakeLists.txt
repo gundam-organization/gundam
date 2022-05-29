@@ -9,7 +9,7 @@ set(SRCFILES
         src/NestedDialTest.cpp
         )
 
-if( USE_STATIC_LINKS STREQUAL "1" )
+if( USE_STATIC_LINKS )
   add_library(GundamFitParameters STATIC ${SRCFILES})
 else()
   add_library(GundamFitParameters SHARED ${SRCFILES})

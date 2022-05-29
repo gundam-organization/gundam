@@ -163,6 +163,7 @@ void PhysicsEvent::resetEventWeight(){
 }
 void PhysicsEvent::reweightUsingDialCache(){
 
+#ifdef USE_ACCUMULATE_PHYSICSEVENT
   _eventWeight_ = std::accumulate(
     _rawDialPtrList_.begin(), _rawDialPtrList_.end(), _treeWeight_,
     [](double weight_, auto& dial){
@@ -262,111 +263,112 @@ void PhysicsEvent::reweightUsingDialCache(){
       return weight_ * dial->evalResponse();
     }
   );
+#else
+  // bare dials
+  _eventWeight_ = _treeWeight_;
+  for( auto& dial : _rawDialPtrList_ ){
+    if( dial == nullptr ) return;
+    if( Dial::enableMaskCheck and dial->isMasked() ){ continue; }
+    _eventWeight_ *= dial->evalResponse();
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
+    double response = dial->evalResponse();
+#warning CACHE_MANAGER_SLOW_VALIDATION in PhysicsEvent::reweightUsingDialCache
+    /////////////////////////////////////////////////////////////////
+    // The internal GPU values for the splines are made available during slow
+    // validation, but are never used in the CPU calculation.  This code here
+    // is checking that the GPU value for the spline agrees with the direct
+    // dial calculation of the spline.
+    static std::map<std::string,double> maxDelta;
+    static std::map<std::string,double> sumDelta;
+    static std::map<std::string,double> sum2Delta;
+    static std::map<std::string,long long int> numDelta;
+    static int deltaTrials = 0;
+    const SplineDial* sDial = dynamic_cast<const SplineDial*>(dial);
+    while (sDial) {
+        if (!dial->getCacheManagerValuePointer()) {
+            LogWarning << "VALIDATION: SplineDial without cache" << std::endl;
+            break;
+        }
+        // This only compiles with slow validation, and the cache validity
+        // is managed elsewhere.
+        if (!std::isfinite(response)) {
+            LogWarning << "VALIDATION: Dial response is not finite" << std::endl;
+            break;
+        }
+        if (response < 0) {
+            LogWarning << "VALIDATION: Dial response is negative" << std::endl;
+            break;
+        }
+        double cacheResponse = *dial->getCacheManagerValuePointer();
+        std::string cacheName = dial->getCacheManagerName();
+        std::string parName = dial->getOwner()->getParameterName();
+        std::string sumName = parName;
+        if (!std::isfinite(cacheResponse)) {
+            LogError << "GPU cache response is not finite" << std::endl;
+            std::runtime_error("GPU cache response is not finite");
+        }
+        if (cacheResponse < 0) {
+            LogWarning << "VALIDATION: GPU cache response is negative" << std::endl;
+        }
+        double avg = 0.5*(std::abs(cacheResponse)+std::abs(response));
+        if (avg < 1.0) avg = 1.0;
+        double delta = std::abs(cacheResponse-response)/avg;
+        sumDelta[sumName] += delta;
+        sum2Delta[sumName] += delta*delta;
+        ++numDelta[sumName];
+        if (numDelta[sumName] < 0) {
+            LogError << "Wrap around during validation" << std::endl;
+            throw std::runtime_error("Validation wrap around");
+        }
+        if (delta > maxDelta[sumName]) {
+            maxDelta[sumName] = delta;
+            LogInfo << "VALIDATION: Increase GPU and Dial max delta"
+                    << " GPU (" << cacheName << ") : " << cacheResponse
+                    << " Dial: " << response
+                    << " delta: " << delta
+                    << " par: " << dial->getAssociatedParameter()
+                    << " name: " << parName
+                    << std::endl;
+            LogInfo << "VALIDATION: Maximum Dial ("
+                    << sumName << ") delta: "
+                    << maxDelta[sumName]
+                    << " Average value delta: "
+                    << sumDelta[sumName]/numDelta[sumName]
+                    << " +/- "
+                    << std::sqrt(
+                        sum2Delta[sumName]/numDelta[sumName]
+                        - sumDelta[sumName]*sumDelta[sumName]
+                        /numDelta[sumName]/numDelta[sumName])
+                    << std::endl;
+        }
 
-//  this->resetEventWeight();
-//  // bare dials
-//  for( auto& dial : _rawDialPtrList_ ){
-//    if( dial == nullptr ) return;
-//    if( dial->isMasked() ) continue;
-//    this->addEventWeight( dial->evalResponse() );
-//#ifdef CACHE_MANAGER_SLOW_VALIDATION
-//    double response = dial->evalResponse();
-//#warning CACHE_MANAGER_SLOW_VALIDATION in PhysicsEvent::reweightUsingDialCache
-//    /////////////////////////////////////////////////////////////////
-//    // The internal GPU values for the splines are made available during slow
-//    // validation, but are never used in the CPU calculation.  This code here
-//    // is checking that the GPU value for the spline agrees with the direct
-//    // dial calculation of the spline.
-//    static std::map<std::string,double> maxDelta;
-//    static std::map<std::string,double> sumDelta;
-//    static std::map<std::string,double> sum2Delta;
-//    static std::map<std::string,long long int> numDelta;
-//    static int deltaTrials = 0;
-//    const SplineDial* sDial = dynamic_cast<const SplineDial*>(dial);
-//    while (sDial) {
-//        if (!dial->getCacheManagerValuePointer()) {
-//            LogWarning << "VALIDATION: SplineDial without cache" << std::endl;
-//            break;
-//        }
-//        // This only compiles with slow validation, and the cache validity
-//        // is managed elsewhere.
-//        if (!std::isfinite(response)) {
-//            LogWarning << "VALIDATION: Dial response is not finite" << std::endl;
-//            break;
-//        }
-//        if (response < 0) {
-//            LogWarning << "VALIDATION: Dial response is negative" << std::endl;
-//            break;
-//        }
-//        double cacheResponse = *dial->getCacheManagerValuePointer();
-//        std::string cacheName = dial->getCacheManagerName();
-//        std::string parName = dial->getOwner()->getParameterName();
-//        std::string sumName = parName;
-//        if (!std::isfinite(cacheResponse)) {
-//            LogError << "GPU cache response is not finite" << std::endl;
-//            std::runtime_error("GPU cache response is not finite");
-//        }
-//        if (cacheResponse < 0) {
-//            LogWarning << "VALIDATION: GPU cache response is negative" << std::endl;
-//        }
-//        double avg = 0.5*(std::abs(cacheResponse)+std::abs(response));
-//        if (avg < 1.0) avg = 1.0;
-//        double delta = std::abs(cacheResponse-response)/avg;
-//        sumDelta[sumName] += delta;
-//        sum2Delta[sumName] += delta*delta;
-//        ++numDelta[sumName];
-//        if (numDelta[sumName] < 0) {
-//            LogError << "Wrap around during validation" << std::endl;
-//            throw std::runtime_error("Validation wrap around");
-//        }
-//        if (delta > maxDelta[sumName]) {
-//            maxDelta[sumName] = delta;
-//            LogInfo << "VALIDATION: Increase GPU and Dial max delta"
-//                    << " GPU (" << cacheName << ") : " << cacheResponse
-//                    << " Dial: " << response
-//                    << " delta: " << delta
-//                    << " par: " << dial->getAssociatedParameter()
-//                    << " name: " << parName
-//                    << std::endl;
-//            LogInfo << "VALIDATION: Maximum Dial ("
-//                    << sumName << ") delta: "
-//                    << maxDelta[sumName]
-//                    << " Average value delta: "
-//                    << sumDelta[sumName]/numDelta[sumName]
-//                    << " +/- "
-//                    << std::sqrt(
-//                        sum2Delta[sumName]/numDelta[sumName]
-//                        - sumDelta[sumName]*sumDelta[sumName]
-//                        /numDelta[sumName]/numDelta[sumName])
-//                    << std::endl;
-//        }
-//
-//        if ((deltaTrials++ % 1000000) == 0) {
-//            for (auto maxD : maxDelta) {
-//                std::string name = maxD.first;
-//                LogInfo << "VALIDATION: Average cache delta for"
-//                        << " " << name << ": "
-//                        << sumDelta[name]/numDelta[name]
-//                        << " +/- "
-//                        << std::sqrt(
-//                            sum2Delta[name]/numDelta[name]
-//                            - sumDelta[name]*sumDelta[name]
-//                            /numDelta[name]/numDelta[name])
-//                        << " Maximum: " << maxDelta[name]
-//                        << std::endl;
-//            }
-//        }
-//
-//        break;
-//    }
-//#endif
-//  }
+        if ((deltaTrials++ % 1000000) == 0) {
+            for (auto maxD : maxDelta) {
+                std::string name = maxD.first;
+                LogInfo << "VALIDATION: Average cache delta for"
+                        << " " << name << ": "
+                        << sumDelta[name]/numDelta[name]
+                        << " +/- "
+                        << std::sqrt(
+                            sum2Delta[name]/numDelta[name]
+                            - sumDelta[name]*sumDelta[name]
+                            /numDelta[name]/numDelta[name])
+                        << " Maximum: " << maxDelta[name]
+                        << std::endl;
+            }
+        }
 
-  // nested dials
+        break;
+    }
+#endif
+  }
+
+//  // nested dials
 //  for( auto& nestedDialEntry : _nestedDialRefList_ ){
 //    if( nestedDialEntry.first == nullptr ) return;
 //    this->addEventWeight( nestedDialEntry.first->eval(nestedDialEntry.second) );
 //  }
+#endif
 }
 
 int PhysicsEvent::findVarIndex(const std::string& leafName_, bool throwIfNotFound_) const{

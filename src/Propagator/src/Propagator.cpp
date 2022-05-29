@@ -246,6 +246,7 @@ void Propagator::initialize() {
     {
       // STAGED MASK
       LogWarning << "Staged event breakdown:" << std::endl;
+      Dial::enableMaskCheck = true;
       std::vector<std::vector<double>> stageBreakdownList(
           _fitSampleSet_.getFitSampleList().size(),
           std::vector<double>(_parameterSetsList_.size()+1, 0)
@@ -284,6 +285,7 @@ void Propagator::initialize() {
         t.addTableLine(tableLine);
       }
       t.printTable();
+      Dial::enableMaskCheck = false;
     }
 
 

@@ -8,7 +8,7 @@ set( SRCFILES
         src/PlotGenerator.cpp
         )
 
-if( USE_STATIC_LINKS STREQUAL "1" )
+if( USE_STATIC_LINKS )
   add_library(GundamFitSamples STATIC ${SRCFILES})
 else()
   add_library(GundamFitSamples SHARED ${SRCFILES})

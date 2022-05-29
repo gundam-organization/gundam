@@ -6,7 +6,7 @@ set( SRCFILES
         src/AnaEvent.cpp
         )
 
-if( USE_STATIC_LINKS STREQUAL "1" )
+if( USE_STATIC_LINKS )
   add_library(XsllhFitterAnaevents STATIC ${SRCFILES})
 else()
   add_library(XsllhFitterAnaevents SHARED ${SRCFILES})

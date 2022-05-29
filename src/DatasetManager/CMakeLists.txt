@@ -10,7 +10,7 @@ set(HEADERS
         include/DataDispenser.h
 )
 
-if( USE_STATIC_LINKS STREQUAL "1" )
+if( USE_STATIC_LINKS )
   add_library(GundamDatasetManager STATIC ${SRCFILES})
 else()
   add_library(GundamDatasetManager SHARED ${SRCFILES})

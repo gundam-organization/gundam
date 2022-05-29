@@ -33,7 +33,7 @@ else(CMAKE_CUDA_COMPILER)
   set(SRCFILES ${SRCFILES} src/CacheIndexedSums.cpp)
 endif(CMAKE_CUDA_COMPILER)
 
-if( USE_STATIC_LINKS STREQUAL "1" )
+if( USE_STATIC_LINKS )
   add_library(GundamCache STATIC ${SRCFILES})
 else()
   add_library(GundamCache SHARED ${SRCFILES})

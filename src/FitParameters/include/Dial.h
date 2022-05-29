@@ -34,6 +34,9 @@ class DialWrapper;
 
 class Dial {
 
+public:
+  static bool enableMaskCheck;
+
 protected:
   // Not supposed to define a bare Dial. Use the downcast instead
   explicit Dial(DialType::DialType dialType_);

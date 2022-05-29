@@ -16,7 +16,7 @@ set( HEADERS
         include/NestedDial.h
 )
 
-if( USE_STATIC_LINKS STREQUAL "1" )
+if( USE_STATIC_LINKS )
   add_library(${LIB_NAME} STATIC ${SRCFILES})
 else()
   add_library(${LIB_NAME} SHARED ${SRCFILES})
