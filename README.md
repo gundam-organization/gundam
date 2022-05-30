@@ -2,7 +2,7 @@
 
 ![](./resources/images/banner2.png)
 
-[![GitHub release](https://img.shields.io/github/release/nadrino/gundam.svg)](https://github.com/nadrino/gundam/releases/) [![GitHub forks](https://badgen.net/github/forks/nadrino/gundam/)](https://GitHub.com/nadrino/gundam/network/) [![Generic badge](https://img.shields.io/badge/Example-OA2020-GREEN.svg)](https://github.com/nadrino/gundamInputOa2020)
+[![GitHub release](https://img.shields.io/github/release/nadrino/gundam.svg)](https://github.com/nadrino/gundam/releases/) [![GitHub forks](https://badgen.net/github/forks/nadrino/gundam/)](https://GitHub.com/nadrino/gundam/network/) [![Generic badge](https://img.shields.io/badge/Example_of_inputs-OA2020-GREEN.svg)](https://github.com/nadrino/gundamInputOa2020)
 
 GUNDAM, for *Generic fitter for Upgraded Near Detector Analysis Methods*, is a suite
 of applications which aims at performing various statistical analysis with different
