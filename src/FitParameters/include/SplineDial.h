@@ -30,16 +30,17 @@ public:
   const TSpline3* getSplinePtr() const;
   std::string getSummary() override;
 
+  double calcDial(double parameterValue_) override;
+
   // Debug
-  void writeSpline(const std::string &fileName_ = "") const override;
+  void writeSpline(const std::string &fileName_) const override;
 
 #ifdef ENABLE_SPLINE_DIAL_FAST_EVAL
   void fastEval();
 #endif
 
-protected:
-  void fillResponseCache() override;
 
+protected:
   // The representation of the spline read from a root input file.
   TSpline3 _spline_;
 

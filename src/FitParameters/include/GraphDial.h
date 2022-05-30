@@ -20,8 +20,8 @@ public:
   void setGraph(const TGraph &graph);
 
   void initialize() override;
-//  double evalResponse(const double &parameterValue_) override;
-  void fillResponseCache() override;
+
+  double calcDial(double parameterValue_) override;
   std::string getSummary() override;
 
 private:

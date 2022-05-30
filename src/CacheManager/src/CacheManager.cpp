@@ -11,7 +11,7 @@
 #include "Dial.h"
 #include "SplineDial.h"
 #include "GraphDial.h"
-#include "NormalizationDial.h"
+#include "NormDial.h"
 #include "GlobalVariables.h"
 
 #include "GenericToolbox.h"
@@ -372,7 +372,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
                         "lower and upper clamps reversed");
                 }
                 int dialUsed = 0;
-                if(dial->getDialType() == DialType::Normalization) {
+                if(dial->getDialType() == DialType::Norm) {
                     ++dialUsed;
                     Cache::Manager::Get()
                         ->fNormalizations

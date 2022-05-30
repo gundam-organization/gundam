@@ -5,7 +5,6 @@
 #include "Dial.h"
 #include "DialSet.h"
 #include "FitParameterSet.h"
-#include "GlobalVariables.h"
 
 #include "Logger.h"
 
@@ -17,7 +16,8 @@ LoggerInit([]{
 
 
 bool Dial::enableMaskCheck{false};
-
+bool Dial::disableDialCache{false};
+bool Dial::throwIfResponseIsNegative{true};
 
 Dial::Dial(DialType::DialType dialType_) : _dialType_{dialType_} {}
 Dial::~Dial() = default;
@@ -25,7 +25,6 @@ Dial::~Dial() = default;
 void Dial::reset() {
   _dialResponseCache_ = std::nan("Unset");
   _dialParameterCache_ = std::nan("Unset");
-  _effectiveDialParameterValue_ = std::nan("Unset");
   _applyConditionBin_ = nullptr;
 }
 
@@ -38,10 +37,7 @@ void Dial::setIsReferenced(bool isReferenced) {
 void Dial::setOwner(const DialSet* dialSetPtr) {
   _owner_ = dialSetPtr;
 }
-const DialSet* Dial::getOwner() const {
-  LogThrowIf(!_owner_, "Invalid owning DialSet")
-  return _owner_;
-}
+
 void Dial::initialize() {
   LogThrowIf( _dialType_ == DialType::Invalid, "_dialType_ is not set." )
   LogThrowIf(_owner_ == nullptr, "Owner not set.")
@@ -59,67 +55,72 @@ double Dial::getDialResponseCache() const{
 double Dial::getAssociatedParameter() const {
   return _owner_->getOwner()->getParameterValue();
 }
+const DialSet* Dial::getOwner() const {
+  LogThrowIf(!_owner_, "Invalid owning DialSet")
+  return _owner_;
+}
 const DataBin* Dial::getApplyConditionBinPtr() const{ return _applyConditionBin_; }
+
 DataBin* Dial::getApplyConditionBinPtr(){ return _applyConditionBin_; }
 DialType::DialType Dial::getDialType() const {
   return _dialType_;
 }
 
-void Dial::updateEffectiveDialParameter(){
-  _effectiveDialParameterValue_ = _dialParameterCache_;
+double Dial::getEffectiveDialParameter(double parameterValue_){
   if( _owner_->useMirrorDial() ){
-    _effectiveDialParameterValue_ = std::abs(std::fmod(
-        _dialParameterCache_ - _owner_->getMirrorLowEdge(),
+    parameterValue_ = std::abs(std::fmod(
+        parameterValue_ - _owner_->getMirrorLowEdge(),
         2 * _owner_->getMirrorRange()
     ));
 
-    if(_effectiveDialParameterValue_ > _owner_->getMirrorRange() ){
+    if(parameterValue_ > _owner_->getMirrorRange() ){
       // odd pattern  -> mirrored -> decreasing effective X while increasing parameter
-      _effectiveDialParameterValue_ -= 2 * _owner_->getMirrorRange();
-      _effectiveDialParameterValue_ = -_effectiveDialParameterValue_;
+      parameterValue_ -= 2 * _owner_->getMirrorRange();
+      parameterValue_ = -parameterValue_;
     }
 
     // re-apply the offset
-    _effectiveDialParameterValue_ += _owner_->getMirrorLowEdge();
+    parameterValue_ += _owner_->getMirrorLowEdge();
   }
+  return parameterValue_;
+}
+double Dial::capDialResponse(double response_){
+  // Cap checks
+  if     (_owner_->getMinDialResponse() == _owner_->getMinDialResponse() and response_ < _owner_->getMinDialResponse() ){ response_=_owner_->getMinDialResponse(); }
+  else if(_owner_->getMaxDialResponse() == _owner_->getMaxDialResponse() and response_ > _owner_->getMaxDialResponse() ){ response_=_owner_->getMaxDialResponse(); }
+
+  LogThrowIf( response_ != response_, "NaN response returned:" << std::endl << this->getSummary());
+  if( Dial::throwIfResponseIsNegative and response_ < 0 ){
+    this->writeSpline("");
+    LogError << this->getSummary() << std::endl;
+    LogThrow("Negative response.");
+  }
+
+  return response_;
 }
 double Dial::evalResponse(){
-  return this->evalResponse(_owner_->getOwner()->getParameterValue() );
+  return this->evalResponse( _owner_->getOwner()->getParameterValue() );
 }
-//void Dial::copySplineCache(TSpline3& splineBuffer_){
-//  if( _responseSplineCache_ == nullptr ) this->buildResponseSplineCache();
-//  splineBuffer_ = *_responseSplineCache_;
-//}
 
 // Virtual
 double Dial::evalResponse(double parameterValue_) {
-  // Check if all is already up-to-date
-  if( not _isEditingCache_ and _dialParameterCache_ == parameterValue_ ){
-    return _dialResponseCache_;
+  if( Dial::disableDialCache ){
+    return this->capDialResponse(this->calcDial(this->getEffectiveDialParameter(parameterValue_)));
   }
+
+  // Check if all is already up-to-date
+  if( not _isEditingCache_ and _dialParameterCache_ == parameterValue_ ){ return _dialResponseCache_; }
 
   // If we reach this point, we either need to compute the response or wait for another thread to make the update.
   std::lock_guard<std::mutex> g(_evalDialLock_); // There can be only one.
   if( _dialParameterCache_ == parameterValue_ ) return _dialResponseCache_; // stop if already updated by another threads
 
   // Edit the cache
+  _isEditingCache_ = true; // invalidate cache
+  _dialResponseCache_ = this->capDialResponse(this->calcDial(this->getEffectiveDialParameter(parameterValue_)));
   _dialParameterCache_ = parameterValue_;
-  this->updateEffectiveDialParameter();
-  this->fillResponseCache(); // specified in the corresponding dial class
+  _isEditingCache_ = false;
 
-  // Cap checks
-  if     (_owner_->getMinDialResponse() == _owner_->getMinDialResponse() and _dialResponseCache_ < _owner_->getMinDialResponse() ){ _dialResponseCache_=_owner_->getMinDialResponse(); }
-  else if(_owner_->getMaxDialResponse() == _owner_->getMaxDialResponse() and _dialResponseCache_ > _owner_->getMaxDialResponse() ){ _dialResponseCache_=_owner_->getMaxDialResponse(); }
-
-  if( _throwIfResponseIsNegative_ and _dialResponseCache_ < 0 ){
-    this->writeSpline();
-    LogError << this->getSummary() << std::endl;
-    LogThrow("Negative response.")
-  }
-
-#ifdef ENABLE_DEV_MODE
-  LogThrowIf( _dialResponseCache_ != _dialResponseCache_, "NaN weight returned:" << std::endl << this->getSummary())
-#endif
   return _dialResponseCache_;
 }
 std::string Dial::getSummary(){
@@ -130,9 +131,14 @@ std::string Dial::getSummary(){
   ss << "/";
   ss << DialType::DialTypeEnumNamespace::toString(_dialType_, true);
   if( _applyConditionBin_ != nullptr and not _applyConditionBin_->getEdgesList().empty() ) ss << ":b{" << _applyConditionBin_->getSummary() << "}";
-  ss << " dial(" << _effectiveDialParameterValue_ << ") = " << _dialResponseCache_;
+  ss << " dial(" << _dialParameterCache_ << ") = " << _dialResponseCache_;
   return ss.str();
 }
+
+//void Dial::copySplineCache(TSpline3& splineBuffer_){
+//  if( _responseSplineCache_ == nullptr ) this->buildResponseSplineCache();
+//  splineBuffer_ = *_responseSplineCache_;
+//}
 //void Dial::buildResponseSplineCache(){
 //  // overridable
 //  double xmin = static_cast<FitParameter *>(_associatedParameterReference_)->getMinValue();

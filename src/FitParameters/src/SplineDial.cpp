@@ -21,46 +21,12 @@ LoggerInit([](){ Logger::setUserHeaderStr("[SplineDial]"); } );
 SplineDial::SplineDial() : Dial(DialType::Spline) {
   this->SplineDial::reset();
 }
+
 void SplineDial::reset() {
   this->Dial::reset();
   _spline_ = TSpline3();
 }
 
-void SplineDial::initialize() {
-  this->Dial::initialize();
-  LogThrowIf(_spline_.GetXmin() == _spline_.GetXmax(), "Spline is not valid.");
-
-  // check if prior is out of bounds:
-  if(
-      _owner_->getOwner()->getPriorValue() < _spline_.GetXmin()
-      or _owner_->getOwner()->getPriorValue() > _spline_.GetXmax()
-  ){
-    LogError << "Prior value of parameter \""
-             << _owner_->getOwner()->getTitle()
-             << "\" = " << _owner_->getOwner()->getPriorValue()
-    << " is out of the spline bounds: " <<  _spline_.GetXmin() << " < X < " << _spline_.GetXmax()
-    << std::endl;
-    throw std::logic_error("Prior is out of the spline bounds.");
-  }
-
-  _effectiveDialParameterValue_ = _owner_->getOwner()->getPriorValue();
-
-#ifndef USE_TSPLINE3_EVAL
-  fillSplineData();
-#endif
-
-  try{ fillResponseCache(); }
-  catch(...){
-    LogError << "Error while evaluating spline response at the prior value: d(" << _effectiveDialParameterValue_ << ") = " << _dialResponseCache_ << std::endl;
-    throw std::logic_error("error eval spline response");
-  }
-}
-
-std::string SplineDial::getSummary() {
-  std::stringstream ss;
-  ss << Dial::getSummary();
-  return ss.str();
-}
 void SplineDial::copySpline(const TSpline3* splinePtr_){
   LogThrowIf(_spline_.GetXmin() != _spline_.GetXmax(), "Spline already set")
   _spline_ = *splinePtr_;
@@ -72,60 +38,97 @@ void SplineDial::createSpline(TGraph* grPtr_){
   fs.stepsize = (_spline_.GetXmax() - _spline_.GetXmin())/((double) grPtr_->GetN());
 #endif
 }
+
+void SplineDial::initialize() {
+  this->Dial::initialize();
+  LogThrowIf(_spline_.GetXmin() == _spline_.GetXmax(), "Spline is not valid.");
+
+  // check if prior is out of bounds:
+  if(
+      this->getEffectiveDialParameter(_owner_->getOwner()->getPriorValue()) < _spline_.GetXmin()
+      or this->getEffectiveDialParameter(_owner_->getOwner()->getPriorValue())  > _spline_.GetXmax()
+  ){
+    LogError << "Prior value of parameter \""
+             << _owner_->getOwner()->getTitle()
+             << "\" = " << this->getEffectiveDialParameter(_owner_->getOwner()->getPriorValue())
+        << " is out of the spline bounds: " <<  _spline_.GetXmin() << " < X < " << _spline_.GetXmax()
+    << std::endl;
+    throw std::logic_error("Prior is out of the spline bounds.");
+  }
+
+#ifndef USE_TSPLINE3_EVAL
+  fillSplineData();
+#endif
+
+  try{ this->evalResponse(); }
+  catch(...){
+    if( not Dial::disableDialCache ) {
+      LogError << "Error while evaluating spline response at the prior value: d(" << _dialParameterCache_ << ") = " << _dialResponseCache_ << std::endl;
+    }
+    throw std::logic_error("error eval spline response");
+  }
+}
+
+std::string SplineDial::getSummary() {
+  std::stringstream ss;
+  ss << Dial::getSummary();
+  return ss.str();
+}
 const TSpline3* SplineDial::getSplinePtr() const {
   return &_spline_;
 }
 
-void SplineDial::fillResponseCache() {
-  if     ( _effectiveDialParameterValue_ < _spline_.GetXmin() ) _dialResponseCache_ = _spline_.Eval(_spline_.GetXmin());
-  else if( _effectiveDialParameterValue_ > _spline_.GetXmax() ) _dialResponseCache_ = _spline_.Eval(_spline_.GetXmax());
-  else   {
+double SplineDial::calcDial(double parameterValue_) {
+  if     (parameterValue_ <= _spline_.GetXmin()) { return _spline_.Eval(_spline_.GetXmin()); }
+  else if(parameterValue_ >= _spline_.GetXmax()) { return _spline_.Eval(_spline_.GetXmax()); }
 #ifdef USE_TSPLINE3_EVAL
-    _dialResponseCache_ = _spline_.Eval(_effectiveDialParameterValue_);
+  return _spline_.Eval(parameterValue_);
 #else
-    if (_splineType_ == SplineDial::Uniform) {
-        _dialResponseCache_ = CalculateUniformSpline(
-            _effectiveDialParameterValue_, -1E20, 1E20,
-            _splineData_.data(), _splineData_.size());
-    }
-    else if (_splineType_ == SplineDial::General) {
-        _dialResponseCache_ = CalculateGeneralSpline(
-            _effectiveDialParameterValue_, -1E20, 1E20,
-            _splineData_.data(), _splineData_.size());
-    }
-    else if (_splineType_ == SplineDial::Monotonic) {
-        _dialResponseCache_ = CalculateMonotonicSpline(
-            _effectiveDialParameterValue_, -1E20, 1E20,
-            _splineData_.data(), _splineData_.size());
-    }
-    else {
-        LogThrow("Must have a spline type defined");
-    }
-#endif
+  double dialResponse{};
+  if (_splineType_ == SplineDial::Uniform) {
+      dialResponse = CalculateUniformSpline(
+          parameterValue_, -1E20, 1E20,
+          _splineData_.data(), _splineData_.size());
+  }
+  else if (_splineType_ == SplineDial::General) {
+      dialResponse = CalculateGeneralSpline(
+          parameterValue_, -1E20, 1E20,
+          _splineData_.data(), _splineData_.size());
+  }
+  else if (_splineType_ == SplineDial::Monotonic) {
+      dialResponse = CalculateMonotonicSpline(
+          parameterValue_, -1E20, 1E20,
+          _splineData_.data(), _splineData_.size());
+  }
+  else {
+      LogThrow("Must have a spline type defined");
   }
 
   // #define SPLINE_DIAL_SLOW_VALIDATION
   #ifdef SPLINE_DIAL_SLOW_VALIDATION
   #error Remove this to compile with validation.
   do {
-      double testVal = _spline_.Eval(_effectiveDialParameterValue_);
+      double testVal = _spline_.Eval(parameterValue_);
       double avg = std::abs(testVal);
       if (avg < 1.0) avg = 1.0;
-      double delta = std::abs(testVal-_dialResponseCache_)/avg;
+      double delta = std::abs(testVal-dialResponse)/avg;
       LogInfo << "VALIDATION: spline"
               << " " << testVal
-              << " " << _dialResponseCache_
+              << " " << dialResponse
               << " " << delta
               << std::endl;
       if (delta < 1E-6) continue;
       LogInfo << "Bad spline value in SplineDial: " << delta
               << " " << testVal
-              << " " << _dialResponseCache_
+              << " " << dialResponse
               << std::endl;
       LogThrow("Bad spline value");
   } while (false);
   #endif
+  return dialResponse;
+#endif
 }
+
 void SplineDial::writeSpline(const std::string &fileName_) const{
   TFile* f;
   if(fileName_.empty()) f = TFile::Open(Form("badDial_%p.root", this), "RECREATE");
@@ -138,16 +141,16 @@ void SplineDial::writeSpline(const std::string &fileName_) const{
 void SplineDial::fastEval(){
     //Function takes a spline with equidistant knots and the number of steps
     //between knots to evaluate the spline at some position 'pos'.
-    fs.l = int((_effectiveDialParameterValue_ - _spline_.GetXmin())
+    fs.l = int((parameterValue_ - _spline_.GetXmin())
                / fs.stepsize) + 1;
 
     _spline_.GetCoeff(fs.l, fs.x, fs.y, fs.b, fs.c, fs.d);
-    fs.num = _effectiveDialParameterValue_ - fs.x;
+    fs.num = parameterValue_ - fs.x;
 
     if (fs.num < 0){
         fs.l -= 1;
         _spline_.GetCoeff(fs.l, fs.x, fs.y, fs.b, fs.c, fs.d);
-        fs.num = _effectiveDialParameterValue_ - fs.x;
+        fs.num = parameterValue_ - fs.x;
     }
     _dialResponseCache_ = (fs.y + fs.num * fs.b + fs.num * fs.num * fs.c + fs.num * fs.num * fs.num * fs.d);
 }
