@@ -78,8 +78,8 @@ void FitterEngine::initialize() {
   _propagator_.initialize();
 
   this->updateChi2Cache();
-  LogDebug << GET_VAR_NAME_VALUE(_chi2Buffer_) << std::endl;
   if( _chi2Buffer_ != 0 ){
+    LogDebug << GET_VAR_NAME_VALUE(_chi2Buffer_) << std::endl;
     LogDebug << "Check asimov: " << std::endl;
     for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
       LogDebug << sample.getName() << std::endl;
@@ -96,7 +96,6 @@ void FitterEngine::initialize() {
       }
     }
   }
-//  LogThrow("debug")
 
   _nbParameters_ = 0;
   for( const auto& parSet : _propagator_.getParameterSetsList() ){
@@ -112,18 +111,20 @@ void FitterEngine::initialize() {
   if( JsonUtils::fetchValue(_config_, "fixGhostFitParameters", false) ) this->fixGhostFitParameters();
 
   this->updateChi2Cache();
-  LogDebug << "Check asimov AGAIN: " << std::endl;
-  for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
-    LogDebug << sample.getName() << std::endl;
-    size_t nDiff{0};
-    for( size_t iEvent = 0 ; iEvent < sample.getMcContainer().eventList.size() ; iEvent++ ){
-      auto& mcEvent = sample.getMcContainer().eventList[iEvent];
-      auto& dataEvent = sample.getDataContainer().eventList[iEvent];
-      if( nDiff<15 and mcEvent.getEventWeight() != dataEvent.getEventWeight() ){
-        nDiff++;
-        LogDebug << iEvent
-            << ": " << mcEvent.getEventWeight() << " => " << dataEvent.getEventWeight()
-            << " / diff: " << mcEvent.getEventWeight() - dataEvent.getEventWeight() << std::endl;
+  if( _chi2Buffer_ != 0 ){
+    LogDebug << "Check asimov: " << std::endl;
+    for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
+      LogDebug << sample.getName() << std::endl;
+      size_t nDiff{0};
+      for( size_t iEvent = 0 ; iEvent < sample.getMcContainer().eventList.size() ; iEvent++ ){
+        auto& mcEvent = sample.getMcContainer().eventList[iEvent];
+        auto& dataEvent = sample.getDataContainer().eventList[iEvent];
+        if( nDiff<15 and mcEvent.getEventWeight() != dataEvent.getEventWeight() ){
+          nDiff++;
+          LogDebug << iEvent
+                   << ": " << mcEvent.getEventWeight() << " => " << dataEvent.getEventWeight()
+                   << " / diff: " << mcEvent.getEventWeight() - dataEvent.getEventWeight() << std::endl;
+        }
       }
     }
   }

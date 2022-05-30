@@ -180,7 +180,7 @@ void SampleElement::refillHistogram(int iThread_){
 }
 void SampleElement::rescaleHistogram() {
   if( isLocked ) return;
-  if(histScale != 1) histogram->Scale(histScale);
+  if( histScale != 1 ) histogram->Scale(histScale);
 }
 
 void SampleElement::throwStatError(){
