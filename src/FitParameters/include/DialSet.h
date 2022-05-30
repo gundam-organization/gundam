@@ -24,7 +24,7 @@ class FitParameter;
 class DialSet {
 
 public:
-  static bool _verboseMode_;
+  static bool verboseMode;
 
 public:
   DialSet();

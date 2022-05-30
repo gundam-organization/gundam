@@ -447,7 +447,7 @@ void Propagator::fillDialsStack(){
     if( not parSet.isUseEigenDecompInFit() ){
       for( auto& par : parSet.getParameterList() ){
         for( auto& dialSet : par.getDialSetList() ){
-          if(dialSet.getGlobalDialType() == DialType::Normalization){ continue; } // no cache needed
+          if(dialSet.getGlobalDialType() == DialType::Norm){ continue; } // no cache needed
           for( auto& dial : dialSet.getDialList() ){
             if(dial->isReferenced()) _dialsStack_.emplace_back(dial.get());
           } // dial

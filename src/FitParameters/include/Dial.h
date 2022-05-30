@@ -23,7 +23,7 @@ namespace DialType{
   ENUM_EXPANDER(
     DialType, -1
     ,Invalid
-    ,Normalization // response = dial
+    ,Norm          // response = dial
     ,Spline        // response = spline(dial)
     ,Graph         // response = graphInterpol(dial)
   )
@@ -35,7 +35,10 @@ class DialWrapper;
 class Dial {
 
 public:
+  // Don't check the mask everytime since it is memory delocalized
   static bool enableMaskCheck;
+  static bool disableDialCache;
+  static bool throwIfResponseIsNegative;
 
 protected:
   // Not supposed to define a bare Dial. Use the downcast instead
@@ -65,17 +68,22 @@ public:
   // getters
   DataBin* getApplyConditionBinPtr();
 
-
-  void updateEffectiveDialParameter();
+  // calc
+  double getEffectiveDialParameter(double parameterValue_);
+  double capDialResponse(double response_);
   double evalResponse();
-//  void copySplineCache(TSpline3& splineBuffer_);
 
+  // virtual
+  virtual double calcDial(double parameterValue_) = 0;
   virtual double evalResponse(double parameterValue_);
   virtual std::string getSummary();
-//  virtual void buildResponseSplineCache();
-  virtual void fillResponseCache() = 0;
-  virtual void writeSpline(const std::string &fileName_ = "") const { return; }
 
+  // debug
+  virtual void writeSpline(const std::string &fileName_) const {}
+
+
+//  void copySplineCache(TSpline3& splineBuffer_);
+//  virtual void buildResponseSplineCache();
 
 protected:
   //! KEEP THE MEMBER AS LIGHT AS POSSIBLE!!
@@ -89,10 +97,8 @@ protected:
   bool _isEditingCache_{false};
   GenericToolbox::NoCopyWrapper<std::mutex> _evalDialLock_;
   bool _isReferenced_{false};
-  bool _throwIfResponseIsNegative_{true};
-  double _dialResponseCache_{};
-  double _dialParameterCache_{};
-  double _effectiveDialParameterValue_{}; // take into account internal transformations while using mirrored splines transformations
+  double _dialResponseCache_{std::nan("unset")};
+  double _dialParameterCache_{std::nan("unset")};
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   // Debugging.  This is only meaningful when the GPU is filling the spline

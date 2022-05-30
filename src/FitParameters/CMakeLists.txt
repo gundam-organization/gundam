@@ -3,7 +3,7 @@ set(SRCFILES
         src/FitParameter.cpp
         src/DialSet.cpp
         src/Dial.cpp
-        src/NormalizationDial.cpp
+        src/NormDial.cpp
         src/SplineDial.cpp
         src/GraphDial.cpp
         src/NestedDialTest.cpp

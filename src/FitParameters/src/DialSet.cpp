@@ -5,7 +5,7 @@
 #include "DialSet.h"
 #include "JsonUtils.h"
 #include "DataBinSet.h"
-#include "NormalizationDial.h"
+#include "NormDial.h"
 #include "SplineDial.h"
 #include "GraphDial.h"
 #include "FitParameter.h"
@@ -18,7 +18,7 @@
 #include "TTree.h"
 
 
-bool DialSet::_verboseMode_{false};
+bool DialSet::verboseMode{false};
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[DialSet]");
@@ -146,6 +146,7 @@ void DialSet::readGlobals(const nlohmann::json &config_){
 
   std::string dialTypeStr = JsonUtils::fetchValue(config_, "dialsType", "");
   if( not dialTypeStr.empty() ){
+    if( dialTypeStr == "Normalization" ) dialTypeStr = "Norm"; // old name
     _globalDialType_ = DialType::DialTypeEnumNamespace::toEnum(dialTypeStr);
     LogThrowIf(_globalDialType_==DialType::DialType_OVERFLOW, "Invalid dial type provided: " << dialTypeStr)
   }
@@ -287,12 +288,12 @@ bool DialSet::initializeNormDialsWithParBinning() {
   _binningCacheList_.emplace_back();
   _binningCacheList_.back().addBin(binning.getBinsList().at(_owner_->getParameterIndex()));
 
-  NormalizationDial dial;
+  NormDial dial;
   dial.setOwner(this);
   this->applyGlobalParameters(&dial);
   dial.setApplyConditionBin( &_binningCacheList_.back().getBinsList()[0] );
   dial.initialize();
-  _dialList_.emplace_back( std::make_unique<NormalizationDial>(dial) );
+  _dialList_.emplace_back( std::make_unique<NormDial>(dial) );
 
   return true;
 }
@@ -311,12 +312,12 @@ bool DialSet::initializeDialsWithDefinition() {
 
   this->readGlobals(dialsDefinition);
 
-  if( _globalDialType_ == DialType::Normalization ){
-    NormalizationDial dial;
+  if( _globalDialType_ == DialType::Norm ){
+    NormDial dial;
     this->applyGlobalParameters(&dial);
     dial.setOwner(this);
     dial.initialize();
-    _dialList_.emplace_back( std::make_unique<NormalizationDial>(dial) );
+    _dialList_.emplace_back( std::make_unique<NormDial>(dial) );
   }
   else if( _globalDialType_ == DialType::Spline or _globalDialType_ == DialType::Graph ){
 
@@ -336,7 +337,7 @@ bool DialSet::initializeDialsWithDefinition() {
       _binningCacheList_.back().setName(binningFilePath);
       _binningCacheList_.back().readBinningDefinition(binningFilePath);
 
-      std::string filePath = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsFilePath");
+      auto filePath = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsFilePath");
       LogThrowIf(not GenericToolbox::doesTFileIsValid(filePath), "Could not open: " << filePath)
       TFile* dialsTFile = TFile::Open(filePath.c_str());
       LogThrowIf(dialsTFile==nullptr, "Could not open: " << filePath)
