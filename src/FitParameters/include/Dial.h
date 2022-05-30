@@ -94,7 +94,6 @@ protected:
   DataBin* _applyConditionBin_{nullptr};
 
   // Internals
-  bool _isEditingCache_{false};
   GenericToolbox::NoCopyWrapper<std::mutex> _evalDialLock_;
   bool _isReferenced_{false};
   double _dialResponseCache_{std::nan("unset")};

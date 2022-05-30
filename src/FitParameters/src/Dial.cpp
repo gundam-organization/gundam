@@ -109,17 +109,15 @@ double Dial::evalResponse(double parameterValue_) {
   }
 
   // Check if all is already up-to-date
-  if( not _isEditingCache_ and _dialParameterCache_ == parameterValue_ ){ return _dialResponseCache_; }
+  if( _dialParameterCache_ == parameterValue_ ){ return _dialResponseCache_; }
 
   // If we reach this point, we either need to compute the response or wait for another thread to make the update.
   std::lock_guard<std::mutex> g(_evalDialLock_); // There can be only one.
   if( _dialParameterCache_ == parameterValue_ ) return _dialResponseCache_; // stop if already updated by another threads
 
   // Edit the cache
-  _isEditingCache_ = true; // invalidate cache
   _dialResponseCache_ = this->capDialResponse(this->calcDial(this->getEffectiveDialParameter(parameterValue_)));
   _dialParameterCache_ = parameterValue_;
-  _isEditingCache_ = false;
 
   return _dialResponseCache_;
 }
