@@ -9,7 +9,7 @@ set( APPLICATION_LIST
         gundamFitCompare
 )
 
-if( ENABLED_DEV_MODE )
+if( ENABLE_DEV_MODE )
     list(APPEND APPLICATION_LIST Sandbox)
 endif()
 
