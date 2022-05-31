@@ -138,7 +138,7 @@ void Propagator::initialize() {
 
   LogInfo << "Initializing propagation threads..." << std::endl;
   initializeThreads();
-  GlobalVariables::getParallelWorker().setCpuTimeSaverIsEnabled(false);
+  GlobalVariables::getParallelWorker().setCpuTimeSaverIsEnabled(true);
 
   // First start with the data:
   bool usedMcContainer{false};
