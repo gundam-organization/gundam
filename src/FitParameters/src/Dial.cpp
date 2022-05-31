@@ -15,6 +15,7 @@ LoggerInit([]{
 });
 
 
+
 bool Dial::enableMaskCheck{false};
 bool Dial::disableDialCache{false};
 bool Dial::throwIfResponseIsNegative{true};
@@ -112,7 +113,11 @@ double Dial::evalResponse(double parameterValue_) {
   if( _dialParameterCache_ == parameterValue_ ){ return _dialResponseCache_; }
 
   // If we reach this point, we either need to compute the response or wait for another thread to make the update.
+#if __cplusplus >= 201703L // https://stackoverflow.com/questions/26089319/is-there-a-standard-definition-for-cplusplus-in-c14
+  std::scoped_lock<std::mutex> g(_evalDialLock_); // There can be only one.
+#else
   std::lock_guard<std::mutex> g(_evalDialLock_); // There can be only one.
+#endif
   if( _dialParameterCache_ == parameterValue_ ) return _dialResponseCache_; // stop if already updated by another threads
 
   // Edit the cache
