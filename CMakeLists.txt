@@ -254,6 +254,7 @@ else()
 endif()
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 17)
 
 if( WITH_OPENMP )
     cmessage(STATUS "Compiling with OpenMP")
