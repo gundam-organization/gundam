@@ -67,6 +67,9 @@ void Propagator::setThrowAsimovToyParameters(bool throwAsimovToyParameters) {
 void Propagator::setIThrow(int iThrow) {
   _iThrow_ = iThrow;
 }
+void Propagator::setLoadAsimovData(bool loadAsimovData) {
+  _loadAsimovData_ = loadAsimovData;
+}
 
 void Propagator::initialize() {
   LogWarning << __METHOD_NAME__ << std::endl;
@@ -146,10 +149,10 @@ void Propagator::initialize() {
   for( auto& dataSet : _dataSetList_ ){
     if( not dataSet.isEnabled() ) continue;
     DataDispenser& dispenser = dataSet.getSelectedDataDispenser();
-    if( _throwAsimovToyParameters_ ) {
-      dispenser = dataSet.getToyDataDispenser();
-      dispenser.getConfigParameters().iThrow = _iThrow_;
-    }
+    if( _throwAsimovToyParameters_ ) { dispenser = dataSet.getToyDataDispenser(); }
+    if( _loadAsimovData_ ){ dispenser = dataSet.getDataDispenserDict()["Asimov"]; }
+
+    dispenser.getConfigParameters().iThrow = _iThrow_;
 
     if( dispenser.getConfigParameters().name != "Asimov" ){ allAsimov = false; }
     LogInfo << "Reading data set: " << dataSet.getName() << "/" << dispenser.getConfigParameters().name << std::endl;

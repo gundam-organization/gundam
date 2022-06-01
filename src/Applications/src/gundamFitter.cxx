@@ -35,6 +35,7 @@ int main(int argc, char** argv){
 
   clParser.addTriggerOption("dry-run", {"--dry-run", "-d"},"Perform the full sequence of initialization, but don't do the actual fit.");
   clParser.addTriggerOption("generateOneSigmaPlots", {"--one-sigma"}, "Generate one sigma plots");
+  clParser.addTriggerOption("asimov", {"-a", "--asimov"}, "Use MC dataset to fill the data histograms");
 
   clParser.addOption("cache", {"-C", "--cache-enabled"}, "Enable the event weight cache");
   clParser.addOption("configFile", {"-c", "--config-file"}, "Specify path to the fitter config file");
@@ -145,6 +146,7 @@ int main(int argc, char** argv){
     fitter.getPropagator().setThrowAsimovToyParameters(true);
     fitter.getPropagator().setIThrow(iToyFit);
   }
+  fitter.getPropagator().setLoadAsimovData( clParser.isOptionTriggered("asimov") );
 
   fitter.initialize();
 
