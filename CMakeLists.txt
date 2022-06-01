@@ -14,10 +14,7 @@ execute_process(
         RESULT_VARIABLE RETURN_VAL
         OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-if(RETURN_VAL EQUAL "1")
-    cmessage(WARNING "Bad exit status")
-    set (GUNDAM_VERSION_STRING "X.X.X")
-else()
+if(RETURN_VAL EQUAL "0")
     cmessage(STATUS "Git version: ${VERSION}")
 
     string(REPLACE "-" ";" VERSION_SEP ${VERSION})
@@ -41,6 +38,9 @@ else()
     list(GET VERSION_STR_SEP 2 GUNDAM_VERSION_REVISION)
 
     set (GUNDAM_VERSION_STRING "${GUNDAM_VERSION_MAJOR}.${GUNDAM_VERSION_MINOR}.${GUNDAM_VERSION_REVISION}${GUNDAM_VERSION_TAG}")
+else()
+    cmessage(WARNING "Bad exit status")
+    set (GUNDAM_VERSION_STRING "X.X.X")
 endif()
 
 
