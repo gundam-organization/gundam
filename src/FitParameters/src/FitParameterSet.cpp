@@ -286,15 +286,18 @@ void FitParameterSet::throwFitParameters(double gain_){
     }
 
     auto throws = GenericToolbox::throwCorrelatedParameters(_choleskyMatrix_.get());
-    int iPar{-1};
+
+    int iFit{-1};
     for( auto& par : _parameterList_ ){
-      iPar++;
-      if( _throwEnabledList_ != nullptr and (*_throwEnabledList_)[iPar] != 1 ){ LogWarning << "Parameter " << par.getTitle() << " is marked as non-throwing." << std::endl; continue; }
-      if( not par.isEnabled() ){ LogWarning << "Parameter " << par.getTitle() << " is disabled. Not throwing" << std::endl; continue; }
-      if( par.isFixed() ){ LogWarning << "Parameter " << par.getTitle() << " is fixed. Not throwing" << std::endl; continue; }
-      LogInfo << "Throwing par " << par.getTitle() << ": " << par.getParameterValue();
-      par.setParameterValue( par.getPriorValue() + gain_ * throws[iPar] );
-      LogInfo << " → " << par.getParameterValue() << std::endl;
+      if( par.isEnabled() and not par.isFixed() and not par.isFree() ){
+        iFit++;
+        LogInfo << "Throwing par " << par.getTitle() << ": " << par.getParameterValue();
+        par.setParameterValue( par.getPriorValue() + gain_ * throws[iFit] );
+        LogInfo << " → " << par.getParameterValue() << std::endl;
+      }
+      else{
+        LogWarning << "Skipping parameter: " << par.getTitle() << std::endl;
+      }
     }
   }
   else{
