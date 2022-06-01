@@ -324,7 +324,7 @@ void DataDispenser::fetchRequestedLeaves(){
 
   // plotGen
   if( _plotGenPtr_ != nullptr ){
-    for( auto& var : _plotGenPtr_->fetchListOfVarToPlot() ){
+    for( auto& var : _plotGenPtr_->fetchListOfVarToPlot(not _parameters_.useMcContainer) ){
       this->addLeafRequestedForStorage(var);
     }
 
