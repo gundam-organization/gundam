@@ -354,16 +354,16 @@ void DataDispenser::preAllocateMemory(){
   TChain* chainPtr{this->generateChain()};
   chainPtr->SetBranchStatus("*", false);
 
-  std::vector<std::string> leafVar;
+  std::vector<std::string> leafVarList;
   for( auto& eventVar : _cache_.leavesRequestedForStorage){
-    leafVar.emplace_back(eventVar);
+    leafVarList.emplace_back(eventVar);
     if( GenericToolbox::doesKeyIsInMap(eventVar, _parameters_.overrideLeafDict) ){
-      leafVar.back() = _parameters_.overrideLeafDict[eventVar];
-      leafVar.back() = GenericToolbox::stripBracket(leafVar.back(), '[', ']');
+      leafVarList.back() = _parameters_.overrideLeafDict[eventVar];
+      leafVarList.back() = GenericToolbox::stripBracket(leafVarList.back(), '[', ']');
     }
   }
   GenericToolbox::TreeEventBuffer tBuf;
-  tBuf.setLeafNameList(leafVar);
+  tBuf.setLeafNameList(leafVarList);
   tBuf.hook(chainPtr);
 
   PhysicsEvent eventPlaceholder;
