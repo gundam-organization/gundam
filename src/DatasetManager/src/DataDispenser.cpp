@@ -180,19 +180,37 @@ void DataDispenser::doEventSelection(){
   std::vector<TTreeFormula*> sampleCutFormulaList;
   chainPtr->SetBranchStatus("*", true); // enabling every branch to define formula
 
+  std::vector<std::string> leavesToOverrideList;
+  if( not _parameters_.overrideLeafDict.empty() ){
+    for( auto& overrideEntry : _parameters_.overrideLeafDict ){
+      leavesToOverrideList.emplace_back(overrideEntry.first);
+    }
+
+    // make sure we process the longest words first: "thisIsATest" variable should be replaced before "thisIs"
+    std::function<bool(const std::string&, const std::string&)> aGoesFirst = [](const std::string& a_, const std::string& b_){ return a_.size() > b_.size(); };
+    auto p = GenericToolbox::getSortPermutation(leavesToOverrideList, aGoesFirst);
+    GenericToolbox::applyPermutation(leavesToOverrideList, p);
+  }
+
   GenericToolbox::TablePrinter t;
   t.setColTitles({{"Sample"}, {"Selection Cut"}});
   for( auto& sample : _cache_.samplesToFillList ){
-    t.addTableLine({{"\""+sample->getName()+"\""}, {"\""+sample->getSelectionCutsStr()+"\""}});
+
+    std::string selectionCut = sample->getSelectionCutsStr();
+    for( auto& replaceEntry : leavesToOverrideList ){
+      GenericToolbox::replaceSubstringInsideInputString(selectionCut, replaceEntry, _parameters_.overrideLeafDict[replaceEntry]);
+    }
+
+    t.addTableLine({{"\""+sample->getName()+"\""}, {"\""+selectionCut+"\""}});
     sampleCutFormulaList.emplace_back(
         new TTreeFormula(
             sample->getName().c_str(),
-            sample->getSelectionCutsStr().c_str(),
+            selectionCut.c_str(),
             chainPtr
         )
     );
     LogThrowIf(sampleCutFormulaList.back()->GetNdim() == 0,
-               "\"" << sample->getSelectionCutsStr() << "\" could not be parsed by the TChain");
+               "\"" << selectionCut << "\" could not be parsed by the TChain");
 
     // The TChain will notify the formula that it has to update leaves addresses while swaping TFile
     formulaManager.Add(sampleCutFormulaList.back());
