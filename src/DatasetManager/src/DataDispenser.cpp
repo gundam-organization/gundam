@@ -180,19 +180,37 @@ void DataDispenser::doEventSelection(){
   std::vector<TTreeFormula*> sampleCutFormulaList;
   chainPtr->SetBranchStatus("*", true); // enabling every branch to define formula
 
+  std::vector<std::string> leavesToOverrideList;
+  if( not _parameters_.overrideLeafDict.empty() ){
+    for( auto& overrideEntry : _parameters_.overrideLeafDict ){
+      leavesToOverrideList.emplace_back(overrideEntry.first);
+    }
+
+    // make sure we process the longest words first: "thisIsATest" variable should be replaced before "thisIs"
+    std::function<bool(const std::string&, const std::string&)> aGoesFirst = [](const std::string& a_, const std::string& b_){ return a_.size() > b_.size(); };
+    auto p = GenericToolbox::getSortPermutation(leavesToOverrideList, aGoesFirst);
+    GenericToolbox::applyPermutation(leavesToOverrideList, p);
+  }
+
   GenericToolbox::TablePrinter t;
   t.setColTitles({{"Sample"}, {"Selection Cut"}});
   for( auto& sample : _cache_.samplesToFillList ){
-    t.addTableLine({{"\""+sample->getName()+"\""}, {"\""+sample->getSelectionCutsStr()+"\""}});
+
+    std::string selectionCut = sample->getSelectionCutsStr();
+    for( auto& replaceEntry : leavesToOverrideList ){
+      GenericToolbox::replaceSubstringInsideInputString(selectionCut, replaceEntry, _parameters_.overrideLeafDict[replaceEntry]);
+    }
+
+    t.addTableLine({{"\""+sample->getName()+"\""}, {"\""+selectionCut+"\""}});
     sampleCutFormulaList.emplace_back(
         new TTreeFormula(
             sample->getName().c_str(),
-            sample->getSelectionCutsStr().c_str(),
+            selectionCut.c_str(),
             chainPtr
         )
     );
     LogThrowIf(sampleCutFormulaList.back()->GetNdim() == 0,
-               "\"" << sample->getSelectionCutsStr() << "\" could not be parsed by the TChain");
+               "\"" << selectionCut << "\" could not be parsed by the TChain");
 
     // The TChain will notify the formula that it has to update leaves addresses while swaping TFile
     formulaManager.Add(sampleCutFormulaList.back());
@@ -306,7 +324,7 @@ void DataDispenser::fetchRequestedLeaves(){
 
   // plotGen
   if( _plotGenPtr_ != nullptr ){
-    for( auto& var : _plotGenPtr_->fetchListOfVarToPlot() ){
+    for( auto& var : _plotGenPtr_->fetchListOfVarToPlot(not _parameters_.useMcContainer) ){
       this->addLeafRequestedForStorage(var);
     }
 
@@ -336,16 +354,16 @@ void DataDispenser::preAllocateMemory(){
   TChain* chainPtr{this->generateChain()};
   chainPtr->SetBranchStatus("*", false);
 
-  std::vector<std::string> leafVar;
+  std::vector<std::string> leafVarList;
   for( auto& eventVar : _cache_.leavesRequestedForStorage){
-    leafVar.emplace_back(eventVar);
+    leafVarList.emplace_back(eventVar);
     if( GenericToolbox::doesKeyIsInMap(eventVar, _parameters_.overrideLeafDict) ){
-      leafVar.back() = _parameters_.overrideLeafDict[eventVar];
-      leafVar.back() = GenericToolbox::stripBracket(leafVar.back(), '[', ']');
+      leafVarList.back() = _parameters_.overrideLeafDict[eventVar];
+      leafVarList.back() = GenericToolbox::stripBracket(leafVarList.back(), '[', ']');
     }
   }
   GenericToolbox::TreeEventBuffer tBuf;
-  tBuf.setLeafNameList(leafVar);
+  tBuf.setLeafNameList(leafVarList);
   tBuf.hook(chainPtr);
 
   PhysicsEvent eventPlaceholder;

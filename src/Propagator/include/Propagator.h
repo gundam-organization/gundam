@@ -37,6 +37,8 @@ public:
 
   void setIThrow(int iThrow);
 
+  void setLoadAsimovData(bool loadAsimovData);
+
   // Init
   void initialize();
 
@@ -78,6 +80,7 @@ protected:
 private:
   // Parameters
   bool _showTimeStats_{false};
+  bool _loadAsimovData_{false};
   TDirectory* _saveDir_{nullptr};
   nlohmann::json _config_;
 

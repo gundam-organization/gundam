@@ -825,14 +825,18 @@ void PlotGenerator::generateComparisonHistograms(const std::vector<HistHolder> &
 
 }
 
-std::vector<std::string> PlotGenerator::fetchListOfVarToPlot(){
+std::vector<std::string> PlotGenerator::fetchListOfVarToPlot(bool isData_){
 //  LogThrowIf(_config_.empty(), "Config not set, can't call " << __METHOD_NAME__);
 
   std::vector<std::string> varNameList;
   _histogramsDefinition_ = JsonUtils::fetchValue(_config_, "histogramsDefinition", nlohmann::json());
   for( const auto& histConfig : _histogramsDefinition_ ){
     auto varToPlot = JsonUtils::fetchValue<std::string>(histConfig, "varToPlot");
-    if( varToPlot != "Raw" and not GenericToolbox::doesElementIsInVector(varToPlot, varNameList) and GenericToolbox::splitString(varToPlot, ":").size() < 2 ){
+    if( varToPlot != "Raw"
+        and not GenericToolbox::doesElementIsInVector(varToPlot, varNameList)
+        and GenericToolbox::splitString(varToPlot, ":").size() < 2
+        and not ( isData_ and JsonUtils::fetchValue(histConfig, "noData", false) )
+        ){
       varNameList.emplace_back(varToPlot);
     }
   }
