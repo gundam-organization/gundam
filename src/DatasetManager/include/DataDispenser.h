@@ -34,7 +34,7 @@ struct DataDispenserCache{
   std::vector<std::vector<bool>> eventIsInSamplesList{};
   std::vector<std::string> leavesRequestedForIndexing{};
   std::vector<std::string> leavesRequestedForStorage{};
-  std::vector<GenericToolbox::CopyableAtomic<size_t>> sampleIndexOffsetList;
+  std::vector<GenericToolbox::CopiableAtomic<size_t>> sampleIndexOffsetList;
   std::vector< std::vector<PhysicsEvent>* > sampleEventListPtrToFill;
   std::map<FitParameterSet*, std::vector<DialSet*>> dialSetPtrMap;
 
