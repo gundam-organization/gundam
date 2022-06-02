@@ -3,6 +3,22 @@ cmake_minimum_required (VERSION 3.12 FATAL_ERROR)
 # Configure CMake project
 project(GUNDAM)
 
+option(CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ langauge (-std=gnu++14)." OFF)
+option(CXX_MARCH_FLAG "Enable cpu architecture specific optimzations." OFF)
+option(CXX_WARNINGS "Enable most C++ warning flags." ON)
+option(COLOR_OUTPUT "Enable colored terminal output." ON)
+option(TTYCHECK "Enable check if output is being sent to terminal/TTY." ON)
+option(WITH_OPENMP "(OLD) Build with OpenMP libraries" OFF )
+option(WITH_CACHE_MANAGER "Build with precalculated weight cache" OFF)
+option(DISABLE_CUDA "Disable CUDA language check (enable for testing only)" OFF)
+option(YAMLCPP_DIR "Set custom path to yaml-cpp lib" OFF )
+option(ENABLE_DEV_MODE "Enable specific dev related printouts" OFF )
+option(BATCH_MODE "Build to run in a batch queue (affects output)" OFF)
+option(BUILD_DOC "Build documentation" OFF)
+option(WITH_XSLLHFITTER "Build old xsllhFitter apps/libraries" OFF)
+option(USE_STATIC_LINKS "Library build in static mod" OFF)
+
+
 # Cmake includes
 include(${CMAKE_SOURCE_DIR}/cmake/cmessage.cmake)
 
@@ -45,20 +61,7 @@ endif()
 
 
 
-option(CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ langauge (-std=gnu++14)." OFF)
-option(CXX_MARCH_FLAG "Enable cpu architecture specific optimzations." OFF)
-option(CXX_WARNINGS "Enable most C++ warning flags." ON)
-option(COLOR_OUTPUT "Enable colored terminal output." ON)
-option(TTYCHECK "Enable check if output is being sent to terminal/TTY." ON)
-option(WITH_OPENMP "(OLD) Build with OpenMP libraries" OFF )
-option(WITH_CACHE_MANAGER "Build with precalculated weight cache" OFF)
-option(DISABLE_CUDA "Disable CUDA language check (enable for testing only)" OFF)
-option(YAMLCPP_DIR "Set custom path to yaml-cpp lib" OFF )
-option(ENABLE_DEV_MODE "Enable specific dev related printouts" OFF )
-option(BATCH_MODE "Build to run in a batch queue (affects output)" OFF)
-option(BUILD_DOC "Build documentation" OFF)
-option(WITH_XSLLHFITTER "Build old xsllhFitter apps/libraries" OFF)
-option(USE_STATIC_LINKS "Library build in static mod" OFF)
+
 
 set(VERBOSE TRUE)
 

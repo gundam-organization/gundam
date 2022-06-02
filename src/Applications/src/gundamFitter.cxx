@@ -182,4 +182,5 @@ int main(int argc, char** argv){
   // --------------------------
   g.goodbye();
 
+  GlobalVariables::getParallelWorker().reset();
 }
