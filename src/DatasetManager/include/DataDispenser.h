@@ -77,7 +77,6 @@ public:
 
 
 protected:
-  TChain* generateChain();
   void buildSampleToFillList();
   void doEventSelection();
   void fetchRequestedLeaves();
