@@ -8,6 +8,8 @@
 #include "FitSampleSet.h"
 #include "PhysicsEvent.h"
 
+#include "GenericToolbox.Wrappers.h"
+
 #include "nlohmann/json.hpp"
 #include "TDirectory.h"
 #include "TH1D.h"
@@ -32,7 +34,6 @@ struct HistHolder{
   // Data
   bool isData{false};
   const FitSample* fitSamplePtr{nullptr};
-  std::mutex* fillMutexPtr{nullptr};
   std::function<void(TH1D*, const PhysicsEvent*)> fillFunctionFitSample;
 
   // X axis

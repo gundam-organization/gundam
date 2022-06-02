@@ -6,6 +6,8 @@
 #include "GlobalVariables.h"
 #include "PlotGenerator.h"
 
+#include <memory>
+
 #include "Logger.h"
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
@@ -265,11 +267,9 @@ void PlotGenerator::defineHistogramHolders() {
                 // Config DONE
                 _histHolderCacheList_[0].emplace_back(histDefBase);
                 if( buildFillFunction ){
-                  _histHolderCacheList_[0].back().fillMutexPtr = new std::mutex();
                   auto splitVarValue = _histHolderCacheList_[0].back().splitVarValue;
                   auto varToPlot = _histHolderCacheList_[0].back().varToPlot;
                   auto splitVarName = _histHolderCacheList_[0].back().splitVarName;
-                  auto* mutexPtr = _histHolderCacheList_[0].back().fillMutexPtr;
                 }
 
               } // isData
@@ -341,10 +341,10 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
         }
       }
       else{
-        histDef.histPtr = std::shared_ptr<TH1D>( new TH1D(
+        histDef.histPtr = std::make_shared<TH1D>(
             histDef.histName.c_str(), histDef.histTitle.c_str(),
             int(histDef.xEdges.size()) - 1, &histDef.xEdges[0]
-        ));
+        );
       }
 
       histDef.histPtr->SetName(Form("%p", (void *) histDef.histPtr.get()));
@@ -549,7 +549,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
         std::string canvasName = "samples_n" + std::to_string(canvasIndex);
         std::string canvasPath = canvasFolderPath + canvasName;
         if (not GenericToolbox::doesKeyIsInMap(canvasPath, _bufferCanvasList_)) {
-          _bufferCanvasList_[canvasPath] = std::shared_ptr<TCanvas>( new TCanvas(canvasPath.c_str(), canvasPath.c_str(), canvasWidth, canvasHeight) );
+          _bufferCanvasList_[canvasPath] = std::make_shared<TCanvas>( canvasPath.c_str(), canvasPath.c_str(), canvasWidth, canvasHeight );
           _bufferCanvasList_[canvasPath]->Divide(canvasNbXplots, canvasNbYplots);
         }
         _bufferCanvasList_[canvasPath]->cd(iSampleSlot);
@@ -576,7 +576,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
         double Ymax = 0.9;
         double Xmin = 0.5;
         double Ymin = Ymax - 0.04 * _maxLegendLength_;
-        auto* splitLegend = new TLegend(Xmin, Ymin, Xmax, Ymax); // ptr required to transfert ownership
+        std::shared_ptr<TLegend> splitLegend(std::make_shared<TLegend>(Xmin, Ymin, Xmax, Ymax)); // ptr required to transfert ownership
         int nLegend{0};
 
         // process mc part

@@ -3,6 +3,8 @@
 //
 
 #include "FitParameterSet.h"
+
+#include <memory>
 #include "JsonUtils.h"
 #include "GlobalVariables.h"
 
@@ -97,20 +99,20 @@ void FitParameterSet::prepareFitParameters(){
     LogWarning << "Decomposing the stripped covariance matrix in set: " << getName() << std::endl;
     _eigenParameterList_.resize(_strippedCovarianceMatrix_->GetNrows());
 
-    _eigenDecomp_     = std::shared_ptr<TMatrixDSymEigen>(new TMatrixDSymEigen(*_strippedCovarianceMatrix_));
+    _eigenDecomp_     = std::make_shared<TMatrixDSymEigen>(*_strippedCovarianceMatrix_);
 
     // Used for base swapping
     _eigenValues_     = std::shared_ptr<TVectorD>( (TVectorD*) _eigenDecomp_->GetEigenValues().Clone() );
     _eigenValuesInv_  = std::shared_ptr<TVectorD>( (TVectorD*) _eigenDecomp_->GetEigenValues().Clone() );
     _eigenVectors_    = std::shared_ptr<TMatrixD>( (TMatrixD*) _eigenDecomp_->GetEigenVectors().Clone() );
-    _eigenVectorsInv_ = std::shared_ptr<TMatrixD>(new TMatrixD(TMatrixD::kTransposed, *_eigenVectors_) );
+    _eigenVectorsInv_ = std::make_shared<TMatrixD>(TMatrixD::kTransposed, *_eigenVectors_ );
 
     double eigenCumulative = 0;
     _nbEnabledEigen_ = 0;
     double eigenTotal = _eigenValues_->Sum();
 
-    _inverseStrippedCovarianceMatrix_ = std::shared_ptr<TMatrixD>(new TMatrixD(_strippedCovarianceMatrix_->GetNrows(), _strippedCovarianceMatrix_->GetNrows()));
-    _projectorMatrix_                 = std::shared_ptr<TMatrixD>(new TMatrixD(_strippedCovarianceMatrix_->GetNrows(), _strippedCovarianceMatrix_->GetNrows()));
+    _inverseStrippedCovarianceMatrix_ = std::make_shared<TMatrixD>(_strippedCovarianceMatrix_->GetNrows(), _strippedCovarianceMatrix_->GetNrows());
+    _projectorMatrix_                 = std::make_shared<TMatrixD>(_strippedCovarianceMatrix_->GetNrows(), _strippedCovarianceMatrix_->GetNrows());
 
     auto* eigenState = new TVectorD(_eigenValues_->GetNrows());
 
@@ -165,8 +167,8 @@ void FitParameterSet::prepareFitParameters(){
       LogInfo << "Fraction taken: " << eigenCumulative / eigenTotal*100 << "%" << std::endl;
     }
 
-    _originalParBuffer_ = std::shared_ptr<TVectorD>(new TVectorD(_strippedCovarianceMatrix_->GetNrows()) );
-    _eigenParBuffer_    = std::shared_ptr<TVectorD>(new TVectorD(_strippedCovarianceMatrix_->GetNrows()) );
+    _originalParBuffer_ = std::make_shared<TVectorD>(_strippedCovarianceMatrix_->GetNrows() );
+    _eigenParBuffer_    = std::make_shared<TVectorD>(_strippedCovarianceMatrix_->GetNrows() );
 
     // Put original parameters to the prior
     for( auto& par : _parameterList_ ){
@@ -490,9 +492,9 @@ void FitParameterSet::readParameterDefinitionFile(){
       ((TMatrixD*) _priorCovarianceMatrix_.get())->Write("CovarianceMatrix_TMatrixD");
       GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) _priorCovarianceMatrix_.get())->Write("CovarianceMatrix_TH2D");
 
-      auto* correlationMatrix = GenericToolbox::convertToCorrelationMatrix((TMatrixD*)_priorCovarianceMatrix_.get());
+      std::unique_ptr<TMatrixD> correlationMatrix( GenericToolbox::convertToCorrelationMatrix((TMatrixD*)_priorCovarianceMatrix_.get()) );
       correlationMatrix->Write("CorrelationMatrix_TMatrixD");
-      GenericToolbox::convertTMatrixDtoTH2D(correlationMatrix)->Write("CorrelationMatrix_TH2D");
+      GenericToolbox::convertTMatrixDtoTH2D(correlationMatrix.get())->Write("CorrelationMatrix_TH2D");
     }
 
     _nbParameterDefinition_ = _priorCovarianceMatrix_->GetNrows();

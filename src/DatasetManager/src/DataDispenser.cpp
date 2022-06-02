@@ -177,7 +177,7 @@ void DataDispenser::doEventSelection(){
 
   LogInfo << "Defining selection formulas..." << std::endl;
   TTreeFormulaManager formulaManager; // TTreeFormulaManager handles the notification of multiple TTreeFormula for one TTChain
-  std::vector<TTreeFormula*> sampleCutFormulaList;
+  std::vector<std::shared_ptr<TTreeFormula>> sampleCutFormulaList;
   chainPtr->SetBranchStatus("*", true); // enabling every branch to define formula
 
   std::vector<std::string> leavesToOverrideList;
@@ -203,7 +203,7 @@ void DataDispenser::doEventSelection(){
 
     t.addTableLine({{"\""+sample->getName()+"\""}, {"\""+selectionCut+"\""}});
     sampleCutFormulaList.emplace_back(
-        new TTreeFormula(
+        std::make_shared<TTreeFormula>(
             sample->getName().c_str(),
             selectionCut.c_str(),
             chainPtr
@@ -213,14 +213,14 @@ void DataDispenser::doEventSelection(){
                "\"" << selectionCut << "\" could not be parsed by the TChain");
 
     // The TChain will notify the formula that it has to update leaves addresses while swaping TFile
-    formulaManager.Add(sampleCutFormulaList.back());
+    formulaManager.Add(sampleCutFormulaList.back().get());
   }
   chainPtr->SetNotify(&formulaManager);
   t.printTable();
 
   LogInfo << "Enabling required branches..." << std::endl;
   chainPtr->SetBranchStatus("*", false);
-  for( auto* sampleFormula : sampleCutFormulaList ){
+  for( auto& sampleFormula : sampleCutFormulaList ){
     for( int iLeaf = 0 ; iLeaf < sampleFormula->GetNcodes() ; iLeaf++ ){
       chainPtr->SetBranchStatus(sampleFormula->GetLeaf(iLeaf)->GetBranch()->GetName(), true);
     }
@@ -238,7 +238,7 @@ void DataDispenser::doEventSelection(){
     if( GenericToolbox::showProgressBar(iEvent, nEvents) ){
       GenericToolbox::displayProgressBar(
           iEvent, nEvents,progressTitle + " - " +
-                          GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.evalTotalGrowthRate()), 8)
+                          GenericToolbox::padString(GenericToolbox::parseSizeUnits((unsigned int)(readSpeed.evalTotalGrowthRate())), 8)
                           + "/s");
     }
 
@@ -253,7 +253,7 @@ void DataDispenser::doEventSelection(){
     } // iSample
   } // iEvent
 
-  // detaching the formulas
+  // detaching the formulas?
   chainPtr->SetNotify(nullptr);
   delete chainPtr;
 
@@ -444,7 +444,7 @@ void DataDispenser::readAndFill(){
     LogInfo << "Nominal weight: \"" << _parameters_.nominalWeightFormulaStr << "\"" << std::endl;
   }
 
-  ROOT::EnableImplicitMT(GlobalVariables::getNbThreads());
+//  ROOT::EnableImplicitMT(GlobalVariables::getNbThreads());
   std::mutex eventOffSetMutex;
   auto fillFunction = [&](int iThread_){
 
