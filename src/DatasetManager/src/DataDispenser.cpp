@@ -472,9 +472,9 @@ void DataDispenser::readAndFill(){
       }
     }
     tEventBuffer.setLeafNameList(leafVar);
-    eventOffSetMutex.lock();
+//    eventOffSetMutex.lock();
     tEventBuffer.hook(&treeChain);
-    eventOffSetMutex.unlock();
+//    eventOffSetMutex.unlock();
 
     PhysicsEvent eventBuffer;
     eventBuffer.setDataSetIndex(_owner_->getDataSetIndex());
@@ -535,9 +535,9 @@ void DataDispenser::readAndFill(){
           GenericToolbox::displayProgressBar(
               iGlobal, nEvents,
               progressTitle
-              + GenericToolbox::padString(GenericToolbox::parseSizeUnits(double(nThreads)*readSpeed.getTotalAccumulated()), 9)
+              + GenericToolbox::padString(GenericToolbox::parseSizeUnits(nThreads*readSpeed.getTotalAccumulated()), 9)
               + " ("
-              + GenericToolbox::padString(GenericToolbox::parseSizeUnits(double(nThreads)*readSpeed.evalTotalGrowthRate()), 9)
+              + GenericToolbox::padString(GenericToolbox::parseSizeUnits(nThreads*readSpeed.evalTotalGrowthRate()), 9)
               + "/s)"
           );
         }
@@ -593,9 +593,9 @@ void DataDispenser::readAndFill(){
           }
 
           // OK, now we have a valid fit bin. Let's claim an index.
-          eventOffSetMutex.lock();
+//          eventOffSetMutex.lock();
           sampleEventIndex = _cache_.sampleIndexOffsetList[iSample]++;
-          eventOffSetMutex.unlock();
+//          eventOffSetMutex.unlock();
 
           eventPtr = &(*_cache_.sampleEventListPtrToFill[iSample])[sampleEventIndex];
           eventPtr->copyData(copyStoreDict, true); // buffer has the right size already
