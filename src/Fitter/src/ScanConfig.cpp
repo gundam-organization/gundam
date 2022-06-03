@@ -13,6 +13,7 @@ ScanConfig::~ScanConfig() = default;
 
 
 void ScanConfig::readConfig() {
+  JsonUtils::forwardConfig(_config_);
   if( _config_.empty() ) return;
 
   _useParameterLimits_ = JsonUtils::fetchValue(_config_, "useParameterLimits", _useParameterLimits_);

@@ -5,21 +5,6 @@ set(SRCFILES
         src/JsonUtils.cpp
         src/YamlUtils.cpp
         src/GundamGreetings.cpp
-        src/ScanConfig.cpp
-        )
-set(HEADERS
-        include/GlobalVariables.h
-        include/DataBin.h
-        include/Likelihoods.hh
-        include/DataBinSet.h
-        include/JsonUtils.h
-        include/YamlUtils.h
-        include/YamlUtils.impl.h
-        include/GundamGreetings.h
-        include/ScanConfig.h
-        include/CalculateMonotonicSpline.h
-        include/CalculateUniformSpline.h
-        include/CalculateGeneralSpline.h
         )
 
 if( USE_STATIC_LINKS )

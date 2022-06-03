@@ -1,10 +1,8 @@
 set(SRCFILES
   src/FitterEngine.cpp
+  src/ScanConfig.cpp
   )
-set(HEADERS
-  include/FitterEngine.h
-  )
-      
+
 if( USE_STATIC_LINKS )
   add_library(GundamFitter STATIC ${SRCFILES})
 else()
