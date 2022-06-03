@@ -387,9 +387,6 @@ void FitterEngine::scanParameters(int nbSteps_, const std::string &saveDir_) {
   } // iPar
 }
 void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &saveDir_) {
-
-  std::pair<double, double> parameterSigmaRange{-3, 3};
-
   if( nbSteps_ < 0 ){ nbSteps_ = _scanConfig_.getNbPoints(); }
 
   std::vector<double> parPoints(nbSteps_+1,0);
@@ -791,7 +788,9 @@ double FitterEngine::evalFit(const double* parArray_){
 
     std::stringstream ss;
     ss << __METHOD_NAME__ << ": call #" << _nbFitCalls_;
-    ss << std::endl << "Current RAM: " << GenericToolbox::parseSizeUnits(GenericToolbox::getProcessMemoryUsage());
+    ss << std::endl << "Current RAM usage: " << GenericToolbox::parseSizeUnits(GenericToolbox::getProcessMemoryUsage());
+    double cpuPercent = GenericToolbox::getCpuUsageByProcess();
+    ss << std::endl << "Current CPU usage: " << cpuPercent << "% (" << 100*cpuPercent/GlobalVariables::getNbThreads() << "% efficiency)";
     ss << std::endl << "Avg " << GUNDAM_CHI2 << " computation time: " << _evalFitAvgTimer_;
     if( not _propagator_.isUseResponseFunctions() ){
       ss << std::endl;
