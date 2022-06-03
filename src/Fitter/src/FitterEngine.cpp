@@ -790,7 +790,7 @@ double FitterEngine::evalFit(const double* parArray_){
     ss << __METHOD_NAME__ << ": call #" << _nbFitCalls_;
     ss << std::endl << "Current RAM usage: " << GenericToolbox::parseSizeUnits(GenericToolbox::getProcessMemoryUsage());
     double cpuPercent = GenericToolbox::getCpuUsageByProcess();
-    ss << std::endl << "Current CPU usage: " << cpuPercent << "% (" << 100*cpuPercent/GlobalVariables::getNbThreads() << "% efficiency)";
+    ss << std::endl << "Current CPU usage: " << cpuPercent << "% (" << cpuPercent/GlobalVariables::getNbThreads() << "% efficiency)";
     ss << std::endl << "Avg " << GUNDAM_CHI2 << " computation time: " << _evalFitAvgTimer_;
     if( not _propagator_.isUseResponseFunctions() ){
       ss << std::endl;
