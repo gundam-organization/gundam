@@ -107,10 +107,14 @@ void FitterEngine::initialize() {
   _convergenceMonitor_.addVariable("Stat");
   _convergenceMonitor_.addVariable("Syst");
 
-  
-  _monitorRefreshRateInMs_ = (long long int) JsonUtils::fetchValue(_config_, "monitorRefreshRateInMs", 500);
-  LogInfo << "Convergence monitor will be refreshed every " << _monitorRefreshRateInMs_ << "ms." << std::endl;
-  _convergenceMonitor_.setMaxRefreshRateInMs(_monitorRefreshRateInMs_);
+  if( JsonUtils::doKeyExist(_config_, "monitorRefreshRateInMs") ){
+    _convergenceMonitor_.setMaxRefreshRateInMs(JsonUtils::fetchValue(_config_, "monitorRefreshRateInMs", _convergenceMonitor_.getMaxRefreshRateInMs()));
+  }
+  else if( GenericToolbox::getTerminalWidth() == 0 ){
+    // running in batch mode (file or a pipen)
+    _convergenceMonitor_.setMaxRefreshRateInMs(5000); // every 5 sec
+  }
+  LogInfo << "Convergence monitor will be refreshed every " << _convergenceMonitor_.getMaxRefreshRateInMs() << "ms." << std::endl;
 
   if( _saveDir_ != nullptr ){
     auto* dir = GenericToolbox::mkdirTFile(_saveDir_, "preFit/events");
@@ -824,7 +828,7 @@ double FitterEngine::evalFit(const double* parArray_){
       LogInfo << _convergenceMonitor_.generateMonitorString();
     }
     else{
-      LogInfo << _convergenceMonitor_.generateMonitorString(true);
+      LogInfo << _convergenceMonitor_.generateMonitorString(true , true);
     }
 
     _itSpeed_.counts = _nbFitCalls_;
