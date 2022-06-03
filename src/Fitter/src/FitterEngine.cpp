@@ -16,6 +16,7 @@
 #include "TLegend.h"
 
 #include <cmath>
+#include <memory>
 
 
 LoggerInit([]{
@@ -106,10 +107,14 @@ void FitterEngine::initialize() {
   _convergenceMonitor_.addVariable("Stat");
   _convergenceMonitor_.addVariable("Syst");
 
-  
-  _monitorRefreshRateInMs_ = (long long int) JsonUtils::fetchValue(_config_, "monitorRefreshRateInMs", 500);
-  LogInfo << "Convergence monitor will be refreshed every " << _monitorRefreshRateInMs_ << "ms." << std::endl;
-  _convergenceMonitor_.setMaxRefreshRateInMs(_monitorRefreshRateInMs_);
+  if( JsonUtils::doKeyExist(_config_, "monitorRefreshRateInMs") ){
+    _convergenceMonitor_.setMaxRefreshRateInMs(JsonUtils::fetchValue(_config_, "monitorRefreshRateInMs", _convergenceMonitor_.getMaxRefreshRateInMs()));
+  }
+  else if( GenericToolbox::getTerminalWidth() == 0 ){
+    // running in batch mode (file or a pipen)
+    _convergenceMonitor_.setMaxRefreshRateInMs(5000); // every 5 sec
+  }
+  LogInfo << "Convergence monitor will be refreshed every " << _convergenceMonitor_.getMaxRefreshRateInMs() << "ms." << std::endl;
 
   if( _saveDir_ != nullptr ){
     auto* dir = GenericToolbox::mkdirTFile(_saveDir_, "preFit/events");
@@ -551,7 +556,6 @@ void FitterEngine::fit(){
 
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Summary of the fit parameters:") << std::endl;
 
-  int iFitPar = -1;
   for( const auto& parSet : _propagator_.getParameterSetsList() ){
 
     std::vector<std::vector<std::string>> tableLines;
@@ -570,8 +574,6 @@ void FitterEngine::fit(){
     if( parList.empty() ) continue;
 
     for( const auto& par : parList ){
-      iFitPar++;
-
       std::vector<std::string> lineValues(tableLines[0].size());
       int valIndex{0};
       lineValues[valIndex++] = par.getTitle();
@@ -778,7 +780,6 @@ double FitterEngine::evalFit(const double* parArray_){
   _evalFitAvgTimer_.counts++; _evalFitAvgTimer_.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 
   if(_convergenceMonitor_.isGenerateMonitorStringOk() and _enableFitMonitor_ ){
-
     if( _itSpeed_.counts != 0 ){
       _itSpeed_.counts = _nbFitCalls_ - _itSpeed_.counts; // how many cycles since last print
       _itSpeed_.cumulated = GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("itSpeed"); // time since last print
@@ -823,10 +824,11 @@ double FitterEngine::evalFit(const double* parArray_){
     _convergenceMonitor_.getVariable("Syst").addQuantity(_chi2PullsBuffer_);
 
     if( _nbFitCalls_ == 1 ){
+      // don't erase these lines
       LogInfo << _convergenceMonitor_.generateMonitorString();
     }
     else{
-      LogInfo << _convergenceMonitor_.generateMonitorString(true);
+      LogInfo << _convergenceMonitor_.generateMonitorString(true , true);
     }
 
     _itSpeed_.counts = _nbFitCalls_;
@@ -911,7 +913,7 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
         eigenBreakdownAccum[iEigen].SetFillColor(GenericToolbox::defaultColorWheel[iEigen%int(GenericToolbox::defaultColorWheel.size())]);
 
         int cycle = iEigen/int(GenericToolbox::defaultColorWheel.size());
-        if( cycle > 0 ) eigenBreakdownAccum[iEigen].SetFillStyle( 3044 + 100 * (cycle%10) );
+        if( cycle > 0 ) eigenBreakdownAccum[iEigen].SetFillStyle( short(3044 + 100 * (cycle%10)) );
         else eigenBreakdownAccum[iEigen].SetFillStyle(1001);
       }
 
@@ -975,9 +977,9 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
       }
       TCanvas accumPlot("accumParPlot", "accumParPlot", 1280, 720);
       bool isFirst{true};
-      for (int iPar = 0; iPar < int(parBreakdownAccum.size()); iPar++) {
+      for (auto & parHist : parBreakdownAccum) {
         accumPlot.cd();
-        isFirst? parBreakdownAccum[iPar].Draw("HIST"): parBreakdownAccum[iPar].Draw("HIST SAME");
+        isFirst ? parHist.Draw("HIST") : parHist.Draw("HIST SAME");
         isFirst = false;
       }
       GenericToolbox::writeInTFile(outDir_, &accumPlot, "parBreakdown");
@@ -1040,7 +1042,7 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
           corMatrixTH2D->GetYaxis()->SetBinLabel(1+par.getParameterIndex(), par.getTitle().c_str());
         }
 
-        auto* corMatrixCanvas = new TCanvas("host_TCanvas", "host_TCanvas", 1024, 1024);
+        auto corMatrixCanvas = std::make_unique<TCanvas>("host_TCanvas", "host_TCanvas", 1024, 1024);
         corMatrixCanvas->cd();
         corMatrixTH2D->GetXaxis()->SetLabelSize(0.025);
         corMatrixTH2D->GetXaxis()->LabelsOption("v");
@@ -1061,8 +1063,8 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
           pal->SetTitleOffset(2);
           pal->Draw();
         }
-        gPad->SetLeftMargin(0.1*(1 + maxLabelLength/20.));
-        gPad->SetBottomMargin(0.1*(1 + maxLabelLength/15.));
+        gPad->SetLeftMargin(float(0.1*(1. + double(maxLabelLength)/20.)));
+        gPad->SetBottomMargin(float(0.1*(1. + double(maxLabelLength)/15.)));
 
         corMatrixTH2D->Draw("COLZ");
 
@@ -1138,8 +1140,8 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
           size_t longestTitleSize{0};
           double minY{std::nan("unset")}, maxY{std::nan("unset")};
 
-          auto* postFitErrorHist = new TH1D("postFitErrors_TH1D", "Post-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
-          auto* preFitErrorHist = new TH1D("preFitErrors_TH1D", "Pre-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
+          auto postFitErrorHist = std::make_unique<TH1D>("postFitErrors_TH1D", "Post-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
+          auto preFitErrorHist = std::make_unique<TH1D>("preFitErrors_TH1D", "Pre-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
 
           for( const auto& par : parList_ ){
             longestTitleSize = std::max(longestTitleSize, par.getTitle().size());
@@ -1212,7 +1214,7 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
           postFitErrorHist->SetTitle(Form("Post-fit Errors of %s", parSet_.getName().c_str()));
           postFitErrorHist->Write();
 
-          auto* errorsCanvas = new TCanvas(
+          auto errorsCanvas = std::make_unique<TCanvas>(
               Form("Fit Constraints for %s", parSet_.getName().c_str()),
               Form("Fit Constraints for %s", parSet_.getName().c_str()),
               800, 600);
@@ -1244,7 +1246,7 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
 
           gPad->SetGridx();
           gPad->SetGridy();
-          gPad->SetBottomMargin(0.1*(1 + longestTitleSize/15.));
+          gPad->SetBottomMargin(float(0.1*(1. + double(longestTitleSize)/15.)));
 
           if( not isNorm_ ){ preFitErrorHist->SetTitle(Form("Pre-fit/Post-fit comparison for %s", parSet_.getName().c_str())); }
           else             { preFitErrorHist->SetTitle(Form("Pre-fit/Post-fit comparison for %s (normalized)", parSet_.getName().c_str())); }
@@ -1265,7 +1267,7 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
     auto* parSetDir = GenericToolbox::mkdirTFile(errorDir, parSet.getName());
 
     auto* parList = &parSet.getEffectiveParameterList();
-    auto* covMatrix = new TMatrixD(int(parList->size()), int(parList->size()));
+    auto covMatrix = std::make_unique<TMatrixD>(int(parList->size()), int(parList->size()));
     for( auto& iPar : *parList ){
       int iMinimizerIndex = GenericToolbox::findElementIndex((FitParameter*) &iPar, _minimizerFitParameterPtr_);
       if( iMinimizerIndex == -1 ) continue;
@@ -1279,7 +1281,7 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
     TDirectory* saveDir;
     if( parSet.isUseEigenDecompInFit() ){
       saveDir = GenericToolbox::mkdirTFile(parSetDir, "eigen");
-      savePostFitObjFct(parSet, *parList, covMatrix, saveDir);
+      savePostFitObjFct(parSet, *parList, covMatrix.get(), saveDir);
 
       // need to restore the non-fitted values before the base swap
       for( auto& eigenPar : *parList ){
@@ -1287,7 +1289,7 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
         (*covMatrix)[eigenPar.getParameterIndex()][eigenPar.getParameterIndex()] = eigenPar.getStdDevValue() * eigenPar.getStdDevValue();
       }
 
-      auto* originalStrippedCovMatrix = new TMatrixD(covMatrix->GetNrows(), covMatrix->GetNcols());
+      auto originalStrippedCovMatrix = std::make_unique<TMatrixD>(covMatrix->GetNrows(), covMatrix->GetNcols());
       (*originalStrippedCovMatrix) =  (*parSet.getEigenVectors());
       (*originalStrippedCovMatrix) *= (*covMatrix);
       (*originalStrippedCovMatrix) *= (*parSet.getInvertedEigenVectors());
@@ -1296,7 +1298,7 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
       parList = &parSet.getParameterList();
 
       // restore the original size of the matrix
-      covMatrix = new TMatrixD(int(parList->size()), int(parList->size()));
+      covMatrix = std::make_unique<TMatrixD>(int(parList->size()), int(parList->size()));
       int iStripped{-1};
       for( auto& iPar : *parList ){
         if( iPar.isFixed() or not iPar.isEnabled() ) continue;
@@ -1310,7 +1312,7 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
       }
     }
 
-    savePostFitObjFct(parSet, *parList, covMatrix, parSetDir);
+    savePostFitObjFct(parSet, *parList, covMatrix.get(), parSetDir);
 
   } // parSet
 
@@ -1398,10 +1400,8 @@ void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
   _nbFitParameters_ = int(_minimizerFitParameterPtr_.size());
 
   LogInfo << "Building functor..." << std::endl;
-  _functor_ = std::shared_ptr<ROOT::Math::Functor>(
-      new ROOT::Math::Functor(
-          this, &FitterEngine::evalFit, _nbFitParameters_
-      )
+  _functor_ = std::make_shared<ROOT::Math::Functor>(
+    this, &FitterEngine::evalFit, _nbFitParameters_
   );
 
   _minimizer_->SetFunction(*_functor_);

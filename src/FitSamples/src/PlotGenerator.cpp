@@ -576,7 +576,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
         double Ymax = 0.9;
         double Xmin = 0.5;
         double Ymin = Ymax - 0.04 * _maxLegendLength_;
-        std::shared_ptr<TLegend> splitLegend(std::make_shared<TLegend>(Xmin, Ymin, Xmax, Ymax)); // ptr required to transfert ownership
+        auto* splitLegend = new TLegend(Xmin, Ymin, Xmax, Ymax); // ptr required to transfert ownership
         int nLegend{0};
 
         // process mc part
