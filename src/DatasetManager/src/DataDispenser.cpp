@@ -458,6 +458,7 @@ void DataDispenser::readAndFill(){
       treeChain.SetBranchStatus("*", false);
       // Enabling needed branches for evaluating formulas
       for( int iLeaf = 0 ; iLeaf < threadNominalWeightFormula->GetNcodes() ; iLeaf++ ){
+        if( threadNominalWeightFormula->GetLeaf(iLeaf) == nullptr ){ continue; } // skip Entry$ like instances
         treeChain.SetBranchStatus(threadNominalWeightFormula->GetLeaf(iLeaf)->GetBranch()->GetName(), true);
       }
     }
