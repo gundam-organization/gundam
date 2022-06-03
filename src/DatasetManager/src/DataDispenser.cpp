@@ -41,6 +41,7 @@ void DataDispenser::readConfig(){
 
   _parameters_.treePath = JsonUtils::fetchValue<std::string>(_config_, "tree", _parameters_.treePath);
   _parameters_.filePathList = JsonUtils::fetchValue<std::vector<std::string>>(_config_, "filePathList", _parameters_.filePathList);
+  _parameters_.selectionCutFormulaStr = JsonUtils::fetchValue(_config_, "selectionCutFormula", _parameters_.selectionCutFormulaStr);
   _parameters_.nominalWeightFormulaStr = JsonUtils::fetchValue(_config_, "nominalWeightFormula", _parameters_.nominalWeightFormulaStr);
   _parameters_.additionalLeavesStorage = JsonUtils::fetchValue(_config_, "additionalLeavesStorage", _parameters_.additionalLeavesStorage);
   _parameters_.useMcContainer = JsonUtils::fetchValue(_config_, "useMcContainer", _parameters_.useMcContainer);
@@ -90,27 +91,37 @@ void DataDispenser::load(){
     return;
   }
 
-  if( GenericToolbox::doesStringContainsSubstring(_parameters_.nominalWeightFormulaStr, "<I_TOY>") ){
-    LogThrowIf(_parameters_.iThrow==-1, "<I_TOY> not set.");
-    GenericToolbox::replaceSubstringInsideInputString(
-        _parameters_.nominalWeightFormulaStr, "<I_TOY>",
-        std::to_string(_parameters_.iThrow)
-    );
-  }
+  auto replaceToyIndexFct = [&](std::string& formula_){
+    if( GenericToolbox::doesStringContainsSubstring(formula_, "<I_TOY>") ){
+      LogThrowIf(_parameters_.iThrow==-1, "<I_TOY> not set.");
+      GenericToolbox::replaceSubstringInsideInputString(formula_, "<I_TOY>", std::to_string(_parameters_.iThrow));
+    }
+  };
+  auto overrideLeavesNamesFct = [&](std::string& formula_){
+    for( auto& replaceEntry : _cache_.leavesToOverrideList ){
+      GenericToolbox::replaceSubstringInsideInputString(formula_, replaceEntry, _parameters_.overrideLeafDict[replaceEntry]);
+    }
+  };
 
   if( not _parameters_.overrideLeafDict.empty() ){
-    for( auto& entryDict : _parameters_.overrideLeafDict ){
-      if( GenericToolbox::doesStringContainsSubstring(entryDict.second, "<I_TOY>") ){
-        LogThrowIf(_parameters_.iThrow==-1, "<I_TOY> not set.");
-        GenericToolbox::replaceSubstringInsideInputString(
-            entryDict.second, "<I_TOY>",
-            std::to_string(_parameters_.iThrow)
-        );
-      }
-    }
+    for( auto& entryDict : _parameters_.overrideLeafDict ){ replaceToyIndexFct(entryDict.second); }
     LogInfo << "Overriding leaf dict: " << std::endl;
     LogInfo << GenericToolbox::parseMapAsString(_parameters_.overrideLeafDict) << std::endl;
+
+    for( auto& overrideEntry : _parameters_.overrideLeafDict ){
+      _cache_.leavesToOverrideList.emplace_back(overrideEntry.first);
+    }
+    // make sure we process the longest words first: "thisIsATest" variable should be replaced before "thisIs"
+    std::function<bool(const std::string&, const std::string&)> aGoesFirst = [](const std::string& a_, const std::string& b_){ return a_.size() > b_.size(); };
+    auto p = GenericToolbox::getSortPermutation(_cache_.leavesToOverrideList, aGoesFirst);
+    GenericToolbox::applyPermutation(_cache_.leavesToOverrideList, p);
   }
+
+  replaceToyIndexFct(_parameters_.nominalWeightFormulaStr);
+  replaceToyIndexFct(_parameters_.selectionCutFormulaStr);
+
+  overrideLeavesNamesFct(_parameters_.nominalWeightFormulaStr);
+  overrideLeavesNamesFct(_parameters_.selectionCutFormulaStr);
 
   LogInfo << "Data will be extracted from: " << GenericToolbox::parseVectorAsString(_parameters_.filePathList, true) << std::endl;
   for( const auto& file: _parameters_.filePathList){ LogThrowIf(not GenericToolbox::doesTFileIsValid(file, {_parameters_.treePath}), "Invalid file: " << file); }
@@ -166,29 +177,29 @@ void DataDispenser::doEventSelection(){
   for( const auto& file: _parameters_.filePathList){ treeChain.Add(file.c_str()); }
   LogThrowIf(treeChain.GetEntries() == 0, "TChain is empty.");
 
-  std::vector<std::string> leavesToOverrideList;
-  if( not _parameters_.overrideLeafDict.empty() ){
-    for( auto& overrideEntry : _parameters_.overrideLeafDict ){
-      leavesToOverrideList.emplace_back(overrideEntry.first);
-    }
-
-    // make sure we process the longest words first: "thisIsATest" variable should be replaced before "thisIs"
-    std::function<bool(const std::string&, const std::string&)> aGoesFirst = [](const std::string& a_, const std::string& b_){ return a_.size() > b_.size(); };
-    auto p = GenericToolbox::getSortPermutation(leavesToOverrideList, aGoesFirst);
-    GenericToolbox::applyPermutation(leavesToOverrideList, p);
-  }
-
   LogInfo << "Defining selection formulas..." << std::endl;
   treeChain.SetBranchStatus("*", true); // enabling every branch to define formula
+
+  TTreeFormula* treeSelectionCutFormula{nullptr};
   std::vector<TTreeFormula*> sampleCutFormulaList(_cache_.samplesToFillList.size(), nullptr);
   TTreeFormulaManager formulaManager; // TTreeFormulaManager handles the notification of multiple TTreeFormula for one TTChain
+
+  if( not _parameters_.selectionCutFormulaStr.empty() ){
+    treeSelectionCutFormula = new TTreeFormula("SelectionCutFormula", _parameters_.selectionCutFormulaStr.c_str(), &treeChain);
+    LogThrowIf(treeSelectionCutFormula->GetNdim() == 0,
+               "\"" << _parameters_.selectionCutFormulaStr << "\" could not be parsed by the TChain");
+
+    // The TChain will notify the formula that it has to update leaves addresses while swaping TFile
+    formulaManager.Add(treeSelectionCutFormula);
+    LogInfo << "Using tree selection cut: \"" << _parameters_.selectionCutFormulaStr << "\"" << std::endl;
+  }
 
   GenericToolbox::TablePrinter t;
   t.setColTitles({{"Sample"}, {"Selection Cut"}});
   for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
 
     std::string selectionCut = _cache_.samplesToFillList[iSample]->getSelectionCutsStr();
-    for( auto& replaceEntry : leavesToOverrideList ){
+    for( auto& replaceEntry : _cache_.leavesToOverrideList ){
       GenericToolbox::replaceSubstringInsideInputString(selectionCut, replaceEntry, _parameters_.overrideLeafDict[replaceEntry]);
     }
 
@@ -205,10 +216,10 @@ void DataDispenser::doEventSelection(){
 
   LogInfo << "Enabling required branches..." << std::endl;
   treeChain.SetBranchStatus("*", false);
+
+  if(treeSelectionCutFormula != nullptr) GenericToolbox::enableSelectedBranches(&treeChain, treeSelectionCutFormula);
   for( auto& sampleFormula : sampleCutFormulaList ){
-    for( int iLeaf = 0 ; iLeaf < sampleFormula->GetNcodes() ; iLeaf++ ){
-      treeChain.SetBranchStatus(sampleFormula->GetLeaf(iLeaf)->GetBranch()->GetName(), true);
-    }
+    GenericToolbox::enableSelectedBranches(&treeChain, sampleFormula);
   }
 
   LogInfo << "Performing event selection..." << std::endl;
@@ -227,14 +238,15 @@ void DataDispenser::doEventSelection(){
                           + "/s");
     }
 
+    if(treeSelectionCutFormula != nullptr and not GenericToolbox::doesEntryPassCut(treeSelectionCutFormula)){
+      for( size_t iSample = 0 ; iSample < sampleCutFormulaList.size() ; iSample++ ){ _cache_.eventIsInSamplesList[iEvent][iSample] = false; }
+      continue;
+    }
+
     for( size_t iSample = 0 ; iSample < sampleCutFormulaList.size() ; iSample++ ){
-      for(int jInstance = 0; jInstance < sampleCutFormulaList[iSample]->GetNdata(); jInstance++) {
-        if (sampleCutFormulaList[iSample]->EvalInstance(jInstance) == 0) {
-          // if it doesn't pass the cut
-          _cache_.eventIsInSamplesList[iEvent][iSample] = false;
-          break;
-        }
-      } // Formula Instances
+      if( not GenericToolbox::doesEntryPassCut(sampleCutFormulaList[iSample]) ){
+        _cache_.eventIsInSamplesList[iEvent][iSample] = false;
+      }
     } // iSample
   } // iEvent
 
@@ -424,10 +436,7 @@ void DataDispenser::readAndFill(){
     LogInfo << "Nominal weight: \"" << _parameters_.nominalWeightFormulaStr << "\"" << std::endl;
   }
 
-//  ROOT::EnableImplicitMT(GlobalVariables::getNbThreads());
-//  ROOT::EnableImplicitMT();
   ROOT::EnableThreadSafety();
-  std::mutex eventOffSetMutex;
   auto fillFunction = [&](int iThread_){
 
     int nThreads = GlobalVariables::getNbThreads();
@@ -456,11 +465,7 @@ void DataDispenser::readAndFill(){
                  "\"" <<  _parameters_.nominalWeightFormulaStr << "\" could not be parsed by the TChain");
       objToNotify.Add(threadNominalWeightFormula); // memory handled here!
       treeChain.SetBranchStatus("*", false);
-      // Enabling needed branches for evaluating formulas
-      for( int iLeaf = 0 ; iLeaf < threadNominalWeightFormula->GetNcodes() ; iLeaf++ ){
-        if( threadNominalWeightFormula->GetLeaf(iLeaf) == nullptr ){ continue; } // skip Entry$ like instances
-        treeChain.SetBranchStatus(threadNominalWeightFormula->GetLeaf(iLeaf)->GetBranch()->GetName(), true);
-      }
+      GenericToolbox::enableSelectedBranches(&treeChain, threadNominalWeightFormula);
     }
 
     GenericToolbox::TreeEventBuffer tEventBuffer;
@@ -473,9 +478,7 @@ void DataDispenser::readAndFill(){
       }
     }
     tEventBuffer.setLeafNameList(leafVar);
-//    eventOffSetMutex.lock();
     tEventBuffer.hook(&treeChain);
-//    eventOffSetMutex.unlock();
 
     PhysicsEvent eventBuffer;
     eventBuffer.setDataSetIndex(_owner_->getDataSetIndex());
