@@ -106,6 +106,11 @@ void FitterEngine::initialize() {
   _convergenceMonitor_.addVariable("Stat");
   _convergenceMonitor_.addVariable("Syst");
 
+  
+  _monitorRefreshRateInMs_ = (long long int) JsonUtils::fetchValue(_config_, "monitorRefreshRateInMs", 500);
+  LogInfo << "Convergence monitor will be refreshed every " << _monitorRefreshRateInMs_ << "ms." << std::endl;
+  _convergenceMonitor_.setMaxRefreshRateInMs(_monitorRefreshRateInMs_);
+
   if( _saveDir_ != nullptr ){
     auto* dir = GenericToolbox::mkdirTFile(_saveDir_, "preFit/events");
     _propagator_.getTreeWriter().writeSamples(dir);
