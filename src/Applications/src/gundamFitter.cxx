@@ -98,10 +98,9 @@ int main(int argc, char** argv){
   if( JsonUtils::doKeyExist(jsonConfig, "minGundamVersion") ){
     LogThrowIf(
       not g.isNewerOrEqualVersion(JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion")),
-      "Minimal version requested by this config is \""
-      << JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion")
-      << "\" but the current one is: \"" << GundamVersionConfig::getVersionStr() << "\""
+      "Version check FAILED: " << GundamVersionConfig::getVersionStr() << " < " << JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion")
     );
+    LogInfo << "Version check passed: " << GundamVersionConfig::getVersionStr() << " >= " << JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion") << std::endl;
   }
 
   bool isDryRun = clParser.isOptionTriggered("dry-run");
