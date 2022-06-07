@@ -50,8 +50,6 @@ bool GundamGreetings::isNewerOrEqualVersion(const std::string &minimalVersion_){
   // stripping "f" tag
   if( minVersionSplit[2].back() == 'f' ){ minVersionSplit[2].pop_back(); }
   if( curVersionSplit[2].back() == 'f' ){ curVersionSplit[2].pop_back(); }
-  LogTrace << minVersionSplit[2] << std::endl;
-  LogTrace << curVersionSplit[2] << std::endl;
 
   if( std::stoi(curVersionSplit[0]) > std::stoi(minVersionSplit[0]) ) return true; // major is GREATER -> OK
   if( std::stoi(curVersionSplit[0]) < std::stoi(minVersionSplit[0]) ) return false; // major is LOWER -> NOT OK
