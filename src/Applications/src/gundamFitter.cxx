@@ -95,6 +95,14 @@ int main(int argc, char** argv){
   LogInfo << "Reading config file: " << configFilePath << std::endl;
   auto jsonConfig = JsonUtils::readConfigFile(configFilePath); // works with yaml
 
+  if( JsonUtils::doKeyExist(jsonConfig, "minGundamVersion") ){
+    LogThrowIf(
+      not g.isNewerOrEqualVersion(JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion")),
+      "Version check FAILED: " << GundamVersionConfig::getVersionStr() << " < " << JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion")
+    );
+    LogInfo << "Version check passed: " << GundamVersionConfig::getVersionStr() << " >= " << JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion") << std::endl;
+  }
+
   bool isDryRun = clParser.isOptionTriggered("dry-run");
   bool enableParameterScan = clParser.isOptionTriggered("scanParameters") or JsonUtils::fetchValue(jsonConfig, "scanParameters", false);
   int nbScanSteps = clParser.getOptionVal("scanParameters", 100);
