@@ -12,8 +12,6 @@
 #include "memory"
 #include "string"
 
-#define USE_TSPLINE3_EVAL
-
 class SplineDial : public Dial {
 
 public:
@@ -56,7 +54,8 @@ protected:
 #ifndef USE_TSPLINE3_EVAL
 public:
   typedef enum {
-    Undefined,  // Fall back to using plain old TSpline3
+    Undefined,  // This should not occur
+    ROOTSpline, // Use ROOTs cubic spline (i.e. TSpline3), cannot use with GPU
     Monotonic,  // Use a monotonic cubic spline (only uses function value)
     Uniform,    // Use a cubic spline with uniformly spaced knots
     General,    // A general cubic spline
@@ -67,11 +66,11 @@ public:
 
 protected:
   // The type of spline that should be used for this dial.
-  Subtype _splineType_;
+  Subtype _splineType_{ROOTSpline};
 
-  // A block of data to calculate the spline values.  This can be copied to
-  // the Cache::Manager and lets the same spline calculation be used here and
-  // there.
+  // A block of data to calculate the spline values.  This must be filled for
+  // the Cache::Manager to work, and provides the input for spline calculation
+  // functions that can be shared between the CPU and the GPU.
   std::vector<double> _splineData_;
 
   // This fills _splineData_ and sets the _splineType_.  It uses the spline

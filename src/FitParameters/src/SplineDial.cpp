@@ -79,8 +79,8 @@ const TSpline3* SplineDial::getSplinePtr() const {
 }
 
 double SplineDial::calcDial(double parameterValue_) {
-  if     (parameterValue_ <= _spline_.GetXmin()) { return _spline_.Eval(_spline_.GetXmin()); }
-  else if(parameterValue_ >= _spline_.GetXmax()) { return _spline_.Eval(_spline_.GetXmax()); }
+  if     (parameterValue_ <= _spline_.GetXmin()) { parameterValue_ = _spline_.GetXmin(); }
+  else if(parameterValue_ >= _spline_.GetXmax()) { parameterValue_ = _spline_.GetXmax(); }
 #ifdef USE_TSPLINE3_EVAL
   return _spline_.Eval(parameterValue_);
 #else
@@ -99,6 +99,9 @@ double SplineDial::calcDial(double parameterValue_) {
       dialResponse = CalculateMonotonicSpline(
           parameterValue_, -1E20, 1E20,
           _splineData_.data(), _splineData_.size());
+  }
+  else if (_splineType_ == SplineDial::ROOTSpline) {
+      dialResponse = _spline_.Eval(parameterValue_);
   }
   else {
       LogThrow("Must have a spline type defined");
@@ -163,6 +166,7 @@ const std::vector<double>& SplineDial::getSplineData() const {
 SplineDial::Subtype SplineDial::getSplineType() const {
   return _splineType_;
 }
+
 void SplineDial::fillSplineData() {
     // Check if the spline has uniformly spaced knots.  There is a flag for
     // this is TSpline3, but it's not uniformly (or ever) filled correctly.
@@ -192,6 +196,7 @@ void SplineDial::fillSplineData() {
     } while(false);
 
 }
+
 bool SplineDial::fillMonotonicSpline(bool uniformKnots) {
     // A monotonic spline has been explicitly requested
     if (!uniformKnots) {
