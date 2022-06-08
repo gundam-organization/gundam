@@ -205,8 +205,8 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
                 if (gDial) {
                     ++graphs;
                 }
-                const NormalizationDial* nDial
-                    = dynamic_cast<const NormalizationDial*>(dial);
+                const NormDial* nDial
+                    = dynamic_cast<const NormDial*>(dial);
                 if (nDial) {
                     ++norms;
                 }
