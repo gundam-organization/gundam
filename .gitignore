@@ -49,3 +49,4 @@ work/
 
 # Cached files
 ._*
+.DS_Store
