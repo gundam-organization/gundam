@@ -760,12 +760,14 @@ void FitterEngine::updateChi2Cache(){
 double FitterEngine::evalFit(const double* parArray_){
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 
-  if( _nbFitCalls_ == 1 ){
-    // don't erase these lines
-    LogInfo << _convergenceMonitor_.generateMonitorString();
-  }
-  else{
-    LogInfo << _convergenceMonitor_.generateMonitorString(true , true);
+  if(_convergenceMonitor_.isGenerateMonitorStringOk() and _enableFitMonitor_ ){
+    if( _nbFitCalls_ == 1 ){
+      // don't erase these lines
+      LogInfo << _convergenceMonitor_.generateMonitorString();
+    }
+    else{
+      LogInfo << _convergenceMonitor_.generateMonitorString(true , true);
+    }
   }
 
   if(_nbFitCalls_ != 0){
