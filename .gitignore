@@ -46,3 +46,6 @@ work/
 *.exe
 *.out
 *.app
+
+# Cached files
+._*

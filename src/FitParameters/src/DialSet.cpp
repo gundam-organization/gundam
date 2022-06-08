@@ -8,7 +8,6 @@
 #include "NormDial.h"
 #include "SplineDial.h"
 #include "GraphDial.h"
-#include "GraphDialLin.h"
 #include "FitParameter.h"
 
 #include "Logger.h"
@@ -366,14 +365,6 @@ bool DialSet::initializeDialsWithDefinition() {
             g.setGraph(*(TGraph*) dialsList->At(iBin));
             g.initialize();
             _dialList_.emplace_back( std::make_unique<GraphDial>(g) );
-          }
-          else if( _globalDialType_ == DialType::GraphLin ){
-            GraphDialLin gLin;
-            this->applyGlobalParameters(&gLin);
-            gLin.setApplyConditionBin(&_binningCacheList_.back().getBinsList()[iBin]);
-            gLin.setGraph(*(TGraph*) dialsList->At(iBin));
-            gLin.initialize();
-            _dialList_.emplace_back( std::make_unique<GraphDialLin>(gLin) );
           }
           else{
             LogThrow("Should not be here???")

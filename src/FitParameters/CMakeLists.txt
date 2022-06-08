@@ -6,7 +6,6 @@ set(SRCFILES
         src/NormDial.cpp
         src/SplineDial.cpp
         src/GraphDial.cpp
-        src/GraphDialLin.cpp
         src/NestedDialTest.cpp
         )
 
