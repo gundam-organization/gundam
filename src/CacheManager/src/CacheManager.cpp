@@ -146,7 +146,6 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
     int generalSplines = 0;
     int generalPoints = 0;
     int graphs = 0;
-    int graphsLin = 0;
     int graphPoints = 0;
     int norms = 0;
     Cache::Manager::ParameterMap.clear();
@@ -205,11 +204,6 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
                     = dynamic_cast<const GraphDial*>(dial);
                 if (gDial) {
                     ++graphs;
-                }
-                const GraphDialLin* gDialLin
-                    = dynamic_cast<const GraphDialLin*>(dial);
-                if (gDialLin) {
-                    ++graphsLin;
                 }
                 const NormalizationDial* nDial
                     = dynamic_cast<const NormalizationDial*>(dial);

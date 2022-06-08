@@ -15,7 +15,6 @@ ENUM_EXPANDER( DialType, -1
                , Norm
                , Spline
                , Graph
-               , GraphLin
                , Nested
 )
 
