@@ -19,9 +19,9 @@
 #include <TTreeFormulaManager.h>
 #include "TTree.h"
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[DataSetLoader]");
-})
+});
 
 DatasetLoader::DatasetLoader() { this->reset(); }
 DatasetLoader::~DatasetLoader(){ this->reset(); }

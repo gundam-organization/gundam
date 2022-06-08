@@ -1,30 +1,75 @@
 cmake_minimum_required (VERSION 3.12 FATAL_ERROR)
 
 # Configure CMake project
-project(gundam)
-set (gundam_VERSION_MAJOR 1)
-set (gundam_VERSION_MINOR 4)
-set (gundam_VERSION_REVISION 0)
-set (gundam_VERSION_TAG "f") # f means forward -> include commits after a given release
-set (gundam_VERSION_STRING "${gundam_VERSION_MAJOR}.${gundam_VERSION_MINOR}.${gundam_VERSION_REVISION}${gundam_VERSION_TAG}")
+project(GUNDAM)
 
 option(CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ langauge (-std=gnu++14)." OFF)
 option(CXX_MARCH_FLAG "Enable cpu architecture specific optimzations." OFF)
 option(CXX_WARNINGS "Enable most C++ warning flags." ON)
 option(COLOR_OUTPUT "Enable colored terminal output." ON)
 option(TTYCHECK "Enable check if output is being sent to terminal/TTY." ON)
-option(WITH_OPENMP "Build with OpenMP libraries" OFF )
-option(WITH_CUDA "Build with CUDA (if available)" OFF)
+option(WITH_OPENMP "(OLD) Build with OpenMP libraries" OFF )
+option(WITH_CACHE_MANAGER "Build with precalculated weight cache" OFF)
+option(DISABLE_CUDA "Disable CUDA language check (enable for testing only)" OFF)
 option(YAMLCPP_DIR "Set custom path to yaml-cpp lib" OFF )
 option(ENABLE_DEV_MODE "Enable specific dev related printouts" OFF )
 option(BATCH_MODE "Build to run in a batch queue (affects output)" OFF)
+option(BUILD_DOC "Build documentation" OFF)
+option(WITH_XSLLHFITTER "Build old xsllhFitter apps/libraries" OFF)
+option(USE_STATIC_LINKS "Library build in static mod" OFF)
+
+
+# Cmake includes
+include(${CMAKE_SOURCE_DIR}/cmake/cmessage.cmake)
+
+# Git version
+execute_process(
+        COMMAND git describe --tags
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE VERSION
+        RESULT_VARIABLE RETURN_VAL
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+if(RETURN_VAL EQUAL "0")
+    cmessage(STATUS "Git version: ${VERSION}")
+
+    string(REPLACE "-" ";" VERSION_SEP ${VERSION})
+    list(LENGTH VERSION_SEP len)
+
+    if( ${len} GREATER_EQUAL 2 )
+        list(GET VERSION_SEP 0 VERSION_STR)         # VERSION_SEP[0] = X.X.X
+        list(GET VERSION_SEP 1 VERSION_POST_NB)     # VERSION_SEP[1] = NB COMMITS AFTER TAG
+        list(GET VERSION_SEP 2 VERSION_POST_COMMIT) # VERSION_COMMIT[2] = "g" + COMMIT HASH
+        #    set(GUNDAM_VERSION_TAG "-${VERSION_POST_NB}-${VERSION_POST_COMMIT}")
+        set(GUNDAM_VERSION_TAG "f")
+    else()
+        list(GET VERSION_SEP 0 VERSION_STR)         # VERSION_SEP[0] = X.X.X
+        set(GUNDAM_VERSION_TAG "")
+    endif()
+
+    # Parsing version number
+    string(REPLACE "." ";" VERSION_STR_SEP ${VERSION_STR})
+    list(GET VERSION_STR_SEP 0 GUNDAM_VERSION_MAJOR)
+    list(GET VERSION_STR_SEP 1 GUNDAM_VERSION_MINOR)
+    list(GET VERSION_STR_SEP 2 GUNDAM_VERSION_REVISION)
+
+    set (GUNDAM_VERSION_STRING "${GUNDAM_VERSION_MAJOR}.${GUNDAM_VERSION_MINOR}.${GUNDAM_VERSION_REVISION}${GUNDAM_VERSION_TAG}")
+else()
+    cmessage(WARNING "Bad exit status")
+    set (GUNDAM_VERSION_STRING "X.X.X")
+endif()
+
+
+
+
 
 set(VERBOSE TRUE)
 
-include(${CMAKE_SOURCE_DIR}/cmake/cmessage.cmake)
-
 # Check for the availability of CUDA
-if(WITH_CUDA)
+if(DISABLE_CUDA)
+    cmessage(STATUS "WARNING: CUDA support is disabled")
+    cmessage(WARNING "WARNING: CUDA support disabled")
+else()
     include(CheckLanguage)
     check_language(CUDA)
     if(CMAKE_CUDA_COMPILER)
@@ -44,9 +89,7 @@ if(WITH_CUDA)
         endif()
         cmessage(STATUS "CUDA compilation architectures: \"${CMAKE_CUDA_ARCHITECTURES}\"")
     endif(CMAKE_CUDA_COMPILER)
-else()
-    cmessage(STATUS "CUDA support disabled")
-endif(WITH_CUDA)
+endif(DISABLE_CUDA)
 
 # Changes default install path to be a subdirectory of the build dir.
 # Should set the installation dir at configure time with
@@ -67,15 +110,13 @@ if(NOT DEFINED CMAKE_BUILD_TYPE
 endif()
 cmessage(STATUS "CMAKE_BUILD_TYPE: \"${CMAKE_BUILD_TYPE}\"")
 
-if(NOT DEFINED USE_STATIC_LINKS)
-    set(USE_STATIC_LINKS 0)
-endif()
 
 if(BATCH_MODE)
   set(COLOR_OUTPUT NO)
   set(TTYCHECK NO)
   add_definitions(-DGUNDAM_BATCH)
 endif(BATCH_MODE)
+
 
 ################################################################################
 #                            Check Dependencies
@@ -162,8 +203,8 @@ if( "${YAML_CPP_INCLUDE_DIR} " STREQUAL " ")
 #    list(APPEND LINK_LIBARY_LIST ${YAMLCPP_LIBRARY})
 endif()
 
-if (WITH_CUDA)
-  add_definitions( -DGUNDAM_USING_CUDA )
+if (WITH_CACHE_MANAGER)
+  add_definitions( -DGUNDAM_USING_CACHE_MANAGER)
 
   # uncomment to enable the slow validations (NEVER during productions
   # or normal running).  These are whole code validations and are
@@ -176,6 +217,7 @@ if (WITH_CUDA)
 
   cmessage(STATUS "Enable GPU support (compiled, but only used when CUDA enabled)")
 endif()
+
 
 ################################################################################
 #                       SubModules
@@ -192,7 +234,7 @@ if(yaml-cpp_FOUND)
     add_definitions( -DCMDLINEPARSER_YAML_CPP_ENABLED=1 )
 endif()
 
-## Add the GenericToolbox
+## Add the GenericToolbox²
 # Reproduce needed parts of the cpp-generic-toolbox CMakeLists.txt
 include_directories(submodules/cpp-generic-toolbox/include)
 add_definitions( -D PROGRESS_BAR_FILL_TAG="\\\"T2K\#"\\\" )
@@ -230,6 +272,7 @@ else()
     add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=1 )
 endif()
 
+
 ################################################################################
 #                            Compiler Setup
 ################################################################################
@@ -265,15 +308,14 @@ else()
 endif()
 
 if(CXX_MARCH_FLAG)
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native")
 endif()
 
 if(CXX_WARNINGS)
   cmessage(STATUS "Enable CXX warnings")
-  add_compile_options(-Wall)
-  add_compile_options(-Wno-unused-variable)
-  add_compile_options(-Wno-sign-compare)
-  add_compile_options(-Wno-unused-function)
+  add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wall>)
+  add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-variable>)
+  add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wno-sign-compare>)
+  add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-function>)
   # add_compile_options(-Wformat=0)
   # add_compile_options(-Wno-reorder)
 endif()
@@ -286,19 +328,49 @@ if(TTYCHECK)
   add_definitions(-D TTYCHECK)
 endif()
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Og")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O2")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fPIC -g")
 
 cmessage (STATUS "C++ Compiler      : ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 cmessage (STATUS "C++ Release flags : ${CMAKE_CXX_FLAGS_RELEASE}")
 cmessage (STATUS "C++ Debug flags   : ${CMAKE_CXX_FLAGS_DEBUG}")
 
+
 ################################################################################
 # CMake Generated
 ###############################################################################
 
-configure_file( ${CMAKE_SOURCE_DIR}/cmake/versionConfig.h.in ${CMAKE_BINARY_DIR}/generated/versionConfig.h )
+configure_file( ${CMAKE_SOURCE_DIR}/cmake/VersionConfig.h.in ${CMAKE_BINARY_DIR}/generated/VersionConfig.h )
 include_directories( ${CMAKE_BINARY_DIR}/generated/ )
+
+
+################################################################################
+# Doxygen
+###############################################################################
+
+if( BUILD_DOC )
+    # check if Doxygen is installed
+    find_package(Doxygen)
+    if (DOXYGEN_FOUND)
+        # set input and output files
+        set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/doxygen/Doxygen.in)
+        set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
+
+        # request to configure the file
+        configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
+        message("Doxygen build started")
+
+        # note the option ALL which allows to build the docs together with the application
+        add_custom_target( doxygen ALL
+                COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
+                WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+                COMMENT "Generating API documentation with Doxygen"
+                VERBATIM )
+    else (DOXYGEN_FOUND)
+        message("Doxygen need to be installed to generate the doxygen documentation")
+    endif (DOXYGEN_FOUND)
+endif()
+
 
 ################################################################################
 #                            Specify Target Subdirs
@@ -306,15 +378,26 @@ include_directories( ${CMAKE_BINARY_DIR}/generated/ )
 
 set( MODULES
         Utils
-        anaevents
-        CacheManager
         DialDirectory
         FitParameters
         FitSamples
         DatasetManager
-        ErrorPropagator
+        Propagator
         Fitter
 )
+
+if(WITH_CACHE_MANAGER)
+    cmessage (STATUS "Adding cmake module: CacheManager")
+    list( APPEND MODULES CacheManager )
+endif()
+
+if(WITH_XSLLHFITTER)
+    list( APPEND MODULES XsllhFitter/Utils )
+    list( APPEND MODULES XsllhFitter/Parameters )
+    list( APPEND MODULES XsllhFitter/Anaevents )
+    list( APPEND MODULES XsllhFitter/ErrProp )
+    list( APPEND MODULES XsllhFitter/Fitter )
+endif()
 
 cmessage (STATUS "Configuring modules...")
 foreach(mod ${MODULES})
@@ -324,9 +407,13 @@ endforeach()
 
 add_subdirectory( ${CMAKE_SOURCE_DIR}/src/Applications )
 
+if(WITH_XSLLHFITTER)
+    add_subdirectory( ${CMAKE_SOURCE_DIR}/src/XsllhFitter/Applications )
+endif()
+
 configure_file(cmake/build_setup.sh.in
   "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/setup.sh" @ONLY)
 install(FILES "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/setup.sh"
   DESTINATION ${CMAKE_INSTALL_PREFIX})
 
-cmessage( STATUS "Tagged Version ${gundam_VERSION_STRING}" )
+cmessage( STATUS "Identified Version ${GUNDAM_VERSION_STRING}" )

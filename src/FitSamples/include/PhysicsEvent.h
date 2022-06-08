@@ -5,9 +5,6 @@
 #ifndef GUNDAM_PHYSICSEVENT_H
 #define GUNDAM_PHYSICSEVENT_H
 
-
-
-#include "AnaEvent.hh"
 #include "FitParameterSet.h"
 #include "Dial.h"
 #include "NestedDialTest.h"
@@ -72,17 +69,17 @@ public:
   int findVarIndex(const std::string& leafName_, bool throwIfNotFound_ = true) const;
   template<typename T> auto getVarValue(const std::string& leafName_, size_t arrayIndex_ = 0) const -> T;
   template<typename T> auto getVariable(const std::string& leafName_, size_t arrayIndex_ = 0) -> T&;
-  template<typename T> auto getVariablePtr(const std::string& leafName_, size_t arrayIndex_ = 0) -> T*;
   void* getVariableAddress(const std::string& leafName_, size_t arrayIndex_ = 0);
   double getVarAsDouble(const std::string& leafName_, size_t arrayIndex_ = 0) const;
   double getVarAsDouble(int varIndex_, size_t arrayIndex_ = 0) const;
+  const GenericToolbox::AnyType& getVar(int varIndex_, size_t arrayIndex_ = 0) const;
+  void fillBuffer(const std::vector<int>& indexList_, std::vector<double>& buffer_) const;
 
   // Eval
   double evalFormula(TFormula* formulaPtr_, std::vector<int>* indexDict_ = nullptr) const;
 
   // Misc
   void print() const;
-  bool isSame(AnaEvent& anaEvent_) const;
   void trimDialCache();
   std::string getSummary() const;
   std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>> generateLeavesDictionary(bool disableArrays_ = false) const;
@@ -90,6 +87,8 @@ public:
   void copyData(const std::vector<std::pair<const GenericToolbox::LeafHolder*, int>>& dict_, bool disableArrayStorage_=false);
   std::vector<std::pair<const GenericToolbox::LeafHolder*, int>> generateDict(const GenericToolbox::TreeEventBuffer& h_, const std::map<std::string, std::string>& leafDict_={});
   void copyLeafContent(const PhysicsEvent& ref_);
+  void resizeVarToDoubleCache();
+  void invalidateVarToDoubleCache();
 
   // Stream operator
   friend std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p );
@@ -113,9 +112,9 @@ private:
   // Cache variables
   std::vector<Dial*> _rawDialPtrList_{};
   std::vector<std::pair<NestedDialTest*, std::vector<Dial*>>> _nestedDialRefList_{};
+  mutable std::vector<std::vector<double>> _varToDoubleCache_{};
 
-
-#ifdef GUNDAM_USING_CUDA
+#ifdef GUNDAM_USING_CACHE_MANAGER
 public:
   void setCacheManagerIndex(int i) {_CacheManagerIndex_ = i;}
   int  getCacheManagerIndex() {return _CacheManagerIndex_;}

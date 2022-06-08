@@ -23,7 +23,7 @@ namespace DialType{
   ENUM_EXPANDER(
     DialType, -1
     ,Invalid
-    ,Normalization // response = dial
+    ,Norm          // response = dial
     ,Spline        // response = spline(dial)
     ,Graph         // response = graphInterpol(dial)
     ,GraphLin         // response = graph Linear Interpol(dial)
@@ -31,10 +31,15 @@ namespace DialType{
 }
 
 class DialSet; // owner
-//template <class T>  class DialWrapper;
 class DialWrapper;
 
 class Dial {
+
+public:
+  // Don't check the mask everytime since it is memory delocalized
+  static bool enableMaskCheck;
+  static bool disableDialCache;
+  static bool throwIfResponseIsNegative;
 
 protected:
   // Not supposed to define a bare Dial. Use the downcast instead
@@ -54,43 +59,48 @@ public:
 
   // const getters
   bool isReferenced() const;
+  bool isMasked() const;
   double getDialResponseCache() const;
-  const DataBin* getApplyConditionBinPtr() const;
+  double getAssociatedParameter() const;
   DialType::DialType getDialType() const;
+  const DataBin* getApplyConditionBinPtr() const;
   const DialSet* getOwner() const;
 
+  // getters
   DataBin* getApplyConditionBinPtr();
 
-  double getAssociatedParameter() const;
-
-  void updateEffectiveDialParameter();
+  // calc
+  double getEffectiveDialParameter(double parameterValue_);
+  double capDialResponse(double response_);
   double evalResponse();
-//  void copySplineCache(TSpline3& splineBuffer_);
 
+  // virtual
+  virtual double calcDial(double parameterValue_) = 0;
   virtual double evalResponse(double parameterValue_);
   virtual std::string getSummary();
+
+  // debug
+  virtual void writeSpline(const std::string &fileName_) const {}
+
+
+//  void copySplineCache(TSpline3& splineBuffer_);
 //  virtual void buildResponseSplineCache();
-  virtual void fillResponseCache() = 0;
 
 protected:
   //! KEEP THE MEMBER AS LIGHT AS POSSIBLE!!
-
   const DialType::DialType _dialType_; // Defines the
-  // The DialSet that owns this dial.  The dial DOES NOT OWN THIS POINTER
   const DialSet* _owner_{nullptr};
 
   // Parameters
   DataBin* _applyConditionBin_{nullptr};
 
   // Internals
-  bool _isEditingCache_{false};
   GenericToolbox::NoCopyWrapper<std::mutex> _evalDialLock_;
   bool _isReferenced_{false};
-  double _dialResponseCache_{};
-  double _dialParameterCache_{};
-  double _effectiveDialParameterValue_{}; // take into account internal transformations while using mirrored splines transformations
+  double _dialResponseCache_{std::nan("unset")};
+  double _dialParameterCache_{std::nan("unset")};
 
-#ifdef GUNDAM_USING_CUDA
+#ifdef GUNDAM_USING_CACHE_MANAGER
   // Debugging.  This is only meaningful when the GPU is filling the spline
   // value cache (only filled during validation).
 public:

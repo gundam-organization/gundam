@@ -28,7 +28,7 @@ on the issue tracker of github!
 
 Let's now use a more up-to-date version of cmake:
 ```sh
-ccenv cmake
+ccenv cmake 3.20.2
 ```
 
 You can also provide a specific version with `ccenv`. Available versions can

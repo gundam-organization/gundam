@@ -11,9 +11,9 @@
 
 #include "DataBin.h"
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[DataBin]");
-} )
+} );
 
 DataBin::DataBin() {
   reset();
@@ -100,17 +100,12 @@ const std::vector<int> &DataBin::getEventVarIndexCache() const {
 
 // Management
 bool DataBin::isInBin(const std::vector<double>& valuesList_) const{
-  if( valuesList_.size() != _edgesList_.size() ){
-    LogError << "Provided " << GET_VAR_NAME_VALUE(valuesList_.size()) << " does not match " << GET_VAR_NAME_VALUE(_edgesList_.size()) << std::endl;
-    throw std::logic_error("Values list size does not match the bin edge list size.");
-  }
+  LogThrowIf( valuesList_.size() != _edgesList_.size(),
+              "Provided " << GET_VAR_NAME_VALUE(valuesList_.size()) << " does not match " << GET_VAR_NAME_VALUE(_edgesList_.size()));
+  const double* buf = &valuesList_[0];
 
-  for( size_t iVar = 0 ; iVar < _edgesList_.size() ; iVar++ ){
-    if( not this->isBetweenEdges(iVar, valuesList_.at(iVar)) ){
-      return false;
-    }
-  }
-  return true;
+  // is "all_of" the variables between defined edges
+  return std::all_of(_edgesList_.begin(), _edgesList_.end(), [&](auto& edge){ return (DataBin::isBetweenEdges(edge, *(buf++))); });
 }
 bool DataBin::isBetweenEdges(const std::string& variableName_, double value_) const {
   if( not this->isVariableSet(variableName_) ){
@@ -128,12 +123,6 @@ bool DataBin::isBetweenEdges(size_t varIndex_, double value_) const{
   }
 
   return this->isBetweenEdges(_edgesList_.at(varIndex_), value_);
-}
-bool DataBin::isBetweenEdges(const std::pair<double,double>& edges_, double value_) const{
-  if(edges_.first == edges_.second ){ return edges_.first == value_; }
-  if(edges_.first > value_){ return false; }
-  if(edges_.second <= value_){ return false; }
-  return true;
 }
 
 // Misc
@@ -198,6 +187,13 @@ void DataBin::generateTreeFormula() {
   }
   _treeFormula_ = std::shared_ptr<TTreeFormula>(GenericToolbox::createTreeFormulaWithoutTree(_treeFormulaStr_, varNameList));
 
+}
+
+// Static
+bool DataBin::isBetweenEdges(const std::pair<double,double>& edges_, double value_){
+  if(edges_.first == edges_.second ){ return (edges_.first == value_); } // condition variable?
+  if(edges_.first > value_ or edges_.second <= value_){ return false; }  // out of range
+  return true; // inside
 }
 
 // Protected

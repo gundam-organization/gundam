@@ -7,8 +7,8 @@
 
 #include "GenericToolbox.h"
 
-#include "mutex"
-#include "vector"
+#include <vector>
+#include <mutex>
 
 ENUM_EXPANDER( DialType, -1
                , Unset
@@ -36,8 +36,6 @@ public:
 private:
   const DialType _dialType_;
   std::shared_ptr<std::mutex> _evalMutex_{nullptr};
-
-
 
 };
 

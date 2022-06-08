@@ -12,10 +12,10 @@
 #include "JsonUtils.h"
 #include "YamlUtils.h"
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[JsonUtils]");
   Logger::setMaxLogLevel(Logger::LogLevel::INFO);
-} )
+} );
 
 namespace JsonUtils{
   nlohmann::json readConfigFile(const std::string& configFilePath_){

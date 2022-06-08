@@ -9,7 +9,9 @@
 #include "GenericToolbox.Root.h"
 
 
-LoggerInit([]{ Logger::setUserHeaderStr("[TreeWriter]"); })
+LoggerInit([]{
+  Logger::setUserHeaderStr("[TreeWriter]");
+});
 
 EventTreeWriter::EventTreeWriter() = default;
 EventTreeWriter::~EventTreeWriter() = default;

@@ -9,9 +9,10 @@
 
 #include "GenericToolbox.h"
 
+#include "nlohmann/json.hpp"
+
 #include "string"
 #include "iostream"
-#include "json.hpp"
 
 namespace JsonUtils {
 

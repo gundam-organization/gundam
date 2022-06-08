@@ -11,7 +11,7 @@
 
 #include "vector"
 #include "string"
-#include "json.hpp"
+#include "nlohmann/json.hpp"
 
 namespace PriorType{
   ENUM_EXPANDER(
@@ -20,8 +20,6 @@ namespace PriorType{
     Gaussian,
     Flat
   );
-
-  PriorType toPriorType(const std::string& priorStr_);
 }
 
 class FitParameterSet;

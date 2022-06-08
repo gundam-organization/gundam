@@ -50,13 +50,15 @@ public:
   bool isInBin(const std::vector<double>& valuesList_) const;
   bool isBetweenEdges(const std::string& variableName_, double value_) const;
   bool isBetweenEdges(size_t varIndex_, double value_) const;
-  bool isBetweenEdges(const std::pair<double,double>& edges_, double value_) const;
 
   // Misc
   bool isVariableSet(const std::string& variableName_) const;
   std::string getSummary() const;
   void generateFormula();
   void generateTreeFormula();
+
+  // Static
+  static bool isBetweenEdges(const std::pair<double,double>& edges_, double value_);
 
 protected:
   std::string generateFormulaStr(bool varNamesAsTreeFormula_);

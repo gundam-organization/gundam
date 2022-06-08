@@ -11,7 +11,7 @@
 #include "PlotGenerator.h"
 
 #include <TChain.h>
-#include "json.hpp"
+#include "nlohmann/json.hpp"
 
 #include "vector"
 #include "string"

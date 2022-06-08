@@ -3,69 +3,74 @@
 //
 
 #include "Logger.h"
+#include "GenericToolbox.h"
+#include "GenericToolbox.ParallelWorker.h"
 
 #include "string"
 #include "vector"
 #include "memory"
+#include "future"
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[Sandbox]");
-})
+});
 
-class Base{
-public:
-  virtual ~Base() = default;
-  Base() = default;
-  virtual std::unique_ptr<Base> clone() = 0;
-  virtual std::string name(){ return "B"; }
-};
-class Derivative1: public Base{
-public:
-  ~Derivative1() override = default;
-  Derivative1() = default;
-  std::unique_ptr<Base> clone() override { return std::make_unique<Derivative1>(*this); }
-  std::string name() override { return "D1"; }
-};
-class Derivative2: public Base{
-public:
-  ~Derivative2() override = default;
-  Derivative2() = default;
-  std::unique_ptr<Base> clone() override { return std::make_unique<Derivative2>(*this); }
-  std::string name() override { return "D2"; }
-};
-
-class Wrapper{
-public:
-  ~Wrapper() = default;
-  Wrapper() = default;
-  explicit Wrapper(std::unique_ptr<Base> def): m{std::move(def)} {};
-  Wrapper(const Wrapper& src_): m{src_.m->clone()} {  }
-
-  Base* operator->() const { return m.get(); }
-
-  std::unique_ptr<Base> m;
-};
-
-class Host{
-public: std::vector<Wrapper> _derivativeList_{};
-};
-
-class Owner{
-public: std::vector<Host> _hostList_;
-};
 
 int main(int argc, char** argv){
-  Owner o;
-  o._hostList_.resize(10);
+  int nThreads = 4;
 
-  Host& h = o._hostList_[0];
-  h._derivativeList_.emplace_back(std::make_unique<Derivative1>());
+  GenericToolbox::ParallelWorker w;
+  w.setNThreads(nThreads);
+  w.initialize();
 
-  Wrapper w = h._derivativeList_[0];
+  w.addJob("test", [](int iThread_){ LogTrace << GET_VAR_NAME_VALUE(iThread_) << std::endl; });
+  w.runJob("test");
+  w.removeJob("test");
 
-  std::cout << "NAME IS " << w->name() << std::endl;
+  LogWarning << "NEXT" << std::endl;
 
-  Owner o2(o);
+  int nRound{100};
+  while(nRound-- > 0){
+    LogWarning << GET_VAR_NAME_VALUE(nRound) << std::endl;
+    w.addJob("test", [](int iThread_){ LogTrace << GET_VAR_NAME_VALUE(iThread_) << std::endl; });
+    w.runJob("test");
+    w.removeJob("test");
+  }
+
+//  bool signal;
+//  std::mutex m;
+//  std::condition_variable v;
+//
+//  std::vector<std::future<void>> workers;
+//  for(int iThread=0 ; iThread < nThreads ; iThread++){
+//    LogInfo << GET_VAR_NAME_VALUE(iThread) << std::endl;
+//    std::function<void()> workerFct = [&, iThread](){
+//      std::unique_lock<std::mutex> lock(m);
+//      v.wait(lock, [&](){ return signal; });
+//      lock.unlock();
+//      LogWarning << "UNLOCKED " << GET_VAR_NAME_VALUE(iThread) << std::endl;
+//      std::this_thread::sleep_for(std::chrono::milliseconds(500));
+//    };
+//    workers.emplace_back(std::async( std::launch::async, workerFct ));
+//  }
+//
+//  LogInfo << "TAKING LOCK?" << std::endl;
+//  std::unique_lock<std::mutex> lock(m);
+//
+//  LogInfo << "SIGNAL ON" << std::endl;
+//  signal = true;
+//
+//  LogInfo << "NOTIFY" << std::endl;
+//  v.notify_all();
+//  lock.unlock();
+//
+//  LogInfo << "GET THREADS" << std::endl;
+//  for( auto& worker : workers ){
+//    worker.get();
+//  }
+
+  LogInfo << "END" << std::endl;
+  return EXIT_SUCCESS;
 }
 
 

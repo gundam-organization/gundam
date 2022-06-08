@@ -13,7 +13,7 @@
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[MinimizerInterface]");
-})
+});
 
 
 MinimizerInterface::MinimizerInterface() {}

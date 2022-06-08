@@ -20,6 +20,8 @@ public:
   void hello();
   void goodbye();
 
+  static bool isNewerOrEqualVersion(const std::string &appName);
+
 private:
   std::string _appName_{};
 

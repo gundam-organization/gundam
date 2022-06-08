@@ -4,8 +4,7 @@
 #include "Dial.h"
 #include "SplineDial.h"
 #include "GraphDial.h"
-#include "GraphDialLin.h"
-#include "NormalizationDial.h"
+#include "NormDial.h"
 #include "GlobalVariables.h"
 
 #include "GenericToolbox.h"
@@ -14,9 +13,17 @@
 #include <vector>
 #include <set>
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[Cache]");
-})
+});
+
+bool Cache::Parameters::UsingCUDA() {
+#ifdef __CUDACC__
+    return true;
+#else
+    return false;
+#endif
+}
 
 Cache::Parameters::Parameters(std::size_t parameters)
 : fParameterCount{parameters} {
