@@ -252,9 +252,6 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
     LogInfo << "    Graphs: " << graphs
             << " (" << 1.0*graphs/events << " per event)"
             << std::endl;
-    LogInfo << "    GraphsLin: " << graphsLin
-            << " (" << 1.0*graphsLin/events << " per event)"
-            << std::endl;
     LogInfo << "    Normalizations: " << norms
             <<" ("<< 1.0*norms/events <<" per event)"
             << std::endl;
