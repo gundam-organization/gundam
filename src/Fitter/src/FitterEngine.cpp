@@ -759,6 +759,15 @@ void FitterEngine::updateChi2Cache(){
 }
 double FitterEngine::evalFit(const double* parArray_){
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+
+  if( _nbFitCalls_ == 1 ){
+    // don't erase these lines
+    LogInfo << _convergenceMonitor_.generateMonitorString();
+  }
+  else{
+    LogInfo << _convergenceMonitor_.generateMonitorString(true , true);
+  }
+
   if(_nbFitCalls_ != 0){
     _outEvalFitAvgTimer_.counts++ ; _outEvalFitAvgTimer_.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("out_evalFit");
   }
@@ -822,13 +831,13 @@ double FitterEngine::evalFit(const double* parArray_){
     _convergenceMonitor_.getVariable("Stat").addQuantity(_chi2StatBuffer_);
     _convergenceMonitor_.getVariable("Syst").addQuantity(_chi2PullsBuffer_);
 
-    if( _nbFitCalls_ == 1 ){
-      // don't erase these lines
-      LogInfo << _convergenceMonitor_.generateMonitorString();
-    }
-    else{
-      LogInfo << _convergenceMonitor_.generateMonitorString(true , true);
-    }
+//    if( _nbFitCalls_ == 1 ){
+//      // don't erase these lines
+//      LogInfo << _convergenceMonitor_.generateMonitorString();
+//    }
+//    else{
+//      LogInfo << _convergenceMonitor_.generateMonitorString(true , true);
+//    }
 
     _itSpeed_.counts = _nbFitCalls_;
   }
