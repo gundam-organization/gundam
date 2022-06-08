@@ -429,7 +429,7 @@ void DataDispenser::preAllocateMemory(){
     }
   }
 
-  LogInfo << "Current RAM is: " << GenericToolbox::parseSizeUnits(GenericToolbox::getProcessMemoryUsage()) << std::endl;
+  LogInfo << "Current RAM is: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage())) << std::endl;
 }
 void DataDispenser::readAndFill(){
   LogWarning << "Reading data set and loading..." << std::endl;
