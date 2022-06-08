@@ -295,6 +295,10 @@ bool DialSet::initializeNormDialsWithParBinning() {
   dial.initialize();
   _dialList_.emplace_back( std::make_unique<NormDial>(dial) );
 
+  // By default use min dial response for norm dials
+  _minDialResponse_ = JsonUtils::fetchValue(_config_, {{"minDialResponse"}, {"minimumSplineResponse"}}, 0);
+  _maxDialResponse_ = JsonUtils::fetchValue(_config_, "maxDialResponse", _maxDialResponse_);
+
   return true;
 }
 bool DialSet::initializeDialsWithDefinition() {
@@ -318,6 +322,10 @@ bool DialSet::initializeDialsWithDefinition() {
     dial.setOwner(this);
     dial.initialize();
     _dialList_.emplace_back( std::make_unique<NormDial>(dial) );
+
+    // By default use min dial response for norm dials
+    _minDialResponse_ = JsonUtils::fetchValue(_config_, {{"minDialResponse"}, {"minimumSplineResponse"}}, 0);
+    _maxDialResponse_ = JsonUtils::fetchValue(_config_, "maxDialResponse", _maxDialResponse_);
   }
   else if( _globalDialType_ == DialType::Spline or _globalDialType_ == DialType::Graph ){
 
