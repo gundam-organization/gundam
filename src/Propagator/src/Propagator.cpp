@@ -155,7 +155,7 @@ void Propagator::initialize() {
     dispenser.getConfigParameters().iThrow = _iThrow_;
 
     if( dispenser.getConfigParameters().name != "Asimov" ){ allAsimov = false; }
-    LogInfo << "Reading data set: " << dataSet.getName() << "/" << dispenser.getConfigParameters().name << std::endl;
+    LogInfo << "Reading dataset: " << dataSet.getName() << "/" << dispenser.getConfigParameters().name << std::endl;
 
     dispenser.setSampleSetPtrToLoad(&_fitSampleSet_);
     dispenser.setPlotGenPtr(&_plotGenerator_);

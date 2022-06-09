@@ -41,10 +41,11 @@ void DataDispenser::readConfig(){
 
   _parameters_.treePath = JsonUtils::fetchValue<std::string>(_config_, "tree", _parameters_.treePath);
   _parameters_.filePathList = JsonUtils::fetchValue<std::vector<std::string>>(_config_, "filePathList", _parameters_.filePathList);
-  _parameters_.selectionCutFormulaStr = JsonUtils::fetchValue(_config_, "selectionCutFormula", _parameters_.selectionCutFormulaStr);
-  _parameters_.nominalWeightFormulaStr = JsonUtils::fetchValue(_config_, "nominalWeightFormula", _parameters_.nominalWeightFormulaStr);
   _parameters_.additionalLeavesStorage = JsonUtils::fetchValue(_config_, "additionalLeavesStorage", _parameters_.additionalLeavesStorage);
   _parameters_.useMcContainer = JsonUtils::fetchValue(_config_, "useMcContainer", _parameters_.useMcContainer);
+
+  _parameters_.selectionCutFormulaStr = JsonUtils::buildFormula(_config_, "selectionCutFormula", "&&", _parameters_.selectionCutFormulaStr);
+  _parameters_.nominalWeightFormulaStr = JsonUtils::buildFormula(_config_, "nominalWeightFormula", "*", _parameters_.nominalWeightFormulaStr);
 
   if( JsonUtils::doKeyExist(_config_, "overrideLeafDict") ){
     _parameters_.overrideLeafDict.clear();
@@ -79,7 +80,7 @@ void DataDispenser::setPlotGenPtr(PlotGenerator *plotGenPtr) {
 }
 
 void DataDispenser::load(){
-  LogWarning << "Loading data set: " << getTitle() << std::endl;
+  LogWarning << "Loading dataset: " << getTitle() << std::endl;
   LogThrowIf(not _isInitialized_, "Can't load while not initialized.");
   LogThrowIf(_sampleSetPtrToLoad_==nullptr, "SampleSet not specified.");
 
@@ -87,7 +88,7 @@ void DataDispenser::load(){
 
   this->buildSampleToFillList();
   if( _cache_.samplesToFillList.empty() ){
-    LogError << "No samples were selected for data set: " << getTitle() << std::endl;
+    LogError << "No samples were selected for dataset: " << getTitle() << std::endl;
     return;
   }
 
@@ -428,9 +429,11 @@ void DataDispenser::preAllocateMemory(){
       }
     }
   }
+
+  LogInfo << "Current RAM is: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage())) << std::endl;
 }
 void DataDispenser::readAndFill(){
-  LogWarning << "Reading data set and loading..." << std::endl;
+  LogWarning << "Reading dataset and loading..." << std::endl;
 
   if( not _parameters_.nominalWeightFormulaStr.empty() ){
     LogInfo << "Nominal weight: \"" << _parameters_.nominalWeightFormulaStr << "\"" << std::endl;
@@ -559,6 +562,20 @@ void DataDispenser::readAndFill(){
 
       if( threadNominalWeightFormula != nullptr ){
         eventBuffer.setTreeWeight(threadNominalWeightFormula->EvalInstance());
+
+        if( eventBuffer.getTreeWeight() < 0 ){
+          LogError << "Negative nominal weight:" << std::endl;
+
+          LogError << "Event buffer is: " << eventBuffer.getSummary() << std::endl;
+
+          LogError << "Formula leaves:" << std::endl;
+          for( int iLeaf = 0 ; iLeaf < threadNominalWeightFormula->GetNcodes() ; iLeaf++ ){
+            if( threadNominalWeightFormula->GetLeaf(iLeaf) == nullptr ) continue; // for "Entry$" like dummy leaves
+            LogError << "Leaf: " << threadNominalWeightFormula->GetLeaf(iLeaf)->GetName() << "[0] = " << threadNominalWeightFormula->GetLeaf(iLeaf)->GetValue(0) << std::endl;
+          }
+
+          LogThrow("Negative nominal weight");
+        }
         if( eventBuffer.getTreeWeight() == 0 ){
           continue;
         } // skip this event

@@ -41,7 +41,7 @@ void DatasetLoader::setDataSetIndex(int dataSetIndex) {
 }
 
 void DatasetLoader::initialize() {
-  LogWarning << "Initializing data set loader..." << std::endl;
+  LogWarning << "Initializing dataset loader..." << std::endl;
   LogThrowIf(_config_.empty(), "Config not set.");
 
   _name_ = JsonUtils::fetchValue<std::string>(_config_, "name");

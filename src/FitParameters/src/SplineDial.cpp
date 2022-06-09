@@ -28,11 +28,12 @@ void SplineDial::reset() {
 }
 
 void SplineDial::copySpline(const TSpline3* splinePtr_){
-  LogThrowIf(_spline_.GetXmin() != _spline_.GetXmax(), "Spline already set")
+  // Don't check for override: when loading toy + mc data, these placeholders has to be filled up twice
+//  LogThrowIf(_spline_.GetXmin() != _spline_.GetXmax(), "Spline already set")
   _spline_ = *splinePtr_;
 }
 void SplineDial::createSpline(TGraph* grPtr_){
-  LogThrowIf(_spline_.GetXmin() != _spline_.GetXmax(), "Spline already set")
+//  LogThrowIf(_spline_.GetXmin() != _spline_.GetXmax(), "Spline already set")
   _spline_ = TSpline3(grPtr_->GetName(), grPtr_);
 #ifdef ENABLE_SPLINE_DIAL_FAST_EVAL
   fs.stepsize = (_spline_.GetXmax() - _spline_.GetXmin())/((double) grPtr_->GetN());

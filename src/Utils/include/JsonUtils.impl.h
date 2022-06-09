@@ -86,6 +86,10 @@ namespace JsonUtils {
     return fetchMatchingEntry(jsonConfig_, keyName_, std::string(keyValue_));
   }
 
+  // gundam specific
+  std::string buildFormula(const nlohmann::json& jsonConfig_, const std::string& keyName_, const std::string& joinStr_);
+  std::string buildFormula(const nlohmann::json& jsonConfig_, const std::string& keyName_, const std::string& joinStr_, const std::string& defaultFormula_);
+
 };
 
 
