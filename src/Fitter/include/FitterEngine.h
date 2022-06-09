@@ -66,6 +66,8 @@ protected:
   void rescaleParametersStepSize();
   void initializeMinimizer(bool doReleaseFixed_ = false);
 
+  void checkNumericalAccuracy();
+
 
 
 private:
