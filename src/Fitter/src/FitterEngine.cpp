@@ -174,6 +174,7 @@ void FitterEngine::initialize() {
 
   _scanConfig_ = ScanConfig( JsonUtils::fetchValue(_config_, "scanConfig", nlohmann::json()) );
 
+//  checkNumericalAccuracy();
 }
 
 bool FitterEngine::isFitHasConverged() const {
@@ -760,8 +761,8 @@ void FitterEngine::updateChi2Cache(){
 double FitterEngine::evalFit(const double* parArray_){
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 
-  if(_convergenceMonitor_.isGenerateMonitorStringOk() and _enableFitMonitor_ ){
-    if( _nbFitCalls_ == 1 ){
+  if( _convergenceMonitor_.isGenerateMonitorStringOk() and _enableFitMonitor_ and _nbFitCalls_ > 1 ){
+    if( _nbFitCalls_ == 2 ){
       // don't erase these lines
       LogInfo << _convergenceMonitor_.generateMonitorString();
     }
@@ -799,7 +800,8 @@ double FitterEngine::evalFit(const double* parArray_){
 
     std::stringstream ss;
     ss << __METHOD_NAME__ << ": call #" << _nbFitCalls_;
-    ss << std::endl << "Current RAM usage: " << GenericToolbox::parseSizeUnits(GenericToolbox::getProcessMemoryUsage());
+    ss << std::endl << "Target EDM: " << 0.001*_minimizer_->Tolerance()*2;
+    ss << std::endl << "Current RAM usage: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
     double cpuPercent = GenericToolbox::getCpuUsageByProcess();
     ss << std::endl << "Current CPU usage: " << cpuPercent << "% (" << cpuPercent/GlobalVariables::getNbThreads() << "% efficiency)";
     ss << std::endl << "Avg " << GUNDAM_CHI2 << " computation time: " << _evalFitAvgTimer_;
@@ -813,7 +815,7 @@ double FitterEngine::evalFit(const double* parArray_){
 #ifndef GUNDAM_BATCH
       ss << "├─";
 #endif
-      ss << " Avg time for " << _minimizerType_ << "/" << _minimizerAlgo_ << ": " << _outEvalFitAvgTimer_;
+      ss << " Avg time for " << _minimizerType_ << "/" << _minimizerAlgo_ << ":   " << _outEvalFitAvgTimer_;
       ss << std::endl;
 #ifndef GUNDAM_BATCH
       ss << "├─";
@@ -1445,4 +1447,53 @@ void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
     }
   }
 
+}
+
+
+void FitterEngine::checkNumericalAccuracy(){
+  LogWarning << __METHOD_NAME__ << std::endl;
+  int nTest{100}; int nThrows{10}; double gain{20};
+  std::vector<std::vector<std::vector<double>>> throws(nThrows); // saved throws [throw][parSet][par]
+  std::vector<double> responses(nThrows, std::nan("unset"));
+  // stability/numerical accuracy test
+
+  LogInfo << "Throwing..." << std::endl;
+  for(auto& throwEntry : throws ){
+    for( auto& parSet : _propagator_.getParameterSetsList() ){
+      if(not parSet.isEnabled()) continue;
+      if( not parSet.isEnabledThrowToyParameters() ){ continue;}
+      parSet.throwFitParameters(gain);
+      throwEntry.emplace_back(std::vector<double>(parSet.getParameterList().size(), 0));
+      for( size_t iPar = 0 ; iPar < parSet.getParameterList().size() ; iPar++){
+        throwEntry.back()[iPar] = parSet.getParameterList()[iPar].getParameterValue();
+      }
+      parSet.moveFitParametersToPrior();
+    }
+  }
+
+  LogInfo << "Testing..." << std::endl;
+  for( int iTest = 0 ; iTest < nTest ; iTest++ ){
+    GenericToolbox::displayProgressBar(iTest, nTest, "Testing computational accuracy...");
+    for( size_t iThrow = 0 ; iThrow < throws.size() ; iThrow++ ){
+      int iParSet{-1};
+      for( auto& parSet : _propagator_.getParameterSetsList() ){
+        if(not parSet.isEnabled()) continue;
+        if( not parSet.isEnabledThrowToyParameters() ){ continue;}
+        iParSet++;
+        for( size_t iPar = 0 ; iPar < parSet.getParameterList().size() ; iPar++){
+          parSet.getParameterList()[iPar].setParameterValue( throws[iThrow][iParSet][iPar] );
+        }
+      }
+      updateChi2Cache();
+
+      if( responses[iThrow] == responses[iThrow] ){ // not nan
+        LogThrowIf( _chi2Buffer_ != responses[iThrow], "Not accurate: " << _chi2Buffer_ - responses[iThrow] << " / "
+                                                                        << GET_VAR_NAME_VALUE(_chi2Buffer_) << " <=> " << GET_VAR_NAME_VALUE(responses[iThrow])
+        )
+      }
+      responses[iThrow] = _chi2Buffer_;
+    }
+    LogDebug << GenericToolbox::parseVectorAsString(responses) << std::endl;
+  }
+  LogInfo << "OK" << std::endl;
 }
