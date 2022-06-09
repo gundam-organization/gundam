@@ -80,7 +80,7 @@ void DataDispenser::setPlotGenPtr(PlotGenerator *plotGenPtr) {
 }
 
 void DataDispenser::load(){
-  LogWarning << "Loading data set: " << getTitle() << std::endl;
+  LogWarning << "Loading dataset: " << getTitle() << std::endl;
   LogThrowIf(not _isInitialized_, "Can't load while not initialized.");
   LogThrowIf(_sampleSetPtrToLoad_==nullptr, "SampleSet not specified.");
 
@@ -88,7 +88,7 @@ void DataDispenser::load(){
 
   this->buildSampleToFillList();
   if( _cache_.samplesToFillList.empty() ){
-    LogError << "No samples were selected for data set: " << getTitle() << std::endl;
+    LogError << "No samples were selected for dataset: " << getTitle() << std::endl;
     return;
   }
 
@@ -433,7 +433,7 @@ void DataDispenser::preAllocateMemory(){
   LogInfo << "Current RAM is: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage())) << std::endl;
 }
 void DataDispenser::readAndFill(){
-  LogWarning << "Reading data set and loading..." << std::endl;
+  LogWarning << "Reading dataset and loading..." << std::endl;
 
   if( not _parameters_.nominalWeightFormulaStr.empty() ){
     LogInfo << "Nominal weight: \"" << _parameters_.nominalWeightFormulaStr << "\"" << std::endl;

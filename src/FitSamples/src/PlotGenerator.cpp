@@ -361,7 +361,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
   // Fill histograms
   if( _fitSampleSetPtr_ != nullptr ){
     for( const auto& sample : _fitSampleSetPtr_->getFitSampleList() ){
-      // Data sets:
+      // Datasets:
       for( bool isData : { false, true } ){
 
         const std::vector<PhysicsEvent>* eventListPtr;

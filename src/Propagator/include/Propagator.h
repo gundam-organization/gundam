@@ -109,7 +109,7 @@ private:
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   // Build the precalculated caches.  This is only relevant when using a GPU
-  // and must be done after the data sets are loaded.  This returns true if
+  // and must be done after the datasets are loaded.  This returns true if
   // the cache is built.
   bool buildGPUCaches();
 
