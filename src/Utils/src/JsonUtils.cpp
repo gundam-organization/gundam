@@ -93,6 +93,38 @@ namespace JsonUtils{
     }
     return output;
   }
+
+  std::string buildFormula(const nlohmann::json& jsonConfig_, const std::string& keyName_, const std::string& joinStr_){
+    std::string out;
+
+    LogThrowIf( not JsonUtils::doKeyExist(jsonConfig_, keyName_), "Could not find key \"" << keyName_ << "\" in " << jsonConfig_ );
+
+    try{ return JsonUtils::fetchValue<std::string>(jsonConfig_, keyName_); }
+    catch (...){
+      // it's a vector of strings
+    }
+
+    std::vector<std::string> conditionsList;
+    for( auto& condEntry : JsonUtils::fetchValue<std::vector<nlohmann::json>>(jsonConfig_, keyName_) ){
+      if( condEntry.is_string() ){
+        conditionsList.emplace_back(condEntry.get<std::string>());
+      }
+      else{
+        LogThrow("Could not recognise condition entry: " << condEntry);
+      }
+    }
+
+    out += "(";
+    out += GenericToolbox::joinVectorString(conditionsList, ") " + joinStr_ + " (");
+    out += ")";
+
+    return out;
+  }
+  std::string buildFormula(const nlohmann::json& jsonConfig_, const std::string& keyName_, const std::string& joinStr_, const std::string& defaultFormula_){
+    if( not JsonUtils::doKeyExist(jsonConfig_, keyName_) ) return defaultFormula_;
+    else return buildFormula(jsonConfig_, keyName_, joinStr_);
+  }
+
 }
 
 

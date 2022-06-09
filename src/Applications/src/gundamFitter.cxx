@@ -118,6 +118,11 @@ int main(int argc, char** argv){
     }
   }
   outFileName = clParser.getOptionVal("outputFile", outFileName + ".root");
+  if( JsonUtils::doKeyExist(jsonConfig, "outputFolder") ){
+    GenericToolbox::mkdirPath(JsonUtils::fetchValue<std::string>(jsonConfig, "outputFolder"));
+    outFileName.insert(0, JsonUtils::fetchValue<std::string>(jsonConfig, "outputFolder") + "/");
+  }
+
   LogWarning << "Creating output file: \"" << outFileName << "\"..." << std::endl;
   TFile* out = TFile::Open(outFileName.c_str(), "RECREATE");
 

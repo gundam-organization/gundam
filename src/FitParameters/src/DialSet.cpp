@@ -255,7 +255,6 @@ void DialSet::readGlobals(const nlohmann::json &config_){
                "\"" << _applyConditionStr_ << "\": could not be parsed as formula expression.")
   }
 
-
   _minDialResponse_ = JsonUtils::fetchValue(config_, {{"minDialResponse"}, {"minimumSplineResponse"}}, _minDialResponse_);
   _maxDialResponse_ = JsonUtils::fetchValue(config_, "maxDialResponse", _maxDialResponse_);
 
