@@ -174,10 +174,10 @@ void FitParameterSet::prepareFitParameters(){
     for( auto& par : _parameterList_ ){
       par.setMinValue(std::nan(""));
       par.setMaxValue(std::nan(""));
-//      for( auto& dialSet : par.getDialSetList() ){
-//        dialSet.setMinDialResponse(std::nan(""));
-//        dialSet.setMaxDialResponse(std::nan(""));
-//      }
+      for( auto& dialSet : par.getDialSetList() ){
+        dialSet.setMinDialResponse(std::nan(""));
+        dialSet.setMaxDialResponse(std::nan(""));
+      }
     }
 
     // Put original parameters to the prior

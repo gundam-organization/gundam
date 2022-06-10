@@ -18,7 +18,7 @@ LoggerInit([]{
 
 bool Dial::enableMaskCheck{false};
 bool Dial::disableDialCache{false};
-bool Dial::throwIfResponseIsNegative{true};
+bool Dial::throwIfResponseIsNegative{false};
 
 Dial::Dial(DialType::DialType dialType_) : _dialType_{dialType_} {}
 Dial::~Dial() = default;
