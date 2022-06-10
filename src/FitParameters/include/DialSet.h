@@ -35,6 +35,9 @@ public:
   void setOwner(const FitParameter* owner_);
   void setConfig(const nlohmann::json &config_);
 
+  void setMinDialResponse(double minDialResponse_){ _minDialResponse_ = minDialResponse_; }
+  void setMaxDialResponse(double maxDialResponse_){ _maxDialResponse_ = maxDialResponse_; }
+
   void initialize();
 
   // Getters

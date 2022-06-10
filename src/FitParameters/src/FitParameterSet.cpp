@@ -170,6 +170,16 @@ void FitParameterSet::prepareFitParameters(){
     _originalParBuffer_ = std::make_shared<TVectorD>(_strippedCovarianceMatrix_->GetNrows() );
     _eigenParBuffer_    = std::make_shared<TVectorD>(_strippedCovarianceMatrix_->GetNrows() );
 
+    LogAlert << "Disabling par/dial limits" << std::endl;
+    for( auto& par : _parameterList_ ){
+      par.setMinValue(std::nan(""));
+      par.setMaxValue(std::nan(""));
+//      for( auto& dialSet : par.getDialSetList() ){
+//        dialSet.setMinDialResponse(std::nan(""));
+//        dialSet.setMaxDialResponse(std::nan(""));
+//      }
+    }
+
     // Put original parameters to the prior
     for( auto& par : _parameterList_ ){
       par.setValueAtPrior();
