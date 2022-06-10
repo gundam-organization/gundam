@@ -648,7 +648,7 @@ void FitterEngine::fit(){
     this->scanParameters(-1, "postFit/scan");
   }
 
-  if( _fitHasConverged_ ){
+  if( _fitHasConverged_ or true ){
     LogInfo << "Evaluating post-fit errors..." << std::endl;
 
     _enableFitMonitor_ = true;
