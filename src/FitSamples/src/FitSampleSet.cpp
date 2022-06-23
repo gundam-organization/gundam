@@ -101,15 +101,13 @@ void FitSampleSet::initialize() {
 
   std::string llhMethod = JsonUtils::fetchValue(_config_, "llhStatFunction", "PoissonLLH");
   LogInfo << "Using \"" << llhMethod << "\" LLH function." << std::endl;
-  if( llhMethod == "PoissonLLH" ){
-    _likelihoodFunctionPtr_ = std::make_shared<PoissonLLH>();
-  }
-  else if( llhMethod == "BarlowLLH" ){
-    _likelihoodFunctionPtr_ = std::make_shared<BarlowLLH>();
-  }
-  else if( llhMethod == "BarlowLLH_OA2020_Bad" ){
-    _likelihoodFunctionPtr_ = std::make_shared<BarlowOA2020BugLLH>();
-  }
+  if     ( llhMethod == "PoissonLLH" ){  _likelihoodFunctionPtr_ = std::make_shared<PoissonLLH>(); }
+  else if( llhMethod == "PoissonLLH2" ){ _likelihoodFunctionPtr_ = std::make_shared<PoissonLLH2>(); }
+  else if( llhMethod == "PoissonLLH3" ){ _likelihoodFunctionPtr_ = std::make_shared<PoissonLLH3>(); }
+  else if( llhMethod == "EffLLH" ){ _likelihoodFunctionPtr_ = std::make_shared<EffLLH>(); }
+  else if( llhMethod == "BarlowBeestonLLH" ){   _likelihoodFunctionPtr_ = std::make_shared<BarlowBeestonLLH>(); }
+  else if( llhMethod == "BarlowLLH" ){   _likelihoodFunctionPtr_ = std::make_shared<BarlowLLH>(); }
+  else if( llhMethod == "BarlowLLH_OA2020_Bad" ){ _likelihoodFunctionPtr_ = std::make_shared<BarlowOA2020BugLLH>(); }
   else{
     LogThrow("Unknown LLH Method: " << llhMethod)
   }

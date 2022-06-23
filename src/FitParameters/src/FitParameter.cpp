@@ -71,6 +71,9 @@ void FitParameter::setParameterValue(double parameterValue) {
 void FitParameter::setPriorValue(double priorValue) {
   _priorValue_ = priorValue;
 }
+void FitParameter::setThrowValue(double throwValue){
+  _throwValue_ = throwValue;
+}
 void FitParameter::setStdDevValue(double stdDevValue) {
   _stdDevValue_ = stdDevValue;
 }
@@ -187,6 +190,9 @@ double FitParameter::getStdDevValue() const {
 }
 double FitParameter::getPriorValue() const {
   return _priorValue_;
+}
+double FitParameter::getThrowValue() const{
+  return _throwValue_;
 }
 PriorType::PriorType FitParameter::getPriorType() const {
   return _priorType_;

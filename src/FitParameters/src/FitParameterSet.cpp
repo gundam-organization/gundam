@@ -304,7 +304,8 @@ void FitParameterSet::throwFitParameters(double gain_){
       if( par.isEnabled() and not par.isFixed() and not par.isFree() ){
         iFit++;
         LogInfo << "Throwing par " << par.getTitle() << ": " << par.getParameterValue();
-        par.setParameterValue( par.getPriorValue() + gain_ * throws[iFit] );
+        par.setThrowValue(par.getPriorValue() + gain_ * throws[iFit]);
+        par.setParameterValue( par.getThrowValue() );
         LogInfo << " → " << par.getParameterValue() << std::endl;
       }
       else{
@@ -316,9 +317,8 @@ void FitParameterSet::throwFitParameters(double gain_){
     LogInfo << "Throwing eigen parameters for " << _name_ << std::endl;
     for( auto& eigenPar : _eigenParameterList_ ){
       if( eigenPar.isFixed() ){ LogWarning << "Eigen parameter #" << eigenPar.getParameterIndex() << " is fixed. Not throwing" << std::endl; continue; }
-      eigenPar.setParameterValue(
-          eigenPar.getPriorValue() + gain_ * gRandom->Gaus(0, eigenPar.getStdDevValue())
-          );
+      eigenPar.setThrowValue(eigenPar.getPriorValue() + gain_ * gRandom->Gaus(0, eigenPar.getStdDevValue()));
+      eigenPar.setParameterValue( eigenPar.getThrowValue() );
     }
     this->propagateEigenToOriginal();
   }

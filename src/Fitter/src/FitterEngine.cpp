@@ -528,6 +528,8 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
     scanGraph.SetTitle(scanEntry.title.c_str());
     scanGraph.GetYaxis()->SetTitle(scanEntry.yTitle.c_str());
     scanGraph.GetXaxis()->SetTitle(_minimizer_->VariableName(iPar).c_str());
+    scanGraph.SetDrawOption("AP");
+    scanGraph.SetMarkerStyle(kFullDotLarge);
     if( _saveDir_ != nullptr ){
       GenericToolbox::mkdirTFile(_saveDir_, saveDir_ + "/" + scanEntry.folder )->cd();
       scanGraph.Write( ss.str().c_str() );
