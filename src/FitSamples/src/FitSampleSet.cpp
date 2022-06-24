@@ -140,21 +140,11 @@ bool FitSampleSet::empty() const {
 }
 double FitSampleSet::evalLikelihood() const{
   double llh = 0.;
-  for( auto& sample : _fitSampleList_ ){
-//    llh += this->evalLikelihood(sample);
-    llh += _jointProbabilityPtr_->eval(sample);
-  }
+  for( auto& sample : _fitSampleList_ ){ llh += this->evalLikelihood(sample); }
   return llh;
 }
 double FitSampleSet::evalLikelihood(const FitSample& sample_) const{
-  double sampleLlh = 0;
-  for( int iBin = 1 ; iBin <= sample_.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-    sampleLlh += (*_likelihoodFunctionPtr_)(
-        sample_.getMcContainer().histogram->GetBinContent(iBin),
-        std::pow(sample_.getMcContainer().histogram->GetBinError(iBin), 2),
-        sample_.getDataContainer().histogram->GetBinContent(iBin));
-  }
-  return sampleLlh;
+  return _jointProbabilityPtr_->eval(sample_);
 }
 
 void FitSampleSet::copyMcEventListToDataContainer(){
