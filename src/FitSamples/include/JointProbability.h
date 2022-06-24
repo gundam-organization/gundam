@@ -17,19 +17,28 @@ namespace JointProbability{
     JointProbability() = default;
     virtual ~JointProbability() = default;
 
-    virtual double eval(const FitSample& sample_) = 0;
+    // two choices -> either override bin by bin llh or global eval function
+    virtual double eval(const FitSample& sample_, int bin_){ return 0; }
+    virtual double eval(const FitSample& sample_){
+      double out{0};
+      int nBins = int(sample_.getBinning().getBinsList().size());
+      for( int iBin = 1 ; iBin <= nBins ; iBin++ ){ out += this->eval(sample_, iBin); }
+      return out;
+    }
   };
 
   class PoissonLLH : public JointProbability{
-    double eval(const FitSample& sample_) override;
+    double eval(const FitSample& sample_, int bin_) override;
   };
 
   class BarlowLLH : public JointProbability{
-    double eval(const FitSample& sample_) override;
+    double eval(const FitSample& sample_, int bin_) override;
+  private:
+    double rel_var, b, c, beta, mc_hat, chi2;
   };
 
   class BarlowLLH_BANFF_OA2020 : public JointProbability{
-    double eval(const FitSample& sample_) override;
+    double eval(const FitSample& sample_, int bin_) override;
   };
 
 }
