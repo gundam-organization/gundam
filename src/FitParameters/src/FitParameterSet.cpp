@@ -287,7 +287,7 @@ void FitParameterSet::throwFitParameters(double gain_){
 
   LogThrowIf(_strippedCovarianceMatrix_==nullptr, "No covariance matrix provided")
 
-  if( not _useEigenDecompInFit_ ){
+//  if( not _useEigenDecompInFit_ ){
     LogInfo << "Throwing parameters for " << _name_ << " using Cholesky matrix" << std::endl;
 
     if( _choleskyMatrix_ == nullptr ){
@@ -312,15 +312,22 @@ void FitParameterSet::throwFitParameters(double gain_){
         LogWarning << "Skipping parameter: " << par.getTitle() << std::endl;
       }
     }
-  }
-  else{
-    LogInfo << "Throwing eigen parameters for " << _name_ << std::endl;
+//  }
+//  else{
+//    LogInfo << "Throwing eigen parameters for " << _name_ << std::endl;
+//    for( auto& eigenPar : _eigenParameterList_ ){
+//      if( eigenPar.isFixed() ){ LogWarning << "Eigen parameter #" << eigenPar.getParameterIndex() << " is fixed. Not throwing" << std::endl; continue; }
+//      eigenPar.setThrowValue(eigenPar.getPriorValue() + gain_ * gRandom->Gaus(0, eigenPar.getStdDevValue()));
+//      eigenPar.setParameterValue( eigenPar.getThrowValue() );
+//    }
+//    this->propagateEigenToOriginal();
+//  }
+
+  if( _useEigenDecompInFit_ ){
+    this->propagateOriginalToEigen();
     for( auto& eigenPar : _eigenParameterList_ ){
-      if( eigenPar.isFixed() ){ LogWarning << "Eigen parameter #" << eigenPar.getParameterIndex() << " is fixed. Not throwing" << std::endl; continue; }
-      eigenPar.setThrowValue(eigenPar.getPriorValue() + gain_ * gRandom->Gaus(0, eigenPar.getStdDevValue()));
-      eigenPar.setParameterValue( eigenPar.getThrowValue() );
+      eigenPar.setThrowValue(eigenPar.getParameterValue());
     }
-    this->propagateEigenToOriginal();
   }
 
 }

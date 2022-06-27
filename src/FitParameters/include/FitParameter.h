@@ -91,7 +91,7 @@ private:
   int _parameterIndex_{-1}; // to get the right definition in the json config (in case "name" is not specified)
   double _parameterValue_{};
   double _priorValue_{};
-  double _throwValue_{};
+  double _throwValue_{std::nan("UNSET")};
   double _stdDevValue_{};
   double _minValue_{std::nan("UNSET")};
   double _maxValue_{std::nan("UNSET")};
