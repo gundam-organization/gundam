@@ -102,11 +102,9 @@ void FitSampleSet::initialize() {
   LogInfo << "Using \"" << llhMethod << "\" LLH function." << std::endl;
   if     ( llhMethod == "PoissonLLH" ){  _jointProbabilityPtr_ = std::make_shared<JointProbability::PoissonLLH>(); }
   else if( llhMethod == "BarlowLLH" ) {  _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH>(); }
-  else if( llhMethod == "BANFF_OA2020" or llhMethod == "BarlowLLH_OA2020_Bad" ) {  _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2020>(); }
-  else if( llhMethod == "BANFF_OA2021" or llhMethod == "BarlowLLH_BANFF_OA2021" ) {  _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2021>(); }
-  else{
-    LogThrow("Unknown LLH Method: " << llhMethod)
-  }
+  else if( llhMethod == "BarlowLLH_BANFF_OA2020" ) {  _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2020>(); }
+  else if( llhMethod == "BarlowLLH_BANFF_OA2021" ) {  _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2021>(); }
+  else{ LogThrow("Unknown LLH Method: " << llhMethod); }
 
   _isInitialized_ = true;
 }
