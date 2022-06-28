@@ -451,12 +451,7 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
                                sample.getBinning().getBinsList()[iBin-1].getSummary().c_str());
         scanEntry.yTitle = "Stat LLH value";
         auto* samplePtr = &sample;
-        scanEntry.evalY = [this, samplePtr, iBin](){ return (*_propagator_.getFitSampleSet().getLikelihoodFunctionPtr())(
-            samplePtr->getMcContainer().histogram->GetBinContent(iBin),
-            std::pow(samplePtr->getMcContainer().histogram->GetBinError(iBin), 2),
-            samplePtr->getDataContainer().histogram->GetBinContent(iBin)
-        );
-        };
+        scanEntry.evalY = [this, samplePtr, iBin](){ return _propagator_.getFitSampleSet().getJointProbabilityFct()->eval(*samplePtr, iBin); };
       }
     }
   }
@@ -528,6 +523,8 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
     scanGraph.SetTitle(scanEntry.title.c_str());
     scanGraph.GetYaxis()->SetTitle(scanEntry.yTitle.c_str());
     scanGraph.GetXaxis()->SetTitle(_minimizer_->VariableName(iPar).c_str());
+    scanGraph.SetDrawOption("AP");
+    scanGraph.SetMarkerStyle(kFullDotLarge);
     if( _saveDir_ != nullptr ){
       GenericToolbox::mkdirTFile(_saveDir_, saveDir_ + "/" + scanEntry.folder )->cd();
       scanGraph.Write( ss.str().c_str() );
@@ -648,7 +645,7 @@ void FitterEngine::fit(){
     this->scanParameters(-1, "postFit/scan");
   }
 
-  if( _fitHasConverged_ ){
+  if( _fitHasConverged_ or true ){
     LogInfo << "Evaluating post-fit errors..." << std::endl;
 
     _enableFitMonitor_ = true;
@@ -1152,8 +1149,13 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
           size_t longestTitleSize{0};
           double minY{std::nan("unset")}, maxY{std::nan("unset")};
 
-          auto postFitErrorHist = std::make_unique<TH1D>("postFitErrors_TH1D", "Post-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
-          auto preFitErrorHist = std::make_unique<TH1D>("preFitErrors_TH1D", "Pre-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
+          auto postFitErrorHist   = std::make_unique<TH1D>("postFitErrors_TH1D", "Post-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
+          auto preFitErrorHist    = std::make_unique<TH1D>("preFitErrors_TH1D", "Pre-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
+          auto toyParametersLine  = std::make_unique<TH1D>("toyParametersLine", "toyParametersLine", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
+
+          auto legend = std::make_unique<TLegend>(0.6, 0.75, 0.9, 0.9);
+          legend->AddEntry(preFitErrorHist.get(),"Pre-fit values","fl");
+          legend->AddEntry(postFitErrorHist.get(),"Post-fit values","ep");
 
           for( const auto& par : parList_ ){
             longestTitleSize = std::max(longestTitleSize, par.getTitle().size());
@@ -1206,6 +1208,7 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
 
           preFitErrorHist->SetMarkerStyle(kFullDotLarge);
           preFitErrorHist->SetMarkerColor(kRed-3);
+          preFitErrorHist->SetLineColor(kRed-3); // for legend
 
           if( not isNorm_ ){
             preFitErrorHist->GetYaxis()->SetTitle("Parameter values (a.u.)");
@@ -1235,7 +1238,7 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
           preFitErrorHist->SetMarkerSize(0);
 
           minY -= 0.1*(maxY-minY);
-          maxY += 0.1*(maxY-minY);
+          maxY += 0.25*(maxY-minY); // 20% -> more space for the legend
           preFitErrorHist->GetYaxis()->SetRangeUser(minY, maxY);
 
           preFitErrorHist->Draw("E2");
@@ -1253,8 +1256,27 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
           preFitErrorHistLine.SetLineColor(kRed-3);
           preFitErrorHistLine.Draw("SAME");
 
+          if( _propagator_.isThrowAsimovToyParameters() ){
+            bool draw{false};
+
+            for( auto& par : parList_ ){
+              if( isNorm_ ) toyParametersLine->SetBinContent(par.getParameterIndex(), FitParameterSet::toNormalizedParValue(par.getThrowValue(), par));
+              else{ toyParametersLine->SetBinContent(par.getParameterIndex(), par.getThrowValue()); }
+
+              if( par.getThrowValue() == par.getThrowValue() ){ draw = true; }
+            }
+
+            if( draw ){
+              legend->AddEntry(toyParametersLine.get(),"Toy throws (asimov dataset)","l");
+              toyParametersLine->SetLineColor(kGray+2);
+              toyParametersLine->Draw("SAME");
+            }
+          }
+
           errorsCanvas->Update(); // otherwise does not display...
           postFitErrorHist->Draw("E1 X0 SAME");
+
+          legend->Draw();
 
           gPad->SetGridx();
           gPad->SetGridy();

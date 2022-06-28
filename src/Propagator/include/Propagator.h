@@ -34,9 +34,7 @@ public:
   void setSaveDir(TDirectory *saveDir);
   void setShowTimeStats(bool showTimeStats);
   void setThrowAsimovToyParameters(bool throwAsimovToyParameters);
-
   void setIThrow(int iThrow);
-
   void setLoadAsimovData(bool loadAsimovData);
 
   // Init
@@ -44,6 +42,7 @@ public:
 
   // Getters
   bool isUseResponseFunctions() const;
+  bool isThrowAsimovToyParameters() const;
   FitSampleSet &getFitSampleSet();
   std::vector<FitParameterSet> &getParameterSetsList();
   const std::vector<FitParameterSet> &getParameterSetsList() const;
@@ -86,6 +85,7 @@ private:
 
   // Internals
   bool _throwAsimovToyParameters_{false};
+  bool _enableStatThrowInToys_{true};
   int _iThrow_{-1};
   bool _isInitialized_{false};
   bool _useResponseFunctions_{false};

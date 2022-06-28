@@ -8,6 +8,7 @@
 #include "FitSample.h"
 #include "FitParameterSet.h"
 #include "Likelihoods.hh"
+#include "JointProbability.h"
 
 #include "GenericToolbox.h"
 #include "nlohmann/json.hpp"
@@ -36,7 +37,7 @@ public:
   const std::vector<FitSample> &getFitSampleList() const;
   std::vector<FitSample> &getFitSampleList();
   const nlohmann::json &getConfig() const;
-  const std::shared_ptr<CalcLLHFunc> &getLikelihoodFunctionPtr() const;
+  const std::shared_ptr<JointProbability::JointProbability> &getJointProbabilityFct() const;
 
   //Core
   bool empty() const;
@@ -54,7 +55,7 @@ private:
   nlohmann::json _config_;
 
   std::vector<FitSample> _fitSampleList_;
-  std::shared_ptr<CalcLLHFunc> _likelihoodFunctionPtr_{nullptr};
+  std::shared_ptr<JointProbability::JointProbability> _jointProbabilityPtr_{nullptr};
   std::vector<std::string> _eventByEventDialLeafList_;
 
 };

@@ -121,6 +121,7 @@ void Propagator::initialize() {
   _plotGenerator_.initialize();
 
   _throwAsimovToyParameters_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "throwAsimovFitParameters", _throwAsimovToyParameters_);
+  _enableStatThrowInToys_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "enableStatThrowInToys", _enableStatThrowInToys_);
 
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Loading datasets...") << std::endl;
   auto dataSetListConfig = JsonUtils::getForwardedConfig(_config_, "dataSetList");
@@ -318,7 +319,7 @@ void Propagator::initialize() {
 
   // Now the data won't be refilled each time
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    if( _throwAsimovToyParameters_ ){ sample.getDataContainer().throwStatError(); }
+    if( _throwAsimovToyParameters_ and _enableStatThrowInToys_ ){ sample.getDataContainer().throwStatError(); }
     sample.getDataContainer().isLocked = true;
   }
 
@@ -345,6 +346,9 @@ void Propagator::initialize() {
 
 bool Propagator::isUseResponseFunctions() const {
   return _useResponseFunctions_;
+}
+bool Propagator::isThrowAsimovToyParameters() const {
+  return _throwAsimovToyParameters_;
 }
 FitSampleSet &Propagator::getFitSampleSet() {
   return _fitSampleSet_;
@@ -659,3 +663,4 @@ void Propagator::applyResponseFunctions(int iThread_){
 const EventTreeWriter &Propagator::getTreeWriter() const {
   return _treeWriter_;
 }
+
