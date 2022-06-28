@@ -26,7 +26,6 @@ void FitSampleSet::reset() {
   _isInitialized_ = false;
   _config_.clear();
 
-  _likelihoodFunctionPtr_ = nullptr;
   _fitSampleList_.clear();
 
   _eventByEventDialLeafList_.clear();
@@ -101,20 +100,10 @@ void FitSampleSet::initialize() {
 
   std::string llhMethod = JsonUtils::fetchValue(_config_, "llhStatFunction", "PoissonLLH");
   LogInfo << "Using \"" << llhMethod << "\" LLH function." << std::endl;
-  if     ( llhMethod == "PoissonLLH" ){  _likelihoodFunctionPtr_ = std::make_shared<PoissonLLH>(); }
-  else if( llhMethod == "PoissonLLH2" ){ _likelihoodFunctionPtr_ = std::make_shared<PoissonLLH2>(); }
-  else if( llhMethod == "PoissonLLH3" ){ _likelihoodFunctionPtr_ = std::make_shared<PoissonLLH3>(); }
-  else if( llhMethod == "EffLLH" ){ _likelihoodFunctionPtr_ = std::make_shared<EffLLH>(); }
-  else if( llhMethod == "BarlowBeestonLLH" ){   _likelihoodFunctionPtr_ = std::make_shared<BarlowBeestonLLH>(); }
-  else if( llhMethod == "BarlowLLH" ){   _likelihoodFunctionPtr_ = std::make_shared<BarlowLLH>(); }
-  else if( llhMethod == "BarlowLLH_OA2020_Bad" ){ _likelihoodFunctionPtr_ = std::make_shared<BarlowOA2020BugLLH>(); }
-  else{
-    LogThrow("Unknown LLH Method: " << llhMethod)
-  }
-
   if     ( llhMethod == "PoissonLLH" ){  _jointProbabilityPtr_ = std::make_shared<JointProbability::PoissonLLH>(); }
   else if( llhMethod == "BarlowLLH" ) {  _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH>(); }
   else if( llhMethod == "BANFF_OA2020" or llhMethod == "BarlowLLH_OA2020_Bad" ) {  _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2020>(); }
+  else if( llhMethod == "BANFF_OA2021" or llhMethod == "BarlowLLH_BANFF_OA2021" ) {  _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2021>(); }
   else{
     LogThrow("Unknown LLH Method: " << llhMethod)
   }
@@ -131,8 +120,8 @@ std::vector<FitSample> &FitSampleSet::getFitSampleList() {
 const nlohmann::json &FitSampleSet::getConfig() const {
   return _config_;
 }
-const std::shared_ptr<CalcLLHFunc> &FitSampleSet::getLikelihoodFunctionPtr() const {
-  return _likelihoodFunctionPtr_;
+const std::shared_ptr<JointProbability::JointProbability> &FitSampleSet::getJointProbabilityFct() const{
+  return _jointProbabilityPtr_;
 }
 
 bool FitSampleSet::empty() const {

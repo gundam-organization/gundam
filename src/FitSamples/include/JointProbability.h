@@ -40,6 +40,9 @@ namespace JointProbability{
   class BarlowLLH_BANFF_OA2020 : public JointProbability{
     double eval(const FitSample& sample_, int bin_) override;
   };
+  class BarlowLLH_BANFF_OA2021 : public JointProbability{
+    double eval(const FitSample& sample_, int bin_) override;
+  };
 
 }
 

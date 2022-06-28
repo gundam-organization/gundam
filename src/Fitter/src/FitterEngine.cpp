@@ -451,12 +451,7 @@ void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &save
                                sample.getBinning().getBinsList()[iBin-1].getSummary().c_str());
         scanEntry.yTitle = "Stat LLH value";
         auto* samplePtr = &sample;
-        scanEntry.evalY = [this, samplePtr, iBin](){ return (*_propagator_.getFitSampleSet().getLikelihoodFunctionPtr())(
-            samplePtr->getMcContainer().histogram->GetBinContent(iBin),
-            std::pow(samplePtr->getMcContainer().histogram->GetBinError(iBin), 2),
-            samplePtr->getDataContainer().histogram->GetBinContent(iBin)
-        );
-        };
+        scanEntry.evalY = [this, samplePtr, iBin](){ return _propagator_.getFitSampleSet().getJointProbabilityFct()->eval(*samplePtr, iBin); };
       }
     }
   }

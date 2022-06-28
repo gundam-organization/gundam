@@ -37,8 +37,8 @@ namespace JointProbability{
     // where sigma^2 is the same as above.
     chi2 = 0.0;
     if(sample_.getDataContainer().histogram->GetBinContent(bin_) <= 0.0) {
-        chi2 = 2 * mc_hat;
-        chi2 += (beta - 1) * (beta - 1) / rel_var;
+      chi2 = 2 * mc_hat;
+      chi2 += (beta - 1) * (beta - 1) / rel_var;
     }
     else{
       chi2 = 2 * (mc_hat - sample_.getDataContainer().histogram->GetBinContent(bin_));
@@ -111,9 +111,88 @@ namespace JointProbability{
 
     if(std::isinf(chisq)){
       LogAlert << "Infinite chi2 " << predVal << " " << dataVal
-                << sample_.getMcContainer().histogram->GetBinError(bin_) << " "
-                << sample_.getMcContainer().histogram->GetBinContent(bin_) << std::endl;
+               << sample_.getMcContainer().histogram->GetBinError(bin_) << " "
+               << sample_.getMcContainer().histogram->GetBinContent(bin_) << std::endl;
     }
+
+    return chisq;
+  }
+  double BarlowLLH_BANFF_OA2021::eval(const FitSample& sample_, int bin_){
+    // From OA2021_Eb branch -> BANFFBinnedSample::CalcLLRContrib
+
+    double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
+    double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
+    double mcuncert = sample_.getMcContainer().histogram->GetBinError(bin_);
+
+    double chisq = 0.0;
+
+//    bool usePoissonLikelihood = (bool)ND::params().GetParameterI("BANFF.UsePoissonLikelihood");
+    bool usePoissonLikelihood = false;
+
+    //Loop over all the bins one by one using their unique bin index.
+    //Use the stored nBins value and bins array so avoid trying to calculate
+    //over underflow or overflow bins.
+//    for (int i = 0; i < nBins; i++)
+//    {
+
+    //implementing Barlow-Beeston correction for LH calculation
+    //the following comments are inspired/copied from Clarence's comments in the MaCh3
+    //implementation of the same feature
+
+    // The MC used in the likelihood calculation
+    // Is allowed to be changed by Barlow Beeston beta parameters
+    double newmc = predVal;
+    // Not full Barlow-Beeston or what is referred to as "light": we're not introducing any more parameters
+    // Assume the MC has a Gaussian distribution around generated
+    // As in https://arxiv.org/abs/1103.0354 eq 10, 11
+
+    // The penalty from MC statistics
+    double penalty = 0;
+    // Barlow-Beeston uses fractional uncertainty on MC, so sqrt(sum[w^2])/mc
+    double fractional = sqrt(mcuncert) / predVal;
+    // -b/2a in quadratic equation
+    double temp = predVal * fractional * fractional - 1;
+    // b^2 - 4ac in quadratic equation
+    double temp2 = temp * temp + 4 * dataVal * fractional * fractional;
+
+    LogThrowIf(temp2 < 0, "Negative square root in Barlow Beeston coefficient calculation!");
+
+    // Solve for the positive beta
+    double beta = (-1 * temp + sqrt(temp2)) / 2.;
+    newmc = predVal * beta;
+    // And penalise the movement in beta relative the mc uncertainty
+    penalty = (beta - 1) * (beta - 1) / (2 * fractional * fractional);
+    // And calculate the new Poisson likelihood
+    // For Barlow-Beeston newmc is modified, so can only calculate Poisson likelihood after Barlow-Beeston
+    double stat = 0;
+    if (dataVal == 0)
+      stat = newmc;
+    else if (newmc > 0)
+      stat = newmc - dataVal + dataVal * TMath::Log(dataVal / newmc);
+
+    if ((predVal > 0.0) && (dataVal > 0.0))
+    {
+      if (usePoissonLikelihood)
+        chisq += 2.0*(predVal - dataVal +dataVal*TMath::Log( dataVal/predVal) );
+      else // Barlow-Beeston likelihood
+        chisq += 2.0 * (stat + penalty);
+    }
+
+    else if (predVal > 0.0)
+    {
+      if (usePoissonLikelihood)
+        chisq += 2.0*predVal;
+      else // Barlow-Beeston likelihood
+        chisq += 2.0 * (stat + penalty);
+    }
+
+    if (std::isinf(chisq))
+    {
+      LogAlert << "Infinite chi2 " << predVal << " " << dataVal
+               << sample_.getMcContainer().histogram->GetBinError(bin_) << " "
+               << sample_.getMcContainer().histogram->GetBinContent(bin_) << std::endl;
+    }
+//    }
 
     return chisq;
   }

@@ -15,10 +15,7 @@ class CalcLLHFunc
 {
 public:
   virtual ~CalcLLHFunc() {};
-  virtual double operator()(double mc, double w2, double data)
-  {
-    return 0.0;
-  }
+  virtual double operator()(double mc, double w2, double data) { return 0.0; }
 };
 
 class PoissonLLH : public CalcLLHFunc
