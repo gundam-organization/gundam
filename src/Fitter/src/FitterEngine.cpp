@@ -1260,14 +1260,23 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
             bool draw{false};
 
             for( auto& par : parList_ ){
-              if( isNorm_ ) toyParametersLine->SetBinContent(par.getParameterIndex(), FitParameterSet::toNormalizedParValue(par.getThrowValue(), par));
-              else{ toyParametersLine->SetBinContent(par.getParameterIndex(), par.getThrowValue()); }
 
-              if( par.getThrowValue() == par.getThrowValue() ){ draw = true; }
+              if( par.getThrowValue() == par.getThrowValue() ){
+                draw = true; // toyParametersLine will be drawn then
+                if( isNorm_ ) { toyParametersLine->SetBinContent(par.getParameterIndex(), FitParameterSet::toNormalizedParValue(par.getThrowValue(), par)); }
+                else{ toyParametersLine->SetBinContent(par.getParameterIndex(), par.getThrowValue()); }
+              }
+              else{
+                if( isNorm_ ) { toyParametersLine->SetBinContent(par.getParameterIndex(), FitParameterSet::toNormalizedParValue(par.getPriorValue(), par)); }
+                else{ toyParametersLine->SetBinContent(par.getParameterIndex(), par.getPriorValue()); }
+              }
+
+
+
             }
 
             if( draw ){
-              legend->AddEntry(toyParametersLine.get(),"Toy throws (asimov dataset)","l");
+              legend->AddEntry(toyParametersLine.get(),"Toy throws from asimov dataset","l");
               toyParametersLine->SetLineColor(kGray+2);
               toyParametersLine->Draw("SAME");
             }
