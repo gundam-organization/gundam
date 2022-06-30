@@ -14,6 +14,8 @@
 #include <Math/Factory.h>
 #include "TGraph.h"
 #include "TLegend.h"
+#include "TH1D.h"
+#include "TBox.h"
 
 #include <cmath>
 #include <memory>
@@ -1153,7 +1155,10 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
           auto preFitErrorHist    = std::make_unique<TH1D>("preFitErrors_TH1D", "Pre-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
           auto toyParametersLine  = std::make_unique<TH1D>("toyParametersLine", "toyParametersLine", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
 
-          auto legend = std::make_unique<TLegend>(0.6, 0.75, 0.9, 0.9);
+          std::vector<TBox> freeParBoxes;
+          std::vector<TBox> fixedParBoxes;
+
+          auto legend = std::make_unique<TLegend>(0.6, 0.79, 0.89, 0.89);
           legend->AddEntry(preFitErrorHist.get(),"Pre-fit values","fl");
           legend->AddEntry(postFitErrorHist.get(),"Post-fit values","ep");
 
@@ -1202,6 +1207,24 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
             maxY = std::max(maxY, postFitErrorHist->GetBinContent(1 + par.getParameterIndex()) + postFitErrorHist->GetBinError(1 + par.getParameterIndex()));
           } // par
 
+          minY -= 0.1*(maxY-minY);
+          maxY += 0.25*(maxY-minY); // 20% -> more space for the legend
+
+          for( const auto& par : parList_ ){
+            TBox b(preFitErrorHist->GetBinLowEdge(1+par.getParameterIndex()), minY,
+                   preFitErrorHist->GetBinLowEdge(1+par.getParameterIndex()+1), maxY);
+            b.SetFillStyle(3001);
+
+            if( par.isFree() ){
+              b.SetFillColor(kGreen-10);
+              freeParBoxes.emplace_back(b);
+            }
+            else if( par.isFixed() or not par.isEnabled() ){
+              b.SetFillColor(kGray);
+              fixedParBoxes.emplace_back(b);
+            }
+          }
+
           if(parSet_.getPriorCovarianceMatrix() != nullptr ){
             gStyle->GetCanvasPreferGL() ? preFitErrorHist->SetFillColorAlpha(kRed-9, 0.7) : preFitErrorHist->SetFillColor(kRed-9);
           }
@@ -1236,12 +1259,12 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
           errorsCanvas->cd();
 
           preFitErrorHist->SetMarkerSize(0);
-
-          minY -= 0.1*(maxY-minY);
-          maxY += 0.25*(maxY-minY); // 20% -> more space for the legend
           preFitErrorHist->GetYaxis()->SetRangeUser(minY, maxY);
-
           preFitErrorHist->Draw("E2");
+
+          for( auto& box : freeParBoxes ) box.Draw();
+          for( auto& box : fixedParBoxes ) box.Draw();
+          preFitErrorHist->Draw("E2 SAME");
 
           TH1D preFitErrorHistLine = TH1D("preFitErrorHistLine", "preFitErrorHistLine",
                                           preFitErrorHist->GetNbinsX(),
@@ -1260,23 +1283,15 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
             bool draw{false};
 
             for( auto& par : parList_ ){
-
-              if( par.getThrowValue() == par.getThrowValue() ){
-                draw = true; // toyParametersLine will be drawn then
-                if( isNorm_ ) { toyParametersLine->SetBinContent(par.getParameterIndex(), FitParameterSet::toNormalizedParValue(par.getThrowValue(), par)); }
-                else{ toyParametersLine->SetBinContent(par.getParameterIndex(), par.getThrowValue()); }
-              }
-              else{
-                if( isNorm_ ) { toyParametersLine->SetBinContent(par.getParameterIndex(), FitParameterSet::toNormalizedParValue(par.getPriorValue(), par)); }
-                else{ toyParametersLine->SetBinContent(par.getParameterIndex(), par.getPriorValue()); }
-              }
-
-
-
+              double val{par.getThrowValue()};
+              val == val ? draw = true : val = par.getPriorValue();
+              if( isNorm_ ) val = FitParameterSet::toNormalizedParValue(val, par);
+              toyParametersLine->SetBinContent(par.getParameterIndex(), val);
             }
 
             if( draw ){
-              legend->AddEntry(toyParametersLine.get(),"Toy throws from asimov dataset","l");
+              legend->SetY1(legend->GetY1() - (legend->GetY2() - legend->GetY1())/2.);
+              legend->AddEntry(toyParametersLine.get(),"Toy throws from asimov data set","l");
               toyParametersLine->SetLineColor(kGray+2);
               toyParametersLine->Draw("SAME");
             }
