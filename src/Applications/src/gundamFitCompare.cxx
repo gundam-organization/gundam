@@ -22,6 +22,8 @@ LoggerInit([]{
 CmdLineParser clp;
 TFile* outFile{nullptr};
 
+void makeSampleComparePlots(bool usePrefit_);
+void makeScanComparePlots(bool usePrefit_);
 void makeErrorComparePlots(bool usePrefit_, bool useNomVal_);
 
 int main( int argc, char** argv ){
@@ -70,6 +72,11 @@ int main( int argc, char** argv ){
 
   outFile = TFile::Open(outPath.c_str(), "RECREATE");
 
+  LogInfo << "Comparing preFit samples..." << std::endl;
+  makeSampleComparePlots(true);
+  LogInfo << "Comparing postFit samples..." << std::endl;
+  makeSampleComparePlots(false);
+
   LogInfo << "Comparing preFit errors..." << std::endl;
   makeErrorComparePlots(true, false);
   LogInfo << "Comparing preFit (normalized) errors..." << std::endl;
@@ -87,6 +94,64 @@ int main( int argc, char** argv ){
 }
 
 
+void makeSampleComparePlots(bool usePrefit_){
+
+  auto filePath1 = clp.getOptionVal<std::string>("file-1");
+  auto filePath2 = clp.getOptionVal<std::string>("file-2");
+
+  auto name1 = clp.getOptionVal("name-1", filePath1);
+  auto name2 = clp.getOptionVal("name-2", filePath2);
+
+  auto* file1 = GenericToolbox::openExistingTFile(filePath1);
+  auto* file2 = GenericToolbox::openExistingTFile(filePath2);
+
+  std::string strBuffer;
+
+  strBuffer = Form("FitterEngine/%s/samples/histograms", (usePrefit_? "preFit": "postFit"));
+  auto* dir1 = file1->Get<TDirectory>(strBuffer.c_str());
+  LogThrowIf(dir1== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath1);
+
+  auto* dir2 = file2->Get<TDirectory>(strBuffer.c_str());
+  LogThrowIf(dir2== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
+
+
+
+}
+void makeScanComparePlots(bool usePrefit_){
+
+  auto filePath1 = clp.getOptionVal<std::string>("file-1");
+  auto filePath2 = clp.getOptionVal<std::string>("file-2");
+
+  auto name1 = clp.getOptionVal("name-1", filePath1);
+  auto name2 = clp.getOptionVal("name-2", filePath2);
+
+  auto* file1 = GenericToolbox::openExistingTFile(filePath1);
+  auto* file2 = GenericToolbox::openExistingTFile(filePath2);
+
+  std::string strBuffer;
+
+  strBuffer = Form("FitterEngine/%s/scan", (usePrefit_? "preFit": "postFit"));
+  auto* dir1 = file1->Get<TDirectory>(strBuffer.c_str());
+  LogReturnIf(dir1== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath1);
+
+  auto* dir2 = file2->Get<TDirectory>(strBuffer.c_str());
+  LogReturnIf(dir2== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
+
+  std::function<void(TDirectory* dir1_, TDirectory* dir2_)> recurseScanCompareGraph;
+  recurseScanCompareGraph = [&](TDirectory* dir1_, TDirectory* dir2_){
+
+    for( int iKey = 0 ; iKey < dir1->GetListOfKeys()->GetEntries() ; iKey++ ){
+      if( dir2_->Get(dir1->GetListOfKeys()->At(iKey)->GetName()) == nullptr ) continue;
+      LogDebug << GET_VAR_NAME_VALUE( dir1->GetListOfKeys()->At(iKey)->ClassName() ) << std::endl;
+    }
+
+  };
+
+  recurseScanCompareGraph(dir1, dir2);
+
+
+
+}
 void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
 
   auto filePath1 = clp.getOptionVal<std::string>("file-1");
@@ -106,11 +171,11 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
 
   strBuffer = Form("FitterEngine/postFit/%s/errors", algo1.c_str());
   auto* dir1 = file1->Get<TDirectory>(strBuffer.c_str());
-  LogThrowIf(dir1== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath1);
+  LogReturnIf(dir1== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath1);
 
   strBuffer = Form("FitterEngine/postFit/%s/errors", algo2.c_str());
   auto* dir2 = file2->Get<TDirectory>(strBuffer.c_str());
-  LogThrowIf(dir2== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
+  LogReturnIf(dir2== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
 
   // loop over parSets
   auto* outDir = GenericToolbox::mkdirTFile(outFile, Form("%s/errors%s", (usePrefit_? "preFit": "postFit"), (useNomVal_? "Norm": "")));
@@ -141,7 +206,7 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
     hist1->GetXaxis()->SetLabelSize(0.03);
     hist1->GetXaxis()->LabelsOption("v");
     hist1->GetYaxis()->SetRangeUser(yBounds.first, yBounds.second);
-    useNomVal_ ? hist1->GetYaxis()->SetTitle("Parameter values (normalized a.u.)"): hist1->GetYaxis()->SetTitle("Parameter values (a.u.)");
+    useNomVal_ ? hist1->GetYaxis()->SetTitle("Parameter values (normalized to the prior)"): hist1->GetYaxis()->SetTitle("Parameter values (a.u.)");
     hist1->Draw("E2");
 
     TH1D hist1Line = TH1D("hist1Line", "hist1Line",
@@ -184,5 +249,4 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
     delete overlayCanvas;
     Logger::setIndentStr("");
   }
-
 }

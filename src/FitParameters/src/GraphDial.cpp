@@ -29,7 +29,7 @@ void GraphDial::initialize() {
 std::string GraphDial::getSummary() {
   std::stringstream ss;
   ss << Dial::getSummary();
-  ss << "g{n=" << _graph_.GetN() << "}";
+  ss << " (graph{nPt=" << _graph_.GetN() << "})";
   return ss.str();
 }
 

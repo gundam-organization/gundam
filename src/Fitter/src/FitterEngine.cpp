@@ -126,6 +126,20 @@ void FitterEngine::initialize() {
   if( _saveDir_ != nullptr ){
     auto* dir = GenericToolbox::mkdirTFile(_saveDir_, "preFit/events");
     _propagator_.getTreeWriter().writeSamples(dir);
+
+    if( JsonUtils::fetchValue(_config_, "debugPrintLoadedEvents", false) ){
+      int debugPrintLoadedEventsNbPerSample = JsonUtils::fetchValue(_config_, "debugPrintLoadedEventsNbPerSample", 10);
+      LogDebug << GET_VAR_NAME_VALUE(debugPrintLoadedEventsNbPerSample) << std::endl;
+      for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
+        LogDebug << "debugPrintLoadedEvents: " << sample.getName() << std::endl;
+
+        int iEvt=0;
+        for( auto& ev : sample.getMcContainer().eventList ){
+          if( iEvt++ >= debugPrintLoadedEventsNbPerSample ) break;
+          LogDebug << ev.getSummary() << std::endl;
+        }
+      }
+    }
   }
 
   if( JsonUtils::fetchValue(_config_, "throwMcBeforeFit", false) ){
@@ -1149,7 +1163,6 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
           saveDir_->cd();
 
           size_t longestTitleSize{0};
-          double minY{std::nan("unset")}, maxY{std::nan("unset")};
 
           auto postFitErrorHist   = std::make_unique<TH1D>("postFitErrors_TH1D", "Post-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
           auto preFitErrorHist    = std::make_unique<TH1D>("preFitErrors_TH1D", "Pre-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
@@ -1194,25 +1207,26 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
                 preFitErrorHist->SetBinError( 1 + par.getParameterIndex(), 1 );
               }
             } // norm
-
-            // boundaries Y
-            // -> init
-            if( minY != minY ) minY = preFitErrorHist->GetBinContent(1 + par.getParameterIndex());
-            if( maxY != maxY ) maxY = preFitErrorHist->GetBinContent(1 + par.getParameterIndex());
-
-            // -> push bounds?
-            minY = std::min(minY, preFitErrorHist->GetBinContent(1 + par.getParameterIndex()) - preFitErrorHist->GetBinError(1 + par.getParameterIndex()));
-            minY = std::min(minY, postFitErrorHist->GetBinContent(1 + par.getParameterIndex()) - postFitErrorHist->GetBinError(1 + par.getParameterIndex()));
-            maxY = std::max(maxY, preFitErrorHist->GetBinContent(1 + par.getParameterIndex()) + preFitErrorHist->GetBinError(1 + par.getParameterIndex()));
-            maxY = std::max(maxY, postFitErrorHist->GetBinContent(1 + par.getParameterIndex()) + postFitErrorHist->GetBinError(1 + par.getParameterIndex()));
           } // par
 
-          minY -= 0.1*(maxY-minY);
-          maxY += 0.25*(maxY-minY); // 20% -> more space for the legend
+          if( _propagator_.isThrowAsimovToyParameters() ){
+            bool draw{false};
+
+            for( auto& par : parList_ ){
+              double val{par.getThrowValue()};
+              val == val ? draw = true : val = par.getPriorValue();
+              if( isNorm_ ) val = FitParameterSet::toNormalizedParValue(val, par);
+              toyParametersLine->SetBinContent(par.getParameterIndex(), val);
+            }
+
+            if( !draw ) toyParametersLine = nullptr;
+          }
+
+          auto yBounds = GenericToolbox::getYBounds({preFitErrorHist.get(), postFitErrorHist.get(), toyParametersLine.get()});
 
           for( const auto& par : parList_ ){
-            TBox b(preFitErrorHist->GetBinLowEdge(1+par.getParameterIndex()), minY,
-                   preFitErrorHist->GetBinLowEdge(1+par.getParameterIndex()+1), maxY);
+            TBox b(preFitErrorHist->GetBinLowEdge(1+par.getParameterIndex()), yBounds.first,
+                   preFitErrorHist->GetBinLowEdge(1+par.getParameterIndex()+1), yBounds.second);
             b.SetFillStyle(3001);
 
             if( par.isFree() ){
@@ -1244,7 +1258,7 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
 
           preFitErrorHist->SetTitle(Form("Pre-fit Errors of %s", parSet_.getName().c_str()));
           preFitErrorHist->SetMarkerSize(0);
-          preFitErrorHist->GetYaxis()->SetRangeUser(minY, maxY);
+          preFitErrorHist->GetYaxis()->SetRangeUser(yBounds.first, yBounds.second);
           preFitErrorHist->Write();
 
           postFitErrorHist->SetLineColor(9);
@@ -1279,22 +1293,11 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
           preFitErrorHistLine.SetLineColor(kRed-3);
           preFitErrorHistLine.Draw("SAME");
 
-          if( _propagator_.isThrowAsimovToyParameters() ){
-            bool draw{false};
-
-            for( auto& par : parList_ ){
-              double val{par.getThrowValue()};
-              val == val ? draw = true : val = par.getPriorValue();
-              if( isNorm_ ) val = FitParameterSet::toNormalizedParValue(val, par);
-              toyParametersLine->SetBinContent(par.getParameterIndex(), val);
-            }
-
-            if( draw ){
-              legend->SetY1(legend->GetY1() - (legend->GetY2() - legend->GetY1())/2.);
-              legend->AddEntry(toyParametersLine.get(),"Toy throws from asimov data set","l");
-              toyParametersLine->SetLineColor(kGray+2);
-              toyParametersLine->Draw("SAME");
-            }
+          if( toyParametersLine != nullptr ){
+            legend->SetY1(legend->GetY1() - (legend->GetY2() - legend->GetY1())/2.);
+            legend->AddEntry(toyParametersLine.get(),"Toy throws from asimov data set","l");
+            toyParametersLine->SetLineColor(kGray+2);
+            toyParametersLine->Draw("SAME");
           }
 
           errorsCanvas->Update(); // otherwise does not display...
