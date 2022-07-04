@@ -88,6 +88,7 @@ private:
   int _nbFitCalls_{0};
   int _nbFitParameters_{0};
   int _nbParameters_{0};
+  int _nbFitBins_{0};
   std::vector<FitParameter*> _minimizerFitParameterPtr_;
   std::vector<FitParameterSet*> _minimizerFitParameterSetPtr_;
 

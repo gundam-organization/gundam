@@ -80,6 +80,11 @@ void FitterEngine::initialize() {
   _propagator_.setSaveDir(GenericToolbox::mkdirTFile(_saveDir_, "Propagator"));
   _propagator_.initialize();
 
+  _nbFitBins_ = 0;
+  for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
+    _nbFitBins_ += int(sample.getBinning().getBinsList().size());
+  }
+
   this->updateChi2Cache();
 
   _nbParameters_ = 0;
@@ -609,7 +614,9 @@ void FitterEngine::fit(){
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling minimize...") << std::endl;
   LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
           << "Number of free parameters   : " << _minimizer_->NFree() << std::endl
-          << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree()
+          << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree() << std::endl
+          << "Number of fit bins : " << _nbFitBins_ << std::endl
+          << "Chi2 # DoF : " << _nbFitBins_ - _minimizer_->NFree()
           << std::endl;
 
   int nbFitCallOffset = _nbFitCalls_;
@@ -695,7 +702,9 @@ void FitterEngine::fit(){
         LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling HESSE...") << std::endl;
         LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
                 << "Number of free parameters   : " << _minimizer_->NFree() << std::endl
-                << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree()
+                << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree() << std::endl
+                << "Number of fit bins : " << _nbFitBins_ << std::endl
+                << "Chi2 # DoF : " << _nbFitBins_ - _minimizer_->NFree()
                 << std::endl;
 
         nbFitCallOffset = _nbFitCalls_;
@@ -760,16 +769,6 @@ void FitterEngine::updateChi2Cache(){
 double FitterEngine::evalFit(const double* parArray_){
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 
-  if( _convergenceMonitor_.isGenerateMonitorStringOk() and _enableFitMonitor_ and _nbFitCalls_ > 1 ){
-    if( _nbFitCalls_ == 2 ){
-      // don't erase these lines
-      LogInfo << _convergenceMonitor_.generateMonitorString();
-    }
-    else{
-      LogInfo << _convergenceMonitor_.generateMonitorString(true , true);
-    }
-  }
-
   if(_nbFitCalls_ != 0){
     _outEvalFitAvgTimer_.counts++ ; _outEvalFitAvgTimer_.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("out_evalFit");
   }
@@ -798,12 +797,13 @@ double FitterEngine::evalFit(const double* parArray_){
     }
 
     std::stringstream ss;
-    ss << __METHOD_NAME__ << ": call #" << _nbFitCalls_;
+    ss << std::endl << __METHOD_NAME__ << ": call #" << _nbFitCalls_;
     ss << std::endl << "Target EDM: " << 0.001*_minimizer_->Tolerance()*2;
     ss << std::endl << "Current RAM usage: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
     double cpuPercent = GenericToolbox::getCpuUsageByProcess();
     ss << std::endl << "Current CPU usage: " << cpuPercent << "% (" << cpuPercent/GlobalVariables::getNbThreads() << "% efficiency)";
     ss << std::endl << "Avg " << GUNDAM_CHI2 << " computation time: " << _evalFitAvgTimer_;
+    ss << std::endl << GUNDAM_CHI2 << "/dof: " << _chi2Buffer_/double(_nbFitBins_ - _minimizer_->NFree());
     if( not _propagator_.isUseResponseFunctions() ){
       ss << std::endl;
 #ifndef GUNDAM_BATCH
@@ -834,13 +834,13 @@ double FitterEngine::evalFit(const double* parArray_){
     _convergenceMonitor_.getVariable("Stat").addQuantity(_chi2StatBuffer_);
     _convergenceMonitor_.getVariable("Syst").addQuantity(_chi2PullsBuffer_);
 
-//    if( _nbFitCalls_ == 1 ){
-//      // don't erase these lines
-//      LogInfo << _convergenceMonitor_.generateMonitorString();
-//    }
-//    else{
-//      LogInfo << _convergenceMonitor_.generateMonitorString(true , true);
-//    }
+    if( _nbFitCalls_ == 1 ){
+      // don't erase these lines
+      LogInfo << _convergenceMonitor_.generateMonitorString();
+    }
+    else{
+      LogInfo << _convergenceMonitor_.generateMonitorString(true , true);
+    }
 
     _itSpeed_.counts = _nbFitCalls_;
   }
@@ -1243,6 +1243,8 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
           preFitErrorHist->GetXaxis()->LabelsOption("v");
 
           preFitErrorHist->SetTitle(Form("Pre-fit Errors of %s", parSet_.getName().c_str()));
+          preFitErrorHist->SetMarkerSize(0);
+          preFitErrorHist->GetYaxis()->SetRangeUser(minY, maxY);
           preFitErrorHist->Write();
 
           postFitErrorHist->SetLineColor(9);
@@ -1258,8 +1260,6 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
               800, 600);
           errorsCanvas->cd();
 
-          preFitErrorHist->SetMarkerSize(0);
-          preFitErrorHist->GetYaxis()->SetRangeUser(minY, maxY);
           preFitErrorHist->Draw("E2");
 
           for( auto& box : freeParBoxes ) box.Draw();
