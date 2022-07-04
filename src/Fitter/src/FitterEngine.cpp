@@ -287,6 +287,124 @@ void FitterEngine::generateOneSigmaPlots(const std::string& savePath_){
 
 }
 
+void FitterEngine::varyEvenRates(std::vector<double> paramVariationList_, const std::string& savePath_){
+
+  _propagator_.preventRfPropagation(); // Making sure since we need the weight of each event
+
+  GenericToolbox::mkdirTFile(_saveDir_, savePath_)->cd();
+  
+  auto makeVariedEventRatesFct = [&](FitParameter& par_, std::vector<double> variationList_, const std::string& parSavePath_){
+    
+    LogInfo << "Making varied event rates for " << parSavePath_ << std::endl;
+    
+    // First make sure all params are at their prior <- is it necessary?
+    for( auto& parSet : _propagator_.getParameterSetsList() ){
+      if( not parSet.isEnabled() ) continue;
+      for( auto& par : parSet.getParameterList() ){
+        par.setParameterValue(par.getPriorValue());
+      }
+    }
+    _propagator_.propagateParametersOnSamples();
+
+    auto* saveDir = GenericToolbox::mkdirTFile(_saveDir_, parSavePath_ );
+    saveDir->cd();
+
+    std::vector<std::vector<double>> buffEvtRatesMap; //[iVar][iSample]
+    std::vector<double> variationList;
+    if (par_.isFree()){
+      if(par_.getMinValue() == par_.getMinValue()) variationList.push_back(par_.getMinValue());
+      variationList.push_back(par_.getPriorValue());
+      if(par_.getMaxValue() == par_.getMaxValue()) variationList.push_back(par_.getMaxValue());
+    }
+    else{
+      variationList = variationList_;
+    }
+      
+    for ( size_t iVar = 0 ; iVar < variationList.size() ; iVar++ ){
+
+      buffEvtRatesMap.emplace_back();
+
+      if (par_.isFree()){
+        par_.setParameterValue(variationList[iVar]);
+      }
+      else{
+        par_.setParameterValue(par_.getPriorValue() + variationList[iVar] * par_.getStdDevValue());
+      }
+      
+      _propagator_.propagateParametersOnSamples();
+
+      for( size_t iSample = 0 ; iSample < _propagator_.getFitSampleSet().getFitSampleList().size() ; iSample++ ){
+        buffEvtRatesMap[iVar].push_back( _propagator_.getFitSampleSet().getFitSampleList()[iSample].getMcContainer().getSumWeights() );
+      }
+      par_.setParameterValue(par_.getPriorValue());
+    }
+
+    
+    // Write in the output
+    
+    TVectorD* variationList_TVectorD = new TVectorD(variationList.size());
+
+    for ( size_t iVar = 0 ; iVar < variationList.size() ; iVar++ ){
+      if (par_.isFree()) (*variationList_TVectorD)(iVar) = variationList[iVar];
+      else (*variationList_TVectorD)(iVar) = par_.getPriorValue() + variationList[iVar] * par_.getStdDevValue();
+    }
+    GenericToolbox::writeInTFile(saveDir, 
+                                 variationList_TVectorD, 
+                                 "paramValues");
+    
+    TVectorD* buffVariedEvtRates_TVectorD{nullptr};
+
+    for( size_t iSample = 0 ; iSample < _propagator_.getFitSampleSet().getFitSampleList().size() ; iSample++ ){
+
+      buffVariedEvtRates_TVectorD = new TVectorD(variationList.size());
+
+      for ( size_t iVar = 0 ; iVar < variationList.size() ; iVar++ ){
+        (*buffVariedEvtRates_TVectorD)(iVar) = buffEvtRatesMap[iVar][iSample];
+      }
+      
+      GenericToolbox::writeInTFile(saveDir, 
+                                   buffVariedEvtRates_TVectorD, 
+                                   _propagator_.getFitSampleSet().getFitSampleList()[iSample].getName());
+
+    }
+        
+      
+  };
+
+  // vary parameters
+  
+  for( auto& parSet : _propagator_.getParameterSetsList() ){
+
+    if( not parSet.isEnabled() ) continue;
+
+    if( parSet.isUseEigenDecompInFit() ){
+      // TODO ?
+      continue;
+    }
+    else{
+      for( auto& par : parSet.getParameterList() ){
+        
+        if( not par.isEnabled() ) continue;
+        
+        std::string tag;
+        if( par.isFixed() ){ tag += "_FIXED"; }
+        if( par.isFree() ){ tag += "_FREE"; }
+        
+        std::string savePath = savePath_;
+        if( not savePath.empty() ) savePath += "/";
+        savePath += "varyEventRates/" + parSet.getName() + "/" + par.getTitle() + tag;
+
+        makeVariedEventRatesFct(par, paramVariationList_, savePath);
+      
+      }
+    }
+
+  }
+
+  _saveDir_->cd();
+
+}
+
 void FitterEngine::fixGhostFitParameters(){
   LogInfo << __METHOD_NAME__ << std::endl;
 
