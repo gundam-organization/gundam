@@ -16,7 +16,7 @@
 LoggerInit([]{
 Logger::setUserHeaderStr("[gundamConfigCompare.cxx]");
 Logger::setPrefixFormat("{TIME} {USER_HEADER}");
-})
+});
 
 bool __showAllKeys__{false};
 std::vector<std::string> __pathBuffer__;

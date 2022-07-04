@@ -2,12 +2,14 @@
 // Created by Nadrino on 01/06/2021.
 //
 
-#include "versionConfig.h"
 #include "FitterEngine.h"
+#include "VersionConfig.h"
 #include "JsonUtils.h"
 #include "GlobalVariables.h"
 #include "GundamGreetings.h"
-
+#ifdef GUNDAM_USING_CACHE_MANAGER
+#include "CacheManager.h"
+#endif
 #include "CmdLineParser.h"
 #include "Logger.h"
 #include "GenericToolbox.Root.h"
@@ -15,9 +17,9 @@
 #include <string>
 
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[gundamFitter.cxx]");
-} )
+});
 
 int main(int argc, char** argv){
 
@@ -32,9 +34,10 @@ int main(int argc, char** argv){
   CmdLineParser clParser;
 
   clParser.addTriggerOption("dry-run", {"--dry-run", "-d"},"Perform the full sequence of initialization, but don't do the actual fit.");
-  clParser.addTriggerOption("cache", {"-C", "--no-cache"}, "Disable the event weight cache");
   clParser.addTriggerOption("generateOneSigmaPlots", {"--one-sigma"}, "Generate one sigma plots");
+  clParser.addTriggerOption("asimov", {"-a", "--asimov"}, "Use MC dataset to fill the data histograms");
 
+  clParser.addOption("cache", {"-C", "--cache-enabled"}, "Enable the event weight cache");
   clParser.addOption("configFile", {"-c", "--config-file"}, "Specify path to the fitter config file");
   clParser.addOption("nbThreads", {"-t", "--nb-threads"}, "Specify nb of parallel threads");
   clParser.addOption("outputFile", {"-o", "--out-file"}, "Specify the output file");
@@ -56,6 +59,20 @@ int main(int argc, char** argv){
   LogInfo << clParser.getValueSummary() << std::endl << std::endl;
   LogInfo << clParser.dumpConfigAsJsonStr() << std::endl;
 
+  std::string cacheDefault = "off";
+#ifdef GUNDAM_USING_CACHE_MANAGER
+  if (Cache::Manager::HasCUDA()) cacheDefault = "on";
+#endif
+  std::string cacheEnabled = clParser.getOptionVal("cache",cacheDefault);
+  if (cacheEnabled != "on") {
+      LogInfo << "Cache::Manager disabled" << std::endl;
+      GlobalVariables::setEnableCacheManager(false);
+  }
+  else {
+      LogInfo << "Enabling Cache::Manager" << std::endl;
+      GlobalVariables::setEnableCacheManager(true);
+  }
+
   if( clParser.isOptionTriggered("randomSeed") ){
     LogAlert << "Using user-specified random seed: " << clParser.getOptionVal<ULong_t>("randomSeed") << std::endl;
     gRandom->SetSeed(clParser.getOptionVal<ULong_t>("randomSeed"));
@@ -64,15 +81,6 @@ int main(int argc, char** argv){
     ULong_t seed = time(nullptr);
     LogInfo << "Using \"time(nullptr)\" random seed: " << seed << std::endl;
     gRandom->SetSeed(seed);
-  }
-
-  if (clParser.isOptionTriggered("cache")) {
-      LogInfo << "Event weight cache is disabled" << std::endl;
-      GlobalVariables::setEnableEventWeightCache(false);
-  }
-  else {
-      LogInfo << "Event weight cache is enabled" << std::endl;
-      GlobalVariables::setEnableEventWeightCache(true);
   }
 
   auto configFilePath = clParser.getOptionVal("configFile", "");
@@ -86,6 +94,14 @@ int main(int argc, char** argv){
   // --------------------------
   LogInfo << "Reading config file: " << configFilePath << std::endl;
   auto jsonConfig = JsonUtils::readConfigFile(configFilePath); // works with yaml
+
+  if( JsonUtils::doKeyExist(jsonConfig, "minGundamVersion") ){
+    LogThrowIf(
+      not g.isNewerOrEqualVersion(JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion")),
+      "Version check FAILED: " << GundamVersionConfig::getVersionStr() << " < " << JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion")
+    );
+    LogInfo << "Version check passed: " << GundamVersionConfig::getVersionStr() << " >= " << JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion") << std::endl;
+  }
 
   bool isDryRun = clParser.isOptionTriggered("dry-run");
   bool enableParameterScan = clParser.isOptionTriggered("scanParameters") or JsonUtils::fetchValue(jsonConfig, "scanParameters", false);
@@ -102,6 +118,11 @@ int main(int argc, char** argv){
     }
   }
   outFileName = clParser.getOptionVal("outputFile", outFileName + ".root");
+  if( JsonUtils::doKeyExist(jsonConfig, "outputFolder") ){
+    GenericToolbox::mkdirPath(JsonUtils::fetchValue<std::string>(jsonConfig, "outputFolder"));
+    outFileName.insert(0, JsonUtils::fetchValue<std::string>(jsonConfig, "outputFolder") + "/");
+  }
+
   LogWarning << "Creating output file: \"" << outFileName << "\"..." << std::endl;
   TFile* out = TFile::Open(outFileName.c_str(), "RECREATE");
 
@@ -109,7 +130,7 @@ int main(int argc, char** argv){
   LogInfo << "Writing runtime parameters in output file..." << std::endl;
 
   // Gundam version?
-  TNamed gundamVersionString("gundamVersion", getVersionStr().c_str());
+  TNamed gundamVersionString("gundamVersion", GundamVersionConfig::getVersionStr().c_str());
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamFitter"), &gundamVersionString);
 
   // Command line?
@@ -138,6 +159,7 @@ int main(int argc, char** argv){
     fitter.getPropagator().setThrowAsimovToyParameters(true);
     fitter.getPropagator().setIThrow(iToyFit);
   }
+  fitter.getPropagator().setLoadAsimovData( clParser.isOptionTriggered("asimov") );
 
   fitter.initialize();
 
@@ -173,4 +195,5 @@ int main(int argc, char** argv){
   // --------------------------
   g.goodbye();
 
+  GlobalVariables::getParallelWorker().reset();
 }

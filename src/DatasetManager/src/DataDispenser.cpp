@@ -22,12 +22,12 @@
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[DataDispenser]");
-})
+});
 
 DataDispenser::DataDispenser() = default;
 DataDispenser::~DataDispenser() = default;
 
-void DataDispenser::setConfig(const json &config) {
+void DataDispenser::setConfig(const nlohmann::json &config) {
   _config_ = config;
   JsonUtils::forwardConfig(_config_, __CLASS_NAME__);
 }
@@ -41,9 +41,11 @@ void DataDispenser::readConfig(){
 
   _parameters_.treePath = JsonUtils::fetchValue<std::string>(_config_, "tree", _parameters_.treePath);
   _parameters_.filePathList = JsonUtils::fetchValue<std::vector<std::string>>(_config_, "filePathList", _parameters_.filePathList);
-  _parameters_.nominalWeightFormulaStr = JsonUtils::fetchValue(_config_, "nominalWeightFormula", _parameters_.nominalWeightFormulaStr);
   _parameters_.additionalLeavesStorage = JsonUtils::fetchValue(_config_, "additionalLeavesStorage", _parameters_.additionalLeavesStorage);
   _parameters_.useMcContainer = JsonUtils::fetchValue(_config_, "useMcContainer", _parameters_.useMcContainer);
+
+  _parameters_.selectionCutFormulaStr = JsonUtils::buildFormula(_config_, "selectionCutFormula", "&&", _parameters_.selectionCutFormulaStr);
+  _parameters_.nominalWeightFormulaStr = JsonUtils::buildFormula(_config_, "nominalWeightFormula", "*", _parameters_.nominalWeightFormulaStr);
 
   if( JsonUtils::doKeyExist(_config_, "overrideLeafDict") ){
     _parameters_.overrideLeafDict.clear();
@@ -78,7 +80,7 @@ void DataDispenser::setPlotGenPtr(PlotGenerator *plotGenPtr) {
 }
 
 void DataDispenser::load(){
-  LogWarning << "Loading data set: " << getTitle() << std::endl;
+  LogWarning << "Loading dataset: " << getTitle() << std::endl;
   LogThrowIf(not _isInitialized_, "Can't load while not initialized.");
   LogThrowIf(_sampleSetPtrToLoad_==nullptr, "SampleSet not specified.");
 
@@ -86,31 +88,44 @@ void DataDispenser::load(){
 
   this->buildSampleToFillList();
   if( _cache_.samplesToFillList.empty() ){
-    LogError << "No samples were selected for data set: " << getTitle() << std::endl;
+    LogError << "No samples were selected for dataset: " << getTitle() << std::endl;
     return;
   }
 
-  if( GenericToolbox::doesStringContainsSubstring(_parameters_.nominalWeightFormulaStr, "<I_TOY>") ){
-    LogThrowIf(_parameters_.iThrow==-1, "<I_TOY> not set.");
-    GenericToolbox::replaceSubstringInsideInputString(
-        _parameters_.nominalWeightFormulaStr, "<I_TOY>",
-        std::to_string(_parameters_.iThrow)
-    );
-  }
+  auto replaceToyIndexFct = [&](std::string& formula_){
+    if( GenericToolbox::doesStringContainsSubstring(formula_, "<I_TOY>") ){
+      LogThrowIf(_parameters_.iThrow==-1, "<I_TOY> not set.");
+      GenericToolbox::replaceSubstringInsideInputString(formula_, "<I_TOY>", std::to_string(_parameters_.iThrow));
+    }
+  };
+  auto overrideLeavesNamesFct = [&](std::string& formula_){
+    for( auto& replaceEntry : _cache_.leavesToOverrideList ){
+      GenericToolbox::replaceSubstringInsideInputString(formula_, replaceEntry, _parameters_.overrideLeafDict[replaceEntry]);
+    }
+  };
 
   if( not _parameters_.overrideLeafDict.empty() ){
-    for( auto& entryDict : _parameters_.overrideLeafDict ){
-      if( GenericToolbox::doesStringContainsSubstring(entryDict.second, "<I_TOY>") ){
-        LogThrowIf(_parameters_.iThrow==-1, "<I_TOY> not set.");
-        GenericToolbox::replaceSubstringInsideInputString(
-            entryDict.second, "<I_TOY>",
-            std::to_string(_parameters_.iThrow)
-        );
-      }
-    }
+    for( auto& entryDict : _parameters_.overrideLeafDict ){ replaceToyIndexFct(entryDict.second); }
     LogInfo << "Overriding leaf dict: " << std::endl;
     LogInfo << GenericToolbox::parseMapAsString(_parameters_.overrideLeafDict) << std::endl;
+
+    for( auto& overrideEntry : _parameters_.overrideLeafDict ){
+      _cache_.leavesToOverrideList.emplace_back(overrideEntry.first);
+    }
+    // make sure we process the longest words first: "thisIsATest" variable should be replaced before "thisIs"
+    std::function<bool(const std::string&, const std::string&)> aGoesFirst = [](const std::string& a_, const std::string& b_){ return a_.size() > b_.size(); };
+    auto p = GenericToolbox::getSortPermutation(_cache_.leavesToOverrideList, aGoesFirst);
+    GenericToolbox::applyPermutation(_cache_.leavesToOverrideList, p);
   }
+
+  replaceToyIndexFct(_parameters_.nominalWeightFormulaStr);
+  replaceToyIndexFct(_parameters_.selectionCutFormulaStr);
+
+  overrideLeavesNamesFct(_parameters_.nominalWeightFormulaStr);
+  overrideLeavesNamesFct(_parameters_.selectionCutFormulaStr);
+
+  LogInfo << "Data will be extracted from: " << GenericToolbox::parseVectorAsString(_parameters_.filePathList, true) << std::endl;
+  for( const auto& file: _parameters_.filePathList){ LogThrowIf(not GenericToolbox::doesTFileIsValid(file, {_parameters_.treePath}), "Invalid file: " << file); }
 
   this->doEventSelection();
   this->fetchRequestedLeaves();
@@ -140,15 +155,6 @@ void DataDispenser::addLeafRequestedForStorage(const std::string& leafName_){
   this->addLeafRequestedForIndexing(leafName_);
 }
 
-TChain *DataDispenser::generateChain() {
-  if( _parameters_.filePathList.empty() ) return nullptr;
-  TChain* out{new TChain(_parameters_.treePath.c_str())};
-  for( const auto& file: _parameters_.filePathList){
-    LogThrowIf(not GenericToolbox::doesTFileIsValid(file, {_parameters_.treePath}), "Invalid file: " << file);
-    out->Add(file.c_str());
-  }
-  return out;
-}
 void DataDispenser::buildSampleToFillList(){
   LogWarning << "Fetching samples to fill..." << std::endl;
 
@@ -163,92 +169,93 @@ void DataDispenser::buildSampleToFillList(){
     LogInfo << "No sample selected." << std::endl;
     return;
   }
-
-  LogInfo << "Selected samples are: " << std::endl
-          << GenericToolbox::iterableToString(
-              _cache_.samplesToFillList,
-              [](const FitSample *samplePtr){ return "\""+samplePtr->getName()+"\""; }
-              )
-          << std::endl;
 }
 void DataDispenser::doEventSelection(){
   LogWarning << "Performing event selection..." << std::endl;
-  TChain* chainPtr{nullptr};
 
   LogInfo << "Opening files..." << std::endl;
-  chainPtr = this->generateChain();
-  LogThrowIf(chainPtr == nullptr, "Can't open TChain.");
-  LogThrowIf(chainPtr->GetEntries() == 0, "TChain is empty.");
+  TChain treeChain(_parameters_.treePath.c_str());
+  for( const auto& file: _parameters_.filePathList){ treeChain.Add(file.c_str()); }
+  LogThrowIf(treeChain.GetEntries() == 0, "TChain is empty.");
 
   LogInfo << "Defining selection formulas..." << std::endl;
+  treeChain.SetBranchStatus("*", true); // enabling every branch to define formula
+
+  TTreeFormula* treeSelectionCutFormula{nullptr};
+  std::vector<TTreeFormula*> sampleCutFormulaList(_cache_.samplesToFillList.size(), nullptr);
   TTreeFormulaManager formulaManager; // TTreeFormulaManager handles the notification of multiple TTreeFormula for one TTChain
-  std::vector<TTreeFormula*> sampleCutFormulaList;
-  chainPtr->SetBranchStatus("*", true); // enabling every branch to define formula
+
+  if( not _parameters_.selectionCutFormulaStr.empty() ){
+    treeSelectionCutFormula = new TTreeFormula("SelectionCutFormula", _parameters_.selectionCutFormulaStr.c_str(), &treeChain);
+    LogThrowIf(treeSelectionCutFormula->GetNdim() == 0,
+               "\"" << _parameters_.selectionCutFormulaStr << "\" could not be parsed by the TChain");
+
+    // The TChain will notify the formula that it has to update leaves addresses while swaping TFile
+    formulaManager.Add(treeSelectionCutFormula);
+    LogInfo << "Using tree selection cut: \"" << _parameters_.selectionCutFormulaStr << "\"" << std::endl;
+  }
 
   GenericToolbox::TablePrinter t;
   t.setColTitles({{"Sample"}, {"Selection Cut"}});
-  for( auto& sample : _cache_.samplesToFillList ){
-    t.addTableLine({{"\""+sample->getName()+"\""}, {"\""+sample->getSelectionCutsStr()+"\""}});
-    sampleCutFormulaList.emplace_back(
-        new TTreeFormula(
-            sample->getName().c_str(),
-            sample->getSelectionCutsStr().c_str(),
-            chainPtr
-        )
-    );
-    LogThrowIf(sampleCutFormulaList.back()->GetNdim() == 0,
-               "\"" << sample->getSelectionCutsStr() << "\" could not be parsed by the TChain");
+  for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
+
+    std::string selectionCut = _cache_.samplesToFillList[iSample]->getSelectionCutsStr();
+    for( auto& replaceEntry : _cache_.leavesToOverrideList ){
+      GenericToolbox::replaceSubstringInsideInputString(selectionCut, replaceEntry, _parameters_.overrideLeafDict[replaceEntry]);
+    }
+
+    t.addTableLine({{"\""+_cache_.samplesToFillList[iSample]->getName()+"\""}, {"\""+selectionCut+"\""}});
+    sampleCutFormulaList[iSample] = new TTreeFormula(_cache_.samplesToFillList[iSample]->getName().c_str(), selectionCut.c_str(), &treeChain);
+    LogThrowIf(sampleCutFormulaList[iSample]->GetNdim() == 0,
+               "\"" << selectionCut << "\" could not be parsed by the TChain");
 
     // The TChain will notify the formula that it has to update leaves addresses while swaping TFile
-    formulaManager.Add(sampleCutFormulaList.back());
+    formulaManager.Add(sampleCutFormulaList[iSample]);
   }
-  chainPtr->SetNotify(&formulaManager);
+  treeChain.SetNotify(&formulaManager);
   t.printTable();
 
   LogInfo << "Enabling required branches..." << std::endl;
-  chainPtr->SetBranchStatus("*", false);
-  for( auto* sampleFormula : sampleCutFormulaList ){
-    for( int iLeaf = 0 ; iLeaf < sampleFormula->GetNcodes() ; iLeaf++ ){
-      chainPtr->SetBranchStatus(sampleFormula->GetLeaf(iLeaf)->GetBranch()->GetName(), true);
-    }
+  treeChain.SetBranchStatus("*", false);
+
+  if(treeSelectionCutFormula != nullptr) GenericToolbox::enableSelectedBranches(&treeChain, treeSelectionCutFormula);
+  for( auto& sampleFormula : sampleCutFormulaList ){
+    GenericToolbox::enableSelectedBranches(&treeChain, sampleFormula);
   }
 
   LogInfo << "Performing event selection..." << std::endl;
   GenericToolbox::VariableMonitor readSpeed("bytes");
-  Long64_t nEvents = chainPtr->GetEntries();
+  Long64_t nEvents = treeChain.GetEntries();
   // for each event, which sample is active?
   _cache_.eventIsInSamplesList.resize(nEvents, std::vector<bool>(_cache_.samplesToFillList.size(), true));
   std::string progressTitle = LogInfo.getPrefixString() + "Reading input dataset";
   TFile* lastFilePtr{nullptr};
   for( Long64_t iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
-    readSpeed.addQuantity(chainPtr->GetEntry(iEvent));
+    readSpeed.addQuantity(treeChain.GetEntry(iEvent));
     if( GenericToolbox::showProgressBar(iEvent, nEvents) ){
       GenericToolbox::displayProgressBar(
           iEvent, nEvents,progressTitle + " - " +
-                          GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.evalTotalGrowthRate()), 8)
+                          GenericToolbox::padString(GenericToolbox::parseSizeUnits((unsigned int)(readSpeed.evalTotalGrowthRate())), 8)
                           + "/s");
     }
 
+    if(treeSelectionCutFormula != nullptr and not GenericToolbox::doesEntryPassCut(treeSelectionCutFormula)){
+      for( size_t iSample = 0 ; iSample < sampleCutFormulaList.size() ; iSample++ ){ _cache_.eventIsInSamplesList[iEvent][iSample] = false; }
+      continue;
+    }
+
     for( size_t iSample = 0 ; iSample < sampleCutFormulaList.size() ; iSample++ ){
-      for(int jInstance = 0; jInstance < sampleCutFormulaList[iSample]->GetNdata(); jInstance++) {
-        if (sampleCutFormulaList[iSample]->EvalInstance(jInstance) == 0) {
-          // if it doesn't pass the cut
-          _cache_.eventIsInSamplesList[iEvent][iSample] = false;
-          break;
-        }
-      } // Formula Instances
+      if( not GenericToolbox::doesEntryPassCut(sampleCutFormulaList[iSample]) ){
+        _cache_.eventIsInSamplesList[iEvent][iSample] = false;
+      }
     } // iSample
   } // iEvent
 
-  // detaching the formulas
-  chainPtr->SetNotify(nullptr);
-  delete chainPtr;
-
   LogInfo << "Counting requested event slots for each samples..." << std::endl;
   _cache_.sampleNbOfEvents.resize(_cache_.samplesToFillList.size(), 0);
-  for( size_t iEvent = 0 ; iEvent < _cache_.eventIsInSamplesList.size() ; iEvent++ ){
+  for(auto & eventIsInSample : _cache_.eventIsInSamplesList){
     for(size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
-      if(_cache_.eventIsInSamplesList[iEvent][iSample]) _cache_.sampleNbOfEvents[iSample]++;
+      if(eventIsInSample[iSample]) _cache_.sampleNbOfEvents[iSample]++;
     }
   }
 
@@ -311,7 +318,7 @@ void DataDispenser::fetchRequestedLeaves(){
 
   // plotGen
   if( _plotGenPtr_ != nullptr ){
-    for( auto& var : _plotGenPtr_->fetchListOfVarToPlot() ){
+    for( auto& var : _plotGenPtr_->fetchListOfVarToPlot(not _parameters_.useMcContainer) ){
       this->addLeafRequestedForStorage(var);
     }
 
@@ -338,20 +345,21 @@ void DataDispenser::preAllocateMemory(){
   /// the vector won't have to do this by allocating the right event size.
 
   // MEMORY CLAIM?
-  TChain* chainPtr{this->generateChain()};
-  chainPtr->SetBranchStatus("*", false);
+  TChain treeChain(_parameters_.treePath.c_str());
+  for( const auto& file: _parameters_.filePathList){ treeChain.Add(file.c_str()); }
+  treeChain.SetBranchStatus("*", false);
 
-  std::vector<std::string> leafVar;
+  std::vector<std::string> leafVarList;
   for( auto& eventVar : _cache_.leavesRequestedForStorage){
-    leafVar.emplace_back(eventVar);
+    leafVarList.emplace_back(eventVar);
     if( GenericToolbox::doesKeyIsInMap(eventVar, _parameters_.overrideLeafDict) ){
-      leafVar.back() = _parameters_.overrideLeafDict[eventVar];
-      leafVar.back() = GenericToolbox::stripBracket(leafVar.back(), '[', ']');
+      leafVarList.back() = _parameters_.overrideLeafDict[eventVar];
+      leafVarList.back() = GenericToolbox::stripBracket(leafVarList.back(), '[', ']');
     }
   }
   GenericToolbox::TreeEventBuffer tBuf;
-  tBuf.setLeafNameList(leafVar);
-  tBuf.hook(chainPtr);
+  tBuf.setLeafNameList(leafVarList);
+  tBuf.hook(&treeChain);
 
   PhysicsEvent eventPlaceholder;
   eventPlaceholder.setDataSetIndex(_owner_->getDataSetIndex());
@@ -404,10 +412,10 @@ void DataDispenser::preAllocateMemory(){
 
             auto dialType = dialSetPtr->getGlobalDialType();
             if     ( dialType == DialType::Spline ){
-              dialSetPtr->getDialList().resize(chainPtr->GetEntries(), DialWrapper(SplineDial()));
+              dialSetPtr->getDialList().resize(treeChain.GetEntries(), DialWrapper(SplineDial()));
             }
             else if( dialType == DialType::Graph ){
-              dialSetPtr->getDialList().resize(chainPtr->GetEntries(), DialWrapper(GraphDial()));
+              dialSetPtr->getDialList().resize(treeChain.GetEntries(), DialWrapper(GraphDial()));
             }
             else{
               LogThrow("Invalid dial type for event-by-event dial: " << DialType::DialTypeEnumNamespace::toString(dialType))
@@ -422,13 +430,16 @@ void DataDispenser::preAllocateMemory(){
     }
   }
 
-  delete chainPtr;
+  LogInfo << "Current RAM is: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage())) << std::endl;
 }
 void DataDispenser::readAndFill(){
-  LogWarning << "Reading data set and loading..." << std::endl;
+  LogWarning << "Reading dataset and loading..." << std::endl;
 
-  ROOT::EnableImplicitMT(GlobalVariables::getNbThreads());
-  std::mutex eventOffSetMutex;
+  if( not _parameters_.nominalWeightFormulaStr.empty() ){
+    LogInfo << "Nominal weight: \"" << _parameters_.nominalWeightFormulaStr << "\"" << std::endl;
+  }
+
+  ROOT::EnableThreadSafety();
   auto fillFunction = [&](int iThread_){
 
     int nThreads = GlobalVariables::getNbThreads();
@@ -437,29 +448,27 @@ void DataDispenser::readAndFill(){
       nThreads = 1;
     }
 
-    TChain* threadChain{this->generateChain()};
+    TChain treeChain(_parameters_.treePath.c_str());
+    for( const auto& file: _parameters_.filePathList){ treeChain.Add(file.c_str()); }
+
     TTreeFormula* threadNominalWeightFormula{nullptr};
     TList objToNotify;
-    threadChain->SetNotify(&objToNotify);
+    treeChain.SetNotify(&objToNotify);
 
-    threadChain->SetBranchStatus("*", false);
+    treeChain.SetBranchStatus("*", false);
 
     if( not _parameters_.nominalWeightFormulaStr.empty() ){
-      threadChain->SetBranchStatus("*", true);
-      if(iThread_ == 0) LogInfo << "Nominal weight: \"" << _parameters_.nominalWeightFormulaStr << "\"" << std::endl;
+      treeChain.SetBranchStatus("*", true);
       threadNominalWeightFormula = new TTreeFormula(
           Form("NominalWeightFormula%i", iThread_),
           _parameters_.nominalWeightFormulaStr.c_str(),
-          threadChain
+          &treeChain
           );
       LogThrowIf(threadNominalWeightFormula->GetNdim() == 0,
                  "\"" <<  _parameters_.nominalWeightFormulaStr << "\" could not be parsed by the TChain");
-      objToNotify.Add(threadNominalWeightFormula);
-      threadChain->SetBranchStatus("*", false);
-      // Enabling needed branches for evaluating formulas
-      for( int iLeaf = 0 ; iLeaf < threadNominalWeightFormula->GetNcodes() ; iLeaf++ ){
-        threadChain->SetBranchStatus(threadNominalWeightFormula->GetLeaf(iLeaf)->GetBranch()->GetName(), true);
-      }
+      objToNotify.Add(threadNominalWeightFormula); // memory handled here!
+      treeChain.SetBranchStatus("*", false);
+      GenericToolbox::enableSelectedBranches(&treeChain, threadNominalWeightFormula);
     }
 
     GenericToolbox::TreeEventBuffer tEventBuffer;
@@ -472,15 +481,14 @@ void DataDispenser::readAndFill(){
       }
     }
     tEventBuffer.setLeafNameList(leafVar);
-    eventOffSetMutex.lock();
-    tEventBuffer.hook(threadChain);
-    eventOffSetMutex.unlock();
+    tEventBuffer.hook(&treeChain);
 
     PhysicsEvent eventBuffer;
     eventBuffer.setDataSetIndex(_owner_->getDataSetIndex());
     eventBuffer.setCommonLeafNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.leavesRequestedForIndexing));
     auto copyDict = eventBuffer.generateDict(tEventBuffer, _parameters_.overrideLeafDict);
     eventBuffer.copyData(copyDict, true); // resize array obj
+    eventBuffer.resizeVarToDoubleCache();
 
     PhysicsEvent evStore;
     evStore.setDataSetIndex(_owner_->getDataSetIndex());
@@ -497,7 +505,8 @@ void DataDispenser::readAndFill(){
     // Loop vars
     bool isEventInDialBin{true};
     int iBin{0};
-    int lastFailedBinVarIndex{-1};
+    int lastFailedBinVarIndex{-1}; int lastEventVarIndex{-1};
+    const std::pair<double, double>* lastEdges{nullptr};
     size_t iVar{0};
     size_t iSample{0};
     // Dials
@@ -510,7 +519,7 @@ void DataDispenser::readAndFill(){
     const DataBin* applyConditionBinPtr;
 
     // Try to read TTree the closest to sequentially possible
-    Long64_t nEvents = threadChain->GetEntries();
+    Long64_t nEvents = treeChain.GetEntries();
     Long64_t nEventPerThread = nEvents/Long64_t(nThreads);
     Long64_t iEnd = nEvents;
     Long64_t iStart = Long64_t(iThread_)*nEventPerThread;
@@ -518,13 +527,13 @@ void DataDispenser::readAndFill(){
     Long64_t iGlobal = 0;
 
     // Load the branches
-    threadChain->LoadTree(iStart);
+    treeChain.LoadTree(iStart);
 
     // IO speed monitor
     GenericToolbox::VariableMonitor readSpeed("bytes");
     Int_t nBytes;
 
-    std::string progressTitle = LogInfo.getPrefixString() + "Loading and indexing";
+    std::string progressTitle = LogInfo.getPrefixString();
 
     for(Long64_t iEntry = iStart ; iEntry < iEnd ; iEntry++ ){
 
@@ -532,10 +541,10 @@ void DataDispenser::readAndFill(){
         if( GenericToolbox::showProgressBar(iGlobal, nEvents) ){
           GenericToolbox::displayProgressBar(
               iGlobal, nEvents,
-              progressTitle + " - "
-              + GenericToolbox::padString(GenericToolbox::parseSizeUnits(double(nThreads)*readSpeed.getTotalAccumulated()), 9)
+              progressTitle
+              + GenericToolbox::padString(GenericToolbox::parseSizeUnits(nThreads*readSpeed.getTotalAccumulated()), 9)
               + " ("
-              + GenericToolbox::padString(GenericToolbox::parseSizeUnits(double(nThreads)*readSpeed.evalTotalGrowthRate()), 9)
+              + GenericToolbox::padString(GenericToolbox::parseSizeUnits(nThreads*readSpeed.evalTotalGrowthRate()), 9)
               + "/s)"
           );
         }
@@ -548,51 +557,26 @@ void DataDispenser::readAndFill(){
       }
       if( skipEvent ) continue;
 
-//      threadChain->GetStatus()->Print();
-//      for( int iElm=0 ;iElm <  threadChain->GetStatus()->GetEntries() ; iElm++ ){
-//        auto* ce = (TChainElement*) threadChain->GetStatus()->At(iElm);
-//        LogWarning << ce->GetName() << " -> " << ce->GetStatus() << std::endl;
-//      }
-//
-//      for( int iBranch = 0 ; iBranch < threadChain->GetListOfLeaves()->GetEntries() ; iBranch++ ){
-//        auto* l = threadChain->GetLeaf(threadChain->GetListOfLeaves()->At(iBranch)->GetName());
-//        if( l == nullptr ) continue;
-//        if( threadChain->GetBranchStatus(l->GetBranch()->GetName()) == 1 ){
-//          LogTrace << std::string(l->GetFullName()) << " -> " << l->GetValuePointer() << " ? ";
-//          if( tEventBuffer.fetchLeafIndex(l->GetName()) == -1 ){
-//            LogTrace << "NO" << std::endl;
-//          }
-//          else{
-//            LogTrace << (int*) &(tEventBuffer.getLeafContent(l->GetName()).getByteBuffer()[0]) << std::endl;
-//          }
-//        }
-//      }
-
-//      LogDebug<< "ENTRY?" << std::endl;
-      nBytes = threadChain->GetEntry(iEntry);
-//      LogDebug << tEventBuffer.getSummary() << std::endl;
-//      eventBuffer.copyData(copyDict, true);
-//      LogDebug << eventBuffer << std::endl;
-//      LogThrow("")
+      nBytes = treeChain.GetEntry(iEntry);
       if( iThread_ == 0 ) readSpeed.addQuantity(nBytes);
 
       if( threadNominalWeightFormula != nullptr ){
         eventBuffer.setTreeWeight(threadNominalWeightFormula->EvalInstance());
+
+        if( eventBuffer.getTreeWeight() < 0 ){
+          LogError << "Negative nominal weight:" << std::endl;
+
+          LogError << "Event buffer is: " << eventBuffer.getSummary() << std::endl;
+
+          LogError << "Formula leaves:" << std::endl;
+          for( int iLeaf = 0 ; iLeaf < threadNominalWeightFormula->GetNcodes() ; iLeaf++ ){
+            if( threadNominalWeightFormula->GetLeaf(iLeaf) == nullptr ) continue; // for "Entry$" like dummy leaves
+            LogError << "Leaf: " << threadNominalWeightFormula->GetLeaf(iLeaf)->GetName() << "[0] = " << threadNominalWeightFormula->GetLeaf(iLeaf)->GetValue(0) << std::endl;
+          }
+
+          LogThrow("Negative nominal weight");
+        }
         if( eventBuffer.getTreeWeight() == 0 ){
-//          LogTrace << std::endl << "DONT PASS CUT:" << threadNominalWeightFormula->GetExpFormula() << std::endl;
-//          for( int iLeaf = 0 ; iLeaf < threadNominalWeightFormula->GetNcodes() ; iLeaf++ ){
-//            LogDebug << "branch:" << threadNominalWeightFormula->GetLeaf(iLeaf)->GetFullName();
-//            for( int i=0 ; i < threadNominalWeightFormula->GetLeaf(iLeaf)->GetNdata(); i++){
-//              LogDebug << " -> " << threadNominalWeightFormula->GetLeaf(iLeaf)->GetValue(i);
-//            }
-//            LogDebug << std::endl;
-//            LogThrowIf(not threadChain->GetBranchStatus(threadNominalWeightFormula->GetLeaf(iLeaf)->GetBranch()->GetName()),
-//                       threadNominalWeightFormula->GetLeaf(iLeaf)->GetBranch()->GetName() << "DISABLE?")
-////            threadChain->SetBranchStatus(threadNominalWeightFormula->GetLeaf(iLeaf)->GetBranch()->GetName(), true);
-//          }
-//          LogWarning << threadNominalWeightFormula->EvalInstance() << std::endl;
-//          eventBuffer.copyData(copyDict, true);
-//          LogThrow(eventBuffer)
           continue;
         } // skip this event
       }
@@ -630,9 +614,9 @@ void DataDispenser::readAndFill(){
           }
 
           // OK, now we have a valid fit bin. Let's claim an index.
-          eventOffSetMutex.lock();
+//          eventOffSetMutex.lock();
           sampleEventIndex = _cache_.sampleIndexOffsetList[iSample]++;
-          eventOffSetMutex.unlock();
+//          eventOffSetMutex.unlock();
 
           eventPtr = &(*_cache_.sampleEventListPtrToFill[iSample])[sampleEventIndex];
           eventPtr->copyData(copyStoreDict, true); // buffer has the right size already
@@ -658,7 +642,8 @@ void DataDispenser::readAndFill(){
               }
 
               if( not dialSetPtr->getDialLeafName().empty() ){
-                if     ( not strcmp(threadChain->GetLeaf(dialSetPtr->getDialLeafName().c_str())->GetTypeName(), "TClonesArray") ){
+                // Event-by-event dial?
+                if     ( not strcmp(treeChain.GetLeaf(dialSetPtr->getDialLeafName().c_str())->GetTypeName(), "TClonesArray") ){
                   grPtr = (TGraph*) eventBuffer.getVariable<TClonesArray*>(dialSetPtr->getDialLeafName())->At(0);
                   if(grPtr->GetN() > 1){
                     if     ( dialSetPtr->getGlobalDialType() == DialType::Spline ){
@@ -684,7 +669,7 @@ void DataDispenser::readAndFill(){
                     }
                   }
                 }
-                else if( not strcmp(threadChain->GetLeaf(dialSetPtr->getDialLeafName().c_str())->GetTypeName(), "TGraph") ){
+                else if( not strcmp(treeChain.GetLeaf(dialSetPtr->getDialLeafName().c_str())->GetTypeName(), "TGraph") ){
                   grPtr = (TGraph*) eventBuffer.getVariable<TGraph*>(dialSetPtr->getDialLeafName());
                   if     ( dialSetPtr->getGlobalDialType() == DialType::Spline ){
                     spDialPtr = (SplineDial*) dialSetPtr->getDialList()[iEntry].get();
@@ -709,40 +694,38 @@ void DataDispenser::readAndFill(){
                   }
                 }
                 else{
-                  LogThrow("Unsupported event-by-event dial type: " << threadChain->GetLeaf(dialSetPtr->getDialLeafName().c_str())->GetTypeName() )
+                  LogThrow("Unsupported event-by-event dial type: " << treeChain.GetLeaf(dialSetPtr->getDialLeafName().c_str())->GetTypeName() )
                 }
               }
               else{
                 // Binned dial?
                 lastFailedBinVarIndex = -1;
                 for( iDial = 0 ; iDial < dialSetPtr->getDialList().size(); iDial++ ){
-                  // ----------> SLOW PART
-                  applyConditionBinPtr = dialSetPtr->getDialList()[iDial]->getApplyConditionBinPtr();
-
-                  if( applyConditionBinPtr != nullptr and lastFailedBinVarIndex != -1 ){
-                    if( not applyConditionBinPtr->isBetweenEdges(
-                        applyConditionBinPtr->getEdgesList()[lastFailedBinVarIndex],
-                        eventBuffer.getVarAsDouble(applyConditionBinPtr->getEventVarIndexCache()[lastFailedBinVarIndex] )
-                    )){
-                      continue;
-                      // NEXT DIAL! Don't check other bin variables
-                    }
-                  }
-
-                  // Ok, lets give this dial a chance:
+                  // Let's give this dial a chance:
                   isEventInDialBin = true;
 
-                  if( applyConditionBinPtr != nullptr ){
+                  // ----------> SLOW PART -> check the bin
+                  if( (applyConditionBinPtr = dialSetPtr->getDialList()[iDial]->getApplyConditionBinPtr()) != nullptr ){
+                    if( lastFailedBinVarIndex != -1 // if the last bin failed, this is not -1
+                        and applyConditionBinPtr->getEventVarIndexCache()[lastFailedBinVarIndex] == lastEventVarIndex // make sure this new bin-edges point to the same variable
+                    ){
+                      if( *lastEdges == applyConditionBinPtr->getEdgesList()[lastFailedBinVarIndex] ){ continue; } // same bin-edges! no need to check again!
+                      else{ lastEdges = &applyConditionBinPtr->getEdgesList()[lastFailedBinVarIndex]; }
+                      if( not DataBin::isBetweenEdges( *lastEdges, eventBuffer.getVarAsDouble(lastEventVarIndex) )){
+                        continue;
+                        // NEXT DIAL! Don't check other bin variables
+                      }
+                    }
+
+                    // Check for the others
                     for( iVar = 0 ; iVar < applyConditionBinPtr->getEdgesList().size() ; iVar++ ){
                       if( iVar == lastFailedBinVarIndex ) continue; // already checked if set
-                      if( not applyConditionBinPtr->isBetweenEdges(
-                          applyConditionBinPtr->getEdgesList()[iVar],
-                          eventBuffer.getVarAsDouble(applyConditionBinPtr->getEventVarIndexCache()[iVar] )
-                      )){
+                      lastEventVarIndex = applyConditionBinPtr->getEventVarIndexCache()[iVar];
+                      lastEdges = &applyConditionBinPtr->getEdgesList()[iVar];
+                      if( not DataBin::isBetweenEdges( *lastEdges,  eventBuffer.getVarAsDouble( lastEventVarIndex ) )){
                         isEventInDialBin = false;
                         lastFailedBinVarIndex = int(iVar);
-                        break;
-                        // NEXT DIAL! Don't check other bin variables
+                        break; // NEXT DIAL! Don't check other bin variables
                       }
                     } // Bin var loop
                   }
@@ -772,10 +755,9 @@ void DataDispenser::readAndFill(){
       } // samples
     } // entries
     if( iThread_ == 0 ) GenericToolbox::displayProgressBar(nEvents, nEvents, progressTitle);
-    delete threadChain;
-    delete threadNominalWeightFormula;
   };
 
+  LogWarning << "Loading and indexing..." << std::endl;
   GlobalVariables::getParallelWorker().addJob(__METHOD_NAME__, fillFunction);
   GlobalVariables::getParallelWorker().runJob(__METHOD_NAME__);
   GlobalVariables::getParallelWorker().removeJob(__METHOD_NAME__);

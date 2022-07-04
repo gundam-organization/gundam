@@ -2,23 +2,22 @@
 // Created by Nadrino on 22/07/2021.
 //
 
-#include <TTreeFormulaManager.h>
 
-#include <memory>
-#include "json.hpp"
-
-#include "Logger.h"
-#include "GenericToolbox.h"
-#include "GenericToolbox.RawDataArray.h"
 
 #include "JsonUtils.h"
 #include "GlobalVariables.h"
 #include "FitSampleSet.h"
 
+#include "Logger.h"
+#include "GenericToolbox.h"
 
-LoggerInit([](){
-  Logger::setUserHeaderStr("[FitSampleSet]");
-})
+#include "nlohmann/json.hpp"
+#include <TTreeFormulaManager.h>
+
+#include <memory>
+
+
+LoggerInit([]{ Logger::setUserHeaderStr("[FitSampleSet]"); });
 
 FitSampleSet::FitSampleSet() { this->reset(); }
 FitSampleSet::~FitSampleSet() { this->reset(); }
@@ -27,7 +26,6 @@ void FitSampleSet::reset() {
   _isInitialized_ = false;
   _config_.clear();
 
-  _likelihoodFunctionPtr_ = nullptr;
   _fitSampleList_.clear();
 
   _eventByEventDialLeafList_.clear();
@@ -102,18 +100,11 @@ void FitSampleSet::initialize() {
 
   std::string llhMethod = JsonUtils::fetchValue(_config_, "llhStatFunction", "PoissonLLH");
   LogInfo << "Using \"" << llhMethod << "\" LLH function." << std::endl;
-  if( llhMethod == "PoissonLLH" ){
-    _likelihoodFunctionPtr_ = std::make_shared<PoissonLLH>();
-  }
-  else if( llhMethod == "BarlowLLH" ){
-    _likelihoodFunctionPtr_ = std::make_shared<BarlowLLH>();
-  }
-  else if( llhMethod == "BarlowLLH_OA2020_Bad" ){
-    _likelihoodFunctionPtr_ = std::make_shared<BarlowOA2020BugLLH>();
-  }
-  else{
-    LogThrow("Unknown LLH Method: " << llhMethod)
-  }
+  if     ( llhMethod == "PoissonLLH" ){  _jointProbabilityPtr_ = std::make_shared<JointProbability::PoissonLLH>(); }
+  else if( llhMethod == "BarlowLLH" ) {  _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH>(); }
+  else if( llhMethod == "BarlowLLH_BANFF_OA2020" ) {  _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2020>(); }
+  else if( llhMethod == "BarlowLLH_BANFF_OA2021" ) {  _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2021>(); }
+  else{ LogThrow("Unknown LLH Method: " << llhMethod); }
 
   _isInitialized_ = true;
 }
@@ -127,8 +118,8 @@ std::vector<FitSample> &FitSampleSet::getFitSampleList() {
 const nlohmann::json &FitSampleSet::getConfig() const {
   return _config_;
 }
-const std::shared_ptr<CalcLLHFunc> &FitSampleSet::getLikelihoodFunctionPtr() const {
-  return _likelihoodFunctionPtr_;
+const std::shared_ptr<JointProbability::JointProbability> &FitSampleSet::getJointProbabilityFct() const{
+  return _jointProbabilityPtr_;
 }
 
 bool FitSampleSet::empty() const {
@@ -136,20 +127,11 @@ bool FitSampleSet::empty() const {
 }
 double FitSampleSet::evalLikelihood() const{
   double llh = 0.;
-  for( auto& sample : _fitSampleList_ ){
-    llh += this->evalLikelihood(sample);
-  }
+  for( auto& sample : _fitSampleList_ ){ llh += this->evalLikelihood(sample); }
   return llh;
 }
 double FitSampleSet::evalLikelihood(const FitSample& sample_) const{
-  double sampleLlh = 0;
-  for( int iBin = 1 ; iBin <= sample_.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-    sampleLlh += (*_likelihoodFunctionPtr_)(
-        sample_.getMcContainer().histogram->GetBinContent(iBin),
-        std::pow(sample_.getMcContainer().histogram->GetBinError(iBin), 2),
-        sample_.getDataContainer().histogram->GetBinContent(iBin));
-  }
-  return sampleLlh;
+  return _jointProbabilityPtr_->eval(sample_);
 }
 
 void FitSampleSet::copyMcEventListToDataContainer(){

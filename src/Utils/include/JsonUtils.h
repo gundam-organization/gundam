@@ -5,10 +5,11 @@
 #ifndef GUNDAM_JSONUTILS_H
 #define GUNDAM_JSONUTILS_H
 
+#include "nlohmann/json.hpp"
+
 #include "string"
 #include "vector"
 #include "iostream"
-#include "json.hpp"
 
 
 namespace JsonUtils {

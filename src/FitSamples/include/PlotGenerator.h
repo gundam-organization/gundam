@@ -5,11 +5,12 @@
 #ifndef GUNDAM_PLOTGENERATOR_H
 #define GUNDAM_PLOTGENERATOR_H
 
-#include "AnaSample.hh"
 #include "FitSampleSet.h"
 #include "PhysicsEvent.h"
 
-#include "json.hpp"
+#include "GenericToolbox.Wrappers.h"
+
+#include "nlohmann/json.hpp"
 #include "TDirectory.h"
 #include "TH1D.h"
 
@@ -32,10 +33,7 @@ struct HistHolder{
 
   // Data
   bool isData{false};
-  const AnaSample* anaSamplePtr{nullptr};
   const FitSample* fitSamplePtr{nullptr};
-  std::mutex* fillMutexPtr{nullptr};
-  std::function<void(TH1D*, const AnaEvent*)> fillFunctionAnaSample;
   std::function<void(TH1D*, const PhysicsEvent*)> fillFunctionFitSample;
 
   // X axis
@@ -65,7 +63,6 @@ struct HistHolder{
   // Caches
   bool isBinCacheBuilt{false};
   std::vector<std::vector<const PhysicsEvent*>> _binEventPtrList_;
-
 };
 
 struct CanvasHolder{
@@ -88,7 +85,6 @@ public:
 
   // Setters
   void setConfig(const nlohmann::json &config_);
-  void setSampleListPtr(const std::vector<AnaSample> *sampleListPtr_);
   void setFitSampleSetPtr(const FitSampleSet *fitSampleSetPtr);
 
   // Init
@@ -111,7 +107,7 @@ public:
   void generateComparisonHistograms(const std::vector<HistHolder> &histList_, const std::vector<HistHolder> &refHistsList_, TDirectory *saveDir_ = nullptr);
 
   // Misc
-  std::vector<std::string> fetchListOfVarToPlot();
+  std::vector<std::string> fetchListOfVarToPlot(bool isData_ = false);
   std::vector<std::string> fetchListOfSplitVarNames();
   std::vector<std::string> fetchRequestedLeafNames();
 
@@ -120,7 +116,6 @@ protected:
 
 private:
   nlohmann::json _config_;
-  const std::vector<AnaSample>* _sampleListPtr_{nullptr};
   const FitSampleSet* _fitSampleSetPtr_{nullptr};
   int _maxLegendLength_{15};
 
@@ -133,7 +128,6 @@ private:
   std::vector<std::vector<HistHolder>> _histHolderCacheList_;
   std::vector<HistHolder> _comparisonHistHolderList_;
   std::map<std::string, std::shared_ptr<TCanvas>> _bufferCanvasList_;
-
 
 };
 

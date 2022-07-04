@@ -9,7 +9,7 @@
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[YamlUtils]");
-})
+});
 
 
 YAML::Node YamlUtils::readConfigFile(const std::string &configFilePath_) {

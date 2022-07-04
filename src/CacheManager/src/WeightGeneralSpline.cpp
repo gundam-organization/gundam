@@ -13,9 +13,9 @@
 #include <hemi/grid_stride_range.h>
 
 #include "Logger.h"
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[Cache]");
-})
+});
 
 // The constructor
 Cache::Weight::GeneralSpline::GeneralSpline(
@@ -37,6 +37,8 @@ Cache::Weight::GeneralSpline::GeneralSpline(
     fTotalBytes += GetSplinesReserved()*sizeof(short);    // fSplineParameter
     fTotalBytes += (1+GetSplinesReserved())*sizeof(int);  // fSplineIndex
 
+    // Calculate the space needed to store the spline data.  This needs
+    // to know how the spline data is packed for CalculateGeneralSpline.
     fSplineKnotsReserved = 2*fSplinesReserved + 3*fSplineKnotsReserved;
 
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
@@ -94,33 +96,8 @@ int Cache::Weight::GeneralSpline::FindPoints(const TSpline3* s) {
     return s->GetNp();
 }
 
-void Cache::Weight::GeneralSpline::AddSpline(int resultIndex,
-                                             int parIndex,
+void Cache::Weight::GeneralSpline::AddSpline(int resIndex, int parIndex,
                                              SplineDial* sDial) {
-    const TSpline3* s = sDial->getSplinePtr();
-    int NP = s->GetNp(); // Don't use FindPoints here!()
-    double xMin = s->GetXmin();
-    double xMax = s->GetXmax();
-    int sIndex = ReserveSpline(resultIndex,parIndex,xMin,xMax,NP);
-#ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in Cache::Weight::GeneralSpline::AddSpline
-    sDial->setCacheManagerName(GetName());
-    sDial->setCacheManagerValuePointer(GetCachePointer(sIndex));
-#endif
-    for (int i=0; i<NP; ++i) {
-        double x;
-        double y;
-        s->GetKnot(i,x,y);
-        double m = s->Derivative(x);
-        if (!std::isfinite(m)) std::runtime_error("invalid spline slope");
-        SetSplineKnot(sIndex,i,x,y,m);
-    }
-}
-
-// Reserve space in the internal structures for spline with uniform knots.
-// The knot values will still need to be set using set spline knot.
-int Cache::Weight::GeneralSpline::ReserveSpline(
-    int resIndex, int parIndex, double low, double high, int points) {
     if (resIndex < 0) {
         LogError << "Invalid result index"
                << std::endl;
@@ -141,12 +118,7 @@ int Cache::Weight::GeneralSpline::ReserveSpline(
                << std::endl;
         throw std::runtime_error("Parameter index out of bounds");
     }
-    if (high <= low) {
-        LogError << "Invalid spline bounds"
-               << std::endl;
-        throw std::runtime_error("Invalid spline bounds");
-    }
-    if (points < 3) {
+    if (sDial->getSplineData().size() < 11) {
         LogError << "Insufficient points in spline"
                << std::endl;
         throw std::runtime_error("Invalid number of spline points");
@@ -165,109 +137,22 @@ int Cache::Weight::GeneralSpline::ReserveSpline(
         throw std::runtime_error("Problem with control indices");
     }
     int knotIndex = fSplineKnotsUsed;
-    fSplineKnotsUsed += 2; // Space for the upper and lower bound
-    fSplineKnotsUsed += 3*points; // Space for the knots.
+    fSplineKnotsUsed += sDial->getSplineData().size();
     if (fSplineKnotsUsed > fSplineKnotsReserved) {
         LogError << "Not enough space reserved for spline knots"
                << std::endl;
         throw std::runtime_error("Not enough space reserved for spline knots");
     }
     fSplineIndex->hostPtr()[newIndex+1] = fSplineKnotsUsed;
-    // Save values needed to calculate the spline offset index.  If the input
-    // value is x, the index is
-    // v = (x-CD[dataIndex])*CD[dataIndex+1].
-    // i = v;
-    // v = v - i;
-    double invStep =  1.0*(points-1.0)/(high-low);
-    fSplineKnots->hostPtr()[knotIndex] = low;
-    fSplineKnots->hostPtr()[knotIndex+1] = invStep;
+    for (std::size_t i = 0; i<sDial->getSplineData().size(); ++i) {
+        fSplineKnots->hostPtr()[knotIndex+i] = sDial->getSplineData().at(i);
+    }
 
-    return newIndex;
-}
-
-void Cache::Weight::GeneralSpline::SetSplineKnot(
-    int sIndex, int kIndex, double place, double value, double slope) {
-    SetSplineKnotValue(sIndex,kIndex,value);
-    SetSplineKnotSlope(sIndex,kIndex,slope);
-    SetSplineKnotPlace(sIndex,kIndex,place);
-}
-
-void Cache::Weight::GeneralSpline::SetSplineKnotValue(
-    int sIndex, int kIndex, double value) {
-    if (sIndex < 0) {
-        LogError << "Requested spline index is negative"
-                  << std::endl;
-        std::runtime_error("Invalid control point being set");
-    }
-    if (GetSplinesUsed() <= sIndex) {
-        LogError << "Requested spline index is to large"
-                  << std::endl;
-        std::runtime_error("Invalid control point being set");
-    }
-    if (kIndex < 0) {
-        LogError << "Requested control point index is negative"
-                  << std::endl;
-        std::runtime_error("Invalid control point being set");
-    }
-    int knotIndex = fSplineIndex->hostPtr()[sIndex] + 2 + 3*kIndex;
-    if (fSplineIndex->hostPtr()[sIndex+1] <= knotIndex) {
-        LogError << "Requested control point index is to large"
-                  << std::endl;
-        std::runtime_error("Invalid control point being set");
-    }
-    fSplineKnots->hostPtr()[knotIndex] = value;
-}
-
-void Cache::Weight::GeneralSpline::SetSplineKnotSlope(
-    int sIndex, int kIndex, double slope) {
-    if (sIndex < 0) {
-        LogError << "Requested spline index is negative"
-                  << std::endl;
-        std::runtime_error("Invalid control point being set");
-    }
-    if (GetSplinesUsed() <= sIndex) {
-        LogError << "Requested spline index is to large"
-                  << std::endl;
-        std::runtime_error("Invalid control point being set");
-    }
-    if (kIndex < 0) {
-        LogError << "Requested control point index is negative"
-                  << std::endl;
-        std::runtime_error("Invalid control point being set");
-    }
-    int knotIndex = fSplineIndex->hostPtr()[sIndex] + 2 + 3*kIndex;
-    if (fSplineIndex->hostPtr()[sIndex+1]+1 <= knotIndex) {
-        LogError << "Requested control point index is to large"
-                  << std::endl;
-        std::runtime_error("Invalid control point being set");
-    }
-    fSplineKnots->hostPtr()[knotIndex+1] = slope;
-}
-
-void Cache::Weight::GeneralSpline::SetSplineKnotPlace(
-    int sIndex, int kIndex, double place) {
-    if (sIndex < 0) {
-        LogError << "Requested spline index is negative"
-                  << std::endl;
-        std::runtime_error("Invalid control point being set");
-    }
-    if (GetSplinesUsed() <= sIndex) {
-        LogError << "Requested spline index is to large"
-                  << std::endl;
-        std::runtime_error("Invalid control point being set");
-    }
-    if (kIndex < 0) {
-        LogError << "Requested control point index is negative"
-                  << std::endl;
-        std::runtime_error("Invalid control point being set");
-    }
-    int knotIndex = fSplineIndex->hostPtr()[sIndex] + 2 + 3*kIndex;
-    if (fSplineIndex->hostPtr()[sIndex+1] <= knotIndex+2) {
-        LogError << "Requested control point index is to large"
-                  << std::endl;
-        std::runtime_error("Invalid control point being set");
-    }
-    fSplineKnots->hostPtr()[knotIndex+2] = place;
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
+#warning Using SLOW VALIDATION in Cache::Weight::GeneralSpline::AddSpline
+    sDial->setCacheManagerName(GetName());
+    sDial->setCacheManagerValuePointer(GetCachePointer(newIndex));
+#endif
 }
 
 int Cache::Weight::GeneralSpline::GetSplineParameterIndex(int sIndex) {
@@ -429,44 +314,12 @@ double* Cache::Weight::GeneralSpline::GetCachePointer(int sIndex) {
 
 // Define CACHE_DEBUG to get lots of output from the host
 #undef CACHE_DEBUG
-#define PRINT_STEP 4
+#define PRINT_STEP 3
 
+#include "CalculateGeneralSpline.h"
 #include "CacheAtomicMult.h"
 
 namespace {
-    // Interpolate one point.  This is the only place that changes when the
-    // interpolation method changes.  This accepts a normalized "x" value, and
-    // an array of control points with "dim" entries..  The control points
-    // will be at (0, 1.0, 2.0, ... , dim-1).  The input variable "x" must be
-    // a "floating point" index. If the index "x" is out of range, then this
-    // turns into a linear extrapolation of the boundary points (try to avoid
-    // that).
-    //
-    // Example: If the control points have dim of 5, the index "x" must be
-    // greater than zero, and less than 5.  Assuming linear interpolation, an
-    // input value of 2.1 results in the linear interpolation between element
-    // [2] and element [3], or "(1.0-0.1)*p[2] + 0.1*p[3])".
-    HEMI_DEV_CALLABLE_INLINE
-    double HEMIInterp(int ix, double x, const WEIGHT_BUFFER_FLOAT* points, int dim) {
-        double x1 = points[3*ix+2];
-        double x2 = points[3*(ix+1)+2];
-        double step = x2-x1;
-
-        double fx = (x - x1)/step;
-        double fxx = fx*fx;
-        double fxxx = fx*fxx;
-
-        double p1 = points[3*ix];
-        double m1 = points[3*ix+1]*step;
-        double p2 = points[3*(ix+1)];
-        double m2 = points[3*(ix+1)+1]*step;
-
-        // Cubic spline with the points and slopes.
-        double v = (p1*(2.0*fxxx-3.0*fxx+1.0) + m1*(fxxx-2.0*fxx+fx)
-                    + p2*(3.0*fxx-2.0*fxxx) + m2*(fxxx-fxx));
-
-        return v;
-    }
 
     // A function to be used as the kernel on either the CPU or GPU.  This
     // must be valid CUDA coda.
@@ -485,61 +338,52 @@ namespace {
                          const short* pIndex,
                          const int* sIndex,
                          const int NP) {
+#ifdef CACHE_DEBUG
+#ifndef HEMI_DEV_CODE
+        int printStep = 0;
+#endif
+#endif
         for (int i : hemi::grid_stride_range(0,NP)) {
             const int id0 = sIndex[i];
             const int id1 = sIndex[i+1];
-            const int dim = (id1-id0-2)/3;
+            const int dim = id1-id0;
             const double x = params[pIndex[i]];
+            const double lClamp = lowerClamp[pIndex[i]];
+            const double uClamp = upperClamp[pIndex[i]];
+
 #ifndef HEMI_DEV_CODE
             if (dim>15) std::runtime_error("To many bins in spline");
 #endif
-            int ix = 0;
-            // Check to find a point that is less than x.
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 1
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 2
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 3
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 4
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 5
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 6
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 7
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 8
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 9
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 10
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 11
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 12
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 13
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 14
-            if (x > knots[id0+2+3*(ix+1)+2] && ix < dim-2) ++ix; // 15
 
-            const double s = 1.0/knots[id0+1];
-            double v = HEMIInterp(ix, x, &knots[id0+2], dim);
-#ifndef HEMI_DEV_CODE
+            double v = CalculateGeneralSpline(x, lClamp,uClamp,
+                                              &knots[id0],dim);
+
 #ifdef CACHE_DEBUG
-            if (i < PRINT_STEP) {
-                std::cout << "Splines kernel " << i
-                          << " iEvt " << rIndex[i]
-                          << " iPar " << pIndex[i]
-                          << " = " << x
-                          << " m " << knots[id0] << " d "  << knots[id0+1]
-                          << " (" << x << "," << ix << ")"
-                          << " --> " << v
-                          << " s: " << s
-                          << " d: " << dim
-                          << std::endl;
-                for (int k = 0; k < dim; ++k) {
-                    std::cout << "        " << k
-                              << " x: " << knots[id0+2+3*k+2]
-                              << " y: " << knots[id0+2+3*k]
-                              << " m: " << knots[id0+2+3*k+1]
-                              << std::endl;
+#ifndef HEMI_DEV_CODE
+            if (printStep++ < PRINT_STEP) {
+                double step = 1.0/knots[id0+1];
+                LogInfo << "CACHE_DEBUG: general " << i
+                        << " iEvt " << rIndex[i]
+                        << " iPar " << pIndex[i]
+                        << " = " << params[pIndex[i]]
+                        << " m " << knots[id0] << " d "  << knots[id0+1]
+                        << " s " << step
+                        << " --> " << v
+                        << " l: " << lClamp
+                        << " u: " << uClamp
+                        << " d: " << dim
+                       << std::endl;
+                for (int k = 0; k < (dim-2)/3; ++k) {
+                    LogInfo << "CACHE_DEBUG:     " << k
+                           << " x: " << knots[id0+2+3*k+2]
+                           << " y: " << knots[id0+2+3*k]
+                           << " m: " << knots[id0+2+3*k+1]
+                           << std::endl;
                 }
             }
 #endif
 #endif
-            const double lc = lowerClamp[pIndex[i]];
-            if (v < lc) v = lc;
-            const double uc = upperClamp[pIndex[i]];
-            if (v > uc) v = uc;
+
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning Using SLOW VALIDATION in Cache::Weight::GeneralSpline::HEMISplinesKernel
             splineValues[i] = v;

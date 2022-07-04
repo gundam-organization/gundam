@@ -9,9 +9,10 @@
 
 #include "GenericToolbox.h"
 
+#include "nlohmann/json.hpp"
+
 #include "string"
 #include "iostream"
-#include "json.hpp"
 
 namespace JsonUtils {
 
@@ -84,6 +85,10 @@ namespace JsonUtils {
   template<std::size_t N> nlohmann::json fetchMatchingEntry(const nlohmann::json& jsonConfig_, const std::string& keyName_, const char (&keyValue_)[N]){
     return fetchMatchingEntry(jsonConfig_, keyName_, std::string(keyValue_));
   }
+
+  // gundam specific
+  std::string buildFormula(const nlohmann::json& jsonConfig_, const std::string& keyName_, const std::string& joinStr_);
+  std::string buildFormula(const nlohmann::json& jsonConfig_, const std::string& keyName_, const std::string& joinStr_, const std::string& defaultFormula_);
 
 };
 

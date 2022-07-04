@@ -21,7 +21,8 @@ struct DataDispenserParameters{
   bool useMcContainer{false}; // define the container to fill -> could get rid of it?
   std::string name{};
   std::string treePath{};
-  std::string nominalWeightFormulaStr{"1"};
+  std::string nominalWeightFormulaStr{};
+  std::string selectionCutFormulaStr{};
   std::vector<std::string> activeLeafNameList{};
   std::vector<std::string> filePathList{};
   std::map<std::string, std::string> overrideLeafDict{};
@@ -34,9 +35,10 @@ struct DataDispenserCache{
   std::vector<std::vector<bool>> eventIsInSamplesList{};
   std::vector<std::string> leavesRequestedForIndexing{};
   std::vector<std::string> leavesRequestedForStorage{};
-  std::vector<size_t> sampleIndexOffsetList{};
+  std::vector<GenericToolbox::CopiableAtomic<size_t>> sampleIndexOffsetList;
   std::vector< std::vector<PhysicsEvent>* > sampleEventListPtrToFill;
   std::map<FitParameterSet*, std::vector<DialSet*>> dialSetPtrMap;
+  std::vector<std::string> leavesToOverrideList; // stores the leaves names to override in the right order
 
   void clear(){
     samplesToFillList.clear();
@@ -47,6 +49,7 @@ struct DataDispenserCache{
     sampleIndexOffsetList.clear();
     sampleEventListPtrToFill.clear();
     dialSetPtrMap.clear();
+    leavesToOverrideList.clear();
   }
 };
 
@@ -77,7 +80,6 @@ public:
 
 
 protected:
-  TChain* generateChain();
   void buildSampleToFillList();
   void doEventSelection();
   void fetchRequestedLeaves();

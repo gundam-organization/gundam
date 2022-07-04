@@ -15,17 +15,14 @@ class CalcLLHFunc
 {
 public:
   virtual ~CalcLLHFunc() {};
-  virtual double operator()(double mc, double w2, double data)
-  {
-    return 0.0;
-  }
+  virtual double operator()(double mc, double w2, double data) { return 0.0; }
 };
 
 class PoissonLLH : public CalcLLHFunc
 {
 public:
   // Compute the standard Poisson likelihood (chi2_stat contribution from a certain sample and bin) based on the number of MC predicted (mc) and the number of data events (data):
-  double operator()(double mc, double w2, double data)
+  double operator()(double mc, double w2, double data) override
   {
     // generateFormula chi2 variable which will be updated below and then returned:
     double chi2 = 0.0;
@@ -43,10 +40,28 @@ public:
   }
 };
 
+class PoissonLLH2 : public CalcLLHFunc
+{
+public:
+  double operator()(double mc, double w2, double data) override {
+    if( mc <= 0 ) return 0;
+    return -TMath::Log(TMath::Poisson(data, mc));
+  }
+};
+
+class PoissonLLH3 : public CalcLLHFunc
+{
+public:
+  double operator()(double mc, double w2, double data) override {
+    if( mc <= 0 ) return 0;
+    return mc + std::lgamma(data) - data*std::log(mc);
+  }
+};
+
 class EffLLH : public CalcLLHFunc
 {
 public:
-  double operator()(double mc, double w2, double data)
+  double operator()(double mc, double w2, double data) override
   {
     // Effective LLH based on Tianlu's paper.
     if(mc <= 0.0)
@@ -65,8 +80,8 @@ class BarlowLLH : public CalcLLHFunc {
 public:
   double rel_var, b, c, beta, mc_hat, chi2;
 
-  double operator()(double mc_, double w2_, double data_) {
-    if(mc_ == data_ ) return 0;
+  double operator()(double mc_, double w2_, double data_) override {
+//    if(mc_ == data_ ) return 0;
     // Solving for the quadratic equation,
     // beta^2 + (mu * sigma^2 - 1)beta - data * sigma^2) = 0
     // where sigma^2 is the relative variance.
@@ -102,8 +117,8 @@ class BarlowOA2020BugLLH : public CalcLLHFunc {
 public:
   double rel_var, b, c, beta, mc_hat, chi2;
 
-  double operator()(double mc_, double w2_, double data_) {
-    if(mc_ == data_ ) return 0;
+  double operator()(double mc_, double w2_, double data_) override {
+//    if(mc_ == data_ ) return 0;
     // Solving for the quadratic equation,
     // beta^2 + (mu * sigma^2 - 1)beta - data * sigma^2) = 0
     // where sigma^2 is the relative variance.
@@ -138,7 +153,7 @@ public:
 class BarlowBeestonLLH : public CalcLLHFunc
 {
 public:
-  double operator()(double mc, double w2, double data)
+  double operator()(double mc, double w2, double data) override
   {
     // Solving for the quadratic equation,
     // beta^2 + (mu * sigma^2 - 1)beta - data * sigma^2) = 0

@@ -12,7 +12,7 @@
 #include "GenericToolbox.h"
 
 #include "TFormula.h"
-#include "json.hpp"
+#include "nlohmann/json.hpp"
 
 #include "string"
 #include "vector"
@@ -24,7 +24,7 @@ class FitParameter;
 class DialSet {
 
 public:
-  static bool _verboseMode_;
+  static bool verboseMode;
 
 public:
   DialSet();
@@ -35,6 +35,9 @@ public:
   void setOwner(const FitParameter* owner_);
   void setConfig(const nlohmann::json &config_);
 
+  void setMinDialResponse(double minDialResponse_){ _minDialResponse_ = minDialResponse_; }
+  void setMaxDialResponse(double maxDialResponse_){ _maxDialResponse_ = maxDialResponse_; }
+
   void initialize();
 
   // Getters
@@ -43,6 +46,7 @@ public:
   const std::vector<std::string> &getDataSetNameList() const;
   TFormula *getApplyConditionFormula() const;
   const std::string &getDialLeafName() const;
+  const std::string &getDialSubType() const;
   DialType::DialType getGlobalDialType() const;
   const FitParameter* getOwner() const { return _owner_; }
 
@@ -83,6 +87,7 @@ private:
 
   // globals
   DialType::DialType _globalDialType_{DialType::DialType_OVERFLOW};
+  std::string _globalDialSubType_{};
   std::string _globalDialLeafName_{};
   double _minDialResponse_{std::nan("unset")};
   double _maxDialResponse_{std::nan("unset")};

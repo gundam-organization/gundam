@@ -8,7 +8,7 @@
 #include "vector"
 #include "string"
 
-#include "json.hpp"
+#include "nlohmann/json.hpp"
 #include "TMatrixDSym.h"
 #include "TVectorT.h"
 #include "TFile.h"
@@ -61,6 +61,7 @@ public:
   const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const;
   std::vector<FitParameter>& getEffectiveParameterList();
   const std::vector<FitParameter>& getEffectiveParameterList() const;
+  bool isMaskedForPropagation() const;
 
   // Core
   size_t getNbParameters() const;
@@ -84,6 +85,8 @@ public:
   static double toNormalizedParValue(double parValue, const FitParameter& par);
   static double toRealParValue(double normParValue, const FitParameter& par);
   static double toRealParRange(double normParRange, const FitParameter& par);
+
+  void setMaskedForPropagation(bool maskedForPropagation);
 
 protected:
   void passIfInitialized(const std::string& methodName_) const;
@@ -110,6 +113,7 @@ private:
   std::string _name_;
   std::string _parameterDefinitionFilePath_{};
   bool _isEnabled_{};
+  bool _maskedForPropagation_{false};
   int _nbParameterDefinition_{-1};
   double _nominalStepSize_{-1};
   int _maxNbEigenParameters_{-1};

@@ -11,7 +11,7 @@
 
 #include "vector"
 #include "string"
-#include "json.hpp"
+#include "nlohmann/json.hpp"
 
 namespace PriorType{
   ENUM_EXPANDER(
@@ -20,8 +20,6 @@ namespace PriorType{
     Gaussian,
     Flat
   );
-
-  PriorType toPriorType(const std::string& priorStr_);
 }
 
 class FitParameterSet;
@@ -42,6 +40,7 @@ public:
   void setParameterIndex(int parameterIndex);
   void setParameterValue(double parameterValue);
   void setPriorValue(double priorValue);
+  void setThrowValue(double throwValue);
   void setStdDevValue(double stdDevValue);
   void setDialSetConfig(const nlohmann::json &jsonConfig_);
   void setParameterDefinitionConfig(const nlohmann::json &config_);
@@ -69,6 +68,7 @@ public:
   double getParameterValue() const;
   double getStdDevValue() const;
   double getPriorValue() const;
+  double getThrowValue() const;
   std::vector<DialSet> &getDialSetList();
   double getMinValue() const;
   double getMaxValue() const;
@@ -91,6 +91,7 @@ private:
   int _parameterIndex_{-1}; // to get the right definition in the json config (in case "name" is not specified)
   double _parameterValue_{};
   double _priorValue_{};
+  double _throwValue_{std::nan("UNSET")};
   double _stdDevValue_{};
   double _minValue_{std::nan("UNSET")};
   double _maxValue_{std::nan("UNSET")};

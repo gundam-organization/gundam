@@ -3,6 +3,8 @@
 //
 
 #include "FitParameterSet.h"
+
+#include <memory>
 #include "JsonUtils.h"
 #include "GlobalVariables.h"
 
@@ -11,9 +13,9 @@
 #include "GenericToolbox.TablePrinter.h"
 #include "Logger.h"
 
-LoggerInit([](){
+LoggerInit([]{
   Logger::setUserHeaderStr("[FitParameterSet]");
-} )
+} );
 
 FitParameterSet::FitParameterSet() {
   this->reset();
@@ -46,6 +48,9 @@ void FitParameterSet::setConfig(const nlohmann::json &config_) {
 }
 void FitParameterSet::setSaveDir(TDirectory* saveDir_){
   _saveDir_ = saveDir_;
+}
+void FitParameterSet::setMaskedForPropagation(bool maskedForPropagation) {
+  _maskedForPropagation_ = maskedForPropagation;
 }
 
 void FitParameterSet::initialize() {
@@ -94,20 +99,20 @@ void FitParameterSet::prepareFitParameters(){
     LogWarning << "Decomposing the stripped covariance matrix in set: " << getName() << std::endl;
     _eigenParameterList_.resize(_strippedCovarianceMatrix_->GetNrows());
 
-    _eigenDecomp_     = std::shared_ptr<TMatrixDSymEigen>(new TMatrixDSymEigen(*_strippedCovarianceMatrix_));
+    _eigenDecomp_     = std::make_shared<TMatrixDSymEigen>(*_strippedCovarianceMatrix_);
 
     // Used for base swapping
     _eigenValues_     = std::shared_ptr<TVectorD>( (TVectorD*) _eigenDecomp_->GetEigenValues().Clone() );
     _eigenValuesInv_  = std::shared_ptr<TVectorD>( (TVectorD*) _eigenDecomp_->GetEigenValues().Clone() );
     _eigenVectors_    = std::shared_ptr<TMatrixD>( (TMatrixD*) _eigenDecomp_->GetEigenVectors().Clone() );
-    _eigenVectorsInv_ = std::shared_ptr<TMatrixD>(new TMatrixD(TMatrixD::kTransposed, *_eigenVectors_) );
+    _eigenVectorsInv_ = std::make_shared<TMatrixD>(TMatrixD::kTransposed, *_eigenVectors_ );
 
     double eigenCumulative = 0;
     _nbEnabledEigen_ = 0;
     double eigenTotal = _eigenValues_->Sum();
 
-    _inverseStrippedCovarianceMatrix_ = std::shared_ptr<TMatrixD>(new TMatrixD(_strippedCovarianceMatrix_->GetNrows(), _strippedCovarianceMatrix_->GetNrows()));
-    _projectorMatrix_                 = std::shared_ptr<TMatrixD>(new TMatrixD(_strippedCovarianceMatrix_->GetNrows(), _strippedCovarianceMatrix_->GetNrows()));
+    _inverseStrippedCovarianceMatrix_ = std::make_shared<TMatrixD>(_strippedCovarianceMatrix_->GetNrows(), _strippedCovarianceMatrix_->GetNrows());
+    _projectorMatrix_                 = std::make_shared<TMatrixD>(_strippedCovarianceMatrix_->GetNrows(), _strippedCovarianceMatrix_->GetNrows());
 
     auto* eigenState = new TVectorD(_eigenValues_->GetNrows());
 
@@ -162,8 +167,18 @@ void FitParameterSet::prepareFitParameters(){
       LogInfo << "Fraction taken: " << eigenCumulative / eigenTotal*100 << "%" << std::endl;
     }
 
-    _originalParBuffer_ = std::shared_ptr<TVectorD>(new TVectorD(_strippedCovarianceMatrix_->GetNrows()) );
-    _eigenParBuffer_    = std::shared_ptr<TVectorD>(new TVectorD(_strippedCovarianceMatrix_->GetNrows()) );
+    _originalParBuffer_ = std::make_shared<TVectorD>(_strippedCovarianceMatrix_->GetNrows() );
+    _eigenParBuffer_    = std::make_shared<TVectorD>(_strippedCovarianceMatrix_->GetNrows() );
+
+//    LogAlert << "Disabling par/dial limits" << std::endl;
+//    for( auto& par : _parameterList_ ){
+//      par.setMinValue(std::nan(""));
+//      par.setMaxValue(std::nan(""));
+//      for( auto& dialSet : par.getDialSetList() ){
+//        dialSet.setMinDialResponse(std::nan(""));
+//        dialSet.setMaxDialResponse(std::nan(""));
+//      }
+//    }
 
     // Put original parameters to the prior
     for( auto& par : _parameterList_ ){
@@ -191,6 +206,9 @@ bool FitParameterSet::isEnabledThrowToyParameters() const {
 }
 const std::string &FitParameterSet::getName() const {
   return _name_;
+}
+bool FitParameterSet::isMaskedForPropagation() const {
+  return _maskedForPropagation_;
 }
 
 std::vector<FitParameter> &FitParameterSet::getParameterList() {
@@ -269,7 +287,7 @@ void FitParameterSet::throwFitParameters(double gain_){
 
   LogThrowIf(_strippedCovarianceMatrix_==nullptr, "No covariance matrix provided")
 
-  if( not _useEigenDecompInFit_ ){
+//  if( not _useEigenDecompInFit_ ){
     LogInfo << "Throwing parameters for " << _name_ << " using Cholesky matrix" << std::endl;
 
     if( _choleskyMatrix_ == nullptr ){
@@ -280,26 +298,36 @@ void FitParameterSet::throwFitParameters(double gain_){
     }
 
     auto throws = GenericToolbox::throwCorrelatedParameters(_choleskyMatrix_.get());
-    int iPar{-1};
+
+    int iFit{-1};
     for( auto& par : _parameterList_ ){
-      iPar++;
-      if( _throwEnabledList_ != nullptr and (*_throwEnabledList_)[iPar] != 1 ){ LogWarning << "Parameter " << par.getTitle() << " is marked as non-throwing." << std::endl; continue; }
-      if( not par.isEnabled() ){ LogWarning << "Parameter " << par.getTitle() << " is disabled. Not throwing" << std::endl; continue; }
-      if( par.isFixed() ){ LogWarning << "Parameter " << par.getTitle() << " is fixed. Not throwing" << std::endl; continue; }
-      LogInfo << "Throwing par " << par.getTitle() << ": " << par.getParameterValue();
-      par.setParameterValue( par.getPriorValue() + gain_ * throws[iPar] );
-      LogInfo << " → " << par.getParameterValue() << std::endl;
+      if( par.isEnabled() and not par.isFixed() and not par.isFree() ){
+        iFit++;
+        LogInfo << "Throwing par " << par.getTitle() << ": " << par.getParameterValue();
+        par.setThrowValue(par.getPriorValue() + gain_ * throws[iFit]);
+        par.setParameterValue( par.getThrowValue() );
+        LogInfo << " → " << par.getParameterValue() << std::endl;
+      }
+      else{
+        LogWarning << "Skipping parameter: " << par.getTitle() << std::endl;
+      }
     }
-  }
-  else{
-    LogInfo << "Throwing eigen parameters for " << _name_ << std::endl;
+//  }
+//  else{
+//    LogInfo << "Throwing eigen parameters for " << _name_ << std::endl;
+//    for( auto& eigenPar : _eigenParameterList_ ){
+//      if( eigenPar.isFixed() ){ LogWarning << "Eigen parameter #" << eigenPar.getParameterIndex() << " is fixed. Not throwing" << std::endl; continue; }
+//      eigenPar.setThrowValue(eigenPar.getPriorValue() + gain_ * gRandom->Gaus(0, eigenPar.getStdDevValue()));
+//      eigenPar.setParameterValue( eigenPar.getThrowValue() );
+//    }
+//    this->propagateEigenToOriginal();
+//  }
+
+  if( _useEigenDecompInFit_ ){
+    this->propagateOriginalToEigen();
     for( auto& eigenPar : _eigenParameterList_ ){
-      if( eigenPar.isFixed() ){ LogWarning << "Eigen parameter #" << eigenPar.getParameterIndex() << " is fixed. Not throwing" << std::endl; continue; }
-      eigenPar.setParameterValue(
-          eigenPar.getPriorValue() + gain_ * gRandom->Gaus(0, eigenPar.getStdDevValue())
-          );
+      eigenPar.setThrowValue(eigenPar.getParameterValue());
     }
-    this->propagateEigenToOriginal();
   }
 
 }
@@ -481,9 +509,9 @@ void FitParameterSet::readParameterDefinitionFile(){
       ((TMatrixD*) _priorCovarianceMatrix_.get())->Write("CovarianceMatrix_TMatrixD");
       GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) _priorCovarianceMatrix_.get())->Write("CovarianceMatrix_TH2D");
 
-      auto* correlationMatrix = GenericToolbox::convertToCorrelationMatrix((TMatrixD*)_priorCovarianceMatrix_.get());
+      std::unique_ptr<TMatrixD> correlationMatrix( GenericToolbox::convertToCorrelationMatrix((TMatrixD*)_priorCovarianceMatrix_.get()) );
       correlationMatrix->Write("CorrelationMatrix_TMatrixD");
-      GenericToolbox::convertTMatrixDtoTH2D(correlationMatrix)->Write("CorrelationMatrix_TH2D");
+      GenericToolbox::convertTMatrixDtoTH2D(correlationMatrix.get())->Write("CorrelationMatrix_TH2D");
     }
 
     _nbParameterDefinition_ = _priorCovarianceMatrix_->GetNrows();
@@ -557,7 +585,6 @@ void FitParameterSet::readParameterDefinitionFile(){
   parDefFile->Close();
 }
 void FitParameterSet::readConfigOptions(){
-  LogInfo << __METHOD_NAME__ << std::endl;
 
   _nbParameterDefinition_ = JsonUtils::fetchValue(_config_, "numberOfParameters", _nbParameterDefinition_);
   _nominalStepSize_ = JsonUtils::fetchValue(_config_, "nominalStepSize", _nominalStepSize_);
@@ -675,3 +702,4 @@ const std::shared_ptr<TMatrixDSym> &FitParameterSet::getPriorCorrelationMatrix()
 const std::shared_ptr<TMatrixDSym> &FitParameterSet::getPriorCovarianceMatrix() const {
   return _priorCovarianceMatrix_;
 }
+

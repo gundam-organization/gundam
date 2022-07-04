@@ -11,10 +11,7 @@
 #include "TRandom.h"
 
 
-LoggerInit([](){
-  Logger::setUserHeaderStr("[SampleElement]");
-})
-
+LoggerInit([]{ Logger::setUserHeaderStr("[SampleElement]"); });
 
 SampleElement::SampleElement() = default;
 SampleElement::~SampleElement() = default;
@@ -84,22 +81,12 @@ void SampleElement::updateBinEventList(int iThread_) {
   int iBin = iThread_;
   size_t count;
   while( iBin < nBins ){
-    count = 0;
-    for( auto& event : eventList ){ if( event.getSampleBinIndex() == iBin ){ count++; } }
-    std::vector<PhysicsEvent*> thisBinEventList(count, nullptr);
+    count = std::count_if(eventList.begin(), eventList.end(), [&](auto& e) {return e.getSampleBinIndex() == iBin;});
+    perBinEventPtrList[iBin].resize(count, nullptr);
 
     // Now filling the event indexes
     size_t index = 0;
-    for( auto& event : eventList ){
-      if( event.getSampleBinIndex() == iBin ){
-        thisBinEventList.at(index++) = &event;
-      }
-    } // event
-
-    GlobalVariables::getThreadMutex().lock();
-    // BETTER TO MAKE SURE THE MEMORY IS NOT MOVED WHILE FILLING UP
-    perBinEventPtrList[iBin] = thisBinEventList;
-    GlobalVariables::getThreadMutex().unlock();
+    std::for_each(eventList.begin(), eventList.end(), [&](auto& e){ if(e.getSampleBinIndex() == iBin){ perBinEventPtrList[iBin][index++] = &e; } });
 
     iBin += nbThreads;
   }
@@ -113,16 +100,11 @@ void SampleElement::refillHistogram(int iThread_){
     iThread_ = 0;
   }
 
-  // Faster that pointer shifter. -> would be slower if refillHistogram is
-  // handled by the propagator
-
+#ifdef GUNDAM_USING_CACHE_MANAGER
   // Size = Nbins + 2 overflow (0 and last)
   auto* binContentArray = histogram->GetArray();
-
   int iBin = iThread_;
   int nBins = int(perBinEventPtrList.size());
-
-#ifdef GUNDAM_USING_CUDA
   if (_CacheManagerValue_) {
       if (_CacheManagerValid_ && !(*_CacheManagerValid_)) {
           // This is slowish, but will make sure that the cached result is
@@ -165,19 +147,40 @@ void SampleElement::refillHistogram(int iThread_){
     iBin += nbThreads;
   }
 #else
+  // Faster that pointer shifter. -> would be slower if refillHistogram is
+  // handled by the propagator
+  int iBin = iThread_;
+  int nBins = int(perBinEventPtrList.size());
+  auto* binContentArray = histogram->GetArray();
+  auto* binErrorArray = histogram->GetSumw2()->GetArray();
   while( iBin < nBins ) {
     binContentArray[iBin + 1] = 0;
     for (auto *eventPtr: perBinEventPtrList[iBin]) {
       binContentArray[iBin + 1] += eventPtr->getEventWeight();
     }
-    histogram->GetSumw2()->GetArray()[iBin + 1] = binContentArray[iBin + 1];
+    binErrorArray[iBin + 1] = binContentArray[iBin + 1];
     iBin += nbThreads;
   }
+
+//  std::vector<PhysicsEvent*>* binEvList = &perBinEventPtrList[0] + iThread_;
+//  auto* bin = &histogram->GetArray()[1] + iThread_;
+//  auto* errBin = &histogram->GetSumw2()->GetArray()[1] + iThread_;
+//  while( binEvList <= &perBinEventPtrList.back() ) {
+//    *bin = 0;
+//    std::for_each(
+//        binEvList->begin(), binEvList->end(),
+//        [&](PhysicsEvent* e){ *bin += e->getEventWeight(); }
+//        );
+//    *errBin = *bin;
+//    binEvList += nbThreads;
+//    bin += nbThreads;
+//    errBin += nbThreads;
+//  }
 #endif
 }
 void SampleElement::rescaleHistogram() {
   if( isLocked ) return;
-  if(histScale != 1) histogram->Scale(histScale);
+  if( histScale != 1 ) histogram->Scale(histScale);
 }
 
 void SampleElement::throwStatError(){
@@ -194,6 +197,10 @@ void SampleElement::throwStatError(){
 double SampleElement::getSumWeights() const{
   return std::accumulate(eventList.begin(), eventList.end(), double(0.),
                          [](double sum_, const PhysicsEvent& ev_){ return sum_ + ev_.getEventWeight(); });
+}
+size_t SampleElement::getNbBinnedEvents() const{
+  return std::accumulate(eventList.begin(), eventList.end(), size_t(0.),
+                         [](size_t sum_, const PhysicsEvent& ev_){ return sum_ + (ev_.getSampleBinIndex() != -1); });
 }
 
 void SampleElement::print() const{

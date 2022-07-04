@@ -5,11 +5,12 @@
 #ifndef GUNDAM_YAMLUTILS_H
 #define GUNDAM_YAMLUTILS_H
 
+#include "nlohmann/json.hpp"
+#include "yaml-cpp/yaml.h"
+
 #include "string"
 #include "iostream"
 
-#include "json.hpp"
-#include "yaml-cpp/yaml.h"
 
 namespace YamlUtils {
 
