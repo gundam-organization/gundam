@@ -129,15 +129,18 @@ void FitterEngine::initialize() {
 
     if( JsonUtils::fetchValue(_config_, "debugPrintLoadedEvents", false) ){
       int debugPrintLoadedEventsNbPerSample = JsonUtils::fetchValue(_config_, "debugPrintLoadedEventsNbPerSample", 10);
-      LogDebug << GET_VAR_NAME_VALUE(debugPrintLoadedEventsNbPerSample) << std::endl;
+      LogWarning << GET_VAR_NAME_VALUE(debugPrintLoadedEventsNbPerSample) << std::endl;
+
       for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
-        LogDebug << "debugPrintLoadedEvents: " << sample.getName() << std::endl;
+        LogWarning << "debugPrintLoadedEvents: " << sample.getName() << std::endl;
+        LogDebug.setIndentStr("  ");
 
         int iEvt=0;
         for( auto& ev : sample.getMcContainer().eventList ){
-          if( iEvt++ >= debugPrintLoadedEventsNbPerSample ) break;
-          LogDebug << ev.getSummary() << std::endl;
+          if(iEvt++ >= debugPrintLoadedEventsNbPerSample) { LogDebug << std::endl; break; }
+          LogDebug << iEvt << " -> " << ev.getSummary() << std::endl;
         }
+        LogDebug.setIndentStr("");
       }
     }
   }
