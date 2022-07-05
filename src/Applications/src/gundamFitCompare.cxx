@@ -10,13 +10,14 @@
 #include "GenericToolbox.Root.h"
 
 #include "nlohmann/json.hpp"
+#include "TKey.h"
+#include "TFile.h"
 
 #include "string"
 #include "vector"
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[gundamFitCompare.cxx]");
-  Logger::setPrefixFormat("{USER_HEADER}");
 });
 
 CmdLineParser clp;
@@ -72,6 +73,11 @@ int main( int argc, char** argv ){
 
   outFile = TFile::Open(outPath.c_str(), "RECREATE");
 
+  LogInfo << "Comparing preFit scans..." << std::endl;
+  makeScanComparePlots(true);
+  LogInfo << "Comparing postFit scans..." << std::endl;
+  makeScanComparePlots(false);
+
   LogInfo << "Comparing preFit samples..." << std::endl;
   makeSampleComparePlots(true);
   LogInfo << "Comparing postFit samples..." << std::endl;
@@ -95,7 +101,6 @@ int main( int argc, char** argv ){
 
 
 void makeSampleComparePlots(bool usePrefit_){
-
   auto filePath1 = clp.getOptionVal<std::string>("file-1");
   auto filePath2 = clp.getOptionVal<std::string>("file-2");
 
@@ -113,9 +118,6 @@ void makeSampleComparePlots(bool usePrefit_){
 
   auto* dir2 = file2->Get<TDirectory>(strBuffer.c_str());
   LogThrowIf(dir2== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
-
-
-
 }
 void makeScanComparePlots(bool usePrefit_){
 
@@ -128,29 +130,84 @@ void makeScanComparePlots(bool usePrefit_){
   auto* file1 = GenericToolbox::openExistingTFile(filePath1);
   auto* file2 = GenericToolbox::openExistingTFile(filePath2);
 
-  std::string strBuffer;
-
-  strBuffer = Form("FitterEngine/%s/scan", (usePrefit_? "preFit": "postFit"));
-  auto* dir1 = file1->Get<TDirectory>(strBuffer.c_str());
-  LogReturnIf(dir1== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath1);
-
-  auto* dir2 = file2->Get<TDirectory>(strBuffer.c_str());
-  LogReturnIf(dir2== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
-
+  std::vector<std::string> pathBuffer;
+  pathBuffer.emplace_back(Form("%s/scan", (usePrefit_? "preFit": "postFit")));
   std::function<void(TDirectory* dir1_, TDirectory* dir2_)> recurseScanCompareGraph;
   recurseScanCompareGraph = [&](TDirectory* dir1_, TDirectory* dir2_){
 
-    for( int iKey = 0 ; iKey < dir1->GetListOfKeys()->GetEntries() ; iKey++ ){
-      if( dir2_->Get(dir1->GetListOfKeys()->At(iKey)->GetName()) == nullptr ) continue;
-      LogDebug << GET_VAR_NAME_VALUE( dir1->GetListOfKeys()->At(iKey)->ClassName() ) << std::endl;
+    for( int iKey = 0 ; iKey < dir1_->GetListOfKeys()->GetEntries() ; iKey++ ){
+      if( dir2_->Get(dir1_->GetListOfKeys()->At(iKey)->GetName()) == nullptr ) continue;
+      TKey* keyObj = (TKey*) dir1_->GetListOfKeys()->At(iKey);
+
+
+      if( (gROOT->GetClass( keyObj->GetClassName() ))->InheritsFrom("TDirectory") ){
+        // recursive part
+        pathBuffer.emplace_back( dir1_->GetListOfKeys()->At(iKey)->GetName() );
+
+        recurseScanCompareGraph(
+            dir1_->GetDirectory(dir1_->GetListOfKeys()->At(iKey)->GetName()),
+            dir2_->GetDirectory(dir1_->GetListOfKeys()->At(iKey)->GetName())
+            );
+
+        pathBuffer.pop_back();
+      }
+      else if( (gROOT->GetClass( keyObj->GetClassName() ))->InheritsFrom("TGraph") ){
+        auto* gr1 = dir1_->Get<TGraph>( dir1_->GetListOfKeys()->At(iKey)->GetName() );
+        auto* gr2 = dir2_->Get<TGraph>( dir1_->GetListOfKeys()->At(iKey)->GetName() );
+
+        auto* overlayCanvas = new TCanvas( dir1_->GetListOfKeys()->At(iKey)->GetName() , Form("Comparing %s scan: \"%s\"", (usePrefit_? "preFit": "postFit"), dir1_->GetListOfKeys()->At(iKey)->GetName()), 800, 600);
+
+        overlayCanvas->cd();
+
+        gr1->SetMarkerStyle(kFullSquare);
+        gr1->SetLineColor(kBlue-7);
+        gr1->SetMarkerColor(kBlue-7);
+
+        gr2->SetLineColor(kBlack);
+        gr2->SetMarkerColor(kBlack);
+
+        gr1->SetTitle( dir1_->GetListOfKeys()->At(iKey)->GetName() );
+
+        std::pair<double, double> xBounds{
+            std::min( gr1->GetXaxis()->GetXmin(), gr2->GetXaxis()->GetXmin() ),
+            std::max( gr1->GetXaxis()->GetXmax(), gr2->GetXaxis()->GetXmax() )
+        };
+        std::pair<double, double> yBounds{
+          std::min( gr1->GetMinimum(), gr2->GetMinimum() ),
+          std::max( gr1->GetMaximum(), gr2->GetMaximum() )
+        };
+
+        gr1->GetXaxis()->SetLimits( xBounds.first - ( xBounds.second - xBounds.first )*0.1, xBounds.second + ( xBounds.second - xBounds.first )*0.1 );
+        gr1->SetMinimum( yBounds.first - ( yBounds.second - yBounds.first )*0.1 ); // not working
+        gr1->SetMaximum( yBounds.second + ( yBounds.second - yBounds.first )*0.2 ); // not working
+
+        gr1->Draw();
+        gr2->Draw("LPSAME");
+
+        TLegend l(0.6, 0.79, 0.89, 0.89);
+        l.AddEntry(gr1, Form("%s", name1.c_str()));
+        l.AddEntry(gr2, Form("%s", name2.c_str()));
+        l.Draw();
+
+        gPad->SetGridx();
+        gPad->SetGridy();
+
+        GenericToolbox::mkdirTFile(outFile, GenericToolbox::joinVectorString(pathBuffer, "/"))->cd();
+        overlayCanvas->Write();
+        delete overlayCanvas;
+      }
     }
 
   };
 
+  std::string strBuffer;
+  strBuffer = Form("FitterEngine/%s/scan", (usePrefit_? "preFit": "postFit"));
+  auto* dir1 = file1->Get<TDirectory>(strBuffer.c_str());
+  LogReturnIf(dir1== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath1);
+  auto* dir2 = file2->Get<TDirectory>(strBuffer.c_str());
+  LogReturnIf(dir2== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
+
   recurseScanCompareGraph(dir1, dir2);
-
-
-
 }
 void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
 
