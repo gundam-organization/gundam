@@ -112,12 +112,59 @@ void makeSampleComparePlots(bool usePrefit_){
 
   std::string strBuffer;
 
-  strBuffer = Form("FitterEngine/%s/samples/histograms", (usePrefit_? "preFit": "postFit"));
+  strBuffer = Form("FitterEngine/%s/samples", (usePrefit_? "preFit": "postFit"));
   auto* dir1 = file1->Get<TDirectory>(strBuffer.c_str());
   LogThrowIf(dir1== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath1);
 
   auto* dir2 = file2->Get<TDirectory>(strBuffer.c_str());
   LogThrowIf(dir2== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
+
+  std::vector<std::string> pathBuffer;
+  pathBuffer.emplace_back(Form("%s/samples", (usePrefit_? "preFit": "postFit")));
+  std::function<void(TDirectory* dir1_, TDirectory* dir2_)> recurseSampleCompareGraph;
+  recurseSampleCompareGraph = [&](TDirectory* dir1_, TDirectory* dir2_){
+
+    for( int iKey = 0 ; iKey < dir1_->GetListOfKeys()->GetEntries() ; iKey++ ){
+      if( dir2_->Get(dir1_->GetListOfKeys()->At(iKey)->GetName()) == nullptr ) continue;
+      TKey* keyObj = (TKey*) dir1_->GetListOfKeys()->At(iKey);
+
+
+      if( (gROOT->GetClass( keyObj->GetClassName() ))->InheritsFrom("TDirectory") ){
+        // recursive part
+        pathBuffer.emplace_back( dir1_->GetListOfKeys()->At(iKey)->GetName() );
+
+        LogTrace << GenericToolbox::joinVectorString(pathBuffer, "/") << std::endl;
+
+        recurseSampleCompareGraph(
+            dir1_->GetDirectory(dir1_->GetListOfKeys()->At(iKey)->GetName()),
+            dir2_->GetDirectory(dir1_->GetListOfKeys()->At(iKey)->GetName())
+        );
+
+        pathBuffer.pop_back();
+      }
+      else if( (gROOT->GetClass( keyObj->GetClassName() ))->InheritsFrom("TH1") ){
+        auto* h1 = dir1_->Get<TH1D>( dir1_->GetListOfKeys()->At(iKey)->GetName() );
+        auto* h2 = dir2_->Get<TH1D>( dir1_->GetListOfKeys()->At(iKey)->GetName() );
+
+        LogContinueIf(h1->GetNbinsX() != h2->GetNbinsX(), "");
+
+        auto* hCompValues = (TH1D*) h1->Clone();
+        hCompValues->Add(h2, -1);
+        GenericToolbox::transformBinContent(hCompValues, [](TH1D* h_, int bin_){ h_->SetBinError(bin_, 0); });
+
+        hCompValues->SetTitle(Form("Comparing \"%s\"", dir1_->GetListOfKeys()->At(iKey)->GetName()));
+        hCompValues->GetYaxis()->SetTitle("Bin content difference");
+
+        GenericToolbox::mkdirTFile(outFile, GenericToolbox::joinVectorString(pathBuffer, "/"))->cd();
+        hCompValues->Write(dir1_->GetListOfKeys()->At(iKey)->GetName());
+      }
+    }
+
+  };
+
+
+  recurseSampleCompareGraph(dir1, dir2);
+
 }
 void makeScanComparePlots(bool usePrefit_){
 
