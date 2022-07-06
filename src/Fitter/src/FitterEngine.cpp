@@ -1219,7 +1219,7 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
               double val{par.getThrowValue()};
               val == val ? draw = true : val = par.getPriorValue();
               if( isNorm_ ) val = FitParameterSet::toNormalizedParValue(val, par);
-              toyParametersLine->SetBinContent(par.getParameterIndex(), val);
+              toyParametersLine->SetBinContent(1+par.getParameterIndex(), val);
             }
 
             if( !draw ) toyParametersLine = nullptr;
