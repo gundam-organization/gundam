@@ -99,9 +99,9 @@ mkdir -p $BUILD_DIR/gundam
 mkdir -p $INSTALL_DIR/gundam
 cd $BUILD_DIR/gundam
 cmake \
-  -DCMAKE_INSTALL_PREFIX:PATH=$INSTALL_DIR/gundam \
+  -D CMAKE_INSTALL_PREFIX:PATH=$INSTALL_DIR/gundam \
   -D CMAKE_BUILD_TYPE=Release \
-  -D YAMLCPP_INSTALL_DIR=/sps/t2k/common/software/install/yaml-cpp \
+  -D YAMLCPP_DIR=/sps/t2k/common/software/install/yaml-cpp \
   $REPO_DIR/gundam/.
 make install -j4
 ```
