@@ -22,6 +22,8 @@ public:
   double evalResponse(double parameterValue_) override;
   double calcDial(double parameterValue_) override;
 
+  std::string getSummary() override;
+
 };
 
 

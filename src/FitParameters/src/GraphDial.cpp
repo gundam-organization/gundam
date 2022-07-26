@@ -2,11 +2,11 @@
 // Created by Adrien BLANCHET on 02/12/2021.
 //
 
-#include "Logger.h"
-#include "GenericToolbox.h"
-
 #include "GraphDial.h"
-#include "GlobalVariables.h"
+#include "DialSet.h"
+
+#include "Logger.h"
+
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[GraphDial]");
@@ -29,19 +29,17 @@ void GraphDial::initialize() {
 std::string GraphDial::getSummary() {
   std::stringstream ss;
   ss << Dial::getSummary();
-  ss << "g{n=" << _graph_.GetN() << "}";
+  ss << " (graph{nPt=" << _graph_.GetN() << "})";
   return ss.str();
 }
 
 
-// disable cacahe?
-//double GraphDial::evalResponse(const double &parameterValue_) {
-//  return _graph_.Eval(parameterValue_);
-//}
 double GraphDial::calcDial(double parameterValue_) {
-  if     (parameterValue_ <= _graph_.GetX()[0])                { return _graph_.GetY()[0]; }
-  else if(parameterValue_ >= _graph_.GetX()[_graph_.GetN()-1]) { return _graph_.GetY()[_graph_.GetN() - 1]; }
-  else{ return _graph_.Eval(parameterValue_); }
+  if( not _owner_->isAllowDialExtrapolation() ){
+    if     (parameterValue_ <= _graph_.GetX()[0])                { return _graph_.GetY()[0]; }
+    else if(parameterValue_ >= _graph_.GetX()[_graph_.GetN()-1]) { return _graph_.GetY()[_graph_.GetN() - 1]; }
+  }
+  return _graph_.Eval(parameterValue_);
 }
 
 void GraphDial::setGraph(const TGraph &graph) {

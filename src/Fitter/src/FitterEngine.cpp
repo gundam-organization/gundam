@@ -14,6 +14,8 @@
 #include <Math/Factory.h>
 #include "TGraph.h"
 #include "TLegend.h"
+#include "TH1D.h"
+#include "TBox.h"
 
 #include <cmath>
 #include <memory>
@@ -78,6 +80,11 @@ void FitterEngine::initialize() {
   _propagator_.setSaveDir(GenericToolbox::mkdirTFile(_saveDir_, "Propagator"));
   _propagator_.initialize();
 
+  _nbFitBins_ = 0;
+  for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
+    _nbFitBins_ += int(sample.getBinning().getBinsList().size());
+  }
+
   this->updateChi2Cache();
 
   _nbParameters_ = 0;
@@ -119,6 +126,23 @@ void FitterEngine::initialize() {
   if( _saveDir_ != nullptr ){
     auto* dir = GenericToolbox::mkdirTFile(_saveDir_, "preFit/events");
     _propagator_.getTreeWriter().writeSamples(dir);
+
+    if( JsonUtils::fetchValue(_config_, "debugPrintLoadedEvents", false) ){
+      int debugPrintLoadedEventsNbPerSample = JsonUtils::fetchValue(_config_, "debugPrintLoadedEventsNbPerSample", 10);
+      LogWarning << GET_VAR_NAME_VALUE(debugPrintLoadedEventsNbPerSample) << std::endl;
+
+      for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
+        LogWarning << "debugPrintLoadedEvents: " << sample.getName() << std::endl;
+        LogDebug.setIndentStr("  ");
+
+        int iEvt=0;
+        for( auto& ev : sample.getMcContainer().eventList ){
+          if(iEvt++ >= debugPrintLoadedEventsNbPerSample) { LogDebug << std::endl; break; }
+          LogDebug << iEvt << " -> " << ev.getSummary() << std::endl;
+        }
+        LogDebug.setIndentStr("");
+      }
+    }
   }
 
   if( JsonUtils::fetchValue(_config_, "throwMcBeforeFit", false) ){
@@ -607,7 +631,9 @@ void FitterEngine::fit(){
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling minimize...") << std::endl;
   LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
           << "Number of free parameters   : " << _minimizer_->NFree() << std::endl
-          << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree()
+          << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree() << std::endl
+          << "Number of fit bins : " << _nbFitBins_ << std::endl
+          << "Chi2 # DoF : " << _nbFitBins_ - _minimizer_->NFree()
           << std::endl;
 
   int nbFitCallOffset = _nbFitCalls_;
@@ -693,7 +719,9 @@ void FitterEngine::fit(){
         LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling HESSE...") << std::endl;
         LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
                 << "Number of free parameters   : " << _minimizer_->NFree() << std::endl
-                << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree()
+                << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree() << std::endl
+                << "Number of fit bins : " << _nbFitBins_ << std::endl
+                << "Chi2 # DoF : " << _nbFitBins_ - _minimizer_->NFree()
                 << std::endl;
 
         nbFitCallOffset = _nbFitCalls_;
@@ -758,16 +786,6 @@ void FitterEngine::updateChi2Cache(){
 double FitterEngine::evalFit(const double* parArray_){
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 
-  if( _convergenceMonitor_.isGenerateMonitorStringOk() and _enableFitMonitor_ and _nbFitCalls_ > 1 ){
-    if( _nbFitCalls_ == 2 ){
-      // don't erase these lines
-      LogInfo << _convergenceMonitor_.generateMonitorString();
-    }
-    else{
-      LogInfo << _convergenceMonitor_.generateMonitorString(true , true);
-    }
-  }
-
   if(_nbFitCalls_ != 0){
     _outEvalFitAvgTimer_.counts++ ; _outEvalFitAvgTimer_.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("out_evalFit");
   }
@@ -796,12 +814,13 @@ double FitterEngine::evalFit(const double* parArray_){
     }
 
     std::stringstream ss;
-    ss << __METHOD_NAME__ << ": call #" << _nbFitCalls_;
+    ss << std::endl << __METHOD_NAME__ << ": call #" << _nbFitCalls_;
     ss << std::endl << "Target EDM: " << 0.001*_minimizer_->Tolerance()*2;
     ss << std::endl << "Current RAM usage: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
     double cpuPercent = GenericToolbox::getCpuUsageByProcess();
     ss << std::endl << "Current CPU usage: " << cpuPercent << "% (" << cpuPercent/GlobalVariables::getNbThreads() << "% efficiency)";
     ss << std::endl << "Avg " << GUNDAM_CHI2 << " computation time: " << _evalFitAvgTimer_;
+    ss << std::endl << GUNDAM_CHI2 << "/dof: " << _chi2Buffer_/double(_nbFitBins_ - _minimizer_->NFree());
     if( not _propagator_.isUseResponseFunctions() ){
       ss << std::endl;
 #ifndef GUNDAM_BATCH
@@ -832,13 +851,13 @@ double FitterEngine::evalFit(const double* parArray_){
     _convergenceMonitor_.getVariable("Stat").addQuantity(_chi2StatBuffer_);
     _convergenceMonitor_.getVariable("Syst").addQuantity(_chi2PullsBuffer_);
 
-//    if( _nbFitCalls_ == 1 ){
-//      // don't erase these lines
-//      LogInfo << _convergenceMonitor_.generateMonitorString();
-//    }
-//    else{
-//      LogInfo << _convergenceMonitor_.generateMonitorString(true , true);
-//    }
+    if( _nbFitCalls_ == 1 ){
+      // don't erase these lines
+      LogInfo << _convergenceMonitor_.generateMonitorString();
+    }
+    else{
+      LogInfo << _convergenceMonitor_.generateMonitorString(true , true);
+    }
 
     _itSpeed_.counts = _nbFitCalls_;
   }
@@ -1147,13 +1166,15 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
           saveDir_->cd();
 
           size_t longestTitleSize{0};
-          double minY{std::nan("unset")}, maxY{std::nan("unset")};
 
           auto postFitErrorHist   = std::make_unique<TH1D>("postFitErrors_TH1D", "Post-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
           auto preFitErrorHist    = std::make_unique<TH1D>("preFitErrors_TH1D", "Pre-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
           auto toyParametersLine  = std::make_unique<TH1D>("toyParametersLine", "toyParametersLine", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
 
-          auto legend = std::make_unique<TLegend>(0.6, 0.75, 0.9, 0.9);
+          std::vector<TBox> freeParBoxes;
+          std::vector<TBox> fixedParBoxes;
+
+          auto legend = std::make_unique<TLegend>(0.6, 0.79, 0.89, 0.89);
           legend->AddEntry(preFitErrorHist.get(),"Pre-fit values","fl");
           legend->AddEntry(postFitErrorHist.get(),"Post-fit values","ep");
 
@@ -1189,18 +1210,37 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
                 preFitErrorHist->SetBinError( 1 + par.getParameterIndex(), 1 );
               }
             } // norm
-
-            // boundaries Y
-            // -> init
-            if( minY != minY ) minY = preFitErrorHist->GetBinContent(1 + par.getParameterIndex());
-            if( maxY != maxY ) maxY = preFitErrorHist->GetBinContent(1 + par.getParameterIndex());
-
-            // -> push bounds?
-            minY = std::min(minY, preFitErrorHist->GetBinContent(1 + par.getParameterIndex()) - preFitErrorHist->GetBinError(1 + par.getParameterIndex()));
-            minY = std::min(minY, postFitErrorHist->GetBinContent(1 + par.getParameterIndex()) - postFitErrorHist->GetBinError(1 + par.getParameterIndex()));
-            maxY = std::max(maxY, preFitErrorHist->GetBinContent(1 + par.getParameterIndex()) + preFitErrorHist->GetBinError(1 + par.getParameterIndex()));
-            maxY = std::max(maxY, postFitErrorHist->GetBinContent(1 + par.getParameterIndex()) + postFitErrorHist->GetBinError(1 + par.getParameterIndex()));
           } // par
+
+          if( _propagator_.isThrowAsimovToyParameters() ){
+            bool draw{false};
+
+            for( auto& par : parList_ ){
+              double val{par.getThrowValue()};
+              val == val ? draw = true : val = par.getPriorValue();
+              if( isNorm_ ) val = FitParameterSet::toNormalizedParValue(val, par);
+              toyParametersLine->SetBinContent(1+par.getParameterIndex(), val);
+            }
+
+            if( !draw ) toyParametersLine = nullptr;
+          }
+
+          auto yBounds = GenericToolbox::getYBounds({preFitErrorHist.get(), postFitErrorHist.get(), toyParametersLine.get()});
+
+          for( const auto& par : parList_ ){
+            TBox b(preFitErrorHist->GetBinLowEdge(1+par.getParameterIndex()), yBounds.first,
+                   preFitErrorHist->GetBinLowEdge(1+par.getParameterIndex()+1), yBounds.second);
+            b.SetFillStyle(3001);
+
+            if( par.isFree() ){
+              b.SetFillColor(kGreen-10);
+              freeParBoxes.emplace_back(b);
+            }
+            else if( par.isFixed() or not par.isEnabled() ){
+              b.SetFillColor(kGray);
+              fixedParBoxes.emplace_back(b);
+            }
+          }
 
           if(parSet_.getPriorCovarianceMatrix() != nullptr ){
             gStyle->GetCanvasPreferGL() ? preFitErrorHist->SetFillColorAlpha(kRed-9, 0.7) : preFitErrorHist->SetFillColor(kRed-9);
@@ -1220,6 +1260,8 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
           preFitErrorHist->GetXaxis()->LabelsOption("v");
 
           preFitErrorHist->SetTitle(Form("Pre-fit Errors of %s", parSet_.getName().c_str()));
+          preFitErrorHist->SetMarkerSize(0);
+          preFitErrorHist->GetYaxis()->SetRangeUser(yBounds.first, yBounds.second);
           preFitErrorHist->Write();
 
           postFitErrorHist->SetLineColor(9);
@@ -1235,13 +1277,11 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
               800, 600);
           errorsCanvas->cd();
 
-          preFitErrorHist->SetMarkerSize(0);
-
-          minY -= 0.1*(maxY-minY);
-          maxY += 0.25*(maxY-minY); // 20% -> more space for the legend
-          preFitErrorHist->GetYaxis()->SetRangeUser(minY, maxY);
-
           preFitErrorHist->Draw("E2");
+
+          for( auto& box : freeParBoxes ) box.Draw();
+          for( auto& box : fixedParBoxes ) box.Draw();
+          preFitErrorHist->Draw("E2 SAME");
 
           TH1D preFitErrorHistLine = TH1D("preFitErrorHistLine", "preFitErrorHistLine",
                                           preFitErrorHist->GetNbinsX(),
@@ -1256,21 +1296,11 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
           preFitErrorHistLine.SetLineColor(kRed-3);
           preFitErrorHistLine.Draw("SAME");
 
-          if( _propagator_.isThrowAsimovToyParameters() ){
-            bool draw{false};
-
-            for( auto& par : parList_ ){
-              if( isNorm_ ) toyParametersLine->SetBinContent(par.getParameterIndex(), FitParameterSet::toNormalizedParValue(par.getThrowValue(), par));
-              else{ toyParametersLine->SetBinContent(par.getParameterIndex(), par.getThrowValue()); }
-
-              if( par.getThrowValue() == par.getThrowValue() ){ draw = true; }
-            }
-
-            if( draw ){
-              legend->AddEntry(toyParametersLine.get(),"Toy throws (asimov dataset)","l");
-              toyParametersLine->SetLineColor(kGray+2);
-              toyParametersLine->Draw("SAME");
-            }
+          if( toyParametersLine != nullptr ){
+            legend->SetY1(legend->GetY1() - (legend->GetY2() - legend->GetY1())/2.);
+            legend->AddEntry(toyParametersLine.get(),"Toy throws from asimov data set","l");
+            toyParametersLine->SetLineColor(kGray+2);
+            toyParametersLine->Draw("SAME");
           }
 
           errorsCanvas->Update(); // otherwise does not display...
