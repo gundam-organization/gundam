@@ -133,8 +133,6 @@ void makeSampleComparePlots(bool usePrefit_){
         // recursive part
         pathBuffer.emplace_back( dir1_->GetListOfKeys()->At(iKey)->GetName() );
 
-        LogTrace << GenericToolbox::joinVectorString(pathBuffer, "/") << std::endl;
-
         recurseSampleCompareGraph(
             dir1_->GetDirectory(dir1_->GetListOfKeys()->At(iKey)->GetName()),
             dir2_->GetDirectory(dir1_->GetListOfKeys()->At(iKey)->GetName())
