@@ -453,7 +453,7 @@ std::string PhysicsEvent::getSummary() const {
   if( not _rawDialPtrList_.empty() ){
     for( auto* dialPtr : _rawDialPtrList_ ){
       ss << std::endl << "  ";
-      if( dialPtr != nullptr ) ss << dialPtr->getSummary() << " = " << dialPtr->getDialResponseCache();
+      if( dialPtr != nullptr ) ss << dialPtr->getSummary();
       else ss << "nullptr";
     }
     ss << std::endl << "}";

@@ -57,6 +57,8 @@ public:
   double getMirrorHighEdge() const;
   double getMirrorRange() const;
 
+  bool isAllowDialExtrapolation() const;
+
   // Core
   std::string getSummary() const;
   void applyGlobalParameters(Dial* dial_) const;
@@ -95,6 +97,8 @@ private:
   double _mirrorLowEdge_{std::nan("unset")};
   double _mirrorHighEdge_{std::nan("unset")};
   double _mirrorRange_{std::nan("unset")};
+
+  bool _allowDialExtrapolation_{false};
 
   std::vector<DataBinSet> _binningCacheList_;
 

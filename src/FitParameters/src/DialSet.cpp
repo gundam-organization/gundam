@@ -265,6 +265,8 @@ void DialSet::readGlobals(const nlohmann::json &config_){
     _mirrorRange_ = _mirrorHighEdge_ - _mirrorLowEdge_;
     LogThrowIf(_mirrorRange_ < 0, GET_VAR_NAME_VALUE(_mirrorHighEdge_) << " < " << GET_VAR_NAME_VALUE(_mirrorLowEdge_))
   }
+
+  _allowDialExtrapolation_ = JsonUtils::fetchValue(config_, "allowDialExtrapolation", _allowDialExtrapolation_);
 }
 bool DialSet::initializeNormDialsWithParBinning() {
 
@@ -472,4 +474,8 @@ nlohmann::json DialSet::fetchDialsDefinition(const nlohmann::json &definitionsLi
     }
   }
   return {};
+}
+
+bool DialSet::isAllowDialExtrapolation() const {
+  return _allowDialExtrapolation_;
 }

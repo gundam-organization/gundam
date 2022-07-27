@@ -80,8 +80,10 @@ const TSpline3* SplineDial::getSplinePtr() const {
 }
 
 double SplineDial::calcDial(double parameterValue_) {
-  if     (parameterValue_ <= _spline_.GetXmin()) { parameterValue_ = _spline_.GetXmin(); }
-  else if(parameterValue_ >= _spline_.GetXmax()) { parameterValue_ = _spline_.GetXmax(); }
+  if( not _owner_->isAllowDialExtrapolation() ){
+    if     (parameterValue_ <= _spline_.GetXmin()) { parameterValue_ = _spline_.GetXmin(); }
+    else if(parameterValue_ >= _spline_.GetXmax()) { parameterValue_ = _spline_.GetXmax(); }
+  }
 #ifdef USE_TSPLINE3_EVAL
   return _spline_.Eval(parameterValue_);
 #else
