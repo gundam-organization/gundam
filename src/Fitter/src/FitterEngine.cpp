@@ -310,27 +310,24 @@ void FitterEngine::varyEvenRates(std::vector<double> paramVariationList_, const 
     saveDir->cd();
 
     std::vector<std::vector<double>> buffEvtRatesMap; //[iVar][iSample]
-    std::vector<double> variationList;
-    if (par_.isFree()){
+    /*std::vector<double> variationList;
+    if (par_.isFree()){ 
+      // Preliminary implementation
       if(par_.getMinValue() == par_.getMinValue()) variationList.push_back(par_.getMinValue());
       variationList.push_back(par_.getPriorValue());
       if(par_.getMaxValue() == par_.getMaxValue()) variationList.push_back(par_.getMaxValue());
     }
     else{
       variationList = variationList_;
-    }
+    }*/
       
-    for ( size_t iVar = 0 ; iVar < variationList.size() ; iVar++ ){
+    for ( size_t iVar = 0 ; iVar < variationList_.size() ; iVar++ ){
 
       buffEvtRatesMap.emplace_back();
 
-      if (par_.isFree()){
-        par_.setParameterValue(variationList[iVar]);
-      }
-      else{
-        par_.setParameterValue(par_.getPriorValue() + variationList[iVar] * par_.getStdDevValue());
-      }
-      
+      par_.setParameterValue(par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue());
+
+        
       _propagator_.propagateParametersOnSamples();
 
       for( size_t iSample = 0 ; iSample < _propagator_.getFitSampleSet().getFitSampleList().size() ; iSample++ ){
@@ -342,11 +339,13 @@ void FitterEngine::varyEvenRates(std::vector<double> paramVariationList_, const 
     
     // Write in the output
     
-    TVectorD* variationList_TVectorD = new TVectorD(variationList.size());
+    TVectorD* variationList_TVectorD = new TVectorD(variationList_.size());
 
-    for ( size_t iVar = 0 ; iVar < variationList.size() ; iVar++ ){
-      if (par_.isFree()) (*variationList_TVectorD)(iVar) = variationList[iVar];
-      else (*variationList_TVectorD)(iVar) = par_.getPriorValue() + variationList[iVar] * par_.getStdDevValue();
+    for ( size_t iVar = 0 ; iVar < variationList_.size() ; iVar++ ){
+      /*if (par_.isFree()) (*variationList_TVectorD)(iVar) = variationList_[iVar];
+      else 
+      */
+      (*variationList_TVectorD)(iVar) = par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue();
     }
     GenericToolbox::writeInTFile(saveDir, 
                                  variationList_TVectorD, 
@@ -356,9 +355,9 @@ void FitterEngine::varyEvenRates(std::vector<double> paramVariationList_, const 
 
     for( size_t iSample = 0 ; iSample < _propagator_.getFitSampleSet().getFitSampleList().size() ; iSample++ ){
 
-      buffVariedEvtRates_TVectorD = new TVectorD(variationList.size());
+      buffVariedEvtRates_TVectorD = new TVectorD(variationList_.size());
 
-      for ( size_t iVar = 0 ; iVar < variationList.size() ; iVar++ ){
+      for ( size_t iVar = 0 ; iVar < variationList_.size() ; iVar++ ){
         (*buffVariedEvtRates_TVectorD)(iVar) = buffEvtRatesMap[iVar][iSample];
       }
       
