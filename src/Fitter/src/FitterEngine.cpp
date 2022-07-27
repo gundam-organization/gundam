@@ -399,6 +399,10 @@ void FitterEngine::varyEvenRates(std::vector<double> paramVariationList_, const 
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 
     if( not parSet.isEnabled() ) continue;
+    if( JsonUtils::fetchValue(parSet.getConfig(), "skipVariedEventRates", false) ){
+      LogInfo << "Event rate variation skipped for \"" << parSet.getName() << "\"" << std::endl;
+      continue;
+    }
 
     if( parSet.isUseEigenDecompInFit() ){
       // TODO ?
