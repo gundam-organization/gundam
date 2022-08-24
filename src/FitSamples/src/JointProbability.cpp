@@ -17,11 +17,10 @@ namespace JointProbability{
 
   double PoissonLLH::eval(const FitSample& sample_, int bin_){
     if( sample_.getMcContainer().histogram->GetBinContent(bin_) <= 0 ) return 0;
-    return - (
-        sample_.getDataContainer().histogram->GetBinContent(bin_) * TMath::Log(sample_.getMcContainer().histogram->GetBinContent(bin_))
-        - sample_.getMcContainer().histogram->GetBinContent(bin_)
-        - TMath::LnGamma(sample_.getDataContainer().histogram->GetBinContent(bin_)+1.)
-    );
+
+    double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
+    double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
+    return 2.0 * (predVal - dataVal + dataVal * TMath::Log(dataVal / predVal));
   }
 
   double BarlowLLH::eval(const FitSample& sample_, int bin_){
