@@ -16,10 +16,9 @@ LoggerInit([]{
 namespace JointProbability{
 
   double PoissonLLH::eval(const FitSample& sample_, int bin_){
-    if( sample_.getMcContainer().histogram->GetBinContent(bin_) <= 0 ) return 0;
-
     double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
     double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
+    if(predVal <= 0) return 0;
     return 2.0 * (predVal - dataVal + dataVal * TMath::Log(dataVal / predVal));
   }
 
