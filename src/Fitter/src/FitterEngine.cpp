@@ -1234,12 +1234,33 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
     (*originalStrippedCovMatrix) *= (*unstrippedCovMatrix);
     (*originalStrippedCovMatrix) *= (*globalPassageMatrixInv);
 
-    GenericToolbox::writeInTFile(outDir_, originalStrippedCovMatrix.get(), "originalStrippedCovMatrix");
-    GenericToolbox::writeInTFile(outDir_, GenericToolbox::convertTMatrixDtoTH2D(originalStrippedCovMatrix.get()), "originalStrippedCovMatrix_TH2D");
+    int nParNonFixed{0};
+    for( int i = 0 ; i < originalStrippedCovMatrix->GetNrows() ; i++ ){
+      if( (*originalStrippedCovMatrix)[i][i] != 0 ) nParNonFixed++;
+    }
+    auto originalCovMatrix = std::make_unique<TMatrixD>(nParNonFixed, nParNonFixed);
+    int iStrip{0};
+    for( int i = 0 ; i < originalStrippedCovMatrix->GetNrows() ; i++ ){
 
-    auto* corr = GenericToolbox::convertToCorrelationMatrix(originalStrippedCovMatrix.get());
-    GenericToolbox::writeInTFile(outDir_, corr, "originalStrippedCovMatrixCorr");
-    GenericToolbox::writeInTFile(outDir_, GenericToolbox::convertTMatrixDtoTH2D(corr), "originalStrippedCovMatrixCorr_TH2D");
+      if( (*originalStrippedCovMatrix)[i][i] == 0 ) continue;
+      iStrip++;
+
+      int jStrip{0};
+      for( int j = 0 ; j < originalStrippedCovMatrix->GetNrows() ; j++ ){
+        if( (*originalStrippedCovMatrix)[j][j] == 0 ) continue;
+        jStrip++;
+
+        (*originalCovMatrix)[iStrip][jStrip] = (*originalStrippedCovMatrix)[i][j];
+      }
+    }
+
+
+    GenericToolbox::writeInTFile(outDir_, originalCovMatrix.get(), "originalCovMatrix");
+    GenericToolbox::writeInTFile(outDir_, GenericToolbox::convertTMatrixDtoTH2D(originalCovMatrix.get()), "originalCovMatrix_TH2D");
+
+    auto* corr = GenericToolbox::convertToCorrelationMatrix(originalCovMatrix.get());
+    GenericToolbox::writeInTFile(outDir_, corr, "originalCovMatrixCorr");
+    GenericToolbox::writeInTFile(outDir_, GenericToolbox::convertTMatrixDtoTH2D(corr), "originalCovMatrixCorr_TH2D");
   };
 
   if( _useNormalizedFitSpace_ ){
