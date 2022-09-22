@@ -118,6 +118,7 @@ void SampleElement::refillHistogram(int iThread_){
   }
   while( iBin < nBins ) {
     double content = 0.0;
+    double sumw2 = 0.0;
     if (_CacheManagerValue_ && 0 <= _CacheManagerIndex_) {
         content = _CacheManagerValue_[_CacheManagerIndex_+iBin];
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
@@ -140,10 +141,11 @@ void SampleElement::refillHistogram(int iThread_){
     else {
         for( auto* eventPtr : perBinEventPtrList.at(iBin)){
             content += eventPtr->getEventWeight();
+            sumw2 += eventPtr->getEventWeight() * eventPtr->getEventWeight();
         }
     }
     binContentArray[iBin+1] = content;
-    histogram->GetSumw2()->GetArray()[iBin+1] = content;
+    histogram->GetSumw2()->GetArray()[iBin+1] = sumw2;
     iBin += nbThreads;
   }
 #else
@@ -154,11 +156,12 @@ void SampleElement::refillHistogram(int iThread_){
   auto* binContentArray = histogram->GetArray();
   auto* binErrorArray = histogram->GetSumw2()->GetArray();
   while( iBin < nBins ) {
-    binContentArray[iBin + 1] = 0;
+    binContentArray[iBin + 1] = 0; 
+    binErrorArray[iBin + 1] = 0;
     for (auto *eventPtr: perBinEventPtrList[iBin]) {
       binContentArray[iBin + 1] += eventPtr->getEventWeight();
+      binErrorArray[iBin + 1]   += eventPtr->getEventWeight() * eventPtr->getEventWeight();
     }
-    binErrorArray[iBin + 1] = binContentArray[iBin + 1];
     iBin += nbThreads;
   }
 

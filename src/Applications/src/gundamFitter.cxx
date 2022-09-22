@@ -170,7 +170,16 @@ int main(int argc, char** argv){
   // --------------------------
   // Pre-fit:
   // --------------------------
-
+  
+  // Event rates variations
+  if( JsonUtils::doKeyExist(jsonConfig, "allParamVariations") ) 
+  {
+    fitter.varyEvenRates(JsonUtils::fetchValue<std::vector<double>>(jsonConfig, 
+                                                                    "allParamVariations", 
+                                                                    std::vector<double>()), 
+                         "preFit");
+  }
+  
   // LLH Visual Scan
   if( clParser.isOptionTriggered("generateOneSigmaPlots") or JsonUtils::fetchValue(jsonConfig, "generateOneSigmaPlots", false) ) fitter.generateOneSigmaPlots("preFit");
   if( clParser.isOptionTriggered("scanParameters") or JsonUtils::fetchValue(jsonConfig, "scanParameters", false) ) fitter.scanParameters(nbScanSteps, "preFit/scan");
