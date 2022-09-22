@@ -589,8 +589,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
               return (histA_->Integral(histA_->FindBin(0), histA_->FindBin(histA_->GetXaxis()->GetXmax()))
               < histB_->Integral(histB_->FindBin(0), histB_->FindBin(histB_->GetXaxis()->GetXmax())));
             };
-            auto p = GenericToolbox::getSortPermutation(mcSampleHistList, aGoesFirst);
-            mcSampleHistList = GenericToolbox::applyPermutation(mcSampleHistList, p);
+						GenericToolbox::sortVector(mcSampleHistList, aGoesFirst);
 
             // Stacking histograms
             TH1D *histPileBuffer = nullptr;

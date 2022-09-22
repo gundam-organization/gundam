@@ -113,9 +113,9 @@ void DataDispenser::load(){
       _cache_.leavesToOverrideList.emplace_back(overrideEntry.first);
     }
     // make sure we process the longest words first: "thisIsATest" variable should be replaced before "thisIs"
-    std::function<bool(const std::string&, const std::string&)> aGoesFirst = [](const std::string& a_, const std::string& b_){ return a_.size() > b_.size(); };
-    auto p = GenericToolbox::getSortPermutation(_cache_.leavesToOverrideList, aGoesFirst);
-    GenericToolbox::applyPermutation(_cache_.leavesToOverrideList, p);
+    std::function<bool(const std::string&, const std::string&)> aGoesFirst =
+				[](const std::string& a_, const std::string& b_){ return a_.size() > b_.size(); };
+		GenericToolbox::sortVector(_cache_.leavesToOverrideList, aGoesFirst);
   }
 
   replaceToyIndexFct(_parameters_.nominalWeightFormulaStr);

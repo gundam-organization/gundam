@@ -18,6 +18,7 @@ namespace JsonUtils {
   nlohmann::json getForwardedConfig(const nlohmann::json& config_, const std::string& keyName_);
   void forwardConfig(nlohmann::json& config_, const std::string& className_ = "");
   void unfoldConfig(nlohmann::json& config_);
+  std::string toReadableString(const nlohmann::json& config_);
 
   std::vector<std::string> ls(const nlohmann::json& jsonConfig_);
   bool doKeyExist(const nlohmann::json& jsonConfig_, const std::string& keyName_);
