@@ -38,7 +38,7 @@ int main( int argc, char** argv ){
   LogInfo << "Reading config..." << std::endl;
   auto configFilePath = clp.getOptionVal<std::string>("config-file");
   auto fConfigFilePath = clp.getOptionVal<std::string>("output-file-path");
-	if( not GenericToolbox::doesStringEndsWithSubstring(fConfigFilePath, ".json") ) fConfigFilePath += ".json";
+  if( not GenericToolbox::doesStringEndsWithSubstring(fConfigFilePath, ".json") ) fConfigFilePath += ".json";
 
   LogInfo << "Reading configuration file..." << std::endl;
   auto config = JsonUtils::readConfigFile(configFilePath);
