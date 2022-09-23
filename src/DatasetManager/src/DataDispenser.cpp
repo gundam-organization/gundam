@@ -550,7 +550,7 @@ void DataDispenser::readAndFill(){
           ssProgressBar << "/s)";
           double cpuPercent = GenericToolbox::getCpuUsageByProcess();
           ssProgressBar << " " << cpuPercent << "% CPU ("
-          << GenericToolbox::padString(std::to_string(int(cpuPercent/GlobalVariables::getNbThreads())), 3, ' ') << "% efficiency)" << std::endl;
+          << GenericToolbox::padString(std::to_string(int(cpuPercent/GlobalVariables::getNbThreads())), 3, ' ') << "% efficiency)";
           GenericToolbox::displayProgressBar( iGlobal, nEvents, ssProgressBar.str() );
         }
         iGlobal += nThreads;
