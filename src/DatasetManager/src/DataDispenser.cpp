@@ -534,19 +534,21 @@ void DataDispenser::readAndFill(){
     Int_t nBytes;
 
     std::string progressTitle = LogInfo.getPrefixString();
+    std::stringstream ssProgressBar;
 
     for(Long64_t iEntry = iStart ; iEntry < iEnd ; iEntry++ ){
 
       if( iThread_ == 0 ){
         if( GenericToolbox::showProgressBar(iGlobal, nEvents) ){
-          GenericToolbox::displayProgressBar(
-              iGlobal, nEvents,
-              progressTitle
-              + GenericToolbox::padString(GenericToolbox::parseSizeUnits(nThreads*readSpeed.getTotalAccumulated()), 9)
-              + " ("
-              + GenericToolbox::padString(GenericToolbox::parseSizeUnits(nThreads*readSpeed.evalTotalGrowthRate()), 9)
-              + "/s)"
-          );
+          ssProgressBar.str("");
+          ssProgressBar << progressTitle;
+          ssProgressBar << GenericToolbox::padString(GenericToolbox::parseSizeUnits(nThreads*readSpeed.getTotalAccumulated()), 9);
+          ssProgressBar << " (";
+          ssProgressBar << GenericToolbox::padString(GenericToolbox::parseSizeUnits(nThreads*readSpeed.evalTotalGrowthRate()), 9);
+          ssProgressBar << "/s)";
+          double cpuPercent = GenericToolbox::getCpuUsageByProcess();
+          ssProgressBar << " " << cpuPercent << "% (" << cpuPercent/GlobalVariables::getNbThreads() << "% efficiency)" << std::endl;
+          GenericToolbox::displayProgressBar( iGlobal, nEvents, ssProgressBar.str() );
         }
         iGlobal += nThreads;
       }
