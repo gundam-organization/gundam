@@ -229,14 +229,16 @@ void DataDispenser::doEventSelection(){
   // for each event, which sample is active?
   _cache_.eventIsInSamplesList.resize(nEvents, std::vector<bool>(_cache_.samplesToFillList.size(), true));
   std::string progressTitle = LogInfo.getPrefixString() + "Reading input dataset";
+  std::stringstream ssProgressTitle;
   TFile* lastFilePtr{nullptr};
   for( Long64_t iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
     readSpeed.addQuantity(treeChain.GetEntry(iEvent));
     if( GenericToolbox::showProgressBar(iEvent, nEvents) ){
-      GenericToolbox::displayProgressBar(
-          iEvent, nEvents,progressTitle + " - " +
-                          GenericToolbox::padString(GenericToolbox::parseSizeUnits((unsigned int)(readSpeed.evalTotalGrowthRate())), 8)
-                          + "/s");
+      ssProgressTitle.str("");
+      ssProgressTitle << progressTitle << " - ";
+      ssProgressTitle << GenericToolbox::padString(GenericToolbox::parseSizeUnits((unsigned int)(readSpeed.evalTotalGrowthRate())), 8) << "/s";
+      ssProgressTitle << "(" << GenericToolbox::padString(std::to_string(int(GenericToolbox::getCpuUsageByProcess())), 3, ' ') << "% CPU efficiency)";
+      GenericToolbox::displayProgressBar( iEvent, nEvents, ssProgressTitle.str() );
     }
 
     if(treeSelectionCutFormula != nullptr and not GenericToolbox::doesEntryPassCut(treeSelectionCutFormula)){
