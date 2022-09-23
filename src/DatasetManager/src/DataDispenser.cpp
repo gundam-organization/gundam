@@ -237,7 +237,7 @@ void DataDispenser::doEventSelection(){
       ssProgressTitle.str("");
       ssProgressTitle << progressTitle << " - ";
       ssProgressTitle << GenericToolbox::padString(GenericToolbox::parseSizeUnits((unsigned int)(readSpeed.evalTotalGrowthRate())), 8) << "/s";
-      ssProgressTitle << "(" << GenericToolbox::padString(std::to_string(int(GenericToolbox::getCpuUsageByProcess())), 3, ' ') << "% CPU efficiency)";
+      ssProgressTitle << " (" << GenericToolbox::padString(std::to_string(int(GenericToolbox::getCpuUsageByProcess())), 3, ' ') << "% CPU efficiency)";
       GenericToolbox::displayProgressBar( iEvent, nEvents, ssProgressTitle.str() );
     }
 
@@ -549,7 +549,8 @@ void DataDispenser::readAndFill(){
           ssProgressBar << GenericToolbox::padString(GenericToolbox::parseSizeUnits(nThreads*readSpeed.evalTotalGrowthRate()), 9);
           ssProgressBar << "/s)";
           double cpuPercent = GenericToolbox::getCpuUsageByProcess();
-          ssProgressBar << " " << cpuPercent << "% (" << cpuPercent/GlobalVariables::getNbThreads() << "% efficiency)" << std::endl;
+          ssProgressBar << " " << cpuPercent << "% CPU ("
+          << GenericToolbox::padString(std::to_string(int(cpuPercent/GlobalVariables::getNbThreads())), 3, ' ') << "% efficiency)" << std::endl;
           GenericToolbox::displayProgressBar( iGlobal, nEvents, ssProgressBar.str() );
         }
         iGlobal += nThreads;
