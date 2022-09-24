@@ -1243,15 +1243,15 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
     for( int i = 0 ; i < originalStrippedCovMatrix->GetNrows() ; i++ ){
 
       if( (*originalStrippedCovMatrix)[i][i] == 0 ) continue;
-      iStrip++;
 
       int jStrip{0};
       for( int j = 0 ; j < originalStrippedCovMatrix->GetNrows() ; j++ ){
         if( (*originalStrippedCovMatrix)[j][j] == 0 ) continue;
-        jStrip++;
 
         (*originalCovMatrix)[iStrip][jStrip] = (*originalStrippedCovMatrix)[i][j];
+        jStrip++;
       }
+      iStrip++;
     }
 
 
