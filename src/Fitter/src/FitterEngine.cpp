@@ -789,7 +789,11 @@ void FitterEngine::fit(){
 
     GenericToolbox::mkdirTFile(_saveDir_, "postFit/")->cd();
 
+    int toyIndex = _propagator_.getIThrow();
+
     auto* bestFitStats = new TTree("bestFitStats", "bestFitStats");
+    bestFitStats->Branch("fitConverged", &_fitHasConverged_);
+    bestFitStats->Branch("toyIndex", &toyIndex);
     bestFitStats->Branch("nCallsAtBestFit", &_nbFitCalls_);
     bestFitStats->Branch("chi2BestFit", &_chi2Buffer_);
     bestFitStats->Branch("chi2StatBestFit", &_chi2StatBuffer_);

@@ -664,3 +664,7 @@ const EventTreeWriter &Propagator::getTreeWriter() const {
   return _treeWriter_;
 }
 
+int Propagator::getIThrow() const {
+  return _iThrow_;
+}
+
