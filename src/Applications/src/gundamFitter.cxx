@@ -110,7 +110,7 @@ int main(int argc, char** argv){
   bool isToyFit = clParser.isOptionTriggered("toyFit");
   int iToyFit = clParser.getOptionVal("toyFit", -1);
 
-  std::string outFileName = configFilePath;
+  std::string outFileName = GenericToolbox::splitString(configFilePath,"/").back();
   if( isToyFit ){
     outFileName += "_toyFit";
     if( iToyFit != -1 ){
