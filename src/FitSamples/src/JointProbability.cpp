@@ -120,7 +120,9 @@ namespace JointProbability{
                << sample_.getMcContainer().histogram->GetBinContent(bin_) << std::endl;
     }
 
-    LogThrowIf(std::isnan(chisq), "CHI2 NAN");
+    LogThrowIf(std::isnan(chisq), "Nan chi2 " << predVal << " " << dataVal
+        << sample_.getMcContainer().histogram->GetBinError(bin_) << " "
+        << sample_.getMcContainer().histogram->GetBinContent(bin_));
 
     return chisq;
   }
