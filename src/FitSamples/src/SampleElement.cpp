@@ -128,7 +128,7 @@ void SampleElement::refillHistogram(int iThread_){
 #endif // CACHE_MANAGER_SLOW_VALIDATION
     }
     else {
-      LogThrow(GET_VAR_NAME_VALUE(_CacheManagerValue_) << " / " << GET_VAR_NAME_VALUE(_CacheManagerIndex_)); // debug
+//      LogThrow(GET_VAR_NAME_VALUE(_CacheManagerValue_) << " / " << GET_VAR_NAME_VALUE(_CacheManagerIndex_)); // debug
 #endif // GUNDAM_USING_CACHE_MANAGER
       for (auto *eventPtr: perBinEventPtrList[iBin]) {
         binContentArray[iBin + 1] += eventPtr->getEventWeight();

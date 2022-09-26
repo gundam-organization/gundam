@@ -85,9 +85,7 @@ void FitSampleSet::initialize() {
   // Histogram fills
   std::function<void(int)> refillMcHistogramsFct = [this](int iThread){
     for( auto& sample : _fitSampleList_ ){
-      LogDebug << "MC" << std::endl;
       sample.getMcContainer().refillHistogram(iThread);
-      LogDebug << "Data" << std::endl;
       sample.getDataContainer().refillHistogram(iThread);
     }
   };
