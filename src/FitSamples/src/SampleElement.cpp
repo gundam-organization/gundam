@@ -125,17 +125,17 @@ void SampleElement::refillHistogram(int iThread_){
                     << " " << delta
                     << std::endl;
         }
-#endif
+#endif // CACHE_MANAGER_SLOW_VALIDATION
     }
     else {
-#endif
+#endif // GUNDAM_USING_CACHE_MANAGER
       for (auto *eventPtr: perBinEventPtrList[iBin]) {
         binContentArray[iBin + 1] += eventPtr->getEventWeight();
         binErrorArray[iBin + 1] += eventPtr->getEventWeight() * eventPtr->getEventWeight();
       }
 #ifdef GUNDAM_USING_CACHE_MANAGER
     }
-#endif
+#endif // GUNDAM_USING_CACHE_MANAGER
     iBin += nbThreads;
   }
 

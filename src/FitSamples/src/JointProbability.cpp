@@ -82,6 +82,7 @@ namespace JointProbability{
     double penalty = 0;
     // Barlow-Beeston uses fractional uncertainty on MC, so sqrt(sum[w^2])/mc
     double fractional = sqrt(mcuncert)/predVal;
+    LogDebug << GET_VAR_NAME_VALUE(fractional) << std::endl;
     // -b/2a in quadratic equation
     double temp = predVal*fractional*fractional-1;
     // b^2 - 4ac in quadratic equation
@@ -94,6 +95,7 @@ namespace JointProbability{
     newmc = predVal*beta;
     // And penalise the movement in beta relative the mc uncertainty
     penalty = (beta-1)*(beta-1)/(2*fractional*fractional);
+    LogThrowIf(std::isnan(penalty));
     // And calculate the new Poisson likelihood
     // For Barlow-Beeston newmc is modified, so can only calculate Poisson likelihood after Barlow-Beeston
     double stat = 0;
@@ -101,7 +103,6 @@ namespace JointProbability{
     else if (newmc > 0) stat = newmc-dataVal+dataVal*TMath::Log(dataVal/newmc);
 
     LogThrowIf(std::isnan(stat));
-    LogThrowIf(std::isnan(penalty));
 
     if((predVal > 0.0) && (dataVal > 0.0)){
 
