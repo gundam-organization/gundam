@@ -100,6 +100,9 @@ namespace JointProbability{
     if (dataVal == 0) stat = newmc;
     else if (newmc > 0) stat = newmc-dataVal+dataVal*TMath::Log(dataVal/newmc);
 
+    LogThrowIf(std::isnan(stat));
+    LogThrowIf(std::isnan(penalty));
+
     if((predVal > 0.0) && (dataVal > 0.0)){
 
       chisq += 2.0*(stat+penalty);
@@ -115,7 +118,7 @@ namespace JointProbability{
     }
 
     if(std::isinf(chisq)){
-      LogAlert << "Infinite chi2 " << predVal << " " << dataVal
+      LogAlert << "Infinite chi2 " << predVal << " " << dataVal << " "
                << sample_.getMcContainer().histogram->GetBinError(bin_) << " "
                << sample_.getMcContainer().histogram->GetBinContent(bin_) << std::endl;
     }
