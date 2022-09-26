@@ -185,7 +185,10 @@ void Propagator::initialize() {
     }
 
     LogInfo << "Propagating prior parameters on events..." << std::endl;
+    bool cacheManagerState = GlobalVariables::getEnableCacheManager();
+    GlobalVariables::setEnableCacheManager(false);
     this->reweightMcEvents();
+    GlobalVariables::setEnableCacheManager(cacheManagerState);
 
     // Copies MC events in data container for both Asimov and FakeData event types
     LogWarning << "Copying loaded mc-like event to data container..." << std::endl;
@@ -488,9 +491,7 @@ void Propagator::initializeThreads() {
 
   std::function<void(int)> refillSampleHistogramsFct = [this](int iThread){
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-      LogDebug << "MC" << std::endl;
       sample.getMcContainer().refillHistogram(iThread);
-      LogDebug << "DATA" << std::endl;
       sample.getDataContainer().refillHistogram(iThread);
     }
   };
