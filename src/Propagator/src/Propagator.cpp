@@ -488,7 +488,9 @@ void Propagator::initializeThreads() {
 
   std::function<void(int)> refillSampleHistogramsFct = [this](int iThread){
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+      LogDebug << "MC" << std::endl;
       sample.getMcContainer().refillHistogram(iThread);
+      LogDebug << "DATA" << std::endl;
       sample.getDataContainer().refillHistogram(iThread);
     }
   };
