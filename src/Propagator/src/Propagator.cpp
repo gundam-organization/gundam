@@ -243,7 +243,7 @@ void Propagator::initialize() {
   // the MC has been copied for the Asimov fit, or the "data" use the MC
   // reweighting cache.  This must also be before the first use of
   // reweightMcEvents.
-  Cache::Manager::Build(getFitSampleSet());
+  if(GlobalVariables::getEnableCacheManager()) Cache::Manager::Build(getFitSampleSet());
 #endif
 
   if( _showEventBreakdown_ ){
@@ -414,7 +414,7 @@ void Propagator::reweightMcEvents() {
   } while (false);
 #endif
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-  usedGPU = Cache::Manager::Fill();
+  if(GlobalVariables::getEnableCacheManager()) usedGPU = Cache::Manager::Fill();
 #endif
   if( not usedGPU ){
     GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
