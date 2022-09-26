@@ -167,14 +167,6 @@ void Propagator::initialize() {
     dispenser.load();
   }
 
-#ifdef GUNDAM_USING_CACHE_MANAGER
-  // After all of the data has been loaded.  Specifically, this must be after
-  // the MC has been copied for the Asimov fit, or the "data" use the MC
-  // reweighting cache.  This must also be before the first use of
-  // reweightMcEvents.
-  if(GlobalVariables::getEnableCacheManager()) Cache::Manager::Build(getFitSampleSet());
-#endif
-
   if( usedMcContainer ){
     if( _throwAsimovToyParameters_ ){
       for( auto& parSet : _parameterSetsList_ ){
@@ -215,13 +207,6 @@ void Propagator::initialize() {
       dispenser.load();
     }
 
-#ifdef GUNDAM_USING_CACHE_MANAGER
-    // After all of the data has been loaded.  Specifically, this must be after
-    // the MC has been copied for the Asimov fit, or the "data" use the MC
-    // reweighting cache.  This must also be before the first use of
-    // reweightMcEvents.
-    if(GlobalVariables::getEnableCacheManager()) Cache::Manager::Build(getFitSampleSet());
-#endif
   }
 //  else{
 //    LogDebug << "Check asimov: " << std::endl;
@@ -241,6 +226,14 @@ void Propagator::initialize() {
 //    }
 ////    LogThrow("debug")
 //  }
+
+#ifdef GUNDAM_USING_CACHE_MANAGER
+  // After all of the data has been loaded.  Specifically, this must be after
+  // the MC has been copied for the Asimov fit, or the "data" use the MC
+  // reweighting cache.  This must also be before the first use of
+  // reweightMcEvents.
+  if(GlobalVariables::getEnableCacheManager()) Cache::Manager::Build(getFitSampleSet());
+#endif
 
   LogInfo << "Propagating prior parameters on events..." << std::endl;
   this->reweightMcEvents();

@@ -65,7 +65,11 @@ int main(int argc, char** argv){
 
   bool useGpu = clParser.isOptionTriggered("usingGpu");
   if( useGpu ){
+#ifdef GUNDAM_USING_CACHE_MANAGER
     LogThrowIf( not Cache::Manager::HasCUDA(), "CUDA support not enabled with this GUNDAM build." );
+#else
+    LogThrow("CUDA support not enabled with this GUNDAM build (GUNDAM_USING_CACHE_MANAGER required).")
+#endif
     LogWarning << "Using GPU parallelization." << std::endl;
   }
 
