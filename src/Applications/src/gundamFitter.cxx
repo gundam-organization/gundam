@@ -71,7 +71,7 @@ int main(int argc, char** argv){
 
   bool useCacheManager = clParser.isOptionTriggered("usingCacheManager") or useGpu;
   if( useCacheManager ){
-#ifndef GUNDAM_USING_CACHE_MANAGER
+#ifdef GUNDAM_USING_CACHE_MANAGER
     GlobalVariables::setEnableCacheManager(true);
 #else
     LogThrow("useCacheManager can only be set while GUNDAM is compiled with GUNDAM_USING_CACHE_MANAGER option.");
