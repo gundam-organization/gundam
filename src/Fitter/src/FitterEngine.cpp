@@ -944,9 +944,6 @@ void FitterEngine::updateChi2Cache(){
   }
 
   _chi2Buffer_ = _chi2StatBuffer_ + _chi2PullsBuffer_ + _chi2RegBuffer_;
-
-  LogThrowIf(_chi2Buffer_!=_chi2Buffer_, "_chi2Buffer_ is Nan");
-
 }
 double FitterEngine::evalFit(const double* parArray_){
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);

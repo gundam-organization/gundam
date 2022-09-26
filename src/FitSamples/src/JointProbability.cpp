@@ -64,6 +64,9 @@ namespace JointProbability{
     double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
     double mcuncert = sample_.getMcContainer().histogram->GetBinError(bin_);
 
+    LogThrowIf(predVal!=predVal, "nan");
+    LogThrowIf(mcuncert!=mcuncert, "nan");
+
     //implementing Barlow-Beeston correction for LH calculation
     //the following comments are inspired/copied from Clarence's comments in the MaCh3
     //implementation of the same feature
