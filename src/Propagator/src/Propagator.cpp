@@ -167,6 +167,14 @@ void Propagator::initialize() {
     dispenser.load();
   }
 
+#ifdef GUNDAM_USING_CACHE_MANAGER
+  // After all of the data has been loaded.  Specifically, this must be after
+  // the MC has been copied for the Asimov fit, or the "data" use the MC
+  // reweighting cache.  This must also be before the first use of
+  // reweightMcEvents.
+  if(GlobalVariables::getEnableCacheManager()) Cache::Manager::Build(getFitSampleSet());
+#endif
+
   if( usedMcContainer ){
     if( _throwAsimovToyParameters_ ){
       for( auto& parSet : _parameterSetsList_ ){
@@ -203,6 +211,14 @@ void Propagator::initialize() {
       dispenser.setParSetPtrToLoad(&_parameterSetsList_);
       dispenser.load();
     }
+
+#ifdef GUNDAM_USING_CACHE_MANAGER
+    // After all of the data has been loaded.  Specifically, this must be after
+    // the MC has been copied for the Asimov fit, or the "data" use the MC
+    // reweighting cache.  This must also be before the first use of
+    // reweightMcEvents.
+    if(GlobalVariables::getEnableCacheManager()) Cache::Manager::Build(getFitSampleSet());
+#endif
   }
 //  else{
 //    LogDebug << "Check asimov: " << std::endl;
@@ -238,16 +254,9 @@ void Propagator::initialize() {
 //    fillDialsStack();
 //  }
 
-#ifdef GUNDAM_USING_CACHE_MANAGER
-  // After all of the data has been loaded.  Specifically, this must be after
-  // the MC has been copied for the Asimov fit, or the "data" use the MC
-  // reweighting cache.  This must also be before the first use of
-  // reweightMcEvents.
-  if(GlobalVariables::getEnableCacheManager()) Cache::Manager::Build(getFitSampleSet());
-#endif
-
   if( _showEventBreakdown_ ){
-    {
+
+    if(true){
       // STAGED MASK
       LogWarning << "Staged event breakdown:" << std::endl;
       Dial::enableMaskCheck = true;
@@ -291,8 +300,6 @@ void Propagator::initialize() {
       t.printTable();
       Dial::enableMaskCheck = false;
     }
-
-
 
     LogWarning << "Sample breakdown:" << std::endl;
     GenericToolbox::TablePrinter t;
@@ -389,7 +396,7 @@ void Propagator::updateDialResponses(){
   GlobalVariables::getParallelWorker().runJob("Propagator::updateDialResponses");
   dialUpdate.counts++; dialUpdate.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 }
-void Propagator::reweightMcEvents() {
+void Propagator::reweighreweightMcEventstMcEvents() {
   bool usedGPU{false};
 #ifdef GUNDAM_USING_CACHE_MANAGER
 #ifdef DUMP_PARAMETERS
@@ -414,6 +421,7 @@ void Propagator::reweightMcEvents() {
   } while (false);
 #endif
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+  LogDebug << "THERE YOU GO" << std::endl;
   if(GlobalVariables::getEnableCacheManager()) usedGPU = Cache::Manager::Fill();
 #endif
   if( not usedGPU ){
