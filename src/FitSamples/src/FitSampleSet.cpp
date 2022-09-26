@@ -127,7 +127,10 @@ bool FitSampleSet::empty() const {
 }
 double FitSampleSet::evalLikelihood() const{
   double llh = 0.;
-  for( auto& sample : _fitSampleList_ ){ llh += this->evalLikelihood(sample); }
+  for( auto& sample : _fitSampleList_ ){
+    llh += this->evalLikelihood(sample);
+    LogThrowIf(llh!=llh, sample.getName() << " LLH is NaN.");
+  }
   return llh;
 }
 double FitSampleSet::evalLikelihood(const FitSample& sample_) const{

@@ -936,13 +936,16 @@ void FitterEngine::updateChi2Cache(){
   // Compute the penalty terms
   ////////////////////////////////
   _chi2PullsBuffer_ = 0;
-  _chi2RegBuffer_ = 0;
+  _chi2RegBuffer_ = 0; // unused
   for( auto& parSet : _propagator_.getParameterSetsList() ){
     buffer = parSet.getPenaltyChi2();
     _chi2PullsBuffer_ += buffer;
+    LogThrowIf(buffer!=buffer, parSet.getName() << " penalty chi2 is Nan");
   }
 
   _chi2Buffer_ = _chi2StatBuffer_ + _chi2PullsBuffer_ + _chi2RegBuffer_;
+
+  LogThrowIf(_chi2Buffer_!=_chi2Buffer_, "_chi2Buffer_ is Nan");
 
 }
 double FitterEngine::evalFit(const double* parArray_){
