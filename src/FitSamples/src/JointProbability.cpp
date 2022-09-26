@@ -97,8 +97,9 @@ namespace JointProbability{
     LogThrowIf(
         std::isnan(penalty),
         GET_VAR_NAME_VALUE(fractional)
-        << " " << GET_VAR_NAME_VALUE(mcuncert)
-        << " " << GET_VAR_NAME_VALUE(predVal)
+        << " / " << GET_VAR_NAME_VALUE(mcuncert)
+        << " / " << GET_VAR_NAME_VALUE(predVal)
+        << " / " << GET_VAR_NAME_VALUE(bin_)
         );
     // And calculate the new Poisson likelihood
     // For Barlow-Beeston newmc is modified, so can only calculate Poisson likelihood after Barlow-Beeston
