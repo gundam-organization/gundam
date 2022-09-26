@@ -421,7 +421,6 @@ void Propagator::reweightMcEvents() {
   } while (false);
 #endif
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-  LogDebug << "THERE YOU GO" << std::endl;
   if(GlobalVariables::getEnableCacheManager()) usedGPU = Cache::Manager::Fill();
 #endif
   if( not usedGPU ){
