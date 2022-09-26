@@ -63,8 +63,8 @@ int main(int argc, char** argv){
   LogInfo << clParser.getValueSummary() << std::endl << std::endl;
   LogInfo << clParser.dumpConfigAsJsonStr() << std::endl;
 
-  bool useGpu = clParser.getOptionVal("usingGpu", false);
-  bool useCacheManager = clParser.getOptionVal("usingCacheManager", false) or useGpu;
+  bool useGpu = clParser.isOptionTriggered("usingGpu");
+  bool useCacheManager = clParser.isOptionTriggered("usingCacheManager") or useGpu;
 
   if( useCacheManager ){
 #ifndef GUNDAM_USING_CACHE_MANAGER
