@@ -19,7 +19,7 @@ std::map<std::string, bool> GlobalVariables::_boolMap_;
 std::vector<TChain*> GlobalVariables::_chainList_;
 GenericToolbox::ParallelWorker GlobalVariables::_threadPool_;
 
-bool GlobalVariables::_enableCacheManager_{true};
+bool GlobalVariables::_enableCacheManager_{false};
 
 void GlobalVariables::setNbThreads(int nbThreads_){
   _nbThreads_ = nbThreads_;
