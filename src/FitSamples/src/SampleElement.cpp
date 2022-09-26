@@ -95,34 +95,23 @@ void SampleElement::refillHistogram(int iThread_){
   if( isLocked ) return;
 
   int nbThreads = GlobalVariables::getNbThreads();
-  if( iThread_ == -1 ){
-    nbThreads = 1;
-    iThread_ = 0;
-  }
+  if( iThread_ == -1 ){ nbThreads = 1; iThread_ = 0; }
 
-#ifdef GUNDAM_USING_CACHE_MANAGER
-  // Size = Nbins + 2 overflow (0 and last)
-  auto* binContentArray = histogram->GetArray();
+  // Faster that pointer shifter. -> would be slower if refillHistogram is
+  // handled by the propagator
   int iBin = iThread_;
   int nBins = int(perBinEventPtrList.size());
-  if (_CacheManagerValue_) {
-      if (_CacheManagerValid_ && !(*_CacheManagerValid_)) {
-          // This is slowish, but will make sure that the cached result is
-          // updated when the cache has changed.  The values pointed to by
-          // _CacheManagerResult_ and _CacheManagerValid_ are inside
-          // of the weights cache (a bit of evil coding here), and are
-          // updated by the cache.  The update is triggered by
-          // _CacheManagerUpdate().
-          if (_CacheManagerUpdate_) (*_CacheManagerUpdate_)();
-      }
-  }
+  auto* binContentArray = histogram->GetArray();
+  auto* binErrorArray = histogram->GetSumw2()->GetArray();
   while( iBin < nBins ) {
-    double content = 0.0;
-    double sumw2 = 0.0;
-    if (_CacheManagerValue_ && 0 <= _CacheManagerIndex_) {
-        content = _CacheManagerValue_[_CacheManagerIndex_+iBin];
+    binContentArray[iBin + 1] = 0; 
+    binErrorArray[iBin + 1] = 0;
+#ifdef GUNDAM_USING_CACHE_MANAGER
+    if (_CacheManagerValue_!=nullptr and _CacheManagerIndex_ >= 0) {
+      binContentArray[iBin + 1] += _CacheManagerValue_[_CacheManagerIndex_+iBin];
+      binErrorArray[iBin + 1] += binContentArray[iBin + 1]*binContentArray[iBin + 1];
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
-        double slowValue = 0.0;
+      double slowValue = 0.0;
         for( auto* eventPtr : perBinEventPtrList.at(iBin)){
             slowValue += eventPtr->getEventWeight();
         }
@@ -139,47 +128,17 @@ void SampleElement::refillHistogram(int iThread_){
 #endif
     }
     else {
-        for( auto* eventPtr : perBinEventPtrList.at(iBin)){
-            content += eventPtr->getEventWeight();
-            sumw2 += eventPtr->getEventWeight() * eventPtr->getEventWeight();
-        }
+#endif
+      for (auto *eventPtr: perBinEventPtrList[iBin]) {
+        binContentArray[iBin + 1] += eventPtr->getEventWeight();
+        binErrorArray[iBin + 1] += eventPtr->getEventWeight() * eventPtr->getEventWeight();
+      }
+#ifdef GUNDAM_USING_CACHE_MANAGER
     }
-    binContentArray[iBin+1] = content;
-    histogram->GetSumw2()->GetArray()[iBin+1] = sumw2;
-    iBin += nbThreads;
-  }
-#else
-  // Faster that pointer shifter. -> would be slower if refillHistogram is
-  // handled by the propagator
-  int iBin = iThread_;
-  int nBins = int(perBinEventPtrList.size());
-  auto* binContentArray = histogram->GetArray();
-  auto* binErrorArray = histogram->GetSumw2()->GetArray();
-  while( iBin < nBins ) {
-    binContentArray[iBin + 1] = 0; 
-    binErrorArray[iBin + 1] = 0;
-    for (auto *eventPtr: perBinEventPtrList[iBin]) {
-      binContentArray[iBin + 1] += eventPtr->getEventWeight();
-      binErrorArray[iBin + 1]   += eventPtr->getEventWeight() * eventPtr->getEventWeight();
-    }
+#endif
     iBin += nbThreads;
   }
 
-//  std::vector<PhysicsEvent*>* binEvList = &perBinEventPtrList[0] + iThread_;
-//  auto* bin = &histogram->GetArray()[1] + iThread_;
-//  auto* errBin = &histogram->GetSumw2()->GetArray()[1] + iThread_;
-//  while( binEvList <= &perBinEventPtrList.back() ) {
-//    *bin = 0;
-//    std::for_each(
-//        binEvList->begin(), binEvList->end(),
-//        [&](PhysicsEvent* e){ *bin += e->getEventWeight(); }
-//        );
-//    *errBin = *bin;
-//    binEvList += nbThreads;
-//    bin += nbThreads;
-//    errBin += nbThreads;
-//  }
-#endif
 }
 void SampleElement::rescaleHistogram() {
   if( isLocked ) return;
