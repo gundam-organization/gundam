@@ -28,7 +28,7 @@ int main(int argc, char** argv){
   g.hello();
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
-  if (Cache::Manager::HasCUDA()){ LogInfo << "CUDA compatible build." << std::endl; }
+  if (Cache::Manager::HasCUDA()){ LogWarning << "CUDA compatible build." << std::endl; }
 #endif
 
   // --------------------------
@@ -62,19 +62,25 @@ int main(int argc, char** argv){
   LogInfo << clParser.getValueSummary() << std::endl << std::endl;
   LogInfo << clParser.dumpConfigAsJsonStr() << std::endl;
 
-  std::string cacheDefault = "off";
 #ifdef GUNDAM_USING_CACHE_MANAGER
-  if (Cache::Manager::HasCUDA()) cacheDefault = "on";
+//  std::string cacheDefault = "off";
+//  if (Cache::Manager::HasCUDA()) cacheDefault = "on";
+  std::string cacheEnabled = clParser.getOptionVal("cache", "off");
+  if (cacheEnabled == "off") {
+    LogInfo << "Cache::Manager disabled" << std::endl;
+    GlobalVariables::setEnableCacheManager(false);
+  }
+  else if(cacheEnabled == "on"){
+    LogInfo << "Enabling Cache::Manager" << std::endl;
+    GlobalVariables::setEnableCacheManager(true);
+    if (Cache::Manager::HasCUDA()){
+      LogWarning << "GPU support enabled" << std::endl;
+    }
+  }
+  else{
+    LogThrow("Unrecognised cache status arg: " << cacheEnabled);
+  }
 #endif
-  std::string cacheEnabled = clParser.getOptionVal("cache",cacheDefault);
-  if (cacheEnabled != "on") {
-      LogInfo << "Cache::Manager disabled" << std::endl;
-      GlobalVariables::setEnableCacheManager(false);
-  }
-  else {
-      LogInfo << "Enabling Cache::Manager" << std::endl;
-      GlobalVariables::setEnableCacheManager(true);
-  }
 
   if( clParser.isOptionTriggered("randomSeed") ){
     LogAlert << "Using user-specified random seed: " << clParser.getOptionVal<ULong_t>("randomSeed") << std::endl;
@@ -100,8 +106,8 @@ int main(int argc, char** argv){
 
   if( JsonUtils::doKeyExist(jsonConfig, "minGundamVersion") ){
     LogThrowIf(
-      not g.isNewerOrEqualVersion(JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion")),
-      "Version check FAILED: " << GundamVersionConfig::getVersionStr() << " < " << JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion")
+        not g.isNewerOrEqualVersion(JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion")),
+        "Version check FAILED: " << GundamVersionConfig::getVersionStr() << " < " << JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion")
     );
     LogInfo << "Version check passed: " << GundamVersionConfig::getVersionStr() << " >= " << JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion") << std::endl;
   }
@@ -173,16 +179,16 @@ int main(int argc, char** argv){
   // --------------------------
   // Pre-fit:
   // --------------------------
-  
+
   // Event rates variations
-  if( JsonUtils::doKeyExist(jsonConfig, "allParamVariations") ) 
+  if( JsonUtils::doKeyExist(jsonConfig, "allParamVariations") )
   {
-    fitter.varyEvenRates(JsonUtils::fetchValue<std::vector<double>>(jsonConfig, 
-                                                                    "allParamVariations", 
-                                                                    std::vector<double>()), 
+    fitter.varyEvenRates(JsonUtils::fetchValue<std::vector<double>>(jsonConfig,
+                                                                    "allParamVariations",
+                                                                    std::vector<double>()),
                          "preFit");
   }
-  
+
   // LLH Visual Scan
   if( clParser.isOptionTriggered("generateOneSigmaPlots") or JsonUtils::fetchValue(jsonConfig, "generateOneSigmaPlots", false) ) fitter.generateOneSigmaPlots("preFit");
   if( clParser.isOptionTriggered("scanParameters") or JsonUtils::fetchValue(jsonConfig, "scanParameters", false) ) fitter.scanParameters(nbScanSteps, "preFit/scan");
