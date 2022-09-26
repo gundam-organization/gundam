@@ -120,6 +120,8 @@ namespace JointProbability{
                << sample_.getMcContainer().histogram->GetBinContent(bin_) << std::endl;
     }
 
+    LogThrowIf(std::isnan(chisq), "CHI2 NAN");
+
     return chisq;
   }
   double BarlowLLH_BANFF_OA2021::eval(const FitSample& sample_, int bin_){
