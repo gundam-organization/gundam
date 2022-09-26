@@ -396,7 +396,7 @@ void Propagator::updateDialResponses(){
   GlobalVariables::getParallelWorker().runJob("Propagator::updateDialResponses");
   dialUpdate.counts++; dialUpdate.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 }
-void Propagator::reweighreweightMcEventstMcEvents() {
+void Propagator::reweightMcEvents() {
   bool usedGPU{false};
 #ifdef GUNDAM_USING_CACHE_MANAGER
 #ifdef DUMP_PARAMETERS
