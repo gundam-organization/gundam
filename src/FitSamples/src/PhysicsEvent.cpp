@@ -70,7 +70,7 @@ double PhysicsEvent::getNominalWeight() const {
 double PhysicsEvent::getEventWeight() const {
 #ifdef GUNDAM_USING_CACHE_MANAGER
     if (_CacheManagerValue_) {
-        if (_CacheManagerValid_ && !(*_CacheManagerValid_)) {
+        if (_CacheManagerValid_!=nullptr and not (*_CacheManagerValid_)) {
             // This is slowish, but will make sure that the cached result is
             // updated when the cache has changed.  The values pointed to by
             // _CacheManagerValue_ and _CacheManagerValid_ are inside
@@ -120,7 +120,8 @@ double PhysicsEvent::getEventWeight() const {
         // calculated after Cache::Manager::Fill
         return _eventWeight_;
 #endif
-        return *_CacheManagerValue_;
+      LogThrowIf(*_CacheManagerValue_!=*_CacheManagerValue_, "Nan weight: " << this->getSummary());
+      return *_CacheManagerValue_;
     }
 #endif
     return _eventWeight_;
