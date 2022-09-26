@@ -27,8 +27,9 @@ int main(int argc, char** argv){
   g.setAppName("GundamFitter");
   g.hello();
 
+#ifdef GUNDAM_USING_CACHE_MANAGER
   if (Cache::Manager::HasCUDA()){ LogInfo << "CUDA compatible build." << std::endl; }
-
+#endif
 
   // --------------------------
   // Read Command Line Args:
