@@ -64,19 +64,18 @@ int main(int argc, char** argv){
   LogInfo << clParser.dumpConfigAsJsonStr() << std::endl;
 
   bool useGpu = clParser.isOptionTriggered("usingGpu");
-  bool useCacheManager = clParser.isOptionTriggered("usingCacheManager") or useGpu;
+  if( useGpu ){
+    LogThrowIf( not Cache::Manager::HasCUDA(), "CUDA support not enabled with this GUNDAM build." );
+    LogWarning << "Using GPU parallelization." << std::endl;
+  }
 
+  bool useCacheManager = clParser.isOptionTriggered("usingCacheManager") or useGpu;
   if( useCacheManager ){
 #ifndef GUNDAM_USING_CACHE_MANAGER
     GlobalVariables::setEnableCacheManager(true);
 #else
     LogThrow("useCacheManager can only be set while GUNDAM is compiled with GUNDAM_USING_CACHE_MANAGER option.");
 #endif
-  }
-
-  if( useGpu ){
-    LogThrowIf( not Cache::Manager::HasCUDA(), "CUDA support not enabled with this GUNDAM build." );
-    LogWarning << "Using GPU parallelization." << std::endl;
   }
 
   if( clParser.isOptionTriggered("randomSeed") ){
