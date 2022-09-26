@@ -39,8 +39,9 @@ int main(int argc, char** argv){
   clParser.addTriggerOption("dry-run", {"--dry-run", "-d"},"Perform the full sequence of initialization, but don't do the actual fit.");
   clParser.addTriggerOption("generateOneSigmaPlots", {"--one-sigma"}, "Generate one sigma plots");
   clParser.addTriggerOption("asimov", {"-a", "--asimov"}, "Use MC dataset to fill the data histograms");
+  clParser.addTriggerOption("usingCacheManager", {"--cache-manager"}, "Event weight cache handle by the CacheManager");
+  clParser.addTriggerOption("usingGpu", {"--gpu"}, "Use GPU parallelization");
 
-  clParser.addOption("cache", {"-C", "--cache-enabled"}, "Enable the event weight cache");
   clParser.addOption("configFile", {"-c", "--config-file"}, "Specify path to the fitter config file");
   clParser.addOption("nbThreads", {"-t", "--nb-threads"}, "Specify nb of parallel threads");
   clParser.addOption("outputFile", {"-o", "--out-file"}, "Specify the output file");
@@ -62,25 +63,21 @@ int main(int argc, char** argv){
   LogInfo << clParser.getValueSummary() << std::endl << std::endl;
   LogInfo << clParser.dumpConfigAsJsonStr() << std::endl;
 
-#ifdef GUNDAM_USING_CACHE_MANAGER
-//  std::string cacheDefault = "off";
-//  if (Cache::Manager::HasCUDA()) cacheDefault = "on";
-  std::string cacheEnabled = clParser.getOptionVal("cache", "off");
-  if (cacheEnabled == "off") {
-    LogInfo << "Cache::Manager disabled" << std::endl;
-    GlobalVariables::setEnableCacheManager(false);
-  }
-  else if(cacheEnabled == "on"){
-    LogInfo << "Enabling Cache::Manager" << std::endl;
+  bool useGpu = clParser.getOptionVal("usingGpu", false);
+  bool useCacheManager = clParser.getOptionVal("usingCacheManager", false) or useGpu;
+
+  if( useCacheManager ){
+#ifndef GUNDAM_USING_CACHE_MANAGER
     GlobalVariables::setEnableCacheManager(true);
-    if (Cache::Manager::HasCUDA()){
-      LogWarning << "GPU support enabled" << std::endl;
-    }
-  }
-  else{
-    LogThrow("Unrecognised cache status arg: " << cacheEnabled);
-  }
+#else
+    LogThrow("useCacheManager can only be set while GUNDAM is compiled with GUNDAM_USING_CACHE_MANAGER option.");
 #endif
+  }
+
+  if( useGpu ){
+    LogThrowIf( not Cache::Manager::HasCUDA(), "CUDA support not enabled with this GUNDAM build." );
+    LogWarning << "Using GPU parallelization." << std::endl;
+  }
 
   if( clParser.isOptionTriggered("randomSeed") ){
     LogAlert << "Using user-specified random seed: " << clParser.getOptionVal<ULong_t>("randomSeed") << std::endl;
