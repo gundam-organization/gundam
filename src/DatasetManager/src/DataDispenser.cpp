@@ -221,7 +221,9 @@ void DataDispenser::doEventSelection(){
   if(treeSelectionCutFormula != nullptr) GenericToolbox::enableSelectedBranches(&treeChain, treeSelectionCutFormula);
   for( auto& sampleFormula : sampleCutFormulaList ){
     GenericToolbox::enableSelectedBranches(&treeChain, sampleFormula);
+    sampleFormula->GetNdata();
   }
+  formulaManager.GetNdata(true);
 
   LogInfo << "Performing event selection..." << std::endl;
   GenericToolbox::VariableMonitor readSpeed("bytes");
