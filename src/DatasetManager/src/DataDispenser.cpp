@@ -187,6 +187,10 @@ void DataDispenser::doEventSelection(){
 
   if( not _parameters_.selectionCutFormulaStr.empty() ){
     treeSelectionCutFormula = new TTreeFormula("SelectionCutFormula", _parameters_.selectionCutFormulaStr.c_str(), &treeChain);
+
+    // ROOT Hot fix: https://root-forum.cern.ch/t/ttreeformula-evalinstance-return-0-0/16366/10
+    treeSelectionCutFormula->GetNdata();
+
     LogThrowIf(treeSelectionCutFormula->GetNdim() == 0,
                "\"" << _parameters_.selectionCutFormulaStr << "\" could not be parsed by the TChain");
 
@@ -206,7 +210,10 @@ void DataDispenser::doEventSelection(){
 
     t.addTableLine({{"\""+_cache_.samplesToFillList[iSample]->getName()+"\""}, {"\""+selectionCut+"\""}});
     sampleCutFormulaList[iSample] = new TTreeFormula(_cache_.samplesToFillList[iSample]->getName().c_str(), selectionCut.c_str(), &treeChain);
+
+    // ROOT Hot fix: https://root-forum.cern.ch/t/ttreeformula-evalinstance-return-0-0/16366/10
     sampleCutFormulaList[iSample]->GetNdata();
+
     LogThrowIf(sampleCutFormulaList[iSample]->GetNdim() == 0,
                "\"" << selectionCut << "\" could not be parsed by the TChain");
 
@@ -487,6 +494,10 @@ void DataDispenser::readAndFill(){
           _parameters_.nominalWeightFormulaStr.c_str(),
           &treeChain
           );
+
+      // ROOT Hot fix: https://root-forum.cern.ch/t/ttreeformula-evalinstance-return-0-0/16366/10
+      threadNominalWeightFormula->GetNdata();
+
       LogThrowIf(threadNominalWeightFormula->GetNdim() == 0,
                  "\"" <<  _parameters_.nominalWeightFormulaStr << "\" could not be parsed by the TChain");
       objToNotify.Add(threadNominalWeightFormula); // memory handled here!
