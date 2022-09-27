@@ -273,10 +273,11 @@ void DataDispenser::doEventSelection(){
     if( treeChain.GetFileNumber() == 0 and treeChain.GetReadEntry() == 0 ){
       for( size_t iSample = 0 ; iSample < sampleCutFormulaList.size() ; iSample++ ){
         LogDebug << sampleCutFormulaList[iSample]->GetLeaf(0)->GetValue(1) << std::endl;
-        LogDebug << sampleCutFormulaList[iSample]->GetExpFormula() << " => " << std::endl;
+        LogDebug << sampleCutFormulaList[iSample]->GetExpFormula() << " => ";
         for(int jInstance = 0; jInstance < sampleCutFormulaList[iSample]->GetNdata(); jInstance++) {
-          LogDebug << sampleCutFormulaList[iSample]->EvalInstance(jInstance) << std::endl;
+          LogDebug << sampleCutFormulaList[iSample]->EvalInstance(jInstance) << " | ";
         }
+        LogDebug << std::endl;
       }
       LogThrow("debug");
     }
