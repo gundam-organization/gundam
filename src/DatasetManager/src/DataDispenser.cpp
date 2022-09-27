@@ -243,12 +243,21 @@ void DataDispenser::doEventSelection(){
 
     if(treeSelectionCutFormula != nullptr and not GenericToolbox::doesEntryPassCut(treeSelectionCutFormula)){
       for( size_t iSample = 0 ; iSample < sampleCutFormulaList.size() ; iSample++ ){ _cache_.eventIsInSamplesList[iEvent][iSample] = false; }
+      if( GlobalVariables::isDebugVerbose()){
+        LogTrace << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
+        << " rejected because of " << treeSelectionCutFormula->GetExpFormula() << std::endl;
+      }
       continue;
     }
 
     for( size_t iSample = 0 ; iSample < sampleCutFormulaList.size() ; iSample++ ){
       if( not GenericToolbox::doesEntryPassCut(sampleCutFormulaList[iSample]) ){
         _cache_.eventIsInSamplesList[iEvent][iSample] = false;
+        if( GlobalVariables::isDebugVerbose()){
+          LogTrace << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
+          << " rejected as sample " << iSample << " because of "
+          << sampleCutFormulaList[iSample]->GetExpFormula() << std::endl;
+        }
       }
     } // iSample
   } // iEvent

@@ -21,10 +21,12 @@ class GlobalVariables{
 public:
 
   // Setters
+  static void setDebugVerbose(bool debugVerbose_);
   static void setNbThreads(int nbThreads_);
   static void setEnableCacheManager(bool enable = true);
 
   // Getters
+  static bool isDebugVerbose();
   static bool isEnableDevMode();
   static const int& getNbThreads();
   static std::mutex& getThreadMutex();
@@ -35,6 +37,7 @@ public:
 
 private:
 
+  static bool _debugVerbose_;
   static bool _enableDevMode_;
   static int _nbThreads_;
   static std::mutex _threadMutex_;

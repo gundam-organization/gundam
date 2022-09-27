@@ -41,6 +41,7 @@ int main(int argc, char** argv){
   clParser.addTriggerOption("asimov", {"-a", "--asimov"}, "Use MC dataset to fill the data histograms");
   clParser.addTriggerOption("usingCacheManager", {"--cache-manager"}, "Event weight cache handle by the CacheManager");
   clParser.addTriggerOption("usingGpu", {"--gpu"}, "Use GPU parallelization");
+  clParser.addTriggerOption("debugVerbose", {"--debug"}, "Enable debug verbose");
 
   clParser.addOption("configFile", {"-c", "--config-file"}, "Specify path to the fitter config file");
   clParser.addOption("nbThreads", {"-t", "--nb-threads"}, "Specify nb of parallel threads");
@@ -62,6 +63,8 @@ int main(int argc, char** argv){
   LogInfo << "Provided arguments: " << std::endl;
   LogInfo << clParser.getValueSummary() << std::endl << std::endl;
   LogInfo << clParser.dumpConfigAsJsonStr() << std::endl;
+
+  if( clParser.isOptionTriggered("debugVerbose") ) GlobalVariables::setDebugVerbose(true);
 
   bool useGpu = clParser.isOptionTriggered("usingGpu");
   if( useGpu ){
