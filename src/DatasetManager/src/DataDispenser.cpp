@@ -272,7 +272,7 @@ void DataDispenser::doEventSelection(){
 
     if( treeChain.GetFileNumber() == 0 and treeChain.GetReadEntry() == 0 ){
       for( size_t iSample = 0 ; iSample < sampleCutFormulaList.size() ; iSample++ ){
-        sampleCutFormulaList[iSample]->GetLeaf(0)->GetValue(1);
+        LogDebug << sampleCutFormulaList[iSample]->GetLeaf(0)->GetValue(1) << std::endl;
       }
       LogThrow("debug");
     }
