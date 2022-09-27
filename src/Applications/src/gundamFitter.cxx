@@ -41,6 +41,7 @@ int main(int argc, char** argv){
   clParser.addTriggerOption("asimov", {"-a", "--asimov"}, "Use MC dataset to fill the data histograms");
   clParser.addTriggerOption("usingCacheManager", {"--cache-manager"}, "Event weight cache handle by the CacheManager");
   clParser.addTriggerOption("usingGpu", {"--gpu"}, "Use GPU parallelization");
+  clParser.addTriggerOption("skipHesse", {"--skip-hesse"}, "Don't perform postfit error evaluation");
 
   clParser.addOption("configFile", {"-c", "--config-file"}, "Specify path to the fitter config file");
   clParser.addOption("nbThreads", {"-t", "--nb-threads"}, "Specify nb of parallel threads");
@@ -67,6 +68,13 @@ int main(int argc, char** argv){
   LogInfo << clParser.dumpConfigAsJsonStr() << std::endl;
 
   if( clParser.isOptionTriggered("debugVerbose") ) GlobalVariables::setVerboseLevel(clParser.getOptionVal("debugVerbose", 1));
+
+//  // TEST
+//  LogDebug << "TEST..." << std::endl;
+//  LogDebug << GET_VAR_NAME_VALUE(gROOT->LoadMacro("test.h")) << std::endl;
+//  LogDebug << GET_VAR_NAME_VALUE(gROOT->ProcessLine("Test t1;")) << std::endl;
+//  LogDebug << GET_VAR_NAME_VALUE(gROOT->ProcessLineFast("t1.i;")) << std::endl;
+
 
   bool useGpu = clParser.isOptionTriggered("usingGpu");
   if( useGpu ){
@@ -176,6 +184,8 @@ int main(int argc, char** argv){
   fitter.getPropagator().setLoadAsimovData( clParser.isOptionTriggered("asimov") );
 
   fitter.initialize();
+
+  if( clParser.isOptionTriggered("skipHesse") ) fitter.setEnablePostFitErrorEval(false);
 
   fitter.updateChi2Cache();
   LogInfo << "Initial χ² = " << fitter.getChi2Buffer() << std::endl;

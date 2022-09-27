@@ -71,6 +71,9 @@ void FitterEngine::setNbScanSteps(int nbScanSteps) {
 void FitterEngine::setEnablePostFitScan(bool enablePostFitScan) {
   _enablePostFitScan_ = enablePostFitScan;
 }
+void FitterEngine::setEnablePostFitErrorEval(bool enablePostFitErrorEval_) {
+  _enablePostFitErrorEval_ = enablePostFitErrorEval_;
+}
 
 void FitterEngine::initialize() {
 
@@ -197,6 +200,8 @@ void FitterEngine::initialize() {
   this->initializeMinimizer();
 
   _scanConfig_ = ScanConfig( JsonUtils::fetchValue(_config_, "scanConfig", nlohmann::json()) );
+
+  _enablePostFitErrorEval_ = JsonUtils::fetchValue(_minimizerConfig_, "enablePostFitErrorFit", true)
 
 //  checkNumericalAccuracy();
 }
@@ -834,7 +839,7 @@ void FitterEngine::fit(){
 
       leavesDict.emplace_back("llhPenalty/D");
       parameterSetArrList[iParSet].writeRawData(parSet.getPenaltyChi2());
-      
+
       for( auto& par : parSet.getParameterList() ){
         leavesDict.emplace_back(GenericToolbox::replaceSubstringInString(par.getTitle(), " ", "_") + "/D");
         parameterSetArrList[iParSet].writeRawData(par.getParameterValue());
@@ -863,7 +868,7 @@ void FitterEngine::fit(){
     LogInfo << "Evaluating post-fit errors..." << std::endl;
 
     _enableFitMonitor_ = true;
-    if( JsonUtils::fetchValue(_minimizerConfig_, "enablePostFitErrorFit", true) ){
+    if( _enablePostFitErrorEval_ ){
       std::string errorAlgo = JsonUtils::fetchValue(_minimizerConfig_, "errors", "Hesse");
       if     ( errorAlgo == "Minos" ){
         LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling MINOS...") << std::endl;

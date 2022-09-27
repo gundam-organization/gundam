@@ -37,6 +37,7 @@ public:
   void setConfig(const nlohmann::json &config_);
   void setNbScanSteps(int nbScanSteps);
   void setEnablePostFitScan(bool enablePostFitScan);
+  void setEnablePostFitErrorEval(bool enablePostFitErrorEval_);
 
   // Init
   void initialize();
@@ -85,6 +86,7 @@ private:
   bool _enableFitMonitor_{false};
   bool _fitHasConverged_{false};
   bool _isBadCovMat_{false};
+  bool _enablePostFitErrorEval_{true};
 
   int _nbFitCalls_{0};
   int _nbFitParameters_{0};
