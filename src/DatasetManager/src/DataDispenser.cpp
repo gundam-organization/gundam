@@ -228,6 +228,7 @@ void DataDispenser::doEventSelection(){
   Long64_t nEvents = treeChain.GetEntries();
   // for each event, which sample is active?
   _cache_.eventIsInSamplesList.resize(nEvents, std::vector<bool>(_cache_.samplesToFillList.size(), true));
+  _cache_.sampleNbOfEvents.resize(_cache_.samplesToFillList.size(), 0);
   std::string progressTitle = LogInfo.getPrefixString() + "Reading input dataset";
   std::stringstream ssProgressTitle;
   TFile* lastFilePtr{nullptr};
@@ -253,22 +254,22 @@ void DataDispenser::doEventSelection(){
     for( size_t iSample = 0 ; iSample < sampleCutFormulaList.size() ; iSample++ ){
       if( not GenericToolbox::doesEntryPassCut(sampleCutFormulaList[iSample]) ){
         _cache_.eventIsInSamplesList[iEvent][iSample] = false;
-        if( GlobalVariables::isDebugVerbose()){
-          LogTrace << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
-          << " rejected as sample " << iSample << " because of "
-          << sampleCutFormulaList[iSample]->GetExpFormula() << std::endl;
+        if( GlobalVariables::isDebugVerbose() ){
+//          LogTrace << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
+//          << " rejected as sample " << iSample << " because of "
+//          << sampleCutFormulaList[iSample]->GetExpFormula() << std::endl;
+        }
+      }
+      else{
+        _cache_.sampleNbOfEvents[iSample]++;
+        if( GlobalVariables::isDebugVerbose() ){
+          LogDebug << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
+                   << " included as sample " << iSample << " using "
+                   << sampleCutFormulaList[iSample]->GetExpFormula() << std::endl;
         }
       }
     } // iSample
   } // iEvent
-
-  LogInfo << "Counting requested event slots for each samples..." << std::endl;
-  _cache_.sampleNbOfEvents.resize(_cache_.samplesToFillList.size(), 0);
-  for(auto & eventIsInSample : _cache_.eventIsInSamplesList){
-    for(size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
-      if(eventIsInSample[iSample]) _cache_.sampleNbOfEvents[iSample]++;
-    }
-  }
 
   if( _owner_->isShowSelectedEventCount() ){
     LogWarning << "Events passing selection cuts:" << std::endl;
