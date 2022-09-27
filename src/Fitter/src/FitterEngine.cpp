@@ -201,7 +201,7 @@ void FitterEngine::initialize() {
 
   _scanConfig_ = ScanConfig( JsonUtils::fetchValue(_config_, "scanConfig", nlohmann::json()) );
 
-  _enablePostFitErrorEval_ = JsonUtils::fetchValue(_minimizerConfig_, "enablePostFitErrorFit", true)
+  _enablePostFitErrorEval_ = JsonUtils::fetchValue(_minimizerConfig_, "enablePostFitErrorFit", true);
 
 //  checkNumericalAccuracy();
 }
