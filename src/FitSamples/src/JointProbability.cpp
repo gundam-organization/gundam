@@ -64,9 +64,6 @@ namespace JointProbability{
     double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
     double mcuncert = sample_.getMcContainer().histogram->GetBinError(bin_);
 
-    LogThrowIf(predVal!=predVal, "nan");
-    LogThrowIf(mcuncert!=mcuncert, "nan");
-
     //implementing Barlow-Beeston correction for LH calculation
     //the following comments are inspired/copied from Clarence's comments in the MaCh3
     //implementation of the same feature
@@ -93,18 +90,22 @@ namespace JointProbability{
     newmc = predVal*beta;
     // And penalise the movement in beta relative the mc uncertainty
     penalty = (beta-1)*(beta-1)/(2*fractional*fractional);
-    LogThrowIf(
-        std::isnan(penalty),
-        GET_VAR_NAME_VALUE(fractional)
-        << " / " << GET_VAR_NAME_VALUE(mcuncert)
-        << " / " << GET_VAR_NAME_VALUE(predVal)
-        << " / " << GET_VAR_NAME_VALUE(bin_)
-        );
+
+//    LogThrowIf(
+//        std::isnan(penalty),
+//        GET_VAR_NAME_VALUE(fractional)
+//        << " / " << GET_VAR_NAME_VALUE(mcuncert)
+//        << " / " << GET_VAR_NAME_VALUE(predVal)
+//        << " / " << GET_VAR_NAME_VALUE(bin_)
+//        );
+
     // And calculate the new Poisson likelihood
     // For Barlow-Beeston newmc is modified, so can only calculate Poisson likelihood after Barlow-Beeston
     double stat = 0;
     if (dataVal == 0) stat = newmc;
     else if (newmc > 0) stat = newmc-dataVal+dataVal*TMath::Log(dataVal/newmc);
+
+    if( std::isnan(penalty) ){ penalty = (1+stat)*1E32; } // huge penalty
 
     if((predVal > 0.0) && (dataVal > 0.0)){
 
