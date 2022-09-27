@@ -22,8 +22,11 @@ bool GlobalVariables::_enableCacheManager_{false};
 VerboseLevel GlobalVariables::_verboseLevel_{NORMAL_MODE};
 
 
-void GlobalVariables::setVerboseLevel(VerboseLevel verboseLevel_){ _verboseLevel_ = verboseLevel_; }
-void GlobalVariables::setVerboseLevel(int verboseLevel_){ _verboseLevel_ = static_cast<VerboseLevel>(verboseLevel_); }
+void GlobalVariables::setVerboseLevel(VerboseLevel verboseLevel_){
+  _verboseLevel_ = verboseLevel_;
+  LogWarning << "Verbose level set to: " << VerboseLevelEnumNamespace::toString(_verboseLevel_) << std::endl;
+}
+void GlobalVariables::setVerboseLevel(int verboseLevel_){ GlobalVariables::setVerboseLevel(static_cast<VerboseLevel>(verboseLevel_)); }
 void GlobalVariables::setNbThreads(int nbThreads_){
   _nbThreads_ = nbThreads_;
   _threadPool_.reset();
