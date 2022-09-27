@@ -41,17 +41,19 @@ int main(int argc, char** argv){
   clParser.addTriggerOption("asimov", {"-a", "--asimov"}, "Use MC dataset to fill the data histograms");
   clParser.addTriggerOption("usingCacheManager", {"--cache-manager"}, "Event weight cache handle by the CacheManager");
   clParser.addTriggerOption("usingGpu", {"--gpu"}, "Use GPU parallelization");
-  clParser.addTriggerOption("debugVerbose", {"--debug"}, "Enable debug verbose");
 
   clParser.addOption("configFile", {"-c", "--config-file"}, "Specify path to the fitter config file");
   clParser.addOption("nbThreads", {"-t", "--nb-threads"}, "Specify nb of parallel threads");
   clParser.addOption("outputFile", {"-o", "--out-file"}, "Specify the output file");
-  clParser.addOption("scanParameters", {"--scan"}, "Enable parameter scan before and after the fit");
-  clParser.addOption("toyFit", {"--toy"}, "Run a toy fit");
   clParser.addOption("randomSeed", {"-s", "--seed"}, "Set random seed");
 
+  clParser.addOption("toyFit", {"--toy"}, "Run a toy fit");
+  clParser.addOption("debugVerbose", {"--debug"}, "Enable debug verbose");
+  clParser.addOption("scanParameters", {"--scan"}, "Enable parameter scan before and after the fit");
+
+  clParser.getOptionPtr("toyFit")->setAllowEmptyValue(true); // --toy can be followed or not by the toy index
+  clParser.getOptionPtr("debugVerbose")->setAllowEmptyValue(true); // --debug can be followed or not by the verbose level
   clParser.getOptionPtr("scanParameters")->setAllowEmptyValue(true); // --scan can be followed or not by the number of steps
-  clParser.getOptionPtr("toyFit")->setAllowEmptyValue(true); // --toy can be followed or not by the number of steps
 
   LogInfo << "Usage: " << std::endl;
   LogInfo << clParser.getConfigSummary() << std::endl << std::endl;
@@ -64,7 +66,7 @@ int main(int argc, char** argv){
   LogInfo << clParser.getValueSummary() << std::endl << std::endl;
   LogInfo << clParser.dumpConfigAsJsonStr() << std::endl;
 
-  if( clParser.isOptionTriggered("debugVerbose") ) GlobalVariables::setDebugVerbose(true);
+  if( clParser.isOptionTriggered("debugVerbose") ) GlobalVariables::setVerboseLevel(clParser.getOptionVal("debugVerbose", 1));
 
   bool useGpu = clParser.isOptionTriggered("usingGpu");
   if( useGpu ){

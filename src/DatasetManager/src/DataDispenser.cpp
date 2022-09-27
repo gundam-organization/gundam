@@ -250,7 +250,7 @@ void DataDispenser::doEventSelection(){
 
     if(treeSelectionCutFormula != nullptr and not GenericToolbox::doesEntryPassCut(treeSelectionCutFormula)){
       for( size_t iSample = 0 ; iSample < sampleCutFormulaList.size() ; iSample++ ){ _cache_.eventIsInSamplesList[iEvent][iSample] = false; }
-      if( GlobalVariables::isDebugVerbose()){
+      if( GlobalVariables::getVerboseLevel() == INLOOP_TRACE ){
         LogTrace << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
         << " rejected because of " << treeSelectionCutFormula->GetExpFormula() << std::endl;
       }
@@ -260,7 +260,7 @@ void DataDispenser::doEventSelection(){
     for( size_t iSample = 0 ; iSample < sampleCutFormulaList.size() ; iSample++ ){
       if( not GenericToolbox::doesEntryPassCut(sampleCutFormulaList[iSample]) ){
         _cache_.eventIsInSamplesList[iEvent][iSample] = false;
-        if( GlobalVariables::isDebugVerbose() ){
+        if( GlobalVariables::getVerboseLevel() == INLOOP_TRACE ){
           LogTrace << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
           << " rejected as sample " << iSample << " because of "
           << sampleCutFormulaList[iSample]->GetExpFormula() << std::endl;
@@ -268,25 +268,13 @@ void DataDispenser::doEventSelection(){
       }
       else{
         _cache_.sampleNbOfEvents[iSample]++;
-        if( GlobalVariables::isDebugVerbose() ){
+        if( GlobalVariables::getVerboseLevel() == INLOOP_TRACE ){
           LogDebug << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
                    << " included as sample " << iSample << " using "
                    << sampleCutFormulaList[iSample]->GetExpFormula() << std::endl;
         }
       }
     } // iSample
-
-    if( treeChain.GetFileNumber() == 0 and treeChain.GetReadEntry() == 0 ){
-      for( size_t iSample = 0 ; iSample < sampleCutFormulaList.size() ; iSample++ ){
-        LogDebug << sampleCutFormulaList[iSample]->GetLeaf(0)->GetValue(1) << std::endl;
-        LogDebug << sampleCutFormulaList[iSample]->GetExpFormula() << " => ";
-        for(int jInstance = 0; jInstance < sampleCutFormulaList[iSample]->GetNdata(); jInstance++) {
-          LogDebug << sampleCutFormulaList[iSample]->EvalInstance(jInstance) << " | ";
-        }
-        LogDebug << std::endl;
-      }
-      LogThrow("debug");
-    }
   } // iEvent
 
   if( _owner_->isShowSelectedEventCount() ){
