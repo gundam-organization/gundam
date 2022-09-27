@@ -206,6 +206,7 @@ void DataDispenser::doEventSelection(){
 
     t.addTableLine({{"\""+_cache_.samplesToFillList[iSample]->getName()+"\""}, {"\""+selectionCut+"\""}});
     sampleCutFormulaList[iSample] = new TTreeFormula(_cache_.samplesToFillList[iSample]->getName().c_str(), selectionCut.c_str(), &treeChain);
+    sampleCutFormulaList[iSample]->GetNdata();
     LogThrowIf(sampleCutFormulaList[iSample]->GetNdim() == 0,
                "\"" << selectionCut << "\" could not be parsed by the TChain");
 
@@ -219,11 +220,7 @@ void DataDispenser::doEventSelection(){
   treeChain.SetBranchStatus("*", false);
 
   if(treeSelectionCutFormula != nullptr) GenericToolbox::enableSelectedBranches(&treeChain, treeSelectionCutFormula);
-  for( auto& sampleFormula : sampleCutFormulaList ){
-    GenericToolbox::enableSelectedBranches(&treeChain, sampleFormula);
-    sampleFormula->GetNdata();
-  }
-  formulaManager.GetNdata(true);
+  for( auto& sampleFormula : sampleCutFormulaList ){ GenericToolbox::enableSelectedBranches(&treeChain, sampleFormula); }
 
   LogInfo << "Performing event selection..." << std::endl;
   GenericToolbox::VariableMonitor readSpeed("bytes");
