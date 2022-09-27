@@ -51,7 +51,7 @@ public:
   // Core
   void generateSamplePlots(const std::string& savePath_ = "");
   void generateOneSigmaPlots(const std::string& savePath_ = "");
-  void varyEvenRates(std::vector<double> paramVariationList_, const std::string& savePath_ = "");
+  void varyEvenRates(const std::vector<double>& paramVariationList_, const std::string& savePath_ = "");
 
   void fixGhostFitParameters();
   void scanParameters(int nbSteps_ = -1, const std::string& saveDir_ = "");

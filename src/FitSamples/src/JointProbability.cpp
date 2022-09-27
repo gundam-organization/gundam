@@ -86,7 +86,6 @@ namespace JointProbability{
     double temp = predVal*fractional*fractional-1;
     // b^2 - 4ac in quadratic equation
     double temp2 = temp*temp + 4*dataVal*fractional*fractional;
-
     LogThrowIf(temp2 < 0, "Negative square root in Barlow Beeston coefficient calculation!");
 
     // Solve for the positive beta
@@ -106,8 +105,6 @@ namespace JointProbability{
     double stat = 0;
     if (dataVal == 0) stat = newmc;
     else if (newmc > 0) stat = newmc-dataVal+dataVal*TMath::Log(dataVal/newmc);
-
-    LogThrowIf(std::isnan(stat));
 
     if((predVal > 0.0) && (dataVal > 0.0)){
 
@@ -129,7 +126,7 @@ namespace JointProbability{
                << sample_.getMcContainer().histogram->GetBinContent(bin_) << std::endl;
     }
 
-    LogThrowIf(std::isnan(chisq), "Nan chi2 " << predVal << " " << dataVal
+    LogThrowIf(std::isnan(chisq), "NaN chi2 " << predVal << " " << dataVal
         << sample_.getMcContainer().histogram->GetBinError(bin_) << " "
         << sample_.getMcContainer().histogram->GetBinContent(bin_));
 

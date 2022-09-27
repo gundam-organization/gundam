@@ -311,7 +311,7 @@ void FitterEngine::generateOneSigmaPlots(const std::string& savePath_){
 
 }
 
-void FitterEngine::varyEvenRates(std::vector<double> paramVariationList_, const std::string& savePath_){
+void FitterEngine::varyEvenRates(const std::vector<double>& paramVariationList_, const std::string& savePath_){
 
   _propagator_.preventRfPropagation(); // Making sure since we need the weight of each event
 
@@ -799,26 +799,52 @@ void FitterEngine::fit(){
     bestFitStats->Branch("chi2StatBestFit", &_chi2StatBuffer_);
     bestFitStats->Branch("chi2PullsBestFit", &_chi2PullsBuffer_);
 
-    std::vector<GenericToolbox::RawDataArray> privateMemberArrList(_propagator_.getParameterSetsList().size());
+    std::vector<GenericToolbox::RawDataArray> samplesArrList(_propagator_.getFitSampleSet().getFitSampleList().size());
+    int iSample{-1};
+    for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
+      if( not sample.isEnabled() ) continue;
+
+      std::vector<std::string> leavesDict;
+      iSample++;
+
+      leavesDict.emplace_back("llhSample/D");
+      samplesArrList[iSample].writeRawData(_propagator_.getFitSampleSet().getJointProbabilityFct()->eval(sample));
+
+      int nBins = int(sample.getBinning().getBinsList().size());
+      for( int iBin = 1 ; iBin <= nBins ; iBin++ ){
+        leavesDict.emplace_back("llhSample_bin" + std::to_string(iBin) + "/D");
+        samplesArrList[iSample].writeRawData(_propagator_.getFitSampleSet().getJointProbabilityFct()->eval(sample, iBin));
+      }
+
+      samplesArrList[iSample].lockArraySize();
+      bestFitStats->Branch(
+          GenericToolbox::replaceSubstringInString(sample.getName(), " ", "_").c_str(),
+          &samplesArrList[iSample].getRawDataArray()[0],
+          GenericToolbox::joinVectorString(leavesDict, ":").c_str()
+          );
+    }
+
+    std::vector<GenericToolbox::RawDataArray> parameterSetArrList(_propagator_.getParameterSetsList().size());
     int iParSet{-1};
     for( auto& parSet : _propagator_.getParameterSetsList() ){
       if( not parSet.isEnabled() ) continue;
 
-      std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const FitParameter& par_)>> leafDictionary;
+      std::vector<std::string> leavesDict;
       iParSet++;
 
-      std::string leavesDefStr;
+      leavesDict.emplace_back("llhPenalty/D");
+      parameterSetArrList[iParSet].writeRawData(parSet.getPenaltyChi2());
+      
       for( auto& par : parSet.getParameterList() ){
-        std::string leafName = GenericToolbox::replaceSubstringInString(par.getTitle(), " ", "_") + "/D";
-        if( not leavesDefStr.empty() ) leavesDefStr += ":";
-        leavesDefStr += leafName;
-        leafDictionary[leafName] = [](GenericToolbox::RawDataArray& arr_, const FitParameter& par_){
-          arr_.writeRawData(par_.getParameterValue());
-        };
-        leafDictionary[leafName](privateMemberArrList[iParSet], par);
+        leavesDict.emplace_back(GenericToolbox::replaceSubstringInString(par.getTitle(), " ", "_") + "/D");
+        parameterSetArrList[iParSet].writeRawData(par.getParameterValue());
       }
-      privateMemberArrList[iParSet].lockArraySize();
-      bestFitStats->Branch(GenericToolbox::replaceSubstringInString(parSet.getName(), " ", "_").c_str(), &privateMemberArrList[iParSet].getRawDataArray()[0], leavesDefStr.c_str());
+
+      bestFitStats->Branch(
+          GenericToolbox::replaceSubstringInString(parSet.getName(), " ", "_").c_str(),
+          &parameterSetArrList[iParSet].getRawDataArray()[0],
+          GenericToolbox::joinVectorString(leavesDict, ":").c_str()
+          );
     }
 
     bestFitStats->Fill();
