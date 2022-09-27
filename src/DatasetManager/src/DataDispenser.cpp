@@ -255,9 +255,9 @@ void DataDispenser::doEventSelection(){
       if( not GenericToolbox::doesEntryPassCut(sampleCutFormulaList[iSample]) ){
         _cache_.eventIsInSamplesList[iEvent][iSample] = false;
         if( GlobalVariables::isDebugVerbose() ){
-//          LogTrace << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
-//          << " rejected as sample " << iSample << " because of "
-//          << sampleCutFormulaList[iSample]->GetExpFormula() << std::endl;
+          LogTrace << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
+          << " rejected as sample " << iSample << " because of "
+          << sampleCutFormulaList[iSample]->GetExpFormula() << std::endl;
         }
       }
       else{
@@ -269,6 +269,13 @@ void DataDispenser::doEventSelection(){
         }
       }
     } // iSample
+
+    if( treeChain.GetFileNumber() == 0 and treeChain.GetReadEntry() == 0 ){
+      for( size_t iSample = 0 ; iSample < sampleCutFormulaList.size() ; iSample++ ){
+        sampleCutFormulaList[iSample]->GetLeaf(0)->GetValue(1);
+      }
+      LogThrow("debug");
+    }
   } // iEvent
 
   if( _owner_->isShowSelectedEventCount() ){
