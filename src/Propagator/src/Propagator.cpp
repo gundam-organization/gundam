@@ -177,7 +177,10 @@ void Propagator::initialize() {
     }
 
     LogInfo << "Propagating prior parameters on events..." << std::endl;
+    bool cacheManagerState = GlobalVariables::getEnableCacheManager();
+    GlobalVariables::setEnableCacheManager(false);
     this->reweightMcEvents();
+    GlobalVariables::setEnableCacheManager(cacheManagerState);
 
     // Copies MC events in data container for both Asimov and FakeData event types
     LogWarning << "Copying loaded mc-like event to data container..." << std::endl;
@@ -203,6 +206,7 @@ void Propagator::initialize() {
       dispenser.setParSetPtrToLoad(&_parameterSetsList_);
       dispenser.load();
     }
+
   }
 //  else{
 //    LogDebug << "Check asimov: " << std::endl;
@@ -223,6 +227,14 @@ void Propagator::initialize() {
 ////    LogThrow("debug")
 //  }
 
+#ifdef GUNDAM_USING_CACHE_MANAGER
+  // After all of the data has been loaded.  Specifically, this must be after
+  // the MC has been copied for the Asimov fit, or the "data" use the MC
+  // reweighting cache.  This must also be before the first use of
+  // reweightMcEvents.
+  if(GlobalVariables::getEnableCacheManager()) Cache::Manager::Build(getFitSampleSet());
+#endif
+
   LogInfo << "Propagating prior parameters on events..." << std::endl;
   this->reweightMcEvents();
 
@@ -238,16 +250,9 @@ void Propagator::initialize() {
 //    fillDialsStack();
 //  }
 
-#ifdef GUNDAM_USING_CACHE_MANAGER
-  // After all of the data has been loaded.  Specifically, this must be after
-  // the MC has been copied for the Asimov fit, or the "data" use the MC
-  // reweighting cache.  This must also be before the first use of
-  // reweightMcEvents.
-  Cache::Manager::Build(getFitSampleSet());
-#endif
-
   if( _showEventBreakdown_ ){
-    {
+
+    if(true){
       // STAGED MASK
       LogWarning << "Staged event breakdown:" << std::endl;
       Dial::enableMaskCheck = true;
@@ -291,8 +296,6 @@ void Propagator::initialize() {
       t.printTable();
       Dial::enableMaskCheck = false;
     }
-
-
 
     LogWarning << "Sample breakdown:" << std::endl;
     GenericToolbox::TablePrinter t;
@@ -414,7 +417,7 @@ void Propagator::reweightMcEvents() {
   } while (false);
 #endif
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-  usedGPU = Cache::Manager::Fill();
+  if(GlobalVariables::getEnableCacheManager()) usedGPU = Cache::Manager::Fill();
 #endif
   if( not usedGPU ){
     GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
@@ -662,5 +665,9 @@ void Propagator::applyResponseFunctions(int iThread_){
 
 const EventTreeWriter &Propagator::getTreeWriter() const {
   return _treeWriter_;
+}
+
+int Propagator::getIThrow() const {
+  return _iThrow_;
 }
 

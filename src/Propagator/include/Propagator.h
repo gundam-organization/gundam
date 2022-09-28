@@ -50,6 +50,8 @@ public:
   const nlohmann::json &getConfig() const;
   const EventTreeWriter &getTreeWriter() const;
 
+  int getIThrow() const;
+
   // Core
   void propagateParametersOnSamples();
   void updateDialResponses();

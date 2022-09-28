@@ -83,7 +83,6 @@ namespace JointProbability{
     double temp = predVal*fractional*fractional-1;
     // b^2 - 4ac in quadratic equation
     double temp2 = temp*temp + 4*dataVal*fractional*fractional;
-
     LogThrowIf(temp2 < 0, "Negative square root in Barlow Beeston coefficient calculation!");
 
     // Solve for the positive beta
@@ -91,11 +90,22 @@ namespace JointProbability{
     newmc = predVal*beta;
     // And penalise the movement in beta relative the mc uncertainty
     penalty = (beta-1)*(beta-1)/(2*fractional*fractional);
+
+//    LogThrowIf(
+//        std::isnan(penalty),
+//        GET_VAR_NAME_VALUE(fractional)
+//        << " / " << GET_VAR_NAME_VALUE(mcuncert)
+//        << " / " << GET_VAR_NAME_VALUE(predVal)
+//        << " / " << GET_VAR_NAME_VALUE(bin_)
+//        );
+
     // And calculate the new Poisson likelihood
     // For Barlow-Beeston newmc is modified, so can only calculate Poisson likelihood after Barlow-Beeston
     double stat = 0;
     if (dataVal == 0) stat = newmc;
     else if (newmc > 0) stat = newmc-dataVal+dataVal*TMath::Log(dataVal/newmc);
+
+    if( std::isnan(penalty) ){ penalty = (1+stat)*1E32; } // huge penalty
 
     if((predVal > 0.0) && (dataVal > 0.0)){
 
@@ -112,10 +122,14 @@ namespace JointProbability{
     }
 
     if(std::isinf(chisq)){
-      LogAlert << "Infinite chi2 " << predVal << " " << dataVal
+      LogAlert << "Infinite chi2 " << predVal << " " << dataVal << " "
                << sample_.getMcContainer().histogram->GetBinError(bin_) << " "
                << sample_.getMcContainer().histogram->GetBinContent(bin_) << std::endl;
     }
+
+    LogThrowIf(std::isnan(chisq), "NaN chi2 " << predVal << " " << dataVal
+        << sample_.getMcContainer().histogram->GetBinError(bin_) << " "
+        << sample_.getMcContainer().histogram->GetBinContent(bin_));
 
     return chisq;
   }

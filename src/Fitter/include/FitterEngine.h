@@ -37,6 +37,7 @@ public:
   void setConfig(const nlohmann::json &config_);
   void setNbScanSteps(int nbScanSteps);
   void setEnablePostFitScan(bool enablePostFitScan);
+  void setEnablePostFitErrorEval(bool enablePostFitErrorEval_);
 
   // Init
   void initialize();
@@ -51,7 +52,7 @@ public:
   // Core
   void generateSamplePlots(const std::string& savePath_ = "");
   void generateOneSigmaPlots(const std::string& savePath_ = "");
-  void varyEvenRates(std::vector<double> paramVariationList_, const std::string& savePath_ = "");
+  void varyEvenRates(const std::vector<double>& paramVariationList_, const std::string& savePath_ = "");
 
   void fixGhostFitParameters();
   void scanParameters(int nbSteps_ = -1, const std::string& saveDir_ = "");
@@ -85,6 +86,7 @@ private:
   bool _enableFitMonitor_{false};
   bool _fitHasConverged_{false};
   bool _isBadCovMat_{false};
+  bool _enablePostFitErrorEval_{true};
 
   int _nbFitCalls_{0};
   int _nbFitParameters_{0};

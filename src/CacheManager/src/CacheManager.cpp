@@ -313,6 +313,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
     }
 
     // Add the dials to the cache.
+    LogDebug << "Add the dials to the cache." << std::endl;
     int usedResults = 0; // Number of cached results that have been used up.
     for(FitSample& sample : sampleList.getFitSampleList() ) {
         LogInfo << "Fill cache for " << sample.getName()
@@ -420,6 +421,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
     }
 
     // Add this histogram cells to the cache.
+    LogDebug << "Add this histogram cells to the cache." << std::endl;
     int nextHist = 0;
     for(FitSample& sample : sampleList.getFitSampleList() ) {
         LogInfo << "Fill cache for " << sample.getName()

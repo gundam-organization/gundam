@@ -27,6 +27,9 @@ int main(int argc, char** argv){
   g.setAppName("GundamFitter");
   g.hello();
 
+#ifdef GUNDAM_USING_CACHE_MANAGER
+  if (Cache::Manager::HasCUDA()){ LogWarning << "CUDA compatible build." << std::endl; }
+#endif
 
   // --------------------------
   // Read Command Line Args:
@@ -36,17 +39,22 @@ int main(int argc, char** argv){
   clParser.addTriggerOption("dry-run", {"--dry-run", "-d"},"Perform the full sequence of initialization, but don't do the actual fit.");
   clParser.addTriggerOption("generateOneSigmaPlots", {"--one-sigma"}, "Generate one sigma plots");
   clParser.addTriggerOption("asimov", {"-a", "--asimov"}, "Use MC dataset to fill the data histograms");
+  clParser.addTriggerOption("usingCacheManager", {"--cache-manager"}, "Event weight cache handle by the CacheManager");
+  clParser.addTriggerOption("usingGpu", {"--gpu"}, "Use GPU parallelization");
+  clParser.addTriggerOption("skipHesse", {"--skip-hesse"}, "Don't perform postfit error evaluation");
 
-  clParser.addOption("cache", {"-C", "--cache-enabled"}, "Enable the event weight cache");
   clParser.addOption("configFile", {"-c", "--config-file"}, "Specify path to the fitter config file");
   clParser.addOption("nbThreads", {"-t", "--nb-threads"}, "Specify nb of parallel threads");
   clParser.addOption("outputFile", {"-o", "--out-file"}, "Specify the output file");
-  clParser.addOption("scanParameters", {"--scan"}, "Enable parameter scan before and after the fit");
-  clParser.addOption("toyFit", {"--toy"}, "Run a toy fit");
   clParser.addOption("randomSeed", {"-s", "--seed"}, "Set random seed");
 
+  clParser.addOption("toyFit", {"--toy"}, "Run a toy fit");
+  clParser.addOption("debugVerbose", {"--debug"}, "Enable debug verbose");
+  clParser.addOption("scanParameters", {"--scan"}, "Enable parameter scan before and after the fit");
+
+  clParser.getOptionPtr("toyFit")->setAllowEmptyValue(true); // --toy can be followed or not by the toy index
+  clParser.getOptionPtr("debugVerbose")->setAllowEmptyValue(true); // --debug can be followed or not by the verbose level
   clParser.getOptionPtr("scanParameters")->setAllowEmptyValue(true); // --scan can be followed or not by the number of steps
-  clParser.getOptionPtr("toyFit")->setAllowEmptyValue(true); // --toy can be followed or not by the number of steps
 
   LogInfo << "Usage: " << std::endl;
   LogInfo << clParser.getConfigSummary() << std::endl << std::endl;
@@ -59,18 +67,32 @@ int main(int argc, char** argv){
   LogInfo << clParser.getValueSummary() << std::endl << std::endl;
   LogInfo << clParser.dumpConfigAsJsonStr() << std::endl;
 
-  std::string cacheDefault = "off";
+  if( clParser.isOptionTriggered("debugVerbose") ) GlobalVariables::setVerboseLevel(clParser.getOptionVal("debugVerbose", 1));
+
+//  // TEST
+//  LogDebug << "TEST..." << std::endl;
+//  LogDebug << GET_VAR_NAME_VALUE(gROOT->LoadMacro("test.h")) << std::endl;
+//  LogDebug << GET_VAR_NAME_VALUE(gROOT->ProcessLine("Test t1;")) << std::endl;
+//  LogDebug << GET_VAR_NAME_VALUE(gROOT->ProcessLineFast("t1.i;")) << std::endl;
+
+
+  bool useGpu = clParser.isOptionTriggered("usingGpu");
+  if( useGpu ){
 #ifdef GUNDAM_USING_CACHE_MANAGER
-  if (Cache::Manager::HasCUDA()) cacheDefault = "on";
+    LogThrowIf( not Cache::Manager::HasCUDA(), "CUDA support not enabled with this GUNDAM build." );
+#else
+    LogThrow("CUDA support not enabled with this GUNDAM build (GUNDAM_USING_CACHE_MANAGER required).")
 #endif
-  std::string cacheEnabled = clParser.getOptionVal("cache",cacheDefault);
-  if (cacheEnabled != "on") {
-      LogInfo << "Cache::Manager disabled" << std::endl;
-      GlobalVariables::setEnableCacheManager(false);
+    LogWarning << "Using GPU parallelization." << std::endl;
   }
-  else {
-      LogInfo << "Enabling Cache::Manager" << std::endl;
-      GlobalVariables::setEnableCacheManager(true);
+
+  bool useCacheManager = clParser.isOptionTriggered("usingCacheManager") or useGpu;
+  if( useCacheManager ){
+#ifdef GUNDAM_USING_CACHE_MANAGER
+    GlobalVariables::setEnableCacheManager(true);
+#else
+    LogThrow("useCacheManager can only be set while GUNDAM is compiled with GUNDAM_USING_CACHE_MANAGER option.");
+#endif
   }
 
   if( clParser.isOptionTriggered("randomSeed") ){
@@ -97,8 +119,8 @@ int main(int argc, char** argv){
 
   if( JsonUtils::doKeyExist(jsonConfig, "minGundamVersion") ){
     LogThrowIf(
-      not g.isNewerOrEqualVersion(JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion")),
-      "Version check FAILED: " << GundamVersionConfig::getVersionStr() << " < " << JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion")
+        not g.isNewerOrEqualVersion(JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion")),
+        "Version check FAILED: " << GundamVersionConfig::getVersionStr() << " < " << JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion")
     );
     LogInfo << "Version check passed: " << GundamVersionConfig::getVersionStr() << " >= " << JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion") << std::endl;
   }
@@ -110,7 +132,7 @@ int main(int argc, char** argv){
   bool isToyFit = clParser.isOptionTriggered("toyFit");
   int iToyFit = clParser.getOptionVal("toyFit", -1);
 
-  std::string outFileName = configFilePath;
+  std::string outFileName = GenericToolbox::splitString(configFilePath,"/").back();
   if( isToyFit ){
     outFileName += "_toyFit";
     if( iToyFit != -1 ){
@@ -163,6 +185,8 @@ int main(int argc, char** argv){
 
   fitter.initialize();
 
+  if( clParser.isOptionTriggered("skipHesse") ) fitter.setEnablePostFitErrorEval(false);
+
   fitter.updateChi2Cache();
   LogInfo << "Initial χ² = " << fitter.getChi2Buffer() << std::endl;
   LogInfo << "Initial χ²(stat) = " << fitter.getChi2StatBuffer() << std::endl;
@@ -170,16 +194,16 @@ int main(int argc, char** argv){
   // --------------------------
   // Pre-fit:
   // --------------------------
-  
+
   // Event rates variations
-  if( JsonUtils::doKeyExist(jsonConfig, "allParamVariations") ) 
+  if( JsonUtils::doKeyExist(jsonConfig, "allParamVariations") )
   {
-    fitter.varyEvenRates(JsonUtils::fetchValue<std::vector<double>>(jsonConfig, 
-                                                                    "allParamVariations", 
-                                                                    std::vector<double>()), 
+    fitter.varyEvenRates(JsonUtils::fetchValue<std::vector<double>>(jsonConfig,
+                                                                    "allParamVariations",
+                                                                    std::vector<double>()),
                          "preFit");
   }
-  
+
   // LLH Visual Scan
   if( clParser.isOptionTriggered("generateOneSigmaPlots") or JsonUtils::fetchValue(jsonConfig, "generateOneSigmaPlots", false) ) fitter.generateOneSigmaPlots("preFit");
   if( clParser.isOptionTriggered("scanParameters") or JsonUtils::fetchValue(jsonConfig, "scanParameters", false) ) fitter.scanParameters(nbScanSteps, "preFit/scan");

@@ -28,8 +28,8 @@ namespace JsonUtils{
     nlohmann::json output;
 
     if( GenericToolbox::doesFilePathHasExtension(configFilePath_, "yml")
-     or GenericToolbox::doesFilePathHasExtension(configFilePath_,"yaml")
-     ){
+        or GenericToolbox::doesFilePathHasExtension(configFilePath_,"yaml")
+        ){
       auto yaml = YamlUtils::readConfigFile(configFilePath_);
       output = YamlUtils::toJson(yaml);
     }
@@ -64,9 +64,9 @@ namespace JsonUtils{
   void unfoldConfig(nlohmann::json& config_){
     for( auto& entry : config_ ){
       if( entry.is_string() and (
-             GenericToolbox::doesStringEndsWithSubstring(entry.get<std::string>(), ".yaml", true)
+          GenericToolbox::doesStringEndsWithSubstring(entry.get<std::string>(), ".yaml", true)
           or GenericToolbox::doesStringEndsWithSubstring(entry.get<std::string>(), ".json", true)
-          ) ){
+      ) ){
         JsonUtils::forwardConfig(entry);
         JsonUtils::unfoldConfig(config_); // remake the loop on the unfolder config
         break; // don't touch anymore
@@ -76,6 +76,48 @@ namespace JsonUtils{
         JsonUtils::unfoldConfig(entry);
       }
     }
+  }
+  std::string toReadableString(const nlohmann::json& config_){
+    std::stringstream ss;
+    ss << config_ << std::endl;
+
+    std::string originalJson = ss.str();
+    ss.str(""); ss.clear();
+    int indentLevel{0};
+    bool inQuote{false};
+    for( char c : originalJson ){
+
+      if( c == '"'){ inQuote = not inQuote; }
+
+      if( not inQuote ){
+        if( c == '{' or c == '[' ){
+          ss << std::endl << GenericToolbox::repeatString("  ", indentLevel) << c;
+          indentLevel++;
+          ss << std::endl << GenericToolbox::repeatString("  ", indentLevel);
+        }
+        else if( c == '}' or c == ']' ){
+          indentLevel--;
+          ss << std::endl << GenericToolbox::repeatString("  ", indentLevel) << c;
+        }
+        else if( c == ':' ){
+          ss << c << " ";
+        }
+        else if( c == ',' ){
+          ss << c << std::endl << GenericToolbox::repeatString("  ", indentLevel);
+        }
+        else if( c == '\n' ){
+          if( ss.str().back() != '\n' ) ss << c;
+        }
+        else{
+          ss << c;
+        }
+      }
+      else{
+        ss << c;
+      }
+
+    }
+    return ss.str();
   }
 
   bool doKeyExist(const nlohmann::json& jsonConfig_, const std::string& keyName_){

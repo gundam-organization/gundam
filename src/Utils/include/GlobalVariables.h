@@ -6,6 +6,7 @@
 #define GUNDAM_GLOBALVARIABLES_H
 
 #include "GenericToolbox.ParallelWorker.h"
+#include "GenericToolbox.h"
 
 #include <TTree.h>
 #include <TChain.h>
@@ -15,16 +16,28 @@
 #include <mutex>
 #include <memory>
 
+ENUM_EXPANDER(
+    VerboseLevel, 0,
+    NORMAL_MODE,
+    MORE_PRINTOUT,
+    DEBUG_TRACE,
+    INLOOP_TRACE,
+    DEV_TRACE
+    )
+
 
 class GlobalVariables{
 
 public:
 
   // Setters
+  static void setVerboseLevel(VerboseLevel verboseLevel_);
+  static void setVerboseLevel(int verboseLevel_);
   static void setNbThreads(int nbThreads_);
   static void setEnableCacheManager(bool enable = true);
 
   // Getters
+  static VerboseLevel getVerboseLevel();
   static bool isEnableDevMode();
   static const int& getNbThreads();
   static std::mutex& getThreadMutex();
@@ -42,6 +55,7 @@ private:
   static std::vector<TChain*> _chainList_;
   static GenericToolbox::ParallelWorker _threadPool_;
   static bool _enableCacheManager_;
+  static VerboseLevel _verboseLevel_;
 
 };
 
