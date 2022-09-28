@@ -794,10 +794,21 @@ void FitterEngine::fit(){
 
     GenericToolbox::mkdirTFile(_saveDir_, "postFit/")->cd();
 
+    this->evalFit(_minimizer_->X());
     int toyIndex = _propagator_.getIThrow();
+    int nIterations = int(_minimizer_->NIterations());
+    double edmBestFit = _minimizer_->Edm();
+    double fitStatus = _minimizer_->Status();
+    double covStatus = _minimizer_->CovMatrixStatus();
+    double chi2MinFitter = _minimizer_->MinValue();
 
     auto* bestFitStats = new TTree("bestFitStats", "bestFitStats");
     bestFitStats->Branch("fitConverged", &_fitHasConverged_);
+    bestFitStats->Branch("fitStatusCode", &fitStatus);
+    bestFitStats->Branch("covStatusCode", &covStatus);
+    bestFitStats->Branch("edmBestFit", &edmBestFit);
+    bestFitStats->Branch("nIterations", &nIterations);
+    bestFitStats->Branch("chi2MinFitter", &chi2MinFitter);
     bestFitStats->Branch("toyIndex", &toyIndex);
     bestFitStats->Branch("nCallsAtBestFit", &_nbFitCalls_);
     bestFitStats->Branch("chi2BestFit", &_chi2Buffer_);
