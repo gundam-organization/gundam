@@ -104,6 +104,19 @@ void FitSampleSet::initialize() {
   else if( llhMethod == "BarlowLLH" ) {  _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH>(); }
   else if( llhMethod == "BarlowLLH_BANFF_OA2020" ) {  _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2020>(); }
   else if( llhMethod == "BarlowLLH_BANFF_OA2021" ) {  _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2021>(); }
+  else if( llhMethod == "Plugin" ) {
+    _jointProbabilityPtr_ = std::make_shared<JointProbability::JointProbabilityPlugin>();
+    if( JsonUtils::doKeyExist(_config_, "llhPluginSrc") ){
+      ((JointProbability::JointProbabilityPlugin *) _jointProbabilityPtr_.get())->compile(
+          JsonUtils::fetchValue<std::string>(_config_, "llhPluginSrc")
+      );
+    }
+    else{
+      ((JointProbability::JointProbabilityPlugin*) _jointProbabilityPtr_.get())->load(
+          JsonUtils::fetchValue<std::string>(_config_, "llhSharedLib")
+      );
+    }
+  }
   else{ LogThrow("Unknown LLH Method: " << llhMethod); }
 
   _isInitialized_ = true;
