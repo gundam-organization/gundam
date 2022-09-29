@@ -7,6 +7,8 @@
 
 #include "FitSample.h"
 
+#include "GenericToolbox.h"
+
 #include "string"
 #include "sstream"
 #include "memory"
@@ -42,7 +44,7 @@ namespace JointProbability{
   public:
     void compile(const std::string& srcPath_){
       LogInfo << "Compiling: " << srcPath_ << std::endl;
-      std::string outLib = srcPath_.substr(0, srcPath_.find_last_of('.')) + ".so";
+      std::string outLib = GenericToolbox::replaceFileExtension(srcPath_, "so");
 
       // create library
       std::stringstream ss;
