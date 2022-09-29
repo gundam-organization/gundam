@@ -581,7 +581,6 @@ void Propagator::updateDialResponses(int iThread_){
   }
 
 }
-
 void Propagator::reweightMcEvents(int iThread_) {
   int nThreads = GlobalVariables::getNbThreads();
   if(iThread_ == -1){
