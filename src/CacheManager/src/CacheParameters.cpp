@@ -14,7 +14,7 @@
 #include <set>
 
 LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache]");
+  Logger::setUserHeaderStr("[Cache::Parameters]");
 });
 
 bool Cache::Parameters::UsingCUDA() {

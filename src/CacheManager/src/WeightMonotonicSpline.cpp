@@ -14,7 +14,7 @@
 
 #include "Logger.h"
 LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache]");
+  Logger::setUserHeaderStr("[Cache::Weight::MonotonicSpline]");
 });
 
 // The constructor

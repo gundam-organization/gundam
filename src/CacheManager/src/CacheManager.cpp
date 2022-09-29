@@ -22,7 +22,7 @@
 
 #include "Logger.h"
 LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache]");
+  Logger::setUserHeaderStr("[Cache::Manager]");
 });
 
 Cache::Manager* Cache::Manager::fSingleton = nullptr;
