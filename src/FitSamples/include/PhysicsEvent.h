@@ -35,7 +35,6 @@ public:
   void setTreeWeight(double treeWeight);
   void setNominalWeight(double nominalWeight);
   void setEventWeight(double eventWeight);
-  void setFakeDataWeight(double fakeDataWeight);
   void setSampleBinIndex(int sampleBinIndex);
   void setCommonLeafNameListPtr(const std::shared_ptr<std::vector<std::string>>& commonLeafNameListPtr_);
 
@@ -45,7 +44,6 @@ public:
   double getTreeWeight() const;
   double getNominalWeight() const;
   double getEventWeight() const;
-  double getFakeDataWeight() const;
   int getSampleBinIndex() const;
   std::vector<Dial *> &getRawDialPtrList();
   const std::vector<Dial *> &getRawDialPtrList() const;
