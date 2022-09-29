@@ -34,7 +34,6 @@ namespace JointProbability{
     }
   };
 
-
   class JointProbabilityPlugin : public JointProbability{
 
   private:
@@ -71,17 +70,14 @@ namespace JointProbability{
     }
 
   };
-
   class PoissonLLH : public JointProbability{
     double eval(const FitSample& sample_, int bin_) override;
   };
-
   class BarlowLLH : public JointProbability{
     double eval(const FitSample& sample_, int bin_) override;
   private:
     double rel_var, b, c, beta, mc_hat, chi2;
   };
-
   class BarlowLLH_BANFF_OA2020 : public JointProbability{
     double eval(const FitSample& sample_, int bin_) override;
   };

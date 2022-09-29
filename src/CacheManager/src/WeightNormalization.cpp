@@ -12,7 +12,7 @@
 
 #include "Logger.h"
 LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache]");
+  Logger::setUserHeaderStr("[Cache::Weight::Normalization]");
 });
 
 // The constructor
