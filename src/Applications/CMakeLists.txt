@@ -3,6 +3,7 @@
 set( APPLICATION_LIST
         # GUNDAM apps
         gundamFitter
+        gundamCalcXsec
         gundamConfigUnfolder
         gundamPlotExtractor
         gundamConfigCompare
