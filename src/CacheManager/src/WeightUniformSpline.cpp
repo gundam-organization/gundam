@@ -93,7 +93,7 @@ Cache::Weight::UniformSpline::UniformSpline(
 Cache::Weight::UniformSpline::~UniformSpline() {}
 
 int Cache::Weight::UniformSpline::FindPoints(const TSpline3* s) {
-    return s->GetNp();
+    return s->GetNp()+1;
 }
 
 void Cache::Weight::UniformSpline::AddSpline(int resIndex, int parIndex,
