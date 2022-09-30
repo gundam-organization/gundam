@@ -274,8 +274,8 @@ void DataDispenser::doEventSelection(){
           ssProgressTitle.str("");
 
           ssProgressTitle << LogDebug.getPrefixString() << "Read from disk: "
-          << GenericToolbox::padString(GenericToolbox::parseSizeUnits((unsigned int) (readSpeed.getTotalAccumulated())), 8) << " ("
-          << GenericToolbox::padString(GenericToolbox::parseSizeUnits((unsigned int) (readSpeed.evalTotalGrowthRate())), 8) << "/s)";
+          << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.getTotalAccumulated()), 8) << " ("
+          << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.evalTotalGrowthRate()), 8) << "/s)";
 
           int cpuPercent = int(GenericToolbox::getCpuUsageByProcess());
           ssProgressTitle << " / CPU efficiency: " << GenericToolbox::padString(std::to_string(cpuPercent/nThreads), 3,' ')
@@ -632,9 +632,9 @@ void DataDispenser::readAndFill(){
 
           ssProgressBar.str("");
 
-          ssProgressBar << LogDebug.getPrefixString() << "Read from disk: "
-                          << GenericToolbox::padString(GenericToolbox::parseSizeUnits((unsigned int) (readSpeed.getTotalAccumulated())), 8) << " ("
-                          << GenericToolbox::padString(GenericToolbox::parseSizeUnits((unsigned int) (readSpeed.evalTotalGrowthRate())), 8) << "/s)";
+          ssProgressBar << LogDebug.getPrefixString() << "Reading from disk: "
+                          << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.getTotalAccumulated()), 8) << " ("
+                          << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.evalTotalGrowthRate()), 8) << "/s)";
 
           int cpuPercent = int(GenericToolbox::getCpuUsageByProcess());
           ssProgressBar << " / CPU efficiency: " << GenericToolbox::padString(std::to_string(cpuPercent/nThreads), 3,' ')
