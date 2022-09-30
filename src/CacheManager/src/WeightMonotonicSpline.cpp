@@ -92,7 +92,7 @@ Cache::Weight::MonotonicSpline::MonotonicSpline(
 Cache::Weight::MonotonicSpline::~MonotonicSpline() {}
 
 int Cache::Weight::MonotonicSpline::FindPoints(const TSpline3* s) {
-    return s->GetNp()+1;
+    return s->GetNp();
 }
 
 void Cache::Weight::MonotonicSpline::AddSpline(int resIndex,
