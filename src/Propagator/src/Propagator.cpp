@@ -208,24 +208,6 @@ void Propagator::initialize() {
     }
 
   }
-//  else{
-//    LogDebug << "Check asimov: " << std::endl;
-//    for( auto& sample : this->getFitSampleSet().getFitSampleList() ){
-//      LogDebug << sample.getName() << std::endl;
-//      size_t nDiff{0};
-//      for( size_t iEvent = 0 ; iEvent < sample.getMcContainer().eventList.size() ; iEvent++ ){
-//        auto& mcEvent = sample.getMcContainer().eventList[iEvent];
-//        auto& dataEvent = sample.getDataContainer().eventList[iEvent];
-//        if( nDiff<15 and mcEvent.getEventWeight() != dataEvent.getEventWeight() ){
-//          nDiff++;
-//          LogDebug
-//              << mcEvent.getEventWeight() << " => " << dataEvent.getEventWeight()
-//              << " / diff: " << mcEvent.getEventWeight() - dataEvent.getEventWeight() << std::endl;
-//        }
-//      }
-//    }
-////    LogThrow("debug")
-//  }
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   // After all of the data has been loaded.  Specifically, this must be after
