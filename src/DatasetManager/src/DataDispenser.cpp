@@ -248,7 +248,6 @@ void DataDispenser::doEventSelection(){
     }
 
 
-    if(iThread_ == 0) LogInfo << "Performing event selection..." << std::endl;
     GenericToolbox::VariableMonitor readSpeed("bytes");
 
     Long64_t nEvents = treeChain.GetEntries();
@@ -264,23 +263,28 @@ void DataDispenser::doEventSelection(){
     // for each event, which sample is active?
     perThreadEventIsInSamplesList[iThread_].resize(nEvents, std::vector<bool>(_cache_.samplesToFillList.size(), true));
     perThreadSampleNbOfEvents[iThread_].resize(_cache_.samplesToFillList.size(), 0);
-    std::string progressTitle = LogInfo.getPrefixString() + "Reading input dataset";
+    std::string progressTitle = "Performing event selection on " + this->getTitle() + "...";
     std::stringstream ssProgressTitle;
     TFile *lastFilePtr{nullptr};
     GlobalVariables::getThreadMutex().unlock();
     for ( Long64_t iEntry = iStart ; iEntry < iEnd ; iEntry++ ) {
       if( iThread_ == 0 ){
         readSpeed.addQuantity(treeChain.GetEntry(iEntry)*nThreads);
-        if (GenericToolbox::showProgressBar(iEntry - iStart, nEventPerThread)) {
+        if (GenericToolbox::showProgressBar(iGlobal, nEvents)) {
           ssProgressTitle.str("");
-          ssProgressTitle << progressTitle << " - ";
-          ssProgressTitle << GenericToolbox::padString(
-              GenericToolbox::parseSizeUnits((unsigned int) (readSpeed.evalTotalGrowthRate())), 8) << "/s";
-          ssProgressTitle << " ("
-                          << GenericToolbox::padString(std::to_string(int(GenericToolbox::getCpuUsageByProcess())), 3,
-                                                       ' ') << "% CPU efficiency)";
-          GenericToolbox::displayProgressBar(iEntry - iStart, nEventPerThread, ssProgressTitle.str());
+
+          ssProgressTitle << LogDebug.getPrefixString() << "Read from disk: "
+          << GenericToolbox::padString(GenericToolbox::parseSizeUnits((unsigned int) (readSpeed.getTotalAccumulated())), 8) << " ("
+          << GenericToolbox::padString(GenericToolbox::parseSizeUnits((unsigned int) (readSpeed.evalTotalGrowthRate())), 8) << "/s)";
+
+          int cpuPercent = int(GenericToolbox::getCpuUsageByProcess());
+          ssProgressTitle << " / CPU efficiency: " << GenericToolbox::padString(std::to_string(cpuPercent/nThreads), 3,' ')
+          << "%" << std::endl;
+
+          ssProgressTitle << LogInfo.getPrefixString() << progressTitle;
+          GenericToolbox::displayProgressBar(iGlobal, nEvents, ssProgressTitle.str());
         }
+        iGlobal += nThreads;
       }
       else{
         treeChain.GetEntry(iEntry);
@@ -315,6 +319,7 @@ void DataDispenser::doEventSelection(){
         }
       } // iSample
     } // iEvent
+    if( iThread_ == 0 ){ GenericToolbox::displayProgressBar(nEvents, nEvents, ssProgressTitle.str()); }
   };
 
   LogInfo << "Event selection..." << std::endl;
@@ -336,122 +341,6 @@ void DataDispenser::doEventSelection(){
     for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
       _cache_.sampleNbOfEvents[iSample] += perThreadSampleNbOfEvents[iThread][iSample];
     }
-  }
-
-  if(false){
-    LogInfo << "Opening files..." << std::endl;
-    TChain treeChain(_parameters_.treePath.c_str());
-    for (const auto &file: _parameters_.filePathList) { treeChain.Add(file.c_str()); }
-    LogThrowIf(treeChain.GetEntries() == 0, "TChain is empty.");
-
-    LogInfo << "Defining selection formulas..." << std::endl;
-    treeChain.SetBranchStatus("*", true); // enabling every branch to define formula
-
-    TTreeFormula *treeSelectionCutFormula{nullptr};
-    std::vector<TTreeFormula *> sampleCutFormulaList(_cache_.samplesToFillList.size(), nullptr);
-    TTreeFormulaManager formulaManager; // TTreeFormulaManager handles the notification of multiple TTreeFormula for one TTChain
-
-    if (not _parameters_.selectionCutFormulaStr.empty()) {
-      treeSelectionCutFormula = new TTreeFormula("SelectionCutFormula", _parameters_.selectionCutFormulaStr.c_str(),
-                                                 &treeChain);
-
-      // ROOT Hot fix: https://root-forum.cern.ch/t/ttreeformula-evalinstance-return-0-0/16366/10
-      treeSelectionCutFormula->GetNdata();
-
-      LogThrowIf(treeSelectionCutFormula->GetNdim() == 0,
-                 "\"" << _parameters_.selectionCutFormulaStr << "\" could not be parsed by the TChain");
-
-      // The TChain will notify the formula that it has to update leaves addresses while swaping TFile
-      formulaManager.Add(treeSelectionCutFormula);
-      LogInfo << "Using tree selection cut: \"" << _parameters_.selectionCutFormulaStr << "\"" << std::endl;
-    }
-
-    GenericToolbox::TablePrinter t;
-    t.setColTitles({{"Sample"},
-                    {"Selection Cut"}});
-    for (size_t iSample = 0; iSample < _cache_.samplesToFillList.size(); iSample++) {
-
-      std::string selectionCut = _cache_.samplesToFillList[iSample]->getSelectionCutsStr();
-      for (auto &replaceEntry: _cache_.leavesToOverrideList) {
-        GenericToolbox::replaceSubstringInsideInputString(selectionCut, replaceEntry,
-                                                          _parameters_.overrideLeafDict[replaceEntry]);
-      }
-
-      t.addTableLine({{"\"" + _cache_.samplesToFillList[iSample]->getName() + "\""},
-                      {"\"" + selectionCut + "\""}});
-      sampleCutFormulaList[iSample] = new TTreeFormula(_cache_.samplesToFillList[iSample]->getName().c_str(),
-                                                       selectionCut.c_str(), &treeChain);
-
-      // ROOT Hot fix: https://root-forum.cern.ch/t/ttreeformula-evalinstance-return-0-0/16366/10
-      sampleCutFormulaList[iSample]->GetNdata();
-
-      LogThrowIf(sampleCutFormulaList[iSample]->GetNdim() == 0,
-                 "\"" << selectionCut << "\" could not be parsed by the TChain");
-
-      // The TChain will notify the formula that it has to update leaves addresses while swaping TFile
-      formulaManager.Add(sampleCutFormulaList[iSample]);
-    }
-    treeChain.SetNotify(&formulaManager);
-    t.printTable();
-
-    LogInfo << "Enabling required branches..." << std::endl;
-    treeChain.SetBranchStatus("*", false);
-
-    if (treeSelectionCutFormula != nullptr) GenericToolbox::enableSelectedBranches(&treeChain, treeSelectionCutFormula);
-    for (auto &sampleFormula: sampleCutFormulaList) {
-      GenericToolbox::enableSelectedBranches(&treeChain, sampleFormula);
-    }
-
-    LogInfo << "Performing event selection..." << std::endl;
-    GenericToolbox::VariableMonitor readSpeed("bytes");
-    Long64_t nEvents = treeChain.GetEntries();
-    // for each event, which sample is active?
-    _cache_.eventIsInSamplesList.resize(nEvents, std::vector<bool>(_cache_.samplesToFillList.size(), true));
-    _cache_.sampleNbOfEvents.resize(_cache_.samplesToFillList.size(), 0);
-    std::string progressTitle = LogInfo.getPrefixString() + "Reading input dataset";
-    std::stringstream ssProgressTitle;
-    TFile *lastFilePtr{nullptr};
-    for (Long64_t iEvent = 0; iEvent < nEvents; iEvent++) {
-      readSpeed.addQuantity(treeChain.GetEntry(iEvent));
-      if (GenericToolbox::showProgressBar(iEvent, nEvents)) {
-        ssProgressTitle.str("");
-        ssProgressTitle << progressTitle << " - ";
-        ssProgressTitle << GenericToolbox::padString(
-            GenericToolbox::parseSizeUnits((unsigned int) (readSpeed.evalTotalGrowthRate())), 8) << "/s";
-        ssProgressTitle << " ("
-                        << GenericToolbox::padString(std::to_string(int(GenericToolbox::getCpuUsageByProcess())), 3,
-                                                     ' ') << "% CPU efficiency)";
-        GenericToolbox::displayProgressBar(iEvent, nEvents, ssProgressTitle.str());
-      }
-
-      if (treeSelectionCutFormula != nullptr and not GenericToolbox::doesEntryPassCut(treeSelectionCutFormula)) {
-        for (size_t iSample = 0; iSample <
-                                 sampleCutFormulaList.size(); iSample++) { _cache_.eventIsInSamplesList[iEvent][iSample] = false; }
-        if (GlobalVariables::getVerboseLevel() == INLOOP_TRACE) {
-          LogTrace << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
-                   << " rejected because of " << treeSelectionCutFormula->GetExpFormula() << std::endl;
-        }
-        continue;
-      }
-
-      for (size_t iSample = 0; iSample < sampleCutFormulaList.size(); iSample++) {
-        if (not GenericToolbox::doesEntryPassCut(sampleCutFormulaList[iSample])) {
-          _cache_.eventIsInSamplesList[iEvent][iSample] = false;
-          if (GlobalVariables::getVerboseLevel() == INLOOP_TRACE) {
-            LogTrace << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
-                     << " rejected as sample " << iSample << " because of "
-                     << sampleCutFormulaList[iSample]->GetExpFormula() << std::endl;
-          }
-        } else {
-          _cache_.sampleNbOfEvents[iSample]++;
-          if (GlobalVariables::getVerboseLevel() == INLOOP_TRACE) {
-            LogDebug << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
-                     << " included as sample " << iSample << " using "
-                     << sampleCutFormulaList[iSample]->GetExpFormula() << std::endl;
-          }
-        }
-      } // iSample
-    } // iEvent
   }
 
   if( _owner_->isShowSelectedEventCount() ){
@@ -733,25 +622,26 @@ void DataDispenser::readAndFill(){
     GenericToolbox::VariableMonitor readSpeed("bytes");
     Int_t nBytes;
 
-    std::string progressTitle = LogInfo.getPrefixString();
+    std::string progressTitle = "Loading and indexing...";
     std::stringstream ssProgressBar;
 
     for(Long64_t iEntry = iStart ; iEntry < iEnd ; iEntry++ ){
 
       if( iThread_ == 0 ){
         if( GenericToolbox::showProgressBar(iGlobal, nEvents) ){
+
           ssProgressBar.str("");
-          ssProgressBar << progressTitle;
-          ssProgressBar << GenericToolbox::padString(GenericToolbox::parseSizeUnits(nThreads*readSpeed.getTotalAccumulated()), 9);
-          ssProgressBar << " (";
-          ssProgressBar << GenericToolbox::padString(GenericToolbox::parseSizeUnits(nThreads*readSpeed.evalTotalGrowthRate()), 9);
-          ssProgressBar << "/s)";
-          double cpuPercent = GenericToolbox::getCpuUsageByProcess();
-          ssProgressBar << " "
-          << GenericToolbox::padString(std::to_string(int(cpuPercent)), 3, ' ')
-          << "% CPU ("
-          << GenericToolbox::padString(std::to_string(int(cpuPercent/GlobalVariables::getNbThreads())), 3, ' ') << "% efficiency)";
-          GenericToolbox::displayProgressBar( iGlobal, nEvents, ssProgressBar.str() );
+
+          ssProgressBar << LogDebug.getPrefixString() << "Read from disk: "
+                          << GenericToolbox::padString(GenericToolbox::parseSizeUnits((unsigned int) (readSpeed.getTotalAccumulated())), 8) << " ("
+                          << GenericToolbox::padString(GenericToolbox::parseSizeUnits((unsigned int) (readSpeed.evalTotalGrowthRate())), 8) << "/s)";
+
+          int cpuPercent = int(GenericToolbox::getCpuUsageByProcess());
+          ssProgressBar << " / CPU efficiency: " << GenericToolbox::padString(std::to_string(cpuPercent/nThreads), 3,' ')
+                          << "%" << std::endl;
+
+          ssProgressBar << LogInfo.getPrefixString() << progressTitle;
+          GenericToolbox::displayProgressBar(iGlobal, nEvents, ssProgressBar.str());
         }
         iGlobal += nThreads;
       }
@@ -959,7 +849,7 @@ void DataDispenser::readAndFill(){
         } // event has passed the selection?
       } // samples
     } // entries
-    if( iThread_ == 0 ) GenericToolbox::displayProgressBar(nEvents, nEvents, progressTitle);
+    if( iThread_ == 0 ) GenericToolbox::displayProgressBar(nEvents, nEvents, ssProgressBar.str());
   };
 
   LogWarning << "Loading and indexing..." << std::endl;
