@@ -93,7 +93,7 @@ Cache::Weight::GeneralSpline::GeneralSpline(
 Cache::Weight::GeneralSpline::~GeneralSpline() {}
 
 int Cache::Weight::GeneralSpline::FindPoints(const TSpline3* s) {
-    return s->GetNp();
+    return s->GetNp()+1;
 }
 
 void Cache::Weight::GeneralSpline::AddSpline(int resIndex, int parIndex,
