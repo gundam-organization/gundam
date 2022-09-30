@@ -173,113 +173,290 @@ void DataDispenser::buildSampleToFillList(){
 void DataDispenser::doEventSelection(){
   LogWarning << "Performing event selection..." << std::endl;
 
-  LogInfo << "Opening files..." << std::endl;
-  TChain treeChain(_parameters_.treePath.c_str());
-  for( const auto& file: _parameters_.filePathList){ treeChain.Add(file.c_str()); }
-  LogThrowIf(treeChain.GetEntries() == 0, "TChain is empty.");
+  ROOT::EnableThreadSafety();
+  int nThreads = GlobalVariables::getNbThreads();
+  std::vector<std::vector<std::vector<bool>>> perThreadEventIsInSamplesList(nThreads);
+  std::vector<std::vector<size_t>> perThreadSampleNbOfEvents(nThreads);
+  auto selectionFct = [&](int iThread_){
 
-  LogInfo << "Defining selection formulas..." << std::endl;
-  treeChain.SetBranchStatus("*", true); // enabling every branch to define formula
-
-  TTreeFormula* treeSelectionCutFormula{nullptr};
-  std::vector<TTreeFormula*> sampleCutFormulaList(_cache_.samplesToFillList.size(), nullptr);
-  TTreeFormulaManager formulaManager; // TTreeFormulaManager handles the notification of multiple TTreeFormula for one TTChain
-
-  if( not _parameters_.selectionCutFormulaStr.empty() ){
-    treeSelectionCutFormula = new TTreeFormula("SelectionCutFormula", _parameters_.selectionCutFormulaStr.c_str(), &treeChain);
-
-    // ROOT Hot fix: https://root-forum.cern.ch/t/ttreeformula-evalinstance-return-0-0/16366/10
-    treeSelectionCutFormula->GetNdata();
-
-    LogThrowIf(treeSelectionCutFormula->GetNdim() == 0,
-               "\"" << _parameters_.selectionCutFormulaStr << "\" could not be parsed by the TChain");
-
-    // The TChain will notify the formula that it has to update leaves addresses while swaping TFile
-    formulaManager.Add(treeSelectionCutFormula);
-    LogInfo << "Using tree selection cut: \"" << _parameters_.selectionCutFormulaStr << "\"" << std::endl;
-  }
-
-  GenericToolbox::TablePrinter t;
-  t.setColTitles({{"Sample"}, {"Selection Cut"}});
-  for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
-
-    std::string selectionCut = _cache_.samplesToFillList[iSample]->getSelectionCutsStr();
-    for( auto& replaceEntry : _cache_.leavesToOverrideList ){
-      GenericToolbox::replaceSubstringInsideInputString(selectionCut, replaceEntry, _parameters_.overrideLeafDict[replaceEntry]);
+    if( iThread_ == -1 ){
+      iThread_ = 0;
+      nThreads = 1;
     }
 
-    t.addTableLine({{"\""+_cache_.samplesToFillList[iSample]->getName()+"\""}, {"\""+selectionCut+"\""}});
-    sampleCutFormulaList[iSample] = new TTreeFormula(_cache_.samplesToFillList[iSample]->getName().c_str(), selectionCut.c_str(), &treeChain);
+    GlobalVariables::getThreadMutex().lock();
+    TChain treeChain(_parameters_.treePath.c_str());
+    for (const auto &file: _parameters_.filePathList) { treeChain.Add(file.c_str()); }
+    LogThrowIf(treeChain.GetEntries() == 0, "TChain is empty.");
 
-    // ROOT Hot fix: https://root-forum.cern.ch/t/ttreeformula-evalinstance-return-0-0/16366/10
-    sampleCutFormulaList[iSample]->GetNdata();
+    if( iThread_ == 0 ) LogInfo << "Defining selection formulas..." << std::endl;
+    treeChain.SetBranchStatus("*", true); // enabling every branch to define formula
 
-    LogThrowIf(sampleCutFormulaList[iSample]->GetNdim() == 0,
-               "\"" << selectionCut << "\" could not be parsed by the TChain");
+    TTreeFormula *treeSelectionCutFormula{nullptr};
+    std::vector<TTreeFormula *> sampleCutFormulaList(_cache_.samplesToFillList.size(), nullptr);
+    TTreeFormulaManager formulaManager; // TTreeFormulaManager handles the notification of multiple TTreeFormula for one TTChain
 
-    // The TChain will notify the formula that it has to update leaves addresses while swaping TFile
-    formulaManager.Add(sampleCutFormulaList[iSample]);
-  }
-  treeChain.SetNotify(&formulaManager);
-  t.printTable();
+    if (not _parameters_.selectionCutFormulaStr.empty()) {
+      treeSelectionCutFormula = new TTreeFormula("SelectionCutFormula", _parameters_.selectionCutFormulaStr.c_str(),
+                                                 &treeChain);
 
-  LogInfo << "Enabling required branches..." << std::endl;
-  treeChain.SetBranchStatus("*", false);
+      // ROOT Hot fix: https://root-forum.cern.ch/t/ttreeformula-evalinstance-return-0-0/16366/10
+      treeSelectionCutFormula->GetNdata();
 
-  if(treeSelectionCutFormula != nullptr) GenericToolbox::enableSelectedBranches(&treeChain, treeSelectionCutFormula);
-  for( auto& sampleFormula : sampleCutFormulaList ){ GenericToolbox::enableSelectedBranches(&treeChain, sampleFormula); }
+      LogThrowIf(treeSelectionCutFormula->GetNdim() == 0,
+                 "\"" << _parameters_.selectionCutFormulaStr << "\" could not be parsed by the TChain");
 
-  LogInfo << "Performing event selection..." << std::endl;
-  GenericToolbox::VariableMonitor readSpeed("bytes");
-  Long64_t nEvents = treeChain.GetEntries();
-  // for each event, which sample is active?
-  _cache_.eventIsInSamplesList.resize(nEvents, std::vector<bool>(_cache_.samplesToFillList.size(), true));
-  _cache_.sampleNbOfEvents.resize(_cache_.samplesToFillList.size(), 0);
-  std::string progressTitle = LogInfo.getPrefixString() + "Reading input dataset";
-  std::stringstream ssProgressTitle;
-  TFile* lastFilePtr{nullptr};
-  for( Long64_t iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
-    readSpeed.addQuantity(treeChain.GetEntry(iEvent));
-    if( GenericToolbox::showProgressBar(iEvent, nEvents) ){
-      ssProgressTitle.str("");
-      ssProgressTitle << progressTitle << " - ";
-      ssProgressTitle << GenericToolbox::padString(GenericToolbox::parseSizeUnits((unsigned int)(readSpeed.evalTotalGrowthRate())), 8) << "/s";
-      ssProgressTitle << " (" << GenericToolbox::padString(std::to_string(int(GenericToolbox::getCpuUsageByProcess())), 3, ' ') << "% CPU efficiency)";
-      GenericToolbox::displayProgressBar( iEvent, nEvents, ssProgressTitle.str() );
+      // The TChain will notify the formula that it has to update leaves addresses while swaping TFile
+      formulaManager.Add(treeSelectionCutFormula);
+      if(iThread_==0) LogInfo << "Using tree selection cut: \"" << _parameters_.selectionCutFormulaStr << "\"" << std::endl;
     }
 
-    if(treeSelectionCutFormula != nullptr and not GenericToolbox::doesEntryPassCut(treeSelectionCutFormula)){
-      for( size_t iSample = 0 ; iSample < sampleCutFormulaList.size() ; iSample++ ){ _cache_.eventIsInSamplesList[iEvent][iSample] = false; }
-      if( GlobalVariables::getVerboseLevel() == INLOOP_TRACE ){
-        LogTrace << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
-        << " rejected because of " << treeSelectionCutFormula->GetExpFormula() << std::endl;
+    GenericToolbox::TablePrinter t;
+    t.setColTitles({{"Sample"}, {"Selection Cut"}});
+    for (size_t iSample = 0; iSample < _cache_.samplesToFillList.size(); iSample++) {
+
+        std::string selectionCut = _cache_.samplesToFillList[iSample]->getSelectionCutsStr();
+        for (auto &replaceEntry: _cache_.leavesToOverrideList) {
+          GenericToolbox::replaceSubstringInsideInputString(selectionCut, replaceEntry,
+                                                            _parameters_.overrideLeafDict[replaceEntry]);
+        }
+
+        t.addTableLine({{"\"" + _cache_.samplesToFillList[iSample]->getName() + "\""},
+                        {"\"" + selectionCut + "\""}});
+        sampleCutFormulaList[iSample] = new TTreeFormula(_cache_.samplesToFillList[iSample]->getName().c_str(),
+                                                         selectionCut.c_str(), &treeChain);
+
+        // ROOT Hot fix: https://root-forum.cern.ch/t/ttreeformula-evalinstance-return-0-0/16366/10
+        sampleCutFormulaList[iSample]->GetNdata();
+
+        LogThrowIf(sampleCutFormulaList[iSample]->GetNdim() == 0,
+                   "\"" << selectionCut << "\" could not be parsed by the TChain");
+
+        // The TChain will notify the formula that it has to update leaves addresses while swaping TFile
+        formulaManager.Add(sampleCutFormulaList[iSample]);
       }
-      continue;
+    treeChain.SetNotify(&formulaManager);
+    if(iThread_==0) t.printTable();
+
+
+    if(iThread_ == 0) LogInfo << "Enabling required branches..." << std::endl;
+    treeChain.SetBranchStatus("*", false);
+
+    if (treeSelectionCutFormula != nullptr) GenericToolbox::enableSelectedBranches(&treeChain, treeSelectionCutFormula);
+    for (auto &sampleFormula: sampleCutFormulaList) {
+      GenericToolbox::enableSelectedBranches(&treeChain, sampleFormula);
     }
 
-    for( size_t iSample = 0 ; iSample < sampleCutFormulaList.size() ; iSample++ ){
-      if( not GenericToolbox::doesEntryPassCut(sampleCutFormulaList[iSample]) ){
-        _cache_.eventIsInSamplesList[iEvent][iSample] = false;
-        if( GlobalVariables::getVerboseLevel() == INLOOP_TRACE ){
-          LogTrace << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
-          << " rejected as sample " << iSample << " because of "
-          << sampleCutFormulaList[iSample]->GetExpFormula() << std::endl;
+
+    if(iThread_ == 0) LogInfo << "Performing event selection..." << std::endl;
+    GenericToolbox::VariableMonitor readSpeed("bytes");
+
+    Long64_t nEvents = treeChain.GetEntries();
+    Long64_t nEventPerThread = nEvents/Long64_t(nThreads);
+    Long64_t iEnd = nEvents;
+    Long64_t iStart = Long64_t(iThread_)*nEventPerThread;
+    if( iThread_+1 != nThreads ) iEnd = (Long64_t(iThread_)+1)*nEventPerThread;
+    Long64_t iGlobal = 0;
+
+    // Load the branches
+    treeChain.LoadTree(iStart);
+
+    // for each event, which sample is active?
+    perThreadEventIsInSamplesList[iThread_].resize(nEvents, std::vector<bool>(_cache_.samplesToFillList.size(), true));
+    perThreadSampleNbOfEvents[iThread_].resize(_cache_.samplesToFillList.size(), 0);
+    std::string progressTitle = LogInfo.getPrefixString() + "Reading input dataset";
+    std::stringstream ssProgressTitle;
+    TFile *lastFilePtr{nullptr};
+    GlobalVariables::getThreadMutex().unlock();
+    for ( Long64_t iEntry = iStart ; iEntry < iEnd ; iEntry++ ) {
+      if( iThread_ == 0 ){
+        readSpeed.addQuantity(treeChain.GetEntry(iEntry)*nThreads);
+        if (GenericToolbox::showProgressBar(iEntry - iStart, nEventPerThread)) {
+          ssProgressTitle.str("");
+          ssProgressTitle << progressTitle << " - ";
+          ssProgressTitle << GenericToolbox::padString(
+              GenericToolbox::parseSizeUnits((unsigned int) (readSpeed.evalTotalGrowthRate())), 8) << "/s";
+          ssProgressTitle << " ("
+                          << GenericToolbox::padString(std::to_string(int(GenericToolbox::getCpuUsageByProcess())), 3,
+                                                       ' ') << "% CPU efficiency)";
+          GenericToolbox::displayProgressBar(iEntry - iStart, nEventPerThread, ssProgressTitle.str());
         }
       }
       else{
-        _cache_.sampleNbOfEvents[iSample]++;
-        if( GlobalVariables::getVerboseLevel() == INLOOP_TRACE ){
-          LogDebug << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
-                   << " included as sample " << iSample << " using "
-                   << sampleCutFormulaList[iSample]->GetExpFormula() << std::endl;
-        }
+        treeChain.GetEntry(iEntry);
       }
-    } // iSample
-  } // iEvent
+
+      if (treeSelectionCutFormula != nullptr and not GenericToolbox::doesEntryPassCut(treeSelectionCutFormula)) {
+        for (size_t iSample = 0; iSample < sampleCutFormulaList.size(); iSample++) {
+          perThreadEventIsInSamplesList[iThread_][iEntry][iSample] = false;
+        }
+        if (GlobalVariables::getVerboseLevel() == INLOOP_TRACE) {
+          LogTrace << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
+                   << " rejected because of " << treeSelectionCutFormula->GetExpFormula() << std::endl;
+        }
+        continue;
+      }
+
+      for (size_t iSample = 0; iSample < sampleCutFormulaList.size(); iSample++) {
+        if (not GenericToolbox::doesEntryPassCut(sampleCutFormulaList[iSample])) {
+          perThreadEventIsInSamplesList[iThread_][iEntry][iSample] = false;
+          if (GlobalVariables::getVerboseLevel() == INLOOP_TRACE) {
+            LogTrace << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
+                     << " rejected as sample " << iSample << " because of "
+                     << sampleCutFormulaList[iSample]->GetExpFormula() << std::endl;
+          }
+        } else {
+          perThreadSampleNbOfEvents[iThread_][iSample]++;
+          if (GlobalVariables::getVerboseLevel() == INLOOP_TRACE) {
+            LogDebug << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
+                     << " included as sample " << iSample << " using "
+                     << sampleCutFormulaList[iSample]->GetExpFormula() << std::endl;
+          }
+        }
+      } // iSample
+    } // iEvent
+  };
+
+  LogInfo << "Event selection..." << std::endl;
+  GlobalVariables::getParallelWorker().addJob(__METHOD_NAME__, selectionFct);
+  GlobalVariables::getParallelWorker().runJob(__METHOD_NAME__);
+  GlobalVariables::getParallelWorker().removeJob(__METHOD_NAME__);
+
+  LogInfo << "Merging thread results" << std::endl;
+  _cache_.sampleNbOfEvents.resize(_cache_.samplesToFillList.size(), 0);
+  for( size_t iThread = 0 ; iThread < nThreads ; iThread++ ){
+    if( _cache_.eventIsInSamplesList.empty() ){
+      _cache_.eventIsInSamplesList.resize(perThreadEventIsInSamplesList[iThread].size(), std::vector<bool>(_cache_.samplesToFillList.size(), true));
+    }
+    for( size_t iEntry = 0 ; iEntry < perThreadEventIsInSamplesList[iThread].size() ; iEntry++ ){
+      for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
+        if(not perThreadEventIsInSamplesList[iThread][iEntry][iSample]) _cache_.eventIsInSamplesList[iEntry][iSample] = false;
+      }
+    }
+    for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
+      _cache_.sampleNbOfEvents[iSample] += perThreadSampleNbOfEvents[iThread][iSample];
+    }
+  }
+
+  if(false){
+    LogInfo << "Opening files..." << std::endl;
+    TChain treeChain(_parameters_.treePath.c_str());
+    for (const auto &file: _parameters_.filePathList) { treeChain.Add(file.c_str()); }
+    LogThrowIf(treeChain.GetEntries() == 0, "TChain is empty.");
+
+    LogInfo << "Defining selection formulas..." << std::endl;
+    treeChain.SetBranchStatus("*", true); // enabling every branch to define formula
+
+    TTreeFormula *treeSelectionCutFormula{nullptr};
+    std::vector<TTreeFormula *> sampleCutFormulaList(_cache_.samplesToFillList.size(), nullptr);
+    TTreeFormulaManager formulaManager; // TTreeFormulaManager handles the notification of multiple TTreeFormula for one TTChain
+
+    if (not _parameters_.selectionCutFormulaStr.empty()) {
+      treeSelectionCutFormula = new TTreeFormula("SelectionCutFormula", _parameters_.selectionCutFormulaStr.c_str(),
+                                                 &treeChain);
+
+      // ROOT Hot fix: https://root-forum.cern.ch/t/ttreeformula-evalinstance-return-0-0/16366/10
+      treeSelectionCutFormula->GetNdata();
+
+      LogThrowIf(treeSelectionCutFormula->GetNdim() == 0,
+                 "\"" << _parameters_.selectionCutFormulaStr << "\" could not be parsed by the TChain");
+
+      // The TChain will notify the formula that it has to update leaves addresses while swaping TFile
+      formulaManager.Add(treeSelectionCutFormula);
+      LogInfo << "Using tree selection cut: \"" << _parameters_.selectionCutFormulaStr << "\"" << std::endl;
+    }
+
+    GenericToolbox::TablePrinter t;
+    t.setColTitles({{"Sample"},
+                    {"Selection Cut"}});
+    for (size_t iSample = 0; iSample < _cache_.samplesToFillList.size(); iSample++) {
+
+      std::string selectionCut = _cache_.samplesToFillList[iSample]->getSelectionCutsStr();
+      for (auto &replaceEntry: _cache_.leavesToOverrideList) {
+        GenericToolbox::replaceSubstringInsideInputString(selectionCut, replaceEntry,
+                                                          _parameters_.overrideLeafDict[replaceEntry]);
+      }
+
+      t.addTableLine({{"\"" + _cache_.samplesToFillList[iSample]->getName() + "\""},
+                      {"\"" + selectionCut + "\""}});
+      sampleCutFormulaList[iSample] = new TTreeFormula(_cache_.samplesToFillList[iSample]->getName().c_str(),
+                                                       selectionCut.c_str(), &treeChain);
+
+      // ROOT Hot fix: https://root-forum.cern.ch/t/ttreeformula-evalinstance-return-0-0/16366/10
+      sampleCutFormulaList[iSample]->GetNdata();
+
+      LogThrowIf(sampleCutFormulaList[iSample]->GetNdim() == 0,
+                 "\"" << selectionCut << "\" could not be parsed by the TChain");
+
+      // The TChain will notify the formula that it has to update leaves addresses while swaping TFile
+      formulaManager.Add(sampleCutFormulaList[iSample]);
+    }
+    treeChain.SetNotify(&formulaManager);
+    t.printTable();
+
+    LogInfo << "Enabling required branches..." << std::endl;
+    treeChain.SetBranchStatus("*", false);
+
+    if (treeSelectionCutFormula != nullptr) GenericToolbox::enableSelectedBranches(&treeChain, treeSelectionCutFormula);
+    for (auto &sampleFormula: sampleCutFormulaList) {
+      GenericToolbox::enableSelectedBranches(&treeChain, sampleFormula);
+    }
+
+    LogInfo << "Performing event selection..." << std::endl;
+    GenericToolbox::VariableMonitor readSpeed("bytes");
+    Long64_t nEvents = treeChain.GetEntries();
+    // for each event, which sample is active?
+    _cache_.eventIsInSamplesList.resize(nEvents, std::vector<bool>(_cache_.samplesToFillList.size(), true));
+    _cache_.sampleNbOfEvents.resize(_cache_.samplesToFillList.size(), 0);
+    std::string progressTitle = LogInfo.getPrefixString() + "Reading input dataset";
+    std::stringstream ssProgressTitle;
+    TFile *lastFilePtr{nullptr};
+    for (Long64_t iEvent = 0; iEvent < nEvents; iEvent++) {
+      readSpeed.addQuantity(treeChain.GetEntry(iEvent));
+      if (GenericToolbox::showProgressBar(iEvent, nEvents)) {
+        ssProgressTitle.str("");
+        ssProgressTitle << progressTitle << " - ";
+        ssProgressTitle << GenericToolbox::padString(
+            GenericToolbox::parseSizeUnits((unsigned int) (readSpeed.evalTotalGrowthRate())), 8) << "/s";
+        ssProgressTitle << " ("
+                        << GenericToolbox::padString(std::to_string(int(GenericToolbox::getCpuUsageByProcess())), 3,
+                                                     ' ') << "% CPU efficiency)";
+        GenericToolbox::displayProgressBar(iEvent, nEvents, ssProgressTitle.str());
+      }
+
+      if (treeSelectionCutFormula != nullptr and not GenericToolbox::doesEntryPassCut(treeSelectionCutFormula)) {
+        for (size_t iSample = 0; iSample <
+                                 sampleCutFormulaList.size(); iSample++) { _cache_.eventIsInSamplesList[iEvent][iSample] = false; }
+        if (GlobalVariables::getVerboseLevel() == INLOOP_TRACE) {
+          LogTrace << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
+                   << " rejected because of " << treeSelectionCutFormula->GetExpFormula() << std::endl;
+        }
+        continue;
+      }
+
+      for (size_t iSample = 0; iSample < sampleCutFormulaList.size(); iSample++) {
+        if (not GenericToolbox::doesEntryPassCut(sampleCutFormulaList[iSample])) {
+          _cache_.eventIsInSamplesList[iEvent][iSample] = false;
+          if (GlobalVariables::getVerboseLevel() == INLOOP_TRACE) {
+            LogTrace << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
+                     << " rejected as sample " << iSample << " because of "
+                     << sampleCutFormulaList[iSample]->GetExpFormula() << std::endl;
+          }
+        } else {
+          _cache_.sampleNbOfEvents[iSample]++;
+          if (GlobalVariables::getVerboseLevel() == INLOOP_TRACE) {
+            LogDebug << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
+                     << " included as sample " << iSample << " using "
+                     << sampleCutFormulaList[iSample]->GetExpFormula() << std::endl;
+          }
+        }
+      } // iSample
+    } // iEvent
+  }
 
   if( _owner_->isShowSelectedEventCount() ){
     LogWarning << "Events passing selection cuts:" << std::endl;
-    t.reset();
+    GenericToolbox::TablePrinter t;
     t.setColTitles({{"Sample"}, {"# of events"}});
     for(size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
       t.addTableLine({{"\""+_cache_.samplesToFillList[iSample]->getName()+"\""}, std::to_string(_cache_.sampleNbOfEvents[iSample])});
@@ -474,6 +651,7 @@ void DataDispenser::readAndFill(){
     treeChain.SetNotify(&objToNotify);
 
     treeChain.SetBranchStatus("*", false);
+
 
     if( not _parameters_.nominalWeightFormulaStr.empty() ){
       treeChain.SetBranchStatus("*", true);

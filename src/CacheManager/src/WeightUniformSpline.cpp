@@ -141,7 +141,9 @@ void Cache::Weight::UniformSpline::AddSpline(int resIndex, int parIndex,
     fSplineKnotsUsed += points;
     if (fSplineKnotsUsed > fSplineKnotsReserved) {
         LogError << "Not enough space reserved for spline knots"
-               << std::endl;
+        << " -> " << GET_VAR_NAME_VALUE(fSplineKnotsReserved)
+        << " / " << GET_VAR_NAME_VALUE(fSplineKnotsUsed)
+        << std::endl;
         throw std::runtime_error("Not enough space reserved for spline knots");
     }
     fSplineIndex->hostPtr()[newIndex+1] = fSplineKnotsUsed;
