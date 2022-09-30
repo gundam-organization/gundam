@@ -653,7 +653,7 @@ void DataDispenser::readAndFill(){
       if( skipEvent ) continue;
 
       nBytes = treeChain.GetEntry(iEntry);
-      if( iThread_ == 0 ) readSpeed.addQuantity(nBytes);
+      if( iThread_ == 0 ) readSpeed.addQuantity(nBytes*nThreads);
 
       if( threadNominalWeightFormula != nullptr ){
         eventBuffer.setTreeWeight(threadNominalWeightFormula->EvalInstance());
