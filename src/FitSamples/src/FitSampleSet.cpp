@@ -153,11 +153,6 @@ double FitSampleSet::evalLikelihood(const FitSample& sample_) const{
 void FitSampleSet::copyMcEventListToDataContainer(){
   for( auto& sample : _fitSampleList_ ){
     LogInfo << "Copying MC events in sample \"" << sample.getName() << "\"" << std::endl;
-#ifdef GUNDAM_USING_CACHE_MANAGER
-    for( auto& event : sample.getMcContainer().eventList){
-
-    }
-#endif
     sample.getDataContainer().eventList.insert(
         std::end(sample.getDataContainer().eventList),
         std::begin(sample.getMcContainer().eventList),
