@@ -765,6 +765,30 @@ void FitterEngine::fit(){
   int nbFitCallOffset = _nbFitCalls_;
   LogInfo << "Fit call offset: " << nbFitCallOffset << std::endl;
   _enableFitMonitor_ = true;
+
+  if( JsonUtils::fetchValue(_minimizerConfig_, "enableSimplexBeforeMinimize", false) ){
+    LogWarning << "Running simplex algo before the minimizer" << std::endl;
+    LogThrowIf(_minimizerType_ != "Minuit2", "Can't launch simplex with " << _minimizerType_);
+
+    std::string originalAlgo = _minimizer_->Options().MinimizerAlgorithm();
+
+    _minimizer_->Options().SetMinimizerAlgorithm("Simplex");
+    _minimizer_->SetMaxFunctionCalls(JsonUtils::fetchValue(_minimizerConfig_, "simplexMaxFcnCalls", (unsigned int)(1000)));
+    _minimizer_->SetTolerance(
+          JsonUtils::fetchValue(_minimizerConfig_, "tolerance", 1E-4)
+        * JsonUtils::fetchValue(_minimizerConfig_, "simplexToleranceLoose", 1000)
+        );
+    _fitHasConverged_ = _minimizer_->Minimize();
+
+    _minimizer_->Options().SetMinimizerAlgorithm(originalAlgo.c_str());
+    _minimizer_->SetMaxFunctionCalls(JsonUtils::fetchValue(_minimizerConfig_, "max_fcn", (unsigned int)(1E9)));
+    _minimizer_->SetTolerance(JsonUtils::fetchValue(_minimizerConfig_, "tolerance", 1E-4));
+
+    LogInfo << _convergenceMonitor_.generateMonitorString(); // lasting printout
+    LogWarning << "Simplex ended after " << _nbFitCalls_ - nbFitCallOffset << " calls." << std::endl;
+  }
+
+
   _fitHasConverged_ = _minimizer_->Minimize();
   _enableFitMonitor_ = false;
   int nbMinimizeCalls = _nbFitCalls_ - nbFitCallOffset;
