@@ -74,6 +74,9 @@ void FitterEngine::setEnablePostFitScan(bool enablePostFitScan) {
 void FitterEngine::setEnablePostFitErrorEval(bool enablePostFitErrorEval_) {
   _enablePostFitErrorEval_ = enablePostFitErrorEval_;
 }
+void FitterEngine::setEnablePca(bool enablePca_){
+  _enablePca_ = enablePca_;
+}
 
 void FitterEngine::initialize() {
 
@@ -101,7 +104,8 @@ void FitterEngine::initialize() {
     this->rescaleParametersStepSize();
   }
 
-  if( JsonUtils::fetchValue(_config_, "fixGhostFitParameters", false) ) this->fixGhostFitParameters();
+  _enablePca_ = _enablePca_ or JsonUtils::fetchValue(_config_, std::vector<std::string>{"fixGhostFitParameters", "enablePca"}, false);
+  if( _enablePca_ ) this->fixGhostFitParameters();
 
   this->updateChi2Cache();
 
@@ -457,7 +461,7 @@ void FitterEngine::fixGhostFitParameters(){
 
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 
-    if( not JsonUtils::fetchValue(parSet.getConfig(), "fixGhostFitParameters", false) ) continue;
+    if( not JsonUtils::fetchValue(parSet.getConfig(), std::vector<std::string>{"fixGhostFitParameters", "enablePca"}, false) ) continue;
 
     bool fixNextEigenPars{false};
     auto& parList = parSet.getEffectiveParameterList();
@@ -1059,7 +1063,7 @@ double FitterEngine::evalFit(const double* parArray_){
 #ifndef GUNDAM_BATCH
       ss << "├─";
 #endif
-      ss << " Avg time for " << _minimizerType_ << "/" << _minimizerAlgo_ << ":   " << _outEvalFitAvgTimer_;
+      ss << " Avg time for " << _minimizer_->Options().MinimizerType() << "/" << _minimizer_->Options().MinimizerAlgorithm() << ":   " << _outEvalFitAvgTimer_;
       ss << std::endl;
 #ifndef GUNDAM_BATCH
       ss << "├─";
