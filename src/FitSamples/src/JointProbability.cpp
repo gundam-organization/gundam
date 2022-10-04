@@ -139,6 +139,8 @@ namespace JointProbability{
     double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
     double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
     double mcuncert = sample_.getMcContainer().histogram->GetBinError(bin_);
+    double datauncert = sample_.getDataContainer().histogram->GetBinError(bin_);
+
 
     double chisq = 0.0;
 
@@ -165,9 +167,13 @@ namespace JointProbability{
     // The penalty from MC statistics
     double penalty = 0;
     // Barlow-Beeston uses fractional uncertainty on MC, so sqrt(sum[w^2])/mc
-    double fractional = sqrt(mcuncert) / predVal;
+    double fractional = datauncert / predVal; 
+    // GetBinError returns sqrt(sum[w^2])
+    // Using the uncertanty from data to make sure that we are not updating MC weights.
+    //double fractional = datauncert / predVal; //===> sigma     \beta^2+(\mu sigma^2 - 1)\beta - n\sigma^2 = 0
+    //double fractional = mcuncert / predVal;         
     // -b/2a in quadratic equation
-    double temp = predVal * fractional * fractional - 1;
+    double temp = predVal * fractional * fractional - 1; //b     \beta^2+ temp\beta - dataVal * fractional * fractional = 0
     // b^2 - 4ac in quadratic equation
     double temp2 = temp * temp + 4 * dataVal * fractional * fractional;
 
