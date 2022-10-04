@@ -227,11 +227,6 @@ void Propagator::initialize() {
     }
   }
 
-//  if( GlobalVariables::isEnableDevMode() ){
-//    LogInfo << "Loading dials stack..." << std::endl;
-//    fillDialsStack();
-//  }
-
   if( _showEventBreakdown_ ){
 
     if(true){
@@ -301,6 +296,11 @@ void Propagator::initialize() {
 
   LogInfo << "Filling up sample histograms..." << std::endl;
   _fitSampleSet_.updateSampleHistograms();
+
+  LogInfo << "Saving nominal histograms..." << std::endl;
+  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    sample.getMcContainer().saveAsHistogramNominal();
+  }
 
   // Now the data won't be refilled each time
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
