@@ -9,6 +9,8 @@
 
 #include "GenericToolbox.h"
 
+#include "nlohmann/json.hpp"
+
 #include "string"
 #include "sstream"
 #include "memory"
@@ -82,7 +84,13 @@ namespace JointProbability{
     double eval(const FitSample& sample_, int bin_) override;
   };
   class BarlowLLH_BANFF_OA2021 : public JointProbability{
+
+  public:
     double eval(const FitSample& sample_, int bin_) override;
+    void readConfig(const nlohmann::json& config_);
+
+    bool usePoissonLikelihood{false};
+    bool BBNoUpdateWeights{false};
   };
 
 }

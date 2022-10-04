@@ -358,7 +358,12 @@ void FitterEngine::varyEvenRates(const std::vector<double>& paramVariationList_,
 
       buffEvtRatesMap.emplace_back();
 
-      par_.setParameterValue(par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue());
+      if(par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue() > par_.getMaxValue()) 
+        par_.setParameterValue(par_.getMaxValue());
+      else if (par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue() < par_.getMinValue())
+        par_.setParameterValue(par_.getMinValue());
+      else
+        par_.setParameterValue(par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue());
 
 
       _propagator_.propagateParametersOnSamples();

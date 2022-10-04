@@ -35,6 +35,7 @@ public:
   // Histograms
   DataBinSet binning;
   std::shared_ptr<TH1D> histogram{nullptr};
+  std::shared_ptr<TH1D> histogramNominal{nullptr};
   std::vector<std::vector<PhysicsEvent*>> perBinEventPtrList;
   double histScale{1};
   bool isLocked{false};
@@ -46,6 +47,7 @@ public:
   void updateBinEventList(int iThread_ = -1);
   void refillHistogram(int iThread_ = -1);
   void rescaleHistogram();
+  void saveAsHistogramNominal();
 
   void throwStatError();
 

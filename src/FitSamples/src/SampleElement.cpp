@@ -145,6 +145,9 @@ void SampleElement::rescaleHistogram() {
   if( isLocked ) return;
   if( histScale != 1 ) histogram->Scale(histScale);
 }
+void SampleElement::saveAsHistogramNominal(){
+  histogramNominal = std::make_shared<TH1D>(*histogram);
+}
 
 void SampleElement::throwStatError(){
   int nCounts;
