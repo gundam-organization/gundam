@@ -36,27 +36,31 @@ int main(int argc, char** argv){
   // --------------------------
   CmdLineParser clParser;
 
-  clParser.addTriggerOption("dry-run", {"--dry-run", "-d"},"Perform the full sequence of initialization, but don't do the actual fit.");
-  clParser.addTriggerOption("asimov", {"-a", "--asimov"}, "Use MC dataset to fill the data histograms");
-  clParser.addTriggerOption("enablePca", {"--enable-pca"}, "Enable principle component analysis for eigen decomposed parameter sets");
-  clParser.addTriggerOption("skipHesse", {"--skip-hesse"}, "Don't perform postfit error evaluation");
-
-  clParser.addTriggerOption("generateOneSigmaPlots", {"--one-sigma"}, "Generate one sigma plots");
-  clParser.addTriggerOption("usingCacheManager", {"--cache-manager"}, "Event weight cache handle by the CacheManager");
-  clParser.addTriggerOption("usingGpu", {"--gpu"}, "Use GPU parallelization");
+  clParser.addDummyOption("Main options");
 
   clParser.addOption("configFile", {"-c", "--config-file"}, "Specify path to the fitter config file");
   clParser.addOption("nbThreads", {"-t", "--nb-threads"}, "Specify nb of parallel threads");
   clParser.addOption("outputFile", {"-o", "--out-file"}, "Specify the output file");
   clParser.addOption("randomSeed", {"-s", "--seed"}, "Set random seed");
 
-  clParser.addOption("toyFit", {"--toy"}, "Run a toy fit");
-  clParser.addOption("debugVerbose", {"--debug"}, "Enable debug verbose");
-  clParser.addOption("scanParameters", {"--scan"}, "Enable parameter scan before and after the fit");
+  clParser.addDummyOption("Trigger options");
 
-  clParser.getOptionPtr("toyFit")->setAllowEmptyValue(true); // --toy can be followed or not by the toy index
-  clParser.getOptionPtr("debugVerbose")->setAllowEmptyValue(true); // --debug can be followed or not by the verbose level
-  clParser.getOptionPtr("scanParameters")->setAllowEmptyValue(true); // --scan can be followed or not by the number of steps
+  clParser.addTriggerOption("dry-run", {"--dry-run", "-d"},"Perform the full sequence of initialization, but don't do the actual fit.");
+  clParser.addTriggerOption("asimov", {"-a", "--asimov"}, "Use MC dataset to fill the data histograms");
+  clParser.addTriggerOption("enablePca", {"--enable-pca"}, "Enable principle component analysis for eigen decomposed parameter sets");
+  clParser.addTriggerOption("skipHesse", {"--skip-hesse"}, "Don't perform postfit error evaluation");
+  clParser.addTriggerOption("generateOneSigmaPlots", {"--one-sigma"}, "Generate one sigma plots");
+  clParser.addOption("scanParameters", {"--scan"}, "Enable parameter scan before and after the fit (can provide nSteps)", 1, true);
+  clParser.addOption("toyFit", {"--toy"}, "Run a toy fit (optional arg to provide toy index)", 1, true);
+
+  clParser.addDummyOption("Runtime/debug options");
+
+  clParser.addOption("debugVerbose", {"--debug"}, "Enable debug verbose (can provide verbose level arg)", 1, true);
+  clParser.addTriggerOption("usingCacheManager", {"--cache-manager"}, "Event weight cache handle by the CacheManager");
+  clParser.addTriggerOption("usingGpu", {"--gpu"}, "Use GPU parallelization");
+
+  clParser.addDummyOption();
+
 
   LogInfo << "Usage: " << std::endl;
   LogInfo << clParser.getConfigSummary() << std::endl << std::endl;
