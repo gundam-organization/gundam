@@ -74,6 +74,9 @@ void FitterEngine::setEnablePostFitScan(bool enablePostFitScan) {
 void FitterEngine::setEnablePostFitErrorEval(bool enablePostFitErrorEval_) {
   _enablePostFitErrorEval_ = enablePostFitErrorEval_;
 }
+void FitterEngine::setEnablePca(bool enablePca_){
+  _enablePca_ = enablePca_;
+}
 
 void FitterEngine::initialize() {
 
@@ -101,7 +104,8 @@ void FitterEngine::initialize() {
     this->rescaleParametersStepSize();
   }
 
-  if( JsonUtils::fetchValue(_config_, "fixGhostFitParameters", false) ) this->fixGhostFitParameters();
+  _enablePca_ = _enablePca_ or JsonUtils::fetchValue(_config_, std::vector<std::string>{"fixGhostFitParameters", "enablePca"}, false);
+  if( _enablePca_ ) this->fixGhostFitParameters();
 
   this->updateChi2Cache();
 
@@ -457,7 +461,7 @@ void FitterEngine::fixGhostFitParameters(){
 
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 
-    if( not JsonUtils::fetchValue(parSet.getConfig(), "fixGhostFitParameters", false) ) continue;
+    if( not JsonUtils::fetchValue(parSet.getConfig(), std::vector<std::string>{"fixGhostFitParameters", "enablePca"}, false) ) continue;
 
     bool fixNextEigenPars{false};
     auto& parList = parSet.getEffectiveParameterList();
@@ -765,6 +769,30 @@ void FitterEngine::fit(){
   int nbFitCallOffset = _nbFitCalls_;
   LogInfo << "Fit call offset: " << nbFitCallOffset << std::endl;
   _enableFitMonitor_ = true;
+
+  if( JsonUtils::fetchValue(_minimizerConfig_, "enableSimplexBeforeMinimize", false) ){
+    LogWarning << "Running simplex algo before the minimizer" << std::endl;
+    LogThrowIf(_minimizerType_ != "Minuit2", "Can't launch simplex with " << _minimizerType_);
+
+    std::string originalAlgo = _minimizer_->Options().MinimizerAlgorithm();
+
+    _minimizer_->Options().SetMinimizerAlgorithm("Simplex");
+    _minimizer_->SetMaxFunctionCalls(JsonUtils::fetchValue(_minimizerConfig_, "simplexMaxFcnCalls", (unsigned int)(1000)));
+    _minimizer_->SetTolerance(
+          JsonUtils::fetchValue(_minimizerConfig_, "tolerance", 1E-4)
+        * JsonUtils::fetchValue(_minimizerConfig_, "simplexToleranceLoose", 1000)
+        );
+    _fitHasConverged_ = _minimizer_->Minimize();
+
+    _minimizer_->Options().SetMinimizerAlgorithm(originalAlgo.c_str());
+    _minimizer_->SetMaxFunctionCalls(JsonUtils::fetchValue(_minimizerConfig_, "max_fcn", (unsigned int)(1E9)));
+    _minimizer_->SetTolerance(JsonUtils::fetchValue(_minimizerConfig_, "tolerance", 1E-4));
+
+    LogInfo << _convergenceMonitor_.generateMonitorString(); // lasting printout
+    LogWarning << "Simplex ended after " << _nbFitCalls_ - nbFitCallOffset << " calls." << std::endl;
+  }
+
+
   _fitHasConverged_ = _minimizer_->Minimize();
   _enableFitMonitor_ = false;
   int nbMinimizeCalls = _nbFitCalls_ - nbFitCallOffset;
@@ -1035,7 +1063,7 @@ double FitterEngine::evalFit(const double* parArray_){
 #ifndef GUNDAM_BATCH
       ss << "├─";
 #endif
-      ss << " Avg time for " << _minimizerType_ << "/" << _minimizerAlgo_ << ":   " << _outEvalFitAvgTimer_;
+      ss << " Avg time for " << _minimizer_->Options().MinimizerType() << "/" << _minimizer_->Options().MinimizerAlgorithm() << ":   " << _outEvalFitAvgTimer_;
       ss << std::endl;
 #ifndef GUNDAM_BATCH
       ss << "├─";
