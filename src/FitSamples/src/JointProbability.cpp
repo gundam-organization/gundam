@@ -5,6 +5,8 @@
 #include "JointProbability.h"
 
 #include "Logger.h"
+#include "GenericToolbox.h"
+#include "JsonUtils.h"
 
 #include "TMath.h"
 
@@ -137,8 +139,7 @@ namespace JointProbability{
 
     TH1D* data = sample_.getDataContainer().histogram.get();
     TH1D* predMC = sample_.getMcContainer().histogram.get();
-    TH1D* nomMC = sample_.getMcContainer().histogram.get(); // TODO: save the NOMINAL histogram and pull it back here
-    int iBin = bin_;
+    TH1D* nomMC = sample_.getMcContainer().histogramNominal.get();
 
     // From OA2021_Eb branch -> BANFFBinnedSample::CalcLLRContrib
     // https://github.com/t2k-software/BANFF/blob/OA2021_Eb/src/BANFFSample/BANFFBinnedSample.cxx
@@ -146,8 +147,8 @@ namespace JointProbability{
     double chisq = 0.0;
     double dataVal, predVal;
 
-    bool usePoissonLikelihood{false}; // = (bool)ND::params().GetParameterI("BANFF.UsePoissonLikelihood");
-    bool BBNoUpdateWeights{false}; //    = (bool)ND::params().GetParameterI("BANFF.BarlowBeestonNoUpdateWeights");
+//    bool usePoissonLikelihood = (bool)ND::params().GetParameterI("BANFF.UsePoissonLikelihood");
+//    bool BBNoUpdateWeights = (bool)ND::params().GetParameterI("BANFF.BarlowBeestonNoUpdateWeights");
 
     //Loop over all the bins one by one using their unique bin index.
     //Use the stored nBins value and bins array so avoid trying to calculate
@@ -158,10 +159,12 @@ namespace JointProbability{
       dataVal = data->GetBinContent(bin_);
       predVal = predMC->GetBinContent(bin_);
       double mcuncert;
-      if (BBNoUpdateWeights)
+      if (BBNoUpdateWeights){
         mcuncert = nomMC->GetBinError(bin_);
-      else
+      }
+      else{
         mcuncert = predMC->GetBinError(bin_);
+      }
 
       //implementing Barlow-Beeston correction for LH calculation
       //the following comments are inspired/copied from Clarence's comments in the MaCh3
@@ -227,5 +230,12 @@ namespace JointProbability{
 //    }
 
     return chisq;
+  }
+  void BarlowLLH_BANFF_OA2021::readConfig(const nlohmann::json& config_){
+    usePoissonLikelihood = JsonUtils::fetchValue(config_, "usePoissonLikelihood", usePoissonLikelihood);
+    BBNoUpdateWeights = JsonUtils::fetchValue(config_, "BBNoUpdateWeights", BBNoUpdateWeights);
+
+    LogDebug << GET_VAR_NAME_VALUE(usePoissonLikelihood) << std::endl;
+    LogDebug << GET_VAR_NAME_VALUE(BBNoUpdateWeights) << std::endl;
   }
 }
