@@ -88,6 +88,7 @@ private:
   // Internals
   bool _throwAsimovToyParameters_{false};
   bool _enableStatThrowInToys_{true};
+  bool _enableEventMcThrow_{true};
   int _iThrow_{-1};
   bool _isInitialized_{false};
   bool _useResponseFunctions_{false};

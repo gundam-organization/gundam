@@ -122,6 +122,7 @@ void Propagator::initialize() {
 
   _throwAsimovToyParameters_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "throwAsimovFitParameters", _throwAsimovToyParameters_);
   _enableStatThrowInToys_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "enableStatThrowInToys", _enableStatThrowInToys_);
+  _enableEventMcThrow_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "enableEventMcThrow", _enableEventMcThrow_);
 
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Loading datasets...") << std::endl;
   auto dataSetListConfig = JsonUtils::getForwardedConfig(_config_, "dataSetList");
@@ -304,7 +305,14 @@ void Propagator::initialize() {
 
   // Now the data won't be refilled each time
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    if( _throwAsimovToyParameters_ and _enableStatThrowInToys_ ){ sample.getDataContainer().throwStatError(); }
+    if( _throwAsimovToyParameters_ and _enableStatThrowInToys_ ){
+      if( _enableEventMcThrow_ ){
+        // Take into account the finite amount of event in MC
+        sample.getDataContainer().throwEventMcError();
+      }
+      // Asimov bin content -> toy data
+      sample.getDataContainer().throwStatError();
+    }
     sample.getDataContainer().isLocked = true;
   }
 
