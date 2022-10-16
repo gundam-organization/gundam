@@ -625,7 +625,16 @@ void DataDispenser::readAndFill(){
     eventBuffer.setDataSetIndex(_owner_->getDataSetIndex());
     eventBuffer.setCommonLeafNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForIndexing));
     auto copyDict = eventBuffer.generateDict(tEventBuffer, _parameters_.overrideLeafDict);
-
+    if(iThread_ == 0){
+      LogInfo << "Copy dictionary: {" << std::endl;
+      for( size_t iVar = 0 ; iVar < eventBuffer.getCommonLeafNameListPtr()->size() ; iVar++ ){
+        if(iVar != 0) LogInfo << "," << std::endl;
+        LogInfo << "  " << (*eventBuffer.getCommonLeafNameListPtr())[iVar] << " << ";
+        LogInfo << copyDict[iVar].first->getLeafFullName();
+        if(copyDict[iVar].second != -1) LogInfo << "[" << copyDict[iVar].second << "]";
+      }
+      LogInfo << std::endl << "}" << std::endl;
+    }
     eventBuffer.copyData(copyDict); // resize array obj
     eventBuffer.resizeVarToDoubleCache();
 
