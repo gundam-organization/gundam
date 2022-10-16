@@ -691,10 +691,10 @@ void DataDispenser::readAndFill(){
                 << std::endl;
       }
       if( not varTransformForStorageList.empty() ){
-        LogInfo << "Event var transform used for storage: "
+        LogInfo << "EventVarTransform used for storage: "
                 << GenericToolbox::iterableToString(
                     varTransformForStorageList, [](
-                        const EventVarTransform* elm_){ return "\"" + elm_->getOutputVariableName() + "\""; }, false) << std::endl;
+                        const EventVarTransform* elm_){ return "\"" + elm_->getTitle() + "\""; }, false) << std::endl;
       }
     }
 
