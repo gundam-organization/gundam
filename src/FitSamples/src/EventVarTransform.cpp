@@ -32,6 +32,7 @@ void EventVarTransform::setUseCache(bool useCache_) { _useCache_ = useCache_; }
 
 int EventVarTransform::getIndex() const { return _index_; }
 bool EventVarTransform::useCache() const { return _useCache_; }
+const std::string &EventVarTransform::getTitle() const { return _title_; }
 const std::string &EventVarTransform::getOutputVariableName() const { return _outputVariableName_; }
 
 const std::vector<std::string>& EventVarTransform::fetchRequestedVars() const {

@@ -675,10 +675,10 @@ void DataDispenser::readAndFill(){
 
     if( iThread_ == 0 ){
       if( not varTransformForIndexingList.empty() ){
-        LogInfo << "Event var transform used for indexing: "
+        LogInfo << "EventVarTransform used for indexing: "
                 << GenericToolbox::iterableToString(
                     varTransformForIndexingList,
-                    [](const EventVarTransform* elm_){ return "\"" + elm_->getOutputVariableName() + "\"";}, false)
+                    [](const EventVarTransform* elm_){ return "\"" + elm_->getTitle() + "\"";}, false)
                 << std::endl;
       }
       if( not varTransformForStorageList.empty() ){

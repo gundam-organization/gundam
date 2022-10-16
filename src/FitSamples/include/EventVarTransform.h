@@ -28,6 +28,7 @@ public:
 
   int getIndex() const;
   bool useCache() const;
+  const std::string &getTitle() const;
   const std::string &getOutputVariableName() const;
 
   const std::vector<std::string>& fetchRequestedVars() const;
