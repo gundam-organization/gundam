@@ -620,20 +620,61 @@ void DataDispenser::readAndFill(){
     // TTree data buffer
     auto tEventBuffer = this->generateTreeEventBuffer(&treeChain, _cache_.varsRequestedForIndexing);
 
+    // Event Var Transform
+    auto eventVarTransformList = _cache_.eventVarTransformList; // copy for cache
+    std::vector<EventVarTransform*> varTransformForIndexingList;
+    std::vector<EventVarTransform*> varTransformForStorageList;
+    for( auto& eventVarTransform : eventVarTransformList ){
+      if( GenericToolbox::doesElementIsInVector(eventVarTransform.getOutputVariableName(), _cache_.varsRequestedForIndexing) ){
+        varTransformForIndexingList.emplace_back(&eventVarTransform);
+      }
+      if( GenericToolbox::doesElementIsInVector(eventVarTransform.getOutputVariableName(), _cache_.varsRequestedForStorage) ){
+        varTransformForStorageList.emplace_back(&eventVarTransform);
+      }
+    }
+
+    if( iThread_ == 0 ){
+      if( not varTransformForIndexingList.empty() ){
+        LogInfo << "EventVarTransform used for indexing: "
+                << GenericToolbox::iterableToString(
+                    varTransformForIndexingList,
+                    [](const EventVarTransform* elm_){ return "\"" + elm_->getTitle() + "\"";}, false)
+                << std::endl;
+      }
+      if( not varTransformForStorageList.empty() ){
+        LogInfo << "EventVarTransform used for storage: "
+                << GenericToolbox::iterableToString(
+                    varTransformForStorageList, [](
+                        const EventVarTransform* elm_){ return "\"" + elm_->getTitle() + "\""; }, false) << std::endl;
+      }
+    }
+
     // buffer that will store the data for indexing
     PhysicsEvent eventBuffer;
     eventBuffer.setDataSetIndex(_owner_->getDataSetIndex());
     eventBuffer.setCommonLeafNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForIndexing));
     auto copyDict = eventBuffer.generateDict(tEventBuffer, _parameters_.overrideLeafDict);
     if(iThread_ == 0){
-      LogInfo << "Copy dictionary: {" << std::endl;
+      LogInfo << "Feeding event variables with:" << std::endl;
+      GenericToolbox::TablePrinter t;
+      t.setColTitles({{"Variable"}, {"Leaf"}, {"Transforms"}});
       for( size_t iVar = 0 ; iVar < eventBuffer.getCommonLeafNameListPtr()->size() ; iVar++ ){
-        if(iVar != 0) LogInfo << "," << std::endl;
-        LogInfo << "  " << (*eventBuffer.getCommonLeafNameListPtr())[iVar] << " << ";
-        LogInfo << copyDict[iVar].first->getLeafFullName();
-        if(copyDict[iVar].second != -1) LogInfo << "[" << copyDict[iVar].second << "]";
+        t << (*eventBuffer.getCommonLeafNameListPtr())[iVar] << std::endl;
+
+        t << copyDict[iVar].first->getLeafFullName();
+        if(copyDict[iVar].second != -1) t << "[" << copyDict[iVar].second << "]";
+        t << std::endl;
+
+        std::vector<std::string> transformsList;
+        for( auto* varTransformForIndexing : varTransformForIndexingList ){
+          if( varTransformForIndexing->getOutputVariableName() == (*eventBuffer.getCommonLeafNameListPtr())[iVar] ){
+            transformsList.emplace_back(varTransformForIndexing->getTitle());
+          }
+        }
+        t << GenericToolbox::parseVectorAsString(transformsList);
+        t << std::endl;
       }
-      LogInfo << std::endl << "}" << std::endl;
+      t.printTable();
     }
     eventBuffer.copyData(copyDict); // resize array obj
     eventBuffer.resizeVarToDoubleCache();
@@ -668,35 +709,6 @@ void DataDispenser::readAndFill(){
     SplineDial* spDialPtr;
     GraphDial* grDialPtr;
     const DataBin* applyConditionBinPtr;
-
-    // Event Var Transform
-    auto eventVarTransformList = _cache_.eventVarTransformList; // copy for cache
-    std::vector<EventVarTransform*> varTransformForIndexingList;
-    std::vector<EventVarTransform*> varTransformForStorageList;
-    for( auto& eventVarTransform : eventVarTransformList ){
-      if( GenericToolbox::doesElementIsInVector(eventVarTransform.getOutputVariableName(), _cache_.varsRequestedForIndexing) ){
-        varTransformForIndexingList.emplace_back(&eventVarTransform);
-      }
-      if( GenericToolbox::doesElementIsInVector(eventVarTransform.getOutputVariableName(), _cache_.varsRequestedForStorage) ){
-        varTransformForStorageList.emplace_back(&eventVarTransform);
-      }
-    }
-
-    if( iThread_ == 0 ){
-      if( not varTransformForIndexingList.empty() ){
-        LogInfo << "EventVarTransform used for indexing: "
-                << GenericToolbox::iterableToString(
-                    varTransformForIndexingList,
-                    [](const EventVarTransform* elm_){ return "\"" + elm_->getTitle() + "\"";}, false)
-                << std::endl;
-      }
-      if( not varTransformForStorageList.empty() ){
-        LogInfo << "EventVarTransform used for storage: "
-                << GenericToolbox::iterableToString(
-                    varTransformForStorageList, [](
-                        const EventVarTransform* elm_){ return "\"" + elm_->getTitle() + "\""; }, false) << std::endl;
-      }
-    }
 
     // Try to read TTree the closest to sequentially possible
     Long64_t nEvents = treeChain.GetEntries();
