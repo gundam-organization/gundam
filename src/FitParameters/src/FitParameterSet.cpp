@@ -394,49 +394,34 @@ std::string FitParameterSet::getSummary() const {
 
     if( not _parameterList_.empty() ){
 
-      std::vector<std::vector<std::string>> tableLines;
-      tableLines.emplace_back(std::vector<std::string>{
-        "Title",
-        "Value",
-        "Prior",
-        "StdDev",
-//        "StepSize",
-        "Min",
-        "Max",
-        "Status"
-      });
+      GenericToolbox::TablePrinter t;
+      t.setColTitles({ {"Title"}, {"Value"}, {"Prior"}, {"StdDev"}, {"Min"}, {"Max"}, {"Status"} });
 
 
       for( const auto& par : _parameterList_ ){
-        std::vector<std::string> lineValues(tableLines[0].size());
-        int idx{0};
-        lineValues[idx++] = par.getTitle();
-        lineValues[idx++] = std::to_string( par.getParameterValue() );
-        lineValues[idx++] = std::to_string( par.getPriorValue() );
-        lineValues[idx++] = std::to_string( par.getStdDevValue() );
-//        lineValues[idx++] = std::to_string( par.getStepSize() );
-
-        lineValues[idx++] = std::to_string( par.getMinValue() );
-        lineValues[idx++] = std::to_string( par.getMaxValue() );
-
         std::string colorStr;
+        std::string statusStr;
 
-        if( not par.isEnabled() ) { lineValues.back() = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackground; }
-        else if( par.isFixed() )  { lineValues.back() = "Fixed";    colorStr = GenericToolbox::ColorCodes::redBackground; }
-        else if( par.isFree() )   { lineValues.back() = "Free"; }
-        else                      { lineValues.back() = "Fit"; }
+        if( not par.isEnabled() ) { statusStr = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackground; }
+        else if( par.isFixed() )  { statusStr = "Fixed";    colorStr = GenericToolbox::ColorCodes::redBackground; }
+        else if( par.isFree() )   { statusStr = "Free";     colorStr = GenericToolbox::ColorCodes::blueBackground; }
+        else                      { statusStr = "Fit"; }
 
-#ifndef NOCOLOR
-        for( auto& line : lineValues ){
-          if(not line.empty()) line = colorStr + line + GenericToolbox::ColorCodes::resetColor;
-        }
+#ifdef NOCOLOR
+        colorStr = "";
 #endif
 
-        tableLines.emplace_back(lineValues);
+        t.addTableLine({
+          par.getTitle(),
+          std::to_string( par.getParameterValue() ),
+          std::to_string( par.getPriorValue() ),
+          std::to_string( par.getStdDevValue() ),
+          std::to_string( par.getMinValue() ),
+          std::to_string( par.getMaxValue() ),
+          statusStr
+        }, colorStr);
       }
 
-      GenericToolbox::TablePrinter t;
-      t.fillTable(tableLines);
       t.printTable();
     }
   }
