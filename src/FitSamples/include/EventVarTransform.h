@@ -50,6 +50,7 @@ private:
   // Config
   std::string _title_;
   std::string _libraryFile_;
+  std::string _messageOnError_;
   std::string _outputVariableName_;
   std::vector<std::string> _inputFormulaStrList_;
 

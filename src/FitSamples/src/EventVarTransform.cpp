@@ -64,15 +64,16 @@ void EventVarTransform::evalAndStore(const PhysicsEvent& evalEvent_, PhysicsEven
 void EventVarTransform::readConfig(const nlohmann::json& config_){
   _title_ = JsonUtils::fetchValue<std::string>(config_, "title");
   _libraryFile_ = JsonUtils::fetchValue<std::string>(config_, "libraryFile");
+  _messageOnError_ = JsonUtils::fetchValue<std::string>(config_, "messageOnError", "");
   _outputVariableName_ = JsonUtils::fetchValue<std::string>(config_, "outputVariableName");
   _inputFormulaStrList_ = JsonUtils::fetchValue(config_, "inputList", std::vector<std::string>());
 }
 void EventVarTransform::loadLibrary(){
   LogInfo << "Loading shared lib: " << _libraryFile_ << std::endl;
   _loadedLibrary_ = dlopen(_libraryFile_.c_str(), RTLD_LAZY );
-  LogThrowIf(_loadedLibrary_ == nullptr, "Cannot open library: " << dlerror());
+  LogThrowIf(_loadedLibrary_ == nullptr, "Cannot open library: " << dlerror() << std::endl << _messageOnError_);
   _evalVariable_ = (dlsym(_loadedLibrary_, "evalVariable"));
-  LogThrowIf(_evalVariable_ == nullptr, "Cannot open evalFcn");
+  LogThrowIf(_evalVariable_ == nullptr, "Cannot open evalFcn" << std::endl << _messageOnError_);
 }
 void EventVarTransform::initInputFormulas(){
   _inputFormulaList_.clear();
