@@ -115,8 +115,8 @@ void DataDispenser::load(){
     }
     // make sure we process the longest words first: "thisIsATest" variable should be replaced before "thisIs"
     std::function<bool(const std::string&, const std::string&)> aGoesFirst =
-				[](const std::string& a_, const std::string& b_){ return a_.size() > b_.size(); };
-		GenericToolbox::sortVector(_cache_.varsToOverrideList, aGoesFirst);
+        [](const std::string& a_, const std::string& b_){ return a_.size() > b_.size(); };
+    GenericToolbox::sortVector(_cache_.varsToOverrideList, aGoesFirst);
   }
 
   if( JsonUtils::doKeyExist(_config_, "variablesTransform") ){
@@ -129,15 +129,15 @@ void DataDispenser::load(){
     // sort them according to their output
     std::function<bool(const EventVarTransform&, const EventVarTransform&)> aGoesFirst =
         [](const EventVarTransform& a_, const EventVarTransform& b_){
-      // does a_ is a self transformation? -> if yes, don't change the order
-      if( GenericToolbox::doesElementIsInVector(a_.getOutputVariableName(), a_.fetchRequestedVars()) ){ return false; }
-      // does b_ transformation needs a_ output? -> if yes, a needs to go first
-      if( GenericToolbox::doesElementIsInVector(a_.getOutputVariableName(), b_.fetchRequestedVars()) ){ return true; }
-      // otherwise keep the order from the declaration
-      if( a_.getIndex() < b_.getIndex() ) return true;
-      // default -> won't change the order
-      return false;
-    };
+          // does a_ is a self transformation? -> if yes, don't change the order
+          if( GenericToolbox::doesElementIsInVector(a_.getOutputVariableName(), a_.fetchRequestedVars()) ){ return false; }
+          // does b_ transformation needs a_ output? -> if yes, a needs to go first
+          if( GenericToolbox::doesElementIsInVector(a_.getOutputVariableName(), b_.fetchRequestedVars()) ){ return true; }
+          // otherwise keep the order from the declaration
+          if( a_.getIndex() < b_.getIndex() ) return true;
+          // default -> won't change the order
+          return false;
+        };
     GenericToolbox::sortVector(_cache_.eventVarTransformList, aGoesFirst);
   }
 
@@ -229,26 +229,26 @@ void DataDispenser::doEventSelection(){
     t.setColTitles({{"Sample"}, {"Selection Cut"}});
     for (size_t iSample = 0; iSample < _cache_.samplesToFillList.size(); iSample++) {
 
-        std::string selectionCut = _cache_.samplesToFillList[iSample]->getSelectionCutsStr();
-        for (auto &replaceEntry: _cache_.varsToOverrideList) {
-          GenericToolbox::replaceSubstringInsideInputString(selectionCut, replaceEntry,
-                                                            _parameters_.overrideLeafDict[replaceEntry]);
-        }
-
-        t.addTableLine({{"\"" + _cache_.samplesToFillList[iSample]->getName() + "\""},
-                        {"\"" + selectionCut + "\""}});
-        sampleCutFormulaList[iSample] = new TTreeFormula(_cache_.samplesToFillList[iSample]->getName().c_str(),
-                                                         selectionCut.c_str(), &treeChain);
-
-        // ROOT Hot fix: https://root-forum.cern.ch/t/ttreeformula-evalinstance-return-0-0/16366/10
-        sampleCutFormulaList[iSample]->GetNdata();
-
-        LogThrowIf(sampleCutFormulaList[iSample]->GetNdim() == 0,
-                   "\"" << selectionCut << "\" could not be parsed by the TChain");
-
-        // The TChain will notify the formula that it has to update leaves addresses while swaping TFile
-        formulaManager.Add(sampleCutFormulaList[iSample]);
+      std::string selectionCut = _cache_.samplesToFillList[iSample]->getSelectionCutsStr();
+      for (auto &replaceEntry: _cache_.varsToOverrideList) {
+        GenericToolbox::replaceSubstringInsideInputString(selectionCut, replaceEntry,
+                                                          _parameters_.overrideLeafDict[replaceEntry]);
       }
+
+      t.addTableLine({{"\"" + _cache_.samplesToFillList[iSample]->getName() + "\""},
+                      {"\"" + selectionCut + "\""}});
+      sampleCutFormulaList[iSample] = new TTreeFormula(_cache_.samplesToFillList[iSample]->getName().c_str(),
+                                                       selectionCut.c_str(), &treeChain);
+
+      // ROOT Hot fix: https://root-forum.cern.ch/t/ttreeformula-evalinstance-return-0-0/16366/10
+      sampleCutFormulaList[iSample]->GetNdata();
+
+      LogThrowIf(sampleCutFormulaList[iSample]->GetNdim() == 0,
+                 "\"" << selectionCut << "\" could not be parsed by the TChain");
+
+      // The TChain will notify the formula that it has to update leaves addresses while swaping TFile
+      formulaManager.Add(sampleCutFormulaList[iSample]);
+    }
     treeChain.SetNotify(&formulaManager);
     if(iThread_==0) t.printTable();
 
@@ -288,12 +288,12 @@ void DataDispenser::doEventSelection(){
           ssProgressTitle.str("");
 
           ssProgressTitle << LogDebug.getPrefixString() << "Read from disk: "
-          << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.getTotalAccumulated()), 8) << " ("
-          << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.evalTotalGrowthRate()), 8) << "/s)";
+                          << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.getTotalAccumulated()), 8) << " ("
+                          << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.evalTotalGrowthRate()), 8) << "/s)";
 
           int cpuPercent = int(GenericToolbox::getCpuUsageByProcess());
           ssProgressTitle << " / CPU efficiency: " << GenericToolbox::padString(std::to_string(cpuPercent/nThreads), 3,' ')
-          << "%" << std::endl;
+                          << "%" << std::endl;
 
           ssProgressTitle << LogInfo.getPrefixString() << progressTitle;
           GenericToolbox::displayProgressBar(iGlobal, nEvents, ssProgressTitle.str());
@@ -605,7 +605,7 @@ void DataDispenser::readAndFill(){
           Form("NominalWeightFormula%i", iThread_),
           _parameters_.nominalWeightFormulaStr.c_str(),
           &treeChain
-          );
+      );
 
       // ROOT Hot fix: https://root-forum.cern.ch/t/ttreeformula-evalinstance-return-0-0/16366/10
       threadNominalWeightFormula->GetNdata();
@@ -672,6 +672,11 @@ void DataDispenser::readAndFill(){
           }
         }
         t << GenericToolbox::parseVectorAsString(transformsList);
+
+        if( GenericToolbox::doesElementIsInVector((*eventBuffer.getCommonLeafNameListPtr())[iVar], _cache_.varsRequestedForStorage)){
+          t.setColorBuffer(GenericToolbox::ColorCodes::blueBackground);
+        }
+
         t << std::endl;
       }
       t.printTable();
@@ -736,12 +741,12 @@ void DataDispenser::readAndFill(){
           ssProgressBar.str("");
 
           ssProgressBar << LogInfo.getPrefixString() << "Reading from disk: "
-                          << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.getTotalAccumulated()), 8) << " ("
-                          << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.evalTotalGrowthRate()), 8) << "/s)";
+                        << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.getTotalAccumulated()), 8) << " ("
+                        << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.evalTotalGrowthRate()), 8) << "/s)";
 
           int cpuPercent = int(GenericToolbox::getCpuUsageByProcess());
           ssProgressBar << " / CPU efficiency: " << GenericToolbox::padString(std::to_string(cpuPercent/nThreads), 3,' ')
-                          << "%" << std::endl;
+                        << "%" << std::endl;
 
           ssProgressBar << LogInfo.getPrefixString() << progressTitle;
           GenericToolbox::displayProgressBar(iGlobal, nEvents, ssProgressBar.str());
@@ -929,7 +934,7 @@ void DataDispenser::readAndFill(){
                   if( (applyConditionBinPtr = dialSetPtr->getDialList()[iDial]->getApplyConditionBinPtr()) != nullptr ){
                     if( lastFailedBinVarIndex != -1 // if the last bin failed, this is not -1
                         and applyConditionBinPtr->getEventVarIndexCache()[lastFailedBinVarIndex] == lastEventVarIndex // make sure this new bin-edges point to the same variable
-                    ){
+                        ){
                       if( *lastEdges == applyConditionBinPtr->getEdgesList()[lastFailedBinVarIndex] ){ continue; } // same bin-edges! no need to check again!
                       else{ lastEdges = &applyConditionBinPtr->getEdgesList()[lastFailedBinVarIndex]; }
                       if( not DataBin::isBetweenEdges( *lastEdges, eventBuffer.getVarAsDouble(lastEventVarIndex) )){
@@ -1004,7 +1009,7 @@ GenericToolbox::TreeEntryBuffer DataDispenser::generateTreeEventBuffer(TChain* t
     LogThrowIf(
         not GenericToolbox::doesKeyIsInMap(var, _cache_.varToLeafDict),
         "Could not find \"" << var << "\" in " << GenericToolbox::parseMapAsString(_cache_.varToLeafDict)
-        );
+    );
     if( not GenericToolbox::doesElementIsInVector(_cache_.varToLeafDict[var].first, leafVarList) ){
       leafVarList.emplace_back(_cache_.varToLeafDict[var].first);
     }
