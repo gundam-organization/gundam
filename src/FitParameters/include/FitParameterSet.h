@@ -115,7 +115,7 @@ private:
   bool _isEnabled_{};
   bool _maskedForPropagation_{false};
   int _nbParameterDefinition_{-1};
-  double _nominalStepSize_{-1};
+  double _nominalStepSize_{std::nan("unset")};
   int _maxNbEigenParameters_{-1};
   double _maxEigenFraction_{1};
 

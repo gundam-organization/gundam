@@ -9,7 +9,7 @@
 #include "Dial.h"
 #include "NestedDialTest.h"
 
-#include "GenericToolbox.Root.TreeEventBuffer.h"
+#include "GenericToolbox.Root.TreeEntryBuffer.h"
 #include "GenericToolbox.Root.LeafHolder.h"
 #include <GenericToolbox.RawDataArray.h>
 #include "GenericToolbox.AnyType.h"
@@ -74,16 +74,17 @@ public:
   void fillBuffer(const std::vector<int>& indexList_, std::vector<double>& buffer_) const;
 
   // Eval
-  double evalFormula(TFormula* formulaPtr_, std::vector<int>* indexDict_ = nullptr) const;
+  double evalFormula(const TFormula* formulaPtr_, std::vector<int>* indexDict_ = nullptr) const;
 
   // Misc
   void print() const;
   void trimDialCache();
   std::string getSummary() const;
+
   std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>> generateLeavesDictionary(bool disableArrays_ = false) const;
 
-  void copyData(const std::vector<std::pair<const GenericToolbox::LeafHolder*, int>>& dict_, bool disableArrayStorage_=false);
-  std::vector<std::pair<const GenericToolbox::LeafHolder*, int>> generateDict(const GenericToolbox::TreeEventBuffer& h_, const std::map<std::string, std::string>& leafDict_={});
+  void copyData(const std::vector<std::pair<const GenericToolbox::LeafHolder *, int>> &dict_);
+  std::vector<std::pair<const GenericToolbox::LeafHolder*, int>> generateDict(const GenericToolbox::TreeEntryBuffer& treeEventBuffer_, const std::map<std::string, std::string>& leafDict_={});
   void copyLeafContent(const PhysicsEvent& ref_);
   void resizeVarToDoubleCache();
   void invalidateVarToDoubleCache();
@@ -92,7 +93,7 @@ public:
   friend std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p );
 
   // DEV
-  void addNestedDialRefToCache(NestedDialTest* nestedDialPtr_, const std::vector<Dial*>& dialPtrList_ = std::vector<Dial*>{});
+  void addNestedDialRefToCache(NestedDialTest* nestedDialPtr_, const std::vector<Dial*>& dialPtrList_ = {});
 
 private:
   // Context variables

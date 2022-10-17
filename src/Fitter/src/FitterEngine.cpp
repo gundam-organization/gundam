@@ -506,9 +506,9 @@ void FitterEngine::fixGhostFitParameters(){
         LogInfo.moveTerminalCursorBack(1);
         LogInfo << ssPrint.str() << std::endl;
 
-        if( std::abs(deltaChi2Stat) < JsonUtils::fetchValue(_config_, "ghostParameterDeltaChi2Threshold", 1E-6) ){
+        if( std::abs(deltaChi2Stat) < JsonUtils::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, 1E-6) ){
           par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
-          ssPrint << " < " << JsonUtils::fetchValue(_config_, "ghostParameterDeltaChi2Threshold", 1E-6) << " -> FIXED";
+          ssPrint << " < " << JsonUtils::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, 1E-6) << " -> FIXED";
           LogInfo.moveTerminalCursorBack(1);
 #ifndef NOCOLOR
           std::string red(GenericToolbox::ColorCodes::redBackground);
@@ -712,52 +712,40 @@ void FitterEngine::fit(){
 
   for( const auto& parSet : _propagator_.getParameterSetsList() ){
 
-    std::vector<std::vector<std::string>> tableLines;
-    tableLines.emplace_back(std::vector<std::string>{
-        "Title"
-        ,"Starting"
-        ,"Prior"
-        ,"StdDev"
-        ,"Min"
-        ,"Max"
-        ,"Status"
-    });
+    GenericToolbox::TablePrinter t;
+    t.setColTitles({ {"Title"}, {"Starting"}, {"Prior"}, {"StdDev"}, {"Min"}, {"Max"}, {"Status"} });
 
     auto& parList = parSet.getEffectiveParameterList();
     LogWarning << parSet.getName() << ": " << parList.size() << " parameters" << std::endl;
     if( parList.empty() ) continue;
 
     for( const auto& par : parList ){
-      std::vector<std::string> lineValues(tableLines[0].size());
-      int valIndex{0};
-      lineValues[valIndex++] = par.getTitle();
-      lineValues[valIndex++] = std::to_string( par.getParameterValue() );
-      lineValues[valIndex++] = std::to_string( par.getPriorValue() );
-      lineValues[valIndex++] = std::to_string( par.getStdDevValue() );
-
-      lineValues[valIndex++] = std::to_string( par.getMinValue() );
-      lineValues[valIndex++] = std::to_string( par.getMaxValue() );
-
       std::string colorStr;
+      std::string statusStr;
 
-      if( not par.isEnabled() ) { lineValues[valIndex++] = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackground; }
-      else if( par.isFixed() )  { lineValues[valIndex++] = "Fixed";    colorStr = GenericToolbox::ColorCodes::redBackground; }
-      else                      { lineValues[valIndex++] = PriorType::PriorTypeEnumNamespace::toString(par.getPriorType(), true) + " Prior"; }
-
-#ifndef NOCOLOR
-      for( auto& line : lineValues ){
-        if(not line.empty()) line = colorStr + line + GenericToolbox::ColorCodes::resetColor;
+      if( not par.isEnabled() ) { statusStr = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackground; }
+      else if( par.isFixed() )  { statusStr = "Fixed";    colorStr = GenericToolbox::ColorCodes::redBackground; }
+      else                      {
+        statusStr = PriorType::PriorTypeEnumNamespace::toString(par.getPriorType(), true) + " Prior";
+        if(par.getPriorType()==PriorType::Flat) colorStr = GenericToolbox::ColorCodes::blueBackground;
       }
+
+#ifdef NOCOLOR
+      colorStr = "";
 #endif
 
-      tableLines.emplace_back(lineValues);
-
+      t.addTableLine({
+           par.getTitle(),
+           std::to_string( par.getParameterValue() ),
+           std::to_string( par.getPriorValue() ),
+           std::to_string( par.getStdDevValue() ),
+           std::to_string( par.getMinValue() ),
+           std::to_string( par.getMaxValue() ),
+           statusStr
+       }, colorStr);
     }
 
-    GenericToolbox::TablePrinter t;
-    t.fillTable(tableLines);
     t.printTable();
-
   }
 
   _propagator_.allowRfPropagation(); // if RF are setup -> a lot faster

@@ -42,6 +42,7 @@ int main(int argc, char** argv){
   clParser.addOption("nbThreads", {"-t", "--nb-threads"}, "Specify nb of parallel threads");
   clParser.addOption("outputFile", {"-o", "--out-file"}, "Specify the output file");
   clParser.addOption("randomSeed", {"-s", "--seed"}, "Set random seed");
+  clParser.addOption("appendix", {"--appendix"}, "Add appendix to the output file name");
 
   clParser.addDummyOption("Trigger options");
 
@@ -153,6 +154,7 @@ int main(int argc, char** argv){
       if( iToyFit != -1 ){ outFileName += "_" + std::to_string(iToyFit); }
     }
     if( clParser.isOptionTriggered("dry-run") ){ outFileName += "_DryRun"; }
+    if( clParser.isOptionTriggered("appendix") ){ outFileName += "_" + clParser.getOptionVal<std::string>("appendix"); }
 
     outFileName += ".root";
   }

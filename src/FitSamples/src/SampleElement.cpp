@@ -156,7 +156,6 @@ void SampleElement::throwEventMcError(){
   double weightSum;
   for( int iBin = 1 ; iBin <= histogram->GetNbinsX() ; iBin++ ){
     weightSum = 0;
-    gRandom->Poisson(histogram->GetBinContent(iBin));
     for (auto *eventPtr: perBinEventPtrList[iBin-1]) {
       // gRandom->Poisson(1) -> returns an INT -> can be 0
       eventPtr->setEventWeight(gRandom->Poisson(1) * eventPtr->getEventWeight());

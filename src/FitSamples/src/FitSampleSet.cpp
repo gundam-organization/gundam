@@ -41,11 +41,6 @@ void FitSampleSet::initialize() {
 
   LogAssert(not _config_.empty(), "_config_ is not set." << std::endl);
 
-//  _dataEventType_ = DataEventTypeEnumNamespace::toEnum(
-//    JsonUtils::fetchValue<std::string>(_config_, "dataEventType"), true
-//    );
-//  LogInfo << "Data events type is set to: " << DataEventTypeEnumNamespace::toString(_dataEventType_) << std::endl;
-
   LogInfo << "Reading samples definition..." << std::endl;
   auto fitSampleListConfig = JsonUtils::fetchValue(_config_, "fitSampleList", nlohmann::json());
   bool _isEnabled_{false};
