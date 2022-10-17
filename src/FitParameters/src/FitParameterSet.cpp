@@ -627,7 +627,7 @@ void FitParameterSet::defineParameters(){
       _parameterList_[iParameter].setStepSize(TMath::Sqrt((*_priorCovarianceMatrix_)[iParameter][iParameter]));
     }
     else{
-      LogThrowIf(_nominalStepSize_==-1, "Can't define free parameter without a \"nominalStepSize\"")
+      LogThrowIf(std::isnan(_nominalStepSize_), "Can't define free parameter without a \"nominalStepSize\"")
       _parameterList_[iParameter].setStdDevValue(_nominalStepSize_); // stdDev will only be used for display purpose
       _parameterList_[iParameter].setStepSize(_nominalStepSize_);
       _parameterList_[iParameter].setPriorType(PriorType::Flat);

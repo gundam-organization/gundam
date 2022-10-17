@@ -477,14 +477,14 @@ void DataDispenser::fetchRequestedLeaves(){
     }
   }
 
-  GenericToolbox::TablePrinter t;
-  t.setColTitles({"Variable name", "Leaf name", "From VarTransform?"});
-  for( auto& varToLeafDictEntry : _cache_.varToLeafDict ){
-    std::string colorCode{};
-    if( GenericToolbox::doesElementIsInVector(varToLeafDictEntry.first, _cache_.varsRequestedForStorage) ){ colorCode = GenericToolbox::ColorCodes::blueBackground; }
-    t.addTableLine({varToLeafDictEntry.first, varToLeafDictEntry.second.first, std::to_string(varToLeafDictEntry.second.second)}, colorCode);
-  }
-  t.printTable();
+//  GenericToolbox::TablePrinter t;
+//  t.setColTitles({"Variable name", "Leaf name", "From VarTransform?"});
+//  for( auto& varToLeafDictEntry : _cache_.varToLeafDict ){
+//    std::string colorCode{};
+//    if( GenericToolbox::doesElementIsInVector(varToLeafDictEntry.first, _cache_.varsRequestedForStorage) ){ colorCode = GenericToolbox::ColorCodes::blueBackground; }
+//    t.addTableLine({varToLeafDictEntry.first, varToLeafDictEntry.second.first, std::to_string(varToLeafDictEntry.second.second)}, colorCode);
+//  }
+//  t.printTable();
 
 }
 void DataDispenser::preAllocateMemory(){
@@ -644,8 +644,9 @@ void DataDispenser::readAndFill(){
       if( not varTransformForStorageList.empty() ){
         LogInfo << "EventVarTransform used for storage: "
                 << GenericToolbox::iterableToString(
-                    varTransformForStorageList, [](
-                        const EventVarTransform* elm_){ return "\"" + elm_->getTitle() + "\""; }, false) << std::endl;
+                    varTransformForStorageList,
+                    []( const EventVarTransform* elm_){ return "\"" + elm_->getTitle() + "\""; }, false)
+                << std::endl;
       }
     }
 
@@ -796,19 +797,6 @@ void DataDispenser::readAndFill(){
           // Propagate transformations for indexing
           for( auto* varTransformForIndexing : varTransformForIndexingList ){
             varTransformForIndexing->evalAndStore(eventBuffer);
-          }
-
-          if(iThread_ == 0 and eventBuffer.getVarAsDouble("Pmu") == 0){
-            LogError << "NULL Pmu" << std::endl;
-
-            LogError << GET_VAR_NAME_VALUE(treeChain.GetBranchStatus("PmuCoulombCorrection")) << std::endl;
-            LogError << GET_VAR_NAME_VALUE(treeChain.GetBranchStatus("Pmu")) << std::endl;
-
-            LogError << GET_VAR_NAME_VALUE(treeChain.GetLeaf("PmuCoulombCorrection")) << std::endl;
-            LogError << GET_VAR_NAME_VALUE(treeChain.GetLeaf("PmuCoulombCorrection")->GetValue(0)) << std::endl;
-            LogError << GET_VAR_NAME_VALUE(treeChain.GetLeaf("PmuCoulombCorrection")->GetBranch()) << std::endl;
-            LogError << GET_VAR_NAME_VALUE(GenericToolbox::toHex(treeChain.GetLeaf("PmuCoulombCorrection")->GetBranch()->GetAddress())) << std::endl;
-            LogThrow("STOP");
           }
 
           // Has valid bin?

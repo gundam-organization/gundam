@@ -506,9 +506,9 @@ void FitterEngine::fixGhostFitParameters(){
         LogInfo.moveTerminalCursorBack(1);
         LogInfo << ssPrint.str() << std::endl;
 
-        if( std::abs(deltaChi2Stat) < JsonUtils::fetchValue(_config_, "ghostParameterDeltaChi2Threshold", 1E-6) ){
+        if( std::abs(deltaChi2Stat) < JsonUtils::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, 1E-6) ){
           par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
-          ssPrint << " < " << JsonUtils::fetchValue(_config_, "ghostParameterDeltaChi2Threshold", 1E-6) << " -> FIXED";
+          ssPrint << " < " << JsonUtils::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, 1E-6) << " -> FIXED";
           LogInfo.moveTerminalCursorBack(1);
 #ifndef NOCOLOR
           std::string red(GenericToolbox::ColorCodes::redBackground);
