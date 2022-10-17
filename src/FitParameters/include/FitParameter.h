@@ -45,7 +45,6 @@ public:
   void setDialSetConfig(const nlohmann::json &jsonConfig_);
   void setParameterDefinitionConfig(const nlohmann::json &config_);
   void setEnableDialSetsSummary(bool enableDialSetsSummary);
-  void setDialsWorkingDirectory(const std::string &dialsWorkingDirectory);
   void setMinValue(double minValue);
   void setMaxValue(double maxValue);
   void setStepSize(double stepSize);
@@ -91,11 +90,11 @@ private:
   int _parameterIndex_{-1}; // to get the right definition in the json config (in case "name" is not specified)
   double _parameterValue_{};
   double _priorValue_{};
-  double _throwValue_{std::nan("UNSET")};
+  double _throwValue_{std::nan("unset")};
   double _stdDevValue_{};
-  double _minValue_{std::nan("UNSET")};
-  double _maxValue_{std::nan("UNSET")};
-  double _stepSize_{std::nan("UNSET")};
+  double _minValue_{std::nan("unset")};
+  double _maxValue_{std::nan("unset")};
+  double _stepSize_{std::nan("unset")};
   nlohmann::json _parameterConfig_;
   nlohmann::json _dialDefinitionsList_;
   bool _enableDialSetsSummary_{false};

@@ -638,7 +638,6 @@ void FitParameterSet::defineParameters(){
     _parameterList_[iParameter].setParameterValue((*_parameterPriorList_)[iParameter]);
     _parameterList_[iParameter].setPriorValue((*_parameterPriorList_)[iParameter]);
 
-    _parameterList_[iParameter].setDialsWorkingDirectory(JsonUtils::fetchValue<std::string>(_config_, "dialSetWorkingDirectory", "./"));
     _parameterList_[iParameter].setEnableDialSetsSummary(JsonUtils::fetchValue<bool>(_config_, "printDialSetsSummary", false));
 
     if( _globalParameterMinValue_ == _globalParameterMinValue_ ){ _parameterList_[iParameter].setMinValue(_globalParameterMinValue_); }
