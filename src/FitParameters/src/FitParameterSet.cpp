@@ -454,7 +454,7 @@ void FitParameterSet::initializeFromConfig(){
 
   LogThrowIf(_config_.empty(), "FitParameterSet config not set.")
 
-  _name_ = JsonUtils::fetchValue<std::string>(_config_, "name", "");
+  _name_ = JsonUtils::fetchValue<std::string>(_config_, "name");
   LogInfo << "Initializing parameter set: " << _name_ << std::endl;
 
   if( _saveDir_ != nullptr ){ _saveDir_ = GenericToolbox::mkdirTFile(_saveDir_, _name_); }
