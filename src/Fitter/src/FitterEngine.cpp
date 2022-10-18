@@ -778,7 +778,7 @@ void FitterEngine::fit(){
     _fitHasConverged_ = _minimizer_->Minimize();
 
     _minimizer_->Options().SetMinimizerAlgorithm(originalAlgo.c_str());
-    _minimizer_->SetMaxFunctionCalls(JsonUtils::fetchValue(_minimizerConfig_, "max_fcn", (unsigned int)(1E9)));
+    _minimizer_->SetMaxFunctionCalls(JsonUtils::fetchValue(_minimizerConfig_, {{"maxFcnCalls"}, {"max_fcn"}}, (unsigned int)(1E9)));
     _minimizer_->SetTolerance(JsonUtils::fetchValue(_minimizerConfig_, "tolerance", 1E-4));
 
     LogInfo << _convergenceMonitor_.generateMonitorString(); // lasting printout
@@ -901,7 +901,7 @@ void FitterEngine::fit(){
 
     _enableFitMonitor_ = true;
     if( _enablePostFitErrorEval_ ){
-      std::string errorAlgo = JsonUtils::fetchValue(_minimizerConfig_, "errors", "Hesse");
+      std::string errorAlgo = JsonUtils::fetchValue(_minimizerConfig_, {{"errorsAlgo"}, {"errors"}}, "Hesse");
       if     ( errorAlgo == "Minos" ){
         LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling MINOS...") << std::endl;
 
@@ -1845,8 +1845,8 @@ void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
   _minimizer_->SetStrategy(JsonUtils::fetchValue(_minimizerConfig_, "strategy", 1));
   _minimizer_->SetPrintLevel(JsonUtils::fetchValue(_minimizerConfig_, "print_level", 2));
   _minimizer_->SetTolerance(JsonUtils::fetchValue(_minimizerConfig_, "tolerance", 1E-4));
-  _minimizer_->SetMaxIterations(JsonUtils::fetchValue(_minimizerConfig_, "max_iter", (unsigned int)(500) ));
-  _minimizer_->SetMaxFunctionCalls(JsonUtils::fetchValue(_minimizerConfig_, "max_fcn", (unsigned int)(1E9)));
+  _minimizer_->SetMaxIterations(JsonUtils::fetchValue(_minimizerConfig_, {{"maxIterations"}, {"max_iter"}}, (unsigned int)(500) ));
+  _minimizer_->SetMaxFunctionCalls(JsonUtils::fetchValue(_minimizerConfig_, {{"maxFcnCalls"}, {"max_fcn"}}, (unsigned int)(1E9)));
 
   for( int iFitPar = 0 ; iFitPar < _nbFitParameters_ ; iFitPar++ ){
     auto& fitPar = *_minimizerFitParameterPtr_[iFitPar];
