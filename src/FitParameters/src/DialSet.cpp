@@ -197,7 +197,7 @@ void DialSet::readGlobals(const nlohmann::json &config_){
         }
 
         auto excludedRanges = JsonUtils::fetchValue(condEntry, "excludedRanges", std::vector<std::pair<double,double>>());
-        auto excludedValues = JsonUtils::fetchValue(condEntry, "excludedValues", std::vector<int>());
+        auto excludedValues = JsonUtils::fetchValue(condEntry, "excludedValues", std::vector<double>());
         if( not excludedRanges.empty() or not excludedValues.empty() ){
           if( not ssCondEntry.str().empty() ){
             // exclusion ranges are linked with &&: they are supposed to prevail
