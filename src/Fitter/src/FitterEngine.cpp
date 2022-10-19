@@ -775,11 +775,16 @@ void FitterEngine::fit(){
           JsonUtils::fetchValue(_minimizerConfig_, "tolerance", 1E-4)
         * JsonUtils::fetchValue(_minimizerConfig_, "simplexToleranceLoose", 1000)
         );
+    _minimizer_->SetStrategy(0);
+
+    // SIMPLEX
     _fitHasConverged_ = _minimizer_->Minimize();
 
+    // Back to original
     _minimizer_->Options().SetMinimizerAlgorithm(originalAlgo.c_str());
     _minimizer_->SetMaxFunctionCalls(JsonUtils::fetchValue(_minimizerConfig_, {{"maxFcnCalls"}, {"max_fcn"}}, (unsigned int)(1E9)));
     _minimizer_->SetTolerance(JsonUtils::fetchValue(_minimizerConfig_, "tolerance", 1E-4));
+    _minimizer_->SetStrategy(JsonUtils::fetchValue(_minimizerConfig_, "strategy", 1));
 
     LogInfo << _convergenceMonitor_.generateMonitorString(); // lasting printout
     LogWarning << "Simplex ended after " << _nbFitCalls_ - nbFitCallOffset << " calls." << std::endl;

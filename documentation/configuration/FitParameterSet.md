@@ -11,6 +11,8 @@
 |--------------------------------------------------------|------------|---------------------------------------------------------------------------------------------------|---------|
 | **name**                                               | string     | parameter set name                                                                                |         |
 | isEnabled                                              | bool       | use in the propagator                                                                             | true    |
+| [parameterDefinitions](./FitParameter.md)              | list(json) | config of individual parameter                                                                    |         |
+| [dialSetDefinitions](./DialSet.md)                     | list(json) | config of dials                                                                                   |         |
 | parameterDefinitionFilePath / covarianceMatrixFilePath | string     | path to root file containing cov matrix                                                           |         |
 | covarianceMatrixTMatrixD                               | string     | path to covariance matrix in root file                                                            |         |
 | parameterPriorTVectorD                                 | string     | path to list of parameter priors in root file                                                     |         |
@@ -19,8 +21,6 @@
 | parameterUpperBoundsTVectorD                           | string     | path to list of parameter max values in root file                                                 |         |
 | enabledThrowToyParameters                              | bool       | throw parameters according to cov matrix if toy fit is selected                                   | true    |
 | throwEnabledList                                       | string     | path to list of parameter throw states in root file                                               |         |
-| [parameterDefinitions](./FitParameter.md)              | list(json) | config of individual parameter                                                                    |         |
-| [dialSetDefinitions](./DialSet.md)                     | list(json) | config of dials                                                                                   |         |
 | useEigenDecompInFit                                    | bool       | eigen decompose the prior matrix                                                                  | false   |
 | enablePca / fixGhostFitParameters                      | bool       | disable plot generation for the included parameters                                               | false   |
 | parameterLimits*                                       | json       | global parameter limits definition                                                                | true    |
