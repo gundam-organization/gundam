@@ -162,7 +162,7 @@ void makeSampleComparePlots(bool usePrefit_){
 
 
   recurseSampleCompareGraph(dir1, dir2);
-
+  outFile->Write();
 }
 void makeScanComparePlots(bool usePrefit_){
 
@@ -253,6 +253,7 @@ void makeScanComparePlots(bool usePrefit_){
   LogReturnIf(dir2== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
 
   recurseScanCompareGraph(dir1, dir2);
+  outFile->Write();
 }
 void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
 
@@ -351,4 +352,6 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
     delete overlayCanvas;
     Logger::setIndentStr("");
   }
+
+  outFile->Write();
 }
