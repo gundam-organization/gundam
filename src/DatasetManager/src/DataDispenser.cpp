@@ -683,7 +683,7 @@ void DataDispenser::readAndFill(){
             copyDict[iVar].first->getLeafTypeName() == "TClonesArray"
             or copyDict[iVar].first->getLeafTypeName() == "TGraph"
             ){
-          t.setColorBuffer(GenericToolbox::ColorCodes::yellowBackground);
+          t.setColorBuffer(GenericToolbox::ColorCodes::magentaBackground);
         }
 
         t << std::endl;
