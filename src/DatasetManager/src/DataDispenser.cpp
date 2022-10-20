@@ -691,7 +691,7 @@ void DataDispenser::readAndFill(){
 
       t.printTable();
       LogInfo(Logger::Color::BG_BLUE) << "      " << Logger::getColorEscapeCode(Logger::Color::RESET) << " -> Variables stored in RAM" << std::endl;
-      LogInfo(Logger::Color::BG_YELLOW) << "      " << Logger::getColorEscapeCode(Logger::Color::RESET) << " -> Dials stored in RAM" << std::endl;
+      LogInfo(Logger::Color::BG_MAGENTA) << "      " << Logger::getColorEscapeCode(Logger::Color::RESET) << " -> Dials stored in RAM" << std::endl;
     }
     eventBuffer.copyData(copyDict); // resize array obj
     eventBuffer.resizeVarToDoubleCache();
