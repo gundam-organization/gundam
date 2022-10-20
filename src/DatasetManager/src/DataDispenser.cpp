@@ -489,6 +489,7 @@ void DataDispenser::fetchRequestedLeaves(){
 }
 void DataDispenser::preAllocateMemory(){
   LogInfo << "Pre-allocating memory..." << std::endl;
+  LogInfo << "Pre-allocation RAM is: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage())) << std::endl;
 
   /// \brief The following lines are necessary since the events might get resized while being in multithread
   /// Because std::vector is insuring continuous memory allocation, a resize sometimes
@@ -572,7 +573,7 @@ void DataDispenser::preAllocateMemory(){
     }
   }
 
-  LogInfo << "Current RAM is: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage())) << std::endl;
+  LogInfo << "Post-allocation RAM is: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage())) << std::endl;
 }
 void DataDispenser::readAndFill(){
   LogWarning << "Reading dataset and loading..." << std::endl;
@@ -660,7 +661,8 @@ void DataDispenser::readAndFill(){
       GenericToolbox::TablePrinter t;
       t.setColTitles({{"Variable"}, {"Leaf"}, {"Transforms"}});
       for( size_t iVar = 0 ; iVar < eventBuffer.getCommonLeafNameListPtr()->size() ; iVar++ ){
-        t << (*eventBuffer.getCommonLeafNameListPtr())[iVar] << std::endl;
+        std::string variableName = (*eventBuffer.getCommonLeafNameListPtr())[iVar];
+        t << variableName << std::endl;
 
         t << copyDict[iVar].first->getLeafFullName();
         if(copyDict[iVar].second != -1) t << "[" << copyDict[iVar].second << "]";
@@ -668,19 +670,28 @@ void DataDispenser::readAndFill(){
 
         std::vector<std::string> transformsList;
         for( auto* varTransformForIndexing : varTransformForIndexingList ){
-          if( varTransformForIndexing->getOutputVariableName() == (*eventBuffer.getCommonLeafNameListPtr())[iVar] ){
+          if( varTransformForIndexing->getOutputVariableName() == variableName ){
             transformsList.emplace_back(varTransformForIndexing->getTitle());
           }
         }
         t << GenericToolbox::parseVectorAsString(transformsList);
 
-        if( GenericToolbox::doesElementIsInVector((*eventBuffer.getCommonLeafNameListPtr())[iVar], _cache_.varsRequestedForStorage)){
+        if( GenericToolbox::doesElementIsInVector(variableName, _cache_.varsRequestedForStorage)){
           t.setColorBuffer(GenericToolbox::ColorCodes::blueBackground);
+        }
+        else if(
+            copyDict[iVar].first->getLeafTypeName() == "TClonesArray"
+            or copyDict[iVar].first->getLeafTypeName() == "TGraph"
+            ){
+          t.setColorBuffer(GenericToolbox::ColorCodes::yellowBackground);
         }
 
         t << std::endl;
       }
+
       t.printTable();
+      LogInfo(Logger::Color::BG_BLUE) << "      " << Logger::getColorEscapeCode(Logger::Color::RESET) << " -> Variables stored in RAM" << std::endl;
+      LogInfo(Logger::Color::BG_YELLOW) << "      " << Logger::getColorEscapeCode(Logger::Color::RESET) << " -> Dials stored in RAM" << std::endl;
     }
     eventBuffer.copyData(copyDict); // resize array obj
     eventBuffer.resizeVarToDoubleCache();
