@@ -162,7 +162,7 @@ void makeSampleComparePlots(bool usePrefit_){
 
 
   recurseSampleCompareGraph(dir1, dir2);
-
+  outFile->Write();
 }
 void makeScanComparePlots(bool usePrefit_){
 
@@ -253,6 +253,7 @@ void makeScanComparePlots(bool usePrefit_){
   LogReturnIf(dir2== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
 
   recurseScanCompareGraph(dir1, dir2);
+  outFile->Write();
 }
 void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
 
@@ -348,7 +349,81 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
     hist1->SetTitle(Form("Comparing %s parameters: \"%s\"", (usePrefit_? "preFit": "postFit"), parSet.c_str()));
     GenericToolbox::mkdirTFile(outDir, parSet)->cd();
     overlayCanvas->Write();
+
+    std::map<std::string, TH1D*> compHist{
+        {"ScaledComp", nullptr},
+        {"ValueDiff", nullptr},
+        {"ValueRatio", nullptr},
+        {"ErrorDiff", nullptr},
+        {"ErrorRatio", nullptr},
+        {"ValueDiffAbs", nullptr},
+        {"ValueRatioAbs", nullptr},
+        {"ErrorDiffAbs", nullptr},
+        {"ErrorRatioAbs", nullptr}
+    };
+
+    for( auto& histEntry : compHist ){
+      histEntry.second = (TH1D*) hist2->Clone();
+      GenericToolbox::resetHistogram(histEntry.second);
+      histEntry.second->SetName(histEntry.first.c_str());
+      histEntry.second->GetXaxis()->LabelsOption("v");
+      histEntry.second->SetTitleSize(0.03);
+      histEntry.second->SetTitle(
+          Form(R"(Comparing "%s" %s parameters: "%s"/%s [1] and "%s"/%s [2])",
+               parSet.c_str(), (usePrefit_? "preFit": "postFit"),
+               name1.c_str(), algo1.c_str(), name2.c_str(), algo2.c_str()));
+    }
+
+    for( int iBin = 1 ; iBin <= hist1->GetNbinsX() ; iBin++ ){
+      double hist1Val = hist1->GetBinContent(iBin);
+      double hist2Val = hist2->GetBinContent(iBin);
+      double hist1Err = hist1->GetBinError(iBin);
+      double hist2Err = hist2->GetBinError(iBin);
+      double diffVal = hist2Val - hist1Val;
+      double diffErr = hist2Err - hist1Err;
+
+      compHist["ValueDiff"]->SetBinContent( iBin, diffVal );
+      compHist["ValueRatio"]->SetBinContent( iBin, ( hist1Val > 0 ) ? 100* (diffVal/hist1Val) : 0 );
+      compHist["ErrorDiff"]->SetBinContent( iBin, diffErr );
+      compHist["ErrorRatio"]->SetBinContent( iBin, ( hist1Err > 0 ) ? 100* (diffErr/hist1Err) : 0 );
+      compHist["ValueDiffAbs"]->SetBinContent( iBin, TMath::Abs(compHist["ValueDiff"]->GetBinContent(iBin)) );
+      compHist["ValueRatioAbs"]->SetBinContent( iBin, TMath::Abs(compHist["ValueRatio"]->GetBinContent(iBin)) );
+      compHist["ErrorDiffAbs"]->SetBinContent( iBin, TMath::Abs(compHist["ErrorDiff"]->GetBinContent(iBin)) );
+      compHist["ErrorRatioAbs"]->SetBinContent( iBin, TMath::Abs(compHist["ErrorRatio"]->GetBinContent(iBin)) );
+      compHist["ScaledComp"]->SetBinContent( iBin, diffVal ); compHist["ScaledComp"]->SetBinError( iBin, ( hist1Err > 0 ) ? hist2Err/hist1Err : 0 );
+    }
+
+    compHist["ValueDiff"]->GetYaxis()->SetTitle("#mu_{2} - #mu_{1}");
+    compHist["ValueRatio"]->GetYaxis()->SetTitle("#mu_{2} / #mu_{1} - 1 (%)");
+    compHist["ErrorDiff"]->GetYaxis()->SetTitle("#sigma_{2} - #sigma_{1}");
+    compHist["ErrorRatio"]->GetYaxis()->SetTitle("#sigma_{2} / #sigma_{1} - 1 (%)");
+    compHist["ValueDiffAbs"]->GetYaxis()->SetTitle("#left|#mu_{2} - #mu_{1}#right|");
+    compHist["ValueRatioAbs"]->GetYaxis()->SetTitle("#left|#mu_{2} / #mu_{1} - 1#right|  (%)");
+    compHist["ErrorDiffAbs"]->GetYaxis()->SetTitle("#left|#sigma_{2} - #sigma_{1}#right|");
+    compHist["ErrorRatioAbs"]->GetYaxis()->SetTitle("#left|#sigma_{2} / #sigma_{1} - 1#right| (%)");
+    compHist["ScaledComp"]->GetYaxis()->SetTitle("(#mu_{2} - #mu_{1}) #pm #sigma_{2}/#sigma_{1}");
+
+    overlayCanvas->cd();
+
+    for( auto& histEntry : compHist ){
+      overlayCanvas->cd();
+
+      histEntry.second->Draw("E1");
+      overlayCanvas->Update();
+      TLine* line1{nullptr}, *line2{nullptr};
+      if( histEntry.first == "ScaledComp" ){
+        histEntry.second->GetYaxis()->SetRangeUser(-2, 2);
+        line1 = new TLine(gPad->GetFrame()->GetX1(), 1, gPad->GetFrame()->GetX2(), 1); line1->SetLineColor(kRed); line1->SetLineStyle(2); line1->Draw();
+        line2 = new TLine(gPad->GetFrame()->GetX1(), -1, gPad->GetFrame()->GetX2(), -1); line2->SetLineColor(kRed); line2->SetLineStyle(2); line2->Draw();
+      }
+
+      overlayCanvas->Write(Form("%s_TCanvas", histEntry.first.c_str()));
+      delete histEntry.second; delete line1; delete line2;
+    }
+
     delete overlayCanvas;
     Logger::setIndentStr("");
   }
+
+  outFile->Write();
 }

@@ -775,11 +775,16 @@ void FitterEngine::fit(){
           JsonUtils::fetchValue(_minimizerConfig_, "tolerance", 1E-4)
         * JsonUtils::fetchValue(_minimizerConfig_, "simplexToleranceLoose", 1000)
         );
+    _minimizer_->SetStrategy(0);
+
+    // SIMPLEX
     _fitHasConverged_ = _minimizer_->Minimize();
 
+    // Back to original
     _minimizer_->Options().SetMinimizerAlgorithm(originalAlgo.c_str());
-    _minimizer_->SetMaxFunctionCalls(JsonUtils::fetchValue(_minimizerConfig_, "max_fcn", (unsigned int)(1E9)));
+    _minimizer_->SetMaxFunctionCalls(JsonUtils::fetchValue(_minimizerConfig_, {{"maxFcnCalls"}, {"max_fcn"}}, (unsigned int)(1E9)));
     _minimizer_->SetTolerance(JsonUtils::fetchValue(_minimizerConfig_, "tolerance", 1E-4));
+    _minimizer_->SetStrategy(JsonUtils::fetchValue(_minimizerConfig_, "strategy", 1));
 
     LogInfo << _convergenceMonitor_.generateMonitorString(); // lasting printout
     LogWarning << "Simplex ended after " << _nbFitCalls_ - nbFitCallOffset << " calls." << std::endl;
@@ -901,7 +906,7 @@ void FitterEngine::fit(){
 
     _enableFitMonitor_ = true;
     if( _enablePostFitErrorEval_ ){
-      std::string errorAlgo = JsonUtils::fetchValue(_minimizerConfig_, "errors", "Hesse");
+      std::string errorAlgo = JsonUtils::fetchValue(_minimizerConfig_, {{"errorsAlgo"}, {"errors"}}, "Hesse");
       if     ( errorAlgo == "Minos" ){
         LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling MINOS...") << std::endl;
 
@@ -1512,7 +1517,7 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
             std::string colorStr;
             if( par.isFree() ){
               lineValues[valIndex++] = "Unconstrained";
-              colorStr = GenericToolbox::ColorCodes::yellowBackground;
+              colorStr = GenericToolbox::ColorCodes::blueBackground;
             }
             else{
               lineValues[valIndex++] = std::to_string( priorFraction*100 ) + " \%";
@@ -1845,8 +1850,8 @@ void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
   _minimizer_->SetStrategy(JsonUtils::fetchValue(_minimizerConfig_, "strategy", 1));
   _minimizer_->SetPrintLevel(JsonUtils::fetchValue(_minimizerConfig_, "print_level", 2));
   _minimizer_->SetTolerance(JsonUtils::fetchValue(_minimizerConfig_, "tolerance", 1E-4));
-  _minimizer_->SetMaxIterations(JsonUtils::fetchValue(_minimizerConfig_, "max_iter", (unsigned int)(500) ));
-  _minimizer_->SetMaxFunctionCalls(JsonUtils::fetchValue(_minimizerConfig_, "max_fcn", (unsigned int)(1E9)));
+  _minimizer_->SetMaxIterations(JsonUtils::fetchValue(_minimizerConfig_, {{"maxIterations"}, {"max_iter"}}, (unsigned int)(500) ));
+  _minimizer_->SetMaxFunctionCalls(JsonUtils::fetchValue(_minimizerConfig_, {{"maxFcnCalls"}, {"max_fcn"}}, (unsigned int)(1E9)));
 
   for( int iFitPar = 0 ; iFitPar < _nbFitParameters_ ; iFitPar++ ){
     auto& fitPar = *_minimizerFitParameterPtr_[iFitPar];
