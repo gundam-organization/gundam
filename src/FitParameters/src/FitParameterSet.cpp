@@ -17,45 +17,9 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[FitParameterSet]");
 } );
 
-FitParameterSet::FitParameterSet() {
-  this->reset();
-}
-FitParameterSet::~FitParameterSet() {
-  this->reset();
-}
 
-void FitParameterSet::reset() {
-
-  _isInitialized_ = false;
-
-  _config_ = nlohmann::json();
-
-  _maxEigenFraction_ = 1;
-  _parameterPriorList_ = nullptr;
-  _parameterNamesList_ = nullptr;
-  _choleskyMatrix_ = nullptr;
-
-  _parameterList_.clear();
-
-}
-
-void FitParameterSet::setConfig(const nlohmann::json &config_) {
-  _config_ = config_;
-  while(_config_.is_string()){
-    LogWarning << "Forwarding FitParameterSet config to: \"" << _config_.get<std::string>() << "\"..." << std::endl;
-    _config_ = JsonUtils::readConfigFile(_config_.get<std::string>());
-  }
-}
-void FitParameterSet::setSaveDir(TDirectory* saveDir_){
-  _saveDir_ = saveDir_;
-}
-void FitParameterSet::setMaskedForPropagation(bool maskedForPropagation) {
-  _maskedForPropagation_ = maskedForPropagation;
-}
-
-void FitParameterSet::readConfig(){
+void FitParameterSet::readConfigImpl(){
   LogThrowIf(_config_.empty(), "FitParameterSet config not set.");
-  _isConfigReadDone_ = true;
 
   _name_ = JsonUtils::fetchValue<std::string>(_config_, "name");
   LogInfo << "Initializing parameter set: " << _name_ << std::endl;
@@ -112,8 +76,7 @@ void FitParameterSet::readConfig(){
 
   _customFitParThrow_ = JsonUtils::fetchValue(_config_, "customFitParThrow", std::vector<nlohmann::json>());
 }
-void FitParameterSet::initialize() {
-  if( not _isConfigReadDone_ ) this->readConfig();
+void FitParameterSet::initializeImpl() {
   LogInfo << "Initializing \"" << this->getName() << "\"" << std::endl;
 
   LogReturnIf(not _isEnabled_, "Not enabled. Skipping.");
@@ -124,9 +87,15 @@ void FitParameterSet::initialize() {
 
   // Make the matrix inversion
   this->prepareFitParameters();
-
-  _isInitialized_ = true;
 }
+
+void FitParameterSet::setSaveDir(TDirectory* saveDir_){
+  _saveDir_ = saveDir_;
+}
+void FitParameterSet::setMaskedForPropagation(bool maskedForPropagation) {
+  _maskedForPropagation_ = maskedForPropagation;
+}
+
 void FitParameterSet::prepareFitParameters(){
 
   if( _priorCovarianceMatrix_ == nullptr ){ return; } // nothing to do
@@ -285,9 +254,6 @@ std::vector<FitParameter> &FitParameterSet::getEigenParameterList(){
 
 const std::vector<FitParameter> &FitParameterSet::getParameterList() const{
   return _parameterList_;
-}
-const nlohmann::json &FitParameterSet::getConfig() const {
-  return _config_;
 }
 
 std::vector<FitParameter>& FitParameterSet::getEffectiveParameterList(){
@@ -453,9 +419,9 @@ void FitParameterSet::propagateEigenToOriginal(){
 std::string FitParameterSet::getSummary() const {
   std::stringstream ss;
 
-  ss << "FitParameterSet: " << _name_ << " -> initialized=" << _isInitialized_ << ", enabled=" << _isEnabled_;
+  ss << "FitParameterSet summary: " << _name_ << " -> enabled=" << _isEnabled_;
 
-  if(_isInitialized_ and _isEnabled_){
+  if(_isEnabled_){
 
     ss << ", nbParameters: " << _parameterList_.size();
 

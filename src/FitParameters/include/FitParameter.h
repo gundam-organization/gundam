@@ -6,6 +6,7 @@
 #define GUNDAM_FITPARAMETER_H
 
 #include "DialSet.h"
+#include "ConfigBasedClass.h"
 
 #include "GenericToolbox.h"
 
@@ -24,14 +25,9 @@ namespace PriorType{
 
 class FitParameterSet;
 
-class FitParameter {
+class FitParameter : public ConfigBasedClass {
 
 public:
-  FitParameter();
-  virtual ~FitParameter();
-
-  void reset();
-
   void setIsEnabled(bool isEnabled);
   void setIsFixed(bool isFixed);
   void setIsEigen(bool isEigen);
@@ -54,8 +50,6 @@ public:
   void setValueAtPrior();
   void setCurrentValueAsPrior();
 
-  void readConfig();
-  void initialize();
 
   // Getters
   bool isEnabled() const;
@@ -83,33 +77,33 @@ public:
   std::string getTitle() const;
   std::string getFullTitle() const;
 
-private:
-  const FitParameterSet* _owner_{nullptr};
-  bool _isConfigReadDone_{false};
+protected:
+  void readConfigImpl() override;
+  void initializeImpl() override;
 
+private:
   // Parameters
-  std::string _name_;
+  bool _isEnabled_{true};
+  bool _isFixed_{false};
+  bool _isEigen_{false};
+  bool _isFree_{false};
+  bool _enableDialSetsSummary_{false};
   int _parameterIndex_{-1}; // to get the right definition in the json config (in case "name" is not specified)
-  double _parameterValue_{};
-  double _priorValue_{};
+  double _parameterValue_{std::nan("unset")};
+  double _priorValue_{std::nan("unset")};
   double _throwValue_{std::nan("unset")};
-  double _stdDevValue_{};
+  double _stdDevValue_{std::nan("unset")};
   double _minValue_{std::nan("unset")};
   double _maxValue_{std::nan("unset")};
   double _stepSize_{std::nan("unset")};
-  nlohmann::json _parameterConfig_;
-  nlohmann::json _dialDefinitionsList_;
-  bool _enableDialSetsSummary_{false};
-  std::string _dialsWorkingDirectory_;
-  bool _isEnabled_{true};
-  bool _isFixed_{false};
-
-  bool _isEigen_{false};
-  bool _isFree_{false};
+  std::string _name_{};
+  std::string _dialsWorkingDirectory_{"."};
+  nlohmann::json _parameterConfig_{};
+  nlohmann::json _dialDefinitionsList_{};
 
   // Internals
+  const FitParameterSet* _owner_{nullptr};
   std::vector<DialSet> _dialSetList_; // one dial set per detector
-  
   PriorType::PriorType _priorType_{PriorType::Gaussian};
 
 

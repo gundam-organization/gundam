@@ -33,7 +33,7 @@ void Propagator::reset() {
 
   std::vector<std::string> jobNameRemoveList;
   for( const auto& jobName : GlobalVariables::getParallelWorker().getJobNameList() ){
-    if(jobName == "Propagator::fillEventDialCaches"
+    if(   jobName == "Propagator::fillEventDialCaches"
        or jobName == "Propagator::reweightMcEvents"
        or jobName == "Propagator::updateDialResponses"
        or jobName == "Propagator::refillSampleHistograms"

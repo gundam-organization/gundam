@@ -29,3 +29,4 @@ void ConfigBasedClass::initialize() {
 bool ConfigBasedClass::isConfigReadDone() const { return _isConfigReadDone_; }
 bool ConfigBasedClass::isInitialized() const { return _isInitialized_; }
 const nlohmann::json &ConfigBasedClass::getConfig() const { return _config_; }
+

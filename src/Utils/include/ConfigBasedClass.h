@@ -12,7 +12,6 @@ class ConfigBasedClass {
 public:
   ConfigBasedClass() = default;
   ConfigBasedClass(const nlohmann::json& config_);
-
   virtual ~ConfigBasedClass() = default;
 
   void setConfig(const nlohmann::json& config_);

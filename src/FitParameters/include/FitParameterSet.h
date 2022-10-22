@@ -5,8 +5,11 @@
 #ifndef GUNDAM_FITPARAMETERSET_H
 #define GUNDAM_FITPARAMETERSET_H
 
-#include "vector"
-#include "string"
+#include "FitParameter.h"
+#include "NestedDialTest.h"
+#include "ConfigBasedClass.h"
+
+#include "Logger.h"
 
 #include "nlohmann/json.hpp"
 #include "TMatrixDSym.h"
@@ -16,10 +19,8 @@
 #include "TVectorT.h"
 #include "TMatrixDSymEigen.h"
 
-#include "Logger.h"
-
-#include "FitParameter.h"
-#include "NestedDialTest.h"
+#include "vector"
+#include "string"
 
 
 /*
@@ -30,21 +31,11 @@
  *
  * */
 
-class FitParameterSet {
+class FitParameterSet : public ConfigBasedClass  {
 
 public:
-  FitParameterSet();
-  virtual ~FitParameterSet();
-
-  void reset();
-
   // Setters
-  void setConfig(const nlohmann::json &config_);
   void setSaveDir(TDirectory* saveDir_);
-
-  // Init
-  void readConfig();
-  void initialize();
 
   // Post-init
   void prepareFitParameters(); // invert the matrices, and make sure fixed parameters are detached from correlations
@@ -57,7 +48,6 @@ public:
   std::vector<FitParameter> &getParameterList();
   std::vector<FitParameter> &getEigenParameterList();
   const std::vector<FitParameter> &getParameterList() const;
-  const nlohmann::json &getConfig() const;
   const std::shared_ptr<TMatrixDSym> &getPriorCorrelationMatrix() const;
   const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const;
   std::vector<FitParameter>& getEffectiveParameterList();
@@ -91,25 +81,21 @@ public:
   void setMaskedForPropagation(bool maskedForPropagation);
 
 protected:
+  void readConfigImpl() override;
+  void initializeImpl() override;
+
   void readParameterDefinitionFile();
-
   void defineParameters();
-
   void fillDeltaParameterList();
 
 private:
-  // User parameters
-  bool _isConfigReadDone_{false};
-  nlohmann::json _config_;
-
   // Internals
-  bool _isInitialized_{false};
   std::vector<FitParameter> _parameterList_;
   std::vector<NestedDialTest> _nestedDialList_;
   TDirectory* _saveDir_{nullptr};
 
   // JSON
-  std::string _name_;
+  std::string _name_{};
   std::string _parameterDefinitionFilePath_{};
   bool _isEnabled_{};
   bool _maskedForPropagation_{false};
@@ -128,7 +114,7 @@ private:
   int _nbEnabledEigen_{0};
   bool _useEigenDecompInFit_{false};
   bool _useOnlyOneParameterPerEvent_{false};
-  std::vector<FitParameter> _eigenParameterList_;
+  std::vector<FitParameter> _eigenParameterList_{};
   std::shared_ptr<TMatrixDSymEigen> _eigenDecomp_{nullptr};
 
   // Toy throwing

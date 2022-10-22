@@ -8,6 +8,7 @@
 #include "DialWrapper.h"
 #include "DataBinSet.h"
 #include "GlobalVariables.h"
+#include "ConfigBasedClass.h"
 
 #include "GenericToolbox.h"
 
@@ -21,25 +22,19 @@
 
 class FitParameter;
 
-class DialSet {
+class DialSet : public ConfigBasedClass {
 
 public:
   static bool verboseMode;
 
 public:
-  DialSet();
-  virtual ~DialSet();
-
-  void reset();
+  DialSet(const FitParameter* owner_, const nlohmann::json& config_);
 
   void setOwner(const FitParameter* owner_);
-  void setConfig(const nlohmann::json &config_);
 
   void setMinDialResponse(double minDialResponse_){ _minDialResponse_ = minDialResponse_; }
   void setMaxDialResponse(double maxDialResponse_){ _maxDialResponse_ = maxDialResponse_; }
 
-  void readConfig();
-  void initialize();
 
   // Getters
   bool isEnabled() const;
@@ -66,6 +61,9 @@ public:
   void applyGlobalParameters(Dial& dial_) const;
 
 protected:
+  void readConfigImpl() override;
+  void initializeImpl() override;
+
   void readGlobals(const nlohmann::json &config_);
   bool initializeNormDialsWithParBinning();
   bool initializeDialsWithDefinition();
@@ -76,16 +74,13 @@ private:
   const FitParameter* _owner_{nullptr};
 
   // Parameters
-  nlohmann::json _config_;
-  bool _isConfigReadDone_{false};
   bool _isEnabled_{true};
+  bool _enableDialsSummary_{false};
   std::string _applyConditionStr_;
+  std::vector<std::string> _dataSetNameList_;
   std::shared_ptr<TFormula> _applyConditionFormula_{nullptr};
 
   // Internals
-  bool _enableDialsSummary_{false};
-  std::vector<std::string> _dataSetNameList_;
-
 //  std::vector<DialWrapper<Dial>> _dialList_{};
   std::vector<DialWrapper> _dialList_{};
 

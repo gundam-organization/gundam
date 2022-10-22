@@ -15,8 +15,6 @@
 
 #include "GenericToolbox.CycleTimer.h"
 
-#include "nlohmann/json.hpp"
-
 #include <vector>
 #include <map>
 #include <future>
@@ -27,7 +25,6 @@ public:
   Propagator();
   ~Propagator() override;
 
-  // Initialize
   void reset();
 
   // Setters

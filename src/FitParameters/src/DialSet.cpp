@@ -24,33 +24,7 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[DialSet]");
 });
 
-
-DialSet::DialSet() {
-  this->reset();
-}
-DialSet::~DialSet() {
-  this->reset();
-}
-
-void DialSet::reset() {
-  _owner_ = nullptr;
-  _dataSetNameList_.clear();
-  _dialList_.clear();
-  _config_ = nlohmann::json();
-  _enableDialsSummary_ = false;
-  _isEnabled_ = true;
-}
-
-void DialSet::setOwner(const FitParameter* owner_){
-  _owner_ = owner_;
-}
-void DialSet::setConfig(const nlohmann::json &config_) {
-  _config_ = config_;
-  JsonUtils::forwardConfig(_config_);
-}
-
-void DialSet::readConfig(){
-  _isConfigReadDone_ = true;
+void DialSet::readConfigImpl(){
   LogThrowIf(_config_.empty(), "Config not set for dial set.");
 
   _dataSetNameList_ = JsonUtils::fetchValue<std::vector<std::string>>(
@@ -72,9 +46,16 @@ void DialSet::readConfig(){
     _isEnabled_ = false;
   }
 }
-void DialSet::initialize() {
-  if( not _isConfigReadDone_ ) this->readConfig();
+void DialSet::initializeImpl() {
   LogThrowIf(_owner_==nullptr, "Owner address not set.");
+}
+
+DialSet::DialSet(const FitParameter* owner_, const nlohmann::json& config_){
+  this->setOwner(owner_);
+  this->readConfig(config_);
+}
+void DialSet::setOwner(const FitParameter* owner_){
+  _owner_ = owner_;
 }
 
 bool DialSet::isEnabled() const {
