@@ -116,7 +116,7 @@ void FitParameterSet::initialize() {
   if( not _isConfigReadDone_ ) this->readConfig();
   LogInfo << "Initializing \"" << this->getName() << "\"" << std::endl;
 
-  if( not _isEnabled_ ) return;
+  LogReturnIf(not _isEnabled_, "Not enabled. Skipping.");
 
   if( _saveDir_ != nullptr ){ _saveDir_ = GenericToolbox::mkdirTFile(_saveDir_, _name_); }
 

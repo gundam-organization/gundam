@@ -28,7 +28,6 @@ Propagator::Propagator() { this->reset(); }
 Propagator::~Propagator() { this->reset(); }
 
 void Propagator::reset() {
-  _isInitialized_ = false;
   _parameterSetsList_.clear();
   _saveDir_ = nullptr;
 
@@ -54,10 +53,6 @@ void Propagator::reset() {
 void Propagator::setShowTimeStats(bool showTimeStats) {
   _showTimeStats_ = showTimeStats;
 }
-void Propagator::setConfig(const nlohmann::json &config) {
-  _config_ = config;
-  JsonUtils::forwardConfig(_config_);
-}
 void Propagator::setSaveDir(TDirectory *saveDir) {
   _saveDir_ = saveDir;
 }
@@ -71,9 +66,8 @@ void Propagator::setLoadAsimovData(bool loadAsimovData) {
   _loadAsimovData_ = loadAsimovData;
 }
 
-void Propagator::readConfig(){
+void Propagator::readConfigImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
-  _isConfigReadDone_ = true;
 
   // Monitoring parameters
   _showEventBreakdown_ = JsonUtils::fetchValue(_config_, "showEventBreakdown", _showEventBreakdown_);
@@ -84,14 +78,12 @@ void Propagator::readConfig(){
 
   auto parameterSetListConfig = JsonUtils::fetchValue(_config_, "parameterSetListConfig", nlohmann::json());
   if( parameterSetListConfig.is_string() ) parameterSetListConfig = JsonUtils::readConfigFile(parameterSetListConfig.get<std::string>());
-  int nPars = 0;
   _parameterSetsList_.reserve(parameterSetListConfig.size()); // make sure the objects aren't moved in RAM ( since FitParameter* will be used )
   for( const auto& parameterSetConfig : parameterSetListConfig ){
     _parameterSetsList_.emplace_back();
     _parameterSetsList_.back().setConfig(parameterSetConfig);
     _parameterSetsList_.back().setSaveDir(GenericToolbox::mkdirTFile(_saveDir_, "ParameterSets"));
     _parameterSetsList_.back().readConfig();
-    nPars += _parameterSetsList_.back().getNbParameters();
     LogInfo << _parameterSetsList_.back().getSummary() << std::endl;
   }
 
@@ -120,8 +112,7 @@ void Propagator::readConfig(){
     _dataSetList_.back().readConfig();
   }
 }
-void Propagator::initialize() {
-  if(not _isConfigReadDone_) this->readConfig();
+void Propagator::initializeImpl() {
   LogWarning << __METHOD_NAME__ << std::endl;
 
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing parameters...") << std::endl;
@@ -349,8 +340,6 @@ void Propagator::initialize() {
 
   // Propagator needs to be fast
   GlobalVariables::getParallelWorker().setCpuTimeSaverIsEnabled(false);
-
-  _isInitialized_ = true;
 }
 
 bool Propagator::isUseResponseFunctions() const {

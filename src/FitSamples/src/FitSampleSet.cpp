@@ -38,7 +38,7 @@ void FitSampleSet::setConfig(const nlohmann::json &config) {
 
 void FitSampleSet::readConfig(){
   LogWarning << __METHOD_NAME__ << std::endl;
-  _isConfigReadDone_ = false;
+  _isConfigReadDone_ = true;
 
   LogThrowIf(_config_.empty(), "_config_ is not set." << std::endl);
 
