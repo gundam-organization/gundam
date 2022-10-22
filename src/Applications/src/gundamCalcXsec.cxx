@@ -120,13 +120,14 @@ int main(int argc, char** argv){
   auto* fitFile = TFile::Open(fitFilePath.c_str());
   std::string configStr{fitFile->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed")->GetTitle()};
 
-  // Get old config file
+  // Get config from the fit
   auto configFit = JsonUtils::readConfigJsonStr(configStr); // works with yaml
+  auto configPropagator = JsonUtils::fetchValue<nlohmann::json>(JsonUtils::fetchValue<nlohmann::json>(configFit, "fitterEngineConfig"), "propagatorConfig");
 
   // Create a propagator object
   Propagator p;
 
-  p.setConfig(JsonUtils::fetchValue<nlohmann::json>(JsonUtils::fetchValue<nlohmann::json>(configFit, "fitterEngineConfig"), "propagatorConfig"));
+  p.setConfig(configPropagator);
   p.readConfig();
 
   // modify according to the Xsec needs
@@ -148,6 +149,8 @@ int main(int argc, char** argv){
       ++i;
     }
   }
+
+  p.propagateParametersOnSamples();
 
 
 
