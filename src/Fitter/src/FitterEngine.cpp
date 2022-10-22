@@ -1517,7 +1517,7 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
             std::string colorStr;
             if( par.isFree() ){
               lineValues[valIndex++] = "Unconstrained";
-              colorStr = GenericToolbox::ColorCodes::yellowBackground;
+              colorStr = GenericToolbox::ColorCodes::blueBackground;
             }
             else{
               lineValues[valIndex++] = std::to_string( priorFraction*100 ) + " \%";
