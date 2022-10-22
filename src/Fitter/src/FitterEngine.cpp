@@ -74,6 +74,9 @@ void FitterEngine::setEnablePostFitScan(bool enablePostFitScan) {
 void FitterEngine::setEnablePostFitErrorEval(bool enablePostFitErrorEval_) {
   _enablePostFitErrorEval_ = enablePostFitErrorEval_;
 }
+void FitterEngine::setEnablePca(bool enablePca_){
+  _enablePca_ = enablePca_;
+}
 
 void FitterEngine::initialize() {
 
@@ -101,7 +104,8 @@ void FitterEngine::initialize() {
     this->rescaleParametersStepSize();
   }
 
-  if( JsonUtils::fetchValue(_config_, "fixGhostFitParameters", false) ) this->fixGhostFitParameters();
+  _enablePca_ = _enablePca_ or JsonUtils::fetchValue(_config_, std::vector<std::string>{"fixGhostFitParameters", "enablePca"}, false);
+  if( _enablePca_ ) this->fixGhostFitParameters();
 
   this->updateChi2Cache();
 
@@ -354,7 +358,12 @@ void FitterEngine::varyEvenRates(const std::vector<double>& paramVariationList_,
 
       buffEvtRatesMap.emplace_back();
 
-      par_.setParameterValue(par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue());
+      if(par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue() > par_.getMaxValue()) 
+        par_.setParameterValue(par_.getMaxValue());
+      else if (par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue() < par_.getMinValue())
+        par_.setParameterValue(par_.getMinValue());
+      else
+        par_.setParameterValue(par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue());
 
 
       _propagator_.propagateParametersOnSamples();
@@ -457,7 +466,7 @@ void FitterEngine::fixGhostFitParameters(){
 
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 
-    if( not JsonUtils::fetchValue(parSet.getConfig(), "fixGhostFitParameters", false) ) continue;
+    if( not JsonUtils::fetchValue(parSet.getConfig(), std::vector<std::string>{"fixGhostFitParameters", "enablePca"}, false) ) continue;
 
     bool fixNextEigenPars{false};
     auto& parList = parSet.getEffectiveParameterList();
@@ -497,9 +506,9 @@ void FitterEngine::fixGhostFitParameters(){
         LogInfo.moveTerminalCursorBack(1);
         LogInfo << ssPrint.str() << std::endl;
 
-        if( std::abs(deltaChi2Stat) < JsonUtils::fetchValue(_config_, "ghostParameterDeltaChi2Threshold", 1E-6) ){
+        if( std::abs(deltaChi2Stat) < JsonUtils::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, 1E-6) ){
           par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
-          ssPrint << " < " << JsonUtils::fetchValue(_config_, "ghostParameterDeltaChi2Threshold", 1E-6) << " -> FIXED";
+          ssPrint << " < " << JsonUtils::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, 1E-6) << " -> FIXED";
           LogInfo.moveTerminalCursorBack(1);
 #ifndef NOCOLOR
           std::string red(GenericToolbox::ColorCodes::redBackground);
@@ -703,52 +712,40 @@ void FitterEngine::fit(){
 
   for( const auto& parSet : _propagator_.getParameterSetsList() ){
 
-    std::vector<std::vector<std::string>> tableLines;
-    tableLines.emplace_back(std::vector<std::string>{
-        "Title"
-        ,"Starting"
-        ,"Prior"
-        ,"StdDev"
-        ,"Min"
-        ,"Max"
-        ,"Status"
-    });
+    GenericToolbox::TablePrinter t;
+    t.setColTitles({ {"Title"}, {"Starting"}, {"Prior"}, {"StdDev"}, {"Min"}, {"Max"}, {"Status"} });
 
     auto& parList = parSet.getEffectiveParameterList();
     LogWarning << parSet.getName() << ": " << parList.size() << " parameters" << std::endl;
     if( parList.empty() ) continue;
 
     for( const auto& par : parList ){
-      std::vector<std::string> lineValues(tableLines[0].size());
-      int valIndex{0};
-      lineValues[valIndex++] = par.getTitle();
-      lineValues[valIndex++] = std::to_string( par.getParameterValue() );
-      lineValues[valIndex++] = std::to_string( par.getPriorValue() );
-      lineValues[valIndex++] = std::to_string( par.getStdDevValue() );
-
-      lineValues[valIndex++] = std::to_string( par.getMinValue() );
-      lineValues[valIndex++] = std::to_string( par.getMaxValue() );
-
       std::string colorStr;
+      std::string statusStr;
 
-      if( not par.isEnabled() ) { lineValues[valIndex++] = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackground; }
-      else if( par.isFixed() )  { lineValues[valIndex++] = "Fixed";    colorStr = GenericToolbox::ColorCodes::redBackground; }
-      else                      { lineValues[valIndex++] = PriorType::PriorTypeEnumNamespace::toString(par.getPriorType(), true) + " Prior"; }
-
-#ifndef NOCOLOR
-      for( auto& line : lineValues ){
-        if(not line.empty()) line = colorStr + line + GenericToolbox::ColorCodes::resetColor;
+      if( not par.isEnabled() ) { statusStr = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackground; }
+      else if( par.isFixed() )  { statusStr = "Fixed";    colorStr = GenericToolbox::ColorCodes::redBackground; }
+      else                      {
+        statusStr = PriorType::PriorTypeEnumNamespace::toString(par.getPriorType(), true) + " Prior";
+        if(par.getPriorType()==PriorType::Flat) colorStr = GenericToolbox::ColorCodes::blueBackground;
       }
+
+#ifdef NOCOLOR
+      colorStr = "";
 #endif
 
-      tableLines.emplace_back(lineValues);
-
+      t.addTableLine({
+           par.getTitle(),
+           std::to_string( par.getParameterValue() ),
+           std::to_string( par.getPriorValue() ),
+           std::to_string( par.getStdDevValue() ),
+           std::to_string( par.getMinValue() ),
+           std::to_string( par.getMaxValue() ),
+           statusStr
+       }, colorStr);
     }
 
-    GenericToolbox::TablePrinter t;
-    t.fillTable(tableLines);
     t.printTable();
-
   }
 
   _propagator_.allowRfPropagation(); // if RF are setup -> a lot faster
@@ -765,6 +762,35 @@ void FitterEngine::fit(){
   int nbFitCallOffset = _nbFitCalls_;
   LogInfo << "Fit call offset: " << nbFitCallOffset << std::endl;
   _enableFitMonitor_ = true;
+
+  if( JsonUtils::fetchValue(_minimizerConfig_, "enableSimplexBeforeMinimize", false) ){
+    LogWarning << "Running simplex algo before the minimizer" << std::endl;
+    LogThrowIf(_minimizerType_ != "Minuit2", "Can't launch simplex with " << _minimizerType_);
+
+    std::string originalAlgo = _minimizer_->Options().MinimizerAlgorithm();
+
+    _minimizer_->Options().SetMinimizerAlgorithm("Simplex");
+    _minimizer_->SetMaxFunctionCalls(JsonUtils::fetchValue(_minimizerConfig_, "simplexMaxFcnCalls", (unsigned int)(1000)));
+    _minimizer_->SetTolerance(
+          JsonUtils::fetchValue(_minimizerConfig_, "tolerance", 1E-4)
+        * JsonUtils::fetchValue(_minimizerConfig_, "simplexToleranceLoose", 1000)
+        );
+    _minimizer_->SetStrategy(0);
+
+    // SIMPLEX
+    _fitHasConverged_ = _minimizer_->Minimize();
+
+    // Back to original
+    _minimizer_->Options().SetMinimizerAlgorithm(originalAlgo.c_str());
+    _minimizer_->SetMaxFunctionCalls(JsonUtils::fetchValue(_minimizerConfig_, {{"maxFcnCalls"}, {"max_fcn"}}, (unsigned int)(1E9)));
+    _minimizer_->SetTolerance(JsonUtils::fetchValue(_minimizerConfig_, "tolerance", 1E-4));
+    _minimizer_->SetStrategy(JsonUtils::fetchValue(_minimizerConfig_, "strategy", 1));
+
+    LogInfo << _convergenceMonitor_.generateMonitorString(); // lasting printout
+    LogWarning << "Simplex ended after " << _nbFitCalls_ - nbFitCallOffset << " calls." << std::endl;
+  }
+
+
   _fitHasConverged_ = _minimizer_->Minimize();
   _enableFitMonitor_ = false;
   int nbMinimizeCalls = _nbFitCalls_ - nbFitCallOffset;
@@ -880,7 +906,7 @@ void FitterEngine::fit(){
 
     _enableFitMonitor_ = true;
     if( _enablePostFitErrorEval_ ){
-      std::string errorAlgo = JsonUtils::fetchValue(_minimizerConfig_, "errors", "Hesse");
+      std::string errorAlgo = JsonUtils::fetchValue(_minimizerConfig_, {{"errorsAlgo"}, {"errors"}}, "Hesse");
       if     ( errorAlgo == "Minos" ){
         LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling MINOS...") << std::endl;
 
@@ -1035,7 +1061,7 @@ double FitterEngine::evalFit(const double* parArray_){
 #ifndef GUNDAM_BATCH
       ss << "├─";
 #endif
-      ss << " Avg time for " << _minimizerType_ << "/" << _minimizerAlgo_ << ":   " << _outEvalFitAvgTimer_;
+      ss << " Avg time for " << _minimizer_->Options().MinimizerType() << "/" << _minimizer_->Options().MinimizerAlgorithm() << ":   " << _outEvalFitAvgTimer_;
       ss << std::endl;
 #ifndef GUNDAM_BATCH
       ss << "├─";
@@ -1491,7 +1517,7 @@ void FitterEngine::writePostFitData(TDirectory* saveDir_) {
             std::string colorStr;
             if( par.isFree() ){
               lineValues[valIndex++] = "Unconstrained";
-              colorStr = GenericToolbox::ColorCodes::yellowBackground;
+              colorStr = GenericToolbox::ColorCodes::blueBackground;
             }
             else{
               lineValues[valIndex++] = std::to_string( priorFraction*100 ) + " \%";
@@ -1824,8 +1850,8 @@ void FitterEngine::initializeMinimizer(bool doReleaseFixed_){
   _minimizer_->SetStrategy(JsonUtils::fetchValue(_minimizerConfig_, "strategy", 1));
   _minimizer_->SetPrintLevel(JsonUtils::fetchValue(_minimizerConfig_, "print_level", 2));
   _minimizer_->SetTolerance(JsonUtils::fetchValue(_minimizerConfig_, "tolerance", 1E-4));
-  _minimizer_->SetMaxIterations(JsonUtils::fetchValue(_minimizerConfig_, "max_iter", (unsigned int)(500) ));
-  _minimizer_->SetMaxFunctionCalls(JsonUtils::fetchValue(_minimizerConfig_, "max_fcn", (unsigned int)(1E9)));
+  _minimizer_->SetMaxIterations(JsonUtils::fetchValue(_minimizerConfig_, {{"maxIterations"}, {"max_iter"}}, (unsigned int)(500) ));
+  _minimizer_->SetMaxFunctionCalls(JsonUtils::fetchValue(_minimizerConfig_, {{"maxFcnCalls"}, {"max_fcn"}}, (unsigned int)(1E9)));
 
   for( int iFitPar = 0 ; iFitPar < _nbFitParameters_ ; iFitPar++ ){
     auto& fitPar = *_minimizerFitParameterPtr_[iFitPar];

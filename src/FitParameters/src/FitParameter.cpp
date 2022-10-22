@@ -80,9 +80,6 @@ void FitParameter::setStdDevValue(double stdDevValue) {
 void FitParameter::setEnableDialSetsSummary(bool enableDialSetsSummary) {
   _enableDialSetsSummary_ = enableDialSetsSummary;
 }
-void FitParameter::setDialsWorkingDirectory(const std::string &dialsWorkingDirectory) {
-  _dialsWorkingDirectory_ = dialsWorkingDirectory;
-}
 void FitParameter::setMinValue(double minValue) {
   _minValue_ = minValue;
 }

@@ -7,6 +7,7 @@ set( SRCFILES
         src/PhysicsEvent.cpp
         src/PlotGenerator.cpp
         src/JointProbability.cpp
+        src/EventVarTransform.cpp
         )
 
 if( USE_STATIC_LINKS )

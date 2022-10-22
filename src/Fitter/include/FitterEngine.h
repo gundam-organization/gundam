@@ -38,6 +38,7 @@ public:
   void setNbScanSteps(int nbScanSteps);
   void setEnablePostFitScan(bool enablePostFitScan);
   void setEnablePostFitErrorEval(bool enablePostFitErrorEval_);
+  void setEnablePca(bool enablePca_);
 
   // Init
   void initialize();
@@ -82,6 +83,7 @@ private:
   bool _useNormalizedFitSpace_{false};
 
   // Internals
+  bool _enablePca_{false};
   bool _fitIsDone_{false};
   bool _enableFitMonitor_{false};
   bool _fitHasConverged_{false};

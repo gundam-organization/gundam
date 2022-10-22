@@ -2,6 +2,7 @@
 // Created by Adrien BLANCHET on 14/05/2022.
 //
 
+#include "EventVarTransform.h"
 #include "DataDispenser.h"
 #include "GlobalVariables.h"
 #include "SplineDial.h"
@@ -9,7 +10,7 @@
 #include "DatasetLoader.h"
 #include "JsonUtils.h"
 
-#include "GenericToolbox.Root.TreeEventBuffer.h"
+#include "GenericToolbox.Root.TreeEntryBuffer.h"
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.VariablesMonitor.h"
 #include "Logger.h"
@@ -41,7 +42,7 @@ void DataDispenser::readConfig(){
 
   _parameters_.treePath = JsonUtils::fetchValue<std::string>(_config_, "tree", _parameters_.treePath);
   _parameters_.filePathList = JsonUtils::fetchValue<std::vector<std::string>>(_config_, "filePathList", _parameters_.filePathList);
-  _parameters_.additionalLeavesStorage = JsonUtils::fetchValue(_config_, "additionalLeavesStorage", _parameters_.additionalLeavesStorage);
+  _parameters_.additionalVarsStorage = JsonUtils::fetchValue(_config_, {{"additionalLeavesStorage"}, {"additionalVarsStorage"}}, _parameters_.additionalVarsStorage);
   _parameters_.useMcContainer = JsonUtils::fetchValue(_config_, "useMcContainer", _parameters_.useMcContainer);
 
   _parameters_.selectionCutFormulaStr = JsonUtils::buildFormula(_config_, "selectionCutFormula", "&&", _parameters_.selectionCutFormulaStr);
@@ -99,7 +100,7 @@ void DataDispenser::load(){
     }
   };
   auto overrideLeavesNamesFct = [&](std::string& formula_){
-    for( auto& replaceEntry : _cache_.leavesToOverrideList ){
+    for( auto& replaceEntry : _cache_.varsToOverrideList ){
       GenericToolbox::replaceSubstringInsideInputString(formula_, replaceEntry, _parameters_.overrideLeafDict[replaceEntry]);
     }
   };
@@ -110,13 +111,37 @@ void DataDispenser::load(){
     LogInfo << GenericToolbox::parseMapAsString(_parameters_.overrideLeafDict) << std::endl;
 
     for( auto& overrideEntry : _parameters_.overrideLeafDict ){
-      _cache_.leavesToOverrideList.emplace_back(overrideEntry.first);
+      _cache_.varsToOverrideList.emplace_back(overrideEntry.first);
     }
     // make sure we process the longest words first: "thisIsATest" variable should be replaced before "thisIs"
     std::function<bool(const std::string&, const std::string&)> aGoesFirst =
-				[](const std::string& a_, const std::string& b_){ return a_.size() > b_.size(); };
-		GenericToolbox::sortVector(_cache_.leavesToOverrideList, aGoesFirst);
+        [](const std::string& a_, const std::string& b_){ return a_.size() > b_.size(); };
+    GenericToolbox::sortVector(_cache_.varsToOverrideList, aGoesFirst);
   }
+
+  if( JsonUtils::doKeyExist(_config_, "variablesTransform") ){
+    // load transformations
+    int index{0};
+    for( auto& varTransform : JsonUtils::fetchValue(_config_, "variablesTransform", nlohmann::json()) ){
+      _cache_.eventVarTransformList.emplace_back(varTransform);
+      _cache_.eventVarTransformList.back().setIndex(index++);
+    }
+    // sort them according to their output
+    std::function<bool(const EventVarTransform&, const EventVarTransform&)> aGoesFirst =
+        [](const EventVarTransform& a_, const EventVarTransform& b_){
+          // does a_ is a self transformation? -> if yes, don't change the order
+          if( GenericToolbox::doesElementIsInVector(a_.getOutputVariableName(), a_.fetchRequestedVars()) ){ return false; }
+          // does b_ transformation needs a_ output? -> if yes, a needs to go first
+          if( GenericToolbox::doesElementIsInVector(a_.getOutputVariableName(), b_.fetchRequestedVars()) ){ return true; }
+          // otherwise keep the order from the declaration
+          if( a_.getIndex() < b_.getIndex() ) return true;
+          // default -> won't change the order
+          return false;
+        };
+    GenericToolbox::sortVector(_cache_.eventVarTransformList, aGoesFirst);
+  }
+
+
 
   replaceToyIndexFct(_parameters_.nominalWeightFormulaStr);
   replaceToyIndexFct(_parameters_.selectionCutFormulaStr);
@@ -139,20 +164,6 @@ std::string DataDispenser::getTitle(){
   if( _owner_ != nullptr ) ss << _owner_->getName();
   ss << "/" << _parameters_.name;
   return ss.str();
-}
-
-void DataDispenser::addLeafRequestedForIndexing(const std::string& leafName_) {
-  LogThrowIf(leafName_.empty(), "no leaf name provided.")
-  if( not GenericToolbox::doesElementIsInVector(leafName_, _cache_.leavesRequestedForIndexing) ){
-    _cache_.leavesRequestedForIndexing.emplace_back(leafName_);
-  }
-}
-void DataDispenser::addLeafRequestedForStorage(const std::string& leafName_){
-  LogThrowIf(leafName_.empty(), "no leaf name provided.")
-  if( not GenericToolbox::doesElementIsInVector(leafName_, _cache_.leavesRequestedForStorage) ){
-    _cache_.leavesRequestedForStorage.emplace_back(leafName_);
-  }
-  this->addLeafRequestedForIndexing(leafName_);
 }
 
 void DataDispenser::buildSampleToFillList(){
@@ -197,8 +208,11 @@ void DataDispenser::doEventSelection(){
     TTreeFormulaManager formulaManager; // TTreeFormulaManager handles the notification of multiple TTreeFormula for one TTChain
 
     if (not _parameters_.selectionCutFormulaStr.empty()) {
-      treeSelectionCutFormula = new TTreeFormula("SelectionCutFormula", _parameters_.selectionCutFormulaStr.c_str(),
-                                                 &treeChain);
+      treeSelectionCutFormula = new TTreeFormula(
+          "SelectionCutFormula",
+          _parameters_.selectionCutFormulaStr.c_str(),
+          &treeChain
+      );
 
       // ROOT Hot fix: https://root-forum.cern.ch/t/ttreeformula-evalinstance-return-0-0/16366/10
       treeSelectionCutFormula->GetNdata();
@@ -215,26 +229,26 @@ void DataDispenser::doEventSelection(){
     t.setColTitles({{"Sample"}, {"Selection Cut"}});
     for (size_t iSample = 0; iSample < _cache_.samplesToFillList.size(); iSample++) {
 
-        std::string selectionCut = _cache_.samplesToFillList[iSample]->getSelectionCutsStr();
-        for (auto &replaceEntry: _cache_.leavesToOverrideList) {
-          GenericToolbox::replaceSubstringInsideInputString(selectionCut, replaceEntry,
-                                                            _parameters_.overrideLeafDict[replaceEntry]);
-        }
-
-        t.addTableLine({{"\"" + _cache_.samplesToFillList[iSample]->getName() + "\""},
-                        {"\"" + selectionCut + "\""}});
-        sampleCutFormulaList[iSample] = new TTreeFormula(_cache_.samplesToFillList[iSample]->getName().c_str(),
-                                                         selectionCut.c_str(), &treeChain);
-
-        // ROOT Hot fix: https://root-forum.cern.ch/t/ttreeformula-evalinstance-return-0-0/16366/10
-        sampleCutFormulaList[iSample]->GetNdata();
-
-        LogThrowIf(sampleCutFormulaList[iSample]->GetNdim() == 0,
-                   "\"" << selectionCut << "\" could not be parsed by the TChain");
-
-        // The TChain will notify the formula that it has to update leaves addresses while swaping TFile
-        formulaManager.Add(sampleCutFormulaList[iSample]);
+      std::string selectionCut = _cache_.samplesToFillList[iSample]->getSelectionCutsStr();
+      for (auto &replaceEntry: _cache_.varsToOverrideList) {
+        GenericToolbox::replaceSubstringInsideInputString(selectionCut, replaceEntry,
+                                                          _parameters_.overrideLeafDict[replaceEntry]);
       }
+
+      t.addTableLine({{"\"" + _cache_.samplesToFillList[iSample]->getName() + "\""},
+                      {"\"" + selectionCut + "\""}});
+      sampleCutFormulaList[iSample] = new TTreeFormula(_cache_.samplesToFillList[iSample]->getName().c_str(),
+                                                       selectionCut.c_str(), &treeChain);
+
+      // ROOT Hot fix: https://root-forum.cern.ch/t/ttreeformula-evalinstance-return-0-0/16366/10
+      sampleCutFormulaList[iSample]->GetNdata();
+
+      LogThrowIf(sampleCutFormulaList[iSample]->GetNdim() == 0,
+                 "\"" << selectionCut << "\" could not be parsed by the TChain");
+
+      // The TChain will notify the formula that it has to update leaves addresses while swaping TFile
+      formulaManager.Add(sampleCutFormulaList[iSample]);
+    }
     treeChain.SetNotify(&formulaManager);
     if(iThread_==0) t.printTable();
 
@@ -274,12 +288,12 @@ void DataDispenser::doEventSelection(){
           ssProgressTitle.str("");
 
           ssProgressTitle << LogDebug.getPrefixString() << "Read from disk: "
-          << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.getTotalAccumulated()), 8) << " ("
-          << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.evalTotalGrowthRate()), 8) << "/s)";
+                          << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.getTotalAccumulated()), 8) << " ("
+                          << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.evalTotalGrowthRate()), 8) << "/s)";
 
           int cpuPercent = int(GenericToolbox::getCpuUsageByProcess());
           ssProgressTitle << " / CPU efficiency: " << GenericToolbox::padString(std::to_string(cpuPercent/nThreads), 3,' ')
-          << "%" << std::endl;
+                          << "%" << std::endl;
 
           ssProgressTitle << LogInfo.getPrefixString() << progressTitle;
           GenericToolbox::displayProgressBar(iGlobal, nEvents, ssProgressTitle.str());
@@ -355,7 +369,7 @@ void DataDispenser::doEventSelection(){
 
 }
 void DataDispenser::fetchRequestedLeaves(){
-  LogWarning << "Fetching requested leaves to extract from the trees..." << std::endl;
+  LogWarning << "Poll every objects for requested variables..." << std::endl;
 
   // parSet
   if( _parSetListPtrToLoad_ != nullptr ){
@@ -369,19 +383,19 @@ void DataDispenser::fetchRequestedLeaves(){
         if( dialSetPtr == nullptr ){ continue; }
 
         if( not dialSetPtr->getDialLeafName().empty() ){
-          this->addLeafRequestedForIndexing(dialSetPtr->getDialLeafName());
+          _cache_.addVarRequestedForIndexing(dialSetPtr->getDialLeafName());
         }
         else{
           if( dialSetPtr->getApplyConditionFormula() != nullptr ){
             for( int iPar = 0 ; iPar < dialSetPtr->getApplyConditionFormula()->GetNpar() ; iPar++ ){
-              this->addLeafRequestedForIndexing(dialSetPtr->getApplyConditionFormula()->GetParName(iPar));
+              _cache_.addVarRequestedForIndexing(dialSetPtr->getApplyConditionFormula()->GetParName(iPar));
             }
           }
 
           for( auto& dial : dialSetPtr->getDialList() ){
             if( dial->getApplyConditionBinPtr() != nullptr ){
               for( auto& var : dial->getApplyConditionBinPtr()->getVariableNameList() ){
-                this->addLeafRequestedForIndexing(var);
+                _cache_.addVarRequestedForIndexing(var);
               } // var
             }
           } // dial
@@ -395,7 +409,7 @@ void DataDispenser::fetchRequestedLeaves(){
   for( auto& sample: _sampleSetPtrToLoad_->getFitSampleList() ){
     for( auto& bin: sample.getBinning().getBinsList()){
       for( auto& var: bin.getVariableNameList()){
-        this->addLeafRequestedForIndexing(var);
+        _cache_.addVarRequestedForIndexing(var);
       }
     }
   }
@@ -403,25 +417,79 @@ void DataDispenser::fetchRequestedLeaves(){
   // plotGen
   if( _plotGenPtr_ != nullptr ){
     for( auto& var : _plotGenPtr_->fetchListOfVarToPlot(not _parameters_.useMcContainer) ){
-      this->addLeafRequestedForStorage(var);
+      _cache_.addVarRequestedForStorage(var);
     }
 
     if( _parameters_.useMcContainer ){
       for( auto& var : _plotGenPtr_->fetchListOfSplitVarNames() ){
-        this->addLeafRequestedForStorage(var);
+        _cache_.addVarRequestedForStorage(var);
       }
     }
   }
 
-  for( auto& additionalLeaf: _parameters_.additionalLeavesStorage ){
-    this->addLeafRequestedForStorage(additionalLeaf);
+  // storage requested by user
+  for( auto& additionalLeaf: _parameters_.additionalVarsStorage ){
+    _cache_.addVarRequestedForStorage(additionalLeaf);
   }
 
-  LogInfo << "Vars requested for indexing: " << GenericToolbox::parseVectorAsString(_cache_.leavesRequestedForIndexing, false) << std::endl;
-  LogInfo << "Vars requested for storage: " << GenericToolbox::parseVectorAsString(_cache_.leavesRequestedForStorage, false) << std::endl;
+  // transforms inputs
+  if( not _cache_.eventVarTransformList.empty() ){
+    std::vector<std::string> additionalTransformVars;
+    for( int iTrans = int(_cache_.eventVarTransformList.size())-1 ; iTrans >= 0 ; iTrans-- ){
+      // in reverse order -> Treat the highest level vars first (they might need lower level variables)
+      std::string outVarName = _cache_.eventVarTransformList[iTrans].getOutputVariableName();
+      if( GenericToolbox::doesElementIsInVector( outVarName, _cache_.varsRequestedForIndexing ) ){
+        // ok it is needed -> activate dependencies
+        for( auto& var: _cache_.eventVarTransformList[iTrans].fetchRequestedVars() ){
+          _cache_.addVarRequestedForIndexing(var);
+        }
+      }
+    }
+  }
+
+  LogInfo << "Vars requested for indexing: " << GenericToolbox::parseVectorAsString(_cache_.varsRequestedForIndexing, false) << std::endl;
+  LogInfo << "Vars requested for storage: " << GenericToolbox::parseVectorAsString(_cache_.varsRequestedForStorage, false) << std::endl;
+
+  // Now build the var to leaf translation
+  for( auto& var : _cache_.varsRequestedForIndexing ){
+    _cache_.varToLeafDict[var].first = var;    // default is the same name
+    _cache_.varToLeafDict[var].second = false; // is dummy branch?
+
+    // strip brackets
+    _cache_.varToLeafDict[var].first = GenericToolbox::stripBracket(_cache_.varToLeafDict[var].first, '[', ']');
+
+    // look for override requests
+    if( GenericToolbox::doesKeyIsInMap(_cache_.varToLeafDict[var].first, _parameters_.overrideLeafDict) ){
+      // leafVar will actually be the overrided leaf name while event will keep the original name
+      _cache_.varToLeafDict[var].first = _parameters_.overrideLeafDict[_cache_.varToLeafDict[var].first];
+      _cache_.varToLeafDict[var].first = GenericToolbox::stripBracket(_cache_.varToLeafDict[var].first, '[', ']');
+    }
+
+    // possible dummy ?
+    // [OUT] variables only
+    // [OUT] not requested by its inputs
+    for( auto& varTransform : _cache_.eventVarTransformList ){
+      std::string outVarName = varTransform.getOutputVariableName();
+      if( outVarName != var ) continue;
+      if( GenericToolbox::doesElementIsInVector(outVarName, varTransform.fetchRequestedVars()) ) continue;
+      _cache_.varToLeafDict[var].second = true;
+      break;
+    }
+  }
+
+//  GenericToolbox::TablePrinter t;
+//  t.setColTitles({"Variable name", "Leaf name", "From VarTransform?"});
+//  for( auto& varToLeafDictEntry : _cache_.varToLeafDict ){
+//    std::string colorCode{};
+//    if( GenericToolbox::doesElementIsInVector(varToLeafDictEntry.first, _cache_.varsRequestedForStorage) ){ colorCode = GenericToolbox::ColorCodes::blueBackground; }
+//    t.addTableLine({varToLeafDictEntry.first, varToLeafDictEntry.second.first, std::to_string(varToLeafDictEntry.second.second)}, colorCode);
+//  }
+//  t.printTable();
+
 }
 void DataDispenser::preAllocateMemory(){
   LogInfo << "Pre-allocating memory..." << std::endl;
+  LogInfo << "Pre-allocation RAM is: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage())) << std::endl;
 
   /// \brief The following lines are necessary since the events might get resized while being in multithread
   /// Because std::vector is insuring continuous memory allocation, a resize sometimes
@@ -433,23 +501,14 @@ void DataDispenser::preAllocateMemory(){
   for( const auto& file: _parameters_.filePathList){ treeChain.Add(file.c_str()); }
   treeChain.SetBranchStatus("*", false);
 
-  std::vector<std::string> leafVarList;
-  for( auto& eventVar : _cache_.leavesRequestedForStorage){
-    leafVarList.emplace_back(eventVar);
-    if( GenericToolbox::doesKeyIsInMap(eventVar, _parameters_.overrideLeafDict) ){
-      leafVarList.back() = _parameters_.overrideLeafDict[eventVar];
-      leafVarList.back() = GenericToolbox::stripBracket(leafVarList.back(), '[', ']');
-    }
-  }
-  GenericToolbox::TreeEventBuffer tBuf;
-  tBuf.setLeafNameList(leafVarList);
-  tBuf.hook(&treeChain);
+  // Just a placeholder for creating the dictionary
+  auto tBuf = this->generateTreeEventBuffer(&treeChain, _cache_.varsRequestedForStorage);
 
   PhysicsEvent eventPlaceholder;
   eventPlaceholder.setDataSetIndex(_owner_->getDataSetIndex());
-  eventPlaceholder.setCommonLeafNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.leavesRequestedForStorage));
+  eventPlaceholder.setCommonLeafNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
   auto copyDict = eventPlaceholder.generateDict(tBuf, _parameters_.overrideLeafDict);
-  eventPlaceholder.copyData(copyDict, true);
+  eventPlaceholder.copyData(copyDict);
   if( _parSetListPtrToLoad_ != nullptr ){
     size_t dialCacheSize = 0;
     for( auto& parSet : *_parSetListPtrToLoad_ ){
@@ -485,7 +544,7 @@ void DataDispenser::preAllocateMemory(){
             if( dial->getApplyConditionBinPtr() != nullptr ){
               std::vector<int> varIndexes;
               for( const auto& var : dial->getApplyConditionBinPtr()->getVariableNameList() ){
-                varIndexes.emplace_back(GenericToolbox::findElementIndex(var, _cache_.leavesRequestedForIndexing));
+                varIndexes.emplace_back(GenericToolbox::findElementIndex(var, _cache_.varsRequestedForIndexing));
               }
               dial->getApplyConditionBinPtr()->setEventVarIndexCache(varIndexes);
             }
@@ -514,7 +573,7 @@ void DataDispenser::preAllocateMemory(){
     }
   }
 
-  LogInfo << "Current RAM is: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage())) << std::endl;
+  LogInfo << "Post-allocation RAM is: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage())) << std::endl;
 }
 void DataDispenser::readAndFill(){
   LogWarning << "Reading dataset and loading..." << std::endl;
@@ -541,14 +600,13 @@ void DataDispenser::readAndFill(){
 
     treeChain.SetBranchStatus("*", false);
 
-
     if( not _parameters_.nominalWeightFormulaStr.empty() ){
       treeChain.SetBranchStatus("*", true);
       threadNominalWeightFormula = new TTreeFormula(
           Form("NominalWeightFormula%i", iThread_),
           _parameters_.nominalWeightFormulaStr.c_str(),
           &treeChain
-          );
+      );
 
       // ROOT Hot fix: https://root-forum.cern.ch/t/ttreeformula-evalinstance-return-0-0/16366/10
       threadNominalWeightFormula->GetNdata();
@@ -560,31 +618,91 @@ void DataDispenser::readAndFill(){
       GenericToolbox::enableSelectedBranches(&treeChain, threadNominalWeightFormula);
     }
 
-    GenericToolbox::TreeEventBuffer tEventBuffer;
-    std::vector<std::string> leafVar;
-    for( auto& eventVar : _cache_.leavesRequestedForIndexing){
-      leafVar.emplace_back(eventVar);
-      if( GenericToolbox::doesKeyIsInMap(eventVar, _parameters_.overrideLeafDict) ){
-        leafVar.back() = _parameters_.overrideLeafDict[eventVar];
-        leafVar.back() = GenericToolbox::stripBracket(leafVar.back(), '[', ']');
+    // TTree data buffer
+    auto tEventBuffer = this->generateTreeEventBuffer(&treeChain, _cache_.varsRequestedForIndexing);
+
+    // Event Var Transform
+    auto eventVarTransformList = _cache_.eventVarTransformList; // copy for cache
+    std::vector<EventVarTransform*> varTransformForIndexingList;
+    std::vector<EventVarTransform*> varTransformForStorageList;
+    for( auto& eventVarTransform : eventVarTransformList ){
+      if( GenericToolbox::doesElementIsInVector(eventVarTransform.getOutputVariableName(), _cache_.varsRequestedForIndexing) ){
+        varTransformForIndexingList.emplace_back(&eventVarTransform);
+      }
+      if( GenericToolbox::doesElementIsInVector(eventVarTransform.getOutputVariableName(), _cache_.varsRequestedForStorage) ){
+        varTransformForStorageList.emplace_back(&eventVarTransform);
       }
     }
-    tEventBuffer.setLeafNameList(leafVar);
-    tEventBuffer.hook(&treeChain);
 
+    if( iThread_ == 0 ){
+      if( not varTransformForIndexingList.empty() ){
+        LogInfo << "EventVarTransform used for indexing: "
+                << GenericToolbox::iterableToString(
+                    varTransformForIndexingList,
+                    [](const EventVarTransform* elm_){ return "\"" + elm_->getTitle() + "\"";}, false)
+                << std::endl;
+      }
+      if( not varTransformForStorageList.empty() ){
+        LogInfo << "EventVarTransform used for storage: "
+                << GenericToolbox::iterableToString(
+                    varTransformForStorageList,
+                    []( const EventVarTransform* elm_){ return "\"" + elm_->getTitle() + "\""; }, false)
+                << std::endl;
+      }
+    }
+
+    // buffer that will store the data for indexing
     PhysicsEvent eventBuffer;
     eventBuffer.setDataSetIndex(_owner_->getDataSetIndex());
-    eventBuffer.setCommonLeafNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.leavesRequestedForIndexing));
+    eventBuffer.setCommonLeafNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForIndexing));
     auto copyDict = eventBuffer.generateDict(tEventBuffer, _parameters_.overrideLeafDict);
-    eventBuffer.copyData(copyDict, true); // resize array obj
+    if(iThread_ == 0){
+      LogInfo << "Feeding event variables with:" << std::endl;
+      GenericToolbox::TablePrinter t;
+      t.setColTitles({{"Variable"}, {"Leaf"}, {"Transforms"}});
+      for( size_t iVar = 0 ; iVar < eventBuffer.getCommonLeafNameListPtr()->size() ; iVar++ ){
+        std::string variableName = (*eventBuffer.getCommonLeafNameListPtr())[iVar];
+        t << variableName << std::endl;
+
+        t << copyDict[iVar].first->getLeafFullName();
+        if(copyDict[iVar].second != -1) t << "[" << copyDict[iVar].second << "]";
+        t << std::endl;
+
+        std::vector<std::string> transformsList;
+        for( auto* varTransformForIndexing : varTransformForIndexingList ){
+          if( varTransformForIndexing->getOutputVariableName() == variableName ){
+            transformsList.emplace_back(varTransformForIndexing->getTitle());
+          }
+        }
+        t << GenericToolbox::parseVectorAsString(transformsList);
+
+        if( GenericToolbox::doesElementIsInVector(variableName, _cache_.varsRequestedForStorage)){
+          t.setColorBuffer(GenericToolbox::ColorCodes::blueBackground);
+        }
+        else if(
+            copyDict[iVar].first->getLeafTypeName() == "TClonesArray"
+            or copyDict[iVar].first->getLeafTypeName() == "TGraph"
+            ){
+          t.setColorBuffer(GenericToolbox::ColorCodes::magentaBackground);
+        }
+
+        t << std::endl;
+      }
+
+      t.printTable();
+      LogInfo(Logger::Color::BG_BLUE) << "      " << Logger::getColorEscapeCode(Logger::Color::RESET) << " -> Variables stored in RAM" << std::endl;
+      LogInfo(Logger::Color::BG_MAGENTA) << "      " << Logger::getColorEscapeCode(Logger::Color::RESET) << " -> Dials stored in RAM" << std::endl;
+    }
+    eventBuffer.copyData(copyDict); // resize array obj
     eventBuffer.resizeVarToDoubleCache();
 
+    // only here to create a dictionary to copy data from the TTree that should store in RAM
     PhysicsEvent evStore;
     evStore.setDataSetIndex(_owner_->getDataSetIndex());
-    evStore.setCommonLeafNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.leavesRequestedForStorage));
+    evStore.setCommonLeafNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
     auto copyStoreDict = evStore.generateDict(tEventBuffer, _parameters_.overrideLeafDict);
 
-
+    // Will keep track of a picked event pointer
     PhysicsEvent* eventPtr{nullptr};
 
     size_t sampleEventIndex;
@@ -593,11 +711,13 @@ void DataDispenser::readAndFill(){
 
     // Loop vars
     bool isEventInDialBin{true};
-    int iBin{0};
     int lastFailedBinVarIndex{-1}; int lastEventVarIndex{-1};
     const std::pair<double, double>* lastEdges{nullptr};
     size_t iVar{0};
-    size_t iSample{0};
+    size_t iBin{0}, nBins;
+    size_t iSample{0}, nSample{_cache_.samplesToFillList.size()};
+    size_t iTransform{0}, nTransform{_cache_.eventVarTransformList.size()};
+
     // Dials
     size_t eventDialOffset;
     DialSet* dialSetPtr;
@@ -632,13 +752,13 @@ void DataDispenser::readAndFill(){
 
           ssProgressBar.str("");
 
-          ssProgressBar << LogDebug.getPrefixString() << "Reading from disk: "
-                          << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.getTotalAccumulated()), 8) << " ("
-                          << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.evalTotalGrowthRate()), 8) << "/s)";
+          ssProgressBar << LogInfo.getPrefixString() << "Reading from disk: "
+                        << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.getTotalAccumulated()), 8) << " ("
+                        << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.evalTotalGrowthRate()), 8) << "/s)";
 
           int cpuPercent = int(GenericToolbox::getCpuUsageByProcess());
           ssProgressBar << " / CPU efficiency: " << GenericToolbox::padString(std::to_string(cpuPercent/nThreads), 3,' ')
-                          << "%" << std::endl;
+                        << "%" << std::endl;
 
           ssProgressBar << LogInfo.getPrefixString() << progressTitle;
           GenericToolbox::displayProgressBar(iGlobal, nEvents, ssProgressBar.str());
@@ -676,19 +796,25 @@ void DataDispenser::readAndFill(){
         } // skip this event
       }
 
-      for( iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
+      for( iSample = 0 ; iSample < nSample ; iSample++ ){
         if( _cache_.eventIsInSamplesList[iEntry][iSample] ){
 
           // Reset bin index of the buffer
           eventBuffer.setSampleBinIndex(-1);
 
           // Getting loaded data in tEventBuffer
-          eventBuffer.copyData(copyDict, true);
+          eventBuffer.copyData(copyDict);
+
+          // Propagate transformations for indexing
+          for( auto* varTransformForIndexing : varTransformForIndexingList ){
+            varTransformForIndexing->evalAndStore(eventBuffer);
+          }
 
           // Has valid bin?
           binsListPtr = &_cache_.samplesToFillList[iSample]->getBinning().getBinsList();
+          nBins = binsListPtr->size();
 
-          for( iBin = 0 ; iBin < binsListPtr->size() ; iBin++ ){
+          for( iBin = 0 ; iBin < nBins ; iBin++ ){
             auto& bin = (*binsListPtr)[iBin];
             bool isInBin = true;
             for( iVar = 0 ; iVar < bin.getVariableNameList().size() ; iVar++ ){
@@ -709,12 +835,16 @@ void DataDispenser::readAndFill(){
           }
 
           // OK, now we have a valid fit bin. Let's claim an index.
-//          eventOffSetMutex.lock();
           sampleEventIndex = _cache_.sampleIndexOffsetList[iSample]++;
-//          eventOffSetMutex.unlock();
 
+          // Get the next free event in our buffer
           eventPtr = &(*_cache_.sampleEventListPtrToFill[iSample])[sampleEventIndex];
-          eventPtr->copyData(copyStoreDict, true); // buffer has the right size already
+          eventPtr->copyData(copyStoreDict); // buffer has the right size already
+
+          // Propagate transformation for storage -> use the previous results calculated for indexing
+          for( auto* varTransformForStorage : varTransformForStorageList ){
+            varTransformForStorage->storeCachedOutput(*eventPtr);
+          }
 
           eventPtr->setEntryIndex(iEntry);
           eventPtr->setSampleBinIndex(eventBuffer.getSampleBinIndex());
@@ -803,7 +933,7 @@ void DataDispenser::readAndFill(){
                   if( (applyConditionBinPtr = dialSetPtr->getDialList()[iDial]->getApplyConditionBinPtr()) != nullptr ){
                     if( lastFailedBinVarIndex != -1 // if the last bin failed, this is not -1
                         and applyConditionBinPtr->getEventVarIndexCache()[lastFailedBinVarIndex] == lastEventVarIndex // make sure this new bin-edges point to the same variable
-                    ){
+                        ){
                       if( *lastEdges == applyConditionBinPtr->getEdgesList()[lastFailedBinVarIndex] ){ continue; } // same bin-edges! no need to check again!
                       else{ lastEdges = &applyConditionBinPtr->getEdgesList()[lastFailedBinVarIndex]; }
                       if( not DataBin::isBetweenEdges( *lastEdges, eventBuffer.getVarAsDouble(lastEventVarIndex) )){
@@ -865,5 +995,50 @@ void DataDispenser::readAndFill(){
   }
 }
 
+GenericToolbox::TreeEntryBuffer DataDispenser::generateTreeEventBuffer(TChain* treeChain_, const std::vector<std::string>& varsList_){
+  GenericToolbox::TreeEntryBuffer tBuf;
+
+  // Gather leaves names list that will have to be hooked to the tree
+  std::vector<std::string> leafVarList, isDummyList;
+  leafVarList.reserve(varsList_.size());
+  isDummyList.reserve(varsList_.size());
+
+  // Find associated leaf according to the dictionary
+  for( auto& var : varsList_ ){
+    LogThrowIf(
+        not GenericToolbox::doesKeyIsInMap(var, _cache_.varToLeafDict),
+        "Could not find \"" << var << "\" in " << GenericToolbox::parseMapAsString(_cache_.varToLeafDict)
+    );
+    if( not GenericToolbox::doesElementIsInVector(_cache_.varToLeafDict[var].first, leafVarList) ){
+      leafVarList.emplace_back(_cache_.varToLeafDict[var].first);
+    }
+  }
+
+  tBuf.setLeafNameList(leafVarList);
+
+  for( auto& var : varsList_ ){
+    // don't activate as dummy if the leaf exists
+    if( treeChain_->GetLeaf(_cache_.varToLeafDict[var].first.c_str()) != nullptr ) continue;
+    tBuf.setIsDummyLeaf(_cache_.varToLeafDict[var].first, _cache_.varToLeafDict[var].second);
+  }
+
+  tBuf.hook(treeChain_);
+
+  return tBuf;
+}
+
+void DataDispenserCache::addVarRequestedForIndexing(const std::string& varName_) {
+  LogThrowIf(varName_.empty(), "no var name provided.")
+  if( not GenericToolbox::doesElementIsInVector(varName_, this->varsRequestedForIndexing) ){
+    this->varsRequestedForIndexing.emplace_back(varName_);
+  }
+}
+void DataDispenserCache::addVarRequestedForStorage(const std::string& varName_){
+  LogThrowIf(varName_.empty(), "no var name provided.")
+  if( not GenericToolbox::doesElementIsInVector(varName_, this->varsRequestedForStorage) ){
+    this->varsRequestedForStorage.emplace_back(varName_);
+  }
+  this->addVarRequestedForIndexing(varName_);
+}
 
 

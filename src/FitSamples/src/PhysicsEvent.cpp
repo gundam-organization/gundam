@@ -414,7 +414,7 @@ void PhysicsEvent::fillBuffer(const std::vector<int>& indexList_, std::vector<do
 }
 
 
-double PhysicsEvent::evalFormula(TFormula* formulaPtr_, std::vector<int>* indexDict_) const{
+double PhysicsEvent::evalFormula(const TFormula* formulaPtr_, std::vector<int>* indexDict_) const{
   LogThrowIf(formulaPtr_ == nullptr, GET_VAR_NAME_VALUE(formulaPtr_));
 
   std::vector<double> parArray(formulaPtr_->GetNpar());
@@ -503,7 +503,9 @@ void PhysicsEvent::addNestedDialRefToCache(NestedDialTest* nestedDialPtr_, const
   _nestedDialRefList_.back().first = nestedDialPtr_;
   _nestedDialRefList_.back().second = dialPtrList_;
 }
-std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>> PhysicsEvent::generateLeavesDictionary(bool disableArrays_) const{
+std::map< std::string,
+  std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>>
+  PhysicsEvent::generateLeavesDictionary(bool disableArrays_) const {
   std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>> out;
 
   for( auto& leafName : *_commonLeafNameListPtr_ ){
@@ -534,20 +536,31 @@ std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const st
   }
   return out;
 }
-void PhysicsEvent::copyData(const std::vector<std::pair<const GenericToolbox::LeafHolder*, int>>& dict_, bool disableArrayStorage_){
-  // Don't check for size? should be very fast
-  for( int iLeaf = 0 ; iLeaf < dict_.size() ; iLeaf++ ){
-    if(dict_[iLeaf].second == -1 and not disableArrayStorage_){ dict_[iLeaf].first->copyToAny(_leafContentList_[iLeaf]); }
+
+void PhysicsEvent::copyData(const std::vector<std::pair<const GenericToolbox::LeafHolder *, int>> &dict_) {
+  // Don't check for size? it has to be very fast
+  size_t nLeaf{dict_.size()};
+  for( size_t iLeaf = 0 ; iLeaf < nLeaf ; iLeaf++ ){
+    if( _leafContentList_[iLeaf].empty() ){
+      // resize buffer
+      _leafContentList_[iLeaf].emplace_back( GenericToolbox::leafToAnyType(dict_[iLeaf].first->getLeafTypeName()) );
+    }
+
+    if( dict_[iLeaf].second==-1 ){
+      // no index specified -> drop only the first element
+      dict_[iLeaf].first->dropToAny(_leafContentList_[iLeaf][0], 0);
+    }
     else{
-      if( _leafContentList_[iLeaf].empty() ) _leafContentList_[iLeaf].emplace_back(GenericToolbox::leafToAnyType(dict_[iLeaf].first->getLeafTypeName()));
-      (dict_[iLeaf].second==-1 and disableArrayStorage_) ?
-      dict_[iLeaf].first->copyToAny(_leafContentList_[iLeaf][0], 0) :
-      dict_[iLeaf].first->copyToAny(_leafContentList_[iLeaf][0], dict_[iLeaf].second);
+      // drop the selected index
+      dict_[iLeaf].first->dropToAny(_leafContentList_[iLeaf][0], dict_[iLeaf].second);
     }
   }
   this->invalidateVarToDoubleCache();
 }
-std::vector<std::pair<const GenericToolbox::LeafHolder*, int>> PhysicsEvent::generateDict(const GenericToolbox::TreeEventBuffer& h_, const std::map<std::string, std::string>& leafDict_){
+std::vector<std::pair<const GenericToolbox::LeafHolder*, int>> PhysicsEvent::generateDict(
+    const GenericToolbox::TreeEntryBuffer& treeEventBuffer_,
+    const std::map<std::string, std::string>& leafDict_
+    ){
   std::vector<std::pair<const GenericToolbox::LeafHolder*, int>> out;
   out.reserve(_commonLeafNameListPtr_->size());
   std::string strBuf;
@@ -561,7 +574,7 @@ std::vector<std::pair<const GenericToolbox::LeafHolder*, int>> PhysicsEvent::gen
       if     ( argBuf.size() == 1 ){ out.back().second = std::stoi(argBuf[0]); }
       else if( argBuf.size() > 1 ){ LogThrow("No support for multi-dim array."); }
     }
-    out.back().first = &h_.getLeafContent(strBuf);
+    out.back().first = &treeEventBuffer_.getLeafContent(strBuf);
   }
   return out;
 }

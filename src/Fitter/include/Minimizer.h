@@ -2,8 +2,8 @@
 // Created by Adrien BLANCHET on 16/12/2021.
 //
 
-#ifndef GUNDAM_MINIMIZERINTERFACE_H
-#define GUNDAM_MINIMIZERINTERFACE_H
+#ifndef GUNDAM_MINIMIZER_H
+#define GUNDAM_MINIMIZER_H
 
 
 #include "FitParameterSet.h"
@@ -15,11 +15,11 @@
 #include "memory"
 #include "vector"
 
-class MinimizerInterface {
+class Minimizer {
 
 public:
-  MinimizerInterface();
-  virtual ~MinimizerInterface();
+  Minimizer();
+  virtual ~Minimizer();
 
   void reset();
 
@@ -57,4 +57,4 @@ private:
 };
 
 
-#endif //GUNDAM_MINIMIZERINTERFACE_H
+#endif //GUNDAM_MINIMIZER_H

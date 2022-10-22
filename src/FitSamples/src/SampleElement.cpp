@@ -145,12 +145,34 @@ void SampleElement::rescaleHistogram() {
   if( isLocked ) return;
   if( histScale != 1 ) histogram->Scale(histScale);
 }
+void SampleElement::saveAsHistogramNominal(){
+  histogramNominal = std::make_shared<TH1D>(*histogram);
+}
 
+void SampleElement::throwEventMcError(){
+  /*
+ * This is to take into account the finite amount of event
+ * */
+  double weightSum;
+  for( int iBin = 1 ; iBin <= histogram->GetNbinsX() ; iBin++ ){
+    weightSum = 0;
+    for (auto *eventPtr: perBinEventPtrList[iBin-1]) {
+      // gRandom->Poisson(1) -> returns an INT -> can be 0
+      eventPtr->setEventWeight(gRandom->Poisson(1) * eventPtr->getEventWeight());
+      weightSum += eventPtr->getEventWeight();
+    }
+    histogram->SetBinContent(iBin, weightSum);
+  }
+}
 void SampleElement::throwStatError(){
+  /*
+   * This is to convert "Asimov" histogram to toy-experiment (pseudo-data), i.e. with statistical fluctuations
+   * */
   int nCounts;
   for( int iBin = 1 ; iBin <= histogram->GetNbinsX() ; iBin++ ){
     nCounts = gRandom->Poisson(histogram->GetBinContent(iBin));
     for (auto *eventPtr: perBinEventPtrList[iBin-1]) {
+      // make sure refill of the histogram will produce the same hist
       eventPtr->setEventWeight(eventPtr->getEventWeight()*((double)nCounts/histogram->GetBinContent(iBin)));
     }
     histogram->SetBinContent(iBin, nCounts);

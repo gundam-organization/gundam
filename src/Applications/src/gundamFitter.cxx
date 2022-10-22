@@ -36,25 +36,32 @@ int main(int argc, char** argv){
   // --------------------------
   CmdLineParser clParser;
 
-  clParser.addTriggerOption("dry-run", {"--dry-run", "-d"},"Perform the full sequence of initialization, but don't do the actual fit.");
-  clParser.addTriggerOption("generateOneSigmaPlots", {"--one-sigma"}, "Generate one sigma plots");
-  clParser.addTriggerOption("asimov", {"-a", "--asimov"}, "Use MC dataset to fill the data histograms");
-  clParser.addTriggerOption("usingCacheManager", {"--cache-manager"}, "Event weight cache handle by the CacheManager");
-  clParser.addTriggerOption("usingGpu", {"--gpu"}, "Use GPU parallelization");
-  clParser.addTriggerOption("skipHesse", {"--skip-hesse"}, "Don't perform postfit error evaluation");
+  clParser.addDummyOption("Main options");
 
   clParser.addOption("configFile", {"-c", "--config-file"}, "Specify path to the fitter config file");
   clParser.addOption("nbThreads", {"-t", "--nb-threads"}, "Specify nb of parallel threads");
   clParser.addOption("outputFile", {"-o", "--out-file"}, "Specify the output file");
   clParser.addOption("randomSeed", {"-s", "--seed"}, "Set random seed");
+  clParser.addOption("appendix", {"--appendix"}, "Add appendix to the output file name");
 
-  clParser.addOption("toyFit", {"--toy"}, "Run a toy fit");
-  clParser.addOption("debugVerbose", {"--debug"}, "Enable debug verbose");
-  clParser.addOption("scanParameters", {"--scan"}, "Enable parameter scan before and after the fit");
+  clParser.addDummyOption("Trigger options");
 
-  clParser.getOptionPtr("toyFit")->setAllowEmptyValue(true); // --toy can be followed or not by the toy index
-  clParser.getOptionPtr("debugVerbose")->setAllowEmptyValue(true); // --debug can be followed or not by the verbose level
-  clParser.getOptionPtr("scanParameters")->setAllowEmptyValue(true); // --scan can be followed or not by the number of steps
+  clParser.addTriggerOption("dry-run", {"--dry-run", "-d"},"Perform the full sequence of initialization, but don't do the actual fit.");
+  clParser.addTriggerOption("asimov", {"-a", "--asimov"}, "Use MC dataset to fill the data histograms");
+  clParser.addTriggerOption("enablePca", {"--enable-pca"}, "Enable principle component analysis for eigen decomposed parameter sets");
+  clParser.addTriggerOption("skipHesse", {"--skip-hesse"}, "Don't perform postfit error evaluation");
+  clParser.addTriggerOption("generateOneSigmaPlots", {"--one-sigma"}, "Generate one sigma plots");
+  clParser.addOption("scanParameters", {"--scan"}, "Enable parameter scan before and after the fit (can provide nSteps)", 1, true);
+  clParser.addOption("toyFit", {"--toy"}, "Run a toy fit (optional arg to provide toy index)", 1, true);
+
+  clParser.addDummyOption("Runtime/debug options");
+
+  clParser.addOption("debugVerbose", {"--debug"}, "Enable debug verbose (can provide verbose level arg)", 1, true);
+  clParser.addTriggerOption("usingCacheManager", {"--cache-manager"}, "Event weight cache handle by the CacheManager");
+  clParser.addTriggerOption("usingGpu", {"--gpu"}, "Use GPU parallelization");
+
+  clParser.addDummyOption();
+
 
   LogInfo << "Usage: " << std::endl;
   LogInfo << clParser.getConfigSummary() << std::endl << std::endl;
@@ -68,13 +75,6 @@ int main(int argc, char** argv){
   LogInfo << clParser.dumpConfigAsJsonStr() << std::endl;
 
   if( clParser.isOptionTriggered("debugVerbose") ) GlobalVariables::setVerboseLevel(clParser.getOptionVal("debugVerbose", 1));
-
-//  // TEST
-//  LogDebug << "TEST..." << std::endl;
-//  LogDebug << GET_VAR_NAME_VALUE(gROOT->LoadMacro("test.h")) << std::endl;
-//  LogDebug << GET_VAR_NAME_VALUE(gROOT->ProcessLine("Test t1;")) << std::endl;
-//  LogDebug << GET_VAR_NAME_VALUE(gROOT->ProcessLineFast("t1.i;")) << std::endl;
-
 
   bool useGpu = clParser.isOptionTriggered("usingGpu");
   if( useGpu ){
@@ -132,17 +132,31 @@ int main(int argc, char** argv){
   bool isToyFit = clParser.isOptionTriggered("toyFit");
   int iToyFit = clParser.getOptionVal("toyFit", -1);
 
-  std::string outFileName = GenericToolbox::splitString(configFilePath,"/").back();
-  if( isToyFit ){
-    outFileName += "_toyFit";
-    if( iToyFit != -1 ){
-      outFileName += "_" + std::to_string(iToyFit);
-    }
+  std::string outFileName;
+  if( clParser.isOptionTriggered("outputFile") ){
+    outFileName = clParser.getOptionVal("outputFile", outFileName + ".root");
   }
-  outFileName = clParser.getOptionVal("outputFile", outFileName + ".root");
-  if( JsonUtils::doKeyExist(jsonConfig, "outputFolder") ){
-    GenericToolbox::mkdirPath(JsonUtils::fetchValue<std::string>(jsonConfig, "outputFolder"));
-    outFileName.insert(0, JsonUtils::fetchValue<std::string>(jsonConfig, "outputFolder") + "/");
+  else{
+    if( JsonUtils::doKeyExist(jsonConfig, "outputFolder") ){
+      GenericToolbox::mkdirPath(JsonUtils::fetchValue<std::string>(jsonConfig, "outputFolder"));
+      outFileName = JsonUtils::fetchValue<std::string>(jsonConfig, "outputFolder");
+      outFileName += "/";
+    }
+    outFileName += GenericToolbox::getFileNameFromFilePath(configFilePath, false);
+
+    if( clParser.isOptionTriggered("asimov") ){ outFileName += "_Asimov"; }
+    if( clParser.isOptionTriggered("scanParameters") ){ outFileName += "_Scan"; }
+    if( clParser.isOptionTriggered("generateOneSigmaPlots") ){ outFileName += "_OneSigma"; }
+    if( clParser.isOptionTriggered("enablePca") ){ outFileName += "_PCA"; }
+    if( clParser.isOptionTriggered("skipHesse") ){ outFileName += "_NoHesse"; }
+    if( clParser.isOptionTriggered("toyFit") ){
+      outFileName += "_toyFit";
+      if( iToyFit != -1 ){ outFileName += "_" + std::to_string(iToyFit); }
+    }
+    if( clParser.isOptionTriggered("dry-run") ){ outFileName += "_DryRun"; }
+    if( clParser.isOptionTriggered("appendix") ){ outFileName += "_" + clParser.getOptionVal<std::string>("appendix"); }
+
+    outFileName += ".root";
   }
 
   LogWarning << "Creating output file: \"" << outFileName << "\"..." << std::endl;
@@ -176,6 +190,7 @@ int main(int argc, char** argv){
   fitter.setSaveDir(GenericToolbox::mkdirTFile(out, "FitterEngine"));
   fitter.setNbScanSteps(nbScanSteps);
   fitter.setEnablePostFitScan(enableParameterScan);
+  fitter.setEnablePca(clParser.isOptionTriggered("enablePca"));
 
   if( isToyFit ){
     fitter.getPropagator().setThrowAsimovToyParameters(true);

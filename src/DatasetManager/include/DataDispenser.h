@@ -5,6 +5,7 @@
 #ifndef GUNDAM_DATADISPENSER_H
 #define GUNDAM_DATADISPENSER_H
 
+#include "EventVarTransform.h"
 #include "FitSampleSet.h"
 #include "FitParameterSet.h"
 #include "PlotGenerator.h"
@@ -26,31 +27,46 @@ struct DataDispenserParameters{
   std::vector<std::string> activeLeafNameList{};
   std::vector<std::string> filePathList{};
   std::map<std::string, std::string> overrideLeafDict{};
-  std::vector<std::string> additionalLeavesStorage{};
+  std::vector<std::string> additionalVarsStorage{};
   int iThrow{-1};
 };
 struct DataDispenserCache{
   std::vector<FitSample*> samplesToFillList{};
   std::vector<size_t> sampleNbOfEvents;
   std::vector<std::vector<bool>> eventIsInSamplesList{};
-  std::vector<std::string> leavesRequestedForIndexing{};
-  std::vector<std::string> leavesRequestedForStorage{};
   std::vector<GenericToolbox::CopiableAtomic<size_t>> sampleIndexOffsetList;
   std::vector< std::vector<PhysicsEvent>* > sampleEventListPtrToFill;
   std::map<FitParameterSet*, std::vector<DialSet*>> dialSetPtrMap;
-  std::vector<std::string> leavesToOverrideList; // stores the leaves names to override in the right order
+
+  std::vector<std::string> varsRequestedForIndexing{};
+  std::vector<std::string> varsRequestedForStorage{};
+  std::map<std::string, std::pair<std::string, bool>> varToLeafDict; // varToLeafDict[EVENT_VAR_NAME] = {LEAF_NAME, IS_DUMMY}
+
+  std::vector<std::string> varsToOverrideList; // stores the leaves names to override in the right order
+
+  // Variable transformations
+  std::vector<EventVarTransform> eventVarTransformList;
 
   void clear(){
     samplesToFillList.clear();
     sampleNbOfEvents.clear();
     eventIsInSamplesList.clear();
-    leavesRequestedForIndexing.clear();
-    leavesRequestedForStorage.clear();
+
     sampleIndexOffsetList.clear();
     sampleEventListPtrToFill.clear();
     dialSetPtrMap.clear();
-    leavesToOverrideList.clear();
+
+    varsRequestedForIndexing.clear();
+    varsRequestedForStorage.clear();
+    varToLeafDict.clear();
+
+    varsToOverrideList.clear();
+
+    eventVarTransformList.clear();
   }
+  void addVarRequestedForIndexing(const std::string& varName_);
+  void addVarRequestedForStorage(const std::string& varName_);
+
 };
 
 class DataDispenser {
@@ -75,9 +91,7 @@ public:
   void load();
   std::string getTitle();
 
-  void addLeafRequestedForIndexing(const std::string& leafName_);
-  void addLeafRequestedForStorage(const std::string& leafName_);
-
+  GenericToolbox::TreeEntryBuffer generateTreeEventBuffer(TChain* treeChain_, const std::vector<std::string>& varsList_);
 
 protected:
   void buildSampleToFillList();

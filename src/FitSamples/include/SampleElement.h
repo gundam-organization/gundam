@@ -35,6 +35,7 @@ public:
   // Histograms
   DataBinSet binning;
   std::shared_ptr<TH1D> histogram{nullptr};
+  std::shared_ptr<TH1D> histogramNominal{nullptr};
   std::vector<std::vector<PhysicsEvent*>> perBinEventPtrList;
   double histScale{1};
   bool isLocked{false};
@@ -46,8 +47,10 @@ public:
   void updateBinEventList(int iThread_ = -1);
   void refillHistogram(int iThread_ = -1);
   void rescaleHistogram();
+  void saveAsHistogramNominal();
 
-  void throwStatError();
+  void throwEventMcError(); // event by event poisson throw -> takes into account the finite amount of stat in MC
+  void throwStatError(); // generate a toy experiment -> hist content as the asimov -> throw poisson for each bin
 
   double getSumWeights() const;
   size_t getNbBinnedEvents() const;

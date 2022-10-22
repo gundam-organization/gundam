@@ -2,7 +2,7 @@
 // Created by Adrien BLANCHET on 16/12/2021.
 //
 
-#include "MinimizerInterface.h"
+#include "Minimizer.h"
 #include "FitterEngine.h"
 #include "JsonUtils.h"
 
@@ -16,23 +16,23 @@ LoggerInit([]{
 });
 
 
-MinimizerInterface::MinimizerInterface() {}
-MinimizerInterface::~MinimizerInterface() {}
+Minimizer::Minimizer() {}
+Minimizer::~Minimizer() {}
 
-void MinimizerInterface::reset(){
+void Minimizer::reset(){
   _isInitialized_ = false;
   _minimizer_.reset();
 }
 
-void MinimizerInterface::setConfig(const nlohmann::json &config) {
+void Minimizer::setConfig(const nlohmann::json &config) {
   _config_ = config;
   JsonUtils::forwardConfig(_config_);
 }
-void MinimizerInterface::setFitterEnginePtr(void *fitterEnginePtr) {
+void Minimizer::setFitterEnginePtr(void *fitterEnginePtr) {
   _fitterEnginePtr_ = fitterEnginePtr;
 }
 
-void MinimizerInterface::initialize(){
+void Minimizer::initialize(){
   LogThrowIf(_isInitialized_, "Already initialized.")
   LogThrowIf(_fitterEnginePtr_== nullptr, "_fitterEnginePtr_ not set.")
 
@@ -65,14 +65,14 @@ void MinimizerInterface::initialize(){
   _isInitialized_ = true;
 }
 
-bool MinimizerInterface::isMinimizeSucceeded() const {
+bool Minimizer::isMinimizeSucceeded() const {
   return _minimizeSucceeded_;
 }
-bool MinimizerInterface::isIsInitialized() const {
+bool Minimizer::isIsInitialized() const {
   return _isInitialized_;
 }
 
-void MinimizerInterface::minimize() {
+void Minimizer::minimize() {
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling minimize...") << std::endl;
   LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
           << "Number of free parameters   : " << _minimizer_->NFree() << std::endl
@@ -82,7 +82,7 @@ void MinimizerInterface::minimize() {
   _minimizeSucceeded_ = _minimizer_->Minimize();
 }
 
-void MinimizerInterface::fillNbFitParameters(){
+void Minimizer::fillNbFitParameters(){
   LogThrowIf(_fitterEnginePtr_== nullptr, "_fitterEnginePtr_ not set.")
 
   _nbFitParameters_ = 0;
@@ -100,7 +100,7 @@ void MinimizerInterface::fillNbFitParameters(){
   }
   LogInfo << "Found " << _nbFitParameters_ << " fit parameters." << std::endl;
 }
-void MinimizerInterface::defineFitParameters(){
+void Minimizer::defineFitParameters(){
 
   for( int iFitPar = 0 ; iFitPar < _nbFitParameters_ ; iFitPar++ ){
 
