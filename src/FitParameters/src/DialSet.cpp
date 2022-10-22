@@ -49,9 +49,9 @@ void DialSet::setConfig(const nlohmann::json &config_) {
   JsonUtils::forwardConfig(_config_);
 }
 
-void DialSet::initialize() {
-  LogThrowIf(_owner_==nullptr, "Owner address not set.")
-  LogThrowIf(_config_.empty(), "Config not set for dial set.")
+void DialSet::readConfig(){
+  _isConfigReadDone_ = true;
+  LogThrowIf(_config_.empty(), "Config not set for dial set.");
 
   _dataSetNameList_ = JsonUtils::fetchValue<std::vector<std::string>>(
       _config_, "applyOnDataSets", std::vector<std::string>()
@@ -59,21 +59,22 @@ void DialSet::initialize() {
   if( _dataSetNameList_.empty() ){
     _dataSetNameList_.emplace_back("*");
   }
-  else { }
 
   // Dials are directly defined with a binning file?
   if     (initializeNormDialsWithParBinning() ){ /* LogInfo << "DialSet initialised with parameter binning definition." << std::endl; */  }
-  // Dials are individually defined?
+    // Dials are individually defined?
   else if( initializeDialsWithDefinition() )   { /* LogInfo << "DialSet initialised with config definition." << std::endl; */ }
-  // Dials definition not found?
+    // Dials definition not found?
   else{
     LogWarning << "Could not fetch dials definition for parameter: #" << _owner_->getParameterIndex();
     if( not _owner_->getName().empty() ) LogWarning << " (" << _owner_->getName() << ")";
     LogWarning << std::endl << "Disabling dialSet." << std::endl;
     _isEnabled_ = false;
   }
-
-
+}
+void DialSet::initialize() {
+  if( not _isConfigReadDone_ ) this->readConfig();
+  LogThrowIf(_owner_==nullptr, "Owner address not set.");
 }
 
 bool DialSet::isEnabled() const {

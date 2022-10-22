@@ -40,15 +40,17 @@ void DatasetLoader::setDataSetIndex(int dataSetIndex) {
   _dataSetIndex_ = dataSetIndex;
 }
 
-void DatasetLoader::initialize() {
-  LogWarning << "Initializing dataset loader..." << std::endl;
+void DatasetLoader::readConfig() {
+  _isConfigReadDone_ = true;
+  LogWarning << __METHOD_NAME__ << std::endl;
   LogThrowIf(_config_.empty(), "Config not set.");
 
   _name_ = JsonUtils::fetchValue<std::string>(_config_, "name");
+  _isEnabled_ = JsonUtils::fetchValue(_config_, "isEnabled", true);
+  LogReturnIf(not _isEnabled_, "\"" << _name_ << "\" is disabled.");
+
   _selectedDataEntry_ = JsonUtils::fetchValue<std::string>(_config_, "selectedDataEntry", "Asimov");
   _selectedToyEntry_ = JsonUtils::fetchValue<std::string>(_config_, "selectedToyEntry", "Asimov");
-  _isEnabled_ = JsonUtils::fetchValue(_config_, "isEnabled", true);
-  if( not _isEnabled_ ){ LogWarning << "\"" << _name_ << "\" is disabled." << std::endl; return; }
 
   _showSelectedEventCount_ = JsonUtils::fetchValue(_config_, "showSelectedEventCount", _showSelectedEventCount_);
 
@@ -56,7 +58,7 @@ void DatasetLoader::initialize() {
   _mcDispenser_.setConfig(JsonUtils::fetchValue<nlohmann::json>(_config_, "mc"));
   _mcDispenser_.getConfigParameters().name = "Asimov";
   _mcDispenser_.getConfigParameters().useMcContainer = true;
-  _mcDispenser_.initialize();
+  _mcDispenser_.readConfig();
 
   // Always loaded by default
   _dataDispenserDict_["Asimov"] = _mcDispenser_;
@@ -71,8 +73,17 @@ void DatasetLoader::initialize() {
     _dataDispenserDict_[name].getConfigParameters().name = name;
     _dataDispenserDict_[name].setOwner(this);
     _dataDispenserDict_[name].setConfig(dataEntry);
-    _dataDispenserDict_[name].initialize();
+    _dataDispenserDict_[name].readConfig();
   }
+}
+void DatasetLoader::initialize() {
+  if( not _isConfigReadDone_ ) this->readConfig();
+
+  LogWarning << __METHOD_NAME__ << std::endl;
+  if( not _isEnabled_ ) return;
+
+  _mcDispenser_.initialize();
+  for( auto& dataDispenser : _dataDispenserDict_ ){ dataDispenser.second.initialize(); }
 
   if( not GenericToolbox::doesKeyIsInMap(_selectedDataEntry_, _dataDispenserDict_) ){
     LogThrow("selectedDataEntry could not be find in available data: "

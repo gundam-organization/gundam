@@ -54,6 +54,7 @@ public:
   void setValueAtPrior();
   void setCurrentValueAsPrior();
 
+  void readConfig();
   void initialize();
 
   // Getters
@@ -84,6 +85,7 @@ public:
 
 private:
   const FitParameterSet* _owner_{nullptr};
+  bool _isConfigReadDone_{false};
 
   // Parameters
   std::string _name_;

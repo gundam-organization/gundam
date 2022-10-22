@@ -54,13 +54,20 @@ void PlotGenerator::setFitSampleSetPtr(const FitSampleSet *fitSampleSetPtr) {
   _fitSampleSetPtr_ = fitSampleSetPtr;
 }
 
-void PlotGenerator::initialize() {
+void PlotGenerator::readConfig(){
+  _isConfigReadDone_ = true;
   LogWarning << __METHOD_NAME__ << std::endl;
 
-//  LogThrowIf(_config_.empty(), "Config is not set.");
   _varDictionary_ = JsonUtils::fetchValue(_config_, "varDictionnaries", nlohmann::json());
   _canvasParameters_ = JsonUtils::fetchValue(_config_, "canvasParameters", nlohmann::json());
   _histogramsDefinition_ = JsonUtils::fetchValue(_config_, "histogramsDefinition", nlohmann::json());
+
+
+}
+void PlotGenerator::initialize() {
+  if( not _isConfigReadDone_ ) this->readConfig();
+  LogWarning << __METHOD_NAME__ << std::endl;
+  this->defineHistogramHolders();
 }
 void PlotGenerator::defineHistogramHolders() {
   LogWarning << __METHOD_NAME__ << std::endl;

@@ -37,8 +37,9 @@ void DataDispenser::setOwner(DatasetLoader* owner_){
 }
 
 void DataDispenser::readConfig(){
-  LogThrowIf( _config_.empty(), "Config is not set." )
-  LogThrowIf( _owner_==nullptr, "Owner not set.")
+  _isConfigReadDone_ = true;
+  LogThrowIf( _config_.empty(), "Config is not set." );
+  LogThrowIf( _owner_==nullptr, "Owner not set.");
 
   _parameters_.treePath = JsonUtils::fetchValue<std::string>(_config_, "tree", _parameters_.treePath);
   _parameters_.filePathList = JsonUtils::fetchValue<std::vector<std::string>>(_config_, "filePathList", _parameters_.filePathList);
@@ -54,10 +55,9 @@ void DataDispenser::readConfig(){
       _parameters_.overrideLeafDict[entry["eventVar"]] = entry["leafVar"];
     }
   }
-
 }
 void DataDispenser::initialize(){
-  this->readConfig();
+  if(not _isConfigReadDone_) this->readConfig();
 
   LogWarning << "Initialized data dispenser: " << getTitle() << std::endl;
   _isInitialized_ = true;

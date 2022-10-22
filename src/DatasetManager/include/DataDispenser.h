@@ -104,6 +104,7 @@ private:
   // Args
   DatasetLoader* _owner_{nullptr};
   nlohmann::json _config_{};
+  bool _isConfigReadDone_{false};
 
   // To be loaded
   FitSampleSet* _sampleSetPtrToLoad_{nullptr};

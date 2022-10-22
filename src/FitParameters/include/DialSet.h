@@ -38,6 +38,7 @@ public:
   void setMinDialResponse(double minDialResponse_){ _minDialResponse_ = minDialResponse_; }
   void setMaxDialResponse(double maxDialResponse_){ _maxDialResponse_ = maxDialResponse_; }
 
+  void readConfig();
   void initialize();
 
   // Getters
@@ -76,6 +77,7 @@ private:
 
   // Parameters
   nlohmann::json _config_;
+  bool _isConfigReadDone_{false};
   bool _isEnabled_{true};
   std::string _applyConditionStr_;
   std::shared_ptr<TFormula> _applyConditionFormula_{nullptr};

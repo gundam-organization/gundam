@@ -30,6 +30,7 @@ public:
   void setConfig(const nlohmann::json &config_);
 
   // INIT
+  void readConfig();
   void initialize();
 
   // GETTERS
@@ -48,6 +49,7 @@ public:
 private:
   // Yaml
   nlohmann::json _config_;
+  bool _isConfigReadDone_{false};
   bool _isEnabled_{false};
   std::string _name_;
   std::string _selectionCuts_;

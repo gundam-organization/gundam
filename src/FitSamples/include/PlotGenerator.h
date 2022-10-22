@@ -88,8 +88,8 @@ public:
   void setFitSampleSetPtr(const FitSampleSet *fitSampleSetPtr);
 
   // Init
+  void readConfig();
   void initialize();
-  void defineHistogramHolders();
 
   // Getters
   const std::vector<HistHolder> &getHistHolderList(int cacheSlot_ = 0) const;
@@ -112,10 +112,12 @@ public:
   std::vector<std::string> fetchRequestedLeafNames();
 
 protected:
+  void defineHistogramHolders();
   void buildEventBinCache(const std::vector<HistHolder *> &histPtrToFillList, const std::vector<PhysicsEvent> *eventListPtr, bool isData_);
 
 private:
   nlohmann::json _config_;
+  bool _isConfigReadDone_{false};
   const FitSampleSet* _fitSampleSetPtr_{nullptr};
   int _maxLegendLength_{15};
 

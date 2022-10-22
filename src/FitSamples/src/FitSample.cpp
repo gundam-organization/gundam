@@ -42,28 +42,29 @@ void FitSample::setConfig(const nlohmann::json &config_) {
   _config_ = config_;
 }
 
-void FitSample::initialize() {
-
-  LogAssert(not _config_.empty(), GET_VAR_NAME_VALUE(_config_.empty()))
+void FitSample::readConfig(){
+  _isConfigReadDone_ = true;
+  LogThrowIf(_config_.empty(), GET_VAR_NAME_VALUE(_config_.empty()));
 
   _name_ = JsonUtils::fetchValue<std::string>(_config_, "name");
   LogThrowIf(
       GenericToolbox::doesStringContainsSubstring(_name_, "/"),
-      "Invalid sample name: \"" << _name_ << "\": should not have '/'.")
+      "Invalid sample name: \"" << _name_ << "\": should not have '/'.");
 
   _isEnabled_ = JsonUtils::fetchValue(_config_, "isEnabled", true);
-  if( not _isEnabled_ ){
-    LogWarning << "\"" << _name_ << "\" is disabled." << std::endl;
-    return;
-  }
-
-  LogInfo << "Initializing FitSample: " << _name_ << std::endl;
+  LogReturnIf(not _isEnabled_, "\"" << _name_ << "\" is disabled.");
 
   _selectionCuts_ = JsonUtils::fetchValue(_config_, "selectionCuts", _selectionCuts_);
   _enabledDatasetList_ = JsonUtils::fetchValue(_config_, std::vector<std::string>{"datasets", "dataSets"}, _enabledDatasetList_);
   _mcNorm_ = JsonUtils::fetchValue(_config_, "mcNorm", _mcNorm_);
   _dataNorm_ = JsonUtils::fetchValue(_config_, "dataNorm", _dataNorm_);
   _binning_.readBinningDefinition( JsonUtils::fetchValue<std::string>(_config_, "binning") );
+}
+void FitSample::initialize() {
+  if( not _isConfigReadDone_ ) this->readConfig();
+  if( not _isEnabled_ ) return;
+
+  LogInfo << "Initializing FitSample: " << _name_ << std::endl;
 
   TH1::SetDefaultSumw2(true);
 

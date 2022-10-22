@@ -103,13 +103,8 @@ void FitParameter::setCurrentValueAsPrior(){
   _priorValue_ = _parameterValue_;
 }
 
-void FitParameter::initialize() {
-
-  LogThrowIf(_parameterIndex_ == -1, "Parameter index is not set.")
-  LogThrowIf(_priorValue_     == std::numeric_limits<double>::quiet_NaN(), "Prior value is not set.")
-  LogThrowIf(_stdDevValue_    == std::numeric_limits<double>::quiet_NaN(), "Std dev value is not set.")
-  LogThrowIf(_parameterValue_ == std::numeric_limits<double>::quiet_NaN(), "Parameter value is not set.")
-  LogThrowIf(_owner_ == nullptr, "Parameter set ref is not set.")
+void FitParameter::readConfig(){
+  _isConfigReadDone_ = true;
 
   if( not _parameterConfig_.empty() ){
     _isEnabled_ = JsonUtils::fetchValue(_parameterConfig_, "isEnabled", true);
@@ -118,7 +113,7 @@ void FitParameter::initialize() {
     auto priorTypeStr = JsonUtils::fetchValue(_parameterConfig_, "priorType", "");
     if( not priorTypeStr.empty() ){
       _priorType_ = PriorType::PriorTypeEnumNamespace::toEnum(priorTypeStr);
-     if( _priorType_ == PriorType::Flat ){ _isFree_ = true; }
+      if( _priorType_ == PriorType::Flat ){ _isFree_ = true; }
     }
 
     if( JsonUtils::doKeyExist(_parameterConfig_, "priorValue") ){
@@ -143,18 +138,27 @@ void FitParameter::initialize() {
     _dialSetList_.emplace_back();
     _dialSetList_.back().setOwner(this);
     _dialSetList_.back().setConfig(dialDefinitionConfig);
-    _dialSetList_.back().initialize();
+    _dialSetList_.back().readConfig();
   }
+}
+void FitParameter::initialize() {
+  if( not _isConfigReadDone_ ){ this->readConfig(); }
+
+  LogThrowIf(_parameterIndex_ == -1, "Parameter index is not set.");
+  LogThrowIf(_priorValue_     == std::numeric_limits<double>::quiet_NaN(), "Prior value is not set.");
+  LogThrowIf(_stdDevValue_    == std::numeric_limits<double>::quiet_NaN(), "Std dev value is not set.");
+  LogThrowIf(_parameterValue_ == std::numeric_limits<double>::quiet_NaN(), "Parameter value is not set.");
+  LogThrowIf(_owner_ == nullptr, "Parameter set ref is not set.");
+
+  if( not _isEnabled_ ) { return; }
+
+  for( auto& dialSet : _dialSetList_ ){ dialSet.initialize(); }
 
   // Check if no dials is actually defined -> disable the parameter in that case
-  bool dialSetAreAllDisabled = true;
-  for( const auto& dialSet : _dialSetList_ ){
-    if( dialSet.isEnabled() ){
-      dialSetAreAllDisabled = false;
-      break;
-    }
-  }
-  if( dialSetAreAllDisabled ){
+//  bool dialSetAreAllDisabled = true;
+//  std::all_of(_dialSetList_.begin(), _dialSetList_.end(), [](const DialSet& dialSet){ return not dialSet.isEnabled(); });
+//  for( const auto& dialSet : _dialSetList_ ){ if( dialSet.isEnabled() ){ dialSetAreAllDisabled = false; break; } }
+  if( std::all_of(_dialSetList_.begin(), _dialSetList_.end(), [](const DialSet& dialSet){ return not dialSet.isEnabled(); }) ){
     LogError << "Parameter " << getTitle() << " has no dials: disabled." << std::endl;
     _isEnabled_ = false;
   }

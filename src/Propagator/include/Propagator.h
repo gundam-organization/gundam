@@ -38,6 +38,7 @@ public:
   void setLoadAsimovData(bool loadAsimovData);
 
   // Init
+  void readConfig();
   void initialize();
 
   // Getters
@@ -83,9 +84,11 @@ private:
   bool _showTimeStats_{false};
   bool _loadAsimovData_{false};
   TDirectory* _saveDir_{nullptr};
+  bool _isConfigReadDone_{false};
   nlohmann::json _config_;
 
   // Internals
+  bool _throwAsimovFitParameters_{false};
   bool _throwAsimovToyParameters_{false};
   bool _enableStatThrowInToys_{true};
   bool _enableEventMcThrow_{true};

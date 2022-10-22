@@ -27,6 +27,7 @@ public:
 
   void setConfig(const nlohmann::json &config);
 
+  void readConfig();
   void initialize();
 
   // Post init
@@ -52,6 +53,7 @@ public:
 private:
   bool _isInitialized_{false};
   bool _showTimeStats_{false};
+  bool _isConfigReadDone_{false};
   nlohmann::json _config_;
 
   std::vector<FitSample> _fitSampleList_;

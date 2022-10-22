@@ -28,6 +28,7 @@ public:
   void setConfig(const nlohmann::json &config_);
   void setDataSetIndex(int dataSetIndex);
 
+  void readConfig();
   void initialize();
 
   bool isEnabled() const;
@@ -46,6 +47,7 @@ public:
 
 private:
   nlohmann::json _config_;
+  bool _isConfigReadDone_{false};
 
   // internals
   bool _isInitialized_{false};

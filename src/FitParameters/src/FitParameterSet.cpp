@@ -53,10 +53,74 @@ void FitParameterSet::setMaskedForPropagation(bool maskedForPropagation) {
   _maskedForPropagation_ = maskedForPropagation;
 }
 
-void FitParameterSet::initialize() {
+void FitParameterSet::readConfig(){
+  LogThrowIf(_config_.empty(), "FitParameterSet config not set.");
+  _isConfigReadDone_ = true;
 
-  this->initializeFromConfig();
+  _name_ = JsonUtils::fetchValue<std::string>(_config_, "name");
+  LogInfo << "Initializing parameter set: " << _name_ << std::endl;
+
+  _isEnabled_ = JsonUtils::fetchValue<bool>(_config_, "isEnabled");
+  LogReturnIf(not _isEnabled_, _name_ << " parameters are disabled.");
+
+  _nbParameterDefinition_ = JsonUtils::fetchValue(_config_, "numberOfParameters", _nbParameterDefinition_);
+  _nominalStepSize_ = JsonUtils::fetchValue(_config_, "nominalStepSize", _nominalStepSize_);
+
+  _useOnlyOneParameterPerEvent_ = JsonUtils::fetchValue<bool>(_config_, "useOnlyOneParameterPerEvent", false);
+  _printDialSetsSummary_ = JsonUtils::fetchValue<bool>(_config_, "printDialSetsSummary", _printDialSetsSummary_);
+
+  if( JsonUtils::doKeyExist(_config_, "parameterLimits") ){
+    auto parLimits = JsonUtils::fetchValue(_config_, "parameterLimits", nlohmann::json());
+    _globalParameterMinValue_ = JsonUtils::fetchValue(parLimits, "minValue", std::nan("UNSET"));
+    _globalParameterMaxValue_ = JsonUtils::fetchValue(parLimits, "maxValue", std::nan("UNSET"));
+  }
+
+  _useEigenDecompInFit_ = JsonUtils::fetchValue(_config_ , "useEigenDecompInFit", false);
+  if( _useEigenDecompInFit_ ){
+
+    LogWarning << "Using eigen decomposition in fit." << std::endl;
+    _maxNbEigenParameters_ = JsonUtils::fetchValue(_config_ , "maxNbEigenParameters", -1);
+    if( _maxNbEigenParameters_ != -1 ){
+      LogInfo << "Maximum nb of eigen parameters is set to " << _maxNbEigenParameters_ << std::endl;
+    }
+    _maxEigenFraction_ = JsonUtils::fetchValue(_config_ , "maxEigenFraction", double(1.));
+    if( _maxEigenFraction_ != 1 ){
+      LogInfo << "Max eigen fraction set to: " << _maxEigenFraction_*100 << "%" << std::endl;
+    }
+
+  }
+
+  _parameterDefinitionFilePath_ = JsonUtils::fetchValue(
+      _config_
+      , std::vector<std::string>{
+          "parameterDefinitionFilePath",
+          "covarianceMatrixFilePath"}
+      , ""
+  );
+
+  if( not _parameterDefinitionFilePath_.empty() ){
+    this->readParameterDefinitionFile();
+  }
+
+  if( _parameterPriorList_ == nullptr ){
+    LogWarning << "No prior list provided, all parameter prior are set to 1." << std::endl;
+    _parameterPriorList_ = std::make_shared<TVectorD>(_nbParameterDefinition_);
+    for( int iPar = 0 ; iPar < _parameterPriorList_->GetNrows() ; iPar++ ){ (*_parameterPriorList_)[iPar] = 1; }
+  }
+
+  this->defineParameters();
+
+  _customFitParThrow_ = JsonUtils::fetchValue(_config_, "customFitParThrow", std::vector<nlohmann::json>());
+}
+void FitParameterSet::initialize() {
+  if( not _isConfigReadDone_ ) this->readConfig();
+  LogInfo << "Initializing \"" << this->getName() << "\"" << std::endl;
+
   if( not _isEnabled_ ) return;
+
+  if( _saveDir_ != nullptr ){ _saveDir_ = GenericToolbox::mkdirTFile(_saveDir_, _name_); }
+
+  for( auto& par : _parameterList_ ){ par.initialize(); }
 
   // Make the matrix inversion
   this->prepareFitParameters();
@@ -331,6 +395,9 @@ void FitParameterSet::throwFitParameters(double gain_){
   }
 
 }
+const std::vector<nlohmann::json>& FitParameterSet::getCustomFitParThrow() const{
+  return _customFitParThrow_;
+}
 
 // Eigen
 bool FitParameterSet::isUseEigenDecompInFit() const {
@@ -444,31 +511,6 @@ double FitParameterSet::toRealParValue(double normParValue, const FitParameter& 
 
 
 // Protected
-void FitParameterSet::passIfInitialized(const std::string &methodName_) const {
-  if( not _isInitialized_ ){
-    LogError << "Can't do \"" << methodName_ << "\" while not initialized." << std::endl;
-    throw std::logic_error("class not initialized");
-  }
-}
-void FitParameterSet::initializeFromConfig(){
-
-  LogThrowIf(_config_.empty(), "FitParameterSet config not set.")
-
-  _name_ = JsonUtils::fetchValue<std::string>(_config_, "name");
-  LogInfo << "Initializing parameter set: " << _name_ << std::endl;
-
-  if( _saveDir_ != nullptr ){ _saveDir_ = GenericToolbox::mkdirTFile(_saveDir_, _name_); }
-
-  _isEnabled_ = JsonUtils::fetchValue<bool>(_config_, "isEnabled");
-  if( not _isEnabled_ ){
-    LogWarning << _name_ << " parameters are disabled." << std::endl;
-    return;
-  }
-
-  this->readConfigOptions();
-  this->defineParameters();
-}
-
 void FitParameterSet::readParameterDefinitionFile(){
 
   std::shared_ptr<TFile> parDefFile(TFile::Open(_parameterDefinitionFilePath_.c_str()));
@@ -569,51 +611,6 @@ void FitParameterSet::readParameterDefinitionFile(){
 
   parDefFile->Close();
 }
-void FitParameterSet::readConfigOptions(){
-
-  _nbParameterDefinition_ = JsonUtils::fetchValue(_config_, "numberOfParameters", _nbParameterDefinition_);
-  _nominalStepSize_ = JsonUtils::fetchValue(_config_, "nominalStepSize", _nominalStepSize_);
-
-  _useOnlyOneParameterPerEvent_ = JsonUtils::fetchValue<bool>(_config_, "useOnlyOneParameterPerEvent", false);
-
-  if( JsonUtils::doKeyExist(_config_, "parameterLimits") ){
-    auto parLimits = JsonUtils::fetchValue(_config_, "parameterLimits", nlohmann::json());
-    _globalParameterMinValue_ = JsonUtils::fetchValue(parLimits, "minValue", std::nan("UNSET"));
-    _globalParameterMaxValue_ = JsonUtils::fetchValue(parLimits, "maxValue", std::nan("UNSET"));
-  }
-
-  _useEigenDecompInFit_ = JsonUtils::fetchValue(_config_ , "useEigenDecompInFit", false);
-  if( _useEigenDecompInFit_ ){
-
-    LogWarning << "Using eigen decomposition in fit." << std::endl;
-    _maxNbEigenParameters_ = JsonUtils::fetchValue(_config_ , "maxNbEigenParameters", -1);
-    if( _maxNbEigenParameters_ != -1 ){
-      LogInfo << "Maximum nb of eigen parameters is set to " << _maxNbEigenParameters_ << std::endl;
-    }
-    _maxEigenFraction_ = JsonUtils::fetchValue(_config_ , "maxEigenFraction", double(1.));
-    if( _maxEigenFraction_ != 1 ){
-      LogInfo << "Max eigen fraction set to: " << _maxEigenFraction_*100 << "%" << std::endl;
-    }
-
-  }
-
-  _parameterDefinitionFilePath_ = JsonUtils::fetchValue(
-      _config_
-      , std::vector<std::string>{
-          "parameterDefinitionFilePath",
-          "covarianceMatrixFilePath"}
-      , ""
-  );
-
-  if( not _parameterDefinitionFilePath_.empty() ) this->readParameterDefinitionFile();
-
-  if( _parameterPriorList_ == nullptr ){
-    LogWarning << "No prior list provided, all parameter prior are set to 1." << std::endl;
-    _parameterPriorList_ = std::make_shared<TVectorD>(_nbParameterDefinition_);
-    for( int iPar = 0 ; iPar < _parameterPriorList_->GetNrows() ; iPar++ ){ (*_parameterPriorList_)[iPar] = 1; }
-  }
-
-}
 void FitParameterSet::defineParameters(){
   LogInfo << "Defining parameters in set: " << getName() << std::endl;
   _parameterList_.resize(_nbParameterDefinition_);
@@ -638,7 +635,7 @@ void FitParameterSet::defineParameters(){
     _parameterList_[iParameter].setParameterValue((*_parameterPriorList_)[iParameter]);
     _parameterList_[iParameter].setPriorValue((*_parameterPriorList_)[iParameter]);
 
-    _parameterList_[iParameter].setEnableDialSetsSummary(JsonUtils::fetchValue<bool>(_config_, "printDialSetsSummary", false));
+    _parameterList_[iParameter].setEnableDialSetsSummary(_printDialSetsSummary_);
 
     if( _globalParameterMinValue_ == _globalParameterMinValue_ ){ _parameterList_[iParameter].setMinValue(_globalParameterMinValue_); }
     if( _globalParameterMaxValue_ == _globalParameterMaxValue_ ){ _parameterList_[iParameter].setMaxValue(_globalParameterMaxValue_); }
@@ -663,7 +660,6 @@ void FitParameterSet::defineParameters(){
     }
 
     _parameterList_[iParameter].initialize();
-
   }
 }
 

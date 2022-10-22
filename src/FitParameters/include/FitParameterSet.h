@@ -43,6 +43,7 @@ public:
   void setSaveDir(TDirectory* saveDir_);
 
   // Init
+  void readConfig();
   void initialize();
 
   // Post-init
@@ -70,6 +71,7 @@ public:
   // Throw / Shifts
   void moveFitParametersToPrior();
   void throwFitParameters(double gain_ = 1);
+  const std::vector<nlohmann::json>& getCustomFitParThrow() const;
 
   bool isUseEigenDecompInFit() const;
   int getNbEnabledEigenParameters() const;
@@ -89,11 +91,7 @@ public:
   void setMaskedForPropagation(bool maskedForPropagation);
 
 protected:
-  void passIfInitialized(const std::string& methodName_) const;
-
-  void initializeFromConfig();
   void readParameterDefinitionFile();
-  void readConfigOptions();
 
   void defineParameters();
 
@@ -101,6 +99,7 @@ protected:
 
 private:
   // User parameters
+  bool _isConfigReadDone_{false};
   nlohmann::json _config_;
 
   // Internals
@@ -114,6 +113,7 @@ private:
   std::string _parameterDefinitionFilePath_{};
   bool _isEnabled_{};
   bool _maskedForPropagation_{false};
+  bool _printDialSetsSummary_{false};
   int _nbParameterDefinition_{-1};
   double _nominalStepSize_{std::nan("unset")};
   int _maxNbEigenParameters_{-1};
@@ -121,6 +121,8 @@ private:
 
   double _globalParameterMinValue_{std::nan("UNSET")};
   double _globalParameterMaxValue_{std::nan("UNSET")};
+
+  std::vector<nlohmann::json> _customFitParThrow_{};
 
   // Eigen objects
   int _nbEnabledEigen_{0};
