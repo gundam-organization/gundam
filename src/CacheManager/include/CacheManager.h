@@ -57,7 +57,6 @@ private:
             int uniformSplines, int uniformPoints,
             int generalSplines, int generalPoints,
             int histBins);
-
     static Manager* fSingleton;  // You get one guess...
 
     // A map between the fit parameter pointers and the parameter index used
@@ -94,11 +93,11 @@ private:
     /// The cache for the summed histgram weights
     std::unique_ptr<Cache::IndexedSums> fHistogramsCache;
 
-    // The rough size of all of the caches.
+    // The rough size of all the caches.
     std::size_t fTotalBytes;
 
 public:
-    ~Manager();
+    virtual ~Manager() = default;
 
     // Provide "internal" references to the GPU cache.  This is used in the
     // implementation, and should be ignored by most people.

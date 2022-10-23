@@ -24,44 +24,24 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[PlotGenerator]");
 });
 
-
-PlotGenerator::PlotGenerator() { this->reset(); }
-PlotGenerator::~PlotGenerator() { this->reset(); }
-
-void PlotGenerator::reset() {
-
-  gStyle->SetOptStat(0);
-
-  defaultColorWheel = {
-    kGreen-3, kTeal+3, kAzure+7,
-    kCyan-2, kBlue-7, kBlue+2,
-    kOrange+1, kOrange+9, kRed+2, kPink+9
-  };
-
-  _config_.clear();
-  _fitSampleSetPtr_ = nullptr;
-
-  _histHolderCacheList_.resize(1);
-}
-
-void PlotGenerator::setConfig(const nlohmann::json &config_) {
-  _config_ = config_;
-  while( _config_.is_string() ){
-    _config_ = JsonUtils::readConfigFile(_config_.get<std::string>());
-  }
-}
-void PlotGenerator::setFitSampleSetPtr(const FitSampleSet *fitSampleSetPtr) {
-  _fitSampleSetPtr_ = fitSampleSetPtr;
-}
-
-void PlotGenerator::initialize() {
+void PlotGenerator::readConfigImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
-
-//  LogThrowIf(_config_.empty(), "Config is not set.");
+  gStyle->SetOptStat(0);
+  _histHolderCacheList_.resize(1);
   _varDictionary_ = JsonUtils::fetchValue(_config_, "varDictionnaries", nlohmann::json());
   _canvasParameters_ = JsonUtils::fetchValue(_config_, "canvasParameters", nlohmann::json());
   _histogramsDefinition_ = JsonUtils::fetchValue(_config_, "histogramsDefinition", nlohmann::json());
 }
+void PlotGenerator::initializeImpl() {
+  LogWarning << __METHOD_NAME__ << std::endl;
+  this->defineHistogramHolders();
+}
+
+void PlotGenerator::setFitSampleSetPtr(const FitSampleSet *fitSampleSetPtr) {
+  _fitSampleSetPtr_ = fitSampleSetPtr;
+}
+
+
 void PlotGenerator::defineHistogramHolders() {
   LogWarning << __METHOD_NAME__ << std::endl;
   _histHolderCacheList_[0].clear();
@@ -825,8 +805,6 @@ void PlotGenerator::generateComparisonHistograms(const std::vector<HistHolder> &
 }
 
 std::vector<std::string> PlotGenerator::fetchListOfVarToPlot(bool isData_){
-//  LogThrowIf(_config_.empty(), "Config not set, can't call " << __METHOD_NAME__);
-
   std::vector<std::string> varNameList;
   _histogramsDefinition_ = JsonUtils::fetchValue(_config_, "histogramsDefinition", nlohmann::json());
   for( const auto& histConfig : _histogramsDefinition_ ){
@@ -854,18 +832,6 @@ std::vector<std::string> PlotGenerator::fetchListOfSplitVarNames(){
       }
     }
   }
-  return varNameList;
-}
-std::vector<std::string> PlotGenerator::fetchRequestedLeafNames(){
-//  LogAssert(not _config_.empty(), "Config not set, can't call " << __METHOD_NAME__);
-
-  std::vector<std::string> varNameList;
-  auto varToPlotList = this->fetchListOfVarToPlot();
-  auto splitVarNameList = this->fetchListOfSplitVarNames();
-
-  varNameList.reserve( varToPlotList.size() + splitVarNameList.size() ); // preallocate memory
-  varNameList.insert( varNameList.end(), varToPlotList.begin(), varToPlotList.end() );
-  varNameList.insert( varNameList.end(), splitVarNameList.begin(), splitVarNameList.end() );
   return varNameList;
 }
 

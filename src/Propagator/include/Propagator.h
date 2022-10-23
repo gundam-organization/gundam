@@ -11,43 +11,35 @@
 #include "EventTreeWriter.h"
 #include "FitSampleSet.h"
 #include "FitParameterSet.h"
+#include "ConfigBasedClass.h"
 
 #include "GenericToolbox.CycleTimer.h"
-
-#include "nlohmann/json.hpp"
 
 #include <vector>
 #include <map>
 #include <future>
 
-class Propagator {
+class Propagator : public ConfigBasedClass {
 
 public:
-  Propagator();
-  virtual ~Propagator();
+  Propagator() = default;
+  ~Propagator() override;
 
-  // Initialize
   void reset();
 
   // Setters
-  void setConfig(const nlohmann::json &config);
   void setSaveDir(TDirectory *saveDir);
   void setShowTimeStats(bool showTimeStats);
   void setThrowAsimovToyParameters(bool throwAsimovToyParameters);
   void setIThrow(int iThrow);
   void setLoadAsimovData(bool loadAsimovData);
 
-  // Init
-  void initialize();
-
   // Getters
-  bool isUseResponseFunctions() const;
   bool isThrowAsimovToyParameters() const;
   FitSampleSet &getFitSampleSet();
   std::vector<FitParameterSet> &getParameterSetsList();
   const std::vector<FitParameterSet> &getParameterSetsList() const;
   PlotGenerator &getPlotGenerator();
-  const nlohmann::json &getConfig() const;
   const EventTreeWriter &getTreeWriter() const;
 
   int getIThrow() const;
@@ -59,21 +51,18 @@ public:
   void refillSampleHistograms();
   void applyResponseFunctions();
 
-  // Switches
-  void preventRfPropagation();
-  void allowRfPropagation();
-
-  // Monitor
-
   // Dev
   void fillDialsStack();
 
+  void generateSamplePlots(const std::string& savePath_, TDirectory* baseDir_ = nullptr);
+
 protected:
+  void readConfigImpl() override;
+  void initializeImpl() override;
+
   void initializeThreads();
 
-  void makeResponseFunctions();
-
-  // multi-threaded
+  // multithreading
   void updateDialResponses(int iThread_);
   void reweightMcEvents(int iThread_);
   void applyResponseFunctions(int iThread_);
@@ -83,16 +72,13 @@ private:
   bool _showTimeStats_{false};
   bool _loadAsimovData_{false};
   TDirectory* _saveDir_{nullptr};
-  nlohmann::json _config_;
 
   // Internals
+  bool _throwAsimovFitParameters_{false};
   bool _throwAsimovToyParameters_{false};
   bool _enableStatThrowInToys_{true};
   bool _enableEventMcThrow_{true};
   int _iThrow_{-1};
-  bool _isInitialized_{false};
-  bool _useResponseFunctions_{false};
-  bool _isRfPropagationEnabled_{false};
   FitSampleSet _fitSampleSet_;
   PlotGenerator _plotGenerator_;
   EventTreeWriter _treeWriter_;

@@ -16,6 +16,17 @@
 #include <mutex>
 #include <memory>
 
+#ifndef GUNDAM_BATCH
+#define GUNDAM_SIGMA "σ"
+#define GUNDAM_CHI2 "χ²"
+#define GUNDAM_DELTA "Δ"
+#else
+#define GUNDAM_SIGMA "sigma"
+#define GUNDAM_CHI2 "chi-squared"
+#define GUNDAM_DELTA "delta-"
+#endif
+
+
 ENUM_EXPANDER(
     VerboseLevel, 0,
     NORMAL_MODE,

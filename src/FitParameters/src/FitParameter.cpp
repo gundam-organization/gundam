@@ -13,26 +13,57 @@
 
 LoggerInit([]{ Logger::setUserHeaderStr("[FitParameter]"); });
 
+void FitParameter::readConfigImpl(){
+  if( not _parameterConfig_.empty() ){
+    _isEnabled_ = JsonUtils::fetchValue(_parameterConfig_, "isEnabled", true);
+    if( not _isEnabled_ ) { return; }
 
-FitParameter::FitParameter() {
-  this->reset();
-}
-FitParameter::~FitParameter() {
-  this->reset();
-}
+    auto priorTypeStr = JsonUtils::fetchValue(_parameterConfig_, "priorType", "");
+    if( not priorTypeStr.empty() ){
+      _priorType_ = PriorType::PriorTypeEnumNamespace::toEnum(priorTypeStr);
+      if( _priorType_ == PriorType::Flat ){ _isFree_ = true; }
+    }
 
-void FitParameter::reset() {
-  _dialSetList_.clear();
-  _dialDefinitionsList_ = nlohmann::json();
-  _parameterIndex_ = -1;
-  _parameterValue_ = std::numeric_limits<double>::quiet_NaN();
-  _priorValue_     = std::numeric_limits<double>::quiet_NaN();
-  _stdDevValue_    = std::numeric_limits<double>::quiet_NaN();
-  _dialsWorkingDirectory_ = ".";
-  _isEnabled_ = true;
-  _isFixed_ = false;
-  _owner_ = nullptr;
-  _priorType_ = PriorType::Gaussian;
+    if( JsonUtils::doKeyExist(_parameterConfig_, "priorValue") ){
+      _priorValue_ = JsonUtils::fetchValue(_parameterConfig_, "priorValue", _priorValue_);
+      LogWarning << this->getTitle() << ": prior value override -> " << _priorValue_ << std::endl;
+      this->setParameterValue(_priorValue_);
+    }
+
+    if( JsonUtils::doKeyExist(_parameterConfig_, "parameterLimits") ){
+      std::pair<double, double> limits{std::nan(""), std::nan("")};
+      limits = JsonUtils::fetchValue(_parameterConfig_, "parameterLimits", limits);
+      LogWarning << "Overriding parameter limits: [" << limits.first << ", " << limits.second << "]." << std::endl;
+      this->setMinValue(limits.first);
+      this->setMaxValue(limits.second);
+    }
+
+    _dialDefinitionsList_ = JsonUtils::fetchValue(_parameterConfig_, "dialSetDefinitions", _dialDefinitionsList_);
+  }
+
+  _dialSetList_.reserve(_dialDefinitionsList_.size());
+  for( const auto& dialDefinitionConfig : _dialDefinitionsList_ ){
+    _dialSetList_.emplace_back(this, dialDefinitionConfig);
+  }
+}
+void FitParameter::initializeImpl() {
+  LogThrowIf(_parameterIndex_ == -1, "Parameter index is not set.");
+  LogThrowIf(_priorValue_     == std::numeric_limits<double>::quiet_NaN(), "Prior value is not set.");
+  LogThrowIf(_stdDevValue_    == std::numeric_limits<double>::quiet_NaN(), "Std dev value is not set.");
+  LogThrowIf(_parameterValue_ == std::numeric_limits<double>::quiet_NaN(), "Parameter value is not set.");
+  LogThrowIf(_owner_ == nullptr, "Parameter set ref is not set.");
+
+  if( not _isEnabled_ ) { return; }
+
+  for( auto& dialSet : _dialSetList_ ){ dialSet.initialize(); }
+
+  // Check if no dials is actually defined -> disable the parameter in that case
+  bool dialSetAreAllDisabled = true;
+  for( const auto& dialSet : _dialSetList_ ){ if( dialSet.isEnabled() ){ dialSetAreAllDisabled = false; break; } }
+  if( dialSetAreAllDisabled ){
+    LogError << "Parameter " << getTitle() << " has no dials: disabled." << std::endl;
+    _isEnabled_ = false;
+  }
 }
 
 void FitParameter::setIsEnabled(bool isEnabled){
@@ -101,64 +132,6 @@ void FitParameter::setValueAtPrior(){
 }
 void FitParameter::setCurrentValueAsPrior(){
   _priorValue_ = _parameterValue_;
-}
-
-void FitParameter::initialize() {
-
-  LogThrowIf(_parameterIndex_ == -1, "Parameter index is not set.")
-  LogThrowIf(_priorValue_     == std::numeric_limits<double>::quiet_NaN(), "Prior value is not set.")
-  LogThrowIf(_stdDevValue_    == std::numeric_limits<double>::quiet_NaN(), "Std dev value is not set.")
-  LogThrowIf(_parameterValue_ == std::numeric_limits<double>::quiet_NaN(), "Parameter value is not set.")
-  LogThrowIf(_owner_ == nullptr, "Parameter set ref is not set.")
-
-  if( not _parameterConfig_.empty() ){
-    _isEnabled_ = JsonUtils::fetchValue(_parameterConfig_, "isEnabled", true);
-    if( not _isEnabled_ ) { return; }
-
-    auto priorTypeStr = JsonUtils::fetchValue(_parameterConfig_, "priorType", "");
-    if( not priorTypeStr.empty() ){
-      _priorType_ = PriorType::PriorTypeEnumNamespace::toEnum(priorTypeStr);
-     if( _priorType_ == PriorType::Flat ){ _isFree_ = true; }
-    }
-
-    if( JsonUtils::doKeyExist(_parameterConfig_, "priorValue") ){
-      _priorValue_ = JsonUtils::fetchValue(_parameterConfig_, "priorValue", _priorValue_);
-      LogWarning << this->getTitle() << ": prior value override -> " << _priorValue_ << std::endl;
-      this->setParameterValue(_priorValue_);
-    }
-
-    if( JsonUtils::doKeyExist(_parameterConfig_, "parameterLimits") ){
-      std::pair<double, double> limits{std::nan(""), std::nan("")};
-      limits = JsonUtils::fetchValue(_parameterConfig_, "parameterLimits", limits);
-      LogWarning << "Overriding parameter limits: [" << limits.first << ", " << limits.second << "]." << std::endl;
-      this->setMinValue(limits.first);
-      this->setMaxValue(limits.second);
-    }
-
-    _dialDefinitionsList_ = JsonUtils::fetchValue(_parameterConfig_, "dialSetDefinitions", _dialDefinitionsList_);
-  }
-
-  _dialSetList_.reserve(_dialDefinitionsList_.size());
-  for( const auto& dialDefinitionConfig : _dialDefinitionsList_ ){
-    _dialSetList_.emplace_back();
-    _dialSetList_.back().setOwner(this);
-    _dialSetList_.back().setConfig(dialDefinitionConfig);
-    _dialSetList_.back().initialize();
-  }
-
-  // Check if no dials is actually defined -> disable the parameter in that case
-  bool dialSetAreAllDisabled = true;
-  for( const auto& dialSet : _dialSetList_ ){
-    if( dialSet.isEnabled() ){
-      dialSetAreAllDisabled = false;
-      break;
-    }
-  }
-  if( dialSetAreAllDisabled ){
-    LogError << "Parameter " << getTitle() << " has no dials: disabled." << std::endl;
-    _isEnabled_ = false;
-  }
-
 }
 
 bool FitParameter::isEnabled() const {

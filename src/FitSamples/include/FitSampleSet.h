@@ -9,6 +9,7 @@
 #include "FitParameterSet.h"
 #include "Likelihoods.hh"
 #include "JointProbability.h"
+#include "ConfigBasedClass.h"
 
 #include "GenericToolbox.h"
 #include "nlohmann/json.hpp"
@@ -17,18 +18,9 @@
 #include "vector"
 
 
-class FitSampleSet {
+class FitSampleSet : public ConfigBasedClass {
 
 public:
-  FitSampleSet();
-  virtual ~FitSampleSet();
-
-  void reset();
-
-  void setConfig(const nlohmann::json &config);
-
-  void initialize();
-
   // Post init
   void copyMcEventListToDataContainer();
   void clearMcContainers();
@@ -49,11 +41,12 @@ public:
   void updateSampleBinEventList() const;
   void updateSampleHistograms() const;
 
-private:
-  bool _isInitialized_{false};
-  bool _showTimeStats_{false};
-  nlohmann::json _config_;
+protected:
+  void readConfigImpl() override;
+  void initializeImpl() override;
 
+private:
+  bool _showTimeStats_{false};
   std::vector<FitSample> _fitSampleList_;
   std::shared_ptr<JointProbability::JointProbability> _jointProbabilityPtr_{nullptr};
   std::vector<std::string> _eventByEventDialLeafList_;

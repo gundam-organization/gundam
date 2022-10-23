@@ -311,7 +311,7 @@ if( WITH_OPENMP )
         cmessage(ERROR "OpenMP not found.")
     endif()
 else()
-    cmessage(STATUS "Compiling without OpenMP, enable with \"-D WITH_OPENMP\"")
+#    cmessage(STATUS "Compiling without OpenMP, enable with \"-D WITH_OPENMP\"")
 endif()
 
 if(CXX_MARCH_FLAG)

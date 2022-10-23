@@ -57,9 +57,6 @@ Cache::Weights::Weights(
               1.0);
 }
 
-// The destructor
-Cache::Weights::~Weights() {}
-
 double Cache::Weights::GetResult(int i) {
     if (i < 0) throw;
     if (GetResultCount() <= i) throw;
