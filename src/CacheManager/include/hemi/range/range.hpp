@@ -11,14 +11,17 @@
 #define DEVICE_CALLABLE
 #endif
 
-namespace util { namespace lang {
+namespace util::lang {
 
 namespace detail {
 
 template <typename T>
-struct range_iter_base : std::iterator<std::input_iterator_tag, T> {
+struct range_iter_base {
+    using iterator_category = std::input_iterator_tag;
+    using value_type = T;
+
     DEVICE_CALLABLE
-    range_iter_base(T current) : current(current) { }
+    explicit range_iter_base(T current) : current(current) { }
 
     DEVICE_CALLABLE
     T operator *() const { return current; }
@@ -46,7 +49,7 @@ struct range_iter_base : std::iterator<std::input_iterator_tag, T> {
 
     DEVICE_CALLABLE
     bool operator !=(range_iter_base const& other) const {
-        return not (*this == other);
+        return *this != other;
     }
 
 protected:
@@ -257,6 +260,6 @@ indices(std::initializer_list<T>&& cont) {
     return {0, cont.size()};
 }
 
-} } // namespace util::lang
+} // namespace util::lang
 
 #endif // ndef UTIL_LANG_RANGE_HPP

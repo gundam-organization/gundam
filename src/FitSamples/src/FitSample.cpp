@@ -19,51 +19,29 @@ LoggerInit([]{
 });
 
 
-FitSample::FitSample() { this->reset(); }
-FitSample::~FitSample() { this->reset(); }
-
-void FitSample::reset() {
-  // YAML
-  _config_.clear();
-  _isEnabled_ = false;
-  _name_ = "";
-  _selectionCuts_ = "";
-  _enabledDatasetList_.clear();
-  _mcNorm_ = 1;
-  _dataNorm_ = 1;
-
-  // Internals
-  _binning_.reset();
-  _mcContainer_ = SampleElement();
-  _dataContainer_ = SampleElement();
-}
-
-void FitSample::setConfig(const nlohmann::json &config_) {
-  _config_ = config_;
-}
-
-void FitSample::initialize() {
-
-  LogAssert(not _config_.empty(), GET_VAR_NAME_VALUE(_config_.empty()))
+void FitSample::readConfigImpl(){
+  LogThrowIf(_config_.empty(), GET_VAR_NAME_VALUE(_config_.empty()));
 
   _name_ = JsonUtils::fetchValue<std::string>(_config_, "name");
   LogThrowIf(
       GenericToolbox::doesStringContainsSubstring(_name_, "/"),
-      "Invalid sample name: \"" << _name_ << "\": should not have '/'.")
+      "Invalid sample name: \"" << _name_ << "\": should not have '/'.");
 
   _isEnabled_ = JsonUtils::fetchValue(_config_, "isEnabled", true);
-  if( not _isEnabled_ ){
-    LogWarning << "\"" << _name_ << "\" is disabled." << std::endl;
-    return;
-  }
-
-  LogInfo << "Initializing FitSample: " << _name_ << std::endl;
+  LogReturnIf(not _isEnabled_, "\"" << _name_ << "\" is disabled.");
 
   _selectionCuts_ = JsonUtils::fetchValue(_config_, "selectionCuts", _selectionCuts_);
   _enabledDatasetList_ = JsonUtils::fetchValue(_config_, std::vector<std::string>{"datasets", "dataSets"}, _enabledDatasetList_);
   _mcNorm_ = JsonUtils::fetchValue(_config_, "mcNorm", _mcNorm_);
   _dataNorm_ = JsonUtils::fetchValue(_config_, "dataNorm", _dataNorm_);
-  _binning_.readBinningDefinition( JsonUtils::fetchValue<std::string>(_config_, "binning") );
+  _binningFile_ = JsonUtils::fetchValue<std::string>(_config_, {{"binningFile"}, {"binning"}});
+}
+void FitSample::initializeImpl() {
+  if( not _isEnabled_ ) return;
+
+  LogInfo << "Initializing FitSample: " << _name_ << std::endl;
+
+  _binning_.readBinningDefinition( _binningFile_ );
 
   TH1::SetDefaultSumw2(true);
 

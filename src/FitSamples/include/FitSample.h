@@ -8,6 +8,7 @@
 
 #include "SampleElement.h"
 #include "DataBinSet.h"
+#include "ConfigBasedClass.h"
 
 #include "nlohmann/json.hpp"
 #include <TH1D.h>
@@ -18,20 +19,9 @@
 #include "memory"
 
 
-class FitSample {
+class FitSample : public ConfigBasedClass {
 
 public:
-  FitSample();
-  virtual ~FitSample();
-
-  void reset();
-
-  // SETTERS
-  void setConfig(const nlohmann::json &config_);
-
-  // INIT
-  void initialize();
-
   // GETTERS
   bool isEnabled() const;
   const std::string &getName() const;
@@ -45,15 +35,19 @@ public:
   // Misc
   bool isDatasetValid(const std::string& datasetName_);
 
+protected:
+  void readConfigImpl() override;
+  void initializeImpl() override;
+
 private:
   // Yaml
-  nlohmann::json _config_;
   bool _isEnabled_{false};
-  std::string _name_;
-  std::string _selectionCuts_;
-  std::vector<std::string> _enabledDatasetList_;
   double _mcNorm_{1};
   double _dataNorm_{1};
+  std::string _name_;
+  std::string _selectionCuts_;
+  std::string _binningFile_;
+  std::vector<std::string> _enabledDatasetList_;
 
   // Internals
   DataBinSet _binning_;

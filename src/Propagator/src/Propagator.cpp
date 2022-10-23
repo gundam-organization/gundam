@@ -28,13 +28,12 @@ Propagator::Propagator() { this->reset(); }
 Propagator::~Propagator() { this->reset(); }
 
 void Propagator::reset() {
-  _isInitialized_ = false;
   _parameterSetsList_.clear();
   _saveDir_ = nullptr;
 
   std::vector<std::string> jobNameRemoveList;
   for( const auto& jobName : GlobalVariables::getParallelWorker().getJobNameList() ){
-    if(jobName == "Propagator::fillEventDialCaches"
+    if(   jobName == "Propagator::fillEventDialCaches"
        or jobName == "Propagator::reweightMcEvents"
        or jobName == "Propagator::updateDialResponses"
        or jobName == "Propagator::refillSampleHistograms"
@@ -54,10 +53,6 @@ void Propagator::reset() {
 void Propagator::setShowTimeStats(bool showTimeStats) {
   _showTimeStats_ = showTimeStats;
 }
-void Propagator::setConfig(const nlohmann::json &config) {
-  _config_ = config;
-  JsonUtils::forwardConfig(_config_);
-}
 void Propagator::setSaveDir(TDirectory *saveDir) {
   _saveDir_ = saveDir;
 }
@@ -71,25 +66,59 @@ void Propagator::setLoadAsimovData(bool loadAsimovData) {
   _loadAsimovData_ = loadAsimovData;
 }
 
-void Propagator::initialize() {
+void Propagator::readConfigImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
 
   // Monitoring parameters
   _showEventBreakdown_ = JsonUtils::fetchValue(_config_, "showEventBreakdown", _showEventBreakdown_);
+  _throwAsimovToyParameters_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "throwAsimovFitParameters", _throwAsimovToyParameters_);
+  _enableStatThrowInToys_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "enableStatThrowInToys", _enableStatThrowInToys_);
+  _enableEventMcThrow_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "enableEventMcThrow", _enableEventMcThrow_);
+  _useResponseFunctions_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "DEV_useResponseFunctions", false);
 
-  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing parameters...") << std::endl;
   auto parameterSetListConfig = JsonUtils::fetchValue(_config_, "parameterSetListConfig", nlohmann::json());
   if( parameterSetListConfig.is_string() ) parameterSetListConfig = JsonUtils::readConfigFile(parameterSetListConfig.get<std::string>());
-  int nPars = 0;
   _parameterSetsList_.reserve(parameterSetListConfig.size()); // make sure the objects aren't moved in RAM ( since FitParameter* will be used )
   for( const auto& parameterSetConfig : parameterSetListConfig ){
     _parameterSetsList_.emplace_back();
     _parameterSetsList_.back().setConfig(parameterSetConfig);
     _parameterSetsList_.back().setSaveDir(GenericToolbox::mkdirTFile(_saveDir_, "ParameterSets"));
-    _parameterSetsList_.back().initialize();
-    nPars += _parameterSetsList_.back().getNbParameters();
+    _parameterSetsList_.back().readConfig();
     LogInfo << _parameterSetsList_.back().getSummary() << std::endl;
   }
+
+  auto fitSampleSetConfig = JsonUtils::fetchValue(_config_, "fitSampleSetConfig", nlohmann::json());
+  _fitSampleSet_.setConfig(fitSampleSetConfig);
+  _fitSampleSet_.readConfig();
+
+  auto plotGeneratorConfig = JsonUtils::fetchValue(_config_, "plotGeneratorConfig", nlohmann::json());
+  if( plotGeneratorConfig.is_string() ) parameterSetListConfig = JsonUtils::readConfigFile(plotGeneratorConfig.get<std::string>());
+  _plotGenerator_.setConfig(plotGeneratorConfig);
+  _plotGenerator_.readConfig();
+
+  auto dataSetListConfig = JsonUtils::getForwardedConfig(_config_, "dataSetList");
+  if( dataSetListConfig.empty() ){
+    // Old config files
+    dataSetListConfig = JsonUtils::getForwardedConfig(_fitSampleSet_.getConfig(), "dataSetList");
+    LogAlert << "DEPRECATED CONFIG OPTION: " << "dataSetList should now be located in the Propagator config." << std::endl;
+  }
+  LogThrowIf(dataSetListConfig.empty(), "No dataSet specified." << std::endl);
+  int iDataSet{0};
+  _dataSetList_.reserve(dataSetListConfig.size());
+  for( const auto& dataSetConfig : dataSetListConfig ){
+    _dataSetList_.emplace_back(dataSetConfig, iDataSet++);
+  }
+}
+void Propagator::initializeImpl() {
+  LogWarning << __METHOD_NAME__ << std::endl;
+
+  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing parameters...") << std::endl;
+  int nPars = 0;
+  for( auto& parSet : _parameterSetsList_ ){
+    parSet.initialize();
+    nPars += int(parSet.getNbParameters());
+  }
+  LogInfo << "Total number of parameters: " << nPars << std::endl;
 
   _globalCovarianceMatrix_ = std::make_shared<TMatrixD>( nPars, nPars );
   int iParOffset = 0;
@@ -110,36 +139,10 @@ void Propagator::initialize() {
   }
 
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing samples...") << std::endl;
-  auto fitSampleSetConfig = JsonUtils::fetchValue(_config_, "fitSampleSetConfig", nlohmann::json());
-  _fitSampleSet_.setConfig(fitSampleSetConfig);
   _fitSampleSet_.initialize();
 
-  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the plot generator") << std::endl;
-  auto plotGeneratorConfig = JsonUtils::fetchValue(_config_, "plotGeneratorConfig", nlohmann::json());
-  if( plotGeneratorConfig.is_string() ) parameterSetListConfig = JsonUtils::readConfigFile(plotGeneratorConfig.get<std::string>());
-  _plotGenerator_.setConfig(plotGeneratorConfig);
-  _plotGenerator_.initialize();
-
-  _throwAsimovToyParameters_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "throwAsimovFitParameters", _throwAsimovToyParameters_);
-  _enableStatThrowInToys_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "enableStatThrowInToys", _enableStatThrowInToys_);
-  _enableEventMcThrow_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "enableEventMcThrow", _enableEventMcThrow_);
-
-  LogInfo << std::endl << GenericToolbox::addUpDownBars("Loading datasets...") << std::endl;
-  auto dataSetListConfig = JsonUtils::getForwardedConfig(_config_, "dataSetList");
-  if( dataSetListConfig.empty() ){
-    // Old config files
-    dataSetListConfig = JsonUtils::getForwardedConfig(_fitSampleSet_.getConfig(), "dataSetList");
-    LogAlert << "DEPRECATED CONFIG OPTION: " << "dataSetList should now be located in the Propagator config." << std::endl;
-  }
-  LogThrowIf(dataSetListConfig.empty(), "No dataSet specified." << std::endl)
-  int iDataSet{0};
-  _dataSetList_.reserve(dataSetListConfig.size());
-  for( const auto& dataSetConfig : dataSetListConfig ){
-    _dataSetList_.emplace_back();
-    _dataSetList_.back().setConfig(dataSetConfig);
-    _dataSetList_.back().setDataSetIndex(iDataSet++);
-    _dataSetList_.back().initialize();
-  }
+  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing " + std::to_string(_dataSetList_.size()) + " datasets...") << std::endl;
+  for( auto& dataset : _dataSetList_ ){ dataset.initialize(); }
 
   LogInfo << "Initializing propagation threads..." << std::endl;
   initializeThreads();
@@ -149,19 +152,19 @@ void Propagator::initialize() {
   bool usedMcContainer{false};
   bool allAsimov{true};
   for( auto& dataSet : _dataSetList_ ){
-    if( not dataSet.isEnabled() ) continue;
+    LogContinueIf(not dataSet.isEnabled(), "Dataset \"" << dataSet.getName() << "\" is disabled. Skipping");
     DataDispenser& dispenser = dataSet.getSelectedDataDispenser();
     if( _throwAsimovToyParameters_ ) { dispenser = dataSet.getToyDataDispenser(); }
     if( _loadAsimovData_ ){ dispenser = dataSet.getDataDispenserDict()["Asimov"]; }
 
-    dispenser.getConfigParameters().iThrow = _iThrow_;
+    dispenser.getParameters().iThrow = _iThrow_;
 
-    if( dispenser.getConfigParameters().name != "Asimov" ){ allAsimov = false; }
-    LogInfo << "Reading dataset: " << dataSet.getName() << "/" << dispenser.getConfigParameters().name << std::endl;
+    if(dispenser.getParameters().name != "Asimov" ){ allAsimov = false; }
+    LogInfo << "Reading dataset: " << dataSet.getName() << "/" << dispenser.getParameters().name << std::endl;
 
     dispenser.setSampleSetPtrToLoad(&_fitSampleSet_);
     dispenser.setPlotGenPtr(&_plotGenerator_);
-    if( dispenser.getConfigParameters().useMcContainer ){
+    if(dispenser.getParameters().useMcContainer ){
       usedMcContainer = true;
       dispenser.setParSetPtrToLoad(&_parameterSetsList_);
     }
@@ -200,7 +203,7 @@ void Propagator::initialize() {
     // Filling the mc containers
     _fitSampleSet_.clearMcContainers();
     for( auto& dataSet : _dataSetList_ ){
-      if( not dataSet.isEnabled() ) continue;
+      LogContinueIf(not dataSet.isEnabled(), "Dataset \"" << dataSet.getName() << "\" is disabled. Skipping");
       auto& dispenser = dataSet.getMcDispenser();
       dispenser.setSampleSetPtrToLoad(&_fitSampleSet_);
       dispenser.setPlotGenPtr(&_plotGenerator_);
@@ -290,7 +293,9 @@ void Propagator::initialize() {
   }
 
   _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
-  _plotGenerator_.defineHistogramHolders();
+
+  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the plot generator") << std::endl;
+  _plotGenerator_.initialize();
 
   LogInfo << "Filling up sample bin caches..." << std::endl;
   _fitSampleSet_.updateSampleBinEventList();
@@ -316,10 +321,9 @@ void Propagator::initialize() {
     sample.getDataContainer().isLocked = true;
   }
 
-  _useResponseFunctions_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "DEV_useResponseFunctions", false);
   if( _useResponseFunctions_ ){ this->makeResponseFunctions(); }
 
-  if( JsonUtils::fetchValue<nlohmann::json>(_config_, "throwAsimovFitParameters", false) ){
+  if( _throwAsimovToyParameters_ ){
     for( auto& parSet : _parameterSetsList_ ){
       for( auto& par : parSet.getParameterList() ){
         par.setParameterValue( par.getPriorValue() );
@@ -333,8 +337,6 @@ void Propagator::initialize() {
 
   // Propagator needs to be fast
   GlobalVariables::getParallelWorker().setCpuTimeSaverIsEnabled(false);
-
-  _isInitialized_ = true;
 }
 
 bool Propagator::isUseResponseFunctions() const {

@@ -22,41 +22,23 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[DataSetLoader]");
 });
 
-DatasetLoader::DatasetLoader() { this->reset(); }
-DatasetLoader::~DatasetLoader(){ this->reset(); }
 
-void DatasetLoader::reset() {
-  _isInitialized_ = false;
-  _config_.clear();
-  _isEnabled_ = false;
-  _name_ = "";
-}
-
-void DatasetLoader::setConfig(const nlohmann::json &config_) {
-  _config_ = config_;
-  JsonUtils::forwardConfig(_config_, __CLASS_NAME__);
-}
-void DatasetLoader::setDataSetIndex(int dataSetIndex) {
-  _dataSetIndex_ = dataSetIndex;
-}
-
-void DatasetLoader::initialize() {
-  LogWarning << "Initializing dataset loader..." << std::endl;
+void DatasetLoader::readConfigImpl() {
   LogThrowIf(_config_.empty(), "Config not set.");
-
   _name_ = JsonUtils::fetchValue<std::string>(_config_, "name");
+  LogInfo << "Reading config for dataset: \"" << _name_ << "\"" << std::endl;
+
+  _isEnabled_ = JsonUtils::fetchValue(_config_, "isEnabled", true);
+  LogReturnIf(not _isEnabled_, "\"" << _name_ << "\" is disabled.");
+
   _selectedDataEntry_ = JsonUtils::fetchValue<std::string>(_config_, "selectedDataEntry", "Asimov");
   _selectedToyEntry_ = JsonUtils::fetchValue<std::string>(_config_, "selectedToyEntry", "Asimov");
-  _isEnabled_ = JsonUtils::fetchValue(_config_, "isEnabled", true);
-  if( not _isEnabled_ ){ LogWarning << "\"" << _name_ << "\" is disabled." << std::endl; return; }
 
   _showSelectedEventCount_ = JsonUtils::fetchValue(_config_, "showSelectedEventCount", _showSelectedEventCount_);
 
-  _mcDispenser_.setOwner(this);
-  _mcDispenser_.setConfig(JsonUtils::fetchValue<nlohmann::json>(_config_, "mc"));
-  _mcDispenser_.getConfigParameters().name = "Asimov";
-  _mcDispenser_.getConfigParameters().useMcContainer = true;
-  _mcDispenser_.initialize();
+  _mcDispenser_ = DataDispenser(JsonUtils::fetchValue<nlohmann::json>(_config_, "mc"), this);
+  _mcDispenser_.getParameters().name = "Asimov";
+  _mcDispenser_.getParameters().useMcContainer = true;
 
   // Always loaded by default
   _dataDispenserDict_["Asimov"] = _mcDispenser_;
@@ -66,22 +48,31 @@ void DatasetLoader::initialize() {
     LogThrowIf( GenericToolbox::doesKeyIsInMap(name, _dataDispenserDict_),
                 "\"" << name << "\" already taken, please use another name." )
 
-    _dataDispenserDict_[name] = DataDispenser();
     if( JsonUtils::fetchValue(dataEntry, "fromMc", false) ){ _dataDispenserDict_[name] = _mcDispenser_; }
-    _dataDispenserDict_[name].getConfigParameters().name = name;
-    _dataDispenserDict_[name].setOwner(this);
-    _dataDispenserDict_[name].setConfig(dataEntry);
-    _dataDispenserDict_[name].initialize();
+    else{ _dataDispenserDict_[name] = DataDispenser(dataEntry, this); }
+    _dataDispenserDict_[name].getParameters().name = name;
   }
+}
+void DatasetLoader::initializeImpl() {
+  if( not _isEnabled_ ) return;
+  LogInfo << "Initializing dataset: \"" << _name_ << "\"" << std::endl;
+
+  _mcDispenser_.initialize();
+  for( auto& dataDispenser : _dataDispenserDict_ ){ dataDispenser.second.initialize(); }
 
   if( not GenericToolbox::doesKeyIsInMap(_selectedDataEntry_, _dataDispenserDict_) ){
     LogThrow("selectedDataEntry could not be find in available data: "
-    << GenericToolbox::iterableToString(_dataDispenserDict_, [](const std::pair<std::string, DataDispenser>& elm){ return elm.first; })
-    << std::endl);
+                 << GenericToolbox::iterableToString(_dataDispenserDict_, [](const std::pair<std::string, DataDispenser>& elm){ return elm.first; })
+                 << std::endl);
   }
+}
 
-  LogInfo << "Initializing dataset: \"" << _name_ << "\"" << std::endl;
-  _isInitialized_ = true;
+DatasetLoader::DatasetLoader(const nlohmann::json& config_, int datasetIndex_): _dataSetIndex_(datasetIndex_) {
+  this->readConfig(config_);
+}
+
+void DatasetLoader::setDataSetIndex(int dataSetIndex) {
+  _dataSetIndex_ = dataSetIndex;
 }
 
 bool DatasetLoader::isEnabled() const {

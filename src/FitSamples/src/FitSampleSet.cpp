@@ -19,43 +19,47 @@
 
 LoggerInit([]{ Logger::setUserHeaderStr("[FitSampleSet]"); });
 
-FitSampleSet::FitSampleSet() { this->reset(); }
-FitSampleSet::~FitSampleSet() { this->reset(); }
 
-void FitSampleSet::reset() {
-  _isInitialized_ = false;
-  _config_.clear();
-
-  _fitSampleList_.clear();
-
-  _eventByEventDialLeafList_.clear();
-}
-
-void FitSampleSet::setConfig(const nlohmann::json &config) {
-  _config_ = config;
-  JsonUtils::forwardConfig(_config_);
-}
-
-void FitSampleSet::initialize() {
+void FitSampleSet::readConfigImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
-
-  LogAssert(not _config_.empty(), "_config_ is not set." << std::endl);
+  LogThrowIf(_config_.empty(), "_config_ is not set." << std::endl);
 
   LogInfo << "Reading samples definition..." << std::endl;
   auto fitSampleListConfig = JsonUtils::fetchValue(_config_, "fitSampleList", nlohmann::json());
-  bool _isEnabled_{false};
-  
   for( const auto& fitSampleConfig: fitSampleListConfig ){
-    _isEnabled_ = JsonUtils::fetchValue(fitSampleConfig, "isEnabled", true);
-    if( not _isEnabled_ ) continue;
+    if( not JsonUtils::fetchValue(fitSampleConfig, "isEnabled", true) ) continue;
     _fitSampleList_.emplace_back();
     _fitSampleList_.back().setConfig(fitSampleConfig);
-    _fitSampleList_.back().initialize();
+    _fitSampleList_.back().readConfig();
   }
 
-  LogInfo << "Creating parallelisable jobs" << std::endl;
+  // To be moved elsewhere -> nothing to do in sample... -> this should belong to the fitter engine
+  std::string llhMethod = "PoissonLLH";
+  llhMethod = JsonUtils::fetchValue(_config_, "llhStatFunction", llhMethod);
 
-  // Fill the bin index inside of each event
+  // new config structure
+  auto configJointProbability = JsonUtils::fetchValue(_config_, {{"jointProbability"}, {"llhConfig"}}, nlohmann::json());
+  llhMethod = JsonUtils::fetchValue(configJointProbability, "type", llhMethod);
+
+  LogInfo << "Using \"" << llhMethod << "\" LLH function." << std::endl;
+  if     ( llhMethod == "PoissonLLH" ){              _jointProbabilityPtr_ = std::make_shared<JointProbability::PoissonLLH>(); }
+  else if( llhMethod == "BarlowLLH" ) {              _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH>(); }
+  else if( llhMethod == "Plugin" ) {                 _jointProbabilityPtr_ = std::make_shared<JointProbability::JointProbabilityPlugin>(); }
+  else if( llhMethod == "BarlowLLH_BANFF_OA2020" ) { _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2020>(); }
+  else if( llhMethod == "BarlowLLH_BANFF_OA2021" ) { _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2021>(); }
+  else{ LogThrow("Unknown LLH Method: " << llhMethod); }
+
+  _jointProbabilityPtr_->readConfig(configJointProbability);
+  _jointProbabilityPtr_->initialize();
+}
+void FitSampleSet::initializeImpl() {
+  LogWarning << __METHOD_NAME__ << std::endl;
+  LogThrowIf(_fitSampleList_.empty(), "No sample is defined.");
+
+  for( auto& sample : _fitSampleList_ ){ sample.initialize(); }
+
+  LogInfo << "Creating parallelisable jobs" << std::endl;
+  // Fill the bin index inside each event
   std::function<void(int)> updateSampleEventBinIndexesFct = [this](int iThread){
     for( auto& sample : _fitSampleList_ ){
       sample.getMcContainer().updateEventBinIndexes(iThread);
@@ -89,34 +93,6 @@ void FitSampleSet::initialize() {
   };
   GlobalVariables::getParallelWorker().addJob("FitSampleSet::updateSampleHistograms", refillMcHistogramsFct);
   GlobalVariables::getParallelWorker().setPostParallelJob("FitSampleSet::updateSampleHistograms", rescaleMcHistogramsFct);
-
-  std::string llhMethod = JsonUtils::fetchValue(_config_, "llhStatFunction", "PoissonLLH");
-  LogInfo << "Using \"" << llhMethod << "\" LLH function." << std::endl;
-  if     ( llhMethod == "PoissonLLH" ){  _jointProbabilityPtr_ = std::make_shared<JointProbability::PoissonLLH>(); }
-  else if( llhMethod == "BarlowLLH" ) {  _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH>(); }
-  else if( llhMethod == "BarlowLLH_BANFF_OA2020" ) {  _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2020>(); }
-  else if( llhMethod == "BarlowLLH_BANFF_OA2021" ) {
-    _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2021>();
-    ((JointProbability::BarlowLLH_BANFF_OA2021 *) _jointProbabilityPtr_.get())->readConfig(
-        JsonUtils::fetchValue(_config_, "llhConfig", nlohmann::json())
-        );
-  }
-  else if( llhMethod == "Plugin" ) {
-    _jointProbabilityPtr_ = std::make_shared<JointProbability::JointProbabilityPlugin>();
-    if( JsonUtils::doKeyExist(_config_, "llhPluginSrc") ){
-      ((JointProbability::JointProbabilityPlugin *) _jointProbabilityPtr_.get())->compile(
-          JsonUtils::fetchValue<std::string>(_config_, "llhPluginSrc")
-      );
-    }
-    else{
-      ((JointProbability::JointProbabilityPlugin*) _jointProbabilityPtr_.get())->load(
-          JsonUtils::fetchValue<std::string>(_config_, "llhSharedLib")
-      );
-    }
-  }
-  else{ LogThrow("Unknown LLH Method: " << llhMethod); }
-
-  _isInitialized_ = true;
 }
 
 const std::vector<FitSample> &FitSampleSet::getFitSampleList() const {

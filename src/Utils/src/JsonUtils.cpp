@@ -18,6 +18,15 @@ LoggerInit([]{
 } );
 
 namespace JsonUtils{
+  nlohmann::json readConfigJsonStr(const std::string& configJsonStr_){
+    std::stringstream ss;
+    ss << configJsonStr_;
+
+    nlohmann::json output;
+    ss >> output;
+
+    return output;
+  }
   nlohmann::json readConfigFile(const std::string& configFilePath_){
 
     if( not GenericToolbox::doesPathIsFile(configFilePath_) ){

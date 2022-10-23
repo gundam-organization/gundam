@@ -5,8 +5,11 @@
 #ifndef GUNDAM_FITPARAMETERSET_H
 #define GUNDAM_FITPARAMETERSET_H
 
-#include "vector"
-#include "string"
+#include "FitParameter.h"
+#include "NestedDialTest.h"
+#include "ConfigBasedClass.h"
+
+#include "Logger.h"
 
 #include "nlohmann/json.hpp"
 #include "TMatrixDSym.h"
@@ -16,10 +19,8 @@
 #include "TVectorT.h"
 #include "TMatrixDSymEigen.h"
 
-#include "Logger.h"
-
-#include "FitParameter.h"
-#include "NestedDialTest.h"
+#include "vector"
+#include "string"
 
 
 /*
@@ -30,20 +31,11 @@
  *
  * */
 
-class FitParameterSet {
+class FitParameterSet : public ConfigBasedClass  {
 
 public:
-  FitParameterSet();
-  virtual ~FitParameterSet();
-
-  void reset();
-
   // Setters
-  void setConfig(const nlohmann::json &config_);
   void setSaveDir(TDirectory* saveDir_);
-
-  // Init
-  void initialize();
 
   // Post-init
   void prepareFitParameters(); // invert the matrices, and make sure fixed parameters are detached from correlations
@@ -56,7 +48,6 @@ public:
   std::vector<FitParameter> &getParameterList();
   std::vector<FitParameter> &getEigenParameterList();
   const std::vector<FitParameter> &getParameterList() const;
-  const nlohmann::json &getConfig() const;
   const std::shared_ptr<TMatrixDSym> &getPriorCorrelationMatrix() const;
   const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const;
   std::vector<FitParameter>& getEffectiveParameterList();
@@ -70,6 +61,7 @@ public:
   // Throw / Shifts
   void moveFitParametersToPrior();
   void throwFitParameters(double gain_ = 1);
+  const std::vector<nlohmann::json>& getCustomFitParThrow() const;
 
   bool isUseEigenDecompInFit() const;
   int getNbEnabledEigenParameters() const;
@@ -89,31 +81,25 @@ public:
   void setMaskedForPropagation(bool maskedForPropagation);
 
 protected:
-  void passIfInitialized(const std::string& methodName_) const;
+  void readConfigImpl() override;
+  void initializeImpl() override;
 
-  void initializeFromConfig();
   void readParameterDefinitionFile();
-  void readConfigOptions();
-
   void defineParameters();
-
   void fillDeltaParameterList();
 
 private:
-  // User parameters
-  nlohmann::json _config_;
-
   // Internals
-  bool _isInitialized_{false};
   std::vector<FitParameter> _parameterList_;
   std::vector<NestedDialTest> _nestedDialList_;
   TDirectory* _saveDir_{nullptr};
 
   // JSON
-  std::string _name_;
+  std::string _name_{};
   std::string _parameterDefinitionFilePath_{};
   bool _isEnabled_{};
   bool _maskedForPropagation_{false};
+  bool _printDialSetsSummary_{false};
   int _nbParameterDefinition_{-1};
   double _nominalStepSize_{std::nan("unset")};
   int _maxNbEigenParameters_{-1};
@@ -122,11 +108,13 @@ private:
   double _globalParameterMinValue_{std::nan("UNSET")};
   double _globalParameterMaxValue_{std::nan("UNSET")};
 
+  std::vector<nlohmann::json> _customFitParThrow_{};
+
   // Eigen objects
   int _nbEnabledEigen_{0};
   bool _useEigenDecompInFit_{false};
   bool _useOnlyOneParameterPerEvent_{false};
-  std::vector<FitParameter> _eigenParameterList_;
+  std::vector<FitParameter> _eigenParameterList_{};
   std::shared_ptr<TMatrixDSymEigen> _eigenDecomp_{nullptr};
 
   // Toy throwing
