@@ -1,6 +1,7 @@
 FROM rootproject/root as base
 
-RUN apt install git libyaml-cpp-dev -y
+RUN apt-get update && apt-get upgrade -y
+RUN apt-get install git libyaml-cpp-dev -y
 
 ENV WORK_DIR /home/work
 RUN mkdir -p $WORK_DIR
