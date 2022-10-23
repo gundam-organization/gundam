@@ -7,8 +7,6 @@
 #include "JsonUtils.h"
 
 
-ConfigBasedClass::ConfigBasedClass(const nlohmann::json& config_){ this->readConfig(config_); }
-
 void ConfigBasedClass::setConfig(const nlohmann::json &config_) { _config_ = config_; JsonUtils::forwardConfig(_config_); }
 
 void ConfigBasedClass::readConfig() {

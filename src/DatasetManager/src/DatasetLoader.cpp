@@ -67,8 +67,9 @@ void DatasetLoader::initializeImpl() {
   }
 }
 
-DatasetLoader::DatasetLoader(const nlohmann::json& config_, int datasetIndex_):
-  ConfigBasedClass(config_), _dataSetIndex_(datasetIndex_) {}
+DatasetLoader::DatasetLoader(const nlohmann::json& config_, int datasetIndex_): _dataSetIndex_(datasetIndex_) {
+  this->readConfig(config_);
+}
 
 void DatasetLoader::setDataSetIndex(int dataSetIndex) {
   _dataSetIndex_ = dataSetIndex;

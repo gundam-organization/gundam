@@ -77,8 +77,7 @@ class DataDispenser : public ConfigBasedClass {
 public:
   DataDispenser() = default;
   explicit DataDispenser(const nlohmann::json& config_, DatasetLoader* owner_):
-    ConfigBasedClass(config_),
-    _owner_(owner_) {};
+    _owner_(owner_) { this->readConfig(config_); }
 
   void setOwner(DatasetLoader* owner_);
 
@@ -89,9 +88,9 @@ public:
   void setParSetPtrToLoad(std::vector<FitParameterSet> *parSetListPtrToLoad_);
   void setPlotGenPtr(PlotGenerator *plotGenPtr);
 
-  void load();
   std::string getTitle();
 
+  void load();
   GenericToolbox::TreeEntryBuffer generateTreeEventBuffer(TChain* treeChain_, const std::vector<std::string>& varsList_);
 
 protected:

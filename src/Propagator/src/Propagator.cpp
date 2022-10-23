@@ -141,7 +141,7 @@ void Propagator::initializeImpl() {
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing samples...") << std::endl;
   _fitSampleSet_.initialize();
 
-  LogInfo << std::endl << GenericToolbox::addUpDownBars("Loading datasets...") << std::endl;
+  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing " + std::to_string(_dataSetList_.size()) + " datasets...") << std::endl;
   for( auto& dataset : _dataSetList_ ){ dataset.initialize(); }
 
   LogInfo << "Initializing propagation threads..." << std::endl;
@@ -152,7 +152,7 @@ void Propagator::initializeImpl() {
   bool usedMcContainer{false};
   bool allAsimov{true};
   for( auto& dataSet : _dataSetList_ ){
-    if( not dataSet.isEnabled() ) continue;
+    LogContinueIf(not dataSet.isEnabled(), "Dataset \"" << dataSet.getName() << "\" is disabled. Skipping");
     DataDispenser& dispenser = dataSet.getSelectedDataDispenser();
     if( _throwAsimovToyParameters_ ) { dispenser = dataSet.getToyDataDispenser(); }
     if( _loadAsimovData_ ){ dispenser = dataSet.getDataDispenserDict()["Asimov"]; }
@@ -203,7 +203,7 @@ void Propagator::initializeImpl() {
     // Filling the mc containers
     _fitSampleSet_.clearMcContainers();
     for( auto& dataSet : _dataSetList_ ){
-      if( not dataSet.isEnabled() ) continue;
+      LogContinueIf(not dataSet.isEnabled(), "Dataset \"" << dataSet.getName() << "\" is disabled. Skipping");
       auto& dispenser = dataSet.getMcDispenser();
       dispenser.setSampleSetPtrToLoad(&_fitSampleSet_);
       dispenser.setPlotGenPtr(&_plotGenerator_);

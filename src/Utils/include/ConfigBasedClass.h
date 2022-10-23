@@ -7,12 +7,12 @@
 
 #include "nlohmann/json.hpp"
 
+
 class ConfigBasedClass {
 
 public:
   // Common structure
   ConfigBasedClass() = default;
-  explicit ConfigBasedClass(const nlohmann::json& config_);
   virtual ~ConfigBasedClass() = default;
 
   void setConfig(const nlohmann::json& config_);
