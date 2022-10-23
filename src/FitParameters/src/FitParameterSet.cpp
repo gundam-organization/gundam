@@ -75,6 +75,7 @@ void FitParameterSet::readConfigImpl(){
   this->defineParameters();
 
   _customFitParThrow_ = JsonUtils::fetchValue(_config_, "customFitParThrow", std::vector<nlohmann::json>());
+  _releaseFixedParametersOnHesse_ = JsonUtils::fetchValue(_config_, "releaseFixedParametersOnHesse", _releaseFixedParametersOnHesse_);
 }
 void FitParameterSet::initializeImpl() {
   LogInfo << "Initializing \"" << this->getName() << "\"" << std::endl;

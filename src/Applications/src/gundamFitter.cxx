@@ -188,7 +188,7 @@ int main(int argc, char** argv){
   FitterEngine fitter;
   fitter.setConfig(JsonUtils::fetchSubEntry(jsonConfig, {"fitterEngineConfig"}));
   fitter.setSaveDir(GenericToolbox::mkdirTFile(out, "FitterEngine"));
-  fitter.setNbScanSteps(nbScanSteps);
+  fitter.getParScanner().setNbPoints(nbScanSteps);
   fitter.setEnablePostFitScan(enableParameterScan);
   fitter.setEnablePca(clParser.isOptionTriggered("enablePca"));
 
@@ -200,7 +200,7 @@ int main(int argc, char** argv){
 
   fitter.initialize();
 
-  if( clParser.isOptionTriggered("skipHesse") ) fitter.setEnablePostFitErrorEval(false);
+  if( clParser.isOptionTriggered("skipHesse") ) fitter.getMinimizer().setEnablePostFitErrorEval(false);
 
   fitter.updateChi2Cache();
   LogInfo << "Initial χ² = " << fitter.getChi2Buffer() << std::endl;
@@ -224,7 +224,9 @@ int main(int argc, char** argv){
   if( clParser.isOptionTriggered("scanParameters") or JsonUtils::fetchValue(jsonConfig, "scanParameters", false) ) fitter.scanParameters(nbScanSteps, "preFit/scan");
 
   // Plot generators
-  if( JsonUtils::fetchValue(jsonConfig, "generateSamplePlots", true) ) fitter.generateSamplePlots("preFit/samples");
+  if( JsonUtils::fetchValue(jsonConfig, "generateSamplePlots", true) ){
+    fitter.getPropagator().generateSamplePlots("preFit/samples", fitter.getSaveDir());
+  }
 
 
   // --------------------------
@@ -232,6 +234,10 @@ int main(int argc, char** argv){
   // --------------------------
   if( not isDryRun and JsonUtils::fetchValue(jsonConfig, "fit", true) ){
     fitter.fit();
+  }
+
+  if( JsonUtils::fetchValue(jsonConfig, "generateSamplePlots", true) ){
+    fitter.getPropagator().generateSamplePlots("postFit/samples", fitter.getSaveDir());
   }
 
   LogWarning << "Closing output file \"" << out->GetName() << "\"..." << std::endl;
