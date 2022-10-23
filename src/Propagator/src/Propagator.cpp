@@ -24,13 +24,9 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[Propagator]");
 });
 
-Propagator::Propagator() { this->reset(); }
 Propagator::~Propagator() { this->reset(); }
 
 void Propagator::reset() {
-  _parameterSetsList_.clear();
-  _saveDir_ = nullptr;
-
   std::vector<std::string> jobNameRemoveList;
   for( const auto& jobName : GlobalVariables::getParallelWorker().getJobNameList() ){
     if(   jobName == "Propagator::fillEventDialCaches"
@@ -45,9 +41,6 @@ void Propagator::reset() {
   for( const auto& jobName : jobNameRemoveList ){
     GlobalVariables::getParallelWorker().removeJob(jobName);
   }
-
-  _responseFunctionsSamplesMcHistogram_.clear();
-  _nominalSamplesMcHistogram_.clear();
 }
 
 void Propagator::setShowTimeStats(bool showTimeStats) {
@@ -74,7 +67,6 @@ void Propagator::readConfigImpl(){
   _throwAsimovToyParameters_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "throwAsimovFitParameters", _throwAsimovToyParameters_);
   _enableStatThrowInToys_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "enableStatThrowInToys", _enableStatThrowInToys_);
   _enableEventMcThrow_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "enableEventMcThrow", _enableEventMcThrow_);
-  _useResponseFunctions_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "DEV_useResponseFunctions", false);
 
   auto parameterSetListConfig = JsonUtils::fetchValue(_config_, "parameterSetListConfig", nlohmann::json());
   if( parameterSetListConfig.is_string() ) parameterSetListConfig = JsonUtils::readConfigFile(parameterSetListConfig.get<std::string>());
@@ -214,7 +206,7 @@ void Propagator::initializeImpl() {
   }
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
-  // After all of the data has been loaded.  Specifically, this must be after
+  // After all the data has been loaded.  Specifically, this must be after
   // the MC has been copied for the Asimov fit, or the "data" use the MC
   // reweighting cache.  This must also be before the first use of
   // reweightMcEvents.
@@ -321,8 +313,6 @@ void Propagator::initializeImpl() {
     sample.getDataContainer().isLocked = true;
   }
 
-  if( _useResponseFunctions_ ){ this->makeResponseFunctions(); }
-
   if( _throwAsimovToyParameters_ ){
     for( auto& parSet : _parameterSetsList_ ){
       for( auto& par : parSet.getParameterList() ){
@@ -339,9 +329,6 @@ void Propagator::initializeImpl() {
   GlobalVariables::getParallelWorker().setCpuTimeSaverIsEnabled(false);
 }
 
-bool Propagator::isUseResponseFunctions() const {
-  return _useResponseFunctions_;
-}
 bool Propagator::isThrowAsimovToyParameters() const {
   return _throwAsimovToyParameters_;
 }
@@ -357,10 +344,6 @@ const std::vector<FitParameterSet> &Propagator::getParameterSetsList() const {
 PlotGenerator &Propagator::getPlotGenerator() {
   return _plotGenerator_;
 }
-const nlohmann::json &Propagator::getConfig() const {
-  return _config_;
-}
-
 
 void Propagator::propagateParametersOnSamples(){
 
@@ -369,14 +352,8 @@ void Propagator::propagateParametersOnSamples(){
     if( parSet.isUseEigenDecompInFit() ) parSet.propagateEigenToOriginal();
   }
 
-  if(not _useResponseFunctions_ or not _isRfPropagationEnabled_ ){
-//    if(GlobalVariables::isEnableDevMode()) updateDialResponses();
-    reweightMcEvents();
-    refillSampleHistograms();
-  }
-  else{
-    applyResponseFunctions();
-  }
+  reweightMcEvents();
+  refillSampleHistograms();
 
 }
 void Propagator::updateDialResponses(){
@@ -431,19 +408,6 @@ void Propagator::applyResponseFunctions(){
   applyRf.counts++; applyRf.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 }
 
-void Propagator::preventRfPropagation(){
-  if(_isRfPropagationEnabled_){
-//    LogInfo << "Parameters propagation using Response Function is now disabled." << std::endl;
-    _isRfPropagationEnabled_ = false;
-  }
-}
-void Propagator::allowRfPropagation(){
-  if(not _isRfPropagationEnabled_){
-//    LogWarning << "Parameters propagation using Response Function is now ENABLED." << std::endl;
-    _isRfPropagationEnabled_ = true;
-  }
-}
-
 void Propagator::fillDialsStack(){
   for( auto& parSet : _parameterSetsList_ ){
     if( not parSet.isUseEigenDecompInFit() ){
@@ -459,6 +423,21 @@ void Propagator::fillDialsStack(){
   } // parSet
 }
 
+void Propagator::generateSamplePlots(const std::string& savePath_, TDirectory* baseDir_){
+  LogInfo << __METHOD_NAME__ << std::endl;
+  LogThrowIf(not isInitialized(), "not initialized");
+
+  if( baseDir_ == nullptr ) baseDir_ = _saveDir_;
+
+  propagateParametersOnSamples();
+
+  if( not getPlotGenerator().isEmpty() ){
+    getPlotGenerator().generateSamplePlots( GenericToolbox::mkdirTFile(baseDir_, savePath_ ) );
+  }
+  else{
+    LogWarning << "No histogram is defined in the PlotGenerator. Skipping..." << std::endl;
+  }
+}
 
 // Protected
 void Propagator::initializeThreads() {
@@ -493,68 +472,6 @@ void Propagator::initializeThreads() {
     this->applyResponseFunctions(iThread);
   };
   GlobalVariables::getParallelWorker().addJob("Propagator::applyResponseFunctions", applyResponseFunctionsFct);
-}
-
-void Propagator::makeResponseFunctions(){
-  LogWarning << __METHOD_NAME__ << std::endl;
-
-  this->preventRfPropagation(); // make sure, not yet setup
-
-  for( auto& parSet : _parameterSetsList_ ){
-    for( auto& par : parSet.getParameterList() ){
-      par.setParameterValue(par.getPriorValue());
-    }
-  }
-  this->propagateParametersOnSamples();
-
-  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    _nominalSamplesMcHistogram_[&sample] = std::shared_ptr<TH1D>((TH1D*) sample.getMcContainer().histogram->Clone());
-  }
-
-  for( auto& parSet : _parameterSetsList_ ){
-    for( auto& par : parSet.getParameterList() ){
-      LogInfo << "Make RF for " << parSet.getName() << "/" << par.getTitle() << std::endl;
-      par.setParameterValue(par.getPriorValue() + par.getStdDevValue());
-
-      this->propagateParametersOnSamples();
-
-      for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-        _responseFunctionsSamplesMcHistogram_[&sample].emplace_back(std::shared_ptr<TH1D>((TH1D*) sample.getMcContainer().histogram->Clone()) );
-        GenericToolbox::transformBinContent(_responseFunctionsSamplesMcHistogram_[&sample].back().get(), [&](TH1D* h_, int b_){
-          h_->SetBinContent(
-              b_,
-              (h_->GetBinContent(b_)/_nominalSamplesMcHistogram_[&sample]->GetBinContent(b_))-1);
-          h_->SetBinError(b_,0);
-        });
-      }
-
-      par.setParameterValue(par.getPriorValue());
-    }
-  }
-  this->propagateParametersOnSamples(); // back to nominal
-
-  // WRITE
-  if( _saveDir_ != nullptr ){
-    auto* rfDir = GenericToolbox::mkdirTFile(_saveDir_, "RF");
-    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-      GenericToolbox::mkdirTFile(rfDir, "nominal")->cd();
-      _nominalSamplesMcHistogram_[&sample]->Write(Form("nominal_%s", sample.getName().c_str()));
-
-      int iPar = -1;
-      auto* devDir = GenericToolbox::mkdirTFile(rfDir, "deviation");
-      for( auto& parSet : _parameterSetsList_ ){
-        auto* parSetDir = GenericToolbox::mkdirTFile(devDir, parSet.getName());
-        for( auto& par : parSet.getParameterList() ){
-          iPar++;
-          GenericToolbox::mkdirTFile(parSetDir, par.getTitle())->cd();
-          _responseFunctionsSamplesMcHistogram_[&sample].at(iPar)->Write(Form("dev_%s", sample.getName().c_str()));
-        }
-      }
-    }
-    _saveDir_->cd();
-  }
-
-  LogInfo << "RF built" << std::endl;
 }
 
 void Propagator::updateDialResponses(int iThread_){

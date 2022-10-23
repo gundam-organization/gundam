@@ -21,7 +21,7 @@
 | scaleParStepWithChi2Response                             | bool   | Use LLH profile to scale parameter step size (dev)                            | false   |
 | parStepGain                                              | bool   | Boost step value with `scaleParStepWithChi2Response` (dev)                    | 0.1     |
 | restoreStepSizeBeforeHesse                               | bool   | Use back original step size for error calculation                             | false   |
-| debugPrintLoadedEvents                                   | bool   | Printout `debugPrintLoadedEventsNbPerSample` loaded events  (dev)             | false   |
+| debugPrintLoadedEvents                                   | bool   | Printout `_debugPrintLoadedEventsNbPerSample_` loaded events  (dev)           | false   |
 | debugPrintLoadedEventsNbPerSample                        | int    | Number of event to print for each sample (dev)                                | 10      |
 
 
