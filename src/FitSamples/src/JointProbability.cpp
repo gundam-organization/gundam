@@ -17,43 +17,149 @@ LoggerInit([]{
 
 namespace JointProbability{
 
-  double PoissonLLH::eval(const FitSample& sample_, int bin_){
-    double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
-    double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
-    if(predVal <= 0){
-      LogAlert << "Zero MC events in bin " << bin_ << ". predVal = " << predVal << ", dataVal = " << dataVal
-               << ". Setting chi2_stat = 0 for this bin." << std::endl;
-      return 0;
-    }
-    return 2.0 * (predVal - dataVal + dataVal * TMath::Log(dataVal / predVal));
+  // JointProbabilityPlugin
+  void JointProbabilityPlugin::readConfigImpl() {
+    llhPluginSrc = JsonUtils::fetchValue<std::string>(_config_, "llhPluginSrc");
+    llhSharedLib = JsonUtils::fetchValue<std::string>(_config_, "llhSharedLib");
+  }
+  void JointProbabilityPlugin::initializeImpl(){
+    if( not llhSharedLib.empty() ) this->load();
+    else if( not llhPluginSrc.empty() ){ this->compile(); this->load(); }
+    else{ LogThrow("Can't initialize JointProbabilityPlugin without llhSharedLib nor llhPluginSrc."); }
+  }
+  double JointProbabilityPlugin::eval(const FitSample& sample_, int bin_) {
+    LogThrowIf(evalFcn == nullptr, "Library not loaded properly.");
+    return reinterpret_cast<double(*)(double, double, double)>(evalFcn)(
+        sample_.getDataContainer().histogram->GetBinContent(bin_),
+        sample_.getMcContainer().histogram->GetBinContent(bin_),
+        sample_.getMcContainer().histogram->GetBinError(bin_)
+    );
+  }
+  void JointProbabilityPlugin::compile(){
+    LogInfo << "Compiling: " << llhPluginSrc << std::endl;
+    llhSharedLib = GenericToolbox::replaceFileExtension(llhPluginSrc, "so");
+
+    // create library
+    std::stringstream ss;
+    LogThrowIf( getenv("CXX") == nullptr, "CXX env is not set. Can't compile." );
+    ss << "$CXX -std=c++11 -shared " << llhPluginSrc << " -o " << llhSharedLib;
+    system ( ss.str().c_str() );
+  }
+  void JointProbabilityPlugin::load(){
+    LogInfo << "Loading shared lib: " << llhSharedLib << std::endl;
+    fLib = dlopen( llhSharedLib.c_str(), RTLD_LAZY );
+    LogThrowIf(fLib == nullptr, "Cannot open library: " << dlerror());
+    evalFcn = (dlsym(fLib, "evalFct"));
+    LogThrowIf(evalFcn == nullptr, "Cannot open evalFcn");
   }
 
-  double BarlowLLH::eval(const FitSample& sample_, int bin_){
-    rel_var = sample_.getMcContainer().histogram->GetBinError(bin_) / TMath::Sq(sample_.getMcContainer().histogram->GetBinContent(bin_));
-    b       = (sample_.getMcContainer().histogram->GetBinContent(bin_) * rel_var) - 1;
-    c       = 4 * sample_.getDataContainer().histogram->GetBinContent(bin_) * rel_var;
+  // BarlowLLH_BANFF_OA2021
+  void BarlowLLH_BANFF_OA2021::readConfigImpl(){
+    usePoissonLikelihood = JsonUtils::fetchValue(_config_, "usePoissonLikelihood", usePoissonLikelihood);
+    BBNoUpdateWeights = JsonUtils::fetchValue(_config_, "BBNoUpdateWeights", BBNoUpdateWeights);
 
-    beta   = (-b + std::sqrt(b * b + c)) / 2.0;
-    mc_hat = sample_.getMcContainer().histogram->GetBinContent(bin_) * beta;
+    LogInfo << "Using BarlowLLH_BANFF_OA2021 parameters:" << std::endl;
+    LogInfo << GET_VAR_NAME_VALUE(usePoissonLikelihood) << std::endl;
+    LogInfo << GET_VAR_NAME_VALUE(BBNoUpdateWeights) << std::endl;
+  }
+  double BarlowLLH_BANFF_OA2021::eval(const FitSample& sample_, int bin_){
 
-    // Calculate the following LLH:
-    //-2lnL = 2 * beta*mc - data + data * ln(data / (beta*mc)) + (beta-1)^2 / sigma^2
-    // where sigma^2 is the same as above.
-    chi2 = 0.0;
-    if(sample_.getDataContainer().histogram->GetBinContent(bin_) <= 0.0) {
-      chi2 = 2 * mc_hat;
-      chi2 += (beta - 1) * (beta - 1) / rel_var;
+    TH1D* data = sample_.getDataContainer().histogram.get();
+    TH1D* predMC = sample_.getMcContainer().histogram.get();
+    TH1D* nomMC = sample_.getMcContainer().histogramNominal.get();
+
+    // From OA2021_Eb branch -> BANFFBinnedSample::CalcLLRContrib
+    // https://github.com/t2k-software/BANFF/blob/OA2021_Eb/src/BANFFSample/BANFFBinnedSample.cxx
+
+    double chisq = 0.0;
+    double dataVal, predVal;
+
+//    bool usePoissonLikelihood = (bool)ND::params().GetParameterI("BANFF.UsePoissonLikelihood");
+//    bool BBNoUpdateWeights = (bool)ND::params().GetParameterI("BANFF.BarlowBeestonNoUpdateWeights");
+
+    //Loop over all the bins one by one using their unique bin index.
+    //Use the stored nBins value and bins array so avoid trying to calculate
+    //over underflow or overflow bins.
+//    for (int i = 0; i < nBins; i++)
+//    {
+
+    dataVal = data->GetBinContent(bin_);
+    predVal = predMC->GetBinContent(bin_);
+    double mcuncert;
+    if (BBNoUpdateWeights){
+      mcuncert = nomMC->GetBinError(bin_);
     }
     else{
-      chi2 = 2 * (mc_hat - sample_.getDataContainer().histogram->GetBinContent(bin_));
-      if(sample_.getDataContainer().histogram->GetBinContent(bin_) > 0.0) {
-        chi2 += 2 * sample_.getDataContainer().histogram->GetBinContent(bin_) *
-                std::log(sample_.getDataContainer().histogram->GetBinContent(bin_) / mc_hat);
-      }
-      chi2 += (beta - 1) * (beta - 1) / rel_var;
+      mcuncert = predMC->GetBinError(bin_);
     }
-    return chi2;
+
+    //implementing Barlow-Beeston correction for LH calculation
+    //the following comments are inspired/copied from Clarence's comments in the MaCh3
+    //implementation of the same feature
+
+    // The MC used in the likelihood calculation
+    // Is allowed to be changed by Barlow Beeston beta parameters
+    double newmc = predVal;
+    // Not full Barlow-Beeston or what is referred to as "light": we're not introducing any more parameters
+    // Assume the MC has a Gaussian distribution around generated
+    // As in https://arxiv.org/abs/1103.0354 eq 10, 11
+
+    // The penalty from MC statistics
+    double penalty = 0;
+    // Barlow-Beeston uses fractional uncertainty on MC, so sqrt(sum[w^2])/mc
+    double fractional = sqrt(mcuncert) / predVal;
+    // -b/2a in quadratic equation
+    double temp = predVal * fractional * fractional - 1;
+    // b^2 - 4ac in quadratic equation
+    double temp2 = temp * temp + 4 * dataVal * fractional * fractional;
+    if (temp2 < 0)
+    {
+      std::cerr << "Negative square root in Barlow Beeston coefficient calculation!" << std::endl;
+      std::cerr << __FILE__ << ":" << __LINE__ << std::endl;
+      throw;
+    }
+    // Solve for the positive beta
+    double beta = (-1 * temp + sqrt(temp2)) / 2.;
+    newmc = predVal * beta;
+    // And penalise the movement in beta relative the mc uncertainty
+    penalty = (beta - 1) * (beta - 1) / (2 * fractional * fractional);
+    // And calculate the new Poisson likelihood
+    // For Barlow-Beeston newmc is modified, so can only calculate Poisson likelihood after Barlow-Beeston
+    double stat = 0;
+    if (dataVal == 0)
+      stat = newmc;
+    else if (newmc > 0)
+      stat = newmc - dataVal + dataVal * TMath::Log(dataVal / newmc);
+
+    if ((predVal > 0.0) && (dataVal > 0.0))
+    {
+      if (usePoissonLikelihood)
+        chisq += 2.0*(predVal - dataVal +dataVal*TMath::Log( dataVal/predVal) );
+      else // Barlow-Beeston likelihood
+        chisq += 2.0 * (stat + penalty);
+    }
+
+    else if (predVal > 0.0)
+    {
+      if (usePoissonLikelihood)
+        chisq += 2.0*predVal;
+      else // Barlow-Beeston likelihood
+        chisq += 2.0 * (stat + penalty);
+    }
+
+    if (std::isnan(chisq))
+    {
+      std::cout << "Infinite chi2 " << predVal << " " << dataVal
+                << " " << nomMC->GetBinContent(bin_) << " "
+                << predMC->GetBinError(bin_) << " "
+                << predMC->GetBinContent(bin_) << std::endl;
+    }
+//    }
+
+    return chisq;
   }
+
+  // BarlowLLH_BANFF_OA2020
   double BarlowLLH_BANFF_OA2020::eval(const FitSample& sample_, int bin_){
     // From BANFF: origin/OA2020 branch -> BANFFBinnedSample::CalcLLRContrib()
 
@@ -130,112 +236,51 @@ namespace JointProbability{
     }
 
     LogThrowIf(std::isnan(chisq), "NaN chi2 " << predVal << " " << dataVal
-        << sample_.getMcContainer().histogram->GetBinError(bin_) << " "
-        << sample_.getMcContainer().histogram->GetBinContent(bin_));
+                                              << sample_.getMcContainer().histogram->GetBinError(bin_) << " "
+                                              << sample_.getMcContainer().histogram->GetBinContent(bin_));
 
     return chisq;
   }
-  double BarlowLLH_BANFF_OA2021::eval(const FitSample& sample_, int bin_){
 
-    TH1D* data = sample_.getDataContainer().histogram.get();
-    TH1D* predMC = sample_.getMcContainer().histogram.get();
-    TH1D* nomMC = sample_.getMcContainer().histogramNominal.get();
-
-    // From OA2021_Eb branch -> BANFFBinnedSample::CalcLLRContrib
-    // https://github.com/t2k-software/BANFF/blob/OA2021_Eb/src/BANFFSample/BANFFBinnedSample.cxx
-
-    double chisq = 0.0;
-    double dataVal, predVal;
-
-//    bool usePoissonLikelihood = (bool)ND::params().GetParameterI("BANFF.UsePoissonLikelihood");
-//    bool BBNoUpdateWeights = (bool)ND::params().GetParameterI("BANFF.BarlowBeestonNoUpdateWeights");
-
-    //Loop over all the bins one by one using their unique bin index.
-    //Use the stored nBins value and bins array so avoid trying to calculate
-    //over underflow or overflow bins.
-//    for (int i = 0; i < nBins; i++)
-//    {
-
-      dataVal = data->GetBinContent(bin_);
-      predVal = predMC->GetBinContent(bin_);
-      double mcuncert;
-      if (BBNoUpdateWeights){
-        mcuncert = nomMC->GetBinError(bin_);
-      }
-      else{
-        mcuncert = predMC->GetBinError(bin_);
-      }
-
-      //implementing Barlow-Beeston correction for LH calculation
-      //the following comments are inspired/copied from Clarence's comments in the MaCh3
-      //implementation of the same feature
-
-      // The MC used in the likelihood calculation
-      // Is allowed to be changed by Barlow Beeston beta parameters
-      double newmc = predVal;
-      // Not full Barlow-Beeston or what is referred to as "light": we're not introducing any more parameters
-      // Assume the MC has a Gaussian distribution around generated
-      // As in https://arxiv.org/abs/1103.0354 eq 10, 11
-
-      // The penalty from MC statistics
-      double penalty = 0;
-      // Barlow-Beeston uses fractional uncertainty on MC, so sqrt(sum[w^2])/mc
-      double fractional = sqrt(mcuncert) / predVal;
-      // -b/2a in quadratic equation
-      double temp = predVal * fractional * fractional - 1;
-      // b^2 - 4ac in quadratic equation
-      double temp2 = temp * temp + 4 * dataVal * fractional * fractional;
-      if (temp2 < 0)
-      {
-        std::cerr << "Negative square root in Barlow Beeston coefficient calculation!" << std::endl;
-        std::cerr << __FILE__ << ":" << __LINE__ << std::endl;
-        throw;
-      }
-      // Solve for the positive beta
-      double beta = (-1 * temp + sqrt(temp2)) / 2.;
-      newmc = predVal * beta;
-      // And penalise the movement in beta relative the mc uncertainty
-      penalty = (beta - 1) * (beta - 1) / (2 * fractional * fractional);
-      // And calculate the new Poisson likelihood
-      // For Barlow-Beeston newmc is modified, so can only calculate Poisson likelihood after Barlow-Beeston
-      double stat = 0;
-      if (dataVal == 0)
-        stat = newmc;
-      else if (newmc > 0)
-        stat = newmc - dataVal + dataVal * TMath::Log(dataVal / newmc);
-
-      if ((predVal > 0.0) && (dataVal > 0.0))
-      {
-        if (usePoissonLikelihood)
-          chisq += 2.0*(predVal - dataVal +dataVal*TMath::Log( dataVal/predVal) );
-        else // Barlow-Beeston likelihood
-          chisq += 2.0 * (stat + penalty);
-      }
-
-      else if (predVal > 0.0)
-      {
-        if (usePoissonLikelihood)
-          chisq += 2.0*predVal;
-        else // Barlow-Beeston likelihood
-          chisq += 2.0 * (stat + penalty);
-      }
-
-      if (std::isnan(chisq))
-      {
-        std::cout << "Infinite chi2 " << predVal << " " << dataVal
-                  << " " << nomMC->GetBinContent(bin_) << " "
-                  << predMC->GetBinError(bin_) << " "
-                  << predMC->GetBinContent(bin_) << std::endl;
-      }
-//    }
-
-    return chisq;
+  // PoissonLLH
+  double PoissonLLH::eval(const FitSample& sample_, int bin_){
+    double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
+    double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
+    if(predVal <= 0){
+      LogAlert << "Zero MC events in bin " << bin_ << ". predVal = " << predVal << ", dataVal = " << dataVal
+               << ". Setting chi2_stat = 0 for this bin." << std::endl;
+      return 0;
+    }
+    return 2.0 * (predVal - dataVal + dataVal * TMath::Log(dataVal / predVal));
   }
-  void BarlowLLH_BANFF_OA2021::readConfig(const nlohmann::json& config_){
-    usePoissonLikelihood = JsonUtils::fetchValue(config_, "usePoissonLikelihood", usePoissonLikelihood);
-    BBNoUpdateWeights = JsonUtils::fetchValue(config_, "BBNoUpdateWeights", BBNoUpdateWeights);
 
-    LogDebug << GET_VAR_NAME_VALUE(usePoissonLikelihood) << std::endl;
-    LogDebug << GET_VAR_NAME_VALUE(BBNoUpdateWeights) << std::endl;
+  // BarlowLLH
+  double BarlowLLH::eval(const FitSample& sample_, int bin_){
+    rel_var = sample_.getMcContainer().histogram->GetBinError(bin_) / TMath::Sq(sample_.getMcContainer().histogram->GetBinContent(bin_));
+    b       = (sample_.getMcContainer().histogram->GetBinContent(bin_) * rel_var) - 1;
+    c       = 4 * sample_.getDataContainer().histogram->GetBinContent(bin_) * rel_var;
+
+    beta   = (-b + std::sqrt(b * b + c)) / 2.0;
+    mc_hat = sample_.getMcContainer().histogram->GetBinContent(bin_) * beta;
+
+    // Calculate the following LLH:
+    //-2lnL = 2 * beta*mc - data + data * ln(data / (beta*mc)) + (beta-1)^2 / sigma^2
+    // where sigma^2 is the same as above.
+    chi2 = 0.0;
+    if(sample_.getDataContainer().histogram->GetBinContent(bin_) <= 0.0) {
+      chi2 = 2 * mc_hat;
+      chi2 += (beta - 1) * (beta - 1) / rel_var;
+    }
+    else{
+      chi2 = 2 * (mc_hat - sample_.getDataContainer().histogram->GetBinContent(bin_));
+      if(sample_.getDataContainer().histogram->GetBinContent(bin_) > 0.0) {
+        chi2 += 2 * sample_.getDataContainer().histogram->GetBinContent(bin_) *
+                std::log(sample_.getDataContainer().histogram->GetBinContent(bin_) / mc_hat);
+      }
+      chi2 += (beta - 1) * (beta - 1) / rel_var;
+    }
+    return chi2;
   }
+
+
 }

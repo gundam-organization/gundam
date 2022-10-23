@@ -9,6 +9,7 @@
 #include "FitSampleSet.h"
 #include "FitParameterSet.h"
 #include "PlotGenerator.h"
+#include "ConfigBasedClass.h"
 
 #include "TChain.h"
 
@@ -29,6 +30,8 @@ struct DataDispenserParameters{
   std::map<std::string, std::string> overrideLeafDict{};
   std::vector<std::string> additionalVarsStorage{};
   int iThrow{-1};
+
+  void clear(){ *this = DataDispenserParameters(); }
 };
 struct DataDispenserCache{
   std::vector<FitSample*> samplesToFillList{};
@@ -69,20 +72,18 @@ struct DataDispenserCache{
 
 };
 
-class DataDispenser {
+class DataDispenser : public ConfigBasedClass {
 
 public:
-  DataDispenser();
-  virtual ~DataDispenser();
+  DataDispenser() = default;
+  explicit DataDispenser(const nlohmann::json& config_, DatasetLoader* owner_):
+    ConfigBasedClass(config_),
+    _owner_(owner_) {};
 
-  void setConfig(const nlohmann::json &config);
   void setOwner(DatasetLoader* owner_);
 
-  void readConfig();
-  void initialize();
-
-  const DataDispenserParameters &getConfigParameters() const;
-  DataDispenserParameters &getConfigParameters();
+  const DataDispenserParameters &getParameters() const;
+  DataDispenserParameters &getParameters();
 
   void setSampleSetPtrToLoad(FitSampleSet *sampleSetPtrToLoad);
   void setParSetPtrToLoad(std::vector<FitParameterSet> *parSetListPtrToLoad_);
@@ -94,6 +95,9 @@ public:
   GenericToolbox::TreeEntryBuffer generateTreeEventBuffer(TChain* treeChain_, const std::vector<std::string>& varsList_);
 
 protected:
+  void readConfigImpl() override;
+  void initializeImpl() override;
+
   void buildSampleToFillList();
   void doEventSelection();
   void fetchRequestedLeaves();
@@ -101,21 +105,14 @@ protected:
   void readAndFill();
 
 private:
-  // Args
-  DatasetLoader* _owner_{nullptr};
-  nlohmann::json _config_{};
-  bool _isConfigReadDone_{false};
+  // Parameters
+  DataDispenserParameters _parameters_;
 
-  // To be loaded
+  // Internals
   FitSampleSet* _sampleSetPtrToLoad_{nullptr};
   std::vector<FitParameterSet>* _parSetListPtrToLoad_{nullptr};
   PlotGenerator* _plotGenPtr_{nullptr}; // used to know which vars have to be kept in memory
-
-  // Internals
-  bool _isInitialized_{false};
-  DataDispenserParameters _parameters_;
-
-  // Cache
+  DatasetLoader* _owner_{nullptr};
   DataDispenserCache _cache_;
 
 };

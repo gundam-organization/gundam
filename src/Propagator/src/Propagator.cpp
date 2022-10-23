@@ -106,10 +106,7 @@ void Propagator::readConfigImpl(){
   int iDataSet{0};
   _dataSetList_.reserve(dataSetListConfig.size());
   for( const auto& dataSetConfig : dataSetListConfig ){
-    _dataSetList_.emplace_back();
-    _dataSetList_.back().setConfig(dataSetConfig);
-    _dataSetList_.back().setDataSetIndex(iDataSet++);
-    _dataSetList_.back().readConfig();
+    _dataSetList_.emplace_back(dataSetConfig, iDataSet++);
   }
 }
 void Propagator::initializeImpl() {
@@ -160,14 +157,14 @@ void Propagator::initializeImpl() {
     if( _throwAsimovToyParameters_ ) { dispenser = dataSet.getToyDataDispenser(); }
     if( _loadAsimovData_ ){ dispenser = dataSet.getDataDispenserDict()["Asimov"]; }
 
-    dispenser.getConfigParameters().iThrow = _iThrow_;
+    dispenser.getParameters().iThrow = _iThrow_;
 
-    if( dispenser.getConfigParameters().name != "Asimov" ){ allAsimov = false; }
-    LogInfo << "Reading dataset: " << dataSet.getName() << "/" << dispenser.getConfigParameters().name << std::endl;
+    if(dispenser.getParameters().name != "Asimov" ){ allAsimov = false; }
+    LogInfo << "Reading dataset: " << dataSet.getName() << "/" << dispenser.getParameters().name << std::endl;
 
     dispenser.setSampleSetPtrToLoad(&_fitSampleSet_);
     dispenser.setPlotGenPtr(&_plotGenerator_);
-    if( dispenser.getConfigParameters().useMcContainer ){
+    if(dispenser.getParameters().useMcContainer ){
       usedMcContainer = true;
       dispenser.setParSetPtrToLoad(&_parameterSetsList_);
     }

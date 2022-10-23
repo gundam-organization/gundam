@@ -7,6 +7,7 @@
 
 #include "FitSampleSet.h"
 #include "PhysicsEvent.h"
+#include "ConfigBasedClass.h"
 
 #include "GenericToolbox.Wrappers.h"
 
@@ -74,22 +75,11 @@ struct CanvasHolder{
 
 
 
-class PlotGenerator {
+class PlotGenerator : public ConfigBasedClass {
 
 public:
-  PlotGenerator();
-  virtual ~PlotGenerator();
-
-  // Reset
-  void reset();
-
   // Setters
-  void setConfig(const nlohmann::json &config_);
   void setFitSampleSetPtr(const FitSampleSet *fitSampleSetPtr);
-
-  // Init
-  void readConfig();
-  void initialize();
 
   // Getters
   const std::vector<HistHolder> &getHistHolderList(int cacheSlot_ = 0) const;
@@ -109,25 +99,28 @@ public:
   // Misc
   std::vector<std::string> fetchListOfVarToPlot(bool isData_ = false);
   std::vector<std::string> fetchListOfSplitVarNames();
-  std::vector<std::string> fetchRequestedLeafNames();
 
 protected:
+  void readConfigImpl() override;
+  void initializeImpl() override;
   void defineHistogramHolders();
   void buildEventBinCache(const std::vector<HistHolder *> &histPtrToFillList, const std::vector<PhysicsEvent> *eventListPtr, bool isData_);
 
 private:
-  nlohmann::json _config_;
-  bool _isConfigReadDone_{false};
-  const FitSampleSet* _fitSampleSetPtr_{nullptr};
+  // Parameters
   int _maxLegendLength_{15};
-
-  // Internals
   nlohmann::json _varDictionary_;
   nlohmann::json _canvasParameters_;
   nlohmann::json _histogramsDefinition_;
-  std::vector<Color_t> defaultColorWheel;
+  std::vector<Color_t> defaultColorWheel {
+      kGreen-3, kTeal+3, kAzure+7,
+      kCyan-2, kBlue-7, kBlue+2,
+      kOrange+1, kOrange+9, kRed+2, kPink+9
+  };
 
-  std::vector<std::vector<HistHolder>> _histHolderCacheList_;
+  // Internals
+  const FitSampleSet* _fitSampleSetPtr_{nullptr};
+  std::vector<std::vector<HistHolder>> _histHolderCacheList_{};
   std::vector<HistHolder> _comparisonHistHolderList_;
   std::map<std::string, std::shared_ptr<TCanvas>> _bufferCanvasList_;
 

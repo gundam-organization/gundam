@@ -25,21 +25,11 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[DataDispenser]");
 });
 
-DataDispenser::DataDispenser() = default;
-DataDispenser::~DataDispenser() = default;
 
-void DataDispenser::setConfig(const nlohmann::json &config) {
-  _config_ = config;
-  JsonUtils::forwardConfig(_config_, __CLASS_NAME__);
-}
-void DataDispenser::setOwner(DatasetLoader* owner_){
-  _owner_ = owner_;
-}
-
-void DataDispenser::readConfig(){
-  _isConfigReadDone_ = true;
+void DataDispenser::readConfigImpl(){
   LogThrowIf( _config_.empty(), "Config is not set." );
-  LogThrowIf( _owner_==nullptr, "Owner not set.");
+
+  _parameters_.clear();
 
   _parameters_.treePath = JsonUtils::fetchValue<std::string>(_config_, "tree", _parameters_.treePath);
   _parameters_.filePathList = JsonUtils::fetchValue<std::vector<std::string>>(_config_, "filePathList", _parameters_.filePathList);
@@ -49,24 +39,23 @@ void DataDispenser::readConfig(){
   _parameters_.selectionCutFormulaStr = JsonUtils::buildFormula(_config_, "selectionCutFormula", "&&", _parameters_.selectionCutFormulaStr);
   _parameters_.nominalWeightFormulaStr = JsonUtils::buildFormula(_config_, "nominalWeightFormula", "*", _parameters_.nominalWeightFormulaStr);
 
-  if( JsonUtils::doKeyExist(_config_, "overrideLeafDict") ){
-    _parameters_.overrideLeafDict.clear();
-    for( auto& entry : JsonUtils::fetchValue<nlohmann::json>(_config_, "overrideLeafDict") ){
-      _parameters_.overrideLeafDict[entry["eventVar"]] = entry["leafVar"];
-    }
+  _parameters_.overrideLeafDict.clear();
+  for( auto& entry : JsonUtils::fetchValue(_config_, "overrideLeafDict", nlohmann::json()) ){
+    _parameters_.overrideLeafDict[entry["eventVar"]] = entry["leafVar"];
   }
 }
-void DataDispenser::initialize(){
-  if(not _isConfigReadDone_) this->readConfig();
-
+void DataDispenser::initializeImpl(){
+  LogThrowIf( _owner_==nullptr, "Owner not set.");
+  // Nothing else to do other than read config?
   LogWarning << "Initialized data dispenser: " << getTitle() << std::endl;
-  _isInitialized_ = true;
 }
 
-const DataDispenserParameters &DataDispenser::getConfigParameters() const {
+void DataDispenser::setOwner(DatasetLoader* owner_){ _owner_ = owner_; }
+
+const DataDispenserParameters &DataDispenser::getParameters() const {
   return _parameters_;
 }
-DataDispenserParameters &DataDispenser::getConfigParameters() {
+DataDispenserParameters &DataDispenser::getParameters() {
   return _parameters_;
 }
 
@@ -82,7 +71,7 @@ void DataDispenser::setPlotGenPtr(PlotGenerator *plotGenPtr) {
 
 void DataDispenser::load(){
   LogWarning << "Loading dataset: " << getTitle() << std::endl;
-  LogThrowIf(not _isInitialized_, "Can't load while not initialized.");
+  LogThrowIf(not this->isInitialized(), "Can't load while not initialized.");
   LogThrowIf(_sampleSetPtrToLoad_==nullptr, "SampleSet not specified.");
 
   _cache_.clear();

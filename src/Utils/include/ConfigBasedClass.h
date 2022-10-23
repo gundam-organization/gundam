@@ -10,8 +10,9 @@
 class ConfigBasedClass {
 
 public:
+  // Common structure
   ConfigBasedClass() = default;
-  ConfigBasedClass(const nlohmann::json& config_);
+  explicit ConfigBasedClass(const nlohmann::json& config_);
   virtual ~ConfigBasedClass() = default;
 
   void setConfig(const nlohmann::json& config_);
@@ -26,8 +27,9 @@ public:
   const nlohmann::json &getConfig() const;
 
 protected:
-  virtual void readConfigImpl() = 0;
-  virtual void initializeImpl() = 0;
+  // where the derivative classes will specify (although override is optional)
+  virtual void readConfigImpl(){};
+  virtual void initializeImpl(){};
 
   nlohmann::json _config_{};
 

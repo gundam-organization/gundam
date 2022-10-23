@@ -9,6 +9,7 @@
 #include "FitParameterSet.h"
 #include <FitSampleSet.h>
 #include "PlotGenerator.h"
+#include "ConfigBasedClass.h"
 
 #include <TChain.h>
 #include "nlohmann/json.hpp"
@@ -17,19 +18,12 @@
 #include "string"
 
 
-class DatasetLoader {
+class DatasetLoader : public ConfigBasedClass {
 
 public:
-  DatasetLoader();
-  virtual ~DatasetLoader();
+  DatasetLoader(const nlohmann::json& config_, int datasetIndex_);
 
-  void reset();
-
-  void setConfig(const nlohmann::json &config_);
   void setDataSetIndex(int dataSetIndex);
-
-  void readConfig();
-  void initialize();
 
   bool isEnabled() const;
   const std::string &getName() const;
@@ -45,16 +39,16 @@ public:
   DataDispenser &getToyDataDispenser();
   std::map<std::string, DataDispenser> &getDataDispenserDict();
 
-private:
-  nlohmann::json _config_;
-  bool _isConfigReadDone_{false};
+protected:
+  void readConfigImpl() override;
+  void initializeImpl() override;
 
+private:
   // internals
-  bool _isInitialized_{false};
   bool _isEnabled_{false};
   bool _showSelectedEventCount_{true};
   int _dataSetIndex_{-1};
-  std::string _name_;
+  std::string _name_{};
   std::string _selectedDataEntry_{"Asimov"};
   std::string _selectedToyEntry_{"Asimov"};
 

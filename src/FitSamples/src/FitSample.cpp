@@ -19,31 +19,7 @@ LoggerInit([]{
 });
 
 
-FitSample::FitSample() { this->reset(); }
-FitSample::~FitSample() { this->reset(); }
-
-void FitSample::reset() {
-  // YAML
-  _config_.clear();
-  _isEnabled_ = false;
-  _name_ = "";
-  _selectionCuts_ = "";
-  _enabledDatasetList_.clear();
-  _mcNorm_ = 1;
-  _dataNorm_ = 1;
-
-  // Internals
-  _binning_.reset();
-  _mcContainer_ = SampleElement();
-  _dataContainer_ = SampleElement();
-}
-
-void FitSample::setConfig(const nlohmann::json &config_) {
-  _config_ = config_;
-}
-
-void FitSample::readConfig(){
-  _isConfigReadDone_ = true;
+void FitSample::readConfigImpl(){
   LogThrowIf(_config_.empty(), GET_VAR_NAME_VALUE(_config_.empty()));
 
   _name_ = JsonUtils::fetchValue<std::string>(_config_, "name");
@@ -58,13 +34,14 @@ void FitSample::readConfig(){
   _enabledDatasetList_ = JsonUtils::fetchValue(_config_, std::vector<std::string>{"datasets", "dataSets"}, _enabledDatasetList_);
   _mcNorm_ = JsonUtils::fetchValue(_config_, "mcNorm", _mcNorm_);
   _dataNorm_ = JsonUtils::fetchValue(_config_, "dataNorm", _dataNorm_);
-  _binning_.readBinningDefinition( JsonUtils::fetchValue<std::string>(_config_, "binning") );
+  _binningFile_ = JsonUtils::fetchValue<std::string>(_config_, {{"binningFile"}, {"binning"}});
 }
-void FitSample::initialize() {
-  if( not _isConfigReadDone_ ) this->readConfig();
+void FitSample::initializeImpl() {
   if( not _isEnabled_ ) return;
 
   LogInfo << "Initializing FitSample: " << _name_ << std::endl;
+
+  _binning_.readBinningDefinition( _binningFile_ );
 
   TH1::SetDefaultSumw2(true);
 
