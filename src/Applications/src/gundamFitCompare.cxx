@@ -114,10 +114,10 @@ void makeSampleComparePlots(bool usePrefit_){
 
   strBuffer = Form("FitterEngine/%s/samples", (usePrefit_? "preFit": "postFit"));
   auto* dir1 = file1->Get<TDirectory>(strBuffer.c_str());
-  LogThrowIf(dir1== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath1);
+  LogReturnIf(dir1== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath1);
 
   auto* dir2 = file2->Get<TDirectory>(strBuffer.c_str());
-  LogThrowIf(dir2== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
+  LogReturnIf(dir2== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
 
   std::vector<std::string> pathBuffer;
   pathBuffer.emplace_back(Form("%s/samples", (usePrefit_? "preFit": "postFit")));
@@ -272,11 +272,11 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
 
   std::string strBuffer;
 
-  strBuffer = Form("FitterEngine/postFit/%s/errors", algo1.c_str());
+  strBuffer = Form("FitterEngine/%s/%s/errors", (usePrefit_? "preFit": "postFit"), algo1.c_str());
   auto* dir1 = file1->Get<TDirectory>(strBuffer.c_str());
   LogReturnIf(dir1== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath1);
 
-  strBuffer = Form("FitterEngine/postFit/%s/errors", algo2.c_str());
+  strBuffer = Form("FitterEngine/%s/%s/errors", (usePrefit_? "preFit": "postFit"), algo2.c_str());
   auto* dir2 = file2->Get<TDirectory>(strBuffer.c_str());
   LogReturnIf(dir2== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
 
