@@ -70,7 +70,7 @@ public:
 
     // Deconstruct the class.  This should deallocate all the memory
     // everyplace.
-    ~Weights();
+    virtual ~Weights() = default;
 
     Results& GetWeights() {return *fResults;}
 

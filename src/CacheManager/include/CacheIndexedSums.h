@@ -39,7 +39,7 @@ public:
 
     // Deconstruct the class.  This should deallocate all the memory
     // everyplace.
-    ~IndexedSums();
+    virtual ~IndexedSums();
 
     /// Return the approximate allocated memory (e.g. on the GPU).
     std::size_t GetResidentMemory() const {return fTotalBytes;}

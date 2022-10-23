@@ -14,13 +14,13 @@
 #include "NormDial.h"
 #include "GlobalVariables.h"
 
-#include "GenericToolbox.h"
+#include "Logger.h"
 #include "GenericToolbox.Root.h"
 
+#include <memory>
 #include <vector>
 #include <set>
 
-#include "Logger.h"
 LoggerInit([]{
   Logger::setUserHeaderStr("[Cache::Manager]");
 });
@@ -54,9 +54,9 @@ std::string Cache::Manager::SplineType(const SplineDial* dial) {
 
     std::string subType = dial->getOwner()->getDialSubType();
 
-    if (!uniform) return std::string("generalSpline");
-    if (subType == "compact") return std::string("compactSpline");
-    return std::string("uniformSpline");
+    if (!uniform) return {"generalSpline"};
+    if (subType == "compact") return {"compactSpline"};
+    return {"uniformSpline"};
 }
 
 Cache::Manager::Manager(int events, int parameters,
@@ -69,53 +69,53 @@ Cache::Manager::Manager(int events, int parameters,
 
     fTotalBytes = 0;
     try {
-        fParameterCache.reset(new Cache::Parameters(parameters));
+        fParameterCache = std::make_unique<Cache::Parameters>(parameters);
         fTotalBytes += fParameterCache->GetResidentMemory();
 
-        fWeightsCache.reset(
-            new Cache::Weights(fParameterCache->GetParameters(),
+        fWeightsCache = std::make_unique<Cache::Weights>(
+            fParameterCache->GetParameters(),
                                fParameterCache->GetLowerClamps(),
                                fParameterCache->GetUpperClamps(),
-                               events));
+                               events);
         fTotalBytes += fWeightsCache->GetResidentMemory();
 
-        fNormalizations.reset(new Cache::Weight::Normalization(
+        fNormalizations = std::make_unique<Cache::Weight::Normalization>(
                                   fWeightsCache->GetWeights(),
                                   fParameterCache->GetParameters(),
-                                  norms));
+                                  norms);
         fWeightsCache->AddWeightCalculator(fNormalizations.get());
         fTotalBytes += fNormalizations->GetResidentMemory();
 
-        fMonotonicSplines.reset(new Cache::Weight::MonotonicSpline(
+        fMonotonicSplines = std::make_unique<Cache::Weight::MonotonicSpline>(
                                   fWeightsCache->GetWeights(),
                                   fParameterCache->GetParameters(),
                                   fParameterCache->GetLowerClamps(),
                                   fParameterCache->GetUpperClamps(),
-                                  compactSplines, compactPoints));
+                                  compactSplines, compactPoints);
         fWeightsCache->AddWeightCalculator(fMonotonicSplines.get());
         fTotalBytes += fMonotonicSplines->GetResidentMemory();
 
-        fUniformSplines.reset(new Cache::Weight::UniformSpline(
+        fUniformSplines = std::make_unique<Cache::Weight::UniformSpline>(
                                   fWeightsCache->GetWeights(),
                                   fParameterCache->GetParameters(),
                                   fParameterCache->GetLowerClamps(),
                                   fParameterCache->GetUpperClamps(),
-                                  uniformSplines, uniformPoints));
+                                  uniformSplines, uniformPoints);
         fWeightsCache->AddWeightCalculator(fUniformSplines.get());
         fTotalBytes += fUniformSplines->GetResidentMemory();
 
-        fGeneralSplines.reset(new Cache::Weight::GeneralSpline(
+        fGeneralSplines = std::make_unique<Cache::Weight::GeneralSpline>(
                                   fWeightsCache->GetWeights(),
                                   fParameterCache->GetParameters(),
                                   fParameterCache->GetLowerClamps(),
                                   fParameterCache->GetUpperClamps(),
-                                  generalSplines, generalPoints));
+                                  generalSplines, generalPoints);
         fWeightsCache->AddWeightCalculator(fGeneralSplines.get());
         fTotalBytes += fGeneralSplines->GetResidentMemory();
 
-        fHistogramsCache.reset(new Cache::IndexedSums(
+        fHistogramsCache = std::make_unique<Cache::IndexedSums>(
                                   fWeightsCache->GetWeights(),
-                                  histBins));
+                                  histBins);
         fTotalBytes += fHistogramsCache->GetResidentMemory();
 
     }
@@ -126,7 +126,7 @@ Cache::Manager::Manager(int events, int parameters,
 
     LogInfo << "Approximate cache manager size for"
             << " " << events << " events:"
-            << " " << GetResidentMemory()/1E+9 << " GB "
+            << " " << double(GetResidentMemory())/1E+9 << " GB "
             << " (" << GetResidentMemory()/events << " bytes per event)"
             << std::endl;
 }
@@ -164,11 +164,10 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
             }
             for (const Dial* dial
                      : event.getRawDialPtrList()) {
-                const FitParameter* fp = dial->getOwner()->getOwner();
+                auto* fp = dial->getOwner()->getOwner();
                 usedParameters.insert(fp);
                 ++useCount[fp->getFullTitle()];
-                const SplineDial* sDial
-                    = dynamic_cast<const SplineDial*>(dial);
+                auto* sDial = dynamic_cast<const SplineDial*>(dial);
                 if (sDial) {
                     std::string splineType = Cache::Manager::SplineType(sDial);
                     if (sDial->getSplineType() == SplineDial::Monotonic
@@ -200,13 +199,11 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
                         throw std::runtime_error("Invalid spline type");
                     }
                 }
-                const GraphDial* gDial
-                    = dynamic_cast<const GraphDial*>(dial);
+                auto* gDial = dynamic_cast<const GraphDial*>(dial);
                 if (gDial) {
                     ++graphs;
                 }
-                const NormDial* nDial
-                    = dynamic_cast<const NormDial*>(dial);
+                auto* nDial = dynamic_cast<const NormDial*>(dial);
                 if (nDial) {
                     ++norms;
                 }
@@ -236,7 +233,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
         histCells += cells;
     }
 
-    int parameters = usedParameters.size();
+    int parameters = int(usedParameters.size());
     LogInfo << "Cache for " << events << " events --"
             << " using " << parameters << " parameters"
             << std::endl;
@@ -339,11 +336,9 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
                      : event.getRawDialPtrList()) {
                 if (!dial->isReferenced()) continue;
                 auto* fp = dial->getOwner()->getOwner();
-                std::map<const FitParameter*,int>::iterator parMapIt
-                    = Cache::Manager::ParameterMap.find(fp);
+                auto parMapIt = Cache::Manager::ParameterMap.find(fp);
                 if (parMapIt == Cache::Manager::ParameterMap.end()) {
-                    Cache::Manager::ParameterMap[fp]
-                        = Cache::Manager::ParameterMap.size();
+                    Cache::Manager::ParameterMap[fp] = int(Cache::Manager::ParameterMap.size());
                 }
                 int parIndex = Cache::Manager::ParameterMap[fp];
                 if (dial->getOwner()->useMirrorDial()) {
@@ -379,7 +374,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
                         ->fNormalizations
                         ->ReserveNorm(resultIndex,parIndex);
                 }
-                SplineDial* sDial = dynamic_cast<SplineDial*>(dial);
+                auto* sDial = dynamic_cast<SplineDial*>(dial);
                 if (sDial) {
                     ++dialUsed;
                     std::string splineType = Cache::Manager::SplineType(sDial);
@@ -500,8 +495,7 @@ bool Cache::Manager::Fill() {
 }
 
 int Cache::Manager::ParameterIndex(const FitParameter* fp) {
-    std::map<const FitParameter*,int>::iterator parMapIt
-        = Cache::Manager::ParameterMap.find(fp);
+    auto parMapIt = Cache::Manager::ParameterMap.find(fp);
     if (parMapIt == Cache::Manager::ParameterMap.end()) return -1;
     return parMapIt->second;
 }
