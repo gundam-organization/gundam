@@ -2,8 +2,8 @@
 // Created by Adrien BLANCHET on 16/12/2021.
 //
 
-#ifndef GUNDAM_MINIMIZER_H
-#define GUNDAM_MINIMIZER_H
+#ifndef GUNDAM_MINIMIZERINTERFACE_H
+#define GUNDAM_MINIMIZERINTERFACE_H
 
 
 #include "FitParameterSet.h"
@@ -23,11 +23,11 @@
 
 class FitterEngine;
 
-class Minimizer : public ConfigBasedClass {
+class MinimizerInterface : public ConfigBasedClass {
 
 public:
-  Minimizer() = default;
-  explicit Minimizer(const nlohmann::json& config_, FitterEngine* owner_);
+  MinimizerInterface() = default;
+  explicit MinimizerInterface(const nlohmann::json& config_, FitterEngine* owner_);
 
   void setOwner(FitterEngine* owner_);
   void setSaveDir(TDirectory* saveDir_);
@@ -125,4 +125,4 @@ private:
 };
 
 
-#endif //GUNDAM_MINIMIZER_H
+#endif //GUNDAM_MINIMIZERINTERFACE_H

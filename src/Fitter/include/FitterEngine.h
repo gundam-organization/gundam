@@ -7,7 +7,7 @@
 
 
 #include "Propagator.h"
-#include "Minimizer.h"
+#include "MinimizerInterface.h"
 #include "ConfigBasedClass.h"
 #include "ParScanner.h"
 
@@ -39,7 +39,7 @@ public:
   const Propagator& getPropagator() const;
   Propagator& getPropagator();
   ParScanner& getParScanner(){ return _parScanner_; }
-  Minimizer& getMinimizer(){ return _minimizer_; }
+  MinimizerInterface& getMinimizer(){ return _minimizer_; }
   TDirectory* getSaveDir(){ return _saveDir_; }
 
   double* getChi2BufferPtr(){ return &_chi2Buffer_; }
@@ -52,8 +52,6 @@ public:
   void varyEvenRates(const std::vector<double>& paramVariationList_, const std::string& savePath_ = "");
 
   void fixGhostFitParameters();
-  void scanParameters(int nbSteps_ = -1, const std::string& saveDir_ = "");
-  void scanParameter(int iPar, int nbSteps_ = -1, const std::string& saveDir_ = "");
 
   void fit();
   void updateChi2Cache();
@@ -79,25 +77,15 @@ private:
 
   // Internals
   TDirectory* _saveDir_{nullptr};
-  TRandom3 _prng_;
   Propagator _propagator_{};
   ParScanner _parScanner_{};
-  Minimizer _minimizer_{};
+  MinimizerInterface _minimizer_{};
 
   // Buffers
   double _chi2Buffer_{0};
   double _chi2StatBuffer_{0};
   double _chi2PullsBuffer_{0};
   double _chi2RegBuffer_{0};
-
-  struct ScanData{
-    std::string folder{};
-    std::string title{};
-    std::string yTitle{};
-    std::vector<double> yPoints{};
-    std::function<double()> evalY{};
-  };
-  std::vector<ScanData> scanDataDict;
 
 };
 

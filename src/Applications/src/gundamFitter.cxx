@@ -221,7 +221,9 @@ int main(int argc, char** argv){
 
   // LLH Visual Scan
   if( clParser.isOptionTriggered("generateOneSigmaPlots") or JsonUtils::fetchValue(jsonConfig, "generateOneSigmaPlots", false) ) fitter.generateOneSigmaPlots("preFit");
-  if( clParser.isOptionTriggered("scanParameters") or JsonUtils::fetchValue(jsonConfig, "scanParameters", false) ) fitter.scanParameters(nbScanSteps, "preFit/scan");
+  if( clParser.isOptionTriggered("scanParameters") or JsonUtils::fetchValue(jsonConfig, "scanParameters", false) ) {
+    fitter.getParScanner().scanFitParameters("preFit/scan");
+  }
 
   // Plot generators
   if( JsonUtils::fetchValue(jsonConfig, "generateSamplePlots", true) ){
