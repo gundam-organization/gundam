@@ -5,7 +5,7 @@
 #ifndef GUNDAM_PARSCANNER_H
 #define GUNDAM_PARSCANNER_H
 
-#include "ConfigBasedClass.h"
+#include "JsonBaseClass.h"
 #include "FitParameter.h"
 
 #include "TDirectory.h"
@@ -15,23 +15,30 @@
 
 class FitterEngine;
 
-class ParScanner : public ConfigBasedClass {
+class ParScanner : public JsonBaseClass {
 
 public:
   ParScanner() = default;
   explicit ParScanner(const nlohmann::json& config_){ this->readConfig(config_); }
 
+  // Setters
   void setOwner(FitterEngine *owner);
   void setSaveDir(TDirectory *saveDir);
   void setNbPoints(int nbPoints);
 
+  // Getters
   const nlohmann::json &getVarsConfig() const { return _varsConfig_; };
   int getNbPoints() const;
   const std::pair<double, double> &getParameterSigmaRange() const;
   bool isUseParameterLimits() const;
 
-  void scanFitParameters(const std::string& saveSubdir_ = "");
-  void scanParameter(FitParameter& par_, const std::string& saveSubdir_ = "");
+  // Core
+  void scanMinimizerParameters(const std::string& saveSubdir_ = "");
+  void scanFitParameters(std::vector<FitParameter>& par_, const std::string& saveSubdir_ = "");
+  void scanFitParameter(FitParameter& par_, const std::string& saveSubdir_ = "");
+  void generateOneSigmaPlots(const std::string& savePath_ = "");
+  void varyEvenRates(const std::vector<double>& paramVariationList_, const std::string& savePath_ = "");
+
 
 protected:
   void readConfigImpl() override;

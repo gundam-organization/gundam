@@ -7,7 +7,7 @@
 
 
 #include "FitParameterSet.h"
-#include "ConfigBasedClass.h"
+#include "JsonBaseClass.h"
 
 #include "GenericToolbox.VariablesMonitor.h"
 #include "GenericToolbox.CycleTimer.h"
@@ -23,7 +23,7 @@
 
 class FitterEngine;
 
-class MinimizerInterface : public ConfigBasedClass {
+class MinimizerInterface : public JsonBaseClass {
 
 public:
   MinimizerInterface() = default;
@@ -34,6 +34,9 @@ public:
   void setEnablePostFitErrorEval(bool enablePostFitErrorEval_);
 
   bool isFitHasConverged() const;
+
+  bool isEnablePostFitErrorEval() const;
+
   GenericToolbox::VariablesMonitor &getConvergenceMonitor();
   std::vector<FitParameter *> &getMinimizerFitParameterPtr();
   const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const;
@@ -42,8 +45,8 @@ public:
   void calcErrors();
 
 protected:
-  void readConfigImpl();
-  void initializeImpl();
+  void readConfigImpl() override;
+  void initializeImpl() override;
 
   double evalFit(const double* parArray_);
   void writePostFitData(TDirectory* saveDir_);

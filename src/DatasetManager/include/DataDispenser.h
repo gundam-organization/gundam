@@ -9,7 +9,7 @@
 #include "FitSampleSet.h"
 #include "FitParameterSet.h"
 #include "PlotGenerator.h"
-#include "ConfigBasedClass.h"
+#include "JsonBaseClass.h"
 
 #include "TChain.h"
 
@@ -72,7 +72,7 @@ struct DataDispenserCache{
 
 };
 
-class DataDispenser : public ConfigBasedClass {
+class DataDispenser : public JsonBaseClass {
 
 public:
   DataDispenser() = default;

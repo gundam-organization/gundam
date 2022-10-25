@@ -9,7 +9,7 @@
 #include "FitParameterSet.h"
 #include "Likelihoods.hh"
 #include "JointProbability.h"
-#include "ConfigBasedClass.h"
+#include "JsonBaseClass.h"
 
 #include "GenericToolbox.h"
 #include "nlohmann/json.hpp"
@@ -18,7 +18,7 @@
 #include "vector"
 
 
-class FitSampleSet : public ConfigBasedClass {
+class FitSampleSet : public JsonBaseClass {
 
 public:
   // Post init

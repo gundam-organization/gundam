@@ -55,7 +55,8 @@ bool ParScanner::isUseParameterLimits() const {
   return _useParameterLimits_;
 }
 
-void ParScanner::scanFitParameters(const std::string& saveSubdir_){
+void ParScanner::scanMinimizerParameters(const std::string& saveSubdir_){
+  LogThrowIf(not isInitialized());
   LogInfo << "Performing scans of fit parameters..." << std::endl;
   for( int iPar = 0 ; iPar < _owner_->getMinimizer().getMinimizer()->NDim() ; iPar++ ){
     if( _owner_->getMinimizer().getMinimizer()->IsFixedVariable(iPar) ){
@@ -63,15 +64,19 @@ void ParScanner::scanFitParameters(const std::string& saveSubdir_){
       << " is fixed. Skipping..." << std::endl;
       continue;
     }
-    this->scanParameter(*_owner_->getMinimizer().getMinimizerFitParameterPtr()[iPar], saveSubdir_);
-    _owner_->getMinimizer().getMinimizerFitParameterPtr();
+    this->scanFitParameter(*_owner_->getMinimizer().getMinimizerFitParameterPtr()[iPar], saveSubdir_);
   } // iPar
 }
-void ParScanner::scanParameter(FitParameter& par_, const std::string &saveDir_) {
+void ParScanner::scanFitParameters(std::vector<FitParameter>& parList_, const std::string& saveSubdir_){
+  LogThrowIf(not isInitialized());
+  for( auto& par : parList_ ){ this->scanFitParameter(par, saveSubdir_); }
+}
+void ParScanner::scanFitParameter(FitParameter& par_, const std::string &saveSubdir_) {
+  LogThrowIf(not isInitialized());
   std::vector<double> parPoints(_nbPoints_+1,0);
 
   std::stringstream ssPbar;
-  ssPbar << LogInfo.getPrefixString() << "Scanning fit parameter: " << par_.getFullTitle() << " / " << _nbPoints_ << " steps...";
+  ssPbar << LogInfo.getPrefixString() << "Scanning: " << par_.getFullTitle() << " / " << _nbPoints_ << " steps...";
   GenericToolbox::displayProgressBar(0, _nbPoints_, ssPbar.str());
 
   scanDataDict.clear();
@@ -188,8 +193,8 @@ void ParScanner::scanParameter(FitParameter& par_, const std::string &saveDir_) 
     for( auto& scanEntry : scanDataDict ){ scanEntry.yPoints[iPt] = scanEntry.evalY(); }
   }
 
-
   par_.setParameterValue(origVal);
+  _owner_->updateChi2Cache();
 
   std::stringstream ss;
   ss << GenericToolbox::replaceSubstringInString(par_.getFullTitle(), "/", "_");
@@ -203,10 +208,208 @@ void ParScanner::scanParameter(FitParameter& par_, const std::string &saveDir_) 
     scanGraph.SetDrawOption("AP");
     scanGraph.SetMarkerStyle(kFullDotLarge);
     if( _saveDir_ != nullptr ){
-      GenericToolbox::mkdirTFile(_saveDir_, saveDir_ + "/" + scanEntry.folder )->cd();
+      GenericToolbox::mkdirTFile(_saveDir_, saveSubdir_ + "/" + scanEntry.folder )->cd();
       scanGraph.Write( ss.str().c_str() );
     }
   }
 }
+void ParScanner::generateOneSigmaPlots(const std::string& savePath_){
+
+  _owner_->getPropagator().propagateParametersOnSamples();
+  _owner_->getPropagator().getPlotGenerator().generateSamplePlots();
+
+  GenericToolbox::mkdirTFile(_saveDir_, savePath_)->cd();
+  auto refHistList = _owner_->getPropagator().getPlotGenerator().getHistHolderList(); // current buffer
+
+
+  auto makeOneSigmaPlotFct = [&](FitParameter& par_, const std::string& parSavePath_){
+    double currentParValue = par_.getParameterValue();
+    par_.setParameterValue( currentParValue + par_.getStdDevValue() );
+    LogInfo << "Processing " << parSavePath_ << " -> " << par_.getParameterValue() << std::endl;
+
+    _owner_->getPropagator().propagateParametersOnSamples();
+
+    auto* saveDir = GenericToolbox::mkdirTFile(_saveDir_, parSavePath_ );
+    saveDir->cd();
+
+    _owner_->getPropagator().getPlotGenerator().generateSampleHistograms(nullptr, 1);
+
+    auto oneSigmaHistList = _owner_->getPropagator().getPlotGenerator().getHistHolderList(1);
+    _owner_->getPropagator().getPlotGenerator().generateComparisonPlots( oneSigmaHistList, refHistList, saveDir );
+    par_.setParameterValue( currentParValue );
+    _owner_->getPropagator().propagateParametersOnSamples();
+
+    const auto& compHistList = _owner_->getPropagator().getPlotGenerator().getComparisonHistHolderList();
+
+//      // Since those were not saved, delete manually
+//      // Don't delete? -> slower each time
+////      for( auto& hist : oneSigmaHistList ){ delete hist.histPtr; }
+//      oneSigmaHistList.clear();
+  };
+
+  // +1 sigma
+  for( auto& parSet : _owner_->getPropagator().getParameterSetsList() ){
+
+    if( not parSet.isEnabled() ) continue;
+
+    if( JsonUtils::fetchValue(parSet.getConfig(), "disableOneSigmaPlots", false) ){
+      LogInfo << "+1σ plots disabled for \"" << parSet.getName() << "\"" << std::endl;
+      continue;
+    }
+
+    if( parSet.isUseEigenDecompInFit() ){
+      for( auto& eigenPar : parSet.getEigenParameterList() ){
+        if( not eigenPar.isEnabled() ) continue;
+        std::string tag;
+        if( eigenPar.isFixed() ){ tag += "_FIXED"; }
+        std::string savePath = savePath_;
+        if( not savePath.empty() ) savePath += "/";
+        savePath += "oneSigma/eigen/" + parSet.getName() + "/" + eigenPar.getTitle() + tag;
+        makeOneSigmaPlotFct(eigenPar, savePath);
+      }
+    }
+    else{
+      for( auto& par : parSet.getParameterList() ){
+        if( not par.isEnabled() ) continue;
+        std::string tag;
+        if( par.isFixed() ){ tag += "_FIXED"; }
+        std::string savePath = savePath_;
+        if( not savePath.empty() ) savePath += "/";
+        savePath += "oneSigma/original/" + parSet.getName() + "/" + par.getTitle() + tag;
+        makeOneSigmaPlotFct(par, savePath);
+      }
+    }
+
+  }
+
+  _saveDir_->cd();
+
+  // Since those were not saved, delete manually
+//  for( auto& refHist : refHistList ){ delete refHist.histPtr; }
+  refHistList.clear();
+
+}
+void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, const std::string& savePath_){
+  GenericToolbox::mkdirTFile(_saveDir_, savePath_)->cd();
+
+  auto makeVariedEventRatesFct = [&](FitParameter& par_, std::vector<double> variationList_, const std::string& parSavePath_){
+
+    LogInfo << "Making varied event rates for " << parSavePath_ << std::endl;
+
+    // First make sure all params are at their prior <- is it necessary?
+    for( auto& parSet : _owner_->getPropagator().getParameterSetsList() ){
+      if( not parSet.isEnabled() ) continue;
+      for( auto& par : parSet.getParameterList() ){
+        par.setParameterValue(par.getPriorValue());
+      }
+    }
+    _owner_->getPropagator().propagateParametersOnSamples();
+
+    auto* saveDir = GenericToolbox::mkdirTFile(_saveDir_, parSavePath_ );
+    saveDir->cd();
+
+    std::vector<std::vector<double>> buffEvtRatesMap; //[iVar][iSample]
+    /*std::vector<double> variationList;
+    if (par_.isFree()){
+      // Preliminary implementation
+      if(par_.getMinValue() == par_.getMinValue()) variationList.push_back(par_.getMinValue());
+      variationList.push_back(par_.getPriorValue());
+      if(par_.getMaxValue() == par_.getMaxValue()) variationList.push_back(par_.getMaxValue());
+    }
+    else{
+      variationList = variationList_;
+    }*/
+
+    for ( size_t iVar = 0 ; iVar < variationList_.size() ; iVar++ ){
+
+      buffEvtRatesMap.emplace_back();
+
+      if(par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue() > par_.getMaxValue())
+        par_.setParameterValue(par_.getMaxValue());
+      else if (par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue() < par_.getMinValue())
+        par_.setParameterValue(par_.getMinValue());
+      else
+        par_.setParameterValue(par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue());
+
+      _owner_->getPropagator().propagateParametersOnSamples();
+
+      for(auto & sample : _owner_->getPropagator().getFitSampleSet().getFitSampleList()){
+        buffEvtRatesMap[iVar].push_back(sample.getMcContainer().getSumWeights() );
+      }
+      par_.setParameterValue(par_.getPriorValue());
+    }
+
+
+    // Write in the output
+
+    auto* variationList_TVectorD = new TVectorD(int(variationList_.size()));
+
+    for ( int iVar = 0 ; iVar < variationList_TVectorD->GetNrows() ; iVar++ ){
+      /*if (par_.isFree()) (*variationList_TVectorD)(iVar) = variationList_[iVar];
+      else
+      */
+      (*variationList_TVectorD)(iVar) = par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue();
+    }
+    GenericToolbox::writeInTFile(saveDir,
+                                 variationList_TVectorD,
+                                 "paramValues");
+
+    TVectorD* buffVariedEvtRates_TVectorD{nullptr};
+
+    for( size_t iSample = 0 ; iSample < _owner_->getPropagator().getFitSampleSet().getFitSampleList().size() ; iSample++ ){
+
+      buffVariedEvtRates_TVectorD = new TVectorD(int(variationList_.size()));
+
+      for ( int iVar = 0 ; iVar < buffVariedEvtRates_TVectorD->GetNrows() ; iVar++ ){
+        (*buffVariedEvtRates_TVectorD)(iVar) = buffEvtRatesMap[iVar][iSample];
+      }
+
+      GenericToolbox::writeInTFile(saveDir,
+                                   buffVariedEvtRates_TVectorD,
+                                   _owner_->getPropagator().getFitSampleSet().getFitSampleList()[iSample].getName());
+
+    }
+
+
+  };
+
+  // vary parameters
+
+  for( auto& parSet : _owner_->getPropagator().getParameterSetsList() ){
+
+    if( not parSet.isEnabled() ) continue;
+    if( JsonUtils::fetchValue(parSet.getConfig(), "skipVariedEventRates", false) ){
+      LogInfo << "Event rate variation skipped for \"" << parSet.getName() << "\"" << std::endl;
+      continue;
+    }
+
+    if( parSet.isUseEigenDecompInFit() ){
+      // TODO ?
+      continue;
+    }
+    else{
+      for( auto& par : parSet.getParameterList() ){
+
+        if( not par.isEnabled() ) continue;
+
+        std::string tag;
+        if( par.isFixed() ){ tag += "_FIXED"; }
+        if( par.isFree() ){ tag += "_FREE"; }
+
+        std::string savePath = savePath_;
+        if( not savePath.empty() ) savePath += "/";
+        savePath += "varyEventRates/" + parSet.getName() + "/" + par.getTitle() + tag;
+
+        makeVariedEventRatesFct(par, paramVariationList_, savePath);
+
+      }
+    }
+
+  }
+
+  _saveDir_->cd();
+
+}
+
 
 

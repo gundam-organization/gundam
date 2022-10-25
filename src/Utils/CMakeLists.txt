@@ -5,7 +5,7 @@ set(SRCFILES
         src/JsonUtils.cpp
         src/YamlUtils.cpp
         src/GundamGreetings.cpp
-        src/ConfigBasedClass.cpp
+        src/JsonBaseClass.cpp
         )
 
 if( USE_STATIC_LINKS )

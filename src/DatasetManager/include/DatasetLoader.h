@@ -9,7 +9,7 @@
 #include "FitParameterSet.h"
 #include <FitSampleSet.h>
 #include "PlotGenerator.h"
-#include "ConfigBasedClass.h"
+#include "JsonBaseClass.h"
 
 #include <TChain.h>
 #include "nlohmann/json.hpp"
@@ -18,7 +18,7 @@
 #include "string"
 
 
-class DatasetLoader : public ConfigBasedClass {
+class DatasetLoader : public JsonBaseClass {
 
 public:
   DatasetLoader(const nlohmann::json& config_, int datasetIndex_);

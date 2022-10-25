@@ -8,7 +8,7 @@
 #include "DialWrapper.h"
 #include "DataBinSet.h"
 #include "GlobalVariables.h"
-#include "ConfigBasedClass.h"
+#include "JsonBaseClass.h"
 
 #include "GenericToolbox.h"
 
@@ -22,7 +22,7 @@
 
 class FitParameter;
 
-class DialSet : public ConfigBasedClass {
+class DialSet : public JsonBaseClass {
 
 public:
   static bool verboseMode;

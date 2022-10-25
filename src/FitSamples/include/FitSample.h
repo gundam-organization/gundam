@@ -8,7 +8,7 @@
 
 #include "SampleElement.h"
 #include "DataBinSet.h"
-#include "ConfigBasedClass.h"
+#include "JsonBaseClass.h"
 
 #include "nlohmann/json.hpp"
 #include <TH1D.h>
@@ -19,7 +19,7 @@
 #include "memory"
 
 
-class FitSample : public ConfigBasedClass {
+class FitSample : public JsonBaseClass {
 
 public:
   // GETTERS

@@ -8,7 +8,7 @@
 
 #include "Propagator.h"
 #include "MinimizerInterface.h"
-#include "ConfigBasedClass.h"
+#include "JsonBaseClass.h"
 #include "ParScanner.h"
 
 #include "GenericToolbox.VariablesMonitor.h"
@@ -24,11 +24,12 @@
 #include "memory"
 
 
-class FitterEngine : public ConfigBasedClass {
+class FitterEngine : public JsonBaseClass {
 
 public:
   // Setters
   void setSaveDir(TDirectory *saveDir);
+  void setEnablePreFitScan(bool enablePreFitScan);
   void setEnablePostFitScan(bool enablePostFitScan);
   void setEnablePca(bool enablePca_);
 
@@ -48,11 +49,6 @@ public:
   double* getChi2RegBufferPtr(){ return &_chi2RegBuffer_; }
 
   // Core
-  void generateOneSigmaPlots(const std::string& savePath_ = "");
-  void varyEvenRates(const std::vector<double>& paramVariationList_, const std::string& savePath_ = "");
-
-  void fixGhostFitParameters();
-
   void fit();
   void updateChi2Cache();
 
@@ -60,6 +56,7 @@ protected:
   void readConfigImpl() override;
   void initializeImpl() override;
 
+  void fixGhostFitParameters();
   void rescaleParametersStepSize();
   void checkNumericalAccuracy();
 
@@ -68,6 +65,7 @@ private:
   // Parameters
   bool _enablePca_{false};
   bool _throwMcBeforeFit_{false};
+  bool _enablePreFitScan_{false};
   bool _enablePostFitScan_{false};
   bool _scaleParStepWithChi2Response_{false};
   bool _debugPrintLoadedEvents_{false};

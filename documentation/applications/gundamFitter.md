@@ -20,6 +20,5 @@ config file was provided.
 | fit (--dry-run)                                        | bool         | Run the fit once everything is loaded                           | true    |
 | generateSamplePlots                                    | bool         | Draw sample histograms according to the PlotGenerator config    | true    |
 | generateOneSigmaPlots (--one-sigma)                    | bool         | Draw comparison plots when each parameter is pushed to +1 sigma | false   |
-| scanParameters (--scan)                                | bool         | Scan of LLH for every parameter                                 | false   |
 | allParamVariations                                     | list(double) | List of points to perform individual parameter variation        |         |
 

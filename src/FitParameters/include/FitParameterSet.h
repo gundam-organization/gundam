@@ -7,7 +7,7 @@
 
 #include "FitParameter.h"
 #include "NestedDialTest.h"
-#include "ConfigBasedClass.h"
+#include "JsonBaseClass.h"
 
 #include "Logger.h"
 
@@ -31,7 +31,7 @@
  *
  * */
 
-class FitParameterSet : public ConfigBasedClass  {
+class FitParameterSet : public JsonBaseClass  {
 
 public:
   // Setters

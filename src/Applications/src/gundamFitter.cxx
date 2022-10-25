@@ -132,6 +132,8 @@ int main(int argc, char** argv){
   bool isToyFit = clParser.isOptionTriggered("toyFit");
   int iToyFit = clParser.getOptionVal("toyFit", -1);
 
+  bool skipHesse = clParser.isOptionTriggered("skipHesse");
+
   std::string outFileName;
   if( clParser.isOptionTriggered("outputFile") ){
     outFileName = clParser.getOptionVal("outputFile", outFileName + ".root");
@@ -176,20 +178,25 @@ int main(int argc, char** argv){
   // Config unfolded ?
   auto unfoldedConfig = jsonConfig;
   JsonUtils::unfoldConfig(unfoldedConfig);
-  std::stringstream ss;
-  ss << unfoldedConfig << std::endl;
-  TNamed unfoldedConfigString("unfoldedConfig", ss.str().c_str());
+  TNamed unfoldedConfigString("unfoldedConfig", JsonUtils::toReadableString(unfoldedConfig).c_str());
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamFitter"), &unfoldedConfigString);
 
 
   LogInfo << "FitterEngine setup..." << std::endl;
 
-  // Fitter
+  // --------------------------
+  // Configure:
+  // --------------------------
   FitterEngine fitter;
   fitter.setConfig(JsonUtils::fetchSubEntry(jsonConfig, {"fitterEngineConfig"}));
   fitter.setSaveDir(GenericToolbox::mkdirTFile(out, "FitterEngine"));
   fitter.getParScanner().setNbPoints(nbScanSteps);
+
+  fitter.setEnablePreFitScan(enableParameterScan);
   fitter.setEnablePostFitScan(enableParameterScan);
+
+  if( skipHesse ) fitter.getMinimizer().setEnablePostFitErrorEval(false);
+
   fitter.setEnablePca(clParser.isOptionTriggered("enablePca"));
 
   if( isToyFit ){
@@ -198,9 +205,10 @@ int main(int argc, char** argv){
   }
   fitter.getPropagator().setLoadAsimovData( clParser.isOptionTriggered("asimov") );
 
+  // --------------------------
+  // Load:
+  // --------------------------
   fitter.initialize();
-
-  if( clParser.isOptionTriggered("skipHesse") ) fitter.getMinimizer().setEnablePostFitErrorEval(false);
 
   fitter.updateChi2Cache();
   LogInfo << "Initial χ² = " << fitter.getChi2Buffer() << std::endl;
@@ -213,17 +221,14 @@ int main(int argc, char** argv){
   // Event rates variations
   if( JsonUtils::doKeyExist(jsonConfig, "allParamVariations") )
   {
-    fitter.varyEvenRates(JsonUtils::fetchValue<std::vector<double>>(jsonConfig,
-                                                                    "allParamVariations",
-                                                                    std::vector<double>()),
-                         "preFit");
+    fitter.getParScanner().varyEvenRates(
+        JsonUtils::fetchValue<std::vector<double>>(jsonConfig, "allParamVariations"),
+        "preFit"
+        );
   }
 
   // LLH Visual Scan
-  if( clParser.isOptionTriggered("generateOneSigmaPlots") or JsonUtils::fetchValue(jsonConfig, "generateOneSigmaPlots", false) ) fitter.generateOneSigmaPlots("preFit");
-  if( clParser.isOptionTriggered("scanParameters") or JsonUtils::fetchValue(jsonConfig, "scanParameters", false) ) {
-    fitter.getParScanner().scanFitParameters("preFit/scan");
-  }
+  if( clParser.isOptionTriggered("generateOneSigmaPlots") or JsonUtils::fetchValue(jsonConfig, "generateOneSigmaPlots", false) ) fitter.getParScanner().generateOneSigmaPlots("preFit");
 
   // Plot generators
   if( JsonUtils::fetchValue(jsonConfig, "generateSamplePlots", true) ){
