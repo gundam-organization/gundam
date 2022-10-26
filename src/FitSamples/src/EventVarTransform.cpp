@@ -101,6 +101,6 @@ double EventVarTransform::evalTransformation(const PhysicsEvent& event_, std::ve
   return reinterpret_cast<double(*)(double*)>(_evalVariable_)(&inputBuffer_[0]);
 }
 void EventVarTransform::storeOutput(double output_, PhysicsEvent& storeEvent_) const{
-  storeEvent_.getVariable<double>(this->getOutputVariableName()) = output_;
+  storeEvent_.setVariable(output_, this->getOutputVariableName());
 }
 
