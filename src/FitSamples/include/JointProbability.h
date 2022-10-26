@@ -6,7 +6,7 @@
 #define GUNDAM_JOINTPROBABILITY_H
 
 #include "FitSample.h"
-#include "ConfigBasedClass.h"
+#include "JsonBaseClass.h"
 
 #include "GenericToolbox.h"
 
@@ -21,7 +21,7 @@
 
 namespace JointProbability {
 
-  class JointProbability : public ConfigBasedClass {
+  class JointProbability : public JsonBaseClass {
   public:
     // two choices -> either override bin by bin llh or global eval function
     virtual double eval(const FitSample& sample_, int bin_){ return 0; }

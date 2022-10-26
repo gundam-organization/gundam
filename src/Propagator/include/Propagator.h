@@ -11,7 +11,7 @@
 #include "EventTreeWriter.h"
 #include "FitSampleSet.h"
 #include "FitParameterSet.h"
-#include "ConfigBasedClass.h"
+#include "JsonBaseClass.h"
 
 #include "GenericToolbox.CycleTimer.h"
 
@@ -19,7 +19,7 @@
 #include <map>
 #include <future>
 
-class Propagator : public ConfigBasedClass {
+class Propagator : public JsonBaseClass {
 
 public:
   Propagator() = default;

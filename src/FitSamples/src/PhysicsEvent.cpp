@@ -400,8 +400,9 @@ double PhysicsEvent::getVarAsDouble(int varIndex_, size_t arrayIndex_) const{
   if( _varToDoubleCache_.empty() ) return _leafContentList_[varIndex_][arrayIndex_].getValueAsDouble();
   else{
     // if using double cache:
-    if( _varToDoubleCache_[varIndex_][arrayIndex_] == _varToDoubleCache_[varIndex_][arrayIndex_] ) return _varToDoubleCache_[varIndex_][arrayIndex_];
-    else _varToDoubleCache_[varIndex_][arrayIndex_] = _leafContentList_[varIndex_][arrayIndex_].getValueAsDouble();
+    if( std::isnan(_varToDoubleCache_[varIndex_][arrayIndex_]) ){
+      return _varToDoubleCache_[varIndex_][arrayIndex_] = _leafContentList_[varIndex_][arrayIndex_].getValueAsDouble();
+    }
     return _varToDoubleCache_[varIndex_][arrayIndex_];
   }
 }

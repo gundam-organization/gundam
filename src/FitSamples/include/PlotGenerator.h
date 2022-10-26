@@ -7,7 +7,7 @@
 
 #include "FitSampleSet.h"
 #include "PhysicsEvent.h"
-#include "ConfigBasedClass.h"
+#include "JsonBaseClass.h"
 
 #include "GenericToolbox.Wrappers.h"
 
@@ -75,7 +75,7 @@ struct CanvasHolder{
 
 
 
-class PlotGenerator : public ConfigBasedClass {
+class PlotGenerator : public JsonBaseClass {
 
 public:
   // Setters

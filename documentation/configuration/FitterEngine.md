@@ -9,8 +9,10 @@
 | FitterEngine Options                                     | Type   | Description                                                                   | Default |
 |----------------------------------------------------------|--------|-------------------------------------------------------------------------------|---------|
 | [propagatorConfig](./Propagator.md)                      | json   | Propagator config                                                             |         |
-| [minimizerConfig](./Minimizer.md)                        | json   | Minimizer config                                                              |         |
-| [scanConfig](./ScanConfig.md)                            | json   | Scan config                                                                   |         |
+| [minimizerConfig](./MinimizerInterface.md)               | json   | MinimizerInterface config                                                     |         |
+| [scanConfig](./ParScanner.md)                            | json   | Scan config                                                                   |         |
+| enablePreFitScan                                         | bool   | Run fit parameter scan right before the minimization                          | false   |
+| enablePostFitScan                                        | bool   | Run fit parameter scan right after the minimization                           | false   |
 | enablePca / fixGhostFitParameters                        | bool   | Fix parameter if the effect on stat LHH is lower than `pcaDeltaChi2Threshold` | false   |
 | pcaDeltaChi2Threshold / ghostParameterDeltaChi2Threshold | double | LLH threshold for PCA                                                         | 1E-6    |
 | fixGhostEigenParmetersAfterFirstRejected                 | bool   | Fix all next parameters once PCA has been triggered (dev)                     | false   |

@@ -16,6 +16,7 @@ namespace JsonUtils {
 
   nlohmann::json readConfigJsonStr(const std::string& configJsonStr_);
   nlohmann::json readConfigFile(const std::string& configFilePath_);
+  nlohmann::json getForwardedConfig(const nlohmann::json& config_);
   nlohmann::json getForwardedConfig(const nlohmann::json& config_, const std::string& keyName_);
   void forwardConfig(nlohmann::json& config_, const std::string& className_ = "");
   void unfoldConfig(nlohmann::json& config_);

@@ -49,8 +49,9 @@ const std::vector<std::string>& EventVarTransform::fetchRequestedVars() const {
 }
 
 double EventVarTransform::eval(const PhysicsEvent& event_){
-  if( _useCache_ ){ return ( _outputCache_ = this->evalTransformation(event_, _inputBuffer_) ); }
-  return this->evalTransformation(event_);
+  if( not _useCache_ ){ return this->evalTransformation(event_); }
+  _outputCache_ = this->evalTransformation(event_, _inputBuffer_);
+  return _outputCache_;
 }
 void EventVarTransform::storeCachedOutput(PhysicsEvent& event_){
   this->storeOutput(_outputCache_, event_);
@@ -100,6 +101,6 @@ double EventVarTransform::evalTransformation(const PhysicsEvent& event_, std::ve
   return reinterpret_cast<double(*)(double*)>(_evalVariable_)(&inputBuffer_[0]);
 }
 void EventVarTransform::storeOutput(double output_, PhysicsEvent& storeEvent_) const{
-  storeEvent_.getVariable<double>(this->getOutputVariableName()) = output_;
+  storeEvent_.setVariable(output_, this->getOutputVariableName());
 }
 

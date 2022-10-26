@@ -795,8 +795,8 @@ void DataDispenser::readAndFill(){
           eventBuffer.copyData(copyDict);
 
           // Propagate transformations for indexing
-          for( auto* varTransformForIndexing : varTransformForIndexingList ){
-            varTransformForIndexing->evalAndStore(eventBuffer);
+          for( auto* varTransformPtr : varTransformForIndexingList ){
+            varTransformPtr->evalAndStore(eventBuffer);
           }
 
           // Has valid bin?
@@ -831,9 +831,11 @@ void DataDispenser::readAndFill(){
           eventPtr->copyData(copyStoreDict); // buffer has the right size already
 
           // Propagate transformation for storage -> use the previous results calculated for indexing
-          for( auto* varTransformForStorage : varTransformForStorageList ){
-            varTransformForStorage->storeCachedOutput(*eventPtr);
+          for( auto* varTransformPtr : varTransformForStorageList ){
+            varTransformPtr->storeCachedOutput(*eventPtr);
           }
+
+
 
           eventPtr->setEntryIndex(iEntry);
           eventPtr->setSampleBinIndex(eventBuffer.getSampleBinIndex());

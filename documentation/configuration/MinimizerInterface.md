@@ -1,4 +1,4 @@
-## Minimizer
+## MinimizerInterface
 
 [< back to parent (FitterEngine)](./FitterEngine.md)
 

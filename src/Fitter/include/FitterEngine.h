@@ -7,8 +7,8 @@
 
 
 #include "Propagator.h"
-#include "Minimizer.h"
-#include "ConfigBasedClass.h"
+#include "MinimizerInterface.h"
+#include "JsonBaseClass.h"
 #include "ParScanner.h"
 
 #include "GenericToolbox.VariablesMonitor.h"
@@ -24,11 +24,12 @@
 #include "memory"
 
 
-class FitterEngine : public ConfigBasedClass {
+class FitterEngine : public JsonBaseClass {
 
 public:
   // Setters
   void setSaveDir(TDirectory *saveDir);
+  void setEnablePreFitScan(bool enablePreFitScan);
   void setEnablePostFitScan(bool enablePostFitScan);
   void setEnablePca(bool enablePca_);
 
@@ -39,7 +40,7 @@ public:
   const Propagator& getPropagator() const;
   Propagator& getPropagator();
   ParScanner& getParScanner(){ return _parScanner_; }
-  Minimizer& getMinimizer(){ return _minimizer_; }
+  MinimizerInterface& getMinimizer(){ return _minimizer_; }
   TDirectory* getSaveDir(){ return _saveDir_; }
 
   double* getChi2BufferPtr(){ return &_chi2Buffer_; }
@@ -48,13 +49,6 @@ public:
   double* getChi2RegBufferPtr(){ return &_chi2RegBuffer_; }
 
   // Core
-  void generateOneSigmaPlots(const std::string& savePath_ = "");
-  void varyEvenRates(const std::vector<double>& paramVariationList_, const std::string& savePath_ = "");
-
-  void fixGhostFitParameters();
-  void scanParameters(int nbSteps_ = -1, const std::string& saveDir_ = "");
-  void scanParameter(int iPar, int nbSteps_ = -1, const std::string& saveDir_ = "");
-
   void fit();
   void updateChi2Cache();
 
@@ -62,6 +56,7 @@ protected:
   void readConfigImpl() override;
   void initializeImpl() override;
 
+  void fixGhostFitParameters();
   void rescaleParametersStepSize();
   void checkNumericalAccuracy();
 
@@ -70,6 +65,7 @@ private:
   // Parameters
   bool _enablePca_{false};
   bool _throwMcBeforeFit_{false};
+  bool _enablePreFitScan_{false};
   bool _enablePostFitScan_{false};
   bool _scaleParStepWithChi2Response_{false};
   bool _debugPrintLoadedEvents_{false};
@@ -79,25 +75,15 @@ private:
 
   // Internals
   TDirectory* _saveDir_{nullptr};
-  TRandom3 _prng_;
   Propagator _propagator_{};
   ParScanner _parScanner_{};
-  Minimizer _minimizer_{};
+  MinimizerInterface _minimizer_{};
 
   // Buffers
   double _chi2Buffer_{0};
   double _chi2StatBuffer_{0};
   double _chi2PullsBuffer_{0};
   double _chi2RegBuffer_{0};
-
-  struct ScanData{
-    std::string folder{};
-    std::string title{};
-    std::string yTitle{};
-    std::vector<double> yPoints{};
-    std::function<double()> evalY{};
-  };
-  std::vector<ScanData> scanDataDict;
 
 };
 

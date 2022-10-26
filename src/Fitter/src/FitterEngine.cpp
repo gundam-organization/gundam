@@ -31,6 +31,9 @@ void FitterEngine::readConfigImpl(){
 
   _enablePca_ = JsonUtils::fetchValue(_config_, std::vector<std::string>{"enablePca", "fixGhostFitParameters"}, _enablePca_);
 
+  _enablePreFitScan_ = JsonUtils::fetchValue(_config_, "enablePreFitScan", _enablePreFitScan_);
+  _enablePostFitScan_ = JsonUtils::fetchValue(_config_, "enablePostFitScan", _enablePostFitScan_);
+
   _scaleParStepWithChi2Response_ = JsonUtils::fetchValue(_config_, "scaleParStepWithChi2Response", _scaleParStepWithChi2Response_);
   _parStepGain_ = JsonUtils::fetchValue(_config_, "parStepGain", _parStepGain_);
 
@@ -43,10 +46,13 @@ void FitterEngine::readConfigImpl(){
   _propagator_.setSaveDir(GenericToolbox::mkdirTFile(_saveDir_, "Propagator"));
   _propagator_.readConfig( JsonUtils::fetchValue<nlohmann::json>(_config_, "propagatorConfig") );
 
+  _parScanner_.setSaveDir(_saveDir_);
+  _parScanner_.setOwner(this);
   _parScanner_.readConfig(JsonUtils::fetchValue(_config_, "scanConfig", nlohmann::json()) );
 
   _minimizer_.readConfig(JsonUtils::fetchValue(_config_, "minimizerConfig", nlohmann::json()));
   _minimizer_.setOwner(this);
+  _minimizer_.setSaveDir(_saveDir_);
 
   _minimizer_.getConvergenceMonitor().setMaxRefreshRateInMs(JsonUtils::fetchValue(_config_, "monitorRefreshRateInMs", _minimizer_.getConvergenceMonitor().getMaxRefreshRateInMs()));
   LogInfo << "Convergence monitor will be refreshed every " << _minimizer_.getConvergenceMonitor().getMaxRefreshRateInMs() << "ms." << std::endl;
@@ -63,7 +69,7 @@ void FitterEngine::initializeImpl(){
     this->rescaleParametersStepSize();
   }
 
-  if( _enablePca_ ) this->fixGhostFitParameters();
+  if( _enablePca_ ) { this->fixGhostFitParameters(); }
 
   this->updateChi2Cache();
 
@@ -135,15 +141,17 @@ void FitterEngine::initializeImpl(){
     _propagator_.propagateParametersOnSamples();
   } // throwMcBeforeFit
 
-  _minimizer_.setSaveDir(_saveDir_);
   _minimizer_.initialize();
-
   _parScanner_.initialize();
+
 //  checkNumericalAccuracy();
 }
 
 void FitterEngine::setSaveDir(TDirectory *saveDir) {
   _saveDir_ = saveDir;
+}
+void FitterEngine::setEnablePreFitScan(bool enablePreFitScan) {
+  _enablePreFitScan_ = enablePreFitScan;
 }
 void FitterEngine::setEnablePostFitScan(bool enablePostFitScan) {
   _enablePostFitScan_ = enablePostFitScan;
@@ -168,203 +176,51 @@ Propagator& FitterEngine::getPropagator() {
   return _propagator_;
 }
 
-void FitterEngine::generateOneSigmaPlots(const std::string& savePath_){
+void FitterEngine::fit(){
+  LogThrowIf(not isInitialized());
+  LogWarning << __METHOD_NAME__ << std::endl;
 
-  _propagator_.propagateParametersOnSamples();
-  _propagator_.getPlotGenerator().generateSamplePlots();
-
-  GenericToolbox::mkdirTFile(_saveDir_, savePath_)->cd();
-  auto refHistList = _propagator_.getPlotGenerator().getHistHolderList(); // current buffer
-
-
-  auto makeOneSigmaPlotFct = [&](FitParameter& par_, const std::string& parSavePath_){
-    double currentParValue = par_.getParameterValue();
-    par_.setParameterValue( currentParValue + par_.getStdDevValue() );
-    LogInfo << "Processing " << parSavePath_ << " -> " << par_.getParameterValue() << std::endl;
-
-    _propagator_.propagateParametersOnSamples();
-
-    auto* saveDir = GenericToolbox::mkdirTFile(_saveDir_, parSavePath_ );
-    saveDir->cd();
-
-    _propagator_.getPlotGenerator().generateSampleHistograms(nullptr, 1);
-
-    auto oneSigmaHistList = _propagator_.getPlotGenerator().getHistHolderList(1);
-    _propagator_.getPlotGenerator().generateComparisonPlots( oneSigmaHistList, refHistList, saveDir );
-    par_.setParameterValue( currentParValue );
-    _propagator_.propagateParametersOnSamples();
-
-    const auto& compHistList = _propagator_.getPlotGenerator().getComparisonHistHolderList();
-
-//      // Since those were not saved, delete manually
-//      // Don't delete? -> slower each time
-////      for( auto& hist : oneSigmaHistList ){ delete hist.histPtr; }
-//      oneSigmaHistList.clear();
-  };
-
-  // +1 sigma
-  for( auto& parSet : _propagator_.getParameterSetsList() ){
-
-    if( not parSet.isEnabled() ) continue;
-
-    if( JsonUtils::fetchValue(parSet.getConfig(), "disableOneSigmaPlots", false) ){
-      LogInfo << "+1σ plots disabled for \"" << parSet.getName() << "\"" << std::endl;
-      continue;
-    }
-
-    if( parSet.isUseEigenDecompInFit() ){
-      for( auto& eigenPar : parSet.getEigenParameterList() ){
-        if( not eigenPar.isEnabled() ) continue;
-        std::string tag;
-        if( eigenPar.isFixed() ){ tag += "_FIXED"; }
-        std::string savePath = savePath_;
-        if( not savePath.empty() ) savePath += "/";
-        savePath += "oneSigma/eigen/" + parSet.getName() + "/" + eigenPar.getTitle() + tag;
-        makeOneSigmaPlotFct(eigenPar, savePath);
-      }
-    }
-    else{
-      for( auto& par : parSet.getParameterList() ){
-        if( not par.isEnabled() ) continue;
-        std::string tag;
-        if( par.isFixed() ){ tag += "_FIXED"; }
-        std::string savePath = savePath_;
-        if( not savePath.empty() ) savePath += "/";
-        savePath += "oneSigma/original/" + parSet.getName() + "/" + par.getTitle() + tag;
-        makeOneSigmaPlotFct(par, savePath);
-      }
-    }
-
+  if( _enablePreFitScan_ ){
+    LogInfo << "Scanning fit parameters before minimizing..." << std::endl;
+    _parScanner_.scanMinimizerParameters("preFit/scan");
   }
 
-  _saveDir_->cd();
+  _minimizer_.minimize();
 
-  // Since those were not saved, delete manually
-//  for( auto& refHist : refHistList ){ delete refHist.histPtr; }
-  refHistList.clear();
+  if( _enablePostFitScan_ ){
+    LogInfo << "Scanning fit parameters around the minimum point..." << std::endl;
+    _parScanner_.scanMinimizerParameters("postFit/scan");
+  }
 
+  if( _minimizer_.isFitHasConverged() and _minimizer_.isEnablePostFitErrorEval() ){
+    _minimizer_.calcErrors();
+  }
+
+  LogWarning << "Fit is done." << std::endl;
 }
+void FitterEngine::updateChi2Cache(){
+  double buffer;
 
-void FitterEngine::varyEvenRates(const std::vector<double>& paramVariationList_, const std::string& savePath_){
-  GenericToolbox::mkdirTFile(_saveDir_, savePath_)->cd();
+  // Propagate on histograms
+  _propagator_.propagateParametersOnSamples();
 
-  auto makeVariedEventRatesFct = [&](FitParameter& par_, std::vector<double> variationList_, const std::string& parSavePath_){
+  ////////////////////////////////
+  // Compute chi2 stat
+  ////////////////////////////////
+  _chi2StatBuffer_ = _propagator_.getFitSampleSet().evalLikelihood();
 
-    LogInfo << "Making varied event rates for " << parSavePath_ << std::endl;
-
-    // First make sure all params are at their prior <- is it necessary?
-    for( auto& parSet : _propagator_.getParameterSetsList() ){
-      if( not parSet.isEnabled() ) continue;
-      for( auto& par : parSet.getParameterList() ){
-        par.setParameterValue(par.getPriorValue());
-      }
-    }
-    _propagator_.propagateParametersOnSamples();
-
-    auto* saveDir = GenericToolbox::mkdirTFile(_saveDir_, parSavePath_ );
-    saveDir->cd();
-
-    std::vector<std::vector<double>> buffEvtRatesMap; //[iVar][iSample]
-    /*std::vector<double> variationList;
-    if (par_.isFree()){ 
-      // Preliminary implementation
-      if(par_.getMinValue() == par_.getMinValue()) variationList.push_back(par_.getMinValue());
-      variationList.push_back(par_.getPriorValue());
-      if(par_.getMaxValue() == par_.getMaxValue()) variationList.push_back(par_.getMaxValue());
-    }
-    else{
-      variationList = variationList_;
-    }*/
-
-    for ( size_t iVar = 0 ; iVar < variationList_.size() ; iVar++ ){
-
-      buffEvtRatesMap.emplace_back();
-
-      if(par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue() > par_.getMaxValue()) 
-        par_.setParameterValue(par_.getMaxValue());
-      else if (par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue() < par_.getMinValue())
-        par_.setParameterValue(par_.getMinValue());
-      else
-        par_.setParameterValue(par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue());
-
-      _propagator_.propagateParametersOnSamples();
-
-      for(auto & sample : _propagator_.getFitSampleSet().getFitSampleList()){
-        buffEvtRatesMap[iVar].push_back(sample.getMcContainer().getSumWeights() );
-      }
-      par_.setParameterValue(par_.getPriorValue());
-    }
-
-
-    // Write in the output
-
-    auto* variationList_TVectorD = new TVectorD(int(variationList_.size()));
-
-    for ( int iVar = 0 ; iVar < variationList_TVectorD->GetNrows() ; iVar++ ){
-      /*if (par_.isFree()) (*variationList_TVectorD)(iVar) = variationList_[iVar];
-      else 
-      */
-      (*variationList_TVectorD)(iVar) = par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue();
-    }
-    GenericToolbox::writeInTFile(saveDir,
-                                 variationList_TVectorD,
-                                 "paramValues");
-
-    TVectorD* buffVariedEvtRates_TVectorD{nullptr};
-
-    for( size_t iSample = 0 ; iSample < _propagator_.getFitSampleSet().getFitSampleList().size() ; iSample++ ){
-
-      buffVariedEvtRates_TVectorD = new TVectorD(int(variationList_.size()));
-
-      for ( int iVar = 0 ; iVar < buffVariedEvtRates_TVectorD->GetNrows() ; iVar++ ){
-        (*buffVariedEvtRates_TVectorD)(iVar) = buffEvtRatesMap[iVar][iSample];
-      }
-
-      GenericToolbox::writeInTFile(saveDir,
-                                   buffVariedEvtRates_TVectorD,
-                                   _propagator_.getFitSampleSet().getFitSampleList()[iSample].getName());
-
-    }
-
-
-  };
-
-  // vary parameters
-
+  ////////////////////////////////
+  // Compute the penalty terms
+  ////////////////////////////////
+  _chi2PullsBuffer_ = 0;
+  _chi2RegBuffer_ = 0; // unused
   for( auto& parSet : _propagator_.getParameterSetsList() ){
-
-    if( not parSet.isEnabled() ) continue;
-    if( JsonUtils::fetchValue(parSet.getConfig(), "skipVariedEventRates", false) ){
-      LogInfo << "Event rate variation skipped for \"" << parSet.getName() << "\"" << std::endl;
-      continue;
-    }
-
-    if( parSet.isUseEigenDecompInFit() ){
-      // TODO ?
-      continue;
-    }
-    else{
-      for( auto& par : parSet.getParameterList() ){
-
-        if( not par.isEnabled() ) continue;
-
-        std::string tag;
-        if( par.isFixed() ){ tag += "_FIXED"; }
-        if( par.isFree() ){ tag += "_FREE"; }
-
-        std::string savePath = savePath_;
-        if( not savePath.empty() ) savePath += "/";
-        savePath += "varyEventRates/" + parSet.getName() + "/" + par.getTitle() + tag;
-
-        makeVariedEventRatesFct(par, paramVariationList_, savePath);
-
-      }
-    }
-
+    buffer = parSet.getPenaltyChi2();
+    _chi2PullsBuffer_ += buffer;
+    LogThrowIf(buffer!=buffer, parSet.getName() << " penalty chi2 is Nan");
   }
 
-  _saveDir_->cd();
-
+  _chi2Buffer_ = _chi2StatBuffer_ + _chi2PullsBuffer_ + _chi2RegBuffer_;
 }
 
 void FitterEngine::fixGhostFitParameters(){
@@ -458,199 +314,6 @@ void FitterEngine::fixGhostFitParameters(){
 
   updateChi2Cache(); // comeback to old values
 }
-void FitterEngine::scanParameters(int nbSteps_, const std::string &saveDir_) {
-  LogInfo << "Performing parameter scans..." << std::endl;
-  for( int iPar = 0 ; iPar < _minimizer_.getMinimizer()->NDim() ; iPar++ ){
-    if( _minimizer_.getMinimizer()->IsFixedVariable(iPar) ) continue;
-    this->scanParameter(iPar, nbSteps_, saveDir_);
-  } // iPar
-}
-void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &saveDir_) {
-  if( nbSteps_ < 0 ){ nbSteps_ = _parScanner_.getNbPoints(); }
-
-  std::vector<double> parPoints(nbSteps_+1,0);
-
-  std::stringstream ssPbar;
-  ssPbar << LogInfo.getPrefixString() << "Scanning fit parameter #" << iPar
-         << ": " << _minimizer_.getMinimizer()->VariableName(iPar) << " / " << nbSteps_ << " steps...";
-  GenericToolbox::displayProgressBar(0, nbSteps_, ssPbar.str());
-
-  scanDataDict.clear();
-  if( JsonUtils::fetchValue(_parScanner_.getVarsConfig(), "llh", true) ){
-    scanDataDict.emplace_back();
-    auto& scanEntry = scanDataDict.back();
-    scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
-    scanEntry.folder = "llh";
-    scanEntry.title = "Total Likelihood Scan";
-    scanEntry.yTitle = "LLH value";
-    scanEntry.evalY = [this](){ return this->_chi2Buffer_; };
-  }
-  if( JsonUtils::fetchValue(_parScanner_.getVarsConfig(), "llhPenalty", true) ){
-    scanDataDict.emplace_back();
-    auto& scanEntry = scanDataDict.back();
-    scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
-    scanEntry.folder = "llhPenalty";
-    scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
-    scanEntry.title = "Penalty Likelihood Scan";
-    scanEntry.yTitle = "Penalty LLH value";
-    scanEntry.evalY = [this](){ return this->_chi2PullsBuffer_; };
-  }
-  if( JsonUtils::fetchValue(_parScanner_.getVarsConfig(), "llhStat", true) ){
-    scanDataDict.emplace_back();
-    auto& scanEntry = scanDataDict.back();
-    scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
-    scanEntry.folder = "llhStat";
-    scanEntry.title = "Stat Likelihood Scan";
-    scanEntry.yTitle = "Stat LLH value";
-    scanEntry.evalY = [this](){ return this->_chi2StatBuffer_; };
-  }
-  if( JsonUtils::fetchValue(_parScanner_.getVarsConfig(), "llhStatPerSample", false) ){
-    for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
-      scanDataDict.emplace_back();
-      auto& scanEntry = scanDataDict.back();
-      scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
-      scanEntry.folder = "llhStat/" + sample.getName() + "/";
-      scanEntry.title = Form("Stat Likelihood Scan of sample \"%s\"", sample.getName().c_str());
-      scanEntry.yTitle = "Stat LLH value";
-      auto* samplePtr = &sample;
-      scanEntry.evalY = [this, samplePtr](){ return _propagator_.getFitSampleSet().evalLikelihood(*samplePtr); };
-    }
-  }
-  if( JsonUtils::fetchValue(_parScanner_.getVarsConfig(), "llhStatPerSamplePerBin", false) ){
-    for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
-      for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-        scanDataDict.emplace_back();
-        auto& scanEntry = scanDataDict.back();
-        scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
-        scanEntry.folder = "llhStat/" + sample.getName() + "/bin_" + std::to_string(iBin);
-        scanEntry.title = Form(R"(Stat LLH Scan of sample "%s", bin #%d "%s")",
-                               sample.getName().c_str(),
-                               iBin,
-                               sample.getBinning().getBinsList()[iBin-1].getSummary().c_str());
-        scanEntry.yTitle = "Stat LLH value";
-        auto* samplePtr = &sample;
-        scanEntry.evalY = [this, samplePtr, iBin](){ return _propagator_.getFitSampleSet().getJointProbabilityFct()->eval(*samplePtr, iBin); };
-      }
-    }
-  }
-  if( JsonUtils::fetchValue(_parScanner_.getVarsConfig(), "weightPerSample", false) ){
-    for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
-      scanDataDict.emplace_back();
-      auto& scanEntry = scanDataDict.back();
-      scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
-      scanEntry.folder = "weight/" + sample.getName();
-      scanEntry.title = Form("MC event weight scan of sample \"%s\"", sample.getName().c_str());
-      scanEntry.yTitle = "Total MC event weight";
-      auto* samplePtr = &sample;
-      scanEntry.evalY = [samplePtr](){ return samplePtr->getMcContainer().getSumWeights(); };
-    }
-  }
-  if( JsonUtils::fetchValue(_parScanner_.getVarsConfig(), "weightPerSamplePerBin", false) ){
-    for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
-      for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-        scanDataDict.emplace_back();
-        auto& scanEntry = scanDataDict.back();
-        scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
-        scanEntry.folder = "weight/" + sample.getName() + "/bin_" + std::to_string(iBin);
-        scanEntry.title = Form(R"(MC event weight scan of sample "%s", bin #%d "%s")",
-                               sample.getName().c_str(),
-                               iBin,
-                               sample.getBinning().getBinsList()[iBin-1].getSummary().c_str());
-        scanEntry.yTitle = "Total MC event weight";
-        auto* samplePtr = &sample;
-        scanEntry.evalY = [samplePtr, iBin](){ return samplePtr->getMcContainer().histogram->GetBinContent(iBin); };
-      }
-    }
-  }
-
-  double origVal = _minimizer_.getMinimizerFitParameterPtr()[iPar]->getParameterValue();
-  double lowBound = origVal + _parScanner_.getParameterSigmaRange().first * _minimizer_.getMinimizerFitParameterPtr()[iPar]->getStdDevValue();
-  double highBound = origVal + _parScanner_.getParameterSigmaRange().second * _minimizer_.getMinimizerFitParameterPtr()[iPar]->getStdDevValue();
-
-  if( _parScanner_.isUseParameterLimits() ){
-    lowBound = std::max(lowBound, _minimizer_.getMinimizerFitParameterPtr()[iPar]->getMinValue());
-    highBound = std::min(highBound, _minimizer_.getMinimizerFitParameterPtr()[iPar]->getMaxValue());
-  }
-
-  int offSet{0};
-  for( int iPt = 0 ; iPt < nbSteps_+1 ; iPt++ ){
-    GenericToolbox::displayProgressBar(iPt, nbSteps_, ssPbar.str());
-
-    double newVal = lowBound + double(iPt-offSet)/(nbSteps_-1)*( highBound - lowBound );
-    if( offSet == 0 and newVal > origVal ){
-      newVal = origVal;
-      offSet = 1;
-    }
-
-    _minimizer_.getMinimizerFitParameterPtr()[iPar]->setParameterValue(newVal);
-    this->updateChi2Cache();
-    parPoints[iPt] = _minimizer_.getMinimizerFitParameterPtr()[iPar]->getParameterValue();
-
-    for( auto& scanEntry : scanDataDict ){ scanEntry.yPoints[iPt] = scanEntry.evalY(); }
-  }
-
-
-  _minimizer_.getMinimizerFitParameterPtr()[iPar]->setParameterValue(origVal);
-
-  std::stringstream ss;
-  ss << GenericToolbox::replaceSubstringInString(_minimizer_.getMinimizer()->VariableName(iPar), "/", "_");
-  ss << "_TGraph";
-
-  for( auto& scanEntry : scanDataDict ){
-    TGraph scanGraph(int(parPoints.size()), &parPoints[0], &scanEntry.yPoints[0]);
-    scanGraph.SetTitle(scanEntry.title.c_str());
-    scanGraph.GetYaxis()->SetTitle(scanEntry.yTitle.c_str());
-    scanGraph.GetXaxis()->SetTitle(_minimizer_.getMinimizer()->VariableName(iPar).c_str());
-    scanGraph.SetDrawOption("AP");
-    scanGraph.SetMarkerStyle(kFullDotLarge);
-    if( _saveDir_ != nullptr ){
-      GenericToolbox::mkdirTFile(_saveDir_, saveDir_ + "/" + scanEntry.folder )->cd();
-      scanGraph.Write( ss.str().c_str() );
-    }
-  }
-}
-
-void FitterEngine::fit(){
-  LogWarning << __METHOD_NAME__ << std::endl;
-
-  _minimizer_.minimize();
-
-  if( _enablePostFitScan_ ){
-    LogInfo << "Scanning parameters around the minimum point..." << std::endl;
-    this->scanParameters(-1, "postFit/scan");
-  }
-
-  if( _minimizer_.isFitHasConverged() or true ){ _minimizer_.calcErrors(); }
-
-  _propagator_.propagateParametersOnSamples();
-}
-void FitterEngine::updateChi2Cache(){
-
-  double buffer;
-
-  // Propagate on histograms
-  _propagator_.propagateParametersOnSamples();
-
-  ////////////////////////////////
-  // Compute chi2 stat
-  ////////////////////////////////
-  _chi2StatBuffer_ = _propagator_.getFitSampleSet().evalLikelihood();
-
-  ////////////////////////////////
-  // Compute the penalty terms
-  ////////////////////////////////
-  _chi2PullsBuffer_ = 0;
-  _chi2RegBuffer_ = 0; // unused
-  for( auto& parSet : _propagator_.getParameterSetsList() ){
-    buffer = parSet.getPenaltyChi2();
-    _chi2PullsBuffer_ += buffer;
-    LogThrowIf(buffer!=buffer, parSet.getName() << " penalty chi2 is Nan");
-  }
-
-  _chi2Buffer_ = _chi2StatBuffer_ + _chi2PullsBuffer_ + _chi2RegBuffer_;
-}
-
-
 void FitterEngine::rescaleParametersStepSize(){
   LogInfo << __METHOD_NAME__ << std::endl;
 

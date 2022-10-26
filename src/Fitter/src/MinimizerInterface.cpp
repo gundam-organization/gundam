@@ -2,7 +2,7 @@
 // Created by Adrien BLANCHET on 16/12/2021.
 //
 
-#include "Minimizer.h"
+#include "MinimizerInterface.h"
 #include "FitterEngine.h"
 #include "JsonUtils.h"
 #include "GlobalVariables.h"
@@ -22,15 +22,15 @@ LoggerInit([]{
 });
 
 
-Minimizer::Minimizer(const nlohmann::json& config_, FitterEngine* owner_): _owner_(owner_){
+MinimizerInterface::MinimizerInterface(const nlohmann::json& config_, FitterEngine* owner_): _owner_(owner_){
   this->readConfig(config_);
 }
 
-void Minimizer::setOwner(FitterEngine* owner_){ _owner_ = owner_; }
-void Minimizer::setSaveDir(TDirectory* saveDir_){ _saveDir_ = saveDir_; }
-void Minimizer::setEnablePostFitErrorEval(bool enablePostFitErrorEval_){ _enablePostFitErrorEval_ = enablePostFitErrorEval_; }
+void MinimizerInterface::setOwner(FitterEngine* owner_){ _owner_ = owner_; }
+void MinimizerInterface::setSaveDir(TDirectory* saveDir_){ _saveDir_ = saveDir_; }
+void MinimizerInterface::setEnablePostFitErrorEval(bool enablePostFitErrorEval_){ _enablePostFitErrorEval_ = enablePostFitErrorEval_; }
 
-void Minimizer::readConfigImpl(){
+void MinimizerInterface::readConfigImpl(){
   LogInfo << "Reading minimizer config..." << std::endl;
 
   _minimizerType_ = JsonUtils::fetchValue(_config_, "minimizer", _minimizerType_);
@@ -51,7 +51,7 @@ void Minimizer::readConfigImpl(){
   _errorAlgo_ = JsonUtils::fetchValue(_config_, {{"errorsAlgo"}, {"errors"}}, "Hesse");
   _enablePostFitErrorEval_ = JsonUtils::fetchValue(_config_, "enablePostFitErrorFit", _enablePostFitErrorEval_);
 }
-void Minimizer::initializeImpl(){
+void MinimizerInterface::initializeImpl(){
   LogInfo << "Initializing the minimizer..." << std::endl;
   LogThrowIf( _owner_== nullptr, "FitterEngine ptr not set." );
 
@@ -76,7 +76,7 @@ void Minimizer::initializeImpl(){
   _nbFitParameters_ = int(_minimizerFitParameterPtr_.size());
 
   LogInfo << "Building functor..." << std::endl;
-  _functor_ = std::make_unique<ROOT::Math::Functor>(this, &Minimizer::evalFit, _nbFitParameters_);
+  _functor_ = std::make_unique<ROOT::Math::Functor>(this, &MinimizerInterface::evalFit, _nbFitParameters_);
 
   _minimizer_->SetFunction(*_functor_);
   _minimizer_->SetStrategy(_strategy_);
@@ -127,20 +127,23 @@ void Minimizer::initializeImpl(){
   _convergenceMonitor_.addVariable("Syst");
 }
 
-bool Minimizer::isFitHasConverged() const {
+bool MinimizerInterface::isFitHasConverged() const {
   return _fitHasConverged_;
 }
-GenericToolbox::VariablesMonitor &Minimizer::getConvergenceMonitor() {
+bool MinimizerInterface::isEnablePostFitErrorEval() const {
+  return _enablePostFitErrorEval_;
+}
+GenericToolbox::VariablesMonitor &MinimizerInterface::getConvergenceMonitor() {
   return _convergenceMonitor_;
 }
-std::vector<FitParameter *> &Minimizer::getMinimizerFitParameterPtr() {
+std::vector<FitParameter *> &MinimizerInterface::getMinimizerFitParameterPtr() {
   return _minimizerFitParameterPtr_;
 }
-const std::unique_ptr<ROOT::Math::Minimizer> &Minimizer::getMinimizer() const {
+const std::unique_ptr<ROOT::Math::Minimizer> &MinimizerInterface::getMinimizer() const {
   return _minimizer_;
 }
 
-void Minimizer::minimize() {
+void MinimizerInterface::minimize() {
   LogThrowIf(not isInitialized(), "not initialized");
 
   GenericToolbox::mkdirTFile(_saveDir_, "fit")->cd();
@@ -333,97 +336,94 @@ void Minimizer::minimize() {
   }
 
 }
-void Minimizer::calcErrors(){
+void MinimizerInterface::calcErrors(){
   LogThrowIf(not isInitialized(), "not initialized");
-  if( _enablePostFitErrorEval_ ){
-    LogInfo << "Evaluating post-fit errors..." << std::endl;
 
-    int nbFitCallOffset = _nbFitCalls_;
-    LogInfo << "Fit call offset: " << nbFitCallOffset << std::endl;
+  int nbFitCallOffset = _nbFitCalls_;
 
-    LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling HESSE...") << std::endl;
-    LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
-            << "Number of free parameters   : " << _minimizer_->NFree() << std::endl
-            << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree() << std::endl
-            << "Number of fit bins : " << _nbFitBins_ << std::endl
-            << "Chi2 # DoF : " << _nbFitBins_ - _minimizer_->NFree()
-            << std::endl;
+  LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling HESSE...") << std::endl;
+  LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
+          << "Number of free parameters   : " << _minimizer_->NFree() << std::endl
+          << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree() << std::endl
+          << "Number of fit bins : " << _nbFitBins_ << std::endl
+          << "Chi2 # DoF : " << _nbFitBins_ - _minimizer_->NFree() << std::endl
+          << "Fit call offset: " << nbFitCallOffset << std::endl;
 
-    if     ( _errorAlgo_ == "Minos" ){
-      LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling MINOS...") << std::endl;
+  if     ( _errorAlgo_ == "Minos" ){
+    LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling MINOS...") << std::endl;
 
-      double errLow, errHigh;
-      _minimizer_->SetPrintLevel(0);
+    double errLow, errHigh;
+    _minimizer_->SetPrintLevel(0);
 
-      for( int iFitPar = 0 ; iFitPar < _minimizer_->NDim() ; iFitPar++ ){
-        LogInfo << "Evaluating: " << _minimizer_->VariableName(iFitPar) << "..." << std::endl;
-
-        this->enableFitMonitor();
-        bool isOk = _minimizer_->GetMinosError(iFitPar, errLow, errHigh);
-        this->disableFitMonitor();
-
-#if ROOT_VERSION_CODE >= ROOT_VERSION(6,23,02)
-        LogWarning << minosStatusCodeStr.at(_minimizer_->MinosStatus()) << std::endl;
-#endif
-        if( isOk ){
-          LogInfo << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh << std::endl;
-        }
-        else{
-          LogError << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh
-                   << " - MINOS returned an error." << std::endl;
-        }
-      }
-
-      // Put back at minimum
-      for( int iFitPar = 0 ; iFitPar < _minimizer_->NDim() ; iFitPar++ ){
-        _minimizerFitParameterPtr_[iFitPar]->setParameterValue(_minimizer_->X()[iFitPar]);
-      }
-
-      _owner_->updateChi2Cache();
-    } // Minos
-    else if( _errorAlgo_ == "Hesse" ){
-
-      if( JsonUtils::fetchValue(_config_, "restoreStepSizeBeforeHesse", false) ){
-        LogWarning << "Restoring step size before HESSE..." << std::endl;
-        for( int iFitPar = 0 ; iFitPar < _minimizer_->NDim() ; iFitPar++ ){
-          auto& par = *_minimizerFitParameterPtr_[iFitPar];
-          if(not _useNormalizedFitSpace_){ _minimizer_->SetVariableStepSize(iFitPar, par.getStepSize()); }
-          else{ _minimizer_->SetVariableStepSize(iFitPar, FitParameterSet::toNormalizedParRange(par.getStepSize(), par)); } // should be 1
-        }
-      }
+    for( int iFitPar = 0 ; iFitPar < _minimizer_->NDim() ; iFitPar++ ){
+      LogInfo << "Evaluating: " << _minimizer_->VariableName(iFitPar) << "..." << std::endl;
 
       this->enableFitMonitor();
-      _fitHasConverged_ = _minimizer_->Hesse();
+      bool isOk = _minimizer_->GetMinosError(iFitPar, errLow, errHigh);
       this->disableFitMonitor();
 
-      LogInfo << "Hesse ended after " << _nbFitCalls_ - nbFitCallOffset << " calls." << std::endl;
-      LogWarning << "HESSE status code: " << hesseStatusCodeStr.at(_minimizer_->Status()) << std::endl;
-      LogWarning << "Covariance matrix status code: " << covMatrixStatusCodeStr.at(_minimizer_->CovMatrixStatus()) << std::endl;
-
-      if( _minimizer_->CovMatrixStatus() == 2 ){ _isBadCovMat_ = true; }
-
-      if(not _fitHasConverged_){
-        LogError  << "Hesse did not converge." << std::endl;
-        LogError << _convergenceMonitor_.generateMonitorString(); // lasting printout
+#if ROOT_VERSION_CODE >= ROOT_VERSION(6,23,02)
+      LogWarning << minosStatusCodeStr.at(_minimizer_->MinosStatus()) << std::endl;
+#endif
+      if( isOk ){
+        LogInfo << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh << std::endl;
       }
       else{
-        LogInfo << "Hesse converged." << std::endl;
-        LogInfo << _convergenceMonitor_.generateMonitorString(); // lasting printout
+        LogError << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh
+                 << " - MINOS returned an error." << std::endl;
       }
+    }
 
-      if(_saveDir_ != nullptr) {
-        LogInfo << "Writing HESSE post-fit errors" << std::endl;
-        this->writePostFitData(GenericToolbox::mkdirTFile(_saveDir_, "postFit/Hesse"));
+    // Put back at minimum
+    for( int iFitPar = 0 ; iFitPar < _minimizer_->NDim() ; iFitPar++ ){
+      _minimizerFitParameterPtr_[iFitPar]->setParameterValue(_minimizer_->X()[iFitPar]);
+    }
+
+    _owner_->updateChi2Cache();
+  } // Minos
+  else if( _errorAlgo_ == "Hesse" ){
+
+    if( JsonUtils::fetchValue(_config_, "restoreStepSizeBeforeHesse", false) ){
+      LogWarning << "Restoring step size before HESSE..." << std::endl;
+      for( int iFitPar = 0 ; iFitPar < _minimizer_->NDim() ; iFitPar++ ){
+        auto& par = *_minimizerFitParameterPtr_[iFitPar];
+        if(not _useNormalizedFitSpace_){ _minimizer_->SetVariableStepSize(iFitPar, par.getStepSize()); }
+        else{ _minimizer_->SetVariableStepSize(iFitPar, FitParameterSet::toNormalizedParRange(par.getStepSize(), par)); } // should be 1
       }
+    }
+
+    this->enableFitMonitor();
+    _fitHasConverged_ = _minimizer_->Hesse();
+    this->disableFitMonitor();
+
+    LogInfo << "Hesse ended after " << _nbFitCalls_ - nbFitCallOffset << " calls." << std::endl;
+    LogWarning << "HESSE status code: " << hesseStatusCodeStr.at(_minimizer_->Status()) << std::endl;
+    LogWarning << "Covariance matrix status code: " << covMatrixStatusCodeStr.at(_minimizer_->CovMatrixStatus()) << std::endl;
+
+    if( _minimizer_->CovMatrixStatus() == 2 ){ _isBadCovMat_ = true; }
+
+    if(not _fitHasConverged_){
+      LogError  << "Hesse did not converge." << std::endl;
+      LogError << _convergenceMonitor_.generateMonitorString(); // lasting printout
     }
     else{
-      LogError << GET_VAR_NAME_VALUE(_errorAlgo_) << " not implemented." << std::endl;
+      LogInfo << "Hesse converged." << std::endl;
+      LogInfo << _convergenceMonitor_.generateMonitorString(); // lasting printout
     }
-  }
 
+    if(_saveDir_ != nullptr) {
+      LogInfo << "Writing HESSE post-fit errors" << std::endl;
+      this->writePostFitData(GenericToolbox::mkdirTFile(_saveDir_, "postFit/Hesse"));
+    }
+
+    _owner_->updateChi2Cache();
+  }
+  else{
+    LogError << GET_VAR_NAME_VALUE(_errorAlgo_) << " not implemented." << std::endl;
+  }
 }
 
-double Minimizer::evalFit(const double* parArray_){
+double MinimizerInterface::evalFit(const double* parArray_){
   LogThrowIf(not isInitialized(), "not initialized");
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 
@@ -507,7 +507,7 @@ double Minimizer::evalFit(const double* parArray_){
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("out_evalFit");
   return _owner_->getChi2Buffer();
 }
-void Minimizer::writePostFitData(TDirectory* saveDir_) {
+void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
   LogInfo << __METHOD_NAME__ << std::endl;
   LogThrowIf(not isInitialized(), "not initialized");
   LogThrowIf(saveDir_==nullptr, "Save dir not specified");
@@ -1167,6 +1167,5 @@ void Minimizer::writePostFitData(TDirectory* saveDir_) {
   } // parSet
 
 }
-
 
 

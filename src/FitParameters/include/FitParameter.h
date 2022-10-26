@@ -6,7 +6,7 @@
 #define GUNDAM_FITPARAMETER_H
 
 #include "DialSet.h"
-#include "ConfigBasedClass.h"
+#include "JsonBaseClass.h"
 
 #include "GenericToolbox.h"
 
@@ -25,7 +25,7 @@ namespace PriorType{
 
 class FitParameterSet;
 
-class FitParameter : public ConfigBasedClass {
+class FitParameter : public JsonBaseClass {
 
 public:
   void setIsEnabled(bool isEnabled);
