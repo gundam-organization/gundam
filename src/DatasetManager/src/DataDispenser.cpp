@@ -721,15 +721,15 @@ void DataDispenser::readAndFill(){
     GraphDial* grDialPtr{nullptr};
     const DataBin* applyConditionBinPtr;
     auto isDialValid = [&](const DialWrapper& d_){
-      applyConditionBinPtr = d_->getApplyConditionBinPtr();
-      if( applyConditionBinPtr != nullptr ){
-        eventVarIndexCachePtr = &applyConditionBinPtr->getEventVarIndexCache();
-        edgesListPtr = &applyConditionBinPtr->getEdgesList();
-        nBinEdges = edgesListPtr->size();
+//      applyConditionBinPtr = d_->getApplyConditionBinPtr();
+      if( d_->getApplyConditionBinPtr() != nullptr ){
+//        eventVarIndexCachePtr = &applyConditionBinPtr->getEventVarIndexCache();
+//        edgesListPtr = &applyConditionBinPtr->getEdgesList();
+        nBinEdges = d_->getApplyConditionBinPtr()->getEventVarIndexCache().size();
         for( iVar = 0 ; iVar < nBinEdges ; iVar++ ){
           if( not DataBin::isBetweenEdges(
-              (*edgesListPtr)[iVar],
-              eventBuffer.getVarAsDouble( (*eventVarIndexCachePtr)[iVar] ) )
+              d_->getApplyConditionBinPtr()->getEdgesList()[iVar],
+              eventBuffer.getVarAsDouble( d_->getApplyConditionBinPtr()->getEventVarIndexCache()[iVar] ) )
               ){
             return false;
           }
