@@ -36,22 +36,22 @@ void DatasetLoader::readConfigImpl() {
 
   _showSelectedEventCount_ = JsonUtils::fetchValue(_config_, "showSelectedEventCount", _showSelectedEventCount_);
 
-  _mcDispenser_ = DataDispenser(JsonUtils::fetchValue<nlohmann::json>(_config_, "mc"), this);
+  _mcDispenser_ = DataDispenser(this);
+  _mcDispenser_.readConfig(JsonUtils::fetchValue<nlohmann::json>(_config_, "mc"));
   _mcDispenser_.getParameters().name = "Asimov";
   _mcDispenser_.getParameters().useMcContainer = true;
 
   // Always loaded by default
-  _dataDispenserDict_["Asimov"] = _mcDispenser_;
+  _dataDispenserDict_.emplace("Asimov", DataDispenser(_mcDispenser_));
 
   for( auto& dataEntry : JsonUtils::fetchValue(_config_, "data", nlohmann::json()) ){
     std::string name = JsonUtils::fetchValue(dataEntry, "name", "data");
     LogThrowIf( GenericToolbox::doesKeyIsInMap(name, _dataDispenserDict_),
                 "\"" << name << "\" already taken, please use another name." )
 
-    if( JsonUtils::fetchValue(dataEntry, "fromMc", false) ){ _dataDispenserDict_[name] = _mcDispenser_; }
-    else{ _dataDispenserDict_[name] = DataDispenser(); }
-    _dataDispenserDict_[name].setOwner(this);
-    _dataDispenserDict_[name].readConfig(dataEntry);
+    if( JsonUtils::fetchValue(dataEntry, "fromMc", false) ){ _dataDispenserDict_.emplace(name, _mcDispenser_); }
+    else{ _dataDispenserDict_.emplace(name, DataDispenser(this)); }
+    _dataDispenserDict_.at(name).readConfig(dataEntry);
   }
 
 }
@@ -93,10 +93,10 @@ DataDispenser &DatasetLoader::getMcDispenser() {
   return _mcDispenser_;
 }
 DataDispenser &DatasetLoader::getSelectedDataDispenser(){
-  return _dataDispenserDict_[_selectedDataEntry_];
+  return _dataDispenserDict_.at(_selectedDataEntry_);
 }
 DataDispenser &DatasetLoader::getToyDataDispenser(){
-  return _dataDispenserDict_[_selectedToyEntry_];
+  return _dataDispenserDict_.at(_selectedToyEntry_);
 }
 std::map<std::string, DataDispenser> &DatasetLoader::getDataDispenserDict() {
   return _dataDispenserDict_;

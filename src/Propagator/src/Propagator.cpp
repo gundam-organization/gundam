@@ -113,7 +113,7 @@ void Propagator::initializeImpl() {
     LogContinueIf(not dataSet.isEnabled(), "Dataset \"" << dataSet.getName() << "\" is disabled. Skipping");
     DataDispenser& dispenser = dataSet.getSelectedDataDispenser();
     if( _throwAsimovToyParameters_ ) { dispenser = dataSet.getToyDataDispenser(); }
-    if( _loadAsimovData_ ){ dispenser = dataSet.getDataDispenserDict()["Asimov"]; }
+    if( _loadAsimovData_ ){ dispenser = dataSet.getDataDispenserDict().at("Asimov"); }
 
     dispenser.getParameters().iThrow = _iThrow_;
 
@@ -295,25 +295,6 @@ void Propagator::initializeImpl() {
   GlobalVariables::getParallelWorker().setCpuTimeSaverIsEnabled(false);
 }
 
-Propagator::~Propagator() { this->reset(); }
-
-void Propagator::reset() {
-  std::vector<std::string> jobNameRemoveList;
-  for( const auto& jobName : GlobalVariables::getParallelWorker().getJobNameList() ){
-    if(   jobName == "Propagator::fillEventDialCaches"
-       or jobName == "Propagator::reweightMcEvents"
-       or jobName == "Propagator::updateDialResponses"
-       or jobName == "Propagator::refillSampleHistograms"
-       or jobName == "Propagator::applyResponseFunctions"
-        ){
-      jobNameRemoveList.emplace_back(jobName);
-    }
-  }
-  for( const auto& jobName : jobNameRemoveList ){
-    GlobalVariables::getParallelWorker().removeJob(jobName);
-  }
-}
-
 void Propagator::setShowTimeStats(bool showTimeStats) {
   _showTimeStats_ = showTimeStats;
 }
@@ -348,7 +329,7 @@ PlotGenerator &Propagator::getPlotGenerator() {
 
 void Propagator::propagateParametersOnSamples(){
 
-  // Only real parameters are propagated on the specta -> need to convert the eigen to original
+  // Only real parameters are propagated on the spectra -> need to convert the eigen to original
   for( auto& parSet : _parameterSetsList_ ){
     if( parSet.isUseEigenDecompInFit() ) parSet.propagateEigenToOriginal();
   }

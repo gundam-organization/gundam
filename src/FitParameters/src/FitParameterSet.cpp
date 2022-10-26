@@ -131,7 +131,7 @@ void FitParameterSet::prepareFitParameters(){
   }
   else {
     LogWarning << "Decomposing the stripped covariance matrix in set: " << getName() << std::endl;
-    _eigenParameterList_.resize(_strippedCovarianceMatrix_->GetNrows());
+    _eigenParameterList_.resize(_strippedCovarianceMatrix_->GetNrows(), FitParameter(this));
 
     _eigenDecomp_     = std::make_shared<TMatrixDSymEigen>(*_strippedCovarianceMatrix_);
 
@@ -155,7 +155,6 @@ void FitParameterSet::prepareFitParameters(){
       _eigenParameterList_[iEigen].setIsEigen(true);
       _eigenParameterList_[iEigen].setIsEnabled(true);
       _eigenParameterList_[iEigen].setIsFixed(false);
-      _eigenParameterList_[iEigen].setOwner(this);
       _eigenParameterList_[iEigen].setParameterIndex(iEigen);
       _eigenParameterList_[iEigen].setStdDevValue(TMath::Sqrt((*_eigenValues_)[iEigen]));
       _eigenParameterList_[iEigen].setStepSize(TMath::Sqrt((*_eigenValues_)[iEigen]));
@@ -580,10 +579,9 @@ void FitParameterSet::readParameterDefinitionFile(){
 }
 void FitParameterSet::defineParameters(){
   LogInfo << "Defining parameters in set: " << getName() << std::endl;
-  _parameterList_.resize(_nbParameterDefinition_);
+  _parameterList_.resize(_nbParameterDefinition_, FitParameter(this));
   for(int iParameter = 0 ; iParameter < _nbParameterDefinition_ ; iParameter++ ){
 
-    _parameterList_[iParameter].setOwner(this);
     _parameterList_[iParameter].setParameterIndex(iParameter);
 
     if( _priorCovarianceMatrix_ != nullptr ){
@@ -625,8 +623,6 @@ void FitParameterSet::defineParameters(){
       // Alternative 2: define dials then parameters
       _parameterList_[iParameter].setDialSetConfig(JsonUtils::fetchValue<nlohmann::json>(_config_, "dialSetDefinitions"));
     }
-
-    _parameterList_[iParameter].initialize();
   }
 }
 

@@ -32,8 +32,10 @@ void ParScanner::readConfigImpl() {
 void ParScanner::initializeImpl() {
   LogInfo << "Initializing ParScanner..." << std::endl;
   LogThrowIf(_owner_== nullptr, "_owner_ is not set");
+  LogThrowIf(_saveDir_== nullptr, "_saveDir_ is not set.");
 }
 
+ParScanner::ParScanner(FitterEngine* owner_): _owner_(owner_) {}
 
 void ParScanner::setOwner(FitterEngine *owner){
   _owner_ = owner;

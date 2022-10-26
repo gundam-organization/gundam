@@ -20,14 +20,7 @@ bool Dial::enableMaskCheck{false};
 bool Dial::disableDialCache{false};
 bool Dial::throwIfResponseIsNegative{true};
 
-Dial::Dial(DialType::DialType dialType_) : _dialType_{dialType_} {}
-Dial::~Dial() = default;
-
-void Dial::reset() {
-  _dialResponseCache_ = std::nan("Unset");
-  _dialParameterCache_ = std::nan("Unset");
-  _applyConditionBin_ = nullptr;
-}
+Dial::Dial(DialType::DialType dialType_, const DialSet *owner_) : _dialType_{dialType_}, _owner_(owner_) {}
 
 void Dial::setApplyConditionBin(DataBin *applyConditionBin) {
   _applyConditionBin_ = applyConditionBin;

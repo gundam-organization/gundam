@@ -26,8 +26,7 @@ class FitterEngine;
 class MinimizerInterface : public JsonBaseClass {
 
 public:
-  MinimizerInterface() = default;
-  explicit MinimizerInterface(const nlohmann::json& config_, FitterEngine* owner_);
+  explicit MinimizerInterface(FitterEngine* owner_);
 
   void setOwner(FitterEngine* owner_);
   void setSaveDir(TDirectory* saveDir_);

@@ -14,11 +14,8 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[NormalizationDial]");
 });
 
-NormDial::NormDial() : Dial(DialType::Norm) {
-  this->NormDial::reset();
-}
+NormDial::NormDial(const DialSet* owner_) : Dial(DialType::Norm, owner_) {}
 
-void NormDial::reset() { Dial::reset(); }
 void NormDial::initialize() { Dial::initialize(); }
 
 std::string NormDial::getSummary() {

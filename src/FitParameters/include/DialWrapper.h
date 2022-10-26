@@ -15,8 +15,9 @@
 
 class DialWrapper{
 public:
-  ~DialWrapper() = default;
   DialWrapper() = default;
+
+  // Handling copy
   DialWrapper(const DialWrapper& src_): dialPtr{src_.dialPtr->clone()} {  }
   DialWrapper& operator=(const DialWrapper& other) { if (this != &other) { dialPtr = other.dialPtr->clone(); } return *this; }
   DialWrapper(DialWrapper&&)  noexcept = default;

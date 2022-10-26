@@ -182,9 +182,8 @@ int main(int argc, char** argv){
   // --------------------------
   // Configure:
   // --------------------------
-  FitterEngine fitter;
+  FitterEngine fitter{GenericToolbox::mkdirTFile(out, "FitterEngine")};
   fitter.readConfig(JsonUtils::fetchSubEntry(jsonConfig, {"fitterEngineConfig"}));
-  fitter.setSaveDir(GenericToolbox::mkdirTFile(out, "FitterEngine"));
 
   // -a
   fitter.getPropagator().setLoadAsimovData( clParser.isOptionTriggered("asimov") );

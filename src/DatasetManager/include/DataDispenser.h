@@ -88,11 +88,7 @@ struct DataDispenserCache{
 class DataDispenser : public JsonBaseClass {
 
 public:
-  DataDispenser() = default;
-  explicit DataDispenser(const nlohmann::json& config_, DatasetLoader* owner_):
-    _owner_(owner_) { this->readConfig(config_); }
-
-  void setOwner(DatasetLoader* owner_);
+  explicit DataDispenser(DatasetLoader* owner_);
 
   const DataDispenserParameters &getParameters() const;
   DataDispenserParameters &getParameters();
@@ -121,10 +117,10 @@ private:
   DataDispenserParameters _parameters_;
 
   // Internals
+  DatasetLoader* _owner_{nullptr};
   FitSampleSet* _sampleSetPtrToLoad_{nullptr};
   std::vector<FitParameterSet>* _parSetListPtrToLoad_{nullptr};
   PlotGenerator* _plotGenPtr_{nullptr}; // used to know which vars have to be kept in memory
-  DatasetLoader* _owner_{nullptr};
   DataDispenserCache _cache_;
 
 };

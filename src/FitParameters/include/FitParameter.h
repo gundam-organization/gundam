@@ -28,6 +28,8 @@ class FitParameterSet;
 class FitParameter : public JsonBaseClass {
 
 public:
+  explicit FitParameter(const FitParameterSet* owner_);
+
   void setIsEnabled(bool isEnabled);
   void setIsFixed(bool isFixed);
   void setIsEigen(bool isEigen);

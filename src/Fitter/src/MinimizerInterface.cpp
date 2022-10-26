@@ -22,9 +22,7 @@ LoggerInit([]{
 });
 
 
-MinimizerInterface::MinimizerInterface(const nlohmann::json& config_, FitterEngine* owner_): _owner_(owner_){
-  this->readConfig(config_);
-}
+MinimizerInterface::MinimizerInterface(FitterEngine* owner_): _owner_(owner_){}
 
 void MinimizerInterface::setOwner(FitterEngine* owner_){ _owner_ = owner_; }
 void MinimizerInterface::setSaveDir(TDirectory* saveDir_){ _saveDir_ = saveDir_; }
@@ -348,6 +346,9 @@ void MinimizerInterface::calcErrors(){
           << "Number of fit bins : " << _nbFitBins_ << std::endl
           << "Chi2 # DoF : " << _nbFitBins_ - _minimizer_->NFree() << std::endl
           << "Fit call offset: " << nbFitCallOffset << std::endl;
+
+  // Make sure the cache is currently at the best fit
+  this->evalFit(_minimizer_->X());
 
   if     ( _errorAlgo_ == "Minos" ){
     LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling MINOS...") << std::endl;

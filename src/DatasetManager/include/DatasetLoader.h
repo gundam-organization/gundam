@@ -52,7 +52,7 @@ private:
   std::string _selectedDataEntry_{"Asimov"};
   std::string _selectedToyEntry_{"Asimov"};
 
-  DataDispenser _mcDispenser_;
+  DataDispenser _mcDispenser_{this};
   std::map<std::string, DataDispenser> _dataDispenserDict_;
 
 };

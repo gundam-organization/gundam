@@ -25,6 +25,10 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[FitterEngine]");
 });
 
+FitterEngine::FitterEngine(TDirectory *saveDir_){
+  this->setSaveDir(saveDir_); // propagate
+}
+
 void FitterEngine::readConfigImpl(){
   LogInfo << "Reading FitterEngine config..." << std::endl;
   GenericToolbox::setT2kPalette();
@@ -43,16 +47,9 @@ void FitterEngine::readConfigImpl(){
   _throwMcBeforeFit_ = JsonUtils::fetchValue(_config_, "throwMcBeforeFit", _throwMcBeforeFit_);
   _throwGain_ = JsonUtils::fetchValue(_config_, "throwMcBeforeFitGain", _throwGain_);
 
-  _propagator_.setSaveDir(GenericToolbox::mkdirTFile(_saveDir_, "Propagator"));
   _propagator_.readConfig( JsonUtils::fetchValue<nlohmann::json>(_config_, "propagatorConfig") );
-
-  _parScanner_.setSaveDir(_saveDir_);
-  _parScanner_.setOwner(this);
-  _parScanner_.readConfig(JsonUtils::fetchValue(_config_, "scanConfig", nlohmann::json()) );
-
-  _minimizer_.readConfig(JsonUtils::fetchValue(_config_, "minimizerConfig", nlohmann::json()));
-  _minimizer_.setOwner(this);
-  _minimizer_.setSaveDir(_saveDir_);
+  _parScanner_.readConfig( JsonUtils::fetchValue(_config_, "scanConfig", nlohmann::json()) );
+  _minimizer_.readConfig( JsonUtils::fetchValue(_config_, "minimizerConfig", nlohmann::json()));
 
   _minimizer_.getConvergenceMonitor().setMaxRefreshRateInMs(JsonUtils::fetchValue(_config_, "monitorRefreshRateInMs", _minimizer_.getConvergenceMonitor().getMaxRefreshRateInMs()));
   LogInfo << "Convergence monitor will be refreshed every " << _minimizer_.getConvergenceMonitor().getMaxRefreshRateInMs() << "ms." << std::endl;
@@ -149,6 +146,9 @@ void FitterEngine::initializeImpl(){
 
 void FitterEngine::setSaveDir(TDirectory *saveDir) {
   _saveDir_ = saveDir;
+  _parScanner_.setSaveDir(_saveDir_);
+  _minimizer_.setSaveDir(_saveDir_);
+  _propagator_.setSaveDir(GenericToolbox::mkdirTFile(_saveDir_, "Propagator"));
 }
 void FitterEngine::setEnablePreFitScan(bool enablePreFitScan) {
   _enablePreFitScan_ = enablePreFitScan;

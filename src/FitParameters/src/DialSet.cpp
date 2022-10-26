@@ -24,6 +24,9 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[DialSet]");
 });
 
+
+DialSet::DialSet(const FitParameter* owner_): _owner_(owner_){}
+
 void DialSet::readConfigImpl(){
   LogThrowIf(_config_.empty(), "Config not set for dial set.");
 
@@ -35,7 +38,7 @@ void DialSet::readConfigImpl(){
   }
 
   // Dials are directly defined with a binning file?
-  if     (initializeNormDialsWithParBinning() ){ /* LogInfo << "DialSet initialised with parameter binning definition." << std::endl; */  }
+  if     ( initializeNormDialsWithParBinning() ){ /* LogInfo << "DialSet initialised with parameter binning definition." << std::endl; */  }
     // Dials are individually defined?
   else if( initializeDialsWithDefinition() )   { /* LogInfo << "DialSet initialised with config definition." << std::endl; */ }
     // Dials definition not found?
@@ -50,10 +53,6 @@ void DialSet::initializeImpl() {
   LogThrowIf(_owner_==nullptr, "Owner address not set.");
 }
 
-DialSet::DialSet(const FitParameter* owner_, const nlohmann::json& config_){
-  this->setOwner(owner_);
-  this->readConfig(config_);
-}
 void DialSet::setOwner(const FitParameter* owner_){
   _owner_ = owner_;
 }
@@ -113,12 +112,6 @@ std::string DialSet::getSummary() const {
   }
 
   return ss.str();
-}
-void DialSet::applyGlobalParameters(Dial* dial_) const {
-  dial_->setOwner(this);
-}
-void DialSet::applyGlobalParameters(Dial& dial_) const{
-  this->applyGlobalParameters(&dial_);
 }
 
 // Protected
@@ -271,9 +264,7 @@ bool DialSet::initializeNormDialsWithParBinning() {
   _binningCacheList_.emplace_back();
   _binningCacheList_.back().addBin(binning.getBinsList().at(_owner_->getParameterIndex()));
 
-  NormDial dial;
-  dial.setOwner(this);
-  this->applyGlobalParameters(&dial);
+  NormDial dial(this);
   dial.setApplyConditionBin( &_binningCacheList_.back().getBinsList()[0] );
   dial.initialize();
   _dialList_.emplace_back( std::make_unique<NormDial>(dial) );
@@ -300,9 +291,7 @@ bool DialSet::initializeDialsWithDefinition() {
   this->readGlobals(dialsDefinition);
 
   if( _globalDialType_ == DialType::Norm ){
-    NormDial dial;
-    this->applyGlobalParameters(&dial);
-    dial.setOwner(this);
+    NormDial dial(this);
     dial.initialize();
     _dialList_.emplace_back( std::make_unique<NormDial>(dial) );
 
@@ -342,16 +331,14 @@ bool DialSet::initializeDialsWithDefinition() {
 
         for( int iBin = 0 ; iBin < _binningCacheList_.back().getBinsList().size() ; iBin++ ){
           if     ( _globalDialType_ == DialType::Spline ){
-            SplineDial s;
-            this->applyGlobalParameters(&s);
+            SplineDial s(this);
             s.setApplyConditionBin(&_binningCacheList_.back().getBinsList()[iBin]);
             s.copySpline((TSpline3*) dialsList->At(iBin));
             s.initialize();
             _dialList_.emplace_back( std::make_unique<SplineDial>(s) );
           }
           else if( _globalDialType_ == DialType::Graph ){
-            GraphDial g;
-            this->applyGlobalParameters(&g);
+            GraphDial g(this);
             g.setApplyConditionBin(&_binningCacheList_.back().getBinsList()[iBin]);
             g.setGraph(*(TGraph*) dialsList->At(iBin));
             g.initialize();
@@ -414,8 +401,7 @@ bool DialSet::initializeDialsWithDefinition() {
             dialBin->addBinEdge(splitVarNameList.at(iSplitVar), splitVarValueList.at(iSplitVar), splitVarValueList.at(iSplitVar));
           }
           if      ( _globalDialType_ == DialType::Spline ){
-            SplineDial s;
-            this->applyGlobalParameters(&s);
+            SplineDial s(this);
             s.setApplyConditionBin(dialBin);
             s.copySpline(splinePtr);
             s.initialize();
