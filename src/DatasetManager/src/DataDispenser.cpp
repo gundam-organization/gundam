@@ -47,7 +47,11 @@ void DataDispenser::readConfigImpl(){
 void DataDispenser::initializeImpl(){
   LogThrowIf( _owner_==nullptr, "Owner not set.");
   // Nothing else to do other than read config?
-  LogWarning << "Initialized data dispenser: " << getTitle() << std::endl;
+  LogWarning << "Initialized data dispenser: " << getTitle() << ": {" << std::endl;
+  LogInfo.setIndentStr("  ");
+  LogInfo << _parameters_.getSummary() << std::endl;
+  LogInfo.setIndentStr("");
+  LogInfo << "}" << std::endl;
 }
 
 void DataDispenser::setOwner(DatasetLoader* owner_){ _owner_ = owner_; }

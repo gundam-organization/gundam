@@ -53,13 +53,16 @@ void DatasetLoader::readConfigImpl() {
     _dataDispenserDict_[name].setOwner(this);
     _dataDispenserDict_[name].readConfig(dataEntry);
   }
+
 }
 void DatasetLoader::initializeImpl() {
   if( not _isEnabled_ ) return;
   LogInfo << "Initializing dataset: \"" << _name_ << "\"" << std::endl;
 
   _mcDispenser_.initialize();
-  for( auto& dataDispenser : _dataDispenserDict_ ){ dataDispenser.second.initialize(); }
+  for( auto& dataDispenser : _dataDispenserDict_ ){
+    dataDispenser.second.initialize();
+  }
 
   if( not GenericToolbox::doesKeyIsInMap(_selectedDataEntry_, _dataDispenserDict_) ){
     LogThrow("selectedDataEntry could not be find in available data: "
