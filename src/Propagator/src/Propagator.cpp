@@ -24,40 +24,6 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[Propagator]");
 });
 
-Propagator::~Propagator() { this->reset(); }
-
-void Propagator::reset() {
-  std::vector<std::string> jobNameRemoveList;
-  for( const auto& jobName : GlobalVariables::getParallelWorker().getJobNameList() ){
-    if(   jobName == "Propagator::fillEventDialCaches"
-       or jobName == "Propagator::reweightMcEvents"
-       or jobName == "Propagator::updateDialResponses"
-       or jobName == "Propagator::refillSampleHistograms"
-       or jobName == "Propagator::applyResponseFunctions"
-        ){
-      jobNameRemoveList.emplace_back(jobName);
-    }
-  }
-  for( const auto& jobName : jobNameRemoveList ){
-    GlobalVariables::getParallelWorker().removeJob(jobName);
-  }
-}
-
-void Propagator::setShowTimeStats(bool showTimeStats) {
-  _showTimeStats_ = showTimeStats;
-}
-void Propagator::setSaveDir(TDirectory *saveDir) {
-  _saveDir_ = saveDir;
-}
-void Propagator::setThrowAsimovToyParameters(bool throwAsimovToyParameters) {
-  _throwAsimovToyParameters_ = throwAsimovToyParameters;
-}
-void Propagator::setIThrow(int iThrow) {
-  _iThrow_ = iThrow;
-}
-void Propagator::setLoadAsimovData(bool loadAsimovData) {
-  _loadAsimovData_ = loadAsimovData;
-}
 
 void Propagator::readConfigImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
@@ -275,10 +241,10 @@ void Propagator::initializeImpl() {
     t.setColTitles({{"Sample"},{"MC (# binned event)"},{"Data (# binned event)"}, {"MC (weighted)"}, {"Data (weighted)"}});
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
       t.addTableLine({{"\""+sample.getName()+"\""},
-                         std::to_string(sample.getMcContainer().getNbBinnedEvents()),
-                         std::to_string(sample.getDataContainer().getNbBinnedEvents()),
-                         std::to_string(sample.getMcContainer().getSumWeights()),
-                         std::to_string(sample.getDataContainer().getSumWeights())
+                      std::to_string(sample.getMcContainer().getNbBinnedEvents()),
+                      std::to_string(sample.getDataContainer().getNbBinnedEvents()),
+                      std::to_string(sample.getMcContainer().getSumWeights()),
+                      std::to_string(sample.getDataContainer().getSumWeights())
                      });
     }
     t.printTable();
@@ -327,6 +293,41 @@ void Propagator::initializeImpl() {
 
   // Propagator needs to be fast
   GlobalVariables::getParallelWorker().setCpuTimeSaverIsEnabled(false);
+}
+
+Propagator::~Propagator() { this->reset(); }
+
+void Propagator::reset() {
+  std::vector<std::string> jobNameRemoveList;
+  for( const auto& jobName : GlobalVariables::getParallelWorker().getJobNameList() ){
+    if(   jobName == "Propagator::fillEventDialCaches"
+       or jobName == "Propagator::reweightMcEvents"
+       or jobName == "Propagator::updateDialResponses"
+       or jobName == "Propagator::refillSampleHistograms"
+       or jobName == "Propagator::applyResponseFunctions"
+        ){
+      jobNameRemoveList.emplace_back(jobName);
+    }
+  }
+  for( const auto& jobName : jobNameRemoveList ){
+    GlobalVariables::getParallelWorker().removeJob(jobName);
+  }
+}
+
+void Propagator::setShowTimeStats(bool showTimeStats) {
+  _showTimeStats_ = showTimeStats;
+}
+void Propagator::setSaveDir(TDirectory *saveDir) {
+  _saveDir_ = saveDir;
+}
+void Propagator::setThrowAsimovToyParameters(bool throwAsimovToyParameters) {
+  _throwAsimovToyParameters_ = throwAsimovToyParameters;
+}
+void Propagator::setIThrow(int iThrow) {
+  _iThrow_ = iThrow;
+}
+void Propagator::setLoadAsimovData(bool loadAsimovData) {
+  _loadAsimovData_ = loadAsimovData;
 }
 
 bool Propagator::isThrowAsimovToyParameters() const {
