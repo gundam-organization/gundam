@@ -183,7 +183,7 @@ int main(int argc, char** argv){
   // Configure:
   // --------------------------
   FitterEngine fitter;
-  fitter.setConfig(JsonUtils::fetchSubEntry(jsonConfig, {"fitterEngineConfig"}));
+  fitter.readConfig(JsonUtils::fetchSubEntry(jsonConfig, {"fitterEngineConfig"}));
   fitter.setSaveDir(GenericToolbox::mkdirTFile(out, "FitterEngine"));
 
   // -a

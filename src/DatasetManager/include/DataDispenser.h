@@ -31,7 +31,20 @@ struct DataDispenserParameters{
   std::vector<std::string> additionalVarsStorage{};
   int iThrow{-1};
 
-  void clear(){ *this = DataDispenserParameters(); }
+  std::string getSummary() const{
+    std::stringstream ss;
+    ss << GET_VAR_NAME_VALUE(useMcContainer);
+    ss << std::endl << GET_VAR_NAME_VALUE(name);
+    ss << std::endl << GET_VAR_NAME_VALUE(treePath);
+    ss << std::endl << GET_VAR_NAME_VALUE(nominalWeightFormulaStr);
+    ss << std::endl << GET_VAR_NAME_VALUE(selectionCutFormulaStr);
+    ss << std::endl << "activeLeafNameList = " << GenericToolbox::parseVectorAsString(activeLeafNameList, true);
+    ss << std::endl << "filePathList = " << GenericToolbox::parseVectorAsString(filePathList, true);
+    ss << std::endl << "overrideLeafDict = " << GenericToolbox::parseMapAsString(overrideLeafDict, true);
+    ss << std::endl << "additionalVarsStorage = " << GenericToolbox::parseVectorAsString(additionalVarsStorage, true);
+    ss << std::endl << GET_VAR_NAME_VALUE(iThrow);
+    return ss.str();
+  }
 };
 struct DataDispenserCache{
   std::vector<FitSample*> samplesToFillList{};
