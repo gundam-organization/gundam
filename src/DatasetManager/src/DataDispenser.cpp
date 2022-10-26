@@ -73,6 +73,10 @@ void DataDispenser::load(){
   LogThrowIf(not this->isInitialized(), "Can't load while not initialized.");
   LogThrowIf(_sampleSetPtrToLoad_==nullptr, "SampleSet not specified.");
 
+  if( GlobalVariables::getVerboseLevel() >= MORE_PRINTOUT ){
+    LogDebug << "Configuration: " << _parameters_.getSummary() << std::endl;
+  }
+
   _cache_.clear();
 
   this->buildSampleToFillList();
@@ -136,8 +140,7 @@ void DataDispenser::load(){
   overrideLeavesNamesFct(_parameters_.nominalWeightFormulaStr);
   overrideLeavesNamesFct(_parameters_.selectionCutFormulaStr);
 
-  LogInfo << _parameters_.getSummary() << std::endl;
-
+  LogInfo << "Data will be extracted from: " << GenericToolbox::parseVectorAsString(_parameters_.filePathList, true) << std::endl;
   for( const auto& file: _parameters_.filePathList){ LogThrowIf(not GenericToolbox::doesTFileIsValid(file, {_parameters_.treePath}), "Invalid file: " << file); }
 
   this->doEventSelection();
