@@ -722,13 +722,13 @@ void DataDispenser::readAndFill(){
     const DataBin* applyConditionBinPtr;
     auto isDialValid = [&](const DialWrapper& d_){
       if( d_->getApplyConditionBinPtr() != nullptr ){
-        eventVarIndexCachePtr = &applyConditionBinPtr->getEventVarIndexCache();
-        edgesListPtr = &applyConditionBinPtr->getEdgesList();
-        nBinEdges = edgesListPtr->size();
-        for( iVar = 0 ; iVar < nBinEdges ; iVar++ ){
+//        eventVarIndexCachePtr = &applyConditionBinPtr->getEventVarIndexCache();
+//        edgesListPtr = &applyConditionBinPtr->getEdgesList();
+//        nBinEdges = edgesListPtr->size();
+        for( iVar = 0 ; iVar < applyConditionBinPtr->getEdgesList().size() ; iVar++ ){
           if( not DataBin::isBetweenEdges(
-              (*edgesListPtr)[iVar],
-              eventBuffer.getVarAsDouble( (*eventVarIndexCachePtr)[iVar] ) )
+              applyConditionBinPtr->getEdgesList()[iVar],
+              eventBuffer.getVarAsDouble( applyConditionBinPtr->getEventVarIndexCache()[iVar] ) )
               ){
             return false;
           }
