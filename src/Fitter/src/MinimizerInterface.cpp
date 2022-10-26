@@ -347,6 +347,9 @@ void MinimizerInterface::calcErrors(){
           << "Chi2 # DoF : " << _nbFitBins_ - _minimizer_->NFree() << std::endl
           << "Fit call offset: " << nbFitCallOffset << std::endl;
 
+  // Make sure the cache is currently at the best fit
+  this->evalFit(_minimizer_->X());
+
   if     ( _errorAlgo_ == "Minos" ){
     LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling MINOS...") << std::endl;
 
