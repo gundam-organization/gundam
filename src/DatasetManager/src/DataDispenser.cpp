@@ -714,22 +714,22 @@ void DataDispenser::readAndFill(){
     DialSet* dialSetPtr;
     size_t iDialSet, iDial;
     size_t nBinEdges;
-    const std::vector<int>* eventVarIndexCachePtr;
-    const std::vector<std::pair<double, double>>* edgesListPtr;
+    const std::vector<int>* eventVarIndexCachePtr{nullptr};
+    const std::vector<std::pair<double, double>>* edgesListPtr{nullptr};
     TGraph* grPtr{nullptr};
-    SplineDial* spDialPtr;
-    GraphDial* grDialPtr;
+    SplineDial* spDialPtr{nullptr};
+    GraphDial* grDialPtr{nullptr};
     const DataBin* applyConditionBinPtr;
     auto isDialValid = [&](const DialWrapper& d_){
       applyConditionBinPtr = d_->getApplyConditionBinPtr();
       if( applyConditionBinPtr != nullptr ){
-//        eventVarIndexCachePtr = &applyConditionBinPtr->getEventVarIndexCache();
-//        edgesListPtr = &applyConditionBinPtr->getEdgesList();
-//        nBinEdges = edgesListPtr->size();
-        for( iVar = 0 ; iVar < applyConditionBinPtr->getEdgesList().size() ; iVar++ ){
+        eventVarIndexCachePtr = &applyConditionBinPtr->getEventVarIndexCache();
+        edgesListPtr = &applyConditionBinPtr->getEdgesList();
+        nBinEdges = edgesListPtr->size();
+        for( iVar = 0 ; iVar < nBinEdges ; iVar++ ){
           if( not DataBin::isBetweenEdges(
-              applyConditionBinPtr->getEdgesList()[iVar],
-              eventBuffer.getVarAsDouble( applyConditionBinPtr->getEventVarIndexCache()[iVar] ) )
+              (*edgesListPtr)[iVar],
+              eventBuffer.getVarAsDouble( (*eventVarIndexCachePtr)[iVar] ) )
               ){
             return false;
           }
