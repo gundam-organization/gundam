@@ -22,11 +22,6 @@
 class Propagator : public JsonBaseClass {
 
 public:
-  Propagator() = default;
-  ~Propagator() override;
-
-  void reset();
-
   // Setters
   void setSaveDir(TDirectory *saveDir);
   void setShowTimeStats(bool showTimeStats);

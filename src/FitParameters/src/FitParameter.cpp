@@ -13,6 +13,9 @@
 
 LoggerInit([]{ Logger::setUserHeaderStr("[FitParameter]"); });
 
+
+FitParameter::FitParameter(const FitParameterSet* owner_): _owner_(owner_) {}
+
 void FitParameter::readConfigImpl(){
   if( not _parameterConfig_.empty() ){
     _isEnabled_ = JsonUtils::fetchValue(_parameterConfig_, "isEnabled", true);
@@ -43,15 +46,16 @@ void FitParameter::readConfigImpl(){
 
   _dialSetList_.reserve(_dialDefinitionsList_.size());
   for( const auto& dialDefinitionConfig : _dialDefinitionsList_ ){
-    _dialSetList_.emplace_back(this, dialDefinitionConfig);
+    _dialSetList_.emplace_back(this);
+    _dialSetList_.back().readConfig(dialDefinitionConfig);
   }
 }
 void FitParameter::initializeImpl() {
-  LogThrowIf(_parameterIndex_ == -1, "Parameter index is not set.");
-  LogThrowIf(_priorValue_     == std::numeric_limits<double>::quiet_NaN(), "Prior value is not set.");
-  LogThrowIf(_stdDevValue_    == std::numeric_limits<double>::quiet_NaN(), "Std dev value is not set.");
-  LogThrowIf(_parameterValue_ == std::numeric_limits<double>::quiet_NaN(), "Parameter value is not set.");
   LogThrowIf(_owner_ == nullptr, "Parameter set ref is not set.");
+  LogThrowIf(_parameterIndex_ == -1, "Parameter index is not set.");
+  LogThrowIf(std::isnan(_priorValue_), "Prior value is not set.");
+  LogThrowIf(std::isnan(_stdDevValue_), "Std dev value is not set.");
+  LogThrowIf(std::isnan(_parameterValue_), "Parameter value is not set.");
 
   if( not _isEnabled_ ) { return; }
 

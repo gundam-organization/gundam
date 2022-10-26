@@ -42,13 +42,11 @@ public:
 
 protected:
   // Not supposed to define a bare Dial. Use the downcast instead
-  explicit Dial(DialType::DialType dialType_);
+  explicit Dial(DialType::DialType dialType_, const DialSet *owner_);
 
 public:
-  virtual ~Dial();
+  virtual ~Dial() = default;
   virtual std::unique_ptr<Dial> clone() const = 0;
-
-  virtual void reset();
 
   void setApplyConditionBin(DataBin *applyConditionBin);
   void setIsReferenced(bool isReferenced);

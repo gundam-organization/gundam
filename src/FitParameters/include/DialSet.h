@@ -28,7 +28,7 @@ public:
   static bool verboseMode;
 
 public:
-  DialSet(const FitParameter* owner_, const nlohmann::json& config_);
+  explicit DialSet(const FitParameter* owner_);
 
   void setOwner(const FitParameter* owner_);
 
@@ -57,8 +57,6 @@ public:
 
   // Core
   std::string getSummary() const;
-  void applyGlobalParameters(Dial* dial_) const;
-  void applyGlobalParameters(Dial& dial_) const;
 
 protected:
   void readConfigImpl() override;

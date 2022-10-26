@@ -26,6 +26,8 @@ LoggerInit([]{
 });
 
 
+DataDispenser::DataDispenser(DatasetLoader* owner_): _owner_(owner_) {}
+
 void DataDispenser::readConfigImpl(){
   LogThrowIf( _config_.empty(), "Config is not set." );
 
@@ -44,12 +46,9 @@ void DataDispenser::readConfigImpl(){
   }
 }
 void DataDispenser::initializeImpl(){
-  LogThrowIf( _owner_==nullptr, "Owner not set.");
   // Nothing else to do other than read config?
   LogWarning << "Initialized data dispenser: " << getTitle() << std::endl;
 }
-
-void DataDispenser::setOwner(DatasetLoader* owner_){ _owner_ = owner_; }
 
 const DataDispenserParameters &DataDispenser::getParameters() const {
   return _parameters_;
@@ -546,10 +545,10 @@ void DataDispenser::preAllocateMemory(){
 
             auto dialType = dialSetPtr->getGlobalDialType();
             if     ( dialType == DialType::Spline ){
-              dialSetPtr->getDialList().resize(treeChain.GetEntries(), DialWrapper(SplineDial()));
+              dialSetPtr->getDialList().resize(treeChain.GetEntries(), DialWrapper(SplineDial(dialSetPtr)));
             }
             else if( dialType == DialType::Graph ){
-              dialSetPtr->getDialList().resize(treeChain.GetEntries(), DialWrapper(GraphDial()));
+              dialSetPtr->getDialList().resize(treeChain.GetEntries(), DialWrapper(GraphDial(dialSetPtr)));
             }
             else{
               LogThrow("Invalid dial type for event-by-event dial: " << DialType::DialTypeEnumNamespace::toString(dialType))
@@ -878,7 +877,6 @@ void DataDispenser::readAndFill(){
                   if(grPtr->GetN() > 1){
                     if     ( dialSetPtr->getGlobalDialType() == DialType::Spline ){
                       spDialPtr = (SplineDial*) dialSetPtr->getDialList()[iEntry].get();
-                      dialSetPtr->applyGlobalParameters(spDialPtr);
                       spDialPtr->createSpline( grPtr );
                       spDialPtr->initialize();
                       spDialPtr->setIsReferenced(true);
@@ -887,7 +885,6 @@ void DataDispenser::readAndFill(){
                     }
                     else if( dialSetPtr->getGlobalDialType() == DialType::Graph ){
                       grDialPtr = (GraphDial*) dialSetPtr->getDialList()[iEntry].get();
-                      dialSetPtr->applyGlobalParameters(grDialPtr);
                       grDialPtr->setGraph(*grPtr);
                       grDialPtr->initialize();
                       grDialPtr->setIsReferenced(true);
@@ -903,7 +900,6 @@ void DataDispenser::readAndFill(){
                   grPtr = (TGraph*) eventBuffer.getVariable<TGraph*>(dialSetPtr->getDialLeafName());
                   if     ( dialSetPtr->getGlobalDialType() == DialType::Spline ){
                     spDialPtr = (SplineDial*) dialSetPtr->getDialList()[iEntry].get();
-                    dialSetPtr->applyGlobalParameters(spDialPtr);
                     spDialPtr->createSpline(grPtr);
                     spDialPtr->initialize();
                     spDialPtr->setIsReferenced(true);
@@ -912,7 +908,6 @@ void DataDispenser::readAndFill(){
                   }
                   else if( dialSetPtr->getGlobalDialType() == DialType::Graph ){
                     grDialPtr = (GraphDial*) dialSetPtr->getDialList()[iEntry].get();
-                    dialSetPtr->applyGlobalParameters(grDialPtr);
                     grDialPtr->setGraph(*grPtr);
                     grDialPtr->initialize();
                     grDialPtr->setIsReferenced(true);

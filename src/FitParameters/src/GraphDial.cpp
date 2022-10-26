@@ -12,18 +12,11 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[GraphDial]");
 });
 
-GraphDial::GraphDial() : Dial{DialType::Graph} {
-  this->GraphDial::reset();
-}
-
-void GraphDial::reset() {
-  this->Dial::reset();
-  _graph_ = TGraph();
-}
+GraphDial::GraphDial(const DialSet* owner_): Dial(DialType::Graph, owner_) {}
 
 void GraphDial::initialize() {
   this->Dial::initialize();
-  LogThrowIf( _graph_.GetN() == 0 )
+  LogThrowIf( _graph_.GetN() == 0 );
 }
 
 std::string GraphDial::getSummary() {

@@ -18,14 +18,7 @@
 LoggerInit([](){ Logger::setUserHeaderStr("[SplineDial]"); } );
 
 
-SplineDial::SplineDial() : Dial(DialType::Spline) {
-  this->SplineDial::reset();
-}
-
-void SplineDial::reset() {
-  this->Dial::reset();
-  _spline_ = TSpline3();
-}
+SplineDial::SplineDial(const DialSet* owner_) : Dial(DialType::Spline, owner_) {}
 
 void SplineDial::copySpline(const TSpline3* splinePtr_){
   // Don't check for override: when loading toy + mc data, these placeholders has to be filled up twice
