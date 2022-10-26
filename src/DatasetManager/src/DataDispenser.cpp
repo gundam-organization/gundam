@@ -795,9 +795,9 @@ void DataDispenser::readAndFill(){
           eventBuffer.copyData(copyDict);
 
           // Propagate transformations for indexing
-          for( auto* varTransformForIndexing : varTransformForIndexingList ){
-            varTransformForIndexing->evalAndStore(eventBuffer);
-            varTransformForIndexing->storeCachedOutput(eventBuffer);
+          for( auto* varTransformPtr : varTransformForIndexingList ){
+            varTransformPtr->evalAndStore(eventBuffer);
+            varTransformPtr->storeCachedOutput(eventBuffer);
           }
 
           // Has valid bin?
@@ -845,7 +845,12 @@ void DataDispenser::readAndFill(){
 
                 varTransformPtr->storeCachedOutput(eventBuffer);
 
+                LogTrace << GenericToolbox::parseVectorAsString(varTransformForIndexingList) << std::endl;
+                LogTrace << GenericToolbox::parseVectorAsString(varTransformForStorageList) << std::endl;
                 LogTrace << "NOW? " << GET_VAR_NAME_VALUE(eventBuffer.getVarAsDouble("Pmu")) << std::endl;
+
+                eventBuffer.print();
+                eventPtr->print();
 
                 LogThrow("SOTP");
               }
