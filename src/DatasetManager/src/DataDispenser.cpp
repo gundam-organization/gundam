@@ -793,11 +793,14 @@ void DataDispenser::readAndFill(){
 
           // Getting loaded data in tEventBuffer
           eventBuffer.copyData(copyDict);
+          if( iThread_ == 0 ) LogTrace << "Pmu bfore CC: " << eventBuffer.getVarAsDouble("Pmu");
 
           // Propagate transformations for indexing
           for( auto* varTransformForIndexing : varTransformForIndexingList ){
             varTransformForIndexing->evalAndStore(eventBuffer);
           }
+
+          if( iThread_ == 0 ) LogTrace << "Pmu after CC: " << eventBuffer.getVarAsDouble("Pmu") << std::endl;
 
           // Has valid bin?
           binsListPtr = &_cache_.samplesToFillList[iSample]->getBinning().getBinsList();

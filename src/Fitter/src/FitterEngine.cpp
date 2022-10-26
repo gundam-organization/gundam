@@ -52,6 +52,7 @@ void FitterEngine::readConfigImpl(){
 
   _minimizer_.readConfig(JsonUtils::fetchValue(_config_, "minimizerConfig", nlohmann::json()));
   _minimizer_.setOwner(this);
+  _minimizer_.setSaveDir(_saveDir_);
 
   _minimizer_.getConvergenceMonitor().setMaxRefreshRateInMs(JsonUtils::fetchValue(_config_, "monitorRefreshRateInMs", _minimizer_.getConvergenceMonitor().getMaxRefreshRateInMs()));
   LogInfo << "Convergence monitor will be refreshed every " << _minimizer_.getConvergenceMonitor().getMaxRefreshRateInMs() << "ms." << std::endl;
@@ -68,7 +69,7 @@ void FitterEngine::initializeImpl(){
     this->rescaleParametersStepSize();
   }
 
-  if( _enablePca_ ) this->fixGhostFitParameters();
+  if( _enablePca_ ) { this->fixGhostFitParameters(); }
 
   this->updateChi2Cache();
 
@@ -140,10 +141,9 @@ void FitterEngine::initializeImpl(){
     _propagator_.propagateParametersOnSamples();
   } // throwMcBeforeFit
 
-  _minimizer_.setSaveDir(_saveDir_);
   _minimizer_.initialize();
-
   _parScanner_.initialize();
+
 //  checkNumericalAccuracy();
 }
 

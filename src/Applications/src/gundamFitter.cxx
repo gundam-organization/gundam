@@ -126,13 +126,6 @@ int main(int argc, char** argv){
   }
 
   bool isDryRun = clParser.isOptionTriggered("dry-run");
-  bool enableParameterScan = clParser.isOptionTriggered("scanParameters") or JsonUtils::fetchValue(jsonConfig, "scanParameters", false);
-  int nbScanSteps = clParser.getOptionVal("scanParameters", 100);
-
-  bool isToyFit = clParser.isOptionTriggered("toyFit");
-  int iToyFit = clParser.getOptionVal("toyFit", -1);
-
-  bool skipHesse = clParser.isOptionTriggered("skipHesse");
 
   std::string outFileName;
   if( clParser.isOptionTriggered("outputFile") ){
@@ -153,7 +146,9 @@ int main(int argc, char** argv){
     if( clParser.isOptionTriggered("skipHesse") ){ outFileName += "_NoHesse"; }
     if( clParser.isOptionTriggered("toyFit") ){
       outFileName += "_toyFit";
-      if( iToyFit != -1 ){ outFileName += "_" + std::to_string(iToyFit); }
+      if( clParser.getOptionVal("toyFit", -1) != -1 ){
+        outFileName += "_" + std::to_string(clParser.getOptionVal("toyFit", -1));
+      }
     }
     if( clParser.isOptionTriggered("dry-run") ){ outFileName += "_DryRun"; }
     if( clParser.isOptionTriggered("appendix") ){ outFileName += "_" + clParser.getOptionVal<std::string>("appendix"); }
@@ -190,20 +185,31 @@ int main(int argc, char** argv){
   FitterEngine fitter;
   fitter.setConfig(JsonUtils::fetchSubEntry(jsonConfig, {"fitterEngineConfig"}));
   fitter.setSaveDir(GenericToolbox::mkdirTFile(out, "FitterEngine"));
-  fitter.getParScanner().setNbPoints(nbScanSteps);
 
-  fitter.setEnablePreFitScan(enableParameterScan);
-  fitter.setEnablePostFitScan(enableParameterScan);
+  // -a
+  fitter.getPropagator().setLoadAsimovData( clParser.isOptionTriggered("asimov") );
 
-  if( skipHesse ) fitter.getMinimizer().setEnablePostFitErrorEval(false);
+  // --skip-hesse
+  fitter.getMinimizer().setEnablePostFitErrorEval(not clParser.isOptionTriggered("skipHesse"));
 
+  // --scan <N>
+  if( clParser.isOptionTriggered("scanParameters") ) {
+    fitter.setEnablePreFitScan( true );
+    fitter.setEnablePostFitScan( true );
+    fitter.getParScanner().setNbPoints(clParser.getOptionVal("scanParameters", fitter.getParScanner().getNbPoints()));
+  }
+
+  // --enable-pca
   fitter.setEnablePca(clParser.isOptionTriggered("enablePca"));
 
-  if( isToyFit ){
+  // --toy <iToy>
+  if( clParser.isOptionTriggered("toyFit") ){
     fitter.getPropagator().setThrowAsimovToyParameters(true);
-    fitter.getPropagator().setIThrow(iToyFit);
+    fitter.getPropagator().setIThrow(clParser.getOptionVal("toyFit", -1));
   }
-  fitter.getPropagator().setLoadAsimovData( clParser.isOptionTriggered("asimov") );
+
+  //
+
 
   // --------------------------
   // Load:
@@ -228,7 +234,7 @@ int main(int argc, char** argv){
   }
 
   // LLH Visual Scan
-  if( clParser.isOptionTriggered("generateOneSigmaPlots") or JsonUtils::fetchValue(jsonConfig, "generateOneSigmaPlots", false) ) fitter.getParScanner().generateOneSigmaPlots("preFit");
+  if( clParser.isOptionTriggered("generateOneSigmaPlots") ) fitter.getParScanner().generateOneSigmaPlots("preFit");
 
   // Plot generators
   if( JsonUtils::fetchValue(jsonConfig, "generateSamplePlots", true) ){
@@ -239,13 +245,13 @@ int main(int argc, char** argv){
   // --------------------------
   // Run the fitter:
   // --------------------------
-  if( not isDryRun and JsonUtils::fetchValue(jsonConfig, "fit", true) ){
+  if( not isDryRun ){
     fitter.fit();
+    if( JsonUtils::fetchValue(jsonConfig, "generateSamplePlots", true) ){
+      fitter.getPropagator().generateSamplePlots("postFit/samples", fitter.getSaveDir());
+    }
   }
 
-  if( JsonUtils::fetchValue(jsonConfig, "generateSamplePlots", true) ){
-    fitter.getPropagator().generateSamplePlots("postFit/samples", fitter.getSaveDir());
-  }
 
   LogWarning << "Closing output file \"" << out->GetName() << "\"..." << std::endl;
   out->Close();
