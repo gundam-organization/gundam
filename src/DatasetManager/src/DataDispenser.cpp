@@ -28,6 +28,8 @@ LoggerInit([]{
 
 void DataDispenser::readConfigImpl(){
   LogThrowIf( _config_.empty(), "Config is not set." );
+
+  _parameters_.name = JsonUtils::fetchValue<std::string>(_config_, "name", _parameters_.name);
   _parameters_.treePath = JsonUtils::fetchValue<std::string>(_config_, "tree", _parameters_.treePath);
   _parameters_.filePathList = JsonUtils::fetchValue<std::vector<std::string>>(_config_, "filePathList", _parameters_.filePathList);
   _parameters_.additionalVarsStorage = JsonUtils::fetchValue(_config_, {{"additionalLeavesStorage"}, {"additionalVarsStorage"}}, _parameters_.additionalVarsStorage);
@@ -44,11 +46,7 @@ void DataDispenser::readConfigImpl(){
 void DataDispenser::initializeImpl(){
   LogThrowIf( _owner_==nullptr, "Owner not set.");
   // Nothing else to do other than read config?
-  LogWarning << "Initialized data dispenser: " << getTitle() << ": {" << std::endl;
-  LogInfo.setIndentStr("  ");
-  LogInfo << _parameters_.getSummary() << std::endl;
-  LogInfo.setIndentStr("");
-  LogInfo << "}" << std::endl;
+  LogWarning << "Initialized data dispenser: " << getTitle() << std::endl;
 }
 
 void DataDispenser::setOwner(DatasetLoader* owner_){ _owner_ = owner_; }
