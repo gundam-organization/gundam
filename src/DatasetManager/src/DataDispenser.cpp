@@ -832,13 +832,24 @@ void DataDispenser::readAndFill(){
           eventPtr->copyData(copyStoreDict); // buffer has the right size already
 
           // Propagate transformation for storage -> use the previous results calculated for indexing
-          for( auto* varTransformForStorage : varTransformForStorageList ){
-            varTransformForStorage->storeCachedOutput(*eventPtr);
+          for( auto* varTransformPtr : varTransformForStorageList ){
+            varTransformPtr->storeCachedOutput(*eventPtr);
             if( iThread_ == 0 ){
-              LogThrowIf( eventBuffer.getVarAsDouble("Pmu") != eventPtr->getVarAsDouble("Pmu"),
-                          "MISMATCH: eventBuffer=" << eventBuffer.getVarAsDouble("Pmu") << " / eventPtr=" << eventPtr->getVarAsDouble("Pmu")
-                          << std::endl << "CC is : " << varTransformForStorage->eval(eventBuffer)
-              );
+              if( eventBuffer.getVarAsDouble("Pmu") != eventPtr->getVarAsDouble("Pmu") ){
+
+                LogTrace << "MISMATCH: "
+                         << std::endl << GET_VAR_NAME_VALUE(eventBuffer.getVarAsDouble("Pmu"))
+                         << std::endl << GET_VAR_NAME_VALUE(eventPtr->getVarAsDouble("Pmu"))
+                         << std::endl << "CC is : " << varTransformPtr->eval(eventBuffer)
+                         << std::endl;
+
+                varTransformPtr->storeCachedOutput(eventBuffer);
+
+                LogTrace << "NOW? " << GET_VAR_NAME_VALUE(eventBuffer.getVarAsDouble("Pmu")) << std::endl;
+
+                LogThrow("SOTP");
+              }
+
             }
           }
 
