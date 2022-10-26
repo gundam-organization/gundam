@@ -713,16 +713,22 @@ void DataDispenser::readAndFill(){
     size_t eventDialOffset;
     DialSet* dialSetPtr;
     size_t iDialSet, iDial;
+    size_t nBinEdges;
+    const std::vector<int>* eventVarIndexCachePtr;
+    const std::vector<std::pair<double, double>>* edgesListPtr;
     TGraph* grPtr{nullptr};
     SplineDial* spDialPtr;
     GraphDial* grDialPtr;
     const DataBin* applyConditionBinPtr;
     auto isDialValid = [&](const DialWrapper& d_){
       if( d_->getApplyConditionBinPtr() != nullptr ){
-        for( iVar = 0 ; iVar < applyConditionBinPtr->getEdgesList().size() ; iVar++ ){
+        eventVarIndexCachePtr = &applyConditionBinPtr->getEventVarIndexCache();
+        edgesListPtr = &applyConditionBinPtr->getEdgesList();
+        nBinEdges = edgesListPtr->size();
+        for( iVar = 0 ; iVar < nBinEdges ; iVar++ ){
           if( not DataBin::isBetweenEdges(
-              applyConditionBinPtr->getEdgesList()[iVar],
-              eventBuffer.getVarAsDouble( applyConditionBinPtr->getEventVarIndexCache()[iVar] ) )
+              (*edgesListPtr)[iVar],
+              eventBuffer.getVarAsDouble( (*eventVarIndexCachePtr)[iVar] ) )
               ){
             return false;
           }
@@ -927,79 +933,24 @@ void DataDispenser::readAndFill(){
                 }
               }
               else{
-                // Binned dial?
-                if(true) {
-                  lastFailedBinVarIndex = -1;
-                  for (iDial = 0; iDial < dialSetPtr->getDialList().size(); iDial++) {
-                    // Let's give this dial a chance:
-                    foundValidDialAmongTheSet = true;
+                // Binned dial:
+                foundValidDialAmongTheSet = false;
 
-                    // ----------> SLOW PART -> check the bin
-                    applyConditionBinPtr = dialSetPtr->getDialList()[iDial]->getApplyConditionBinPtr();
-                    if( applyConditionBinPtr != nullptr ){
+                // -- probably the slowest part of the indexing: ----
+                auto itr = std::find_if(
+                    dialSetPtr->getDialList().begin(),
+                    dialSetPtr->getDialList().end(),
+                    isDialValid
+                );
+                // --------------------------------------------------
 
-                      if (lastFailedBinVarIndex != -1 // if the last bin failed, this is not -1
-                          and applyConditionBinPtr->getEventVarIndexCache()[lastFailedBinVarIndex] ==
-                              lastEventVarIndex // make sure this new bin-edges point to the same variable
-                          ) {
-                        if (*lastEdges ==
-                            applyConditionBinPtr->getEdgesList()[lastFailedBinVarIndex]) { continue; } // same bin-edges! no need to check again!
-                        else { lastEdges = &applyConditionBinPtr->getEdgesList()[lastFailedBinVarIndex]; }
-                        if (not DataBin::isBetweenEdges(*lastEdges, eventBuffer.getVarAsDouble(lastEventVarIndex))) {
-                          continue;
-                          // NEXT DIAL! Don't check other bin variables
-                        }
-                      }
+                if (itr != dialSetPtr->getDialList().end()) {
+                  // found DIAL -> get index
+                  iDial = std::distance(dialSetPtr->getDialList().begin(), itr);
 
-                      // Check for the others
-                      for (iVar = 0; iVar < applyConditionBinPtr->getEdgesList().size(); iVar++) {
-                        if (iVar == lastFailedBinVarIndex) continue; // already checked if set
-                        lastEventVarIndex = applyConditionBinPtr->getEventVarIndexCache()[iVar];
-                        lastEdges = &applyConditionBinPtr->getEdgesList()[iVar];
-                        if (not DataBin::isBetweenEdges(*lastEdges, eventBuffer.getVarAsDouble(lastEventVarIndex))) {
-                          foundValidDialAmongTheSet = false;
-                          lastFailedBinVarIndex = int(iVar);
-                          // -> No, iDial is not the right dial.
-                          // Leave the bin var loop, and go to next dial.
-                          break;
-                        }
-                        else{
-                          // -> yes, may be it is the right dial, check the next variable?
-                        }
-                      } // iVar loop
-                      // If this dial has failed -> isEventInDialBin is false
-                      // Otherwise isEventInDialBin is still true!
-                    }
-                    else{
-                      // No bin condition? -> this dial should be applied
-                      foundValidDialAmongTheSet = true;
-                    }
-
-                    // <------------------
-                    if (foundValidDialAmongTheSet) {
-                      dialSetPtr->getDialList()[iDial]->setIsReferenced(true);
-                      eventPtr->getRawDialPtrList()[eventDialOffset++] = dialSetPtr->getDialList()[iDial].get();
-                      // found the right dial, break the iDial loop, check the NEXT iDialSet (i.e. parameter)
-                      break;
-                    }
-                  } // iDial
-                }
-                else{
-                  foundValidDialAmongTheSet = false;
-                  auto itr = std::find_if(
-                      dialSetPtr->getDialList().begin(),
-                      dialSetPtr->getDialList().end(),
-                      isDialValid
-                  );
-
-                  if (itr != dialSetPtr->getDialList().end()) {
-                    // found DIAL -> get index
-                    iDial = std::distance(dialSetPtr->getDialList().begin(), itr);
-
-                    foundValidDialAmongTheSet = true;
-                    dialSetPtr->getDialList()[iDial]->setIsReferenced(true);
-                    eventPtr->getRawDialPtrList()[eventDialOffset++] = dialSetPtr->getDialList()[iDial].get();
-                  }
+                  foundValidDialAmongTheSet = true;
+                  dialSetPtr->getDialList()[iDial]->setIsReferenced(true);
+                  eventPtr->getRawDialPtrList()[eventDialOffset++] = dialSetPtr->getDialList()[iDial].get();
                 }
 
                 if( foundValidDialAmongTheSet and dialSetPair.first->isUseOnlyOneParameterPerEvent() ){
