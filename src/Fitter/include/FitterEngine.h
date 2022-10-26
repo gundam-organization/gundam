@@ -27,6 +27,8 @@
 class FitterEngine : public JsonBaseClass {
 
 public:
+  explicit FitterEngine(TDirectory *saveDir_);
+
   // Setters
   void setSaveDir(TDirectory *saveDir);
   void setEnablePreFitScan(bool enablePreFitScan);
@@ -76,8 +78,8 @@ private:
   // Internals
   TDirectory* _saveDir_{nullptr};
   Propagator _propagator_{};
-  ParScanner _parScanner_{};
-  MinimizerInterface _minimizer_{};
+  ParScanner _parScanner_{this};
+  MinimizerInterface _minimizer_{this};
 
   // Buffers
   double _chi2Buffer_{0};

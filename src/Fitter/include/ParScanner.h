@@ -18,8 +18,7 @@ class FitterEngine;
 class ParScanner : public JsonBaseClass {
 
 public:
-  ParScanner() = default;
-  explicit ParScanner(const nlohmann::json& config_){ this->readConfig(config_); }
+  explicit ParScanner(FitterEngine* owner_);
 
   // Setters
   void setOwner(FitterEngine *owner);

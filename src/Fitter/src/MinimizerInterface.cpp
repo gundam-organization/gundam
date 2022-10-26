@@ -22,9 +22,7 @@ LoggerInit([]{
 });
 
 
-MinimizerInterface::MinimizerInterface(const nlohmann::json& config_, FitterEngine* owner_): _owner_(owner_){
-  this->readConfig(config_);
-}
+MinimizerInterface::MinimizerInterface(FitterEngine* owner_): _owner_(owner_){}
 
 void MinimizerInterface::setOwner(FitterEngine* owner_){ _owner_ = owner_; }
 void MinimizerInterface::setSaveDir(TDirectory* saveDir_){ _saveDir_ = saveDir_; }
