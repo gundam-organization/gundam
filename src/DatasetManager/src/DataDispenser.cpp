@@ -834,13 +834,15 @@ void DataDispenser::readAndFill(){
           // Propagate transformation for storage -> use the previous results calculated for indexing
           for( auto* varTransformForStorage : varTransformForStorageList ){
             varTransformForStorage->storeCachedOutput(*eventPtr);
+            if( iThread_ == 0 ){
+              LogThrowIf( eventBuffer.getVarAsDouble("Pmu") != eventPtr->getVarAsDouble("Pmu"),
+                          "MISMATCH: eventBuffer=" << eventBuffer.getVarAsDouble("Pmu") << " / eventPtr=" << eventPtr->getVarAsDouble("Pmu")
+                          << std::endl << "CC is : " << varTransformForStorage->eval(eventBuffer)
+              );
+            }
           }
 
-          if( iThread_ == 0 ){
-            LogThrowIf( eventBuffer.getVarAsDouble("Pmu") != eventPtr->getVarAsDouble("Pmu"),
-                        "MISMATCH: eventBuffer=" << eventBuffer.getVarAsDouble("Pmu") << " / eventPtr=" << eventPtr->getVarAsDouble("Pmu")
-                        );
-          }
+
 
           eventPtr->setEntryIndex(iEntry);
           eventPtr->setSampleBinIndex(eventBuffer.getSampleBinIndex());
