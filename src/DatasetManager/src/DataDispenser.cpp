@@ -721,7 +721,8 @@ void DataDispenser::readAndFill(){
     GraphDial* grDialPtr;
     const DataBin* applyConditionBinPtr;
     auto isDialValid = [&](const DialWrapper& d_){
-      if( d_->getApplyConditionBinPtr() != nullptr ){
+      applyConditionBinPtr = d_->getApplyConditionBinPtr();
+      if( applyConditionBinPtr != nullptr ){
 //        eventVarIndexCachePtr = &applyConditionBinPtr->getEventVarIndexCache();
 //        edgesListPtr = &applyConditionBinPtr->getEdgesList();
 //        nBinEdges = edgesListPtr->size();
