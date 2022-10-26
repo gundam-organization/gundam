@@ -797,6 +797,7 @@ void DataDispenser::readAndFill(){
           // Propagate transformations for indexing
           for( auto* varTransformForIndexing : varTransformForIndexingList ){
             varTransformForIndexing->evalAndStore(eventBuffer);
+            varTransformForIndexing->storeCachedOutput(eventBuffer);
           }
 
           // Has valid bin?
