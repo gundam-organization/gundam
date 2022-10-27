@@ -195,7 +195,9 @@ int main(int argc, char** argv){
   if( clParser.isOptionTriggered("scanParameters") ) {
     fitter.setEnablePreFitScan( true );
     fitter.setEnablePostFitScan( true );
-    fitter.getParScanner().setNbPoints(clParser.getOptionVal("scanParameters", fitter.getParScanner().getNbPoints()));
+    fitter.getPropagator().getParScanner().setNbPoints(
+        clParser.getOptionVal("scanParameters", fitter.getPropagator().getParScanner().getNbPoints())
+        );
   }
 
   // --enable-pca
@@ -227,18 +229,18 @@ int main(int argc, char** argv){
   // Event rates variations
   if( JsonUtils::doKeyExist(jsonConfig, "allParamVariations") )
   {
-    fitter.getParScanner().varyEvenRates(
+    fitter.getPropagator().getParScanner().varyEvenRates(
         JsonUtils::fetchValue<std::vector<double>>(jsonConfig, "allParamVariations"),
-        "preFit"
+        GenericToolbox::mkdirTFile(fitter.getSaveDir(), "preFit")
         );
   }
 
   // LLH Visual Scan
-  if( clParser.isOptionTriggered("generateOneSigmaPlots") ) fitter.getParScanner().generateOneSigmaPlots("preFit");
+  if( clParser.isOptionTriggered("generateOneSigmaPlots") ) fitter.getPropagator().getParScanner().generateOneSigmaPlots(GenericToolbox::mkdirTFile(fitter.getSaveDir(), "preFit"));
 
   // Plot generators
   if( JsonUtils::fetchValue(jsonConfig, "generateSamplePlots", true) ){
-    fitter.getPropagator().generateSamplePlots("preFit/samples", fitter.getSaveDir());
+    fitter.getPropagator().getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(fitter.getSaveDir(), "preFit/samples"));
   }
 
 
@@ -248,7 +250,7 @@ int main(int argc, char** argv){
   if( not isDryRun ){
     fitter.fit();
     if( JsonUtils::fetchValue(jsonConfig, "generateSamplePlots", true) ){
-      fitter.getPropagator().generateSamplePlots("postFit/samples", fitter.getSaveDir());
+      fitter.getPropagator().getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(fitter.getSaveDir(), "postFit/samples"));
     }
   }
 

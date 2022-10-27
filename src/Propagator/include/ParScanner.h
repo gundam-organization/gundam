@@ -13,16 +13,15 @@
 
 #include "utility"
 
-class FitterEngine;
+class Propagator;
 
 class ParScanner : public JsonBaseClass {
 
 public:
-  explicit ParScanner(FitterEngine* owner_);
+  explicit ParScanner(Propagator* owner_);
 
   // Setters
-  void setOwner(FitterEngine *owner);
-  void setSaveDir(TDirectory *saveDir);
+  void setOwner(Propagator *owner);
   void setNbPoints(int nbPoints);
 
   // Getters
@@ -32,11 +31,10 @@ public:
   bool isUseParameterLimits() const;
 
   // Core
-  void scanMinimizerParameters(const std::string& saveSubdir_ = "");
-  void scanFitParameters(std::vector<FitParameter>& par_, const std::string& saveSubdir_ = "");
-  void scanFitParameter(FitParameter& par_, const std::string& saveSubdir_ = "");
-  void generateOneSigmaPlots(const std::string& savePath_ = "");
-  void varyEvenRates(const std::vector<double>& paramVariationList_, const std::string& savePath_ = "");
+  void scanFitParameters(std::vector<FitParameter>& par_, TDirectory* saveDir_);
+  void scanFitParameter(FitParameter& par_, TDirectory* saveDir_);
+  void generateOneSigmaPlots(TDirectory* saveDir_);
+  void varyEvenRates(const std::vector<double>& paramVariationList_, TDirectory* saveDir_);
 
 
 protected:
@@ -51,8 +49,7 @@ private:
   nlohmann::json _varsConfig_{};
 
   // Internals
-  FitterEngine* _owner_{nullptr};
-  TDirectory* _saveDir_{nullptr};
+  Propagator* _owner_{nullptr};
   struct ScanData{
     std::string folder{};
     std::string title{};

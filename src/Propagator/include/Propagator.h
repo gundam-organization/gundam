@@ -12,6 +12,7 @@
 #include "FitSampleSet.h"
 #include "FitParameterSet.h"
 #include "JsonBaseClass.h"
+#include "ParScanner.h"
 
 #include "GenericToolbox.CycleTimer.h"
 
@@ -23,7 +24,6 @@ class Propagator : public JsonBaseClass {
 
 public:
   // Setters
-  void setSaveDir(TDirectory *saveDir);
   void setShowTimeStats(bool showTimeStats);
   void setThrowAsimovToyParameters(bool throwAsimovToyParameters);
   void setIThrow(int iThrow);
@@ -32,11 +32,15 @@ public:
   // Getters
   bool isThrowAsimovToyParameters() const;
   int getIThrow() const;
+
+  const std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix() const;
+
   FitSampleSet &getFitSampleSet();
   std::vector<FitParameterSet> &getParameterSetsList();
   const std::vector<FitParameterSet> &getParameterSetsList() const;
   PlotGenerator &getPlotGenerator();
   const EventTreeWriter &getTreeWriter() const;
+  ParScanner& getParScanner(){ return _parScanner_; }
 
   double getLlhBuffer() const;
   double getLlhStatBuffer() const;
@@ -53,7 +57,6 @@ public:
   void updateDialResponses();
   void reweightMcEvents();
   void refillSampleHistograms();
-  void generateSamplePlots(const std::string& savePath_, TDirectory* baseDir_ = nullptr);
 
   // Dev
   void fillDialsStack();
@@ -73,7 +76,6 @@ private:
   // Parameters
   bool _showTimeStats_{false};
   bool _loadAsimovData_{false};
-  TDirectory* _saveDir_{nullptr};
 
   // Internals
   bool _throwAsimovFitParameters_{false};
@@ -81,17 +83,18 @@ private:
   bool _enableStatThrowInToys_{true};
   bool _enableEventMcThrow_{true};
   int _iThrow_{-1};
-  std::shared_ptr<TMatrixD> _globalCovarianceMatrix_;
   double _llhBuffer_{0};
   double _llhStatBuffer_{0};
   double _llhPenaltyBuffer_{0};
   double _llhRegBuffer_{0};
+  std::shared_ptr<TMatrixD> _globalCovarianceMatrix_{nullptr};
 
   // Sub-layers
   FitSampleSet _fitSampleSet_;
   PlotGenerator _plotGenerator_;
   EventTreeWriter _treeWriter_;
-  std::vector<FitParameterSet> _parameterSetsList_;
+  ParScanner _parScanner_{this};
+  std::vector<FitParameterSet> _parameterSetList_;
   std::vector<DatasetLoader> _dataSetList_;
 
   // Monitoring

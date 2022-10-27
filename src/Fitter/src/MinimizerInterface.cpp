@@ -25,7 +25,6 @@ LoggerInit([]{
 MinimizerInterface::MinimizerInterface(FitterEngine* owner_): _owner_(owner_){}
 
 void MinimizerInterface::setOwner(FitterEngine* owner_){ _owner_ = owner_; }
-void MinimizerInterface::setSaveDir(TDirectory* saveDir_){ _saveDir_ = saveDir_; }
 void MinimizerInterface::setEnablePostFitErrorEval(bool enablePostFitErrorEval_){ _enablePostFitErrorEval_ = enablePostFitErrorEval_; }
 
 void MinimizerInterface::readConfigImpl(){
@@ -145,7 +144,7 @@ const std::unique_ptr<ROOT::Math::Minimizer> &MinimizerInterface::getMinimizer()
 void MinimizerInterface::minimize() {
   LogThrowIf(not isInitialized(), "not initialized");
 
-  GenericToolbox::mkdirTFile(_saveDir_, "fit")->cd();
+  GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "fit")->cd();
   _chi2HistoryTree_ = new TTree("chi2History", "chi2History");
   _chi2HistoryTree_->Branch("nbFitCalls", &_nbFitCalls_);
   _chi2HistoryTree_->Branch("chi2Total", _owner_->getPropagator().getLlhBufferPtr());
@@ -243,10 +242,8 @@ void MinimizerInterface::minimize() {
   if(_minimizerAlgo_ == "Migrad") LogWarning << "Covariance matrix status code: " << this->covMatrixStatusCodeStr.at(_minimizer_->CovMatrixStatus()) << std::endl;
   else LogWarning << "Covariance matrix status code: " << _minimizer_->CovMatrixStatus() << std::endl;
 
-  if( _saveDir_ != nullptr ){
-    GenericToolbox::mkdirTFile(_saveDir_, "fit")->cd();
-    _chi2HistoryTree_->Write();
-  }
+  GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "fit")->cd();
+  _chi2HistoryTree_->Write();
 
   // Make sure the cache is currently at the best fit
   this->evalFit(_minimizer_->X());
@@ -254,88 +251,84 @@ void MinimizerInterface::minimize() {
   if( _fitHasConverged_ ){ LogInfo << "Minimization has converged!" << std::endl; }
   else{ LogError << "Minimization did not converged." << std::endl; }
 
-  if( _saveDir_ != nullptr ){
-    LogInfo << "Writing convergence stats..." << std::endl;
 
-    GenericToolbox::mkdirTFile(_saveDir_, "postFit/")->cd();
+  LogInfo << "Writing convergence stats..." << std::endl;
+  GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "postFit/")->cd();
 
-    this->evalFit(_minimizer_->X());
-    int toyIndex = _owner_->getPropagator().getIThrow();
-    int nIterations = int(_minimizer_->NIterations());
-    double edmBestFit = _minimizer_->Edm();
-    double fitStatus = _minimizer_->Status();
-    double covStatus = _minimizer_->CovMatrixStatus();
-    double chi2MinFitter = _minimizer_->MinValue();
+  this->evalFit(_minimizer_->X());
+  int toyIndex = _owner_->getPropagator().getIThrow();
+  int nIterations = int(_minimizer_->NIterations());
+  double edmBestFit = _minimizer_->Edm();
+  double fitStatus = _minimizer_->Status();
+  double covStatus = _minimizer_->CovMatrixStatus();
+  double chi2MinFitter = _minimizer_->MinValue();
 
-    auto* bestFitStats = new TTree("bestFitStats", "bestFitStats");
-    bestFitStats->Branch("fitConverged", &_fitHasConverged_);
-    bestFitStats->Branch("fitStatusCode", &fitStatus);
-    bestFitStats->Branch("covStatusCode", &covStatus);
-    bestFitStats->Branch("edmBestFit", &edmBestFit);
-    bestFitStats->Branch("nIterations", &nIterations);
-    bestFitStats->Branch("chi2MinFitter", &chi2MinFitter);
-    bestFitStats->Branch("toyIndex", &toyIndex);
-    bestFitStats->Branch("nCallsAtBestFit", &_nbFitCalls_);
-    bestFitStats->Branch("chi2BestFit", _owner_->getPropagator().getLlhBufferPtr());
-    bestFitStats->Branch("chi2StatBestFit", _owner_->getPropagator().getLlhStatBufferPtr());
-    bestFitStats->Branch("chi2PullsBestFit", _owner_->getPropagator().getLlhPenaltyBufferPtr());
+  auto* bestFitStats = new TTree("bestFitStats", "bestFitStats");
+  bestFitStats->Branch("fitConverged", &_fitHasConverged_);
+  bestFitStats->Branch("fitStatusCode", &fitStatus);
+  bestFitStats->Branch("covStatusCode", &covStatus);
+  bestFitStats->Branch("edmBestFit", &edmBestFit);
+  bestFitStats->Branch("nIterations", &nIterations);
+  bestFitStats->Branch("chi2MinFitter", &chi2MinFitter);
+  bestFitStats->Branch("toyIndex", &toyIndex);
+  bestFitStats->Branch("nCallsAtBestFit", &_nbFitCalls_);
+  bestFitStats->Branch("chi2BestFit", _owner_->getPropagator().getLlhBufferPtr());
+  bestFitStats->Branch("chi2StatBestFit", _owner_->getPropagator().getLlhStatBufferPtr());
+  bestFitStats->Branch("chi2PullsBestFit", _owner_->getPropagator().getLlhPenaltyBufferPtr());
 
-    std::vector<GenericToolbox::RawDataArray> samplesArrList(_owner_->getPropagator().getFitSampleSet().getFitSampleList().size());
-    int iSample{-1};
-    for( auto& sample : _owner_->getPropagator().getFitSampleSet().getFitSampleList() ){
-      if( not sample.isEnabled() ) continue;
+  std::vector<GenericToolbox::RawDataArray> samplesArrList(_owner_->getPropagator().getFitSampleSet().getFitSampleList().size());
+  int iSample{-1};
+  for( auto& sample : _owner_->getPropagator().getFitSampleSet().getFitSampleList() ){
+    if( not sample.isEnabled() ) continue;
 
-      std::vector<std::string> leavesDict;
-      iSample++;
+    std::vector<std::string> leavesDict;
+    iSample++;
 
-      leavesDict.emplace_back("llhSample/D");
-      samplesArrList[iSample].writeRawData(_owner_->getPropagator().getFitSampleSet().getJointProbabilityFct()->eval(sample));
+    leavesDict.emplace_back("llhSample/D");
+    samplesArrList[iSample].writeRawData(_owner_->getPropagator().getFitSampleSet().getJointProbabilityFct()->eval(sample));
 
-      int nBins = int(sample.getBinning().getBinsList().size());
-      for( int iBin = 1 ; iBin <= nBins ; iBin++ ){
-        leavesDict.emplace_back("llhSample_bin" + std::to_string(iBin) + "/D");
-        samplesArrList[iSample].writeRawData(_owner_->getPropagator().getFitSampleSet().getJointProbabilityFct()->eval(sample, iBin));
-      }
-
-      samplesArrList[iSample].lockArraySize();
-      bestFitStats->Branch(
-          GenericToolbox::replaceSubstringInString(sample.getName(), " ", "_").c_str(),
-          &samplesArrList[iSample].getRawDataArray()[0],
-          GenericToolbox::joinVectorString(leavesDict, ":").c_str()
-      );
+    int nBins = int(sample.getBinning().getBinsList().size());
+    for( int iBin = 1 ; iBin <= nBins ; iBin++ ){
+      leavesDict.emplace_back("llhSample_bin" + std::to_string(iBin) + "/D");
+      samplesArrList[iSample].writeRawData(_owner_->getPropagator().getFitSampleSet().getJointProbabilityFct()->eval(sample, iBin));
     }
 
-    std::vector<GenericToolbox::RawDataArray> parameterSetArrList(_owner_->getPropagator().getParameterSetsList().size());
-    int iParSet{-1};
-    for( auto& parSet : _owner_->getPropagator().getParameterSetsList() ){
-      if( not parSet.isEnabled() ) continue;
+    samplesArrList[iSample].lockArraySize();
+    bestFitStats->Branch(
+        GenericToolbox::replaceSubstringInString(sample.getName(), " ", "_").c_str(),
+        &samplesArrList[iSample].getRawDataArray()[0],
+        GenericToolbox::joinVectorString(leavesDict, ":").c_str()
+    );
+  }
 
-      std::vector<std::string> leavesDict;
-      iParSet++;
+  std::vector<GenericToolbox::RawDataArray> parameterSetArrList(_owner_->getPropagator().getParameterSetsList().size());
+  int iParSet{-1};
+  for( auto& parSet : _owner_->getPropagator().getParameterSetsList() ){
+    if( not parSet.isEnabled() ) continue;
 
-      leavesDict.emplace_back("llhPenalty/D");
-      parameterSetArrList[iParSet].writeRawData(parSet.getPenaltyChi2());
+    std::vector<std::string> leavesDict;
+    iParSet++;
 
-      for( auto& par : parSet.getParameterList() ){
-        leavesDict.emplace_back(GenericToolbox::replaceSubstringInString(par.getTitle(), " ", "_") + "/D");
-        parameterSetArrList[iParSet].writeRawData(par.getParameterValue());
-      }
+    leavesDict.emplace_back("llhPenalty/D");
+    parameterSetArrList[iParSet].writeRawData(parSet.getPenaltyChi2());
 
-      bestFitStats->Branch(
-          GenericToolbox::replaceSubstringInString(parSet.getName(), " ", "_").c_str(),
-          &parameterSetArrList[iParSet].getRawDataArray()[0],
-          GenericToolbox::joinVectorString(leavesDict, ":").c_str()
-      );
+    for( auto& par : parSet.getParameterList() ){
+      leavesDict.emplace_back(GenericToolbox::replaceSubstringInString(par.getTitle(), " ", "_") + "/D");
+      parameterSetArrList[iParSet].writeRawData(par.getParameterValue());
     }
 
-    bestFitStats->Fill();
-    bestFitStats->Write();
+    bestFitStats->Branch(
+        GenericToolbox::replaceSubstringInString(parSet.getName(), " ", "_").c_str(),
+        &parameterSetArrList[iParSet].getRawDataArray()[0],
+        GenericToolbox::joinVectorString(leavesDict, ":").c_str()
+    );
   }
 
-  if(_saveDir_ != nullptr){
-    LogInfo << "Writing " << _minimizerType_ << "/" << _minimizerAlgo_ << " post-fit errors" << std::endl;
-    this->writePostFitData(GenericToolbox::mkdirTFile(_saveDir_, "postFit/" + _minimizerAlgo_));
-  }
+  bestFitStats->Fill();
+  bestFitStats->Write();
+
+  LogInfo << "Writing " << _minimizerType_ << "/" << _minimizerAlgo_ << " post-fit errors" << std::endl;
+  this->writePostFitData(GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "postFit/" + _minimizerAlgo_));
 
   // Make sure the cache is currently at the best fit
   this->evalFit(_minimizer_->X());
@@ -413,10 +406,8 @@ void MinimizerInterface::calcErrors(){
       LogInfo << _convergenceMonitor_.generateMonitorString(); // lasting printout
     }
 
-    if(_saveDir_ != nullptr) {
-      LogInfo << "Writing HESSE post-fit errors" << std::endl;
-      this->writePostFitData(GenericToolbox::mkdirTFile(_saveDir_, "postFit/Hesse"));
-    }
+    LogInfo << "Writing HESSE post-fit errors" << std::endl;
+    this->writePostFitData(GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "postFit/Hesse"));
   }
   else{
     LogError << GET_VAR_NAME_VALUE(_errorAlgo_) << " not implemented." << std::endl;

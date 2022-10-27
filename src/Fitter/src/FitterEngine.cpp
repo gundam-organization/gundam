@@ -34,6 +34,7 @@ void FitterEngine::readConfigImpl(){
   GenericToolbox::setT2kPalette();
 
   _enablePca_ = JsonUtils::fetchValue(_config_, std::vector<std::string>{"enablePca", "fixGhostFitParameters"}, _enablePca_);
+  _pcaDeltaChi2Threshold_ = JsonUtils::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, _pcaDeltaChi2Threshold_);
 
   _enablePreFitScan_ = JsonUtils::fetchValue(_config_, "enablePreFitScan", _enablePreFitScan_);
   _enablePostFitScan_ = JsonUtils::fetchValue(_config_, "enablePostFitScan", _enablePostFitScan_);
@@ -48,62 +49,113 @@ void FitterEngine::readConfigImpl(){
   _throwGain_ = JsonUtils::fetchValue(_config_, "throwMcBeforeFitGain", _throwGain_);
 
   _propagator_.readConfig( JsonUtils::fetchValue<nlohmann::json>(_config_, "propagatorConfig") );
-  _parScanner_.readConfig( JsonUtils::fetchValue(_config_, "scanConfig", nlohmann::json()) );
   _minimizer_.readConfig( JsonUtils::fetchValue(_config_, "minimizerConfig", nlohmann::json()));
+
+  // legacy
+  if( JsonUtils::doKeyExist(_config_, "scanConfig") ){
+    LogAlert << "\"scanConfig\" option should now be specified within propagatorConfig" << std::endl;
+    LogAlert << "For LEGACY, parScanner config is provided. This will be deprecated in the future versions." << std::endl;
+    _propagator_.getParScanner().readConfig( JsonUtils::fetchValue(_config_, "scanConfig", nlohmann::json()) );
+  }
 
   _minimizer_.getConvergenceMonitor().setMaxRefreshRateInMs(JsonUtils::fetchValue(_config_, "monitorRefreshRateInMs", _minimizer_.getConvergenceMonitor().getMaxRefreshRateInMs()));
   LogInfo << "Convergence monitor will be refreshed every " << _minimizer_.getConvergenceMonitor().getMaxRefreshRateInMs() << "ms." << std::endl;
 }
 void FitterEngine::initializeImpl(){
   LogThrowIf(_config_.empty(), "Config is not set.");
+  LogThrowIf(_saveDir_== nullptr);
 
   _propagator_.initialize();
 
-  this->_propagator_.updateLlhCache();
+  if( _debugPrintLoadedEvents_ ){
+    LogWarning << GET_VAR_NAME_VALUE(_debugPrintLoadedEventsNbPerSample_) << std::endl;
+    for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
+      LogWarning << "debugPrintLoadedEvents: " << sample.getName() << std::endl;
+      LogDebug.setIndentStr("  ");
+
+      int iEvt=0;
+      for( auto& ev : sample.getMcContainer().eventList ){
+        if(iEvt++ >= _debugPrintLoadedEventsNbPerSample_) { LogDebug << std::endl; break; }
+        LogDebug << iEvt << " -> " << ev.getSummary() << std::endl;
+      }
+      LogDebug.setIndentStr("");
+    }
+  }
+
+  if( _enablePca_ ) {
+    LogWarning << "PCA is enabled. Polling parameters..." << std::endl;
+    this->fixGhostFitParameters();
+  }
 
   if( _scaleParStepWithChi2Response_ ){
     LogInfo << "Using parameter step scale: " << _parStepGain_ << std::endl;
     this->rescaleParametersStepSize();
   }
 
-  if( _enablePca_ ) { this->fixGhostFitParameters(); }
-
   this->_propagator_.updateLlhCache();
+  _propagator_.getTreeWriter().writeSamples(GenericToolbox::mkdirTFile(_saveDir_, "preFit/events"));
 
-  if( _saveDir_ != nullptr ){
-    auto* dir = GenericToolbox::mkdirTFile(_saveDir_, "preFit/events");
-    _propagator_.getTreeWriter().writeSamples(dir);
+  // The minimizer needs all the parameters to be fully setup (i.e. PCA done and other properties)
+  _minimizer_.initialize();
 
-    if( _debugPrintLoadedEvents_ ){
-      LogWarning << GET_VAR_NAME_VALUE(_debugPrintLoadedEventsNbPerSample_) << std::endl;
+  if(GlobalVariables::getVerboseLevel() >= MORE_PRINTOUT) checkNumericalAccuracy();
 
-      for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
-        LogWarning << "debugPrintLoadedEvents: " << sample.getName() << std::endl;
-        LogDebug.setIndentStr("  ");
+  // Write data
+  LogInfo << "Writing propagator objects..." << std::endl;
+  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
+                               _propagator_.getGlobalCovarianceMatrix().get(), "globalCovarianceMatrix");
+  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
+                               GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) _propagator_.getGlobalCovarianceMatrix().get()),
+                               "globalCovarianceMatrix");
+  for( auto& parSet : _propagator_.getParameterSetsList() ){
+    if(not parSet.isEnabled()) continue;
+    GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(_saveDir_, "propagator/"+parSet.getName()),
+                                  parSet.getPriorCovarianceMatrix().get(), "covarianceMatrix");
+//    GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(_saveDir_, "propagator/"+parSet.getName()),
+//                                  GenericToolbox::convertTMatrixDtoTH2D(m),
+//                                  "covarianceMatrix");
 
-        int iEvt=0;
-        for( auto& ev : sample.getMcContainer().eventList ){
-          if(iEvt++ >= _debugPrintLoadedEventsNbPerSample_) { LogDebug << std::endl; break; }
-          LogDebug << iEvt << " -> " << ev.getSummary() << std::endl;
-        }
-        LogDebug.setIndentStr("");
-      }
-    }
+    GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(_saveDir_, "propagator/"+parSet.getName()),
+                                  parSet.getPriorCorrelationMatrix().get(), "correlationMatrix");
+//    GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(_saveDir_, "propagator/"+parSet.getName()),
+//                                  GenericToolbox::convertTMatrixDtoTH2D(m),
+//                                  "correlationMatrix");
   }
+}
+
+void FitterEngine::setSaveDir(TDirectory *saveDir) {
+  _saveDir_ = saveDir;
+}
+void FitterEngine::setEnablePreFitScan(bool enablePreFitScan) {
+  _enablePreFitScan_ = enablePreFitScan;
+}
+void FitterEngine::setEnablePostFitScan(bool enablePostFitScan) {
+  _enablePostFitScan_ = enablePostFitScan;
+}
+void FitterEngine::setEnablePca(bool enablePca_){
+  _enablePca_ = enablePca_;
+}
+
+const Propagator& FitterEngine::getPropagator() const {
+  return _propagator_;
+}
+Propagator& FitterEngine::getPropagator() {
+  return _propagator_;
+}
+
+void FitterEngine::fit(){
+  LogThrowIf(not isInitialized());
+  LogWarning << __METHOD_NAME__ << std::endl;
 
   if( _throwMcBeforeFit_ ){
     LogInfo << "Throwing correlated parameters of MC away from their prior..." << std::endl;
     LogInfo << "Throw gain form MC push set to: " << _throwGain_ << std::endl;
-
     for( auto& parSet : _propagator_.getParameterSetsList() ){
-
       if(not parSet.isEnabled()) continue;
-
       if( not parSet.isEnabledThrowToyParameters() ){
         LogWarning << "\"" << parSet.getName() << "\" has marked disabled throwMcBeforeFit: skipping." << std::endl;
         continue;
       }
-
       if( JsonUtils::doKeyExist(parSet.getConfig(), "customFitParThrow") ){
 
         LogAlert << "Using custom mc parameter push for " << parSet.getName() << std::endl;
@@ -132,55 +184,19 @@ void FitterEngine::initializeImpl(){
         LogAlert << "Throwing correlated parameters for " << parSet.getName() << std::endl;
         parSet.throwFitParameters(_throwGain_);
       }
-
     } // parSet
-
-    _propagator_.propagateParametersOnSamples();
   } // throwMcBeforeFit
-
-  _minimizer_.initialize();
-  _parScanner_.initialize();
-
-  if(GlobalVariables::getVerboseLevel() >= MORE_PRINTOUT) checkNumericalAccuracy();
-}
-
-void FitterEngine::setSaveDir(TDirectory *saveDir) {
-  _saveDir_ = saveDir;
-  _parScanner_.setSaveDir(_saveDir_);
-  _minimizer_.setSaveDir(_saveDir_);
-  _propagator_.setSaveDir(GenericToolbox::mkdirTFile(_saveDir_, "Propagator"));
-}
-void FitterEngine::setEnablePreFitScan(bool enablePreFitScan) {
-  _enablePreFitScan_ = enablePreFitScan;
-}
-void FitterEngine::setEnablePostFitScan(bool enablePostFitScan) {
-  _enablePostFitScan_ = enablePostFitScan;
-}
-void FitterEngine::setEnablePca(bool enablePca_){
-  _enablePca_ = enablePca_;
-}
-
-const Propagator& FitterEngine::getPropagator() const {
-  return _propagator_;
-}
-Propagator& FitterEngine::getPropagator() {
-  return _propagator_;
-}
-
-void FitterEngine::fit(){
-  LogThrowIf(not isInitialized());
-  LogWarning << __METHOD_NAME__ << std::endl;
 
   if( _enablePreFitScan_ ){
     LogInfo << "Scanning fit parameters before minimizing..." << std::endl;
-    _parScanner_.scanMinimizerParameters("preFit/scan");
+    this->scanMinimizerParameters(GenericToolbox::mkdirTFile(_saveDir_, "preFit/scan"));
   }
 
   _minimizer_.minimize();
 
   if( _enablePostFitScan_ ){
     LogInfo << "Scanning fit parameters around the minimum point..." << std::endl;
-    _parScanner_.scanMinimizerParameters("postFit/scan");
+    this->scanMinimizerParameters(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scan"));
   }
 
   if( _minimizer_.isFitHasConverged() and _minimizer_.isEnablePostFitErrorEval() ){
@@ -189,28 +205,27 @@ void FitterEngine::fit(){
 
   LogWarning << "Fit is done." << std::endl;
 }
+
+// protected
 void FitterEngine::fixGhostFitParameters(){
-  LogInfo << __METHOD_NAME__ << std::endl;
 
   _propagator_.updateLlhCache();
-
-  LogInfo << "Reference " << GUNDAM_CHI2 << " for PCA: " << _propagator_.getLlhStatBuffer() << std::endl;
   double baseChi2 = _propagator_.getLlhBuffer();
   double baseChi2Stat = _propagator_.getLlhStatBuffer();
   double baseChi2Syst = _propagator_.getLlhPenaltyBuffer();
 
+  LogInfo << "Reference " << GUNDAM_CHI2 << "(stat) for PCA: " << baseChi2Stat << std::endl;
+
   // +1 sigma
   int iFitPar = -1;
   std::stringstream ssPrint;
-//  double deltaChi2;
   double deltaChi2Stat;
-//  double deltaChi2Syst;
 
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 
-    if( not parSet.isEnabled() ) continue;
+    if( not parSet.isEnabled() ){ continue; }
 
-    if( not JsonUtils::fetchValue(parSet.getConfig(), std::vector<std::string>{"fixGhostFitParameters", "enablePca"}, false) ){
+    if( not parSet.isEnablePca() ){
       LogWarning << "PCA disabled on " << parSet.getName() << ". Skipping..." << std::endl;
       continue;
     }
@@ -222,8 +237,6 @@ void FitterEngine::fixGhostFitParameters(){
     auto& parList = parSet.getEffectiveParameterList();
     for( auto& par : parList ){
       ssPrint.str("");
-
-
       ssPrint << "(" << par.getParameterIndex()+1 << "/" << parList.size() << ") +1" << GUNDAM_SIGMA << " on " << parSet.getName() + "/" + par.getTitle();
 
       if( fixNextEigenPars ){
@@ -248,15 +261,13 @@ void FitterEngine::fixGhostFitParameters(){
 
         _propagator_.updateLlhCache();
         deltaChi2Stat = _propagator_.getLlhStatBuffer() - baseChi2Stat;
-//        deltaChi2Syst = _propagator_.getLlhPenaltyBuffer() - baseChi2Syst;
-//        deltaChi2 = _propagator_.getLlhBuffer() - baseChi2;
 
         ssPrint << ": " << GUNDAM_DELTA << GUNDAM_CHI2 << " (stat) = " << deltaChi2Stat;
 
         LogInfo.moveTerminalCursorBack(1);
         LogInfo << ssPrint.str() << std::endl;
 
-        if( std::abs(deltaChi2Stat) < JsonUtils::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, 1E-6) ){
+        if( std::abs(deltaChi2Stat) < _pcaDeltaChi2Threshold_ ){
           par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
           ssPrint << " < " << JsonUtils::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, 1E-6) << " -> FIXED";
           LogInfo.moveTerminalCursorBack(1);
@@ -274,19 +285,21 @@ void FitterEngine::fixGhostFitParameters(){
           }
         }
 
+        // Come back to the original values
         par.setParameterValue( currentParValue );
       }
     }
 
+    // Recompute inverse matrix for the fitter
+    // Note: Eigen decomposed parSet don't need a new inversion since the matrix is diagonal
     if( not parSet.isUseEigenDecompInFit() ){
-      // Recompute inverse matrix for the fitter
-      // Eigen decomposed parSet don't need a new inversion since the matrix is diagonal
       parSet.prepareFitParameters();
     }
 
   }
 
-  _propagator_.updateLlhCache(); // comeback to old values
+  // comeback to old values
+  _propagator_.updateLlhCache();
 }
 void FitterEngine::rescaleParametersStepSize(){
   LogInfo << __METHOD_NAME__ << std::endl;
@@ -337,6 +350,18 @@ void FitterEngine::rescaleParametersStepSize(){
   }
 
   _propagator_.updateLlhCache();
+}
+void FitterEngine::scanMinimizerParameters(TDirectory* saveDir_){
+  LogThrowIf(not isInitialized());
+  LogInfo << "Performing scans of fit parameters..." << std::endl;
+  for( int iPar = 0 ; iPar < _minimizer_.getMinimizer()->NDim() ; iPar++ ){
+    if( _minimizer_.getMinimizer()->IsFixedVariable(iPar) ){
+      LogWarning << _minimizer_.getMinimizer()->VariableName(iPar)
+                 << " is fixed. Skipping..." << std::endl;
+      continue;
+    }
+    _propagator_.getParScanner().scanFitParameter(*_minimizer_.getMinimizerFitParameterPtr()[iPar], saveDir_);
+  } // iPar
 }
 void FitterEngine::checkNumericalAccuracy(){
   LogWarning << __METHOD_NAME__ << std::endl;

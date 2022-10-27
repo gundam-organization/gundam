@@ -9,7 +9,6 @@
 #include "Propagator.h"
 #include "MinimizerInterface.h"
 #include "JsonBaseClass.h"
-#include "ParScanner.h"
 
 #include "GenericToolbox.VariablesMonitor.h"
 #include "GenericToolbox.CycleTimer.h"
@@ -38,7 +37,6 @@ public:
   // Getters
   const Propagator& getPropagator() const;
   Propagator& getPropagator();
-  ParScanner& getParScanner(){ return _parScanner_; }
   MinimizerInterface& getMinimizer(){ return _minimizer_; }
   TDirectory* getSaveDir(){ return _saveDir_; }
 
@@ -51,6 +49,7 @@ protected:
 
   void fixGhostFitParameters();
   void rescaleParametersStepSize();
+  void scanMinimizerParameters(TDirectory* saveDir_);
   void checkNumericalAccuracy();
 
 
@@ -65,11 +64,11 @@ private:
   int _debugPrintLoadedEventsNbPerSample_{10};
   double _throwGain_{1.};
   double _parStepGain_{0.1};
+  double _pcaDeltaChi2Threshold_{1E-6};
 
   // Internals
   TDirectory* _saveDir_{nullptr};
   Propagator _propagator_{};
-  ParScanner _parScanner_{this};
   MinimizerInterface _minimizer_{this};
 
 };

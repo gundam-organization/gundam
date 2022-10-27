@@ -29,7 +29,6 @@ public:
   explicit MinimizerInterface(FitterEngine* owner_);
 
   void setOwner(FitterEngine* owner_);
-  void setSaveDir(TDirectory* saveDir_);
   void setEnablePostFitErrorEval(bool enablePostFitErrorEval_);
 
   bool isFitHasConverged() const;
@@ -79,7 +78,6 @@ private:
   std::unique_ptr<ROOT::Math::Minimizer> _minimizer_{nullptr};
   std::unique_ptr<ROOT::Math::Functor> _functor_{nullptr};
   std::vector<FitParameter*> _minimizerFitParameterPtr_{};
-  TDirectory* _saveDir_{nullptr};
   TTree* _chi2HistoryTree_{nullptr};
 
   // monitors
