@@ -208,7 +208,15 @@ void FitterEngine::fixGhostFitParameters(){
 
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 
-    if( not JsonUtils::fetchValue(parSet.getConfig(), std::vector<std::string>{"fixGhostFitParameters", "enablePca"}, false) ) continue;
+    if( not parSet.isEnabled() ) continue;
+
+    if( not JsonUtils::fetchValue(parSet.getConfig(), std::vector<std::string>{"fixGhostFitParameters", "enablePca"}, false) ){
+      LogWarning << "PCA disabled on " << parSet.getName() << ". Skipping..." << std::endl;
+      continue;
+    }
+    else{
+      LogInfo << "Performing PCA on " << parSet.getName() << "..." << std::endl;
+    }
 
     bool fixNextEigenPars{false};
     auto& parList = parSet.getEffectiveParameterList();
