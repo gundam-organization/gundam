@@ -215,9 +215,10 @@ int main(int argc, char** argv){
   // --------------------------
   fitter.initialize();
 
-  fitter.updateChi2Cache();
-  LogInfo << "Initial χ² = " << fitter.getChi2Buffer() << std::endl;
-  LogInfo << "Initial χ²(stat) = " << fitter.getChi2StatBuffer() << std::endl;
+  fitter.getPropagator().updateLlhCache();
+  LogInfo << "Initial χ² = " << fitter.getPropagator().getLlhBuffer() << std::endl;
+  LogInfo << "Initial χ²(stat) = " << fitter.getPropagator().getLlhStatBuffer() << std::endl;
+  LogInfo << "Initial χ²(penalty) = " << fitter.getPropagator().getLlhPenaltyBuffer() << std::endl;
 
   // --------------------------
   // Pre-fit:

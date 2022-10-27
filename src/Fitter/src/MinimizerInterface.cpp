@@ -48,6 +48,7 @@ void MinimizerInterface::readConfigImpl(){
 
   _errorAlgo_ = JsonUtils::fetchValue(_config_, {{"errorsAlgo"}, {"errors"}}, "Hesse");
   _enablePostFitErrorEval_ = JsonUtils::fetchValue(_config_, "enablePostFitErrorFit", _enablePostFitErrorEval_);
+  _restoreStepSizeBeforeHesse_ = JsonUtils::fetchValue(_config_, "restoreStepSizeBeforeHesse", _restoreStepSizeBeforeHesse_);
 }
 void MinimizerInterface::initializeImpl(){
   LogInfo << "Initializing the minimizer..." << std::endl;
@@ -147,9 +148,9 @@ void MinimizerInterface::minimize() {
   GenericToolbox::mkdirTFile(_saveDir_, "fit")->cd();
   _chi2HistoryTree_ = new TTree("chi2History", "chi2History");
   _chi2HistoryTree_->Branch("nbFitCalls", &_nbFitCalls_);
-  _chi2HistoryTree_->Branch("chi2Total", _owner_->getChi2BufferPtr());
-  _chi2HistoryTree_->Branch("chi2Stat", _owner_->getChi2StatBufferPtr());
-  _chi2HistoryTree_->Branch("chi2Pulls", _owner_->getChi2PullsBufferPtr());
+  _chi2HistoryTree_->Branch("chi2Total", _owner_->getPropagator().getLlhBufferPtr());
+  _chi2HistoryTree_->Branch("chi2Stat", _owner_->getPropagator().getLlhStatBufferPtr());
+  _chi2HistoryTree_->Branch("chi2Pulls", _owner_->getPropagator().getLlhPenaltyBufferPtr());
 
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Summary of the fit parameters:") << std::endl;
   for( const auto& parSet : _owner_->getPropagator().getParameterSetsList() ){
@@ -190,7 +191,7 @@ void MinimizerInterface::minimize() {
     t.printTable();
   }
 
-  _owner_->updateChi2Cache();
+  _owner_->getPropagator().updateLlhCache();
 
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling minimize...") << std::endl;
   LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
@@ -247,6 +248,9 @@ void MinimizerInterface::minimize() {
     _chi2HistoryTree_->Write();
   }
 
+  // Make sure the cache is currently at the best fit
+  this->evalFit(_minimizer_->X());
+
   if( _fitHasConverged_ ){ LogInfo << "Minimization has converged!" << std::endl; }
   else{ LogError << "Minimization did not converged." << std::endl; }
 
@@ -272,9 +276,9 @@ void MinimizerInterface::minimize() {
     bestFitStats->Branch("chi2MinFitter", &chi2MinFitter);
     bestFitStats->Branch("toyIndex", &toyIndex);
     bestFitStats->Branch("nCallsAtBestFit", &_nbFitCalls_);
-    bestFitStats->Branch("chi2BestFit", _owner_->getChi2BufferPtr());
-    bestFitStats->Branch("chi2StatBestFit", _owner_->getChi2StatBufferPtr());
-    bestFitStats->Branch("chi2PullsBestFit", _owner_->getChi2PullsBufferPtr());
+    bestFitStats->Branch("chi2BestFit", _owner_->getPropagator().getLlhBufferPtr());
+    bestFitStats->Branch("chi2StatBestFit", _owner_->getPropagator().getLlhStatBufferPtr());
+    bestFitStats->Branch("chi2PullsBestFit", _owner_->getPropagator().getLlhPenaltyBufferPtr());
 
     std::vector<GenericToolbox::RawDataArray> samplesArrList(_owner_->getPropagator().getFitSampleSet().getFitSampleList().size());
     int iSample{-1};
@@ -333,6 +337,8 @@ void MinimizerInterface::minimize() {
     this->writePostFitData(GenericToolbox::mkdirTFile(_saveDir_, "postFit/" + _minimizerAlgo_));
   }
 
+  // Make sure the cache is currently at the best fit
+  this->evalFit(_minimizer_->X());
 }
 void MinimizerInterface::calcErrors(){
   LogThrowIf(not isInitialized(), "not initialized");
@@ -346,9 +352,6 @@ void MinimizerInterface::calcErrors(){
           << "Number of fit bins : " << _nbFitBins_ << std::endl
           << "Chi2 # DoF : " << _nbFitBins_ - _minimizer_->NFree() << std::endl
           << "Fit call offset: " << nbFitCallOffset << std::endl;
-
-  // Make sure the cache is currently at the best fit
-  this->evalFit(_minimizer_->X());
 
   if     ( _errorAlgo_ == "Minos" ){
     LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling MINOS...") << std::endl;
@@ -379,12 +382,10 @@ void MinimizerInterface::calcErrors(){
     for( int iFitPar = 0 ; iFitPar < _minimizer_->NDim() ; iFitPar++ ){
       _minimizerFitParameterPtr_[iFitPar]->setParameterValue(_minimizer_->X()[iFitPar]);
     }
-
-    _owner_->updateChi2Cache();
   } // Minos
   else if( _errorAlgo_ == "Hesse" ){
 
-    if( JsonUtils::fetchValue(_config_, "restoreStepSizeBeforeHesse", false) ){
+    if( _restoreStepSizeBeforeHesse_ ){
       LogWarning << "Restoring step size before HESSE..." << std::endl;
       for( int iFitPar = 0 ; iFitPar < _minimizer_->NDim() ; iFitPar++ ){
         auto& par = *_minimizerFitParameterPtr_[iFitPar];
@@ -416,12 +417,13 @@ void MinimizerInterface::calcErrors(){
       LogInfo << "Writing HESSE post-fit errors" << std::endl;
       this->writePostFitData(GenericToolbox::mkdirTFile(_saveDir_, "postFit/Hesse"));
     }
-
-    _owner_->updateChi2Cache();
   }
   else{
     LogError << GET_VAR_NAME_VALUE(_errorAlgo_) << " not implemented." << std::endl;
   }
+
+  // Make sure the cache is currently at the best fit
+  this->evalFit(_minimizer_->X());
 }
 
 double MinimizerInterface::evalFit(const double* parArray_){
@@ -441,7 +443,7 @@ double MinimizerInterface::evalFit(const double* parArray_){
   }
 
   // Compute the Chi2
-  _owner_->updateChi2Cache();
+  _owner_->getPropagator().updateLlhCache();
 
   _evalFitAvgTimer_.counts++; _evalFitAvgTimer_.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 
@@ -462,7 +464,7 @@ double MinimizerInterface::evalFit(const double* parArray_){
     double cpuPercent = GenericToolbox::getCpuUsageByProcess();
     ss << std::endl << "Current CPU usage: " << cpuPercent << "% (" << cpuPercent/GlobalVariables::getNbThreads() << "% efficiency)";
     ss << std::endl << "Avg " << GUNDAM_CHI2 << " computation time: " << _evalFitAvgTimer_;
-    ss << std::endl << GUNDAM_CHI2 << "/dof: " << _owner_->getChi2Buffer()/double(_nbFitBins_ - _minimizer_->NFree());
+    ss << std::endl << GUNDAM_CHI2 << "/dof: " << _owner_->getPropagator().getLlhBuffer()/double(_nbFitBins_ - _minimizer_->NFree());
     ss << std::endl;
 #ifndef GUNDAM_BATCH
     ss << "├─";
@@ -484,9 +486,9 @@ double MinimizerInterface::evalFit(const double* parArray_){
 #endif
     ss << " Avg time to fill histograms:   " << _owner_->getPropagator().fillProp;
     _convergenceMonitor_.setHeaderString(ss.str());
-    _convergenceMonitor_.getVariable("Total").addQuantity(_owner_->getChi2Buffer());
-    _convergenceMonitor_.getVariable("Stat").addQuantity(_owner_->getChi2StatBuffer());
-    _convergenceMonitor_.getVariable("Syst").addQuantity(_owner_->getChi2PullsBuffer());
+    _convergenceMonitor_.getVariable("Total").addQuantity(_owner_->getPropagator().getLlhBuffer());
+    _convergenceMonitor_.getVariable("Stat").addQuantity(_owner_->getPropagator().getLlhStatBuffer());
+    _convergenceMonitor_.getVariable("Syst").addQuantity(_owner_->getPropagator().getLlhPenaltyBuffer());
 
     if( _nbFitCalls_ == 1 ){
       // don't erase these lines
@@ -501,12 +503,12 @@ double MinimizerInterface::evalFit(const double* parArray_){
 
   // Fill History
   _chi2HistoryTree_->Fill();
-//  _chi2History_["Total"].emplace_back(_owner_->getChi2Buffer());
+//  _chi2History_["Total"].emplace_back(_owner_->getPropagator().getLlhBuffer());
 //  _chi2History_["Stat"].emplace_back(_chi2StatBuffer_);
 //  _chi2History_["Syst"].emplace_back(_chi2PullsBuffer_);
 
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("out_evalFit");
-  return _owner_->getChi2Buffer();
+  return _owner_->getPropagator().getLlhBuffer();
 }
 void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
   LogInfo << __METHOD_NAME__ << std::endl;
