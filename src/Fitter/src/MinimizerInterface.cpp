@@ -245,9 +245,6 @@ void MinimizerInterface::minimize() {
   GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "fit")->cd();
   _chi2HistoryTree_->Write();
 
-  // Make sure the cache is currently at the best fit
-  this->evalFit(_minimizer_->X());
-
   if( _fitHasConverged_ ){ LogInfo << "Minimization has converged!" << std::endl; }
   else{ LogError << "Minimization did not converged." << std::endl; }
 
@@ -255,7 +252,6 @@ void MinimizerInterface::minimize() {
   LogInfo << "Writing convergence stats..." << std::endl;
   GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "postFit/")->cd();
 
-  this->evalFit(_minimizer_->X());
   int toyIndex = _owner_->getPropagator().getIThrow();
   int nIterations = int(_minimizer_->NIterations());
   double edmBestFit = _minimizer_->Edm();
@@ -329,9 +325,6 @@ void MinimizerInterface::minimize() {
 
   LogInfo << "Writing " << _minimizerType_ << "/" << _minimizerAlgo_ << " post-fit errors" << std::endl;
   this->writePostFitData(GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "postFit/" + _minimizerAlgo_));
-
-  // Make sure the cache is currently at the best fit
-  this->evalFit(_minimizer_->X());
 }
 void MinimizerInterface::calcErrors(){
   LogThrowIf(not isInitialized(), "not initialized");
@@ -412,9 +405,6 @@ void MinimizerInterface::calcErrors(){
   else{
     LogError << GET_VAR_NAME_VALUE(_errorAlgo_) << " not implemented." << std::endl;
   }
-
-  // Make sure the cache is currently at the best fit
-  this->evalFit(_minimizer_->X());
 }
 
 double MinimizerInterface::evalFit(const double* parArray_){
