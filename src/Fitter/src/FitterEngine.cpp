@@ -59,7 +59,7 @@ void FitterEngine::initializeImpl(){
 
   _propagator_.initialize();
 
-  this->updateChi2Cache();
+  this->_propagator_.updateLlhCache();
 
   if( _scaleParStepWithChi2Response_ ){
     LogInfo << "Using parameter step scale: " << _parStepGain_ << std::endl;
@@ -68,7 +68,7 @@ void FitterEngine::initializeImpl(){
 
   if( _enablePca_ ) { this->fixGhostFitParameters(); }
 
-  this->updateChi2Cache();
+  this->_propagator_.updateLlhCache();
 
   if( _saveDir_ != nullptr ){
     auto* dir = GenericToolbox::mkdirTFile(_saveDir_, "preFit/events");
@@ -141,7 +141,7 @@ void FitterEngine::initializeImpl(){
   _minimizer_.initialize();
   _parScanner_.initialize();
 
-//  checkNumericalAccuracy();
+  if(GlobalVariables::getVerboseLevel() >= MORE_PRINTOUT) checkNumericalAccuracy();
 }
 
 void FitterEngine::setSaveDir(TDirectory *saveDir) {
@@ -160,15 +160,6 @@ void FitterEngine::setEnablePca(bool enablePca_){
   _enablePca_ = enablePca_;
 }
 
-double FitterEngine::getChi2Buffer() const {
-  return _chi2Buffer_;
-}
-double FitterEngine::getChi2StatBuffer() const {
-  return _chi2StatBuffer_;
-}
-double FitterEngine::getChi2PullsBuffer() const {
-  return _chi2PullsBuffer_;
-}
 const Propagator& FitterEngine::getPropagator() const {
   return _propagator_;
 }
@@ -198,40 +189,15 @@ void FitterEngine::fit(){
 
   LogWarning << "Fit is done." << std::endl;
 }
-void FitterEngine::updateChi2Cache(){
-  double buffer;
-
-  // Propagate on histograms
-  _propagator_.propagateParametersOnSamples();
-
-  ////////////////////////////////
-  // Compute chi2 stat
-  ////////////////////////////////
-  _chi2StatBuffer_ = _propagator_.getFitSampleSet().evalLikelihood();
-
-  ////////////////////////////////
-  // Compute the penalty terms
-  ////////////////////////////////
-  _chi2PullsBuffer_ = 0;
-  _chi2RegBuffer_ = 0; // unused
-  for( auto& parSet : _propagator_.getParameterSetsList() ){
-    buffer = parSet.getPenaltyChi2();
-    _chi2PullsBuffer_ += buffer;
-    LogThrowIf(buffer!=buffer, parSet.getName() << " penalty chi2 is Nan");
-  }
-
-  _chi2Buffer_ = _chi2StatBuffer_ + _chi2PullsBuffer_ + _chi2RegBuffer_;
-}
-
 void FitterEngine::fixGhostFitParameters(){
   LogInfo << __METHOD_NAME__ << std::endl;
 
-  updateChi2Cache();
+  _propagator_.updateLlhCache();
 
-  LogDebug << "Reference " << GUNDAM_CHI2 << " = " << _chi2StatBuffer_ << std::endl;
-  double baseChi2 = _chi2Buffer_;
-  double baseChi2Stat = _chi2StatBuffer_;
-  double baseChi2Syst = _chi2PullsBuffer_;
+  LogDebug << "Reference " << GUNDAM_CHI2 << " = " << _propagator_.getLlhStatBuffer() << std::endl;
+  double baseChi2 = _propagator_.getLlhBuffer();
+  double baseChi2Stat = _propagator_.getLlhStatBuffer();
+  double baseChi2Syst = _propagator_.getLlhPenaltyBuffer();
 
   // +1 sigma
   int iFitPar = -1;
@@ -242,7 +208,15 @@ void FitterEngine::fixGhostFitParameters(){
 
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 
-    if( not JsonUtils::fetchValue(parSet.getConfig(), std::vector<std::string>{"fixGhostFitParameters", "enablePca"}, false) ) continue;
+    if( not parSet.isEnabled() ) continue;
+
+    if( not JsonUtils::fetchValue(parSet.getConfig(), std::vector<std::string>{"fixGhostFitParameters", "enablePca"}, false) ){
+      LogWarning << "PCA disabled on " << parSet.getName() << ". Skipping..." << std::endl;
+      continue;
+    }
+    else{
+      LogInfo << "Performing PCA on " << parSet.getName() << "..." << std::endl;
+    }
 
     bool fixNextEigenPars{false};
     auto& parList = parSet.getEffectiveParameterList();
@@ -272,10 +246,10 @@ void FitterEngine::fixGhostFitParameters(){
         ssPrint << " " << currentParValue << " -> " << par.getParameterValue();
         LogInfo << ssPrint.str() << "..." << std::endl;
 
-        updateChi2Cache();
-        deltaChi2Stat = _chi2StatBuffer_ - baseChi2Stat;
-//        deltaChi2Syst = _chi2PullsBuffer_ - baseChi2Syst;
-//        deltaChi2 = _chi2Buffer_ - baseChi2;
+        _propagator_.updateLlhCache();
+        deltaChi2Stat = _propagator_.getLlhStatBuffer() - baseChi2Stat;
+//        deltaChi2Syst = _propagator_.getLlhPenaltyBuffer() - baseChi2Syst;
+//        deltaChi2 = _propagator_.getLlhBuffer() - baseChi2;
 
         ssPrint << ": " << GUNDAM_DELTA << GUNDAM_CHI2 << " (stat) = " << deltaChi2Stat;
 
@@ -312,14 +286,14 @@ void FitterEngine::fixGhostFitParameters(){
 
   }
 
-  updateChi2Cache(); // comeback to old values
+  _propagator_.updateLlhCache(); // comeback to old values
 }
 void FitterEngine::rescaleParametersStepSize(){
   LogInfo << __METHOD_NAME__ << std::endl;
 
-  updateChi2Cache();
-  double baseChi2Pull = _chi2PullsBuffer_;
-  double baseChi2 = _chi2Buffer_;
+  _propagator_.updateLlhCache();
+  double baseChi2Pull = _propagator_.getLlhPenaltyBuffer();
+  double baseChi2 = _propagator_.getLlhBuffer();
 
   // +1 sigma
   int iFitPar = -1;
@@ -335,10 +309,10 @@ void FitterEngine::rescaleParametersStepSize(){
       double currentParValue = par.getParameterValue();
       par.setParameterValue( currentParValue + par.getStdDevValue() );
 
-      updateChi2Cache();
+      _propagator_.updateLlhCache();
 
-      double deltaChi2 = _chi2Buffer_ - baseChi2;
-      double deltaChi2Pulls = _chi2PullsBuffer_ - baseChi2Pull;
+      double deltaChi2 = _propagator_.getLlhBuffer() - baseChi2;
+      double deltaChi2Pulls = _propagator_.getLlhPenaltyBuffer() - baseChi2Pull;
 
       // Consider a parabolic approx:
       // only rescale with X2 stat?
@@ -355,14 +329,14 @@ void FitterEngine::rescaleParametersStepSize(){
 
       par.setStepSize( stepSize );
       par.setParameterValue( currentParValue + stepSize );
-      updateChi2Cache();
-      LogInfo << " -> Δχ²(step) = " << _chi2Buffer_ - baseChi2 << std::endl;
+      _propagator_.updateLlhCache();
+      LogInfo << " -> Δχ²(step) = " << _propagator_.getLlhBuffer() - baseChi2 << std::endl;
       par.setParameterValue( currentParValue );
     }
 
   }
 
-  updateChi2Cache();
+  _propagator_.updateLlhCache();
 }
 void FitterEngine::checkNumericalAccuracy(){
   LogWarning << __METHOD_NAME__ << std::endl;
@@ -398,14 +372,14 @@ void FitterEngine::checkNumericalAccuracy(){
           parSet.getParameterList()[iPar].setParameterValue( throws[iThrow][iParSet][iPar] );
         }
       }
-      updateChi2Cache();
+      _propagator_.updateLlhCache();
 
       if( responses[iThrow] == responses[iThrow] ){ // not nan
-        LogThrowIf( _chi2Buffer_ != responses[iThrow], "Not accurate: " << _chi2Buffer_ - responses[iThrow] << " / "
-                                                                        << GET_VAR_NAME_VALUE(_chi2Buffer_) << " <=> " << GET_VAR_NAME_VALUE(responses[iThrow])
+        LogThrowIf( _propagator_.getLlhBuffer() != responses[iThrow], "Not accurate: " << _propagator_.getLlhBuffer() - responses[iThrow] << " / "
+                                                                        << GET_VAR_NAME_VALUE(_propagator_.getLlhBuffer()) << " <=> " << GET_VAR_NAME_VALUE(responses[iThrow])
         )
       }
-      responses[iThrow] = _chi2Buffer_;
+      responses[iThrow] = _propagator_.getLlhBuffer();
     }
     LogDebug << GenericToolbox::parseVectorAsString(responses) << std::endl;
   }

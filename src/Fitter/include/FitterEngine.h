@@ -36,23 +36,14 @@ public:
   void setEnablePca(bool enablePca_);
 
   // Getters
-  double getChi2Buffer() const;
-  double getChi2StatBuffer() const;
-  double getChi2PullsBuffer() const;
   const Propagator& getPropagator() const;
   Propagator& getPropagator();
   ParScanner& getParScanner(){ return _parScanner_; }
   MinimizerInterface& getMinimizer(){ return _minimizer_; }
   TDirectory* getSaveDir(){ return _saveDir_; }
 
-  double* getChi2BufferPtr(){ return &_chi2Buffer_; }
-  double* getChi2StatBufferPtr(){ return &_chi2StatBuffer_; }
-  double* getChi2PullsBufferPtr(){ return &_chi2PullsBuffer_; }
-  double* getChi2RegBufferPtr(){ return &_chi2RegBuffer_; }
-
   // Core
   void fit();
-  void updateChi2Cache();
 
 protected:
   void readConfigImpl() override;
@@ -80,12 +71,6 @@ private:
   Propagator _propagator_{};
   ParScanner _parScanner_{this};
   MinimizerInterface _minimizer_{this};
-
-  // Buffers
-  double _chi2Buffer_{0};
-  double _chi2StatBuffer_{0};
-  double _chi2PullsBuffer_{0};
-  double _chi2RegBuffer_{0};
 
 };
 

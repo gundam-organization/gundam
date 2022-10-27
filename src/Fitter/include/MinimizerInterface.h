@@ -33,9 +33,7 @@ public:
   void setEnablePostFitErrorEval(bool enablePostFitErrorEval_);
 
   bool isFitHasConverged() const;
-
   bool isEnablePostFitErrorEval() const;
-
   GenericToolbox::VariablesMonitor &getConvergenceMonitor();
   std::vector<FitParameter *> &getMinimizerFitParameterPtr();
   const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const;
@@ -58,6 +56,7 @@ private:
   bool _useNormalizedFitSpace_{true};
   bool _enableSimplexBeforeMinimize_{false};
   bool _enablePostFitErrorEval_{true};
+  bool _restoreStepSizeBeforeHesse_{false};
   int _strategy_{1};
   int _printLevel_{2};
   double _tolerance_{1E-4};

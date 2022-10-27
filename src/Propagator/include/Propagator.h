@@ -31,25 +31,33 @@ public:
 
   // Getters
   bool isThrowAsimovToyParameters() const;
+  int getIThrow() const;
   FitSampleSet &getFitSampleSet();
   std::vector<FitParameterSet> &getParameterSetsList();
   const std::vector<FitParameterSet> &getParameterSetsList() const;
   PlotGenerator &getPlotGenerator();
   const EventTreeWriter &getTreeWriter() const;
 
-  int getIThrow() const;
+  double getLlhBuffer() const;
+  double getLlhStatBuffer() const;
+  double getLlhPenaltyBuffer() const;
+  double getLlhRegBuffer() const;
+  double* getLlhBufferPtr(){ return &_llhBuffer_; }
+  double* getLlhStatBufferPtr(){ return &_llhStatBuffer_; }
+  double* getLlhPenaltyBufferPtr(){ return &_llhPenaltyBuffer_; }
+  double* getLlhRegBufferPtr(){ return &_llhRegBuffer_; }
 
   // Core
+  void updateLlhCache();
   void propagateParametersOnSamples();
   void updateDialResponses();
   void reweightMcEvents();
   void refillSampleHistograms();
-  void applyResponseFunctions();
+  void generateSamplePlots(const std::string& savePath_, TDirectory* baseDir_ = nullptr);
 
   // Dev
   void fillDialsStack();
 
-  void generateSamplePlots(const std::string& savePath_, TDirectory* baseDir_ = nullptr);
 
 protected:
   void readConfigImpl() override;
@@ -60,7 +68,6 @@ protected:
   // multithreading
   void updateDialResponses(int iThread_);
   void reweightMcEvents(int iThread_);
-  void applyResponseFunctions(int iThread_);
 
 private:
   // Parameters
@@ -74,12 +81,18 @@ private:
   bool _enableStatThrowInToys_{true};
   bool _enableEventMcThrow_{true};
   int _iThrow_{-1};
+  std::shared_ptr<TMatrixD> _globalCovarianceMatrix_;
+  double _llhBuffer_{0};
+  double _llhStatBuffer_{0};
+  double _llhPenaltyBuffer_{0};
+  double _llhRegBuffer_{0};
+
+  // Sub-layers
   FitSampleSet _fitSampleSet_;
   PlotGenerator _plotGenerator_;
   EventTreeWriter _treeWriter_;
   std::vector<FitParameterSet> _parameterSetsList_;
   std::vector<DatasetLoader> _dataSetList_;
-  std::shared_ptr<TMatrixD> _globalCovarianceMatrix_;
 
   // Monitoring
   bool _showEventBreakdown_{true};
@@ -111,10 +124,6 @@ public:
   GenericToolbox::CycleTimer dialUpdate;
   GenericToolbox::CycleTimer weightProp;
   GenericToolbox::CycleTimer fillProp;
-  GenericToolbox::CycleTimer applyRf;
-
-  long long nbWeightProp = 0;
-  long long cumulatedWeightPropTime = 0;
 
 };
 

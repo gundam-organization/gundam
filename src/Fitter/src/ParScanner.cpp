@@ -89,7 +89,7 @@ void ParScanner::scanFitParameter(FitParameter& par_, const std::string &saveSub
     scanEntry.folder = "llh";
     scanEntry.title = "Total Likelihood Scan";
     scanEntry.yTitle = "LLH value";
-    scanEntry.evalY = [this](){ return _owner_->getChi2Buffer(); };
+    scanEntry.evalY = [this](){ return _owner_->getPropagator().getLlhBuffer(); };
   }
   if( JsonUtils::fetchValue(_varsConfig_, "llhPenalty", true) ){
     scanDataDict.emplace_back();
@@ -99,7 +99,7 @@ void ParScanner::scanFitParameter(FitParameter& par_, const std::string &saveSub
     scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
     scanEntry.title = "Penalty Likelihood Scan";
     scanEntry.yTitle = "Penalty LLH value";
-    scanEntry.evalY = [this](){ return _owner_->getChi2PullsBuffer(); };
+    scanEntry.evalY = [this](){ return _owner_->getPropagator().getLlhPenaltyBuffer(); };
   }
   if( JsonUtils::fetchValue(_varsConfig_, "llhStat", true) ){
     scanDataDict.emplace_back();
@@ -108,7 +108,7 @@ void ParScanner::scanFitParameter(FitParameter& par_, const std::string &saveSub
     scanEntry.folder = "llhStat";
     scanEntry.title = "Stat Likelihood Scan";
     scanEntry.yTitle = "Stat LLH value";
-    scanEntry.evalY = [this](){ return _owner_->getChi2StatBuffer(); };
+    scanEntry.evalY = [this](){ return _owner_->getPropagator().getLlhStatBuffer(); };
   }
   if( JsonUtils::fetchValue(_varsConfig_, "llhStatPerSample", false) ){
     for( auto& sample : _owner_->getPropagator().getFitSampleSet().getFitSampleList() ){
@@ -189,14 +189,14 @@ void ParScanner::scanFitParameter(FitParameter& par_, const std::string &saveSub
     }
 
     par_.setParameterValue(newVal);
-    _owner_->updateChi2Cache();
+    _owner_->getPropagator().updateLlhCache();
     parPoints[iPt] = par_.getParameterValue();
 
     for( auto& scanEntry : scanDataDict ){ scanEntry.yPoints[iPt] = scanEntry.evalY(); }
   }
 
   par_.setParameterValue(origVal);
-  _owner_->updateChi2Cache();
+  _owner_->getPropagator().updateLlhCache();
 
   std::stringstream ss;
   ss << GenericToolbox::replaceSubstringInString(par_.getFullTitle(), "/", "_");

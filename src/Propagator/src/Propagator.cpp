@@ -314,6 +314,21 @@ void Propagator::setLoadAsimovData(bool loadAsimovData) {
 bool Propagator::isThrowAsimovToyParameters() const {
   return _throwAsimovToyParameters_;
 }
+int Propagator::getIThrow() const {
+  return _iThrow_;
+}
+double Propagator::getLlhBuffer() const {
+  return _llhBuffer_;
+}
+double Propagator::getLlhStatBuffer() const {
+  return _llhStatBuffer_;
+}
+double Propagator::getLlhPenaltyBuffer() const {
+  return _llhPenaltyBuffer_;
+}
+double Propagator::getLlhRegBuffer() const {
+  return _llhRegBuffer_;
+}
 FitSampleSet &Propagator::getFitSampleSet() {
   return _fitSampleSet_;
 }
@@ -326,7 +341,41 @@ const std::vector<FitParameterSet> &Propagator::getParameterSetsList() const {
 PlotGenerator &Propagator::getPlotGenerator() {
   return _plotGenerator_;
 }
+const EventTreeWriter &Propagator::getTreeWriter() const {
+  return _treeWriter_;
+}
 
+void Propagator::updateLlhCache(){
+  double buffer;
+
+  // Propagate on histograms
+  this->propagateParametersOnSamples();
+
+  ////////////////////////////////
+  // Compute LLH stat
+  ////////////////////////////////
+  _llhStatBuffer_ = _fitSampleSet_.evalLikelihood();
+
+  ////////////////////////////////
+  // Compute the penalty terms
+  ////////////////////////////////
+  _llhPenaltyBuffer_ = 0;
+  for( auto& parSet : _parameterSetsList_ ){
+    buffer = parSet.getPenaltyChi2();
+    _llhPenaltyBuffer_ += buffer;
+    LogThrowIf(std::isnan(buffer), parSet.getName() << " penalty chi2 is Nan");
+  }
+
+  ////////////////////////////////
+  // Compute the regularisation term
+  ////////////////////////////////
+  _llhRegBuffer_ = 0; // unused
+
+  ////////////////////////////////
+  // Total LLH
+  ////////////////////////////////
+  _llhBuffer_ = _llhStatBuffer_ + _llhPenaltyBuffer_ + _llhRegBuffer_;
+}
 void Propagator::propagateParametersOnSamples(){
 
   // Only real parameters are propagated on the spectra -> need to convert the eigen to original
@@ -384,12 +433,6 @@ void Propagator::refillSampleHistograms(){
   fillProp.counts++; fillProp.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 }
 
-void Propagator::applyResponseFunctions(){
-  GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-  GlobalVariables::getParallelWorker().runJob("Propagator::applyResponseFunctions");
-  applyRf.counts++; applyRf.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-}
-
 void Propagator::fillDialsStack(){
   for( auto& parSet : _parameterSetsList_ ){
     if( not parSet.isUseEigenDecompInFit() ){
@@ -423,7 +466,6 @@ void Propagator::generateSamplePlots(const std::string& savePath_, TDirectory* b
 
 // Protected
 void Propagator::initializeThreads() {
-
   std::function<void(int)> reweightMcEventsFct = [this](int iThread){
     this->reweightMcEvents(iThread);
   };
@@ -433,7 +475,6 @@ void Propagator::initializeThreads() {
     this->updateDialResponses(iThread);
   };
   GlobalVariables::getParallelWorker().addJob("Propagator::updateDialResponses", updateDialResponsesFct);
-
 
   std::function<void(int)> refillSampleHistogramsFct = [this](int iThread){
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
@@ -449,11 +490,6 @@ void Propagator::initializeThreads() {
   };
   GlobalVariables::getParallelWorker().addJob("Propagator::refillSampleHistograms", refillSampleHistogramsFct);
   GlobalVariables::getParallelWorker().setPostParallelJob("Propagator::refillSampleHistograms", refillSampleHistogramsPostParallelFct);
-
-  std::function<void(int)> applyResponseFunctionsFct = [this](int iThread){
-    this->applyResponseFunctions(iThread);
-  };
-  GlobalVariables::getParallelWorker().addJob("Propagator::applyResponseFunctions", applyResponseFunctionsFct);
 }
 
 void Propagator::updateDialResponses(int iThread_){
@@ -499,65 +535,5 @@ void Propagator::reweightMcEvents(int iThread_) {
     }
   );
 }
-void Propagator::applyResponseFunctions(int iThread_){
 
-  TH1D* histBuffer{nullptr};
-  TH1D* nominalHistBuffer{nullptr};
-  TH1D* rfHistBuffer{nullptr};
-  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    histBuffer = sample.getMcContainer().histogram.get();
-    nominalHistBuffer = _nominalSamplesMcHistogram_[&sample].get();
-    for( int iBin = 1 ; iBin <= histBuffer->GetNbinsX() ; iBin++ ){
-      if( iBin % GlobalVariables::getNbThreads() != iThread_ ) continue;
-      histBuffer->SetBinContent(iBin, nominalHistBuffer->GetBinContent(iBin));
-    }
-  }
-
-  int iPar = -1;
-  for( auto& parSet : _parameterSetsList_ ){
-    for( auto& par : parSet.getParameterList() ){
-      iPar++;
-      double xSigmaPar = par.getDistanceFromNominal();
-      if( xSigmaPar == 0 ) continue;
-
-      for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-        histBuffer = sample.getMcContainer().histogram.get();
-        nominalHistBuffer = _nominalSamplesMcHistogram_[&sample].get();
-        rfHistBuffer = _responseFunctionsSamplesMcHistogram_[&sample][iPar].get();
-
-        for( int iBin = 1 ; iBin <= histBuffer->GetNbinsX() ; iBin++ ){
-          if( iBin % GlobalVariables::getNbThreads() != iThread_ ) continue;
-          histBuffer->SetBinContent(
-              iBin,
-              histBuffer->GetBinContent(iBin) * ( 1 + xSigmaPar * rfHistBuffer->GetBinContent(iBin) )
-          );
-        }
-      }
-    }
-  }
-
-  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    histBuffer = sample.getMcContainer().histogram.get();
-    nominalHistBuffer = _nominalSamplesMcHistogram_[&sample].get();
-    for( int iBin = 1 ; iBin <= histBuffer->GetNbinsX() ; iBin++ ){
-      if( iBin % GlobalVariables::getNbThreads() != iThread_ ) continue;
-      histBuffer->SetBinError(iBin, TMath::Sqrt(histBuffer->GetBinContent(iBin)));
-//      if( iThread_ == 0 ){
-//        LogTrace << GET_VAR_NAME_VALUE(iBin)
-//        << " / " << GET_VAR_NAME_VALUE(histBuffer->GetBinContent(iBin))
-//        << " / " << GET_VAR_NAME_VALUE(nominalHistBuffer->GetBinContent(iBin))
-//        << std::endl;
-//      }
-    }
-  }
-
-}
-
-const EventTreeWriter &Propagator::getTreeWriter() const {
-  return _treeWriter_;
-}
-
-int Propagator::getIThrow() const {
-  return _iThrow_;
-}
 
