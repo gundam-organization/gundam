@@ -194,7 +194,7 @@ void FitterEngine::fixGhostFitParameters(){
 
   _propagator_.updateLlhCache();
 
-  LogDebug << "Reference " << GUNDAM_CHI2 << " = " << _propagator_.getLlhStatBuffer() << std::endl;
+  LogInfo << "Reference " << GUNDAM_CHI2 << " for PCA: " << _propagator_.getLlhStatBuffer() << std::endl;
   double baseChi2 = _propagator_.getLlhBuffer();
   double baseChi2Stat = _propagator_.getLlhStatBuffer();
   double baseChi2Syst = _propagator_.getLlhPenaltyBuffer();
