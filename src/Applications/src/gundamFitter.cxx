@@ -125,8 +125,6 @@ int main(int argc, char** argv){
     LogInfo << "Version check passed: " << GundamVersionConfig::getVersionStr() << " >= " << JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion") << std::endl;
   }
 
-  bool isDryRun = clParser.isOptionTriggered("dry-run");
-
   std::string outFileName;
   if( clParser.isOptionTriggered("outputFile") ){
     outFileName = clParser.getOptionVal("outputFile", outFileName + ".root");
@@ -209,51 +207,36 @@ int main(int argc, char** argv){
     fitter.getPropagator().setIThrow(clParser.getOptionVal("toyFit", -1));
   }
 
-  //
+  // -d
+  fitter.setIsDryRun( clParser.isOptionTriggered("dry-run") );
 
+  // --one-sigma
+  fitter.setGenerateOneSigmaPlots( clParser.isOptionTriggered("generateOneSigmaPlots") );
+
+  // Also check app level config options
+  if( JsonUtils::doKeyExist(jsonConfig, "generateSamplePlots") ){
+    LogAlert << "Deprecated option location: \"generateSamplePlots\" should now belong to the fitterEngineConfig." << std::endl;
+    fitter.setGenerateSamplePlots( JsonUtils::fetchValue<bool>(jsonConfig, "generateSamplePlots") );
+  }
+
+  if( JsonUtils::doKeyExist(jsonConfig, "allParamVariations") ){
+    LogAlert << "Deprecated option location: \"allParamVariations\" should now belong to the fitterEngineConfig." << std::endl;
+    fitter.setDoAllParamVariations(true);
+    fitter.setAllParamVariationsSigmas(JsonUtils::fetchValue<std::vector<double>>(jsonConfig, "allParamVariations"));
+  }
 
   // --------------------------
   // Load:
   // --------------------------
   fitter.initialize();
-
-  fitter.getPropagator().updateLlhCache();
   LogInfo << "Initial χ² = " << fitter.getPropagator().getLlhBuffer() << std::endl;
   LogInfo << "Initial χ²(stat) = " << fitter.getPropagator().getLlhStatBuffer() << std::endl;
   LogInfo << "Initial χ²(penalty) = " << fitter.getPropagator().getLlhPenaltyBuffer() << std::endl;
 
   // --------------------------
-  // Pre-fit:
-  // --------------------------
-
-  // Event rates variations
-  if( JsonUtils::doKeyExist(jsonConfig, "allParamVariations") )
-  {
-    fitter.getPropagator().getParScanner().varyEvenRates(
-        JsonUtils::fetchValue<std::vector<double>>(jsonConfig, "allParamVariations"),
-        GenericToolbox::mkdirTFile(fitter.getSaveDir(), "preFit")
-        );
-  }
-
-  // LLH Visual Scan
-  if( clParser.isOptionTriggered("generateOneSigmaPlots") ) fitter.getPropagator().getParScanner().generateOneSigmaPlots(GenericToolbox::mkdirTFile(fitter.getSaveDir(), "preFit"));
-
-  // Plot generators
-  if( JsonUtils::fetchValue(jsonConfig, "generateSamplePlots", true) ){
-    fitter.getPropagator().getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(fitter.getSaveDir(), "preFit/samples"));
-  }
-
-
-  // --------------------------
   // Run the fitter:
   // --------------------------
-  if( not isDryRun ){
-    fitter.fit();
-    if( JsonUtils::fetchValue(jsonConfig, "generateSamplePlots", true) ){
-      fitter.getPropagator().getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(fitter.getSaveDir(), "postFit/samples"));
-    }
-  }
-
+  fitter.fit();
 
   LogWarning << "Closing output file \"" << out->GetName() << "\"..." << std::endl;
   out->Close();

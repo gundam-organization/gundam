@@ -39,6 +39,11 @@ void FitterEngine::readConfigImpl(){
   _enablePreFitScan_ = JsonUtils::fetchValue(_config_, "enablePreFitScan", _enablePreFitScan_);
   _enablePostFitScan_ = JsonUtils::fetchValue(_config_, "enablePostFitScan", _enablePostFitScan_);
 
+  _generateSamplePlots_ = JsonUtils::fetchValue(_config_, "generateSamplePlots", _generateSamplePlots_);
+  _generateOneSigmaPlots_ = JsonUtils::fetchValue(_config_, "generateOneSigmaPlots", _generateOneSigmaPlots_);
+  _doAllParamVariations_ = JsonUtils::doKeyExist(_config_, "allParamVariations");
+  _allParamVariationsSigmas_ = JsonUtils::fetchValue(_config_, "allParamVariations", _allParamVariationsSigmas_);
+
   _scaleParStepWithChi2Response_ = JsonUtils::fetchValue(_config_, "scaleParStepWithChi2Response", _scaleParStepWithChi2Response_);
   _parStepGain_ = JsonUtils::fetchValue(_config_, "parStepGain", _parStepGain_);
 
@@ -50,6 +55,7 @@ void FitterEngine::readConfigImpl(){
 
   _propagator_.readConfig( JsonUtils::fetchValue<nlohmann::json>(_config_, "propagatorConfig") );
   _minimizer_.readConfig( JsonUtils::fetchValue(_config_, "minimizerConfig", nlohmann::json()));
+
 
   // legacy
   if( JsonUtils::doKeyExist(_config_, "scanConfig") ){
@@ -104,27 +110,24 @@ void FitterEngine::initializeImpl(){
   LogInfo << "Writing propagator objects..." << std::endl;
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
                                _propagator_.getGlobalCovarianceMatrix().get(), "globalCovarianceMatrix");
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
-                               GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) _propagator_.getGlobalCovarianceMatrix().get()),
-                               "globalCovarianceMatrix");
   for( auto& parSet : _propagator_.getParameterSetsList() ){
     if(not parSet.isEnabled()) continue;
     GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(_saveDir_, "propagator/"+parSet.getName()),
                                   parSet.getPriorCovarianceMatrix().get(), "covarianceMatrix");
-//    GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(_saveDir_, "propagator/"+parSet.getName()),
-//                                  GenericToolbox::convertTMatrixDtoTH2D(m),
-//                                  "covarianceMatrix");
-
     GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(_saveDir_, "propagator/"+parSet.getName()),
                                   parSet.getPriorCorrelationMatrix().get(), "correlationMatrix");
-//    GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(_saveDir_, "propagator/"+parSet.getName()),
-//                                  GenericToolbox::convertTMatrixDtoTH2D(m),
-//                                  "correlationMatrix");
   }
 }
 
+// Setters
 void FitterEngine::setSaveDir(TDirectory *saveDir) {
   _saveDir_ = saveDir;
+}
+void FitterEngine::setIsDryRun(bool isDryRun_){
+  _isDryRun_ = isDryRun_;
+}
+void FitterEngine::setEnablePca(bool enablePca_){
+  _enablePca_ = enablePca_;
 }
 void FitterEngine::setEnablePreFitScan(bool enablePreFitScan) {
   _enablePreFitScan_ = enablePreFitScan;
@@ -132,10 +135,20 @@ void FitterEngine::setEnablePreFitScan(bool enablePreFitScan) {
 void FitterEngine::setEnablePostFitScan(bool enablePostFitScan) {
   _enablePostFitScan_ = enablePostFitScan;
 }
-void FitterEngine::setEnablePca(bool enablePca_){
-  _enablePca_ = enablePca_;
+void FitterEngine::setGenerateSamplePlots(bool generateSamplePlots) {
+  _generateSamplePlots_ = generateSamplePlots;
+}
+void FitterEngine::setGenerateOneSigmaPlots(bool generateOneSigmaPlots){
+  _generateOneSigmaPlots_ = generateOneSigmaPlots;
+}
+void FitterEngine::setDoAllParamVariations(bool doAllParamVariations_){
+  _doAllParamVariations_ = doAllParamVariations_;
+}
+void FitterEngine::setAllParamVariationsSigmas(const std::vector<double> &allParamVariationsSigmas) {
+  _allParamVariationsSigmas_ = allParamVariationsSigmas;
 }
 
+// Getters
 const Propagator& FitterEngine::getPropagator() const {
   return _propagator_;
 }
@@ -143,9 +156,32 @@ Propagator& FitterEngine::getPropagator() {
   return _propagator_;
 }
 
+// Core
 void FitterEngine::fit(){
-  LogThrowIf(not isInitialized());
   LogWarning << __METHOD_NAME__ << std::endl;
+  LogThrowIf(not isInitialized());
+
+  // Not moving parameters
+  if( _generateSamplePlots_ ){
+    LogInfo << "Generating pre-fit sample plots..." << std::endl;
+    _propagator_.getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(_saveDir_, "preFit/samples"));
+  }
+
+  // Moving parameters
+  if( _generateOneSigmaPlots_ ){
+    LogInfo << "Generating pre-fit one-sigma variation plots..." << std::endl;
+    _propagator_.getParScanner().generateOneSigmaPlots(GenericToolbox::mkdirTFile(_saveDir_, "preFit"));
+  }
+
+  if( _doAllParamVariations_ ){
+    LogInfo << "Running all parameter variation on pre-fit samples..." << std::endl;
+    _propagator_.getParScanner().varyEvenRates( _allParamVariationsSigmas_, GenericToolbox::mkdirTFile(_saveDir_, "preFit") );
+  }
+
+  if( _enablePreFitScan_ ){
+    LogInfo << "Scanning fit parameters before minimizing..." << std::endl;
+    this->scanMinimizerParameters(GenericToolbox::mkdirTFile(_saveDir_, "preFit/scan"));
+  }
 
   if( _throwMcBeforeFit_ ){
     LogInfo << "Throwing correlated parameters of MC away from their prior..." << std::endl;
@@ -185,14 +221,18 @@ void FitterEngine::fit(){
         parSet.throwFitParameters(_throwGain_);
       }
     } // parSet
-  } // throwMcBeforeFit
+  }
 
-  if( _enablePreFitScan_ ){
-    LogInfo << "Scanning fit parameters before minimizing..." << std::endl;
-    this->scanMinimizerParameters(GenericToolbox::mkdirTFile(_saveDir_, "preFit/scan"));
+  if( _isDryRun_ ){
+    LogAlert << "Dry run requested. Leaving before the minimization." << std::endl;
+    return;
   }
 
   _minimizer_.minimize();
+
+  if( _generateSamplePlots_ ){
+    _propagator_.getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(_saveDir_, "postFit/samples"));
+  }
 
   if( _enablePostFitScan_ ){
     LogInfo << "Scanning fit parameters around the minimum point..." << std::endl;

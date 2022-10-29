@@ -261,6 +261,7 @@ void ParScanner::generateOneSigmaPlots(TDirectory* saveDir_){
 
 }
 void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, TDirectory* saveDir_){
+  LogThrowIf(not isInitialized());
   saveDir_->cd();
 
   auto makeVariedEventRatesFct = [&](FitParameter& par_, std::vector<double> variationList_, TDirectory* saveSubDir_){
