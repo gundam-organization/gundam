@@ -195,43 +195,40 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
     scanGraph.GetXaxis()->SetTitle(par_.getFullTitle().c_str());
     scanGraph.SetDrawOption("AP");
     scanGraph.SetMarkerStyle(kFullDotLarge);
-    GenericToolbox::mkdirTFile( saveDir_, scanEntry.folder )->cd();
-    scanGraph.Write( ss.str().c_str() );
+    GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile( saveDir_, scanEntry.folder ), &scanGraph, ss.str());
   }
 }
 void ParScanner::generateOneSigmaPlots(TDirectory* saveDir_){
   LogThrowIf(not isInitialized());
   LogThrowIf(saveDir_ == nullptr, "saveDir_ not set.");
 
+  // Build the histograms with the current parameters
   _owner_->propagateParametersOnSamples();
   _owner_->getPlotGenerator().generateSamplePlots();
-
-  saveDir_->cd();
-  auto refHistList = _owner_->getPlotGenerator().getHistHolderList(); // current buffer
-
+  auto refHistList = _owner_->getPlotGenerator().getHistHolderList();
 
   auto makeOneSigmaPlotFct = [&](FitParameter& par_, TDirectory* parSavePath_){
+    LogInfo << "Generating one sigma plots for \"" << par_.getFullTitle() << "\" -> " << par_.getParameterValue() << " + " << par_.getStdDevValue() << std::endl;
     double currentParValue = par_.getParameterValue();
-    par_.setParameterValue( currentParValue + par_.getStdDevValue() );
-    LogInfo << "Processing onw sigma on " << par_.getParameterValue() << std::endl;
 
+    // Push the selected parameter to 1 sigma
+    par_.setParameterValue( currentParValue + par_.getStdDevValue() );
+
+    // Propagate the parameters
     _owner_->propagateParametersOnSamples();
 
-    parSavePath_->cd();
-
+    // put the saved histograms in slot 1 of the buffer
     _owner_->getPlotGenerator().generateSampleHistograms(nullptr, 1);
 
-    auto oneSigmaHistList = _owner_->getPlotGenerator().getHistHolderList(1);
-    _owner_->getPlotGenerator().generateComparisonPlots( oneSigmaHistList, refHistList, saveDir_ );
+    // Compare with the
+    _owner_->getPlotGenerator().generateComparisonPlots(
+        _owner_->getPlotGenerator().getHistHolderList(1),
+        refHistList, parSavePath_
+    );
+
+    // Come back to the original place
     par_.setParameterValue( currentParValue );
     _owner_->propagateParametersOnSamples();
-
-    const auto& compHistList = _owner_->getPlotGenerator().getComparisonHistHolderList();
-
-//      // Since those were not saved, delete manually
-//      // Don't delete? -> slower each time
-////      for( auto& hist : oneSigmaHistList ){ delete hist.histPtr; }
-//      oneSigmaHistList.clear();
   };
 
   // +1 sigma
@@ -244,13 +241,14 @@ void ParScanner::generateOneSigmaPlots(TDirectory* saveDir_){
       continue;
     }
 
-
     for( auto& effPar : parSet.getEffectiveParameterList() ){
       if( not effPar.isEnabled() ) continue;
       std::string tag;
       if( effPar.isFixed() ){ tag += "_FIXED"; }
-      TDirectory* subDir = GenericToolbox::mkdirTFile(saveDir_, parSet.getName() + "/" + effPar.getTitle() + tag);
-      makeOneSigmaPlotFct(effPar, subDir);
+      makeOneSigmaPlotFct(
+          effPar,
+          GenericToolbox::mkdirTFile(saveDir_, parSet.getName() + "/" + effPar.getTitle() + tag)
+      );
     }
 
   }
@@ -258,6 +256,8 @@ void ParScanner::generateOneSigmaPlots(TDirectory* saveDir_){
   // Since those were not saved, delete manually
 //  for( auto& refHist : refHistList ){ delete refHist.histPtr; }
   refHistList.clear();
+
+  GenericToolbox::triggerTFileWrite(saveDir_);
 
 }
 void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, TDirectory* saveDir_){

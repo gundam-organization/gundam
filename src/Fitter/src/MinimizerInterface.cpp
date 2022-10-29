@@ -820,9 +820,9 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
   auto savePostFitObjFct =
       [&](const FitParameterSet& parSet_, const std::vector<FitParameter>& parList_, TMatrixD* covMatrix_, TDirectory* saveSubdir_){
 
-        auto* covMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) covMatrix_, Form("Covariance_%s_TH2D", parSet_.getName().c_str()));
+        auto* covMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) covMatrix_, Form("Covariance_%s", parSet_.getName().c_str()));
         auto* corMatrix = GenericToolbox::convertToCorrelationMatrix((TMatrixD*) covMatrix_);
-        auto* corMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D(corMatrix, Form("Correlation_%s_TH2D", parSet_.getName().c_str()));
+        auto* corMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D(corMatrix, Form("Correlation_%s", parSet_.getName().c_str()));
 
         size_t maxLabelLength{0};
         for( const auto& par : parList_ ){
@@ -833,7 +833,7 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
           corMatrixTH2D->GetYaxis()->SetBinLabel(1+par.getParameterIndex(), par.getTitle().c_str());
         }
 
-        auto corMatrixCanvas = std::make_unique<TCanvas>("host_TCanvas", "host_TCanvas", 1024, 1024);
+        auto corMatrixCanvas = std::make_unique<TCanvas>("host", "host", 1024, 1024);
         corMatrixCanvas->cd();
         corMatrixTH2D->GetXaxis()->SetLabelSize(0.025);
         corMatrixTH2D->GetXaxis()->LabelsOption("v");
@@ -860,11 +860,11 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
         corMatrixTH2D->Draw("COLZ");
 
         GenericToolbox::mkdirTFile(saveSubdir_, "matrices")->cd();
-        covMatrix_->Write("Covariance_TMatrixD");
-        covMatrixTH2D->Write("Covariance_TH2D");
-        corMatrix->Write("Correlation_TMatrixD");
-        corMatrixTH2D->Write("Correlation_TH2D");
-        corMatrixCanvas->Write("Correlation_TCanvas");
+        covMatrix_->Write("Covariance");
+        covMatrixTH2D->Write("Covariance");
+        corMatrix->Write("Correlation");
+        corMatrixTH2D->Write("Correlation");
+        corMatrixCanvas->Write("Correlation");
 
 
         // Table printout
@@ -935,8 +935,8 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
 
           size_t longestTitleSize{0};
 
-          auto postFitErrorHist   = std::make_unique<TH1D>("postFitErrors_TH1D", "Post-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
-          auto preFitErrorHist    = std::make_unique<TH1D>("preFitErrors_TH1D", "Pre-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
+          auto postFitErrorHist   = std::make_unique<TH1D>("postFitErrors", "Post-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
+          auto preFitErrorHist    = std::make_unique<TH1D>("preFitErrors", "Pre-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
           auto toyParametersLine  = std::make_unique<TH1D>("toyParametersLine", "toyParametersLine", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
 
           std::vector<TBox> freeParBoxes;
@@ -1082,7 +1082,7 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
 
           if( not isNorm_ ){ preFitErrorHist->SetTitle(Form("Pre-fit/Post-fit comparison for %s", parSet_.getName().c_str())); }
           else             { preFitErrorHist->SetTitle(Form("Pre-fit/Post-fit comparison for %s (normalized)", parSet_.getName().c_str())); }
-          errorsCanvas->Write("fitConstraints_TCanvas");
+          errorsCanvas->Write("fitConstraints");
 
         }; // makePrePostFitCompPlot
 

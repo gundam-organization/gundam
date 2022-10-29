@@ -175,11 +175,10 @@ int main(int argc, char** argv){
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamFitter"), &unfoldedConfigString);
 
 
-  LogInfo << "FitterEngine setup..." << std::endl;
-
   // --------------------------
   // Configure:
   // --------------------------
+  LogInfo << "FitterEngine setup..." << std::endl;
   FitterEngine fitter{GenericToolbox::mkdirTFile(out, "FitterEngine")};
   fitter.readConfig(JsonUtils::fetchSubEntry(jsonConfig, {"fitterEngineConfig"}));
 
@@ -225,7 +224,7 @@ int main(int argc, char** argv){
     fitter.setAllParamVariationsSigmas(JsonUtils::fetchValue<std::vector<double>>(jsonConfig, "allParamVariations"));
   }
 
-  
+
   // --------------------------
   // Load:
   // --------------------------

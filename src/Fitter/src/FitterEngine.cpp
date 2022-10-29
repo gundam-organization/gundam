@@ -100,9 +100,6 @@ void FitterEngine::initializeImpl(){
     this->rescaleParametersStepSize();
   }
 
-  this->_propagator_.updateLlhCache();
-  _propagator_.getTreeWriter().writeSamples(GenericToolbox::mkdirTFile(_saveDir_, "preFit/events"));
-
   // The minimizer needs all the parameters to be fully setup (i.e. PCA done and other properties)
   _minimizer_.initialize();
 
@@ -119,6 +116,9 @@ void FitterEngine::initializeImpl(){
     GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(_saveDir_, "propagator/"+parSet.getName()),
                                   parSet.getPriorCorrelationMatrix().get(), "correlationMatrix");
   }
+
+  this->_propagator_.updateLlhCache();
+  _propagator_.getTreeWriter().writeSamples(GenericToolbox::mkdirTFile(_saveDir_, "preFit/events"));
 }
 
 // Setters

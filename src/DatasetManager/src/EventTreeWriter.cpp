@@ -29,15 +29,9 @@ void EventTreeWriter::writeSamples(TDirectory* saveDir_) const{
     LogInfo << "Writing sample: " << sample.getName() << std::endl;
 
     for( bool isData : {false, true} ) {
-
       const auto *evListPtr = (isData ? &sample.getDataContainer().eventList : &sample.getMcContainer().eventList);
       if (evListPtr->empty()) continue;
-
-      auto* saveDir = GenericToolbox::mkdirTFile(saveDir_, sample.getName());
-
-      std::string treeName = (isData ? "Data_TTree" : "MC_TTree");
-      this->writeEvents(saveDir, treeName, *evListPtr);
-
+      this->writeEvents(GenericToolbox::mkdirTFile(saveDir_, sample.getName()), (isData ? "Data" : "MC"), *evListPtr);
     }
   }
 
@@ -47,7 +41,6 @@ void EventTreeWriter::writeEvents(TDirectory *saveDir_, const std::string& treeN
   LogThrowIf(treeName_.empty(), "TTree name no set.");
 
   auto* oldDir = GenericToolbox::getCurrentTDirectory();
-  saveDir_->cd();
 
   auto* tree = new TTree(treeName_.c_str(), treeName_.c_str());
 
@@ -145,7 +138,8 @@ void EventTreeWriter::writeEvents(TDirectory *saveDir_, const std::string& treeN
 
     tree->Fill();
   }
-  tree->Write();
+
+  GenericToolbox::writeInTFile( saveDir_, tree );
   delete tree;
 
   if(oldDir != nullptr) oldDir->cd();
