@@ -148,7 +148,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
         for( auto& histPtrToFill : histPtrToFillList ){
           if( not histPtrToFill->isBinCacheBuilt ){
             // If any, launch rebuild cache
-            LogInfo << "Build event bin cache for sample \"" << sample.getName() << "\"" << std::endl;
+            LogInfo << "Build event bin cache for sample \"" << sample.getName() << "\" " << (isData? "(data)":"(mc)") << std::endl;
             this->buildEventBinCache(histPtrToFillList, eventListPtr, isData);
             break; // all caches done at once
           }
