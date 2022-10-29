@@ -167,6 +167,7 @@ void FitterEngine::fit(){
   if( _generateSamplePlots_ ){
     LogInfo << "Generating pre-fit sample plots..." << std::endl;
     _propagator_.getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(_saveDir_, "preFit/samples"));
+    GenericToolbox::triggerTFileWrite(_saveDir_);
   }
 
   // Moving parameters

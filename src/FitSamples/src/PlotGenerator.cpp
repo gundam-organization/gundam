@@ -177,7 +177,6 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
         GlobalVariables::getParallelWorker().addJob("fillJob", fillJob);
         GlobalVariables::getParallelWorker().runJob("fillJob");
         GlobalVariables::getParallelWorker().removeJob("fillJob");
-
       } // isData loop
     } // sample
 
@@ -235,7 +234,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
     for( auto& histHolderCached : _histHolderCacheList_[cacheSlot_] ){
       GenericToolbox::writeInTFile(
           GenericToolbox::mkdirTFile(saveDir_, histHolderCached.folderPath ),
-          histHolderCached.histPtr.get(), histHolderCached.histName
+          histHolderCached.histPtr.get(), histHolderCached.histName, false
           );
     }
   }
