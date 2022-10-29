@@ -225,6 +225,7 @@ int main(int argc, char** argv){
     fitter.setAllParamVariationsSigmas(JsonUtils::fetchValue<std::vector<double>>(jsonConfig, "allParamVariations"));
   }
 
+  
   // --------------------------
   // Load:
   // --------------------------
@@ -232,6 +233,7 @@ int main(int argc, char** argv){
   LogInfo << "Initial χ² = " << fitter.getPropagator().getLlhBuffer() << std::endl;
   LogInfo << "Initial χ²(stat) = " << fitter.getPropagator().getLlhStatBuffer() << std::endl;
   LogInfo << "Initial χ²(penalty) = " << fitter.getPropagator().getLlhPenaltyBuffer() << std::endl;
+
 
   // --------------------------
   // Run the fitter:

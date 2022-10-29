@@ -249,7 +249,7 @@ void ParScanner::generateOneSigmaPlots(TDirectory* saveDir_){
       if( not effPar.isEnabled() ) continue;
       std::string tag;
       if( effPar.isFixed() ){ tag += "_FIXED"; }
-      TDirectory* subDir = GenericToolbox::mkdirTFile(saveDir_, "oneSigma/" + parSet.getName() + "/" + effPar.getTitle() + tag);
+      TDirectory* subDir = GenericToolbox::mkdirTFile(saveDir_, parSet.getName() + "/" + effPar.getTitle() + tag);
       makeOneSigmaPlotFct(effPar, subDir);
     }
 
@@ -364,7 +364,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
         if( par.isFixed() ){ tag += "_FIXED"; }
         if( par.isFree() ){ tag += "_FREE"; }
 
-        TDirectory* subDir = GenericToolbox::mkdirTFile(saveDir_, "varyEventRates/" + parSet.getName() + "/" + par.getTitle() + tag);
+        TDirectory* subDir = GenericToolbox::mkdirTFile(saveDir_, parSet.getName() + "/" + par.getTitle() + tag);
         makeVariedEventRatesFct(par, paramVariationList_, subDir);
 
       }

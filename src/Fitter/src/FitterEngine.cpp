@@ -74,9 +74,9 @@ void FitterEngine::initializeImpl(){
   _propagator_.initialize();
 
   if( _debugPrintLoadedEvents_ ){
-    LogWarning << GET_VAR_NAME_VALUE(_debugPrintLoadedEventsNbPerSample_) << std::endl;
+    LogDebug << GET_VAR_NAME_VALUE(_debugPrintLoadedEventsNbPerSample_) << std::endl;
     for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
-      LogWarning << "debugPrintLoadedEvents: " << sample.getName() << std::endl;
+      LogDebug << "debugPrintLoadedEvents: " << sample.getName() << std::endl;
       LogDebug.setIndentStr("  ");
 
       int iEvt=0;
@@ -88,11 +88,13 @@ void FitterEngine::initializeImpl(){
     }
   }
 
+  // This moves the parameters
   if( _enablePca_ ) {
     LogWarning << "PCA is enabled. Polling parameters..." << std::endl;
     this->fixGhostFitParameters();
   }
 
+  // This moves the parameters
   if( _scaleParStepWithChi2Response_ ){
     LogInfo << "Using parameter step scale: " << _parStepGain_ << std::endl;
     this->rescaleParametersStepSize();
@@ -170,19 +172,16 @@ void FitterEngine::fit(){
   // Moving parameters
   if( _generateOneSigmaPlots_ ){
     LogInfo << "Generating pre-fit one-sigma variation plots..." << std::endl;
-    _propagator_.getParScanner().generateOneSigmaPlots(GenericToolbox::mkdirTFile(_saveDir_, "preFit"));
+    _propagator_.getParScanner().generateOneSigmaPlots(GenericToolbox::mkdirTFile(_saveDir_, "preFit/oneSigma"));
   }
-
   if( _doAllParamVariations_ ){
     LogInfo << "Running all parameter variation on pre-fit samples..." << std::endl;
-    _propagator_.getParScanner().varyEvenRates( _allParamVariationsSigmas_, GenericToolbox::mkdirTFile(_saveDir_, "preFit") );
+    _propagator_.getParScanner().varyEvenRates( _allParamVariationsSigmas_, GenericToolbox::mkdirTFile(_saveDir_, "preFit/varyEventRates") );
   }
-
   if( _enablePreFitScan_ ){
     LogInfo << "Scanning fit parameters before minimizing..." << std::endl;
     this->scanMinimizerParameters(GenericToolbox::mkdirTFile(_saveDir_, "preFit/scan"));
   }
-
   if( _throwMcBeforeFit_ ){
     LogInfo << "Throwing correlated parameters of MC away from their prior..." << std::endl;
     LogInfo << "Throw gain form MC push set to: " << _throwGain_ << std::endl;
@@ -223,6 +222,7 @@ void FitterEngine::fit(){
     } // parSet
   }
 
+  // Leaving now?
   if( _isDryRun_ ){
     LogAlert << "Dry run requested. Leaving before the minimization." << std::endl;
     return;
@@ -233,14 +233,18 @@ void FitterEngine::fit(){
   if( _generateSamplePlots_ ){
     _propagator_.getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(_saveDir_, "postFit/samples"));
   }
-
   if( _enablePostFitScan_ ){
     LogInfo << "Scanning fit parameters around the minimum point..." << std::endl;
     this->scanMinimizerParameters(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scan"));
   }
 
   if( _minimizer_.isFitHasConverged() and _minimizer_.isEnablePostFitErrorEval() ){
+    LogWarning << "Computing post-fit errors..." << std::endl;
     _minimizer_.calcErrors();
+  }
+  else{
+    if( not _minimizer_.isFitHasConverged() ) LogAlert << "Skipping post-fit error calculation since the minimizer did not converge." << std::endl;
+    else LogAlert << "Skipping post-fit error calculation since the option is disabled." << std::endl;
   }
 
   LogWarning << "Fit is done." << std::endl;
