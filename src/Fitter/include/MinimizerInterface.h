@@ -56,6 +56,8 @@ private:
   bool _enableSimplexBeforeMinimize_{false};
   bool _enablePostFitErrorEval_{true};
   bool _restoreStepSizeBeforeHesse_{false};
+  bool _generatedPostFitParBreakdown_{false};
+  bool _generatedPostFitEigenBreakdown_{false};
   int _strategy_{1};
   int _printLevel_{2};
   double _tolerance_{1E-4};

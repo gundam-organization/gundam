@@ -48,6 +48,10 @@ void MinimizerInterface::readConfigImpl(){
   _errorAlgo_ = JsonUtils::fetchValue(_config_, {{"errorsAlgo"}, {"errors"}}, "Hesse");
   _enablePostFitErrorEval_ = JsonUtils::fetchValue(_config_, "enablePostFitErrorFit", _enablePostFitErrorEval_);
   _restoreStepSizeBeforeHesse_ = JsonUtils::fetchValue(_config_, "restoreStepSizeBeforeHesse", _restoreStepSizeBeforeHesse_);
+
+  _generatedPostFitParBreakdown_ = JsonUtils::fetchValue(_config_, "generatedPostFitParBreakdown", _generatedPostFitParBreakdown_);
+  _generatedPostFitEigenBreakdown_ = JsonUtils::fetchValue(_config_, "generatedPostFitEigenBreakdown", _generatedPostFitEigenBreakdown_);
+
 }
 void MinimizerInterface::initializeImpl(){
   LogInfo << "Initializing the minimizer..." << std::endl;
@@ -534,15 +538,13 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
       LogInfo << "Eigen decomposition of the post-fit covariance matrix" << std::endl;
       TMatrixDSymEigen decompCovMatrix(postfitCovarianceMatrix);
 
-      auto* outSubdir = GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition");
-
       TH2D* eigenVectors = GenericToolbox::convertTMatrixDtoTH2D(&decompCovMatrix.GetEigenVectors());
       applyBinLabels(eigenVectors);
-      GenericToolbox::writeInTFile(outSubdir, eigenVectors, "eigenVectors");
+      GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), eigenVectors, "eigenVectors");
 
       TH1D* eigenValues = GenericToolbox::convertTVectorDtoTH1D(&decompCovMatrix.GetEigenValues());
       applyBinLabels(eigenValues);
-      GenericToolbox::writeInTFile(outSubdir, eigenValues, "eigenValues");
+      GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), eigenValues, "eigenValues");
 
       double conditioning = decompCovMatrix.GetEigenValues().Min() / decompCovMatrix.GetEigenValues().Max();
       LogWarning << "Post-fit error conditioning is: " << conditioning << std::endl;
@@ -563,7 +565,7 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
       applyBinLabels(postfitHessianTH2D);
       GenericToolbox::writeInTFile(outDir_, postfitHessianTH2D, "postfitHessian");
 
-      if(true){
+      if( _generatedPostFitEigenBreakdown_ ){
         LogInfo << "Eigen breakdown..." << std::endl;
         TH1D eigenBreakdownHist("eigenBreakdownHist", "eigenBreakdownHist",
                                 int(_minimizer_->NDim()), -0.5, int(_minimizer_->NDim()) - 0.5);
@@ -592,8 +594,9 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
           applyBinLabels(&eigenBreakdownHist);
           applyBinLabels(&eigenBreakdownAccum[iEigen]);
 
-          GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outSubdir, "eigenBreakdown"), &eigenBreakdownHist,
-                                       Form("eigen#%i", iEigen));
+          GenericToolbox::writeInTFile(
+              GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition/eigenBreakdown"),
+              &eigenBreakdownHist, Form("eigen#%i", iEigen));
 
           eigenBreakdownAccum[iEigen].Add(&eigenBreakdownHist);
           eigenBreakdownAccum[iEigen].SetLabelSize(0.02);
@@ -627,10 +630,10 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
         l.Draw();
         gPad->SetGridx();
         gPad->SetGridy();
-        GenericToolbox::writeInTFile(outSubdir, &accumPlot, "eigenBreakdown");
+        GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), &accumPlot, "eigenBreakdown");
       }
 
-      if(true){
+      if( _generatedPostFitParBreakdown_ ){
         LogInfo << "Parameters breakdown..." << std::endl;
         TH1D parBreakdownHist("parBreakdownHist", "parBreakdownHist",
                               decompCovMatrix.GetEigenValues().GetNrows(), -0.5,
@@ -654,8 +657,10 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
                 * decompCovMatrix.GetEigenValues()[iEigen]
             );
           }
-          GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outSubdir, "parBreakdown"), &parBreakdownHist,
-                                       Form("par#%i", iPar));
+          GenericToolbox::writeInTFile(
+              GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition/parBreakdown"),
+              &parBreakdownHist, Form("par#%i", iPar)
+              );
 
           parBreakdownAccum[iPar].Add(&parBreakdownHist);
           parBreakdownAccum[iPar].SetLabelSize(0.02);
@@ -669,7 +674,10 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
           isFirst ? parHist.Draw("HIST") : parHist.Draw("HIST SAME");
           isFirst = false;
         }
-        GenericToolbox::writeInTFile(outSubdir, &accumPlot, "parBreakdown");
+        GenericToolbox::writeInTFile(
+            GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"),
+            &accumPlot, "parBreakdown"
+            );
       }
 
     }
@@ -797,8 +805,6 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
     LogInfo << "Writing normalized decomposition of the output matrix..." << std::endl;
     decomposeCovarianceMatrixFct(GenericToolbox::mkdirTFile(matricesDir, "normalizedFitSpace"));
 
-//    auto* totalCorrelationMatrix = GenericToolbox::convertToCorrelationMatrix((TMatrixD*) &totalCovMatrix);
-
     // Rescale the post-fit values:
     for(int iRow = 0 ; iRow < postfitCovarianceMatrix.GetNrows() ; iRow++ ){
       for(int iCol = 0 ; iCol < postfitCovarianceMatrix.GetNcols() ; iCol++ ){
@@ -810,9 +816,6 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
 
   LogInfo << "Writing decomposition of the output matrix..." << std::endl;
   decomposeCovarianceMatrixFct(matricesDir);
-
-
-  TH2D* totalCovTH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) &postfitCovarianceMatrix);
 
   LogInfo << "Fitter covariance matrix is " << postfitCovarianceMatrix.GetNrows() << "x" << postfitCovarianceMatrix.GetNcols() << std::endl;
   auto* errorDir = GenericToolbox::mkdirTFile(saveDir_, "errors");
@@ -1150,6 +1153,8 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
 
   } // parSet
 
+  LogWarning << "Writing out file..." << std::endl;
+  GenericToolbox::triggerTFileWrite(saveDir_);
 }
 
 

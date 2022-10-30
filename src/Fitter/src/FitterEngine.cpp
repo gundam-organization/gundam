@@ -119,6 +119,9 @@ void FitterEngine::initializeImpl(){
 
   this->_propagator_.updateLlhCache();
   _propagator_.getTreeWriter().writeSamples(GenericToolbox::mkdirTFile(_saveDir_, "preFit/events"));
+
+  LogWarning << "Saving all objects to disk..." << std::endl;
+  GenericToolbox::triggerTFileWrite(_saveDir_);
 }
 
 // Setters
@@ -174,14 +177,17 @@ void FitterEngine::fit(){
   if( _generateOneSigmaPlots_ ){
     LogInfo << "Generating pre-fit one-sigma variation plots..." << std::endl;
     _propagator_.getParScanner().generateOneSigmaPlots(GenericToolbox::mkdirTFile(_saveDir_, "preFit/oneSigma"));
+    GenericToolbox::triggerTFileWrite(_saveDir_);
   }
   if( _doAllParamVariations_ ){
     LogInfo << "Running all parameter variation on pre-fit samples..." << std::endl;
     _propagator_.getParScanner().varyEvenRates( _allParamVariationsSigmas_, GenericToolbox::mkdirTFile(_saveDir_, "preFit/varyEventRates") );
+    GenericToolbox::triggerTFileWrite(_saveDir_);
   }
   if( _enablePreFitScan_ ){
     LogInfo << "Scanning fit parameters before minimizing..." << std::endl;
     this->scanMinimizerParameters(GenericToolbox::mkdirTFile(_saveDir_, "preFit/scan"));
+    GenericToolbox::triggerTFileWrite(_saveDir_);
   }
   if( _throwMcBeforeFit_ ){
     LogInfo << "Throwing correlated parameters of MC away from their prior..." << std::endl;
@@ -232,11 +238,14 @@ void FitterEngine::fit(){
   _minimizer_.minimize();
 
   if( _generateSamplePlots_ ){
+    LogInfo << "Generating post-fit sample plots..." << std::endl;
     _propagator_.getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(_saveDir_, "postFit/samples"));
+    GenericToolbox::triggerTFileWrite(_saveDir_);
   }
   if( _enablePostFitScan_ ){
     LogInfo << "Scanning fit parameters around the minimum point..." << std::endl;
     this->scanMinimizerParameters(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scan"));
+    GenericToolbox::triggerTFileWrite(_saveDir_);
   }
 
   if( _minimizer_.isFitHasConverged() and _minimizer_.isEnablePostFitErrorEval() ){
