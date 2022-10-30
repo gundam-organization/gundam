@@ -234,6 +234,7 @@ void FitterEngine::fit(){
     return;
   }
 
+  LogInfo << "Minimizing LLH..." << std::endl;
   _minimizer_.minimize();
 
   if( _generateSamplePlots_ ){
@@ -248,7 +249,7 @@ void FitterEngine::fit(){
   }
 
   if( _minimizer_.isFitHasConverged() and _minimizer_.isEnablePostFitErrorEval() ){
-    LogWarning << "Computing post-fit errors..." << std::endl;
+    LogInfo << "Computing post-fit errors..." << std::endl;
     _minimizer_.calcErrors();
   }
   else{

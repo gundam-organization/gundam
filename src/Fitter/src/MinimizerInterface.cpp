@@ -840,6 +840,7 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
 
   auto savePostFitObjFct =
       [&](const FitParameterSet& parSet_, const std::vector<FitParameter>& parList_, TMatrixD* covMatrix_, TDirectory* saveSubdir_){
+        GenericToolbox::mkdirTFile(saveSubdir_, "matrices")->cd(); // prevent ROOT to delete other hists with the same name...
 
         auto* covMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) covMatrix_, Form("Covariance_%s", parSet_.getName().c_str()));
         auto* corMatrix = GenericToolbox::convertToCorrelationMatrix((TMatrixD*) covMatrix_);
@@ -1113,7 +1114,7 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
   for( const auto& parSet : _owner_->getPropagator().getParameterSetsList() ){
     if( not parSet.isEnabled() ){ continue; }
 
-    LogWarning << "Extracting post-fit errors of parameter set: " << parSet.getName() << std::endl;
+    LogInfo << "Extracting post-fit errors of parameter set: " << parSet.getName() << std::endl;
     auto* parSetDir = GenericToolbox::mkdirTFile(errorDir, parSet.getName());
 
     auto* parList = &parSet.getEffectiveParameterList();
