@@ -253,16 +253,16 @@ int main(int argc, char** argv){
   fitter.setGenerateOneSigmaPlots( clParser.isOptionTriggered("generateOneSigmaPlots") );
 
   // Also check app level config options
-  if( JsonUtils::doKeyExist(jsonConfig, "generateSamplePlots") ){
-    LogAlert << "Deprecated option location: \"generateSamplePlots\" should now belong to the fitterEngineConfig." << std::endl;
+  JsonUtils::deprecatedAction(jsonConfig, "generateSamplePlots", [&]{
+    LogAlert << "Forwarding the option to FitterEngine. Consider moving it into \"fitterEngineConfig:\"" << std::endl;
     fitter.setGenerateSamplePlots( JsonUtils::fetchValue<bool>(jsonConfig, "generateSamplePlots") );
-  }
+  });
 
-  if( JsonUtils::doKeyExist(jsonConfig, "allParamVariations") ){
-    LogAlert << "Deprecated option location: \"allParamVariations\" should now belong to the fitterEngineConfig." << std::endl;
+  JsonUtils::deprecatedAction(jsonConfig, "allParamVariations", [&]{
+    LogAlert << "Forwarding the option to FitterEngine. Consider moving it into \"fitterEngineConfig:\"" << std::endl;
     fitter.setDoAllParamVariations(true);
     fitter.setAllParamVariationsSigmas(JsonUtils::fetchValue<std::vector<double>>(jsonConfig, "allParamVariations"));
-  }
+  });
 
 
   // --------------------------

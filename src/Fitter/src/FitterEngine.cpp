@@ -58,11 +58,10 @@ void FitterEngine::readConfigImpl(){
 
 
   // legacy
-  if( JsonUtils::doKeyExist(_config_, "scanConfig") ){
-    LogAlert << "\"scanConfig\" option should now be specified within propagatorConfig" << std::endl;
-    LogAlert << "For LEGACY, parScanner config is provided. This will be deprecated in the future versions." << std::endl;
+  JsonUtils::deprecatedAction(_config_, "scanConfig", [&]{
+    LogAlert << "Forwarding the option to Propagator. Consider moving it into \"propagatorConfig:\"" << std::endl;
     _propagator_.getParScanner().readConfig( JsonUtils::fetchValue(_config_, "scanConfig", nlohmann::json()) );
-  }
+  });
 
   _minimizer_.getConvergenceMonitor().setMaxRefreshRateInMs(JsonUtils::fetchValue(_config_, "monitorRefreshRateInMs", _minimizer_.getConvergenceMonitor().getMaxRefreshRateInMs()));
   LogInfo << "Convergence monitor will be refreshed every " << _minimizer_.getConvergenceMonitor().getMaxRefreshRateInMs() << "ms." << std::endl;
