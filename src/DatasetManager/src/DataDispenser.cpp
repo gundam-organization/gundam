@@ -727,7 +727,7 @@ void DataDispenser::readAndFill(){
     DialSet* dialSetPtr;
     const std::vector<DataBin>* binsListPtr;
     std::vector<DialWrapper>::iterator dialFoundItr;
-    std::vector<const DataBin>::const_iterator binFoundItr;
+    std::vector<DataBin>::const_iterator binFoundItr;
     auto isBinValid = [&](const DataBin& b_){
       for( iVar = 0 ; iVar < b_.getVariableNameList().size() ; iVar++ ){
         if( not b_.isBetweenEdges(iVar, eventBuffer.getVarAsDouble(b_.getVariableNameList()[iVar])) ){
