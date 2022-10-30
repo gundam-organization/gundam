@@ -22,6 +22,9 @@ void SampleElement::reserveEventMemory(size_t dataSetIndex_, size_t nEvents, con
   dataSetIndexList.emplace_back(dataSetIndex_);
   eventOffSetList.emplace_back(eventList.size());
   eventNbList.emplace_back(nEvents);
+  LogInfo << name << ": creating " << eventNbList.back() << " events ("
+  << GenericToolbox::parseSizeUnits( double(eventNbList.back()) * sizeof(eventBuffer_) )
+  << ")" << std::endl;
   eventList.resize(eventOffSetList.back()+eventNbList.back(), eventBuffer_);
 }
 void SampleElement::shrinkEventList(size_t newTotalSize_){
@@ -31,7 +34,8 @@ void SampleElement::shrinkEventList(size_t newTotalSize_){
              "Can't shrink since eventList is too small: " << GET_VAR_NAME_VALUE(newTotalSize_)
              << " > " << GET_VAR_NAME_VALUE(eventList.size()));
   LogThrowIf(not eventNbList.empty() and eventNbList.back() < (eventList.size() - newTotalSize_), "Can't shrink since eventList of the last dataSet is too small.");
-  LogInfo << "-> Shrinking " << eventList.size() << " to " << newTotalSize_ << "..." << std::endl;
+  LogInfo << name << ": shrinking event list from " << eventList.size() << " to " << newTotalSize_ << "..."
+  << "(+" << GenericToolbox::parseSizeUnits( double(eventList.size() - newTotalSize_) * sizeof(eventList.back()) ) << ")" << std::endl;
   eventNbList.back() -= (eventList.size() - newTotalSize_);
   eventList.resize(newTotalSize_);
   eventList.shrink_to_fit();
