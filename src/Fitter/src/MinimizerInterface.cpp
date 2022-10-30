@@ -148,8 +148,8 @@ const std::unique_ptr<ROOT::Math::Minimizer> &MinimizerInterface::getMinimizer()
 void MinimizerInterface::minimize() {
   LogThrowIf(not isInitialized(), "not initialized");
 
-  GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "fit")->cd();
-  _chi2HistoryTree_ = new TTree("chi2History", "chi2History");
+  _chi2HistoryTree_ = std::make_unique<TTree>("chi2History", "chi2History");
+  _chi2HistoryTree_->SetDirectory(nullptr);
   _chi2HistoryTree_->Branch("nbFitCalls", &_nbFitCalls_);
   _chi2HistoryTree_->Branch("chi2Total", _owner_->getPropagator().getLlhBufferPtr());
   _chi2HistoryTree_->Branch("chi2Stat", _owner_->getPropagator().getLlhStatBufferPtr());
@@ -246,16 +246,13 @@ void MinimizerInterface::minimize() {
   if(_minimizerAlgo_ == "Migrad") LogWarning << "Covariance matrix status code: " << this->covMatrixStatusCodeStr.at(_minimizer_->CovMatrixStatus()) << std::endl;
   else LogWarning << "Covariance matrix status code: " << _minimizer_->CovMatrixStatus() << std::endl;
 
-  GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "fit")->cd();
-  _chi2HistoryTree_->Write();
+  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "fit"), _chi2HistoryTree_.get());
 
   if( _fitHasConverged_ ){ LogInfo << "Minimization has converged!" << std::endl; }
   else{ LogError << "Minimization did not converged." << std::endl; }
 
 
   LogInfo << "Writing convergence stats..." << std::endl;
-  GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "postFit/")->cd();
-
   int toyIndex = _owner_->getPropagator().getIThrow();
   int nIterations = int(_minimizer_->NIterations());
   double edmBestFit = _minimizer_->Edm();
@@ -263,7 +260,8 @@ void MinimizerInterface::minimize() {
   double covStatus = _minimizer_->CovMatrixStatus();
   double chi2MinFitter = _minimizer_->MinValue();
 
-  auto* bestFitStats = new TTree("bestFitStats", "bestFitStats");
+  auto bestFitStats = std::make_unique<TTree>("bestFitStats", "bestFitStats");
+  bestFitStats->SetDirectory(nullptr);
   bestFitStats->Branch("fitConverged", &_fitHasConverged_);
   bestFitStats->Branch("fitStatusCode", &fitStatus);
   bestFitStats->Branch("covStatusCode", &covStatus);
@@ -294,8 +292,16 @@ void MinimizerInterface::minimize() {
     }
 
     samplesArrList[iSample].lockArraySize();
+
+
+    std::string cleanBranchName{sample.getName()};
+    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, " ", "_");
+    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, "-", "_");
+    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, "(", "");
+    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, ")", "");
+
     bestFitStats->Branch(
-        GenericToolbox::replaceSubstringInString(sample.getName(), " ", "_").c_str(),
+        cleanBranchName.c_str(),
         &samplesArrList[iSample].getRawDataArray()[0],
         GenericToolbox::joinVectorString(leavesDict, ":").c_str()
     );
@@ -317,18 +323,25 @@ void MinimizerInterface::minimize() {
       parameterSetArrList[iParSet].writeRawData(par.getParameterValue());
     }
 
+    std::string cleanBranchName{parSet.getName()};
+    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, " ", "_");
+    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, "-", "_");
+    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, "(", "");
+    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, ")", "");
+
     bestFitStats->Branch(
-        GenericToolbox::replaceSubstringInString(parSet.getName(), " ", "_").c_str(),
+        cleanBranchName.c_str(),
         &parameterSetArrList[iParSet].getRawDataArray()[0],
         GenericToolbox::joinVectorString(leavesDict, ":").c_str()
     );
   }
 
   bestFitStats->Fill();
-  bestFitStats->Write();
+  GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "postFit")->WriteObject(bestFitStats.get(), bestFitStats->GetName());
 
   LogInfo << "Writing " << _minimizerType_ << "/" << _minimizerAlgo_ << " post-fit errors" << std::endl;
   this->writePostFitData(GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "postFit/" + _minimizerAlgo_));
+  GenericToolbox::triggerTFileWrite(GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "postFit/" + _minimizerAlgo_));
 }
 void MinimizerInterface::calcErrors(){
   LogThrowIf(not isInitialized(), "not initialized");
@@ -405,6 +418,7 @@ void MinimizerInterface::calcErrors(){
 
     LogInfo << "Writing HESSE post-fit errors" << std::endl;
     this->writePostFitData(GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "postFit/Hesse"));
+    GenericToolbox::triggerTFileWrite(GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "postFit/Hesse"));
   }
   else{
     LogError << GET_VAR_NAME_VALUE(_errorAlgo_) << " not implemented." << std::endl;
@@ -524,27 +538,31 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
       applyLooks(hist_);
     };
 
-    TH2D* postfitCovarianceTH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) &postfitCovarianceMatrix);
-    applyBinLabels(postfitCovarianceTH2D);
-    GenericToolbox::writeInTFile(outDir_, postfitCovarianceTH2D, "postfitCovariance");
+    {
+      LogInfo << "Writing post-fit matrices" << std::endl;
+      auto postFitCovarianceTH2D = std::unique_ptr<TH2D>(GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) &postfitCovarianceMatrix) );
+      applyBinLabels(postFitCovarianceTH2D.get());
+      GenericToolbox::writeInTFile(outDir_, postFitCovarianceTH2D.get(), "postfitCovariance");
 
-    TH2D* postfitCorrelationTH2D = GenericToolbox::convertTMatrixDtoTH2D(GenericToolbox::convertToCorrelationMatrix((TMatrixD*) &postfitCovarianceMatrix));
-    applyBinLabels(postfitCorrelationTH2D);
-    postfitCorrelationTH2D->GetZaxis()->SetRangeUser(-1,1);
-    GenericToolbox::writeInTFile(outDir_, postfitCorrelationTH2D, "postfitCorrelation");
+      auto postfitCorrelationMatrix = std::unique_ptr<TMatrixD>(GenericToolbox::convertToCorrelationMatrix((TMatrixD*) &postfitCovarianceMatrix));
+      auto postfitCorrelationTH2D = std::unique_ptr<TH2D>(GenericToolbox::convertTMatrixDtoTH2D(postfitCorrelationMatrix.get()));
+      applyBinLabels(postfitCorrelationTH2D.get());
+      postfitCorrelationTH2D->GetZaxis()->SetRangeUser(-1,1);
+      GenericToolbox::writeInTFile(outDir_, postfitCorrelationTH2D.get(), "postfitCorrelation");
+    }
 
     // Fitter covariance matrix decomposition
     {
       LogInfo << "Eigen decomposition of the post-fit covariance matrix" << std::endl;
       TMatrixDSymEigen decompCovMatrix(postfitCovarianceMatrix);
 
-      TH2D* eigenVectors = GenericToolbox::convertTMatrixDtoTH2D(&decompCovMatrix.GetEigenVectors());
-      applyBinLabels(eigenVectors);
-      GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), eigenVectors, "eigenVectors");
+      auto eigenVectors = std::unique_ptr<TH2D>( GenericToolbox::convertTMatrixDtoTH2D(&decompCovMatrix.GetEigenVectors()) );
+      applyBinLabels(eigenVectors.get());
+      GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), eigenVectors.get(), "eigenVectors");
 
-      TH1D* eigenValues = GenericToolbox::convertTVectorDtoTH1D(&decompCovMatrix.GetEigenValues());
-      applyBinLabels(eigenValues);
-      GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), eigenValues, "eigenValues");
+      auto eigenValues = std::unique_ptr<TH1D>( GenericToolbox::convertTVectorDtoTH1D(&decompCovMatrix.GetEigenValues()) );
+      applyBinLabels(eigenValues.get());
+      GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), eigenValues.get(), "eigenValues");
 
       double conditioning = decompCovMatrix.GetEigenValues().Min() / decompCovMatrix.GetEigenValues().Max();
       LogWarning << "Post-fit error conditioning is: " << conditioning << std::endl;
@@ -552,13 +570,13 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
       LogInfo << "Reconstructing postfit hessian matrix..." << std::endl;
       auto eigenValuesInv = TVectorD(decompCovMatrix.GetEigenValues());
       for( int iEigen = 0 ; iEigen < eigenValuesInv.GetNrows() ; iEigen++ ){ eigenValuesInv[iEigen] = 1./eigenValuesInv[iEigen]; }
-      auto& diagonalMatrixInv = *GenericToolbox::makeDiagonalMatrix(&eigenValuesInv);
+      auto diagonalMatrixInv = std::unique_ptr<TMatrixD>( GenericToolbox::makeDiagonalMatrix(&eigenValuesInv) );
       auto invEigVectors = TMatrixD(decompCovMatrix.GetEigenVectors());
       invEigVectors.T();
 
       TMatrixD hessianMatrix(int(_minimizer_->NDim()), int(_minimizer_->NDim())); hessianMatrix.Zero();
       hessianMatrix += decompCovMatrix.GetEigenVectors();
-      hessianMatrix *= diagonalMatrixInv;
+      hessianMatrix *= (*diagonalMatrixInv);
       hessianMatrix *= invEigVectors;
 
       TH2D* postfitHessianTH2D = GenericToolbox::convertTMatrixDtoTH2D(&hessianMatrix);
@@ -862,13 +880,12 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
 
         corMatrixTH2D->Draw("COLZ");
 
-        GenericToolbox::mkdirTFile(saveSubdir_, "matrices")->cd();
-        covMatrix_->Write("Covariance");
-        covMatrixTH2D->Write("Covariance");
-        corMatrix->Write("Correlation");
-        corMatrixTH2D->Write("Correlation");
-        corMatrixCanvas->Write("Correlation");
-
+        GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), covMatrix_, "Covariance");
+        GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), covMatrixTH2D, "Covariance");
+        GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), corMatrix, "Correlation");
+        GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), corMatrixTH2D, "Correlation");
+        GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), corMatrix, "Correlation");
+        GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), corMatrixCanvas.get(), "Correlation");
 
         // Table printout
         std::vector<std::vector<std::string>> tableLines;
@@ -934,8 +951,6 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
 
         // Parameters plots
         auto makePrePostFitCompPlot = [&](TDirectory* saveDir_, bool isNorm_){
-          saveDir_->cd();
-
           size_t longestTitleSize{0};
 
           auto postFitErrorHist   = std::make_unique<TH1D>("postFitErrors", "Post-fit Errors", parSet_.getNbParameters(), 0, parSet_.getNbParameters());
@@ -1033,14 +1048,14 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
           preFitErrorHist->SetTitle(Form("Pre-fit Errors of %s", parSet_.getName().c_str()));
           preFitErrorHist->SetMarkerSize(0);
           preFitErrorHist->GetYaxis()->SetRangeUser(yBounds.first, yBounds.second);
-          preFitErrorHist->Write();
+          GenericToolbox::writeInTFile(saveDir_, preFitErrorHist.get());
 
           postFitErrorHist->SetLineColor(9);
           postFitErrorHist->SetLineWidth(2);
           postFitErrorHist->SetMarkerColor(9);
           postFitErrorHist->SetMarkerStyle(kFullDotLarge);
           postFitErrorHist->SetTitle(Form("Post-fit Errors of %s", parSet_.getName().c_str()));
-          postFitErrorHist->Write();
+          GenericToolbox::writeInTFile(saveDir_, postFitErrorHist.get());
 
           auto errorsCanvas = std::make_unique<TCanvas>(
               Form("Fit Constraints for %s", parSet_.getName().c_str()),
@@ -1085,7 +1100,7 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
 
           if( not isNorm_ ){ preFitErrorHist->SetTitle(Form("Pre-fit/Post-fit comparison for %s", parSet_.getName().c_str())); }
           else             { preFitErrorHist->SetTitle(Form("Pre-fit/Post-fit comparison for %s (normalized)", parSet_.getName().c_str())); }
-          errorsCanvas->Write("fitConstraints");
+          GenericToolbox::writeInTFile(saveDir_, errorsCanvas.get(), "fitConstraints");
 
         }; // makePrePostFitCompPlot
 
@@ -1152,9 +1167,6 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
     savePostFitObjFct(parSet, *parList, covMatrix.get(), parSetDir);
 
   } // parSet
-
-  LogWarning << "Writing out file..." << std::endl;
-  GenericToolbox::triggerTFileWrite(saveDir_);
 }
 
 

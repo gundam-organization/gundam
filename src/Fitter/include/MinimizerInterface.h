@@ -80,7 +80,7 @@ private:
   std::unique_ptr<ROOT::Math::Minimizer> _minimizer_{nullptr};
   std::unique_ptr<ROOT::Math::Functor> _functor_{nullptr};
   std::vector<FitParameter*> _minimizerFitParameterPtr_{};
-  TTree* _chi2HistoryTree_{nullptr};
+  std::unique_ptr<TTree> _chi2HistoryTree_{nullptr};
 
   // monitors
   GenericToolbox::VariablesMonitor _convergenceMonitor_;
