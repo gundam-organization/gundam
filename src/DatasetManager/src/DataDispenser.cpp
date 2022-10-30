@@ -726,8 +726,8 @@ void DataDispenser::readAndFill(){
     GraphDial* grDialPtr{nullptr};
 
     // Bin searches
-    std::__wrap_iter<DialWrapper*> dialFoundItr;
-    std::__wrap_iter<const DataBin*> binFoundItr;
+    std::vector<DialWrapper>::iterator dialFoundItr;
+    std::vector<const DataBin>::iterator binFoundItr;
     auto isBinValid = [&](const DataBin& b_){
       for( iVar = 0 ; iVar < b_.getVariableNameList().size() ; iVar++ ){
         if( not b_.isBetweenEdges(iVar, eventBuffer.getVarAsDouble(b_.getVariableNameList()[iVar])) ){
