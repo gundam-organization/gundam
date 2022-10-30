@@ -17,6 +17,4 @@ config file was provided.
 | [fitterEngineConfig](../configuration/FitterEngine.md) | json         | FitterEngine config                                             |         |
 | minGundamVersion                                       | string       | gundamFitter will stop if the version is lower                  |         |
 | outputFolder                                           | string       | Folder where the output file is written                         | ./      |
-| generateSamplePlots                                    | bool         | Draw sample histograms according to the PlotGenerator config    | true    |
-| allParamVariations                                     | list(double) | List of points to perform individual parameter variation        |         |
 
