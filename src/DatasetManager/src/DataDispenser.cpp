@@ -706,7 +706,6 @@ void DataDispenser::readAndFill(){
 
     size_t sampleEventIndex;
     int threadDialIndex;
-    const std::vector<DataBin>* binsListPtr;
 
     // Loop vars
     bool foundValidDialAmongTheSet{true};
@@ -718,7 +717,6 @@ void DataDispenser::readAndFill(){
 
     // Dials
     size_t eventDialOffset;
-    DialSet* dialSetPtr;
     size_t iDialSet, iDial;
     size_t nBinEdges;
     TGraph* grPtr{nullptr};
@@ -726,8 +724,10 @@ void DataDispenser::readAndFill(){
     GraphDial* grDialPtr{nullptr};
 
     // Bin searches
+    DialSet* dialSetPtr;
+    const std::vector<DataBin>* binsListPtr;
     std::vector<DialWrapper>::iterator dialFoundItr;
-    std::vector<const DataBin>::iterator binFoundItr;
+    std::vector<const DataBin>::const_iterator binFoundItr;
     auto isBinValid = [&](const DataBin& b_){
       for( iVar = 0 ; iVar < b_.getVariableNameList().size() ; iVar++ ){
         if( not b_.isBetweenEdges(iVar, eventBuffer.getVarAsDouble(b_.getVariableNameList()[iVar])) ){
