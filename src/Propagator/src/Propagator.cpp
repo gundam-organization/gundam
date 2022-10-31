@@ -132,8 +132,14 @@ void Propagator::initializeImpl() {
 
   if( usedMcContainer ){
     this->propagateParametersOnSamples();
+
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
       LogDebug << sample.getName() << ": " << sample.getMcContainer().getSumWeights() << std::endl;
+      for( auto& event : sample.getMcContainer().eventList ){
+        event.print();
+        break;
+      }
+      break;
     }
 
     if( _throwAsimovToyParameters_ ){
@@ -152,6 +158,11 @@ void Propagator::initializeImpl() {
 
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
       LogDebug << sample.getName() << ": " << sample.getMcContainer().getSumWeights() << std::endl;
+      for( auto& event : sample.getMcContainer().eventList ){
+        event.print();
+        break;
+      }
+      break;
     }
 
     // Copies MC events in data container for both Asimov and FakeData event types
