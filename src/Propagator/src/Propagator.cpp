@@ -131,17 +131,6 @@ void Propagator::initializeImpl() {
   }
 
   if( usedMcContainer ){
-    this->propagateParametersOnSamples();
-
-    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-      LogDebug << sample.getName() << ": " << sample.getMcContainer().getSumWeights() << std::endl;
-      for( auto& event : sample.getMcContainer().eventList ){
-        event.print();
-        break;
-      }
-      break;
-    }
-
     if( _throwAsimovToyParameters_ ){
       for( auto& parSet : _parameterSetList_ ){
         if( parSet.isEnabledThrowToyParameters() and parSet.getPriorCovarianceMatrix() != nullptr ){
@@ -153,17 +142,8 @@ void Propagator::initializeImpl() {
     LogInfo << "Propagating prior parameters on events..." << std::endl;
     bool cacheManagerState = GlobalVariables::getEnableCacheManager();
     GlobalVariables::setEnableCacheManager(false);
-    this->propagateParametersOnSamples();
+    this->reweightMcEvents();
     GlobalVariables::setEnableCacheManager(cacheManagerState);
-
-    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-      LogDebug << sample.getName() << ": " << sample.getMcContainer().getSumWeights() << std::endl;
-      for( auto& event : sample.getMcContainer().eventList ){
-        event.print();
-        break;
-      }
-      break;
-    }
 
     // Copies MC events in data container for both Asimov and FakeData event types
     LogWarning << "Copying loaded mc-like event to data container..." << std::endl;
@@ -175,6 +155,25 @@ void Propagator::initializeImpl() {
         parSet.moveFitParametersToPrior();
       }
     }
+  }
+
+  // Stat error
+  if( _throwAsimovToyParameters_ and _enableStatThrowInToys_ ){
+    LogInfo << "Throwing statistical error for data container..." << std::endl;
+    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+      if( _enableEventMcThrow_ ){
+        // Take into account the finite amount of event in MC
+        sample.getDataContainer().throwEventMcError();
+      }
+      // Asimov bin content -> toy data
+      sample.getDataContainer().throwStatError();
+    }
+  }
+
+  LogInfo << "Locking data event containers..." << std::endl;
+  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    // Now the data won't be refilled each time
+    sample.getDataContainer().isLocked = true;
   }
 
   if( not allAsimov ){
@@ -196,12 +195,12 @@ void Propagator::initializeImpl() {
   // After all the data has been loaded.  Specifically, this must be after
   // the MC has been copied for the Asimov fit, or the "data" use the MC
   // reweighting cache.  This must also be before the first use of
-  // propagateParametersOnSamples.
+  // reweightMcEvents.
   if(GlobalVariables::getEnableCacheManager()) Cache::Manager::Build(getFitSampleSet());
 #endif
 
   LogInfo << "Propagating prior parameters on events..." << std::endl;
-  this->propagateParametersOnSamples();
+  this->reweightMcEvents();
 
   LogInfo << "Set the current MC prior weights as nominal weight..." << std::endl;
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
@@ -209,6 +208,28 @@ void Propagator::initializeImpl() {
       event.setNominalWeight(event.getEventWeight());
     }
   }
+
+  LogInfo << "Filling up sample bin caches..." << std::endl;
+  _fitSampleSet_.updateSampleBinEventList();
+
+  LogInfo << "Filling up sample histograms..." << std::endl;
+  _fitSampleSet_.updateSampleHistograms();
+
+
+  _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
+
+  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the plot generator") << std::endl;
+  _plotGenerator_.initialize();
+
+  LogInfo << "Saving nominal histograms..." << std::endl;
+  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    sample.getMcContainer().saveAsHistogramNominal();
+  }
+
+  _treeWriter_.setFitSampleSetPtr(&_fitSampleSet_);
+  _treeWriter_.setParSetListPtr(&_parameterSetList_);
+
+  _parScanner_.initialize();
 
   if( _showEventBreakdown_ ){
 
@@ -229,14 +250,14 @@ void Propagator::initializeImpl() {
 
       int iStage{0};
       for( auto& parSet : _parameterSetList_ ){ parSet.setMaskedForPropagation(true); }
-      this->propagateParametersOnSamples();
+      this->reweightMcEvents();
       for( size_t iSample = 0 ; iSample < _fitSampleSet_.getFitSampleList().size() ; iSample++ ){
         stageBreakdownList[iSample][iStage] = _fitSampleSet_.getFitSampleList()[iSample].getMcContainer().getSumWeights();
       }
 
       for( auto& parSet : _parameterSetList_ ){
         parSet.setMaskedForPropagation(false);
-        this->propagateParametersOnSamples();
+        this->reweightMcEvents();
         iStage++;
         for( size_t iSample = 0 ; iSample < _fitSampleSet_.getFitSampleList().size() ; iSample++ ){
           stageBreakdownList[iSample][iStage] = _fitSampleSet_.getFitSampleList()[iSample].getMcContainer().getSumWeights();
@@ -271,59 +292,15 @@ void Propagator::initializeImpl() {
     t.printTable();
   }
 
-  _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
-
-  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the plot generator") << std::endl;
-  _plotGenerator_.initialize();
-
-  LogInfo << "Filling up sample bin caches..." << std::endl;
-  _fitSampleSet_.updateSampleBinEventList();
-
-  LogInfo << "Filling up sample histograms..." << std::endl;
-  _fitSampleSet_.updateSampleHistograms();
-
-  LogInfo << "Saving nominal histograms..." << std::endl;
-  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    sample.getMcContainer().saveAsHistogramNominal();
-  }
-
-  // Now the data won't be refilled each time
-  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    if( _throwAsimovToyParameters_ and _enableStatThrowInToys_ ){
-      if( _enableEventMcThrow_ ){
-        // Take into account the finite amount of event in MC
-        sample.getDataContainer().throwEventMcError();
-      }
-      // Asimov bin content -> toy data
-      sample.getDataContainer().throwStatError();
-    }
-    sample.getDataContainer().isLocked = true;
-  }
-
-  if( _throwAsimovToyParameters_ ){
-    for( auto& parSet : _parameterSetList_ ){
-      for( auto& par : parSet.getParameterList() ){
-        par.setParameterValue( par.getPriorValue() );
-      }
-    }
-    propagateParametersOnSamples();
-  }
-
-  _treeWriter_.setFitSampleSetPtr(&_fitSampleSet_);
-  _treeWriter_.setParSetListPtr(&_parameterSetList_);
-
-  _parScanner_.initialize();
-
   if( _debugPrintLoadedEvents_ ){
     LogDebug << GET_VAR_NAME_VALUE(_debugPrintLoadedEventsNbPerSample_) << std::endl;
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-      LogDebug << "debugPrintLoadedEvents: " << sample.getName() << std::endl;
-      Logger::Indent lIndent;
+      LogDebug << GenericToolbox::addUpDownBars( sample.getName() ) << std::endl;
 
       int iEvt=0;
       for( auto& ev : sample.getMcContainer().eventList ){
-        if(iEvt++ >= _debugPrintLoadedEventsNbPerSample_) { LogDebug << std::endl; break; }
-        LogDebug << iEvt << " -> " << ev.getSummary() << std::endl;
+        if(iEvt++ >= _debugPrintLoadedEventsNbPerSample_) { LogTrace << std::endl; break; }
+        LogTrace << iEvt << " -> " << ev.getSummary() << std::endl;
       }
     }
   }

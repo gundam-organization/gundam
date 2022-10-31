@@ -77,7 +77,7 @@ private:
   bool _showTimeStats_{false};
   bool _loadAsimovData_{false};
   bool _debugPrintLoadedEvents_{false};
-  int _debugPrintLoadedEventsNbPerSample_{10};
+  int _debugPrintLoadedEventsNbPerSample_{5};
 
   // Internals
   bool _throwAsimovFitParameters_{false};
