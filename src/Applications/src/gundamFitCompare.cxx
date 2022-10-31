@@ -49,9 +49,10 @@ int main( int argc, char** argv ){
   clp.addOption("output", {"-o"}, "Output file.", 1);
 
   LogInfo << "Options list:" << std::endl;
-  Logger::setIndentStr("  ");
-  LogInfo << clp.getConfigSummary() << std::endl;
-  Logger::setIndentStr("");
+  {
+    Logger::Indent lIndent;
+    LogInfo << clp.getConfigSummary() << std::endl;
+  }
 
   clp.parseCmdLine();
 
@@ -285,15 +286,25 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
   // loop over parSets
   auto* outDir = GenericToolbox::mkdirTFile(outFile, Form("%s/errors%s", (usePrefit_? "preFit": "postFit"), (useNomVal_? "Norm": "")));
   for( int iKey = 0 ; iKey < dir1->GetListOfKeys()->GetEntries() ; iKey++ ){
-    Logger::setIndentStr("  ");
+    Logger::Indent lIndent;
     std::string parSet = dir1->GetListOfKeys()->At(iKey)->GetName();
 
-    strBuffer = Form("%s/values%s/%sErrors", parSet.c_str(), (useNomVal_? "Norm": ""), (usePrefit_? "preFit": "postFit"));
+    strBuffer = Form("%s/values%s/%sErrors_TH1D", parSet.c_str(), (useNomVal_? "Norm": ""), (usePrefit_? "preFit": "postFit"));
     auto* hist1 = dir1->Get<TH1D>(strBuffer.c_str());
+    if( hist1 == nullptr ){
+      // legacy
+      strBuffer = Form("%s/values%s/%sErrors", parSet.c_str(), (useNomVal_? "Norm": ""), (usePrefit_? "preFit": "postFit"));
+      hist1 = dir1->Get<TH1D>(strBuffer.c_str());
+    }
     LogContinueIf(hist1 == nullptr, "Could no find parSet \"" << strBuffer << "\" in " << file1->GetPath());
 
-    strBuffer = Form("%s/values%s/%sErrors", parSet.c_str(), (useNomVal_? "Norm": ""), (usePrefit_? "preFit": "postFit"));
+    strBuffer = Form("%s/values%s/%sErrors_TH1D", parSet.c_str(), (useNomVal_? "Norm": ""), (usePrefit_? "preFit": "postFit"));
     auto* hist2 = dir2->Get<TH1D>(strBuffer.c_str());
+    if( hist1 == nullptr ){
+      // legacy
+      strBuffer = Form("%s/values%s/%sErrors", parSet.c_str(), (useNomVal_? "Norm": ""), (usePrefit_? "preFit": "postFit"));
+      hist2 = dir2->Get<TH1D>(strBuffer.c_str());
+    }
     LogContinueIf(hist2 == nullptr, "Could no find parSet \"" << strBuffer << "\" in " << file2->GetPath());
 
     LogInfo << "Processing parameter set: \"" << parSet << "\"" << std::endl;
@@ -428,6 +439,5 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
     }
 
     delete overlayCanvas;
-    Logger::setIndentStr("");
   }
 }
