@@ -160,7 +160,21 @@ void Propagator::initializeImpl() {
   if( not allAsimov ){
     // reload everything
     // Filling the mc containers
+
+    // clearing events in MC containers
     _fitSampleSet_.clearMcContainers();
+
+    // also wiping event-by-event dials...
+    LogInfo << "Wiping event-by-event dials..." << std::endl;
+    for( auto& parSet : _parameterSetList_ ){
+      for( auto& par : parSet.getParameterList() ){
+        for( auto& dialSet : par.getDialSetList() ){
+          if( dialSet.getDialLeafName().empty() ) continue;
+          dialSet.getDialList().clear();
+        }
+      }
+    }
+
     for( auto& dataSet : _dataSetList_ ){
       LogContinueIf(not dataSet.isEnabled(), "Dataset \"" << dataSet.getName() << "\" is disabled. Skipping");
       auto& dispenser = dataSet.getMcDispenser();
