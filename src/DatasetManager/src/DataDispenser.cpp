@@ -20,6 +20,11 @@
 #include "TChainElement.h"
 
 #include "sstream"
+#include "string"
+#include "vector"
+
+#include "GenericToolbox.TimeProfiler.h"
+
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[DataDispenser]");
@@ -724,9 +729,7 @@ void DataDispenser::readAndFill(){
     GraphDial* grDialPtr{nullptr};
 
     // Bin searches
-    DialSet* dialSetPtr;
     const std::vector<DataBin>* binsListPtr;
-    std::vector<DialWrapper>::iterator dialFoundItr;
     std::vector<DataBin>::const_iterator binFoundItr;
     auto isBinValid = [&](const DataBin& b_){
       for( iVar = 0 ; iVar < b_.getVariableNameList().size() ; iVar++ ){
@@ -736,16 +739,20 @@ void DataDispenser::readAndFill(){
       } // Var
       return true;
     };
+
+    // Dial bin search
+    DialSet* dialSetPtr;
+    DataBin* dataBin{nullptr};
+    std::vector<DialWrapper>::iterator dialFoundItr;
     auto isDialValid = [&](const DialWrapper& d_){
-      if( d_->getApplyConditionBinPtr() != nullptr ){
-        nBinEdges = d_->getApplyConditionBinPtr()->getEventVarIndexCache().size();
-        for( iVar = 0 ; iVar < nBinEdges ; iVar++ ){
-          if( not DataBin::isBetweenEdges(
-              d_->getApplyConditionBinPtr()->getEdgesList()[iVar],
-              eventBuffer.getVarAsDouble( d_->getApplyConditionBinPtr()->getEventVarIndexCache()[iVar] ) )
-              ){
-            return false;
-          }
+      dataBin = d_->getApplyConditionBinPtr();
+      nBinEdges = dataBin->getEdgesList().size();
+      for( iVar = 0 ; iVar < nBinEdges ; iVar++ ){
+        if( not DataBin::isBetweenEdges(
+            dataBin->getEdgesList()[iVar],
+            eventBuffer.getVarAsDouble( dataBin->getEventVarIndexCache()[iVar] ) )
+            ){
+          return false;
         }
       }
       return true;
@@ -797,6 +804,8 @@ void DataDispenser::readAndFill(){
       if( skipEvent ) continue;
 
       nBytes = treeChain.GetEntry(iEntry);
+
+      // monitor
       if( iThread_ == 0 ) readSpeed.addQuantity(nBytes*nThreads);
 
       if( threadNominalWeightFormula != nullptr ){
@@ -938,21 +947,28 @@ void DataDispenser::readAndFill(){
                 // Binned dial:
                 foundValidDialAmongTheSet = false;
 
-                // -- probably the slowest part of the indexing: ----
-                dialFoundItr = std::find_if(
-                    dialSetPtr->getDialList().begin(),
-                    dialSetPtr->getDialList().end(),
-                    isDialValid
-                );
-                // --------------------------------------------------
-
-                if (dialFoundItr != dialSetPtr->getDialList().end()) {
-                  // found DIAL -> get index
-                  iDial = std::distance(dialSetPtr->getDialList().begin(), dialFoundItr);
-
+                if( dialSetPtr->getDialList().size() == 1 and dialSetPtr->getDialList()[0]->getApplyConditionBinPtr() == nullptr ){
                   foundValidDialAmongTheSet = true;
-                  dialSetPtr->getDialList()[iDial]->setIsReferenced(true);
-                  eventPtr->getRawDialPtrList()[eventDialOffset++] = dialSetPtr->getDialList()[iDial].get();
+                  dialSetPtr->getDialList()[0]->setIsReferenced(true);
+                  eventPtr->getRawDialPtrList()[eventDialOffset++] = dialSetPtr->getDialList()[0].get();
+                }
+                else {
+                  // -- probably the slowest part of the indexing: ----
+                  dialFoundItr = std::find_if(
+                      dialSetPtr->getDialList().begin(),
+                      dialSetPtr->getDialList().end(),
+                      isDialValid
+                  );
+                  // --------------------------------------------------
+
+                 if (dialFoundItr != dialSetPtr->getDialList().end()) {
+                  // found DIAL -> get index
+                    iDial = std::distance(dialSetPtr->getDialList().begin(), dialFoundItr);
+
+                    foundValidDialAmongTheSet = true;
+                    dialSetPtr->getDialList()[iDial]->setIsReferenced(true);
+                    eventPtr->getRawDialPtrList()[eventDialOffset++] = dialSetPtr->getDialList()[iDial].get();
+                  }
                 }
 
                 if( foundValidDialAmongTheSet and dialSetPair.first->isUseOnlyOneParameterPerEvent() ){
@@ -971,7 +987,9 @@ void DataDispenser::readAndFill(){
         } // event has passed the selection?
       } // samples
     } // entries
-    if( iThread_ == 0 ) GenericToolbox::displayProgressBar(nEvents, nEvents, ssProgressBar.str());
+    if( iThread_ == 0 ){
+      GenericToolbox::displayProgressBar(nEvents, nEvents, ssProgressBar.str());
+    }
   };
 
   LogWarning << "Loading and indexing..." << std::endl;

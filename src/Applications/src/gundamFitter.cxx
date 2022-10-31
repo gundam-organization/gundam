@@ -10,6 +10,7 @@
 #ifdef GUNDAM_USING_CACHE_MANAGER
 #include "CacheManager.h"
 #endif
+
 #include "CmdLineParser.h"
 #include "Logger.h"
 #include "GenericToolbox.Root.h"
@@ -164,21 +165,6 @@ int main(int argc, char** argv){
       outFileName += "_";
       outFileName += GenericToolbox::joinVectorString(appendixList, "_");
     }
-
-//    if( clParser.isOptionTriggered("asimov") ){ outFileName += "_Asimov"; }
-//    if( clParser.isOptionTriggered("scanParameters") ){ outFileName += "_Scan"; }
-//    if( clParser.isOptionTriggered("generateOneSigmaPlots") ){ outFileName += "_OneSigma"; }
-//    if( clParser.isOptionTriggered("enablePca") ){ outFileName += "_PCA"; }
-//    if( clParser.isOptionTriggered("skipHesse") ){ outFileName += "_NoHesse"; }
-//    if( clParser.isOptionTriggered("toyFit") ){
-//      outFileName += "_toyFit";
-//      if( clParser.getOptionVal("toyFit", -1) != -1 ){
-//        outFileName += "_" + std::to_string(clParser.getOptionVal("toyFit", -1));
-//      }
-//    }
-//    if( clParser.isOptionTriggered("dry-run") ){ outFileName += "_DryRun"; }
-//    if( clParser.isOptionTriggered("appendix") ){ outFileName += "_" + clParser.getOptionVal<std::string>("appendix"); }
-
     outFileName += ".root";
   }
 

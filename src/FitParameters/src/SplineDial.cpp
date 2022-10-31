@@ -20,6 +20,7 @@ LoggerInit([](){ Logger::setUserHeaderStr("[SplineDial]"); } );
 
 
 SplineDial::SplineDial(const DialSet* owner_) : Dial(DialType::Spline, owner_) {}
+SplineDial::SplineDial(const DialSet* owner_, const TGraph& graph_): Dial(DialType::Spline, owner_), _spline_(graph_.GetName(), &graph_) {}
 
 void SplineDial::copySpline(const TSpline3* splinePtr_){
   // Don't check for override: when loading toy + mc data, these placeholders has to be filled up twice

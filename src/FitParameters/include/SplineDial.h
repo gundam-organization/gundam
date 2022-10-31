@@ -16,6 +16,7 @@ class SplineDial : public Dial {
 
 public:
   explicit SplineDial(const DialSet* owner_);
+  explicit SplineDial(const DialSet* owner_, const TGraph& graph_);
   std::unique_ptr<Dial> clone() const override { return std::make_unique<SplineDial>(*this); }
 
   void copySpline(const TSpline3* splinePtr_);
@@ -49,7 +50,7 @@ protected:
   FastSpliner fs;
 #endif
 
-#ifndef USE_TSPLINE3_EVAL
+#ifndef USE_TSPLINE3_EVAL // aka with CacheManager
 public:
   typedef enum {
     Undefined,  // This should not occur
