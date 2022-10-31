@@ -19,5 +19,8 @@
 | enableSimplexBeforeMinimize    | bool   | run SIMPLEX before the real fit (can help to find the minimum)               | false               |
 | simplexMaxFcnCalls             | int    | stop SIMPLEX after N calls                                                   | 1000                |
 | simplexToleranceLoose          | int    | loosing up minimizer by this factor                                          | 1000                |
+| simplexStrategy                | int    | strategy for SIMPLEX                                                         | 1                   |
 | generatedPostFitParBreakdown   | bool   | Generate figures showing hessian eigen decomp breakdown by parameter         | false               |
 | generatedPostFitEigenBreakdown | bool   | Generate figures showing parameter breakdown by hessian eigen                | false               |
+| monitorRefreshRateInMs         | int    | Max refresh rate for the fit monitor in milliseconds                         | 5000                |
+| showParametersOnFitMonitor     | bool   | Display fit parameter parameter values on the monitor                        | false               |

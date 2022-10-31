@@ -26,6 +26,7 @@ MinimizerInterface::MinimizerInterface(FitterEngine* owner_): _owner_(owner_){}
 
 void MinimizerInterface::setOwner(FitterEngine* owner_){ _owner_ = owner_; }
 void MinimizerInterface::setEnablePostFitErrorEval(bool enablePostFitErrorEval_){ _enablePostFitErrorEval_ = enablePostFitErrorEval_; }
+void MinimizerInterface::setMonitorRefreshRateInMs(int monitorRefreshRateInMs_){ _monitorRefreshRateInMs_ = monitorRefreshRateInMs_; }
 
 void MinimizerInterface::readConfigImpl(){
   LogInfo << "Reading minimizer config..." << std::endl;
@@ -44,6 +45,7 @@ void MinimizerInterface::readConfigImpl(){
   _enableSimplexBeforeMinimize_ = JsonUtils::fetchValue(_config_, "enableSimplexBeforeMinimize", _enableSimplexBeforeMinimize_);
   _simplexMaxFcnCalls_ = JsonUtils::fetchValue(_config_, "simplexMaxFcnCalls", _simplexMaxFcnCalls_);
   _simplexToleranceLoose_ = JsonUtils::fetchValue(_config_, "simplexToleranceLoose", _simplexToleranceLoose_);
+  _simplexStrategy_ = JsonUtils::fetchValue(_config_, "simplexStrategy", _simplexStrategy_);
 
   _errorAlgo_ = JsonUtils::fetchValue(_config_, {{"errorsAlgo"}, {"errors"}}, "Hesse");
   _enablePostFitErrorEval_ = JsonUtils::fetchValue(_config_, "enablePostFitErrorFit", _enablePostFitErrorEval_);
@@ -52,6 +54,9 @@ void MinimizerInterface::readConfigImpl(){
   _generatedPostFitParBreakdown_ = JsonUtils::fetchValue(_config_, "generatedPostFitParBreakdown", _generatedPostFitParBreakdown_);
   _generatedPostFitEigenBreakdown_ = JsonUtils::fetchValue(_config_, "generatedPostFitEigenBreakdown", _generatedPostFitEigenBreakdown_);
 
+  _monitorRefreshRateInMs_ = JsonUtils::fetchValue(_config_, "monitorRefreshRateInMs", _monitorRefreshRateInMs_);
+  _showParametersOnFitMonitor_ = JsonUtils::fetchValue(_config_, "showParametersOnFitMonitor", _showParametersOnFitMonitor_);
+  _maxNbParametersPerLineOnMonitor_ = JsonUtils::fetchValue(_config_, "maxNbParametersPerLineOnMonitor", _maxNbParametersPerLineOnMonitor_);
 }
 void MinimizerInterface::initializeImpl(){
   LogInfo << "Initializing the minimizer..." << std::endl;
@@ -127,6 +132,8 @@ void MinimizerInterface::initializeImpl(){
   _convergenceMonitor_.addVariable("Total");
   _convergenceMonitor_.addVariable("Stat");
   _convergenceMonitor_.addVariable("Syst");
+
+  _convergenceMonitor_.setMaxRefreshRateInMs(_monitorRefreshRateInMs_);
 }
 
 bool MinimizerInterface::isFitHasConverged() const {
@@ -456,38 +463,70 @@ double MinimizerInterface::evalFit(const double* parArray_){
       GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("itSpeed");
     }
 
-    std::stringstream ss;
-    ss << std::endl << __METHOD_NAME__ << ": call #" << _nbFitCalls_;
-    ss << std::endl << "Target EDM: " << 0.001*_minimizer_->Tolerance()*2;
-    ss << std::endl << "Current RAM usage: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
+    std::stringstream ssHeader;
+    ssHeader << std::endl << __METHOD_NAME__ << ": call #" << _nbFitCalls_;
+    ssHeader << std::endl << "Target EDM: " << 0.001 * _minimizer_->Tolerance() * 2;
+    ssHeader << std::endl << "Current RAM usage: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
     double cpuPercent = GenericToolbox::getCpuUsageByProcess();
-    ss << std::endl << "Current CPU usage: " << cpuPercent << "% (" << cpuPercent/GlobalVariables::getNbThreads() << "% efficiency)";
-    ss << std::endl << "Avg " << GUNDAM_CHI2 << " computation time: " << _evalFitAvgTimer_;
-    ss << std::endl << GUNDAM_CHI2 << "/dof: " << _owner_->getPropagator().getLlhBuffer()/double(_nbFitBins_ - _minimizer_->NFree());
-    ss << std::endl;
+    ssHeader << std::endl << "Current CPU usage: " << cpuPercent << "% (" << cpuPercent / GlobalVariables::getNbThreads() << "% efficiency)";
+    ssHeader << std::endl << "Avg " << GUNDAM_CHI2 << " computation time: " << _evalFitAvgTimer_;
+    ssHeader << std::endl << GUNDAM_CHI2 << "/dof: " << _owner_->getPropagator().getLlhBuffer() / double(_nbFitBins_ - _minimizer_->NFree());
+    ssHeader << std::endl;
 #ifndef GUNDAM_BATCH
-    ss << "├─";
+    ssHeader << "├─";
 #endif
-    ss << " Current speed:                 " << (double)_itSpeed_.counts/(double)_itSpeed_.cumulated * 1E6 << " it/s";
-    ss << std::endl;
+    ssHeader << " Current speed:                 " << (double)_itSpeed_.counts / (double)_itSpeed_.cumulated * 1E6 << " it/s";
+    ssHeader << std::endl;
 #ifndef GUNDAM_BATCH
-    ss << "├─";
+    ssHeader << "├─";
 #endif
-    ss << " Avg time for " << _minimizerType_ << "/" << _minimizerAlgo_ << ":   " << _outEvalFitAvgTimer_;
-    ss << std::endl;
+    ssHeader << " Avg time for " << _minimizerType_ << "/" << _minimizerAlgo_ << ":   " << _outEvalFitAvgTimer_;
+    ssHeader << std::endl;
 #ifndef GUNDAM_BATCH
-    ss << "├─";
+    ssHeader << "├─";
 #endif
-    ss << " Avg time to propagate weights: " << _owner_->getPropagator().weightProp;
-    ss << std::endl;
+    ssHeader << " Avg time to propagate weights: " << _owner_->getPropagator().weightProp;
+    ssHeader << std::endl;
 #ifndef GUNDAM_BATCH
-    ss << "├─";
+    ssHeader << "├─";
 #endif
-    ss << " Avg time to fill histograms:   " << _owner_->getPropagator().fillProp;
-    _convergenceMonitor_.setHeaderString(ss.str());
+    ssHeader << " Avg time to fill histograms:   " << _owner_->getPropagator().fillProp;
+
+
+    if( _showParametersOnFitMonitor_ ){
+      std::string curParSet;
+//    std::stringstream ssFooter;
+      ssHeader << std::endl << std::setprecision(1) << std::scientific << std::showpos;
+      int nParPerLine{0};
+      for( auto* fitPar : _minimizerFitParameterPtr_ ){
+        if( fitPar->isFixed() ) continue;
+        if( curParSet != fitPar->getOwner()->getName() ){
+          if( not curParSet.empty() ) ssHeader << std::endl;
+          curParSet = fitPar->getOwner()->getName();
+          ssHeader << curParSet
+                   << (fitPar->getOwner()->isUseEigenDecompInFit()? " (eigen)": "")
+                   << ":" << std::endl;
+          nParPerLine = 0;
+        }
+        else{
+          ssHeader << ", ";
+          if( nParPerLine >= _maxNbParametersPerLineOnMonitor_ ) { ssHeader << std::endl; nParPerLine = 0; }
+        }
+        if(fitPar->gotUpdated()) ssHeader << GenericToolbox::ColorCodes::blueBackground;
+        if(_useNormalizedFitSpace_) ssHeader << FitParameterSet::toNormalizedParValue(fitPar->getParameterValue(), *fitPar);
+        else ssHeader << fitPar->getParameterValue();
+        if(fitPar->gotUpdated()) ssHeader << GenericToolbox::ColorCodes::resetColor;
+        nParPerLine++;
+      }
+    }
+
+
+    _convergenceMonitor_.setHeaderString(ssHeader.str());
+//    _convergenceMonitor_.setFooterString(ssFooter.str());
     _convergenceMonitor_.getVariable("Total").addQuantity(_owner_->getPropagator().getLlhBuffer());
     _convergenceMonitor_.getVariable("Stat").addQuantity(_owner_->getPropagator().getLlhStatBuffer());
     _convergenceMonitor_.getVariable("Syst").addQuantity(_owner_->getPropagator().getLlhPenaltyBuffer());
+
 
     if( _nbFitCalls_ == 1 ){
       // don't erase these lines

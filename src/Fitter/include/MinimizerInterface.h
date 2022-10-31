@@ -30,6 +30,7 @@ public:
 
   void setOwner(FitterEngine* owner_);
   void setEnablePostFitErrorEval(bool enablePostFitErrorEval_);
+  void setMonitorRefreshRateInMs(int monitorRefreshRateInMs_);
 
   bool isFitHasConverged() const;
   bool isEnablePostFitErrorEval() const;
@@ -58,8 +59,12 @@ private:
   bool _restoreStepSizeBeforeHesse_{false};
   bool _generatedPostFitParBreakdown_{false};
   bool _generatedPostFitEigenBreakdown_{false};
+  bool _showParametersOnFitMonitor_{false};
   int _strategy_{1};
   int _printLevel_{2};
+  int _simplexStrategy_{1};
+  int _monitorRefreshRateInMs_{5000};
+  int _maxNbParametersPerLineOnMonitor_{15};
   double _tolerance_{1E-4};
   double _simplexToleranceLoose_{1000.};
   unsigned int _maxIterations_{500};

@@ -101,7 +101,11 @@ void FitParameter::setName(const std::string &name) {
   _name_ = name;
 }
 void FitParameter::setParameterValue(double parameterValue) {
-  _parameterValue_ = parameterValue;
+  if( _parameterValue_ != parameterValue ){
+    _gotUpdated_ = true;
+    _parameterValue_ = parameterValue;
+  }
+  else{ _gotUpdated_ = false; }
 }
 void FitParameter::setPriorValue(double priorValue) {
   _priorValue_ = priorValue;

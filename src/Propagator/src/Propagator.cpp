@@ -157,25 +157,6 @@ void Propagator::initializeImpl() {
     }
   }
 
-  // Stat error
-  if( _throwAsimovToyParameters_ and _enableStatThrowInToys_ ){
-    LogInfo << "Throwing statistical error for data container..." << std::endl;
-    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-      if( _enableEventMcThrow_ ){
-        // Take into account the finite amount of event in MC
-        sample.getDataContainer().throwEventMcError();
-      }
-      // Asimov bin content -> toy data
-      sample.getDataContainer().throwStatError();
-    }
-  }
-
-  LogInfo << "Locking data event containers..." << std::endl;
-  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    // Now the data won't be refilled each time
-    sample.getDataContainer().isLocked = true;
-  }
-
   if( not allAsimov ){
     // reload everything
     // Filling the mc containers
@@ -188,7 +169,6 @@ void Propagator::initializeImpl() {
       dispenser.setParSetPtrToLoad(&_parameterSetList_);
       dispenser.load();
     }
-
   }
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
@@ -214,6 +194,25 @@ void Propagator::initializeImpl() {
 
   LogInfo << "Filling up sample histograms..." << std::endl;
   _fitSampleSet_.updateSampleHistograms();
+
+  // Stat error -> BINNING SHOULD BE SET!!
+  if( _throwAsimovToyParameters_ and _enableStatThrowInToys_ ){
+    LogInfo << "Throwing statistical error for data container..." << std::endl;
+    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+      if( _enableEventMcThrow_ ){
+        // Take into account the finite amount of event in MC
+        sample.getDataContainer().throwEventMcError();
+      }
+      // Asimov bin content -> toy data
+      sample.getDataContainer().throwStatError();
+    }
+  }
+
+  LogInfo << "Locking data event containers..." << std::endl;
+  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    // Now the data won't be refilled each time
+    sample.getDataContainer().isLocked = true;
+  }
 
 
   _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
