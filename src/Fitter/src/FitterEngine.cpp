@@ -47,9 +47,6 @@ void FitterEngine::readConfigImpl(){
   _scaleParStepWithChi2Response_ = JsonUtils::fetchValue(_config_, "scaleParStepWithChi2Response", _scaleParStepWithChi2Response_);
   _parStepGain_ = JsonUtils::fetchValue(_config_, "parStepGain", _parStepGain_);
 
-  _debugPrintLoadedEvents_ = JsonUtils::fetchValue(_config_, "debugPrintLoadedEvents", _debugPrintLoadedEvents_);
-  _debugPrintLoadedEventsNbPerSample_ = JsonUtils::fetchValue(_config_, "debugPrintLoadedEventsNbPerSample", _debugPrintLoadedEventsNbPerSample_);
-
   _throwMcBeforeFit_ = JsonUtils::fetchValue(_config_, "throwMcBeforeFit", _throwMcBeforeFit_);
   _throwGain_ = JsonUtils::fetchValue(_config_, "throwMcBeforeFitGain", _throwGain_);
 
@@ -71,21 +68,6 @@ void FitterEngine::initializeImpl(){
   LogThrowIf(_saveDir_== nullptr);
 
   _propagator_.initialize();
-
-  if( _debugPrintLoadedEvents_ ){
-    LogDebug << GET_VAR_NAME_VALUE(_debugPrintLoadedEventsNbPerSample_) << std::endl;
-    for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
-      LogDebug << "debugPrintLoadedEvents: " << sample.getName() << std::endl;
-      LogDebug.setIndentStr("  ");
-
-      int iEvt=0;
-      for( auto& ev : sample.getMcContainer().eventList ){
-        if(iEvt++ >= _debugPrintLoadedEventsNbPerSample_) { LogDebug << std::endl; break; }
-        LogDebug << iEvt << " -> " << ev.getSummary() << std::endl;
-      }
-      LogDebug.setIndentStr("");
-    }
-  }
 
   // This moves the parameters
   if( _enablePca_ ) {

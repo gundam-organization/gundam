@@ -67,6 +67,9 @@ void Propagator::readConfigImpl(){
   }
 
   _parScanner_.readConfig( JsonUtils::fetchValue(_config_, "scanConfig", nlohmann::json()) );
+
+  _debugPrintLoadedEvents_ = JsonUtils::fetchValue(_config_, "debugPrintLoadedEvents", _debugPrintLoadedEvents_);
+  _debugPrintLoadedEventsNbPerSample_ = JsonUtils::fetchValue(_config_, "debugPrintLoadedEventsNbPerSample", _debugPrintLoadedEventsNbPerSample_);
 }
 void Propagator::initializeImpl() {
   LogWarning << __METHOD_NAME__ << std::endl;
@@ -139,8 +142,12 @@ void Propagator::initializeImpl() {
     LogInfo << "Propagating prior parameters on events..." << std::endl;
     bool cacheManagerState = GlobalVariables::getEnableCacheManager();
     GlobalVariables::setEnableCacheManager(false);
-    this->reweightMcEvents();
+    this->propagateParametersOnSamples();
     GlobalVariables::setEnableCacheManager(cacheManagerState);
+
+    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+      LogDebug << sample.getName() << ": " << sample.getMcContainer().getSumWeights() << std::endl;
+    }
 
     // Copies MC events in data container for both Asimov and FakeData event types
     LogWarning << "Copying loaded mc-like event to data container..." << std::endl;
@@ -173,12 +180,12 @@ void Propagator::initializeImpl() {
   // After all the data has been loaded.  Specifically, this must be after
   // the MC has been copied for the Asimov fit, or the "data" use the MC
   // reweighting cache.  This must also be before the first use of
-  // reweightMcEvents.
+  // propagateParametersOnSamples.
   if(GlobalVariables::getEnableCacheManager()) Cache::Manager::Build(getFitSampleSet());
 #endif
 
   LogInfo << "Propagating prior parameters on events..." << std::endl;
-  this->reweightMcEvents();
+  this->propagateParametersOnSamples();
 
   LogInfo << "Set the current MC prior weights as nominal weight..." << std::endl;
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
@@ -206,14 +213,14 @@ void Propagator::initializeImpl() {
 
       int iStage{0};
       for( auto& parSet : _parameterSetList_ ){ parSet.setMaskedForPropagation(true); }
-      this->reweightMcEvents();
+      this->propagateParametersOnSamples();
       for( size_t iSample = 0 ; iSample < _fitSampleSet_.getFitSampleList().size() ; iSample++ ){
         stageBreakdownList[iSample][iStage] = _fitSampleSet_.getFitSampleList()[iSample].getMcContainer().getSumWeights();
       }
 
       for( auto& parSet : _parameterSetList_ ){
         parSet.setMaskedForPropagation(false);
-        this->reweightMcEvents();
+        this->propagateParametersOnSamples();
         iStage++;
         for( size_t iSample = 0 ; iSample < _fitSampleSet_.getFitSampleList().size() ; iSample++ ){
           stageBreakdownList[iSample][iStage] = _fitSampleSet_.getFitSampleList()[iSample].getMcContainer().getSumWeights();
@@ -290,6 +297,21 @@ void Propagator::initializeImpl() {
   _treeWriter_.setParSetListPtr(&_parameterSetList_);
 
   _parScanner_.initialize();
+
+  if( _debugPrintLoadedEvents_ ){
+    LogDebug << GET_VAR_NAME_VALUE(_debugPrintLoadedEventsNbPerSample_) << std::endl;
+    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+      LogDebug << "debugPrintLoadedEvents: " << sample.getName() << std::endl;
+      LogDebug.setIndentStr("  ");
+
+      int iEvt=0;
+      for( auto& ev : sample.getMcContainer().eventList ){
+        if(iEvt++ >= _debugPrintLoadedEventsNbPerSample_) { LogDebug << std::endl; break; }
+        LogDebug << iEvt << " -> " << ev.getSummary() << std::endl;
+      }
+      LogDebug.setIndentStr("");
+    }
+  }
 
   // Propagator needs to be fast
   GlobalVariables::getParallelWorker().setCpuTimeSaverIsEnabled(false);
