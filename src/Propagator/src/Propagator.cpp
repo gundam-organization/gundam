@@ -131,6 +131,11 @@ void Propagator::initializeImpl() {
   }
 
   if( usedMcContainer ){
+    this->propagateParametersOnSamples();
+    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+      LogDebug << sample.getName() << ": " << sample.getMcContainer().getSumWeights() << std::endl;
+    }
+
     if( _throwAsimovToyParameters_ ){
       for( auto& parSet : _parameterSetList_ ){
         if( parSet.isEnabledThrowToyParameters() and parSet.getPriorCovarianceMatrix() != nullptr ){
@@ -302,14 +307,13 @@ void Propagator::initializeImpl() {
     LogDebug << GET_VAR_NAME_VALUE(_debugPrintLoadedEventsNbPerSample_) << std::endl;
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
       LogDebug << "debugPrintLoadedEvents: " << sample.getName() << std::endl;
-      LogDebug.setIndentStr("  ");
+      Logger::Indent lIndent;
 
       int iEvt=0;
       for( auto& ev : sample.getMcContainer().eventList ){
         if(iEvt++ >= _debugPrintLoadedEventsNbPerSample_) { LogDebug << std::endl; break; }
         LogDebug << iEvt << " -> " << ev.getSummary() << std::endl;
       }
-      LogDebug.setIndentStr("");
     }
   }
 
