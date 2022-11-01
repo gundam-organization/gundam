@@ -300,7 +300,7 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
 
     strBuffer = Form("%s/values%s/%sErrors_TH1D", parSet.c_str(), (useNomVal_? "Norm": ""), (usePrefit_? "preFit": "postFit"));
     auto* hist2 = dir2->Get<TH1D>(strBuffer.c_str());
-    if( hist1 == nullptr ){
+    if( hist2 == nullptr ){
       // legacy
       strBuffer = Form("%s/values%s/%sErrors", parSet.c_str(), (useNomVal_? "Norm": ""), (usePrefit_? "preFit": "postFit"));
       hist2 = dir2->Get<TH1D>(strBuffer.c_str());
