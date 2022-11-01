@@ -83,7 +83,7 @@ double Dial::capDialResponse(double response_){
   if     (_owner_->getMinDialResponse() == _owner_->getMinDialResponse() and response_ < _owner_->getMinDialResponse() ){ response_=_owner_->getMinDialResponse(); }
   else if(_owner_->getMaxDialResponse() == _owner_->getMaxDialResponse() and response_ > _owner_->getMaxDialResponse() ){ response_=_owner_->getMaxDialResponse(); }
 
-  LogThrowIf( response_ != response_, "NaN response returned:" << std::endl << this->getSummary());
+  LogThrowIf( std::isnan(response_), "NaN response returned:" << std::endl << this->getSummary());
   if( Dial::throwIfResponseIsNegative and response_ < 0 ){
     this->writeSpline("");
     LogError << this->getSummary() << std::endl;
