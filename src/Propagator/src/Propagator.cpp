@@ -36,13 +36,12 @@ void Propagator::readConfigImpl(){
 
   auto parameterSetListConfig = JsonUtils::fetchValue(_config_, "parameterSetListConfig", nlohmann::json());
   if( parameterSetListConfig.is_string() ) parameterSetListConfig = JsonUtils::readConfigFile(parameterSetListConfig.get<std::string>());
-  _parameterSetsList_.reserve(parameterSetListConfig.size()); // make sure the objects aren't moved in RAM ( since FitParameter* will be used )
+  _parameterSetList_.reserve(parameterSetListConfig.size()); // make sure the objects aren't moved in RAM ( since FitParameter* will be used )
   for( const auto& parameterSetConfig : parameterSetListConfig ){
-    _parameterSetsList_.emplace_back();
-    _parameterSetsList_.back().setConfig(parameterSetConfig);
-    _parameterSetsList_.back().setSaveDir(GenericToolbox::mkdirTFile(_saveDir_, "ParameterSets"));
-    _parameterSetsList_.back().readConfig();
-    LogInfo << _parameterSetsList_.back().getSummary() << std::endl;
+    _parameterSetList_.emplace_back();
+    _parameterSetList_.back().setConfig(parameterSetConfig);
+    _parameterSetList_.back().readConfig();
+    LogInfo << _parameterSetList_.back().getSummary() << std::endl;
   }
 
   auto fitSampleSetConfig = JsonUtils::fetchValue(_config_, "fitSampleSetConfig", nlohmann::json());
@@ -66,21 +65,27 @@ void Propagator::readConfigImpl(){
   for( const auto& dataSetConfig : dataSetListConfig ){
     _dataSetList_.emplace_back(dataSetConfig, iDataSet++);
   }
+
+  _parScanner_.readConfig( JsonUtils::fetchValue(_config_, "scanConfig", nlohmann::json()) );
+
+  _debugPrintLoadedEvents_ = JsonUtils::fetchValue(_config_, "debugPrintLoadedEvents", _debugPrintLoadedEvents_);
+  _debugPrintLoadedEventsNbPerSample_ = JsonUtils::fetchValue(_config_, "debugPrintLoadedEventsNbPerSample", _debugPrintLoadedEventsNbPerSample_);
 }
 void Propagator::initializeImpl() {
   LogWarning << __METHOD_NAME__ << std::endl;
 
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing parameters...") << std::endl;
   int nPars = 0;
-  for( auto& parSet : _parameterSetsList_ ){
+  for( auto& parSet : _parameterSetList_ ){
     parSet.initialize();
     nPars += int(parSet.getNbParameters());
   }
   LogInfo << "Total number of parameters: " << nPars << std::endl;
 
+  LogInfo << "Building global covariance matrix..." << std::endl;
   _globalCovarianceMatrix_ = std::make_shared<TMatrixD>( nPars, nPars );
   int iParOffset = 0;
-  for( const auto& parSet : _parameterSetsList_ ){
+  for( const auto& parSet : _parameterSetList_ ){
     if( not parSet.isEnabled() ) continue;
     if(parSet.getPriorCovarianceMatrix() != nullptr ){
       for(int iCov = 0 ; iCov < parSet.getPriorCovarianceMatrix()->GetNrows() ; iCov++ ){
@@ -90,10 +95,6 @@ void Propagator::initializeImpl() {
       }
       iParOffset += parSet.getPriorCovarianceMatrix()->GetNrows();
     }
-  }
-  if( _saveDir_ != nullptr ){
-    _saveDir_->cd();
-    _globalCovarianceMatrix_->Write("globalCovarianceMatrix_TMatrixD");
   }
 
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing samples...") << std::endl;
@@ -124,14 +125,14 @@ void Propagator::initializeImpl() {
     dispenser.setPlotGenPtr(&_plotGenerator_);
     if(dispenser.getParameters().useMcContainer ){
       usedMcContainer = true;
-      dispenser.setParSetPtrToLoad(&_parameterSetsList_);
+      dispenser.setParSetPtrToLoad(&_parameterSetList_);
     }
     dispenser.load();
   }
 
   if( usedMcContainer ){
     if( _throwAsimovToyParameters_ ){
-      for( auto& parSet : _parameterSetsList_ ){
+      for( auto& parSet : _parameterSetList_ ){
         if( parSet.isEnabledThrowToyParameters() and parSet.getPriorCovarianceMatrix() != nullptr ){
           parSet.throwFitParameters();
         }
@@ -150,7 +151,7 @@ void Propagator::initializeImpl() {
 
     // back to prior
     if( _throwAsimovToyParameters_ ){
-      for( auto& parSet : _parameterSetsList_ ){
+      for( auto& parSet : _parameterSetList_ ){
         parSet.moveFitParametersToPrior();
       }
     }
@@ -159,16 +160,29 @@ void Propagator::initializeImpl() {
   if( not allAsimov ){
     // reload everything
     // Filling the mc containers
+
+    // clearing events in MC containers
     _fitSampleSet_.clearMcContainers();
+
+    // also wiping event-by-event dials...
+    LogInfo << "Wiping event-by-event dials..." << std::endl;
+    for( auto& parSet : _parameterSetList_ ){
+      for( auto& par : parSet.getParameterList() ){
+        for( auto& dialSet : par.getDialSetList() ){
+          if( dialSet.getDialLeafName().empty() ) continue;
+          dialSet.getDialList().clear();
+        }
+      }
+    }
+
     for( auto& dataSet : _dataSetList_ ){
       LogContinueIf(not dataSet.isEnabled(), "Dataset \"" << dataSet.getName() << "\" is disabled. Skipping");
       auto& dispenser = dataSet.getMcDispenser();
       dispenser.setSampleSetPtrToLoad(&_fitSampleSet_);
       dispenser.setPlotGenPtr(&_plotGenerator_);
-      dispenser.setParSetPtrToLoad(&_parameterSetsList_);
+      dispenser.setParSetPtrToLoad(&_parameterSetList_);
       dispenser.load();
     }
-
   }
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
@@ -189,6 +203,47 @@ void Propagator::initializeImpl() {
     }
   }
 
+  LogInfo << "Filling up sample bin caches..." << std::endl;
+  _fitSampleSet_.updateSampleBinEventList();
+
+  LogInfo << "Filling up sample histograms..." << std::endl;
+  _fitSampleSet_.updateSampleHistograms();
+
+  // Stat error -> BINNING SHOULD BE SET!!
+  if( _throwAsimovToyParameters_ and _enableStatThrowInToys_ ){
+    LogInfo << "Throwing statistical error for data container..." << std::endl;
+    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+      if( _enableEventMcThrow_ ){
+        // Take into account the finite amount of event in MC
+        sample.getDataContainer().throwEventMcError();
+      }
+      // Asimov bin content -> toy data
+      sample.getDataContainer().throwStatError();
+    }
+  }
+
+  LogInfo << "Locking data event containers..." << std::endl;
+  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    // Now the data won't be refilled each time
+    sample.getDataContainer().isLocked = true;
+  }
+
+
+  _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
+
+  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the plot generator") << std::endl;
+  _plotGenerator_.initialize();
+
+  LogInfo << "Saving nominal histograms..." << std::endl;
+  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    sample.getMcContainer().saveAsHistogramNominal();
+  }
+
+  _treeWriter_.setFitSampleSetPtr(&_fitSampleSet_);
+  _treeWriter_.setParSetListPtr(&_parameterSetList_);
+
+  _parScanner_.initialize();
+
   if( _showEventBreakdown_ ){
 
     if(true){
@@ -197,23 +252,23 @@ void Propagator::initializeImpl() {
       Dial::enableMaskCheck = true;
       std::vector<std::vector<double>> stageBreakdownList(
           _fitSampleSet_.getFitSampleList().size(),
-          std::vector<double>(_parameterSetsList_.size()+1, 0)
+          std::vector<double>(_parameterSetList_.size() + 1, 0)
       ); // [iSample][iStage]
       std::vector<std::string> stageTitles;
       stageTitles.emplace_back("Sample");
       stageTitles.emplace_back("No reweight");
-      for( auto& parSet : _parameterSetsList_ ){
+      for( auto& parSet : _parameterSetList_ ){
         stageTitles.emplace_back("+ " + parSet.getName());
       }
 
       int iStage{0};
-      for( auto& parSet : _parameterSetsList_ ){ parSet.setMaskedForPropagation(true); }
+      for( auto& parSet : _parameterSetList_ ){ parSet.setMaskedForPropagation(true); }
       this->reweightMcEvents();
       for( size_t iSample = 0 ; iSample < _fitSampleSet_.getFitSampleList().size() ; iSample++ ){
         stageBreakdownList[iSample][iStage] = _fitSampleSet_.getFitSampleList()[iSample].getMcContainer().getSumWeights();
       }
 
-      for( auto& parSet : _parameterSetsList_ ){
+      for( auto& parSet : _parameterSetList_ ){
         parSet.setMaskedForPropagation(false);
         this->reweightMcEvents();
         iStage++;
@@ -250,46 +305,18 @@ void Propagator::initializeImpl() {
     t.printTable();
   }
 
-  _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
+  if( _debugPrintLoadedEvents_ ){
+    LogDebug << GET_VAR_NAME_VALUE(_debugPrintLoadedEventsNbPerSample_) << std::endl;
+    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+      LogDebug << GenericToolbox::addUpDownBars( sample.getName() ) << std::endl;
 
-  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the plot generator") << std::endl;
-  _plotGenerator_.initialize();
-
-  LogInfo << "Filling up sample bin caches..." << std::endl;
-  _fitSampleSet_.updateSampleBinEventList();
-
-  LogInfo << "Filling up sample histograms..." << std::endl;
-  _fitSampleSet_.updateSampleHistograms();
-
-  LogInfo << "Saving nominal histograms..." << std::endl;
-  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    sample.getMcContainer().saveAsHistogramNominal();
-  }
-
-  // Now the data won't be refilled each time
-  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    if( _throwAsimovToyParameters_ and _enableStatThrowInToys_ ){
-      if( _enableEventMcThrow_ ){
-        // Take into account the finite amount of event in MC
-        sample.getDataContainer().throwEventMcError();
-      }
-      // Asimov bin content -> toy data
-      sample.getDataContainer().throwStatError();
-    }
-    sample.getDataContainer().isLocked = true;
-  }
-
-  if( _throwAsimovToyParameters_ ){
-    for( auto& parSet : _parameterSetsList_ ){
-      for( auto& par : parSet.getParameterList() ){
-        par.setParameterValue( par.getPriorValue() );
+      int iEvt=0;
+      for( auto& ev : sample.getMcContainer().eventList ){
+        if(iEvt++ >= _debugPrintLoadedEventsNbPerSample_) { LogTrace << std::endl; break; }
+        LogTrace << iEvt << " -> " << ev.getSummary() << std::endl;
       }
     }
-    propagateParametersOnSamples();
   }
-
-  _treeWriter_.setFitSampleSetPtr(&_fitSampleSet_);
-  _treeWriter_.setParSetListPtr(&_parameterSetsList_);
 
   // Propagator needs to be fast
   GlobalVariables::getParallelWorker().setCpuTimeSaverIsEnabled(false);
@@ -297,9 +324,6 @@ void Propagator::initializeImpl() {
 
 void Propagator::setShowTimeStats(bool showTimeStats) {
   _showTimeStats_ = showTimeStats;
-}
-void Propagator::setSaveDir(TDirectory *saveDir) {
-  _saveDir_ = saveDir;
 }
 void Propagator::setThrowAsimovToyParameters(bool throwAsimovToyParameters) {
   _throwAsimovToyParameters_ = throwAsimovToyParameters;
@@ -317,6 +341,9 @@ bool Propagator::isThrowAsimovToyParameters() const {
 int Propagator::getIThrow() const {
   return _iThrow_;
 }
+const std::shared_ptr<TMatrixD> &Propagator::getGlobalCovarianceMatrix() const {
+  return _globalCovarianceMatrix_;
+}
 double Propagator::getLlhBuffer() const {
   return _llhBuffer_;
 }
@@ -333,10 +360,10 @@ FitSampleSet &Propagator::getFitSampleSet() {
   return _fitSampleSet_;
 }
 std::vector<FitParameterSet> &Propagator::getParameterSetsList() {
-  return _parameterSetsList_;
+  return _parameterSetList_;
 }
 const std::vector<FitParameterSet> &Propagator::getParameterSetsList() const {
-  return _parameterSetsList_;
+  return _parameterSetList_;
 }
 PlotGenerator &Propagator::getPlotGenerator() {
   return _plotGenerator_;
@@ -360,7 +387,7 @@ void Propagator::updateLlhCache(){
   // Compute the penalty terms
   ////////////////////////////////
   _llhPenaltyBuffer_ = 0;
-  for( auto& parSet : _parameterSetsList_ ){
+  for( auto& parSet : _parameterSetList_ ){
     buffer = parSet.getPenaltyChi2();
     _llhPenaltyBuffer_ += buffer;
     LogThrowIf(std::isnan(buffer), parSet.getName() << " penalty chi2 is Nan");
@@ -379,7 +406,7 @@ void Propagator::updateLlhCache(){
 void Propagator::propagateParametersOnSamples(){
 
   // Only real parameters are propagated on the spectra -> need to convert the eigen to original
-  for( auto& parSet : _parameterSetsList_ ){
+  for( auto& parSet : _parameterSetList_ ){
     if( parSet.isUseEigenDecompInFit() ) parSet.propagateEigenToOriginal();
   }
 
@@ -426,15 +453,13 @@ void Propagator::reweightMcEvents() {
   weightProp.counts++;
   weightProp.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 }
-
 void Propagator::refillSampleHistograms(){
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
   GlobalVariables::getParallelWorker().runJob("Propagator::refillSampleHistograms");
   fillProp.counts++; fillProp.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 }
-
 void Propagator::fillDialsStack(){
-  for( auto& parSet : _parameterSetsList_ ){
+  for( auto& parSet : _parameterSetList_ ){
     if( not parSet.isUseEigenDecompInFit() ){
       for( auto& par : parSet.getParameterList() ){
         for( auto& dialSet : par.getDialSetList() ){
@@ -448,21 +473,6 @@ void Propagator::fillDialsStack(){
   } // parSet
 }
 
-void Propagator::generateSamplePlots(const std::string& savePath_, TDirectory* baseDir_){
-  LogInfo << __METHOD_NAME__ << std::endl;
-  LogThrowIf(not isInitialized(), "not initialized");
-
-  if( baseDir_ == nullptr ) baseDir_ = _saveDir_;
-
-  propagateParametersOnSamples();
-
-  if( not getPlotGenerator().isEmpty() ){
-    getPlotGenerator().generateSamplePlots( GenericToolbox::mkdirTFile(baseDir_, savePath_ ) );
-  }
-  else{
-    LogWarning << "No histogram is defined in the PlotGenerator. Skipping..." << std::endl;
-  }
-}
 
 // Protected
 void Propagator::initializeThreads() {
@@ -535,5 +545,6 @@ void Propagator::reweightMcEvents(int iThread_) {
     }
   );
 }
+
 
 

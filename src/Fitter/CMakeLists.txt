@@ -1,6 +1,5 @@
 set(SRCFILES
         src/FitterEngine.cpp
-        src/ParScanner.cpp
         src/MinimizerInterface.cpp
   )
 

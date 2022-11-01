@@ -1,9 +1,11 @@
 set(SRCFILES
         src/Propagator.cpp
+        src/ParScanner.cpp
 )
 
 set(HEADERS
         include/Propagator.h
+        include/ParScanner.h
 )
 
 if( USE_STATIC_LINKS )

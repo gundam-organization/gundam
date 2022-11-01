@@ -29,8 +29,8 @@ public:
   explicit MinimizerInterface(FitterEngine* owner_);
 
   void setOwner(FitterEngine* owner_);
-  void setSaveDir(TDirectory* saveDir_);
   void setEnablePostFitErrorEval(bool enablePostFitErrorEval_);
+  void setMonitorRefreshRateInMs(int monitorRefreshRateInMs_);
 
   bool isFitHasConverged() const;
   bool isEnablePostFitErrorEval() const;
@@ -57,8 +57,14 @@ private:
   bool _enableSimplexBeforeMinimize_{false};
   bool _enablePostFitErrorEval_{true};
   bool _restoreStepSizeBeforeHesse_{false};
+  bool _generatedPostFitParBreakdown_{false};
+  bool _generatedPostFitEigenBreakdown_{false};
+  bool _showParametersOnFitMonitor_{false};
   int _strategy_{1};
   int _printLevel_{2};
+  int _simplexStrategy_{1};
+  int _monitorRefreshRateInMs_{5000};
+  int _maxNbParametersPerLineOnMonitor_{15};
   double _tolerance_{1E-4};
   double _simplexToleranceLoose_{1000.};
   unsigned int _maxIterations_{500};
@@ -79,8 +85,7 @@ private:
   std::unique_ptr<ROOT::Math::Minimizer> _minimizer_{nullptr};
   std::unique_ptr<ROOT::Math::Functor> _functor_{nullptr};
   std::vector<FitParameter*> _minimizerFitParameterPtr_{};
-  TDirectory* _saveDir_{nullptr};
-  TTree* _chi2HistoryTree_{nullptr};
+  std::unique_ptr<TTree> _chi2HistoryTree_{nullptr};
 
   // monitors
   GenericToolbox::VariablesMonitor _convergenceMonitor_;

@@ -8,6 +8,7 @@
 #include "JsonUtils.h"
 
 #include "GenericToolbox.h"
+#include "Logger.h" // The displayed header will depend on the src file it's been included.
 
 #include "nlohmann/json.hpp"
 
@@ -54,9 +55,9 @@ namespace JsonUtils {
   template<class T> nlohmann::json fetchMatchingEntry(const nlohmann::json& jsonConfig_, const std::string& keyName_, const T& keyValue_){
 
     if( not jsonConfig_.is_array() ){
-      std::cout << "key: " << keyName_ << std::endl;
-      std::cout << "value: " << keyValue_ << std::endl;
-      std::cout << "dump: " << jsonConfig_.dump() << std::endl;
+      LogError << "key: " << keyName_ << std::endl;
+      LogError << "value: " << keyValue_ << std::endl;
+      LogError << "dump: " << jsonConfig_.dump() << std::endl;
       throw std::runtime_error("JsonUtils::fetchMatchingEntry: jsonConfig_ is not an array.");
     }
 
@@ -71,8 +72,13 @@ namespace JsonUtils {
       }
 
     }
-
-    return nlohmann::json(); // .empty()
+    return {}; // .empty()
+  }
+  template<typename F> void deprecatedAction(const nlohmann::json& jsonConfig_, const std::string& keyName_, const F& action_){
+    if( JsonUtils::doKeyExist(jsonConfig_, keyName_) ){
+      LogAlert << "DEPRECATED option: \"" << keyName_ << "\". Running defined action..." << std::endl;
+      action_();
+    }
   }
 
   // specialization

@@ -58,6 +58,7 @@ public:
   bool isFixed() const;
   bool isEigen() const;
   bool isFree() const;
+  bool gotUpdated() const { return _gotUpdated_; }
   PriorType::PriorType getPriorType() const;
   int getParameterIndex() const;
   const std::string &getName() const;
@@ -89,6 +90,7 @@ private:
   bool _isFixed_{false};
   bool _isEigen_{false};
   bool _isFree_{false};
+  bool _gotUpdated_{false};
   bool _enableDialSetsSummary_{false};
   int _parameterIndex_{-1}; // to get the right definition in the json config (in case "name" is not specified)
   double _parameterValue_{std::nan("unset")};

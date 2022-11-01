@@ -12,6 +12,7 @@
 #endif
 
 #include "Logger.h"
+#include "GenericToolbox.Root.h"
 
 #include "TFile.h"
 
@@ -19,6 +20,7 @@ LoggerInit([](){ Logger::setUserHeaderStr("[SplineDial]"); } );
 
 
 SplineDial::SplineDial(const DialSet* owner_) : Dial(DialType::Spline, owner_) {}
+SplineDial::SplineDial(const DialSet* owner_, const TGraph& graph_): Dial(DialType::Spline, owner_), _spline_(graph_.GetName(), &graph_) {}
 
 void SplineDial::copySpline(const TSpline3* splinePtr_){
   // Don't check for override: when loading toy + mc data, these placeholders has to be filled up twice
@@ -84,17 +86,17 @@ double SplineDial::calcDial(double parameterValue_) {
   if (_splineType_ == SplineDial::Uniform) {
       dialResponse = CalculateUniformSpline(
           parameterValue_, -1E20, 1E20,
-          _splineData_.data(), _splineData_.size());
+          _splineData_.data(), int(_splineData_.size()));
   }
   else if (_splineType_ == SplineDial::General) {
       dialResponse = CalculateGeneralSpline(
           parameterValue_, -1E20, 1E20,
-          _splineData_.data(), _splineData_.size());
+          _splineData_.data(), int(_splineData_.size()));
   }
   else if (_splineType_ == SplineDial::Monotonic) {
       dialResponse = CalculateMonotonicSpline(
           parameterValue_, -1E20, 1E20,
-          _splineData_.data(), _splineData_.size());
+          _splineData_.data(), int(_splineData_.size()));
   }
   else if (_splineType_ == SplineDial::ROOTSpline) {
       dialResponse = _spline_.Eval(parameterValue_);
@@ -133,7 +135,7 @@ void SplineDial::writeSpline(const std::string &fileName_) const{
   if(fileName_.empty()) f = TFile::Open(Form("badDial_%p.root", this), "RECREATE");
   else                  f = TFile::Open(fileName_.c_str(), "RECREATE");
 
-  f->WriteObject(&_spline_, _spline_.GetName());
+  GenericToolbox::writeInTFile( f, &_spline_ );
   f->Close();
 }
 #ifdef ENABLE_SPLINE_DIAL_FAST_EVAL

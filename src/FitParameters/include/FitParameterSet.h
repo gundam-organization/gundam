@@ -34,14 +34,13 @@
 class FitParameterSet : public JsonBaseClass  {
 
 public:
-  // Setters
-  void setSaveDir(TDirectory* saveDir_);
-
   // Post-init
   void prepareFitParameters(); // invert the matrices, and make sure fixed parameters are detached from correlations
 
   // Getters
   bool isEnabled() const;
+  bool isEnablePca() const;
+  bool isUseEigenDecompInFit() const;
   bool isEnabledThrowToyParameters() const;
   bool isUseOnlyOneParameterPerEvent() const;
   const std::string &getName() const;
@@ -63,7 +62,6 @@ public:
   void throwFitParameters(double gain_ = 1);
   const std::vector<nlohmann::json>& getCustomFitParThrow() const;
 
-  bool isUseEigenDecompInFit() const;
   int getNbEnabledEigenParameters() const;
   const TMatrixD* getInvertedEigenVectors() const;
   const TMatrixD* getEigenVectors() const;
@@ -92,7 +90,6 @@ private:
   // Internals
   std::vector<FitParameter> _parameterList_;
   std::vector<NestedDialTest> _nestedDialList_;
-  TDirectory* _saveDir_{nullptr};
 
   // JSON
   std::string _name_{};
@@ -113,6 +110,7 @@ private:
 
   // Eigen objects
   int _nbEnabledEigen_{0};
+  bool _enablePca_{false};
   bool _useEigenDecompInFit_{false};
   bool _useOnlyOneParameterPerEvent_{false};
   std::vector<FitParameter> _eigenParameterList_{};

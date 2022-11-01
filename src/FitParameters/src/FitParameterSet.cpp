@@ -41,7 +41,6 @@ void FitParameterSet::readConfigImpl(){
 
   _useEigenDecompInFit_ = JsonUtils::fetchValue(_config_ , "useEigenDecompInFit", false);
   if( _useEigenDecompInFit_ ){
-
     LogWarning << "Using eigen decomposition in fit." << std::endl;
     _maxNbEigenParameters_ = JsonUtils::fetchValue(_config_ , "maxNbEigenParameters", -1);
     if( _maxNbEigenParameters_ != -1 ){
@@ -51,8 +50,9 @@ void FitParameterSet::readConfigImpl(){
     if( _maxEigenFraction_ != 1 ){
       LogInfo << "Max eigen fraction set to: " << _maxEigenFraction_*100 << "%" << std::endl;
     }
-
   }
+
+  _enablePca_ = JsonUtils::fetchValue(_config_, std::vector<std::string>{"fixGhostFitParameters", "enablePca"}, _enablePca_);
 
   _parameterDefinitionFilePath_ = JsonUtils::fetchValue(
       _config_
@@ -82,17 +82,12 @@ void FitParameterSet::initializeImpl() {
 
   LogReturnIf(not _isEnabled_, "Not enabled. Skipping.");
 
-  if( _saveDir_ != nullptr ){ _saveDir_ = GenericToolbox::mkdirTFile(_saveDir_, _name_); }
-
   for( auto& par : _parameterList_ ){ par.initialize(); }
 
   // Make the matrix inversion
   this->prepareFitParameters();
 }
 
-void FitParameterSet::setSaveDir(TDirectory* saveDir_){
-  _saveDir_ = saveDir_;
-}
 void FitParameterSet::setMaskedForPropagation(bool maskedForPropagation) {
   _maskedForPropagation_ = maskedForPropagation;
 }
@@ -234,6 +229,9 @@ void FitParameterSet::prepareFitParameters(){
 bool FitParameterSet::isEnabled() const {
   return _isEnabled_;
 }
+bool FitParameterSet::isEnablePca() const {
+  return _enablePca_;
+}
 bool FitParameterSet::isEnabledThrowToyParameters() const {
   return _enabledThrowToyParameters_;
 }
@@ -243,19 +241,15 @@ const std::string &FitParameterSet::getName() const {
 bool FitParameterSet::isMaskedForPropagation() const {
   return _maskedForPropagation_;
 }
-
 std::vector<FitParameter> &FitParameterSet::getParameterList() {
   return _parameterList_;
 }
 std::vector<FitParameter> &FitParameterSet::getEigenParameterList(){
   return _eigenParameterList_;
 }
-
-
 const std::vector<FitParameter> &FitParameterSet::getParameterList() const{
   return _parameterList_;
 }
-
 std::vector<FitParameter>& FitParameterSet::getEffectiveParameterList(){
   if( _useEigenDecompInFit_ ) return _eigenParameterList_;
   return _parameterList_;
@@ -494,19 +488,6 @@ void FitParameterSet::readParameterDefinitionFile(){
     LogThrowIf(objBuffer == nullptr, "Can't find \"" << strBuffer << "\" in " << parDefFile->GetPath())
     _priorCovarianceMatrix_ = std::shared_ptr<TMatrixDSym>((TMatrixDSym*) objBuffer->Clone());
     _priorCorrelationMatrix_ = std::shared_ptr<TMatrixDSym>((TMatrixDSym*) GenericToolbox::convertToCorrelationMatrix((TMatrixD*)_priorCovarianceMatrix_.get()));
-
-    if( _saveDir_ != nullptr ){
-      // TODO: better writing of the inputs
-      GenericToolbox::mkdirTFile(_saveDir_, "inputs")->cd();
-
-      ((TMatrixD*) _priorCovarianceMatrix_.get())->Write("CovarianceMatrix_TMatrixD");
-      GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) _priorCovarianceMatrix_.get())->Write("CovarianceMatrix_TH2D");
-
-      std::unique_ptr<TMatrixD> correlationMatrix( GenericToolbox::convertToCorrelationMatrix((TMatrixD*)_priorCovarianceMatrix_.get()) );
-      correlationMatrix->Write("CorrelationMatrix_TMatrixD");
-      GenericToolbox::convertTMatrixDtoTH2D(correlationMatrix.get())->Write("CorrelationMatrix_TH2D");
-    }
-
     _nbParameterDefinition_ = _priorCovarianceMatrix_->GetNrows();
   }
 

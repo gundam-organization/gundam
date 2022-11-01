@@ -49,9 +49,10 @@ int main( int argc, char** argv ){
   clp.addOption("output", {"-o"}, "Output file.", 1);
 
   LogInfo << "Options list:" << std::endl;
-  Logger::setIndentStr("  ");
-  LogInfo << clp.getConfigSummary() << std::endl;
-  Logger::setIndentStr("");
+  {
+    Logger::Indent lIndent;
+    LogInfo << clp.getConfigSummary() << std::endl;
+  }
 
   clp.parseCmdLine();
 
@@ -153,16 +154,17 @@ void makeSampleComparePlots(bool usePrefit_){
         hCompValues->SetTitle(Form("Comparing \"%s\"", dir1_->GetListOfKeys()->At(iKey)->GetName()));
         hCompValues->GetYaxis()->SetTitle("Bin content difference");
 
-        GenericToolbox::mkdirTFile(outFile, GenericToolbox::joinVectorString(pathBuffer, "/"))->cd();
-        hCompValues->Write(dir1_->GetListOfKeys()->At(iKey)->GetName());
+        GenericToolbox::writeInTFile(
+            GenericToolbox::mkdirTFile(outFile, GenericToolbox::joinVectorString(pathBuffer, "/")),
+            hCompValues,
+            dir1_->GetListOfKeys()->At(iKey)->GetName()
+            );
       }
     }
 
   };
 
-
   recurseSampleCompareGraph(dir1, dir2);
-  outFile->Write();
 }
 void makeScanComparePlots(bool usePrefit_){
 
@@ -237,8 +239,10 @@ void makeScanComparePlots(bool usePrefit_){
         gPad->SetGridx();
         gPad->SetGridy();
 
-        GenericToolbox::mkdirTFile(outFile, GenericToolbox::joinVectorString(pathBuffer, "/"))->cd();
-        overlayCanvas->Write();
+        GenericToolbox::writeInTFile(
+            GenericToolbox::mkdirTFile(outFile, GenericToolbox::joinVectorString(pathBuffer, "/")),
+            overlayCanvas
+            );
         delete overlayCanvas;
       }
     }
@@ -253,7 +257,6 @@ void makeScanComparePlots(bool usePrefit_){
   LogReturnIf(dir2== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
 
   recurseScanCompareGraph(dir1, dir2);
-  outFile->Write();
 }
 void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
 
@@ -283,22 +286,32 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
   // loop over parSets
   auto* outDir = GenericToolbox::mkdirTFile(outFile, Form("%s/errors%s", (usePrefit_? "preFit": "postFit"), (useNomVal_? "Norm": "")));
   for( int iKey = 0 ; iKey < dir1->GetListOfKeys()->GetEntries() ; iKey++ ){
-    Logger::setIndentStr("  ");
+    Logger::Indent lIndent;
     std::string parSet = dir1->GetListOfKeys()->At(iKey)->GetName();
 
     strBuffer = Form("%s/values%s/%sErrors_TH1D", parSet.c_str(), (useNomVal_? "Norm": ""), (usePrefit_? "preFit": "postFit"));
     auto* hist1 = dir1->Get<TH1D>(strBuffer.c_str());
+    if( hist1 == nullptr ){
+      // legacy
+      strBuffer = Form("%s/values%s/%sErrors", parSet.c_str(), (useNomVal_? "Norm": ""), (usePrefit_? "preFit": "postFit"));
+      hist1 = dir1->Get<TH1D>(strBuffer.c_str());
+    }
     LogContinueIf(hist1 == nullptr, "Could no find parSet \"" << strBuffer << "\" in " << file1->GetPath());
 
     strBuffer = Form("%s/values%s/%sErrors_TH1D", parSet.c_str(), (useNomVal_? "Norm": ""), (usePrefit_? "preFit": "postFit"));
     auto* hist2 = dir2->Get<TH1D>(strBuffer.c_str());
+    if( hist1 == nullptr ){
+      // legacy
+      strBuffer = Form("%s/values%s/%sErrors", parSet.c_str(), (useNomVal_? "Norm": ""), (usePrefit_? "preFit": "postFit"));
+      hist2 = dir2->Get<TH1D>(strBuffer.c_str());
+    }
     LogContinueIf(hist2 == nullptr, "Could no find parSet \"" << strBuffer << "\" in " << file2->GetPath());
 
     LogInfo << "Processing parameter set: \"" << parSet << "\"" << std::endl;
 
     auto yBounds = GenericToolbox::getYBounds({hist1, hist2});
 
-    auto* overlayCanvas = new TCanvas( "overlay_TCanvas" , Form("Comparing %s parameters: \"%s\"", (usePrefit_? "preFit": "postFit"), parSet.c_str()), 800, 600);
+    auto* overlayCanvas = new TCanvas( "overlay" , Form("Comparing %s parameters: \"%s\"", (usePrefit_? "preFit": "postFit"), parSet.c_str()), 800, 600);
     hist1->SetFillColor(kRed-9);
     hist1->SetLineColor(kRed-3);
     hist1->SetMarkerStyle(kFullDotLarge);
@@ -347,8 +360,7 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
     l.Draw();
 
     hist1->SetTitle(Form("Comparing %s parameters: \"%s\"", (usePrefit_? "preFit": "postFit"), parSet.c_str()));
-    GenericToolbox::mkdirTFile(outDir, parSet)->cd();
-    overlayCanvas->Write();
+    GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(outDir, parSet), overlayCanvas );
 
     std::map<std::string, TH1D*> compHist{
         {"ScaledComp", nullptr},
@@ -417,13 +429,15 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
         line2 = new TLine(gPad->GetFrame()->GetX1(), -1, gPad->GetFrame()->GetX2(), -1); line2->SetLineColor(kRed); line2->SetLineStyle(2); line2->Draw();
       }
 
-      overlayCanvas->Write(Form("%s_TCanvas", histEntry.first.c_str()));
+      GenericToolbox::writeInTFile(
+          GenericToolbox::mkdirTFile(outDir, parSet),
+          overlayCanvas,
+          histEntry.first
+          );
+
       delete histEntry.second; delete line1; delete line2;
     }
 
     delete overlayCanvas;
-    Logger::setIndentStr("");
   }
-
-  outFile->Write();
 }
