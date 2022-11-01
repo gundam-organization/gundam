@@ -130,6 +130,8 @@ void Propagator::initializeImpl() {
     dispenser.load();
   }
 
+
+  // Copy to data container
   if( usedMcContainer ){
     if( _throwAsimovToyParameters_ ){
       for( auto& parSet : _parameterSetList_ ){
