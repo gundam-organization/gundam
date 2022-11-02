@@ -162,6 +162,9 @@ void Propagator::initializeImpl() {
               if( not keepThrow ){
                 LogAlert << "Rethrowing \"" << parSet.getName() << "\"..." << std::endl;
               }
+              else{
+                LogWarning << "Keeping throw..." << std::endl;
+              }
             } // check bounds?
           } // keep?
         } // throw?
