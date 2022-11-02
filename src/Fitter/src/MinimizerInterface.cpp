@@ -152,7 +152,7 @@ const std::unique_ptr<ROOT::Math::Minimizer> &MinimizerInterface::getMinimizer()
   return _minimizer_;
 }
 
-void MinimizerInterface::minimize() {
+void MinimizerInterface::minimize(){
   LogThrowIf(not isInitialized(), "not initialized");
 
   _chi2HistoryTree_ = std::make_unique<TTree>("chi2History", "chi2History");

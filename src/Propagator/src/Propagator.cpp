@@ -137,10 +137,11 @@ void Propagator::initializeImpl() {
     if( _throwAsimovToyParameters_ ){
       for( auto& parSet : _parameterSetList_ ){
         bool keepThrow{false};
-        while( not keepThrow ){
-          if( parSet.isEnabledThrowToyParameters() and parSet.getPriorCovarianceMatrix() != nullptr ){
+        if( parSet.isEnabledThrowToyParameters() and parSet.getPriorCovarianceMatrix() != nullptr ){
+
+          while( not keepThrow ){
             parSet.throwFitParameters();
-            keepThrow = true;
+            keepThrow = true; // keep by default
 
             if( _reThrowParSetIfOutOfBounds_ ){
               LogInfo << "Checking if the thrown parameters of the set are within bounds..." << std::endl;
@@ -161,13 +162,11 @@ void Propagator::initializeImpl() {
               if( not keepThrow ){
                 LogAlert << "Rethrowing \"" << parSet.getName() << "\"..." << std::endl;
               }
-            }
-          }
-        }
-
-
-      }
-    }
+            } // check bounds?
+          } // keep?
+        } // throw?
+      } // parSet
+    } // throw asimov?
 
     LogInfo << "Propagating parameters on events..." << std::endl;
     bool cacheManagerState = GlobalVariables::getEnableCacheManager();
