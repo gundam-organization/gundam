@@ -101,6 +101,7 @@ void FitParameter::setName(const std::string &name) {
   _name_ = name;
 }
 void FitParameter::setParameterValue(double parameterValue) {
+  LogThrowIf( std::isnan(parameterValue), "Attempting to set NaN value for par:" << std::endl << this->getSummary() );
   if( _parameterValue_ != parameterValue ){
     _gotUpdated_ = true;
     _parameterValue_ = parameterValue;

@@ -11,11 +11,6 @@ set( APPLICATION_LIST
         gundamRoot
 )
 
-#set (DICT_HEADERS FitterEngine.h)
-#
-#ROOT_GENERATE_DICTIONARY(FitterEngineDict ${DICT_HEADERS} LINKDEF ./GundamLinkDef.h)
-#list(APPEND SRCFILES FitterEngineDict.cxx)
-
 
 if( ENABLE_DEV_MODE )
     list(APPEND APPLICATION_LIST Sandbox)

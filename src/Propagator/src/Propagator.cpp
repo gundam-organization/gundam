@@ -31,6 +31,7 @@ void Propagator::readConfigImpl(){
   // Monitoring parameters
   _showEventBreakdown_ = JsonUtils::fetchValue(_config_, "showEventBreakdown", _showEventBreakdown_);
   _throwAsimovToyParameters_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "throwAsimovFitParameters", _throwAsimovToyParameters_);
+  _reThrowParSetIfOutOfBounds_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "reThrowParSetIfOutOfBounds", _reThrowParSetIfOutOfBounds_);
   _enableStatThrowInToys_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "enableStatThrowInToys", _enableStatThrowInToys_);
   _enableEventMcThrow_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "enableEventMcThrow", _enableEventMcThrow_);
 
@@ -135,13 +136,40 @@ void Propagator::initializeImpl() {
   if( usedMcContainer ){
     if( _throwAsimovToyParameters_ ){
       for( auto& parSet : _parameterSetList_ ){
-        if( parSet.isEnabledThrowToyParameters() and parSet.getPriorCovarianceMatrix() != nullptr ){
-          parSet.throwFitParameters();
+        bool keepThrow{false};
+        while( not keepThrow ){
+          if( parSet.isEnabledThrowToyParameters() and parSet.getPriorCovarianceMatrix() != nullptr ){
+            parSet.throwFitParameters();
+            keepThrow = true;
+
+            if( _reThrowParSetIfOutOfBounds_ ){
+              LogInfo << "Checking if the thrown parameters of the set are within bounds..." << std::endl;
+
+              for( auto& par : parSet.getParameterList() ){
+                if( not std::isnan(par.getMinValue()) and par.getParameterValue() < par.getMinValue() ){
+                  keepThrow = false;
+                  LogWarning << par.getFullTitle() << ": thrown value lower than min bound ->" << std::endl;
+                  LogWarning << par.getSummary() << std::endl;
+                }
+                else if( not std::isnan(par.getMaxValue()) and par.getParameterValue() > par.getMaxValue() ){
+                  keepThrow = false;
+                  LogWarning << par.getFullTitle() << ": thrown value high than max bound ->" << std::endl;
+                  LogWarning << par.getSummary() << std::endl;
+                }
+              }
+
+              if( not keepThrow ){
+                LogAlert << "Rethrowing \"" << parSet.getName() << "\"..." << std::endl;
+              }
+            }
+          }
         }
+
+
       }
     }
 
-    LogInfo << "Propagating prior parameters on events..." << std::endl;
+    LogInfo << "Propagating parameters on events..." << std::endl;
     bool cacheManagerState = GlobalVariables::getEnableCacheManager();
     GlobalVariables::setEnableCacheManager(false);
     this->reweightMcEvents();
