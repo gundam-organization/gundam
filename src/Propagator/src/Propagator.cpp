@@ -154,7 +154,7 @@ void Propagator::initializeImpl() {
                 }
                 else if( not std::isnan(par.getMaxValue()) and par.getParameterValue() > par.getMaxValue() ){
                   keepThrow = false;
-                  LogAlert << par.getFullTitle() << ": thrown value high than max bound ->" << std::endl;
+                  LogAlert << par.getFullTitle() << ": thrown value higher than max bound ->" << std::endl;
                   LogAlert << par.getSummary(true) << std::endl;
                 }
               }
