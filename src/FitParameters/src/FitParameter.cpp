@@ -216,17 +216,24 @@ DialSet* FitParameter::findDialSet(const std::string& dataSetName_){
   return nullptr;
 }
 
-std::string FitParameter::getSummary() const {
+std::string FitParameter::getSummary(bool shallow_) const {
   std::stringstream ss;
 
   ss << "#" << _parameterIndex_;
   if( not _name_.empty() ) ss << " (" << _name_ << ")";
+  ss << ", isEnabled=" << _isEnabled_;
   ss << ": value=" << _parameterValue_;
   ss << ", prior=" << _priorValue_;
   ss << ", stdDev=" << _stdDevValue_;
-  ss << ", isEnabled=" << _isEnabled_;
+  ss << ", bounds=[ ";
+  if( std::isnan(_minValue_) ) ss << "-inf";
+  else ss << _minValue_;
+  ss << ", ";
+  if( std::isnan(_maxValue_) ) ss << "+inf";
+  else ss << _maxValue_;
+  ss << " ]";
 
-  if( _enableDialSetsSummary_ ){
+  if( not shallow_ and _enableDialSetsSummary_ ){
     ss << ":";
     for( const auto& dialSet : _dialSetList_ ){
       ss << std::endl << GenericToolbox::indentString(dialSet.getSummary(), 2);

@@ -149,13 +149,13 @@ void Propagator::initializeImpl() {
               for( auto& par : parSet.getParameterList() ){
                 if( not std::isnan(par.getMinValue()) and par.getParameterValue() < par.getMinValue() ){
                   keepThrow = false;
-                  LogWarning << par.getFullTitle() << ": thrown value lower than min bound ->" << std::endl;
-                  LogWarning << par.getSummary() << std::endl;
+                  LogAlert << par.getFullTitle() << ": thrown value lower than min bound ->" << std::endl;
+                  LogAlert << par.getSummary(true) << std::endl;
                 }
                 else if( not std::isnan(par.getMaxValue()) and par.getParameterValue() > par.getMaxValue() ){
                   keepThrow = false;
-                  LogWarning << par.getFullTitle() << ": thrown value high than max bound ->" << std::endl;
-                  LogWarning << par.getSummary() << std::endl;
+                  LogAlert << par.getFullTitle() << ": thrown value high than max bound ->" << std::endl;
+                  LogAlert << par.getSummary(true) << std::endl;
                 }
               }
 

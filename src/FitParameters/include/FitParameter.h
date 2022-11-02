@@ -76,7 +76,7 @@ public:
   // Core
   double getDistanceFromNominal() const; // in unit of sigmas
   DialSet* findDialSet(const std::string& dataSetName_);
-  std::string getSummary() const;
+  std::string getSummary(bool shallow_=false) const;
   std::string getTitle() const;
   std::string getFullTitle() const;
 

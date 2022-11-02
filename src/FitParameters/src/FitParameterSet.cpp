@@ -309,7 +309,7 @@ void FitParameterSet::moveFitParametersToPrior(){
 }
 void FitParameterSet::throwFitParameters(double gain_){
 
-  LogThrowIf(_strippedCovarianceMatrix_==nullptr, "No covariance matrix provided")
+  LogThrowIf(_strippedCovarianceMatrix_==nullptr, "No covariance matrix provided");
 
 //  if( not _useEigenDecompInFit_ ){
     LogInfo << "Throwing parameters for " << _name_ << " using Cholesky matrix" << std::endl;
