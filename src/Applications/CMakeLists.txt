@@ -24,8 +24,8 @@ endforeach()
 
 # Dependencies
 target_link_libraries( gundamFitter GundamFitter )
-target_link_libraries( gundamFitCompare Utils )
-target_link_libraries( gundamConfigUnfolder Utils )
-target_link_libraries( gundamPlotExtractor Utils )
-target_link_libraries( gundamCalcXsec Propagator )
+target_link_libraries( gundamFitCompare GundamUtils )
+target_link_libraries( gundamConfigUnfolder GundamUtils )
+target_link_libraries( gundamPlotExtractor GundamUtils )
+target_link_libraries( gundamCalcXsec GundamPropagator )
 
