@@ -18,7 +18,7 @@ endif()
 
 foreach( app ${APPLICATION_LIST} )
     cmessage( STATUS "Defining app: ${app}" )
-    add_executable( ${app} src/${app}.cxx)
+    add_executable( ${app} src/${app}.cxx )
     install( TARGETS ${app} DESTINATION bin )
 endforeach()
 
@@ -26,6 +26,8 @@ endforeach()
 target_link_libraries( gundamFitter GundamFitter )
 target_link_libraries( gundamFitCompare GundamUtils )
 target_link_libraries( gundamConfigUnfolder GundamUtils )
+target_link_libraries( gundamConfigCompare GundamUtils )
 target_link_libraries( gundamPlotExtractor GundamUtils )
 target_link_libraries( gundamCalcXsec GundamPropagator )
+target_link_libraries( gundamRoot GundamPropagator )
 
