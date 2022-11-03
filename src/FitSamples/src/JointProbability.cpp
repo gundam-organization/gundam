@@ -87,7 +87,7 @@ namespace JointProbability{
     predVal = predMC->GetBinContent(bin_);
     double mcuncert;
 
-    // Why SQUARE?? -> BANFF let the BBH make the sqrt. GetBinError is returning the sqrt(Sum^2)
+    // Why SQUARE?? -> GetBinError is returning the sqrt(Sum^2) but the BANFF let the BBH make the sqrt
     // https://github.com/t2k-software/BANFF/blob/9140ec11bd74606c10ab4af9ec525352de119c06/src/BANFFSample/BANFFBinnedSample.cxx#L374
     if (BBNoUpdateWeights){
       mcuncert = nomMC->GetBinError(bin_) * nomMC->GetBinError(bin_);

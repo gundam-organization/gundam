@@ -57,6 +57,7 @@ void MinimizerInterface::readConfigImpl(){
   _monitorRefreshRateInMs_ = JsonUtils::fetchValue(_config_, "monitorRefreshRateInMs", _monitorRefreshRateInMs_);
   _showParametersOnFitMonitor_ = JsonUtils::fetchValue(_config_, "showParametersOnFitMonitor", _showParametersOnFitMonitor_);
   _maxNbParametersPerLineOnMonitor_ = JsonUtils::fetchValue(_config_, "maxNbParametersPerLineOnMonitor", _maxNbParametersPerLineOnMonitor_);
+  _monitorBashModeRefreshRateInS_ = JsonUtils::fetchValue(_config_, "monitorBashModeRefreshRateInS", _monitorBashModeRefreshRateInS_);
 }
 void MinimizerInterface::initializeImpl(){
   LogInfo << "Initializing the minimizer..." << std::endl;
@@ -133,7 +134,13 @@ void MinimizerInterface::initializeImpl(){
   _convergenceMonitor_.addVariable("Stat");
   _convergenceMonitor_.addVariable("Syst");
 
-  _convergenceMonitor_.setMaxRefreshRateInMs(_monitorRefreshRateInMs_);
+  if( GenericToolbox::getTerminalWidth() == 0 ){
+    // batch mode
+    _convergenceMonitor_.setMaxRefreshRateInMs(_monitorBashModeRefreshRateInS_);
+  }
+  else{
+    _convergenceMonitor_.setMaxRefreshRateInMs(_monitorRefreshRateInMs_);
+  }
 }
 
 bool MinimizerInterface::isFitHasConverged() const {
@@ -533,7 +540,10 @@ double MinimizerInterface::evalFit(const double* parArray_){
       LogInfo << _convergenceMonitor_.generateMonitorString();
     }
     else{
-      LogInfo << _convergenceMonitor_.generateMonitorString(true , true);
+      LogInfo << _convergenceMonitor_.generateMonitorString(
+          GenericToolbox::getTerminalWidth() != 0, // trail back if not in batch mode
+          true // force generate
+      );
     }
 
     _itSpeed_.counts = _nbFitCalls_;
