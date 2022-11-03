@@ -82,7 +82,7 @@ private:
   // Internals
   bool _throwAsimovFitParameters_{false};
   bool _throwAsimovToyParameters_{false};
-  bool _reThrowParSetIfOutOfBounds_{true};
+  bool _reThrowParSetIfOutOfBounds_{false};
   bool _enableStatThrowInToys_{true};
   bool _enableEventMcThrow_{true};
   int _iThrow_{-1};

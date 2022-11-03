@@ -136,7 +136,7 @@ void MinimizerInterface::initializeImpl(){
 
   if( GenericToolbox::getTerminalWidth() == 0 ){
     // batch mode
-    _convergenceMonitor_.setMaxRefreshRateInMs(_monitorBashModeRefreshRateInS_);
+    _convergenceMonitor_.setMaxRefreshRateInMs(_monitorBashModeRefreshRateInS_ * 1000.);
   }
   else{
     _convergenceMonitor_.setMaxRefreshRateInMs(_monitorRefreshRateInMs_);
