@@ -34,6 +34,7 @@ public:
   int getIThrow() const;
 
   const std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix() const;
+  std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix();
 
   FitSampleSet &getFitSampleSet();
   std::vector<FitParameterSet> &getParameterSetsList();

@@ -83,20 +83,29 @@ void Propagator::initializeImpl() {
   }
   LogInfo << "Total number of parameters: " << nPars << std::endl;
 
-  LogInfo << "Building global covariance matrix..." << std::endl;
-  _globalCovarianceMatrix_ = std::make_shared<TMatrixD>( nPars, nPars );
-  int iParOffset = 0;
-  for( const auto& parSet : _parameterSetList_ ){
-    if( not parSet.isEnabled() ) continue;
-    if(parSet.getPriorCovarianceMatrix() != nullptr ){
-      for(int iCov = 0 ; iCov < parSet.getPriorCovarianceMatrix()->GetNrows() ; iCov++ ){
-        for(int jCov = 0 ; jCov < parSet.getPriorCovarianceMatrix()->GetNcols() ; jCov++ ){
-          (*_globalCovarianceMatrix_)[iParOffset+iCov][iParOffset+jCov] = (*parSet.getPriorCovarianceMatrix())[iCov][jCov];
+
+  if( _globalCovarianceMatrix_ == nullptr ){
+    LogInfo << "Building global covariance matrix..." << std::endl;
+    _globalCovarianceMatrix_ = std::make_shared<TMatrixD>( nPars, nPars );
+    int iParOffset = 0;
+    for( const auto& parSet : _parameterSetList_ ){
+      if( not parSet.isEnabled() ) continue;
+      if(parSet.getPriorCovarianceMatrix() != nullptr ){
+        for(int iCov = 0 ; iCov < parSet.getPriorCovarianceMatrix()->GetNrows() ; iCov++ ){
+          for(int jCov = 0 ; jCov < parSet.getPriorCovarianceMatrix()->GetNcols() ; jCov++ ){
+            (*_globalCovarianceMatrix_)[iParOffset+iCov][iParOffset+jCov] = (*parSet.getPriorCovarianceMatrix())[iCov][jCov];
+          }
         }
+        iParOffset += parSet.getPriorCovarianceMatrix()->GetNrows();
       }
-      iParOffset += parSet.getPriorCovarianceMatrix()->GetNrows();
     }
   }
+  else{
+    LogInfo << "Global covariance matrix is already set. Checking dimensions..." << std::endl;
+    LogThrowIf(_globalCovarianceMatrix_->GetNrows() != nPars or _globalCovarianceMatrix_->GetNcols() != nPars,
+               "The provided covariance matrix don't have the right size: " << nPars << "x" << nPars);
+  }
+
 
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing samples...") << std::endl;
   _fitSampleSet_.initialize();
@@ -376,6 +385,9 @@ int Propagator::getIThrow() const {
 const std::shared_ptr<TMatrixD> &Propagator::getGlobalCovarianceMatrix() const {
   return _globalCovarianceMatrix_;
 }
+std::shared_ptr<TMatrixD> &Propagator::getGlobalCovarianceMatrix(){
+  return _globalCovarianceMatrix_;
+}
 double Propagator::getLlhBuffer() const {
   return _llhBuffer_;
 }
@@ -577,6 +589,5 @@ void Propagator::reweightMcEvents(int iThread_) {
     }
   );
 }
-
 
 

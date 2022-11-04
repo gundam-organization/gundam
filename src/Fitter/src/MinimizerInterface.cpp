@@ -537,7 +537,7 @@ double MinimizerInterface::evalFit(const double* parArray_){
 
     if( _nbFitCalls_ == 1 ){
       // don't erase these lines
-      LogInfo << _convergenceMonitor_.generateMonitorString();
+      LogWarning << _convergenceMonitor_.generateMonitorString();
     }
     else{
       LogInfo << _convergenceMonitor_.generateMonitorString(

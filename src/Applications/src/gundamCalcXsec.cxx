@@ -16,6 +16,8 @@
 
 #include <TFile.h>
 #include "TDirectory.h"
+#include "TH1D.h"
+#include "TH2D.h"
 
 #include <string>
 #include <vector>
@@ -116,8 +118,9 @@ int main(int argc, char** argv){
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamCalcXsec"), &commandLineString);
 
   // Fit file
-  auto fitFilePath = clParser.getOptionVal<std::string>("fitterOutputFile");
-  auto* fitFile = TFile::Open(fitFilePath.c_str());
+  LogThrowIf(not GenericToolbox::doesTFileIsValid(clParser.getOptionVal<std::string>("fitterOutputFile")),
+             "Can't open input fitter file: " << clParser.getOptionVal<std::string>("fitterOutputFile"));
+  auto* fitFile = TFile::Open(clParser.getOptionVal<std::string>("fitterOutputFile").c_str());
   std::string configStr{fitFile->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed")->GetTitle()};
 
   // Get config from the fit
@@ -133,10 +136,30 @@ int main(int argc, char** argv){
   // modify according to the Xsec needs
   // binning?
 
+  // Get best fit parameter values and postfit covariance matrix
+  LogInfo << "Injecting postfit values of fitted parameters..." << std::endl;
+  auto* postFitDir = fitFile->Get<TDirectory>("FitterEngine/postFit/Hesse/errors");
+  for( auto& parSet : p.getParameterSetsList() ){
+    auto* postFitParHist = postFitDir->Get<TH1D>(Form("%s/values/postFitErrors_TH1D", parSet.getName().c_str()));
+    LogThrowIf(parSet.getNbParameters() != postFitParHist->GetNbinsX(),
+               "Expecting " << parSet.getNbParameters() << " postfit parameter values, but got: " << postFitParHist->GetNbinsX());
+    for( auto& par : parSet.getParameterList() ){
+      par.setPriorValue(postFitParHist->GetBinContent( 1+par.getParameterIndex() ));
+    }
+    parSet.moveFitParametersToPrior();
+  }
+
+  LogInfo << "Using postfit covariance matrix as the global covariance matrix for the Propagator..." << std::endl;
+  auto* postFitCovMat = fitFile->Get<TH2D>("FitterEngine/postFit/Hesse/hessian/postfitCovarianceOriginal_TH2D");
+  for( int iBin = 0 ; iBin < postFitCovMat->GetNbinsX() ; iBin++ ){
+    for( int jBin = 0 ; jBin < postFitCovMat->GetNbinsX() ; jBin++ ){
+      (*p.getGlobalCovarianceMatrix())[iBin][jBin] = postFitCovMat->GetBinContent(1+iBin, 1+jBin);
+    }
+  }
+
   // load the data
   p.initialize();
 
-  // Get best fit parameter values and postfit covariance matrix
 
 
 
