@@ -100,12 +100,12 @@ public:
   std::vector<std::string> fetchListOfVarToPlot(bool isData_ = false);
   std::vector<std::string> fetchListOfSplitVarNames();
 
+  void defineHistogramHolders();
 protected:
   void readConfigImpl() override;
   void initializeImpl() override;
 
   // Internals
-  void defineHistogramHolders();
   void buildEventBinCache(const std::vector<HistHolder *> &histPtrToFillList, const std::vector<PhysicsEvent> *eventListPtr, bool isData_);
 
 private:

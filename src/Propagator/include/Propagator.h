@@ -28,29 +28,29 @@ public:
   void setThrowAsimovToyParameters(bool throwAsimovToyParameters);
   void setIThrow(int iThrow);
   void setLoadAsimovData(bool loadAsimovData);
+  void setGlobalCovarianceMatrix(const std::shared_ptr<TMatrixD> &globalCovarianceMatrix);
 
   // Getters
   bool isThrowAsimovToyParameters() const;
   int getIThrow() const;
-
   const std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix() const;
   std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix();
-
   FitSampleSet &getFitSampleSet();
   std::vector<FitParameterSet> &getParameterSetsList();
   const std::vector<FitParameterSet> &getParameterSetsList() const;
   PlotGenerator &getPlotGenerator();
   const EventTreeWriter &getTreeWriter() const;
   ParScanner& getParScanner(){ return _parScanner_; }
-
   double getLlhBuffer() const;
   double getLlhStatBuffer() const;
   double getLlhPenaltyBuffer() const;
   double getLlhRegBuffer() const;
+
   double* getLlhBufferPtr(){ return &_llhBuffer_; }
   double* getLlhStatBufferPtr(){ return &_llhStatBuffer_; }
   double* getLlhPenaltyBufferPtr(){ return &_llhPenaltyBuffer_; }
   double* getLlhRegBufferPtr(){ return &_llhRegBuffer_; }
+  const FitParameterSet* getFitParameterSetPtr(const std::string& name_) const;
 
   // Core
   void updateLlhCache();
@@ -81,7 +81,6 @@ private:
   int _debugPrintLoadedEventsNbPerSample_{5};
 
   // Internals
-  bool _throwAsimovFitParameters_{false};
   bool _throwAsimovToyParameters_{false};
   bool _reThrowParSetIfOutOfBounds_{false};
   bool _enableStatThrowInToys_{true};

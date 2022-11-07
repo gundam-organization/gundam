@@ -398,6 +398,11 @@ void DataDispenser::fetchRequestedLeaves(){
     } // parSet
   }
 
+  // fit sample set storage requests
+  for( auto& var: _sampleSetPtrToLoad_->getAdditionalVariablesForStorage() ){
+    _cache_.addVarRequestedForStorage(var);
+  }
+
   // sample
   for( auto& sample: _sampleSetPtrToLoad_->getFitSampleList() ){
     for( auto& bin: sample.getBinning().getBinsList()){

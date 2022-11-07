@@ -695,7 +695,14 @@ void PlotGenerator::defineHistogramHolders() {
                   std::string sampleObsBinning = JsonUtils::fetchValue(histConfig, "useSampleBinningOfObservable", histDefBase.varToPlot);
 
                   for( const auto& bin : sample.getBinning().getBinsList() ){
-                    const auto& edges = bin.getVarEdges(sampleObsBinning);
+                    std::pair<double, double> edges;
+                    try{
+                      edges = bin.getVarEdges(sampleObsBinning);
+                    }
+                    catch(...){
+                      LogError << "Can't use sampling binning" << std::endl;
+                      break;
+                    }
                     for( const auto& edge : { edges.first, edges.second } ) {
                       if ((histDefBase.xMin != histDefBase.xMin or histDefBase.xMin <= edge)
                           and (histDefBase.xMax != histDefBase.xMax or histDefBase.xMax >= edge)) {

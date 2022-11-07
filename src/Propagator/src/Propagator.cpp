@@ -375,6 +375,9 @@ void Propagator::setIThrow(int iThrow) {
 void Propagator::setLoadAsimovData(bool loadAsimovData) {
   _loadAsimovData_ = loadAsimovData;
 }
+void Propagator::setGlobalCovarianceMatrix(const std::shared_ptr<TMatrixD> &globalCovarianceMatrix) {
+  _globalCovarianceMatrix_ = globalCovarianceMatrix;
+}
 
 bool Propagator::isThrowAsimovToyParameters() const {
   return _throwAsimovToyParameters_;
@@ -414,6 +417,16 @@ PlotGenerator &Propagator::getPlotGenerator() {
 }
 const EventTreeWriter &Propagator::getTreeWriter() const {
   return _treeWriter_;
+}
+
+const FitParameterSet* Propagator::getFitParameterSetPtr(const std::string& name_) const{
+  for( auto& parSet : _parameterSetList_ ){
+    if( parSet.getName() == name_ ) return &parSet;
+  }
+  std::vector<std::string> parSetNames{};
+  for( auto& parSet : _parameterSetList_ ){ parSetNames.emplace_back(parSet.getName()); }
+  LogThrow("Could not find fit parameter set named \"" << name_ << "\" among defined: " << GenericToolbox::parseVectorAsString(parSetNames));
+  return nullptr;
 }
 
 void Propagator::updateLlhCache(){

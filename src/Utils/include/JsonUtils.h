@@ -29,6 +29,7 @@ namespace JsonUtils {
   template<class T> auto fetchValue(const nlohmann::json& jsonConfig_, const std::vector<std::string>& keyNames_) -> T;
   template<class T> auto fetchValue(const nlohmann::json& jsonConfig_, const std::string& keyName_, const T& defaultValue_) -> T;
   template<class T> auto fetchValue(const nlohmann::json& jsonConfig_, const std::vector<std::string>& keyName_, const T& defaultValue_) -> T;
+  template<class T> auto fetchValuePath(const nlohmann::json& jsonConfig_, const std::string& keyNamePath_) -> T;
   template<class T> nlohmann::json fetchMatchingEntry(const nlohmann::json& jsonConfig_, const std::string& keyName_, const T& keyValue_);
   template<typename F> void deprecatedAction(const nlohmann::json& jsonConfig_, const std::string& keyName_, const F& action_);
 

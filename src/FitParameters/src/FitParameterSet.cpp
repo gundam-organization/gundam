@@ -254,6 +254,9 @@ const std::vector<FitParameter>& FitParameterSet::getEffectiveParameterList() co
   if( _useEigenDecompInFit_ ) return _eigenParameterList_;
   return _parameterList_;
 }
+const nlohmann::json &FitParameterSet::getDialSetDefinitions() const {
+  return _dialSetDefinitions_;
+}
 
 // Core
 size_t FitParameterSet::getNbParameters() const {
@@ -616,4 +619,5 @@ const std::shared_ptr<TMatrixDSym> &FitParameterSet::getPriorCorrelationMatrix()
 const std::shared_ptr<TMatrixDSym> &FitParameterSet::getPriorCovarianceMatrix() const {
   return _priorCovarianceMatrix_;
 }
+
 

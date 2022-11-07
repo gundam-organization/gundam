@@ -20,28 +20,27 @@ LoggerInit([]{
 
 
 void FitSample::readConfigImpl(){
-  LogThrowIf(_config_.empty(), GET_VAR_NAME_VALUE(_config_.empty()));
-
-  _name_ = JsonUtils::fetchValue<std::string>(_config_, "name");
+  _name_ = JsonUtils::fetchValue(_config_, "name", _name_);
   LogThrowIf(
       GenericToolbox::doesStringContainsSubstring(_name_, "/"),
       "Invalid sample name: \"" << _name_ << "\": should not have '/'.");
 
+  _binningFilePath_ = JsonUtils::fetchValue(_config_, {{"binningFilePath"}, {"binningFile"}, {"binning"}}, _binningFilePath_);
+
   _isEnabled_ = JsonUtils::fetchValue(_config_, "isEnabled", true);
   LogReturnIf(not _isEnabled_, "\"" << _name_ << "\" is disabled.");
 
-  _selectionCuts_ = JsonUtils::fetchValue(_config_, "selectionCuts", _selectionCuts_);
+  _selectionCutStr_ = JsonUtils::fetchValue(_config_, {{"selectionCutStr"}, {"selectionCuts"}}, _selectionCutStr_);
   _enabledDatasetList_ = JsonUtils::fetchValue(_config_, std::vector<std::string>{"datasets", "dataSets"}, _enabledDatasetList_);
   _mcNorm_ = JsonUtils::fetchValue(_config_, "mcNorm", _mcNorm_);
   _dataNorm_ = JsonUtils::fetchValue(_config_, "dataNorm", _dataNorm_);
-  _binningFile_ = JsonUtils::fetchValue<std::string>(_config_, {{"binningFile"}, {"binning"}});
 }
 void FitSample::initializeImpl() {
   if( not _isEnabled_ ) return;
 
   LogInfo << "Initializing FitSample: " << _name_ << std::endl;
 
-  _binning_.readBinningDefinition( _binningFile_ );
+  _binning_.readBinningDefinition(_binningFilePath_ );
 
   TH1::SetDefaultSumw2(true);
 
@@ -65,6 +64,16 @@ void FitSample::initializeImpl() {
   _dataContainer_.histogram->SetDirectory(nullptr);
 }
 
+void FitSample::setName(const std::string &name) {
+  _name_ = name;
+}
+void FitSample::setBinningFilePath(const std::string &binningFilePath_) {
+  _binningFilePath_ = binningFilePath_;
+}
+void FitSample::setSelectionCutStr(const std::string &selectionCutStr_) {
+  _selectionCutStr_ = selectionCutStr_;
+}
+
 bool FitSample::isEnabled() const {
   return _isEnabled_;
 }
@@ -72,7 +81,7 @@ const std::string &FitSample::getName() const {
   return _name_;
 }
 const std::string &FitSample::getSelectionCutsStr() const {
-  return _selectionCuts_;
+  return _selectionCutStr_;
 }
 const DataBinSet &FitSample::getBinning() const {
   return _binning_;

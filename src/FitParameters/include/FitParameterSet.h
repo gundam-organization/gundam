@@ -52,6 +52,7 @@ public:
   std::vector<FitParameter>& getEffectiveParameterList();
   const std::vector<FitParameter>& getEffectiveParameterList() const;
   bool isMaskedForPropagation() const;
+  const nlohmann::json &getDialSetDefinitions() const;
 
   // Core
   size_t getNbParameters() const;
