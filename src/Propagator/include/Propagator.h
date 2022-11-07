@@ -58,6 +58,7 @@ public:
   void updateDialResponses();
   void reweightMcEvents();
   void refillSampleHistograms();
+  void throwParametersFromGlobalCovariance();
 
   // Dev
   void fillDialsStack();
@@ -91,6 +92,9 @@ private:
   double _llhPenaltyBuffer_{0};
   double _llhRegBuffer_{0};
   std::shared_ptr<TMatrixD> _globalCovarianceMatrix_{nullptr};
+  std::shared_ptr<TMatrixD> _strippedCovarianceMatrix_{nullptr};
+  std::shared_ptr<TMatrixD> _choleskyMatrix_{nullptr};
+  std::vector<FitParameter*> _strippedParameterList_{};
 
   // Sub-layers
   FitSampleSet _fitSampleSet_;

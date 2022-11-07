@@ -692,17 +692,34 @@ void PlotGenerator::defineHistogramHolders() {
 
                 if( JsonUtils::fetchValue(histConfig, "useSampleBinning", false) ){
 
+                  bool varNotAvailable{false};
                   std::string sampleObsBinning = JsonUtils::fetchValue(histConfig, "useSampleBinningOfObservable", histDefBase.varToPlot);
 
                   for( const auto& bin : sample.getBinning().getBinsList() ){
+                    std::string variableNameForBinning{sampleObsBinning};
+
+                    if( not GenericToolbox::doesElementIsInVector(sampleObsBinning, bin.getVariableNameList()) ){
+                      if( JsonUtils::doKeyExist(histConfig, "sampleVariableIfNotAvailable") ){
+                        for( auto& varSubstitution : JsonUtils::fetchValue<std::vector<std::string>>(histConfig, "sampleVariableIfNotAvailable") ){
+                          if( GenericToolbox::doesElementIsInVector(varSubstitution, bin.getVariableNameList()) ){
+                            variableNameForBinning = varSubstitution;
+                            break;
+                          }
+                        }
+                      } // sampleVariableIfNotAvailable
+                    } // sampleObsBinning not in the sample binning
+
                     std::pair<double, double> edges;
                     try{
-                      edges = bin.getVarEdges(sampleObsBinning);
+                      edges = bin.getVarEdges(variableNameForBinning);
                     }
                     catch(...){
-                      LogError << "Can't use sampling binning" << std::endl;
+                      LogAlert << "Can't use sample binning for var " << variableNameForBinning << " and sample " << sample.getName() << std::endl;
+                      varNotAvailable = true;
                       break;
                     }
+
+
                     for( const auto& edge : { edges.first, edges.second } ) {
                       if ((histDefBase.xMin != histDefBase.xMin or histDefBase.xMin <= edge)
                           and (histDefBase.xMax != histDefBase.xMax or histDefBase.xMax >= edge)) {
@@ -713,6 +730,9 @@ void PlotGenerator::defineHistogramHolders() {
                       }
                     }
                   }
+
+
+                  if( varNotAvailable ) break;
                   if( histDefBase.xEdges.empty() ) continue; // skip
                   std::sort( histDefBase.xEdges.begin(), histDefBase.xEdges.end() ); // sort for ROOT
 

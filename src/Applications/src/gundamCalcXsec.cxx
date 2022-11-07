@@ -278,13 +278,14 @@ int main(int argc, char** argv){
 
   templateSampleDetected.getDataContainer().isLocked = true;
 
+  // redefine histograms for the plot generator
   p.getPlotGenerator().defineHistogramHolders();
+
+  p.throwParametersFromGlobalCovariance();
+  p.propagateParametersOnSamples();
+
   p.getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(out, "XsecExtractor/postFit/samples"));
 
-
-//  for( auto& event : templateSample.getMcContainer().eventList ){
-//    event.getDataSetIndex();
-//  }
 
   // TODO: Get number of selected true signal events in each truth bin (after best fit reweight)
   // TODO: Get number of   all    true signal events in each truth bin (after best fit reweight)
