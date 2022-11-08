@@ -213,7 +213,7 @@ int main(int argc, char** argv){
     // Don't fill the events yet -> add a dummy cut
     p.getFitSampleSet().getFitSampleList().emplace_back( *signalSampleList.back().first );
     signalSampleList.back().second = &p.getFitSampleSet().getFitSampleList().back();
-    signalSampleList.back().second->setName( parameterSetName + "_Reconstructed" );
+    signalSampleList.back().second->setName( parameterSetName + " (Reconstructed)" );
     signalSampleList.back().second->setSelectionCutStr("0"); // dummy cut to select no event during the data loading
 
 
@@ -330,6 +330,8 @@ int main(int argc, char** argv){
     signalSamplePair.second->getDataContainer().isLocked = true;
   }
 
+  p.propagateParametersOnSamples();
+
   // redefine histograms for the plot generator
   p.getPlotGenerator().defineHistogramHolders();
 
@@ -338,74 +340,111 @@ int main(int argc, char** argv){
     p.getTreeWriter().writeEvents(GenericToolbox::mkdirTFile(out, "XsecExtractor/postFit/events/" + sample->getName()), "MC", sample->getMcContainer().eventList);
   }
 
-
-  p.throwParametersFromGlobalCovariance();
-  p.propagateParametersOnSamples();
-
+  LogInfo << "Generating loaded sample plots..." << std::endl;
   p.getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(out, "XsecExtractor/postFit/samples"));
+
+
+//  std::vector<std::vector<double>> signalBinVolumeList{signalSampleList.size()};
+//  for( size_t iSignal = 0 ; iSignal < signalSampleList.size() ; iSignal++ ){
+//    signalBinVolumeList[iSignal].reserve(signalSampleList[iSignal].first->getBinning().getBinsList().size());
+//    for( auto& bin : signalSampleList[iSignal].first->getBinning().getBinsList() ) {
+//      signalBinVolumeList[iSignal].emplace_back( bin.getVolume() );
+//    }
+//  }
+//
+//  std::vector<std::shared_ptr<TH1D>> signalEfficiencyHistList{};
+//  signalEfficiencyHistList.reserve(signalSampleList.size());
+//  for( auto& signalSamplePair : signalSampleList ){
+//    signalEfficiencyHistList.emplace_back(std::make_shared<TH1D>( *signalSamplePair.second->getMcContainer().histogram ));
+//    signalEfficiencyHistList.back()->Divide(signalSamplePair.first->getMcContainer().histogram.get());
+//  }
+//
+//  std::vector<std::shared_ptr<TH1D>> signalToyHistList{};
+//  signalToyHistList.reserve(signalSampleList.size());
+//  for( auto& signalSamplePair : signalSampleList ){
+//    signalToyHistList.emplace_back(std::make_shared<TH1D>( *signalSamplePair.second->getMcContainer().histogram ));
+//    signalToyHistList.back()->Reset();
+//  }
+
+  LogInfo << "Creating throws tree" << std::endl;
+  auto* signalThrowTree = new TTree("signalThrowTree", "signalThrowTree");
+  std::vector<GenericToolbox::RawDataArray> signalThrowData{signalSampleList.size()};
+  for( size_t iSignal = 0 ; iSignal < signalSampleList.size() ; iSignal++ ){
+
+    std::vector<std::string> leafNameList{};
+
+    signalThrowData[iSignal].resetCurrentByteOffset();
+    for( int iBin = 0 ; iBin < signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+
+      leafNameList.emplace_back(Form("bin_%i/D", iBin));
+      signalThrowData[iSignal].writeRawData(
+          signalSampleList[iSignal].first->getMcContainer().histogram->GetBinContent(1+iBin)
+          );
+    }
+
+    signalThrowData[iSignal].lockArraySize();
+
+    std::string cleanBranchName{signalSampleList[iSignal].first->getName()};
+    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, " ", "_");
+//    cleanBranchName = GenericToolbox::replaceSubstringInString(
+//          signalSampleList[iSignal].first->getName(),
+//          {{" "}, {"-"}, {""}},
+//          {{"_"}, {"_"}, {"_"}}
+//      );
+
+    signalThrowTree->Branch(
+        cleanBranchName.c_str(),
+        &signalThrowData[iSignal].getRawDataArray()[0],
+        GenericToolbox::joinVectorString(leafNameList, ":").c_str()
+    );
+  }
+
 
 
   // TODO: Get number of selected true signal events in each truth bin (after best fit reweight)
   // TODO: Get number of   all    true signal events in each truth bin (after best fit reweight)
 
 
+  int nToys{100};
+  if(clParser.isOptionTriggered("nToys")) nToys = clParser.getOptionVal<int>("nToys");
+  std::stringstream ss; ss << LogWarning.getPrefixString() << "Loading toys...";
+  for( int iToy = 0 ; iToy < nToys ; iToy++ ){
+    GenericToolbox::displayProgressBar(iToy, nToys, ss.str());
 
+    p.throwParametersFromGlobalCovariance();
+    p.propagateParametersOnSamples();
 
-  // Cholesky decompose postfit covariance matrix
-//  TMatrixT<double>* choleskyMatrix = GenericToolbox::getCholeskyMatrix(postfit_cov);
+    for( size_t iSignal = 0 ; iSignal < signalSampleList.size() ; iSignal++ ){
 
+      signalThrowData[iSignal].resetCurrentByteOffset();
+      for( int iBin = 0 ; iBin < signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+        signalThrowData[iSignal].writeRawData(
+            signalSampleList[iSignal].first->getMcContainer().histogram->GetBinContent(1+iBin)
+        );
+      }
 
+      // TODO: Get number of selected true signal events in each truth bin (after each toy reweight)
+      // TODO: Get number of   all    true signal events in each truth bin (after each toy reweight)
 
-  // Create toys which throw the fit parameters according to chol.-decomp. postfit cov matrix
-  // get number of toys from cmlParser
-//  for (int iToy = 0; iToy < 1000; iToy++) {
-//    std::vector<double> throws = GenericToolbox::throwCorrelatedParameters(choleskyMatrix);
-//    for (int j = 0; j < throws.size(); j++){
-//      throws.at(j) += postfit_params->GetBinContent(j+1);
-//      if ( throws.at(j) < 0) {
-//        throws.at(j) = 0.01;
+//      for( int iBin = 0 ; iBin < signalEfficiencyHistList[iSignal]->GetNbinsX() ; iBin++ ){
+//        signalEfficiencyHistList[iSignal]->SetBinContent(
+//            1+iBin,
+//            signalSampleList[iSignal].second->getMcContainer().histogram->GetBinContent(1+iBin)
+//            / signalSampleList[iSignal].first->getMcContainer().histogram->GetBinContent(1+iBin)
+//        );
 //      }
-//    }
-
-    // Reweight events based on toy params
-//    int i = 0;
-//    for( auto& parSet : _parameterSetsList_ ){
-//      for( auto& par : parSet.getParameterList() ){
-//        par.setParameterValue( throws.at(i) );
-//        ++i;
-//      }
-//    }
-//
-//    // TODO: Get number of selected true signal events in each truth bin (after each toy reweight)
-//    // TODO: Get number of   all    true signal events in each truth bin (after each toy reweight)
-//
-//
-//
-//    // TODO: Apply efficiency correction
-//    // TODO: Apply normalizations for number of targets, integrated flux and bin widths
-//
-//  }
-//
-
-  // TODO: calculated covariance matrix between computed cross section values for the different toys
 
 
-
-//  postfit_file->Close();
-
-
+      // TODO: Apply efficiency correction
+      // TODO: Apply normalizations for number of targets, integrated flux and bin widths
 
 
+    }
 
+    signalThrowTree->Fill();
+  }
 
-
-
-
-
-
-
-
-
+  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "XsecExtractor/throws"), signalThrowTree, "signalThrow");
 
   LogWarning << "Closing output file \"" << out->GetName() << "\"..." << std::endl;
   out->Close();
