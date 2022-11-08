@@ -26,11 +26,9 @@ public:
   void setDataSetIndex(int dataSetIndex);
 
   bool isEnabled() const;
-  const std::string &getName() const;
-  int getDataSetIndex() const;
-
   bool isShowSelectedEventCount() const;
-
+  int getDataSetIndex() const;
+  const std::string &getName() const;
   const std::string &getSelectedDataEntry() const;
   const std::string &getToyDataEntry() const;
 
@@ -39,12 +37,14 @@ public:
   DataDispenser &getToyDataDispenser();
   std::map<std::string, DataDispenser> &getDataDispenserDict();
 
+  void updateDispenserOwnership();
+
 protected:
   void readConfigImpl() override;
   void initializeImpl() override;
 
 private:
-  // internals
+  // config
   bool _isEnabled_{false};
   bool _showSelectedEventCount_{true};
   int _dataSetIndex_{-1};
@@ -52,6 +52,7 @@ private:
   std::string _selectedDataEntry_{"Asimov"};
   std::string _selectedToyEntry_{"Asimov"};
 
+  // internals
   DataDispenser _mcDispenser_{this};
   std::map<std::string, DataDispenser> _dataDispenserDict_;
 

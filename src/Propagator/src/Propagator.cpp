@@ -61,10 +61,9 @@ void Propagator::readConfigImpl(){
     LogAlert << "DEPRECATED CONFIG OPTION: " << "dataSetList should now be located in the Propagator config." << std::endl;
   }
   LogThrowIf(dataSetListConfig.empty(), "No dataSet specified." << std::endl);
-  int iDataSet{0};
   _dataSetList_.reserve(dataSetListConfig.size());
   for( const auto& dataSetConfig : dataSetListConfig ){
-    _dataSetList_.emplace_back(dataSetConfig, iDataSet++);
+    _dataSetList_.emplace_back(dataSetConfig, int(_dataSetList_.size()));
   }
 
   _parScanner_.readConfig( JsonUtils::fetchValue(_config_, "scanConfig", nlohmann::json()) );
@@ -385,12 +384,6 @@ bool Propagator::isThrowAsimovToyParameters() const {
 int Propagator::getIThrow() const {
   return _iThrow_;
 }
-const std::shared_ptr<TMatrixD> &Propagator::getGlobalCovarianceMatrix() const {
-  return _globalCovarianceMatrix_;
-}
-std::shared_ptr<TMatrixD> &Propagator::getGlobalCovarianceMatrix(){
-  return _globalCovarianceMatrix_;
-}
 double Propagator::getLlhBuffer() const {
   return _llhBuffer_;
 }
@@ -403,20 +396,33 @@ double Propagator::getLlhPenaltyBuffer() const {
 double Propagator::getLlhRegBuffer() const {
   return _llhRegBuffer_;
 }
-FitSampleSet &Propagator::getFitSampleSet() {
-  return _fitSampleSet_;
+const std::shared_ptr<TMatrixD> &Propagator::getGlobalCovarianceMatrix() const {
+  return _globalCovarianceMatrix_;
 }
-std::vector<FitParameterSet> &Propagator::getParameterSetsList() {
-  return _parameterSetList_;
+const EventTreeWriter &Propagator::getTreeWriter() const {
+  return _treeWriter_;
+}
+const std::vector<DatasetLoader> &Propagator::getDataSetList() const {
+  return _dataSetList_;
 }
 const std::vector<FitParameterSet> &Propagator::getParameterSetsList() const {
   return _parameterSetList_;
 }
+
+FitSampleSet &Propagator::getFitSampleSet() {
+  return _fitSampleSet_;
+}
 PlotGenerator &Propagator::getPlotGenerator() {
   return _plotGenerator_;
 }
-const EventTreeWriter &Propagator::getTreeWriter() const {
-  return _treeWriter_;
+std::vector<FitParameterSet> &Propagator::getParameterSetsList() {
+  return _parameterSetList_;
+}
+std::shared_ptr<TMatrixD> &Propagator::getGlobalCovarianceMatrix(){
+  return _globalCovarianceMatrix_;
+}
+std::vector<DatasetLoader> &Propagator::getDataSetList() {
+  return _dataSetList_;
 }
 
 const FitParameterSet* Propagator::getFitParameterSetPtr(const std::string& name_) const{
@@ -653,5 +659,6 @@ void Propagator::reweightMcEvents(int iThread_) {
     }
   );
 }
+
 
 

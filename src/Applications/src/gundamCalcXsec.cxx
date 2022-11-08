@@ -78,14 +78,14 @@ int main(int argc, char** argv){
   // Initialize the fitter:
   // --------------------------
   LogInfo << "Reading config file: " << configFilePath << std::endl;
-  auto jsonConfig = JsonUtils::readConfigFile(configFilePath); // works with yaml
+  auto configXsecExtractor = JsonUtils::readConfigFile(configFilePath); // works with yaml
 
-  if( JsonUtils::doKeyExist(jsonConfig, "minGundamVersion") ){
+  if( JsonUtils::doKeyExist(configXsecExtractor, "minGundamVersion") ){
     LogThrowIf(
-      not g.isNewerOrEqualVersion(JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion")),
-      "Version check FAILED: " << GundamVersionConfig::getVersionStr() << " < " << JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion")
+      not g.isNewerOrEqualVersion(JsonUtils::fetchValue<std::string>(configXsecExtractor, "minGundamVersion")),
+      "Version check FAILED: " << GundamVersionConfig::getVersionStr() << " < " << JsonUtils::fetchValue<std::string>(configXsecExtractor, "minGundamVersion")
     );
-    LogInfo << "Version check passed: " << GundamVersionConfig::getVersionStr() << " >= " << JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion") << std::endl;
+    LogInfo << "Version check passed: " << GundamVersionConfig::getVersionStr() << " >= " << JsonUtils::fetchValue<std::string>(configXsecExtractor, "minGundamVersion") << std::endl;
   }
 
 
@@ -98,9 +98,9 @@ int main(int argc, char** argv){
   std::string outFileName = configFilePath;
 
   outFileName = clParser.getOptionVal("outputFile", outFileName + ".root");
-  if( JsonUtils::doKeyExist(jsonConfig, "outputFolder") ){
-    GenericToolbox::mkdirPath(JsonUtils::fetchValue<std::string>(jsonConfig, "outputFolder"));
-    outFileName.insert(0, JsonUtils::fetchValue<std::string>(jsonConfig, "outputFolder") + "/");
+  if( JsonUtils::doKeyExist(configXsecExtractor, "outputFolder") ){
+    GenericToolbox::mkdirPath(JsonUtils::fetchValue<std::string>(configXsecExtractor, "outputFolder"));
+    outFileName.insert(0, JsonUtils::fetchValue<std::string>(configXsecExtractor, "outputFolder") + "/");
   }
 
   LogWarning << "Creating output file: \"" << outFileName << "\"..." << std::endl;
@@ -128,56 +128,104 @@ int main(int argc, char** argv){
   auto configPropagator = JsonUtils::fetchValuePath<nlohmann::json>( configFit, "fitterEngineConfig/propagatorConfig" );
 
 
-//  Propagator fitterPropagator;
-//  fitterPropagator.readConfig(configPropagator);
-//  fitterPropagator.initialize();
-
   // Create a propagator object
   Propagator p;
 
   // Read the whole fitter config
   p.readConfig(configPropagator);
 
-  // We are only interested in our MC. Data has been used to get the post-fit error/values
+  // We are only interested in our MC. Data has already been used to get the post-fit error/values
   p.setLoadAsimovData( true );
 
-  // Need this number later
+  // Need this number later -> STILL NEEDED?
   size_t nFitSample{ p.getFitSampleSet().getFitSampleList().size() };
 
-  // Make sure the memory don't move around
-  p.getFitSampleSet().getFitSampleList().reserve( p.getFitSampleSet().getFitSampleList().size() + 2 );
+
+  for( auto& dataset : p.getDataSetList() ){ LogDebug << dataset.getDataDispenserDict().at("Asimov").getTitle() << std::endl; }
+
+  // As the signal sample might use external data-set, we need to make sure the fit sample will be filled up with
+  // the original ones:
+  LogInfo << "Defining explicit dataset names from fit samples..." << std::endl;
+  for( auto& sample : p.getFitSampleSet().getFitSampleList() ){
+    std::vector<std::string> explicitDatasetNameList;
+    for( auto& dataset : p.getDataSetList() ){
+      if( sample.isDatasetValid( dataset.getName() ) ){
+        explicitDatasetNameList.emplace_back( dataset.getName() );
+      }
+    }
+    LogInfo << "Sample \"" << sample.getName() << "\" will be loaded from datasets: "
+    << GenericToolbox::parseVectorAsString(explicitDatasetNameList) << std::endl;
+    sample.setEnabledDatasetList( explicitDatasetNameList );
+  }
+
+  if( JsonUtils::doKeyExist(configXsecExtractor, "signalDatasets") ){
+    LogWarning << "Defining additional datasets for signals..." << std::endl;
+    auto signalDatasetList = JsonUtils::fetchValue<std::vector<nlohmann::json>>(configXsecExtractor, "signalDatasets");
+
+    // WARNING THIS CHANGES THE SIZE OF THE VECTOR:
+    p.getDataSetList().reserve( p.getDataSetList().size() + signalDatasetList.size() );
+
+    // So DatasetLoaders get moved in memory so the _owner_ reference within the DataDispenser are pointing to garbage in memory
+    // We need to update this reference.
+    for( auto& dataset : p.getDataSetList() ){ dataset.updateDispenserOwnership(); }
+
+    for( auto& signalDatasetConfig : signalDatasetList ){
+      p.getDataSetList().emplace_back(signalDatasetConfig, p.getDataSetList().size());
+    }
+  }
 
   // Add template sample
-  auto templateParameterSetName = JsonUtils::fetchValue<std::string>(jsonConfig, "templateParameterSetName");
-  LogInfo << "Adding cross-section sample: \"" << templateParameterSetName << "\"" << std::endl;
-  p.getFitSampleSet().getFitSampleList().emplace_back();
-  auto& templateSample = p.getFitSampleSet().getFitSampleList().back();
-  templateSample.readConfig(); // read empty config
-  templateSample.setName( templateParameterSetName );
-
-  auto templateBinningFilePath = JsonUtils::fetchValue<std::string>(
-      p.getFitParameterSetPtr(templateSample.getName())->getDialSetDefinitions()[0],
-      "parametersBinningPath"
+  auto signalDefinitions = JsonUtils::fetchValue<std::vector<nlohmann::json>>(configXsecExtractor, "signalDefinitions");
+  LogInfo << "Adding 2 x " << signalDefinitions.size() << " signal samples (true + reconstructed) to the propagator..." << std::endl;
+  std::vector<std::pair<FitSample*, FitSample*>> signalSampleList;
+  p.getFitSampleSet().getFitSampleList().reserve(
+      p.getFitSampleSet().getFitSampleList().size() + signalDefinitions.size()*2
   );
 
-  templateSample.setBinningFilePath( templateBinningFilePath );
-  templateSample.setSelectionCutStr("1"); // dummy cut to select all event during the data loading
+  LogInfo << "Defining sample for signal definitions..." << std::endl;
+  for( auto& signalDef : signalDefinitions ){
 
-  // Add template sample which will take care of the detection efficiency
-  // Same as templateSample but will need to make sure events belong to any of the fit sample
-  // Don't fill the events yet -> add a dummy cut
-  p.getFitSampleSet().getFitSampleList().emplace_back( templateSample );
-  auto& templateSampleDetected = p.getFitSampleSet().getFitSampleList().back();
-  templateSampleDetected.setName( templateSampleDetected.getName() + "_Detected" );
-  templateSampleDetected.setSelectionCutStr("0"); // dummy cut to select no event during the data loading
+    auto parameterSetName = JsonUtils::fetchValue<std::string>(signalDef, "parameterSetName");
+    LogInfo << "Adding signal samples: \"" << parameterSetName << "\"" << std::endl;
+    signalSampleList.emplace_back();
+    p.getFitSampleSet().getFitSampleList().emplace_back();
+    signalSampleList.back().first = &p.getFitSampleSet().getFitSampleList().back();
+    signalSampleList.back().first->readConfig(); // read empty config
+    signalSampleList.back().first->setName( parameterSetName );
+
+    auto templateBinningFilePath = JsonUtils::fetchValue<std::string>(
+        p.getFitParameterSetPtr( parameterSetName )->getDialSetDefinitions()[0], "parametersBinningPath"
+    );
+
+    signalSampleList.back().first->setBinningFilePath( templateBinningFilePath );
+    signalSampleList.back().first->setSelectionCutStr("1"); // dummy cut to select all event during the data loading
+
+    if( JsonUtils::doKeyExist(signalDef, "datasetSources") ){
+      auto datasetSrcList = JsonUtils::fetchValue<std::vector<std::string>>(signalDef, "datasetSources");
+      LogInfo << "Signal sample \"" << parameterSetName << "\" (truth) will load data from datasets: "
+      << GenericToolbox::parseVectorAsString( datasetSrcList ) << std::endl;
+      signalSampleList.back().first->setEnabledDatasetList( datasetSrcList );
+    }
 
 
-  // Events in templateSampleDetected will be loaded using the original fit samples
-  // To identify the right template bin for each detected event, one need to make sure the variables are kept in memory
-  DataBinSet templateBinning;
-  templateBinning.readBinningDefinition(templateBinningFilePath);
-  for( auto& varStorageList : templateBinning.getBinVariables() ){
-    p.getFitSampleSet().getAdditionalVariablesForStorage().emplace_back(varStorageList);
+    // Add template sample which will take care of the detection efficiency
+    // Same as templateSample but will need to make sure events belong to any of the fit sample
+    // Don't fill the events yet -> add a dummy cut
+    p.getFitSampleSet().getFitSampleList().emplace_back( *signalSampleList.back().first );
+    signalSampleList.back().second = &p.getFitSampleSet().getFitSampleList().back();
+    signalSampleList.back().second->setName( parameterSetName + "_Reconstructed" );
+    signalSampleList.back().second->setSelectionCutStr("0"); // dummy cut to select no event during the data loading
+
+
+    // Events in templateSampleDetected will be loaded using the original fit samples
+    // To identify the right template bin for each detected event, one need to make sure the variables are kept in memory
+    DataBinSet templateBinning;
+    templateBinning.readBinningDefinition( templateBinningFilePath );
+    for( auto& varStorageList : templateBinning.getBinVariables() ){
+      if( not GenericToolbox::doesElementIsInVector(varStorageList, p.getFitSampleSet().getAdditionalVariablesForStorage()) ){
+        p.getFitSampleSet().getAdditionalVariablesForStorage().emplace_back(varStorageList);
+      }
+    }
   }
 
 
@@ -227,59 +275,69 @@ int main(int argc, char** argv){
   // load the data
   p.initialize();
 
-//  for( int iFitSample = 0 ; iFitSample < nFitSample ; iFitSample++ ){  }
-//  p.getTreeWriter().writeEvents(GenericToolbox::mkdirTFile(saveDir_, sample.getName()), (isData ? "Data" : "MC"), *evListPtr);
+  LogWarning << std::endl << GenericToolbox::addUpDownBars("Propagator initialized. Now filling selected events...") << std::endl;
 
   LogInfo << "Filling selected true signal events..." << std::endl;
 
-  // reserving events for templateSampleDetected by the maximum size it could be
-  templateSampleDetected.getMcContainer().reserveEventMemory(
-      0,
-      templateSample.getMcContainer().eventList.size(),
-      templateSample.getMcContainer().eventList[0]
-  );
-  int iTemplateEvt{0};
+  for( auto& signalSamplePair : signalSampleList ){
+    // reserving events for templateSampleDetected by the maximum size it could be
+    signalSamplePair.second->getMcContainer().reserveEventMemory(
+        0,
+        signalSamplePair.first->getMcContainer().eventList.size(),
+        signalSamplePair.first->getMcContainer().eventList[0]
+    );
+    int iTemplateEvt{0};
 
-  auto isInTemplateBin = [&](const PhysicsEvent& ev_, const DataBin& b_){
-    for( size_t iVar = 0 ; iVar < b_.getVariableNameList().size() ; iVar++ ){
-      if( not b_.isBetweenEdges(iVar, ev_.getVarAsDouble(b_.getVariableNameList()[iVar])) ){
-        return false;
-      }
-    } // Var
-    return true;
-  };
-
-
-  for( int iFitSample = 0 ; iFitSample < nFitSample ; iFitSample++ ){
-    for( auto& event : p.getFitSampleSet().getFitSampleList()[iFitSample].getMcContainer().eventList ){
-      templateSample.getBinning().getBinsList();
-      for( size_t iBin = 0 ; iBin < templateSample.getBinning().getBinsList().size() ; iBin++ ){
-        if( isInTemplateBin(event, templateSample.getBinning().getBinsList()[iBin]) ){
-          // copy event in template bin
-          templateSampleDetected.getMcContainer().eventList[iTemplateEvt++] = event;
-          templateSampleDetected.getMcContainer().eventList[iTemplateEvt-1].setSampleBinIndex(int(iBin));
-          break;
+    auto isInTemplateBin = [&](const PhysicsEvent& ev_, const DataBin& b_){
+      for( size_t iVar = 0 ; iVar < b_.getVariableNameList().size() ; iVar++ ){
+        if( not b_.isBetweenEdges(iVar, ev_.getVarAsDouble(b_.getVariableNameList()[iVar])) ){
+          return false;
         }
-      } // template bins
-    } // sample event
-  } // sample loop
-  templateSampleDetected.getMcContainer().shrinkEventList(iTemplateEvt);
+      } // Var
+      return true;
+    };
 
 
-  // copying data..
-  templateSampleDetected.getDataContainer().eventList.insert(
-      std::end(templateSampleDetected.getDataContainer().eventList),
-      std::begin(templateSampleDetected.getMcContainer().eventList),
-      std::end(templateSampleDetected.getMcContainer().eventList)
-  );
+    for( int iFitSample = 0 ; iFitSample < nFitSample ; iFitSample++ ){
+      for( auto& event : p.getFitSampleSet().getFitSampleList()[iFitSample].getMcContainer().eventList ){
+        signalSamplePair.first->getBinning().getBinsList();
+        for( size_t iBin = 0 ; iBin < signalSamplePair.first->getBinning().getBinsList().size() ; iBin++ ){
+          if( isInTemplateBin(event, signalSamplePair.first->getBinning().getBinsList()[iBin]) ){
+            // copy event in template bin
+            signalSamplePair.second->getMcContainer().eventList[iTemplateEvt++] = event;
+            signalSamplePair.second->getMcContainer().eventList[iTemplateEvt-1].setSampleBinIndex(int(iBin));
+            break;
+          }
+        } // template bins
+      } // sample event
+    } // sample loop
+    signalSamplePair.second->getMcContainer().shrinkEventList(iTemplateEvt);
 
+
+    // copying to data container..
+    signalSamplePair.second->getDataContainer().eventList.insert(
+        std::end(signalSamplePair.second->getDataContainer().eventList),
+        std::begin(signalSamplePair.second->getMcContainer().eventList),
+        std::end(signalSamplePair.second->getMcContainer().eventList)
+    );
+  }
+
+  LogInfo << "Updating sample bin cache for signal sample (reconstructed)..." << std::endl;
   p.getFitSampleSet().updateSampleBinEventList();
   p.getFitSampleSet().updateSampleHistograms();
 
-  templateSampleDetected.getDataContainer().isLocked = true;
+  for( auto& signalSamplePair : signalSampleList ) {
+    signalSamplePair.second->getDataContainer().isLocked = true;
+  }
 
   // redefine histograms for the plot generator
   p.getPlotGenerator().defineHistogramHolders();
+
+  for( size_t iSample = nFitSample ; iSample < p.getFitSampleSet().getFitSampleList().size() ; iSample++ ){
+    auto* sample = &p.getFitSampleSet().getFitSampleList()[iSample];
+    p.getTreeWriter().writeEvents(GenericToolbox::mkdirTFile(out, "XsecExtractor/postFit/events/" + sample->getName()), "MC", sample->getMcContainer().eventList);
+  }
+
 
   p.throwParametersFromGlobalCovariance();
   p.propagateParametersOnSamples();

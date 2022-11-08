@@ -30,22 +30,27 @@ public:
   void setLoadAsimovData(bool loadAsimovData);
   void setGlobalCovarianceMatrix(const std::shared_ptr<TMatrixD> &globalCovarianceMatrix);
 
-  // Getters
+  // Const getters
   bool isThrowAsimovToyParameters() const;
   int getIThrow() const;
-  const std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix() const;
-  std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix();
-  FitSampleSet &getFitSampleSet();
-  std::vector<FitParameterSet> &getParameterSetsList();
-  const std::vector<FitParameterSet> &getParameterSetsList() const;
-  PlotGenerator &getPlotGenerator();
-  const EventTreeWriter &getTreeWriter() const;
-  ParScanner& getParScanner(){ return _parScanner_; }
   double getLlhBuffer() const;
   double getLlhStatBuffer() const;
   double getLlhPenaltyBuffer() const;
   double getLlhRegBuffer() const;
+  const std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix() const;
+  const EventTreeWriter &getTreeWriter() const;
+  const std::vector<DatasetLoader> &getDataSetList() const;
+  const std::vector<FitParameterSet> &getParameterSetsList() const;
 
+  // Non-const getters
+  std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix();
+  FitSampleSet &getFitSampleSet();
+  PlotGenerator &getPlotGenerator();
+  ParScanner& getParScanner(){ return _parScanner_; }
+  std::vector<FitParameterSet> &getParameterSetsList();
+  std::vector<DatasetLoader> &getDataSetList();
+
+  // Misc getters
   double* getLlhBufferPtr(){ return &_llhBuffer_; }
   double* getLlhStatBufferPtr(){ return &_llhStatBuffer_; }
   double* getLlhPenaltyBufferPtr(){ return &_llhPenaltyBuffer_; }

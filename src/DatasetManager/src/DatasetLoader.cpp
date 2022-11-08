@@ -74,7 +74,6 @@ void DatasetLoader::initializeImpl() {
 DatasetLoader::DatasetLoader(const nlohmann::json& config_, int datasetIndex_): _dataSetIndex_(datasetIndex_) {
   this->readConfig(config_);
 }
-
 void DatasetLoader::setDataSetIndex(int dataSetIndex) {
   _dataSetIndex_ = dataSetIndex;
 }
@@ -82,11 +81,20 @@ void DatasetLoader::setDataSetIndex(int dataSetIndex) {
 bool DatasetLoader::isEnabled() const {
   return _isEnabled_;
 }
-const std::string &DatasetLoader::getName() const {
-  return _name_;
+bool DatasetLoader::isShowSelectedEventCount() const {
+  return _showSelectedEventCount_;
 }
 int DatasetLoader::getDataSetIndex() const {
   return _dataSetIndex_;
+}
+const std::string &DatasetLoader::getName() const {
+  return _name_;
+}
+const std::string &DatasetLoader::getSelectedDataEntry() const {
+  return _selectedDataEntry_;
+}
+const std::string &DatasetLoader::getToyDataEntry() const {
+  return _selectedToyEntry_;
 }
 
 DataDispenser &DatasetLoader::getMcDispenser() {
@@ -102,13 +110,9 @@ std::map<std::string, DataDispenser> &DatasetLoader::getDataDispenserDict() {
   return _dataDispenserDict_;
 }
 
-const std::string &DatasetLoader::getSelectedDataEntry() const {
-  return _selectedDataEntry_;
-}
-const std::string &DatasetLoader::getToyDataEntry() const {
-  return _selectedToyEntry_;
-}
-
-bool DatasetLoader::isShowSelectedEventCount() const {
-  return _showSelectedEventCount_;
+void DatasetLoader::updateDispenserOwnership(){
+  _mcDispenser_.setOwner(this);
+  for( auto& dispenser : _dataDispenserDict_ ){
+    dispenser.second.setOwner(this);
+  }
 }

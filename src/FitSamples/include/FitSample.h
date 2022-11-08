@@ -26,6 +26,7 @@ public:
   void setName(const std::string &name);
   void setBinningFilePath(const std::string &binningFilePath_);
   void setSelectionCutStr(const std::string &selectionCutStr_);
+  void setEnabledDatasetList(const std::vector<std::string>& enabledDatasetList_);
 
   // GETTERS
   bool isEnabled() const;
