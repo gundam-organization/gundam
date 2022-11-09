@@ -39,7 +39,6 @@ int main(int argc, char** argv){
   // Read Command Line Args:
   // --------------------------
   CmdLineParser clParser;
-
   clParser.addOption("configFile", {"-c", "--config-file"}, "Specify path to the fitter config file");
   clParser.addOption("fitterOutputFile", {"-f"}, "Specify the fitter output file");
   clParser.addOption("outputFile", {"-o", "--out-file"}, "Specify the CalcXsec output file");
@@ -369,7 +368,11 @@ int main(int argc, char** argv){
   LogInfo << "Creating throws tree" << std::endl;
   auto* signalThrowTree = new TTree("signalThrowTree", "signalThrowTree");
   std::vector<GenericToolbox::RawDataArray> signalThrowData{signalSampleList.size()};
+  std::vector<TVectorD*> bestFitBinValues;
+  bestFitBinValues.reserve(signalSampleList.size());
   for( size_t iSignal = 0 ; iSignal < signalSampleList.size() ; iSignal++ ){
+
+    bestFitBinValues.emplace_back( new TVectorD( signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX() ) );
 
     std::vector<std::string> leafNameList{};
 
@@ -380,6 +383,9 @@ int main(int argc, char** argv){
       signalThrowData[iSignal].writeRawData(
           signalSampleList[iSignal].first->getMcContainer().histogram->GetBinContent(1+iBin)
           );
+
+      (*bestFitBinValues.back())[iBin] = signalSampleList[iSignal].first->getMcContainer().histogram->GetBinContent(1+iBin);
+
     }
 
     signalThrowData[iSignal].lockArraySize();
@@ -405,9 +411,22 @@ int main(int argc, char** argv){
   // TODO: Get number of   all    true signal events in each truth bin (after best fit reweight)
 
 
+  std::vector<TVectorD*> cumulativeBinValues;
+  std::vector<TMatrixD*> cumulativeBinsOuterProd;
+  cumulativeBinValues.reserve(signalSampleList.size());
+  cumulativeBinsOuterProd.reserve(signalSampleList.size());
+  for(auto & signalSample : signalSampleList){
+    cumulativeBinValues.emplace_back( new TVectorD(signalSample.first->getMcContainer().histogram->GetNbinsX()) );
+    cumulativeBinsOuterProd.emplace_back( new TMatrixD(
+        signalSample.first->getMcContainer().histogram->GetNbinsX(),
+        signalSample.first->getMcContainer().histogram->GetNbinsX()
+    ) );
+  }
+
+
   int nToys{100};
   if(clParser.isOptionTriggered("nToys")) nToys = clParser.getOptionVal<int>("nToys");
-  std::stringstream ss; ss << LogWarning.getPrefixString() << "Loading toys...";
+  std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating toys...";
   for( int iToy = 0 ; iToy < nToys ; iToy++ ){
     GenericToolbox::displayProgressBar(iToy, nToys, ss.str());
 
@@ -421,6 +440,14 @@ int main(int argc, char** argv){
         signalThrowData[iSignal].writeRawData(
             signalSampleList[iSignal].first->getMcContainer().histogram->GetBinContent(1+iBin)
         );
+
+        (*cumulativeBinValues[iSignal])[iBin] += signalSampleList[iSignal].first->getMcContainer().histogram->GetBinContent(1+iBin);
+        for( int jBin = 0 ; jBin < signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX() ; jBin++ ){
+          (*cumulativeBinsOuterProd[iSignal])[iBin][jBin] +=
+              ( signalSampleList[iSignal].first->getMcContainer().histogram->GetBinContent(1+iBin) - (*bestFitBinValues[iSignal])[iBin] )
+              * ( signalSampleList[iSignal].first->getMcContainer().histogram->GetBinContent(1+jBin) - (*bestFitBinValues[iSignal])[iBin] );
+        }
+
       }
 
       // TODO: Get number of selected true signal events in each truth bin (after each toy reweight)
@@ -445,6 +472,60 @@ int main(int argc, char** argv){
   }
 
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "XsecExtractor/throws"), signalThrowTree, "signalThrow");
+
+  for( size_t iSignal = 0 ; iSignal < signalSampleList.size() ; iSignal++ ){
+    for( int iBin = 0 ; iBin < signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+      (*cumulativeBinValues[iSignal])[iBin] /= double(nToys);
+      for( int jBin = 0 ; jBin < signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX() ; jBin++ ){
+        (*cumulativeBinsOuterProd[iSignal])[iBin][jBin] /= double(nToys);
+      } // jBin
+    } // iBin
+  } // iSignal
+
+
+  std::vector<TH1D> binValues{};
+  binValues.reserve( signalSampleList.size() );
+  for( size_t iSignal = 0 ; iSignal < signalSampleList.size() ; iSignal++ ){
+    binValues.emplace_back(
+      TH1D(
+        signalSampleList[iSignal].first->getName().c_str(),
+        signalSampleList[iSignal].first->getName().c_str(),
+        signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX(),
+        0,
+        signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX()
+      )
+    );
+
+    for( int iBin = 0 ; iBin < signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+      binValues[iSignal].SetBinContent(1+iBin, (*cumulativeBinValues[iSignal])[iBin]);
+      binValues[iSignal].SetBinError(1+iBin, TMath::Sqrt((*cumulativeBinsOuterProd[iSignal])[iBin][iBin]));
+    }
+
+    GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "XsecExtractor/histograms"), &binValues[iSignal], signalSampleList[iSignal].first->getName());
+  }
+
+
+
+  // attach branches to vector of bins
+
+
+
+
+
+  // create cumulative vectors (mean and stddev) and outer product matrix
+
+  LogInfo << "Reading throws..." << std::endl;
+  for( int iEntry = 0 ; iEntry < signalThrowTree->GetEntries() ; iEntry++ ){
+    signalThrowTree->GetEntry(iEntry);
+
+    // add to cumulative vectors and outer product matrix
+
+  }
+
+  // divide cumulative vectors by nEntries
+
+
+
 
   LogWarning << "Closing output file \"" << out->GetName() << "\"..." << std::endl;
   out->Close();
