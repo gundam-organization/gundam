@@ -392,15 +392,9 @@ int main(int argc, char** argv){
 
 
   std::vector<TVectorD*> cumulativeBinValues;
-  std::vector<TMatrixD*> cumulativeBinsOuterProd;
   cumulativeBinValues.reserve(signalSampleList.size());
-  cumulativeBinsOuterProd.reserve(signalSampleList.size());
   for(auto & signalSample : signalSampleList){
     cumulativeBinValues.emplace_back( new TVectorD(signalSample.first->getMcContainer().histogram->GetNbinsX()) );
-    cumulativeBinsOuterProd.emplace_back( new TMatrixD(
-        signalSample.first->getMcContainer().histogram->GetNbinsX(),
-        signalSample.first->getMcContainer().histogram->GetNbinsX()
-    ) );
   }
 
 
@@ -420,14 +414,7 @@ int main(int argc, char** argv){
         signalThrowData[iSignal].writeRawData(
             signalSampleList[iSignal].first->getMcContainer().histogram->GetBinContent(1+iBin)
         );
-
         (*cumulativeBinValues[iSignal])[iBin] += signalSampleList[iSignal].first->getMcContainer().histogram->GetBinContent(1+iBin);
-        for( int jBin = 0 ; jBin < signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX() ; jBin++ ){
-          (*cumulativeBinsOuterProd[iSignal])[iBin][jBin] +=
-              ( signalSampleList[iSignal].first->getMcContainer().histogram->GetBinContent(1+iBin) - (*bestFitBinValues[iSignal])[iBin] )
-              * ( signalSampleList[iSignal].first->getMcContainer().histogram->GetBinContent(1+jBin) - (*bestFitBinValues[iSignal])[iBin] );
-        }
-
       }
     }
 
@@ -435,20 +422,24 @@ int main(int argc, char** argv){
   }
 
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "XsecExtractor/throws"), signalThrowTree, "signalThrow");
+  auto* globalCovMatrix = GenericToolbox::getCovarianceMatrixOfTree(signalThrowTree);
+
 
   for( size_t iSignal = 0 ; iSignal < signalSampleList.size() ; iSignal++ ){
     for( int iBin = 0 ; iBin < signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX() ; iBin++ ){
       (*cumulativeBinValues[iSignal])[iBin] /= double(nToys);
-      for( int jBin = 0 ; jBin < signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX() ; jBin++ ){
-        (*cumulativeBinsOuterProd[iSignal])[iBin][jBin] /= double(nToys);
-      } // jBin
     } // iBin
   } // iSignal
 
 
+
   std::vector<TH1D> binValues{};
   binValues.reserve( signalSampleList.size() );
+  int iGlobal{-1};
   for( size_t iSignal = 0 ; iSignal < signalSampleList.size() ; iSignal++ ){
+    auto numberOfTargets = JsonUtils::fetchValue<double>(signalDefinitions[iSignal], "numberOfTargets", 1);
+    auto integratedFlux = JsonUtils::fetchValue<double>(signalDefinitions[iSignal], "integratedFlux", 1);
+
     binValues.emplace_back(
       TH1D(
         signalSampleList[iSignal].first->getName().c_str(),
@@ -459,18 +450,19 @@ int main(int argc, char** argv){
       )
     );
 
-
-
-    auto numberOfTargets = JsonUtils::fetchValue<double>(signalDefinitions[iSignal], "numberOfTargets", 1);
-    auto integratedFlux = JsonUtils::fetchValue<double>(signalDefinitions[iSignal], "integratedFlux", 1);
-
-
     for( int iBin = 0 ; iBin < signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+      iGlobal++;
       binValues[iSignal].SetBinContent(1+iBin, (*cumulativeBinValues[iSignal])[iBin] / numberOfTargets / integratedFlux );
-      binValues[iSignal].SetBinError(1+iBin, TMath::Sqrt((*cumulativeBinsOuterProd[iSignal])[iBin][iBin])  / numberOfTargets / integratedFlux );
+      binValues[iSignal].SetBinError(1+iBin, TMath::Sqrt( (*globalCovMatrix)[iGlobal][iGlobal] ) / numberOfTargets / integratedFlux );
+      binValues[iSignal].GetXaxis()->SetBinLabel(
+          1+iBin,
+          signalSampleList[iSignal].first->getBinning().getBinsList()[iBin].getSummary().c_str()
+      );
     }
 
     GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "XsecExtractor/histograms"), &binValues[iSignal], signalSampleList[iSignal].first->getName());
+    GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "XsecExtractor/covariance"), GenericToolbox::convertTMatrixDtoTH2D(globalCovMatrix), signalSampleList[iSignal].first->getName());
+    GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "XsecExtractor/correlation"), GenericToolbox::convertTMatrixDtoTH2D(GenericToolbox::convertToCorrelationMatrix(globalCovMatrix)), signalSampleList[iSignal].first->getName());
   }
 
 
