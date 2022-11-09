@@ -857,7 +857,7 @@ void PlotGenerator::buildEventBinCache(const std::vector<HistHolder *> &histPtrT
         int iBin{-1};
         for( const auto& event : *eventListPtr ){
           if( histPtrToFill->splitVarName.empty() or event.getVarValue<int>(histPtrToFill->splitVarName) == histPtrToFill->splitVarValue){
-            if( histPtrToFill->varToPlot == "Raw" ) iBin = event.getSampleBinIndex();
+            if( histPtrToFill->varToPlot == "Raw" ) iBin = event.getSampleBinIndex() + 1;
             else iBin = histPtrToFill->histPtr->FindBin(event.getVarAsDouble(histPtrToFill->varToPlot));
             if( iBin > 0 and iBin <= histPtrToFill->histPtr->GetNbinsX() ){
               // so it's a valid bin!

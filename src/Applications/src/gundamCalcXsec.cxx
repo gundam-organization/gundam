@@ -126,7 +126,6 @@ int main(int argc, char** argv){
   auto configFit = JsonUtils::readConfigJsonStr(configStr); // works with yaml
   auto configPropagator = JsonUtils::fetchValuePath<nlohmann::json>( configFit, "fitterEngineConfig/propagatorConfig" );
 
-
   // Create a propagator object
   Propagator p;
 
@@ -226,25 +225,6 @@ int main(int argc, char** argv){
       }
     }
   }
-
-
-  // throw all parameters
-  // - indexing the events according to the truth binning (template parameters)
-  // - (selected events -> if it falls into reco sample)/(all true events)
-  // - reweight events ->
-  // - efficiency for each template bin
-  // each bin of the template binning
-  //
-
-  // - add one sample "truth" -> template parameter based
-  // - keep all the samples for the fit "reco"
-  // - then to compute the efficiency we need to figure out if a given event in the template space is in the fit sample
-  // - each toy will have its own efficiency + each bin of the template parameters
-
-
-  // - get the true number of selected events in template / efficiency -> true number of events that occured in detector
-
-
 
   // Get best fit parameter values and postfit covariance matrix
   LogInfo << "Injecting post-fit values of fitted parameters..." << std::endl;
@@ -449,23 +429,6 @@ int main(int argc, char** argv){
         }
 
       }
-
-      // TODO: Get number of selected true signal events in each truth bin (after each toy reweight)
-      // TODO: Get number of   all    true signal events in each truth bin (after each toy reweight)
-
-//      for( int iBin = 0 ; iBin < signalEfficiencyHistList[iSignal]->GetNbinsX() ; iBin++ ){
-//        signalEfficiencyHistList[iSignal]->SetBinContent(
-//            1+iBin,
-//            signalSampleList[iSignal].second->getMcContainer().histogram->GetBinContent(1+iBin)
-//            / signalSampleList[iSignal].first->getMcContainer().histogram->GetBinContent(1+iBin)
-//        );
-//      }
-
-
-      // TODO: Apply efficiency correction
-      // TODO: Apply normalizations for number of targets, integrated flux and bin widths
-
-
     }
 
     signalThrowTree->Fill();
@@ -496,9 +459,15 @@ int main(int argc, char** argv){
       )
     );
 
+
+
+    auto numberOfTargets = JsonUtils::fetchValue<double>(signalDefinitions[iSignal], "numberOfTargets", 1);
+    auto integratedFlux = JsonUtils::fetchValue<double>(signalDefinitions[iSignal], "integratedFlux", 1);
+
+
     for( int iBin = 0 ; iBin < signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-      binValues[iSignal].SetBinContent(1+iBin, (*cumulativeBinValues[iSignal])[iBin]);
-      binValues[iSignal].SetBinError(1+iBin, TMath::Sqrt((*cumulativeBinsOuterProd[iSignal])[iBin][iBin]));
+      binValues[iSignal].SetBinContent(1+iBin, (*cumulativeBinValues[iSignal])[iBin] / numberOfTargets / integratedFlux );
+      binValues[iSignal].SetBinError(1+iBin, TMath::Sqrt((*cumulativeBinsOuterProd[iSignal])[iBin][iBin])  / numberOfTargets / integratedFlux );
     }
 
     GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "XsecExtractor/histograms"), &binValues[iSignal], signalSampleList[iSignal].first->getName());
