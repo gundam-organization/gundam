@@ -432,6 +432,8 @@ int main(int argc, char** argv){
   } // iSignal
 
 
+  auto* globalCovMatrixHist = GenericToolbox::convertTMatrixDtoTH2D(globalCovMatrix);
+  auto* globalCorMatrixHist = GenericToolbox::convertTMatrixDtoTH2D(GenericToolbox::convertToCorrelationMatrix(globalCovMatrix));
 
   std::vector<TH1D> binValues{};
   binValues.reserve( signalSampleList.size() );
@@ -458,12 +460,29 @@ int main(int argc, char** argv){
           1+iBin,
           signalSampleList[iSignal].first->getBinning().getBinsList()[iBin].getSummary().c_str()
       );
+
+      globalCovMatrixHist->GetXaxis()->SetBinLabel(1+iGlobal, signalSampleList[iSignal].first->getBinning().getBinsList()[iBin].getSummary().c_str());
+      globalCorMatrixHist->GetXaxis()->SetBinLabel(1+iGlobal, signalSampleList[iSignal].first->getBinning().getBinsList()[iBin].getSummary().c_str());
+      globalCovMatrixHist->GetYaxis()->SetBinLabel(1+iGlobal, signalSampleList[iSignal].first->getBinning().getBinsList()[iBin].getSummary().c_str());
+      globalCorMatrixHist->GetYaxis()->SetBinLabel(1+iGlobal, signalSampleList[iSignal].first->getBinning().getBinsList()[iBin].getSummary().c_str());
     }
 
-    GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "XsecExtractor/histograms"), &binValues[iSignal], signalSampleList[iSignal].first->getName());
-    GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "XsecExtractor/covariance"), GenericToolbox::convertTMatrixDtoTH2D(globalCovMatrix), signalSampleList[iSignal].first->getName());
-    GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "XsecExtractor/correlation"), GenericToolbox::convertTMatrixDtoTH2D(GenericToolbox::convertToCorrelationMatrix(globalCovMatrix)), signalSampleList[iSignal].first->getName());
+    std::string cleanName{signalSampleList[iSignal].first->getName()};
+    GenericToolbox::replaceSubstringInsideInputString(cleanName, " ", "_");
+    GenericToolbox::replaceSubstringInsideInputString(cleanName, "-", "_");
+    GenericToolbox::replaceSubstringInsideInputString(cleanName, "(", "");
+    GenericToolbox::replaceSubstringInsideInputString(cleanName, ")", "");
+
+    binValues[iSignal].SetLineWidth(2);
+    binValues[iSignal].SetLineColor(kGreen-3);
+    binValues[iSignal].SetDrawOption("E2");
+    binValues[iSignal].GetXaxis()->LabelsOption("v");
+
+    GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "XsecExtractor/histograms"), &binValues[iSignal], cleanName);
   }
+
+  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "XsecExtractor/matrices"), globalCovMatrixHist, "covarianceMatrix");
+  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "XsecExtractor/matrices"), globalCorMatrixHist, "correlationMatrix");
 
 
 
