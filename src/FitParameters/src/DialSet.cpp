@@ -99,7 +99,7 @@ double DialSet::getMirrorRange() const {
 
 std::string DialSet::getSummary() const {
   std::stringstream ss;
-  ss << "DialSet: Datasets: " << GenericToolbox::parseVectorAsString(_dataSetNameList_);
+  ss << getTitle();
 
   if( not _applyConditionStr_.empty() ) {
     ss << " / applyCondition:\"" << _applyConditionStr_ << "\"";
@@ -112,6 +112,9 @@ std::string DialSet::getSummary() const {
   }
 
   return ss.str();
+}
+std::string DialSet::getTitle() const{
+  return _owner_->getTitle() + "/DialSet" + GenericToolbox::parseVectorAsString(_dataSetNameList_);
 }
 
 // Protected
@@ -224,7 +227,6 @@ void DialSet::readGlobals(const nlohmann::json &config_){
   }
 
   if( not _applyConditionStr_.empty() ){
-//    LogWarning << "Apply condition: " << _applyConditionStr_ << std::endl;
     _applyConditionFormula_ = std::make_shared<TFormula>("_applyConditionFormula_", _applyConditionStr_.c_str());
     LogThrowIf(not _applyConditionFormula_->IsValid(),
                "\"" << _applyConditionStr_ << "\": could not be parsed as formula expression.")

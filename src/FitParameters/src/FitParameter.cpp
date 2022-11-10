@@ -117,9 +117,6 @@ void FitParameter::setThrowValue(double throwValue){
 void FitParameter::setStdDevValue(double stdDevValue) {
   _stdDevValue_ = stdDevValue;
 }
-void FitParameter::setEnableDialSetsSummary(bool enableDialSetsSummary) {
-  _enableDialSetsSummary_ = enableDialSetsSummary;
-}
 void FitParameter::setMinValue(double minValue) {
   _minValue_ = minValue;
 }
@@ -233,7 +230,7 @@ std::string FitParameter::getSummary(bool shallow_) const {
   else ss << _maxValue_;
   ss << " ]";
 
-  if( not shallow_ and _enableDialSetsSummary_ ){
+  if( not shallow_ ){
     ss << ":";
     for( const auto& dialSet : _dialSetList_ ){
       ss << std::endl << GenericToolbox::indentString(dialSet.getSummary(), 2);

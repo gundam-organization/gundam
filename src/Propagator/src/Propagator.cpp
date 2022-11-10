@@ -100,9 +100,10 @@ void Propagator::initializeImpl() {
     }
   }
   else{
-    LogInfo << "Global covariance matrix is already set. Checking dimensions..." << std::endl;
-    LogThrowIf(_globalCovarianceMatrix_->GetNrows() != nPars or _globalCovarianceMatrix_->GetNcols() != nPars,
-               "The provided covariance matrix don't have the right size: " << nPars << "x" << nPars);
+//    LogInfo << "Global covariance matrix is already set. Checking dimensions..." << std::endl;
+//    LogThrowIf(_globalCovarianceMatrix_->GetNrows() != nPars or _globalCovarianceMatrix_->GetNcols() != nPars,
+//               "The provided covariance matrix don't have the right size: " << nPars << "x" << nPars
+//               << " / " << _globalCovarianceMatrix_->GetNrows() << " x " << _globalCovarianceMatrix_->GetNcols());
   }
 
 
