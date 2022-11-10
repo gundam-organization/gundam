@@ -586,6 +586,11 @@ void Propagator::throwParametersFromGlobalCovariance(){
     );
   }
 
+  // Making sure eigen decomposed parameters get the conversion done
+  for( auto& parSet : _parameterSetList_ ){
+    if( parSet.isUseEigenDecompInFit() ){ parSet.propagateOriginalToEigen(); }
+  }
+
 }
 
 

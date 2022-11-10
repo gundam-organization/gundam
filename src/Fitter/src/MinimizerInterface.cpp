@@ -306,16 +306,8 @@ void MinimizerInterface::minimize(){
     }
 
     samplesArrList[iSample].lockArraySize();
-
-
-    std::string cleanBranchName{sample.getName()};
-    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, " ", "_");
-    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, "-", "_");
-    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, "(", "");
-    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, ")", "");
-
     bestFitStats->Branch(
-        cleanBranchName.c_str(),
+        GenericToolbox::generateCleanBranchName(sample.getName()).c_str(),
         &samplesArrList[iSample].getRawDataArray()[0],
         GenericToolbox::joinVectorString(leavesDict, ":").c_str()
     );
@@ -337,14 +329,8 @@ void MinimizerInterface::minimize(){
       parameterSetArrList[iParSet].writeRawData(par.getParameterValue());
     }
 
-    std::string cleanBranchName{parSet.getName()};
-    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, " ", "_");
-    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, "-", "_");
-    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, "(", "");
-    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, ")", "");
-
     bestFitStats->Branch(
-        cleanBranchName.c_str(),
+        GenericToolbox::generateCleanBranchName(parSet.getName()).c_str(),
         &parameterSetArrList[iParSet].getRawDataArray()[0],
         GenericToolbox::joinVectorString(leavesDict, ":").c_str()
     );

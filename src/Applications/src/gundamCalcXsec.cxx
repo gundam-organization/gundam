@@ -126,6 +126,12 @@ int main(int argc, char** argv){
   auto configFit = JsonUtils::readConfigJsonStr(configStr); // works with yaml
   auto configPropagator = JsonUtils::fetchValuePath<nlohmann::json>( configFit, "fitterEngineConfig/propagatorConfig" );
 
+  bool enableEventMcThrow{true};
+  bool enableStatThrowInToys{true};
+
+  enableStatThrowInToys = JsonUtils::fetchValue(configXsecExtractor, "enableStatThrowInToys", enableStatThrowInToys);
+  enableEventMcThrow = JsonUtils::fetchValue(configXsecExtractor, "enableEventMcThrow", enableEventMcThrow);
+
   // Create a propagator object
   Propagator p;
 
@@ -369,22 +375,8 @@ int main(int argc, char** argv){
     }
 
     signalThrowData[iSignal].lockArraySize();
-
-    std::string cleanBranchName{signalSampleList[iSignal].first->getName()};
-    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, " ", "_");
-    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, "-", "_");
-    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, "(", "");
-    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, ")", "");
-    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, "[", "");
-    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, "]", "");
-//    cleanBranchName = GenericToolbox::replaceSubstringInString(
-//          signalSampleList[iSignal].first->getName(),
-//          {{" "}, {"-"}, {""}},
-//          {{"_"}, {"_"}, {"_"}}
-//      );
-
     signalThrowTree->Branch(
-        cleanBranchName.c_str(),
+        GenericToolbox::generateCleanBranchName(signalSampleList[iSignal].first->getName()).c_str(),
         &signalThrowData[iSignal].getRawDataArray()[0],
         GenericToolbox::joinVectorString(leafNameList, ":").c_str()
     );
@@ -411,6 +403,18 @@ int main(int argc, char** argv){
 
     p.throwParametersFromGlobalCovariance();
     p.propagateParametersOnSamples();
+
+    if( enableStatThrowInToys ){
+      for( auto& sample : p.getFitSampleSet().getFitSampleList() ){
+        if( enableEventMcThrow ){
+          // Take into account the finite amount of event in MC
+          sample.getMcContainer().throwEventMcError();
+        }
+        // Asimov bin content -> toy data
+        sample.getMcContainer().throwStatError();
+      }
+    }
+
 
     for( size_t iSignal = 0 ; iSignal < signalSampleList.size() ; iSignal++ ){
 
@@ -475,18 +479,16 @@ int main(int argc, char** argv){
       globalCorMatrixHist->GetYaxis()->SetBinLabel(1+iGlobal, (sampleTitle + "/" + binTitle).c_str());
     }
 
-    std::string cleanName{signalSampleList[iSignal].first->getName()};
-    GenericToolbox::replaceSubstringInsideInputString(cleanName, " ", "_");
-    GenericToolbox::replaceSubstringInsideInputString(cleanName, "-", "_");
-    GenericToolbox::replaceSubstringInsideInputString(cleanName, "(", "");
-    GenericToolbox::replaceSubstringInsideInputString(cleanName, ")", "");
-
     binValues[iSignal].SetLineWidth(2);
     binValues[iSignal].SetLineColor(kGreen-3);
     binValues[iSignal].SetDrawOption("E2");
     binValues[iSignal].GetXaxis()->LabelsOption("v");
 
-    GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "XsecExtractor/histograms"), &binValues[iSignal], cleanName);
+    GenericToolbox::writeInTFile(
+        GenericToolbox::mkdirTFile(out, "XsecExtractor/histograms"),
+        &binValues[iSignal],
+        GenericToolbox::generateCleanBranchName(signalSampleList[iSignal].first->getName())
+    );
   }
 
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "XsecExtractor/matrices"), globalCovMatrixHist, "covarianceMatrix");
