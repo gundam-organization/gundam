@@ -462,10 +462,14 @@ int main(int argc, char** argv){
       globalCorMatrixHist->GetYaxis()->SetBinLabel(1+iGlobal, (sampleTitle + "/" + binTitle).c_str());
     }
 
+    binValues[iSignal].SetMarkerStyle(kFullDotLarge);
+    binValues[iSignal].SetMarkerColor(kGreen-3);
+    binValues[iSignal].SetMarkerSize(0.5);
     binValues[iSignal].SetLineWidth(2);
     binValues[iSignal].SetLineColor(kGreen-3);
-    binValues[iSignal].SetDrawOption("E2");
+    binValues[iSignal].SetDrawOption("E1");
     binValues[iSignal].GetXaxis()->LabelsOption("v");
+    binValues[iSignal].GetXaxis()->SetLabelSize(0.02);
 
     GenericToolbox::writeInTFile(
         GenericToolbox::mkdirTFile(out, "XsecExtractor/histograms"),
@@ -474,7 +478,14 @@ int main(int argc, char** argv){
     );
   }
 
+
+  globalCovMatrixHist->GetXaxis()->SetLabelSize(0.02);
+  globalCovMatrixHist->GetYaxis()->SetLabelSize(0.02);
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "XsecExtractor/matrices"), globalCovMatrixHist, "covarianceMatrix");
+
+  globalCorMatrixHist->GetXaxis()->SetLabelSize(0.02);
+  globalCorMatrixHist->GetYaxis()->SetLabelSize(0.02);
+  globalCorMatrixHist->GetZaxis()->SetRangeUser(-1, 1);
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "XsecExtractor/matrices"), globalCorMatrixHist, "correlationMatrix");
 
   LogWarning << "Closing output file \"" << out->GetName() << "\"..." << std::endl;
