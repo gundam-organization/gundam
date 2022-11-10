@@ -243,7 +243,7 @@ int main(int argc, char** argv){
     LogThrowIf(parSet.getNbParameters() != postFitParHist->GetNbinsX(),
                "Expecting " << parSet.getNbParameters() << " postfit parameter values, but got: " << postFitParHist->GetNbinsX());
     for( auto& par : parSet.getParameterList() ){
-      par.setPriorValue(postFitParHist->GetBinContent( 1+par.getParameterIndex() ));
+      par.setPriorValue( postFitParHist->GetBinContent( 1+par.getParameterIndex() ) );
     }
   }
 
@@ -327,29 +327,6 @@ int main(int argc, char** argv){
 
   LogInfo << "Generating loaded sample plots..." << std::endl;
   p.getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(out, "XsecExtractor/postFit/samples"));
-
-
-//  std::vector<std::vector<double>> signalBinVolumeList{signalSampleList.size()};
-//  for( size_t iSignal = 0 ; iSignal < signalSampleList.size() ; iSignal++ ){
-//    signalBinVolumeList[iSignal].reserve(signalSampleList[iSignal].first->getBinning().getBinsList().size());
-//    for( auto& bin : signalSampleList[iSignal].first->getBinning().getBinsList() ) {
-//      signalBinVolumeList[iSignal].emplace_back( bin.getVolume() );
-//    }
-//  }
-//
-//  std::vector<std::shared_ptr<TH1D>> signalEfficiencyHistList{};
-//  signalEfficiencyHistList.reserve(signalSampleList.size());
-//  for( auto& signalSamplePair : signalSampleList ){
-//    signalEfficiencyHistList.emplace_back(std::make_shared<TH1D>( *signalSamplePair.second->getMcContainer().histogram ));
-//    signalEfficiencyHistList.back()->Divide(signalSamplePair.first->getMcContainer().histogram.get());
-//  }
-//
-//  std::vector<std::shared_ptr<TH1D>> signalToyHistList{};
-//  signalToyHistList.reserve(signalSampleList.size());
-//  for( auto& signalSamplePair : signalSampleList ){
-//    signalToyHistList.emplace_back(std::make_shared<TH1D>( *signalSamplePair.second->getMcContainer().histogram ));
-//    signalToyHistList.back()->Reset();
-//  }
 
   LogInfo << "Creating throws tree" << std::endl;
   auto* signalThrowTree = new TTree("signalThrowTree", "signalThrowTree");
@@ -470,6 +447,7 @@ int main(int argc, char** argv){
     binValues[iSignal].SetDrawOption("E1");
     binValues[iSignal].GetXaxis()->LabelsOption("v");
     binValues[iSignal].GetXaxis()->SetLabelSize(0.02);
+    binValues[iSignal].GetYaxis()->SetTitle("#delta#sigma");
 
     GenericToolbox::writeInTFile(
         GenericToolbox::mkdirTFile(out, "XsecExtractor/histograms"),
