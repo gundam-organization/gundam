@@ -382,6 +382,13 @@ int main(int argc, char** argv){
     );
   }
 
+  std::vector<double> numberOfTargets(signalSampleList.size());
+  std::vector<double> integratedFlux(signalSampleList.size());
+  for( size_t iSignal = 0 ; iSignal < signalSampleList.size() ; iSignal++ ){
+    numberOfTargets[iSignal] = JsonUtils::fetchValue<double>(signalDefinitions[iSignal], "numberOfTargets", 1);
+    integratedFlux[iSignal] = JsonUtils::fetchValue<double>(signalDefinitions[iSignal], "integratedFlux", 1);
+  }
+
   int nToys{100};
   if(clParser.isOptionTriggered("nToys")) nToys = clParser.getOptionVal<int>("nToys");
   std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating toys...";
@@ -404,11 +411,11 @@ int main(int argc, char** argv){
 
 
     for( size_t iSignal = 0 ; iSignal < signalSampleList.size() ; iSignal++ ){
-
       signalThrowData[iSignal].resetCurrentByteOffset();
       for( int iBin = 0 ; iBin < signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX() ; iBin++ ){
         signalThrowData[iSignal].writeRawData(
             signalSampleList[iSignal].first->getMcContainer().histogram->GetBinContent(1+iBin)
+            / numberOfTargets[iSignal] / integratedFlux[iSignal]
         );
       }
     }
@@ -427,9 +434,6 @@ int main(int argc, char** argv){
   binValues.reserve( signalSampleList.size() );
   int iGlobal{-1};
   for( size_t iSignal = 0 ; iSignal < signalSampleList.size() ; iSignal++ ){
-    auto numberOfTargets = JsonUtils::fetchValue<double>(signalDefinitions[iSignal], "numberOfTargets", 1);
-    auto integratedFlux = JsonUtils::fetchValue<double>(signalDefinitions[iSignal], "integratedFlux", 1);
-
     binValues.emplace_back(
       TH1D(
         signalSampleList[iSignal].first->getName().c_str(),
@@ -448,8 +452,8 @@ int main(int argc, char** argv){
       std::string binTitle = signalSampleList[iSignal].first->getBinning().getBinsList()[iBin].getSummary();
       double binVolume = signalSampleList[iSignal].first->getBinning().getBinsList()[iBin].getVolume();
 
-      binValues[iSignal].SetBinContent(1+iBin, (*meanValuesVector)[iGlobal] / numberOfTargets / integratedFlux / binVolume );
-      binValues[iSignal].SetBinError(1+iBin, TMath::Sqrt( (*globalCovMatrix)[iGlobal][iGlobal] ) / numberOfTargets / integratedFlux / binVolume );
+      binValues[iSignal].SetBinContent(1+iBin, (*meanValuesVector)[iGlobal] / binVolume  );
+      binValues[iSignal].SetBinError(1+iBin, TMath::Sqrt( (*globalCovMatrix)[iGlobal][iGlobal] ) / binVolume );
       binValues[iSignal].GetXaxis()->SetBinLabel( 1+iBin, binTitle.c_str() );
 
       globalCovMatrixHist->GetXaxis()->SetBinLabel(1+iGlobal, (sampleTitle + "/" + binTitle).c_str());
