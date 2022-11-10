@@ -382,19 +382,6 @@ int main(int argc, char** argv){
     );
   }
 
-
-
-  // TODO: Get number of selected true signal events in each truth bin (after best fit reweight)
-  // TODO: Get number of   all    true signal events in each truth bin (after best fit reweight)
-
-
-  std::vector<TVectorD*> cumulativeBinValues;
-  cumulativeBinValues.reserve(signalSampleList.size());
-  for(auto & signalSample : signalSampleList){
-    cumulativeBinValues.emplace_back( new TVectorD(signalSample.first->getMcContainer().histogram->GetNbinsX()) );
-  }
-
-
   int nToys{100};
   if(clParser.isOptionTriggered("nToys")) nToys = clParser.getOptionVal<int>("nToys");
   std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating toys...";
@@ -423,7 +410,6 @@ int main(int argc, char** argv){
         signalThrowData[iSignal].writeRawData(
             signalSampleList[iSignal].first->getMcContainer().histogram->GetBinContent(1+iBin)
         );
-        (*cumulativeBinValues[iSignal])[iBin] += signalSampleList[iSignal].first->getMcContainer().histogram->GetBinContent(1+iBin);
       }
     }
 
@@ -431,15 +417,8 @@ int main(int argc, char** argv){
   }
 
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "XsecExtractor/throws"), signalThrowTree, "signalThrow");
-  auto* globalCovMatrix = GenericToolbox::getCovarianceMatrixOfTree(signalThrowTree);
-
-
-  for( size_t iSignal = 0 ; iSignal < signalSampleList.size() ; iSignal++ ){
-    for( int iBin = 0 ; iBin < signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-      (*cumulativeBinValues[iSignal])[iBin] /= double(nToys);
-    } // iBin
-  } // iSignal
-
+  auto* meanValuesVector = GenericToolbox::generateMeanVectorOfTree(signalThrowTree);
+  auto* globalCovMatrix = GenericToolbox::generateCovarianceMatrixOfTree(signalThrowTree);
 
   auto* globalCovMatrixHist = GenericToolbox::convertTMatrixDtoTH2D(globalCovMatrix);
   auto* globalCorMatrixHist = GenericToolbox::convertTMatrixDtoTH2D(GenericToolbox::convertToCorrelationMatrix(globalCovMatrix));
@@ -469,7 +448,7 @@ int main(int argc, char** argv){
       std::string binTitle = signalSampleList[iSignal].first->getBinning().getBinsList()[iBin].getSummary();
       double binVolume = signalSampleList[iSignal].first->getBinning().getBinsList()[iBin].getVolume();
 
-      binValues[iSignal].SetBinContent(1+iBin, (*cumulativeBinValues[iSignal])[iBin] / numberOfTargets / integratedFlux / binVolume );
+      binValues[iSignal].SetBinContent(1+iBin, (*meanValuesVector)[iGlobal] / numberOfTargets / integratedFlux / binVolume );
       binValues[iSignal].SetBinError(1+iBin, TMath::Sqrt( (*globalCovMatrix)[iGlobal][iGlobal] ) / numberOfTargets / integratedFlux / binVolume );
       binValues[iSignal].GetXaxis()->SetBinLabel( 1+iBin, binTitle.c_str() );
 
