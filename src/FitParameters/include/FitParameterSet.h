@@ -106,6 +106,7 @@ private:
   bool _isEnabled_{};
   bool _maskedForPropagation_{false};
   bool _printDialSetsSummary_{false};
+  bool _printParametersSummary_{false};
   bool _releaseFixedParametersOnHesse_{false};
   int _nbParameterDefinition_{-1};
   double _nominalStepSize_{std::nan("unset")};

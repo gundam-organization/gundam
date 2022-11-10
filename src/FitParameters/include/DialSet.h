@@ -57,6 +57,7 @@ public:
 
   // Core
   std::string getSummary() const;
+  std::string getTitle() const;
 
 protected:
   void readConfigImpl() override;

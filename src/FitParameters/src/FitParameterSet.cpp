@@ -32,6 +32,7 @@ void FitParameterSet::readConfigImpl(){
 
   _useOnlyOneParameterPerEvent_ = JsonUtils::fetchValue<bool>(_config_, "useOnlyOneParameterPerEvent", false);
   _printDialSetsSummary_ = JsonUtils::fetchValue<bool>(_config_, "printDialSetsSummary", _printDialSetsSummary_);
+  _printParametersSummary_ = JsonUtils::fetchValue<bool>(_config_, "printParametersSummary", _printDialSetsSummary_);
 
   if( JsonUtils::doKeyExist(_config_, "parameterLimits") ){
     auto parLimits = JsonUtils::fetchValue(_config_, "parameterLimits", nlohmann::json());
@@ -71,14 +72,43 @@ void FitParameterSet::readConfigImpl(){
   _dialSetDefinitions_ = JsonUtils::fetchValue(_config_, "dialSetDefinitions", _dialSetDefinitions_);
 
   this->readParameterDefinitionFile();
+
+  if( _nbParameterDefinition_ == -1 ){
+    LogWarning << "No number of parameter provided. Looking for alternative definitions..." << std::endl;
+
+    if( not _dialSetDefinitions_.empty() ){
+      for( auto& dialSetDef : _dialSetDefinitions_.get<std::vector<nlohmann::json>>() ){
+        if( JsonUtils::doKeyExist(dialSetDef, "parametersBinningPath") ){
+          LogInfo << "Found parameter binning within dialSetDefinition. Defining parameters number..." << std::endl;
+          DataBinSet b;
+          b.readBinningDefinition( JsonUtils::fetchValue<std::string>(dialSetDef, "parametersBinningPath") );
+          _nbParameterDefinition_ = int(b.getBinsList().size());
+          break;
+        }
+      }
+    }
+
+    if( _nbParameterDefinition_ == -1 and not _parameterDefinitionConfig_.empty() ){
+      LogInfo << "Using parameter definition config list to determine the number of parameters..." << std::endl;
+      _nbParameterDefinition_ = int(_parameterDefinitionConfig_.get<std::vector<nlohmann::json>>().size());
+    }
+
+    LogThrowIf(_nbParameterDefinition_==-1, "Could not figure out the number of parameters to be defined for the set: " << _name_ );
+  }
+
   this->defineParameters();
 }
 void FitParameterSet::initializeImpl() {
   LogInfo << "Initializing \"" << this->getName() << "\"" << std::endl;
 
-  LogReturnIf(not _isEnabled_, "Not enabled. Skipping.");
+  LogReturnIf(not _isEnabled_, this->getName() << " is not enabled. Skipping.");
 
-  for( auto& par : _parameterList_ ){ par.initialize(); }
+  for( auto& par : _parameterList_ ){
+    par.initialize();
+    if( par.isInitialized() and _printParametersSummary_ ){
+      LogInfo << par.getSummary(not _printDialSetsSummary_) << std::endl;
+    }
+  }
 
   // Make the matrix inversion
   this->processCovarianceMatrix();
@@ -551,7 +581,7 @@ void FitParameterSet::readParameterDefinitionFile(){
   parDefFile->Close();
 }
 void FitParameterSet::defineParameters(){
-  LogInfo << "Defining parameters in set: " << getName() << std::endl;
+  LogInfo << "Defining " << _nbParameterDefinition_ << " parameters for the set: " << getName() << std::endl;
   _parameterList_.resize(_nbParameterDefinition_, FitParameter(this));
   int parIndex{0};
 
@@ -575,7 +605,6 @@ void FitParameterSet::defineParameters(){
     else{ par.setPriorValue(1); }
 
     par.setParameterValue(par.getPriorValue());
-    par.setEnableDialSetsSummary(_printDialSetsSummary_);
 
     if( _globalParameterMinValue_ == _globalParameterMinValue_ ){ par.setMinValue(_globalParameterMinValue_); }
     if( _globalParameterMaxValue_ == _globalParameterMaxValue_ ){ par.setMaxValue(_globalParameterMaxValue_); }

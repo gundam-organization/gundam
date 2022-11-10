@@ -372,6 +372,11 @@ int main(int argc, char** argv){
 
     std::string cleanBranchName{signalSampleList[iSignal].first->getName()};
     GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, " ", "_");
+    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, "-", "_");
+    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, "(", "");
+    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, ")", "");
+    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, "[", "");
+    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, "]", "");
 //    cleanBranchName = GenericToolbox::replaceSubstringInString(
 //          signalSampleList[iSignal].first->getName(),
 //          {{" "}, {"-"}, {""}},
@@ -452,19 +457,22 @@ int main(int argc, char** argv){
       )
     );
 
+    std::string sampleTitle{ signalSampleList[iSignal].first->getName() };
+
     for( int iBin = 0 ; iBin < signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX() ; iBin++ ){
       iGlobal++;
-      binValues[iSignal].SetBinContent(1+iBin, (*cumulativeBinValues[iSignal])[iBin] / numberOfTargets / integratedFlux );
-      binValues[iSignal].SetBinError(1+iBin, TMath::Sqrt( (*globalCovMatrix)[iGlobal][iGlobal] ) / numberOfTargets / integratedFlux );
-      binValues[iSignal].GetXaxis()->SetBinLabel(
-          1+iBin,
-          signalSampleList[iSignal].first->getBinning().getBinsList()[iBin].getSummary().c_str()
-      );
 
-      globalCovMatrixHist->GetXaxis()->SetBinLabel(1+iGlobal, signalSampleList[iSignal].first->getBinning().getBinsList()[iBin].getSummary().c_str());
-      globalCorMatrixHist->GetXaxis()->SetBinLabel(1+iGlobal, signalSampleList[iSignal].first->getBinning().getBinsList()[iBin].getSummary().c_str());
-      globalCovMatrixHist->GetYaxis()->SetBinLabel(1+iGlobal, signalSampleList[iSignal].first->getBinning().getBinsList()[iBin].getSummary().c_str());
-      globalCorMatrixHist->GetYaxis()->SetBinLabel(1+iGlobal, signalSampleList[iSignal].first->getBinning().getBinsList()[iBin].getSummary().c_str());
+      std::string binTitle = signalSampleList[iSignal].first->getBinning().getBinsList()[iBin].getSummary();
+      double binVolume = signalSampleList[iSignal].first->getBinning().getBinsList()[iBin].getVolume();
+
+      binValues[iSignal].SetBinContent(1+iBin, (*cumulativeBinValues[iSignal])[iBin] / numberOfTargets / integratedFlux / binVolume );
+      binValues[iSignal].SetBinError(1+iBin, TMath::Sqrt( (*globalCovMatrix)[iGlobal][iGlobal] ) / numberOfTargets / integratedFlux / binVolume );
+      binValues[iSignal].GetXaxis()->SetBinLabel( 1+iBin, binTitle.c_str() );
+
+      globalCovMatrixHist->GetXaxis()->SetBinLabel(1+iGlobal, (sampleTitle + "/" + binTitle).c_str());
+      globalCorMatrixHist->GetXaxis()->SetBinLabel(1+iGlobal, (sampleTitle + "/" + binTitle).c_str());
+      globalCovMatrixHist->GetYaxis()->SetBinLabel(1+iGlobal, (sampleTitle + "/" + binTitle).c_str());
+      globalCorMatrixHist->GetYaxis()->SetBinLabel(1+iGlobal, (sampleTitle + "/" + binTitle).c_str());
     }
 
     std::string cleanName{signalSampleList[iSignal].first->getName()};
@@ -483,29 +491,6 @@ int main(int argc, char** argv){
 
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "XsecExtractor/matrices"), globalCovMatrixHist, "covarianceMatrix");
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "XsecExtractor/matrices"), globalCorMatrixHist, "correlationMatrix");
-
-
-
-  // attach branches to vector of bins
-
-
-
-
-
-  // create cumulative vectors (mean and stddev) and outer product matrix
-
-  LogInfo << "Reading throws..." << std::endl;
-  for( int iEntry = 0 ; iEntry < signalThrowTree->GetEntries() ; iEntry++ ){
-    signalThrowTree->GetEntry(iEntry);
-
-    // add to cumulative vectors and outer product matrix
-
-  }
-
-  // divide cumulative vectors by nEntries
-
-
-
 
   LogWarning << "Closing output file \"" << out->GetName() << "\"..." << std::endl;
   out->Close();
