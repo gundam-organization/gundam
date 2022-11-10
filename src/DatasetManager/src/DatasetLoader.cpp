@@ -36,29 +36,33 @@ void DatasetLoader::readConfigImpl() {
 
   _showSelectedEventCount_ = JsonUtils::fetchValue(_config_, "showSelectedEventCount", _showSelectedEventCount_);
 
-  _mcDispenser_ = DataDispenser(JsonUtils::fetchValue<nlohmann::json>(_config_, "mc"), this);
+  _mcDispenser_ = DataDispenser(this);
+  _mcDispenser_.readConfig(JsonUtils::fetchValue<nlohmann::json>(_config_, "mc"));
   _mcDispenser_.getParameters().name = "Asimov";
   _mcDispenser_.getParameters().useMcContainer = true;
 
   // Always loaded by default
-  _dataDispenserDict_["Asimov"] = _mcDispenser_;
+  _dataDispenserDict_.emplace("Asimov", DataDispenser(_mcDispenser_));
 
   for( auto& dataEntry : JsonUtils::fetchValue(_config_, "data", nlohmann::json()) ){
     std::string name = JsonUtils::fetchValue(dataEntry, "name", "data");
     LogThrowIf( GenericToolbox::doesKeyIsInMap(name, _dataDispenserDict_),
                 "\"" << name << "\" already taken, please use another name." )
 
-    if( JsonUtils::fetchValue(dataEntry, "fromMc", false) ){ _dataDispenserDict_[name] = _mcDispenser_; }
-    else{ _dataDispenserDict_[name] = DataDispenser(dataEntry, this); }
-    _dataDispenserDict_[name].getParameters().name = name;
+    if( JsonUtils::fetchValue(dataEntry, "fromMc", false) ){ _dataDispenserDict_.emplace(name, _mcDispenser_); }
+    else{ _dataDispenserDict_.emplace(name, DataDispenser(this)); }
+    _dataDispenserDict_.at(name).readConfig(dataEntry);
   }
+
 }
 void DatasetLoader::initializeImpl() {
   if( not _isEnabled_ ) return;
   LogInfo << "Initializing dataset: \"" << _name_ << "\"" << std::endl;
 
   _mcDispenser_.initialize();
-  for( auto& dataDispenser : _dataDispenserDict_ ){ dataDispenser.second.initialize(); }
+  for( auto& dataDispenser : _dataDispenserDict_ ){
+    dataDispenser.second.initialize();
+  }
 
   if( not GenericToolbox::doesKeyIsInMap(_selectedDataEntry_, _dataDispenserDict_) ){
     LogThrow("selectedDataEntry could not be find in available data: "
@@ -70,7 +74,6 @@ void DatasetLoader::initializeImpl() {
 DatasetLoader::DatasetLoader(const nlohmann::json& config_, int datasetIndex_): _dataSetIndex_(datasetIndex_) {
   this->readConfig(config_);
 }
-
 void DatasetLoader::setDataSetIndex(int dataSetIndex) {
   _dataSetIndex_ = dataSetIndex;
 }
@@ -78,26 +81,15 @@ void DatasetLoader::setDataSetIndex(int dataSetIndex) {
 bool DatasetLoader::isEnabled() const {
   return _isEnabled_;
 }
-const std::string &DatasetLoader::getName() const {
-  return _name_;
+bool DatasetLoader::isShowSelectedEventCount() const {
+  return _showSelectedEventCount_;
 }
 int DatasetLoader::getDataSetIndex() const {
   return _dataSetIndex_;
 }
-
-DataDispenser &DatasetLoader::getMcDispenser() {
-  return _mcDispenser_;
+const std::string &DatasetLoader::getName() const {
+  return _name_;
 }
-DataDispenser &DatasetLoader::getSelectedDataDispenser(){
-  return _dataDispenserDict_[_selectedDataEntry_];
-}
-DataDispenser &DatasetLoader::getToyDataDispenser(){
-  return _dataDispenserDict_[_selectedToyEntry_];
-}
-std::map<std::string, DataDispenser> &DatasetLoader::getDataDispenserDict() {
-  return _dataDispenserDict_;
-}
-
 const std::string &DatasetLoader::getSelectedDataEntry() const {
   return _selectedDataEntry_;
 }
@@ -105,6 +97,22 @@ const std::string &DatasetLoader::getToyDataEntry() const {
   return _selectedToyEntry_;
 }
 
-bool DatasetLoader::isShowSelectedEventCount() const {
-  return _showSelectedEventCount_;
+DataDispenser &DatasetLoader::getMcDispenser() {
+  return _mcDispenser_;
+}
+DataDispenser &DatasetLoader::getSelectedDataDispenser(){
+  return _dataDispenserDict_.at(_selectedDataEntry_);
+}
+DataDispenser &DatasetLoader::getToyDataDispenser(){
+  return _dataDispenserDict_.at(_selectedToyEntry_);
+}
+std::map<std::string, DataDispenser> &DatasetLoader::getDataDispenserDict() {
+  return _dataDispenserDict_;
+}
+
+void DatasetLoader::updateDispenserOwnership(){
+  _mcDispenser_.setOwner(this);
+  for( auto& dispenser : _dataDispenserDict_ ){
+    dispenser.second.setOwner(this);
+  }
 }

@@ -32,6 +32,7 @@ void FitParameterSet::readConfigImpl(){
 
   _useOnlyOneParameterPerEvent_ = JsonUtils::fetchValue<bool>(_config_, "useOnlyOneParameterPerEvent", false);
   _printDialSetsSummary_ = JsonUtils::fetchValue<bool>(_config_, "printDialSetsSummary", _printDialSetsSummary_);
+  _printParametersSummary_ = JsonUtils::fetchValue<bool>(_config_, "printParametersSummary", _printDialSetsSummary_);
 
   if( JsonUtils::doKeyExist(_config_, "parameterLimits") ){
     auto parLimits = JsonUtils::fetchValue(_config_, "parameterLimits", nlohmann::json());
@@ -41,7 +42,6 @@ void FitParameterSet::readConfigImpl(){
 
   _useEigenDecompInFit_ = JsonUtils::fetchValue(_config_ , "useEigenDecompInFit", false);
   if( _useEigenDecompInFit_ ){
-
     LogWarning << "Using eigen decomposition in fit." << std::endl;
     _maxNbEigenParameters_ = JsonUtils::fetchValue(_config_ , "maxNbEigenParameters", -1);
     if( _maxNbEigenParameters_ != -1 ){
@@ -51,53 +51,74 @@ void FitParameterSet::readConfigImpl(){
     if( _maxEigenFraction_ != 1 ){
       LogInfo << "Max eigen fraction set to: " << _maxEigenFraction_*100 << "%" << std::endl;
     }
-
   }
 
-  _parameterDefinitionFilePath_ = JsonUtils::fetchValue(
-      _config_
-      , std::vector<std::string>{
-          "parameterDefinitionFilePath",
-          "covarianceMatrixFilePath"}
-      , ""
+  _enablePca_ = JsonUtils::fetchValue(_config_, std::vector<std::string>{"fixGhostFitParameters", "enablePca"}, _enablePca_);
+  _enabledThrowToyParameters_ = JsonUtils::fetchValue(_config_, "enabledThrowToyParameters", _enabledThrowToyParameters_);
+  _customFitParThrow_ = JsonUtils::fetchValue(_config_, "customFitParThrow", std::vector<nlohmann::json>());
+  _releaseFixedParametersOnHesse_ = JsonUtils::fetchValue(_config_, "releaseFixedParametersOnHesse", _releaseFixedParametersOnHesse_);
+
+  _parameterDefinitionFilePath_ = JsonUtils::fetchValue( _config_,
+    {{"parameterDefinitionFilePath"}, {"covarianceMatrixFilePath"} }, _parameterDefinitionFilePath_
   );
+  _covarianceMatrixTMatrixD_ = JsonUtils::fetchValue(_config_, "covarianceMatrixTMatrixD", _covarianceMatrixTMatrixD_);
+  _parameterPriorTVectorD_ = JsonUtils::fetchValue(_config_, "parameterPriorTVectorD", _parameterPriorTVectorD_);
+  _parameterNameTObjArray_ = JsonUtils::fetchValue(_config_, "parameterNameTObjArray", _parameterNameTObjArray_);
+  _parameterLowerBoundsTVectorD_ = JsonUtils::fetchValue(_config_, "parameterLowerBoundsTVectorD", _parameterLowerBoundsTVectorD_);
+  _parameterUpperBoundsTVectorD_ = JsonUtils::fetchValue(_config_, "parameterUpperBoundsTVectorD", _parameterUpperBoundsTVectorD_);
+  _throwEnabledListPath_ = JsonUtils::fetchValue(_config_, "throwEnabledList", _throwEnabledListPath_);
 
-  if( not _parameterDefinitionFilePath_.empty() ){
-    this->readParameterDefinitionFile();
-  }
+  _parameterDefinitionConfig_ = JsonUtils::fetchValue(_config_, "parameterDefinitions", _parameterDefinitionConfig_);
+  _dialSetDefinitions_ = JsonUtils::fetchValue(_config_, "dialSetDefinitions", _dialSetDefinitions_);
 
-  if( _parameterPriorList_ == nullptr ){
-    LogWarning << "No prior list provided, all parameter prior are set to 1." << std::endl;
-    _parameterPriorList_ = std::make_shared<TVectorD>(_nbParameterDefinition_);
-    for( int iPar = 0 ; iPar < _parameterPriorList_->GetNrows() ; iPar++ ){ (*_parameterPriorList_)[iPar] = 1; }
+  this->readParameterDefinitionFile();
+
+  if( _nbParameterDefinition_ == -1 ){
+    LogWarning << "No number of parameter provided. Looking for alternative definitions..." << std::endl;
+
+    if( not _dialSetDefinitions_.empty() ){
+      for( auto& dialSetDef : _dialSetDefinitions_.get<std::vector<nlohmann::json>>() ){
+        if( JsonUtils::doKeyExist(dialSetDef, "parametersBinningPath") ){
+          LogInfo << "Found parameter binning within dialSetDefinition. Defining parameters number..." << std::endl;
+          DataBinSet b;
+          b.readBinningDefinition( JsonUtils::fetchValue<std::string>(dialSetDef, "parametersBinningPath") );
+          _nbParameterDefinition_ = int(b.getBinsList().size());
+          break;
+        }
+      }
+    }
+
+    if( _nbParameterDefinition_ == -1 and not _parameterDefinitionConfig_.empty() ){
+      LogInfo << "Using parameter definition config list to determine the number of parameters..." << std::endl;
+      _nbParameterDefinition_ = int(_parameterDefinitionConfig_.get<std::vector<nlohmann::json>>().size());
+    }
+
+    LogThrowIf(_nbParameterDefinition_==-1, "Could not figure out the number of parameters to be defined for the set: " << _name_ );
   }
 
   this->defineParameters();
-
-  _customFitParThrow_ = JsonUtils::fetchValue(_config_, "customFitParThrow", std::vector<nlohmann::json>());
-  _releaseFixedParametersOnHesse_ = JsonUtils::fetchValue(_config_, "releaseFixedParametersOnHesse", _releaseFixedParametersOnHesse_);
 }
 void FitParameterSet::initializeImpl() {
   LogInfo << "Initializing \"" << this->getName() << "\"" << std::endl;
 
-  LogReturnIf(not _isEnabled_, "Not enabled. Skipping.");
+  LogReturnIf(not _isEnabled_, this->getName() << " is not enabled. Skipping.");
 
-  if( _saveDir_ != nullptr ){ _saveDir_ = GenericToolbox::mkdirTFile(_saveDir_, _name_); }
-
-  for( auto& par : _parameterList_ ){ par.initialize(); }
+  for( auto& par : _parameterList_ ){
+    par.initialize();
+    if( par.isInitialized() and _printParametersSummary_ ){
+      LogInfo << par.getSummary(not _printDialSetsSummary_) << std::endl;
+    }
+  }
 
   // Make the matrix inversion
-  this->prepareFitParameters();
+  this->processCovarianceMatrix();
 }
 
-void FitParameterSet::setSaveDir(TDirectory* saveDir_){
-  _saveDir_ = saveDir_;
-}
 void FitParameterSet::setMaskedForPropagation(bool maskedForPropagation) {
   _maskedForPropagation_ = maskedForPropagation;
 }
 
-void FitParameterSet::prepareFitParameters(){
+void FitParameterSet::processCovarianceMatrix(){
 
   if( _priorCovarianceMatrix_ == nullptr ){ return; } // nothing to do
 
@@ -131,7 +152,7 @@ void FitParameterSet::prepareFitParameters(){
   }
   else {
     LogWarning << "Decomposing the stripped covariance matrix in set: " << getName() << std::endl;
-    _eigenParameterList_.resize(_strippedCovarianceMatrix_->GetNrows());
+    _eigenParameterList_.resize(_strippedCovarianceMatrix_->GetNrows(), FitParameter(this));
 
     _eigenDecomp_     = std::make_shared<TMatrixDSymEigen>(*_strippedCovarianceMatrix_);
 
@@ -155,7 +176,6 @@ void FitParameterSet::prepareFitParameters(){
       _eigenParameterList_[iEigen].setIsEigen(true);
       _eigenParameterList_[iEigen].setIsEnabled(true);
       _eigenParameterList_[iEigen].setIsFixed(false);
-      _eigenParameterList_[iEigen].setOwner(this);
       _eigenParameterList_[iEigen].setParameterIndex(iEigen);
       _eigenParameterList_[iEigen].setStdDevValue(TMath::Sqrt((*_eigenValues_)[iEigen]));
       _eigenParameterList_[iEigen].setStepSize(TMath::Sqrt((*_eigenValues_)[iEigen]));
@@ -235,6 +255,9 @@ void FitParameterSet::prepareFitParameters(){
 bool FitParameterSet::isEnabled() const {
   return _isEnabled_;
 }
+bool FitParameterSet::isEnablePca() const {
+  return _enablePca_;
+}
 bool FitParameterSet::isEnabledThrowToyParameters() const {
   return _enabledThrowToyParameters_;
 }
@@ -244,19 +267,15 @@ const std::string &FitParameterSet::getName() const {
 bool FitParameterSet::isMaskedForPropagation() const {
   return _maskedForPropagation_;
 }
-
 std::vector<FitParameter> &FitParameterSet::getParameterList() {
   return _parameterList_;
 }
 std::vector<FitParameter> &FitParameterSet::getEigenParameterList(){
   return _eigenParameterList_;
 }
-
-
 const std::vector<FitParameter> &FitParameterSet::getParameterList() const{
   return _parameterList_;
 }
-
 std::vector<FitParameter>& FitParameterSet::getEffectiveParameterList(){
   if( _useEigenDecompInFit_ ) return _eigenParameterList_;
   return _parameterList_;
@@ -264,6 +283,9 @@ std::vector<FitParameter>& FitParameterSet::getEffectiveParameterList(){
 const std::vector<FitParameter>& FitParameterSet::getEffectiveParameterList() const{
   if( _useEigenDecompInFit_ ) return _eigenParameterList_;
   return _parameterList_;
+}
+const nlohmann::json &FitParameterSet::getDialSetDefinitions() const {
+  return _dialSetDefinitions_;
 }
 
 // Core
@@ -316,7 +338,7 @@ void FitParameterSet::moveFitParametersToPrior(){
 }
 void FitParameterSet::throwFitParameters(double gain_){
 
-  LogThrowIf(_strippedCovarianceMatrix_==nullptr, "No covariance matrix provided")
+  LogThrowIf(_strippedCovarianceMatrix_==nullptr, "No covariance matrix provided");
 
 //  if( not _useEigenDecompInFit_ ){
     LogInfo << "Throwing parameters for " << _name_ << " using Cholesky matrix" << std::endl;
@@ -480,72 +502,55 @@ double FitParameterSet::toRealParValue(double normParValue, const FitParameter& 
 // Protected
 void FitParameterSet::readParameterDefinitionFile(){
 
-  std::shared_ptr<TFile> parDefFile(TFile::Open(_parameterDefinitionFilePath_.c_str()));
+  if( _parameterDefinitionFilePath_.empty() ) return;
+
+  std::unique_ptr<TFile> parDefFile(TFile::Open(_parameterDefinitionFilePath_.c_str()));
   LogThrowIf(parDefFile == nullptr or not parDefFile->IsOpen(), "Could not open: " << _parameterDefinitionFilePath_)
 
   TObject* objBuffer{nullptr};
-  std::string strBuffer;
 
-  strBuffer = JsonUtils::fetchValue<std::string>(_config_, "covarianceMatrixTMatrixD", "");
-  if( strBuffer.empty() ){
+  if( _covarianceMatrixTMatrixD_.empty() ){
     LogWarning << "No covariance matrix provided. Free parameter definition expected." << std::endl;
   }
   else{
-    objBuffer = parDefFile->Get(strBuffer.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << strBuffer << "\" in " << parDefFile->GetPath())
+    objBuffer = parDefFile->Get(_covarianceMatrixTMatrixD_.c_str());
+    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _covarianceMatrixTMatrixD_ << "\" in " << parDefFile->GetPath())
     _priorCovarianceMatrix_ = std::shared_ptr<TMatrixDSym>((TMatrixDSym*) objBuffer->Clone());
     _priorCorrelationMatrix_ = std::shared_ptr<TMatrixDSym>((TMatrixDSym*) GenericToolbox::convertToCorrelationMatrix((TMatrixD*)_priorCovarianceMatrix_.get()));
-
-    if( _saveDir_ != nullptr ){
-      // TODO: better writing of the inputs
-      GenericToolbox::mkdirTFile(_saveDir_, "inputs")->cd();
-
-      ((TMatrixD*) _priorCovarianceMatrix_.get())->Write("CovarianceMatrix_TMatrixD");
-      GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) _priorCovarianceMatrix_.get())->Write("CovarianceMatrix_TH2D");
-
-      std::unique_ptr<TMatrixD> correlationMatrix( GenericToolbox::convertToCorrelationMatrix((TMatrixD*)_priorCovarianceMatrix_.get()) );
-      correlationMatrix->Write("CorrelationMatrix_TMatrixD");
-      GenericToolbox::convertTMatrixDtoTH2D(correlationMatrix.get())->Write("CorrelationMatrix_TH2D");
-    }
-
+    LogThrowIf(_nbParameterDefinition_ != -1, "Nb of parameter was manually defined but the covariance matrix");
     _nbParameterDefinition_ = _priorCovarianceMatrix_->GetNrows();
   }
 
-  if( JsonUtils::doKeyExist(_config_, "enableParameterMask") ){
-    // TODO: implement parameter mask
-  }
-
   // parameterPriorTVectorD
-  strBuffer = JsonUtils::fetchValue(_config_, "parameterPriorTVectorD", "");
-  if(not strBuffer.empty()){
-    LogInfo << "Reading provided parameterPriorTVectorD: \"" << strBuffer << "\"" << std::endl;
+  if(not _parameterPriorTVectorD_.empty()){
+    LogInfo << "Reading provided parameterPriorTVectorD: \"" << _parameterPriorTVectorD_ << "\"" << std::endl;
 
-    objBuffer = parDefFile->Get(strBuffer.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << strBuffer << "\" in " << parDefFile->GetPath())
+    objBuffer = parDefFile->Get(_parameterPriorTVectorD_.c_str());
+    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterPriorTVectorD_ << "\" in " << parDefFile->GetPath())
     _parameterPriorList_ = std::shared_ptr<TVectorD>((TVectorD*) objBuffer->Clone());
 
     LogThrowIf(_parameterPriorList_->GetNrows() != _nbParameterDefinition_,
-                "Parameter prior list don't have the same size(" << _parameterPriorList_->GetNrows()
-                                                                 << ") as cov matrix(" << _nbParameterDefinition_ << ")" );
+      "Parameter prior list don't have the same size("
+      << _parameterPriorList_->GetNrows()
+      << ") as cov matrix(" << _nbParameterDefinition_ << ")"
+    );
   }
 
   // parameterNameTObjArray
-  strBuffer = JsonUtils::fetchValue<std::string>(_config_, "parameterNameTObjArray", "");
-  if(not strBuffer.empty()){
-    LogInfo << "Reading provided parameterNameTObjArray: \"" << strBuffer << "\"" << std::endl;
+  if(not _parameterNameTObjArray_.empty()){
+    LogInfo << "Reading provided parameterNameTObjArray: \"" << _parameterNameTObjArray_ << "\"" << std::endl;
 
-    objBuffer = parDefFile->Get(strBuffer.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << strBuffer << "\" in " << parDefFile->GetPath())
+    objBuffer = parDefFile->Get(_parameterNameTObjArray_.c_str());
+    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterNameTObjArray_ << "\" in " << parDefFile->GetPath())
     _parameterNamesList_ = std::shared_ptr<TObjArray>((TObjArray*) objBuffer->Clone());
   }
 
   // parameterLowerBoundsTVectorD
-  strBuffer = JsonUtils::fetchValue<std::string>(_config_, "parameterLowerBoundsTVectorD", "");
-  if( not strBuffer.empty() ){
-    LogInfo << "Reading provided parameterLowerBoundsTVectorD: \"" << strBuffer << "\"" << std::endl;
+  if( not _parameterLowerBoundsTVectorD_.empty() ){
+    LogInfo << "Reading provided parameterLowerBoundsTVectorD: \"" << _parameterLowerBoundsTVectorD_ << "\"" << std::endl;
 
-    objBuffer = parDefFile->Get(strBuffer.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << strBuffer << "\" in " << parDefFile->GetPath())
+    objBuffer = parDefFile->Get(_parameterLowerBoundsTVectorD_.c_str());
+    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterLowerBoundsTVectorD_ << "\" in " << parDefFile->GetPath())
     _parameterLowerBoundsList_ = std::shared_ptr<TVectorD>((TVectorD*) objBuffer->Clone());
 
     LogThrowIf(_parameterLowerBoundsList_->GetNrows() != _nbParameterDefinition_,
@@ -554,79 +559,73 @@ void FitParameterSet::readParameterDefinitionFile(){
   }
 
   // parameterUpperBoundsTVectorD
-  strBuffer = JsonUtils::fetchValue<std::string>(_config_, "parameterUpperBoundsTVectorD", "");
-  if( not strBuffer.empty() ){
-    LogInfo << "Reading provided parameterUpperBoundsTVectorD: \"" << strBuffer << "\"" << std::endl;
+  if( not _parameterUpperBoundsTVectorD_.empty() ){
+    LogInfo << "Reading provided parameterUpperBoundsTVectorD: \"" << _parameterUpperBoundsTVectorD_ << "\"" << std::endl;
 
-    objBuffer = parDefFile->Get(strBuffer.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << strBuffer << "\" in " << parDefFile->GetPath())
+    objBuffer = parDefFile->Get(_parameterUpperBoundsTVectorD_.c_str());
+    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterUpperBoundsTVectorD_ << "\" in " << parDefFile->GetPath())
     _parameterUpperBoundsList_ = std::shared_ptr<TVectorD>((TVectorD*) objBuffer->Clone());
     LogThrowIf(_parameterUpperBoundsList_->GetNrows() != _nbParameterDefinition_,
                 "Parameter prior list don't have the same size(" << _parameterUpperBoundsList_->GetNrows()
                                                                  << ") as cov matrix(" << _nbParameterDefinition_ << ")" );
   }
 
-  _enabledThrowToyParameters_ = JsonUtils::fetchValue(_config_, "enabledThrowToyParameters", _enabledThrowToyParameters_);
-  strBuffer = JsonUtils::fetchValue<std::string>(_config_, "throwEnabledList", "");
-  if( not strBuffer.empty() ){
-    LogInfo << "Reading provided throwEnabledList: \"" << strBuffer << "\"" << std::endl;
+  if( not _throwEnabledListPath_.empty() ){
+    LogInfo << "Reading provided throwEnabledList: \"" << _throwEnabledListPath_ << "\"" << std::endl;
 
-    objBuffer = parDefFile->Get(strBuffer.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << strBuffer << "\" in " << parDefFile->GetPath())
+    objBuffer = parDefFile->Get(_throwEnabledListPath_.c_str());
+    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _throwEnabledListPath_ << "\" in " << parDefFile->GetPath())
     _throwEnabledList_ = std::shared_ptr<TVectorD>((TVectorD*) objBuffer->Clone());
   }
 
   parDefFile->Close();
 }
 void FitParameterSet::defineParameters(){
-  LogInfo << "Defining parameters in set: " << getName() << std::endl;
-  _parameterList_.resize(_nbParameterDefinition_);
-  for(int iParameter = 0 ; iParameter < _nbParameterDefinition_ ; iParameter++ ){
+  LogInfo << "Defining " << _nbParameterDefinition_ << " parameters for the set: " << getName() << std::endl;
+  _parameterList_.resize(_nbParameterDefinition_, FitParameter(this));
+  int parIndex{0};
 
-    _parameterList_[iParameter].setOwner(this);
-    _parameterList_[iParameter].setParameterIndex(iParameter);
+  for( auto& par : _parameterList_ ){
+    par.setParameterIndex(parIndex++);
 
     if( _priorCovarianceMatrix_ != nullptr ){
-      _parameterList_[iParameter].setStdDevValue(TMath::Sqrt((*_priorCovarianceMatrix_)[iParameter][iParameter]));
-      _parameterList_[iParameter].setStepSize(TMath::Sqrt((*_priorCovarianceMatrix_)[iParameter][iParameter]));
+      par.setStdDevValue(TMath::Sqrt((*_priorCovarianceMatrix_)[par.getParameterIndex()][par.getParameterIndex()]));
+      par.setStepSize(TMath::Sqrt((*_priorCovarianceMatrix_)[par.getParameterIndex()][par.getParameterIndex()]));
     }
     else{
-      LogThrowIf(std::isnan(_nominalStepSize_), "Can't define free parameter without a \"nominalStepSize\"")
-      _parameterList_[iParameter].setStdDevValue(_nominalStepSize_); // stdDev will only be used for display purpose
-      _parameterList_[iParameter].setStepSize(_nominalStepSize_);
-      _parameterList_[iParameter].setPriorType(PriorType::Flat);
-      _parameterList_[iParameter].setIsFree(true);
+      LogThrowIf(std::isnan(_nominalStepSize_), "Can't define free parameter without a \"nominalStepSize\"");
+      par.setStdDevValue(_nominalStepSize_); // stdDev will only be used for display purpose
+      par.setStepSize(_nominalStepSize_);
+      par.setPriorType(PriorType::Flat);
+      par.setIsFree(true);
     }
 
-    if(_parameterNamesList_ != nullptr) _parameterList_[iParameter].setName(_parameterNamesList_->At(iParameter)->GetName());
-    _parameterList_[iParameter].setParameterValue((*_parameterPriorList_)[iParameter]);
-    _parameterList_[iParameter].setPriorValue((*_parameterPriorList_)[iParameter]);
+    if( _parameterNamesList_ != nullptr ){ par.setName(_parameterNamesList_->At(par.getParameterIndex())->GetName()); }
+    if( _parameterPriorList_ != nullptr ){ par.setPriorValue((*_parameterPriorList_)[par.getParameterIndex()]); }
+    else{ par.setPriorValue(1); }
 
-    _parameterList_[iParameter].setEnableDialSetsSummary(_printDialSetsSummary_);
+    par.setParameterValue(par.getPriorValue());
 
-    if( _globalParameterMinValue_ == _globalParameterMinValue_ ){ _parameterList_[iParameter].setMinValue(_globalParameterMinValue_); }
-    if( _globalParameterMaxValue_ == _globalParameterMaxValue_ ){ _parameterList_[iParameter].setMaxValue(_globalParameterMaxValue_); }
+    if( _globalParameterMinValue_ == _globalParameterMinValue_ ){ par.setMinValue(_globalParameterMinValue_); }
+    if( _globalParameterMaxValue_ == _globalParameterMaxValue_ ){ par.setMaxValue(_globalParameterMaxValue_); }
 
-    if( _parameterLowerBoundsList_ != nullptr ){ _parameterList_[iParameter].setMinValue((*_parameterLowerBoundsList_)[iParameter]); }
-    if( _parameterUpperBoundsList_ != nullptr ){ _parameterList_[iParameter].setMaxValue((*_parameterUpperBoundsList_)[iParameter]); }
+    if( _parameterLowerBoundsList_ != nullptr ){ par.setMinValue((*_parameterLowerBoundsList_)[par.getParameterIndex()]); }
+    if( _parameterUpperBoundsList_ != nullptr ){ par.setMaxValue((*_parameterUpperBoundsList_)[par.getParameterIndex()]); }
 
-    if( JsonUtils::doKeyExist(_config_, "parameterDefinitions") ){
-      // Alternative 1: define parameters then dials
-      auto parsConfig = JsonUtils::fetchValue<nlohmann::json>(_config_, "parameterDefinitions");
-      JsonUtils::forwardConfig(parsConfig);
-      auto parConfig = JsonUtils::fetchMatchingEntry(parsConfig, "parameterName", std::string(_parameterNamesList_->At(iParameter)->GetName()));
+    if( not _parameterDefinitionConfig_.empty() ){
+      // Alternative 1: define dials then parameters
+      JsonUtils::forwardConfig(_parameterDefinitionConfig_);
+      auto parConfig = JsonUtils::fetchMatchingEntry(_parameterDefinitionConfig_, "parameterName", std::string(_parameterNamesList_->At(par.getParameterIndex())->GetName()));
       if( parConfig.empty() ){
         // try with par index
-        parConfig = JsonUtils::fetchMatchingEntry(parsConfig, "parameterIndex", iParameter);
+        parConfig = JsonUtils::fetchMatchingEntry(_parameterDefinitionConfig_, "parameterIndex", par.getParameterIndex());
       }
-      _parameterList_[iParameter].setParameterDefinitionConfig(parConfig);
+      par.setParameterDefinitionConfig(parConfig);
     }
-    else if( JsonUtils::doKeyExist(_config_, "dialSetDefinitions") ){
+    else if( not _dialSetDefinitions_.empty() ){
       // Alternative 2: define dials then parameters
-      _parameterList_[iParameter].setDialSetConfig(JsonUtils::fetchValue<nlohmann::json>(_config_, "dialSetDefinitions"));
+      par.setDialSetConfig( _dialSetDefinitions_ );
     }
-
-    _parameterList_[iParameter].initialize();
   }
 }
 
@@ -649,4 +648,5 @@ const std::shared_ptr<TMatrixDSym> &FitParameterSet::getPriorCorrelationMatrix()
 const std::shared_ptr<TMatrixDSym> &FitParameterSet::getPriorCovarianceMatrix() const {
   return _priorCovarianceMatrix_;
 }
+
 

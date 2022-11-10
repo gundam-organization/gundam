@@ -7,9 +7,8 @@
 
 
 #include "Propagator.h"
-#include "Minimizer.h"
-#include "ConfigBasedClass.h"
-#include "ParScanner.h"
+#include "MinimizerInterface.h"
+#include "JsonBaseClass.h"
 
 #include "GenericToolbox.VariablesMonitor.h"
 #include "GenericToolbox.CycleTimer.h"
@@ -24,80 +23,61 @@
 #include "memory"
 
 
-class FitterEngine : public ConfigBasedClass {
+class FitterEngine : public JsonBaseClass {
 
 public:
+  explicit FitterEngine(TDirectory *saveDir_);
+
   // Setters
   void setSaveDir(TDirectory *saveDir);
-  void setEnablePostFitScan(bool enablePostFitScan);
+  void setIsDryRun(bool isDryRun_);
   void setEnablePca(bool enablePca_);
+  void setEnablePreFitScan(bool enablePreFitScan);
+  void setEnablePostFitScan(bool enablePostFitScan);
+  void setGenerateSamplePlots(bool generateSamplePlots);
+  void setGenerateOneSigmaPlots(bool generateOneSigmaPlots);
+  void setDoAllParamVariations(bool doAllParamVariations_);
+  void setAllParamVariationsSigmas(const std::vector<double> &allParamVariationsSigmas);
 
   // Getters
-  double getChi2Buffer() const;
-  double getChi2StatBuffer() const;
-  double getChi2PullsBuffer() const;
   const Propagator& getPropagator() const;
   Propagator& getPropagator();
-  ParScanner& getParScanner(){ return _parScanner_; }
-  Minimizer& getMinimizer(){ return _minimizer_; }
+  MinimizerInterface& getMinimizer(){ return _minimizer_; }
   TDirectory* getSaveDir(){ return _saveDir_; }
 
-  double* getChi2BufferPtr(){ return &_chi2Buffer_; }
-  double* getChi2StatBufferPtr(){ return &_chi2StatBuffer_; }
-  double* getChi2PullsBufferPtr(){ return &_chi2PullsBuffer_; }
-  double* getChi2RegBufferPtr(){ return &_chi2RegBuffer_; }
-
   // Core
-  void generateOneSigmaPlots(const std::string& savePath_ = "");
-  void varyEvenRates(const std::vector<double>& paramVariationList_, const std::string& savePath_ = "");
-
-  void fixGhostFitParameters();
-  void scanParameters(int nbSteps_ = -1, const std::string& saveDir_ = "");
-  void scanParameter(int iPar, int nbSteps_ = -1, const std::string& saveDir_ = "");
-
   void fit();
-  void updateChi2Cache();
 
 protected:
   void readConfigImpl() override;
   void initializeImpl() override;
 
+  void fixGhostFitParameters();
   void rescaleParametersStepSize();
+  void scanMinimizerParameters(TDirectory* saveDir_);
   void checkNumericalAccuracy();
 
 
 private:
   // Parameters
+  bool _isDryRun_{false};
   bool _enablePca_{false};
   bool _throwMcBeforeFit_{false};
+  bool _enablePreFitScan_{false};
   bool _enablePostFitScan_{false};
+  bool _generateSamplePlots_{true};
+  bool _generateOneSigmaPlots_{false};
+  bool _doAllParamVariations_{false};
   bool _scaleParStepWithChi2Response_{false};
-  bool _debugPrintLoadedEvents_{false};
-  int _debugPrintLoadedEventsNbPerSample_{10};
   double _throwGain_{1.};
   double _parStepGain_{0.1};
+  double _pcaDeltaChi2Threshold_{1E-6};
+  std::vector<double> _allParamVariationsSigmas_{};
 
   // Internals
   TDirectory* _saveDir_{nullptr};
-  TRandom3 _prng_;
   Propagator _propagator_{};
-  ParScanner _parScanner_{};
-  Minimizer _minimizer_{};
-
-  // Buffers
-  double _chi2Buffer_{0};
-  double _chi2StatBuffer_{0};
-  double _chi2PullsBuffer_{0};
-  double _chi2RegBuffer_{0};
-
-  struct ScanData{
-    std::string folder{};
-    std::string title{};
-    std::string yTitle{};
-    std::vector<double> yPoints{};
-    std::function<double()> evalY{};
-  };
-  std::vector<ScanData> scanDataDict;
+  MinimizerInterface _minimizer_{this};
 
 };
 

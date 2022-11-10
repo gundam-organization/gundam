@@ -45,6 +45,7 @@ public:
 
   // Non-native Getters
   size_t getNbEdges() const;
+  double getVolume() const;
 
   // Management
   bool isInBin(const std::vector<double>& valuesList_) const;

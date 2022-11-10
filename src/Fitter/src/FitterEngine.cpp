@@ -25,82 +25,164 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[FitterEngine]");
 });
 
+FitterEngine::FitterEngine(TDirectory *saveDir_){
+  this->setSaveDir(saveDir_); // propagate
+}
+
 void FitterEngine::readConfigImpl(){
   LogInfo << "Reading FitterEngine config..." << std::endl;
   GenericToolbox::setT2kPalette();
 
   _enablePca_ = JsonUtils::fetchValue(_config_, std::vector<std::string>{"enablePca", "fixGhostFitParameters"}, _enablePca_);
+  _pcaDeltaChi2Threshold_ = JsonUtils::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, _pcaDeltaChi2Threshold_);
+
+  _enablePreFitScan_ = JsonUtils::fetchValue(_config_, "enablePreFitScan", _enablePreFitScan_);
+  _enablePostFitScan_ = JsonUtils::fetchValue(_config_, "enablePostFitScan", _enablePostFitScan_);
+
+  _generateSamplePlots_ = JsonUtils::fetchValue(_config_, "generateSamplePlots", _generateSamplePlots_);
+  _generateOneSigmaPlots_ = JsonUtils::fetchValue(_config_, "generateOneSigmaPlots", _generateOneSigmaPlots_);
+  _doAllParamVariations_ = JsonUtils::doKeyExist(_config_, "allParamVariations");
+  _allParamVariationsSigmas_ = JsonUtils::fetchValue(_config_, "allParamVariations", _allParamVariationsSigmas_);
 
   _scaleParStepWithChi2Response_ = JsonUtils::fetchValue(_config_, "scaleParStepWithChi2Response", _scaleParStepWithChi2Response_);
   _parStepGain_ = JsonUtils::fetchValue(_config_, "parStepGain", _parStepGain_);
 
-  _debugPrintLoadedEvents_ = JsonUtils::fetchValue(_config_, "debugPrintLoadedEvents", _debugPrintLoadedEvents_);
-  _debugPrintLoadedEventsNbPerSample_ = JsonUtils::fetchValue(_config_, "debugPrintLoadedEventsNbPerSample", _debugPrintLoadedEventsNbPerSample_);
-
   _throwMcBeforeFit_ = JsonUtils::fetchValue(_config_, "throwMcBeforeFit", _throwMcBeforeFit_);
   _throwGain_ = JsonUtils::fetchValue(_config_, "throwMcBeforeFitGain", _throwGain_);
 
-  _propagator_.setSaveDir(GenericToolbox::mkdirTFile(_saveDir_, "Propagator"));
   _propagator_.readConfig( JsonUtils::fetchValue<nlohmann::json>(_config_, "propagatorConfig") );
+  _minimizer_.readConfig( JsonUtils::fetchValue(_config_, "minimizerConfig", nlohmann::json()));
 
-  _parScanner_.readConfig(JsonUtils::fetchValue(_config_, "scanConfig", nlohmann::json()) );
 
-  _minimizer_.readConfig(JsonUtils::fetchValue(_config_, "minimizerConfig", nlohmann::json()));
-  _minimizer_.setOwner(this);
+  // legacy
+  JsonUtils::deprecatedAction(_config_, "scanConfig", [&]{
+    LogAlert << "Forwarding the option to Propagator. Consider moving it into \"propagatorConfig:\"" << std::endl;
+    _propagator_.getParScanner().readConfig( JsonUtils::fetchValue(_config_, "scanConfig", nlohmann::json()) );
+  });
 
-  _minimizer_.getConvergenceMonitor().setMaxRefreshRateInMs(JsonUtils::fetchValue(_config_, "monitorRefreshRateInMs", _minimizer_.getConvergenceMonitor().getMaxRefreshRateInMs()));
+  JsonUtils::deprecatedAction(_config_, "monitorRefreshRateInMs", [&]{
+    LogAlert << "Forwarding the option to Propagator. Consider moving it into \"minimizerConfig:\"" << std::endl;
+    _minimizer_.setMonitorRefreshRateInMs(JsonUtils::fetchValue<int>(_config_, "monitorRefreshRateInMs"));
+  });
+
   LogInfo << "Convergence monitor will be refreshed every " << _minimizer_.getConvergenceMonitor().getMaxRefreshRateInMs() << "ms." << std::endl;
 }
 void FitterEngine::initializeImpl(){
   LogThrowIf(_config_.empty(), "Config is not set.");
+  LogThrowIf(_saveDir_== nullptr);
 
   _propagator_.initialize();
 
-  this->updateChi2Cache();
+  // This moves the parameters
+  if( _enablePca_ ) {
+    LogWarning << "PCA is enabled. Polling parameters..." << std::endl;
+    this->fixGhostFitParameters();
+  }
 
+  // This moves the parameters
   if( _scaleParStepWithChi2Response_ ){
     LogInfo << "Using parameter step scale: " << _parStepGain_ << std::endl;
     this->rescaleParametersStepSize();
   }
 
-  if( _enablePca_ ) this->fixGhostFitParameters();
+  // The minimizer needs all the parameters to be fully setup (i.e. PCA done and other properties)
+  _minimizer_.initialize();
 
-  this->updateChi2Cache();
+  if(GlobalVariables::getVerboseLevel() >= MORE_PRINTOUT) checkNumericalAccuracy();
 
-  if( _saveDir_ != nullptr ){
-    auto* dir = GenericToolbox::mkdirTFile(_saveDir_, "preFit/events");
-    _propagator_.getTreeWriter().writeSamples(dir);
-
-    if( _debugPrintLoadedEvents_ ){
-      LogWarning << GET_VAR_NAME_VALUE(_debugPrintLoadedEventsNbPerSample_) << std::endl;
-
-      for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
-        LogWarning << "debugPrintLoadedEvents: " << sample.getName() << std::endl;
-        LogDebug.setIndentStr("  ");
-
-        int iEvt=0;
-        for( auto& ev : sample.getMcContainer().eventList ){
-          if(iEvt++ >= _debugPrintLoadedEventsNbPerSample_) { LogDebug << std::endl; break; }
-          LogDebug << iEvt << " -> " << ev.getSummary() << std::endl;
-        }
-        LogDebug.setIndentStr("");
-      }
-    }
+  // Write data
+  LogInfo << "Writing propagator objects..." << std::endl;
+  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
+                               _propagator_.getGlobalCovarianceMatrix().get(), "globalCovarianceMatrix");
+  for( auto& parSet : _propagator_.getParameterSetsList() ){
+    if(not parSet.isEnabled()) continue;
+    GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(_saveDir_, "propagator/"+parSet.getName()),
+                                  parSet.getPriorCovarianceMatrix().get(), "covarianceMatrix");
+    GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(_saveDir_, "propagator/"+parSet.getName()),
+                                  parSet.getPriorCorrelationMatrix().get(), "correlationMatrix");
   }
 
+  this->_propagator_.updateLlhCache();
+  _propagator_.getTreeWriter().writeSamples(GenericToolbox::mkdirTFile(_saveDir_, "preFit/events"));
+
+  LogWarning << "Saving all objects to disk..." << std::endl;
+  GenericToolbox::triggerTFileWrite(_saveDir_);
+}
+
+// Setters
+void FitterEngine::setSaveDir(TDirectory *saveDir) {
+  _saveDir_ = saveDir;
+}
+void FitterEngine::setIsDryRun(bool isDryRun_){
+  _isDryRun_ = isDryRun_;
+}
+void FitterEngine::setEnablePca(bool enablePca_){
+  _enablePca_ = enablePca_;
+}
+void FitterEngine::setEnablePreFitScan(bool enablePreFitScan) {
+  _enablePreFitScan_ = enablePreFitScan;
+}
+void FitterEngine::setEnablePostFitScan(bool enablePostFitScan) {
+  _enablePostFitScan_ = enablePostFitScan;
+}
+void FitterEngine::setGenerateSamplePlots(bool generateSamplePlots) {
+  _generateSamplePlots_ = generateSamplePlots;
+}
+void FitterEngine::setGenerateOneSigmaPlots(bool generateOneSigmaPlots){
+  _generateOneSigmaPlots_ = generateOneSigmaPlots;
+}
+void FitterEngine::setDoAllParamVariations(bool doAllParamVariations_){
+  _doAllParamVariations_ = doAllParamVariations_;
+}
+void FitterEngine::setAllParamVariationsSigmas(const std::vector<double> &allParamVariationsSigmas) {
+  _allParamVariationsSigmas_ = allParamVariationsSigmas;
+}
+
+// Getters
+const Propagator& FitterEngine::getPropagator() const {
+  return _propagator_;
+}
+Propagator& FitterEngine::getPropagator() {
+  return _propagator_;
+}
+
+// Core
+void FitterEngine::fit(){
+  LogWarning << __METHOD_NAME__ << std::endl;
+  LogThrowIf(not isInitialized());
+
+  // Not moving parameters
+  if( _generateSamplePlots_ ){
+    LogInfo << "Generating pre-fit sample plots..." << std::endl;
+    _propagator_.getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(_saveDir_, "preFit/samples"));
+    GenericToolbox::triggerTFileWrite(_saveDir_);
+  }
+
+  // Moving parameters
+  if( _generateOneSigmaPlots_ ){
+    LogInfo << "Generating pre-fit one-sigma variation plots..." << std::endl;
+    _propagator_.getParScanner().generateOneSigmaPlots(GenericToolbox::mkdirTFile(_saveDir_, "preFit/oneSigma"));
+    GenericToolbox::triggerTFileWrite(_saveDir_);
+  }
+  if( _doAllParamVariations_ ){
+    LogInfo << "Running all parameter variation on pre-fit samples..." << std::endl;
+    _propagator_.getParScanner().varyEvenRates( _allParamVariationsSigmas_, GenericToolbox::mkdirTFile(_saveDir_, "preFit/varyEventRates") );
+    GenericToolbox::triggerTFileWrite(_saveDir_);
+  }
+  if( _enablePreFitScan_ ){
+    LogInfo << "Scanning fit parameters before minimizing..." << std::endl;
+    this->scanMinimizerParameters(GenericToolbox::mkdirTFile(_saveDir_, "preFit/scan"));
+    GenericToolbox::triggerTFileWrite(_saveDir_);
+  }
   if( _throwMcBeforeFit_ ){
     LogInfo << "Throwing correlated parameters of MC away from their prior..." << std::endl;
     LogInfo << "Throw gain form MC push set to: " << _throwGain_ << std::endl;
-
     for( auto& parSet : _propagator_.getParameterSetsList() ){
-
       if(not parSet.isEnabled()) continue;
-
       if( not parSet.isEnabledThrowToyParameters() ){
         LogWarning << "\"" << parSet.getName() << "\" has marked disabled throwMcBeforeFit: skipping." << std::endl;
         continue;
       }
-
       if( JsonUtils::doKeyExist(parSet.getConfig(), "customFitParThrow") ){
 
         LogAlert << "Using custom mc parameter push for " << parSet.getName() << std::endl;
@@ -129,271 +211,72 @@ void FitterEngine::initializeImpl(){
         LogAlert << "Throwing correlated parameters for " << parSet.getName() << std::endl;
         parSet.throwFitParameters(_throwGain_);
       }
-
     } // parSet
-
-    _propagator_.propagateParametersOnSamples();
-  } // throwMcBeforeFit
-
-  _minimizer_.setSaveDir(_saveDir_);
-  _minimizer_.initialize();
-
-  _parScanner_.initialize();
-//  checkNumericalAccuracy();
-}
-
-void FitterEngine::setSaveDir(TDirectory *saveDir) {
-  _saveDir_ = saveDir;
-}
-void FitterEngine::setEnablePostFitScan(bool enablePostFitScan) {
-  _enablePostFitScan_ = enablePostFitScan;
-}
-void FitterEngine::setEnablePca(bool enablePca_){
-  _enablePca_ = enablePca_;
-}
-
-double FitterEngine::getChi2Buffer() const {
-  return _chi2Buffer_;
-}
-double FitterEngine::getChi2StatBuffer() const {
-  return _chi2StatBuffer_;
-}
-double FitterEngine::getChi2PullsBuffer() const {
-  return _chi2PullsBuffer_;
-}
-const Propagator& FitterEngine::getPropagator() const {
-  return _propagator_;
-}
-Propagator& FitterEngine::getPropagator() {
-  return _propagator_;
-}
-
-void FitterEngine::generateOneSigmaPlots(const std::string& savePath_){
-
-  _propagator_.propagateParametersOnSamples();
-  _propagator_.getPlotGenerator().generateSamplePlots();
-
-  GenericToolbox::mkdirTFile(_saveDir_, savePath_)->cd();
-  auto refHistList = _propagator_.getPlotGenerator().getHistHolderList(); // current buffer
-
-
-  auto makeOneSigmaPlotFct = [&](FitParameter& par_, const std::string& parSavePath_){
-    double currentParValue = par_.getParameterValue();
-    par_.setParameterValue( currentParValue + par_.getStdDevValue() );
-    LogInfo << "Processing " << parSavePath_ << " -> " << par_.getParameterValue() << std::endl;
-
-    _propagator_.propagateParametersOnSamples();
-
-    auto* saveDir = GenericToolbox::mkdirTFile(_saveDir_, parSavePath_ );
-    saveDir->cd();
-
-    _propagator_.getPlotGenerator().generateSampleHistograms(nullptr, 1);
-
-    auto oneSigmaHistList = _propagator_.getPlotGenerator().getHistHolderList(1);
-    _propagator_.getPlotGenerator().generateComparisonPlots( oneSigmaHistList, refHistList, saveDir );
-    par_.setParameterValue( currentParValue );
-    _propagator_.propagateParametersOnSamples();
-
-    const auto& compHistList = _propagator_.getPlotGenerator().getComparisonHistHolderList();
-
-//      // Since those were not saved, delete manually
-//      // Don't delete? -> slower each time
-////      for( auto& hist : oneSigmaHistList ){ delete hist.histPtr; }
-//      oneSigmaHistList.clear();
-  };
-
-  // +1 sigma
-  for( auto& parSet : _propagator_.getParameterSetsList() ){
-
-    if( not parSet.isEnabled() ) continue;
-
-    if( JsonUtils::fetchValue(parSet.getConfig(), "disableOneSigmaPlots", false) ){
-      LogInfo << "+1σ plots disabled for \"" << parSet.getName() << "\"" << std::endl;
-      continue;
-    }
-
-    if( parSet.isUseEigenDecompInFit() ){
-      for( auto& eigenPar : parSet.getEigenParameterList() ){
-        if( not eigenPar.isEnabled() ) continue;
-        std::string tag;
-        if( eigenPar.isFixed() ){ tag += "_FIXED"; }
-        std::string savePath = savePath_;
-        if( not savePath.empty() ) savePath += "/";
-        savePath += "oneSigma/eigen/" + parSet.getName() + "/" + eigenPar.getTitle() + tag;
-        makeOneSigmaPlotFct(eigenPar, savePath);
-      }
-    }
-    else{
-      for( auto& par : parSet.getParameterList() ){
-        if( not par.isEnabled() ) continue;
-        std::string tag;
-        if( par.isFixed() ){ tag += "_FIXED"; }
-        std::string savePath = savePath_;
-        if( not savePath.empty() ) savePath += "/";
-        savePath += "oneSigma/original/" + parSet.getName() + "/" + par.getTitle() + tag;
-        makeOneSigmaPlotFct(par, savePath);
-      }
-    }
-
   }
 
-  _saveDir_->cd();
-
-  // Since those were not saved, delete manually
-//  for( auto& refHist : refHistList ){ delete refHist.histPtr; }
-  refHistList.clear();
-
-}
-
-void FitterEngine::varyEvenRates(const std::vector<double>& paramVariationList_, const std::string& savePath_){
-  GenericToolbox::mkdirTFile(_saveDir_, savePath_)->cd();
-
-  auto makeVariedEventRatesFct = [&](FitParameter& par_, std::vector<double> variationList_, const std::string& parSavePath_){
-
-    LogInfo << "Making varied event rates for " << parSavePath_ << std::endl;
-
-    // First make sure all params are at their prior <- is it necessary?
-    for( auto& parSet : _propagator_.getParameterSetsList() ){
-      if( not parSet.isEnabled() ) continue;
-      for( auto& par : parSet.getParameterList() ){
-        par.setParameterValue(par.getPriorValue());
-      }
-    }
-    _propagator_.propagateParametersOnSamples();
-
-    auto* saveDir = GenericToolbox::mkdirTFile(_saveDir_, parSavePath_ );
-    saveDir->cd();
-
-    std::vector<std::vector<double>> buffEvtRatesMap; //[iVar][iSample]
-    /*std::vector<double> variationList;
-    if (par_.isFree()){ 
-      // Preliminary implementation
-      if(par_.getMinValue() == par_.getMinValue()) variationList.push_back(par_.getMinValue());
-      variationList.push_back(par_.getPriorValue());
-      if(par_.getMaxValue() == par_.getMaxValue()) variationList.push_back(par_.getMaxValue());
-    }
-    else{
-      variationList = variationList_;
-    }*/
-
-    for ( size_t iVar = 0 ; iVar < variationList_.size() ; iVar++ ){
-
-      buffEvtRatesMap.emplace_back();
-
-      if(par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue() > par_.getMaxValue()) 
-        par_.setParameterValue(par_.getMaxValue());
-      else if (par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue() < par_.getMinValue())
-        par_.setParameterValue(par_.getMinValue());
-      else
-        par_.setParameterValue(par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue());
-
-      _propagator_.propagateParametersOnSamples();
-
-      for(auto & sample : _propagator_.getFitSampleSet().getFitSampleList()){
-        buffEvtRatesMap[iVar].push_back(sample.getMcContainer().getSumWeights() );
-      }
-      par_.setParameterValue(par_.getPriorValue());
-    }
-
-
-    // Write in the output
-
-    auto* variationList_TVectorD = new TVectorD(int(variationList_.size()));
-
-    for ( int iVar = 0 ; iVar < variationList_TVectorD->GetNrows() ; iVar++ ){
-      /*if (par_.isFree()) (*variationList_TVectorD)(iVar) = variationList_[iVar];
-      else 
-      */
-      (*variationList_TVectorD)(iVar) = par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue();
-    }
-    GenericToolbox::writeInTFile(saveDir,
-                                 variationList_TVectorD,
-                                 "paramValues");
-
-    TVectorD* buffVariedEvtRates_TVectorD{nullptr};
-
-    for( size_t iSample = 0 ; iSample < _propagator_.getFitSampleSet().getFitSampleList().size() ; iSample++ ){
-
-      buffVariedEvtRates_TVectorD = new TVectorD(int(variationList_.size()));
-
-      for ( int iVar = 0 ; iVar < buffVariedEvtRates_TVectorD->GetNrows() ; iVar++ ){
-        (*buffVariedEvtRates_TVectorD)(iVar) = buffEvtRatesMap[iVar][iSample];
-      }
-
-      GenericToolbox::writeInTFile(saveDir,
-                                   buffVariedEvtRates_TVectorD,
-                                   _propagator_.getFitSampleSet().getFitSampleList()[iSample].getName());
-
-    }
-
-
-  };
-
-  // vary parameters
-
-  for( auto& parSet : _propagator_.getParameterSetsList() ){
-
-    if( not parSet.isEnabled() ) continue;
-    if( JsonUtils::fetchValue(parSet.getConfig(), "skipVariedEventRates", false) ){
-      LogInfo << "Event rate variation skipped for \"" << parSet.getName() << "\"" << std::endl;
-      continue;
-    }
-
-    if( parSet.isUseEigenDecompInFit() ){
-      // TODO ?
-      continue;
-    }
-    else{
-      for( auto& par : parSet.getParameterList() ){
-
-        if( not par.isEnabled() ) continue;
-
-        std::string tag;
-        if( par.isFixed() ){ tag += "_FIXED"; }
-        if( par.isFree() ){ tag += "_FREE"; }
-
-        std::string savePath = savePath_;
-        if( not savePath.empty() ) savePath += "/";
-        savePath += "varyEventRates/" + parSet.getName() + "/" + par.getTitle() + tag;
-
-        makeVariedEventRatesFct(par, paramVariationList_, savePath);
-
-      }
-    }
-
+  // Leaving now?
+  if( _isDryRun_ ){
+    LogAlert << "Dry run requested. Leaving before the minimization." << std::endl;
+    return;
   }
 
-  _saveDir_->cd();
+  LogInfo << "Minimizing LLH..." << std::endl;
+  _minimizer_.minimize();
 
+  if( _generateSamplePlots_ ){
+    LogInfo << "Generating post-fit sample plots..." << std::endl;
+    _propagator_.getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(_saveDir_, "postFit/samples"));
+    GenericToolbox::triggerTFileWrite(_saveDir_);
+  }
+  if( _enablePostFitScan_ ){
+    LogInfo << "Scanning fit parameters around the minimum point..." << std::endl;
+    this->scanMinimizerParameters(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scan"));
+    GenericToolbox::triggerTFileWrite(_saveDir_);
+  }
+
+  if( _minimizer_.isFitHasConverged() and _minimizer_.isEnablePostFitErrorEval() ){
+    LogInfo << "Computing post-fit errors..." << std::endl;
+    _minimizer_.calcErrors();
+  }
+  else{
+    if( not _minimizer_.isFitHasConverged() ) LogAlert << "Skipping post-fit error calculation since the minimizer did not converge." << std::endl;
+    else LogAlert << "Skipping post-fit error calculation since the option is disabled." << std::endl;
+  }
+
+  LogWarning << "Fit is done." << std::endl;
 }
 
+// protected
 void FitterEngine::fixGhostFitParameters(){
-  LogInfo << __METHOD_NAME__ << std::endl;
 
-  updateChi2Cache();
+  _propagator_.updateLlhCache();
+  double baseChi2 = _propagator_.getLlhBuffer();
+  double baseChi2Stat = _propagator_.getLlhStatBuffer();
+  double baseChi2Syst = _propagator_.getLlhPenaltyBuffer();
 
-  LogDebug << "Reference " << GUNDAM_CHI2 << " = " << _chi2StatBuffer_ << std::endl;
-  double baseChi2 = _chi2Buffer_;
-  double baseChi2Stat = _chi2StatBuffer_;
-  double baseChi2Syst = _chi2PullsBuffer_;
+  LogInfo << "Reference " << GUNDAM_CHI2 << "(stat) for PCA: " << baseChi2Stat << std::endl;
 
   // +1 sigma
   int iFitPar = -1;
   std::stringstream ssPrint;
-//  double deltaChi2;
   double deltaChi2Stat;
-//  double deltaChi2Syst;
 
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 
-    if( not JsonUtils::fetchValue(parSet.getConfig(), std::vector<std::string>{"fixGhostFitParameters", "enablePca"}, false) ) continue;
+    if( not parSet.isEnabled() ){ continue; }
+
+    if( not parSet.isEnablePca() ){
+      LogWarning << "PCA disabled on " << parSet.getName() << ". Skipping..." << std::endl;
+      continue;
+    }
+    else{
+      LogInfo << "Performing PCA on " << parSet.getName() << "..." << std::endl;
+    }
 
     bool fixNextEigenPars{false};
     auto& parList = parSet.getEffectiveParameterList();
     for( auto& par : parList ){
       ssPrint.str("");
-
-
       ssPrint << "(" << par.getParameterIndex()+1 << "/" << parList.size() << ") +1" << GUNDAM_SIGMA << " on " << parSet.getName() + "/" + par.getTitle();
 
       if( fixNextEigenPars ){
@@ -416,17 +299,15 @@ void FitterEngine::fixGhostFitParameters(){
         ssPrint << " " << currentParValue << " -> " << par.getParameterValue();
         LogInfo << ssPrint.str() << "..." << std::endl;
 
-        updateChi2Cache();
-        deltaChi2Stat = _chi2StatBuffer_ - baseChi2Stat;
-//        deltaChi2Syst = _chi2PullsBuffer_ - baseChi2Syst;
-//        deltaChi2 = _chi2Buffer_ - baseChi2;
+        _propagator_.updateLlhCache();
+        deltaChi2Stat = _propagator_.getLlhStatBuffer() - baseChi2Stat;
 
         ssPrint << ": " << GUNDAM_DELTA << GUNDAM_CHI2 << " (stat) = " << deltaChi2Stat;
 
         LogInfo.moveTerminalCursorBack(1);
         LogInfo << ssPrint.str() << std::endl;
 
-        if( std::abs(deltaChi2Stat) < JsonUtils::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, 1E-6) ){
+        if( std::abs(deltaChi2Stat) < _pcaDeltaChi2Threshold_ ){
           par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
           ssPrint << " < " << JsonUtils::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, 1E-6) << " -> FIXED";
           LogInfo.moveTerminalCursorBack(1);
@@ -444,219 +325,28 @@ void FitterEngine::fixGhostFitParameters(){
           }
         }
 
+        // Come back to the original values
         par.setParameterValue( currentParValue );
       }
     }
 
+    // Recompute inverse matrix for the fitter
+    // Note: Eigen decomposed parSet don't need a new inversion since the matrix is diagonal
     if( not parSet.isUseEigenDecompInFit() ){
-      // Recompute inverse matrix for the fitter
-      // Eigen decomposed parSet don't need a new inversion since the matrix is diagonal
-      parSet.prepareFitParameters();
+      parSet.processCovarianceMatrix();
     }
 
   }
 
-  updateChi2Cache(); // comeback to old values
+  // comeback to old values
+  _propagator_.updateLlhCache();
 }
-void FitterEngine::scanParameters(int nbSteps_, const std::string &saveDir_) {
-  LogInfo << "Performing parameter scans..." << std::endl;
-  for( int iPar = 0 ; iPar < _minimizer_.getMinimizer()->NDim() ; iPar++ ){
-    if( _minimizer_.getMinimizer()->IsFixedVariable(iPar) ) continue;
-    this->scanParameter(iPar, nbSteps_, saveDir_);
-  } // iPar
-}
-void FitterEngine::scanParameter(int iPar, int nbSteps_, const std::string &saveDir_) {
-  if( nbSteps_ < 0 ){ nbSteps_ = _parScanner_.getNbPoints(); }
-
-  std::vector<double> parPoints(nbSteps_+1,0);
-
-  std::stringstream ssPbar;
-  ssPbar << LogInfo.getPrefixString() << "Scanning fit parameter #" << iPar
-         << ": " << _minimizer_.getMinimizer()->VariableName(iPar) << " / " << nbSteps_ << " steps...";
-  GenericToolbox::displayProgressBar(0, nbSteps_, ssPbar.str());
-
-  scanDataDict.clear();
-  if( JsonUtils::fetchValue(_parScanner_.getVarsConfig(), "llh", true) ){
-    scanDataDict.emplace_back();
-    auto& scanEntry = scanDataDict.back();
-    scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
-    scanEntry.folder = "llh";
-    scanEntry.title = "Total Likelihood Scan";
-    scanEntry.yTitle = "LLH value";
-    scanEntry.evalY = [this](){ return this->_chi2Buffer_; };
-  }
-  if( JsonUtils::fetchValue(_parScanner_.getVarsConfig(), "llhPenalty", true) ){
-    scanDataDict.emplace_back();
-    auto& scanEntry = scanDataDict.back();
-    scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
-    scanEntry.folder = "llhPenalty";
-    scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
-    scanEntry.title = "Penalty Likelihood Scan";
-    scanEntry.yTitle = "Penalty LLH value";
-    scanEntry.evalY = [this](){ return this->_chi2PullsBuffer_; };
-  }
-  if( JsonUtils::fetchValue(_parScanner_.getVarsConfig(), "llhStat", true) ){
-    scanDataDict.emplace_back();
-    auto& scanEntry = scanDataDict.back();
-    scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
-    scanEntry.folder = "llhStat";
-    scanEntry.title = "Stat Likelihood Scan";
-    scanEntry.yTitle = "Stat LLH value";
-    scanEntry.evalY = [this](){ return this->_chi2StatBuffer_; };
-  }
-  if( JsonUtils::fetchValue(_parScanner_.getVarsConfig(), "llhStatPerSample", false) ){
-    for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
-      scanDataDict.emplace_back();
-      auto& scanEntry = scanDataDict.back();
-      scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
-      scanEntry.folder = "llhStat/" + sample.getName() + "/";
-      scanEntry.title = Form("Stat Likelihood Scan of sample \"%s\"", sample.getName().c_str());
-      scanEntry.yTitle = "Stat LLH value";
-      auto* samplePtr = &sample;
-      scanEntry.evalY = [this, samplePtr](){ return _propagator_.getFitSampleSet().evalLikelihood(*samplePtr); };
-    }
-  }
-  if( JsonUtils::fetchValue(_parScanner_.getVarsConfig(), "llhStatPerSamplePerBin", false) ){
-    for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
-      for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-        scanDataDict.emplace_back();
-        auto& scanEntry = scanDataDict.back();
-        scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
-        scanEntry.folder = "llhStat/" + sample.getName() + "/bin_" + std::to_string(iBin);
-        scanEntry.title = Form(R"(Stat LLH Scan of sample "%s", bin #%d "%s")",
-                               sample.getName().c_str(),
-                               iBin,
-                               sample.getBinning().getBinsList()[iBin-1].getSummary().c_str());
-        scanEntry.yTitle = "Stat LLH value";
-        auto* samplePtr = &sample;
-        scanEntry.evalY = [this, samplePtr, iBin](){ return _propagator_.getFitSampleSet().getJointProbabilityFct()->eval(*samplePtr, iBin); };
-      }
-    }
-  }
-  if( JsonUtils::fetchValue(_parScanner_.getVarsConfig(), "weightPerSample", false) ){
-    for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
-      scanDataDict.emplace_back();
-      auto& scanEntry = scanDataDict.back();
-      scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
-      scanEntry.folder = "weight/" + sample.getName();
-      scanEntry.title = Form("MC event weight scan of sample \"%s\"", sample.getName().c_str());
-      scanEntry.yTitle = "Total MC event weight";
-      auto* samplePtr = &sample;
-      scanEntry.evalY = [samplePtr](){ return samplePtr->getMcContainer().getSumWeights(); };
-    }
-  }
-  if( JsonUtils::fetchValue(_parScanner_.getVarsConfig(), "weightPerSamplePerBin", false) ){
-    for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
-      for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-        scanDataDict.emplace_back();
-        auto& scanEntry = scanDataDict.back();
-        scanEntry.yPoints = std::vector<double>(nbSteps_+1,0);
-        scanEntry.folder = "weight/" + sample.getName() + "/bin_" + std::to_string(iBin);
-        scanEntry.title = Form(R"(MC event weight scan of sample "%s", bin #%d "%s")",
-                               sample.getName().c_str(),
-                               iBin,
-                               sample.getBinning().getBinsList()[iBin-1].getSummary().c_str());
-        scanEntry.yTitle = "Total MC event weight";
-        auto* samplePtr = &sample;
-        scanEntry.evalY = [samplePtr, iBin](){ return samplePtr->getMcContainer().histogram->GetBinContent(iBin); };
-      }
-    }
-  }
-
-  double origVal = _minimizer_.getMinimizerFitParameterPtr()[iPar]->getParameterValue();
-  double lowBound = origVal + _parScanner_.getParameterSigmaRange().first * _minimizer_.getMinimizerFitParameterPtr()[iPar]->getStdDevValue();
-  double highBound = origVal + _parScanner_.getParameterSigmaRange().second * _minimizer_.getMinimizerFitParameterPtr()[iPar]->getStdDevValue();
-
-  if( _parScanner_.isUseParameterLimits() ){
-    lowBound = std::max(lowBound, _minimizer_.getMinimizerFitParameterPtr()[iPar]->getMinValue());
-    highBound = std::min(highBound, _minimizer_.getMinimizerFitParameterPtr()[iPar]->getMaxValue());
-  }
-
-  int offSet{0};
-  for( int iPt = 0 ; iPt < nbSteps_+1 ; iPt++ ){
-    GenericToolbox::displayProgressBar(iPt, nbSteps_, ssPbar.str());
-
-    double newVal = lowBound + double(iPt-offSet)/(nbSteps_-1)*( highBound - lowBound );
-    if( offSet == 0 and newVal > origVal ){
-      newVal = origVal;
-      offSet = 1;
-    }
-
-    _minimizer_.getMinimizerFitParameterPtr()[iPar]->setParameterValue(newVal);
-    this->updateChi2Cache();
-    parPoints[iPt] = _minimizer_.getMinimizerFitParameterPtr()[iPar]->getParameterValue();
-
-    for( auto& scanEntry : scanDataDict ){ scanEntry.yPoints[iPt] = scanEntry.evalY(); }
-  }
-
-
-  _minimizer_.getMinimizerFitParameterPtr()[iPar]->setParameterValue(origVal);
-
-  std::stringstream ss;
-  ss << GenericToolbox::replaceSubstringInString(_minimizer_.getMinimizer()->VariableName(iPar), "/", "_");
-  ss << "_TGraph";
-
-  for( auto& scanEntry : scanDataDict ){
-    TGraph scanGraph(int(parPoints.size()), &parPoints[0], &scanEntry.yPoints[0]);
-    scanGraph.SetTitle(scanEntry.title.c_str());
-    scanGraph.GetYaxis()->SetTitle(scanEntry.yTitle.c_str());
-    scanGraph.GetXaxis()->SetTitle(_minimizer_.getMinimizer()->VariableName(iPar).c_str());
-    scanGraph.SetDrawOption("AP");
-    scanGraph.SetMarkerStyle(kFullDotLarge);
-    if( _saveDir_ != nullptr ){
-      GenericToolbox::mkdirTFile(_saveDir_, saveDir_ + "/" + scanEntry.folder )->cd();
-      scanGraph.Write( ss.str().c_str() );
-    }
-  }
-}
-
-void FitterEngine::fit(){
-  LogWarning << __METHOD_NAME__ << std::endl;
-
-  _minimizer_.minimize();
-
-  if( _enablePostFitScan_ ){
-    LogInfo << "Scanning parameters around the minimum point..." << std::endl;
-    this->scanParameters(-1, "postFit/scan");
-  }
-
-  if( _minimizer_.isFitHasConverged() or true ){ _minimizer_.calcErrors(); }
-
-  _propagator_.propagateParametersOnSamples();
-}
-void FitterEngine::updateChi2Cache(){
-
-  double buffer;
-
-  // Propagate on histograms
-  _propagator_.propagateParametersOnSamples();
-
-  ////////////////////////////////
-  // Compute chi2 stat
-  ////////////////////////////////
-  _chi2StatBuffer_ = _propagator_.getFitSampleSet().evalLikelihood();
-
-  ////////////////////////////////
-  // Compute the penalty terms
-  ////////////////////////////////
-  _chi2PullsBuffer_ = 0;
-  _chi2RegBuffer_ = 0; // unused
-  for( auto& parSet : _propagator_.getParameterSetsList() ){
-    buffer = parSet.getPenaltyChi2();
-    _chi2PullsBuffer_ += buffer;
-    LogThrowIf(buffer!=buffer, parSet.getName() << " penalty chi2 is Nan");
-  }
-
-  _chi2Buffer_ = _chi2StatBuffer_ + _chi2PullsBuffer_ + _chi2RegBuffer_;
-}
-
-
 void FitterEngine::rescaleParametersStepSize(){
   LogInfo << __METHOD_NAME__ << std::endl;
 
-  updateChi2Cache();
-  double baseChi2Pull = _chi2PullsBuffer_;
-  double baseChi2 = _chi2Buffer_;
+  _propagator_.updateLlhCache();
+  double baseChi2Pull = _propagator_.getLlhPenaltyBuffer();
+  double baseChi2 = _propagator_.getLlhBuffer();
 
   // +1 sigma
   int iFitPar = -1;
@@ -672,10 +362,10 @@ void FitterEngine::rescaleParametersStepSize(){
       double currentParValue = par.getParameterValue();
       par.setParameterValue( currentParValue + par.getStdDevValue() );
 
-      updateChi2Cache();
+      _propagator_.updateLlhCache();
 
-      double deltaChi2 = _chi2Buffer_ - baseChi2;
-      double deltaChi2Pulls = _chi2PullsBuffer_ - baseChi2Pull;
+      double deltaChi2 = _propagator_.getLlhBuffer() - baseChi2;
+      double deltaChi2Pulls = _propagator_.getLlhPenaltyBuffer() - baseChi2Pull;
 
       // Consider a parabolic approx:
       // only rescale with X2 stat?
@@ -692,14 +382,26 @@ void FitterEngine::rescaleParametersStepSize(){
 
       par.setStepSize( stepSize );
       par.setParameterValue( currentParValue + stepSize );
-      updateChi2Cache();
-      LogInfo << " -> Δχ²(step) = " << _chi2Buffer_ - baseChi2 << std::endl;
+      _propagator_.updateLlhCache();
+      LogInfo << " -> Δχ²(step) = " << _propagator_.getLlhBuffer() - baseChi2 << std::endl;
       par.setParameterValue( currentParValue );
     }
 
   }
 
-  updateChi2Cache();
+  _propagator_.updateLlhCache();
+}
+void FitterEngine::scanMinimizerParameters(TDirectory* saveDir_){
+  LogThrowIf(not isInitialized());
+  LogInfo << "Performing scans of fit parameters..." << std::endl;
+  for( int iPar = 0 ; iPar < _minimizer_.getMinimizer()->NDim() ; iPar++ ){
+    if( _minimizer_.getMinimizer()->IsFixedVariable(iPar) ){
+      LogWarning << _minimizer_.getMinimizer()->VariableName(iPar)
+                 << " is fixed. Skipping..." << std::endl;
+      continue;
+    }
+    _propagator_.getParScanner().scanFitParameter(*_minimizer_.getMinimizerFitParameterPtr()[iPar], saveDir_);
+  } // iPar
 }
 void FitterEngine::checkNumericalAccuracy(){
   LogWarning << __METHOD_NAME__ << std::endl;
@@ -735,14 +437,14 @@ void FitterEngine::checkNumericalAccuracy(){
           parSet.getParameterList()[iPar].setParameterValue( throws[iThrow][iParSet][iPar] );
         }
       }
-      updateChi2Cache();
+      _propagator_.updateLlhCache();
 
       if( responses[iThrow] == responses[iThrow] ){ // not nan
-        LogThrowIf( _chi2Buffer_ != responses[iThrow], "Not accurate: " << _chi2Buffer_ - responses[iThrow] << " / "
-                                                                        << GET_VAR_NAME_VALUE(_chi2Buffer_) << " <=> " << GET_VAR_NAME_VALUE(responses[iThrow])
+        LogThrowIf( _propagator_.getLlhBuffer() != responses[iThrow], "Not accurate: " << _propagator_.getLlhBuffer() - responses[iThrow] << " / "
+                                                                        << GET_VAR_NAME_VALUE(_propagator_.getLlhBuffer()) << " <=> " << GET_VAR_NAME_VALUE(responses[iThrow])
         )
       }
-      responses[iThrow] = _chi2Buffer_;
+      responses[iThrow] = _propagator_.getLlhBuffer();
     }
     LogDebug << GenericToolbox::parseVectorAsString(responses) << std::endl;
   }

@@ -29,8 +29,7 @@ protected:
 
 public:
   virtual ~DialBase();
-
-  double evalResponse();
+  double evalResponse(){ return 0; }
 
 private:
   const DialType _dialType_;

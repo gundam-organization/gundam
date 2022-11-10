@@ -20,17 +20,21 @@
 #include "TChainElement.h"
 
 #include "sstream"
+#include "string"
+#include "vector"
+
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[DataDispenser]");
 });
 
 
+DataDispenser::DataDispenser(DatasetLoader* owner_): _owner_(owner_) {}
+
 void DataDispenser::readConfigImpl(){
   LogThrowIf( _config_.empty(), "Config is not set." );
 
-  _parameters_.clear();
-
+  _parameters_.name = JsonUtils::fetchValue<std::string>(_config_, "name", _parameters_.name);
   _parameters_.treePath = JsonUtils::fetchValue<std::string>(_config_, "tree", _parameters_.treePath);
   _parameters_.filePathList = JsonUtils::fetchValue<std::vector<std::string>>(_config_, "filePathList", _parameters_.filePathList);
   _parameters_.additionalVarsStorage = JsonUtils::fetchValue(_config_, {{"additionalLeavesStorage"}, {"additionalVarsStorage"}}, _parameters_.additionalVarsStorage);
@@ -45,12 +49,9 @@ void DataDispenser::readConfigImpl(){
   }
 }
 void DataDispenser::initializeImpl(){
-  LogThrowIf( _owner_==nullptr, "Owner not set.");
   // Nothing else to do other than read config?
   LogWarning << "Initialized data dispenser: " << getTitle() << std::endl;
 }
-
-void DataDispenser::setOwner(DatasetLoader* owner_){ _owner_ = owner_; }
 
 const DataDispenserParameters &DataDispenser::getParameters() const {
   return _parameters_;
@@ -73,6 +74,10 @@ void DataDispenser::load(){
   LogWarning << "Loading dataset: " << getTitle() << std::endl;
   LogThrowIf(not this->isInitialized(), "Can't load while not initialized.");
   LogThrowIf(_sampleSetPtrToLoad_==nullptr, "SampleSet not specified.");
+
+  if( GlobalVariables::getVerboseLevel() >= MORE_PRINTOUT ){
+    LogDebug << "Configuration: " << _parameters_.getSummary() << std::endl;
+  }
 
   _cache_.clear();
 
@@ -129,7 +134,6 @@ void DataDispenser::load(){
         };
     GenericToolbox::sortVector(_cache_.eventVarTransformList, aGoesFirst);
   }
-
 
 
   replaceToyIndexFct(_parameters_.nominalWeightFormulaStr);
@@ -276,7 +280,7 @@ void DataDispenser::doEventSelection(){
         if (GenericToolbox::showProgressBar(iGlobal, nEvents)) {
           ssProgressTitle.str("");
 
-          ssProgressTitle << LogDebug.getPrefixString() << "Read from disk: "
+          ssProgressTitle << LogInfo.getPrefixString() << "Read from disk: "
                           << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.getTotalAccumulated()), 8) << " ("
                           << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.evalTotalGrowthRate()), 8) << "/s)";
 
@@ -394,6 +398,11 @@ void DataDispenser::fetchRequestedLeaves(){
     } // parSet
   }
 
+  // fit sample set storage requests
+  for( auto& var: _sampleSetPtrToLoad_->getAdditionalVariablesForStorage() ){
+    _cache_.addVarRequestedForStorage(var);
+  }
+
   // sample
   for( auto& sample: _sampleSetPtrToLoad_->getFitSampleList() ){
     for( auto& bin: sample.getBinning().getBinsList()){
@@ -478,8 +487,6 @@ void DataDispenser::fetchRequestedLeaves(){
 }
 void DataDispenser::preAllocateMemory(){
   LogInfo << "Pre-allocating memory..." << std::endl;
-  LogInfo << "Pre-allocation RAM is: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage())) << std::endl;
-
   /// \brief The following lines are necessary since the events might get resized while being in multithread
   /// Because std::vector is insuring continuous memory allocation, a resize sometimes
   /// lead to the full moving of a vector memory. This is not thread safe, so better ensure
@@ -520,7 +527,8 @@ void DataDispenser::preAllocateMemory(){
   // DIALS
   DialSet* dialSetPtr;
   if( _parSetListPtrToLoad_ != nullptr ){
-    LogInfo << "Claiming memory for additional dials..." << std::endl;
+    LogInfo << "Claiming memory for event-by-event dials..." << std::endl;
+    double eventByEventDialSize{0};
     for( auto& parSet : *_parSetListPtrToLoad_ ){
       if( not parSet.isEnabled() ){ continue; }
       for( auto& par : parSet.getParameterList() ){
@@ -528,7 +536,7 @@ void DataDispenser::preAllocateMemory(){
         dialSetPtr = par.findDialSet( _owner_->getName() );
         if( dialSetPtr != nullptr and ( not dialSetPtr->getDialList().empty() or not dialSetPtr->getDialLeafName().empty() ) ){
 
-          // Filling var indexes:
+          // Filling var indexes for faster eval with PhysicsEvent:
           for( auto& dial : dialSetPtr->getDialList() ){
             if( dial->getApplyConditionBinPtr() != nullptr ){
               std::vector<int> varIndexes;
@@ -543,13 +551,24 @@ void DataDispenser::preAllocateMemory(){
           if( not dialSetPtr->getDialLeafName().empty() ){
 
             auto dialType = dialSetPtr->getGlobalDialType();
+            size_t nEvents = treeChain.GetEntries();
+            LogInfo << par.getFullTitle() << ": creating " << nEvents;
+            LogInfo << " " << DialType::DialTypeEnumNamespace::toString(dialType, true);
+
             if     ( dialType == DialType::Spline ){
-              dialSetPtr->getDialList().resize(treeChain.GetEntries(), DialWrapper(SplineDial()));
+              double dialsSizeInRam = double(nEvents) * sizeof(SplineDial);
+              eventByEventDialSize += dialsSizeInRam;
+              LogInfo << " dials (" << GenericToolbox::parseSizeUnits( dialsSizeInRam ) << ")" << std::endl;
+              dialSetPtr->getDialList().resize(nEvents, DialWrapper(SplineDial(dialSetPtr)));
             }
             else if( dialType == DialType::Graph ){
-              dialSetPtr->getDialList().resize(treeChain.GetEntries(), DialWrapper(GraphDial()));
+              double dialsSizeInRam = double(nEvents) * sizeof(GraphDial);
+              eventByEventDialSize += dialsSizeInRam;
+              LogInfo << " dials (" << GenericToolbox::parseSizeUnits( dialsSizeInRam ) << ")" << std::endl;
+              dialSetPtr->getDialList().resize(nEvents, DialWrapper(GraphDial(dialSetPtr)));
             }
             else{
+              LogInfo << std::endl;
               LogThrow("Invalid dial type for event-by-event dial: " << DialType::DialTypeEnumNamespace::toString(dialType))
             }
 
@@ -560,9 +579,8 @@ void DataDispenser::preAllocateMemory(){
         }
       }
     }
+    LogInfo << "Event-by-event dials take " << GenericToolbox::parseSizeUnits(eventByEventDialSize) << " in RAM." << std::endl;
   }
-
-  LogInfo << "Post-allocation RAM is: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage())) << std::endl;
 }
 void DataDispenser::readAndFill(){
   LogWarning << "Reading dataset and loading..." << std::endl;
@@ -696,25 +714,52 @@ void DataDispenser::readAndFill(){
 
     size_t sampleEventIndex;
     int threadDialIndex;
-    const std::vector<DataBin>* binsListPtr;
 
     // Loop vars
-    bool isEventInDialBin{true};
+    bool foundValidDialAmongTheSet{true};
     int lastFailedBinVarIndex{-1}; int lastEventVarIndex{-1};
     const std::pair<double, double>* lastEdges{nullptr};
     size_t iVar{0};
-    size_t iBin{0}, nBins;
     size_t iSample{0}, nSample{_cache_.samplesToFillList.size()};
     size_t iTransform{0}, nTransform{_cache_.eventVarTransformList.size()};
 
     // Dials
     size_t eventDialOffset;
-    DialSet* dialSetPtr;
     size_t iDialSet, iDial;
+    size_t nBinEdges;
     TGraph* grPtr{nullptr};
-    SplineDial* spDialPtr;
-    GraphDial* grDialPtr;
-    const DataBin* applyConditionBinPtr;
+    SplineDial* spDialPtr{nullptr};
+    GraphDial* grDialPtr{nullptr};
+
+    // Bin searches
+    const std::vector<DataBin>* binsListPtr;
+    std::vector<DataBin>::const_iterator binFoundItr;
+    auto isBinValid = [&](const DataBin& b_){
+      for( iVar = 0 ; iVar < b_.getVariableNameList().size() ; iVar++ ){
+        if( not b_.isBetweenEdges(iVar, eventBuffer.getVarAsDouble(b_.getVariableNameList()[iVar])) ){
+          return false;
+        }
+      } // Var
+      return true;
+    };
+
+    // Dial bin search
+    DialSet* dialSetPtr;
+    DataBin* dataBin{nullptr};
+    std::vector<DialWrapper>::iterator dialFoundItr;
+    auto isDialValid = [&](const DialWrapper& d_){
+      dataBin = d_->getApplyConditionBinPtr();
+      nBinEdges = dataBin->getEdgesList().size();
+      for( iVar = 0 ; iVar < nBinEdges ; iVar++ ){
+        if( not DataBin::isBetweenEdges(
+            dataBin->getEdgesList()[iVar],
+            eventBuffer.getVarAsDouble( dataBin->getEventVarIndexCache()[iVar] ) )
+            ){
+          return false;
+        }
+      }
+      return true;
+    };
 
     // Try to read TTree the closest to sequentially possible
     Long64_t nEvents = treeChain.GetEntries();
@@ -762,11 +807,12 @@ void DataDispenser::readAndFill(){
       if( skipEvent ) continue;
 
       nBytes = treeChain.GetEntry(iEntry);
+
+      // monitor
       if( iThread_ == 0 ) readSpeed.addQuantity(nBytes*nThreads);
 
       if( threadNominalWeightFormula != nullptr ){
         eventBuffer.setTreeWeight(threadNominalWeightFormula->EvalInstance());
-
         if( eventBuffer.getTreeWeight() < 0 ){
           LogError << "Negative nominal weight:" << std::endl;
 
@@ -795,32 +841,25 @@ void DataDispenser::readAndFill(){
           eventBuffer.copyData(copyDict);
 
           // Propagate transformations for indexing
-          for( auto* varTransformForIndexing : varTransformForIndexingList ){
-            varTransformForIndexing->evalAndStore(eventBuffer);
+          for( auto* varTransformPtr : varTransformForIndexingList ){
+            varTransformPtr->evalAndStore(eventBuffer);
           }
 
           // Has valid bin?
           binsListPtr = &_cache_.samplesToFillList[iSample]->getBinning().getBinsList();
-          nBins = binsListPtr->size();
+          binFoundItr = std::find_if(
+              binsListPtr->begin(),
+              binsListPtr->end(),
+              isBinValid
+          );
 
-          for( iBin = 0 ; iBin < nBins ; iBin++ ){
-            auto& bin = (*binsListPtr)[iBin];
-            bool isInBin = true;
-            for( iVar = 0 ; iVar < bin.getVariableNameList().size() ; iVar++ ){
-              if( not bin.isBetweenEdges(iVar, eventBuffer.getVarAsDouble(bin.getVariableNameList()[iVar])) ){
-                isInBin = false;
-                break;
-              }
-            } // Var
-            if( isInBin ){
-              eventBuffer.setSampleBinIndex(int(iBin));
-              break;
-            }
-          } // Bin
-
-          if( eventBuffer.getSampleBinIndex() == -1 ) {
+          if (binFoundItr == binsListPtr->end()) {
             // Invalid bin -> next sample
             break;
+          }
+          else {
+            // found bin
+            eventBuffer.setSampleBinIndex(int(std::distance(binsListPtr->begin(), binFoundItr)));
           }
 
           // OK, now we have a valid fit bin. Let's claim an index.
@@ -831,8 +870,8 @@ void DataDispenser::readAndFill(){
           eventPtr->copyData(copyStoreDict); // buffer has the right size already
 
           // Propagate transformation for storage -> use the previous results calculated for indexing
-          for( auto* varTransformForStorage : varTransformForStorageList ){
-            varTransformForStorage->storeCachedOutput(*eventPtr);
+          for( auto* varTransformPtr : varTransformForStorageList ){
+            varTransformPtr->storeCachedOutput(*eventPtr);
           }
 
           eventPtr->setEntryIndex(iEntry);
@@ -862,7 +901,6 @@ void DataDispenser::readAndFill(){
                   if(grPtr->GetN() > 1){
                     if     ( dialSetPtr->getGlobalDialType() == DialType::Spline ){
                       spDialPtr = (SplineDial*) dialSetPtr->getDialList()[iEntry].get();
-                      dialSetPtr->applyGlobalParameters(spDialPtr);
                       spDialPtr->createSpline( grPtr );
                       spDialPtr->initialize();
                       spDialPtr->setIsReferenced(true);
@@ -871,7 +909,6 @@ void DataDispenser::readAndFill(){
                     }
                     else if( dialSetPtr->getGlobalDialType() == DialType::Graph ){
                       grDialPtr = (GraphDial*) dialSetPtr->getDialList()[iEntry].get();
-                      dialSetPtr->applyGlobalParameters(grDialPtr);
                       grDialPtr->setGraph(*grPtr);
                       grDialPtr->initialize();
                       grDialPtr->setIsReferenced(true);
@@ -887,7 +924,6 @@ void DataDispenser::readAndFill(){
                   grPtr = (TGraph*) eventBuffer.getVariable<TGraph*>(dialSetPtr->getDialLeafName());
                   if     ( dialSetPtr->getGlobalDialType() == DialType::Spline ){
                     spDialPtr = (SplineDial*) dialSetPtr->getDialList()[iEntry].get();
-                    dialSetPtr->applyGlobalParameters(spDialPtr);
                     spDialPtr->createSpline(grPtr);
                     spDialPtr->initialize();
                     spDialPtr->setIsReferenced(true);
@@ -896,7 +932,6 @@ void DataDispenser::readAndFill(){
                   }
                   else if( dialSetPtr->getGlobalDialType() == DialType::Graph ){
                     grDialPtr = (GraphDial*) dialSetPtr->getDialList()[iEntry].get();
-                    dialSetPtr->applyGlobalParameters(grDialPtr);
                     grDialPtr->setGraph(*grPtr);
                     grDialPtr->initialize();
                     grDialPtr->setIsReferenced(true);
@@ -912,51 +947,38 @@ void DataDispenser::readAndFill(){
                 }
               }
               else{
-                // Binned dial?
-                lastFailedBinVarIndex = -1;
-                for( iDial = 0 ; iDial < dialSetPtr->getDialList().size(); iDial++ ){
-                  // Let's give this dial a chance:
-                  isEventInDialBin = true;
+                // Binned dial:
+                foundValidDialAmongTheSet = false;
 
-                  // ----------> SLOW PART -> check the bin
-                  if( (applyConditionBinPtr = dialSetPtr->getDialList()[iDial]->getApplyConditionBinPtr()) != nullptr ){
-                    if( lastFailedBinVarIndex != -1 // if the last bin failed, this is not -1
-                        and applyConditionBinPtr->getEventVarIndexCache()[lastFailedBinVarIndex] == lastEventVarIndex // make sure this new bin-edges point to the same variable
-                        ){
-                      if( *lastEdges == applyConditionBinPtr->getEdgesList()[lastFailedBinVarIndex] ){ continue; } // same bin-edges! no need to check again!
-                      else{ lastEdges = &applyConditionBinPtr->getEdgesList()[lastFailedBinVarIndex]; }
-                      if( not DataBin::isBetweenEdges( *lastEdges, eventBuffer.getVarAsDouble(lastEventVarIndex) )){
-                        continue;
-                        // NEXT DIAL! Don't check other bin variables
-                      }
-                    }
+                if( dialSetPtr->getDialList().size() == 1 and dialSetPtr->getDialList()[0]->getApplyConditionBinPtr() == nullptr ){
+                  foundValidDialAmongTheSet = true;
+                  dialSetPtr->getDialList()[0]->setIsReferenced(true);
+                  eventPtr->getRawDialPtrList()[eventDialOffset++] = dialSetPtr->getDialList()[0].get();
+                }
+                else {
+                  // -- probably the slowest part of the indexing: ----
+                  dialFoundItr = std::find_if(
+                      dialSetPtr->getDialList().begin(),
+                      dialSetPtr->getDialList().end(),
+                      isDialValid
+                  );
+                  // --------------------------------------------------
 
-                    // Check for the others
-                    for( iVar = 0 ; iVar < applyConditionBinPtr->getEdgesList().size() ; iVar++ ){
-                      if( iVar == lastFailedBinVarIndex ) continue; // already checked if set
-                      lastEventVarIndex = applyConditionBinPtr->getEventVarIndexCache()[iVar];
-                      lastEdges = &applyConditionBinPtr->getEdgesList()[iVar];
-                      if( not DataBin::isBetweenEdges( *lastEdges,  eventBuffer.getVarAsDouble( lastEventVarIndex ) )){
-                        isEventInDialBin = false;
-                        lastFailedBinVarIndex = int(iVar);
-                        break; // NEXT DIAL! Don't check other bin variables
-                      }
-                    } // Bin var loop
-                  }
+                 if (dialFoundItr != dialSetPtr->getDialList().end()) {
+                  // found DIAL -> get index
+                    iDial = std::distance(dialSetPtr->getDialList().begin(), dialFoundItr);
 
-                  // <------------------
-                  if( isEventInDialBin ) {
+                    foundValidDialAmongTheSet = true;
                     dialSetPtr->getDialList()[iDial]->setIsReferenced(true);
                     eventPtr->getRawDialPtrList()[eventDialOffset++] = dialSetPtr->getDialList()[iDial].get();
-                    break;
                   }
-                } // iDial
-
-                if( isEventInDialBin and dialSetPair.first->isUseOnlyOneParameterPerEvent() ){
-                  break;
-                  // leave iDialSet (ie loop over parameters of the ParSet)
                 }
-              }
+
+                if( foundValidDialAmongTheSet and dialSetPair.first->isUseOnlyOneParameterPerEvent() ){
+                  // leave dialSet (corresponding to a given parameter) loop since we explicitly ask for 1 parameter for this parSet
+                  break;
+                }
+              } // else (not dialSetPtr->getDialLeafName().empty())
 
             } // iDialSet / Enabled-parameter
           } // ParSet / DialSet Pairs
@@ -968,7 +990,9 @@ void DataDispenser::readAndFill(){
         } // event has passed the selection?
       } // samples
     } // entries
-    if( iThread_ == 0 ) GenericToolbox::displayProgressBar(nEvents, nEvents, ssProgressBar.str());
+    if( iThread_ == 0 ){
+      GenericToolbox::displayProgressBar(nEvents, nEvents, ssProgressBar.str());
+    }
   };
 
   LogWarning << "Loading and indexing..." << std::endl;

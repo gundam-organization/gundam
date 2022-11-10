@@ -9,7 +9,7 @@
 #include "FitSampleSet.h"
 #include "FitParameterSet.h"
 #include "PlotGenerator.h"
-#include "ConfigBasedClass.h"
+#include "JsonBaseClass.h"
 
 #include "TChain.h"
 
@@ -31,7 +31,20 @@ struct DataDispenserParameters{
   std::vector<std::string> additionalVarsStorage{};
   int iThrow{-1};
 
-  void clear(){ *this = DataDispenserParameters(); }
+  std::string getSummary() const{
+    std::stringstream ss;
+    ss << GET_VAR_NAME_VALUE(useMcContainer);
+    ss << std::endl << GET_VAR_NAME_VALUE(name);
+    ss << std::endl << GET_VAR_NAME_VALUE(treePath);
+    ss << std::endl << GET_VAR_NAME_VALUE(nominalWeightFormulaStr);
+    ss << std::endl << GET_VAR_NAME_VALUE(selectionCutFormulaStr);
+    ss << std::endl << "activeLeafNameList = " << GenericToolbox::parseVectorAsString(activeLeafNameList, true);
+    ss << std::endl << "filePathList = " << GenericToolbox::parseVectorAsString(filePathList, true);
+    ss << std::endl << "overrideLeafDict = " << GenericToolbox::parseMapAsString(overrideLeafDict, true);
+    ss << std::endl << "additionalVarsStorage = " << GenericToolbox::parseVectorAsString(additionalVarsStorage, true);
+    ss << std::endl << GET_VAR_NAME_VALUE(iThrow);
+    return ss.str();
+  }
 };
 struct DataDispenserCache{
   std::vector<FitSample*> samplesToFillList{};
@@ -72,14 +85,11 @@ struct DataDispenserCache{
 
 };
 
-class DataDispenser : public ConfigBasedClass {
+class DataDispenser : public JsonBaseClass {
 
 public:
-  DataDispenser() = default;
-  explicit DataDispenser(const nlohmann::json& config_, DatasetLoader* owner_):
-    _owner_(owner_) { this->readConfig(config_); }
-
-  void setOwner(DatasetLoader* owner_);
+  explicit DataDispenser(DatasetLoader* owner_);
+  void setOwner(DatasetLoader* owner_){ _owner_ = owner_; }
 
   const DataDispenserParameters &getParameters() const;
   DataDispenserParameters &getParameters();
@@ -108,10 +118,10 @@ private:
   DataDispenserParameters _parameters_;
 
   // Internals
+  DatasetLoader* _owner_{nullptr};
   FitSampleSet* _sampleSetPtrToLoad_{nullptr};
   std::vector<FitParameterSet>* _parSetListPtrToLoad_{nullptr};
   PlotGenerator* _plotGenPtr_{nullptr}; // used to know which vars have to be kept in memory
-  DatasetLoader* _owner_{nullptr};
   DataDispenserCache _cache_;
 
 };

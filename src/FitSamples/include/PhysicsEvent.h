@@ -51,7 +51,6 @@ public:
   const std::vector<GenericToolbox::AnyType>& getLeafHolder(int index_) const;
   const std::vector<std::vector<GenericToolbox::AnyType>> &getLeafContentList() const;
   const std::shared_ptr<std::vector<std::string>>& getCommonLeafNameListPtr() const;
-
   std::vector<std::vector<GenericToolbox::AnyType>> &getLeafContentList();
 
   // CORE
@@ -66,7 +65,8 @@ public:
   // Fetch var
   int findVarIndex(const std::string& leafName_, bool throwIfNotFound_ = true) const;
   template<typename T> auto getVarValue(const std::string& leafName_, size_t arrayIndex_ = 0) const -> T;
-  template<typename T> auto getVariable(const std::string& leafName_, size_t arrayIndex_ = 0) -> T&;
+  template<typename T> auto getVariable(const std::string& leafName_, size_t arrayIndex_ = 0) -> const T&;
+  template<typename T> void setVariable(const T& value_, const std::string& leafName_, size_t arrayIndex_ = 0);
   void* getVariableAddress(const std::string& leafName_, size_t arrayIndex_ = 0);
   double getVarAsDouble(const std::string& leafName_, size_t arrayIndex_ = 0) const;
   double getVarAsDouble(int varIndex_, size_t arrayIndex_ = 0) const;
@@ -140,9 +140,14 @@ template<typename T> auto PhysicsEvent::getVarValue(const std::string &leafName_
   int index = this->findVarIndex(leafName_, true);
   return _leafContentList_[index][arrayIndex_].template getValue<T>();
 }
-template<typename T> auto PhysicsEvent::getVariable(const std::string& leafName_, size_t arrayIndex_) -> T&{
+template<typename T> auto PhysicsEvent::getVariable(const std::string& leafName_, size_t arrayIndex_) -> const T&{
   int index = this->findVarIndex(leafName_, true);
   return _leafContentList_[index][arrayIndex_].template getValue<T>();
+}
+template<typename T> void PhysicsEvent::setVariable(const T& value_, const std::string& leafName_, size_t arrayIndex_){
+  int index = this->findVarIndex(leafName_, true);
+  _leafContentList_[index][arrayIndex_].template getValue<T>() = value_;
+  if( not _varToDoubleCache_.empty() ){ _varToDoubleCache_[index][arrayIndex_] = std::nan("unset"); }
 }
 
 

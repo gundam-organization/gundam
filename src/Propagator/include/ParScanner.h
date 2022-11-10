@@ -5,34 +5,51 @@
 #ifndef GUNDAM_PARSCANNER_H
 #define GUNDAM_PARSCANNER_H
 
-#include "ConfigBasedClass.h"
+#include "JsonBaseClass.h"
+#include "FitParameter.h"
 
+#include "TDirectory.h"
 #include "nlohmann/json.hpp"
 
 #include "utility"
 
-class ParScanner : public ConfigBasedClass {
+class Propagator;
+
+class ParScanner : public JsonBaseClass {
 
 public:
-  ParScanner() = default;
-  explicit ParScanner(const nlohmann::json& config_){ this->readConfig(config_); }
+  explicit ParScanner(Propagator* owner_);
 
+  // Setters
+  void setOwner(Propagator *owner);
   void setNbPoints(int nbPoints);
 
+  // Getters
   const nlohmann::json &getVarsConfig() const { return _varsConfig_; };
   int getNbPoints() const;
   const std::pair<double, double> &getParameterSigmaRange() const;
   bool isUseParameterLimits() const;
 
+  // Core
+  void scanFitParameters(std::vector<FitParameter>& par_, TDirectory* saveDir_);
+  void scanFitParameter(FitParameter& par_, TDirectory* saveDir_);
+  void generateOneSigmaPlots(TDirectory* saveDir_);
+  void varyEvenRates(const std::vector<double>& paramVariationList_, TDirectory* saveDir_);
+
+
 protected:
   void readConfigImpl() override;
+  void initializeImpl() override;
 
 private:
-  nlohmann::json _varsConfig_{};
+  // Parameters
+  bool _useParameterLimits_{true};
   int _nbPoints_{100};
   std::pair<double, double> _parameterSigmaRange_{-3,3};
-  bool _useParameterLimits_{true};
+  nlohmann::json _varsConfig_{};
 
+  // Internals
+  Propagator* _owner_{nullptr};
   struct ScanData{
     std::string folder{};
     std::string title{};

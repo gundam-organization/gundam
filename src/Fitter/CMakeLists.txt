@@ -1,7 +1,6 @@
 set(SRCFILES
         src/FitterEngine.cpp
-        src/ParScanner.cpp
-        src/Minimizer.cpp
+        src/MinimizerInterface.cpp
   )
 
 if( USE_STATIC_LINKS )

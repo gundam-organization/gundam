@@ -2,12 +2,12 @@
 // Created by Adrien BLANCHET on 16/12/2021.
 //
 
-#ifndef GUNDAM_MINIMIZER_H
-#define GUNDAM_MINIMIZER_H
+#ifndef GUNDAM_MINIMIZERINTERFACE_H
+#define GUNDAM_MINIMIZERINTERFACE_H
 
 
 #include "FitParameterSet.h"
-#include "ConfigBasedClass.h"
+#include "JsonBaseClass.h"
 
 #include "GenericToolbox.VariablesMonitor.h"
 #include "GenericToolbox.CycleTimer.h"
@@ -23,17 +23,17 @@
 
 class FitterEngine;
 
-class Minimizer : public ConfigBasedClass {
+class MinimizerInterface : public JsonBaseClass {
 
 public:
-  Minimizer() = default;
-  explicit Minimizer(const nlohmann::json& config_, FitterEngine* owner_);
+  explicit MinimizerInterface(FitterEngine* owner_);
 
   void setOwner(FitterEngine* owner_);
-  void setSaveDir(TDirectory* saveDir_);
   void setEnablePostFitErrorEval(bool enablePostFitErrorEval_);
+  void setMonitorRefreshRateInMs(int monitorRefreshRateInMs_);
 
   bool isFitHasConverged() const;
+  bool isEnablePostFitErrorEval() const;
   GenericToolbox::VariablesMonitor &getConvergenceMonitor();
   std::vector<FitParameter *> &getMinimizerFitParameterPtr();
   const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const;
@@ -42,8 +42,8 @@ public:
   void calcErrors();
 
 protected:
-  void readConfigImpl();
-  void initializeImpl();
+  void readConfigImpl() override;
+  void initializeImpl() override;
 
   double evalFit(const double* parArray_);
   void writePostFitData(TDirectory* saveDir_);
@@ -56,8 +56,16 @@ private:
   bool _useNormalizedFitSpace_{true};
   bool _enableSimplexBeforeMinimize_{false};
   bool _enablePostFitErrorEval_{true};
+  bool _restoreStepSizeBeforeHesse_{false};
+  bool _generatedPostFitParBreakdown_{false};
+  bool _generatedPostFitEigenBreakdown_{false};
+  bool _showParametersOnFitMonitor_{false};
   int _strategy_{1};
   int _printLevel_{2};
+  int _simplexStrategy_{1};
+  int _monitorRefreshRateInMs_{5000};
+  int _monitorBashModeRefreshRateInS_{30};
+  int _maxNbParametersPerLineOnMonitor_{15};
   double _tolerance_{1E-4};
   double _simplexToleranceLoose_{1000.};
   unsigned int _maxIterations_{500};
@@ -78,8 +86,7 @@ private:
   std::unique_ptr<ROOT::Math::Minimizer> _minimizer_{nullptr};
   std::unique_ptr<ROOT::Math::Functor> _functor_{nullptr};
   std::vector<FitParameter*> _minimizerFitParameterPtr_{};
-  TDirectory* _saveDir_{nullptr};
-  TTree* _chi2HistoryTree_{nullptr};
+  std::unique_ptr<TTree> _chi2HistoryTree_{nullptr};
 
   // monitors
   GenericToolbox::VariablesMonitor _convergenceMonitor_;
@@ -125,4 +132,4 @@ private:
 };
 
 
-#endif //GUNDAM_MINIMIZER_H
+#endif //GUNDAM_MINIMIZERINTERFACE_H

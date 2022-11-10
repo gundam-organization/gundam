@@ -9,7 +9,7 @@
 #include "FitParameterSet.h"
 #include "Likelihoods.hh"
 #include "JointProbability.h"
-#include "ConfigBasedClass.h"
+#include "JsonBaseClass.h"
 
 #include "GenericToolbox.h"
 #include "nlohmann/json.hpp"
@@ -18,7 +18,7 @@
 #include "vector"
 
 
-class FitSampleSet : public ConfigBasedClass {
+class FitSampleSet : public JsonBaseClass {
 
 public:
   // Post init
@@ -30,6 +30,8 @@ public:
   std::vector<FitSample> &getFitSampleList();
   const nlohmann::json &getConfig() const;
   const std::shared_ptr<JointProbability::JointProbability> &getJointProbabilityFct() const;
+  const std::vector<std::string>& getAdditionalVariablesForStorage() const { return _additionalVariablesForStorage_; }
+  std::vector<std::string>& getAdditionalVariablesForStorage() { return _additionalVariablesForStorage_; }
 
   //Core
   bool empty() const;
@@ -50,6 +52,7 @@ private:
   std::vector<FitSample> _fitSampleList_;
   std::shared_ptr<JointProbability::JointProbability> _jointProbabilityPtr_{nullptr};
   std::vector<std::string> _eventByEventDialLeafList_;
+  std::vector<std::string> _additionalVariablesForStorage_;
 
 };
 

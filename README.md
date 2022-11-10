@@ -136,7 +136,9 @@ cd -
 ![](./resources/guides/images/lxplusLogo.png)
 
 
-### Input examples
+### Input documentation
+
+[gundamFitter options](./documentation/applications/gundamFitter.md)
 
 ## I want to contribute!
 

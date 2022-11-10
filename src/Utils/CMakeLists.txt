@@ -5,7 +5,7 @@ set(SRCFILES
         src/JsonUtils.cpp
         src/YamlUtils.cpp
         src/GundamGreetings.cpp
-        src/ConfigBasedClass.cpp
+        src/JsonBaseClass.cpp
         )
 
 if( USE_STATIC_LINKS )
@@ -23,6 +23,9 @@ target_link_libraries( GundamUtils PUBLIC
         ${ROOT_LIBRARIES}
         ${YAML_CPP_LIBRARIES}
         )
+
+
+ROOT_GENERATE_DICTIONARY(UtilsDict include/JsonUtils.h LINKDEF ./UtilsLinkDef.h)
 
 #set_target_properties(GundamUtils PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")
 
