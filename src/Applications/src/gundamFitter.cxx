@@ -155,9 +155,13 @@ int main(int argc, char** argv){
       if( clParser.isOptionTriggered(appendixDictEntry.first) ){
         appendixList.emplace_back( appendixDictEntry.second );
         if( clParser.getNbValueSet(appendixDictEntry.first) > 0 ){
-          appendixList.back() = Form( appendixList.back().c_str(),
-                                      clParser.getOptionVal<std::string>(appendixDictEntry.first).c_str()
+          appendixList.back() = Form(
+              appendixList.back().c_str(),
+              clParser.getOptionVal<std::string>(appendixDictEntry.first).c_str()
           );
+        }
+        else{
+          appendixList.back() = GenericToolbox::trimString(Form( appendixList.back().c_str(), "" ), "_");
         }
       }
     }

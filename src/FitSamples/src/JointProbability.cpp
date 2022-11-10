@@ -86,11 +86,14 @@ namespace JointProbability{
     dataVal = data->GetBinContent(bin_);
     predVal = predMC->GetBinContent(bin_);
     double mcuncert;
+
+    // Why SQUARE?? -> GetBinError is returning the sqrt(Sum^2) but the BANFF let the BBH make the sqrt
+    // https://github.com/t2k-software/BANFF/blob/9140ec11bd74606c10ab4af9ec525352de119c06/src/BANFFSample/BANFFBinnedSample.cxx#L374
     if (BBNoUpdateWeights){
-      mcuncert = nomMC->GetBinError(bin_);
+      mcuncert = nomMC->GetBinError(bin_) * nomMC->GetBinError(bin_);
     }
     else{
-      mcuncert = predMC->GetBinError(bin_);
+      mcuncert = predMC->GetBinError(bin_) * predMC->GetBinError(bin_);
     }
 
     //implementing Barlow-Beeston correction for LH calculation

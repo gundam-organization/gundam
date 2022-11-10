@@ -42,7 +42,6 @@ public:
   void setStdDevValue(double stdDevValue);
   void setDialSetConfig(const nlohmann::json &jsonConfig_);
   void setParameterDefinitionConfig(const nlohmann::json &config_);
-  void setEnableDialSetsSummary(bool enableDialSetsSummary);
   void setMinValue(double minValue);
   void setMaxValue(double maxValue);
   void setStepSize(double stepSize);
@@ -76,7 +75,7 @@ public:
   // Core
   double getDistanceFromNominal() const; // in unit of sigmas
   DialSet* findDialSet(const std::string& dataSetName_);
-  std::string getSummary() const;
+  std::string getSummary(bool shallow_=false) const;
   std::string getTitle() const;
   std::string getFullTitle() const;
 
@@ -91,7 +90,6 @@ private:
   bool _isEigen_{false};
   bool _isFree_{false};
   bool _gotUpdated_{false};
-  bool _enableDialSetsSummary_{false};
   int _parameterIndex_{-1}; // to get the right definition in the json config (in case "name" is not specified)
   double _parameterValue_{std::nan("unset")};
   double _priorValue_{std::nan("unset")};

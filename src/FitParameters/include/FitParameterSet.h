@@ -35,7 +35,7 @@ class FitParameterSet : public JsonBaseClass  {
 
 public:
   // Post-init
-  void prepareFitParameters(); // invert the matrices, and make sure fixed parameters are detached from correlations
+  void processCovarianceMatrix(); // invert the matrices, and make sure fixed parameters are detached from correlations
 
   // Getters
   bool isEnabled() const;
@@ -52,6 +52,7 @@ public:
   std::vector<FitParameter>& getEffectiveParameterList();
   const std::vector<FitParameter>& getEffectiveParameterList() const;
   bool isMaskedForPropagation() const;
+  const nlohmann::json &getDialSetDefinitions() const;
 
   // Core
   size_t getNbParameters() const;
@@ -94,9 +95,18 @@ private:
   // JSON
   std::string _name_{};
   std::string _parameterDefinitionFilePath_{};
+  std::string _covarianceMatrixTMatrixD_{};
+  std::string _parameterPriorTVectorD_{};
+  std::string _parameterNameTObjArray_{};
+  std::string _parameterLowerBoundsTVectorD_{};
+  std::string _parameterUpperBoundsTVectorD_{};
+  std::string _throwEnabledListPath_{};
+  nlohmann::json _parameterDefinitionConfig_{};
+  nlohmann::json _dialSetDefinitions_{};
   bool _isEnabled_{};
   bool _maskedForPropagation_{false};
   bool _printDialSetsSummary_{false};
+  bool _printParametersSummary_{false};
   bool _releaseFixedParametersOnHesse_{false};
   int _nbParameterDefinition_{-1};
   double _nominalStepSize_{std::nan("unset")};

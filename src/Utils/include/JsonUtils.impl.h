@@ -52,6 +52,14 @@ namespace JsonUtils {
     }
     return defaultValue_;
   }
+  template<class T> auto fetchValuePath(const nlohmann::json& jsonConfig_, const std::string& keyNamePath_) -> T{
+    auto keyPathElements = GenericToolbox::splitString(keyNamePath_, "/", true);
+    nlohmann::json elm{jsonConfig_};
+    for( auto& keyPathElement : keyPathElements ){
+      elm = JsonUtils::fetchValue<nlohmann::json>(elm, keyPathElement);
+    }
+    return elm.template get<T>();
+  }
   template<class T> nlohmann::json fetchMatchingEntry(const nlohmann::json& jsonConfig_, const std::string& keyName_, const T& keyValue_){
 
     if( not jsonConfig_.is_array() ){

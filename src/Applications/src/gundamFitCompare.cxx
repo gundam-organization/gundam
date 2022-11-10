@@ -2,7 +2,6 @@
 // Created by Adrien BLANCHET on 12/05/2022.
 //
 
-#include <TLegend.h>
 #include "GundamGreetings.h"
 
 #include "Logger.h"
@@ -12,6 +11,7 @@
 #include "nlohmann/json.hpp"
 #include "TKey.h"
 #include "TFile.h"
+#include <TLegend.h>
 
 #include "string"
 #include "vector"

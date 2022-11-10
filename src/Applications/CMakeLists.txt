@@ -11,11 +11,6 @@ set( APPLICATION_LIST
         gundamRoot
 )
 
-#set (DICT_HEADERS FitterEngine.h)
-#
-#ROOT_GENERATE_DICTIONARY(FitterEngineDict ${DICT_HEADERS} LINKDEF ./GundamLinkDef.h)
-#list(APPEND SRCFILES FitterEngineDict.cxx)
-
 
 if( ENABLE_DEV_MODE )
     list(APPEND APPLICATION_LIST Sandbox)
@@ -23,7 +18,16 @@ endif()
 
 foreach( app ${APPLICATION_LIST} )
     cmessage( STATUS "Defining app: ${app}" )
-    add_executable( ${app} src/${app}.cxx)
-    target_link_libraries( ${app} GundamFitter )
+    add_executable( ${app} src/${app}.cxx )
     install( TARGETS ${app} DESTINATION bin )
 endforeach()
+
+# Dependencies
+target_link_libraries( gundamFitter GundamFitter )
+target_link_libraries( gundamFitCompare GundamUtils )
+target_link_libraries( gundamConfigUnfolder GundamUtils )
+target_link_libraries( gundamConfigCompare GundamUtils )
+target_link_libraries( gundamPlotExtractor GundamUtils )
+target_link_libraries( gundamCalcXsec GundamPropagator )
+target_link_libraries( gundamRoot GundamPropagator )
+

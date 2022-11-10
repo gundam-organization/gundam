@@ -94,6 +94,14 @@ TTreeFormula *DataBin::getTreeFormula() const {
 size_t DataBin::getNbEdges() const{
   return _edgesList_.size();
 }
+double DataBin::getVolume() const{
+  double out{1};
+  for( auto& edges : _edgesList_ ){
+    if( edges.first == edges.second ) continue; // no volume, just a condition variable
+    out *= std::max(edges.first, edges.second) - std::min(edges.first, edges.second);
+  }
+  return out;
+}
 const std::vector<int> &DataBin::getEventVarIndexCache() const {
   return _eventVarIndexCache_;
 }

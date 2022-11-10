@@ -89,6 +89,7 @@ class DataDispenser : public JsonBaseClass {
 
 public:
   explicit DataDispenser(DatasetLoader* owner_);
+  void setOwner(DatasetLoader* owner_){ _owner_ = owner_; }
 
   const DataDispenserParameters &getParameters() const;
   DataDispenserParameters &getParameters();

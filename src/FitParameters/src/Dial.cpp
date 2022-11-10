@@ -80,10 +80,10 @@ double Dial::getEffectiveDialParameter(double parameterValue_){
 }
 double Dial::capDialResponse(double response_){
   // Cap checks
-  if     (_owner_->getMinDialResponse() == _owner_->getMinDialResponse() and response_ < _owner_->getMinDialResponse() ){ response_=_owner_->getMinDialResponse(); }
-  else if(_owner_->getMaxDialResponse() == _owner_->getMaxDialResponse() and response_ > _owner_->getMaxDialResponse() ){ response_=_owner_->getMaxDialResponse(); }
+  if     ( not std::isnan(_owner_->getMinDialResponse()) and response_ < _owner_->getMinDialResponse() ){ response_=_owner_->getMinDialResponse(); }
+  else if( not std::isnan(_owner_->getMaxDialResponse()) and response_ > _owner_->getMaxDialResponse() ){ response_=_owner_->getMaxDialResponse(); }
 
-  LogThrowIf( std::isnan(response_), "NaN response returned:" << std::endl << this->getSummary());
+  LogThrowIf( std::isnan(response_), "NaN response returned:" << std::endl << this->Dial::getSummary());
   if( Dial::throwIfResponseIsNegative and response_ < 0 ){
     this->writeSpline("");
     LogError << this->getSummary() << std::endl;

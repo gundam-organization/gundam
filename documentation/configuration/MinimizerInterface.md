@@ -23,4 +23,5 @@
 | generatedPostFitParBreakdown   | bool   | Generate figures showing hessian eigen decomp breakdown by parameter         | false               |
 | generatedPostFitEigenBreakdown | bool   | Generate figures showing parameter breakdown by hessian eigen                | false               |
 | monitorRefreshRateInMs         | int    | Max refresh rate for the fit monitor in milliseconds                         | 5000                |
+| monitorBashModeRefreshRateInS  | int    | Max refresh rate for the fit monitor in second when running in batch mode    | 30                  |
 | showParametersOnFitMonitor     | bool   | Display fit parameter parameter values on the monitor                        | false               |

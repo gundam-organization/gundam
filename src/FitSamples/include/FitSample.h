@@ -22,6 +22,12 @@
 class FitSample : public JsonBaseClass {
 
 public:
+  // SETTERS
+  void setName(const std::string &name);
+  void setBinningFilePath(const std::string &binningFilePath_);
+  void setSelectionCutStr(const std::string &selectionCutStr_);
+  void setEnabledDatasetList(const std::vector<std::string>& enabledDatasetList_);
+
   // GETTERS
   bool isEnabled() const;
   const std::string &getName() const;
@@ -45,8 +51,8 @@ private:
   double _mcNorm_{1};
   double _dataNorm_{1};
   std::string _name_;
-  std::string _selectionCuts_;
-  std::string _binningFile_;
+  std::string _selectionCutStr_;
+  std::string _binningFilePath_;
   std::vector<std::string> _enabledDatasetList_;
 
   // Internals

@@ -57,6 +57,7 @@ void MinimizerInterface::readConfigImpl(){
   _monitorRefreshRateInMs_ = JsonUtils::fetchValue(_config_, "monitorRefreshRateInMs", _monitorRefreshRateInMs_);
   _showParametersOnFitMonitor_ = JsonUtils::fetchValue(_config_, "showParametersOnFitMonitor", _showParametersOnFitMonitor_);
   _maxNbParametersPerLineOnMonitor_ = JsonUtils::fetchValue(_config_, "maxNbParametersPerLineOnMonitor", _maxNbParametersPerLineOnMonitor_);
+  _monitorBashModeRefreshRateInS_ = JsonUtils::fetchValue(_config_, "monitorBashModeRefreshRateInS", _monitorBashModeRefreshRateInS_);
 }
 void MinimizerInterface::initializeImpl(){
   LogInfo << "Initializing the minimizer..." << std::endl;
@@ -133,7 +134,13 @@ void MinimizerInterface::initializeImpl(){
   _convergenceMonitor_.addVariable("Stat");
   _convergenceMonitor_.addVariable("Syst");
 
-  _convergenceMonitor_.setMaxRefreshRateInMs(_monitorRefreshRateInMs_);
+  if( GenericToolbox::getTerminalWidth() == 0 ){
+    // batch mode
+    _convergenceMonitor_.setMaxRefreshRateInMs(_monitorBashModeRefreshRateInS_ * 1000.);
+  }
+  else{
+    _convergenceMonitor_.setMaxRefreshRateInMs(_monitorRefreshRateInMs_);
+  }
 }
 
 bool MinimizerInterface::isFitHasConverged() const {
@@ -152,7 +159,7 @@ const std::unique_ptr<ROOT::Math::Minimizer> &MinimizerInterface::getMinimizer()
   return _minimizer_;
 }
 
-void MinimizerInterface::minimize() {
+void MinimizerInterface::minimize(){
   LogThrowIf(not isInitialized(), "not initialized");
 
   _chi2HistoryTree_ = std::make_unique<TTree>("chi2History", "chi2History");
@@ -248,9 +255,9 @@ void MinimizerInterface::minimize() {
 
   LogInfo << _convergenceMonitor_.generateMonitorString(); // lasting printout
   LogInfo << "Minimization ended after " << nbMinimizeCalls << " calls." << std::endl;
-  if(_minimizerAlgo_ == "Migrad") LogWarning << "Status code: " << this->minuitStatusCodeStr.at(_minimizer_->Status()) << std::endl;
+  if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogWarning << "Status code: " << this->minuitStatusCodeStr.at(_minimizer_->Status()) << std::endl;
   else LogWarning << "Status code: " << _minimizer_->Status() << std::endl;
-  if(_minimizerAlgo_ == "Migrad") LogWarning << "Covariance matrix status code: " << this->covMatrixStatusCodeStr.at(_minimizer_->CovMatrixStatus()) << std::endl;
+  if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogWarning << "Covariance matrix status code: " << this->covMatrixStatusCodeStr.at(_minimizer_->CovMatrixStatus()) << std::endl;
   else LogWarning << "Covariance matrix status code: " << _minimizer_->CovMatrixStatus() << std::endl;
 
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "fit"), _chi2HistoryTree_.get());
@@ -299,16 +306,8 @@ void MinimizerInterface::minimize() {
     }
 
     samplesArrList[iSample].lockArraySize();
-
-
-    std::string cleanBranchName{sample.getName()};
-    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, " ", "_");
-    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, "-", "_");
-    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, "(", "");
-    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, ")", "");
-
     bestFitStats->Branch(
-        cleanBranchName.c_str(),
+        GenericToolbox::generateCleanBranchName(sample.getName()).c_str(),
         &samplesArrList[iSample].getRawDataArray()[0],
         GenericToolbox::joinVectorString(leavesDict, ":").c_str()
     );
@@ -330,14 +329,8 @@ void MinimizerInterface::minimize() {
       parameterSetArrList[iParSet].writeRawData(par.getParameterValue());
     }
 
-    std::string cleanBranchName{parSet.getName()};
-    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, " ", "_");
-    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, "-", "_");
-    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, "(", "");
-    GenericToolbox::replaceSubstringInsideInputString(cleanBranchName, ")", "");
-
     bestFitStats->Branch(
-        cleanBranchName.c_str(),
+        GenericToolbox::generateCleanBranchName(parSet.getName()).c_str(),
         &parameterSetArrList[iParSet].getRawDataArray()[0],
         GenericToolbox::joinVectorString(leavesDict, ":").c_str()
     );
@@ -530,10 +523,13 @@ double MinimizerInterface::evalFit(const double* parArray_){
 
     if( _nbFitCalls_ == 1 ){
       // don't erase these lines
-      LogInfo << _convergenceMonitor_.generateMonitorString();
+      LogWarning << _convergenceMonitor_.generateMonitorString();
     }
     else{
-      LogInfo << _convergenceMonitor_.generateMonitorString(true , true);
+      LogInfo << _convergenceMonitor_.generateMonitorString(
+          GenericToolbox::getTerminalWidth() != 0, // trail back if not in batch mode
+          true // force generate
+      );
     }
 
     _itSpeed_.counts = _nbFitCalls_;

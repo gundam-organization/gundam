@@ -64,6 +64,7 @@ private:
   int _printLevel_{2};
   int _simplexStrategy_{1};
   int _monitorRefreshRateInMs_{5000};
+  int _monitorBashModeRefreshRateInS_{30};
   int _maxNbParametersPerLineOnMonitor_{15};
   double _tolerance_{1E-4};
   double _simplexToleranceLoose_{1000.};

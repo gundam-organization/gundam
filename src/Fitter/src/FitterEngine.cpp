@@ -333,7 +333,7 @@ void FitterEngine::fixGhostFitParameters(){
     // Recompute inverse matrix for the fitter
     // Note: Eigen decomposed parSet don't need a new inversion since the matrix is diagonal
     if( not parSet.isUseEigenDecompInFit() ){
-      parSet.prepareFitParameters();
+      parSet.processCovarianceMatrix();
     }
 
   }
