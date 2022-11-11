@@ -5,7 +5,7 @@
 #ifndef GUNDAM_DATADISPENSER_H
 #define GUNDAM_DATADISPENSER_H
 
-#include "EventVarTransform.h"
+#include "EventVarTransformLib.h"
 #include "FitSampleSet.h"
 #include "FitParameterSet.h"
 #include "PlotGenerator.h"
@@ -29,6 +29,7 @@ struct DataDispenserParameters{
   std::vector<std::string> filePathList{};
   std::map<std::string, std::string> overrideLeafDict{};
   std::vector<std::string> additionalVarsStorage{};
+  std::vector<std::string> dummyVariablesList;
   int iThrow{-1};
 
   std::string getSummary() const{
@@ -61,7 +62,7 @@ struct DataDispenserCache{
   std::vector<std::string> varsToOverrideList; // stores the leaves names to override in the right order
 
   // Variable transformations
-  std::vector<EventVarTransform> eventVarTransformList;
+  std::vector<EventVarTransformLib> eventVarTransformList;
 
   void clear(){
     samplesToFillList.clear();

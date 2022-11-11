@@ -190,6 +190,10 @@ void Propagator::initializeImpl() {
     LogWarning << "Copying loaded mc-like event to data container..." << std::endl;
     _fitSampleSet_.copyMcEventListToDataContainer();
 
+    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+      sample.getDataContainer().histScale = sample.getMcContainer().histScale;
+    }
+
     // back to prior
     if( _throwAsimovToyParameters_ ){
       for( auto& parSet : _parameterSetList_ ){
