@@ -814,6 +814,7 @@ void DataDispenser::readAndFill(){
             Form("%s_%i_VarSelectionFormula", sample->getName().c_str(), iThread_),
             sample->getVarSelectionFormulaStr().c_str()
         );
+        LogInfo(iThread_==0) << "Var selection formula for " << sample->getName() << ": \"" << sample->getVarSelectionFormulaStr() << "\"" << std::endl;
       }
     }
 
