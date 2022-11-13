@@ -73,6 +73,9 @@ void FitSample::setBinningFilePath(const std::string &binningFilePath_) {
 void FitSample::setSelectionCutStr(const std::string &selectionCutStr_) {
   _selectionCutStr_ = selectionCutStr_;
 }
+void FitSample::setVarSelectionFormulaStr(const std::string &varSelectionFormulaStr_){
+  _varSelectionFormulaStr_ = varSelectionFormulaStr_;
+}
 void FitSample::setEnabledDatasetList(const std::vector<std::string>& enabledDatasetList_){
   _enabledDatasetList_ = enabledDatasetList_;
 }
@@ -85,6 +88,9 @@ const std::string &FitSample::getName() const {
 }
 const std::string &FitSample::getSelectionCutsStr() const {
   return _selectionCutStr_;
+}
+const std::string &FitSample::getVarSelectionFormulaStr() const {
+  return _varSelectionFormulaStr_;
 }
 const DataBinSet &FitSample::getBinning() const {
   return _binning_;

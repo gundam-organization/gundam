@@ -200,9 +200,12 @@ int main(int argc, char** argv){
     auto templateBinningFilePath = JsonUtils::fetchValue<std::string>(
         p.getFitParameterSetPtr( parameterSetName )->getDialSetDefinitions()[0], "parametersBinningPath"
     );
+    auto applyOnCondition = JsonUtils::fetchValue<std::string>(
+        p.getFitParameterSetPtr( parameterSetName )->getDialSetDefinitions()[0], "applyCondition"
+    );
 
     signalSampleList.back().first->setBinningFilePath( templateBinningFilePath );
-    signalSampleList.back().first->setSelectionCutStr("1"); // dummy cut to select all event during the data loading
+    signalSampleList.back().first->setVarSelectionFormulaStr( applyOnCondition );
 
     if( JsonUtils::doKeyExist(signalDef, "datasetSources") ){
       auto datasetSrcList = JsonUtils::fetchValue<std::vector<std::string>>(signalDef, "datasetSources");

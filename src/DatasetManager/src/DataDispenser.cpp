@@ -202,7 +202,7 @@ void DataDispenser::doEventSelection(){
     std::vector<TTreeFormula *> sampleCutFormulaList(_cache_.samplesToFillList.size(), nullptr);
     TTreeFormulaManager formulaManager; // TTreeFormulaManager handles the notification of multiple TTreeFormula for one TTChain
 
-    if (not _parameters_.selectionCutFormulaStr.empty()) {
+    if ( not _parameters_.selectionCutFormulaStr.empty() ) {
       treeSelectionCutFormula = new TTreeFormula(
           "SelectionCutFormula",
           _parameters_.selectionCutFormulaStr.c_str(),
@@ -232,6 +232,9 @@ void DataDispenser::doEventSelection(){
 
       t.addTableLine({{"\"" + _cache_.samplesToFillList[iSample]->getName() + "\""},
                       {"\"" + selectionCut + "\""}});
+
+      if( selectionCut.empty() ) continue;
+
       sampleCutFormulaList[iSample] = new TTreeFormula(_cache_.samplesToFillList[iSample]->getName().c_str(),
                                                        selectionCut.c_str(), &treeChain);
 
@@ -253,6 +256,7 @@ void DataDispenser::doEventSelection(){
 
     if (treeSelectionCutFormula != nullptr) GenericToolbox::enableSelectedBranches(&treeChain, treeSelectionCutFormula);
     for (auto &sampleFormula: sampleCutFormulaList) {
+      if( sampleFormula == nullptr ) continue;
       GenericToolbox::enableSelectedBranches(&treeChain, sampleFormula);
     }
 
@@ -311,7 +315,17 @@ void DataDispenser::doEventSelection(){
       }
 
       for (size_t iSample = 0; iSample < sampleCutFormulaList.size(); iSample++) {
-        if (not GenericToolbox::doesEntryPassCut(sampleCutFormulaList[iSample])) {
+
+        if( sampleCutFormulaList[iSample] == nullptr ){
+          perThreadSampleNbOfEvents[iThread_][iSample]++;
+          if (GlobalVariables::getVerboseLevel() == INLOOP_TRACE) {
+            LogDebug << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
+                     << " included as sample " << iSample << " (NO SELECTION CUT)" << std::endl;
+          }
+          continue;
+        }
+
+        if ( not GenericToolbox::doesEntryPassCut(sampleCutFormulaList[iSample])) {
           perThreadEventIsInSamplesList[iThread_][iEntry][iSample] = false;
           if (GlobalVariables::getVerboseLevel() == INLOOP_TRACE) {
             LogTrace << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
@@ -791,6 +805,18 @@ void DataDispenser::readAndFill(){
       return true;
     };
 
+    // Formula
+    std::vector<std::shared_ptr<TFormula>> varSelectionFormulaList{};
+    for( auto* sample : _cache_.samplesToFillList ){
+      varSelectionFormulaList.emplace_back(nullptr);
+      if( not sample->getVarSelectionFormulaStr().empty() ){
+        varSelectionFormulaList.back() = std::make_shared<TFormula>(
+            Form("%s_%i_VarSelectionFormula", sample->getName().c_str(), iThread_),
+            sample->getVarSelectionFormulaStr().c_str()
+        );
+      }
+    }
+
     // Try to read TTree the closest to sequentially possible
     Long64_t nEvents = treeChain.GetEntries();
     Long64_t nEventPerThread = nEvents/Long64_t(nThreads);
@@ -874,6 +900,12 @@ void DataDispenser::readAndFill(){
           for( auto* varTransformPtr : varTransformForIndexingList ){
             varTransformPtr->evalAndStore(eventBuffer);
           }
+
+          // Sample variable
+          if( varSelectionFormulaList[iSample] != nullptr ){
+            if( eventBuffer.evalFormula( varSelectionFormulaList[iSample].get() ) == 0 ) break;
+          }
+
 
           // Has valid bin?
           binsListPtr = &_cache_.samplesToFillList[iSample]->getBinning().getBinsList();
