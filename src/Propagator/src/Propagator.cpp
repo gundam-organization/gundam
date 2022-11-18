@@ -144,7 +144,11 @@ void Propagator::initializeImpl() {
   // Copy to data container
   if( usedMcContainer ){
     if( _throwAsimovToyParameters_ ){
+      LogInfo << "Throwing asimov toy parameters..." << std::endl;
+
       for( auto& parSet : _parameterSetList_ ){
+        if( not parSet.isEnabled() ) continue;
+
         bool keepThrow{false};
         if( parSet.isEnabledThrowToyParameters() and parSet.getPriorCovarianceMatrix() != nullptr ){
 

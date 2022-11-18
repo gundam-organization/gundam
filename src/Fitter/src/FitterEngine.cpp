@@ -73,6 +73,34 @@ void FitterEngine::initializeImpl(){
 
   _propagator_.initialize();
 
+  if( _propagator_.isThrowAsimovToyParameters() ){
+    LogInfo << "Writing throws in TTree..." << std::endl;
+    auto* throwsTree = new TTree("throws", "throws");
+
+    std::vector<GenericToolbox::RawDataArray> thrownParameterValues{};
+    thrownParameterValues.reserve(_propagator_.getParameterSetsList().size());
+    for( auto& parSet : _propagator_.getParameterSetsList() ){
+      if( not parSet.isEnabled() ) continue;
+
+      std::vector<std::string> leavesList;
+      thrownParameterValues.emplace_back();
+
+      for( auto& par : parSet.getParameterList() ){
+        leavesList.emplace_back(GenericToolbox::generateCleanBranchName(par.getTitle()) + "/D");
+        thrownParameterValues.back().writeRawData(par.getThrowValue());
+      }
+
+      thrownParameterValues.back().lockArraySize();
+      throwsTree->Branch(
+          GenericToolbox::generateCleanBranchName(parSet.getName()).c_str(),
+          &thrownParameterValues.back().getRawDataArray()[0],
+          GenericToolbox::joinVectorString(leavesList, ":").c_str()
+      );
+    }
+
+    GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(_saveDir_, "preFit/events"), throwsTree);
+  }
+
   // This moves the parameters
   if( _enablePca_ ) {
     LogWarning << "PCA is enabled. Polling parameters..." << std::endl;
@@ -103,7 +131,10 @@ void FitterEngine::initializeImpl(){
   }
 
   this->_propagator_.updateLlhCache();
-  _propagator_.getTreeWriter().writeSamples(GenericToolbox::mkdirTFile(_saveDir_, "preFit/events"));
+
+  if( not _lightMode_ ){
+    _propagator_.getTreeWriter().writeSamples(GenericToolbox::mkdirTFile(_saveDir_, "preFit/events"));
+  }
 
   LogWarning << "Saving all objects to disk..." << std::endl;
   GenericToolbox::triggerTFileWrite(_saveDir_);
@@ -118,6 +149,9 @@ void FitterEngine::setIsDryRun(bool isDryRun_){
 }
 void FitterEngine::setEnablePca(bool enablePca_){
   _enablePca_ = enablePca_;
+}
+void FitterEngine::setLightMode(bool lightMode_){
+  _lightMode_ = lightMode_;
 }
 void FitterEngine::setEnablePreFitScan(bool enablePreFitScan) {
   _enablePreFitScan_ = enablePreFitScan;
@@ -152,14 +186,14 @@ void FitterEngine::fit(){
   LogThrowIf(not isInitialized());
 
   // Not moving parameters
-  if( _generateSamplePlots_ ){
+  if( not _lightMode_ and _generateSamplePlots_ ){
     LogInfo << "Generating pre-fit sample plots..." << std::endl;
     _propagator_.getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(_saveDir_, "preFit/samples"));
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
 
   // Moving parameters
-  if( _generateOneSigmaPlots_ ){
+  if( not _lightMode_ and _generateOneSigmaPlots_ ){
     LogInfo << "Generating pre-fit one-sigma variation plots..." << std::endl;
     _propagator_.getParScanner().generateOneSigmaPlots(GenericToolbox::mkdirTFile(_saveDir_, "preFit/oneSigma"));
     GenericToolbox::triggerTFileWrite(_saveDir_);
@@ -223,7 +257,7 @@ void FitterEngine::fit(){
   LogInfo << "Minimizing LLH..." << std::endl;
   _minimizer_.minimize();
 
-  if( _generateSamplePlots_ ){
+  if( not _lightMode_ and _generateSamplePlots_ ){
     LogInfo << "Generating post-fit sample plots..." << std::endl;
     _propagator_.getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(_saveDir_, "postFit/samples"));
     GenericToolbox::triggerTFileWrite(_saveDir_);

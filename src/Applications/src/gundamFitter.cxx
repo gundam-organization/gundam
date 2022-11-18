@@ -57,6 +57,8 @@ int main(int argc, char** argv){
   clParser.addTriggerOption("enablePca", {"--enable-pca"}, "Enable principle component analysis for eigen decomposed parameter sets");
   clParser.addTriggerOption("skipHesse", {"--skip-hesse"}, "Don't perform postfit error evaluation");
   clParser.addTriggerOption("generateOneSigmaPlots", {"--one-sigma"}, "Generate one sigma plots");
+  clParser.addTriggerOption("lightOutputMode", {"--light-mode"}, "Disable plot generation");
+
   clParser.addOption("scanParameters", {"--scan"}, "Enable parameter scan before and after the fit (can provide nSteps)", 1, true);
   clParser.addOption("toyFit", {"--toy"}, "Run a toy fit (optional arg to provide toy index)", 1, true);
 
@@ -219,6 +221,7 @@ int main(int argc, char** argv){
   // --------------------------
   LogInfo << "FitterEngine setup..." << std::endl;
   FitterEngine fitter{GenericToolbox::mkdirTFile(out, "FitterEngine")};
+
   fitter.readConfig(JsonUtils::fetchSubEntry(jsonConfig, {"fitterEngineConfig"}));
 
   // -a
@@ -250,6 +253,9 @@ int main(int argc, char** argv){
 
   // --one-sigma
   fitter.setGenerateOneSigmaPlots( clParser.isOptionTriggered("generateOneSigmaPlots") );
+
+  // --light-mode
+  fitter.setLightMode( clParser.isOptionTriggered("lightOutputMode") );
 
   // Also check app level config options
   JsonUtils::deprecatedAction(jsonConfig, "generateSamplePlots", [&]{

@@ -32,6 +32,7 @@ public:
   void setSaveDir(TDirectory *saveDir);
   void setIsDryRun(bool isDryRun_);
   void setEnablePca(bool enablePca_);
+  void setLightMode(bool lightMode_);
   void setEnablePreFitScan(bool enablePreFitScan);
   void setEnablePostFitScan(bool enablePostFitScan);
   void setGenerateSamplePlots(bool generateSamplePlots);
@@ -62,6 +63,7 @@ private:
   // Parameters
   bool _isDryRun_{false};
   bool _enablePca_{false};
+  bool _lightMode_{false};
   bool _throwMcBeforeFit_{false};
   bool _enablePreFitScan_{false};
   bool _enablePostFitScan_{false};
