@@ -98,6 +98,7 @@ void FitterEngine::initializeImpl(){
       );
     }
 
+    throwsTree->Fill();
     GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(_saveDir_, "preFit/events"), throwsTree);
   }
 
