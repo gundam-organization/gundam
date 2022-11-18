@@ -46,6 +46,7 @@ int main(int argc, char** argv){
   clParser.addOption("configFile", {"-c", "--config-file"}, "Specify path to the fitter config file");
   clParser.addOption("nbThreads", {"-t", "--nb-threads"}, "Specify nb of parallel threads");
   clParser.addOption("outputFilePath", {"-o", "--out-file"}, "Specify the output file");
+  clParser.addOption("outputDir", {"--out-dir"}, "Specify the output directory");
   clParser.addOption("randomSeed", {"-s", "--seed"}, "Set random seed");
   clParser.addOption("appendix", {"--appendix"}, "Add appendix to the output file name");
 
@@ -131,11 +132,18 @@ int main(int argc, char** argv){
     outFileName = clParser.getOptionVal("outputFilePath", outFileName + ".root");
   }
   else{
-    if( JsonUtils::doKeyExist(jsonConfig, "outputFolder") ){
-      GenericToolbox::mkdirPath(JsonUtils::fetchValue<std::string>(jsonConfig, "outputFolder"));
+
+    if( clParser.isOptionTriggered("outputDir") ){
+      outFileName = clParser.getOptionVal<std::string>("outputDir");
+      outFileName += "/";
+      GenericToolbox::mkdirPath( outFileName );
+    }
+    else if( JsonUtils::doKeyExist(jsonConfig, "outputFolder") ){
       outFileName = JsonUtils::fetchValue<std::string>(jsonConfig, "outputFolder");
       outFileName += "/";
+      GenericToolbox::mkdirPath( outFileName );
     }
+
     outFileName += GenericToolbox::getFileNameFromFilePath(configFilePath, false);
 
     // appendixDict["optionName"] = "Appendix"
