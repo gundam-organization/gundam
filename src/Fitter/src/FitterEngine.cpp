@@ -99,7 +99,7 @@ void FitterEngine::initializeImpl(){
     }
 
     throwsTree->Fill();
-    GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(_saveDir_, "preFit/events"), throwsTree);
+    GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(_saveDir_, "preFit/parameters"), throwsTree);
   }
 
   // This moves the parameters
