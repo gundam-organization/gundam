@@ -38,6 +38,7 @@ void DataDispenser::readConfigImpl(){
   _parameters_.treePath = JsonUtils::fetchValue<std::string>(_config_, "tree", _parameters_.treePath);
   _parameters_.filePathList = JsonUtils::fetchValue<std::vector<std::string>>(_config_, "filePathList", _parameters_.filePathList);
   _parameters_.additionalVarsStorage = JsonUtils::fetchValue(_config_, {{"additionalLeavesStorage"}, {"additionalVarsStorage"}}, _parameters_.additionalVarsStorage);
+  _parameters_.dummyVariablesList = JsonUtils::fetchValue(_config_, "dummyVariablesList", _parameters_.dummyVariablesList);
   _parameters_.useMcContainer = JsonUtils::fetchValue(_config_, "useMcContainer", _parameters_.useMcContainer);
 
   _parameters_.selectionCutFormulaStr = JsonUtils::buildFormula(_config_, "selectionCutFormula", "&&", _parameters_.selectionCutFormulaStr);
@@ -116,13 +117,14 @@ void DataDispenser::load(){
   if( JsonUtils::doKeyExist(_config_, "variablesTransform") ){
     // load transformations
     int index{0};
-    for( auto& varTransform : JsonUtils::fetchValue(_config_, "variablesTransform", nlohmann::json()) ){
-      _cache_.eventVarTransformList.emplace_back(varTransform);
+    for( auto& varTransform : JsonUtils::fetchValue<std::vector<nlohmann::json>>(_config_, "variablesTransform") ){
+      _cache_.eventVarTransformList.emplace_back( varTransform );
       _cache_.eventVarTransformList.back().setIndex(index++);
+      _cache_.eventVarTransformList.back().initialize();
     }
     // sort them according to their output
-    std::function<bool(const EventVarTransform&, const EventVarTransform&)> aGoesFirst =
-        [](const EventVarTransform& a_, const EventVarTransform& b_){
+    std::function<bool(const EventVarTransformLib&, const EventVarTransformLib&)> aGoesFirst =
+        [](const EventVarTransformLib& a_, const EventVarTransformLib& b_){
           // does a_ is a self transformation? -> if yes, don't change the order
           if( GenericToolbox::doesElementIsInVector(a_.getOutputVariableName(), a_.fetchRequestedVars()) ){ return false; }
           // does b_ transformation needs a_ output? -> if yes, a needs to go first
@@ -200,7 +202,7 @@ void DataDispenser::doEventSelection(){
     std::vector<TTreeFormula *> sampleCutFormulaList(_cache_.samplesToFillList.size(), nullptr);
     TTreeFormulaManager formulaManager; // TTreeFormulaManager handles the notification of multiple TTreeFormula for one TTChain
 
-    if (not _parameters_.selectionCutFormulaStr.empty()) {
+    if ( not _parameters_.selectionCutFormulaStr.empty() ) {
       treeSelectionCutFormula = new TTreeFormula(
           "SelectionCutFormula",
           _parameters_.selectionCutFormulaStr.c_str(),
@@ -230,6 +232,9 @@ void DataDispenser::doEventSelection(){
 
       t.addTableLine({{"\"" + _cache_.samplesToFillList[iSample]->getName() + "\""},
                       {"\"" + selectionCut + "\""}});
+
+      if( selectionCut.empty() ) continue;
+
       sampleCutFormulaList[iSample] = new TTreeFormula(_cache_.samplesToFillList[iSample]->getName().c_str(),
                                                        selectionCut.c_str(), &treeChain);
 
@@ -251,6 +256,7 @@ void DataDispenser::doEventSelection(){
 
     if (treeSelectionCutFormula != nullptr) GenericToolbox::enableSelectedBranches(&treeChain, treeSelectionCutFormula);
     for (auto &sampleFormula: sampleCutFormulaList) {
+      if( sampleFormula == nullptr ) continue;
       GenericToolbox::enableSelectedBranches(&treeChain, sampleFormula);
     }
 
@@ -309,7 +315,17 @@ void DataDispenser::doEventSelection(){
       }
 
       for (size_t iSample = 0; iSample < sampleCutFormulaList.size(); iSample++) {
-        if (not GenericToolbox::doesEntryPassCut(sampleCutFormulaList[iSample])) {
+
+        if( sampleCutFormulaList[iSample] == nullptr ){
+          perThreadSampleNbOfEvents[iThread_][iSample]++;
+          if (GlobalVariables::getVerboseLevel() == INLOOP_TRACE) {
+            LogDebug << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
+                     << " included as sample " << iSample << " (NO SELECTION CUT)" << std::endl;
+          }
+          continue;
+        }
+
+        if ( not GenericToolbox::doesEntryPassCut(sampleCutFormulaList[iSample])) {
           perThreadEventIsInSamplesList[iThread_][iEntry][iSample] = false;
           if (GlobalVariables::getVerboseLevel() == INLOOP_TRACE) {
             LogTrace << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
@@ -366,6 +382,7 @@ void DataDispenser::fetchRequestedLeaves(){
 
   // parSet
   if( _parSetListPtrToLoad_ != nullptr ){
+    std::vector<std::string> indexRequests;
     for( auto& parSet : *_parSetListPtrToLoad_ ){
       if( not parSet.isEnabled() ) continue;
 
@@ -376,19 +393,19 @@ void DataDispenser::fetchRequestedLeaves(){
         if( dialSetPtr == nullptr ){ continue; }
 
         if( not dialSetPtr->getDialLeafName().empty() ){
-          _cache_.addVarRequestedForIndexing(dialSetPtr->getDialLeafName());
+          GenericToolbox::addIfNotInVector(dialSetPtr->getDialLeafName(), indexRequests);
         }
         else{
           if( dialSetPtr->getApplyConditionFormula() != nullptr ){
             for( int iPar = 0 ; iPar < dialSetPtr->getApplyConditionFormula()->GetNpar() ; iPar++ ){
-              _cache_.addVarRequestedForIndexing(dialSetPtr->getApplyConditionFormula()->GetParName(iPar));
+              GenericToolbox::addIfNotInVector(dialSetPtr->getApplyConditionFormula()->GetParName(iPar), indexRequests);
             }
           }
 
           for( auto& dial : dialSetPtr->getDialList() ){
             if( dial->getApplyConditionBinPtr() != nullptr ){
               for( auto& var : dial->getApplyConditionBinPtr()->getVariableNameList() ){
-                _cache_.addVarRequestedForIndexing(var);
+                GenericToolbox::addIfNotInVector(var, indexRequests);
               } // var
             }
           } // dial
@@ -396,53 +413,80 @@ void DataDispenser::fetchRequestedLeaves(){
 
       } // par
     } // parSet
+
+    LogInfo << "ParameterSets requests for indexing: " << GenericToolbox::parseVectorAsString(indexRequests) << std::endl;
+    for( auto& var : indexRequests ){ _cache_.addVarRequestedForIndexing(var); }
   }
 
-  // fit sample set storage requests
-  for( auto& var: _sampleSetPtrToLoad_->getAdditionalVariablesForStorage() ){
-    _cache_.addVarRequestedForStorage(var);
-  }
-
-  // sample
-  for( auto& sample: _sampleSetPtrToLoad_->getFitSampleList() ){
-    for( auto& bin: sample.getBinning().getBinsList()){
-      for( auto& var: bin.getVariableNameList()){
-        _cache_.addVarRequestedForIndexing(var);
+  // sample binning
+  if( _sampleSetPtrToLoad_ != nullptr ){
+    std::vector<std::string> indexRequests;
+    for (auto &sample: _sampleSetPtrToLoad_->getFitSampleList()) {
+      for (auto &bin: sample.getBinning().getBinsList()) {
+        for (auto &var: bin.getVariableNameList()) {
+          GenericToolbox::addIfNotInVector(var, indexRequests);
+        }
       }
     }
+    LogInfo << "Samples requests for indexing: " << GenericToolbox::parseVectorAsString(indexRequests) << std::endl;
+    for( auto& var : indexRequests ){ _cache_.addVarRequestedForIndexing(var); }
   }
 
   // plotGen
   if( _plotGenPtr_ != nullptr ){
+    std::vector<std::string> storeRequests;
     for( auto& var : _plotGenPtr_->fetchListOfVarToPlot(not _parameters_.useMcContainer) ){
-      _cache_.addVarRequestedForStorage(var);
+      GenericToolbox::addIfNotInVector(var, storeRequests);
     }
 
     if( _parameters_.useMcContainer ){
       for( auto& var : _plotGenPtr_->fetchListOfSplitVarNames() ){
-        _cache_.addVarRequestedForStorage(var);
+        GenericToolbox::addIfNotInVector(var, storeRequests);
       }
     }
+
+    LogInfo << "PlotGenerator requests for storage:" << GenericToolbox::parseVectorAsString(storeRequests) << std::endl;
+    for (auto &var: storeRequests) { _cache_.addVarRequestedForStorage(var); }
   }
 
   // storage requested by user
-  for( auto& additionalLeaf: _parameters_.additionalVarsStorage ){
-    _cache_.addVarRequestedForStorage(additionalLeaf);
+  {
+    std::vector<std::string> storeRequests;
+    for (auto &additionalLeaf: _parameters_.additionalVarsStorage) {
+      GenericToolbox::addIfNotInVector(additionalLeaf, storeRequests);
+    }
+    LogInfo << "Dataset additional requests for storage:" << GenericToolbox::parseVectorAsString(storeRequests) << std::endl;
+    for (auto &var: storeRequests) { _cache_.addVarRequestedForStorage(var); }
+  }
+
+  // fit sample set storage requests
+  if( _sampleSetPtrToLoad_ != nullptr ){
+    std::vector<std::string> storeRequests;
+    for (auto &var: _sampleSetPtrToLoad_->getAdditionalVariablesForStorage()) {
+      GenericToolbox::addIfNotInVector(var, storeRequests);
+    }
+    LogInfo << "SampleSet additional request for storage:" << GenericToolbox::parseVectorAsString(storeRequests) << std::endl;
+    for (auto &var: storeRequests) { _cache_.addVarRequestedForStorage(var); }
   }
 
   // transforms inputs
   if( not _cache_.eventVarTransformList.empty() ){
-    std::vector<std::string> additionalTransformVars;
+    std::vector<std::string> indexRequests;
     for( int iTrans = int(_cache_.eventVarTransformList.size())-1 ; iTrans >= 0 ; iTrans-- ){
       // in reverse order -> Treat the highest level vars first (they might need lower level variables)
       std::string outVarName = _cache_.eventVarTransformList[iTrans].getOutputVariableName();
-      if( GenericToolbox::doesElementIsInVector( outVarName, _cache_.varsRequestedForIndexing ) ){
+      if( GenericToolbox::doesElementIsInVector( outVarName, _cache_.varsRequestedForIndexing )
+          or GenericToolbox::doesElementIsInVector( outVarName, indexRequests )
+      ){
         // ok it is needed -> activate dependencies
         for( auto& var: _cache_.eventVarTransformList[iTrans].fetchRequestedVars() ){
-          _cache_.addVarRequestedForIndexing(var);
+          GenericToolbox::addIfNotInVector(var, indexRequests);
         }
       }
     }
+
+    LogInfo << "EventVariableTransformation requests for indexing: " << GenericToolbox::parseVectorAsString(indexRequests) << std::endl;
+    for( auto& var : indexRequests ){ _cache_.addVarRequestedForIndexing(var); }
   }
 
   LogInfo << "Vars requested for indexing: " << GenericToolbox::parseVectorAsString(_cache_.varsRequestedForIndexing, false) << std::endl;
@@ -630,8 +674,8 @@ void DataDispenser::readAndFill(){
 
     // Event Var Transform
     auto eventVarTransformList = _cache_.eventVarTransformList; // copy for cache
-    std::vector<EventVarTransform*> varTransformForIndexingList;
-    std::vector<EventVarTransform*> varTransformForStorageList;
+    std::vector<EventVarTransformLib*> varTransformForIndexingList;
+    std::vector<EventVarTransformLib*> varTransformForStorageList;
     for( auto& eventVarTransform : eventVarTransformList ){
       if( GenericToolbox::doesElementIsInVector(eventVarTransform.getOutputVariableName(), _cache_.varsRequestedForIndexing) ){
         varTransformForIndexingList.emplace_back(&eventVarTransform);
@@ -643,17 +687,17 @@ void DataDispenser::readAndFill(){
 
     if( iThread_ == 0 ){
       if( not varTransformForIndexingList.empty() ){
-        LogInfo << "EventVarTransform used for indexing: "
+        LogInfo << "EventVarTransformLib used for indexing: "
                 << GenericToolbox::iterableToString(
                     varTransformForIndexingList,
-                    [](const EventVarTransform* elm_){ return "\"" + elm_->getTitle() + "\"";}, false)
+                    [](const EventVarTransformLib* elm_){ return "\"" + elm_->getTitle() + "\"";}, false)
                 << std::endl;
       }
       if( not varTransformForStorageList.empty() ){
-        LogInfo << "EventVarTransform used for storage: "
+        LogInfo << "EventVarTransformLib used for storage: "
                 << GenericToolbox::iterableToString(
                     varTransformForStorageList,
-                    []( const EventVarTransform* elm_){ return "\"" + elm_->getTitle() + "\""; }, false)
+                    []( const EventVarTransformLib* elm_){ return "\"" + elm_->getTitle() + "\""; }, false)
                 << std::endl;
       }
     }
@@ -761,6 +805,19 @@ void DataDispenser::readAndFill(){
       return true;
     };
 
+    // Formula
+    std::vector<std::shared_ptr<TFormula>> varSelectionFormulaList{};
+    for( auto* sample : _cache_.samplesToFillList ){
+      varSelectionFormulaList.emplace_back(nullptr);
+      if( not sample->getVarSelectionFormulaStr().empty() ){
+        varSelectionFormulaList.back() = std::make_shared<TFormula>(
+            Form("%s_%i_VarSelectionFormula", sample->getName().c_str(), iThread_),
+            sample->getVarSelectionFormulaStr().c_str()
+        );
+        LogInfo(iThread_==0) << "Var selection formula for " << sample->getName() << ": \"" << sample->getVarSelectionFormulaStr() << "\"" << std::endl;
+      }
+    }
+
     // Try to read TTree the closest to sequentially possible
     Long64_t nEvents = treeChain.GetEntries();
     Long64_t nEventPerThread = nEvents/Long64_t(nThreads);
@@ -844,6 +901,12 @@ void DataDispenser::readAndFill(){
           for( auto* varTransformPtr : varTransformForIndexingList ){
             varTransformPtr->evalAndStore(eventBuffer);
           }
+
+          // Sample variable
+          if( varSelectionFormulaList[iSample] != nullptr ){
+            if( eventBuffer.evalFormula( varSelectionFormulaList[iSample].get() ) == 0 ) break;
+          }
+
 
           // Has valid bin?
           binsListPtr = &_cache_.samplesToFillList[iSample]->getBinning().getBinsList();
@@ -1035,22 +1098,22 @@ GenericToolbox::TreeEntryBuffer DataDispenser::generateTreeEventBuffer(TChain* t
     tBuf.setIsDummyLeaf(_cache_.varToLeafDict[var].first, _cache_.varToLeafDict[var].second);
   }
 
+  for( auto& dummyVar : _parameters_.dummyVariablesList ){
+    tBuf.setIsDummyLeaf(dummyVar, true);
+  }
+
   tBuf.hook(treeChain_);
 
   return tBuf;
 }
 
 void DataDispenserCache::addVarRequestedForIndexing(const std::string& varName_) {
-  LogThrowIf(varName_.empty(), "no var name provided.")
-  if( not GenericToolbox::doesElementIsInVector(varName_, this->varsRequestedForIndexing) ){
-    this->varsRequestedForIndexing.emplace_back(varName_);
-  }
+  LogThrowIf(varName_.empty(), "no var name provided.");
+  GenericToolbox::addIfNotInVector(varName_, this->varsRequestedForIndexing);
 }
 void DataDispenserCache::addVarRequestedForStorage(const std::string& varName_){
-  LogThrowIf(varName_.empty(), "no var name provided.")
-  if( not GenericToolbox::doesElementIsInVector(varName_, this->varsRequestedForStorage) ){
-    this->varsRequestedForStorage.emplace_back(varName_);
-  }
+  LogThrowIf(varName_.empty(), "no var name provided.");
+  GenericToolbox::addIfNotInVector(varName_, this->varsRequestedForStorage);
   this->addVarRequestedForIndexing(varName_);
 }
 
