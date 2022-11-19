@@ -379,7 +379,7 @@ void FitParameterSet::throwFitParameters(double gain_){
   if( _useEigenDecompInFit_ ){
     this->propagateOriginalToEigen();
     for( auto& eigenPar : _eigenParameterList_ ){
-      eigenPar.setThrowValue(eigenPar.getParameterValue());
+      eigenPar.setThrowValue( eigenPar.getParameterValue() );
     }
   }
 

@@ -86,6 +86,7 @@ void FitterEngine::initializeImpl(){
       thrownParameterValues.emplace_back();
 
       for( auto& par : parSet.getParameterList() ){
+        if( not par.isEnabled() or par.isFixed() or par.isFree() ) continue;
         leavesList.emplace_back(GenericToolbox::generateCleanBranchName(par.getTitle()) + "/D");
         thrownParameterValues.back().writeRawData(par.getThrowValue());
       }
