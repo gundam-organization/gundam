@@ -193,14 +193,14 @@ void FitterEngine::fit(){
   LogThrowIf(not isInitialized());
 
   // Not moving parameters
-  if( _generateSamplePlots_ ){
+  if( _generateSamplePlots_ and not _propagator_.getPlotGenerator().getConfig().empty() ){
     LogInfo << "Generating pre-fit sample plots..." << std::endl;
     _propagator_.getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(_saveDir_, "preFit/samples"));
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
 
   // Moving parameters
-  if( _generateOneSigmaPlots_ ){
+  if( _generateOneSigmaPlots_ and not _propagator_.getPlotGenerator().getConfig().empty() ){
     LogInfo << "Generating pre-fit one-sigma variation plots..." << std::endl;
     _propagator_.getParScanner().generateOneSigmaPlots(GenericToolbox::mkdirTFile(_saveDir_, "preFit/oneSigma"));
     GenericToolbox::triggerTFileWrite(_saveDir_);
@@ -264,7 +264,7 @@ void FitterEngine::fit(){
   LogInfo << "Minimizing LLH..." << std::endl;
   _minimizer_.minimize();
 
-  if( _generateSamplePlots_ ){
+  if( _generateSamplePlots_ and not _propagator_.getPlotGenerator().getConfig().empty() ){
     LogInfo << "Generating post-fit sample plots..." << std::endl;
     _propagator_.getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(_saveDir_, "postFit/samples"));
     GenericToolbox::triggerTFileWrite(_saveDir_);
