@@ -105,7 +105,7 @@ void FitParameterSet::initializeImpl() {
 
   for( auto& par : _parameterList_ ){
     par.initialize();
-    if( par.isInitialized() and _printParametersSummary_ ){
+    if( _printParametersSummary_ and par.isEnabled() ){
       LogInfo << par.getSummary(not _printDialSetsSummary_) << std::endl;
     }
   }

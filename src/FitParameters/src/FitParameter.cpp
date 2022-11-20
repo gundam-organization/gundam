@@ -65,7 +65,7 @@ void FitParameter::initializeImpl() {
   bool dialSetAreAllDisabled = true;
   for( const auto& dialSet : _dialSetList_ ){ if( dialSet.isEnabled() ){ dialSetAreAllDisabled = false; break; } }
   if( dialSetAreAllDisabled ){
-    LogError << "Parameter " << getTitle() << " has no dials: disabled." << std::endl;
+    LogWarning << "Parameter " << getTitle() << " has no dials: disabled." << std::endl;
     _isEnabled_ = false;
   }
 }
