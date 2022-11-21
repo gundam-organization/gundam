@@ -1,13 +1,13 @@
 //
 // Created by Adrien BLANCHET on 23/10/2022.
 //
+#include "Logger.h"
 
 #include "TROOT.h"
 #include "TRint.h"
 
 #include <cstdlib>
 
-#include "Logger.h"
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[gundamRoot.cxx]");

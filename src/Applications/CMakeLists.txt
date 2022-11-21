@@ -25,19 +25,20 @@ ROOT_GENERATE_DICTIONARY(
 )
 
 if( USE_STATIC_LINKS )
-    add_library(GundamRootDict STATIC G__GundamRootDict.cxx)
+    add_library( GundamRootDict STATIC G__GundamRootDict.cxx )
 else()
-    add_library(GundamRootDict SHARED G__GundamRootDict.cxx)
+    add_library( GundamRootDict SHARED G__GundamRootDict.cxx )
 endif()
+
 target_link_libraries( GundamRootDict ${ROOT_LIBRARIES} )
 install(TARGETS GundamRootDict DESTINATION lib)
 install(
-        FILES
+    FILES
         ${CMAKE_CURRENT_BINARY_DIR}/libGundamRootDict_rdict.pcm
         ${CMAKE_CURRENT_BINARY_DIR}/libGundamRootDict.rootmap
-        DESTINATION
+    DESTINATION
         ${CMAKE_INSTALL_PREFIX}/lib
-        COMPONENT
+    COMPONENT
         libraries
 )
 
@@ -54,5 +55,5 @@ target_link_libraries( gundamConfigUnfolder GundamUtils )
 target_link_libraries( gundamConfigCompare GundamUtils )
 target_link_libraries( gundamPlotExtractor GundamUtils )
 target_link_libraries( gundamCalcXsec GundamPropagator )
-target_link_libraries( gundamRoot GundamRootDict )
+target_link_libraries( gundamRoot GundamPropagator GundamRootDict )
 

@@ -245,6 +245,11 @@ endif()
 ## Add the GenericToolbox²
 # Reproduce needed parts of the cpp-generic-toolbox CMakeLists.txt
 include_directories(submodules/cpp-generic-toolbox/include)
+set(CPP_GENERIC_TOOLBOX_HEADERS
+        ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.h
+        ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.Root.h
+        )
+install(FILES ${CPP_GENERIC_TOOLBOX_HEADERS} DESTINATION include)
 add_definitions( -D PROGRESS_BAR_FILL_TAG="\\\"T2K\#"\\\" )
 if (COLOR_OUTPUT)
   add_definitions( -D PROGRESS_BAR_ENABLE_RAINBOW=1 )
