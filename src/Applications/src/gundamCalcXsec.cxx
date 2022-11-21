@@ -200,9 +200,12 @@ int main(int argc, char** argv){
     auto templateBinningFilePath = JsonUtils::fetchValue<std::string>(
         p.getFitParameterSetPtr( parameterSetName )->getDialSetDefinitions()[0], "parametersBinningPath"
     );
+    auto applyOnCondition = JsonUtils::fetchValue<std::string>(
+        p.getFitParameterSetPtr( parameterSetName )->getDialSetDefinitions()[0], "applyCondition"
+    );
 
     signalSampleList.back().first->setBinningFilePath( templateBinningFilePath );
-    signalSampleList.back().first->setSelectionCutStr("1"); // dummy cut to select all event during the data loading
+    signalSampleList.back().first->setVarSelectionFormulaStr( applyOnCondition );
 
     if( JsonUtils::doKeyExist(signalDef, "datasetSources") ){
       auto datasetSrcList = JsonUtils::fetchValue<std::vector<std::string>>(signalDef, "datasetSources");
@@ -243,7 +246,7 @@ int main(int argc, char** argv){
     LogThrowIf(parSet.getNbParameters() != postFitParHist->GetNbinsX(),
                "Expecting " << parSet.getNbParameters() << " postfit parameter values, but got: " << postFitParHist->GetNbinsX());
     for( auto& par : parSet.getParameterList() ){
-      par.setPriorValue(postFitParHist->GetBinContent( 1+par.getParameterIndex() ));
+      par.setPriorValue( postFitParHist->GetBinContent( 1+par.getParameterIndex() ) );
     }
   }
 
@@ -328,50 +331,20 @@ int main(int argc, char** argv){
   LogInfo << "Generating loaded sample plots..." << std::endl;
   p.getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(out, "XsecExtractor/postFit/samples"));
 
-
-//  std::vector<std::vector<double>> signalBinVolumeList{signalSampleList.size()};
-//  for( size_t iSignal = 0 ; iSignal < signalSampleList.size() ; iSignal++ ){
-//    signalBinVolumeList[iSignal].reserve(signalSampleList[iSignal].first->getBinning().getBinsList().size());
-//    for( auto& bin : signalSampleList[iSignal].first->getBinning().getBinsList() ) {
-//      signalBinVolumeList[iSignal].emplace_back( bin.getVolume() );
-//    }
-//  }
-//
-//  std::vector<std::shared_ptr<TH1D>> signalEfficiencyHistList{};
-//  signalEfficiencyHistList.reserve(signalSampleList.size());
-//  for( auto& signalSamplePair : signalSampleList ){
-//    signalEfficiencyHistList.emplace_back(std::make_shared<TH1D>( *signalSamplePair.second->getMcContainer().histogram ));
-//    signalEfficiencyHistList.back()->Divide(signalSamplePair.first->getMcContainer().histogram.get());
-//  }
-//
-//  std::vector<std::shared_ptr<TH1D>> signalToyHistList{};
-//  signalToyHistList.reserve(signalSampleList.size());
-//  for( auto& signalSamplePair : signalSampleList ){
-//    signalToyHistList.emplace_back(std::make_shared<TH1D>( *signalSamplePair.second->getMcContainer().histogram ));
-//    signalToyHistList.back()->Reset();
-//  }
-
   LogInfo << "Creating throws tree" << std::endl;
   auto* signalThrowTree = new TTree("signalThrowTree", "signalThrowTree");
   std::vector<GenericToolbox::RawDataArray> signalThrowData{signalSampleList.size()};
-  std::vector<TVectorD*> bestFitBinValues;
-  bestFitBinValues.reserve(signalSampleList.size());
+  std::vector<std::vector<double>> bufferList{signalSampleList.size()};
   for( size_t iSignal = 0 ; iSignal < signalSampleList.size() ; iSignal++ ){
 
-    bestFitBinValues.emplace_back( new TVectorD( signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX() ) );
-
-    std::vector<std::string> leafNameList{};
+    int nBins = signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX();
+    bufferList[iSignal].resize(nBins, 0);
 
     signalThrowData[iSignal].resetCurrentByteOffset();
-    for( int iBin = 0 ; iBin < signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-
+    std::vector<std::string> leafNameList(nBins);
+    for( int iBin = 0 ; iBin < nBins ; iBin++ ){
       leafNameList.emplace_back(Form("bin_%i/D", iBin));
-      signalThrowData[iSignal].writeRawData(
-          signalSampleList[iSignal].first->getMcContainer().histogram->GetBinContent(1+iBin)
-          );
-
-      (*bestFitBinValues.back())[iBin] = signalSampleList[iSignal].first->getMcContainer().histogram->GetBinContent(1+iBin);
-
+      signalThrowData[iSignal].writeRawData( double(0) );
     }
 
     signalThrowData[iSignal].lockArraySize();
@@ -391,13 +364,14 @@ int main(int argc, char** argv){
 
   int nToys{100};
   if(clParser.isOptionTriggered("nToys")) nToys = clParser.getOptionVal<int>("nToys");
-  std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating toys...";
+
+  std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating " << nToys << " toys...";
   for( int iToy = 0 ; iToy < nToys ; iToy++ ){
     GenericToolbox::displayProgressBar(iToy, nToys, ss.str());
 
+    // Do the throwing:
     p.throwParametersFromGlobalCovariance();
     p.propagateParametersOnSamples();
-
     if( enableStatThrowInToys ){
       for( auto& sample : p.getFitSampleSet().getFitSampleList() ){
         if( enableEventMcThrow ){
@@ -409,7 +383,14 @@ int main(int argc, char** argv){
       }
     }
 
+    // Compute N_truth_i(flux, xsec) and N_selected_truth_i(flux, xsec, det) -> efficiency
+    // mask detector parameters?
 
+
+    // Then compute N_selected_truth_i(flux, xsec, det, c_i) -> N_i
+
+
+    // Write N_i / efficiency / T / phi
     for( size_t iSignal = 0 ; iSignal < signalSampleList.size() ; iSignal++ ){
       signalThrowData[iSignal].resetCurrentByteOffset();
       for( int iBin = 0 ; iBin < signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX() ; iBin++ ){
@@ -420,6 +401,7 @@ int main(int argc, char** argv){
       }
     }
 
+    // Write the branches
     signalThrowTree->Fill();
   }
 
@@ -462,10 +444,15 @@ int main(int argc, char** argv){
       globalCorMatrixHist->GetYaxis()->SetBinLabel(1+iGlobal, (sampleTitle + "/" + binTitle).c_str());
     }
 
+    binValues[iSignal].SetMarkerStyle(kFullDotLarge);
+    binValues[iSignal].SetMarkerColor(kGreen-3);
+    binValues[iSignal].SetMarkerSize(0.5);
     binValues[iSignal].SetLineWidth(2);
     binValues[iSignal].SetLineColor(kGreen-3);
-    binValues[iSignal].SetDrawOption("E2");
+    binValues[iSignal].SetDrawOption("E1");
     binValues[iSignal].GetXaxis()->LabelsOption("v");
+    binValues[iSignal].GetXaxis()->SetLabelSize(0.02);
+    binValues[iSignal].GetYaxis()->SetTitle("#delta#sigma");
 
     GenericToolbox::writeInTFile(
         GenericToolbox::mkdirTFile(out, "XsecExtractor/histograms"),
@@ -474,7 +461,14 @@ int main(int argc, char** argv){
     );
   }
 
+
+  globalCovMatrixHist->GetXaxis()->SetLabelSize(0.02);
+  globalCovMatrixHist->GetYaxis()->SetLabelSize(0.02);
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "XsecExtractor/matrices"), globalCovMatrixHist, "covarianceMatrix");
+
+  globalCorMatrixHist->GetXaxis()->SetLabelSize(0.02);
+  globalCorMatrixHist->GetYaxis()->SetLabelSize(0.02);
+  globalCorMatrixHist->GetZaxis()->SetRangeUser(-1, 1);
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "XsecExtractor/matrices"), globalCorMatrixHist, "correlationMatrix");
 
   LogWarning << "Closing output file \"" << out->GetName() << "\"..." << std::endl;

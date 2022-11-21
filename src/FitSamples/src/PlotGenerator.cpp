@@ -70,7 +70,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
   LogThrowIf(not isInitialized());
 
   if( _histogramsDefinition_.empty() ){
-    LogError << "No histogram has been defined." << std::endl;
+    LogWarning << "No histogram has been defined." << std::endl;
     return;
   }
   if( cacheSlot_ >= _histHolderCacheList_.size() ){

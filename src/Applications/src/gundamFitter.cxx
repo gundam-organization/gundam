@@ -46,6 +46,7 @@ int main(int argc, char** argv){
   clParser.addOption("configFile", {"-c", "--config-file"}, "Specify path to the fitter config file");
   clParser.addOption("nbThreads", {"-t", "--nb-threads"}, "Specify nb of parallel threads");
   clParser.addOption("outputFilePath", {"-o", "--out-file"}, "Specify the output file");
+  clParser.addOption("outputDir", {"--out-dir"}, "Specify the output directory");
   clParser.addOption("randomSeed", {"-s", "--seed"}, "Set random seed");
   clParser.addOption("appendix", {"--appendix"}, "Add appendix to the output file name");
 
@@ -56,6 +57,8 @@ int main(int argc, char** argv){
   clParser.addTriggerOption("enablePca", {"--enable-pca"}, "Enable principle component analysis for eigen decomposed parameter sets");
   clParser.addTriggerOption("skipHesse", {"--skip-hesse"}, "Don't perform postfit error evaluation");
   clParser.addTriggerOption("generateOneSigmaPlots", {"--one-sigma"}, "Generate one sigma plots");
+  clParser.addTriggerOption("lightOutputMode", {"--light-mode"}, "Disable plot generation");
+
   clParser.addOption("scanParameters", {"--scan"}, "Enable parameter scan before and after the fit (can provide nSteps)", 1, true);
   clParser.addOption("toyFit", {"--toy"}, "Run a toy fit (optional arg to provide toy index)", 1, true);
 
@@ -131,11 +134,18 @@ int main(int argc, char** argv){
     outFileName = clParser.getOptionVal("outputFilePath", outFileName + ".root");
   }
   else{
-    if( JsonUtils::doKeyExist(jsonConfig, "outputFolder") ){
-      GenericToolbox::mkdirPath(JsonUtils::fetchValue<std::string>(jsonConfig, "outputFolder"));
+
+    if( clParser.isOptionTriggered("outputDir") ){
+      outFileName = clParser.getOptionVal<std::string>("outputDir");
+      outFileName += "/";
+      GenericToolbox::mkdirPath( outFileName );
+    }
+    else if( JsonUtils::doKeyExist(jsonConfig, "outputFolder") ){
       outFileName = JsonUtils::fetchValue<std::string>(jsonConfig, "outputFolder");
       outFileName += "/";
+      GenericToolbox::mkdirPath( outFileName );
     }
+
     outFileName += GenericToolbox::getFileNameFromFilePath(configFilePath, false);
 
     // appendixDict["optionName"] = "Appendix"
@@ -211,6 +221,7 @@ int main(int argc, char** argv){
   // --------------------------
   LogInfo << "FitterEngine setup..." << std::endl;
   FitterEngine fitter{GenericToolbox::mkdirTFile(out, "FitterEngine")};
+
   fitter.readConfig(JsonUtils::fetchSubEntry(jsonConfig, {"fitterEngineConfig"}));
 
   // -a
@@ -242,6 +253,9 @@ int main(int argc, char** argv){
 
   // --one-sigma
   fitter.setGenerateOneSigmaPlots( clParser.isOptionTriggered("generateOneSigmaPlots") );
+
+  // --light-mode
+  fitter.setLightMode( clParser.isOptionTriggered("lightOutputMode") );
 
   // Also check app level config options
   JsonUtils::deprecatedAction(jsonConfig, "generateSamplePlots", [&]{

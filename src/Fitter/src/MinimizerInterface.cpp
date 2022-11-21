@@ -74,10 +74,12 @@ void MinimizerInterface::initializeImpl(){
 
   LogWarning << "Fetching the effective number of fit parameters..." << std::endl;
   _minimizerFitParameterPtr_.clear();
+  _nbFreePars_ = 0;
   for( auto& parSet : _owner_->getPropagator().getParameterSetsList() ){
     for( auto& par : parSet.getEffectiveParameterList() ){
       if( par.isEnabled() and not par.isFixed() ) {
         _minimizerFitParameterPtr_.emplace_back(&par);
+        if( par.isFree() ) _nbFreePars_++;
       }
     }
   }
@@ -212,10 +214,11 @@ void MinimizerInterface::minimize(){
 
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling minimize...") << std::endl;
   LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
-          << "Number of free parameters   : " << _minimizer_->NFree() << std::endl
+          << "Number of fit parameters   : " << _minimizer_->NFree() << std::endl
+          << "Number of free parameters : " << _nbFreePars_ << std::endl
           << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree() << std::endl
           << "Number of fit bins : " << _nbFitBins_ << std::endl
-          << "Chi2 # DoF : " << _nbFitBins_ - _minimizer_->NFree()
+          << "Chi2 # DoF : " << _nbFitBins_ - _nbFreePars_
           << std::endl;
 
   int nbFitCallOffset = _nbFitCalls_;
@@ -269,6 +272,8 @@ void MinimizerInterface::minimize(){
   LogInfo << "Writing convergence stats..." << std::endl;
   int toyIndex = _owner_->getPropagator().getIThrow();
   int nIterations = int(_minimizer_->NIterations());
+  int nFitPars = int(_minimizer_->NFree());
+  int nDof = _nbFitBins_ - _nbFreePars_;
   double edmBestFit = _minimizer_->Edm();
   double fitStatus = _minimizer_->Status();
   double covStatus = _minimizer_->CovMatrixStatus();
@@ -284,6 +289,10 @@ void MinimizerInterface::minimize(){
   bestFitStats->Branch("chi2MinFitter", &chi2MinFitter);
   bestFitStats->Branch("toyIndex", &toyIndex);
   bestFitStats->Branch("nCallsAtBestFit", &_nbFitCalls_);
+  bestFitStats->Branch("nFitBins", &_nbFitBins_);
+  bestFitStats->Branch("nFreePars", &_nbFreePars_);
+  bestFitStats->Branch("nFitPars", &nFitPars);
+  bestFitStats->Branch("nDof", &nDof);
   bestFitStats->Branch("chi2BestFit", _owner_->getPropagator().getLlhBufferPtr());
   bestFitStats->Branch("chi2StatBestFit", _owner_->getPropagator().getLlhStatBufferPtr());
   bestFitStats->Branch("chi2PullsBestFit", _owner_->getPropagator().getLlhPenaltyBufferPtr());
@@ -350,10 +359,11 @@ void MinimizerInterface::calcErrors(){
 
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling HESSE...") << std::endl;
   LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
-          << "Number of free parameters   : " << _minimizer_->NFree() << std::endl
+          << "Number of fit parameters   : " << _minimizer_->NFree() << std::endl
+          << "Number of free parameters : " << _nbFreePars_ << std::endl
           << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree() << std::endl
           << "Number of fit bins : " << _nbFitBins_ << std::endl
-          << "Chi2 # DoF : " << _nbFitBins_ - _minimizer_->NFree() << std::endl
+          << "Chi2 # DoF : " << _nbFitBins_ - _nbFreePars_  << std::endl
           << "Fit call offset: " << nbFitCallOffset << std::endl;
 
   if     ( _errorAlgo_ == "Minos" ){
@@ -463,7 +473,7 @@ double MinimizerInterface::evalFit(const double* parArray_){
     double cpuPercent = GenericToolbox::getCpuUsageByProcess();
     ssHeader << std::endl << "Current CPU usage: " << cpuPercent << "% (" << cpuPercent / GlobalVariables::getNbThreads() << "% efficiency)";
     ssHeader << std::endl << "Avg " << GUNDAM_CHI2 << " computation time: " << _evalFitAvgTimer_;
-    ssHeader << std::endl << GUNDAM_CHI2 << "/dof: " << _owner_->getPropagator().getLlhBuffer() / double(_nbFitBins_ - _minimizer_->NFree());
+    ssHeader << std::endl << GUNDAM_CHI2 << "/dof: " << _owner_->getPropagator().getLlhBuffer() / double(_nbFitBins_ - _nbFreePars_);
     ssHeader << std::endl;
 #ifndef GUNDAM_BATCH
     ssHeader << "├─";

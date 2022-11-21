@@ -80,7 +80,8 @@ private:
   bool _isBadCovMat_{false};
   bool _enableFitMonitor_{false};
   int _nbFitParameters_{-1};
-  int _nbFitBins_{-1};
+  int _nbFitBins_{0};
+  int _nbFreePars_{0};
   int _nbFitCalls_{0};
   FitterEngine* _owner_{nullptr};
   std::unique_ptr<ROOT::Math::Minimizer> _minimizer_{nullptr};

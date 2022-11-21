@@ -105,7 +105,7 @@ void FitParameterSet::initializeImpl() {
 
   for( auto& par : _parameterList_ ){
     par.initialize();
-    if( par.isInitialized() and _printParametersSummary_ ){
+    if( _printParametersSummary_ and par.isEnabled() ){
       LogInfo << par.getSummary(not _printDialSetsSummary_) << std::endl;
     }
   }
@@ -379,7 +379,7 @@ void FitParameterSet::throwFitParameters(double gain_){
   if( _useEigenDecompInFit_ ){
     this->propagateOriginalToEigen();
     for( auto& eigenPar : _eigenParameterList_ ){
-      eigenPar.setThrowValue(eigenPar.getParameterValue());
+      eigenPar.setThrowValue( eigenPar.getParameterValue() );
     }
   }
 
