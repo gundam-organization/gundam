@@ -248,10 +248,14 @@ include_directories(submodules/cpp-generic-toolbox/include)
 set(CPP_GENERIC_TOOLBOX_HEADERS
         ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.h
         ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.Root.h
-        ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.AnyType.h
-        ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.Wrappers.h
+        ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.AnyType.h # GenericToolbox.Root.h dependency
+        ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.Wrappers.h # GenericToolbox.Root.h dependency
+        )
+set(CPP_GENERIC_TOOLBOX_HEADERS_IMPL
+        ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.AnyType.Impl.h
         )
 install(FILES ${CPP_GENERIC_TOOLBOX_HEADERS} DESTINATION include)
+install(FILES ${CPP_GENERIC_TOOLBOX_HEADERS_IMPL} DESTINATION include/implementation)
 add_definitions( -D PROGRESS_BAR_FILL_TAG="\\\"T2K\#"\\\" )
 if (COLOR_OUTPUT)
   add_definitions( -D PROGRESS_BAR_ENABLE_RAINBOW=1 )
