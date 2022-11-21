@@ -17,10 +17,12 @@ TROOT root("Rint","The ROOT Interactive Interface");
 
 int main(int argc, char **argv) {
   LogInfo << "Creating ROOT interpreter..." << std::endl;
-  auto theApp = TRint("Rint", &argc, argv, nullptr, 0);
+  auto* theApp = new TRint("Rint", &argc, argv, nullptr, 0);
   LogInfo << "Including GenericToolbox.Root.h..." << std::endl;
-  theApp.ProcessLine("#include \"GenericToolbox.Root.h\"");
+  theApp->ProcessLine("#include \"GenericToolbox.Root.h\"");
   LogInfo << "Running interpreter..." << std::endl;
-  theApp.Run();
+  theApp->Run();
+
+  delete theApp;
   return EXIT_SUCCESS;
 }
