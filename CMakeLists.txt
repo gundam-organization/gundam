@@ -249,6 +249,7 @@ set(CPP_GENERIC_TOOLBOX_HEADERS
         ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.h
         ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.Root.h
         ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.AnyType.h
+        ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.Wrappers.h
         )
 install(FILES ${CPP_GENERIC_TOOLBOX_HEADERS} DESTINATION include)
 add_definitions( -D PROGRESS_BAR_FILL_TAG="\\\"T2K\#"\\\" )
