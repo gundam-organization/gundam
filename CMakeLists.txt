@@ -253,7 +253,7 @@ set(CPP_GENERIC_TOOLBOX_HEADERS
         )
 set(CPP_GENERIC_TOOLBOX_HEADERS_IMPL
         ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/implementation/GenericToolbox.AnyType.Impl.h
-        ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/implementation/GenericToolbox.Root.Impl.h
+        ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/implementation/GenericToolbox.Root.impl.h
         )
 install(FILES ${CPP_GENERIC_TOOLBOX_HEADERS} DESTINATION include)
 install(FILES ${CPP_GENERIC_TOOLBOX_HEADERS_IMPL} DESTINATION include/implementation)
