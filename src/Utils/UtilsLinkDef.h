@@ -23,13 +23,13 @@
 //#pragma link C++ defined_in "GenericToolbox.h";
 //#pragma link C++ defined_in "GenericToolbox.Root.h";
 
-#pragma link C++ nestedclass;
-#pragma link C++ nestedtypedef;
+//#pragma link C++ nestedclass;
+//#pragma link C++ nestedtypedef;
 
-#pragma link C++ namespace GenericToolbox+;
-#pragma link C++ defined_in namespace GenericToolbox+;
-#pragma link C++ namespace JsonUtils+;
-#pragma link C++ defined_in namespace JsonUtils+;
+//#pragma link C++ namespace GenericToolbox+;
+//#pragma link C++ defined_in namespace GenericToolbox+;
+//#pragma link C++ namespace JsonUtils+;
+//#pragma link C++ defined_in namespace JsonUtils+;
 
 //#pragma link C++ namespace GenericToolbox+;
 //#pragma link C++ namespace JsonUtils+;

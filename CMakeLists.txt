@@ -247,17 +247,6 @@ endif()
 include_directories(submodules/cpp-generic-toolbox/include)
 file( GLOB CPP_GENERIC_TOOLBOX_HEADERS ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/*.h )
 file( GLOB CPP_GENERIC_TOOLBOX_HEADERS_IMPL ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/implementation/*.h )
-#set(CPP_GENERIC_TOOLBOX_HEADERS
-#        ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.h
-#        ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.Root.h
-#        ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.AnyType.h # GenericToolbox.Root.h dependency
-#        ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.Wrappers.h # GenericToolbox.Root.h dependency
-#        )
-#set(CPP_GENERIC_TOOLBOX_HEADERS_IMPL
-#        ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/implementation/GenericToolbox.AnyType.Impl.h
-#        ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/implementation/GenericToolbox.Root.impl.h
-#        ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/implementation/GenericToolbox.param.h # GenericToolbox.Root.h dependency
-#        )
 install(FILES ${CPP_GENERIC_TOOLBOX_HEADERS} DESTINATION include)
 install(FILES ${CPP_GENERIC_TOOLBOX_HEADERS_IMPL} DESTINATION include/implementation)
 add_definitions( -D PROGRESS_BAR_FILL_TAG="\\\"T2K\#"\\\" )
