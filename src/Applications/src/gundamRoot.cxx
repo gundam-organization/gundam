@@ -41,7 +41,7 @@ int main(int argc, char **argv) {
   );
 
 //  LogInfo << "Including GenericToolbox.Root.h..." << std::endl;
-  theApp->ProcessLine("#include \"GenericToolbox.Root.h\"");
+//  theApp->ProcessLine("#include \"GenericToolbox.Root.h\"");
 
   LogInfo << "Running interpreter..." << std::endl;
   theApp->Run();
