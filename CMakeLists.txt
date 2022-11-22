@@ -249,6 +249,9 @@ file( GLOB CPP_GENERIC_TOOLBOX_HEADERS ${CMAKE_SOURCE_DIR}/submodules/cpp-generi
 file( GLOB CPP_GENERIC_TOOLBOX_HEADERS_IMPL ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/implementation/*.h )
 install(FILES ${CPP_GENERIC_TOOLBOX_HEADERS} DESTINATION include)
 install(FILES ${CPP_GENERIC_TOOLBOX_HEADERS_IMPL} DESTINATION include/implementation)
+
+set( GENERICTOOLBOX_PATH ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include )
+#add_definitions( -D GENERICTOOLBOX_PATH="\\\"${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.Root.h"\\\" )
 add_definitions( -D PROGRESS_BAR_FILL_TAG="\\\"T2K\#"\\\" )
 if (COLOR_OUTPUT)
   add_definitions( -D PROGRESS_BAR_ENABLE_RAINBOW=1 )

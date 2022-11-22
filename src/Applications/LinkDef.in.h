@@ -12,7 +12,7 @@
 #pragma link off all functions;
 #pragma link C++ nestedclasses;
 
-#pragma link C++ defined_in "GenericToolbox.Root.h";
+#pragma link C++ defined_in "@GENERICTOOLBOX_PATH@/GenericToolbox.Root.h";
 
 #endif
 

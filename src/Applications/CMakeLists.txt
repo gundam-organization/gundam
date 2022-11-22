@@ -17,11 +17,16 @@ if( ENABLE_DEV_MODE )
 endif()
 
 
+configure_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/LinkDef.in.h
+        ${CMAKE_CURRENT_BINARY_DIR}/LinkDef.h )
+
+
 ROOT_GENERATE_DICTIONARY(
         G__GundamRootDict
         ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.Root.h
         LINKDEF
-        ${CMAKE_CURRENT_SOURCE_DIR}/LinkDef.h
+        ${CMAKE_CURRENT_BINARY_DIR}/LinkDef.h
 )
 
 if( USE_STATIC_LINKS )
