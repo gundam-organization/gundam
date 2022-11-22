@@ -245,10 +245,10 @@ endif()
 ## Add the GenericToolbox²
 # Reproduce needed parts of the cpp-generic-toolbox CMakeLists.txt
 include_directories(submodules/cpp-generic-toolbox/include)
-file( GLOB CPP_GENERIC_TOOLBOX_HEADERS ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/*.h )
-file( GLOB CPP_GENERIC_TOOLBOX_HEADERS_IMPL ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/implementation/*.h )
-install(FILES ${CPP_GENERIC_TOOLBOX_HEADERS} DESTINATION include)
-install(FILES ${CPP_GENERIC_TOOLBOX_HEADERS_IMPL} DESTINATION include/implementation)
+#file( GLOB CPP_GENERIC_TOOLBOX_HEADERS ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/*.h )
+#file( GLOB CPP_GENERIC_TOOLBOX_HEADERS_IMPL ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/implementation/*.h )
+#install(FILES ${CPP_GENERIC_TOOLBOX_HEADERS} DESTINATION include)
+#install(FILES ${CPP_GENERIC_TOOLBOX_HEADERS_IMPL} DESTINATION include/implementation)
 
 set( GENERICTOOLBOX_PATH ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include )
 #add_definitions( -D GENERICTOOLBOX_PATH="\\\"${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.Root.h"\\\" )
