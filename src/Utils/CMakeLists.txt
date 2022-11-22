@@ -32,12 +32,12 @@ set( UTILS_HEADERS ${HEADERS} )
 ROOT_GENERATE_DICTIONARY(
         GundamUtilsDict
         ${HEADERS}
-        LINKDEF ${CMAKE_CURRENT_SOURCE_DIR}/UtilsLinkDef.h
+        LINKDEF
+        ${CMAKE_CURRENT_SOURCE_DIR}/UtilsLinkDef.h
 )
 
-
+# TODO: dont do that -> shared lib only
 list(APPEND SRCFILES GundamUtilsDict.cxx)
-
 
 if( USE_STATIC_LINKS )
   add_library(GundamUtils STATIC ${SRCFILES})
