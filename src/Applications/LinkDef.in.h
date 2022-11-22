@@ -12,7 +12,8 @@
 #pragma link off all functions;
 #pragma link C++ nestedclasses;
 
-#pragma link C++ defined_in "@GENERICTOOLBOX_PATH@/GenericToolbox.Root.h";
+#pragma link C++ defined_in "@CMAKE_SOURCE_DIR@/submodules/cpp-generic-toolbox/include/GenericToolbox.Root.h";
+#pragma link C++ defined_in "@CMAKE_SOURCE_DIR@/submodules/cpp-generic-toolbox/include/GenericToolbox.TablePrinter.h";
 
 #endif
 

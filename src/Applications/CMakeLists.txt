@@ -23,21 +23,22 @@ configure_file(
         ${CMAKE_CURRENT_BINARY_DIR}/LinkDef.h
 )
 
+# Generate .cxx file
+# Explicit include of the GenericToolbox.Root.h
 ROOT_GENERATE_DICTIONARY(
         G__GundamRootDict
         ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.Root.h
+        ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.TablePrinter.h
         LINKDEF
         ${CMAKE_CURRENT_BINARY_DIR}/LinkDef.h
 )
 
-#if( USE_STATIC_LINKS )
-#    add_library( GundamRootDict STATIC G__GundamRootDict.cxx )
-#else()
-    add_library( GundamRootDict SHARED G__GundamRootDict.cxx )
-#endif()
-
+# Needs to be a shared library
+add_library( GundamRootDict SHARED G__GundamRootDict.cxx )
 target_link_libraries( GundamRootDict ${ROOT_LIBRARIES} )
 install(TARGETS GundamRootDict DESTINATION lib)
+
+# Also need to install dict files
 install(
     FILES
         ${CMAKE_CURRENT_BINARY_DIR}/libGundamRootDict_rdict.pcm

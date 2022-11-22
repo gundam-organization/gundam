@@ -36,8 +36,7 @@ int main(int argc, char **argv) {
       /*options*/ nullptr,
       /*numOptions*/ 0,
       /*noLogo*/ kFALSE
-//      ,
-//      /*exitOnUnknownArgs*/ kTRUE // ROOT 6.20?
+//    , /*exitOnUnknownArgs*/ kTRUE // ROOT 6.20?
   );
 
 //  LogInfo << "Including GenericToolbox.Root.h..." << std::endl;
