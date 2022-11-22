@@ -17,10 +17,11 @@ if( ENABLE_DEV_MODE )
 endif()
 
 
+# Need a full unfold of the source path
 configure_file(
         ${CMAKE_CURRENT_SOURCE_DIR}/LinkDef.in.h
-        ${CMAKE_CURRENT_BINARY_DIR}/LinkDef.h )
-
+        ${CMAKE_CURRENT_BINARY_DIR}/LinkDef.h
+)
 
 ROOT_GENERATE_DICTIONARY(
         G__GundamRootDict
@@ -29,11 +30,11 @@ ROOT_GENERATE_DICTIONARY(
         ${CMAKE_CURRENT_BINARY_DIR}/LinkDef.h
 )
 
-if( USE_STATIC_LINKS )
-    add_library( GundamRootDict STATIC G__GundamRootDict.cxx )
-else()
+#if( USE_STATIC_LINKS )
+#    add_library( GundamRootDict STATIC G__GundamRootDict.cxx )
+#else()
     add_library( GundamRootDict SHARED G__GundamRootDict.cxx )
-endif()
+#endif()
 
 target_link_libraries( GundamRootDict ${ROOT_LIBRARIES} )
 install(TARGETS GundamRootDict DESTINATION lib)
