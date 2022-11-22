@@ -49,6 +49,7 @@ install(
         libraries
 )
 
+# Now define the frontends
 foreach( app ${APPLICATION_LIST} )
     cmessage( STATUS "Defining app: ${app}" )
     add_executable( ${app} src/${app}.cxx )
