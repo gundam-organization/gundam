@@ -26,9 +26,18 @@ int main(int argc, char **argv) {
   for(auto& s: argvVector) cstrings.push_back(&s[0]);
   int argcInterpreter = int( cstrings.size() );
 
+  char** argvInterpreter{ cstrings.data() };
+
   LogInfo << "Creating ROOT interpreter..." << std::endl;
-  auto *theApp = new TRint("Rint", &argcInterpreter, cstrings.data(), /*options*/ nullptr, /*numOptions*/ 0, /*noLogo*/ kFALSE,
-      /*exitOnUnknownArgs*/ kTRUE);
+  auto *theApp = new TRint(
+      "Rint",
+      &argcInterpreter,
+      argvInterpreter,
+      /*options*/ nullptr,
+      /*numOptions*/ 0,
+      /*noLogo*/ kFALSE,
+      /*exitOnUnknownArgs*/ kTRUE
+  );
 
 //  LogInfo << "Including GenericToolbox.Root.h..." << std::endl;
   theApp->ProcessLine("#include \"GenericToolbox.Root.h\"");
