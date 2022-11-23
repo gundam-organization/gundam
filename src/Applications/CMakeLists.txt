@@ -63,5 +63,8 @@ target_link_libraries( gundamConfigUnfolder GundamUtils )
 target_link_libraries( gundamConfigCompare GundamUtils )
 target_link_libraries( gundamPlotExtractor GundamUtils )
 target_link_libraries( gundamCalcXsec GundamPropagator )
+
+#target_sources( gundamRoot PRIVATE G__GundamRootDict.cxx )
+#target_link_libraries( gundamRoot GundamPropagator )
 target_link_libraries( gundamRoot GundamPropagator GundamRootDict )
 
