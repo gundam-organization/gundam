@@ -40,7 +40,7 @@ add_library(
     G__GundamRootDict.cxx
 #    ${CMAKE_CURRENT_SOURCE_DIR}/LinkDef.cpp
 )
-target_compile_features(GundamRootDict PRIVATE cxx_std_17)
+#target_compile_features(GundamRootDict PRIVATE cxx_std_17)
 
 target_link_libraries( GundamRootDict ${ROOT_LIBRARIES} )
 install(TARGETS GundamRootDict DESTINATION lib)
