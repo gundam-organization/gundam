@@ -51,4 +51,4 @@ endif()
 
 install(TARGETS GundamPropagator DESTINATION lib)
 #Can uncomment this to install the headers... but is it really neccessary?
-install(FILES ${HEADERS} DESTINATION include)
+#install(FILES ${HEADERS} DESTINATION include)
