@@ -1,15 +1,15 @@
 # Applications
 
 set( APPLICATION_LIST
-        # GUNDAM apps
-        gundamFitter
-        gundamCalcXsec
-        gundamConfigUnfolder
-        gundamPlotExtractor
-        gundamConfigCompare
-        gundamFitCompare
-        gundamRoot
-)
+    # GUNDAM apps
+    gundamFitter
+    gundamCalcXsec
+    gundamConfigUnfolder
+    gundamPlotExtractor
+    gundamConfigCompare
+    gundamFitCompare
+    gundamRoot
+    )
 
 
 if( ENABLE_DEV_MODE )
@@ -19,34 +19,38 @@ endif()
 
 # Need a full unfold of the source path
 configure_file(
-        ${CMAKE_CURRENT_SOURCE_DIR}/LinkDef.in.h
-        ${CMAKE_CURRENT_BINARY_DIR}/LinkDef.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/LinkDef.in.h
+    ${CMAKE_CURRENT_BINARY_DIR}/LinkDef.h
 )
 
 # Generate .cxx file
 # Explicit include of the GenericToolbox.Root.h
 ROOT_GENERATE_DICTIONARY(
-        G__GundamRootDict
-        ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.Root.h
-        ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.TablePrinter.h
-        LINKDEF
-        ${CMAKE_CURRENT_BINARY_DIR}/LinkDef.h
+    G__GundamRootDict
+    ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.Root.h
+    ${CMAKE_SOURCE_DIR}/submodules/simple-cpp-logger/include/Logger.h
+    LINKDEF
+    ${CMAKE_CURRENT_BINARY_DIR}/LinkDef.h
 )
 
 # Needs to be a shared library
-add_library( GundamRootDict SHARED G__GundamRootDict.cxx )
+add_library(
+    GundamRootDict SHARED
+    G__GundamRootDict.cxx
+#    ${CMAKE_CURRENT_SOURCE_DIR}/LinkDef.cpp
+)
 target_link_libraries( GundamRootDict ${ROOT_LIBRARIES} )
 install(TARGETS GundamRootDict DESTINATION lib)
 
 # Also need to install dict files
 install(
     FILES
-        ${CMAKE_CURRENT_BINARY_DIR}/libGundamRootDict_rdict.pcm
-        ${CMAKE_CURRENT_BINARY_DIR}/libGundamRootDict.rootmap
+    ${CMAKE_CURRENT_BINARY_DIR}/libGundamRootDict_rdict.pcm
+    ${CMAKE_CURRENT_BINARY_DIR}/libGundamRootDict.rootmap
     DESTINATION
-        ${CMAKE_INSTALL_PREFIX}/lib
+    ${CMAKE_INSTALL_PREFIX}/lib
     COMPONENT
-        libraries
+    libraries
 )
 
 # Now define the frontends
@@ -66,5 +70,8 @@ target_link_libraries( gundamCalcXsec GundamPropagator )
 
 #target_sources( gundamRoot PRIVATE G__GundamRootDict.cxx )
 #target_link_libraries( gundamRoot GundamPropagator )
-target_link_libraries( gundamRoot GundamPropagator GundamRootDict )
+target_link_libraries( gundamRoot
+    GundamRootDict
+#    GundamPropagator
+    )
 

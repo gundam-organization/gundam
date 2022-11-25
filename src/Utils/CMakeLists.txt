@@ -29,15 +29,15 @@ set(HEADERS
 
 set( UTILS_HEADERS ${HEADERS} )
 
-ROOT_GENERATE_DICTIONARY(
-        GundamUtilsDict
-        ${HEADERS}
-        LINKDEF
-        ${CMAKE_CURRENT_SOURCE_DIR}/UtilsLinkDef.h
-)
+#ROOT_GENERATE_DICTIONARY(
+#        GundamUtilsDict
+#        ${HEADERS}
+#        LINKDEF
+#        ${CMAKE_CURRENT_SOURCE_DIR}/UtilsLinkDef.h
+#)
 
 # TODO: dont do that -> shared lib only
-list(APPEND SRCFILES GundamUtilsDict.cxx)
+#list(APPEND SRCFILES GundamUtilsDict.cxx)
 
 if( USE_STATIC_LINKS )
   add_library(GundamUtils STATIC ${SRCFILES})
@@ -62,13 +62,13 @@ install(TARGETS GundamUtils DESTINATION lib)
 #install(FILES ${HEADERS} DESTINATION include)
 
 
-install(
-        FILES
-        ${CMAKE_CURRENT_BINARY_DIR}/libGundamUtilsDict_rdict.pcm
-        ${CMAKE_CURRENT_BINARY_DIR}/libGundamUtilsDict.rootmap
-        DESTINATION
-        ${CMAKE_INSTALL_PREFIX}/lib
-        COMPONENT
-        libraries
-)
+#install(
+#        FILES
+#        ${CMAKE_CURRENT_BINARY_DIR}/libGundamUtilsDict_rdict.pcm
+#        ${CMAKE_CURRENT_BINARY_DIR}/libGundamUtilsDict.rootmap
+#        DESTINATION
+#        ${CMAKE_INSTALL_PREFIX}/lib
+#        COMPONENT
+#        libraries
+#)
 

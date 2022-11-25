@@ -2,13 +2,13 @@
 // Created by Adrien BLANCHET on 23/10/2022.
 //
 #include "Logger.h"
-#include "GenericToolbox.TablePrinter.h"
 
 #include "TRint.h"
 
 #include <cstdlib>
 #include "string"
 #include "vector"
+#include "iostream"
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[gundamRoot.cxx]");
@@ -28,8 +28,6 @@ int main(int argc, char **argv) {
   int argcInterpreter = int( cstrings.size() );
   char** argvInterpreter{ cstrings.data() };
 
-  GenericToolbox::TablePrinter t;
-
   LogInfo << "Creating ROOT interpreter..." << std::endl;
   auto *theApp = new TRint(
       "Rint"
@@ -42,8 +40,7 @@ int main(int argc, char **argv) {
   );
 
   LogInfo << "Enabling GenericToolbox lib..." << std::endl;
-//  theApp->ProcessLine("#include \"GenericToolbox.Root.h\"");
-  theApp->ProcessLine("{ GenericToolbox::TablePrinter t; }");
+  theApp->ProcessLine("{ GenericToolbox::Enabler e; }");
 
   theApp->SetPrompt("gundamRoot [%d] ");
 

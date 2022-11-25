@@ -10,10 +10,13 @@
 #pragma link off all globals;
 #pragma link off all classes;
 #pragma link off all functions;
-#pragma link C++ nestedclasses;
+
+#pragma link C++ nestedclass;
+#pragma link C++ nestedtypedef;
+
 
 #pragma link C++ defined_in "@CMAKE_SOURCE_DIR@/submodules/cpp-generic-toolbox/include/GenericToolbox.Root.h";
-#pragma link C++ defined_in "@CMAKE_SOURCE_DIR@/submodules/cpp-generic-toolbox/include/GenericToolbox.TablePrinter.h";
+#pragma link C++ defined_in "@CMAKE_SOURCE_DIR@/submodules/simple-cpp-logger/include/Logger.h";
 
 #endif
 
