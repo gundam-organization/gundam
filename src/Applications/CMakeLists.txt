@@ -28,6 +28,7 @@ configure_file(
 ROOT_GENERATE_DICTIONARY(
     G__GundamRootDict
     ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.Root.h
+    ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.RawDataArray.h
     ${CMAKE_SOURCE_DIR}/submodules/simple-cpp-logger/include/Logger.h
     LINKDEF
     ${CMAKE_CURRENT_BINARY_DIR}/LinkDef.h
