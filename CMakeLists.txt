@@ -319,6 +319,7 @@ else()
     cmessage(WARNING "You are using an untested compiler.")
 endif()
 
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if( WITH_OPENMP )
