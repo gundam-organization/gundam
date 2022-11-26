@@ -38,7 +38,7 @@ ROOT_GENERATE_DICTIONARY(
 add_library(
     GundamRootDict SHARED
     G__GundamRootDict.cxx
-#    ${CMAKE_CURRENT_SOURCE_DIR}/LinkDef.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/LinkDef.cpp
 )
 target_compile_features(GundamRootDict PRIVATE cxx_std_17)
 
