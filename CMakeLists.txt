@@ -319,6 +319,7 @@ else()
     cmessage(WARNING "You are using an untested compiler.")
 endif()
 
+# CXX standard is required but should match the one by ROOT
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if( WITH_OPENMP )
