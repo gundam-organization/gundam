@@ -71,6 +71,16 @@ void FitParameterSet::readConfigImpl(){
   _parameterDefinitionConfig_ = JsonUtils::fetchValue(_config_, "parameterDefinitions", _parameterDefinitionConfig_);
   _dialSetDefinitions_ = JsonUtils::fetchValue(_config_, "dialSetDefinitions", _dialSetDefinitions_);
 
+
+  // MISC / DEV
+
+  _devUseParLimitsOnEigen_ = JsonUtils::fetchValue(_config_, "devUseParLimitsOnEigen", _devUseParLimitsOnEigen_);
+  if( _devUseParLimitsOnEigen_ ){
+    LogAlert << "USING DEV OPTION: _devUseParLimitsOnEigen_ = true" << std::endl;
+  }
+
+
+
   this->readParameterDefinitionFile();
 
   if( _nbParameterDefinition_ == -1 ){
@@ -180,6 +190,12 @@ void FitParameterSet::processCovarianceMatrix(){
       _eigenParameterList_[iEigen].setStdDevValue(TMath::Sqrt((*_eigenValues_)[iEigen]));
       _eigenParameterList_[iEigen].setStepSize(TMath::Sqrt((*_eigenValues_)[iEigen]));
       _eigenParameterList_[iEigen].setName("eigen");
+
+      if( _devUseParLimitsOnEigen_ ){
+        _eigenParameterList_[iEigen].setMinValue( _parameterList_[iEigen].getMinValue() );
+        _eigenParameterList_[iEigen].setMaxValue( _parameterList_[iEigen].getMaxValue() );
+      }
+
 
       (*_eigenValuesInv_)[iEigen] = 1./(*_eigenValues_)[iEigen];
       (*eigenState)[iEigen] = 1.;

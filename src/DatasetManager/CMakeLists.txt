@@ -2,7 +2,7 @@ set(SRCFILES
         src/DatasetLoader.cpp
         src/EventTreeWriter.cpp
         src/DataDispenser.cpp
-)
+    )
 
 set(HEADERS
         include/DatasetLoader.h

@@ -11,7 +11,15 @@
 #pragma link off all classes;
 #pragma link off all functions;
 
-#pragma link C namespace engOpen;
+#pragma link C++ nestedclasses;
+#pragma link C++ nestedtypedef;
+
+#pragma link C++ class DataBin+;
+#pragma link C++ class DataBinSet+;
+#pragma link C++ class GundamGreetings+;
+#pragma link C++ class JsonBaseClass+;
+#pragma link C++ class VariableDictionary+;
+#pragma link C++ class YamlUtils+;
 
 #endif
 
