@@ -108,6 +108,7 @@ private:
   bool _printDialSetsSummary_{false};
   bool _printParametersSummary_{false};
   bool _releaseFixedParametersOnHesse_{false};
+  bool _devUseParLimitsOnEigen_{false};
   int _nbParameterDefinition_{-1};
   double _nominalStepSize_{std::nan("unset")};
   int _maxNbEigenParameters_{-1};
