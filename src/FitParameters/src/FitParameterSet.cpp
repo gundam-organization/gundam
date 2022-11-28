@@ -191,12 +191,6 @@ void FitParameterSet::processCovarianceMatrix(){
       _eigenParameterList_[iEigen].setStepSize(TMath::Sqrt((*_eigenValues_)[iEigen]));
       _eigenParameterList_[iEigen].setName("eigen");
 
-      if( _devUseParLimitsOnEigen_ ){
-        _eigenParameterList_[iEigen].setMinValue( _parameterList_[iEigen].getMinValue() );
-        _eigenParameterList_[iEigen].setMaxValue( _parameterList_[iEigen].getMaxValue() );
-      }
-
-
       (*_eigenValuesInv_)[iEigen] = 1./(*_eigenValues_)[iEigen];
       (*eigenState)[iEigen] = 1.;
 
@@ -261,6 +255,14 @@ void FitParameterSet::processCovarianceMatrix(){
     // Tag the prior
     for( auto& eigenPar : _eigenParameterList_ ){
       eigenPar.setCurrentValueAsPrior();
+
+      if( _devUseParLimitsOnEigen_ ){
+        eigenPar.setMinValue( _parameterList_[eigenPar.getParameterIndex()].getMinValue() );
+        eigenPar.setMaxValue( _parameterList_[eigenPar.getParameterIndex()].getMaxValue() );
+
+        LogThrowIf( not std::isnan(eigenPar.getMinValue()) and eigenPar.getPriorValue() < eigenPar.getMinValue(), "PRIOR IS BELLOW MIN: " << eigenPar.getSummary(true) );
+        LogThrowIf( not std::isnan(eigenPar.getMaxValue()) and eigenPar.getPriorValue() > eigenPar.getMaxValue(), "PRIOR IS ABOVE MAX: " << eigenPar.getSummary(true) );
+      }
     }
 
   }
@@ -622,11 +624,14 @@ void FitParameterSet::defineParameters(){
 
     par.setParameterValue(par.getPriorValue());
 
-    if( _globalParameterMinValue_ == _globalParameterMinValue_ ){ par.setMinValue(_globalParameterMinValue_); }
-    if( _globalParameterMaxValue_ == _globalParameterMaxValue_ ){ par.setMaxValue(_globalParameterMaxValue_); }
+    if( not std::isnan(_globalParameterMinValue_) ){ par.setMinValue(_globalParameterMinValue_); }
+    if( not std::isnan(_globalParameterMaxValue_) ){ par.setMaxValue(_globalParameterMaxValue_); }
 
     if( _parameterLowerBoundsList_ != nullptr ){ par.setMinValue((*_parameterLowerBoundsList_)[par.getParameterIndex()]); }
     if( _parameterUpperBoundsList_ != nullptr ){ par.setMaxValue((*_parameterUpperBoundsList_)[par.getParameterIndex()]); }
+
+    LogThrowIf( not std::isnan(par.getMinValue()) and par.getPriorValue() < par.getMinValue(), "PRIOR IS BELLOW MIN: " << par.getSummary(true) );
+    LogThrowIf( not std::isnan(par.getMaxValue()) and par.getPriorValue() > par.getMaxValue(), "PRIOR IS ABOVE MAX: " << par.getSummary(true) );
 
     if( not _parameterDefinitionConfig_.empty() ){
       // Alternative 1: define dials then parameters
