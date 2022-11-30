@@ -43,6 +43,7 @@ else()
     GundamFitParameters
     GundamFitSamples
     GundamDatasetManager
+    GundamDials
     ${ROOT_LIBRARIES}
   )
 endif()

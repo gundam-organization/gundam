@@ -1,20 +1,25 @@
-set( LIB_NAME GundamDialDirectory )
+set( LIB_NAME GundamDials )
 
 set( SRCFILES
-        src/DialDirectory.cpp
-        src/DialCollection.cpp
-        src/DialBase.cpp
-        src/NormDial.cpp
-        src/NestedDial.cpp
-)
+    src/DialBase.cpp
+    src/DialBaseCache.cpp
+    src/DialNorm.cpp
+    src/DialInputBuffer.cpp
+    src/DialInterface.cpp
+    src/DialResponseSupervisor.cpp
+    src/DialCollection.cpp
+    src/DialSpline.cpp)
 
 set( HEADERS
-        include/DialDirectory.h
-        include/DialCollection.h
-        include/DialBase.h
-        include/NormDial.h
-        include/NestedDial.h
-)
+    include/DialBase.h
+    include/DialBaseCache.h
+    include/DialNorm.h
+    include/DialInputBuffer.h
+    include/DialInterface.h
+    include/DialResponseSupervisor.h
+    include/DialCollection.h
+    include/DialSpline.h
+    )
 
 if( USE_STATIC_LINKS )
   add_library(${LIB_NAME} STATIC ${SRCFILES})
@@ -22,10 +27,17 @@ else()
   add_library(${LIB_NAME} SHARED ${SRCFILES})
 endif()
 
-target_include_directories(${LIB_NAME} PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(
+    ${LIB_NAME} PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
 
-target_link_libraries( ${LIB_NAME} GundamFitParameters ${ROOT_LIBRARIES} )
+target_link_libraries(
+    ${LIB_NAME}
+    GundamFitParameters
+    GundamFitSamples
+    ${ROOT_LIBRARIES}
+)
 
 
 

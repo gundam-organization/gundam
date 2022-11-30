@@ -4,6 +4,9 @@
 
 #include "DialBase.h"
 
-DialBase::DialBase(DialType dialType_)
-  : _dialType_{dialType_}, _evalMutex_{std::make_shared<std::mutex>()} {}
-DialBase::~DialBase() = default;
+#include "Logger.h"
+
+LoggerInit([]{
+  Logger::setUserHeaderStr("[DialBase]");
+});
+

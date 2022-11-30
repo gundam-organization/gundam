@@ -13,6 +13,7 @@
 #include "FitParameterSet.h"
 #include "JsonBaseClass.h"
 #include "ParScanner.h"
+#include "DialCollection.h"
 
 #include "GenericToolbox.CycleTimer.h"
 
@@ -116,9 +117,6 @@ private:
   std::map<FitSample*, std::shared_ptr<TH1D>> _nominalSamplesMcHistogram_;
   std::map<FitSample*, std::vector<std::shared_ptr<TH1D>>> _responseFunctionsSamplesMcHistogram_;
 
-  // DEV
-  std::vector<Dial*> _dialsStack_;
-
 #ifdef GUNDAM_USING_CACHE_MANAGER
   // Build the precalculated caches.  This is only relevant when using a GPU
   // and must be done after the datasets are loaded.  This returns true if
@@ -134,6 +132,11 @@ private:
   // A map of parameters to the indices that got used by the GPU.
   std::map<const FitParameter*, int> _gpuParameterIndex_;
 #endif
+
+
+  // DEV
+  std::vector<Dial*> _dialsStack_{};
+  std::vector<DialCollection> _dialCollections_{};
 
 public:
   GenericToolbox::CycleTimer dialUpdate;

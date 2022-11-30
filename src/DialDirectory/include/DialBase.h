@@ -5,37 +5,42 @@
 #ifndef GUNDAM_DIALBASE_H
 #define GUNDAM_DIALBASE_H
 
-#include "GenericToolbox.h"
+#include "DialInputBuffer.h"
 
-#include <vector>
-#include <mutex>
+#include "vector"
 
-ENUM_EXPANDER( DialType, -1
-               , Unset
-               , Norm
-               , Spline
-               , Graph
-               , Nested
-)
 
-// DialBase is a virtual class which is in charge of providing the response to be applied on the physics events.
-// DialApplier is supposed to be owned by DialCollection
+// should be thread safe -> add lock?
+// any number of inputs (provided doubles) -> set input size
+// fast -> no checks while eval
+
+// as light as possible: minimize members
+// keep in mind: class size is n*8 bytes (64 bits chunks)
+// virtual layer adds 8 bytes for vftable pointer (virtual function table)
+// adds members memory ->
+// https://stackoverflow.com/questions/9439240/sizeof-class-with-int-function-virtual-function-in-c
+
 
 class DialBase {
 
-protected:
-  // Not supposed to define a bare Dial. Use the downcast instead
-  explicit DialBase(DialType dialType_);
-
 public:
-  virtual ~DialBase();
-  double evalResponse(){ return 0; }
+  DialBase() = default;
 
-private:
-  const DialType _dialType_;
-  std::shared_ptr<std::mutex> _evalMutex_{nullptr};
+  // virtual layer + 8 bytes
 
+  // to override
+  [[nodiscard]] virtual std::unique_ptr<DialBase> clone() const = 0;
+  virtual double evalResponseImpl(const DialInputBuffer& input_) = 0;
+
+  // internals
+  virtual double evalResponse(const DialInputBuffer& input_){ return this->evalResponseImpl(input_); }
+
+  // class size = 8 bytes (no padding!)
 };
+
+
+
+
 
 
 #endif //GUNDAM_DIALBASE_H
