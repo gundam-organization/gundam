@@ -647,6 +647,7 @@ void FitParameterSet::defineParameters(){
       // Alternative 2: define dials then parameters
       par.setDialSetConfig( _dialSetDefinitions_ );
     }
+    par.readConfig();
   }
 }
 

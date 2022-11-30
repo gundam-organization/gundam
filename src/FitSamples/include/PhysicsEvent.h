@@ -20,6 +20,7 @@
 #include "vector"
 #include "string"
 #include "map"
+#include "mutex"
 
 class PhysicsEvent {
 
@@ -133,7 +134,7 @@ private:
 
 
   // Dev
-  GenericToolbox::NoCopyWrapper<std::mutex> _eventMutex_{};
+  GenericToolbox::NoCopyWrapper<std::mutex> _eventMutex_;
 
 public:
   void multiplyEventWeight(double value_){

@@ -218,6 +218,17 @@ if( "${YAML_CPP_INCLUDE_DIR} " STREQUAL " ")
     #    list(APPEND LINK_LIBARY_LIST ${YAMLCPP_LIBRARY})
 endif()
 
+find_package(ZLIB REQUIRED)
+if (${ZLIB_FOUND})
+    cmessage(STATUS "ZLIB found : ${ZLIB_VERSION_STRING}")
+    cmessage(STATUS "ZLIB_INCLUDE_DIRS = ${ZLIB_INCLUDE_DIRS}")
+    cmessage(STATUS "ZLIB_LIBRARIES = ${ZLIB_LIBRARIES}")
+else()
+    cmessage(FATAL_ERROR "ZLIB has not been found.")
+endif ()
+
+
+
 if (WITH_CACHE_MANAGER)
     add_definitions( -DGUNDAM_USING_CACHE_MANAGER)
 

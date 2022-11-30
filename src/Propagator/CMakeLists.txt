@@ -36,6 +36,7 @@ if( WITH_CACHE_MANAGER )
           GundamFitSamples
           GundamDatasetManager
           GundamCache
+          GundamDials
           ${ROOT_LIBRARIES}
           )
 else()

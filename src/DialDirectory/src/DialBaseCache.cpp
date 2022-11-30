@@ -24,7 +24,7 @@ double DialBaseCache::evalResponse(const DialInputBuffer& input_){
   if( _cachedInputHash_ == input_.getCurrentHash() ){ return _cachedResponse_; }
 
   // Eval
-  _cachedResponse_ = this->DialBase::evalResponseImpl(input_);
+  _cachedResponse_ = this->evalResponseImpl(input_);
 
   // Update hash
   _cachedInputHash_ = input_.getCurrentHash();

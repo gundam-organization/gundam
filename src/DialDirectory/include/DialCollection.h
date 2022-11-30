@@ -24,10 +24,11 @@ public:
   DialCollection() = default;
 
   void setSupervisedParameterSetRef(FitParameterSet *supervisedParameterSetRef);
-
   void setSupervisedParameterRef(FitParameter *supervisedParameterRef);
 
   void propagate(int iThread_);
+
+  std::string getSummary(bool shallow_ = true);
 
 
 protected:

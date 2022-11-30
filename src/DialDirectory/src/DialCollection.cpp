@@ -11,6 +11,8 @@
 
 #include "Logger.h"
 
+#include "sstream"
+
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[DialCollection]");
@@ -22,6 +24,26 @@ void DialCollection::setSupervisedParameterSetRef(FitParameterSet *supervisedPar
 }
 void DialCollection::setSupervisedParameterRef(FitParameter *supervisedParameterRef) {
   _supervisedParameterRef_ = supervisedParameterRef;
+}
+
+
+std::string DialCollection::getSummary(bool shallow_){
+  std::stringstream ss;
+  ss << "DialCollection: ";
+  if( _supervisedParameterRef_ != nullptr ){
+    ss << _supervisedParameterRef_->getFullTitle();
+  }
+  else if( _supervisedParameterSetRef_ != nullptr ){
+    ss << _supervisedParameterSetRef_->getName();
+  }
+
+  ss << " / nDials=" << _dialInterfaceList_.size();
+
+  if( not shallow_ ){
+    // print parameters
+  }
+
+  return ss.str();
 }
 
 void DialCollection::readConfigImpl() {
@@ -104,7 +126,7 @@ bool DialCollection::initializeDialsWithDefinition() {
 
   this->readGlobals( dialsDefinition );
 
-  if( _globalDialType_ == "Norm" ){
+  if( _globalDialType_ == "Norm" or _globalDialType_ == "Normalization" ){
     NormBinned dial;
     _dialBaseList_.emplace_back( std::make_unique<NormBinned>(dial) );
   }
@@ -235,7 +257,7 @@ bool DialCollection::initializeDialsWithDefinition() {
     }
   } // Spline ? Graph ?
   else{
-    LogError << "unknown dialsType: " << _globalDialType_ << "(" << _globalDialType_ << ")" << std::endl;
+    LogError << "unknown dialsType: " << _globalDialType_ << std::endl;
     throw std::logic_error("dialsType is not supported");
   }
 
