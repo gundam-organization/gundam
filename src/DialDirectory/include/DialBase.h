@@ -8,6 +8,8 @@
 #include "DialInputBuffer.h"
 
 #include "vector"
+#include "string"
+#include "memory"
 
 
 // should be thread safe -> add lock?
@@ -25,17 +27,19 @@ class DialBase {
 
 public:
   DialBase() = default;
+  virtual ~DialBase() = default;
 
   // virtual layer + 8 bytes
 
   // to override
-  [[nodiscard]] virtual std::unique_ptr<DialBase> clone() const = 0;
+  [[nodiscard]] virtual std::unique_ptr<DialBase> clone() const = 0; // can't allocate pure virtual class
+  [[nodiscard]] virtual std::string getDialTypeName() const { return {"DialBase"}; }
   virtual double evalResponseImpl(const DialInputBuffer& input_) = 0;
 
-  // internals
+  // internal virtuals (overrided in Dial cache)
   virtual double evalResponse(const DialInputBuffer& input_){ return this->evalResponseImpl(input_); }
 
-  // class size = 8 bytes (no padding!)
+  //! class size = 8 bytes (no padding!)
 };
 
 

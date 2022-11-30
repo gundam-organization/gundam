@@ -3,22 +3,33 @@ set( LIB_NAME GundamDials )
 set( SRCFILES
     src/DialBase.cpp
     src/DialBaseCache.cpp
-    src/DialNorm.cpp
     src/DialInputBuffer.cpp
     src/DialInterface.cpp
     src/DialResponseSupervisor.cpp
     src/DialCollection.cpp
-    src/DialSpline.cpp)
+    src/DialSplineHandler.cpp
+    src/Norm.cpp
+    src/NormBinned.cpp
+    src/SplineCacheBinned.cpp
+    src/DialBinned.cpp
+    src/Spline.cpp
+    src/SplineCache.cpp
+    )
 
 set( HEADERS
     include/DialBase.h
     include/DialBaseCache.h
-    include/DialNorm.h
     include/DialInputBuffer.h
     include/DialInterface.h
     include/DialResponseSupervisor.h
     include/DialCollection.h
-    include/DialSpline.h
+    include/DialSplineHandler.h
+    include/Norm.h
+    include/NormBinned.h
+    include/SplineCacheBinned.h
+    include/DialBinned.h
+    include/Spline.h
+    include/SplineCache.h
     )
 
 if( USE_STATIC_LINKS )

@@ -20,13 +20,17 @@ class DialInterface {
 public:
   DialInterface() = default;
 
+  void setDialBaseRef(DialBase *dialBasePtr);
+  void setInputBufferRef(const DialInputBuffer *inputBufferRef);
+  void setResponseSupervisorRef(const DialResponseSupervisor *responseSupervisorRef);
+
   double evalResponse();
-  void propagateToTargets(int iThread_=-1);
+  void propagateToTargets(int event_=-1);
 
 private:
-  DialBase* _dialBasePtr_{nullptr};
-  const DialInputBuffer* _inputBuffer_{nullptr};
-  const DialResponseSupervisor* _responseSupervisor_{nullptr};
+  DialBase* _dialBaseRef_{nullptr}; // should be filled while init
+  const DialInputBuffer* _inputBufferRef_{nullptr};
+  const DialResponseSupervisor* _responseSupervisorRef_{nullptr};
 
   std::vector<PhysicsEvent*> _responseTargetsList_{};
 

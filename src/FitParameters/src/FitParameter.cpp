@@ -248,3 +248,7 @@ std::string FitParameter::getTitle() const {
 std::string FitParameter::getFullTitle() const{
   return ((FitParameterSet*) _owner_)->getName() + "/" + this->getTitle();
 }
+
+const nlohmann::json &FitParameter::getDialDefinitionsList() const {
+  return _dialDefinitionsList_;
+}

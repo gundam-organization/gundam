@@ -11,11 +11,7 @@ LoggerInit([]{
 });
 
 
-void DialInputBuffer::setInputParRefList(const std::vector<FitParameter *> &inputParRefList) {
-  _inputParRefList_ = inputParRefList;
-}
-
-void DialInputBuffer::udpateBuffer(){
+void DialInputBuffer::updateBuffer(){
   if(_buffer_.size() != _inputParRefList_.size() ){
     _buffer_.resize(_inputParRefList_.size(), std::nan("unset"));
   }
@@ -25,6 +21,10 @@ void DialInputBuffer::udpateBuffer(){
     buffer++;
   }
   _currentHash_ = generateHash();
+}
+void DialInputBuffer::addInputParRef(const FitParameter* par_){
+  _inputParRefList_.emplace_back(par_);
+  _buffer_.emplace_back(std::nan("unset"));
 }
 
 size_t DialInputBuffer::getBufferSize() const{

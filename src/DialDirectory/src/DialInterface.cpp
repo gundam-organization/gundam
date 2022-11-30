@@ -5,18 +5,21 @@
 #include "DialInterface.h"
 #include "GlobalVariables.h"
 
-
-
-
-void DialInterface::initialize(){
-
+void DialInterface::setDialBaseRef(DialBase *dialBasePtr) {
+  _dialBaseRef_ = dialBasePtr;
+}
+void DialInterface::setInputBufferRef(const DialInputBuffer *inputBufferRef) {
+  _inputBufferRef_ = inputBufferRef;
+}
+void DialInterface::setResponseSupervisorRef(const DialResponseSupervisor *responseSupervisorRef) {
+  _responseSupervisorRef_ = responseSupervisorRef;
 }
 
 double DialInterface::evalResponse(){
-  double response = _dialBasePtr_->evalResponse( *_inputBuffer_ );
+  double response = _dialBaseRef_->evalResponse(*_inputBufferRef_ );
 
-  if( _responseSupervisor_ != nullptr ){
-    _responseSupervisor_->process(response);
+  if(_responseSupervisorRef_ != nullptr ){
+    _responseSupervisorRef_->process(response);
   }
 
   return response;
@@ -37,9 +40,10 @@ void DialInterface::propagateToTargets(int iThread_){
     }
   }
 
-  std::for_each(beginPtr, endPtr, [&](PhysicsEvent* target_){
+  std::for_each(beginPtr, endPtr, [&](PhysicsEvent* event_){
     // thread safe:
-    target_->multiplyEventWeight( cachedResponse );
+    event_->multiplyEventWeight(cachedResponse );
   });
 
 }
+

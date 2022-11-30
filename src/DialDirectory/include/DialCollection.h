@@ -5,8 +5,10 @@
 #ifndef GUNDAM_DIALCOLLECTION_H
 #define GUNDAM_DIALCOLLECTION_H
 
-#include "DialInterface.h"
 #include "DialBase.h"
+#include "DialInterface.h"
+#include "DialInputBuffer.h"
+#include "DialResponseSupervisor.h"
 
 #include "GenericToolbox.Wrappers.h"
 
@@ -21,6 +23,10 @@ class DialCollection : public JsonBaseClass {
 public:
   DialCollection() = default;
 
+  void setSupervisedParameterSetRef(FitParameterSet *supervisedParameterSetRef);
+
+  void setSupervisedParameterRef(FitParameter *supervisedParameterRef);
+
   void propagate(int iThread_);
 
 
@@ -34,33 +40,36 @@ protected:
 
 
 private:
-  // parameter
+  // parameters
   bool _isEnabled_{true};
+  bool _useMirrorDial_{false};
   bool _enableDialsSummary_{false};
-  std::string _applyConditionStr_{};
-  std::vector<std::string> _dataSetNameList_{};
-  std::shared_ptr<TFormula> _applyConditionFormula_{nullptr};
-
-  DialType::DialType _globalDialType_{DialType::DialType_OVERFLOW};
-  std::string _globalDialSubType_{};
-  std::string _globalDialLeafName_{};
+  bool _allowDialExtrapolation_{false};
   double _minDialResponse_{std::nan("unset")};
   double _maxDialResponse_{std::nan("unset")};
-  bool _useMirrorDial_{false};
   double _mirrorLowEdge_{std::nan("unset")};
   double _mirrorHighEdge_{std::nan("unset")};
   double _mirrorRange_{std::nan("unset")};
+  std::string _applyConditionStr_{};
+  std::string _globalDialSubType_{};
+  std::string _globalDialLeafName_{};
+  std::string _globalDialType_{};
+  std::vector<std::string> _dataSetNameList_{};
+  std::shared_ptr<TFormula> _applyConditionFormula_{nullptr};
+//  DialType::DialType _globalDialType_{ DialType::DialType_OVERFLOW };
 
-  bool _allowDialExtrapolation_{false};
-
-  std::vector<DataBinSet> _binningCacheList_;
+  // optional
+  FitParameterSet* _supervisedParameterSetRef_{nullptr};
+  FitParameter* _supervisedParameterRef_{nullptr};
 
   // internal
   bool _parallelizeEventList_{false};
   std::string _title_{};
 
-  std::vector<DialInterface> _dialsList_{}; // what is going to be stored in each event?
-  std::vector<GenericToolbox::PolymorphicObjectWrapper<DialBase>> _dialBaseList_;
+  std::vector<DialInterface> _dialInterfaceList_{};
+  std::vector<DialInputBuffer> _dialInputBufferList_{};
+  std::vector<DialResponseSupervisor> _dialResponseSupervisorList_{};
+  std::vector<GenericToolbox::PolymorphicObjectWrapper<DialBase>> _dialBaseList_{};
 
 };
 

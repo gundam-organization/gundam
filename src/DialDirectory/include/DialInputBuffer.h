@@ -17,25 +17,22 @@ class DialInputBuffer {
 public:
   DialInputBuffer() = default;
 
-  void setInputParRefList(const std::vector<FitParameter *> &inputParRefList);
-
-  void udpateBuffer();
-
   [[nodiscard]] size_t getBufferSize() const;
   [[nodiscard]] const double* getBuffer() const;
   [[nodiscard]] const uint32_t& getCurrentHash() const;
 
+  void updateBuffer();
+  void addInputParRef(const FitParameter* par_);
+
 protected:
   uint32_t generateHash();
 
-
 private:
   std::vector<double> _buffer_;
-  std::vector<FitParameter*> _inputParRefList_;
+  std::vector<const FitParameter*> _inputParRefList_;
 
   // for cache
   uint32_t _currentHash_{0};
-
 
 };
 

@@ -5,11 +5,15 @@
 #include "DialResponseSupervisor.h"
 
 
-void DialResponseSupervisor::process(double& output_) const{
+void DialResponseSupervisor::setMinResponse(double minResponse) {
+  _minResponse_ = minResponse;
+}
+void DialResponseSupervisor::setMaxResponse(double maxResponse) {
+  _maxResponse_ = maxResponse;
+}
+
+void DialResponseSupervisor::process(double& output_) const {
   // apply cap?
-
-  for( auto& transformFunction : _functionsList_ ){
-    transformFunction(output_);
-  }
-
+  if( not std::isnan(_minResponse_) and output_ < _minResponse_ ){ output_ = _minResponse_; }
+  else if( not std::isnan(_maxResponse_) and output_ > _maxResponse_ ){ output_ = _maxResponse_; }
 }

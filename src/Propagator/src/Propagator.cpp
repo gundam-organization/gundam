@@ -45,6 +45,29 @@ void Propagator::readConfigImpl(){
     LogInfo << _parameterSetList_.back().getSummary() << std::endl;
   }
 
+  for( auto& parSet : _parameterSetList_ ){
+    // DEV / DialCollections
+    if( not parSet.getDialSetDefinitions().empty() ){
+      for( auto& dialSetDef : parSet.getDialSetDefinitions().get<std::vector<nlohmann::json>>() ){
+        if( JsonUtils::doKeyExist(dialSetDef, "parametersBinningPath") ){
+          _dialCollections_.emplace_back();
+          _dialCollections_.back().setSupervisedParameterSetRef( &parSet );
+          _dialCollections_.back().readConfig( dialSetDef );
+        }
+        else{ LogThrow("no parametersBinningPath option?"); }
+      }
+    }
+
+    for( auto& par : parSet.getParameterList() ){
+      for( const auto& dialDefinitionConfig : par.getDialDefinitionsList() ){
+        _dialCollections_.emplace_back();
+        _dialCollections_.back().setSupervisedParameterRef( &par );
+        _dialCollections_.back().readConfig( dialDefinitionConfig );
+      }
+    }
+  }
+
+
   auto fitSampleSetConfig = JsonUtils::fetchValue(_config_, "fitSampleSetConfig", nlohmann::json());
   _fitSampleSet_.setConfig(fitSampleSetConfig);
   _fitSampleSet_.readConfig();
@@ -82,7 +105,6 @@ void Propagator::initializeImpl() {
   }
   LogInfo << "Total number of parameters: " << nPars << std::endl;
 
-
   if( _globalCovarianceMatrix_ == nullptr ){
     LogInfo << "Building global covariance matrix..." << std::endl;
     _globalCovarianceMatrix_ = std::make_shared<TMatrixD>( nPars, nPars );
@@ -109,6 +131,9 @@ void Propagator::initializeImpl() {
 
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing samples...") << std::endl;
   _fitSampleSet_.initialize();
+
+  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing dials...") << std::endl;
+  for( auto& dialCollection : _dialCollections_ ){ dialCollection.initialize(); }
 
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing " + std::to_string(_dataSetList_.size()) + " datasets...") << std::endl;
   for( auto& dataset : _dataSetList_ ){ dataset.initialize(); }

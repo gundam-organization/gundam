@@ -7,6 +7,7 @@
 
 #include "vector"
 #include "functional"
+#include "cmath"
 
 
 class DialResponseSupervisor {
@@ -14,10 +15,14 @@ class DialResponseSupervisor {
 public:
   DialResponseSupervisor() = default;
 
+  void setMinResponse(double minResponse);
+  void setMaxResponse(double maxResponse);
+
   void process(double &output_) const;
 
 private:
-  std::vector<std::function<void(double&)>> _functionsList_;
+  double _minResponse_{std::nan("unset")};
+  double _maxResponse_{std::nan("unset")};
 
 
 };

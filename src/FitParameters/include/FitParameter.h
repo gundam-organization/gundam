@@ -70,6 +70,8 @@ public:
   double getMaxValue() const;
   double getStepSize() const;
 
+  const nlohmann::json &getDialDefinitionsList() const;
+
   const FitParameterSet *getOwner() const;
 
   // Core

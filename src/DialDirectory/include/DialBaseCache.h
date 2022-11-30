@@ -24,9 +24,10 @@ class DialBaseCache : public DialBase {
 
 public:
   DialBaseCache() = default;
+  [[nodiscard]] std::string getDialTypeName() const override { return {"DialBaseCache"}; }
 
+  // Cache handling here:
   double evalResponse(const DialInputBuffer& input_) override;
-
 
 protected:
   GenericToolbox::NoCopyWrapper<std::mutex> _evalLock_{}; // + 64 bytes
