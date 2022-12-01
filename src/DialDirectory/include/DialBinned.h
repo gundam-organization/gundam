@@ -17,6 +17,7 @@ public:
   void setApplyConditionBin(const DataBin &applyConditionBin);
 
   [[nodiscard]] const DataBin &getApplyConditionBin() const;
+  [[nodiscard]] DataBin &getApplyConditionBin();
 
 protected:
   DataBin _applyConditionBin_;

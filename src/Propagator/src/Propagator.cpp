@@ -96,10 +96,6 @@ void Propagator::readConfigImpl(){
     }
   }
 
-  for( auto& dialCollection : _dialCollections_ ){
-    LogDebug << dialCollection.getSummary() << std::endl;
-  }
-
 }
 void Propagator::initializeImpl() {
   LogWarning << __METHOD_NAME__ << std::endl;
@@ -139,11 +135,13 @@ void Propagator::initializeImpl() {
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing samples...") << std::endl;
   _fitSampleSet_.initialize();
 
-  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing dials...") << std::endl;
-  for( auto& dialCollection : _dialCollections_ ){ dialCollection.initialize(); }
-
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing " + std::to_string(_dataSetList_.size()) + " datasets...") << std::endl;
   for( auto& dataset : _dataSetList_ ){ dataset.initialize(); }
+
+  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing dials...") << std::endl;
+  for( auto& dialCollection : _dialCollections_ ){
+    dialCollection.initialize();
+  }
 
   LogInfo << "Initializing propagation threads..." << std::endl;
   initializeThreads();
@@ -168,10 +166,14 @@ void Propagator::initializeImpl() {
     if(dispenser.getParameters().useMcContainer ){
       usedMcContainer = true;
       dispenser.setParSetPtrToLoad(&_parameterSetList_);
+      dispenser.setDialCollectionListPtr(&_dialCollections_);
     }
     dispenser.load();
   }
 
+  for( auto& dialCollection : _dialCollections_ ){
+    LogInfo << dialCollection.getSummary() << std::endl;
+  }
 
   // Copy to data container
   if( usedMcContainer ){
@@ -262,6 +264,7 @@ void Propagator::initializeImpl() {
       dispenser.setSampleSetPtrToLoad(&_fitSampleSet_);
       dispenser.setPlotGenPtr(&_plotGenerator_);
       dispenser.setParSetPtrToLoad(&_parameterSetList_);
+      dispenser.setDialCollectionListPtr(&_dialCollections_);
       dispenser.load();
     }
   }
@@ -514,6 +517,20 @@ void Propagator::propagateParametersOnSamples(){
     if( parSet.isUseEigenDecompInFit() ) parSet.propagateEigenToOriginal();
   }
 
+#if USE_NEW_DIALS
+  std::for_each(
+      _fitSampleSet_.getFitSampleList().begin(), _fitSampleSet_.getFitSampleList().end(),
+      [&](auto& s){
+        if( s.getMcContainer().eventList.empty() ) return;
+        std::for_each(
+            s.getMcContainer().eventList.begin(),
+            s.getMcContainer().eventList.end(),
+            [&](PhysicsEvent& e){ e.resetEventWeight(); }
+        );
+      }
+  );
+#endif
+
   reweightMcEvents();
   refillSampleHistograms();
 
@@ -679,14 +696,21 @@ void Propagator::updateDialResponses(int iThread_){
 
 }
 void Propagator::reweightMcEvents(int iThread_) {
+
+  //! Warning: everything you modify here, may significantly slow down the fitter
+
+#if USE_NEW_DIALS
+  std::for_each(
+      _dialCollections_.begin(), _dialCollections_.end(), [&](DialCollection& d){
+        d.propagate(iThread_);
+      });
+#else
   int nThreads = GlobalVariables::getNbThreads();
   if(iThread_ == -1){
     // force single thread
     nThreads = 1;
     iThread_ = 0;
   }
-
-  //! Warning: everything you modify here, may significantly slow down the fitter
   long nToProcess;
   long offset;
   std::vector<PhysicsEvent>* eList;
@@ -704,6 +728,10 @@ void Propagator::reweightMcEvents(int iThread_) {
           );
     }
   );
+#endif
+
+
+
 }
 
 

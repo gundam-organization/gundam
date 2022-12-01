@@ -10,6 +10,7 @@
 #include "FitParameterSet.h"
 #include "PlotGenerator.h"
 #include "JsonBaseClass.h"
+#include "DialCollection.h"
 
 #include "TChain.h"
 
@@ -54,6 +55,7 @@ struct DataDispenserCache{
   std::vector<GenericToolbox::CopiableAtomic<size_t>> sampleIndexOffsetList;
   std::vector< std::vector<PhysicsEvent>* > sampleEventListPtrToFill;
   std::map<FitParameterSet*, std::vector<DialSet*>> dialSetPtrMap;
+  std::vector<DialCollection*> dialCollectionsRefList{};
 
   std::vector<std::string> varsRequestedForIndexing{};
   std::vector<std::string> varsRequestedForStorage{};
@@ -92,11 +94,14 @@ public:
   explicit DataDispenser(DatasetLoader* owner_);
   void setOwner(DatasetLoader* owner_){ _owner_ = owner_; }
 
-  const DataDispenserParameters &getParameters() const;
+  [[nodiscard]] const DataDispenserParameters &getParameters() const;
   DataDispenserParameters &getParameters();
 
   void setSampleSetPtrToLoad(FitSampleSet *sampleSetPtrToLoad);
   void setParSetPtrToLoad(std::vector<FitParameterSet> *parSetListPtrToLoad_);
+
+  void setDialCollectionListPtr(std::vector<DialCollection> *dialCollectionListPtr);
+
   void setPlotGenPtr(PlotGenerator *plotGenPtr);
 
   std::string getTitle();
@@ -114,6 +119,8 @@ protected:
   void preAllocateMemory();
   void readAndFill();
 
+  void fillFunction(int iThread_);
+
 private:
   // Parameters
   DataDispenserParameters _parameters_;
@@ -122,6 +129,7 @@ private:
   DatasetLoader* _owner_{nullptr};
   FitSampleSet* _sampleSetPtrToLoad_{nullptr};
   std::vector<FitParameterSet>* _parSetListPtrToLoad_{nullptr};
+  std::vector<DialCollection>* _dialCollectionListPtr_{nullptr};
   PlotGenerator* _plotGenPtr_{nullptr}; // used to know which vars have to be kept in memory
   DataDispenserCache _cache_;
 

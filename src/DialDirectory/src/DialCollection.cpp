@@ -19,33 +19,6 @@ LoggerInit([]{
 });
 
 
-void DialCollection::setSupervisedParameterSetRef(FitParameterSet *supervisedParameterSetRef) {
-  _supervisedParameterSetRef_ = supervisedParameterSetRef;
-}
-void DialCollection::setSupervisedParameterRef(FitParameter *supervisedParameterRef) {
-  _supervisedParameterRef_ = supervisedParameterRef;
-}
-
-
-std::string DialCollection::getSummary(bool shallow_){
-  std::stringstream ss;
-  ss << "DialCollection: ";
-  if( _supervisedParameterRef_ != nullptr ){
-    ss << _supervisedParameterRef_->getFullTitle();
-  }
-  else if( _supervisedParameterSetRef_ != nullptr ){
-    ss << _supervisedParameterSetRef_->getName();
-  }
-
-  ss << " / nDials=" << _dialInterfaceList_.size();
-
-  if( not shallow_ ){
-    // print parameters
-  }
-
-  return ss.str();
-}
-
 void DialCollection::readConfigImpl() {
 
   _dataSetNameList_ = JsonUtils::fetchValue<std::vector<std::string>>(
@@ -54,18 +27,167 @@ void DialCollection::readConfigImpl() {
   if( _dataSetNameList_.empty() ){ _dataSetNameList_.emplace_back("*"); }
 
   // Dials are directly defined with a binning file?
-  if     ( initializeNormDialsWithParBinning() ){ /* LogInfo << "DialSet initialised with parameter binning definition." << std::endl; */  }
-    // Dials are individually defined?
-  else if( initializeDialsWithDefinition() )   { /* LogInfo << "DialSet initialised with config definition." << std::endl; */ }
-    // Dials definition not found?
+  if     ( initializeNormDialsWithParBinning() ){}
+  else if( initializeDialsWithDefinition() ){}
   else{
-//    LogWarning << "Could not fetch dials definition for parameter: #" << _owner_->getParameterIndex();
-//    if( not _owner_->getName().empty() ) LogWarning << " (" << _owner_->getName() << ")";
     LogWarning << std::endl << "Disabling dialSet." << std::endl;
     _isEnabled_ = false;
   }
 
 }
+void DialCollection::initializeImpl() {
+  LogInfo << "Initialising dial collection \"" << this->getTitle() << "\"" << std::endl;
+
+  this->updateDialInterfaceReferences();
+}
+
+void DialCollection::setSupervisedParameterSetRef(FitParameterSet *supervisedParameterSetRef) {
+  _supervisedParameterSetRef_ = supervisedParameterSetRef;
+}
+void DialCollection::setSupervisedParameterRef(FitParameter *supervisedParameterRef) {
+  _supervisedParameterRef_ = supervisedParameterRef;
+}
+
+bool DialCollection::isBinned() const {
+  return _isBinned_;
+}
+const std::string &DialCollection::getGlobalDialLeafName() const {
+  return _globalDialLeafName_;
+}
+const std::string &DialCollection::getGlobalDialType() const {
+  return _globalDialType_;
+}
+const std::shared_ptr<TFormula> &DialCollection::getApplyConditionFormula() const {
+  return _applyConditionFormula_;
+}
+FitParameterSet *DialCollection::getSupervisedParameterSetRef() const {
+  return _supervisedParameterSetRef_;
+}
+std::vector<GenericToolbox::PolymorphicObjectWrapper<DialBase>> &DialCollection::getDialBaseList() {
+  return _dialBaseList_;
+}
+std::vector<DialInterface> &DialCollection::getDialInterfaceList() {
+  return _dialInterfaceList_;
+}
+
+void DialCollection::propagate(int iThread_){
+
+  auto beginPtr = _dialInterfaceList_.begin();
+  auto endPtr = _dialInterfaceList_.end();
+  int iThreadEvent_{-1};
+
+  if( not _isBinned_ ){
+    // parallelize dials (useful for event by event dials -> only one event per dial = nothing to parallelize)
+    if( iThread_ != -1 ){
+      Long64_t nEventPerThread = Long64_t(_dialInterfaceList_.size())/GlobalVariables::getNbThreads();
+      beginPtr = _dialInterfaceList_.begin() + Long64_t(iThread_)*nEventPerThread;
+      if( iThread_+1 != GlobalVariables::getNbThreads() ){
+        endPtr = _dialInterfaceList_.begin() + (Long64_t(iThread_) + 1) * nEventPerThread;
+      }
+    }
+  }
+  else{
+    iThreadEvent_ = iThread_;
+  }
+
+  std::for_each(beginPtr, endPtr, [&](DialInterface& dial){
+    dial.propagateToTargets(iThreadEvent_);
+  });
+
+}
+std::string DialCollection::getTitle() {
+  if( _supervisedParameterRef_ != nullptr ){
+    return _supervisedParameterRef_->getFullTitle();
+  }
+  else if( _supervisedParameterSetRef_ != nullptr ){
+    return _supervisedParameterSetRef_->getName();
+  }
+  return _title_;
+}
+std::string DialCollection::getSummary(bool shallow_){
+  std::stringstream ss;
+  ss << "DialCollection: ";
+  ss << this->getTitle();
+  ss << " / nDials=" << _dialInterfaceList_.size();
+
+  if( not shallow_ ){
+    // print parameters
+    for( auto& dialInterface : _dialInterfaceList_ ){
+      if( _isBinned_ ){
+        ss << std::endl << "  " << dialInterface.getSummary();
+      }
+    }
+  }
+
+  return ss.str();
+}
+bool DialCollection::isDatasetValid(const std::string& datasetName_) const{
+  for( auto& dialSet : _dataSetNameList_ ){
+    if( GenericToolbox::doesElementIsInVector(datasetName_, _dataSetNameList_) ){ return true; }
+  }
+
+  // If not found, find general dialSet
+  for( auto& dialSet : _dataSetNameList_ ){
+    if( _dataSetNameList_.size() == 1 ){
+      if( GenericToolbox::doesElementIsInVector("", _dataSetNameList_)
+          or GenericToolbox::doesElementIsInVector("*", _dataSetNameList_)
+          ){
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+size_t DialCollection::getNextDialFreeSlot(){
+#if __cplusplus >= 201703L
+  std::scoped_lock<std::mutex> g(_mutex_);
+#else
+  std::lock_guard<std::mutex> g(_mutex_);
+#endif
+  return _dialFreeSlot_++;
+}
+void DialCollection::shrinkContainers(){
+  LogDebug << "Shrinking dial collection \"" << this->getTitle() << "\" from "
+  << _dialInterfaceList_.size() << " to " << _dialFreeSlot_ << std::endl;
+  _dialInterfaceList_.resize(_dialFreeSlot_);
+  _dialBaseList_.resize(_dialFreeSlot_);
+  _dialInterfaceList_.shrink_to_fit();
+  _dialBaseList_.shrink_to_fit();
+  this->updateDialInterfaceReferences();
+}
+void DialCollection::updateDialInterfaceReferences(){
+  LogWarning << "Updating references in dial interfaces..." << std::endl;
+  _dialInterfaceList_.resize( _dialBaseList_.size() );
+  for( size_t iDial = 0 ; iDial < _dialBaseList_.size() ; iDial++ ){
+    // Dial base reference
+    _dialInterfaceList_[iDial].setDialBaseRef( _dialBaseList_[iDial].get() );
+
+    // Inputs reference
+    if( _dialInputBufferList_.size() == 1 ){
+      _dialInterfaceList_[iDial].setInputBufferRef( &_dialInputBufferList_[0] );
+    }
+    else if( _dialInputBufferList_.size() == _dialInterfaceList_.size() ){
+      _dialInterfaceList_[iDial].setInputBufferRef( &_dialInputBufferList_[iDial] );
+    }
+    else{
+      LogThrow("DEV: size mismatch between input buffer and dial interfaces.");
+    }
+
+
+    // Supervisor reference
+    if( _dialResponseSupervisorList_.size() == 1 ){
+      _dialInterfaceList_[iDial].setResponseSupervisorRef( &_dialResponseSupervisorList_[0] );
+    }
+    else if( _dialResponseSupervisorList_.size() == _dialInterfaceList_.size() ){
+      _dialInterfaceList_[iDial].setResponseSupervisorRef( &_dialResponseSupervisorList_[iDial] );
+    }
+    else{
+      LogThrow("DEV: size mismatch between response supervisors and dial interfaces.");
+    }
+  }
+}
+
 bool DialCollection::initializeNormDialsWithParBinning() {
 
   auto parameterBinningPath = JsonUtils::fetchValue<std::string>(_config_, "parametersBinningPath", "");
@@ -95,17 +217,12 @@ bool DialCollection::initializeNormDialsWithParBinning() {
   _dialResponseSupervisorList_[0].setMaxResponse( JsonUtils::fetchValue(_config_, "maxDialResponse", _maxDialResponse_) );
 
   _dialBaseList_.reserve( binning.getBinsList().size() );
-  _dialInterfaceList_.resize( binning.getBinsList().size() );
   _dialInputBufferList_.resize( binning.getBinsList().size() );
   for( size_t iBin = 0 ; iBin < binning.getBinsList().size() ; iBin++ ){
     NormBinned dial;
     dial.setApplyConditionBin( binning.getBinsList()[iBin] );
     _dialBaseList_.emplace_back( std::make_unique<NormBinned>(dial) );
     _dialInputBufferList_[iBin].addInputParRef( &_supervisedParameterSetRef_->getParameterList()[iBin] );
-
-    _dialInterfaceList_[iBin].setDialBaseRef( _dialBaseList_.back().get() );
-    _dialInterfaceList_[iBin].setInputBufferRef( &_dialInputBufferList_[iBin] );
-    _dialInterfaceList_[iBin].setResponseSupervisorRef( &_dialResponseSupervisorList_[0] );
   }
 
   return true;
@@ -138,7 +255,7 @@ bool DialCollection::initializeDialsWithDefinition() {
 
     if     ( JsonUtils::doKeyExist(dialsDefinition, "dialLeafName") ){
       _globalDialLeafName_ = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialLeafName");
-      // nothing to do here, the dials list will be filled while reading the datasets
+      _isBinned_ = false;
     }
     else if( JsonUtils::doKeyExist(dialsDefinition, "binningFilePath") ){
 
@@ -271,14 +388,6 @@ bool DialCollection::initializeDialsWithDefinition() {
   _dialResponseSupervisorList_.back().setMaxResponse(
       JsonUtils::fetchValue(_config_, "maxDialResponse", _maxDialResponse_)
   );
-
-  _dialInterfaceList_.reserve( _dialBaseList_.size() );
-  for( auto& dialBase : _dialBaseList_ ){
-    _dialInterfaceList_.emplace_back();
-    _dialInterfaceList_.back().setDialBaseRef( dialBase.get() );
-    _dialInterfaceList_.back().setInputBufferRef( &_dialInputBufferList_.back() );
-    _dialInterfaceList_.back().setResponseSupervisorRef( &_dialResponseSupervisorList_.back() );
-  }
 
   return true;
 }

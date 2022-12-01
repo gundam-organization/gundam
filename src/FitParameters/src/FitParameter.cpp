@@ -42,7 +42,6 @@ void FitParameter::readConfigImpl(){
     }
 
     _dialDefinitionsList_ = JsonUtils::fetchValue(_parameterConfig_, "dialSetDefinitions", _dialDefinitionsList_);
-    LogDebug << GET_VAR_NAME_VALUE(_dialDefinitionsList_.size()) << std::endl;
   }
 
   _dialSetList_.reserve(_dialDefinitionsList_.size());

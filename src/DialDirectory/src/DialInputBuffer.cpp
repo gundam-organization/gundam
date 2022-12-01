@@ -28,7 +28,7 @@ void DialInputBuffer::addInputParRef(const FitParameter* par_){
 }
 
 size_t DialInputBuffer::getBufferSize() const{
-  return _buffer_.size();
+  return _inputParRefList_.size();
 }
 const double* DialInputBuffer::getBuffer() const{
   return _buffer_.data();

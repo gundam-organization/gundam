@@ -11,3 +11,6 @@ void DialBinned::setApplyConditionBin(const DataBin &applyConditionBin) {
 const DataBin &DialBinned::getApplyConditionBin() const {
   return _applyConditionBin_;
 }
+DataBin &DialBinned::getApplyConditionBin() {
+  return _applyConditionBin_;
+}

@@ -14,6 +14,7 @@
 #include "JsonBaseClass.h"
 #include "ParScanner.h"
 #include "DialCollection.h"
+#include "EventDialCache.h"
 
 #include "GenericToolbox.CycleTimer.h"
 
@@ -137,6 +138,7 @@ private:
   // DEV
   std::vector<Dial*> _dialsStack_{};
   std::vector<DialCollection> _dialCollections_{};
+  EventDialCache _eventDialCache_{};
 
 public:
   GenericToolbox::CycleTimer dialUpdate;

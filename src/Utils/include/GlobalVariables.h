@@ -26,6 +26,8 @@
 #define GUNDAM_DELTA "delta-"
 #endif
 
+#define USE_NEW_DIALS 1
+
 
 ENUM_EXPANDER(
     VerboseLevel, 0,
@@ -34,7 +36,7 @@ ENUM_EXPANDER(
     DEBUG_TRACE,
     INLOOP_TRACE,
     DEV_TRACE
-    )
+    );
 
 
 class GlobalVariables{
