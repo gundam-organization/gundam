@@ -63,6 +63,7 @@ public:
   void updateLlhCache();
   void propagateParametersOnSamples();
   void updateDialResponses();
+  void resetReweight();
   void reweightMcEvents();
   void refillSampleHistograms();
   void throwParametersFromGlobalCovariance();

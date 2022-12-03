@@ -9,6 +9,7 @@
 #include "DialInterface.h"
 #include "DialInputBuffer.h"
 #include "DialResponseSupervisor.h"
+#include "FitSampleSet.h"
 
 #include "GenericToolbox.Wrappers.h"
 
@@ -22,28 +23,26 @@
 class DialCollection : public JsonBaseClass {
 
 public:
-  DialCollection() = default;
+  DialCollection(FitSampleSet *targetSampleSetPtr, std::vector<FitParameterSet> *targetParameterSetListPtr);
 
-  void setSupervisedParameterSetRef(FitParameterSet *supervisedParameterSetRef);
-  void setSupervisedParameterRef(FitParameter *supervisedParameterRef);
+  void setSupervisedParameterIndex(int supervisedParameterIndex);
+  void setSupervisedParameterSetIndex(int supervisedParameterSetIndex);
 
   [[nodiscard]] bool isBinned() const;
   [[nodiscard]] const std::string &getGlobalDialLeafName() const;
   [[nodiscard]] const std::string &getGlobalDialType() const;
   [[nodiscard]] const std::shared_ptr<TFormula> &getApplyConditionFormula() const;
-  [[nodiscard]] FitParameterSet *getSupervisedParameterSetRef() const;
   std::vector<GenericToolbox::PolymorphicObjectWrapper<DialBase>> &getDialBaseList();
   std::vector<DialInterface> &getDialInterfaceList();
 
-
-  void propagate(int iThread_);
+  void propagate(int iThread_ = -1);
   std::string getTitle();
   std::string getSummary(bool shallow_ = true);
   [[nodiscard]] bool isDatasetValid(const std::string& datasetName_) const;
   size_t getNextDialFreeSlot();
   void shrinkContainers();
-  void updateDialInterfaceReferences();
-
+  void setupDialInterfaceReferences();
+  void updateInputBuffers();
 
 protected:
   void readConfigImpl() override;
@@ -74,20 +73,22 @@ private:
   std::shared_ptr<TFormula> _applyConditionFormula_{nullptr};
 //  DialType::DialType _globalDialType_{ DialType::DialType_OVERFLOW };
 
-  // optional
-  FitParameterSet* _supervisedParameterSetRef_{nullptr};
-  FitParameter* _supervisedParameterRef_{nullptr};
+  int _supervisedParameterIndex_{-1};
+  int _supervisedParameterSetIndex_{-1};
 
   // internal
 //  bool _parallelizeDials_{false}; // instead of event parallelization
   size_t _dialFreeSlot_{0};
-  std::string _title_{};
   GenericToolbox::NoCopyWrapper<std::mutex> _mutex_{};
 
   std::vector<DialInterface> _dialInterfaceList_{};
   std::vector<DialInputBuffer> _dialInputBufferList_{};
   std::vector<DialResponseSupervisor> _dialResponseSupervisorList_{};
   std::vector<GenericToolbox::PolymorphicObjectWrapper<DialBase>> _dialBaseList_{};
+
+  // external refs
+  FitSampleSet* _sampleSetPtr_{nullptr};
+  std::vector<FitParameterSet>* _parameterSetListPtr_{nullptr};
 
 };
 

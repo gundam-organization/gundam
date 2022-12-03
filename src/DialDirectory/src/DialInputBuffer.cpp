@@ -6,35 +6,46 @@
 
 #include "Logger.h"
 
+#include "zlib.h"
+
 LoggerInit([]{
   Logger::setUserHeaderStr("[DialInputBuffer]");
 });
 
 
-void DialInputBuffer::updateBuffer(){
-  if(_buffer_.size() != _inputParRefList_.size() ){
-    _buffer_.resize(_inputParRefList_.size(), std::nan("unset"));
-  }
+void DialInputBuffer::updateBuffer(const std::vector<FitParameterSet>& parSetList_){
   double* buffer{_buffer_.data()};
-  for( auto* par : _inputParRefList_ ){
-    *buffer = par->getParameterValue();
+  for( auto& parIndices : _inputParameterIndicesList_ ){
+    *buffer = parSetList_[parIndices.first].getParameterList()[parIndices.second].getParameterValue();
     buffer++;
   }
   _currentHash_ = generateHash();
 }
-void DialInputBuffer::addInputParRef(const FitParameter* par_){
-  _inputParRefList_.emplace_back(par_);
+
+void DialInputBuffer::addParameterIndices(const std::pair<size_t, size_t>& indices_){
+  _inputParameterIndicesList_.emplace_back(indices_);
   _buffer_.emplace_back(std::nan("unset"));
 }
 
+std::string DialInputBuffer::getSummary() const{
+  std::stringstream ss;
+  ss << "Par indices: " << GenericToolbox::iterableToString(_inputParameterIndicesList_, [](const std::pair<size_t, size_t>& idx_){
+    std::stringstream ss; ss << "{" << idx_.first << ", " << idx_.second << "}"; return ss.str();
+  }, false);
+  return ss.str();
+}
+
 size_t DialInputBuffer::getBufferSize() const{
-  return _inputParRefList_.size();
+  return _buffer_.size();
 }
 const double* DialInputBuffer::getBuffer() const{
   return _buffer_.data();
 }
 const uint32_t& DialInputBuffer::getCurrentHash() const{
   return _currentHash_;
+}
+const std::vector<std::pair<size_t, size_t>> &DialInputBuffer::getInputParameterIndicesList() const {
+  return _inputParameterIndicesList_;
 }
 
 uint32_t DialInputBuffer::generateHash(){
@@ -46,5 +57,4 @@ uint32_t DialInputBuffer::generateHash(){
   }
   return out;
 }
-
 

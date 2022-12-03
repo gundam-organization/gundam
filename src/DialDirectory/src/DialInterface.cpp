@@ -14,19 +14,26 @@ LoggerInit([]{
 void DialInterface::setDialBaseRef(DialBase *dialBasePtr) {
   _dialBaseRef_ = dialBasePtr;
 }
-void DialInterface::setInputBufferRef(const DialInputBuffer *inputBufferRef) {
+void DialInterface::setInputBufferRef(DialInputBuffer *inputBufferRef) {
   _inputBufferRef_ = inputBufferRef;
 }
 void DialInterface::setResponseSupervisorRef(const DialResponseSupervisor *responseSupervisorRef) {
   _responseSupervisorRef_ = responseSupervisorRef;
 }
 
-std::vector<PhysicsEvent *> &DialInterface::getTargetEventList() {
-  return _targetEventList_;
-}
-
 double DialInterface::evalResponse(){
-  double response = _dialBaseRef_->evalResponse(*_inputBufferRef_ );
+//  LogTrace << GET_VAR_NAME_VALUE(_inputBufferRef_->getBuffer()[0]) << std::endl;
+//  LogTrace << _inputBufferRef_->getSummary() << std::endl;
+
+  double response = _dialBaseRef_->evalResponse( *_inputBufferRef_ );
+
+  LogThrowIf(
+      std::isnan(response),
+      "invalid dial response: "
+      << GET_VAR_NAME_VALUE(_inputBufferRef_->getBufferSize())
+      << GET_VAR_NAME_VALUE(_inputBufferRef_->getBuffer()[0])
+      << GET_VAR_NAME_VALUE(_inputBufferRef_->getSummary())
+      );
 
   if(_responseSupervisorRef_ != nullptr ){
     _responseSupervisorRef_->process(response);
@@ -34,31 +41,31 @@ double DialInterface::evalResponse(){
 
   return response;
 }
-void DialInterface::propagateToTargets(int iThread_){
-  if( _targetEventList_.empty() ) return;
+void DialInterface::propagateToTargets(FitSampleSet& sampleSet_, int iThread_){
+  if( _targetSampleEventIndicesList_.empty() ) return;
 
+  PhysicsEvent* eventPtr_{nullptr};
   double cachedResponse{ this->evalResponse() };
 
-  auto beginPtr = _targetEventList_.begin();
-  auto endPtr = _targetEventList_.end();
+  auto beginPtr = _targetSampleEventIndicesList_.begin();
+  auto endPtr = _targetSampleEventIndicesList_.end();
 
   if( iThread_ != -1 ){
-    Long64_t nEventPerThread = Long64_t(_targetEventList_.size()) / GlobalVariables::getNbThreads();
-    beginPtr = _targetEventList_.begin() + Long64_t(iThread_) * nEventPerThread;
+    Long64_t nEventPerThread = Long64_t(_targetSampleEventIndicesList_.size()) / GlobalVariables::getNbThreads();
+    beginPtr = _targetSampleEventIndicesList_.begin() + Long64_t(iThread_) * nEventPerThread;
     if( iThread_+1 != GlobalVariables::getNbThreads() ){
-      endPtr = _targetEventList_.begin() + (Long64_t(iThread_) + 1) * nEventPerThread;
+      endPtr = _targetSampleEventIndicesList_.begin() + (Long64_t(iThread_) + 1) * nEventPerThread;
     }
   }
 
-  std::for_each(beginPtr, endPtr, [&](PhysicsEvent* event_){
+  std::for_each(beginPtr, endPtr, [&](std::pair<size_t, size_t>& sampleEventIndices_){
     // thread safe:
-    LogDebug << GET_VAR_NAME_VALUE(event_->getSummary()) << std::endl;
-    if( event_->getLeafContentList().empty() ) return;
-    event_->multiplyEventWeight( cachedResponse );
+    eventPtr_ = &sampleSet_.getFitSampleList()[sampleEventIndices_.first].getMcContainer().eventList[sampleEventIndices_.second];
+    eventPtr_->multiplyEventWeight( cachedResponse );
   });
 
 }
-void DialInterface::addTargetEvent(PhysicsEvent* event_){
+void DialInterface::addTarget(const std::pair<size_t, size_t>& sampleEventIndices_){
   // lock -> only one at a time pass this point
 #if __cplusplus >= 201703L
   // https://stackoverflow.com/questions/26089319/is-there-a-standard-definition-for-cplusplus-in-c14
@@ -66,7 +73,7 @@ void DialInterface::addTargetEvent(PhysicsEvent* event_){
 #else
   std::lock_guard<std::mutex> g(_mutex_);
 #endif
-  _targetEventList_.emplace_back(event_);
+  _targetSampleEventIndicesList_.emplace_back(sampleEventIndices_);
 }
 std::string DialInterface::getSummary(bool shallow_) const {
   std::stringstream ss;

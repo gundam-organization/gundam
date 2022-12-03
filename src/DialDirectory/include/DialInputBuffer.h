@@ -5,11 +5,10 @@
 #ifndef GUNDAM_DIALINPUTBUFFER_H
 #define GUNDAM_DIALINPUTBUFFER_H
 
-#include "FitParameter.h"
-
-#include "zlib.h"
+#include "FitParameterSet.h"
 
 #include "vector"
+#include "utility"
 
 
 class DialInputBuffer {
@@ -20,16 +19,19 @@ public:
   [[nodiscard]] size_t getBufferSize() const;
   [[nodiscard]] const double* getBuffer() const;
   [[nodiscard]] const uint32_t& getCurrentHash() const;
+  [[nodiscard]] const std::vector<std::pair<size_t, size_t>> &getInputParameterIndicesList() const;
 
-  void updateBuffer();
-  void addInputParRef(const FitParameter* par_);
+  void updateBuffer(const std::vector<FitParameterSet>& parSetList_);
+  void addParameterIndices(const std::pair<size_t, size_t>& indices_);
+
+  [[nodiscard]] std::string getSummary() const;
 
 protected:
   uint32_t generateHash();
 
 private:
   std::vector<double> _buffer_;
-  std::vector<const FitParameter*> _inputParRefList_;
+  std::vector<std::pair<size_t, size_t>> _inputParameterIndicesList_{};
 
   // for cache
   uint32_t _currentHash_{0};

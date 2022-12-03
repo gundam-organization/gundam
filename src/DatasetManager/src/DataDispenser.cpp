@@ -665,12 +665,9 @@ void DataDispenser::preAllocateMemory(){
             double dialsSizeInRam = double(nEvents) * sizeof(Spline);
             eventByEventDialSize += dialsSizeInRam;
             LogInfo << " dials (" << GenericToolbox::parseSizeUnits( dialsSizeInRam ) << ")" << std::endl;
+            dialCollection.getDialBaseList().clear();
             dialCollection.getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(Spline()));
-
-            // Interface:
-            DialInterface di;
-            di.getTargetEventList().emplace_back();
-            dialCollection.getDialInterfaceList().resize(nEvents, di);
+            dialCollection.getDialInterfaceList().resize(nEvents);
           }
 //          else if( dialType == "Graph" ){
 //            double dialsSizeInRam = double(nEvents) * sizeof(GraphDial);
@@ -720,10 +717,7 @@ void DataDispenser::readAndFill(){
     container->shrinkEventList(_cache_.sampleIndexOffsetList[iSample]);
   }
   for( auto& dialCollection : *_dialCollectionListPtr_ ) {
-    if( not dialCollection.isBinned() ) {
-      LogDebug << "Shrinking dial collection: " << dialCollection.getTitle() << std::endl;
-      dialCollection.shrinkContainers();
-    }
+    if( not dialCollection.isBinned() ){ dialCollection.shrinkContainers(); }
   }
 }
 void DataDispenser::fillFunction(int iThread_){
@@ -1072,7 +1066,7 @@ void DataDispenser::fillFunction(int iThread_){
             if( dialCollectionRef->getDialBaseList().size() == 1 ){
               // if is it NOT a DialBinned -> this is the one we are supposed to use
               if( dynamic_cast< DialBinned* >( dialCollectionRef->getDialBaseList()[0].get() ) == nullptr ){
-                dialCollectionRef->getDialInterfaceList()[0].addTargetEvent(eventPtr);
+                dialCollectionRef->getDialInterfaceList()[0].addTarget({iSample, sampleEventIndex});
               }
             }
             else {
@@ -1087,7 +1081,7 @@ void DataDispenser::fillFunction(int iThread_){
               if (dial2FoundItr !=  dialCollectionRef->getDialBaseList().end()) {
                 // found DIAL -> get index
                 iDial = std::distance( dialCollectionRef->getDialBaseList().begin(), dial2FoundItr);
-                dialCollectionRef->getDialInterfaceList()[iDial].addTargetEvent(eventPtr);
+                dialCollectionRef->getDialInterfaceList()[iDial].addTarget({iSample, sampleEventIndex});
               }
             }
           }
@@ -1107,7 +1101,7 @@ void DataDispenser::fillFunction(int iThread_){
             if( grPtr != nullptr and grPtr->GetN() > 1){
               freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
               DialBase* db{dialCollectionRef->getDialBaseList()[freeSlotDial].get()};
-              dialCollectionRef->getDialInterfaceList()[freeSlotDial].getTargetEventList()[0] = eventPtr;
+              dialCollectionRef->getDialInterfaceList()[freeSlotDial].addTarget({iSample, sampleEventIndex});
               dialCollectionRef->getDialInterfaceList()[freeSlotDial].setDialBaseRef(db);
               if     ( dialCollectionRef->getGlobalDialType() == "Spline" ){
                 ( (Spline*) db )->createSpline( grPtr );

@@ -10,10 +10,12 @@
 #include "DialResponseSupervisor.h"
 #include "DialUtils.h"
 
-#include "PhysicsEvent.h"
+#include "FitSampleSet.h"
+#include "FitParameterSet.h"
 
 #include "string"
 #include "memory"
+#include "vector"
 
 
 class DialInterface {
@@ -22,23 +24,21 @@ public:
   DialInterface() = default;
 
   void setDialBaseRef(DialBase *dialBasePtr);
-  void setInputBufferRef(const DialInputBuffer *inputBufferRef);
+  void setInputBufferRef(DialInputBuffer *inputBufferRef);
   void setResponseSupervisorRef(const DialResponseSupervisor *responseSupervisorRef);
 
-  std::vector<PhysicsEvent *> &getTargetEventList();
-
   double evalResponse();
-  void propagateToTargets(int event_=-1);
-  void addTargetEvent(PhysicsEvent* event_);
+  void propagateToTargets(FitSampleSet& sampleSet_, int iThread_=-1);
+  void addTarget(const std::pair<size_t, size_t>& sampleEventIndices_);
   [[nodiscard]] std::string getSummary(bool shallow_=true) const;
 
 private:
   DialBase* _dialBaseRef_{nullptr}; // should be filled while init
-  const DialInputBuffer* _inputBufferRef_{nullptr};
+  DialInputBuffer* _inputBufferRef_{nullptr};
   const DialResponseSupervisor* _responseSupervisorRef_{nullptr};
 
   GenericToolbox::NoCopyWrapper<std::mutex> _mutex_{};
-  std::vector<PhysicsEvent*> _targetEventList_{};
+  std::vector<std::pair<size_t, size_t>> _targetSampleEventIndicesList_{};
 
 };
 
