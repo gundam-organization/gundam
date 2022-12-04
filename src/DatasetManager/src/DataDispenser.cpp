@@ -910,11 +910,14 @@ void DataDispenser::fillFunction(int iThread_){
   };
 
   // Dial bin search
-  DialSet* dialSetPtr;
   DataBin* dataBin{nullptr};
-  std::vector<DialWrapper>::iterator dialFoundItr;
-  auto isDialValid = [&](const DialWrapper& d_){
-    dataBin = d_->getApplyConditionBinPtr();
+#ifdef USE_NEW_DIALS
+  size_t freeSlotDial{0};
+  size_t iCollection(-1);
+  std::pair<std::pair<size_t, size_t>, std::vector<std::pair<size_t, size_t>>>* eventDialCacheEntry;
+  std::vector<GenericToolbox::PolymorphicObjectWrapper<DialBase>>::iterator dial2FoundItr;
+  auto isDial2Valid = [&](const GenericToolbox::PolymorphicObjectWrapper<DialBase>& d_){
+    dataBin = &dynamic_cast<DialBinned*>(d_.get())->getApplyConditionBin();
     nBinEdges = dataBin->getEdgesList().size();
     for( iVar = 0 ; iVar < nBinEdges ; iVar++ ){
       if( not DataBin::isBetweenEdges(
@@ -926,15 +929,11 @@ void DataDispenser::fillFunction(int iThread_){
     }
     return true;
   };
-
-  // DEV
-#ifdef USE_NEW_DIALS
-  size_t freeSlotDial{0};
-  size_t iCollection(-1);
-  std::pair<std::pair<size_t, size_t>, std::vector<std::pair<size_t, size_t>>>* eventDialCacheEntry;
-  std::vector<GenericToolbox::PolymorphicObjectWrapper<DialBase>>::iterator dial2FoundItr;
-  auto isDial2Valid = [&](const GenericToolbox::PolymorphicObjectWrapper<DialBase>& d_){
-    dataBin = &dynamic_cast<DialBinned*>(d_.get())->getApplyConditionBin();
+#else
+  DialSet* dialSetPtr;
+  std::vector<DialWrapper>::iterator dialFoundItr;
+  auto isDialValid = [&](const DialWrapper& d_){
+    dataBin = d_->getApplyConditionBinPtr();
     nBinEdges = dataBin->getEdgesList().size();
     for( iVar = 0 ; iVar < nBinEdges ; iVar++ ){
       if( not DataBin::isBetweenEdges(
@@ -1112,8 +1111,9 @@ void DataDispenser::fillFunction(int iThread_){
             if( dialCollectionRef->getDialBaseList().size() == 1 ){
               // if is it NOT a DialBinned -> this is the one we are supposed to use
               if( dynamic_cast< DialBinned* >( dialCollectionRef->getDialBaseList()[0].get() ) == nullptr ){
-                eventDialCacheEntry->second[eventDialOffset++].first = iCollection;
-                eventDialCacheEntry->second[eventDialOffset++].second = 0;
+                eventDialCacheEntry->second[eventDialOffset].first = iCollection;
+                eventDialCacheEntry->second[eventDialOffset].second = 0;
+                eventDialOffset++;
               }
             }
             else {
@@ -1128,8 +1128,9 @@ void DataDispenser::fillFunction(int iThread_){
               if (dial2FoundItr !=  dialCollectionRef->getDialBaseList().end()) {
                 // found DIAL -> get index
                 iDial = std::distance( dialCollectionRef->getDialBaseList().begin(), dial2FoundItr);
-                eventDialCacheEntry->second[eventDialOffset++].first = iCollection;
-                eventDialCacheEntry->second[eventDialOffset++].second = iDial;
+                eventDialCacheEntry->second[eventDialOffset].first = iCollection;
+                eventDialCacheEntry->second[eventDialOffset].second = iDial;
+                eventDialOffset++;
               }
             }
           }
@@ -1155,8 +1156,9 @@ void DataDispenser::fillFunction(int iThread_){
               else{
                 LogThrow( "Unsupported event-by-event dial: " << dialCollectionRef->getGlobalDialType() );
               }
-              eventDialCacheEntry->second[eventDialOffset++].first = iCollection;
-              eventDialCacheEntry->second[eventDialOffset++].second = freeSlotDial;
+              eventDialCacheEntry->second[eventDialOffset].first = iCollection;
+              eventDialCacheEntry->second[eventDialOffset].second = freeSlotDial;
+              eventDialOffset++;
             }
 
           }
