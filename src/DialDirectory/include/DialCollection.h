@@ -35,7 +35,6 @@ public:
   std::vector<GenericToolbox::PolymorphicObjectWrapper<DialBase>> &getDialBaseList();
   std::vector<DialInterface> &getDialInterfaceList();
 
-  void propagate(int iThread_ = -1);
   std::string getTitle();
   std::string getSummary(bool shallow_ = true);
   [[nodiscard]] bool isDatasetValid(const std::string& datasetName_) const;

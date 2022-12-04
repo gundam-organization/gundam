@@ -22,9 +22,6 @@ void DialInterface::setResponseSupervisorRef(const DialResponseSupervisor *respo
 }
 
 double DialInterface::evalResponse(){
-//  LogTrace << GET_VAR_NAME_VALUE(_inputBufferRef_->getBuffer()[0]) << std::endl;
-//  LogTrace << _inputBufferRef_->getSummary() << std::endl;
-
   double response = _dialBaseRef_->evalResponse( *_inputBufferRef_ );
 
   LogThrowIf(
@@ -40,30 +37,6 @@ double DialInterface::evalResponse(){
   }
 
   return response;
-}
-void DialInterface::propagateToTargets(FitSampleSet& sampleSet_, int iThread_){
-  if( _targetSampleEventIndicesList_.empty() ) return;
-
-  PhysicsEvent* eventPtr_{nullptr};
-  double cachedResponse{ this->evalResponse() };
-
-  auto beginPtr = _targetSampleEventIndicesList_.begin();
-  auto endPtr = _targetSampleEventIndicesList_.end();
-
-  if( iThread_ != -1 ){
-    Long64_t nEventPerThread = Long64_t(_targetSampleEventIndicesList_.size()) / GlobalVariables::getNbThreads();
-    beginPtr = _targetSampleEventIndicesList_.begin() + Long64_t(iThread_) * nEventPerThread;
-    if( iThread_+1 != GlobalVariables::getNbThreads() ){
-      endPtr = _targetSampleEventIndicesList_.begin() + (Long64_t(iThread_) + 1) * nEventPerThread;
-    }
-  }
-
-  std::for_each(beginPtr, endPtr, [&](std::pair<size_t, size_t>& sampleEventIndices_){
-    // thread safe:
-    eventPtr_ = &sampleSet_.getFitSampleList()[sampleEventIndices_.first].getMcContainer().eventList[sampleEventIndices_.second];
-    eventPtr_->multiplyEventWeight( cachedResponse );
-  });
-
 }
 void DialInterface::addTarget(const std::pair<size_t, size_t>& sampleEventIndices_){
   // lock -> only one at a time pass this point

@@ -69,31 +69,6 @@ std::vector<DialInterface> &DialCollection::getDialInterfaceList() {
   return _dialInterfaceList_;
 }
 
-void DialCollection::propagate(int iThread_){
-
-  auto beginPtr = _dialInterfaceList_.begin();
-  auto endPtr = _dialInterfaceList_.end();
-  int iThreadEvent_{-1};
-
-  if( not _isBinned_ ){
-    // parallelize dials (useful for event by event dials -> only one event per dial = nothing to parallelize)
-    if( iThread_ != -1 ){
-      Long64_t nEventPerThread = Long64_t(_dialInterfaceList_.size())/GlobalVariables::getNbThreads();
-      beginPtr = _dialInterfaceList_.begin() + Long64_t(iThread_)*nEventPerThread;
-      if( iThread_+1 != GlobalVariables::getNbThreads() ){
-        endPtr = _dialInterfaceList_.begin() + (Long64_t(iThread_) + 1) * nEventPerThread;
-      }
-    }
-  }
-  else{
-    iThreadEvent_ = iThread_;
-  }
-
-  std::for_each(beginPtr, endPtr, [&](DialInterface& dial){
-    dial.propagateToTargets(*_sampleSetPtr_, iThreadEvent_);
-  });
-
-}
 std::string DialCollection::getTitle() {
   if( _supervisedParameterSetIndex_ != -1 ){
     if( _supervisedParameterIndex_ != -1 ){

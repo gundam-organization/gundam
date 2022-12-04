@@ -132,20 +132,6 @@ private:
   void (*_CacheManagerUpdate_)(){nullptr};
 #endif
 
-
-  // Dev
-  GenericToolbox::NoCopyWrapper<std::mutex> _eventMutex_;
-
-public:
-  void multiplyEventWeight(double value_){
-#if __cplusplus >= 201703L
-    std::scoped_lock<std::mutex> g(_eventMutex_);
-#else
-    std::lock_guard<std::mutex> g(_eventMutex_);
-#endif
-    _eventWeight_ *= value_;
-  }
-
 };
 
 

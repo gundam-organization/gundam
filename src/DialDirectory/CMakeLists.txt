@@ -14,7 +14,8 @@ set( SRCFILES
     src/DialBinned.cpp
     src/Spline.cpp
     src/SplineCache.cpp
-    src/EventDialCache.cpp include/EventDialCache.h)
+    src/EventDialCache.cpp
+    )
 
 set( HEADERS
     include/DialBase.h
@@ -31,6 +32,7 @@ set( HEADERS
     include/Spline.h
     include/SplineCache.h
     include/DialUtils.h
+    include/EventDialCache.h
     )
 
 if( USE_STATIC_LINKS )

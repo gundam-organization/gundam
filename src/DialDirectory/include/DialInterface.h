@@ -28,7 +28,6 @@ public:
   void setResponseSupervisorRef(const DialResponseSupervisor *responseSupervisorRef);
 
   double evalResponse();
-  void propagateToTargets(FitSampleSet& sampleSet_, int iThread_=-1);
   void addTarget(const std::pair<size_t, size_t>& sampleEventIndices_);
   [[nodiscard]] std::string getSummary(bool shallow_=true) const;
 

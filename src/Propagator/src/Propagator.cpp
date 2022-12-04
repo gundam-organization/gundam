@@ -168,6 +168,7 @@ void Propagator::initializeImpl() {
       usedMcContainer = true;
       dispenser.setParSetPtrToLoad(&_parameterSetList_);
       dispenser.setDialCollectionListPtr(&_dialCollections_);
+      dispenser.setEventDialCache(&_eventDialCache_);
     }
     dispenser.load();
   }
@@ -263,6 +264,7 @@ void Propagator::initializeImpl() {
       dispenser.setPlotGenPtr(&_plotGenerator_);
       dispenser.setParSetPtrToLoad(&_parameterSetList_);
       dispenser.setDialCollectionListPtr(&_dialCollections_);
+      dispenser.setEventDialCache(&_eventDialCache_);
       dispenser.load();
     }
   }
@@ -274,6 +276,9 @@ void Propagator::initializeImpl() {
   // reweightMcEvents.
   if(GlobalVariables::getEnableCacheManager()) Cache::Manager::Build(getFitSampleSet());
 #endif
+
+  LogInfo << "Build reference cache..." << std::endl;
+  _eventDialCache_.buildReferenceCache(_fitSampleSet_, _dialCollections_);
 
   LogInfo << "Propagating prior parameters on events..." << std::endl;
   this->resetReweight();
@@ -530,17 +535,6 @@ void Propagator::updateDialResponses(){
 }
 void Propagator::resetReweight(){
 #if USE_NEW_DIALS
-  std::for_each(
-      _fitSampleSet_.getFitSampleList().begin(), _fitSampleSet_.getFitSampleList().end(),
-      [&](auto& s){
-        if( s.getMcContainer().eventList.empty() ) return;
-        std::for_each(
-            s.getMcContainer().eventList.begin(),
-            s.getMcContainer().eventList.end(),
-            [&](PhysicsEvent& e){ e.resetEventWeight(); }
-        );
-      }
-  );
   std::for_each(_dialCollections_.begin(), _dialCollections_.end(),[&](DialCollection& dc_){
     dc_.updateInputBuffers();
   });
@@ -706,8 +700,7 @@ void Propagator::reweightMcEvents(int iThread_) {
   //! Warning: everything you modify here, may significantly slow down the fitter
 
 #if USE_NEW_DIALS
-  std::for_each(
-      _dialCollections_.begin(), _dialCollections_.end(), [&](DialCollection& d){ d.propagate(iThread_); });
+  _eventDialCache_.propagate(iThread_, GlobalVariables::getNbThreads());
 #else
   int nThreads = GlobalVariables::getNbThreads();
   if(iThread_ == -1){

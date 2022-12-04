@@ -36,7 +36,7 @@ public:
   [[nodiscard]] virtual std::string getDialTypeName() const { return {"DialBase"}; }
   virtual double evalResponseImpl(const DialInputBuffer& input_) = 0;
 
-  // internal virtuals (overrided in Dial cache)
+  // other virtual
   virtual double evalResponse(const DialInputBuffer& input_){ return this->evalResponseImpl(input_); }
 
   //! class size = 8 bytes (no padding!)

@@ -11,6 +11,7 @@
 #include "PlotGenerator.h"
 #include "JsonBaseClass.h"
 #include "DialCollection.h"
+#include "EventDialCache.h"
 
 #include "TChain.h"
 
@@ -33,7 +34,7 @@ struct DataDispenserParameters{
   std::vector<std::string> dummyVariablesList;
   int iThrow{-1};
 
-  std::string getSummary() const{
+  [[nodiscard]] std::string getSummary() const{
     std::stringstream ss;
     ss << GET_VAR_NAME_VALUE(useMcContainer);
     ss << std::endl << GET_VAR_NAME_VALUE(name);
@@ -99,10 +100,9 @@ public:
 
   void setSampleSetPtrToLoad(FitSampleSet *sampleSetPtrToLoad);
   void setParSetPtrToLoad(std::vector<FitParameterSet> *parSetListPtrToLoad_);
-
   void setDialCollectionListPtr(std::vector<DialCollection> *dialCollectionListPtr);
-
   void setPlotGenPtr(PlotGenerator *plotGenPtr);
+  void setEventDialCache(EventDialCache* eventDialCache_);
 
   std::string getTitle();
 
@@ -131,6 +131,8 @@ private:
   std::vector<FitParameterSet>* _parSetListPtrToLoad_{nullptr};
   std::vector<DialCollection>* _dialCollectionListPtr_{nullptr};
   PlotGenerator* _plotGenPtr_{nullptr}; // used to know which vars have to be kept in memory
+  EventDialCache* _eventDialCacheRef_{nullptr};
+
   DataDispenserCache _cache_;
 
 };
