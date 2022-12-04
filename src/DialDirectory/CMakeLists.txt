@@ -13,6 +13,7 @@ set( SRCFILES
     src/SplineCacheBinned.cpp
     src/DialBinned.cpp
     src/Spline.cpp
+    src/SplineBinned.cpp
     src/SplineCache.cpp
     src/EventDialCache.cpp
     )
@@ -30,6 +31,7 @@ set( HEADERS
     include/SplineCacheBinned.h
     include/DialBinned.h
     include/Spline.h
+    include/SplineBinned.h
     include/SplineCache.h
     include/DialUtils.h
     include/EventDialCache.h

@@ -4,13 +4,19 @@
 
 #include "DialBaseCache.h"
 
-#include "zlib.h"
+#include "Logger.h"
+
+LoggerInit([]{
+  Logger::setUserHeaderStr("[DialBaseCache]");
+});
 
 
 double DialBaseCache::evalResponse(const DialInputBuffer& input_){
 
   // Already computed ? unlocked cache
-  if( _cachedInputHash_ == input_.getCurrentHash() ){ return _cachedResponse_; }
+  if( isCacheValid(input_) ){
+    return _cachedResponse_;
+  }
 
   // lock -> only one at a time pass this point
 #if __cplusplus >= 201703L
@@ -21,14 +27,34 @@ double DialBaseCache::evalResponse(const DialInputBuffer& input_){
 #endif
 
   // Still not computed?
-  if( _cachedInputHash_ == input_.getCurrentHash() ){ return _cachedResponse_; }
+  if( isCacheValid(input_) ){ return _cachedResponse_; }
 
   // Eval
   _cachedResponse_ = this->evalResponseImpl(input_);
 
   // Update hash
-  _cachedInputHash_ = input_.getCurrentHash();
+  updateInputCache(input_);
 
   // return it
   return _cachedResponse_;
+}
+
+bool DialBaseCache::isCacheValid(const DialInputBuffer& input_){
+#if USE_ZLIB
+  if( _cachedInputHash_ != input_.getCurrentHash() ) return false;
+  return true;
+#else
+  if( _cachedInputs_.size() != input_.getBufferSize() ) return false;
+  return ( memcmp(_cachedInputs_.data(), input_.getBuffer(), input_.getBufferSize() * sizeof(*input_.getBuffer())) == 0 );
+#endif
+}
+void DialBaseCache::updateInputCache(const DialInputBuffer& input_){
+#if USE_ZLIB
+  _cachedInputHash_ = input_.getCurrentHash();
+#else
+  if( _cachedInputs_.size() != input_.getBufferSize() ){
+    _cachedInputs_.resize(input_.getBufferSize(), std::nan("unset"));
+  }
+  memcpy(_cachedInputs_.data(), input_.getBuffer(), input_.getBufferSize() * sizeof(*input_.getBuffer()));
+#endif
 }

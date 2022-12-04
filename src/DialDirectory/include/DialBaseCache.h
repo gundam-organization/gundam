@@ -9,14 +9,9 @@
 
 #include "GenericToolbox.Wrappers.h"
 
-
-#include <zlib.h>
-
 #include "cmath"
 #include "vector"
 #include "mutex"
-
-
 
 
 class DialBaseCache : public DialBase {
@@ -28,11 +23,18 @@ public:
 
   // Cache handling here:
   double evalResponse(const DialInputBuffer& input_) override;
+  bool isCacheValid(const DialInputBuffer& input_);
+  void updateInputCache(const DialInputBuffer& input_);
 
 protected:
   GenericToolbox::NoCopyWrapper<std::mutex> _evalLock_{}; // + 64 bytes
-  uint32_t _cachedInputHash_{0}; // + 4 bytes (keeping a vector empty is already 24...)
   double _cachedResponse_{std::nan("unset")}; // + 8 bytes
+
+#if USE_ZLIB
+  uint32_t _cachedInputHash_{0}; // + 4 bytes (keeping a vector empty is already 24...)
+#else
+  std::vector<double> _cachedInputs_{}; // + 24 bytes
+#endif
 
   // + 8 bytes padding
   // = 96 bytes

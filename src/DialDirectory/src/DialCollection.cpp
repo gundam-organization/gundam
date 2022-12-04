@@ -6,6 +6,7 @@
 #include "NormBinned.h"
 #include "Norm.h"
 #include "SplineCacheBinned.h"
+#include "SplineBinned.h"
 
 #include "JsonUtils.h"
 
@@ -18,8 +19,8 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[DialCollection]");
 });
 
-DialCollection::DialCollection(FitSampleSet *targetSampleSetPtr, std::vector<FitParameterSet> *targetParameterSetListPtr)
-    : _sampleSetPtr_(targetSampleSetPtr), _parameterSetListPtr_(targetParameterSetListPtr) {}
+DialCollection::DialCollection(std::vector<FitParameterSet> *targetParameterSetListPtr)
+    : _parameterSetListPtr_(targetParameterSetListPtr) {}
 
 void DialCollection::readConfigImpl() {
 
@@ -274,10 +275,20 @@ bool DialCollection::initializeDialsWithDefinition() {
 
         for( int iBin = 0 ; iBin < binning.getBinsList().size() ; iBin++ ){
           if     ( _globalDialType_ == "Spline" ){
-            SplineCacheBinned s;
-            s.setApplyConditionBin( binning.getBinsList()[iBin] );
-            s.copySpline((TSpline3*) dialsList->At(iBin));
-            _dialBaseList_.emplace_back( std::make_unique<SplineCacheBinned>(s) );
+            if( _useDialCache_ ){
+              SplineCacheBinned s;
+              s.setApplyConditionBin( binning.getBinsList()[iBin] );
+              s.copySpline((TSpline3*) dialsList->At(iBin));
+              s.setAllowExtrapolation(_allowDialExtrapolation_);
+              _dialBaseList_.emplace_back( std::make_unique<SplineCacheBinned>(s) );
+            }
+            else{
+              SplineBinned s;
+              s.setApplyConditionBin( binning.getBinsList()[iBin] );
+              s.setAllowExtrapolation(_allowDialExtrapolation_);
+              s.copySpline((TSpline3*) dialsList->At(iBin));
+              _dialBaseList_.emplace_back( std::make_unique<SplineBinned>(s) );
+            }
           }
 //          else if( _globalDialType_ == "Graph" ){
 //            GraphDial g(this);
@@ -343,10 +354,20 @@ bool DialCollection::initializeDialsWithDefinition() {
             dialBin->addBinEdge(splitVarNameList.at(iSplitVar), splitVarValueList.at(iSplitVar), splitVarValueList.at(iSplitVar));
           }
           if      ( _globalDialType_ == "Spline" ){
-            SplineCacheBinned s;
-            s.setApplyConditionBin( *dialBin );
-            s.copySpline(splinePtr);
-            _dialBaseList_.emplace_back( std::make_unique<SplineCacheBinned>(s) );
+            if( _useDialCache_ ){
+              SplineCacheBinned s;
+              s.setApplyConditionBin( *dialBin );
+              s.setAllowExtrapolation(_allowDialExtrapolation_);
+              s.copySpline(splinePtr);
+              _dialBaseList_.emplace_back( std::make_unique<SplineCacheBinned>(s) );
+            }
+            else{
+              SplineBinned s;
+              s.setApplyConditionBin( *dialBin );
+              s.setAllowExtrapolation(_allowDialExtrapolation_);
+              s.copySpline(splinePtr);
+              _dialBaseList_.emplace_back( std::make_unique<SplineBinned>(s) );
+            }
           }
           else if( _globalDialType_ == "Graph" ){
             LogThrow("TTree loading of \"Graph\" not implemented.");
@@ -499,6 +520,8 @@ void DialCollection::readGlobals(const nlohmann::json &config_){
   }
 
   _allowDialExtrapolation_ = JsonUtils::fetchValue(config_, "allowDialExtrapolation", _allowDialExtrapolation_);
+
+  _useDialCache_ = JsonUtils::fetchValue(config_, "useDialCache", _useDialCache_);
 }
 nlohmann::json DialCollection::fetchDialsDefinition(const nlohmann::json &definitionsList_) {
   LogThrowIf(_supervisedParameterIndex_==-1, "Can't fetch dial definition of parameter: par ref not set.");

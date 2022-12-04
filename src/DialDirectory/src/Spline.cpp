@@ -11,6 +11,5 @@ LoggerInit([]{
 });
 
 double Spline::evalResponseImpl(const DialInputBuffer& input_) {
-//  LogTrace << GET_VAR_NAME_VALUE(input_.getBuffer()[0]) << " -> " << _spline_.Eval( input_.getBuffer()[0] ) << std::endl;
-  return _spline_.Eval( input_.getBuffer()[0] );
+  return this->calculateSplineResponse(input_);
 }

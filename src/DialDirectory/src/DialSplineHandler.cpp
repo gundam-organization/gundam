@@ -6,6 +6,9 @@
 
 
 
+void DialSplineHandler::setAllowExtrapolation(bool allowExtrapolation) {
+  _allowExtrapolation_ = allowExtrapolation;
+}
 void DialSplineHandler::setSpline(const TSpline3 &spline) {
   _spline_ = spline;
 }
@@ -27,3 +30,10 @@ void DialSplineHandler::createSpline(TGraph* grPtr_){
 #endif
 }
 
+double DialSplineHandler::calculateSplineResponse(const DialInputBuffer& input_) const{
+  if( not _allowExtrapolation_ ){
+    if     (input_.getBuffer()[0] <= _spline_.GetXmin()) { return _spline_.Eval( _spline_.GetXmin() ); }
+    else if(input_.getBuffer()[0] >= _spline_.GetXmax()) { return _spline_.Eval( _spline_.GetXmax() ); }
+  }
+  return _spline_.Eval( input_.getBuffer()[0] );
+}

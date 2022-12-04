@@ -12,7 +12,7 @@ LoggerInit([]{
 
 
 void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<DialCollection>& dialCollectionList_){
-
+  LogInfo << "Building event dial cache..." << std::endl;
 
   auto countValidDials = [](std::vector<std::pair<size_t, size_t>>& dialIndices_){
     return std::count_if(dialIndices_.begin(), dialIndices_.end(),
@@ -42,8 +42,6 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
       continue;
     }
 
-    LogTrace << entry.first.first << " / " << entry.first.second << std::endl;
-
     _cache_.emplace_back();
 
     _cache_.back().first =
@@ -57,17 +55,12 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
 
     for( auto& dialIndex : entry.second ){
       if( dialIndex.first == size_t(-1) or dialIndex.second == size_t(-1) ){ continue; }
-      LogTrace << " -> " << dialIndex.first << " / " << dialIndex.second << "  ";
-      LogTrace << dialCollectionList_.at(dialIndex.first).getSummary();
-      LogTrace << "  " << dialCollectionList_.at(dialIndex.first).getDialBaseList().size() << std::endl;
-
       _cache_.back().second.emplace_back(
           &dialCollectionList_.at(dialIndex.first).getDialInterfaceList().at(dialIndex.second)
       );
     }
-
-    LogThrowIf(_cache_.back().second.empty(), "empty");
   }
+  this->sortCache();
 }
 void EventDialCache::allocateCacheEntries(size_t nEvent_, size_t nDialsMaxPerEvent_) {
   _indexedCache_.resize( _indexedCache_.size() + nEvent_, {{-1,-1}, std::vector<std::pair<size_t, size_t>>(nDialsMaxPerEvent_, {-1,-1})} );
@@ -85,7 +78,6 @@ std::pair<std::pair<size_t, size_t>, std::vector<std::pair<size_t, size_t>>>* Ev
   return &_indexedCache_[_fillIndex_++];
 }
 void EventDialCache::propagate(int iThread_, int nThreads_){
-
   auto start = _cache_.begin();
   auto end = _cache_.end();
 
@@ -105,10 +97,10 @@ void EventDialCache::propagate(int iThread_, int nThreads_){
     });
     entry_.first->setEventWeight(weightBuffer);
   });
-
 }
 
 void EventDialCache::sortCache(){
+  LogInfo << "Sorting event dial cache..." << std::endl;
   std::sort(_cache_.begin(), _cache_.end(), [](
       const std::pair<PhysicsEvent*, std::vector<DialInterface*>>& a_,
       const std::pair<PhysicsEvent*, std::vector<DialInterface*>>& b_){

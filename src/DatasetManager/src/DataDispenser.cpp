@@ -743,7 +743,7 @@ void DataDispenser::readAndFill(){
     GlobalVariables::getParallelWorker().removeJob(__METHOD_NAME__);
   }
   else{
-    this->fillFunction(0);
+    this->fillFunction(0); // for better debug breakdown
   }
 
   LogInfo << "Shrinking lists..." << std::endl;
@@ -755,6 +755,11 @@ void DataDispenser::readAndFill(){
   for( auto& dialCollection : *_dialCollectionListPtr_ ) {
     if( not dialCollection.isBinned() ){ dialCollection.shrinkContainers(); }
   }
+
+#if USE_NEW_DIALS
+  LogInfo << "Build reference cache..." << std::endl;
+  _eventDialCacheRef_->buildReferenceCache(*_sampleSetPtrToLoad_, *_dialCollectionListPtr_);
+#endif
 }
 void DataDispenser::fillFunction(int iThread_){
 
@@ -911,7 +916,7 @@ void DataDispenser::fillFunction(int iThread_){
 
   // Dial bin search
   DataBin* dataBin{nullptr};
-#ifdef USE_NEW_DIALS
+#if USE_NEW_DIALS
   size_t freeSlotDial{0};
   size_t iCollection(-1);
   std::pair<std::pair<size_t, size_t>, std::vector<std::pair<size_t, size_t>>>* eventDialCacheEntry;
@@ -1127,9 +1132,8 @@ void DataDispenser::fillFunction(int iThread_){
 
               if (dial2FoundItr !=  dialCollectionRef->getDialBaseList().end()) {
                 // found DIAL -> get index
-                iDial = std::distance( dialCollectionRef->getDialBaseList().begin(), dial2FoundItr);
                 eventDialCacheEntry->second[eventDialOffset].first = iCollection;
-                eventDialCacheEntry->second[eventDialOffset].second = iDial;
+                eventDialCacheEntry->second[eventDialOffset].second = std::distance( dialCollectionRef->getDialBaseList().begin(), dial2FoundItr);
                 eventDialOffset++;
               }
             }
@@ -1149,9 +1153,8 @@ void DataDispenser::fillFunction(int iThread_){
             // loaded graph is valid?
             if( grPtr != nullptr and grPtr->GetN() > 1){
               freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
-              DialBase* db{dialCollectionRef->getDialBaseList()[freeSlotDial].get()};
               if     ( dialCollectionRef->getGlobalDialType() == "Spline" ){
-                ( (Spline*) db )->createSpline( grPtr );
+                ( (Spline*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->createSpline( grPtr );
               }
               else{
                 LogThrow( "Unsupported event-by-event dial: " << dialCollectionRef->getGlobalDialType() );

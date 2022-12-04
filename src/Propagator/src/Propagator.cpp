@@ -79,7 +79,7 @@ void Propagator::readConfigImpl(){
     if( not _parameterSetList_[iParSet].getDialSetDefinitions().empty() ){
       for( auto& dialSetDef : _parameterSetList_[iParSet].getDialSetDefinitions().get<std::vector<nlohmann::json>>() ){
         if( JsonUtils::doKeyExist(dialSetDef, "parametersBinningPath") ){
-          _dialCollections_.emplace_back(&_fitSampleSet_, &_parameterSetList_);
+          _dialCollections_.emplace_back(&_parameterSetList_);
           _dialCollections_.back().setSupervisedParameterSetIndex( int(iParSet) );
           _dialCollections_.back().readConfig( dialSetDef );
         }
@@ -90,7 +90,7 @@ void Propagator::readConfigImpl(){
       for( auto& par : _parameterSetList_[iParSet].getParameterList() ){
         if( not par.isEnabled() ) continue;
         for( const auto& dialDefinitionConfig : par.getDialDefinitionsList() ){
-          _dialCollections_.emplace_back(&_fitSampleSet_, &_parameterSetList_);
+          _dialCollections_.emplace_back(&_parameterSetList_);
           _dialCollections_.back().setSupervisedParameterSetIndex( int(iParSet) );
           _dialCollections_.back().setSupervisedParameterIndex( par.getParameterIndex() );
           _dialCollections_.back().readConfig( dialDefinitionConfig );
@@ -276,9 +276,6 @@ void Propagator::initializeImpl() {
   // reweightMcEvents.
   if(GlobalVariables::getEnableCacheManager()) Cache::Manager::Build(getFitSampleSet());
 #endif
-
-  LogInfo << "Build reference cache..." << std::endl;
-  _eventDialCache_.buildReferenceCache(_fitSampleSet_, _dialCollections_);
 
   LogInfo << "Propagating prior parameters on events..." << std::endl;
   this->resetReweight();

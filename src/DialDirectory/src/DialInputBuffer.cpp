@@ -6,7 +6,11 @@
 
 #include "Logger.h"
 
+#define USE_ZLIB 0
+
+#if USE_ZLIB
 #include "zlib.h"
+#endif
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[DialInputBuffer]");
@@ -49,6 +53,7 @@ const std::vector<std::pair<size_t, size_t>> &DialInputBuffer::getInputParameter
 }
 
 uint32_t DialInputBuffer::generateHash(){
+#if USE_ZLIB
   uint32_t out = crc32(0L, Z_NULL, 0);
   double* inputPtr = _buffer_.data();
   while( inputPtr < _buffer_.data() + _buffer_.size() ){
@@ -56,5 +61,7 @@ uint32_t DialInputBuffer::generateHash(){
     inputPtr++;
   }
   return out;
+#endif
+  return 0;
 }
 
