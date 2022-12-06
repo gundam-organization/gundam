@@ -27,6 +27,9 @@
 #endif
 
 #define USE_NEW_DIALS 1
+#define USE_ZLIB 0
+#define USE_MANUAL_CACHE 0
+//#define USE_TSPLINE3_EVAL
 
 
 ENUM_EXPANDER(

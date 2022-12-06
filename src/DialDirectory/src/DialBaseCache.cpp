@@ -11,12 +11,14 @@ LoggerInit([]{
 });
 
 
+#if USE_MANUAL_CACHE
+double DialBaseCache::evalResponse(const DialInputBuffer& input_) {
+  return _cachedResponse_;
+}
+#else
 double DialBaseCache::evalResponse(const DialInputBuffer& input_){
 
-  // Already computed ? unlocked cache
-  if( isCacheValid(input_) ){
-    return _cachedResponse_;
-  }
+  if( isCacheValid(input_) ){ return _cachedResponse_; }
 
   // lock -> only one at a time pass this point
 #if __cplusplus >= 201703L
@@ -26,7 +28,6 @@ double DialBaseCache::evalResponse(const DialInputBuffer& input_){
   std::lock_guard<std::mutex> g(_evalLock_);
 #endif
 
-  // Still not computed?
   if( isCacheValid(input_) ){ return _cachedResponse_; }
 
   // Eval
@@ -58,3 +59,4 @@ void DialBaseCache::updateInputCache(const DialInputBuffer& input_){
   memcpy(_cachedInputs_.data(), input_.getBuffer(), input_.getBufferSize() * sizeof(*input_.getBuffer()));
 #endif
 }
+#endif

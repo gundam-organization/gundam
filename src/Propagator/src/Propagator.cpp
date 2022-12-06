@@ -9,6 +9,7 @@
 #endif
 
 #include "FitParameterSet.h"
+#include "SplineCache.h"
 #include "Dial.h"
 #include "JsonUtils.h"
 #include "GlobalVariables.h"
@@ -534,6 +535,13 @@ void Propagator::resetReweight(){
 #if USE_NEW_DIALS
   std::for_each(_dialCollections_.begin(), _dialCollections_.end(),[&](DialCollection& dc_){
     dc_.updateInputBuffers();
+#if USE_MANUAL_CACHE
+    if( dc_.useCachedSplines() ){
+      std::for_each(dc_.getDialInterfaceList().begin(), dc_.getDialInterfaceList().end(), [](DialInterface& dial_){
+        dial_.updateCache();
+      });
+    }
+#endif
   });
 #endif
 }
@@ -697,7 +705,18 @@ void Propagator::reweightMcEvents(int iThread_) {
   //! Warning: everything you modify here, may significantly slow down the fitter
 
 #if USE_NEW_DIALS
-  _eventDialCache_.propagate(iThread_, GlobalVariables::getNbThreads());
+//  _eventDialCache_.propagate(iThread_, GlobalVariables::getNbThreads());
+  auto start = _eventDialCache_.getCache().begin();
+  auto end = _eventDialCache_.getCache().end();
+
+  if( GlobalVariables::getNbThreads() != 1 ){
+    start = _eventDialCache_.getCache().begin() + Long64_t(iThread_)*(Long64_t(_eventDialCache_.getCache().size())/GlobalVariables::getNbThreads());
+    if( iThread_+1 != GlobalVariables::getNbThreads() ){
+      end = _eventDialCache_.getCache().begin() + (Long64_t(iThread_) + 1) * (Long64_t(_eventDialCache_.getCache().size())/GlobalVariables::getNbThreads());
+    }
+  }
+
+  std::for_each(start, end, &EventDialCache::reweightEntry);
 #else
   int nThreads = GlobalVariables::getNbThreads();
   if(iThread_ == -1){

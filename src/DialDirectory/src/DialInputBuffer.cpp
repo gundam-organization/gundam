@@ -6,8 +6,6 @@
 
 #include "Logger.h"
 
-#define USE_ZLIB 0
-
 #if USE_ZLIB
 #include "zlib.h"
 #endif

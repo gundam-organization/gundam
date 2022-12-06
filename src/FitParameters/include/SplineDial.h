@@ -17,14 +17,14 @@ class SplineDial : public Dial {
 public:
   explicit SplineDial(const DialSet* owner_);
   explicit SplineDial(const DialSet* owner_, const TGraph& graph_);
-  std::unique_ptr<Dial> clone() const override { return std::make_unique<SplineDial>(*this); }
+  [[nodiscard]] std::unique_ptr<Dial> clone() const override { return std::make_unique<SplineDial>(*this); }
 
   void copySpline(const TSpline3* splinePtr_);
   void createSpline(TGraph* grPtr_);
 
   void initialize() override;
 
-  const TSpline3* getSplinePtr() const;
+  [[nodiscard]] const TSpline3* getSplinePtr() const;
   std::string getSummary() override;
 
   double calcDial(double parameterValue_) override;

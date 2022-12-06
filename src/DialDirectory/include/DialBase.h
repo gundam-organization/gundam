@@ -35,6 +35,7 @@ public:
   [[nodiscard]] virtual std::unique_ptr<DialBase> clone() const = 0; // can't allocate pure virtual class
   [[nodiscard]] virtual std::string getDialTypeName() const { return {"DialBase"}; }
   virtual double evalResponseImpl(const DialInputBuffer& input_) = 0;
+  virtual bool isBinned(){ return false; }
 
   // other virtual
   virtual double evalResponse(const DialInputBuffer& input_){ return this->evalResponseImpl(input_); }

@@ -53,6 +53,7 @@ public:
   const std::vector<std::vector<GenericToolbox::AnyType>> &getLeafContentList() const;
   const std::shared_ptr<std::vector<std::string>>& getCommonLeafNameListPtr() const;
   std::vector<std::vector<GenericToolbox::AnyType>> &getLeafContentList();
+  double& getEventWeightRef(){ return _eventWeight_; }
 
   // CORE
   // Filling up

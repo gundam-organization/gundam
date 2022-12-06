@@ -41,12 +41,12 @@ void SplineDial::initialize() {
 
   // check if prior is out of bounds:
   if(
-      this->getEffectiveDialParameter(_owner_->getOwner()->getPriorValue()) < _spline_.GetXmin()
-      or this->getEffectiveDialParameter(_owner_->getOwner()->getPriorValue())  > _spline_.GetXmax()
+         this->getEffectiveDialParameter(_owner_->getOwner()->getPriorValue()) < _spline_.GetXmin()
+      or this->getEffectiveDialParameter(_owner_->getOwner()->getPriorValue()) > _spline_.GetXmax()
   ){
     LogError << "Prior value of parameter \""
              << _owner_->getOwner()->getTitle()
-             << "\" = " << this->getEffectiveDialParameter(_owner_->getOwner()->getPriorValue())
+             << "\" = " << this->getEffectiveDialParameter( _owner_->getOwner()->getPriorValue() )
         << " is out of the spline bounds: " <<  _spline_.GetXmin() << " < X < " << _spline_.GetXmax()
     << std::endl;
     throw std::logic_error("Prior is out of the spline bounds.");

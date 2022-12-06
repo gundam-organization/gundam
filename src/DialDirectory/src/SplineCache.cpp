@@ -4,6 +4,11 @@
 
 #include "SplineCache.h"
 
+
+LoggerInit([]{
+  Logger::setUserHeaderStr("[SplineCache]");
+});
+
 double SplineCache::evalResponseImpl(const DialInputBuffer& input_) {
-  return _spline_.Eval( input_.getBuffer()[0] );
+  return this->calculateSplineResponse(input_);
 }

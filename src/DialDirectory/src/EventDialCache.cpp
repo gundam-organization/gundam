@@ -11,6 +11,10 @@ LoggerInit([]{
 });
 
 
+std::vector<std::pair<PhysicsEvent *, std::vector<DialInterface *>>> &EventDialCache::getCache() {
+  return _cache_;
+}
+
 void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<DialCollection>& dialCollectionList_){
   LogInfo << "Building event dial cache..." << std::endl;
 
@@ -60,7 +64,6 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
       );
     }
   }
-  this->sortCache();
 }
 void EventDialCache::allocateCacheEntries(size_t nEvent_, size_t nDialsMaxPerEvent_) {
   _indexedCache_.resize( _indexedCache_.size() + nEvent_, {{-1,-1}, std::vector<std::pair<size_t, size_t>>(nDialsMaxPerEvent_, {-1,-1})} );
@@ -77,41 +80,11 @@ std::pair<std::pair<size_t, size_t>, std::vector<std::pair<size_t, size_t>>>* Ev
   }
   return &_indexedCache_[_fillIndex_++];
 }
-void EventDialCache::propagate(int iThread_, int nThreads_){
-  auto start = _cache_.begin();
-  auto end = _cache_.end();
 
-  if( nThreads_ != 1 ){
-    Long64_t nEventPerThread = Long64_t(_cache_.size())/nThreads_;
-    start = _cache_.begin() + Long64_t(iThread_)*nEventPerThread;
-    if( iThread_+1 != GlobalVariables::getNbThreads() ){
-      end = _cache_.begin() + (Long64_t(iThread_) + 1) * nEventPerThread;
-    }
-  }
-
-  double weightBuffer{std::nan("unset")};
-  std::for_each(start, end, [&](std::pair<PhysicsEvent*, std::vector<DialInterface*>>& entry_){
-    weightBuffer = entry_.first->getTreeWeight();
-    std::for_each(entry_.second.begin(), entry_.second.end(), [&](DialInterface* dial_){
-      weightBuffer *= dial_->evalResponse();
-    });
-    entry_.first->setEventWeight(weightBuffer);
+void EventDialCache::reweightEntry(std::pair<PhysicsEvent*, std::vector<DialInterface*>>& entry_){
+  entry_.first->resetEventWeight();
+  std::for_each(entry_.second.begin(), entry_.second.end(), [&](DialInterface* dial_){
+    entry_.first->getEventWeightRef() *= dial_->evalResponse();
   });
 }
 
-void EventDialCache::sortCache(){
-  LogInfo << "Sorting event dial cache..." << std::endl;
-  std::sort(_cache_.begin(), _cache_.end(), [](
-      const std::pair<PhysicsEvent*, std::vector<DialInterface*>>& a_,
-      const std::pair<PhysicsEvent*, std::vector<DialInterface*>>& b_){
-    // a goes first?
-    return a_.first < b_.first;
-  });
-
-  std::for_each(_cache_.begin(), _cache_.end(),[]( std::pair<PhysicsEvent*, std::vector<DialInterface*>>& entry_ ){
-    std::sort(entry_.second.begin(), entry_.second.end(), []( const DialInterface* a_, const DialInterface* b_ ){
-      // a goes first?
-      return a_ < b_;
-    });
-  });
-}

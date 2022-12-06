@@ -32,8 +32,10 @@ public:
   [[nodiscard]] const std::string &getGlobalDialLeafName() const;
   [[nodiscard]] const std::string &getGlobalDialType() const;
   [[nodiscard]] const std::shared_ptr<TFormula> &getApplyConditionFormula() const;
+  [[nodiscard]] const DataBinSet &getDialBinSet() const;
   std::vector<GenericToolbox::PolymorphicObjectWrapper<DialBase>> &getDialBaseList();
   std::vector<DialInterface> &getDialInterfaceList();
+  DataBinSet &getDialBinSet();
 
   std::string getTitle();
   std::string getSummary(bool shallow_ = true);
@@ -42,6 +44,8 @@ public:
   void shrinkContainers();
   void setupDialInterfaceReferences();
   void updateInputBuffers();
+
+  bool useCachedSplines() const;
 
 protected:
   void readConfigImpl() override;
@@ -59,7 +63,6 @@ private:
   bool _enableDialsSummary_{false};
   bool _allowDialExtrapolation_{false};
   bool _isBinned_{true};
-  bool _useDialCache_{true};
   double _minDialResponse_{std::nan("unset")};
   double _maxDialResponse_{std::nan("unset")};
   double _mirrorLowEdge_{std::nan("unset")};
@@ -85,9 +88,9 @@ private:
   std::vector<DialInputBuffer> _dialInputBufferList_{};
   std::vector<DialResponseSupervisor> _dialResponseSupervisorList_{};
   std::vector<GenericToolbox::PolymorphicObjectWrapper<DialBase>> _dialBaseList_{};
+  DataBinSet _dialBinSet_{};
 
   // external refs
-//  FitSampleSet* _sampleSetPtr_{nullptr};
   std::vector<FitParameterSet>* _parameterSetListPtr_{nullptr};
 
 };

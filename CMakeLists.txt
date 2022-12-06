@@ -246,9 +246,9 @@ endif()
 
 if(NOT WITH_GENERIC_SPLINES)
     if(WITH_CACHE_MANAGER)
-        cmessage(STATUS "Generic spline interface required with Cache::Manager")
+        cmessage(FATAL_ERROR "Generic spline interface required with Cache::Manager")
     else(WITH_CACHE_MANAGER)
-        add_definitions(-DUSE_TSPLINE3_EVAL)
+        add_definitions(-D USE_TSPLINE3_EVAL)
     endif(WITH_CACHE_MANAGER)
 endif(NOT WITH_GENERIC_SPLINES)
 

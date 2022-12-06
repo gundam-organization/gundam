@@ -9,11 +9,7 @@ set( SRCFILES
     src/DialCollection.cpp
     src/DialSplineHandler.cpp
     src/Norm.cpp
-    src/NormBinned.cpp
-    src/SplineCacheBinned.cpp
-    src/DialBinned.cpp
     src/Spline.cpp
-    src/SplineBinned.cpp
     src/SplineCache.cpp
     src/EventDialCache.cpp
     )
@@ -27,11 +23,7 @@ set( HEADERS
     include/DialCollection.h
     include/DialSplineHandler.h
     include/Norm.h
-    include/NormBinned.h
-    include/SplineCacheBinned.h
-    include/DialBinned.h
     include/Spline.h
-    include/SplineBinned.h
     include/SplineCache.h
     include/DialUtils.h
     include/EventDialCache.h

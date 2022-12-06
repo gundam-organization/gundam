@@ -20,13 +20,13 @@ class EventDialCache {
 public:
   EventDialCache() = default;
 
-  void buildReferenceCache(FitSampleSet& sampleSet_, std::vector<DialCollection>& dialCollectionList_);
-  void allocateCacheEntries(size_t nEvent_, size_t nDialsMaxPerEvent_);
-  void propagate(int iThread_ = 0, int nThreads_ = 1);
-  std::pair<std::pair<size_t, size_t>, std::vector<std::pair<size_t, size_t>>>* fetchNextCacheEntry();
+  std::vector<std::pair<PhysicsEvent *, std::vector<DialInterface *>>> &getCache();
 
-protected:
-  void sortCache();
+  void allocateCacheEntries(size_t nEvent_, size_t nDialsMaxPerEvent_);
+  std::pair<std::pair<size_t, size_t>, std::vector<std::pair<size_t, size_t>>>* fetchNextCacheEntry();
+  void buildReferenceCache(FitSampleSet& sampleSet_, std::vector<DialCollection>& dialCollectionList_);
+
+  static void reweightEntry(std::pair<PhysicsEvent*, std::vector<DialInterface*>>& entry_);
 
 private:
   bool _warnForDialLessEvent_{false};
