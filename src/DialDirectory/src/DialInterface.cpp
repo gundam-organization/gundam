@@ -22,14 +22,13 @@ void DialInterface::setResponseSupervisorRef(const DialResponseSupervisor *respo
 }
 
 double DialInterface::evalResponse(){
-  return _dialBaseRef_->evalResponse( *_inputBufferRef_ );
-//  double response = _dialBaseRef_->evalResponse( *_inputBufferRef_ );
+  double response = _dialBaseRef_->evalResponse( *_inputBufferRef_ );
 
-//  if(_responseSupervisorRef_ != nullptr ){
-//    _responseSupervisorRef_->process(response);
-//  }
+  if(_responseSupervisorRef_ != nullptr ){
+    _responseSupervisorRef_->process(response);
+  }
 
-//  return response;
+  return response;
 }
 std::string DialInterface::getSummary(bool shallow_) const {
   std::stringstream ss;

@@ -197,12 +197,13 @@ void DialCollection::updateInputBuffers(){
 
 bool DialCollection::useCachedSplines() const{
   // only:
-  // binned dials
-  if( not _isBinned_ ) return false;
   // and not "norm"
   if( _globalDialType_ == "Norm" or _globalDialType_ == "Normalization" ) return false;
+  // binned dials -> NO! use cache: event by event dial cache is usefull since fitters don't move all parameters at once
+//  if( not _isBinned_ ) return false;
   // and not eigen decomp (as the cache will never be triggered)
-  if( _parameterSetListPtr_->at(_supervisedParameterSetIndex_).isUseEigenDecompInFit() ) return false;
+  // NO ! fitters don't move all parameters at once
+//  if( _parameterSetListPtr_->at(_supervisedParameterSetIndex_).isUseEigenDecompInFit() ) return false;
 
   // then ok:
   return true;
