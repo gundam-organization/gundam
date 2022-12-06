@@ -116,7 +116,7 @@ cmessage(STATUS "CMAKE_BUILD_TYPE: \"${CMAKE_BUILD_TYPE}\"")
 if(BATCH_MODE)
     set(COLOR_OUTPUT NO)
     set(TTYCHECK NO)
-    add_definitions(-DGUNDAM_BATCH)
+    add_definitions( -D GUNDAM_BATCH )
 endif(BATCH_MODE)
 
 ################################################################################
@@ -218,13 +218,14 @@ if( "${YAML_CPP_INCLUDE_DIR} " STREQUAL " ")
     #    list(APPEND LINK_LIBARY_LIST ${YAMLCPP_LIBRARY})
 endif()
 
-find_package(ZLIB REQUIRED)
+find_package(ZLIB)
 if (${ZLIB_FOUND})
     cmessage(STATUS "ZLIB found : ${ZLIB_VERSION_STRING}")
     cmessage(STATUS "ZLIB_INCLUDE_DIRS = ${ZLIB_INCLUDE_DIRS}")
     cmessage(STATUS "ZLIB_LIBRARIES = ${ZLIB_LIBRARIES}")
+    add_definitions( -D USE_ZLIB=1 )
 else()
-    cmessage(FATAL_ERROR "ZLIB has not been found.")
+    add_definitions( -D USE_ZLIB=0 )
 endif ()
 
 

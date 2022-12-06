@@ -138,7 +138,6 @@ void DialCollection::setupDialInterfaceReferences(){
   LogThrowIf(_supervisedParameterSetIndex_==-1, "par set index not set.");
   LogThrowIf(_supervisedParameterSetIndex_>_parameterSetListPtr_->size(), "invalid selected parset index: " << _supervisedParameterSetIndex_);
 
-
   // Initializing dial input buffers:
   _dialInputBufferList_.clear();
   if( _supervisedParameterIndex_ == -1 ){

@@ -39,13 +39,13 @@ public:
 
   std::string getTitle();
   std::string getSummary(bool shallow_ = true);
+  [[nodiscard]] bool useCachedSplines() const;
   [[nodiscard]] bool isDatasetValid(const std::string& datasetName_) const;
   size_t getNextDialFreeSlot();
   void shrinkContainers();
   void setupDialInterfaceReferences();
   void updateInputBuffers();
 
-  bool useCachedSplines() const;
 
 protected:
   void readConfigImpl() override;
