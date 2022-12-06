@@ -11,11 +11,6 @@ LoggerInit([]{
 });
 
 
-#if USE_MANUAL_CACHE
-double DialBaseCache::evalResponse(const DialInputBuffer& input_) {
-  return _cachedResponse_;
-}
-#else
 double DialBaseCache::evalResponse(const DialInputBuffer& input_){
 
   if( isCacheValid(input_) ){ return _cachedResponse_; }
@@ -40,10 +35,9 @@ double DialBaseCache::evalResponse(const DialInputBuffer& input_){
   return _cachedResponse_;
 }
 
-bool DialBaseCache::isCacheValid(const DialInputBuffer& input_){
+bool DialBaseCache::isCacheValid(const DialInputBuffer& input_) const{
 #if USE_ZLIB
-  if( _cachedInputHash_ != input_.getCurrentHash() ) return false;
-  return true;
+  return _cachedInputHash_ == input_.getCurrentHash();
 #else
   if( _cachedInputs_.size() != input_.getBufferSize() ) return false;
   return ( memcmp(_cachedInputs_.data(), input_.getBuffer(), input_.getBufferSize() * sizeof(*input_.getBuffer())) == 0 );
@@ -59,4 +53,3 @@ void DialBaseCache::updateInputCache(const DialInputBuffer& input_){
   memcpy(_cachedInputs_.data(), input_.getBuffer(), input_.getBufferSize() * sizeof(*input_.getBuffer()));
 #endif
 }
-#endif

@@ -22,6 +22,8 @@ void DialInterface::setResponseSupervisorRef(const DialResponseSupervisor *respo
 }
 
 double DialInterface::evalResponse(){
+  if( _inputBufferRef_->isMasked() ) return 1;
+
   double response = _dialBaseRef_->evalResponse( *_inputBufferRef_ );
 
   if(_responseSupervisorRef_ != nullptr ){

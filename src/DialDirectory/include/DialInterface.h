@@ -28,9 +28,6 @@ public:
   void setInputBufferRef(DialInputBuffer *inputBufferRef);
   void setResponseSupervisorRef(const DialResponseSupervisor *responseSupervisorRef);
 
-#if USE_MANUAL_CACHE
-  void updateCache(){ ((SplineCache*)_dialBaseRef_)->updateCache(*_inputBufferRef_); }
-#endif
   double evalResponse();
   [[nodiscard]] std::string getSummary(bool shallow_=true) const;
 

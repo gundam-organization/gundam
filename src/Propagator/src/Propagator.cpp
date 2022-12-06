@@ -535,13 +535,6 @@ void Propagator::resetReweight(){
 #if USE_NEW_DIALS
   std::for_each(_dialCollections_.begin(), _dialCollections_.end(),[&](DialCollection& dc_){
     dc_.updateInputBuffers();
-#if USE_MANUAL_CACHE
-    if( dc_.useCachedSplines() ){
-      std::for_each(dc_.getDialInterfaceList().begin(), dc_.getDialInterfaceList().end(), [](DialInterface& dial_){
-        dial_.updateCache();
-      });
-    }
-#endif
   });
 #endif
 }
