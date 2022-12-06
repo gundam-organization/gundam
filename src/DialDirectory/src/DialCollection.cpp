@@ -154,7 +154,14 @@ void DialCollection::setupDialInterfaceReferences(){
   else{
     // one parameter for every dial of the collection
     _dialInputBufferList_.resize(1);
-    _dialInputBufferList_[0].addParameterIndices({_supervisedParameterSetIndex_, _supervisedParameterIndex_});
+    _dialInputBufferList_.back().addParameterIndices({_supervisedParameterSetIndex_, _supervisedParameterIndex_});
+  }
+
+  if( _useMirrorDial_ ){
+    for( auto& inputBuffer : _dialInputBufferList_ ){
+      inputBuffer.setIsMasked( _useMirrorDial_ );
+      inputBuffer.addParameterIndices( {_mirrorLowEdge_, _mirrorRange_} );
+    }
   }
 
   // Initializing dial interfaces:

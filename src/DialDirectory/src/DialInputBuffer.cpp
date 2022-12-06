@@ -14,6 +14,11 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[DialInputBuffer]");
 });
 
+
+void DialInputBuffer::setIsMasked(bool isMasked) {
+  _isMasked_ = isMasked;
+}
+
 bool DialInputBuffer::isMasked() const {
   return _isMasked_;
 }
@@ -64,6 +69,9 @@ void DialInputBuffer::updateBuffer(const std::vector<FitParameterSet>& parSetLis
 void DialInputBuffer::addParameterIndices(const std::pair<size_t, size_t>& indices_){
   _inputParameterIndicesList_.emplace_back(indices_);
   _buffer_.emplace_back(std::nan("unset"));
+}
+void DialInputBuffer::addMirrorBounds(const std::pair<double, double>& lowEdgeAndRange_){
+  _parameterMirrorBounds_.emplace_back(lowEdgeAndRange_);
 }
 std::string DialInputBuffer::getSummary() const{
   std::stringstream ss;

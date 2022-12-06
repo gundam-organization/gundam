@@ -16,8 +16,9 @@ class DialInputBuffer {
 public:
   DialInputBuffer() = default;
 
-  bool isMasked() const;
+  void setIsMasked(bool isMasked);
 
+  [[nodiscard]] bool isMasked() const;
   [[nodiscard]] size_t getBufferSize() const;
   [[nodiscard]] const double* getBuffer() const;
   [[nodiscard]] const uint32_t& getCurrentHash() const;
@@ -25,6 +26,7 @@ public:
 
   void updateBuffer(const std::vector<FitParameterSet>& parSetList_);
   void addParameterIndices(const std::pair<size_t, size_t>& indices_);
+  void addMirrorBounds(const std::pair<double, double>& lowEdgeAndRange_);
 
   [[nodiscard]] std::string getSummary() const;
 
