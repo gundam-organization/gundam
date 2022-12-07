@@ -6,17 +6,17 @@
 #define GUNDAM_SPLINECACHE_H
 
 #include "DialBaseCache.h"
-#include "DialSplineHandler.h"
+#include "SplineHandler.h"
 
 
-class SplineCache : public DialBaseCache, public  DialSplineHandler {
+class SplineCache : public DialBaseCache, public  SplineHandler {
 
 public:
   SplineCache() = default;
 
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<SplineCache>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return {"SplineCache"}; }
-  double evalResponseImpl(const DialInputBuffer& input_) override;
+  double evalResponseImpl(const DialInputBuffer& input_) override { return this->evaluateSpline(input_); }
 
 };
 

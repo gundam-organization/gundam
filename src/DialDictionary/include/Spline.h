@@ -6,16 +6,16 @@
 #define GUNDAM_SPLINE_H
 
 #include "DialBase.h"
-#include "DialSplineHandler.h"
+#include "SplineHandler.h"
 
-class Spline : public DialBase, public DialSplineHandler {
+class Spline : public DialBase, public SplineHandler {
 
 public:
   Spline() = default;
 
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<Spline>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return {"Spline"}; }
-  double evalResponseImpl(const DialInputBuffer& input_) override;
+  double evalResponseImpl(const DialInputBuffer& input_) override { return this->evaluateSpline(input_); }
 
 };
 

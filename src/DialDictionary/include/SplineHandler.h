@@ -2,18 +2,23 @@
 // Created by Adrien Blanchet on 30/11/2022.
 //
 
-#ifndef GUNDAM_DIALSPLINEHANDLER_H
-#define GUNDAM_DIALSPLINEHANDLER_H
+#ifndef GUNDAM_SPLINEHANDLER_H
+#define GUNDAM_SPLINEHANDLER_H
 
 #include "DialInputBuffer.h"
 
 #include "TSpline.h"
 
-class DialSplineHandler {
+
+/* \brief SplineHandler handles every property of a spline from creation to eval.
+ * It is meant to be used with DialBase derived classes.
+ */
+
+class SplineHandler {
 
 public:
-  DialSplineHandler() = default;
-  virtual ~DialSplineHandler() = default;
+  SplineHandler() = default;
+  virtual ~SplineHandler() = default;
 
   void setAllowExtrapolation(bool allowExtrapolation);
   void setSpline(const TSpline3 &spline);
@@ -22,7 +27,7 @@ public:
   void copySpline(const TSpline3* splinePtr_);
   void createSpline(TGraph* grPtr_);
 
-  [[nodiscard]] double calculateSplineResponse(const DialInputBuffer& input_) const;
+  [[nodiscard]] double evaluateSpline(const DialInputBuffer& input_) const;
 
 protected:
   bool _allowExtrapolation_{false};
@@ -31,4 +36,4 @@ protected:
 };
 
 
-#endif //GUNDAM_DIALSPLINEHANDLER_H
+#endif //GUNDAM_SPLINEHANDLER_H

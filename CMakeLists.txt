@@ -419,7 +419,7 @@ endif()
 
 set( MODULES
     Utils
-    DialDirectory
+    DialDictionary
     FitParameters
     FitSamples
     DatasetManager

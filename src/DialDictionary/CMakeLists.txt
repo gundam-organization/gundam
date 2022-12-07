@@ -1,4 +1,4 @@
-set( LIB_NAME GundamDials )
+set( LIB_NAME GundamDialDictionary )
 
 set( SRCFILES
     src/DialBase.cpp
@@ -7,11 +7,9 @@ set( SRCFILES
     src/DialInterface.cpp
     src/DialResponseSupervisor.cpp
     src/DialCollection.cpp
-    src/DialSplineHandler.cpp
-    src/Norm.cpp
-    src/Spline.cpp
-    src/SplineCache.cpp
+    src/SplineHandler.cpp
     src/EventDialCache.cpp
+    src/GraphHandler.cpp
     )
 
 set( HEADERS
@@ -21,12 +19,14 @@ set( HEADERS
     include/DialInterface.h
     include/DialResponseSupervisor.h
     include/DialCollection.h
-    include/DialSplineHandler.h
+    include/SplineHandler.h
     include/Norm.h
     include/Spline.h
     include/SplineCache.h
     include/DialUtils.h
     include/EventDialCache.h
+    include/Graph.h
+    include/GraphHandler.h
     )
 
 if( USE_STATIC_LINKS )

@@ -28,6 +28,10 @@ void DialCollection::readConfigImpl() {
   );
   if( _dataSetNameList_.empty() ){ _dataSetNameList_.emplace_back("*"); }
 
+  if( GlobalVariables::isDisableDialCache() ){
+    _disableDialCache_ = true;
+  }
+
   // Dials are directly defined with a binning file?
   if     ( initializeNormDialsWithParBinning() ){}
   else if( initializeDialsWithDefinition() ){}
@@ -50,6 +54,9 @@ void DialCollection::setSupervisedParameterSetIndex(int supervisedParameterSetIn
   _supervisedParameterSetIndex_ = supervisedParameterSetIndex;
 }
 
+bool DialCollection::isEnabled() const {
+  return _isEnabled_;
+}
 bool DialCollection::isBinned() const {
   return _isBinned_;
 }
@@ -201,7 +208,10 @@ void DialCollection::updateInputBuffers(){
   }
 }
 
-bool DialCollection::useCachedSplines() const{
+bool DialCollection::useCachedDials() const{
+
+  if( _disableDialCache_ ) return false;
+
   // only:
   // and not "norm"
   if( _globalDialType_ == "Norm" or _globalDialType_ == "Normalization" ) return false;
@@ -298,7 +308,7 @@ bool DialCollection::initializeDialsWithDefinition() {
 
         for( int iBin = 0 ; iBin < _dialBinSet_.getBinsList().size() ; iBin++ ){
           if     ( _globalDialType_ == "Spline" ){
-            if( useCachedSplines() ){
+            if(useCachedDials() ){
               SplineCache s;
               s.copySpline((TSpline3*) dialsList->At(iBin));
               s.setAllowExtrapolation(_allowDialExtrapolation_);
@@ -375,7 +385,7 @@ bool DialCollection::initializeDialsWithDefinition() {
             dialBin->addBinEdge(splitVarNameList.at(iSplitVar), splitVarValueList.at(iSplitVar), splitVarValueList.at(iSplitVar));
           }
           if      ( _globalDialType_ == "Spline" ){
-            if( useCachedSplines() ){
+            if(useCachedDials() ){
               SplineCache s;
               s.setAllowExtrapolation(_allowDialExtrapolation_);
               s.copySpline(splinePtr);
@@ -561,5 +571,6 @@ nlohmann::json DialCollection::fetchDialsDefinition(const nlohmann::json &defini
   }
   return {};
 }
+
 
 

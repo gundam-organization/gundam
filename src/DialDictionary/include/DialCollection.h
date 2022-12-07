@@ -29,6 +29,7 @@ public:
   void setSupervisedParameterSetIndex(int supervisedParameterSetIndex);
 
   [[nodiscard]] bool isBinned() const;
+  [[nodiscard]] bool isEnabled() const;
   [[nodiscard]] const std::string &getGlobalDialLeafName() const;
   [[nodiscard]] const std::string &getGlobalDialType() const;
   [[nodiscard]] const std::shared_ptr<TFormula> &getApplyConditionFormula() const;
@@ -39,7 +40,7 @@ public:
 
   std::string getTitle();
   std::string getSummary(bool shallow_ = true);
-  [[nodiscard]] bool useCachedSplines() const;
+  [[nodiscard]] bool useCachedDials() const;
   [[nodiscard]] bool isDatasetValid(const std::string& datasetName_) const;
   size_t getNextDialFreeSlot();
   void shrinkContainers();
@@ -58,11 +59,12 @@ protected:
 
 private:
   // parameters
+  bool _isBinned_{true};
   bool _isEnabled_{true};
   bool _useMirrorDial_{false};
+  bool _disableDialCache_{false};
   bool _enableDialsSummary_{false};
   bool _allowDialExtrapolation_{false};
-  bool _isBinned_{true};
   double _minDialResponse_{std::nan("unset")};
   double _maxDialResponse_{std::nan("unset")};
   double _mirrorLowEdge_{std::nan("unset")};

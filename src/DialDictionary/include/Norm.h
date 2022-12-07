@@ -17,7 +17,7 @@ public:
 
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<Norm>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return {"Norm"}; }
-  double evalResponseImpl(const DialInputBuffer& input_) override;
+  double evalResponseImpl(const DialInputBuffer& input_) override { return input_.getBuffer()[0]; }
 
 };
 
