@@ -304,37 +304,85 @@ bool DialCollection::initializeDialsWithDefinition() {
             "Number of dials (" << dialsList->GetSize() << ") don't match the number of bins " << _dialBinSet_.getBinsList().size()
         );
 
-        for( int iBin = 0 ; iBin < _dialBinSet_.getBinsList().size() ; iBin++ ){
+        std::vector<int> excludedBins{};
+        for( int iBin = 0 ; iBin < int(_dialBinSet_.getBinsList().size()) ; iBin++ ){
+
           if     ( _globalDialType_ == "Spline" ){
+            TSpline3* loadedDial{(TSpline3*) dialsList->At(iBin)};
+
+            if( loadedDial->GetNp() <= 1 ){
+              LogAlert << "Invalid dial for " << getTitle() << " -> " << _dialBinSet_.getBinsList()[iBin].getSummary() << std::endl;
+              excludedBins.emplace_back(iBin);
+              continue;
+            }
+
+            bool isFlatOne{true};
+            for( int iKnot = 0 ; iKnot < int(loadedDial->GetNp()) ; iKnot++ ){
+              double xBuff{}, yBuff{}; loadedDial->GetKnot(iKnot, xBuff, yBuff);
+              if( yBuff != 1. ){
+                isFlatOne = false;
+                break;
+              }
+            }
+            if( isFlatOne ) {
+              LogAlert << "Flat dial for " << getTitle() << " -> " << _dialBinSet_.getBinsList()[iBin].getSummary() << std::endl;
+              excludedBins.emplace_back(iBin);
+              continue;
+            }
+
             if( useCachedDials() ){
               SplineCache s;
-              s.copySpline((TSpline3*) dialsList->At(iBin));
+              s.copySpline(loadedDial);
               s.setAllowExtrapolation(_allowDialExtrapolation_);
               _dialBaseList_.emplace_back( std::make_unique<SplineCache>(s) );
             }
             else{
               Spline s;
               s.setAllowExtrapolation(_allowDialExtrapolation_);
-              s.copySpline((TSpline3*) dialsList->At(iBin));
+              s.copySpline(loadedDial);
               _dialBaseList_.emplace_back( std::make_unique<Spline>(s) );
             }
           }
           else if     ( _globalDialType_ == "Graph" ){
+            // check if flat at 1
+            TGraph* loadedDial{(TGraph*) dialsList->At(iBin)};
+
+            if( loadedDial->GetN() <= 1 ){
+              LogAlert << "Invalid dial for " << getTitle() << " -> " << _dialBinSet_.getBinsList()[iBin].getSummary() << std::endl;
+              excludedBins.emplace_back(iBin);
+              continue;
+            }
+
+            if( not std::any_of(&(loadedDial->GetY()[0]), &(loadedDial->GetY()[loadedDial->GetN()]), [](Double_t val_){ return val_ != 1.; }) ){
+              LogAlert << "Flat dial for " << getTitle() << " -> " << _dialBinSet_.getBinsList()[iBin].getSummary() << std::endl;
+              excludedBins.emplace_back(iBin);
+              continue;
+            }
+
             if( useCachedDials() ){
               GraphCache g;
               g.setAllowExtrapolation(_allowDialExtrapolation_);
-              g.setGraph( *( (TGraph*) dialsList->At(iBin)) );
+              g.setGraph( *(loadedDial) );
               _dialBaseList_.emplace_back( std::make_unique<GraphCache>(g) );
             }
             else{
               Graph g;
               g.setAllowExtrapolation(_allowDialExtrapolation_);
-              g.setGraph( *( (TGraph*) dialsList->At(iBin)) );
+              g.setGraph( *(loadedDial) );
               _dialBaseList_.emplace_back( std::make_unique<Graph>(g) );
             }
           }
           else{
             LogThrow(_globalDialType_ << " is not implemented.");
+          }
+        }
+
+        if( not excludedBins.empty() ){
+          LogInfo << "Removing invalid bin dials..." << std::endl;
+          for( int iBin = int(_dialBinSet_.getBinsList().size()) ; iBin >= 0 ; iBin-- ){
+            if( GenericToolbox::doesElementIsInVector(iBin, excludedBins) ){
+              _dialBinSet_.getBinsList().erase(_dialBinSet_.getBinsList().begin() + iBin);
+            }
           }
         }
 
