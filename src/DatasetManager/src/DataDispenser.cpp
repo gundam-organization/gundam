@@ -10,10 +10,7 @@
 
 #if USE_NEW_DIALS
 #include "DialCollection.h"
-#include "Spline.h"
-#include "SplineCache.h"
-#include "Graph.h"
-#include "GraphCache.h"
+#include "DialTypes.h"
 #else
 #include "SplineDial.h"
 #include "GraphDial.h"

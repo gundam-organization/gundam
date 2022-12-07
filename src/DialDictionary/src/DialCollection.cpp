@@ -3,9 +3,7 @@
 //
 
 #include "DialCollection.h"
-#include "Norm.h"
-#include "SplineCache.h"
-#include "Spline.h"
+#include "DialTypes.h"
 
 #include "JsonUtils.h"
 
@@ -308,7 +306,7 @@ bool DialCollection::initializeDialsWithDefinition() {
 
         for( int iBin = 0 ; iBin < _dialBinSet_.getBinsList().size() ; iBin++ ){
           if     ( _globalDialType_ == "Spline" ){
-            if(useCachedDials() ){
+            if( useCachedDials() ){
               SplineCache s;
               s.copySpline((TSpline3*) dialsList->At(iBin));
               s.setAllowExtrapolation(_allowDialExtrapolation_);
@@ -321,13 +319,20 @@ bool DialCollection::initializeDialsWithDefinition() {
               _dialBaseList_.emplace_back( std::make_unique<Spline>(s) );
             }
           }
-//          else if( _globalDialType_ == "Graph" ){
-//            GraphDial g(this);
-//            g.setApplyConditionBin(&binning.getBinsList()[iBin]);
-//            g.setGraph(*(TGraph*) dialsList->At(iBin));
-//            g.initialize();
-//            _dialList_.emplace_back( std::make_unique<GraphDial>(g) );
-//          }
+          else if     ( _globalDialType_ == "Graph" ){
+            if( useCachedDials() ){
+              GraphCache g;
+              g.setAllowExtrapolation(_allowDialExtrapolation_);
+              g.setGraph( *( (TGraph*) dialsList->At(iBin)) );
+              _dialBaseList_.emplace_back( std::make_unique<GraphCache>(g) );
+            }
+            else{
+              Graph g;
+              g.setAllowExtrapolation(_allowDialExtrapolation_);
+              g.setGraph( *( (TGraph*) dialsList->At(iBin)) );
+              _dialBaseList_.emplace_back( std::make_unique<Graph>(g) );
+            }
+          }
           else{
             LogThrow(_globalDialType_ << " is not implemented.");
           }
