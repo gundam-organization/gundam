@@ -409,7 +409,7 @@ void Propagator::initializeImpl() {
         LogDebug << std::endl << "}" << std::endl;
       }
       LogDebug << "}" << std::endl;
-      if( iEvt+1 >= _debugPrintLoadedEventsNbPerSample_ ) break;
+      if( iEvt >= _debugPrintLoadedEventsNbPerSample_ ) break;
     }
 #else
     LogDebug << GET_VAR_NAME_VALUE(_debugPrintLoadedEventsNbPerSample_) << std::endl;
