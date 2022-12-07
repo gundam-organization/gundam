@@ -310,7 +310,7 @@ bool DialCollection::initializeDialsWithDefinition() {
           if     ( _globalDialType_ == "Spline" ){
             TSpline3* loadedDial{(TSpline3*) dialsList->At(iBin)};
 
-            if( loadedDial->GetNp() <= 1 ){
+            if( GenericToolbox::isFlatAndOne(loadedDial) ){
               LogAlert << "Invalid dial for " << getTitle() << " -> " << _dialBinSet_.getBinsList()[iBin].getSummary() << std::endl;
               excludedBins.emplace_back(iBin);
               continue;
@@ -347,8 +347,8 @@ bool DialCollection::initializeDialsWithDefinition() {
             // check if flat at 1
             TGraph* loadedDial{(TGraph*) dialsList->At(iBin)};
 
-            if( loadedDial->GetN() <= 1 ){
-              LogAlert << "Invalid dial for " << getTitle() << " -> " << _dialBinSet_.getBinsList()[iBin].getSummary() << std::endl;
+            if( GenericToolbox::isFlatAndOne(loadedDial) ){
+              LogAlert << "Invalid/flat dial for " << getTitle() << " -> " << _dialBinSet_.getBinsList()[iBin].getSummary() << std::endl;
               excludedBins.emplace_back(iBin);
               continue;
             }

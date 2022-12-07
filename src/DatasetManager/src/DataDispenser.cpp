@@ -1166,9 +1166,9 @@ void DataDispenser::fillFunction(int iThread_){
             }
 
             // loaded graph is valid?
-            if( grPtr != nullptr and grPtr->GetN() > 1){
+            if( grPtr != nullptr and not GenericToolbox::isFlatAndOne(grPtr) ){
               freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
-              if     ( dialCollectionRef->getGlobalDialType() == "Spline" ){
+              if      ( dialCollectionRef->getGlobalDialType() == "Spline" ){
                 if(dialCollectionRef->useCachedDials() ) {
                   ( (SplineCache*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->createSpline( grPtr );
                 }
