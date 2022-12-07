@@ -394,6 +394,24 @@ void Propagator::initializeImpl() {
   }
 
   if( _debugPrintLoadedEvents_ ){
+
+#if USE_NEW_DIALS
+    int iEvt{0};
+    for( auto& entry : _eventDialCache_.getCache() ) {
+      LogDebug << "#" << iEvt++ << "{" << std::endl;
+      {
+        Logger::Indent i;
+        LogDebug << entry.first->getSummary() << std::endl;
+        LogDebug << "dialCache = {";
+        for( auto& dialInterface : entry.second ) {
+          LogDebug << std::endl << "  - " << dialInterface->getSummary();
+        }
+        LogDebug << std::endl << "}" << std::endl;
+      }
+      LogDebug << "}" << std::endl;
+      if( iEvt+1 >= _debugPrintLoadedEventsNbPerSample_ ) break;
+    }
+#else
     LogDebug << GET_VAR_NAME_VALUE(_debugPrintLoadedEventsNbPerSample_) << std::endl;
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
       LogDebug << GenericToolbox::addUpDownBars( sample.getName() ) << std::endl;
@@ -404,6 +422,7 @@ void Propagator::initializeImpl() {
         LogTrace << iEvt << " -> " << ev.getSummary() << std::endl;
       }
     }
+#endif
   }
 
   // Propagator needs to be fast

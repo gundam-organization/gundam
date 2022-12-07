@@ -4,6 +4,8 @@
 
 #include "DialResponseSupervisor.h"
 
+#include "sstream"
+
 
 void DialResponseSupervisor::setMinResponse(double minResponse) {
   _minResponse_ = minResponse;
@@ -16,4 +18,12 @@ void DialResponseSupervisor::process(double& output_) const {
   // apply cap?
   if     ( not std::isnan(_minResponse_) and output_ < _minResponse_ ){ output_ = _minResponse_; }
   else if( not std::isnan(_maxResponse_) and output_ > _maxResponse_ ){ output_ = _maxResponse_; }
+}
+
+std::string DialResponseSupervisor::getSummary() const{
+  std::stringstream ss;
+  if(not std::isnan(_minResponse_)) ss << "minResponse=" << _minResponse_;
+  if( not ss.str().empty() ) ss << ", ";
+  if(not std::isnan(_maxResponse_)) ss << "maxResponse=" << _maxResponse_;
+  return ss.str();
 }

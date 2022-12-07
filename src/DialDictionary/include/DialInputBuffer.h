@@ -17,6 +17,8 @@ public:
   DialInputBuffer() = default;
 
   void setIsMasked(bool isMasked);
+  void setUseParameterMirroring(bool useParameterMirroring);
+  void setParSetRef(std::vector<FitParameterSet> *parSetRef);
 
   [[nodiscard]] bool isMasked() const;
   [[nodiscard]] size_t getBufferSize() const;
@@ -24,7 +26,7 @@ public:
   [[nodiscard]] const uint32_t& getCurrentHash() const;
   [[nodiscard]] const std::vector<std::pair<size_t, size_t>> &getInputParameterIndicesList() const;
 
-  void updateBuffer(const std::vector<FitParameterSet>& parSetList_);
+  void updateBuffer();
   void addParameterIndices(const std::pair<size_t, size_t>& indices_);
   void addMirrorBounds(const std::pair<double, double>& lowEdgeAndRange_);
 
@@ -39,6 +41,7 @@ private:
   std::vector<std::pair<double, double>> _parameterMirrorBounds_{}; // first = lowBound, second = range
   std::vector<double> _buffer_;
   std::vector<std::pair<size_t, size_t>> _inputParameterIndicesList_{};
+  std::vector<FitParameterSet>* _parSetRef_{nullptr};
 
   // for cache
   uint32_t _currentHash_{0};

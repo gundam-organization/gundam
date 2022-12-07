@@ -130,8 +130,8 @@ size_t DialCollection::getNextDialFreeSlot(){
 #endif
   return _dialFreeSlot_++;
 }
-void DialCollection::shrinkContainers(){
-  LogInfo << "Shrinking dial collection \"" << this->getTitle() << "\" from "
+void DialCollection::resizeContainers(){
+  LogInfo << "Resizing containers of the dial collection \"" << this->getTitle() << "\" from "
   << _dialInterfaceList_.size() << " to " << _dialFreeSlot_ << std::endl;
   _dialInterfaceList_.resize(_dialFreeSlot_);
   _dialBaseList_.resize(_dialFreeSlot_);
@@ -161,10 +161,14 @@ void DialCollection::setupDialInterfaceReferences(){
     _dialInputBufferList_.back().addParameterIndices({_supervisedParameterSetIndex_, _supervisedParameterIndex_});
   }
 
+  for( auto& inputBuffer : _dialInputBufferList_ ){
+    inputBuffer.setParSetRef( _parameterSetListPtr_ );
+  }
+
   if( _useMirrorDial_ ){
     for( auto& inputBuffer : _dialInputBufferList_ ){
-      inputBuffer.setIsMasked( _useMirrorDial_ );
-      inputBuffer.addParameterIndices( {_mirrorLowEdge_, _mirrorRange_} );
+      inputBuffer.setUseParameterMirroring( _useMirrorDial_ );
+      inputBuffer.addMirrorBounds( {_mirrorLowEdge_, _mirrorRange_} );
     }
   }
 
@@ -185,8 +189,28 @@ void DialCollection::setupDialInterfaceReferences(){
       _dialInterfaceList_[iDial].setInputBufferRef( &_dialInputBufferList_[iDial] );
     }
     else{
-      LogThrow("DEV: size mismatch between input buffers and dial interfaces.");
+      LogThrow("DEV: size mismatch between input buffers and dial interfaces."
+                   << std::endl << "interface = " << _dialInterfaceList_.size()
+                   << std::endl << "input = " << _dialInputBufferList_.size()
+      );
     }
+
+    // Input buffers
+    if( not _dialBinSet_.getBinsList().empty() ){
+      if( _dialBinSet_.getBinsList().size() == 1 ){
+        _dialInterfaceList_[iDial].setDialBinRef( &_dialBinSet_.getBinsList()[0] );
+      }
+      else if( _dialBinSet_.getBinsList().size() == _dialInterfaceList_.size() ){
+        _dialInterfaceList_[iDial].setDialBinRef( &_dialBinSet_.getBinsList()[iDial] );
+      }
+      else{
+        LogThrow("DEV: size mismatch between bins and dial interfaces."
+                     << std::endl << "interface = " << _dialInterfaceList_.size()
+                     << std::endl << "bins = " << _dialBinSet_.getBinsList().size()
+        );
+      }
+    }
+
 
     // Supervisor reference
     if( _dialResponseSupervisorList_.size() == 1 ){
@@ -196,14 +220,17 @@ void DialCollection::setupDialInterfaceReferences(){
       _dialInterfaceList_[iDial].setResponseSupervisorRef( &_dialResponseSupervisorList_[iDial] );
     }
     else{
-      LogThrow("DEV: size mismatch between response supervisors and dial interfaces.");
+      LogThrow("DEV: size mismatch between response supervisors and dial interfaces."
+                   << std::endl << "interface = " << _dialInterfaceList_.size()
+                   << std::endl << "supervisor = " << _dialResponseSupervisorList_.size()
+      );
     }
   }
 }
 void DialCollection::updateInputBuffers(){
-  for( auto& inputBuffer : _dialInputBufferList_ ){
-    inputBuffer.updateBuffer(*_parameterSetListPtr_);
-  }
+  std::for_each(_dialInputBufferList_.begin(), _dialInputBufferList_.end(), [](DialInputBuffer& i_){
+    i_.updateBuffer();
+  });
 }
 
 bool DialCollection::useCachedDials() const{

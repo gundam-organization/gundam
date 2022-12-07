@@ -46,8 +46,6 @@ public:
   double getNominalWeight() const;
   double getEventWeight() const;
   int getSampleBinIndex() const;
-  std::vector<Dial *> &getRawDialPtrList();
-  const std::vector<Dial *> &getRawDialPtrList() const;
   const std::vector<GenericToolbox::AnyType>& getLeafHolder(const std::string &leafName_) const;
   const std::vector<GenericToolbox::AnyType>& getLeafHolder(int index_) const;
   const std::vector<std::vector<GenericToolbox::AnyType>> &getLeafContentList() const;
@@ -62,7 +60,6 @@ public:
   // Weight
   void addEventWeight(double weight_);
   void resetEventWeight();
-  void reweightUsingDialCache();
 
   // Fetch var
   int findVarIndex(const std::string& leafName_, bool throwIfNotFound_ = true) const;
@@ -80,7 +77,6 @@ public:
 
   // Misc
   void print() const;
-  void trimDialCache();
   std::string getSummary() const;
 
   std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>> generateLeavesDictionary(bool disableArrays_ = false) const;
@@ -94,8 +90,15 @@ public:
   // Stream operator
   friend std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p );
 
-  // DEV
+#if USE_NEW_DIALS
+#else
+  std::vector<Dial *> &getRawDialPtrList();
+  const std::vector<Dial *> &getRawDialPtrList() const;
+  void reweightUsingDialCache();
+  void trimDialCache();
   void addNestedDialRefToCache(NestedDialTest* nestedDialPtr_, const std::vector<Dial*>& dialPtrList_ = {});
+#endif
+
 
 private:
   // Context variables
@@ -111,9 +114,12 @@ private:
   std::vector<std::vector<GenericToolbox::AnyType>> _leafContentList_;
 
   // Cache variables
+  mutable std::vector<std::vector<double>> _varToDoubleCache_{};
+#ifdef USE_NEW_DIALS
+#else
   std::vector<Dial*> _rawDialPtrList_{};
   std::vector<std::pair<NestedDialTest*, std::vector<Dial*>>> _nestedDialRefList_{};
-  mutable std::vector<std::vector<double>> _varToDoubleCache_{};
+#endif
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
 public:

@@ -43,7 +43,7 @@ public:
   [[nodiscard]] bool useCachedDials() const;
   [[nodiscard]] bool isDatasetValid(const std::string& datasetName_) const;
   size_t getNextDialFreeSlot();
-  void shrinkContainers();
+  void resizeContainers();
   void setupDialInterfaceReferences();
   void updateInputBuffers();
 

@@ -583,6 +583,9 @@ void DataDispenser::preAllocateMemory(){
   eventPlaceholder.setCommonLeafNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
   auto copyDict = eventPlaceholder.generateDict(tBuf, _parameters_.overrideLeafDict);
   eventPlaceholder.copyData(copyDict);
+
+#if USE_NEW_DIALS
+#else
   if( _parSetListPtrToLoad_ != nullptr ){
     size_t dialCacheSize = 0;
     for( auto& parSet : *_parSetListPtrToLoad_ ){
@@ -590,6 +593,7 @@ void DataDispenser::preAllocateMemory(){
     }
     eventPlaceholder.getRawDialPtrList().resize(dialCacheSize);
   }
+#endif
 
   _cache_.sampleIndexOffsetList.resize(_cache_.samplesToFillList.size());
   _cache_.sampleEventListPtrToFill.resize(_cache_.samplesToFillList.size());
@@ -764,11 +768,13 @@ void DataDispenser::readAndFill(){
     if(_parameters_.useMcContainer) container = &_cache_.samplesToFillList[iSample]->getMcContainer();
     container->shrinkEventList(_cache_.sampleIndexOffsetList[iSample]);
   }
-  for( auto& dialCollection : *_dialCollectionListPtr_ ) {
-    if( not dialCollection.isBinned() ){ dialCollection.shrinkContainers(); }
-  }
 
 #if USE_NEW_DIALS
+  LogInfo << "Resizing dial containers..." << std::endl;
+  for( auto& dialCollection : *_dialCollectionListPtr_ ) {
+    if( not dialCollection.isBinned() ){ dialCollection.resizeContainers(); }
+  }
+
   LogInfo << "Build reference cache..." << std::endl;
   _eventDialCacheRef_->buildReferenceCache(*_sampleSetPtrToLoad_, *_dialCollectionListPtr_);
 #endif

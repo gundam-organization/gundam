@@ -6,6 +6,10 @@
 
 #include <dlfcn.h>
 
+LoggerInit([]{
+  Logger::setUserHeaderStr("[EventVarTransformLib]");
+});
+
 
 void EventVarTransformLib::readConfigImpl(){
   this->EventVarTransform::readConfigImpl();

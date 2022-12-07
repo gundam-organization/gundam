@@ -8,6 +8,7 @@
 #include "vector"
 #include "functional"
 #include "cmath"
+#include "string"
 
 
 class DialResponseSupervisor {
@@ -19,6 +20,8 @@ public:
   void setMaxResponse(double maxResponse);
 
   void process(double &output_) const;
+
+  std::string getSummary() const;
 
 private:
   double _minResponse_{std::nan("unset")};

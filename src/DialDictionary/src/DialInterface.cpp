@@ -20,6 +20,9 @@ void DialInterface::setInputBufferRef(DialInputBuffer *inputBufferRef) {
 void DialInterface::setResponseSupervisorRef(const DialResponseSupervisor *responseSupervisorRef) {
   _responseSupervisorRef_ = responseSupervisorRef;
 }
+void DialInterface::setDialBinRef(const DataBin *dialBinRef) {
+  _dialBinRef_ = dialBinRef;
+}
 
 double DialInterface::evalResponse(){
   if( _inputBufferRef_->isMasked() ) return 1;
@@ -32,14 +35,25 @@ double DialInterface::evalResponse(){
 
   return response;
 }
-std::string DialInterface::getSummary(bool shallow_) const {
+std::string DialInterface::getSummary(bool shallow_) {
   std::stringstream ss;
-  ss << "DialInterface:";
-  if( _dialBaseRef_ != nullptr ) ss << " DialBase(" << _dialBaseRef_ << ")";
-  if( _inputBufferRef_ != nullptr ) ss << " nInputs=" << _inputBufferRef_->getBufferSize() << "(" << _inputBufferRef_->getBuffer() << ")";
-//  if( _responseSupervisorRef_ != nullptr ) ss << " nInputs=" << _responseSupervisorRef_->;
-  if( not shallow_){
+  ss << _dialBaseRef_->getDialTypeName() << ":" << std::endl;
 
+  // apply on?
+  if( _dialBinRef_ != nullptr ){
+    ss << " applyOn(" << _dialBinRef_->getSummary() << ")";
   }
+
+  if( _inputBufferRef_ != nullptr ){
+    ss << " input(" << _inputBufferRef_->getSummary() << ")";
+  }
+
+  if( _responseSupervisorRef_ != nullptr ){
+    ss << " supervisor(" << _responseSupervisorRef_->getSummary();
+  }
+
+  ss << " response=" << this->evalResponse();
+
   return ss.str();
 }
+

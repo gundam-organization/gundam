@@ -20,7 +20,11 @@ PhysicsEvent::~PhysicsEvent() { this->reset(); }
 void PhysicsEvent::reset() {
   _commonLeafNameListPtr_ = nullptr;
   _leafContentList_.clear();
+
+#ifdef USE_NEW_DIALS
+#else
   _rawDialPtrList_.clear();
+#endif
 
   // Weight carriers
   _dataSetIndex_=-1;
@@ -142,12 +146,16 @@ const std::vector<std::vector<GenericToolbox::AnyType>> &PhysicsEvent::getLeafCo
 std::vector<std::vector<GenericToolbox::AnyType>> &PhysicsEvent::getLeafContentList(){
   return _leafContentList_;
 }
+
+#ifdef USE_NEW_DIALS
+#else
 std::vector<Dial *> &PhysicsEvent::getRawDialPtrList() {
   return _rawDialPtrList_;
 }
 const std::vector<Dial *> &PhysicsEvent::getRawDialPtrList() const{
   return _rawDialPtrList_;
 }
+#endif
 
 void PhysicsEvent::copyOnlyExistingLeaves(const PhysicsEvent& other_){
   LogThrowIf(_commonLeafNameListPtr_ == nullptr, "_commonLeafNameListPtr_ not set")
@@ -162,6 +170,9 @@ void PhysicsEvent::addEventWeight(double weight_){
 void PhysicsEvent::resetEventWeight(){
   _eventWeight_ = _treeWeight_;
 }
+
+#ifdef USE_NEW_DIALS
+#else
 void PhysicsEvent::reweightUsingDialCache(){
 
 #ifdef USE_ACCUMULATE_PHYSICSEVENT
@@ -371,6 +382,7 @@ void PhysicsEvent::reweightUsingDialCache(){
 //  }
 #endif
 }
+#endif
 
 int PhysicsEvent::findVarIndex(const std::string& leafName_, bool throwIfNotFound_) const{
   LogThrowIf(_commonLeafNameListPtr_ == nullptr, "Can't " << __METHOD_NAME__ << " while _commonLeafNameListPtr_ is empty.");
@@ -451,6 +463,8 @@ std::string PhysicsEvent::getSummary() const {
     ss << std::endl << "}";
   }
 
+#ifdef USE_NEW_DIALS
+#else
   ss << std::endl << "_rawDialPtrList_: {";
   if( not _rawDialPtrList_.empty() ){
     for( auto* dialPtr : _rawDialPtrList_ ){
@@ -463,12 +477,16 @@ std::string PhysicsEvent::getSummary() const {
   else{
     ss << "}";
   }
-  ss << std::endl << "===========================";
+#endif
+
   return ss.str();
 }
 void PhysicsEvent::print() const {
   LogInfo << *this << std::endl;
 }
+
+#ifdef USE_NEW_DIALS
+#else
 void PhysicsEvent::trimDialCache(){
   size_t newSize{0};
   for( auto& dial : _rawDialPtrList_ ){
@@ -504,9 +522,9 @@ void PhysicsEvent::addNestedDialRefToCache(NestedDialTest* nestedDialPtr_, const
   _nestedDialRefList_.back().first = nestedDialPtr_;
   _nestedDialRefList_.back().second = dialPtrList_;
 }
+#endif
 std::map< std::string,
-  std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>>
-  PhysicsEvent::generateLeavesDictionary(bool disableArrays_) const {
+  std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>> PhysicsEvent::generateLeavesDictionary(bool disableArrays_) const {
   std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>> out;
 
   for( auto& leafName : *_commonLeafNameListPtr_ ){
