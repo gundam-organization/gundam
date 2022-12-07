@@ -39,13 +39,13 @@ std::string DialInterface::getSummary(bool shallow_) {
   std::stringstream ss;
   ss << _dialBaseRef_->getDialTypeName() << ":";
 
+  if( _inputBufferRef_ != nullptr ){
+    ss << " input(" << _inputBufferRef_->getSummary() << ")";
+  }
+
   // apply on?
   if( _dialBinRef_ != nullptr ){
     ss << " applyOn(" << _dialBinRef_->getSummary() << ")";
-  }
-
-  if( _inputBufferRef_ != nullptr ){
-    ss << " input(" << _inputBufferRef_->getSummary() << ")";
   }
 
   if( _responseSupervisorRef_ != nullptr ){
