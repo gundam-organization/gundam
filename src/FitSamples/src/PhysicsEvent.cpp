@@ -441,9 +441,8 @@ double PhysicsEvent::evalFormula(const TFormula* formulaPtr_, std::vector<int>* 
 
 std::string PhysicsEvent::getSummary() const {
   std::stringstream ss;
-  ss << "PhysicsEvent :";
 
-  ss << std::endl << GET_VAR_NAME_VALUE(_dataSetIndex_);
+  ss << GET_VAR_NAME_VALUE(_dataSetIndex_);
   ss << std::endl << GET_VAR_NAME_VALUE(_entryIndex_);
   ss << std::endl << GET_VAR_NAME_VALUE(_treeWeight_);
   ss << std::endl << GET_VAR_NAME_VALUE(_nominalWeight_);

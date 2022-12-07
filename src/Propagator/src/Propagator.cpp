@@ -395,10 +395,11 @@ void Propagator::initializeImpl() {
 
   if( _debugPrintLoadedEvents_ ){
 
+    LogDebug << GET_VAR_NAME_VALUE(_debugPrintLoadedEventsNbPerSample_) << std::endl;
 #if USE_NEW_DIALS
     int iEvt{0};
     for( auto& entry : _eventDialCache_.getCache() ) {
-      LogDebug << "#" << iEvt++ << "{" << std::endl;
+      LogDebug << "Event #" << iEvt++ << "{" << std::endl;
       {
         Logger::Indent i;
         LogDebug << entry.first->getSummary() << std::endl;
@@ -412,7 +413,6 @@ void Propagator::initializeImpl() {
       if( iEvt >= _debugPrintLoadedEventsNbPerSample_ ) break;
     }
 #else
-    LogDebug << GET_VAR_NAME_VALUE(_debugPrintLoadedEventsNbPerSample_) << std::endl;
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
       LogDebug << GenericToolbox::addUpDownBars( sample.getName() ) << std::endl;
 

@@ -1,7 +1,7 @@
 set(SRCFILES
     src/Propagator.cpp
     src/ParScanner.cpp
-)
+    )
 
 set(HEADERS
     include/Propagator.h
