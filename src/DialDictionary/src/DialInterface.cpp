@@ -37,7 +37,7 @@ double DialInterface::evalResponse(){
 }
 std::string DialInterface::getSummary(bool shallow_) {
   std::stringstream ss;
-  ss << _dialBaseRef_->getDialTypeName() << ":" << std::endl;
+  ss << _dialBaseRef_->getDialTypeName() << ":";
 
   // apply on?
   if( _dialBinRef_ != nullptr ){
@@ -49,7 +49,7 @@ std::string DialInterface::getSummary(bool shallow_) {
   }
 
   if( _responseSupervisorRef_ != nullptr ){
-    ss << " supervisor(" << _responseSupervisorRef_->getSummary();
+    ss << " supervisor(" << _responseSupervisorRef_->getSummary() << ")";
   }
 
   ss << " response=" << this->evalResponse();

@@ -22,8 +22,15 @@ void DialResponseSupervisor::process(double& output_) const {
 
 std::string DialResponseSupervisor::getSummary() const{
   std::stringstream ss;
-  if(not std::isnan(_minResponse_)) ss << "minResponse=" << _minResponse_;
-  if( not ss.str().empty() ) ss << ", ";
-  if(not std::isnan(_maxResponse_)) ss << "maxResponse=" << _maxResponse_;
+
+  if(not std::isnan(_minResponse_)){
+    ss << "minResponse=" << _minResponse_;
+  }
+
+  if(not std::isnan(_maxResponse_)){
+    if( not ss.str().empty() ) ss << ", ";
+    ss << "maxResponse=" << _maxResponse_;
+  }
+
   return ss.str();
 }

@@ -83,7 +83,7 @@ void DialInputBuffer::addMirrorBounds(const std::pair<double, double>& lowEdgeAn
 }
 std::string DialInputBuffer::getSummary() const{
   std::stringstream ss;
-  ss << "inputs=" << GenericToolbox::iterableToString(_inputParameterIndicesList_, [&](const std::pair<size_t, size_t>& idx_){
+  ss << GenericToolbox::iterableToString(_inputParameterIndicesList_, [&](const std::pair<size_t, size_t>& idx_){
     std::stringstream ss;
     if( _parSetRef_ != nullptr ){
       ss << (*_parSetRef_)[idx_.first].getParameterList()[idx_.second].getFullTitle() << "=";
@@ -95,9 +95,9 @@ std::string DialInputBuffer::getSummary() const{
     return ss.str();
   }, false);
   if( _useParameterMirroring_ ){
-    ss << "mirroring=" << GenericToolbox::iterableToString(_parameterMirrorBounds_, [&](const std::pair<double, double>& bounds_){
+    ss << ", " << GenericToolbox::iterableToString(_parameterMirrorBounds_, [&](const std::pair<double, double>& bounds_){
       std::stringstream ss;
-      ss << "lowBound=" << bounds_.first << ", upperBound=" << bounds_.first + bounds_.second;
+      ss << "mirrorLow=" << bounds_.first << ", mirrorUp=" << bounds_.first + bounds_.second;
       return ss.str();
     }, false);
   }
