@@ -64,7 +64,7 @@ private:
   bool _useMirrorDial_{false};
   bool _disableDialCache_{false};
   bool _enableDialsSummary_{false};
-  bool _allowDialExtrapolation_{false};
+  bool _allowDialExtrapolation_{true};
   double _minDialResponse_{std::nan("unset")};
   double _maxDialResponse_{std::nan("unset")};
   double _mirrorLowEdge_{std::nan("unset")};
@@ -75,22 +75,17 @@ private:
   std::string _globalDialLeafName_{};
   std::string _globalDialType_{};
   std::vector<std::string> _dataSetNameList_{};
-  std::shared_ptr<TFormula> _applyConditionFormula_{nullptr};
-//  DialType::DialType _globalDialType_{ DialType::DialType_OVERFLOW };
-
-  int _supervisedParameterIndex_{-1};
-  int _supervisedParameterSetIndex_{-1};
 
   // internal
-//  bool _parallelizeDials_{false}; // instead of event parallelization
-  size_t _dialFreeSlot_{0};
-  GenericToolbox::NoCopyWrapper<std::mutex> _mutex_{};
-
+  int _supervisedParameterIndex_{-1};
+  int _supervisedParameterSetIndex_{-1};
+  DataBinSet _dialBinSet_{};
   std::vector<DialInterface> _dialInterfaceList_{};
   std::vector<DialInputBuffer> _dialInputBufferList_{};
   std::vector<DialResponseSupervisor> _dialResponseSupervisorList_{};
   std::vector<GenericToolbox::PolymorphicObjectWrapper<DialBase>> _dialBaseList_{};
-  DataBinSet _dialBinSet_{};
+  std::shared_ptr<TFormula> _applyConditionFormula_{nullptr};
+  GenericToolbox::CopiableAtomic<size_t> _dialFreeSlot_{0};
 
   // external refs
   std::vector<FitParameterSet>* _parameterSetListPtr_{nullptr};

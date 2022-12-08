@@ -123,11 +123,6 @@ bool DialCollection::isDatasetValid(const std::string& datasetName_) const{
   return false;
 }
 size_t DialCollection::getNextDialFreeSlot(){
-#if __cplusplus >= 201703L
-  std::scoped_lock<std::mutex> g(_mutex_);
-#else
-  std::lock_guard<std::mutex> g(_mutex_);
-#endif
   return _dialFreeSlot_++;
 }
 void DialCollection::resizeContainers(){
