@@ -28,6 +28,9 @@ void DialInputBuffer::setParSetRef(std::vector<FitParameterSet> *parSetRef) {
 bool DialInputBuffer::isMasked() const {
   return _isMasked_;
 }
+bool DialInputBuffer::isDialUpdateRequested() const {
+  return _isDialUpdateRequested_;
+}
 size_t DialInputBuffer::getBufferSize() const{
   return _buffer_.size();
 }
@@ -45,7 +48,12 @@ void DialInputBuffer::updateBuffer(){
   LogThrowIf(_parSetRef_ == nullptr, "parSetRef is not set.");
 
   _isMasked_ = false;
-  double* buffer{_buffer_.data()};
+  double* bufferPtr{_buffer_.data()};
+  double buffer;
+
+  // will change if at least one parameter is updated
+  _isDialUpdateRequested_ = false;
+
   for( auto& parIndices : _inputParameterIndicesList_ ){
 
     if( (*_parSetRef_)[parIndices.first].isMaskedForPropagation() ){
@@ -53,25 +61,37 @@ void DialInputBuffer::updateBuffer(){
       return;
     }
 
-    *buffer = (*_parSetRef_)[parIndices.first].getParameterList()[parIndices.second].getParameterValue();
+    buffer = (*_parSetRef_)[parIndices.first].getParameterList()[parIndices.second].getParameterValue();
     if( _useParameterMirroring_ ){
-      *buffer = std::abs(std::fmod(
-          *buffer - _parameterMirrorBounds_[std::distance(_buffer_.data(), buffer)].first,
-          2 * _parameterMirrorBounds_[std::distance(_buffer_.data(), buffer)].second
+      buffer = std::abs(std::fmod(
+          buffer - _parameterMirrorBounds_[std::distance(_buffer_.data(), bufferPtr)].first,
+          2 * _parameterMirrorBounds_[std::distance(_buffer_.data(), bufferPtr)].second
       ));
 
-      if(*buffer > _parameterMirrorBounds_[std::distance(_buffer_.data(), buffer)].second ){
+      if(buffer > _parameterMirrorBounds_[std::distance(_buffer_.data(), bufferPtr)].second ){
         // odd pattern  -> mirrored -> decreasing effective X while increasing parameter
-        *buffer -= 2 * _parameterMirrorBounds_[std::distance(_buffer_.data(), buffer)].second;
-        *buffer = -*buffer;
+        buffer -= 2 * _parameterMirrorBounds_[std::distance(_buffer_.data(), bufferPtr)].second;
+        buffer = -buffer;
       }
 
       // re-apply the offset
-      *buffer += _parameterMirrorBounds_[std::distance(_buffer_.data(), buffer)].first;
+      buffer += _parameterMirrorBounds_[std::distance(_buffer_.data(), bufferPtr)].first;
     }
-    LogThrowIf(std::isnan(*buffer), "NaN while evaluating input buffer of " << (*_parSetRef_)[parIndices.first].getParameterList()[parIndices.second].getTitle());
-    buffer++;
+    LogThrowIf(std::isnan(buffer), "NaN while evaluating input buffer of " << (*_parSetRef_)[parIndices.first].getParameterList()[parIndices.second].getTitle());
+
+    if( *bufferPtr != buffer ){
+//      LogTrace << "UPT: " << this->getSummary() << ": " << *bufferPtr << " -> " << buffer << std::endl;
+      _isDialUpdateRequested_ = true;
+    }
+
+    *bufferPtr = buffer;
+    bufferPtr++;
   }
+
+  if( not _isDialUpdateRequested_ ){
+//    LogDebug << "CACHED: " << this->getSummary() << std::endl;
+  }
+
   _currentHash_ = generateHash();
 }
 void DialInputBuffer::addParameterIndices(const std::pair<size_t, size_t>& indices_){
@@ -115,6 +135,4 @@ uint32_t DialInputBuffer::generateHash(){
 #endif
   return 0;
 }
-
-
 

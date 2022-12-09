@@ -27,8 +27,9 @@ public:
   void setDialBaseRef(DialBase *dialBasePtr);
   void setInputBufferRef(DialInputBuffer *inputBufferRef);
   void setResponseSupervisorRef(const DialResponseSupervisor *responseSupervisorRef);
-
   void setDialBinRef(const DataBin *dialBinRef);
+
+  DialInputBuffer *getInputBufferRef() const;
 
   double evalResponse();
   [[nodiscard]] std::string getSummary(bool shallow_=true);

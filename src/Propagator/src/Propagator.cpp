@@ -405,7 +405,11 @@ void Propagator::initializeImpl() {
         LogDebug << entry.first->getSummary() << std::endl;
         LogDebug << "dialCache = {";
         for( auto& dialInterface : entry.second ) {
+#ifndef USE_BREAKDOWN_CACHE
           LogDebug << std::endl << "  - " << dialInterface->getSummary();
+#else
+          LogDebug << std::endl << "  - " << dialInterface.first->getSummary();
+#endif
         }
         LogDebug << std::endl << "}" << std::endl;
       }

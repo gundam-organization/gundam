@@ -229,6 +229,9 @@ void DialCollection::updateInputBuffers(){
 }
 
 bool DialCollection::useCachedDials() const{
+#ifdef USE_BREAKDOWN_CACHE
+  return false;
+#endif
 
   if( _disableDialCache_ ) return false;
 

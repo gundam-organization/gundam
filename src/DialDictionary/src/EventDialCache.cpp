@@ -11,9 +11,15 @@ LoggerInit([]{
 });
 
 
+#ifndef USE_BREAKDOWN_CACHE
 std::vector<std::pair<PhysicsEvent *, std::vector<DialInterface *>>> &EventDialCache::getCache() {
   return _cache_;
 }
+#else
+std::vector<std::pair< PhysicsEvent*, std::vector<std::pair<DialInterface*, double> > >> &EventDialCache::getCache() {
+  return _cache_;
+}
+#endif
 
 void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<DialCollection>& dialCollectionList_){
   LogInfo << "Building event dial cache..." << std::endl;
@@ -25,16 +31,18 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
         return true;
       });
   };
+
   auto isCacheEntryValid = [&](std::pair<std::pair<size_t, size_t>, std::vector<std::pair<size_t, size_t>>>& entry_){
     if( entry_.first.first == size_t(-1) or entry_.first.second == size_t(-1) or entry_.second.empty() ){ return false; }
     return countValidDials(entry_.second) != 0;
   };
 
-  _cache_.reserve(
-      std::count_if(
-          _indexedCache_.begin(), _indexedCache_.end(),
-          isCacheEntryValid)
-      );
+  // reserve memory before emplace_back
+  long nCacheEntries = std::count_if(
+      _indexedCache_.begin(), _indexedCache_.end(),
+      isCacheEntryValid
+  );
+  _cache_.reserve( nCacheEntries );
 
   for(auto & entry : _indexedCache_){
 
@@ -59,9 +67,15 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
 
     for( auto& dialIndex : entry.second ){
       if( dialIndex.first == size_t(-1) or dialIndex.second == size_t(-1) ){ continue; }
+#ifndef USE_BREAKDOWN_CACHE
       _cache_.back().second.emplace_back(
           &dialCollectionList_.at(dialIndex.first).getDialInterfaceList().at(dialIndex.second)
       );
+#else
+      _cache_.back().second.emplace_back(
+          &dialCollectionList_.at(dialIndex.first).getDialInterfaceList().at(dialIndex.second), std::nan("unset")
+      );
+#endif
     }
   }
 }
@@ -81,10 +95,22 @@ std::pair<std::pair<size_t, size_t>, std::vector<std::pair<size_t, size_t>>>* Ev
   return &_indexedCache_[_fillIndex_++];
 }
 
+#ifndef USE_BREAKDOWN_CACHE
 void EventDialCache::reweightEntry(std::pair<PhysicsEvent*, std::vector<DialInterface*>>& entry_){
   entry_.first->resetEventWeight();
   std::for_each(entry_.second.begin(), entry_.second.end(), [&](DialInterface* dial_){
     entry_.first->getEventWeightRef() *= dial_->evalResponse();
   });
 }
-
+#else
+void EventDialCache::reweightEntry(std::pair<PhysicsEvent*, std::vector<std::pair<DialInterface*, double>>>& entry_){
+  entry_.first->resetEventWeight();
+  std::for_each(entry_.second.begin(), entry_.second.end(), [&](std::pair<DialInterface*, double>& dial_){
+    if( std::isnan(dial_.second) or dial_.first->getInputBufferRef()->isDialUpdateRequested() ){
+      dial_.second = dial_.first->evalResponse();
+    }
+    LogThrowIf(std::isnan(dial_.second), "invalid cache response for " << dial_.first->getSummary());
+    entry_.first->getEventWeightRef() *= dial_.second;
+  });
+}
+#endif

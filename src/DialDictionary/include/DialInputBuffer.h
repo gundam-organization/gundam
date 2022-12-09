@@ -21,6 +21,7 @@ public:
   void setParSetRef(std::vector<FitParameterSet> *parSetRef);
 
   [[nodiscard]] bool isMasked() const;
+  [[nodiscard]] bool isDialUpdateRequested() const;
   [[nodiscard]] size_t getBufferSize() const;
   [[nodiscard]] const double* getBuffer() const;
   [[nodiscard]] const uint32_t& getCurrentHash() const;
@@ -37,6 +38,7 @@ protected:
 
 private:
   bool _isMasked_{false};
+  bool _isDialUpdateRequested_{true};
   bool _useParameterMirroring_{false};
   std::vector<std::pair<double, double>> _parameterMirrorBounds_{}; // first = lowBound, second = range
   std::vector<double> _buffer_;

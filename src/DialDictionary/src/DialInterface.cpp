@@ -57,3 +57,7 @@ std::string DialInterface::getSummary(bool shallow_) {
   return ss.str();
 }
 
+DialInputBuffer *DialInterface::getInputBufferRef() const {
+  return _inputBufferRef_;
+}
+
