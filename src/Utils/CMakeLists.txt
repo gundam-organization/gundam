@@ -1,5 +1,5 @@
 set(SRCFILES
-        src/GlobalVariables.cc
+    src/GlobalVariables.cpp
         src/DataBinSet.cpp
         src/DataBin.cpp
         src/JsonUtils.cpp

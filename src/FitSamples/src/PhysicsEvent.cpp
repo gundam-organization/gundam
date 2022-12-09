@@ -21,7 +21,7 @@ void PhysicsEvent::reset() {
   _commonLeafNameListPtr_ = nullptr;
   _leafContentList_.clear();
 
-#ifdef USE_NEW_DIALS
+#if USE_NEW_DIALS
 #else
   _rawDialPtrList_.clear();
 #endif
@@ -147,7 +147,7 @@ std::vector<std::vector<GenericToolbox::AnyType>> &PhysicsEvent::getLeafContentL
   return _leafContentList_;
 }
 
-#ifdef USE_NEW_DIALS
+#if USE_NEW_DIALS
 #else
 std::vector<Dial *> &PhysicsEvent::getRawDialPtrList() {
   return _rawDialPtrList_;
@@ -171,7 +171,7 @@ void PhysicsEvent::resetEventWeight(){
   _eventWeight_ = _treeWeight_;
 }
 
-#ifdef USE_NEW_DIALS
+#if USE_NEW_DIALS
 #else
 void PhysicsEvent::reweightUsingDialCache(){
 
@@ -462,7 +462,7 @@ std::string PhysicsEvent::getSummary() const {
     ss << std::endl << "}";
   }
 
-#ifdef USE_NEW_DIALS
+#if USE_NEW_DIALS
 #else
   ss << std::endl << "_rawDialPtrList_: {";
   if( not _rawDialPtrList_.empty() ){
@@ -484,7 +484,7 @@ void PhysicsEvent::print() const {
   LogInfo << *this << std::endl;
 }
 
-#ifdef USE_NEW_DIALS
+#if USE_NEW_DIALS
 #else
 void PhysicsEvent::trimDialCache(){
   size_t newSize{0};

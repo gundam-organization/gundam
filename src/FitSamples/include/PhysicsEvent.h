@@ -115,7 +115,7 @@ private:
 
   // Cache variables
   mutable std::vector<std::vector<double>> _varToDoubleCache_{};
-#ifdef USE_NEW_DIALS
+#if USE_NEW_DIALS
 #else
   std::vector<Dial*> _rawDialPtrList_{};
   std::vector<std::pair<NestedDialTest*, std::vector<Dial*>>> _nestedDialRefList_{};

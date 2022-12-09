@@ -27,6 +27,7 @@
 #endif
 
 #define USE_NEW_DIALS 1
+#define USE_BREAKDOWN_CACHE 1
 
 
 ENUM_EXPANDER(
