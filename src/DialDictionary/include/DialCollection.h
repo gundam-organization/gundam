@@ -46,6 +46,7 @@ public:
   void resizeContainers();
   void setupDialInterfaceReferences();
   void updateInputBuffers();
+  void clear();
 
 
 protected:

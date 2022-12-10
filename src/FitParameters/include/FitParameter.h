@@ -5,7 +5,10 @@
 #ifndef GUNDAM_FITPARAMETER_H
 #define GUNDAM_FITPARAMETER_H
 
+#if USE_NEW_DIALS
+#else
 #include "DialSet.h"
+#endif
 #include "JsonBaseClass.h"
 
 #include "GenericToolbox.h"
@@ -53,33 +56,39 @@ public:
 
 
   // Getters
-  bool isEnabled() const;
-  bool isFixed() const;
-  bool isEigen() const;
-  bool isFree() const;
-  bool gotUpdated() const { return _gotUpdated_; }
-  PriorType::PriorType getPriorType() const;
-  int getParameterIndex() const;
-  const std::string &getName() const;
-  double getParameterValue() const;
-  double getStdDevValue() const;
-  double getPriorValue() const;
-  double getThrowValue() const;
+  [[nodiscard]] bool isEnabled() const;
+  [[nodiscard]] bool isFixed() const;
+  [[nodiscard]] bool isEigen() const;
+  [[nodiscard]] bool isFree() const;
+  [[nodiscard]] bool gotUpdated() const { return _gotUpdated_; }
+  [[nodiscard]] int getParameterIndex() const;
+  [[nodiscard]] double getMinValue() const;
+  [[nodiscard]] double getMaxValue() const;
+  [[nodiscard]] double getStepSize() const;
+  [[nodiscard]] double getPriorValue() const;
+  [[nodiscard]] double getThrowValue() const;
+  [[nodiscard]] double getStdDevValue() const;
+  [[nodiscard]] double getParameterValue() const;
+  [[nodiscard]] const std::string &getName() const;
+  [[nodiscard]] const nlohmann::json &getDialDefinitionsList() const;
+  [[nodiscard]] const FitParameterSet *getOwner() const;
+  [[nodiscard]] PriorType::PriorType getPriorType() const;
+
+#if USE_NEW_DIALS
+#else
   std::vector<DialSet> &getDialSetList();
-  double getMinValue() const;
-  double getMaxValue() const;
-  double getStepSize() const;
-
-  const nlohmann::json &getDialDefinitionsList() const;
-
-  const FitParameterSet *getOwner() const;
+#endif
 
   // Core
-  double getDistanceFromNominal() const; // in unit of sigmas
+  [[nodiscard]] double getDistanceFromNominal() const; // in unit of sigmas
+  [[nodiscard]] std::string getSummary(bool shallow_=false) const;
+  [[nodiscard]] std::string getTitle() const;
+  [[nodiscard]] std::string getFullTitle() const;
+
+#if USE_NEW_DIALS
+#else
   DialSet* findDialSet(const std::string& dataSetName_);
-  std::string getSummary(bool shallow_=false) const;
-  std::string getTitle() const;
-  std::string getFullTitle() const;
+#endif
 
 protected:
   void readConfigImpl() override;
@@ -107,9 +116,12 @@ private:
 
   // Internals
   const FitParameterSet* _owner_{nullptr};
-  std::vector<DialSet> _dialSetList_; // one dial set per detector
   PriorType::PriorType _priorType_{PriorType::Gaussian};
 
+#if USE_NEW_DIALS
+#else
+  std::vector<DialSet> _dialSetList_; // one dial set per detector
+#endif
 
 };
 

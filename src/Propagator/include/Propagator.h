@@ -39,8 +39,8 @@ public:
   double getLlhStatBuffer() const;
   double getLlhPenaltyBuffer() const;
   double getLlhRegBuffer() const;
-  const std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix() const;
   const EventTreeWriter &getTreeWriter() const;
+  const std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix() const;
   const std::vector<DatasetLoader> &getDataSetList() const;
   const std::vector<FitParameterSet> &getParameterSetsList() const;
 
@@ -57,20 +57,15 @@ public:
   double* getLlhStatBufferPtr(){ return &_llhStatBuffer_; }
   double* getLlhPenaltyBufferPtr(){ return &_llhPenaltyBuffer_; }
   double* getLlhRegBufferPtr(){ return &_llhRegBuffer_; }
-  const FitParameterSet* getFitParameterSetPtr(const std::string& name_) const;
+  [[nodiscard]] const FitParameterSet* getFitParameterSetPtr(const std::string& name_) const;
 
   // Core
   void updateLlhCache();
   void propagateParametersOnSamples();
-  void updateDialResponses();
   void resetReweight();
   void reweightMcEvents();
   void refillSampleHistograms();
   void throwParametersFromGlobalCovariance();
-
-  // Dev
-  void fillDialsStack();
-
 
 protected:
   void readConfigImpl() override;
@@ -79,7 +74,6 @@ protected:
   void initializeThreads();
 
   // multithreading
-  void updateDialResponses(int iThread_);
   void reweightMcEvents(int iThread_);
 
 private:
@@ -115,10 +109,6 @@ private:
   // Monitoring
   bool _showEventBreakdown_{true};
 
-  // Response functions (WIP)
-  std::map<FitSample*, std::shared_ptr<TH1D>> _nominalSamplesMcHistogram_;
-  std::map<FitSample*, std::vector<std::shared_ptr<TH1D>>> _responseFunctionsSamplesMcHistogram_;
-
 #ifdef GUNDAM_USING_CACHE_MANAGER
   // Build the precalculated caches.  This is only relevant when using a GPU
   // and must be done after the datasets are loaded.  This returns true if
@@ -135,11 +125,11 @@ private:
   std::map<const FitParameter*, int> _gpuParameterIndex_;
 #endif
 
-
   // DEV
-  std::vector<Dial*> _dialsStack_{};
+#if USE_NEW_DIALS
   std::vector<DialCollection> _dialCollections_{};
   EventDialCache _eventDialCache_{};
+#endif
 
 public:
   GenericToolbox::CycleTimer dialUpdate;

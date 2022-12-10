@@ -227,6 +227,13 @@ void DialCollection::updateInputBuffers(){
     i_.updateBuffer();
   });
 }
+void DialCollection::clear(){
+  _dialInterfaceList_.clear();
+  _dialBaseList_.clear();
+  _dialInterfaceList_.shrink_to_fit();
+  _dialBaseList_.shrink_to_fit();
+  _dialFreeSlot_ = 0;
+}
 
 bool DialCollection::useCachedDials() const{
 #ifdef USE_BREAKDOWN_CACHE
