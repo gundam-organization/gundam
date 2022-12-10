@@ -19,9 +19,9 @@ public:
   void setMinResponse(double minResponse);
   void setMaxResponse(double maxResponse);
 
-  void process(double &output_) const;
+  double process(double reponse_) const;
 
-  std::string getSummary() const;
+  [[nodiscard]] std::string getSummary() const;
 
 private:
   double _minResponse_{std::nan("unset")};

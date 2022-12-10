@@ -14,10 +14,14 @@ void DialResponseSupervisor::setMaxResponse(double maxResponse) {
   _maxResponse_ = maxResponse;
 }
 
-void DialResponseSupervisor::process(double& output_) const {
+double DialResponseSupervisor::process(double reponse_) const {
   // apply cap?
-  if     ( not std::isnan(_minResponse_) and output_ < _minResponse_ ){ output_ = _minResponse_; }
-  else if( not std::isnan(_maxResponse_) and output_ > _maxResponse_ ){ output_ = _maxResponse_; }
+  if     ( not std::isnan(_minResponse_) and reponse_ < _minResponse_ ){ return _minResponse_; }
+  else if( not std::isnan(_maxResponse_) and reponse_ > _maxResponse_ ){ return _maxResponse_; }
+
+  // else?
+
+  return reponse_;
 }
 
 std::string DialResponseSupervisor::getSummary() const{
