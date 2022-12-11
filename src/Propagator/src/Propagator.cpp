@@ -89,6 +89,14 @@ void Propagator::readConfigImpl(){
     else{
       for( auto& par : _parameterSetList_[iParSet].getParameterList() ){
         if( not par.isEnabled() ) continue;
+
+        // Check if no definition is present -> disable the parameter in that case
+        if( par.getDialDefinitionsList().empty() ) {
+          LogAlert << "Disabling \"" << par.getFullTitle() << "\": no dial definition." << std::endl;
+          par.setIsEnabled(false);
+          continue;
+        }
+
         for( const auto& dialDefinitionConfig : par.getDialDefinitionsList() ){
           _dialCollections_.emplace_back(&_parameterSetList_);
           _dialCollections_.back().setSupervisedParameterSetIndex( int(iParSet) );
@@ -302,7 +310,7 @@ void Propagator::initializeImpl() {
   LogInfo << "Filling up sample histograms..." << std::endl;
   _fitSampleSet_.updateSampleHistograms();
 
-  // Stat error -> BINNING SHOULD BE SET!!
+  // Throwing stat error on data -> BINNING SHOULD BE SET!!
   if( _throwAsimovToyParameters_ and _enableStatThrowInToys_ ){
     LogInfo << "Throwing statistical error for data container..." << std::endl;
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
@@ -321,10 +329,8 @@ void Propagator::initializeImpl() {
     sample.getDataContainer().isLocked = true;
   }
 
-
-  _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
-
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the plot generator") << std::endl;
+  _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
   _plotGenerator_.initialize();
 
   LogInfo << "Saving nominal histograms..." << std::endl;

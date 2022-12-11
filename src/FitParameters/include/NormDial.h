@@ -14,7 +14,7 @@ class NormDial : public Dial {
 
 public:
   explicit NormDial(const DialSet* owner_);
-  std::unique_ptr<Dial> clone() const override { return std::make_unique<NormDial>(*this); }
+  [[nodiscard]] std::unique_ptr<Dial> clone() const override { return std::make_unique<NormDial>(*this); }
 
   void initialize() override;
 

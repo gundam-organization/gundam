@@ -109,6 +109,7 @@ void EventDialCache::reweightEntry(std::pair<PhysicsEvent*, std::vector<std::pai
     if( std::isnan(dial_.second) or dial_.first->getInputBufferRef()->isDialUpdateRequested() ){
       dial_.second = dial_.first->evalResponse();
     }
+    LogThrowIf(std::isnan(dial_.second), "Invalid dial response for " << dial_.first->getSummary());
     entry_.first->getEventWeightRef() *= dial_.second;
   });
 }
