@@ -10,6 +10,8 @@
 #include "FitParameterSet.h"
 #include "PlotGenerator.h"
 #include "JsonBaseClass.h"
+#include "DialCollection.h"
+#include "EventDialCache.h"
 
 #include "TChain.h"
 
@@ -32,7 +34,7 @@ struct DataDispenserParameters{
   std::vector<std::string> dummyVariablesList;
   int iThrow{-1};
 
-  std::string getSummary() const{
+  [[nodiscard]] std::string getSummary() const{
     std::stringstream ss;
     ss << GET_VAR_NAME_VALUE(useMcContainer);
     ss << std::endl << GET_VAR_NAME_VALUE(name);
@@ -54,6 +56,7 @@ struct DataDispenserCache{
   std::vector<GenericToolbox::CopiableAtomic<size_t>> sampleIndexOffsetList;
   std::vector< std::vector<PhysicsEvent>* > sampleEventListPtrToFill;
   std::map<FitParameterSet*, std::vector<DialSet*>> dialSetPtrMap;
+  std::vector<DialCollection*> dialCollectionsRefList{};
 
   std::vector<std::string> varsRequestedForIndexing{};
   std::vector<std::string> varsRequestedForStorage{};
@@ -92,12 +95,14 @@ public:
   explicit DataDispenser(DatasetLoader* owner_);
   void setOwner(DatasetLoader* owner_){ _owner_ = owner_; }
 
-  const DataDispenserParameters &getParameters() const;
+  [[nodiscard]] const DataDispenserParameters &getParameters() const;
   DataDispenserParameters &getParameters();
 
   void setSampleSetPtrToLoad(FitSampleSet *sampleSetPtrToLoad);
   void setParSetPtrToLoad(std::vector<FitParameterSet> *parSetListPtrToLoad_);
+  void setDialCollectionListPtr(std::vector<DialCollection> *dialCollectionListPtr);
   void setPlotGenPtr(PlotGenerator *plotGenPtr);
+  void setEventDialCache(EventDialCache* eventDialCache_);
 
   std::string getTitle();
 
@@ -114,6 +119,8 @@ protected:
   void preAllocateMemory();
   void readAndFill();
 
+  void fillFunction(int iThread_);
+
 private:
   // Parameters
   DataDispenserParameters _parameters_;
@@ -122,7 +129,10 @@ private:
   DatasetLoader* _owner_{nullptr};
   FitSampleSet* _sampleSetPtrToLoad_{nullptr};
   std::vector<FitParameterSet>* _parSetListPtrToLoad_{nullptr};
+  std::vector<DialCollection>* _dialCollectionListPtr_{nullptr};
   PlotGenerator* _plotGenPtr_{nullptr}; // used to know which vars have to be kept in memory
+  EventDialCache* _eventDialCacheRef_{nullptr};
+
   DataDispenserCache _cache_;
 
 };

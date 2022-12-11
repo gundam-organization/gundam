@@ -5,10 +5,16 @@
 #include "EventVarTransform.h"
 #include "DataDispenser.h"
 #include "GlobalVariables.h"
-#include "SplineDial.h"
-#include "GraphDial.h"
 #include "DatasetLoader.h"
 #include "JsonUtils.h"
+
+#if USE_NEW_DIALS
+#include "DialCollection.h"
+#include "DialTypes.h"
+#else
+#include "SplineDial.h"
+#include "GraphDial.h"
+#endif
 
 #include "GenericToolbox.Root.TreeEntryBuffer.h"
 #include "GenericToolbox.Root.h"
@@ -67,8 +73,14 @@ void DataDispenser::setSampleSetPtrToLoad(FitSampleSet *sampleSetPtrToLoad) {
 void DataDispenser::setParSetPtrToLoad(std::vector<FitParameterSet> *parSetListPtrToLoad_) {
   _parSetListPtrToLoad_ = parSetListPtrToLoad_;
 }
+void DataDispenser::setDialCollectionListPtr(std::vector<DialCollection> *dialCollectionListPtr) {
+  _dialCollectionListPtr_ = dialCollectionListPtr;
+}
 void DataDispenser::setPlotGenPtr(PlotGenerator *plotGenPtr) {
   _plotGenPtr_ = plotGenPtr;
+}
+void DataDispenser::setEventDialCache(EventDialCache* eventDialCache_) {
+  _eventDialCacheRef_ = eventDialCache_;
 }
 
 void DataDispenser::load(){
@@ -380,6 +392,28 @@ void DataDispenser::doEventSelection(){
 void DataDispenser::fetchRequestedLeaves(){
   LogWarning << "Poll every objects for requested variables..." << std::endl;
 
+#if USE_NEW_DIALS
+  if( _dialCollectionListPtr_ != nullptr ) {
+    std::vector<std::string> indexRequests;
+    for( auto& dialCollection : *_dialCollectionListPtr_ ) {
+      if( dialCollection.getApplyConditionFormula() != nullptr ) {
+        for( int iPar = 0 ; iPar < dialCollection.getApplyConditionFormula()->GetNpar() ; iPar++ ){
+          GenericToolbox::addIfNotInVector(dialCollection.getApplyConditionFormula()->GetParName(iPar), indexRequests);
+        }
+      }
+      if( not dialCollection.getGlobalDialLeafName().empty() ){
+        GenericToolbox::addIfNotInVector(dialCollection.getGlobalDialLeafName(), indexRequests);
+      }
+      for( auto& bin : dialCollection.getDialBinSet().getBinsList() ) {
+        for( auto& var : bin.getVariableNameList() ) {
+          GenericToolbox::addIfNotInVector(var, indexRequests);
+        }
+      }
+    }
+    LogInfo << "DialCollection requests for indexing: " << GenericToolbox::parseVectorAsString(indexRequests) << std::endl;
+    for( auto& var : indexRequests ){ _cache_.addVarRequestedForIndexing(var); }
+  }
+#else
   // parSet
   if( _parSetListPtrToLoad_ != nullptr ){
     std::vector<std::string> indexRequests;
@@ -410,13 +444,13 @@ void DataDispenser::fetchRequestedLeaves(){
             }
           } // dial
         }
-
       } // par
     } // parSet
 
     LogInfo << "ParameterSets requests for indexing: " << GenericToolbox::parseVectorAsString(indexRequests) << std::endl;
     for( auto& var : indexRequests ){ _cache_.addVarRequestedForIndexing(var); }
   }
+#endif
 
   // sample binning
   if( _sampleSetPtrToLoad_ != nullptr ){
@@ -549,6 +583,9 @@ void DataDispenser::preAllocateMemory(){
   eventPlaceholder.setCommonLeafNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
   auto copyDict = eventPlaceholder.generateDict(tBuf, _parameters_.overrideLeafDict);
   eventPlaceholder.copyData(copyDict);
+
+#if USE_NEW_DIALS
+#else
   if( _parSetListPtrToLoad_ != nullptr ){
     size_t dialCacheSize = 0;
     for( auto& parSet : *_parSetListPtrToLoad_ ){
@@ -556,6 +593,7 @@ void DataDispenser::preAllocateMemory(){
     }
     eventPlaceholder.getRawDialPtrList().resize(dialCacheSize);
   }
+#endif
 
   _cache_.sampleIndexOffsetList.resize(_cache_.samplesToFillList.size());
   _cache_.sampleEventListPtrToFill.resize(_cache_.samplesToFillList.size());
@@ -568,6 +606,83 @@ void DataDispenser::preAllocateMemory(){
     container->reserveEventMemory(_owner_->getDataSetIndex(), _cache_.sampleNbOfEvents[iSample], eventPlaceholder);
   }
 
+  size_t nEvents = treeChain.GetEntries();
+#if USE_NEW_DIALS
+  // DEV
+  LogThrowIf(_eventDialCacheRef_ == nullptr, "Event dial cache ref not set.");
+  if( _dialCollectionListPtr_ != nullptr ){
+    LogInfo << "Claiming memory for event-by-event dials (DIAL COLLECTIONS)..." << std::endl;
+    double eventByEventDialSize{0};
+    size_t nDialsMaxPerEvent{0};
+    for( auto& dialCollection : *_dialCollectionListPtr_ ){
+      nDialsMaxPerEvent += 1;
+      if( dialCollection.isDatasetValid(_owner_->getName()) ){
+
+        if( dialCollection.isBinned() ){
+          // Filling var indexes for faster eval with PhysicsEvent:
+          for( auto& bin : dialCollection.getDialBinSet().getBinsList() ){
+            std::vector<int> varIndexes;
+            for( auto& var : bin.getVariableNameList() ){
+              varIndexes.emplace_back(GenericToolbox::findElementIndex(var, _cache_.varsRequestedForIndexing));
+            }
+            bin.setEventVarIndexCache(varIndexes);
+          }
+        }
+        else if( not dialCollection.getGlobalDialLeafName().empty() ){
+          // Reserve memory for additional dials (those on a tree leaf)
+          auto dialType = dialCollection.getGlobalDialType();
+          LogInfo << dialCollection.getTitle() << ": creating " << nEvents;
+          LogInfo << " " << dialType;
+
+          if     ( dialType == "Spline" ){
+            dialCollection.getDialBaseList().clear();
+            double dialsSizeInRam{0};
+            if(dialCollection.useCachedDials() ){
+              dialsSizeInRam = double(nEvents) * sizeof(SplineCache);
+              dialCollection.getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(SplineCache()));
+            }
+            else{
+              dialsSizeInRam = double(nEvents) * sizeof(Spline);
+              dialCollection.getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(Spline()));
+            }
+
+            eventByEventDialSize += dialsSizeInRam;
+            LogInfo << " dials (" << GenericToolbox::parseSizeUnits( dialsSizeInRam ) << ")" << std::endl;
+
+          }
+          else if( dialType == "Graph" ){
+            dialCollection.getDialBaseList().clear();
+            double dialsSizeInRam{0};
+            if(dialCollection.useCachedDials() ){
+              dialsSizeInRam = double(nEvents) * sizeof(GraphCache);
+              dialCollection.getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(GraphCache()));
+            }
+            else{
+              dialsSizeInRam = double(nEvents) * sizeof(Graph);
+              dialCollection.getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(Graph()));
+            }
+
+            eventByEventDialSize += dialsSizeInRam;
+            LogInfo << " dials (" << GenericToolbox::parseSizeUnits( dialsSizeInRam ) << ")" << std::endl;
+
+          }
+          else{
+            LogInfo << std::endl;
+            LogThrow("Invalid dial type for event-by-event dial: " << dialType);
+          }
+
+        }
+        else{
+          LogThrow("DEV ERROR: not binned, not event-by-event?");
+        }
+
+        _cache_.dialCollectionsRefList.emplace_back( &dialCollection );
+      }
+    }
+    _eventDialCacheRef_->allocateCacheEntries(nEvents, nDialsMaxPerEvent);
+    LogInfo << "Event-by-event dials take " << GenericToolbox::parseSizeUnits(eventByEventDialSize) << " in RAM." << std::endl;
+  }
+#else
   // DIALS
   DialSet* dialSetPtr;
   if( _parSetListPtrToLoad_ != nullptr ){
@@ -595,7 +710,7 @@ void DataDispenser::preAllocateMemory(){
           if( not dialSetPtr->getDialLeafName().empty() ){
 
             auto dialType = dialSetPtr->getGlobalDialType();
-            size_t nEvents = treeChain.GetEntries();
+
             LogInfo << par.getFullTitle() << ": creating " << nEvents;
             LogInfo << " " << DialType::DialTypeEnumNamespace::toString(dialType, true);
 
@@ -625,6 +740,8 @@ void DataDispenser::preAllocateMemory(){
     }
     LogInfo << "Event-by-event dials take " << GenericToolbox::parseSizeUnits(eventByEventDialSize) << " in RAM." << std::endl;
   }
+#endif
+
 }
 void DataDispenser::readAndFill(){
   LogWarning << "Reading dataset and loading..." << std::endl;
@@ -633,361 +750,481 @@ void DataDispenser::readAndFill(){
     LogInfo << "Nominal weight: \"" << _parameters_.nominalWeightFormulaStr << "\"" << std::endl;
   }
 
-  ROOT::EnableThreadSafety();
-  auto fillFunction = [&](int iThread_){
+  LogWarning << "Loading and indexing..." << std::endl;
+  if( GlobalVariables::getNbThreads() > 1 ){
+    ROOT::EnableThreadSafety();
+    std::function<void(int)> f = [&](int iThread_){ this->fillFunction(iThread_); };
+    GlobalVariables::getParallelWorker().addJob(__METHOD_NAME__, f);
+    GlobalVariables::getParallelWorker().runJob(__METHOD_NAME__);
+    GlobalVariables::getParallelWorker().removeJob(__METHOD_NAME__);
+  }
+  else{
+    this->fillFunction(0); // for better debug breakdown
+  }
 
-    int nThreads = GlobalVariables::getNbThreads();
-    if( iThread_ == -1 ){
-      iThread_ = 0;
-      nThreads = 1;
-    }
+  LogInfo << "Shrinking lists..." << std::endl;
+  for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
+    auto* container = &_cache_.samplesToFillList[iSample]->getDataContainer();
+    if(_parameters_.useMcContainer) container = &_cache_.samplesToFillList[iSample]->getMcContainer();
+    container->shrinkEventList(_cache_.sampleIndexOffsetList[iSample]);
+  }
 
-    TChain treeChain(_parameters_.treePath.c_str());
-    for( const auto& file: _parameters_.filePathList){ treeChain.Add(file.c_str()); }
+#if USE_NEW_DIALS
+  LogInfo << "Resizing dial containers..." << std::endl;
+  for( auto& dialCollection : *_dialCollectionListPtr_ ) {
+    if( not dialCollection.isBinned() ){ dialCollection.resizeContainers(); }
+  }
 
-    TTreeFormula* threadNominalWeightFormula{nullptr};
-    TList objToNotify;
-    treeChain.SetNotify(&objToNotify);
+  LogInfo << "Build reference cache..." << std::endl;
+  _eventDialCacheRef_->buildReferenceCache(*_sampleSetPtrToLoad_, *_dialCollectionListPtr_);
+#endif
+}
+void DataDispenser::fillFunction(int iThread_){
 
+  int nThreads = GlobalVariables::getNbThreads();
+  if( iThread_ == -1 ){
+    iThread_ = 0;
+    nThreads = 1;
+  }
+
+  TChain treeChain(_parameters_.treePath.c_str());
+  for( const auto& file: _parameters_.filePathList){ treeChain.Add(file.c_str()); }
+
+  TTreeFormula* threadNominalWeightFormula{nullptr};
+  TList objToNotify;
+  treeChain.SetNotify(&objToNotify);
+
+  treeChain.SetBranchStatus("*", false);
+
+  if( not _parameters_.nominalWeightFormulaStr.empty() ){
+    treeChain.SetBranchStatus("*", true);
+    threadNominalWeightFormula = new TTreeFormula(
+        Form("NominalWeightFormula%i", iThread_),
+        _parameters_.nominalWeightFormulaStr.c_str(),
+        &treeChain
+    );
+
+    // ROOT Hot fix: https://root-forum.cern.ch/t/ttreeformula-evalinstance-return-0-0/16366/10
+    threadNominalWeightFormula->GetNdata();
+
+    LogThrowIf(threadNominalWeightFormula->GetNdim() == 0,
+               "\"" <<  _parameters_.nominalWeightFormulaStr << "\" could not be parsed by the TChain");
+    objToNotify.Add(threadNominalWeightFormula); // memory handled here!
     treeChain.SetBranchStatus("*", false);
+    GenericToolbox::enableSelectedBranches(&treeChain, threadNominalWeightFormula);
+  }
 
-    if( not _parameters_.nominalWeightFormulaStr.empty() ){
-      treeChain.SetBranchStatus("*", true);
-      threadNominalWeightFormula = new TTreeFormula(
-          Form("NominalWeightFormula%i", iThread_),
-          _parameters_.nominalWeightFormulaStr.c_str(),
-          &treeChain
+  // TTree data buffer
+  auto tEventBuffer = this->generateTreeEventBuffer(&treeChain, _cache_.varsRequestedForIndexing);
+
+  // Event Var Transform
+  auto eventVarTransformList = _cache_.eventVarTransformList; // copy for cache
+  std::vector<EventVarTransformLib*> varTransformForIndexingList;
+  std::vector<EventVarTransformLib*> varTransformForStorageList;
+  for( auto& eventVarTransform : eventVarTransformList ){
+    if( GenericToolbox::doesElementIsInVector(eventVarTransform.getOutputVariableName(), _cache_.varsRequestedForIndexing) ){
+      varTransformForIndexingList.emplace_back(&eventVarTransform);
+    }
+    if( GenericToolbox::doesElementIsInVector(eventVarTransform.getOutputVariableName(), _cache_.varsRequestedForStorage) ){
+      varTransformForStorageList.emplace_back(&eventVarTransform);
+    }
+  }
+
+  if( iThread_ == 0 ){
+    if( not varTransformForIndexingList.empty() ){
+      LogInfo << "EventVarTransformLib used for indexing: "
+              << GenericToolbox::iterableToString(
+                  varTransformForIndexingList,
+                  [](const EventVarTransformLib* elm_){ return "\"" + elm_->getTitle() + "\"";}, false)
+              << std::endl;
+    }
+    if( not varTransformForStorageList.empty() ){
+      LogInfo << "EventVarTransformLib used for storage: "
+              << GenericToolbox::iterableToString(
+                  varTransformForStorageList,
+                  []( const EventVarTransformLib* elm_){ return "\"" + elm_->getTitle() + "\""; }, false)
+              << std::endl;
+    }
+  }
+
+  // buffer that will store the data for indexing
+  PhysicsEvent eventBuffer;
+  eventBuffer.setDataSetIndex(_owner_->getDataSetIndex());
+  eventBuffer.setCommonLeafNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForIndexing));
+  auto copyDict = eventBuffer.generateDict(tEventBuffer, _parameters_.overrideLeafDict);
+  if(iThread_ == 0){
+    LogInfo << "Feeding event variables with:" << std::endl;
+    GenericToolbox::TablePrinter t;
+    t.setColTitles({{"Variable"}, {"Leaf"}, {"Transforms"}});
+    for( size_t iVar = 0 ; iVar < eventBuffer.getCommonLeafNameListPtr()->size() ; iVar++ ){
+      std::string variableName = (*eventBuffer.getCommonLeafNameListPtr())[iVar];
+      t << variableName << std::endl;
+
+      t << copyDict[iVar].first->getLeafFullName();
+      if(copyDict[iVar].second != -1) t << "[" << copyDict[iVar].second << "]";
+      t << std::endl;
+
+      std::vector<std::string> transformsList;
+      for( auto* varTransformForIndexing : varTransformForIndexingList ){
+        if( varTransformForIndexing->getOutputVariableName() == variableName ){
+          transformsList.emplace_back(varTransformForIndexing->getTitle());
+        }
+      }
+      t << GenericToolbox::parseVectorAsString(transformsList);
+
+      if( GenericToolbox::doesElementIsInVector(variableName, _cache_.varsRequestedForStorage)){
+        t.setColorBuffer(GenericToolbox::ColorCodes::blueBackground);
+      }
+      else if(
+          copyDict[iVar].first->getLeafTypeName() == "TClonesArray"
+          or copyDict[iVar].first->getLeafTypeName() == "TGraph"
+          ){
+        t.setColorBuffer(GenericToolbox::ColorCodes::magentaBackground);
+      }
+
+      t << std::endl;
+    }
+
+    t.printTable();
+    LogInfo(Logger::Color::BG_BLUE) << "      " << Logger::getColorEscapeCode(Logger::Color::RESET) << " -> Variables stored in RAM" << std::endl;
+    LogInfo(Logger::Color::BG_MAGENTA) << "      " << Logger::getColorEscapeCode(Logger::Color::RESET) << " -> Dials stored in RAM" << std::endl;
+  }
+  eventBuffer.copyData(copyDict); // resize array obj
+  eventBuffer.resizeVarToDoubleCache();
+
+  // only here to create a dictionary to copy data from the TTree that should store in RAM
+  PhysicsEvent evStore;
+  evStore.setDataSetIndex(_owner_->getDataSetIndex());
+  evStore.setCommonLeafNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
+  auto copyStoreDict = evStore.generateDict(tEventBuffer, _parameters_.overrideLeafDict);
+
+  // Will keep track of a picked event pointer
+  PhysicsEvent* eventPtr{nullptr};
+
+  size_t sampleEventIndex;
+  int threadDialIndex;
+
+  // Loop vars
+  bool foundValidDialAmongTheSet{true};
+  int lastFailedBinVarIndex{-1}; int lastEventVarIndex{-1};
+  const std::pair<double, double>* lastEdges{nullptr};
+  size_t iVar{0};
+  size_t iSample{0}, nSample{_cache_.samplesToFillList.size()};
+  size_t iTransform{0}, nTransform{_cache_.eventVarTransformList.size()};
+
+  // Dials
+  size_t eventDialOffset;
+  size_t iDialSet, iDial;
+  size_t nBinEdges;
+  TGraph* grPtr{nullptr};
+
+  // Bin searches
+  const std::vector<DataBin>* binsListPtr;
+  std::vector<DataBin>::const_iterator binFoundItr;
+  auto isBinValid = [&](const DataBin& b_){
+    for( iVar = 0 ; iVar < b_.getVariableNameList().size() ; iVar++ ){
+      if( not b_.isBetweenEdges(iVar, eventBuffer.getVarAsDouble(b_.getVariableNameList()[iVar])) ){
+        return false;
+      }
+    } // Var
+    return true;
+  };
+
+  // Dial bin search
+  DataBin* dataBin{nullptr};
+#if USE_NEW_DIALS
+  size_t freeSlotDial{0};
+  size_t iCollection(-1);
+  std::pair<std::pair<size_t, size_t>, std::vector<std::pair<size_t, size_t>>>* eventDialCacheEntry;
+  std::vector<DataBin>::iterator dial2FoundItr;
+  auto isDial2Valid = [&](const DataBin& d_){
+    nBinEdges = d_.getEdgesList().size();
+    for( iVar = 0 ; iVar < nBinEdges ; iVar++ ){
+      if( not DataBin::isBetweenEdges(
+          d_.getEdgesList()[iVar],
+          eventBuffer.getVarAsDouble( d_.getEventVarIndexCache()[iVar] ) )
+          ){
+        return false;
+      }
+    }
+    return true;
+  };
+#else
+  SplineDial* spDialPtr{nullptr};
+  GraphDial* grDialPtr{nullptr};
+  DialSet* dialSetPtr;
+  std::vector<DialWrapper>::iterator dialFoundItr;
+  auto isDialValid = [&](const DialWrapper& d_){
+    dataBin = d_->getApplyConditionBinPtr();
+    nBinEdges = dataBin->getEdgesList().size();
+    for( iVar = 0 ; iVar < nBinEdges ; iVar++ ){
+      if( not DataBin::isBetweenEdges(
+          dataBin->getEdgesList()[iVar],
+          eventBuffer.getVarAsDouble( dataBin->getEventVarIndexCache()[iVar] ) )
+          ){
+        return false;
+      }
+    }
+    return true;
+  };
+#endif
+
+  // Formula
+  std::vector<std::shared_ptr<TFormula>> varSelectionFormulaList{};
+  for( auto* sample : _cache_.samplesToFillList ){
+    varSelectionFormulaList.emplace_back(nullptr);
+    if( not sample->getVarSelectionFormulaStr().empty() ){
+      varSelectionFormulaList.back() = std::make_shared<TFormula>(
+          Form("%s_%i_VarSelectionFormula", sample->getName().c_str(), iThread_),
+          sample->getVarSelectionFormulaStr().c_str()
       );
-
-      // ROOT Hot fix: https://root-forum.cern.ch/t/ttreeformula-evalinstance-return-0-0/16366/10
-      threadNominalWeightFormula->GetNdata();
-
-      LogThrowIf(threadNominalWeightFormula->GetNdim() == 0,
-                 "\"" <<  _parameters_.nominalWeightFormulaStr << "\" could not be parsed by the TChain");
-      objToNotify.Add(threadNominalWeightFormula); // memory handled here!
-      treeChain.SetBranchStatus("*", false);
-      GenericToolbox::enableSelectedBranches(&treeChain, threadNominalWeightFormula);
+      LogInfo(iThread_==0) << "Var selection formula for " << sample->getName() << ": \"" << sample->getVarSelectionFormulaStr() << "\"" << std::endl;
     }
+  }
 
-    // TTree data buffer
-    auto tEventBuffer = this->generateTreeEventBuffer(&treeChain, _cache_.varsRequestedForIndexing);
+  // Try to read TTree the closest to sequentially possible
+  Long64_t nEvents = treeChain.GetEntries();
+  Long64_t nEventPerThread = nEvents/Long64_t(nThreads);
+  Long64_t iEnd = nEvents;
+  Long64_t iStart = Long64_t(iThread_)*nEventPerThread;
+  if( iThread_+1 != nThreads ) iEnd = (Long64_t(iThread_)+1)*nEventPerThread;
+  Long64_t iGlobal = 0;
 
-    // Event Var Transform
-    auto eventVarTransformList = _cache_.eventVarTransformList; // copy for cache
-    std::vector<EventVarTransformLib*> varTransformForIndexingList;
-    std::vector<EventVarTransformLib*> varTransformForStorageList;
-    for( auto& eventVarTransform : eventVarTransformList ){
-      if( GenericToolbox::doesElementIsInVector(eventVarTransform.getOutputVariableName(), _cache_.varsRequestedForIndexing) ){
-        varTransformForIndexingList.emplace_back(&eventVarTransform);
-      }
-      if( GenericToolbox::doesElementIsInVector(eventVarTransform.getOutputVariableName(), _cache_.varsRequestedForStorage) ){
-        varTransformForStorageList.emplace_back(&eventVarTransform);
-      }
-    }
+  // Load the branches
+  treeChain.LoadTree(iStart);
+
+  // IO speed monitor
+  GenericToolbox::VariableMonitor readSpeed("bytes");
+  Int_t nBytes;
+
+  std::string progressTitle = "Loading and indexing...";
+  std::stringstream ssProgressBar;
+
+  for(Long64_t iEntry = iStart ; iEntry < iEnd ; iEntry++ ){
 
     if( iThread_ == 0 ){
-      if( not varTransformForIndexingList.empty() ){
-        LogInfo << "EventVarTransformLib used for indexing: "
-                << GenericToolbox::iterableToString(
-                    varTransformForIndexingList,
-                    [](const EventVarTransformLib* elm_){ return "\"" + elm_->getTitle() + "\"";}, false)
-                << std::endl;
+      if( GenericToolbox::showProgressBar(iGlobal, nEvents) ){
+
+        ssProgressBar.str("");
+
+        ssProgressBar << LogInfo.getPrefixString() << "Reading from disk: "
+                      << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.getTotalAccumulated()), 8) << " ("
+                      << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.evalTotalGrowthRate()), 8) << "/s)";
+
+        int cpuPercent = int(GenericToolbox::getCpuUsageByProcess());
+        ssProgressBar << " / CPU efficiency: " << GenericToolbox::padString(std::to_string(cpuPercent/nThreads), 3,' ')
+                      << "% / RAM: " << GenericToolbox::parseSizeUnits( double(GenericToolbox::getProcessMemoryUsage()) ) << std::endl;
+
+        ssProgressBar << LogInfo.getPrefixString() << progressTitle;
+        GenericToolbox::displayProgressBar(iGlobal, nEvents, ssProgressBar.str());
       }
-      if( not varTransformForStorageList.empty() ){
-        LogInfo << "EventVarTransformLib used for storage: "
-                << GenericToolbox::iterableToString(
-                    varTransformForStorageList,
-                    []( const EventVarTransformLib* elm_){ return "\"" + elm_->getTitle() + "\""; }, false)
-                << std::endl;
-      }
+      iGlobal += nThreads;
     }
 
-    // buffer that will store the data for indexing
-    PhysicsEvent eventBuffer;
-    eventBuffer.setDataSetIndex(_owner_->getDataSetIndex());
-    eventBuffer.setCommonLeafNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForIndexing));
-    auto copyDict = eventBuffer.generateDict(tEventBuffer, _parameters_.overrideLeafDict);
-    if(iThread_ == 0){
-      LogInfo << "Feeding event variables with:" << std::endl;
-      GenericToolbox::TablePrinter t;
-      t.setColTitles({{"Variable"}, {"Leaf"}, {"Transforms"}});
-      for( size_t iVar = 0 ; iVar < eventBuffer.getCommonLeafNameListPtr()->size() ; iVar++ ){
-        std::string variableName = (*eventBuffer.getCommonLeafNameListPtr())[iVar];
-        t << variableName << std::endl;
-
-        t << copyDict[iVar].first->getLeafFullName();
-        if(copyDict[iVar].second != -1) t << "[" << copyDict[iVar].second << "]";
-        t << std::endl;
-
-        std::vector<std::string> transformsList;
-        for( auto* varTransformForIndexing : varTransformForIndexingList ){
-          if( varTransformForIndexing->getOutputVariableName() == variableName ){
-            transformsList.emplace_back(varTransformForIndexing->getTitle());
-          }
-        }
-        t << GenericToolbox::parseVectorAsString(transformsList);
-
-        if( GenericToolbox::doesElementIsInVector(variableName, _cache_.varsRequestedForStorage)){
-          t.setColorBuffer(GenericToolbox::ColorCodes::blueBackground);
-        }
-        else if(
-            copyDict[iVar].first->getLeafTypeName() == "TClonesArray"
-            or copyDict[iVar].first->getLeafTypeName() == "TGraph"
-            ){
-          t.setColorBuffer(GenericToolbox::ColorCodes::magentaBackground);
-        }
-
-        t << std::endl;
-      }
-
-      t.printTable();
-      LogInfo(Logger::Color::BG_BLUE) << "      " << Logger::getColorEscapeCode(Logger::Color::RESET) << " -> Variables stored in RAM" << std::endl;
-      LogInfo(Logger::Color::BG_MAGENTA) << "      " << Logger::getColorEscapeCode(Logger::Color::RESET) << " -> Dials stored in RAM" << std::endl;
+    bool skipEvent = true;
+    for( bool isInSample : _cache_.eventIsInSamplesList[iEntry] ){
+      if( isInSample ){ skipEvent = false; break; }
     }
-    eventBuffer.copyData(copyDict); // resize array obj
-    eventBuffer.resizeVarToDoubleCache();
+    if( skipEvent ) continue;
 
-    // only here to create a dictionary to copy data from the TTree that should store in RAM
-    PhysicsEvent evStore;
-    evStore.setDataSetIndex(_owner_->getDataSetIndex());
-    evStore.setCommonLeafNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
-    auto copyStoreDict = evStore.generateDict(tEventBuffer, _parameters_.overrideLeafDict);
+    nBytes = treeChain.GetEntry(iEntry);
 
-    // Will keep track of a picked event pointer
-    PhysicsEvent* eventPtr{nullptr};
+    // monitor
+    if( iThread_ == 0 ) readSpeed.addQuantity(nBytes*nThreads);
 
-    size_t sampleEventIndex;
-    int threadDialIndex;
+    if( threadNominalWeightFormula != nullptr ){
+      eventBuffer.setTreeWeight(threadNominalWeightFormula->EvalInstance());
+      if( eventBuffer.getTreeWeight() < 0 ){
+        LogError << "Negative nominal weight:" << std::endl;
 
-    // Loop vars
-    bool foundValidDialAmongTheSet{true};
-    int lastFailedBinVarIndex{-1}; int lastEventVarIndex{-1};
-    const std::pair<double, double>* lastEdges{nullptr};
-    size_t iVar{0};
-    size_t iSample{0}, nSample{_cache_.samplesToFillList.size()};
-    size_t iTransform{0}, nTransform{_cache_.eventVarTransformList.size()};
+        LogError << "Event buffer is: " << eventBuffer.getSummary() << std::endl;
 
-    // Dials
-    size_t eventDialOffset;
-    size_t iDialSet, iDial;
-    size_t nBinEdges;
-    TGraph* grPtr{nullptr};
-    SplineDial* spDialPtr{nullptr};
-    GraphDial* grDialPtr{nullptr};
-
-    // Bin searches
-    const std::vector<DataBin>* binsListPtr;
-    std::vector<DataBin>::const_iterator binFoundItr;
-    auto isBinValid = [&](const DataBin& b_){
-      for( iVar = 0 ; iVar < b_.getVariableNameList().size() ; iVar++ ){
-        if( not b_.isBetweenEdges(iVar, eventBuffer.getVarAsDouble(b_.getVariableNameList()[iVar])) ){
-          return false;
+        LogError << "Formula leaves:" << std::endl;
+        for( int iLeaf = 0 ; iLeaf < threadNominalWeightFormula->GetNcodes() ; iLeaf++ ){
+          if( threadNominalWeightFormula->GetLeaf(iLeaf) == nullptr ) continue; // for "Entry$" like dummy leaves
+          LogError << "Leaf: " << threadNominalWeightFormula->GetLeaf(iLeaf)->GetName() << "[0] = " << threadNominalWeightFormula->GetLeaf(iLeaf)->GetValue(0) << std::endl;
         }
-      } // Var
-      return true;
-    };
 
-    // Dial bin search
-    DialSet* dialSetPtr;
-    DataBin* dataBin{nullptr};
-    std::vector<DialWrapper>::iterator dialFoundItr;
-    auto isDialValid = [&](const DialWrapper& d_){
-      dataBin = d_->getApplyConditionBinPtr();
-      nBinEdges = dataBin->getEdgesList().size();
-      for( iVar = 0 ; iVar < nBinEdges ; iVar++ ){
-        if( not DataBin::isBetweenEdges(
-            dataBin->getEdgesList()[iVar],
-            eventBuffer.getVarAsDouble( dataBin->getEventVarIndexCache()[iVar] ) )
-            ){
-          return false;
-        }
+        LogThrow("Negative nominal weight");
       }
-      return true;
-    };
+      if( eventBuffer.getTreeWeight() == 0 ){
+        continue;
+      } // skip this event
+    }
 
-    // Formula
-    std::vector<std::shared_ptr<TFormula>> varSelectionFormulaList{};
-    for( auto* sample : _cache_.samplesToFillList ){
-      varSelectionFormulaList.emplace_back(nullptr);
-      if( not sample->getVarSelectionFormulaStr().empty() ){
-        varSelectionFormulaList.back() = std::make_shared<TFormula>(
-            Form("%s_%i_VarSelectionFormula", sample->getName().c_str(), iThread_),
-            sample->getVarSelectionFormulaStr().c_str()
+    for( iSample = 0 ; iSample < nSample ; iSample++ ){
+      if( _cache_.eventIsInSamplesList[iEntry][iSample] ){
+
+        // Reset bin index of the buffer
+        eventBuffer.setSampleBinIndex(-1);
+
+        // Getting loaded data in tEventBuffer
+        eventBuffer.copyData(copyDict);
+
+        // Propagate transformations for indexing
+        for( auto* varTransformPtr : varTransformForIndexingList ){
+          varTransformPtr->evalAndStore(eventBuffer);
+        }
+
+        // Sample variable
+        if( varSelectionFormulaList[iSample] != nullptr ){
+          if( eventBuffer.evalFormula( varSelectionFormulaList[iSample].get() ) == 0 ) break;
+        }
+
+
+        // Has valid bin?
+        binsListPtr = &_cache_.samplesToFillList[iSample]->getBinning().getBinsList();
+        binFoundItr = std::find_if(
+            binsListPtr->begin(),
+            binsListPtr->end(),
+            isBinValid
         );
-        LogInfo(iThread_==0) << "Var selection formula for " << sample->getName() << ": \"" << sample->getVarSelectionFormulaStr() << "\"" << std::endl;
-      }
-    }
 
-    // Try to read TTree the closest to sequentially possible
-    Long64_t nEvents = treeChain.GetEntries();
-    Long64_t nEventPerThread = nEvents/Long64_t(nThreads);
-    Long64_t iEnd = nEvents;
-    Long64_t iStart = Long64_t(iThread_)*nEventPerThread;
-    if( iThread_+1 != nThreads ) iEnd = (Long64_t(iThread_)+1)*nEventPerThread;
-    Long64_t iGlobal = 0;
-
-    // Load the branches
-    treeChain.LoadTree(iStart);
-
-    // IO speed monitor
-    GenericToolbox::VariableMonitor readSpeed("bytes");
-    Int_t nBytes;
-
-    std::string progressTitle = "Loading and indexing...";
-    std::stringstream ssProgressBar;
-
-    for(Long64_t iEntry = iStart ; iEntry < iEnd ; iEntry++ ){
-
-      if( iThread_ == 0 ){
-        if( GenericToolbox::showProgressBar(iGlobal, nEvents) ){
-
-          ssProgressBar.str("");
-
-          ssProgressBar << LogInfo.getPrefixString() << "Reading from disk: "
-                        << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.getTotalAccumulated()), 8) << " ("
-                        << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.evalTotalGrowthRate()), 8) << "/s)";
-
-          int cpuPercent = int(GenericToolbox::getCpuUsageByProcess());
-          ssProgressBar << " / CPU efficiency: " << GenericToolbox::padString(std::to_string(cpuPercent/nThreads), 3,' ')
-                        << "%" << std::endl;
-
-          ssProgressBar << LogInfo.getPrefixString() << progressTitle;
-          GenericToolbox::displayProgressBar(iGlobal, nEvents, ssProgressBar.str());
+        if (binFoundItr == binsListPtr->end()) {
+          // Invalid bin -> next sample
+          break;
         }
-        iGlobal += nThreads;
-      }
-
-      bool skipEvent = true;
-      for( bool isInSample : _cache_.eventIsInSamplesList[iEntry] ){
-        if( isInSample ){ skipEvent = false; break; }
-      }
-      if( skipEvent ) continue;
-
-      nBytes = treeChain.GetEntry(iEntry);
-
-      // monitor
-      if( iThread_ == 0 ) readSpeed.addQuantity(nBytes*nThreads);
-
-      if( threadNominalWeightFormula != nullptr ){
-        eventBuffer.setTreeWeight(threadNominalWeightFormula->EvalInstance());
-        if( eventBuffer.getTreeWeight() < 0 ){
-          LogError << "Negative nominal weight:" << std::endl;
-
-          LogError << "Event buffer is: " << eventBuffer.getSummary() << std::endl;
-
-          LogError << "Formula leaves:" << std::endl;
-          for( int iLeaf = 0 ; iLeaf < threadNominalWeightFormula->GetNcodes() ; iLeaf++ ){
-            if( threadNominalWeightFormula->GetLeaf(iLeaf) == nullptr ) continue; // for "Entry$" like dummy leaves
-            LogError << "Leaf: " << threadNominalWeightFormula->GetLeaf(iLeaf)->GetName() << "[0] = " << threadNominalWeightFormula->GetLeaf(iLeaf)->GetValue(0) << std::endl;
-          }
-
-          LogThrow("Negative nominal weight");
+        else {
+          // found bin
+          eventBuffer.setSampleBinIndex(int(std::distance(binsListPtr->begin(), binFoundItr)));
         }
-        if( eventBuffer.getTreeWeight() == 0 ){
-          continue;
-        } // skip this event
-      }
 
-      for( iSample = 0 ; iSample < nSample ; iSample++ ){
-        if( _cache_.eventIsInSamplesList[iEntry][iSample] ){
+        // OK, now we have a valid fit bin. Let's claim an index.
+        sampleEventIndex = _cache_.sampleIndexOffsetList[iSample]++;
 
-          // Reset bin index of the buffer
-          eventBuffer.setSampleBinIndex(-1);
+        // Get the next free event in our buffer
+        eventPtr = &(*_cache_.sampleEventListPtrToFill[iSample])[sampleEventIndex];
+        eventPtr->copyData(copyStoreDict); // buffer has the right size already
 
-          // Getting loaded data in tEventBuffer
-          eventBuffer.copyData(copyDict);
+        // Propagate transformation for storage -> use the previous results calculated for indexing
+        for( auto* varTransformPtr : varTransformForStorageList ){
+          varTransformPtr->storeCachedOutput(*eventPtr);
+        }
 
-          // Propagate transformations for indexing
-          for( auto* varTransformPtr : varTransformForIndexingList ){
-            varTransformPtr->evalAndStore(eventBuffer);
+        eventPtr->setEntryIndex(iEntry);
+        eventPtr->setSampleBinIndex(eventBuffer.getSampleBinIndex());
+        eventPtr->setTreeWeight(eventBuffer.getTreeWeight());
+        eventPtr->setNominalWeight(eventBuffer.getTreeWeight());
+        eventPtr->resetEventWeight();
+
+        // Now the event is ready. Let's index the dials:
+        eventDialOffset = 0;
+
+
+#if USE_NEW_DIALS
+        eventDialCacheEntry = _eventDialCacheRef_->fetchNextCacheEntry();
+        eventDialCacheEntry->first.first = iSample;
+        eventDialCacheEntry->first.second = sampleEventIndex;
+
+        iCollection = -1;
+        for( auto* dialCollectionRef : _cache_.dialCollectionsRefList ){
+          iCollection++;
+
+          if( not dialCollectionRef->isEnabled() ){ continue; }
+
+          if( dialCollectionRef->getApplyConditionFormula() != nullptr ){
+            if( eventBuffer.evalFormula(dialCollectionRef->getApplyConditionFormula().get()) == 0 ){
+              // next dialSet
+              continue;
+            }
           }
 
-          // Sample variable
-          if( varSelectionFormulaList[iSample] != nullptr ){
-            if( eventBuffer.evalFormula( varSelectionFormulaList[iSample].get() ) == 0 ) break;
+          if( dialCollectionRef->isBinned() ){
+
+            // is only one bin with no condition:
+            if( dialCollectionRef->getDialBaseList().size() == 1 ){
+              // if is it NOT a DialBinned -> this is the one we are supposed to use
+              if( dialCollectionRef->getDialBinSet().isEmpty() ){
+                eventDialCacheEntry->second[eventDialOffset].first = iCollection;
+                eventDialCacheEntry->second[eventDialOffset].second = 0;
+                eventDialOffset++;
+              }
+            }
+            else {
+              // -- probably the slowest part of the indexing: ----
+              dial2FoundItr = std::find_if(
+                  dialCollectionRef->getDialBinSet().getBinsList().begin(),
+                  dialCollectionRef->getDialBinSet().getBinsList().end(),
+                  isDial2Valid
+              );
+              // --------------------------------------------------
+
+              if (dial2FoundItr !=  dialCollectionRef->getDialBinSet().getBinsList().end()) {
+                // found DIAL -> get index
+                eventDialCacheEntry->second[eventDialOffset].first = iCollection;
+                eventDialCacheEntry->second[eventDialOffset].second = std::distance(
+                    dialCollectionRef->getDialBinSet().getBinsList().begin(), dial2FoundItr
+                );
+                eventDialOffset++;
+              }
+            }
           }
+          else if( not dialCollectionRef->getGlobalDialLeafName().empty() ){
+            // Event-by-event dial?
+            if     ( not strcmp(treeChain.GetLeaf(dialCollectionRef->getGlobalDialLeafName().c_str())->GetTypeName(), "TClonesArray") ){
+              grPtr = (TGraph*) eventBuffer.getVariable<TClonesArray*>(dialCollectionRef->getGlobalDialLeafName())->At(0);
+            }
+            else if( not strcmp(treeChain.GetLeaf(dialCollectionRef->getGlobalDialLeafName().c_str())->GetTypeName(), "TGraph") ){
+              grPtr = (TGraph*) eventBuffer.getVariable<TGraph*>(dialCollectionRef->getGlobalDialLeafName());
+            }
+            else{
+              LogThrow("Unsupported event-by-event dial type: " << treeChain.GetLeaf(dialCollectionRef->getGlobalDialLeafName().c_str())->GetTypeName() )
+            }
 
-
-          // Has valid bin?
-          binsListPtr = &_cache_.samplesToFillList[iSample]->getBinning().getBinsList();
-          binFoundItr = std::find_if(
-              binsListPtr->begin(),
-              binsListPtr->end(),
-              isBinValid
-          );
-
-          if (binFoundItr == binsListPtr->end()) {
-            // Invalid bin -> next sample
-            break;
-          }
-          else {
-            // found bin
-            eventBuffer.setSampleBinIndex(int(std::distance(binsListPtr->begin(), binFoundItr)));
-          }
-
-          // OK, now we have a valid fit bin. Let's claim an index.
-          sampleEventIndex = _cache_.sampleIndexOffsetList[iSample]++;
-
-          // Get the next free event in our buffer
-          eventPtr = &(*_cache_.sampleEventListPtrToFill[iSample])[sampleEventIndex];
-          eventPtr->copyData(copyStoreDict); // buffer has the right size already
-
-          // Propagate transformation for storage -> use the previous results calculated for indexing
-          for( auto* varTransformPtr : varTransformForStorageList ){
-            varTransformPtr->storeCachedOutput(*eventPtr);
-          }
-
-          eventPtr->setEntryIndex(iEntry);
-          eventPtr->setSampleBinIndex(eventBuffer.getSampleBinIndex());
-          eventPtr->setTreeWeight(eventBuffer.getTreeWeight());
-          eventPtr->setNominalWeight(eventBuffer.getTreeWeight());
-          eventPtr->resetEventWeight();
-
-          // Now the event is ready. Let's index the dials:
-          eventDialOffset = 0;
-          // Loop over the parameter Sets (the ones which have a valid dialSet for this dataSet)
-          for( auto& dialSetPair : _cache_.dialSetPtrMap ){
-            for( iDialSet = 0 ; iDialSet < dialSetPair.second.size() ; iDialSet++ ){
-              dialSetPtr = dialSetPair.second[iDialSet];
-
-              if( dialSetPtr->getApplyConditionFormula() != nullptr ){
-                if( eventBuffer.evalFormula(dialSetPtr->getApplyConditionFormula()) == 0 ){
-                  // next dialSet
-                  continue;
+            // loaded graph is valid?
+            if( grPtr != nullptr and not GenericToolbox::isFlatAndOne(grPtr) ){
+              freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
+              if      ( dialCollectionRef->getGlobalDialType() == "Spline" ){
+                if(dialCollectionRef->useCachedDials() ) {
+                  ( (SplineCache*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->createSpline( grPtr );
+                }
+                else{
+                  ( (Spline*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->createSpline( grPtr );
                 }
               }
-
-              if( not dialSetPtr->getDialLeafName().empty() ){
-                // Event-by-event dial?
-                if     ( not strcmp(treeChain.GetLeaf(dialSetPtr->getDialLeafName().c_str())->GetTypeName(), "TClonesArray") ){
-                  grPtr = (TGraph*) eventBuffer.getVariable<TClonesArray*>(dialSetPtr->getDialLeafName())->At(0);
-                  if(grPtr->GetN() > 1){
-                    if     ( dialSetPtr->getGlobalDialType() == DialType::Spline ){
-                      spDialPtr = (SplineDial*) dialSetPtr->getDialList()[iEntry].get();
-                      spDialPtr->createSpline( grPtr );
-                      spDialPtr->initialize();
-                      spDialPtr->setIsReferenced(true);
-                      // Adding dial in the event
-                      eventPtr->getRawDialPtrList()[eventDialOffset++] = spDialPtr;
-                    }
-                    else if( dialSetPtr->getGlobalDialType() == DialType::Graph ){
-                      grDialPtr = (GraphDial*) dialSetPtr->getDialList()[iEntry].get();
-                      grDialPtr->setGraph(*grPtr);
-                      grDialPtr->initialize();
-                      grDialPtr->setIsReferenced(true);
-                      // Adding dial in the event
-                      eventPtr->getRawDialPtrList()[eventDialOffset++] = grDialPtr;
-                    }
-                    else{
-                      LogThrow("Unsupported event-by-event dial: " << DialType::DialTypeEnumNamespace::toString(dialSetPtr->getGlobalDialType()))
-                    }
-                  }
+              else if ( dialCollectionRef->getGlobalDialType() == "Graph" ){
+                if(dialCollectionRef->useCachedDials() ) {
+                  ( (GraphCache*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->setGraph( *grPtr );
                 }
-                else if( not strcmp(treeChain.GetLeaf(dialSetPtr->getDialLeafName().c_str())->GetTypeName(), "TGraph") ){
-                  grPtr = (TGraph*) eventBuffer.getVariable<TGraph*>(dialSetPtr->getDialLeafName());
+                else{
+                  ( (Graph*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->setGraph( *grPtr );
+                }
+              }
+              else{
+                LogThrow( "Unsupported event-by-event dial: " << dialCollectionRef->getGlobalDialType() );
+              }
+              eventDialCacheEntry->second[eventDialOffset].first = iCollection;
+              eventDialCacheEntry->second[eventDialOffset].second = freeSlotDial;
+              eventDialOffset++;
+            }
+
+          }
+          else{
+            LogThrow("not an event by event dial, nor binned");
+          }
+
+        }
+#else
+        // Loop over the parameter Sets (the ones which have a valid dialSet for this dataSet)
+        for( auto& dialSetPair : _cache_.dialSetPtrMap ){
+          for( iDialSet = 0 ; iDialSet < dialSetPair.second.size() ; iDialSet++ ){
+            dialSetPtr = dialSetPair.second[iDialSet];
+
+            if( dialSetPtr->getApplyConditionFormula() != nullptr ){
+              if( eventBuffer.evalFormula(dialSetPtr->getApplyConditionFormula()) == 0 ){
+                // next dialSet
+                continue;
+              }
+            }
+
+            if( not dialSetPtr->getDialLeafName().empty() ){
+              // Event-by-event dial?
+              if     ( not strcmp(treeChain.GetLeaf(dialSetPtr->getDialLeafName().c_str())->GetTypeName(), "TClonesArray") ){
+                grPtr = (TGraph*) eventBuffer.getVariable<TClonesArray*>(dialSetPtr->getDialLeafName())->At(0);
+                if(grPtr->GetN() > 1){
                   if     ( dialSetPtr->getGlobalDialType() == DialType::Spline ){
                     spDialPtr = (SplineDial*) dialSetPtr->getDialList()[iEntry].get();
-                    spDialPtr->createSpline(grPtr);
+                    spDialPtr->createSpline( grPtr );
                     spDialPtr->initialize();
                     spDialPtr->setIsReferenced(true);
                     // Adding dial in the event
@@ -1005,69 +1242,80 @@ void DataDispenser::readAndFill(){
                     LogThrow("Unsupported event-by-event dial: " << DialType::DialTypeEnumNamespace::toString(dialSetPtr->getGlobalDialType()))
                   }
                 }
+              }
+              else if( not strcmp(treeChain.GetLeaf(dialSetPtr->getDialLeafName().c_str())->GetTypeName(), "TGraph") ){
+                grPtr = (TGraph*) eventBuffer.getVariable<TGraph*>(dialSetPtr->getDialLeafName());
+                if     ( dialSetPtr->getGlobalDialType() == DialType::Spline ){
+                  spDialPtr = (SplineDial*) dialSetPtr->getDialList()[iEntry].get();
+                  spDialPtr->createSpline(grPtr);
+                  spDialPtr->initialize();
+                  spDialPtr->setIsReferenced(true);
+                  // Adding dial in the event
+                  eventPtr->getRawDialPtrList()[eventDialOffset++] = spDialPtr;
+                }
+                else if( dialSetPtr->getGlobalDialType() == DialType::Graph ){
+                  grDialPtr = (GraphDial*) dialSetPtr->getDialList()[iEntry].get();
+                  grDialPtr->setGraph(*grPtr);
+                  grDialPtr->initialize();
+                  grDialPtr->setIsReferenced(true);
+                  // Adding dial in the event
+                  eventPtr->getRawDialPtrList()[eventDialOffset++] = grDialPtr;
+                }
                 else{
-                  LogThrow("Unsupported event-by-event dial type: " << treeChain.GetLeaf(dialSetPtr->getDialLeafName().c_str())->GetTypeName() )
+                  LogThrow("Unsupported event-by-event dial: " << DialType::DialTypeEnumNamespace::toString(dialSetPtr->getGlobalDialType()))
                 }
               }
               else{
-                // Binned dial:
-                foundValidDialAmongTheSet = false;
+                LogThrow("Unsupported event-by-event dial type: " << treeChain.GetLeaf(dialSetPtr->getDialLeafName().c_str())->GetTypeName() )
+              }
+            }
+            else{
+              // Binned dial:
+              foundValidDialAmongTheSet = false;
 
-                if( dialSetPtr->getDialList().size() == 1 and dialSetPtr->getDialList()[0]->getApplyConditionBinPtr() == nullptr ){
-                  foundValidDialAmongTheSet = true;
-                  dialSetPtr->getDialList()[0]->setIsReferenced(true);
-                  eventPtr->getRawDialPtrList()[eventDialOffset++] = dialSetPtr->getDialList()[0].get();
-                }
-                else {
-                  // -- probably the slowest part of the indexing: ----
-                  dialFoundItr = std::find_if(
-                      dialSetPtr->getDialList().begin(),
-                      dialSetPtr->getDialList().end(),
-                      isDialValid
-                  );
-                  // --------------------------------------------------
+              if( dialSetPtr->getDialList().size() == 1 and dialSetPtr->getDialList()[0]->getApplyConditionBinPtr() == nullptr ){
+                foundValidDialAmongTheSet = true;
+                dialSetPtr->getDialList()[0]->setIsReferenced(true);
+                eventPtr->getRawDialPtrList()[eventDialOffset++] = dialSetPtr->getDialList()[0].get();
+              }
+              else {
+                // -- probably the slowest part of the indexing: ----
+                dialFoundItr = std::find_if(
+                    dialSetPtr->getDialList().begin(),
+                    dialSetPtr->getDialList().end(),
+                    isDialValid
+                );
+                // --------------------------------------------------
 
-                 if (dialFoundItr != dialSetPtr->getDialList().end()) {
+                if (dialFoundItr != dialSetPtr->getDialList().end()) {
                   // found DIAL -> get index
-                    iDial = std::distance(dialSetPtr->getDialList().begin(), dialFoundItr);
+                  iDial = std::distance(dialSetPtr->getDialList().begin(), dialFoundItr);
 
-                    foundValidDialAmongTheSet = true;
-                    dialSetPtr->getDialList()[iDial]->setIsReferenced(true);
-                    eventPtr->getRawDialPtrList()[eventDialOffset++] = dialSetPtr->getDialList()[iDial].get();
-                  }
+                  foundValidDialAmongTheSet = true;
+                  dialSetPtr->getDialList()[iDial]->setIsReferenced(true);
+                  eventPtr->getRawDialPtrList()[eventDialOffset++] = dialSetPtr->getDialList()[iDial].get();
                 }
+              }
 
-                if( foundValidDialAmongTheSet and dialSetPair.first->isUseOnlyOneParameterPerEvent() ){
-                  // leave dialSet (corresponding to a given parameter) loop since we explicitly ask for 1 parameter for this parSet
-                  break;
-                }
-              } // else (not dialSetPtr->getDialLeafName().empty())
+              if( foundValidDialAmongTheSet and dialSetPair.first->isUseOnlyOneParameterPerEvent() ){
+                // leave dialSet (corresponding to a given parameter) loop since we explicitly ask for 1 parameter for this parSet
+                break;
+              }
+            } // else (not dialSetPtr->getDialLeafName().empty())
 
-            } // iDialSet / Enabled-parameter
-          } // ParSet / DialSet Pairs
+          } // iDialSet / Enabled-parameter
+        } // ParSet / DialSet Pairs
 
-          // Resize the dialRef list
-          eventPtr->getRawDialPtrList().resize(eventDialOffset);
-          eventPtr->getRawDialPtrList().shrink_to_fit();
+        // Resize the dialRef list
+        eventPtr->getRawDialPtrList().resize(eventDialOffset);
+        eventPtr->getRawDialPtrList().shrink_to_fit();
+#endif
 
-        } // event has passed the selection?
-      } // samples
-    } // entries
-    if( iThread_ == 0 ){
-      GenericToolbox::displayProgressBar(nEvents, nEvents, ssProgressBar.str());
-    }
-  };
-
-  LogWarning << "Loading and indexing..." << std::endl;
-  GlobalVariables::getParallelWorker().addJob(__METHOD_NAME__, fillFunction);
-  GlobalVariables::getParallelWorker().runJob(__METHOD_NAME__);
-  GlobalVariables::getParallelWorker().removeJob(__METHOD_NAME__);
-
-  LogInfo << "Shrinking event lists..." << std::endl;
-  for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
-    auto* container = &_cache_.samplesToFillList[iSample]->getDataContainer();
-    if(_parameters_.useMcContainer) container = &_cache_.samplesToFillList[iSample]->getMcContainer();
-    container->shrinkEventList(_cache_.sampleIndexOffsetList[iSample]);
+      } // event has passed the selection?
+    } // samples
+  } // entries
+  if( iThread_ == 0 ){
+    GenericToolbox::displayProgressBar(nEvents, nEvents, ssProgressBar.str());
   }
 }
 

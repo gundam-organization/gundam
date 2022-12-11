@@ -155,6 +155,22 @@ void DataBinSet::setVerbosity(int maxLogLevel_) {
   Logger::setMaxLogLevel(maxLogLevel_);
 }
 
+const std::vector<DataBin> &DataBinSet::getBinsList() const {
+  return _binsList_;
+}
+const std::string &DataBinSet::getFilePath() const {
+  return _filePath_;
+}
+const std::vector<std::string> &DataBinSet::getBinVariables() const {
+  return _binVariables_;
+}
+std::vector<DataBin> &DataBinSet::getBinsList(){
+  return _binsList_;
+}
+
+bool DataBinSet::isEmpty() const{
+  return _binsList_.empty();
+}
 std::string DataBinSet::getSummary() const{
   std::stringstream ss;
   ss << "DataBinSet";
@@ -177,16 +193,3 @@ void DataBinSet::addBinContent(int binIndex_, double weight_) {
   _binContent_.at(binIndex_) += weight_;
 }
 
-const std::vector<DataBin> &DataBinSet::getBinsList() const {
-  return _binsList_;
-}
-const std::string &DataBinSet::getFilePath() const {
-  return _filePath_;
-}
-const std::vector<std::string> &DataBinSet::getBinVariables() const {
-  return _binVariables_;
-}
-
-std::vector<DataBin> &DataBinSet::getBinsList(){
-  return _binsList_;
-}

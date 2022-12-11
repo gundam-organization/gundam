@@ -45,6 +45,7 @@ void Propagator::readConfigImpl(){
     LogInfo << _parameterSetList_.back().getSummary() << std::endl;
   }
 
+
   auto fitSampleSetConfig = JsonUtils::fetchValue(_config_, "fitSampleSetConfig", nlohmann::json());
   _fitSampleSet_.setConfig(fitSampleSetConfig);
   _fitSampleSet_.readConfig();
@@ -70,6 +71,42 @@ void Propagator::readConfigImpl(){
 
   _debugPrintLoadedEvents_ = JsonUtils::fetchValue(_config_, "debugPrintLoadedEvents", _debugPrintLoadedEvents_);
   _debugPrintLoadedEventsNbPerSample_ = JsonUtils::fetchValue(_config_, "debugPrintLoadedEventsNbPerSample", _debugPrintLoadedEventsNbPerSample_);
+
+
+  for(size_t iParSet = 0 ; iParSet < _parameterSetList_.size() ; iParSet++ ){
+    if( not _parameterSetList_[iParSet].isEnabled() ) continue;
+    // DEV / DialCollections
+    if( not _parameterSetList_[iParSet].getDialSetDefinitions().empty() ){
+      for( auto& dialSetDef : _parameterSetList_[iParSet].getDialSetDefinitions().get<std::vector<nlohmann::json>>() ){
+        if( JsonUtils::doKeyExist(dialSetDef, "parametersBinningPath") ){
+          _dialCollections_.emplace_back(&_parameterSetList_);
+          _dialCollections_.back().setSupervisedParameterSetIndex( int(iParSet) );
+          _dialCollections_.back().readConfig( dialSetDef );
+        }
+        else{ LogThrow("no parametersBinningPath option?"); }
+      }
+    }
+    else{
+      for( auto& par : _parameterSetList_[iParSet].getParameterList() ){
+        if( not par.isEnabled() ) continue;
+
+        // Check if no definition is present -> disable the parameter in that case
+        if( par.getDialDefinitionsList().empty() ) {
+          LogAlert << "Disabling \"" << par.getFullTitle() << "\": no dial definition." << std::endl;
+          par.setIsEnabled(false);
+          continue;
+        }
+
+        for( const auto& dialDefinitionConfig : par.getDialDefinitionsList() ){
+          _dialCollections_.emplace_back(&_parameterSetList_);
+          _dialCollections_.back().setSupervisedParameterSetIndex( int(iParSet) );
+          _dialCollections_.back().setSupervisedParameterIndex( par.getParameterIndex() );
+          _dialCollections_.back().readConfig( dialDefinitionConfig );
+        }
+      }
+    }
+  }
+
 }
 void Propagator::initializeImpl() {
   LogWarning << __METHOD_NAME__ << std::endl;
@@ -81,7 +118,6 @@ void Propagator::initializeImpl() {
     nPars += int(parSet.getNbParameters());
   }
   LogInfo << "Total number of parameters: " << nPars << std::endl;
-
 
   if( _globalCovarianceMatrix_ == nullptr ){
     LogInfo << "Building global covariance matrix..." << std::endl;
@@ -113,6 +149,9 @@ void Propagator::initializeImpl() {
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing " + std::to_string(_dataSetList_.size()) + " datasets...") << std::endl;
   for( auto& dataset : _dataSetList_ ){ dataset.initialize(); }
 
+  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing dials...") << std::endl;
+  for( auto& dialCollection : _dialCollections_ ){ dialCollection.initialize(); }
+
   LogInfo << "Initializing propagation threads..." << std::endl;
   initializeThreads();
   GlobalVariables::getParallelWorker().setCpuTimeSaverIsEnabled(true);
@@ -136,10 +175,11 @@ void Propagator::initializeImpl() {
     if(dispenser.getParameters().useMcContainer ){
       usedMcContainer = true;
       dispenser.setParSetPtrToLoad(&_parameterSetList_);
+      dispenser.setDialCollectionListPtr(&_dialCollections_);
+      dispenser.setEventDialCache(&_eventDialCache_);
     }
     dispenser.load();
   }
-
 
   // Copy to data container
   if( usedMcContainer ){
@@ -187,6 +227,7 @@ void Propagator::initializeImpl() {
     LogInfo << "Propagating parameters on events..." << std::endl;
     bool cacheManagerState = GlobalVariables::getEnableCacheManager();
     GlobalVariables::setEnableCacheManager(false);
+    this->resetReweight();
     this->reweightMcEvents();
     GlobalVariables::setEnableCacheManager(cacheManagerState);
 
@@ -215,6 +256,13 @@ void Propagator::initializeImpl() {
 
     // also wiping event-by-event dials...
     LogInfo << "Wiping event-by-event dials..." << std::endl;
+#if USE_NEW_DIALS
+    for( auto& dialCollection: _dialCollections_ ) {
+      if( not dialCollection.getGlobalDialLeafName().empty() ) {
+        dialCollection.clear();
+      }
+    }
+#else
     for( auto& parSet : _parameterSetList_ ){
       for( auto& par : parSet.getParameterList() ){
         for( auto& dialSet : par.getDialSetList() ){
@@ -223,6 +271,7 @@ void Propagator::initializeImpl() {
         }
       }
     }
+#endif
 
     for( auto& dataSet : _dataSetList_ ){
       LogContinueIf(not dataSet.isEnabled(), "Dataset \"" << dataSet.getName() << "\" is disabled. Skipping");
@@ -230,6 +279,8 @@ void Propagator::initializeImpl() {
       dispenser.setSampleSetPtrToLoad(&_fitSampleSet_);
       dispenser.setPlotGenPtr(&_plotGenerator_);
       dispenser.setParSetPtrToLoad(&_parameterSetList_);
+      dispenser.setDialCollectionListPtr(&_dialCollections_);
+      dispenser.setEventDialCache(&_eventDialCache_);
       dispenser.load();
     }
   }
@@ -243,6 +294,7 @@ void Propagator::initializeImpl() {
 #endif
 
   LogInfo << "Propagating prior parameters on events..." << std::endl;
+  this->resetReweight();
   this->reweightMcEvents();
 
   LogInfo << "Set the current MC prior weights as nominal weight..." << std::endl;
@@ -258,7 +310,7 @@ void Propagator::initializeImpl() {
   LogInfo << "Filling up sample histograms..." << std::endl;
   _fitSampleSet_.updateSampleHistograms();
 
-  // Stat error -> BINNING SHOULD BE SET!!
+  // Throwing stat error on data -> BINNING SHOULD BE SET!!
   if( _throwAsimovToyParameters_ and _enableStatThrowInToys_ ){
     LogInfo << "Throwing statistical error for data container..." << std::endl;
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
@@ -277,10 +329,8 @@ void Propagator::initializeImpl() {
     sample.getDataContainer().isLocked = true;
   }
 
-
-  _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
-
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the plot generator") << std::endl;
+  _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
   _plotGenerator_.initialize();
 
   LogInfo << "Saving nominal histograms..." << std::endl;
@@ -312,6 +362,7 @@ void Propagator::initializeImpl() {
 
       int iStage{0};
       for( auto& parSet : _parameterSetList_ ){ parSet.setMaskedForPropagation(true); }
+      this->resetReweight();
       this->reweightMcEvents();
       for( size_t iSample = 0 ; iSample < _fitSampleSet_.getFitSampleList().size() ; iSample++ ){
         stageBreakdownList[iSample][iStage] = _fitSampleSet_.getFitSampleList()[iSample].getMcContainer().getSumWeights();
@@ -319,6 +370,7 @@ void Propagator::initializeImpl() {
 
       for( auto& parSet : _parameterSetList_ ){
         parSet.setMaskedForPropagation(false);
+        this->resetReweight();
         this->reweightMcEvents();
         iStage++;
         for( size_t iSample = 0 ; iSample < _fitSampleSet_.getFitSampleList().size() ; iSample++ ){
@@ -355,7 +407,29 @@ void Propagator::initializeImpl() {
   }
 
   if( _debugPrintLoadedEvents_ ){
+
     LogDebug << GET_VAR_NAME_VALUE(_debugPrintLoadedEventsNbPerSample_) << std::endl;
+#if USE_NEW_DIALS
+    int iEvt{0};
+    for( auto& entry : _eventDialCache_.getCache() ) {
+      LogDebug << "Event #" << iEvt++ << "{" << std::endl;
+      {
+        Logger::Indent i;
+        LogDebug << entry.first->getSummary() << std::endl;
+        LogDebug << "dialCache = {";
+        for( auto& dialInterface : entry.second ) {
+#ifndef USE_BREAKDOWN_CACHE
+          LogDebug << std::endl << "  - " << dialInterface->getSummary();
+#else
+          LogDebug << std::endl << "  - " << dialInterface.first->getSummary();
+#endif
+        }
+        LogDebug << std::endl << "}" << std::endl;
+      }
+      LogDebug << "}" << std::endl;
+      if( iEvt >= _debugPrintLoadedEventsNbPerSample_ ) break;
+    }
+#else
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
       LogDebug << GenericToolbox::addUpDownBars( sample.getName() ) << std::endl;
 
@@ -365,6 +439,7 @@ void Propagator::initializeImpl() {
         LogTrace << iEvt << " -> " << ev.getSummary() << std::endl;
       }
     }
+#endif
   }
 
   // Propagator needs to be fast
@@ -482,14 +557,17 @@ void Propagator::propagateParametersOnSamples(){
     if( parSet.isUseEigenDecompInFit() ) parSet.propagateEigenToOriginal();
   }
 
+  resetReweight();
   reweightMcEvents();
   refillSampleHistograms();
 
 }
-void Propagator::updateDialResponses(){
-  GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-  GlobalVariables::getParallelWorker().runJob("Propagator::updateDialResponses");
-  dialUpdate.counts++; dialUpdate.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+void Propagator::resetReweight(){
+#if USE_NEW_DIALS
+  std::for_each(_dialCollections_.begin(), _dialCollections_.end(),[&](DialCollection& dc_){
+    dc_.updateInputBuffers();
+  });
+#endif
 }
 void Propagator::reweightMcEvents() {
   bool usedGPU{false};
@@ -529,20 +607,6 @@ void Propagator::refillSampleHistograms(){
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
   GlobalVariables::getParallelWorker().runJob("Propagator::refillSampleHistograms");
   fillProp.counts++; fillProp.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-}
-void Propagator::fillDialsStack(){
-  for( auto& parSet : _parameterSetList_ ){
-    if( not parSet.isUseEigenDecompInFit() ){
-      for( auto& par : parSet.getParameterList() ){
-        for( auto& dialSet : par.getDialSetList() ){
-          if(dialSet.getGlobalDialType() == DialType::Norm){ continue; } // no cache needed
-          for( auto& dial : dialSet.getDialList() ){
-            if(dial->isReferenced()) _dialsStack_.emplace_back(dial.get());
-          } // dial
-        } // dialSet
-      } // par
-    }
-  } // parSet
 }
 void Propagator::throwParametersFromGlobalCovariance(){
 
@@ -609,11 +673,6 @@ void Propagator::initializeThreads() {
   };
   GlobalVariables::getParallelWorker().addJob("Propagator::reweightMcEvents", reweightMcEventsFct);
 
-  std::function<void(int)> updateDialResponsesFct = [this](int iThread){
-    this->updateDialResponses(iThread);
-  };
-  GlobalVariables::getParallelWorker().addJob("Propagator::updateDialResponses", updateDialResponsesFct);
-
   std::function<void(int)> refillSampleHistogramsFct = [this](int iThread){
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
       sample.getMcContainer().refillHistogram(iThread);
@@ -630,31 +689,30 @@ void Propagator::initializeThreads() {
   GlobalVariables::getParallelWorker().setPostParallelJob("Propagator::refillSampleHistograms", refillSampleHistogramsPostParallelFct);
 }
 
-void Propagator::updateDialResponses(int iThread_){
-  int nThreads = GlobalVariables::getNbThreads();
-  if(iThread_ == -1){
-    // force single thread
-    nThreads = 1;
-    iThread_ = 0;
-  }
-  int iDial{0};
-  int nDials(int(_dialsStack_.size()));
-
-  while( iDial < nDials ){
-    _dialsStack_[iDial]->evalResponse();
-    iDial += nThreads;
-  }
-
-}
 void Propagator::reweightMcEvents(int iThread_) {
-  int nThreads = GlobalVariables::getNbThreads();
-  if(iThread_ == -1){
-    // force single thread
-    nThreads = 1;
-    iThread_ = 0;
-  }
 
   //! Warning: everything you modify here, may significantly slow down the fitter
+
+#if USE_NEW_DIALS
+//  _eventDialCache_.propagate(iThread_, GlobalVariables::getNbThreads());
+  auto start = _eventDialCache_.getCache().begin();
+  auto end = _eventDialCache_.getCache().end();
+
+  if( GlobalVariables::getNbThreads() != 1 ){
+    start = _eventDialCache_.getCache().begin() + Long64_t(iThread_)*(Long64_t(_eventDialCache_.getCache().size())/GlobalVariables::getNbThreads());
+    if( iThread_+1 != GlobalVariables::getNbThreads() ){
+      end = _eventDialCache_.getCache().begin() + (Long64_t(iThread_) + 1) * (Long64_t(_eventDialCache_.getCache().size())/GlobalVariables::getNbThreads());
+    }
+  }
+
+  std::for_each(start, end, &EventDialCache::reweightEntry);
+#else
+  int nThreads = GlobalVariables::getNbThreads();
+  if(iThread_ == -1){
+    // force single thread
+    nThreads = 1;
+    iThread_ = 0;
+  }
   long nToProcess;
   long offset;
   std::vector<PhysicsEvent>* eList;
@@ -672,6 +730,10 @@ void Propagator::reweightMcEvents(int iThread_) {
           );
     }
   );
+#endif
+
+
+
 }
 
 

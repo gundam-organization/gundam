@@ -12,9 +12,9 @@
 class GraphDial : public Dial {
 
 public:
-  GraphDial(const DialSet* owner_);
+  explicit GraphDial(const DialSet* owner_);
 
-  std::unique_ptr<Dial> clone() const override { return std::make_unique<GraphDial>(*this); }
+  [[nodiscard]] std::unique_ptr<Dial> clone() const override { return std::make_unique<GraphDial>(*this); }
 
   void setGraph(const TGraph &graph);
 

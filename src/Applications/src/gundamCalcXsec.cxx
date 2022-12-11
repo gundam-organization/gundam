@@ -288,7 +288,6 @@ int main(int argc, char** argv){
 
     for( int iFitSample = 0 ; iFitSample < nFitSample ; iFitSample++ ){
       for( auto& event : p.getFitSampleSet().getFitSampleList()[iFitSample].getMcContainer().eventList ){
-        signalSamplePair.first->getBinning().getBinsList();
         for( size_t iBin = 0 ; iBin < signalSamplePair.first->getBinning().getBinsList().size() ; iBin++ ){
           if( isInTemplateBin(event, signalSamplePair.first->getBinning().getBinsList()[iBin]) ){
             // copy event in template bin

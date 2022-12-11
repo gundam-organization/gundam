@@ -58,6 +58,7 @@ int main(int argc, char** argv){
   clParser.addTriggerOption("skipHesse", {"--skip-hesse"}, "Don't perform postfit error evaluation");
   clParser.addTriggerOption("generateOneSigmaPlots", {"--one-sigma"}, "Generate one sigma plots");
   clParser.addTriggerOption("lightOutputMode", {"--light-mode"}, "Disable plot generation");
+  clParser.addTriggerOption("noDialCache", {"--no-dial-cache"}, "Disable cache handling for dial eval");
 
   clParser.addOption("scanParameters", {"--scan"}, "Enable parameter scan before and after the fit (can provide nSteps)", 1, true);
   clParser.addOption("toyFit", {"--toy"}, "Run a toy fit (optional arg to provide toy index)", 1, true);
@@ -106,6 +107,13 @@ int main(int argc, char** argv){
     LogThrow("useCacheManager can only be set while GUNDAM is compiled with GUNDAM_USING_CACHE_MANAGER option.");
 #endif
   }
+
+  // No cache on dials?
+  if( clParser.isOptionTriggered("noDialCache") ){
+    LogAlert << "Disabling cache in dial evaluation (when available)..." << std::endl;
+    GlobalVariables::setDisableDialCache(true);
+  }
+
 
   // PRNG seed?
   if( clParser.isOptionTriggered("randomSeed") ){

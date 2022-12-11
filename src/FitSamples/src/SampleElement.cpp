@@ -138,6 +138,7 @@ void SampleElement::refillHistogram(int iThread_){
         binContentArray[iBin + 1] += eventPtr->getEventWeight();
         binErrorArray[iBin + 1] += eventPtr->getEventWeight() * eventPtr->getEventWeight();
       }
+    LogThrowIf(std::isnan(binContentArray[iBin + 1]));
 #ifdef GUNDAM_USING_CACHE_MANAGER
     }
 #endif // GUNDAM_USING_CACHE_MANAGER
@@ -174,18 +175,32 @@ void SampleElement::throwStatError(){
    * */
   int nCounts;
   for( int iBin = 1 ; iBin <= histogram->GetNbinsX() ; iBin++ ){
-    nCounts = gRandom->Poisson(histogram->GetBinContent(iBin));
-    for (auto *eventPtr: perBinEventPtrList[iBin-1]) {
-      // make sure refill of the histogram will produce the same hist
-      eventPtr->setEventWeight(eventPtr->getEventWeight()*((double)nCounts/histogram->GetBinContent(iBin)));
+    if( histogram->GetBinContent(iBin) != 0 ){
+      nCounts = gRandom->Poisson(histogram->GetBinContent(iBin));
+      for (auto *eventPtr: perBinEventPtrList[iBin-1]) {
+        // make sure refill of the histogram will produce the same hist
+        eventPtr->setEventWeight( eventPtr->getEventWeight()*( (double) nCounts/histogram->GetBinContent(iBin)) );
+      }
+      histogram->SetBinContent(iBin, nCounts);
     }
-    histogram->SetBinContent(iBin, nCounts);
+
   }
 }
 
 double SampleElement::getSumWeights() const{
-  return std::accumulate(eventList.begin(), eventList.end(), double(0.),
-                         [](double sum_, const PhysicsEvent& ev_){ return sum_ + ev_.getEventWeight(); });
+  double output = std::accumulate(eventList.begin(), eventList.end(), double(0.),
+                                  [](double sum_, const PhysicsEvent& ev_){ return sum_ + ev_.getEventWeight(); });
+
+  if( std::isnan(output) ){
+    for( auto& event : eventList ){
+      if( std::isnan(event.getEventWeight()) ){
+        event.print();
+      }
+    }
+    LogThrow("NAN getSumWeights");
+  }
+
+  return output;
 }
 size_t SampleElement::getNbBinnedEvents() const{
   return std::accumulate(eventList.begin(), eventList.end(), size_t(0.),

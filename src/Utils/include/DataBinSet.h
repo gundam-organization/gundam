@@ -24,17 +24,17 @@ public:
   void addBin(const DataBin& bin_);
 
   // Management
-  void addBinContent(int binIndex_, double weight_);
 
   // Getters
-  const std::vector<DataBin> &getBinsList() const;
-  const std::string &getFilePath() const;
-  const std::vector<std::string> &getBinVariables() const;
-
+  [[nodiscard]] const std::vector<DataBin> &getBinsList() const;
+  [[nodiscard]] const std::string &getFilePath() const;
+  [[nodiscard]] const std::vector<std::string> &getBinVariables() const;
   std::vector<DataBin> &getBinsList();
 
   // Misc
-  std::string getSummary() const;
+  bool isEmpty() const;
+  [[nodiscard]] std::string getSummary() const;
+  void addBinContent(int binIndex_, double weight_);
 
   // Globals
   static void setVerbosity(int maxLogLevel_);

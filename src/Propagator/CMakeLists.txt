@@ -1,11 +1,11 @@
 set(SRCFILES
-        src/Propagator.cpp
-        src/ParScanner.cpp
-)
+    src/Propagator.cpp
+    src/ParScanner.cpp
+    )
 
 set(HEADERS
-        include/Propagator.h
-        include/ParScanner.h
+    include/Propagator.h
+    include/ParScanner.h
 )
 
 #ROOT_GENERATE_DICTIONARY(
@@ -36,6 +36,7 @@ if( WITH_CACHE_MANAGER )
           GundamFitSamples
           GundamDatasetManager
           GundamCache
+          GundamDials
           ${ROOT_LIBRARIES}
           )
 else()
@@ -43,6 +44,7 @@ else()
     GundamFitParameters
     GundamFitSamples
     GundamDatasetManager
+    GundamDialDictionary
     ${ROOT_LIBRARIES}
   )
 endif()

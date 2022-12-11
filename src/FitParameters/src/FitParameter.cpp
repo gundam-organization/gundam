@@ -44,11 +44,14 @@ void FitParameter::readConfigImpl(){
     _dialDefinitionsList_ = JsonUtils::fetchValue(_parameterConfig_, "dialSetDefinitions", _dialDefinitionsList_);
   }
 
+#if USE_NEW_DIALS
+#else
   _dialSetList_.reserve(_dialDefinitionsList_.size());
   for( const auto& dialDefinitionConfig : _dialDefinitionsList_ ){
     _dialSetList_.emplace_back(this);
     _dialSetList_.back().readConfig(dialDefinitionConfig);
   }
+#endif
 }
 void FitParameter::initializeImpl() {
   LogThrowIf(_owner_ == nullptr, "Parameter set ref is not set.");
@@ -59,8 +62,9 @@ void FitParameter::initializeImpl() {
 
   if( not _isEnabled_ ) { return; }
 
+#if USE_NEW_DIALS
+#else
   for( auto& dialSet : _dialSetList_ ){ dialSet.initialize(); }
-
   // Check if no dials is actually defined -> disable the parameter in that case
   bool dialSetAreAllDisabled = true;
   for( const auto& dialSet : _dialSetList_ ){ if( dialSet.isEnabled() ){ dialSetAreAllDisabled = false; break; } }
@@ -68,6 +72,8 @@ void FitParameter::initializeImpl() {
     LogWarning << "Parameter " << getTitle() << " has no dials: disabled." << std::endl;
     _isEnabled_ = false;
   }
+#endif
+
 }
 
 void FitParameter::setIsEnabled(bool isEnabled){
@@ -140,41 +146,20 @@ void FitParameter::setCurrentValueAsPrior(){
   _priorValue_ = _parameterValue_;
 }
 
-bool FitParameter::isEnabled() const {
-  return _isEnabled_;
-}
-bool FitParameter::isFixed() const {
-  return _isFixed_;
+bool FitParameter::isFree() const {
+  return _isFree_;
 }
 bool FitParameter::isEigen() const {
   return _isEigen_;
 }
-bool FitParameter::isFree() const {
-  return _isFree_;
+bool FitParameter::isFixed() const {
+  return _isFixed_;
 }
-const std::string &FitParameter::getName() const {
-  return _name_;
-}
-double FitParameter::getParameterValue() const {
-  return _parameterValue_;
+bool FitParameter::isEnabled() const {
+  return _isEnabled_;
 }
 int FitParameter::getParameterIndex() const {
   return _parameterIndex_;
-}
-double FitParameter::getStdDevValue() const {
-  return _stdDevValue_;
-}
-double FitParameter::getPriorValue() const {
-  return _priorValue_;
-}
-double FitParameter::getThrowValue() const{
-  return _throwValue_;
-}
-PriorType::PriorType FitParameter::getPriorType() const {
-  return _priorType_;
-}
-std::vector<DialSet> &FitParameter::getDialSetList() {
-  return _dialSetList_;
 }
 double FitParameter::getMinValue() const {
   return _minValue_;
@@ -185,34 +170,49 @@ double FitParameter::getMaxValue() const {
 double FitParameter::getStepSize() const {
   return _stepSize_;
 }
+double FitParameter::getPriorValue() const {
+  return _priorValue_;
+}
+double FitParameter::getThrowValue() const{
+  return _throwValue_;
+}
+double FitParameter::getStdDevValue() const {
+  return _stdDevValue_;
+}
+double FitParameter::getParameterValue() const {
+  return _parameterValue_;
+}
+const std::string &FitParameter::getName() const {
+  return _name_;
+}
+const nlohmann::json &FitParameter::getDialDefinitionsList() const {
+  return _dialDefinitionsList_;
+}
 const FitParameterSet *FitParameter::getOwner() const {
   return _owner_;
 }
-
+PriorType::PriorType FitParameter::getPriorType() const {
+  return _priorType_;
+}
+#if USE_NEW_DIALS
+#else
+std::vector<DialSet> &FitParameter::getDialSetList() {
+  return _dialSetList_;
+}
+#endif
 
 double FitParameter::getDistanceFromNominal() const{
   return (_parameterValue_ - _priorValue_) / _stdDevValue_;
 }
-DialSet* FitParameter::findDialSet(const std::string& dataSetName_){
-  for( auto& dialSet : _dialSetList_ ){
-    if( GenericToolbox::doesElementIsInVector(dataSetName_, dialSet.getDataSetNameList()) ){
-      return &dialSet;
-    }
-  }
-
-  // If not found, find general dialSet
-  for( auto& dialSet : _dialSetList_ ){
-    if( GenericToolbox::doesElementIsInVector("", dialSet.getDataSetNameList())
-        or GenericToolbox::doesElementIsInVector("*", dialSet.getDataSetNameList())
-      ){
-      return &dialSet;
-    }
-  }
-
-  // If no general dialSet found, this parameter does not apply on this dataSet
-  return nullptr;
+std::string FitParameter::getTitle() const {
+  std::stringstream ss;
+  ss << "#" << _parameterIndex_;
+  if( not _name_.empty() ) ss << "_" << _name_;
+  return ss.str();
 }
-
+std::string FitParameter::getFullTitle() const{
+  return ((FitParameterSet*) _owner_)->getName() + "/" + this->getTitle();
+}
 std::string FitParameter::getSummary(bool shallow_) const {
   std::stringstream ss;
 
@@ -230,21 +230,37 @@ std::string FitParameter::getSummary(bool shallow_) const {
   else ss << _maxValue_;
   ss << " ]";
 
+#if USE_NEW_DIALS
+#else
   if( not shallow_ ){
     ss << ":";
     for( const auto& dialSet : _dialSetList_ ){
       ss << std::endl << GenericToolbox::indentString(dialSet.getSummary(), 2);
     }
   }
+#endif
 
   return ss.str();
 }
-std::string FitParameter::getTitle() const {
-  std::stringstream ss;
-  ss << "#" << _parameterIndex_;
-  if( not _name_.empty() ) ss << "_" << _name_;
-  return ss.str();
+#if USE_NEW_DIALS
+#else
+DialSet* FitParameter::findDialSet(const std::string& dataSetName_){
+  for( auto& dialSet : _dialSetList_ ){
+    if( GenericToolbox::doesElementIsInVector(dataSetName_, dialSet.getDataSetNameList()) ){
+      return &dialSet;
+    }
+  }
+
+  // If not found, find general dialSet
+  for( auto& dialSet : _dialSetList_ ){
+    if( GenericToolbox::doesElementIsInVector("", dialSet.getDataSetNameList())
+        or GenericToolbox::doesElementIsInVector("*", dialSet.getDataSetNameList())
+        ){
+      return &dialSet;
+    }
+  }
+
+  // If no general dialSet found, this parameter does not apply on this dataSet
+  return nullptr;
 }
-std::string FitParameter::getFullTitle() const{
-  return ((FitParameterSet*) _owner_)->getName() + "/" + this->getTitle();
-}
+#endif

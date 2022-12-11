@@ -33,8 +33,8 @@ void Dial::setOwner(const DialSet* dialSetPtr) {
 }
 
 void Dial::initialize() {
-  LogThrowIf( _dialType_ == DialType::Invalid, "_dialType_ is not set." )
-  LogThrowIf(_owner_ == nullptr, "Owner not set.")
+  LogThrowIf( _dialType_ == DialType::Invalid, "_dialType_ is not set." );
+  LogThrowIf( _owner_ == nullptr, "Owner not set." );
 }
 
 bool Dial::isReferenced() const {

@@ -3,6 +3,7 @@
 //
 
 #include "NormDial.h"
+#include "DialSet.h"
 #include "FitParameter.h"
 
 #include "Logger.h"

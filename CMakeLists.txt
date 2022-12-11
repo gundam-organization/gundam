@@ -116,7 +116,7 @@ cmessage(STATUS "CMAKE_BUILD_TYPE: \"${CMAKE_BUILD_TYPE}\"")
 if(BATCH_MODE)
     set(COLOR_OUTPUT NO)
     set(TTYCHECK NO)
-    add_definitions(-DGUNDAM_BATCH)
+    add_definitions( -D GUNDAM_BATCH )
 endif(BATCH_MODE)
 
 ################################################################################
@@ -218,6 +218,18 @@ if( "${YAML_CPP_INCLUDE_DIR} " STREQUAL " ")
     #    list(APPEND LINK_LIBARY_LIST ${YAMLCPP_LIBRARY})
 endif()
 
+find_package(ZLIB)
+if (${ZLIB_FOUND})
+    cmessage(STATUS "ZLIB found : ${ZLIB_VERSION_STRING}")
+    cmessage(STATUS "ZLIB_INCLUDE_DIRS = ${ZLIB_INCLUDE_DIRS}")
+    cmessage(STATUS "ZLIB_LIBRARIES = ${ZLIB_LIBRARIES}")
+    add_definitions( -D USE_ZLIB=1 )
+else()
+    add_definitions( -D USE_ZLIB=0 )
+endif ()
+
+
+
 if (WITH_CACHE_MANAGER)
     add_definitions( -DGUNDAM_USING_CACHE_MANAGER)
 
@@ -235,9 +247,9 @@ endif()
 
 if(NOT WITH_GENERIC_SPLINES)
     if(WITH_CACHE_MANAGER)
-        cmessage(STATUS "Generic spline interface required with Cache::Manager")
+        cmessage(FATAL_ERROR "Generic spline interface required with Cache::Manager")
     else(WITH_CACHE_MANAGER)
-        add_definitions(-DUSE_TSPLINE3_EVAL)
+        add_definitions(-D USE_TSPLINE3_EVAL)
     endif(WITH_CACHE_MANAGER)
 endif(NOT WITH_GENERIC_SPLINES)
 
@@ -407,7 +419,7 @@ endif()
 
 set( MODULES
     Utils
-    DialDirectory
+    DialDictionary
     FitParameters
     FitSamples
     DatasetManager
