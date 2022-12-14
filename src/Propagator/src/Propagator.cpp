@@ -72,7 +72,7 @@ void Propagator::readConfigImpl(){
   _debugPrintLoadedEvents_ = JsonUtils::fetchValue(_config_, "debugPrintLoadedEvents", _debugPrintLoadedEvents_);
   _debugPrintLoadedEventsNbPerSample_ = JsonUtils::fetchValue(_config_, "debugPrintLoadedEventsNbPerSample", _debugPrintLoadedEventsNbPerSample_);
 
-
+#if USE_NEW_DIALS
   for(size_t iParSet = 0 ; iParSet < _parameterSetList_.size() ; iParSet++ ){
     if( not _parameterSetList_[iParSet].isEnabled() ) continue;
     // DEV / DialCollections
@@ -106,6 +106,7 @@ void Propagator::readConfigImpl(){
       }
     }
   }
+#endif
 
 }
 void Propagator::initializeImpl() {
@@ -149,8 +150,10 @@ void Propagator::initializeImpl() {
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing " + std::to_string(_dataSetList_.size()) + " datasets...") << std::endl;
   for( auto& dataset : _dataSetList_ ){ dataset.initialize(); }
 
+#if USE_NEW_DIALS
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing dials...") << std::endl;
   for( auto& dialCollection : _dialCollections_ ){ dialCollection.initialize(); }
+#endif
 
   LogInfo << "Initializing propagation threads..." << std::endl;
   initializeThreads();
@@ -175,8 +178,10 @@ void Propagator::initializeImpl() {
     if(dispenser.getParameters().useMcContainer ){
       usedMcContainer = true;
       dispenser.setParSetPtrToLoad(&_parameterSetList_);
+#if USE_NEW_DIALS
       dispenser.setDialCollectionListPtr(&_dialCollections_);
       dispenser.setEventDialCache(&_eventDialCache_);
+#endif
     }
     dispenser.load();
   }
@@ -279,8 +284,10 @@ void Propagator::initializeImpl() {
       dispenser.setSampleSetPtrToLoad(&_fitSampleSet_);
       dispenser.setPlotGenPtr(&_plotGenerator_);
       dispenser.setParSetPtrToLoad(&_parameterSetList_);
+#if USE_NEW_DIALS
       dispenser.setDialCollectionListPtr(&_dialCollections_);
       dispenser.setEventDialCache(&_eventDialCache_);
+#endif
       dispenser.load();
     }
   }
