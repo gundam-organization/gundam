@@ -636,12 +636,27 @@ void FitParameterSet::defineParameters(){
     if( not _parameterDefinitionConfig_.empty() ){
       // Alternative 1: define dials then parameters
       JsonUtils::forwardConfig(_parameterDefinitionConfig_);
-      auto parConfig = JsonUtils::fetchMatchingEntry(_parameterDefinitionConfig_, "parameterName", std::string(_parameterNamesList_->At(par.getParameterIndex())->GetName()));
-      if( parConfig.empty() ){
-        // try with par index
-        parConfig = JsonUtils::fetchMatchingEntry(_parameterDefinitionConfig_, "parameterIndex", par.getParameterIndex());
+      if (_parameterNamesList_) {
+        // Find the parameter using the name from the vector of names for
+        // the covariance.
+        auto parConfig = JsonUtils::fetchMatchingEntry(_parameterDefinitionConfig_, "parameterName", std::string(_parameterNamesList_->At(par.getParameterIndex())->GetName()));
+        if( parConfig.empty() ){
+            // try with par index
+          parConfig = JsonUtils::fetchMatchingEntry(_parameterDefinitionConfig_, "parameterIndex", par.getParameterIndex());
+        }
+        par.setParameterDefinitionConfig(parConfig);
       }
-      par.setParameterDefinitionConfig(parConfig);
+      else {
+        // No covariance provided, so find the name based on the order in
+        // the parameter set.
+        auto configVector = _parameterDefinitionConfig_.get<std::vector<nlohmann::json>>();
+        LogThrowIf(configVector.size() <= par.getParameterIndex());
+        auto parConfig = configVector.at(par.getParameterIndex());
+        auto parName = JsonUtils::fetchValue<std::string>(parConfig, "parameterName");
+        if (not parName.empty()) par.setName(parName);
+        par.setParameterDefinitionConfig(parConfig);
+
+      }
     }
     else if( not _dialSetDefinitions_.empty() ){
       // Alternative 2: define dials then parameters
@@ -670,5 +685,3 @@ const std::shared_ptr<TMatrixDSym> &FitParameterSet::getPriorCorrelationMatrix()
 const std::shared_ptr<TMatrixDSym> &FitParameterSet::getPriorCovarianceMatrix() const {
   return _priorCovarianceMatrix_;
 }
-
-
