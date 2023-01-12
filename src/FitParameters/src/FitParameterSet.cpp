@@ -655,7 +655,10 @@ void FitParameterSet::defineParameters(){
         auto parName = JsonUtils::fetchValue<std::string>(parConfig, "parameterName");
         if (not parName.empty()) par.setName(parName);
         par.setParameterDefinitionConfig(parConfig);
-
+        LogWarning << "Parameter #" << par.getParameterIndex()
+                   << " (name \"" << par.getName() << "\")"
+                   << " not defined by covariance matrix file"
+                   << std::endl;
       }
     }
     else if( not _dialSetDefinitions_.empty() ){
