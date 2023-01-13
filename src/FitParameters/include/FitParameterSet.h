@@ -70,7 +70,7 @@ public:
   void propagateOriginalToEigen();
 
   // Misc
-  std::string getSummary() const;
+  [[nodiscard]] std::string getSummary() const;
 
   static double toNormalizedParRange(double parRange, const FitParameter& par);
   static double toNormalizedParValue(double parValue, const FitParameter& par);
