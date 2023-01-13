@@ -322,11 +322,26 @@ namespace JointProbability{
               }
           }
       }
-      // ADD DETECTOR UNCERTAINTY FOR WAGASCI
-      //if (sample_.getName().find("WAGASCI") != std::string::npos){
+
+      // DETECTOR UNCERTAINTY FOR WAGASCI
+      double wg_det_uncert = 0.;
+      if (sample_.getName().find("WAGASCI") != std::string::npos){
+          wg_det_uncert = 0.; 
+          if(sample_.getName().find("#0pi") != std::string::npos) {
+              if(sample_.getName().find("PM-BM") != std::string::npos) wg_det_uncert = 0.05;
+              if(sample_.getName().find("PM-WMRD") != std::string::npos) wg_det_uncert = 0.1;
+              if(sample_.getName().find("DWG-BM") != std::string::npos) wg_det_uncert = 0.1;
+              if(sample_.getName().find("UWG-BM") != std::string::npos) wg_det_uncert = 0.12;
+              if(sample_.getName().find("UWG-WMRD") != std::string::npos) wg_det_uncert = 0.1;
+          }
+          if(sample_.getName().find("#1pi") != std::string::npos)  {
+              if(sample_.getName().find("PM") != std::string::npos) wg_det_uncert = 0.1;
+              if(sample_.getName().find("WG") != std::string::npos) wg_det_uncert = 0.08;
+          }
+      }
 
       // Barlow-Beeston uses fractional uncertainty on MC, so sqrt(sum[w^2])/mc
-      double fractional = mcuncert / predVal + sfgd_det_uncert; // Add SFGD detector uncertainty 
+      double fractional = mcuncert / predVal + sfgd_det_uncert + wg_det_uncert; // Add SFGD detector uncertainty 
       // -b/2a in quadratic equation
       double temp = predVal * fractional * fractional - 1;
       // b^2 - 4ac in quadratic equation
