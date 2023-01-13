@@ -157,7 +157,10 @@ void DataDispenser::load(){
   overrideLeavesNamesFct(_parameters_.selectionCutFormulaStr);
 
   LogInfo << "Data will be extracted from: " << GenericToolbox::parseVectorAsString(_parameters_.filePathList, true) << std::endl;
-  for( const auto& file: _parameters_.filePathList){ LogThrowIf(not GenericToolbox::doesTFileIsValid(file, {_parameters_.treePath}), "Invalid file: " << file); }
+  for( const auto& file: _parameters_.filePathList){
+    std::string path = GenericToolbox::expandEnvironmentVariables(file);
+    LogThrowIf(not GenericToolbox::doesTFileIsValid(path, {_parameters_.treePath}), "Invalid file: " << path);
+  }
 
   this->doEventSelection();
   this->fetchRequestedLeaves();
@@ -204,7 +207,13 @@ void DataDispenser::doEventSelection(){
 
     GlobalVariables::getThreadMutex().lock();
     TChain treeChain(_parameters_.treePath.c_str());
-    for (const auto &file: _parameters_.filePathList) { treeChain.Add(file.c_str()); }
+    for (const auto &file: _parameters_.filePathList) {
+      std::string name = GenericToolbox::expandEnvironmentVariables(file);
+      if (name != file) {
+        LogWarning << "Filename expanded to: " << name << std::endl;
+      }
+      treeChain.Add(name.c_str());
+    }
     LogThrowIf(treeChain.GetEntries() == 0, "TChain is empty.");
 
     if( iThread_ == 0 ) LogInfo << "Defining selection formulas..." << std::endl;
@@ -572,7 +581,13 @@ void DataDispenser::preAllocateMemory(){
 
   // MEMORY CLAIM?
   TChain treeChain(_parameters_.treePath.c_str());
-  for( const auto& file: _parameters_.filePathList){ treeChain.Add(file.c_str()); }
+  for( const auto& file: _parameters_.filePathList){
+    std::string name = GenericToolbox::expandEnvironmentVariables(file);
+    if (name != file) {
+      LogWarning << "Filename expanded to: " << name << std::endl;
+    }
+    treeChain.Add(name.c_str());
+  }
   treeChain.SetBranchStatus("*", false);
 
   // Just a placeholder for creating the dictionary
@@ -788,7 +803,13 @@ void DataDispenser::fillFunction(int iThread_){
   }
 
   TChain treeChain(_parameters_.treePath.c_str());
-  for( const auto& file: _parameters_.filePathList){ treeChain.Add(file.c_str()); }
+  for( const auto& file: _parameters_.filePathList){
+    std::string name = GenericToolbox::expandEnvironmentVariables(file);
+    if (name != file) {
+      LogWarning << "Filename expanded to: " << name << std::endl;
+    }
+    treeChain.Add(name.c_str());
+  }
 
   TTreeFormula* threadNominalWeightFormula{nullptr};
   TList objToNotify;
@@ -1364,5 +1385,3 @@ void DataDispenserCache::addVarRequestedForStorage(const std::string& varName_){
   GenericToolbox::addIfNotInVector(varName_, this->varsRequestedForStorage);
   this->addVarRequestedForIndexing(varName_);
 }
-
-
