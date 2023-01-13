@@ -159,6 +159,14 @@ void DataDispenser::load(){
   LogInfo << "Data will be extracted from: " << GenericToolbox::parseVectorAsString(_parameters_.filePathList, true) << std::endl;
   for( const auto& file: _parameters_.filePathList){ LogThrowIf(not GenericToolbox::doesTFileIsValid(file, {_parameters_.treePath}), "Invalid file: " << file); }
 
+#if USE_NEW_DIALS
+  for( auto& dialCollection : *_dialCollectionListPtr_ ){
+    if( dialCollection.isDatasetValid( _owner_->getName() ) ){
+      _cache_.dialCollectionsRefList.emplace_back( &dialCollection );
+    }
+  }
+#endif
+
   this->doEventSelection();
   this->fetchRequestedLeaves();
   this->preAllocateMemory();
@@ -393,18 +401,18 @@ void DataDispenser::fetchRequestedLeaves(){
   LogWarning << "Poll every objects for requested variables..." << std::endl;
 
 #if USE_NEW_DIALS
-  if( _dialCollectionListPtr_ != nullptr ) {
+  if( not _cache_.dialCollectionsRefList.empty() ) {
     std::vector<std::string> indexRequests;
-    for( auto& dialCollection : *_dialCollectionListPtr_ ) {
-      if( dialCollection.getApplyConditionFormula() != nullptr ) {
-        for( int iPar = 0 ; iPar < dialCollection.getApplyConditionFormula()->GetNpar() ; iPar++ ){
-          GenericToolbox::addIfNotInVector(dialCollection.getApplyConditionFormula()->GetParName(iPar), indexRequests);
+    for( auto& dialCollection : _cache_.dialCollectionsRefList ) {
+      if( dialCollection->getApplyConditionFormula() != nullptr ) {
+        for( int iPar = 0 ; iPar < dialCollection->getApplyConditionFormula()->GetNpar() ; iPar++ ){
+          GenericToolbox::addIfNotInVector(dialCollection->getApplyConditionFormula()->GetParName(iPar), indexRequests);
         }
       }
-      if( not dialCollection.getGlobalDialLeafName().empty() ){
-        GenericToolbox::addIfNotInVector(dialCollection.getGlobalDialLeafName(), indexRequests);
+      if( not dialCollection->getGlobalDialLeafName().empty() ){
+        GenericToolbox::addIfNotInVector(dialCollection->getGlobalDialLeafName(), indexRequests);
       }
-      for( auto& bin : dialCollection.getDialBinSet().getBinsList() ) {
+      for( auto& bin : dialCollection->getDialBinSet().getBinsList() ) {
         for( auto& var : bin.getVariableNameList() ) {
           GenericToolbox::addIfNotInVector(var, indexRequests);
         }
@@ -610,73 +618,68 @@ void DataDispenser::preAllocateMemory(){
 #if USE_NEW_DIALS
   // DEV
   LogThrowIf(_eventDialCacheRef_ == nullptr, "Event dial cache ref not set.");
-  if( _dialCollectionListPtr_ != nullptr ){
-    LogInfo << "Claiming memory for event-by-event dials (DIAL COLLECTIONS)..." << std::endl;
+  if( not _cache_.dialCollectionsRefList.empty() ){
+    LogInfo << "Claiming memory for event-by-event dials..." << std::endl;
     double eventByEventDialSize{0};
     size_t nDialsMaxPerEvent{0};
-    for( auto& dialCollection : *_dialCollectionListPtr_ ){
+    for( auto& dialCollection : _cache_.dialCollectionsRefList ){
       nDialsMaxPerEvent += 1;
-      if( dialCollection.isDatasetValid(_owner_->getName()) ){
-
-        if( dialCollection.isBinned() ){
-          // Filling var indexes for faster eval with PhysicsEvent:
-          for( auto& bin : dialCollection.getDialBinSet().getBinsList() ){
-            std::vector<int> varIndexes;
-            for( auto& var : bin.getVariableNameList() ){
-              varIndexes.emplace_back(GenericToolbox::findElementIndex(var, _cache_.varsRequestedForIndexing));
-            }
-            bin.setEventVarIndexCache(varIndexes);
+      if( dialCollection->isBinned() ){
+        // Filling var indexes for faster eval with PhysicsEvent:
+        for( auto& bin : dialCollection->getDialBinSet().getBinsList() ){
+          std::vector<int> varIndexes;
+          for( auto& var : bin.getVariableNameList() ){
+            varIndexes.emplace_back(GenericToolbox::findElementIndex(var, _cache_.varsRequestedForIndexing));
           }
+          bin.setEventVarIndexCache(varIndexes);
         }
-        else if( not dialCollection.getGlobalDialLeafName().empty() ){
-          // Reserve memory for additional dials (those on a tree leaf)
-          auto dialType = dialCollection.getGlobalDialType();
-          LogInfo << dialCollection.getTitle() << ": creating " << nEvents;
-          LogInfo << " " << dialType;
+      }
+      else if( not dialCollection->getGlobalDialLeafName().empty() ){
+        // Reserve memory for additional dials (those on a tree leaf)
+        auto dialType = dialCollection->getGlobalDialType();
+        LogInfo << dialCollection->getTitle() << ": creating " << nEvents;
+        LogInfo << " " << dialType;
 
-          if     ( dialType == "Spline" ){
-            dialCollection.getDialBaseList().clear();
-            double dialsSizeInRam{0};
-            if(dialCollection.useCachedDials() ){
-              dialsSizeInRam = double(nEvents) * sizeof(SplineCache);
-              dialCollection.getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(SplineCache()));
-            }
-            else{
-              dialsSizeInRam = double(nEvents) * sizeof(Spline);
-              dialCollection.getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(Spline()));
-            }
-
-            eventByEventDialSize += dialsSizeInRam;
-            LogInfo << " dials (" << GenericToolbox::parseSizeUnits( dialsSizeInRam ) << ")" << std::endl;
-
-          }
-          else if( dialType == "Graph" ){
-            dialCollection.getDialBaseList().clear();
-            double dialsSizeInRam{0};
-            if(dialCollection.useCachedDials() ){
-              dialsSizeInRam = double(nEvents) * sizeof(GraphCache);
-              dialCollection.getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(GraphCache()));
-            }
-            else{
-              dialsSizeInRam = double(nEvents) * sizeof(Graph);
-              dialCollection.getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(Graph()));
-            }
-
-            eventByEventDialSize += dialsSizeInRam;
-            LogInfo << " dials (" << GenericToolbox::parseSizeUnits( dialsSizeInRam ) << ")" << std::endl;
-
+        if     ( dialType == "Spline" ){
+          dialCollection->getDialBaseList().clear();
+          double dialsSizeInRam{0};
+          if(dialCollection->useCachedDials() ){
+            dialsSizeInRam = double(nEvents) * sizeof(SplineCache);
+            dialCollection->getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(SplineCache()));
           }
           else{
-            LogInfo << std::endl;
-            LogThrow("Invalid dial type for event-by-event dial: " << dialType);
+            dialsSizeInRam = double(nEvents) * sizeof(Spline);
+            dialCollection->getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(Spline()));
           }
+
+          eventByEventDialSize += dialsSizeInRam;
+          LogInfo << " dials (" << GenericToolbox::parseSizeUnits( dialsSizeInRam ) << ")" << std::endl;
+
+        }
+        else if( dialType == "Graph" ){
+          dialCollection->getDialBaseList().clear();
+          double dialsSizeInRam{0};
+          if(dialCollection->useCachedDials() ){
+            dialsSizeInRam = double(nEvents) * sizeof(GraphCache);
+            dialCollection->getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(GraphCache()));
+          }
+          else{
+            dialsSizeInRam = double(nEvents) * sizeof(Graph);
+            dialCollection->getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(Graph()));
+          }
+
+          eventByEventDialSize += dialsSizeInRam;
+          LogInfo << " dials (" << GenericToolbox::parseSizeUnits( dialsSizeInRam ) << ")" << std::endl;
 
         }
         else{
-          LogThrow("DEV ERROR: not binned, not event-by-event?");
+          LogInfo << std::endl;
+          LogThrow("Invalid dial type for event-by-event dial: " << dialType);
         }
 
-        _cache_.dialCollectionsRefList.emplace_back( &dialCollection );
+      }
+      else{
+        LogThrow("DEV ERROR: not binned, not event-by-event?");
       }
     }
     _eventDialCacheRef_->allocateCacheEntries(nEvents, nDialsMaxPerEvent);
@@ -768,16 +771,6 @@ void DataDispenser::readAndFill(){
     if(_parameters_.useMcContainer) container = &_cache_.samplesToFillList[iSample]->getMcContainer();
     container->shrinkEventList(_cache_.sampleIndexOffsetList[iSample]);
   }
-
-#if USE_NEW_DIALS
-  LogInfo << "Resizing dial containers..." << std::endl;
-  for( auto& dialCollection : *_dialCollectionListPtr_ ) {
-    if( not dialCollection.isBinned() ){ dialCollection.resizeContainers(); }
-  }
-
-  LogInfo << "Build reference cache..." << std::endl;
-  _eventDialCacheRef_->buildReferenceCache(*_sampleSetPtrToLoad_, *_dialCollectionListPtr_);
-#endif
 }
 void DataDispenser::fillFunction(int iThread_){
 
@@ -1113,12 +1106,14 @@ void DataDispenser::fillFunction(int iThread_){
 
 #if USE_NEW_DIALS
         eventDialCacheEntry = _eventDialCacheRef_->fetchNextCacheEntry();
-        eventDialCacheEntry->first.first = iSample;
-        eventDialCacheEntry->first.second = sampleEventIndex;
+        eventDialCacheEntry->first = {
+            _cache_.samplesToFillList[iSample]->getIndex(),
+            sampleEventIndex
+            };
 
         iCollection = -1;
         for( auto* dialCollectionRef : _cache_.dialCollectionsRefList ){
-          iCollection++;
+          iCollection = dialCollectionRef->getIndex();
 
           if( not dialCollectionRef->isEnabled() ){ continue; }
 

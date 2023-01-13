@@ -80,6 +80,7 @@ void Propagator::readConfigImpl(){
       for( auto& dialSetDef : _parameterSetList_[iParSet].getDialSetDefinitions().get<std::vector<nlohmann::json>>() ){
         if( JsonUtils::doKeyExist(dialSetDef, "parametersBinningPath") ){
           _dialCollections_.emplace_back(&_parameterSetList_);
+          _dialCollections_.back().setIndex(int(_dialCollections_.size())-1);
           _dialCollections_.back().setSupervisedParameterSetIndex( int(iParSet) );
           _dialCollections_.back().readConfig( dialSetDef );
         }
@@ -99,6 +100,7 @@ void Propagator::readConfigImpl(){
 
         for( const auto& dialDefinitionConfig : par.getDialDefinitionsList() ){
           _dialCollections_.emplace_back(&_parameterSetList_);
+          _dialCollections_.back().setIndex(int(_dialCollections_.size())-1);
           _dialCollections_.back().setSupervisedParameterSetIndex( int(iParSet) );
           _dialCollections_.back().setSupervisedParameterIndex( par.getParameterIndex() );
           _dialCollections_.back().readConfig( dialDefinitionConfig );
@@ -185,6 +187,17 @@ void Propagator::initializeImpl() {
     }
     dispenser.load();
   }
+
+#if USE_NEW_DIALS
+  LogInfo << "Resizing dial containers..." << std::endl;
+  for( auto& dialCollection : _dialCollections_ ) {
+    if( not dialCollection.isBinned() ){ dialCollection.resizeContainers(); }
+  }
+
+  LogInfo << "Build reference cache..." << std::endl;
+  _eventDialCache_.buildReferenceCache(_fitSampleSet_, _dialCollections_);
+#endif
+
 
   // Copy to data container
   if( usedMcContainer ){
@@ -290,6 +303,16 @@ void Propagator::initializeImpl() {
 #endif
       dispenser.load();
     }
+
+#if USE_NEW_DIALS
+    LogInfo << "Resizing dial containers..." << std::endl;
+    for( auto& dialCollection : _dialCollections_ ) {
+      if( not dialCollection.isBinned() ){ dialCollection.resizeContainers(); }
+    }
+
+    LogInfo << "Build reference cache..." << std::endl;
+    _eventDialCache_.buildReferenceCache(_fitSampleSet_, _dialCollections_);
+#endif
   }
 
 #ifdef GUNDAM_USING_CACHE_MANAGER

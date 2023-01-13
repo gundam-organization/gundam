@@ -328,7 +328,8 @@ bool DialSet::initializeDialsWithDefinition() {
         auto* dialsList = dialsTFile->Get<TObjArray>(JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsList").c_str());
         LogThrowIf(dialsList==nullptr, "Could not find dialsList: " << JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsList"));
 
-        LogThrowIf(dialsList->GetSize() != _binningCacheList_.back().getBinsList().size(), "Number of dials (" << dialsList->GetSize() << ") don't match the number of bins "
+        LogThrowIf(dialsList->GetSize() != _binningCacheList_.back().getBinsList().size(),
+                   "Number of dials (" << dialsList->GetSize() << ") don't match the number of bins "
                    << _binningCacheList_.back().getBinsList().size() << "");
 
         for( int iBin = 0 ; iBin < _binningCacheList_.back().getBinsList().size() ; iBin++ ){
@@ -347,7 +348,7 @@ bool DialSet::initializeDialsWithDefinition() {
             _dialList_.emplace_back( std::make_unique<GraphDial>(g) );
           }
           else{
-            LogThrow("Should not be here???")
+            LogThrow("Should not be here???");
           }
         }
 

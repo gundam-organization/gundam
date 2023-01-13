@@ -25,15 +25,18 @@ class DialCollection : public JsonBaseClass {
 public:
   explicit DialCollection(std::vector<FitParameterSet> *targetParameterSetListPtr);
 
+  void setIndex(int index);
   void setSupervisedParameterIndex(int supervisedParameterIndex);
   void setSupervisedParameterSetIndex(int supervisedParameterSetIndex);
 
   [[nodiscard]] bool isBinned() const;
   [[nodiscard]] bool isEnabled() const;
+  [[nodiscard]] int getIndex() const{ return _index_; }
   [[nodiscard]] const std::string &getGlobalDialLeafName() const;
   [[nodiscard]] const std::string &getGlobalDialType() const;
   [[nodiscard]] const std::shared_ptr<TFormula> &getApplyConditionFormula() const;
   [[nodiscard]] const DataBinSet &getDialBinSet() const;
+  const std::vector<std::string> &getDataSetNameList() const;
   std::vector<GenericToolbox::PolymorphicObjectWrapper<DialBase>> &getDialBaseList();
   std::vector<DialInterface> &getDialInterfaceList();
   DataBinSet &getDialBinSet();
@@ -66,6 +69,7 @@ private:
   bool _disableDialCache_{false};
   bool _enableDialsSummary_{false};
   bool _allowDialExtrapolation_{true};
+  int _index_{-1};
   double _minDialResponse_{std::nan("unset")};
   double _maxDialResponse_{std::nan("unset")};
   double _mirrorLowEdge_{std::nan("unset")};

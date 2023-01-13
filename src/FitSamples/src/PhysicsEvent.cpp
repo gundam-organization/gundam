@@ -14,26 +14,8 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[PhysicsEvent]");
 });
 
-PhysicsEvent::PhysicsEvent() { this->reset(); }
-PhysicsEvent::~PhysicsEvent() { this->reset(); }
-
-void PhysicsEvent::reset() {
-  _commonLeafNameListPtr_ = nullptr;
-  _leafContentList_.clear();
-
-#if USE_NEW_DIALS
-#else
-  _rawDialPtrList_.clear();
-#endif
-
-  // Weight carriers
-  _dataSetIndex_=-1;
-  _entryIndex_=-1;
-  _treeWeight_ = 1;
-  _nominalWeight_ = 1;
-  _eventWeight_ = 1;
-  _sampleBinIndex_ = -1;
-}
+PhysicsEvent::PhysicsEvent() = default;
+PhysicsEvent::~PhysicsEvent()  = default;
 
 void PhysicsEvent::setCommonLeafNameListPtr(const std::shared_ptr<std::vector<std::string>>& commonLeafNameListPtr_){
   _commonLeafNameListPtr_ = commonLeafNameListPtr_;

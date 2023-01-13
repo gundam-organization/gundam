@@ -29,6 +29,7 @@ void FitSampleSet::readConfigImpl(){
   for( const auto& fitSampleConfig: fitSampleListConfig ){
     if( not JsonUtils::fetchValue(fitSampleConfig, "isEnabled", true) ) continue;
     _fitSampleList_.emplace_back();
+    _fitSampleList_.back().setIndex(int(_fitSampleList_.size())-1);
     _fitSampleList_.back().setConfig(fitSampleConfig);
     _fitSampleList_.back().readConfig();
   }
@@ -126,8 +127,11 @@ double FitSampleSet::evalLikelihood(const FitSample& sample_) const{
 void FitSampleSet::copyMcEventListToDataContainer(){
   for( auto& sample : _fitSampleList_ ){
     LogInfo << "Copying MC events in sample \"" << sample.getName() << "\"" << std::endl;
+    sample.getDataContainer().eventList.clear();
+    sample.getDataContainer().eventList.reserve(sample.getMcContainer().eventList.size());
+//    sample.getDataContainer().eventList = sample.getMcContainer().eventList;
     sample.getDataContainer().eventList.insert(
-        std::end(sample.getDataContainer().eventList),
+        sample.getDataContainer().eventList.begin(),
         std::begin(sample.getMcContainer().eventList),
         std::end(sample.getMcContainer().eventList)
     );
