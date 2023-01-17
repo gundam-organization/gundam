@@ -28,8 +28,6 @@ public:
   PhysicsEvent();
   virtual ~PhysicsEvent();
 
-  void reset();
-
   // SETTERS
   void setDataSetIndex(int dataSetIndex_);
   void setEntryIndex(Long64_t entryIndex_);
@@ -111,7 +109,7 @@ private:
 
   // Data storage variables
   std::shared_ptr<std::vector<std::string>> _commonLeafNameListPtr_{nullptr};
-  std::vector<std::vector<GenericToolbox::AnyType>> _leafContentList_;
+  std::vector<std::vector<GenericToolbox::AnyType>> _leafContentList_{};
 
   // Cache variables
   mutable std::vector<std::vector<double>> _varToDoubleCache_{};

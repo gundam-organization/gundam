@@ -42,9 +42,13 @@ void DialCollection::readConfigImpl() {
 void DialCollection::initializeImpl() {
   LogInfo << "Initialising dial collection \"" << this->getTitle() << "\"" << std::endl;
 
+  LogThrowIf(_index_==-1, "Index not set.");
   this->setupDialInterfaceReferences();
 }
 
+void DialCollection::setIndex(int index) {
+  _index_ = index;
+}
 void DialCollection::setSupervisedParameterIndex(int supervisedParameterIndex) {
   _supervisedParameterIndex_ = supervisedParameterIndex;
 }
@@ -69,6 +73,9 @@ const std::shared_ptr<TFormula> &DialCollection::getApplyConditionFormula() cons
 }
 const DataBinSet &DialCollection::getDialBinSet() const {
   return _dialBinSet_;
+}
+const std::vector<std::string> &DialCollection::getDataSetNameList() const {
+  return _dataSetNameList_;
 }
 std::vector<GenericToolbox::PolymorphicObjectWrapper<DialBase>> &DialCollection::getDialBaseList() {
   return _dialBaseList_;
@@ -333,8 +340,9 @@ bool DialCollection::initializeDialsWithDefinition() {
             "Could not find dialsList: " << JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsList")
         );
         LogThrowIf(
-            dialsList->GetSize() != _dialBinSet_.getBinsList().size(),
-            "Number of dials (" << dialsList->GetSize() << ") don't match the number of bins " << _dialBinSet_.getBinsList().size()
+            dialsList->GetEntries() != _dialBinSet_.getBinsList().size(),
+            this->getTitle() << ": Number of dials (" << dialsList->GetEntries()
+            << ") don't match the number of bins " << _dialBinSet_.getBinsList().size()
         );
 
         std::vector<int> excludedBins{};

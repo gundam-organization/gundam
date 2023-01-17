@@ -153,6 +153,8 @@ void FitParameterSet::processCovarianceMatrix(){
   }
   _deltaParameterList_ = std::make_shared<TVectorD>(_strippedCovarianceMatrix_->GetNrows());
 
+  LogThrowIf(not _strippedCovarianceMatrix_->IsSymmetric(), "Covariance matrix is not symmetric");
+
   if( not _useEigenDecompInFit_ ){
     LogWarning << "Computing inverse of the stripped covariance matrix: "
                << _strippedCovarianceMatrix_->GetNcols() << "x"
@@ -175,6 +177,9 @@ void FitParameterSet::processCovarianceMatrix(){
     double eigenCumulative = 0;
     _nbEnabledEigen_ = 0;
     double eigenTotal = _eigenValues_->Sum();
+
+    LogInfo << "Covariance eigen values are between " << _eigenValues_->Min() << " and " << _eigenValues_->Max() << std::endl;
+    LogThrowIf(_eigenValues_->Min() < 0, "Input covariance matrix is not positive definite.");
 
     _inverseStrippedCovarianceMatrix_ = std::make_shared<TMatrixD>(_strippedCovarianceMatrix_->GetNrows(), _strippedCovarianceMatrix_->GetNrows());
     _projectorMatrix_                 = std::make_shared<TMatrixD>(_strippedCovarianceMatrix_->GetNrows(), _strippedCovarianceMatrix_->GetNrows());

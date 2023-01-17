@@ -24,19 +24,22 @@ class FitSample : public JsonBaseClass {
 public:
   // SETTERS
   void setName(const std::string &name);
+  void setIndex(int index);
+
   void setBinningFilePath(const std::string &binningFilePath_);
   void setSelectionCutStr(const std::string &selectionCutStr_);
   void setVarSelectionFormulaStr(const std::string &varSelectionFormulaStr_);
   void setEnabledDatasetList(const std::vector<std::string>& enabledDatasetList_);
 
   // GETTERS
-  bool isEnabled() const;
-  const std::string &getName() const;
-  const std::string &getSelectionCutsStr() const;
-  const std::string &getVarSelectionFormulaStr() const;
-  const DataBinSet &getBinning() const;
-  const SampleElement &getMcContainer() const;
-  const SampleElement &getDataContainer() const;
+  [[nodiscard]] bool isEnabled() const;
+  [[nodiscard]] int getIndex() const;
+  [[nodiscard]] const std::string &getName() const;
+  [[nodiscard]] const std::string &getSelectionCutsStr() const;
+  [[nodiscard]] const std::string &getVarSelectionFormulaStr() const;
+  [[nodiscard]] const DataBinSet &getBinning() const;
+  [[nodiscard]] const SampleElement &getMcContainer() const;
+  [[nodiscard]] const SampleElement &getDataContainer() const;
   SampleElement &getMcContainer();
   SampleElement &getDataContainer();
 
@@ -50,6 +53,7 @@ protected:
 private:
   // Yaml
   bool _isEnabled_{false};
+  int _index_{-1};
   double _mcNorm_{1};
   double _dataNorm_{1};
   std::string _name_;

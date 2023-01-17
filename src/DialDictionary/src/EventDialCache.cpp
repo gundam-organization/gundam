@@ -44,7 +44,7 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
   );
   _cache_.reserve( nCacheEntries );
 
-  for(auto & entry : _indexedCache_){
+  for( auto& entry : _indexedCache_ ){
 
     if( not isCacheEntryValid(entry) ){
       if( _warnForDialLessEvent_ ){
@@ -55,7 +55,6 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
     }
 
     _cache_.emplace_back();
-
     _cache_.back().first =
         &sampleSet_.getFitSampleList().at(
             entry.first.first
@@ -65,6 +64,15 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
 
     _cache_.back().second.reserve( countValidDials(entry.second) );
 
+//    LogTrace << "Sample #" << entry.first.first << "(" << sampleSet_.getFitSampleList().at(entry.first.first).getName() << ") / MC_Event#" << entry.first.second << std::endl;
+//    LogTrace << "Nb of dials: " << entry.second.size() << std::endl;
+//    LogTrace << "dials :" << GenericToolbox::iterableToString(entry.second, [&](auto& dialIndex){
+//      std::stringstream ss;
+//      if( dialIndex.first == size_t(-1) or dialIndex.second == size_t(-1) ){ return std::string("invalid"); }
+//      ss << dialCollectionList_.at(dialIndex.first).getTitle() << "/#" << dialIndex.second;
+//      ss << dialIndex.first << "/#" << dialIndex.second;
+//      return ss.str();
+//    }) << std::endl;
     for( auto& dialIndex : entry.second ){
       if( dialIndex.first == size_t(-1) or dialIndex.second == size_t(-1) ){ continue; }
 #ifndef USE_BREAKDOWN_CACHE
@@ -83,7 +91,7 @@ void EventDialCache::allocateCacheEntries(size_t nEvent_, size_t nDialsMaxPerEve
   _indexedCache_.resize( _indexedCache_.size() + nEvent_, {{-1,-1}, std::vector<std::pair<size_t, size_t>>(nDialsMaxPerEvent_, {-1,-1})} );
 }
 std::pair<std::pair<size_t, size_t>, std::vector<std::pair<size_t, size_t>>>* EventDialCache::fetchNextCacheEntry(){
-#if __cplusplus >= 201703L
+#if HAS_CPP_17
   std::scoped_lock<std::mutex> g(_mutex_);
 #else
   std::lock_guard<std::mutex> g(_mutex_);

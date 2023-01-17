@@ -16,7 +16,7 @@ double DialBaseCache::evalResponse(const DialInputBuffer& input_){
   if( isCacheValid(input_) ){ return _cachedResponse_; }
 
   // lock -> only one at a time pass this point
-#if __cplusplus >= 201703L
+#if HAS_CPP_17
   // https://stackoverflow.com/questions/26089319/is-there-a-standard-definition-for-cplusplus-in-c14
   std::scoped_lock<std::mutex> g(_evalLock_);
 #else

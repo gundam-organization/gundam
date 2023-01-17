@@ -67,6 +67,9 @@ void FitSample::initializeImpl() {
 void FitSample::setName(const std::string &name) {
   _name_ = name;
 }
+void FitSample::setIndex(int index) {
+  _index_ = index;
+}
 void FitSample::setBinningFilePath(const std::string &binningFilePath_) {
   _binningFilePath_ = binningFilePath_;
 }
@@ -82,6 +85,9 @@ void FitSample::setEnabledDatasetList(const std::vector<std::string>& enabledDat
 
 bool FitSample::isEnabled() const {
   return _isEnabled_;
+}
+int FitSample::getIndex() const {
+  return _index_;
 }
 const std::string &FitSample::getName() const {
   return _name_;
