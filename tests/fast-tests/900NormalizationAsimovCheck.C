@@ -47,7 +47,6 @@ int status{0};
     } while(false);
 
 int main() {
-    std::cout << "Run 900NormalizationAsimovCheck.C" << std::endl;
     std::shared_ptr<TFile> file(new TFile("200NormalizationAsimov.root","old"));
 
     EXPECT("File pointer is not null",file);
@@ -109,7 +108,7 @@ int main() {
 
     return status;
 }
-exit(main())
+exit(main());
 EOF
 # Local Variables:
 # mode:c++
