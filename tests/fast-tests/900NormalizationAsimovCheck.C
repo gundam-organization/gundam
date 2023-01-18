@@ -16,34 +16,43 @@ root -b -n <<EOF
 std::string args{"$*"};
 int status{0};
 
-#define EXPECT(msg,v1)                                                  \
-    do {                                                                \
-        if (not (v1)) {                                                 \
-            std::cout << "FAIL:";                                       \
-            ++ status;                                                  \
-        } else {                                                        \
-            std::cout << "SUCCESS:";                                    \
-        }                                                               \
-        std::cout << " " << msg                                         \
-                  << " [ (" << #v1 << ") --> " << v1 << "]"             \
-                  << std::endl;                                         \
+/// Fail with message if "v1" evaluates to false.  THIS IS COPIED
+/// HERE TO AVOID DEPENDENCIES
+#define EXPECT(msg,v1)                                      \
+    do {                                                    \
+        if (not (v1)) {                                     \
+            std::cout << "FAIL:";                           \
+            ++ status;                                      \
+        } else {                                            \
+            std::cout << "SUCCESS:";                        \
+        }                                                   \
+        std::cout << " " << msg                             \
+                  << " [ (" << #v1 << ") --> " << v1 << "]" \
+                  << std::endl;                             \
     } while (false)
 
-
-#define TOLERANCE(msg,v1,v2,tol)                                        \
-    do {                                                                \
-        if (std::abs(v1-v2) > tol) {                                    \
-            std::cout << "FAIL:";                                       \
-            ++ status;                                                  \
-        } else {                                                        \
-            std::cout << "SUCCESS:";                                    \
-        }                                                               \
-        std::cout << " " << msg                                         \
-                  << std::setprecision(15)                              \
-                  << " [" << #v1 << "=" << (v1)                         \
-                  << " " << #v2 << "=" << (v2)                          \
-                  << " " << std::abs(v1-v2) << ">" << (tol) << "]"      \
-                  << std::endl;                                         \
+/// Fail if fractional difference between "v1" and "v2" is larger than "tol"
+/// THIS IS COPIED HERE TO AVOID DEPENDENCIES
+#define TOLERANCE(msg,v1,v2,tol)                            \
+    do {                                                    \
+        double v = (v1)>0 ? (v1): -(v1);                    \
+        double vv = (v2)>0 ? (v2): -(v2);                   \
+        double d = std::abs((v1)-(v2));                     \
+        double r = d/std::max(0.5*(v+vv),(tol));            \
+        if (r > (tol)) {                                    \
+            std::cout << "FAIL:";                           \
+            ++ status;                                      \
+        } else {                                            \
+            std::cout << "SUCCESS:";                        \
+        }                                                   \
+        std::cout << " " << msg                             \
+                  << std::setprecision(8)                   \
+                  << std::scientific                        \
+                  << " (" << r << "<" << (tol) << ")"       \
+                  << " [" << #v1 << "=" << (v1)             \
+                  << " " << #v2 << "=" << (v2)              \
+                  << " " << d << "]"                        \
+                  << std::endl;                             \
     } while(false);
 
 int main() {
@@ -59,7 +68,7 @@ int main() {
         = dynamic_cast<TH1*>(file->Get(
                                  "FitterEngine"
                                  "/postFit"
-                                 "/Migrad"
+                                 "/Hesse"
                                  "/errors"
                                  "/Normalizations"
                                  "/values"
@@ -70,7 +79,7 @@ int main() {
         = dynamic_cast<TMatrixD*>(file->Get(
                                       "FitterEngine"
                                       "/postFit"
-                                      "/Migrad"
+                                      "/Hesse"
                                       "/errors"
                                       "/Normalizations"
                                       "/matrices"
@@ -94,12 +103,12 @@ int main() {
     TOLERANCE("Check nominal value for #0_Positive_C",
               postFitErrors->GetBinContent(1), 1.0, tolerance);
     TOLERANCE("Check variance for #0_Positive_C",
-              (*covariance)(0,0), 0.000290364, tolerance);
+              (*covariance)(0,0), 0.00057842, 1E-5);
 
     TOLERANCE("Check nominal value for #1_Negative_C",
               postFitErrors->GetBinContent(2), 1.0, tolerance);
     TOLERANCE("Check variance for #1_Negative_C",
-              (*covariance)(1,1), 0.000289376, tolerance);
+              (*covariance)(1,1), 0.00057688, 1E-5);
 
     TOLERANCE("Check covariance",
               (*covariance)(0,1), 0.0, tolerance);
