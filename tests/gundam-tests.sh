@@ -161,6 +161,7 @@ fi
 
 # Find and run the jobs in lexical order.
 FAILURES=""
+EXPECTED=""
 for i in $(find ${TESTS} -name "[0-9]*" -type f | grep -v "~" | sort); do
     JOB=${PWD}/${i}
     # Only run files that are executable
@@ -190,18 +191,27 @@ for i in $(find ${TESTS} -name "[0-9]*" -type f | grep -v "~" | sort); do
     if [ ${SUCCESS} = "yes" ]; then
         # The job succeeded, make sure it's not in EXPECTED_FAILURES
         if (grep $i EXPECTED_FAILURES >> /dev/null); then
-            echo ERROR: Expected $i to fail
-            FAILURES="${FAILURES} \"${JOB}\""
+            echo JOB FAILURE: Expected $i to fail
+            FAILURES="${FAILURES} unexpected-success:\"${JOB}\""
         fi
     else
         # The job failed, check if it was expected
         if (grep $i EXPECTED_FAILURES >> /dev/null); then
             echo JOB SUCCESS: Failure was expected for $i
+            EXPECTED="${EXPECTED} \"${JOB}\""
         else
-            FAILURES="${FAILURES} \"${JOB}\""
+            FAILURES="${FAILURES} unexpected-failure:\"${JOB}\""
         fi
     fi
 done
+
+if [ ${#EXPECTED} -gt 0 ]; then
+    echo
+    echo Expected Failures:
+    for i in ${EXPECTED}; do
+        echo EXPECTED: $i
+    done
+fi
 
 if [ ${#FAILURES} -gt 0 ]; then
     echo
