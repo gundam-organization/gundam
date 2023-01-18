@@ -17,7 +17,8 @@ fitterEngineConfig:
     minimizer: "Minuit2"
     algorithm: "Migrad"
     errors: "Hesse"
-  
+    print_level: 2
+
   propagatorConfig:
     throwAsimovFitParameters: false
 
@@ -32,13 +33,13 @@ fitterEngineConfig:
             - "${DATA_DIR}/100NormalizationTree.root"
 
     fitSampleSetConfig:
-      llhStatFunction: BarlowLLH_BANFF_OA2021
+      # PoissonLLH is used for tests because it is mathematically simple
+      llhStatFunction: PoissonLLH
       dataEventType: Asimov
-      
+
       llhConfig:
-        usePoissonLikelihood: false
-        BBNoUpdateWeights: false
-      
+        usePoissonLikelihood: true
+
       fitSampleList:
         - name: AB
           isEnabled: true

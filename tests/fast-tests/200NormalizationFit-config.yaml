@@ -3,6 +3,9 @@
 # Do a data fit to the tree_dt tree in 100NormalizationTree.root.  This
 # fits the (A,B) distribution with two free normalization variables.
 #
+#   Positive_C : Normalization for events where the C truth variable is >0
+#   Negative_C : Normalization for events where the C truth variable is <=0
+#
 
 fit: true                    # can be disabled with -d
 scanParameters: false        # can be triggered with --scan
@@ -14,10 +17,10 @@ fitterEngineConfig:
     minimizer: "Minuit2"
     algorithm: "Migrad"
     errors: "Hesse"
-  
+    print_level: 2
+
   propagatorConfig:
     throwAsimovFitParameters: false
-    llhStatFunctino: BarlowLLH
 
     dataSetList:
       - name: "TestSample"
@@ -37,6 +40,13 @@ fitterEngineConfig:
 
 
     fitSampleSetConfig:
+      # PoissonLLH is used for tests because it is mathematically simple
+      llhStatFunction: PoissonLLH
+      dataEventType: TestData
+
+      llhConfig:
+        usePoissonLikelihood: true
+
       fitSampleList:
         - name: AB
           isEnabled: true
@@ -46,7 +56,7 @@ fitterEngineConfig:
     parameterSetListConfig:
       - name: Normalizations
         isEnabled: true
-        nominalStepSize: 0.01
+        nominalStepSize: 0.1
 
         parameterDefinitions:
 
