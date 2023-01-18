@@ -196,7 +196,7 @@ for i in $(find ${TESTS} -name "[0-9]*" -type f | grep -v "~" | sort); do
     else
         # The job failed, check if it was expected
         if (grep $i EXPECTED_FAILURES >> /dev/null); then
-            echo SUCCESS: Failure was expected for $i
+            echo JOB SUCCESS: Failure was expected for $i
         else
             FAILURES="${FAILURES} \"${JOB}\""
         fi
@@ -210,10 +210,10 @@ if [ ${#FAILURES} -gt 0 ]; then
         echo FAILED: $i
     done
     echo
-    echo Tests failed
+    echo FAIL: Tests failed
     exit 1
 else
     echo
-    echo Tests succeeded
+    echo SUCCESS: Tests succeeded
 fi
 # End of the script
