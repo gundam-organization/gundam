@@ -20,7 +20,6 @@ fitterEngineConfig:
   
   propagatorConfig:
     throwAsimovFitParameters: false
-    llhStatFunctino: BarlowLLH
 
     dataSetList:
       - name: "TestSample"
@@ -33,6 +32,13 @@ fitterEngineConfig:
             - "${DATA_DIR}/100NormalizationTree.root"
 
     fitSampleSetConfig:
+      llhStatFunction: BarlowLLH_BANFF_OA2021
+      dataEventType: Asimov
+      
+      llhConfig:
+        usePoissonLikelihood: false
+        BBNoUpdateWeights: false
+      
       fitSampleList:
         - name: AB
           isEnabled: true
@@ -42,7 +48,7 @@ fitterEngineConfig:
     parameterSetListConfig:
       - name: Normalizations
         isEnabled: true
-        nominalStepSize: 0.01
+        nominalStepSize: 0.1
 
         parameterDefinitions:
 
