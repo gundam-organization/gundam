@@ -4,7 +4,8 @@
 # subdirectory will always be run.  Any test scripts that take a lot
 # of time and are for more detailed validation should be kept in
 # slow-tests.  The slow-tests will only be run if the "-s" option is
-# provided.
+# provided.  The apply option ("-a") must be added to actually run the
+# scripts.
 #
 # This needs to be run in the tests subdirectory (which contains this
 # script).  Any tests that are expected to fail should be listed in
@@ -23,7 +24,12 @@
 # full path of the test script, and <directory> is the full path of
 # the directory containing the test script.  Any necessary
 # configuration files should be saved in the same directory as the
-# script.  
+# script.
+#
+# The gundam-tests.sh script will run all of the executable scripts in
+# the script directories (i.e. fast-tests and/or slow-tests) that
+# start with a digit.  The list of scripts to be run are printed
+# before they start to run.
 #
 # The validation scripts are run in lexical order based on the script
 # name.  This means that script "001MyName" is run before "002MyName",
@@ -41,7 +47,10 @@
 #
 #    800-899 -- Scripts which produce summary trees.
 #
-#    900-999 -- Scripts looking at summary trees and checking results
+#    900-998 -- Scripts looking at summary trees and checking results
+#
+#    999 -- Reserved for gundam-tests.sh.  This is where job
+#               completion information is generated.
 #
 # NAMING CONVENTION EXAMPLE: This is how the naming convention works
 # in practice.  This is how a script that runs a GUNDAM fit that takes
