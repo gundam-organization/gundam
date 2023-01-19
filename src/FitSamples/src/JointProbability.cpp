@@ -257,6 +257,21 @@ namespace JointProbability{
     return 2.0 * (predVal - dataVal + dataVal * TMath::Log(dataVal / predVal));
   }
 
+  // LeastSquaresLLH
+  void LeastSquaresLLH::readConfigImpl(){
+    LogWarning << "Using LeastSquaresLLH: NOT A REAL LIKELIHOOD" << std::endl;
+    lsqPoissonianApproximation = JsonUtils::fetchValue(_config_, "lsqPoissonianApproximation", lsqPoissonianApproximation);
+    LogWarning << "Using Least Squares Poissonian Approximation" << std::endl;
+  }
+  double LeastSquaresLLH::eval(const FitSample& sample_, int bin_){
+    double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
+    double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
+    double v = dataVal - predVal;
+    v = v*v;
+    if (lsqPoissonianApproximation && dataVal > 1.0) v /= 0.5*dataVal;
+    return v;
+  }
+
   // BarlowLLH
   double BarlowLLH::eval(const FitSample& sample_, int bin_){
     rel_var = sample_.getMcContainer().histogram->GetBinError(bin_) / TMath::Sq(sample_.getMcContainer().histogram->GetBinContent(bin_));
