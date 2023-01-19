@@ -309,7 +309,7 @@ bool DialCollection::initializeDialsWithDefinition() {
   if( _globalDialType_ == "Norm" or _globalDialType_ == "Normalization" ){
     _dialBaseList_.emplace_back( std::make_unique<Norm>() );
   }
-  else if( _globalDialType_ == "Spline" or _globalDialType_ == "Graph" ){
+  else if( _globalDialType_ == "Spline" or _globalDialType_ == "Graph" or _globalDialType_ == "LightGraph" ){
 
     if ( JsonUtils::doKeyExist(dialsDefinition, "dialSubType") ) {
       _globalDialSubType_ =  JsonUtils::fetchValue<std::string>(dialsDefinition, "dialSubType");
@@ -384,7 +384,7 @@ bool DialCollection::initializeDialsWithDefinition() {
               _dialBaseList_.emplace_back( std::make_unique<Spline>(s) );
             }
           }
-          else if     ( _globalDialType_ == "Graph" ){
+          else if( _globalDialType_ == "Graph" ){
             // check if flat at 1
             TGraph* loadedDial{(TGraph*) dialsList->At(iBin)};
 
@@ -412,6 +412,27 @@ bool DialCollection::initializeDialsWithDefinition() {
               g.setGraph( *(loadedDial) );
               _dialBaseList_.emplace_back( std::make_unique<Graph>(g) );
             }
+          }
+          else if( _globalDialType_ == "LightGraph" ){
+            // check if flat at 1
+            TGraph* loadedDial{(TGraph*) dialsList->At(iBin)};
+
+            if( GenericToolbox::isFlatAndOne(loadedDial) ){
+              LogAlert << "Invalid/flat dial for " << getTitle() << " -> " << _dialBinSet_.getBinsList()[iBin].getSummary() << std::endl;
+              excludedBins.emplace_back(iBin);
+              continue;
+            }
+
+            if( not std::any_of(&(loadedDial->GetY()[0]), &(loadedDial->GetY()[loadedDial->GetN()]), [](Double_t val_){ return val_ != 1.; }) ){
+              LogAlert << "Flat dial for " << getTitle() << " -> " << _dialBinSet_.getBinsList()[iBin].getSummary() << std::endl;
+              excludedBins.emplace_back(iBin);
+              continue;
+            }
+
+            LightGraph g;
+            g.setAllowExtrapolation(_allowDialExtrapolation_);
+            g.setGraph( *(loadedDial) );
+            _dialBaseList_.emplace_back( std::make_unique<LightGraph>(g) );
           }
           else{
             LogThrow(_globalDialType_ << " is not implemented.");

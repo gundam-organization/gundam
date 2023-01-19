@@ -674,6 +674,15 @@ void DataDispenser::preAllocateMemory(){
             LogInfo << " dials (" << GenericToolbox::parseSizeUnits( dialsSizeInRam ) << ")" << std::endl;
 
           }
+          else if( dialType == "LightGraph" ){
+            dialCollection->getDialBaseList().clear();
+            double dialsSizeInRam{0};
+            dialsSizeInRam = double(nEvents) * sizeof(LightGraph);
+            dialCollection->getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(LightGraph()));
+
+            eventByEventDialSize += dialsSizeInRam;
+            LogInfo << " dials (" << GenericToolbox::parseSizeUnits( dialsSizeInRam ) << ")" << std::endl;
+          }
           else{
             LogInfo << std::endl;
             LogThrow("Invalid dial type for event-by-event dial: " << dialType);
@@ -1188,6 +1197,9 @@ void DataDispenser::fillFunction(int iThread_){
                   else{
                     ( (Graph*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->setGraph( *grPtr );
                   }
+                }
+                else if ( dialCollectionRef->getGlobalDialType() == "LightGraph" ){
+                  ( (LightGraph*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->setGraph( *grPtr );
                 }
                 else{
                   LogThrow( "Unsupported event-by-event dial: " << dialCollectionRef->getGlobalDialType() );
