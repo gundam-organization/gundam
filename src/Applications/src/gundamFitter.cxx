@@ -198,7 +198,7 @@ int main(int argc, char** argv){
   // --------------------------
 
   // Checking the minimal version for the config
-  if( JsonUtils::doKeyExist(jsonConfig, "minGundamVersion") and not clParser.isOptionTriggered("--ignore-version") ){
+  if( JsonUtils::doKeyExist(jsonConfig, "minGundamVersion") and not clParser.isOptionTriggered("ignoreVersionCheck") ){
     LogThrowIf(
         not g.isNewerOrEqualVersion(JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion")),
         "Version check FAILED: " << GundamVersionConfig::getVersionStr() << " < " << JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion")
