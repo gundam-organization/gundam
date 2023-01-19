@@ -32,14 +32,14 @@ void DataBinSet::setName(const std::string &name) {
 }
 void DataBinSet::readBinningDefinition(const std::string &filePath_) {
 
-  _filePath_ = filePath_;
+  _filePath_ = GenericToolbox::expandEnvironmentVariables(filePath_);
 
-  if( not GenericToolbox::doesPathIsFile(filePath_) ){
-    LogError << GET_VAR_NAME_VALUE(filePath_) << ": file not found." << std::endl;
-    throw std::runtime_error(GET_VAR_NAME_VALUE(filePath_) + ": file not found.");
+  if( not GenericToolbox::doesPathIsFile(_filePath_) ){
+    LogError << GET_VAR_NAME_VALUE(_filePath_) << ": file not found." << std::endl;
+    throw std::runtime_error(GET_VAR_NAME_VALUE(_filePath_) + ": file not found.");
   }
 
-  auto lines = GenericToolbox::dumpFileAsVectorString(filePath_);
+  auto lines = GenericToolbox::dumpFileAsVectorString(_filePath_);
   std::vector<std::string> expectedVariableList;
   std::vector<std::string> expectedVariableTitleList;
   std::vector<bool> expectedVariableIsRangeList;
@@ -192,4 +192,3 @@ void DataBinSet::addBinContent(int binIndex_, double weight_) {
   }
   _binContent_.at(binIndex_) += weight_;
 }
-

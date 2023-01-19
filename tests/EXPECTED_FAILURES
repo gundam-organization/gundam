@@ -1,0 +1,5 @@
+# Tests that are expected to fail.  This file can be empty.
+fast-tests/090ExpectedFailure.sh
+fast-tests/200NormalizationFit.sh
+fast-tests/900NormalizationFitCheck.C
+#end of file
