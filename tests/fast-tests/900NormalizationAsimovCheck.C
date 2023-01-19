@@ -103,15 +103,15 @@ int main() {
     TOLERANCE("Check nominal value for #0_Positive_C",
               postFitErrors->GetBinContent(1), 1.0, tolerance);
     TOLERANCE("Check variance for #0_Positive_C",
-              (*covariance)(0,0), 2.90029056e-04, tolerance);
+              (*covariance)(0,0), 1.40652139e-04, tolerance);
 
     TOLERANCE("Check nominal value for #1_Negative_C",
               postFitErrors->GetBinContent(2), 1.0, tolerance);
     TOLERANCE("Check variance for #1_Negative_C",
-              (*covariance)(1,1), 2.88813415e-04, tolerance);
+              (*covariance)(1,1), 1.43712809e-04, tolerance);
 
     TOLERANCE("Check covariance",
-              (*covariance)(0,1), -8.93441147e-05, tolerance);
+              (*covariance)(0,1), -4.21397580e-05, tolerance);
 
     file->Close();
 
