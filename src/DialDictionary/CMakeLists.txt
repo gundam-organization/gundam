@@ -10,7 +10,7 @@ set( SRCFILES
     src/SplineHandler.cpp
     src/EventDialCache.cpp
     src/GraphHandler.cpp
-    include/DialTypes.h)
+    include/DialTypes.h src/LightGraphHandler.cpp include/LightGraphHandler.h include/LightGraph.h)
 
 set( HEADERS
     include/DialBase.h

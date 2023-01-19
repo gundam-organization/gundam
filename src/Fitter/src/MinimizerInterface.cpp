@@ -263,6 +263,9 @@ void MinimizerInterface::minimize(){
   if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogWarning << "Covariance matrix status code: " << this->covMatrixStatusCodeStr.at(_minimizer_->CovMatrixStatus()) << std::endl;
   else LogWarning << "Covariance matrix status code: " << _minimizer_->CovMatrixStatus() << std::endl;
 
+  // Make sure we are on the right spot
+  updateCacheToBestfitPoint();
+
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "fit"), _chi2HistoryTree_.get());
 
   if( _fitHasConverged_ ){ LogInfo << "Minimization has converged!" << std::endl; }
@@ -414,6 +417,9 @@ void MinimizerInterface::calcErrors(){
     LogInfo << "Hesse ended after " << _nbFitCalls_ - nbFitCallOffset << " calls." << std::endl;
     LogWarning << "HESSE status code: " << hesseStatusCodeStr.at(_minimizer_->Status()) << std::endl;
     LogWarning << "Covariance matrix status code: " << covMatrixStatusCodeStr.at(_minimizer_->CovMatrixStatus()) << std::endl;
+
+    // Make sure we are on the right spot
+    updateCacheToBestfitPoint();
 
     if( _minimizer_->CovMatrixStatus() == 2 ){ _isBadCovMat_ = true; }
 
@@ -1215,4 +1221,13 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
   } // parSet
 }
 
+void MinimizerInterface::updateCacheToBestfitPoint(){
+  if( _minimizer_->X() != nullptr ){
+    LogWarning << "Updating propagator cache to the best fit point..." << std::endl;
+    this->evalFit( _minimizer_->X() );
+  }
+  else{
+    LogAlert << "No best fit point provided by minimized." << std::endl;
+  }
+}
 

@@ -13,5 +13,6 @@
 #include "Spline.h"
 #include "SplineCache.h"
 
+#include "LightGraph.h"
 
 #endif //GUNDAM_DIALTYPES_H

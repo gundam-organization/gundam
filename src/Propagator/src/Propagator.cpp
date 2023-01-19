@@ -280,6 +280,7 @@ void Propagator::initializeImpl() {
         dialCollection.clear();
       }
     }
+    _eventDialCache_ = EventDialCache();
 #else
     for( auto& parSet : _parameterSetList_ ){
       for( auto& par : parSet.getParameterList() ){

@@ -311,6 +311,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
       TH1D *dataSampleHist{nullptr};
       std::vector<TH1D *> mcSampleHistList;
       double minYValue = 1;
+      double maxYValue = minYValue;
       for( const auto* histHolder : histList.second ) {
         TH1D* hist = histHolder->histPtr.get();
         if ( histHolder->isData ) {
@@ -319,6 +320,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
         else {
           mcSampleHistList.emplace_back(hist);
           minYValue = std::min(minYValue, hist->GetMinimum(0));
+          maxYValue = std::max(maxYValue, hist->GetMaximum());
         }
       }
 
@@ -373,9 +375,6 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
 
             if ( firstHistToPlot == nullptr ) {
               firstHistToPlot = mcSampleHistAccumulatorList[iHist];
-              mcSampleHistAccumulatorList[iHist]->GetYaxis()->SetRangeUser(minYValue,
-                                                                           mcSampleHistAccumulatorList[iHist]->GetMaximum() *
-                                                                           1.2);
               mcSampleHistAccumulatorList[iHist]->Draw("HIST GOFF");
             }
             else {
@@ -417,6 +416,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
       // Draw the data hist on top
       if (dataSampleHist != nullptr) {
         std::string originalTitle = dataSampleHist->GetTitle(); // title can be used for figuring out the type of the histogram
+        maxYValue = std::max(maxYValue, dataSampleHist->GetMaximum());
         dataSampleHist->SetTitle("Data");
         splitLegend->AddEntry(dataSampleHist, dataSampleHist->GetTitle(), "lep"); nLegend++;
         if ( firstHistToPlot != nullptr ) {
@@ -440,6 +440,11 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
       }
       gPad->cd();
       splitLegend->Draw();
+
+      firstHistToPlot->GetYaxis()->SetRangeUser(
+          minYValue,
+          maxYValue * 1.2
+      );
 
       firstHistToPlot->SetTitle( samplePtr->getName().c_str() ); // the actual displayed title
       gPad->SetGridx();

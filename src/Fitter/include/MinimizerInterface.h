@@ -48,6 +48,8 @@ protected:
   double evalFit(const double* parArray_);
   void writePostFitData(TDirectory* saveDir_);
 
+  void updateCacheToBestfitPoint();
+
   void enableFitMonitor(){ _enableFitMonitor_ = true; }
   void disableFitMonitor(){ _enableFitMonitor_ = false; }
 
