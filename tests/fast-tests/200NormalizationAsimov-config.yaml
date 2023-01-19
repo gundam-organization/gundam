@@ -33,12 +33,13 @@ fitterEngineConfig:
             - "${DATA_DIR}/100NormalizationTree.root"
 
     fitSampleSetConfig:
-      # PoissonLLH is used for tests because it is mathematically simple
-      llhStatFunction: PoissonLLH
+      # LeastSquares is used for tests because it is mathematically simple
+      # and numerically stable.
+      llhStatFunction: LeastSquares
       dataEventType: Asimov
 
       llhConfig:
-        usePoissonLikelihood: true
+        lsqPoissonianApproximation: true
 
       fitSampleList:
         - name: AB
