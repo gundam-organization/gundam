@@ -70,11 +70,8 @@ namespace JsonUtils{
   void forwardConfig(nlohmann::json& config_, const std::string& className_){
     while( config_.is_string() ){
       LogDebug << "Forwarding " << (className_.empty()? "": className_ + " ") << "config: \"" << config_.get<std::string>() << "\"" << std::endl;
-      std::string name = config_.get<std::string>();
+      auto name = config_.get<std::string>();
       std::string expand = GenericToolbox::expandEnvironmentVariables(name);
-      if (name != expand) {
-        LogWarning << "   Expanded file name: " << expand << std::endl;
-      }
       config_ = JsonUtils::readConfigFile(expand);
     }
   }

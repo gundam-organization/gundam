@@ -219,7 +219,7 @@ void DataDispenser::doEventSelection(){
     TChain treeChain(_parameters_.treePath.c_str());
     for (const auto &file: _parameters_.filePathList) {
       std::string name = GenericToolbox::expandEnvironmentVariables(file);
-      if (name != file) {
+      if (name != file and iThread_ == 0) {
         LogWarning << "Filename expanded to: " << name << std::endl;
       }
       treeChain.Add(name.c_str());
@@ -810,7 +810,7 @@ void DataDispenser::fillFunction(int iThread_){
   TChain treeChain(_parameters_.treePath.c_str());
   for( const auto& file: _parameters_.filePathList){
     std::string name = GenericToolbox::expandEnvironmentVariables(file);
-    if (name != file) {
+    if (name != file and iThread_ == 0) {
       LogWarning << "Filename expanded to: " << name << std::endl;
     }
     treeChain.Add(name.c_str());
