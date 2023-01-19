@@ -83,14 +83,24 @@ void writeMCTree() {
     double varC;
     tree->Branch("C",&varC);
 
-    for (int i=0; i<10000; ++i) {
+    for (int i=0; i<5000; ++i) {
         varA = MakeA();
         varB = MakeB();
-        varC = MakeB();
-        if (varC > 0.0) varA += 1.0;
-        else varA -= 1.0;
+        varC = MakeC();
+        if (varC <= 0.0) varC = - varC + 1E-10;
+        varA += 1.0;
         tree->Fill();
     }
+
+    for (int i=0; i<5000; ++i) {
+        varA = MakeA();
+        varB = MakeB();
+        varC = MakeC();
+        if (varC > 0.0) varC = - varC - 1E-10;
+        varA -= 1.0;
+        tree->Fill();
+    }
+
 }
 
 void writeDataTree() {
