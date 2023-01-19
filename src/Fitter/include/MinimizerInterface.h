@@ -32,11 +32,11 @@ public:
   void setEnablePostFitErrorEval(bool enablePostFitErrorEval_);
   void setMonitorRefreshRateInMs(int monitorRefreshRateInMs_);
 
-  bool isFitHasConverged() const;
-  bool isEnablePostFitErrorEval() const;
+  [[nodiscard]] bool isFitHasConverged() const;
+  [[nodiscard]] bool isEnablePostFitErrorEval() const;
+  [[nodiscard]] const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const;
   GenericToolbox::VariablesMonitor &getConvergenceMonitor();
   std::vector<FitParameter *> &getMinimizerFitParameterPtr();
-  const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const;
 
   void minimize();
   void calcErrors();
