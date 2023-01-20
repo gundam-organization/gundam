@@ -144,7 +144,7 @@ if(ROOT_FOUND)
     endif(NOT ROOT_minuit2_FOUND)
 
     # inc dir is $ROOTSYS/include/root
-    set(CMAKE_ROOTSYS ${ROOT_INCLUDE_DIRS}/../../)
+    set(CMAKE_ROOTSYS ${ROOT_INCLUDE_DIRS}/..)
 
 else(ROOT_FOUND)
     cmessage(STATUS "find_package didn't find ROOT. Using shell instead...")

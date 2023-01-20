@@ -100,12 +100,12 @@ private:
   // dict
   const std::map<int, std::string> minuitStatusCodeStr{
       { 0 , "status = 0    : OK" },
-      { 1 , "status = 1    : Covariance was mad  epos defined"},
+      { 1 , "status = 1    : Covariance was mad! Thus made pos defined"},
       { 2 , "status = 2    : Hesse is invalid"},
       { 3 , "status = 3    : Edm is above max"},
       { 4 , "status = 4    : Reached call limit"},
       { 5 , "status = 5    : Any other failure"},
-      { -1, "status = -1   : Unknown error?"}
+      { -1, "status = -1   : We don't even know what happened"}
   };
   const std::map<int, std::string> hesseStatusCodeStr{
       { 0, "status = 0    : OK" },
