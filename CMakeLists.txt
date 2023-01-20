@@ -21,6 +21,7 @@ option(USE_STATIC_LINKS "Library build in static mod" OFF)
 
 
 # Cmake includes
+include(CTest)
 include(${CMAKE_SOURCE_DIR}/cmake/cmessage.cmake)
 
 # Git version
@@ -451,6 +452,8 @@ add_subdirectory( ${CMAKE_SOURCE_DIR}/src/Applications )
 if(WITH_XSLLHFITTER)
     add_subdirectory( ${CMAKE_SOURCE_DIR}/src/XsllhFitter/Applications )
 endif()
+
+add_subdirectory( ${CMAKE_SOURCE_DIR}/tests )
 
 configure_file(cmake/build_setup.sh.in
     "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/setup.sh" @ONLY)

@@ -191,15 +191,18 @@ for i in $(find ${TESTS} -name "[0-9]*" -type f | grep -v "~" | sort); do
     if [ ${SUCCESS} = "yes" ]; then
         # The job succeeded, make sure it's not in EXPECTED_FAILURES
         if (grep $i EXPECTED_FAILURES >> /dev/null); then
+            cat ${OUTPUT_DIR}/${LOG}
             echo JOB FAILURE: Expected $i to fail
             FAILURES="${FAILURES} unexpected-success:\"${JOB}\""
         fi
     else
         # The job failed, check if it was expected
         if (grep $i EXPECTED_FAILURES >> /dev/null); then
+            cat ${OUTPUT_DIR}/${LOG}
             echo JOB SUCCESS: Failure was expected for $i
             EXPECTED="${EXPECTED} \"${JOB}\""
         else
+            cat ${OUTPUT_DIR}/${LOG}
             FAILURES="${FAILURES} unexpected-failure:\"${JOB}\""
         fi
     fi
