@@ -30,4 +30,7 @@ RUN cd $REPO_DIR/gundam && \
       -D CMAKE_INSTALL_PREFIX=$INSTALL_DIR \
 #      -D WITH_CUDA=ON \
       $REPO_DIR/gundam && \
-    make -j3 install
+    make -j3 install && \
+    make test
+
+# End of the file
