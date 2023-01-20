@@ -31,6 +31,6 @@ RUN cd $REPO_DIR/gundam && \
 #      -D WITH_CUDA=ON \
       $REPO_DIR/gundam && \
     make -j3 install && \
-    make test
+    CTEST_OUTPUT_ON_FAILURE=1 make test
 
 # End of the file
