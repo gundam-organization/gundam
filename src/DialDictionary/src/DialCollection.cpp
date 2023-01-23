@@ -309,7 +309,7 @@ bool DialCollection::initializeDialsWithDefinition() {
   if( _globalDialType_ == "Norm" or _globalDialType_ == "Normalization" ){
     _dialBaseList_.emplace_back( std::make_unique<Norm>() );
   }
-  else if( _globalDialType_ == "Spline" or _globalDialType_ == "Graph" or _globalDialType_ == "LightGraph" ){
+  else{
 
     if ( JsonUtils::doKeyExist(dialsDefinition, "dialSubType") ) {
       _globalDialSubType_ =  JsonUtils::fetchValue<std::string>(dialsDefinition, "dialSubType");
@@ -499,8 +499,8 @@ bool DialCollection::initializeDialsWithDefinition() {
             }
             dialBin->addBinEdge(splitVarNameList.at(iSplitVar), splitVarValueList.at(iSplitVar), splitVarValueList.at(iSplitVar));
           }
-          if      ( _globalDialType_ == "Spline" ){
-            if(useCachedDials() ){
+          if     ( _globalDialType_ == "Spline" ){
+            if( this->useCachedDials() ){
               SplineCache s;
               s.setAllowExtrapolation(_allowDialExtrapolation_);
               s.copySpline(splinePtr);
@@ -528,10 +528,10 @@ bool DialCollection::initializeDialsWithDefinition() {
       LogError << "The dial is neither even-by-event nor binned..." << std::endl;
     }
   } // Spline ? Graph ?
-  else{
-    LogError << "unknown dialsType: " << _globalDialType_ << std::endl;
-    throw std::logic_error("dialsType is not supported");
-  }
+//  else{
+//    LogError << "unknown dialsType: " << _globalDialType_ << std::endl;
+//    throw std::logic_error("dialsType is not supported");
+//  }
 
   _dialResponseSupervisorList_.emplace_back();
   _dialResponseSupervisorList_.back().setMinResponse(

@@ -51,7 +51,6 @@ namespace JsonUtils{
         throw std::runtime_error("file not readable.");
       }
 
-
       fs >> output;
     }
 
