@@ -45,7 +45,7 @@ fitterEngineConfig:
       dataEventType: TestData
 
       llhConfig:
-        usePoissonLikelihood: true
+        lsqPoissonianApproximation: true
 
       fitSampleList:
         - name: AB
