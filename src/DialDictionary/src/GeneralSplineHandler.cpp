@@ -18,7 +18,6 @@ void GeneralSplineHandler::setAllowExtrapolation(bool allowExtrapolation) {
 }
 
 void GeneralSplineHandler::buildSplineData(TGraph& graph_){
-
   // Copy the spline data into local storage.
   graph_.Sort();
   buildSplineData(TSpline3(Form("%p", &graph_), &graph_));
