@@ -191,7 +191,7 @@ void writeDataTree() {
 void writeCovariance() {
     TMatrixDSym cov(4);
     double sigma = 0.3;
-    double correlation = 0.0;
+    double correlation = 0.5;
     for (int i=0; i<cov.GetNrows(); ++i) {
         for (int j=0; j<cov.GetNrows(); ++j) {
             if (i == j) {
