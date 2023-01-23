@@ -23,7 +23,7 @@ void GeneralSplineHandler::buildSplineData(TGraph& graph_){
   buildSplineData(TSpline3(Form("%p", &graph_), &graph_));
 }
 void GeneralSplineHandler::buildSplineData(const TSpline3& sp_){
-  LogThrowIf(not _splineData_.empty(), "Spline data already set.");
+//  LogThrowIf(not _splineData_.empty(), "Spline data already set.");
 
   _splineBounds_.first = sp_.GetXmin();
   _splineBounds_.second = sp_.GetXmax();
