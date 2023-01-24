@@ -17,7 +17,7 @@
 class GeneralSplineHandler {
 
 public:
-  GeneralSplineHandler(){ _splineData_.resize(2 + 3 * 7); };
+  GeneralSplineHandler() = default;
   virtual ~GeneralSplineHandler() = default;
 
   void setAllowExtrapolation(bool allowExtrapolation);
