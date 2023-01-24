@@ -7,6 +7,7 @@
 #include "GlobalVariables.h"
 #include "DatasetLoader.h"
 #include "JsonUtils.h"
+#include "Misc.h"
 
 #if USE_NEW_DIALS
 #include "DialCollection.h"
@@ -1249,7 +1250,7 @@ void DataDispenser::fillFunction(int iThread_){
               }
 
               // loaded graph is valid?
-              if( grPtr != nullptr and not GenericToolbox::isFlatAndOne(grPtr) ){
+              if( Misc::isGraphValid(grPtr) ){
                 freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
                 if      ( dialCollectionRef->getGlobalDialType() == "Spline" ){
                   if(dialCollectionRef->useCachedDials() ) {

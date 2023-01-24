@@ -138,7 +138,8 @@ namespace JointProbability{
     {
       if (usePoissonLikelihood)
         chisq += 2.0*(predVal - dataVal +dataVal*TMath::Log( dataVal/predVal) );
-      else // Barlow-Beeston likelihood
+      // Barlow-Beeston likelihood
+      else
         chisq += 2.0 * (stat + penalty);
     }
 
@@ -152,10 +153,16 @@ namespace JointProbability{
 
     if (std::isnan(chisq))
     {
-      std::cout << "Infinite chi2 " << predVal << " " << dataVal
-                << " " << nomMC->GetBinContent(bin_) << " "
-                << predMC->GetBinError(bin_) << " "
-                << predMC->GetBinContent(bin_) << std::endl;
+      LogError << "Infinite chi2: " << chisq << std::endl
+      << GET_VAR_NAME_VALUE(predVal) << std::endl
+      << GET_VAR_NAME_VALUE(dataVal) << std::endl
+      << GET_VAR_NAME_VALUE(stat) << std::endl
+      << GET_VAR_NAME_VALUE(penalty) << std::endl
+      << GET_VAR_NAME_VALUE(beta) << std::endl
+      << GET_VAR_NAME_VALUE(fractional) << std::endl
+      << GET_VAR_NAME_VALUE( nomMC->GetBinContent(bin_) ) << std::endl
+      << GET_VAR_NAME_VALUE( predMC->GetBinError(bin_) ) << std::endl
+      << GET_VAR_NAME_VALUE( predMC->GetBinContent(bin_) ) << std::endl;
     }
 //    }
 

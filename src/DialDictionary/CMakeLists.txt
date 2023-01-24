@@ -14,7 +14,7 @@ set( SRCFILES
     src/MonotonicSplineHandler.cpp
     src/GeneralSplineHandler.cpp
     src/SimpleSplineHandler.cpp
-    )
+    include/LightGraphCache.h)
 
 set( HEADERS
     include/DialTypes.h
