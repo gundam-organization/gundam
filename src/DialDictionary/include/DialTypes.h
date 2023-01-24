@@ -16,6 +16,8 @@
 #include "MonotonicSplineCache.h"
 #include "GeneralSpline.h"
 #include "GeneralSplineCache.h"
+#include "SimpleSpline.h"
+#include "SimpleSplineCache.h"
 
 #include "LightGraph.h"
 

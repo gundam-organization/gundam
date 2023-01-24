@@ -13,6 +13,7 @@ set( SRCFILES
     src/LightGraphHandler.cpp
     src/MonotonicSplineHandler.cpp
     src/GeneralSplineHandler.cpp
+    src/SimpleSplineHandler.cpp
     )
 
 set( HEADERS
@@ -39,6 +40,9 @@ set( HEADERS
     include/GeneralSplineHandler.h
     include/GeneralSpline.h
     include/GeneralSplineCache.h
+    include/SimpleSplineHandler.h
+    include/SimpleSpline.h
+    include/SimpleSplineCache.h
     )
 
 if( USE_STATIC_LINKS )

@@ -705,6 +705,22 @@ void DataDispenser::preAllocateMemory(){
             LogInfo << " dials (" << GenericToolbox::parseSizeUnits( dialsSizeInRam ) << ")" << std::endl;
 
           }
+          else if( dialType == "SimpleSpline" ){
+            dialCollection->getDialBaseList().clear();
+            double dialsSizeInRam{0};
+            if(dialCollection->useCachedDials() ){
+              dialsSizeInRam = double(nEvents) * sizeof(SimpleSplineCache);
+              dialCollection->getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(SimpleSplineCache()));
+            }
+            else{
+              dialsSizeInRam = double(nEvents) * sizeof(SimpleSpline);
+              dialCollection->getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(SimpleSpline()));
+            }
+
+            eventByEventDialSize += dialsSizeInRam;
+            LogInfo << " dials (" << GenericToolbox::parseSizeUnits( dialsSizeInRam ) << ")" << std::endl;
+
+          }
           else if( dialType == "Graph" ){
             dialCollection->getDialBaseList().clear();
             double dialsSizeInRam{0};
@@ -1257,6 +1273,14 @@ void DataDispenser::fillFunction(int iThread_){
                   }
                   else {
                     ( (GeneralSpline*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->buildSplineData( *grPtr );
+                  }
+                }
+                else if ( dialCollectionRef->getGlobalDialType() == "SimpleSpline" ){
+                  if(dialCollectionRef->useCachedDials() ) {
+                    ( (SimpleSplineCache*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->buildSplineData( *grPtr );
+                  }
+                  else {
+                    ( (SimpleSpline*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->buildSplineData( *grPtr );
                   }
                 }
                 else if ( dialCollectionRef->getGlobalDialType() == "Graph" ){
