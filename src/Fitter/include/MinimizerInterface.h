@@ -35,8 +35,6 @@ public:
   [[nodiscard]] bool isFitHasConverged() const;
   [[nodiscard]] bool isEnablePostFitErrorEval() const;
   [[nodiscard]] const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const;
-  GenericToolbox::VariablesMonitor &getConvergenceMonitor();
-  std::vector<FitParameter *> &getMinimizerFitParameterPtr();
 
   void minimize();
   void calcErrors();
@@ -45,15 +43,19 @@ protected:
   void readConfigImpl() override;
   void initializeImpl() override;
 
-  double evalFit(const double* parArray_);
   void writePostFitData(TDirectory* saveDir_);
 
   void updateCacheToBestfitPoint();
 
-  void enableFitMonitor(){ _enableFitMonitor_ = true; }
-  void disableFitMonitor(){ _enableFitMonitor_ = false; }
-
 private:
+  // A local convenience function to get the convergence monitor.  The monitor
+  // actually lives in the likelihood).
+  GenericToolbox::VariablesMonitor &getConvergenceMonitor();
+
+  // A local convenience function to get the vector of fit parameter pointers.
+  // The actual vector lives in the likelihood.
+  std::vector<FitParameter *> &getMinimizerFitParameterPtr();
+
   // Parameters
   bool _useNormalizedFitSpace_{true};
   bool _enableSimplexBeforeMinimize_{false};
@@ -80,22 +82,9 @@ private:
   // internals
   bool _fitHasConverged_{false};
   bool _isBadCovMat_{false};
-  bool _enableFitMonitor_{false};
-  int _nbFitParameters_{-1};
-  int _nbFitBins_{0};
-  int _nbFreePars_{0};
-  int _nbFitCalls_{0};
+
   FitterEngine* _owner_{nullptr};
   std::unique_ptr<ROOT::Math::Minimizer> _minimizer_{nullptr};
-  std::unique_ptr<ROOT::Math::Functor> _functor_{nullptr};
-  std::vector<FitParameter*> _minimizerFitParameterPtr_{};
-  std::unique_ptr<TTree> _chi2HistoryTree_{nullptr};
-
-  // monitors
-  GenericToolbox::VariablesMonitor _convergenceMonitor_;
-  GenericToolbox::CycleTimer _evalFitAvgTimer_;
-  GenericToolbox::CycleTimer _outEvalFitAvgTimer_;
-  GenericToolbox::CycleTimer _itSpeed_;
 
   // dict
   const std::map<int, std::string> minuitStatusCodeStr{
@@ -133,6 +122,4 @@ private:
   };
 
 };
-
-
 #endif //GUNDAM_MINIMIZERINTERFACE_H

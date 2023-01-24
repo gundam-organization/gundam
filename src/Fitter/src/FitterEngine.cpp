@@ -65,7 +65,7 @@ void FitterEngine::readConfigImpl(){
     _minimizer_.setMonitorRefreshRateInMs(JsonUtils::fetchValue<int>(_config_, "monitorRefreshRateInMs"));
   });
 
-  LogInfo << "Convergence monitor will be refreshed every " << _minimizer_.getConvergenceMonitor().getMaxRefreshRateInMs() << "ms." << std::endl;
+  LogInfo << "Convergence monitor will be refreshed every " << _likelihood_.getConvergenceMonitor().getMaxRefreshRateInMs() << "ms." << std::endl;
 }
 void FitterEngine::initializeImpl(){
   LogThrowIf(_config_.empty(), "Config is not set.");
@@ -441,7 +441,7 @@ void FitterEngine::scanMinimizerParameters(TDirectory* saveDir_){
                  << " is fixed. Skipping..." << std::endl;
       continue;
     }
-    _propagator_.getParScanner().scanFitParameter(*_minimizer_.getMinimizerFitParameterPtr()[iPar], saveDir_);
+    _propagator_.getParScanner().scanFitParameter(*_likelihood_.getMinimizerFitParameterPtr()[iPar], saveDir_);
   } // iPar
 }
 void FitterEngine::checkNumericalAccuracy(){
