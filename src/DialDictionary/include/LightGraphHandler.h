@@ -24,7 +24,7 @@ public:
 
 protected:
   bool _allowExtrapolation_{false};
-  Int_t nPoints;   ///< Number of points <= fMaxSize
+  Int_t nPoints{0};   ///< Number of points <= fMaxSize
   std::vector<Double_t> xPoints; ///<[fNpoints] array of X points
   std::vector<Double_t> yPoints; ///<[fNpoints] array of Y points
 

@@ -52,12 +52,6 @@ double LightGraphHandler::evaluateGraph(const DialInputBuffer& input_) const{
     if (xPoints[low] == xPoints[up]) return yPoints[low];
     yn = yPoints[up] + (input_.getBuffer()[0] - xPoints[up]) * (yPoints[low] - yPoints[up]) / (xPoints[low] - xPoints[up]);
   }
-
-  LogThrowIf(std::isnan(yn));
-  LogThrowIf(yn == 0, "null response: "
-  << GenericToolbox::parseVectorAsString(yPoints)
-  << GenericToolbox::parseVectorAsString(xPoints) );
-
   return yn;
 }
 
