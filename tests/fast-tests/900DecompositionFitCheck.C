@@ -1,7 +1,7 @@
 #!/bin/bash
 # Wrap a ROOT macro as a script.
 #
-#  Check the output of GUNDAM 200NormalizationFit.sh against the
+#  Check the output of GUNDAM 200DecompositionFit.sh against the
 #  expected values.
 #
 root -b -n <<EOF
@@ -33,13 +33,12 @@ int status{0};
 
 /// Fail if fractional difference between "v1" and "v2" is larger than "tol"
 /// THIS IS COPIED HERE TO AVOID DEPENDENCIES
-#define TOLERANCE(msg,v1,v2,tol)                            \
+#define ABSOLUTE_TOLERANCE(msg,v1,v2,tol)                   \
     do {                                                    \
         double v = (v1)>0 ? (v1): -(v1);                    \
         double vv = (v2)>0 ? (v2): -(v2);                   \
         double d = std::abs((v1)-(v2));                     \
-        double r = d/std::max(0.5*(v+vv),(tol));            \
-        if (r > (tol)) {                                    \
+        if (d > (tol)) {                                    \
             std::cout << "FAIL:";                           \
             ++ status;                                      \
         } else {                                            \
@@ -48,15 +47,15 @@ int status{0};
         std::cout << " " << msg                             \
                   << std::setprecision(8)                   \
                   << std::scientific                        \
-                  << " (" << r << "<" << (tol) << ")"       \
+                  << " (" << d << "<" << (tol) << ")"       \
                   << " [" << #v1 << "=" << (v1)             \
-                  << " " << #v2 << "=" << (v2)              \
-                  << " " << d << "]"                        \
+                  << " " << #v2 << "=" << (v2) << "]"       \
                   << std::endl;                             \
     } while(false);
 
 int main() {
-    std::shared_ptr<TFile> file(new TFile("200NormalizationFit.root","old"));
+    std::shared_ptr<TFile> file(new TFile("200DecompositionFit.root","old"));
+    std::shared_ptr<TFile> target(new TFile("200CovarianceFit.root","old"));
 
     EXPECT("File pointer is not null",file);
     if (!file) return status;
@@ -70,7 +69,7 @@ int main() {
                                  "/postFit"
                                  "/Migrad"
                                  "/errors"
-                                 "/Normalizations"
+                                 "/CovarianceConstraints"
                                  "/values"
                                  "/postFitErrors_TH1D"));
     EXPECT("postFitErrors must exist",  postFitErrorsMigrad);
@@ -81,7 +80,7 @@ int main() {
                                  "/postFit"
                                  "/Hesse"
                                  "/errors"
-                                 "/Normalizations"
+                                 "/CovarianceConstraints"
                                  "/values"
                                  "/postFitErrors_TH1D"));
     EXPECT("postFitErrors must exist",  postFitErrorsHesse);
@@ -92,48 +91,76 @@ int main() {
                                       "/postFit"
                                       "/Hesse"
                                       "/errors"
-                                      "/Normalizations"
+                                      "/CovarianceConstraints"
                                       "/matrices"
                                       "/Covariance_TMatrixD"));
     EXPECT("covariance must exist",  covariance);
+
+    TH1* targetHesse
+        = dynamic_cast<TH1*>(target->Get(
+                                 "FitterEngine"
+                                 "/postFit"
+                                 "/Hesse"
+                                 "/errors"
+                                 "/CovarianceConstraints"
+                                 "/values"
+                                 "/postFitErrors_TH1D"));
+    EXPECT("targetFitErrors must exist",  targetHesse);
+
+    TMatrixD* targetCov
+        = dynamic_cast<TMatrixD*>(target->Get(
+                                      "FitterEngine"
+                                      "/postFit"
+                                      "/Hesse"
+                                      "/errors"
+                                      "/CovarianceConstraints"
+                                      "/matrices"
+                                      "/Covariance_TMatrixD"));
+    EXPECT("target covariance must exist",  targetCov);
 
     // Don't try to continue if the data is missing from the file.
     if (not postFitErrorsMigrad) return status;
     if (not postFitErrorsHesse) return status;
     if (not covariance) return status;
 
-    postFitErrorsMigrad->Draw();
-    gPad->Print("900NormalizationFitCheck.pdf[");
-    postFitErrorsHesse->Draw();
-    gPad->Print("900NormalizationFitCheck.pdf");
-    gPad->Print("900NormalizationFitCheck.pdf]");
+    postFitErrorsHesse->Draw("E");
+    gPad->Print("900DecompositionFitCheck.pdf");
 
     covariance->Print();
 
-    // Change this to set the expected absolute tolerance.
-    double tolerance = 1E-6;
+    // Change this to set the expected relative tolerance.
+    double tolerance = 5E-6;
 
     // The expected values are for the data generated by
-    // 100NormalizationTree.C.  They need to be changed if that tree is
+    // 100CovarianceTree.C.  They need to be changed if that tree is
     // changed.
-    TOLERANCE("Check HESSE value for #0_Positive_C",
-              postFitErrorsHesse->GetBinContent(1), 7.96683932e-01, tolerance);
-    TOLERANCE("Check MIGRAD matches HESSE value for #0_Positive_C",
-              postFitErrorsMigrad->GetBinContent(1),
-              postFitErrorsHesse->GetBinContent(1), 1E-12);
-    TOLERANCE("Check variance for #0_Positive_C",
-              (*covariance)(0,0), 1.10574664e-04, tolerance);
+    ABSOLUTE_TOLERANCE("Check HESSE value for #0_norm_A",
+                       postFitErrorsHesse->GetBinContent(1),
+                       targetHesse->GetBinContent(1), tolerance);
+    ABSOLUTE_TOLERANCE("Check error for #0_norm_A",
+                       postFitErrorsHesse->GetBinError(1),
+                       targetHesse->GetBinError(1), tolerance);
 
-    TOLERANCE("Check HESSE value for #1_Negative_C",
-              postFitErrorsHesse->GetBinContent(2), 5.88292045e-01, tolerance);
-    TOLERANCE("Check MIGRAD matches HESSE value for #1_Negative_C",
-              postFitErrorsMigrad->GetBinContent(2),
-               postFitErrorsHesse->GetBinContent(2), 1E-12);
-    TOLERANCE("Check variance for #1_Negative_C",
-              (*covariance)(1,1), 8.97100595e-05, tolerance);
+    ABSOLUTE_TOLERANCE("Check HESSE value for #1_norm_B",
+                       postFitErrorsHesse->GetBinContent(2),
+                       targetHesse->GetBinContent(2), tolerance);
+    ABSOLUTE_TOLERANCE("Check error for #1_norm_B",
+                       postFitErrorsHesse->GetBinError(2),
+                       targetHesse->GetBinError(2), tolerance);
 
-    TOLERANCE("Check covariance",
-              (*covariance)(0,1), -3.08874630e-05, tolerance);
+    ABSOLUTE_TOLERANCE("Check HESSE value for #2_spline_C",
+                       postFitErrorsHesse->GetBinContent(3),
+                       targetHesse->GetBinContent(3),tolerance);
+    ABSOLUTE_TOLERANCE("Check error for #2_spline_C",
+                       postFitErrorsHesse->GetBinError(3),
+                       targetHesse->GetBinError(3), tolerance);
+
+    ABSOLUTE_TOLERANCE("Check HESSE value for #3_spline_D",
+                       postFitErrorsHesse->GetBinContent(4),
+                       targetHesse->GetBinContent(4), tolerance);
+    ABSOLUTE_TOLERANCE("Check error for #3_spline_D",
+                       postFitErrorsHesse->GetBinError(4),
+                       targetHesse->GetBinError(4), tolerance);
 
     file->Close();
 

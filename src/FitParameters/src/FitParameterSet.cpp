@@ -527,8 +527,14 @@ void FitParameterSet::readParameterDefinitionFile(){
 
   if( _parameterDefinitionFilePath_.empty() ) return;
 
-  std::unique_ptr<TFile> parDefFile(TFile::Open(_parameterDefinitionFilePath_.c_str()));
-  LogThrowIf(parDefFile == nullptr or not parDefFile->IsOpen(), "Could not open: " << _parameterDefinitionFilePath_)
+  std::string path = GenericToolbox::expandEnvironmentVariables(_parameterDefinitionFilePath_);
+  if (path != _parameterDefinitionFilePath_) {
+    LogInfo << "Using parameter definition file " << path
+            << std::endl;
+  }
+
+  std::unique_ptr<TFile> parDefFile(TFile::Open(path.c_str()));
+  LogThrowIf(parDefFile == nullptr or not parDefFile->IsOpen(), "Could not open: " << path);
 
   TObject* objBuffer{nullptr};
 

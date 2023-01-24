@@ -41,11 +41,11 @@ fitterEngineConfig:
 
     fitSampleSetConfig:
       # PoissonLLH is used for tests because it is mathematically simple
-      llhStatFunction: PoissonLLH
+      llhStatFunction: LeastSquares
       dataEventType: TestData
 
       llhConfig:
-        usePoissonLikelihood: true
+        lsqPoissonianApproximation: true
 
       fitSampleList:
         - name: AB
