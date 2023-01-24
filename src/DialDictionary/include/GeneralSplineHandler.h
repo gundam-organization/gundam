@@ -9,6 +9,7 @@
 #include "DialInputBuffer.h"
 
 #include "TGraph.h"
+#include "TSpline.h"
 
 #include "vector"
 #include "utility"
