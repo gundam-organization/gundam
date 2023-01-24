@@ -226,7 +226,7 @@ void writeCovariance() {
 int main() {
     std::shared_ptr<TFile> file(new TFile("100CovarianceTree.root","new"));
     if (!file || !file->IsOpen()) {
-        std::cout << "FAIL: TFile not openned" << std::endl;
+        std::cout << "FAIL: TFile not opened" << std::endl;
         return 1;
     }
 
