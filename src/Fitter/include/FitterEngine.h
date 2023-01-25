@@ -7,6 +7,7 @@
 
 
 #include "Propagator.h"
+#include "LikelihoodInterface.h"
 #include "MinimizerInterface.h"
 #include "JsonBaseClass.h"
 
@@ -44,6 +45,8 @@ public:
   const Propagator& getPropagator() const;
   Propagator& getPropagator();
   MinimizerInterface& getMinimizer(){ return _minimizer_; }
+  LikelihoodInterface& getLikelihood(){ return _likelihood_; }
+
   TDirectory* getSaveDir(){ return _saveDir_; }
 
   // Core
@@ -80,7 +83,7 @@ private:
   TDirectory* _saveDir_{nullptr};
   Propagator _propagator_{};
   MinimizerInterface _minimizer_{this};
-
+  LikelihoodInterface _likelihood_{this};
 };
 
 

@@ -2,6 +2,7 @@
 // Created by Adrien BLANCHET on 16/12/2021.
 //
 
+#include "LikelihoodInterface.h"
 #include "MinimizerInterface.h"
 #include "FitterEngine.h"
 #include "JsonUtils.h"
@@ -25,8 +26,14 @@ LoggerInit([]{
 MinimizerInterface::MinimizerInterface(FitterEngine* owner_): _owner_(owner_){}
 
 void MinimizerInterface::setOwner(FitterEngine* owner_){ _owner_ = owner_; }
+
 void MinimizerInterface::setEnablePostFitErrorEval(bool enablePostFitErrorEval_){ _enablePostFitErrorEval_ = enablePostFitErrorEval_; }
+
 void MinimizerInterface::setMonitorRefreshRateInMs(int monitorRefreshRateInMs_){ _monitorRefreshRateInMs_ = monitorRefreshRateInMs_; }
+
+GenericToolbox::VariablesMonitor &MinimizerInterface::getConvergenceMonitor() {
+  return _owner_->getLikelihood().getConvergenceMonitor();
+}
 
 void MinimizerInterface::readConfigImpl(){
   LogInfo << "Reading minimizer config..." << std::endl;
@@ -72,36 +79,23 @@ void MinimizerInterface::initializeImpl(){
     LogWarning << "Using default minimizer algo: " << _minimizerAlgo_ << std::endl;
   }
 
-  LogWarning << "Fetching the effective number of fit parameters..." << std::endl;
-  _minimizerFitParameterPtr_.clear();
-  _nbFreePars_ = 0;
-  for( auto& parSet : _owner_->getPropagator().getParameterSetsList() ){
-    for( auto& par : parSet.getEffectiveParameterList() ){
-      if( par.isEnabled() and not par.isFixed() ) {
-        _minimizerFitParameterPtr_.emplace_back(&par);
-        if( par.isFree() ) _nbFreePars_++;
-      }
-    }
-  }
-  _nbFitParameters_ = int(_minimizerFitParameterPtr_.size());
+  // Configure the likelihood with the local settings and then initialize.
+  _owner_->getLikelihood().setMinimizerInfo(_minimizerType_,_minimizerAlgo_);
+  _owner_->getLikelihood().setTargetEDM(0.001*_tolerance_*2);
+  _owner_->getLikelihood().setUseNormalizedFitSpace(_useNormalizedFitSpace_);
+  _owner_->getLikelihood().setShowParametersOnFitMonitor(_showParametersOnFitMonitor_);
+  _owner_->getLikelihood().setMaxNbParametersPerLineOnMonitor(_maxNbParametersPerLineOnMonitor_);
+  _owner_->getLikelihood().initialize();
 
-  LogInfo << "Building functor..." << std::endl;
-  _functor_ = std::make_unique<ROOT::Math::Functor>(this, &MinimizerInterface::evalFit, _nbFitParameters_);
-
-  _minimizer_->SetFunction(*_functor_);
+  _minimizer_->SetFunction(*(_owner_->getLikelihood().evalFitFunctor()));
   _minimizer_->SetStrategy(_strategy_);
   _minimizer_->SetPrintLevel(_printLevel_);
   _minimizer_->SetTolerance(_tolerance_);
   _minimizer_->SetMaxIterations(_maxIterations_);
   _minimizer_->SetMaxFunctionCalls(_maxFcnCalls_);
 
-  _nbFitBins_ = 0;
-  for( auto& sample : _owner_->getPropagator().getFitSampleSet().getFitSampleList() ){
-    _nbFitBins_ += int(sample.getBinning().getBinsList().size());
-  }
-
-  for( int iFitPar = 0 ; iFitPar < _nbFitParameters_ ; iFitPar++ ){
-    auto& fitPar = *_minimizerFitParameterPtr_[iFitPar];
+  for( std::size_t iFitPar = 0 ; iFitPar < getMinimizerFitParameterPtr().size() ; iFitPar++ ){
+    auto& fitPar = *(getMinimizerFitParameterPtr()[iFitPar]);
 
     if( not _useNormalizedFitSpace_ ){
       _minimizer_->SetVariable(iFitPar, fitPar.getFullTitle(),fitPar.getParameterValue(),fitPar.getStepSize());
@@ -124,24 +118,12 @@ void MinimizerInterface::initializeImpl(){
     }
   }
 
-  _convergenceMonitor_.addDisplayedQuantity("VarName");
-  _convergenceMonitor_.addDisplayedQuantity("LastAddedValue");
-  _convergenceMonitor_.addDisplayedQuantity("SlopePerCall");
-
-  _convergenceMonitor_.getQuantity("VarName").title = "Likelihood";
-  _convergenceMonitor_.getQuantity("LastAddedValue").title = "Current Value";
-  _convergenceMonitor_.getQuantity("SlopePerCall").title = "Avg. Slope /call";
-
-  _convergenceMonitor_.addVariable("Total");
-  _convergenceMonitor_.addVariable("Stat");
-  _convergenceMonitor_.addVariable("Syst");
-
   if( GenericToolbox::getTerminalWidth() == 0 ){
     // batch mode
-    _convergenceMonitor_.setMaxRefreshRateInMs(_monitorBashModeRefreshRateInS_ * 1000.);
+    getConvergenceMonitor().setMaxRefreshRateInMs(_monitorBashModeRefreshRateInS_ * 1000.);
   }
   else{
-    _convergenceMonitor_.setMaxRefreshRateInMs(_monitorRefreshRateInMs_);
+    getConvergenceMonitor().setMaxRefreshRateInMs(_monitorRefreshRateInMs_);
   }
 }
 
@@ -151,25 +133,17 @@ bool MinimizerInterface::isFitHasConverged() const {
 bool MinimizerInterface::isEnablePostFitErrorEval() const {
   return _enablePostFitErrorEval_;
 }
-GenericToolbox::VariablesMonitor &MinimizerInterface::getConvergenceMonitor() {
-  return _convergenceMonitor_;
-}
-std::vector<FitParameter *> &MinimizerInterface::getMinimizerFitParameterPtr() {
-  return _minimizerFitParameterPtr_;
-}
+
 const std::unique_ptr<ROOT::Math::Minimizer> &MinimizerInterface::getMinimizer() const {
   return _minimizer_;
 }
 
+std::vector<FitParameter *>& MinimizerInterface::getMinimizerFitParameterPtr() {
+  return _owner_->getLikelihood().getMinimizerFitParameterPtr();
+}
+
 void MinimizerInterface::minimize(){
   LogThrowIf(not isInitialized(), "not initialized");
-
-  _chi2HistoryTree_ = std::make_unique<TTree>("chi2History", "chi2History");
-  _chi2HistoryTree_->SetDirectory(nullptr);
-  _chi2HistoryTree_->Branch("nbFitCalls", &_nbFitCalls_);
-  _chi2HistoryTree_->Branch("chi2Total", _owner_->getPropagator().getLlhBufferPtr());
-  _chi2HistoryTree_->Branch("chi2Stat", _owner_->getPropagator().getLlhStatBufferPtr());
-  _chi2HistoryTree_->Branch("chi2Pulls", _owner_->getPropagator().getLlhPenaltyBufferPtr());
 
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Summary of the fit parameters:") << std::endl;
   for( const auto& parSet : _owner_->getPropagator().getParameterSetsList() ){
@@ -215,13 +189,13 @@ void MinimizerInterface::minimize(){
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling minimize...") << std::endl;
   LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
           << "Number of fit parameters   : " << _minimizer_->NFree() << std::endl
-          << "Number of free parameters : " << _nbFreePars_ << std::endl
+          << "Number of free parameters : " << _owner_->getLikelihood().getNbFreePars() << std::endl
           << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree() << std::endl
-          << "Number of fit bins : " << _nbFitBins_ << std::endl
-          << "Chi2 # DoF : " << _nbFitBins_ - _nbFreePars_
+          << "Number of fit bins : " << _owner_->getLikelihood().getNbFitBins() << std::endl
+          << "Chi2 # DoF : " << _owner_->getLikelihood().getNbFitBins() - _owner_->getLikelihood().getNbFreePars()
           << std::endl;
 
-  int nbFitCallOffset = _nbFitCalls_;
+  int nbFitCallOffset = _owner_->getLikelihood().getNbFitCalls();
   LogInfo << "Fit call offset: " << nbFitCallOffset << std::endl;
 
   if( _enableSimplexBeforeMinimize_ ){
@@ -236,9 +210,9 @@ void MinimizerInterface::minimize(){
     _minimizer_->SetStrategy(0);
 
     // SIMPLEX
-    this->enableFitMonitor();
+    _owner_->getLikelihood().enableFitMonitor();
     _fitHasConverged_ = _minimizer_->Minimize();
-    this->disableFitMonitor();
+    _owner_->getLikelihood().disableFitMonitor();
 
     // Back to original
     _minimizer_->Options().SetMinimizerAlgorithm(originalAlgo.c_str());
@@ -246,17 +220,17 @@ void MinimizerInterface::minimize(){
     _minimizer_->SetTolerance(_tolerance_);
     _minimizer_->SetStrategy(_strategy_);
 
-    LogInfo << _convergenceMonitor_.generateMonitorString(); // lasting printout
-    LogWarning << "Simplex ended after " << _nbFitCalls_ - nbFitCallOffset << " calls." << std::endl;
+    LogInfo << getConvergenceMonitor().generateMonitorString(); // lasting printout
+    LogWarning << "Simplex ended after " << _owner_->getLikelihood().getNbFitCalls() - nbFitCallOffset << " calls." << std::endl;
   }
 
-  this->enableFitMonitor();
+  _owner_->getLikelihood().enableFitMonitor();
   _fitHasConverged_ = _minimizer_->Minimize();
-  this->disableFitMonitor();
+  _owner_->getLikelihood().disableFitMonitor();
 
-  int nbMinimizeCalls = _nbFitCalls_ - nbFitCallOffset;
+  int nbMinimizeCalls = _owner_->getLikelihood().getNbFitCalls() - nbFitCallOffset;
 
-  LogInfo << _convergenceMonitor_.generateMonitorString(); // lasting printout
+  LogInfo << getConvergenceMonitor().generateMonitorString(); // lasting printout
   LogInfo << "Minimization ended after " << nbMinimizeCalls << " calls." << std::endl;
   if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogWarning << "Status code: " << this->minuitStatusCodeStr.at(_minimizer_->Status()) << std::endl;
   else LogWarning << "Status code: " << _minimizer_->Status() << std::endl;
@@ -266,7 +240,7 @@ void MinimizerInterface::minimize(){
   // Make sure we are on the right spot
   updateCacheToBestfitPoint();
 
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "fit"), _chi2HistoryTree_.get());
+  _owner_->getLikelihood().saveChi2History();
 
   if( _fitHasConverged_ ){ LogInfo << "Minimization has converged!" << std::endl; }
   else{ LogError << "Minimization did not converged." << std::endl; }
@@ -276,11 +250,14 @@ void MinimizerInterface::minimize(){
   int toyIndex = _owner_->getPropagator().getIThrow();
   int nIterations = int(_minimizer_->NIterations());
   int nFitPars = int(_minimizer_->NFree());
-  int nDof = _nbFitBins_ - _nbFreePars_;
+  int nDof = _owner_->getLikelihood().getNbFitBins() - _owner_->getLikelihood().getNbFreePars();
   double edmBestFit = _minimizer_->Edm();
   double fitStatus = _minimizer_->Status();
   double covStatus = _minimizer_->CovMatrixStatus();
   double chi2MinFitter = _minimizer_->MinValue();
+  int nbFreePars = _owner_->getLikelihood().getNbFreePars();
+  int nbFitCalls = _owner_->getLikelihood().getNbFitCalls();
+  int nbFitBins = _owner_->getLikelihood().getNbFitBins();
 
   auto bestFitStats = std::make_unique<TTree>("bestFitStats", "bestFitStats");
   bestFitStats->SetDirectory(nullptr);
@@ -291,9 +268,9 @@ void MinimizerInterface::minimize(){
   bestFitStats->Branch("nIterations", &nIterations);
   bestFitStats->Branch("chi2MinFitter", &chi2MinFitter);
   bestFitStats->Branch("toyIndex", &toyIndex);
-  bestFitStats->Branch("nCallsAtBestFit", &_nbFitCalls_);
-  bestFitStats->Branch("nFitBins", &_nbFitBins_);
-  bestFitStats->Branch("nFreePars", &_nbFreePars_);
+  bestFitStats->Branch("nCallsAtBestFit", &nbFitCalls);
+  bestFitStats->Branch("nFitBins", &nbFitBins);
+  bestFitStats->Branch("nFreePars", &nbFreePars);
   bestFitStats->Branch("nFitPars", &nFitPars);
   bestFitStats->Branch("nDof", &nDof);
   bestFitStats->Branch("chi2BestFit", _owner_->getPropagator().getLlhBufferPtr());
@@ -358,15 +335,15 @@ void MinimizerInterface::minimize(){
 void MinimizerInterface::calcErrors(){
   LogThrowIf(not isInitialized(), "not initialized");
 
-  int nbFitCallOffset = _nbFitCalls_;
+  int nbFitCallOffset = _owner_->getLikelihood().getNbFitCalls();
 
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling HESSE...") << std::endl;
   LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
           << "Number of fit parameters   : " << _minimizer_->NFree() << std::endl
-          << "Number of free parameters : " << _nbFreePars_ << std::endl
+          << "Number of free parameters : " << _owner_->getLikelihood().getNbFreePars() << std::endl
           << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree() << std::endl
-          << "Number of fit bins : " << _nbFitBins_ << std::endl
-          << "Chi2 # DoF : " << _nbFitBins_ - _nbFreePars_  << std::endl
+          << "Number of fit bins : " << _owner_->getLikelihood().getNbFitBins() << std::endl
+          << "Chi2 # DoF : " << _owner_->getLikelihood().getNbFitBins() - _owner_->getLikelihood().getNbFreePars()  << std::endl
           << "Fit call offset: " << nbFitCallOffset << std::endl;
 
   if     ( _errorAlgo_ == "Minos" ){
@@ -378,9 +355,9 @@ void MinimizerInterface::calcErrors(){
     for( int iFitPar = 0 ; iFitPar < _minimizer_->NDim() ; iFitPar++ ){
       LogInfo << "Evaluating: " << _minimizer_->VariableName(iFitPar) << "..." << std::endl;
 
-      this->enableFitMonitor();
+      _owner_->getLikelihood().enableFitMonitor();
       bool isOk = _minimizer_->GetMinosError(iFitPar, errLow, errHigh);
-      this->disableFitMonitor();
+      _owner_->getLikelihood().disableFitMonitor();
 
 #if ROOT_VERSION_CODE >= ROOT_VERSION(6,23,02)
       LogWarning << minosStatusCodeStr.at(_minimizer_->MinosStatus()) << std::endl;
@@ -396,7 +373,7 @@ void MinimizerInterface::calcErrors(){
 
     // Put back at minimum
     for( int iFitPar = 0 ; iFitPar < _minimizer_->NDim() ; iFitPar++ ){
-      _minimizerFitParameterPtr_[iFitPar]->setParameterValue(_minimizer_->X()[iFitPar]);
+      getMinimizerFitParameterPtr()[iFitPar]->setParameterValue(_minimizer_->X()[iFitPar]);
     }
   } // Minos
   else if( _errorAlgo_ == "Hesse" ){
@@ -404,17 +381,17 @@ void MinimizerInterface::calcErrors(){
     if( _restoreStepSizeBeforeHesse_ ){
       LogWarning << "Restoring step size before HESSE..." << std::endl;
       for( int iFitPar = 0 ; iFitPar < _minimizer_->NDim() ; iFitPar++ ){
-        auto& par = *_minimizerFitParameterPtr_[iFitPar];
+        auto& par = *getMinimizerFitParameterPtr()[iFitPar];
         if(not _useNormalizedFitSpace_){ _minimizer_->SetVariableStepSize(iFitPar, par.getStepSize()); }
         else{ _minimizer_->SetVariableStepSize(iFitPar, FitParameterSet::toNormalizedParRange(par.getStepSize(), par)); } // should be 1
       }
     }
 
-    this->enableFitMonitor();
+    _owner_->getLikelihood().enableFitMonitor();
     _fitHasConverged_ = _minimizer_->Hesse();
-    this->disableFitMonitor();
+    _owner_->getLikelihood().disableFitMonitor();
 
-    LogInfo << "Hesse ended after " << _nbFitCalls_ - nbFitCallOffset << " calls." << std::endl;
+    LogInfo << "Hesse ended after " << _owner_->getLikelihood().getNbFitCalls() - nbFitCallOffset << " calls." << std::endl;
     LogWarning << "HESSE status code: " << hesseStatusCodeStr.at(_minimizer_->Status()) << std::endl;
     LogWarning << "Covariance matrix status code: " << covMatrixStatusCodeStr.at(_minimizer_->CovMatrixStatus()) << std::endl;
 
@@ -425,11 +402,11 @@ void MinimizerInterface::calcErrors(){
 
     if(not _fitHasConverged_){
       LogError  << "Hesse did not converge." << std::endl;
-      LogError << _convergenceMonitor_.generateMonitorString(); // lasting printout
+      LogError << getConvergenceMonitor().generateMonitorString(); // lasting printout
     }
     else{
       LogInfo << "Hesse converged." << std::endl;
-      LogInfo << _convergenceMonitor_.generateMonitorString(); // lasting printout
+      LogInfo << getConvergenceMonitor().generateMonitorString(); // lasting printout
     }
 
     LogInfo << "Writing HESSE post-fit errors" << std::endl;
@@ -441,125 +418,6 @@ void MinimizerInterface::calcErrors(){
   }
 }
 
-double MinimizerInterface::evalFit(const double* parArray_){
-  LogThrowIf(not isInitialized(), "not initialized");
-  GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-
-  if(_nbFitCalls_ != 0){
-    _outEvalFitAvgTimer_.counts++ ; _outEvalFitAvgTimer_.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("out_evalFit");
-  }
-  _nbFitCalls_++;
-
-  // Update fit parameter values:
-  int iFitPar{0};
-  for( auto* par : _minimizerFitParameterPtr_ ){
-    if( _useNormalizedFitSpace_ ) par->setParameterValue(FitParameterSet::toRealParValue(parArray_[iFitPar++], *par));
-    else par->setParameterValue(parArray_[iFitPar++]);
-  }
-
-  // Compute the Chi2
-  _owner_->getPropagator().updateLlhCache();
-
-  _evalFitAvgTimer_.counts++; _evalFitAvgTimer_.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-
-  if(_convergenceMonitor_.isGenerateMonitorStringOk() and _enableFitMonitor_ ){
-    if( _itSpeed_.counts != 0 ){
-      _itSpeed_.counts = _nbFitCalls_ - _itSpeed_.counts; // how many cycles since last print
-      _itSpeed_.cumulated = GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("itSpeed"); // time since last print
-    }
-    else{
-      _itSpeed_.counts = _nbFitCalls_;
-      GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("itSpeed");
-    }
-
-    std::stringstream ssHeader;
-    ssHeader << std::endl << __METHOD_NAME__ << ": call #" << _nbFitCalls_;
-    ssHeader << std::endl << "Target EDM: " << 0.001 * _minimizer_->Tolerance() * 2;
-    ssHeader << std::endl << "Current RAM usage: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
-    double cpuPercent = GenericToolbox::getCpuUsageByProcess();
-    ssHeader << std::endl << "Current CPU usage: " << cpuPercent << "% (" << cpuPercent / GlobalVariables::getNbThreads() << "% efficiency)";
-    ssHeader << std::endl << "Avg " << GUNDAM_CHI2 << " computation time: " << _evalFitAvgTimer_;
-    ssHeader << std::endl << GUNDAM_CHI2 << "/dof: " << _owner_->getPropagator().getLlhBuffer() / double(_nbFitBins_ - _nbFreePars_);
-    ssHeader << std::endl;
-#ifndef GUNDAM_BATCH
-    ssHeader << "├─";
-#endif
-    ssHeader << " Current speed:                 " << (double)_itSpeed_.counts / (double)_itSpeed_.cumulated * 1E6 << " it/s";
-    ssHeader << std::endl;
-#ifndef GUNDAM_BATCH
-    ssHeader << "├─";
-#endif
-    ssHeader << " Avg time for " << _minimizerType_ << "/" << _minimizerAlgo_ << ":   " << _outEvalFitAvgTimer_;
-    ssHeader << std::endl;
-#ifndef GUNDAM_BATCH
-    ssHeader << "├─";
-#endif
-    ssHeader << " Avg time to propagate weights: " << _owner_->getPropagator().weightProp;
-    ssHeader << std::endl;
-#ifndef GUNDAM_BATCH
-    ssHeader << "├─";
-#endif
-    ssHeader << " Avg time to fill histograms:   " << _owner_->getPropagator().fillProp;
-
-
-    if( _showParametersOnFitMonitor_ ){
-      std::string curParSet;
-//    std::stringstream ssFooter;
-      ssHeader << std::endl << std::setprecision(1) << std::scientific << std::showpos;
-      int nParPerLine{0};
-      for( auto* fitPar : _minimizerFitParameterPtr_ ){
-        if( fitPar->isFixed() ) continue;
-        if( curParSet != fitPar->getOwner()->getName() ){
-          if( not curParSet.empty() ) ssHeader << std::endl;
-          curParSet = fitPar->getOwner()->getName();
-          ssHeader << curParSet
-                   << (fitPar->getOwner()->isUseEigenDecompInFit()? " (eigen)": "")
-                   << ":" << std::endl;
-          nParPerLine = 0;
-        }
-        else{
-          ssHeader << ", ";
-          if( nParPerLine >= _maxNbParametersPerLineOnMonitor_ ) { ssHeader << std::endl; nParPerLine = 0; }
-        }
-        if(fitPar->gotUpdated()) ssHeader << GenericToolbox::ColorCodes::blueBackground;
-        if(_useNormalizedFitSpace_) ssHeader << FitParameterSet::toNormalizedParValue(fitPar->getParameterValue(), *fitPar);
-        else ssHeader << fitPar->getParameterValue();
-        if(fitPar->gotUpdated()) ssHeader << GenericToolbox::ColorCodes::resetColor;
-        nParPerLine++;
-      }
-    }
-
-
-    _convergenceMonitor_.setHeaderString(ssHeader.str());
-//    _convergenceMonitor_.setFooterString(ssFooter.str());
-    _convergenceMonitor_.getVariable("Total").addQuantity(_owner_->getPropagator().getLlhBuffer());
-    _convergenceMonitor_.getVariable("Stat").addQuantity(_owner_->getPropagator().getLlhStatBuffer());
-    _convergenceMonitor_.getVariable("Syst").addQuantity(_owner_->getPropagator().getLlhPenaltyBuffer());
-
-
-    if( _nbFitCalls_ == 1 ){
-      // don't erase these lines
-      LogWarning << _convergenceMonitor_.generateMonitorString();
-    }
-    else{
-      LogInfo << _convergenceMonitor_.generateMonitorString(
-          GenericToolbox::getTerminalWidth() != 0, // trail back if not in batch mode
-          true // force generate
-      );
-    }
-
-    _itSpeed_.counts = _nbFitCalls_;
-  }
-
-  // Fill History
-  _chi2HistoryTree_->Fill();
-//  _chi2History_["Total"].emplace_back(_owner_->getPropagator().getLlhBuffer());
-//  _chi2History_["Stat"].emplace_back(_chi2StatBuffer_);
-//  _chi2History_["Syst"].emplace_back(_chi2PullsBuffer_);
-
-  GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("out_evalFit");
-  return _owner_->getPropagator().getLlhBuffer();
-}
 void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
   LogInfo << __METHOD_NAME__ << std::endl;
   LogThrowIf(not isInitialized(), "not initialized");
@@ -799,7 +657,7 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
 
         auto* iParList = &iParSet.getEffectiveParameterList();
         for( auto& iPar : *iParList ){
-          int iMinimizerIndex = GenericToolbox::findElementIndex((FitParameter*) &iPar, _minimizerFitParameterPtr_);
+            int iMinimizerIndex = GenericToolbox::findElementIndex((FitParameter*) &iPar, getMinimizerFitParameterPtr());
 
           int jOffset{0};
           for( const auto& jParSet : _owner_->getPropagator().getParameterSetsList() ){
@@ -807,7 +665,8 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
 
             auto* jParList = &jParSet.getEffectiveParameterList();
             for( auto& jPar : *jParList ){
-              int jMinimizerIndex = GenericToolbox::findElementIndex((FitParameter*) &jPar, _minimizerFitParameterPtr_);
+              int jMinimizerIndex = GenericToolbox::findElementIndex((FitParameter*) &jPar,
+                                                                     getMinimizerFitParameterPtr());
 
               if( iMinimizerIndex != -1 and jMinimizerIndex != -1 ){
                 // Use the fit-constrained value
@@ -877,7 +736,7 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
     // Rescale the post-fit values:
     for(int iRow = 0 ; iRow < postfitCovarianceMatrix.GetNrows() ; iRow++ ){
       for(int iCol = 0 ; iCol < postfitCovarianceMatrix.GetNcols() ; iCol++ ){
-        postfitCovarianceMatrix[iRow][iCol] *= (_minimizerFitParameterPtr_[iRow]->getStdDevValue()) * (_minimizerFitParameterPtr_[iCol]->getStdDevValue());
+        postfitCovarianceMatrix[iRow][iCol] *= (getMinimizerFitParameterPtr()[iRow]->getStdDevValue()) * (getMinimizerFitParameterPtr()[iCol]->getStdDevValue());
       }
     }
 
@@ -1172,10 +1031,10 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
     // dimension should be the right one -> parList includes the fixed one
     auto covMatrix = std::make_unique<TMatrixD>(int(parList->size()), int(parList->size()));
     for( auto& iPar : *parList ){
-      int iMinimizerIndex = GenericToolbox::findElementIndex((FitParameter*) &iPar, _minimizerFitParameterPtr_);
+      int iMinimizerIndex = GenericToolbox::findElementIndex((FitParameter*) &iPar,getMinimizerFitParameterPtr());
       if( iMinimizerIndex == -1 ) continue;
       for( auto& jPar : *parList ){
-        int jMinimizerIndex = GenericToolbox::findElementIndex((FitParameter*) &jPar, _minimizerFitParameterPtr_);
+        int jMinimizerIndex = GenericToolbox::findElementIndex((FitParameter*) &jPar,getMinimizerFitParameterPtr());
         if( jMinimizerIndex == -1 ) continue;
         (*covMatrix)[iPar.getParameterIndex()][jPar.getParameterIndex()] = postfitCovarianceMatrix[iMinimizerIndex][jMinimizerIndex];
       }
@@ -1224,10 +1083,15 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
 void MinimizerInterface::updateCacheToBestfitPoint(){
   if( _minimizer_->X() != nullptr ){
     LogWarning << "Updating propagator cache to the best fit point..." << std::endl;
-    this->evalFit( _minimizer_->X() );
+    _owner_->getLikelihood().evalFit( _minimizer_->X() );
   }
   else{
     LogAlert << "No best fit point provided by minimized." << std::endl;
   }
 }
 
+// Local Variables:
+// mode:c++
+// c-basic-offset:2
+// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
+// End:
