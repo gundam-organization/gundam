@@ -44,7 +44,9 @@ public:
   // Getters
   const Propagator& getPropagator() const;
   Propagator& getPropagator();
-  MinimizerInterface& getMinimizer(){ return _minimizer_; }
+  const MinimizerInterface& getMinimizer() const { return *_minimizer_; }
+  MinimizerInterface& getMinimizer(){ return *_minimizer_; }
+  const LikelihoodInterface& getLikelihood() const { return _likelihood_; }
   LikelihoodInterface& getLikelihood(){ return _likelihood_; }
 
   TDirectory* getSaveDir(){ return _saveDir_; }
@@ -82,7 +84,7 @@ private:
   // Internals
   TDirectory* _saveDir_{nullptr};
   Propagator _propagator_{};
-  MinimizerInterface _minimizer_{this};
+  std::unique_ptr<MinimizerInterface> _minimizer_{nullptr};
   LikelihoodInterface _likelihood_{this};
 };
 
