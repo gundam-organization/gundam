@@ -404,7 +404,7 @@ bool DialCollection::initializeDialsWithDefinition() {
               continue;
             }
 
-            if( useCachedDials() ){
+            if( this->useCachedDials() ){
               LightGraphCache g;
               g.setAllowExtrapolation(_allowDialExtrapolation_);
               g.setGraph( *(binnedGraph) );
@@ -418,7 +418,7 @@ bool DialCollection::initializeDialsWithDefinition() {
             }
           }
           else{
-            LogThrow(_globalDialType_ << " is not implemented.");
+            LogThrow(_globalDialType_ << " is not implemented for binned dials.");
           }
         }
 

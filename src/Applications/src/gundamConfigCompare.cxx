@@ -8,6 +8,9 @@
 #include "CmdLineParser.h"
 #include "Logger.h"
 #include "GenericToolbox.h"
+#include "GenericToolbox.Root.h"
+
+#include "nlohmann/json.hpp"
 
 #include "string"
 #include "vector"
@@ -32,13 +35,15 @@ int main( int argc, char** argv ){
   CmdLineParser clp(argc, argv);
   clp.addOption("config-1", {"-c1"}, "Path to first config file.", 1);
   clp.addOption("config-2", {"-c2"}, "Path to second config file.", 1);
+  clp.addOption("file-1", {"-f1"}, "Path to first output fit file.", 1);
+  clp.addOption("file-2", {"-f2"}, "Path to second output fit file.", 1);
   clp.addOption("show-all-keys", {"-a"}, "Show all keys.", 0);
 
   clp.parseCmdLine();
 
   if( clp.isNoOptionTriggered()
-    or not clp.isOptionTriggered("config-1")
-    or not clp.isOptionTriggered("config-2")
+    or not ( clp.isOptionTriggered("config-1") or clp.isOptionTriggered("file-1") )
+    or not ( clp.isOptionTriggered("config-2") or clp.isOptionTriggered("file-2") )
   ){
     LogError << "Missing options. Reminding usage..." << std::endl;
     LogInfo << clp.getConfigSummary() << std::endl;
@@ -46,15 +51,42 @@ int main( int argc, char** argv ){
   }
 
   LogInfo << "Reading config..." << std::endl;
-  auto configPath1 = clp.getOptionVal<std::string>("config-1");
-  auto configPath2 = clp.getOptionVal<std::string>("config-2");
+  std::string configPath1;
+  std::string configPath2;
+
+  if     ( clp.isOptionTriggered("config-1") ){ configPath1 = clp.getOptionVal<std::string>("config-1"); }
+  else if( clp.isOptionTriggered("file-1") ){ configPath1 = clp.getOptionVal<std::string>("file-1"); }
+  if     ( clp.isOptionTriggered("config-2") ){ configPath2 = clp.getOptionVal<std::string>("config-2"); }
+  else if( clp.isOptionTriggered("file-2") ){ configPath2 = clp.getOptionVal<std::string>("file-2"); }
+
   if( clp.isOptionTriggered("show-all-keys") ){ __showAllKeys__ = true; }
 
-  LogThrowIf(not GenericToolbox::doesPathIsFile(configPath1), configPath1 << " not found.")
-  LogThrowIf(not GenericToolbox::doesPathIsFile(configPath2), configPath2 << " not found.")
+  LogThrowIf(not GenericToolbox::doesPathIsFile(configPath1), configPath1 << " not found.");
+  LogThrowIf(not GenericToolbox::doesPathIsFile(configPath2), configPath2 << " not found.");
 
-  auto config1 = JsonUtils::readConfigFile(configPath1);
-  auto config2 = JsonUtils::readConfigFile(configPath2);
+  nlohmann::json config1;
+  if     ( clp.isOptionTriggered("config-1") ){ config1 = JsonUtils::readConfigFile(configPath1); }
+  else if( clp.isOptionTriggered("file-1") ){
+    LogThrowIf(not GenericToolbox::doesTFileIsValid(configPath1, {"gundamFitter/unfoldedConfig_TNamed"}),
+               "Could not find config in file " << configPath1
+    );
+    auto* f = TFile::Open(configPath1.c_str());
+    auto* conf = f->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed");
+    config1 = JsonUtils::readConfigJsonStr(conf->GetTitle());
+    delete f;
+  }
+
+  nlohmann::json config2;
+  if     ( clp.isOptionTriggered("config-2") ){ config2 = JsonUtils::readConfigFile(configPath2); }
+  else if( clp.isOptionTriggered("file-2") ){
+    LogThrowIf(not GenericToolbox::doesTFileIsValid(configPath2, {"gundamFitter/unfoldedConfig_TNamed"}),
+               "Could not find config in file " << configPath2
+    );
+    auto* f = TFile::Open(configPath2.c_str());
+    auto* conf = f->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed");
+    config2 = JsonUtils::readConfigJsonStr(conf->GetTitle());
+    delete f;
+  }
 
   JsonUtils::unfoldConfig(config1);
   JsonUtils::unfoldConfig(config2);
