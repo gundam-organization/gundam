@@ -7,6 +7,7 @@
 
 
 #include "FitParameterSet.h"
+#include "MinimizerBase.h"
 #include "JsonBaseClass.h"
 
 #include "GenericToolbox.VariablesMonitor.h"
@@ -20,24 +21,20 @@
 #include "memory"
 #include "vector"
 
-
 class FitterEngine;
 
-class MinimizerInterface : public JsonBaseClass {
+class MinimizerInterface : public MinimizerBase {
 
 public:
   explicit MinimizerInterface(FitterEngine* owner_);
 
-  void setOwner(FitterEngine* owner_);
-  void setEnablePostFitErrorEval(bool enablePostFitErrorEval_);
-  void setMonitorRefreshRateInMs(int monitorRefreshRateInMs_);
+  [[nodiscard]] virtual bool isFitHasConverged() const override;
 
-  [[nodiscard]] bool isFitHasConverged() const;
-  [[nodiscard]] bool isEnablePostFitErrorEval() const;
   [[nodiscard]] const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const;
 
-  void minimize();
-  void calcErrors();
+  void minimize() override;
+  void calcErrors() override;
+  void scanParameters(TDirectory* saveDir_) override;
 
 protected:
   void readConfigImpl() override;
@@ -48,28 +45,16 @@ protected:
   void updateCacheToBestfitPoint();
 
 private:
-  // A local convenience function to get the convergence monitor.  The monitor
-  // actually lives in the likelihood).
-  GenericToolbox::VariablesMonitor &getConvergenceMonitor();
-
-  // A local convenience function to get the vector of fit parameter pointers.
-  // The actual vector lives in the likelihood.
-  std::vector<FitParameter *> &getMinimizerFitParameterPtr();
 
   // Parameters
-  bool _useNormalizedFitSpace_{true};
   bool _enableSimplexBeforeMinimize_{false};
-  bool _enablePostFitErrorEval_{true};
+  // bool _enablePostFitErrorEval_{true};
   bool _restoreStepSizeBeforeHesse_{false};
   bool _generatedPostFitParBreakdown_{false};
   bool _generatedPostFitEigenBreakdown_{false};
-  bool _showParametersOnFitMonitor_{false};
   int _strategy_{1};
   int _printLevel_{2};
   int _simplexStrategy_{1};
-  int _monitorRefreshRateInMs_{5000};
-  int _monitorBashModeRefreshRateInS_{30};
-  int _maxNbParametersPerLineOnMonitor_{15};
   double _tolerance_{1E-4};
   double _simplexToleranceLoose_{1000.};
   unsigned int _maxIterations_{500};
@@ -83,7 +68,6 @@ private:
   bool _fitHasConverged_{false};
   bool _isBadCovMat_{false};
 
-  FitterEngine* _owner_{nullptr};
   std::unique_ptr<ROOT::Math::Minimizer> _minimizer_{nullptr};
 
   // dict

@@ -51,8 +51,9 @@ void FitterEngine::readConfigImpl(){
   _throwGain_ = JsonUtils::fetchValue(_config_, "throwMcBeforeFitGain", _throwGain_);
 
   _propagator_.readConfig( JsonUtils::fetchValue<nlohmann::json>(_config_, "propagatorConfig") );
-  _minimizer_.readConfig( JsonUtils::fetchValue(_config_, "minimizerConfig", nlohmann::json()));
 
+  this->_minimizer_.reset(new MinimizerInterface(this));
+  getMinimizer().readConfig( JsonUtils::fetchValue(_config_, "minimizerConfig", nlohmann::json()));
 
   // legacy
   JsonUtils::deprecatedAction(_config_, "scanConfig", [&]{
@@ -62,7 +63,7 @@ void FitterEngine::readConfigImpl(){
 
   JsonUtils::deprecatedAction(_config_, "monitorRefreshRateInMs", [&]{
     LogAlert << "Forwarding the option to Propagator. Consider moving it into \"minimizerConfig:\"" << std::endl;
-    _minimizer_.setMonitorRefreshRateInMs(JsonUtils::fetchValue<int>(_config_, "monitorRefreshRateInMs"));
+    getLikelihood().getConvergenceMonitor().setMaxRefreshRateInMs(JsonUtils::fetchValue<int>(_config_, "monitorRefreshRateInMs"));
   });
 
   LogInfo << "Convergence monitor will be refreshed every " << _likelihood_.getConvergenceMonitor().getMaxRefreshRateInMs() << "ms." << std::endl;
@@ -120,8 +121,12 @@ void FitterEngine::initializeImpl(){
     this->rescaleParametersStepSize();
   }
 
-  // The minimizer needs all the parameters to be fully setup (i.e. PCA done and other properties)
-  _minimizer_.initialize();
+  // The likelihood needs everything to be fully setup before it is initialized.
+  getLikelihood().initialize();
+
+  // The minimizer needs all the parameters to be fully setup (i.e. PCA done
+  // and other properties)
+  getMinimizer().initialize();
 
   if(GlobalVariables::getVerboseLevel() >= MORE_PRINTOUT) checkNumericalAccuracy();
 
@@ -212,7 +217,7 @@ void FitterEngine::fit(){
   }
   if( _enablePreFitScan_ ){
     LogInfo << "Scanning fit parameters before minimizing..." << std::endl;
-    this->scanMinimizerParameters(GenericToolbox::mkdirTFile(_saveDir_, "preFit/scan"));
+    getMinimizer().scanParameters(GenericToolbox::mkdirTFile(_saveDir_, "preFit/scan"));
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
   if( _throwMcBeforeFit_ ){
@@ -262,7 +267,7 @@ void FitterEngine::fit(){
   }
 
   LogInfo << "Minimizing LLH..." << std::endl;
-  _minimizer_.minimize();
+  getMinimizer().minimize();
 
   if( _generateSamplePlots_ and not _propagator_.getPlotGenerator().getConfig().empty() ){
     LogInfo << "Generating post-fit sample plots..." << std::endl;
@@ -271,16 +276,16 @@ void FitterEngine::fit(){
   }
   if( _enablePostFitScan_ ){
     LogInfo << "Scanning fit parameters around the minimum point..." << std::endl;
-    this->scanMinimizerParameters(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scan"));
+    getMinimizer().scanParameters(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scan"));
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
 
-  if( _minimizer_.isFitHasConverged() and _minimizer_.isEnablePostFitErrorEval() ){
+  if( getMinimizer().isFitHasConverged() and getMinimizer().isEnablePostFitErrorEval() ){
     LogInfo << "Computing post-fit errors..." << std::endl;
-    _minimizer_.calcErrors();
+    getMinimizer().calcErrors();
   }
   else{
-    if( not _minimizer_.isFitHasConverged() ) LogAlert << "Skipping post-fit error calculation since the minimizer did not converge." << std::endl;
+    if( not getMinimizer().isFitHasConverged() ) LogAlert << "Skipping post-fit error calculation since the minimizer did not converge." << std::endl;
     else LogAlert << "Skipping post-fit error calculation since the option is disabled." << std::endl;
   }
 
@@ -435,14 +440,15 @@ void FitterEngine::rescaleParametersStepSize(){
 void FitterEngine::scanMinimizerParameters(TDirectory* saveDir_){
   LogThrowIf(not isInitialized());
   LogInfo << "Performing scans of fit parameters..." << std::endl;
-  for( int iPar = 0 ; iPar < _minimizer_.getMinimizer()->NDim() ; iPar++ ){
-    if( _minimizer_.getMinimizer()->IsFixedVariable(iPar) ){
-      LogWarning << _minimizer_.getMinimizer()->VariableName(iPar)
-                 << " is fixed. Skipping..." << std::endl;
-      continue;
-    }
-    _propagator_.getParScanner().scanFitParameter(*_likelihood_.getMinimizerFitParameterPtr()[iPar], saveDir_);
-  } // iPar
+  getMinimizer().scanParameters(saveDir_);
+  // for( int iPar = 0 ; iPar < getMinimizer().getMinimizer()->NDim() ; iPar++ ){
+  //   if( getMinimizer().getMinimizer()->IsFixedVariable(iPar) ){
+  //     LogWarning << getMinimizer().getMinimizer()->VariableName(iPar)
+  //                << " is fixed. Skipping..." << std::endl;
+  //     continue;
+  //   }
+  //   _propagator_.getParScanner().scanFitParameter(*_likelihood_.getMinimizerFitParameterPtr()[iPar], saveDir_);
+  // } // iPar
 }
 void FitterEngine::checkNumericalAccuracy(){
   LogWarning << __METHOD_NAME__ << std::endl;

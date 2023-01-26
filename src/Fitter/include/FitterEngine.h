@@ -44,7 +44,9 @@ public:
   // Getters
   const Propagator& getPropagator() const;
   Propagator& getPropagator();
-  MinimizerInterface& getMinimizer(){ return _minimizer_; }
+  const MinimizerBase& getMinimizer() const { return *_minimizer_; }
+  MinimizerBase& getMinimizer(){ return *_minimizer_; }
+  const LikelihoodInterface& getLikelihood() const { return _likelihood_; }
   LikelihoodInterface& getLikelihood(){ return _likelihood_; }
 
   TDirectory* getSaveDir(){ return _saveDir_; }
@@ -58,7 +60,12 @@ protected:
 
   void fixGhostFitParameters();
   void rescaleParametersStepSize();
-  void scanMinimizerParameters(TDirectory* saveDir_);
+
+  // Scan the parameters as used by the minimizer (e.g. MINUIT).  This has
+  // been replaced by MinimizerBase::scanParameters() which can be accessed
+  // through the getMinimizer() method.  For example:
+  // "fitter.scanMinimizerParameters(dir)" should be replaced by "fitter.getMinimizer().scanParameters(dir)"
+  [[deprecated("Use getMinimizer().scanParameters(dir) instead")]] void scanMinimizerParameters(TDirectory* saveDir_);
   void checkNumericalAccuracy();
 
 
@@ -82,7 +89,7 @@ private:
   // Internals
   TDirectory* _saveDir_{nullptr};
   Propagator _propagator_{};
-  MinimizerInterface _minimizer_{this};
+  std::unique_ptr<MinimizerBase> _minimizer_{nullptr};
   LikelihoodInterface _likelihood_{this};
 };
 

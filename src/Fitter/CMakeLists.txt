@@ -1,5 +1,6 @@
 set(SRCFILES
         src/FitterEngine.cpp
+        src/MinimizerBase.cpp
         src/MinimizerInterface.cpp
         src/LikelihoodInterface.cpp
   )
