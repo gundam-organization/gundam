@@ -217,7 +217,7 @@ void FitterEngine::fit(){
   }
   if( _enablePreFitScan_ ){
     LogInfo << "Scanning fit parameters before minimizing..." << std::endl;
-    this->scanMinimizerParameters(GenericToolbox::mkdirTFile(_saveDir_, "preFit/scan"));
+    getMinimizer().scanParameters(GenericToolbox::mkdirTFile(_saveDir_, "preFit/scan"));
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
   if( _throwMcBeforeFit_ ){
@@ -276,7 +276,7 @@ void FitterEngine::fit(){
   }
   if( _enablePostFitScan_ ){
     LogInfo << "Scanning fit parameters around the minimum point..." << std::endl;
-    this->scanMinimizerParameters(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scan"));
+    getMinimizer().scanParameters(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scan"));
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
 
@@ -440,14 +440,15 @@ void FitterEngine::rescaleParametersStepSize(){
 void FitterEngine::scanMinimizerParameters(TDirectory* saveDir_){
   LogThrowIf(not isInitialized());
   LogInfo << "Performing scans of fit parameters..." << std::endl;
-  for( int iPar = 0 ; iPar < getMinimizer().getMinimizer()->NDim() ; iPar++ ){
-    if( getMinimizer().getMinimizer()->IsFixedVariable(iPar) ){
-      LogWarning << getMinimizer().getMinimizer()->VariableName(iPar)
-                 << " is fixed. Skipping..." << std::endl;
-      continue;
-    }
-    _propagator_.getParScanner().scanFitParameter(*_likelihood_.getMinimizerFitParameterPtr()[iPar], saveDir_);
-  } // iPar
+  getMinimizer().scanParameters(saveDir_);
+  // for( int iPar = 0 ; iPar < getMinimizer().getMinimizer()->NDim() ; iPar++ ){
+  //   if( getMinimizer().getMinimizer()->IsFixedVariable(iPar) ){
+  //     LogWarning << getMinimizer().getMinimizer()->VariableName(iPar)
+  //                << " is fixed. Skipping..." << std::endl;
+  //     continue;
+  //   }
+  //   _propagator_.getParScanner().scanFitParameter(*_likelihood_.getMinimizerFitParameterPtr()[iPar], saveDir_);
+  // } // iPar
 }
 void FitterEngine::checkNumericalAccuracy(){
   LogWarning << __METHOD_NAME__ << std::endl;

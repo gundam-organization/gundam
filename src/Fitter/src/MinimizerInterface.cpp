@@ -26,9 +26,6 @@ LoggerInit([]{
 MinimizerInterface::MinimizerInterface(FitterEngine* owner_):
   MinimizerBase(owner_){}
 
-void MinimizerInterface::setEnablePostFitErrorEval(bool enablePostFitErrorEval_){ _enablePostFitErrorEval_ = enablePostFitErrorEval_; }
-
-
 void MinimizerInterface::readConfigImpl(){
   MinimizerBase::readConfigImpl();
   LogInfo << "Reading minimizer config..." << std::endl;
@@ -48,7 +45,6 @@ void MinimizerInterface::readConfigImpl(){
   _simplexStrategy_ = JsonUtils::fetchValue(_config_, "simplexStrategy", _simplexStrategy_);
 
   _errorAlgo_ = JsonUtils::fetchValue(_config_, {{"errorsAlgo"}, {"errors"}}, "Hesse");
-  _enablePostFitErrorEval_ = JsonUtils::fetchValue(_config_, "enablePostFitErrorFit", _enablePostFitErrorEval_);
   _restoreStepSizeBeforeHesse_ = JsonUtils::fetchValue(_config_, "restoreStepSizeBeforeHesse", _restoreStepSizeBeforeHesse_);
 
   _generatedPostFitParBreakdown_ = JsonUtils::fetchValue(_config_, "generatedPostFitParBreakdown", _generatedPostFitParBreakdown_);
@@ -108,9 +104,6 @@ void MinimizerInterface::initializeImpl(){
 
 bool MinimizerInterface::isFitHasConverged() const {
   return _fitHasConverged_;
-}
-bool MinimizerInterface::isEnablePostFitErrorEval() const {
-  return _enablePostFitErrorEval_;
 }
 
 const std::unique_ptr<ROOT::Math::Minimizer> &MinimizerInterface::getMinimizer() const {
@@ -1053,6 +1046,19 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
     savePostFitObjFct(parSet, *parList, covMatrix.get(), parSetDir);
 
   } // parSet
+}
+
+void MinimizerInterface::scanParameters(TDirectory* saveDir_){
+  LogThrowIf(not isInitialized());
+  LogInfo << "Performing scans of fit parameters..." << std::endl;
+  for( int iPar = 0 ; iPar < getMinimizer()->NDim() ; iPar++ ){
+    if( getMinimizer()->IsFixedVariable(iPar) ){
+      LogWarning << getMinimizer()->VariableName(iPar)
+                 << " is fixed. Skipping..." << std::endl;
+      continue;
+    }
+    getPropagator().getParScanner().scanFitParameter(*getMinimizerFitParameterPtr()[iPar], saveDir_);
+  } // iPar
 }
 
 void MinimizerInterface::updateCacheToBestfitPoint(){

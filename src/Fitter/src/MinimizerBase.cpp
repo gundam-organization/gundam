@@ -14,6 +14,8 @@ MinimizerBase::MinimizerBase(FitterEngine* owner_): _owner_(owner_){}
 void MinimizerBase::readConfigImpl(){
   LogInfo << "Reading MinimizerBase config..." << std::endl;
 
+  _enablePostFitErrorEval_ = JsonUtils::fetchValue(_config_, "enablePostFitErrorFit", _enablePostFitErrorEval_);
+
   bool useNormalizedFitSpace = getLikelihood().getUseNormalizedFitSpace();
   useNormalizedFitSpace = JsonUtils::fetchValue(_config_, "useNormalizedFitSpace", useNormalizedFitSpace);
   getLikelihood().setUseNormalizedFitSpace(useNormalizedFitSpace);
@@ -41,6 +43,11 @@ void MinimizerBase::readConfigImpl(){
 void MinimizerBase::initializeImpl(){
   LogInfo << "Initializing the minimizer..." << std::endl;
   LogThrowIf( _owner_== nullptr, "FitterEngine ptr not set." );
+}
+
+void MinimizerBase::scanParameters(TDirectory* saveDir_) {
+  LogWarning << "Parameter scanning is not implemented for this minimizer"
+             << std::endl;
 }
 
 std::vector<FitParameter *>& MinimizerBase::getMinimizerFitParameterPtr() {

@@ -8,6 +8,7 @@
 #include "JsonBaseClass.h"
 #include "GenericToolbox.VariablesMonitor.h"
 
+class TDirectory;
 class FitterEngine;
 class FitParameter;
 class Propagator;
@@ -34,6 +35,20 @@ public:
   /// should either be skipped, or the covariance can be filled using
   /// information from the posterior.
   virtual void calcErrors() = 0;
+
+  /// A pure virtual method that returns true if the fit has converted.
+  [[nodiscard]] virtual bool isFitHasConverged() const = 0;
+
+  /// A virtual method that should scan the parameters used by the minimizer.
+  /// This provides a view of the parameters seen by the minimizer, which may
+  /// be different from the parameters used for the likelihood.  Most
+  /// MinimizerBase derived classes should override this method.  If it is not
+  /// provided then it will be a no-op.
+  virtual void scanParameters(TDirectory* saveDir_);
+
+  /// Set if the calcErrors method should be called by the FitterEngine.
+  void setEnablePostFitErrorEval(bool enablePostFitErrorEval_) {_enablePostFitErrorEval_ = enablePostFitErrorEval_;}
+  [[nodiscard]] bool isEnablePostFitErrorEval() const {return _enablePostFitErrorEval_;}
 
 protected:
   /// Get a reference to the FitterEngine that owns this minimizer.
@@ -71,6 +86,9 @@ protected:
 private:
   /// Save a copy of the address of the engine that owns this object.
   FitterEngine* _owner_{nullptr};
+
+  bool _enablePostFitErrorEval_{true};
+
 };
 #endif //GUNDAM_MinimizerBase_h
 

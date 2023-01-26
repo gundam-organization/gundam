@@ -28,14 +28,13 @@ class MinimizerInterface : public MinimizerBase {
 public:
   explicit MinimizerInterface(FitterEngine* owner_);
 
-  void setEnablePostFitErrorEval(bool enablePostFitErrorEval_);
+  [[nodiscard]] virtual bool isFitHasConverged() const override;
 
-  [[nodiscard]] bool isFitHasConverged() const;
-  [[nodiscard]] bool isEnablePostFitErrorEval() const;
   [[nodiscard]] const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const;
 
   void minimize() override;
   void calcErrors() override;
+  void scanParameters(TDirectory* saveDir_) override;
 
 protected:
   void readConfigImpl() override;
@@ -49,7 +48,7 @@ private:
 
   // Parameters
   bool _enableSimplexBeforeMinimize_{false};
-  bool _enablePostFitErrorEval_{true};
+  // bool _enablePostFitErrorEval_{true};
   bool _restoreStepSizeBeforeHesse_{false};
   bool _generatedPostFitParBreakdown_{false};
   bool _generatedPostFitEigenBreakdown_{false};
