@@ -84,13 +84,13 @@ public:
   void disableFitMonitor(){ _enableFitMonitor_ = false; }
 
   /// Set whether fit parameters should be shown in the monitor output.
-  void setShowParametersOnFitMonitor(bool v)
-    {_showParametersOnFitMonitor_=v;}
+  void setShowParametersOnFitMonitor(bool v) {_showParametersOnFitMonitor_=v;}
+  bool getShowParametersOnFitMonitor() {return _showParametersOnFitMonitor_;}
 
   /// Set the maximum number of parameters to show on a line when parameters
   /// are being show by the monitor.
-  void setMaxNbParametersPerLineOnMonitor(int v)
-    {_maxNbParametersPerLineOnMonitor_=v;}
+  void setMaxNbParametersPerLineOnMonitor(int v) {_maxNbParametersPerLineOnMonitor_=v;}
+  bool getMaxNbParametersPerLineOnMonitor() {return _maxNbParametersPerLineOnMonitor_;}
 
   /// Save the chi2 history to the current output file.
   void saveChi2History();

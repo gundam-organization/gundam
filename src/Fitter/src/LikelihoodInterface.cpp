@@ -10,7 +10,6 @@
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
 
-
 LoggerInit([]{
   Logger::setUserHeaderStr("[Likelihood]");
 });
