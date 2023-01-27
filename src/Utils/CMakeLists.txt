@@ -1,13 +1,14 @@
 set(SRCFILES
     src/GlobalVariables.cpp
-        src/DataBinSet.cpp
-        src/DataBin.cpp
-        src/JsonUtils.cpp
-        src/YamlUtils.cpp
-        src/GundamGreetings.cpp
-        src/JsonBaseClass.cpp
-        src/VariableDictionary.cpp
-        )
+    src/DataBinSet.cpp
+    src/DataBin.cpp
+    src/JsonUtils.cpp
+    src/YamlUtils.cpp
+    src/GundamGreetings.cpp
+    src/JsonBaseClass.cpp
+    src/VariableDictionary.cpp
+    src/Misc.cpp
+    )
 
 set(HEADERS
         ${CMAKE_CURRENT_SOURCE_DIR}/include/CalculateGeneralSpline.h
@@ -24,6 +25,7 @@ set(HEADERS
         ${CMAKE_CURRENT_SOURCE_DIR}/include/VariableDictionary.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/YamlUtils.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/YamlUtils.impl.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/Misc.h
         )
 
 

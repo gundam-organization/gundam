@@ -10,9 +10,14 @@ set( SRCFILES
     src/SplineHandler.cpp
     src/EventDialCache.cpp
     src/GraphHandler.cpp
-    include/DialTypes.h src/LightGraphHandler.cpp include/LightGraphHandler.h include/LightGraph.h)
+    src/LightGraphHandler.cpp
+    src/MonotonicSplineHandler.cpp
+    src/GeneralSplineHandler.cpp
+    src/SimpleSplineHandler.cpp
+    include/LightGraphCache.h)
 
 set( HEADERS
+    include/DialTypes.h
     include/DialBase.h
     include/DialBaseCache.h
     include/DialInputBuffer.h
@@ -25,8 +30,19 @@ set( HEADERS
     include/SplineCache.h
     include/DialUtils.h
     include/EventDialCache.h
-    include/Graph.h
     include/GraphHandler.h
+    include/LightGraphHandler.h
+    include/Graph.h
+    include/LightGraph.h
+    include/MonotonicSplineHandler.h
+    include/MonotonicSpline.h
+    include/MonotonicSplineCache.h
+    include/GeneralSplineHandler.h
+    include/GeneralSpline.h
+    include/GeneralSplineCache.h
+    include/SimpleSplineHandler.h
+    include/SimpleSpline.h
+    include/SimpleSplineCache.h
     )
 
 if( USE_STATIC_LINKS )

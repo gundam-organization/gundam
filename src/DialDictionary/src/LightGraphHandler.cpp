@@ -17,8 +17,8 @@ void LightGraphHandler::setGraph(TGraph &graph) {
   xPoints.resize(nPoints);
   yPoints.resize(nPoints);
 
-  memcpy(&xPoints[0], graph.GetX(), nPoints);
-  memcpy(&yPoints[0], graph.GetY(), nPoints);
+  memcpy(&xPoints[0], graph.GetX(), nPoints * sizeof(double));
+  memcpy(&yPoints[0], graph.GetY(), nPoints * sizeof(double));
 }
 
 double LightGraphHandler::evaluateGraph(const DialInputBuffer& input_) const{
@@ -40,12 +40,18 @@ double LightGraphHandler::evaluateGraph(const DialInputBuffer& input_) const{
     // use first two points for doing an extrapolation
     low = 0;
   }
-  if (xPoints[low] == input_.getBuffer()[0]) return yPoints[low];
-  if (low == xPoints.size() - 1) low--; // for extrapolating
-  Int_t up(low+1);
 
-  if (xPoints[low] == xPoints[up]) return yPoints[low];
-  Double_t yn = yPoints[up] + (input_.getBuffer()[0] - xPoints[up]) * (yPoints[low] - yPoints[up]) / (xPoints[low] - xPoints[up]);
+  Double_t yn;
+  if (xPoints[low] == input_.getBuffer()[0]){
+    yn = yPoints[low];
+  }
+  else{
+    if (low == xPoints.size() - 1) low--; // for extrapolating
+    Int_t up(low+1);
+
+    if (xPoints[low] == xPoints[up]) return yPoints[low];
+    yn = yPoints[up] + (input_.getBuffer()[0] - xPoints[up]) * (yPoints[low] - yPoints[up]) / (xPoints[low] - xPoints[up]);
+  }
   return yn;
 }
 
