@@ -55,9 +55,9 @@ int main( int argc, char** argv ){
   std::string configPath2;
 
   if     ( clp.isOptionTriggered("config-1") ){ configPath1 = clp.getOptionVal<std::string>("config-1"); }
-  else if( clp.isOptionTriggered("file-1") ){ configPath1 = clp.getOptionVal<std::string>("file-1"); }
+  else if( clp.isOptionTriggered("file-1")   ){ configPath1 = clp.getOptionVal<std::string>("file-1"); }
   if     ( clp.isOptionTriggered("config-2") ){ configPath2 = clp.getOptionVal<std::string>("config-2"); }
-  else if( clp.isOptionTriggered("file-2") ){ configPath2 = clp.getOptionVal<std::string>("file-2"); }
+  else if( clp.isOptionTriggered("file-2")   ){ configPath2 = clp.getOptionVal<std::string>("file-2"); }
 
   if( clp.isOptionTriggered("show-all-keys") ){ __showAllKeys__ = true; }
 
