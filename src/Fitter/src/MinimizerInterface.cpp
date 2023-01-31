@@ -113,44 +113,7 @@ const std::unique_ptr<ROOT::Math::Minimizer> &MinimizerInterface::getMinimizer()
 void MinimizerInterface::minimize(){
   LogThrowIf(not isInitialized(), "not initialized");
 
-  LogWarning << std::endl << GenericToolbox::addUpDownBars("Summary of the fit parameters:") << std::endl;
-  for( const auto& parSet : getPropagator().getParameterSetsList() ){
-
-    GenericToolbox::TablePrinter t;
-    t.setColTitles({ {"Title"}, {"Starting"}, {"Prior"}, {"StdDev"}, {"Min"}, {"Max"}, {"Status"} });
-
-    auto& parList = parSet.getEffectiveParameterList();
-    LogWarning << parSet.getName() << ": " << parList.size() << " parameters" << std::endl;
-    if( parList.empty() ) continue;
-
-    for( const auto& par : parList ){
-      std::string colorStr;
-      std::string statusStr;
-
-      if( not par.isEnabled() ) { statusStr = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackground; }
-      else if( par.isFixed() )  { statusStr = "Fixed";    colorStr = GenericToolbox::ColorCodes::redBackground; }
-      else                      {
-        statusStr = PriorType::PriorTypeEnumNamespace::toString(par.getPriorType(), true) + " Prior";
-        if(par.getPriorType()==PriorType::Flat) colorStr = GenericToolbox::ColorCodes::blueBackground;
-      }
-
-#ifdef NOCOLOR
-      colorStr = "";
-#endif
-
-      t.addTableLine({
-                         par.getTitle(),
-                         std::to_string( par.getParameterValue() ),
-                         std::to_string( par.getPriorValue() ),
-                         std::to_string( par.getStdDevValue() ),
-                         std::to_string( par.getMinValue() ),
-                         std::to_string( par.getMaxValue() ),
-                         statusStr
-                     }, colorStr);
-    }
-
-    t.printTable();
-  }
+  printMinimizerFitParameters();
 
   getPropagator().updateLlhCache();
 

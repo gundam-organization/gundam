@@ -64,27 +64,71 @@ const Propagator& MinimizerBase::getPropagator() const { return owner().getPropa
 LikelihoodInterface& MinimizerBase::getLikelihood() {return owner().getLikelihood();}
 const LikelihoodInterface& MinimizerBase::getLikelihood() const {return owner().getLikelihood();}
 
-// An MIT Style License
+void MinimizerBase::printMinimizerFitParameters () {
+  // This prints the same set of parameters as are in the vector returned by
+  // getMinimizerFitParameterPtr(), but does it by parameter set so that the
+  // output is a little more clear.
 
-// Copyright (c) 2022 GUNDUM DEVELOPERS
+  LogWarning << std::endl << GenericToolbox::addUpDownBars("Summary of the fit parameters:") << std::endl;
+  for( const auto& parSet : getPropagator().getParameterSetsList() ){
 
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
+    GenericToolbox::TablePrinter t;
+    t.setColTitles({ {"Title"}, {"Starting"}, {"Prior"}, {"StdDev"}, {"Min"}, {"Max"}, {"Status"} });
 
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
+    auto& parList = parSet.getEffectiveParameterList();
+    LogWarning << parSet.getName() << ": " << parList.size() << " parameters" << std::endl;
+    if( parList.empty() ) continue;
 
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
+    for( const auto& par : parList ){
+      std::string colorStr;
+      std::string statusStr;
+
+      if( not par.isEnabled() ) { statusStr = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackground; }
+      else if( par.isFixed() )  { statusStr = "Fixed";    colorStr = GenericToolbox::ColorCodes::redBackground; }
+      else                      {
+        statusStr = PriorType::PriorTypeEnumNamespace::toString(par.getPriorType(), true) + " Prior";
+        if(par.getPriorType()==PriorType::Flat) colorStr = GenericToolbox::ColorCodes::blueBackground;
+      }
+
+#ifdef NOCOLOR
+      colorStr = "";
+#endif
+
+      t.addTableLine({
+                         par.getTitle(),
+                         std::to_string( par.getParameterValue() ),
+                         std::to_string( par.getPriorValue() ),
+                         std::to_string( par.getStdDevValue() ),
+                         std::to_string( par.getMinValue() ),
+                         std::to_string( par.getMaxValue() ),
+                         statusStr
+                     }, colorStr);
+    }
+
+    t.printTable();
+  }
+}
+
+//  A Lesser GNU Public License
+
+//  Copyright (C) 2023 GUNDAM DEVELOPERS
+
+//  This library is free software; you can redistribute it and/or
+//  modify it under the terms of the GNU Lesser General Public
+//  License as published by the Free Software Foundation; either
+//  version 2.1 of the License, or (at your option) any later version.
+
+//  This library is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+//  Lesser General Public License for more details.
+
+//  You should have received a copy of the GNU Lesser General Public
+//  License along with this library; if not, write to the
+//
+//  Free Software Foundation, Inc.
+//  51 Franklin Street, Fifth Floor,
+//  Boston, MA  02110-1301  USA
 
 // Local Variables:
 // mode:c++
