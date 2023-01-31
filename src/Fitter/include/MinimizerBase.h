@@ -83,6 +83,9 @@ protected:
   // lives in the likelihood.
   std::vector<FitParameter *> &getMinimizerFitParameterPtr();
 
+  // Print a table of the fitting parameters.
+  void printMinimizerFitParameters();
+
 private:
   /// Save a copy of the address of the engine that owns this object.
   FitterEngine* _owner_{nullptr};
