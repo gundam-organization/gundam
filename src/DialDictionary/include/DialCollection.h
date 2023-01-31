@@ -31,6 +31,7 @@ public:
 
   [[nodiscard]] bool isBinned() const;
   [[nodiscard]] bool isEnabled() const;
+  [[nodiscard]] bool isAllowDialExtrapolation() const;
   [[nodiscard]] int getIndex() const{ return _index_; }
   [[nodiscard]] const std::string &getGlobalDialLeafName() const;
   [[nodiscard]] const std::string &getGlobalDialType() const;
