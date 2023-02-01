@@ -63,6 +63,9 @@ bool DialCollection::isEnabled() const {
 bool DialCollection::isBinned() const {
   return _isBinned_;
 }
+bool DialCollection::isAllowDialExtrapolation() const {
+  return _allowDialExtrapolation_;
+}
 const std::string &DialCollection::getGlobalDialLeafName() const {
   return _globalDialLeafName_;
 }
@@ -151,7 +154,8 @@ void DialCollection::setupDialInterfaceReferences(){
   if( _supervisedParameterIndex_ == -1 ){
     // one dial interface per parameter
     LogThrowIf(_dialBaseList_.size() != _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size(),
-      "Nb of dial base don't match the number of parameters of the selected set: nDials=" << _dialBaseList_.size() << " != " << "nPars=" << _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size()
+      "Nb of dial base don't match the number of parameters of the selected set: nDials=" << _dialBaseList_.size()
+      << " != " << "nPars=" << _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size()
       << std::endl << "is the defined dial binning matching the number of parameters?"
     );
     _dialInputBufferList_.resize(_dialBaseList_.size());
@@ -669,6 +673,7 @@ nlohmann::json DialCollection::fetchDialsDefinition(const nlohmann::json &defini
   }
   return {};
 }
+
 
 
 

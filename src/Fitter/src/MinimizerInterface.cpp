@@ -318,6 +318,20 @@ void MinimizerInterface::calcErrors(){
       }
     }
 
+    LogDebug << "DEBUG: PUSHING AWAY PARAMETERS FOR HESSE TO NOT FREAK OUT FOR SOME REASON..." << std::endl;
+    // Make sure we are on the right spot
+    updateCacheToBestfitPoint();
+
+//    TMatrixDSym postfitCovarianceMatrix(int(_minimizer_->NDim()));
+//    _minimizer_->GetCovMatrix(postfitCovarianceMatrix.GetMatrixArray());
+//
+//    for( int iPar = 0 ; iPar < int(_minimizer_->NDim()) ; iPar++ ){
+//      _minimizerFitParameterPtr_[iPar]->setParameterValue(
+//          _minimizerFitParameterPtr_[iPar]->getParameterValue()
+//          + TMath::Sqrt( postfitCovarianceMatrix[iPar][iPar] )
+//          );
+//    }
+
     getLikelihood().enableFitMonitor();
     _fitHasConverged_ = _minimizer_->Hesse();
     getLikelihood().disableFitMonitor();
@@ -339,6 +353,19 @@ void MinimizerInterface::calcErrors(){
       LogInfo << "Hesse converged." << std::endl;
       LogInfo << getConvergenceMonitor().generateMonitorString(); // lasting printout
     }
+
+    int covStatus = _minimizer_->CovMatrixStatus();
+
+    auto hesseStats = std::make_unique<TTree>("hesseStats", "hesseStats");
+    hesseStats->SetDirectory(nullptr);
+    hesseStats->Branch("hesseSuccess", &_fitHasConverged_);
+    hesseStats->Branch("covStatusCode", &covStatus);
+
+    LogDebug << GET_VAR_NAME_VALUE(_minimizer_->IsValidError()) << std::endl;
+    LogDebug << GET_VAR_NAME_VALUE(_minimizer_->ProvidesError()) << std::endl;
+
+    hesseStats->Fill();
+    GenericToolbox::mkdirTFile(owner().getSaveDir(), "postFit")->WriteObject(hesseStats.get(), hesseStats->GetName());
 
     LogInfo << "Writing HESSE post-fit errors" << std::endl;
     this->writePostFitData(GenericToolbox::mkdirTFile(owner().getSaveDir(), "postFit/Hesse"));
