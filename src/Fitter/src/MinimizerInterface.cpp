@@ -365,7 +365,7 @@ void MinimizerInterface::calcErrors(){
     LogDebug << GET_VAR_NAME_VALUE(_minimizer_->ProvidesError()) << std::endl;
 
     hesseStats->Fill();
-    GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "postFit")->WriteObject(hesseStats.get(), hesseStats->GetName());
+    GenericToolbox::mkdirTFile(owner().getSaveDir(), "postFit")->WriteObject(hesseStats.get(), hesseStats->GetName());
 
     LogInfo << "Writing HESSE post-fit errors" << std::endl;
     this->writePostFitData(GenericToolbox::mkdirTFile(owner().getSaveDir(), "postFit/Hesse"));
