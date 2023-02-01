@@ -7,6 +7,7 @@
 
 
 #include "FitParameterSet.h"
+#include "MinimizerBase.h"
 #include "JsonBaseClass.h"
 
 #include "GenericToolbox.VariablesMonitor.h"
@@ -20,54 +21,40 @@
 #include "memory"
 #include "vector"
 
-
 class FitterEngine;
 
-class MinimizerInterface : public JsonBaseClass {
+class MinimizerInterface : public MinimizerBase {
 
 public:
   explicit MinimizerInterface(FitterEngine* owner_);
 
-  void setOwner(FitterEngine* owner_);
-  void setEnablePostFitErrorEval(bool enablePostFitErrorEval_);
-  void setMonitorRefreshRateInMs(int monitorRefreshRateInMs_);
+  [[nodiscard]] virtual bool isFitHasConverged() const override;
 
-  [[nodiscard]] bool isFitHasConverged() const;
-  [[nodiscard]] bool isEnablePostFitErrorEval() const;
   [[nodiscard]] const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const;
-  GenericToolbox::VariablesMonitor &getConvergenceMonitor();
-  std::vector<FitParameter *> &getMinimizerFitParameterPtr();
 
-  void minimize();
-  void calcErrors();
+  void minimize() override;
+  void calcErrors() override;
+  void scanParameters(TDirectory* saveDir_) override;
 
 protected:
   void readConfigImpl() override;
   void initializeImpl() override;
 
-  double evalFit(const double* parArray_);
   void writePostFitData(TDirectory* saveDir_);
 
   void updateCacheToBestfitPoint();
 
-  void enableFitMonitor(){ _enableFitMonitor_ = true; }
-  void disableFitMonitor(){ _enableFitMonitor_ = false; }
-
 private:
+
   // Parameters
-  bool _useNormalizedFitSpace_{true};
   bool _enableSimplexBeforeMinimize_{false};
-  bool _enablePostFitErrorEval_{true};
+  // bool _enablePostFitErrorEval_{true};
   bool _restoreStepSizeBeforeHesse_{false};
   bool _generatedPostFitParBreakdown_{false};
   bool _generatedPostFitEigenBreakdown_{false};
-  bool _showParametersOnFitMonitor_{false};
   int _strategy_{1};
   int _printLevel_{2};
   int _simplexStrategy_{1};
-  int _monitorRefreshRateInMs_{5000};
-  int _monitorBashModeRefreshRateInS_{30};
-  int _maxNbParametersPerLineOnMonitor_{15};
   double _tolerance_{1E-4};
   double _simplexToleranceLoose_{1000.};
   unsigned int _maxIterations_{500};
@@ -80,32 +67,18 @@ private:
   // internals
   bool _fitHasConverged_{false};
   bool _isBadCovMat_{false};
-  bool _enableFitMonitor_{false};
-  int _nbFitParameters_{-1};
-  int _nbFitBins_{0};
-  int _nbFreePars_{0};
-  int _nbFitCalls_{0};
-  FitterEngine* _owner_{nullptr};
-  std::unique_ptr<ROOT::Math::Minimizer> _minimizer_{nullptr};
-  std::unique_ptr<ROOT::Math::Functor> _functor_{nullptr};
-  std::vector<FitParameter*> _minimizerFitParameterPtr_{};
-  std::unique_ptr<TTree> _chi2HistoryTree_{nullptr};
 
-  // monitors
-  GenericToolbox::VariablesMonitor _convergenceMonitor_;
-  GenericToolbox::CycleTimer _evalFitAvgTimer_;
-  GenericToolbox::CycleTimer _outEvalFitAvgTimer_;
-  GenericToolbox::CycleTimer _itSpeed_;
+  std::unique_ptr<ROOT::Math::Minimizer> _minimizer_{nullptr};
 
   // dict
   const std::map<int, std::string> minuitStatusCodeStr{
       { 0 , "status = 0    : OK" },
-      { 1 , "status = 1    : Covariance was mad  epos defined"},
+      { 1 , "status = 1    : Covariance was mad! Thus made pos defined"},
       { 2 , "status = 2    : Hesse is invalid"},
       { 3 , "status = 3    : Edm is above max"},
       { 4 , "status = 4    : Reached call limit"},
       { 5 , "status = 5    : Any other failure"},
-      { -1, "status = -1   : Unknown error?"}
+      { -1, "status = -1   : We don't even know what happened"}
   };
   const std::map<int, std::string> hesseStatusCodeStr{
       { 0, "status = 0    : OK" },
@@ -133,6 +106,4 @@ private:
   };
 
 };
-
-
 #endif //GUNDAM_MINIMIZERINTERFACE_H

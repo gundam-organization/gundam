@@ -125,7 +125,7 @@ int main(int argc, char** argv){
   // Get config from the fit
   auto configFit = JsonUtils::readConfigJsonStr(configStr); // works with yaml
 //  auto configPropagator = JsonUtils::fetchValuePath<nlohmann::json>( configFit, "fitterEngineConfig/propagatorConfig" );
-  auto configPropagator = JsonUtils::fetchValuePath<nlohmann::json>( configFit, "fitterEngineConfig/propagatorConfig" );
+  auto configPropagator = JsonUtils::fetchValue<nlohmann::json>(JsonUtils::fetchValue<nlohmann::json>(configFit, "fitterEngineConfig"), "propagatorConfig");
 
   bool enableEventMcThrow{true};
   bool enableStatThrowInToys{true};

@@ -21,6 +21,7 @@ option(USE_STATIC_LINKS "Library build in static mod" OFF)
 
 
 # Cmake includes
+include(CTest)
 include(${CMAKE_SOURCE_DIR}/cmake/cmessage.cmake)
 
 # Git version
@@ -144,7 +145,7 @@ if(ROOT_FOUND)
     endif(NOT ROOT_minuit2_FOUND)
 
     # inc dir is $ROOTSYS/include/root
-    set(CMAKE_ROOTSYS ${ROOT_INCLUDE_DIRS}/../../)
+    set(CMAKE_ROOTSYS ${ROOT_INCLUDE_DIRS}/..)
 
 else(ROOT_FOUND)
     cmessage(STATUS "find_package didn't find ROOT. Using shell instead...")
@@ -451,6 +452,8 @@ add_subdirectory( ${CMAKE_SOURCE_DIR}/src/Applications )
 if(WITH_XSLLHFITTER)
     add_subdirectory( ${CMAKE_SOURCE_DIR}/src/XsllhFitter/Applications )
 endif()
+
+add_subdirectory( ${CMAKE_SOURCE_DIR}/tests )
 
 configure_file(cmake/build_setup.sh.in
     "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/setup.sh" @ONLY)

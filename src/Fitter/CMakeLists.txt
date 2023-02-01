@@ -1,6 +1,8 @@
 set(SRCFILES
         src/FitterEngine.cpp
+        src/MinimizerBase.cpp
         src/MinimizerInterface.cpp
+        src/LikelihoodInterface.cpp
   )
 
 if( USE_STATIC_LINKS )
@@ -22,4 +24,3 @@ target_link_libraries( GundamFitter PUBLIC
 install(TARGETS GundamFitter DESTINATION lib)
 #Can uncomment this to install the headers... but is it really neccessary?
 # install(FILES ${HEADERS} DESTINATION include)
-
