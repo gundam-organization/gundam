@@ -20,13 +20,13 @@ fitterEngineConfig:
     burninCycles: 4
     burninSteps: 1000
     burninResets: 1
-    saveBurnin: true
+    saveBurnin: false
     burninWindow: 500
     burninCovWindow: 1500
     burninFreezeAfter: 2
 
     cycles: 4
-    steps: 1000
+    steps: 10000
     adaptiveWindow: 1000
     adaptiveCovWindow: 1500
     adaptiveFreezeAfter: 1
