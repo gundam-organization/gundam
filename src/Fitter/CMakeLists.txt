@@ -1,8 +1,9 @@
 set(SRCFILES
         src/FitterEngine.cpp
+        src/LikelihoodInterface.cpp
         src/MinimizerBase.cpp
         src/MinimizerInterface.cpp
-        src/LikelihoodInterface.cpp
+        src/MCMCInterface.cpp
   )
 
 if( USE_STATIC_LINKS )

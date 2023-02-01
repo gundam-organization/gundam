@@ -8,7 +8,7 @@
 
 #include "Propagator.h"
 #include "LikelihoodInterface.h"
-#include "MinimizerInterface.h"
+#include "MinimizerBase.h"
 #include "JsonBaseClass.h"
 
 #include "GenericToolbox.VariablesMonitor.h"
@@ -65,7 +65,8 @@ protected:
   // been replaced by MinimizerBase::scanParameters() which can be accessed
   // through the getMinimizer() method.  For example:
   // "fitter.scanMinimizerParameters(dir)" should be replaced by "fitter.getMinimizer().scanParameters(dir)"
-  [[deprecated("Use getMinimizer().scanParameters(dir) instead")]] void scanMinimizerParameters(TDirectory* saveDir_);
+  [[deprecated("Use getMinimizer().scanParameters(dir) instead")]]
+       void scanMinimizerParameters(TDirectory* saveDir_);
   void checkNumericalAccuracy();
 
 
@@ -92,6 +93,4 @@ private:
   std::unique_ptr<MinimizerBase> _minimizer_{nullptr};
   LikelihoodInterface _likelihood_{this};
 };
-
-
 #endif //GUNDAM_FITTERENGINE_H

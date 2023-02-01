@@ -5,6 +5,8 @@
 #include "FitterEngine.h"
 #include "JsonUtils.h"
 #include "GlobalVariables.h"
+#include "MinimizerInterface.h"
+#include "MCMCInterface.h"
 
 #include "Logger.h"
 #include "GenericToolbox.Root.h"
@@ -52,8 +54,21 @@ void FitterEngine::readConfigImpl(){
 
   _propagator_.readConfig( JsonUtils::fetchValue<nlohmann::json>(_config_, "propagatorConfig") );
 
-  this->_minimizer_.reset(new MinimizerInterface(this));
-  getMinimizer().readConfig( JsonUtils::fetchValue(_config_, "minimizerConfig", nlohmann::json()));
+  std::string engineType = JsonUtils::fetchValue(_config_,"engineType","minimizer");
+
+  if (engineType == "minimizer") {
+      this->_minimizer_.reset(new MinimizerInterface(this));
+      getMinimizer().readConfig( JsonUtils::fetchValue(_config_, "minimizerConfig", nlohmann::json()));
+  }
+  else if (engineType == "mcmc") {
+      this->_minimizer_.reset(new MCMCInterface(this));
+      getMinimizer().readConfig( JsonUtils::fetchValue(_config_, "mcmcConfig", nlohmann::json()));
+  }
+  else {
+      LogWarning << "Allowed engine types: minimizer, mcmc" << std::endl;
+      LogThrow("Illegal engine type: \"" + engineType + "\"");
+  }
+
 
   // legacy
   JsonUtils::deprecatedAction(_config_, "scanConfig", [&]{
@@ -376,8 +391,8 @@ void FitterEngine::fixGhostFitParameters(){
       }
     }
 
-    // Recompute inverse matrix for the fitter
-    // Note: Eigen decomposed parSet don't need a new inversion since the matrix is diagonal
+    // Recompute inverse matrix for the fitter.  Note: Eigen decomposed parSet
+    // don't need a new inversion since the matrix is diagonal
     if( not parSet.isUseEigenDecompInFit() ){
       parSet.processCovarianceMatrix();
     }
@@ -441,14 +456,6 @@ void FitterEngine::scanMinimizerParameters(TDirectory* saveDir_){
   LogThrowIf(not isInitialized());
   LogInfo << "Performing scans of fit parameters..." << std::endl;
   getMinimizer().scanParameters(saveDir_);
-  // for( int iPar = 0 ; iPar < getMinimizer().getMinimizer()->NDim() ; iPar++ ){
-  //   if( getMinimizer().getMinimizer()->IsFixedVariable(iPar) ){
-  //     LogWarning << getMinimizer().getMinimizer()->VariableName(iPar)
-  //                << " is fixed. Skipping..." << std::endl;
-  //     continue;
-  //   }
-  //   _propagator_.getParScanner().scanFitParameter(*_likelihood_.getMinimizerFitParameterPtr()[iPar], saveDir_);
-  // } // iPar
 }
 void FitterEngine::checkNumericalAccuracy(){
   LogWarning << __METHOD_NAME__ << std::endl;

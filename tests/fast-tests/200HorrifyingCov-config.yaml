@@ -1,0 +1,120 @@
+# A test yaml file for GUNDAM.
+#
+# Do a data fit to the tree_dt tree in 100HorrifyingTree.root.  This
+# fits the (A,B) distribution with four variables.
+#
+#   norm_A : Normalization for events where the C truth variable is >0
+#   norm_B : Normalization for events where the C truth variable is <=0
+#   spline_C : Event-by-event weights for C greater than zero
+#   spline_D : Event-by-event weights for C less than zero.
+#
+
+fit: true                    # can be disabled with -d
+scanParameters: false        # can be triggered with --scan
+generateOneSigmaPlots: false # can be enabled with --one-sigma
+
+fitterEngineConfig:
+  engineType: minimizer
+
+  mcmcConfig:
+    algorithm: metropolis
+    proposal: adaptive
+    burninCycles: 3
+    burninSteps: 10000
+    burninResets: 1
+    saveBurnin: false
+    burninWindow: 1000
+    burninCovWindow: 3000
+
+    cycles: 4
+    steps: 10000
+    adaptiveWindow: 5000
+    adaptiveCovWindow: 5000
+    adaptiveFreezeAfter: 1
+
+  minimizerConfig:
+    minimizer: "Minuit2"
+    algorithm: "Migrad"
+    errors: "Hesse"
+    print_level: 2
+
+  propagatorConfig:
+    throwAsimovFitParameters: false
+
+    dataSetList:
+      - name: "TestSample"
+        isEnabled: true
+        selectedDataEntry: "TestData"
+        mc:
+          tree: tree_mc
+          selectionCutFormula: "(1)"
+          nominalWeightFormula: "(1.0)"
+          filePathList:
+            - "${DATA_DIR}/100HorrifyingTree.root"
+        data:
+          - name: "TestData"
+            tree: tree_dt
+            filePathList:
+              - "${DATA_DIR}/100HorrifyingTree.root"
+
+    fitSampleSetConfig:
+      # LeastSquares is used for tests because it is mathematically simple
+      # and numerically stable.
+      llhStatFunction: LeastSquares
+      dataEventType: TestData
+
+      llhConfig:
+        lsqPoissonianApproximation: true
+
+      fitSampleList:
+        - name: AB
+          isEnabled: true
+          binning: "${CONFIG_DIR}/200HorrifyingCov-binning.txt"
+          dataSets: [ "TestSample" ]
+
+    parameterSetListConfig:
+      - name: Horrifying
+        isEnabled: true
+        covarianceMatrixFilePath: "${DATA_DIR}/100HorrifyingTree.root"
+        covarianceMatrixTMatrixD: CovarianceInputCovariance
+        parameterNameTObjArray: CovarianceInputNames
+        parameterPriorTVectorD: CovarianceInputPriors
+        printDialSetsSummary: true
+        nominalStepSize: 0.1
+
+        parameterDefinitions:
+
+          - parameterName: "norm_A"
+            isEnabled: true
+            dialSetDefinitions:
+              - dialsType: Normalization
+                applyOnDataSets: [ "TestSample" ]
+                applyCondition: "[C] > 0"
+
+          - parameterName: "norm_B"
+            isEnabled: true
+            dialSetDefinitions:
+              - dialsType: Normalization
+                applyOnDataSets: [ "TestSample" ]
+                applyCondition: "[C] <= 0"
+
+          - parameterName: "spline_C"
+            isEnabled: true
+            dialSetDefinitions:
+              - dialsType: Spline
+                dialLeafName: "spline_C"
+                applyOnDataSets: [ "TestSample" ]
+                applyCondition: "[C] > 0"
+
+          - parameterName: "spline_D"
+            isEnabled: true
+            dialSetDefinitions:
+              - dialsType: Spline
+                dialLeafName: "spline_D"
+                applyOnDataSets: [ "TestSample" ]
+                applyCondition: "[C] <= 0"
+
+# End of the yaml file
+# Local Variables:
+# mode:yaml
+# End:
