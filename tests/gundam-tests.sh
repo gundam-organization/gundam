@@ -208,50 +208,56 @@ fi
 # Find and run the jobs in lexical order.
 FAILURES=""
 EXPECTED=""
-for i in $(find ${TESTS} -name "[0-9]*" -type f | grep -v "~" | sort); do
-    JOB=${PWD}/${i}
-    # Only run files that are executable
-    if [ ! -x ${JOB} ]; then
+for d in ${TESTS}; do
+    if [ ! -x ${PWD}/${d} ]; then
+        echo TESTING DIRECTORY ${d} DOES NOT EXIST
         continue;
     fi
-    # SUCCESS is false by default.
-    SUCCESS="no"
-    # Get the full path to the script.  This is passed to the script
-    # so the script can easily find any input files.
-    DIR=$(dirname ${JOB})
-    # The name of the output log file
-    LOG=$(basename ${JOB}).log
-    # Run the script in the output directory.
-    echo "(cd $OUTPUT_DIR && ${JOB} ${DIR})"
-    if (cd $OUTPUT_DIR && ${JOB} ${DIR} >& ${LOG}); then
-        # The job exited with success, but look for a fail messsage
-        if (tail -5 ${OUTPUT_DIR}/${LOG} | grep FAIL >> /dev/null); then
+    for i in $(find ${d} -name "[0-9]*" -type f | grep -v "~" | sort); do
+        JOB=${PWD}/${i}
+        # Only run files that are executable
+        if [ ! -x ${JOB} ]; then
+            continue;
+        fi
+        # SUCCESS is false by default.
+        SUCCESS="no"
+        # Get the full path to the script.  This is passed to the script
+        # so the script can easily find any input files.
+        DIR=$(dirname ${JOB})
+        # The name of the output log file
+        LOG=$(basename ${JOB}).log
+        # Run the script in the output directory.
+        echo "(cd $OUTPUT_DIR && ${JOB} ${DIR})"
+        if (cd $OUTPUT_DIR && ${JOB} ${DIR} >& ${LOG}); then
+            # The job exited with success, but look for a fail messsage
+            if (tail -5 ${OUTPUT_DIR}/${LOG} | grep FAIL >> /dev/null); then
+                echo JOB FAILURE: ${i}
+            else
+                echo JOB SUCCESS: ${i}
+                SUCCESS="yes"
+            fi
+        else
             echo JOB FAILURE: ${i}
+        fi
+        if [ ${SUCCESS} = "yes" ]; then
+            # The job succeeded, make sure it's not in EXPECTED_FAILURES
+            if (grep $i EXPECTED_FAILURES >> /dev/null); then
+                cat ${OUTPUT_DIR}/${LOG}
+                echo JOB FAILURE: Expected $i to fail
+                FAILURES="${FAILURES} unexpected-success:\"${JOB}\""
+            fi
         else
-            echo JOB SUCCESS: ${i}
-            SUCCESS="yes"
+            # The job failed, check if it was expected
+            if (grep $i EXPECTED_FAILURES >> /dev/null); then
+                cat ${OUTPUT_DIR}/${LOG}
+                echo JOB SUCCESS: Failure was expected for $i
+                EXPECTED="${EXPECTED} \"${JOB}\""
+            else
+                cat ${OUTPUT_DIR}/${LOG}
+                FAILURES="${FAILURES} unexpected-failure:\"${JOB}\""
+            fi
         fi
-    else
-        echo JOB FAILURE: ${i}
-    fi
-    if [ ${SUCCESS} = "yes" ]; then
-        # The job succeeded, make sure it's not in EXPECTED_FAILURES
-        if (grep $i EXPECTED_FAILURES >> /dev/null); then
-            cat ${OUTPUT_DIR}/${LOG}
-            echo JOB FAILURE: Expected $i to fail
-            FAILURES="${FAILURES} unexpected-success:\"${JOB}\""
-        fi
-    else
-        # The job failed, check if it was expected
-        if (grep $i EXPECTED_FAILURES >> /dev/null); then
-            cat ${OUTPUT_DIR}/${LOG}
-            echo JOB SUCCESS: Failure was expected for $i
-            EXPECTED="${EXPECTED} \"${JOB}\""
-        else
-            cat ${OUTPUT_DIR}/${LOG}
-            FAILURES="${FAILURES} unexpected-failure:\"${JOB}\""
-        fi
-    fi
+    done
 done
 
 if [ ${#EXPECTED} -gt 0 ]; then
