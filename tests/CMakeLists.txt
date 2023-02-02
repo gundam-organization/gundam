@@ -10,4 +10,4 @@
 # sub-directory of the binary directory.
 #
 add_test(NAME gundam-tests
-         COMMAND "sh" "-c" "(cd ${CMAKE_SOURCE_DIR}/tests && ./gundam-tests.sh -a ${CMAKE_CURRENT_BINARY_DIR}/output.$(date +%Y-%m-%d-%H%M%S) )" )
+         COMMAND "sh" "-c" "(cd ${CMAKE_SOURCE_DIR}/tests && ./gundam-tests.sh -f -a ${CMAKE_CURRENT_BINARY_DIR}/output.$(date +%Y-%m-%d-%H%M%S) )" )
