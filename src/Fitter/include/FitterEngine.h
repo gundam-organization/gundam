@@ -41,15 +41,16 @@ public:
   void setDoAllParamVariations(bool doAllParamVariations_);
   void setAllParamVariationsSigmas(const std::vector<double> &allParamVariationsSigmas);
 
-  // Getters
-  const Propagator& getPropagator() const;
-  Propagator& getPropagator();
-  const MinimizerBase& getMinimizer() const { return *_minimizer_; }
-  MinimizerBase& getMinimizer(){ return *_minimizer_; }
-  const LikelihoodInterface& getLikelihood() const { return _likelihood_; }
-  LikelihoodInterface& getLikelihood(){ return _likelihood_; }
+  // Getters (const)
+  [[nodiscard]] const Propagator& getPropagator() const;
+  [[nodiscard]] const MinimizerBase& getMinimizer() const;
+  [[nodiscard]] const LikelihoodInterface& getLikelihood() const;
 
-  TDirectory* getSaveDir(){ return _saveDir_; }
+  // Getters (non-const)
+  Propagator& getPropagator();
+  MinimizerBase& getMinimizer();
+  LikelihoodInterface& getLikelihood();
+  TDirectory* getSaveDir();
 
   // Core
   void fit();

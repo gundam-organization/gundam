@@ -57,11 +57,11 @@ void FitterEngine::readConfigImpl(){
   std::string engineType = JsonUtils::fetchValue(_config_,"engineType","minimizer");
 
   if (engineType == "minimizer") {
-      this->_minimizer_.reset(new MinimizerInterface(this));
+      this->_minimizer_ = std::make_unique<MinimizerInterface>(this);
       getMinimizer().readConfig( JsonUtils::fetchValue(_config_, "minimizerConfig", nlohmann::json()));
   }
   else if (engineType == "mcmc") {
-      this->_minimizer_.reset(new MCMCInterface(this));
+      this->_minimizer_ = std::make_unique<MCMCInterface>(this);
       getMinimizer().readConfig( JsonUtils::fetchValue(_config_, "mcmcConfig", nlohmann::json()));
   }
   else {
@@ -203,8 +203,23 @@ void FitterEngine::setAllParamVariationsSigmas(const std::vector<double> &allPar
 const Propagator& FitterEngine::getPropagator() const {
   return _propagator_;
 }
+const MinimizerBase& FitterEngine::getMinimizer() const {
+  return *_minimizer_;
+}
+const LikelihoodInterface& FitterEngine::getLikelihood() const {
+  return _likelihood_;
+}
 Propagator& FitterEngine::getPropagator() {
   return _propagator_;
+}
+MinimizerBase& FitterEngine::getMinimizer(){
+  return *_minimizer_;
+}
+LikelihoodInterface& FitterEngine::getLikelihood(){
+  return _likelihood_;
+}
+TDirectory* FitterEngine::getSaveDir(){
+  return _saveDir_;
 }
 
 // Core
