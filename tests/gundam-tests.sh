@@ -37,7 +37,7 @@
 #
 # Validation scripts can be any executable file, but are generally
 # written in bash or python.  They are run in a separate execution
-# directory with command line 
+# directory with command line
 #
 # cd <output> && <script> <directory>
 #
@@ -105,9 +105,9 @@ TESTS="fast-tests"
 # Handle any input arguments
   TEMP=$(getopt -o 'afres' -n "$0" -- "$@")
 if [ $? -ne 0 ]; then
-     e cho "Error ..."
-      exit 1
-fi    
+    echo "Error ..."
+    exit 1
+fi
 eval set -- "$TEMP"
 unset TEMP
 while true; do
