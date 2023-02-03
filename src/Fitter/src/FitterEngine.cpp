@@ -38,6 +38,7 @@ void FitterEngine::readConfigImpl(){
   _enablePca_ = JsonUtils::fetchValue(_config_, std::vector<std::string>{"enablePca", "fixGhostFitParameters"}, _enablePca_);
   _pcaDeltaChi2Threshold_ = JsonUtils::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, _pcaDeltaChi2Threshold_);
 
+
   _enablePreFitScan_ = JsonUtils::fetchValue(_config_, "enablePreFitScan", _enablePreFitScan_);
   _enablePostFitScan_ = JsonUtils::fetchValue(_config_, "enablePostFitScan", _enablePostFitScan_);
 
@@ -51,6 +52,8 @@ void FitterEngine::readConfigImpl(){
 
   _throwMcBeforeFit_ = JsonUtils::fetchValue(_config_, "throwMcBeforeFit", _throwMcBeforeFit_);
   _throwGain_ = JsonUtils::fetchValue(_config_, "throwMcBeforeFitGain", _throwGain_);
+
+  _savePostfitEventTrees_ = JsonUtils::fetchValue(_config_, "savePostfitEventTrees", _savePostfitEventTrees_);
 
   _propagator_.readConfig( JsonUtils::fetchValue<nlohmann::json>(_config_, "propagatorConfig") );
 
@@ -284,6 +287,10 @@ void FitterEngine::fit(){
   LogInfo << "Minimizing LLH..." << std::endl;
   getMinimizer().minimize();
 
+  if (_savePostfitEventTrees_){
+      LogInfo << "Saving PostFit event Trees" << std::endl;
+      _propagator_.getTreeWriter().writeSamples(GenericToolbox::mkdirTFile(_saveDir_, "postFit/events"));
+  }
   if( _generateSamplePlots_ and not _propagator_.getPlotGenerator().getConfig().empty() ){
     LogInfo << "Generating post-fit sample plots..." << std::endl;
     _propagator_.getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(_saveDir_, "postFit/samples"));
