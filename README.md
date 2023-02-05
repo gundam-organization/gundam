@@ -109,8 +109,8 @@ Pull the latest version on github with the following commands:
 ```bash
 cd $REPO_DIR/gundam
 git pull
-git submodule update --remote
 git checkout $(git describe --tags `git rev-list --tags --max-count=1`)
+git submodule update --init --recursive
 cd -
 ```
 
