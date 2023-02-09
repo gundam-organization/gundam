@@ -33,16 +33,16 @@ public:
   void setGlobalCovarianceMatrix(const std::shared_ptr<TMatrixD> &globalCovarianceMatrix);
 
   // Const getters
-  bool isThrowAsimovToyParameters() const;
-  int getIThrow() const;
-  double getLlhBuffer() const;
-  double getLlhStatBuffer() const;
-  double getLlhPenaltyBuffer() const;
-  double getLlhRegBuffer() const;
-  const EventTreeWriter &getTreeWriter() const;
-  const std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix() const;
-  const std::vector<DatasetLoader> &getDataSetList() const;
-  const std::vector<FitParameterSet> &getParameterSetsList() const;
+  [[nodiscard]] bool isThrowAsimovToyParameters() const;
+  [[nodiscard]] int getIThrow() const;
+  [[nodiscard]] double getLlhBuffer() const;
+  [[nodiscard]] double getLlhStatBuffer() const;
+  [[nodiscard]] double getLlhPenaltyBuffer() const;
+  [[nodiscard]] double getLlhRegBuffer() const;
+  [[nodiscard]] const EventTreeWriter &getTreeWriter() const;
+  [[nodiscard]] const std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix() const;
+  [[nodiscard]] const std::vector<DatasetLoader> &getDataSetList() const;
+  [[nodiscard]] const std::vector<FitParameterSet> &getParameterSetsList() const;
 
   // Non-const getters
   std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix();

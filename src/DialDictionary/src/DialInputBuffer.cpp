@@ -88,9 +88,9 @@ void DialInputBuffer::updateBuffer(){
     bufferPtr++;
   }
 
-  if( not _isDialUpdateRequested_ ){
+//  if( not _isDialUpdateRequested_ ){
 //    LogDebug << "CACHED: " << this->getSummary() << std::endl;
-  }
+//  }
 
   _currentHash_ = generateHash();
 }
