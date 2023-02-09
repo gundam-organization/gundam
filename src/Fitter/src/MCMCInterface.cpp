@@ -137,7 +137,7 @@ void MCMCInterface::setupAndRunAdaptiveStep(
   TSimpleMCMC<PrivateProxyLikelihood,TProposeAdaptiveStep>& mcmc) {
 
   mcmc.GetProposeStep().SetDim(getMinimizerFitParameterPtr().size());
-  mcmc.GetLogLikelihood().functor = getLikelihood().evalFitFunctor();
+  mcmc.GetLogLikelihood().functor = getLikelihood().evalFitValidFunctor();
 
   // Create a fitting parameter vector and initialize it.  No need to worry
   // about resizing it or it moving, so be lazy and just use push_back.
