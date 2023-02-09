@@ -417,13 +417,11 @@ int main(int argc, char** argv){
   int iGlobal{-1};
   for( size_t iSignal = 0 ; iSignal < signalSampleList.size() ; iSignal++ ){
     binValues.emplace_back(
-      TH1D(
-        signalSampleList[iSignal].first->getName().c_str(),
-        signalSampleList[iSignal].first->getName().c_str(),
-        signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX(),
-        0,
-        signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX()
-      )
+      signalSampleList[iSignal].first->getName().c_str(),
+      signalSampleList[iSignal].first->getName().c_str(),
+      signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX(),
+      0,
+      signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX()
     );
 
     std::string sampleTitle{ signalSampleList[iSignal].first->getName() };

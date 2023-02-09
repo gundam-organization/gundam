@@ -19,7 +19,7 @@ public:
   void setMinResponse(double minResponse);
   void setMaxResponse(double maxResponse);
 
-  double process(double reponse_) const;
+  [[nodiscard]] double process(double reponse_) const;
 
   [[nodiscard]] std::string getSummary() const;
 
