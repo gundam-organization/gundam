@@ -14,15 +14,24 @@
 
 class FitterEngine;
 
-/// Wrap the calculation of the likelihood using the propagator into a single
+/// Wrap the calculation of the "likelihood" using the propagator into a single
 /// place.  This provides an abstract interface that can is provided to the
 /// FitterEngine and can be accessed by any MinimizerInterface.  The main
 /// access is through the evalFit method which takes an array of floating
 /// point values and returns the likelihood.  The meaning of the parameters is
 /// defined by the vector of pointers to FitParameter returned by
 /// getMinimizerFitParameterPtr.
+///
+/// The "likelihood" for GUNDAM is documented in various places as the LLH
+/// (Log Likelihood), but while it is proportional to the LLH, it's actually
+/// more closely related to the chi-square (so -LLH/2).
 class LikelihoodInterface {
 public:
+  /////////////////////////////////////////////////////////////////
+  // Getters and Setters are defined in this file so the compiler can inline
+  // the code very early in optimization.
+  /////////////////////////////////////////////////////////////////
+
   LikelihoodInterface(FitterEngine* owner_);
   virtual ~LikelihoodInterface();
   void setOwner(FitterEngine* owner_) {_owner_ = owner_;}
@@ -35,9 +44,21 @@ public:
   /// to create a functor that can be used by MINIUT or TSimpleMCMC.
   double evalFit(const double* parArray_);
 
+  /// Same as `evalFit` but also check that all the parameters are within
+  /// the allowed ranges.  If a parameter is out of range, then return an
+  /// "infinite" likelihood.
+  double evalFitValid(const double* parArray_);
+
   /// A pointer to a ROOT functor that calls the evalFit method.  The object
   /// referenced by the functor can be handed directly to Minuit.
   ROOT::Math::Functor* evalFitFunctor() {return _functor_.get();}
+
+  /// A pointer to a ROOT runctor that calls the evalFitValid method.
+  ROOT::Math::Functor* evalFitValidFunctor() {return _validFunctor_.get();}
+
+  /// Check that the parameters for the last time the propagator was used are
+  /// all within the allowed ranges.
+  [[nodiscard]] bool hasValidParameterValues() const;
 
   /// A vector of the parameters being used in the fit.  This provides
   /// the correspondence between an array of doubles (param[]) and the
@@ -102,8 +123,13 @@ private:
     /// The fitter engion that owns this likelihood.
   FitterEngine* _owner_{nullptr};
 
-  /// A functor that can be called by Minuit or anybody else.  This wraps evalFit.
+  /// A functor that can be called by Minuit or anybody else.  This wraps
+  /// evalFit.
   std::unique_ptr<ROOT::Math::Functor> _functor_;
+
+  /// A functor that can be called by MINUIT or anybody else.  This wraps
+  /// evalFitValid.
+  std::unique_ptr<ROOT::Math::Functor> _validFunctor_;
 
   /// A vector of pointers to fit parameters that defined the elements in the
   /// array of parameters passed to evalFit.
