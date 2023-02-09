@@ -115,25 +115,26 @@ cd -
 ```
 
 
-### Compiling on macOS?
+### Compiling on macOS:
 
-[Click here for the compilation guide on macOS](./resources/guides/installOnMacOs.md)
-
-![](./resources/guides/images/macOsLogo.png)
+[![](./resources/guides/images/macOsLogo.png)](./resources/guides/installOnMacOs.md)
 
 
-### Compiling on CCLyon?
+### Compiling on CCLyon:
 
-[Click here for the compilation guide on CCLyon](./resources/guides/installOnCCLyon.md)
-
-![](./resources/guides/images/cc_in2p3_logo.png)
+[![](./resources/guides/images/cc_in2p3_logo.png)](./resources/guides/installOnCCLyon.md)
 
 
-### Compiling on LXPLUS?
+### Compiling on HPC:
 
-[TO BE DONE](./resources/guides/.md)
+[![](./resources/guides/images/hpcLogo.png)](./resources/guides/installOnHpc.md)
 
-![](./resources/guides/images/lxplusLogo.png)
+
+### Compiling on LXPLUS: - TO BE DONE
+
+[![](./resources/guides/images/lxplusLogo.png)](./resources/guides/.md)
+
+
 
 
 ### Input documentation
