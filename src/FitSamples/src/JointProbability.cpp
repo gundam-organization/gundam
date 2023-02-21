@@ -259,7 +259,7 @@ namespace JointProbability{
     if( dataVal == 0 ){
       return TMath::Sq(predVal - dataVal);
     }
-    return TMath::Sq(predVal - dataVal)/TMath::Sqrt(dataVal);
+    return TMath::Sq(predVal - dataVal)/dataVal;
   }
 
   // PoissonLLH
