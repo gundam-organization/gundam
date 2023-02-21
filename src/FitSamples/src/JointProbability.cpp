@@ -271,6 +271,9 @@ namespace JointProbability{
               << ". Setting chi2_stat = 0 for this bin." << std::endl;
           return 0;
       }
+      if(dataVal <= 0){
+        return 2.0 * (predVal - dataVal);
+      }
       return 2.0 * (predVal - dataVal + dataVal * TMath::Log(dataVal / predVal));
   }
 
