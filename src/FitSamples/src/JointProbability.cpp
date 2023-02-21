@@ -252,6 +252,13 @@ namespace JointProbability{
       return chisq;
   }
 
+  // Chi2
+  double Chi2::eval(const FitSample& sample_, int bin_){
+    double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
+    double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
+    return TMath::Sq(predVal - dataVal)/TMath::Sqrt(dataVal);
+  }
+
   // PoissonLLH
   double PoissonLLH::eval(const FitSample& sample_, int bin_){
       double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);

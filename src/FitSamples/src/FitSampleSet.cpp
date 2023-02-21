@@ -43,6 +43,7 @@ void FitSampleSet::readConfigImpl(){
   llhMethod = JsonUtils::fetchValue(configJointProbability, "type", llhMethod);
 
   LogInfo << "Using \"" << llhMethod << "\" LLH function." << std::endl;
+  if     ( llhMethod == "Chi2" ){                    _jointProbabilityPtr_ = std::make_shared<JointProbability::Chi2>(); }
   if     ( llhMethod == "PoissonLLH" ){              _jointProbabilityPtr_ = std::make_shared<JointProbability::PoissonLLH>(); }
   else if( llhMethod == "BarlowLLH" ) {              _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH>(); }
   else if( llhMethod == "Plugin" ) {                 _jointProbabilityPtr_ = std::make_shared<JointProbability::JointProbabilityPlugin>(); }

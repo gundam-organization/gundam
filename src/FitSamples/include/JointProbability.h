@@ -53,6 +53,11 @@ namespace JointProbability {
 
   };
 
+
+  class Chi2 : public JointProbability{
+    double eval(const FitSample& sample_, int bin_) override;
+  };
+
   class PoissonLLH : public JointProbability{
     double eval(const FitSample& sample_, int bin_) override;
   };

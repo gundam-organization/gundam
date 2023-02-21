@@ -347,7 +347,11 @@ void Propagator::initializeImpl() {
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
       if( _enableEventMcThrow_ ){
         // Take into account the finite amount of event in MC
+        LogWarning << "enableEventMcThrow is enabled: throwing individual MC events" << std::endl;
         sample.getDataContainer().throwEventMcError();
+      }
+      else{
+        LogWarning << "enableEventMcThrow is disable" << std::endl;
       }
       // Asimov bin content -> toy data
       sample.getDataContainer().throwStatError();

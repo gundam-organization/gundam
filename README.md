@@ -10,12 +10,6 @@ purposes and setups. It has been developed as a fork of
 [xsllhFitter](https://gitlab.com/cuddandr/xsLLhFitter), in the context of the Upgrade
 of ND280 for the T2K neutrino experiment.
 
-
-The main framework offers a code structure which is capable of  handling parameters/errors
-propagation on a model and compare to experimental data. As an example, GUNDAM includes
-a likelihood-based fitter which was initially designed  to reproduce T2K's BANFF fit as
-a proof of concept.
-
 The applications are intended to be fully configurable with a set of YAML/JSON files, as
 the philosophy of this project is to avoid users having to put their hands into the code
 for each study. A lot of time and efforts are usually invested by various working groups
