@@ -256,8 +256,9 @@ namespace JointProbability{
   double Chi2::eval(const FitSample& sample_, int bin_){
     double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
     double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
-    LogTrace << GET_VAR_NAME_VALUE(bin_) << " = " << GET_VAR_NAME_VALUE(dataVal)
-    << " -> " << GET_VAR_NAME_VALUE(predVal) << std::endl;
+    if( dataVal == 0 ){
+      return TMath::Sq(predVal - dataVal);
+    }
     return TMath::Sq(predVal - dataVal)/TMath::Sqrt(dataVal);
   }
 
