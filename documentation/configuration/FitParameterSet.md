@@ -29,6 +29,7 @@
 | disableOneSigmaPlots                                   | bool       | disable plot generation for the included parameters                                               | false   |
 | skipVariedEventRates                                   | bool       | disable event rate breakdown for the included parameters                                          | false   |
 | useOnlyOneParameterPerEvent                            | bool       | at most one parameter from the set is attributed per event (faster data loading)                  | false   |
+| useMarkGenerator                                       | bool       | Use Mark Hartz Cholesky decomposition implementation to throw correlated parameters               | false   |
 | printDialSetsSummary                                   | bool       | print defined dialsets                                                                            | false   |
 | maxNbEigenParameters (OLD)                             | int        | use only the N first eigen parameters with the highest eigen value                                | -1      |
 | maxEigenFraction (OLD)                                 | double     | use only the N first eigen parameters which cover X % of the total variance (sum of eigen values) | 1.      |
