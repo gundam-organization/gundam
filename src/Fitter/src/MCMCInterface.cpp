@@ -23,28 +23,40 @@ void MCMCInterface::readConfigImpl(){
   MinimizerBase::readConfigImpl();
   LogInfo << "Reading minimizer config..." << std::endl;
 
+  // The type of algorithm to be using.  It should be left at the default
+  // value (metropolis is the only supported MCMC algorithm right now).
   _algorithmName_ = JsonUtils::fetchValue(_config_, "algorithm", _algorithmName_);
+
+  // The step proposal algorithm.  This should usually be left at the default
+  // value.
   _proposalName_ = JsonUtils::fetchValue(_config_, "proposal", _proposalName_);
-  _stepCount_= JsonUtils::fetchValue(_config_, "steps", _stepCount_);
+
+  // The name of the MCMC result tree in the output file.  This doesn't need
+  // to be changed.  Generally, leave it alone.
   _outTreeName_ = JsonUtils::fetchValue(_config_, "mcmcOutputTree", "MCMC");
 
-  // Get MCMC burnin parameters.  Each burnin discards previous information
-  // about the posterior and reset to the initial state (but starts from
-  // the last accepted point.  The burnin will be skipped if the state
-  // has been restored from a file.  The burnin can be skipped in favor of
-  // discarding the initial parts of the MCMC chain (usually a better option).
+  // Get the MCMC chain parameters to be used during burn-in.  The burnin will
+  // be skipped if the state has been restored from a file.  The burnin can be
+  // skipped in favor of discarding the initial parts of the MCMC chain
+  // (usually a better option).  A run is broken into "mini-Chains" called a
+  // "cycle" where the posterior covariance information is updated after each
+  // mini-chain.  Each cycle will have "steps" steps.
   _burninCycles_ = JsonUtils::fetchValue(_config_,
                                          "burninCycles", _burninCycles_);
+
+  // The number of steps to run in each burn in cycle
   _burninLength_ = JsonUtils::fetchValue(_config_,
                                          "burninSteps", _burninLength_);
-  _burninResets_ = JsonUtils::fetchValue(_config_,
-                                         "burninResets", _burninResets_);
+
+  // If this is set to false, the burnin steps will not be saved to disk.
+  // This should usually be true since it lets you see the progress of the
+  // burnin.
   _saveBurnin_ = JsonUtils::fetchValue(_config_,
                                        "saveBurnin", _saveBurnin_);
 
   // Get the MCMC chain parameters.  A run is broken into "mini-Chains"
   // called a "cycle" where the posterior covariance information is updated
-  // after each mini-chain.  The cycle will have "mcmcRunLength" steps.
+  // after each mini-chain.  Each cycle will have "steps" steps.
   _cycles_ = JsonUtils::fetchValue(_config_,
                                      "cycles", _cycles_);
   _steps_ = JsonUtils::fetchValue(_config_,
@@ -60,7 +72,16 @@ void MCMCInterface::readConfigImpl(){
   _burninCovWindow_ = JsonUtils::fetchValue(
     _config_, "burninCovWindow", _burninCovWindow_);
 
-  // Freeze the step size after this many burn-in chains
+  // The number of times that the burnin state will be reset.  If this is
+  // zero, then there are no resets (one means reset after the first cycle,
+  // &c).  Resets are sometimes needed if the initial conditions are far from
+  // the main probability in the posterior and the "best fit" parameters need
+  // to be found.
+  _burninResets_ = JsonUtils::fetchValue(_config_,
+                                         "burninResets", _burninResets_);
+
+  // Freeze the step size after this many burn-in chains.  This stops
+  // adaptively adjusting the step size.
   _burninFreezeAfter_ = JsonUtils::fetchValue(
     _config_, "burninFreezeAfter", _burninFreezeAfter_);
 
@@ -72,7 +93,9 @@ void MCMCInterface::readConfigImpl(){
     _config_, "burninWindow", _burninWindow_);
 
   // Set the name of a file containing a previous sequence of the chain.  This
-  // restores the state from the end of the chain and continues.
+  // restores the state from the end of the chain and continues.  This should
+  // also be settable from the command line (setting from the command line is
+  // the better option).
   _adaptiveRestore_ = JsonUtils::fetchValue(
     _config_, "adaptiveRestore", _adaptiveRestore_);
 
@@ -84,14 +107,15 @@ void MCMCInterface::readConfigImpl(){
     _config_, "adaptiveCovWindow", _adaptiveCovWindow_);
 
   // Set the initial rigidity for the changes in the step size.  If this is
-  // negative, the step size is not updated as it runs.
+  // negative, the step size is not updated as it runs. This stops adaptively
+  // adjusting the step size.
   _adaptiveFreezeAfter_ = JsonUtils::fetchValue(
     _config_, "adaptiveFreezeAfter", _adaptiveFreezeAfter_);
 
   // Set the window to calculate the current acceptance value over.  If this
-  // is set to short, the step size will fluctuate.  If this is set to long,
-  // the step size won't be adjusted to match the target acceptance.  Make
-  // this very large to lock the step size.
+  // is set to short, the step size will fluctuate a lot.  If this is set to
+  // long, the step size won't be adjusted to match the target acceptance.
+  // Make this very large effectively locks the step size.
   _adaptiveWindow_ = JsonUtils::fetchValue(
     _config_, "adaptiveWindow", _adaptiveWindow_);
 
@@ -111,7 +135,6 @@ void MCMCInterface::initializeImpl(){
   // likelihood to print informational messages, but do not affect how the
   // likelihood code runs.
   getLikelihood().setMinimizerInfo(_algorithmName_,_proposalName_);
-
 
 }
 
