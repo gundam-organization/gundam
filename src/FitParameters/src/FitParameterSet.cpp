@@ -397,14 +397,19 @@ void FitParameterSet::throwFitParameters(double gain_){
       eigenPar.setParameterValue( eigenPar.getThrowValue() );
     }
     this->propagateEigenToOriginal();
+
+    for( auto& par : _parameterList_ ){
+      par.setThrowValue(par.getParameterValue());
+    }
+
   }
 
-  if( _useEigenDecompInFit_ ){
-    this->propagateOriginalToEigen();
-    for( auto& eigenPar : _eigenParameterList_ ){
-      eigenPar.setThrowValue( eigenPar.getParameterValue() );
-    }
-  }
+//  if( _useEigenDecompInFit_ ){
+//    this->propagateOriginalToEigen();
+//    for( auto& eigenPar : _eigenParameterList_ ){
+//      eigenPar.setThrowValue( eigenPar.getParameterValue() );
+//    }
+//  }
 
 }
 const std::vector<nlohmann::json>& FitParameterSet::getCustomFitParThrow() const{
