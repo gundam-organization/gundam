@@ -258,7 +258,9 @@ namespace JointProbability{
     double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
     if( predVal == 0 ){
       // should not be the case right?
-      return TMath::Sq(predVal - dataVal);
+      LogAlert << "Zero MC events in bin " << bin_ << ". predVal = " << predVal << ", dataVal = " << dataVal
+               << ". Setting llh = +inf for this bin." << std::endl;
+      return std::numeric_limits<double>::infinity();
     }
     return TMath::Sq(predVal - dataVal)/predVal;
   }
@@ -267,14 +269,19 @@ namespace JointProbability{
   double PoissonLLH::eval(const FitSample& sample_, int bin_){
       double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
       double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
+
       if(predVal <= 0){
           LogAlert << "Zero MC events in bin " << bin_ << ". predVal = " << predVal << ", dataVal = " << dataVal
-              << ". Setting chi2_stat = 0 for this bin." << std::endl;
-          return 0;
+              << ". Setting llh = +inf for this bin." << std::endl;
+          return std::numeric_limits<double>::infinity();
       }
+
       if(dataVal <= 0){
-        return 2.0 * (predVal - dataVal);
+        // lim x -> 0 : x ln(x) = 0
+        return 2.0 * predVal;
       }
+
+      // LLH calculation
       return 2.0 * (predVal - dataVal + dataVal * TMath::Log(dataVal / predVal));
   }
 
