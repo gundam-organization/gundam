@@ -256,10 +256,11 @@ namespace JointProbability{
   double Chi2::eval(const FitSample& sample_, int bin_){
     double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
     double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
-    if( dataVal == 0 ){
+    if( predVal == 0 ){
+      // should not be the case right?
       return TMath::Sq(predVal - dataVal);
     }
-    return TMath::Sq(predVal - dataVal)/dataVal;
+    return TMath::Sq(predVal - dataVal)/predVal;
   }
 
   // PoissonLLH
