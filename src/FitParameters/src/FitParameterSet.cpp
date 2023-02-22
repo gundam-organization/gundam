@@ -366,7 +366,15 @@ void FitParameterSet::throwFitParameters(double gain_){
   LogThrowIf(_strippedCovarianceMatrix_==nullptr, "No covariance matrix provided");
 
   if( _useMarkGenerator_ ){
-    TVectorD parms(_choleskyMatrix_->GetNrows()); int iPar{0};
+    if( _choleskyMatrix_ == nullptr ){
+      LogInfo << "Generating Cholesky matrix in set: " << getName() << std::endl;
+      _choleskyMatrix_ = std::shared_ptr<TMatrixD>(
+          GenericToolbox::getCholeskyMatrix( _strippedCovarianceMatrix_.get() )
+      );
+    }
+
+    TVectorD parms(_choleskyMatrix_->GetNrows());
+    int iPar{0};
     for( auto& par : _parameterList_ ){
       if( par.isEnabled() and not par.isFixed() and not par.isFree() ){ parms[iPar++] = par.getPriorValue(); }
     }

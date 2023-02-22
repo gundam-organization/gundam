@@ -55,17 +55,17 @@ public:
   const nlohmann::json &getDialSetDefinitions() const;
 
   // Core
-  size_t getNbParameters() const;
+  [[nodiscard]] size_t getNbParameters() const;
   double getPenaltyChi2();
 
   // Throw / Shifts
   void moveFitParametersToPrior();
   void throwFitParameters(double gain_ = 1);
-  const std::vector<nlohmann::json>& getCustomFitParThrow() const;
+  [[nodiscard]] const std::vector<nlohmann::json>& getCustomFitParThrow() const;
 
-  int getNbEnabledEigenParameters() const;
-  const TMatrixD* getInvertedEigenVectors() const;
-  const TMatrixD* getEigenVectors() const;
+  [[nodiscard]] int getNbEnabledEigenParameters() const;
+  [[nodiscard]] const TMatrixD* getInvertedEigenVectors() const;
+  [[nodiscard]] const TMatrixD* getEigenVectors() const;
   void propagateEigenToOriginal();
   void propagateOriginalToEigen();
 
