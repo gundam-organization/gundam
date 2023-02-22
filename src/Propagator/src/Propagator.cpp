@@ -30,10 +30,11 @@ void Propagator::readConfigImpl(){
 
   // Monitoring parameters
   _showEventBreakdown_ = JsonUtils::fetchValue(_config_, "showEventBreakdown", _showEventBreakdown_);
-  _throwAsimovToyParameters_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "throwAsimovFitParameters", _throwAsimovToyParameters_);
-  _reThrowParSetIfOutOfBounds_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "reThrowParSetIfOutOfBounds", _reThrowParSetIfOutOfBounds_);
-  _enableStatThrowInToys_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "enableStatThrowInToys", _enableStatThrowInToys_);
-  _enableEventMcThrow_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "enableEventMcThrow", _enableEventMcThrow_);
+  _throwAsimovToyParameters_ = JsonUtils::fetchValue(_config_, "throwAsimovFitParameters", _throwAsimovToyParameters_);
+  _reThrowParSetIfOutOfBounds_ = JsonUtils::fetchValue(_config_, "reThrowParSetIfOutOfBounds", _reThrowParSetIfOutOfBounds_);
+  _enableStatThrowInToys_ = JsonUtils::fetchValue(_config_, "enableStatThrowInToys", _enableStatThrowInToys_);
+  _gaussStatThrowInToys_ = JsonUtils::fetchValue(_config_, "gaussStatThrowInToys", _gaussStatThrowInToys_);
+  _enableEventMcThrow_ = JsonUtils::fetchValue(_config_, "enableEventMcThrow", _enableEventMcThrow_);
 
   auto parameterSetListConfig = JsonUtils::fetchValue(_config_, "parameterSetListConfig", nlohmann::json());
   if( parameterSetListConfig.is_string() ) parameterSetListConfig = JsonUtils::readConfigFile(parameterSetListConfig.get<std::string>());
@@ -344,17 +345,22 @@ void Propagator::initializeImpl() {
   // Throwing stat error on data -> BINNING SHOULD BE SET!!
   if( _throwAsimovToyParameters_ and _enableStatThrowInToys_ ){
     LogInfo << "Throwing statistical error for data container..." << std::endl;
-    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-      if( _enableEventMcThrow_ ){
-        // Take into account the finite amount of event in MC
-        LogWarning << "enableEventMcThrow is enabled: throwing individual MC events" << std::endl;
+
+    if( _enableEventMcThrow_ ){
+      // Take into account the finite amount of event in MC
+      LogInfo << "enableEventMcThrow is enabled: throwing individual MC events" << std::endl;
+      for( auto& sample : _fitSampleSet_.getFitSampleList() ) {
         sample.getDataContainer().throwEventMcError();
       }
-      else{
-        LogWarning << "enableEventMcThrow is disable" << std::endl;
-      }
+    }
+    else{
+      LogWarning << "enableEventMcThrow is disabled. Not throwing individual MC events" << std::endl;
+    }
+
+    LogInfo << "Throwing statistical error on histograms..." << std::endl;
+    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
       // Asimov bin content -> toy data
-      sample.getDataContainer().throwStatError();
+      sample.getDataContainer().throwStatError(_gaussStatThrowInToys_);
     }
   }
 
