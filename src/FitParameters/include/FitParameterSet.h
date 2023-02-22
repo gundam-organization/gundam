@@ -104,6 +104,7 @@ private:
   nlohmann::json _parameterDefinitionConfig_{};
   nlohmann::json _dialSetDefinitions_{};
   bool _isEnabled_{};
+  bool _useMarkGenerator_{false};
   bool _maskedForPropagation_{false};
   bool _printDialSetsSummary_{false};
   bool _printParametersSummary_{false};
