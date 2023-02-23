@@ -55,11 +55,11 @@ public:
   [[nodiscard]] const TMatrixD* getInvertedEigenVectors() const;
   [[nodiscard]] const TMatrixD* getEigenVectors() const;
   [[nodiscard]] const nlohmann::json &getDialSetDefinitions() const;
-  [[nodiscard]] const std::vector<FitParameter> &getParameterList() const;
   [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCorrelationMatrix() const;
   [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const;
-  [[nodiscard]] const std::vector<FitParameter>& getEffectiveParameterList() const;
   [[nodiscard]] const std::vector<nlohmann::json>& getCustomFitParThrow() const;
+  [[nodiscard]] const std::vector<FitParameter> &getParameterList() const;
+  [[nodiscard]] const std::vector<FitParameter>& getEffectiveParameterList() const;
 
   std::vector<FitParameter> &getParameterList();
   std::vector<FitParameter> &getEigenParameterList();
