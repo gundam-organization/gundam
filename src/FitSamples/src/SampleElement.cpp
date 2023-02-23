@@ -180,7 +180,10 @@ void SampleElement::throwStatError(bool useGaussThrow_){
         nCounts = gRandom->Poisson(histogram->GetBinContent(iBin));
       }
       else{
-        nCounts = int( gRandom->Gaus(histogram->GetBinContent(iBin), TMath::Sqrt(histogram->GetBinContent(iBin))) );
+        nCounts = std::max(
+            int( gRandom->Gaus(histogram->GetBinContent(iBin), TMath::Sqrt(histogram->GetBinContent(iBin))) )
+            , 0 // if the throw is negative, cap it to 0
+            );
       }
       for (auto *eventPtr: perBinEventPtrList[iBin-1]) {
         // make sure refill of the histogram will produce the same hist
@@ -188,7 +191,6 @@ void SampleElement::throwStatError(bool useGaussThrow_){
       }
       histogram->SetBinContent(iBin, nCounts);
     }
-
   }
 }
 

@@ -358,6 +358,9 @@ void Propagator::initializeImpl() {
     }
 
     LogInfo << "Throwing statistical error on histograms..." << std::endl;
+    if( _gaussStatThrowInToys_ ) {
+      LogWarning << "Using gaussian statistical throws. (caveat: distribution truncated when the bins are close to zero)" << std::endl;
+    }
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
       // Asimov bin content -> toy data
       sample.getDataContainer().throwStatError(_gaussStatThrowInToys_);
