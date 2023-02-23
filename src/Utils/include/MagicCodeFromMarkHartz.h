@@ -8,7 +8,7 @@
 #include "TVectorD.h"
 #include "TMatrixDSym.h"
 #include "TF1.h"
-#include "TRandom3.h"
+
 
 class MagicCodeFromMarkHartz {
 
@@ -17,7 +17,7 @@ public:
   ~MagicCodeFromMarkHartz();
 
   void ThrowSet(std::vector<double> &parms);
-  void StdNormRand(double *z);
+  static void StdNormRand(double *z);
   void CheloskyDecomp(TMatrixD &chel_mat);
 
 private:
@@ -26,7 +26,6 @@ private:
   TMatrixDSym* covar{nullptr};
   TMatrixD* chel_dec{nullptr};
   TF1* gauss{nullptr};
-  TRandom3    rand;
 
 };
 

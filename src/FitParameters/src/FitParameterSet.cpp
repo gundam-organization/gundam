@@ -371,9 +371,13 @@ void FitParameterSet::throwFitParameters(double gain_){
     for( auto& par : _parameterList_ ){
       if( par.isEnabled() and not par.isFixed() and not par.isFree() ){ parms[iPar++] = par.getPriorValue(); }
     }
-    auto m = MagicCodeFromMarkHartz(parms, *_strippedCovarianceMatrix_);
+
+    if( _markHartzGen_ == nullptr ){
+      LogInfo << "Generating Cholesky matrix in set: " << getName() << std::endl;
+      _markHartzGen_ = std::make_shared<MagicCodeFromMarkHartz>(parms, *_strippedCovarianceMatrix_);
+    }
     std::vector<double> throwPars(_strippedCovarianceMatrix_->GetNrows());
-    m.ThrowSet(throwPars);
+    _markHartzGen_->ThrowSet(throwPars);
 
     iPar = 0;
     for( auto& par : _parameterList_ ){
@@ -388,6 +392,8 @@ void FitParameterSet::throwFitParameters(double gain_){
   else{
     if( not _useEigenDecompInFit_ ){
       LogInfo << "Throwing parameters for " << _name_ << " using Cholesky matrix" << std::endl;
+
+      // TODO: CHOLESKY THROW IS NOT WORKING PROPERLY
 
       if( _choleskyMatrix_ == nullptr ){
         LogInfo << "Generating Cholesky matrix in set: " << getName() << std::endl;

@@ -8,6 +8,7 @@
 #include "FitParameter.h"
 #include "NestedDialTest.h"
 #include "JsonBaseClass.h"
+#include "MagicCodeFromMarkHartz.h"
 
 #include "Logger.h"
 
@@ -155,6 +156,7 @@ private:
   std::shared_ptr<TVectorD>  _deltaParameterList_{nullptr}; // difference from prior
 
   std::shared_ptr<TMatrixD> _choleskyMatrix_{nullptr};
+  std::shared_ptr<MagicCodeFromMarkHartz> _markHartzGen_{nullptr};
 
 };
 

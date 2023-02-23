@@ -5,6 +5,7 @@
 #include "MagicCodeFromMarkHartz.h"
 
 #include <TDecompChol.h>
+#include "TRandom3.h"
 
 #include "iostream"
 
@@ -62,15 +63,15 @@ void MagicCodeFromMarkHartz::StdNormRand(double *z)
   //with origins in what is known as the box-muller transform.
   //There is nothign important about the fact that pairs are
   //generated -- it is simply an efficient method.
-  double u = 2. * rand.Rndm() - 1.;
-  double v = 2. * rand.Rndm() - 1.;
+  double u = 2. * gRandom->Rndm() - 1.;
+  double v = 2. * gRandom->Rndm() - 1.;
 
   double s = u * u + v * v;
 
   while (s == 0 || s >= 1.)
   {
-    u = 2. * rand.Rndm() - 1.;
-    v = 2. * rand.Rndm() - 1.;
+    u = 2. * gRandom->Rndm() - 1.;
+    v = 2. * gRandom->Rndm() - 1.;
     s = u * u + v * v;
   }
 
