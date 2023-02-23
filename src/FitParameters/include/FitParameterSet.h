@@ -43,31 +43,32 @@ public:
   [[nodiscard]] bool isEnabled() const;
   [[nodiscard]] bool isEnablePca() const;
   [[nodiscard]] bool isUseEigenDecompInFit() const;
-  bool isEnabledThrowToyParameters() const;
-  bool isUseOnlyOneParameterPerEvent() const;
-  const std::string &getName() const;
+  [[nodiscard]] bool isEnabledThrowToyParameters() const;
+  [[nodiscard]] bool isUseOnlyOneParameterPerEvent() const;
+  [[nodiscard]] bool isMaskedForPropagation() const;
+  [[nodiscard]] int getNbEnabledEigenParameters() const;
+  [[nodiscard]] size_t getNbParameters() const;
+  [[nodiscard]] const std::string &getName() const;
+  [[nodiscard]] const TMatrixD* getInvertedEigenVectors() const;
+  [[nodiscard]] const TMatrixD* getEigenVectors() const;
+  [[nodiscard]] const nlohmann::json &getDialSetDefinitions() const;
+  [[nodiscard]] const std::vector<FitParameter> &getParameterList() const;
+  [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCorrelationMatrix() const;
+  [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const;
+  [[nodiscard]] const std::vector<FitParameter>& getEffectiveParameterList() const;
+  [[nodiscard]] const std::vector<nlohmann::json>& getCustomFitParThrow() const;
+
   std::vector<FitParameter> &getParameterList();
   std::vector<FitParameter> &getEigenParameterList();
-  const std::vector<FitParameter> &getParameterList() const;
-  const std::shared_ptr<TMatrixDSym> &getPriorCorrelationMatrix() const;
-  const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const;
   std::vector<FitParameter>& getEffectiveParameterList();
-  const std::vector<FitParameter>& getEffectiveParameterList() const;
-  bool isMaskedForPropagation() const;
-  const nlohmann::json &getDialSetDefinitions() const;
 
   // Core
-  [[nodiscard]] size_t getNbParameters() const;
   double getPenaltyChi2();
 
   // Throw / Shifts
   void moveFitParametersToPrior();
   void throwFitParameters(double gain_ = 1);
-  [[nodiscard]] const std::vector<nlohmann::json>& getCustomFitParThrow() const;
 
-  [[nodiscard]] int getNbEnabledEigenParameters() const;
-  [[nodiscard]] const TMatrixD* getInvertedEigenVectors() const;
-  [[nodiscard]] const TMatrixD* getEigenVectors() const;
   void propagateEigenToOriginal();
   void propagateOriginalToEigen();
 
