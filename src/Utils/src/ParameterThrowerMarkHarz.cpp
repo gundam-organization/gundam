@@ -2,14 +2,14 @@
 // Created by Adrien Blanchet on 22/02/2023.
 //
 
-#include "MagicCodeFromMarkHartz.h"
+#include "ParameterThrowerMarkHarz.h"
 
 #include <TDecompChol.h>
 #include "TRandom3.h"
 
 #include "iostream"
 
-MagicCodeFromMarkHartz::MagicCodeFromMarkHartz(TVectorD &parms, TMatrixDSym &covm) {
+ParameterThrowerMarkHarz::ParameterThrowerMarkHarz(TVectorD &parms, TMatrixDSym &covm) {
   npars = parms.GetNrows();
   std::cout << "Number of parameters " << npars << std::endl;
   pvals = new TVectorD(npars);
@@ -27,7 +27,7 @@ MagicCodeFromMarkHartz::MagicCodeFromMarkHartz(TVectorD &parms, TMatrixDSym &cov
   CheloskyDecomp((*chel_dec));
   gauss = new TF1("gauss", "1./2./3.14159*TMath::Exp(-0.5*x*x)", -7, 7);
 }
-MagicCodeFromMarkHartz::~MagicCodeFromMarkHartz()
+ParameterThrowerMarkHarz::~ParameterThrowerMarkHarz()
 {
   if (pvals != NULL)
     pvals->Delete();
@@ -37,7 +37,7 @@ MagicCodeFromMarkHartz::~MagicCodeFromMarkHartz()
     chel_dec->Delete();
 }
 
-void MagicCodeFromMarkHartz::ThrowSet(std::vector<double> &parms)
+void ParameterThrowerMarkHarz::ThrowSet(std::vector<double> &parms)
 {
   if (!parms.empty())
     parms.clear();
@@ -56,7 +56,8 @@ void MagicCodeFromMarkHartz::ThrowSet(std::vector<double> &parms)
   for (int i = 0; i < npars; i++)
     parms[i] = prod(i) + (*pvals)(i);
 }
-void MagicCodeFromMarkHartz::StdNormRand(double *z)
+
+void ParameterThrowerMarkHarz::StdNormRand(double *z)
 {
   //http://www.design.caltech.edu/erik/Misc/Gaussian.html
   //This is a method to throw random numbers efficiently,
@@ -80,7 +81,7 @@ void MagicCodeFromMarkHartz::StdNormRand(double *z)
   //z[0] = gauss->GetRandom();
   //z[1] = gauss->GetRandom();
 }
-void MagicCodeFromMarkHartz::CheloskyDecomp(TMatrixD &chel_mat)
+void ParameterThrowerMarkHarz::CheloskyDecomp(TMatrixD &chel_mat)
 {
 
   for (int i = 0; i < npars; i++)

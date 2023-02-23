@@ -2,19 +2,19 @@
 // Created by Adrien Blanchet on 22/02/2023.
 //
 
-#ifndef GUNDAM_MAGICCODEFROMMARKHARTZ_H
-#define GUNDAM_MAGICCODEFROMMARKHARTZ_H
+#ifndef GUNDAM_PARAMETERTHROWERMARKHARZ_H
+#define GUNDAM_PARAMETERTHROWERMARKHARZ_H
 
 #include "TVectorD.h"
 #include "TMatrixDSym.h"
 #include "TF1.h"
 
 
-class MagicCodeFromMarkHartz {
+class ParameterThrowerMarkHarz {
 
 public:
-  MagicCodeFromMarkHartz(TVectorD &parms, TMatrixDSym &covm);
-  ~MagicCodeFromMarkHartz();
+  ParameterThrowerMarkHarz(TVectorD &parms, TMatrixDSym &covm);
+  ~ParameterThrowerMarkHarz();
 
   void ThrowSet(std::vector<double> &parms);
   static void StdNormRand(double *z);
@@ -30,4 +30,4 @@ private:
 };
 
 
-#endif //GUNDAM_MAGICCODEFROMMARKHARTZ_H
+#endif //GUNDAM_PARAMETERTHROWERMARKHARZ_H

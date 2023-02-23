@@ -6,7 +6,7 @@
 
 #include "JsonUtils.h"
 #include "GlobalVariables.h"
-#include "MagicCodeFromMarkHartz.h"
+#include "ParameterThrowerMarkHarz.h"
 
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
@@ -76,6 +76,7 @@ void FitParameterSet::readConfigImpl(){
 
   // MISC / DEV
   _useMarkGenerator_ = JsonUtils::fetchValue(_config_, "useMarkGenerator", _useMarkGenerator_);
+  _useEigenDecompForThrows_ = JsonUtils::fetchValue(_config_, "useEigenDecompForThrows", _useEigenDecompForThrows_);
   _devUseParLimitsOnEigen_ = JsonUtils::fetchValue(_config_, "devUseParLimitsOnEigen", _devUseParLimitsOnEigen_);
   if( _devUseParLimitsOnEigen_ ){
     LogAlert << "USING DEV OPTION: _devUseParLimitsOnEigen_ = true" << std::endl;
@@ -137,18 +138,18 @@ void FitParameterSet::processCovarianceMatrix(){
   LogInfo << "Stripping the matrix from fixed/disabled parameters in set: " << getName() << std::endl;
   int nbFitParameters{0};
   for( const auto& par : _parameterList_ ){
-    if( par.isEnabled() and not par.isFixed() and not par.isFree() ) nbFitParameters++;
+    if( FitParameterSet::isValidCorrelatedParameter(par) ) nbFitParameters++;
   }
   LogInfo << "Effective nb parameters: " << nbFitParameters << std::endl;
 
   _strippedCovarianceMatrix_ = std::make_shared<TMatrixDSym>(nbFitParameters);
   int iStrippedPar = -1;
   for( int iPar = 0 ; iPar < int(_parameterList_.size()) ; iPar++ ){
-    if( not _parameterList_[iPar].isEnabled() or _parameterList_[iPar].isFixed() or _parameterList_[iPar].isFree() ) continue;
+    if( not FitParameterSet::isValidCorrelatedParameter(_parameterList_[iPar]) ) continue;
     iStrippedPar++;
     int jStrippedPar = -1;
     for( int jPar = 0 ; jPar < int(_parameterList_.size()) ; jPar++ ){
-      if( not _parameterList_[jPar].isEnabled() or _parameterList_[jPar].isFixed() or _parameterList_[jPar].isFree() ) continue;
+      if( not FitParameterSet::isValidCorrelatedParameter(_parameterList_[jPar]) ) continue;
       jStrippedPar++;
       (*_strippedCovarianceMatrix_)[iStrippedPar][jStrippedPar] = (*_priorCovarianceMatrix_)[iPar][jPar];
     }
@@ -369,19 +370,20 @@ void FitParameterSet::throwFitParameters(double gain_){
     TVectorD parms(_strippedCovarianceMatrix_->GetNrows());
     int iPar{0};
     for( auto& par : _parameterList_ ){
-      if( par.isEnabled() and not par.isFixed() and not par.isFree() ){ parms[iPar++] = par.getPriorValue(); }
+      if( FitParameterSet::isValidCorrelatedParameter(par) ){ parms[iPar++] = par.getPriorValue(); }
     }
 
     if( _markHartzGen_ == nullptr ){
       LogInfo << "Generating Cholesky matrix in set: " << getName() << std::endl;
-      _markHartzGen_ = std::make_shared<MagicCodeFromMarkHartz>(parms, *_strippedCovarianceMatrix_);
+      _markHartzGen_ = std::make_shared<ParameterThrowerMarkHarz>(parms, *_strippedCovarianceMatrix_);
     }
     std::vector<double> throwPars(_strippedCovarianceMatrix_->GetNrows());
     _markHartzGen_->ThrowSet(throwPars);
+    // THROWS ARE CENTERED AROUND 1!!
 
     iPar = 0;
     for( auto& par : _parameterList_ ){
-      if( par.isEnabled() and not par.isFixed() and not par.isFree() ){
+      if( FitParameterSet::isValidCorrelatedParameter(par) ){
         LogInfo << "Throwing par (mark's generator) " << par.getTitle() << ": " << par.getPriorValue();
         par.setThrowValue(throwPars[iPar++]);
         par.setParameterValue( par.getThrowValue() );
@@ -390,22 +392,45 @@ void FitParameterSet::throwFitParameters(double gain_){
     }
   }
   else{
-    if( not _useEigenDecompInFit_ ){
+    if( _useEigenDecompForThrows_ and _useEigenDecompInFit_ ){
+      LogInfo << "Throwing eigen parameters for " << _name_ << std::endl;
+      for( auto& eigenPar : _eigenParameterList_ ){
+        if( eigenPar.isFixed() ){ LogWarning << "Eigen parameter #" << eigenPar.getParameterIndex() << " is fixed. Not throwing" << std::endl; continue; }
+        eigenPar.setThrowValue(eigenPar.getPriorValue() + gain_ * gRandom->Gaus(0, eigenPar.getStdDevValue()));
+        eigenPar.setParameterValue( eigenPar.getThrowValue() );
+      }
+      this->propagateEigenToOriginal();
+
+      for( auto& par : _parameterList_ ){
+        LogInfo << "Throwing par (through eigen decomp) " << par.getTitle() << ": " << par.getPriorValue();
+        par.setThrowValue(par.getParameterValue());
+        LogInfo << " → " << par.getParameterValue() << std::endl;
+      }
+    }
+    else{
       LogInfo << "Throwing parameters for " << _name_ << " using Cholesky matrix" << std::endl;
 
       // TODO: CHOLESKY THROW IS NOT WORKING PROPERLY
 
-      if( _choleskyMatrix_ == nullptr ){
-        LogInfo << "Generating Cholesky matrix in set: " << getName() << std::endl;
-        _choleskyMatrix_ = std::shared_ptr<TMatrixD>(
-            GenericToolbox::getCholeskyMatrix( _strippedCovarianceMatrix_.get() )
-        );
+
+//      if( _choleskyMatrix_ == nullptr ){
+//        LogInfo << "Generating Cholesky matrix in set: " << getName() << std::endl;
+//        _choleskyMatrix_ = std::shared_ptr<TMatrixD>(
+//            GenericToolbox::getCholeskyMatrix( _strippedCovarianceMatrix_.get() )
+//        );
+//      }
+//      auto throws = GenericToolbox::throwCorrelatedParameters(_choleskyMatrix_.get());
+
+      if( not _correlatedVariableThrower_.isInitialized() ){
+        _correlatedVariableThrower_.setCovarianceMatrixPtr(_strippedCovarianceMatrix_.get());
+        _correlatedVariableThrower_.initialize();
       }
-      auto throws = GenericToolbox::throwCorrelatedParameters(_choleskyMatrix_.get());
+      TVectorD throws(_strippedCovarianceMatrix_->GetNrows());
+      _correlatedVariableThrower_.throwCorrelatedVariables(throws);
 
       int iFit{-1};
       for( auto& par : _parameterList_ ){
-        if( par.isEnabled() and not par.isFixed() and not par.isFree() ){
+        if( FitParameterSet::isValidCorrelatedParameter(par) ){
           iFit++;
           LogInfo << "Throwing par " << par.getTitle() << ": " << par.getPriorValue();
           par.setThrowValue(par.getPriorValue() + gain_ * throws[iFit]);
@@ -423,21 +448,6 @@ void FitParameterSet::throwFitParameters(double gain_){
 //        eigenPar.setThrowValue( eigenPar.getParameterValue() );
 //      }
 //    }
-    }
-    else{
-      LogInfo << "Throwing eigen parameters for " << _name_ << std::endl;
-      for( auto& eigenPar : _eigenParameterList_ ){
-        if( eigenPar.isFixed() ){ LogWarning << "Eigen parameter #" << eigenPar.getParameterIndex() << " is fixed. Not throwing" << std::endl; continue; }
-        eigenPar.setThrowValue(eigenPar.getPriorValue() + gain_ * gRandom->Gaus(0, eigenPar.getStdDevValue()));
-        eigenPar.setParameterValue( eigenPar.getThrowValue() );
-      }
-      this->propagateEigenToOriginal();
-
-      for( auto& par : _parameterList_ ){
-        LogInfo << "Throwing par (through eigen decomp) " << par.getTitle() << ": " << par.getPriorValue();
-        par.setThrowValue(par.getParameterValue());
-        LogInfo << " → " << par.getParameterValue() << std::endl;
-      }
     }
   }
 
@@ -555,6 +565,9 @@ double FitParameterSet::toRealParRange(double normParRange, const FitParameter& 
 }
 double FitParameterSet::toRealParValue(double normParValue, const FitParameter& par) {
   return normParValue*par.getStdDevValue() + par.getPriorValue();
+}
+bool FitParameterSet::isValidCorrelatedParameter(const FitParameter& par_){
+  return ( par_.isEnabled() and not par_.isFixed() and not par_.isFree() );
 }
 
 
@@ -719,7 +732,7 @@ void FitParameterSet::defineParameters(){
 void FitParameterSet::fillDeltaParameterList(){
   int iFit{0};
   for( const auto& par : _parameterList_ ){
-    if( par.isEnabled() and not par.isFixed() and not par.isFree() ){
+    if( FitParameterSet::isValidCorrelatedParameter(par) ){
       (*_deltaParameterList_)[iFit++] = par.getParameterValue() - par.getPriorValue();
     }
   }

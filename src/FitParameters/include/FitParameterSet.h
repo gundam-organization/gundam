@@ -8,9 +8,10 @@
 #include "FitParameter.h"
 #include "NestedDialTest.h"
 #include "JsonBaseClass.h"
-#include "MagicCodeFromMarkHartz.h"
+#include "ParameterThrowerMarkHarz.h"
 
 #include "Logger.h"
+#include "GenericToolbox.CorrelatedVariablesSampler.h"
 
 #include "nlohmann/json.hpp"
 #include "TMatrixDSym.h"
@@ -39,9 +40,9 @@ public:
   void processCovarianceMatrix(); // invert the matrices, and make sure fixed parameters are detached from correlations
 
   // Getters
-  bool isEnabled() const;
-  bool isEnablePca() const;
-  bool isUseEigenDecompInFit() const;
+  [[nodiscard]] bool isEnabled() const;
+  [[nodiscard]] bool isEnablePca() const;
+  [[nodiscard]] bool isUseEigenDecompInFit() const;
   bool isEnabledThrowToyParameters() const;
   bool isUseOnlyOneParameterPerEvent() const;
   const std::string &getName() const;
@@ -77,6 +78,7 @@ public:
   static double toNormalizedParValue(double parValue, const FitParameter& par);
   static double toRealParValue(double normParValue, const FitParameter& par);
   static double toRealParRange(double normParRange, const FitParameter& par);
+  static bool isValidCorrelatedParameter(const FitParameter& par_);
 
   void setMaskedForPropagation(bool maskedForPropagation);
 
@@ -106,6 +108,7 @@ private:
   nlohmann::json _dialSetDefinitions_{};
   bool _isEnabled_{};
   bool _useMarkGenerator_{false};
+  bool _useEigenDecompForThrows_{false};
   bool _maskedForPropagation_{false};
   bool _printDialSetsSummary_{false};
   bool _printParametersSummary_{false};
@@ -156,7 +159,8 @@ private:
   std::shared_ptr<TVectorD>  _deltaParameterList_{nullptr}; // difference from prior
 
   std::shared_ptr<TMatrixD> _choleskyMatrix_{nullptr};
-  std::shared_ptr<MagicCodeFromMarkHartz> _markHartzGen_{nullptr};
+  GenericToolbox::CorrelatedVariablesSampler _correlatedVariableThrower_{};
+  std::shared_ptr<ParameterThrowerMarkHarz> _markHartzGen_{nullptr};
 
 };
 

@@ -1,14 +1,14 @@
 set(SRCFILES
-    src/GlobalVariables.cpp
-    src/DataBinSet.cpp
-    src/DataBin.cpp
-    src/JsonUtils.cpp
-    src/YamlUtils.cpp
-    src/GundamGreetings.cpp
-    src/JsonBaseClass.cpp
-    src/VariableDictionary.cpp
-    src/Misc.cpp
-    src/MagicCodeFromMarkHartz.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/GlobalVariables.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/DataBinSet.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/DataBin.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/JsonUtils.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/YamlUtils.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamGreetings.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/JsonBaseClass.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/VariableDictionary.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Misc.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ParameterThrowerMarkHarz.cpp
     )
 
 set(HEADERS
@@ -27,8 +27,8 @@ set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/YamlUtils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/YamlUtils.impl.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/Misc.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/MagicCodeFromMarkHartz.h
-)
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ParameterThrowerMarkHarz.h
+    )
 
 
 set( UTILS_HEADERS ${HEADERS} )
