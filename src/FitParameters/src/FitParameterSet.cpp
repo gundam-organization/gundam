@@ -127,8 +127,8 @@ void FitParameterSet::initializeImpl() {
   this->processCovarianceMatrix();
 }
 
-void FitParameterSet::setMaskedForPropagation(bool maskedForPropagation) {
-  _maskedForPropagation_ = maskedForPropagation;
+void FitParameterSet::setMaskedForPropagation(bool maskedForPropagation_) {
+  _maskedForPropagation_ = maskedForPropagation_;
 }
 
 void FitParameterSet::processCovarianceMatrix(){

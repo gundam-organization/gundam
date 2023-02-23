@@ -39,6 +39,9 @@ public:
   // Post-init
   void processCovarianceMatrix(); // invert the matrices, and make sure fixed parameters are detached from correlations
 
+  // Setters
+  void setMaskedForPropagation(bool maskedForPropagation_);
+
   // Getters
   [[nodiscard]] bool isEnabled() const;
   [[nodiscard]] bool isEnablePca() const;
@@ -80,8 +83,6 @@ public:
   static double toRealParValue(double normParValue, const FitParameter& par);
   static double toRealParRange(double normParRange, const FitParameter& par);
   static bool isValidCorrelatedParameter(const FitParameter& par_);
-
-  void setMaskedForPropagation(bool maskedForPropagation);
 
 protected:
   void readConfigImpl() override;
