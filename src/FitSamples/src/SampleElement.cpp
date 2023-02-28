@@ -169,21 +169,28 @@ void SampleElement::throwEventMcError(){
     histogram->SetBinContent(iBin, weightSum);
   }
 }
-void SampleElement::throwStatError(){
+void SampleElement::throwStatError(bool useGaussThrow_){
   /*
    * This is to convert "Asimov" histogram to toy-experiment (pseudo-data), i.e. with statistical fluctuations
    * */
   int nCounts;
   for( int iBin = 1 ; iBin <= histogram->GetNbinsX() ; iBin++ ){
     if( histogram->GetBinContent(iBin) != 0 ){
-      nCounts = gRandom->Poisson(histogram->GetBinContent(iBin));
+      if( not useGaussThrow_ ){
+        nCounts = gRandom->Poisson(histogram->GetBinContent(iBin));
+      }
+      else{
+        nCounts = std::max(
+            int( gRandom->Gaus(histogram->GetBinContent(iBin), TMath::Sqrt(histogram->GetBinContent(iBin))) )
+            , 0 // if the throw is negative, cap it to 0
+            );
+      }
       for (auto *eventPtr: perBinEventPtrList[iBin-1]) {
         // make sure refill of the histogram will produce the same hist
         eventPtr->setEventWeight( eventPtr->getEventWeight()*( (double) nCounts/histogram->GetBinContent(iBin)) );
       }
       histogram->SetBinContent(iBin, nCounts);
     }
-
   }
 }
 
