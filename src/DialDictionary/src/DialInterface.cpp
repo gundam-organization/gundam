@@ -25,7 +25,7 @@ void DialInterface::setDialBinRef(const DataBin *dialBinRef) {
 }
 
 double DialInterface::evalResponse(){
-  if( _inputBufferRef_->isMasked() ) return 1;
+  if( _inputBufferRef_->isMasked() ){ return 1; }
   return _responseSupervisorRef_->process( _dialBaseRef_->evalResponse( *_inputBufferRef_ ) );
 }
 std::string DialInterface::getSummary(bool shallow_) {

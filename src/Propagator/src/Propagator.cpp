@@ -10,8 +10,9 @@
 
 #include "FitParameterSet.h"
 #include "Dial.h"
-#include "JsonUtils.h"
+#include "GenericToolbox.Json.h"
 #include "GlobalVariables.h"
+#include "ConfigUtils.h"
 
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
@@ -29,15 +30,14 @@ void Propagator::readConfigImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
 
   // Monitoring parameters
-  _showEventBreakdown_ = JsonUtils::fetchValue(_config_, "showEventBreakdown", _showEventBreakdown_);
-  _throwAsimovToyParameters_ = JsonUtils::fetchValue(_config_, "throwAsimovFitParameters", _throwAsimovToyParameters_);
-  _reThrowParSetIfOutOfBounds_ = JsonUtils::fetchValue(_config_, "reThrowParSetIfOutOfBounds", _reThrowParSetIfOutOfBounds_);
-  _enableStatThrowInToys_ = JsonUtils::fetchValue(_config_, "enableStatThrowInToys", _enableStatThrowInToys_);
-  _gaussStatThrowInToys_ = JsonUtils::fetchValue(_config_, "gaussStatThrowInToys", _gaussStatThrowInToys_);
-  _enableEventMcThrow_ = JsonUtils::fetchValue(_config_, "enableEventMcThrow", _enableEventMcThrow_);
+  _showEventBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showEventBreakdown", _showEventBreakdown_);
+  _throwAsimovToyParameters_ = GenericToolbox::Json::fetchValue(_config_, "throwAsimovFitParameters", _throwAsimovToyParameters_);
+  _reThrowParSetIfOutOfBounds_ = GenericToolbox::Json::fetchValue(_config_, "reThrowParSetIfOutOfBounds", _reThrowParSetIfOutOfBounds_);
+  _enableStatThrowInToys_ = GenericToolbox::Json::fetchValue(_config_, "enableStatThrowInToys", _enableStatThrowInToys_);
+  _gaussStatThrowInToys_ = GenericToolbox::Json::fetchValue(_config_, "gaussStatThrowInToys", _gaussStatThrowInToys_);
+  _enableEventMcThrow_ = GenericToolbox::Json::fetchValue(_config_, "enableEventMcThrow", _enableEventMcThrow_);
 
-  auto parameterSetListConfig = JsonUtils::fetchValue(_config_, "parameterSetListConfig", nlohmann::json());
-  if( parameterSetListConfig.is_string() ) parameterSetListConfig = JsonUtils::readConfigFile(parameterSetListConfig.get<std::string>());
+  auto parameterSetListConfig = ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue(_config_, "parameterSetListConfig", nlohmann::json()));
   _parameterSetList_.reserve(parameterSetListConfig.size()); // make sure the objects aren't moved in RAM ( since FitParameter* will be used )
   for( const auto& parameterSetConfig : parameterSetListConfig ){
     _parameterSetList_.emplace_back();
@@ -47,19 +47,18 @@ void Propagator::readConfigImpl(){
   }
 
 
-  auto fitSampleSetConfig = JsonUtils::fetchValue(_config_, "fitSampleSetConfig", nlohmann::json());
+  auto fitSampleSetConfig = GenericToolbox::Json::fetchValue(_config_, "fitSampleSetConfig", nlohmann::json());
   _fitSampleSet_.setConfig(fitSampleSetConfig);
   _fitSampleSet_.readConfig();
 
-  auto plotGeneratorConfig = JsonUtils::fetchValue(_config_, "plotGeneratorConfig", nlohmann::json());
-  if( plotGeneratorConfig.is_string() ) parameterSetListConfig = JsonUtils::readConfigFile(plotGeneratorConfig.get<std::string>());
+  auto plotGeneratorConfig = ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue(_config_, "plotGeneratorConfig", nlohmann::json()));
   _plotGenerator_.setConfig(plotGeneratorConfig);
   _plotGenerator_.readConfig();
 
-  auto dataSetListConfig = JsonUtils::getForwardedConfig(_config_, "dataSetList");
+  auto dataSetListConfig = ConfigUtils::getForwardedConfig(_config_, "dataSetList");
   if( dataSetListConfig.empty() ){
     // Old config files
-    dataSetListConfig = JsonUtils::getForwardedConfig(_fitSampleSet_.getConfig(), "dataSetList");
+    dataSetListConfig = ConfigUtils::getForwardedConfig(_fitSampleSet_.getConfig(), "dataSetList");
     LogAlert << "DEPRECATED CONFIG OPTION: " << "dataSetList should now be located in the Propagator config." << std::endl;
   }
   LogThrowIf(dataSetListConfig.empty(), "No dataSet specified." << std::endl);
@@ -68,10 +67,10 @@ void Propagator::readConfigImpl(){
     _dataSetList_.emplace_back(dataSetConfig, int(_dataSetList_.size()));
   }
 
-  _parScanner_.readConfig( JsonUtils::fetchValue(_config_, "scanConfig", nlohmann::json()) );
+  _parScanner_.readConfig( GenericToolbox::Json::fetchValue(_config_, "scanConfig", nlohmann::json()) );
 
-  _debugPrintLoadedEvents_ = JsonUtils::fetchValue(_config_, "debugPrintLoadedEvents", _debugPrintLoadedEvents_);
-  _debugPrintLoadedEventsNbPerSample_ = JsonUtils::fetchValue(_config_, "debugPrintLoadedEventsNbPerSample", _debugPrintLoadedEventsNbPerSample_);
+  _debugPrintLoadedEvents_ = GenericToolbox::Json::fetchValue(_config_, "debugPrintLoadedEvents", _debugPrintLoadedEvents_);
+  _debugPrintLoadedEventsNbPerSample_ = GenericToolbox::Json::fetchValue(_config_, "debugPrintLoadedEventsNbPerSample", _debugPrintLoadedEventsNbPerSample_);
 
 #if USE_NEW_DIALS
   for(size_t iParSet = 0 ; iParSet < _parameterSetList_.size() ; iParSet++ ){
@@ -79,7 +78,7 @@ void Propagator::readConfigImpl(){
     // DEV / DialCollections
     if( not _parameterSetList_[iParSet].getDialSetDefinitions().empty() ){
       for( auto& dialSetDef : _parameterSetList_[iParSet].getDialSetDefinitions().get<std::vector<nlohmann::json>>() ){
-        if( JsonUtils::doKeyExist(dialSetDef, "parametersBinningPath") ){
+        if( GenericToolbox::Json::doKeyExist(dialSetDef, "parametersBinningPath") ){
           _dialCollections_.emplace_back(&_parameterSetList_);
           _dialCollections_.back().setIndex(int(_dialCollections_.size())-1);
           _dialCollections_.back().setSupervisedParameterSetIndex( int(iParSet) );

@@ -6,7 +6,7 @@
 #include "DataDispenser.h"
 #include "GlobalVariables.h"
 #include "DatasetLoader.h"
-#include "JsonUtils.h"
+#include "GenericToolbox.Json.h"
 #include "Misc.h"
 
 #if USE_NEW_DIALS
@@ -41,18 +41,18 @@ DataDispenser::DataDispenser(DatasetLoader* owner_): _owner_(owner_) {}
 void DataDispenser::readConfigImpl(){
   LogThrowIf( _config_.empty(), "Config is not set." );
 
-  _parameters_.name = JsonUtils::fetchValue<std::string>(_config_, "name", _parameters_.name);
-  _parameters_.treePath = JsonUtils::fetchValue<std::string>(_config_, "tree", _parameters_.treePath);
-  _parameters_.filePathList = JsonUtils::fetchValue<std::vector<std::string>>(_config_, "filePathList", _parameters_.filePathList);
-  _parameters_.additionalVarsStorage = JsonUtils::fetchValue(_config_, {{"additionalLeavesStorage"}, {"additionalVarsStorage"}}, _parameters_.additionalVarsStorage);
-  _parameters_.dummyVariablesList = JsonUtils::fetchValue(_config_, "dummyVariablesList", _parameters_.dummyVariablesList);
-  _parameters_.useMcContainer = JsonUtils::fetchValue(_config_, "useMcContainer", _parameters_.useMcContainer);
+  _parameters_.name = GenericToolbox::Json::fetchValue<std::string>(_config_, "name", _parameters_.name);
+  _parameters_.treePath = GenericToolbox::Json::fetchValue<std::string>(_config_, "tree", _parameters_.treePath);
+  _parameters_.filePathList = GenericToolbox::Json::fetchValue<std::vector<std::string>>(_config_, "filePathList", _parameters_.filePathList);
+  _parameters_.additionalVarsStorage = GenericToolbox::Json::fetchValue(_config_, {{"additionalLeavesStorage"}, {"additionalVarsStorage"}}, _parameters_.additionalVarsStorage);
+  _parameters_.dummyVariablesList = GenericToolbox::Json::fetchValue(_config_, "dummyVariablesList", _parameters_.dummyVariablesList);
+  _parameters_.useMcContainer = GenericToolbox::Json::fetchValue(_config_, "useMcContainer", _parameters_.useMcContainer);
 
-  _parameters_.selectionCutFormulaStr = JsonUtils::buildFormula(_config_, "selectionCutFormula", "&&", _parameters_.selectionCutFormulaStr);
-  _parameters_.nominalWeightFormulaStr = JsonUtils::buildFormula(_config_, "nominalWeightFormula", "*", _parameters_.nominalWeightFormulaStr);
+  _parameters_.selectionCutFormulaStr = GenericToolbox::Json::buildFormula(_config_, "selectionCutFormula", "&&", _parameters_.selectionCutFormulaStr);
+  _parameters_.nominalWeightFormulaStr = GenericToolbox::Json::buildFormula(_config_, "nominalWeightFormula", "*", _parameters_.nominalWeightFormulaStr);
 
   _parameters_.overrideLeafDict.clear();
-  for( auto& entry : JsonUtils::fetchValue(_config_, "overrideLeafDict", nlohmann::json()) ){
+  for( auto& entry : GenericToolbox::Json::fetchValue(_config_, "overrideLeafDict", nlohmann::json()) ){
     _parameters_.overrideLeafDict[entry["eventVar"]] = entry["leafVar"];
   }
 }
@@ -127,10 +127,10 @@ void DataDispenser::load(){
     GenericToolbox::sortVector(_cache_.varsToOverrideList, aGoesFirst);
   }
 
-  if( JsonUtils::doKeyExist(_config_, "variablesTransform") ){
+  if( GenericToolbox::Json::doKeyExist(_config_, "variablesTransform") ){
     // load transformations
     int index{0};
-    for( auto& varTransform : JsonUtils::fetchValue<std::vector<nlohmann::json>>(_config_, "variablesTransform") ){
+    for( auto& varTransform : GenericToolbox::Json::fetchValue<std::vector<nlohmann::json>>(_config_, "variablesTransform") ){
       _cache_.eventVarTransformList.emplace_back( varTransform );
       _cache_.eventVarTransformList.back().setIndex(index++);
       _cache_.eventVarTransformList.back().initialize();

@@ -4,8 +4,9 @@
 
 #include "FitParameter.h"
 #include "FitParameterSet.h"
-#include "JsonUtils.h"
+#include "ConfigUtils.h"
 
+#include "GenericToolbox.Json.h"
 #include "Logger.h"
 
 #include "sstream"
@@ -18,30 +19,30 @@ FitParameter::FitParameter(const FitParameterSet* owner_): _owner_(owner_) {}
 
 void FitParameter::readConfigImpl(){
   if( not _parameterConfig_.empty() ){
-    _isEnabled_ = JsonUtils::fetchValue(_parameterConfig_, "isEnabled", true);
+    _isEnabled_ = GenericToolbox::Json::fetchValue(_parameterConfig_, "isEnabled", true);
     if( not _isEnabled_ ) { return; }
 
-    auto priorTypeStr = JsonUtils::fetchValue(_parameterConfig_, "priorType", "");
+    auto priorTypeStr = GenericToolbox::Json::fetchValue(_parameterConfig_, "priorType", "");
     if( not priorTypeStr.empty() ){
       _priorType_ = PriorType::PriorTypeEnumNamespace::toEnum(priorTypeStr);
       if( _priorType_ == PriorType::Flat ){ _isFree_ = true; }
     }
 
-    if( JsonUtils::doKeyExist(_parameterConfig_, "priorValue") ){
-      _priorValue_ = JsonUtils::fetchValue(_parameterConfig_, "priorValue", _priorValue_);
+    if( GenericToolbox::Json::doKeyExist(_parameterConfig_, "priorValue") ){
+      _priorValue_ = GenericToolbox::Json::fetchValue(_parameterConfig_, "priorValue", _priorValue_);
       LogWarning << this->getTitle() << ": prior value override -> " << _priorValue_ << std::endl;
       this->setParameterValue(_priorValue_);
     }
 
-    if( JsonUtils::doKeyExist(_parameterConfig_, "parameterLimits") ){
+    if( GenericToolbox::Json::doKeyExist(_parameterConfig_, "parameterLimits") ){
       std::pair<double, double> limits{std::nan(""), std::nan("")};
-      limits = JsonUtils::fetchValue(_parameterConfig_, "parameterLimits", limits);
+      limits = GenericToolbox::Json::fetchValue(_parameterConfig_, "parameterLimits", limits);
       LogWarning << "Overriding parameter limits: [" << limits.first << ", " << limits.second << "]." << std::endl;
       this->setMinValue(limits.first);
       this->setMaxValue(limits.second);
     }
 
-    _dialDefinitionsList_ = JsonUtils::fetchValue(_parameterConfig_, "dialSetDefinitions", _dialDefinitionsList_);
+    _dialDefinitionsList_ = GenericToolbox::Json::fetchValue(_parameterConfig_, "dialSetDefinitions", _dialDefinitionsList_);
   }
 
 #if USE_NEW_DIALS
@@ -92,13 +93,13 @@ void FitParameter::setDialSetConfig(const nlohmann::json &jsonConfig_) {
   auto jsonConfig = jsonConfig_;
   while( jsonConfig.is_string() ){
     LogWarning << "Forwarding FitParameterSet config to: \"" << jsonConfig.get<std::string>() << "\"..." << std::endl;
-    jsonConfig = JsonUtils::readConfigFile(jsonConfig.get<std::string>());
+    jsonConfig = ConfigUtils::readConfigFile(jsonConfig.get<std::string>());
   }
   _dialDefinitionsList_ = jsonConfig.get<std::vector<nlohmann::json>>();
 }
 void FitParameter::setParameterDefinitionConfig(const nlohmann::json &config_){
   _parameterConfig_ = config_;
-  JsonUtils::forwardConfig(_parameterConfig_);
+  ConfigUtils::forwardConfig(_parameterConfig_);
 }
 void FitParameter::setParameterIndex(int parameterIndex) {
   _parameterIndex_ = parameterIndex;

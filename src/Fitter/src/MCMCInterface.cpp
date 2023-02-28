@@ -5,7 +5,7 @@
 #include "LikelihoodInterface.h"
 #include "MCMCInterface.h"
 #include "FitterEngine.h"
-#include "JsonUtils.h"
+#include "GenericToolbox.Json.h"
 #include "GlobalVariables.h"
 
 #include "GenericToolbox.h"
@@ -23,31 +23,31 @@ void MCMCInterface::readConfigImpl(){
   MinimizerBase::readConfigImpl();
   LogInfo << "Reading minimizer config..." << std::endl;
 
-  _algorithmName_ = JsonUtils::fetchValue(_config_, "algorithm", _algorithmName_);
-  _proposalName_ = JsonUtils::fetchValue(_config_, "proposal", _proposalName_);
-  _stepCount_= JsonUtils::fetchValue(_config_, "steps", _stepCount_);
-  _outTreeName_ = JsonUtils::fetchValue(_config_, "mcmcOutputTree", "MCMC");
+  _algorithmName_ = GenericToolbox::Json::fetchValue(_config_, "algorithm", _algorithmName_);
+  _proposalName_ = GenericToolbox::Json::fetchValue(_config_, "proposal", _proposalName_);
+  _stepCount_= GenericToolbox::Json::fetchValue(_config_, "steps", _stepCount_);
+  _outTreeName_ = GenericToolbox::Json::fetchValue(_config_, "mcmcOutputTree", "MCMC");
 
   // Get MCMC burnin parameters.  Each burnin discards previous information
   // about the posterior and reset to the initial state (but starts from
   // the last accepted point.  The burnin will be skipped if the state
   // has been restored from a file.  The burnin can be skipped in favor of
   // discarding the initial parts of the MCMC chain (usually a better option).
-  _burninCycles_ = JsonUtils::fetchValue(_config_,
+  _burninCycles_ = GenericToolbox::Json::fetchValue(_config_,
                                          "burninCycles", _burninCycles_);
-  _burninLength_ = JsonUtils::fetchValue(_config_,
+  _burninLength_ = GenericToolbox::Json::fetchValue(_config_,
                                          "burninSteps", _burninLength_);
-  _burninResets_ = JsonUtils::fetchValue(_config_,
+  _burninResets_ = GenericToolbox::Json::fetchValue(_config_,
                                          "burninResets", _burninResets_);
-  _saveBurnin_ = JsonUtils::fetchValue(_config_,
+  _saveBurnin_ = GenericToolbox::Json::fetchValue(_config_,
                                        "saveBurnin", _saveBurnin_);
 
   // Get the MCMC chain parameters.  A run is broken into "mini-Chains"
   // called a "cycle" where the posterior covariance information is updated
   // after each mini-chain.  The cycle will have "mcmcRunLength" steps.
-  _cycles_ = JsonUtils::fetchValue(_config_,
+  _cycles_ = GenericToolbox::Json::fetchValue(_config_,
                                      "cycles", _cycles_);
-  _steps_ = JsonUtils::fetchValue(_config_,
+  _steps_ = GenericToolbox::Json::fetchValue(_config_,
                                       "steps", _steps_);
 
   ///////////////////////////////////////////////////////////////
@@ -57,49 +57,49 @@ void MCMCInterface::readConfigImpl(){
   // burn-in.  If this is set to short, the step size will fluctuate.  If this
   // is set to long, the step size won't be adjusted to match the target
   // acceptance.  Make this very large to lock the step size.
-  _burninCovWindow_ = JsonUtils::fetchValue(
+  _burninCovWindow_ = GenericToolbox::Json::fetchValue(
     _config_, "burninCovWindow", _burninCovWindow_);
 
   // Freeze the step size after this many burn-in chains
-  _burninFreezeAfter_ = JsonUtils::fetchValue(
+  _burninFreezeAfter_ = GenericToolbox::Json::fetchValue(
     _config_, "burninFreezeAfter", _burninFreezeAfter_);
 
   // Set the window to calculate the current acceptance value over during
   // burn-in.  If this is set to short, the step size will fluctuate.  If this
   // is set to long, the step size won't be adjusted to match the target
   // acceptance.  Make this very large to lock the step size.
-  _burninWindow_ = JsonUtils::fetchValue(
+  _burninWindow_ = GenericToolbox::Json::fetchValue(
     _config_, "burninWindow", _burninWindow_);
 
   // Set the name of a file containing a previous sequence of the chain.  This
   // restores the state from the end of the chain and continues.
-  _adaptiveRestore_ = JsonUtils::fetchValue(
+  _adaptiveRestore_ = GenericToolbox::Json::fetchValue(
     _config_, "adaptiveRestore", _adaptiveRestore_);
 
   // Set the window to calculate the current acceptance value over.  If this
   // is set to short, the step size will fluctuate.  If this is set to long,
   // the step size won't be adjusted to match the target acceptance.  Make
   // this very large to lock the step size.
-  _adaptiveCovWindow_ = JsonUtils::fetchValue(
+  _adaptiveCovWindow_ = GenericToolbox::Json::fetchValue(
     _config_, "adaptiveCovWindow", _adaptiveCovWindow_);
 
   // Set the initial rigidity for the changes in the step size.  If this is
   // negative, the step size is not updated as it runs.
-  _adaptiveFreezeAfter_ = JsonUtils::fetchValue(
+  _adaptiveFreezeAfter_ = GenericToolbox::Json::fetchValue(
     _config_, "adaptiveFreezeAfter", _adaptiveFreezeAfter_);
 
   // Set the window to calculate the current acceptance value over.  If this
   // is set to short, the step size will fluctuate.  If this is set to long,
   // the step size won't be adjusted to match the target acceptance.  Make
   // this very large to lock the step size.
-  _adaptiveWindow_ = JsonUtils::fetchValue(
+  _adaptiveWindow_ = GenericToolbox::Json::fetchValue(
     _config_, "adaptiveWindow", _adaptiveWindow_);
 
   ///////////////////////////////////////////////////////////////
   // Get parameters for the simple proposal.
 
   // Set the step size for the simple proposal.
-  _simpleSigma_ = JsonUtils::fetchValue(_config_,
+  _simpleSigma_ = GenericToolbox::Json::fetchValue(_config_,
                                         "simpleSigma", _simpleSigma_);
 }
 

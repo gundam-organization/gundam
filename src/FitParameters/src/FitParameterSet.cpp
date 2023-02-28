@@ -4,12 +4,13 @@
 
 #include "FitParameterSet.h"
 
-#include "JsonUtils.h"
 #include "GlobalVariables.h"
 #include "ParameterThrowerMarkHarz.h"
+#include "ConfigUtils.h"
 
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
+#include "GenericToolbox.Json.h"
 #include "GenericToolbox.TablePrinter.h"
 #include "Logger.h"
 
@@ -23,61 +24,61 @@ LoggerInit([]{
 void FitParameterSet::readConfigImpl(){
   LogThrowIf(_config_.empty(), "FitParameterSet config not set.");
 
-  _name_ = JsonUtils::fetchValue<std::string>(_config_, "name");
+  _name_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
   LogInfo << "Initializing parameter set: " << _name_ << std::endl;
 
-  _isEnabled_ = JsonUtils::fetchValue<bool>(_config_, "isEnabled");
+  _isEnabled_ = GenericToolbox::Json::fetchValue<bool>(_config_, "isEnabled");
   LogReturnIf(not _isEnabled_, _name_ << " parameters are disabled.");
 
-  _nbParameterDefinition_ = JsonUtils::fetchValue(_config_, "numberOfParameters", _nbParameterDefinition_);
-  _nominalStepSize_ = JsonUtils::fetchValue(_config_, "nominalStepSize", _nominalStepSize_);
+  _nbParameterDefinition_ = GenericToolbox::Json::fetchValue(_config_, "numberOfParameters", _nbParameterDefinition_);
+  _nominalStepSize_ = GenericToolbox::Json::fetchValue(_config_, "nominalStepSize", _nominalStepSize_);
 
-  _useOnlyOneParameterPerEvent_ = JsonUtils::fetchValue<bool>(_config_, "useOnlyOneParameterPerEvent", false);
-  _printDialSetsSummary_ = JsonUtils::fetchValue<bool>(_config_, "printDialSetsSummary", _printDialSetsSummary_);
-  _printParametersSummary_ = JsonUtils::fetchValue<bool>(_config_, "printParametersSummary", _printDialSetsSummary_);
+  _useOnlyOneParameterPerEvent_ = GenericToolbox::Json::fetchValue<bool>(_config_, "useOnlyOneParameterPerEvent", false);
+  _printDialSetsSummary_ = GenericToolbox::Json::fetchValue<bool>(_config_, "printDialSetsSummary", _printDialSetsSummary_);
+  _printParametersSummary_ = GenericToolbox::Json::fetchValue<bool>(_config_, "printParametersSummary", _printDialSetsSummary_);
 
-  if( JsonUtils::doKeyExist(_config_, "parameterLimits") ){
-    auto parLimits = JsonUtils::fetchValue(_config_, "parameterLimits", nlohmann::json());
-    _globalParameterMinValue_ = JsonUtils::fetchValue(parLimits, "minValue", std::nan("UNSET"));
-    _globalParameterMaxValue_ = JsonUtils::fetchValue(parLimits, "maxValue", std::nan("UNSET"));
+  if( GenericToolbox::Json::doKeyExist(_config_, "parameterLimits") ){
+    auto parLimits = GenericToolbox::Json::fetchValue(_config_, "parameterLimits", nlohmann::json());
+    _globalParameterMinValue_ = GenericToolbox::Json::fetchValue(parLimits, "minValue", std::nan("UNSET"));
+    _globalParameterMaxValue_ = GenericToolbox::Json::fetchValue(parLimits, "maxValue", std::nan("UNSET"));
   }
 
-  _useEigenDecompInFit_ = JsonUtils::fetchValue(_config_ , "useEigenDecompInFit", false);
+  _useEigenDecompInFit_ = GenericToolbox::Json::fetchValue(_config_ , "useEigenDecompInFit", false);
   if( _useEigenDecompInFit_ ){
     LogWarning << "Using eigen decomposition in fit." << std::endl;
-    _maxNbEigenParameters_ = JsonUtils::fetchValue(_config_ , "maxNbEigenParameters", -1);
+    _maxNbEigenParameters_ = GenericToolbox::Json::fetchValue(_config_ , "maxNbEigenParameters", -1);
     if( _maxNbEigenParameters_ != -1 ){
       LogInfo << "Maximum nb of eigen parameters is set to " << _maxNbEigenParameters_ << std::endl;
     }
-    _maxEigenFraction_ = JsonUtils::fetchValue(_config_ , "maxEigenFraction", double(1.));
+    _maxEigenFraction_ = GenericToolbox::Json::fetchValue(_config_ , "maxEigenFraction", double(1.));
     if( _maxEigenFraction_ != 1 ){
       LogInfo << "Max eigen fraction set to: " << _maxEigenFraction_*100 << "%" << std::endl;
     }
   }
 
-  _enablePca_ = JsonUtils::fetchValue(_config_, std::vector<std::string>{"allowPca", "fixGhostFitParameters", "enablePca"}, _enablePca_);
-  _enabledThrowToyParameters_ = JsonUtils::fetchValue(_config_, "enabledThrowToyParameters", _enabledThrowToyParameters_);
-  _customFitParThrow_ = JsonUtils::fetchValue(_config_, "customFitParThrow", std::vector<nlohmann::json>());
-  _releaseFixedParametersOnHesse_ = JsonUtils::fetchValue(_config_, "releaseFixedParametersOnHesse", _releaseFixedParametersOnHesse_);
+  _enablePca_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"allowPca", "fixGhostFitParameters", "enablePca"}, _enablePca_);
+  _enabledThrowToyParameters_ = GenericToolbox::Json::fetchValue(_config_, "enabledThrowToyParameters", _enabledThrowToyParameters_);
+  _customFitParThrow_ = GenericToolbox::Json::fetchValue(_config_, "customFitParThrow", std::vector<nlohmann::json>());
+  _releaseFixedParametersOnHesse_ = GenericToolbox::Json::fetchValue(_config_, "releaseFixedParametersOnHesse", _releaseFixedParametersOnHesse_);
 
-  _parameterDefinitionFilePath_ = JsonUtils::fetchValue( _config_,
+  _parameterDefinitionFilePath_ = GenericToolbox::Json::fetchValue( _config_,
     {{"parameterDefinitionFilePath"}, {"covarianceMatrixFilePath"} }, _parameterDefinitionFilePath_
   );
-  _covarianceMatrixTMatrixD_ = JsonUtils::fetchValue(_config_, "covarianceMatrixTMatrixD", _covarianceMatrixTMatrixD_);
-  _parameterPriorTVectorD_ = JsonUtils::fetchValue(_config_, "parameterPriorTVectorD", _parameterPriorTVectorD_);
-  _parameterNameTObjArray_ = JsonUtils::fetchValue(_config_, "parameterNameTObjArray", _parameterNameTObjArray_);
-  _parameterLowerBoundsTVectorD_ = JsonUtils::fetchValue(_config_, "parameterLowerBoundsTVectorD", _parameterLowerBoundsTVectorD_);
-  _parameterUpperBoundsTVectorD_ = JsonUtils::fetchValue(_config_, "parameterUpperBoundsTVectorD", _parameterUpperBoundsTVectorD_);
-  _throwEnabledListPath_ = JsonUtils::fetchValue(_config_, "throwEnabledList", _throwEnabledListPath_);
+  _covarianceMatrixTMatrixD_ = GenericToolbox::Json::fetchValue(_config_, "covarianceMatrixTMatrixD", _covarianceMatrixTMatrixD_);
+  _parameterPriorTVectorD_ = GenericToolbox::Json::fetchValue(_config_, "parameterPriorTVectorD", _parameterPriorTVectorD_);
+  _parameterNameTObjArray_ = GenericToolbox::Json::fetchValue(_config_, "parameterNameTObjArray", _parameterNameTObjArray_);
+  _parameterLowerBoundsTVectorD_ = GenericToolbox::Json::fetchValue(_config_, "parameterLowerBoundsTVectorD", _parameterLowerBoundsTVectorD_);
+  _parameterUpperBoundsTVectorD_ = GenericToolbox::Json::fetchValue(_config_, "parameterUpperBoundsTVectorD", _parameterUpperBoundsTVectorD_);
+  _throwEnabledListPath_ = GenericToolbox::Json::fetchValue(_config_, "throwEnabledList", _throwEnabledListPath_);
 
-  _parameterDefinitionConfig_ = JsonUtils::fetchValue(_config_, "parameterDefinitions", _parameterDefinitionConfig_);
-  _dialSetDefinitions_ = JsonUtils::fetchValue(_config_, "dialSetDefinitions", _dialSetDefinitions_);
+  _parameterDefinitionConfig_ = GenericToolbox::Json::fetchValue(_config_, "parameterDefinitions", _parameterDefinitionConfig_);
+  _dialSetDefinitions_ = GenericToolbox::Json::fetchValue(_config_, "dialSetDefinitions", _dialSetDefinitions_);
 
 
   // MISC / DEV
-  _useMarkGenerator_ = JsonUtils::fetchValue(_config_, "useMarkGenerator", _useMarkGenerator_);
-  _useEigenDecompForThrows_ = JsonUtils::fetchValue(_config_, "useEigenDecompForThrows", _useEigenDecompForThrows_);
-  _devUseParLimitsOnEigen_ = JsonUtils::fetchValue(_config_, "devUseParLimitsOnEigen", _devUseParLimitsOnEigen_);
+  _useMarkGenerator_ = GenericToolbox::Json::fetchValue(_config_, "useMarkGenerator", _useMarkGenerator_);
+  _useEigenDecompForThrows_ = GenericToolbox::Json::fetchValue(_config_, "useEigenDecompForThrows", _useEigenDecompForThrows_);
+  _devUseParLimitsOnEigen_ = GenericToolbox::Json::fetchValue(_config_, "devUseParLimitsOnEigen", _devUseParLimitsOnEigen_);
   if( _devUseParLimitsOnEigen_ ){
     LogAlert << "USING DEV OPTION: _devUseParLimitsOnEigen_ = true" << std::endl;
   }
@@ -91,10 +92,10 @@ void FitParameterSet::readConfigImpl(){
 
     if( not _dialSetDefinitions_.empty() ){
       for( auto& dialSetDef : _dialSetDefinitions_.get<std::vector<nlohmann::json>>() ){
-        if( JsonUtils::doKeyExist(dialSetDef, "parametersBinningPath") ){
+        if( GenericToolbox::Json::doKeyExist(dialSetDef, "parametersBinningPath") ){
           LogInfo << "Found parameter binning within dialSetDefinition. Defining parameters number..." << std::endl;
           DataBinSet b;
-          b.readBinningDefinition( JsonUtils::fetchValue<std::string>(dialSetDef, "parametersBinningPath") );
+          b.readBinningDefinition( GenericToolbox::Json::fetchValue<std::string>(dialSetDef, "parametersBinningPath") );
           _nbParameterDefinition_ = int(b.getBinsList().size());
           break;
         }
@@ -695,14 +696,14 @@ void FitParameterSet::defineParameters(){
 
     if( not _parameterDefinitionConfig_.empty() ){
       // Alternative 1: define dials then parameters
-      JsonUtils::forwardConfig(_parameterDefinitionConfig_);
+      ConfigUtils::forwardConfig(_parameterDefinitionConfig_);
       if (_parameterNamesList_) {
         // Find the parameter using the name from the vector of names for
         // the covariance.
-        auto parConfig = JsonUtils::fetchMatchingEntry(_parameterDefinitionConfig_, "parameterName", std::string(_parameterNamesList_->At(par.getParameterIndex())->GetName()));
+        auto parConfig = GenericToolbox::Json::fetchMatchingEntry(_parameterDefinitionConfig_, "parameterName", std::string(_parameterNamesList_->At(par.getParameterIndex())->GetName()));
         if( parConfig.empty() ){
             // try with par index
-          parConfig = JsonUtils::fetchMatchingEntry(_parameterDefinitionConfig_, "parameterIndex", par.getParameterIndex());
+          parConfig = GenericToolbox::Json::fetchMatchingEntry(_parameterDefinitionConfig_, "parameterIndex", par.getParameterIndex());
         }
         par.setParameterDefinitionConfig(parConfig);
       }
@@ -712,7 +713,7 @@ void FitParameterSet::defineParameters(){
         auto configVector = _parameterDefinitionConfig_.get<std::vector<nlohmann::json>>();
         LogThrowIf(configVector.size() <= par.getParameterIndex());
         auto parConfig = configVector.at(par.getParameterIndex());
-        auto parName = JsonUtils::fetchValue<std::string>(parConfig, "parameterName");
+        auto parName = GenericToolbox::Json::fetchValue<std::string>(parConfig, "parameterName");
         if (not parName.empty()) par.setName(parName);
         par.setParameterDefinitionConfig(parConfig);
         LogWarning << "Parameter #" << par.getParameterIndex()

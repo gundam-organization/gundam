@@ -2,13 +2,12 @@ set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GlobalVariables.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/DataBinSet.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/DataBin.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/JsonUtils.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/YamlUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamGreetings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/JsonBaseClass.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/VariableDictionary.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Misc.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ParameterThrowerMarkHarz.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ConfigUtils.cpp
     )
 
 set(HEADERS
@@ -20,14 +19,11 @@ set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GlobalVariables.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamGreetings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/JsonBaseClass.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/JsonUtils.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/JsonUtils.impl.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/Likelihoods.hh
     ${CMAKE_CURRENT_SOURCE_DIR}/include/VariableDictionary.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/YamlUtils.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/YamlUtils.impl.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/Misc.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ParameterThrowerMarkHarz.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ConfigUtils.h
     )
 
 

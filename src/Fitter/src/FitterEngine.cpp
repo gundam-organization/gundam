@@ -3,7 +3,7 @@
 //
 
 #include "FitterEngine.h"
-#include "JsonUtils.h"
+#include "GenericToolbox.Json.h"
 #include "GlobalVariables.h"
 #include "MinimizerInterface.h"
 #include "MCMCInterface.h"
@@ -35,34 +35,34 @@ void FitterEngine::readConfigImpl(){
   LogInfo << "Reading FitterEngine config..." << std::endl;
   GenericToolbox::setT2kPalette();
 
-  _enablePca_ = JsonUtils::fetchValue(_config_, std::vector<std::string>{"enablePca", "fixGhostFitParameters"}, _enablePca_);
-  _pcaDeltaChi2Threshold_ = JsonUtils::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, _pcaDeltaChi2Threshold_);
+  _enablePca_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"enablePca", "fixGhostFitParameters"}, _enablePca_);
+  _pcaDeltaChi2Threshold_ = GenericToolbox::Json::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, _pcaDeltaChi2Threshold_);
 
-  _enablePreFitScan_ = JsonUtils::fetchValue(_config_, "enablePreFitScan", _enablePreFitScan_);
-  _enablePostFitScan_ = JsonUtils::fetchValue(_config_, "enablePostFitScan", _enablePostFitScan_);
+  _enablePreFitScan_ = GenericToolbox::Json::fetchValue(_config_, "enablePreFitScan", _enablePreFitScan_);
+  _enablePostFitScan_ = GenericToolbox::Json::fetchValue(_config_, "enablePostFitScan", _enablePostFitScan_);
 
-  _generateSamplePlots_ = JsonUtils::fetchValue(_config_, "generateSamplePlots", _generateSamplePlots_);
-  _generateOneSigmaPlots_ = JsonUtils::fetchValue(_config_, "generateOneSigmaPlots", _generateOneSigmaPlots_);
-  _doAllParamVariations_ = JsonUtils::doKeyExist(_config_, "allParamVariations");
-  _allParamVariationsSigmas_ = JsonUtils::fetchValue(_config_, "allParamVariations", _allParamVariationsSigmas_);
+  _generateSamplePlots_ = GenericToolbox::Json::fetchValue(_config_, "generateSamplePlots", _generateSamplePlots_);
+  _generateOneSigmaPlots_ = GenericToolbox::Json::fetchValue(_config_, "generateOneSigmaPlots", _generateOneSigmaPlots_);
+  _doAllParamVariations_ = GenericToolbox::Json::doKeyExist(_config_, "allParamVariations");
+  _allParamVariationsSigmas_ = GenericToolbox::Json::fetchValue(_config_, "allParamVariations", _allParamVariationsSigmas_);
 
-  _scaleParStepWithChi2Response_ = JsonUtils::fetchValue(_config_, "scaleParStepWithChi2Response", _scaleParStepWithChi2Response_);
-  _parStepGain_ = JsonUtils::fetchValue(_config_, "parStepGain", _parStepGain_);
+  _scaleParStepWithChi2Response_ = GenericToolbox::Json::fetchValue(_config_, "scaleParStepWithChi2Response", _scaleParStepWithChi2Response_);
+  _parStepGain_ = GenericToolbox::Json::fetchValue(_config_, "parStepGain", _parStepGain_);
 
-  _throwMcBeforeFit_ = JsonUtils::fetchValue(_config_, "throwMcBeforeFit", _throwMcBeforeFit_);
-  _throwGain_ = JsonUtils::fetchValue(_config_, "throwMcBeforeFitGain", _throwGain_);
+  _throwMcBeforeFit_ = GenericToolbox::Json::fetchValue(_config_, "throwMcBeforeFit", _throwMcBeforeFit_);
+  _throwGain_ = GenericToolbox::Json::fetchValue(_config_, "throwMcBeforeFitGain", _throwGain_);
 
-  _propagator_.readConfig( JsonUtils::fetchValue<nlohmann::json>(_config_, "propagatorConfig") );
+  _propagator_.readConfig( GenericToolbox::Json::fetchValue<nlohmann::json>(_config_, "propagatorConfig") );
 
-  std::string engineType = JsonUtils::fetchValue(_config_,"engineType","minimizer");
+  std::string engineType = GenericToolbox::Json::fetchValue(_config_,"engineType","minimizer");
 
   if (engineType == "minimizer") {
       this->_minimizer_ = std::make_unique<MinimizerInterface>(this);
-      getMinimizer().readConfig( JsonUtils::fetchValue(_config_, "minimizerConfig", nlohmann::json()));
+      getMinimizer().readConfig( GenericToolbox::Json::fetchValue(_config_, "minimizerConfig", nlohmann::json()));
   }
   else if (engineType == "mcmc") {
       this->_minimizer_ = std::make_unique<MCMCInterface>(this);
-      getMinimizer().readConfig( JsonUtils::fetchValue(_config_, "mcmcConfig", nlohmann::json()));
+      getMinimizer().readConfig( GenericToolbox::Json::fetchValue(_config_, "mcmcConfig", nlohmann::json()));
   }
   else {
       LogWarning << "Allowed engine types: minimizer, mcmc" << std::endl;
@@ -71,14 +71,14 @@ void FitterEngine::readConfigImpl(){
 
 
   // legacy
-  JsonUtils::deprecatedAction(_config_, "scanConfig", [&]{
+  GenericToolbox::Json::deprecatedAction(_config_, "scanConfig", [&]{
     LogAlert << "Forwarding the option to Propagator. Consider moving it into \"propagatorConfig:\"" << std::endl;
-    _propagator_.getParScanner().readConfig( JsonUtils::fetchValue(_config_, "scanConfig", nlohmann::json()) );
+    _propagator_.getParScanner().readConfig( GenericToolbox::Json::fetchValue(_config_, "scanConfig", nlohmann::json()) );
   });
 
-  JsonUtils::deprecatedAction(_config_, "monitorRefreshRateInMs", [&]{
+  GenericToolbox::Json::deprecatedAction(_config_, "monitorRefreshRateInMs", [&]{
     LogAlert << "Forwarding the option to Propagator. Consider moving it into \"minimizerConfig:\"" << std::endl;
-    getLikelihood().getConvergenceMonitor().setMaxRefreshRateInMs(JsonUtils::fetchValue<int>(_config_, "monitorRefreshRateInMs"));
+    getLikelihood().getConvergenceMonitor().setMaxRefreshRateInMs(GenericToolbox::Json::fetchValue<int>(_config_, "monitorRefreshRateInMs"));
   });
 
   LogInfo << "Convergence monitor will be refreshed every " << _likelihood_.getConvergenceMonitor().getMaxRefreshRateInMs() << "ms." << std::endl;
@@ -259,19 +259,19 @@ void FitterEngine::fit(){
         LogWarning << "\"" << parSet.getName() << "\" has marked disabled throwMcBeforeFit: skipping." << std::endl;
         continue;
       }
-      if( JsonUtils::doKeyExist(parSet.getConfig(), "customFitParThrow") ){
+      if( GenericToolbox::Json::doKeyExist(parSet.getConfig(), "customFitParThrow") ){
 
         LogAlert << "Using custom mc parameter push for " << parSet.getName() << std::endl;
 
-        for(auto& entry : JsonUtils::fetchValue(parSet.getConfig(), "customFitParThrow", std::vector<nlohmann::json>())){
+        for(auto& entry : GenericToolbox::Json::fetchValue(parSet.getConfig(), "customFitParThrow", std::vector<nlohmann::json>())){
 
-          int parIndex = JsonUtils::fetchValue<int>(entry, "parIndex");
+          int parIndex = GenericToolbox::Json::fetchValue<int>(entry, "parIndex");
 
           auto& parList = parSet.getParameterList();
           double pushVal =
               parList[parIndex].getParameterValue()
               + parList[parIndex].getStdDevValue()
-                * JsonUtils::fetchValue<double>(entry, "nbSigmaAway");
+                * GenericToolbox::Json::fetchValue<double>(entry, "nbSigmaAway");
 
           LogWarning << "Pushing #" << parIndex << " to " << pushVal << std::endl;
           parList[parIndex].setParameterValue( pushVal );
@@ -385,7 +385,7 @@ void FitterEngine::fixGhostFitParameters(){
 
         if( std::abs(deltaChi2Stat) < _pcaDeltaChi2Threshold_ ){
           par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
-          ssPrint << " < " << JsonUtils::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, 1E-6) << " -> FIXED";
+          ssPrint << " < " << GenericToolbox::Json::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, 1E-6) << " -> FIXED";
           LogInfo.moveTerminalCursorBack(1);
 #ifndef NOCOLOR
           std::string red(GenericToolbox::ColorCodes::redBackground);
@@ -396,7 +396,7 @@ void FitterEngine::fixGhostFitParameters(){
 #endif
           LogInfo << red << ssPrint.str() << rst << std::endl;
 
-          if( parSet.isUseEigenDecompInFit() and JsonUtils::fetchValue(_config_, "fixGhostEigenParmetersAfterFirstRejected", false) ){
+          if( parSet.isUseEigenDecompInFit() and GenericToolbox::Json::fetchValue(_config_, "fixGhostEigenParmetersAfterFirstRejected", false) ){
             fixNextEigenPars = true;
           }
         }

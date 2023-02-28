@@ -1,7 +1,7 @@
 #include "MinimizerBase.h"
 #include "FitterEngine.h"
 
-#include "JsonUtils.h"
+#include "GenericToolbox.Json.h"
 #include "Logger.h"
 
 LoggerInit([]{
@@ -14,27 +14,27 @@ MinimizerBase::MinimizerBase(FitterEngine* owner_): _owner_(owner_){}
 void MinimizerBase::readConfigImpl(){
   LogInfo << "Reading MinimizerBase config..." << std::endl;
 
-  _enablePostFitErrorEval_ = JsonUtils::fetchValue(_config_, "enablePostFitErrorFit", _enablePostFitErrorEval_);
+  _enablePostFitErrorEval_ = GenericToolbox::Json::fetchValue(_config_, "enablePostFitErrorFit", _enablePostFitErrorEval_);
 
   bool useNormalizedFitSpace = getLikelihood().getUseNormalizedFitSpace();
-  useNormalizedFitSpace = JsonUtils::fetchValue(_config_, "useNormalizedFitSpace", useNormalizedFitSpace);
+  useNormalizedFitSpace = GenericToolbox::Json::fetchValue(_config_, "useNormalizedFitSpace", useNormalizedFitSpace);
   getLikelihood().setUseNormalizedFitSpace(useNormalizedFitSpace);
 
   bool showParametersOnFitMonitor = getLikelihood().getShowParametersOnFitMonitor();
-  showParametersOnFitMonitor = JsonUtils::fetchValue(_config_, "showParametersOnFitMonitor", showParametersOnFitMonitor);
+  showParametersOnFitMonitor = GenericToolbox::Json::fetchValue(_config_, "showParametersOnFitMonitor", showParametersOnFitMonitor);
   getLikelihood().setShowParametersOnFitMonitor(showParametersOnFitMonitor);
 
   bool maxNbParametersPerLineOnMonitor = getLikelihood().getMaxNbParametersPerLineOnMonitor();
-  maxNbParametersPerLineOnMonitor = JsonUtils::fetchValue(_config_, "maxNbParametersPerLineOnMonitor", maxNbParametersPerLineOnMonitor);
+  maxNbParametersPerLineOnMonitor = GenericToolbox::Json::fetchValue(_config_, "maxNbParametersPerLineOnMonitor", maxNbParametersPerLineOnMonitor);
   getLikelihood().setMaxNbParametersPerLineOnMonitor(maxNbParametersPerLineOnMonitor);
 
   if( GenericToolbox::getTerminalWidth() == 0 ){
     // batch mode
-    double monitorBashModeRefreshRateInS = JsonUtils::fetchValue(_config_, "monitorBashModeRefreshRateInS", 30.0);
+    double monitorBashModeRefreshRateInS = GenericToolbox::Json::fetchValue(_config_, "monitorBashModeRefreshRateInS", 30.0);
     getConvergenceMonitor().setMaxRefreshRateInMs(monitorBashModeRefreshRateInS * 1000.);
   }
   else{
-    int monitorRefreshRateInMs = JsonUtils::fetchValue(_config_, "monitorRefreshRateInMs", 5000);
+    int monitorRefreshRateInMs = GenericToolbox::Json::fetchValue(_config_, "monitorRefreshRateInMs", 5000);
     getConvergenceMonitor().setMaxRefreshRateInMs(monitorRefreshRateInMs);
   }
 

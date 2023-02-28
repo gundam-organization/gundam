@@ -5,7 +5,7 @@
 #include "LikelihoodInterface.h"
 #include "MinimizerInterface.h"
 #include "FitterEngine.h"
-#include "JsonUtils.h"
+#include "GenericToolbox.Json.h"
 #include "GlobalVariables.h"
 
 #include "GenericToolbox.h"
@@ -30,25 +30,25 @@ void MinimizerInterface::readConfigImpl(){
   MinimizerBase::readConfigImpl();
   LogInfo << "Reading minimizer config..." << std::endl;
 
-  _minimizerType_ = JsonUtils::fetchValue(_config_, "minimizer", _minimizerType_);
-  _minimizerAlgo_ = JsonUtils::fetchValue(_config_, "algorithm", _minimizerAlgo_);
+  _minimizerType_ = GenericToolbox::Json::fetchValue(_config_, "minimizer", _minimizerType_);
+  _minimizerAlgo_ = GenericToolbox::Json::fetchValue(_config_, "algorithm", _minimizerAlgo_);
 
-  _strategy_ = JsonUtils::fetchValue(_config_, "strategy", _strategy_);
-  _printLevel_ = JsonUtils::fetchValue(_config_, "print_level", _printLevel_);
-  _tolerance_ = JsonUtils::fetchValue(_config_, "tolerance", _tolerance_);
-  _maxIterations_ = JsonUtils::fetchValue(_config_, {{"maxIterations"}, {"max_iter"}}, _maxIterations_ );
-  _maxFcnCalls_ = JsonUtils::fetchValue(_config_, {{"maxFcnCalls"}, {"max_fcn"}}, _maxFcnCalls_ );
+  _strategy_ = GenericToolbox::Json::fetchValue(_config_, "strategy", _strategy_);
+  _printLevel_ = GenericToolbox::Json::fetchValue(_config_, "print_level", _printLevel_);
+  _tolerance_ = GenericToolbox::Json::fetchValue(_config_, "tolerance", _tolerance_);
+  _maxIterations_ = GenericToolbox::Json::fetchValue(_config_, {{"maxIterations"}, {"max_iter"}}, _maxIterations_ );
+  _maxFcnCalls_ = GenericToolbox::Json::fetchValue(_config_, {{"maxFcnCalls"}, {"max_fcn"}}, _maxFcnCalls_ );
 
-  _enableSimplexBeforeMinimize_ = JsonUtils::fetchValue(_config_, "enableSimplexBeforeMinimize", _enableSimplexBeforeMinimize_);
-  _simplexMaxFcnCalls_ = JsonUtils::fetchValue(_config_, "simplexMaxFcnCalls", _simplexMaxFcnCalls_);
-  _simplexToleranceLoose_ = JsonUtils::fetchValue(_config_, "simplexToleranceLoose", _simplexToleranceLoose_);
-  _simplexStrategy_ = JsonUtils::fetchValue(_config_, "simplexStrategy", _simplexStrategy_);
+  _enableSimplexBeforeMinimize_ = GenericToolbox::Json::fetchValue(_config_, "enableSimplexBeforeMinimize", _enableSimplexBeforeMinimize_);
+  _simplexMaxFcnCalls_ = GenericToolbox::Json::fetchValue(_config_, "simplexMaxFcnCalls", _simplexMaxFcnCalls_);
+  _simplexToleranceLoose_ = GenericToolbox::Json::fetchValue(_config_, "simplexToleranceLoose", _simplexToleranceLoose_);
+  _simplexStrategy_ = GenericToolbox::Json::fetchValue(_config_, "simplexStrategy", _simplexStrategy_);
 
-  _errorAlgo_ = JsonUtils::fetchValue(_config_, {{"errorsAlgo"}, {"errors"}}, "Hesse");
-  _restoreStepSizeBeforeHesse_ = JsonUtils::fetchValue(_config_, "restoreStepSizeBeforeHesse", _restoreStepSizeBeforeHesse_);
+  _errorAlgo_ = GenericToolbox::Json::fetchValue(_config_, {{"errorsAlgo"}, {"errors"}}, "Hesse");
+  _restoreStepSizeBeforeHesse_ = GenericToolbox::Json::fetchValue(_config_, "restoreStepSizeBeforeHesse", _restoreStepSizeBeforeHesse_);
 
-  _generatedPostFitParBreakdown_ = JsonUtils::fetchValue(_config_, "generatedPostFitParBreakdown", _generatedPostFitParBreakdown_);
-  _generatedPostFitEigenBreakdown_ = JsonUtils::fetchValue(_config_, "generatedPostFitEigenBreakdown", _generatedPostFitEigenBreakdown_);
+  _generatedPostFitParBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "generatedPostFitParBreakdown", _generatedPostFitParBreakdown_);
+  _generatedPostFitEigenBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "generatedPostFitEigenBreakdown", _generatedPostFitEigenBreakdown_);
 
 }
 void MinimizerInterface::initializeImpl(){

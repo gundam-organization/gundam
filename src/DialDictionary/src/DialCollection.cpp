@@ -5,7 +5,7 @@
 #include "DialCollection.h"
 #include "DialTypes.h"
 
-#include "JsonUtils.h"
+#include "GenericToolbox.Json.h"
 #include "Misc.h"
 
 #include "Logger.h"
@@ -22,7 +22,7 @@ DialCollection::DialCollection(std::vector<FitParameterSet> *targetParameterSetL
 
 void DialCollection::readConfigImpl() {
 
-  _dataSetNameList_ = JsonUtils::fetchValue<std::vector<std::string>>(
+  _dataSetNameList_ = GenericToolbox::Json::fetchValue<std::vector<std::string>>(
       _config_, "applyOnDataSets", std::vector<std::string>()
   );
   if( _dataSetNameList_.empty() ){ _dataSetNameList_.emplace_back("*"); }
@@ -270,7 +270,7 @@ bool DialCollection::useCachedDials() const{
 
 bool DialCollection::initializeNormDialsWithParBinning() {
 
-  auto parameterBinningPath = JsonUtils::fetchValue<std::string>(_config_, "parametersBinningPath", "");
+  auto parameterBinningPath = GenericToolbox::Json::fetchValue<std::string>(_config_, "parametersBinningPath", "");
   if( parameterBinningPath.empty() ){ return false; }
 
   // Get global parameters from the main config
@@ -285,8 +285,8 @@ bool DialCollection::initializeNormDialsWithParBinning() {
 
   // By default use min dial response for norm dials
   _dialResponseSupervisorList_.resize( 1 );
-  _dialResponseSupervisorList_[0].setMinResponse( JsonUtils::fetchValue(_config_, {{"minDialResponse"}, {"minimumSplineResponse"}}, 0) );
-  _dialResponseSupervisorList_[0].setMaxResponse( JsonUtils::fetchValue(_config_, "maxDialResponse", _maxDialResponse_) );
+  _dialResponseSupervisorList_[0].setMinResponse( GenericToolbox::Json::fetchValue(_config_, {{"minDialResponse"}, {"minimumSplineResponse"}}, 0) );
+  _dialResponseSupervisorList_[0].setMaxResponse( GenericToolbox::Json::fetchValue(_config_, "maxDialResponse", _maxDialResponse_) );
 
   _dialBaseList_.reserve( _dialBinSet_.getBinsList().size() );
   for(const auto & bin : _dialBinSet_.getBinsList()){
@@ -298,13 +298,13 @@ bool DialCollection::initializeNormDialsWithParBinning() {
 bool DialCollection::initializeDialsWithDefinition() {
 
   nlohmann::json dialsDefinition = _config_;
-  if( JsonUtils::doKeyExist(dialsDefinition, "dialsDefinitions") ){
+  if( GenericToolbox::Json::doKeyExist(dialsDefinition, "dialsDefinitions") ){
     // Fetch the dialSet corresponding to the selected parameter
-    dialsDefinition = this->fetchDialsDefinition(JsonUtils::fetchValue<nlohmann::json>(_config_, "dialsDefinitions"));
+    dialsDefinition = this->fetchDialsDefinition(GenericToolbox::Json::fetchValue<nlohmann::json>(_config_, "dialsDefinitions"));
   }
   if( dialsDefinition.empty() ){ return false; }
 
-  if( not JsonUtils::fetchValue<bool>(dialsDefinition, "isEnabled", true) ){
+  if( not GenericToolbox::Json::fetchValue<bool>(dialsDefinition, "isEnabled", true) ){
     LogDebug << "DialSet is disabled." << std::endl;
     return true;
   }
@@ -316,33 +316,33 @@ bool DialCollection::initializeDialsWithDefinition() {
   }
   else{
 
-    if ( JsonUtils::doKeyExist(dialsDefinition, "dialSubType") ) {
-      _globalDialSubType_ =  JsonUtils::fetchValue<std::string>(dialsDefinition, "dialSubType");
+    if ( GenericToolbox::Json::doKeyExist(dialsDefinition, "dialSubType") ) {
+      _globalDialSubType_ =  GenericToolbox::Json::fetchValue<std::string>(dialsDefinition, "dialSubType");
     }
 
-    if     ( JsonUtils::doKeyExist(dialsDefinition, "dialLeafName") ){
-      _globalDialLeafName_ = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialLeafName");
+    if     ( GenericToolbox::Json::doKeyExist(dialsDefinition, "dialLeafName") ){
+      _globalDialLeafName_ = GenericToolbox::Json::fetchValue<std::string>(dialsDefinition, "dialLeafName");
       _isBinned_ = false;
     }
-    else if( JsonUtils::doKeyExist(dialsDefinition, "binningFilePath") ){
+    else if( GenericToolbox::Json::doKeyExist(dialsDefinition, "binningFilePath") ){
 
-      auto binningFilePath = JsonUtils::fetchValue<std::string>(dialsDefinition, "binningFilePath");
+      auto binningFilePath = GenericToolbox::Json::fetchValue<std::string>(dialsDefinition, "binningFilePath");
 
       _dialBinSet_ = DataBinSet();
       _dialBinSet_.setName(binningFilePath);
       _dialBinSet_.readBinningDefinition(binningFilePath);
 
-      auto filePath = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsFilePath");
+      auto filePath = GenericToolbox::Json::fetchValue<std::string>(dialsDefinition, "dialsFilePath");
       LogThrowIf(not GenericToolbox::doesTFileIsValid(filePath), "Could not open: " << filePath)
       TFile* dialsTFile = TFile::Open(filePath.c_str());
       LogThrowIf(dialsTFile==nullptr, "Could not open: " << filePath)
 
-      if      ( JsonUtils::doKeyExist(dialsDefinition, "dialsList") ) {
-        auto* dialsList = dialsTFile->Get<TObjArray>(JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsList").c_str());
+      if      ( GenericToolbox::Json::doKeyExist(dialsDefinition, "dialsList") ) {
+        auto* dialsList = dialsTFile->Get<TObjArray>(GenericToolbox::Json::fetchValue<std::string>(dialsDefinition, "dialsList").c_str());
 
         LogThrowIf(
             dialsList==nullptr,
-            "Could not find dialsList: " << JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsList")
+            "Could not find dialsList: " << GenericToolbox::Json::fetchValue<std::string>(dialsDefinition, "dialsList")
         );
         LogThrowIf(
             dialsList->GetEntries() != _dialBinSet_.getBinsList().size(),
@@ -438,9 +438,9 @@ bool DialCollection::initializeDialsWithDefinition() {
         dialsTFile->Close();
 
       }
-      else if ( JsonUtils::doKeyExist(dialsDefinition, "dialsTreePath") ) {
+      else if ( GenericToolbox::Json::doKeyExist(dialsDefinition, "dialsTreePath") ) {
         // OLD
-        auto objPath = JsonUtils::fetchValue<std::string>(dialsDefinition, "dialsTreePath");
+        auto objPath = GenericToolbox::Json::fetchValue<std::string>(dialsDefinition, "dialsTreePath");
         auto* dialsTTree = (TTree*) dialsTFile->Get(objPath.c_str());
         LogThrowIf(dialsTTree== nullptr, objPath << " within " << filePath << " could not be opened.")
 
@@ -522,30 +522,30 @@ bool DialCollection::initializeDialsWithDefinition() {
 
   _dialResponseSupervisorList_.emplace_back();
   _dialResponseSupervisorList_.back().setMinResponse(
-      JsonUtils::fetchValue(_config_, {{"minDialResponse"}, {"minimumSplineResponse"}}, 0)
+      GenericToolbox::Json::fetchValue(_config_, {{"minDialResponse"}, {"minimumSplineResponse"}}, 0)
   );
   _dialResponseSupervisorList_.back().setMaxResponse(
-      JsonUtils::fetchValue(_config_, "maxDialResponse", _maxDialResponse_)
+      GenericToolbox::Json::fetchValue(_config_, "maxDialResponse", _maxDialResponse_)
   );
 
   return true;
 }
 void DialCollection::readGlobals(const nlohmann::json &config_) {
   // globals for the dialSet
-  _enableDialsSummary_ = JsonUtils::fetchValue<bool>(_config_, "printDialsSummary", _enableDialsSummary_);
+  _enableDialsSummary_ = GenericToolbox::Json::fetchValue<bool>(_config_, "printDialsSummary", _enableDialsSummary_);
 
-  _globalDialType_ = JsonUtils::fetchValue(config_, "dialsType", "");
+  _globalDialType_ = GenericToolbox::Json::fetchValue(config_, "dialsType", "");
 
-  if (JsonUtils::doKeyExist(config_, "applyCondition")) {
-    _applyConditionStr_ = JsonUtils::fetchValue<std::string>(config_, "applyCondition");
-  } else if (JsonUtils::doKeyExist(config_, "applyConditions")) {
+  if (GenericToolbox::Json::doKeyExist(config_, "applyCondition")) {
+    _applyConditionStr_ = GenericToolbox::Json::fetchValue<std::string>(config_, "applyCondition");
+  } else if (GenericToolbox::Json::doKeyExist(config_, "applyConditions")) {
     std::vector<std::string> conditionsList;
 
-    for (auto &condEntry: JsonUtils::fetchValue<std::vector<nlohmann::json>>(config_, "applyConditions")) {
+    for (auto &condEntry: GenericToolbox::Json::fetchValue<std::vector<nlohmann::json>>(config_, "applyConditions")) {
       if (condEntry.is_string()) {
         conditionsList.emplace_back(condEntry.get<std::string>());
       } else if (condEntry.is_structured()) {
-        auto expression = JsonUtils::fetchValue<std::string>(condEntry, {{"exp"},
+        auto expression = GenericToolbox::Json::fetchValue<std::string>(condEntry, {{"exp"},
                                                                          {"expression"},
                                                                          {"var"},
                                                                          {"variable"}});
@@ -553,7 +553,7 @@ void DialCollection::readGlobals(const nlohmann::json &config_) {
 
         // allowedRanges
         {
-          auto allowedRanges = JsonUtils::fetchValue(condEntry, "allowedRanges",
+          auto allowedRanges = GenericToolbox::Json::fetchValue(condEntry, "allowedRanges",
                                                      std::vector<std::pair<double, double>>());
           if (not allowedRanges.empty()) {
             std::vector<std::string> allowedRangesCond;
@@ -571,7 +571,7 @@ void DialCollection::readGlobals(const nlohmann::json &config_) {
 
         // allowedValues
         {
-          auto allowedValues = JsonUtils::fetchValue(condEntry, "allowedValues", std::vector<double>());
+          auto allowedValues = GenericToolbox::Json::fetchValue(condEntry, "allowedValues", std::vector<double>());
           if (not allowedValues.empty()) {
             std::vector<std::string> allowedValuesCond;
             for (auto &allowedValue: allowedValues) {
@@ -584,9 +584,9 @@ void DialCollection::readGlobals(const nlohmann::json &config_) {
           }
         }
 
-        auto excludedRanges = JsonUtils::fetchValue(condEntry, "excludedRanges",
+        auto excludedRanges = GenericToolbox::Json::fetchValue(condEntry, "excludedRanges",
                                                     std::vector<std::pair<double, double>>());
-        auto excludedValues = JsonUtils::fetchValue(condEntry, "excludedValues", std::vector<double>());
+        auto excludedValues = GenericToolbox::Json::fetchValue(condEntry, "excludedValues", std::vector<double>());
         if (not excludedRanges.empty() or not excludedValues.empty()) {
           if (not ssCondEntry.str().empty()) {
             // exclusion ranges are linked with &&: they are supposed to prevail
@@ -644,19 +644,19 @@ void DialCollection::readGlobals(const nlohmann::json &config_) {
                "\"" << _applyConditionStr_ << "\": could not be parsed as formula expression.")
   }
 
-  _minDialResponse_ = JsonUtils::fetchValue(config_, {{"minDialResponse"},
+  _minDialResponse_ = GenericToolbox::Json::fetchValue(config_, {{"minDialResponse"},
                                                       {"minimumSplineResponse"}}, _minDialResponse_);
-  _maxDialResponse_ = JsonUtils::fetchValue(config_, "maxDialResponse", _maxDialResponse_);
+  _maxDialResponse_ = GenericToolbox::Json::fetchValue(config_, "maxDialResponse", _maxDialResponse_);
 
-  _useMirrorDial_ = JsonUtils::fetchValue(config_, "useMirrorDial", _useMirrorDial_);
+  _useMirrorDial_ = GenericToolbox::Json::fetchValue(config_, "useMirrorDial", _useMirrorDial_);
   if (_useMirrorDial_) {
-    _mirrorLowEdge_ = JsonUtils::fetchValue(config_, "mirrorLowEdge", _mirrorLowEdge_);
-    _mirrorHighEdge_ = JsonUtils::fetchValue(config_, "mirrorHighEdge", _mirrorHighEdge_);
+    _mirrorLowEdge_ = GenericToolbox::Json::fetchValue(config_, "mirrorLowEdge", _mirrorLowEdge_);
+    _mirrorHighEdge_ = GenericToolbox::Json::fetchValue(config_, "mirrorHighEdge", _mirrorHighEdge_);
     _mirrorRange_ = _mirrorHighEdge_ - _mirrorLowEdge_;
     LogThrowIf(_mirrorRange_ < 0, GET_VAR_NAME_VALUE(_mirrorHighEdge_) << " < " << GET_VAR_NAME_VALUE(_mirrorLowEdge_))
   }
 
-  _allowDialExtrapolation_ = JsonUtils::fetchValue(config_, "allowDialExtrapolation", _allowDialExtrapolation_);
+  _allowDialExtrapolation_ = GenericToolbox::Json::fetchValue(config_, "allowDialExtrapolation", _allowDialExtrapolation_);
 }
 nlohmann::json DialCollection::fetchDialsDefinition(const nlohmann::json &definitionsList_) {
   LogThrowIf(_supervisedParameterIndex_==-1, "Can't fetch dial definition of parameter: par ref not set.");
@@ -667,7 +667,7 @@ nlohmann::json DialCollection::fetchDialsDefinition(const nlohmann::json &defini
         return definitionsList_.at(iDial);
       }
     }
-    else if( par->getName() == JsonUtils::fetchValue<std::string>(definitionsList_.at(iDial), "parameterName", "") ){
+    else if( par->getName() == GenericToolbox::Json::fetchValue<std::string>(definitionsList_.at(iDial), "parameterName", "") ){
       return definitionsList_.at(iDial);
     }
   }

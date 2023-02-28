@@ -7,7 +7,7 @@
 
 #include "Dial.h"
 
-#include "JsonUtils.h"
+#include "GenericToolbox.Json.h"
 
 #include "nlohmann/json.hpp"
 #include "TFormula.h"

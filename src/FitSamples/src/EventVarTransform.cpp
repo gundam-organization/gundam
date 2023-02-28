@@ -3,7 +3,7 @@
 //
 
 #include "EventVarTransform.h"
-#include "JsonUtils.h"
+#include "GenericToolbox.Json.h"
 
 #include "GenericToolbox.h"
 #include "Logger.h"
@@ -15,10 +15,10 @@ LoggerInit([]{
 });
 
 void EventVarTransform::readConfigImpl(){
-  _title_ = JsonUtils::fetchValue(_config_, "title", _title_);
-  _messageOnError_ = JsonUtils::fetchValue(_config_, "messageOnError", _messageOnError_);
-  _outputVariableName_ = JsonUtils::fetchValue(_config_, "outputVariableName", _outputVariableName_);
-  _inputFormulaStrList_ = JsonUtils::fetchValue(_config_, "inputList", _inputFormulaStrList_);
+  _title_ = GenericToolbox::Json::fetchValue(_config_, "title", _title_);
+  _messageOnError_ = GenericToolbox::Json::fetchValue(_config_, "messageOnError", _messageOnError_);
+  _outputVariableName_ = GenericToolbox::Json::fetchValue(_config_, "outputVariableName", _outputVariableName_);
+  _inputFormulaStrList_ = GenericToolbox::Json::fetchValue(_config_, "inputList", _inputFormulaStrList_);
 }
 void EventVarTransform::initializeImpl(){
   LogInfo << "Loading variable transformation: " << _title_ << std::endl;
