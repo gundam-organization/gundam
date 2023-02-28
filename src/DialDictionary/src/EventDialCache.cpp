@@ -114,6 +114,7 @@ void EventDialCache::reweightEntry(std::pair<PhysicsEvent*, std::vector<DialInte
 void EventDialCache::reweightEntry(std::pair<PhysicsEvent*, std::vector<std::pair<DialInterface*, double>>>& entry_){
   entry_.first->resetEventWeight();
   std::for_each(entry_.second.begin(), entry_.second.end(), [&](std::pair<DialInterface*, double>& dial_){
+    if( dial_.first->getInputBufferRef()->isMasked() ){ return ; }
     if( std::isnan(dial_.second) or dial_.first->getInputBufferRef()->isDialUpdateRequested() ){
       dial_.second = dial_.first->evalResponse();
     }

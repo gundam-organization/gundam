@@ -3,12 +3,13 @@
 //
 
 #include "GundamGreetings.h"
-#include "JsonUtils.h"
+#include "ConfigUtils.h"
 
 #include "CmdLineParser.h"
 #include "Logger.h"
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
+#include "GenericToolbox.Json.h"
 
 #include "nlohmann/json.hpp"
 
@@ -65,31 +66,31 @@ int main( int argc, char** argv ){
   LogThrowIf(not GenericToolbox::doesPathIsFile(configPath2), configPath2 << " not found.");
 
   nlohmann::json config1;
-  if     ( clp.isOptionTriggered("config-1") ){ config1 = JsonUtils::readConfigFile(configPath1); }
+  if     ( clp.isOptionTriggered("config-1") ){ config1 = ConfigUtils::readConfigFile(configPath1); }
   else if( clp.isOptionTriggered("file-1") ){
     LogThrowIf(not GenericToolbox::doesTFileIsValid(configPath1, {"gundamFitter/unfoldedConfig_TNamed"}),
                "Could not find config in file " << configPath1
     );
     auto* f = TFile::Open(configPath1.c_str());
     auto* conf = f->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed");
-    config1 = JsonUtils::readConfigJsonStr(conf->GetTitle());
+    config1 = GenericToolbox::Json::readConfigJsonStr(conf->GetTitle());
     delete f;
   }
 
   nlohmann::json config2;
-  if     ( clp.isOptionTriggered("config-2") ){ config2 = JsonUtils::readConfigFile(configPath2); }
+  if     ( clp.isOptionTriggered("config-2") ){ config2 = ConfigUtils::readConfigFile(configPath2); }
   else if( clp.isOptionTriggered("file-2") ){
     LogThrowIf(not GenericToolbox::doesTFileIsValid(configPath2, {"gundamFitter/unfoldedConfig_TNamed"}),
                "Could not find config in file " << configPath2
     );
     auto* f = TFile::Open(configPath2.c_str());
     auto* conf = f->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed");
-    config2 = JsonUtils::readConfigJsonStr(conf->GetTitle());
+    config2 = GenericToolbox::Json::readConfigJsonStr(conf->GetTitle());
     delete f;
   }
 
-  JsonUtils::unfoldConfig(config1);
-  JsonUtils::unfoldConfig(config2);
+  ConfigUtils::unfoldConfig(config1);
+  ConfigUtils::unfoldConfig(config2);
 
   compareConfigStage(config1, config2);
 
@@ -117,24 +118,24 @@ void compareConfigStage(const nlohmann::json& subConfig1, const nlohmann::json& 
 
   }
   else if( subConfig1.is_structured() and subConfig2.is_structured() ){
-    std::vector<std::string> keysToFetch{JsonUtils::ls(subConfig1)};
-    for( auto& key2 : JsonUtils::ls(subConfig2) ){
+    std::vector<std::string> keysToFetch{GenericToolbox::Json::ls(subConfig1)};
+    for( auto& key2 : GenericToolbox::Json::ls(subConfig2) ){
       if( not GenericToolbox::doesElementIsInVector(key2, keysToFetch) ){ keysToFetch.emplace_back(key2); }
     }
 
     for( auto& key : keysToFetch ){
-      if     ( not JsonUtils::doKeyExist(subConfig1, key) ){
+      if     ( not GenericToolbox::Json::doKeyExist(subConfig1, key) ){
         LogError << path <<  " -> missing key \"" << key << "\" in c1." << std::endl;
         continue;
       }
-      else if( not JsonUtils::doKeyExist(subConfig2, key ) ){
+      else if( not GenericToolbox::Json::doKeyExist(subConfig2, key ) ){
         LogError << path << " -> missing key \"" << key << "\" in c2." << std::endl;
         continue;
       }
 
       // both have the key:
-      auto content1 = JsonUtils::fetchValue<nlohmann::json>(subConfig1, key);
-      auto content2 = JsonUtils::fetchValue<nlohmann::json>(subConfig2, key);
+      auto content1 = GenericToolbox::Json::fetchValue<nlohmann::json>(subConfig1, key);
+      auto content2 = GenericToolbox::Json::fetchValue<nlohmann::json>(subConfig2, key);
 
       __pathBuffer__.emplace_back(key);
       compareConfigStage(content1, content2);

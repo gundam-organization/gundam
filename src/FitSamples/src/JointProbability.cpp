@@ -6,7 +6,7 @@
 
 #include "Logger.h"
 #include "GenericToolbox.h"
-#include "JsonUtils.h"
+#include "GenericToolbox.Json.h"
 
 #include "TMath.h"
 
@@ -19,8 +19,8 @@ namespace JointProbability{
 
   // JointProbabilityPlugin
   void JointProbabilityPlugin::readConfigImpl() {
-    llhPluginSrc = JsonUtils::fetchValue<std::string>(_config_, "llhPluginSrc");
-    llhSharedLib = JsonUtils::fetchValue<std::string>(_config_, "llhSharedLib");
+    llhPluginSrc = GenericToolbox::Json::fetchValue<std::string>(_config_, "llhPluginSrc");
+    llhSharedLib = GenericToolbox::Json::fetchValue<std::string>(_config_, "llhSharedLib");
   }
   void JointProbabilityPlugin::initializeImpl(){
     if( not llhSharedLib.empty() ) this->load();
@@ -55,8 +55,8 @@ namespace JointProbability{
 
   // BarlowLLH_BANFF_OA2021
   void BarlowLLH_BANFF_OA2021::readConfigImpl(){
-    usePoissonLikelihood = JsonUtils::fetchValue(_config_, "usePoissonLikelihood", usePoissonLikelihood);
-    BBNoUpdateWeights = JsonUtils::fetchValue(_config_, "BBNoUpdateWeights", BBNoUpdateWeights);
+    usePoissonLikelihood = GenericToolbox::Json::fetchValue(_config_, "usePoissonLikelihood", usePoissonLikelihood);
+    BBNoUpdateWeights = GenericToolbox::Json::fetchValue(_config_, "BBNoUpdateWeights", BBNoUpdateWeights);
 
     LogInfo << "Using BarlowLLH_BANFF_OA2021 parameters:" << std::endl;
     LogInfo << GET_VAR_NAME_VALUE(usePoissonLikelihood) << std::endl;
@@ -288,7 +288,7 @@ namespace JointProbability{
   // LeastSquaresLLH
   void LeastSquaresLLH::readConfigImpl(){
     LogWarning << "Using LeastSquaresLLH: NOT A REAL LIKELIHOOD" << std::endl;
-    lsqPoissonianApproximation = JsonUtils::fetchValue(_config_, "lsqPoissonianApproximation", lsqPoissonianApproximation);
+    lsqPoissonianApproximation = GenericToolbox::Json::fetchValue(_config_, "lsqPoissonianApproximation", lsqPoissonianApproximation);
     LogWarning << "Using Least Squares Poissonian Approximation" << std::endl;
   }
   double LeastSquaresLLH::eval(const FitSample& sample_, int bin_){

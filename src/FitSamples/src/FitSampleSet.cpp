@@ -4,7 +4,7 @@
 
 
 
-#include "JsonUtils.h"
+#include "GenericToolbox.Json.h"
 #include "GlobalVariables.h"
 #include "FitSampleSet.h"
 
@@ -25,9 +25,9 @@ void FitSampleSet::readConfigImpl(){
   LogThrowIf(_config_.empty(), "_config_ is not set." << std::endl);
 
   LogInfo << "Reading samples definition..." << std::endl;
-  auto fitSampleListConfig = JsonUtils::fetchValue(_config_, "fitSampleList", nlohmann::json());
+  auto fitSampleListConfig = GenericToolbox::Json::fetchValue(_config_, "fitSampleList", nlohmann::json());
   for( const auto& fitSampleConfig: fitSampleListConfig ){
-    if( not JsonUtils::fetchValue(fitSampleConfig, "isEnabled", true) ) continue;
+    if( not GenericToolbox::Json::fetchValue(fitSampleConfig, "isEnabled", true) ) continue;
     _fitSampleList_.emplace_back();
     _fitSampleList_.back().setIndex(int(_fitSampleList_.size())-1);
     _fitSampleList_.back().setConfig(fitSampleConfig);
@@ -36,11 +36,11 @@ void FitSampleSet::readConfigImpl(){
 
   // To be moved elsewhere -> nothing to do in sample... -> this should belong to the fitter engine
   std::string llhMethod = "PoissonLLH";
-  llhMethod = JsonUtils::fetchValue(_config_, "llhStatFunction", llhMethod);
+  llhMethod = GenericToolbox::Json::fetchValue(_config_, "llhStatFunction", llhMethod);
 
   // new config structure
-  auto configJointProbability = JsonUtils::fetchValue(_config_, {{"jointProbability"}, {"llhConfig"}}, nlohmann::json());
-  llhMethod = JsonUtils::fetchValue(configJointProbability, "type", llhMethod);
+  auto configJointProbability = GenericToolbox::Json::fetchValue(_config_, {{"jointProbability"}, {"llhConfig"}}, nlohmann::json());
+  llhMethod = GenericToolbox::Json::fetchValue(configJointProbability, "type", llhMethod);
 
   LogInfo << "Using \"" << llhMethod << "\" LLH function." << std::endl;
   if     ( llhMethod == "Chi2" ){                    _jointProbabilityPtr_ = std::make_shared<JointProbability::Chi2>(); }
