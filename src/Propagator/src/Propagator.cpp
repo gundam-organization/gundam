@@ -401,11 +401,15 @@ void Propagator::initializeImpl() {
       stageTitles.emplace_back("Sample");
       stageTitles.emplace_back("No reweight");
       for( auto& parSet : _parameterSetList_ ){
+        if( not parSet.isEnabled() ){ continue; }
         stageTitles.emplace_back("+ " + parSet.getName());
       }
 
       int iStage{0};
-      for( auto& parSet : _parameterSetList_ ){ parSet.setMaskedForPropagation(true); }
+      for( auto& parSet : _parameterSetList_ ){
+        if( not parSet.isEnabled() ){ continue; }
+        parSet.setMaskedForPropagation(true);
+      }
       this->resetReweight();
       this->reweightMcEvents();
       for( size_t iSample = 0 ; iSample < _fitSampleSet_.getFitSampleList().size() ; iSample++ ){
@@ -413,6 +417,7 @@ void Propagator::initializeImpl() {
       }
 
       for( auto& parSet : _parameterSetList_ ){
+        if( not parSet.isEnabled() ){ continue; }
         parSet.setMaskedForPropagation(false);
         this->resetReweight();
         this->reweightMcEvents();
