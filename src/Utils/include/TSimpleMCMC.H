@@ -195,6 +195,7 @@ public:
             fTree->Branch("LogLikelihood",&fAcceptedLogLikelihood);
             fTree->Branch("TotalSteps", &fTotalSteps);
             fTree->Branch("Accepted",&fAccepted);
+            fTree->Branch("StepRMS",&fStepRMS);
             if (saveStep) {
                 MCMC_DEBUG(0) << "TSimpleMCMC: Saving the trial steps."
                               << std::endl;
@@ -204,6 +205,9 @@ public:
         fLogLikelihoodCount = 0;
         fTotalSteps = 0;
         fProposeStep.AttachState(fTree);
+        fStepRMS = 0.0;
+        fStepRMSTrials = 0;
+        fStepRMSWindow = 1000;
     }
 
     /// Get a reference to the object that will propose the step.  The
@@ -258,14 +262,18 @@ public:
         Vector getAccepted;
         Vector* addrAccepted = &getAccepted;
 
-        /// A place to get the likelihood at the last accepted pont.
+        /// A place to get the likelihood at the last accepted point.
         double getAcceptedLogLikelihood;
+
+        /// A place to get the step rms at the last accepted point
+        double getStepRMS;
 
         MCMC_DEBUG(0) << "Restore the state" << std::endl;
 
         tree->SetBranchAddress("LogLikelihood",&getAcceptedLogLikelihood);
         tree->SetBranchAddress("TotalSteps", &getTotalSteps);
         tree->SetBranchAddress("Accepted",&addrAccepted);
+        tree->SetBranchAddress("StepRMS",&getStepRMS);
 
         fTotalSteps = -1;
         fAcceptedLogLikelihood = 0;
@@ -284,6 +292,7 @@ public:
 
             fTotalSteps = getTotalSteps;
             fAcceptedLogLikelihood = getAcceptedLogLikelihood;
+            fStepRMS = getStepRMS;
             fAccepted.resize(getAccepted.size());
             std::copy(getAccepted.begin(), getAccepted.end(),
                       fAccepted.begin());
@@ -341,10 +350,22 @@ public:
 
         fProposeStep(fProposed,fAccepted,fAcceptedLogLikelihood);
 
-        // Only cache the trial step when tree is being saved.
-        if (save) {
+        // Only cache the trial step when it's being saved in the tree, or the
+        // step RMS is being calculated.
+        if (save || fStepRMSWindow > 0) {
+            double sqr = 0.0;
             for (std::size_t i = 0; i < fProposed.size(); ++i) {
                 fTrialStep[i] = fProposed[i] - fAccepted[i];
+                sqr += fTrialStep[i] * fTrialStep[i];
+            }
+            if (fStepRMSWindow > 0) {
+                // Update the step RMS over the last "fStepRMSWindow" trials.
+                double ms = fStepRMS*fStepRMS;
+                ms *= fStepRMSTrials;
+                ms += sqr;
+                ms /= fStepRMSTrials + 1.0;
+                fStepRMSTrials = std::min(fStepRMSWindow,fStepRMSTrials+1);
+                fStepRMS = std::sqrt(ms);
             }
         }
 
@@ -437,6 +458,12 @@ public:
     /// Get the likelihood at the most recently proposed point.
     double GetProposedLogLikelihood() const {return fProposedLogLikelihood;}
 
+    /// Get the recent step length RMS.
+    double GetStepRMS() const { return fStepRMS;}
+
+    /// Set the number of trials to use when calculating the step RMS.
+    void SetStepRMSWindow(int n) {fStepRMSWindow = n;}
+
     /// Get the most recently proposed point.
     const Vector& GetProposed() const {return fProposed;}
 
@@ -491,6 +518,16 @@ protected:
     /// The proposed point for the most recent step (This may be the same as
     /// the accepted point).
     Vector fProposed;
+
+    /// The RMS of the proposed step length.  This will be averaged over
+    /// recent steps.
+    double fStepRMS;
+
+    /// The number of trials currently used to estimate the step length RMS
+    int fStepRMSTrials;
+
+    /// The maximum number of trials to be used to estimiate the step length RMS
+    int fStepRMSWindow;
 
     /// The likelihood at the last proposed point.
     double fProposedLogLikelihood;
@@ -547,9 +584,10 @@ struct TProposeSimpleStep {
 class TProposeAdaptiveStep {
 public:
     TProposeAdaptiveStep() :
-        fLastValue(0.0), fCovarianceWindow(-1),
+        fLastValue(0.0),
+        fCovarianceTrials(0.0), fCovarianceDeweight(0.5), fCovarianceWindow(-1),
         fTrials(0), fSuccesses(0), fNextUpdate(-1),
-        fAcceptance(0.0), fAcceptanceTrials(0),
+        fAcceptance(0.0), fAcceptanceTrials(0), fAcceptanceDeweight(0.5),
         fAcceptanceWindow(-1), fAcceptanceRigidity(2.0),
         fTargetAcceptance(-1), fSigma(0.0), fStateInitialized(false),
         fScanDimension(-1) {
@@ -743,6 +781,18 @@ public:
     void SetCovarianceWindow(int w) {fCovarianceWindow = w;}
     double GetCovarianceWindow() const {return fCovarianceWindow;}
 
+    /// Set the amount that the old covariance should be deweighted when there
+    /// is an update.  This lets the new information have more effect on the
+    /// covariance, and is mostly useful during burn-in.  After burn-in is
+    /// finished the deweighing can (should?) be set to zero.
+    ///
+    /// The deweighting should be between 0.0 and 1.0.  A zero (0.0)
+    /// deweighting means that the existing covariance is directly used in the
+    /// average.  A deweighting of one (1.0) means that the existing
+    /// covariance is NOT used in the running average.  Larger deweighting
+    /// means that the newly accepted points will have more effect.
+    void SetCovarianceUpdateDeweighting(double d) {fCovarianceDeweight = d;}
+
     /// Get the number of trials used to calculate the covariance.
     double GetCovarianceTrials() const {return fCovarianceTrials;}
 
@@ -770,6 +820,10 @@ public:
     /// acceptance.
     void SetAcceptanceWindow(double a) {fAcceptanceWindow = a;}
     double GetAcceptanceWindow() const {return fAcceptanceWindow;}
+
+    /// Set the amount that the old covariance should be deweighted when there
+    /// is an update.  See SetCovarianceUpdateDeweighting for more details.
+    void SetAcceptanceUpdateDeweighting(double d) {fAcceptanceDeweight = d;}
 
     /// Set (get) the number of trials until the next proposal update.  This
     /// grows with each successfull update, but can be overridden by this
@@ -833,8 +887,12 @@ public:
 
         // The proposal is being updated, so deweight the current covariance
         // so that the new information weighs more.
-        fCovarianceTrials = std::max(1000.0,0.1*fCovarianceTrials);
-        fCovarianceTrials = std::min(fCovarianceTrials,0.1*fCovarianceWindow);
+        if (fCovarianceDeweight > 0.0) {
+            if (fCovarianceDeweight > 1.0) fCovarianceDeweight = 1.0;
+            double w = 1.0 - fCovarianceDeweight;
+            fCovarianceTrials = std::max(1.0,w*fCovarianceTrials);
+            fCovarianceTrials = std::min(fCovarianceTrials,w*fCovarianceWindow);
+        }
 
         MCMC_DEBUG(1) << " Next update: " << fNextUpdate
                       << " Effective trials in previous covariance: "
@@ -843,8 +901,12 @@ public:
 
         // The proposal is being updated, so deweight the current acceptance
         // so that the new information weighs more.
-        fAcceptanceTrials = std::max(1000.0,0.1*fAcceptanceTrials);
-        fAcceptanceTrials = std::min(fAcceptanceTrials,0.1*fAcceptanceWindow);
+        if (fAcceptanceDeweight > 0.0) {
+            if (fAcceptanceDeweight > 1.0) fAcceptanceDeweight = 1.0;
+            double w = 1.0 - fAcceptanceDeweight;
+            fAcceptanceTrials = std::max(1.0,w*fAcceptanceTrials);
+            fAcceptanceTrials = std::min(fAcceptanceTrials,w*fAcceptanceWindow);
+        }
 
         // Save the covariance that is being used to generate the Cholesky
         // decomposition.
@@ -868,6 +930,15 @@ public:
             if (MCMC_DEBUG_LEVEL>1 && fLastPoint.size() < 6) {
                 fDecomposition.Print();
             }
+            MCMC_DEBUG(2) << " Decomposition Diagonal: "
+                          << std::endl;
+            MCMC_DEBUG(2) << "        = ";
+            for (std::size_t i=0; i<fLastPoint.size(); ++i) {
+                MCMC_DEBUG(2) << fDecomposition(i,i);
+                if (i<fLastPoint.size()-1) MCMC_DEBUG(2) << " + ";
+                if (i%6 == 5) MCMC_DEBUG(2) << std::endl << "           ";
+            }
+            MCMC_DEBUG(2) << std::endl;
             return;
         }
         MCMC_DEBUG(1) << "Covariance matrix decomposition failed"
@@ -977,6 +1048,15 @@ public:
             if (MCMC_DEBUG_LEVEL>1 && fLastPoint.size() < 6) {
                 fDecomposition.Print();
             }
+            MCMC_DEBUG(2) << " Decomposition Diagonal: "
+                          << std::endl;
+            MCMC_DEBUG(2) << "        = ";
+            for (std::size_t i=0; i<fLastPoint.size(); ++i) {
+                MCMC_DEBUG(2) << fDecomposition(i,i);
+                if (i<fLastPoint.size()-1) MCMC_DEBUG(2) << " + ";
+                if (i%6 == 5) MCMC_DEBUG(2) << std::endl << "           ";
+            }
+            MCMC_DEBUG(2) << std::endl;
             return;
         }
 
@@ -1066,7 +1146,7 @@ public:
 #endif
 
         // We are in serious trouble because the covariance wasn't positive
-        // definite causing Cholesky decomposition to faile, and none of the
+        // definite causing Cholesky decomposition to failed, and none of the
         // eigen values were positive (mathematically, that can't be true, but
         // can happen due to numeric error build up).  Try reducing the
         // correlations and increasing the variances in steps.  This is a last
@@ -1105,6 +1185,15 @@ public:
                 if (MCMC_DEBUG_LEVEL>1 && fLastPoint.size() < 6) {
                     fDecomposition.Print();
                 }
+                MCMC_DEBUG(2) << " Decomposition Diagonal: "
+                              << std::endl;
+                MCMC_DEBUG(2) << "        = ";
+                for (std::size_t i=0; i<fLastPoint.size(); ++i) {
+                    MCMC_DEBUG(2) << fDecomposition(i,i);
+                    if (i<fLastPoint.size()-1) MCMC_DEBUG(2) << " + ";
+                    if (i%6 == 5) MCMC_DEBUG(2) << std::endl << "           ";
+                }
+                MCMC_DEBUG(2) << std::endl;
                 return;
             }
         }
@@ -1579,6 +1668,9 @@ private:
     double fCovarianceTrials;
     double fSaveCovarianceTrials;
 
+    // The amount the old covariance should be deweighted after an update.
+    double fCovarianceDeweight;
+
     // The window to average the covariance and central value over.  The
     // covariance window should be several times the autocorrelation period.
     // It should usually be very large so that all to points used to probe the
@@ -1641,6 +1733,9 @@ private:
     // will be a value between one and fAcceptanceWindow.
     double fAcceptanceTrials;
     double fSaveAcceptanceTrials;
+
+    // The amount the old acceptance should be deweighted after an update.
+    double fAcceptanceDeweight;
 
     // The window to average the acceptance over.
     double fAcceptanceWindow;
