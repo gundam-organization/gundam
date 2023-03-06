@@ -55,7 +55,6 @@ protected:
 private:
   std::string _algorithmName_{"metropolis"};
   std::string _proposalName_{"adaptive"};
-  int _stepCount_{1000};
   std::string _outTreeName_{"MCMC"};
 
   // The number of burn-in cylces to use.
