@@ -16,6 +16,8 @@
 #include "TSystem.h"
 
 #include <cstdlib>
+#include "string"
+#include "vector"
 
 
 LoggerInit([]{
@@ -88,6 +90,9 @@ void walkAndUnfoldTDirectory(TDirectory* dir_, const std::string &saveFolderPath
     }
     else if( classObj->InheritsFrom("TCanvas") ){
       canObj = dir_->Get<TCanvas>(dir_->GetListOfKeys()->At(iObj)->GetName());
+
+      LogContinueIf( canObj == nullptr, "Could not cast \"" << dir_->GetListOfKeys()->At(iObj)->GetName() << "\" as TCanvas" );
+
 //      canObj->Draw();
 //      canObj->Update();
 ////      canObj->GetWindowHeight()
@@ -111,7 +116,9 @@ void walkAndUnfoldTDirectory(TDirectory* dir_, const std::string &saveFolderPath
             );
 
         LogWarning << outPath << std::endl;
-        if( GenericToolbox::doesPathIsFile(outPath) ){ std::remove(outPath.c_str()); }
+        if( GenericToolbox::doesPathIsFile(outPath) ){
+          std::remove(outPath.c_str());
+        }
 
         GenericToolbox::muteRoot();
         canObj->SaveAs( outPath.c_str() );
@@ -159,8 +166,8 @@ void init(){
 
   gStyle->SetGridStyle(3);
   gStyle->SetGridWidth(1);
-  gStyle->SetPadGridX(1);
-  gStyle->SetPadGridY(1);
+  gStyle->SetPadGridX(true);
+  gStyle->SetPadGridY(true);
 
   //  gStyle->SetPalette(1);
 
