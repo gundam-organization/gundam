@@ -273,6 +273,7 @@ void MCMCInterface::setupAndRunAdaptiveStep(
   LogInfo << "Start with " << p.size() << " parameters" << std::endl;
   mcmc.Start(p, _saveBurnin_);
   mcmc.GetProposeStep().SetAcceptanceWindow(_adaptiveWindow_);
+  mcmc.SetStepRMSWindow(_adaptiveWindow_);
 
   // Restore the chain if exist
   if (!_adaptiveRestore_.empty()) {
@@ -302,13 +303,18 @@ void MCMCInterface::setupAndRunAdaptiveStep(
     // Burnin cycles
     mcmc.GetProposeStep().SetCovarianceWindow(_burninCovWindow_);
     mcmc.GetProposeStep().SetAcceptanceWindow(_burninWindow_);
-    // No automatic updates during burn-in.
-    mcmc.GetProposeStep().SetNextUpdate(2000*_burninLength_);
+    mcmc.SetStepRMSWindow(_burninWindow_);
     mcmc.GetProposeStep()
       .SetCovarianceUpdateDeweighting(_burninCovDeweighting_);
     for (int chain = 0; chain < _burninCycles_; ++chain){
       LogInfo << "Start Burnin chain " << chain << std::endl;
       mcmc.GetProposeStep().UpdateProposal();
+      // Override default number of steps until the next automatic
+      // UpdateProposal call.  This disables automatic updates during adaptive
+      // burn-in.
+      mcmc.GetProposeStep().SetNextUpdate(2*_burninLength_);
+      mcmc.GetProposeStep()
+        .SetCovarianceUpdateDeweighting(_burninCovDeweighting_);
       if (chain < _burninFreezeAfter_) {
         LogInfo << "Burn-in step size variance will be updated" << std::endl;
         mcmc.GetProposeStep().SetAcceptanceRigidity(2.0);
@@ -331,8 +337,9 @@ void MCMCInterface::setupAndRunAdaptiveStep(
                   << " Trials: "
                   << mcmc.GetProposeStep().GetSuccesses()
                   << "/" << mcmc.GetProposeStep().GetTrials()
-                  << " (" << mcmc.GetProposeStep().GetAcceptance()
-                  << ": " << mcmc.GetProposeStep().GetSigma()
+                  << " (acc " << mcmc.GetProposeStep().GetAcceptance()
+                  << ", sig " << mcmc.GetProposeStep().GetSigma()
+                  << ", rms " << mcmc.GetStepRMS()
                   << ")"
                   << std::endl;
         }
@@ -349,12 +356,16 @@ void MCMCInterface::setupAndRunAdaptiveStep(
   // Run cycles
   mcmc.GetProposeStep().SetCovarianceWindow(_adaptiveCovWindow_);
   mcmc.GetProposeStep().SetAcceptanceWindow(_adaptiveWindow_);
-  mcmc.GetProposeStep().SetNextUpdate(2000*_steps_); // no automatic updates
+  mcmc.SetStepRMSWindow(_adaptiveWindow_);
   for (int chain = 0; chain < _cycles_; ++chain){
     LogInfo << "Start run chain " << chain << std::endl;
     // Update the covariance with the steps from the last cycle.  This
     // starts a new "reversible-chain".
     mcmc.GetProposeStep().UpdateProposal();
+    // Override default number of steps until the next automatic
+    // UpdateProposal call.  This disables automatic updates during normal
+    // chains.
+    mcmc.GetProposeStep().SetNextUpdate(2*_steps_);
     // Set the adaptive covariance deweighting after the first update so that
     // the previous deweighting is used for the first update.  This is a very
     // cheap call so set it on every iteration.
@@ -383,8 +394,10 @@ void MCMCInterface::setupAndRunAdaptiveStep(
                 << " Trials: "
                 << mcmc.GetProposeStep().GetSuccesses()
                 << "/" << mcmc.GetProposeStep().GetTrials()
-                << " (" << mcmc.GetProposeStep().GetAcceptance()
-                << ": " << mcmc.GetProposeStep().GetSigma() << ")"
+                << " (acc " << mcmc.GetProposeStep().GetAcceptance()
+                << ", sig " << mcmc.GetProposeStep().GetSigma()
+                << ", rms " << mcmc.GetStepRMS()
+                << ")"
                 << std::endl;
       }
     }
