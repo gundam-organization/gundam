@@ -284,25 +284,30 @@ void MCMCInterface::setupAndRunAdaptiveStep(
   if (!_adaptiveRestore_.empty() && _adaptiveRestore_ != "none") {
     // Check for restore file
     LogInfo << "Restore from: " << _adaptiveRestore_ << std::endl;
-    std::unique_ptr<TFile> restoreFile
-      (new TFile(_adaptiveRestore_.c_str(), "old"));
-    if (!restoreFile || !restoreFile->IsOpen()) {
-      LogInfo << "File to restore was is found: "
-              << _adaptiveRestore_ << std::endl;
-      throw std::runtime_error("Old state file not open");
+    TFile* saveFile = gFile;
+    {
+      std::unique_ptr<TFile> restoreFile
+        (new TFile(_adaptiveRestore_.c_str(), "old"));
+      if (!restoreFile || !restoreFile->IsOpen()) {
+        LogInfo << "File to restore was is found: "
+                << _adaptiveRestore_ << std::endl;
+        throw std::runtime_error("Old state file not open");
+      }
+      std::string treeName = "FitterEngine/fit/" + _outTreeName_;
+      TTree* restoreTree = (TTree*) restoreFile->Get(treeName.c_str());
+      if (!restoreTree) {
+        LogInfo << "Tree to restore state is not found"
+                << treeName << std::endl;
+        throw std::runtime_error("Old state tree not open");
+      }
+      // Set the deweighting to zero so the previous state is directly used.
+      mcmc.GetProposeStep().SetCovarianceUpdateDeweighting(0.0);
+      // Load the old state from the tree.
+      mcmc.Restore(restoreTree);
+      LogInfo << "State Restored" << std::endl;
     }
-    std::string treeName = "FitterEngine/fit/" + _outTreeName_;
-    TTree* restoreTree = (TTree*) restoreFile->Get(treeName.c_str());
-    if (!restoreTree) {
-      LogInfo << "Tree to restore state is not found"
-              << treeName << std::endl;
-      throw std::runtime_error("Old state tree not open");
-    }
-    // Set the deweighting to zero so the previous state is directly used.
-    mcmc.GetProposeStep().SetCovarianceUpdateDeweighting(0.0);
-    // Load the old state from the tree.
-    mcmc.Restore(restoreTree);
-    LogInfo << "State Restored" << std::endl;
+    gFile = saveFile;
+    gFile->cd((std::string(owner().getSaveDir()->GetName())+"/fit").c_str());
   }
   else {
     // Burnin cycles
