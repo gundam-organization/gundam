@@ -12,6 +12,10 @@
 #include "memory"
 #include "string"
 
+#ifdef USE_NEW_DIALS
+#warning Not used with new dial implementation
+#endif
+
 class SplineDial : public Dial {
 
 public:

@@ -2,15 +2,21 @@
 // Created by Nadrino on 26/05/2021.
 //
 
-
 #include "FitParameter.h"
-#include "SplineDial.h"
-#include "DialSet.h"
+
 #ifndef USE_TSPLINE3_EVAL
 #include "CalculateMonotonicSpline.h"
 #include "CalculateUniformSpline.h"
 #include "CalculateGeneralSpline.h"
 #endif
+
+// Unset for this file since the entire file is deprecated.
+#ifdef USE_NEW_DIALS
+#undef USE_NEW_DIALS
+#endif
+
+#include "SplineDial.h"
+#include "DialSet.h"
 
 #include "Logger.h"
 #include "GenericToolbox.Root.h"

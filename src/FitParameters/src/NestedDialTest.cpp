@@ -2,6 +2,11 @@
 // Created by Adrien BLANCHET on 22/03/2022.
 //
 
+// Unset for this file since the entire file is deprecated.
+#ifdef USE_NEW_DIALS
+#undef USE_NEW_DIALS
+#endif
+
 #include "NestedDialTest.h"
 
 #include "Logger.h"
@@ -54,4 +59,3 @@ void NestedDialTest::updateDialResponseCache(const std::vector<Dial*>& dialRefLi
     (*valIt) = (*dialIt)->evalResponse();
   }
 }
-
