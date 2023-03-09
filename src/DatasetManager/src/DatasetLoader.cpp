@@ -4,10 +4,7 @@
 
 #include "DatasetLoader.h"
 
-#include "DialSet.h"
 #include "GlobalVariables.h"
-#include "GraphDial.h"
-#include "SplineDial.h"
 #include "GenericToolbox.Json.h"
 
 #include "GenericToolbox.h"
