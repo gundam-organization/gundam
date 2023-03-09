@@ -11,6 +11,8 @@ option(TTYCHECK "Enable check if output is being sent to terminal/TTY." ON)
 option(WITH_OPENMP "(OLD) Build with OpenMP libraries" OFF )
 option(WITH_CACHE_MANAGER "Build with precalculated weight cache" OFF)
 option(WITH_GENERIC_SPLINES "Do not solely depend on ROOT TSpline3" OFF)
+option(WITH_OLD_DIALS "Use the old dial implementation" OFF)
+option(WITH_BREAKDOWN_CACHE "Use the breakdown cache" ON)
 option(DISABLE_CUDA "Disable CUDA language check (enable for testing only)" OFF)
 option(YAMLCPP_DIR "Set custom path to yaml-cpp lib" OFF )
 option(ENABLE_DEV_MODE "Enable specific dev related printouts" OFF )
@@ -18,7 +20,6 @@ option(BATCH_MODE "Build to run in a batch queue (affects output)" OFF)
 option(BUILD_DOC "Build documentation" OFF)
 option(WITH_XSLLHFITTER "Build old xsllhFitter apps/libraries" OFF)
 option(USE_STATIC_LINKS "Library build in static mod" OFF)
-
 
 # Cmake includes
 include(CTest)
@@ -61,10 +62,6 @@ else()
     cmessage(WARNING "Bad exit status")
     set (GUNDAM_VERSION_STRING "X.X.X")
 endif()
-
-
-
-
 
 set(VERBOSE TRUE)
 
@@ -112,7 +109,6 @@ if(NOT DEFINED CMAKE_BUILD_TYPE
     set(CMAKE_BUILD_TYPE Debug)
 endif()
 cmessage(STATUS "CMAKE_BUILD_TYPE: \"${CMAKE_BUILD_TYPE}\"")
-
 
 if(BATCH_MODE)
     set(COLOR_OUTPUT NO)
@@ -229,8 +225,6 @@ else()
     add_definitions( -D USE_ZLIB=0 )
 endif ()
 
-
-
 if (WITH_CACHE_MANAGER)
     add_definitions( -DGUNDAM_USING_CACHE_MANAGER)
 
@@ -243,7 +237,9 @@ if (WITH_CACHE_MANAGER)
         add_definitions( -DCACHE_MANAGER_SLOW_VALIDATION)
     endif (CACHE_MANAGER_SLOW_VALIDATION)
 
-    cmessage(STATUS "Enable GPU support (compiled, but only used when CUDA enabled)")
+    cmessage(STATUS "GPU support is enabled (compiled, but only used when CUDA enabled)")
+else()
+    cmessage(STATUS "GPU support is disabled")
 endif()
 
 if(NOT WITH_GENERIC_SPLINES)
@@ -254,6 +250,18 @@ if(NOT WITH_GENERIC_SPLINES)
     endif(WITH_CACHE_MANAGER)
 endif(NOT WITH_GENERIC_SPLINES)
 
+if(NOT WITH_OLD_DIALS)
+    add_definitions(-D USE_NEW_DIALS=1)
+else()
+    cmessage(WARNING "Using old dial implementation")
+endif(NOT WITH_OLD_DIALS)
+  
+if(WITH_BREAKDOWN_CACHE)
+    add_definitions(-D USE_BREAKDOWN_CACHE)
+else()
+    cmessage(WARNING "Not using breakdown cache")
+endif(WITH_BREAKDOWN_CACHE)
+  
 ################################################################################
 #                       SubModules
 ################################################################################
@@ -418,18 +426,17 @@ endif()
 #                            Specify Target Subdirs
 ################################################################################
 
-set( MODULES
-    Utils
-    DialDictionary
-    FitParameters
-    FitSamples
-    DatasetManager
-    Propagator
-    Fitter
-    )
+set( MODULES Utils)
+
+# Add the basic modules
+list( APPEND MODULES DialDictionary)
+list( APPEND MODULES FitParameters)
+list( APPEND MODULES FitSamples)
+list( APPEND MODULES DatasetManager)
+list( APPEND MODULES Propagator)
+list( APPEND MODULES Fitter)
 
 if(WITH_CACHE_MANAGER)
-    cmessage (STATUS "Adding cmake module: CacheManager")
     list( APPEND MODULES CacheManager )
 endif()
 

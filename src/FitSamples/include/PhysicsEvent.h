@@ -6,8 +6,11 @@
 #define GUNDAM_PHYSICSEVENT_H
 
 #include "FitParameterSet.h"
+
+#ifndef USE_NEW_DIALS
 #include "Dial.h"
 #include "NestedDialTest.h"
+#endif
 
 #include "GenericToolbox.Root.TreeEntryBuffer.h"
 #include "GenericToolbox.Root.LeafHolder.h"

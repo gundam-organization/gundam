@@ -7,6 +7,9 @@
 
 #include "EventVarTransformLib.h"
 #include "FitSampleSet.h"
+#ifndef USE_NEW_DIALS
+#include "DialSet.h"
+#endif
 #include "FitParameterSet.h"
 #include "PlotGenerator.h"
 #include "JsonBaseClass.h"
@@ -55,7 +58,9 @@ struct DataDispenserCache{
   std::vector<std::vector<bool>> eventIsInSamplesList{};
   std::vector<GenericToolbox::CopiableAtomic<size_t>> sampleIndexOffsetList;
   std::vector< std::vector<PhysicsEvent>* > sampleEventListPtrToFill;
+#ifndef USE_NEW_DIALS
   std::map<FitParameterSet*, std::vector<DialSet*>> dialSetPtrMap;
+#endif
   std::vector<DialCollection*> dialCollectionsRefList{};
 
   std::vector<std::string> varsRequestedForIndexing{};
@@ -74,7 +79,9 @@ struct DataDispenserCache{
 
     sampleIndexOffsetList.clear();
     sampleEventListPtrToFill.clear();
+#ifndef USE_NEW_DIALS
     dialSetPtrMap.clear();
+#endif
 
     varsRequestedForIndexing.clear();
     varsRequestedForStorage.clear();

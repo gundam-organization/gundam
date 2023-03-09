@@ -3,7 +3,10 @@
 //
 
 #include "PhysicsEvent.h"
+
+#ifndef USE_NEW_DIALS
 #include "SplineDial.h"
+#endif
 
 #include "GenericToolbox.Root.h"
 #include "Logger.h"

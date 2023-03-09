@@ -26,10 +26,6 @@
 #define GUNDAM_DELTA "delta-"
 #endif
 
-#define USE_NEW_DIALS 1
-#define USE_BREAKDOWN_CACHE
-
-
 ENUM_EXPANDER(
     VerboseLevel, 0,
     NORMAL_MODE,
