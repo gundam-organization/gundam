@@ -32,14 +32,16 @@ target_include_directories( GundamPropagator PUBLIC
 
 if( WITH_CACHE_MANAGER )
   set(CACHE_MANAGER_LIBRARIES "GundamCache")
+else()
+  set(CACHE_MANAGER_LIBRARIES "")
 endif()
 
 target_link_libraries( GundamPropagator
   GundamFitParameters
   GundamFitSamples
-  ${CACHE_MANAGER_LIBRARIES}
   GundamDatasetManager
   GundamDialDictionary
+  ${CACHE_MANAGER_LIBRARIES}
   ${ROOT_LIBRARIES}
   )
 
