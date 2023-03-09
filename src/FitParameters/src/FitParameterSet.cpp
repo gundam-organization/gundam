@@ -3,6 +3,7 @@
 //
 
 #include "FitParameterSet.h"
+#include "DataBinSet.h"
 
 #include "GlobalVariables.h"
 #include "ParameterThrowerMarkHarz.h"

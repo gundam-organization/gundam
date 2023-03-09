@@ -5,6 +5,7 @@
 
 #include "FitParameter.h"
 #include "SplineDial.h"
+#include "DialSet.h"
 #ifndef USE_TSPLINE3_EVAL
 #include "CalculateMonotonicSpline.h"
 #include "CalculateUniformSpline.h"
