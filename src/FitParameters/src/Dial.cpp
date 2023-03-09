@@ -2,13 +2,19 @@
 // Created by Nadrino on 21/05/2021.
 //
 
-#include "Dial.h"
-#include "DialSet.h"
 #include "FitParameterSet.h"
 
 #include "Logger.h"
 
 #include "sstream"
+
+// Unset for this file since the entire file is deprecated.
+#ifdef USE_NEW_DIALS
+#undef USE_NEW_DIALS
+#endif
+
+#include "Dial.h"
+#include "DialSet.h"
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[Dial]");
@@ -161,6 +167,3 @@ std::string Dial::getSummary(){
 //      new TSpline3(Form("%p", this), &xSigmaSteps[0], &yResponse[0], int(xSigmaSteps.size()))
 //  );
 //}
-
-
-
