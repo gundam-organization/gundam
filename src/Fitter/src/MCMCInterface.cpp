@@ -99,9 +99,14 @@ void MCMCInterface::readConfigImpl(){
     _config_, "burninWindow", _burninWindow_);
 
   // Set the name of a file containing a previous sequence of the chain.  This
-  // restores the state from the end of the chain and continues.  This should
-  // also be settable from the command line (setting from the command line is
-  // the better option).
+  // restores the state from the end of the chain and continues.  This is also
+  // be settable from the command line (setting from the command line is the
+  // better option) using the override option
+  //
+  // "-O /fitterEngineConfig/mcmcConfig/adaptiveRestore=<filename>"
+  //
+  // If restore is going to be used, the adaptiveRestore value must exist in
+  // the configuration file (with a NULL value)
   _adaptiveRestore_ = GenericToolbox::Json::fetchValue(
     _config_, "adaptiveRestore", _adaptiveRestore_);
 
@@ -276,28 +281,33 @@ void MCMCInterface::setupAndRunAdaptiveStep(
   mcmc.SetStepRMSWindow(_adaptiveWindow_);
 
   // Restore the chain if exist
-  if (!_adaptiveRestore_.empty()) {
+  if (!_adaptiveRestore_.empty() && _adaptiveRestore_ != "none") {
     // Check for restore file
     LogInfo << "Restore from: " << _adaptiveRestore_ << std::endl;
-    std::unique_ptr<TFile> restoreFile
-      (new TFile(_adaptiveRestore_.c_str(), "old"));
-    if (!restoreFile) {
-      LogInfo << "File to restore was not openned: "
-              << _adaptiveRestore_ << std::endl;
-      std::runtime_error("Old state file not open");
+    TFile* saveFile = gFile;
+    {
+      std::unique_ptr<TFile> restoreFile
+        (new TFile(_adaptiveRestore_.c_str(), "old"));
+      if (!restoreFile || !restoreFile->IsOpen()) {
+        LogInfo << "File to restore was is found: "
+                << _adaptiveRestore_ << std::endl;
+        throw std::runtime_error("Old state file not open");
+      }
+      std::string treeName = "FitterEngine/fit/" + _outTreeName_;
+      TTree* restoreTree = (TTree*) restoreFile->Get(treeName.c_str());
+      if (!restoreTree) {
+        LogInfo << "Tree to restore state is not found"
+                << treeName << std::endl;
+        throw std::runtime_error("Old state tree not open");
+      }
+      // Set the deweighting to zero so the previous state is directly used.
+      mcmc.GetProposeStep().SetCovarianceUpdateDeweighting(0.0);
+      // Load the old state from the tree.
+      mcmc.Restore(restoreTree);
+      LogInfo << "State Restored" << std::endl;
     }
-    std::string treeName = "FitterEngine/fit/" + _outTreeName_;
-    TTree* restoreTree = (TTree*) restoreFile->Get(treeName.c_str());
-    if (!restoreTree) {
-      LogInfo << "Tree to restore state is not found"
-              << treeName << std::endl;
-      std::runtime_error("Old state tree not open");
-    }
-    // Set the deweighting to zero so the previous state is directly used.
-    mcmc.GetProposeStep().SetCovarianceUpdateDeweighting(0.0);
-    // Load the old state from the tree.
-    mcmc.Restore(restoreTree);
-    LogInfo << "State Restored" << std::endl;
+    gFile = saveFile;
+    gFile->cd((std::string(owner().getSaveDir()->GetName())+"/fit").c_str());
   }
   else {
     // Burnin cycles
