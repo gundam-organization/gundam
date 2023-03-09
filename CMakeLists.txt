@@ -11,7 +11,7 @@ option(TTYCHECK "Enable check if output is being sent to terminal/TTY." ON)
 option(WITH_OPENMP "(OLD) Build with OpenMP libraries" OFF )
 option(WITH_CACHE_MANAGER "Build with precalculated weight cache" OFF)
 option(WITH_GENERIC_SPLINES "Do not solely depend on ROOT TSpline3" OFF)
-option(WITH_OLD_DIALS "Use the old dial implementation" ON)
+option(WITH_OLD_DIALS "Use the old dial implementation" OFF)
 option(DISABLE_CUDA "Disable CUDA language check (enable for testing only)" OFF)
 option(YAMLCPP_DIR "Set custom path to yaml-cpp lib" OFF )
 option(ENABLE_DEV_MODE "Enable specific dev related printouts" OFF )
@@ -251,6 +251,8 @@ endif(NOT WITH_GENERIC_SPLINES)
 
 if(NOT WITH_OLD_DIALS)
     add_definitions(-D USE_NEW_DIALS=1)
+else()
+    cmessage(WARNING "Using old dial implementation")
 endif(NOT WITH_OLD_DIALS)
   
 ################################################################################
