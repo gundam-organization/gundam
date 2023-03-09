@@ -12,6 +12,7 @@ option(WITH_OPENMP "(OLD) Build with OpenMP libraries" OFF )
 option(WITH_CACHE_MANAGER "Build with precalculated weight cache" OFF)
 option(WITH_GENERIC_SPLINES "Do not solely depend on ROOT TSpline3" OFF)
 option(WITH_OLD_DIALS "Use the old dial implementation" OFF)
+option(WITH_BREAKDOWN_CACHE "Use the breakdown cache" ON)
 option(DISABLE_CUDA "Disable CUDA language check (enable for testing only)" OFF)
 option(YAMLCPP_DIR "Set custom path to yaml-cpp lib" OFF )
 option(ENABLE_DEV_MODE "Enable specific dev related printouts" OFF )
@@ -254,6 +255,12 @@ if(NOT WITH_OLD_DIALS)
 else()
     cmessage(WARNING "Using old dial implementation")
 endif(NOT WITH_OLD_DIALS)
+  
+if(WITH_BREAKDOWN_CACHE)
+    add_definitions(-D USE_BREAKDOWN_CACHE)
+else()
+    cmessage(WARNING "Not using breakdown cache")
+endif(WITH_BREAKDOWN_CACHE)
   
 ################################################################################
 #                       SubModules
