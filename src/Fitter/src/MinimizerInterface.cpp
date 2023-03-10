@@ -110,6 +110,17 @@ const std::unique_ptr<ROOT::Math::Minimizer> &MinimizerInterface::getMinimizer()
   return _minimizer_;
 }
 
+double MinimizerInterface::getTargetEdm() const{
+  // Migrad: The default tolerance is 0.1, and the minimization will stop
+  // when the estimated vertical distance to the minimum (EDM) is less
+  // than 0.001*[tolerance]*UP (see SET ERR).
+  // UP:
+  // Minuit defines parameter errors as the change in parameter value required
+  // to change the function value by UP. Normally, for chisquared fits
+  // UP=1, and for negative log likelihood, UP=0.5
+  return 0.001 * _tolerance_ * 1;
+}
+
 void MinimizerInterface::minimize(){
   LogThrowIf(not isInitialized(), "not initialized");
 
@@ -140,6 +151,8 @@ void MinimizerInterface::minimize(){
     _minimizer_->SetTolerance( _tolerance_ * _simplexToleranceLoose_ );
     _minimizer_->SetStrategy(0);
 
+    getLikelihood().setStateTitleMonitor("Running SIMPLEX...");
+
     // SIMPLEX
     getLikelihood().enableFitMonitor();
     _fitHasConverged_ = _minimizer_->Minimize();
@@ -154,6 +167,8 @@ void MinimizerInterface::minimize(){
     LogInfo << getConvergenceMonitor().generateMonitorString(); // lasting printout
     LogWarning << "Simplex ended after " << getLikelihood().getNbFitCalls() - nbFitCallOffset << " calls." << std::endl;
   }
+
+  getLikelihood().setStateTitleMonitor("Running " + _minimizer_->Options().MinimizerAlgorithm() + "...");
 
   getLikelihood().enableFitMonitor();
   _fitHasConverged_ = _minimizer_->Minimize();
@@ -331,6 +346,9 @@ void MinimizerInterface::calcErrors(){
 //          + TMath::Sqrt( postfitCovarianceMatrix[iPar][iPar] )
 //          );
 //    }
+
+
+    getLikelihood().setStateTitleMonitor("Running HESSE...");
 
     getLikelihood().enableFitMonitor();
     _fitHasConverged_ = _minimizer_->Hesse();

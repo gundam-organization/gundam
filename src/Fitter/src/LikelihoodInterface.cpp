@@ -14,10 +14,20 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[Likelihood]");
 });
 
-LikelihoodInterface::LikelihoodInterface(FitterEngine* owner_)
-    : _owner_(owner_) {}
+LikelihoodInterface::LikelihoodInterface(FitterEngine* owner_): _owner_(owner_) {}
+LikelihoodInterface::~LikelihoodInterface() = default;
 
-LikelihoodInterface::~LikelihoodInterface() {}
+void LikelihoodInterface::setOwner(FitterEngine* owner_) {
+  _owner_ = owner_;
+}
+void LikelihoodInterface::setStateTitleMonitor(const std::string& stateTitleMonitor_){
+  _stateTitleMonitor_ = stateTitleMonitor_;
+}
+
+std::vector<FitParameter *> &LikelihoodInterface::getMinimizerFitParameterPtr(){
+  return _minimizerFitParameterPtr_;
+}
+
 
 void LikelihoodInterface::initialize() {
   _chi2HistoryTree_ = std::make_unique<TTree>("chi2History", "chi2History");
@@ -101,10 +111,11 @@ double LikelihoodInterface::evalFit(const double* parArray_){
 
     std::stringstream ssHeader;
     ssHeader << std::endl << __METHOD_NAME__ << ": call #" << _nbFitCalls_;
-    ssHeader << std::endl << "Target EDM: " << _targetEDM_;
-    ssHeader << std::endl << "Current RAM usage: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
+    ssHeader << std::endl << _stateTitleMonitor_;
+//    ssHeader << std::endl << "Target EDM: " << _owner_->getMinimizer().get;
+    ssHeader << std::endl << "RAM: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
     double cpuPercent = GenericToolbox::getCpuUsageByProcess();
-    ssHeader << std::endl << "Current CPU usage: " << cpuPercent << "% (" << cpuPercent / GlobalVariables::getNbThreads() << "% efficiency)";
+    ssHeader << " / CPU: " << cpuPercent << "% (" << cpuPercent / GlobalVariables::getNbThreads() << "% efficiency)";
     ssHeader << std::endl << "Avg " << GUNDAM_CHI2 << " computation time: " << _evalFitAvgTimer_;
     ssHeader << std::endl;
 

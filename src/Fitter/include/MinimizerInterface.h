@@ -28,20 +28,20 @@ class MinimizerInterface : public MinimizerBase {
 public:
   explicit MinimizerInterface(FitterEngine* owner_);
 
-  [[nodiscard]] virtual bool isFitHasConverged() const override;
-
+  [[nodiscard]] bool isFitHasConverged() const override;
   [[nodiscard]] const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const;
 
   void minimize() override;
   void calcErrors() override;
   void scanParameters(TDirectory* saveDir_) override;
 
+  double getTargetEdm() const;
+
 protected:
   void readConfigImpl() override;
   void initializeImpl() override;
 
   void writePostFitData(TDirectory* saveDir_);
-
   void updateCacheToBestfitPoint();
 
 private:
