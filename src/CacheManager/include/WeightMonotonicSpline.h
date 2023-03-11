@@ -4,7 +4,6 @@
 #include "CacheWeights.h"
 #include "WeightBase.h"
 
-#include "SplineDial.h"
 #include "hemi/array.h"
 
 #include <TSpline.h>
@@ -13,6 +12,7 @@
 #include <memory>
 #include <vector>
 
+class SplineDial;
 
 namespace Cache {
     namespace Weight {
