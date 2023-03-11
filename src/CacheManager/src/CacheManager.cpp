@@ -9,6 +9,7 @@
 
 #include "FitParameterSet.h"
 #include "Dial.h"
+#include "DialSet.h"
 #include "SplineDial.h"
 #include "GraphDial.h"
 #include "NormDial.h"
