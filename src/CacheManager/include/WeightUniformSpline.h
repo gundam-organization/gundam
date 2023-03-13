@@ -4,8 +4,9 @@
 #include "CacheWeights.h"
 #include "WeightBase.h"
 
-#include "SplineDial.h"
 #include "hemi/array.h"
+
+class SplineDial;
 
 #include <TSpline.h>
 

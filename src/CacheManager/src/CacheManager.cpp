@@ -9,6 +9,7 @@
 
 #include "FitParameterSet.h"
 #include "Dial.h"
+#include "DialSet.h"
 #include "SplineDial.h"
 #include "GraphDial.h"
 #include "NormDial.h"
@@ -352,13 +353,18 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
                         .SetUpperMirror(parIndex,xHigh);
                 }
                 double lowerClamp = dial->getOwner()->getMinDialResponse();
-                if (std::isfinite(lowerClamp)) {
+                if (std::isnan(lowerClamp)) {
+                    // Applied by default when USE_NEW_DIALS is set, and by
+                    // the old dials, so apply explicitly here.
+                    lowerClamp = 0.0;
+                }
+                if (not std::isnan(lowerClamp)) {
                     Cache::Manager::Get()
                         ->GetParameterCache()
                         .SetLowerClamp(parIndex,lowerClamp);
                 }
                 double upperClamp = dial->getOwner()->getMaxDialResponse();
-                if (std::isfinite(upperClamp)) {
+                if (not std::isnan(upperClamp)) {
                     Cache::Manager::Get()
                         ->GetParameterCache()
                         .SetUpperClamp(parIndex,upperClamp);

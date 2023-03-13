@@ -85,11 +85,13 @@ double Dial::getEffectiveDialParameter(double parameterValue_){
   return parameterValue_;
 }
 double Dial::capDialResponse(double response_){
+  LogThrowIf( std::isnan(response_), "NaN response returned:" << std::endl << this->Dial::getSummary());
+
   // Cap checks
   if     ( not std::isnan(_owner_->getMinDialResponse()) and response_ < _owner_->getMinDialResponse() ){ response_=_owner_->getMinDialResponse(); }
   else if( not std::isnan(_owner_->getMaxDialResponse()) and response_ > _owner_->getMaxDialResponse() ){ response_=_owner_->getMaxDialResponse(); }
+  else if ( std::isnan(_owner_->getMinDialResponse()) and response_ < 0.0 ){ response_=0.0; }
 
-  LogThrowIf( std::isnan(response_), "NaN response returned:" << std::endl << this->Dial::getSummary());
   if( Dial::throwIfResponseIsNegative and response_ < 0 ){
     this->writeSpline("");
     LogError << this->getSummary() << std::endl;
