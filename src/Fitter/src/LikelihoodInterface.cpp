@@ -26,10 +26,6 @@ void LikelihoodInterface::setStateTitleMonitor(const std::string& stateTitleMoni
   _stateTitleMonitor_ = stateTitleMonitor_;
 }
 
-std::vector<FitParameter *> &LikelihoodInterface::getMinimizerFitParameterPtr(){
-  return _minimizerFitParameterPtr_;
-}
-
 
 void LikelihoodInterface::initialize() {
   _chi2HistoryTree_ = std::make_unique<TTree>("chi2History", "chi2History");
