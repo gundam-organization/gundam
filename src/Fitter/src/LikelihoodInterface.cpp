@@ -16,10 +16,20 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[Likelihood]");
 });
 
-LikelihoodInterface::LikelihoodInterface(FitterEngine* owner_)
-    : _owner_(owner_) {}
+LikelihoodInterface::LikelihoodInterface(FitterEngine* owner_): _owner_(owner_) {}
+LikelihoodInterface::~LikelihoodInterface() = default;
 
-LikelihoodInterface::~LikelihoodInterface() {}
+void LikelihoodInterface::setOwner(FitterEngine* owner_) {
+  _owner_ = owner_;
+}
+void LikelihoodInterface::setStateTitleMonitor(const std::string& stateTitleMonitor_){
+  _stateTitleMonitor_ = stateTitleMonitor_;
+}
+
+std::vector<FitParameter *> &LikelihoodInterface::getMinimizerFitParameterPtr(){
+  return _minimizerFitParameterPtr_;
+}
+
 
 void LikelihoodInterface::initialize() {
   _chi2HistoryTree_ = std::make_unique<TTree>("chi2History", "chi2History");
@@ -59,6 +69,7 @@ void LikelihoodInterface::initialize() {
   _convergenceMonitor_.getQuantity("LastAddedValue").title = "Current Value";
   _convergenceMonitor_.getQuantity("SlopePerCall").title = "Avg. Slope /call";
 
+  _convergenceMonitor_.addVariable("Total/dof");
   _convergenceMonitor_.addVariable("Total");
   _convergenceMonitor_.addVariable("Stat");
   _convergenceMonitor_.addVariable("Syst");
@@ -103,32 +114,29 @@ double LikelihoodInterface::evalFit(const double* parArray_){
 
     std::stringstream ssHeader;
     ssHeader << std::endl << __METHOD_NAME__ << ": call #" << _nbFitCalls_;
-    ssHeader << std::endl << "Target EDM: " << _targetEDM_;
-    ssHeader << std::endl << "Current RAM usage: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
+    ssHeader << std::endl << _stateTitleMonitor_;
+//    ssHeader << std::endl << "Target EDM: " << _owner_->getMinimizer().get;
+    ssHeader << std::endl << "RAM: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
     double cpuPercent = GenericToolbox::getCpuUsageByProcess();
-    ssHeader << std::endl << "Current CPU usage: " << cpuPercent << "% (" << cpuPercent / GlobalVariables::getNbThreads() << "% efficiency)";
+    ssHeader << " / CPU: " << cpuPercent << "% (" << cpuPercent / GlobalVariables::getNbThreads() << "% efficiency)";
     ssHeader << std::endl << "Avg " << GUNDAM_CHI2 << " computation time: " << _evalFitAvgTimer_;
-    ssHeader << std::endl << GUNDAM_CHI2 << "/dof: " << _owner_->getPropagator().getLlhBuffer() / double(_nbFitBins_ - _nbFreePars_);
     ssHeader << std::endl;
-#ifndef GUNDAM_BATCH
-    ssHeader << "├─";
-#endif
-    ssHeader << " Current speed:                 " << (double)_itSpeed_.counts / (double)_itSpeed_.cumulated * 1E6 << " it/s";
-    ssHeader << std::endl;
-#ifndef GUNDAM_BATCH
-    ssHeader << "├─";
-#endif
-    ssHeader << " Avg time for " << _minimizerType_ << "/" << _minimizerAlgo_ << ":   " << _outEvalFitAvgTimer_;
-    ssHeader << std::endl;
-#ifndef GUNDAM_BATCH
-    ssHeader << "├─";
-#endif
-    ssHeader << " Avg time to propagate weights: " << _owner_->getPropagator().weightProp;
-    ssHeader << std::endl;
-#ifndef GUNDAM_BATCH
-    ssHeader << "├─";
-#endif
-    ssHeader << " Avg time to fill histograms:   " << _owner_->getPropagator().fillProp;
+
+    GenericToolbox::TablePrinter t;
+
+    t << "" << GenericToolbox::TablePrinter::NextColumn;
+    t << "Propagator" << GenericToolbox::TablePrinter::NextColumn;
+    t << "Re-weight" << GenericToolbox::TablePrinter::NextColumn;
+    t << "histograms fill" << GenericToolbox::TablePrinter::NextColumn;
+    t << _minimizerType_ << "/" << _minimizerAlgo_ << GenericToolbox::TablePrinter::NextLine;
+
+    t << "Speed" << GenericToolbox::TablePrinter::NextColumn;
+    t << (double)_itSpeed_.counts / (double)_itSpeed_.cumulated * 1E6 << " it/s" << GenericToolbox::TablePrinter::NextColumn;
+    t << _owner_->getPropagator().weightProp << GenericToolbox::TablePrinter::NextColumn;
+    t << _owner_->getPropagator().fillProp << GenericToolbox::TablePrinter::NextColumn;
+    t << _outEvalFitAvgTimer_ << GenericToolbox::TablePrinter::NextLine;
+
+    ssHeader << t.generateTableString();
 
     if( _showParametersOnFitMonitor_ ){
       std::string curParSet;
@@ -157,6 +165,7 @@ double LikelihoodInterface::evalFit(const double* parArray_){
     }
 
     _convergenceMonitor_.setHeaderString(ssHeader.str());
+    _convergenceMonitor_.getVariable("Total/dof").addQuantity(_owner_->getPropagator().getLlhBuffer() / double(_nbFitBins_ - _nbFreePars_));
     _convergenceMonitor_.getVariable("Total").addQuantity(_owner_->getPropagator().getLlhBuffer());
     _convergenceMonitor_.getVariable("Stat").addQuantity(_owner_->getPropagator().getLlhStatBuffer());
     _convergenceMonitor_.getVariable("Syst").addQuantity(_owner_->getPropagator().getLlhPenaltyBuffer());

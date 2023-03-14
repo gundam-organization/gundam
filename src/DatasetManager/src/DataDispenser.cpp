@@ -930,23 +930,15 @@ void DataDispenser::fillFunction(int iThread_){
   if(iThread_ == 0){
     LogInfo << "Feeding event variables with:" << std::endl;
     GenericToolbox::TablePrinter t;
-    t.setColTitles({{"Variable"}, {"Leaf"}, {"Transforms"}});
+
+    t << "Variable" << GenericToolbox::TablePrinter::NextColumn;
+    t << "Leaf" << GenericToolbox::TablePrinter::NextColumn;
+    t << "Transforms" << GenericToolbox::TablePrinter::NextLine;
+
     for( size_t iVar = 0 ; iVar < eventBuffer.getCommonLeafNameListPtr()->size() ; iVar++ ){
       std::string variableName = (*eventBuffer.getCommonLeafNameListPtr())[iVar];
-      t << variableName << std::endl;
 
-      t << copyDict[iVar].first->getLeafFullName();
-      if(copyDict[iVar].second != -1) t << "[" << copyDict[iVar].second << "]";
-      t << std::endl;
-
-      std::vector<std::string> transformsList;
-      for( auto* varTransformForIndexing : varTransformForIndexingList ){
-        if( varTransformForIndexing->getOutputVariableName() == variableName ){
-          transformsList.emplace_back(varTransformForIndexing->getTitle());
-        }
-      }
-      t << GenericToolbox::parseVectorAsString(transformsList);
-
+      // line color?
       if( GenericToolbox::doesElementIsInVector(variableName, _cache_.varsRequestedForStorage)){
         t.setColorBuffer(GenericToolbox::ColorCodes::blueBackground);
       }
@@ -957,7 +949,19 @@ void DataDispenser::fillFunction(int iThread_){
         t.setColorBuffer(GenericToolbox::ColorCodes::magentaBackground);
       }
 
-      t << std::endl;
+      t << variableName << GenericToolbox::TablePrinter::NextColumn;
+
+      t << copyDict[iVar].first->getLeafFullName();
+      if(copyDict[iVar].second != -1) t << "[" << copyDict[iVar].second << "]";
+      t << GenericToolbox::TablePrinter::NextColumn;
+
+      std::vector<std::string> transformsList;
+      for( auto* varTransformForIndexing : varTransformForIndexingList ){
+        if( varTransformForIndexing->getOutputVariableName() == variableName ){
+          transformsList.emplace_back(varTransformForIndexing->getTitle());
+        }
+      }
+      t << GenericToolbox::parseVectorAsString(transformsList) << GenericToolbox::TablePrinter::NextColumn;
     }
 
     t.printTable();

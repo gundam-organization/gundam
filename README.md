@@ -1,6 +1,6 @@
 # GUNDAM — 風をあつめて 
 
-![](./resources/images/banner2.png)
+![](./resources/images/bannerv2.png)
 
 [![Generic badge](https://img.shields.io/badge/Example_of_inputs-OA2020-GREEN.svg)](https://github.com/nadrino/gundamInputOa2020)  [![GitHub forks](https://badgen.net/github/forks/nadrino/gundam/)](https://github.com/nadrino/gundam/network/members) [![GitHub release](https://img.shields.io/github/release/nadrino/gundam.svg)](https://github.com/nadrino/gundam/releases/)
 
