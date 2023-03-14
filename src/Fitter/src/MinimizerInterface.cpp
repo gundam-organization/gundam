@@ -983,7 +983,7 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
 
           gPad->SetGridx();
           gPad->SetGridy();
-          gPad->SetBottomMargin(float(0.1*(1. + double(longestTitleSize)/15.)));
+          gPad->SetBottomMargin(float(0.1*(1. + double(longestTitleSize)/12.)));
 
           if( not isNorm_ ){ preFitErrorHist->SetTitle(Form("Pre-fit/Post-fit comparison for %s", parSet_.getName().c_str())); }
           else             { preFitErrorHist->SetTitle(Form("Pre-fit/Post-fit comparison for %s (normalized)", parSet_.getName().c_str())); }
