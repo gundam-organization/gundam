@@ -9,7 +9,9 @@
 #endif
 
 #include "FitParameterSet.h"
+#ifndef USE_NEW_DIALS
 #include "Dial.h"
+#endif
 #include "GenericToolbox.Json.h"
 #include "GlobalVariables.h"
 #include "ConfigUtils.h"
@@ -391,7 +393,9 @@ void Propagator::initializeImpl() {
     if(true){
       // STAGED MASK
       LogWarning << "Staged event breakdown:" << std::endl;
+#ifndef USE_NEW_DIALS
       Dial::enableMaskCheck = true;
+#endif
       std::vector<std::vector<double>> stageBreakdownList(
           _fitSampleSet_.getFitSampleList().size(),
           std::vector<double>(_parameterSetList_.size() + 1, 0)
@@ -437,7 +441,9 @@ void Propagator::initializeImpl() {
         t.addTableLine(tableLine);
       }
       t.printTable();
+#ifndef USE_NEW_DIALS
       Dial::enableMaskCheck = false;
+#endif
     }
 
     LogWarning << "Sample breakdown:" << std::endl;
@@ -783,6 +789,3 @@ void Propagator::reweightMcEvents(int iThread_) {
 
 
 }
-
-
-

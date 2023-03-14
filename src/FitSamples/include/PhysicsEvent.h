@@ -6,8 +6,14 @@
 #define GUNDAM_PHYSICSEVENT_H
 
 #include "FitParameterSet.h"
+
+#ifndef USE_NEW_DIALS
 #include "Dial.h"
 #include "NestedDialTest.h"
+#else
+class Dial;           // Define for deprecated class
+class NestedDialTest; // Define for deprecated class
+#endif
 
 #include "GenericToolbox.Root.TreeEntryBuffer.h"
 #include "GenericToolbox.Root.LeafHolder.h"
@@ -89,6 +95,13 @@ public:
   friend std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p );
 
 #if USE_NEW_DIALS
+  [[deprecated]] std::vector<Dial *> getRawDialPtrList() const {
+       LogThrow("PhysicsEvent::getRawDialPtrList() not implemented");
+       return std::vector<Dial*>();
+  }
+  [[deprecated]] void reweightUsingDialCache() {LogThrow("PhysicsEvent::reweightUsingDialCache() not implemented");}
+  [[deprecated]] void trimDialCache() {LogThrow("PhysicsEvent::trimDialCache() not implemented");}
+  [[deprecated]] void addNestedDialRefToCache(NestedDialTest* nestedDialPtr_, const std::vector<Dial*>& dialPtrList_ = {}) {LogThrow("PhysicsEvent::addNestedDialRefToCache() not implemented");}
 #else
   std::vector<Dial *> &getRawDialPtrList();
   const std::vector<Dial *> &getRawDialPtrList() const;

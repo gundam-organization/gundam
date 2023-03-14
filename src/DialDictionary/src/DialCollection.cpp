@@ -2,6 +2,7 @@
 // Created by Adrien Blanchet on 29/11/2022.
 //
 
+#include "GlobalVariables.h"
 #include "DialCollection.h"
 #include "DialTypes.h"
 
@@ -673,7 +674,3 @@ nlohmann::json DialCollection::fetchDialsDefinition(const nlohmann::json &defini
   }
   return {};
 }
-
-
-
-

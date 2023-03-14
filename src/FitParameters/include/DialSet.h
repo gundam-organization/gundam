@@ -19,8 +19,13 @@
 #include "vector"
 #include "memory"
 
-
 class FitParameter;
+
+#ifdef USE_NEW_DIALS
+#define DEPRECATED [[deprecated("Not used with new dial implementation")]]
+#else
+#define DEPRECATED /*[[deprecated("Not used with new dial implementation")]]*/
+#endif
 
 class DialSet : public JsonBaseClass {
 

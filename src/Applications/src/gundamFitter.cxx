@@ -70,6 +70,7 @@ int main(int argc, char** argv){
   clParser.addOption("debugVerbose", {"--debug"}, "Enable debug verbose (can provide verbose level arg)", 1, true);
   clParser.addTriggerOption("usingCacheManager", {"--cache-manager"}, "Event weight cache handle by the CacheManager");
   clParser.addTriggerOption("usingGpu", {"--gpu"}, "Use GPU parallelization");
+  clParser.addOption("overrides", {"-O", "--override"}, "Add a config override [e.g. /fitterEngineConfig/engineType=mcmc)", -1);
 
   clParser.addDummyOption();
 
@@ -89,6 +90,7 @@ int main(int argc, char** argv){
   // --------------------------
   // Init command line args:
   // --------------------------
+
   if( clParser.isOptionTriggered("debugVerbose") ) GlobalVariables::setVerboseLevel(clParser.getOptionVal("debugVerbose", 1));
 
   // Is build compatible with GPU option?
@@ -137,6 +139,32 @@ int main(int argc, char** argv){
   LogThrowIf(configFilePath.empty(), "Config file not provided.");
   LogInfo << "Reading config file: " << configFilePath << std::endl;
   auto jsonConfig = ConfigUtils::readConfigFile(configFilePath); // works with yaml
+
+  // Override the configuration values.  If the old value was a string then
+  // replace with the new string. Otherwise, the input value is parsed.  The
+  // configuration value are references like path names
+  // (e.g. /fitterEngineConfig/mcmcConfig/steps to change the MCMC interface
+  // "steps" value.)  This is intended to make minor changes to the behavior,
+  // so for sanity's sake, the key must already exist in the configuration
+  // files (if the key does not exist an exception will be thrown).  The
+  // command line syntax to change the number of mcmc steps to 1000 per cycle
+  // would be
+  //
+  // gundamFitter.exe -O /fitterEngineConfig/mcmcConfig/steps=1000 ...
+  //
+  for (auto s : clParser.getOptionValList<std::string>("overrides")) {
+    std::vector<std::string> split = GenericToolbox::splitString(s,"=");
+    LogWarning << "Override " << split[0] << " with " << split[1]
+               << std::endl;
+    nlohmann::json flat = jsonConfig.flatten();
+    LogWarning << "    Original value: " << flat.at(split[0])
+               << std::endl;
+    if (flat.at(split[0]).is_string()) flat.at(split[0]) = split[1];
+    else flat.at(split[0]) = nlohmann::json::parse(split[1]);
+    LogWarning << "         New value: " << flat.at(split[0])
+               << std::endl;
+    jsonConfig = flat.unflatten();
+  }
 
   // Output file path
   std::string outFileName;

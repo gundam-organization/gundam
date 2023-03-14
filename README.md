@@ -108,6 +108,16 @@ git submodule update --init --recursive
 cd -
 ```
 
+### Alternative installation procedure
+
+```bash
+cd $REPO_DIR/gundam
+cd cmake
+./gundam-setup.sh
+./gundam-build.sh
+```
+
+this will create the build directory `gundam-${compiler}_${compiler_version}-${compiler_machine}`.
 
 ### Compiling on macOS:
 
@@ -148,3 +158,14 @@ analysis, and provide an expandable base on which future studies with the *Upgra
 ND280 Detectors* will be performed.
 
 ![](./resources/images/ride.png)
+
+### Development policy 
+
+- Main development of the code should take place in the main branch.
+- Code developments must be discussed with the group before they happen.
+- Developments should happen in a feature brach with a name descriptive of the feature you are developing. 
+- Commit messages must be detailed. This means that messages like "Minor fix" or "Update" must be avoided.
+- Pull requests and merge request do not need to be merged by an admin but all the CI tests must be successfull before merging.
+- Avoid pull request for a single commit. 
+- Forks are allowed and the usage of the forked code is regulated by the code license. 
+- Share of the code is regulated by the code license. 

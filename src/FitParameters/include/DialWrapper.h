@@ -12,8 +12,13 @@
 #include <vector>
 #include "type_traits"
 
+#ifdef USE_NEW_DIALS
+#define DEPRECATED [[deprecated("Not used with new dial implementation")]]
+#else
+#define DEPRECATED /*[[deprecated("Not used with new dial implementation")]]*/
+#endif
 
-class DialWrapper{
+class DEPRECATED DialWrapper{
 public:
   DialWrapper() = default;
 

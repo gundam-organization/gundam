@@ -2,11 +2,7 @@
 // Created by Nadrino on 21/05/2021.
 //
 
-#include "DialSet.h"
 #include "DataBinSet.h"
-#include "NormDial.h"
-#include "SplineDial.h"
-#include "GraphDial.h"
 #include "FitParameter.h"
 
 #include "Logger.h"
@@ -17,6 +13,15 @@
 #include "TFile.h"
 #include "TTree.h"
 
+// Unset for this file since the entire file is deprecated.
+#ifdef USE_NEW_DIALS
+#undef USE_NEW_DIALS
+#endif
+
+#include "DialSet.h"
+#include "NormDial.h"
+#include "SplineDial.h"
+#include "GraphDial.h"
 
 bool DialSet::verboseMode{false};
 

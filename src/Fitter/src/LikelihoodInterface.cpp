@@ -10,6 +10,8 @@
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
 
+#include <limits>
+
 LoggerInit([]{
   Logger::setUserHeaderStr("[Likelihood]");
 });
@@ -52,6 +54,7 @@ void LikelihoodInterface::initialize() {
 
   LogInfo << "Building functor with " << _nbFitParameters_ << " parameters ..." << std::endl;
   _functor_ = std::make_unique<ROOT::Math::Functor>(this, &LikelihoodInterface::evalFit, _nbFitParameters_);
+  _validFunctor_ = std::make_unique<ROOT::Math::Functor>(this, &LikelihoodInterface::evalFitValid, _nbFitParameters_);
 
   _nbFitBins_ = 0;
   for( auto& sample : _owner_->getPropagator().getFitSampleSet().getFitSampleList() ){
@@ -167,7 +170,6 @@ double LikelihoodInterface::evalFit(const double* parArray_){
     _convergenceMonitor_.getVariable("Stat").addQuantity(_owner_->getPropagator().getLlhStatBuffer());
     _convergenceMonitor_.getVariable("Syst").addQuantity(_owner_->getPropagator().getLlhPenaltyBuffer());
 
-
     if( _nbFitCalls_ == 1 ){
       // don't erase these lines
       LogWarning << _convergenceMonitor_.generateMonitorString();
@@ -187,6 +189,28 @@ double LikelihoodInterface::evalFit(const double* parArray_){
 
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("out_evalFit");
   return _owner_->getPropagator().getLlhBuffer();
+}
+
+double LikelihoodInterface::evalFitValid(const double* parArray_) {
+  double value = evalFit(parArray_);
+  if (hasValidParameterValues()) return value;
+  /// A "Really Big Number".  This is nominally just infinity, but is done as
+  /// a defined constant to make the code easier to understand.  This needs to
+  /// be an appropriate value to safely represent an impossible chi-squared
+  /// value "representing" -log(0.0)/2 and should should be larger than 5E+30.
+  const double RBN = std::numeric_limits<double>::infinity();
+  return RBN;
+}
+
+bool LikelihoodInterface::hasValidParameterValues() const {
+  for (const FitParameterSet& parSet:
+         _owner_->getPropagator().getParameterSetsList()) {
+    for (const FitParameter& par : parSet.getParameterList()) {
+      if (std::isfinite(par.getMinValue()) && par.getParameterValue() < par.getMinValue()) [[unlikely]] return false;
+      if (std::isfinite(par.getMaxValue()) && par.getParameterValue() > par.getMaxValue()) [[unlikely]] return false;
+    }
+  }
+  return true;
 }
 
 // An MIT Style License

@@ -17,17 +17,17 @@ fitterEngineConfig:
   mcmcConfig:
     algorithm: metropolis
     proposal: adaptive
-    burninCycles: 3
-    burninSteps: 10000
+    burninCycles: 8
+    burninSteps: 2000
     burninResets: 1
     saveBurnin: false
-    burninWindow: 1000
-    burninCovWindow: 3000
+    burninWindow: 100
+    burninCovWindow: 10000
 
     cycles: 4
     steps: 10000
-    adaptiveWindow: 5000
-    adaptiveCovWindow: 5000
+    adaptiveWindow: 400
+    adaptiveCovWindow: 1000000
     adaptiveFreezeAfter: 1
 
   minimizerConfig:
@@ -81,6 +81,7 @@ fitterEngineConfig:
             isEnabled: true
             priorValue: 1.0
             priorType: Flat
+            parameterLimits: [0.0, 10.0]
             dialSetDefinitions:
               - dialsType: Normalization
                 applyCondition: "[C] > 0"
@@ -89,6 +90,7 @@ fitterEngineConfig:
             isEnabled: true
             priorValue: 1.0
             priorType: Flat
+            parameterLimits: [0.0, 10.0]
             dialSetDefinitions:
               - dialsType: Normalization
                 applyCondition: "[C] <= 0"

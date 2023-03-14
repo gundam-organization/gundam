@@ -2,6 +2,8 @@
 #include "WeightBase.h"
 #include "WeightUniformSpline.h"
 
+#include "SplineDial.h"
+
 #include <algorithm>
 #include <iostream>
 #include <exception>

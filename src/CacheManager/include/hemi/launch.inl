@@ -45,12 +45,18 @@ void launch(const ExecutionPolicy &policy, Function f, Arguments... args)
 {
     ExecutionPolicy p = policy;
     checkCuda(configureGrid(p, Kernel<Function, Arguments...>));
-    HEMI_LAUNCH_OUTPUT("CUDA launch with grid size of " << p.getGridSize()
+    HEMI_LAUNCH_OUTPUT("hemi::launch with grid size of " << p.getGridSize()
                        << " and block size of " << p.getBlockSize());
-    Kernel<<<p.getGridSize(),
+    if (p.getGridSize() > 0 && p.getBlockSize() > 0) {
+        Kernel<<<p.getGridSize(),
              p.getBlockSize(),
              p.getSharedMemBytes(),
              p.getStream()>>>(f, args...);
+    }
+    else {
+        std::cout << "hemi::launch: CUDA without available GPU" << std::endl;
+        throw std::runtime_error("GPU not available");
+    }
 }
 #else
 void launch(const ExecutionPolicy&, Function f, Arguments... args)
@@ -85,12 +91,18 @@ void cudaLaunch(const ExecutionPolicy &policy, void (*f)(Arguments...), Argument
 {
     ExecutionPolicy p = policy;
     checkCuda(configureGrid(p, f));
-    HEMI_LAUNCH_OUTPUT("CUDA launch with grid size of " << p.getGridSize()
+    HEMI_LAUNCH_OUTPUT("cudaLaunch: with grid size of " << p.getGridSize()
                        << " and block size of " << p.getBlockSize());
-    f<<<p.getGridSize(),
-        p.getBlockSize(),
-        p.getSharedMemBytes(),
-        p.getStream()>>>(args...);
+    if (p.getGridSize() > 0 && p.getBlockSize() > 0) {
+        f<<<p.getGridSize(),
+            p.getBlockSize(),
+            p.getSharedMemBytes(),
+            p.getStream()>>>(args...);
+    }
+    else {
+        std::cout << "cudaLaunch: CUDA without available GPU" << std::endl;
+        throw std::runtime_error("GPU not available");
+    }
 }
 #else
 void cudaLaunch(const ExecutionPolicy&, void (*f)(Arguments...), Arguments... args)
