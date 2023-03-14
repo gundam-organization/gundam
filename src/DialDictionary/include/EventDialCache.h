@@ -25,22 +25,25 @@ public:
   EventDialCache() = default;
 
 #ifndef USE_BREAKDOWN_CACHE
-  struct CacheElem_t {
-     PhysicsEvent* first;
-     std::vector<DialInterface*> second;
-  };
+  // The dial interface to be used with the PhysicsEvent
+  typedef DialInterface* DialsElem_t;
 #else
   struct DialsElem_t {
-    DialsElem_t(DialInterface* a,double b): first(a), second(b) {}
-    DialInterface* first;
-    double second;
-  };
-  struct CacheElem_t {
-     PhysicsEvent* first;
-     std::vector<DialsElem_t> second;
+    DialsElem_t(DialInterface* d,double w): dial(d), result(w) {}
+    // The dial interface to be used with the PhysicsEvent.
+    DialInterface* dial;
+    // The cached result calculated by the dial.
+    double result;
   };
 #endif
 
+  /// The cache element associating a PhysicsEvent to the dials.
+  struct CacheElem_t {
+     PhysicsEvent* event;
+     std::vector<DialsElem_t> dials;
+  };
+
+  /// Provide the event dial cache.
   std::vector<CacheElem_t> &getCache();
 
   void allocateCacheEntries(size_t nEvent_, size_t nDialsMaxPerEvent_);
