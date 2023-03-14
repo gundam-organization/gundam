@@ -43,7 +43,7 @@ public:
   /// A vector of the parameters being used in the fit.  This provides
   /// the correspondence between an array of doubles (param[]) and the
   /// pointers to the parameters.
-  std::vector<FitParameter *> &getMinimizerFitParameterPtr();
+  std::vector<FitParameter *> &getMinimizerFitParameterPtr(){ return _minimizerFitParameterPtr_; }
 
   /// Initialize the likelihood interface.  Must be called after all of the
   /// paramters are set, but before the first function evaluation.
@@ -68,12 +68,6 @@ public:
   /// Check that the parameters for the last time the propagator was used are
   /// all within the allowed ranges.
   [[nodiscard]] bool hasValidParameterValues() const;
-
-  /// A vector of the parameters being used in the fit.  This provides
-  /// the correspondence between an array of doubles (param[]) and the
-  /// pointers to the parameters.
-  std::vector<FitParameter *> &getMinimizerFitParameterPtr()
-    { return _minimizerFitParameterPtr_; }
 
   /// Set whether a normalized fit space should be used.  This controls how
   /// the fit parameter array is copied into the propagator parameter
