@@ -40,6 +40,15 @@ const double* DialInputBuffer::getBuffer() const{
 const uint32_t& DialInputBuffer::getCurrentHash() const{
   return _currentHash_;
 }
+
+const FitParameter& DialInputBuffer::getFitParameter(int i) const {
+    return _parSetRef_->at(_inputParameterIndicesList_[i].first).getParameterList().at(_inputParameterIndicesList_[i].second);
+}
+
+const FitParameterSet& DialInputBuffer::getFitParameterSet(int i) const {
+  return _parSetRef_->at(_inputParameterIndicesList_[i].first);
+}
+
 const std::vector<std::pair<size_t, size_t>> &DialInputBuffer::getInputParameterIndicesList() const {
   return _inputParameterIndicesList_;
 }
@@ -135,4 +144,3 @@ uint32_t DialInputBuffer::generateHash(){
 #endif
   return 0;
 }
-
