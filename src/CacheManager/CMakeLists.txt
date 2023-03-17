@@ -6,6 +6,7 @@ set(HEADERS
   include/CacheParameters.h
   include/CacheWeights.h
   include/WeightNormalization.h
+  include/WeightCompactSpline.h
   include/WeightMonotonicSpline.h
   include/WeightUniformSpline.h
   include/WeightGeneralSpline.h
@@ -16,6 +17,7 @@ set(HEADERS
 if(CMAKE_CUDA_COMPILER)
   cmessage(STATUS "CUDA utilities being compiled")
   set(SRCFILES ${SRCFILES} src/WeightNormalization.cu)
+  set(SRCFILES ${SRCFILES} src/WeightCompactSpline.cu)
   set(SRCFILES ${SRCFILES} src/WeightMonotonicSpline.cu)
   set(SRCFILES ${SRCFILES} src/WeightUniformSpline.cu)
   set(SRCFILES ${SRCFILES} src/WeightGeneralSpline.cu)
@@ -25,6 +27,7 @@ if(CMAKE_CUDA_COMPILER)
 else(CMAKE_CUDA_COMPILER)
   cmessage(STATUS "CUDA utilities are not being compiled")
   set(SRCFILES ${SRCFILES} src/WeightNormalization.cpp)
+  set(SRCFILES ${SRCFILES} src/WeightCompactSpline.cpp)
   set(SRCFILES ${SRCFILES} src/WeightMonotonicSpline.cpp)
   set(SRCFILES ${SRCFILES} src/WeightUniformSpline.cpp)
   set(SRCFILES ${SRCFILES} src/WeightGeneralSpline.cpp)
@@ -44,7 +47,11 @@ endif()
 target_include_directories( GundamCache PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-target_link_libraries( GundamCache PUBLIC GundamFitParameters GundamFitSamples ${ROOT_LIBRARIES} )
+target_link_libraries( GundamCache PUBLIC
+  GundamDialDictionary
+  GundamFitParameters
+  GundamFitSamples
+  ${ROOT_LIBRARIES} )
 
 #  set_target_properties(GundamCache PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")
 
