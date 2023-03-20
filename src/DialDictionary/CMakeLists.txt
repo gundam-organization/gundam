@@ -11,8 +11,10 @@ set( SRCFILES
     src/EventDialCache.cpp
     src/GraphHandler.cpp
     src/LightGraphHandler.cpp
-    src/MonotonicSplineHandler.cpp
     src/GeneralSplineHandler.cpp
+    src/UniformSplineHandler.cpp
+    src/CompactSplineHandler.cpp
+    src/MonotonicSplineHandler.cpp
     src/SimpleSplineHandler.cpp
     include/LightGraphCache.h)
 
@@ -34,12 +36,17 @@ set( HEADERS
     include/LightGraphHandler.h
     include/Graph.h
     include/LightGraph.h
-    include/MonotonicSplineHandler.h
-    include/MonotonicSpline.h
-    include/MonotonicSplineCache.h
     include/GeneralSplineHandler.h
     include/GeneralSpline.h
     include/GeneralSplineCache.h
+    include/UniformSplineHandler.h
+    include/UniformSpline.h
+    include/CompactSplineHandler.h
+    include/CompactSpline.h
+    include/CompactSplineCache.h
+    include/MonotonicSplineHandler.h
+    include/MonotonicSpline.h
+    include/MonotonicSplineCache.h
     include/SimpleSplineHandler.h
     include/SimpleSpline.h
     include/SimpleSplineCache.h

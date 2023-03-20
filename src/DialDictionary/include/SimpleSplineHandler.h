@@ -27,9 +27,12 @@ public:
   void buildSplineData(const TSpline3& sp_);
   [[nodiscard]] double evaluateSpline(const DialInputBuffer& input_) const;
 
+  bool getIsUniform() const {return _isUniform_;}
+  const std::vector<double>& getSplineData() const {return _splineData_;}
+
 protected:
   bool _allowExtrapolation_{false};
-  bool _isMonotonic_{false};
+  bool _isUniform_{false};
 
   // A block of data to calculate the spline values.  This must be filled for
   // the Cache::Manager to work, and provides the input for spline calculation
