@@ -25,7 +25,7 @@ void MonotonicSplineHandler::buildSplineData(TGraph& graph_){
 
   LogThrowIf(
       not GenericToolbox::hasUniformlySpacedKnots(&graph_),
-      "Can't use uniform spline with an input that doesn't have uniformly spaced knots"
+      "Can't use monotonic spline with a input that doesn't have uniformly spaced knots"
   );
 
   _splineBounds_.first = graph_.GetX()[0];
@@ -47,4 +47,3 @@ double MonotonicSplineHandler::evaluateSpline(const DialInputBuffer& input_) con
 
   return CalculateMonotonicSpline( dialInput, -1E20, 1E20, _splineData_.data(), int(_splineData_.size()) );
 }
-
