@@ -1,11 +1,12 @@
 #ifndef CALCULATE_COMPACT_SPLINE_H_SEEN
-// Calculate a spline with uniformly space knots.  This adds a function that
-// can be called from CPU (with c++), or a GPU (with CUDA).  This is much
-// faster than TSpline3.  This uses the constraint that the slope at the first
-// and last point is equal to the average slope between the first and last two
-// points [i.e. The slope at the first point, M0, is equal to the slope
-// between P0 and P1, so M0 is (P1-P0)/(dist)]. The slope at any point is
-// fixed to be the average slope between the preceding and following points.
+// Calculate a Catmull-Rom spline with uniformly space knots.  This adds a
+// function that can be called from CPU (with c++), or a GPU (with CUDA).
+// This is much faster than TSpline3.  This uses the constraint that the slope
+// at the first and last point is equal to the average slope between the first
+// and last two points [i.e. The slope at the first point, M0, is equal to the
+// slope between P0 and P1, so M0 is (P1-P0)/(dist)]. The slope at any point
+// is fixed to be the average slope between the preceding and following
+// points.
 
 // Wrap the CUDA compiler attributes into a definition.  When this is compiled
 // with a CUDA compiler __CUDACC__ will be defined.  In that case, the code
