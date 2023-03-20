@@ -24,6 +24,9 @@ public:
   void buildSplineData(TGraph& graph_);
   [[nodiscard]] double evaluateSpline(const DialInputBuffer& input_) const;
 
+  bool getIsUniform() const {return true;}
+  const std::vector<double>& getSplineData() const {return _splineData_;}
+
 protected:
   bool _allowExtrapolation_{false};
 
