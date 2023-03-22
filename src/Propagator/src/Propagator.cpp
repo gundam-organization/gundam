@@ -323,7 +323,13 @@ void Propagator::initializeImpl() {
   // the MC has been copied for the Asimov fit, or the "data" use the MC
   // reweighting cache.  This must also be before the first use of
   // reweightMcEvents.
-  if(GlobalVariables::getEnableCacheManager()) Cache::Manager::Build(getFitSampleSet());
+  if(GlobalVariables::getEnableCacheManager()) {
+#ifdef USE_NEW_DIALS
+      Cache::Manager::Build(getFitSampleSet(), _eventDialCache_);
+#else
+      Cache::Manager::Build(getFitSampleSet());
+#endif
+  }
 #endif
 
   LogInfo << "Propagating prior parameters on events..." << std::endl;
@@ -469,13 +475,13 @@ void Propagator::initializeImpl() {
       LogDebug << "Event #" << iEvt++ << "{" << std::endl;
       {
         Logger::Indent i;
-        LogDebug << entry.first->getSummary() << std::endl;
+        LogDebug << entry.event->getSummary() << std::endl;
         LogDebug << "dialCache = {";
-        for( auto& dialInterface : entry.second ) {
+        for( auto& dialInterface : entry.dials ) {
 #ifndef USE_BREAKDOWN_CACHE
           LogDebug << std::endl << "  - " << dialInterface->getSummary();
 #else
-          LogDebug << std::endl << "  - " << dialInterface.first->getSummary();
+          LogDebug << std::endl << "  - " << dialInterface.dial->getSummary();
 #endif
         }
         LogDebug << std::endl << "}" << std::endl;

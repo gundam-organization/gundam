@@ -1,6 +1,6 @@
 #include "CacheWeights.h"
 #include "WeightBase.h"
-#include "WeightMonotonicSpline.h"
+#include "WeightCompactSpline.h"
 
 #include <algorithm>
 #include <iostream>
@@ -14,11 +14,11 @@
 
 #include "Logger.h"
 LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache::Weight::MonotonicSpline]");
+  Logger::setUserHeaderStr("[Cache::Weight::CompactSpline]");
 });
 
 // The constructor
-Cache::Weight::MonotonicSpline::MonotonicSpline(
+Cache::Weight::CompactSpline::CompactSpline(
     Cache::Weights::Results& weights,
     Cache::Parameters::Values& parameters,
     Cache::Parameters::Clamps& lowerClamps,
@@ -47,7 +47,7 @@ Cache::Weight::MonotonicSpline::MonotonicSpline(
     }
 
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in Cache::Weight::MonotonicSpline::MonotonicSpline
+#warning Using SLOW VALIDATION in Cache::Weight::CompactSpline::CompactSpline
         // Add validation code for the spline calculation.  This can be rather
         // slow, so do not use if it is not required.
     fTotalBytes += GetSplinesReserved()*sizeof(double);
@@ -73,7 +73,7 @@ Cache::Weight::MonotonicSpline::MonotonicSpline(
         fSplineIndex.reset(new hemi::Array<int>(1+GetSplinesReserved(),false));
 
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in Cache::Weight::MonotonicSpline::MonotonicSpline
+#warning Using SLOW VALIDATION in Cache::Weight::CompactSpline::CompactSpline
         // Add validation code for the spline calculation.  This can be rather
         // slow, so do not use if it is not required.
         fSplineValue.reset(new hemi::Array<double>(GetSplinesReserved(),true));
@@ -96,15 +96,15 @@ Cache::Weight::MonotonicSpline::MonotonicSpline(
 }
 
 // The destructor
-Cache::Weight::MonotonicSpline::~MonotonicSpline() {}
+Cache::Weight::CompactSpline::~CompactSpline() {}
 
-int Cache::Weight::MonotonicSpline::FindPoints(const TSpline3* s) {
+int Cache::Weight::CompactSpline::FindPoints(const TSpline3* s) {
     return s->GetNp();
 }
 
-void Cache::Weight::MonotonicSpline::AddSpline(int resIndex,
-                                               int parIndex,
-                                               const std::vector<double>& splineData) {
+void Cache::Weight::CompactSpline::AddSpline(int resIndex,
+                                             int parIndex,
+                                             const std::vector<double>& splineData) {
     if (resIndex < 0) {
         LogError << "Invalid result index"
                << std::endl;
@@ -157,7 +157,7 @@ void Cache::Weight::MonotonicSpline::AddSpline(int resIndex,
 
 }
 
-void Cache::Weight::MonotonicSpline::SetSplineKnot(
+void Cache::Weight::CompactSpline::SetSplineKnot(
     int sIndex, int kIndex, double value) {
     if (sIndex < 0) {
         LogError << "Requested spline index is negative"
@@ -183,7 +183,7 @@ void Cache::Weight::MonotonicSpline::SetSplineKnot(
     fSplineKnots->hostPtr()[knotIndex] = value;
 }
 
-int Cache::Weight::MonotonicSpline::GetSplineParameterIndex(int sIndex) {
+int Cache::Weight::CompactSpline::GetSplineParameterIndex(int sIndex) {
     if (sIndex < 0) {
         throw std::runtime_error("Spline index invalid");
     }
@@ -193,7 +193,7 @@ int Cache::Weight::MonotonicSpline::GetSplineParameterIndex(int sIndex) {
     return fSplineParameter->hostPtr()[sIndex];
 }
 
-double Cache::Weight::MonotonicSpline::GetSplineParameter(int sIndex) {
+double Cache::Weight::CompactSpline::GetSplineParameter(int sIndex) {
     int i = GetSplineParameterIndex(sIndex);
     if (i<0) {
         throw std::runtime_error("Spine parameter index out of bounds");
@@ -204,7 +204,7 @@ double Cache::Weight::MonotonicSpline::GetSplineParameter(int sIndex) {
     return fParameters.hostPtr()[i];
 }
 
-int Cache::Weight::MonotonicSpline::GetSplineKnotCount(int sIndex) {
+int Cache::Weight::CompactSpline::GetSplineKnotCount(int sIndex) {
     if (sIndex < 0) {
         throw std::runtime_error("Spline index invalid");
     }
@@ -214,7 +214,7 @@ int Cache::Weight::MonotonicSpline::GetSplineKnotCount(int sIndex) {
     return fSplineIndex->hostPtr()[sIndex+1]-fSplineIndex->hostPtr()[sIndex]-2;
 }
 
-double Cache::Weight::MonotonicSpline::GetSplineLowerBound(int sIndex) {
+double Cache::Weight::CompactSpline::GetSplineLowerBound(int sIndex) {
     if (sIndex < 0) {
         throw std::runtime_error("Spline index invalid");
     }
@@ -225,7 +225,7 @@ double Cache::Weight::MonotonicSpline::GetSplineLowerBound(int sIndex) {
     return fSplineKnots->hostPtr()[knotsIndex];
 }
 
-double Cache::Weight::MonotonicSpline::GetSplineUpperBound(int sIndex) {
+double Cache::Weight::CompactSpline::GetSplineUpperBound(int sIndex) {
     if (sIndex < 0) {
         throw std::runtime_error("Spline index invalid");
     }
@@ -239,7 +239,7 @@ double Cache::Weight::MonotonicSpline::GetSplineUpperBound(int sIndex) {
     return lower + (knotCount-1)/step;
 }
 
-double Cache::Weight::MonotonicSpline::GetSplineLowerClamp(int sIndex) {
+double Cache::Weight::CompactSpline::GetSplineLowerClamp(int sIndex) {
     int i = GetSplineParameterIndex(sIndex);
     if (i<0) {
         throw std::runtime_error("Spine lower clamp index out of bounds");
@@ -250,7 +250,7 @@ double Cache::Weight::MonotonicSpline::GetSplineLowerClamp(int sIndex) {
     return fLowerClamp.hostPtr()[i];
 }
 
-double Cache::Weight::MonotonicSpline::GetSplineUpperClamp(int sIndex) {
+double Cache::Weight::CompactSpline::GetSplineUpperClamp(int sIndex) {
     int i = GetSplineParameterIndex(sIndex);
     if (i<0) {
         throw std::runtime_error("Spine upper clamp index out of bounds");
@@ -261,7 +261,7 @@ double Cache::Weight::MonotonicSpline::GetSplineUpperClamp(int sIndex) {
     return fUpperClamp.hostPtr()[i];
 }
 
-double Cache::Weight::MonotonicSpline::GetSplineKnot(int sIndex, int knot) {
+double Cache::Weight::CompactSpline::GetSplineKnot(int sIndex, int knot) {
     if (sIndex < 0) {
         throw std::runtime_error("Spline index invalid");
     }
@@ -284,13 +284,13 @@ double Cache::Weight::MonotonicSpline::GetSplineKnot(int sIndex, int knot) {
 // NOOPs and should mostly not be called.
 
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in Cache::Weight::MonotonicSpline::GetSplineValue
+#warning Using SLOW VALIDATION in Cache::Weight::CompactSpline::GetSplineValue
 // Get the intermediate spline result that is used to calculate an event
 // weight.  This can trigger a copy from the GPU to CPU, and must only be
 // enabled during validation.  Using this validation code also significantly
 // increases the amount of GPU memory required.  In a short sentence, "Do not
 // use this method."
-double* Cache::Weight::MonotonicSpline::GetCachePointer(int sIndex) {
+double* Cache::Weight::CompactSpline::GetCachePointer(int sIndex) {
     if (sIndex < 0) {
         throw std::runtime_error("GetSplineValue: Spline index invalid");
     }
@@ -304,7 +304,7 @@ double* Cache::Weight::MonotonicSpline::GetCachePointer(int sIndex) {
 #endif
 
 #include "CacheAtomicMult.h"
-#include "CalculateMonotonicSpline.h"
+#include "CalculateCompactSpline.h"
 
 // Define CACHE_DEBUG to get lots of output from the host
 #undef CACHE_DEBUG
@@ -316,7 +316,7 @@ namespace {
     HEMI_KERNEL_FUNCTION(HEMISplinesKernel,
                          double* results,
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in Cache::Weight::MonotonicSpline::HEMISplinesKernel
+#warning Using SLOW VALIDATION in Cache::Weight::CompactSpline::HEMISplinesKernel
                          // inputs/output for validation
                          double* splineValues,
 #endif
@@ -338,11 +338,11 @@ namespace {
             const double lClamp = lowerClamp[pIndex[i]];
             const double uClamp = upperClamp[pIndex[i]];
 
-            double v = CalculateMonotonicSpline(x, lClamp,uClamp,
+            double v = CalculateCompactSpline(x, lClamp,uClamp,
                                                 &knots[id0],dim);
 
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in Cache::Weight::MonotonicSpline::HEMISplinesKernel
+#warning Using SLOW VALIDATION in Cache::Weight::CompactSpline::HEMISplinesKernel
             splineValues[i] = v;
 #endif
             CacheAtomicMult(&results[rIndex[i]], v);
@@ -362,14 +362,14 @@ namespace {
     }
 }
 
-bool Cache::Weight::MonotonicSpline::Apply() {
+bool Cache::Weight::CompactSpline::Apply() {
     if (GetSplinesUsed() < 1) return false;
 
     HEMISplinesKernel splinesKernel;
     hemi::launch(splinesKernel,
                  fWeights.writeOnlyPtr(),
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in Cache::Weight::MonotonicSpline::Apply
+#warning Using SLOW VALIDATION in Cache::Weight::CompactSpline::Apply
                  fSplineValue->writeOnlyPtr(),
 #endif
                  fParameters.readOnlyPtr(),

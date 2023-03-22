@@ -71,8 +71,8 @@ public:
                   Cache::Parameters::Values& parameters,
                   Cache::Parameters::Clamps& lowerClamps,
                   Cache::Parameters::Clamps& upperClamps,
-                  std::size_t splines,
-                  std::size_t knots);
+                  std::size_t splines,std::size_t knots,
+                  std::string spaceOption);
 
     // Deconstruct the class.  This should deallocate all the memory
     // everyplace.
@@ -95,9 +95,8 @@ public:
     /// Return the number of elements currently used to hold knots.
     std::size_t GetSplineKnotsUsed() const {return fSplineKnotsUsed;}
 
-    /// Add a spline for the dial.  This may modify the dial if debugging is
-    /// enabled.
-    void AddSpline(int resultIndex, int parIndex, SplineDial* dial);
+    /// Add a spline data.
+    void AddSpline(int resultIndex, int parIndex, const std::vector<double>& splineData);
 
     // Get the index of the parameter for the spline at sIndex.
     int GetSplineParameterIndex(int sIndex);

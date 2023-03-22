@@ -2,8 +2,8 @@
 // Created by Adrien Blanchet on 22/01/2023.
 //
 
-#ifndef GUNDAM_MONOTONICSPLINEHANDLER_H
-#define GUNDAM_MONOTONICSPLINEHANDLER_H
+#ifndef GUNDAM_COMPACTSPLINEHANDLER_H
+#define GUNDAM_COMPACTSPLINEHANDLER_H
 
 #include "DialInputBuffer.h"
 
@@ -13,11 +13,11 @@
 #include "utility"
 
 
-class MonotonicSplineHandler {
+class CompactSplineHandler {
 
 public:
-  MonotonicSplineHandler() = default;
-  virtual ~MonotonicSplineHandler() = default;
+  CompactSplineHandler() = default;
+  virtual ~CompactSplineHandler() = default;
 
   void setAllowExtrapolation(bool allowExtrapolation);
 
@@ -39,4 +39,4 @@ protected:
 };
 
 
-#endif //GUNDAM_MONOTONICSPLINEHANDLER_H
+#endif //GUNDAM_COMPACTSPLINEHANDLER_H

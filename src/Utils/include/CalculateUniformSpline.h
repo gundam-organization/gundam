@@ -28,7 +28,7 @@
 namespace {
     // Interpolate one point using a spline with uniformly spaced knots.  This
     // is much faster than TSpline3 (about fifty times faster, but careful,
-    // controlled, benchmarking was not done).  This takes the "index" of the
+    // controlled benchmarking was not done).  This takes the "index" of the
     // point in the data, the parameter value (that made the index), a minimum
     // and maximum output value, the buffer of data for this spline, and the
     // number of data elements in the spline data.  The input data is arrange

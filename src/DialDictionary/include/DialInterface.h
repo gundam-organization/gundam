@@ -19,6 +19,8 @@
 #include "vector"
 
 
+/// This class is size critical and should not be used as a base class (no
+/// virtual methods.
 class DialInterface {
 
 public:
@@ -29,9 +31,25 @@ public:
   void setResponseSupervisorRef(const DialResponseSupervisor *responseSupervisorRef);
   void setDialBinRef(const DataBin *dialBinRef);
 
-  [[nodiscard]] DialInputBuffer *getInputBufferRef() const;
+  /// Return the input buffer containing the connection to the FitParameter(s)
+  /// used by this dial.  The number of FitParameters contained in the input
+  /// buffer musts mach the number expected by the specialization of the
+  /// DialBase.
+  [[nodiscard]] inline DialInputBuffer *getInputBufferRef() const {return _inputBufferRef_;}
 
-  double evalResponse();
+  /// Get the dial calculation method.  The dial will need one or more
+  /// FitParameter inputs, and the number *must* match the number and order of
+  /// the FitParameters in the DialInputBuffer.
+  [[nodiscard]] inline DialBase* getDialBaseRef() const {return _dialBaseRef_;}
+
+  /// Get the DialResponseSupervisor. This conditions the return value of the
+  /// dial (normally truncates between zero and the maximum response).
+  [[nodiscard]] inline const DialResponseSupervisor* getResponseSupervisorRef() const {return _responseSupervisorRef_;}
+
+  /// Get the data bin definition for the dial.
+  [[nodiscard]] inline const DataBin* getDialBinRef() const {return _dialBinRef_;}
+
+  [[nodiscard]] double evalResponse();
   [[nodiscard]] std::string getSummary(bool shallow_=true);
 
 private:

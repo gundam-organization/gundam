@@ -1,12 +1,12 @@
-#ifndef CALCULATE_MONOTONIC_SPLINE_H_SEEN
-// Calculate a monotonic spline with uniformly space knots.  This adds a
+#ifndef CALCULATE_COMPACT_SPLINE_H_SEEN
+// Calculate a Catmull-Rom spline with uniformly space knots.  This adds a
 // function that can be called from CPU (with c++), or a GPU (with CUDA).
 // This is much faster than TSpline3.  This uses the constraint that the slope
 // at the first and last point is equal to the average slope between the first
 // and last two points [i.e. The slope at the first point, M0, is equal to the
-// slope between P0 and P1, so M0 is (P1-P0)/(dist)].  Before applying the
-// monotonic constraint, the slope at any point is set equal to the average
-// slope between the preceding and following points.
+// slope between P0 and P1, so M0 is (P1-P0)/(dist)]. The slope at any point
+// is fixed to be the average slope between the preceding and following
+// points.
 
 // Wrap the CUDA compiler attributes into a definition.  When this is compiled
 // with a CUDA compiler __CUDACC__ will be defined.  In that case, the code
@@ -31,7 +31,7 @@
 
 // Place in a private name space so it plays nicely with CUDA
 namespace {
-    // Interpolate one point using a monotonic spline.  This takes the "index"
+    // Interpolate one point using a compact spline.  This takes the "index"
     // of the point in the data, the parameter value (that made the index), a
     // minimum and maximum bound, the buffer of data for this spline, and the
     // number of data elements in the spline data.  The input data is arrange
@@ -41,10 +41,10 @@ namespace {
     // data[1] -- spline inverse step (not used)
     // data[2+2*n+0] -- The function value for knot n
     DEVICE_CALLABLE_INLINE
-    double CalculateMonotonicSpline(const double x,
-                                    const double lowerBound, double upperBound,
-                                    const DEVICE_FLOATING_POINT* data,
-                                    const int dim) {
+    double CalculateCompactSpline(const double x,
+                                  const double lowerBound, double upperBound,
+                                  const DEVICE_FLOATING_POINT* data,
+                                  const int dim) {
 
         // Interpolate between p2 and p3
         // ix-2 ix-1 ix   ix+1 ix+2 ix+3
@@ -106,50 +106,6 @@ namespace {
         // double m1 = 0.5*(d10+d21);
         double m2 = 0.5*(d21+d32);
         double m3 = 0.5*(d32+d43);
-
-#define COMPACT_SPLINE_MONOTONIC
-#ifdef COMPACT_SPLINE_MONOTONIC
-// #warning Using a MONOTONIC spline
-        const double d54 = data[2+d54_1] - data[2+d54_0];
-        double m4 = 0.5*(d43+d54);
-
-        // Deal with cusp points and flat areas.
-        // if (d21*d10 < 0.0) m1 = 0.0;
-        if (d32*d21 <= 0.0) m2 = 0.0;
-        if (d43*d32 <= 0.0) m3 = 0.0;
-        if (d54*d43 <= 0.0) m4 = 0.0;
-
-        // Find the alphas and betas
-        // double a0 = (d10>0) ? m0/d21: 0;
-        // double b0 = (d10>0) ? m1/d21: 0;
-        // double a1 = (d21>0) ? m1/d21: 0;
-        const double b1 = (d21>0) ? m2/d21: 0;
-        const double a2 = (d32>0) ? m2/d32: 0;
-        const double b2 = (d32>0) ? m3/d32: 0;
-        const double a3 = (d43>0) ? m3/d43: 0;
-        const double b3 = (d43>0) ? m4/d43: 0;
-        // double a4 = (d54>0) ? m4/d54: 0;
-        // double b4 = (d54>0) ? m5/d54: 0;
-
-        // Find places where can only be piecewise monotonic.
-        // if (b0 <= 0) m1 = 0.0;
-        if (b1 <= 0) m2 = 0.0;
-        if (b2 <= 0) m3 = 0.0;
-        // if (b3 <= 0) m4 = 0.0;
-        // if (b4 <= 0) m5 = 0.0;
-        // if (a0 <= 0) m0 = 0.0;
-        // if (a1 <= 0) m1 = 0.0;
-        if (a2 <= 0) m2 = 0.0;
-        if (a3 <= 0) m3 = 0.0;
-        // if (a4 <= 0) m4 = 0.0;
-
-        // Limit the slopes so there isn't overshoot.  It might be
-        // possible to handle the zero slope sections here without an
-        // extra conditional.  if (a1 > 3 || b1 > 3) m1 = 3.0*d21;
-        if (a2 > 3 || b2 > 3) m2 = 3.0*d32;
-        if (a3 > 3 || b3 > 3) m3 = 3.0*d43;
-        // if (a4 > 3 || b4 > 3) m4 = 3.0*d54;
-#endif
 
         // Cubic spline with the points and slopes.
         // double v = p2*(2.0*fxxx-3.0*fxx+1.0) + m2*(fxxx-2.0*fxx+fx)
