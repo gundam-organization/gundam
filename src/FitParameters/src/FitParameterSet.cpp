@@ -510,6 +510,14 @@ void FitParameterSet::propagateEigenToOriginal(){
 
 
 // Misc
+FitParameter* FitParameterSet::getParameterPtr(const std::string& parName_){
+  if( not parName_.empty() ){
+    for( auto& par : _parameterList_ ){
+      if( par.getName() == parName_ ){ return &par; }
+    }
+  }
+  return nullptr;
+}
 std::string FitParameterSet::getSummary() const {
   std::stringstream ss;
 

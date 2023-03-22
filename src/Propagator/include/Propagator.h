@@ -30,6 +30,7 @@ public:
   void setThrowAsimovToyParameters(bool throwAsimovToyParameters);
   void setIThrow(int iThrow);
   void setLoadAsimovData(bool loadAsimovData);
+  void setParameterInjector(const nlohmann::json &parameterInjector);
   void setGlobalCovarianceMatrix(const std::shared_ptr<TMatrixD> &globalCovarianceMatrix);
 
   // Const getters
@@ -57,7 +58,9 @@ public:
   double* getLlhStatBufferPtr(){ return &_llhStatBuffer_; }
   double* getLlhPenaltyBufferPtr(){ return &_llhPenaltyBuffer_; }
   double* getLlhRegBufferPtr(){ return &_llhRegBuffer_; }
+
   [[nodiscard]] const FitParameterSet* getFitParameterSetPtr(const std::string& name_) const;
+  [[nodiscard]] FitParameterSet* getFitParameterSetPtr(const std::string& name_);
 
   // Core
   void updateLlhCache();
@@ -82,6 +85,7 @@ private:
   bool _loadAsimovData_{false};
   bool _debugPrintLoadedEvents_{false};
   int _debugPrintLoadedEventsNbPerSample_{5};
+  nlohmann::json _parameterInjector_;
 
   // Internals
   bool _throwAsimovToyParameters_{false};
