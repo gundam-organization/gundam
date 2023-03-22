@@ -49,6 +49,7 @@ int main(int argc, char** argv){
   clParser.addOption("outputFilePath", {"-o", "--out-file"}, "Specify the output file");
   clParser.addOption("outputDir", {"--out-dir"}, "Specify the output directory");
   clParser.addOption("randomSeed", {"-s", "--seed"}, "Set random seed");
+  clParser.addOption("injectParameterConfig", {"--inject-parameters"}, "Inject parameters defined in the provided config file");
   clParser.addOption("appendix", {"--appendix"}, "Add appendix to the output file name");
 
   clParser.addDummyOption("Trigger options");
@@ -118,6 +119,12 @@ int main(int argc, char** argv){
     GlobalVariables::setDisableDialCache(true);
   }
 
+  // inject parameter config?
+  std::string injectParameterPath{};
+  if( clParser.isOptionTriggered("injectParameterConfig") ){
+    LogWarning << "Inject parameter config: " << clParser.getOptionVal<std::string>("injectParameterConfig") << std::endl;
+    injectParameterPath = clParser.getOptionVal<std::string>("injectParameterConfig");
+  }
 
   // PRNG seed?
   if( clParser.isOptionTriggered("randomSeed") ){
@@ -294,6 +301,12 @@ int main(int argc, char** argv){
 
   // --light-mode
   fitter.setLightMode( clParser.isOptionTriggered("lightOutputMode") );
+
+  // injectParameterPath
+  if( not injectParameterPath.empty() ){
+    auto injectConfig = ConfigUtils::readConfigFile( injectParameterPath ); ConfigUtils::forwardConfig( injectConfig );
+    fitter.getPropagator().setParameterInjector( injectConfig );
+  }
 
   // Also check app level config options
   GenericToolbox::Json::deprecatedAction(jsonConfig, "generateSamplePlots", [&]{

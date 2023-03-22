@@ -78,6 +78,7 @@ public:
   void propagateOriginalToEigen();
 
   // Misc
+  FitParameter* getParameterPtr(const std::string& parName_);
   [[nodiscard]] std::string getSummary() const;
 
   static double toNormalizedParRange(double parRange, const FitParameter& par);

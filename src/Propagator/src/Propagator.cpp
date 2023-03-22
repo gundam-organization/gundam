@@ -112,6 +112,9 @@ void Propagator::readConfigImpl(){
   }
 #endif
 
+  _parameterInjector_ = GenericToolbox::Json::fetchValue(_config_, "parameterInjection", _parameterInjector_);
+  ConfigUtils::forwardConfig(_parameterInjector_);
+
 }
 void Propagator::initializeImpl() {
   LogWarning << __METHOD_NAME__ << std::endl;
@@ -502,6 +505,58 @@ void Propagator::initializeImpl() {
 #endif
   }
 
+
+  if( not _parameterInjector_.empty() ){
+
+    nlohmann::json injParsetList;
+    injParsetList = GenericToolbox::Json::fetchValue(_parameterInjector_, "parameterSetList", injParsetList);
+
+    for( auto& entryParset : injParsetList ){
+      auto parsetName = GenericToolbox::Json::fetchValue<std::string>(entryParset, "name");
+      LogInfo << "Reading injection parameters for parSet: " << parsetName << std::endl;
+
+      auto* selectedParset = this->getFitParameterSetPtr( parsetName );
+      LogThrowIf( selectedParset == nullptr, "Could not find parset: " << parsetName );
+
+      auto parValues = GenericToolbox::Json::fetchValue<nlohmann::json>(entryParset, "parameterValues");
+      if( parValues.empty() ) {
+        LogThrow( "" );
+      }
+      else if( parValues.is_string() ){
+        LogInfo << "Reading parameter values from file: " << parValues.get<std::string>() << std::endl;
+        auto parList = GenericToolbox::dumpFileAsVectorString( parValues.get<std::string>(), true );
+        LogThrowIf( parList.size() != selectedParset->getNbParameters()  ,
+                    parList.size() << " parameters provided for " << parsetName << ", expecting " << selectedParset->getNbParameters()
+                    );
+
+        for( size_t iPar = 0 ; iPar < selectedParset->getNbParameters() ; iPar++ ) {
+          LogWarning << "Injecting \"" << selectedParset->getParameterList()[iPar].getFullTitle() << "\": " << parList[iPar] << std::endl;
+          selectedParset->getParameterList()[iPar].setParameterValue( std::stod(parList[iPar]) );
+        }
+
+        if( selectedParset->isUseEigenDecompInFit() ){ selectedParset->propagateOriginalToEigen(); }
+      }
+      else{
+        for( auto& parValueEntry : parValues ){
+          if( GenericToolbox::Json::doKeyExist(parValueEntry, "name") ) {
+            auto parName = GenericToolbox::Json::fetchValue<std::string>(parValueEntry, "name");
+            auto* parPtr = selectedParset->getParameterPtr(parName);
+            LogThrowIf(parPtr == nullptr, "Could not find " << parName << " among the defined parameters in " << selectedParset->getName());
+
+            LogWarning << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
+            parPtr->setParameterValue( GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") );
+          }
+          else {
+            LogThrow("Unsupported: " << parValueEntry);
+          }
+        }
+
+
+      }
+    }
+
+  }
+
   // Propagator needs to be fast
   GlobalVariables::getParallelWorker().setCpuTimeSaverIsEnabled(false);
 }
@@ -517,6 +572,9 @@ void Propagator::setIThrow(int iThrow) {
 }
 void Propagator::setLoadAsimovData(bool loadAsimovData) {
   _loadAsimovData_ = loadAsimovData;
+}
+void Propagator::setParameterInjector(const nlohmann::json &parameterInjector) {
+  _parameterInjector_ = parameterInjector;
 }
 void Propagator::setGlobalCovarianceMatrix(const std::shared_ptr<TMatrixD> &globalCovarianceMatrix) {
   _globalCovarianceMatrix_ = globalCovarianceMatrix;
@@ -570,6 +628,15 @@ std::vector<DatasetLoader> &Propagator::getDataSetList() {
 }
 
 const FitParameterSet* Propagator::getFitParameterSetPtr(const std::string& name_) const{
+  for( auto& parSet : _parameterSetList_ ){
+    if( parSet.getName() == name_ ) return &parSet;
+  }
+  std::vector<std::string> parSetNames{};
+  for( auto& parSet : _parameterSetList_ ){ parSetNames.emplace_back(parSet.getName()); }
+  LogThrow("Could not find fit parameter set named \"" << name_ << "\" among defined: " << GenericToolbox::parseVectorAsString(parSetNames));
+  return nullptr;
+}
+FitParameterSet* Propagator::getFitParameterSetPtr(const std::string& name_){
   for( auto& parSet : _parameterSetList_ ){
     if( parSet.getName() == name_ ) return &parSet;
   }
@@ -795,3 +862,4 @@ void Propagator::reweightMcEvents(int iThread_) {
 
 
 }
+

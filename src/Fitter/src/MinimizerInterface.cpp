@@ -333,7 +333,7 @@ void MinimizerInterface::calcErrors(){
       }
     }
 
-    LogDebug << "DEBUG: PUSHING AWAY PARAMETERS FOR HESSE TO NOT FREAK OUT FOR SOME REASON..." << std::endl;
+//    LogDebug << "DEBUG: PUSHING AWAY PARAMETERS FOR HESSE TO NOT FREAK OUT FOR SOME REASON..." << std::endl;
     // Make sure we are on the right spot
     updateCacheToBestfitPoint();
 
