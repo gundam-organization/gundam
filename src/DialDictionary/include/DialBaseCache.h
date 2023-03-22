@@ -14,7 +14,7 @@
 #include "mutex"
 
 
-class DialBaseCache : public DialBase {
+class [[deprecated]] DialBaseCache : public DialBase {
   // + sizeof(DialBase) = 24 bytes - padding = 20 bytes
 
 public:
