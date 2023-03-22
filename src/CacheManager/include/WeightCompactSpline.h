@@ -1,5 +1,5 @@
-#ifndef CacheMonotonicSpline_hxx_seen
-#define CacheMonotonicSpline_hxx_seen
+#ifndef CacheCompactSpline_hxx_seen
+#define CacheCompactSpline_hxx_seen
 
 #include "CacheWeights.h"
 #include "WeightBase.h"
@@ -16,17 +16,16 @@ class SplineDial;
 
 namespace Cache {
     namespace Weight {
-        class MonotonicSpline;
+        class CompactSpline;
     }
 }
 
 /// A class apply a splined weight parameter to the cached event weights.
 /// This will be used in Cache::Weights to run the GPU for this type of
 /// reweighting.  This spline is controlled by the value at uniformly spaced
-/// knots.  This starts with a Catmull-Rom spline and then modifies the
-/// weights to guarantee that the function is monotonic, except at cusp
-/// points..
-class Cache::Weight::MonotonicSpline:
+/// knots.  This basically uses Catmull-Rom, but without using an extra point
+/// at the end of the spline.
+class Cache::Weight::CompactSpline:
     public Cache::Weight::Base {
 private:
     Cache::Parameters::Clamps& fLowerClamp;
@@ -68,16 +67,17 @@ public:
     // results (typically a few per event).  The knots are the total number of
     // knots in all of the uniform splines (e.g. For 1000 splines with 7
     // knots for each spline, knots is 7000).
-    MonotonicSpline(Cache::Weights::Results& results,
-                    Cache::Parameters::Values& parameters,
-                    Cache::Parameters::Clamps& lowerClamps,
-                    Cache::Parameters::Clamps& upperClamps,
-                    std::size_t splines, std::size_t knots,
-                    std::string spaceOption);
+    CompactSpline(Cache::Weights::Results& results,
+                  Cache::Parameters::Values& parameters,
+                  Cache::Parameters::Clamps& lowerClamps,
+                  Cache::Parameters::Clamps& upperClamps,
+                  std::size_t splines,
+                  std::size_t knots,
+                  std::string spaceOption);
 
     // Deconstruct the class.  This should deallocate all the memory
     // everyplace.
-    virtual ~MonotonicSpline();
+    virtual ~CompactSpline();
 
     // Apply the kernel to the event weights.
     virtual bool Apply();

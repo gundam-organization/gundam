@@ -1,27 +1,30 @@
 //
-// Created by Adrien Blanchet on 22/01/2023.
+// Created by Adrien Blanchet on 23/01/2023.
 //
 
-#ifndef GUNDAM_MONOTONICSPLINEHANDLER_H
-#define GUNDAM_MONOTONICSPLINEHANDLER_H
+#ifndef GUNDAM_UNIFORMSPLINEHANDLER_H
+#define GUNDAM_UNIFORMSPLINEHANDLER_H
+
 
 #include "DialInputBuffer.h"
 
 #include "TGraph.h"
+#include "TSpline.h"
 
 #include "vector"
 #include "utility"
 
 
-class MonotonicSplineHandler {
+class UniformSplineHandler {
 
 public:
-  MonotonicSplineHandler() = default;
-  virtual ~MonotonicSplineHandler() = default;
+  UniformSplineHandler() = default;
+  virtual ~UniformSplineHandler() = default;
 
   void setAllowExtrapolation(bool allowExtrapolation);
 
   void buildSplineData(TGraph& graph_);
+  void buildSplineData(const TSpline3& sp_);
   [[nodiscard]] double evaluateSpline(const DialInputBuffer& input_) const;
 
   bool getIsUniform() const {return true;}
@@ -39,4 +42,4 @@ protected:
 };
 
 
-#endif //GUNDAM_MONOTONICSPLINEHANDLER_H
+#endif //GUNDAM_UNIFORMSPLINEHANDLER_H

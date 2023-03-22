@@ -2,22 +2,22 @@
 // Created by Adrien Blanchet on 22/01/2023.
 //
 
-#include "MonotonicSplineHandler.h"
-#include "CalculateMonotonicSpline.h"
+#include "CompactSplineHandler.h"
+#include "CalculateCompactSpline.h"
 
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
 
 
 LoggerInit([]{
-  Logger::setUserHeaderStr("[MonotonicSplineHandler]");
+  Logger::setUserHeaderStr("[CompactSplineHandler]");
 });
 
-void MonotonicSplineHandler::setAllowExtrapolation(bool allowExtrapolation) {
+void CompactSplineHandler::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;
 }
 
-void MonotonicSplineHandler::buildSplineData(TGraph& graph_){
+void CompactSplineHandler::buildSplineData(TGraph& graph_){
   LogThrowIf(not _splineData_.empty(), "Spline data already set.");
 
   // Copy the spline data into local storage.
@@ -25,7 +25,7 @@ void MonotonicSplineHandler::buildSplineData(TGraph& graph_){
 
   LogThrowIf(
       not GenericToolbox::hasUniformlySpacedKnots(&graph_),
-      "Can't use monotonic spline with a input that doesn't have uniformly spaced knots"
+      "Can't use compact spline with a input that doesn't have uniformly spaced knots"
   );
 
   _splineBounds_.first = graph_.GetX()[0];
@@ -37,7 +37,7 @@ void MonotonicSplineHandler::buildSplineData(TGraph& graph_){
 
   memcpy(&_splineData_[2], graph_.GetY(), graph_.GetN() * sizeof(double));
 }
-double MonotonicSplineHandler::evaluateSpline(const DialInputBuffer& input_) const{
+double CompactSplineHandler::evaluateSpline(const DialInputBuffer& input_) const{
   double dialInput{input_.getBuffer()[0]};
 
   if( not _allowExtrapolation_ ){
@@ -45,5 +45,5 @@ double MonotonicSplineHandler::evaluateSpline(const DialInputBuffer& input_) con
     else if(input_.getBuffer()[0] >= _splineBounds_.second){ dialInput = _splineBounds_.second; }
   }
 
-  return CalculateMonotonicSpline( dialInput, -1E20, 1E20, _splineData_.data(), int(_splineData_.size()) );
+  return CalculateCompactSpline( dialInput, -1E20, 1E20, _splineData_.data(), int(_splineData_.size()) );
 }

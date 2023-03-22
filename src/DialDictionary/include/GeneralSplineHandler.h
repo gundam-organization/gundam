@@ -27,6 +27,9 @@ public:
   void buildSplineData(const TSpline3& sp_);
   [[nodiscard]] double evaluateSpline(const DialInputBuffer& input_) const;
 
+  bool getIsUniform() const {return false;}
+  const std::vector<double>& getSplineData() const {return _splineData_;}
+
 protected:
   bool _allowExtrapolation_{false};
 
