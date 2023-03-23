@@ -6,10 +6,10 @@
 #define GUNDAM_GRAPH_H
 
 #include "DialBase.h"
-#include "GraphHandler.h"
+#include "DialInputBuffer.h"
+#include "TGraph.h"
 
-
-class Graph : public DialBase, public GraphHandler {
+class Graph : public DialBase {
 
 public:
   Graph() = default;
@@ -18,6 +18,14 @@ public:
   [[nodiscard]] std::string getDialTypeName() const override { return {"Graph"}; }
   double evalResponseImpl(const DialInputBuffer& input_) override { return this->evaluateGraph(input_); }
 
+  void setAllowExtrapolation(bool allowExtrapolation);
+  void setGraph(const TGraph &graph);
+
+  [[nodiscard]] double evaluateGraph(const DialInputBuffer& input_) const;
+
+protected:
+  bool _allowExtrapolation_{false};
+  TGraph _graph_{};
 };
 
 
