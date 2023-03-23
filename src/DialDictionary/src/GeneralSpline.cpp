@@ -2,7 +2,7 @@
 // Created by Adrien Blanchet on 23/01/2023.
 //
 
-#include "GeneralSplineHandler.h"
+#include "GeneralSpline.h"
 #include "CalculateGeneralSpline.h"
 
 #include "GenericToolbox.Root.h"
@@ -13,16 +13,16 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[MonotonicSplineHandler]");
 });
 
-void GeneralSplineHandler::setAllowExtrapolation(bool allowExtrapolation) {
+void GeneralSpline::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;
 }
 
-void GeneralSplineHandler::buildSplineData(TGraph& graph_){
+void GeneralSpline::buildSplineData(TGraph& graph_){
   // Copy the spline data into local storage.
   graph_.Sort();
   buildSplineData(TSpline3(Form("%p", &graph_), &graph_));
 }
-void GeneralSplineHandler::buildSplineData(const TSpline3& sp_){
+void GeneralSpline::buildSplineData(const TSpline3& sp_){
   LogThrowIf(not _splineData_.empty(), "Spline data already set.");
 
   _splineBounds_.first = sp_.GetXmin();
@@ -44,7 +44,7 @@ void GeneralSplineHandler::buildSplineData(const TSpline3& sp_){
 
 //  LogThrow(GenericToolbox::parseVectorAsString(_splineData_));
 }
-double GeneralSplineHandler::evaluateSpline(const DialInputBuffer& input_) const{
+double GeneralSpline::evaluateSpline(const DialInputBuffer& input_) const{
   double dialInput{input_.getBuffer()[0]};
 
   if( not _allowExtrapolation_ ){
@@ -54,4 +54,3 @@ double GeneralSplineHandler::evaluateSpline(const DialInputBuffer& input_) const
 
   return CalculateGeneralSpline( dialInput, -1E20, 1E20, _splineData_.data(), int(_splineData_.size()) );
 }
-
