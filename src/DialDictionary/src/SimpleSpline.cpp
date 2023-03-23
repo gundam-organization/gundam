@@ -2,7 +2,7 @@
 // Created by Adrien Blanchet on 24/01/2023.
 //
 
-#include "SimpleSplineHandler.h"
+#include "SimpleSpline.h"
 #include "CalculateGeneralSpline.h"
 #include "CalculateUniformSpline.h"
 #include "CalculateMonotonicSpline.h"
@@ -13,14 +13,14 @@
 
 
 LoggerInit([]{
-  Logger::setUserHeaderStr("[MonotonicSplineHandler]");
+  Logger::setUserHeaderStr("[SimpleSpline]");
 });
 
-void SimpleSplineHandler::setAllowExtrapolation(bool allowExtrapolation) {
+void SimpleSpline::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;
 }
 
-void SimpleSplineHandler::buildSplineData(TGraph& graph_){
+void SimpleSpline::buildSplineData(TGraph& graph_){
   LogThrowIf(not _splineData_.empty(), "Spline data already set.");
 
   // Copy the spline data into local storage.
@@ -84,7 +84,7 @@ void SimpleSplineHandler::buildSplineData(TGraph& graph_){
   }
 
 }
-void SimpleSplineHandler::buildSplineData(const TSpline3& sp_){
+void SimpleSpline::buildSplineData(const TSpline3& sp_){
   LogThrow("NOT IMPLEMENTED");
 
 
@@ -92,7 +92,7 @@ void SimpleSplineHandler::buildSplineData(const TSpline3& sp_){
 
 
 }
-double SimpleSplineHandler::evaluateSpline(const DialInputBuffer& input_) const{
+double SimpleSpline::evaluateSpline(const DialInputBuffer& input_) const{
   double dialInput{input_.getBuffer()[0]};
 
   if( not _allowExtrapolation_ ){
