@@ -2,7 +2,7 @@
 // Created by Adrien Blanchet on 22/01/2023.
 //
 
-#include "CompactSplineHandler.h"
+#include "CompactSpline.h"
 #include "CalculateCompactSpline.h"
 
 #include "GenericToolbox.Root.h"
@@ -10,14 +10,14 @@
 
 
 LoggerInit([]{
-  Logger::setUserHeaderStr("[CompactSplineHandler]");
+  Logger::setUserHeaderStr("[CompactSpline]");
 });
 
-void CompactSplineHandler::setAllowExtrapolation(bool allowExtrapolation) {
+void CompactSpline::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;
 }
 
-void CompactSplineHandler::buildSplineData(TGraph& graph_){
+void CompactSpline::buildSplineData(TGraph& graph_){
   LogThrowIf(not _splineData_.empty(), "Spline data already set.");
 
   // Copy the spline data into local storage.
@@ -37,7 +37,7 @@ void CompactSplineHandler::buildSplineData(TGraph& graph_){
 
   memcpy(&_splineData_[2], graph_.GetY(), graph_.GetN() * sizeof(double));
 }
-double CompactSplineHandler::evaluateSpline(const DialInputBuffer& input_) const{
+double CompactSpline::evaluateSpline(const DialInputBuffer& input_) const{
   double dialInput{input_.getBuffer()[0]};
 
   if( not _allowExtrapolation_ ){
