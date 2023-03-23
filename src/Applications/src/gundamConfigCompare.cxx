@@ -68,7 +68,6 @@ int main( int argc, char** argv ){
   nlohmann::json config1;
   if     ( clp.isOptionTriggered("config-1") ){ config1 = ConfigUtils::readConfigFile(configPath1); }
   else if( clp.isOptionTriggered("file-1") ){
-    LogInfo << "config-1 is within the output of a fit run." << std::endl;
     LogThrowIf(not GenericToolbox::doesTFileIsValid(configPath1, {"gundamFitter/unfoldedConfig_TNamed"}),
                "Could not find config in file " << configPath1
     );
@@ -76,7 +75,7 @@ int main( int argc, char** argv ){
     auto* conf = f->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed");
     auto* version = f->Get<TNamed>("gundamFitter/gundamVersion_TNamed");
     auto* cmdLine = f->Get<TNamed>("gundamFitter/commandLine_TNamed");
-    LogInfo << "Was run under GUNDAM v" << version->GetTitle() << " with cmdLine: "<< cmdLine->GetTitle() << std::endl;
+    LogInfo << "config-1 is within .root file. Ran under GUNDAM v" << version->GetTitle() << " with cmdLine: "<< cmdLine->GetTitle() << std::endl;
     config1 = GenericToolbox::Json::readConfigJsonStr(conf->GetTitle());
     delete f;
   }
@@ -84,7 +83,6 @@ int main( int argc, char** argv ){
   nlohmann::json config2;
   if     ( clp.isOptionTriggered("config-2") ){ config2 = ConfigUtils::readConfigFile(configPath2); }
   else if( clp.isOptionTriggered("file-2") ){
-    LogInfo << "config-1 is within the output of a fit run." << std::endl;
     LogThrowIf(not GenericToolbox::doesTFileIsValid(configPath2, {"gundamFitter/unfoldedConfig_TNamed"}),
                "Could not find config in file " << configPath2
     );
@@ -92,7 +90,7 @@ int main( int argc, char** argv ){
     auto* conf = f->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed");
     auto* version = f->Get<TNamed>("gundamFitter/gundamVersion_TNamed");
     auto* cmdLine = f->Get<TNamed>("gundamFitter/commandLine_TNamed");
-    LogInfo << "Was run under GUNDAM v" << version->GetTitle() << " with cmdLine: "<< cmdLine->GetTitle() << std::endl;
+    LogInfo << "config-2 is within .root file. Ran under GUNDAM v" << version->GetTitle() << " with cmdLine: "<< cmdLine->GetTitle() << std::endl;
     config2 = GenericToolbox::Json::readConfigJsonStr(conf->GetTitle());
     delete f;
   }
