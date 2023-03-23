@@ -511,6 +511,17 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
           else eigenBreakdownAccum[iEigen].SetFillStyle(1001);
         }
 
+        // normalize to the maximum hist
+        for (int iEigen = decompCovMatrix.GetEigenValues().GetNrows() - 1; iEigen >= 0; iEigen--) {
+          for (int iPar = 0 ; iPar < eigenBreakdownAccum[iEigen].GetNbinsX() ; iPar++ ) {
+            eigenBreakdownAccum[iEigen].SetBinContent(
+                iPar + 1,
+                eigenBreakdownAccum[iEigen].GetBinContent(iPar + 1)
+                /eigenBreakdownAccum[0].GetBinContent(iPar + 1)
+            );
+          }
+        }
+
         TCanvas accumPlot("accumPlot", "accumPlot", 1280, 720);
         TLegend l(0.15, 0.4, 0.3, 0.85);
         bool isFirst{true};
