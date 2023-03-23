@@ -2,7 +2,7 @@
 // Created by Adrien Blanchet on 23/01/2023.
 //
 
-#include "UniformSplineHandler.h"
+#include "UniformSpline.h"
 #include "CalculateUniformSpline.h"
 
 #include "GenericToolbox.Root.h"
@@ -13,16 +13,16 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[MonotonicSplineHandler]");
 });
 
-void UniformSplineHandler::setAllowExtrapolation(bool allowExtrapolation) {
+void UniformSpline::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;
 }
 
-void UniformSplineHandler::buildSplineData(TGraph& graph_){
+void UniformSpline::buildSplineData(TGraph& graph_){
   // Copy the spline data into local storage.
   graph_.Sort();
   buildSplineData(TSpline3(Form("%p", &graph_), &graph_));
 }
-void UniformSplineHandler::buildSplineData(const TSpline3& sp_){
+void UniformSpline::buildSplineData(const TSpline3& sp_){
   LogThrowIf(not _splineData_.empty(), "Spline data already set.");
 
   _splineBounds_.first = sp_.GetXmin();
@@ -43,7 +43,7 @@ void UniformSplineHandler::buildSplineData(const TSpline3& sp_){
 
 //  LogThrow(GenericToolbox::parseVectorAsString(_splineData_));
 }
-double UniformSplineHandler::evaluateSpline(const DialInputBuffer& input_) const{
+double UniformSpline::evaluateSpline(const DialInputBuffer& input_) const{
   double dialInput{input_.getBuffer()[0]};
 
   if( not _allowExtrapolation_ ){
