@@ -341,7 +341,7 @@ namespace JointProbability{
       }
 
       // Barlow-Beeston uses fractional uncertainty on MC, so sqrt(sum[w^2])/mc
-      double fractional = sqrt(mcuncert / predVal + sfgd_det_uncert*sfgd_det_uncert + wg_det_uncert*wg_det_uncert); // Add SFGD detector uncertainty 
+      double fractional = sqrt((mcuncert / predVal)*(mcuncert / predVal) + sfgd_det_uncert*sfgd_det_uncert + wg_det_uncert*wg_det_uncert); // Add SFGD detector uncertainty 
       // -b/2a in quadratic equation
       double temp = predVal * fractional * fractional - 1;
       // b^2 - 4ac in quadratic equation
