@@ -103,6 +103,9 @@ private:
   std::shared_ptr<TMatrixD> _choleskyMatrix_{nullptr};
   std::vector<FitParameter*> _strippedParameterList_{};
 
+  bool _devSingleThreadReweight_{false};
+  bool _devSingleThreadHistFill_{false};
+
   // Sub-layers
   FitSampleSet _fitSampleSet_;
   PlotGenerator _plotGenerator_;
@@ -135,6 +138,11 @@ private:
   std::vector<DialCollection> _dialCollections_{};
   EventDialCache _eventDialCache_{};
 #endif
+
+  // parallel holders
+  std::function<void(int)> reweightMcEventsFct;
+  std::function<void(int)> refillSampleHistogramsFct;
+  std::function<void()> refillSampleHistogramsPostParallelFct;
 
 public:
   GenericToolbox::CycleTimer dialUpdate;

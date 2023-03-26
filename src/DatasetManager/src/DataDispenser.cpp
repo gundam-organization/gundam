@@ -205,8 +205,11 @@ void DataDispenser::buildSampleToFillList(){
 void DataDispenser::doEventSelection(){
   LogWarning << "Performing event selection..." << std::endl;
 
+  LogInfo << "Event selection..." << std::endl;
+
   ROOT::EnableThreadSafety();
-  int nThreads = GlobalVariables::getNbThreads();
+  int nThreads = 1;
+  if( not _owner_->isDevSingleThreadEventSelection() ) { nThreads = GlobalVariables::getNbThreads(); }
   std::vector<std::vector<std::vector<bool>>> perThreadEventIsInSamplesList(nThreads);
   std::vector<std::vector<size_t>> perThreadSampleNbOfEvents(nThreads);
   auto selectionFct = [&](int iThread_){
@@ -378,9 +381,15 @@ void DataDispenser::doEventSelection(){
   };
 
   LogInfo << "Event selection..." << std::endl;
-  GlobalVariables::getParallelWorker().addJob(__METHOD_NAME__, selectionFct);
-  GlobalVariables::getParallelWorker().runJob(__METHOD_NAME__);
-  GlobalVariables::getParallelWorker().removeJob(__METHOD_NAME__);
+  if( not _owner_->isDevSingleThreadEventSelection() ) {
+    GlobalVariables::getParallelWorker().addJob(__METHOD_NAME__, selectionFct);
+    GlobalVariables::getParallelWorker().runJob(__METHOD_NAME__);
+    GlobalVariables::getParallelWorker().removeJob(__METHOD_NAME__);
+  }
+  else {
+    selectionFct(0);
+  }
+
 
   LogInfo << "Merging thread results" << std::endl;
   _cache_.sampleNbOfEvents.resize(_cache_.samplesToFillList.size(), 0);
@@ -830,7 +839,7 @@ void DataDispenser::readAndFill(){
   }
 
   LogWarning << "Loading and indexing..." << std::endl;
-  if( GlobalVariables::getNbThreads() > 1 ){
+  if( not _owner_->isDevSingleThreadEventLoaderAndIndexer() and GlobalVariables::getNbThreads() > 1 ){
     ROOT::EnableThreadSafety();
     std::function<void(int)> f = [&](int iThread_){ this->fillFunction(iThread_); };
     GlobalVariables::getParallelWorker().addJob(__METHOD_NAME__, f);
@@ -838,7 +847,7 @@ void DataDispenser::readAndFill(){
     GlobalVariables::getParallelWorker().removeJob(__METHOD_NAME__);
   }
   else{
-    this->fillFunction(0); // for better debug breakdown
+    this->fillFunction(-1); // for better debug breakdown
   }
 
   LogInfo << "Shrinking lists..." << std::endl;
@@ -847,8 +856,25 @@ void DataDispenser::readAndFill(){
     if(_parameters_.useMcContainer) container = &_cache_.samplesToFillList[iSample]->getMcContainer();
     container->shrinkEventList(_cache_.sampleIndexOffsetList[iSample]);
   }
+
+  if( _owner_->isSortLoadedEvents() ){
+    LogAlert << "[DEV OPTION] Sorting loaded events..." << std::endl;
+    for( auto& evList : _cache_.sampleEventListPtrToFill ){
+      std::function<bool(const PhysicsEvent&, const PhysicsEvent&)> aGoesFirst = [](const PhysicsEvent& a, const PhysicsEvent& b){
+        if( a.getDataSetIndex() < b.getDataSetIndex() ) { return true; }
+        if( a.getEntryIndex() < b.getEntryIndex() ) { return true; }
+        if( a.getEntryIndex() == b.getEntryIndex() and a.getDataSetIndex() == b.getDataSetIndex() ){ return false; }
+        return false;
+      };
+      GenericToolbox::sortVector(*evList, aGoesFirst);
+    }
+  }
+
+
+
 }
 void DataDispenser::fillFunction(int iThread_){
+//  std::scoped_lock<std::mutex> l(_mutex_);
 
   int nThreads = GlobalVariables::getNbThreads();
   if( iThread_ == -1 ){
@@ -1112,7 +1138,7 @@ void DataDispenser::fillFunction(int iThread_){
     if( iThread_ == 0 ) readSpeed.addQuantity(nBytes*nThreads);
 
     if( threadNominalWeightFormula != nullptr ){
-      eventBuffer.setTreeWeight(threadNominalWeightFormula->EvalInstance());
+      eventBuffer.setTreeWeight(threadNominalWeightFormula->EvalInstance<Double_t>());
       if( eventBuffer.getTreeWeight() < 0 ){
         LogError << "Negative nominal weight:" << std::endl;
 
@@ -1438,6 +1464,7 @@ void DataDispenser::fillFunction(int iThread_){
   if( iThread_ == 0 ){
     GenericToolbox::displayProgressBar(nEvents, nEvents, ssProgressBar.str());
   }
+
 }
 
 GenericToolbox::TreeEntryBuffer DataDispenser::generateTreeEventBuffer(TChain* treeChain_, const std::vector<std::string>& varsList_){

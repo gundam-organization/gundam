@@ -91,7 +91,7 @@ std::pair<std::pair<size_t, size_t>, std::vector<std::pair<size_t, size_t>>>* Ev
   std::lock_guard<std::mutex> g(_mutex_);
 #endif
   if( _fillIndex_ >= _indexedCache_.size() ){
-    LogThrow("out of range" << _fillIndex_);
+    LogThrow("out of range: " << _fillIndex_);
     _indexedCache_.emplace_back();
   }
   return &_indexedCache_[_fillIndex_++];

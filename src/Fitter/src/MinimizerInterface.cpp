@@ -538,7 +538,7 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
           if( isFirst ){
             eigenBreakdownAccum[iEigen].SetTitle("Hessian eigen composition of post-fit errors");
             eigenBreakdownAccum[iEigen].GetYaxis()->SetRangeUser(minYval, eigenBreakdownAccum[iEigen].GetMaximum()*1.2);
-            eigenBreakdownAccum[iEigen].GetYaxis()->SetTitle("Post-fit #sigma^{2}");
+            eigenBreakdownAccum[iEigen].GetYaxis()->SetTitle("Hessian eigen composition of postfit errors");
             eigenBreakdownAccum[iEigen].Draw("HIST");
           }
           else{
