@@ -25,6 +25,8 @@ class DialCollection : public JsonBaseClass {
 public:
   explicit DialCollection(std::vector<FitParameterSet> *targetParameterSetListPtr);
 
+  typedef GenericToolbox::PolymorphicObjectWrapper<DialBase> DialBaseObject;
+  
   void setIndex(int index);
   void setSupervisedParameterIndex(int supervisedParameterIndex);
   void setSupervisedParameterSetIndex(int supervisedParameterSetIndex);
@@ -38,7 +40,7 @@ public:
   [[nodiscard]] const std::shared_ptr<TFormula> &getApplyConditionFormula() const;
   [[nodiscard]] const DataBinSet &getDialBinSet() const;
   const std::vector<std::string> &getDataSetNameList() const;
-  std::vector<GenericToolbox::PolymorphicObjectWrapper<DialBase>> &getDialBaseList();
+  std::vector<DialBaseObject> &getDialBaseList();
   std::vector<DialInterface> &getDialInterfaceList();
   DataBinSet &getDialBinSet();
 
@@ -89,7 +91,7 @@ private:
   std::vector<DialInterface> _dialInterfaceList_{};
   std::vector<DialInputBuffer> _dialInputBufferList_{};
   std::vector<DialResponseSupervisor> _dialResponseSupervisorList_{};
-  std::vector<GenericToolbox::PolymorphicObjectWrapper<DialBase>> _dialBaseList_{};
+  std::vector<DialBaseObject> _dialBaseList_{};
   std::shared_ptr<TFormula> _applyConditionFormula_{nullptr};
   GenericToolbox::CopiableAtomic<size_t> _dialFreeSlot_{0};
 

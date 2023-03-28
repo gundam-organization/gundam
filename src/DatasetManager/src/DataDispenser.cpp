@@ -663,11 +663,11 @@ void DataDispenser::preAllocateMemory(){
             double dialsSizeInRam{0};
             if(dialCollection->useCachedDials() ){
               dialsSizeInRam = double(nEvents) * sizeof(SplineCache);
-              dialCollection->getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(SplineCache()));
+              dialCollection->getDialBaseList().resize(nEvents, DialCollection::DialBaseObject(SplineCache()));
             }
             else{
               dialsSizeInRam = double(nEvents) * sizeof(Spline);
-              dialCollection->getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(Spline()));
+              dialCollection->getDialBaseList().resize(nEvents, DialCollection::DialBaseObject(Spline()));
             }
 
             eventByEventDialSize += dialsSizeInRam;
@@ -679,11 +679,11 @@ void DataDispenser::preAllocateMemory(){
             double dialsSizeInRam{0};
             if(dialCollection->useCachedDials() ){
               dialsSizeInRam = double(nEvents) * sizeof(MonotonicSplineCache);
-              dialCollection->getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(MonotonicSplineCache()));
+              dialCollection->getDialBaseList().resize(nEvents, DialCollection::DialBaseObject(MonotonicSplineCache()));
             }
             else{
               dialsSizeInRam = double(nEvents) * sizeof(MonotonicSpline);
-              dialCollection->getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(MonotonicSpline()));
+              dialCollection->getDialBaseList().resize(nEvents, DialCollection::DialBaseObject(MonotonicSpline()));
             }
 
             eventByEventDialSize += dialsSizeInRam;
@@ -695,11 +695,11 @@ void DataDispenser::preAllocateMemory(){
             double dialsSizeInRam{0};
             if(dialCollection->useCachedDials() ){
               dialsSizeInRam = double(nEvents) * sizeof(GeneralSplineCache);
-              dialCollection->getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(GeneralSplineCache()));
+              dialCollection->getDialBaseList().resize(nEvents, DialCollection::DialBaseObject(GeneralSplineCache()));
             }
             else{
               dialsSizeInRam = double(nEvents) * sizeof(GeneralSpline);
-              dialCollection->getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(GeneralSpline()));
+              dialCollection->getDialBaseList().resize(nEvents, DialCollection::DialBaseObject(GeneralSpline()));
             }
 
             eventByEventDialSize += dialsSizeInRam;
@@ -711,11 +711,11 @@ void DataDispenser::preAllocateMemory(){
             double dialsSizeInRam{0};
             if(dialCollection->useCachedDials() ){
               dialsSizeInRam = double(nEvents) * sizeof(SimpleSplineCache);
-              dialCollection->getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(SimpleSplineCache()));
+              dialCollection->getDialBaseList().resize(nEvents, DialCollection::DialBaseObject(SimpleSplineCache()));
             }
             else{
               dialsSizeInRam = double(nEvents) * sizeof(SimpleSpline);
-              dialCollection->getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(SimpleSpline()));
+              dialCollection->getDialBaseList().resize(nEvents, DialCollection::DialBaseObject(SimpleSpline()));
             }
 
             eventByEventDialSize += dialsSizeInRam;
@@ -727,11 +727,11 @@ void DataDispenser::preAllocateMemory(){
             double dialsSizeInRam{0};
             if(dialCollection->useCachedDials() ){
               dialsSizeInRam = double(nEvents) * sizeof(GraphCache);
-              dialCollection->getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(GraphCache()));
+              dialCollection->getDialBaseList().resize(nEvents, DialCollection::DialBaseObject(GraphCache()));
             }
             else{
               dialsSizeInRam = double(nEvents) * sizeof(Graph);
-              dialCollection->getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(Graph()));
+              dialCollection->getDialBaseList().resize(nEvents, DialCollection::DialBaseObject(Graph()));
             }
 
             eventByEventDialSize += dialsSizeInRam;
@@ -742,7 +742,7 @@ void DataDispenser::preAllocateMemory(){
             dialCollection->getDialBaseList().clear();
             double dialsSizeInRam{0};
             dialsSizeInRam = double(nEvents) * sizeof(LightGraph);
-            dialCollection->getDialBaseList().resize(nEvents, GenericToolbox::PolymorphicObjectWrapper<DialBase>(LightGraph()));
+            dialCollection->getDialBaseList().resize(nEvents, DialCollection::DialBaseObject(LightGraph()));
 
             eventByEventDialSize += dialsSizeInRam;
             LogInfo << " dials (" << GenericToolbox::parseSizeUnits( dialsSizeInRam ) << ")" << std::endl;

@@ -82,7 +82,7 @@ const DataBinSet &DialCollection::getDialBinSet() const {
 const std::vector<std::string> &DialCollection::getDataSetNameList() const {
   return _dataSetNameList_;
 }
-std::vector<GenericToolbox::PolymorphicObjectWrapper<DialBase>> &DialCollection::getDialBaseList() {
+std::vector<DialCollection::DialBaseObject> &DialCollection::getDialBaseList() {
   return _dialBaseList_;
 }
 std::vector<DialInterface> &DialCollection::getDialInterfaceList() {
