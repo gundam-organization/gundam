@@ -2,13 +2,13 @@
 // Created by Adrien Blanchet on 19/01/2023.
 //
 
-#include "LightGraphHandler.h"
+#include "LightGraph.h"
 
 
-void LightGraphHandler::setAllowExtrapolation(bool allowExtrapolation) {
+void LightGraph::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;
 }
-void LightGraphHandler::setGraph(TGraph &graph) {
+void LightGraph::setGraph(TGraph &graph) {
   LogThrowIf(graph.GetN() == 0, "Invalid input graph");
   graph.Sort();
 
@@ -21,7 +21,7 @@ void LightGraphHandler::setGraph(TGraph &graph) {
   memcpy(&yPoints[0], graph.GetY(), nPoints * sizeof(double));
 }
 
-double LightGraphHandler::evaluateGraph(const DialInputBuffer& input_) const{
+double LightGraph::evaluateGraph(const DialInputBuffer& input_) const{
   LogThrowIf(xPoints.empty(), "No graph point defined.");
   if (nPoints == 1) return yPoints[0];
 
@@ -54,4 +54,3 @@ double LightGraphHandler::evaluateGraph(const DialInputBuffer& input_) const{
   }
   return yn;
 }
-

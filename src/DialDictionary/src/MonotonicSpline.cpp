@@ -2,7 +2,7 @@
 // Created by Adrien Blanchet on 22/01/2023.
 //
 
-#include "MonotonicSplineHandler.h"
+#include "MonotonicSpline.h"
 #include "CalculateMonotonicSpline.h"
 
 #include "GenericToolbox.Root.h"
@@ -10,14 +10,14 @@
 
 
 LoggerInit([]{
-  Logger::setUserHeaderStr("[MonotonicSplineHandler]");
+  Logger::setUserHeaderStr("[MonotonicSpline]");
 });
 
-void MonotonicSplineHandler::setAllowExtrapolation(bool allowExtrapolation) {
+void MonotonicSpline::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;
 }
 
-void MonotonicSplineHandler::buildSplineData(TGraph& graph_){
+void MonotonicSpline::buildSplineData(TGraph& graph_){
   LogThrowIf(not _splineData_.empty(), "Spline data already set.");
 
   // Copy the spline data into local storage.
@@ -37,7 +37,7 @@ void MonotonicSplineHandler::buildSplineData(TGraph& graph_){
 
   memcpy(&_splineData_[2], graph_.GetY(), graph_.GetN() * sizeof(double));
 }
-double MonotonicSplineHandler::evaluateSpline(const DialInputBuffer& input_) const{
+double MonotonicSpline::evaluateSpline(const DialInputBuffer& input_) const{
   double dialInput{input_.getBuffer()[0]};
 
   if( not _allowExtrapolation_ ){
