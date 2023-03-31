@@ -8,8 +8,14 @@
 void LightGraph::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;
 }
-void LightGraph::setGraph(TGraph &graph) {
-  LogThrowIf(graph.GetN() == 0, "Invalid input graph");
+
+bool LightGraph::getAllowExtrapolation() const {
+  return _allowExtrapolation_;
+}
+
+void LightGraph::buildDial(const TGraph &grf, std::string option) {
+  LogThrowIf(grf.GetN() == 0, "Invalid input graph");
+  TGraph graph(grf);
   graph.Sort();
 
   nPoints = graph.GetN();
@@ -21,7 +27,7 @@ void LightGraph::setGraph(TGraph &graph) {
   memcpy(&yPoints[0], graph.GetY(), nPoints * sizeof(double));
 }
 
-double LightGraph::evaluateGraph(const DialInputBuffer& input_) const{
+double LightGraph::evalResponse(const DialInputBuffer& input_) const {
   LogThrowIf(xPoints.empty(), "No graph point defined.");
   if (nPoints == 1) return yPoints[0];
 
