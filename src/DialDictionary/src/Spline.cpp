@@ -7,31 +7,55 @@
 void Spline::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;
 }
-void Spline::setSpline(const TSpline3 &spline) {
-  _spline_ = spline;
+
+void Spline::buildDial(const TSpline3& spline, std::string option) {
+  std::vector<double> xPoint(spline.GetNp());
+  std::vector<double> yPoint(spline.GetNp());
+  std::vector<double> dummy;
+  xPoint.clear(); yPoint.clear();
+  for (int i = 0; i<spline.GetNp(); ++i) {
+    double x; double y;
+    spline.GetKnot(i,x,y);
+    xPoint.push_back(x);
+    yPoint.push_back(y);
+  }
+  buildDial(xPoint,yPoint,dummy,option);
+  _spline_.SetTitle(spline.GetTitle());
 }
 
-const TSpline3 &Spline::getSpline() const {
-  return _spline_;
+void Spline::buildDial(const TGraph& grf, std::string option) {
+  std::vector<double> xPoint(grf.GetN());
+  std::vector<double> yPoint(grf.GetN());
+  std::vector<double> dummy;
+  xPoint.clear(); yPoint.clear();
+  for (int i = 0; i<grf.GetN(); ++i) {
+      double x; double y;
+      grf.GetPoint(i,x,y);
+      xPoint.push_back(x);
+      yPoint.push_back(y);
+  }
+  buildDial(xPoint,yPoint,dummy,option);
+  _spline_.SetTitle(grf.GetName());
 }
 
-void Spline::copySpline(const TSpline3* splinePtr_){
-  // Don't check for override: when loading toy + mc data, these placeholders has to be filled up twice
-//  LogThrowIf(_graph_.GetXmin() != _graph_.GetXmax(), "Spline already set");
-  _spline_ = *splinePtr_;
-}
-void Spline::createSpline(TGraph* grPtr_){
-//  LogThrowIf(_graph_.GetXmin() != _graph_.GetXmax(), "Spline already set");
-  _spline_ = TSpline3(grPtr_->GetName(), grPtr_);
-#ifdef ENABLE_SPLINE_DIAL_FAST_EVAL
-  fs.stepsize = (_graph_.GetXmax() - _graph_.GetXmin())/((double) grPtr_->GetN());
-#endif
+void Spline::buildDial(const std::vector<double>& v1,
+                       const std::vector<double>& v2,
+                       const std::vector<double>& v3,
+                       std::string option) {
+  _spline_ = TSpline3("",const_cast<double*>(v1.data()),
+                      const_cast<double*>(v2.data()), v1.size());
 }
 
-double Spline::evaluateSpline(const DialInputBuffer& input_) const{
+const TSpline3 &Spline::getSpline() const {return _spline_;}
+
+double Spline::evalResponse(const DialInputBuffer& input_) const {
   if( not _allowExtrapolation_ ){
-    if     (input_.getBuffer()[0] <= _spline_.GetXmin()) { return _spline_.Eval( _spline_.GetXmin() ); }
-    else if(input_.getBuffer()[0] >= _spline_.GetXmax()) { return _spline_.Eval( _spline_.GetXmax() ); }
+    if (input_.getBuffer()[0] <= _spline_.GetXmin()) {
+      return _spline_.Eval( _spline_.GetXmin() );
+    }
+    else if (input_.getBuffer()[0] >= _spline_.GetXmax()) {
+      return _spline_.Eval( _spline_.GetXmax() );
+    }
   }
   return _spline_.Eval( input_.getBuffer()[0] );
 }
