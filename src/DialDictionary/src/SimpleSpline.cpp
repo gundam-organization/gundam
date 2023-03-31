@@ -20,8 +20,13 @@ void SimpleSpline::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;
 }
 
-void SimpleSpline::buildSplineData(TGraph& graph_){
+bool SimpleSpline::getAllowExtrapolation() const {
+  return _allowExtrapolation_;
+}
+
+void SimpleSpline::buildDial(const TGraph& grf, std::string option){
   LogThrowIf(not _splineData_.empty(), "Spline data already set.");
+  TGraph graph_ = grf;
 
   // Copy the spline data into local storage.
   graph_.Sort();
@@ -84,7 +89,8 @@ void SimpleSpline::buildSplineData(TGraph& graph_){
   }
 
 }
-void SimpleSpline::buildSplineData(const TSpline3& sp_){
+
+void SimpleSpline::buildDial(const TSpline3& sp_, std::string option) {
   LogThrow("NOT IMPLEMENTED");
 
 
@@ -92,7 +98,8 @@ void SimpleSpline::buildSplineData(const TSpline3& sp_){
 
 
 }
-double SimpleSpline::evaluateSpline(const DialInputBuffer& input_) const{
+
+double SimpleSpline::evalResponse(const DialInputBuffer& input_) const {
   double dialInput{input_.getBuffer()[0]};
 
   if( not _allowExtrapolation_ ){

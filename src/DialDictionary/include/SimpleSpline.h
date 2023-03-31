@@ -22,20 +22,23 @@ public:
 
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<SimpleSpline>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return {"SimpleSpline"}; }
-  double evalResponseImpl(const DialInputBuffer& input_) override { return this->evaluateSpline(input_); }
+  double evalResponse(const DialInputBuffer& input_) const override;
 
-  void setAllowExtrapolation(bool allowExtrapolation);
+  void setAllowExtrapolation(bool allowExtrapolation) override;
+  bool getAllowExtrapolation() const override;
 
-  void buildSplineData(TGraph& graph_);
-  void buildSplineData(const TSpline3& sp_);
-  [[nodiscard]] double evaluateSpline(const DialInputBuffer& input_) const;
+  /// Pass information to the dial so that it can build it's
+  /// internal information.  New build overloads should be
+  /// added as we have classes of dials
+  /// (e.g. multi-dimensional dials).
+  virtual void buildDial(const TGraph& grf, std::string option="") override;
+  virtual void buildDial(const TSpline3& spl, std::string option="") override;
 
-  bool getIsUniform() const {return _isUniform_;}
-  const std::vector<double>& getSplineData() const {return _splineData_;}
+  const std::vector<double>& getDialData() const override {return _splineData_;}
 
 protected:
-  bool _allowExtrapolation_{false};
   bool _isUniform_{false};
+  bool _allowExtrapolation_{false};
 
   // A block of data to calculate the spline values.  This must be filled for
   // the Cache::Manager to work, and provides the input for spline calculation
