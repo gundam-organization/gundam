@@ -1258,57 +1258,57 @@ void DataDispenser::fillFunction(int iThread_){
                 freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
                 if      ( dialCollectionRef->getGlobalDialType() == "Spline" ){
                   if(dialCollectionRef->useCachedDials() ) {
-                    ( (SplineCache*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->createSpline( grPtr );
-                    ( (SplineCache*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->setAllowExtrapolation( dialCollectionRef->isAllowDialExtrapolation() );
+                    dialCollectionRef->getDialBaseList()[freeSlotDial]->buildDial( *grPtr );
+                    dialCollectionRef->getDialBaseList()[freeSlotDial]->setAllowExtrapolation( dialCollectionRef->isAllowDialExtrapolation() );
                   }
                   else {
-                    ( (Spline*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->createSpline( grPtr );
-                    ( (Spline*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->setAllowExtrapolation( dialCollectionRef->isAllowDialExtrapolation() );
+                    dialCollectionRef->getDialBaseList()[freeSlotDial]->buildDial( *grPtr );
+                    dialCollectionRef->getDialBaseList()[freeSlotDial]->setAllowExtrapolation( dialCollectionRef->isAllowDialExtrapolation() );
                   }
                 }
                 else if ( dialCollectionRef->getGlobalDialType() == "MonotonicSpline" ){
                   if(dialCollectionRef->useCachedDials() ) {
-                    ( (MonotonicSplineCache*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->buildSplineData( *grPtr );
-                    ( (MonotonicSplineCache*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->setAllowExtrapolation( dialCollectionRef->isAllowDialExtrapolation() );
+                    dialCollectionRef->getDialBaseList()[freeSlotDial]->buildDial( *grPtr );
+                    dialCollectionRef->getDialBaseList()[freeSlotDial]->setAllowExtrapolation( dialCollectionRef->isAllowDialExtrapolation() );
                   }
                   else {
-                    ( (MonotonicSpline*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->buildSplineData( *grPtr );
-                    ( (MonotonicSpline*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->setAllowExtrapolation( dialCollectionRef->isAllowDialExtrapolation() );
+                    dialCollectionRef->getDialBaseList()[freeSlotDial]->buildDial( *grPtr );
+                    dialCollectionRef->getDialBaseList()[freeSlotDial]->setAllowExtrapolation( dialCollectionRef->isAllowDialExtrapolation() );
                   }
                 }
                 else if ( dialCollectionRef->getGlobalDialType() == "GeneralSpline" ){
                   if(dialCollectionRef->useCachedDials() ) {
-                    ( (GeneralSplineCache*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->buildSplineData( *grPtr );
-                    ( (GeneralSplineCache*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->setAllowExtrapolation( dialCollectionRef->isAllowDialExtrapolation() );
+                    dialCollectionRef->getDialBaseList()[freeSlotDial]->buildDial( *grPtr );
+                    dialCollectionRef->getDialBaseList()[freeSlotDial]->setAllowExtrapolation( dialCollectionRef->isAllowDialExtrapolation() );
                   }
                   else {
-                    ( (GeneralSpline*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->buildSplineData( *grPtr );
-                    ( (GeneralSpline*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->setAllowExtrapolation( dialCollectionRef->isAllowDialExtrapolation() );
+                    dialCollectionRef->getDialBaseList()[freeSlotDial]->buildDial( *grPtr );
+                    dialCollectionRef->getDialBaseList()[freeSlotDial]->setAllowExtrapolation( dialCollectionRef->isAllowDialExtrapolation() );
                   }
                 }
                 else if ( dialCollectionRef->getGlobalDialType() == "SimpleSpline" ){
                   if(dialCollectionRef->useCachedDials() ) {
-                    ( (SimpleSplineCache*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->buildSplineData( *grPtr );
-                    ( (SimpleSplineCache*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->setAllowExtrapolation( dialCollectionRef->isAllowDialExtrapolation() );
+                    dialCollectionRef->getDialBaseList()[freeSlotDial]->buildDial( *grPtr );
+                    dialCollectionRef->getDialBaseList()[freeSlotDial]->setAllowExtrapolation( dialCollectionRef->isAllowDialExtrapolation() );
                   }
                   else {
-                    ( (SimpleSpline*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->buildSplineData( *grPtr );
-                    ( (SimpleSpline*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->setAllowExtrapolation( dialCollectionRef->isAllowDialExtrapolation() );
+                    dialCollectionRef->getDialBaseList()[freeSlotDial]->buildDial( *grPtr );
+                    dialCollectionRef->getDialBaseList()[freeSlotDial]->setAllowExtrapolation( dialCollectionRef->isAllowDialExtrapolation() );
                   }
                 }
                 else if ( dialCollectionRef->getGlobalDialType() == "Graph" ){
                   if(dialCollectionRef->useCachedDials() ) {
-                    ( (GraphCache*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->setGraph( *grPtr );
-                    ( (GraphCache*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->setAllowExtrapolation( dialCollectionRef->isAllowDialExtrapolation() );
+                    dialCollectionRef->getDialBaseList()[freeSlotDial]->buildDial( *grPtr );
+                    dialCollectionRef->getDialBaseList()[freeSlotDial]->setAllowExtrapolation( dialCollectionRef->isAllowDialExtrapolation() );
                   }
                   else{
-                    ( (Graph*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->setGraph( *grPtr );
-                    ( (Graph*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->setAllowExtrapolation( dialCollectionRef->isAllowDialExtrapolation() );
+                    dialCollectionRef->getDialBaseList()[freeSlotDial]->buildDial( *grPtr );
+                    dialCollectionRef->getDialBaseList()[freeSlotDial]->setAllowExtrapolation( dialCollectionRef->isAllowDialExtrapolation() );
                   }
                 }
                 else if ( dialCollectionRef->getGlobalDialType() == "LightGraph" ){
-                  ( (LightGraph*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->setGraph( *grPtr );
-                  ( (LightGraph*) dialCollectionRef->getDialBaseList()[freeSlotDial].get() )->setAllowExtrapolation( dialCollectionRef->isAllowDialExtrapolation() );
+                  dialCollectionRef->getDialBaseList()[freeSlotDial]->buildDial( *grPtr );
+                  dialCollectionRef->getDialBaseList()[freeSlotDial]->setAllowExtrapolation( dialCollectionRef->isAllowDialExtrapolation() );
                 }
                 else{
                   LogThrow( "Unsupported event-by-event dial: " << dialCollectionRef->getGlobalDialType() );

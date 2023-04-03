@@ -22,16 +22,23 @@ public:
 
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<GeneralSpline>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return {"GeneralSpline"}; }
-  double evalResponseImpl(const DialInputBuffer& input_) override { return this->evaluateSpline(input_); }
+  double evalResponse(const DialInputBuffer& input_) const override;
 
-  void setAllowExtrapolation(bool allowExtrapolation);
+  void setAllowExtrapolation(bool allowExtrapolation) override;
+  bool getAllowExtrapolation() const override;
 
-  void buildSplineData(TGraph& graph_);
-  void buildSplineData(const TSpline3& sp_);
-  [[nodiscard]] double evaluateSpline(const DialInputBuffer& input_) const;
+  /// Pass information to the dial so that it can build it's
+  /// internal information.  New build overloads should be
+  /// added as we have classes of dials
+  /// (e.g. multi-dimensional dials).
+  virtual void buildDial(const TGraph& grf, std::string option="") override;
+  virtual void buildDial(const TSpline3& spl, std::string option="") override;
+  virtual void buildDial(const std::vector<double>& v1,
+                         const std::vector<double>& v2,
+                         const std::vector<double>& v3,
+                         std::string option="") override;
 
-  bool getIsUniform() const {return false;}
-  const std::vector<double>& getSplineData() const {return _splineData_;}
+   const std::vector<double>& getDialData() const override {return _splineData_;}
 
 protected:
   bool _allowExtrapolation_{false};

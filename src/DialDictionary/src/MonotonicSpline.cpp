@@ -17,27 +17,62 @@ void MonotonicSpline::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;
 }
 
-void MonotonicSpline::buildSplineData(TGraph& graph_){
+bool MonotonicSpline::getAllowExtrapolation() const {
+  return _allowExtrapolation_;
+}
+
+void MonotonicSpline::buildDial(const TSpline3& spline, std::string option) {
+  std::vector<double> xPoint(spline.GetNp());
+  std::vector<double> yPoint(spline.GetNp());
+  std::vector<double> dummy;
+  xPoint.clear(); yPoint.clear();
+  for (int i = 0; i<spline.GetNp(); ++i) {
+    double x; double y;
+    spline.GetKnot(i,x,y);
+    xPoint.push_back(x);
+    yPoint.push_back(y);
+  }
+  buildDial(xPoint,yPoint,dummy,option);
+}
+
+void MonotonicSpline::buildDial(const TGraph& grf, std::string option) {
+  std::vector<double> xPoint(grf.GetN());
+  std::vector<double> yPoint(grf.GetN());
+  std::vector<double> dummy;
+  xPoint.clear(); yPoint.clear();
+  for (int i = 0; i<grf.GetN(); ++i) {
+      double x; double y;
+      grf.GetPoint(i,x,y);
+      xPoint.push_back(x);
+      yPoint.push_back(y);
+  }
+  buildDial(xPoint,yPoint,dummy,option);
+}
+
+
+void MonotonicSpline::buildDial(const std::vector<double>& v1,
+                                const std::vector<double>& v2,
+                                const std::vector<double>& v3,
+                                std::string option) {
   LogThrowIf(not _splineData_.empty(), "Spline data already set.");
 
-  // Copy the spline data into local storage.
-  graph_.Sort();
+  _splineBounds_.first = v1.front();
+  _splineBounds_.second = v1.back();
 
-  LogThrowIf(
-      not GenericToolbox::hasUniformlySpacedKnots(&graph_),
-      "Can't use monotonic spline with a input that doesn't have uniformly spaced knots"
-  );
+  _splineData_.resize(2 + v1.size());
+  _splineData_[0] = v1.front();
+  _splineData_[1] = (v1.back() - v1.front())/(v1.size()-1.0);
 
-  _splineBounds_.first = graph_.GetX()[0];
-  _splineBounds_.second = graph_.GetX()[graph_.GetN()-1];
+  for (int i=0; i<v1.size()-1; ++i) {
+      double d = std::abs(v1[i] - _splineData_[0] - i*_splineData_[1]);
+      LogThrowIf(d>1E-8, "Monotonic splines require uniform knots");
+  }
 
-  _splineData_.resize(2 + graph_.GetN());
-  _splineData_[0] = graph_.GetX()[0];
-  _splineData_[1] = (graph_.GetX()[graph_.GetN()-1] - graph_.GetX()[0])/(graph_.GetN()-1.0);
+  for(int i=0; i<v2.size(); ++i) _splineData_[2+i] = v2[i];
 
-  memcpy(&_splineData_[2], graph_.GetY(), graph_.GetN() * sizeof(double));
 }
-double MonotonicSpline::evaluateSpline(const DialInputBuffer& input_) const{
+
+double MonotonicSpline::evalResponse(const DialInputBuffer& input_) const {
   double dialInput{input_.getBuffer()[0]};
 
   if( not _allowExtrapolation_ ){

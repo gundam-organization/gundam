@@ -365,14 +365,14 @@ bool DialCollection::initializeDialsWithDefinition() {
 
             if( useCachedDials() ){
               SplineCache s;
-              s.copySpline(binnedSpline);
+              s.buildDial(*binnedSpline);
               s.setAllowExtrapolation(_allowDialExtrapolation_);
               _dialBaseList_.emplace_back( std::make_unique<SplineCache>(s) );
             }
             else{
               Spline s;
               s.setAllowExtrapolation(_allowDialExtrapolation_);
-              s.copySpline(binnedSpline);
+              s.buildDial(*binnedSpline);
               _dialBaseList_.emplace_back( std::make_unique<Spline>(s) );
             }
           }
@@ -389,13 +389,13 @@ bool DialCollection::initializeDialsWithDefinition() {
             if( useCachedDials() ){
               GraphCache g;
               g.setAllowExtrapolation(_allowDialExtrapolation_);
-              g.setGraph( *(binnedGraph) );
+              g.buildDial( *(binnedGraph) );
               _dialBaseList_.emplace_back( std::make_unique<GraphCache>(g) );
             }
             else{
               Graph g;
               g.setAllowExtrapolation(_allowDialExtrapolation_);
-              g.setGraph( *(binnedGraph) );
+              g.buildDial( *(binnedGraph) );
               _dialBaseList_.emplace_back( std::make_unique<Graph>(g) );
             }
           }
@@ -412,13 +412,13 @@ bool DialCollection::initializeDialsWithDefinition() {
             if( this->useCachedDials() ){
               LightGraphCache g;
               g.setAllowExtrapolation(_allowDialExtrapolation_);
-              g.setGraph( *(binnedGraph) );
+              g.buildDial( *(binnedGraph) );
               _dialBaseList_.emplace_back( std::make_unique<LightGraphCache>(g) );
             }
             else{
               LightGraph g;
               g.setAllowExtrapolation(_allowDialExtrapolation_);
-              g.setGraph( *(binnedGraph) );
+              g.buildDial( *(binnedGraph) );
               _dialBaseList_.emplace_back( std::make_unique<LightGraph>(g) );
             }
           }
@@ -491,13 +491,13 @@ bool DialCollection::initializeDialsWithDefinition() {
             if( this->useCachedDials() ){
               SplineCache s;
               s.setAllowExtrapolation(_allowDialExtrapolation_);
-              s.copySpline(splinePtr);
+              s.buildDial(*splinePtr);
               _dialBaseList_.emplace_back( std::make_unique<SplineCache>(s) );
             }
             else{
               Spline s;
               s.setAllowExtrapolation(_allowDialExtrapolation_);
-              s.copySpline(splinePtr);
+              s.buildDial(*splinePtr);
               _dialBaseList_.emplace_back( std::make_unique<Spline>(s) );
             }
           }
