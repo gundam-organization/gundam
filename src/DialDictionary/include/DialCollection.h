@@ -19,14 +19,22 @@
 #include "string"
 #include "memory"
 
-
 class DialCollection : public JsonBaseClass {
 
 public:
   explicit DialCollection(std::vector<FitParameterSet> *targetParameterSetListPtr);
 
-  typedef GenericToolbox::PolymorphicObjectWrapper<DialBase> DialBaseObject;
-  
+  //  The PolymorphicObjectWrapper doesn't have the correct semantics since it
+  // clones the payload when it's copied.  We want to leave the pointee alone
+  // and just move the pointers around.
+  //
+  // Temporarily replace specialty class with shared_ptr.  The shared_ptr
+  // class has the correct semantics (copyable, and deletes the object), but
+  // we don't need the reference counting since we can only have one of each
+  // object.  Also shared_ptr is a bit to memory hungry.
+  typedef std::shared_ptr<DialBase> DialBaseObject;
+  // typedef GenericToolbox::PolymorphicObjectWrapper<DialBase> DialBaseObject;
+
   void setIndex(int index);
   void setSupervisedParameterIndex(int supervisedParameterIndex);
   void setSupervisedParameterSetIndex(int supervisedParameterSetIndex);
@@ -37,6 +45,7 @@ public:
   [[nodiscard]] int getIndex() const{ return _index_; }
   [[nodiscard]] const std::string &getGlobalDialLeafName() const;
   [[nodiscard]] const std::string &getGlobalDialType() const;
+  [[nodiscard]] const std::string &getGlobalDialSubType() const;
   [[nodiscard]] const std::shared_ptr<TFormula> &getApplyConditionFormula() const;
   [[nodiscard]] const DataBinSet &getDialBinSet() const;
   const std::vector<std::string> &getDataSetNameList() const;
@@ -79,9 +88,9 @@ private:
   double _mirrorHighEdge_{std::nan("unset")};
   double _mirrorRange_{std::nan("unset")};
   std::string _applyConditionStr_{};
-  std::string _globalDialSubType_{};
   std::string _globalDialLeafName_{};
   std::string _globalDialType_{};
+  std::string _globalDialSubType_{};
   std::vector<std::string> _dataSetNameList_{};
 
   // internal
