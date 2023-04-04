@@ -19,6 +19,10 @@ public:
   [[nodiscard]] std::string getDialTypeName() const override { return {"Norm"}; }
   double evalResponse(const DialInputBuffer& input_) const override { return input_.getBuffer()[0]; }
 
+  /// Build the dial with no input arguments.  This is here for completeness,
+  /// but could eventually do... something.
+  virtual void buildDial(std::string option="") override {}
+
 };
 
 
