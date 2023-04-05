@@ -3,6 +3,8 @@
 #include "GraphDialBaseFactory.h"
 #include "SplineDialBaseFactory.h"
 
+#include "Logger.h"
+
 DialBaseFactory::DialBaseFactory() {}
 DialBaseFactory::~DialBaseFactory() {}
 
@@ -27,6 +29,34 @@ DialBase* DialBaseFactory::operator () (std::string dialType,
     SplineDialBaseFactory factory;
     dialBase.reset(factory(dialType, dialSubType, dialInitializer,cached));
   }
+#define INCLUDE_DEPRECATED_DIAL_TYPES
+#ifdef INCLUDE_DEPRECATED_DIAL_TYPES
+  else if (dialType == "MonotonicSpline") {
+    LogWarning << "DEPRECATED DIAL-TYPE USED: MonotonicSpline will be removed"
+            << std::endl;
+    SplineDialBaseFactory factory;
+    dialBase.reset(factory("Spline", "catmull-rom, monotonic",
+                           dialInitializer,cached));
+  }
+  else if (dialType == "GeneralSpline") {
+    LogWarning << "DEPRECATED DIAL-TYPE USED: GeneralSpline will be removed"
+            << std::endl;
+    SplineDialBaseFactory factory;
+    dialBase.reset(factory("Spline", "not-a-knot", dialInitializer,cached));
+  }
+  else if (dialType == "SimpleSpline") {
+    LogWarning << "DEPRECATED DIAL-TYPE USED: SimpleSpline will be removed"
+            << std::endl;
+    SplineDialBaseFactory factory;
+    dialBase.reset(factory("Spline", "knot-a-knot", dialInitializer,cached));
+  }
+  else if (dialType == "LightGraph") {
+    LogWarning << "DEPRECATED DIAL-TYPE USED: LightGraph will be removed"
+            << std::endl;
+    GraphDialBaseFactory factory;
+    dialBase.reset(factory("Graph", "light", dialInitializer,cached));
+  }
+#endif
 
   // Pass the ownership without any constraints!
   return dialBase.release();
