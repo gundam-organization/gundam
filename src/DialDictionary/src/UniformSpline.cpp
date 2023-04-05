@@ -61,7 +61,7 @@ void UniformSpline::buildDial(const std::vector<double>& xPoints,
 
   for (int i=0; i<xPoints.size()-1; ++i) {
       double d = std::abs(xPoints[i] - _splineData_[0] - i*_splineData_[1]);
-      LogThrowIf((d/_splineData_[1])>1E-6,
+      LogThrowIf((d/_splineData_[1])>1E-5,
                  "UniformSplines require uniformly spaced knots");
   }
 

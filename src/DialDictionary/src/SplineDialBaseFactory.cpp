@@ -195,7 +195,7 @@ DialBase* SplineDialBaseFactory::operator () (std::string dialType,
   double s = (xPoint.back() - xPoint.front())/(xPoint.size()-1.0);
   bool uniform = true;
   for (int i=1; i<xPoint.size(); ++i) {
-    if (std::abs(((xPoint[i]-xPoint[i-1])-s)/s) > 1E-8) {
+    if (std::abs(((xPoint[i]-xPoint[i-1])-s)/s) > 5E-6) {
       uniform = false;
       break;
     }
