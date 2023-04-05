@@ -23,7 +23,7 @@ DialBase* GraphDialBaseFactory::operator () (std::string dialType,
   // in the event of an exception.
   std::unique_ptr<DialBase> dialBase;
 
-  if (dialSubType == "TGraph") {
+  if (dialSubType == "ROOT") {
     dialBase.reset((not cached) ? new Graph: new GraphCache);
   }
   else {
