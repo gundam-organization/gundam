@@ -126,7 +126,8 @@ DialBase* SplineDialBaseFactory::operator () (std::string dialType,
   // might be implemented with at TSpline3).  The "ROOT" spline will use an
   // actual TSpline3 (and is slow).  The natural and catmull-rom splines are
   // just as expected.
-  std::string splType = "not-a-knot";
+  std::string splType = "not-a-knot";  // The default.
+  if (dialSubType.find("not-a-knot")!=std::string::npos) splType = "not-a-knot";
   if (dialSubType.find("catmull")!=std::string::npos) splType = "catmull-rom";
   if (dialSubType.find("natural") != std::string:: npos) splType = "natural";
   if (dialSubType.find("ROOT") != std::string:: npos) splType = "ROOT";
@@ -145,6 +146,11 @@ DialBase* SplineDialBaseFactory::operator () (std::string dialType,
   if (xPoint.size() < 2) {
     LogWarning << "Splines must have at least two points." << std::endl;
     return nullptr;
+  }
+
+  // If there are only two points, then force catmull-rom
+  if (xPoint.size()<3) {
+    splType = "catmull-rom";
   }
 
   // Check that there are equal numbers of X and Y
