@@ -10,7 +10,7 @@
 
 
 LoggerInit([]{
-  Logger::setUserHeaderStr("[MonotonicSplineHandler]");
+  Logger::setUserHeaderStr("[GeneralSpline]");
 });
 
 void GeneralSpline::setAllowExtrapolation(bool allowExtrapolation) {
