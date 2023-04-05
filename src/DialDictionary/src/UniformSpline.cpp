@@ -10,7 +10,7 @@
 
 
 LoggerInit([]{
-  Logger::setUserHeaderStr("[MonotonicSplineHandler]");
+  Logger::setUserHeaderStr("[UniformSpline]");
 });
 
 void UniformSpline::setAllowExtrapolation(bool allowExtrapolation) {
@@ -61,7 +61,8 @@ void UniformSpline::buildDial(const std::vector<double>& xPoints,
 
   for (int i=0; i<xPoints.size()-1; ++i) {
       double d = std::abs(xPoints[i] - _splineData_[0] - i*_splineData_[1]);
-      LogThrowIf(d>1E-8, "UniformSplines require uniform knots");
+      LogThrowIf((d/_splineData_[1])>1E-6,
+                 "UniformSplines require uniformly spaced knots");
   }
 
   // Copy the spline data into local storage.
