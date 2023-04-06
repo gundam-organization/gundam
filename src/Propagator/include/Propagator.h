@@ -28,6 +28,7 @@ public:
   // Setters
   void setShowTimeStats(bool showTimeStats);
   void setThrowAsimovToyParameters(bool throwAsimovToyParameters);
+  void setEnableEigenToOrigInPropagate(bool enableEigenToOrigInPropagate);
   void setIThrow(int iThrow);
   void setLoadAsimovData(bool loadAsimovData);
   void setParameterInjector(const nlohmann::json &parameterInjector);
@@ -93,6 +94,7 @@ private:
   bool _enableStatThrowInToys_{true};
   bool _gaussStatThrowInToys_{false};
   bool _enableEventMcThrow_{true};
+  bool _enableEigenToOrigInPropagate_{true};
   int _iThrow_{-1};
   double _llhBuffer_{0};
   double _llhStatBuffer_{0};

@@ -578,6 +578,9 @@ void Propagator::setShowTimeStats(bool showTimeStats) {
 void Propagator::setThrowAsimovToyParameters(bool throwAsimovToyParameters) {
   _throwAsimovToyParameters_ = throwAsimovToyParameters;
 }
+void Propagator::setEnableEigenToOrigInPropagate(bool enableEigenToOrigInPropagate) {
+  _enableEigenToOrigInPropagate_ = enableEigenToOrigInPropagate;
+}
 void Propagator::setIThrow(int iThrow) {
   _iThrow_ = iThrow;
 }
@@ -690,9 +693,11 @@ void Propagator::updateLlhCache(){
 }
 void Propagator::propagateParametersOnSamples(){
 
-  // Only real parameters are propagated on the spectra -> need to convert the eigen to original
-  for( auto& parSet : _parameterSetList_ ){
-    if( parSet.isUseEigenDecompInFit() ) parSet.propagateEigenToOriginal();
+  if( _enableEigenToOrigInPropagate_ ){
+    // Only real parameters are propagated on the spectra -> need to convert the eigen to original
+    for( auto& parSet : _parameterSetList_ ){
+      if( parSet.isUseEigenDecompInFit() ) parSet.propagateEigenToOriginal();
+    }
   }
 
   resetReweight();
@@ -884,4 +889,3 @@ void Propagator::reweightMcEvents(int iThread_) {
 
 
 }
-

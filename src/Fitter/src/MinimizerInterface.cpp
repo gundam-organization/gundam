@@ -1081,8 +1081,16 @@ void MinimizerInterface::scanParameters(TDirectory* saveDir_){
                  << " is fixed. Skipping..." << std::endl;
       continue;
     }
-    getPropagator().getParScanner().scanFitParameter(*getMinimizerFitParameterPtr()[iPar], saveDir_);
+    this->getPropagator().getParScanner().scanFitParameter(*getMinimizerFitParameterPtr()[iPar], saveDir_);
   } // iPar
+  for( auto& parSet : this->getPropagator().getParameterSetsList() ){
+    if( parSet.isUseEigenDecompInFit() ){
+      LogWarning << parSet.getName() << " is using eigen decomposition. Scanning original parameters..." << std::endl;
+      for( auto& par : parSet.getParameterList() ){
+        this->getPropagator().getParScanner().scanFitParameter(par, saveDir_);
+      }
+    }
+  }
 }
 
 void MinimizerInterface::updateCacheToBestfitPoint(){
