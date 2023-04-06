@@ -309,7 +309,7 @@ bool DialCollection::initializeNormDialsWithParBinning() {
   _dialBaseList_.reserve( _dialBinSet_.getBinsList().size() );
   DialBaseFactory factory;
   for(const auto & bin : _dialBinSet_.getBinsList()) {
-      _dialBaseList_.emplace_back(DialBaseObject(factory("Normalization","",nullptr,false)));
+    _dialBaseList_.emplace_back(DialBaseObject(factory("Normalization","",nullptr,false)));
   }
 
   return true;
@@ -386,6 +386,7 @@ bool DialCollection::initializeDialsWithDefinition() {
           }
           dialBase->setAllowExtrapolation(_allowDialExtrapolation_);
           _dialBaseList_.emplace_back(DialBaseObject(dialBase));
+        }
 
         if( not excludedBins.empty() ){
           LogInfo << "Removing invalid bin dials..." << std::endl;
@@ -398,8 +399,8 @@ bool DialCollection::initializeDialsWithDefinition() {
 
         dialsTFile->Close();
 
-        }
       }
+
       else if ( GenericToolbox::Json::doKeyExist(dialsDefinition, "dialsTreePath") ) {
       // OLD
       auto objPath = GenericToolbox::Json::fetchValue<std::string>(dialsDefinition, "dialsTreePath");
