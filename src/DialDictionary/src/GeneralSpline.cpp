@@ -21,14 +21,14 @@ bool GeneralSpline::getAllowExtrapolation() const {
   return _allowExtrapolation_;
 }
 
-void GeneralSpline::buildDial(const TGraph& graph_, std::string option_){
+void GeneralSpline::buildDial(const TGraph& graph_, const std::string &option_){
   // Copy the spline data into local storage.
   TGraph grf(graph_);
   grf.Sort();
   buildDial(TSpline3(Form("%p", &graph_), &graph_), option_);
 }
 
-void GeneralSpline::buildDial(const TSpline3& sp_, std::string option_){
+void GeneralSpline::buildDial(const TSpline3& sp_, const std::string &option_){
   std::vector<double> xPoints;
   std::vector<double> yPoints;
   std::vector<double> deriv;
@@ -49,7 +49,7 @@ void GeneralSpline::buildDial(const TSpline3& sp_, std::string option_){
 void GeneralSpline::buildDial(const std::vector<double>& xPoints,
                               const std::vector<double>& yPoints,
                               const std::vector<double>& deriv,
-                              std::string option_){
+                              const std::string &option_){
   LogThrowIf(not _splineData_.empty(), "Spline data already set.");
 
   _splineBounds_.first = xPoints.front();

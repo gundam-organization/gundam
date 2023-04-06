@@ -31,8 +31,8 @@ public:
   /// internal information.  New build overloads should be
   /// added as we have classes of dials
   /// (e.g. multi-dimensional dials).
-  virtual void buildDial(const TGraph& grf, std::string option="") override;
-  virtual void buildDial(const TSpline3& spl, std::string option="") override;
+  virtual void buildDial(const TGraph& grf, const std::string &option= "") override;
+  virtual void buildDial(const TSpline3& spl, const std::string &option_="") override;
 
   const std::vector<double>& getDialData() const override {return _splineData_;}
 

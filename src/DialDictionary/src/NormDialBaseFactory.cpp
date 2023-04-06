@@ -1,8 +1,8 @@
 #include "NormDialBaseFactory.h"
 #include "Norm.h"
 
-NormDialBaseFactory::NormDialBaseFactory() {}
-NormDialBaseFactory::~NormDialBaseFactory() {}
+NormDialBaseFactory::NormDialBaseFactory() = default;
+NormDialBaseFactory::~NormDialBaseFactory() = default;
 
 DialBase* NormDialBaseFactory::operator () (std::string dialType,
                                             std::string dialSubType,

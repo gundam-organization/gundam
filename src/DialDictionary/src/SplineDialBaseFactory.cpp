@@ -17,6 +17,7 @@
 #include "TGraph.h"
 #include "TSpline.h"
 
+#include <memory>
 #include <numeric>
 
 LoggerInit([]{
@@ -222,7 +223,7 @@ DialBase* SplineDialBaseFactory::operator () (const std::string& dialType,
     }
   }
   else if (splType == "ROOT") {
-    dialBase.reset(new Spline);
+    dialBase = std::make_unique<Spline>();
   }
   else {
     if (not uniform) {

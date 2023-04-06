@@ -13,7 +13,7 @@ bool LightGraph::getAllowExtrapolation() const {
   return _allowExtrapolation_;
 }
 
-void LightGraph::buildDial(const TGraph &grf, std::string option) {
+void LightGraph::buildDial(const TGraph &grf, const std::string &option) {
   LogThrowIf(grf.GetN() == 0, "Invalid input graph");
   TGraph graph(grf);
   graph.Sort();
