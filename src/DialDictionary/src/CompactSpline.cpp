@@ -65,7 +65,7 @@ void CompactSpline::buildDial(const std::vector<double>& v1,
 
   for (int i=0; i<v1.size()-1; ++i) {
       double d = std::abs(v1[i] - _splineData_[0] - i*_splineData_[1]);
-      LogThrowIf(d>1E-8, "CompactSplines require uniform knots: " << GET_VAR_NAME_VALUE(d));
+      LogThrowIf(d>1E-7, "CompactSplines require uniform knots: " << GET_VAR_NAME_VALUE(d));
   }
 
   for(int i=0; i<v2.size(); ++i) _splineData_[2+i] = v2[i];

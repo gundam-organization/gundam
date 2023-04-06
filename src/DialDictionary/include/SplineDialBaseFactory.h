@@ -14,7 +14,7 @@ public:
 
   /// Fill the points starting from a TObject that needs to be pointing to a
   /// graph.  This returns false if it can't get the points.
-  bool FillFromGraph(std::vector<double>& xPoint,
+  static bool FillFromGraph(std::vector<double>& xPoint,
                      std::vector<double>& yPoint,
                      std::vector<double>& slope,
                      TObject* dialInitializer,
@@ -22,14 +22,14 @@ public:
 
   /// Fill the points starting from a TObject that needs to be pointing to a
   /// spline.  This returns false if it can't get the points.
-  bool FillFromSpline(std::vector<double>& xPoint,
+  static bool FillFromSpline(std::vector<double>& xPoint,
                       std::vector<double>& yPoint,
                       std::vector<double>& slope,
                       TObject* dialInitializer,
                       const std::string& splType);
 
   /// Apply the monotonic constraint to the slopes.
-  void MakeMonotonic(const std::vector<double>& xPoint,
+  static void MakeMonotonic(const std::vector<double>& xPoint,
                      const std::vector<double>& yPoint,
                      std::vector<double>& slope);
 
@@ -38,8 +38,8 @@ public:
   /// pointed to by the dialInitializer to fill the dial.  The ownership of
   /// the pointer is passed to the caller, so it should be put in a managed
   /// variable (e.g. a unique_ptr, or shared_ptr).
-  DialBase* operator () (std::string dialType,
-                         std::string dialSubType,
+  DialBase* operator () (const std::string& dialType,
+                         const std::string& dialSubType,
                          TObject* dialInitializer,
                          bool cached);
 };

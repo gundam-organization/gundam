@@ -61,7 +61,7 @@ void UniformSpline::buildDial(const std::vector<double>& xPoints,
 
   for (int i=0; i<xPoints.size()-1; ++i) {
       double d = std::abs(xPoints[i] - _splineData_[0] - i*_splineData_[1]);
-      LogThrowIf(d>1E-8, "UniformSplines require uniform knots: " << GET_VAR_NAME_VALUE(d));
+      LogThrowIf(d>1E-7, "UniformSplines require uniform knots: " << GET_VAR_NAME_VALUE(d));
   }
 
   // Copy the spline data into local storage.

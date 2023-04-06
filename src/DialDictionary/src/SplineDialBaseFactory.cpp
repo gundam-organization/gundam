@@ -23,8 +23,8 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[SplineDialBaseFactory]");
 });
 
-SplineDialBaseFactory::SplineDialBaseFactory() {}
-SplineDialBaseFactory::~SplineDialBaseFactory() {}
+SplineDialBaseFactory::SplineDialBaseFactory() = default;
+SplineDialBaseFactory::~SplineDialBaseFactory() = default;
 
 bool SplineDialBaseFactory::FillFromGraph(std::vector<double>& xPoint,
                                           std::vector<double>& yPoint,
@@ -34,8 +34,8 @@ bool SplineDialBaseFactory::FillFromGraph(std::vector<double>& xPoint,
   if (not dialInitializer) return false;
 
   // Get the spline knots and slopes (starting from a graph).
-  TGraph* graph = dynamic_cast<TGraph*>(dialInitializer);
-  if (not graph) return false;
+  auto* graph = dynamic_cast<TGraph*>(dialInitializer);
+  if (graph == nullptr) return false;
 
   // Turn the graph into a spline.
   std::string opt;
@@ -74,8 +74,8 @@ bool SplineDialBaseFactory::FillFromSpline(std::vector<double>& xPoint,
   if (not dialInitializer) return false;
 
   // Get the spline knots and slopes (starting from a spline).
-  TSpline3* spline = dynamic_cast<TSpline3*>(dialInitializer);
-  if (not spline) return false;
+  auto* spline = dynamic_cast<TSpline3*>(dialInitializer);
+  if (spline == nullptr) return false;
 
   xPoint.reserve(spline->GetNp());
   yPoint.reserve(spline->GetNp());
@@ -120,8 +120,8 @@ void SplineDialBaseFactory::MakeMonotonic(const std::vector<double>& xPoint,
   }
 }
 
-DialBase* SplineDialBaseFactory::operator () (std::string dialType,
-                                              std::string dialSubType,
+DialBase* SplineDialBaseFactory::operator () (const std::string& dialType,
+                                              const std::string& dialSubType,
                                               TObject* dialInitializer,
                                               bool cached) {
 
@@ -133,10 +133,11 @@ DialBase* SplineDialBaseFactory::operator () (std::string dialType,
   // actual TSpline3 (and is slow).  The natural and catmull-rom splines are
   // just as expected.
   std::string splType = "not-a-knot";  // The default.
-  if (dialSubType.find("not-a-knot")!=std::string::npos) splType = "not-a-knot";
-  if (dialSubType.find("catmull")!=std::string::npos) splType = "catmull-rom";
-  if (dialSubType.find("natural") != std::string:: npos) splType = "natural";
-  if (dialSubType.find("ROOT") != std::string:: npos) splType = "ROOT";
+
+  if ( dialSubType.find("not-a-knot")!=std::string::npos ) splType = "not-a-knot";
+  if ( dialSubType.find("catmull")!=std::string::npos ) splType = "catmull-rom";
+  if ( dialSubType.find("natural") != std::string:: npos ) splType = "natural";
+  if ( dialSubType.find("ROOT") != std::string:: npos ) splType = "ROOT";
 
   std::vector<double> xPoint;
   std::vector<double> yPoint;
