@@ -14,7 +14,7 @@ public:
 
   /// Fill the points starting from a TObject that needs to be pointing to a
   /// graph.  This returns false if it can't get the points.
-  static bool FillFromGraph(std::vector<double>& xPoint,
+  bool FillFromGraph(std::vector<double>& xPoint,
                      std::vector<double>& yPoint,
                      std::vector<double>& slope,
                      TObject* dialInitializer,
@@ -22,7 +22,7 @@ public:
 
   /// Fill the points starting from a TObject that needs to be pointing to a
   /// spline.  This returns false if it can't get the points.
-  static bool FillFromSpline(std::vector<double>& xPoint,
+  bool FillFromSpline(std::vector<double>& xPoint,
                       std::vector<double>& yPoint,
                       std::vector<double>& slope,
                       TObject* dialInitializer,
@@ -38,10 +38,8 @@ public:
   /// pointed to by the dialInitializer to fill the dial.  The ownership of
   /// the pointer is passed to the caller, so it should be put in a managed
   /// variable (e.g. a unique_ptr, or shared_ptr).
-  DialBase* operator () (const std::string& dialType,
-                         const std::string& dialSubType,
-                         TObject* dialInitializer,
-                         bool cached);
+  DialBase* operator () (const std::string& dialType, const std::string& dialSubType,
+                         TObject* dialInitializer, bool cached);
 };
 
 //  A Lesser GNU Public License

@@ -140,6 +140,8 @@ DialBase* SplineDialBaseFactory::operator () (const std::string& dialType,
   if ( dialSubType.find("natural") != std::string:: npos ) splType = "natural";
   if ( dialSubType.find("ROOT") != std::string:: npos ) splType = "ROOT";
 
+  LogDebug << GET_VAR_NAME_VALUE(splType) << std::endl;
+
   std::vector<double> xPoint;
   std::vector<double> yPoint;
   std::vector<double> slope;
@@ -160,6 +162,8 @@ DialBase* SplineDialBaseFactory::operator () (const std::string& dialType,
   if (xPoint.size()<3) {
     splType = "catmull-rom";
   }
+
+  LogDebug << "CHANGED: " << GET_VAR_NAME_VALUE(splType) << std::endl;
 
   // Check that there are equal numbers of X and Y
   if (xPoint.size() != yPoint.size()) {
