@@ -4,6 +4,10 @@
 NormDialBaseFactory::NormDialBaseFactory() {}
 NormDialBaseFactory::~NormDialBaseFactory() {}
 
+LoggerInit([]{
+  Logger::setUserHeaderStr("[NormFactory]");
+});
+
 DialBase* NormDialBaseFactory::operator () (std::string dialType,
                                             std::string dialSubType,
                                             TObject* dialInitializer,

@@ -8,6 +8,10 @@
 
 #include <TGraph.h>
 
+LoggerInit([]{
+  Logger::setUserHeaderStr("[GraphFactory]");
+});
+
 GraphDialBaseFactory::GraphDialBaseFactory() {}
 GraphDialBaseFactory::~GraphDialBaseFactory() {}
 

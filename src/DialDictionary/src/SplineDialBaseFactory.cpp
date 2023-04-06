@@ -17,6 +17,10 @@
 
 #include <numeric>
 
+LoggerInit([]{
+  Logger::setUserHeaderStr("[SplineFactory]");
+});
+
 SplineDialBaseFactory::SplineDialBaseFactory() {}
 SplineDialBaseFactory::~SplineDialBaseFactory() {}
 
@@ -188,10 +192,10 @@ DialBase* SplineDialBaseFactory::operator () (std::string dialType,
   ////////////////////////////////////////////////////////////////
   // Check if the spline can be treated as having uniformly spaced knots.
   ////////////////////////////////////////////////////////////////
-  double s = (xPoint.back() - xPoint.front())/(xPoint.size()-1);
+  double s = (xPoint.back() - xPoint.front())/(xPoint.size()-1.0);
   bool uniform = true;
   for (int i=1; i<xPoint.size(); ++i) {
-    if (std::abs(xPoint[i]-xPoint[i-1]-s) > 1E-6) {
+    if (std::abs(((xPoint[i]-xPoint[i-1])-s)/s) > 5E-6) {
       uniform = false;
       break;
     }

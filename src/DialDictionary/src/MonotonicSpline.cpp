@@ -8,7 +8,6 @@
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
 
-
 LoggerInit([]{
   Logger::setUserHeaderStr("[MonotonicSpline]");
 });
@@ -65,7 +64,8 @@ void MonotonicSpline::buildDial(const std::vector<double>& v1,
 
   for (int i=0; i<v1.size()-1; ++i) {
       double d = std::abs(v1[i] - _splineData_[0] - i*_splineData_[1]);
-      LogThrowIf(d>1E-8, "Monotonic splines require uniform knots");
+      LogThrowIf((d/_splineData_[1])>1E-5,
+                 "MonotonicSplines require uniformly spaced knots");
   }
 
   for(int i=0; i<v2.size(); ++i) _splineData_[2+i] = v2[i];

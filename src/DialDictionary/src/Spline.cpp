@@ -4,6 +4,10 @@
 
 #include "Spline.h"
 
+LoggerInit([]{
+  Logger::setUserHeaderStr("[Spline]");
+});
+
 void Spline::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;
 }

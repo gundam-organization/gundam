@@ -5,6 +5,10 @@
 
 #include "Logger.h"
 
+LoggerInit([]{
+  Logger::setUserHeaderStr("[DialBaseFactory]");
+});
+
 DialBaseFactory::DialBaseFactory() {}
 DialBaseFactory::~DialBaseFactory() {}
 

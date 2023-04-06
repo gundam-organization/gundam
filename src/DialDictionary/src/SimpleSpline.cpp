@@ -11,7 +11,6 @@
 #include "Logger.h"
 #include "GenericToolbox.Root.h"
 
-
 LoggerInit([]{
   Logger::setUserHeaderStr("[SimpleSpline]");
 });
