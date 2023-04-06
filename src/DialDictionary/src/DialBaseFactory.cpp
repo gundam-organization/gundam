@@ -5,11 +5,16 @@
 
 #include "Logger.h"
 
-DialBaseFactory::DialBaseFactory() {}
-DialBaseFactory::~DialBaseFactory() {}
+LoggerInit([]{
+  Logger::setUserHeaderStr("[DialBaseFactory]");
+});
 
-DialBase* DialBaseFactory::operator () (std::string dialType,
-                                        std::string dialSubType,
+
+DialBaseFactory::DialBaseFactory() = default;
+DialBaseFactory::~DialBaseFactory() = default;
+
+DialBase* DialBaseFactory::operator () (const std::string& dialType,
+                                        const std::string& dialSubType,
                                         TObject* dialInitializer,
                                         bool cached) {
 

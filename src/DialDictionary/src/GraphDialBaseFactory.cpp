@@ -1,15 +1,25 @@
 #include "GraphDialBaseFactory.h"
 
+// internal headers
 #include "Graph.h"
 #include "LightGraph.h"
-
 #include "GraphCache.h"
 #include "LightGraphCache.h"
 
+// submodules
+#include "Logger.h"
+
+// external libs
 #include <TGraph.h>
 
-GraphDialBaseFactory::GraphDialBaseFactory() {}
-GraphDialBaseFactory::~GraphDialBaseFactory() {}
+LoggerInit([]{
+  Logger::setUserHeaderStr("[GraphDialBaseFactory]");
+});
+
+
+
+GraphDialBaseFactory::GraphDialBaseFactory() = default;
+GraphDialBaseFactory::~GraphDialBaseFactory() = default;
 
 DialBase* GraphDialBaseFactory::operator () (std::string dialType,
                                              std::string dialSubType,

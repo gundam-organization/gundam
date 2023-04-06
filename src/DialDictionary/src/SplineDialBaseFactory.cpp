@@ -12,10 +12,16 @@
 #include "CompactSplineCache.h"
 #include "MonotonicSplineCache.h"
 
+#include "Logger.h"
+
 #include "TGraph.h"
 #include "TSpline.h"
 
 #include <numeric>
+
+LoggerInit([]{
+  Logger::setUserHeaderStr("[SplineDialBaseFactory]");
+});
 
 SplineDialBaseFactory::SplineDialBaseFactory() {}
 SplineDialBaseFactory::~SplineDialBaseFactory() {}

@@ -376,14 +376,18 @@ bool DialCollection::initializeDialsWithDefinition() {
               getGlobalDialType(),
               getGlobalDialSubType(),
               binnedInitializer,
-              useCachedDials());
-          if (dialBase) {
+              useCachedDials()
+          );
+
+          if (dialBase == nullptr) {
               LogAlert << "Invalid dial for " << getTitle() << " -> "
                        << _dialBinSet_.getBinsList()[iBin].getSummary()
                        << std::endl;
               excludedBins.emplace_back(iBin);
               continue;
           }
+
+
           dialBase->setAllowExtrapolation(_allowDialExtrapolation_);
           _dialBaseList_.emplace_back(DialBaseObject(dialBase));
 
