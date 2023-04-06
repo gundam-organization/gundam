@@ -21,24 +21,22 @@ LoggerInit([]{
 GraphDialBaseFactory::GraphDialBaseFactory() = default;
 GraphDialBaseFactory::~GraphDialBaseFactory() = default;
 
-DialBase* GraphDialBaseFactory::operator () (std::string dialType,
-                                             std::string dialSubType,
+DialBase* GraphDialBaseFactory::operator () (const std::string& dialType,
+                                             const std::string& dialSubType,
                                              TObject* dialInitializer,
                                              bool cached) {
 
-  TGraph* graph = dynamic_cast<TGraph*>(dialInitializer);
-  LogThrowIf(!graph, "Graph dial initializer must be a TGraph");
+  auto* graph = dynamic_cast<TGraph*>(dialInitializer);
+  LogThrowIf(graph == nullptr, "Graph dial initializer must be a TGraph");
 
   // Stuff the created dial into a unique_ptr, so it will be properly deleted
   // in the event of an exception.
   std::unique_ptr<DialBase> dialBase;
 
-  if (dialSubType == "ROOT") {
-    dialBase.reset((not cached) ? new Graph: new GraphCache);
-  }
-  else {
-    dialBase.reset((not cached) ? new LightGraph: new LightGraphCache);
-  }
+  if (dialSubType == "ROOT")
+  { dialBase = ( cached ? std::make_unique<GraphCache>()      : std::make_unique<Graph>());      }
+  else
+  { dialBase = ( cached ? std::make_unique<LightGraphCache>() : std::make_unique<LightGraph>()); }
 
   dialBase->buildDial(*graph);
 

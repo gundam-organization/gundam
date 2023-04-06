@@ -17,27 +17,30 @@ class MonotonicSpline : public DialBase {
 
 public:
   MonotonicSpline() = default;
-  virtual ~MonotonicSpline() = default;
+  ~MonotonicSpline() override = default;
 
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<MonotonicSpline>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return {"MonotonicSpline"}; }
-  double evalResponse(const DialInputBuffer& input_) const override;
+  [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
 
+  // setters
   void setAllowExtrapolation(bool allowExtrapolation) override;
-  bool getAllowExtrapolation() const override;
+
+  // getters
+  [[nodiscard]] bool getAllowExtrapolation() const override;
+  [[nodiscard]] const std::vector<double>& getDialData() const override {return _splineData_;}
 
   /// Pass information to the dial so that it can build it's
   /// internal information.  New build overloads should be
   /// added as we have classes of dials
   /// (e.g. multi-dimensional dials).
-  virtual void buildDial(const TGraph& grf, const std::string &option= "") override;
-  virtual void buildDial(const TSpline3& spl, const std::string &option_="") override;
-  virtual void buildDial(const std::vector<double>& v1,
-                         const std::vector<double>& v2,
-                         const std::vector<double>& v3,
-                         const std::string &option_= "") override;
+  void buildDial(const TGraph& grf, const std::string &option= "") override;
+  void buildDial(const TSpline3& spl, const std::string &option_="") override;
+  void buildDial(const std::vector<double>& v1,
+                 const std::vector<double>& v2,
+                 const std::vector<double>& v3,
+                 const std::string &option_= "") override;
 
-  const std::vector<double>& getDialData() const override {return _splineData_;}
 
 protected:
   bool _allowExtrapolation_{false};
