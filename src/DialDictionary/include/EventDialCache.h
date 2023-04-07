@@ -40,13 +40,43 @@ public:
   /// The cache element associating a PhysicsEvent to the appropriate
   /// DialInterface.
   struct CacheElem_t {
-     PhysicsEvent* event;
-     std::vector<DialsElem_t> dials;
+    PhysicsEvent* event;
+    std::vector<DialsElem_t> dials;
   };
 
-  typedef std::pair<size_t, size_t> EventIndexEntry_t;
-  typedef std::pair<size_t, size_t> DialIndexEntry_t;
-  typedef std::pair<EventIndexEntry_t, std::vector<DialIndexEntry_t>> IndexedEntry_t;
+  /// A pair of indices into the vector of dial collections, and then the
+  /// index of the dial interfaces in the dial collection vector of dial
+  /// interfaces.
+  struct DialIndexEntry_t {
+    /// The index in the dial collection being associated with the event.
+    std::size_t first {std::size_t(-1)};
+    /// The index of the actual dial interface in the dial collection being
+    /// associated with the event.
+    std::size_t second {std::size_t(-1)};
+  };
+
+  /// A pair of indices into the the vector of FitSamples in the FitSampleSet
+  /// vector of fit samples, and the index of the event eventList in the
+  /// SampleElement returned by getMcContainer().
+  struct EventIndexEntry_t {
+    /// The index of the fit sample being referenced by this indexed cache
+    /// entry in the FitSampleSet vector of FitSample objects (returned by
+    /// getFitSampleList().
+    std::size_t first {std::size_t(-1)};
+    /// The index of the MC event being reference by this indexed cache entry
+    /// in the SampleElement eveltList vector for the SampleElement returned
+    /// by FitSample::getMcContainer()
+    std::size_t second {std::size_t(-1)};
+  };
+
+  /// A mapping between the event (in the FitSampleSet, and the dial in the
+  /// DialCollectionVector.  This will be used to build a fast lookup table
+  /// between the PhysicsEvent* and the DialInterface* (i.e. a CacheElem_t
+  /// returned by getCache().
+  struct IndexedEntry_t{
+    EventIndexEntry_t first;
+    std::vector<DialIndexEntry_t> second;
+  };
 
   /// Provide the event dial cache.  The event dial cache containes a
   /// CacheElem_t object for every dial applied to a physics event.  The
@@ -64,7 +94,8 @@ public:
 
   /// This gets the next available indexed cache entry.  WARNING: This is a
   /// bare pointer but it is referencing an element of a vector and can be
-  /// invalidated if the values get added to the indexed cache.
+  /// invalidated if the values get added to the indexed cache.  The ownership
+  /// of the pointer is not passed to the caller.
   IndexedEntry_t* fetchNextCacheEntry();
 
   /// Build the association between pointers to PhysicsEvent objects and the
@@ -92,10 +123,9 @@ private:
   /// associations for efficient use when reweighting the MC events.
   std::vector<CacheElem_t> _cache_;
 
-  /// Flag that all events should have dials (or not).
+  /// Flag that all events should have dials (or not).  At the end to have
+  /// better packed alignment.
   bool _warnForDialLessEvent_{false};
-
-
 };
 
 
