@@ -388,7 +388,7 @@ bool DialCollection::initializeDialsWithDefinition() {
               getGlobalDialSubType(),
               binnedInitializer,
               useCachedDials());
-          if (dialBase) {
+          if (dialBase == nullptr) {
               LogAlert << "Invalid dial for " << getTitle() << " -> "
                        << _dialBinSet_.getBinsList()[iBin].getSummary()
                        << std::endl;
