@@ -584,6 +584,7 @@ void DataDispenser::fetchRequestedLeaves(){
 //  t.printTable();
 
 }
+
 void DataDispenser::preAllocateMemory(){
   LogInfo << "Pre-allocating memory..." << std::endl;
   /// \brief The following lines are necessary since the events might get
@@ -789,6 +790,7 @@ void DataDispenser::preAllocateMemory(){
 #endif
 
 }
+
 void DataDispenser::readAndFill(){
   LogWarning << "Reading dataset and loading..." << std::endl;
 
@@ -815,6 +817,7 @@ void DataDispenser::readAndFill(){
     container->shrinkEventList(_cache_.sampleIndexOffsetList[iSample]);
   }
 }
+
 void DataDispenser::fillFunction(int iThread_){
 
   int nThreads = GlobalVariables::getNbThreads();
@@ -981,7 +984,7 @@ void DataDispenser::fillFunction(int iThread_){
 #if USE_NEW_DIALS
   size_t freeSlotDial{0};
   size_t iCollection(-1);
-  std::pair<std::pair<size_t, size_t>, std::vector<std::pair<size_t, size_t>>>* eventDialCacheEntry;
+  EventDialCache::IndexedEntry_t* eventDialCacheEntry;
   std::vector<DataBin>::iterator dial2FoundItr;
   auto isDial2Valid = [&](const DataBin& d_){
     nBinEdges = d_.getEdgesList().size();
@@ -1117,7 +1120,6 @@ void DataDispenser::fillFunction(int iThread_){
           if( eventBuffer.evalFormula( varSelectionFormulaList[iSample].get() ) == 0 ) break;
         }
 
-
         // Has valid bin?
         binsListPtr = &_cache_.samplesToFillList[iSample]->getBinning().getBinsList();
         binFoundItr = std::find_if(
@@ -1130,10 +1132,9 @@ void DataDispenser::fillFunction(int iThread_){
           // Invalid bin -> next sample
           break;
         }
-        else {
-          // found bin
-          eventBuffer.setSampleBinIndex(int(std::distance(binsListPtr->begin(), binFoundItr)));
-        }
+
+        // found the bin
+        eventBuffer.setSampleBinIndex(int(std::distance(binsListPtr->begin(), binFoundItr)));
 
         // OK, now we have a valid fit bin. Let's claim an index.
         sampleEventIndex = _cache_.sampleIndexOffsetList[iSample]++;
@@ -1156,14 +1157,12 @@ void DataDispenser::fillFunction(int iThread_){
         // Now the event is ready. Let's index the dials:
         eventDialOffset = 0;
 
-
 #if USE_NEW_DIALS
         if( _eventDialCacheRef_ != nullptr ) {
           eventDialCacheEntry = _eventDialCacheRef_->fetchNextCacheEntry();
-          eventDialCacheEntry->first = {
-              _cache_.samplesToFillList[iSample]->getIndex(),
-              sampleEventIndex
-          };
+          eventDialCacheEntry->event.sampleIndex
+              = std::size_t(_cache_.samplesToFillList[iSample]->getIndex());
+          eventDialCacheEntry->event.eventIndex = sampleEventIndex;
 
           iCollection = -1;
           for( auto* dialCollectionRef : _cache_.dialCollectionsRefList ){
@@ -1185,8 +1184,8 @@ void DataDispenser::fillFunction(int iThread_){
                 // if is it NOT a DialBinned -> this is the one we are
                 // supposed to use
                 if( dialCollectionRef->getDialBinSet().isEmpty() ){
-                  eventDialCacheEntry->second[eventDialOffset].first = iCollection;
-                  eventDialCacheEntry->second[eventDialOffset].second = 0;
+                  eventDialCacheEntry->dials[eventDialOffset].collectionIndex = iCollection;
+                  eventDialCacheEntry->dials[eventDialOffset].interfaceIndex = 0;
                   eventDialOffset++;
                 }
               }
@@ -1201,8 +1200,8 @@ void DataDispenser::fillFunction(int iThread_){
 
                 if (dial2FoundItr !=  dialCollectionRef->getDialBinSet().getBinsList().end()) {
                   // found DIAL -> get index
-                  eventDialCacheEntry->second[eventDialOffset].first = iCollection;
-                  eventDialCacheEntry->second[eventDialOffset].second = std::distance(
+                  eventDialCacheEntry->dials[eventDialOffset].collectionIndex = iCollection;
+                  eventDialCacheEntry->dials[eventDialOffset].interfaceIndex = std::distance(
                       dialCollectionRef->getDialBinSet().getBinsList().begin(), dial2FoundItr
                   );
                   eventDialOffset++;
@@ -1236,8 +1235,8 @@ void DataDispenser::fillFunction(int iThread_){
                 else {
                     LogThrow( "Unsupported event-by-event dial: " << dialCollectionRef->getGlobalDialType() );
                 }
-                eventDialCacheEntry->second[eventDialOffset].first = iCollection;
-                eventDialCacheEntry->second[eventDialOffset].second = freeSlotDial;
+                eventDialCacheEntry->dials[eventDialOffset].collectionIndex = iCollection;
+                eventDialCacheEntry->dials[eventDialOffset].interfaceIndex = freeSlotDial;
                 eventDialOffset++;
               }
 

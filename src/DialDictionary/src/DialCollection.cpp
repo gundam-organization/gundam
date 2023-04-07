@@ -334,24 +334,35 @@ bool DialCollection::initializeDialsWithDefinition() {
   DialBaseFactory dialBaseFactory;
 
   if( _globalDialType_ == "Norm" or _globalDialType_ == "Normalization" ) {
+    // This dial collection is a normalization, so there is a single dial.
+    // Create it here.
     _dialBaseList_.emplace_back(
       DialBaseObject(dialBaseFactory("Normalization","",nullptr,false)));
   }
   else {
     if     (not _globalDialLeafName_.empty()) {
+      // The dialLeafName field has been provided, so this is an event by
+      // event dial.  The generation of the dials will be handled in
+      // DataDispenser.
       _isBinned_ = false;
     }
-    else if( GenericToolbox::Json::doKeyExist(dialsDefinition, "binningFilePath") ) {
 
+    ///////////////////////////////////////////////////////////////////////
+    else if( GenericToolbox::Json::doKeyExist(dialsDefinition, "binningFilePath") ) {
+      // A binning file has been provided, so this is a binned dial.  Create
+      // the dials for each bin here.  The dials will be assigned to the
+      // events in DataDispenser.
       auto binningFilePath = GenericToolbox::Json::fetchValue<std::string>(dialsDefinition, "binningFilePath");
 
       _dialBinSet_ = DataBinSet();
       _dialBinSet_.setName(binningFilePath);
       _dialBinSet_.readBinningDefinition(binningFilePath);
 
+      // Get the filename for a file with the object array of dials (graphs)
+      // that will be applied based on the binning.
       auto filePath = GenericToolbox::Json::fetchValue<std::string>(dialsDefinition, "dialsFilePath");
-      LogThrowIf(not GenericToolbox::doesTFileIsValid(filePath), "Could not open: " << filePath)
-        TFile* dialsTFile = TFile::Open(filePath.c_str());
+      LogThrowIf(not GenericToolbox::doesTFileIsValid(filePath), "Could not open: " << filePath);
+      TFile* dialsTFile = TFile::Open(filePath.c_str());
       LogThrowIf(dialsTFile==nullptr, "Could not open: " << filePath);
 
       if      ( GenericToolbox::Json::doKeyExist(dialsDefinition, "dialsList") ) {
@@ -401,10 +412,13 @@ bool DialCollection::initializeDialsWithDefinition() {
 
       }
 
+      ///////////////////////////////////////////////////////////////////////
       else if ( GenericToolbox::Json::doKeyExist(dialsDefinition, "dialsTreePath") ) {
-      // OLD
-      auto objPath = GenericToolbox::Json::fetchValue<std::string>(dialsDefinition, "dialsTreePath");
-      auto* dialsTTree = (TTree*) dialsTFile->Get(objPath.c_str());
+        // Deprecated: A tree with event binning has beenprovided, so this is
+        // a binned dial.  Create the dials for each bin here.  The dials will
+        // be assigned to the events in DataDispenser.
+        auto objPath = GenericToolbox::Json::fetchValue<std::string>(dialsDefinition, "dialsTreePath");
+        auto* dialsTTree = (TTree*) dialsTFile->Get(objPath.c_str());
         LogThrowIf(dialsTTree== nullptr, objPath << " within " << filePath << " could not be opened.")
 
         Int_t kinematicBin;
@@ -466,7 +480,7 @@ bool DialCollection::initializeDialsWithDefinition() {
       }
     }
     else {
-      LogError << "The dial is neither even-by-event nor binned..." << std::endl;
+      LogError << "The dial is neither event-by-event nor binned..." << std::endl;
     }
   }
 
