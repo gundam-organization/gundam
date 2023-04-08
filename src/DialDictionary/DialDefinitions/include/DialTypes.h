@@ -12,9 +12,11 @@
 #include "LightGraph.h"
 
 #include "Spline.h"
-#include "MonotonicSpline.h"
-#include "GeneralSpline.h"
 #include "SimpleSpline.h"
+#include "CompactSpline.h"
+#include "UniformSpline.h"
+#include "GeneralSpline.h"
+#include "MonotonicSpline.h"
 
 
 #endif //GUNDAM_DIALTYPES_H

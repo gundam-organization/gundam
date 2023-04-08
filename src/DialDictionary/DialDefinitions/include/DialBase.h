@@ -73,62 +73,9 @@ public:
 
 };
 
-/// This is a template to add caching to a DialBase derived class.
-template <typename T>
-class CachedDial: public T {
-public:
-  CachedDial() = default;
-  double evalResponse(const DialInputBuffer& input_) const override {
-    if (isCacheValid(input_)) {return _cachedResponse_;}
-#if HAS_CPP_17
-    std::scoped_lock<std::mutex> g(_evalLock_);
-#else
-    std::lock_guard<std::mutex> g(_evalLock_);
-#endif
-    if (isCacheValid(input_)) {return _cachedResponse_;}
-    _cachedResponse_ = T::evalResponse(input_);
-    updateInputCache(input_);
-    return _cachedResponse_;
-  }
-  bool isCacheValid(const DialInputBuffer& input_) const;
-  void updateInputCache(const DialInputBuffer& input_) const;
+// extensions
+#include "CachedDial.h"
 
-protected:
-  mutable double _cachedResponse_{std::nan("unset")}; // + 8 bytes
-  mutable GenericToolbox::NoCopyWrapper<std::mutex> _evalLock_{}; // + 64 bytes
-#if USE_ZLIB
-  // + 4 bytes (keeping a vector empty is already 24...)
-  mutable uint32_t _cachedInputHash_{0};
-#else
-  mutable std::vector<double> _cachedInputs_{}; // + 24 bytes
-#endif
-};
-
-
-template <typename T>
-bool CachedDial<T>::isCacheValid(const DialInputBuffer& input_) const {
-#if USE_ZLIB
-  return _cachedInputHash_ == input_.getCurrentHash();
-#else
-  if( _cachedInputs_.size() != input_.getBufferSize() ) return false;
-  return ( memcmp(
-             _cachedInputs_.data(), input_.getBuffer(),
-             input_.getBufferSize() * sizeof(*input_.getBuffer())) == 0 );
-#endif
-}
-
-template <typename T>
-void CachedDial<T>::updateInputCache(const DialInputBuffer& input_) const {
-#if USE_ZLIB
-  _cachedInputHash_ = input_.getCurrentHash();
-#else
-  if( _cachedInputs_.size() != input_.getBufferSize() ){
-    _cachedInputs_.resize(input_.getBufferSize(), std::nan("unset"));
-  }
-  memcpy(_cachedInputs_.data(), input_.getBuffer(),
-         input_.getBufferSize() * sizeof(*input_.getBuffer()));
-#endif
-}
 #endif //GUNDAM_DIALBASE_H
 // Local Variables:
 // mode:c++
