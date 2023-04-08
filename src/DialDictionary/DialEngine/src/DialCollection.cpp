@@ -309,7 +309,7 @@ bool DialCollection::initializeNormDialsWithParBinning() {
   _dialBaseList_.reserve( _dialBinSet_.getBinsList().size() );
   DialBaseFactory factory;
   for(const auto & bin : _dialBinSet_.getBinsList()) {
-    _dialBaseList_.emplace_back(DialBaseObject(factory("Normalization","",nullptr,false)));
+    _dialBaseList_.emplace_back(DialBaseObject(factory.makeDial("Normalization","",nullptr,false)));
   }
 
   return true;
@@ -337,7 +337,7 @@ bool DialCollection::initializeDialsWithDefinition() {
     // This dial collection is a normalization, so there is a single dial.
     // Create it here.
     _dialBaseList_.emplace_back(
-      DialBaseObject(dialBaseFactory("Normalization","",nullptr,false)));
+      DialBaseObject(dialBaseFactory.makeDial("Normalization","",nullptr,false)));
   }
   else {
     if     (not _globalDialLeafName_.empty()) {
@@ -383,7 +383,7 @@ bool DialCollection::initializeDialsWithDefinition() {
              iBin < int(_dialBinSet_.getBinsList().size()) ; ++iBin ) {
           TObject* binnedInitializer = dialsList->At(iBin);
 
-          DialBase *dialBase = dialBaseFactory(
+          DialBase *dialBase = dialBaseFactory.makeDial(
               getGlobalDialType(),
               getGlobalDialSubType(),
               binnedInitializer,
@@ -470,7 +470,7 @@ bool DialCollection::initializeDialsWithDefinition() {
           DialBaseFactory factory;
           _dialBaseList_.emplace_back(
             DialBaseObject(
-              factory(getGlobalDialType(),getGlobalDialSubType(),
+              factory.makeDial(getGlobalDialType(),getGlobalDialSubType(),
                       dialInitializer,this->useCachedDials())));
         } // iSpline (in TTree)
         dialsTFile->Close();

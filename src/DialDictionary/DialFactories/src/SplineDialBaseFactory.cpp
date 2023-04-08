@@ -114,7 +114,7 @@ void SplineDialBaseFactory::MakeMonotonic(const std::vector<double>& xPoint,
   }
 }
 
-DialBase* SplineDialBaseFactory::operator () (const std::string& dialType_,
+DialBase* SplineDialBaseFactory::makeDial(const std::string& dialType_,
                                               const std::string& dialSubType_,
                                               TObject* dialInitializer_,
                                               bool useCachedDial_) {

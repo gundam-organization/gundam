@@ -8,7 +8,7 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[GraphFactory]");
 });
 
-DialBase* GraphDialBaseFactory::operator () (const std::string& dialType_,
+DialBase* GraphDialBaseFactory::makeDial(const std::string& dialType_,
                                              const std::string& dialSubType_,
                                              TObject* dialInitializer_,
                                              bool useCachedDial_) {

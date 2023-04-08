@@ -34,8 +34,6 @@ public:
   // Return the name of the dial type (simple local RTTI).
   [[nodiscard]] virtual std::string getDialTypeName() const = 0;
 
-  // virtual bool isBinned(){ return false; }
-
   /// Evaluate the the dial response at the set of parameter values in
   /// DialInputBuffer.
   [[nodiscard]] virtual double evalResponse(const DialInputBuffer& input_) const = 0;
