@@ -147,32 +147,22 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialType_,
   }
 
   // Check that there are equal numbers of X and Y
-  LogThrowIf(xPoints.size() != yPoints.size(), "INVALID Spline: must have the same number of X and Y points");
+  LogThrowIf( xPoints.size() != yPoints.size(), "INVALID Spline: must have the same number of X and Y points" );
 
   // Check that the X points are in increasing order.
-  double lastX{std::nan("")};
-  for (double xPoint : xPoints) {
-    LogThrowIf(xPoint <= lastX, "INVALID Spline: points are not in increasing order.");
-    lastX = xPoint;
-  }
+  LogThrowIf( not std::is_sorted(xPoints.begin(), xPoints.end()), "INVALID Spline: points are not in increasing order." );
 
   // Stuff the created dial into a unique_ptr, so it will be properly deleted
   // in the event of an exception.
   std::unique_ptr<DialBase> dialBase;
 
   // Check that the spline isn't flat and 1.0
-  bool isFlat{true};
-  double lastY{yPoints[0]};
-  for( double yPoint : yPoints ){
-    if( yPoint != lastY ){ isFlat = false; break; }
-    lastY = yPoint;
-  }
+  bool isFlat{ std::all_of( yPoints.begin(), yPoints.end(), [&] (double y) {return y == yPoints[0];} ) };
   if ( isFlat or yPoints.size() == 1 ){
     // get rid of the spline if the flat response is one
-    if( lastY == 1. ){
-      return nullptr;
-    }
+    if( yPoints[0] == 1. ){ return nullptr; }
     else{
+      // create a special dial that will handle the constant shift
       dialBase = std::make_unique<Shift>();
       ((Shift*) dialBase.get())->setShiftValue( yPoints[0] );
     }
