@@ -1223,7 +1223,7 @@ void DataDispenser::fillFunction(int iThread_){
               // loaded graph is valid?
               if( grPtr != nullptr ){
                 DialBaseFactory factory;
-                DialBase* dialBase = factory(
+                DialBase* dialBase = factory.makeDial(
                     dialCollectionRef->getGlobalDialType(),
                     dialCollectionRef->getGlobalDialSubType(),
                     grPtr, dialCollectionRef->useCachedDials()

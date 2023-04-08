@@ -18,6 +18,7 @@ option(BATCH_MODE "Build to run in a batch queue (affects output)" OFF)
 option(BUILD_DOC "Build documentation" OFF)
 option(WITH_XSLLHFITTER "Build old xsllhFitter apps/libraries" OFF)
 option(USE_STATIC_LINKS "Library build in static mod" OFF)
+option(WITH_GUNDAM_ROOT_APP "Build app gundamRoot" ON)
 
 # Cmake includes
 include(CTest)
