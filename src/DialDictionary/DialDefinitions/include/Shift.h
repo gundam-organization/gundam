@@ -2,8 +2,8 @@
 // Created by Adrien Blanchet on 29/11/2022.
 //
 
-#ifndef GUNDAM_NORM_H
-#define GUNDAM_NORM_H
+#ifndef GUNDAM_SHIFT_H
+#define GUNDAM_SHIFT_H
 
 #include "DialBase.h"
 
@@ -31,4 +31,4 @@ private:
 };
 
 
-#endif //GUNDAM_NORM_H
+#endif //GUNDAM_SHIFT_H
