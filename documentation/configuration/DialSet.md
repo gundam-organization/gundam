@@ -14,7 +14,8 @@
 | printDialsSummary      | bool         | extra verbose                                                   | false   |
 | parametersBinningPath  | string       | create a dedicated norm dial according to the parameter binning |         |
 | dialsDefinitions       | json         | dials config                                                    |         |
-| dialsType              | string       | {Norm, Spline, Graph}                                           |         |
+| dialsType              | string       | {Norm, Normalization, Spline, Graph}                            |         |
+| dialSubType            | string       | {not-a-knot, natural, catmull-rom, light, monotonic} [1]        | empty   |
 | applyCondition         | string       | formula condition that applies on every dial of the set         |         |
 | applyConditions        | json         | config gathering multiple formulas                              |         |
 | minDialResponse        | double       | cap dial response                                               |         |
@@ -24,6 +25,30 @@
 | mirrorHighEdge         | double       | upper edge where mirroring applies                              |         |
 | allowDialExtrapolation | bool         | evaluate dials even out of boundaries                           | false   |
 
+[1] The values for the dialSubType depend on the value of dialsType.  Specifically:
+
+* Norm: This is a normalization parameter, and the subtype is currently ignored
+* Graph: This does linear interpolation between points.  The subtype
+      values are ROOT, or light.
+  - ROOT: A ROOT TGraph object is used
+  - light: A gundam LightGraph object is used.
+* Spline: Implement a spline controled by input knots provided as a
+      graph.  In several cases a GeneralSpline, or UniformSpline
+      object may be used.  The choice depends on the spacing of the
+      input points.  UniformSpline assumes regular point spacing, and
+      GeneralSpline does not require that.  The subtype meanings are:
+  - ROOT: A ROOT TSpline3 without constraints is used.  This results
+      the slopes being estimated using the Not-A-Knot criteria.
+  - not-a-knot: Use a GeneralSpline, or UniformSpline with the slopes
+      calculated using the not-a-knot criteria.
+  - natural: Use a GeneralSpline with the slopes calculated using the
+      natural spline criteria
+  - catmull-rom: Estimate the slopes using the Catmull-Rom criteria.
+      This uses the average slopes for the points before and after.
+  - monotonic: Apply the monotonic critera to the slopes before they
+      are used.  This applies to "not-a-knot", "natural" and
+      "catmull-rom" splines.  The monotonic criteria cannot be applied
+      the "ROOT" TSpline3.
 
 ### applyConditions options
 
@@ -34,6 +59,8 @@
 | excludedRanges                    | list(pair(double)) | list of ranges (min, max) where the dials of the set don't apply |         |
 | allowedValues                     | list(double)       | list of values where the dials of the set apply                  |         |
 | excludedValues                    | list(double)       | list of values where the dials of the set apply                  |         |
+
+
 
 
 ### dialsDefinitions options
@@ -48,4 +75,3 @@
 | dialsList           | string | path within root file to the list of dials                         |         |
 | dialsTreePath (old) | string | tree name where the dials are stored                               |         |
 | dialSubType         | string | cache manager spline type (dev)                                    |         |
-
