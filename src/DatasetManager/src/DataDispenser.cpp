@@ -1247,23 +1247,24 @@ void DataDispenser::fillFunction(int iThread_){
               }
 
               // loaded graph is valid?
-              if( Misc::isGraphValid(grPtr) ){
+              if( grPtr != nullptr ){
                 DialBaseFactory factory;
-                DialBase* dialBase
-                    = factory(dialCollectionRef->getGlobalDialType(),
-                              dialCollectionRef->getGlobalDialSubType(),
-                              grPtr, dialCollectionRef->useCachedDials());
-                if (dialBase) {
-                    freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
-                    dialBase->setAllowExtrapolation(dialCollectionRef->isAllowDialExtrapolation());
-                    dialCollectionRef->getDialBaseList()[freeSlotDial] = DialCollection::DialBaseObject(dialBase);
+                DialBase* dialBase = factory(
+                    dialCollectionRef->getGlobalDialType(),
+                    dialCollectionRef->getGlobalDialSubType(),
+                    grPtr, dialCollectionRef->useCachedDials()
+                );
+                if ( dialBase != nullptr ) {
+                  freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
+                  dialBase->setAllowExtrapolation(dialCollectionRef->isAllowDialExtrapolation());
+                  dialCollectionRef->getDialBaseList()[freeSlotDial] = DialCollection::DialBaseObject(dialBase);
+                  eventDialCacheEntry->dials[eventDialOffset].collectionIndex = iCollection;
+                  eventDialCacheEntry->dials[eventDialOffset].interfaceIndex = freeSlotDial;
+                  eventDialOffset++;
                 }
                 else {
-                    LogThrow( "Unsupported event-by-event dial: " << dialCollectionRef->getGlobalDialType() );
+                  // the Dial is not valid and should be skipped.
                 }
-                eventDialCacheEntry->dials[eventDialOffset].collectionIndex = iCollection;
-                eventDialCacheEntry->dials[eventDialOffset].interfaceIndex = freeSlotDial;
-                eventDialOffset++;
               }
 
             }

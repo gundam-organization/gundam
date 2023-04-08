@@ -9,56 +9,55 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[DialBaseFactory]");
 });
 
-DialBaseFactory::DialBaseFactory() {}
-DialBaseFactory::~DialBaseFactory() {}
-
-DialBase* DialBaseFactory::operator () (std::string dialType,
-                                        std::string dialSubType,
-                                        TObject* dialInitializer,
-                                        bool cached) {
+DialBase* DialBaseFactory::operator () (const std::string& dialType_,
+                                        const std::string& dialSubType_,
+                                        TObject* dialInitializer_,
+                                        bool useCachedDial_) {
 
   // Stuff the created dial into a unique_ptr, so it will be properly deleted
   // in the event of an exception.
   std::unique_ptr<DialBase> dialBase;
 
-  if (dialType == "Norm" || dialType == "Normalization") {
+  if (dialType_ == "Norm" || dialType_ == "Normalization") {
     NormDialBaseFactory factory;
-    dialBase.reset(factory(dialType, dialSubType, dialInitializer,cached));
+    dialBase.reset(factory(dialType_, dialSubType_, dialInitializer_, useCachedDial_));
   }
-  else if (dialType == "Graph") {
+  else if (dialType_ == "Graph") {
     GraphDialBaseFactory factory;
-    dialBase.reset(factory(dialType, dialSubType, dialInitializer,cached));
+    dialBase.reset(factory(dialType_, dialSubType_, dialInitializer_, useCachedDial_));
   }
-  else if (dialType == "Spline") {
+  else if (dialType_ == "Spline") {
     SplineDialBaseFactory factory;
-    dialBase.reset(factory(dialType, dialSubType, dialInitializer,cached));
+    dialBase.reset(factory(dialType_, dialSubType_, dialInitializer_, useCachedDial_));
   }
 #define INCLUDE_DEPRECATED_DIAL_TYPES
 #ifdef INCLUDE_DEPRECATED_DIAL_TYPES
-  else if (dialType == "MonotonicSpline") {
-    LogWarning << "DEPRECATED DIAL-TYPE USED: MonotonicSpline will be removed"
+  else if (dialType_ == "MonotonicSpline") {
+    LogAlertOnce << "DEPRECATED DIAL-TYPE USED: MonotonicSpline will be removed. Instead use:"
+    << std::endl << "  dialType: \"Spline\""
+    << std::endl << "  dialSubType: \"catmull-rom, monotonic\""
             << std::endl;
     SplineDialBaseFactory factory;
     dialBase.reset(factory("Spline", "catmull-rom, monotonic",
-                           dialInitializer,cached));
+                           dialInitializer_, useCachedDial_));
   }
-  else if (dialType == "GeneralSpline") {
-    LogWarning << "DEPRECATED DIAL-TYPE USED: GeneralSpline will be removed"
+  else if (dialType_ == "GeneralSpline") {
+    LogAlertOnce << "DEPRECATED DIAL-TYPE USED: GeneralSpline will be removed. Instead use: \"Spline\""
             << std::endl;
     SplineDialBaseFactory factory;
-    dialBase.reset(factory("Spline", "not-a-knot", dialInitializer,cached));
+    dialBase.reset(factory("Spline", "not-a-knot", dialInitializer_, useCachedDial_));
   }
-  else if (dialType == "SimpleSpline") {
-    LogWarning << "DEPRECATED DIAL-TYPE USED: SimpleSpline will be removed"
+  else if (dialType_ == "SimpleSpline") {
+    LogAlertOnce << "DEPRECATED DIAL-TYPE USED: SimpleSpline will be removed. Instead use: \"Spline\""
             << std::endl;
     SplineDialBaseFactory factory;
-    dialBase.reset(factory("Spline", "knot-a-knot", dialInitializer,cached));
+    dialBase.reset(factory("Spline", "knot-a-knot", dialInitializer_, useCachedDial_));
   }
-  else if (dialType == "LightGraph") {
-    LogWarning << "DEPRECATED DIAL-TYPE USED: LightGraph will be removed"
+  else if (dialType_ == "LightGraph") {
+    LogAlertOnce << "DEPRECATED DIAL-TYPE USED: LightGraph will be removed. Instead use: \"Graph\""
             << std::endl;
     GraphDialBaseFactory factory;
-    dialBase.reset(factory("Graph", "light", dialInitializer,cached));
+    dialBase.reset(factory("Graph", "light", dialInitializer_, useCachedDial_));
   }
 #endif
 

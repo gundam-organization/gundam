@@ -69,7 +69,7 @@ public:
 
   /// Return the data used by the dial to calculate the output values. The
   /// specific data contained in the vector depends on the derived class.
-  virtual const std::vector<double>& getDialData() const;
+  [[nodiscard]] virtual const std::vector<double>& getDialData() const;
 
 };
 
