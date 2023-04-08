@@ -21,7 +21,7 @@ public:
 
   /// Build the dial with no input arguments.  This is here for completeness,
   /// but could eventually do... something.
-  virtual void buildDial(std::string option="") override {}
+  virtual void buildDial(const std::string& option_="") override {}
 
 };
 

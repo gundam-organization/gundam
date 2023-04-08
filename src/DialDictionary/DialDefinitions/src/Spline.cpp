@@ -12,7 +12,7 @@ void Spline::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;
 }
 
-void Spline::buildDial(const TSpline3& spline, std::string option) {
+void Spline::buildDial(const TSpline3& spline, const std::string& option_) {
   std::vector<double> xPoint(spline.GetNp());
   std::vector<double> yPoint(spline.GetNp());
   std::vector<double> dummy;
@@ -23,11 +23,11 @@ void Spline::buildDial(const TSpline3& spline, std::string option) {
     xPoint.push_back(x);
     yPoint.push_back(y);
   }
-  buildDial(xPoint,yPoint,dummy,option);
+  buildDial(xPoint,yPoint,dummy,option_);
   _spline_.SetTitle(spline.GetTitle());
 }
 
-void Spline::buildDial(const TGraph& grf, std::string option) {
+void Spline::buildDial(const TGraph& grf, const std::string& option_) {
   std::vector<double> xPoint(grf.GetN());
   std::vector<double> yPoint(grf.GetN());
   std::vector<double> dummy;
@@ -38,14 +38,14 @@ void Spline::buildDial(const TGraph& grf, std::string option) {
       xPoint.push_back(x);
       yPoint.push_back(y);
   }
-  buildDial(xPoint,yPoint,dummy,option);
+  buildDial(xPoint,yPoint,dummy,option_);
   _spline_.SetTitle(grf.GetName());
 }
 
 void Spline::buildDial(const std::vector<double>& v1,
                        const std::vector<double>& v2,
                        const std::vector<double>& v3,
-                       std::string option) {
+                       const std::string& option_) {
   _spline_ = TSpline3("",const_cast<double*>(v1.data()),
                       const_cast<double*>(v2.data()), v1.size());
 }

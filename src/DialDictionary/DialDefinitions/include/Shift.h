@@ -19,11 +19,7 @@ public:
   [[nodiscard]] std::string getDialTypeName() const override { return {"Shift"}; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override { return _shiftValue_; }
 
-  /// Build the dial with no input arguments.  This is here for completeness,
-  /// but could eventually do... something.
-  virtual void buildDial(std::string option="") override {}
-
-  void setShiftValue(double shiftValue_) { _shiftValue_ = shiftValue_; }
+  void buildDial(void* shiftValuePtr_, const std::string& options_="") override { _shiftValue_ = *((double*) shiftValuePtr_); }
 
 private:
   double _shiftValue_{1};

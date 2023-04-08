@@ -20,7 +20,7 @@ bool MonotonicSpline::getAllowExtrapolation() const {
   return _allowExtrapolation_;
 }
 
-void MonotonicSpline::buildDial(const TSpline3& spline, std::string option) {
+void MonotonicSpline::buildDial(const TSpline3& spline, const std::string& option_) {
   std::vector<double> xPoint(spline.GetNp());
   std::vector<double> yPoint(spline.GetNp());
   std::vector<double> dummy;
@@ -31,10 +31,10 @@ void MonotonicSpline::buildDial(const TSpline3& spline, std::string option) {
     xPoint.push_back(x);
     yPoint.push_back(y);
   }
-  buildDial(xPoint,yPoint,dummy,option);
+  buildDial(xPoint,yPoint,dummy,option_);
 }
 
-void MonotonicSpline::buildDial(const TGraph& grf, std::string option) {
+void MonotonicSpline::buildDial(const TGraph& grf, const std::string& option_) {
   std::vector<double> xPoint(grf.GetN());
   std::vector<double> yPoint(grf.GetN());
   std::vector<double> dummy;
@@ -45,14 +45,14 @@ void MonotonicSpline::buildDial(const TGraph& grf, std::string option) {
       xPoint.push_back(x);
       yPoint.push_back(y);
   }
-  buildDial(xPoint,yPoint,dummy,option);
+  buildDial(xPoint,yPoint,dummy,option_);
 }
 
 
 void MonotonicSpline::buildDial(const std::vector<double>& v1,
                                 const std::vector<double>& v2,
                                 const std::vector<double>& v3,
-                                std::string option) {
+                                const std::string& option_) {
   LogThrowIf(not _splineData_.empty(), "Spline data already set.");
 
   _splineBounds_.first = v1.front();

@@ -50,20 +50,23 @@ public:
   /////////////////////////////////////////////////////////////////////////
 
   /// Build the dial with no input arguments.  Mostly here for completeness!
-  virtual void buildDial(std::string option="") {throw std::runtime_error("Not implemented");}
+  virtual void buildDial(const std::string& option_="") {throw std::runtime_error("Not implemented");}
 
   /// Build the dial using up to up to three vectors of doubles.  Mostly
   /// an internal tool to make spline and graph builders work the same.
   virtual void buildDial(const std::vector<double>& v1,
                          const std::vector<double>& v2,
                          const std::vector<double>& v3,
-                         std::string option="") {throw std::runtime_error("Not implemented");}
+                         const std::string& option_="") {throw std::runtime_error("Not implemented");}
 
   /// Build the dial using a graph (usually a leaf in the input file
-  virtual void buildDial(const TGraph& grf, std::string option="") {throw std::runtime_error("Not implemented");}
+  virtual void buildDial(const TGraph& grf, const std::string& option_="") {throw std::runtime_error("Not implemented");}
 
   /// Build the dial using a spline (usually a leaf in the input file.
-  virtual void buildDial(const TSpline3& spl, std::string option="") {throw std::runtime_error("Not implemented");}
+  virtual void buildDial(const TSpline3& spl, const std::string& option_="") {throw std::runtime_error("Not implemented");}
+
+  /// Generic builder
+  virtual void buildDial(void* inputDataPtr_, const std::string& option_="") {throw std::runtime_error("Not implemented");}
 
   /// Return the data used by the dial to calculate the output values. The
   /// specific data contained in the vector depends on the derived class.

@@ -164,7 +164,7 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialType_,
     else{
       // create a special dial that will handle the constant shift
       dialBase = std::make_unique<Shift>();
-      ((Shift*) dialBase.get())->setShiftValue( yPoints[0] );
+      dialBase->buildDial(&yPoints[0]);
     }
   }
   else{

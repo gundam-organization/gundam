@@ -21,7 +21,7 @@ public:
   void setAllowExtrapolation(bool allowExtrapolation) override;
   [[nodiscard]] bool getAllowExtrapolation() const override;
 
-  virtual void buildDial(const TGraph& grf, std::string option="") override;
+  virtual void buildDial(const TGraph& grf, const std::string& option_="") override;
 
 protected:
   [[nodiscard]] double evaluateGraph(const DialInputBuffer& input_) const;
