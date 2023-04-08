@@ -144,7 +144,7 @@ DialBase* SplineDialBaseFactory::operator () (const std::string& dialType_,
 
   // Check that there are enough points in the spline.
   if (xPoints.size() < 2) {
-    LogWarning << "Splines must have at least two points." << std::endl;
+    LogAlertOnce << "Splines must have at least two points." << std::endl;
     return nullptr;
   }
 
@@ -165,7 +165,7 @@ DialBase* SplineDialBaseFactory::operator () (const std::string& dialType_,
   bool isFlat{true};
   double lastY{std::nan("")};
   for( double yPoint : yPoints ){
-    if( yPoint == lastY ){ isFlat = false; break; }
+    if( yPoint != lastY ){ isFlat = false; break; }
     lastY = yPoint;
   }
   if ( isFlat ){
@@ -211,12 +211,14 @@ DialBase* SplineDialBaseFactory::operator () (const std::string& dialType_,
     dialBase = std::make_unique<Spline>();
   }
   else {
-    if (not hasUniformlySpacedKnots) {
-      (useCachedDial_ ? ( dialBase = std::make_unique<GeneralSplineCache>() ) : dialBase = std::make_unique<GeneralSpline>() );
-    }
-    else {
-      (useCachedDial_ ? ( dialBase = std::make_unique<UniformSplineCache>() ) : dialBase = std::make_unique<UniformSpline>() );
-    }
+    (useCachedDial_ ? ( dialBase = std::make_unique<GeneralSplineCache>() ) : dialBase = std::make_unique<GeneralSpline>() );
+//    if (not hasUniformlySpacedKnots) {
+//      (useCachedDial_ ? ( dialBase = std::make_unique<GeneralSplineCache>() ) : dialBase = std::make_unique<GeneralSpline>() );
+//    }
+//    else {
+//      LogDebug << "CONVERTED TO UNIFORMSPLINE" << std::endl;
+//      (useCachedDial_ ? ( dialBase = std::make_unique<UniformSplineCache>() ) : dialBase = std::make_unique<UniformSpline>() );
+//    }
   }
 
   // Initialize the spline
