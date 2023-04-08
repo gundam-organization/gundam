@@ -1,7 +1,6 @@
 #include "GraphDialBaseFactory.h"
 
-#include "Graph.h"
-#include "LightGraph.h"
+#include "DialTypes.h"
 
 #include <TGraph.h>
 

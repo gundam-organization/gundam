@@ -1,11 +1,6 @@
 #include "SplineDialBaseFactory.h"
 
-#include "Shift.h"
-#include "Spline.h"
-#include "GeneralSpline.h"
-#include "UniformSpline.h"
-#include "CompactSpline.h"
-#include "MonotonicSpline.h"
+#include "DialTypes.h"
 
 #include "TGraph.h"
 #include "TSpline.h"
