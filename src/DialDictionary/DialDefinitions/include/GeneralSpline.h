@@ -22,10 +22,10 @@ public:
 
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<GeneralSpline>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return {"GeneralSpline"}; }
-  double evalResponse(const DialInputBuffer& input_) const override;
+  [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
 
   void setAllowExtrapolation(bool allowExtrapolation) override;
-  bool getAllowExtrapolation() const override;
+  [[nodiscard]] bool getAllowExtrapolation() const override;
 
   /// Pass information to the dial so that it can build it's
   /// internal information.  New build overloads should be

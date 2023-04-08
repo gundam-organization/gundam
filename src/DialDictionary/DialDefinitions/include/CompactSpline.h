@@ -17,14 +17,14 @@ class CompactSpline : public DialBase {
 
 public:
   CompactSpline() = default;
-  virtual ~CompactSpline() = default;
+  ~CompactSpline() override = default;
 
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<CompactSpline>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return {"CompactSpline"}; }
-  double evalResponse(const DialInputBuffer& input_) const override;
+  [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
 
   void setAllowExtrapolation(bool allowExtrapolation) override;
-  bool getAllowExtrapolation() const override;
+  [[nodiscard]] bool getAllowExtrapolation() const override;
 
   void buildSplineData(TGraph& graph_);
   [[nodiscard]] double evaluateSpline(const DialInputBuffer& input_) const;
@@ -40,7 +40,7 @@ public:
                          const std::vector<double>& v3,
                          std::string option="") override;
 
-  const std::vector<double>& getDialData() const override {return _splineData_;}
+  [[nodiscard]] const std::vector<double>& getDialData() const override {return _splineData_;}
 
 protected:
   bool _allowExtrapolation_{false};

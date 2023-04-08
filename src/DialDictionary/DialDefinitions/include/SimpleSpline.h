@@ -18,14 +18,15 @@ class SimpleSpline : public DialBase {
 
 public:
   SimpleSpline() = default;
-  virtual ~SimpleSpline() = default;
+  ~SimpleSpline() override = default;
 
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<SimpleSpline>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return {"SimpleSpline"}; }
-  double evalResponse(const DialInputBuffer& input_) const override;
+  [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
 
   void setAllowExtrapolation(bool allowExtrapolation) override;
-  bool getAllowExtrapolation() const override;
+
+  [[nodiscard]] bool getAllowExtrapolation() const override;
 
   /// Pass information to the dial so that it can build it's
   /// internal information.  New build overloads should be
@@ -34,7 +35,7 @@ public:
   virtual void buildDial(const TGraph& grf, std::string option="") override;
   virtual void buildDial(const TSpline3& spl, std::string option="") override;
 
-  const std::vector<double>& getDialData() const override {return _splineData_;}
+  [[nodiscard]] const std::vector<double>& getDialData() const override {return _splineData_;}
 
 protected:
   bool _isUniform_{false};

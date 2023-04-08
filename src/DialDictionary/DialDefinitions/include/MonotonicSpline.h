@@ -17,14 +17,14 @@ class MonotonicSpline : public DialBase {
 
 public:
   MonotonicSpline() = default;
-  virtual ~MonotonicSpline() = default;
+  ~MonotonicSpline() override = default;
 
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<MonotonicSpline>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return {"MonotonicSpline"}; }
-  double evalResponse(const DialInputBuffer& input_) const override;
+  [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
 
   void setAllowExtrapolation(bool allowExtrapolation) override;
-  bool getAllowExtrapolation() const override;
+  [[nodiscard]] bool getAllowExtrapolation() const override;
 
   /// Pass information to the dial so that it can build it's
   /// internal information.  New build overloads should be
@@ -37,7 +37,7 @@ public:
                          const std::vector<double>& v3,
                          std::string option="") override;
 
-  const std::vector<double>& getDialData() const override {return _splineData_;}
+  [[nodiscard]] const std::vector<double>& getDialData() const override {return _splineData_;}
 
 protected:
   bool _allowExtrapolation_{false};

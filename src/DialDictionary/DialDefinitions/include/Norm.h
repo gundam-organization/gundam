@@ -17,7 +17,7 @@ public:
 
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<Norm>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return {"Norm"}; }
-  double evalResponse(const DialInputBuffer& input_) const override { return input_.getBuffer()[0]; }
+  [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override { return input_.getBuffer()[0]; }
 
   /// Build the dial with no input arguments.  This is here for completeness,
   /// but could eventually do... something.

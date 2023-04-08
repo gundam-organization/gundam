@@ -8,8 +8,7 @@
 #include "DialInputBuffer.h"
 
 /// This is a template to add caching to a DialBase derived class.
-template <typename T>
-class CachedDial: public T {
+template <typename T> class CachedDial: public T {
 public:
   CachedDial() = default;
   double evalResponse(const DialInputBuffer& input_) const override;
