@@ -12,29 +12,26 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[GraphFactory]");
 });
 
-GraphDialBaseFactory::GraphDialBaseFactory() {}
-GraphDialBaseFactory::~GraphDialBaseFactory() {}
+DialBase* GraphDialBaseFactory::operator () (const std::string& dialType_,
+                                             const std::string& dialSubType_,
+                                             TObject* dialInitializer_,
+                                             bool useCachedDial_) {
 
-DialBase* GraphDialBaseFactory::operator () (std::string dialType,
-                                             std::string dialSubType,
-                                             TObject* dialInitializer,
-                                             bool cached) {
-
-  TGraph* graph = dynamic_cast<TGraph*>(dialInitializer);
-  LogThrowIf(!graph, "Graph dial initializer must be a TGraph");
+  auto* srcGraph = dynamic_cast<TGraph*>(dialInitializer_);
+  LogThrowIf(srcGraph == nullptr, "Graph dial initializer must be a TGraph");
 
   // Stuff the created dial into a unique_ptr, so it will be properly deleted
   // in the event of an exception.
   std::unique_ptr<DialBase> dialBase;
 
-  if (dialSubType == "ROOT") {
-    dialBase.reset((not cached) ? new Graph: new GraphCache);
+  if (dialSubType_ == "ROOT") {
+    (useCachedDial_ ? ( dialBase = std::make_unique<GraphCache>() ) : ( dialBase = std::make_unique<Graph>() ) );
   }
   else {
-    dialBase.reset((not cached) ? new LightGraph: new LightGraphCache);
+    (useCachedDial_ ? ( dialBase = std::make_unique<LightGraphCache>() ) : ( dialBase = std::make_unique<LightGraph>() ) );
   }
 
-  dialBase->buildDial(*graph);
+  dialBase->buildDial(*srcGraph);
 
   // Pass the ownership without any constraints!
   return dialBase.release();

@@ -9,8 +9,8 @@
 // the object.  The ownership of the object is passed to the caller.
 class SplineDialBaseFactory {
 public:
-  SplineDialBaseFactory();
-  ~SplineDialBaseFactory();
+  SplineDialBaseFactory() = default;
+  ~SplineDialBaseFactory() = default;
 
   /// Fill the points starting from a TObject that needs to be pointing to a
   /// graph.  This returns false if it can't get the points.
@@ -38,10 +38,10 @@ public:
   /// pointed to by the dialInitializer to fill the dial.  The ownership of
   /// the pointer is passed to the caller, so it should be put in a managed
   /// variable (e.g. a unique_ptr, or shared_ptr).
-  DialBase* operator () (std::string dialType,
-                         std::string dialSubType,
-                         TObject* dialInitializer,
-                         bool cached);
+  DialBase* operator () (const std::string& dialType_,
+                         const std::string& dialSubType_,
+                         TObject* dialInitializer_,
+                         bool useCachedDial_);
 };
 
 //  A Lesser GNU Public License
