@@ -217,22 +217,22 @@ bool Cache::Manager::Build(FitSampleSet& sampleList,
             else if (dialType.find("GeneralSpline") == 0) {
                 ++generalSplines;
                 GeneralSpline* d = dynamic_cast<GeneralSpline*>(dial);
-                generalPoints += d->getSplineData().size();
+                generalPoints += d->getDialData().size();
             }
             else if (dialType.find("UniformSpline") == 0) {
                 ++uniformSplines;
                 UniformSpline* d = dynamic_cast<UniformSpline*>(dial);
-                uniformPoints += d->getSplineData().size();
+                uniformPoints += d->getDialData().size();
             }
             else if (dialType.find("MonotonicSpline") == 0) {
                 ++monotonicSplines;
                 MonotonicSpline* d = dynamic_cast<MonotonicSpline*>(dial);
-                monotonicPoints += d->getSplineData().size();
+                monotonicPoints += d->getDialData().size();
             }
             else if (dialType.find("CompactSpline")) {
                 ++compactSplines;
                 CompactSpline* d = dynamic_cast<CompactSpline*>(dial);
-                compactPoints += d->getSplineData().size();
+                compactPoints += d->getDialData().size();
             }
             else {
                 LogThrow("Unsupported dial type in Cache::Manager -- "

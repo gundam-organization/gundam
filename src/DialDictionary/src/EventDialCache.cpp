@@ -18,17 +18,17 @@ std::vector<EventDialCache::CacheElem_t> &EventDialCache::getCache() {
 void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<DialCollection>& dialCollectionList_){
   LogInfo << "Building event dial cache..." << std::endl;
 
-  auto countValidDials = [](std::vector<std::pair<size_t, size_t>>& dialIndices_){
+  auto countValidDials = [](std::vector<DialIndexEntry_t>& dialIndices_){
     return std::count_if(dialIndices_.begin(), dialIndices_.end(),
-      [](std::pair<size_t, size_t>& dialIndex_){
-        if( dialIndex_.first == size_t(-1) or dialIndex_.second == size_t(-1) ){ return false; }
+      [](DialIndexEntry_t& dialIndex_){
+        if( dialIndex_.collectionIndex == size_t(-1) or dialIndex_.interfaceIndex == size_t(-1) ){ return false; }
         return true;
       });
   };
 
-  auto isCacheEntryValid = [&](std::pair<std::pair<size_t, size_t>, std::vector<std::pair<size_t, size_t>>>& entry_){
-    if( entry_.first.first == size_t(-1) or entry_.first.second == size_t(-1) or entry_.second.empty() ){ return false; }
-    return countValidDials(entry_.second) != 0;
+  auto isCacheEntryValid = [&](IndexedEntry_t& entry_){
+    if( entry_.event.sampleIndex == size_t(-1) or entry_.event.eventIndex == size_t(-1) or entry_.dials.empty() ){ return false; }
+    return countValidDials(entry_.dials) != 0;
   };
 
   // reserve memory before emplace_back
@@ -42,8 +42,8 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
 
     if( not isCacheEntryValid(entry) ){
       if( _warnForDialLessEvent_ ){
-        LogAlert << "Sample \"" << sampleSet_.getFitSampleList().at(entry.first.first).getName() << "\"";
-        LogAlert << "/Event #" << entry.first.second << " has no dial!" << std::endl;
+        LogAlert << "Sample \"" << sampleSet_.getFitSampleList().at(entry.event.sampleIndex).getName() << "\"";
+        LogAlert << "/Event #" << entry.event.eventIndex << " has no dial!" << std::endl;
       }
       continue;
     }
@@ -51,12 +51,12 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
     _cache_.emplace_back();
     _cache_.back().event =
         &sampleSet_.getFitSampleList().at(
-            entry.first.first
+            entry.event.sampleIndex
         ).getMcContainer().eventList.at(
-            entry.first.second
+            entry.event.eventIndex
         );
 
-    _cache_.back().dials.reserve( countValidDials(entry.second) );
+    _cache_.back().dials.reserve( countValidDials(entry.dials) );
 
 //    LogTrace << "Sample #" << entry.first.first << "(" << sampleSet_.getFitSampleList().at(entry.first.first).getName() << ") / MC_Event#" << entry.first.second << std::endl;
 //    LogTrace << "Nb of dials: " << entry.second.size() << std::endl;
@@ -67,33 +67,48 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
 //      ss << dialIndex.first << "/#" << dialIndex.second;
 //      return ss.str();
 //    }) << std::endl;
-    for( auto& dialIndex : entry.second ){
-      if( dialIndex.first == size_t(-1) or dialIndex.second == size_t(-1) ){ continue; }
+    for( auto& dialIndex : entry.dials ){
+      if( dialIndex.collectionIndex == size_t(-1) or dialIndex.interfaceIndex == size_t(-1) ){ continue; }
 #ifndef USE_BREAKDOWN_CACHE
       _cache_.back().dials.emplace_back(
-          &dialCollectionList_.at(dialIndex.first).getDialInterfaceList().at(dialIndex.second)
+          &dialCollectionList_.at(dialIndex.collectionIndex)
+          .getDialInterfaceList().at(dialIndex.interfaceIndex)
       );
 #else
       _cache_.back().dials.emplace_back(
-          &dialCollectionList_.at(dialIndex.first).getDialInterfaceList().at(dialIndex.second), std::nan("unset")
+          &dialCollectionList_.at(dialIndex.collectionIndex)
+          .getDialInterfaceList().at(dialIndex.interfaceIndex),
+          std::nan("unset")
       );
 #endif
     }
   }
 }
+
 void EventDialCache::allocateCacheEntries(size_t nEvent_, size_t nDialsMaxPerEvent_) {
-  _indexedCache_.resize( _indexedCache_.size() + nEvent_, {{-1,-1}, std::vector<std::pair<size_t, size_t>>(nDialsMaxPerEvent_, {-1,-1})} );
+    _indexedCache_.resize(
+        _indexedCache_.size() + nEvent_,
+        {{std::size_t(-1),std::size_t(-1)},
+         std::vector<DialIndexEntry_t>(nDialsMaxPerEvent_,
+                                       {std::size_t(-1),std::size_t(-1)})} );
 }
-std::pair<std::pair<size_t, size_t>, std::vector<std::pair<size_t, size_t>>>* EventDialCache::fetchNextCacheEntry(){
+
+EventDialCache::IndexedEntry_t* EventDialCache::fetchNextCacheEntry(){
 #if HAS_CPP_17
   std::scoped_lock<std::mutex> g(_mutex_);
 #else
   std::lock_guard<std::mutex> g(_mutex_);
 #endif
+  // This is VERY not thread safe since another thread could emplace a new
+  // value on the back of the indexed cache and force the vector to be copied.
+  // I don't see where the space for the cache is reserved (there is a resize,
+  // but that doesn't solve this problem.
   if( _fillIndex_ >= _indexedCache_.size() ){
     LogThrow("out of range: " << _fillIndex_);
     _indexedCache_.emplace_back();
   }
+  // Warning warning Will Robinson!  This only works IFF the indexed cache is
+  // not resized (violated by the previouls stanza).
   return &_indexedCache_[_fillIndex_++];
 }
 

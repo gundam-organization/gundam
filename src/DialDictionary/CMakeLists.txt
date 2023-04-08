@@ -2,52 +2,53 @@ set( LIB_NAME GundamDialDictionary )
 
 set( SRCFILES
     src/DialBase.cpp
-    src/DialBaseCache.cpp
+    src/DialBaseFactory.cpp
+    src/NormDialBaseFactory.cpp
+    src/GraphDialBaseFactory.cpp
+    src/SplineDialBaseFactory.cpp
     src/DialInputBuffer.cpp
     src/DialInterface.cpp
     src/DialResponseSupervisor.cpp
     src/DialCollection.cpp
-    src/SplineHandler.cpp
     src/EventDialCache.cpp
-    src/GraphHandler.cpp
-    src/LightGraphHandler.cpp
-    src/GeneralSplineHandler.cpp
-    src/UniformSplineHandler.cpp
-    src/CompactSplineHandler.cpp
-    src/MonotonicSplineHandler.cpp
-    src/SimpleSplineHandler.cpp
+    src/Spline.cpp
+    src/Graph.cpp
+    src/LightGraph.cpp
+    src/GeneralSpline.cpp
+    src/UniformSpline.cpp
+    src/CompactSpline.cpp
+    src/MonotonicSpline.cpp
+    src/SimpleSpline.cpp
     include/LightGraphCache.h)
 
 set( HEADERS
     include/DialTypes.h
+    include/DialBaseFactory.h
+    include/NormDialBaseFactory.h
+    include/GraphDialBaseFactory.h
+    include/SplineDialBaseFactory.h
     include/DialBase.h
-    include/DialBaseCache.h
     include/DialInputBuffer.h
     include/DialInterface.h
     include/DialResponseSupervisor.h
     include/DialCollection.h
-    include/SplineHandler.h
+    include/DialUtils.h
+    include/EventDialCache.h
     include/Norm.h
     include/Spline.h
     include/SplineCache.h
-    include/DialUtils.h
-    include/EventDialCache.h
-    include/GraphHandler.h
-    include/LightGraphHandler.h
     include/Graph.h
+    include/GraphCache.h
     include/LightGraph.h
-    include/GeneralSplineHandler.h
+    include/LightGraphCache.h
     include/GeneralSpline.h
     include/GeneralSplineCache.h
-    include/UniformSplineHandler.h
     include/UniformSpline.h
-    include/CompactSplineHandler.h
+    include/UniformSplineCache.h
     include/CompactSpline.h
     include/CompactSplineCache.h
-    include/MonotonicSplineHandler.h
     include/MonotonicSpline.h
     include/MonotonicSplineCache.h
-    include/SimpleSplineHandler.h
     include/SimpleSpline.h
     include/SimpleSplineCache.h
     )

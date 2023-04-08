@@ -6,18 +6,28 @@
 #define GUNDAM_GRAPH_H
 
 #include "DialBase.h"
-#include "GraphHandler.h"
+#include "DialInputBuffer.h"
+#include "TGraph.h"
 
-
-class Graph : public DialBase, public GraphHandler {
+class Graph : public DialBase {
 
 public:
   Graph() = default;
 
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<Graph>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return {"Graph"}; }
-  double evalResponseImpl(const DialInputBuffer& input_) override { return this->evaluateGraph(input_); }
+  double evalResponse(const DialInputBuffer& input_) const override;
 
+  void setAllowExtrapolation(bool allowExtrapolation) override;
+  bool getAllowExtrapolation() const override;
+
+  virtual void buildDial(const TGraph& grf, std::string option="") override;
+
+protected:
+  [[nodiscard]] double evaluateGraph(const DialInputBuffer& input_) const;
+
+  bool _allowExtrapolation_{false};
+  TGraph _graph_{};
 };
 
 
