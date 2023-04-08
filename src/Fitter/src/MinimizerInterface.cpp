@@ -509,7 +509,7 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
         }
 
         // normalize to the maximum hist
-        double minYval{-1};
+        double minYval{std::nan("")};
         for (int iEigen = decompCovMatrix.GetEigenValues().GetNrows() - 1; iEigen >= 0; iEigen--) {
           for (int iPar = 0 ; iPar < eigenBreakdownAccum[iEigen].GetNbinsX() ; iPar++ ) {
             eigenBreakdownAccum[iEigen].SetBinContent(
@@ -517,7 +517,7 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
                 eigenBreakdownAccum[iEigen].GetBinContent(iPar + 1)
                 /eigenBreakdownAccum[0].GetBinContent(iPar + 1)
             );
-            if( minYval == -1 ){ minYval = eigenBreakdownAccum[iEigen].GetBinContent(iPar + 1); }
+            if( std::isnan(minYval) ){ minYval = eigenBreakdownAccum[iEigen].GetBinContent(iPar + 1); }
             else{
               minYval = std::min(minYval, eigenBreakdownAccum[iEigen].GetBinContent(iPar + 1));
             }
