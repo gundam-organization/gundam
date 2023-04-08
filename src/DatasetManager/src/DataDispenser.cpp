@@ -1221,12 +1221,13 @@ void DataDispenser::fillFunction(int iThread_){
               }
 
               // loaded graph is valid?
-              if( Misc::isGraphValid(grPtr) ){
+              if( grPtr != nullptr ){
                 DialBaseFactory factory;
-                DialBase* dialBase
-                    = factory(dialCollectionRef->getGlobalDialType(),
-                              dialCollectionRef->getGlobalDialSubType(),
-                              grPtr, dialCollectionRef->useCachedDials());
+                DialBase* dialBase = factory(
+                    dialCollectionRef->getGlobalDialType(),
+                    dialCollectionRef->getGlobalDialSubType(),
+                    grPtr, dialCollectionRef->useCachedDials()
+                );
                 if ( dialBase != nullptr ) {
                   freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
                   dialBase->setAllowExtrapolation(dialCollectionRef->isAllowDialExtrapolation());

@@ -19,7 +19,7 @@ set( SRCFILES
     src/CompactSpline.cpp
     src/MonotonicSpline.cpp
     src/SimpleSpline.cpp
-    include/LightGraphCache.h)
+    )
 
 set( HEADERS
     include/DialTypes.h
@@ -35,6 +35,7 @@ set( HEADERS
     include/DialUtils.h
     include/EventDialCache.h
     include/Norm.h
+    include/Shift.h
     include/Spline.h
     include/SplineCache.h
     include/Graph.h
@@ -51,6 +52,7 @@ set( HEADERS
     include/MonotonicSplineCache.h
     include/SimpleSpline.h
     include/SimpleSplineCache.h
+    include/LightGraphCache.h
     )
 
 if( USE_STATIC_LINKS )

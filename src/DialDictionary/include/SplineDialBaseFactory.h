@@ -42,6 +42,10 @@ public:
                          const std::string& dialSubType_,
                          TObject* dialInitializer_,
                          bool useCachedDial_);
+
+  /// A static function called whenever we need to find out if we can assume
+  /// uniform splines.
+  static bool hasUniformlySpacedKnots(const std::vector<double>& points_);
 };
 
 //  A Lesser GNU Public License

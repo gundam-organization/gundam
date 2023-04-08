@@ -1,11 +1,11 @@
 #include "SplineDialBaseFactory.h"
 
+#include "Shift.h"
 #include "Spline.h"
 #include "GeneralSpline.h"
 #include "UniformSpline.h"
 #include "CompactSpline.h"
 #include "MonotonicSpline.h"
-
 #include "SplineCache.h"
 #include "GeneralSplineCache.h"
 #include "UniformSplineCache.h"
@@ -27,18 +27,26 @@ bool SplineDialBaseFactory::FillFromGraph(std::vector<double>& xPoint,
                                           std::vector<double>& slope,
                                           TObject* dialInitializer,
                                           const std::string& splType) {
-  if (not dialInitializer) return false;
+  if (dialInitializer == nullptr) return false;
 
   // Get the spline knots and slopes (starting from a graph).
   TGraph* graph = dynamic_cast<TGraph*>(dialInitializer);
-  if (not graph) return false;
+  if( graph == nullptr ) return false;
+
+  if( graph->GetN() == 1 ){
+    // TSpline3 creating messes up with TClonesArray in that case.
+    xPoint.reserve(1); xPoint.clear(); xPoint.emplace_back( graph->GetX()[0] );
+    yPoint.reserve(1); yPoint.clear(); yPoint.emplace_back( graph->GetY()[0] );
+    slope.reserve(1); slope.clear(); slope.emplace_back( 0 );
+    return true;
+  }
 
   // Turn the graph into a spline.
   std::string opt;
   double valBeg = 0;
   double valEnd = 0;
-  if (splType == "not-a-knot") opt = "";
-  else if (splType == "natural") opt = "b2,e2";
+  if     ( splType == "not-a-knot" ) opt = "";
+  else if( splType == "natural" ) opt = "b2,e2";
   TSpline3 spline(Form("%p", graph), graph, opt.c_str(), valBeg, valEnd);
 
   xPoint.reserve(spline.GetNp());
@@ -54,9 +62,9 @@ bool SplineDialBaseFactory::FillFromGraph(std::vector<double>& xPoint,
     if (!std::isfinite(y)) return false;
     double d = spline.Derivative(x);
     if (!std::isfinite(d)) return false;
-    xPoint.push_back(x);
-    yPoint.push_back(y);
-    slope.push_back(d);
+    xPoint.emplace_back(x);
+    yPoint.emplace_back(y);
+    slope.emplace_back(d);
   }
 
   return true;
@@ -143,13 +151,10 @@ DialBase* SplineDialBaseFactory::operator () (const std::string& dialType_,
   else{ return nullptr; }
 
   // Check that there are enough points in the spline.
-  if (xPoints.size() < 2) {
-    LogAlertOnce << "Splines must have at least two points." << std::endl;
+  if (xPoints.empty()) {
+    LogAlertOnce << "Splines must have at least one points." << std::endl;
     return nullptr;
   }
-
-  // If there are only two points, then force catmull-rom
-  if (xPoints.size() < 3) { splType = "catmull-rom"; }
 
   // Check that there are equal numbers of X and Y
   LogThrowIf(xPoints.size() != yPoints.size(), "INVALID Spline: must have the same number of X and Y points");
@@ -161,69 +166,81 @@ DialBase* SplineDialBaseFactory::operator () (const std::string& dialType_,
     lastX = xPoint;
   }
 
-  // Check that the spline isn't flat and 1.0
-  bool isFlat{true};
-  double lastY{std::nan("")};
-  for( double yPoint : yPoints ){
-    if( yPoint != lastY ){ isFlat = false; break; }
-    lastY = yPoint;
-  }
-  if ( isFlat ){
-    // get rid of the spline if the flat response is one
-    if( lastY == 1. ){
-      return nullptr;
-    }
-  }
-
-  ////////////////////////////////////////////////////////////////
-  // Condition the slopes as necessary (only matters if the dial sub-type
-  // includes "monotonic"
-  ////////////////////////////////////////////////////////////////
-  bool isMonotonic = ( dialSubType_.find("monotonic") != std::string::npos );  // So the right catmull-rom class can be chosen.
-  if ( isMonotonic ) { MakeMonotonic(xPoints, yPoints, slopePoints); }
-
-  ////////////////////////////////////////////////////////////////
-  // Check if the spline can be treated as having uniformly spaced knots.
-  ////////////////////////////////////////////////////////////////
-  double s = (xPoints.back() - xPoints.front()) / (double(xPoints.size()) - 1.0);
-  bool hasUniformlySpacedKnots = true;
-  for (size_t iPoint=1; iPoint < xPoints.size(); ++iPoint) {
-    if ( std::abs( ((xPoints[iPoint] - xPoints[iPoint - 1]) - s) ) != 0 ) {
-      hasUniformlySpacedKnots = false; break;
-    }
-  }
-
   // Stuff the created dial into a unique_ptr, so it will be properly deleted
   // in the event of an exception.
   std::unique_ptr<DialBase> dialBase;
 
-  // Create the right low level spline class.
-  if (splType == "catmull-rom") {
-    LogThrowIf(not hasUniformlySpacedKnots, "Catmull-rom splines need a uniformly spaced points");
-    if (not isMonotonic) {
-      (useCachedDial_ ? ( dialBase = std::make_unique<CompactSplineCache>() ) : dialBase = std::make_unique<SplineCache>() );
+  // Check that the spline isn't flat and 1.0
+  bool isFlat{true};
+  double lastY{yPoints[0]};
+  for( double yPoint : yPoints ){
+    if( yPoint != lastY ){ isFlat = false; break; }
+    lastY = yPoint;
+  }
+  if ( isFlat or yPoints.size() == 1 ){
+    // get rid of the spline if the flat response is one
+    if( lastY == 1. ){
+      return nullptr;
     }
-    else {
-      (useCachedDial_ ? ( dialBase = std::make_unique<MonotonicSplineCache>() ) : dialBase = std::make_unique<MonotonicSpline>() );
+    else{
+      dialBase = std::make_unique<Shift>();
+      ((Shift*) dialBase.get())->setShiftValue( yPoints[0] );
     }
   }
-  else if (splType == "ROOT") {
-    dialBase = std::make_unique<Spline>();
-  }
-  else {
-    if (not hasUniformlySpacedKnots) {
-      (useCachedDial_ ? ( dialBase = std::make_unique<GeneralSplineCache>() ) : dialBase = std::make_unique<GeneralSpline>() );
-    }
-    else {
-      (useCachedDial_ ? ( dialBase = std::make_unique<UniformSplineCache>() ) : dialBase = std::make_unique<UniformSpline>() );
-    }
-  }
+  else{
+    // If there are only two points, then force catmull-rom
+    if (xPoints.size() == 2) { splType = "catmull-rom"; }
 
-  // Initialize the spline
-  dialBase->buildDial(xPoints, yPoints, slopePoints);
+    ////////////////////////////////////////////////////////////////
+    // Condition the slopes as necessary (only matters if the dial sub-type
+    // includes "monotonic"
+    ////////////////////////////////////////////////////////////////
+    bool isMonotonic = ( dialSubType_.find("monotonic") != std::string::npos );  // So the right catmull-rom class can be chosen.
+    if ( isMonotonic ) { MakeMonotonic(xPoints, yPoints, slopePoints); }
+
+    // Create the right low level spline class.
+    if (splType == "catmull-rom") {
+      LogThrowIf(not hasUniformlySpacedKnots(xPoints), "Catmull-rom splines need a uniformly spaced points");
+      if (not isMonotonic) {
+        (useCachedDial_ ? ( dialBase = std::make_unique<CompactSplineCache>() ) : dialBase = std::make_unique<SplineCache>() );
+      }
+      else {
+        (useCachedDial_ ? ( dialBase = std::make_unique<MonotonicSplineCache>() ) : dialBase = std::make_unique<MonotonicSpline>() );
+      }
+    }
+    else if (splType == "ROOT") {
+      dialBase = std::make_unique<Spline>();
+    }
+    else {
+      if (not hasUniformlySpacedKnots(xPoints)) {
+        (useCachedDial_ ? ( dialBase = std::make_unique<GeneralSplineCache>() ) : dialBase = std::make_unique<GeneralSpline>() );
+      }
+      else {
+        (useCachedDial_ ? ( dialBase = std::make_unique<UniformSplineCache>() ) : dialBase = std::make_unique<UniformSpline>() );
+      }
+    }
+
+    // Initialize the spline
+    dialBase->buildDial(xPoints, yPoints, slopePoints);
+  }
 
   // Pass the ownership without any constraints!
   return dialBase.release();
+}
+
+
+
+bool SplineDialBaseFactory::hasUniformlySpacedKnots(const std::vector<double>& points_){
+  ////////////////////////////////////////////////////////////////
+  // Check if the spline can be treated as having uniformly spaced knots.
+  ////////////////////////////////////////////////////////////////
+  double s = (points_.back() - points_.front()) / (double(points_.size()) - 1.0);
+  for (size_t iPoint=1; iPoint < points_.size(); ++iPoint) {
+    if ( std::abs( ((points_[iPoint] - points_[iPoint - 1]) - s) ) != 0 ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 //  A Lesser GNU Public License
