@@ -9,18 +9,18 @@
 // the object.  The ownership of the object is passed to the caller.
 class GraphDialBaseFactory {
 public:
-  GraphDialBaseFactory();
-  ~GraphDialBaseFactory();
+  GraphDialBaseFactory() = default;
+  ~GraphDialBaseFactory() = default;
 
   // Construct a pointer to the correct DialBase.  This uses the dialType and
   // dialSubType to figure out the correct class, and then uses the object
   // pointed to by the dialInitializer to fill the dial.  The ownership of the
   // pointer is passed to the caller, so it should be put in a managed
   // variable (e.g. a unique_ptr, or shared_ptr).
-  DialBase* operator () (std::string dialType,
-                         std::string dialSubType,
-                         TObject* dialInitializer,
-                         bool cached);
+  DialBase* operator () (const std::string& dialType_,
+                         const std::string& dialSubType_,
+                         TObject* dialInitializer_,
+                         bool useCachedDial_);
 };
 
 //  A Lesser GNU Public License

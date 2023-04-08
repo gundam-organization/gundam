@@ -1,23 +1,21 @@
 #include "NormDialBaseFactory.h"
 #include "Norm.h"
 
-NormDialBaseFactory::NormDialBaseFactory() {}
-NormDialBaseFactory::~NormDialBaseFactory() {}
-
 LoggerInit([]{
   Logger::setUserHeaderStr("[NormFactory]");
 });
 
-DialBase* NormDialBaseFactory::operator () (std::string dialType,
-                                            std::string dialSubType,
-                                            TObject* dialInitializer,
-                                            bool cached) {
+
+DialBase* NormDialBaseFactory::operator () (const std::string& dialType_,
+                                            const std::string& dialSubType_,
+                                            TObject* dialInitializer_,
+                                            bool useCachedDial_) {
   // Stuff the created dial into a unique_ptr, so it will be properly deleted
   // in the event of an exception.
   std::unique_ptr<DialBase> dialBase;
 
   // Nothing much to do for a normalization dial!
-  dialBase.reset(new Norm);
+  dialBase = std::make_unique<Norm>();
   dialBase->buildDial();
 
   // Pass the ownership without any constraints!
