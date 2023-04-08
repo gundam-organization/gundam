@@ -9,8 +9,8 @@
 // the object.  The ownership of the object is passed to the caller.
 class DialBaseFactory {
 public:
-  DialBaseFactory();
-  ~DialBaseFactory();
+  DialBaseFactory() = default;
+  ~DialBaseFactory() = default;
 
   // Construct a pointer to the correct DialBase.  This uses the dialType and
   // dialSubType to figure out the correct class, and then uses the object
