@@ -2,8 +2,8 @@
 // Created by Adrien Blanchet on 23/01/2023.
 //
 
-#ifndef GUNDAM_UNIFORMSPLINE_H
-#define GUNDAM_UNIFORMSPLINE_H
+#ifndef GUNDAM_GENERALSPLINE_H
+#define GUNDAM_GENERALSPLINE_H
 
 #include "DialBase.h"
 #include "DialInputBuffer.h"
@@ -14,14 +14,14 @@
 #include "vector"
 #include "utility"
 
-class UniformSpline : public DialBase {
+
+class GeneralSpline : public DialBase {
 
 public:
-  UniformSpline() = default;
-  virtual ~UniformSpline() = default;
+  GeneralSpline() = default;
 
-  [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<UniformSpline>(*this); }
-  [[nodiscard]] std::string getDialTypeName() const override { return {"UniformSpline"}; }
+  [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<GeneralSpline>(*this); }
+  [[nodiscard]] std::string getDialTypeName() const override { return {"GeneralSpline"}; }
   double evalResponse(const DialInputBuffer& input_) const override;
 
   void setAllowExtrapolation(bool allowExtrapolation) override;
@@ -50,5 +50,7 @@ protected:
   std::pair<double, double> _splineBounds_{std::nan("unset"), std::nan("unset")};
 };
 
+typedef CachedDial<GeneralSpline> GeneralSplineCache;
 
-#endif //GUNDAM_UNIFORMSPLINE_H
+
+#endif //GUNDAM_GENERALSPLINE_H

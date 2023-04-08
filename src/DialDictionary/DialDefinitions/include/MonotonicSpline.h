@@ -1,27 +1,26 @@
 //
-// Created by Adrien Blanchet on 24/01/2023.
+// Created by Adrien Blanchet on 22/01/2023.
 //
 
-#ifndef GUNDAM_SIMPLESPLINE_H
-#define GUNDAM_SIMPLESPLINE_H
+#ifndef GUNDAM_MONOTONICSPLINE_H
+#define GUNDAM_MONOTONICSPLINE_H
 
 #include "DialBase.h"
 #include "DialInputBuffer.h"
 
 #include "TGraph.h"
-#include "TSpline.h"
 
 #include "vector"
 #include "utility"
 
-class SimpleSpline : public DialBase {
+class MonotonicSpline : public DialBase {
 
 public:
-  SimpleSpline() = default;
-  virtual ~SimpleSpline() = default;
+  MonotonicSpline() = default;
+  virtual ~MonotonicSpline() = default;
 
-  [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<SimpleSpline>(*this); }
-  [[nodiscard]] std::string getDialTypeName() const override { return {"SimpleSpline"}; }
+  [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<MonotonicSpline>(*this); }
+  [[nodiscard]] std::string getDialTypeName() const override { return {"MonotonicSpline"}; }
   double evalResponse(const DialInputBuffer& input_) const override;
 
   void setAllowExtrapolation(bool allowExtrapolation) override;
@@ -33,11 +32,14 @@ public:
   /// (e.g. multi-dimensional dials).
   virtual void buildDial(const TGraph& grf, std::string option="") override;
   virtual void buildDial(const TSpline3& spl, std::string option="") override;
+  virtual void buildDial(const std::vector<double>& v1,
+                         const std::vector<double>& v2,
+                         const std::vector<double>& v3,
+                         std::string option="") override;
 
   const std::vector<double>& getDialData() const override {return _splineData_;}
 
 protected:
-  bool _isUniform_{false};
   bool _allowExtrapolation_{false};
 
   // A block of data to calculate the spline values.  This must be filled for
@@ -47,5 +49,6 @@ protected:
   std::pair<double, double> _splineBounds_{std::nan("unset"), std::nan("unset")};
 };
 
+typedef CachedDial<MonotonicSpline> MonotonicSplineCache;
 
-#endif //GUNDAM_SIMPLESPLINE_H
+#endif //GUNDAM_MONOTONICSPLINE_H

@@ -8,8 +8,6 @@
 #include "DialBase.h"
 #include "DialInputBuffer.h"
 #include "DialResponseSupervisor.h"
-#include "DialUtils.h"
-#include "SplineCache.h"
 
 #include "FitSampleSet.h"
 #include "FitParameterSet.h"

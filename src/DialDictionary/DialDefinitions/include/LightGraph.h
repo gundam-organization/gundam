@@ -32,4 +32,7 @@ protected:
   std::vector<Double_t> yPoints; ///<[fNpoints] array of Y points
 };
 
+typedef CachedDial<LightGraph> LightGraphCache;
+
+
 #endif //GUNDAM_LIGHTGRAPH_H

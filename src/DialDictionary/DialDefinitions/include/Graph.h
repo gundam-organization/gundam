@@ -30,5 +30,7 @@ protected:
   TGraph _graph_{};
 };
 
+typedef CachedDial<Graph> GraphCache;
+
 
 #endif //GUNDAM_GRAPH_H

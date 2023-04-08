@@ -6,6 +6,7 @@
 #define GUNDAM_DIALTYPES_H
 
 #include "Norm.h"
+#include "Shift.h"
 
 #include "Graph.h"
 #include "GraphCache.h"

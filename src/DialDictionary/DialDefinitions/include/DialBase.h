@@ -78,7 +78,18 @@ template <typename T>
 class CachedDial: public T {
 public:
   CachedDial() = default;
-  double evalResponse(const DialInputBuffer& input_) const override;
+  double evalResponse(const DialInputBuffer& input_) const override {
+    if (isCacheValid(input_)) {return _cachedResponse_;}
+#if HAS_CPP_17
+    std::scoped_lock<std::mutex> g(_evalLock_);
+#else
+    std::lock_guard<std::mutex> g(_evalLock_);
+#endif
+    if (isCacheValid(input_)) {return _cachedResponse_;}
+    _cachedResponse_ = T::evalResponse(input_);
+    updateInputCache(input_);
+    return _cachedResponse_;
+  }
   bool isCacheValid(const DialInputBuffer& input_) const;
   void updateInputCache(const DialInputBuffer& input_) const;
 
@@ -93,20 +104,6 @@ protected:
 #endif
 };
 
-/// This is a template to add caching to a DialBase derived class.
-template <typename T>
-double CachedDial<T>::evalResponse(const DialInputBuffer& input_) const {
-  if (isCacheValid(input_)) {return _cachedResponse_;}
-#if HAS_CPP_17
-  std::scoped_lock<std::mutex> g(_evalLock_);
-#else
-  std::lock_guard<std::mutex> g(_evalLock_);
-#endif
-  if (isCacheValid(input_)) {return _cachedResponse_;}
-  _cachedResponse_ = T::evalResponse(input_);
-  updateInputCache(input_);
-  return _cachedResponse_;
-}
 
 template <typename T>
 bool CachedDial<T>::isCacheValid(const DialInputBuffer& input_) const {

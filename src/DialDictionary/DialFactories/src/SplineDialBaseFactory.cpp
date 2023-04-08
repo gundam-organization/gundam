@@ -6,11 +6,6 @@
 #include "UniformSpline.h"
 #include "CompactSpline.h"
 #include "MonotonicSpline.h"
-#include "SplineCache.h"
-#include "GeneralSplineCache.h"
-#include "UniformSplineCache.h"
-#include "CompactSplineCache.h"
-#include "MonotonicSplineCache.h"
 
 #include "TGraph.h"
 #include "TSpline.h"
