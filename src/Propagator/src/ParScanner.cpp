@@ -67,6 +67,10 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
   ssPbar << LogInfo.getPrefixString() << "Scanning: " << par_.getFullTitle() << " / " << _nbPoints_ << " steps...";
   GenericToolbox::displayProgressBar(0, _nbPoints_, ssPbar.str());
 
+  if( par_.getOwner()->isUseEigenDecompInFit() and not par_.isEigen() ){
+    _owner_->setEnableEigenToOrigInPropagate( false );
+  }
+
   scanDataDict.clear();
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llh", true) ){
     scanDataDict.emplace_back();
@@ -183,6 +187,10 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
 
   par_.setParameterValue(origVal);
   _owner_->updateLlhCache();
+
+  if( par_.getOwner()->isUseEigenDecompInFit() and not par_.isEigen() ){
+    _owner_->setEnableEigenToOrigInPropagate( true );
+  }
 
   std::stringstream ss;
   ss << GenericToolbox::replaceSubstringInString(par_.getFullTitle(), "/", "_");

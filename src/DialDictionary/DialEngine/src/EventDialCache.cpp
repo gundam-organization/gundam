@@ -104,7 +104,7 @@ EventDialCache::IndexedEntry_t* EventDialCache::fetchNextCacheEntry(){
   // I don't see where the space for the cache is reserved (there is a resize,
   // but that doesn't solve this problem.
   if( _fillIndex_ >= _indexedCache_.size() ){
-    LogThrow("out of range" << _fillIndex_);
+    LogThrow("out of range: " << _fillIndex_);
     _indexedCache_.emplace_back();
   }
   // Warning warning Will Robinson!  This only works IFF the indexed cache is

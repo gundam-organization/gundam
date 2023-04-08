@@ -73,6 +73,9 @@ int main( int argc, char** argv ){
     );
     auto* f = TFile::Open(configPath1.c_str());
     auto* conf = f->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed");
+    auto* version = f->Get<TNamed>("gundamFitter/gundamVersion_TNamed");
+    auto* cmdLine = f->Get<TNamed>("gundamFitter/commandLine_TNamed");
+    LogInfo << "config-1 is within .root file. Ran under GUNDAM v" << version->GetTitle() << " with cmdLine: "<< cmdLine->GetTitle() << std::endl;
     config1 = GenericToolbox::Json::readConfigJsonStr(conf->GetTitle());
     delete f;
   }
@@ -85,6 +88,9 @@ int main( int argc, char** argv ){
     );
     auto* f = TFile::Open(configPath2.c_str());
     auto* conf = f->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed");
+    auto* version = f->Get<TNamed>("gundamFitter/gundamVersion_TNamed");
+    auto* cmdLine = f->Get<TNamed>("gundamFitter/commandLine_TNamed");
+    LogInfo << "config-2 is within .root file. Ran under GUNDAM v" << version->GetTitle() << " with cmdLine: "<< cmdLine->GetTitle() << std::endl;
     config2 = GenericToolbox::Json::readConfigJsonStr(conf->GetTitle());
     delete f;
   }

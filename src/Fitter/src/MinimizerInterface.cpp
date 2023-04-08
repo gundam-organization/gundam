@@ -508,6 +508,22 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
           else eigenBreakdownAccum[iEigen].SetFillStyle(1001);
         }
 
+        // normalize to the maximum hist
+        double minYval{std::nan("")};
+        for (int iEigen = decompCovMatrix.GetEigenValues().GetNrows() - 1; iEigen >= 0; iEigen--) {
+          for (int iPar = 0 ; iPar < eigenBreakdownAccum[iEigen].GetNbinsX() ; iPar++ ) {
+            eigenBreakdownAccum[iEigen].SetBinContent(
+                iPar + 1,
+                eigenBreakdownAccum[iEigen].GetBinContent(iPar + 1)
+                /eigenBreakdownAccum[0].GetBinContent(iPar + 1)
+            );
+            if( std::isnan(minYval) ){ minYval = eigenBreakdownAccum[iEigen].GetBinContent(iPar + 1); }
+            else{
+              minYval = std::min(minYval, eigenBreakdownAccum[iEigen].GetBinContent(iPar + 1));
+            }
+          }
+        }
+
         TCanvas accumPlot("accumPlot", "accumPlot", 1280, 720);
         TLegend l(0.15, 0.4, 0.3, 0.85);
         bool isFirst{true};
@@ -518,8 +534,8 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
           accumPlot.cd();
           if( isFirst ){
             eigenBreakdownAccum[iEigen].SetTitle("Hessian eigen composition of post-fit errors");
-            eigenBreakdownAccum[iEigen].GetYaxis()->SetRangeUser(0, eigenBreakdownAccum[iEigen].GetMaximum()*1.2);
-            eigenBreakdownAccum[iEigen].GetYaxis()->SetTitle("Post-fit #sigma^{2}");
+            eigenBreakdownAccum[iEigen].GetYaxis()->SetRangeUser(minYval, eigenBreakdownAccum[iEigen].GetMaximum()*1.2);
+            eigenBreakdownAccum[iEigen].GetYaxis()->SetTitle("Hessian eigen composition of postfit errors");
             eigenBreakdownAccum[iEigen].Draw("HIST");
           }
           else{
@@ -1062,8 +1078,16 @@ void MinimizerInterface::scanParameters(TDirectory* saveDir_){
                  << " is fixed. Skipping..." << std::endl;
       continue;
     }
-    getPropagator().getParScanner().scanFitParameter(*getMinimizerFitParameterPtr()[iPar], saveDir_);
+    this->getPropagator().getParScanner().scanFitParameter(*getMinimizerFitParameterPtr()[iPar], saveDir_);
   } // iPar
+  for( auto& parSet : this->getPropagator().getParameterSetsList() ){
+    if( parSet.isUseEigenDecompInFit() ){
+      LogWarning << parSet.getName() << " is using eigen decomposition. Scanning original parameters..." << std::endl;
+      for( auto& par : parSet.getParameterList() ){
+        this->getPropagator().getParScanner().scanFitParameter(par, saveDir_);
+      }
+    }
+  }
 }
 
 void MinimizerInterface::updateCacheToBestfitPoint(){
