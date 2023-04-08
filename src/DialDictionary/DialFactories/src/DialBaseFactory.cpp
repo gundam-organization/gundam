@@ -9,6 +9,7 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[DialBaseFactory]");
 });
 
+
 DialBase* DialBaseFactory::operator () (const std::string& dialType_,
                                         const std::string& dialSubType_,
                                         TObject* dialInitializer_,

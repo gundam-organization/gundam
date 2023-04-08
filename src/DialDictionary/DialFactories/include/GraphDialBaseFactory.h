@@ -2,7 +2,9 @@
 #define GraphDialBaseFactory_h_Seen
 
 #include <DialBase.h>
+
 #include <TObject.h>
+
 #include <string>
 
 // A functor class that will build DialBase objects and return the pointer to
