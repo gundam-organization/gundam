@@ -188,7 +188,7 @@ DialBase* SplineDialBaseFactory::operator () (const std::string& dialType_,
   double s = (xPoints.back() - xPoints.front()) / (double(xPoints.size()) - 1.0);
   bool hasUniformlySpacedKnots = true;
   for (size_t iPoint=1; iPoint < xPoints.size(); ++iPoint) {
-    if (std::abs(((xPoints[iPoint] - xPoints[iPoint - 1]) - s) / s) > 5E-6) {
+    if ( std::abs( ((xPoints[iPoint] - xPoints[iPoint - 1]) - s) ) != 0 ) {
       hasUniformlySpacedKnots = false; break;
     }
   }
@@ -211,14 +211,12 @@ DialBase* SplineDialBaseFactory::operator () (const std::string& dialType_,
     dialBase = std::make_unique<Spline>();
   }
   else {
-    (useCachedDial_ ? ( dialBase = std::make_unique<GeneralSplineCache>() ) : dialBase = std::make_unique<GeneralSpline>() );
-//    if (not hasUniformlySpacedKnots) {
-//      (useCachedDial_ ? ( dialBase = std::make_unique<GeneralSplineCache>() ) : dialBase = std::make_unique<GeneralSpline>() );
-//    }
-//    else {
-//      LogDebug << "CONVERTED TO UNIFORMSPLINE" << std::endl;
-//      (useCachedDial_ ? ( dialBase = std::make_unique<UniformSplineCache>() ) : dialBase = std::make_unique<UniformSpline>() );
-//    }
+    if (not hasUniformlySpacedKnots) {
+      (useCachedDial_ ? ( dialBase = std::make_unique<GeneralSplineCache>() ) : dialBase = std::make_unique<GeneralSpline>() );
+    }
+    else {
+      (useCachedDial_ ? ( dialBase = std::make_unique<UniformSplineCache>() ) : dialBase = std::make_unique<UniformSpline>() );
+    }
   }
 
   // Initialize the spline
