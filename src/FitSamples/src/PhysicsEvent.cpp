@@ -522,17 +522,21 @@ std::map< std::string,
     leafDefStr += "/";
     leafDefStr += typeTag;
     if(not disableArrays_){
-      out[leafDefStr] = [](GenericToolbox::RawDataArray& arr_, const std::vector<GenericToolbox::AnyType>& lH_){
-        for(size_t iIndex = 0 ; iIndex < lH_.size() ; iIndex++){
-          auto ph = lH_[iIndex].getPlaceHolderPtr();
-          arr_.writeMemoryContent(ph->getVariableAddress(), ph->getVariableSize());
+      out[leafDefStr] = [](GenericToolbox::RawDataArray& arr_, const std::vector<GenericToolbox::AnyType>& variablesList_){
+        for(const auto & variable : variablesList_){
+          arr_.writeMemoryContent(
+              variable.getPlaceHolderPtr()->getVariableAddress(),
+              variable.getPlaceHolderPtr()->getVariableSize()
+          );
         }
       };
     }
     else{
-      out[leafDefStr] = [](GenericToolbox::RawDataArray& arr_, const std::vector<GenericToolbox::AnyType>& lH_){
-        auto ph = lH_[0].getPlaceHolderPtr();
-        arr_.writeMemoryContent(ph->getVariableAddress(), ph->getVariableSize());
+      out[leafDefStr] = [](GenericToolbox::RawDataArray& arr_, const std::vector<GenericToolbox::AnyType>& variablesList_){
+        arr_.writeMemoryContent(
+            variablesList_[0].getPlaceHolderPtr()->getVariableAddress(),
+            variablesList_[0].getPlaceHolderPtr()->getVariableSize()
+        );
       };
     }
 
