@@ -28,6 +28,7 @@ public:
   // Setters
   void setShowTimeStats(bool showTimeStats);
   void setThrowAsimovToyParameters(bool throwAsimovToyParameters);
+  void setEnableEigenToOrigInPropagate(bool enableEigenToOrigInPropagate);
   void setIThrow(int iThrow);
   void setLoadAsimovData(bool loadAsimovData);
   void setParameterInjector(const nlohmann::json &parameterInjector);
@@ -93,6 +94,7 @@ private:
   bool _enableStatThrowInToys_{true};
   bool _gaussStatThrowInToys_{false};
   bool _enableEventMcThrow_{true};
+  bool _enableEigenToOrigInPropagate_{true};
   int _iThrow_{-1};
   double _llhBuffer_{0};
   double _llhStatBuffer_{0};
@@ -102,6 +104,9 @@ private:
   std::shared_ptr<TMatrixD> _strippedCovarianceMatrix_{nullptr};
   std::shared_ptr<TMatrixD> _choleskyMatrix_{nullptr};
   std::vector<FitParameter*> _strippedParameterList_{};
+
+  bool _devSingleThreadReweight_{false};
+  bool _devSingleThreadHistFill_{false};
 
   // Sub-layers
   FitSampleSet _fitSampleSet_;
@@ -138,6 +143,11 @@ private:
   std::vector<DialCollection> _dialCollections_{};
   EventDialCache _eventDialCache_{};
 #endif
+
+  // parallel holders
+  std::function<void(int)> reweightMcEventsFct;
+  std::function<void(int)> refillSampleHistogramsFct;
+  std::function<void()> refillSampleHistogramsPostParallelFct;
 
 public:
   GenericToolbox::CycleTimer dialUpdate;

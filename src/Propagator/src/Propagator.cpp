@@ -74,6 +74,9 @@ void Propagator::readConfigImpl(){
   _debugPrintLoadedEvents_ = GenericToolbox::Json::fetchValue(_config_, "debugPrintLoadedEvents", _debugPrintLoadedEvents_);
   _debugPrintLoadedEventsNbPerSample_ = GenericToolbox::Json::fetchValue(_config_, "debugPrintLoadedEventsNbPerSample", _debugPrintLoadedEventsNbPerSample_);
 
+  _devSingleThreadReweight_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadReweight", _devSingleThreadReweight_);
+  _devSingleThreadHistFill_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadHistFill", _devSingleThreadHistFill_);
+
 #if USE_NEW_DIALS
   for(size_t iParSet = 0 ; iParSet < _parameterSetList_.size() ; iParSet++ ){
     if( not _parameterSetList_[iParSet].isEnabled() ) continue;
@@ -248,6 +251,14 @@ void Propagator::initializeImpl() {
     } // throw asimov?
 
     LogInfo << "Propagating parameters on events..." << std::endl;
+
+    // Make sure before the copy to the data:
+    // At this point, MC events have been reweighted using their prior
+    // but when using eigen decomp, the conversion eigen -> original has a small computational error
+    for( auto& parSet: _parameterSetList_ ) {
+      if( parSet.isUseEigenDecompInFit() ) { parSet.propagateEigenToOriginal(); }
+    }
+
     bool cacheManagerState = GlobalVariables::getEnableCacheManager();
     GlobalVariables::setEnableCacheManager(false);
     this->resetReweight();
@@ -567,6 +578,9 @@ void Propagator::setShowTimeStats(bool showTimeStats) {
 void Propagator::setThrowAsimovToyParameters(bool throwAsimovToyParameters) {
   _throwAsimovToyParameters_ = throwAsimovToyParameters;
 }
+void Propagator::setEnableEigenToOrigInPropagate(bool enableEigenToOrigInPropagate) {
+  _enableEigenToOrigInPropagate_ = enableEigenToOrigInPropagate;
+}
 void Propagator::setIThrow(int iThrow) {
   _iThrow_ = iThrow;
 }
@@ -679,9 +693,11 @@ void Propagator::updateLlhCache(){
 }
 void Propagator::propagateParametersOnSamples(){
 
-  // Only real parameters are propagated on the spectra -> need to convert the eigen to original
-  for( auto& parSet : _parameterSetList_ ){
-    if( parSet.isUseEigenDecompInFit() ) parSet.propagateEigenToOriginal();
+  if( _enableEigenToOrigInPropagate_ ){
+    // Only real parameters are propagated on the spectra -> need to convert the eigen to original
+    for( auto& parSet : _parameterSetList_ ){
+      if( parSet.isUseEigenDecompInFit() ) parSet.propagateEigenToOriginal();
+    }
   }
 
   resetReweight();
@@ -725,14 +741,25 @@ void Propagator::reweightMcEvents() {
 #endif
   if( not usedGPU ){
     GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-    GlobalVariables::getParallelWorker().runJob("Propagator::reweightMcEvents");
+    if( not _devSingleThreadReweight_ ){
+      GlobalVariables::getParallelWorker().runJob("Propagator::reweightMcEvents");
+    }
+    else{
+      this->reweightMcEvents(-1);
+    }
   }
   weightProp.counts++;
   weightProp.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 }
 void Propagator::refillSampleHistograms(){
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-  GlobalVariables::getParallelWorker().runJob("Propagator::refillSampleHistograms");
+  if( not _devSingleThreadHistFill_ ){
+    GlobalVariables::getParallelWorker().runJob("Propagator::refillSampleHistograms");
+  }
+  else{
+    refillSampleHistogramsFct(-1);
+    refillSampleHistogramsPostParallelFct();
+  }
   fillProp.counts++; fillProp.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 }
 void Propagator::throwParametersFromGlobalCovariance(){
@@ -795,18 +822,18 @@ void Propagator::throwParametersFromGlobalCovariance(){
 
 // Protected
 void Propagator::initializeThreads() {
-  std::function<void(int)> reweightMcEventsFct = [this](int iThread){
+  reweightMcEventsFct = [this](int iThread){
     this->reweightMcEvents(iThread);
   };
   GlobalVariables::getParallelWorker().addJob("Propagator::reweightMcEvents", reweightMcEventsFct);
 
-  std::function<void(int)> refillSampleHistogramsFct = [this](int iThread){
+  refillSampleHistogramsFct = [this](int iThread){
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
       sample.getMcContainer().refillHistogram(iThread);
       sample.getDataContainer().refillHistogram(iThread);
     }
   };
-  std::function<void()> refillSampleHistogramsPostParallelFct = [this](){
+  refillSampleHistogramsPostParallelFct = [this](){
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
       sample.getMcContainer().rescaleHistogram();
       sample.getDataContainer().rescaleHistogram();
@@ -825,7 +852,7 @@ void Propagator::reweightMcEvents(int iThread_) {
   auto start = _eventDialCache_.getCache().begin();
   auto end = _eventDialCache_.getCache().end();
 
-  if( GlobalVariables::getNbThreads() != 1 ){
+  if( iThread_ != -1 and GlobalVariables::getNbThreads() != 1 ){
     start = _eventDialCache_.getCache().begin() + Long64_t(iThread_)*(Long64_t(_eventDialCache_.getCache().size())/GlobalVariables::getNbThreads());
     if( iThread_+1 != GlobalVariables::getNbThreads() ){
       end = _eventDialCache_.getCache().begin() + (Long64_t(iThread_) + 1) * (Long64_t(_eventDialCache_.getCache().size())/GlobalVariables::getNbThreads());
@@ -862,4 +889,3 @@ void Propagator::reweightMcEvents(int iThread_) {
 
 
 }
-

@@ -142,6 +142,8 @@ private:
 
   DataDispenserCache _cache_;
 
+  GenericToolbox::NoCopyWrapper<std::mutex> _mutex_{};
+
 };
 
 

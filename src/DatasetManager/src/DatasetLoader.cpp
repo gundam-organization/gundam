@@ -51,6 +51,10 @@ void DatasetLoader::readConfigImpl() {
     _dataDispenserDict_.at(name).readConfig(dataEntry);
   }
 
+  _devSingleThreadEventLoaderAndIndexer_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadEventLoaderAndIndexer", _devSingleThreadEventLoaderAndIndexer_);
+  _devSingleThreadEventSelection_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadEventSelection", _devSingleThreadEventSelection_);
+  _sortLoadedEvents_ = GenericToolbox::Json::fetchValue(_config_, "sortLoadedEvents", _sortLoadedEvents_);
+
 }
 void DatasetLoader::initializeImpl() {
   if( not _isEnabled_ ) return;
@@ -92,6 +96,15 @@ const std::string &DatasetLoader::getSelectedDataEntry() const {
 }
 const std::string &DatasetLoader::getToyDataEntry() const {
   return _selectedToyEntry_;
+}
+bool DatasetLoader::isDevSingleThreadEventLoaderAndIndexer() const {
+  return _devSingleThreadEventLoaderAndIndexer_;
+}
+bool DatasetLoader::isDevSingleThreadEventSelection() const {
+  return _devSingleThreadEventSelection_;
+}
+bool DatasetLoader::isSortLoadedEvents() const {
+  return _sortLoadedEvents_;
 }
 
 DataDispenser &DatasetLoader::getMcDispenser() {

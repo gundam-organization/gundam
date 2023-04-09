@@ -260,7 +260,7 @@ void FitParameterSet::processCovarianceMatrix(){
     }
 
     // Original parameter values are already set -> need to propagate to Eigen parameter list
-    propagateOriginalToEigen();
+    this->propagateOriginalToEigen();
 
     // Tag the prior
     for( auto& eigenPar : _eigenParameterList_ ){
