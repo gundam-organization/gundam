@@ -20,6 +20,8 @@ set( SRCFILES
     DialDefinitions/src/CompactSpline.cpp
     DialDefinitions/src/MonotonicSpline.cpp
 
+    DialDefinitions/src/RootFormula.cpp
+
     # DialFactories
     DialFactories/src/DialBaseFactory.cpp
     DialFactories/src/NormDialBaseFactory.cpp
@@ -50,6 +52,8 @@ set( HEADERS
     DialDefinitions/include/UniformSpline.h
     DialDefinitions/include/CompactSpline.h
     DialDefinitions/include/MonotonicSpline.h
+
+    DialDefinitions/include/RootFormula.h
 
     # DialFactories
     DialFactories/include/DialBaseFactory.h
