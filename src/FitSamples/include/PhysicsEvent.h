@@ -135,7 +135,7 @@ private:
 #ifdef GUNDAM_USING_CACHE_MANAGER
 public:
   void setCacheManagerIndex(int i) {_CacheManagerIndex_ = i;}
-  int  getCacheManagerIndex() {return _CacheManagerIndex_;}
+  int  getCacheManagerIndex() const {return _CacheManagerIndex_;}
   void setCacheManagerValuePointer(const double* v) {_CacheManagerValue_ = v;}
   void setCacheManagerValidPointer(const bool* v) {_CacheManagerValid_ = v;}
   void setCacheManagerUpdatePointer(void (*p)()) {_CacheManagerUpdate_ = p;}

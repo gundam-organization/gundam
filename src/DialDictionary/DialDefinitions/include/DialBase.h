@@ -40,8 +40,8 @@ public:
 
   /// Allow extrapolation of the data.  The default is to
   /// forbid extrapolation.
-  virtual void setAllowExtrapolation(bool allow=false) {}
-  virtual bool getAllowExtrapolation() const {return false;}
+  virtual void setAllowExtrapolation(bool allow_) {}
+  [[nodiscard]] virtual bool getAllowExtrapolation() const {return false;}
 
   /////////////////////////////////////////////////////////////////////////
   // Pass information to the dial so that it can build it's internal
