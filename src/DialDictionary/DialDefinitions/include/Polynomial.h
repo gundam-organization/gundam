@@ -7,16 +7,23 @@
 
 #include "DialBase.h"
 
-#include "array"
+#include "vector"
 
 
-template <std::size_t N> class Polynomial : public DialBase {
+class Polynomial : public DialBase {
 
 public:
   Polynomial() = default;
 
+  [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<Polynomial>(*this); }
+  [[nodiscard]] std::string getDialTypeName() const override { return {"Polynomial"}; }
+  [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
+
+  void setCoefficientList(const std::vector<double> &coefficientList_);
+
+
 private:
-  std::array<double, N> _coefs_;
+  std::vector<double> _coefficientList_{};
 
 };
 

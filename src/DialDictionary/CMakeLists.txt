@@ -21,6 +21,7 @@ set( SRCFILES
     DialDefinitions/src/MonotonicSpline.cpp
 
     DialDefinitions/src/RootFormula.cpp
+    DialDefinitions/src/Polynomial.cpp
 
     # DialFactories
     DialFactories/src/DialBaseFactory.cpp
