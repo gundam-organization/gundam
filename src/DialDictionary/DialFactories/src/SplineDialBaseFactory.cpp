@@ -182,7 +182,7 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialType_,
     if (splType == "catmull-rom") {
       LogThrowIf(not hasUniformlySpacedKnots(xPoints), "Catmull-rom splines need a uniformly spaced points");
       if (not isMonotonic) {
-        (useCachedDial_ ? ( dialBase = std::make_unique<CompactSplineCache>() ) : dialBase = std::make_unique<SplineCache>() );
+        (useCachedDial_ ? ( dialBase = std::make_unique<CompactSplineCache>() ) : dialBase = std::make_unique<CompactSpline>() );
       }
       else {
         (useCachedDial_ ? ( dialBase = std::make_unique<MonotonicSplineCache>() ) : dialBase = std::make_unique<MonotonicSpline>() );
