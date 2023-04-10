@@ -8,6 +8,8 @@
 #include "Norm.h"
 #include "Shift.h"
 
+#include "Polynomial.h"
+
 #include "Graph.h"
 #include "LightGraph.h"
 
@@ -17,6 +19,8 @@
 #include "UniformSpline.h"
 #include "GeneralSpline.h"
 #include "MonotonicSpline.h"
+
+#include "RootFormula.h"
 
 
 #endif //GUNDAM_DIALTYPES_H

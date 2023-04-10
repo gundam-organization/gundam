@@ -54,6 +54,7 @@ set( HEADERS
     DialDefinitions/include/MonotonicSpline.h
 
     DialDefinitions/include/RootFormula.h
+    DialDefinitions/include/Polynomial.h
 
     # DialFactories
     DialFactories/include/DialBaseFactory.h
