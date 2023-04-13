@@ -417,6 +417,7 @@ void FitterEngine::fixGhostFitParameters(){
   // comeback to old values
   _propagator_.updateLlhCache();
 }
+
 void FitterEngine::rescaleParametersStepSize(){
   LogInfo << __METHOD_NAME__ << std::endl;
 
