@@ -2,7 +2,6 @@
 // Created by Adrien BLANCHET on 12/05/2022.
 //
 
-#include <TLegend.h>
 #include "GundamGreetings.h"
 
 #include "Logger.h"
@@ -12,6 +11,7 @@
 #include "nlohmann/json.hpp"
 #include "TKey.h"
 #include "TFile.h"
+#include <TLegend.h>
 
 #include "string"
 #include "vector"
@@ -49,9 +49,10 @@ int main( int argc, char** argv ){
   clp.addOption("output", {"-o"}, "Output file.", 1);
 
   LogInfo << "Options list:" << std::endl;
-  Logger::setIndentStr("  ");
-  LogInfo << clp.getConfigSummary() << std::endl;
-  Logger::setIndentStr("");
+  {
+    Logger::Indent lIndent;
+    LogInfo << clp.getConfigSummary() << std::endl;
+  }
 
   clp.parseCmdLine();
 
@@ -114,10 +115,10 @@ void makeSampleComparePlots(bool usePrefit_){
 
   strBuffer = Form("FitterEngine/%s/samples", (usePrefit_? "preFit": "postFit"));
   auto* dir1 = file1->Get<TDirectory>(strBuffer.c_str());
-  LogThrowIf(dir1== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath1);
+  LogReturnIf(dir1== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath1);
 
   auto* dir2 = file2->Get<TDirectory>(strBuffer.c_str());
-  LogThrowIf(dir2== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
+  LogReturnIf(dir2== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
 
   std::vector<std::string> pathBuffer;
   pathBuffer.emplace_back(Form("%s/samples", (usePrefit_? "preFit": "postFit")));
@@ -153,16 +154,17 @@ void makeSampleComparePlots(bool usePrefit_){
         hCompValues->SetTitle(Form("Comparing \"%s\"", dir1_->GetListOfKeys()->At(iKey)->GetName()));
         hCompValues->GetYaxis()->SetTitle("Bin content difference");
 
-        GenericToolbox::mkdirTFile(outFile, GenericToolbox::joinVectorString(pathBuffer, "/"))->cd();
-        hCompValues->Write(dir1_->GetListOfKeys()->At(iKey)->GetName());
+        GenericToolbox::writeInTFile(
+            GenericToolbox::mkdirTFile(outFile, GenericToolbox::joinVectorString(pathBuffer, "/")),
+            hCompValues,
+            dir1_->GetListOfKeys()->At(iKey)->GetName()
+            );
       }
     }
 
   };
 
-
   recurseSampleCompareGraph(dir1, dir2);
-
 }
 void makeScanComparePlots(bool usePrefit_){
 
@@ -237,8 +239,10 @@ void makeScanComparePlots(bool usePrefit_){
         gPad->SetGridx();
         gPad->SetGridy();
 
-        GenericToolbox::mkdirTFile(outFile, GenericToolbox::joinVectorString(pathBuffer, "/"))->cd();
-        overlayCanvas->Write();
+        GenericToolbox::writeInTFile(
+            GenericToolbox::mkdirTFile(outFile, GenericToolbox::joinVectorString(pathBuffer, "/")),
+            overlayCanvas
+            );
         delete overlayCanvas;
       }
     }
@@ -271,33 +275,43 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
 
   std::string strBuffer;
 
-  strBuffer = Form("FitterEngine/postFit/%s/errors", algo1.c_str());
+  strBuffer = Form("FitterEngine/%s/%s/errors", (usePrefit_? "preFit": "postFit"), algo1.c_str());
   auto* dir1 = file1->Get<TDirectory>(strBuffer.c_str());
   LogReturnIf(dir1== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath1);
 
-  strBuffer = Form("FitterEngine/postFit/%s/errors", algo2.c_str());
+  strBuffer = Form("FitterEngine/%s/%s/errors", (usePrefit_? "preFit": "postFit"), algo2.c_str());
   auto* dir2 = file2->Get<TDirectory>(strBuffer.c_str());
   LogReturnIf(dir2== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
 
   // loop over parSets
   auto* outDir = GenericToolbox::mkdirTFile(outFile, Form("%s/errors%s", (usePrefit_? "preFit": "postFit"), (useNomVal_? "Norm": "")));
   for( int iKey = 0 ; iKey < dir1->GetListOfKeys()->GetEntries() ; iKey++ ){
-    Logger::setIndentStr("  ");
+    Logger::Indent lIndent;
     std::string parSet = dir1->GetListOfKeys()->At(iKey)->GetName();
 
     strBuffer = Form("%s/values%s/%sErrors_TH1D", parSet.c_str(), (useNomVal_? "Norm": ""), (usePrefit_? "preFit": "postFit"));
     auto* hist1 = dir1->Get<TH1D>(strBuffer.c_str());
+    if( hist1 == nullptr ){
+      // legacy
+      strBuffer = Form("%s/values%s/%sErrors", parSet.c_str(), (useNomVal_? "Norm": ""), (usePrefit_? "preFit": "postFit"));
+      hist1 = dir1->Get<TH1D>(strBuffer.c_str());
+    }
     LogContinueIf(hist1 == nullptr, "Could no find parSet \"" << strBuffer << "\" in " << file1->GetPath());
 
     strBuffer = Form("%s/values%s/%sErrors_TH1D", parSet.c_str(), (useNomVal_? "Norm": ""), (usePrefit_? "preFit": "postFit"));
     auto* hist2 = dir2->Get<TH1D>(strBuffer.c_str());
+    if( hist2 == nullptr ){
+      // legacy
+      strBuffer = Form("%s/values%s/%sErrors", parSet.c_str(), (useNomVal_? "Norm": ""), (usePrefit_? "preFit": "postFit"));
+      hist2 = dir2->Get<TH1D>(strBuffer.c_str());
+    }
     LogContinueIf(hist2 == nullptr, "Could no find parSet \"" << strBuffer << "\" in " << file2->GetPath());
 
     LogInfo << "Processing parameter set: \"" << parSet << "\"" << std::endl;
 
     auto yBounds = GenericToolbox::getYBounds({hist1, hist2});
 
-    auto* overlayCanvas = new TCanvas( "overlay_TCanvas" , Form("Comparing %s parameters: \"%s\"", (usePrefit_? "preFit": "postFit"), parSet.c_str()), 800, 600);
+    auto* overlayCanvas = new TCanvas( "overlay" , Form("Comparing %s parameters: \"%s\"", (usePrefit_? "preFit": "postFit"), parSet.c_str()), 800, 600);
     hist1->SetFillColor(kRed-9);
     hist1->SetLineColor(kRed-3);
     hist1->SetMarkerStyle(kFullDotLarge);
@@ -346,9 +360,84 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
     l.Draw();
 
     hist1->SetTitle(Form("Comparing %s parameters: \"%s\"", (usePrefit_? "preFit": "postFit"), parSet.c_str()));
-    GenericToolbox::mkdirTFile(outDir, parSet)->cd();
-    overlayCanvas->Write();
+    GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(outDir, parSet), overlayCanvas );
+
+    std::map<std::string, TH1D*> compHist{
+        {"ScaledComp", nullptr},
+        {"ValueDiff", nullptr},
+        {"ValueRatio", nullptr},
+        {"ErrorDiff", nullptr},
+        {"ErrorRatio", nullptr},
+        {"ValueDiffAbs", nullptr},
+        {"ValueRatioAbs", nullptr},
+        {"ErrorDiffAbs", nullptr},
+        {"ErrorRatioAbs", nullptr}
+    };
+
+    for( auto& histEntry : compHist ){
+      histEntry.second = (TH1D*) hist2->Clone();
+      GenericToolbox::resetHistogram(histEntry.second);
+      histEntry.second->SetName(histEntry.first.c_str());
+      histEntry.second->GetXaxis()->LabelsOption("v");
+      histEntry.second->SetTitleSize(0.03);
+      histEntry.second->SetTitle(
+          Form(R"(Comparing "%s" %s parameters: "%s"/%s [1] and "%s"/%s [2])",
+               parSet.c_str(), (usePrefit_? "preFit": "postFit"),
+               name1.c_str(), algo1.c_str(), name2.c_str(), algo2.c_str()));
+    }
+
+    for( int iBin = 1 ; iBin <= hist1->GetNbinsX() ; iBin++ ){
+      double hist1Val = hist1->GetBinContent(iBin);
+      double hist2Val = hist2->GetBinContent(iBin);
+      double hist1Err = hist1->GetBinError(iBin);
+      double hist2Err = hist2->GetBinError(iBin);
+      double diffVal = hist2Val - hist1Val;
+      double diffErr = hist2Err - hist1Err;
+
+      compHist["ValueDiff"]->SetBinContent( iBin, diffVal );
+      compHist["ValueRatio"]->SetBinContent( iBin, ( hist1Val > 0 ) ? 100* (diffVal/hist1Val) : 0 );
+      compHist["ErrorDiff"]->SetBinContent( iBin, diffErr );
+      compHist["ErrorRatio"]->SetBinContent( iBin, ( hist1Err > 0 ) ? 100* (diffErr/hist1Err) : 0 );
+      compHist["ValueDiffAbs"]->SetBinContent( iBin, TMath::Abs(compHist["ValueDiff"]->GetBinContent(iBin)) );
+      compHist["ValueRatioAbs"]->SetBinContent( iBin, TMath::Abs(compHist["ValueRatio"]->GetBinContent(iBin)) );
+      compHist["ErrorDiffAbs"]->SetBinContent( iBin, TMath::Abs(compHist["ErrorDiff"]->GetBinContent(iBin)) );
+      compHist["ErrorRatioAbs"]->SetBinContent( iBin, TMath::Abs(compHist["ErrorRatio"]->GetBinContent(iBin)) );
+      compHist["ScaledComp"]->SetBinContent( iBin, diffVal ); compHist["ScaledComp"]->SetBinError( iBin, ( hist1Err > 0 ) ? hist2Err/hist1Err : 0 );
+    }
+
+    compHist["ValueDiff"]->GetYaxis()->SetTitle("#mu_{2} - #mu_{1}");
+    compHist["ValueRatio"]->GetYaxis()->SetTitle("#mu_{2} / #mu_{1} - 1 (%)");
+    compHist["ErrorDiff"]->GetYaxis()->SetTitle("#sigma_{2} - #sigma_{1}");
+    compHist["ErrorRatio"]->GetYaxis()->SetTitle("#sigma_{2} / #sigma_{1} - 1 (%)");
+    compHist["ValueDiffAbs"]->GetYaxis()->SetTitle("#left|#mu_{2} - #mu_{1}#right|");
+    compHist["ValueRatioAbs"]->GetYaxis()->SetTitle("#left|#mu_{2} / #mu_{1} - 1#right|  (%)");
+    compHist["ErrorDiffAbs"]->GetYaxis()->SetTitle("#left|#sigma_{2} - #sigma_{1}#right|");
+    compHist["ErrorRatioAbs"]->GetYaxis()->SetTitle("#left|#sigma_{2} / #sigma_{1} - 1#right| (%)");
+    compHist["ScaledComp"]->GetYaxis()->SetTitle("(#mu_{2} - #mu_{1}) #pm #sigma_{2}/#sigma_{1}");
+
+    overlayCanvas->cd();
+
+    for( auto& histEntry : compHist ){
+      overlayCanvas->cd();
+
+      histEntry.second->Draw("E1");
+      overlayCanvas->Update();
+      TLine* line1{nullptr}, *line2{nullptr};
+      if( histEntry.first == "ScaledComp" ){
+        histEntry.second->GetYaxis()->SetRangeUser(-2, 2);
+        line1 = new TLine(gPad->GetFrame()->GetX1(), 1, gPad->GetFrame()->GetX2(), 1); line1->SetLineColor(kRed); line1->SetLineStyle(2); line1->Draw();
+        line2 = new TLine(gPad->GetFrame()->GetX1(), -1, gPad->GetFrame()->GetX2(), -1); line2->SetLineColor(kRed); line2->SetLineStyle(2); line2->Draw();
+      }
+
+      GenericToolbox::writeInTFile(
+          GenericToolbox::mkdirTFile(outDir, parSet),
+          overlayCanvas,
+          histEntry.first
+          );
+
+      delete histEntry.second; delete line1; delete line2;
+    }
+
     delete overlayCanvas;
-    Logger::setIndentStr("");
   }
 }

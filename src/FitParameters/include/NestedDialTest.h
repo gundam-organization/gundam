@@ -7,13 +7,17 @@
 
 #include "Dial.h"
 
-#include "JsonUtils.h"
+#include "GenericToolbox.Json.h"
 
 #include "nlohmann/json.hpp"
 #include "TFormula.h"
 
 #include "vector"
 #include "string"
+
+#ifdef USE_NEW_DIALS
+#warning Not used with new dial implementation
+#endif
 
 class NestedDialTest {
 

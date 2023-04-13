@@ -1,0 +1,76 @@
+# A test yaml file for GUNDAM.
+#
+# Do an Asimov fit to the tree_mc tree in 100NormalizationTree.root.  This
+# fits the (A,B) distribution with two free normalization variables.
+#
+#   Positive_C : Normalization for events where the C truth variable is >0
+#   Negative_C : Normalization for events where the C truth variable is <=0
+#
+
+fit: true                    # can be disabled with -d
+scanParameters: false        # can be triggered with --scan
+generateOneSigmaPlots: false # can be enabled with --one-sigma
+
+fitterEngineConfig:
+
+  minimizerConfig:
+    minimizer: "Minuit2"
+    algorithm: "Migrad"
+    errors: "Hesse"
+    print_level: 2
+
+  propagatorConfig:
+    throwAsimovFitParameters: false
+
+    dataSetList:
+      - name: "TestSample"
+        isEnabled: true
+        mc:
+          tree: tree_mc
+          selectionCutFormula: "(1)"
+          nominalWeightFormula: "(1.0)"
+          filePathList:
+            - "${DATA_DIR}/100NormalizationTree.root"
+
+    fitSampleSetConfig:
+      # LeastSquares is used for tests because it is mathematically simple
+      # and numerically stable.
+      llhStatFunction: LeastSquares
+      dataEventType: Asimov
+
+      llhConfig:
+        lsqPoissonianApproximation: true
+
+      fitSampleList:
+        - name: AB
+          isEnabled: true
+          binning: "${CONFIG_DIR}/200NormalizationAsimov-binning.txt"
+          dataSets: [ "TestSample" ]
+
+    parameterSetListConfig:
+      - name: Normalizations
+        isEnabled: true
+        nominalStepSize: 0.1
+
+        parameterDefinitions:
+
+          - parameterName: "Positive_C"
+            isEnabled: true
+            priorValue: 1.0
+            priorType: Flat
+            dialSetDefinitions:
+              - dialsType: Normalization
+                applyCondition: "[C] > 0"
+
+          - parameterName: "Negative_C"
+            isEnabled: true
+            priorValue: 1.0
+            priorType: Flat
+            dialSetDefinitions:
+              - dialsType: Normalization
+                applyCondition: "[C] <= 0"
+
+# End of the yaml file
+# Local Variables:
+# mode:yaml
+# End:

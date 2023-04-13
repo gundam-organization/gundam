@@ -5,6 +5,7 @@
 
 #include "CacheWeights.h"
 #include "WeightNormalization.h"
+#include "WeightCompactSpline.h"
 #include "WeightMonotonicSpline.h"
 #include "WeightUniformSpline.h"
 #include "WeightGeneralSpline.h"
@@ -12,6 +13,7 @@
 #include "CacheIndexedSums.h"
 
 #include "FitSampleSet.h"
+#include "EventDialCache.h"
 
 #include "hemi/array.h"
 
@@ -37,7 +39,11 @@ public:
 
     // Build the cache and load it into the device.  This is used in
     // Propagator.cpp to fill the constants needed to for the calculations.
+#ifndef USE_NEW_DIALS
     static bool Build(FitSampleSet& sampleList);
+#else
+    static bool Build(FitSampleSet& sampleList, EventDialCache& eventDials);
+#endif
 
     /// This returns the index of the parameter in the cache.  If the
     /// parameter isn't defined, this will return a negative value.
@@ -54,21 +60,23 @@ private:
     Manager(int results, int parameters,
             int norms,
             int compactSplines, int compactPoints,
+            int monotonicSplines, int monotonicPoints,
             int uniformSplines, int uniformPoints,
             int generalSplines, int generalPoints,
-            int histBins);
-
+            int histBins, std::string spaceType);
     static Manager* fSingleton;  // You get one guess...
 
     // A map between the fit parameter pointers and the parameter index used
     // by the fitter.
     static std::map<const FitParameter*, int> ParameterMap;
 
+#ifndef USE_NEW_DIALS
     // Determine the type of spline cache to use.  The possible results are
     // "compactSpline", "uniformSpline", "generalSpline", or
     // "this-cannot-happen".  This is used to determine which cache is used
     // for each event.
     static std::string SplineType(const SplineDial* dial);
+#endif
 
     /// Declare all of the actual GPU caches here.  There is one GPU, so this
     /// is the ONE place that everything is collected together.
@@ -82,23 +90,26 @@ private:
     /// The cache for the normalizations
     std::unique_ptr<Cache::Weight::Normalization> fNormalizations;
 
+    /// The cache for the compact (Catmull-Rom) splines
+    std::unique_ptr<Cache::Weight::CompactSpline> fCompactSplines;
+
     /// The cache for the monotonic splines
     std::unique_ptr<Cache::Weight::MonotonicSpline> fMonotonicSplines;
 
-    /// The cache for the uniform splines (really compact splines for now).
+    /// The cache for the uniform splines
     std::unique_ptr<Cache::Weight::UniformSpline> fUniformSplines;
 
-    /// The cache for the general splines (really compact splines for now).
+    /// The cache for the general splines
     std::unique_ptr<Cache::Weight::GeneralSpline> fGeneralSplines;
 
     /// The cache for the summed histgram weights
     std::unique_ptr<Cache::IndexedSums> fHistogramsCache;
 
-    // The rough size of all of the caches.
+    // The rough size of all the caches.
     std::size_t fTotalBytes;
 
 public:
-    ~Manager();
+    virtual ~Manager() = default;
 
     // Provide "internal" references to the GPU cache.  This is used in the
     // implementation, and should be ignored by most people.

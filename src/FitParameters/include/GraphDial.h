@@ -9,13 +9,16 @@
 
 #include "Dial.h"
 
+#ifdef USE_NEW_DIALS
+#warning Not used with new dial implementation
+#endif
+
 class GraphDial : public Dial {
 
 public:
-  GraphDial();
+  explicit GraphDial(const DialSet* owner_);
 
-  void reset() override;
-  std::unique_ptr<Dial> clone() const override { return std::make_unique<GraphDial>(*this); }
+  [[nodiscard]] std::unique_ptr<Dial> clone() const override { return std::make_unique<GraphDial>(*this); }
 
   void setGraph(const TGraph &graph);
 

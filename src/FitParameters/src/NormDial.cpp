@@ -2,8 +2,15 @@
 // Created by Nadrino on 26/05/2021.
 //
 
-#include "NormDial.h"
 #include "FitParameter.h"
+
+// Unset for this file since the entire file is deprecated.
+#ifdef USE_NEW_DIALS
+#undef USE_NEW_DIALS
+#endif
+
+#include "NormDial.h"
+#include "DialSet.h"
 
 #include "Logger.h"
 
@@ -14,11 +21,8 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[NormalizationDial]");
 });
 
-NormDial::NormDial() : Dial(DialType::Norm) {
-  this->NormDial::reset();
-}
+NormDial::NormDial(const DialSet* owner_) : Dial(DialType::Norm, owner_) {}
 
-void NormDial::reset() { Dial::reset(); }
 void NormDial::initialize() { Dial::initialize(); }
 
 std::string NormDial::getSummary() {
@@ -31,4 +35,3 @@ std::string NormDial::getSummary() {
 
 double NormDial::evalResponse(double parameterValue_){ return this->capDialResponse(this->calcDial(parameterValue_)); } // no cache
 double NormDial::calcDial(double parameterValue_){ return parameterValue_; }
-

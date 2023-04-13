@@ -8,6 +8,7 @@
 #     force -- Force cmake to ignore the cache
 #     cmake -- Don't compile the source (only run cmake).
 #     clean -- Run clean the build area after running cmake (run make clean)
+#     test  -- Run tests after the build
 #     help  -- This message
 #
 
@@ -51,7 +52,10 @@ fi
 
 ONLY_CMAKE="no"
 RUN_CLEAN="no"
-DEFINES="-DCMAKE_INSTALL_PREFIX=${GUNDAM_INSTALL}"
+RUN_TEST="no"
+DEFINES=" -DCMAKE_INSTALL_PREFIX=${GUNDAM_INSTALL} "
+DEFINES="${DEFINES} -DCMAKE_EXPORT_COMPILE_COMMANDS=1 "
+MAKE_OPTIONS=" -j1 "
 while [ "x${1}" != "x" ]; do
     case ${1} in
         fo*) # force
@@ -73,6 +77,16 @@ while [ "x${1}" != "x" ]; do
             shift
             echo Clean the build area
             RUN_CLEAN="yes"
+            ;;
+        ke*) # Keep going
+            shift
+            echo Continue on errors
+            MAKE_OPTIONS=" -k ${MAKE_OPTIONS}"
+            ;;
+        te*) # test
+            shift
+            echo Run tests
+            RUN_TEST="yes"
             ;;
         ve*) # verbose
             shift
@@ -105,7 +119,7 @@ fi
 
 if [ ${RUN_CLEAN} = "yes" ]; then
     echo make clean
-    make clean
+    make ${MAKE_OPTIONS} clean
     echo Source cleaned.
 fi
 
@@ -113,10 +127,15 @@ if [ ${ONLY_CMAKE} = "yes" ]; then
     exit 0
 fi
 
-echo make -j1
-make -j1 || exit 1
+echo make ${MAKE_OPTIONS}
+make ${MAKE_OPTIONS} || exit 1
 echo make install
-make install || exit 1
+make ${MAKE_OPTIONS} install || exit 1
+
+if [ ${RUN_TEST} = "yes" ]; then
+    echo make test
+    make ${MAKE_OPTIONS} test || exit 1
+fi
 
 echo "build:       " ${BUILD_LOCATION}
 echo "installation:" ${GUNDAM_INSTALL}

@@ -9,6 +9,7 @@
 #include "FitParameterSet.h"
 #include "Likelihoods.hh"
 #include "JointProbability.h"
+#include "JsonBaseClass.h"
 
 #include "GenericToolbox.h"
 #include "nlohmann/json.hpp"
@@ -17,18 +18,12 @@
 #include "vector"
 
 
-class FitSampleSet {
+/// Hold a description of all of the event samples (both "data" and the
+/// matching "MC") that are going to be managed by the Propagator.  The
+/// samples in the set can be referred to by their sample set index.
+class FitSampleSet : public JsonBaseClass {
 
 public:
-  FitSampleSet();
-  virtual ~FitSampleSet();
-
-  void reset();
-
-  void setConfig(const nlohmann::json &config);
-
-  void initialize();
-
   // Post init
   void copyMcEventListToDataContainer();
   void clearMcContainers();
@@ -38,6 +33,8 @@ public:
   std::vector<FitSample> &getFitSampleList();
   const nlohmann::json &getConfig() const;
   const std::shared_ptr<JointProbability::JointProbability> &getJointProbabilityFct() const;
+  const std::vector<std::string>& getAdditionalVariablesForStorage() const { return _additionalVariablesForStorage_; }
+  std::vector<std::string>& getAdditionalVariablesForStorage() { return _additionalVariablesForStorage_; }
 
   //Core
   bool empty() const;
@@ -49,14 +46,16 @@ public:
   void updateSampleBinEventList() const;
   void updateSampleHistograms() const;
 
-private:
-  bool _isInitialized_{false};
-  bool _showTimeStats_{false};
-  nlohmann::json _config_;
+protected:
+  void readConfigImpl() override;
+  void initializeImpl() override;
 
+private:
+  bool _showTimeStats_{false};
   std::vector<FitSample> _fitSampleList_;
   std::shared_ptr<JointProbability::JointProbability> _jointProbabilityPtr_{nullptr};
   std::vector<std::string> _eventByEventDialLeafList_;
+  std::vector<std::string> _additionalVariablesForStorage_;
 
 };
 

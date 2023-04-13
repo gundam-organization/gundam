@@ -9,9 +9,12 @@
 #endif
 
 #include "FitParameterSet.h"
+#ifndef USE_NEW_DIALS
 #include "Dial.h"
-#include "JsonUtils.h"
+#endif
+#include "GenericToolbox.Json.h"
 #include "GlobalVariables.h"
+#include "ConfigUtils.h"
 
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
@@ -24,121 +27,143 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[Propagator]");
 });
 
-Propagator::Propagator() { this->reset(); }
-Propagator::~Propagator() { this->reset(); }
 
-void Propagator::reset() {
-  _isInitialized_ = false;
-  _parameterSetsList_.clear();
-  _saveDir_ = nullptr;
-
-  std::vector<std::string> jobNameRemoveList;
-  for( const auto& jobName : GlobalVariables::getParallelWorker().getJobNameList() ){
-    if(jobName == "Propagator::fillEventDialCaches"
-       or jobName == "Propagator::reweightMcEvents"
-       or jobName == "Propagator::updateDialResponses"
-       or jobName == "Propagator::refillSampleHistograms"
-       or jobName == "Propagator::applyResponseFunctions"
-        ){
-      jobNameRemoveList.emplace_back(jobName);
-    }
-  }
-  for( const auto& jobName : jobNameRemoveList ){
-    GlobalVariables::getParallelWorker().removeJob(jobName);
-  }
-
-  _responseFunctionsSamplesMcHistogram_.clear();
-  _nominalSamplesMcHistogram_.clear();
-}
-
-void Propagator::setShowTimeStats(bool showTimeStats) {
-  _showTimeStats_ = showTimeStats;
-}
-void Propagator::setConfig(const nlohmann::json &config) {
-  _config_ = config;
-  JsonUtils::forwardConfig(_config_);
-}
-void Propagator::setSaveDir(TDirectory *saveDir) {
-  _saveDir_ = saveDir;
-}
-void Propagator::setThrowAsimovToyParameters(bool throwAsimovToyParameters) {
-  _throwAsimovToyParameters_ = throwAsimovToyParameters;
-}
-void Propagator::setIThrow(int iThrow) {
-  _iThrow_ = iThrow;
-}
-void Propagator::setLoadAsimovData(bool loadAsimovData) {
-  _loadAsimovData_ = loadAsimovData;
-}
-
-void Propagator::initialize() {
+void Propagator::readConfigImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
 
   // Monitoring parameters
-  _showEventBreakdown_ = JsonUtils::fetchValue(_config_, "showEventBreakdown", _showEventBreakdown_);
+  _showEventBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showEventBreakdown", _showEventBreakdown_);
+  _throwAsimovToyParameters_ = GenericToolbox::Json::fetchValue(_config_, "throwAsimovFitParameters", _throwAsimovToyParameters_);
+  _reThrowParSetIfOutOfBounds_ = GenericToolbox::Json::fetchValue(_config_, "reThrowParSetIfOutOfBounds", _reThrowParSetIfOutOfBounds_);
+  _enableStatThrowInToys_ = GenericToolbox::Json::fetchValue(_config_, "enableStatThrowInToys", _enableStatThrowInToys_);
+  _gaussStatThrowInToys_ = GenericToolbox::Json::fetchValue(_config_, "gaussStatThrowInToys", _gaussStatThrowInToys_);
+  _enableEventMcThrow_ = GenericToolbox::Json::fetchValue(_config_, "enableEventMcThrow", _enableEventMcThrow_);
 
-  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing parameters...") << std::endl;
-  auto parameterSetListConfig = JsonUtils::fetchValue(_config_, "parameterSetListConfig", nlohmann::json());
-  if( parameterSetListConfig.is_string() ) parameterSetListConfig = JsonUtils::readConfigFile(parameterSetListConfig.get<std::string>());
-  int nPars = 0;
-  _parameterSetsList_.reserve(parameterSetListConfig.size()); // make sure the objects aren't moved in RAM ( since FitParameter* will be used )
+  auto parameterSetListConfig = ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue(_config_, "parameterSetListConfig", nlohmann::json()));
+  _parameterSetList_.reserve(parameterSetListConfig.size()); // make sure the objects aren't moved in RAM ( since FitParameter* will be used )
   for( const auto& parameterSetConfig : parameterSetListConfig ){
-    _parameterSetsList_.emplace_back();
-    _parameterSetsList_.back().setConfig(parameterSetConfig);
-    _parameterSetsList_.back().setSaveDir(GenericToolbox::mkdirTFile(_saveDir_, "ParameterSets"));
-    _parameterSetsList_.back().initialize();
-    nPars += _parameterSetsList_.back().getNbParameters();
-    LogInfo << _parameterSetsList_.back().getSummary() << std::endl;
+    _parameterSetList_.emplace_back();
+    _parameterSetList_.back().setConfig(parameterSetConfig);
+    _parameterSetList_.back().readConfig();
+    LogInfo << _parameterSetList_.back().getSummary() << std::endl;
   }
 
-  _globalCovarianceMatrix_ = std::make_shared<TMatrixD>( nPars, nPars );
-  int iParOffset = 0;
-  for( const auto& parSet : _parameterSetsList_ ){
-    if( not parSet.isEnabled() ) continue;
-    if(parSet.getPriorCovarianceMatrix() != nullptr ){
-      for(int iCov = 0 ; iCov < parSet.getPriorCovarianceMatrix()->GetNrows() ; iCov++ ){
-        for(int jCov = 0 ; jCov < parSet.getPriorCovarianceMatrix()->GetNcols() ; jCov++ ){
-          (*_globalCovarianceMatrix_)[iParOffset+iCov][iParOffset+jCov] = (*parSet.getPriorCovarianceMatrix())[iCov][jCov];
-        }
-      }
-      iParOffset += parSet.getPriorCovarianceMatrix()->GetNrows();
-    }
-  }
-  if( _saveDir_ != nullptr ){
-    _saveDir_->cd();
-    _globalCovarianceMatrix_->Write("globalCovarianceMatrix_TMatrixD");
-  }
 
-  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing samples...") << std::endl;
-  auto fitSampleSetConfig = JsonUtils::fetchValue(_config_, "fitSampleSetConfig", nlohmann::json());
+  auto fitSampleSetConfig = GenericToolbox::Json::fetchValue(_config_, "fitSampleSetConfig", nlohmann::json());
   _fitSampleSet_.setConfig(fitSampleSetConfig);
-  _fitSampleSet_.initialize();
+  _fitSampleSet_.readConfig();
 
-  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the plot generator") << std::endl;
-  auto plotGeneratorConfig = JsonUtils::fetchValue(_config_, "plotGeneratorConfig", nlohmann::json());
-  if( plotGeneratorConfig.is_string() ) parameterSetListConfig = JsonUtils::readConfigFile(plotGeneratorConfig.get<std::string>());
+  auto plotGeneratorConfig = ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue(_config_, "plotGeneratorConfig", nlohmann::json()));
   _plotGenerator_.setConfig(plotGeneratorConfig);
-  _plotGenerator_.initialize();
+  _plotGenerator_.readConfig();
 
-  _throwAsimovToyParameters_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "throwAsimovFitParameters", _throwAsimovToyParameters_);
-  _enableStatThrowInToys_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "enableStatThrowInToys", _enableStatThrowInToys_);
-
-  LogInfo << std::endl << GenericToolbox::addUpDownBars("Loading datasets...") << std::endl;
-  auto dataSetListConfig = JsonUtils::getForwardedConfig(_config_, "dataSetList");
+  auto dataSetListConfig = ConfigUtils::getForwardedConfig(_config_, "dataSetList");
   if( dataSetListConfig.empty() ){
     // Old config files
-    dataSetListConfig = JsonUtils::getForwardedConfig(_fitSampleSet_.getConfig(), "dataSetList");
+    dataSetListConfig = ConfigUtils::getForwardedConfig(_fitSampleSet_.getConfig(), "dataSetList");
     LogAlert << "DEPRECATED CONFIG OPTION: " << "dataSetList should now be located in the Propagator config." << std::endl;
   }
-  LogThrowIf(dataSetListConfig.empty(), "No dataSet specified." << std::endl)
-  int iDataSet{0};
+  LogThrowIf(dataSetListConfig.empty(), "No dataSet specified." << std::endl);
   _dataSetList_.reserve(dataSetListConfig.size());
   for( const auto& dataSetConfig : dataSetListConfig ){
-    _dataSetList_.emplace_back();
-    _dataSetList_.back().setConfig(dataSetConfig);
-    _dataSetList_.back().setDataSetIndex(iDataSet++);
-    _dataSetList_.back().initialize();
+    _dataSetList_.emplace_back(dataSetConfig, int(_dataSetList_.size()));
   }
+
+  _parScanner_.readConfig( GenericToolbox::Json::fetchValue(_config_, "scanConfig", nlohmann::json()) );
+
+  _debugPrintLoadedEvents_ = GenericToolbox::Json::fetchValue(_config_, "debugPrintLoadedEvents", _debugPrintLoadedEvents_);
+  _debugPrintLoadedEventsNbPerSample_ = GenericToolbox::Json::fetchValue(_config_, "debugPrintLoadedEventsNbPerSample", _debugPrintLoadedEventsNbPerSample_);
+
+  _devSingleThreadReweight_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadReweight", _devSingleThreadReweight_);
+  _devSingleThreadHistFill_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadHistFill", _devSingleThreadHistFill_);
+
+#if USE_NEW_DIALS
+  for(size_t iParSet = 0 ; iParSet < _parameterSetList_.size() ; iParSet++ ){
+    if( not _parameterSetList_[iParSet].isEnabled() ) continue;
+    // DEV / DialCollections
+    if( not _parameterSetList_[iParSet].getDialSetDefinitions().empty() ){
+      for( auto& dialSetDef : _parameterSetList_[iParSet].getDialSetDefinitions().get<std::vector<nlohmann::json>>() ){
+        if( GenericToolbox::Json::doKeyExist(dialSetDef, "parametersBinningPath") ){
+          _dialCollections_.emplace_back(&_parameterSetList_);
+          _dialCollections_.back().setIndex(int(_dialCollections_.size())-1);
+          _dialCollections_.back().setSupervisedParameterSetIndex( int(iParSet) );
+          _dialCollections_.back().readConfig( dialSetDef );
+        }
+        else{ LogThrow("no parametersBinningPath option?"); }
+      }
+    }
+    else{
+      for( auto& par : _parameterSetList_[iParSet].getParameterList() ){
+        if( not par.isEnabled() ) continue;
+
+        // Check if no definition is present -> disable the parameter in that case
+        if( par.getDialDefinitionsList().empty() ) {
+          LogAlert << "Disabling \"" << par.getFullTitle() << "\": no dial definition." << std::endl;
+          par.setIsEnabled(false);
+          continue;
+        }
+
+        for( const auto& dialDefinitionConfig : par.getDialDefinitionsList() ){
+          _dialCollections_.emplace_back(&_parameterSetList_);
+          _dialCollections_.back().setIndex(int(_dialCollections_.size())-1);
+          _dialCollections_.back().setSupervisedParameterSetIndex( int(iParSet) );
+          _dialCollections_.back().setSupervisedParameterIndex( par.getParameterIndex() );
+          _dialCollections_.back().readConfig( dialDefinitionConfig );
+        }
+      }
+    }
+  }
+#endif
+
+  _parameterInjector_ = GenericToolbox::Json::fetchValue(_config_, "parameterInjection", _parameterInjector_);
+  ConfigUtils::forwardConfig(_parameterInjector_);
+
+}
+void Propagator::initializeImpl() {
+  LogWarning << __METHOD_NAME__ << std::endl;
+
+  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing parameters...") << std::endl;
+  int nPars = 0;
+  for( auto& parSet : _parameterSetList_ ){
+    parSet.initialize();
+    nPars += int(parSet.getNbParameters());
+  }
+  LogInfo << "Total number of parameters: " << nPars << std::endl;
+
+  if( _globalCovarianceMatrix_ == nullptr ){
+    LogInfo << "Building global covariance matrix..." << std::endl;
+    _globalCovarianceMatrix_ = std::make_shared<TMatrixD>( nPars, nPars );
+    int iParOffset = 0;
+    for( const auto& parSet : _parameterSetList_ ){
+      if( not parSet.isEnabled() ) continue;
+      if(parSet.getPriorCovarianceMatrix() != nullptr ){
+        for(int iCov = 0 ; iCov < parSet.getPriorCovarianceMatrix()->GetNrows() ; iCov++ ){
+          for(int jCov = 0 ; jCov < parSet.getPriorCovarianceMatrix()->GetNcols() ; jCov++ ){
+            (*_globalCovarianceMatrix_)[iParOffset+iCov][iParOffset+jCov] = (*parSet.getPriorCovarianceMatrix())[iCov][jCov];
+          }
+        }
+        iParOffset += parSet.getPriorCovarianceMatrix()->GetNrows();
+      }
+    }
+  }
+  else{
+//    LogInfo << "Global covariance matrix is already set. Checking dimensions..." << std::endl;
+//    LogThrowIf(_globalCovarianceMatrix_->GetNrows() != nPars or _globalCovarianceMatrix_->GetNcols() != nPars,
+//               "The provided covariance matrix don't have the right size: " << nPars << "x" << nPars
+//               << " / " << _globalCovarianceMatrix_->GetNrows() << " x " << _globalCovarianceMatrix_->GetNcols());
+  }
+
+
+  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing samples...") << std::endl;
+  _fitSampleSet_.initialize();
+
+  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing " + std::to_string(_dataSetList_.size()) + " datasets...") << std::endl;
+  for( auto& dataset : _dataSetList_ ){ dataset.initialize(); }
+
+#if USE_NEW_DIALS
+  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing dials...") << std::endl;
+  for( auto& dialCollection : _dialCollections_ ){ dialCollection.initialize(); }
+#endif
 
   LogInfo << "Initializing propagation threads..." << std::endl;
   initializeThreads();
@@ -148,44 +173,109 @@ void Propagator::initialize() {
   bool usedMcContainer{false};
   bool allAsimov{true};
   for( auto& dataSet : _dataSetList_ ){
-    if( not dataSet.isEnabled() ) continue;
+    LogContinueIf(not dataSet.isEnabled(), "Dataset \"" << dataSet.getName() << "\" is disabled. Skipping");
     DataDispenser& dispenser = dataSet.getSelectedDataDispenser();
     if( _throwAsimovToyParameters_ ) { dispenser = dataSet.getToyDataDispenser(); }
-    if( _loadAsimovData_ ){ dispenser = dataSet.getDataDispenserDict()["Asimov"]; }
+    if( _loadAsimovData_ ){ dispenser = dataSet.getDataDispenserDict().at("Asimov"); }
 
-    dispenser.getConfigParameters().iThrow = _iThrow_;
+    dispenser.getParameters().iThrow = _iThrow_;
 
-    if( dispenser.getConfigParameters().name != "Asimov" ){ allAsimov = false; }
-    LogInfo << "Reading dataset: " << dataSet.getName() << "/" << dispenser.getConfigParameters().name << std::endl;
+    if(dispenser.getParameters().name != "Asimov" ){ allAsimov = false; }
+    LogInfo << "Reading dataset: " << dataSet.getName() << "/" << dispenser.getParameters().name << std::endl;
 
     dispenser.setSampleSetPtrToLoad(&_fitSampleSet_);
     dispenser.setPlotGenPtr(&_plotGenerator_);
-    if( dispenser.getConfigParameters().useMcContainer ){
+    if(dispenser.getParameters().useMcContainer ){
       usedMcContainer = true;
-      dispenser.setParSetPtrToLoad(&_parameterSetsList_);
+      dispenser.setParSetPtrToLoad(&_parameterSetList_);
+#if USE_NEW_DIALS
+      dispenser.setDialCollectionListPtr(&_dialCollections_);
+      dispenser.setEventDialCache(&_eventDialCache_);
+#endif
     }
     dispenser.load();
   }
 
+#if USE_NEW_DIALS
+  LogInfo << "Resizing dial containers..." << std::endl;
+  for( auto& dialCollection : _dialCollections_ ) {
+    if( not dialCollection.isBinned() ){ dialCollection.resizeContainers(); }
+  }
+
+  LogInfo << "Build reference cache..." << std::endl;
+  _eventDialCache_.buildReferenceCache(_fitSampleSet_, _dialCollections_);
+#endif
+
+
+  // Copy to data container
   if( usedMcContainer ){
     if( _throwAsimovToyParameters_ ){
-      for( auto& parSet : _parameterSetsList_ ){
+      LogInfo << "Throwing asimov toy parameters..." << std::endl;
+
+      for( auto& parSet : _parameterSetList_ ){
+        if( not parSet.isEnabled() ) continue;
+
+        bool keepThrow{false};
         if( parSet.isEnabledThrowToyParameters() and parSet.getPriorCovarianceMatrix() != nullptr ){
-          parSet.throwFitParameters();
-        }
-      }
+
+          while( not keepThrow ){
+            parSet.throwFitParameters();
+            keepThrow = true; // keep by default
+
+            if( _reThrowParSetIfOutOfBounds_ ){
+              LogInfo << "Checking if the thrown parameters of the set are within bounds..." << std::endl;
+
+              for( auto& par : parSet.getParameterList() ){
+                if( not std::isnan(par.getMinValue()) and par.getParameterValue() < par.getMinValue() ){
+                  keepThrow = false;
+                  LogAlert << par.getFullTitle() << ": thrown value lower than min bound ->" << std::endl;
+                  LogAlert << par.getSummary(true) << std::endl;
+                }
+                else if( not std::isnan(par.getMaxValue()) and par.getParameterValue() > par.getMaxValue() ){
+                  keepThrow = false;
+                  LogAlert << par.getFullTitle() << ": thrown value higher than max bound ->" << std::endl;
+                  LogAlert << par.getSummary(true) << std::endl;
+                }
+              }
+
+              if( not keepThrow ){
+                LogAlert << "Rethrowing \"" << parSet.getName() << "\"..." << std::endl;
+              }
+              else{
+                LogWarning << "Keeping throw..." << std::endl;
+              }
+            } // check bounds?
+          } // keep?
+        } // throw?
+      } // parSet
+    } // throw asimov?
+
+    LogInfo << "Propagating parameters on events..." << std::endl;
+
+    // Make sure before the copy to the data:
+    // At this point, MC events have been reweighted using their prior
+    // but when using eigen decomp, the conversion eigen -> original has a small computational error
+    for( auto& parSet: _parameterSetList_ ) {
+      if( parSet.isUseEigenDecompInFit() ) { parSet.propagateEigenToOriginal(); }
     }
 
-    LogInfo << "Propagating prior parameters on events..." << std::endl;
+    bool cacheManagerState = GlobalVariables::getEnableCacheManager();
+    GlobalVariables::setEnableCacheManager(false);
+    this->resetReweight();
     this->reweightMcEvents();
+    GlobalVariables::setEnableCacheManager(cacheManagerState);
 
     // Copies MC events in data container for both Asimov and FakeData event types
     LogWarning << "Copying loaded mc-like event to data container..." << std::endl;
     _fitSampleSet_.copyMcEventListToDataContainer();
 
+    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+      sample.getDataContainer().histScale = sample.getMcContainer().histScale;
+    }
+
     // back to prior
     if( _throwAsimovToyParameters_ ){
-      for( auto& parSet : _parameterSetsList_ ){
+      for( auto& parSet : _parameterSetList_ ){
         parSet.moveFitParametersToPrior();
       }
     }
@@ -194,36 +284,70 @@ void Propagator::initialize() {
   if( not allAsimov ){
     // reload everything
     // Filling the mc containers
+
+    // clearing events in MC containers
     _fitSampleSet_.clearMcContainers();
+
+    // also wiping event-by-event dials...
+    LogInfo << "Wiping event-by-event dials..." << std::endl;
+#if USE_NEW_DIALS
+    for( auto& dialCollection: _dialCollections_ ) {
+      if( not dialCollection.getGlobalDialLeafName().empty() ) {
+        dialCollection.clear();
+      }
+    }
+    _eventDialCache_ = EventDialCache();
+#else
+    for( auto& parSet : _parameterSetList_ ){
+      for( auto& par : parSet.getParameterList() ){
+        for( auto& dialSet : par.getDialSetList() ){
+          if( dialSet.getDialLeafName().empty() ) continue;
+          dialSet.getDialList().clear();
+        }
+      }
+    }
+#endif
+
     for( auto& dataSet : _dataSetList_ ){
-      if( not dataSet.isEnabled() ) continue;
+      LogContinueIf(not dataSet.isEnabled(), "Dataset \"" << dataSet.getName() << "\" is disabled. Skipping");
       auto& dispenser = dataSet.getMcDispenser();
       dispenser.setSampleSetPtrToLoad(&_fitSampleSet_);
       dispenser.setPlotGenPtr(&_plotGenerator_);
-      dispenser.setParSetPtrToLoad(&_parameterSetsList_);
+      dispenser.setParSetPtrToLoad(&_parameterSetList_);
+#if USE_NEW_DIALS
+      dispenser.setDialCollectionListPtr(&_dialCollections_);
+      dispenser.setEventDialCache(&_eventDialCache_);
+#endif
       dispenser.load();
     }
+
+#if USE_NEW_DIALS
+    LogInfo << "Resizing dial containers..." << std::endl;
+    for( auto& dialCollection : _dialCollections_ ) {
+      if( not dialCollection.isBinned() ){ dialCollection.resizeContainers(); }
+    }
+
+    LogInfo << "Build reference cache..." << std::endl;
+    _eventDialCache_.buildReferenceCache(_fitSampleSet_, _dialCollections_);
+#endif
   }
-//  else{
-//    LogDebug << "Check asimov: " << std::endl;
-//    for( auto& sample : this->getFitSampleSet().getFitSampleList() ){
-//      LogDebug << sample.getName() << std::endl;
-//      size_t nDiff{0};
-//      for( size_t iEvent = 0 ; iEvent < sample.getMcContainer().eventList.size() ; iEvent++ ){
-//        auto& mcEvent = sample.getMcContainer().eventList[iEvent];
-//        auto& dataEvent = sample.getDataContainer().eventList[iEvent];
-//        if( nDiff<15 and mcEvent.getEventWeight() != dataEvent.getEventWeight() ){
-//          nDiff++;
-//          LogDebug
-//              << mcEvent.getEventWeight() << " => " << dataEvent.getEventWeight()
-//              << " / diff: " << mcEvent.getEventWeight() - dataEvent.getEventWeight() << std::endl;
-//        }
-//      }
-//    }
-////    LogThrow("debug")
-//  }
+
+#ifdef GUNDAM_USING_CACHE_MANAGER
+  // After all the data has been loaded.  Specifically, this must be after
+  // the MC has been copied for the Asimov fit, or the "data" use the MC
+  // reweighting cache.  This must also be before the first use of
+  // reweightMcEvents.
+  if(GlobalVariables::getEnableCacheManager()) {
+#ifdef USE_NEW_DIALS
+      Cache::Manager::Build(getFitSampleSet(), _eventDialCache_);
+#else
+      Cache::Manager::Build(getFitSampleSet());
+#endif
+  }
+#endif
 
   LogInfo << "Propagating prior parameters on events..." << std::endl;
+  this->resetReweight();
   this->reweightMcEvents();
 
   LogInfo << "Set the current MC prior weights as nominal weight..." << std::endl;
@@ -233,44 +357,92 @@ void Propagator::initialize() {
     }
   }
 
-//  if( GlobalVariables::isEnableDevMode() ){
-//    LogInfo << "Loading dials stack..." << std::endl;
-//    fillDialsStack();
-//  }
+  LogInfo << "Filling up sample bin caches..." << std::endl;
+  _fitSampleSet_.updateSampleBinEventList();
 
-#ifdef GUNDAM_USING_CACHE_MANAGER
-  // After all of the data has been loaded.  Specifically, this must be after
-  // the MC has been copied for the Asimov fit, or the "data" use the MC
-  // reweighting cache.  This must also be before the first use of
-  // reweightMcEvents.
-  Cache::Manager::Build(getFitSampleSet());
-#endif
+  LogInfo << "Filling up sample histograms..." << std::endl;
+  _fitSampleSet_.updateSampleHistograms();
+
+  // Throwing stat error on data -> BINNING SHOULD BE SET!!
+  if( _throwAsimovToyParameters_ and _enableStatThrowInToys_ ){
+    LogInfo << "Throwing statistical error for data container..." << std::endl;
+
+    if( _enableEventMcThrow_ ){
+      // Take into account the finite amount of event in MC
+      LogInfo << "enableEventMcThrow is enabled: throwing individual MC events" << std::endl;
+      for( auto& sample : _fitSampleSet_.getFitSampleList() ) {
+        sample.getDataContainer().throwEventMcError();
+      }
+    }
+    else{
+      LogWarning << "enableEventMcThrow is disabled. Not throwing individual MC events" << std::endl;
+    }
+
+    LogInfo << "Throwing statistical error on histograms..." << std::endl;
+    if( _gaussStatThrowInToys_ ) {
+      LogWarning << "Using gaussian statistical throws. (caveat: distribution truncated when the bins are close to zero)" << std::endl;
+    }
+    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+      // Asimov bin content -> toy data
+      sample.getDataContainer().throwStatError(_gaussStatThrowInToys_);
+    }
+  }
+
+  LogInfo << "Locking data event containers..." << std::endl;
+  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    // Now the data won't be refilled each time
+    sample.getDataContainer().isLocked = true;
+  }
+
+  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the plot generator") << std::endl;
+  _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
+  _plotGenerator_.initialize();
+
+  LogInfo << "Saving nominal histograms..." << std::endl;
+  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    sample.getMcContainer().saveAsHistogramNominal();
+  }
+
+  _treeWriter_.setFitSampleSetPtr(&_fitSampleSet_);
+  _treeWriter_.setParSetListPtr(&_parameterSetList_);
+
+  _parScanner_.initialize();
 
   if( _showEventBreakdown_ ){
-    {
+
+    if(true){
       // STAGED MASK
       LogWarning << "Staged event breakdown:" << std::endl;
+#ifndef USE_NEW_DIALS
       Dial::enableMaskCheck = true;
+#endif
       std::vector<std::vector<double>> stageBreakdownList(
           _fitSampleSet_.getFitSampleList().size(),
-          std::vector<double>(_parameterSetsList_.size()+1, 0)
+          std::vector<double>(_parameterSetList_.size() + 1, 0)
       ); // [iSample][iStage]
       std::vector<std::string> stageTitles;
       stageTitles.emplace_back("Sample");
       stageTitles.emplace_back("No reweight");
-      for( auto& parSet : _parameterSetsList_ ){
+      for( auto& parSet : _parameterSetList_ ){
+        if( not parSet.isEnabled() ){ continue; }
         stageTitles.emplace_back("+ " + parSet.getName());
       }
 
       int iStage{0};
-      for( auto& parSet : _parameterSetsList_ ){ parSet.setMaskedForPropagation(true); }
+      for( auto& parSet : _parameterSetList_ ){
+        if( not parSet.isEnabled() ){ continue; }
+        parSet.setMaskedForPropagation(true);
+      }
+      this->resetReweight();
       this->reweightMcEvents();
       for( size_t iSample = 0 ; iSample < _fitSampleSet_.getFitSampleList().size() ; iSample++ ){
         stageBreakdownList[iSample][iStage] = _fitSampleSet_.getFitSampleList()[iSample].getMcContainer().getSumWeights();
       }
 
-      for( auto& parSet : _parameterSetsList_ ){
+      for( auto& parSet : _parameterSetList_ ){
+        if( not parSet.isEnabled() ){ continue; }
         parSet.setMaskedForPropagation(false);
+        this->resetReweight();
         this->reweightMcEvents();
         iStage++;
         for( size_t iSample = 0 ; iSample < _fitSampleSet_.getFitSampleList().size() ; iSample++ ){
@@ -289,105 +461,256 @@ void Propagator::initialize() {
         t.addTableLine(tableLine);
       }
       t.printTable();
+#ifndef USE_NEW_DIALS
       Dial::enableMaskCheck = false;
+#endif
     }
-
-
 
     LogWarning << "Sample breakdown:" << std::endl;
     GenericToolbox::TablePrinter t;
     t.setColTitles({{"Sample"},{"MC (# binned event)"},{"Data (# binned event)"}, {"MC (weighted)"}, {"Data (weighted)"}});
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
       t.addTableLine({{"\""+sample.getName()+"\""},
-                         std::to_string(sample.getMcContainer().getNbBinnedEvents()),
-                         std::to_string(sample.getDataContainer().getNbBinnedEvents()),
-                         std::to_string(sample.getMcContainer().getSumWeights()),
-                         std::to_string(sample.getDataContainer().getSumWeights())
+                      std::to_string(sample.getMcContainer().getNbBinnedEvents()),
+                      std::to_string(sample.getDataContainer().getNbBinnedEvents()),
+                      std::to_string(sample.getMcContainer().getSumWeights()),
+                      std::to_string(sample.getDataContainer().getSumWeights())
                      });
     }
     t.printTable();
   }
 
-  _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
-  _plotGenerator_.defineHistogramHolders();
+  if( _debugPrintLoadedEvents_ ){
 
-  LogInfo << "Filling up sample bin caches..." << std::endl;
-  _fitSampleSet_.updateSampleBinEventList();
+    LogDebug << GET_VAR_NAME_VALUE(_debugPrintLoadedEventsNbPerSample_) << std::endl;
+#if USE_NEW_DIALS
+    int iEvt{0};
+    for( auto& entry : _eventDialCache_.getCache() ) {
+      LogDebug << "Event #" << iEvt++ << "{" << std::endl;
+      {
+        Logger::Indent i;
+        LogDebug << entry.event->getSummary() << std::endl;
+        LogDebug << "dialCache = {";
+        for( auto& dialInterface : entry.dials ) {
+#ifndef USE_BREAKDOWN_CACHE
+          LogDebug << std::endl << "  - " << dialInterface->getSummary();
+#else
+          LogDebug << std::endl << "  - " << dialInterface.dial->getSummary();
+#endif
+        }
+        LogDebug << std::endl << "}" << std::endl;
+      }
+      LogDebug << "}" << std::endl;
+      if( iEvt >= _debugPrintLoadedEventsNbPerSample_ ) break;
+    }
+#else
+    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+      LogDebug << GenericToolbox::addUpDownBars( sample.getName() ) << std::endl;
 
-  LogInfo << "Filling up sample histograms..." << std::endl;
-  _fitSampleSet_.updateSampleHistograms();
-
-  // Now the data won't be refilled each time
-  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    if( _throwAsimovToyParameters_ and _enableStatThrowInToys_ ){ sample.getDataContainer().throwStatError(); }
-    sample.getDataContainer().isLocked = true;
-  }
-
-  _useResponseFunctions_ = JsonUtils::fetchValue<nlohmann::json>(_config_, "DEV_useResponseFunctions", false);
-  if( _useResponseFunctions_ ){ this->makeResponseFunctions(); }
-
-  if( JsonUtils::fetchValue<nlohmann::json>(_config_, "throwAsimovFitParameters", false) ){
-    for( auto& parSet : _parameterSetsList_ ){
-      for( auto& par : parSet.getParameterList() ){
-        par.setParameterValue( par.getPriorValue() );
+      int iEvt=0;
+      for( auto& ev : sample.getMcContainer().eventList ){
+        if(iEvt++ >= _debugPrintLoadedEventsNbPerSample_) { LogTrace << std::endl; break; }
+        LogTrace << iEvt << " -> " << ev.getSummary() << std::endl;
       }
     }
-    propagateParametersOnSamples();
+#endif
   }
 
-  _treeWriter_.setFitSampleSetPtr(&_fitSampleSet_);
-  _treeWriter_.setParSetListPtr(&_parameterSetsList_);
+
+  if( not _parameterInjector_.empty() ){
+
+    nlohmann::json injParsetList;
+    injParsetList = GenericToolbox::Json::fetchValue(_parameterInjector_, "parameterSetList", injParsetList);
+
+    for( auto& entryParset : injParsetList ){
+      auto parsetName = GenericToolbox::Json::fetchValue<std::string>(entryParset, "name");
+      LogInfo << "Reading injection parameters for parSet: " << parsetName << std::endl;
+
+      auto* selectedParset = this->getFitParameterSetPtr( parsetName );
+      LogThrowIf( selectedParset == nullptr, "Could not find parset: " << parsetName );
+
+      auto parValues = GenericToolbox::Json::fetchValue<nlohmann::json>(entryParset, "parameterValues");
+      if( parValues.empty() ) {
+        LogThrow( "" );
+      }
+      else if( parValues.is_string() ){
+        LogInfo << "Reading parameter values from file: " << parValues.get<std::string>() << std::endl;
+        auto parList = GenericToolbox::dumpFileAsVectorString( parValues.get<std::string>(), true );
+        LogThrowIf( parList.size() != selectedParset->getNbParameters()  ,
+                    parList.size() << " parameters provided for " << parsetName << ", expecting " << selectedParset->getNbParameters()
+                    );
+
+        for( size_t iPar = 0 ; iPar < selectedParset->getNbParameters() ; iPar++ ) {
+          LogWarning << "Injecting \"" << selectedParset->getParameterList()[iPar].getFullTitle() << "\": " << parList[iPar] << std::endl;
+          selectedParset->getParameterList()[iPar].setParameterValue( std::stod(parList[iPar]) );
+        }
+
+        if( selectedParset->isUseEigenDecompInFit() ){ selectedParset->propagateOriginalToEigen(); }
+      }
+      else{
+        for( auto& parValueEntry : parValues ){
+          if( GenericToolbox::Json::doKeyExist(parValueEntry, "name") ) {
+            auto parName = GenericToolbox::Json::fetchValue<std::string>(parValueEntry, "name");
+            auto* parPtr = selectedParset->getParameterPtr(parName);
+            LogThrowIf(parPtr == nullptr, "Could not find " << parName << " among the defined parameters in " << selectedParset->getName());
+
+            LogWarning << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
+            parPtr->setParameterValue( GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") );
+          }
+          else {
+            LogThrow("Unsupported: " << parValueEntry);
+          }
+        }
+
+
+      }
+    }
+
+  }
 
   // Propagator needs to be fast
   GlobalVariables::getParallelWorker().setCpuTimeSaverIsEnabled(false);
-
-  _isInitialized_ = true;
 }
 
-bool Propagator::isUseResponseFunctions() const {
-  return _useResponseFunctions_;
+void Propagator::setShowTimeStats(bool showTimeStats) {
+  _showTimeStats_ = showTimeStats;
 }
+void Propagator::setThrowAsimovToyParameters(bool throwAsimovToyParameters) {
+  _throwAsimovToyParameters_ = throwAsimovToyParameters;
+}
+void Propagator::setEnableEigenToOrigInPropagate(bool enableEigenToOrigInPropagate) {
+  _enableEigenToOrigInPropagate_ = enableEigenToOrigInPropagate;
+}
+void Propagator::setIThrow(int iThrow) {
+  _iThrow_ = iThrow;
+}
+void Propagator::setLoadAsimovData(bool loadAsimovData) {
+  _loadAsimovData_ = loadAsimovData;
+}
+void Propagator::setParameterInjector(const nlohmann::json &parameterInjector) {
+  _parameterInjector_ = parameterInjector;
+}
+void Propagator::setGlobalCovarianceMatrix(const std::shared_ptr<TMatrixD> &globalCovarianceMatrix) {
+  _globalCovarianceMatrix_ = globalCovarianceMatrix;
+}
+
 bool Propagator::isThrowAsimovToyParameters() const {
   return _throwAsimovToyParameters_;
 }
-FitSampleSet &Propagator::getFitSampleSet() {
-  return _fitSampleSet_;
+int Propagator::getIThrow() const {
+  return _iThrow_;
 }
-std::vector<FitParameterSet> &Propagator::getParameterSetsList() {
-  return _parameterSetsList_;
+double Propagator::getLlhBuffer() const {
+  return _llhBuffer_;
+}
+double Propagator::getLlhStatBuffer() const {
+  return _llhStatBuffer_;
+}
+double Propagator::getLlhPenaltyBuffer() const {
+  return _llhPenaltyBuffer_;
+}
+double Propagator::getLlhRegBuffer() const {
+  return _llhRegBuffer_;
+}
+const std::shared_ptr<TMatrixD> &Propagator::getGlobalCovarianceMatrix() const {
+  return _globalCovarianceMatrix_;
+}
+const EventTreeWriter &Propagator::getTreeWriter() const {
+  return _treeWriter_;
+}
+const std::vector<DatasetLoader> &Propagator::getDataSetList() const {
+  return _dataSetList_;
 }
 const std::vector<FitParameterSet> &Propagator::getParameterSetsList() const {
-  return _parameterSetsList_;
+  return _parameterSetList_;
+}
+
+FitSampleSet &Propagator::getFitSampleSet() {
+  return _fitSampleSet_;
 }
 PlotGenerator &Propagator::getPlotGenerator() {
   return _plotGenerator_;
 }
-const nlohmann::json &Propagator::getConfig() const {
-  return _config_;
+std::vector<FitParameterSet> &Propagator::getParameterSetsList() {
+  return _parameterSetList_;
+}
+std::shared_ptr<TMatrixD> &Propagator::getGlobalCovarianceMatrix(){
+  return _globalCovarianceMatrix_;
+}
+std::vector<DatasetLoader> &Propagator::getDataSetList() {
+  return _dataSetList_;
 }
 
+const FitParameterSet* Propagator::getFitParameterSetPtr(const std::string& name_) const{
+  for( auto& parSet : _parameterSetList_ ){
+    if( parSet.getName() == name_ ) return &parSet;
+  }
+  std::vector<std::string> parSetNames{};
+  for( auto& parSet : _parameterSetList_ ){ parSetNames.emplace_back(parSet.getName()); }
+  LogThrow("Could not find fit parameter set named \"" << name_ << "\" among defined: " << GenericToolbox::parseVectorAsString(parSetNames));
+  return nullptr;
+}
+FitParameterSet* Propagator::getFitParameterSetPtr(const std::string& name_){
+  for( auto& parSet : _parameterSetList_ ){
+    if( parSet.getName() == name_ ) return &parSet;
+  }
+  std::vector<std::string> parSetNames{};
+  for( auto& parSet : _parameterSetList_ ){ parSetNames.emplace_back(parSet.getName()); }
+  LogThrow("Could not find fit parameter set named \"" << name_ << "\" among defined: " << GenericToolbox::parseVectorAsString(parSetNames));
+  return nullptr;
+}
 
+void Propagator::updateLlhCache(){
+  double buffer;
+
+  // Propagate on histograms
+  this->propagateParametersOnSamples();
+
+  ////////////////////////////////
+  // Compute LLH stat
+  ////////////////////////////////
+  _llhStatBuffer_ = _fitSampleSet_.evalLikelihood();
+
+  ////////////////////////////////
+  // Compute the penalty terms
+  ////////////////////////////////
+  _llhPenaltyBuffer_ = 0;
+  for( auto& parSet : _parameterSetList_ ){
+    buffer = parSet.getPenaltyChi2();
+    _llhPenaltyBuffer_ += buffer;
+    LogThrowIf(std::isnan(buffer), parSet.getName() << " penalty chi2 is Nan");
+  }
+
+  ////////////////////////////////
+  // Compute the regularisation term
+  ////////////////////////////////
+  _llhRegBuffer_ = 0; // unused
+
+  ////////////////////////////////
+  // Total LLH
+  ////////////////////////////////
+  _llhBuffer_ = _llhStatBuffer_ + _llhPenaltyBuffer_ + _llhRegBuffer_;
+}
 void Propagator::propagateParametersOnSamples(){
 
-  // Only real parameters are propagated on the specta -> need to convert the eigen to original
-  for( auto& parSet : _parameterSetsList_ ){
-    if( parSet.isUseEigenDecompInFit() ) parSet.propagateEigenToOriginal();
+  if( _enableEigenToOrigInPropagate_ ){
+    // Only real parameters are propagated on the spectra -> need to convert the eigen to original
+    for( auto& parSet : _parameterSetList_ ){
+      if( parSet.isUseEigenDecompInFit() ) parSet.propagateEigenToOriginal();
+    }
   }
 
-  if(not _useResponseFunctions_ or not _isRfPropagationEnabled_ ){
-//    if(GlobalVariables::isEnableDevMode()) updateDialResponses();
-    reweightMcEvents();
-    refillSampleHistograms();
-  }
-  else{
-    applyResponseFunctions();
-  }
+  resetReweight();
+  reweightMcEvents();
+  refillSampleHistograms();
 
 }
-void Propagator::updateDialResponses(){
-  GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-  GlobalVariables::getParallelWorker().runJob("Propagator::updateDialResponses");
-  dialUpdate.counts++; dialUpdate.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+void Propagator::resetReweight(){
+#if USE_NEW_DIALS
+  std::for_each(_dialCollections_.begin(), _dialCollections_.end(),[&](DialCollection& dc_){
+    dc_.updateInputBuffers();
+  });
+#endif
 }
 void Propagator::reweightMcEvents() {
   bool usedGPU{false};
@@ -414,78 +737,103 @@ void Propagator::reweightMcEvents() {
   } while (false);
 #endif
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-  usedGPU = Cache::Manager::Fill();
+  if(GlobalVariables::getEnableCacheManager()) usedGPU = Cache::Manager::Fill();
 #endif
   if( not usedGPU ){
     GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-    GlobalVariables::getParallelWorker().runJob("Propagator::reweightMcEvents");
+    if( not _devSingleThreadReweight_ ){
+      GlobalVariables::getParallelWorker().runJob("Propagator::reweightMcEvents");
+    }
+    else{
+      this->reweightMcEvents(-1);
+    }
   }
   weightProp.counts++;
   weightProp.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 }
-
 void Propagator::refillSampleHistograms(){
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-  GlobalVariables::getParallelWorker().runJob("Propagator::refillSampleHistograms");
+  if( not _devSingleThreadHistFill_ ){
+    GlobalVariables::getParallelWorker().runJob("Propagator::refillSampleHistograms");
+  }
+  else{
+    refillSampleHistogramsFct(-1);
+    refillSampleHistogramsPostParallelFct();
+  }
   fillProp.counts++; fillProp.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 }
+void Propagator::throwParametersFromGlobalCovariance(){
 
-void Propagator::applyResponseFunctions(){
-  GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-  GlobalVariables::getParallelWorker().runJob("Propagator::applyResponseFunctions");
-  applyRf.counts++; applyRf.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-}
-
-void Propagator::preventRfPropagation(){
-  if(_isRfPropagationEnabled_){
-//    LogInfo << "Parameters propagation using Response Function is now disabled." << std::endl;
-    _isRfPropagationEnabled_ = false;
-  }
-}
-void Propagator::allowRfPropagation(){
-  if(not _isRfPropagationEnabled_){
-//    LogWarning << "Parameters propagation using Response Function is now ENABLED." << std::endl;
-    _isRfPropagationEnabled_ = true;
-  }
-}
-
-void Propagator::fillDialsStack(){
-  for( auto& parSet : _parameterSetsList_ ){
-    if( not parSet.isUseEigenDecompInFit() ){
-      for( auto& par : parSet.getParameterList() ){
-        for( auto& dialSet : par.getDialSetList() ){
-          if(dialSet.getGlobalDialType() == DialType::Norm){ continue; } // no cache needed
-          for( auto& dial : dialSet.getDialList() ){
-            if(dial->isReferenced()) _dialsStack_.emplace_back(dial.get());
-          } // dial
-        } // dialSet
-      } // par
+  if( _strippedCovarianceMatrix_ == nullptr ){
+    LogInfo << "Creating stripped global covariance matrix..." << std::endl;
+    LogThrowIf( _globalCovarianceMatrix_ == nullptr, "Global covariance matrix not set." );
+    int nStripped{0};
+    for( int iDiag = 0 ; iDiag < _globalCovarianceMatrix_->GetNrows() ; iDiag++ ){
+      if( (*_globalCovarianceMatrix_)[iDiag][iDiag] != 0 ){ nStripped++; }
     }
-  } // parSet
+
+    LogInfo << "Stripped global covariance matrix is " << nStripped << "x" << nStripped << std::endl;
+    _strippedCovarianceMatrix_ = std::make_shared<TMatrixD>(nStripped, nStripped);
+    int iStrippedBin{-1};
+    for( int iBin = 0 ; iBin < _globalCovarianceMatrix_->GetNrows() ; iBin++ ){
+      if( (*_globalCovarianceMatrix_)[iBin][iBin] == 0 ){ continue; }
+      iStrippedBin++;
+      int jStrippedBin{-1};
+      for( int jBin = 0 ; jBin < _globalCovarianceMatrix_->GetNrows() ; jBin++ ){
+        if( (*_globalCovarianceMatrix_)[jBin][jBin] == 0 ){ continue; }
+        jStrippedBin++;
+        (*_strippedCovarianceMatrix_)[iStrippedBin][jStrippedBin] = (*_globalCovarianceMatrix_)[iBin][jBin];
+      }
+    }
+
+    _strippedParameterList_.reserve( nStripped );
+    for( auto& parSet : _parameterSetList_ ){
+      if( not parSet.isEnabled() ) continue;
+      for( auto& par : parSet.getParameterList() ){
+        if( not par.isEnabled() ) continue;
+        _strippedParameterList_.emplace_back(&par);
+      }
+    }
+    LogThrowIf( _strippedParameterList_.size() != nStripped, "Enabled parameters list don't correspond to the matrix" );
+  }
+
+  if( _choleskyMatrix_ == nullptr ){
+    LogInfo << "Generating global cholesky matrix" << std::endl;
+    _choleskyMatrix_ = std::shared_ptr<TMatrixD>(
+        GenericToolbox::getCholeskyMatrix(_strippedCovarianceMatrix_.get())
+    );
+  }
+
+  auto throws = GenericToolbox::throwCorrelatedParameters(_choleskyMatrix_.get());
+  for( int iPar = 0 ; iPar < _choleskyMatrix_->GetNrows() ; iPar++ ){
+    _strippedParameterList_[iPar]->setParameterValue(
+        _strippedParameterList_[iPar]->getPriorValue()
+        + throws[iPar]
+    );
+  }
+
+  // Making sure eigen decomposed parameters get the conversion done
+  for( auto& parSet : _parameterSetList_ ){
+    if( parSet.isUseEigenDecompInFit() ){ parSet.propagateOriginalToEigen(); }
+  }
+
 }
 
 
 // Protected
 void Propagator::initializeThreads() {
-
-  std::function<void(int)> reweightMcEventsFct = [this](int iThread){
+  reweightMcEventsFct = [this](int iThread){
     this->reweightMcEvents(iThread);
   };
   GlobalVariables::getParallelWorker().addJob("Propagator::reweightMcEvents", reweightMcEventsFct);
 
-  std::function<void(int)> updateDialResponsesFct = [this](int iThread){
-    this->updateDialResponses(iThread);
-  };
-  GlobalVariables::getParallelWorker().addJob("Propagator::updateDialResponses", updateDialResponsesFct);
-
-
-  std::function<void(int)> refillSampleHistogramsFct = [this](int iThread){
+  refillSampleHistogramsFct = [this](int iThread){
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
       sample.getMcContainer().refillHistogram(iThread);
       sample.getDataContainer().refillHistogram(iThread);
     }
   };
-  std::function<void()> refillSampleHistogramsPostParallelFct = [this](){
+  refillSampleHistogramsPostParallelFct = [this](){
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
       sample.getMcContainer().rescaleHistogram();
       sample.getDataContainer().rescaleHistogram();
@@ -493,101 +841,32 @@ void Propagator::initializeThreads() {
   };
   GlobalVariables::getParallelWorker().addJob("Propagator::refillSampleHistograms", refillSampleHistogramsFct);
   GlobalVariables::getParallelWorker().setPostParallelJob("Propagator::refillSampleHistograms", refillSampleHistogramsPostParallelFct);
-
-  std::function<void(int)> applyResponseFunctionsFct = [this](int iThread){
-    this->applyResponseFunctions(iThread);
-  };
-  GlobalVariables::getParallelWorker().addJob("Propagator::applyResponseFunctions", applyResponseFunctionsFct);
-}
-
-void Propagator::makeResponseFunctions(){
-  LogWarning << __METHOD_NAME__ << std::endl;
-
-  this->preventRfPropagation(); // make sure, not yet setup
-
-  for( auto& parSet : _parameterSetsList_ ){
-    for( auto& par : parSet.getParameterList() ){
-      par.setParameterValue(par.getPriorValue());
-    }
-  }
-  this->propagateParametersOnSamples();
-
-  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    _nominalSamplesMcHistogram_[&sample] = std::shared_ptr<TH1D>((TH1D*) sample.getMcContainer().histogram->Clone());
-  }
-
-  for( auto& parSet : _parameterSetsList_ ){
-    for( auto& par : parSet.getParameterList() ){
-      LogInfo << "Make RF for " << parSet.getName() << "/" << par.getTitle() << std::endl;
-      par.setParameterValue(par.getPriorValue() + par.getStdDevValue());
-
-      this->propagateParametersOnSamples();
-
-      for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-        _responseFunctionsSamplesMcHistogram_[&sample].emplace_back(std::shared_ptr<TH1D>((TH1D*) sample.getMcContainer().histogram->Clone()) );
-        GenericToolbox::transformBinContent(_responseFunctionsSamplesMcHistogram_[&sample].back().get(), [&](TH1D* h_, int b_){
-          h_->SetBinContent(
-              b_,
-              (h_->GetBinContent(b_)/_nominalSamplesMcHistogram_[&sample]->GetBinContent(b_))-1);
-          h_->SetBinError(b_,0);
-        });
-      }
-
-      par.setParameterValue(par.getPriorValue());
-    }
-  }
-  this->propagateParametersOnSamples(); // back to nominal
-
-  // WRITE
-  if( _saveDir_ != nullptr ){
-    auto* rfDir = GenericToolbox::mkdirTFile(_saveDir_, "RF");
-    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-      GenericToolbox::mkdirTFile(rfDir, "nominal")->cd();
-      _nominalSamplesMcHistogram_[&sample]->Write(Form("nominal_%s", sample.getName().c_str()));
-
-      int iPar = -1;
-      auto* devDir = GenericToolbox::mkdirTFile(rfDir, "deviation");
-      for( auto& parSet : _parameterSetsList_ ){
-        auto* parSetDir = GenericToolbox::mkdirTFile(devDir, parSet.getName());
-        for( auto& par : parSet.getParameterList() ){
-          iPar++;
-          GenericToolbox::mkdirTFile(parSetDir, par.getTitle())->cd();
-          _responseFunctionsSamplesMcHistogram_[&sample].at(iPar)->Write(Form("dev_%s", sample.getName().c_str()));
-        }
-      }
-    }
-    _saveDir_->cd();
-  }
-
-  LogInfo << "RF built" << std::endl;
-}
-
-void Propagator::updateDialResponses(int iThread_){
-  int nThreads = GlobalVariables::getNbThreads();
-  if(iThread_ == -1){
-    // force single thread
-    nThreads = 1;
-    iThread_ = 0;
-  }
-  int iDial{0};
-  int nDials(int(_dialsStack_.size()));
-
-  while( iDial < nDials ){
-    _dialsStack_[iDial]->evalResponse();
-    iDial += nThreads;
-  }
-
 }
 
 void Propagator::reweightMcEvents(int iThread_) {
+
+  //! Warning: everything you modify here, may significantly slow down the fitter
+
+#if USE_NEW_DIALS
+//  _eventDialCache_.propagate(iThread_, GlobalVariables::getNbThreads());
+  auto start = _eventDialCache_.getCache().begin();
+  auto end = _eventDialCache_.getCache().end();
+
+  if( iThread_ != -1 and GlobalVariables::getNbThreads() != 1 ){
+    start = _eventDialCache_.getCache().begin() + Long64_t(iThread_)*(Long64_t(_eventDialCache_.getCache().size())/GlobalVariables::getNbThreads());
+    if( iThread_+1 != GlobalVariables::getNbThreads() ){
+      end = _eventDialCache_.getCache().begin() + (Long64_t(iThread_) + 1) * (Long64_t(_eventDialCache_.getCache().size())/GlobalVariables::getNbThreads());
+    }
+  }
+
+  std::for_each(start, end, &EventDialCache::reweightEntry);
+#else
   int nThreads = GlobalVariables::getNbThreads();
   if(iThread_ == -1){
     // force single thread
     nThreads = 1;
     iThread_ = 0;
   }
-
-  //! Warning: everything you modify here, may significantly slow down the fitter
   long nToProcess;
   long offset;
   std::vector<PhysicsEvent>* eList;
@@ -605,62 +884,8 @@ void Propagator::reweightMcEvents(int iThread_) {
           );
     }
   );
-}
-void Propagator::applyResponseFunctions(int iThread_){
+#endif
 
-  TH1D* histBuffer{nullptr};
-  TH1D* nominalHistBuffer{nullptr};
-  TH1D* rfHistBuffer{nullptr};
-  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    histBuffer = sample.getMcContainer().histogram.get();
-    nominalHistBuffer = _nominalSamplesMcHistogram_[&sample].get();
-    for( int iBin = 1 ; iBin <= histBuffer->GetNbinsX() ; iBin++ ){
-      if( iBin % GlobalVariables::getNbThreads() != iThread_ ) continue;
-      histBuffer->SetBinContent(iBin, nominalHistBuffer->GetBinContent(iBin));
-    }
-  }
 
-  int iPar = -1;
-  for( auto& parSet : _parameterSetsList_ ){
-    for( auto& par : parSet.getParameterList() ){
-      iPar++;
-      double xSigmaPar = par.getDistanceFromNominal();
-      if( xSigmaPar == 0 ) continue;
-
-      for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-        histBuffer = sample.getMcContainer().histogram.get();
-        nominalHistBuffer = _nominalSamplesMcHistogram_[&sample].get();
-        rfHistBuffer = _responseFunctionsSamplesMcHistogram_[&sample][iPar].get();
-
-        for( int iBin = 1 ; iBin <= histBuffer->GetNbinsX() ; iBin++ ){
-          if( iBin % GlobalVariables::getNbThreads() != iThread_ ) continue;
-          histBuffer->SetBinContent(
-              iBin,
-              histBuffer->GetBinContent(iBin) * ( 1 + xSigmaPar * rfHistBuffer->GetBinContent(iBin) )
-          );
-        }
-      }
-    }
-  }
-
-  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-    histBuffer = sample.getMcContainer().histogram.get();
-    nominalHistBuffer = _nominalSamplesMcHistogram_[&sample].get();
-    for( int iBin = 1 ; iBin <= histBuffer->GetNbinsX() ; iBin++ ){
-      if( iBin % GlobalVariables::getNbThreads() != iThread_ ) continue;
-      histBuffer->SetBinError(iBin, TMath::Sqrt(histBuffer->GetBinContent(iBin)));
-//      if( iThread_ == 0 ){
-//        LogTrace << GET_VAR_NAME_VALUE(iBin)
-//        << " / " << GET_VAR_NAME_VALUE(histBuffer->GetBinContent(iBin))
-//        << " / " << GET_VAR_NAME_VALUE(nominalHistBuffer->GetBinContent(iBin))
-//        << std::endl;
-//      }
-    }
-  }
 
 }
-
-const EventTreeWriter &Propagator::getTreeWriter() const {
-  return _treeWriter_;
-}
-

@@ -2,13 +2,19 @@
 // Created by Nadrino on 21/05/2021.
 //
 
-#include "Dial.h"
-#include "DialSet.h"
 #include "FitParameterSet.h"
 
 #include "Logger.h"
 
 #include "sstream"
+
+// Unset for this file since the entire file is deprecated.
+#ifdef USE_NEW_DIALS
+#undef USE_NEW_DIALS
+#endif
+
+#include "Dial.h"
+#include "DialSet.h"
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[Dial]");
@@ -20,14 +26,7 @@ bool Dial::enableMaskCheck{false};
 bool Dial::disableDialCache{false};
 bool Dial::throwIfResponseIsNegative{true};
 
-Dial::Dial(DialType::DialType dialType_) : _dialType_{dialType_} {}
-Dial::~Dial() = default;
-
-void Dial::reset() {
-  _dialResponseCache_ = std::nan("Unset");
-  _dialParameterCache_ = std::nan("Unset");
-  _applyConditionBin_ = nullptr;
-}
+Dial::Dial(DialType::DialType dialType_, const DialSet *owner_) : _dialType_{dialType_}, _owner_(owner_) {}
 
 void Dial::setApplyConditionBin(DataBin *applyConditionBin) {
   _applyConditionBin_ = applyConditionBin;
@@ -40,8 +39,8 @@ void Dial::setOwner(const DialSet* dialSetPtr) {
 }
 
 void Dial::initialize() {
-  LogThrowIf( _dialType_ == DialType::Invalid, "_dialType_ is not set." )
-  LogThrowIf(_owner_ == nullptr, "Owner not set.")
+  LogThrowIf( _dialType_ == DialType::Invalid, "_dialType_ is not set." );
+  LogThrowIf( _owner_ == nullptr, "Owner not set." );
 }
 
 bool Dial::isReferenced() const {
@@ -86,11 +85,13 @@ double Dial::getEffectiveDialParameter(double parameterValue_){
   return parameterValue_;
 }
 double Dial::capDialResponse(double response_){
-  // Cap checks
-  if     (_owner_->getMinDialResponse() == _owner_->getMinDialResponse() and response_ < _owner_->getMinDialResponse() ){ response_=_owner_->getMinDialResponse(); }
-  else if(_owner_->getMaxDialResponse() == _owner_->getMaxDialResponse() and response_ > _owner_->getMaxDialResponse() ){ response_=_owner_->getMaxDialResponse(); }
+  LogThrowIf( std::isnan(response_), "NaN response returned:" << std::endl << this->Dial::getSummary());
 
-  LogThrowIf( response_ != response_, "NaN response returned:" << std::endl << this->getSummary());
+  // Cap checks
+  if     ( not std::isnan(_owner_->getMinDialResponse()) and response_ < _owner_->getMinDialResponse() ){ response_=_owner_->getMinDialResponse(); }
+  else if( not std::isnan(_owner_->getMaxDialResponse()) and response_ > _owner_->getMaxDialResponse() ){ response_=_owner_->getMaxDialResponse(); }
+  else if ( std::isnan(_owner_->getMinDialResponse()) and response_ < 0.0 ){ response_=0.0; }
+
   if( Dial::throwIfResponseIsNegative and response_ < 0 ){
     this->writeSpline("");
     LogError << this->getSummary() << std::endl;
@@ -113,7 +114,7 @@ double Dial::evalResponse(double parameterValue_) {
   if( _dialParameterCache_ == parameterValue_ ){ return _dialResponseCache_; }
 
   // If we reach this point, we either need to compute the response or wait for another thread to make the update.
-#if __cplusplus >= 201703L // https://stackoverflow.com/questions/26089319/is-there-a-standard-definition-for-cplusplus-in-c14
+#if HAS_CPP_17 // https://stackoverflow.com/questions/26089319/is-there-a-standard-definition-for-cplusplus-in-c14
   std::scoped_lock<std::mutex> g(_evalDialLock_); // There can be only one.
 #else
   std::lock_guard<std::mutex> g(_evalDialLock_); // There can be only one.
@@ -168,6 +169,3 @@ std::string Dial::getSummary(){
 //      new TSpline3(Form("%p", this), &xSigmaSteps[0], &yResponse[0], int(xSigmaSteps.size()))
 //  );
 //}
-
-
-

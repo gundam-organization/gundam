@@ -4,7 +4,7 @@
 
 #include "FitSample.h"
 #include "GlobalVariables.h"
-#include "JsonUtils.h"
+#include "GenericToolbox.Json.h"
 
 #include "GenericToolbox.h"
 #include "Logger.h"
@@ -19,51 +19,28 @@ LoggerInit([]{
 });
 
 
-FitSample::FitSample() { this->reset(); }
-FitSample::~FitSample() { this->reset(); }
-
-void FitSample::reset() {
-  // YAML
-  _config_.clear();
-  _isEnabled_ = false;
-  _name_ = "";
-  _selectionCuts_ = "";
-  _enabledDatasetList_.clear();
-  _mcNorm_ = 1;
-  _dataNorm_ = 1;
-
-  // Internals
-  _binning_.reset();
-  _mcContainer_ = SampleElement();
-  _dataContainer_ = SampleElement();
-}
-
-void FitSample::setConfig(const nlohmann::json &config_) {
-  _config_ = config_;
-}
-
-void FitSample::initialize() {
-
-  LogAssert(not _config_.empty(), GET_VAR_NAME_VALUE(_config_.empty()))
-
-  _name_ = JsonUtils::fetchValue<std::string>(_config_, "name");
+void FitSample::readConfigImpl(){
+  _name_ = GenericToolbox::Json::fetchValue(_config_, "name", _name_);
   LogThrowIf(
       GenericToolbox::doesStringContainsSubstring(_name_, "/"),
-      "Invalid sample name: \"" << _name_ << "\": should not have '/'.")
+      "Invalid sample name: \"" << _name_ << "\": should not have '/'.");
 
-  _isEnabled_ = JsonUtils::fetchValue(_config_, "isEnabled", true);
-  if( not _isEnabled_ ){
-    LogWarning << "\"" << _name_ << "\" is disabled." << std::endl;
-    return;
-  }
+  _binningFilePath_ = GenericToolbox::Json::fetchValue(_config_, {{"binningFilePath"}, {"binningFile"}, {"binning"}}, _binningFilePath_);
+
+  _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", true);
+  LogReturnIf(not _isEnabled_, "\"" << _name_ << "\" is disabled.");
+
+  _selectionCutStr_ = GenericToolbox::Json::fetchValue(_config_, {{"selectionCutStr"}, {"selectionCuts"}}, _selectionCutStr_);
+  _enabledDatasetList_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"datasets", "dataSets"}, _enabledDatasetList_);
+  _mcNorm_ = GenericToolbox::Json::fetchValue(_config_, "mcNorm", _mcNorm_);
+  _dataNorm_ = GenericToolbox::Json::fetchValue(_config_, "dataNorm", _dataNorm_);
+}
+void FitSample::initializeImpl() {
+  if( not _isEnabled_ ) return;
 
   LogInfo << "Initializing FitSample: " << _name_ << std::endl;
 
-  _selectionCuts_ = JsonUtils::fetchValue(_config_, "selectionCuts", _selectionCuts_);
-  _enabledDatasetList_ = JsonUtils::fetchValue(_config_, std::vector<std::string>{"datasets", "dataSets"}, _enabledDatasetList_);
-  _mcNorm_ = JsonUtils::fetchValue(_config_, "mcNorm", _mcNorm_);
-  _dataNorm_ = JsonUtils::fetchValue(_config_, "dataNorm", _dataNorm_);
-  _binning_.readBinningDefinition( JsonUtils::fetchValue<std::string>(_config_, "binning") );
+  _binning_.readBinningDefinition(_binningFilePath_ );
 
   TH1::SetDefaultSumw2(true);
 
@@ -87,14 +64,39 @@ void FitSample::initialize() {
   _dataContainer_.histogram->SetDirectory(nullptr);
 }
 
+void FitSample::setName(const std::string &name) {
+  _name_ = name;
+}
+void FitSample::setIndex(int index) {
+  _index_ = index;
+}
+void FitSample::setBinningFilePath(const std::string &binningFilePath_) {
+  _binningFilePath_ = binningFilePath_;
+}
+void FitSample::setSelectionCutStr(const std::string &selectionCutStr_) {
+  _selectionCutStr_ = selectionCutStr_;
+}
+void FitSample::setVarSelectionFormulaStr(const std::string &varSelectionFormulaStr_){
+  _varSelectionFormulaStr_ = varSelectionFormulaStr_;
+}
+void FitSample::setEnabledDatasetList(const std::vector<std::string>& enabledDatasetList_){
+  _enabledDatasetList_ = enabledDatasetList_;
+}
+
 bool FitSample::isEnabled() const {
   return _isEnabled_;
+}
+int FitSample::getIndex() const {
+  return _index_;
 }
 const std::string &FitSample::getName() const {
   return _name_;
 }
 const std::string &FitSample::getSelectionCutsStr() const {
-  return _selectionCuts_;
+  return _selectionCutStr_;
+}
+const std::string &FitSample::getVarSelectionFormulaStr() const {
+  return _varSelectionFormulaStr_;
 }
 const DataBinSet &FitSample::getBinning() const {
   return _binning_;

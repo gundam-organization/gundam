@@ -14,7 +14,7 @@
 
 #include "Logger.h"
 LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache]");
+  Logger::setUserHeaderStr("[Cache::Weight::GeneralSpline]");
 });
 
 // The constructor
@@ -23,7 +23,8 @@ Cache::Weight::GeneralSpline::GeneralSpline(
     Cache::Parameters::Values& parameters,
     Cache::Parameters::Clamps& lowerClamps,
     Cache::Parameters::Clamps& upperClamps,
-    std::size_t splines, std::size_t knots)
+    std::size_t splines, std::size_t knots,
+    std::string spaceOption)
     : Cache::Weight::Base("generalSpline",weights,parameters),
       fLowerClamp(lowerClamps), fUpperClamp(upperClamps),
       fSplinesReserved(splines), fSplinesUsed(0),
@@ -39,7 +40,14 @@ Cache::Weight::GeneralSpline::GeneralSpline(
 
     // Calculate the space needed to store the spline data.  This needs
     // to know how the spline data is packed for CalculateGeneralSpline.
-    fSplineKnotsReserved = 2*fSplinesReserved + 3*fSplineKnotsReserved;
+    if (spaceOption == "points") {
+        fSplineKnotsReserved = 2*fSplinesReserved + 3*fSplineKnotsReserved;
+    }
+    else {
+        LogThrowIf(spaceOption != "space",
+                   "Invalid space option for compact splines");
+    }
+
 
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning Using SLOW VALIDATION in Cache::Weight::GeneralSpline::GeneralSpline
@@ -97,7 +105,7 @@ int Cache::Weight::GeneralSpline::FindPoints(const TSpline3* s) {
 }
 
 void Cache::Weight::GeneralSpline::AddSpline(int resIndex, int parIndex,
-                                             SplineDial* sDial) {
+                                             const std::vector<double>& splineData) {
     if (resIndex < 0) {
         LogError << "Invalid result index"
                << std::endl;
@@ -118,7 +126,7 @@ void Cache::Weight::GeneralSpline::AddSpline(int resIndex, int parIndex,
                << std::endl;
         throw std::runtime_error("Parameter index out of bounds");
     }
-    if (sDial->getSplineData().size() < 11) {
+    if (splineData.size() < 11) {
         LogError << "Insufficient points in spline"
                << std::endl;
         throw std::runtime_error("Invalid number of spline points");
@@ -137,22 +145,17 @@ void Cache::Weight::GeneralSpline::AddSpline(int resIndex, int parIndex,
         throw std::runtime_error("Problem with control indices");
     }
     int knotIndex = fSplineKnotsUsed;
-    fSplineKnotsUsed += sDial->getSplineData().size();
+    fSplineKnotsUsed += splineData.size();
     if (fSplineKnotsUsed > fSplineKnotsReserved) {
         LogError << "Not enough space reserved for spline knots"
                << std::endl;
         throw std::runtime_error("Not enough space reserved for spline knots");
     }
     fSplineIndex->hostPtr()[newIndex+1] = fSplineKnotsUsed;
-    for (std::size_t i = 0; i<sDial->getSplineData().size(); ++i) {
-        fSplineKnots->hostPtr()[knotIndex+i] = sDial->getSplineData().at(i);
+    for (std::size_t i = 0; i<splineData.size(); ++i) {
+        fSplineKnots->hostPtr()[knotIndex+i] = splineData.at(i);
     }
 
-#ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in Cache::Weight::GeneralSpline::AddSpline
-    sDial->setCacheManagerName(GetName());
-    sDial->setCacheManagerValuePointer(GetCachePointer(newIndex));
-#endif
 }
 
 int Cache::Weight::GeneralSpline::GetSplineParameterIndex(int sIndex) {

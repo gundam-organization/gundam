@@ -2,6 +2,11 @@
 // Created by Adrien BLANCHET on 22/03/2022.
 //
 
+// Unset for this file since the entire file is deprecated.
+#ifdef USE_NEW_DIALS
+#undef USE_NEW_DIALS
+#endif
+
 #include "NestedDialTest.h"
 
 #include "Logger.h"
@@ -43,9 +48,9 @@ double NestedDialTest::eval(const std::vector<Dial*>& dialRefList_) {
 
 void NestedDialTest::readConfig(){
   if( _config_.empty() ) return;
-  this->setName(JsonUtils::fetchValue(_config_, "name", ""));
-  this->setApplyConditionStr(JsonUtils::fetchValue<std::string>(_config_, "applyCondition"));
-  this->setFormulaStr(JsonUtils::fetchValue<std::string>(_config_, "evalFormula"));
+  this->setName(GenericToolbox::Json::fetchValue(_config_, "name", ""));
+  this->setApplyConditionStr(GenericToolbox::Json::fetchValue<std::string>(_config_, "applyCondition"));
+  this->setFormulaStr(GenericToolbox::Json::fetchValue<std::string>(_config_, "evalFormula"));
 }
 void NestedDialTest::updateDialResponseCache(const std::vector<Dial*>& dialRefList_) {
   auto dialIt = dialRefList_.begin();
@@ -54,4 +59,3 @@ void NestedDialTest::updateDialResponseCache(const std::vector<Dial*>& dialRefLi
     (*valIt) = (*dialIt)->evalResponse();
   }
 }
-

@@ -13,7 +13,7 @@
 
 #include "Logger.h"
 LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache]");
+  Logger::setUserHeaderStr("[Cache::Weights]");
 });
 
 // The constructor
@@ -56,9 +56,6 @@ Cache::Weights::Weights(
               fInitialValues->hostPtr() + fInitialValues->size(),
               1.0);
 }
-
-// The destructor
-Cache::Weights::~Weights() {}
 
 double Cache::Weights::GetResult(int i) {
     if (i < 0) throw;

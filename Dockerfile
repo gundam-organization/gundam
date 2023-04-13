@@ -1,6 +1,8 @@
 FROM rootproject/root as base
 
-RUN apt install git libyaml-cpp-dev -y
+RUN apt-get dist-upgrade -y 
+RUN apt-get update && apt-get upgrade -y
+RUN apt-get install git libyaml-cpp-dev -y
 
 ENV WORK_DIR /home/work
 RUN mkdir -p $WORK_DIR
@@ -29,4 +31,8 @@ RUN cd $REPO_DIR/gundam && \
       -D CMAKE_INSTALL_PREFIX=$INSTALL_DIR \
 #      -D WITH_CUDA=ON \
       $REPO_DIR/gundam && \
-    make -j3 install
+    make -j3 install && \
+    . $INSTALL_DIR/setup.sh && \
+    CTEST_OUTPUT_ON_FAILURE=1 make test
+
+# End of the file

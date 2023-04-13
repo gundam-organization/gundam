@@ -5,8 +5,15 @@
 #ifndef GUNDAM_FITPARAMETERSET_H
 #define GUNDAM_FITPARAMETERSET_H
 
-#include "vector"
-#include "string"
+#include "FitParameter.h"
+#ifndef USE_NEW_DIALS
+#include "NestedDialTest.h"
+#endif
+#include "JsonBaseClass.h"
+#include "ParameterThrowerMarkHarz.h"
+
+#include "Logger.h"
+#include "GenericToolbox.CorrelatedVariablesSampler.h"
 
 #include "nlohmann/json.hpp"
 #include "TMatrixDSym.h"
@@ -16,10 +23,8 @@
 #include "TVectorT.h"
 #include "TMatrixDSymEigen.h"
 
-#include "Logger.h"
-
-#include "FitParameter.h"
-#include "NestedDialTest.h"
+#include "vector"
+#include "string"
 
 
 /*
@@ -30,103 +35,108 @@
  *
  * */
 
-class FitParameterSet {
+class FitParameterSet : public JsonBaseClass  {
 
 public:
-  FitParameterSet();
-  virtual ~FitParameterSet();
-
-  void reset();
+  // Post-init
+  void processCovarianceMatrix(); // invert the matrices, and make sure fixed parameters are detached from correlations
 
   // Setters
-  void setConfig(const nlohmann::json &config_);
-  void setSaveDir(TDirectory* saveDir_);
-
-  // Init
-  void initialize();
-
-  // Post-init
-  void prepareFitParameters(); // invert the matrices, and make sure fixed parameters are detached from correlations
+  void setMaskedForPropagation(bool maskedForPropagation_);
 
   // Getters
-  bool isEnabled() const;
-  bool isEnabledThrowToyParameters() const;
-  bool isUseOnlyOneParameterPerEvent() const;
-  const std::string &getName() const;
+  [[nodiscard]] bool isEnabled() const;
+  [[nodiscard]] bool isEnablePca() const;
+  [[nodiscard]] bool isUseEigenDecompInFit() const;
+  [[nodiscard]] bool isEnabledThrowToyParameters() const;
+  [[nodiscard]] bool isUseOnlyOneParameterPerEvent() const;
+  [[nodiscard]] bool isMaskedForPropagation() const;
+  [[nodiscard]] int getNbEnabledEigenParameters() const;
+  [[nodiscard]] size_t getNbParameters() const;
+  [[nodiscard]] const std::string &getName() const;
+  [[nodiscard]] const TMatrixD* getInvertedEigenVectors() const;
+  [[nodiscard]] const TMatrixD* getEigenVectors() const;
+  [[nodiscard]] const nlohmann::json &getDialSetDefinitions() const;
+  [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCorrelationMatrix() const;
+  [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const;
+  [[nodiscard]] const std::vector<nlohmann::json>& getCustomFitParThrow() const;
+  [[nodiscard]] const std::vector<FitParameter> &getParameterList() const;
+  [[nodiscard]] const std::vector<FitParameter>& getEffectiveParameterList() const;
+
   std::vector<FitParameter> &getParameterList();
   std::vector<FitParameter> &getEigenParameterList();
-  const std::vector<FitParameter> &getParameterList() const;
-  const nlohmann::json &getConfig() const;
-  const std::shared_ptr<TMatrixDSym> &getPriorCorrelationMatrix() const;
-  const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const;
   std::vector<FitParameter>& getEffectiveParameterList();
-  const std::vector<FitParameter>& getEffectiveParameterList() const;
-  bool isMaskedForPropagation() const;
 
   // Core
-  size_t getNbParameters() const;
   double getPenaltyChi2();
 
   // Throw / Shifts
   void moveFitParametersToPrior();
   void throwFitParameters(double gain_ = 1);
 
-  bool isUseEigenDecompInFit() const;
-  int getNbEnabledEigenParameters() const;
-  const TMatrixD* getInvertedEigenVectors() const;
-  const TMatrixD* getEigenVectors() const;
   void propagateEigenToOriginal();
   void propagateOriginalToEigen();
 
   // Misc
-  std::string getSummary() const;
+  FitParameter* getParameterPtr(const std::string& parName_);
+  [[nodiscard]] std::string getSummary() const;
 
   static double toNormalizedParRange(double parRange, const FitParameter& par);
   static double toNormalizedParValue(double parValue, const FitParameter& par);
   static double toRealParValue(double normParValue, const FitParameter& par);
   static double toRealParRange(double normParRange, const FitParameter& par);
-
-  void setMaskedForPropagation(bool maskedForPropagation);
+  static bool isValidCorrelatedParameter(const FitParameter& par_);
 
 protected:
-  void passIfInitialized(const std::string& methodName_) const;
+  void readConfigImpl() override;
+  void initializeImpl() override;
 
-  void initializeFromConfig();
   void readParameterDefinitionFile();
-  void readConfigOptions();
-
   void defineParameters();
-
   void fillDeltaParameterList();
 
 private:
-  // User parameters
-  nlohmann::json _config_;
-
   // Internals
-  bool _isInitialized_{false};
   std::vector<FitParameter> _parameterList_;
+#ifndef USE_NEW_DIALS
   std::vector<NestedDialTest> _nestedDialList_;
-  TDirectory* _saveDir_{nullptr};
+#endif
 
   // JSON
-  std::string _name_;
+  std::string _name_{};
   std::string _parameterDefinitionFilePath_{};
+  std::string _covarianceMatrixTMatrixD_{};
+  std::string _parameterPriorTVectorD_{};
+  std::string _parameterNameTObjArray_{};
+  std::string _parameterLowerBoundsTVectorD_{};
+  std::string _parameterUpperBoundsTVectorD_{};
+  std::string _throwEnabledListPath_{};
+  nlohmann::json _parameterDefinitionConfig_{};
+  nlohmann::json _dialSetDefinitions_{};
   bool _isEnabled_{};
+  bool _useMarkGenerator_{false};
+  bool _useEigenDecompForThrows_{false};
   bool _maskedForPropagation_{false};
+  bool _printDialSetsSummary_{false};
+  bool _printParametersSummary_{false};
+  bool _releaseFixedParametersOnHesse_{false};
+  bool _devUseParLimitsOnEigen_{false};
   int _nbParameterDefinition_{-1};
-  double _nominalStepSize_{-1};
+  double _nominalStepSize_{std::nan("unset")};
   int _maxNbEigenParameters_{-1};
   double _maxEigenFraction_{1};
 
   double _globalParameterMinValue_{std::nan("UNSET")};
   double _globalParameterMaxValue_{std::nan("UNSET")};
 
+  std::vector<nlohmann::json> _customFitParThrow_{};
+
   // Eigen objects
   int _nbEnabledEigen_{0};
+  bool _enablePca_{false};
   bool _useEigenDecompInFit_{false};
   bool _useOnlyOneParameterPerEvent_{false};
-  std::vector<FitParameter> _eigenParameterList_;
+  std::vector<FitParameter> _eigenParameterList_{};
   std::shared_ptr<TMatrixDSymEigen> _eigenDecomp_{nullptr};
 
   // Toy throwing
@@ -156,6 +166,8 @@ private:
   std::shared_ptr<TVectorD>  _deltaParameterList_{nullptr}; // difference from prior
 
   std::shared_ptr<TMatrixD> _choleskyMatrix_{nullptr};
+  GenericToolbox::CorrelatedVariablesSampler _correlatedVariableThrower_{};
+  std::shared_ptr<ParameterThrowerMarkHarz> _markHartzGen_{nullptr};
 
 };
 

@@ -1,6 +1,6 @@
 # GUNDAM — 風をあつめて 
 
-![](./resources/images/banner2.png)
+![](./resources/images/bannerv2.png)
 
 [![Generic badge](https://img.shields.io/badge/Example_of_inputs-OA2020-GREEN.svg)](https://github.com/nadrino/gundamInputOa2020)  [![GitHub forks](https://badgen.net/github/forks/nadrino/gundam/)](https://github.com/nadrino/gundam/network/members) [![GitHub release](https://img.shields.io/github/release/nadrino/gundam.svg)](https://github.com/nadrino/gundam/releases/)
 
@@ -9,12 +9,6 @@ of applications which aims at performing various statistical analysis with diffe
 purposes and setups. It has been developed as a fork of 
 [xsllhFitter](https://gitlab.com/cuddandr/xsLLhFitter), in the context of the Upgrade
 of ND280 for the T2K neutrino experiment.
-
-
-The main framework offers a code structure which is capable of  handling parameters/errors
-propagation on a model and compare to experimental data. As an example, GUNDAM includes
-a likelihood-based fitter which was initially designed  to reproduce T2K's BANFF fit as
-a proof of concept.
 
 The applications are intended to be fully configurable with a set of YAML/JSON files, as
 the philosophy of this project is to avoid users having to put their hands into the code
@@ -109,34 +103,47 @@ Pull the latest version on github with the following commands:
 ```bash
 cd $REPO_DIR/gundam
 git pull
-git submodule update --remote
 git checkout $(git describe --tags `git rev-list --tags --max-count=1`)
+git submodule update --init --recursive
 cd -
 ```
 
+### Alternative installation procedure
 
-### Compiling on macOS?
+```bash
+cd $REPO_DIR/gundam
+cd cmake
+./gundam-setup.sh
+./gundam-build.sh
+```
 
-[Click here for the compilation guide on macOS](./resources/guides/installOnMacOs.md)
+this will create the build directory `gundam-${compiler}_${compiler_version}-${compiler_machine}`.
 
-![](./resources/guides/images/macOsLogo.png)
+### Compiling on macOS:
 
-
-### Compiling on CCLyon?
-
-[Click here for the compilation guide on CCLyon](./resources/guides/installOnCCLyon.md)
-
-![](./resources/guides/images/cc_in2p3_logo.png)
-
-
-### Compiling on LXPLUS?
-
-[TO BE DONE](./resources/guides/.md)
-
-![](./resources/guides/images/lxplusLogo.png)
+[![](./resources/guides/images/macOsLogo.png)](./resources/guides/installOnMacOs.md)
 
 
-### Input examples
+### Compiling on CCLyon:
+
+[![](./resources/guides/images/cc_in2p3_logo.png)](./resources/guides/installOnCCLyon.md)
+
+
+### Compiling on HPC:
+
+[![](./resources/guides/images/hpcLogo.png)](./resources/guides/installOnHpc.md)
+
+
+### Compiling on LXPLUS: - TO BE DONE
+
+[![](./resources/guides/images/lxplusLogo.png)](./resources/guides/.md)
+
+
+
+
+### Input documentation
+
+[gundamFitter options](./documentation/applications/gundamFitter.md)
 
 ## I want to contribute!
 
@@ -151,3 +158,14 @@ analysis, and provide an expandable base on which future studies with the *Upgra
 ND280 Detectors* will be performed.
 
 ![](./resources/images/ride.png)
+
+### Development policy 
+
+- Main development of the code should take place in the main branch.
+- Code developments must be discussed with the group before they happen.
+- Developments should happen in a feature brach with a name descriptive of the feature you are developing. 
+- Commit messages must be detailed. This means that messages like "Minor fix" or "Update" must be avoided.
+- Pull requests and merge request do not need to be merged by an admin but all the CI tests must be successfull before merging.
+- Avoid pull request for a single commit. 
+- Forks are allowed and the usage of the forked code is regulated by the code license. 
+- Share of the code is regulated by the code license. 

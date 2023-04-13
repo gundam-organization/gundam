@@ -7,6 +7,7 @@
 
 #include "FitSampleSet.h"
 #include "PhysicsEvent.h"
+#include "JsonBaseClass.h"
 
 #include "GenericToolbox.Wrappers.h"
 
@@ -25,6 +26,8 @@
 struct HistHolder{
   // Hist
   std::shared_ptr<TH1D> histPtr{nullptr};
+//  GenericToolbox::NoCopyWrapper<std::unique_ptr<TH1D>> histPtr;
+//  TH1D hist;
 
   // Path
   std::string folderPath;
@@ -74,58 +77,53 @@ struct CanvasHolder{
 
 
 
-class PlotGenerator {
+class PlotGenerator : public JsonBaseClass {
 
 public:
-  PlotGenerator();
-  virtual ~PlotGenerator();
-
-  // Reset
-  void reset();
-
   // Setters
-  void setConfig(const nlohmann::json &config_);
   void setFitSampleSetPtr(const FitSampleSet *fitSampleSetPtr);
 
-  // Init
-  void initialize();
-  void defineHistogramHolders();
-
   // Getters
+  bool isEmpty() const;
   const std::vector<HistHolder> &getHistHolderList(int cacheSlot_ = 0) const;
   const std::vector<HistHolder> &getComparisonHistHolderList() const;
   std::map<std::string, std::shared_ptr<TCanvas>> getBufferCanvasList() const;
 
   // Core
-  bool isEmpty() const;
-
   void generateSamplePlots(TDirectory *saveDir_ = nullptr, int cacheSlot_ = 0);
   void generateSampleHistograms(TDirectory *saveDir_ = nullptr, int cacheSlot_ = 0);
   void generateCanvas(const std::vector<HistHolder> &histHolderList_, TDirectory *saveDir_ = nullptr, bool stackHist_ = true);
-
   void generateComparisonPlots(const std::vector<HistHolder> &histsToStackOther_, const std::vector<HistHolder> &histsToStackReference_, TDirectory *saveDir_ = nullptr);
   void generateComparisonHistograms(const std::vector<HistHolder> &histList_, const std::vector<HistHolder> &refHistsList_, TDirectory *saveDir_ = nullptr);
 
   // Misc
   std::vector<std::string> fetchListOfVarToPlot(bool isData_ = false);
   std::vector<std::string> fetchListOfSplitVarNames();
-  std::vector<std::string> fetchRequestedLeafNames();
 
+  void defineHistogramHolders();
 protected:
+  void readConfigImpl() override;
+  void initializeImpl() override;
+
+  // Internals
   void buildEventBinCache(const std::vector<HistHolder *> &histPtrToFillList, const std::vector<PhysicsEvent> *eventListPtr, bool isData_);
 
 private:
-  nlohmann::json _config_;
-  const FitSampleSet* _fitSampleSetPtr_{nullptr};
+  // Parameters
+  bool _writeGeneratedHistograms_{false};
   int _maxLegendLength_{15};
-
-  // Internals
   nlohmann::json _varDictionary_;
   nlohmann::json _canvasParameters_;
   nlohmann::json _histogramsDefinition_;
-  std::vector<Color_t> defaultColorWheel;
+  std::vector<Color_t> defaultColorWheel {
+      kGreen-3, kTeal+3, kAzure+7,
+      kCyan-2, kBlue-7, kBlue+2,
+      kOrange+1, kOrange+9, kRed+2, kPink+9
+  };
 
-  std::vector<std::vector<HistHolder>> _histHolderCacheList_;
+  // Internals
+  const FitSampleSet* _fitSampleSetPtr_{nullptr};
+  std::vector<std::vector<HistHolder>> _histHolderCacheList_{};
   std::vector<HistHolder> _comparisonHistHolderList_;
   std::map<std::string, std::shared_ptr<TCanvas>> _bufferCanvasList_;
 

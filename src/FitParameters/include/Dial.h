@@ -18,6 +18,11 @@
 #include "mutex"
 #include "memory"
 
+#ifdef USE_NEW_DIALS
+#define DEPRECATED [[deprecated("Not used with new dial implementation")]]
+#else
+#define DEPRECATED /*[[deprecated("Not used with new dial implementation")]]*/
+#endif
 
 namespace DialType{
   ENUM_EXPANDER(
@@ -32,7 +37,7 @@ namespace DialType{
 class DialSet; // owner
 class DialWrapper;
 
-class Dial {
+class DEPRECATED Dial {
 
 public:
   // Don't check the mask everytime since it is memory delocalized
@@ -42,13 +47,11 @@ public:
 
 protected:
   // Not supposed to define a bare Dial. Use the downcast instead
-  explicit Dial(DialType::DialType dialType_);
+  explicit Dial(DialType::DialType dialType_, const DialSet *owner_);
 
 public:
-  virtual ~Dial();
+  virtual ~Dial() = default;
   virtual std::unique_ptr<Dial> clone() const = 0;
-
-  virtual void reset();
 
   void setApplyConditionBin(DataBin *applyConditionBin);
   void setIsReferenced(bool isReferenced);

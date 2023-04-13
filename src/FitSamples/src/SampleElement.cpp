@@ -22,6 +22,9 @@ void SampleElement::reserveEventMemory(size_t dataSetIndex_, size_t nEvents, con
   dataSetIndexList.emplace_back(dataSetIndex_);
   eventOffSetList.emplace_back(eventList.size());
   eventNbList.emplace_back(nEvents);
+  LogInfo << name << ": creating " << eventNbList.back() << " events ("
+  << GenericToolbox::parseSizeUnits( double(eventNbList.back()) * sizeof(eventBuffer_) )
+  << ")" << std::endl;
   eventList.resize(eventOffSetList.back()+eventNbList.back(), eventBuffer_);
 }
 void SampleElement::shrinkEventList(size_t newTotalSize_){
@@ -31,7 +34,8 @@ void SampleElement::shrinkEventList(size_t newTotalSize_){
              "Can't shrink since eventList is too small: " << GET_VAR_NAME_VALUE(newTotalSize_)
              << " > " << GET_VAR_NAME_VALUE(eventList.size()));
   LogThrowIf(not eventNbList.empty() and eventNbList.back() < (eventList.size() - newTotalSize_), "Can't shrink since eventList of the last dataSet is too small.");
-  LogInfo << "-> Shrinking " << eventList.size() << " to " << newTotalSize_ << "..." << std::endl;
+  LogInfo << name << ": shrinking event list from " << eventList.size() << " to " << newTotalSize_ << "..."
+  << "(+" << GenericToolbox::parseSizeUnits( double(eventList.size() - newTotalSize_) * sizeof(eventList.back()) ) << ")" << std::endl;
   eventNbList.back() -= (eventList.size() - newTotalSize_);
   eventList.resize(newTotalSize_);
   eventList.shrink_to_fit();
@@ -95,34 +99,23 @@ void SampleElement::refillHistogram(int iThread_){
   if( isLocked ) return;
 
   int nbThreads = GlobalVariables::getNbThreads();
-  if( iThread_ == -1 ){
-    nbThreads = 1;
-    iThread_ = 0;
-  }
+  if( iThread_ == -1 ){ nbThreads = 1; iThread_ = 0; }
 
-#ifdef GUNDAM_USING_CACHE_MANAGER
-  // Size = Nbins + 2 overflow (0 and last)
-  auto* binContentArray = histogram->GetArray();
+  // Faster that pointer shifter. -> would be slower if refillHistogram is
+  // handled by the propagator
   int iBin = iThread_;
   int nBins = int(perBinEventPtrList.size());
-  if (_CacheManagerValue_) {
-      if (_CacheManagerValid_ && !(*_CacheManagerValid_)) {
-          // This is slowish, but will make sure that the cached result is
-          // updated when the cache has changed.  The values pointed to by
-          // _CacheManagerResult_ and _CacheManagerValid_ are inside
-          // of the weights cache (a bit of evil coding here), and are
-          // updated by the cache.  The update is triggered by
-          // _CacheManagerUpdate().
-          if (_CacheManagerUpdate_) (*_CacheManagerUpdate_)();
-      }
-  }
+  auto* binContentArray = histogram->GetArray();
+  auto* binErrorArray = histogram->GetSumw2()->GetArray();
   while( iBin < nBins ) {
-    double content = 0.0;
-    double sumw2 = 0.0;
-    if (_CacheManagerValue_ && 0 <= _CacheManagerIndex_) {
-        content = _CacheManagerValue_[_CacheManagerIndex_+iBin];
+    binContentArray[iBin + 1] = 0; 
+    binErrorArray[iBin + 1] = 0;
+#ifdef GUNDAM_USING_CACHE_MANAGER
+    if (_CacheManagerValue_!=nullptr and _CacheManagerIndex_ >= 0) {
+      binContentArray[iBin + 1] += _CacheManagerValue_[_CacheManagerIndex_+iBin];
+      binErrorArray[iBin + 1] += binContentArray[iBin + 1]*binContentArray[iBin + 1];
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
-        double slowValue = 0.0;
+      double slowValue = 0.0;
         for( auto* eventPtr : perBinEventPtrList.at(iBin)){
             slowValue += eventPtr->getEventWeight();
         }
@@ -136,70 +129,85 @@ void SampleElement::refillHistogram(int iThread_){
                     << " " << delta
                     << std::endl;
         }
-#endif
+#endif // CACHE_MANAGER_SLOW_VALIDATION
     }
     else {
-        for( auto* eventPtr : perBinEventPtrList.at(iBin)){
-            content += eventPtr->getEventWeight();
-            sumw2 += eventPtr->getEventWeight() * eventPtr->getEventWeight();
-        }
+//      LogThrow(GET_VAR_NAME_VALUE(_CacheManagerValue_) << " / " << GET_VAR_NAME_VALUE(_CacheManagerIndex_)); // debug
+#endif // GUNDAM_USING_CACHE_MANAGER
+      for (auto *eventPtr: perBinEventPtrList[iBin]) {
+        binContentArray[iBin + 1] += eventPtr->getEventWeight();
+        binErrorArray[iBin + 1] += eventPtr->getEventWeight() * eventPtr->getEventWeight();
+      }
+    LogThrowIf(std::isnan(binContentArray[iBin + 1]));
+#ifdef GUNDAM_USING_CACHE_MANAGER
     }
-    binContentArray[iBin+1] = content;
-    histogram->GetSumw2()->GetArray()[iBin+1] = sumw2;
-    iBin += nbThreads;
-  }
-#else
-  // Faster that pointer shifter. -> would be slower if refillHistogram is
-  // handled by the propagator
-  int iBin = iThread_;
-  int nBins = int(perBinEventPtrList.size());
-  auto* binContentArray = histogram->GetArray();
-  auto* binErrorArray = histogram->GetSumw2()->GetArray();
-  while( iBin < nBins ) {
-    binContentArray[iBin + 1] = 0; 
-    binErrorArray[iBin + 1] = 0;
-    for (auto *eventPtr: perBinEventPtrList[iBin]) {
-      binContentArray[iBin + 1] += eventPtr->getEventWeight();
-      binErrorArray[iBin + 1]   += eventPtr->getEventWeight() * eventPtr->getEventWeight();
-    }
+#endif // GUNDAM_USING_CACHE_MANAGER
     iBin += nbThreads;
   }
 
-//  std::vector<PhysicsEvent*>* binEvList = &perBinEventPtrList[0] + iThread_;
-//  auto* bin = &histogram->GetArray()[1] + iThread_;
-//  auto* errBin = &histogram->GetSumw2()->GetArray()[1] + iThread_;
-//  while( binEvList <= &perBinEventPtrList.back() ) {
-//    *bin = 0;
-//    std::for_each(
-//        binEvList->begin(), binEvList->end(),
-//        [&](PhysicsEvent* e){ *bin += e->getEventWeight(); }
-//        );
-//    *errBin = *bin;
-//    binEvList += nbThreads;
-//    bin += nbThreads;
-//    errBin += nbThreads;
-//  }
-#endif
 }
 void SampleElement::rescaleHistogram() {
   if( isLocked ) return;
   if( histScale != 1 ) histogram->Scale(histScale);
 }
+void SampleElement::saveAsHistogramNominal(){
+  histogramNominal = std::make_shared<TH1D>(*histogram);
+}
 
-void SampleElement::throwStatError(){
+void SampleElement::throwEventMcError(){
+  /*
+ * This is to take into account the finite amount of event
+ * */
+  double weightSum;
+  for( int iBin = 1 ; iBin <= histogram->GetNbinsX() ; iBin++ ){
+    weightSum = 0;
+    for (auto *eventPtr: perBinEventPtrList[iBin-1]) {
+      // gRandom->Poisson(1) -> returns an INT -> can be 0
+      eventPtr->setEventWeight(gRandom->Poisson(1) * eventPtr->getEventWeight());
+      weightSum += eventPtr->getEventWeight();
+    }
+    histogram->SetBinContent(iBin, weightSum);
+  }
+}
+void SampleElement::throwStatError(bool useGaussThrow_){
+  /*
+   * This is to convert "Asimov" histogram to toy-experiment (pseudo-data), i.e. with statistical fluctuations
+   * */
   int nCounts;
   for( int iBin = 1 ; iBin <= histogram->GetNbinsX() ; iBin++ ){
-    nCounts = gRandom->Poisson(histogram->GetBinContent(iBin));
-    for (auto *eventPtr: perBinEventPtrList[iBin-1]) {
-      eventPtr->setEventWeight(eventPtr->getEventWeight()*((double)nCounts/histogram->GetBinContent(iBin)));
+    if( histogram->GetBinContent(iBin) != 0 ){
+      if( not useGaussThrow_ ){
+        nCounts = gRandom->Poisson(histogram->GetBinContent(iBin));
+      }
+      else{
+        nCounts = std::max(
+            int( gRandom->Gaus(histogram->GetBinContent(iBin), TMath::Sqrt(histogram->GetBinContent(iBin))) )
+            , 0 // if the throw is negative, cap it to 0
+            );
+      }
+      for (auto *eventPtr: perBinEventPtrList[iBin-1]) {
+        // make sure refill of the histogram will produce the same hist
+        eventPtr->setEventWeight( eventPtr->getEventWeight()*( (double) nCounts/histogram->GetBinContent(iBin)) );
+      }
+      histogram->SetBinContent(iBin, nCounts);
     }
-    histogram->SetBinContent(iBin, nCounts);
   }
 }
 
 double SampleElement::getSumWeights() const{
-  return std::accumulate(eventList.begin(), eventList.end(), double(0.),
-                         [](double sum_, const PhysicsEvent& ev_){ return sum_ + ev_.getEventWeight(); });
+  double output = std::accumulate(eventList.begin(), eventList.end(), double(0.),
+                                  [](double sum_, const PhysicsEvent& ev_){ return sum_ + ev_.getEventWeight(); });
+
+  if( std::isnan(output) ){
+    for( auto& event : eventList ){
+      if( std::isnan(event.getEventWeight()) ){
+        event.print();
+      }
+    }
+    LogThrow("NAN getSumWeights");
+  }
+
+  return output;
 }
 size_t SampleElement::getNbBinnedEvents() const{
   return std::accumulate(eventList.begin(), eventList.end(), size_t(0.),

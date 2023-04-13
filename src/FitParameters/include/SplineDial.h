@@ -12,20 +12,23 @@
 #include "memory"
 #include "string"
 
+#ifdef USE_NEW_DIALS
+#warning Not used with new dial implementation
+#endif
+
 class SplineDial : public Dial {
 
 public:
-  SplineDial();
-  std::unique_ptr<Dial> clone() const override { return std::make_unique<SplineDial>(*this); }
-
-  void reset() override;
+  explicit SplineDial(const DialSet* owner_);
+  explicit SplineDial(const DialSet* owner_, const TGraph& graph_);
+  [[nodiscard]] std::unique_ptr<Dial> clone() const override { return std::make_unique<SplineDial>(*this); }
 
   void copySpline(const TSpline3* splinePtr_);
   void createSpline(TGraph* grPtr_);
 
   void initialize() override;
 
-  const TSpline3* getSplinePtr() const;
+  [[nodiscard]] const TSpline3* getSplinePtr() const;
   std::string getSummary() override;
 
   double calcDial(double parameterValue_) override;
@@ -51,7 +54,7 @@ protected:
   FastSpliner fs;
 #endif
 
-#ifndef USE_TSPLINE3_EVAL
+#ifndef USE_TSPLINE3_EVAL // aka with CacheManager
 public:
   typedef enum {
     Undefined,  // This should not occur

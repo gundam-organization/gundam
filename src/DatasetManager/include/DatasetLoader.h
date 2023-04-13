@@ -9,6 +9,7 @@
 #include "FitParameterSet.h"
 #include <FitSampleSet.h>
 #include "PlotGenerator.h"
+#include "JsonBaseClass.h"
 
 #include <TChain.h>
 #include "nlohmann/json.hpp"
@@ -17,46 +18,49 @@
 #include "string"
 
 
-class DatasetLoader {
+class DatasetLoader : public JsonBaseClass {
 
 public:
-  DatasetLoader();
-  virtual ~DatasetLoader();
+  DatasetLoader(const nlohmann::json& config_, int datasetIndex_);
 
-  void reset();
-
-  void setConfig(const nlohmann::json &config_);
   void setDataSetIndex(int dataSetIndex);
 
-  void initialize();
-
-  bool isEnabled() const;
-  const std::string &getName() const;
-  int getDataSetIndex() const;
-
-  bool isShowSelectedEventCount() const;
-
-  const std::string &getSelectedDataEntry() const;
-  const std::string &getToyDataEntry() const;
+  [[nodiscard]] bool isEnabled() const;
+  [[nodiscard]] bool isShowSelectedEventCount() const;
+  [[nodiscard]] bool isDevSingleThreadEventLoaderAndIndexer() const;
+  [[nodiscard]] bool isDevSingleThreadEventSelection() const;
+  [[nodiscard]] bool isSortLoadedEvents() const;
+  [[nodiscard]] int getDataSetIndex() const;
+  [[nodiscard]] const std::string &getName() const;
+  [[nodiscard]] const std::string &getSelectedDataEntry() const;
+  [[nodiscard]] const std::string &getToyDataEntry() const;
 
   DataDispenser &getMcDispenser();
   DataDispenser &getSelectedDataDispenser();
   DataDispenser &getToyDataDispenser();
   std::map<std::string, DataDispenser> &getDataDispenserDict();
 
-private:
-  nlohmann::json _config_;
+  void updateDispenserOwnership();
 
-  // internals
-  bool _isInitialized_{false};
+protected:
+  void readConfigImpl() override;
+  void initializeImpl() override;
+
+private:
+  // config
   bool _isEnabled_{false};
   bool _showSelectedEventCount_{true};
   int _dataSetIndex_{-1};
-  std::string _name_;
+  std::string _name_{};
   std::string _selectedDataEntry_{"Asimov"};
   std::string _selectedToyEntry_{"Asimov"};
 
-  DataDispenser _mcDispenser_;
+  bool _sortLoadedEvents_{false};
+  bool _devSingleThreadEventLoaderAndIndexer_{false};
+  bool _devSingleThreadEventSelection_{false};
+
+  // internals
+  DataDispenser _mcDispenser_{this};
   std::map<std::string, DataDispenser> _dataDispenserDict_;
 
 };

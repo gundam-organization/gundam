@@ -1,8 +1,8 @@
 set(SRCFILES
-        src/DataSetLoader.cpp
+        src/DatasetLoader.cpp
         src/EventTreeWriter.cpp
         src/DataDispenser.cpp
-)
+    )
 
 set(HEADERS
         include/DatasetLoader.h
@@ -19,7 +19,12 @@ endif()
 target_include_directories(GundamDatasetManager PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-target_link_libraries( GundamDatasetManager GundamFitParameters GundamFitSamples ${ROOT_LIBRARIES} )
+target_link_libraries( GundamDatasetManager
+        GundamFitParameters
+        GundamFitSamples
+        GundamDialDictionary
+        ${ROOT_LIBRARIES}
+        )
 
 #set_target_properties(GundamDatasetManager PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")
 

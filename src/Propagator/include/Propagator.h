@@ -11,101 +11,113 @@
 #include "EventTreeWriter.h"
 #include "FitSampleSet.h"
 #include "FitParameterSet.h"
+#include "JsonBaseClass.h"
+#include "ParScanner.h"
+#include "DialCollection.h"
+#include "EventDialCache.h"
 
 #include "GenericToolbox.CycleTimer.h"
-
-#include "nlohmann/json.hpp"
 
 #include <vector>
 #include <map>
 #include <future>
 
-class Propagator {
+class Propagator : public JsonBaseClass {
 
 public:
-  Propagator();
-  virtual ~Propagator();
-
-  // Initialize
-  void reset();
-
   // Setters
-  void setConfig(const nlohmann::json &config);
-  void setSaveDir(TDirectory *saveDir);
   void setShowTimeStats(bool showTimeStats);
   void setThrowAsimovToyParameters(bool throwAsimovToyParameters);
+  void setEnableEigenToOrigInPropagate(bool enableEigenToOrigInPropagate);
   void setIThrow(int iThrow);
   void setLoadAsimovData(bool loadAsimovData);
+  void setParameterInjector(const nlohmann::json &parameterInjector);
+  void setGlobalCovarianceMatrix(const std::shared_ptr<TMatrixD> &globalCovarianceMatrix);
 
-  // Init
-  void initialize();
+  // Const getters
+  [[nodiscard]] bool isThrowAsimovToyParameters() const;
+  [[nodiscard]] int getIThrow() const;
+  [[nodiscard]] double getLlhBuffer() const;
+  [[nodiscard]] double getLlhStatBuffer() const;
+  [[nodiscard]] double getLlhPenaltyBuffer() const;
+  [[nodiscard]] double getLlhRegBuffer() const;
+  [[nodiscard]] const EventTreeWriter &getTreeWriter() const;
+  [[nodiscard]] const std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix() const;
+  [[nodiscard]] const std::vector<DatasetLoader> &getDataSetList() const;
+  [[nodiscard]] const std::vector<FitParameterSet> &getParameterSetsList() const;
 
-  // Getters
-  bool isUseResponseFunctions() const;
-  bool isThrowAsimovToyParameters() const;
+  // Non-const getters
+  std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix();
   FitSampleSet &getFitSampleSet();
-  std::vector<FitParameterSet> &getParameterSetsList();
-  const std::vector<FitParameterSet> &getParameterSetsList() const;
   PlotGenerator &getPlotGenerator();
-  const nlohmann::json &getConfig() const;
-  const EventTreeWriter &getTreeWriter() const;
+  ParScanner& getParScanner(){ return _parScanner_; }
+  std::vector<FitParameterSet> &getParameterSetsList();
+  std::vector<DatasetLoader> &getDataSetList();
+
+  // Misc getters
+  double* getLlhBufferPtr(){ return &_llhBuffer_; }
+  double* getLlhStatBufferPtr(){ return &_llhStatBuffer_; }
+  double* getLlhPenaltyBufferPtr(){ return &_llhPenaltyBuffer_; }
+  double* getLlhRegBufferPtr(){ return &_llhRegBuffer_; }
+
+  [[nodiscard]] const FitParameterSet* getFitParameterSetPtr(const std::string& name_) const;
+  [[nodiscard]] FitParameterSet* getFitParameterSetPtr(const std::string& name_);
 
   // Core
+  void updateLlhCache();
   void propagateParametersOnSamples();
-  void updateDialResponses();
+  void resetReweight();
   void reweightMcEvents();
   void refillSampleHistograms();
-  void applyResponseFunctions();
-
-  // Switches
-  void preventRfPropagation();
-  void allowRfPropagation();
-
-  // Monitor
-
-  // Dev
-  void fillDialsStack();
+  void throwParametersFromGlobalCovariance();
 
 protected:
+  void readConfigImpl() override;
+  void initializeImpl() override;
+
   void initializeThreads();
 
-  void makeResponseFunctions();
-
-  // multi-threaded
-  void updateDialResponses(int iThread_);
+  // multithreading
   void reweightMcEvents(int iThread_);
-  void applyResponseFunctions(int iThread_);
 
 private:
   // Parameters
   bool _showTimeStats_{false};
   bool _loadAsimovData_{false};
-  TDirectory* _saveDir_{nullptr};
-  nlohmann::json _config_;
+  bool _debugPrintLoadedEvents_{false};
+  int _debugPrintLoadedEventsNbPerSample_{5};
+  nlohmann::json _parameterInjector_;
 
   // Internals
   bool _throwAsimovToyParameters_{false};
+  bool _reThrowParSetIfOutOfBounds_{true};
   bool _enableStatThrowInToys_{true};
+  bool _gaussStatThrowInToys_{false};
+  bool _enableEventMcThrow_{true};
+  bool _enableEigenToOrigInPropagate_{true};
   int _iThrow_{-1};
-  bool _isInitialized_{false};
-  bool _useResponseFunctions_{false};
-  bool _isRfPropagationEnabled_{false};
+  double _llhBuffer_{0};
+  double _llhStatBuffer_{0};
+  double _llhPenaltyBuffer_{0};
+  double _llhRegBuffer_{0};
+  std::shared_ptr<TMatrixD> _globalCovarianceMatrix_{nullptr};
+  std::shared_ptr<TMatrixD> _strippedCovarianceMatrix_{nullptr};
+  std::shared_ptr<TMatrixD> _choleskyMatrix_{nullptr};
+  std::vector<FitParameter*> _strippedParameterList_{};
+
+  bool _devSingleThreadReweight_{false};
+  bool _devSingleThreadHistFill_{false};
+
+  // Sub-layers
   FitSampleSet _fitSampleSet_;
   PlotGenerator _plotGenerator_;
   EventTreeWriter _treeWriter_;
-  std::vector<FitParameterSet> _parameterSetsList_;
+  ParScanner _parScanner_{this};
+  std::vector<FitParameterSet> _parameterSetList_;
   std::vector<DatasetLoader> _dataSetList_;
-  std::shared_ptr<TMatrixD> _globalCovarianceMatrix_;
 
   // Monitoring
   bool _showEventBreakdown_{true};
-
-  // Response functions (WIP)
-  std::map<FitSample*, std::shared_ptr<TH1D>> _nominalSamplesMcHistogram_;
-  std::map<FitSample*, std::vector<std::shared_ptr<TH1D>>> _responseFunctionsSamplesMcHistogram_;
-
-  // DEV
-  std::vector<Dial*> _dialsStack_;
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   // Build the precalculated caches.  This is only relevant when using a GPU
@@ -123,14 +135,24 @@ private:
   std::map<const FitParameter*, int> _gpuParameterIndex_;
 #endif
 
+  // DEV
+#if USE_NEW_DIALS
+  // A vector of all the dial collections used by all of the fit samples.
+  // Once a dial collection has been added to this vector, it's index becomes
+  // the immutable tag for that specific group of dials.
+  std::vector<DialCollection> _dialCollections_{};
+  EventDialCache _eventDialCache_{};
+#endif
+
+  // parallel holders
+  std::function<void(int)> reweightMcEventsFct;
+  std::function<void(int)> refillSampleHistogramsFct;
+  std::function<void()> refillSampleHistogramsPostParallelFct;
+
 public:
   GenericToolbox::CycleTimer dialUpdate;
   GenericToolbox::CycleTimer weightProp;
   GenericToolbox::CycleTimer fillProp;
-  GenericToolbox::CycleTimer applyRf;
-
-  long long nbWeightProp = 0;
-  long long cumulatedWeightPropTime = 0;
 
 };
 

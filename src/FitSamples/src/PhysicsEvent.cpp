@@ -3,7 +3,10 @@
 //
 
 #include "PhysicsEvent.h"
+
+#ifndef USE_NEW_DIALS
 #include "SplineDial.h"
+#endif
 
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
@@ -14,22 +17,8 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[PhysicsEvent]");
 });
 
-PhysicsEvent::PhysicsEvent() { this->reset(); }
-PhysicsEvent::~PhysicsEvent() { this->reset(); }
-
-void PhysicsEvent::reset() {
-  _commonLeafNameListPtr_ = nullptr;
-  _leafContentList_.clear();
-  _rawDialPtrList_.clear();
-
-  // Weight carriers
-  _dataSetIndex_=-1;
-  _entryIndex_=-1;
-  _treeWeight_ = 1;
-  _nominalWeight_ = 1;
-  _eventWeight_ = 1;
-  _sampleBinIndex_ = -1;
-}
+PhysicsEvent::PhysicsEvent() = default;
+PhysicsEvent::~PhysicsEvent()  = default;
 
 void PhysicsEvent::setCommonLeafNameListPtr(const std::shared_ptr<std::vector<std::string>>& commonLeafNameListPtr_){
   _commonLeafNameListPtr_ = commonLeafNameListPtr_;
@@ -70,7 +59,7 @@ double PhysicsEvent::getNominalWeight() const {
 double PhysicsEvent::getEventWeight() const {
 #ifdef GUNDAM_USING_CACHE_MANAGER
     if (_CacheManagerValue_) {
-        if (_CacheManagerValid_ && !(*_CacheManagerValid_)) {
+        if (_CacheManagerValid_!=nullptr and not (*_CacheManagerValid_)) {
             // This is slowish, but will make sure that the cached result is
             // updated when the cache has changed.  The values pointed to by
             // _CacheManagerValue_ and _CacheManagerValid_ are inside
@@ -120,7 +109,8 @@ double PhysicsEvent::getEventWeight() const {
         // calculated after Cache::Manager::Fill
         return _eventWeight_;
 #endif
-        return *_CacheManagerValue_;
+      LogThrowIf(*_CacheManagerValue_!=*_CacheManagerValue_, "Nan weight: " << this->getSummary());
+      return *_CacheManagerValue_;
     }
 #endif
     return _eventWeight_;
@@ -141,12 +131,16 @@ const std::vector<std::vector<GenericToolbox::AnyType>> &PhysicsEvent::getLeafCo
 std::vector<std::vector<GenericToolbox::AnyType>> &PhysicsEvent::getLeafContentList(){
   return _leafContentList_;
 }
+
+#if USE_NEW_DIALS
+#else
 std::vector<Dial *> &PhysicsEvent::getRawDialPtrList() {
   return _rawDialPtrList_;
 }
 const std::vector<Dial *> &PhysicsEvent::getRawDialPtrList() const{
   return _rawDialPtrList_;
 }
+#endif
 
 void PhysicsEvent::copyOnlyExistingLeaves(const PhysicsEvent& other_){
   LogThrowIf(_commonLeafNameListPtr_ == nullptr, "_commonLeafNameListPtr_ not set")
@@ -161,6 +155,9 @@ void PhysicsEvent::addEventWeight(double weight_){
 void PhysicsEvent::resetEventWeight(){
   _eventWeight_ = _treeWeight_;
 }
+
+#if USE_NEW_DIALS
+#else
 void PhysicsEvent::reweightUsingDialCache(){
 
 #ifdef USE_ACCUMULATE_PHYSICSEVENT
@@ -370,6 +367,7 @@ void PhysicsEvent::reweightUsingDialCache(){
 //  }
 #endif
 }
+#endif
 
 int PhysicsEvent::findVarIndex(const std::string& leafName_, bool throwIfNotFound_) const{
   LogThrowIf(_commonLeafNameListPtr_ == nullptr, "Can't " << __METHOD_NAME__ << " while _commonLeafNameListPtr_ is empty.");
@@ -399,8 +397,9 @@ double PhysicsEvent::getVarAsDouble(int varIndex_, size_t arrayIndex_) const{
   if( _varToDoubleCache_.empty() ) return _leafContentList_[varIndex_][arrayIndex_].getValueAsDouble();
   else{
     // if using double cache:
-    if( _varToDoubleCache_[varIndex_][arrayIndex_] == _varToDoubleCache_[varIndex_][arrayIndex_] ) return _varToDoubleCache_[varIndex_][arrayIndex_];
-    else _varToDoubleCache_[varIndex_][arrayIndex_] = _leafContentList_[varIndex_][arrayIndex_].getValueAsDouble();
+    if( std::isnan(_varToDoubleCache_[varIndex_][arrayIndex_]) ){
+      return _varToDoubleCache_[varIndex_][arrayIndex_] = _leafContentList_[varIndex_][arrayIndex_].getValueAsDouble();
+    }
     return _varToDoubleCache_[varIndex_][arrayIndex_];
   }
 }
@@ -413,7 +412,7 @@ void PhysicsEvent::fillBuffer(const std::vector<int>& indexList_, std::vector<do
 }
 
 
-double PhysicsEvent::evalFormula(TFormula* formulaPtr_, std::vector<int>* indexDict_) const{
+double PhysicsEvent::evalFormula(const TFormula* formulaPtr_, std::vector<int>* indexDict_) const{
   LogThrowIf(formulaPtr_ == nullptr, GET_VAR_NAME_VALUE(formulaPtr_));
 
   std::vector<double> parArray(formulaPtr_->GetNpar());
@@ -427,9 +426,8 @@ double PhysicsEvent::evalFormula(TFormula* formulaPtr_, std::vector<int>* indexD
 
 std::string PhysicsEvent::getSummary() const {
   std::stringstream ss;
-  ss << "PhysicsEvent :";
 
-  ss << std::endl << GET_VAR_NAME_VALUE(_dataSetIndex_);
+  ss << GET_VAR_NAME_VALUE(_dataSetIndex_);
   ss << std::endl << GET_VAR_NAME_VALUE(_entryIndex_);
   ss << std::endl << GET_VAR_NAME_VALUE(_treeWeight_);
   ss << std::endl << GET_VAR_NAME_VALUE(_nominalWeight_);
@@ -449,6 +447,8 @@ std::string PhysicsEvent::getSummary() const {
     ss << std::endl << "}";
   }
 
+#if USE_NEW_DIALS
+#else
   ss << std::endl << "_rawDialPtrList_: {";
   if( not _rawDialPtrList_.empty() ){
     for( auto* dialPtr : _rawDialPtrList_ ){
@@ -461,12 +461,16 @@ std::string PhysicsEvent::getSummary() const {
   else{
     ss << "}";
   }
-  ss << std::endl << "===========================";
+#endif
+
   return ss.str();
 }
 void PhysicsEvent::print() const {
   LogInfo << *this << std::endl;
 }
+
+#if USE_NEW_DIALS
+#else
 void PhysicsEvent::trimDialCache(){
   size_t newSize{0};
   for( auto& dial : _rawDialPtrList_ ){
@@ -502,7 +506,9 @@ void PhysicsEvent::addNestedDialRefToCache(NestedDialTest* nestedDialPtr_, const
   _nestedDialRefList_.back().first = nestedDialPtr_;
   _nestedDialRefList_.back().second = dialPtrList_;
 }
-std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>> PhysicsEvent::generateLeavesDictionary(bool disableArrays_) const{
+#endif
+std::map< std::string,
+  std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>> PhysicsEvent::generateLeavesDictionary(bool disableArrays_) const {
   std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>> out;
 
   for( auto& leafName : *_commonLeafNameListPtr_ ){
@@ -516,37 +522,52 @@ std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const st
     leafDefStr += "/";
     leafDefStr += typeTag;
     if(not disableArrays_){
-      out[leafDefStr] = [](GenericToolbox::RawDataArray& arr_, const std::vector<GenericToolbox::AnyType>& lH_){
-        for(size_t iIndex = 0 ; iIndex < lH_.size() ; iIndex++){
-          auto ph = lH_[iIndex].getPlaceHolderPtr();
-          arr_.writeMemoryContent(ph->getVariableAddress(), ph->getVariableSize());
+      out[leafDefStr] = [](GenericToolbox::RawDataArray& arr_, const std::vector<GenericToolbox::AnyType>& variablesList_){
+        for(const auto & variable : variablesList_){
+          arr_.writeMemoryContent(
+              variable.getPlaceHolderPtr()->getVariableAddress(),
+              variable.getPlaceHolderPtr()->getVariableSize()
+          );
         }
       };
     }
     else{
-      out[leafDefStr] = [](GenericToolbox::RawDataArray& arr_, const std::vector<GenericToolbox::AnyType>& lH_){
-        auto ph = lH_[0].getPlaceHolderPtr();
-        arr_.writeMemoryContent(ph->getVariableAddress(), ph->getVariableSize());
+      out[leafDefStr] = [](GenericToolbox::RawDataArray& arr_, const std::vector<GenericToolbox::AnyType>& variablesList_){
+        arr_.writeMemoryContent(
+            variablesList_[0].getPlaceHolderPtr()->getVariableAddress(),
+            variablesList_[0].getPlaceHolderPtr()->getVariableSize()
+        );
       };
     }
 
   }
   return out;
 }
-void PhysicsEvent::copyData(const std::vector<std::pair<const GenericToolbox::LeafHolder*, int>>& dict_, bool disableArrayStorage_){
-  // Don't check for size? should be very fast
-  for( int iLeaf = 0 ; iLeaf < dict_.size() ; iLeaf++ ){
-    if(dict_[iLeaf].second == -1 and not disableArrayStorage_){ dict_[iLeaf].first->copyToAny(_leafContentList_[iLeaf]); }
+
+void PhysicsEvent::copyData(const std::vector<std::pair<const GenericToolbox::LeafHolder *, int>> &dict_) {
+  // Don't check for size? it has to be very fast
+  size_t nLeaf{dict_.size()};
+  for( size_t iLeaf = 0 ; iLeaf < nLeaf ; iLeaf++ ){
+    if( _leafContentList_[iLeaf].empty() ){
+      // resize buffer
+      _leafContentList_[iLeaf].emplace_back( GenericToolbox::leafToAnyType(dict_[iLeaf].first->getLeafTypeName()) );
+    }
+
+    if( dict_[iLeaf].second==-1 ){
+      // no index specified -> drop only the first element
+      dict_[iLeaf].first->dropToAny(_leafContentList_[iLeaf][0], 0);
+    }
     else{
-      if( _leafContentList_[iLeaf].empty() ) _leafContentList_[iLeaf].emplace_back(GenericToolbox::leafToAnyType(dict_[iLeaf].first->getLeafTypeName()));
-      (dict_[iLeaf].second==-1 and disableArrayStorage_) ?
-      dict_[iLeaf].first->copyToAny(_leafContentList_[iLeaf][0], 0) :
-      dict_[iLeaf].first->copyToAny(_leafContentList_[iLeaf][0], dict_[iLeaf].second);
+      // drop the selected index
+      dict_[iLeaf].first->dropToAny(_leafContentList_[iLeaf][0], dict_[iLeaf].second);
     }
   }
   this->invalidateVarToDoubleCache();
 }
-std::vector<std::pair<const GenericToolbox::LeafHolder*, int>> PhysicsEvent::generateDict(const GenericToolbox::TreeEventBuffer& h_, const std::map<std::string, std::string>& leafDict_){
+std::vector<std::pair<const GenericToolbox::LeafHolder*, int>> PhysicsEvent::generateDict(
+    const GenericToolbox::TreeEntryBuffer& treeEventBuffer_,
+    const std::map<std::string, std::string>& leafDict_
+    ){
   std::vector<std::pair<const GenericToolbox::LeafHolder*, int>> out;
   out.reserve(_commonLeafNameListPtr_->size());
   std::string strBuf;
@@ -560,7 +581,7 @@ std::vector<std::pair<const GenericToolbox::LeafHolder*, int>> PhysicsEvent::gen
       if     ( argBuf.size() == 1 ){ out.back().second = std::stoi(argBuf[0]); }
       else if( argBuf.size() > 1 ){ LogThrow("No support for multi-dim array."); }
     }
-    out.back().first = &h_.getLeafContent(strBuf);
+    out.back().first = &treeEventBuffer_.getLeafContent(strBuf);
   }
   return out;
 }
