@@ -8,6 +8,7 @@
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
 
+#include <limits>
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[UniformSpline]");
@@ -59,9 +60,14 @@ void UniformSpline::buildDial(const std::vector<double>& xPoints,
   _splineData_[0] = xPoints.front();
   _splineData_[1] = (xPoints.back()-xPoints.front())/(xPoints.size()-1.0);
 
+  /// Apply a very loose check that the point spacing is uniform to catch
+  /// mistakes.  This only flags clear problems and isn't an accuracy
+  /// guarrantee.  The tolerance is set based on "float" since the spline
+  /// knots may have been saved or calculated using floats.
+  const double tolerance{std::sqrt(std::numeric_limits<float>::epsilon())};
   for (int i=0; i<xPoints.size()-1; ++i) {
       double d = std::abs(xPoints[i] - _splineData_[0] - i*_splineData_[1]);
-      LogThrowIf((d/_splineData_[1])>1E-5,
+      LogThrowIf((d/_splineData_[1])>tolerance,
                  "UniformSplines require uniformly spaced knots");
   }
 
