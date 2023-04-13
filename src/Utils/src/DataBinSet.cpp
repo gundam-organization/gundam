@@ -13,7 +13,6 @@
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[DataBinSet]");
-  Logger::setMaxLogLevel(Logger::LogLevel::INFO);
 } );
 
 DataBinSet::DataBinSet() {

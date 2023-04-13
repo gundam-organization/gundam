@@ -1206,23 +1206,21 @@ void DataDispenser::fillFunction(int iThread_){
             if( dialCollectionRef->isBinned() ){
 
               // is only one bin with no condition:
-              if( dialCollectionRef->getDialBaseList().size() == 1 ){
+              if( dialCollectionRef->getDialBaseList().size() == 1 and dialCollectionRef->getDialBinSet().isEmpty() ){
                 // if is it NOT a DialBinned -> this is the one we are
                 // supposed to use
-                if( dialCollectionRef->getDialBinSet().isEmpty() ){
-                  eventDialCacheEntry->dials[eventDialOffset].collectionIndex = iCollection;
-                  eventDialCacheEntry->dials[eventDialOffset].interfaceIndex = 0;
-                  eventDialOffset++;
-                }
+                eventDialCacheEntry->dials[eventDialOffset].collectionIndex = iCollection;
+                eventDialCacheEntry->dials[eventDialOffset].interfaceIndex = 0;
+                eventDialOffset++;
               }
               else {
-                // -- probably the slowest part of the indexing: ----
+                // ---- probably the slowest part of the indexing: ----
                 dial2FoundItr = std::find_if(
                     dialCollectionRef->getDialBinSet().getBinsList().begin(),
                     dialCollectionRef->getDialBinSet().getBinsList().end(),
                     isDial2Valid
                 );
-                // --------------------------------------------------
+                // ----------------------------------------------------
 
                 if (dial2FoundItr !=  dialCollectionRef->getDialBinSet().getBinsList().end()) {
                   // found DIAL -> get index
@@ -1231,6 +1229,9 @@ void DataDispenser::fillFunction(int iThread_){
                       dialCollectionRef->getDialBinSet().getBinsList().begin(), dial2FoundItr
                   );
                   eventDialOffset++;
+                }
+                else {
+                  // dial not valid
                 }
               }
             }
