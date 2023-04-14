@@ -4,7 +4,6 @@
 
 #include "Polynomial.h"
 
-
 double Polynomial::evalResponse(const DialInputBuffer& input_) const {
   double result{0};
   double factor{1};
@@ -15,6 +14,9 @@ double Polynomial::evalResponse(const DialInputBuffer& input_) const {
   return result;
 }
 
-void Polynomial::setCoefficientList(const std::vector<double> &coefficientList_) {
+void Polynomial::buildDial(const std::vector<double>& coefficientList_,
+                       const std::vector<double>&,
+                       const std::vector<double>&,
+                       const std::string& option_) {
   _coefficientList_ = coefficientList_;
 }
