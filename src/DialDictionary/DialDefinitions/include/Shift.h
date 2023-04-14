@@ -7,9 +7,9 @@
 
 #include "DialBase.h"
 
-// for norm dial, no cache is needed
-
-
+// Implement a dial to apply a scale factor (not a variable shift).  This can
+// be used to replace a Spline or a Graph when it corresponds to a constant
+// value.
 class Shift : public DialBase {
 
 public:
@@ -19,12 +19,10 @@ public:
   [[nodiscard]] std::string getDialTypeName() const override { return {"Shift"}; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override { return _shiftValue_; }
 
-  void buildDial(void* shiftValuePtr_, const std::string& options_="") override { _shiftValue_ = *((double*) shiftValuePtr_); }
+  void buildDial(double shift_, const std::string& options_="") override { _shiftValue_ = shift_; }
 
 private:
   double _shiftValue_{1};
 
 };
-
-
 #endif //GUNDAM_SHIFT_H
