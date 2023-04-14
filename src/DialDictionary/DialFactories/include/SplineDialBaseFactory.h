@@ -8,8 +8,11 @@
 #include <string>
 
 
-// A functor class that will build DialBase objects and return the pointer to
-// the object.  The ownership of the object is passed to the caller.
+// A factory that handles "dialType: Spline" from the YAML to create a Dial
+// and return the pointer to the object.  Try to keep the interaces uniform
+// (see DialBaseFactory).  The ownership of the object is passed to the caller
+// so the pointer should be put into a managed pointer (e.g. unique_ptr, or
+// shared_ptr).
 class SplineDialBaseFactory {
 public:
   SplineDialBaseFactory() = default;
@@ -36,19 +39,17 @@ public:
                      const std::vector<double>& yPoint,
                      std::vector<double>& slope);
 
-  /// Construct a pointer to the correct DialBase.  This uses the dialType and
-  /// dialSubType to figure out the correct class, and then uses the object
-  /// pointed to by the dialInitializer to fill the dial.  The ownership of
-  /// the pointer is passed to the caller, so it should be put in a managed
-  /// variable (e.g. a unique_ptr, or shared_ptr).
+  /// Implement the factory that constructs a pointer to the correct
+  /// DialBase.  This uses the dialType and dialSubType to figure out the
+  /// correct class, and then uses the object pointed to by the
+  /// dialInitializer to fill the dial.  The ownership of the pointer is
+  /// passed to the caller, so it should be put in a managed variable (e.g. a
+  /// unique_ptr, or shared_ptr).
   DialBase* makeDial(const std::string& dialType_,
-                         const std::string& dialSubType_,
-                         TObject* dialInitializer_,
-                         bool useCachedDial_);
+                     const std::string& dialSubType_,
+                     TObject* dialInitializer_,
+                     bool useCachedDial_);
 
-  /// A static function called whenever we need to find out if we can assume
-  /// uniform splines.
-  static bool hasUniformlySpacedKnots(const std::vector<double>& points_);
 };
 
 //  A Lesser GNU Public License
