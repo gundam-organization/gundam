@@ -7,8 +7,10 @@
 
 #include <string>
 
-// A functor class that will build DialBase objects and return the pointer to
-// the object.  The ownership of the object is passed to the caller.
+// A factory that will build DialBase objects and return the pointer to the
+// object.  Try to keep the interaces uniform (see DialBaseFactory).  The
+// ownership of the object is passed to the caller so the pointer should be
+// put into a managed pointer (e.g. unique_ptr, or shared_ptr).
 class NormDialBaseFactory {
 public:
   NormDialBaseFactory() = default;
@@ -20,9 +22,9 @@ public:
   // pointer is passed to the caller, so it should be put in a managed
   // variable (e.g. a unique_ptr, or shared_ptr).
   DialBase* makeDial(const std::string& dialType_,
-                         const std::string& dialSubType_,
-                         TObject* dialInitializer_,
-                         bool useCachedDial_);
+                     const std::string& dialSubType_,
+                     TObject* dialInitializer_,
+                     bool useCachedDial_);
 };
 
 //  A Lesser GNU Public License
