@@ -87,7 +87,7 @@ fitterEngineConfig:
               - dialsType: Spline
                 dialLeafName: "spline_C"
                 applyOnDataSets: [ "TestSample" ]
-                applyCondition: "[C] > 0"
+                # applyCondition: "[C] > 0"
 
           - parameterName: "spline_D"
             isEnabled: true
@@ -95,7 +95,7 @@ fitterEngineConfig:
               - dialsType: Spline
                 dialLeafName: "spline_D"
                 applyOnDataSets: [ "TestSample" ]
-                applyCondition: "[C] <= 0"
+                # applyCondition: "[C] <= 0"
 
 # End of the yaml file
 # Local Variables:
