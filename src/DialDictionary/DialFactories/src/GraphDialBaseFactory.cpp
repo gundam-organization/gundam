@@ -9,11 +9,12 @@ LoggerInit([]{
 });
 
 DialBase* GraphDialBaseFactory::makeDial(const std::string& dialType_,
-                                             const std::string& dialSubType_,
-                                             TObject* dialInitializer_,
-                                             bool useCachedDial_) {
+                                         const std::string& dialSubType_,
+                                         TObject* dialInitializer_,
+                                         bool useCachedDial_) {
 
-  auto* srcGraph = dynamic_cast<TGraph*>(dialInitializer_);
+  TGraph* srcGraph = dynamic_cast<TGraph*>(dialInitializer_);
+
   LogThrowIf(srcGraph == nullptr, "Graph dial initializer must be a TGraph");
 
   // Stuff the created dial into a unique_ptr, so it will be properly deleted
@@ -21,10 +22,16 @@ DialBase* GraphDialBaseFactory::makeDial(const std::string& dialType_,
   std::unique_ptr<DialBase> dialBase;
 
   if (dialSubType_ == "ROOT") {
-    (useCachedDial_ ? ( dialBase = std::make_unique<GraphCache>() ) : ( dialBase = std::make_unique<Graph>() ) );
+    // Basic coding: Give a hint to the reader and put likely branch "first".
+    // Do we really expect the cached version more than the uncached?
+    dialBase = (useCachedDial_) ?
+      std::make_unique<GraphCache>():
+      std::make_unique<Graph>();
   }
   else {
-    (useCachedDial_ ? ( dialBase = std::make_unique<LightGraphCache>() ) : ( dialBase = std::make_unique<LightGraph>() ) );
+    dialBase = (useCachedDial_) ?
+      std::make_unique<LightGraphCache>():
+      std::make_unique<LightGraph>();
   }
 
   dialBase->buildDial(*srcGraph);

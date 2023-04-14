@@ -7,8 +7,9 @@
 
 #include <string>
 
-// A functor class that will build DialBase objects and return the pointer to
-// the object.  The ownership of the object is passed to the caller.
+// A factory that will build DialBase objects and return the pointer to the
+// object.  This factory handles "dialType: Graph" from the yaml.  The
+// ownership of the object is passed to the caller.
 class GraphDialBaseFactory {
 public:
   GraphDialBaseFactory() = default;
@@ -20,9 +21,9 @@ public:
   // pointer is passed to the caller, so it should be put in a managed
   // variable (e.g. a unique_ptr, or shared_ptr).
   DialBase* makeDial(const std::string& dialType_,
-                         const std::string& dialSubType_,
-                         TObject* dialInitializer_,
-                         bool useCachedDial_);
+                     const std::string& dialSubType_,
+                     TObject* dialInitializer_,
+                     bool useCachedDial_);
 };
 
 //  A Lesser GNU Public License
