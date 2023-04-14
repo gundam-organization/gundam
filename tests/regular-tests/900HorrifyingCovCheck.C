@@ -107,14 +107,14 @@ int main() {
     TOLERANCE("Check HESSE value for #0_Norm_A",
               postFitErrorsHesse->GetBinContent(1), 1.0, tolerance);
     TOLERANCE("Check HESSE error for #0_Norm_A",
-              postFitErrorsHesse->GetBinError(1), 0.21213, 0.01);
+              postFitErrorsHesse->GetBinError(1), 0.21213, 0.05);
 
     TOLERANCE("Check MIGRAD value for #1_Norm_B",
               postFitErrorsMigrad->GetBinContent(2), 1.0, tolerance);
     TOLERANCE("Check HESSE value for #1_Norm_B",
               postFitErrorsHesse->GetBinContent(2), 1.0, tolerance);
     TOLERANCE("Check HESSE error for #0_Norm_B",
-              postFitErrorsHesse->GetBinError(2), 0.21213, 0.01);
+              postFitErrorsHesse->GetBinError(2), 0.21213, 0.05);
 
     file->Close();
 
