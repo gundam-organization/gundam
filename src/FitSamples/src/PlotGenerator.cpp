@@ -340,11 +340,10 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
 
         if (stackHist_) {
           // Sorting histograms by norm (lowest stat first)
-          std::function<bool(TH1D *, TH1D *)> aGoesFirst = [](TH1D *histA_, TH1D *histB_) {
+          GenericToolbox::sortVector(mcSampleHistList,  [](TH1D *histA_, TH1D *histB_) {
             return (histA_->Integral(histA_->FindBin(0), histA_->FindBin(histA_->GetXaxis()->GetXmax()))
-            < histB_->Integral(histB_->FindBin(0), histB_->FindBin(histB_->GetXaxis()->GetXmax())));
-          };
-          GenericToolbox::sortVector(mcSampleHistList, aGoesFirst);
+                    < histB_->Integral(histB_->FindBin(0), histB_->FindBin(histB_->GetXaxis()->GetXmax())));
+          });
 
           // Stacking histograms
           TH1D *histPileBuffer = nullptr;

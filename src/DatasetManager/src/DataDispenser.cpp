@@ -123,9 +123,7 @@ void DataDispenser::load(){
       _cache_.varsToOverrideList.emplace_back(overrideEntry.first);
     }
     // make sure we process the longest words first: "thisIsATest" variable should be replaced before "thisIs"
-    std::function<bool(const std::string&, const std::string&)> aGoesFirst =
-        [](const std::string& a_, const std::string& b_){ return a_.size() > b_.size(); };
-    GenericToolbox::sortVector(_cache_.varsToOverrideList, aGoesFirst);
+    GenericToolbox::sortVector(_cache_.varsToOverrideList, [](const std::string& a_, const std::string& b_){ return a_.size() > b_.size(); });
   }
 
   if( GenericToolbox::Json::doKeyExist(_config_, "variablesTransform") ){
@@ -137,18 +135,16 @@ void DataDispenser::load(){
       _cache_.eventVarTransformList.back().initialize();
     }
     // sort them according to their output
-    std::function<bool(const EventVarTransformLib&, const EventVarTransformLib&)> aGoesFirst =
-        [](const EventVarTransformLib& a_, const EventVarTransformLib& b_){
-          // does a_ is a self transformation? -> if yes, don't change the order
-          if( GenericToolbox::doesElementIsInVector(a_.getOutputVariableName(), a_.fetchRequestedVars()) ){ return false; }
-          // does b_ transformation needs a_ output? -> if yes, a needs to go first
-          if( GenericToolbox::doesElementIsInVector(a_.getOutputVariableName(), b_.fetchRequestedVars()) ){ return true; }
-          // otherwise keep the order from the declaration
-          if( a_.getIndex() < b_.getIndex() ) return true;
-          // default -> won't change the order
-          return false;
-        };
-    GenericToolbox::sortVector(_cache_.eventVarTransformList, aGoesFirst);
+    GenericToolbox::sortVector(_cache_.eventVarTransformList, [](const EventVarTransformLib& a_, const EventVarTransformLib& b_){
+      // does a_ is a self transformation? -> if yes, don't change the order
+      if( GenericToolbox::doesElementIsInVector(a_.getOutputVariableName(), a_.fetchRequestedVars()) ){ return false; }
+      // does b_ transformation needs a_ output? -> if yes, a needs to go first
+      if( GenericToolbox::doesElementIsInVector(a_.getOutputVariableName(), b_.fetchRequestedVars()) ){ return true; }
+      // otherwise keep the order from the declaration
+      if( a_.getIndex() < b_.getIndex() ) return true;
+      // default -> won't change the order
+      return false;
+    });
   }
 
 
@@ -829,13 +825,12 @@ void DataDispenser::readAndFill(){
   if( _owner_->isSortLoadedEvents() ){
     LogAlert << "[DEV OPTION] Sorting loaded events..." << std::endl;
     for( auto& evList : _cache_.sampleEventListPtrToFill ){
-      std::function<bool(const PhysicsEvent&, const PhysicsEvent&)> aGoesFirst = [](const PhysicsEvent& a, const PhysicsEvent& b){
+      GenericToolbox::sortVector(*evList, [](const PhysicsEvent& a, const PhysicsEvent& b){
         if( a.getDataSetIndex() < b.getDataSetIndex() ) { return true; }
         if( a.getEntryIndex() < b.getEntryIndex() ) { return true; }
         if( a.getEntryIndex() == b.getEntryIndex() and a.getDataSetIndex() == b.getDataSetIndex() ){ return false; }
         return false;
-      };
-      GenericToolbox::sortVector(*evList, aGoesFirst);
+      });
     }
   }
 
