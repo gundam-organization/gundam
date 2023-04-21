@@ -19,6 +19,13 @@ public:
   [[nodiscard]] std::string getDialTypeName() const override { return {"Polynomial"}; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
 
+  // Initialize the polynomial ocoefficients.  The coefficients go in the first
+  // vector, and the other two are ignored.
+  virtual void buildDial(const std::vector<double>& coefficientList_,
+                         const std::vector<double>&,
+                         const std::vector<double>&,
+                         const std::string& option_="") override;
+
   void setCoefficientList(const std::vector<double> &coefficientList_);
 
 

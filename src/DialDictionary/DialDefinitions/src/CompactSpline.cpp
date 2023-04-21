@@ -62,9 +62,14 @@ void CompactSpline::buildDial(const std::vector<double>& v1,
   _splineData_[0] = v1.front();
   _splineData_[1] = (v1.back() - v1.front())/(v1.size()-1.0);
 
+  /// Apply a very loose check that the point spacing is uniform to catch
+  /// mistakes.  This only flags clear problems and isn't an accuracy
+  /// guarrantee.  The tolerance is set based on "float" since the spline
+  /// knots may have been saved or calculated using floats.
+  const double tolerance{std::sqrt(std::numeric_limits<float>::epsilon())};
   for (int i=0; i<v1.size()-1; ++i) {
       double d = std::abs(v1[i] - _splineData_[0] - i*_splineData_[1]);
-      LogThrowIf((d/_splineData_[1])>1E-5,
+      LogThrowIf((d/_splineData_[1])>tolerance,
                  "CompactSplines require uniformly spaced knots");
   }
 

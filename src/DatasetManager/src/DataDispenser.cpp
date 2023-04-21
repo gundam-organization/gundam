@@ -1247,30 +1247,24 @@ void DataDispenser::fillFunction(int iThread_){
                 LogThrow("Unsupported event-by-event dial type: " << treeChain.GetLeaf(dialCollectionRef->getGlobalDialLeafName().c_str())->GetTypeName() )
               }
 
-              // loaded graph is valid?
-              if( grPtr != nullptr ){
-                DialBaseFactory factory;
-                DialBase* dialBase = factory.makeDial(
-                    dialCollectionRef->getGlobalDialType(),
-                    dialCollectionRef->getGlobalDialSubType(),
-                    grPtr, dialCollectionRef->useCachedDials()
-                );
-                if ( dialBase != nullptr ) {
-                  freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
-                  dialBase->setAllowExtrapolation(dialCollectionRef->isAllowDialExtrapolation());
-                  dialCollectionRef->getDialBaseList()[freeSlotDial] = DialCollection::DialBaseObject(dialBase);
-                  eventDialCacheEntry->dials[eventDialOffset].collectionIndex = iCollection;
-                  eventDialCacheEntry->dials[eventDialOffset].interfaceIndex = freeSlotDial;
-                  eventDialOffset++;
-                }
-                else {
-                  // the Dial is not valid and should be skipped.
-                }
+              DialBaseFactory factory;
+              // Do the unique_ptr dance so that memory gets deleted if
+              // there is an exception (being stupidly paranoid).
+              std::unique_ptr<DialBase> dialBase(
+                  factory.makeDial(dialCollectionRef->getGlobalDialType(),
+                                   dialCollectionRef->getGlobalDialSubType(),
+                                   grPtr, dialCollectionRef->useCachedDials()));
+              if (dialBase) {
+                freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
+                dialBase->setAllowExtrapolation(dialCollectionRef->isAllowDialExtrapolation());
+                dialCollectionRef->getDialBaseList()[freeSlotDial] = DialCollection::DialBaseObject(dialBase.release());
+                eventDialCacheEntry->dials[eventDialOffset].collectionIndex = iCollection;
+                eventDialCacheEntry->dials[eventDialOffset].interfaceIndex = freeSlotDial;
+                eventDialOffset++;
               }
-
             }
             else{
-              LogThrow("not an event by event dial, nor binned");
+              LogThrow("neither an event by event dial, nor a binned dial");
             }
 
           }

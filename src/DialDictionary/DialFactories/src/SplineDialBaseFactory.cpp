@@ -5,12 +5,11 @@
 #include "TGraph.h"
 #include "TSpline.h"
 
-#include <numeric>
+#include <limits>
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[SplineFactory]");
 });
-
 
 bool SplineDialBaseFactory::FillFromGraph(std::vector<double>& xPoint,
                                           std::vector<double>& yPoint,
@@ -21,22 +20,23 @@ bool SplineDialBaseFactory::FillFromGraph(std::vector<double>& xPoint,
 
   // Get the spline knots and slopes (starting from a graph).
   TGraph* graph = dynamic_cast<TGraph*>(dialInitializer);
-  if( graph == nullptr ) return false;
+  if ( graph == nullptr ) return false;
 
-  if( graph->GetN() == 1 ){
-    // TSpline3 creating messes up with TClonesArray in that case.
+  if ( graph->GetN() == 1 ){
     xPoint.reserve(1); xPoint.clear(); xPoint.emplace_back( graph->GetX()[0] );
     yPoint.reserve(1); yPoint.clear(); yPoint.emplace_back( graph->GetY()[0] );
     slope.reserve(1); slope.clear(); slope.emplace_back( 0 );
     return true;
   }
 
-  // Turn the graph into a spline.
+  // Turn the graph into a spline.  This is where we can handle getting the
+  // slopes for not-a-knot and natural splines (by using ROOT TSpline3
+  // boundary conditinos).
   std::string opt;
   double valBeg = 0;
   double valEnd = 0;
-  if     ( splType == "not-a-knot" ) opt = "";
-  else if( splType == "natural" ) opt = "b2,e2";
+  if      ( splType == "not-a-knot" ) opt = ""; // be explicit!
+  else if ( splType == "natural" ) opt = "b2,e2"; // fix second derivative.
   TSpline3 spline(Form("%p", graph), graph, opt.c_str(), valBeg, valEnd);
 
   xPoint.reserve(spline.GetNp());
@@ -45,6 +45,9 @@ bool SplineDialBaseFactory::FillFromGraph(std::vector<double>& xPoint,
   xPoint.clear();
   yPoint.clear();
   slope.clear();
+
+  // Copy the points, values, and slopes to the output, but also check that
+  // we're getting valid numeric values.
   for (int i = 0; i<graph->GetN(); ++i) {
     double x; double y;
     spline.GetKnot(i,x,y);
@@ -69,8 +72,12 @@ bool SplineDialBaseFactory::FillFromSpline(std::vector<double>& xPoint,
 
   // Get the spline knots and slopes (starting from a spline).
   TSpline3* spline = dynamic_cast<TSpline3*>(dialInitializer);
-  if (not spline) return false;
+  if (spline == nullptr) return false;
 
+  // We could apply logic similar to FillFromGraph to implement not-a-knot and
+  // natural splines, but if the analysis is actually saving splines in the
+  // input files, then assume it knows what it is doing.  Directly use the
+  // saved spline.
   xPoint.reserve(spline->GetNp());
   yPoint.reserve(spline->GetNp());
   slope.reserve(spline->GetNp());
@@ -84,9 +91,9 @@ bool SplineDialBaseFactory::FillFromSpline(std::vector<double>& xPoint,
     if (!std::isfinite(y)) return false;
     double d = spline->Derivative(x);
     if (!std::isfinite(d)) return false;
-    xPoint.push_back(x);
-    yPoint.push_back(y);
-    slope.push_back(d);
+    xPoint.emplace_back(x);
+    yPoint.emplace_back(y);
+    slope.emplace_back(d);
   }
 
   return true;
@@ -104,123 +111,204 @@ void SplineDialBaseFactory::MakeMonotonic(const std::vector<double>& xPoint,
     double p{std::numeric_limits<double>::infinity()};
     if (i<xPoint.size()-1) p =(yPoint[i+1]-yPoint[i])/(xPoint[i+1]-xPoint[i]);
     double delta = std::min(std::abs(m),std::abs(p));
-    // This applies an upper bound on when the slope is "safe".  It's not
-    // the actual bound for when the actual bound on when the slope makes
-    // the spline non-monotonic.
+    // This a conservative bound on when the slope is "safe".  It's not the
+    // actual value at which the spline becomes non-monotonic.
     if (std::abs(slope[i]) > 3.0*delta) {
       if (slope[i] < 0.0) slope[i] = -3.0*delta;
-      slope[i] = 3.0*delta;
+      else slope[i] = 3.0*delta;
     }
   }
 }
 
 DialBase* SplineDialBaseFactory::makeDial(const std::string& dialType_,
-                                              const std::string& dialSubType_,
-                                              TObject* dialInitializer_,
-                                              bool useCachedDial_) {
+                                          const std::string& dialSubType_,
+                                          TObject* dialInitializer_,
+                                          bool useCachedDial_) {
 
   if (dialInitializer_ == nullptr) return nullptr;
 
-  // The types of splines are "not-a-knot", "natural", "catmull-rom", and
-  // "ROOT".  The "not-a-knot" spline will give the same curve as ROOT (and
-  // might be implemented with at TSpline3).  The "ROOT" spline will use an
-  // actual TSpline3 (and is slow).  The natural and catmull-rom splines are
-  // just as expected.
+  // The types of cubic splines are "not-a-knot", "natural", "catmull-rom",
+  // and "ROOT".  The "not-a-knot" spline will give the same curve as ROOT
+  // (and might be implemented with at TSpline3).  The "ROOT" spline will use
+  // an actual TSpline3 (and is slow).  The "natural" and "catmull-rom"
+  // splines are just as expected (you can seen the underlying math on
+  // Wikipedia or another source).  Be careful about the order since later
+  // conditionals can override earlier ones.
   std::string splType = "not-a-knot";  // The default.
   if (dialSubType_.find("not-a-knot") != std::string::npos) splType = "not-a-knot";
   if (dialSubType_.find("catmull") != std::string::npos) splType = "catmull-rom";
   if (dialSubType_.find("natural") != std::string:: npos) splType = "natural";
   if (dialSubType_.find("ROOT") != std::string:: npos) splType = "ROOT";
 
-  std::vector<double> xPoints;
-  std::vector<double> yPoints;
-  std::vector<double> slopePoints;
+  std::vector<double> xPoint;
+  std::vector<double> yPoint;
+  std::vector<double> slopePoint;
 
-  if      ( FillFromGraph(xPoints, yPoints, slopePoints, dialInitializer_, splType) ) { /* filled from TGraph successful */ }
-  else if ( FillFromSpline(xPoints, yPoints, slopePoints, dialInitializer_, splType) ) { /* filled from TSpline3 successful */ }
-  else{ return nullptr; }
-
-  // Check that there are enough points in the spline.
-  if (xPoints.empty()) {
-    LogAlertOnce << "Splines must have at least one points." << std::endl;
+  ///////////////////////////////////////////////////////////////////////
+  // Side-effect programming alert.  The conditionals are doing the actual
+  // work and setting xPoint, yPoint and slopePoint.  We only have a couple
+  // of types of input for now, but watch out for the evil
+  // if-then-elseif-elseif-elseif-elseif idiom.  Change this to do-while-false
+  // if the number of kinds of initializers is more than a few.
+  ///////////////////////////////////////////////////////////////////////
+  if (FillFromGraph(xPoint, yPoint, slopePoint,
+                     dialInitializer_, splType)) {
+    // The points were from a ROOT graph like object and the points were
+    // filled, don't check any further.
+  }
+  else if (FillFromSpline(xPoint, yPoint, slopePoint,
+                          dialInitializer_, splType) ) {
+    // The points were from a ROOT TSpline3 like object and the points were
+    // filled, don't check any further.
+  }
+  else {
+    // If we get to this point, we don't know how to grab the spline points
+    // out of the initializer, so flag this as an invalid dial.
     return nullptr;
   }
 
-  // Check that there are equal numbers of X and Y
-  LogThrowIf( xPoints.size() != yPoints.size(), "INVALID Spline: must have the same number of X and Y points" );
-
-  // Check that the X points are in increasing order.
-  LogThrowIf( not std::is_sorted(xPoints.begin(), xPoints.end()), "INVALID Spline: points are not in increasing order." );
-
-  // Stuff the created dial into a unique_ptr, so it will be properly deleted
-  // in the event of an exception.
-  std::unique_ptr<DialBase> dialBase;
-
-  // Check that the spline isn't flat and 1.0
-  bool isFlat{ std::all_of( yPoints.begin(), yPoints.end(), [&] (double y) {return y == yPoints[0];} ) };
-  if ( isFlat or yPoints.size() == 1 ){
-    // get rid of the spline if the flat response is one
-    if( yPoints[0] == 1. ){ return nullptr; }
-    else{
-      // create a special dial that will handle the constant shift
-      dialBase = std::make_unique<Shift>();
-      dialBase->buildDial(&yPoints[0]);
-    }
-  }
-  else{
-    // If there are only two points, then force catmull-rom
-    if (xPoints.size() == 2) { splType = "catmull-rom"; }
-
-    ////////////////////////////////////////////////////////////////
-    // Condition the slopes as necessary (only matters if the dial sub-type
-    // includes "monotonic"
-    ////////////////////////////////////////////////////////////////
-    bool isMonotonic = ( dialSubType_.find("monotonic") != std::string::npos );  // So the right catmull-rom class can be chosen.
-    if ( isMonotonic ) { MakeMonotonic(xPoints, yPoints, slopePoints); }
-
-    // Create the right low level spline class.
-    if (splType == "catmull-rom") {
-      LogThrowIf(not hasUniformlySpacedKnots(xPoints), "Catmull-rom splines need a uniformly spaced points");
-      if (not isMonotonic) {
-        (useCachedDial_ ? ( dialBase = std::make_unique<CompactSplineCache>() ) : dialBase = std::make_unique<CompactSpline>() );
-      }
-      else {
-        (useCachedDial_ ? ( dialBase = std::make_unique<MonotonicSplineCache>() ) : dialBase = std::make_unique<MonotonicSpline>() );
-      }
-    }
-    else if (splType == "ROOT") {
-      dialBase = std::make_unique<Spline>();
-    }
-    else {
-      if (not hasUniformlySpacedKnots(xPoints)) {
-        (useCachedDial_ ? ( dialBase = std::make_unique<GeneralSplineCache>() ) : dialBase = std::make_unique<GeneralSpline>() );
-      }
-      else {
-        (useCachedDial_ ? ( dialBase = std::make_unique<UniformSplineCache>() ) : dialBase = std::make_unique<UniformSpline>() );
-      }
-    }
-
-    // Initialize the spline
-    dialBase->buildDial(xPoints, yPoints, slopePoints);
+  // Check that we got at least some points!  A single point will be treated
+  // as a constant value, but it's not an error.
+  if (xPoint.empty()) {
+    LogAlertOnce << "Splines must have at least one point." << std::endl;
+    return nullptr;
   }
 
-  // Pass the ownership without any constraints!
-  return dialBase.release();
-}
+  // Check that there are equal numbers of X and Y.  There have to be an equal
+  // number of points or something is very wrong.
+  LogThrowIf( xPoint.size() != yPoint.size(),
+              "INVALID Spline Input: "
+              << "must have the same number of X and Y points" );
 
+  // Check that the X points are in strictly increasing order (sorted order is
+  // not sufficient) with explicit comparisons in case we want to add more
+  // detailed logic.  This shouldn't happen, and indicates there is a problem
+  // with the inputs.  Don't try to continue!
+  for (int i = 1; i<xPoint.size(); ++i) {
+    LogThrowIf(xPoint[i] <= xPoint[i-1],
+               "INVALID Spline Input: points are not in increasing order." );
+  }
 
+  // Check if the spline is flat.  Flat functions won't be handled with
+  // splines.
+  bool isFlat{true};
+  for (double y : yPoint) {
+    // Use a tolerance based on float in case the data when through a float.
+    // Keep this inside the loop so it has the right scope, and depend on the
+    // compiler to do the right thing.
+    const double toler{std::numeric_limits<float>::epsilon()};
+    const double delta{std::abs(y-yPoint[0])};
+    if (delta > toler) isFlat = false;
+  }
 
-bool SplineDialBaseFactory::hasUniformlySpacedKnots(const std::vector<double>& points_){
+  // If the function is flat AND equal to one, the drop it.  Compare against
+  // float accuracy in case the value was actually calculated against with a
+  // float.
+  if (std::abs(yPoint[0]-1.0)<std::numeric_limits<float>::epsilon()
+      and isFlat) {
+    return nullptr;
+  }
+
+  // If the function is equal to a constant (but not to one) then we don't
+  // need a Spline so use the faster "Shift" dial (which applies a "scale"
+  // factor, and not an additive shift).
+  if (isFlat) {
+    // Do the unique_ptr dance in case there are exceptions.
+    std::unique_ptr<DialBase> dialBase = std::make_unique<Shift>();
+    dialBase->buildDial(yPoint[0]);
+    return dialBase.release();
+  }
+
+  // Sanity check.  By the time we get here, there can't be fewer than two
+  // points, and it should have been trapped above by other conditionals
+  // (e.g. a single point "spline" should have been flagged as flat).
+  LogThrowIf((xPoint.size() < 2), "Input data logic error: two few points");
+
+  // If there are only two points, then force catmull-rom.  This could be
+  // handled using a graph, but Catmull-Rom is fast, and works better with the
+  // GPU.
+  if (xPoint.size() < 3) { splType = "catmull-rom"; }
+
   ////////////////////////////////////////////////////////////////
   // Check if the spline can be treated as having uniformly spaced knots.
   ////////////////////////////////////////////////////////////////
-  double s = (points_.back() - points_.front()) / (double(points_.size()) - 1.0);
-  for (size_t iPoint=1; iPoint < points_.size(); ++iPoint) {
-    if ( std::abs( ((points_[iPoint] - points_[iPoint - 1]) - s) ) != 0 ) {
-      return false;
-    }
+  bool isUniform = true;
+  for (int i=0; i<xPoint.size()-1; ++i) {
+    // Could be precalculated, but this only gets run once per dial so go for
+    // clarity instead.  The compiler probably optimizes it out of the loop.
+    const double avgSpace = (xPoint.back()-xPoint.front())/(xPoint.size()-1.0);
+    // Capture the tolerance.
+    const double tolerance{std::sqrt(std::numeric_limits<double>::epsilon())};
+    // Find out how far the point is from the expected lattice point
+    const double delta = std::abs(xPoint[i] - xPoint[0] - i*avgSpace);
+    if (delta < tolerance) continue;
+    // Point isn't in the right place so this is not uniform and break out of
+    // the loop.
+    isUniform = false;
+    break;
   }
-  return true;
+
+  ////////////////////////////////////////////////////////////////
+  // Check if the spline is suppose to be monotonic and condition the slopes
+  // if necessary.  This is ignored by "ROOT" splines.  The Catmull-Rom
+  // splines have a special implementation for monotonic splines, so save a
+  // flag that can be checked later.
+  ////////////////////////////////////////////////////////////////
+  bool isMonotonic = ( dialSubType_.find("monotonic") != std::string::npos );
+  if ( isMonotonic ) { MakeMonotonic(xPoint, yPoint, slopePoint); }
+
+  ///////////////////////////////////////////////////////////
+  // Create the right kind low level spline class base on all of the previous
+  // queries.  This is pushing the if-elseif-elseif limit so watch for when it
+  // should change to the do-while-false idiom.  Make sure the individual
+  // conditionals are less than 10 lines.
+  ///////////////////////////////////////////////////////////
+  std::unique_ptr<DialBase> dialBase;
+  if (splType == "ROOT") {
+    // The ROOT implementation of the spline has been explicitly requested, so
+    // use it.
+    dialBase = std::make_unique<Spline>();
+  }
+  else if (splType == "catmull-rom" and isMonotonic) {
+    // Catmull-Rom is handled as a special case because it ignores the slopes,
+    // and has an explicit monotonic implementatino.  It also must have
+    // uniformly spaced knots.
+    LogThrowIf(not isUniform,
+               "Catmull-rom splines need a uniformly spaced points");
+    dialBase = (not useCachedDial_) ?
+      std::make_unique<MonotonicSpline>():
+      std::make_unique<MonotonicSplineCache>();
+  }
+  else if (splType == "catmull-rom") {
+    // Catmull-Rom is handled as a special case because it ignores the slopes.
+    // This is the version when the spline doesn't need to be monotonic.
+    LogThrowIf(not isUniform,
+               "Catmull-rom splines need a uniformly spaced points");
+    dialBase = (not useCachedDial_) ?
+      std::make_unique<CompactSpline>():
+      std::make_unique<CompactSplineCache>();
+  }
+  else if (isUniform) {
+    // Haven't matched a specific special case, but we have uniformly spaced
+    // knots so we can use the faster UniformSpline implementation.
+    dialBase = (not useCachedDial_) ?
+      std::make_unique<UniformSpline>():
+      std::make_unique<UniformSplineCache>();
+  }
+  else {
+    // Haven't matched a specific special case, and the knots are not
+    // uniformly spaced, so we have to use the GeneralSpline implemenatation
+    // which can handle any kind of cubic spline.
+    dialBase = (not useCachedDial_) ?
+      std::make_unique<GeneralSpline>():
+      std::make_unique<GeneralSplineCache>();
+  }
+
+  // Initialize the spline from the slopes
+  dialBase->buildDial(xPoint, yPoint, slopePoint);
+
+  // Pass the ownership without any constraints!
+  return dialBase.release();
 }
 
 //  A Lesser GNU Public License

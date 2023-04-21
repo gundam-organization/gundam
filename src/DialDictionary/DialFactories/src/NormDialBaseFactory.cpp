@@ -5,11 +5,10 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[NormFactory]");
 });
 
-
 DialBase* NormDialBaseFactory::makeDial(const std::string& dialType_,
-                                            const std::string& dialSubType_,
-                                            TObject* dialInitializer_,
-                                            bool useCachedDial_) {
+                                        const std::string& dialSubType_,
+                                        TObject* dialInitializer_,
+                                        bool useCachedDial_) {
   // Stuff the created dial into a unique_ptr, so it will be properly deleted
   // in the event of an exception.
   std::unique_ptr<DialBase> dialBase;

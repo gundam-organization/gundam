@@ -468,10 +468,12 @@ bool DialCollection::initializeDialsWithDefinition() {
           if (getGlobalDialType() == "Spline") dialInitializer = splinePtr;
           if (getGlobalDialType() == "Graph") dialInitializer = graphPtr;
           DialBaseFactory factory;
-          _dialBaseList_.emplace_back(
-            DialBaseObject(
-              factory.makeDial(getGlobalDialType(),getGlobalDialSubType(),
-                      dialInitializer,this->useCachedDials())));
+          DialBase *dialBase = factory.makeDial(
+              getGlobalDialType(),
+              getGlobalDialSubType(),
+              dialInitializer,
+              this->useCachedDials());
+          if (dialBase) _dialBaseList_.emplace_back(DialBaseObject(dialBase));
         } // iSpline (in TTree)
         dialsTFile->Close();
       } // Splines in TTree

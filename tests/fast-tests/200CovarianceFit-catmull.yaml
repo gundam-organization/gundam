@@ -85,17 +85,19 @@ fitterEngineConfig:
             isEnabled: true
             dialSetDefinitions:
               - dialsType: Spline
+                dialSubType: catmull-rom
                 dialLeafName: "spline_C"
                 applyOnDataSets: [ "TestSample" ]
-                # applyCondition: "[C] > 0"
+                applyCondition: "[C] > 0"
 
           - parameterName: "spline_D"
             isEnabled: true
             dialSetDefinitions:
               - dialsType: Spline
+                dialSubType: catmull-rom, monotonic
                 dialLeafName: "spline_D"
                 applyOnDataSets: [ "TestSample" ]
-                # applyCondition: "[C] <= 0"
+                applyCondition: "[C] <= 0"
 
 # End of the yaml file
 # Local Variables:
