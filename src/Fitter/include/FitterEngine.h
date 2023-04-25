@@ -86,6 +86,7 @@ private:
   double _throwGain_{1.};
   double _parStepGain_{0.1};
   double _pcaDeltaChi2Threshold_{1E-6};
+  bool _savePostfitEventTrees_{false};
   std::vector<double> _allParamVariationsSigmas_{};
 
   // Internals
