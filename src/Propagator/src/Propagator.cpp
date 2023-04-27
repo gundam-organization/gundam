@@ -488,7 +488,7 @@ void Propagator::initializeImpl() {
     for( auto& entry : _eventDialCache_.getCache() ) {
       LogDebug << "Event #" << iEvt++ << "{" << std::endl;
       {
-        Logger::Indent i;
+        LogScopeIndent;
         LogDebug << entry.event->getSummary() << std::endl;
         LogDebug << "dialCache = {";
         for( auto& dialInterface : entry.dials ) {

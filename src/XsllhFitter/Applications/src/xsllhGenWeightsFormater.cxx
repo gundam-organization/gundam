@@ -989,8 +989,8 @@ void mergeSplines(){
     };
 //        std::sort(processedBins.begin(), processedBins.end(), aGoesFirst);
     auto p = GenericToolbox::getSortPermutation(processedBins, aGoesFirst);
-    GenericToolbox::applySwapPermutation(processedBins, p);
-    GenericToolbox::applySwapPermutation(graphsListHolder, p);
+    GenericToolbox::applyPermutation(processedBins, p);
+    GenericToolbox::applyPermutation(graphsListHolder, p);
 
     // Reopening
     __mapOutSplineTFiles__[xsecSplineName]->Close();
