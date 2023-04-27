@@ -50,7 +50,7 @@ int main( int argc, char** argv ){
 
   LogInfo << "Options list:" << std::endl;
   {
-    Logger::Indent lIndent;
+    LogScopeIndent;
     LogInfo << clp.getConfigSummary() << std::endl;
   }
 
@@ -286,7 +286,7 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
   // loop over parSets
   auto* outDir = GenericToolbox::mkdirTFile(outFile, Form("%s/errors%s", (usePrefit_? "preFit": "postFit"), (useNomVal_? "Norm": "")));
   for( int iKey = 0 ; iKey < dir1->GetListOfKeys()->GetEntries() ; iKey++ ){
-    Logger::Indent lIndent;
+    LogScopeIndent;
     std::string parSet = dir1->GetListOfKeys()->At(iKey)->GetName();
 
     strBuffer = Form("%s/values%s/%sErrors_TH1D", parSet.c_str(), (useNomVal_? "Norm": ""), (usePrefit_? "preFit": "postFit"));
