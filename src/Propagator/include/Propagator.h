@@ -31,7 +31,7 @@ public:
   void setEnableEigenToOrigInPropagate(bool enableEigenToOrigInPropagate);
   void setIThrow(int iThrow);
   void setLoadAsimovData(bool loadAsimovData);
-  void setParameterInjector(const nlohmann::json &parameterInjector);
+  void setParameterInjectorConfig(const nlohmann::json &parameterInjector);
   void setGlobalCovarianceMatrix(const std::shared_ptr<TMatrixD> &globalCovarianceMatrix);
 
   // Const getters
@@ -70,6 +70,7 @@ public:
   void reweightMcEvents();
   void refillSampleHistograms();
   void throwParametersFromGlobalCovariance();
+  void injectParameterOnMcSamples(const nlohmann::json &injectConfig_);
 
 protected:
   void readConfigImpl() override;
@@ -86,7 +87,8 @@ private:
   bool _loadAsimovData_{false};
   bool _debugPrintLoadedEvents_{false};
   int _debugPrintLoadedEventsNbPerSample_{5};
-  nlohmann::json _parameterInjector_;
+  nlohmann::json _parameterInjectorMc_;
+  nlohmann::json _parameterInjectorToy_;
 
   // Internals
   bool _throwAsimovToyParameters_{false};
