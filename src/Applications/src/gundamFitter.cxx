@@ -305,7 +305,7 @@ int main(int argc, char** argv){
   // injectParameterPath
   if( not injectParameterPath.empty() ){
     auto injectConfig = ConfigUtils::readConfigFile( injectParameterPath ); ConfigUtils::forwardConfig( injectConfig );
-    fitter.getPropagator().setParameterInjector( injectConfig );
+    fitter.getPropagator().setParameterInjectorConfig(injectConfig);
   }
 
   // Also check app level config options

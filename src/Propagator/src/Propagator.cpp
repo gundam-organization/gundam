@@ -115,8 +115,8 @@ void Propagator::readConfigImpl(){
   }
 #endif
 
-  _parameterInjector_ = GenericToolbox::Json::fetchValue(_config_, "parameterInjection", _parameterInjector_);
-  ConfigUtils::forwardConfig(_parameterInjector_);
+  _parameterInjectorMc_ = GenericToolbox::Json::fetchValue(_config_, "parameterInjection", _parameterInjectorMc_);
+  ConfigUtils::forwardConfig(_parameterInjectorMc_);
 
 }
 void Propagator::initializeImpl() {
@@ -394,6 +394,13 @@ void Propagator::initializeImpl() {
     sample.getDataContainer().isLocked = true;
   }
 
+  if( not _parameterInjectorMc_.empty() ){
+    LogWarning << "Injecting parameters on MC samples..." << std::endl;
+    this->injectParameterOnMcSamples(_parameterInjectorMc_);
+    this->resetReweight();
+    this->reweightMcEvents();
+  }
+
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the plot generator") << std::endl;
   _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
   _plotGenerator_.initialize();
@@ -517,56 +524,6 @@ void Propagator::initializeImpl() {
   }
 
 
-  if( not _parameterInjector_.empty() ){
-
-    nlohmann::json injParsetList;
-    injParsetList = GenericToolbox::Json::fetchValue(_parameterInjector_, "parameterSetList", injParsetList);
-
-    for( auto& entryParset : injParsetList ){
-      auto parsetName = GenericToolbox::Json::fetchValue<std::string>(entryParset, "name");
-      LogInfo << "Reading injection parameters for parSet: " << parsetName << std::endl;
-
-      auto* selectedParset = this->getFitParameterSetPtr( parsetName );
-      LogThrowIf( selectedParset == nullptr, "Could not find parset: " << parsetName );
-
-      auto parValues = GenericToolbox::Json::fetchValue<nlohmann::json>(entryParset, "parameterValues");
-      if( parValues.empty() ) {
-        LogThrow( "" );
-      }
-      else if( parValues.is_string() ){
-        LogInfo << "Reading parameter values from file: " << parValues.get<std::string>() << std::endl;
-        auto parList = GenericToolbox::dumpFileAsVectorString( parValues.get<std::string>(), true );
-        LogThrowIf( parList.size() != selectedParset->getNbParameters()  ,
-                    parList.size() << " parameters provided for " << parsetName << ", expecting " << selectedParset->getNbParameters()
-                    );
-
-        for( size_t iPar = 0 ; iPar < selectedParset->getNbParameters() ; iPar++ ) {
-          LogWarning << "Injecting \"" << selectedParset->getParameterList()[iPar].getFullTitle() << "\": " << parList[iPar] << std::endl;
-          selectedParset->getParameterList()[iPar].setParameterValue( std::stod(parList[iPar]) );
-        }
-
-        if( selectedParset->isUseEigenDecompInFit() ){ selectedParset->propagateOriginalToEigen(); }
-      }
-      else{
-        for( auto& parValueEntry : parValues ){
-          if( GenericToolbox::Json::doKeyExist(parValueEntry, "name") ) {
-            auto parName = GenericToolbox::Json::fetchValue<std::string>(parValueEntry, "name");
-            auto* parPtr = selectedParset->getParameterPtr(parName);
-            LogThrowIf(parPtr == nullptr, "Could not find " << parName << " among the defined parameters in " << selectedParset->getName());
-
-            LogWarning << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
-            parPtr->setParameterValue( GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") );
-          }
-          else {
-            LogThrow("Unsupported: " << parValueEntry);
-          }
-        }
-
-
-      }
-    }
-
-  }
 
   // Propagator needs to be fast
   GlobalVariables::getParallelWorker().setCpuTimeSaverIsEnabled(false);
@@ -587,8 +544,8 @@ void Propagator::setIThrow(int iThrow) {
 void Propagator::setLoadAsimovData(bool loadAsimovData) {
   _loadAsimovData_ = loadAsimovData;
 }
-void Propagator::setParameterInjector(const nlohmann::json &parameterInjector) {
-  _parameterInjector_ = parameterInjector;
+void Propagator::setParameterInjectorConfig(const nlohmann::json &parameterInjector) {
+  _parameterInjectorMc_ = parameterInjector;
 }
 void Propagator::setGlobalCovarianceMatrix(const std::shared_ptr<TMatrixD> &globalCovarianceMatrix) {
   _globalCovarianceMatrix_ = globalCovarianceMatrix;
@@ -815,6 +772,56 @@ void Propagator::throwParametersFromGlobalCovariance(){
   // Making sure eigen decomposed parameters get the conversion done
   for( auto& parSet : _parameterSetList_ ){
     if( parSet.isUseEigenDecompInFit() ){ parSet.propagateOriginalToEigen(); }
+  }
+
+}
+void Propagator::injectParameterOnMcSamples(const nlohmann::json &injectConfig_) {
+
+  nlohmann::json injParsetList;
+  injParsetList = GenericToolbox::Json::fetchValue(injectConfig_, "parameterSetList", injParsetList);
+
+  for( auto& entryParset : injParsetList ){
+    auto parsetName = GenericToolbox::Json::fetchValue<std::string>(entryParset, "name");
+    LogInfo << "Reading injection parameters for parSet: " << parsetName << std::endl;
+
+    auto* selectedParset = this->getFitParameterSetPtr( parsetName );
+    LogThrowIf( selectedParset == nullptr, "Could not find parset: " << parsetName );
+
+    auto parValues = GenericToolbox::Json::fetchValue<nlohmann::json>(entryParset, "parameterValues");
+    if( parValues.empty() ) {
+      LogThrow( "" );
+    }
+    else if( parValues.is_string() ){
+      LogInfo << "Reading parameter values from file: " << parValues.get<std::string>() << std::endl;
+      auto parList = GenericToolbox::dumpFileAsVectorString( parValues.get<std::string>(), true );
+      LogThrowIf( parList.size() != selectedParset->getNbParameters()  ,
+                  parList.size() << " parameters provided for " << parsetName << ", expecting " << selectedParset->getNbParameters()
+      );
+
+      for( size_t iPar = 0 ; iPar < selectedParset->getNbParameters() ; iPar++ ) {
+        LogWarning << "Injecting \"" << selectedParset->getParameterList()[iPar].getFullTitle() << "\": " << parList[iPar] << std::endl;
+        selectedParset->getParameterList()[iPar].setParameterValue( std::stod(parList[iPar]) );
+      }
+
+      if( selectedParset->isUseEigenDecompInFit() ){ selectedParset->propagateOriginalToEigen(); }
+    }
+    else{
+      for( auto& parValueEntry : parValues ){
+        if( GenericToolbox::Json::doKeyExist(parValueEntry, "name") ) {
+          auto parName = GenericToolbox::Json::fetchValue<std::string>(parValueEntry, "name");
+          auto* parPtr = selectedParset->getParameterPtr(parName);
+          LogThrowIf(parPtr == nullptr, "Could not find " << parName << " among the defined parameters in " << selectedParset->getName());
+
+          LogWarning << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
+          parPtr->setParameterValue( GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") );
+        }
+        else {
+          LogThrow("Unsupported: " << parValueEntry);
+        }
+      }
+
+
+    }
   }
 
 }
