@@ -26,6 +26,7 @@
 #include "TTreeFormulaManager.h"
 #include "TChain.h"
 #include "TChainElement.h"
+#include "THn.h"
 
 #include "sstream"
 #include "string"
@@ -873,11 +874,48 @@ void DataDispenser::loadFromHistContent(){
     _cache_.sampleEventListPtrToFill[iSample] = &container->eventList;
     _cache_.sampleIndexOffsetList[iSample] = _cache_.sampleEventListPtrToFill[iSample]->size();
     container->reserveEventMemory( _owner_->getDataSetIndex(), _cache_.sampleNbOfEvents[iSample], eventPlaceholder );
+
+    // indexing according to the binning
+    for( size_t iEvent=_cache_.sampleIndexOffsetList[iSample] ; iEvent < container->eventList.size() ; iEvent++ ){
+      container->eventList[iEvent].setSampleBinIndex( int( iEvent ) );
+    }
   }
 
   // read hist content from file
+  TFile* fHist{nullptr};
+  LogThrowIf( not GenericToolbox::Json::doKeyExist(_parameters_.fromHistContent, "fromRootFile"), "No root file provided." );
+  auto filePath = GenericToolbox::Json::fetchValue<std::string>(_parameters_.fromHistContent, "fromRootFile");
 
+  fHist = GenericToolbox::openExistingTFile(filePath);
+  LogThrowIf(fHist == nullptr, "Could not open file: " << filePath);
 
+  LogThrowIf( not GenericToolbox::Json::doKeyExist(_parameters_.fromHistContent, "sampleList"), "Could not find samplesList." );
+  auto sampleList = GenericToolbox::Json::fetchValue<nlohmann::json>(_parameters_.fromHistContent, "sampleList");
+  for( auto& sample : _cache_.samplesToFillList ){
+
+    auto entry = GenericToolbox::Json::fetchMatchingEntry( sampleList, "name", sample->getName() );
+    LogContinueIf( entry.empty(), "Could not find sample histogram: " << sample->getName() );
+
+    LogThrowIf( not GenericToolbox::Json::doKeyExist( entry, "hist" ), "No hist name provided for " << sample->getName() );
+    auto histName = GenericToolbox::Json::fetchValue<std::string>( entry, "hist" );
+
+    auto* hist = fHist->Get<THnD>( histName.c_str() );
+    LogThrowIf( hist == nullptr, "Could not find hist \"" << histName << "\" within " << fHist->GetPath() );
+
+    LogThrowIf( hist->GetNbins() != int( sample->getBinning().getBinsList().size() ),
+                "Mismatching bin number for " << sample->getName() << std::endl
+                << GET_VAR_NAME_VALUE(hist->GetNbins()) << std::endl
+                << GET_VAR_NAME_VALUE(sample->getBinning().getBinsList().size()) << std::endl
+                );
+
+    auto* container = &sample->getDataContainer();
+    for( size_t iBin = 0 ; iBin < sample->getBinning().getBinsList().size() ; iBin++ ){
+      container->eventList[iBin].setTreeWeight( hist->GetBinContent( int(iBin) + 1 ) );
+      container->eventList[iBin].resetEventWeight();
+    }
+  }
+
+  fHist->Close();
 }
 
 void DataDispenser::fillFunction(int iThread_){
