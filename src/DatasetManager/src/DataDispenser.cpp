@@ -43,6 +43,15 @@ void DataDispenser::readConfigImpl(){
   LogThrowIf( _config_.empty(), "Config is not set." );
 
   _parameters_.name = GenericToolbox::Json::fetchValue<std::string>(_config_, "name", _parameters_.name);
+
+  if( GenericToolbox::Json::doKeyExist( _config_, "fromHistContent" ) ) {
+    LogWarning << "Dataset \"" << _parameters_.name << "\" will be defined with histogram data." << std::endl;
+
+    _parameters_.fromHistContent = GenericToolbox::Json::fetchValue<nlohmann::json>( _config_, "fromHistContent" );
+    GenericToolbox::Json::forwardConfig( _parameters_.fromHistContent );
+    return;
+  }
+
   _parameters_.treePath = GenericToolbox::Json::fetchValue<std::string>(_config_, "tree", _parameters_.treePath);
   _parameters_.filePathList = GenericToolbox::Json::fetchValue<std::vector<std::string>>(_config_, "filePathList", _parameters_.filePathList);
   _parameters_.additionalVarsStorage = GenericToolbox::Json::fetchValue(_config_, {{"additionalLeavesStorage"}, {"additionalVarsStorage"}}, _parameters_.additionalVarsStorage);
@@ -97,10 +106,54 @@ void DataDispenser::load(){
   _cache_.clear();
 
   this->buildSampleToFillList();
+
   if( _cache_.samplesToFillList.empty() ){
     LogError << "No samples were selected for dataset: " << getTitle() << std::endl;
     return;
   }
+
+  LogInfo << "Data will be extracted from: " << GenericToolbox::parseVectorAsString(_parameters_.filePathList, true) << std::endl;
+  for( const auto& file: _parameters_.filePathList){
+    std::string path = GenericToolbox::expandEnvironmentVariables(file);
+    LogThrowIf(not GenericToolbox::doesTFileIsValid(path, {_parameters_.treePath}), "Invalid file: " << path);
+  }
+
+  if( not _parameters_.fromHistContent.empty() ){
+    this->loadFromHistContent();
+    return;
+  }
+
+  this->parseStringParameters();
+  this->doEventSelection();
+  this->fetchRequestedLeaves();
+  this->preAllocateMemory();
+  this->readAndFill();
+
+  LogWarning << "Loaded " << getTitle() << std::endl;
+}
+std::string DataDispenser::getTitle(){
+  std::stringstream ss;
+  if( _owner_ != nullptr ) ss << _owner_->getName();
+  ss << "/" << _parameters_.name;
+  return ss.str();
+}
+
+void DataDispenser::buildSampleToFillList(){
+  LogWarning << "Fetching samples to fill..." << std::endl;
+
+  for( auto& sample : _sampleSetPtrToLoad_->getFitSampleList() ){
+    if( not sample.isEnabled() ) continue;
+    if( sample.isDatasetValid(_owner_->getName()) ){
+      _cache_.samplesToFillList.emplace_back(&sample);
+    }
+  }
+
+  if( _cache_.samplesToFillList.empty() ){
+    LogInfo << "No sample selected." << std::endl;
+    return;
+  }
+}
+void DataDispenser::parseStringParameters() {
 
   auto replaceToyIndexFct = [&](std::string& formula_){
     if( GenericToolbox::doesStringContainsSubstring(formula_, "<I_TOY>") ){
@@ -147,57 +200,12 @@ void DataDispenser::load(){
     });
   }
 
-
   replaceToyIndexFct(_parameters_.nominalWeightFormulaStr);
   replaceToyIndexFct(_parameters_.selectionCutFormulaStr);
 
   overrideLeavesNamesFct(_parameters_.nominalWeightFormulaStr);
   overrideLeavesNamesFct(_parameters_.selectionCutFormulaStr);
 
-  LogInfo << "Data will be extracted from: " << GenericToolbox::parseVectorAsString(_parameters_.filePathList, true) << std::endl;
-  for( const auto& file: _parameters_.filePathList){
-    std::string path = GenericToolbox::expandEnvironmentVariables(file);
-    LogThrowIf(not GenericToolbox::doesTFileIsValid(path, {_parameters_.treePath}), "Invalid file: " << path);
-  }
-
-#if USE_NEW_DIALS
-  if( _dialCollectionListPtr_ != nullptr ){
-    for( auto& dialCollection : *_dialCollectionListPtr_ ){
-      if( dialCollection.isDatasetValid( _owner_->getName() ) ){
-        _cache_.dialCollectionsRefList.emplace_back( &dialCollection );
-      }
-    }
-  }
-#endif
-
-  this->doEventSelection();
-  this->fetchRequestedLeaves();
-  this->preAllocateMemory();
-  this->readAndFill();
-
-  LogWarning << "Loaded " << getTitle() << std::endl;
-}
-std::string DataDispenser::getTitle(){
-  std::stringstream ss;
-  if( _owner_ != nullptr ) ss << _owner_->getName();
-  ss << "/" << _parameters_.name;
-  return ss.str();
-}
-
-void DataDispenser::buildSampleToFillList(){
-  LogWarning << "Fetching samples to fill..." << std::endl;
-
-  for( auto& sample : _sampleSetPtrToLoad_->getFitSampleList() ){
-    if( not sample.isEnabled() ) continue;
-    if(sample.isDatasetValid(_owner_->getName()) ){
-      _cache_.samplesToFillList.emplace_back(&sample);
-    }
-  }
-
-  if( _cache_.samplesToFillList.empty() ){
-    LogInfo << "No sample selected." << std::endl;
-    return;
-  }
 }
 void DataDispenser::doEventSelection(){
   LogWarning << "Performing event selection..." << std::endl;
@@ -419,6 +427,15 @@ void DataDispenser::fetchRequestedLeaves(){
   LogWarning << "Poll every objects for requested variables..." << std::endl;
 
 #if USE_NEW_DIALS
+  if( _dialCollectionListPtr_ != nullptr ){
+    LogInfo << "Selecting dial collections..." << std::endl;
+    for( auto& dialCollection : *_dialCollectionListPtr_ ){
+      if( dialCollection.isDatasetValid( _owner_->getName() ) ){
+        _cache_.dialCollectionsRefList.emplace_back( &dialCollection );
+      }
+    }
+  }
+
   if( not _cache_.dialCollectionsRefList.empty() ) {
     std::vector<std::string> indexRequests;
     for( auto& dialCollection : _cache_.dialCollectionsRefList ) {
@@ -589,7 +606,6 @@ void DataDispenser::fetchRequestedLeaves(){
 //  t.printTable();
 
 }
-
 void DataDispenser::preAllocateMemory(){
   LogInfo << "Pre-allocating memory..." << std::endl;
   /// \brief The following lines are necessary since the events might get
@@ -795,7 +811,6 @@ void DataDispenser::preAllocateMemory(){
 #endif
 
 }
-
 void DataDispenser::readAndFill(){
   LogWarning << "Reading dataset and loading..." << std::endl;
 
@@ -834,6 +849,33 @@ void DataDispenser::readAndFill(){
     }
   }
 
+
+
+}
+void DataDispenser::loadFromHistContent(){
+  LogWarning << "Creating dummy PhysicsEvent entries for loading hist content" << std::endl;
+
+  // non-trivial as we need to propagate systematics. Need to merge with the original data loader, but not straight forward?
+  LogThrowIf( _parameters_.useMcContainer, "Hist loader not implemented for MC containers" );
+
+  // counting events
+  for( auto& sample : _cache_.samplesToFillList ){
+    // one event per bin
+    _cache_.sampleNbOfEvents.resize( sample->getBinning().getBinsList().size(), 0);
+  }
+
+  PhysicsEvent eventPlaceholder;
+  eventPlaceholder.setDataSetIndex(_owner_->getDataSetIndex());
+
+  // claiming event memory
+  for( size_t iSample = 0 ; iSample < _cache_.sampleNbOfEvents.size() ; iSample++ ){
+    auto* container = &_cache_.samplesToFillList[iSample]->getDataContainer();
+    _cache_.sampleEventListPtrToFill[iSample] = &container->eventList;
+    _cache_.sampleIndexOffsetList[iSample] = _cache_.sampleEventListPtrToFill[iSample]->size();
+    container->reserveEventMemory( _owner_->getDataSetIndex(), _cache_.sampleNbOfEvents[iSample], eventPlaceholder );
+  }
+
+  // read hist content from file
 
 
 }
