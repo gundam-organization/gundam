@@ -877,19 +877,14 @@ void DataDispenser::loadFromHistContent(){
     // fetch event container
     auto* container = &_cache_.samplesToFillList[iSample]->getDataContainer();
 
-    LogDebug << __LINE__ << GET_VAR_NAME_VALUE(container) << std::endl;
     _cache_.sampleEventListPtrToFill[iSample] = &container->eventList;
-    LogDebug << __LINE__ << GET_VAR_NAME_VALUE(container) << std::endl;
     _cache_.sampleIndexOffsetList[iSample] = _cache_.sampleEventListPtrToFill[iSample]->size();
-    LogDebug << __LINE__ << GET_VAR_NAME_VALUE(container) << std::endl;
     container->reserveEventMemory( _owner_->getDataSetIndex(), _cache_.sampleNbOfEvents[iSample], eventPlaceholder );
 
-    LogDebug << __LINE__ << GET_VAR_NAME_VALUE(iSample) << std::endl;
     // indexing according to the binning
     for( size_t iEvent=_cache_.sampleIndexOffsetList[iSample] ; iEvent < container->eventList.size() ; iEvent++ ){
       container->eventList[iEvent].setSampleBinIndex( int( iEvent ) );
     }
-    LogDebug << __LINE__ << GET_VAR_NAME_VALUE(iSample) << std::endl;
   }
 
   // read hist content from file
