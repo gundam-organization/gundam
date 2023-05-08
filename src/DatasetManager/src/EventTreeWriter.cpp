@@ -66,8 +66,8 @@ void EventTreeWriter::writeEvents(TDirectory *saveDir_, const std::string& treeN
 
   GenericToolbox::RawDataArray loadedLeavesArr;
   auto loadedLeavesDict = eventList_[0].generateLeavesDictionary(true);
+  std::vector<std::string> leafNamesList;
   if( not loadedLeavesDict.empty() ){
-    std::vector<std::string> leafNamesList;
     leavesDefStr = "";
     for( auto& leafDef : loadedLeavesDict ){
       if( not leavesDefStr.empty() ) leavesDefStr += ":";
