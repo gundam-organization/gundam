@@ -861,16 +861,16 @@ void DataDispenser::loadFromHistContent(){
   LogThrowIf( _parameters_.useMcContainer, "Hist loader not implemented for MC containers" );
 
   // counting events
-  for( auto& sample : _cache_.samplesToFillList ){
-    // one event per bin
-    _cache_.sampleNbOfEvents.resize( sample->getBinning().getBinsList().size(), 0);
-  }
+  _cache_.sampleNbOfEvents.resize(_cache_.samplesToFillList.size());
 
   PhysicsEvent eventPlaceholder;
   eventPlaceholder.setDataSetIndex(_owner_->getDataSetIndex());
 
   // claiming event memory
   for( size_t iSample = 0 ; iSample < _cache_.sampleNbOfEvents.size() ; iSample++ ){
+    // one event per bin
+    _cache_.sampleNbOfEvents[iSample] = _cache_.samplesToFillList[iSample]->getBinning().getBinsList().size();
+
     auto* container = &_cache_.samplesToFillList[iSample]->getDataContainer();
     _cache_.sampleEventListPtrToFill[iSample] = &container->eventList;
     _cache_.sampleIndexOffsetList[iSample] = _cache_.sampleEventListPtrToFill[iSample]->size();
