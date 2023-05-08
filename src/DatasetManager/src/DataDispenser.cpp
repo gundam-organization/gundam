@@ -892,7 +892,8 @@ void DataDispenser::loadFromHistContent(){
   LogThrowIf( not GenericToolbox::Json::doKeyExist(_parameters_.fromHistContent, "fromRootFile"), "No root file provided." );
   auto filePath = GenericToolbox::Json::fetchValue<std::string>(_parameters_.fromHistContent, "fromRootFile");
 
-  fHist = GenericToolbox::openExistingTFile(filePath);
+  LogThrowIf( GenericToolbox::doesTFileIsValid(filePath), "Could not open file: " << filePath );
+  fHist = TFile::Open(filePath.c_str());
   LogThrowIf(fHist == nullptr, "Could not open file: " << filePath);
 
   LogThrowIf( not GenericToolbox::Json::doKeyExist(_parameters_.fromHistContent, "sampleList"), "Could not find samplesList." );
