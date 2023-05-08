@@ -870,6 +870,7 @@ void DataDispenser::loadFromHistContent(){
 
   // claiming event memory
   for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
+    LogScopeIndent;
 
     // one event per bin
     _cache_.sampleNbOfEvents[iSample] = _cache_.samplesToFillList[iSample]->getBinning().getBinsList().size();
@@ -887,10 +888,14 @@ void DataDispenser::loadFromHistContent(){
     }
   }
 
+  LogInfo << "Reading external hist files..." << std::endl;
+
   // read hist content from file
   TFile* fHist{nullptr};
   LogThrowIf( not GenericToolbox::Json::doKeyExist(_parameters_.fromHistContent, "fromRootFile"), "No root file provided." );
   auto filePath = GenericToolbox::Json::fetchValue<std::string>(_parameters_.fromHistContent, "fromRootFile");
+
+  LogInfo << "Opening: " << filePath << std::endl;
 
   LogThrowIf( GenericToolbox::doesTFileIsValid(filePath), "Could not open file: " << filePath );
   fHist = TFile::Open(filePath.c_str());
@@ -899,12 +904,14 @@ void DataDispenser::loadFromHistContent(){
   LogThrowIf( not GenericToolbox::Json::doKeyExist(_parameters_.fromHistContent, "sampleList"), "Could not find samplesList." );
   auto sampleList = GenericToolbox::Json::fetchValue<nlohmann::json>(_parameters_.fromHistContent, "sampleList");
   for( auto& sample : _cache_.samplesToFillList ){
+    LogScopeIndent;
 
     auto entry = GenericToolbox::Json::fetchMatchingEntry( sampleList, "name", sample->getName() );
     LogContinueIf( entry.empty(), "Could not find sample histogram: " << sample->getName() );
 
     LogThrowIf( not GenericToolbox::Json::doKeyExist( entry, "hist" ), "No hist name provided for " << sample->getName() );
     auto histName = GenericToolbox::Json::fetchValue<std::string>( entry, "hist" );
+    LogInfo << "Filling sample \"" << sample->getName() << "\" using hist with name: " << histName << std::endl;
 
     auto* hist = fHist->Get<THnD>( histName.c_str() );
     LogThrowIf( hist == nullptr, "Could not find hist \"" << histName << "\" within " << fHist->GetPath() );
