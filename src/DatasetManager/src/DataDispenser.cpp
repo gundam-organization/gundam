@@ -935,19 +935,8 @@ void DataDispenser::loadFromHistContent(){
       auto target = sample->getBinning().getBinsList()[iBin].generateBinTarget( axisNameList );
       auto histBinIndex = hist->GetBin( target.data() ); // bad fetch..?
 
-//      // manual fetch??
-//      histBinIndex = 1;
-//      std::vector<int> axisIdxList{};
-//      for( int iDim = 0 ; iDim < hist->GetNdimensions() ; iDim++ ){
-//        LogTrace << axisNameList[iDim] << " => " << GET_VAR_NAME_VALUE(target[iDim]) << std::endl;
-//        axisIdxList.emplace_back(hist->GetAxis(iDim)->FindBin( target[iDim] ));
-//      }
-//      LogTrace << "bins: " << GenericToolbox::parseVectorAsString(axisIdxList) << std::endl;
-//      histBinIndex = hist->GetBin( axisIdxList.data() );
-
       container->eventList[iBin].setTreeWeight( hist->GetBinContent( histBinIndex ) );
       container->eventList[iBin].resetEventWeight();
-//      LogDebug << "Bin #" << iBin << " (" << histBinIndex << ") " << GenericToolbox::parseVectorAsString(target) << " -> weight = " << container->eventList[iBin].getEventWeight() << std::endl;
     }
 
   }
