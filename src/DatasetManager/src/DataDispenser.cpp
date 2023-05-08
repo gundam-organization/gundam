@@ -914,18 +914,22 @@ void DataDispenser::loadFromHistContent(){
     LogInfo << "Filling sample \"" << sample->getName() << "\" using hist with name: " << histName << std::endl;
 
     auto* hist = fHist->Get<THnD>( histName.c_str() );
-    LogThrowIf( hist == nullptr, "Could not find hist \"" << histName << "\" within " << fHist->GetPath() );
+    LogThrowIf( hist == nullptr, "Could not find THnD \"" << histName << "\" within " << fHist->GetPath() );
 
-    LogThrowIf( hist->GetNbins() != int( sample->getBinning().getBinsList().size() ),
+    LogWarningIf( hist->GetNbins() != int( sample->getBinning().getBinsList().size() ) ) <<
       "Mismatching bin number for " << sample->getName() << std::endl
       << GET_VAR_NAME_VALUE(hist->GetNbins()) << std::endl
-      << GET_VAR_NAME_VALUE(sample->getBinning().getBinsList().size()) << std::endl
-    );
+      << GET_VAR_NAME_VALUE(sample->getBinning().getBinsList().size()) << std::endl;
 
     auto* container = &sample->getDataContainer();
     for( size_t iBin = 0 ; iBin < sample->getBinning().getBinsList().size() ; iBin++ ){
-      container->eventList[iBin].setTreeWeight( hist->GetBinContent( int(iBin) + 1 ) );
+      container->eventList[iBin].setTreeWeight(
+          hist->GetBinContent(
+              hist->GetBin( sample->getBinning().getBinsList()[iBin].generateBinTarget().data() )
+          )
+      );
       container->eventList[iBin].resetEventWeight();
+      LogDebug << "Bin #" << iBin << " -> weight = " << container->eventList[iBin].getEventWeight() << std::endl;
     }
 
   }

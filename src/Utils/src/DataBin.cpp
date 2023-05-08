@@ -15,24 +15,6 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[DataBin]");
 } );
 
-DataBin::DataBin() {
-  reset();
-}
-DataBin::~DataBin() {
-  reset();
-}
-
-void DataBin::reset() {
-  _edgesList_.clear();
-  _variableNameList_.clear();
-  _isLowMemoryUsageMode_ = false;
-  _isZeroWideRangesTolerated_ = false;
-  _formulaStr_ = "";
-  _treeFormulaStr_ = "";
-  _formula_ = nullptr;
-  _treeFormula_ = nullptr;
-}
-
 // Setters
 void DataBin::setIsLowMemoryUsageMode(bool isLowMemoryUsageMode_){
   _isLowMemoryUsageMode_ = isLowMemoryUsageMode_;
@@ -169,14 +151,22 @@ std::string DataBin::getSummary() const{
   }
   return ss.str();
 }
+std::vector<double> DataBin::generateBinTarget() const{
+  std::vector<double> out;
+  out.reserve( _edgesList_.size() );
+  for( auto& edge : _edgesList_ ){
+    out.emplace_back(edge.first);
+    if( edge.first != edge.second ){
+      out.back() = std::abs( edge.second - edge.first )/2.;
+    }
+  }
+  return out;
+}
 void DataBin::generateFormula() {
-
   _formulaStr_ = generateFormulaStr(false);
   _formula_ = std::make_shared<TFormula>(_formulaStr_.c_str(), _formulaStr_.c_str());
-
 }
 void DataBin::generateTreeFormula() {
-
   _treeFormulaStr_ = generateFormulaStr(true);
   // For treeFormula we need a fake tree to compile the formula
   std::vector<std::string> varNameList;
