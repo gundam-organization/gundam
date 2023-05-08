@@ -860,31 +860,35 @@ void DataDispenser::loadFromHistContent(){
   // non-trivial as we need to propagate systematics. Need to merge with the original data loader, but not straight forward?
   LogThrowIf( _parameters_.useMcContainer, "Hist loader not implemented for MC containers" );
 
-  LogDebug << __LINE__ << std::endl;
   // counting events
   _cache_.sampleNbOfEvents.resize(_cache_.samplesToFillList.size());
 
-  LogDebug << __LINE__ << std::endl;
   PhysicsEvent eventPlaceholder;
   eventPlaceholder.setDataSetIndex(_owner_->getDataSetIndex());
 
-  LogDebug << __LINE__ << std::endl;
   // claiming event memory
-  for( size_t iSample = 0 ; iSample < _cache_.sampleNbOfEvents.size() ; iSample++ ){
+  for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
 
     LogDebug << __LINE__ << GET_VAR_NAME_VALUE(iSample) << std::endl;
     // one event per bin
     _cache_.sampleNbOfEvents[iSample] = _cache_.samplesToFillList[iSample]->getBinning().getBinsList().size();
 
+    LogDebug << __LINE__ << GET_VAR_NAME_VALUE(iSample) << std::endl;
+
     auto* container = &_cache_.samplesToFillList[iSample]->getDataContainer();
+
+
+    LogDebug << __LINE__ << GET_VAR_NAME_VALUE(iSample) << std::endl;
     _cache_.sampleEventListPtrToFill[iSample] = &container->eventList;
     _cache_.sampleIndexOffsetList[iSample] = _cache_.sampleEventListPtrToFill[iSample]->size();
     container->reserveEventMemory( _owner_->getDataSetIndex(), _cache_.sampleNbOfEvents[iSample], eventPlaceholder );
 
+    LogDebug << __LINE__ << GET_VAR_NAME_VALUE(iSample) << std::endl;
     // indexing according to the binning
     for( size_t iEvent=_cache_.sampleIndexOffsetList[iSample] ; iEvent < container->eventList.size() ; iEvent++ ){
       container->eventList[iEvent].setSampleBinIndex( int( iEvent ) );
     }
+    LogDebug << __LINE__ << GET_VAR_NAME_VALUE(iSample) << std::endl;
   }
 
   // read hist content from file
