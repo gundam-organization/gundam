@@ -937,6 +937,9 @@ void DataDispenser::loadFromHistContent(){
       auto target = sample->getBinning().getBinsList()[iBin].generateBinTarget( axisNameList );
       auto histBinIndex = hist->GetBin( target.data() ); // bad fetch..?
 
+      for( size_t iVar = 0 ; iVar < target.size() ; iVar++ ){
+        container->eventList[iBin].setVariable( target[iVar], axisNameList[iVar] );
+      }
       container->eventList[iBin].setTreeWeight( hist->GetBinContent( histBinIndex ) );
       container->eventList[iBin].resetEventWeight();
     }
