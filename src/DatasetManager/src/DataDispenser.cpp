@@ -387,7 +387,6 @@ void DataDispenser::doEventSelection(){
     if( iThread_ == 0 ){ GenericToolbox::displayProgressBar(nEvents, nEvents, ssProgressTitle.str()); }
   };
 
-  LogInfo << "Event selection..." << std::endl;
   if( not _owner_->isDevSingleThreadEventSelection() ) {
     GlobalVariables::getParallelWorker().addJob(__METHOD_NAME__, selectionFct);
     GlobalVariables::getParallelWorker().runJob(__METHOD_NAME__);

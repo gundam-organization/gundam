@@ -510,36 +510,37 @@ void PhysicsEvent::addNestedDialRefToCache(NestedDialTest* nestedDialPtr_, const
 std::map< std::string,
   std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>> PhysicsEvent::generateLeavesDictionary(bool disableArrays_) const {
   std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>> out;
+  if( _commonLeafNameListPtr_ != nullptr ){
+    for( auto& leafName : *_commonLeafNameListPtr_ ){
 
-  for( auto& leafName : *_commonLeafNameListPtr_ ){
+      const auto& lH = this->getLeafHolder(leafName);
+      char typeTag = GenericToolbox::findOriginalVariableType(lH[0]);
+      LogThrowIf( typeTag == 0 or typeTag == char(0xFF), leafName << " has an invalid leaf type." )
 
-    const auto& lH = this->getLeafHolder(leafName);
-    char typeTag = GenericToolbox::findOriginalVariableType(lH[0]);
-    LogThrowIf( typeTag == 0 or typeTag == char(0xFF), leafName << " has an invalid leaf type." )
-
-    std::string leafDefStr{leafName};
-    if(not disableArrays_ and lH.size() > 1){ leafDefStr += "[" + std::to_string(lH.size()) + "]"; }
-    leafDefStr += "/";
-    leafDefStr += typeTag;
-    if(not disableArrays_){
-      out[leafDefStr] = [](GenericToolbox::RawDataArray& arr_, const std::vector<GenericToolbox::AnyType>& variablesList_){
-        for(const auto & variable : variablesList_){
+      std::string leafDefStr{leafName};
+      if(not disableArrays_ and lH.size() > 1){ leafDefStr += "[" + std::to_string(lH.size()) + "]"; }
+      leafDefStr += "/";
+      leafDefStr += typeTag;
+      if(not disableArrays_){
+        out[leafDefStr] = [](GenericToolbox::RawDataArray& arr_, const std::vector<GenericToolbox::AnyType>& variablesList_){
+          for(const auto & variable : variablesList_){
+            arr_.writeMemoryContent(
+                variable.getPlaceHolderPtr()->getVariableAddress(),
+                variable.getPlaceHolderPtr()->getVariableSize()
+            );
+          }
+        };
+      }
+      else{
+        out[leafDefStr] = [](GenericToolbox::RawDataArray& arr_, const std::vector<GenericToolbox::AnyType>& variablesList_){
           arr_.writeMemoryContent(
-              variable.getPlaceHolderPtr()->getVariableAddress(),
-              variable.getPlaceHolderPtr()->getVariableSize()
+              variablesList_[0].getPlaceHolderPtr()->getVariableAddress(),
+              variablesList_[0].getPlaceHolderPtr()->getVariableSize()
           );
-        }
-      };
-    }
-    else{
-      out[leafDefStr] = [](GenericToolbox::RawDataArray& arr_, const std::vector<GenericToolbox::AnyType>& variablesList_){
-        arr_.writeMemoryContent(
-            variablesList_[0].getPlaceHolderPtr()->getVariableAddress(),
-            variablesList_[0].getPlaceHolderPtr()->getVariableSize()
-        );
-      };
-    }
+        };
+      }
 
+    }
   }
   return out;
 }
