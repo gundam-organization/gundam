@@ -938,6 +938,7 @@ void DataDispenser::loadFromHistContent(){
       // manual fetch??
       histBinIndex = 1;
       for( int iDim = 0 ; iDim < hist->GetNdimensions() ; iDim++ ){
+        LogTrace << GET_VAR_NAME_VALUE(hist->GetAxis(iDim)->FindBin( target[iDim] )) << std::endl;
         histBinIndex *= hist->GetAxis(iDim)->FindBin( target[iDim] );
       }
 
