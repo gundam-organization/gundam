@@ -932,13 +932,14 @@ void DataDispenser::loadFromHistContent(){
 
     auto* container = &sample->getDataContainer();
     for( size_t iBin = 0 ; iBin < sample->getBinning().getBinsList().size() ; iBin++ ){
+      auto target = sample->getBinning().getBinsList()[iBin].generateBinTarget( axisNameList );
       container->eventList[iBin].setTreeWeight(
           hist->GetBinContent(
-              hist->GetBin( sample->getBinning().getBinsList()[iBin].generateBinTarget( axisNameList ).data() )
+              hist->GetBin( target.data() )
           )
       );
       container->eventList[iBin].resetEventWeight();
-      LogDebug << "Bin #" << iBin << " -> weight = " << container->eventList[iBin].getEventWeight() << std::endl;
+      LogDebug << "Bin #" << iBin << " " << GenericToolbox::parseVectorAsString(target) << " -> weight = " << container->eventList[iBin].getEventWeight() << std::endl;
     }
 
   }
