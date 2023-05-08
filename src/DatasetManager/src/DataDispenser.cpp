@@ -114,15 +114,15 @@ void DataDispenser::load(){
     return;
   }
 
+  if( not _parameters_.fromHistContent.empty() ){
+    this->loadFromHistContent();
+    return;
+  }
+
   LogInfo << "Data will be extracted from: " << GenericToolbox::parseVectorAsString(_parameters_.filePathList, true) << std::endl;
   for( const auto& file: _parameters_.filePathList){
     std::string path = GenericToolbox::expandEnvironmentVariables(file);
     LogThrowIf(not GenericToolbox::doesTFileIsValid(path, {_parameters_.treePath}), "Invalid file: " << path);
-  }
-
-  if( not _parameters_.fromHistContent.empty() ){
-    this->loadFromHistContent();
-    return;
   }
 
   this->parseStringParameters();
