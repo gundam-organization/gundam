@@ -8,6 +8,7 @@
 #include "DatasetLoader.h"
 #include "GenericToolbox.Json.h"
 #include "Misc.h"
+#include "ConfigUtils.h"
 
 #if USE_NEW_DIALS
 #include "DialCollection.h"
@@ -49,7 +50,7 @@ void DataDispenser::readConfigImpl(){
     LogWarning << "Dataset \"" << _parameters_.name << "\" will be defined with histogram data." << std::endl;
 
     _parameters_.fromHistContent = GenericToolbox::Json::fetchValue<nlohmann::json>( _config_, "fromHistContent" );
-    GenericToolbox::Json::forwardConfig( _parameters_.fromHistContent );
+    ConfigUtils::forwardConfig( _parameters_.fromHistContent );
     return;
   }
 
