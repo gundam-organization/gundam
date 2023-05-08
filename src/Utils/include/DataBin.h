@@ -55,7 +55,7 @@ public:
   void generateFormula();
   void generateTreeFormula();
   [[nodiscard]] std::string getSummary() const;
-  [[nodiscard]] std::vector<double> generateBinTarget() const;
+  [[nodiscard]] std::vector<double> generateBinTarget(const std::vector<std::string>& varNameList_ = {}) const;
 
   // Static
   static bool isBetweenEdges(const std::pair<double,double>& edges_, double value_);

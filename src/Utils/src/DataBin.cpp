@@ -151,13 +151,17 @@ std::string DataBin::getSummary() const{
   }
   return ss.str();
 }
-std::vector<double> DataBin::generateBinTarget() const{
+std::vector<double> DataBin::generateBinTarget( const std::vector<std::string>& varNameList_ ) const{
   std::vector<double> out;
   out.reserve( _edgesList_.size() );
-  for( auto& edge : _edgesList_ ){
-    out.emplace_back(edge.first);
-    if( edge.first != edge.second ){
-      out.back() = std::abs( edge.second - edge.first )/2.;
+
+  for( auto& var : (varNameList_.empty() ? _variableNameList_ : varNameList_) ){
+    LogThrowIf( not GenericToolbox::doesElementIsInVector(var, _variableNameList_),
+                "Could not find " << var << " within " << GenericToolbox::parseVectorAsString(_variableNameList_));
+    auto& edges = this->getVarEdges( var );
+    out.emplace_back(edges.first);
+    if( edges.first != edges.second ){
+      out.back() = std::abs(edges.second - edges.first ) / 2.;
     }
   }
   return out;
