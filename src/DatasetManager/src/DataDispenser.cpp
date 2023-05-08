@@ -862,6 +862,8 @@ void DataDispenser::loadFromHistContent(){
 
   // counting events
   _cache_.sampleNbOfEvents.resize(_cache_.samplesToFillList.size());
+  _cache_.sampleIndexOffsetList.resize(_cache_.samplesToFillList.size());
+  _cache_.sampleEventListPtrToFill.resize(_cache_.samplesToFillList.size());
 
   PhysicsEvent eventPlaceholder;
   eventPlaceholder.setDataSetIndex(_owner_->getDataSetIndex());
