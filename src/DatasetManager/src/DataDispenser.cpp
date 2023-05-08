@@ -903,16 +903,17 @@ void DataDispenser::loadFromHistContent(){
     LogThrowIf( hist == nullptr, "Could not find hist \"" << histName << "\" within " << fHist->GetPath() );
 
     LogThrowIf( hist->GetNbins() != int( sample->getBinning().getBinsList().size() ),
-                "Mismatching bin number for " << sample->getName() << std::endl
-                << GET_VAR_NAME_VALUE(hist->GetNbins()) << std::endl
-                << GET_VAR_NAME_VALUE(sample->getBinning().getBinsList().size()) << std::endl
-                );
+      "Mismatching bin number for " << sample->getName() << std::endl
+      << GET_VAR_NAME_VALUE(hist->GetNbins()) << std::endl
+      << GET_VAR_NAME_VALUE(sample->getBinning().getBinsList().size()) << std::endl
+    );
 
     auto* container = &sample->getDataContainer();
     for( size_t iBin = 0 ; iBin < sample->getBinning().getBinsList().size() ; iBin++ ){
       container->eventList[iBin].setTreeWeight( hist->GetBinContent( int(iBin) + 1 ) );
       container->eventList[iBin].resetEventWeight();
     }
+
   }
 
   fHist->Close();
