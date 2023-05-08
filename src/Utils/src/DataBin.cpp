@@ -161,7 +161,7 @@ std::vector<double> DataBin::generateBinTarget( const std::vector<std::string>& 
     auto& edges = this->getVarEdges( var );
     out.emplace_back(edges.first);
     if( edges.first != edges.second ){
-      out.back() = std::abs(edges.second - edges.first ) / 2.;
+      out.back() = edges.first + (edges.second - edges.first )/ 2.;
     }
   }
   return out;

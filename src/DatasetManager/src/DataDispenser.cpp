@@ -939,10 +939,10 @@ void DataDispenser::loadFromHistContent(){
       histBinIndex = 1;
       std::vector<int> axisIdxList{};
       for( int iDim = 0 ; iDim < hist->GetNdimensions() ; iDim++ ){
-        LogTrace << GET_VAR_NAME_VALUE(hist->GetAxis(iDim)->FindBin( target[iDim] )) << std::endl;
+        LogTrace << axisNameList[iDim] << " => " << GET_VAR_NAME_VALUE(target[iDim]) << std::endl;
         axisIdxList.emplace_back(hist->GetAxis(iDim)->FindBin( target[iDim] ));
       }
-      LogTrace << GenericToolbox::parseVectorAsString(axisIdxList) << std::endl;
+      LogTrace << "bins: " << GenericToolbox::parseVectorAsString(axisIdxList) << std::endl;
       histBinIndex = hist->GetBin( axisIdxList.data() );
 
       container->eventList[iBin].setTreeWeight( hist->GetBinContent( histBinIndex ) );
