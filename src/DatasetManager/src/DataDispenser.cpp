@@ -920,9 +920,9 @@ void DataDispenser::loadFromHistContent(){
     LogThrowIf( hist == nullptr, "Could not find THnD \"" << histName << "\" within " << fHist->GetPath() );
 
 
-    int nBins = 0;
+    int nBins = 1;
     for( int iDim = 0 ; iDim < hist->GetNdimensions() ; iDim++ ){
-      nBins += hist->GetAxis(iDim)->GetNbins();
+      nBins *= hist->GetAxis(iDim)->GetNbins();
     }
 
     LogAlertIf( nBins != int( sample->getBinning().getBinsList().size() ) ) <<
@@ -933,7 +933,14 @@ void DataDispenser::loadFromHistContent(){
     auto* container = &sample->getDataContainer();
     for( size_t iBin = 0 ; iBin < sample->getBinning().getBinsList().size() ; iBin++ ){
       auto target = sample->getBinning().getBinsList()[iBin].generateBinTarget( axisNameList );
-      auto histBinIndex = hist->GetBin( target.data() );
+      auto histBinIndex = hist->GetBin( target.data() ); // bad fetch..?
+
+      // manual fetch??
+      histBinIndex = 1;
+      for( int iDim = 0 ; iDim < hist->GetNdimensions() ; iDim++ ){
+        histBinIndex *= hist->GetAxis(iDim)->FindBin( target[iDim] );
+      }
+
       container->eventList[iBin].setTreeWeight( hist->GetBinContent( histBinIndex ) );
       container->eventList[iBin].resetEventWeight();
       LogDebug << "Bin #" << iBin << " (" << histBinIndex << ") " << GenericToolbox::parseVectorAsString(target) << " -> weight = " << container->eventList[iBin].getEventWeight() << std::endl;
