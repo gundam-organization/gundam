@@ -563,7 +563,7 @@ void PhysicsEvent::copyData(const std::vector<std::pair<const GenericToolbox::Le
       dict_[iLeaf].first->dropToAny(_leafContentList_[iLeaf][0], dict_[iLeaf].second);
     }
   }
-  this->invalidateVarToDoubleCache();
+  this->resizeVarToDoubleCache();
 }
 std::vector<std::pair<const GenericToolbox::LeafHolder*, int>> PhysicsEvent::generateDict(
     const GenericToolbox::TreeEntryBuffer& treeEventBuffer_,

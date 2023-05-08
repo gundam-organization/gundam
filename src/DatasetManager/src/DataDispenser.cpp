@@ -874,6 +874,10 @@ void DataDispenser::loadFromHistContent(){
     eventPlaceholder.setCommonLeafNameListPtr(
       std::make_shared<std::vector<std::string>>(_cache_.samplesToFillList[iSample]->getBinning().getBinVariables())
     );
+    for( size_t iVar = 0 ; iVar < _cache_.samplesToFillList[iSample]->getBinning().getBinVariables().size() ; iVar++ ){
+      eventPlaceholder.getLeafContentList()[iVar].emplace_back( double(0.) );
+    }
+    eventPlaceholder.resizeVarToDoubleCache();
 
     // one event per bin
     _cache_.sampleNbOfEvents[iSample] = _cache_.samplesToFillList[iSample]->getBinning().getBinsList().size();
