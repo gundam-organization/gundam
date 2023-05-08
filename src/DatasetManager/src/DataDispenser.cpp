@@ -867,6 +867,7 @@ void DataDispenser::loadFromHistContent(){
 
   PhysicsEvent eventPlaceholder;
   eventPlaceholder.setDataSetIndex(_owner_->getDataSetIndex());
+  eventPlaceholder.setEventWeight(0); // default.
 
   // claiming event memory
   for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){

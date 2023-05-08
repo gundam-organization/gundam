@@ -145,7 +145,6 @@ void EventTreeWriter::writeEvents(TDirectory *saveDir_, const std::string& treeN
     tree->Fill();
   }
 
-  LogDebug << __LINE__ << std::endl;
   GenericToolbox::writeInTFile( saveDir_, tree );
   delete tree;
 
