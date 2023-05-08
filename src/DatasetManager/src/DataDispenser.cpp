@@ -864,12 +864,16 @@ void DataDispenser::loadFromHistContent(){
   _cache_.sampleIndexOffsetList.resize(_cache_.samplesToFillList.size());
   _cache_.sampleEventListPtrToFill.resize(_cache_.samplesToFillList.size());
 
+
   PhysicsEvent eventPlaceholder;
   eventPlaceholder.setDataSetIndex(_owner_->getDataSetIndex());
 
   // claiming event memory
   for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
-    LogScopeIndent;
+
+    eventPlaceholder.setCommonLeafNameListPtr(
+      std::make_shared<std::vector<std::string>>(_cache_.samplesToFillList[iSample]->getBinning().getBinVariables())
+    );
 
     // one event per bin
     _cache_.sampleNbOfEvents[iSample] = _cache_.samplesToFillList[iSample]->getBinning().getBinsList().size();
@@ -917,7 +921,6 @@ void DataDispenser::loadFromHistContent(){
 
     auto* hist = fHist->Get<THnD>( histName.c_str() );
     LogThrowIf( hist == nullptr, "Could not find THnD \"" << histName << "\" within " << fHist->GetPath() );
-
 
     int nBins = 1;
     for( int iDim = 0 ; iDim < hist->GetNdimensions() ; iDim++ ){

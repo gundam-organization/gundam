@@ -47,7 +47,6 @@ void EventTreeWriter::writeEvents(TDirectory *saveDir_, const std::string& treeN
 
   auto* tree = new TTree(treeName_.c_str(), treeName_.c_str());
 
-  LogDebug << __LINE__ << std::endl;
   GenericToolbox::RawDataArray privateMemberArr;
   std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const PhysicsEvent&)>> leafDictionary;
   leafDictionary["eventWeight/D"] =   [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getEventWeight()); };
@@ -65,21 +64,22 @@ void EventTreeWriter::writeEvents(TDirectory *saveDir_, const std::string& treeN
   privateMemberArr.lockArraySize();
   tree->Branch("Event", &privateMemberArr.getRawDataArray()[0], leavesDefStr.c_str());
 
-  LogDebug << __LINE__ << std::endl;
   GenericToolbox::RawDataArray loadedLeavesArr;
   auto loadedLeavesDict = eventList_[0].generateLeavesDictionary(true);
-  std::vector<std::string> leafNamesList;
-  leavesDefStr = "";
-  for( auto& leafDef : loadedLeavesDict ){
-    if( not leavesDefStr.empty() ) leavesDefStr += ":";
-    leavesDefStr += leafDef.first;
-    leafNamesList.emplace_back(leafDef.first.substr(0,leafDef.first.find("[")).substr(0, leafDef.first.find("/")));
-    leafDef.second(loadedLeavesArr, eventList_[0].getLeafHolder(leafNamesList.back())); // resize buffer
+  if( not loadedLeavesDict.empty() ){
+    std::vector<std::string> leafNamesList;
+    leavesDefStr = "";
+    for( auto& leafDef : loadedLeavesDict ){
+      if( not leavesDefStr.empty() ) leavesDefStr += ":";
+      leavesDefStr += leafDef.first;
+      leafNamesList.emplace_back(leafDef.first.substr(0,leafDef.first.find("[")).substr(0, leafDef.first.find("/")));
+      leafDef.second(loadedLeavesArr, eventList_[0].getLeafHolder(leafNamesList.back())); // resize buffer
+    }
+    loadedLeavesArr.lockArraySize();
+    tree->Branch("Leaves", &loadedLeavesArr.getRawDataArray()[0], leavesDefStr.c_str());
   }
-  loadedLeavesArr.lockArraySize();
-  tree->Branch("Leaves", &loadedLeavesArr.getRawDataArray()[0], leavesDefStr.c_str());
 
-  LogDebug << __LINE__ << std::endl;
+
   std::vector<void*> parReferences;
   std::vector<TSpline3*> responseSplineList;
   std::vector<TSpline3> flatSplinesList; // flat splines for event not affected by parameter (1 spline per parameter)
@@ -120,7 +120,6 @@ void EventTreeWriter::writeEvents(TDirectory *saveDir_, const std::string& treeN
   }
 
 
-  LogDebug << __LINE__ << std::endl;
   int iLeaf;
   int iPar{0};
   std::string progressTitle = LogInfo.getPrefixString() + "Writing " + treeName_;
