@@ -869,18 +869,17 @@ void DataDispenser::loadFromHistContent(){
   // claiming event memory
   for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
 
-    LogDebug << __LINE__ << GET_VAR_NAME_VALUE(iSample) << std::endl;
     // one event per bin
     _cache_.sampleNbOfEvents[iSample] = _cache_.samplesToFillList[iSample]->getBinning().getBinsList().size();
 
-    LogDebug << __LINE__ << GET_VAR_NAME_VALUE(iSample) << std::endl;
-
+    // fetch event container
     auto* container = &_cache_.samplesToFillList[iSample]->getDataContainer();
 
-
-    LogDebug << __LINE__ << GET_VAR_NAME_VALUE(iSample) << std::endl;
+    LogDebug << __LINE__ << GET_VAR_NAME_VALUE(container) << std::endl;
     _cache_.sampleEventListPtrToFill[iSample] = &container->eventList;
+    LogDebug << __LINE__ << GET_VAR_NAME_VALUE(container) << std::endl;
     _cache_.sampleIndexOffsetList[iSample] = _cache_.sampleEventListPtrToFill[iSample]->size();
+    LogDebug << __LINE__ << GET_VAR_NAME_VALUE(container) << std::endl;
     container->reserveEventMemory( _owner_->getDataSetIndex(), _cache_.sampleNbOfEvents[iSample], eventPlaceholder );
 
     LogDebug << __LINE__ << GET_VAR_NAME_VALUE(iSample) << std::endl;
