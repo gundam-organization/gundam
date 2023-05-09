@@ -127,6 +127,12 @@ void EventDialCache::reweightEntry(EventDialCache::CacheElem_t& entry_){
     if( std::isnan(dial_.result) or dial_.dial->getInputBufferRef()->isDialUpdateRequested() ){
       dial_.result = dial_.dial->evalResponse();
     }
+
+    if( std::isnan( dial_.result ) ){
+
+      LogThrow("Invalid dial response for " << dial_.dial->getSummary());
+    }
+
     LogThrowIf(std::isnan(dial_.result), "Invalid dial response for " << dial_.dial->getSummary());
     entry_.event->getEventWeightRef() *= dial_.result;
   });

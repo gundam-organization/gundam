@@ -23,6 +23,8 @@ public:
   [[nodiscard]] std::string getDialTypeName() const override { return {"CompactSpline"}; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
 
+  [[nodiscard]] std::string getSummary() const override;
+
   void setAllowExtrapolation(bool allowExtrapolation) override;
   [[nodiscard]] bool getAllowExtrapolation() const override;
 

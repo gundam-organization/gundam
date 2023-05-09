@@ -47,5 +47,10 @@ std::string DialInterface::getSummary(bool shallow_) {
 
   ss << " response=" << this->evalResponse();
 
+  if( not shallow_ ){
+    ss << std::endl;
+    ss << _dialBaseRef_->getSummary();
+  }
+
   return ss.str();
 }
