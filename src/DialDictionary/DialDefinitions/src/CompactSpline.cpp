@@ -87,3 +87,12 @@ double CompactSpline::evalResponse(const DialInputBuffer& input_) const {
 
   return CalculateCompactSpline( dialInput, -1E20, 1E20, _splineData_.data(), int(_splineData_.size()) );
 }
+
+
+std::string CompactSpline::getSummary() const {
+  std::stringstream ss;
+  ss << "spline data = " << GenericToolbox::parseVectorAsString(_splineData_) << std::endl;
+  ss << "defined bounds = { " << _splineBounds_.first << ", " << _splineBounds_.second << "}" << std::endl;
+  ss << "allow extrapolation ? " << _allowExtrapolation_;
+  return ss.str();
+};

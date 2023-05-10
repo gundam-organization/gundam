@@ -16,10 +16,8 @@
 class DataBin {
 
 public:
-  DataBin();
-  virtual ~DataBin();
-
-  void reset();
+  DataBin() = default;
+  virtual ~DataBin() = default;
 
   // Setters
   void setIsLowMemoryUsageMode(bool isLowMemoryUsageMode_);
@@ -32,31 +30,32 @@ public:
   // Init
 
   // Getters
-  bool isLowMemoryUsageMode() const;
-  bool isZeroWideRangesTolerated() const;
-  const std::vector<std::string> &getVariableNameList() const;
-  const std::vector<std::pair<double, double>> &getEdgesList() const;
-  const std::pair<double, double>& getVarEdges( const std::string& varName_ ) const;
-  const std::string &getFormulaStr() const;
-  const std::string &getTreeFormulaStr() const;
-  TFormula *getFormula() const;
-  TTreeFormula *getTreeFormula() const;
-  const std::vector<int> &getEventVarIndexCache() const;
+  [[nodiscard]] bool isLowMemoryUsageMode() const;
+  [[nodiscard]] bool isZeroWideRangesTolerated() const;
+  [[nodiscard]] const std::vector<std::string> &getVariableNameList() const;
+  [[nodiscard]] const std::vector<std::pair<double, double>> &getEdgesList() const;
+  [[nodiscard]] const std::pair<double, double>& getVarEdges( const std::string& varName_ ) const;
+  [[nodiscard]] const std::string &getFormulaStr() const;
+  [[nodiscard]] const std::string &getTreeFormulaStr() const;
+  [[nodiscard]] TFormula *getFormula() const;
+  [[nodiscard]] TTreeFormula *getTreeFormula() const;
+  [[nodiscard]] const std::vector<int> &getEventVarIndexCache() const;
 
   // Non-native Getters
-  size_t getNbEdges() const;
-  double getVolume() const;
+  [[nodiscard]] size_t getNbEdges() const;
+  [[nodiscard]] double getVolume() const;
 
   // Management
-  bool isInBin(const std::vector<double>& valuesList_) const;
-  bool isBetweenEdges(const std::string& variableName_, double value_) const;
-  bool isBetweenEdges(size_t varIndex_, double value_) const;
+  [[nodiscard]] bool isInBin(const std::vector<double>& valuesList_) const;
+  [[nodiscard]] bool isBetweenEdges(const std::string& variableName_, double value_) const;
+  [[nodiscard]] bool isBetweenEdges(size_t varIndex_, double value_) const;
+  [[nodiscard]] bool isVariableSet(const std::string& variableName_) const;
 
   // Misc
-  bool isVariableSet(const std::string& variableName_) const;
-  std::string getSummary() const;
   void generateFormula();
   void generateTreeFormula();
+  [[nodiscard]] std::string getSummary() const;
+  [[nodiscard]] std::vector<double> generateBinTarget(const std::vector<std::string>& varNameList_ = {}) const;
 
   // Static
   static bool isBetweenEdges(const std::pair<double,double>& edges_, double value_);
@@ -70,10 +69,10 @@ private:
   std::vector<std::string> _variableNameList_{};
   std::vector<std::pair<double, double>> _edgesList_{};
 
-  std::string _formulaStr_;
-  std::shared_ptr<TFormula> _formula_;
-  std::string _treeFormulaStr_;
-  std::shared_ptr<TTreeFormula> _treeFormula_;
+  std::string _formulaStr_{};
+  std::string _treeFormulaStr_{};
+  std::shared_ptr<TFormula> _formula_{nullptr};
+  std::shared_ptr<TTreeFormula> _treeFormula_{nullptr};
 
   std::vector<int> _eventVarIndexCache_{};
 

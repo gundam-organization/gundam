@@ -17,6 +17,7 @@
 #include "EventDialCache.h"
 
 #include "TChain.h"
+#include "nlohmann/json.hpp"
 
 #include "string"
 #include "vector"
@@ -36,6 +37,8 @@ struct DataDispenserParameters{
   std::vector<std::string> additionalVarsStorage{};
   std::vector<std::string> dummyVariablesList;
   int iThrow{-1};
+
+  nlohmann::json fromHistContent{};
 
   [[nodiscard]] std::string getSummary() const{
     std::stringstream ss;
@@ -121,12 +124,15 @@ protected:
   void initializeImpl() override;
 
   void buildSampleToFillList();
+  void parseStringParameters();
   void doEventSelection();
   void fetchRequestedLeaves();
   void preAllocateMemory();
   void readAndFill();
+  void loadFromHistContent();
 
   void fillFunction(int iThread_);
+
 
 private:
   // Parameters

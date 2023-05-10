@@ -43,6 +43,9 @@ public:
   virtual void setAllowExtrapolation(bool allow_) {}
   [[nodiscard]] virtual bool getAllowExtrapolation() const {return false;}
 
+  /// Dial summary describing its content
+  [[nodiscard]] virtual std::string getSummary() const { return {}; };
+
   /////////////////////////////////////////////////////////////////////////
   // Pass information to the dial so that it can build it's internal
   // information.  New overloads should be added as we have classes of dials
@@ -76,6 +79,7 @@ public:
   /// Return the data used by the dial to calculate the output values. The
   /// specific data contained in the vector depends on the derived class.
   [[nodiscard]] virtual const std::vector<double>& getDialData() const;
+
 
 };
 
