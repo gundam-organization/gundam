@@ -125,7 +125,7 @@ void compareConfigStage(const nlohmann::json& subConfig1, const nlohmann::json& 
       for( int iEntry1 = 0 ; iEntry1 < subConfig1.size() ; iEntry1++ ){
         auto name1 = GenericToolbox::Json::fetchValue(subConfig1[iEntry1], "name", "");
         bool found1{false};
-        for( int iEntry2 = 0 ; iEntry2 < subConfig1.size() ; iEntry2++){
+        for( int iEntry2 = 0 ; iEntry2 < subConfig2.size() ; iEntry2++){
           auto name2 = GenericToolbox::Json::fetchValue(subConfig2[iEntry2], "name", "");
           if( name1 == name2 ){
             found1 = true;
@@ -142,7 +142,7 @@ void compareConfigStage(const nlohmann::json& subConfig1, const nlohmann::json& 
       }
 
       // looking for missing keys in 2
-      for( int iEntry2 = 0 ; iEntry2 < subConfig1.size() ; iEntry2++){
+      for( int iEntry2 = 0 ; iEntry2 < subConfig2.size() ; iEntry2++){
         auto name2 = GenericToolbox::Json::fetchValue(subConfig2[iEntry2], "name", "");
         bool found2{false};
         for( int iEntry1 = 0 ; iEntry1 < subConfig1.size() ; iEntry1++ ){
