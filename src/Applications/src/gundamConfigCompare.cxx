@@ -108,6 +108,7 @@ int main( int argc, char** argv ){
 
 void compareConfigStage(const nlohmann::json& subConfig1, const nlohmann::json& subConfig2){
   std::string path = GenericToolbox::joinVectorString(__pathBuffer__, "/");
+  LogTrace << path << std::endl;
 
   if( subConfig1.is_array() and subConfig2.is_array() ){
 
@@ -134,6 +135,7 @@ void compareConfigStage(const nlohmann::json& subConfig1, const nlohmann::json& 
             found1 = true;
             __pathBuffer__.emplace_back("#"+std::to_string(iEntry1));
             if( iEntry1 != iEntry2 ) __pathBuffer__.back() += "<->" + std::to_string(iEntry2);
+            LogTrace << "-> " << __pathBuffer__.back();
             compareConfigStage(subConfig1[iEntry1], subConfig2[iEntry2]);
             __pathBuffer__.pop_back();
             break;
