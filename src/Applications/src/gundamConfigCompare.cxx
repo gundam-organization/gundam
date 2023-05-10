@@ -118,42 +118,42 @@ void compareConfigStage(const nlohmann::json& subConfig1, const nlohmann::json& 
         LogError << "empty array detected." << std::endl;
         return;
       }
+    }
 
-      if( GenericToolbox::Json::doKeyExist(subConfig1[0], "name") ){
-        // trying to fetch by key "name"
-        for( int iEntry1 = 0 ; iEntry1 < subConfig1.size() ; iEntry1++ ){
-          auto name1 = GenericToolbox::Json::fetchValue(subConfig1[iEntry1], "name", "");
-          bool found1{false};
-          for( int iEntry2 = 0 ; iEntry2 < subConfig1.size() ; iEntry2++){
-            auto name2 = GenericToolbox::Json::fetchValue(subConfig2[iEntry2], "name", "");
-            if( name1 == name2 ){
-              found1 = true;
-              __pathBuffer__.emplace_back("#"+std::to_string(iEntry1));
-              if( iEntry1 != iEntry2 ) __pathBuffer__.back() += "<->" + std::to_string(iEntry2);
-              compareConfigStage(subConfig1[iEntry1], subConfig2[iEntry2]);
-              __pathBuffer__.pop_back();
-              break;
-            }
-          }
-          if( not found1 ){
-            LogError << "Could not find key with name \"" << name1 << "\" in config2." << std::endl;
-          }
-        }
-
-        // looking for missing keys in 2
+    if( GenericToolbox::Json::doKeyExist(subConfig1[0], "name") ){
+      // trying to fetch by key "name"
+      for( int iEntry1 = 0 ; iEntry1 < subConfig1.size() ; iEntry1++ ){
+        auto name1 = GenericToolbox::Json::fetchValue(subConfig1[iEntry1], "name", "");
+        bool found1{false};
         for( int iEntry2 = 0 ; iEntry2 < subConfig1.size() ; iEntry2++){
           auto name2 = GenericToolbox::Json::fetchValue(subConfig2[iEntry2], "name", "");
-          bool found2{false};
-          for( int iEntry1 = 0 ; iEntry1 < subConfig1.size() ; iEntry1++ ){
-            auto name1 = GenericToolbox::Json::fetchValue(subConfig1[iEntry1], "name", "");
-            if( name1 == name2 ){
-              found2 = true;
-              break;
-            }
+          if( name1 == name2 ){
+            found1 = true;
+            __pathBuffer__.emplace_back("#"+std::to_string(iEntry1));
+            if( iEntry1 != iEntry2 ) __pathBuffer__.back() += "<->" + std::to_string(iEntry2);
+            compareConfigStage(subConfig1[iEntry1], subConfig2[iEntry2]);
+            __pathBuffer__.pop_back();
+            break;
           }
-          if( not found2 ){
-            LogError << "Could not find key with name \"" << name2 << "\" in config1." << std::endl;
+        }
+        if( not found1 ){
+          LogError << "Could not find key with name \"" << name1 << "\" in config2." << std::endl;
+        }
+      }
+
+      // looking for missing keys in 2
+      for( int iEntry2 = 0 ; iEntry2 < subConfig1.size() ; iEntry2++){
+        auto name2 = GenericToolbox::Json::fetchValue(subConfig2[iEntry2], "name", "");
+        bool found2{false};
+        for( int iEntry1 = 0 ; iEntry1 < subConfig1.size() ; iEntry1++ ){
+          auto name1 = GenericToolbox::Json::fetchValue(subConfig1[iEntry1], "name", "");
+          if( name1 == name2 ){
+            found2 = true;
+            break;
           }
+        }
+        if( not found2 ){
+          LogError << "Could not find key with name \"" << name2 << "\" in config1." << std::endl;
         }
       }
     }
