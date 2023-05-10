@@ -108,18 +108,14 @@ int main( int argc, char** argv ){
 
 void compareConfigStage(const nlohmann::json& subConfig1, const nlohmann::json& subConfig2){
   std::string path = GenericToolbox::joinVectorString(__pathBuffer__, "/");
-  LogTrace << path << std::endl;
 
   if( subConfig1.is_array() and subConfig2.is_array() ){
 
     if( subConfig1.size() != subConfig2.size() ){
       LogAlert << path << "Array size mismatch: " << subConfig1.size() << " <-> " << subConfig2.size() << std::endl;
-
-      if( subConfig1.empty() or subConfig2.empty() ){
-        LogError << "empty array detected." << std::endl;
-        return;
-      }
     }
+
+    if( subConfig1.empty() or subConfig2.empty() ){ return; }
 
     if( GenericToolbox::Json::doKeyExist(subConfig1[0], "name") ){
       // trying to fetch by key "name"
@@ -127,15 +123,12 @@ void compareConfigStage(const nlohmann::json& subConfig1, const nlohmann::json& 
         auto name1 = GenericToolbox::Json::fetchValue(subConfig1[iEntry1], "name", "");
         bool found1{false};
 
-        LogDebug << GET_VAR_NAME_VALUE(name1) << std::endl;
         for( int iEntry2 = 0 ; iEntry2 < subConfig2.size() ; iEntry2++){
           auto name2 = GenericToolbox::Json::fetchValue(subConfig2[iEntry2], "name", "");
           if( name1 == name2 ){
-            LogTrace << "FOUND " << name1 << std::endl;
             found1 = true;
-            __pathBuffer__.emplace_back("#"+std::to_string(iEntry1));
+            __pathBuffer__.emplace_back( "#"+std::to_string(iEntry1) );
             if( iEntry1 != iEntry2 ) __pathBuffer__.back() += "<->" + std::to_string(iEntry2);
-            LogTrace << "-> " << __pathBuffer__.back();
             compareConfigStage(subConfig1[iEntry1], subConfig2[iEntry2]);
             __pathBuffer__.pop_back();
             break;
@@ -163,7 +156,7 @@ void compareConfigStage(const nlohmann::json& subConfig1, const nlohmann::json& 
       }
     }
     else{
-      for( int iEntry = 0 ; iEntry < subConfig1.size() ; iEntry++ ){
+      for( int iEntry = 0 ; iEntry < std::min( subConfig1.size(), subConfig2.size() ) ; iEntry++ ){
         __pathBuffer__.emplace_back("#"+std::to_string(iEntry));
         compareConfigStage(subConfig1[iEntry], subConfig2[iEntry]);
         __pathBuffer__.pop_back();
