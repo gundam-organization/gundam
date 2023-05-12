@@ -137,8 +137,24 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialType_,
   std::string splType = "not-a-knot";  // The default.
   if (dialSubType_.find("not-a-knot") != std::string::npos) splType = "not-a-knot";
   if (dialSubType_.find("catmull") != std::string::npos) splType = "catmull-rom";
-  if (dialSubType_.find("natural") != std::string:: npos) splType = "natural";
-  if (dialSubType_.find("ROOT") != std::string:: npos) splType = "ROOT";
+  if (dialSubType_.find("natural") != std::string::npos) splType = "natural";
+  if (dialSubType_.find("ROOT") != std::string::npos) splType = "ROOT";
+
+  // Get the numeric tolerance for when a uniform spline can be used.  We
+  // should be able to set this in the DialSubType.
+  const double defUniformityTolerance{std::numeric_limits<float>::epsilon()};
+  double uniformityTolerance{defUniformityTolerance};
+  if (dialSubType_.find("uniformity(") != std::string::npos) {
+    std::size_t bg = dialSubType_.find("uniformity(");
+    bg = dialSubType_.find("(",bg);
+    std::size_t en = dialSubType_.find(")",bg);
+    LogThrowIf(en == std::string::npos,
+               "Invalid spline uniformity with dialSubType: " << dialSubType_);
+    en = en - bg;
+    std::string uniformityString = dialSubType_.substr(bg+1,en-1);
+    std::istringstream unif(uniformityString);
+    unif >> uniformityTolerance;
+  }
 
   std::vector<double> xPoint;
   std::vector<double> yPoint;
@@ -237,11 +253,9 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialType_,
     // Could be precalculated, but this only gets run once per dial so go for
     // clarity instead.  The compiler probably optimizes it out of the loop.
     const double avgSpace = (xPoint.back()-xPoint.front())/(xPoint.size()-1.0);
-    // Capture the tolerance.
-    const double tolerance{std::sqrt(std::numeric_limits<double>::epsilon())};
     // Find out how far the point is from the expected lattice point
-    const double delta = std::abs(xPoint[i] - xPoint[0] - i*avgSpace);
-    if (delta < tolerance) continue;
+    const double delta = std::abs(xPoint[i] - xPoint[0] - i*avgSpace)/avgSpace;
+    if (delta < uniformityTolerance) continue;
     // Point isn't in the right place so this is not uniform and break out of
     // the loop.
     isUniform = false;
@@ -273,8 +287,22 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialType_,
     // Catmull-Rom is handled as a special case because it ignores the slopes,
     // and has an explicit monotonic implementatino.  It also must have
     // uniformly spaced knots.
-    LogThrowIf(not isUniform,
-               "Catmull-rom splines need a uniformly spaced points");
+    if (not isUniform) {
+      LogError << "Monotonic Catmull-rom splines need a uniformly spaced points"
+               << std::endl;
+      double step = (xPoint.back()-xPoint.front())/(xPoint.size()-1);
+      for (int i = 0; i<xPoint.size()-1; ++i) {
+        LogError << i << " --  X: " << xPoint[i]
+                 << " X+1: " << xPoint[i+1]
+                 << " step: " << step
+                 << " error: " << xPoint[i+1] - xPoint[i] - step
+                 << std::endl;
+      }
+      // If the user specified a tolerance then crash, otherwise trust the
+      // user knows that it's not uniform and continue.
+      LogThrowIf(uniformityTolerance != defUniformityTolerance,
+                 "Invalid catmull-rom inputs -- Nonuniform spacing");
+    }
     dialBase = (not useCachedDial_) ?
       std::make_unique<MonotonicSpline>():
       std::make_unique<MonotonicSplineCache>();
@@ -282,8 +310,22 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialType_,
   else if (splType == "catmull-rom") {
     // Catmull-Rom is handled as a special case because it ignores the slopes.
     // This is the version when the spline doesn't need to be monotonic.
-    LogThrowIf(not isUniform,
-               "Catmull-rom splines need a uniformly spaced points");
+    if (not isUniform) {
+      LogError << "Catmull-rom splines need a uniformly spaced points"
+               << std::endl;
+      double step = (xPoint.back()-xPoint.front())/(xPoint.size()-1);
+      for (int i = 0; i<xPoint.size()-1; ++i) {
+        LogError << i << " --  X: " << xPoint[i]
+                 << " X+1: " << xPoint[i+1]
+                 << " step: " << step
+                 << " error: " << xPoint[i+1] - xPoint[i] - step
+                 << std::endl;
+      }
+      // If the user specified a tolerance then crash, otherwise trust the
+      // user knows that it's not uniform and continue.
+      LogThrowIf(uniformityTolerance != defUniformityTolerance,
+                 "Invalid catmull-rom inputs -- Nonuniform spacing");
+    }
     dialBase = (not useCachedDial_) ?
       std::make_unique<CompactSpline>():
       std::make_unique<CompactSplineCache>();
