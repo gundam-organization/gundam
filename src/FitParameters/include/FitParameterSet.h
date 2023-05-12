@@ -79,6 +79,7 @@ public:
 
   // Misc
   FitParameter* getParameterPtr(const std::string& parName_);
+  FitParameter* getParameterPtrWithTitle(const std::string& parTitle_);
   [[nodiscard]] std::string getSummary() const;
 
   static double toNormalizedParRange(double parRange, const FitParameter& par);

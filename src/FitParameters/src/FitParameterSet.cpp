@@ -518,6 +518,14 @@ FitParameter* FitParameterSet::getParameterPtr(const std::string& parName_){
   }
   return nullptr;
 }
+FitParameter* FitParameterSet::getParameterPtrWithTitle(const std::string& parTitle_){
+  if( not parTitle_.empty() ){
+    for( auto& par : _parameterList_ ){
+      if( par.getTitle() == parTitle_ ){ return &par; }
+    }
+  }
+  return nullptr;
+}
 std::string FitParameterSet::getSummary() const {
   std::stringstream ss;
 

@@ -788,7 +788,7 @@ void Propagator::injectParameterOnMcSamples(const nlohmann::json &injectConfig_)
     LogThrowIf( selectedParset == nullptr, "Could not find parset: " << parsetName );
 
     auto parValues = GenericToolbox::Json::fetchValue<nlohmann::json>(entryParset, "parameterValues");
-    if( parValues.empty() ) {
+    if     ( parValues.empty() ) {
       LogThrow( "" );
     }
     else if( parValues.is_string() ){
@@ -811,6 +811,14 @@ void Propagator::injectParameterOnMcSamples(const nlohmann::json &injectConfig_)
           auto parName = GenericToolbox::Json::fetchValue<std::string>(parValueEntry, "name");
           auto* parPtr = selectedParset->getParameterPtr(parName);
           LogThrowIf(parPtr == nullptr, "Could not find " << parName << " among the defined parameters in " << selectedParset->getName());
+
+          LogWarning << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
+          parPtr->setParameterValue( GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") );
+        }
+        else if( GenericToolbox::Json::doKeyExist(parValueEntry, "title") ){
+          auto parTitle = GenericToolbox::Json::fetchValue<std::string>(parValueEntry, "title");
+          auto* parPtr = selectedParset->getParameterPtrWithTitle(parTitle);
+          LogThrowIf(parPtr == nullptr, "Could not find " << parTitle << " among the defined parameters in " << selectedParset->getName());
 
           LogWarning << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
           parPtr->setParameterValue( GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") );
