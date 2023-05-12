@@ -805,18 +805,28 @@ void Propagator::injectParameterOnMcSamples(const nlohmann::json &injectConfig_)
       );
 
       for( size_t iPar = 0 ; iPar < selectedParset->getNbParameters() ; iPar++ ) {
+
+        if( not selectedParset->getParameterList()[iPar].isEnabled() ){
+          LogAlert << "NOT injecting \"" << selectedParset->getParameterList()[iPar].getFullTitle() << "\" as it is disabled." << std::endl;
+          continue;
+        }
+
         LogWarning << "Injecting \"" << selectedParset->getParameterList()[iPar].getFullTitle() << "\": " << parList[iPar] << std::endl;
         selectedParset->getParameterList()[iPar].setParameterValue( std::stod(parList[iPar]) );
       }
-
-      if( selectedParset->isUseEigenDecompInFit() ){ selectedParset->propagateOriginalToEigen(); }
     }
     else{
       for( auto& parValueEntry : parValues ){
-        if( GenericToolbox::Json::doKeyExist(parValueEntry, "name") ) {
+        if     ( GenericToolbox::Json::doKeyExist(parValueEntry, "name") ) {
           auto parName = GenericToolbox::Json::fetchValue<std::string>(parValueEntry, "name");
           auto* parPtr = selectedParset->getParameterPtr(parName);
           LogThrowIf(parPtr == nullptr, "Could not find " << parName << " among the defined parameters in " << selectedParset->getName());
+
+
+          if( not parPtr->isEnabled() ){
+            LogAlert << "NOT injecting \"" << parPtr->getFullTitle() << "\" as it is disabled." << std::endl;
+            continue;
+          }
 
           LogWarning << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
           parPtr->setParameterValue( GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") );
@@ -825,6 +835,12 @@ void Propagator::injectParameterOnMcSamples(const nlohmann::json &injectConfig_)
           auto parTitle = GenericToolbox::Json::fetchValue<std::string>(parValueEntry, "title");
           auto* parPtr = selectedParset->getParameterPtrWithTitle(parTitle);
           LogThrowIf(parPtr == nullptr, "Could not find " << parTitle << " among the defined parameters in " << selectedParset->getName());
+
+
+          if( not parPtr->isEnabled() ){
+            LogAlert << "NOT injecting \"" << parPtr->getFullTitle() << "\" as it is disabled." << std::endl;
+            continue;
+          }
 
           LogWarning << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
           parPtr->setParameterValue( GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") );
@@ -836,6 +852,12 @@ void Propagator::injectParameterOnMcSamples(const nlohmann::json &injectConfig_)
 
 
     }
+
+    if( selectedParset->isUseEigenDecompInFit() ){
+      LogInfo << "Propagating back to the eigen decomposed parameters for parSet: " << selectedParset->getName() << std::endl;
+      selectedParset->propagateOriginalToEigen();
+    }
+
   }
 
 }
