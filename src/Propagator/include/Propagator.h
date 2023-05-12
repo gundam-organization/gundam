@@ -62,6 +62,7 @@ public:
 
   [[nodiscard]] const FitParameterSet* getFitParameterSetPtr(const std::string& name_) const;
   [[nodiscard]] FitParameterSet* getFitParameterSetPtr(const std::string& name_);
+  [[nodiscard]] DatasetLoader* getDatasetLoaderPtr(const std::string& name_);
 
   // Core
   void updateLlhCache();

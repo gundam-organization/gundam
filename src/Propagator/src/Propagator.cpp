@@ -616,6 +616,12 @@ FitParameterSet* Propagator::getFitParameterSetPtr(const std::string& name_){
   LogThrow("Could not find fit parameter set named \"" << name_ << "\" among defined: " << GenericToolbox::parseVectorAsString(parSetNames));
   return nullptr;
 }
+DatasetLoader* Propagator::getDatasetLoaderPtr(const std::string& name_){
+  for( auto& dataSet : _dataSetList_ ){
+    if( dataSet.getName() == name_ ){ return &dataSet; }
+  }
+  return nullptr;
+}
 
 void Propagator::updateLlhCache(){
   double buffer;

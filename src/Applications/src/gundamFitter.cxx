@@ -49,6 +49,8 @@ int main(int argc, char** argv){
   clParser.addOption("outputFilePath", {"-o", "--out-file"}, "Specify the output file");
   clParser.addOption("outputDir", {"--out-dir"}, "Specify the output directory");
   clParser.addOption("randomSeed", {"-s", "--seed"}, "Set random seed");
+  clParser.addOption("useDataEntry", {"--use-data-entry"}, "Overrides \"selectedDataEntry\" in dataSet config. Second arg is to select a given dataset");
+  clParser.addOption("useDataConfig", {"--use-data-config"}, "Add a data entry to the data set definition and use it for the fit");
   clParser.addOption("injectParameterConfig", {"--inject-parameters"}, "Inject parameters defined in the provided config file");
   clParser.addOption("appendix", {"--appendix"}, "Add appendix to the output file name");
 
@@ -272,6 +274,15 @@ int main(int argc, char** argv){
   // -a
   fitter.getPropagator().setLoadAsimovData( clParser.isOptionTriggered("asimov") );
 
+  // --use-data-entry
+  if( clParser.isOptionTriggered("useDataEntry") ){
+    auto selectedDataEntry = clParser.getOptionVal<std::string>("useDataEntry", 0);
+    if( clParser.getNbValueSet("useDataEntry") >= 2 ){
+
+    }
+    fitter.getPropagator().getDataSetList();
+  }
+
   // --skip-hesse
   fitter.getMinimizer().setEnablePostFitErrorEval(not clParser.isOptionTriggered("skipHesse"));
 
@@ -325,6 +336,13 @@ int main(int argc, char** argv){
   // Load:
   // --------------------------
   fitter.initialize();
+
+  for( auto& parSet : fitter.getPropagator().getParameterSetsList() ){
+    for( auto& par : parSet.getParameterList() ){
+      LogDebug << par.getTitle() << ": " << par.getParameterValue() << std::endl;
+    }
+  }
+
   LogInfo << "Initial χ² = " << fitter.getPropagator().getLlhBuffer() << std::endl;
   LogInfo << "Initial χ²(stat) = " << fitter.getPropagator().getLlhStatBuffer() << std::endl;
   LogInfo << "Initial χ²(penalty) = " << fitter.getPropagator().getLlhPenaltyBuffer() << std::endl;
