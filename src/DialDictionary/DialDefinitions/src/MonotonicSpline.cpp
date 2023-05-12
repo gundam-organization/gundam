@@ -62,15 +62,50 @@ void MonotonicSpline::buildDial(const std::vector<double>& v1,
   _splineData_[0] = v1.front();
   _splineData_[1] = (v1.back() - v1.front())/(v1.size()-1.0);
 
-  /// Apply a very loose check that the point spacing is uniform to catch
-  /// mistakes.  This only flags clear problems and isn't an accuracy
-  /// guarrantee.  The tolerance is set based on "float" since the spline
-  /// knots may have been saved or calculated using floats.
-  const double tolerance{std::sqrt(std::numeric_limits<float>::epsilon())};
+  // Non uniform input points should be caught before the MonotonicSpline is
+  // built, but apply a final sanity check to make sure the point spacing is
+  // uniform.  This only flags very clear mistakes and isn't an accuracy
+  // guarrantee.  The tolerance is set as a fraction of the point spacing.
+  const double tolerance{1E-2};
+  bool validInputs = true;
+  // First check that the points have a reasonable separation.
+  if (_splineData_[1] < 1E-6) validInputs = false;
+  // Make sure the points are uniformly spaced.
   for (int i=0; i<v1.size()-1; ++i) {
       double d = std::abs(v1[i] - _splineData_[0] - i*_splineData_[1]);
-      LogThrowIf((d/_splineData_[1])>tolerance,
-                 "MonotonicSplines require uniformly spaced knots");
+      if ((d/_splineData_[1])>tolerance) validInputs = false;
+  }
+  // Make lots of output if there is a problem!  This hopefully gives a clue
+  // which spline is causing trouble.
+  if (not validInputs) {
+      LogError << "Invalid inputs -- Bounds: " << _splineBounds_.first
+               << " to " << _splineBounds_.second
+               << ", First X: " << _splineData_[0]
+               << ", X spacing: " << _splineData_[1]
+               << std::endl;
+      for (int i=0; i<v1.size()-1; ++i) {
+          double d = std::abs(v1[i] - _splineData_[0] - i*_splineData_[1]);
+          d /= _splineData_[1];
+          LogError << "Invalid inputs -- point: " << i
+                   << " X: " << v1[i]
+                   << " (tolerance " << d << ")"
+                   << " Y: " << v2[i]
+                   << std::endl;
+      }
+#ifndef NDEBUG
+      /// Crash if this is a release build since the inputs *should* have
+      /// already been validated.  This continues during a debug build, but
+      /// there will be lots of output (which I'm *sure* the user will read).
+      LogError << "Stop execution because of invalid inputs" << std::endl;
+      // Make sure that the cerr and cout output gets the message, even if the
+      // log output is redirected.  This code should never execute, so it
+      // might as well be loud.
+      std::cout << "ERROR " << __FILE__ << "(" << __LINE__ << "): "
+                << " MonotonicSpline: Invalid inputs" << std::endl;
+      std::cerr << "ERROR " << __FILE__ << "(" << __LINE__ << "): "
+                << " MonotonicSpline: Invalid inputs -- terminating" << std::endl;
+      LogThrow("MonotonicSpline with invalid inputs");
+#endif
   }
 
   for(int i=0; i<v2.size(); ++i) _splineData_[2+i] = v2[i];
