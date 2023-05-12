@@ -85,7 +85,7 @@ fitterEngineConfig:
             isEnabled: true
             dialSetDefinitions:
               - dialsType: Spline
-                dialSubType: catmull-rom
+                dialSubType: catmull-rom, uniformity(0.001)
                 dialLeafName: "spline_C"
                 applyOnDataSets: [ "TestSample" ]
                 applyCondition: "[C] > 0"
