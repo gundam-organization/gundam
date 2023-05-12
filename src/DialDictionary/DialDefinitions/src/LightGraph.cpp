@@ -31,12 +31,18 @@ void LightGraph::buildDial(const TGraph &grf, const std::string& option_) {
 }
 
 double LightGraph::evalResponse(const DialInputBuffer& input_) const {
+  double dialInput{input_.getBuffer()[0]};
+
+#ifndef NDEBUG
+  LogThrowIf(not std::isfinite(dialInput), "Invalid input for LightGraph");
+#endif
+
   LogThrowIf(xPoints.empty(), "No graph point defined.");
   if (nPoints == 1) return yPoints[0];
 
   if( not _allowExtrapolation_ ){
-    if     (input_.getBuffer()[0] <= xPoints[0])     { return yPoints[0]; }
-    else if(input_.getBuffer()[0] >= xPoints.back()) { return yPoints.back(); }
+    if     (dialInput <= xPoints[0])     { return yPoints[0]; }
+    else if(dialInput >= xPoints.back()) { return yPoints.back(); }
   }
 
   //linear interpolation
@@ -44,14 +50,14 @@ double LightGraph::evalResponse(const DialInputBuffer& input_) const {
 
   //find points in graph around x assuming points are not sorted
   // (if point are sorted use a binary search)
-  auto low = Int_t( TMath::BinarySearch(nPoints, &xPoints[0], input_.getBuffer()[0] ) );
+  auto low = Int_t( TMath::BinarySearch(nPoints, &xPoints[0], dialInput) );
   if (low == -1)  {
     // use first two points for doing an extrapolation
     low = 0;
   }
 
   Double_t yn;
-  if (xPoints[low] == input_.getBuffer()[0]){
+  if (xPoints[low] == dialInput){
     yn = yPoints[low];
   }
   else{
@@ -59,7 +65,7 @@ double LightGraph::evalResponse(const DialInputBuffer& input_) const {
     Int_t up(low+1);
 
     if (xPoints[low] == xPoints[up]) return yPoints[low];
-    yn = yPoints[up] + (input_.getBuffer()[0] - xPoints[up]) * (yPoints[low] - yPoints[up]) / (xPoints[low] - xPoints[up]);
+    yn = yPoints[up] + (dialInput - xPoints[up]) * (yPoints[low] - yPoints[up]) / (xPoints[low] - xPoints[up]);
   }
   return yn;
 }
