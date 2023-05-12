@@ -338,7 +338,12 @@ int main(int argc, char** argv){
   fitter.initialize();
 
   for( auto& parSet : fitter.getPropagator().getParameterSetsList() ){
+    LogScopeIndent;
+    if( not parSet.isEnabled() ) continue;
+    LogDebug << parSet.getName() << std::endl;
     for( auto& par : parSet.getParameterList() ){
+      LogScopeIndent;
+      if( not par.isEnabled() ) continue;
       LogDebug << par.getTitle() << ": " << par.getParameterValue() << std::endl;
     }
   }
