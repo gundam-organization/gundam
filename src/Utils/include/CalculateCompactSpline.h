@@ -39,12 +39,6 @@ namespace {
     // number of data elements in the spline data.  The input data is arrange
     // as
 
-    namespace CompactSplineVars {
-      bool DEBUG_PRINOUT{false};
-      std::mutex DEBUG_MUTEX{};
-    }
-
-
     // data[0] -- spline lower bound (not used)
     // data[1] -- spline inverse step (not used)
     // data[2+2*n+0] -- The function value for knot n
@@ -53,9 +47,6 @@ namespace {
                                   const double lowerBound, double upperBound,
                                   const DEVICE_FLOATING_POINT* data,
                                   const int dim) {
-      if( CompactSplineVars::DEBUG_PRINOUT ){
-        CompactSplineVars::DEBUG_MUTEX.lock();
-      }
 
         // Interpolate between p2 and p3
         // ix-2 ix-1 ix   ix+1 ix+2 ix+3
@@ -112,12 +103,6 @@ namespace {
         const double d21 = data[2+d21_1] - data[2+d21_0];
         const double d32 = p3-p2;
         const double d43 = data[2+d43_1] - data[2+d43_0];
-        LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(d43) << std::endl;
-        LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(data[2+d43_1]) << std::endl;
-        LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(dim) << std::endl;
-        LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(d43_1) << std::endl;
-        LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(d43_0+1) << std::endl;
-        LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(ix+1) << std::endl;
 
         // Find the raw slopes at each point
         // double m1 = 0.5*(d10+d21);
