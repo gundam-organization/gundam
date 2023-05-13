@@ -286,6 +286,11 @@ int main(int argc, char** argv){
     }
   }
 
+  // --use-data-config
+  if( clParser.isOptionTriggered("useDataConfig") ){
+    LogThrow("--use-data-config not implemented yet");
+  }
+
   // --skip-hesse
   fitter.getMinimizer().setEnablePostFitErrorEval(not clParser.isOptionTriggered("skipHesse"));
 
