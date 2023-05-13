@@ -124,7 +124,7 @@ double CompactSpline::evalResponse(const DialInputBuffer& input_) const {
     else if(dialInput >= _splineBounds_.second){ dialInput = _splineBounds_.second; }
   }
 
-  return CalculateCompactSpline( dialInput, -1E20, 1E20, _splineData_.data(), int(_splineData_.size()) );
+  return CalculateCompactSpline( dialInput, -1E20, 1E20, _splineData_.data(), int(_splineData_.size()-2) );
 }
 
 
