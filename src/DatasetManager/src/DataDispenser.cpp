@@ -1314,7 +1314,7 @@ void DataDispenser::fillFunction(int iThread_){
               }
             }
 
-            if( dialCollectionRef->isBinned() ){
+            if     ( dialCollectionRef->isBinned() ){
 
               // is only one bin with no condition:
               if( dialCollectionRef->getDialBaseList().size() == 1 and dialCollectionRef->getDialBinSet().isEmpty() ){
@@ -1359,12 +1359,20 @@ void DataDispenser::fillFunction(int iThread_){
               }
 
               DialBaseFactory factory;
+
               // Do the unique_ptr dance so that memory gets deleted if
               // there is an exception (being stupidly paranoid).
               std::unique_ptr<DialBase> dialBase(
-                  factory.makeDial(dialCollectionRef->getGlobalDialType(),
-                                   dialCollectionRef->getGlobalDialSubType(),
-                                   grPtr, dialCollectionRef->useCachedDials()));
+                  factory.makeDial(
+                      dialCollectionRef->getGlobalDialType(),
+                      dialCollectionRef->getGlobalDialSubType(),
+                      grPtr,
+                      dialCollectionRef->useCachedDials()
+                  )
+              );
+
+
+
               if (dialBase) {
                 freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
                 dialBase->setAllowExtrapolation(dialCollectionRef->isAllowDialExtrapolation());

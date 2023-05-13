@@ -129,8 +129,10 @@ void EventDialCache::reweightEntry(EventDialCache::CacheElem_t& entry_){
     }
 
     if( std::isnan( dial_.result ) ){
-
-      LogThrow("Invalid dial response for " << dial_.dial->getSummary( false ));
+      LogError << "Invalid dial response:" << std::endl;
+      LogError << dial_.dial->getSummary( false ) << std::endl;
+      LogError << GET_VAR_NAME_VALUE( dial_.dial->evalResponse() ) << std::endl;
+      LogThrow("Exception thrown because of invalid spline response.");
     }
 
     LogThrowIf(std::isnan(dial_.result), "Invalid dial response for " << dial_.dial->getSummary());
