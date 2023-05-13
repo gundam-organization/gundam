@@ -37,6 +37,11 @@ namespace {
     // number of data elements in the spline data.  The input data is arrange
     // as
 
+    namespace CompactSplineVars {
+      bool DEBUG_PRINOUT{false};
+    }
+
+
     // data[0] -- spline lower bound (not used)
     // data[1] -- spline inverse step (not used)
     // data[2+2*n+0] -- The function value for knot n
@@ -113,12 +118,16 @@ namespace {
 
         // A more numerically stable calculation
         const double t = 3.0*fxx-2.0*fxxx;
+        if( CompactSpline::DEBUG_PRINOUT ) LogTraceIf(CompactSpline::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(t) << std::endl;
         double v = p2 - p2*t + m2*(fxxx-2.0*fxx+fx)
                     + p3*t + m3*(fxxx-fxx);
+
+        if( CompactSpline::DEBUG_PRINOUT ) LogTraceIf(CompactSpline::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(v) << std::endl;
 
         if (v < lowerBound) v = lowerBound;
         if (v > upperBound) v = upperBound;
 
+        if( CompactSplineVars::DEBUG_PRINOUT ) LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(v) << std::endl;
         return v;
     }
 

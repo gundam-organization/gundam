@@ -129,6 +129,7 @@ std::string CompactSpline::getSummary() const {
   ss << this->getDialTypeName() << ": spline data = " << GenericToolbox::parseVectorAsString(_splineData_);
   ss << std::endl << this->getDialTypeName() << ": defined bounds = { " << _splineBounds_.first << ", " << _splineBounds_.second << " }";
   ss << std::endl << this->getDialTypeName() << ": allow extrapolation ? " << _allowExtrapolation_;
+  CompactSplineVars::DEBUG_PRINOUT = true;
   ss << std::endl << this->getDialTypeName() << ": EVAL MANUAL at 0:" << CalculateCompactSpline( 0, -1E20, 1E20, _splineData_.data(), int(_splineData_.size()) );
   return ss.str();
 };
