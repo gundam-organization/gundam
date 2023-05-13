@@ -277,10 +277,13 @@ int main(int argc, char** argv){
   // --use-data-entry
   if( clParser.isOptionTriggered("useDataEntry") ){
     auto selectedDataEntry = clParser.getOptionVal<std::string>("useDataEntry", 0);
-    if( clParser.getNbValueSet("useDataEntry") >= 2 ){
-
+    // Do something better in case multiple datasets are defined
+    for( auto& dataSet : fitter.getPropagator().getDataSetList() ){
+      if( GenericToolbox::doesKeyIsInMap( selectedDataEntry, dataSet.getDataDispenserDict() ) ){
+        LogWarning << "Using data entry \"" << selectedDataEntry << "\" for dataset: " << dataSet.getName() << std::endl;
+        dataSet.setSelectedDataEntry( selectedDataEntry );
+      }
     }
-    fitter.getPropagator().getDataSetList();
   }
 
   // --skip-hesse
@@ -338,7 +341,6 @@ int main(int argc, char** argv){
   fitter.initialize();
 
   for( auto& parSet : fitter.getPropagator().getParameterSetsList() ){
-    LogScopeIndent;
     if( not parSet.isEnabled() ) continue;
     LogDebug << parSet.getName() << std::endl;
     for( auto& par : parSet.getParameterList() ){

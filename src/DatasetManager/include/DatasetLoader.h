@@ -25,6 +25,8 @@ public:
 
   void setDataSetIndex(int dataSetIndex);
 
+  void setSelectedDataEntry(const std::string &selectedDataEntry);
+
   [[nodiscard]] bool isEnabled() const;
   [[nodiscard]] bool isShowSelectedEventCount() const;
   [[nodiscard]] bool isDevSingleThreadEventLoaderAndIndexer() const;

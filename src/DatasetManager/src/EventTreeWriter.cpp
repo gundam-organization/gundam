@@ -40,8 +40,8 @@ void EventTreeWriter::writeEvents(TDirectory *saveDir_, const std::string& treeN
   LogThrowIf(saveDir_ == nullptr, "Save TDirectory is not set.");
   LogThrowIf(treeName_.empty(), "TTree name no set.");
 
-  LogInfo << "Writing " << eventList_.size() << " events in TTree: " << saveDir_->GetPath() << "/" << treeName_ << std::endl;
   LogReturnIf(eventList_.empty(), "No event to be writen. Leaving...");
+  LogInfo << "Writing " << eventList_.size() << " events in TTree " << treeName_ << std::endl;
 
   auto* oldDir = GenericToolbox::getCurrentTDirectory();
 
