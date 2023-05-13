@@ -107,26 +107,22 @@ namespace {
         const double fx = xx-d32_0;
         const double fxx = fx*fx;
         const double fxxx = fx*fxx;
-        LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(fx) << std::endl;
-        LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(fxx) << std::endl;
-        LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(fxxx) << std::endl;
 
         // Get the values of the deltas
         const double d21 = data[2+d21_1] - data[2+d21_0];
         const double d32 = p3-p2;
         const double d43 = data[2+d43_1] - data[2+d43_0];
-        LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(d21) << std::endl;
-        LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(d32) << std::endl;
         LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(d43) << std::endl;
         LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(data[2+d43_1]) << std::endl;
-        LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(data[2+d43_0]) << std::endl;
+        LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(dim) << std::endl;
+        LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(d43_1) << std::endl;
+        LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(d43_0+1) << std::endl;
+        LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(ix+1) << std::endl;
 
         // Find the raw slopes at each point
         // double m1 = 0.5*(d10+d21);
         double m2 = 0.5*(d21+d32);
         double m3 = 0.5*(d32+d43);
-        LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(m2) << std::endl;
-        LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(m3) << std::endl;
 
         // Cubic spline with the points and slopes.
         // double v = p2*(2.0*fxxx-3.0*fxx+1.0) + m2*(fxxx-2.0*fxx+fx)
@@ -136,8 +132,6 @@ namespace {
         const double t = 3.0*fxx-2.0*fxxx;
         double v = p2 - p2*t + m2*(fxxx-2.0*fxx+fx)
                     + p3*t + m3*(fxxx-fxx);
-
-        LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(v) << std::endl;
 
         if (v < lowerBound) v = lowerBound;
         if (v > upperBound) v = upperBound;
