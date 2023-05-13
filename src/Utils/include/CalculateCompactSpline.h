@@ -41,6 +41,7 @@ namespace {
 
     namespace CompactSplineVars {
       bool DEBUG_PRINOUT{false};
+      std::mutex DEBUG_MUTEX{};
     }
 
 
@@ -52,6 +53,9 @@ namespace {
                                   const double lowerBound, double upperBound,
                                   const DEVICE_FLOATING_POINT* data,
                                   const int dim) {
+      if( CompactSplineVars::DEBUG_PRINOUT ){
+        CompactSplineVars::DEBUG_MUTEX.lock();
+      }
 
         // Interpolate between p2 and p3
         // ix-2 ix-1 ix   ix+1 ix+2 ix+3
