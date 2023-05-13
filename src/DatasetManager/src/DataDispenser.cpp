@@ -663,9 +663,9 @@ void DataDispenser::preAllocateMemory(){
   if( _eventDialCacheRef_ != nullptr ){
     if( not _cache_.dialCollectionsRefList.empty() ){
       LogInfo << "Claiming memory for event-by-event dials..." << std::endl;
-      double eventByEventDialSize{0};
       size_t nDialsMaxPerEvent{0};
       for( auto& dialCollection : _cache_.dialCollectionsRefList ){
+        LogScopeIndent;
         nDialsMaxPerEvent += 1;
         if( dialCollection->isBinned() ){
           // Filling var indexes for faster eval with PhysicsEvent:
@@ -683,72 +683,16 @@ void DataDispenser::preAllocateMemory(){
           // Reserve memory for additional dials (those on a tree leaf)
           auto dialType = dialCollection->getGlobalDialType();
           LogInfo << dialCollection->getTitle() << ": creating " << nEvents;
-          LogInfo << " " << dialType;
+          LogInfo << " slots for " << dialType << std::endl;
 
-          double dialsSizeInRam{0};
           dialCollection->getDialBaseList().clear();
           dialCollection->getDialBaseList().resize(nEvents);
-          if     ( dialType == "Spline" ){
-            if(dialCollection->useCachedDials() ){
-              dialsSizeInRam = double(nEvents) * sizeof(SplineCache);
-            }
-            else{
-              dialsSizeInRam = double(nEvents) * sizeof(Spline);
-            }
-          }
-          else if( dialType == "MonotonicSpline" ){
-            if(dialCollection->useCachedDials() ){
-              dialsSizeInRam = double(nEvents) * sizeof(MonotonicSplineCache);
-            }
-            else{
-              dialsSizeInRam = double(nEvents) * sizeof(MonotonicSpline);
-            }
-          }
-          else if( dialType == "GeneralSpline" ){
-            if(dialCollection->useCachedDials() ){
-              dialsSizeInRam = double(nEvents) * sizeof(GeneralSplineCache);
-            }
-            else{
-              dialsSizeInRam = double(nEvents) * sizeof(GeneralSpline);
-            }
-          }
-          else if( dialType == "SimpleSpline" ){
-            if(dialCollection->useCachedDials() ){
-              dialsSizeInRam = double(nEvents) * sizeof(SimpleSplineCache);
-            }
-            else{
-              dialsSizeInRam = double(nEvents) * sizeof(SimpleSpline);
-            }
-          }
-          else if( dialType == "Graph" ){
-            if(dialCollection->useCachedDials() ){
-              dialsSizeInRam = double(nEvents) * sizeof(GraphCache);
-            }
-            else{
-              dialsSizeInRam = double(nEvents) * sizeof(Graph);
-            }
-          }
-          else if( dialType == "LightGraph" ){
-            dialsSizeInRam = double(nEvents) * sizeof(LightGraph);
-          }
-          else{
-            LogInfo << std::endl;
-            LogThrow("Invalid dial type for event-by-event dial: " << dialType);
-          }
-          eventByEventDialSize += dialsSizeInRam;
-          LogInfo << " dials ("
-                  << GenericToolbox::parseSizeUnits( dialsSizeInRam )
-                  << ")" << std::endl;
-
         }
         else{
           LogThrow("DEV ERROR: not binned, not event-by-event?");
         }
       }
       _eventDialCacheRef_->allocateCacheEntries(nEvents, nDialsMaxPerEvent);
-      LogInfo << "Event-by-event dials take "
-              << GenericToolbox::parseSizeUnits(eventByEventDialSize)
-              << " in RAM." << std::endl;
     }
   }
 #else
