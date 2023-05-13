@@ -36,10 +36,15 @@ namespace {
     // The input data is arrange as
     //
     // data[0] -- spline lower bound (not used)
-    // data[1] -- spline inverse step (not used)
+    // data[1] -- spline step (not used)
     // data[2+3*n+0] -- The function value for knot n
     // data[2+3*n+1] -- The function slope for knot n
     // data[2+3*n+2] -- The point for knot n
+    //
+    // NOTE: CalculateUniformSpline, CalculateGeneralSpline,
+    // CalculateCompactSpline, and CalculateMonotonicSpline have very similar,
+    // but different calls.  In particular the dim parameter meaning is not
+    // consistent.
     DEVICE_CALLABLE_INLINE
     double CalculateGeneralSpline(const double x,
                                   const double lowerBound, double upperBound,
