@@ -118,6 +118,8 @@ namespace {
         LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(d21) << std::endl;
         LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(d32) << std::endl;
         LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(d43) << std::endl;
+        LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(data[2+d43_1]) << std::endl;
+        LogTraceIf(CompactSplineVars::DEBUG_PRINOUT) << GET_VAR_NAME_VALUE(data[2+d43_0]) << std::endl;
 
         // Find the raw slopes at each point
         // double m1 = 0.5*(d10+d21);
