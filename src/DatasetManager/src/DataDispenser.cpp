@@ -1176,6 +1176,9 @@ void DataDispenser::fillFunction(int iThread_){
   if( iThread_+1 != nThreads ) iEnd = (Long64_t(iThread_)+1)*nEventPerThread;
   Long64_t iGlobal = 0;
 
+  // to generate dials
+  DialBaseFactory factory;
+
   // Load the branches
   treeChain.LoadTree(iStart);
 
@@ -1357,8 +1360,6 @@ void DataDispenser::fillFunction(int iThread_){
               else{
                 LogThrow("Unsupported event-by-event dial type: " << treeChain.GetLeaf(dialCollectionRef->getGlobalDialLeafName().c_str())->GetTypeName() )
               }
-
-              DialBaseFactory factory;
 
               // Do the unique_ptr dance so that memory gets deleted if
               // there is an exception (being stupidly paranoid).
