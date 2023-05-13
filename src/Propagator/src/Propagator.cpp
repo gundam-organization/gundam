@@ -811,11 +811,13 @@ void Propagator::injectParameterOnMcSamples(const nlohmann::json &injectConfig_)
           continue;
         }
 
-        LogWarning << "Injecting \"" << selectedParset->getParameterList()[iPar].getFullTitle() << "\": " << parList[iPar] << std::endl;
+        LogScopeIndent;
+        LogInfo << "Injecting \"" << selectedParset->getParameterList()[iPar].getFullTitle() << "\": " << parList[iPar] << std::endl;
         selectedParset->getParameterList()[iPar].setParameterValue( std::stod(parList[iPar]) );
       }
     }
     else{
+      LogScopeIndent;
       for( auto& parValueEntry : parValues ){
         if     ( GenericToolbox::Json::doKeyExist(parValueEntry, "name") ) {
           auto parName = GenericToolbox::Json::fetchValue<std::string>(parValueEntry, "name");
@@ -828,7 +830,7 @@ void Propagator::injectParameterOnMcSamples(const nlohmann::json &injectConfig_)
             continue;
           }
 
-          LogWarning << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
+          LogInfo << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
           parPtr->setParameterValue( GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") );
         }
         else if( GenericToolbox::Json::doKeyExist(parValueEntry, "title") ){
@@ -842,7 +844,7 @@ void Propagator::injectParameterOnMcSamples(const nlohmann::json &injectConfig_)
             continue;
           }
 
-          LogWarning << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
+          LogInfo << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
           parPtr->setParameterValue( GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") );
         }
         else {

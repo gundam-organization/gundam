@@ -662,7 +662,7 @@ void DataDispenser::preAllocateMemory(){
   // DEV
   if( _eventDialCacheRef_ != nullptr ){
     if( not _cache_.dialCollectionsRefList.empty() ){
-      LogInfo << "Claiming memory for event-by-event dials..." << std::endl;
+      LogInfo << "Creating slots for event-by-event dials..." << std::endl;
       size_t nDialsMaxPerEvent{0};
       for( auto& dialCollection : _cache_.dialCollectionsRefList ){
         LogScopeIndent;
