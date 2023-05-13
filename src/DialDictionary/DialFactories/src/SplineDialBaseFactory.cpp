@@ -254,7 +254,11 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialType_,
     // intercept -> y = ax + b -> b = y - ax
     _slopeListBuffer_[0] = _yPointListBuffer_[0] - _xPointListBuffer_[0]*_slopeListBuffer_[1];
 
+    // fill data
     ((Polynomial*) dialBase.get())->setCoefficientList(_slopeListBuffer_);
+    ((Polynomial*) dialBase.get())->setSplineBounds({_xPointListBuffer_[0], _xPointListBuffer_[1]});
+
+    // release
     return dialBase.release();
   }
 
