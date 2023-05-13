@@ -224,7 +224,7 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialType_,
   // If the function is flat AND equal to one, the drop it.  Compare against
   // float accuracy in case the value was actually calculated against with a
   // float.
-  if (std::abs(_yPointListBuffer_[0]-1.0)<std::numeric_limits<float>::epsilon()
+  if (std::abs(_yPointListBuffer_[0]-1.0) < std::numeric_limits<float>::epsilon()
       and isFlat) {
     return nullptr;
   }
@@ -236,6 +236,25 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialType_,
     // Do the unique_ptr dance in case there are exceptions.
     std::unique_ptr<DialBase> dialBase = std::make_unique<Shift>();
     dialBase->buildDial(_yPointListBuffer_[0]);
+    return dialBase.release();
+  }
+
+  // If there is only two points, just create an affine dial
+  if( _xPointListBuffer_.size() == 2 ){
+    // Do the unique_ptr dance in case there are exceptions.
+    std::unique_ptr<DialBase> dialBase = std::make_unique<Polynomial>();
+
+    // create coefficients
+    _slopeListBuffer_.clear();
+    _slopeListBuffer_.resize(2, 0);
+
+    // delta(y)/delta(x)
+    _slopeListBuffer_[1] = (_yPointListBuffer_[1] - _yPointListBuffer_[0])/(_xPointListBuffer_[1] - _xPointListBuffer_[0]);
+
+    // intercept -> y = ax + b -> b = y - ax
+    _slopeListBuffer_[0] = _yPointListBuffer_[0] - _xPointListBuffer_[0]*_slopeListBuffer_[1];
+
+    ((Polynomial*) dialBase.get())->setCoefficientList(_slopeListBuffer_);
     return dialBase.release();
   }
 

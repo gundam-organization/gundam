@@ -26,7 +26,7 @@ public:
                          const std::vector<double>&,
                          const std::string& option_="") override;
 
-  void setCoefficientList(const std::vector<double> &coefficientList_);
+  void setCoefficientList(const std::vector<double> &coefficientList_){ _coefficientList_ = coefficientList_; }
 
 
 private:
