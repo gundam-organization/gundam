@@ -124,5 +124,5 @@ double MonotonicSpline::evalResponse(const DialInputBuffer& input_) const {
     else if(dialInput >= _splineBounds_.second){ dialInput = _splineBounds_.second; }
   }
 
-  return CalculateMonotonicSpline( dialInput, -1E20, 1E20, _splineData_.data(), int(_splineData_.size()) );
+  return CalculateMonotonicSpline( dialInput, -1E20, 1E20, _splineData_.data(), int(_splineData_.size()-2) );
 }
