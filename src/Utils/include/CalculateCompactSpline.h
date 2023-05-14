@@ -36,12 +36,17 @@ namespace {
     // Interpolate one point using a compact spline.  This takes the "index"
     // of the point in the data, the parameter value (that made the index), a
     // minimum and maximum bound, the buffer of data for this spline, and the
-    // number of data elements in the spline data.  The input data is arrange
+    // number of knots in the spline data.  The input data is arrange
     // as
 
-    // data[0] -- spline lower bound (not used)
-    // data[1] -- spline inverse step (not used)
-    // data[2+2*n+0] -- The function value for knot n
+    // data[0] -- spline lower bound
+    // data[1] -- spline step between X values
+    // data[2+n+0] -- The function value for knot n (0 to dim-1)
+    //
+    // NOTE: CalculateUniformSpline, CalculateGeneralSpline,
+    // CalculateCompactSpline, and CalculateMonotonicSpline have very similar,
+    // but different calls.  In particular the dim parameter meaning is not
+    // consistent.
     DEVICE_CALLABLE_INLINE
     double CalculateCompactSpline(const double x,
                                   const double lowerBound, double upperBound,

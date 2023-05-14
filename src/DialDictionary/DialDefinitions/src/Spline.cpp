@@ -53,13 +53,19 @@ void Spline::buildDial(const std::vector<double>& v1,
 const TSpline3 &Spline::getSpline() const {return _spline_;}
 
 double Spline::evalResponse(const DialInputBuffer& input_) const {
+  const double dialInput{input_.getBuffer()[0]};
+
+#ifndef NDEBUG
+  LogThrowIf(not std::isfinite(dialInput), "Invalid input for Spline");
+#endif
+
   if( not _allowExtrapolation_ ){
-    if (input_.getBuffer()[0] <= _spline_.GetXmin()) {
+    if (dialInput <= _spline_.GetXmin()) {
       return _spline_.Eval( _spline_.GetXmin() );
     }
-    else if (input_.getBuffer()[0] >= _spline_.GetXmax()) {
+    else if (dialInput >= _spline_.GetXmax()) {
       return _spline_.Eval( _spline_.GetXmax() );
     }
   }
-  return _spline_.Eval( input_.getBuffer()[0] );
+  return _spline_.Eval( dialInput );
 }

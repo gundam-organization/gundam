@@ -101,9 +101,13 @@ void SimpleSpline::buildDial(const TSpline3& sp_, const std::string& option_) {
 double SimpleSpline::evalResponse(const DialInputBuffer& input_) const {
   double dialInput{input_.getBuffer()[0]};
 
+#ifndef NDEBUG
+  LogThrowIf(not std::isfinite(dialInput), "Invalid input for SimpleSpline");
+#endif
+
   if( not _allowExtrapolation_ ){
-    if     (input_.getBuffer()[0] <= _splineBounds_.first) { dialInput = _splineBounds_.first; }
-    else if(input_.getBuffer()[0] >= _splineBounds_.second){ dialInput = _splineBounds_.second; }
+    if     (dialInput <= _splineBounds_.first) { dialInput = _splineBounds_.first; }
+    else if(dialInput >= _splineBounds_.second){ dialInput = _splineBounds_.second; }
   }
 
   if( _isUniform_ ){
