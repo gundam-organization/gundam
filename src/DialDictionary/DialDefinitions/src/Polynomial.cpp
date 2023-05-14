@@ -20,10 +20,3 @@ double Polynomial::evalResponse(const DialInputBuffer& input_) const {
   }
   return result;
 }
-
-void Polynomial::buildDial(const std::vector<double>& coefficientList_,
-                       const std::vector<double>&,
-                       const std::vector<double>&,
-                       const std::string& option_) {
-  setCoefficientList( coefficientList_ );
-}

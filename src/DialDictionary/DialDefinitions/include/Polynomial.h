@@ -21,13 +21,6 @@ public:
 
   void setAllowExtrapolation(bool allowExtrapolation_) override { _allowExtrapolation_ = allowExtrapolation_; }
 
-  // Initialize the polynomial ocoefficients.  The coefficients go in the first
-  // vector, and the other two are ignored.
-  virtual void buildDial(const std::vector<double>& coefficientList_,
-                         const std::vector<double>&,
-                         const std::vector<double>&,
-                         const std::string& option_="") override;
-
   void setCoefficientList(const std::vector<double> &coefficientList_){ _coefficientList_ = coefficientList_; }
   void setSplineBounds(const std::pair<double, double>& splineBounds_){ _splineBounds_ = splineBounds_; }
 
