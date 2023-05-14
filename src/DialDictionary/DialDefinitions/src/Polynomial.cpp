@@ -10,8 +10,8 @@ double Polynomial::evalResponse(const DialInputBuffer& input_) const {
   double dialInput{input_.getBuffer()[0]};
 
   if( not _allowExtrapolation_ ){
-    if     (input_.getBuffer()[0] <= _splineBounds_.first) { dialInput = _splineBounds_.first; }
-    else if(input_.getBuffer()[0] >= _splineBounds_.second){ dialInput = _splineBounds_.second; }
+    if     ( dialInput <= _splineBounds_.first  ){ dialInput = _splineBounds_.first; }
+    else if( dialInput >= _splineBounds_.second ){ dialInput = _splineBounds_.second; }
   }
 
   for( auto coefficient : _coefficientList_ ) {
