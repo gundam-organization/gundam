@@ -124,7 +124,7 @@ void EventTreeWriter::writeEvents(TDirectory *saveDir_, const std::string& treeN
 
   int iLeaf;
   int iPar{0};
-  std::string progressTitle = LogInfo.getPrefixString() + LogInfo.getIndentStr() + "Writing " + treeName_;
+  std::string progressTitle = LogInfo.getPrefixString() + Logger::getIndentStr() + "Writing " + treeName_;
   size_t iEvent{0}; size_t nEvents = (eventList_.size());
   for( auto& event : eventList_ ){
     GenericToolbox::displayProgressBar(iEvent++,nEvents,progressTitle);
