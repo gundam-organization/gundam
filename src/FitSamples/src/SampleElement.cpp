@@ -44,9 +44,8 @@ void SampleElement::shrinkEventList(size_t newTotalSize_){
 }
 void SampleElement::updateEventBinIndexes(int iThread_){
   if( isLocked ) return;
-  LogScopeIndent;
   int nBins = int(binning.getBinsList().size());
-  if(iThread_ <= 0) LogInfo << "Finding bin indexes for \"" << name << "\"..." << std::endl;
+  if(iThread_ <= 0){ LogScopeIndent; LogInfo << "Finding bin indexes for \"" << name << "\"..." << std::endl; }
   int toDelete = 0;
   for( size_t iEvent = 0 ; iEvent < eventList.size() ; iEvent++ ){
     if( iThread_ != -1 and iEvent % GlobalVariables::getNbThreads() != iThread_ ) continue;
@@ -77,8 +76,7 @@ void SampleElement::updateEventBinIndexes(int iThread_){
 void SampleElement::updateBinEventList(int iThread_) {
   if( isLocked ) return;
 
-  LogScopeIndent;
-  if(iThread_ <= 0) LogInfo << "Filling bin event cache for \"" << name << "\"..." << std::endl;
+  if( iThread_ <= 0 ){ LogScopeIndent; LogInfo << "Filling bin event cache for \"" << name << "\"..." << std::endl; }
   int nBins = int(perBinEventPtrList.size());
   int nbThreads = GlobalVariables::getNbThreads();
   if( iThread_ == -1 ){
