@@ -29,11 +29,11 @@ public:
   typedef DialInterface* DialsElem_t;
 #else
   struct DialsElem_t {
-    DialsElem_t(DialInterface* d,double w): dial(d), result(w) {}
+    DialsElem_t(DialInterface* interface_, double response_): interface(interface_), response(response_) {}
     // The dial interface to be used with the PhysicsEvent.
-    DialInterface* dial;
+    DialInterface* interface;
     // The cached result calculated by the dial.
-    double result;
+    double response;
   };
 #endif
 
@@ -86,6 +86,7 @@ public:
   /// DialInterface objects), and each DialInterface object could be in the
   /// cache multiple times (but for different Physics event objects).
   std::vector<CacheElem_t> &getCache();
+  const std::vector<CacheElem_t> &getCache() const;
 
   /// Allocate entries for events in the indexed cache.  The first parameter
   /// arethe number of events to allocate space for, and the second number is
@@ -110,6 +111,7 @@ private:
   // The next available entry in the indexed cache.
   size_t _fillIndex_{0};
 
+  // Keep the copy-constructor of the EventDialCache.
   GenericToolbox::NoCopyWrapper<std::mutex> _mutex_;
 
   // A cache mapping events to dials.  This is built while the dials are

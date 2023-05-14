@@ -502,7 +502,7 @@ void Propagator::initializeImpl() {
 #ifndef USE_BREAKDOWN_CACHE
           LogDebug << std::endl << "  - " << dialInterface->getSummary();
 #else
-          LogDebug << std::endl << "  - " << dialInterface.dial->getSummary();
+          LogDebug << std::endl << "  - " << dialInterface.interface->getSummary();
 #endif
         }
         LogDebug << std::endl << "}" << std::endl;

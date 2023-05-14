@@ -887,6 +887,7 @@ void DataDispenser::loadFromHistContent(){
       auto target = sample->getBinning().getBinsList()[iBin].generateBinTarget( axisNameList );
       auto histBinIndex = hist->GetBin( target.data() ); // bad fetch..?
 
+      container->eventList[iBin].setSampleIndex( sample->getIndex() );
       for( size_t iVar = 0 ; iVar < target.size() ; iVar++ ){
         container->eventList[iBin].setVariable( target[iVar], axisNameList[iVar] );
       }
@@ -1237,6 +1238,7 @@ void DataDispenser::fillFunction(int iThread_){
         eventPtr->setSampleBinIndex(eventBuffer.getSampleBinIndex());
         eventPtr->setTreeWeight(eventBuffer.getTreeWeight());
         eventPtr->setNominalWeight(eventBuffer.getTreeWeight());
+        eventPtr->setSampleIndex(_cache_.samplesToFillList[iSample]->getIndex());
         eventPtr->resetEventWeight();
 
         // Now the event is ready. Let's index the dials:
