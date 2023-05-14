@@ -62,9 +62,9 @@ void FitSampleSet::initializeImpl() {
 
   for( auto& sample : _fitSampleList_ ){ sample.initialize(); }
 
-  LogInfo << "Creating parallelisable jobs" << std::endl;
   // Fill the bin index inside each event
   std::function<void(int)> updateSampleEventBinIndexesFct = [this](int iThread){
+    LogInfoIf(iThread <= 0) << "Updating event sample bin indices..." << std::endl;
     for( auto& sample : _fitSampleList_ ){
       sample.getMcContainer().updateEventBinIndexes(iThread);
       sample.getDataContainer().updateEventBinIndexes(iThread);
@@ -74,6 +74,7 @@ void FitSampleSet::initializeImpl() {
 
   // Fill bin event caches
   std::function<void(int)> updateSampleBinEventListFct = [this](int iThread){
+    LogInfoIf(iThread <= 0) << "Updating sample per bin event lists..." << std::endl;
     for( auto& sample : _fitSampleList_ ){
       sample.getMcContainer().updateBinEventList(iThread);
       sample.getDataContainer().updateBinEventList(iThread);

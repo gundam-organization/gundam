@@ -646,6 +646,7 @@ void DataDispenser::preAllocateMemory(){
   }
 #endif
 
+  LogInfo << "Reserving event memory..." << std::endl;
   _cache_.sampleIndexOffsetList.resize(_cache_.samplesToFillList.size());
   _cache_.sampleEventListPtrToFill.resize(_cache_.samplesToFillList.size());
   for( size_t iSample = 0 ; iSample < _cache_.sampleNbOfEvents.size() ; iSample++ ){
