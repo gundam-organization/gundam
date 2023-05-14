@@ -63,6 +63,7 @@ std::map<std::string, std::shared_ptr<TCanvas>> PlotGenerator::getBufferCanvasLi
 // Core
 void PlotGenerator::generateSamplePlots(TDirectory *saveDir_, int cacheSlot_) {
   LogThrowIf(not isInitialized());
+  LogScopeIndent;
   this->generateSampleHistograms(GenericToolbox::mkdirTFile(saveDir_, "histograms"), cacheSlot_);
   this->generateCanvas(_histHolderCacheList_[cacheSlot_], GenericToolbox::mkdirTFile(saveDir_, "canvas"));
 }

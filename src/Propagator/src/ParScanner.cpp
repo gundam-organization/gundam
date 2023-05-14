@@ -272,6 +272,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
   LogThrowIf(not isInitialized());
   saveDir_->cd();
 
+  LogScopeIndent;
   auto makeVariedEventRatesFct = [&](FitParameter& par_, std::vector<double> variationList_, TDirectory* saveSubDir_){
 
     LogInfo << "Making varied event rates for " << par_.getFullTitle() << std::endl;
