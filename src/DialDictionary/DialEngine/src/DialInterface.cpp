@@ -24,11 +24,10 @@ void DialInterface::setDialBinRef(const DataBin *dialBinRef) {
   _dialBinRef_ = dialBinRef;
 }
 
-double DialInterface::evalResponse() {
-  if( _inputBufferRef_->isMasked() ){ return 1; }
-  return _responseSupervisorRef_->process( _dialBaseRef_->evalResponse( *_inputBufferRef_ ) );
+double DialInterface::evalResponse() const {
+  return DialInterface::evalResponse(_inputBufferRef_, _dialBaseRef_, _responseSupervisorRef_);
 }
-std::string DialInterface::getSummary(bool shallow_) {
+std::string DialInterface::getSummary(bool shallow_) const {
   std::stringstream ss;
   ss << _dialBaseRef_->getDialTypeName() << ":";
 
@@ -53,4 +52,22 @@ std::string DialInterface::getSummary(bool shallow_) {
   }
 
   return ss.str();
+}
+
+void DialInterface::fillWithDialResponse(TGraph *graphBuffer_) const {
+  LogThrowIf(graphBuffer_ == nullptr, "no buffer provided for " << std::endl << this->getSummary( false ));
+  DialInputBuffer inputBuf{*_inputBufferRef_};
+  for( int iPt = 0 ; iPt < graphBuffer_->GetN() ; iPt++ ){
+    LogThrowIf(inputBuf.getBufferSize() != 1, "multi-dim dial not supported yet.");
+    inputBuf.getBufferVector()[0] = graphBuffer_->GetX()[iPt];
+    graphBuffer_->GetY()[iPt] = DialInterface::evalResponse(&inputBuf, _dialBaseRef_, _responseSupervisorRef_);
+  }
+}
+
+double DialInterface::evalResponse(
+    DialInputBuffer *inputBufferPtr_, DialBase *dialBaseRef_,
+    const DialResponseSupervisor *responseSupervisorRef_
+    ) {
+  if( inputBufferPtr_->isMasked() ){ return 1; }
+  return responseSupervisorRef_->process( dialBaseRef_->evalResponse( *inputBufferPtr_ ) );
 }

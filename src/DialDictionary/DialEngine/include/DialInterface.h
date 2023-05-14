@@ -47,14 +47,19 @@ public:
   /// Get the data bin definition for the dial.
   [[nodiscard]] inline const DataBin* getDialBinRef() const {return _dialBinRef_;}
 
-  [[nodiscard]] double evalResponse();
-  [[nodiscard]] std::string getSummary(bool shallow_=true);
+  [[nodiscard]] double evalResponse() const;
+  [[nodiscard]] std::string getSummary(bool shallow_=true) const;
+
+  void fillWithDialResponse(TGraph* graphBuffer_) const;
 
 private:
   DialBase* _dialBaseRef_{nullptr}; // should be filled while init
   DialInputBuffer* _inputBufferRef_{nullptr};
   const DialResponseSupervisor* _responseSupervisorRef_{nullptr};
   const DataBin* _dialBinRef_{nullptr}; // for printout
+
+public:
+  [[nodiscard]] static double evalResponse(DialInputBuffer* inputBufferPtr_, DialBase* dialBaseRef_, const DialResponseSupervisor* responseSupervisorRef_);
 
 };
 
