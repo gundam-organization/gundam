@@ -278,12 +278,15 @@ int main(int argc, char** argv){
   if( clParser.isOptionTriggered("useDataEntry") ){
     auto selectedDataEntry = clParser.getOptionVal<std::string>("useDataEntry", 0);
     // Do something better in case multiple datasets are defined
+    bool isFound{false};
     for( auto& dataSet : fitter.getPropagator().getDataSetList() ){
       if( GenericToolbox::doesKeyIsInMap( selectedDataEntry, dataSet.getDataDispenserDict() ) ){
         LogWarning << "Using data entry \"" << selectedDataEntry << "\" for dataset: " << dataSet.getName() << std::endl;
         dataSet.setSelectedDataEntry( selectedDataEntry );
+        isFound = true;
       }
     }
+    LogThrowIf(not isFound, "Could not find data entry \"" << selectedDataEntry << "\" among defined data sets");
   }
 
   // --use-data-config
