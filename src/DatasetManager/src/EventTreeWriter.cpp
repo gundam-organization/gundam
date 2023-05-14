@@ -24,8 +24,10 @@ void EventTreeWriter::setParSetListPtr(const std::vector<FitParameterSet> *parSe
 }
 
 void EventTreeWriter::writeSamples(TDirectory* saveDir_) const{
+  LogInfo << "Writing sample data in TTrees..." << std::endl;
 
   for( const auto& sample : _fitSampleSetPtr_->getFitSampleList() ){
+    LogScopeIndent;
     LogInfo << "Writing sample: " << sample.getName() << std::endl;
 
     for( bool isData : {false, true} ) {

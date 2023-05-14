@@ -645,6 +645,7 @@ void PlotGenerator::defineHistogramHolders() {
   int sampleCounter = -1;
   HistHolder histDefBase;
   for( const auto& sample : _fitSampleSetPtr_->getFitSampleList() ){
+    LogScopeIndent;
     LogInfo << "Defining holders for sample: \"" << sample.getName() << "\"" << std::endl;
     sampleCounter++;
     histDefBase.fitSamplePtr = &sample;
