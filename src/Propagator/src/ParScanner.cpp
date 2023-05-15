@@ -231,10 +231,14 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
     GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile( saveDir_, scanEntry.folder ), &scanGraph, ss.str());
   }
 
+  std::stringstream ssVal;
+  ssVal << GenericToolbox::replaceSubstringInString(par_.getFullTitle(), "/", "_");
+  ssVal << "_CurrentPar";
+
   // current parameter value / center of the scan:
   TVectorD currentParValue(1);
   currentParValue[0] = par_.getParameterValue();
-  GenericToolbox::writeInTFile(saveDir_, &currentParValue, "currenParValue_TVectorD");
+  GenericToolbox::writeInTFile(saveDir_, &currentParValue, ssVal.str());
 }
 void ParScanner::generateOneSigmaPlots(TDirectory* saveDir_){
   LogThrowIf(not isInitialized());
