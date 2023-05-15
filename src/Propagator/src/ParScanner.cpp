@@ -168,7 +168,7 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
     highBound = std::min(highBound, par_.getMaxValue());
   }
 
-  int offSet{0};
+  int offSet{0}; // offset help make sure the first point
   for( int iPt = 0 ; iPt < _nbPoints_+1 ; iPt++ ){
     double newVal = lowBound + double(iPt-offSet)/(_nbPoints_-1)*( highBound - lowBound );
     if( offSet == 0 and newVal > origVal ){
@@ -176,12 +176,34 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
       offSet = 1;
     }
 
+    LogThrowIf(
+        std::isnan(newVal),
+        "Scanning point is nan. Current values are: "
+        << std::endl
+        << GET_VAR_NAME_VALUE(iPt) << std::endl
+        << GET_VAR_NAME_VALUE(lowBound) << std::endl
+        << GET_VAR_NAME_VALUE(highBound) << std::endl
+        << GET_VAR_NAME_VALUE(_nbPoints_) << std::endl
+        << GET_VAR_NAME_VALUE(offSet) << std::endl
+        );
+
     par_.setParameterValue(newVal);
     _owner_->updateLlhCache();
     parPoints[iPt] = par_.getParameterValue();
 
     for( auto& scanEntry : scanDataDict ){ scanEntry.yPoints[iPt] = scanEntry.evalY(); }
   }
+
+  // sorting points in increasing order
+  auto p = GenericToolbox::getSortPermutation(parPoints, [](double a_, double b_){
+    if( a_ < b_ ) return true;
+    return false;
+  });
+  GenericToolbox::applyPermutation(parPoints, p);
+  for( auto& scanEntry : scanDataDict ){
+    GenericToolbox::applyPermutation(scanEntry.yPoints, p);
+  }
+
 
   par_.setParameterValue(origVal);
   _owner_->updateLlhCache();
