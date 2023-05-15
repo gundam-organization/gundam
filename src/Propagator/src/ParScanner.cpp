@@ -185,6 +185,10 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
         << GET_VAR_NAME_VALUE(highBound) << std::endl
         << GET_VAR_NAME_VALUE(_nbPoints_) << std::endl
         << GET_VAR_NAME_VALUE(offSet) << std::endl
+        << GET_VAR_NAME_VALUE(origVal) << std::endl
+        << GET_VAR_NAME_VALUE(_parameterSigmaRange_.first) << std::endl
+        << GET_VAR_NAME_VALUE(_parameterSigmaRange_.second) << std::endl
+        << GET_VAR_NAME_VALUE(par_.getStdDevValue()) << std::endl
         );
 
     par_.setParameterValue(newVal);

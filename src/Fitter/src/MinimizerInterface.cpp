@@ -1081,9 +1081,11 @@ void MinimizerInterface::scanParameters(TDirectory* saveDir_){
     this->getPropagator().getParScanner().scanFitParameter(*getMinimizerFitParameterPtr()[iPar], saveDir_);
   } // iPar
   for( auto& parSet : this->getPropagator().getParameterSetsList() ){
+    if( not parSet.isEnabled() ) continue;
     if( parSet.isUseEigenDecompInFit() ){
       LogWarning << parSet.getName() << " is using eigen decomposition. Scanning original parameters..." << std::endl;
       for( auto& par : parSet.getParameterList() ){
+        if( not par.isEnabled() ) continue;
         this->getPropagator().getParScanner().scanFitParameter(par, saveDir_);
       }
     }

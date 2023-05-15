@@ -248,12 +248,6 @@ void FitterEngine::fit(){
     LogInfo << "Running all parameter variation on pre-fit samples..." << std::endl;
     _propagator_.getParScanner().varyEvenRates( _allParamVariationsSigmas_, GenericToolbox::mkdirTFile(_saveDir_, "preFit/varyEventRates") );
     GenericToolbox::triggerTFileWrite(_saveDir_);
-
-    LogTrace << "Pre-fit likelihood state after var event rate?:" << std::endl;
-    LogTrace << _propagator_.getLlhBufferSummary() << std::endl;
-
-    LogTrace << "pars??:" << std::endl;
-    LogTrace << getPropagator().getParametersSummary( false ) << std::endl;
   }
   if( _enablePreFitScan_ ){
     LogInfo << "Scanning fit parameters before minimizing..." << std::endl;
