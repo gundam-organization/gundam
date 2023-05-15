@@ -29,8 +29,6 @@
 #define DEVICE_FLOATING_POINT double
 #endif
 
-#define GET_VAR_NAME_VALUE(var) ( ((std::stringstream&) (std::stringstream() << #var << " = " << (var)) ).str() )
-
 // Place in a private name space so it plays nicely with CUDA
 namespace {
     // Interpolate one point using a compact spline.  This takes the "index"
