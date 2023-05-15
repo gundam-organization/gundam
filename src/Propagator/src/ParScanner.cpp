@@ -4,6 +4,7 @@
 
 #include "ParScanner.h"
 #include "GenericToolbox.Json.h"
+#include "GenericToolbox.ScopedGuard.h"
 #include "Propagator.h"
 #include "FitParameter.h"
 
@@ -271,14 +272,39 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
 
   LogScopeIndent;
   auto makeVariedEventRatesFct = [&](FitParameter& par_, std::vector<double> variationList_, TDirectory* saveSubDir_){
-
     LogInfo << "Making varied event rates for " << par_.getFullTitle() << std::endl;
+
+    // make sure the parameters are rolled back to their original value
+    std::map<FitParameter*, double> parStateList{};
+    GenericToolbox::ScopedGuard g(
+        [&]{
+          for( auto& parSet : _owner_->getParameterSetsList() ){
+            if( not parSet.isEnabled() ) { continue; }
+            for( auto& par : parSet.getParameterList() ){
+              if( not par.isEnabled() ) { continue; }
+              parStateList[&par] = par.getParameterValue();
+              par.setParameterValue( par.getPriorValue() );
+            }
+          }
+        },
+        [&]{
+          for( auto& parSet : _owner_->getParameterSetsList() ){
+            if( not parSet.isEnabled() ) { continue; }
+            for( auto& par : parSet.getParameterList() ){
+              if( not par.isEnabled() ){ continue; }
+              par.setParameterValue( parStateList[&par] );
+            }
+          }
+        }
+    );
+
 
     // First make sure all params are at their prior <- is it necessary?
     for( auto& parSet : _owner_->getParameterSetsList() ){
       if( not parSet.isEnabled() ) continue;
       for( auto& par : parSet.getParameterList() ){
-        par.setParameterValue(par.getPriorValue());
+        if( not par.isEnabled() ) continue;
+        par.setParameterValue( par.getPriorValue() );
       }
     }
     _owner_->propagateParametersOnSamples();
@@ -301,19 +327,19 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
 
       buffEvtRatesMap.emplace_back();
 
-      if(par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue() > par_.getMaxValue())
-        par_.setParameterValue(par_.getMaxValue());
-      else if (par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue() < par_.getMinValue())
-        par_.setParameterValue(par_.getMinValue());
-      else
-        par_.setParameterValue(par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue());
+      double cappedParValue{par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue()};
+      cappedParValue = std::min(cappedParValue, par_.getMaxValue());
+      cappedParValue = std::max(cappedParValue, par_.getMinValue());
+      par_.setParameterValue( cappedParValue );
 
       _owner_->propagateParametersOnSamples();
 
       for(auto & sample : _owner_->getFitSampleSet().getFitSampleList()){
-        buffEvtRatesMap[iVar].push_back(sample.getMcContainer().getSumWeights() );
+        buffEvtRatesMap[iVar].emplace_back( sample.getMcContainer().getSumWeights() );
       }
-      par_.setParameterValue(par_.getPriorValue());
+
+      // back to the prior
+      par_.setParameterValue( par_.getPriorValue() );
     }
 
 
