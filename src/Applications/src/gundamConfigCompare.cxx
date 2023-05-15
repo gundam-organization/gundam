@@ -127,7 +127,7 @@ void compareConfigStage(const nlohmann::json& subConfig1, const nlohmann::json& 
           auto name2 = GenericToolbox::Json::fetchValue(subConfig2[iEntry2], "name", "");
           if( name1 == name2 ){
             found1 = true;
-            __pathBuffer__.emplace_back( "#"+std::to_string(iEntry1) );
+            __pathBuffer__.emplace_back( "#"+std::to_string(iEntry1) + "(name:" + name1 + ")" );
             if( iEntry1 != iEntry2 ) __pathBuffer__.back() += "<->" + std::to_string(iEntry2);
             compareConfigStage(subConfig1[iEntry1], subConfig2[iEntry2]);
             __pathBuffer__.pop_back();

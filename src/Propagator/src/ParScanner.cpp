@@ -66,6 +66,7 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
   LogInfo << "Scanning: " << par_.getFullTitle() << " / " << _nbPoints_ << " steps..." << std::endl;
 
   if( par_.getOwner()->isUseEigenDecompInFit() and not par_.isEigen() ){
+    // temporarily disable the automatic conversion Eigen -> Original
     _owner_->setEnableEigenToOrigInPropagate( false );
   }
 
