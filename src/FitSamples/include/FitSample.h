@@ -25,7 +25,7 @@ public:
   // SETTERS
   void setName(const std::string &name);
   void setIndex(int index);
-  double setLlhStatBuffer(double llhStatBuffer_) { _llhStatBuffer_ = llhStatBuffer_; }
+  void setLlhStatBuffer(double llhStatBuffer_) { _llhStatBuffer_ = llhStatBuffer_; }
   void setBinningFilePath(const std::string &binningFilePath_);
   void setSelectionCutStr(const std::string &selectionCutStr_);
   void setVarSelectionFormulaStr(const std::string &varSelectionFormulaStr_);
