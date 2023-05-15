@@ -60,6 +60,7 @@ public:
   double* getLlhPenaltyBufferPtr(){ return &_llhPenaltyBuffer_; }
   double* getLlhRegBufferPtr(){ return &_llhRegBuffer_; }
   [[nodiscard]] std::string getLlhBufferSummary() const;
+  [[nodiscard]] std::string getParametersSummary( bool showEigen_ = true ) const;
 
   [[nodiscard]] const FitParameterSet* getFitParameterSetPtr(const std::string& name_) const;
   [[nodiscard]] FitParameterSet* getFitParameterSetPtr(const std::string& name_);

@@ -351,16 +351,7 @@ int main(int argc, char** argv){
   // show initial conditions
   if( clParser.isOptionTriggered("injectParameterConfig") ) {
     LogDebug << "Starting mc parameters that where injected:" << std::endl;
-    for (auto &parSet: fitter.getPropagator().getParameterSetsList()) {
-      LogScopeIndent;
-      if (not parSet.isEnabled()) continue;
-      LogDebug << parSet.getName() << std::endl;
-      for (auto &par: parSet.getParameterList()) {
-        LogScopeIndent;
-        if (not par.isEnabled()) continue;
-        LogDebug << par.getTitle() << ": " << par.getParameterValue() << std::endl;
-      }
-    }
+    LogDebug << fitter.getPropagator().getParametersSummary( false ) << std::endl;
   }
 
   // --------------------------

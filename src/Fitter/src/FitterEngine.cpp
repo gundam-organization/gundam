@@ -251,6 +251,9 @@ void FitterEngine::fit(){
 
     LogTrace << "Pre-fit likelihood state after var event rate?:" << std::endl;
     LogTrace << _propagator_.getLlhBufferSummary() << std::endl;
+
+    LogTrace << "pars??:" << std::endl;
+    LogTrace << getPropagator().getParametersSummary( false ) << std::endl;
   }
   if( _enablePreFitScan_ ){
     LogInfo << "Scanning fit parameters before minimizing..." << std::endl;

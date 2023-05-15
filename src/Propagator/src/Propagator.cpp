@@ -621,6 +621,19 @@ std::string Propagator::getLlhBufferSummary() const{
   );
   return ss.str();
 }
+std::string Propagator::getParametersSummary( bool showEigen_ ) const{
+  std::stringstream ss;
+  for( auto &parSet: getParameterSetsList() ){
+    if( not parSet.isEnabled() ){ continue; }
+    if( not ss.str().empty() ) ss << std::endl;
+    ss << parSet.getName();
+    for( auto &par: parSet.getParameterList() ){
+      if( not par.isEnabled() ){ continue; }
+      ss << std::endl << "  " << par.getTitle() << ": " << par.getParameterValue();
+    }
+  }
+  return ss.str();
+}
 const FitParameterSet* Propagator::getFitParameterSetPtr(const std::string& name_) const{
   for( auto& parSet : _parameterSetList_ ){
     if( parSet.getName() == name_ ) return &parSet;
