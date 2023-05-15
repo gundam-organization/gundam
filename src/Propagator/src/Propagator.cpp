@@ -600,7 +600,7 @@ std::string Propagator::getLlhBufferSummary() const{
   std::stringstream ss;
   ss << "Total likelihood = " << getLlhBuffer();
   ss << std::endl << "Stat likelihood = " << getLlhStatBuffer();
-  ss << " = sum: " << GenericToolbox::iterableToString(
+  ss << " = sum of: " << GenericToolbox::iterableToString(
       _fitSampleSet_.getFitSampleList(), [](const FitSample& sample_){
         std::stringstream ssSub;
         ssSub << sample_.getName() << ": ";
@@ -610,7 +610,7 @@ std::string Propagator::getLlhBufferSummary() const{
       }
   );
   ss << std::endl << "Penalty likelihood = " << getLlhPenaltyBuffer();
-  ss << " = sum: " << GenericToolbox::iterableToString(
+  ss << " = sum of: " << GenericToolbox::iterableToString(
       _parameterSetList_, [](const FitParameterSet& parSet_){
         std::stringstream ssSub;
         ssSub << parSet_.getName() << ": ";

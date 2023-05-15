@@ -230,7 +230,7 @@ void FitterEngine::fit(){
   LogWarning << "Pre-fit likelihood state:" << std::endl;
   {
     LogScopeIndent;
-    LogWarning << _propagator_.getLlhBufferSummary();
+    LogInfo << _propagator_.getLlhBufferSummary() << std::endl;
   }
 
 
@@ -309,7 +309,7 @@ void FitterEngine::fit(){
   LogWarning << "Post-fit likelihood state:" << std::endl;
   {
     LogScopeIndent;
-    LogWarning << _propagator_.getLlhBufferSummary();
+    LogInfo << _propagator_.getLlhBufferSummary() << std::endl;
   }
 
   if( _generateSamplePlots_ and not _propagator_.getPlotGenerator().getConfig().empty() ){

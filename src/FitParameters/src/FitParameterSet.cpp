@@ -74,6 +74,8 @@ void FitParameterSet::readConfigImpl(){
 
   _parameterDefinitionConfig_ = GenericToolbox::Json::fetchValue(_config_, "parameterDefinitions", _parameterDefinitionConfig_);
   _dialSetDefinitions_ = GenericToolbox::Json::fetchValue(_config_, "dialSetDefinitions", _dialSetDefinitions_);
+  _enableOnlyParameters_ = GenericToolbox::Json::fetchValue(_config_, "enableOnlyParameters", _enableOnlyParameters_);
+  _disableParameters_ = GenericToolbox::Json::fetchValue(_config_, "disableParameters", _disableParameters_);
 
 
   // MISC / DEV
@@ -709,6 +711,43 @@ void FitParameterSet::defineParameters(){
     }
 
     if( _parameterNamesList_ != nullptr ){ par.setName(_parameterNamesList_->At(par.getParameterIndex())->GetName()); }
+
+    // par is now fully identifiable.
+    if( not _enableOnlyParameters_.empty() ){
+      bool isEnabled = false;
+      for( auto& enableEntry : _enableOnlyParameters_ ){
+        if( GenericToolbox::Json::doKeyExist(enableEntry, "name")
+            and par.getName() == GenericToolbox::Json::fetchValue<std::string>(enableEntry, "name") ){
+          isEnabled = true;
+          break;
+        }
+      }
+
+      if( not isEnabled ){
+        LogAlert << "Skipping parameter \"" << par.getFullTitle() << "\" as it is not set in enableOnlyParameters" << std::endl;
+        par.setIsEnabled( false );
+        continue;
+      }
+    }
+    if( not _disableParameters_.empty() ){
+      bool isEnabled = true;
+      for( auto& disableEntry : _disableParameters_ ){
+        if( GenericToolbox::Json::doKeyExist(disableEntry, "name")
+            and par.getName() == GenericToolbox::Json::fetchValue<std::string>(disableEntry, "name") ){
+          isEnabled = false;
+          break;
+        }
+      }
+
+      if( not isEnabled ){
+        LogAlert << "Skipping parameter \"" << par.getFullTitle() << "\" as it is set in disableParameters" << std::endl;
+        par.setIsEnabled( false );
+        continue;
+      }
+    }
+
+
+
     if( _parameterPriorList_ != nullptr ){ par.setPriorValue((*_parameterPriorList_)[par.getParameterIndex()]); }
     else{ par.setPriorValue(1); }
 

@@ -134,6 +134,8 @@ private:
 
   double _penaltyChi2Buffer_{std::nan("unset")};
 
+  std::vector<nlohmann::json> _enableOnlyParameters_{};
+  std::vector<nlohmann::json> _disableParameters_{};
   std::vector<nlohmann::json> _customFitParThrow_{};
 
   // Eigen objects
