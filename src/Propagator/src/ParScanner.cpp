@@ -271,36 +271,41 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
   LogThrowIf(not isInitialized());
   saveDir_->cd();
 
+  LogInfo << __METHOD_NAME__ << std::endl;
   LogScopeIndent;
+
+  // make sure the parameters are rolled back to their original value
+  std::map<FitParameter*, double> parStateList{};
+  GenericToolbox::ScopedGuard g(
+      [&]{
+        LogScopeIndent;
+        LogDebug << "Temporarily pulling back parameters at their prior before performing the event rate..." << std::endl;
+        for( auto& parSet : _owner_->getParameterSetsList() ){
+          if( not parSet.isEnabled() ) { continue; }
+          for( auto& par : parSet.getParameterList() ){
+            if( not par.isEnabled() ) { continue; }
+            parStateList[&par] = par.getParameterValue();
+            par.setParameterValue( par.getPriorValue() );
+          }
+        }
+        _owner_->propagateParametersOnSamples();
+      },
+      [&]{
+        LogScopeIndent;
+        LogDebug << "Restoring parameters to their original values..." << std::endl;
+        for( auto& parSet : _owner_->getParameterSetsList() ){
+          if( not parSet.isEnabled() ) { continue; }
+          for( auto& par : parSet.getParameterList() ){
+            if( not par.isEnabled() ){ continue; }
+            par.setParameterValue( parStateList[&par] );
+          }
+        }
+        _owner_->propagateParametersOnSamples();
+      }
+  );
+
   auto makeVariedEventRatesFct = [&](FitParameter& par_, std::vector<double> variationList_, TDirectory* saveSubDir_){
     LogInfo << "Making varied event rates for " << par_.getFullTitle() << std::endl;
-
-    // make sure the parameters are rolled back to their original value
-    std::map<FitParameter*, double> parStateList{};
-    GenericToolbox::ScopedGuard g(
-        [&]{
-          for( auto& parSet : _owner_->getParameterSetsList() ){
-            if( not parSet.isEnabled() ) { continue; }
-            for( auto& par : parSet.getParameterList() ){
-              if( not par.isEnabled() ) { continue; }
-              parStateList[&par] = par.getParameterValue();
-              par.setParameterValue( par.getPriorValue() );
-            }
-          }
-          _owner_->propagateParametersOnSamples();
-        },
-        [&]{
-          for( auto& parSet : _owner_->getParameterSetsList() ){
-            if( not parSet.isEnabled() ) { continue; }
-            for( auto& par : parSet.getParameterList() ){
-              if( not par.isEnabled() ){ continue; }
-              par.setParameterValue( parStateList[&par] );
-            }
-          }
-          _owner_->propagateParametersOnSamples();
-        }
-    );
-
 
     // First make sure all params are at their prior <- is it necessary?
     for( auto& parSet : _owner_->getParameterSetsList() ){
@@ -333,8 +338,8 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
       double cappedParValue{par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue()};
       cappedParValue = std::min(cappedParValue, par_.getMaxValue());
       cappedParValue = std::max(cappedParValue, par_.getMinValue());
-      par_.setParameterValue( cappedParValue );
 
+      par_.setParameterValue( cappedParValue );
       _owner_->propagateParametersOnSamples();
 
       for(auto & sample : _owner_->getFitSampleSet().getFitSampleList()){
@@ -343,6 +348,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
 
       // back to the prior
       par_.setParameterValue( par_.getPriorValue() );
+      _owner_->propagateParametersOnSamples();
     }
 
 
