@@ -228,10 +228,7 @@ void FitterEngine::fit(){
   LogThrowIf(not isInitialized());
 
   LogWarning << "Pre-fit likelihood state:" << std::endl;
-  {
-    LogScopeIndent;
-    LogInfo << _propagator_.getLlhBufferSummary() << std::endl;
-  }
+  LogInfo << _propagator_.getLlhBufferSummary() << std::endl;
 
 
   // Not moving parameters
@@ -251,6 +248,9 @@ void FitterEngine::fit(){
     LogInfo << "Running all parameter variation on pre-fit samples..." << std::endl;
     _propagator_.getParScanner().varyEvenRates( _allParamVariationsSigmas_, GenericToolbox::mkdirTFile(_saveDir_, "preFit/varyEventRates") );
     GenericToolbox::triggerTFileWrite(_saveDir_);
+
+    LogTrace << "Pre-fit likelihood state after var event rate?:" << std::endl;
+    LogTrace << _propagator_.getLlhBufferSummary() << std::endl;
   }
   if( _enablePreFitScan_ ){
     LogInfo << "Scanning fit parameters before minimizing..." << std::endl;
@@ -307,10 +307,7 @@ void FitterEngine::fit(){
   this->getMinimizer().minimize();
 
   LogWarning << "Post-fit likelihood state:" << std::endl;
-  {
-    LogScopeIndent;
-    LogInfo << _propagator_.getLlhBufferSummary() << std::endl;
-  }
+  LogInfo << _propagator_.getLlhBufferSummary() << std::endl;
 
   if( _generateSamplePlots_ and not _propagator_.getPlotGenerator().getConfig().empty() ){
     LogInfo << "Generating post-fit sample plots..." << std::endl;
