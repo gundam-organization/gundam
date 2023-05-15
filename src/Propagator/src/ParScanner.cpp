@@ -186,6 +186,7 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
   par_.setParameterValue(origVal);
   _owner_->updateLlhCache();
 
+  // Disable the auto conversion from Eigen to Original if the fit is set to use eigen decomp
   if( par_.getOwner()->isUseEigenDecompInFit() and not par_.isEigen() ){
     _owner_->setEnableEigenToOrigInPropagate( true );
   }
@@ -286,6 +287,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
               par.setParameterValue( par.getPriorValue() );
             }
           }
+          _owner_->propagateParametersOnSamples();
         },
         [&]{
           for( auto& parSet : _owner_->getParameterSetsList() ){
@@ -295,6 +297,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
               par.setParameterValue( parStateList[&par] );
             }
           }
+          _owner_->propagateParametersOnSamples();
         }
     );
 

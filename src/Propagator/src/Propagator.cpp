@@ -661,9 +661,7 @@ void Propagator::updateLlhCache(){
   // Compute the penalty terms
   ////////////////////////////////
   _llhPenaltyBuffer_ = 0;
-  int iParset{-1};
   for( auto& parSet : _parameterSetList_ ){
-    iParset++;
     buffer = parSet.getPenaltyChi2();
     LogThrowIf(std::isnan(buffer), parSet.getName() << " penalty chi2 is Nan");
     _llhPenaltyBuffer_ += buffer;
