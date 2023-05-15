@@ -63,9 +63,7 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
   LogThrowIf(saveDir_ == nullptr);
   std::vector<double> parPoints(_nbPoints_+1,0);
 
-  std::stringstream ssPbar;
-  ssPbar << LogInfo.getPrefixString() << "Scanning: " << par_.getFullTitle() << " / " << _nbPoints_ << " steps...";
-  GenericToolbox::displayProgressBar(0, _nbPoints_, ssPbar.str());
+  LogInfo << "Scanning: " << par_.getFullTitle() << " / " << _nbPoints_ << " steps..." << std::endl;
 
   if( par_.getOwner()->isUseEigenDecompInFit() and not par_.isEigen() ){
     _owner_->setEnableEigenToOrigInPropagate( false );
@@ -170,8 +168,6 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
 
   int offSet{0};
   for( int iPt = 0 ; iPt < _nbPoints_+1 ; iPt++ ){
-    GenericToolbox::displayProgressBar(iPt, _nbPoints_, ssPbar.str());
-
     double newVal = lowBound + double(iPt-offSet)/(_nbPoints_-1)*( highBound - lowBound );
     if( offSet == 0 and newVal > origVal ){
       newVal = origVal;
