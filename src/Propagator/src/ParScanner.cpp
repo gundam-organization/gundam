@@ -204,6 +204,11 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
     scanGraph.SetMarkerStyle(kFullDotLarge);
     GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile( saveDir_, scanEntry.folder ), &scanGraph, ss.str());
   }
+
+  // current parameter value / center of the scan:
+  TVectorD currentParValue(1);
+  currentParValue[0] = par_.getParameterValue();
+  GenericToolbox::writeInTFile(saveDir_, &currentParValue, "currenParValue_TVectorD");
 }
 void ParScanner::generateOneSigmaPlots(TDirectory* saveDir_){
   LogThrowIf(not isInitialized());
