@@ -38,8 +38,8 @@ public:
 
   //Core
   bool empty() const;
-  double evalLikelihood() const;
-  double evalLikelihood(const FitSample& sample_) const;
+  double evalLikelihood();
+  double evalLikelihood(FitSample& sample_);
 
   // Parallel
   void updateSampleEventBinIndexes() const;

@@ -523,8 +523,6 @@ void Propagator::initializeImpl() {
 #endif
   }
 
-  _llhPenaltyPerParSet_.resize(_parameterSetList_.size(), 0);
-
   // Propagator needs to be fast
   GlobalVariables::getParallelWorker().setCpuTimeSaverIsEnabled(false);
 }
@@ -569,9 +567,6 @@ double Propagator::getLlhPenaltyBuffer() const {
 double Propagator::getLlhRegBuffer() const {
   return _llhRegBuffer_;
 }
-std::vector<double> Propagator::getLlhPenaltyPerParSet() const{
-  return _llhPenaltyPerParSet_;
-}
 const std::shared_ptr<TMatrixD> &Propagator::getGlobalCovarianceMatrix() const {
   return _globalCovarianceMatrix_;
 }
@@ -601,6 +596,31 @@ std::vector<DatasetLoader> &Propagator::getDataSetList() {
   return _dataSetList_;
 }
 
+std::string Propagator::getLlhBufferSummary() const{
+  std::stringstream ss;
+  ss << "Total likelihood = " << getLlhBuffer();
+  ss << std::endl << "Stat likelihood = " << getLlhStatBuffer();
+  ss << " = sum: " << GenericToolbox::iterableToString(
+      _fitSampleSet_.getFitSampleList(), [](const FitSample& sample_){
+        std::stringstream ssSub;
+        ssSub << sample_.getName() << ": ";
+        if( sample_.isEnabled() ){ ssSub << sample_.getLlhStatBuffer(); }
+        else                     { ssSub << "disabled."; }
+        return ssSub.str();
+      }
+  );
+  ss << std::endl << "Penalty likelihood = " << getLlhPenaltyBuffer();
+  ss << " = sum: " << GenericToolbox::iterableToString(
+      _parameterSetList_, [](const FitParameterSet& parSet_){
+        std::stringstream ssSub;
+        ssSub << parSet_.getName() << ": ";
+        if( parSet_.isEnabled() ){ ssSub << parSet_.getPenaltyChi2Buffer(); }
+        else                     { ssSub << "disabled."; }
+        return ssSub.str();
+      }
+  );
+  return ss.str();
+}
 const FitParameterSet* Propagator::getFitParameterSetPtr(const std::string& name_) const{
   for( auto& parSet : _parameterSetList_ ){
     if( parSet.getName() == name_ ) return &parSet;
@@ -647,7 +667,6 @@ void Propagator::updateLlhCache(){
     buffer = parSet.getPenaltyChi2();
     LogThrowIf(std::isnan(buffer), parSet.getName() << " penalty chi2 is Nan");
     _llhPenaltyBuffer_ += buffer;
-    _llhPenaltyPerParSet_[iParset] = buffer;
   }
 
   ////////////////////////////////

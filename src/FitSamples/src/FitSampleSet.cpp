@@ -116,7 +116,7 @@ const std::shared_ptr<JointProbability::JointProbability> &FitSampleSet::getJoin
 bool FitSampleSet::empty() const {
   return _fitSampleList_.empty();
 }
-double FitSampleSet::evalLikelihood() const{
+double FitSampleSet::evalLikelihood(){
   double llh = 0.;
   for( auto& sample : _fitSampleList_ ){
     llh += this->evalLikelihood(sample);
@@ -124,8 +124,9 @@ double FitSampleSet::evalLikelihood() const{
   }
   return llh;
 }
-double FitSampleSet::evalLikelihood(const FitSample& sample_) const{
-  return _jointProbabilityPtr_->eval(sample_);
+double FitSampleSet::evalLikelihood(FitSample& sample_){
+  sample_.setLlhStatBuffer(_jointProbabilityPtr_->eval(sample_));
+  return sample_.getLlhStatBuffer();
 }
 
 void FitSampleSet::copyMcEventListToDataContainer(){

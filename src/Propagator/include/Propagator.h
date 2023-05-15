@@ -41,7 +41,6 @@ public:
   [[nodiscard]] double getLlhStatBuffer() const;
   [[nodiscard]] double getLlhPenaltyBuffer() const;
   [[nodiscard]] double getLlhRegBuffer() const;
-  [[nodiscard]] std::vector<double> getLlhPenaltyPerParSet() const;
   [[nodiscard]] const EventTreeWriter &getTreeWriter() const;
   [[nodiscard]] const std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix() const;
   [[nodiscard]] const std::vector<DatasetLoader> &getDataSetList() const;
@@ -60,6 +59,7 @@ public:
   double* getLlhStatBufferPtr(){ return &_llhStatBuffer_; }
   double* getLlhPenaltyBufferPtr(){ return &_llhPenaltyBuffer_; }
   double* getLlhRegBufferPtr(){ return &_llhRegBuffer_; }
+  [[nodiscard]] std::string getLlhBufferSummary() const;
 
   [[nodiscard]] const FitParameterSet* getFitParameterSetPtr(const std::string& name_) const;
   [[nodiscard]] FitParameterSet* getFitParameterSetPtr(const std::string& name_);
@@ -104,7 +104,6 @@ private:
   double _llhStatBuffer_{0};
   double _llhPenaltyBuffer_{0};
   double _llhRegBuffer_{0};
-  std::vector<double> _llhPenaltyPerParSet_{};
   std::shared_ptr<TMatrixD> _globalCovarianceMatrix_{nullptr};
   std::shared_ptr<TMatrixD> _strippedCovarianceMatrix_{nullptr};
   std::shared_ptr<TMatrixD> _choleskyMatrix_{nullptr};

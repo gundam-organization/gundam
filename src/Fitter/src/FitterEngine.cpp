@@ -227,6 +227,13 @@ void FitterEngine::fit(){
   LogWarning << __METHOD_NAME__ << std::endl;
   LogThrowIf(not isInitialized());
 
+  LogWarning << "Pre-fit likelihood state:" << std::endl;
+  {
+    LogScopeIndent;
+    LogWarning << _propagator_.getLlhBufferSummary();
+  }
+
+
   // Not moving parameters
   if( _generateSamplePlots_ and not _propagator_.getPlotGenerator().getConfig().empty() ){
     LogInfo << "Generating pre-fit sample plots..." << std::endl;
@@ -297,7 +304,13 @@ void FitterEngine::fit(){
   }
 
   LogInfo << "Minimizing LLH..." << std::endl;
-  getMinimizer().minimize();
+  this->getMinimizer().minimize();
+
+  LogWarning << "Post-fit likelihood state:" << std::endl;
+  {
+    LogScopeIndent;
+    LogWarning << _propagator_.getLlhBufferSummary();
+  }
 
   if( _generateSamplePlots_ and not _propagator_.getPlotGenerator().getConfig().empty() ){
     LogInfo << "Generating post-fit sample plots..." << std::endl;
@@ -315,8 +328,12 @@ void FitterEngine::fit(){
     getMinimizer().calcErrors();
   }
   else{
-    if( not getMinimizer().isFitHasConverged() ) LogAlert << "Skipping post-fit error calculation since the minimizer did not converge." << std::endl;
-    else LogAlert << "Skipping post-fit error calculation since the option is disabled." << std::endl;
+    if( not getMinimizer().isFitHasConverged() ) {
+      LogError << "Skipping post-fit error calculation since the minimizer did not converge." << std::endl;
+    }
+    else{
+      LogAlert << "Skipping post-fit error calculation since the option is disabled." << std::endl;
+    }
   }
 
   LogWarning << "Fit is done." << std::endl;

@@ -286,51 +286,77 @@ bool FitParameterSet::isEnabled() const {
 bool FitParameterSet::isEnablePca() const {
   return _enablePca_;
 }
-bool FitParameterSet::isEnabledThrowToyParameters() const {
-  return _enabledThrowToyParameters_;
-}
-const std::string &FitParameterSet::getName() const {
-  return _name_;
+bool FitParameterSet::isUseEigenDecompInFit() const {
+  return _useEigenDecompInFit_;
 }
 bool FitParameterSet::isMaskedForPropagation() const {
   return _maskedForPropagation_;
 }
-std::vector<FitParameter> &FitParameterSet::getParameterList() {
-  return _parameterList_;
+bool FitParameterSet::isEnabledThrowToyParameters() const {
+  return _enabledThrowToyParameters_;
 }
-std::vector<FitParameter> &FitParameterSet::getEigenParameterList(){
-  return _eigenParameterList_;
+bool FitParameterSet::isUseOnlyOneParameterPerEvent() const {
+  return _useOnlyOneParameterPerEvent_;
+}
+int FitParameterSet::getNbEnabledEigenParameters() const {
+  return _nbEnabledEigen_;
+}
+double FitParameterSet::getPenaltyChi2Buffer() const{
+  return _penaltyChi2Buffer_;
+}
+size_t FitParameterSet::getNbParameters() const {
+  return _parameterList_.size();
+}
+const std::string &FitParameterSet::getName() const {
+  return _name_;
+}
+const nlohmann::json &FitParameterSet::getDialSetDefinitions() const {
+  return _dialSetDefinitions_;
+}
+const TMatrixD* FitParameterSet::getInvertedEigenVectors() const{
+  return _eigenVectorsInv_.get();
+}
+const TMatrixD* FitParameterSet::getEigenVectors() const{
+  return _eigenVectors_.get();
 }
 const std::vector<FitParameter> &FitParameterSet::getParameterList() const{
-  return _parameterList_;
-}
-std::vector<FitParameter>& FitParameterSet::getEffectiveParameterList(){
-  if( _useEigenDecompInFit_ ) return _eigenParameterList_;
   return _parameterList_;
 }
 const std::vector<FitParameter>& FitParameterSet::getEffectiveParameterList() const{
   if( _useEigenDecompInFit_ ) return _eigenParameterList_;
   return _parameterList_;
 }
-const nlohmann::json &FitParameterSet::getDialSetDefinitions() const {
-  return _dialSetDefinitions_;
+const std::shared_ptr<TMatrixDSym> &FitParameterSet::getPriorCorrelationMatrix() const {
+  return _priorCorrelationMatrix_;
+}
+const std::shared_ptr<TMatrixDSym> &FitParameterSet::getPriorCovarianceMatrix() const {
+  return _priorCovarianceMatrix_;
+}
+
+// non const getters
+std::vector<FitParameter> &FitParameterSet::getParameterList() {
+  return _parameterList_;
+}
+std::vector<FitParameter> &FitParameterSet::getEigenParameterList(){
+  return _eigenParameterList_;
+}
+std::vector<FitParameter>& FitParameterSet::getEffectiveParameterList(){
+  if( _useEigenDecompInFit_ ) return _eigenParameterList_;
+  return _parameterList_;
 }
 
 // Core
-size_t FitParameterSet::getNbParameters() const {
-  return _parameterList_.size();
-}
 double FitParameterSet::getPenaltyChi2() {
 
   if (not _isEnabled_) { return 0; }
 
-  double chi2 = 0;
+  _penaltyChi2Buffer_ = 0;
 
   if( _priorCovarianceMatrix_ != nullptr ){
     if( _useEigenDecompInFit_ ){
       for( const auto& eigenPar : _eigenParameterList_ ){
         if( eigenPar.isFixed() ) continue;
-        chi2 += TMath::Sq( (eigenPar.getParameterValue() - eigenPar.getPriorValue()) / eigenPar.getStdDevValue() ) ;
+        _penaltyChi2Buffer_ += TMath::Sq( (eigenPar.getParameterValue() - eigenPar.getPriorValue()) / eigenPar.getStdDevValue() ) ;
       }
     }
     else{
@@ -338,11 +364,11 @@ double FitParameterSet::getPenaltyChi2() {
       this->fillDeltaParameterList();
 
       // compute penalty term with covariance
-      chi2 = (*_deltaParameterList_) * ( (*_inverseStrippedCovarianceMatrix_) * (*_deltaParameterList_) );
+      _penaltyChi2Buffer_ = (*_deltaParameterList_) * ( (*_inverseStrippedCovarianceMatrix_) * (*_deltaParameterList_) );
     }
   }
 
-  return chi2;
+  return _penaltyChi2Buffer_;
 }
 
 // Parameter throw
@@ -459,20 +485,6 @@ const std::vector<nlohmann::json>& FitParameterSet::getCustomFitParThrow() const
   return _customFitParThrow_;
 }
 
-// Eigen
-bool FitParameterSet::isUseEigenDecompInFit() const {
-  return _useEigenDecompInFit_;
-}
-int FitParameterSet::getNbEnabledEigenParameters() const {
-  return _nbEnabledEigen_;
-}
-
-const TMatrixD* FitParameterSet::getInvertedEigenVectors() const{
-  return _eigenVectorsInv_.get();
-}
-const TMatrixD* FitParameterSet::getEigenVectors() const{
-  return _eigenVectors_.get();
-}
 void FitParameterSet::propagateOriginalToEigen(){
   // First propagate to the buffer
   int iParOffSet{0};
@@ -756,13 +768,4 @@ void FitParameterSet::fillDeltaParameterList(){
   }
 }
 
-bool FitParameterSet::isUseOnlyOneParameterPerEvent() const {
-  return _useOnlyOneParameterPerEvent_;
-}
 
-const std::shared_ptr<TMatrixDSym> &FitParameterSet::getPriorCorrelationMatrix() const {
-  return _priorCorrelationMatrix_;
-}
-const std::shared_ptr<TMatrixDSym> &FitParameterSet::getPriorCovarianceMatrix() const {
-  return _priorCovarianceMatrix_;
-}

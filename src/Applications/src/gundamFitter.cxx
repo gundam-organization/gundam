@@ -348,8 +348,9 @@ int main(int argc, char** argv){
   // --------------------------
   fitter.initialize();
 
+  // show initial conditions
   if( clParser.isOptionTriggered("injectParameterConfig") ) {
-    LogDebug << "Current (injected) mc parameters:" << std::endl;
+    LogDebug << "Starting mc parameters that where injected:" << std::endl;
     for (auto &parSet: fitter.getPropagator().getParameterSetsList()) {
       LogScopeIndent;
       if (not parSet.isEnabled()) continue;
@@ -361,12 +362,6 @@ int main(int argc, char** argv){
       }
     }
   }
-
-  LogInfo << "Initial χ² = " << fitter.getPropagator().getLlhBuffer() << std::endl;
-  LogInfo << "Initial χ²(stat) = " << fitter.getPropagator().getLlhStatBuffer() << std::endl;
-  LogInfo << "Initial χ²(penalty) = " << fitter.getPropagator().getLlhPenaltyBuffer() << std::endl;
-  LogInfo << "Initial χ²(penalty per parset) = " << GenericToolbox::parseVectorAsString(fitter.getPropagator().getLlhPenaltyPerParSet()) << std::endl;
-
 
   // --------------------------
   // Run the fitter:
