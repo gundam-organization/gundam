@@ -41,6 +41,7 @@ public:
   [[nodiscard]] double getLlhStatBuffer() const;
   [[nodiscard]] double getLlhPenaltyBuffer() const;
   [[nodiscard]] double getLlhRegBuffer() const;
+  [[nodiscard]] std::vector<double> getLlhPenaltyPerParSet() const;
   [[nodiscard]] const EventTreeWriter &getTreeWriter() const;
   [[nodiscard]] const std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix() const;
   [[nodiscard]] const std::vector<DatasetLoader> &getDataSetList() const;
@@ -103,6 +104,7 @@ private:
   double _llhStatBuffer_{0};
   double _llhPenaltyBuffer_{0};
   double _llhRegBuffer_{0};
+  std::vector<double> _llhPenaltyPerParSet_{};
   std::shared_ptr<TMatrixD> _globalCovarianceMatrix_{nullptr};
   std::shared_ptr<TMatrixD> _strippedCovarianceMatrix_{nullptr};
   std::shared_ptr<TMatrixD> _choleskyMatrix_{nullptr};

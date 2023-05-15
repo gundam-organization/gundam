@@ -152,6 +152,46 @@ void EventTreeWriter::writeEvents(TDirectory* saveDir_, const std::string& treeN
   }
 
 
+  int nPoints{5};
+
+  std::vector<std::vector<double>> parameterXvalues{};
+  std::vector<TGraph*> graphParResponse{};
+  std::vector<std::pair<size_t,size_t>> parIndexList{};
+  if( _parSetListPtr_ != nullptr ){
+    size_t nPars = 0;
+    for( auto& parSet : *_parSetListPtr_ ){
+      nPars += parSet.getNbParameters();
+    }
+
+    // reserve max potential size
+    parameterXvalues.reserve(nPars);
+    graphParResponse.reserve(nPars);
+    parIndexList.reserve(nPars);
+
+    int iParSet{-1};
+    for( auto& parSet : *_parSetListPtr_ ){
+      iParSet++;
+      if( not parSet.isEnabled() ) continue;
+      for( auto& par : parSet.getParameterList() ){
+        if( not par.isEnabled() ) continue;
+
+        // entry
+        parameterXvalues.emplace_back(nPoints, par.getParameterValue());
+        parIndexList.emplace_back(int(iParSet), par.getParameterIndex());
+        graphParResponse.emplace_back( new TGraph(nPoints) );
+
+        // determining eval points
+        double min = par.getParameterValue() - 5*par.getStdDevValue();
+        double max = par.getParameterValue() + 5*par.getStdDevValue();
+        for( int iPt = 0 ; iPt < nPoints ; iPt++ ){
+          parameterXvalues.back()[iPt] = min + (max - min)*iPt/(nPoints-1);
+          graphParResponse.back()->SetPointX(iPt, parameterXvalues.back()[iPt]);
+        }
+      }
+    }
+  }
+
+
 //  std::vector<void*> parReferences;
 //  std::vector<TSpline3*> responseSplineList;
 //  std::vector<TSpline3> flatSplinesList; // flat splines for event not affected by parameter (1 spline per parameter)
@@ -208,16 +248,19 @@ void EventTreeWriter::writeEvents(TDirectory* saveDir_, const std::string& treeN
 
     if( _writeDials_ ){
 
-      for( auto& dial : cacheEntry.dials ){
-        dial.interface->getInputBufferRef()->getFitParameter();
+      for( size_t iGlobalPar = 0 ; iGlobalPar < parIndexList.size() ; iGlobalPar++ ){
+        // reset the corresponding graph
+
+        // fetch corresponding dial if it exists
+        for( auto& dial : cacheEntry.dials ){
+          if( dial.interface->getInputBufferRef()->getInputParameterIndicesList()[0] == parIndexList[iGlobalPar] ){
+
+            // fill the corresponding graph
+
+          }
+        }
       }
 
-
-//      for( auto& spline : responseSplineList ){ *spline = flatSplinesList[iPar]; } // by default
-//      for( auto* dialPtr : event.getRawDialPtrList() ){
-//        iPar = GenericToolbox::findElementIndex(dialPtr->getAssociatedParameterReference(), parReferences);
-//        dialPtr->copySplineCache(*responseSplineList[iPar]);
-//      }
     }
 
     tree->Fill();

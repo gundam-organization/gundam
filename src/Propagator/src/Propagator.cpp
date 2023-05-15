@@ -523,7 +523,7 @@ void Propagator::initializeImpl() {
 #endif
   }
 
-
+  _llhPenaltyPerParSet_.resize(_parameterSetList_.size(), 0);
 
   // Propagator needs to be fast
   GlobalVariables::getParallelWorker().setCpuTimeSaverIsEnabled(false);
@@ -568,6 +568,9 @@ double Propagator::getLlhPenaltyBuffer() const {
 }
 double Propagator::getLlhRegBuffer() const {
   return _llhRegBuffer_;
+}
+std::vector<double> Propagator::getLlhPenaltyPerParSet() const{
+  return _llhPenaltyPerParSet_;
 }
 const std::shared_ptr<TMatrixD> &Propagator::getGlobalCovarianceMatrix() const {
   return _globalCovarianceMatrix_;
@@ -638,10 +641,13 @@ void Propagator::updateLlhCache(){
   // Compute the penalty terms
   ////////////////////////////////
   _llhPenaltyBuffer_ = 0;
+  int iParset{-1};
   for( auto& parSet : _parameterSetList_ ){
+    iParset++;
     buffer = parSet.getPenaltyChi2();
-    _llhPenaltyBuffer_ += buffer;
     LogThrowIf(std::isnan(buffer), parSet.getName() << " penalty chi2 is Nan");
+    _llhPenaltyBuffer_ += buffer;
+    _llhPenaltyPerParSet_[iParset] = buffer;
   }
 
   ////////////////////////////////

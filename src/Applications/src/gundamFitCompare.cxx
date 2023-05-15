@@ -46,6 +46,10 @@ int main( int argc, char** argv ){
   clp.addOption("algo-1", {"-a1"}, "Specify algo folder to compare for the first fit file.", 1);
   clp.addOption("algo-2", {"-a2"}, "Specify algo folder to compare for the second fit file.", 1);
 
+  // compare post-fit with pre-fit data (useful when f1 and f2 are the same file)
+  clp.addTriggerOption("use-prefit-1", {"--prefit-1"}, "Use prefit data only for file 1.");
+  clp.addTriggerOption("use-prefit-2", {"--prefit-2"}, "Use prefit data only for file 2.");
+
   clp.addOption("output", {"-o"}, "Output file.", 1);
 
   LogInfo << "Options list:" << std::endl;
@@ -113,10 +117,11 @@ void makeSampleComparePlots(bool usePrefit_){
 
   std::string strBuffer;
 
-  strBuffer = Form("FitterEngine/%s/samples", (usePrefit_? "preFit": "postFit"));
+  strBuffer = Form("FitterEngine/%s/samples", ((usePrefit_ or clp.isOptionTriggered("use-prefit-1"))? "preFit": "postFit"));
   auto* dir1 = file1->Get<TDirectory>(strBuffer.c_str());
   LogReturnIf(dir1== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath1);
 
+  strBuffer = Form("FitterEngine/%s/samples", ((usePrefit_ or clp.isOptionTriggered("use-prefit-2"))? "preFit": "postFit"));
   auto* dir2 = file2->Get<TDirectory>(strBuffer.c_str());
   LogReturnIf(dir2== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
 
@@ -178,7 +183,10 @@ void makeScanComparePlots(bool usePrefit_){
   auto* file2 = GenericToolbox::openExistingTFile(filePath2);
 
   std::vector<std::string> pathBuffer;
-  pathBuffer.emplace_back(Form("%s/scan", (usePrefit_? "preFit": "postFit")));
+  pathBuffer.emplace_back(
+      Form( "%s/scan",
+        ( (usePrefit_ or clp.isOptionTriggered("use-prefit-2") or clp.isOptionTriggered("use-prefit-2") ) ?
+        "preFit": "postFit")));
   std::function<void(TDirectory* dir1_, TDirectory* dir2_)> recurseScanCompareGraph;
   recurseScanCompareGraph = [&](TDirectory* dir1_, TDirectory* dir2_){
 
@@ -250,9 +258,12 @@ void makeScanComparePlots(bool usePrefit_){
   };
 
   std::string strBuffer;
-  strBuffer = Form("FitterEngine/%s/scan", (usePrefit_? "preFit": "postFit"));
+
+  strBuffer = Form("FitterEngine/%s/scan", ((usePrefit_ or clp.isOptionTriggered("use-prefit-1"))? "preFit": "postFit"));
   auto* dir1 = file1->Get<TDirectory>(strBuffer.c_str());
   LogReturnIf(dir1== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath1);
+
+  strBuffer = Form("FitterEngine/%s/scan", ((usePrefit_ or clp.isOptionTriggered("use-prefit-2"))? "preFit": "postFit"));
   auto* dir2 = file2->Get<TDirectory>(strBuffer.c_str());
   LogReturnIf(dir2== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
 
@@ -275,11 +286,11 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
 
   std::string strBuffer;
 
-  strBuffer = Form("FitterEngine/%s/%s/errors", (usePrefit_? "preFit": "postFit"), algo1.c_str());
+  strBuffer = Form("FitterEngine/%s/%s/errors", ((usePrefit_ or clp.isOptionTriggered("use-prefit-1"))? "preFit": "postFit"), algo1.c_str());
   auto* dir1 = file1->Get<TDirectory>(strBuffer.c_str());
   LogReturnIf(dir1== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath1);
 
-  strBuffer = Form("FitterEngine/%s/%s/errors", (usePrefit_? "preFit": "postFit"), algo2.c_str());
+  strBuffer = Form("FitterEngine/%s/%s/errors", ((usePrefit_ or clp.isOptionTriggered("use-prefit-2"))? "preFit": "postFit"), algo2.c_str());
   auto* dir2 = file2->Get<TDirectory>(strBuffer.c_str());
   LogReturnIf(dir2== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
 
