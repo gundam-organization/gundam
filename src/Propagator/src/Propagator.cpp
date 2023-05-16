@@ -115,6 +115,8 @@ void Propagator::readConfigImpl(){
   }
 #endif
 
+  _treeWriter_.readConfig( GenericToolbox::Json::fetchValue(_config_, "eventTreeWriter", nlohmann::json()) );
+
   _parameterInjectorMc_ = GenericToolbox::Json::fetchValue(_config_, "parameterInjection", _parameterInjectorMc_);
   ConfigUtils::forwardConfig(_parameterInjectorMc_);
 

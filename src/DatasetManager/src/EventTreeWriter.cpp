@@ -26,9 +26,6 @@ void EventTreeWriter::readConfigImpl() {
   _nPointsPerDial_ = GenericToolbox::Json::fetchValue(_config_, "nPointsPerDial", _nPointsPerDial_);
 }
 
-void EventTreeWriter::setWriteDials(bool writeDials) {
-  _writeDials_ = writeDials;
-}
 void EventTreeWriter::setFitSampleSetPtr(const FitSampleSet *fitSampleSetPtr) {
   _fitSampleSetPtr_ = fitSampleSetPtr;
 }

@@ -23,7 +23,6 @@ public:
   EventTreeWriter();
   ~EventTreeWriter() override;
 
-  void setWriteDials(bool writeDials);
   void setFitSampleSetPtr(const FitSampleSet *fitSampleSetPtr);
   void setParSetListPtr(const std::vector<FitParameterSet> *parSetListPtr);
   void setEventDialCachePtr(const EventDialCache *eventDialCachePtr_);
