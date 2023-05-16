@@ -40,6 +40,8 @@ public:
   void setGenerateOneSigmaPlots(bool generateOneSigmaPlots);
   void setDoAllParamVariations(bool doAllParamVariations_);
   void setAllParamVariationsSigmas(const std::vector<double> &allParamVariationsSigmas);
+  void setThrowMcBeforeFit(bool throwMcBeforeFit_){ _throwMcBeforeFit_ = throwMcBeforeFit_; }
+  void setThrowGain(double throwGain_){ _throwGain_ = throwGain_; }
 
   // Getters (const)
   [[nodiscard]] const Propagator& getPropagator() const;
