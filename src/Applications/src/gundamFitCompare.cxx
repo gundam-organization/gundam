@@ -69,6 +69,9 @@ int main( int argc, char** argv ){
     exit(EXIT_FAILURE);
   }
 
+  LogThrowIf(clp.isOptionTriggered("use-prefit-1") and clp.isOptionTriggered("use-prefit-2"),
+             "Remove the two options to see prefit comparison of both files");
+
   LogInfo << "Reading config..." << std::endl;
 
   auto outPath = clp.getOptionVal<std::string>("output");
@@ -182,11 +185,10 @@ void makeScanComparePlots(bool usePrefit_){
   auto* file1 = GenericToolbox::openExistingTFile(filePath1);
   auto* file2 = GenericToolbox::openExistingTFile(filePath2);
 
+  // path buffer should not care about "use-prefit" option
+  // it is used for the output file.
   std::vector<std::string> pathBuffer;
-  pathBuffer.emplace_back(
-      Form( "%s/scan",
-        ( (usePrefit_ or clp.isOptionTriggered("use-prefit-2") or clp.isOptionTriggered("use-prefit-2") ) ?
-        "preFit": "postFit")));
+  pathBuffer.emplace_back( Form( "%s/scan", ( usePrefit_ ? "preFit": "postFit")) );
   std::function<void(TDirectory* dir1_, TDirectory* dir2_)> recurseScanCompareGraph;
   recurseScanCompareGraph = [&](TDirectory* dir1_, TDirectory* dir2_){
 
@@ -195,7 +197,7 @@ void makeScanComparePlots(bool usePrefit_){
       TKey* keyObj = (TKey*) dir1_->GetListOfKeys()->At(iKey);
 
 
-      if( (gROOT->GetClass( keyObj->GetClassName() ))->InheritsFrom("TDirectory") ){
+      if     ( (gROOT->GetClass( keyObj->GetClassName() ))->InheritsFrom("TDirectory") ){
         // recursive part
         pathBuffer.emplace_back( dir1_->GetListOfKeys()->At(iKey)->GetName() );
 
@@ -208,10 +210,23 @@ void makeScanComparePlots(bool usePrefit_){
       }
       else if( (gROOT->GetClass( keyObj->GetClassName() ))->InheritsFrom("TGraph") ){
         auto* gr1 = dir1_->Get<TGraph>( dir1_->GetListOfKeys()->At(iKey)->GetName() );
-        auto* gr2 = dir2_->Get<TGraph>( dir1_->GetListOfKeys()->At(iKey)->GetName() );
+        auto* gr2 = dir2_->Get<TGraph>( dir1_->GetListOfKeys()->At(iKey)->GetName() ); // should be the same keyname.
 
-        auto* overlayCanvas = new TCanvas( dir1_->GetListOfKeys()->At(iKey)->GetName() , Form("Comparing %s scan: \"%s\"", (usePrefit_? "preFit": "postFit"), dir1_->GetListOfKeys()->At(iKey)->GetName()), 800, 600);
+        // look for current value:
+        std::string parValObjName = dir1_->GetListOfKeys()->At(iKey)->GetName();
+        // removing "_TGraph"
+        parValObjName = GenericToolbox::joinVectorString(GenericToolbox::splitString(parValObjName, "_"), "_", 0, -1);
+        parValObjName += "_CurrentPar_TVectorT_double";
+        auto* val1 = dir1_->GetDirectory("../")->Get<TVectorD>(parValObjName.c_str());
+        auto* val2 = dir2_->GetDirectory("../")->Get<TVectorD>(parValObjName.c_str());
 
+        auto* overlayCanvas = new TCanvas(
+            dir1_->GetListOfKeys()->At(iKey)->GetName() ,
+            Form("Comparing %s scan: \"%s\"", (usePrefit_? "preFit": "postFit"),
+                 dir1_->GetListOfKeys()->At(iKey)->GetName()
+            ),
+            800, 600
+        );
         overlayCanvas->cd();
 
         gr1->SetMarkerStyle(kFullSquare);
@@ -244,6 +259,25 @@ void makeScanComparePlots(bool usePrefit_){
         l.AddEntry(gr2, Form("%s", name2.c_str()));
         l.Draw();
 
+        if( val1 != nullptr ){
+          // vertical lines
+          overlayCanvas->Update(); // update Y1 and Y2
+          auto* line1 = new TLine((*val1)[0], gPad->GetFrame()->GetY1(), (*val1)[0], gPad->GetFrame()->GetY2());
+          line1->SetLineColor(kBlue-7);
+          line1->SetLineStyle(2);
+          line1->SetLineWidth(3);
+          line1->Draw();
+        }
+        if( val2 != nullptr ){
+          // vertical lines
+          overlayCanvas->Update();
+          auto* line2 = new TLine((*val2)[0], gPad->GetFrame()->GetY2(), (*val2)[0], gPad->GetFrame()->GetY2());
+          line2->SetLineColor(kBlack);
+          line2->SetLineStyle(3);
+          line2->SetLineWidth(3);
+          line2->Draw();
+        }
+
         gPad->SetGridx();
         gPad->SetGridy();
 
@@ -252,6 +286,8 @@ void makeScanComparePlots(bool usePrefit_){
             overlayCanvas
             );
         delete overlayCanvas;
+        delete val1;
+        delete val2;
       }
     }
 
@@ -261,11 +297,11 @@ void makeScanComparePlots(bool usePrefit_){
 
   strBuffer = Form("FitterEngine/%s/scan", ((usePrefit_ or clp.isOptionTriggered("use-prefit-1"))? "preFit": "postFit"));
   auto* dir1 = file1->Get<TDirectory>(strBuffer.c_str());
-  LogReturnIf(dir1== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath1);
+  LogReturnIf(dir1 == nullptr, "Could not find \"" << strBuffer << "\" within " << filePath1);
 
   strBuffer = Form("FitterEngine/%s/scan", ((usePrefit_ or clp.isOptionTriggered("use-prefit-2"))? "preFit": "postFit"));
   auto* dir2 = file2->Get<TDirectory>(strBuffer.c_str());
-  LogReturnIf(dir2== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
+  LogReturnIf(dir2 == nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
 
   recurseScanCompareGraph(dir1, dir2);
 }
