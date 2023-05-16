@@ -22,6 +22,7 @@ LoggerInit([]{
 
 CmdLineParser clp;
 TFile* outFile{nullptr};
+bool verbose{false};
 
 void makeSampleComparePlots(bool usePrefit_);
 void makeScanComparePlots(bool usePrefit_);
@@ -50,6 +51,8 @@ int main( int argc, char** argv ){
   clp.addTriggerOption("use-prefit-1", {"--prefit-1"}, "Use prefit data only for file 1.");
   clp.addTriggerOption("use-prefit-2", {"--prefit-2"}, "Use prefit data only for file 2.");
 
+  clp.addTriggerOption("verbose", {"-v"}, "Use prefit data only for file 2.");
+
   clp.addOption("output", {"-o"}, "Output file.", 1);
 
   LogInfo << "Options list:" << std::endl;
@@ -75,6 +78,8 @@ int main( int argc, char** argv ){
   LogInfo << "Reading config..." << std::endl;
 
   auto outPath = clp.getOptionVal<std::string>("output");
+
+  verbose = clp.isOptionTriggered("verbose");
 
 
   std::string strBuffer;
@@ -201,6 +206,7 @@ void makeScanComparePlots(bool usePrefit_){
         // recursive part
         pathBuffer.emplace_back( dir1_->GetListOfKeys()->At(iKey)->GetName() );
 
+        LogDebugIf(verbose) << "Exploring: " << GenericToolbox::joinPath(pathBuffer) << std::endl;
         recurseScanCompareGraph(
             dir1_->GetDirectory(dir1_->GetListOfKeys()->At(iKey)->GetName()),
             dir2_->GetDirectory(dir1_->GetListOfKeys()->At(iKey)->GetName())
@@ -209,6 +215,8 @@ void makeScanComparePlots(bool usePrefit_){
         pathBuffer.pop_back();
       }
       else if( (gROOT->GetClass( keyObj->GetClassName() ))->InheritsFrom("TGraph") ){
+        LogDebugIf(verbose) << "Found: " << dir1_->GetListOfKeys()->At(iKey)->GetName() << std::endl;
+
         auto* gr1 = dir1_->Get<TGraph>( dir1_->GetListOfKeys()->At(iKey)->GetName() );
         auto* gr2 = dir2_->Get<TGraph>( dir1_->GetListOfKeys()->At(iKey)->GetName() ); // should be the same keyname.
 
@@ -271,7 +279,7 @@ void makeScanComparePlots(bool usePrefit_){
         if( val2 != nullptr ){
           // vertical lines
           overlayCanvas->Update();
-          auto* line2 = new TLine((*val2)[0], gPad->GetFrame()->GetY2(), (*val2)[0], gPad->GetFrame()->GetY2());
+          auto* line2 = new TLine((*val2)[0], gPad->GetFrame()->GetY1(), (*val2)[0], gPad->GetFrame()->GetY2());
           line2->SetLineColor(kBlack);
           line2->SetLineStyle(3);
           line2->SetLineWidth(3);
