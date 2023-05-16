@@ -7,6 +7,7 @@
 #include "ConfigUtils.h"
 #include "GlobalVariables.h"
 #include "GundamGreetings.h"
+#include "MinimizerInterface.h"
 #ifdef GUNDAM_USING_CACHE_MANAGER
 #include "CacheManager.h"
 #endif
@@ -60,6 +61,7 @@ int main(int argc, char** argv){
   clParser.addTriggerOption("asimov", {"-a", "--asimov"}, "Use MC dataset to fill the data histograms");
   clParser.addTriggerOption("enablePca", {"--enable-pca"}, "Enable principle component analysis for eigen decomposed parameter sets");
   clParser.addTriggerOption("skipHesse", {"--skip-hesse"}, "Don't perform postfit error evaluation");
+  clParser.addTriggerOption("skipSimplex", {"--skip-simplex"}, "Don't run SIMPLEX before the actual fit");
   clParser.addTriggerOption("kickMc", {"--kick-mc"}, "Push MC parameters away from their prior to help the fit converge");
   clParser.addTriggerOption("generateOneSigmaPlots", {"--one-sigma"}, "Generate one sigma plots");
   clParser.addTriggerOption("lightOutputMode", {"--light-mode"}, "Disable plot generation");
@@ -347,6 +349,12 @@ int main(int argc, char** argv){
   if( clParser.isOptionTriggered("kickMc") ){
     fitter.setThrowMcBeforeFit( true );
     fitter.setThrowGain( 0.1 );
+  }
+
+  if( clParser.isOptionTriggered("skipSimplex") ){
+    LogAlert << "Explicitly disabling SIMPLEX first pass" << std::endl;
+    LogThrowIf( fitter.getMinimizer().getMinimizerTypeName() != "MinimizerInterface", "invalid option --skip-simplex" );
+    ((MinimizerInterface*) &fitter.getMinimizer())->setEnableSimplexBeforeMinimize( false );
   }
 
 

@@ -255,8 +255,8 @@ void FitterEngine::fit(){
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
   if( _throwMcBeforeFit_ ){
-    LogInfo << "Throwing correlated parameters of MC away from their prior..." << std::endl;
-    LogInfo << "Throw gain form MC push set to: " << _throwGain_ << std::endl;
+    LogAlert << "Throwing correlated parameters of MC away from their prior..." << std::endl;
+    LogAlert << "Throw gain form MC push set to: " << _throwGain_ << std::endl;
     for( auto& parSet : _propagator_.getParameterSetsList() ){
       if(not parSet.isEnabled()) continue;
       if( not parSet.isEnabledThrowToyParameters() ){
@@ -292,6 +292,11 @@ void FitterEngine::fit(){
         parSet.throwFitParameters(_throwGain_);
       }
     } // parSet
+
+
+    LogAlert << "Current LLH state:" << std::endl;
+    this->_propagator_.updateLlhCache();
+    LogAlert << _propagator_.getLlhBufferSummary() << std::endl;
   }
 
   // Leaving now?

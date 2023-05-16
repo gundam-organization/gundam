@@ -8,6 +8,8 @@
 #include "JsonBaseClass.h"
 #include "GenericToolbox.VariablesMonitor.h"
 
+#include "string"
+
 class TDirectory;
 class FitterEngine;
 class FitParameter;
@@ -24,6 +26,9 @@ class MinimizerBase : public JsonBaseClass {
 
 public:
   explicit MinimizerBase(FitterEngine* owner_);
+
+  /// Local RTTI
+  [[nodiscard]] virtual std::string getMinimizerTypeName() const { return "MinimizerBase"; };
 
   /// A pure virtual method that is called by the FitterEngine to find the
   /// minimum of the likelihood, or, in the case of a Bayesian integration find
@@ -93,6 +98,7 @@ private:
   bool _enablePostFitErrorEval_{true};
 
 };
+
 #endif //GUNDAM_MinimizerBase_h
 
 //  A Lesser GNU Public License

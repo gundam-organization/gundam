@@ -35,6 +35,9 @@ class MCMCInterface : public MinimizerBase {
 public:
   explicit MCMCInterface(FitterEngine* owner_);
 
+  /// Local RTTI
+  [[nodiscard]] std::string getMinimizerTypeName() const override { return "MCMCInterface"; };
+
   /// A boolean to flag indicating if the MCMC exited successfully.
   [[nodiscard]] virtual bool isFitHasConverged() const override;
 

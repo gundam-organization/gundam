@@ -28,14 +28,18 @@ class MinimizerInterface : public MinimizerBase {
 public:
   explicit MinimizerInterface(FitterEngine* owner_);
 
+  // setters
+  void setEnableSimplexBeforeMinimize(bool enableSimplexBeforeMinimize_){ _enableSimplexBeforeMinimize_ = enableSimplexBeforeMinimize_; }
+
+  // getters
+  [[nodiscard]] std::string getMinimizerTypeName() const override { return "MinimizerInterface"; };
   [[nodiscard]] bool isFitHasConverged() const override;
+  [[nodiscard]] double getTargetEdm() const;
   [[nodiscard]] const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const;
 
   void minimize() override;
   void calcErrors() override;
   void scanParameters(TDirectory* saveDir_) override;
-
-  double getTargetEdm() const;
 
 protected:
   void readConfigImpl() override;
