@@ -205,7 +205,11 @@ int main(int argc, char** argv){
         {"generateOneSigmaPlots", "OneSigma"},
         {"enablePca", "PCA"},
         {"skipHesse", "NoHesse"},
+        {"skipSimplex", "NoSimplex"},
+        {"kickMc", "KickedMcAtStart"},
+        {"lightOutputMode", "LightOutput"},
         {"toyFit", "toyFit_%s"},
+        {"useDataEntry", "dataEntry_%s"},
         {"dry-run", "DryRun"},
         {"appendix", "%s"},
     };
