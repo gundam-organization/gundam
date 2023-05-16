@@ -69,7 +69,11 @@ public:
   /// parameter.
   void addMirrorBounds(const std::pair<double, double>& lowEdgeAndRange_);
 
+  /// Simple printout function for debug info on error
   [[nodiscard]] std::string getSummary() const;
+
+  /// Function that allow to tweak the buffer from the inside. Used for individual spline evaluation.
+  std::vector<double>& getBufferVector(){ return _buffer_; }
 
 protected:
   uint32_t generateHash();

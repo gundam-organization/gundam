@@ -25,7 +25,6 @@ public:
   virtual void buildDial(const TGraph& grf, const std::string& option_="") override;
 
 protected:
-  [[nodiscard]] double evaluateGraph(const DialInputBuffer& input_) const;
   bool _allowExtrapolation_{false};
   Int_t nPoints{0};   ///< Number of points <= fMaxSize
   std::vector<Double_t> xPoints; ///<[fNpoints] array of X points

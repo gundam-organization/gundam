@@ -52,17 +52,19 @@ public:
   [[nodiscard]] bool isUseOnlyOneParameterPerEvent() const;
   [[nodiscard]] bool isMaskedForPropagation() const;
   [[nodiscard]] int getNbEnabledEigenParameters() const;
+  [[nodiscard]] double getPenaltyChi2Buffer() const;
   [[nodiscard]] size_t getNbParameters() const;
   [[nodiscard]] const std::string &getName() const;
+  [[nodiscard]] const nlohmann::json &getDialSetDefinitions() const;
   [[nodiscard]] const TMatrixD* getInvertedEigenVectors() const;
   [[nodiscard]] const TMatrixD* getEigenVectors() const;
-  [[nodiscard]] const nlohmann::json &getDialSetDefinitions() const;
+  [[nodiscard]] const std::vector<nlohmann::json>& getCustomFitParThrow() const;
   [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCorrelationMatrix() const;
   [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const;
-  [[nodiscard]] const std::vector<nlohmann::json>& getCustomFitParThrow() const;
   [[nodiscard]] const std::vector<FitParameter> &getParameterList() const;
   [[nodiscard]] const std::vector<FitParameter>& getEffectiveParameterList() const;
 
+  // non-const Getters
   std::vector<FitParameter> &getParameterList();
   std::vector<FitParameter> &getEigenParameterList();
   std::vector<FitParameter>& getEffectiveParameterList();
@@ -79,6 +81,7 @@ public:
 
   // Misc
   FitParameter* getParameterPtr(const std::string& parName_);
+  FitParameter* getParameterPtrWithTitle(const std::string& parTitle_);
   [[nodiscard]] std::string getSummary() const;
 
   static double toNormalizedParRange(double parRange, const FitParameter& par);
@@ -126,9 +129,13 @@ private:
   int _maxNbEigenParameters_{-1};
   double _maxEigenFraction_{1};
 
-  double _globalParameterMinValue_{std::nan("UNSET")};
-  double _globalParameterMaxValue_{std::nan("UNSET")};
+  double _globalParameterMinValue_{std::nan("unset")};
+  double _globalParameterMaxValue_{std::nan("unset")};
 
+  double _penaltyChi2Buffer_{std::nan("unset")};
+
+  std::vector<nlohmann::json> _enableOnlyParameters_{};
+  std::vector<nlohmann::json> _disableParameters_{};
   std::vector<nlohmann::json> _customFitParThrow_{};
 
   // Eigen objects

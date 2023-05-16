@@ -4,6 +4,7 @@
 
 #include "ParScanner.h"
 #include "GenericToolbox.Json.h"
+#include "GenericToolbox.ScopedGuard.h"
 #include "Propagator.h"
 #include "FitParameter.h"
 
@@ -63,11 +64,10 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
   LogThrowIf(saveDir_ == nullptr);
   std::vector<double> parPoints(_nbPoints_+1,0);
 
-  std::stringstream ssPbar;
-  ssPbar << LogInfo.getPrefixString() << "Scanning: " << par_.getFullTitle() << " / " << _nbPoints_ << " steps...";
-  GenericToolbox::displayProgressBar(0, _nbPoints_, ssPbar.str());
+  LogInfo << "Scanning: " << par_.getFullTitle() << " / " << _nbPoints_ << " steps..." << std::endl;
 
   if( par_.getOwner()->isUseEigenDecompInFit() and not par_.isEigen() ){
+    // temporarily disable the automatic conversion Eigen -> Original
     _owner_->setEnableEigenToOrigInPropagate( false );
   }
 
@@ -168,15 +168,28 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
     highBound = std::min(highBound, par_.getMaxValue());
   }
 
-  int offSet{0};
+  int offSet{0}; // offset help make sure the first point
   for( int iPt = 0 ; iPt < _nbPoints_+1 ; iPt++ ){
-    GenericToolbox::displayProgressBar(iPt, _nbPoints_, ssPbar.str());
-
     double newVal = lowBound + double(iPt-offSet)/(_nbPoints_-1)*( highBound - lowBound );
     if( offSet == 0 and newVal > origVal ){
       newVal = origVal;
       offSet = 1;
     }
+
+    LogThrowIf(
+        std::isnan(newVal),
+        "Scanning point is nan. Current values are: "
+        << std::endl
+        << GET_VAR_NAME_VALUE(iPt) << std::endl
+        << GET_VAR_NAME_VALUE(lowBound) << std::endl
+        << GET_VAR_NAME_VALUE(highBound) << std::endl
+        << GET_VAR_NAME_VALUE(_nbPoints_) << std::endl
+        << GET_VAR_NAME_VALUE(offSet) << std::endl
+        << GET_VAR_NAME_VALUE(origVal) << std::endl
+        << GET_VAR_NAME_VALUE(_parameterSigmaRange_.first) << std::endl
+        << GET_VAR_NAME_VALUE(_parameterSigmaRange_.second) << std::endl
+        << GET_VAR_NAME_VALUE(par_.getStdDevValue()) << std::endl
+        );
 
     par_.setParameterValue(newVal);
     _owner_->updateLlhCache();
@@ -185,9 +198,21 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
     for( auto& scanEntry : scanDataDict ){ scanEntry.yPoints[iPt] = scanEntry.evalY(); }
   }
 
+  // sorting points in increasing order
+  auto p = GenericToolbox::getSortPermutation(parPoints, [](double a_, double b_){
+    if( a_ < b_ ) return true;
+    return false;
+  });
+  GenericToolbox::applyPermutation(parPoints, p);
+  for( auto& scanEntry : scanDataDict ){
+    GenericToolbox::applyPermutation(scanEntry.yPoints, p);
+  }
+
+
   par_.setParameterValue(origVal);
   _owner_->updateLlhCache();
 
+  // Disable the auto conversion from Eigen to Original if the fit is set to use eigen decomp
   if( par_.getOwner()->isUseEigenDecompInFit() and not par_.isEigen() ){
     _owner_->setEnableEigenToOrigInPropagate( true );
   }
@@ -205,6 +230,15 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
     scanGraph.SetMarkerStyle(kFullDotLarge);
     GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile( saveDir_, scanEntry.folder ), &scanGraph, ss.str());
   }
+
+  std::stringstream ssVal;
+  ssVal << GenericToolbox::replaceSubstringInString(par_.getFullTitle(), "/", "_");
+  ssVal << "_CurrentPar";
+
+  // current parameter value / center of the scan:
+  TVectorD currentParValue(1);
+  currentParValue[0] = par_.getParameterValue();
+  GenericToolbox::writeInTFile(saveDir_, &currentParValue, ssVal.str());
 }
 void ParScanner::generateOneSigmaPlots(TDirectory* saveDir_){
   LogThrowIf(not isInitialized());
@@ -272,15 +306,48 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
   LogThrowIf(not isInitialized());
   saveDir_->cd();
 
-  auto makeVariedEventRatesFct = [&](FitParameter& par_, std::vector<double> variationList_, TDirectory* saveSubDir_){
+  LogInfo << __METHOD_NAME__ << std::endl;
+  LogScopeIndent;
 
+  // make sure the parameters are rolled back to their original value
+  std::map<FitParameter*, double> parStateList{};
+  GenericToolbox::ScopedGuard g(
+      [&]{
+        LogScopeIndent;
+        LogDebug << "Temporarily pulling back parameters at their prior before performing the event rate..." << std::endl;
+        for( auto& parSet : _owner_->getParameterSetsList() ){
+          if( not parSet.isEnabled() ) { continue; }
+          for( auto& par : parSet.getParameterList() ){
+            if( not par.isEnabled() ) { continue; }
+            parStateList[&par] = par.getParameterValue();
+            par.setParameterValue( par.getPriorValue() );
+          }
+        }
+        _owner_->propagateParametersOnSamples();
+      },
+      [&]{
+        LogScopeIndent;
+        LogDebug << "Restoring parameters to their original values..." << std::endl;
+        for( auto& parSet : _owner_->getParameterSetsList() ){
+          if( not parSet.isEnabled() ) { continue; }
+          for( auto& par : parSet.getParameterList() ){
+            if( not par.isEnabled() ){ continue; }
+            par.setParameterValue( parStateList[&par] );
+          }
+        }
+        _owner_->propagateParametersOnSamples();
+      }
+  );
+
+  auto makeVariedEventRatesFct = [&](FitParameter& par_, std::vector<double> variationList_, TDirectory* saveSubDir_){
     LogInfo << "Making varied event rates for " << par_.getFullTitle() << std::endl;
 
     // First make sure all params are at their prior <- is it necessary?
     for( auto& parSet : _owner_->getParameterSetsList() ){
       if( not parSet.isEnabled() ) continue;
       for( auto& par : parSet.getParameterList() ){
-        par.setParameterValue(par.getPriorValue());
+        if( not par.isEnabled() ) continue;
+        par.setParameterValue( par.getPriorValue() );
       }
     }
     _owner_->propagateParametersOnSamples();
@@ -303,19 +370,20 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
 
       buffEvtRatesMap.emplace_back();
 
-      if(par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue() > par_.getMaxValue())
-        par_.setParameterValue(par_.getMaxValue());
-      else if (par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue() < par_.getMinValue())
-        par_.setParameterValue(par_.getMinValue());
-      else
-        par_.setParameterValue(par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue());
+      double cappedParValue{par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue()};
+      cappedParValue = std::min(cappedParValue, par_.getMaxValue());
+      cappedParValue = std::max(cappedParValue, par_.getMinValue());
 
+      par_.setParameterValue( cappedParValue );
       _owner_->propagateParametersOnSamples();
 
       for(auto & sample : _owner_->getFitSampleSet().getFitSampleList()){
-        buffEvtRatesMap[iVar].push_back(sample.getMcContainer().getSumWeights() );
+        buffEvtRatesMap[iVar].emplace_back( sample.getMcContainer().getSumWeights() );
       }
-      par_.setParameterValue(par_.getPriorValue());
+
+      // back to the prior
+      par_.setParameterValue( par_.getPriorValue() );
+      _owner_->propagateParametersOnSamples();
     }
 
 

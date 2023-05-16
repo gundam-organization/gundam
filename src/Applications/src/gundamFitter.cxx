@@ -7,6 +7,7 @@
 #include "ConfigUtils.h"
 #include "GlobalVariables.h"
 #include "GundamGreetings.h"
+#include "MinimizerInterface.h"
 #ifdef GUNDAM_USING_CACHE_MANAGER
 #include "CacheManager.h"
 #endif
@@ -49,6 +50,8 @@ int main(int argc, char** argv){
   clParser.addOption("outputFilePath", {"-o", "--out-file"}, "Specify the output file");
   clParser.addOption("outputDir", {"--out-dir"}, "Specify the output directory");
   clParser.addOption("randomSeed", {"-s", "--seed"}, "Set random seed");
+  clParser.addOption("useDataEntry", {"--use-data-entry"}, "Overrides \"selectedDataEntry\" in dataSet config. Second arg is to select a given dataset");
+  clParser.addOption("useDataConfig", {"--use-data-config"}, "Add a data entry to the data set definition and use it for the fit");
   clParser.addOption("injectParameterConfig", {"--inject-parameters"}, "Inject parameters defined in the provided config file");
   clParser.addOption("appendix", {"--appendix"}, "Add appendix to the output file name");
 
@@ -58,6 +61,8 @@ int main(int argc, char** argv){
   clParser.addTriggerOption("asimov", {"-a", "--asimov"}, "Use MC dataset to fill the data histograms");
   clParser.addTriggerOption("enablePca", {"--enable-pca"}, "Enable principle component analysis for eigen decomposed parameter sets");
   clParser.addTriggerOption("skipHesse", {"--skip-hesse"}, "Don't perform postfit error evaluation");
+  clParser.addTriggerOption("skipSimplex", {"--skip-simplex"}, "Don't run SIMPLEX before the actual fit");
+  clParser.addTriggerOption("kickMc", {"--kick-mc"}, "Push MC parameters away from their prior to help the fit converge");
   clParser.addTriggerOption("generateOneSigmaPlots", {"--one-sigma"}, "Generate one sigma plots");
   clParser.addTriggerOption("lightOutputMode", {"--light-mode"}, "Disable plot generation");
   clParser.addTriggerOption("noDialCache", {"--no-dial-cache"}, "Disable cache handling for dial eval");
@@ -200,7 +205,11 @@ int main(int argc, char** argv){
         {"generateOneSigmaPlots", "OneSigma"},
         {"enablePca", "PCA"},
         {"skipHesse", "NoHesse"},
+        {"skipSimplex", "NoSimplex"},
+        {"kickMc", "KickedMcAtStart"},
+        {"lightOutputMode", "LightOutput"},
         {"toyFit", "toyFit_%s"},
+        {"useDataEntry", "dataEntry_%s"},
         {"dry-run", "DryRun"},
         {"appendix", "%s"},
     };
@@ -272,6 +281,26 @@ int main(int argc, char** argv){
   // -a
   fitter.getPropagator().setLoadAsimovData( clParser.isOptionTriggered("asimov") );
 
+  // --use-data-entry
+  if( clParser.isOptionTriggered("useDataEntry") ){
+    auto selectedDataEntry = clParser.getOptionVal<std::string>("useDataEntry", 0);
+    // Do something better in case multiple datasets are defined
+    bool isFound{false};
+    for( auto& dataSet : fitter.getPropagator().getDataSetList() ){
+      if( GenericToolbox::doesKeyIsInMap( selectedDataEntry, dataSet.getDataDispenserDict() ) ){
+        LogWarning << "Using data entry \"" << selectedDataEntry << "\" for dataset: " << dataSet.getName() << std::endl;
+        dataSet.setSelectedDataEntry( selectedDataEntry );
+        isFound = true;
+      }
+    }
+    LogThrowIf(not isFound, "Could not find data entry \"" << selectedDataEntry << "\" among defined data sets");
+  }
+
+  // --use-data-config
+  if( clParser.isOptionTriggered("useDataConfig") ){
+    LogThrow("--use-data-config not implemented yet");
+  }
+
   // --skip-hesse
   fitter.getMinimizer().setEnablePostFitErrorEval(not clParser.isOptionTriggered("skipHesse"));
 
@@ -321,14 +350,28 @@ int main(int argc, char** argv){
   });
 
 
+  if( clParser.isOptionTriggered("kickMc") ){
+    fitter.setThrowMcBeforeFit( true );
+    fitter.setThrowGain( 0.1 );
+  }
+
+  if( clParser.isOptionTriggered("skipSimplex") ){
+    LogAlert << "Explicitly disabling SIMPLEX first pass" << std::endl;
+    LogThrowIf( fitter.getMinimizer().getMinimizerTypeName() != "MinimizerInterface", "invalid option --skip-simplex" );
+    ((MinimizerInterface*) &fitter.getMinimizer())->setEnableSimplexBeforeMinimize( false );
+  }
+
+
   // --------------------------
   // Load:
   // --------------------------
   fitter.initialize();
-  LogInfo << "Initial χ² = " << fitter.getPropagator().getLlhBuffer() << std::endl;
-  LogInfo << "Initial χ²(stat) = " << fitter.getPropagator().getLlhStatBuffer() << std::endl;
-  LogInfo << "Initial χ²(penalty) = " << fitter.getPropagator().getLlhPenaltyBuffer() << std::endl;
 
+  // show initial conditions
+  if( clParser.isOptionTriggered("injectParameterConfig") ) {
+    LogDebug << "Starting mc parameters that where injected:" << std::endl;
+    LogDebug << fitter.getPropagator().getParametersSummary( false ) << std::endl;
+  }
 
   // --------------------------
   // Run the fitter:

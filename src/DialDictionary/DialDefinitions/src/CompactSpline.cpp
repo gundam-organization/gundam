@@ -130,8 +130,8 @@ double CompactSpline::evalResponse(const DialInputBuffer& input_) const {
 
 std::string CompactSpline::getSummary() const {
   std::stringstream ss;
-  ss << "spline data = " << GenericToolbox::parseVectorAsString(_splineData_) << std::endl;
-  ss << "defined bounds = { " << _splineBounds_.first << ", " << _splineBounds_.second << "}" << std::endl;
-  ss << "allow extrapolation ? " << _allowExtrapolation_;
+  ss << this->getDialTypeName() << ": spline data = " << GenericToolbox::parseVectorAsString(_splineData_);
+  ss << std::endl << this->getDialTypeName() << ": defined bounds = { " << _splineBounds_.first << ", " << _splineBounds_.second << " }";
+  ss << std::endl << this->getDialTypeName() << ": allow extrapolation ? " << _allowExtrapolation_;
   return ss.str();
 };

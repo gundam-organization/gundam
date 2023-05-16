@@ -115,6 +115,8 @@ void Propagator::readConfigImpl(){
   }
 #endif
 
+  _treeWriter_.readConfig( GenericToolbox::Json::fetchValue(_config_, "eventTreeWriter", nlohmann::json()) );
+
   _parameterInjectorMc_ = GenericToolbox::Json::fetchValue(_config_, "parameterInjection", _parameterInjectorMc_);
   ConfigUtils::forwardConfig(_parameterInjectorMc_);
 
@@ -203,6 +205,7 @@ void Propagator::initializeImpl() {
   }
 
   LogInfo << "Build reference cache..." << std::endl;
+  _eventDialCache_.shrinkIndexedCache();
   _eventDialCache_.buildReferenceCache(_fitSampleSet_, _dialCollections_);
 #endif
 
@@ -328,6 +331,7 @@ void Propagator::initializeImpl() {
     }
 
     LogInfo << "Build reference cache..." << std::endl;
+    _eventDialCache_.shrinkIndexedCache();
     _eventDialCache_.buildReferenceCache(_fitSampleSet_, _dialCollections_);
 #endif
   }
@@ -412,6 +416,7 @@ void Propagator::initializeImpl() {
 
   _treeWriter_.setFitSampleSetPtr(&_fitSampleSet_);
   _treeWriter_.setParSetListPtr(&_parameterSetList_);
+  _treeWriter_.setEventDialCachePtr(&_eventDialCache_);
 
   _parScanner_.initialize();
 
@@ -502,7 +507,7 @@ void Propagator::initializeImpl() {
 #ifndef USE_BREAKDOWN_CACHE
           LogDebug << std::endl << "  - " << dialInterface->getSummary();
 #else
-          LogDebug << std::endl << "  - " << dialInterface.dial->getSummary();
+          LogDebug << std::endl << "  - " << dialInterface.interface->getSummary();
 #endif
         }
         LogDebug << std::endl << "}" << std::endl;
@@ -522,8 +527,6 @@ void Propagator::initializeImpl() {
     }
 #endif
   }
-
-
 
   // Propagator needs to be fast
   GlobalVariables::getParallelWorker().setCpuTimeSaverIsEnabled(false);
@@ -598,6 +601,44 @@ std::vector<DatasetLoader> &Propagator::getDataSetList() {
   return _dataSetList_;
 }
 
+std::string Propagator::getLlhBufferSummary() const{
+  std::stringstream ss;
+  ss << "Total likelihood = " << getLlhBuffer();
+  ss << std::endl << "Stat likelihood = " << getLlhStatBuffer();
+  ss << " = sum of: " << GenericToolbox::iterableToString(
+      _fitSampleSet_.getFitSampleList(), [](const FitSample& sample_){
+        std::stringstream ssSub;
+        ssSub << sample_.getName() << ": ";
+        if( sample_.isEnabled() ){ ssSub << sample_.getLlhStatBuffer(); }
+        else                     { ssSub << "disabled."; }
+        return ssSub.str();
+      }
+  );
+  ss << std::endl << "Penalty likelihood = " << getLlhPenaltyBuffer();
+  ss << " = sum of: " << GenericToolbox::iterableToString(
+      _parameterSetList_, [](const FitParameterSet& parSet_){
+        std::stringstream ssSub;
+        ssSub << parSet_.getName() << ": ";
+        if( parSet_.isEnabled() ){ ssSub << parSet_.getPenaltyChi2Buffer(); }
+        else                     { ssSub << "disabled."; }
+        return ssSub.str();
+      }
+  );
+  return ss.str();
+}
+std::string Propagator::getParametersSummary( bool showEigen_ ) const{
+  std::stringstream ss;
+  for( auto &parSet: getParameterSetsList() ){
+    if( not parSet.isEnabled() ){ continue; }
+    if( not ss.str().empty() ) ss << std::endl;
+    ss << parSet.getName();
+    for( auto &par: parSet.getParameterList() ){
+      if( not par.isEnabled() ){ continue; }
+      ss << std::endl << "  " << par.getTitle() << ": " << par.getParameterValue();
+    }
+  }
+  return ss.str();
+}
 const FitParameterSet* Propagator::getFitParameterSetPtr(const std::string& name_) const{
   for( auto& parSet : _parameterSetList_ ){
     if( parSet.getName() == name_ ) return &parSet;
@@ -614,6 +655,12 @@ FitParameterSet* Propagator::getFitParameterSetPtr(const std::string& name_){
   std::vector<std::string> parSetNames{};
   for( auto& parSet : _parameterSetList_ ){ parSetNames.emplace_back(parSet.getName()); }
   LogThrow("Could not find fit parameter set named \"" << name_ << "\" among defined: " << GenericToolbox::parseVectorAsString(parSetNames));
+  return nullptr;
+}
+DatasetLoader* Propagator::getDatasetLoaderPtr(const std::string& name_){
+  for( auto& dataSet : _dataSetList_ ){
+    if( dataSet.getName() == name_ ){ return &dataSet; }
+  }
   return nullptr;
 }
 
@@ -634,8 +681,8 @@ void Propagator::updateLlhCache(){
   _llhPenaltyBuffer_ = 0;
   for( auto& parSet : _parameterSetList_ ){
     buffer = parSet.getPenaltyChi2();
-    _llhPenaltyBuffer_ += buffer;
     LogThrowIf(std::isnan(buffer), parSet.getName() << " penalty chi2 is Nan");
+    _llhPenaltyBuffer_ += buffer;
   }
 
   ////////////////////////////////
@@ -788,7 +835,7 @@ void Propagator::injectParameterOnMcSamples(const nlohmann::json &injectConfig_)
     LogThrowIf( selectedParset == nullptr, "Could not find parset: " << parsetName );
 
     auto parValues = GenericToolbox::Json::fetchValue<nlohmann::json>(entryParset, "parameterValues");
-    if( parValues.empty() ) {
+    if     ( parValues.empty() ) {
       LogThrow( "" );
     }
     else if( parValues.is_string() ){
@@ -799,20 +846,46 @@ void Propagator::injectParameterOnMcSamples(const nlohmann::json &injectConfig_)
       );
 
       for( size_t iPar = 0 ; iPar < selectedParset->getNbParameters() ; iPar++ ) {
-        LogWarning << "Injecting \"" << selectedParset->getParameterList()[iPar].getFullTitle() << "\": " << parList[iPar] << std::endl;
+
+        if( not selectedParset->getParameterList()[iPar].isEnabled() ){
+          LogAlert << "NOT injecting \"" << selectedParset->getParameterList()[iPar].getFullTitle() << "\" as it is disabled." << std::endl;
+          continue;
+        }
+
+        LogScopeIndent;
+        LogInfo << "Injecting \"" << selectedParset->getParameterList()[iPar].getFullTitle() << "\": " << parList[iPar] << std::endl;
         selectedParset->getParameterList()[iPar].setParameterValue( std::stod(parList[iPar]) );
       }
-
-      if( selectedParset->isUseEigenDecompInFit() ){ selectedParset->propagateOriginalToEigen(); }
     }
     else{
+      LogScopeIndent;
       for( auto& parValueEntry : parValues ){
-        if( GenericToolbox::Json::doKeyExist(parValueEntry, "name") ) {
+        if     ( GenericToolbox::Json::doKeyExist(parValueEntry, "name") ) {
           auto parName = GenericToolbox::Json::fetchValue<std::string>(parValueEntry, "name");
           auto* parPtr = selectedParset->getParameterPtr(parName);
           LogThrowIf(parPtr == nullptr, "Could not find " << parName << " among the defined parameters in " << selectedParset->getName());
 
-          LogWarning << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
+
+          if( not parPtr->isEnabled() ){
+            LogAlert << "NOT injecting \"" << parPtr->getFullTitle() << "\" as it is disabled." << std::endl;
+            continue;
+          }
+
+          LogInfo << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
+          parPtr->setParameterValue( GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") );
+        }
+        else if( GenericToolbox::Json::doKeyExist(parValueEntry, "title") ){
+          auto parTitle = GenericToolbox::Json::fetchValue<std::string>(parValueEntry, "title");
+          auto* parPtr = selectedParset->getParameterPtrWithTitle(parTitle);
+          LogThrowIf(parPtr == nullptr, "Could not find " << parTitle << " among the defined parameters in " << selectedParset->getName());
+
+
+          if( not parPtr->isEnabled() ){
+            LogAlert << "NOT injecting \"" << parPtr->getFullTitle() << "\" as it is disabled." << std::endl;
+            continue;
+          }
+
+          LogInfo << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
           parPtr->setParameterValue( GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") );
         }
         else {
@@ -822,6 +895,12 @@ void Propagator::injectParameterOnMcSamples(const nlohmann::json &injectConfig_)
 
 
     }
+
+    if( selectedParset->isUseEigenDecompInFit() ){
+      LogInfo << "Propagating back to the eigen decomposed parameters for parSet: " << selectedParset->getName() << std::endl;
+      selectedParset->propagateOriginalToEigen();
+    }
+
   }
 
 }

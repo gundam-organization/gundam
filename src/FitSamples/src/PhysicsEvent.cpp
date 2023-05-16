@@ -42,6 +42,9 @@ void PhysicsEvent::setEventWeight(double eventWeight) {
 void PhysicsEvent::setSampleBinIndex(int sampleBinIndex) {
   _sampleBinIndex_ = sampleBinIndex;
 }
+void PhysicsEvent::setSampleIndex(int sampleIndex) {
+  _sampleIndex_ = sampleIndex;
+}
 
 int PhysicsEvent::getDataSetIndex() const {
   return _dataSetIndex_;
@@ -117,6 +120,9 @@ double PhysicsEvent::getEventWeight() const {
 }
 int PhysicsEvent::getSampleBinIndex() const {
   return _sampleBinIndex_;
+}
+int PhysicsEvent::getSampleIndex() const {
+  return _sampleIndex_;
 }
 const std::vector<GenericToolbox::AnyType>& PhysicsEvent::getLeafHolder(const std::string &leafName_) const{
   int index = this->findVarIndex(leafName_, true);

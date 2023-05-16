@@ -641,7 +641,7 @@ nlohmann::json DialCollection::fetchDialsDefinition(const nlohmann::json &defini
         return definitionsList_.at(iDial);
       }
     }
-    else if( par->getName() == GenericToolbox::Json::fetchValue<std::string>(definitionsList_.at(iDial), "parameterName", "") ){
+    else if( par->getName() == GenericToolbox::Json::fetchValue<std::string>(definitionsList_.at(iDial), {{"name"}, {"parameterName"}}, "") ){
       return definitionsList_.at(iDial);
     }
   }

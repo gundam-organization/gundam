@@ -50,6 +50,11 @@ public:
                      TObject* dialInitializer_,
                      bool useCachedDial_);
 
+private:
+  std::vector<double> _xPointListBuffer_{};
+  std::vector<double> _yPointListBuffer_{};
+  std::vector<double> _slopeListBuffer_{};
+
 };
 
 //  A Lesser GNU Public License

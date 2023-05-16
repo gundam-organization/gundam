@@ -227,6 +227,10 @@ void FitterEngine::fit(){
   LogWarning << __METHOD_NAME__ << std::endl;
   LogThrowIf(not isInitialized());
 
+  LogWarning << "Pre-fit likelihood state:" << std::endl;
+  LogInfo << _propagator_.getLlhBufferSummary() << std::endl;
+
+
   // Not moving parameters
   if( _generateSamplePlots_ and not _propagator_.getPlotGenerator().getConfig().empty() ){
     LogInfo << "Generating pre-fit sample plots..." << std::endl;
@@ -251,8 +255,8 @@ void FitterEngine::fit(){
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
   if( _throwMcBeforeFit_ ){
-    LogInfo << "Throwing correlated parameters of MC away from their prior..." << std::endl;
-    LogInfo << "Throw gain form MC push set to: " << _throwGain_ << std::endl;
+    LogAlert << "Throwing correlated parameters of MC away from their prior..." << std::endl;
+    LogAlert << "Throw gain form MC push set to: " << _throwGain_ << std::endl;
     for( auto& parSet : _propagator_.getParameterSetsList() ){
       if(not parSet.isEnabled()) continue;
       if( not parSet.isEnabledThrowToyParameters() ){
@@ -288,6 +292,11 @@ void FitterEngine::fit(){
         parSet.throwFitParameters(_throwGain_);
       }
     } // parSet
+
+
+    LogAlert << "Current LLH state:" << std::endl;
+    this->_propagator_.updateLlhCache();
+    LogAlert << _propagator_.getLlhBufferSummary() << std::endl;
   }
 
   // Leaving now?
@@ -297,7 +306,10 @@ void FitterEngine::fit(){
   }
 
   LogInfo << "Minimizing LLH..." << std::endl;
-  getMinimizer().minimize();
+  this->getMinimizer().minimize();
+
+  LogWarning << "Post-fit likelihood state:" << std::endl;
+  LogInfo << _propagator_.getLlhBufferSummary() << std::endl;
 
   if( _generateSamplePlots_ and not _propagator_.getPlotGenerator().getConfig().empty() ){
     LogInfo << "Generating post-fit sample plots..." << std::endl;
@@ -315,8 +327,12 @@ void FitterEngine::fit(){
     getMinimizer().calcErrors();
   }
   else{
-    if( not getMinimizer().isFitHasConverged() ) LogAlert << "Skipping post-fit error calculation since the minimizer did not converge." << std::endl;
-    else LogAlert << "Skipping post-fit error calculation since the option is disabled." << std::endl;
+    if( not getMinimizer().isFitHasConverged() ) {
+      LogError << "Skipping post-fit error calculation since the minimizer did not converge." << std::endl;
+    }
+    else{
+      LogAlert << "Skipping post-fit error calculation since the option is disabled." << std::endl;
+    }
   }
 
   LogWarning << "Fit is done." << std::endl;
@@ -396,7 +412,7 @@ void FitterEngine::fixGhostFitParameters(){
 #endif
           LogInfo << red << ssPrint.str() << rst << std::endl;
 
-          if( parSet.isUseEigenDecompInFit() and GenericToolbox::Json::fetchValue(_config_, "fixGhostEigenParmetersAfterFirstRejected", false) ){
+          if( parSet.isUseEigenDecompInFit() and GenericToolbox::Json::fetchValue(_config_, "fixGhostEigenParametersAfterFirstRejected", false) ){
             fixNextEigenPars = true;
           }
         }

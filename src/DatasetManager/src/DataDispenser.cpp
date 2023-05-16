@@ -646,6 +646,7 @@ void DataDispenser::preAllocateMemory(){
   }
 #endif
 
+  LogInfo << "Reserving event memory..." << std::endl;
   _cache_.sampleIndexOffsetList.resize(_cache_.samplesToFillList.size());
   _cache_.sampleEventListPtrToFill.resize(_cache_.samplesToFillList.size());
   for( size_t iSample = 0 ; iSample < _cache_.sampleNbOfEvents.size() ; iSample++ ){
@@ -662,10 +663,10 @@ void DataDispenser::preAllocateMemory(){
   // DEV
   if( _eventDialCacheRef_ != nullptr ){
     if( not _cache_.dialCollectionsRefList.empty() ){
-      LogInfo << "Claiming memory for event-by-event dials..." << std::endl;
-      double eventByEventDialSize{0};
+      LogInfo << "Creating slots for event-by-event dials..." << std::endl;
       size_t nDialsMaxPerEvent{0};
       for( auto& dialCollection : _cache_.dialCollectionsRefList ){
+        LogScopeIndent;
         nDialsMaxPerEvent += 1;
         if( dialCollection->isBinned() ){
           // Filling var indexes for faster eval with PhysicsEvent:
@@ -683,72 +684,20 @@ void DataDispenser::preAllocateMemory(){
           // Reserve memory for additional dials (those on a tree leaf)
           auto dialType = dialCollection->getGlobalDialType();
           LogInfo << dialCollection->getTitle() << ": creating " << nEvents;
-          LogInfo << " " << dialType;
+          LogInfo << " slots for " << dialType << std::endl;
 
-          double dialsSizeInRam{0};
           dialCollection->getDialBaseList().clear();
           dialCollection->getDialBaseList().resize(nEvents);
-          if     ( dialType == "Spline" ){
-            if(dialCollection->useCachedDials() ){
-              dialsSizeInRam = double(nEvents) * sizeof(SplineCache);
-            }
-            else{
-              dialsSizeInRam = double(nEvents) * sizeof(Spline);
-            }
-          }
-          else if( dialType == "MonotonicSpline" ){
-            if(dialCollection->useCachedDials() ){
-              dialsSizeInRam = double(nEvents) * sizeof(MonotonicSplineCache);
-            }
-            else{
-              dialsSizeInRam = double(nEvents) * sizeof(MonotonicSpline);
-            }
-          }
-          else if( dialType == "GeneralSpline" ){
-            if(dialCollection->useCachedDials() ){
-              dialsSizeInRam = double(nEvents) * sizeof(GeneralSplineCache);
-            }
-            else{
-              dialsSizeInRam = double(nEvents) * sizeof(GeneralSpline);
-            }
-          }
-          else if( dialType == "SimpleSpline" ){
-            if(dialCollection->useCachedDials() ){
-              dialsSizeInRam = double(nEvents) * sizeof(SimpleSplineCache);
-            }
-            else{
-              dialsSizeInRam = double(nEvents) * sizeof(SimpleSpline);
-            }
-          }
-          else if( dialType == "Graph" ){
-            if(dialCollection->useCachedDials() ){
-              dialsSizeInRam = double(nEvents) * sizeof(GraphCache);
-            }
-            else{
-              dialsSizeInRam = double(nEvents) * sizeof(Graph);
-            }
-          }
-          else if( dialType == "LightGraph" ){
-            dialsSizeInRam = double(nEvents) * sizeof(LightGraph);
-          }
-          else{
-            LogInfo << std::endl;
-            LogThrow("Invalid dial type for event-by-event dial: " << dialType);
-          }
-          eventByEventDialSize += dialsSizeInRam;
-          LogInfo << " dials ("
-                  << GenericToolbox::parseSizeUnits( dialsSizeInRam )
-                  << ")" << std::endl;
-
         }
         else{
           LogThrow("DEV ERROR: not binned, not event-by-event?");
         }
       }
       _eventDialCacheRef_->allocateCacheEntries(nEvents, nDialsMaxPerEvent);
-      LogInfo << "Event-by-event dials take "
-              << GenericToolbox::parseSizeUnits(eventByEventDialSize)
-              << " in RAM." << std::endl;
+    }
+    else{
+      // all events should be referenced in the cache
+      _eventDialCacheRef_->allocateCacheEntries(nEvents, 0);
     }
   }
 #else
@@ -942,6 +891,7 @@ void DataDispenser::loadFromHistContent(){
       auto target = sample->getBinning().getBinsList()[iBin].generateBinTarget( axisNameList );
       auto histBinIndex = hist->GetBin( target.data() ); // bad fetch..?
 
+      container->eventList[iBin].setSampleIndex( sample->getIndex() );
       for( size_t iVar = 0 ; iVar < target.size() ; iVar++ ){
         container->eventList[iBin].setVariable( target[iVar], axisNameList[iVar] );
       }
@@ -1176,6 +1126,9 @@ void DataDispenser::fillFunction(int iThread_){
   if( iThread_+1 != nThreads ) iEnd = (Long64_t(iThread_)+1)*nEventPerThread;
   Long64_t iGlobal = 0;
 
+  // to generate dials
+  DialBaseFactory factory;
+
   // Load the branches
   treeChain.LoadTree(iStart);
 
@@ -1289,6 +1242,7 @@ void DataDispenser::fillFunction(int iThread_){
         eventPtr->setSampleBinIndex(eventBuffer.getSampleBinIndex());
         eventPtr->setTreeWeight(eventBuffer.getTreeWeight());
         eventPtr->setNominalWeight(eventBuffer.getTreeWeight());
+        eventPtr->setSampleIndex(_cache_.samplesToFillList[iSample]->getIndex());
         eventPtr->resetEventWeight();
 
         // Now the event is ready. Let's index the dials:
@@ -1296,6 +1250,9 @@ void DataDispenser::fillFunction(int iThread_){
 
 #if USE_NEW_DIALS
         if( _eventDialCacheRef_ != nullptr ) {
+
+          // there should always be a cache entry even if no dials are applied.
+          // This cache is actually used to write MC events with dials in output tree
           eventDialCacheEntry = _eventDialCacheRef_->fetchNextCacheEntry();
           eventDialCacheEntry->event.sampleIndex
               = std::size_t(_cache_.samplesToFillList[iSample]->getIndex());
@@ -1314,7 +1271,7 @@ void DataDispenser::fillFunction(int iThread_){
               }
             }
 
-            if( dialCollectionRef->isBinned() ){
+            if     ( dialCollectionRef->isBinned() ){
 
               // is only one bin with no condition:
               if( dialCollectionRef->getDialBaseList().size() == 1 and dialCollectionRef->getDialBinSet().isEmpty() ){
@@ -1358,13 +1315,19 @@ void DataDispenser::fillFunction(int iThread_){
                 LogThrow("Unsupported event-by-event dial type: " << treeChain.GetLeaf(dialCollectionRef->getGlobalDialLeafName().c_str())->GetTypeName() )
               }
 
-              DialBaseFactory factory;
               // Do the unique_ptr dance so that memory gets deleted if
               // there is an exception (being stupidly paranoid).
               std::unique_ptr<DialBase> dialBase(
-                  factory.makeDial(dialCollectionRef->getGlobalDialType(),
-                                   dialCollectionRef->getGlobalDialSubType(),
-                                   grPtr, dialCollectionRef->useCachedDials()));
+                  factory.makeDial(
+                      dialCollectionRef->getGlobalDialType(),
+                      dialCollectionRef->getGlobalDialSubType(),
+                      grPtr,
+                      dialCollectionRef->useCachedDials()
+                  )
+              );
+
+
+
               if (dialBase) {
                 freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
                 dialBase->setAllowExtrapolation(dialCollectionRef->isAllowDialExtrapolation());

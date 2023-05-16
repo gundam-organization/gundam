@@ -195,7 +195,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList,
         }
         for (EventDialCache::DialsElem_t& dialElem : elem.dials) {
 #ifdef USE_BREAKDOWN_CACHE
-            DialInterface* dialInterface = dialElem.dial;
+            DialInterface* dialInterface = dialElem.interface;
 #else
             DialInterface* dialInterface = dialElem;
 #endif
