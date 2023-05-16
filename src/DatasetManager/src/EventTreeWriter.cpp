@@ -24,6 +24,13 @@ void EventTreeWriter::readConfigImpl() {
 
   _writeDials_ = GenericToolbox::Json::fetchValue(_config_, "writeDials", _writeDials_);
   _nPointsPerDial_ = GenericToolbox::Json::fetchValue(_config_, "nPointsPerDial", _nPointsPerDial_);
+
+  LogInfo << "EventTreeWriter configured as:" << std::endl;
+  {
+    LogScopeIndent;
+    LogInfo << GET_VAR_NAME_VALUE(_writeDials_) << std::endl;
+    LogInfo << GET_VAR_NAME_VALUE(_nPointsPerDial_) << std::endl;
+  }
 }
 
 void EventTreeWriter::setFitSampleSetPtr(const FitSampleSet *fitSampleSetPtr) {
