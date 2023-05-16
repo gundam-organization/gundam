@@ -203,6 +203,7 @@ void Propagator::initializeImpl() {
   }
 
   LogInfo << "Build reference cache..." << std::endl;
+  _eventDialCache_.shrinkIndexedCache();
   _eventDialCache_.buildReferenceCache(_fitSampleSet_, _dialCollections_);
 #endif
 
@@ -328,6 +329,7 @@ void Propagator::initializeImpl() {
     }
 
     LogInfo << "Build reference cache..." << std::endl;
+    _eventDialCache_.shrinkIndexedCache();
     _eventDialCache_.buildReferenceCache(_fitSampleSet_, _dialCollections_);
 #endif
   }
@@ -412,6 +414,7 @@ void Propagator::initializeImpl() {
 
   _treeWriter_.setFitSampleSetPtr(&_fitSampleSet_);
   _treeWriter_.setParSetListPtr(&_parameterSetList_);
+  _treeWriter_.setEventDialCachePtr(&_eventDialCache_);
 
   _parScanner_.initialize();
 

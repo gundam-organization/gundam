@@ -105,6 +105,9 @@ public:
   void buildReferenceCache(FitSampleSet& sampleSet_,
                            std::vector<DialCollection>& dialCollectionList_);
 
+  /// Resize the cache vectors to remove entries with null events
+  void shrinkIndexedCache();
+
   static void reweightEntry(CacheElem_t& entry_);
 
 private:

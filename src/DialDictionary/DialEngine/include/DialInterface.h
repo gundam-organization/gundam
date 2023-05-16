@@ -50,8 +50,6 @@ public:
   [[nodiscard]] double evalResponse() const;
   [[nodiscard]] std::string getSummary(bool shallow_=true) const;
 
-  void fillWithDialResponse(TGraph* graphBuffer_) const;
-
 private:
   DialBase* _dialBaseRef_{nullptr}; // should be filled while init
   DialInputBuffer* _inputBufferRef_{nullptr};

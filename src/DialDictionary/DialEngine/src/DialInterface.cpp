@@ -54,16 +54,6 @@ std::string DialInterface::getSummary(bool shallow_) const {
   return ss.str();
 }
 
-void DialInterface::fillWithDialResponse(TGraph *graphBuffer_) const {
-  LogThrowIf(graphBuffer_ == nullptr, "no buffer provided for " << std::endl << this->getSummary( false ));
-  DialInputBuffer inputBuf{*_inputBufferRef_};
-  for( int iPt = 0 ; iPt < graphBuffer_->GetN() ; iPt++ ){
-    LogThrowIf(inputBuf.getBufferSize() != 1, "multi-dim dial not supported yet.");
-    inputBuf.getBufferVector()[0] = graphBuffer_->GetX()[iPt];
-    graphBuffer_->GetY()[iPt] = DialInterface::evalResponse(&inputBuf, _dialBaseRef_, _responseSupervisorRef_);
-  }
-}
-
 double DialInterface::evalResponse(
     DialInputBuffer *inputBufferPtr_, DialBase *dialBaseRef_,
     const DialResponseSupervisor *responseSupervisorRef_

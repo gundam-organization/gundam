@@ -115,6 +115,11 @@ EventDialCache::IndexedEntry_t* EventDialCache::fetchNextCacheEntry(){
   return &_indexedCache_[_fillIndex_++];
 }
 
+void EventDialCache::shrinkIndexedCache(){
+  _indexedCache_.resize(_fillIndex_+1);
+  _indexedCache_.shrink_to_fit();
+}
+
 #ifndef USE_BREAKDOWN_CACHE
 void EventDialCache::reweightEntry(EventDialCache::CacheElem_t& entry_){
   entry_.event->resetEventWeight();

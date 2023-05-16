@@ -695,6 +695,10 @@ void DataDispenser::preAllocateMemory(){
       }
       _eventDialCacheRef_->allocateCacheEntries(nEvents, nDialsMaxPerEvent);
     }
+    else{
+      // all events should be referenced in the cache
+      _eventDialCacheRef_->allocateCacheEntries(nEvents, 0);
+    }
   }
 #else
   // DIALS
@@ -1246,6 +1250,9 @@ void DataDispenser::fillFunction(int iThread_){
 
 #if USE_NEW_DIALS
         if( _eventDialCacheRef_ != nullptr ) {
+
+          // there should always be a cache entry even if no dials are applied.
+          // This cache is actually used to write MC events with dials in output tree
           eventDialCacheEntry = _eventDialCacheRef_->fetchNextCacheEntry();
           eventDialCacheEntry->event.sampleIndex
               = std::size_t(_cache_.samplesToFillList[iSample]->getIndex());
