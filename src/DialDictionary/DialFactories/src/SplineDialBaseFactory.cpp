@@ -120,7 +120,8 @@ void SplineDialBaseFactory::MakeMonotonic(const std::vector<double>& xPoint,
   }
 }
 
-DialBase* SplineDialBaseFactory::makeDial(const std::string& dialType_,
+DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
+                                          const std::string& dialType_,
                                           const std::string& dialSubType_,
                                           TObject* dialInitializer_,
                                           bool useCachedDial_) {
@@ -142,14 +143,15 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialType_,
 
   // Get the numeric tolerance for when a uniform spline can be used.  We
   // should be able to set this in the DialSubType.
-  const double defUniformityTolerance{std::numeric_limits<float>::epsilon()};
+  const double defUniformityTolerance{16*std::numeric_limits<float>::epsilon()};
   double uniformityTolerance{defUniformityTolerance};
   if (dialSubType_.find("uniformity(") != std::string::npos) {
     std::size_t bg = dialSubType_.find("uniformity(");
     bg = dialSubType_.find("(",bg);
     std::size_t en = dialSubType_.find(")",bg);
     LogThrowIf(en == std::string::npos,
-               "Invalid spline uniformity with dialSubType: " << dialSubType_);
+               "Invalid spline uniformity with dialSubType: " << dialSubType_
+               << " dial: " << dialTitle_);
     en = en - bg;
     std::string uniformityString = dialSubType_.substr(bg+1,en-1);
     std::istringstream unif(uniformityString);
@@ -198,7 +200,8 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialType_,
   // number of points or something is very wrong.
   LogThrowIf( _xPointListBuffer_.size() != _yPointListBuffer_.size(),
               "INVALID Spline Input: "
-              << "must have the same number of X and Y points" );
+              << "must have the same number of X and Y points "
+              << "for dial " << dialTitle_ );
 
   // Check that the X points are in strictly increasing order (sorted order is
   // not sufficient) with explicit comparisons in case we want to add more
@@ -206,7 +209,8 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialType_,
   // with the inputs.  Don't try to continue!
   for (int i = 1; i<_xPointListBuffer_.size(); ++i) {
     LogThrowIf(_xPointListBuffer_[i] <= _xPointListBuffer_[i-1],
-               "INVALID Spline Input: points are not in increasing order." );
+               "INVALID Spline Input: points are not in increasing order "
+               << " for dial " << dialTitle_);
   }
 
   // Check if the spline is flat.  Flat functions won't be handled with
@@ -265,7 +269,9 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialType_,
   // Sanity check.  By the time we get here, there can't be fewer than two
   // points, and it should have been trapped above by other conditionals
   // (e.g. a single point "spline" should have been flagged as flat).
-  LogThrowIf((_xPointListBuffer_.size() < 2), "Input data logic error: two few points");
+  LogThrowIf((_xPointListBuffer_.size() < 2),
+             "Input data logic error: two few points "
+             << "for dial " << dialTitle_ );
 
   // If there are only two points, then force catmull-rom.  This could be
   // handled using a graph, but Catmull-Rom is fast, and works better with the
@@ -316,6 +322,7 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialType_,
     // uniformly spaced knots.
     if (not isUniform) {
       LogError << "Monotonic Catmull-rom splines need a uniformly spaced points"
+               << " Dial: " << dialTitle_
                << std::endl;
       double step = (_xPointListBuffer_.back()-_xPointListBuffer_.front())/(_xPointListBuffer_.size()-1);
       for (int i = 0; i<_xPointListBuffer_.size()-1; ++i) {
@@ -339,6 +346,7 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialType_,
     // This is the version when the spline doesn't need to be monotonic.
     if (not isUniform) {
       LogError << "Catmull-rom splines need a uniformly spaced points"
+               << " Dial: " << dialTitle_
                << std::endl;
       double step = (_xPointListBuffer_.back()-_xPointListBuffer_.front())/(_xPointListBuffer_.size()-1);
       for (int i = 0; i<_xPointListBuffer_.size()-1; ++i) {

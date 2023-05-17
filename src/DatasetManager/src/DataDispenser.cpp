@@ -1319,6 +1319,7 @@ void DataDispenser::fillFunction(int iThread_){
               // there is an exception (being stupidly paranoid).
               std::unique_ptr<DialBase> dialBase(
                   factory.makeDial(
+                      dialCollectionRef->getTitle(),
                       dialCollectionRef->getGlobalDialType(),
                       dialCollectionRef->getGlobalDialSubType(),
                       grPtr,
