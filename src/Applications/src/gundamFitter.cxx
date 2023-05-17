@@ -43,6 +43,12 @@ int main(int argc, char** argv){
   // --------------------------
   CmdLineParser clParser;
 
+  clParser.getDescription() << "gundamFitter is the main interface for the fitter." << std::endl;
+  clParser.getDescription() << "It takes a set of inputs through config files and command line argument," << std::endl;
+  clParser.getDescription() << "and initialize the fitter engine." << std::endl;
+  clParser.getDescription() << "Once ready, the fitter minimize the likelihood function and" << std::endl;
+  clParser.getDescription() << "produce a set of plot saved in the output ROOT file." << std::endl;
+
   clParser.addDummyOption("Main options");
 
   clParser.addOption("configFile", {"-c", "--config-file"}, "Specify path to the fitter config file");
@@ -80,6 +86,8 @@ int main(int argc, char** argv){
 
   clParser.addDummyOption();
 
+
+  LogInfo << clParser.getDescription().str() << std::endl;
 
   LogInfo << "Usage: " << std::endl;
   LogInfo << clParser.getConfigSummary() << std::endl << std::endl;
