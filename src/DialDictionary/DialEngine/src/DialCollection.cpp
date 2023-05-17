@@ -309,7 +309,7 @@ bool DialCollection::initializeNormDialsWithParBinning() {
   _dialBaseList_.reserve( _dialBinSet_.getBinsList().size() );
   DialBaseFactory factory;
   for(const auto & bin : _dialBinSet_.getBinsList()) {
-    _dialBaseList_.emplace_back(DialBaseObject(factory.makeDial("Normalization","",nullptr,false)));
+    _dialBaseList_.emplace_back(DialBaseObject(factory.makeDial(getTitle(), "Normalization","",nullptr,false)));
   }
 
   return true;
@@ -337,7 +337,7 @@ bool DialCollection::initializeDialsWithDefinition() {
     // This dial collection is a normalization, so there is a single dial.
     // Create it here.
     _dialBaseList_.emplace_back(
-      DialBaseObject(dialBaseFactory.makeDial("Normalization","",nullptr,false)));
+      DialBaseObject(dialBaseFactory.makeDial(getTitle(),"Normalization","",nullptr,false)));
   }
   else {
     if     (not _globalDialLeafName_.empty()) {
@@ -384,6 +384,7 @@ bool DialCollection::initializeDialsWithDefinition() {
           TObject* binnedInitializer = dialsList->At(iBin);
 
           DialBase *dialBase = dialBaseFactory.makeDial(
+              getTitle(),
               getGlobalDialType(),
               getGlobalDialSubType(),
               binnedInitializer,
@@ -469,6 +470,7 @@ bool DialCollection::initializeDialsWithDefinition() {
           if (getGlobalDialType() == "Graph") dialInitializer = graphPtr;
           DialBaseFactory factory;
           DialBase *dialBase = factory.makeDial(
+              getTitle(),
               getGlobalDialType(),
               getGlobalDialSubType(),
               dialInitializer,
