@@ -143,7 +143,7 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
 
   // Get the numeric tolerance for when a uniform spline can be used.  We
   // should be able to set this in the DialSubType.
-  const double defUniformityTolerance{std::numeric_limits<float>::epsilon()};
+  const double defUniformityTolerance{16*std::numeric_limits<float>::epsilon()};
   double uniformityTolerance{defUniformityTolerance};
   if (dialSubType_.find("uniformity(") != std::string::npos) {
     std::size_t bg = dialSubType_.find("uniformity(");
