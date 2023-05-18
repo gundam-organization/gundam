@@ -19,7 +19,7 @@
 
 
 LoggerInit([]{
-  Logger::getUserHeader() << "[" << __FILE_NAME__ << "]";
+  Logger::getUserHeader() << "[" << FILENAME << "]";
 });
 
 
