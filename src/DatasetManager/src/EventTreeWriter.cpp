@@ -86,12 +86,12 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
   LogThrowIf(saveDir_ == nullptr, "Save TDirectory is not set.");
   LogThrowIf(treeName_.empty(), "TTree name no set.");
 
-  LogReturnIf(eventList_.empty(), "No event to be writen. Leaving...");
+  LogReturnIf(eventList_.empty(), "No event to be written. Leaving...");
 
   const std::vector<EventDialCache::DialsElem_t>* dialElements{getDialElementsPtr(eventList_[0])};
   bool writeDials{dialElements != nullptr};
 
-  LogInfo << "Writing " << eventList_.size() << " events " << (writeDials? "with response dials ": "") << "in TTree " << treeName_ << std::endl;
+  LogInfo << "Writing " << eventList_.size() << " events " << (writeDials? "with response dials ": "without response dials") << "in TTree " << treeName_ << std::endl;
 
   auto* oldDir = GenericToolbox::getCurrentTDirectory();
 
