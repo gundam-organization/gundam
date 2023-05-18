@@ -244,7 +244,7 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
   currentParValue[0] = par_.getParameterValue();
   GenericToolbox::writeInTFile(saveDir_, &currentParValue, ssVal.str());
 }
-void ParScanner::scanSegment(const nlohmann::json& start_, const nlohmann::json& end_, TDirectory* saveDir_){
+void ParScanner::scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, const nlohmann::json &start_) {
   LogWarning << "Scanning along a segment with " << _nbPointsLineScan_ << " steps." << std::endl;
 
   // don't shout while re-injecting parameters
@@ -253,7 +253,6 @@ void ParScanner::scanSegment(const nlohmann::json& start_, const nlohmann::json&
       []{ FitParameterSet::unmuteLogger(); Propagator::unmuteLogger(); }
       );
 
-  LogThrowIf(start_.empty(), "Starting injector config is empty()");
   LogThrowIf(end_.empty(), "Ending injector config is empty()");
   LogThrowIf(_nbPointsLineScan_ < 0, "Invalid nSteps");
 
@@ -265,7 +264,8 @@ void ParScanner::scanSegment(const nlohmann::json& start_, const nlohmann::json&
 
   LogInfo << "Reading start point parameter state..." << std::endl;
   std::vector<std::pair<FitParameter*, double>> startPointParValList;
-  _owner_->injectParameterValues(start_);
+  if( not start_.empty() ) _owner_->injectParameterValues(start_);
+  else{ _owner_->injectParameterValues(currentParState); }
   for( auto& parSet : _owner_->getParameterSetsList() ){
     if( not parSet.isEnabled() ){ continue; }
     for( auto& par : parSet.getParameterList() ){
@@ -297,9 +297,12 @@ void ParScanner::scanSegment(const nlohmann::json& start_, const nlohmann::json&
     }
   }
 
+  std::stringstream ss;
+  ss << LogWarning.getPrefixString() << "Scanning...";
 
   LogInfo << "Scanning along the line..." << std::endl;
   for( int iStep = 0 ; iStep < nTotalSteps ; iStep++ ){
+    GenericToolbox::displayProgressBar(iStep, nTotalSteps-1, ss.str());
 
     for( size_t iPar = 0 ; iPar < startPointParValList.size() ; iPar++ ){
       auto* par = startPointParValList[iPar].first;
@@ -332,7 +335,23 @@ void ParScanner::scanSegment(const nlohmann::json& start_, const nlohmann::json&
     graphEntry.graph.GetYaxis()->SetTitle(graphEntry.scanDataPtr->yTitle.c_str());
     graphEntry.graph.GetXaxis()->SetTitle(graphEntry.fitParPtr->getFullTitle().c_str());
     graphEntry.graph.SetDrawOption("AP");
-    graphEntry.graph.SetMarkerStyle(kFullDotLarge);
+
+    // marker indicates the direction
+    if( graphEntry.graph.GetY()[0] == graphEntry.graph.GetY()[graphEntry.graph.GetN()-1] ){
+      // Did not move
+      graphEntry.graph.SetMarkerStyle( kFullDotMedium );
+    }
+    else if( graphEntry.graph.GetY()[0] > graphEntry.graph.GetY()[graphEntry.graph.GetN()-1] ){
+      // Did go down
+      graphEntry.graph.SetMarkerStyle( kFullTriangleDown );
+    }
+    else{
+      // Did go up
+      graphEntry.graph.SetMarkerStyle( kFullTriangleUp );
+    }
+
+
+
 
     GenericToolbox::writeInTFile(
         GenericToolbox::mkdirTFile( saveDir_, graphEntry.scanDataPtr->folder ),

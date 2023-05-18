@@ -34,7 +34,7 @@ public:
   // Core
   void scanFitParameters(std::vector<FitParameter>& par_, TDirectory* saveDir_);
   void scanFitParameter(FitParameter& par_, TDirectory* saveDir_);
-  void scanSegment(const nlohmann::json& start_, const nlohmann::json& end_, TDirectory* saveDir_);
+  void scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, const nlohmann::json &start_ = nlohmann::json());
   void generateOneSigmaPlots(TDirectory* saveDir_);
   void varyEvenRates(const std::vector<double>& paramVariationList_, TDirectory* saveDir_);
 

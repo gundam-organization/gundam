@@ -347,7 +347,8 @@ void FitterEngine::fit(){
   }
   if( _enablePreFitToPostFitLineScan_ ){
     LogInfo << "Scanning along the line from pre-fit to post-fit points..." << std::endl;
-    getPropagator().getParScanner().scanSegment(_preFitParState_, _postFitParState_, GenericToolbox::mkdirTFile(_saveDir_, "postFit/scanConvergence"));
+    getPropagator().getParScanner().scanSegment(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scanConvergence"),
+                                                _postFitParState_, _preFitParState_);
   }
 
   if( getMinimizer().isFitHasConverged() and getMinimizer().isEnablePostFitErrorEval() ){

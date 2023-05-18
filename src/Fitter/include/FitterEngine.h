@@ -82,7 +82,7 @@ private:
   bool _throwMcBeforeFit_{false};
   bool _enablePreFitScan_{false};
   bool _enablePostFitScan_{false};
-  bool _enablePreFitToPostFitLineScan_{false};
+  bool _enablePreFitToPostFitLineScan_{true};
   bool _generateSamplePlots_{true};
   bool _generateOneSigmaPlots_{false};
   bool _doAllParamVariations_{false};

@@ -78,7 +78,7 @@ int main(int argc, char** argv){
   clParser.addTriggerOption("ignoreVersionCheck", {"--ignore-version"}, "Don't check GUNDAM version with config request");
 
   clParser.addOption("scanParameters", {"--scan"}, "Enable parameter scan before and after the fit (can provide nSteps)", 1, true);
-  clParser.addOption("scanPreFitToPostFitLine", {"--line-scan"}, "Enable pre-fit to post-fit scan after the fit (can provide nSteps)", 1, true);
+  clParser.addOption("scanLine", {"--scan-line"}, "Provide par injector files: start and end point or only end point (start will be prefit)", 2);
   clParser.addOption("toyFit", {"--toy"}, "Run a toy fit (optional arg to provide toy index)", 1, true);
 
   clParser.addDummyOption("Runtime/debug options");
@@ -214,7 +214,7 @@ int main(int argc, char** argv){
     std::vector<std::pair<std::string, std::string>> appendixDict{
         {"asimov", "Asimov"},
         {"scanParameters", "Scan"},
-        {"scanPreFitToPostFitLine", "WithLineScan"},
+        {"scanLine", "WithLineScan"},
         {"generateOneSigmaPlots", "OneSigma"},
         {"enablePca", "PCA"},
         {"skipHesse", "NoHesse"},
@@ -326,13 +326,6 @@ int main(int argc, char** argv){
         );
   }
 
-  if( clParser.isOptionTriggered("scanPreFitToPostFitLine") ){
-    fitter.setEnablePreFitToPostFitLineScan( true );
-    fitter.getPropagator().getParScanner().setNbPoints(
-        clParser.getOptionVal("scanParameters", fitter.getPropagator().getParScanner().getNbPoints())
-    );
-  }
-
   // --enable-pca
   fitter.setEnablePca(clParser.isOptionTriggered("enablePca"));
 
@@ -391,6 +384,36 @@ int main(int argc, char** argv){
   if( clParser.isOptionTriggered("injectParameterConfig") ) {
     LogDebug << "Starting mc parameters that where injected:" << std::endl;
     LogDebug << fitter.getPropagator().getParametersSummary( false ) << std::endl;
+  }
+
+  auto* outDir = GenericToolbox::mkdirTFile(fitter.getSaveDir(), GenericToolbox::joinPath("preFit", "cmdScanLine"));
+
+  if( clParser.isOptionTriggered("scanLine") ){
+    LogThrowIf( clParser.getNbValueSet("scanLine") == 0, "No injector file provided.");
+    if( clParser.getNbValueSet("scanLine") == 1 ){
+      LogAlert << "Will scan the line toward the point set in: " << clParser.getOptionVal<std::string>("scanLine", 0) << std::endl;
+
+      auto endPoint = ConfigUtils::readConfigFile(clParser.getOptionVal<std::string>("scanLine", 0));
+
+      GenericToolbox::writeInTFile( outDir, TNamed("endPoint", GenericToolbox::Json::toReadableString(endPoint).c_str()) );
+
+      fitter.getPropagator().getParScanner().scanSegment( outDir, endPoint );
+    }
+    else if( clParser.getNbValueSet("scanLine") == 2 ) {
+      LogAlert << "Will scan the line from point A (" << clParser.getOptionVal<std::string>("scanLine", 0)
+          << ") to point B (" << clParser.getOptionVal<std::string>("scanLine", 1) << ")" << std::endl;
+
+      auto startPoint = ConfigUtils::readConfigFile(clParser.getOptionVal<std::string>("scanLine", 0));
+      auto endPoint = ConfigUtils::readConfigFile(clParser.getOptionVal<std::string>("scanLine", 1));
+
+      GenericToolbox::writeInTFile( outDir, TNamed("startPoint", GenericToolbox::Json::toReadableString(startPoint).c_str()) );
+      GenericToolbox::writeInTFile( outDir, TNamed("endPoint", GenericToolbox::Json::toReadableString(endPoint).c_str()) );
+
+      fitter.getPropagator().getParScanner().scanSegment( outDir, endPoint, startPoint );
+    }
+    else{
+      LogThrow("");
+    }
   }
 
   // --------------------------
