@@ -147,14 +147,25 @@ void FitterEngine::initializeImpl(){
 
   // Write data
   LogInfo << "Writing propagator objects..." << std::endl;
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
-                               _propagator_.getGlobalCovarianceMatrix().get(), "globalCovarianceMatrix");
+  GenericToolbox::writeInTFile(
+      GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
+      TNamed("initialParameterState", GenericToolbox::Json::toReadableString(_propagator_.exportParameterInjectorConfig()).c_str())
+  );
+
+  GenericToolbox::writeInTFile(
+      GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
+      _propagator_.getGlobalCovarianceMatrix().get(), "globalCovarianceMatrix"
+  );
   for( auto& parSet : _propagator_.getParameterSetsList() ){
     if(not parSet.isEnabled()) continue;
-    GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(_saveDir_, "propagator/"+parSet.getName()),
-                                  parSet.getPriorCovarianceMatrix().get(), "covarianceMatrix");
-    GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(_saveDir_, "propagator/"+parSet.getName()),
-                                  parSet.getPriorCorrelationMatrix().get(), "correlationMatrix");
+    GenericToolbox::writeInTFile(
+        GenericToolbox::mkdirTFile( _saveDir_, GenericToolbox::joinPath("propagator", parSet.getName()) ),
+        parSet.getPriorCovarianceMatrix().get(), "covarianceMatrix"
+    );
+    GenericToolbox::writeInTFile(
+        GenericToolbox::mkdirTFile(_saveDir_, GenericToolbox::joinPath("propagator", parSet.getName()) ),
+        parSet.getPriorCorrelationMatrix().get(), "correlationMatrix"
+    );
   }
 
   this->_propagator_.updateLlhCache();
@@ -228,8 +239,14 @@ void FitterEngine::fit(){
   LogThrowIf(not isInitialized());
 
   LogWarning << "Pre-fit likelihood state:" << std::endl;
-  LogInfo << _propagator_.getLlhBufferSummary() << std::endl;
 
+  std::string llhState{_propagator_.getLlhBufferSummary()};
+  LogInfo << llhState << std::endl;
+  GenericToolbox::writeInTFile(
+      GenericToolbox::mkdirTFile( _saveDir_, "preFit" ),
+      TNamed("preFitLlhState", llhState.c_str())
+  );
+  _preFitParState_ = _propagator_.exportParameterInjectorConfig();
 
   // Not moving parameters
   if( _generateSamplePlots_ and not _propagator_.getPlotGenerator().getConfig().empty() ){
@@ -307,6 +324,9 @@ void FitterEngine::fit(){
 
   LogInfo << "Minimizing LLH..." << std::endl;
   this->getMinimizer().minimize();
+
+  LogWarning << "Saving post-fit par state..." << std::endl;
+  _postFitParState_ = _propagator_.exportParameterInjectorConfig();
 
   LogWarning << "Post-fit likelihood state:" << std::endl;
   LogInfo << _propagator_.getLlhBufferSummary() << std::endl;

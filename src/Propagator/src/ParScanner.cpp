@@ -31,6 +31,94 @@ void ParScanner::readConfigImpl() {
   _parameterSigmaRange_ = GenericToolbox::Json::fetchValue(_config_, "parameterSigmaRange", _parameterSigmaRange_);
 
   _varsConfig_ = GenericToolbox::Json::fetchValue(_config_, "varsConfig", nlohmann::json());
+
+  _scanDataDict_.clear();
+  if( GenericToolbox::Json::fetchValue(_varsConfig_, "llh", true) ){
+    _scanDataDict_.emplace_back();
+    auto& scanEntry = _scanDataDict_.back();
+    scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
+    scanEntry.folder = "llh";
+    scanEntry.title = "Total Likelihood Scan";
+    scanEntry.yTitle = "LLH value";
+    scanEntry.evalY = [this](){ return _owner_->getLlhBuffer(); };
+  }
+  if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhPenalty", true) ){
+    _scanDataDict_.emplace_back();
+    auto& scanEntry = _scanDataDict_.back();
+    scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
+    scanEntry.folder = "llhPenalty";
+    scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
+    scanEntry.title = "Penalty Likelihood Scan";
+    scanEntry.yTitle = "Penalty LLH value";
+    scanEntry.evalY = [this](){ return _owner_->getLlhPenaltyBuffer(); };
+  }
+  if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStat", true) ){
+    _scanDataDict_.emplace_back();
+    auto& scanEntry = _scanDataDict_.back();
+    scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
+    scanEntry.folder = "llhStat";
+    scanEntry.title = "Stat Likelihood Scan";
+    scanEntry.yTitle = "Stat LLH value";
+    scanEntry.evalY = [this](){ return _owner_->getLlhStatBuffer(); };
+  }
+  if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSample", false) ){
+    for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
+      _scanDataDict_.emplace_back();
+      auto& scanEntry = _scanDataDict_.back();
+      scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
+      scanEntry.folder = "llhStat/" + sample.getName() + "/";
+      scanEntry.title = Form("Stat Likelihood Scan of sample \"%s\"", sample.getName().c_str());
+      scanEntry.yTitle = "Stat LLH value";
+      auto* samplePtr = &sample;
+      scanEntry.evalY = [this, samplePtr](){ return _owner_->getFitSampleSet().evalLikelihood(*samplePtr); };
+    }
+  }
+  if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSamplePerBin", false) ){
+    for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
+      for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+        _scanDataDict_.emplace_back();
+        auto& scanEntry = _scanDataDict_.back();
+        scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
+        scanEntry.folder = "llhStat/" + sample.getName() + "/bin_" + std::to_string(iBin);
+        scanEntry.title = Form(R"(Stat LLH Scan of sample "%s", bin #%d "%s")",
+                               sample.getName().c_str(),
+                               iBin,
+                               sample.getBinning().getBinsList()[iBin-1].getSummary().c_str());
+        scanEntry.yTitle = "Stat LLH value";
+        auto* samplePtr = &sample;
+        scanEntry.evalY = [this, samplePtr, iBin](){ return _owner_->getFitSampleSet().getJointProbabilityFct()->eval(*samplePtr, iBin); };
+      }
+    }
+  }
+  if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSample", false) ){
+    for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
+      _scanDataDict_.emplace_back();
+      auto& scanEntry = _scanDataDict_.back();
+      scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
+      scanEntry.folder = "weight/" + sample.getName();
+      scanEntry.title = Form("MC event weight scan of sample \"%s\"", sample.getName().c_str());
+      scanEntry.yTitle = "Total MC event weight";
+      auto* samplePtr = &sample;
+      scanEntry.evalY = [samplePtr](){ return samplePtr->getMcContainer().getSumWeights(); };
+    }
+  }
+  if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSamplePerBin", false) ){
+    for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
+      for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+        _scanDataDict_.emplace_back();
+        auto& scanEntry = _scanDataDict_.back();
+        scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
+        scanEntry.folder = "weight/" + sample.getName() + "/bin_" + std::to_string(iBin);
+        scanEntry.title = Form(R"(MC event weight scan of sample "%s", bin #%d "%s")",
+                               sample.getName().c_str(),
+                               iBin,
+                               sample.getBinning().getBinsList()[iBin-1].getSummary().c_str());
+        scanEntry.yTitle = "Total MC event weight";
+        auto* samplePtr = &sample;
+        scanEntry.evalY = [samplePtr, iBin](){ return samplePtr->getMcContainer().histogram->GetBinContent(iBin); };
+      }
+    }
+  }
 }
 void ParScanner::initializeImpl() {
   LogInfo << "Initializing ParScanner..." << std::endl;
@@ -71,94 +159,6 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
     _owner_->setEnableEigenToOrigInPropagate( false );
   }
 
-  scanDataDict.clear();
-  if( GenericToolbox::Json::fetchValue(_varsConfig_, "llh", true) ){
-    scanDataDict.emplace_back();
-    auto& scanEntry = scanDataDict.back();
-    scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
-    scanEntry.folder = "llh";
-    scanEntry.title = "Total Likelihood Scan";
-    scanEntry.yTitle = "LLH value";
-    scanEntry.evalY = [this](){ return _owner_->getLlhBuffer(); };
-  }
-  if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhPenalty", true) ){
-    scanDataDict.emplace_back();
-    auto& scanEntry = scanDataDict.back();
-    scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
-    scanEntry.folder = "llhPenalty";
-    scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
-    scanEntry.title = "Penalty Likelihood Scan";
-    scanEntry.yTitle = "Penalty LLH value";
-    scanEntry.evalY = [this](){ return _owner_->getLlhPenaltyBuffer(); };
-  }
-  if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStat", true) ){
-    scanDataDict.emplace_back();
-    auto& scanEntry = scanDataDict.back();
-    scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
-    scanEntry.folder = "llhStat";
-    scanEntry.title = "Stat Likelihood Scan";
-    scanEntry.yTitle = "Stat LLH value";
-    scanEntry.evalY = [this](){ return _owner_->getLlhStatBuffer(); };
-  }
-  if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSample", false) ){
-    for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
-      scanDataDict.emplace_back();
-      auto& scanEntry = scanDataDict.back();
-      scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
-      scanEntry.folder = "llhStat/" + sample.getName() + "/";
-      scanEntry.title = Form("Stat Likelihood Scan of sample \"%s\"", sample.getName().c_str());
-      scanEntry.yTitle = "Stat LLH value";
-      auto* samplePtr = &sample;
-      scanEntry.evalY = [this, samplePtr](){ return _owner_->getFitSampleSet().evalLikelihood(*samplePtr); };
-    }
-  }
-  if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSamplePerBin", false) ){
-    for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
-      for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-        scanDataDict.emplace_back();
-        auto& scanEntry = scanDataDict.back();
-        scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
-        scanEntry.folder = "llhStat/" + sample.getName() + "/bin_" + std::to_string(iBin);
-        scanEntry.title = Form(R"(Stat LLH Scan of sample "%s", bin #%d "%s")",
-                               sample.getName().c_str(),
-                               iBin,
-                               sample.getBinning().getBinsList()[iBin-1].getSummary().c_str());
-        scanEntry.yTitle = "Stat LLH value";
-        auto* samplePtr = &sample;
-        scanEntry.evalY = [this, samplePtr, iBin](){ return _owner_->getFitSampleSet().getJointProbabilityFct()->eval(*samplePtr, iBin); };
-      }
-    }
-  }
-  if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSample", false) ){
-    for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
-      scanDataDict.emplace_back();
-      auto& scanEntry = scanDataDict.back();
-      scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
-      scanEntry.folder = "weight/" + sample.getName();
-      scanEntry.title = Form("MC event weight scan of sample \"%s\"", sample.getName().c_str());
-      scanEntry.yTitle = "Total MC event weight";
-      auto* samplePtr = &sample;
-      scanEntry.evalY = [samplePtr](){ return samplePtr->getMcContainer().getSumWeights(); };
-    }
-  }
-  if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSamplePerBin", false) ){
-    for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
-      for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-        scanDataDict.emplace_back();
-        auto& scanEntry = scanDataDict.back();
-        scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
-        scanEntry.folder = "weight/" + sample.getName() + "/bin_" + std::to_string(iBin);
-        scanEntry.title = Form(R"(MC event weight scan of sample "%s", bin #%d "%s")",
-                               sample.getName().c_str(),
-                               iBin,
-                               sample.getBinning().getBinsList()[iBin-1].getSummary().c_str());
-        scanEntry.yTitle = "Total MC event weight";
-        auto* samplePtr = &sample;
-        scanEntry.evalY = [samplePtr, iBin](){ return samplePtr->getMcContainer().histogram->GetBinContent(iBin); };
-      }
-    }
-  }
-
   double origVal = par_.getParameterValue();
   double lowBound = origVal + _parameterSigmaRange_.first * par_.getStdDevValue();
   double highBound = origVal + _parameterSigmaRange_.second * par_.getStdDevValue();
@@ -195,7 +195,7 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
     _owner_->updateLlhCache();
     parPoints[iPt] = par_.getParameterValue();
 
-    for( auto& scanEntry : scanDataDict ){ scanEntry.yPoints[iPt] = scanEntry.evalY(); }
+    for( auto& scanEntry : _scanDataDict_ ){ scanEntry.yPoints[iPt] = scanEntry.evalY(); }
   }
 
   // sorting points in increasing order
@@ -204,7 +204,7 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
     return false;
   });
   GenericToolbox::applyPermutation(parPoints, p);
-  for( auto& scanEntry : scanDataDict ){
+  for( auto& scanEntry : _scanDataDict_ ){
     GenericToolbox::applyPermutation(scanEntry.yPoints, p);
   }
 
@@ -221,7 +221,7 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
   ss << GenericToolbox::replaceSubstringInString(par_.getFullTitle(), "/", "_");
   ss << "_TGraph";
 
-  for( auto& scanEntry : scanDataDict ){
+  for( auto& scanEntry : _scanDataDict_ ){
     TGraph scanGraph(int(parPoints.size()), &parPoints[0], &scanEntry.yPoints[0]);
     scanGraph.SetTitle(scanEntry.title.c_str());
     scanGraph.GetYaxis()->SetTitle(scanEntry.yTitle.c_str());
@@ -239,6 +239,94 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
   TVectorD currentParValue(1);
   currentParValue[0] = par_.getParameterValue();
   GenericToolbox::writeInTFile(saveDir_, &currentParValue, ssVal.str());
+}
+void ParScanner::scanSegment(const nlohmann::json& start_, const nlohmann::json& end_, int nSteps_, TDirectory* saveDir_){
+  LogWarning << "Scanning along a segment with " << nSteps_ << " steps." << std::endl;
+
+  LogThrowIf(start_.empty(), "Starting injector config is empty()");
+  LogThrowIf(end_.empty(), "Ending injector config is empty()");
+  LogThrowIf(nSteps_ < 0, "Invalid nSteps");
+
+  // nSteps_+2 as we also want the first and last points
+  int nTotalSteps = nSteps_+2;
+
+  LogInfo << "Backup current position of the propagator..." << std::endl;
+  auto currentParState = _owner_->exportParameterInjectorConfig();
+
+  LogInfo << "Reading start point parameter state..." << std::endl;
+  std::vector<std::pair<FitParameter*, double>> startPointParValList;
+  _owner_->injectParameterValues(start_);
+  for( auto& parSet : _owner_->getParameterSetsList() ){
+    if( not parSet.isEnabled() ){ continue; }
+    for( auto& par : parSet.getParameterList() ){
+      if( not par.isEnabled() ){ continue; }
+      startPointParValList.emplace_back(&par, par.getParameterValue());
+    }
+  }
+
+  LogInfo << "Reading end point parameter state..." << std::endl;
+  std::vector<std::pair<FitParameter*, double>> endPointParValList;
+  _owner_->injectParameterValues(end_);
+  endPointParValList.reserve(startPointParValList.size());
+  for( auto& parPair : startPointParValList ){
+    endPointParValList.emplace_back(parPair.first, parPair.first->getParameterValue());
+  }
+
+  LogInfo << "Creating graph holders..." << std::endl;
+
+  struct GraphEntry{
+    ScanData* scanDataPtr{nullptr};
+    FitParameter* fitParPtr{nullptr};
+    TGraph graph{};
+  };
+
+  std::vector<GraphEntry> graphEntryList;
+  for( auto& scanData : _scanDataDict_ ){
+    for( auto& parPair : startPointParValList ){
+      graphEntryList.emplace_back(GraphEntry{&scanData, parPair.first, TGraph(nTotalSteps)});
+    }
+  }
+
+
+  LogInfo << "Scanning along the line..." << std::endl;
+  for( int iStep = 0 ; iStep < nTotalSteps ; iStep++ ){
+
+    for( size_t iPar = 0 ; iPar < startPointParValList.size() ; iPar++ ){
+      auto* par = startPointParValList[iPar].first;
+      par->setParameterValue(
+          startPointParValList[iPar].second
+          + ( endPointParValList[iPar].second - startPointParValList[iPar].second ) * double(iStep) / double(nTotalSteps-1)
+          );
+    }
+
+    _owner_->updateLlhCache();
+
+    for( auto& graphEntry : graphEntryList ){
+      graphEntry.graph.SetPointX(iStep, graphEntry.fitParPtr->getParameterValue());
+      graphEntry.graph.SetPointY(iStep, graphEntry.scanDataPtr->evalY());
+    }
+
+  }
+
+  LogInfo << "Writing scan line graph in file..." << std::endl;
+  for( auto& graphEntry : graphEntryList ){
+    graphEntry.graph.SetTitle(graphEntry.scanDataPtr->title.c_str());
+    graphEntry.graph.GetYaxis()->SetTitle(graphEntry.scanDataPtr->yTitle.c_str());
+    graphEntry.graph.GetXaxis()->SetTitle(graphEntry.fitParPtr->getFullTitle().c_str());
+    graphEntry.graph.SetDrawOption("AP");
+    graphEntry.graph.SetMarkerStyle(kFullDotLarge);
+
+    GenericToolbox::writeInTFile(
+        GenericToolbox::mkdirTFile( saveDir_, graphEntry.scanDataPtr->folder ),
+        graphEntry.graph,
+        GenericToolbox::generateCleanBranchName(graphEntry.fitParPtr->getFullTitle())
+    );
+  }
+
+
+  LogInfo << "Restore position of the propagator..." << std::endl;
+  _owner_->injectParameterValues( currentParState );
+  _owner_->updateLlhCache();
 }
 void ParScanner::generateOneSigmaPlots(TDirectory* saveDir_){
   LogThrowIf(not isInitialized());

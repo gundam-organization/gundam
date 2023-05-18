@@ -95,5 +95,8 @@ private:
   Propagator _propagator_{};
   std::unique_ptr<MinimizerBase> _minimizer_{nullptr};
   LikelihoodInterface _likelihood_{this};
+  nlohmann::json _preFitParState_{};
+  nlohmann::json _postFitParState_{};
+
 };
 #endif //GUNDAM_FITTERENGINE_H

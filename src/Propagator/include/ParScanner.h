@@ -33,6 +33,7 @@ public:
   // Core
   void scanFitParameters(std::vector<FitParameter>& par_, TDirectory* saveDir_);
   void scanFitParameter(FitParameter& par_, TDirectory* saveDir_);
+  void scanSegment(const nlohmann::json& start_, const nlohmann::json& end_, int nSteps_, TDirectory* saveDir_);
   void generateOneSigmaPlots(TDirectory* saveDir_);
   void varyEvenRates(const std::vector<double>& paramVariationList_, TDirectory* saveDir_);
 
@@ -56,8 +57,12 @@ private:
     std::string yTitle{};
     std::vector<double> yPoints{};
     std::function<double()> evalY{};
+
+    void reset(){
+
+    }
   };
-  std::vector<ScanData> scanDataDict;
+  std::vector<ScanData> _scanDataDict_;
 
 
 };

@@ -151,12 +151,22 @@ void MinimizerInterface::minimize(){
     _minimizer_->SetTolerance( _tolerance_ * _simplexToleranceLoose_ );
     _minimizer_->SetStrategy(0);
 
-    getLikelihood().setStateTitleMonitor("Running SIMPLEX...");
+    getLikelihood().setStateTitleMonitor("Running Simplex...");
 
     // SIMPLEX
     getLikelihood().enableFitMonitor();
     _fitHasConverged_ = _minimizer_->Minimize();
     getLikelihood().disableFitMonitor();
+
+    // Make sure we are on the right spot
+    updateCacheToBestfitPoint();
+
+    // export bf point with SIMPLEX
+    LogInfo << "Writing " << _minimizerType_ << "/Simplex best fit parameters..." << std::endl;
+    GenericToolbox::writeInTFile(
+        GenericToolbox::mkdirTFile( owner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_) ),
+        TNamed("parameterStateAfterSimplex", GenericToolbox::Json::toReadableString( getPropagator().exportParameterInjectorConfig() ).c_str() )
+    );
 
     // Back to original
     _minimizer_->Options().SetMinimizerAlgorithm(originalAlgo.c_str());
@@ -185,6 +195,13 @@ void MinimizerInterface::minimize(){
 
   // Make sure we are on the right spot
   updateCacheToBestfitPoint();
+
+  // export bf point
+  LogInfo << "Writing " << _minimizerType_ << "/" << _minimizerAlgo_ << " best fit parameters..." << std::endl;
+  GenericToolbox::writeInTFile(
+      GenericToolbox::mkdirTFile( owner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_) ),
+      TNamed("parameterStateAfterMinimize", GenericToolbox::Json::toReadableString( getPropagator().exportParameterInjectorConfig() ).c_str() )
+  );
 
   getLikelihood().saveChi2History();
 
@@ -219,9 +236,9 @@ void MinimizerInterface::minimize(){
   bestFitStats->Branch("nFreePars", &nbFreePars);
   bestFitStats->Branch("nFitPars", &nFitPars);
   bestFitStats->Branch("nDof", &nDof);
-  bestFitStats->Branch("chi2BestFit", getPropagator().getLlhBufferPtr());
-  bestFitStats->Branch("chi2StatBestFit", getPropagator().getLlhStatBufferPtr());
-  bestFitStats->Branch("chi2PullsBestFit", getPropagator().getLlhPenaltyBufferPtr());
+  bestFitStats->Branch("chi2BestFit",      (double*) getPropagator().getLlhBufferPtr() ); // need non const ptr...
+  bestFitStats->Branch("chi2StatBestFit",  (double*) getPropagator().getLlhStatBufferPtr() );
+  bestFitStats->Branch("chi2PullsBestFit", (double*) getPropagator().getLlhPenaltyBufferPtr() );
 
   std::vector<GenericToolbox::RawDataArray> samplesArrList(getPropagator().getFitSampleSet().getFitSampleList().size());
   int iSample{-1};
@@ -275,8 +292,8 @@ void MinimizerInterface::minimize(){
   GenericToolbox::mkdirTFile(owner().getSaveDir(), "postFit")->WriteObject(bestFitStats.get(), bestFitStats->GetName());
 
   LogInfo << "Writing " << _minimizerType_ << "/" << _minimizerAlgo_ << " post-fit errors" << std::endl;
-  this->writePostFitData(GenericToolbox::mkdirTFile(owner().getSaveDir(), "postFit/" + _minimizerAlgo_));
-  GenericToolbox::triggerTFileWrite(GenericToolbox::mkdirTFile(owner().getSaveDir(), "postFit/" + _minimizerAlgo_));
+  this->writePostFitData(GenericToolbox::mkdirTFile(owner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_)));
+  GenericToolbox::triggerTFileWrite(GenericToolbox::mkdirTFile(owner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_)));
 }
 void MinimizerInterface::calcErrors(){
   LogThrowIf(not isInitialized(), "not initialized");
@@ -1093,13 +1110,10 @@ void MinimizerInterface::scanParameters(TDirectory* saveDir_){
 }
 
 void MinimizerInterface::updateCacheToBestfitPoint(){
-  if( _minimizer_->X() != nullptr ){
-    LogWarning << "Updating propagator cache to the best fit point..." << std::endl;
-    getLikelihood().evalFit( _minimizer_->X() );
-  }
-  else{
-    LogAlert << "No best fit point provided by minimized." << std::endl;
-  }
+  LogThrowIf(_minimizer_->X() == nullptr, "No best fit point provided by the minimizer.");
+
+  LogWarning << "Updating propagator cache to the best fit point..." << std::endl;
+  getLikelihood().evalFit( _minimizer_->X() );
 }
 
 // Local Variables:

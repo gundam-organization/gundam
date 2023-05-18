@@ -55,13 +55,12 @@ public:
   std::vector<DatasetLoader> &getDataSetList();
 
   // Misc getters
-  double* getLlhBufferPtr(){ return &_llhBuffer_; }
-  double* getLlhStatBufferPtr(){ return &_llhStatBuffer_; }
-  double* getLlhPenaltyBufferPtr(){ return &_llhPenaltyBuffer_; }
-  double* getLlhRegBufferPtr(){ return &_llhRegBuffer_; }
+  [[nodiscard]] const double* getLlhBufferPtr() const { return &_llhBuffer_; }
+  [[nodiscard]] const double* getLlhStatBufferPtr() const { return &_llhStatBuffer_; }
+  [[nodiscard]] const double* getLlhPenaltyBufferPtr() const { return &_llhPenaltyBuffer_; }
+  [[nodiscard]] const double* getLlhRegBufferPtr() const { return &_llhRegBuffer_; }
   [[nodiscard]] std::string getLlhBufferSummary() const;
   [[nodiscard]] std::string getParametersSummary( bool showEigen_ = true ) const;
-
   [[nodiscard]] const FitParameterSet* getFitParameterSetPtr(const std::string& name_) const;
   [[nodiscard]] FitParameterSet* getFitParameterSetPtr(const std::string& name_);
   [[nodiscard]] DatasetLoader* getDatasetLoaderPtr(const std::string& name_);
@@ -72,8 +71,11 @@ public:
   void resetReweight();
   void reweightMcEvents();
   void refillSampleHistograms();
+
+  // Misc
+  [[nodiscard]] nlohmann::json exportParameterInjectorConfig() const;
+  void injectParameterValues(const nlohmann::json &config_);
   void throwParametersFromGlobalCovariance();
-  void injectParameterOnMcSamples(const nlohmann::json &injectConfig_);
 
 protected:
   void readConfigImpl() override;

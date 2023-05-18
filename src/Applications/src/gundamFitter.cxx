@@ -43,11 +43,14 @@ int main(int argc, char** argv){
   // --------------------------
   CmdLineParser clParser;
 
-  clParser.getDescription() << "gundamFitter is the main interface for the fitter." << std::endl;
-  clParser.getDescription() << "It takes a set of inputs through config files and command line argument," << std::endl;
-  clParser.getDescription() << "and initialize the fitter engine." << std::endl;
-  clParser.getDescription() << "Once ready, the fitter minimize the likelihood function and" << std::endl;
-  clParser.getDescription() << "produce a set of plot saved in the output ROOT file." << std::endl;
+  CmdLineParserGlobals::_fascistMode_ = true;
+
+  clParser.getDescription() << "> gundamFitter is the main interface for the fitter." << std::endl;
+  clParser.getDescription() << "> " << std::endl;
+  clParser.getDescription() << "> It takes a set of inputs through config files and command line argument," << std::endl;
+  clParser.getDescription() << "> and initialize the fitter engine." << std::endl;
+  clParser.getDescription() << "> Once ready, the fitter minimize the likelihood function and" << std::endl;
+  clParser.getDescription() << "> produce a set of plot saved in the output ROOT file." << std::endl;
 
   clParser.addDummyOption("Main options");
 
