@@ -19,6 +19,7 @@ option(BUILD_DOC "Build documentation" OFF)
 option(WITH_XSLLHFITTER "Build old xsllhFitter apps/libraries" OFF)
 option(USE_STATIC_LINKS "Library build in static mod" OFF)
 option(WITH_GUNDAM_ROOT_APP "Build app gundamRoot" ON)
+option(WITH_CACHE_MANAGER "Enable compiling of the cache manager used by the GPU" ON)
 
 # Cmake includes
 include(CTest)
@@ -226,7 +227,6 @@ else()
     add_definitions( -D USE_ZLIB=0 )
 endif ()
 
-set(WITH_CACHE_MANAGER ON)
 if (WITH_CACHE_MANAGER)
     add_definitions( -DGUNDAM_USING_CACHE_MANAGER)
 
