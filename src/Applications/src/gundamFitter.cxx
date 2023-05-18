@@ -78,6 +78,7 @@ int main(int argc, char** argv){
   clParser.addTriggerOption("ignoreVersionCheck", {"--ignore-version"}, "Don't check GUNDAM version with config request");
 
   clParser.addOption("scanParameters", {"--scan"}, "Enable parameter scan before and after the fit (can provide nSteps)", 1, true);
+  clParser.addOption("scanPreFitToPostFitLine", {"--line-scan"}, "Enable pre-fit to post-fit scan after the fit (can provide nSteps)", 1, true);
   clParser.addOption("toyFit", {"--toy"}, "Run a toy fit (optional arg to provide toy index)", 1, true);
 
   clParser.addDummyOption("Runtime/debug options");
@@ -213,6 +214,7 @@ int main(int argc, char** argv){
     std::vector<std::pair<std::string, std::string>> appendixDict{
         {"asimov", "Asimov"},
         {"scanParameters", "Scan"},
+        {"scanPreFitToPostFitLine", "WithLineScan"},
         {"generateOneSigmaPlots", "OneSigma"},
         {"enablePca", "PCA"},
         {"skipHesse", "NoHesse"},
@@ -322,6 +324,13 @@ int main(int argc, char** argv){
     fitter.getPropagator().getParScanner().setNbPoints(
         clParser.getOptionVal("scanParameters", fitter.getPropagator().getParScanner().getNbPoints())
         );
+  }
+
+  if( clParser.isOptionTriggered("scanPreFitToPostFitLine") ){
+    fitter.setEnablePreFitToPostFitLineScan( true );
+    fitter.getPropagator().getParScanner().setNbPoints(
+        clParser.getOptionVal("scanParameters", fitter.getPropagator().getParScanner().getNbPoints())
+    );
   }
 
   // --enable-pca

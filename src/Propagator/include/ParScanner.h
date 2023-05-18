@@ -23,17 +23,18 @@ public:
   // Setters
   void setOwner(Propagator *owner);
   void setNbPoints(int nbPoints);
+  void setNbPointsLineScan(int nbPointsLineScan);
 
   // Getters
-  const nlohmann::json &getVarsConfig() const { return _varsConfig_; };
-  int getNbPoints() const;
-  const std::pair<double, double> &getParameterSigmaRange() const;
-  bool isUseParameterLimits() const;
+  [[nodiscard]] bool isUseParameterLimits() const;
+  [[nodiscard]] int getNbPoints() const;
+  [[nodiscard]] const std::pair<double, double> &getParameterSigmaRange() const;
+  [[nodiscard]] const nlohmann::json &getVarsConfig() const { return _varsConfig_; };
 
   // Core
   void scanFitParameters(std::vector<FitParameter>& par_, TDirectory* saveDir_);
   void scanFitParameter(FitParameter& par_, TDirectory* saveDir_);
-  void scanSegment(const nlohmann::json& start_, const nlohmann::json& end_, int nSteps_, TDirectory* saveDir_);
+  void scanSegment(const nlohmann::json& start_, const nlohmann::json& end_, TDirectory* saveDir_);
   void generateOneSigmaPlots(TDirectory* saveDir_);
   void varyEvenRates(const std::vector<double>& paramVariationList_, TDirectory* saveDir_);
 
@@ -46,6 +47,7 @@ private:
   // Parameters
   bool _useParameterLimits_{true};
   int _nbPoints_{100};
+  int _nbPointsLineScan_{_nbPoints_};
   std::pair<double, double> _parameterSigmaRange_{-3,3};
   nlohmann::json _varsConfig_{};
 

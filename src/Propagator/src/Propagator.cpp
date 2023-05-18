@@ -27,6 +27,9 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[Propagator]");
 });
 
+void Propagator::muteLogger(){ Logger::setIsMuted( true ); }
+void Propagator::unmuteLogger(){ Logger::setIsMuted( false ); }
+
 
 void Propagator::readConfigImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;

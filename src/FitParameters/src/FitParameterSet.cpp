@@ -21,6 +21,9 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[FitParameterSet]");
 } );
 
+void FitParameterSet::muteLogger(){ Logger::setIsMuted( true ); }
+void FitParameterSet::unmuteLogger(){ Logger::setIsMuted( false ); }
+
 
 void FitParameterSet::readConfigImpl(){
   LogThrowIf(_config_.empty(), "FitParameterSet config not set.");

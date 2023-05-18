@@ -28,6 +28,7 @@ void ParScanner::readConfigImpl() {
 
   _useParameterLimits_ = GenericToolbox::Json::fetchValue(_config_, "useParameterLimits", _useParameterLimits_);
   _nbPoints_ = GenericToolbox::Json::fetchValue(_config_, "nbPoints", _nbPoints_);
+  _nbPointsLineScan_ = GenericToolbox::Json::fetchValue(_config_, "nbPointsLineScan", _nbPoints_);
   _parameterSigmaRange_ = GenericToolbox::Json::fetchValue(_config_, "parameterSigmaRange", _parameterSigmaRange_);
 
   _varsConfig_ = GenericToolbox::Json::fetchValue(_config_, "varsConfig", nlohmann::json());
@@ -130,6 +131,9 @@ void ParScanner::setOwner(Propagator *owner){
 }
 void ParScanner::setNbPoints(int nbPoints) {
   _nbPoints_ = nbPoints;
+}
+void ParScanner::setNbPointsLineScan(int nbPointsLineScan){
+  _nbPointsLineScan_ = nbPointsLineScan;
 }
 
 int ParScanner::getNbPoints() const {
@@ -240,15 +244,21 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
   currentParValue[0] = par_.getParameterValue();
   GenericToolbox::writeInTFile(saveDir_, &currentParValue, ssVal.str());
 }
-void ParScanner::scanSegment(const nlohmann::json& start_, const nlohmann::json& end_, int nSteps_, TDirectory* saveDir_){
-  LogWarning << "Scanning along a segment with " << nSteps_ << " steps." << std::endl;
+void ParScanner::scanSegment(const nlohmann::json& start_, const nlohmann::json& end_, TDirectory* saveDir_){
+  LogWarning << "Scanning along a segment with " << _nbPointsLineScan_ << " steps." << std::endl;
+
+  // don't shout while re-injecting parameters
+  GenericToolbox::ScopedGuard s(
+      []{ FitParameterSet::muteLogger(); Propagator::muteLogger(); },
+      []{ FitParameterSet::unmuteLogger(); Propagator::unmuteLogger(); }
+      );
 
   LogThrowIf(start_.empty(), "Starting injector config is empty()");
   LogThrowIf(end_.empty(), "Ending injector config is empty()");
-  LogThrowIf(nSteps_ < 0, "Invalid nSteps");
+  LogThrowIf(_nbPointsLineScan_ < 0, "Invalid nSteps");
 
   // nSteps_+2 as we also want the first and last points
-  int nTotalSteps = nSteps_+2;
+  int nTotalSteps = _nbPointsLineScan_+2;
 
   LogInfo << "Backup current position of the propagator..." << std::endl;
   auto currentParState = _owner_->exportParameterInjectorConfig();
@@ -297,6 +307,14 @@ void ParScanner::scanSegment(const nlohmann::json& start_, const nlohmann::json&
           startPointParValList[iPar].second
           + ( endPointParValList[iPar].second - startPointParValList[iPar].second ) * double(iStep) / double(nTotalSteps-1)
           );
+    }
+
+    for( auto& parSet : _owner_->getParameterSetsList() ){
+      if( not parSet.isEnabled() ){ continue; }
+      if( parSet.isUseEigenDecompInFit() ){
+        // make sure the parameters don't get overwritten
+        parSet.propagateOriginalToEigen();
+      }
     }
 
     _owner_->updateLlhCache();

@@ -40,6 +40,7 @@ void FitterEngine::readConfigImpl(){
 
   _enablePreFitScan_ = GenericToolbox::Json::fetchValue(_config_, "enablePreFitScan", _enablePreFitScan_);
   _enablePostFitScan_ = GenericToolbox::Json::fetchValue(_config_, "enablePostFitScan", _enablePostFitScan_);
+  _enablePreFitToPostFitLineScan_ = GenericToolbox::Json::fetchValue(_config_, "enablePreFitToPostFitLineScan", _enablePreFitToPostFitLineScan_);
 
   _generateSamplePlots_ = GenericToolbox::Json::fetchValue(_config_, "generateSamplePlots", _generateSamplePlots_);
   _generateOneSigmaPlots_ = GenericToolbox::Json::fetchValue(_config_, "generateOneSigmaPlots", _generateOneSigmaPlots_);
@@ -197,6 +198,9 @@ void FitterEngine::setEnablePreFitScan(bool enablePreFitScan) {
 void FitterEngine::setEnablePostFitScan(bool enablePostFitScan) {
   _enablePostFitScan_ = enablePostFitScan;
 }
+void FitterEngine::setEnablePreFitToPostFitLineScan(bool enablePreFitToPostFitLineScan_) {
+  _enablePreFitToPostFitLineScan_ = enablePreFitToPostFitLineScan_;
+}
 void FitterEngine::setGenerateSamplePlots(bool generateSamplePlots) {
   _generateSamplePlots_ = generateSamplePlots;
 }
@@ -340,6 +344,10 @@ void FitterEngine::fit(){
     LogInfo << "Scanning fit parameters around the minimum point..." << std::endl;
     getMinimizer().scanParameters(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scan"));
     GenericToolbox::triggerTFileWrite(_saveDir_);
+  }
+  if( _enablePreFitToPostFitLineScan_ ){
+    LogInfo << "Scanning along the line from pre-fit to post-fit points..." << std::endl;
+    getPropagator().getParScanner().scanSegment(_preFitParState_, _postFitParState_, GenericToolbox::mkdirTFile(_saveDir_, "postFit/scanConvergence"));
   }
 
   if( getMinimizer().isFitHasConverged() and getMinimizer().isEnablePostFitErrorEval() ){

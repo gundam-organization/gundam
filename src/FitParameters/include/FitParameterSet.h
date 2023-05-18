@@ -92,6 +92,10 @@ public:
   static double toRealParRange(double normParRange, const FitParameter& par);
   static bool isValidCorrelatedParameter(const FitParameter& par_);
 
+  // in src dependent
+  static void muteLogger();
+  static void unmuteLogger();
+
 protected:
   void readConfigImpl() override;
   void initializeImpl() override;

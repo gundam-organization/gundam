@@ -77,6 +77,10 @@ public:
   void injectParameterValues(const nlohmann::json &config_);
   void throwParametersFromGlobalCovariance();
 
+  // Logger related
+  static void muteLogger();
+  static void unmuteLogger();
+
 protected:
   void readConfigImpl() override;
   void initializeImpl() override;
