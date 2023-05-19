@@ -57,6 +57,7 @@ int main(int argc, char** argv){
   clParser.addDummyOption("Options");
   clParser.addOption("fitFiles", {"-f", "--file"}, "Specify path to fitter output files", -1);
   clParser.addOption("verbose", {"-v", "--verbose"}, "Set the verbosity level", 1, true);
+  clParser.addOption("showCorrelationsWith", {"--show-correlations-with"}, "Show all correlation coefficients of a given par wrt others", 1);
 
   clParser.addDummyOption("Triggers");
   clParser.addTriggerOption("dryRun", {"-d", "--dry-run"}, "Don't write files on disk");
@@ -97,6 +98,7 @@ int main(int argc, char** argv){
     });
 
 
+    // FitterEngine/propagator
     do {
       auto pathPropagator{GenericToolbox::joinPath("FitterEngine", "propagator")};
       if( not readObject(f.get(), pathPropagator) ){ break; }
@@ -133,13 +135,43 @@ int main(int argc, char** argv){
 
     } while( false ); // allows to skip if not found
 
+    /// FitterEngine/preFit
+    do {
+      auto pathPreFit{GenericToolbox::joinPath("FitterEngine", "preFit")};
+      if( not readObject(f.get(), pathPreFit) ){ break; }
+
+      LogInfo << cyanLightText << "Reading inside: " << pathPreFit << resetColor << std::endl;
+      LogScopeIndent;
+
+      readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPreFit, "preFitLlhState_TNamed"), [&](TNamed* injectorStr){
+        LogInfo << blueLightText << "Pre-fit Likelihood state: " << resetColor << injectorStr->GetTitle() << std::endl;
+      });
+
+    } while( false ); // allows to skip if not found
+
+    /// FitterEngine/postFit
+    do {
+      auto pathPreFit{GenericToolbox::joinPath("FitterEngine", "postFit")};
+      if( not readObject(f.get(), pathPreFit) ){ break; }
+
+      LogInfo << cyanLightText << "Reading inside: " << pathPreFit << resetColor << std::endl;
+      LogScopeIndent;
+
+      readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPreFit, "postFitLlhState_TNamed"), [&](TNamed* injectorStr){
+        LogInfo << blueLightText << "Post-fit Likelihood state: " << resetColor << injectorStr->GetTitle() << std::endl;
+      });
+
+    } while( false ); // allows to skip if not found
+
 
     if( clParser.isOptionTriggered("dryRun") ){
       LogAlert << "Dry run set. Not doing actions involving writing of files on disk" << std::endl;
       continue;
     }
 
+
     auto outDir{GenericToolbox::getFileNameFromFilePath(file, false)};
+    LogWarning << "Will now write data in sub-folder: " << outDir << std::endl;
 
 
     readObject<TNamed>(f.get(), GenericToolbox::joinPath("gundamFitter", "unfoldedConfig_TNamed"), [&](TNamed* obj_){
@@ -150,7 +182,7 @@ int main(int argc, char** argv){
     });
 
 
-    /// Pre-fit folder
+    /// FitterEngine/preFit
     do {
       auto pathPreFit{GenericToolbox::joinPath("FitterEngine", "preFit")};
       if( not readObject(f.get(), pathPreFit) ){ break; }
@@ -177,7 +209,7 @@ int main(int argc, char** argv){
     } while( false ); // allows to skip if not found
 
 
-    /// Post-fit folder
+    /// FitterEngine/postFit
     do {
       auto pathPostFit{GenericToolbox::joinPath("FitterEngine", "postFit")};
       if( not readObject(f.get(), pathPostFit) ){ break; }
