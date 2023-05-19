@@ -43,7 +43,7 @@ namespace JointProbability{
     std::stringstream ss;
     LogThrowIf( getenv("CXX") == nullptr, "CXX env is not set. Can't compile." );
     ss << "$CXX -std=c++11 -shared " << llhPluginSrc << " -o " << llhSharedLib;
-    system ( ss.str().c_str() );
+    LogThrowIf( system( ss.str().c_str() ) != 0, "Compile command failed." );
   }
   void JointProbabilityPlugin::load(){
     LogInfo << "Loading shared lib: " << llhSharedLib << std::endl;

@@ -25,12 +25,17 @@ public:
 
   void setDataSetIndex(int dataSetIndex);
 
-  bool isEnabled() const;
-  bool isShowSelectedEventCount() const;
-  int getDataSetIndex() const;
-  const std::string &getName() const;
-  const std::string &getSelectedDataEntry() const;
-  const std::string &getToyDataEntry() const;
+  void setSelectedDataEntry(const std::string &selectedDataEntry);
+
+  [[nodiscard]] bool isEnabled() const;
+  [[nodiscard]] bool isShowSelectedEventCount() const;
+  [[nodiscard]] bool isDevSingleThreadEventLoaderAndIndexer() const;
+  [[nodiscard]] bool isDevSingleThreadEventSelection() const;
+  [[nodiscard]] bool isSortLoadedEvents() const;
+  [[nodiscard]] int getDataSetIndex() const;
+  [[nodiscard]] const std::string &getName() const;
+  [[nodiscard]] const std::string &getSelectedDataEntry() const;
+  [[nodiscard]] const std::string &getToyDataEntry() const;
 
   DataDispenser &getMcDispenser();
   DataDispenser &getSelectedDataDispenser();
@@ -51,6 +56,10 @@ private:
   std::string _name_{};
   std::string _selectedDataEntry_{"Asimov"};
   std::string _selectedToyEntry_{"Asimov"};
+
+  bool _sortLoadedEvents_{false};
+  bool _devSingleThreadEventLoaderAndIndexer_{false};
+  bool _devSingleThreadEventSelection_{false};
 
   // internals
   DataDispenser _mcDispenser_{this};

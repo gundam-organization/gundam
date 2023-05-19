@@ -241,14 +241,14 @@ for d in ${TESTS}; do
         fi
         if [ ${SUCCESS} = "yes" ]; then
             # The job succeeded, make sure it's not in EXPECTED_FAILURES
-            if (grep $i EXPECTED_FAILURES >> /dev/null); then
+            if (grep -F $i EXPECTED_FAILURES >> /dev/null); then
                 cat ${OUTPUT_DIR}/${LOG}
                 echo JOB FAILURE: Expected $i to fail
                 FAILURES="${FAILURES} unexpected-success:\"${JOB}\""
             fi
         else
             # The job failed, check if it was expected
-            if (grep $i EXPECTED_FAILURES >> /dev/null); then
+            if (grep -F $i EXPECTED_FAILURES >> /dev/null); then
                 cat ${OUTPUT_DIR}/${LOG}
                 echo JOB SUCCESS: Failure was expected for $i
                 EXPECTED="${EXPECTED} \"${JOB}\""

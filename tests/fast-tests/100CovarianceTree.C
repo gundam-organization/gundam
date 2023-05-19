@@ -133,7 +133,7 @@ void writeMCTree() {
     tree->Branch("spline_D",&spline_D,32000,0);
 
     // Make events shifted by A of +1.  These events are reweighted by
-    // spline_C in the fit, and spline_D is set to beflat.
+    // spline_C in the fit, and spline_D is set to be flat.
     for (int i=0; i<5000; ++i) {
         do {varA = MakeA();} while (std::abs(varA) > 5.0);
         do {varB = MakeB();} while (std::abs(varB) > 5.0);

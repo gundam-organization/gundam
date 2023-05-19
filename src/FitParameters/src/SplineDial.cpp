@@ -2,14 +2,21 @@
 // Created by Nadrino on 26/05/2021.
 //
 
-
 #include "FitParameter.h"
-#include "SplineDial.h"
+
 #ifndef USE_TSPLINE3_EVAL
 #include "CalculateMonotonicSpline.h"
 #include "CalculateUniformSpline.h"
 #include "CalculateGeneralSpline.h"
 #endif
+
+// Unset for this file since the entire file is deprecated.
+#ifdef USE_NEW_DIALS
+#undef USE_NEW_DIALS
+#endif
+
+#include "SplineDial.h"
+#include "DialSet.h"
 
 #include "Logger.h"
 #include "GenericToolbox.Root.h"
@@ -93,10 +100,10 @@ double SplineDial::calcDial(double parameterValue_) {
   else if (_splineType_ == SplineDial::Monotonic) {
       dialResponse = CalculateMonotonicSpline(
           parameterValue_, -1E20, 1E20,
-          _splineData_.data(), int(_splineData_.size()));
+          _splineData_.data(), int(_splineData_.size()-2));
   }
   else if (_splineType_ == SplineDial::ROOTSpline) {
-      dialResponse = _graph_.Eval(parameterValue_);
+      dialResponse = _spline_.Eval(parameterValue_);
   }
   else {
       LogThrow("Must have a spline type defined");
@@ -106,7 +113,7 @@ double SplineDial::calcDial(double parameterValue_) {
   #ifdef SPLINE_DIAL_SLOW_VALIDATION
   #error Remove this to compile with validation.
   do {
-      double testVal = _graph_.Eval(parameterValue_);
+      double testVal = _spline_.Eval(parameterValue_);
       double avg = std::abs(testVal);
       if (avg < 1.0) avg = 1.0;
       double delta = std::abs(testVal-dialResponse)/avg;
@@ -139,15 +146,15 @@ void SplineDial::writeSpline(const std::string &fileName_) const{
 void SplineDial::fastEval(){
     //Function takes a spline with equidistant knots and the number of steps
     //between knots to evaluateSpline the spline at some position 'pos'.
-    fs.l = int((parameterValue_ - _graph_.GetXmin())
+    fs.l = int((parameterValue_ - _spline_.GetXmin())
                / fs.stepsize) + 1;
 
-    _graph_.GetCoeff(fs.l, fs.x, fs.y, fs.b, fs.c, fs.d);
+    _spline_.GetCoeff(fs.l, fs.x, fs.y, fs.b, fs.c, fs.d);
     fs.num = parameterValue_ - fs.x;
 
     if (fs.num < 0){
         fs.l -= 1;
-        _graph_.GetCoeff(fs.l, fs.x, fs.y, fs.b, fs.c, fs.d);
+        _spline_.GetCoeff(fs.l, fs.x, fs.y, fs.b, fs.c, fs.d);
         fs.num = parameterValue_ - fs.x;
     }
     _dialResponseCache_ = (fs.y + fs.num * fs.b + fs.num * fs.num * fs.c + fs.num * fs.num * fs.num * fs.d);
@@ -166,15 +173,15 @@ void SplineDial::fillSplineData() {
     // Check if the spline has uniformly spaced knots.  There is a flag for
     // this is TSpline3, but it's not uniformly (or ever) filled correctly.
     bool uniform = true;
-    for (int i = 1; i < _graph_.GetNp()-1; ++i) {
+    for (int i = 1; i < _spline_.GetNp()-1; ++i) {
         double x;
         double y;
-        _graph_.GetKnot(i-1,x,y);
+        _spline_.GetKnot(i-1,x,y);
         double d1 = x;
-        _graph_.GetKnot(i,x,y);
+        _spline_.GetKnot(i,x,y);
         d1 = x - d1;
         double d2 = x;
-        _graph_.GetKnot(i+1,x,y);
+        _spline_.GetKnot(i+1,x,y);
         d2 = x - d2;
         if (std::abs((d1-d2)/(d1+d2)) > 1E-6) {
             uniform = false;
@@ -203,13 +210,13 @@ bool SplineDial::fillMonotonicSpline(bool uniformKnots) {
     _splineType_ = SplineDial::Monotonic;
 
     // Copy the spline data into local storage.
-    _splineData_.push_back(_graph_.GetXmin());
-    _splineData_.push_back((_graph_.GetXmax()-_graph_.GetXmin())
-                           /(_graph_.GetNp()-1.0));
-    for (int i = 0; i < _graph_.GetNp(); ++i) {
+    _splineData_.push_back(_spline_.GetXmin());
+    _splineData_.push_back((_spline_.GetXmax()-_spline_.GetXmin())
+                           /(_spline_.GetNp()-1.0));
+    for (int i = 0; i < _spline_.GetNp(); ++i) {
         double x;
         double y;
-        _graph_.GetKnot(i,x,y);
+        _spline_.GetKnot(i,x,y);
         _splineData_.push_back(y);
     }
     return true;
@@ -219,15 +226,15 @@ bool SplineDial::fillNaturalSpline(bool uniformKnots) {
     else _splineType_ = SplineDial::General;
 
     // Copy the spline data into local storage.
-    _splineData_.push_back(_graph_.GetXmin());
-    _splineData_.push_back((_graph_.GetXmax()-_graph_.GetXmin())
-                           /(_graph_.GetNp()-1.0));
-    for (int i = 0; i < _graph_.GetNp(); ++i) {
+    _splineData_.push_back(_spline_.GetXmin());
+    _splineData_.push_back((_spline_.GetXmax()-_spline_.GetXmin())
+                           /(_spline_.GetNp()-1.0));
+    for (int i = 0; i < _spline_.GetNp(); ++i) {
         double x;
         double y;
-        _graph_.GetKnot(i,x,y);
+        _spline_.GetKnot(i,x,y);
         _splineData_.push_back(y);
-         _splineData_.push_back(_graph_.Derivative(x));
+         _splineData_.push_back(_spline_.Derivative(x));
          if (_splineType_ == SplineDial::Uniform) continue;
         _splineData_.push_back(x);
     }

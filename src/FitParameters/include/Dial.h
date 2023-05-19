@@ -18,6 +18,11 @@
 #include "mutex"
 #include "memory"
 
+#ifdef USE_NEW_DIALS
+#define DEPRECATED [[deprecated("Not used with new dial implementation")]]
+#else
+#define DEPRECATED /*[[deprecated("Not used with new dial implementation")]]*/
+#endif
 
 namespace DialType{
   ENUM_EXPANDER(
@@ -32,7 +37,7 @@ namespace DialType{
 class DialSet; // owner
 class DialWrapper;
 
-class Dial {
+class DEPRECATED Dial {
 
 public:
   // Don't check the mask everytime since it is memory delocalized

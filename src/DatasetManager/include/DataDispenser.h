@@ -7,6 +7,9 @@
 
 #include "EventVarTransformLib.h"
 #include "FitSampleSet.h"
+#ifndef USE_NEW_DIALS
+#include "DialSet.h"
+#endif
 #include "FitParameterSet.h"
 #include "PlotGenerator.h"
 #include "JsonBaseClass.h"
@@ -14,6 +17,7 @@
 #include "EventDialCache.h"
 
 #include "TChain.h"
+#include "nlohmann/json.hpp"
 
 #include "string"
 #include "vector"
@@ -33,6 +37,8 @@ struct DataDispenserParameters{
   std::vector<std::string> additionalVarsStorage{};
   std::vector<std::string> dummyVariablesList;
   int iThrow{-1};
+
+  nlohmann::json fromHistContent{};
 
   [[nodiscard]] std::string getSummary() const{
     std::stringstream ss;
@@ -55,7 +61,9 @@ struct DataDispenserCache{
   std::vector<std::vector<bool>> eventIsInSamplesList{};
   std::vector<GenericToolbox::CopiableAtomic<size_t>> sampleIndexOffsetList;
   std::vector< std::vector<PhysicsEvent>* > sampleEventListPtrToFill;
+#ifndef USE_NEW_DIALS
   std::map<FitParameterSet*, std::vector<DialSet*>> dialSetPtrMap;
+#endif
   std::vector<DialCollection*> dialCollectionsRefList{};
 
   std::vector<std::string> varsRequestedForIndexing{};
@@ -74,7 +82,9 @@ struct DataDispenserCache{
 
     sampleIndexOffsetList.clear();
     sampleEventListPtrToFill.clear();
+#ifndef USE_NEW_DIALS
     dialSetPtrMap.clear();
+#endif
 
     varsRequestedForIndexing.clear();
     varsRequestedForStorage.clear();
@@ -114,12 +124,15 @@ protected:
   void initializeImpl() override;
 
   void buildSampleToFillList();
+  void parseStringParameters();
   void doEventSelection();
   void fetchRequestedLeaves();
   void preAllocateMemory();
   void readAndFill();
+  void loadFromHistContent();
 
   void fillFunction(int iThread_);
+
 
 private:
   // Parameters
@@ -134,6 +147,8 @@ private:
   EventDialCache* _eventDialCacheRef_{nullptr};
 
   DataDispenserCache _cache_;
+
+  GenericToolbox::NoCopyWrapper<std::mutex> _mutex_{};
 
 };
 

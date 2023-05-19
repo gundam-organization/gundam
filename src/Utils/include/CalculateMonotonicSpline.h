@@ -1,6 +1,12 @@
-#ifndef CALCULATE_UNIFORM_SPLINE_H_SEEN
-// Calculate a spline with uniformly space knots.  This adds a function that
-// can be called from CPU (with c++), or a GPU (with CUDA).
+#ifndef CALCULATE_MONOTONIC_SPLINE_H_SEEN
+// Calculate a monotonic spline with uniformly space knots.  This adds a
+// function that can be called from CPU (with c++), or a GPU (with CUDA).
+// This is much faster than TSpline3.  This uses the constraint that the slope
+// at the first and last point is equal to the average slope between the first
+// and last two points [i.e. The slope at the first point, M0, is equal to the
+// slope between P0 and P1, so M0 is (P1-P0)/(dist)].  Before applying the
+// monotonic constraint, the slope at any point is set equal to the average
+// slope between the preceding and following points.
 
 // Wrap the CUDA compiler attributes into a definition.  When this is compiled
 // with a CUDA compiler __CUDACC__ will be defined.  In that case, the code
@@ -28,12 +34,17 @@ namespace {
     // Interpolate one point using a monotonic spline.  This takes the "index"
     // of the point in the data, the parameter value (that made the index), a
     // minimum and maximum bound, the buffer of data for this spline, and the
-    // number of data elements in the spline data.  The input data is arrange
+    // number of knots in the spline data.  The input data is arrange
     // as
 
     // data[0] -- spline lower bound (not used)
     // data[1] -- spline inverse step (not used)
-    // data[2+2*n+0] -- The function value for knot n
+    // data[2+n+0] -- The function value for knot n (0 to dim-1)
+    //
+    // NOTE: CalculateUniformSpline, CalculateGeneralSpline,
+    // CalculateCompactSpline, and CalculateMonotonicSpline have very similar,
+    // but different calls.  In particular the dim parameter meaning is not
+    // consistent.
     DEVICE_CALLABLE_INLINE
     double CalculateMonotonicSpline(const double x,
                                     const double lowerBound, double upperBound,

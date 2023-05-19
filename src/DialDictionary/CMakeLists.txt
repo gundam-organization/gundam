@@ -1,48 +1,67 @@
 set( LIB_NAME GundamDialDictionary )
 
 set( SRCFILES
-    src/DialBase.cpp
-    src/DialBaseCache.cpp
-    src/DialInputBuffer.cpp
-    src/DialInterface.cpp
-    src/DialResponseSupervisor.cpp
-    src/DialCollection.cpp
-    src/SplineHandler.cpp
-    src/EventDialCache.cpp
-    src/GraphHandler.cpp
-    src/LightGraphHandler.cpp
-    src/MonotonicSplineHandler.cpp
-    src/GeneralSplineHandler.cpp
-    src/SimpleSplineHandler.cpp
-    include/LightGraphCache.h)
+    DialEngine/src/DialInputBuffer.cpp
+    DialEngine/src/DialInterface.cpp
+    DialEngine/src/DialResponseSupervisor.cpp
+    DialEngine/src/DialCollection.cpp
+    DialEngine/src/EventDialCache.cpp
+
+    # DialDefinitions
+    DialDefinitions/src/DialBase.cpp
+
+    DialDefinitions/src/Graph.cpp
+    DialDefinitions/src/LightGraph.cpp
+
+    DialDefinitions/src/Spline.cpp
+    DialDefinitions/src/SimpleSpline.cpp
+    DialDefinitions/src/GeneralSpline.cpp
+    DialDefinitions/src/UniformSpline.cpp
+    DialDefinitions/src/CompactSpline.cpp
+    DialDefinitions/src/MonotonicSpline.cpp
+
+    DialDefinitions/src/RootFormula.cpp
+    DialDefinitions/src/Polynomial.cpp
+
+    # DialFactories
+    DialFactories/src/DialBaseFactory.cpp
+    DialFactories/src/NormDialBaseFactory.cpp
+    DialFactories/src/GraphDialBaseFactory.cpp
+    DialFactories/src/SplineDialBaseFactory.cpp
+    )
 
 set( HEADERS
-    include/DialTypes.h
-    include/DialBase.h
-    include/DialBaseCache.h
-    include/DialInputBuffer.h
-    include/DialInterface.h
-    include/DialResponseSupervisor.h
-    include/DialCollection.h
-    include/SplineHandler.h
-    include/Norm.h
-    include/Spline.h
-    include/SplineCache.h
-    include/DialUtils.h
-    include/EventDialCache.h
-    include/GraphHandler.h
-    include/LightGraphHandler.h
-    include/Graph.h
-    include/LightGraph.h
-    include/MonotonicSplineHandler.h
-    include/MonotonicSpline.h
-    include/MonotonicSplineCache.h
-    include/GeneralSplineHandler.h
-    include/GeneralSpline.h
-    include/GeneralSplineCache.h
-    include/SimpleSplineHandler.h
-    include/SimpleSpline.h
-    include/SimpleSplineCache.h
+    DialEngine/include/DialInputBuffer.h
+    DialEngine/include/DialInterface.h
+    DialEngine/include/DialResponseSupervisor.h
+    DialEngine/include/DialCollection.h
+    DialEngine/include/EventDialCache.h
+
+    # DialDefinitions
+    DialDefinitions/include/DialBase.h
+    DialDefinitions/include/DialTypes.h
+
+    DialDefinitions/include/Norm.h
+    DialDefinitions/include/Shift.h
+
+    DialDefinitions/include/Graph.h
+    DialDefinitions/include/LightGraph.h
+
+    DialDefinitions/include/Spline.h
+    DialDefinitions/include/SimpleSpline.h
+    DialDefinitions/include/GeneralSpline.h
+    DialDefinitions/include/UniformSpline.h
+    DialDefinitions/include/CompactSpline.h
+    DialDefinitions/include/MonotonicSpline.h
+
+    DialDefinitions/include/RootFormula.h
+    DialDefinitions/include/Polynomial.h
+
+    # DialFactories
+    DialFactories/include/DialBaseFactory.h
+    DialFactories/include/NormDialBaseFactory.h
+    DialFactories/include/GraphDialBaseFactory.h
+    DialFactories/include/SplineDialBaseFactory.h
     )
 
 if( USE_STATIC_LINKS )
@@ -53,7 +72,9 @@ endif()
 
 target_include_directories(
     ${LIB_NAME} PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    DialEngine/include
+    DialFactories/include
+    DialDefinitions/include
 )
 
 target_include_directories(

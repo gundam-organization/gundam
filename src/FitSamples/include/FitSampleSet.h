@@ -18,6 +18,9 @@
 #include "vector"
 
 
+/// Hold a description of all of the event samples (both "data" and the
+/// matching "MC") that are going to be managed by the Propagator.  The
+/// samples in the set can be referred to by their sample set index.
 class FitSampleSet : public JsonBaseClass {
 
 public:
@@ -35,8 +38,8 @@ public:
 
   //Core
   bool empty() const;
-  double evalLikelihood() const;
-  double evalLikelihood(const FitSample& sample_) const;
+  double evalLikelihood();
+  double evalLikelihood(FitSample& sample_);
 
   // Parallel
   void updateSampleEventBinIndexes() const;

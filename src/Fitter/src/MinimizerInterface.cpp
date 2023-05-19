@@ -110,6 +110,17 @@ const std::unique_ptr<ROOT::Math::Minimizer> &MinimizerInterface::getMinimizer()
   return _minimizer_;
 }
 
+double MinimizerInterface::getTargetEdm() const{
+  // Migrad: The default tolerance is 0.1, and the minimization will stop
+  // when the estimated vertical distance to the minimum (EDM) is less
+  // than 0.001*[tolerance]*UP (see SET ERR).
+  // UP:
+  // Minuit defines parameter errors as the change in parameter value required
+  // to change the function value by UP. Normally, for chisquared fits
+  // UP=1, and for negative log likelihood, UP=0.5
+  return 0.001 * _tolerance_ * 1;
+}
+
 void MinimizerInterface::minimize(){
   LogThrowIf(not isInitialized(), "not initialized");
 
@@ -140,10 +151,22 @@ void MinimizerInterface::minimize(){
     _minimizer_->SetTolerance( _tolerance_ * _simplexToleranceLoose_ );
     _minimizer_->SetStrategy(0);
 
+    getLikelihood().setStateTitleMonitor("Running Simplex...");
+
     // SIMPLEX
     getLikelihood().enableFitMonitor();
     _fitHasConverged_ = _minimizer_->Minimize();
     getLikelihood().disableFitMonitor();
+
+    // Make sure we are on the right spot
+    updateCacheToBestfitPoint();
+
+    // export bf point with SIMPLEX
+    LogInfo << "Writing " << _minimizerType_ << "/Simplex best fit parameters..." << std::endl;
+    GenericToolbox::writeInTFile(
+        GenericToolbox::mkdirTFile( owner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_) ),
+        TNamed("parameterStateAfterSimplex", GenericToolbox::Json::toReadableString( getPropagator().exportParameterInjectorConfig() ).c_str() )
+    );
 
     // Back to original
     _minimizer_->Options().SetMinimizerAlgorithm(originalAlgo.c_str());
@@ -154,6 +177,8 @@ void MinimizerInterface::minimize(){
     LogInfo << getConvergenceMonitor().generateMonitorString(); // lasting printout
     LogWarning << "Simplex ended after " << getLikelihood().getNbFitCalls() - nbFitCallOffset << " calls." << std::endl;
   }
+
+  getLikelihood().setStateTitleMonitor("Running " + _minimizer_->Options().MinimizerAlgorithm() + "...");
 
   getLikelihood().enableFitMonitor();
   _fitHasConverged_ = _minimizer_->Minimize();
@@ -170,6 +195,13 @@ void MinimizerInterface::minimize(){
 
   // Make sure we are on the right spot
   updateCacheToBestfitPoint();
+
+  // export bf point
+  LogInfo << "Writing " << _minimizerType_ << "/" << _minimizerAlgo_ << " best fit parameters..." << std::endl;
+  GenericToolbox::writeInTFile(
+      GenericToolbox::mkdirTFile( owner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_) ),
+      TNamed("parameterStateAfterMinimize", GenericToolbox::Json::toReadableString( getPropagator().exportParameterInjectorConfig() ).c_str() )
+  );
 
   getLikelihood().saveChi2History();
 
@@ -204,9 +236,9 @@ void MinimizerInterface::minimize(){
   bestFitStats->Branch("nFreePars", &nbFreePars);
   bestFitStats->Branch("nFitPars", &nFitPars);
   bestFitStats->Branch("nDof", &nDof);
-  bestFitStats->Branch("chi2BestFit", getPropagator().getLlhBufferPtr());
-  bestFitStats->Branch("chi2StatBestFit", getPropagator().getLlhStatBufferPtr());
-  bestFitStats->Branch("chi2PullsBestFit", getPropagator().getLlhPenaltyBufferPtr());
+  bestFitStats->Branch("chi2BestFit",      (double*) getPropagator().getLlhBufferPtr() ); // need non const ptr...
+  bestFitStats->Branch("chi2StatBestFit",  (double*) getPropagator().getLlhStatBufferPtr() );
+  bestFitStats->Branch("chi2PullsBestFit", (double*) getPropagator().getLlhPenaltyBufferPtr() );
 
   std::vector<GenericToolbox::RawDataArray> samplesArrList(getPropagator().getFitSampleSet().getFitSampleList().size());
   int iSample{-1};
@@ -260,8 +292,8 @@ void MinimizerInterface::minimize(){
   GenericToolbox::mkdirTFile(owner().getSaveDir(), "postFit")->WriteObject(bestFitStats.get(), bestFitStats->GetName());
 
   LogInfo << "Writing " << _minimizerType_ << "/" << _minimizerAlgo_ << " post-fit errors" << std::endl;
-  this->writePostFitData(GenericToolbox::mkdirTFile(owner().getSaveDir(), "postFit/" + _minimizerAlgo_));
-  GenericToolbox::triggerTFileWrite(GenericToolbox::mkdirTFile(owner().getSaveDir(), "postFit/" + _minimizerAlgo_));
+  this->writePostFitData(GenericToolbox::mkdirTFile(owner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_)));
+  GenericToolbox::triggerTFileWrite(GenericToolbox::mkdirTFile(owner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_)));
 }
 void MinimizerInterface::calcErrors(){
   LogThrowIf(not isInitialized(), "not initialized");
@@ -318,7 +350,7 @@ void MinimizerInterface::calcErrors(){
       }
     }
 
-    LogDebug << "DEBUG: PUSHING AWAY PARAMETERS FOR HESSE TO NOT FREAK OUT FOR SOME REASON..." << std::endl;
+//    LogDebug << "DEBUG: PUSHING AWAY PARAMETERS FOR HESSE TO NOT FREAK OUT FOR SOME REASON..." << std::endl;
     // Make sure we are on the right spot
     updateCacheToBestfitPoint();
 
@@ -331,6 +363,9 @@ void MinimizerInterface::calcErrors(){
 //          + TMath::Sqrt( postfitCovarianceMatrix[iPar][iPar] )
 //          );
 //    }
+
+
+    getLikelihood().setStateTitleMonitor("Running HESSE...");
 
     getLikelihood().enableFitMonitor();
     _fitHasConverged_ = _minimizer_->Hesse();
@@ -360,9 +395,6 @@ void MinimizerInterface::calcErrors(){
     hesseStats->SetDirectory(nullptr);
     hesseStats->Branch("hesseSuccess", &_fitHasConverged_);
     hesseStats->Branch("covStatusCode", &covStatus);
-
-    LogDebug << GET_VAR_NAME_VALUE(_minimizer_->IsValidError()) << std::endl;
-    LogDebug << GET_VAR_NAME_VALUE(_minimizer_->ProvidesError()) << std::endl;
 
     hesseStats->Fill();
     GenericToolbox::mkdirTFile(owner().getSaveDir(), "postFit")->WriteObject(hesseStats.get(), hesseStats->GetName());
@@ -493,6 +525,22 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
           else eigenBreakdownAccum[iEigen].SetFillStyle(1001);
         }
 
+        // normalize to the maximum hist
+        double minYval{std::nan("")};
+        for (int iEigen = decompCovMatrix.GetEigenValues().GetNrows() - 1; iEigen >= 0; iEigen--) {
+          for (int iPar = 0 ; iPar < eigenBreakdownAccum[iEigen].GetNbinsX() ; iPar++ ) {
+            eigenBreakdownAccum[iEigen].SetBinContent(
+                iPar + 1,
+                eigenBreakdownAccum[iEigen].GetBinContent(iPar + 1)
+                /eigenBreakdownAccum[0].GetBinContent(iPar + 1)
+            );
+            if( std::isnan(minYval) ){ minYval = eigenBreakdownAccum[iEigen].GetBinContent(iPar + 1); }
+            else{
+              minYval = std::min(minYval, eigenBreakdownAccum[iEigen].GetBinContent(iPar + 1));
+            }
+          }
+        }
+
         TCanvas accumPlot("accumPlot", "accumPlot", 1280, 720);
         TLegend l(0.15, 0.4, 0.3, 0.85);
         bool isFirst{true};
@@ -503,8 +551,8 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
           accumPlot.cd();
           if( isFirst ){
             eigenBreakdownAccum[iEigen].SetTitle("Hessian eigen composition of post-fit errors");
-            eigenBreakdownAccum[iEigen].GetYaxis()->SetRangeUser(0, eigenBreakdownAccum[iEigen].GetMaximum()*1.2);
-            eigenBreakdownAccum[iEigen].GetYaxis()->SetTitle("Post-fit #sigma^{2}");
+            eigenBreakdownAccum[iEigen].GetYaxis()->SetRangeUser(minYval, eigenBreakdownAccum[iEigen].GetMaximum()*1.2);
+            eigenBreakdownAccum[iEigen].GetYaxis()->SetTitle("Hessian eigen composition of postfit errors");
             eigenBreakdownAccum[iEigen].Draw("HIST");
           }
           else{
@@ -965,7 +1013,7 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
 
           gPad->SetGridx();
           gPad->SetGridy();
-          gPad->SetBottomMargin(float(0.1*(1. + double(longestTitleSize)/15.)));
+          gPad->SetBottomMargin(float(0.1*(1. + double(longestTitleSize)/12.)));
 
           if( not isNorm_ ){ preFitErrorHist->SetTitle(Form("Pre-fit/Post-fit comparison for %s", parSet_.getName().c_str())); }
           else             { preFitErrorHist->SetTitle(Form("Pre-fit/Post-fit comparison for %s (normalized)", parSet_.getName().c_str())); }
@@ -1047,18 +1095,25 @@ void MinimizerInterface::scanParameters(TDirectory* saveDir_){
                  << " is fixed. Skipping..." << std::endl;
       continue;
     }
-    getPropagator().getParScanner().scanFitParameter(*getMinimizerFitParameterPtr()[iPar], saveDir_);
+    this->getPropagator().getParScanner().scanFitParameter(*getMinimizerFitParameterPtr()[iPar], saveDir_);
   } // iPar
+  for( auto& parSet : this->getPropagator().getParameterSetsList() ){
+    if( not parSet.isEnabled() ) continue;
+    if( parSet.isUseEigenDecompInFit() ){
+      LogWarning << parSet.getName() << " is using eigen decomposition. Scanning original parameters..." << std::endl;
+      for( auto& par : parSet.getParameterList() ){
+        if( not par.isEnabled() ) continue;
+        this->getPropagator().getParScanner().scanFitParameter(par, saveDir_);
+      }
+    }
+  }
 }
 
 void MinimizerInterface::updateCacheToBestfitPoint(){
-  if( _minimizer_->X() != nullptr ){
-    LogWarning << "Updating propagator cache to the best fit point..." << std::endl;
-    getLikelihood().evalFit( _minimizer_->X() );
-  }
-  else{
-    LogAlert << "No best fit point provided by minimized." << std::endl;
-  }
+  LogThrowIf(_minimizer_->X() == nullptr, "No best fit point provided by the minimizer.");
+
+  LogWarning << "Updating propagator cache to the best fit point..." << std::endl;
+  getLikelihood().evalFit( _minimizer_->X() );
 }
 
 // Local Variables:

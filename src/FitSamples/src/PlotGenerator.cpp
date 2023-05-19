@@ -63,6 +63,7 @@ std::map<std::string, std::shared_ptr<TCanvas>> PlotGenerator::getBufferCanvasLi
 // Core
 void PlotGenerator::generateSamplePlots(TDirectory *saveDir_, int cacheSlot_) {
   LogThrowIf(not isInitialized());
+  LogScopeIndent;
   this->generateSampleHistograms(GenericToolbox::mkdirTFile(saveDir_, "histograms"), cacheSlot_);
   this->generateCanvas(_histHolderCacheList_[cacheSlot_], GenericToolbox::mkdirTFile(saveDir_, "canvas"));
 }
@@ -340,11 +341,10 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
 
         if (stackHist_) {
           // Sorting histograms by norm (lowest stat first)
-          std::function<bool(TH1D *, TH1D *)> aGoesFirst = [](TH1D *histA_, TH1D *histB_) {
+          GenericToolbox::sortVector(mcSampleHistList,  [](TH1D *histA_, TH1D *histB_) {
             return (histA_->Integral(histA_->FindBin(0), histA_->FindBin(histA_->GetXaxis()->GetXmax()))
-            < histB_->Integral(histB_->FindBin(0), histB_->FindBin(histB_->GetXaxis()->GetXmax())));
-          };
-          GenericToolbox::sortVector(mcSampleHistList, aGoesFirst);
+                    < histB_->Integral(histB_->FindBin(0), histB_->FindBin(histB_->GetXaxis()->GetXmax())));
+          });
 
           // Stacking histograms
           TH1D *histPileBuffer = nullptr;
@@ -645,6 +645,7 @@ void PlotGenerator::defineHistogramHolders() {
   int sampleCounter = -1;
   HistHolder histDefBase;
   for( const auto& sample : _fitSampleSetPtr_->getFitSampleList() ){
+    LogScopeIndent;
     LogInfo << "Defining holders for sample: \"" << sample.getName() << "\"" << std::endl;
     sampleCounter++;
     histDefBase.fitSamplePtr = &sample;

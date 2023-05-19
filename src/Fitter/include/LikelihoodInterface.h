@@ -25,16 +25,25 @@ class FitterEngine;
 /// The "likelihood" for GUNDAM is documented in various places as the LLH
 /// (Log Likelihood), but while it is proportional to the LLH, it's actually
 /// more closely related to the chi-square (so -LLH/2).
+
 class LikelihoodInterface {
+  
 public:
   /////////////////////////////////////////////////////////////////
   // Getters and Setters are defined in this file so the compiler can inline
   // the code very early in optimization.
   /////////////////////////////////////////////////////////////////
 
-  LikelihoodInterface(FitterEngine* owner_);
+  explicit LikelihoodInterface(FitterEngine* owner_);
   virtual ~LikelihoodInterface();
-  void setOwner(FitterEngine* owner_) {_owner_ = owner_;}
+
+  void setOwner(FitterEngine* owner_);
+  void setStateTitleMonitor(const std::string& stateTitleMonitor_);
+
+  /// A vector of the parameters being used in the fit.  This provides
+  /// the correspondence between an array of doubles (param[]) and the
+  /// pointers to the parameters.
+  std::vector<FitParameter *> &getMinimizerFitParameterPtr(){ return _minimizerFitParameterPtr_; }
 
   /// Initialize the likelihood interface.  Must be called after all of the
   /// paramters are set, but before the first function evaluation.
@@ -60,17 +69,11 @@ public:
   /// all within the allowed ranges.
   [[nodiscard]] bool hasValidParameterValues() const;
 
-  /// A vector of the parameters being used in the fit.  This provides
-  /// the correspondence between an array of doubles (param[]) and the
-  /// pointers to the parameters.
-  std::vector<FitParameter *> &getMinimizerFitParameterPtr()
-    { return _minimizerFitParameterPtr_; }
-
   /// Set whether a normalized fit space should be used.  This controls how
   /// the fit parameter array is copied into the propagator parameter
   /// structures.
   void setUseNormalizedFitSpace(bool v) {_useNormalizedFitSpace_ = v;}
-  bool getUseNormalizedFitSpace() const {return _useNormalizedFitSpace_;}
+  [[nodiscard]] bool getUseNormalizedFitSpace() const {return _useNormalizedFitSpace_;}
 
   /// Set the minimizer type and algorithm.
   void setMinimizerInfo(const std::string& type, const std::string& algo) {
@@ -82,6 +85,7 @@ public:
   /// LikelihoodInterface, but it appears in the running summaries.  It needs
   /// to be set by the minimizer.
   void setTargetEDM(double v) { _targetEDM_=v; }
+  double getTargetEdm(){ return _targetEDM_; }
 
   /// Get the total number of parameters expected by the evalFit method.
   int getNbFitParameters() const {return _nbFitParameters_;}
@@ -159,6 +163,9 @@ private:
   /// The target EDM for the best fit point.  This will have different
   /// meanings for different "minimizers"
   double _targetEDM_{1E-6};
+
+  /// Monitor state title buffer. Briefly summarize what the fitter is currently doing
+  std::string _stateTitleMonitor_{};
 
   /// A tree that save the history of the minimization.
   std::unique_ptr<TTree> _chi2HistoryTree_{nullptr};

@@ -9,7 +9,9 @@
 #endif
 
 #include "FitParameterSet.h"
+#ifndef USE_NEW_DIALS
 #include "Dial.h"
+#endif
 #include "GenericToolbox.Json.h"
 #include "GlobalVariables.h"
 #include "ConfigUtils.h"
@@ -24,6 +26,9 @@
 LoggerInit([]{
   Logger::setUserHeaderStr("[Propagator]");
 });
+
+void Propagator::muteLogger(){ Logger::setIsMuted( true ); }
+void Propagator::unmuteLogger(){ Logger::setIsMuted( false ); }
 
 
 void Propagator::readConfigImpl(){
@@ -72,6 +77,9 @@ void Propagator::readConfigImpl(){
   _debugPrintLoadedEvents_ = GenericToolbox::Json::fetchValue(_config_, "debugPrintLoadedEvents", _debugPrintLoadedEvents_);
   _debugPrintLoadedEventsNbPerSample_ = GenericToolbox::Json::fetchValue(_config_, "debugPrintLoadedEventsNbPerSample", _debugPrintLoadedEventsNbPerSample_);
 
+  _devSingleThreadReweight_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadReweight", _devSingleThreadReweight_);
+  _devSingleThreadHistFill_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadHistFill", _devSingleThreadHistFill_);
+
 #if USE_NEW_DIALS
   for(size_t iParSet = 0 ; iParSet < _parameterSetList_.size() ; iParSet++ ){
     if( not _parameterSetList_[iParSet].isEnabled() ) continue;
@@ -109,6 +117,11 @@ void Propagator::readConfigImpl(){
     }
   }
 #endif
+
+  _treeWriter_.readConfig( GenericToolbox::Json::fetchValue(_config_, "eventTreeWriter", nlohmann::json()) );
+
+  _parameterInjectorMc_ = GenericToolbox::Json::fetchValue(_config_, "parameterInjection", _parameterInjectorMc_);
+  ConfigUtils::forwardConfig(_parameterInjectorMc_);
 
 }
 void Propagator::initializeImpl() {
@@ -195,6 +208,7 @@ void Propagator::initializeImpl() {
   }
 
   LogInfo << "Build reference cache..." << std::endl;
+  _eventDialCache_.shrinkIndexedCache();
   _eventDialCache_.buildReferenceCache(_fitSampleSet_, _dialCollections_);
 #endif
 
@@ -243,6 +257,14 @@ void Propagator::initializeImpl() {
     } // throw asimov?
 
     LogInfo << "Propagating parameters on events..." << std::endl;
+
+    // Make sure before the copy to the data:
+    // At this point, MC events have been reweighted using their prior
+    // but when using eigen decomp, the conversion eigen -> original has a small computational error
+    for( auto& parSet: _parameterSetList_ ) {
+      if( parSet.isUseEigenDecompInFit() ) { parSet.propagateEigenToOriginal(); }
+    }
+
     bool cacheManagerState = GlobalVariables::getEnableCacheManager();
     GlobalVariables::setEnableCacheManager(false);
     this->resetReweight();
@@ -312,6 +334,7 @@ void Propagator::initializeImpl() {
     }
 
     LogInfo << "Build reference cache..." << std::endl;
+    _eventDialCache_.shrinkIndexedCache();
     _eventDialCache_.buildReferenceCache(_fitSampleSet_, _dialCollections_);
 #endif
   }
@@ -321,7 +344,13 @@ void Propagator::initializeImpl() {
   // the MC has been copied for the Asimov fit, or the "data" use the MC
   // reweighting cache.  This must also be before the first use of
   // reweightMcEvents.
-  if(GlobalVariables::getEnableCacheManager()) Cache::Manager::Build(getFitSampleSet());
+  if(GlobalVariables::getEnableCacheManager()) {
+#ifdef USE_NEW_DIALS
+      Cache::Manager::Build(getFitSampleSet(), _eventDialCache_);
+#else
+      Cache::Manager::Build(getFitSampleSet());
+#endif
+  }
 #endif
 
   LogInfo << "Propagating prior parameters on events..." << std::endl;
@@ -372,26 +401,49 @@ void Propagator::initializeImpl() {
     sample.getDataContainer().isLocked = true;
   }
 
-  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the plot generator") << std::endl;
-  _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
-  _plotGenerator_.initialize();
+  if( not _parameterInjectorMc_.empty() ){
+    LogWarning << "Injecting parameters on MC samples..." << std::endl;
+    this->injectParameterValues(_parameterInjectorMc_);
+    this->resetReweight();
+    this->reweightMcEvents();
+  }
 
-  LogInfo << "Saving nominal histograms..." << std::endl;
+
+  //////////////////////////////////////////
+  // DON'T MOVE PARAMETERS FROM THIS POINT
+  //////////////////////////////////////////
+
+
+  /// Copy the current state of MC as "nominal" histogram
+  LogInfo << "Copy the current state of MC as \"nominal\" histogram..." << std::endl;
   for( auto& sample : _fitSampleSet_.getFitSampleList() ){
     sample.getMcContainer().saveAsHistogramNominal();
   }
 
-  _treeWriter_.setFitSampleSetPtr(&_fitSampleSet_);
-  _treeWriter_.setParSetListPtr(&_parameterSetList_);
 
+  /// Initialise other tools
+  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the plot generator") << std::endl;
+  _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
+  _plotGenerator_.initialize();
+
+  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the tree writer") << std::endl;
+  _treeWriter_.setFitSampleSetPtr( &_fitSampleSet_ );
+  _treeWriter_.setParSetListPtr( &_parameterSetList_ );
+  _treeWriter_.setEventDialCachePtr( &_eventDialCache_ );
+
+  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the par scanner") << std::endl;
   _parScanner_.initialize();
 
+
+  /// Printouts for quick monitoring
   if( _showEventBreakdown_ ){
 
     if(true){
       // STAGED MASK
       LogWarning << "Staged event breakdown:" << std::endl;
+#ifndef USE_NEW_DIALS
       Dial::enableMaskCheck = true;
+#endif
       std::vector<std::vector<double>> stageBreakdownList(
           _fitSampleSet_.getFitSampleList().size(),
           std::vector<double>(_parameterSetList_.size() + 1, 0)
@@ -407,7 +459,7 @@ void Propagator::initializeImpl() {
       int iStage{0};
       for( auto& parSet : _parameterSetList_ ){
         if( not parSet.isEnabled() ){ continue; }
-        parSet.setMaskedForPropagation(true);
+        parSet.setMaskedForPropagation( true );
       }
       this->resetReweight();
       this->reweightMcEvents();
@@ -437,39 +489,46 @@ void Propagator::initializeImpl() {
         t.addTableLine(tableLine);
       }
       t.printTable();
+#ifndef USE_NEW_DIALS
       Dial::enableMaskCheck = false;
+#endif
     }
 
     LogWarning << "Sample breakdown:" << std::endl;
     GenericToolbox::TablePrinter t;
-    t.setColTitles({{"Sample"},{"MC (# binned event)"},{"Data (# binned event)"}, {"MC (weighted)"}, {"Data (weighted)"}});
+
+    t << "Sample" << GenericToolbox::TablePrinter::NextColumn;
+    t << "MC (# binned event)" << GenericToolbox::TablePrinter::NextColumn;
+    t << "Data (# binned event)" << GenericToolbox::TablePrinter::NextColumn;
+    t << "MC (weighted)" << GenericToolbox::TablePrinter::NextColumn;
+    t << "Data (weighted)" << GenericToolbox::TablePrinter::NextLine;
+
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-      t.addTableLine({{"\""+sample.getName()+"\""},
-                      std::to_string(sample.getMcContainer().getNbBinnedEvents()),
-                      std::to_string(sample.getDataContainer().getNbBinnedEvents()),
-                      std::to_string(sample.getMcContainer().getSumWeights()),
-                      std::to_string(sample.getDataContainer().getSumWeights())
-                     });
+      t << "\"" << sample.getName() << "\"" << GenericToolbox::TablePrinter::NextColumn;
+      t << sample.getMcContainer().getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
+      t << sample.getDataContainer().getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
+      t << sample.getMcContainer().getSumWeights() << GenericToolbox::TablePrinter::NextColumn;
+      t << sample.getDataContainer().getSumWeights() << GenericToolbox::TablePrinter::NextLine;
     }
+
     t.printTable();
+
   }
-
   if( _debugPrintLoadedEvents_ ){
-
     LogDebug << GET_VAR_NAME_VALUE(_debugPrintLoadedEventsNbPerSample_) << std::endl;
 #if USE_NEW_DIALS
     int iEvt{0};
     for( auto& entry : _eventDialCache_.getCache() ) {
       LogDebug << "Event #" << iEvt++ << "{" << std::endl;
       {
-        Logger::Indent i;
-        LogDebug << entry.first->getSummary() << std::endl;
+        LogScopeIndent;
+        LogDebug << entry.event->getSummary() << std::endl;
         LogDebug << "dialCache = {";
-        for( auto& dialInterface : entry.second ) {
+        for( auto& dialInterface : entry.dials ) {
 #ifndef USE_BREAKDOWN_CACHE
           LogDebug << std::endl << "  - " << dialInterface->getSummary();
 #else
-          LogDebug << std::endl << "  - " << dialInterface.first->getSummary();
+          LogDebug << std::endl << "  - " << dialInterface.interface->getSummary();
 #endif
         }
         LogDebug << std::endl << "}" << std::endl;
@@ -490,7 +549,8 @@ void Propagator::initializeImpl() {
 #endif
   }
 
-  // Propagator needs to be fast
+
+  /// Propagator needs to be responsive, let the workers wait for the signal
   GlobalVariables::getParallelWorker().setCpuTimeSaverIsEnabled(false);
 }
 
@@ -500,11 +560,17 @@ void Propagator::setShowTimeStats(bool showTimeStats) {
 void Propagator::setThrowAsimovToyParameters(bool throwAsimovToyParameters) {
   _throwAsimovToyParameters_ = throwAsimovToyParameters;
 }
+void Propagator::setEnableEigenToOrigInPropagate(bool enableEigenToOrigInPropagate) {
+  _enableEigenToOrigInPropagate_ = enableEigenToOrigInPropagate;
+}
 void Propagator::setIThrow(int iThrow) {
   _iThrow_ = iThrow;
 }
 void Propagator::setLoadAsimovData(bool loadAsimovData) {
   _loadAsimovData_ = loadAsimovData;
+}
+void Propagator::setParameterInjectorConfig(const nlohmann::json &parameterInjector) {
+  _parameterInjectorMc_ = parameterInjector;
 }
 void Propagator::setGlobalCovarianceMatrix(const std::shared_ptr<TMatrixD> &globalCovarianceMatrix) {
   _globalCovarianceMatrix_ = globalCovarianceMatrix;
@@ -557,6 +623,45 @@ std::vector<DatasetLoader> &Propagator::getDataSetList() {
   return _dataSetList_;
 }
 
+// Misc getters
+std::string Propagator::getLlhBufferSummary() const{
+  std::stringstream ss;
+  ss << "Total likelihood = " << getLlhBuffer();
+  ss << std::endl << "Stat likelihood = " << getLlhStatBuffer();
+  ss << " = sum of: " << GenericToolbox::iterableToString(
+      _fitSampleSet_.getFitSampleList(), [](const FitSample& sample_){
+        std::stringstream ssSub;
+        ssSub << sample_.getName() << ": ";
+        if( sample_.isEnabled() ){ ssSub << sample_.getLlhStatBuffer(); }
+        else                     { ssSub << "disabled."; }
+        return ssSub.str();
+      }
+  );
+  ss << std::endl << "Penalty likelihood = " << getLlhPenaltyBuffer();
+  ss << " = sum of: " << GenericToolbox::iterableToString(
+      _parameterSetList_, [](const FitParameterSet& parSet_){
+        std::stringstream ssSub;
+        ssSub << parSet_.getName() << ": ";
+        if( parSet_.isEnabled() ){ ssSub << parSet_.getPenaltyChi2Buffer(); }
+        else                     { ssSub << "disabled."; }
+        return ssSub.str();
+      }
+  );
+  return ss.str();
+}
+std::string Propagator::getParametersSummary( bool showEigen_ ) const{
+  std::stringstream ss;
+  for( auto &parSet: getParameterSetsList() ){
+    if( not parSet.isEnabled() ){ continue; }
+    if( not ss.str().empty() ) ss << std::endl;
+    ss << parSet.getName();
+    for( auto &par: parSet.getParameterList() ){
+      if( not par.isEnabled() ){ continue; }
+      ss << std::endl << "  " << par.getTitle() << ": " << par.getParameterValue();
+    }
+  }
+  return ss.str();
+}
 const FitParameterSet* Propagator::getFitParameterSetPtr(const std::string& name_) const{
   for( auto& parSet : _parameterSetList_ ){
     if( parSet.getName() == name_ ) return &parSet;
@@ -566,7 +671,23 @@ const FitParameterSet* Propagator::getFitParameterSetPtr(const std::string& name
   LogThrow("Could not find fit parameter set named \"" << name_ << "\" among defined: " << GenericToolbox::parseVectorAsString(parSetNames));
   return nullptr;
 }
+FitParameterSet* Propagator::getFitParameterSetPtr(const std::string& name_){
+  for( auto& parSet : _parameterSetList_ ){
+    if( parSet.getName() == name_ ) return &parSet;
+  }
+  std::vector<std::string> parSetNames{};
+  for( auto& parSet : _parameterSetList_ ){ parSetNames.emplace_back(parSet.getName()); }
+  LogThrow("Could not find fit parameter set named \"" << name_ << "\" among defined: " << GenericToolbox::parseVectorAsString(parSetNames));
+  return nullptr;
+}
+DatasetLoader* Propagator::getDatasetLoaderPtr(const std::string& name_){
+  for( auto& dataSet : _dataSetList_ ){
+    if( dataSet.getName() == name_ ){ return &dataSet; }
+  }
+  return nullptr;
+}
 
+// Core
 void Propagator::updateLlhCache(){
   double buffer;
 
@@ -584,8 +705,8 @@ void Propagator::updateLlhCache(){
   _llhPenaltyBuffer_ = 0;
   for( auto& parSet : _parameterSetList_ ){
     buffer = parSet.getPenaltyChi2();
-    _llhPenaltyBuffer_ += buffer;
     LogThrowIf(std::isnan(buffer), parSet.getName() << " penalty chi2 is Nan");
+    _llhPenaltyBuffer_ += buffer;
   }
 
   ////////////////////////////////
@@ -600,9 +721,11 @@ void Propagator::updateLlhCache(){
 }
 void Propagator::propagateParametersOnSamples(){
 
-  // Only real parameters are propagated on the spectra -> need to convert the eigen to original
-  for( auto& parSet : _parameterSetList_ ){
-    if( parSet.isUseEigenDecompInFit() ) parSet.propagateEigenToOriginal();
+  if( _enableEigenToOrigInPropagate_ ){
+    // Only real parameters are propagated on the spectra -> need to convert the eigen to original
+    for( auto& parSet : _parameterSetList_ ){
+      if( parSet.isUseEigenDecompInFit() ) parSet.propagateEigenToOriginal();
+    }
   }
 
   resetReweight();
@@ -646,15 +769,55 @@ void Propagator::reweightMcEvents() {
 #endif
   if( not usedGPU ){
     GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-    GlobalVariables::getParallelWorker().runJob("Propagator::reweightMcEvents");
+    if( not _devSingleThreadReweight_ ){
+      GlobalVariables::getParallelWorker().runJob("Propagator::reweightMcEvents");
+    }
+    else{
+      this->reweightMcEvents(-1);
+    }
   }
   weightProp.counts++;
   weightProp.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 }
 void Propagator::refillSampleHistograms(){
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-  GlobalVariables::getParallelWorker().runJob("Propagator::refillSampleHistograms");
+  if( not _devSingleThreadHistFill_ ){
+    GlobalVariables::getParallelWorker().runJob("Propagator::refillSampleHistograms");
+  }
+  else{
+    refillSampleHistogramsFct(-1);
+    refillSampleHistogramsPostParallelFct();
+  }
   fillProp.counts++; fillProp.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+}
+
+// Misc
+nlohmann::json Propagator::exportParameterInjectorConfig() const{
+  nlohmann::json out;
+
+  std::vector<nlohmann::json> parSetConfig;
+  parSetConfig.reserve( _parameterSetList_.size() );
+  for( auto& parSet : _parameterSetList_ ){
+    if( not parSet.isEnabled() ){ continue; }
+    parSetConfig.emplace_back( parSet.exportInjectorConfig() );
+  }
+
+  out["parameterSetList"] = parSetConfig;
+
+  return out;
+}
+void Propagator::injectParameterValues(const nlohmann::json &config_) {
+  LogWarning << "Injecting parameters..." << std::endl;
+
+  for( auto& entryParSet : GenericToolbox::Json::fetchValue(config_, "parameterSetList", nlohmann::json() ) ){
+    auto parSetName = GenericToolbox::Json::fetchValue<std::string>(entryParSet, "name");
+    LogInfo << "Reading injection parameters for parSet: " << parSetName << std::endl;
+
+    auto* selectedParSet = this->getFitParameterSetPtr(parSetName );
+    LogThrowIf( selectedParSet == nullptr, "Could not find parSet: " << parSetName );
+
+    selectedParSet->injectParameterValues(entryParSet);
+  }
 }
 void Propagator::throwParametersFromGlobalCovariance(){
 
@@ -716,18 +879,18 @@ void Propagator::throwParametersFromGlobalCovariance(){
 
 // Protected
 void Propagator::initializeThreads() {
-  std::function<void(int)> reweightMcEventsFct = [this](int iThread){
+  reweightMcEventsFct = [this](int iThread){
     this->reweightMcEvents(iThread);
   };
   GlobalVariables::getParallelWorker().addJob("Propagator::reweightMcEvents", reweightMcEventsFct);
 
-  std::function<void(int)> refillSampleHistogramsFct = [this](int iThread){
+  refillSampleHistogramsFct = [this](int iThread){
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
       sample.getMcContainer().refillHistogram(iThread);
       sample.getDataContainer().refillHistogram(iThread);
     }
   };
-  std::function<void()> refillSampleHistogramsPostParallelFct = [this](){
+  refillSampleHistogramsPostParallelFct = [this](){
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
       sample.getMcContainer().rescaleHistogram();
       sample.getDataContainer().rescaleHistogram();
@@ -746,7 +909,7 @@ void Propagator::reweightMcEvents(int iThread_) {
   auto start = _eventDialCache_.getCache().begin();
   auto end = _eventDialCache_.getCache().end();
 
-  if( GlobalVariables::getNbThreads() != 1 ){
+  if( iThread_ != -1 and GlobalVariables::getNbThreads() != 1 ){
     start = _eventDialCache_.getCache().begin() + Long64_t(iThread_)*(Long64_t(_eventDialCache_.getCache().size())/GlobalVariables::getNbThreads());
     if( iThread_+1 != GlobalVariables::getNbThreads() ){
       end = _eventDialCache_.getCache().begin() + (Long64_t(iThread_) + 1) * (Long64_t(_eventDialCache_.getCache().size())/GlobalVariables::getNbThreads());
@@ -783,6 +946,3 @@ void Propagator::reweightMcEvents(int iThread_) {
 
 
 }
-
-
-

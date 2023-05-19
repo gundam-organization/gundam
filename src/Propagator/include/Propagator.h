@@ -28,8 +28,10 @@ public:
   // Setters
   void setShowTimeStats(bool showTimeStats);
   void setThrowAsimovToyParameters(bool throwAsimovToyParameters);
+  void setEnableEigenToOrigInPropagate(bool enableEigenToOrigInPropagate);
   void setIThrow(int iThrow);
   void setLoadAsimovData(bool loadAsimovData);
+  void setParameterInjectorConfig(const nlohmann::json &parameterInjector);
   void setGlobalCovarianceMatrix(const std::shared_ptr<TMatrixD> &globalCovarianceMatrix);
 
   // Const getters
@@ -53,11 +55,15 @@ public:
   std::vector<DatasetLoader> &getDataSetList();
 
   // Misc getters
-  double* getLlhBufferPtr(){ return &_llhBuffer_; }
-  double* getLlhStatBufferPtr(){ return &_llhStatBuffer_; }
-  double* getLlhPenaltyBufferPtr(){ return &_llhPenaltyBuffer_; }
-  double* getLlhRegBufferPtr(){ return &_llhRegBuffer_; }
+  [[nodiscard]] const double* getLlhBufferPtr() const { return &_llhBuffer_; }
+  [[nodiscard]] const double* getLlhStatBufferPtr() const { return &_llhStatBuffer_; }
+  [[nodiscard]] const double* getLlhPenaltyBufferPtr() const { return &_llhPenaltyBuffer_; }
+  [[nodiscard]] const double* getLlhRegBufferPtr() const { return &_llhRegBuffer_; }
+  [[nodiscard]] std::string getLlhBufferSummary() const;
+  [[nodiscard]] std::string getParametersSummary( bool showEigen_ = true ) const;
   [[nodiscard]] const FitParameterSet* getFitParameterSetPtr(const std::string& name_) const;
+  [[nodiscard]] FitParameterSet* getFitParameterSetPtr(const std::string& name_);
+  [[nodiscard]] DatasetLoader* getDatasetLoaderPtr(const std::string& name_);
 
   // Core
   void updateLlhCache();
@@ -65,7 +71,15 @@ public:
   void resetReweight();
   void reweightMcEvents();
   void refillSampleHistograms();
+
+  // Misc
+  [[nodiscard]] nlohmann::json exportParameterInjectorConfig() const;
+  void injectParameterValues(const nlohmann::json &config_);
   void throwParametersFromGlobalCovariance();
+
+  // Logger related
+  static void muteLogger();
+  static void unmuteLogger();
 
 protected:
   void readConfigImpl() override;
@@ -82,6 +96,8 @@ private:
   bool _loadAsimovData_{false};
   bool _debugPrintLoadedEvents_{false};
   int _debugPrintLoadedEventsNbPerSample_{5};
+  nlohmann::json _parameterInjectorMc_;
+  nlohmann::json _parameterInjectorToy_;
 
   // Internals
   bool _throwAsimovToyParameters_{false};
@@ -89,6 +105,7 @@ private:
   bool _enableStatThrowInToys_{true};
   bool _gaussStatThrowInToys_{false};
   bool _enableEventMcThrow_{true};
+  bool _enableEigenToOrigInPropagate_{true};
   int _iThrow_{-1};
   double _llhBuffer_{0};
   double _llhStatBuffer_{0};
@@ -98,6 +115,9 @@ private:
   std::shared_ptr<TMatrixD> _strippedCovarianceMatrix_{nullptr};
   std::shared_ptr<TMatrixD> _choleskyMatrix_{nullptr};
   std::vector<FitParameter*> _strippedParameterList_{};
+
+  bool _devSingleThreadReweight_{false};
+  bool _devSingleThreadHistFill_{false};
 
   // Sub-layers
   FitSampleSet _fitSampleSet_;
@@ -128,9 +148,17 @@ private:
 
   // DEV
 #if USE_NEW_DIALS
+  // A vector of all the dial collections used by all of the fit samples.
+  // Once a dial collection has been added to this vector, it's index becomes
+  // the immutable tag for that specific group of dials.
   std::vector<DialCollection> _dialCollections_{};
   EventDialCache _eventDialCache_{};
 #endif
+
+  // parallel holders
+  std::function<void(int)> reweightMcEventsFct;
+  std::function<void(int)> refillSampleHistogramsFct;
+  std::function<void()> refillSampleHistogramsPostParallelFct;
 
 public:
   GenericToolbox::CycleTimer dialUpdate;

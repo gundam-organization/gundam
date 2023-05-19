@@ -25,7 +25,7 @@ public:
   // SETTERS
   void setName(const std::string &name);
   void setIndex(int index);
-
+  void setLlhStatBuffer(double llhStatBuffer_) { _llhStatBuffer_ = llhStatBuffer_; }
   void setBinningFilePath(const std::string &binningFilePath_);
   void setSelectionCutStr(const std::string &selectionCutStr_);
   void setVarSelectionFormulaStr(const std::string &varSelectionFormulaStr_);
@@ -34,6 +34,7 @@ public:
   // GETTERS
   [[nodiscard]] bool isEnabled() const;
   [[nodiscard]] int getIndex() const;
+  [[nodiscard]] double getLlhStatBuffer() const { return _llhStatBuffer_; }
   [[nodiscard]] const std::string &getName() const;
   [[nodiscard]] const std::string &getSelectionCutsStr() const;
   [[nodiscard]] const std::string &getVarSelectionFormulaStr() const;
@@ -63,6 +64,7 @@ private:
   std::vector<std::string> _enabledDatasetList_;
 
   // Internals
+  double _llhStatBuffer_{std::nan("unset")}; // set by FitSampleSet which hold the joinProbability obj
   DataBinSet _binning_;
   SampleElement _mcContainer_;
   SampleElement _dataContainer_;

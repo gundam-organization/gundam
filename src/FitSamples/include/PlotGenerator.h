@@ -84,10 +84,10 @@ public:
   void setFitSampleSetPtr(const FitSampleSet *fitSampleSetPtr);
 
   // Getters
-  bool isEmpty() const;
-  const std::vector<HistHolder> &getHistHolderList(int cacheSlot_ = 0) const;
-  const std::vector<HistHolder> &getComparisonHistHolderList() const;
-  std::map<std::string, std::shared_ptr<TCanvas>> getBufferCanvasList() const;
+  [[nodiscard]] bool isEmpty() const;
+  [[nodiscard]] const std::vector<HistHolder> &getHistHolderList(int cacheSlot_ = 0) const;
+  [[nodiscard]] const std::vector<HistHolder> &getComparisonHistHolderList() const;
+  [[nodiscard]] std::map<std::string, std::shared_ptr<TCanvas>> getBufferCanvasList() const;
 
   // Core
   void generateSamplePlots(TDirectory *saveDir_ = nullptr, int cacheSlot_ = 0);

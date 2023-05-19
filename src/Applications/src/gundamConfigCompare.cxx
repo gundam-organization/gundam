@@ -73,6 +73,9 @@ int main( int argc, char** argv ){
     );
     auto* f = TFile::Open(configPath1.c_str());
     auto* conf = f->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed");
+    auto* version = f->Get<TNamed>("gundamFitter/gundamVersion_TNamed");
+    auto* cmdLine = f->Get<TNamed>("gundamFitter/commandLine_TNamed");
+    LogInfo << "config-1 is within .root file. Ran under GUNDAM v" << version->GetTitle() << " with cmdLine: "<< cmdLine->GetTitle() << std::endl;
     config1 = GenericToolbox::Json::readConfigJsonStr(conf->GetTitle());
     delete f;
   }
@@ -85,6 +88,9 @@ int main( int argc, char** argv ){
     );
     auto* f = TFile::Open(configPath2.c_str());
     auto* conf = f->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed");
+    auto* version = f->Get<TNamed>("gundamFitter/gundamVersion_TNamed");
+    auto* cmdLine = f->Get<TNamed>("gundamFitter/commandLine_TNamed");
+    LogInfo << "config-2 is within .root file. Ran under GUNDAM v" << version->GetTitle() << " with cmdLine: "<< cmdLine->GetTitle() << std::endl;
     config2 = GenericToolbox::Json::readConfigJsonStr(conf->GetTitle());
     delete f;
   }
@@ -106,10 +112,51 @@ void compareConfigStage(const nlohmann::json& subConfig1, const nlohmann::json& 
   if( subConfig1.is_array() and subConfig2.is_array() ){
 
     if( subConfig1.size() != subConfig2.size() ){
-      LogError << path << "Array size mismatch: " << subConfig1.size() << " <-> " << subConfig2.size() << std::endl;
+      LogAlert << path << "Array size mismatch: " << subConfig1.size() << " <-> " << subConfig2.size() << std::endl;
+    }
+
+    if( subConfig1.empty() or subConfig2.empty() ){ return; }
+
+    if( GenericToolbox::Json::doKeyExist(subConfig1[0], "name") ){
+      // trying to fetch by key "name"
+      for( int iEntry1 = 0 ; iEntry1 < subConfig1.size() ; iEntry1++ ){
+        auto name1 = GenericToolbox::Json::fetchValue(subConfig1[iEntry1], "name", "");
+        bool found1{false};
+
+        for( int iEntry2 = 0 ; iEntry2 < subConfig2.size() ; iEntry2++){
+          auto name2 = GenericToolbox::Json::fetchValue(subConfig2[iEntry2], "name", "");
+          if( name1 == name2 ){
+            found1 = true;
+            __pathBuffer__.emplace_back( "#"+std::to_string(iEntry1) + "(name:" + name1 + ")" );
+            if( iEntry1 != iEntry2 ) __pathBuffer__.back() += "<->" + std::to_string(iEntry2);
+            compareConfigStage(subConfig1[iEntry1], subConfig2[iEntry2]);
+            __pathBuffer__.pop_back();
+            break;
+          }
+        }
+        if( not found1 ){
+          LogError << "Could not find key with name \"" << name1 << "\" in config2." << std::endl;
+        }
+      }
+
+      // looking for missing keys in 2
+      for( const auto & entry2 : subConfig2 ){
+        auto name2 = GenericToolbox::Json::fetchValue(entry2, "name", "");
+        bool found2{false};
+        for(const auto & entry1 : subConfig1){
+          auto name1 = GenericToolbox::Json::fetchValue(entry1, "name", "");
+          if( name1 == name2 ){
+            found2 = true;
+            break;
+          }
+        }
+        if( not found2 ){
+          LogError << "Could not find key with name \"" << name2 << "\" in config1." << std::endl;
+        }
+      }
     }
     else{
-      for( int iEntry = 0 ; iEntry < subConfig1.size() ; iEntry++ ){
+      for( int iEntry = 0 ; iEntry < std::min( subConfig1.size(), subConfig2.size() ) ; iEntry++ ){
         __pathBuffer__.emplace_back("#"+std::to_string(iEntry));
         compareConfigStage(subConfig1[iEntry], subConfig2[iEntry]);
         __pathBuffer__.pop_back();

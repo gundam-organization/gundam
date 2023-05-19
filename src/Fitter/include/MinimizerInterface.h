@@ -28,8 +28,13 @@ class MinimizerInterface : public MinimizerBase {
 public:
   explicit MinimizerInterface(FitterEngine* owner_);
 
-  [[nodiscard]] virtual bool isFitHasConverged() const override;
+  // setters
+  void setEnableSimplexBeforeMinimize(bool enableSimplexBeforeMinimize_){ _enableSimplexBeforeMinimize_ = enableSimplexBeforeMinimize_; }
 
+  // getters
+  [[nodiscard]] std::string getMinimizerTypeName() const override { return "MinimizerInterface"; };
+  [[nodiscard]] bool isFitHasConverged() const override;
+  [[nodiscard]] double getTargetEdm() const;
   [[nodiscard]] const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const;
 
   void minimize() override;
@@ -41,7 +46,6 @@ protected:
   void initializeImpl() override;
 
   void writePostFitData(TDirectory* saveDir_);
-
   void updateCacheToBestfitPoint();
 
 private:

@@ -42,6 +42,12 @@ void FitParameter::readConfigImpl(){
       this->setMaxValue(limits.second);
     }
 
+    if( GenericToolbox::Json::doKeyExist(_parameterConfig_, "parameterStepSize") ){
+      double stepSize{GenericToolbox::Json::fetchValue<double>(_parameterConfig_, "parameterStepSize")};
+      LogWarning << "Using step size: " << stepSize << std::endl;
+      this->setStepSize( stepSize );
+    }
+
     _dialDefinitionsList_ = GenericToolbox::Json::fetchValue(_parameterConfig_, "dialSetDefinitions", _dialDefinitionsList_);
   }
 
@@ -57,11 +63,11 @@ void FitParameter::readConfigImpl(){
 void FitParameter::initializeImpl() {
   LogThrowIf(_owner_ == nullptr, "Parameter set ref is not set.");
   LogThrowIf(_parameterIndex_ == -1, "Parameter index is not set.");
+
+  if( not _isEnabled_ ) { return; }
   LogThrowIf(std::isnan(_priorValue_), "Prior value is not set.");
   LogThrowIf(std::isnan(_stdDevValue_), "Std dev value is not set.");
   LogThrowIf(std::isnan(_parameterValue_), "Parameter value is not set.");
-
-  if( not _isEnabled_ ) { return; }
 
 #if USE_NEW_DIALS
 #else

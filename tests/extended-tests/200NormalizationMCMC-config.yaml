@@ -17,18 +17,22 @@ fitterEngineConfig:
   mcmcConfig:
     algorithm: metropolis
     proposal: adaptive
+    adaptiveRestore: none
+    
     burninCycles: 4
     burninSteps: 1000
     burninResets: 1
     saveBurnin: false
-    burninWindow: 500
-    burninCovWindow: 1500
+    burninWindow: 100
+    burninCovWindow: 10000
+    burninCovDeweighting: 0.5
     burninFreezeAfter: 2
 
     cycles: 4
     steps: 10000
-    adaptiveWindow: 1000
-    adaptiveCovWindow: 1500
+    adaptiveWindow: 400
+    adaptiveCovWindow: 100000
+    burninCovDeweighting: 0.0
     adaptiveFreezeAfter: 1
 
   minimizerConfig:

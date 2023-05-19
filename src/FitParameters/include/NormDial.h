@@ -9,6 +9,9 @@
 
 #include "memory"
 
+#ifdef USE_NEW_DIALS
+#warning Not used with new dial implementation
+#endif
 
 class NormDial : public Dial {
 

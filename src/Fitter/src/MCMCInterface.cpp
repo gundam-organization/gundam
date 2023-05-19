@@ -23,28 +23,40 @@ void MCMCInterface::readConfigImpl(){
   MinimizerBase::readConfigImpl();
   LogInfo << "Reading minimizer config..." << std::endl;
 
+  // The type of algorithm to be using.  It should be left at the default
+  // value (metropolis is the only supported MCMC algorithm right now).
   _algorithmName_ = GenericToolbox::Json::fetchValue(_config_, "algorithm", _algorithmName_);
+
+  // The step proposal algorithm.  This should usually be left at the default
+  // value.
   _proposalName_ = GenericToolbox::Json::fetchValue(_config_, "proposal", _proposalName_);
-  _stepCount_= GenericToolbox::Json::fetchValue(_config_, "steps", _stepCount_);
+
+  // The name of the MCMC result tree in the output file.  This doesn't need
+  // to be changed.  Generally, leave it alone.
   _outTreeName_ = GenericToolbox::Json::fetchValue(_config_, "mcmcOutputTree", "MCMC");
 
-  // Get MCMC burnin parameters.  Each burnin discards previous information
-  // about the posterior and reset to the initial state (but starts from
-  // the last accepted point.  The burnin will be skipped if the state
-  // has been restored from a file.  The burnin can be skipped in favor of
-  // discarding the initial parts of the MCMC chain (usually a better option).
+  // Get the MCMC chain parameters to be used during burn-in.  The burnin will
+  // be skipped if the state has been restored from a file.  The burnin can be
+  // skipped in favor of discarding the initial parts of the MCMC chain
+  // (usually a better option).  A run is broken into "mini-Chains" called a
+  // "cycle" where the posterior covariance information is updated after each
+  // mini-chain.  Each cycle will have "steps" steps.
   _burninCycles_ = GenericToolbox::Json::fetchValue(_config_,
                                          "burninCycles", _burninCycles_);
+
+  // The number of steps to run in each burn in cycle
   _burninLength_ = GenericToolbox::Json::fetchValue(_config_,
                                          "burninSteps", _burninLength_);
-  _burninResets_ = GenericToolbox::Json::fetchValue(_config_,
-                                         "burninResets", _burninResets_);
+
+  // If this is set to false, the burnin steps will not be saved to disk.
+  // This should usually be true since it lets you see the progress of the
+  // burnin.
   _saveBurnin_ = GenericToolbox::Json::fetchValue(_config_,
                                        "saveBurnin", _saveBurnin_);
 
   // Get the MCMC chain parameters.  A run is broken into "mini-Chains"
   // called a "cycle" where the posterior covariance information is updated
-  // after each mini-chain.  The cycle will have "mcmcRunLength" steps.
+  // after each mini-chain.  Each cycle will have "steps" steps.
   _cycles_ = GenericToolbox::Json::fetchValue(_config_,
                                      "cycles", _cycles_);
   _steps_ = GenericToolbox::Json::fetchValue(_config_,
@@ -60,7 +72,22 @@ void MCMCInterface::readConfigImpl(){
   _burninCovWindow_ = GenericToolbox::Json::fetchValue(
     _config_, "burninCovWindow", _burninCovWindow_);
 
-  // Freeze the step size after this many burn-in chains
+  // The covariance deweighting during burn-in.  This should usually be left
+  // at the default value.  This sets how much extra influence new points
+  // should have on the covariance.
+  _burninCovDeweighting_ = GenericToolbox::Json::fetchValue(
+    _config_, "burninCovDeweighting", _burninCovDeweighting_);
+
+  // The number of times that the burnin state will be reset.  If this is
+  // zero, then there are no resets (one means reset after the first cycle,
+  // &c).  Resets are sometimes needed if the initial conditions are far from
+  // the main probability in the posterior and the "best fit" parameters need
+  // to be found.
+  _burninResets_ = GenericToolbox::Json::fetchValue(_config_,
+                                         "burninResets", _burninResets_);
+
+  // Freeze the step size after this many burn-in chains.  This stops
+  // adaptively adjusting the step size.
   _burninFreezeAfter_ = GenericToolbox::Json::fetchValue(
     _config_, "burninFreezeAfter", _burninFreezeAfter_);
 
@@ -72,26 +99,41 @@ void MCMCInterface::readConfigImpl(){
     _config_, "burninWindow", _burninWindow_);
 
   // Set the name of a file containing a previous sequence of the chain.  This
-  // restores the state from the end of the chain and continues.
+  // restores the state from the end of the chain and continues.  This is also
+  // be settable from the command line (setting from the command line is the
+  // better option) using the override option
+  //
+  // "-O /fitterEngineConfig/mcmcConfig/adaptiveRestore=<filename>"
+  //
+  // If restore is going to be used, the adaptiveRestore value must exist in
+  // the configuration file (with a NULL value)
   _adaptiveRestore_ = GenericToolbox::Json::fetchValue(
     _config_, "adaptiveRestore", _adaptiveRestore_);
 
-  // Set the window to calculate the current acceptance value over.  If this
-  // is set to short, the step size will fluctuate.  If this is set to long,
-  // the step size won't be adjusted to match the target acceptance.  Make
-  // this very large to lock the step size.
+  // Set the window to calculate the current covariance value over.  If this
+  // is set to short, the covariance will not sample the entire posterior.
+  // Generally, the window should be long compared to the number of steps
+  // required to get to an uncorrelated point.
   _adaptiveCovWindow_ = GenericToolbox::Json::fetchValue(
     _config_, "adaptiveCovWindow", _adaptiveCovWindow_);
 
+  // The covariance deweighting while the chain is running.  This should
+  // usually be left at zero so the entire chain history is used after an
+  // update and more recent points don't get a heavier weight (within the
+  // covariance window).
+  _adaptiveCovDeweighting_ = GenericToolbox::Json::fetchValue(
+    _config_, "adaptiveCovDeweighting", _adaptiveCovDeweighting_);
+
   // Set the initial rigidity for the changes in the step size.  If this is
-  // negative, the step size is not updated as it runs.
+  // negative, the step size is not updated as it runs. This stops adaptively
+  // adjusting the step size.
   _adaptiveFreezeAfter_ = GenericToolbox::Json::fetchValue(
     _config_, "adaptiveFreezeAfter", _adaptiveFreezeAfter_);
 
   // Set the window to calculate the current acceptance value over.  If this
-  // is set to short, the step size will fluctuate.  If this is set to long,
-  // the step size won't be adjusted to match the target acceptance.  Make
-  // this very large to lock the step size.
+  // is set to short, the step size will fluctuate a lot.  If this is set to
+  // long, the step size won't be adjusted to match the target acceptance.
+  // Make this very large effectively locks the step size.
   _adaptiveWindow_ = GenericToolbox::Json::fetchValue(
     _config_, "adaptiveWindow", _adaptiveWindow_);
 
@@ -111,7 +153,6 @@ void MCMCInterface::initializeImpl(){
   // likelihood to print informational messages, but do not affect how the
   // likelihood code runs.
   getLikelihood().setMinimizerInfo(_algorithmName_,_proposalName_);
-
 
 }
 
@@ -237,36 +278,53 @@ void MCMCInterface::setupAndRunAdaptiveStep(
   LogInfo << "Start with " << p.size() << " parameters" << std::endl;
   mcmc.Start(p, _saveBurnin_);
   mcmc.GetProposeStep().SetAcceptanceWindow(_adaptiveWindow_);
+  mcmc.SetStepRMSWindow(_adaptiveWindow_);
 
   // Restore the chain if exist
-  if (!_adaptiveRestore_.empty()) {
+  if (!_adaptiveRestore_.empty() && _adaptiveRestore_ != "none") {
     // Check for restore file
     LogInfo << "Restore from: " << _adaptiveRestore_ << std::endl;
-    std::unique_ptr<TFile> restoreFile
-      (new TFile(_adaptiveRestore_.c_str(), "old"));
-    if (!restoreFile) {
-      LogInfo << "File to restore was not openned: "
-              << _adaptiveRestore_ << std::endl;
-      std::runtime_error("Old state file not open");
+    TFile* saveFile = gFile;
+    {
+      std::unique_ptr<TFile> restoreFile
+        (new TFile(_adaptiveRestore_.c_str(), "old"));
+      if (!restoreFile || !restoreFile->IsOpen()) {
+        LogInfo << "File to restore was is found: "
+                << _adaptiveRestore_ << std::endl;
+        throw std::runtime_error("Old state file not open");
+      }
+      std::string treeName = "FitterEngine/fit/" + _outTreeName_;
+      TTree* restoreTree = (TTree*) restoreFile->Get(treeName.c_str());
+      if (!restoreTree) {
+        LogInfo << "Tree to restore state is not found"
+                << treeName << std::endl;
+        throw std::runtime_error("Old state tree not open");
+      }
+      // Set the deweighting to zero so the previous state is directly used.
+      mcmc.GetProposeStep().SetCovarianceUpdateDeweighting(0.0);
+      // Load the old state from the tree.
+      mcmc.Restore(restoreTree);
+      LogInfo << "State Restored" << std::endl;
     }
-    std::string treeName = "FitterEngine/fit/" + _outTreeName_;
-    TTree* restoreTree = (TTree*) restoreFile->Get(treeName.c_str());
-    if (!restoreTree) {
-      LogInfo << "Tree to restore state is not found"
-              << treeName << std::endl;
-      std::runtime_error("Old state tree not open");
-    }
-    mcmc.Restore(restoreTree);
-    LogInfo << "State Restored" << std::endl;
+    gFile = saveFile;
+    gFile->cd((std::string(owner().getSaveDir()->GetName())+"/fit").c_str());
   }
   else {
     // Burnin cycles
     mcmc.GetProposeStep().SetCovarianceWindow(_burninCovWindow_);
     mcmc.GetProposeStep().SetAcceptanceWindow(_burninWindow_);
-    mcmc.GetProposeStep().SetNextUpdate(2000*_burninLength_); // no automatic updates
+    mcmc.SetStepRMSWindow(_burninWindow_);
+    mcmc.GetProposeStep()
+      .SetCovarianceUpdateDeweighting(_burninCovDeweighting_);
     for (int chain = 0; chain < _burninCycles_; ++chain){
       LogInfo << "Start Burnin chain " << chain << std::endl;
       mcmc.GetProposeStep().UpdateProposal();
+      // Override default number of steps until the next automatic
+      // UpdateProposal call.  This disables automatic updates during adaptive
+      // burn-in.
+      mcmc.GetProposeStep().SetNextUpdate(2*_burninLength_);
+      mcmc.GetProposeStep()
+        .SetCovarianceUpdateDeweighting(_burninCovDeweighting_);
       if (chain < _burninFreezeAfter_) {
         LogInfo << "Burn-in step size variance will be updated" << std::endl;
         mcmc.GetProposeStep().SetAcceptanceRigidity(2.0);
@@ -289,8 +347,9 @@ void MCMCInterface::setupAndRunAdaptiveStep(
                   << " Trials: "
                   << mcmc.GetProposeStep().GetSuccesses()
                   << "/" << mcmc.GetProposeStep().GetTrials()
-                  << " (" << mcmc.GetProposeStep().GetAcceptance()
-                  << ": " << mcmc.GetProposeStep().GetSigma()
+                  << " (acc " << mcmc.GetProposeStep().GetAcceptance()
+                  << ", sig " << mcmc.GetProposeStep().GetSigma()
+                  << ", rms " << mcmc.GetStepRMS()
                   << ")"
                   << std::endl;
         }
@@ -307,12 +366,21 @@ void MCMCInterface::setupAndRunAdaptiveStep(
   // Run cycles
   mcmc.GetProposeStep().SetCovarianceWindow(_adaptiveCovWindow_);
   mcmc.GetProposeStep().SetAcceptanceWindow(_adaptiveWindow_);
-  mcmc.GetProposeStep().SetNextUpdate(2000*_steps_); // no automatic updates
+  mcmc.SetStepRMSWindow(_adaptiveWindow_);
   for (int chain = 0; chain < _cycles_; ++chain){
     LogInfo << "Start run chain " << chain << std::endl;
     // Update the covariance with the steps from the last cycle.  This
     // starts a new "reversible-chain".
     mcmc.GetProposeStep().UpdateProposal();
+    // Override default number of steps until the next automatic
+    // UpdateProposal call.  This disables automatic updates during normal
+    // chains.
+    mcmc.GetProposeStep().SetNextUpdate(2*_steps_);
+    // Set the adaptive covariance deweighting after the first update so that
+    // the previous deweighting is used for the first update.  This is a very
+    // cheap call so set it on every iteration.
+    mcmc.GetProposeStep()
+      .SetCovarianceUpdateDeweighting(_adaptiveCovDeweighting_);
     if (chain < _adaptiveFreezeAfter_) {
       LogWarning << "Step size variance will be updated" << std::endl;
       mcmc.GetProposeStep().SetAcceptanceRigidity(2.0);
@@ -336,8 +404,10 @@ void MCMCInterface::setupAndRunAdaptiveStep(
                 << " Trials: "
                 << mcmc.GetProposeStep().GetSuccesses()
                 << "/" << mcmc.GetProposeStep().GetTrials()
-                << " (" << mcmc.GetProposeStep().GetAcceptance()
-                << ": " << mcmc.GetProposeStep().GetSigma() << ")"
+                << " (acc " << mcmc.GetProposeStep().GetAcceptance()
+                << ", sig " << mcmc.GetProposeStep().GetSigma()
+                << ", rms " << mcmc.GetStepRMS()
+                << ")"
                 << std::endl;
       }
     }
@@ -391,7 +461,7 @@ void MCMCInterface::setupAndRunSimpleStep(
   }
   LogInfo << "Finished burnin chains" << std::endl;
 
-    // Run cycles
+  // Run cycles
   for (int chain = 0; chain < _cycles_; ++chain){
     LogInfo << "Start run chain " << chain << std::endl;
     // Update the covariance with the steps from the last cycle.  This

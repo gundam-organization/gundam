@@ -28,16 +28,21 @@
 namespace {
     // Interpolate one point using a spline with uniformly spaced knots.  This
     // is much faster than TSpline3 (about fifty times faster, but careful,
-    // controlled, benchmarking was not done).  This takes the "index" of the
+    // controlled benchmarking was not done).  This takes the "index" of the
     // point in the data, the parameter value (that made the index), a minimum
     // and maximum output value, the buffer of data for this spline, and the
     // number of data elements in the spline data.  The input data is arrange
     // as
     //
-    // data[0] -- spline lower bound (not used)
-    // data[1] -- spline inverse step (not used)
-    // data[2+2*n+0] -- The function value for knot n
+    // data[0] -- spline lower bound
+    // data[1] -- spline step
+    // data[2+2*n+0] -- The function value for knot n (0 to dim-3)
     // data[2+2*n+1] -- The function slope for knot n
+    //
+    // NOTE: CalculateUniformSpline, CalculateGeneralSpline,
+    // CalculateCompactSpline, and CalculateMonotonicSpline have very similar,
+    // but different calls.  In particular the dim parameter meaning is not
+    // consistent.
     DEVICE_CALLABLE_INLINE
     double CalculateUniformSpline(const double x,
                                   const double lowerBound, double upperBound,

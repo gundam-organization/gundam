@@ -13,6 +13,7 @@
 | [parameterSetListConfig](./FitParameterSet.md) | json | ParameterSetList config                                             |         |
 | [dataSetList](./DatasetLoader.md)              | json | DatasetManager config                                               |         |
 | [plotGeneratorConfig](./PlotGenerator.md)      | json | PlotGenerator config                                                |         |
+| [eventTreeWriter](./EventTreeWriter.md)        | json | EventTreeWriter config                                              |         |
 | showEventBreakdown                             | bool | Print sample total weight                                           | true    |
 | enableStatThrowInToys                          | bool | Throw statistical error with a poisson distribution                 | true    |
 | enableEventMcThrow                             | bool | Each MC event get reweighted with Poisson(1)                        | true    |

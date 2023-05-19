@@ -2,6 +2,11 @@
 // Created by Adrien BLANCHET on 02/12/2021.
 //
 
+// Unset for this file since the entire file is deprecated.
+#ifdef USE_NEW_DIALS
+#undef USE_NEW_DIALS
+#endif
+
 #include "GraphDial.h"
 #include "DialSet.h"
 
@@ -41,4 +46,3 @@ void GraphDial::setGraph(const TGraph &graph) {
   _graph_ = graph;
   _graph_.Sort();
 }
-

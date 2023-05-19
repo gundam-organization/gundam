@@ -4,6 +4,7 @@
 
 #include "ParScanner.h"
 #include "GenericToolbox.Json.h"
+#include "GenericToolbox.ScopedGuard.h"
 #include "Propagator.h"
 #include "FitParameter.h"
 
@@ -27,9 +28,98 @@ void ParScanner::readConfigImpl() {
 
   _useParameterLimits_ = GenericToolbox::Json::fetchValue(_config_, "useParameterLimits", _useParameterLimits_);
   _nbPoints_ = GenericToolbox::Json::fetchValue(_config_, "nbPoints", _nbPoints_);
+  _nbPointsLineScan_ = GenericToolbox::Json::fetchValue(_config_, "nbPointsLineScan", _nbPoints_);
   _parameterSigmaRange_ = GenericToolbox::Json::fetchValue(_config_, "parameterSigmaRange", _parameterSigmaRange_);
 
   _varsConfig_ = GenericToolbox::Json::fetchValue(_config_, "varsConfig", nlohmann::json());
+
+  _scanDataDict_.clear();
+  if( GenericToolbox::Json::fetchValue(_varsConfig_, "llh", true) ){
+    _scanDataDict_.emplace_back();
+    auto& scanEntry = _scanDataDict_.back();
+    scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
+    scanEntry.folder = "llh";
+    scanEntry.title = "Total Likelihood Scan";
+    scanEntry.yTitle = "LLH value";
+    scanEntry.evalY = [this](){ return _owner_->getLlhBuffer(); };
+  }
+  if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhPenalty", true) ){
+    _scanDataDict_.emplace_back();
+    auto& scanEntry = _scanDataDict_.back();
+    scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
+    scanEntry.folder = "llhPenalty";
+    scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
+    scanEntry.title = "Penalty Likelihood Scan";
+    scanEntry.yTitle = "Penalty LLH value";
+    scanEntry.evalY = [this](){ return _owner_->getLlhPenaltyBuffer(); };
+  }
+  if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStat", true) ){
+    _scanDataDict_.emplace_back();
+    auto& scanEntry = _scanDataDict_.back();
+    scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
+    scanEntry.folder = "llhStat";
+    scanEntry.title = "Stat Likelihood Scan";
+    scanEntry.yTitle = "Stat LLH value";
+    scanEntry.evalY = [this](){ return _owner_->getLlhStatBuffer(); };
+  }
+  if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSample", false) ){
+    for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
+      _scanDataDict_.emplace_back();
+      auto& scanEntry = _scanDataDict_.back();
+      scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
+      scanEntry.folder = "llhStat/" + sample.getName() + "/";
+      scanEntry.title = Form("Stat Likelihood Scan of sample \"%s\"", sample.getName().c_str());
+      scanEntry.yTitle = "Stat LLH value";
+      auto* samplePtr = &sample;
+      scanEntry.evalY = [this, samplePtr](){ return _owner_->getFitSampleSet().evalLikelihood(*samplePtr); };
+    }
+  }
+  if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSamplePerBin", false) ){
+    for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
+      for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+        _scanDataDict_.emplace_back();
+        auto& scanEntry = _scanDataDict_.back();
+        scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
+        scanEntry.folder = "llhStat/" + sample.getName() + "/bin_" + std::to_string(iBin);
+        scanEntry.title = Form(R"(Stat LLH Scan of sample "%s", bin #%d "%s")",
+                               sample.getName().c_str(),
+                               iBin,
+                               sample.getBinning().getBinsList()[iBin-1].getSummary().c_str());
+        scanEntry.yTitle = "Stat LLH value";
+        auto* samplePtr = &sample;
+        scanEntry.evalY = [this, samplePtr, iBin](){ return _owner_->getFitSampleSet().getJointProbabilityFct()->eval(*samplePtr, iBin); };
+      }
+    }
+  }
+  if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSample", false) ){
+    for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
+      _scanDataDict_.emplace_back();
+      auto& scanEntry = _scanDataDict_.back();
+      scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
+      scanEntry.folder = "weight/" + sample.getName();
+      scanEntry.title = Form("MC event weight scan of sample \"%s\"", sample.getName().c_str());
+      scanEntry.yTitle = "Total MC event weight";
+      auto* samplePtr = &sample;
+      scanEntry.evalY = [samplePtr](){ return samplePtr->getMcContainer().getSumWeights(); };
+    }
+  }
+  if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSamplePerBin", false) ){
+    for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
+      for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+        _scanDataDict_.emplace_back();
+        auto& scanEntry = _scanDataDict_.back();
+        scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
+        scanEntry.folder = "weight/" + sample.getName() + "/bin_" + std::to_string(iBin);
+        scanEntry.title = Form(R"(MC event weight scan of sample "%s", bin #%d "%s")",
+                               sample.getName().c_str(),
+                               iBin,
+                               sample.getBinning().getBinsList()[iBin-1].getSummary().c_str());
+        scanEntry.yTitle = "Total MC event weight";
+        auto* samplePtr = &sample;
+        scanEntry.evalY = [samplePtr, iBin](){ return samplePtr->getMcContainer().histogram->GetBinContent(iBin); };
+      }
+    }
+  }
 }
 void ParScanner::initializeImpl() {
   LogInfo << "Initializing ParScanner..." << std::endl;
@@ -41,6 +131,9 @@ void ParScanner::setOwner(Propagator *owner){
 }
 void ParScanner::setNbPoints(int nbPoints) {
   _nbPoints_ = nbPoints;
+}
+void ParScanner::setNbPointsLineScan(int nbPointsLineScan){
+  _nbPointsLineScan_ = nbPointsLineScan;
 }
 
 int ParScanner::getNbPoints() const {
@@ -63,96 +156,11 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
   LogThrowIf(saveDir_ == nullptr);
   std::vector<double> parPoints(_nbPoints_+1,0);
 
-  std::stringstream ssPbar;
-  ssPbar << LogInfo.getPrefixString() << "Scanning: " << par_.getFullTitle() << " / " << _nbPoints_ << " steps...";
-  GenericToolbox::displayProgressBar(0, _nbPoints_, ssPbar.str());
+  LogInfo << "Scanning: " << par_.getFullTitle() << " / " << _nbPoints_ << " steps..." << std::endl;
 
-  scanDataDict.clear();
-  if( GenericToolbox::Json::fetchValue(_varsConfig_, "llh", true) ){
-    scanDataDict.emplace_back();
-    auto& scanEntry = scanDataDict.back();
-    scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
-    scanEntry.folder = "llh";
-    scanEntry.title = "Total Likelihood Scan";
-    scanEntry.yTitle = "LLH value";
-    scanEntry.evalY = [this](){ return _owner_->getLlhBuffer(); };
-  }
-  if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhPenalty", true) ){
-    scanDataDict.emplace_back();
-    auto& scanEntry = scanDataDict.back();
-    scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
-    scanEntry.folder = "llhPenalty";
-    scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
-    scanEntry.title = "Penalty Likelihood Scan";
-    scanEntry.yTitle = "Penalty LLH value";
-    scanEntry.evalY = [this](){ return _owner_->getLlhPenaltyBuffer(); };
-  }
-  if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStat", true) ){
-    scanDataDict.emplace_back();
-    auto& scanEntry = scanDataDict.back();
-    scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
-    scanEntry.folder = "llhStat";
-    scanEntry.title = "Stat Likelihood Scan";
-    scanEntry.yTitle = "Stat LLH value";
-    scanEntry.evalY = [this](){ return _owner_->getLlhStatBuffer(); };
-  }
-  if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSample", false) ){
-    for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
-      scanDataDict.emplace_back();
-      auto& scanEntry = scanDataDict.back();
-      scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
-      scanEntry.folder = "llhStat/" + sample.getName() + "/";
-      scanEntry.title = Form("Stat Likelihood Scan of sample \"%s\"", sample.getName().c_str());
-      scanEntry.yTitle = "Stat LLH value";
-      auto* samplePtr = &sample;
-      scanEntry.evalY = [this, samplePtr](){ return _owner_->getFitSampleSet().evalLikelihood(*samplePtr); };
-    }
-  }
-  if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSamplePerBin", false) ){
-    for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
-      for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-        scanDataDict.emplace_back();
-        auto& scanEntry = scanDataDict.back();
-        scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
-        scanEntry.folder = "llhStat/" + sample.getName() + "/bin_" + std::to_string(iBin);
-        scanEntry.title = Form(R"(Stat LLH Scan of sample "%s", bin #%d "%s")",
-                               sample.getName().c_str(),
-                               iBin,
-                               sample.getBinning().getBinsList()[iBin-1].getSummary().c_str());
-        scanEntry.yTitle = "Stat LLH value";
-        auto* samplePtr = &sample;
-        scanEntry.evalY = [this, samplePtr, iBin](){ return _owner_->getFitSampleSet().getJointProbabilityFct()->eval(*samplePtr, iBin); };
-      }
-    }
-  }
-  if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSample", false) ){
-    for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
-      scanDataDict.emplace_back();
-      auto& scanEntry = scanDataDict.back();
-      scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
-      scanEntry.folder = "weight/" + sample.getName();
-      scanEntry.title = Form("MC event weight scan of sample \"%s\"", sample.getName().c_str());
-      scanEntry.yTitle = "Total MC event weight";
-      auto* samplePtr = &sample;
-      scanEntry.evalY = [samplePtr](){ return samplePtr->getMcContainer().getSumWeights(); };
-    }
-  }
-  if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSamplePerBin", false) ){
-    for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
-      for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-        scanDataDict.emplace_back();
-        auto& scanEntry = scanDataDict.back();
-        scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
-        scanEntry.folder = "weight/" + sample.getName() + "/bin_" + std::to_string(iBin);
-        scanEntry.title = Form(R"(MC event weight scan of sample "%s", bin #%d "%s")",
-                               sample.getName().c_str(),
-                               iBin,
-                               sample.getBinning().getBinsList()[iBin-1].getSummary().c_str());
-        scanEntry.yTitle = "Total MC event weight";
-        auto* samplePtr = &sample;
-        scanEntry.evalY = [samplePtr, iBin](){ return samplePtr->getMcContainer().histogram->GetBinContent(iBin); };
-      }
-    }
+  if( par_.getOwner()->isUseEigenDecompInFit() and not par_.isEigen() ){
+    // temporarily disable the automatic conversion Eigen -> Original
+    _owner_->setEnableEigenToOrigInPropagate( false );
   }
 
   double origVal = par_.getParameterValue();
@@ -164,31 +172,60 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
     highBound = std::min(highBound, par_.getMaxValue());
   }
 
-  int offSet{0};
+  int offSet{0}; // offset help make sure the first point
   for( int iPt = 0 ; iPt < _nbPoints_+1 ; iPt++ ){
-    GenericToolbox::displayProgressBar(iPt, _nbPoints_, ssPbar.str());
-
     double newVal = lowBound + double(iPt-offSet)/(_nbPoints_-1)*( highBound - lowBound );
     if( offSet == 0 and newVal > origVal ){
       newVal = origVal;
       offSet = 1;
     }
 
+    LogThrowIf(
+        std::isnan(newVal),
+        "Scanning point is nan. Current values are: "
+        << std::endl
+        << GET_VAR_NAME_VALUE(iPt) << std::endl
+        << GET_VAR_NAME_VALUE(lowBound) << std::endl
+        << GET_VAR_NAME_VALUE(highBound) << std::endl
+        << GET_VAR_NAME_VALUE(_nbPoints_) << std::endl
+        << GET_VAR_NAME_VALUE(offSet) << std::endl
+        << GET_VAR_NAME_VALUE(origVal) << std::endl
+        << GET_VAR_NAME_VALUE(_parameterSigmaRange_.first) << std::endl
+        << GET_VAR_NAME_VALUE(_parameterSigmaRange_.second) << std::endl
+        << GET_VAR_NAME_VALUE(par_.getStdDevValue()) << std::endl
+        );
+
     par_.setParameterValue(newVal);
     _owner_->updateLlhCache();
     parPoints[iPt] = par_.getParameterValue();
 
-    for( auto& scanEntry : scanDataDict ){ scanEntry.yPoints[iPt] = scanEntry.evalY(); }
+    for( auto& scanEntry : _scanDataDict_ ){ scanEntry.yPoints[iPt] = scanEntry.evalY(); }
   }
+
+  // sorting points in increasing order
+  auto p = GenericToolbox::getSortPermutation(parPoints, [](double a_, double b_){
+    if( a_ < b_ ) return true;
+    return false;
+  });
+  GenericToolbox::applyPermutation(parPoints, p);
+  for( auto& scanEntry : _scanDataDict_ ){
+    GenericToolbox::applyPermutation(scanEntry.yPoints, p);
+  }
+
 
   par_.setParameterValue(origVal);
   _owner_->updateLlhCache();
+
+  // Disable the auto conversion from Eigen to Original if the fit is set to use eigen decomp
+  if( par_.getOwner()->isUseEigenDecompInFit() and not par_.isEigen() ){
+    _owner_->setEnableEigenToOrigInPropagate( true );
+  }
 
   std::stringstream ss;
   ss << GenericToolbox::replaceSubstringInString(par_.getFullTitle(), "/", "_");
   ss << "_TGraph";
 
-  for( auto& scanEntry : scanDataDict ){
+  for( auto& scanEntry : _scanDataDict_ ){
     TGraph scanGraph(int(parPoints.size()), &parPoints[0], &scanEntry.yPoints[0]);
     scanGraph.SetTitle(scanEntry.title.c_str());
     scanGraph.GetYaxis()->SetTitle(scanEntry.yTitle.c_str());
@@ -197,6 +234,136 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
     scanGraph.SetMarkerStyle(kFullDotLarge);
     GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile( saveDir_, scanEntry.folder ), &scanGraph, ss.str());
   }
+
+  std::stringstream ssVal;
+  ssVal << GenericToolbox::replaceSubstringInString(par_.getFullTitle(), "/", "_");
+  ssVal << "_CurrentPar";
+
+  // current parameter value / center of the scan:
+  TVectorD currentParValue(1);
+  currentParValue[0] = par_.getParameterValue();
+  GenericToolbox::writeInTFile(saveDir_, &currentParValue, ssVal.str());
+}
+void ParScanner::scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, const nlohmann::json &start_) {
+  LogWarning << "Scanning along a segment with " << _nbPointsLineScan_ << " steps." << std::endl;
+
+  // don't shout while re-injecting parameters
+  GenericToolbox::ScopedGuard s(
+      []{ FitParameterSet::muteLogger(); Propagator::muteLogger(); },
+      []{ FitParameterSet::unmuteLogger(); Propagator::unmuteLogger(); }
+  );
+
+  LogThrowIf(end_.empty(), "Ending injector config is empty()");
+  LogThrowIf(_nbPointsLineScan_ < 0, "Invalid nSteps");
+
+  // nSteps_+2 as we also want the first and last points
+  int nTotalSteps = _nbPointsLineScan_+2;
+
+  LogInfo << "Backup current position of the propagator..." << std::endl;
+  auto currentParState = _owner_->exportParameterInjectorConfig();
+
+  LogInfo << "Reading start point parameter state..." << std::endl;
+  std::vector<std::pair<FitParameter*, double>> startPointParValList;
+  if( not start_.empty() ){ _owner_->injectParameterValues(start_); }
+  else{ _owner_->injectParameterValues(currentParState); }
+  for( auto& parSet : _owner_->getParameterSetsList() ){
+    if( not parSet.isEnabled() ){ continue; }
+    for( auto& par : parSet.getParameterList() ){
+      if( not par.isEnabled() ){ continue; }
+      startPointParValList.emplace_back(&par, par.getParameterValue());
+    }
+  }
+
+  LogInfo << "Reading end point parameter state..." << std::endl;
+  std::vector<std::pair<FitParameter*, double>> endPointParValList;
+  _owner_->injectParameterValues(end_);
+  endPointParValList.reserve(startPointParValList.size());
+  for( auto& parPair : startPointParValList ){
+    endPointParValList.emplace_back(parPair.first, parPair.first->getParameterValue());
+  }
+
+  LogInfo << "Creating graph holders..." << std::endl;
+
+  struct GraphEntry{
+    ScanData* scanDataPtr{nullptr};
+    FitParameter* fitParPtr{nullptr};
+    TGraph graph{};
+  };
+
+  std::vector<GraphEntry> graphEntryList;
+  for( auto& scanData : _scanDataDict_ ){
+    for( auto& parPair : startPointParValList ){
+      graphEntryList.emplace_back(GraphEntry{&scanData, parPair.first, TGraph(nTotalSteps)});
+    }
+  }
+
+  std::stringstream ss;
+  ss << LogWarning.getPrefixString() << "Scanning...";
+
+  LogInfo << "Scanning along the line..." << std::endl;
+  for( int iStep = 0 ; iStep < nTotalSteps ; iStep++ ){
+    GenericToolbox::displayProgressBar(iStep, nTotalSteps-1, ss.str());
+
+    for( size_t iPar = 0 ; iPar < startPointParValList.size() ; iPar++ ){
+      auto* par = startPointParValList[iPar].first;
+      par->setParameterValue(
+          startPointParValList[iPar].second
+          + ( endPointParValList[iPar].second - startPointParValList[iPar].second ) * double(iStep) / double(nTotalSteps-1)
+          );
+    }
+
+    for( auto& parSet : _owner_->getParameterSetsList() ){
+      if( not parSet.isEnabled() ){ continue; }
+      if( parSet.isUseEigenDecompInFit() ){
+        // make sure the parameters don't get overwritten
+        parSet.propagateOriginalToEigen();
+      }
+    }
+
+    _owner_->updateLlhCache();
+
+    for( auto& graphEntry : graphEntryList ){
+      graphEntry.graph.SetPointX(iStep, graphEntry.fitParPtr->getParameterValue());
+      graphEntry.graph.SetPointY(iStep, graphEntry.scanDataPtr->evalY());
+    }
+
+  }
+
+  LogInfo << "Writing scan line graph in file..." << std::endl;
+  for( auto& graphEntry : graphEntryList ){
+    graphEntry.graph.SetTitle(graphEntry.scanDataPtr->title.c_str());
+    graphEntry.graph.GetYaxis()->SetTitle(graphEntry.scanDataPtr->yTitle.c_str());
+    graphEntry.graph.GetXaxis()->SetTitle(graphEntry.fitParPtr->getFullTitle().c_str());
+    graphEntry.graph.SetDrawOption("AP");
+
+    // marker indicates the direction
+    if( graphEntry.graph.GetY()[0] == graphEntry.graph.GetY()[graphEntry.graph.GetN()-1] ){
+      // Did not move
+      graphEntry.graph.SetMarkerStyle( kFullDotMedium );
+    }
+    else if( graphEntry.graph.GetY()[0] > graphEntry.graph.GetY()[graphEntry.graph.GetN()-1] ){
+      // Did go down
+      graphEntry.graph.SetMarkerStyle( kFullTriangleDown );
+    }
+    else{
+      // Did go up
+      graphEntry.graph.SetMarkerStyle( kFullTriangleUp );
+    }
+
+
+
+
+    GenericToolbox::writeInTFile(
+        GenericToolbox::mkdirTFile( saveDir_, graphEntry.scanDataPtr->folder ),
+        graphEntry.graph,
+        GenericToolbox::generateCleanBranchName(graphEntry.fitParPtr->getFullTitle())
+    );
+  }
+
+
+  LogInfo << "Restore position of the propagator..." << std::endl;
+  _owner_->injectParameterValues( currentParState );
+  _owner_->updateLlhCache();
 }
 void ParScanner::generateOneSigmaPlots(TDirectory* saveDir_){
   LogThrowIf(not isInitialized());
@@ -264,15 +431,48 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
   LogThrowIf(not isInitialized());
   saveDir_->cd();
 
-  auto makeVariedEventRatesFct = [&](FitParameter& par_, std::vector<double> variationList_, TDirectory* saveSubDir_){
+  LogInfo << __METHOD_NAME__ << std::endl;
+  LogScopeIndent;
 
+  // make sure the parameters are rolled back to their original value
+  std::map<FitParameter*, double> parStateList{};
+  GenericToolbox::ScopedGuard g(
+      [&]{
+        LogScopeIndent;
+        LogDebug << "Temporarily pulling back parameters at their prior before performing the event rate..." << std::endl;
+        for( auto& parSet : _owner_->getParameterSetsList() ){
+          if( not parSet.isEnabled() ) { continue; }
+          for( auto& par : parSet.getParameterList() ){
+            if( not par.isEnabled() ) { continue; }
+            parStateList[&par] = par.getParameterValue();
+            par.setParameterValue( par.getPriorValue() );
+          }
+        }
+        _owner_->propagateParametersOnSamples();
+      },
+      [&]{
+        LogScopeIndent;
+        LogDebug << "Restoring parameters to their original values..." << std::endl;
+        for( auto& parSet : _owner_->getParameterSetsList() ){
+          if( not parSet.isEnabled() ) { continue; }
+          for( auto& par : parSet.getParameterList() ){
+            if( not par.isEnabled() ){ continue; }
+            par.setParameterValue( parStateList[&par] );
+          }
+        }
+        _owner_->propagateParametersOnSamples();
+      }
+  );
+
+  auto makeVariedEventRatesFct = [&](FitParameter& par_, std::vector<double> variationList_, TDirectory* saveSubDir_){
     LogInfo << "Making varied event rates for " << par_.getFullTitle() << std::endl;
 
     // First make sure all params are at their prior <- is it necessary?
     for( auto& parSet : _owner_->getParameterSetsList() ){
       if( not parSet.isEnabled() ) continue;
       for( auto& par : parSet.getParameterList() ){
-        par.setParameterValue(par.getPriorValue());
+        if( not par.isEnabled() ) continue;
+        par.setParameterValue( par.getPriorValue() );
       }
     }
     _owner_->propagateParametersOnSamples();
@@ -295,19 +495,20 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
 
       buffEvtRatesMap.emplace_back();
 
-      if(par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue() > par_.getMaxValue())
-        par_.setParameterValue(par_.getMaxValue());
-      else if (par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue() < par_.getMinValue())
-        par_.setParameterValue(par_.getMinValue());
-      else
-        par_.setParameterValue(par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue());
+      double cappedParValue{par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue()};
+      cappedParValue = std::min(cappedParValue, par_.getMaxValue());
+      cappedParValue = std::max(cappedParValue, par_.getMinValue());
 
+      par_.setParameterValue( cappedParValue );
       _owner_->propagateParametersOnSamples();
 
       for(auto & sample : _owner_->getFitSampleSet().getFitSampleList()){
-        buffEvtRatesMap[iVar].push_back(sample.getMcContainer().getSumWeights() );
+        buffEvtRatesMap[iVar].emplace_back( sample.getMcContainer().getSumWeights() );
       }
-      par_.setParameterValue(par_.getPriorValue());
+
+      // back to the prior
+      par_.setParameterValue( par_.getPriorValue() );
+      _owner_->propagateParametersOnSamples();
     }
 
 

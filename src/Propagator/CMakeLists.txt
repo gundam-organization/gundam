@@ -31,23 +31,19 @@ target_include_directories( GundamPropagator PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 if( WITH_CACHE_MANAGER )
-  target_link_libraries(  GundamPropagator
-          GundamFitParameters
-          GundamFitSamples
-          GundamDatasetManager
-          GundamCache
-          GundamDials
-          ${ROOT_LIBRARIES}
-          )
+  set(CACHE_MANAGER_LIBRARIES "GundamCache")
 else()
-  target_link_libraries( GundamPropagator
-    GundamFitParameters
-    GundamFitSamples
-    GundamDatasetManager
-    GundamDialDictionary
-    ${ROOT_LIBRARIES}
-  )
+  set(CACHE_MANAGER_LIBRARIES "")
 endif()
+
+target_link_libraries( GundamPropagator
+  GundamFitParameters
+  GundamFitSamples
+  GundamDatasetManager
+  GundamDialDictionary
+  ${CACHE_MANAGER_LIBRARIES}
+  ${ROOT_LIBRARIES}
+  )
 
 #set_target_properties( GundamPropagator PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")
 

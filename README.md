@@ -1,6 +1,6 @@
 # GUNDAM — 風をあつめて 
 
-![](./resources/images/banner2.png)
+![](./resources/images/bannerv2.png)
 
 [![Generic badge](https://img.shields.io/badge/Example_of_inputs-OA2020-GREEN.svg)](https://github.com/nadrino/gundamInputOa2020)  [![GitHub forks](https://badgen.net/github/forks/nadrino/gundam/)](https://github.com/nadrino/gundam/network/members) [![GitHub release](https://img.shields.io/github/release/nadrino/gundam.svg)](https://github.com/nadrino/gundam/releases/)
 
@@ -108,6 +108,16 @@ git submodule update --init --recursive
 cd -
 ```
 
+### Alternative installation procedure
+
+```bash
+cd $REPO_DIR/gundam
+cd cmake
+./gundam-setup.sh
+./gundam-build.sh
+```
+
+this will create the build directory `gundam-${compiler}_${compiler_version}-${compiler_machine}`.
 
 ### Compiling on macOS:
 
@@ -151,7 +161,7 @@ ND280 Detectors* will be performed.
 
 ### Development policy 
 
-- Main development of the code should take place in the master branch.
+- Main development of the code should take place in the main branch.
 - Code developments must be discussed with the group before they happen.
 - Developments should happen in a feature brach with a name descriptive of the feature you are developing. 
 - Commit messages must be detailed. This means that messages like "Minor fix" or "Update" must be avoided.

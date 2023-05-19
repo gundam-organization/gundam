@@ -6,8 +6,14 @@
 #define GUNDAM_PHYSICSEVENT_H
 
 #include "FitParameterSet.h"
+
+#ifndef USE_NEW_DIALS
 #include "Dial.h"
 #include "NestedDialTest.h"
+#else
+class Dial;           // Define for deprecated class
+class NestedDialTest; // Define for deprecated class
+#endif
 
 #include "GenericToolbox.Root.TreeEntryBuffer.h"
 #include "GenericToolbox.Root.LeafHolder.h"
@@ -35,6 +41,7 @@ public:
   void setNominalWeight(double nominalWeight);
   void setEventWeight(double eventWeight);
   void setSampleBinIndex(int sampleBinIndex);
+  void setSampleIndex(int sampleIndex);
   void setCommonLeafNameListPtr(const std::shared_ptr<std::vector<std::string>>& commonLeafNameListPtr_);
 
   // GETTERS
@@ -44,6 +51,7 @@ public:
   double getNominalWeight() const;
   double getEventWeight() const;
   int getSampleBinIndex() const;
+  int getSampleIndex() const;
   const std::vector<GenericToolbox::AnyType>& getLeafHolder(const std::string &leafName_) const;
   const std::vector<GenericToolbox::AnyType>& getLeafHolder(int index_) const;
   const std::vector<std::vector<GenericToolbox::AnyType>> &getLeafContentList() const;
@@ -89,6 +97,13 @@ public:
   friend std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p );
 
 #if USE_NEW_DIALS
+  [[deprecated]] std::vector<Dial *> getRawDialPtrList() const {
+       LogThrow("PhysicsEvent::getRawDialPtrList() not implemented");
+       return std::vector<Dial*>();
+  }
+  [[deprecated]] void reweightUsingDialCache() {LogThrow("PhysicsEvent::reweightUsingDialCache() not implemented");}
+  [[deprecated]] void trimDialCache() {LogThrow("PhysicsEvent::trimDialCache() not implemented");}
+  [[deprecated]] void addNestedDialRefToCache(NestedDialTest* nestedDialPtr_, const std::vector<Dial*>& dialPtrList_ = {}) {LogThrow("PhysicsEvent::addNestedDialRefToCache() not implemented");}
 #else
   std::vector<Dial *> &getRawDialPtrList();
   const std::vector<Dial *> &getRawDialPtrList() const;
@@ -106,6 +121,7 @@ private:
   double _nominalWeight_{1};
   double _eventWeight_{1};
   int _sampleBinIndex_{-1};
+  int _sampleIndex_{-1}; // this information is lost in the EventDialCache manager
 
   // Data storage variables
   std::shared_ptr<std::vector<std::string>> _commonLeafNameListPtr_{nullptr};
@@ -122,7 +138,7 @@ private:
 #ifdef GUNDAM_USING_CACHE_MANAGER
 public:
   void setCacheManagerIndex(int i) {_CacheManagerIndex_ = i;}
-  int  getCacheManagerIndex() {return _CacheManagerIndex_;}
+  int  getCacheManagerIndex() const {return _CacheManagerIndex_;}
   void setCacheManagerValuePointer(const double* v) {_CacheManagerValue_ = v;}
   void setCacheManagerValidPointer(const bool* v) {_CacheManagerValid_ = v;}
   void setCacheManagerUpdatePointer(void (*p)()) {_CacheManagerUpdate_ = p;}

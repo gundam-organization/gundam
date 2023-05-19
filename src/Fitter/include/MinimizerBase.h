@@ -8,6 +8,8 @@
 #include "JsonBaseClass.h"
 #include "GenericToolbox.VariablesMonitor.h"
 
+#include "string"
+
 class TDirectory;
 class FitterEngine;
 class FitParameter;
@@ -24,6 +26,9 @@ class MinimizerBase : public JsonBaseClass {
 
 public:
   explicit MinimizerBase(FitterEngine* owner_);
+
+  /// Local RTTI
+  [[nodiscard]] virtual std::string getMinimizerTypeName() const { return "MinimizerBase"; };
 
   /// A pure virtual method that is called by the FitterEngine to find the
   /// minimum of the likelihood, or, in the case of a Bayesian integration find
@@ -53,25 +58,25 @@ public:
 protected:
   /// Get a reference to the FitterEngine that owns this minimizer.
   inline FitterEngine& owner() { return *_owner_; }
-  inline const FitterEngine& owner() const { return *_owner_; }
+  [[nodiscard]] inline const FitterEngine& owner() const { return *_owner_; }
 
-  // Implement the methods required by JsonBaseClass.  These MinimizerBase
-  // methods may be overridden by the derived class, but if overriden, the
-  // derived class must run these instantiations (i.e. call
-  // MinimizerBase::readConfigImpl() and MinimizerBase::initializeImpl in the
-  // respective methods).
-  virtual void readConfigImpl() override;
-  virtual void initializeImpl() override;
+  /// Implement the methods required by JsonBaseClass.  These MinimizerBase
+  /// methods may be overridden by the derived class, but if overriden, the
+  /// derived class must run these instantiations (i.e. call
+  /// MinimizerBase::readConfigImpl() and MinimizerBase::initializeImpl in the
+  /// respective methods).
+  void readConfigImpl() override;
+  void initializeImpl() override;
 
   // Get the propagator being used to calculate the likelihood.  This is a
   // local convenience function to get the propagator from the owner.
   Propagator& getPropagator();
-  const Propagator& getPropagator() const;
+  [[nodiscard]] const Propagator& getPropagator() const;
 
   // Get the likelihood that should be used by the minimization.  This is a
   // local convenience function to get the likelihood from the owner.
   LikelihoodInterface& getLikelihood();
-  const LikelihoodInterface& getLikelihood() const;
+  [[nodiscard]] const LikelihoodInterface& getLikelihood() const;
 
   // Get the convergence monitor that is maintained by the likelihood
   // interface.  A local convenience function to get the convergence monitor.
@@ -93,6 +98,7 @@ private:
   bool _enablePostFitErrorEval_{true};
 
 };
+
 #endif //GUNDAM_MinimizerBase_h
 
 //  A Lesser GNU Public License

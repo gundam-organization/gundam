@@ -2,13 +2,19 @@
 // Created by Nadrino on 21/05/2021.
 //
 
-#include "Dial.h"
-#include "DialSet.h"
 #include "FitParameterSet.h"
 
 #include "Logger.h"
 
 #include "sstream"
+
+// Unset for this file since the entire file is deprecated.
+#ifdef USE_NEW_DIALS
+#undef USE_NEW_DIALS
+#endif
+
+#include "Dial.h"
+#include "DialSet.h"
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[Dial]");
@@ -79,11 +85,13 @@ double Dial::getEffectiveDialParameter(double parameterValue_){
   return parameterValue_;
 }
 double Dial::capDialResponse(double response_){
+  LogThrowIf( std::isnan(response_), "NaN response returned:" << std::endl << this->Dial::getSummary());
+
   // Cap checks
   if     ( not std::isnan(_owner_->getMinDialResponse()) and response_ < _owner_->getMinDialResponse() ){ response_=_owner_->getMinDialResponse(); }
   else if( not std::isnan(_owner_->getMaxDialResponse()) and response_ > _owner_->getMaxDialResponse() ){ response_=_owner_->getMaxDialResponse(); }
+  else if ( std::isnan(_owner_->getMinDialResponse()) and response_ < 0.0 ){ response_=0.0; }
 
-  LogThrowIf( std::isnan(response_), "NaN response returned:" << std::endl << this->Dial::getSummary());
   if( Dial::throwIfResponseIsNegative and response_ < 0 ){
     this->writeSpline("");
     LogError << this->getSummary() << std::endl;
@@ -161,6 +169,3 @@ std::string Dial::getSummary(){
 //      new TSpline3(Form("%p", this), &xSigmaSteps[0], &yResponse[0], int(xSigmaSteps.size()))
 //  );
 //}
-
-
-

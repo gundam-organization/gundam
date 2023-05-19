@@ -35,6 +35,9 @@ class MCMCInterface : public MinimizerBase {
 public:
   explicit MCMCInterface(FitterEngine* owner_);
 
+  /// Local RTTI
+  [[nodiscard]] std::string getMinimizerTypeName() const override { return "MCMCInterface"; };
+
   /// A boolean to flag indicating if the MCMC exited successfully.
   [[nodiscard]] virtual bool isFitHasConverged() const override;
 
@@ -55,7 +58,6 @@ protected:
 private:
   std::string _algorithmName_{"metropolis"};
   std::string _proposalName_{"adaptive"};
-  int _stepCount_{1000};
   std::string _outTreeName_{"MCMC"};
 
   // The number of burn-in cylces to use.
@@ -84,22 +86,31 @@ private:
   std::string _adaptiveRestore_{""};
 
   // Freeze the burn-in step after this many cycles.
-  int _burninFreezeAfter_{1000000}; // Never freeze except by request
+  int _burninFreezeAfter_{1000000000}; // Never freeze except by request
 
   // The window to calculate the covariance during burn-in
   int _burninCovWindow_{20000};
+
+  // The amount of deweighting during burning updates.
+  double _burninCovDeweighting_{0.5};
 
   // The acceptance window during burn-in.
   int _burninWindow_{3000};
 
   // Freeze the step after this many cycles.
-  int _adaptiveFreezeAfter_{1000000}; // Never freeze except by request
+  int _adaptiveFreezeAfter_{1000000000}; // Never freeze except by request
 
-  // The window to calculate the covariance during burn-in
-  int _adaptiveCovWindow_{20000};
+  // The window to calculate the covariance during normal chains.
+  int _adaptiveCovWindow_{1000000000};
+
+  // The covariance deweighting while the chain is running.  This should
+  // usually be left at zero so the entire chain history is used after an
+  // update and more recent points don't get a heavier weight (within the
+  // covariance window).
+  double _adaptiveCovDeweighting_{0.0};
 
   // The window used to calculate the current acceptance value.
-  int _adaptiveWindow_{10000};
+  int _adaptiveWindow_{5000};
 
   //////////////////////////////////////////
   // Parameters for the simple stepper
