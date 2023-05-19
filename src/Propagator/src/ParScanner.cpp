@@ -251,7 +251,7 @@ void ParScanner::scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, c
   GenericToolbox::ScopedGuard s(
       []{ FitParameterSet::muteLogger(); Propagator::muteLogger(); },
       []{ FitParameterSet::unmuteLogger(); Propagator::unmuteLogger(); }
-      );
+  );
 
   LogThrowIf(end_.empty(), "Ending injector config is empty()");
   LogThrowIf(_nbPointsLineScan_ < 0, "Invalid nSteps");
@@ -264,7 +264,7 @@ void ParScanner::scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, c
 
   LogInfo << "Reading start point parameter state..." << std::endl;
   std::vector<std::pair<FitParameter*, double>> startPointParValList;
-  if( not start_.empty() ) _owner_->injectParameterValues(start_);
+  if( not start_.empty() ){ _owner_->injectParameterValues(start_); }
   else{ _owner_->injectParameterValues(currentParState); }
   for( auto& parSet : _owner_->getParameterSetsList() ){
     if( not parSet.isEnabled() ){ continue; }

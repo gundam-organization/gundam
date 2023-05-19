@@ -134,19 +134,37 @@ int main(int argc, char** argv){
     } while( false ); // allows to skip if not found
 
 
-
     if( clParser.isOptionTriggered("dryRun") ){
       LogAlert << "Dry run set. Not doing actions involving writing of files on disk" << std::endl;
       continue;
     }
 
     auto outDir{GenericToolbox::getFileNameFromFilePath(file, false)};
+
+
     readObject<TNamed>(f.get(), GenericToolbox::joinPath("gundamFitter", "unfoldedConfig_TNamed"), [&](TNamed* obj_){
       if( not GenericToolbox::doesPathIsFolder(outDir) ){ GenericToolbox::mkdirPath(outDir); }
       auto outConfigPath = GenericToolbox::joinPath(outDir, "config.json");
       LogInfo << blueLightText << "Writing unfolded config under: " << resetColor << outConfigPath << std::endl;
       GenericToolbox::dumpStringInFile( outConfigPath, obj_->GetTitle() );
     });
+
+    do {
+      auto pathPreFit{GenericToolbox::joinPath("FitterEngine", "preFit")};
+      if( not readObject(f.get(), pathPreFit) ){ break; }
+
+      LogInfo << cyanLightText << "Reading inside: " << pathPreFit << resetColor << std::endl;
+      LogScopeIndent;
+
+      readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPreFit, "preFitLlhState_TNamed"), [&](TNamed* injectorStr){
+        auto outSubDir{GenericToolbox::joinPath( outDir, pathPreFit)};
+        if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
+        auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".txt");
+        LogInfo << blueLightText << "Writing pre-fit LLH stats under: " << resetColor << outConfigPath << std::endl;
+        GenericToolbox::dumpStringInFile( outConfigPath, injectorStr->GetTitle() );
+      });
+
+    } while( false ); // allows to skip if not found
 
     f->Close();
   }

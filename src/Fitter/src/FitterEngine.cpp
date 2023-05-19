@@ -251,6 +251,10 @@ void FitterEngine::fit(){
       TNamed("preFitLlhState", llhState.c_str())
   );
   _preFitParState_ = _propagator_.exportParameterInjectorConfig();
+  GenericToolbox::writeInTFile(
+      GenericToolbox::mkdirTFile( _saveDir_, "preFit" ),
+      TNamed("preFitParState", GenericToolbox::Json::toReadableString(_preFitParState_).c_str())
+  );
 
   // Not moving parameters
   if( _generateSamplePlots_ and not _propagator_.getPlotGenerator().getConfig().empty() ){
@@ -331,6 +335,10 @@ void FitterEngine::fit(){
 
   LogWarning << "Saving post-fit par state..." << std::endl;
   _postFitParState_ = _propagator_.exportParameterInjectorConfig();
+  GenericToolbox::writeInTFile(
+      GenericToolbox::mkdirTFile( _saveDir_, "postFit" ),
+      TNamed("postFitParState", GenericToolbox::Json::toReadableString(_postFitParState_).c_str())
+  );
 
   LogWarning << "Post-fit likelihood state:" << std::endl;
   LogInfo << _propagator_.getLlhBufferSummary() << std::endl;
