@@ -149,6 +149,8 @@ int main(int argc, char** argv){
       GenericToolbox::dumpStringInFile( outConfigPath, obj_->GetTitle() );
     });
 
+
+    /// Pre-fit folder
     do {
       auto pathPreFit{GenericToolbox::joinPath("FitterEngine", "preFit")};
       if( not readObject(f.get(), pathPreFit) ){ break; }
@@ -161,6 +163,41 @@ int main(int argc, char** argv){
         if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
         auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".txt");
         LogInfo << blueLightText << "Writing pre-fit LLH stats under: " << resetColor << outConfigPath << std::endl;
+        GenericToolbox::dumpStringInFile( outConfigPath, injectorStr->GetTitle() );
+      });
+
+      readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPreFit, "preFitParState_TNamed"), [&](TNamed* injectorStr){
+        auto outSubDir{GenericToolbox::joinPath( outDir, pathPreFit)};
+        if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
+        auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".json");
+        LogInfo << blueLightText << "Writing pre-fit LLH parameter injector under: " << resetColor << outConfigPath << std::endl;
+        GenericToolbox::dumpStringInFile( outConfigPath, injectorStr->GetTitle() );
+      });
+
+    } while( false ); // allows to skip if not found
+
+
+    /// Post-fit folder
+    do {
+      auto pathPostFit{GenericToolbox::joinPath("FitterEngine", "postFit")};
+      if( not readObject(f.get(), pathPostFit) ){ break; }
+
+      LogInfo << cyanLightText << "Reading inside: " << pathPostFit << resetColor << std::endl;
+      LogScopeIndent;
+
+      readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPostFit, "postFitLlhState_TNamed"), [&](TNamed* injectorStr){
+        auto outSubDir{GenericToolbox::joinPath( outDir, pathPostFit)};
+        if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
+        auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".txt");
+        LogInfo << blueLightText << "Writing post-fit LLH stats under: " << resetColor << outConfigPath << std::endl;
+        GenericToolbox::dumpStringInFile( outConfigPath, injectorStr->GetTitle() );
+      });
+
+      readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPostFit, "postFitParState_TNamed"), [&](TNamed* injectorStr){
+        auto outSubDir{GenericToolbox::joinPath( outDir, pathPostFit)};
+        if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
+        auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".json");
+        LogInfo << blueLightText << "Writing post-fit LLH parameter injector under: " << resetColor << outConfigPath << std::endl;
         GenericToolbox::dumpStringInFile( outConfigPath, injectorStr->GetTitle() );
       });
 

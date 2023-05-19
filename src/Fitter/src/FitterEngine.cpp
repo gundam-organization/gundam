@@ -341,7 +341,10 @@ void FitterEngine::fit(){
   );
 
   LogWarning << "Post-fit likelihood state:" << std::endl;
-  LogInfo << _propagator_.getLlhBufferSummary() << std::endl;
+  llhState = _propagator_.getLlhBufferSummary();
+  LogInfo << llhState << std::endl;
+  GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile( _saveDir_, "postFit" ), TNamed("postFitLlhState", llhState.c_str()) );
+
 
   if( _generateSamplePlots_ and not _propagator_.getPlotGenerator().getConfig().empty() ){
     LogInfo << "Generating post-fit sample plots..." << std::endl;
