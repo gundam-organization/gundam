@@ -57,7 +57,7 @@ int main(int argc, char** argv){
   clParser.addDummyOption("Options");
   clParser.addOption("fitFiles", {"-f", "--file"}, "Specify path to fitter output files", -1);
   clParser.addOption("verbose", {"-v", "--verbose"}, "Set the verbosity level", 1, true);
-  clParser.addOption("showCorrelationsWith", {"--show-correlations-with"}, "Show all correlation coefficients of a given par wrt others", 1);
+  clParser.addOption("showCorrelationsWith", {"--show-correlations-with"}, "Show all correlation coefficients of a given par wrt others", -1);
 
   clParser.addDummyOption("Triggers");
   clParser.addTriggerOption("dryRun", {"-d", "--dry-run"}, "Don't write files on disk");
@@ -164,12 +164,22 @@ int main(int argc, char** argv){
     } while( false ); // allows to skip if not found
 
 
+    /// Multiple entries
+    if( clParser.isOptionTriggered("showCorrelationsWith") ){
+
+      for( auto& parFullTitle : clParser.getOptionValList<std::string>("showCorrelationsWith") ){
+        LogInfo << "Looking for \"" << parFullTitle << "\"" << std::endl;
+
+
+      }
+
+    }
+
+
     if( clParser.isOptionTriggered("dryRun") ){
       LogAlert << "Dry run set. Not doing actions involving writing of files on disk" << std::endl;
       continue;
     }
-
-
     auto outDir{GenericToolbox::getFileNameFromFilePath(file, false)};
     LogWarning << "Will now write data in sub-folder: " << outDir << std::endl;
 
@@ -180,7 +190,6 @@ int main(int argc, char** argv){
       LogInfo << blueLightText << "Writing unfolded config under: " << resetColor << outConfigPath << std::endl;
       GenericToolbox::dumpStringInFile( outConfigPath, obj_->GetTitle() );
     });
-
 
     /// FitterEngine/preFit
     do {
@@ -207,7 +216,6 @@ int main(int argc, char** argv){
       });
 
     } while( false ); // allows to skip if not found
-
 
     /// FitterEngine/postFit
     do {

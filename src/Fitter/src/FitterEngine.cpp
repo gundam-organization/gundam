@@ -167,6 +167,14 @@ void FitterEngine::initializeImpl(){
         GenericToolbox::mkdirTFile(_saveDir_, GenericToolbox::joinPath("propagator", parSet.getName()) ),
         parSet.getPriorCorrelationMatrix().get(), "correlationMatrix"
     );
+
+    for( auto& par : parSet.getParameterList() ){
+      if( not par.isEnabled() ){ continue; }
+      GenericToolbox::writeInTFile(
+          GenericToolbox::mkdirTFile(_saveDir_, GenericToolbox::joinPath("propagator", "parameters") ),
+          TNamed(GenericToolbox::generateCleanBranchName(par.getFullTitle()).c_str(), GenericToolbox::generateCleanBranchName(par.getFullTitle()).c_str())
+      );
+    }
   }
 
   this->_propagator_.updateLlhCache();
