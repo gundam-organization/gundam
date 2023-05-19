@@ -7,7 +7,8 @@
 
 
 #include "Propagator.h"
-#include "MinimizerInterface.h"
+#include "LikelihoodInterface.h"
+#include "MinimizerBase.h"
 #include "JsonBaseClass.h"
 
 #include "GenericToolbox.VariablesMonitor.h"
@@ -40,11 +41,16 @@ public:
   void setDoAllParamVariations(bool doAllParamVariations_);
   void setAllParamVariationsSigmas(const std::vector<double> &allParamVariationsSigmas);
 
-  // Getters
-  const Propagator& getPropagator() const;
+  // Getters (const)
+  [[nodiscard]] const Propagator& getPropagator() const;
+  [[nodiscard]] const MinimizerBase& getMinimizer() const;
+  [[nodiscard]] const LikelihoodInterface& getLikelihood() const;
+
+  // Getters (non-const)
   Propagator& getPropagator();
-  MinimizerInterface& getMinimizer(){ return _minimizer_; }
-  TDirectory* getSaveDir(){ return _saveDir_; }
+  MinimizerBase& getMinimizer();
+  LikelihoodInterface& getLikelihood();
+  TDirectory* getSaveDir();
 
   // Core
   void fit();
@@ -55,7 +61,13 @@ protected:
 
   void fixGhostFitParameters();
   void rescaleParametersStepSize();
-  void scanMinimizerParameters(TDirectory* saveDir_);
+
+  // Scan the parameters as used by the minimizer (e.g. MINUIT).  This has
+  // been replaced by MinimizerBase::scanParameters() which can be accessed
+  // through the getMinimizer() method.  For example:
+  // "fitter.scanMinimizerParameters(dir)" should be replaced by "fitter.getMinimizer().scanParameters(dir)"
+  [[deprecated("Use getMinimizer().scanParameters(dir) instead")]]
+       void scanMinimizerParameters(TDirectory* saveDir_);
   void checkNumericalAccuracy();
 
 
@@ -79,9 +91,7 @@ private:
   // Internals
   TDirectory* _saveDir_{nullptr};
   Propagator _propagator_{};
-  MinimizerInterface _minimizer_{this};
-
+  std::unique_ptr<MinimizerBase> _minimizer_{nullptr};
+  LikelihoodInterface _likelihood_{this};
 };
-
-
 #endif //GUNDAM_FITTERENGINE_H

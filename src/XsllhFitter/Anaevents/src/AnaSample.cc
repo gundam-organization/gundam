@@ -6,7 +6,7 @@
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
 #include "TTreeFormula.h"
-#include "JsonUtils.h"
+#include "GenericToolbox.Json.h"
 
 using xsllh::FitBin;
 
@@ -49,13 +49,13 @@ AnaSample::AnaSample(const SampleOpt& sample, TTree* t_data){
 
 void AnaSample::setupWithJsonConfig(const json &config_) {
 
-  m_name = JsonUtils::fetchValue<std::string>(config_, "name");
-  m_detector = JsonUtils::fetchValue<std::string>(config_, "detector");
-  m_binning = JsonUtils::fetchValue<std::string>(config_, "binning");
-  m_additional_cuts = JsonUtils::fetchValue<std::string>(config_, "selectionCuts");
-  m_data_POT = JsonUtils::fetchValue<double>(config_, "dataNorm");
-  m_mc_POT = JsonUtils::fetchValue<double>(config_, "mcNorm");
-  m_sample_id = JsonUtils::fetchValue<int>(config_, "cutBranch");
+  m_name = GenericToolbox::Json::fetchValue<std::string>(config_, "name");
+  m_detector = GenericToolbox::Json::fetchValue<std::string>(config_, "detector");
+  m_binning = GenericToolbox::Json::fetchValue<std::string>(config_, "binning");
+  m_additional_cuts = GenericToolbox::Json::fetchValue<std::string>(config_, "selectionCuts");
+  m_data_POT = GenericToolbox::Json::fetchValue<double>(config_, "dataNorm");
+  m_mc_POT = GenericToolbox::Json::fetchValue<double>(config_, "mcNorm");
+  m_sample_id = GenericToolbox::Json::fetchValue<int>(config_, "cutBranch");
 
   m_fit_phase_space = {"D2Reco", "D1Reco"};
 

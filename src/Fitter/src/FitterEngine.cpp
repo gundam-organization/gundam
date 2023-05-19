@@ -3,8 +3,10 @@
 //
 
 #include "FitterEngine.h"
-#include "JsonUtils.h"
+#include "GenericToolbox.Json.h"
 #include "GlobalVariables.h"
+#include "MinimizerInterface.h"
+#include "MCMCInterface.h"
 
 #include "Logger.h"
 #include "GenericToolbox.Root.h"
@@ -33,39 +35,53 @@ void FitterEngine::readConfigImpl(){
   LogInfo << "Reading FitterEngine config..." << std::endl;
   GenericToolbox::setT2kPalette();
 
-  _enablePca_ = JsonUtils::fetchValue(_config_, std::vector<std::string>{"enablePca", "fixGhostFitParameters"}, _enablePca_);
-  _pcaDeltaChi2Threshold_ = JsonUtils::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, _pcaDeltaChi2Threshold_);
+  _enablePca_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"enablePca", "fixGhostFitParameters"}, _enablePca_);
+  _pcaDeltaChi2Threshold_ = GenericToolbox::Json::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, _pcaDeltaChi2Threshold_);
 
-  _enablePreFitScan_ = JsonUtils::fetchValue(_config_, "enablePreFitScan", _enablePreFitScan_);
-  _enablePostFitScan_ = JsonUtils::fetchValue(_config_, "enablePostFitScan", _enablePostFitScan_);
+  _enablePreFitScan_ = GenericToolbox::Json::fetchValue(_config_, "enablePreFitScan", _enablePreFitScan_);
+  _enablePostFitScan_ = GenericToolbox::Json::fetchValue(_config_, "enablePostFitScan", _enablePostFitScan_);
 
-  _generateSamplePlots_ = JsonUtils::fetchValue(_config_, "generateSamplePlots", _generateSamplePlots_);
-  _generateOneSigmaPlots_ = JsonUtils::fetchValue(_config_, "generateOneSigmaPlots", _generateOneSigmaPlots_);
-  _doAllParamVariations_ = JsonUtils::doKeyExist(_config_, "allParamVariations");
-  _allParamVariationsSigmas_ = JsonUtils::fetchValue(_config_, "allParamVariations", _allParamVariationsSigmas_);
+  _generateSamplePlots_ = GenericToolbox::Json::fetchValue(_config_, "generateSamplePlots", _generateSamplePlots_);
+  _generateOneSigmaPlots_ = GenericToolbox::Json::fetchValue(_config_, "generateOneSigmaPlots", _generateOneSigmaPlots_);
+  _doAllParamVariations_ = GenericToolbox::Json::doKeyExist(_config_, "allParamVariations");
+  _allParamVariationsSigmas_ = GenericToolbox::Json::fetchValue(_config_, "allParamVariations", _allParamVariationsSigmas_);
 
-  _scaleParStepWithChi2Response_ = JsonUtils::fetchValue(_config_, "scaleParStepWithChi2Response", _scaleParStepWithChi2Response_);
-  _parStepGain_ = JsonUtils::fetchValue(_config_, "parStepGain", _parStepGain_);
+  _scaleParStepWithChi2Response_ = GenericToolbox::Json::fetchValue(_config_, "scaleParStepWithChi2Response", _scaleParStepWithChi2Response_);
+  _parStepGain_ = GenericToolbox::Json::fetchValue(_config_, "parStepGain", _parStepGain_);
 
-  _throwMcBeforeFit_ = JsonUtils::fetchValue(_config_, "throwMcBeforeFit", _throwMcBeforeFit_);
-  _throwGain_ = JsonUtils::fetchValue(_config_, "throwMcBeforeFitGain", _throwGain_);
+  _throwMcBeforeFit_ = GenericToolbox::Json::fetchValue(_config_, "throwMcBeforeFit", _throwMcBeforeFit_);
+  _throwGain_ = GenericToolbox::Json::fetchValue(_config_, "throwMcBeforeFitGain", _throwGain_);
 
-  _propagator_.readConfig( JsonUtils::fetchValue<nlohmann::json>(_config_, "propagatorConfig") );
-  _minimizer_.readConfig( JsonUtils::fetchValue(_config_, "minimizerConfig", nlohmann::json()));
+  _propagator_.readConfig( GenericToolbox::Json::fetchValue<nlohmann::json>(_config_, "propagatorConfig") );
+
+  std::string engineType = GenericToolbox::Json::fetchValue(_config_,"engineType","minimizer");
+
+  if (engineType == "minimizer") {
+      this->_minimizer_ = std::make_unique<MinimizerInterface>(this);
+      getMinimizer().readConfig( GenericToolbox::Json::fetchValue(_config_, "minimizerConfig", nlohmann::json()));
+  }
+  else if (engineType == "mcmc") {
+      this->_minimizer_ = std::make_unique<MCMCInterface>(this);
+      getMinimizer().readConfig( GenericToolbox::Json::fetchValue(_config_, "mcmcConfig", nlohmann::json()));
+  }
+  else {
+      LogWarning << "Allowed engine types: minimizer, mcmc" << std::endl;
+      LogThrow("Illegal engine type: \"" + engineType + "\"");
+  }
 
 
   // legacy
-  JsonUtils::deprecatedAction(_config_, "scanConfig", [&]{
+  GenericToolbox::Json::deprecatedAction(_config_, "scanConfig", [&]{
     LogAlert << "Forwarding the option to Propagator. Consider moving it into \"propagatorConfig:\"" << std::endl;
-    _propagator_.getParScanner().readConfig( JsonUtils::fetchValue(_config_, "scanConfig", nlohmann::json()) );
+    _propagator_.getParScanner().readConfig( GenericToolbox::Json::fetchValue(_config_, "scanConfig", nlohmann::json()) );
   });
 
-  JsonUtils::deprecatedAction(_config_, "monitorRefreshRateInMs", [&]{
+  GenericToolbox::Json::deprecatedAction(_config_, "monitorRefreshRateInMs", [&]{
     LogAlert << "Forwarding the option to Propagator. Consider moving it into \"minimizerConfig:\"" << std::endl;
-    _minimizer_.setMonitorRefreshRateInMs(JsonUtils::fetchValue<int>(_config_, "monitorRefreshRateInMs"));
+    getLikelihood().getConvergenceMonitor().setMaxRefreshRateInMs(GenericToolbox::Json::fetchValue<int>(_config_, "monitorRefreshRateInMs"));
   });
 
-  LogInfo << "Convergence monitor will be refreshed every " << _minimizer_.getConvergenceMonitor().getMaxRefreshRateInMs() << "ms." << std::endl;
+  LogInfo << "Convergence monitor will be refreshed every " << _likelihood_.getConvergenceMonitor().getMaxRefreshRateInMs() << "ms." << std::endl;
 }
 void FitterEngine::initializeImpl(){
   LogThrowIf(_config_.empty(), "Config is not set.");
@@ -120,8 +136,12 @@ void FitterEngine::initializeImpl(){
     this->rescaleParametersStepSize();
   }
 
-  // The minimizer needs all the parameters to be fully setup (i.e. PCA done and other properties)
-  _minimizer_.initialize();
+  // The likelihood needs everything to be fully setup before it is initialized.
+  getLikelihood().initialize();
+
+  // The minimizer needs all the parameters to be fully setup (i.e. PCA done
+  // and other properties)
+  getMinimizer().initialize();
 
   if(GlobalVariables::getVerboseLevel() >= MORE_PRINTOUT) checkNumericalAccuracy();
 
@@ -183,8 +203,23 @@ void FitterEngine::setAllParamVariationsSigmas(const std::vector<double> &allPar
 const Propagator& FitterEngine::getPropagator() const {
   return _propagator_;
 }
+const MinimizerBase& FitterEngine::getMinimizer() const {
+  return *_minimizer_;
+}
+const LikelihoodInterface& FitterEngine::getLikelihood() const {
+  return _likelihood_;
+}
 Propagator& FitterEngine::getPropagator() {
   return _propagator_;
+}
+MinimizerBase& FitterEngine::getMinimizer(){
+  return *_minimizer_;
+}
+LikelihoodInterface& FitterEngine::getLikelihood(){
+  return _likelihood_;
+}
+TDirectory* FitterEngine::getSaveDir(){
+  return _saveDir_;
 }
 
 // Core
@@ -212,7 +247,7 @@ void FitterEngine::fit(){
   }
   if( _enablePreFitScan_ ){
     LogInfo << "Scanning fit parameters before minimizing..." << std::endl;
-    this->scanMinimizerParameters(GenericToolbox::mkdirTFile(_saveDir_, "preFit/scan"));
+    getMinimizer().scanParameters(GenericToolbox::mkdirTFile(_saveDir_, "preFit/scan"));
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
   if( _throwMcBeforeFit_ ){
@@ -224,19 +259,19 @@ void FitterEngine::fit(){
         LogWarning << "\"" << parSet.getName() << "\" has marked disabled throwMcBeforeFit: skipping." << std::endl;
         continue;
       }
-      if( JsonUtils::doKeyExist(parSet.getConfig(), "customFitParThrow") ){
+      if( GenericToolbox::Json::doKeyExist(parSet.getConfig(), "customFitParThrow") ){
 
         LogAlert << "Using custom mc parameter push for " << parSet.getName() << std::endl;
 
-        for(auto& entry : JsonUtils::fetchValue(parSet.getConfig(), "customFitParThrow", std::vector<nlohmann::json>())){
+        for(auto& entry : GenericToolbox::Json::fetchValue(parSet.getConfig(), "customFitParThrow", std::vector<nlohmann::json>())){
 
-          int parIndex = JsonUtils::fetchValue<int>(entry, "parIndex");
+          int parIndex = GenericToolbox::Json::fetchValue<int>(entry, "parIndex");
 
           auto& parList = parSet.getParameterList();
           double pushVal =
               parList[parIndex].getParameterValue()
               + parList[parIndex].getStdDevValue()
-                * JsonUtils::fetchValue<double>(entry, "nbSigmaAway");
+                * GenericToolbox::Json::fetchValue<double>(entry, "nbSigmaAway");
 
           LogWarning << "Pushing #" << parIndex << " to " << pushVal << std::endl;
           parList[parIndex].setParameterValue( pushVal );
@@ -262,7 +297,7 @@ void FitterEngine::fit(){
   }
 
   LogInfo << "Minimizing LLH..." << std::endl;
-  _minimizer_.minimize();
+  getMinimizer().minimize();
 
   if( _generateSamplePlots_ and not _propagator_.getPlotGenerator().getConfig().empty() ){
     LogInfo << "Generating post-fit sample plots..." << std::endl;
@@ -271,16 +306,16 @@ void FitterEngine::fit(){
   }
   if( _enablePostFitScan_ ){
     LogInfo << "Scanning fit parameters around the minimum point..." << std::endl;
-    this->scanMinimizerParameters(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scan"));
+    getMinimizer().scanParameters(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scan"));
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
 
-  if( _minimizer_.isFitHasConverged() and _minimizer_.isEnablePostFitErrorEval() ){
+  if( getMinimizer().isFitHasConverged() and getMinimizer().isEnablePostFitErrorEval() ){
     LogInfo << "Computing post-fit errors..." << std::endl;
-    _minimizer_.calcErrors();
+    getMinimizer().calcErrors();
   }
   else{
-    if( not _minimizer_.isFitHasConverged() ) LogAlert << "Skipping post-fit error calculation since the minimizer did not converge." << std::endl;
+    if( not getMinimizer().isFitHasConverged() ) LogAlert << "Skipping post-fit error calculation since the minimizer did not converge." << std::endl;
     else LogAlert << "Skipping post-fit error calculation since the option is disabled." << std::endl;
   }
 
@@ -350,7 +385,7 @@ void FitterEngine::fixGhostFitParameters(){
 
         if( std::abs(deltaChi2Stat) < _pcaDeltaChi2Threshold_ ){
           par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
-          ssPrint << " < " << JsonUtils::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, 1E-6) << " -> FIXED";
+          ssPrint << " < " << GenericToolbox::Json::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, 1E-6) << " -> FIXED";
           LogInfo.moveTerminalCursorBack(1);
 #ifndef NOCOLOR
           std::string red(GenericToolbox::ColorCodes::redBackground);
@@ -361,7 +396,7 @@ void FitterEngine::fixGhostFitParameters(){
 #endif
           LogInfo << red << ssPrint.str() << rst << std::endl;
 
-          if( parSet.isUseEigenDecompInFit() and JsonUtils::fetchValue(_config_, "fixGhostEigenParmetersAfterFirstRejected", false) ){
+          if( parSet.isUseEigenDecompInFit() and GenericToolbox::Json::fetchValue(_config_, "fixGhostEigenParmetersAfterFirstRejected", false) ){
             fixNextEigenPars = true;
           }
         }
@@ -371,8 +406,8 @@ void FitterEngine::fixGhostFitParameters(){
       }
     }
 
-    // Recompute inverse matrix for the fitter
-    // Note: Eigen decomposed parSet don't need a new inversion since the matrix is diagonal
+    // Recompute inverse matrix for the fitter.  Note: Eigen decomposed parSet
+    // don't need a new inversion since the matrix is diagonal
     if( not parSet.isUseEigenDecompInFit() ){
       parSet.processCovarianceMatrix();
     }
@@ -435,14 +470,7 @@ void FitterEngine::rescaleParametersStepSize(){
 void FitterEngine::scanMinimizerParameters(TDirectory* saveDir_){
   LogThrowIf(not isInitialized());
   LogInfo << "Performing scans of fit parameters..." << std::endl;
-  for( int iPar = 0 ; iPar < _minimizer_.getMinimizer()->NDim() ; iPar++ ){
-    if( _minimizer_.getMinimizer()->IsFixedVariable(iPar) ){
-      LogWarning << _minimizer_.getMinimizer()->VariableName(iPar)
-                 << " is fixed. Skipping..." << std::endl;
-      continue;
-    }
-    _propagator_.getParScanner().scanFitParameter(*_minimizer_.getMinimizerFitParameterPtr()[iPar], saveDir_);
-  } // iPar
+  getMinimizer().scanParameters(saveDir_);
 }
 void FitterEngine::checkNumericalAccuracy(){
   LogWarning << __METHOD_NAME__ << std::endl;

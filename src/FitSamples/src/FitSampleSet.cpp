@@ -4,7 +4,7 @@
 
 
 
-#include "JsonUtils.h"
+#include "GenericToolbox.Json.h"
 #include "GlobalVariables.h"
 #include "FitSampleSet.h"
 
@@ -25,29 +25,32 @@ void FitSampleSet::readConfigImpl(){
   LogThrowIf(_config_.empty(), "_config_ is not set." << std::endl);
 
   LogInfo << "Reading samples definition..." << std::endl;
-  auto fitSampleListConfig = JsonUtils::fetchValue(_config_, "fitSampleList", nlohmann::json());
+  auto fitSampleListConfig = GenericToolbox::Json::fetchValue(_config_, "fitSampleList", nlohmann::json());
   for( const auto& fitSampleConfig: fitSampleListConfig ){
-    if( not JsonUtils::fetchValue(fitSampleConfig, "isEnabled", true) ) continue;
+    if( not GenericToolbox::Json::fetchValue(fitSampleConfig, "isEnabled", true) ) continue;
     _fitSampleList_.emplace_back();
+    _fitSampleList_.back().setIndex(int(_fitSampleList_.size())-1);
     _fitSampleList_.back().setConfig(fitSampleConfig);
     _fitSampleList_.back().readConfig();
   }
 
   // To be moved elsewhere -> nothing to do in sample... -> this should belong to the fitter engine
   std::string llhMethod = "PoissonLLH";
-  llhMethod = JsonUtils::fetchValue(_config_, "llhStatFunction", llhMethod);
+  llhMethod = GenericToolbox::Json::fetchValue(_config_, "llhStatFunction", llhMethod);
 
   // new config structure
-  auto configJointProbability = JsonUtils::fetchValue(_config_, {{"jointProbability"}, {"llhConfig"}}, nlohmann::json());
-  llhMethod = JsonUtils::fetchValue(configJointProbability, "type", llhMethod);
+  auto configJointProbability = GenericToolbox::Json::fetchValue(_config_, {{"jointProbability"}, {"llhConfig"}}, nlohmann::json());
+  llhMethod = GenericToolbox::Json::fetchValue(configJointProbability, "type", llhMethod);
 
   LogInfo << "Using \"" << llhMethod << "\" LLH function." << std::endl;
-  if     ( llhMethod == "PoissonLLH" ){              _jointProbabilityPtr_ = std::make_shared<JointProbability::PoissonLLH>(); }
+  if     ( llhMethod == "Chi2" ){                    _jointProbabilityPtr_ = std::make_shared<JointProbability::Chi2>(); }
+  else if( llhMethod == "PoissonLLH" ){              _jointProbabilityPtr_ = std::make_shared<JointProbability::PoissonLLH>(); }
   else if( llhMethod == "BarlowLLH" ) {              _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH>(); }
   else if( llhMethod == "Plugin" ) {                 _jointProbabilityPtr_ = std::make_shared<JointProbability::JointProbabilityPlugin>(); }
   else if( llhMethod == "BarlowLLH_BANFF_OA2020" ) { _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2020>(); }
   else if( llhMethod == "BarlowLLH_BANFF_OA2021" ) { _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2021>(); }
-  else if( llhMethod == "BarlowLLH_BANFF_OA2021_SFGD" ) { _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2021_SFGD>(); }
+  else if( llhMethod == "LeastSquares" ) { _jointProbabilityPtr_ = std::make_shared<JointProbability::LeastSquaresLLH>(); }
+  else if( llhMethod == "BarlowLLH_BANFF_OA2021_SFGD" ) {  _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2021_SFGD>(); }
   else{ LogThrow("Unknown LLH Method: " << llhMethod); }
 
   _jointProbabilityPtr_->readConfig(configJointProbability);
@@ -127,8 +130,11 @@ double FitSampleSet::evalLikelihood(const FitSample& sample_) const{
 void FitSampleSet::copyMcEventListToDataContainer(){
   for( auto& sample : _fitSampleList_ ){
     LogInfo << "Copying MC events in sample \"" << sample.getName() << "\"" << std::endl;
+    sample.getDataContainer().eventList.clear();
+    sample.getDataContainer().eventList.reserve(sample.getMcContainer().eventList.size());
+//    sample.getDataContainer().eventList = sample.getMcContainer().eventList;
     sample.getDataContainer().eventList.insert(
-        std::end(sample.getDataContainer().eventList),
+        sample.getDataContainer().eventList.begin(),
         std::begin(sample.getMcContainer().eventList),
         std::end(sample.getMcContainer().eventList)
     );
@@ -156,5 +162,3 @@ void FitSampleSet::updateSampleHistograms() const {
   GlobalVariables::getParallelWorker().runJob("FitSampleSet::updateSampleHistograms");
   if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
 }
-
-

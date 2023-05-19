@@ -8,7 +8,7 @@
 #include "GlobalVariables.h"
 #include "GraphDial.h"
 #include "SplineDial.h"
-#include "JsonUtils.h"
+#include "GenericToolbox.Json.h"
 
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
@@ -25,31 +25,31 @@ LoggerInit([]{
 
 void DatasetLoader::readConfigImpl() {
   LogThrowIf(_config_.empty(), "Config not set.");
-  _name_ = JsonUtils::fetchValue<std::string>(_config_, "name");
+  _name_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
   LogInfo << "Reading config for dataset: \"" << _name_ << "\"" << std::endl;
 
-  _isEnabled_ = JsonUtils::fetchValue(_config_, "isEnabled", true);
+  _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", true);
   LogReturnIf(not _isEnabled_, "\"" << _name_ << "\" is disabled.");
 
-  _selectedDataEntry_ = JsonUtils::fetchValue<std::string>(_config_, "selectedDataEntry", "Asimov");
-  _selectedToyEntry_ = JsonUtils::fetchValue<std::string>(_config_, "selectedToyEntry", "Asimov");
+  _selectedDataEntry_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "selectedDataEntry", "Asimov");
+  _selectedToyEntry_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "selectedToyEntry", "Asimov");
 
-  _showSelectedEventCount_ = JsonUtils::fetchValue(_config_, "showSelectedEventCount", _showSelectedEventCount_);
+  _showSelectedEventCount_ = GenericToolbox::Json::fetchValue(_config_, "showSelectedEventCount", _showSelectedEventCount_);
 
   _mcDispenser_ = DataDispenser(this);
-  _mcDispenser_.readConfig(JsonUtils::fetchValue<nlohmann::json>(_config_, "mc"));
+  _mcDispenser_.readConfig(GenericToolbox::Json::fetchValue<nlohmann::json>(_config_, "mc"));
   _mcDispenser_.getParameters().name = "Asimov";
   _mcDispenser_.getParameters().useMcContainer = true;
 
   // Always loaded by default
   _dataDispenserDict_.emplace("Asimov", DataDispenser(_mcDispenser_));
 
-  for( auto& dataEntry : JsonUtils::fetchValue(_config_, "data", nlohmann::json()) ){
-    std::string name = JsonUtils::fetchValue(dataEntry, "name", "data");
+  for( auto& dataEntry : GenericToolbox::Json::fetchValue(_config_, "data", nlohmann::json()) ){
+    std::string name = GenericToolbox::Json::fetchValue(dataEntry, "name", "data");
     LogThrowIf( GenericToolbox::doesKeyIsInMap(name, _dataDispenserDict_),
                 "\"" << name << "\" already taken, please use another name." )
 
-    if( JsonUtils::fetchValue(dataEntry, "fromMc", false) ){ _dataDispenserDict_.emplace(name, _mcDispenser_); }
+    if( GenericToolbox::Json::fetchValue(dataEntry, "fromMc", false) ){ _dataDispenserDict_.emplace(name, _mcDispenser_); }
     else{ _dataDispenserDict_.emplace(name, DataDispenser(this)); }
     _dataDispenserDict_.at(name).readConfig(dataEntry);
   }

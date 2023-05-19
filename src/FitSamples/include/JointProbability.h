@@ -53,8 +53,28 @@ namespace JointProbability {
 
   };
 
+
+  class Chi2 : public JointProbability{
+    double eval(const FitSample& sample_, int bin_) override;
+  };
+
   class PoissonLLH : public JointProbability{
     double eval(const FitSample& sample_, int bin_) override;
+  };
+
+  /// Evaluate the Least Squares difference between the expected and observed.
+  /// This is NOT a real LLH function, but is good for debugging since it has
+  /// minimal numeric problems (doesn't use any functions like Log or Sqrt).
+  class LeastSquaresLLH : public JointProbability{
+  protected:
+    void readConfigImpl() override;
+
+  public:
+    double eval(const FitSample& sample_, int bin_) override;
+
+    /// If true the use Poissonian approximation with the variance equal to
+    /// the observed value (i.e. the data).
+    bool lsqPoissonianApproximation{false};
   };
 
   class BarlowLLH : public JointProbability{
@@ -81,6 +101,10 @@ namespace JointProbability {
 
   class BarlowLLH_BANFF_OA2021_SFGD : public JointProbability{
       double eval(const FitSample& sample_, int bin_) override;
+  };
+
+  class BarlowLLH_BANFF_OA2021_SFGD : public JointProbability{
+    double eval(const FitSample& sample_, int bin_) override;
   };
 
 }

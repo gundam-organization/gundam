@@ -4,14 +4,17 @@
 
 #include "FitParameterSet.h"
 
-#include <memory>
-#include "JsonUtils.h"
 #include "GlobalVariables.h"
+#include "ParameterThrowerMarkHarz.h"
+#include "ConfigUtils.h"
 
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
+#include "GenericToolbox.Json.h"
 #include "GenericToolbox.TablePrinter.h"
 #include "Logger.h"
+
+#include <memory>
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[FitParameterSet]");
@@ -21,60 +24,61 @@ LoggerInit([]{
 void FitParameterSet::readConfigImpl(){
   LogThrowIf(_config_.empty(), "FitParameterSet config not set.");
 
-  _name_ = JsonUtils::fetchValue<std::string>(_config_, "name");
+  _name_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
   LogInfo << "Initializing parameter set: " << _name_ << std::endl;
 
-  _isEnabled_ = JsonUtils::fetchValue<bool>(_config_, "isEnabled");
+  _isEnabled_ = GenericToolbox::Json::fetchValue<bool>(_config_, "isEnabled");
   LogReturnIf(not _isEnabled_, _name_ << " parameters are disabled.");
 
-  _nbParameterDefinition_ = JsonUtils::fetchValue(_config_, "numberOfParameters", _nbParameterDefinition_);
-  _nominalStepSize_ = JsonUtils::fetchValue(_config_, "nominalStepSize", _nominalStepSize_);
+  _nbParameterDefinition_ = GenericToolbox::Json::fetchValue(_config_, "numberOfParameters", _nbParameterDefinition_);
+  _nominalStepSize_ = GenericToolbox::Json::fetchValue(_config_, "nominalStepSize", _nominalStepSize_);
 
-  _useOnlyOneParameterPerEvent_ = JsonUtils::fetchValue<bool>(_config_, "useOnlyOneParameterPerEvent", false);
-  _printDialSetsSummary_ = JsonUtils::fetchValue<bool>(_config_, "printDialSetsSummary", _printDialSetsSummary_);
-  _printParametersSummary_ = JsonUtils::fetchValue<bool>(_config_, "printParametersSummary", _printDialSetsSummary_);
+  _useOnlyOneParameterPerEvent_ = GenericToolbox::Json::fetchValue<bool>(_config_, "useOnlyOneParameterPerEvent", false);
+  _printDialSetsSummary_ = GenericToolbox::Json::fetchValue<bool>(_config_, "printDialSetsSummary", _printDialSetsSummary_);
+  _printParametersSummary_ = GenericToolbox::Json::fetchValue<bool>(_config_, "printParametersSummary", _printDialSetsSummary_);
 
-  if( JsonUtils::doKeyExist(_config_, "parameterLimits") ){
-    auto parLimits = JsonUtils::fetchValue(_config_, "parameterLimits", nlohmann::json());
-    _globalParameterMinValue_ = JsonUtils::fetchValue(parLimits, "minValue", std::nan("UNSET"));
-    _globalParameterMaxValue_ = JsonUtils::fetchValue(parLimits, "maxValue", std::nan("UNSET"));
+  if( GenericToolbox::Json::doKeyExist(_config_, "parameterLimits") ){
+    auto parLimits = GenericToolbox::Json::fetchValue(_config_, "parameterLimits", nlohmann::json());
+    _globalParameterMinValue_ = GenericToolbox::Json::fetchValue(parLimits, "minValue", std::nan("UNSET"));
+    _globalParameterMaxValue_ = GenericToolbox::Json::fetchValue(parLimits, "maxValue", std::nan("UNSET"));
   }
 
-  _useEigenDecompInFit_ = JsonUtils::fetchValue(_config_ , "useEigenDecompInFit", false);
+  _useEigenDecompInFit_ = GenericToolbox::Json::fetchValue(_config_ , "useEigenDecompInFit", false);
   if( _useEigenDecompInFit_ ){
     LogWarning << "Using eigen decomposition in fit." << std::endl;
-    _maxNbEigenParameters_ = JsonUtils::fetchValue(_config_ , "maxNbEigenParameters", -1);
+    _maxNbEigenParameters_ = GenericToolbox::Json::fetchValue(_config_ , "maxNbEigenParameters", -1);
     if( _maxNbEigenParameters_ != -1 ){
       LogInfo << "Maximum nb of eigen parameters is set to " << _maxNbEigenParameters_ << std::endl;
     }
-    _maxEigenFraction_ = JsonUtils::fetchValue(_config_ , "maxEigenFraction", double(1.));
+    _maxEigenFraction_ = GenericToolbox::Json::fetchValue(_config_ , "maxEigenFraction", double(1.));
     if( _maxEigenFraction_ != 1 ){
       LogInfo << "Max eigen fraction set to: " << _maxEigenFraction_*100 << "%" << std::endl;
     }
   }
 
-  _enablePca_ = JsonUtils::fetchValue(_config_, std::vector<std::string>{"fixGhostFitParameters", "enablePca"}, _enablePca_);
-  _enabledThrowToyParameters_ = JsonUtils::fetchValue(_config_, "enabledThrowToyParameters", _enabledThrowToyParameters_);
-  _customFitParThrow_ = JsonUtils::fetchValue(_config_, "customFitParThrow", std::vector<nlohmann::json>());
-  _releaseFixedParametersOnHesse_ = JsonUtils::fetchValue(_config_, "releaseFixedParametersOnHesse", _releaseFixedParametersOnHesse_);
+  _enablePca_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"allowPca", "fixGhostFitParameters", "enablePca"}, _enablePca_);
+  _enabledThrowToyParameters_ = GenericToolbox::Json::fetchValue(_config_, "enabledThrowToyParameters", _enabledThrowToyParameters_);
+  _customFitParThrow_ = GenericToolbox::Json::fetchValue(_config_, "customFitParThrow", std::vector<nlohmann::json>());
+  _releaseFixedParametersOnHesse_ = GenericToolbox::Json::fetchValue(_config_, "releaseFixedParametersOnHesse", _releaseFixedParametersOnHesse_);
 
-  _parameterDefinitionFilePath_ = JsonUtils::fetchValue( _config_,
+  _parameterDefinitionFilePath_ = GenericToolbox::Json::fetchValue( _config_,
     {{"parameterDefinitionFilePath"}, {"covarianceMatrixFilePath"} }, _parameterDefinitionFilePath_
   );
-  _covarianceMatrixTMatrixD_ = JsonUtils::fetchValue(_config_, "covarianceMatrixTMatrixD", _covarianceMatrixTMatrixD_);
-  _parameterPriorTVectorD_ = JsonUtils::fetchValue(_config_, "parameterPriorTVectorD", _parameterPriorTVectorD_);
-  _parameterNameTObjArray_ = JsonUtils::fetchValue(_config_, "parameterNameTObjArray", _parameterNameTObjArray_);
-  _parameterLowerBoundsTVectorD_ = JsonUtils::fetchValue(_config_, "parameterLowerBoundsTVectorD", _parameterLowerBoundsTVectorD_);
-  _parameterUpperBoundsTVectorD_ = JsonUtils::fetchValue(_config_, "parameterUpperBoundsTVectorD", _parameterUpperBoundsTVectorD_);
-  _throwEnabledListPath_ = JsonUtils::fetchValue(_config_, "throwEnabledList", _throwEnabledListPath_);
+  _covarianceMatrixTMatrixD_ = GenericToolbox::Json::fetchValue(_config_, "covarianceMatrixTMatrixD", _covarianceMatrixTMatrixD_);
+  _parameterPriorTVectorD_ = GenericToolbox::Json::fetchValue(_config_, "parameterPriorTVectorD", _parameterPriorTVectorD_);
+  _parameterNameTObjArray_ = GenericToolbox::Json::fetchValue(_config_, "parameterNameTObjArray", _parameterNameTObjArray_);
+  _parameterLowerBoundsTVectorD_ = GenericToolbox::Json::fetchValue(_config_, "parameterLowerBoundsTVectorD", _parameterLowerBoundsTVectorD_);
+  _parameterUpperBoundsTVectorD_ = GenericToolbox::Json::fetchValue(_config_, "parameterUpperBoundsTVectorD", _parameterUpperBoundsTVectorD_);
+  _throwEnabledListPath_ = GenericToolbox::Json::fetchValue(_config_, "throwEnabledList", _throwEnabledListPath_);
 
-  _parameterDefinitionConfig_ = JsonUtils::fetchValue(_config_, "parameterDefinitions", _parameterDefinitionConfig_);
-  _dialSetDefinitions_ = JsonUtils::fetchValue(_config_, "dialSetDefinitions", _dialSetDefinitions_);
+  _parameterDefinitionConfig_ = GenericToolbox::Json::fetchValue(_config_, "parameterDefinitions", _parameterDefinitionConfig_);
+  _dialSetDefinitions_ = GenericToolbox::Json::fetchValue(_config_, "dialSetDefinitions", _dialSetDefinitions_);
 
 
   // MISC / DEV
-
-  _devUseParLimitsOnEigen_ = JsonUtils::fetchValue(_config_, "devUseParLimitsOnEigen", _devUseParLimitsOnEigen_);
+  _useMarkGenerator_ = GenericToolbox::Json::fetchValue(_config_, "useMarkGenerator", _useMarkGenerator_);
+  _useEigenDecompForThrows_ = GenericToolbox::Json::fetchValue(_config_, "useEigenDecompForThrows", _useEigenDecompForThrows_);
+  _devUseParLimitsOnEigen_ = GenericToolbox::Json::fetchValue(_config_, "devUseParLimitsOnEigen", _devUseParLimitsOnEigen_);
   if( _devUseParLimitsOnEigen_ ){
     LogAlert << "USING DEV OPTION: _devUseParLimitsOnEigen_ = true" << std::endl;
   }
@@ -88,10 +92,10 @@ void FitParameterSet::readConfigImpl(){
 
     if( not _dialSetDefinitions_.empty() ){
       for( auto& dialSetDef : _dialSetDefinitions_.get<std::vector<nlohmann::json>>() ){
-        if( JsonUtils::doKeyExist(dialSetDef, "parametersBinningPath") ){
+        if( GenericToolbox::Json::doKeyExist(dialSetDef, "parametersBinningPath") ){
           LogInfo << "Found parameter binning within dialSetDefinition. Defining parameters number..." << std::endl;
           DataBinSet b;
-          b.readBinningDefinition( JsonUtils::fetchValue<std::string>(dialSetDef, "parametersBinningPath") );
+          b.readBinningDefinition( GenericToolbox::Json::fetchValue<std::string>(dialSetDef, "parametersBinningPath") );
           _nbParameterDefinition_ = int(b.getBinsList().size());
           break;
         }
@@ -124,8 +128,8 @@ void FitParameterSet::initializeImpl() {
   this->processCovarianceMatrix();
 }
 
-void FitParameterSet::setMaskedForPropagation(bool maskedForPropagation) {
-  _maskedForPropagation_ = maskedForPropagation;
+void FitParameterSet::setMaskedForPropagation(bool maskedForPropagation_) {
+  _maskedForPropagation_ = maskedForPropagation_;
 }
 
 void FitParameterSet::processCovarianceMatrix(){
@@ -135,23 +139,25 @@ void FitParameterSet::processCovarianceMatrix(){
   LogInfo << "Stripping the matrix from fixed/disabled parameters in set: " << getName() << std::endl;
   int nbFitParameters{0};
   for( const auto& par : _parameterList_ ){
-    if( par.isEnabled() and not par.isFixed() and not par.isFree() ) nbFitParameters++;
+    if( FitParameterSet::isValidCorrelatedParameter(par) ) nbFitParameters++;
   }
   LogInfo << "Effective nb parameters: " << nbFitParameters << std::endl;
 
   _strippedCovarianceMatrix_ = std::make_shared<TMatrixDSym>(nbFitParameters);
   int iStrippedPar = -1;
   for( int iPar = 0 ; iPar < int(_parameterList_.size()) ; iPar++ ){
-    if( not _parameterList_[iPar].isEnabled() or _parameterList_[iPar].isFixed() or _parameterList_[iPar].isFree() ) continue;
+    if( not FitParameterSet::isValidCorrelatedParameter(_parameterList_[iPar]) ) continue;
     iStrippedPar++;
     int jStrippedPar = -1;
     for( int jPar = 0 ; jPar < int(_parameterList_.size()) ; jPar++ ){
-      if( not _parameterList_[jPar].isEnabled() or _parameterList_[jPar].isFixed() or _parameterList_[jPar].isFree() ) continue;
+      if( not FitParameterSet::isValidCorrelatedParameter(_parameterList_[jPar]) ) continue;
       jStrippedPar++;
       (*_strippedCovarianceMatrix_)[iStrippedPar][jStrippedPar] = (*_priorCovarianceMatrix_)[iPar][jPar];
     }
   }
   _deltaParameterList_ = std::make_shared<TVectorD>(_strippedCovarianceMatrix_->GetNrows());
+
+  LogThrowIf(not _strippedCovarianceMatrix_->IsSymmetric(), "Covariance matrix is not symmetric");
 
   if( not _useEigenDecompInFit_ ){
     LogWarning << "Computing inverse of the stripped covariance matrix: "
@@ -175,6 +181,9 @@ void FitParameterSet::processCovarianceMatrix(){
     double eigenCumulative = 0;
     _nbEnabledEigen_ = 0;
     double eigenTotal = _eigenValues_->Sum();
+
+    LogInfo << "Covariance eigen values are between " << _eigenValues_->Min() << " and " << _eigenValues_->Max() << std::endl;
+    LogThrowIf(_eigenValues_->Min() < 0, "Input covariance matrix is not positive definite.");
 
     _inverseStrippedCovarianceMatrix_ = std::make_shared<TMatrixD>(_strippedCovarianceMatrix_->GetNrows(), _strippedCovarianceMatrix_->GetNrows());
     _projectorMatrix_                 = std::make_shared<TMatrixD>(_strippedCovarianceMatrix_->GetNrows(), _strippedCovarianceMatrix_->GetNrows());
@@ -358,48 +367,91 @@ void FitParameterSet::throwFitParameters(double gain_){
 
   LogThrowIf(_strippedCovarianceMatrix_==nullptr, "No covariance matrix provided");
 
-//  if( not _useEigenDecompInFit_ ){
-    LogInfo << "Throwing parameters for " << _name_ << " using Cholesky matrix" << std::endl;
-
-    if( _choleskyMatrix_ == nullptr ){
-      LogInfo << "Generating Cholesky matrix in set: " << getName() << std::endl;
-      _choleskyMatrix_ = std::shared_ptr<TMatrixD>(
-          GenericToolbox::getCholeskyMatrix(_strippedCovarianceMatrix_.get())
-      );
+  if( _useMarkGenerator_ ){
+    TVectorD parms(_strippedCovarianceMatrix_->GetNrows());
+    int iPar{0};
+    for( auto& par : _parameterList_ ){
+      if( FitParameterSet::isValidCorrelatedParameter(par) ){ parms[iPar++] = par.getPriorValue(); }
     }
 
-    auto throws = GenericToolbox::throwCorrelatedParameters(_choleskyMatrix_.get());
+    if( _markHartzGen_ == nullptr ){
+      LogInfo << "Generating Cholesky matrix in set: " << getName() << std::endl;
+      _markHartzGen_ = std::make_shared<ParameterThrowerMarkHarz>(parms, *_strippedCovarianceMatrix_);
+    }
+    std::vector<double> throwPars(_strippedCovarianceMatrix_->GetNrows());
+    _markHartzGen_->ThrowSet(throwPars);
+    // THROWS ARE CENTERED AROUND 1!!
 
-    int iFit{-1};
+    iPar = 0;
     for( auto& par : _parameterList_ ){
-      if( par.isEnabled() and not par.isFixed() and not par.isFree() ){
-        iFit++;
-        LogInfo << "Throwing par " << par.getTitle() << ": " << par.getParameterValue();
-        par.setThrowValue(par.getPriorValue() + gain_ * throws[iFit]);
+      if( FitParameterSet::isValidCorrelatedParameter(par) ){
+        LogInfo << "Throwing par (mark's generator) " << par.getTitle() << ": " << par.getPriorValue();
+        par.setThrowValue(throwPars[iPar++]);
         par.setParameterValue( par.getThrowValue() );
         LogInfo << " → " << par.getParameterValue() << std::endl;
       }
-      else{
-        LogWarning << "Skipping parameter: " << par.getTitle() << std::endl;
-      }
-    }
-//  }
-//  else{
-//    LogInfo << "Throwing eigen parameters for " << _name_ << std::endl;
-//    for( auto& eigenPar : _eigenParameterList_ ){
-//      if( eigenPar.isFixed() ){ LogWarning << "Eigen parameter #" << eigenPar.getParameterIndex() << " is fixed. Not throwing" << std::endl; continue; }
-//      eigenPar.setThrowValue(eigenPar.getPriorValue() + gain_ * gRandom->Gaus(0, eigenPar.getStdDevValue()));
-//      eigenPar.setParameterValue( eigenPar.getThrowValue() );
-//    }
-//    this->propagateEigenToOriginal();
-//  }
-
-  if( _useEigenDecompInFit_ ){
-    this->propagateOriginalToEigen();
-    for( auto& eigenPar : _eigenParameterList_ ){
-      eigenPar.setThrowValue( eigenPar.getParameterValue() );
     }
   }
+  else{
+    if( _useEigenDecompForThrows_ and _useEigenDecompInFit_ ){
+      LogInfo << "Throwing eigen parameters for " << _name_ << std::endl;
+      for( auto& eigenPar : _eigenParameterList_ ){
+        if( eigenPar.isFixed() ){ LogWarning << "Eigen parameter #" << eigenPar.getParameterIndex() << " is fixed. Not throwing" << std::endl; continue; }
+        eigenPar.setThrowValue(eigenPar.getPriorValue() + gain_ * gRandom->Gaus(0, eigenPar.getStdDevValue()));
+        eigenPar.setParameterValue( eigenPar.getThrowValue() );
+      }
+      this->propagateEigenToOriginal();
+
+      for( auto& par : _parameterList_ ){
+        LogInfo << "Throwing par (through eigen decomp) " << par.getTitle() << ": " << par.getPriorValue();
+        par.setThrowValue(par.getParameterValue());
+        LogInfo << " → " << par.getParameterValue() << std::endl;
+      }
+    }
+    else{
+      LogInfo << "Throwing parameters for " << _name_ << " using Cholesky matrix" << std::endl;
+
+      // TODO: CHOLESKY THROW IS NOT WORKING PROPERLY
+
+
+//      if( _choleskyMatrix_ == nullptr ){
+//        LogInfo << "Generating Cholesky matrix in set: " << getName() << std::endl;
+//        _choleskyMatrix_ = std::shared_ptr<TMatrixD>(
+//            GenericToolbox::getCholeskyMatrix( _strippedCovarianceMatrix_.get() )
+//        );
+//      }
+//      auto throws = GenericToolbox::throwCorrelatedParameters(_choleskyMatrix_.get());
+
+      if( not _correlatedVariableThrower_.isInitialized() ){
+        _correlatedVariableThrower_.setCovarianceMatrixPtr(_strippedCovarianceMatrix_.get());
+        _correlatedVariableThrower_.initialize();
+      }
+      TVectorD throws(_strippedCovarianceMatrix_->GetNrows());
+      _correlatedVariableThrower_.throwCorrelatedVariables(throws);
+
+      int iFit{-1};
+      for( auto& par : _parameterList_ ){
+        if( FitParameterSet::isValidCorrelatedParameter(par) ){
+          iFit++;
+          LogInfo << "Throwing par " << par.getTitle() << ": " << par.getPriorValue();
+          par.setThrowValue(par.getPriorValue() + gain_ * throws[iFit]);
+          par.setParameterValue( par.getThrowValue() );
+          LogInfo << " → " << par.getParameterValue() << std::endl;
+        }
+        else{
+          LogWarning << "Skipping parameter: " << par.getTitle() << std::endl;
+        }
+      }
+
+//    if( _useEigenDecompInFit_ ){
+//      this->propagateOriginalToEigen();
+//      for( auto& eigenPar : _eigenParameterList_ ){
+//        eigenPar.setThrowValue( eigenPar.getParameterValue() );
+//      }
+//    }
+    }
+  }
+
 
 }
 const std::vector<nlohmann::json>& FitParameterSet::getCustomFitParThrow() const{
@@ -515,6 +567,9 @@ double FitParameterSet::toRealParRange(double normParRange, const FitParameter& 
 double FitParameterSet::toRealParValue(double normParValue, const FitParameter& par) {
   return normParValue*par.getStdDevValue() + par.getPriorValue();
 }
+bool FitParameterSet::isValidCorrelatedParameter(const FitParameter& par_){
+  return ( par_.isEnabled() and not par_.isFixed() and not par_.isFree() );
+}
 
 
 // Protected
@@ -522,8 +577,14 @@ void FitParameterSet::readParameterDefinitionFile(){
 
   if( _parameterDefinitionFilePath_.empty() ) return;
 
-  std::unique_ptr<TFile> parDefFile(TFile::Open(_parameterDefinitionFilePath_.c_str()));
-  LogThrowIf(parDefFile == nullptr or not parDefFile->IsOpen(), "Could not open: " << _parameterDefinitionFilePath_)
+  std::string path = GenericToolbox::expandEnvironmentVariables(_parameterDefinitionFilePath_);
+  if (path != _parameterDefinitionFilePath_) {
+    LogInfo << "Using parameter definition file " << path
+            << std::endl;
+  }
+
+  std::unique_ptr<TFile> parDefFile(TFile::Open(path.c_str()));
+  LogThrowIf(parDefFile == nullptr or not parDefFile->IsOpen(), "Could not open: " << path);
 
   TObject* objBuffer{nullptr};
 
@@ -635,25 +696,44 @@ void FitParameterSet::defineParameters(){
 
     if( not _parameterDefinitionConfig_.empty() ){
       // Alternative 1: define dials then parameters
-      JsonUtils::forwardConfig(_parameterDefinitionConfig_);
-      auto parConfig = JsonUtils::fetchMatchingEntry(_parameterDefinitionConfig_, "parameterName", std::string(_parameterNamesList_->At(par.getParameterIndex())->GetName()));
-      if( parConfig.empty() ){
-        // try with par index
-        parConfig = JsonUtils::fetchMatchingEntry(_parameterDefinitionConfig_, "parameterIndex", par.getParameterIndex());
+      ConfigUtils::forwardConfig(_parameterDefinitionConfig_);
+      if (_parameterNamesList_) {
+        // Find the parameter using the name from the vector of names for
+        // the covariance.
+        auto parConfig = GenericToolbox::Json::fetchMatchingEntry(_parameterDefinitionConfig_, "parameterName", std::string(_parameterNamesList_->At(par.getParameterIndex())->GetName()));
+        if( parConfig.empty() ){
+            // try with par index
+          parConfig = GenericToolbox::Json::fetchMatchingEntry(_parameterDefinitionConfig_, "parameterIndex", par.getParameterIndex());
+        }
+        par.setParameterDefinitionConfig(parConfig);
       }
-      par.setParameterDefinitionConfig(parConfig);
+      else {
+        // No covariance provided, so find the name based on the order in
+        // the parameter set.
+        auto configVector = _parameterDefinitionConfig_.get<std::vector<nlohmann::json>>();
+        LogThrowIf(configVector.size() <= par.getParameterIndex());
+        auto parConfig = configVector.at(par.getParameterIndex());
+        auto parName = GenericToolbox::Json::fetchValue<std::string>(parConfig, "parameterName");
+        if (not parName.empty()) par.setName(parName);
+        par.setParameterDefinitionConfig(parConfig);
+        LogWarning << "Parameter #" << par.getParameterIndex()
+                   << " (name \"" << par.getName() << "\")"
+                   << " not defined by covariance matrix file"
+                   << std::endl;
+      }
     }
     else if( not _dialSetDefinitions_.empty() ){
       // Alternative 2: define dials then parameters
       par.setDialSetConfig( _dialSetDefinitions_ );
     }
+    par.readConfig();
   }
 }
 
 void FitParameterSet::fillDeltaParameterList(){
   int iFit{0};
   for( const auto& par : _parameterList_ ){
-    if( par.isEnabled() and not par.isFixed() and not par.isFree() ){
+    if( FitParameterSet::isValidCorrelatedParameter(par) ){
       (*_deltaParameterList_)[iFit++] = par.getParameterValue() - par.getPriorValue();
     }
   }
@@ -669,5 +749,3 @@ const std::shared_ptr<TMatrixDSym> &FitParameterSet::getPriorCorrelationMatrix()
 const std::shared_ptr<TMatrixDSym> &FitParameterSet::getPriorCovarianceMatrix() const {
   return _priorCovarianceMatrix_;
 }
-
-

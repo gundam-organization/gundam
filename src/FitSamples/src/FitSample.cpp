@@ -4,7 +4,7 @@
 
 #include "FitSample.h"
 #include "GlobalVariables.h"
-#include "JsonUtils.h"
+#include "GenericToolbox.Json.h"
 
 #include "GenericToolbox.h"
 #include "Logger.h"
@@ -20,20 +20,20 @@ LoggerInit([]{
 
 
 void FitSample::readConfigImpl(){
-  _name_ = JsonUtils::fetchValue(_config_, "name", _name_);
+  _name_ = GenericToolbox::Json::fetchValue(_config_, "name", _name_);
   LogThrowIf(
       GenericToolbox::doesStringContainsSubstring(_name_, "/"),
       "Invalid sample name: \"" << _name_ << "\": should not have '/'.");
 
-  _binningFilePath_ = JsonUtils::fetchValue(_config_, {{"binningFilePath"}, {"binningFile"}, {"binning"}}, _binningFilePath_);
+  _binningFilePath_ = GenericToolbox::Json::fetchValue(_config_, {{"binningFilePath"}, {"binningFile"}, {"binning"}}, _binningFilePath_);
 
-  _isEnabled_ = JsonUtils::fetchValue(_config_, "isEnabled", true);
+  _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", true);
   LogReturnIf(not _isEnabled_, "\"" << _name_ << "\" is disabled.");
 
-  _selectionCutStr_ = JsonUtils::fetchValue(_config_, {{"selectionCutStr"}, {"selectionCuts"}}, _selectionCutStr_);
-  _enabledDatasetList_ = JsonUtils::fetchValue(_config_, std::vector<std::string>{"datasets", "dataSets"}, _enabledDatasetList_);
-  _mcNorm_ = JsonUtils::fetchValue(_config_, "mcNorm", _mcNorm_);
-  _dataNorm_ = JsonUtils::fetchValue(_config_, "dataNorm", _dataNorm_);
+  _selectionCutStr_ = GenericToolbox::Json::fetchValue(_config_, {{"selectionCutStr"}, {"selectionCuts"}}, _selectionCutStr_);
+  _enabledDatasetList_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"datasets", "dataSets"}, _enabledDatasetList_);
+  _mcNorm_ = GenericToolbox::Json::fetchValue(_config_, "mcNorm", _mcNorm_);
+  _dataNorm_ = GenericToolbox::Json::fetchValue(_config_, "dataNorm", _dataNorm_);
 }
 void FitSample::initializeImpl() {
   if( not _isEnabled_ ) return;
@@ -67,6 +67,9 @@ void FitSample::initializeImpl() {
 void FitSample::setName(const std::string &name) {
   _name_ = name;
 }
+void FitSample::setIndex(int index) {
+  _index_ = index;
+}
 void FitSample::setBinningFilePath(const std::string &binningFilePath_) {
   _binningFilePath_ = binningFilePath_;
 }
@@ -82,6 +85,9 @@ void FitSample::setEnabledDatasetList(const std::vector<std::string>& enabledDat
 
 bool FitSample::isEnabled() const {
   return _isEnabled_;
+}
+int FitSample::getIndex() const {
+  return _index_;
 }
 const std::string &FitSample::getName() const {
   return _name_;

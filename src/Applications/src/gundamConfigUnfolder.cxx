@@ -2,7 +2,8 @@
 // Created by Nadrino on 21/04/2021.
 //
 
-#include "JsonUtils.h"
+#include "GenericToolbox.Json.h"
+#include "ConfigUtils.h"
 #include "GundamGreetings.h"
 
 #include "Logger.h"
@@ -41,13 +42,13 @@ int main( int argc, char** argv ){
   if( not GenericToolbox::doesStringEndsWithSubstring(fConfigFilePath, ".json") ) fConfigFilePath += ".json";
 
   LogInfo << "Reading configuration file..." << std::endl;
-  auto config = JsonUtils::readConfigFile(configFilePath);
+  auto config = ConfigUtils::readConfigFile(configFilePath);
 
   LogInfo << "Unfolding configuration file..." << std::endl;
-  JsonUtils::unfoldConfig(config);
+  ConfigUtils::unfoldConfig(config);
 
   LogInfo << "Writing as: " << fConfigFilePath << std::endl;
-  GenericToolbox::dumpStringInFile(fConfigFilePath, JsonUtils::toReadableString(config));
+  GenericToolbox::dumpStringInFile(fConfigFilePath, GenericToolbox::Json::toReadableString(config));
 
   LogInfo << "Unfolded config written as: " << fConfigFilePath << std::endl;
 

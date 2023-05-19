@@ -3,10 +3,11 @@
 //
 
 #include "VariableDictionary.h"
+#include "ConfigUtils.h"
 
 #include "Logger.h"
 
-#include "JsonUtils.h"
+#include "GenericToolbox.Json.h"
 
 
 LoggerInit([]{
@@ -18,30 +19,30 @@ VariableDictEntry::VariableDictEntry(const nlohmann::json& config_){
 }
 
 void VariableDictEntry::readConfig(const nlohmann::json& config_){
-  auto config = JsonUtils::getForwardedConfig(config_);
+  auto config = ConfigUtils::getForwardedConfig(config_);
 
   // Mandatory
-  this->name = JsonUtils::fetchValue<std::string>(config, "name");
+  this->name = GenericToolbox::Json::fetchValue<std::string>(config, "name");
 
   // Defaulted
   this->displayName = this->name;
 
   // Optionals
-  this->displayName = JsonUtils::fetchValue(config, "displayName", this->displayName);
-  this->unit = JsonUtils::fetchValue(config, "unit", this->unit);
-  this->description = JsonUtils::fetchValue(config, "description", this->description);
+  this->displayName = GenericToolbox::Json::fetchValue(config, "displayName", this->displayName);
+  this->unit = GenericToolbox::Json::fetchValue(config, "unit", this->unit);
+  this->description = GenericToolbox::Json::fetchValue(config, "description", this->description);
 }
 
 
 void VariableDictionary::fillDictionary(const nlohmann::json& config_, bool overrideIfDefined_){
-  auto config = JsonUtils::getForwardedConfig(config_);
+  auto config = ConfigUtils::getForwardedConfig(config_);
 
   auto entryList = config.get<std::vector<nlohmann::json>>();
   dictionary.reserve( dictionary.size() + entryList.size() ); // max size
 
   for( auto& dictEntry : entryList ){
-    if( this->isVariableDefined( JsonUtils::fetchValue<std::string>(dictEntry, "name") ) and overrideIfDefined_ ){
-      this->getEntry( JsonUtils::fetchValue<std::string>(dictEntry, "name") ).readConfig(dictEntry);
+    if( this->isVariableDefined( GenericToolbox::Json::fetchValue<std::string>(dictEntry, "name") ) and overrideIfDefined_ ){
+      this->getEntry( GenericToolbox::Json::fetchValue<std::string>(dictEntry, "name") ).readConfig(dictEntry);
     }
     else{
       dictionary.emplace_back( dictEntry );

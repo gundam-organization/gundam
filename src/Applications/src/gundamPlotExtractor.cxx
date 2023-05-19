@@ -60,7 +60,7 @@ int main( int argc, char** argv ){
   init();
   walkAndUnfoldTDirectory(rootFile, outFolderPath);
 
-  LogInfo << nPlots << " plots writen." << std::endl;
+  LogInfo << nPlots << " plots written." << std::endl;
 
   rootFile->Close();
   delete rootFile;

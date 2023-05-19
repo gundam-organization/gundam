@@ -17,6 +17,7 @@ work/
 *.pdf
 *.tar
 *.zip
+.gdb*
 
 # Compiled Object files
 *.slo

@@ -1,9 +1,9 @@
 
 #include "GlobalVariables.h"
 #include "VersionConfig.h"
-#include "JsonUtils.h"
 #include "GundamGreetings.h"
 #include "Propagator.h"
+#include "ConfigUtils.h"
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
 #include "CacheManager.h"
@@ -12,6 +12,7 @@
 #include "Logger.h"
 #include "CmdLineParser.h"
 #include "GenericToolbox.h"
+#include "GenericToolbox.Json.h"
 #include "GenericToolbox.Root.h"
 
 #include <TFile.h>
@@ -77,14 +78,14 @@ int main(int argc, char** argv){
   // Initialize the fitter:
   // --------------------------
   LogInfo << "Reading config file: " << configFilePath << std::endl;
-  auto configXsecExtractor = JsonUtils::readConfigFile(configFilePath); // works with yaml
+  auto configXsecExtractor = ConfigUtils::readConfigFile(configFilePath); // works with yaml
 
-  if( JsonUtils::doKeyExist(configXsecExtractor, "minGundamVersion") ){
+  if( GenericToolbox::Json::doKeyExist(configXsecExtractor, "minGundamVersion") ){
     LogThrowIf(
-      not g.isNewerOrEqualVersion(JsonUtils::fetchValue<std::string>(configXsecExtractor, "minGundamVersion")),
-      "Version check FAILED: " << GundamVersionConfig::getVersionStr() << " < " << JsonUtils::fetchValue<std::string>(configXsecExtractor, "minGundamVersion")
+      not g.isNewerOrEqualVersion(GenericToolbox::Json::fetchValue<std::string>(configXsecExtractor, "minGundamVersion")),
+      "Version check FAILED: " << GundamVersionConfig::getVersionStr() << " < " << GenericToolbox::Json::fetchValue<std::string>(configXsecExtractor, "minGundamVersion")
     );
-    LogInfo << "Version check passed: " << GundamVersionConfig::getVersionStr() << " >= " << JsonUtils::fetchValue<std::string>(configXsecExtractor, "minGundamVersion") << std::endl;
+    LogInfo << "Version check passed: " << GundamVersionConfig::getVersionStr() << " >= " << GenericToolbox::Json::fetchValue<std::string>(configXsecExtractor, "minGundamVersion") << std::endl;
   }
 
 
@@ -97,9 +98,9 @@ int main(int argc, char** argv){
   std::string outFileName = configFilePath;
 
   outFileName = clParser.getOptionVal("outputFile", outFileName + ".root");
-  if( JsonUtils::doKeyExist(configXsecExtractor, "outputFolder") ){
-    GenericToolbox::mkdirPath(JsonUtils::fetchValue<std::string>(configXsecExtractor, "outputFolder"));
-    outFileName.insert(0, JsonUtils::fetchValue<std::string>(configXsecExtractor, "outputFolder") + "/");
+  if( GenericToolbox::Json::doKeyExist(configXsecExtractor, "outputFolder") ){
+    GenericToolbox::mkdirPath(GenericToolbox::Json::fetchValue<std::string>(configXsecExtractor, "outputFolder"));
+    outFileName.insert(0, GenericToolbox::Json::fetchValue<std::string>(configXsecExtractor, "outputFolder") + "/");
   }
 
   LogWarning << "Creating output file: \"" << outFileName << "\"..." << std::endl;
@@ -123,14 +124,15 @@ int main(int argc, char** argv){
   std::string configStr{fitFile->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed")->GetTitle()};
 
   // Get config from the fit
-  auto configFit = JsonUtils::readConfigJsonStr(configStr); // works with yaml
-  auto configPropagator = JsonUtils::fetchValuePath<nlohmann::json>( configFit, "fitterEngineConfig/propagatorConfig" );
+  auto configFit = GenericToolbox::Json::readConfigJsonStr(configStr); // works with yaml
+//  auto configPropagator = GenericToolbox::Json::fetchValuePath<nlohmann::json>( configFit, "fitterEngineConfig/propagatorConfig" );
+  auto configPropagator = GenericToolbox::Json::fetchValue<nlohmann::json>(GenericToolbox::Json::fetchValue<nlohmann::json>(configFit, "fitterEngineConfig"), "propagatorConfig");
 
   bool enableEventMcThrow{true};
   bool enableStatThrowInToys{true};
 
-  enableStatThrowInToys = JsonUtils::fetchValue(configXsecExtractor, "enableStatThrowInToys", enableStatThrowInToys);
-  enableEventMcThrow = JsonUtils::fetchValue(configXsecExtractor, "enableEventMcThrow", enableEventMcThrow);
+  enableStatThrowInToys = GenericToolbox::Json::fetchValue(configXsecExtractor, "enableStatThrowInToys", enableStatThrowInToys);
+  enableEventMcThrow = GenericToolbox::Json::fetchValue(configXsecExtractor, "enableEventMcThrow", enableEventMcThrow);
 
   // Create a propagator object
   Propagator p;
@@ -162,9 +164,9 @@ int main(int argc, char** argv){
     sample.setEnabledDatasetList( explicitDatasetNameList );
   }
 
-  if( JsonUtils::doKeyExist(configXsecExtractor, "signalDatasets") ){
+  if( GenericToolbox::Json::doKeyExist(configXsecExtractor, "signalDatasets") ){
     LogWarning << "Defining additional datasets for signals..." << std::endl;
-    auto signalDatasetList = JsonUtils::fetchValue<std::vector<nlohmann::json>>(configXsecExtractor, "signalDatasets");
+    auto signalDatasetList = GenericToolbox::Json::fetchValue<std::vector<nlohmann::json>>(configXsecExtractor, "signalDatasets");
 
     // WARNING THIS CHANGES THE SIZE OF THE VECTOR:
     p.getDataSetList().reserve( p.getDataSetList().size() + signalDatasetList.size() );
@@ -179,7 +181,7 @@ int main(int argc, char** argv){
   }
 
   // Add template sample
-  auto signalDefinitions = JsonUtils::fetchValue<std::vector<nlohmann::json>>(configXsecExtractor, "signalDefinitions");
+  auto signalDefinitions = GenericToolbox::Json::fetchValue<std::vector<nlohmann::json>>(configXsecExtractor, "signalDefinitions");
   LogInfo << "Adding 2 x " << signalDefinitions.size() << " signal samples (true + reconstructed) to the propagator..." << std::endl;
   std::vector<std::pair<FitSample*, FitSample*>> signalSampleList;
   p.getFitSampleSet().getFitSampleList().reserve(
@@ -189,7 +191,7 @@ int main(int argc, char** argv){
   LogInfo << "Defining sample for signal definitions..." << std::endl;
   for( auto& signalDef : signalDefinitions ){
 
-    auto parameterSetName = JsonUtils::fetchValue<std::string>(signalDef, "parameterSetName");
+    auto parameterSetName = GenericToolbox::Json::fetchValue<std::string>(signalDef, "parameterSetName");
     LogInfo << "Adding signal samples: \"" << parameterSetName << "\"" << std::endl;
     signalSampleList.emplace_back();
     p.getFitSampleSet().getFitSampleList().emplace_back();
@@ -197,18 +199,18 @@ int main(int argc, char** argv){
     signalSampleList.back().first->readConfig(); // read empty config
     signalSampleList.back().first->setName( parameterSetName );
 
-    auto templateBinningFilePath = JsonUtils::fetchValue<std::string>(
+    auto templateBinningFilePath = GenericToolbox::Json::fetchValue<std::string>(
         p.getFitParameterSetPtr( parameterSetName )->getDialSetDefinitions()[0], "parametersBinningPath"
     );
-    auto applyOnCondition = JsonUtils::fetchValue<std::string>(
+    auto applyOnCondition = GenericToolbox::Json::fetchValue<std::string>(
         p.getFitParameterSetPtr( parameterSetName )->getDialSetDefinitions()[0], "applyCondition"
     );
 
     signalSampleList.back().first->setBinningFilePath( templateBinningFilePath );
     signalSampleList.back().first->setVarSelectionFormulaStr( applyOnCondition );
 
-    if( JsonUtils::doKeyExist(signalDef, "datasetSources") ){
-      auto datasetSrcList = JsonUtils::fetchValue<std::vector<std::string>>(signalDef, "datasetSources");
+    if( GenericToolbox::Json::doKeyExist(signalDef, "datasetSources") ){
+      auto datasetSrcList = GenericToolbox::Json::fetchValue<std::vector<std::string>>(signalDef, "datasetSources");
       LogInfo << "Signal sample \"" << parameterSetName << "\" (truth) will load data from datasets: "
       << GenericToolbox::parseVectorAsString( datasetSrcList ) << std::endl;
       signalSampleList.back().first->setEnabledDatasetList( datasetSrcList );
@@ -288,7 +290,6 @@ int main(int argc, char** argv){
 
     for( int iFitSample = 0 ; iFitSample < nFitSample ; iFitSample++ ){
       for( auto& event : p.getFitSampleSet().getFitSampleList()[iFitSample].getMcContainer().eventList ){
-        signalSamplePair.first->getBinning().getBinsList();
         for( size_t iBin = 0 ; iBin < signalSamplePair.first->getBinning().getBinsList().size() ; iBin++ ){
           if( isInTemplateBin(event, signalSamplePair.first->getBinning().getBinsList()[iBin]) ){
             // copy event in template bin
@@ -358,8 +359,8 @@ int main(int argc, char** argv){
   std::vector<double> numberOfTargets(signalSampleList.size());
   std::vector<double> integratedFlux(signalSampleList.size());
   for( size_t iSignal = 0 ; iSignal < signalSampleList.size() ; iSignal++ ){
-    numberOfTargets[iSignal] = JsonUtils::fetchValue<double>(signalDefinitions[iSignal], "numberOfTargets", 1);
-    integratedFlux[iSignal] = JsonUtils::fetchValue<double>(signalDefinitions[iSignal], "integratedFlux", 1);
+    numberOfTargets[iSignal] = GenericToolbox::Json::fetchValue<double>(signalDefinitions[iSignal], "numberOfTargets", 1);
+    integratedFlux[iSignal] = GenericToolbox::Json::fetchValue<double>(signalDefinitions[iSignal], "integratedFlux", 1);
   }
 
   int nToys{100};
@@ -417,13 +418,11 @@ int main(int argc, char** argv){
   int iGlobal{-1};
   for( size_t iSignal = 0 ; iSignal < signalSampleList.size() ; iSignal++ ){
     binValues.emplace_back(
-      TH1D(
-        signalSampleList[iSignal].first->getName().c_str(),
-        signalSampleList[iSignal].first->getName().c_str(),
-        signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX(),
-        0,
-        signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX()
-      )
+      signalSampleList[iSignal].first->getName().c_str(),
+      signalSampleList[iSignal].first->getName().c_str(),
+      signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX(),
+      0,
+      signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX()
     );
 
     std::string sampleTitle{ signalSampleList[iSignal].first->getName() };

@@ -6,10 +6,14 @@
 
 #include <dlfcn.h>
 
+LoggerInit([]{
+  Logger::setUserHeaderStr("[EventVarTransformLib]");
+});
+
 
 void EventVarTransformLib::readConfigImpl(){
   this->EventVarTransform::readConfigImpl();
-  _libraryFile_ = JsonUtils::fetchValue(_config_, "libraryFile", _libraryFile_);
+  _libraryFile_ = GenericToolbox::Json::fetchValue(_config_, "libraryFile", _libraryFile_);
 }
 void EventVarTransformLib::initializeImpl(){
   LogInfo << "Loading variable transformation: " << _title_ << std::endl;

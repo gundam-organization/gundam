@@ -49,11 +49,14 @@ public:
   void rescaleHistogram();
   void saveAsHistogramNominal();
 
-  void throwEventMcError(); // event by event poisson throw -> takes into account the finite amount of stat in MC
-  void throwStatError(); // generate a toy experiment -> hist content as the asimov -> throw poisson for each bin
+  // event by event poisson throw -> takes into account the finite amount of stat in MC
+  void throwEventMcError();
 
-  double getSumWeights() const;
-  size_t getNbBinnedEvents() const;
+  // generate a toy experiment -> hist content as the asimov -> throw poisson for each bin
+  void throwStatError(bool useGaussThrow_ = false);
+
+  [[nodiscard]] double getSumWeights() const;
+  [[nodiscard]] size_t getNbBinnedEvents() const;
 
   // debug
   void print() const;

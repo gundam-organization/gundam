@@ -32,14 +32,14 @@ void DataBinSet::setName(const std::string &name) {
 }
 void DataBinSet::readBinningDefinition(const std::string &filePath_) {
 
-  _filePath_ = filePath_;
+  _filePath_ = GenericToolbox::expandEnvironmentVariables(filePath_);
 
-  if( not GenericToolbox::doesPathIsFile(filePath_) ){
-    LogError << GET_VAR_NAME_VALUE(filePath_) << ": file not found." << std::endl;
-    throw std::runtime_error(GET_VAR_NAME_VALUE(filePath_) + ": file not found.");
+  if( not GenericToolbox::doesPathIsFile(_filePath_) ){
+    LogError << GET_VAR_NAME_VALUE(_filePath_) << ": file not found." << std::endl;
+    throw std::runtime_error(GET_VAR_NAME_VALUE(_filePath_) + ": file not found.");
   }
 
-  auto lines = GenericToolbox::dumpFileAsVectorString(filePath_);
+  auto lines = GenericToolbox::dumpFileAsVectorString(_filePath_);
   std::vector<std::string> expectedVariableList;
   std::vector<std::string> expectedVariableTitleList;
   std::vector<bool> expectedVariableIsRangeList;
@@ -155,6 +155,22 @@ void DataBinSet::setVerbosity(int maxLogLevel_) {
   Logger::setMaxLogLevel(maxLogLevel_);
 }
 
+const std::vector<DataBin> &DataBinSet::getBinsList() const {
+  return _binsList_;
+}
+const std::string &DataBinSet::getFilePath() const {
+  return _filePath_;
+}
+const std::vector<std::string> &DataBinSet::getBinVariables() const {
+  return _binVariables_;
+}
+std::vector<DataBin> &DataBinSet::getBinsList(){
+  return _binsList_;
+}
+
+bool DataBinSet::isEmpty() const{
+  return _binsList_.empty();
+}
 std::string DataBinSet::getSummary() const{
   std::stringstream ss;
   ss << "DataBinSet";
@@ -175,18 +191,4 @@ void DataBinSet::addBinContent(int binIndex_, double weight_) {
     throw std::logic_error("Invalid binIndex");
   }
   _binContent_.at(binIndex_) += weight_;
-}
-
-const std::vector<DataBin> &DataBinSet::getBinsList() const {
-  return _binsList_;
-}
-const std::string &DataBinSet::getFilePath() const {
-  return _filePath_;
-}
-const std::vector<std::string> &DataBinSet::getBinVariables() const {
-  return _binVariables_;
-}
-
-std::vector<DataBin> &DataBinSet::getBinsList(){
-  return _binsList_;
 }

@@ -4,7 +4,7 @@
 
 #include "FitterEngine.h"
 #include "VersionConfig.h"
-#include "JsonUtils.h"
+#include "ConfigUtils.h"
 #include "GlobalVariables.h"
 #include "GundamGreetings.h"
 #ifdef GUNDAM_USING_CACHE_MANAGER
@@ -14,6 +14,7 @@
 #include "CmdLineParser.h"
 #include "Logger.h"
 #include "GenericToolbox.Root.h"
+#include "GenericToolbox.Json.h"
 
 #include <string>
 #include "vector"
@@ -58,6 +59,8 @@ int main(int argc, char** argv){
   clParser.addTriggerOption("skipHesse", {"--skip-hesse"}, "Don't perform postfit error evaluation");
   clParser.addTriggerOption("generateOneSigmaPlots", {"--one-sigma"}, "Generate one sigma plots");
   clParser.addTriggerOption("lightOutputMode", {"--light-mode"}, "Disable plot generation");
+  clParser.addTriggerOption("noDialCache", {"--no-dial-cache"}, "Disable cache handling for dial eval");
+  clParser.addTriggerOption("ignoreVersionCheck", {"--ignore-version"}, "Don't check GUNDAM version with config request");
 
   clParser.addOption("scanParameters", {"--scan"}, "Enable parameter scan before and after the fit (can provide nSteps)", 1, true);
   clParser.addOption("toyFit", {"--toy"}, "Run a toy fit (optional arg to provide toy index)", 1, true);
@@ -107,6 +110,13 @@ int main(int argc, char** argv){
 #endif
   }
 
+  // No cache on dials?
+  if( clParser.isOptionTriggered("noDialCache") ){
+    LogAlert << "Disabling cache in dial evaluation (when available)..." << std::endl;
+    GlobalVariables::setDisableDialCache(true);
+  }
+
+
   // PRNG seed?
   if( clParser.isOptionTriggered("randomSeed") ){
     LogAlert << "Using user-specified random seed: " << clParser.getOptionVal<ULong_t>("randomSeed") << std::endl;
@@ -126,7 +136,7 @@ int main(int argc, char** argv){
   auto configFilePath = clParser.getOptionVal("configFile", "");
   LogThrowIf(configFilePath.empty(), "Config file not provided.");
   LogInfo << "Reading config file: " << configFilePath << std::endl;
-  auto jsonConfig = JsonUtils::readConfigFile(configFilePath); // works with yaml
+  auto jsonConfig = ConfigUtils::readConfigFile(configFilePath); // works with yaml
 
   // Output file path
   std::string outFileName;
@@ -140,8 +150,8 @@ int main(int argc, char** argv){
       outFileName += "/";
       GenericToolbox::mkdirPath( outFileName );
     }
-    else if( JsonUtils::doKeyExist(jsonConfig, "outputFolder") ){
-      outFileName = JsonUtils::fetchValue<std::string>(jsonConfig, "outputFolder");
+    else if( GenericToolbox::Json::doKeyExist(jsonConfig, "outputFolder") ){
+      outFileName = GenericToolbox::Json::fetchValue<std::string>(jsonConfig, "outputFolder");
       outFileName += "/";
       GenericToolbox::mkdirPath( outFileName );
     }
@@ -189,12 +199,12 @@ int main(int argc, char** argv){
   // --------------------------
 
   // Checking the minimal version for the config
-  if( JsonUtils::doKeyExist(jsonConfig, "minGundamVersion") ){
+  if( GenericToolbox::Json::doKeyExist(jsonConfig, "minGundamVersion") and not clParser.isOptionTriggered("ignoreVersionCheck") ){
     LogThrowIf(
-        not g.isNewerOrEqualVersion(JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion")),
-        "Version check FAILED: " << GundamVersionConfig::getVersionStr() << " < " << JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion")
+        not g.isNewerOrEqualVersion(GenericToolbox::Json::fetchValue<std::string>(jsonConfig, "minGundamVersion")),
+        "Version check FAILED: " << GundamVersionConfig::getVersionStr() << " < " << GenericToolbox::Json::fetchValue<std::string>(jsonConfig, "minGundamVersion")
     );
-    LogInfo << "Version check passed: " << GundamVersionConfig::getVersionStr() << " >= " << JsonUtils::fetchValue<std::string>(jsonConfig, "minGundamVersion") << std::endl;
+    LogInfo << "Version check passed: " << GundamVersionConfig::getVersionStr() << " >= " << GenericToolbox::Json::fetchValue<std::string>(jsonConfig, "minGundamVersion") << std::endl;
   }
 
   // Ok, we should run. Create the out file.
@@ -211,8 +221,8 @@ int main(int argc, char** argv){
 
   // Config unfolded ?
   auto unfoldedConfig = jsonConfig;
-  JsonUtils::unfoldConfig(unfoldedConfig);
-  TNamed unfoldedConfigString("unfoldedConfig", JsonUtils::toReadableString(unfoldedConfig).c_str());
+  ConfigUtils::unfoldConfig(unfoldedConfig);
+  TNamed unfoldedConfigString("unfoldedConfig", GenericToolbox::Json::toReadableString(unfoldedConfig).c_str());
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamFitter"), &unfoldedConfigString);
 
 
@@ -222,7 +232,7 @@ int main(int argc, char** argv){
   LogInfo << "FitterEngine setup..." << std::endl;
   FitterEngine fitter{GenericToolbox::mkdirTFile(out, "FitterEngine")};
 
-  fitter.readConfig(JsonUtils::fetchSubEntry(jsonConfig, {"fitterEngineConfig"}));
+  fitter.readConfig(GenericToolbox::Json::fetchSubEntry(jsonConfig, {"fitterEngineConfig"}));
 
   // -a
   fitter.getPropagator().setLoadAsimovData( clParser.isOptionTriggered("asimov") );
@@ -258,15 +268,15 @@ int main(int argc, char** argv){
   fitter.setLightMode( clParser.isOptionTriggered("lightOutputMode") );
 
   // Also check app level config options
-  JsonUtils::deprecatedAction(jsonConfig, "generateSamplePlots", [&]{
+  GenericToolbox::Json::deprecatedAction(jsonConfig, "generateSamplePlots", [&]{
     LogAlert << "Forwarding the option to FitterEngine. Consider moving it into \"fitterEngineConfig:\"" << std::endl;
-    fitter.setGenerateSamplePlots( JsonUtils::fetchValue<bool>(jsonConfig, "generateSamplePlots") );
+    fitter.setGenerateSamplePlots( GenericToolbox::Json::fetchValue<bool>(jsonConfig, "generateSamplePlots") );
   });
 
-  JsonUtils::deprecatedAction(jsonConfig, "allParamVariations", [&]{
+  GenericToolbox::Json::deprecatedAction(jsonConfig, "allParamVariations", [&]{
     LogAlert << "Forwarding the option to FitterEngine. Consider moving it into \"fitterEngineConfig:\"" << std::endl;
     fitter.setDoAllParamVariations(true);
-    fitter.setAllParamVariationsSigmas(JsonUtils::fetchValue<std::vector<double>>(jsonConfig, "allParamVariations"));
+    fitter.setAllParamVariationsSigmas(GenericToolbox::Json::fetchValue<std::vector<double>>(jsonConfig, "allParamVariations"));
   });
 
 

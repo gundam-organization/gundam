@@ -3,7 +3,7 @@
 //
 
 #include "ParScanner.h"
-#include "JsonUtils.h"
+#include "GenericToolbox.Json.h"
 #include "Propagator.h"
 #include "FitParameter.h"
 
@@ -25,11 +25,11 @@ ParScanner::ParScanner(Propagator* owner_): _owner_(owner_) {}
 void ParScanner::readConfigImpl() {
   if( _config_.empty() ) return;
 
-  _useParameterLimits_ = JsonUtils::fetchValue(_config_, "useParameterLimits", _useParameterLimits_);
-  _nbPoints_ = JsonUtils::fetchValue(_config_, "nbPoints", _nbPoints_);
-  _parameterSigmaRange_ = JsonUtils::fetchValue(_config_, "parameterSigmaRange", _parameterSigmaRange_);
+  _useParameterLimits_ = GenericToolbox::Json::fetchValue(_config_, "useParameterLimits", _useParameterLimits_);
+  _nbPoints_ = GenericToolbox::Json::fetchValue(_config_, "nbPoints", _nbPoints_);
+  _parameterSigmaRange_ = GenericToolbox::Json::fetchValue(_config_, "parameterSigmaRange", _parameterSigmaRange_);
 
-  _varsConfig_ = JsonUtils::fetchValue(_config_, "varsConfig", nlohmann::json());
+  _varsConfig_ = GenericToolbox::Json::fetchValue(_config_, "varsConfig", nlohmann::json());
 }
 void ParScanner::initializeImpl() {
   LogInfo << "Initializing ParScanner..." << std::endl;
@@ -68,7 +68,7 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
   GenericToolbox::displayProgressBar(0, _nbPoints_, ssPbar.str());
 
   scanDataDict.clear();
-  if( JsonUtils::fetchValue(_varsConfig_, "llh", true) ){
+  if( GenericToolbox::Json::fetchValue(_varsConfig_, "llh", true) ){
     scanDataDict.emplace_back();
     auto& scanEntry = scanDataDict.back();
     scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
@@ -77,7 +77,7 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
     scanEntry.yTitle = "LLH value";
     scanEntry.evalY = [this](){ return _owner_->getLlhBuffer(); };
   }
-  if( JsonUtils::fetchValue(_varsConfig_, "llhPenalty", true) ){
+  if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhPenalty", true) ){
     scanDataDict.emplace_back();
     auto& scanEntry = scanDataDict.back();
     scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
@@ -87,7 +87,7 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
     scanEntry.yTitle = "Penalty LLH value";
     scanEntry.evalY = [this](){ return _owner_->getLlhPenaltyBuffer(); };
   }
-  if( JsonUtils::fetchValue(_varsConfig_, "llhStat", true) ){
+  if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStat", true) ){
     scanDataDict.emplace_back();
     auto& scanEntry = scanDataDict.back();
     scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
@@ -96,7 +96,7 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
     scanEntry.yTitle = "Stat LLH value";
     scanEntry.evalY = [this](){ return _owner_->getLlhStatBuffer(); };
   }
-  if( JsonUtils::fetchValue(_varsConfig_, "llhStatPerSample", false) ){
+  if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSample", false) ){
     for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
       scanDataDict.emplace_back();
       auto& scanEntry = scanDataDict.back();
@@ -108,7 +108,7 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
       scanEntry.evalY = [this, samplePtr](){ return _owner_->getFitSampleSet().evalLikelihood(*samplePtr); };
     }
   }
-  if( JsonUtils::fetchValue(_varsConfig_, "llhStatPerSamplePerBin", false) ){
+  if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSamplePerBin", false) ){
     for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
       for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
         scanDataDict.emplace_back();
@@ -125,7 +125,7 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
       }
     }
   }
-  if( JsonUtils::fetchValue(_varsConfig_, "weightPerSample", false) ){
+  if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSample", false) ){
     for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
       scanDataDict.emplace_back();
       auto& scanEntry = scanDataDict.back();
@@ -137,7 +137,7 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
       scanEntry.evalY = [samplePtr](){ return samplePtr->getMcContainer().getSumWeights(); };
     }
   }
-  if( JsonUtils::fetchValue(_varsConfig_, "weightPerSamplePerBin", false) ){
+  if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSamplePerBin", false) ){
     for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
       for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
         scanDataDict.emplace_back();
@@ -236,7 +236,7 @@ void ParScanner::generateOneSigmaPlots(TDirectory* saveDir_){
 
     if( not parSet.isEnabled() ) continue;
 
-    if( JsonUtils::fetchValue(parSet.getConfig(), "disableOneSigmaPlots", false) ){
+    if( GenericToolbox::Json::fetchValue(parSet.getConfig(), "disableOneSigmaPlots", false) ){
       LogInfo << "+1σ plots disabled for \"" << parSet.getName() << "\"" << std::endl;
       continue;
     }
@@ -346,7 +346,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
   for( auto& parSet : _owner_->getParameterSetsList() ){
 
     if( not parSet.isEnabled() ) continue;
-    if( JsonUtils::fetchValue(parSet.getConfig(), "skipVariedEventRates", false) ){
+    if( GenericToolbox::Json::fetchValue(parSet.getConfig(), "skipVariedEventRates", false) ){
       LogInfo << "Event rate variation skipped for \"" << parSet.getName() << "\"" << std::endl;
       continue;
     }

@@ -2,11 +2,10 @@
 // Created by Nadrino on 16/06/2021.
 //
 
-#include "JsonUtils.h"
+#include "GenericToolbox.Json.h"
 #include "GlobalVariables.h"
 #include "PlotGenerator.h"
-
-#include <memory>
+#include "ConfigUtils.h"
 
 #include "Logger.h"
 #include "GenericToolbox.h"
@@ -19,6 +18,7 @@
 #include "string"
 #include "vector"
 #include "sstream"
+#include <memory>
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[PlotGenerator]");
@@ -29,11 +29,11 @@ void PlotGenerator::readConfigImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
   gStyle->SetOptStat(0);
   _histHolderCacheList_.resize(1);
-  _varDictionary_ = JsonUtils::fetchValue(_config_, "varDictionnaries", nlohmann::json());
-  _canvasParameters_ = JsonUtils::fetchValue(_config_, "canvasParameters", nlohmann::json());
-  _histogramsDefinition_ = JsonUtils::fetchValue(_config_, "histogramsDefinition", nlohmann::json());
+  _varDictionary_ = GenericToolbox::Json::fetchValue(_config_, "varDictionnaries", nlohmann::json());
+  _canvasParameters_ = GenericToolbox::Json::fetchValue(_config_, "canvasParameters", nlohmann::json());
+  _histogramsDefinition_ = GenericToolbox::Json::fetchValue(_config_, "histogramsDefinition", nlohmann::json());
 
-  _writeGeneratedHistograms_ = JsonUtils::fetchValue(_config_, "writeGeneratedHistograms", _writeGeneratedHistograms_);
+  _writeGeneratedHistograms_ = GenericToolbox::Json::fetchValue(_config_, "writeGeneratedHistograms", _writeGeneratedHistograms_);
 }
 void PlotGenerator::initializeImpl() {
   LogWarning << __METHOD_NAME__ << std::endl;
@@ -250,10 +250,10 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
     return ss.str();
   };
 
-  int canvasHeight = JsonUtils::fetchValue(_canvasParameters_, "height", 700);
-  int canvasWidth = JsonUtils::fetchValue(_canvasParameters_, "width", 1200);
-  int canvasNbXplots = JsonUtils::fetchValue(_canvasParameters_, "nbXplots", 3);
-  int canvasNbYplots = JsonUtils::fetchValue(_canvasParameters_, "nbYplots", 2);
+  int canvasHeight = GenericToolbox::Json::fetchValue(_canvasParameters_, "height", 700);
+  int canvasWidth = GenericToolbox::Json::fetchValue(_canvasParameters_, "width", 1200);
+  int canvasNbXplots = GenericToolbox::Json::fetchValue(_canvasParameters_, "nbXplots", 3);
+  int canvasNbYplots = GenericToolbox::Json::fetchValue(_canvasParameters_, "nbYplots", 2);
 
   std::map<std::string, std::map<const FitSample*, std::vector<const HistHolder*>>> histsToStackMap; // histsToStackMap[path][FitSample] = listOfTh1d
   for( auto& histHolder : histHolderList_ ){
@@ -311,6 +311,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
       TH1D *dataSampleHist{nullptr};
       std::vector<TH1D *> mcSampleHistList;
       double minYValue = 1;
+      double maxYValue = minYValue;
       for( const auto* histHolder : histList.second ) {
         TH1D* hist = histHolder->histPtr.get();
         if ( histHolder->isData ) {
@@ -319,6 +320,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
         else {
           mcSampleHistList.emplace_back(hist);
           minYValue = std::min(minYValue, hist->GetMinimum(0));
+          maxYValue = std::max(maxYValue, hist->GetMaximum());
         }
       }
 
@@ -373,9 +375,6 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
 
             if ( firstHistToPlot == nullptr ) {
               firstHistToPlot = mcSampleHistAccumulatorList[iHist];
-              mcSampleHistAccumulatorList[iHist]->GetYaxis()->SetRangeUser(minYValue,
-                                                                           mcSampleHistAccumulatorList[iHist]->GetMaximum() *
-                                                                           1.2);
               mcSampleHistAccumulatorList[iHist]->Draw("HIST GOFF");
             }
             else {
@@ -417,6 +416,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
       // Draw the data hist on top
       if (dataSampleHist != nullptr) {
         std::string originalTitle = dataSampleHist->GetTitle(); // title can be used for figuring out the type of the histogram
+        maxYValue = std::max(maxYValue, dataSampleHist->GetMaximum());
         dataSampleHist->SetTitle("Data");
         splitLegend->AddEntry(dataSampleHist, dataSampleHist->GetTitle(), "lep"); nLegend++;
         if ( firstHistToPlot != nullptr ) {
@@ -440,6 +440,11 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
       }
       gPad->cd();
       splitLegend->Draw();
+
+      firstHistToPlot->GetYaxis()->SetRangeUser(
+          minYValue,
+          maxYValue * 1.2
+      );
 
       firstHistToPlot->SetTitle( samplePtr->getName().c_str() ); // the actual displayed title
       gPad->SetGridx();
@@ -568,13 +573,13 @@ void PlotGenerator::generateComparisonHistograms(const std::vector<HistHolder> &
 // Misc
 std::vector<std::string> PlotGenerator::fetchListOfVarToPlot(bool isData_){
   std::vector<std::string> varNameList;
-  _histogramsDefinition_ = JsonUtils::fetchValue(_config_, "histogramsDefinition", nlohmann::json());
+  _histogramsDefinition_ = GenericToolbox::Json::fetchValue(_config_, "histogramsDefinition", nlohmann::json());
   for( const auto& histConfig : _histogramsDefinition_ ){
-    auto varToPlot = JsonUtils::fetchValue<std::string>(histConfig, "varToPlot");
+    auto varToPlot = GenericToolbox::Json::fetchValue<std::string>(histConfig, "varToPlot");
     if( varToPlot != "Raw"
         and not GenericToolbox::doesElementIsInVector(varToPlot, varNameList)
         and GenericToolbox::splitString(varToPlot, ":").size() < 2
-        and not ( isData_ and JsonUtils::fetchValue(histConfig, "noData", false) )
+        and not ( isData_ and GenericToolbox::Json::fetchValue(histConfig, "noData", false) )
         ){
       varNameList.emplace_back(varToPlot);
     }
@@ -585,9 +590,9 @@ std::vector<std::string> PlotGenerator::fetchListOfSplitVarNames(){
 //  LogThrowIf(_config_.empty(), "Config not set, can't call " << __METHOD_NAME__);
 
   std::vector<std::string> varNameList;
-  _histogramsDefinition_ = JsonUtils::fetchValue(_config_, "histogramsDefinition", nlohmann::json());
+  _histogramsDefinition_ = GenericToolbox::Json::fetchValue(_config_, "histogramsDefinition", nlohmann::json());
   for( const auto& histConfig : _histogramsDefinition_ ){
-    auto splitVars = JsonUtils::fetchValue(histConfig, "splitVars", std::vector<std::string>{""});
+    auto splitVars = GenericToolbox::Json::fetchValue(histConfig, "splitVars", std::vector<std::string>{""});
     for( const auto& splitVar : splitVars ){
       if( not splitVar.empty() and not GenericToolbox::doesElementIsInVector(splitVar, varNameList) ){
         varNameList.emplace_back(splitVar);
@@ -605,7 +610,7 @@ void PlotGenerator::defineHistogramHolders() {
   LogInfo << "Fetching appearing split vars..." << std::endl;
   std::map<std::string, std::map<const FitSample*, std::vector<int>>> splitVarsDictionary;
   for( const auto& histConfig : _histogramsDefinition_ ){
-    auto splitVars = JsonUtils::fetchValue(histConfig, "splitVars", std::vector<std::string>{""});
+    auto splitVars = GenericToolbox::Json::fetchValue(histConfig, "splitVars", std::vector<std::string>{""});
     for( auto& splitVar : splitVars ){
       if( not GenericToolbox::doesKeyIsInMap(splitVar, splitVarsDictionary) ){
         for( const auto& sample : _fitSampleSetPtr_->getFitSampleList() ){
@@ -648,17 +653,17 @@ void PlotGenerator::defineHistogramHolders() {
     // Definition of histograms
     for( const auto& histConfig : _histogramsDefinition_ ){
 
-      histDefBase.varToPlot         = JsonUtils::fetchValue<std::string>(histConfig, "varToPlot");
-      histDefBase.prefix            = JsonUtils::fetchValue(histConfig, "prefix", "");
-      histDefBase.rescaleAsBinWidth = JsonUtils::fetchValue(histConfig, "rescaleAsBinWidth", true);
-      histDefBase.rescaleBinFactor  = JsonUtils::fetchValue(histConfig, "rescaleBinFactor", 1.);
+      histDefBase.varToPlot         = GenericToolbox::Json::fetchValue<std::string>(histConfig, "varToPlot");
+      histDefBase.prefix            = GenericToolbox::Json::fetchValue(histConfig, "prefix", "");
+      histDefBase.rescaleAsBinWidth = GenericToolbox::Json::fetchValue(histConfig, "rescaleAsBinWidth", true);
+      histDefBase.rescaleBinFactor  = GenericToolbox::Json::fetchValue(histConfig, "rescaleBinFactor", 1.);
 
       if( GenericToolbox::splitString(histDefBase.varToPlot, ":").size() >= 2 ){
         LogAlert << "Skipping 2D plot def: " << histDefBase.varToPlot << std::endl;
         continue;
       }
       else{
-        auto splitVars = JsonUtils::fetchValue(histConfig, "splitVars", std::vector<std::string>{""});
+        auto splitVars = GenericToolbox::Json::fetchValue(histConfig, "splitVars", std::vector<std::string>{""});
 
         for( const auto& splitVar : splitVars ){
 
@@ -676,7 +681,7 @@ void PlotGenerator::defineHistogramHolders() {
 
               if( histDefBase.isData and
                   ( not histDefBase.splitVarName.empty()
-                    or JsonUtils::fetchValue(histConfig, "noData", false)
+                    or GenericToolbox::Json::fetchValue(histConfig, "noData", false)
                   ) ){
                 continue;
               }
@@ -687,20 +692,20 @@ void PlotGenerator::defineHistogramHolders() {
                 // Binning
                 histDefBase.xEdges.clear();
 
-                histDefBase.xMin = JsonUtils::fetchValue(histConfig, "xMin", std::nan("nan"));;
-                histDefBase.xMax = JsonUtils::fetchValue(histConfig, "xMax", std::nan("nan"));
+                histDefBase.xMin = GenericToolbox::Json::fetchValue(histConfig, "xMin", std::nan("nan"));;
+                histDefBase.xMax = GenericToolbox::Json::fetchValue(histConfig, "xMax", std::nan("nan"));
 
-                if( JsonUtils::fetchValue(histConfig, "useSampleBinning", false) ){
+                if( GenericToolbox::Json::fetchValue(histConfig, "useSampleBinning", false) ){
 
                   bool varNotAvailable{false};
-                  std::string sampleObsBinning = JsonUtils::fetchValue(histConfig, "useSampleBinningOfObservable", histDefBase.varToPlot);
+                  std::string sampleObsBinning = GenericToolbox::Json::fetchValue(histConfig, "useSampleBinningOfObservable", histDefBase.varToPlot);
 
                   for( const auto& bin : sample.getBinning().getBinsList() ){
                     std::string variableNameForBinning{sampleObsBinning};
 
                     if( not GenericToolbox::doesElementIsInVector(sampleObsBinning, bin.getVariableNameList()) ){
-                      if( JsonUtils::doKeyExist(histConfig, "sampleVariableIfNotAvailable") ){
-                        for( auto& varSubstitution : JsonUtils::fetchValue<std::vector<std::string>>(histConfig, "sampleVariableIfNotAvailable") ){
+                      if( GenericToolbox::Json::doKeyExist(histConfig, "sampleVariableIfNotAvailable") ){
+                        for( auto& varSubstitution : GenericToolbox::Json::fetchValue<std::vector<std::string>>(histConfig, "sampleVariableIfNotAvailable") ){
                           if( GenericToolbox::doesElementIsInVector(varSubstitution, bin.getVariableNameList()) ){
                             variableNameForBinning = varSubstitution;
                             break;
@@ -737,9 +742,9 @@ void PlotGenerator::defineHistogramHolders() {
                   std::sort( histDefBase.xEdges.begin(), histDefBase.xEdges.end() ); // sort for ROOT
 
                 } // sample binning ?
-                else if( JsonUtils::doKeyExist(histConfig, "binningFile") ){
+                else if( GenericToolbox::Json::doKeyExist(histConfig, "binningFile") ){
                   DataBinSet b;
-                  b.readBinningDefinition(JsonUtils::fetchValue<std::string>(histConfig, "binningFile") );
+                  b.readBinningDefinition(GenericToolbox::Json::fetchValue<std::string>(histConfig, "binningFile") );
                   LogThrowIf(b.getBinVariables().size()!=1, "Binning should be defined with only one variable, here: " << GenericToolbox::parseVectorAsString(b.getBinVariables()))
 
                   for(const auto& bin: b.getBinsList()){
@@ -764,8 +769,8 @@ void PlotGenerator::defineHistogramHolders() {
 
               } // not Raw?
 
-              histDefBase.xTitle = JsonUtils::fetchValue(histConfig, "xTitle", histDefBase.varToPlot);
-              histDefBase.yTitle = JsonUtils::fetchValue(histConfig, "yTitle", "");
+              histDefBase.xTitle = GenericToolbox::Json::fetchValue(histConfig, "xTitle", histDefBase.varToPlot);
+              histDefBase.yTitle = GenericToolbox::Json::fetchValue(histConfig, "yTitle", "");
               if( histDefBase.yTitle.empty() ){
                 histDefBase.yTitle = "Counts";
                 if( histDefBase.rescaleAsBinWidth ) histDefBase.yTitle += " (/bin width)";
@@ -792,9 +797,9 @@ void PlotGenerator::defineHistogramHolders() {
                   histDefBase.histColor = defaultColorWheel[ splitValueIndex % defaultColorWheel.size() ];
 
                   // User defined color?
-                  auto varDict = JsonUtils::fetchMatchingEntry(_varDictionary_, "name", splitVar); // does the cosmetic pars are configured?
+                  auto varDict = GenericToolbox::Json::fetchMatchingEntry(_varDictionary_, "name", splitVar); // does the cosmetic pars are configured?
                   auto dictEntries = varDict["dictionary"];
-                  JsonUtils::forwardConfig(dictEntries);
+                  ConfigUtils::forwardConfig(dictEntries);
 
                   if( not varDict.empty() ){
 
@@ -804,11 +809,11 @@ void PlotGenerator::defineHistogramHolders() {
                     }
 
                     // Look for the value we want
-                    auto valDict = JsonUtils::fetchMatchingEntry(dictEntries, "value", splitValue);
+                    auto valDict = GenericToolbox::Json::fetchMatchingEntry(dictEntries, "value", splitValue);
 
-                    histDefBase.histTitle = JsonUtils::fetchValue(valDict, "title", histDefBase.histTitle);
-                    histDefBase.fillStyle = JsonUtils::fetchValue(valDict, "fillStyle", short(1001));
-                    histDefBase.histColor = JsonUtils::fetchValue(valDict, "color", unsetSplitValueColor);
+                    histDefBase.histTitle = GenericToolbox::Json::fetchValue(valDict, "title", histDefBase.histTitle);
+                    histDefBase.fillStyle = GenericToolbox::Json::fetchValue(valDict, "fillStyle", short(1001));
+                    histDefBase.histColor = GenericToolbox::Json::fetchValue(valDict, "color", unsetSplitValueColor);
                     if( histDefBase.histColor == unsetSplitValueColor ) unsetSplitValueColor++; // increment for the next ones
 
                   } // var dict?
