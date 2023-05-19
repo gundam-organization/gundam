@@ -221,7 +221,7 @@ template<typename T> bool readObject( TFile* f_, const std::vector<std::string>&
     if( obj != nullptr ){ break; }
   }
   if( obj == nullptr ){
-    LogErrorIf(not quiet) << redLightText << "Could not find object among names:" << resetColor << GenericToolbox::parseVectorAsString(objPathList_) << std::endl;
+    LogErrorIf(not quiet) << redLightText << "Could not find object among names: " << resetColor << GenericToolbox::parseVectorAsString(objPathList_) << std::endl;
     return false;
   }
   action_(obj);

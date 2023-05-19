@@ -234,7 +234,7 @@ int main(int argc, char** argv){
         if( clParser.getNbValueSet(appendixDictEntry.first) > 0 ){
           appendixList.back() = Form(
               appendixList.back().c_str(),
-              clParser.getOptionVal<std::string>(appendixDictEntry.first).c_str()
+              clParser.getOptionVal<std::string>(appendixDictEntry.first, 0).c_str()
           );
         }
         else{
