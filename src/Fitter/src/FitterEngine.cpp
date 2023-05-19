@@ -176,7 +176,7 @@ void FitterEngine::initializeImpl(){
 
     auto parsSaveFolder = GenericToolbox::joinPath( saveFolder, "parameters" );
     for( auto& par : parSet.getParameterList() ){
-      auto parSaveFolder = GenericToolbox::joinPath(parsSaveFolder, par.getTitle());
+      auto parSaveFolder = GenericToolbox::joinPath(parsSaveFolder, GenericToolbox::generateCleanBranchName(par.getTitle()));
       auto outDir = GenericToolbox::mkdirTFile(_saveDir_, parSaveFolder );
 
       GenericToolbox::writeInTFile( outDir, TNamed( "title", par.getTitle().c_str() ) );
