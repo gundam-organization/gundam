@@ -103,10 +103,6 @@ namespace JointProbability {
       double eval(const FitSample& sample_, int bin_) override;
   };
 
-  class BarlowLLH_BANFF_OA2021_SFGD : public JointProbability{
-    double eval(const FitSample& sample_, int bin_) override;
-  };
-
 }
 
 
