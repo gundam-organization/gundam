@@ -43,6 +43,7 @@ public:
   [[nodiscard]] double getLlhRegBuffer() const;
   [[nodiscard]] const EventTreeWriter &getTreeWriter() const;
   [[nodiscard]] const std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix() const;
+  [[nodiscard]] const std::shared_ptr<TMatrixD> &getStrippedCovarianceMatrix() const;
   [[nodiscard]] const std::vector<DatasetLoader> &getDataSetList() const;
   [[nodiscard]] const std::vector<FitParameterSet> &getParameterSetsList() const;
 

@@ -157,23 +157,37 @@ void FitterEngine::initializeImpl(){
       GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
       _propagator_.getGlobalCovarianceMatrix().get(), "globalCovarianceMatrix"
   );
+  GenericToolbox::writeInTFile(
+      GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
+      _propagator_.getStrippedCovarianceMatrix().get(), "strippedCovarianceMatrix"
+  );
   for( auto& parSet : _propagator_.getParameterSetsList() ){
     if(not parSet.isEnabled()) continue;
+
+    auto saveFolder = GenericToolbox::joinPath( "propagator", parSet.getName() );
     GenericToolbox::writeInTFile(
-        GenericToolbox::mkdirTFile( _saveDir_, GenericToolbox::joinPath("propagator", parSet.getName()) ),
+        GenericToolbox::mkdirTFile( _saveDir_, saveFolder ),
         parSet.getPriorCovarianceMatrix().get(), "covarianceMatrix"
     );
     GenericToolbox::writeInTFile(
-        GenericToolbox::mkdirTFile(_saveDir_, GenericToolbox::joinPath("propagator", parSet.getName()) ),
+        GenericToolbox::mkdirTFile(_saveDir_, saveFolder ),
         parSet.getPriorCorrelationMatrix().get(), "correlationMatrix"
     );
 
+    auto parsSaveFolder = GenericToolbox::joinPath( saveFolder, "parameters" );
     for( auto& par : parSet.getParameterList() ){
-      if( not par.isEnabled() ){ continue; }
-      GenericToolbox::writeInTFile(
-          GenericToolbox::mkdirTFile(_saveDir_, GenericToolbox::joinPath("propagator", "parameters") ),
-          TNamed(GenericToolbox::generateCleanBranchName(par.getFullTitle()).c_str(), GenericToolbox::generateCleanBranchName(par.getFullTitle()).c_str())
-      );
+      auto parSaveFolder = GenericToolbox::joinPath(parsSaveFolder, par.getTitle());
+      auto outDir = GenericToolbox::mkdirTFile(_saveDir_, parSaveFolder );
+
+      GenericToolbox::writeInTFile( outDir, TNamed( "title", par.getTitle().c_str() ) );
+      GenericToolbox::writeInTFile( outDir, TNamed( "name", par.getName().c_str() ) );
+      GenericToolbox::writeInTFile( outDir, TNamed( "isEnabled", std::to_string( par.isEnabled() ).c_str() ) );
+      GenericToolbox::writeInTFile( outDir, TNamed( "index", std::to_string( par.getParameterIndex() ).c_str() ) );
+      GenericToolbox::writeInTFile( outDir, TNamed( "prior", std::to_string( par.getPriorValue() ).c_str() ) );
+      GenericToolbox::writeInTFile( outDir, TNamed( "stdDev", std::to_string( par.getStdDevValue() ).c_str() ) );
+      GenericToolbox::writeInTFile( outDir, TNamed( "priorType", std::to_string( par.getPriorType() ).c_str() ) );
+      GenericToolbox::writeInTFile( outDir, TNamed( "min", std::to_string( par.getMinValue() ).c_str() ) );
+      GenericToolbox::writeInTFile( outDir, TNamed( "max", std::to_string( par.getMaxValue() ).c_str() ) );
     }
   }
 
@@ -256,12 +270,12 @@ void FitterEngine::fit(){
   LogInfo << llhState << std::endl;
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile( _saveDir_, "preFit" ),
-      TNamed("preFitLlhState", llhState.c_str())
+      TNamed("llhState", llhState.c_str())
   );
   _preFitParState_ = _propagator_.exportParameterInjectorConfig();
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile( _saveDir_, "preFit" ),
-      TNamed("preFitParState", GenericToolbox::Json::toReadableString(_preFitParState_).c_str())
+      TNamed("parState", GenericToolbox::Json::toReadableString(_preFitParState_).c_str())
   );
 
   // Not moving parameters
@@ -345,13 +359,16 @@ void FitterEngine::fit(){
   _postFitParState_ = _propagator_.exportParameterInjectorConfig();
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile( _saveDir_, "postFit" ),
-      TNamed("postFitParState", GenericToolbox::Json::toReadableString(_postFitParState_).c_str())
+      TNamed("parState", GenericToolbox::Json::toReadableString(_postFitParState_).c_str())
   );
 
   LogWarning << "Post-fit likelihood state:" << std::endl;
   llhState = _propagator_.getLlhBufferSummary();
   LogInfo << llhState << std::endl;
-  GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile( _saveDir_, "postFit" ), TNamed("postFitLlhState", llhState.c_str()) );
+  GenericToolbox::writeInTFile(
+      GenericToolbox::mkdirTFile( _saveDir_, "postFit" ),
+      TNamed("llhState", llhState.c_str())
+  );
 
 
   if( _generateSamplePlots_ and not _propagator_.getPlotGenerator().getConfig().empty() ){

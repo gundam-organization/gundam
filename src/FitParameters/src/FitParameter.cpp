@@ -218,7 +218,7 @@ std::string FitParameter::getTitle() const {
   return ss.str();
 }
 std::string FitParameter::getFullTitle() const{
-  return ((FitParameterSet*) _owner_)->getName() + "/" + this->getTitle();
+  return _owner_->getName() + "/" + this->getTitle();
 }
 std::string FitParameter::getSummary(bool shallow_) const {
   std::stringstream ss;

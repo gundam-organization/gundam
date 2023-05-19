@@ -1,72 +1,51 @@
 cmake_minimum_required (VERSION 3.12 FATAL_ERROR)
 
-# Configure CMake project
-project(GUNDAM)
+###############################
+# CMake project definition
+###############################
+project( GUNDAM )
 
-option(CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ langauge (-std=gnu++14)." OFF)
-option(CXX_MARCH_FLAG "Enable cpu architecture specific optimzations." OFF)
-option(CXX_WARNINGS "Enable most C++ warning flags." ON)
-option(COLOR_OUTPUT "Enable colored terminal output." ON)
-option(TTYCHECK "Enable check if output is being sent to terminal/TTY." ON)
-option(WITH_OPENMP "(OLD) Build with OpenMP libraries" OFF )
-option(WITH_OLD_DIALS "Use the old dial implementation" OFF)
-option(WITH_BREAKDOWN_CACHE "Use the breakdown cache" ON)
-option(ENABLE_CUDA "Enable CUDA language check (Cache::Manager requires a GPU if CUDA is found)" OFF)
-option(YAMLCPP_DIR "Set custom path to yaml-cpp lib" OFF )
-option(ENABLE_DEV_MODE "Enable specific dev related printouts" OFF )
-option(BATCH_MODE "Build to run in a batch queue (affects output)" OFF)
-option(BUILD_DOC "Build documentation" OFF)
-option(WITH_XSLLHFITTER "Build old xsllhFitter apps/libraries" OFF)
-option(USE_STATIC_LINKS "Library build in static mod" OFF)
-option(WITH_GUNDAM_ROOT_APP "Build app gundamRoot" ON)
-option(WITH_CACHE_MANAGER "Enable compiling of the cache manager used by the GPU" ON)
 
+###############################
+# CMake options
+###############################
+option( WITH_GUNDAM_ROOT_APP "Build app gundamRoot" ON )
+option( WITH_CACHE_MANAGER "Enable compiling of the cache manager used by the GPU" ON )
+option( WITH_BREAKDOWN_CACHE "Use the breakdown cache" ON )
+option( WITH_OLD_DIALS "Use the old dial implementation" OFF )
+option( WITH_XSLLHFITTER "Build old xsllhFitter apps/libraries" OFF )
+option( WITH_OPENMP "(OLD/xsllhFitter) Build with OpenMP libraries" OFF )
+option( ENABLE_CUDA "Enable CUDA language check (Cache::Manager requires a GPU if CUDA is found)" OFF )
+
+option( BUILD_DOC "Build documentation" OFF )
+option( ENABLE_DEV_MODE "Enable specific dev related printouts" OFF  )
+option( USE_STATIC_LINKS "Library build in static mod" OFF )
+option( YAMLCPP_DIR "Set custom path to yaml-cpp lib" OFF )
+
+option( COLOR_OUTPUT "Enable colored terminal output." ON )
+option( TTYCHECK "Enable check if output is being sent to terminal/TTY." ON )
+option( BATCH_MODE "Build to run in a batch queue (affects output)" OFF )
+
+option( CXX_WARNINGS "Enable most C++ warning flags." ON )
+option( CXX_MARCH_FLAG "Enable cpu architecture specific optimzations." OFF )
+option( CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ langauge (-std=gnu++14)." OFF )
+
+
+###############################
 # Cmake includes
-include(CTest)
-include(${CMAKE_SOURCE_DIR}/cmake/cmessage.cmake)
+###############################
+include( CTest )
+include( ${CMAKE_SOURCE_DIR}/cmake/cmessage.cmake )
+include( ${CMAKE_SOURCE_DIR}/cmake/versionCheck.cmake )
 
-# Git version
-execute_process(
-    COMMAND git describe --tags
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    OUTPUT_VARIABLE VERSION
-    RESULT_VARIABLE RETURN_VAL
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
 
-if(RETURN_VAL EQUAL "0")
-    cmessage(STATUS "Git version: ${VERSION}")
 
-    string(REPLACE "-" ";" VERSION_SEP ${VERSION})
-    list(LENGTH VERSION_SEP len)
+doVersionCheck()
 
-    if( ${len} GREATER_EQUAL 2 )
-        list(GET VERSION_SEP 0 VERSION_STR)         # VERSION_SEP[0] = X.X.X
-        list(GET VERSION_SEP 1 VERSION_POST_NB)     # VERSION_SEP[1] = NB COMMITS AFTER TAG
-        list(GET VERSION_SEP 2 VERSION_POST_COMMIT) # VERSION_COMMIT[2] = "g" + COMMIT HASH
-        #    set(GUNDAM_VERSION_TAG "-${VERSION_POST_NB}-${VERSION_POST_COMMIT}")
-        set(GUNDAM_VERSION_TAG "f")
-    else()
-        list(GET VERSION_SEP 0 VERSION_STR)         # VERSION_SEP[0] = X.X.X
-        set(GUNDAM_VERSION_TAG "")
-    endif()
-
-    # Parsing version number
-    string(REPLACE "." ";" VERSION_STR_SEP ${VERSION_STR})
-    list(GET VERSION_STR_SEP 0 GUNDAM_VERSION_MAJOR)
-    list(GET VERSION_STR_SEP 1 GUNDAM_VERSION_MINOR)
-    list(GET VERSION_STR_SEP 2 GUNDAM_VERSION_REVISION)
-
-    set (GUNDAM_VERSION_STRING "${GUNDAM_VERSION_MAJOR}.${GUNDAM_VERSION_MINOR}.${GUNDAM_VERSION_REVISION}${GUNDAM_VERSION_TAG}")
-else()
-    cmessage(WARNING "Bad exit status")
-    set (GUNDAM_VERSION_STRING "X.X.X")
-endif()
-
-set(VERBOSE TRUE)
+set( VERBOSE TRUE )
 
 # Check for the availability of CUDA
-if(ENABLE_CUDA)
+if( ENABLE_CUDA )
     include(CheckLanguage)
     check_language(CUDA)
     if(CMAKE_CUDA_COMPILER)

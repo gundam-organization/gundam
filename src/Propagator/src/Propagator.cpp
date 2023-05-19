@@ -594,11 +594,14 @@ double Propagator::getLlhPenaltyBuffer() const {
 double Propagator::getLlhRegBuffer() const {
   return _llhRegBuffer_;
 }
+const EventTreeWriter &Propagator::getTreeWriter() const {
+  return _treeWriter_;
+}
 const std::shared_ptr<TMatrixD> &Propagator::getGlobalCovarianceMatrix() const {
   return _globalCovarianceMatrix_;
 }
-const EventTreeWriter &Propagator::getTreeWriter() const {
-  return _treeWriter_;
+const std::shared_ptr<TMatrixD> &Propagator::getStrippedCovarianceMatrix() const {
+  return _strippedCovarianceMatrix_;
 }
 const std::vector<DatasetLoader> &Propagator::getDataSetList() const {
   return _dataSetList_;
@@ -946,3 +949,4 @@ void Propagator::reweightMcEvents(int iThread_) {
 
 
 }
+

@@ -166,10 +166,20 @@ int main(int argc, char** argv){
 
     /// Multiple entries
     if( clParser.isOptionTriggered("showCorrelationsWith") ){
+      auto pathPropagator{GenericToolbox::joinPath("FitterEngine", "propagator")};
 
       for( auto& parFullTitle : clParser.getOptionValList<std::string>("showCorrelationsWith") ){
-        LogInfo << "Looking for \"" << parFullTitle << "\"" << std::endl;
+        LogInfo << "Looking for \"" << parFullTitle << "\"..." << std::endl;
+        bool isFound{false};
+        bool isDisabled{false};
+        for( auto& parSetDir : GenericToolbox::lsSubDirTDirectory( f->Get<TDirectory>(pathPropagator.c_str()) ) ){
 
+//          for( auto& parEntry :  ){
+//
+//          }
+
+        }
+        LogThrowIf(not isFound, "Could not find parameter with name: " << parFullTitle);
 
       }
 
@@ -199,7 +209,7 @@ int main(int argc, char** argv){
       LogInfo << cyanLightText << "Reading inside: " << pathPreFit << resetColor << std::endl;
       LogScopeIndent;
 
-      readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPreFit, "preFitLlhState_TNamed"), [&](TNamed* injectorStr){
+      readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPreFit, "llhState_TNamed"), [&](TNamed* injectorStr){
         auto outSubDir{GenericToolbox::joinPath( outDir, pathPreFit)};
         if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
         auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".txt");
@@ -207,7 +217,7 @@ int main(int argc, char** argv){
         GenericToolbox::dumpStringInFile( outConfigPath, injectorStr->GetTitle() );
       });
 
-      readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPreFit, "preFitParState_TNamed"), [&](TNamed* injectorStr){
+      readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPreFit, "parState_TNamed"), [&](TNamed* injectorStr){
         auto outSubDir{GenericToolbox::joinPath( outDir, pathPreFit)};
         if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
         auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".json");
@@ -225,7 +235,7 @@ int main(int argc, char** argv){
       LogInfo << cyanLightText << "Reading inside: " << pathPostFit << resetColor << std::endl;
       LogScopeIndent;
 
-      readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPostFit, "postFitLlhState_TNamed"), [&](TNamed* injectorStr){
+      readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPostFit, "llhState_TNamed"), [&](TNamed* injectorStr){
         auto outSubDir{GenericToolbox::joinPath( outDir, pathPostFit)};
         if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
         auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".txt");
@@ -233,7 +243,7 @@ int main(int argc, char** argv){
         GenericToolbox::dumpStringInFile( outConfigPath, injectorStr->GetTitle() );
       });
 
-      readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPostFit, "postFitParState_TNamed"), [&](TNamed* injectorStr){
+      readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPostFit, "parState_TNamed"), [&](TNamed* injectorStr){
         auto outSubDir{GenericToolbox::joinPath( outDir, pathPostFit)};
         if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
         auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".json");
