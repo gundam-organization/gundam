@@ -43,6 +43,15 @@ int main(int argc, char** argv){
   // --------------------------
   CmdLineParser clParser;
 
+  CmdLineParserGlobals::_fascistMode_ = true;
+
+  clParser.getDescription() << "> gundamFitter is the main interface for the fitter." << std::endl;
+  clParser.getDescription() << "> " << std::endl;
+  clParser.getDescription() << "> It takes a set of inputs through config files and command line argument," << std::endl;
+  clParser.getDescription() << "> and initialize the fitter engine." << std::endl;
+  clParser.getDescription() << "> Once ready, the fitter minimize the likelihood function and" << std::endl;
+  clParser.getDescription() << "> produce a set of plot saved in the output ROOT file." << std::endl;
+
   clParser.addDummyOption("Main options");
 
   clParser.addOption("configFile", {"-c", "--config-file"}, "Specify path to the fitter config file");
@@ -69,6 +78,7 @@ int main(int argc, char** argv){
   clParser.addTriggerOption("ignoreVersionCheck", {"--ignore-version"}, "Don't check GUNDAM version with config request");
 
   clParser.addOption("scanParameters", {"--scan"}, "Enable parameter scan before and after the fit (can provide nSteps)", 1, true);
+  clParser.addOption("scanLine", {"--scan-line"}, "Provide par injector files: start and end point or only end point (start will be prefit)", 2, true);
   clParser.addOption("toyFit", {"--toy"}, "Run a toy fit (optional arg to provide toy index)", 1, true);
 
   clParser.addDummyOption("Runtime/debug options");
@@ -80,6 +90,8 @@ int main(int argc, char** argv){
 
   clParser.addDummyOption();
 
+
+  LogInfo << clParser.getDescription().str() << std::endl;
 
   LogInfo << "Usage: " << std::endl;
   LogInfo << clParser.getConfigSummary() << std::endl << std::endl;
@@ -202,6 +214,7 @@ int main(int argc, char** argv){
     std::vector<std::pair<std::string, std::string>> appendixDict{
         {"asimov", "Asimov"},
         {"scanParameters", "Scan"},
+        {"scanLine", "WithLineScan"},
         {"generateOneSigmaPlots", "OneSigma"},
         {"enablePca", "PCA"},
         {"skipHesse", "NoHesse"},
@@ -221,7 +234,7 @@ int main(int argc, char** argv){
         if( clParser.getNbValueSet(appendixDictEntry.first) > 0 ){
           appendixList.back() = Form(
               appendixList.back().c_str(),
-              clParser.getOptionVal<std::string>(appendixDictEntry.first).c_str()
+              clParser.getOptionVal<std::string>(appendixDictEntry.first, 0).c_str()
           );
         }
         else{
@@ -371,6 +384,36 @@ int main(int argc, char** argv){
   if( clParser.isOptionTriggered("injectParameterConfig") ) {
     LogDebug << "Starting mc parameters that where injected:" << std::endl;
     LogDebug << fitter.getPropagator().getParametersSummary( false ) << std::endl;
+  }
+
+  auto* outDir = GenericToolbox::mkdirTFile(fitter.getSaveDir(), GenericToolbox::joinPath("preFit", "cmdScanLine"));
+
+  if( clParser.isOptionTriggered("scanLine") ){
+    LogThrowIf( clParser.getNbValueSet("scanLine") == 0, "No injector file provided.");
+    if( clParser.getNbValueSet("scanLine") == 1 ){
+      LogAlert << "Will scan the line toward the point set in: " << clParser.getOptionVal<std::string>("scanLine", 0) << std::endl;
+
+      auto endPoint = ConfigUtils::readConfigFile(clParser.getOptionVal<std::string>("scanLine", 0));
+
+      GenericToolbox::writeInTFile( outDir, TNamed("endPoint", GenericToolbox::Json::toReadableString(endPoint).c_str()) );
+
+      fitter.getPropagator().getParScanner().scanSegment( outDir, endPoint );
+    }
+    else if( clParser.getNbValueSet("scanLine") == 2 ) {
+      LogAlert << "Will scan the line from point A (" << clParser.getOptionVal<std::string>("scanLine", 0)
+          << ") to point B (" << clParser.getOptionVal<std::string>("scanLine", 1) << ")" << std::endl;
+
+      auto startPoint = ConfigUtils::readConfigFile(clParser.getOptionVal<std::string>("scanLine", 0));
+      auto endPoint = ConfigUtils::readConfigFile(clParser.getOptionVal<std::string>("scanLine", 1));
+
+      GenericToolbox::writeInTFile( outDir, TNamed("startPoint", GenericToolbox::Json::toReadableString(startPoint).c_str()) );
+      GenericToolbox::writeInTFile( outDir, TNamed("endPoint", GenericToolbox::Json::toReadableString(endPoint).c_str()) );
+
+      fitter.getPropagator().getParScanner().scanSegment( outDir, endPoint, startPoint );
+    }
+    else{
+      LogThrow("");
+    }
   }
 
   // --------------------------

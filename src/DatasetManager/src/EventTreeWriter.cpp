@@ -91,7 +91,7 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
   const std::vector<EventDialCache::DialsElem_t>* dialElements{getDialElementsPtr(eventList_[0])};
   bool writeDials{dialElements != nullptr};
 
-  LogInfo << "Writing " << eventList_.size() << " events " << (writeDials? "with response dials ": "without response dials") << "in TTree " << treeName_ << std::endl;
+  LogInfo << "Writing " << eventList_.size() << " events " << (writeDials? "with response dials": "without response dials") << " in TTree " << treeName_ << std::endl;
 
   auto* oldDir = GenericToolbox::getCurrentTDirectory();
 

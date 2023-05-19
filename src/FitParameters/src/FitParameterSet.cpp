@@ -21,6 +21,9 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[FitParameterSet]");
 } );
 
+void FitParameterSet::muteLogger(){ Logger::setIsMuted( true ); }
+void FitParameterSet::unmuteLogger(){ Logger::setIsMuted( false ); }
+
 
 void FitParameterSet::readConfigImpl(){
   LogThrowIf(_config_.empty(), "FitParameterSet config not set.");
@@ -524,22 +527,6 @@ void FitParameterSet::propagateEigenToOriginal(){
 
 
 // Misc
-FitParameter* FitParameterSet::getParameterPtr(const std::string& parName_){
-  if( not parName_.empty() ){
-    for( auto& par : _parameterList_ ){
-      if( par.getName() == parName_ ){ return &par; }
-    }
-  }
-  return nullptr;
-}
-FitParameter* FitParameterSet::getParameterPtrWithTitle(const std::string& parTitle_){
-  if( not parTitle_.empty() ){
-    for( auto& par : _parameterList_ ){
-      if( par.getTitle() == parTitle_ ){ return &par; }
-    }
-  }
-  return nullptr;
-}
 std::string FitParameterSet::getSummary() const {
   std::stringstream ss;
 
@@ -569,14 +556,14 @@ std::string FitParameterSet::getSummary() const {
 #endif
 
         t.addTableLine({
-          par.getTitle(),
-          std::to_string( par.getParameterValue() ),
-          std::to_string( par.getPriorValue() ),
-          std::to_string( par.getStdDevValue() ),
-          std::to_string( par.getMinValue() ),
-          std::to_string( par.getMaxValue() ),
-          statusStr
-        }, colorStr);
+                           par.getTitle(),
+                           std::to_string( par.getParameterValue() ),
+                           std::to_string( par.getPriorValue() ),
+                           std::to_string( par.getStdDevValue() ),
+                           std::to_string( par.getMinValue() ),
+                           std::to_string( par.getMaxValue() ),
+                           statusStr
+                       }, colorStr);
       }
 
       t.printTable();
@@ -585,6 +572,141 @@ std::string FitParameterSet::getSummary() const {
 
   return ss.str();
 }
+nlohmann::json FitParameterSet::exportInjectorConfig() const{
+  nlohmann::json out;
+
+  out["name"] = this->getName();
+
+  std::vector<nlohmann::json> parJsonList{};
+  parJsonList.reserve( _parameterList_.size() );
+
+  for( auto& par : _parameterList_ ){
+    if( not par.isEnabled() ){ continue; }
+    parJsonList.emplace_back();
+
+    if( par.getName().empty() ){
+      // will be identified by their index. For instance: '#52'
+      parJsonList.back()["title"] = par.getTitle();
+    }
+    else{
+      parJsonList.back()["name"] = par.getName();
+    }
+
+    parJsonList.back()["value"] = par.getParameterValue();
+  }
+
+  out["parameterValues"] = parJsonList;
+
+  return out;
+}
+void FitParameterSet::injectParameterValues(const nlohmann::json& config_){
+  LogWarning << "Importing parameters from config for \"" << this->getName() << "\"" << std::endl;
+
+  auto config = ConfigUtils::getForwardedConfig(config_);
+  LogThrowIf( config.empty(), "Invalid injector config" << std::endl << config_ );
+  LogThrowIf( not GenericToolbox::Json::doKeyExist(config, "name"), "No parameter set name provided in" << std::endl << config_ );
+  LogThrowIf( GenericToolbox::Json::fetchValue<std::string>(config, "name") != this->getName(),
+              "Mismatching between parSet name (" << this->getName() << ") and injector config ("
+              << GenericToolbox::Json::fetchValue<std::string>(config, "name") << ")" );
+
+  auto parValues = GenericToolbox::Json::fetchValue( config, "parameterValues", nlohmann::json() );
+  if     ( parValues.empty() ) {
+    LogThrow( "No parameterValues provided." );
+  }
+  else if( parValues.is_string() ){
+    //
+    LogInfo << "Reading parameter values from file: " << parValues.get<std::string>() << std::endl;
+    auto parList = GenericToolbox::dumpFileAsVectorString( parValues.get<std::string>(), true );
+    LogThrowIf( parList.size() != this->getNbParameters()  ,
+                parList.size() << " parameters provided for " << this->getName() << ", expecting " << this->getNbParameters()
+    );
+
+    for( size_t iPar = 0 ; iPar < this->getNbParameters() ; iPar++ ) {
+
+      if( not this->getParameterList()[iPar].isEnabled() ){
+        LogAlert << "NOT injecting \"" << this->getParameterList()[iPar].getFullTitle() << "\" as it is disabled." << std::endl;
+        continue;
+      }
+
+      LogScopeIndent;
+      LogInfo << "Injecting \"" << this->getParameterList()[iPar].getFullTitle() << "\": " << parList[iPar] << std::endl;
+      this->getParameterList()[iPar].setParameterValue( std::stod(parList[iPar]) );
+    }
+  }
+  else{
+    LogScopeIndent;
+    for( auto& parValueEntry : parValues ){
+      if     ( GenericToolbox::Json::doKeyExist(parValueEntry, "name") ) {
+        auto parName = GenericToolbox::Json::fetchValue<std::string>(parValueEntry, "name");
+        auto* parPtr = this->getParameterPtr(parName);
+        LogThrowIf(parPtr == nullptr, "Could not find " << parName << " among the defined parameters in " << this->getName());
+
+
+        if( not parPtr->isEnabled() ){
+          LogAlert << "NOT injecting \"" << parPtr->getFullTitle() << "\" as it is disabled." << std::endl;
+          continue;
+        }
+
+        LogInfo << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
+        parPtr->setParameterValue( GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") );
+      }
+      else if( GenericToolbox::Json::doKeyExist(parValueEntry, "title") ){
+        auto parTitle = GenericToolbox::Json::fetchValue<std::string>(parValueEntry, "title");
+        auto* parPtr = this->getParameterPtrWithTitle(parTitle);
+        LogThrowIf(parPtr == nullptr, "Could not find " << parTitle << " among the defined parameters in " << this->getName());
+
+
+        if( not parPtr->isEnabled() ){
+          LogAlert << "NOT injecting \"" << parPtr->getFullTitle() << "\" as it is disabled." << std::endl;
+          continue;
+        }
+
+        LogInfo << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
+        parPtr->setParameterValue( GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") );
+      }
+      else if( GenericToolbox::Json::doKeyExist(parValueEntry, "index") ){
+        auto parIndex = GenericToolbox::Json::fetchValue<int>(parValueEntry, "index");
+        LogThrowIf( parIndex < 0 or parIndex >= this->getParameterList().size(),
+                    "invalid parameter index (" << parIndex << ") for injection in parSet: " << this->getName() );
+
+        auto* parPtr = &this->getParameterList()[parIndex];
+        if( not parPtr->isEnabled() ){
+          LogAlert << "NOT injecting \"" << parPtr->getFullTitle() << "\" as it is disabled." << std::endl;
+          continue;
+        }
+
+        LogInfo << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
+        parPtr->setParameterValue( GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") );
+      }
+      else {
+        LogThrow("Unsupported: " << parValueEntry);
+      }
+    }
+  }
+
+  if( this->isUseEigenDecompInFit() ){
+    LogInfo << "Propagating back to the eigen decomposed parameters for parSet: " << this->getName() << std::endl;
+    this->propagateOriginalToEigen();
+  }
+
+}
+FitParameter* FitParameterSet::getParameterPtr(const std::string& parName_){
+  if( not parName_.empty() ){
+    for( auto& par : _parameterList_ ){
+      if( par.getName() == parName_ ){ return &par; }
+    }
+  }
+  return nullptr;
+}
+FitParameter* FitParameterSet::getParameterPtrWithTitle(const std::string& parTitle_){
+  if( not parTitle_.empty() ){
+    for( auto& par : _parameterList_ ){
+      if( par.getTitle() == parTitle_ ){ return &par; }
+    }
+  }
+  return nullptr;
+}
+
 
 double FitParameterSet::toNormalizedParRange(double parRange, const FitParameter& par){
   return (parRange)/par.getStdDevValue();

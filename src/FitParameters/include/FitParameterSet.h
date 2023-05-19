@@ -80,15 +80,21 @@ public:
   void propagateOriginalToEigen();
 
   // Misc
+  [[nodiscard]] std::string getSummary() const;
+  [[nodiscard]] nlohmann::json exportInjectorConfig() const;
+  void injectParameterValues(const nlohmann::json& config_);
   FitParameter* getParameterPtr(const std::string& parName_);
   FitParameter* getParameterPtrWithTitle(const std::string& parTitle_);
-  [[nodiscard]] std::string getSummary() const;
 
   static double toNormalizedParRange(double parRange, const FitParameter& par);
   static double toNormalizedParValue(double parValue, const FitParameter& par);
   static double toRealParValue(double normParValue, const FitParameter& par);
   static double toRealParRange(double normParRange, const FitParameter& par);
   static bool isValidCorrelatedParameter(const FitParameter& par_);
+
+  // in src dependent
+  static void muteLogger();
+  static void unmuteLogger();
 
 protected:
   void readConfigImpl() override;

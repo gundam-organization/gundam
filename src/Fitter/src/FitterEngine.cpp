@@ -40,6 +40,7 @@ void FitterEngine::readConfigImpl(){
 
   _enablePreFitScan_ = GenericToolbox::Json::fetchValue(_config_, "enablePreFitScan", _enablePreFitScan_);
   _enablePostFitScan_ = GenericToolbox::Json::fetchValue(_config_, "enablePostFitScan", _enablePostFitScan_);
+  _enablePreFitToPostFitLineScan_ = GenericToolbox::Json::fetchValue(_config_, "enablePreFitToPostFitLineScan", _enablePreFitToPostFitLineScan_);
 
   _generateSamplePlots_ = GenericToolbox::Json::fetchValue(_config_, "generateSamplePlots", _generateSamplePlots_);
   _generateOneSigmaPlots_ = GenericToolbox::Json::fetchValue(_config_, "generateOneSigmaPlots", _generateOneSigmaPlots_);
@@ -147,14 +148,25 @@ void FitterEngine::initializeImpl(){
 
   // Write data
   LogInfo << "Writing propagator objects..." << std::endl;
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
-                               _propagator_.getGlobalCovarianceMatrix().get(), "globalCovarianceMatrix");
+  GenericToolbox::writeInTFile(
+      GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
+      TNamed("initialParameterState", GenericToolbox::Json::toReadableString(_propagator_.exportParameterInjectorConfig()).c_str())
+  );
+
+  GenericToolbox::writeInTFile(
+      GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
+      _propagator_.getGlobalCovarianceMatrix().get(), "globalCovarianceMatrix"
+  );
   for( auto& parSet : _propagator_.getParameterSetsList() ){
     if(not parSet.isEnabled()) continue;
-    GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(_saveDir_, "propagator/"+parSet.getName()),
-                                  parSet.getPriorCovarianceMatrix().get(), "covarianceMatrix");
-    GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(_saveDir_, "propagator/"+parSet.getName()),
-                                  parSet.getPriorCorrelationMatrix().get(), "correlationMatrix");
+    GenericToolbox::writeInTFile(
+        GenericToolbox::mkdirTFile( _saveDir_, GenericToolbox::joinPath("propagator", parSet.getName()) ),
+        parSet.getPriorCovarianceMatrix().get(), "covarianceMatrix"
+    );
+    GenericToolbox::writeInTFile(
+        GenericToolbox::mkdirTFile(_saveDir_, GenericToolbox::joinPath("propagator", parSet.getName()) ),
+        parSet.getPriorCorrelationMatrix().get(), "correlationMatrix"
+    );
   }
 
   this->_propagator_.updateLlhCache();
@@ -185,6 +197,9 @@ void FitterEngine::setEnablePreFitScan(bool enablePreFitScan) {
 }
 void FitterEngine::setEnablePostFitScan(bool enablePostFitScan) {
   _enablePostFitScan_ = enablePostFitScan;
+}
+void FitterEngine::setEnablePreFitToPostFitLineScan(bool enablePreFitToPostFitLineScan_) {
+  _enablePreFitToPostFitLineScan_ = enablePreFitToPostFitLineScan_;
 }
 void FitterEngine::setGenerateSamplePlots(bool generateSamplePlots) {
   _generateSamplePlots_ = generateSamplePlots;
@@ -228,8 +243,18 @@ void FitterEngine::fit(){
   LogThrowIf(not isInitialized());
 
   LogWarning << "Pre-fit likelihood state:" << std::endl;
-  LogInfo << _propagator_.getLlhBufferSummary() << std::endl;
 
+  std::string llhState{_propagator_.getLlhBufferSummary()};
+  LogInfo << llhState << std::endl;
+  GenericToolbox::writeInTFile(
+      GenericToolbox::mkdirTFile( _saveDir_, "preFit" ),
+      TNamed("preFitLlhState", llhState.c_str())
+  );
+  _preFitParState_ = _propagator_.exportParameterInjectorConfig();
+  GenericToolbox::writeInTFile(
+      GenericToolbox::mkdirTFile( _saveDir_, "preFit" ),
+      TNamed("preFitParState", GenericToolbox::Json::toReadableString(_preFitParState_).c_str())
+  );
 
   // Not moving parameters
   if( _generateSamplePlots_ and not _propagator_.getPlotGenerator().getConfig().empty() ){
@@ -308,8 +333,18 @@ void FitterEngine::fit(){
   LogInfo << "Minimizing LLH..." << std::endl;
   this->getMinimizer().minimize();
 
+  LogWarning << "Saving post-fit par state..." << std::endl;
+  _postFitParState_ = _propagator_.exportParameterInjectorConfig();
+  GenericToolbox::writeInTFile(
+      GenericToolbox::mkdirTFile( _saveDir_, "postFit" ),
+      TNamed("postFitParState", GenericToolbox::Json::toReadableString(_postFitParState_).c_str())
+  );
+
   LogWarning << "Post-fit likelihood state:" << std::endl;
-  LogInfo << _propagator_.getLlhBufferSummary() << std::endl;
+  llhState = _propagator_.getLlhBufferSummary();
+  LogInfo << llhState << std::endl;
+  GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile( _saveDir_, "postFit" ), TNamed("postFitLlhState", llhState.c_str()) );
+
 
   if( _generateSamplePlots_ and not _propagator_.getPlotGenerator().getConfig().empty() ){
     LogInfo << "Generating post-fit sample plots..." << std::endl;
@@ -320,6 +355,11 @@ void FitterEngine::fit(){
     LogInfo << "Scanning fit parameters around the minimum point..." << std::endl;
     getMinimizer().scanParameters(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scan"));
     GenericToolbox::triggerTFileWrite(_saveDir_);
+  }
+  if( _enablePreFitToPostFitLineScan_ ){
+    LogInfo << "Scanning along the line from pre-fit to post-fit points..." << std::endl;
+    getPropagator().getParScanner().scanSegment(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scanConvergence"),
+                                                _postFitParState_, _preFitParState_);
   }
 
   if( getMinimizer().isFitHasConverged() and getMinimizer().isEnablePostFitErrorEval() ){

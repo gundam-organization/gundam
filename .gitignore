@@ -7,6 +7,11 @@ cmake-build-debug/
 workDir/
 work/
 
+# cache files
+.DS_Store
+.idea
+
+
 # Misc Files
 *.root
 *~

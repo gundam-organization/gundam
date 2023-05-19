@@ -36,6 +36,7 @@ public:
   void setLightMode(bool lightMode_);
   void setEnablePreFitScan(bool enablePreFitScan);
   void setEnablePostFitScan(bool enablePostFitScan);
+  void setEnablePreFitToPostFitLineScan(bool enablePreFitToPostFitScan);
   void setGenerateSamplePlots(bool generateSamplePlots);
   void setGenerateOneSigmaPlots(bool generateOneSigmaPlots);
   void setDoAllParamVariations(bool doAllParamVariations_);
@@ -81,6 +82,7 @@ private:
   bool _throwMcBeforeFit_{false};
   bool _enablePreFitScan_{false};
   bool _enablePostFitScan_{false};
+  bool _enablePreFitToPostFitLineScan_{true};
   bool _generateSamplePlots_{true};
   bool _generateOneSigmaPlots_{false};
   bool _doAllParamVariations_{false};
@@ -95,5 +97,8 @@ private:
   Propagator _propagator_{};
   std::unique_ptr<MinimizerBase> _minimizer_{nullptr};
   LikelihoodInterface _likelihood_{this};
+  nlohmann::json _preFitParState_{};
+  nlohmann::json _postFitParState_{};
+
 };
 #endif //GUNDAM_FITTERENGINE_H
