@@ -87,7 +87,7 @@ int main(int argc, char** argv){
   clParser.addTriggerOption("usingCacheManager", {"--cache-manager"}, "Event weight cache handle by the CacheManager");
   clParser.addTriggerOption("usingGpu", {"--gpu"}, "Use GPU parallelization");
   clParser.addOption("overrides", {"-O", "--override"}, "Add a config override [e.g. /fitterEngineConfig/engineType=mcmc)", -1);
-  clParser.addOption("overrideFiles", {"--override-files"}, "Provide config files that will override keys", -1);
+  clParser.addOption("overrideFiles", {"-of", "--override-files"}, "Provide config files that will override keys", -1);
 
   clParser.addDummyOption();
 

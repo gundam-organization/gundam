@@ -30,7 +30,7 @@ int main( int argc, char** argv ){
   CmdLineParser clp(argc, argv);
   clp.addOption("config-file", {"-c"}, "Provide YAML/Json configuration file.", 1);
   clp.addOption("output-file-path", {"-o"}, "Set output file name.", 1);
-  clp.addOption("overrideFiles", {"--override-files"}, "Provide config files that will override keys", -1);
+  clp.addOption("overrideFiles", {"-of", "--override-files"}, "Provide config files that will override keys", -1);
 
   LogInfo << "Available options: " << std::endl;
   LogInfo << clp.getConfigSummary() << std::endl;
