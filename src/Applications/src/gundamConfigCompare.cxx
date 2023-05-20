@@ -180,6 +180,7 @@ void compareConfigStage(const nlohmann::json& config1_, const nlohmann::json& co
         return;
   };
 
+  LogInfo << "Recursive function call..." << std::endl;
   recursiveFct( config1_, config2_ );
 
 }
