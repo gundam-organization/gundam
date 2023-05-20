@@ -199,8 +199,8 @@ int main(int argc, char** argv){
         {"kickMc", "KickedMcAtStart"},
         {"lightOutputMode", "LightOutput"},
         {"overrideFiles", "With_%s"},
-        {"useDataEntry", "dataEntry_%s"},
-        {"toyFit", "toyFit_%s"},
+        {"useDataEntry", "DataEntry_%s"},
+        {"toyFit", "ToyFit_%s"},
         {"dry-run", "DryRun"},
         {"appendix", "%s"},
     };
