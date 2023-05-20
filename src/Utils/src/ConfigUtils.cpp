@@ -251,7 +251,13 @@ namespace ConfigUtils {
     };
 
     // recursive
-    overrideRecursive(outConfig_, overrideConfig_);
+    if( overrideConfig_.is_array() ){
+      // old nlohmann json version -> can be defined as array
+      overrideRecursive(outConfig_, overrideConfig_[0]);
+    }
+    else{
+      overrideRecursive(outConfig_, overrideConfig_);
+    }
 
   }
 
