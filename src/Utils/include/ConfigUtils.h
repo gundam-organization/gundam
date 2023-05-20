@@ -24,6 +24,8 @@ namespace ConfigUtils {
   void forwardConfig(nlohmann::json& config_, const std::string& className_ = "");
   void unfoldConfig(nlohmann::json& config_);
 
+  void applyOverrides(nlohmann::json& jsonConfig_, const nlohmann::json& overrideConfig_);
+
 }
 
 #endif //GUNDAM_CONFIGUTILS_H

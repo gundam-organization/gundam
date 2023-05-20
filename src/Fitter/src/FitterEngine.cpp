@@ -180,6 +180,7 @@ void FitterEngine::initializeImpl(){
       auto outDir = GenericToolbox::mkdirTFile(_saveDir_, parSaveFolder );
 
       GenericToolbox::writeInTFile( outDir, TNamed( "title", par.getTitle().c_str() ) );
+      GenericToolbox::writeInTFile( outDir, TNamed( "fullTitle", par.getFullTitle().c_str() ) );
       GenericToolbox::writeInTFile( outDir, TNamed( "name", par.getName().c_str() ) );
       GenericToolbox::writeInTFile( outDir, TNamed( "isEnabled", std::to_string( par.isEnabled() ).c_str() ) );
       GenericToolbox::writeInTFile( outDir, TNamed( "index", std::to_string( par.getParameterIndex() ).c_str() ) );

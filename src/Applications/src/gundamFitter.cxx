@@ -87,6 +87,7 @@ int main(int argc, char** argv){
   clParser.addTriggerOption("usingCacheManager", {"--cache-manager"}, "Event weight cache handle by the CacheManager");
   clParser.addTriggerOption("usingGpu", {"--gpu"}, "Use GPU parallelization");
   clParser.addOption("overrides", {"-O", "--override"}, "Add a config override [e.g. /fitterEngineConfig/engineType=mcmc)", -1);
+  clParser.addOption("overrideFiles", {"--override-files"}, "Provide config files that will override keys", -1);
 
   clParser.addDummyOption();
 
@@ -163,6 +164,18 @@ int main(int argc, char** argv){
   LogThrowIf(configFilePath.empty(), "Config file not provided.");
   LogInfo << "Reading config file: " << configFilePath << std::endl;
   auto jsonConfig = ConfigUtils::readConfigFile(configFilePath); // works with yaml
+  ConfigUtils::unfoldConfig(jsonConfig);
+
+  for( auto& overrideFile: clParser.getOptionValList<std::string>("overrideFiles") ){
+    LogInfo << "Overriding config with \"" << overrideFile << "\"" << std::endl;
+
+    LogThrowIf(not GenericToolbox::doesPathIsFile(overrideFile), "Could not find " << overrideFile);
+
+    auto jsonOverride = ConfigUtils::readConfigFile( overrideFile );
+    ConfigUtils::unfoldConfig( jsonOverride );
+
+    ConfigUtils::applyOverrides(jsonConfig, jsonOverride);
+  }
 
   // Override the configuration values.  If the old value was a string then
   // replace with the new string. Otherwise, the input value is parsed.  The
@@ -176,8 +189,8 @@ int main(int argc, char** argv){
   //
   // gundamFitter.exe -O /fitterEngineConfig/mcmcConfig/steps=1000 ...
   //
-  for (auto s : clParser.getOptionValList<std::string>("overrides")) {
-    std::vector<std::string> split = GenericToolbox::splitString(s,"=");
+  for( auto& overrideEntry : clParser.getOptionValList<std::string>("overrides") ){
+    std::vector<std::string> split = GenericToolbox::splitString( overrideEntry,"=" );
     LogWarning << "Override " << split[0] << " with " << split[1]
                << std::endl;
     nlohmann::json flat = jsonConfig.flatten();
@@ -220,6 +233,7 @@ int main(int argc, char** argv){
         {"skipHesse", "NoHesse"},
         {"skipSimplex", "NoSimplex"},
         {"kickMc", "KickedMcAtStart"},
+        {"overrideFiles", "WithOverrides"},
         {"lightOutputMode", "LightOutput"},
         {"toyFit", "toyFit_%s"},
         {"useDataEntry", "dataEntry_%s"},
@@ -277,10 +291,11 @@ int main(int argc, char** argv){
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamFitter"), &commandLineString);
 
   // Config unfolded ?
-  auto unfoldedConfig = jsonConfig;
-  ConfigUtils::unfoldConfig(unfoldedConfig);
-  TNamed unfoldedConfigString("unfoldedConfig", GenericToolbox::Json::toReadableString(unfoldedConfig).c_str());
+  TNamed unfoldedConfigString("unfoldedConfig", GenericToolbox::Json::toReadableString(jsonConfig).c_str());
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamFitter"), &unfoldedConfigString);
+
+  // Save point
+  GenericToolbox::triggerTFileWrite( out );
 
 
   // --------------------------

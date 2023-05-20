@@ -61,6 +61,7 @@ int main(int argc, char** argv){
 
   clParser.addDummyOption("Triggers");
   clParser.addTriggerOption("dryRun", {"-d", "--dry-run"}, "Don't write files on disk");
+  clParser.addTriggerOption("showParList", {"--show-par-list"}, "Show parameters list");
 
   clParser.addDummyOption();
 

@@ -110,18 +110,135 @@ namespace ConfigUtils {
   void unfoldConfig(nlohmann::json& config_){
     for( auto& entry : config_ ){
       if( entry.is_string() and (
-          GenericToolbox::doesStringEndsWithSubstring(entry.get<std::string>(), ".yaml", true)
+             GenericToolbox::doesStringEndsWithSubstring(entry.get<std::string>(), ".yaml", true)
           or GenericToolbox::doesStringEndsWithSubstring(entry.get<std::string>(), ".json", true)
       ) ){
-        ConfigUtils::forwardConfig(entry);
-        ConfigUtils::unfoldConfig(config_); // remake the loop on the unfolder config
+        ConfigUtils::forwardConfig( entry );
+        ConfigUtils::unfoldConfig( config_ ); // remake the loop on the unfolder config
         break; // don't touch anymore
       }
 
-      if( entry.is_structured() ){
-        ConfigUtils::unfoldConfig(entry);
-      }
+      if( entry.is_structured() ){ ConfigUtils::unfoldConfig( entry ); }
     }
+  }
+
+
+  void applyOverrides(nlohmann::json& outConfig_, const nlohmann::json& overrideConfig_){
+
+    // dev options
+    bool debug{false};
+    bool allowAddMissingKey{true};
+    std::vector<std::string> listOfIdentifiers{{"name"}, {"__INDEX__"}}; // specific keys like "name" might help reference the lists
+
+    std::vector<std::string> jsonPath{};
+    std::function<void(nlohmann::json&, const nlohmann::json&)> overrideRecursive = [&](nlohmann::json& outEntry_, const nlohmann::json& overrideEntry_){
+      LogDebug(debug) << GET_VAR_NAME_VALUE(GenericToolbox::joinPath( jsonPath )) << std::endl;
+
+      if( overrideEntry_.is_array() ){
+        // entry is list
+        LogReturnIf(not outEntry_.is_array(), GenericToolbox::joinPath( jsonPath ) << " is not an array.");
+
+        // loop over to find the right entry
+        for( auto& overrideListEntry: overrideEntry_.items() ){
+
+          // fetch identifier if available using override
+          std::string identifier{};
+          for( auto& identifierCandidate : listOfIdentifiers ){
+            if( GenericToolbox::Json::doKeyExist( overrideListEntry.value(), identifierCandidate ) ){
+              identifier = identifierCandidate;
+            }
+          }
+
+          if( not identifier.empty() ){
+            // will i
+            LogDebug(debug) << "Will identify override list item with key \"" << identifier << "\" = " << overrideListEntry.value()[identifier] << std::endl;
+
+            nlohmann::json* outListEntryMatch{nullptr};
+
+            if( identifier == "__INDEX__" ){
+              if( overrideListEntry.value()[identifier].get<int>() == -1 ){
+                // add entry
+                LogAlert << "Adding: " << GenericToolbox::joinPath(jsonPath, outEntry_.size()) << std::endl;
+                outEntry_.emplace_back(overrideListEntry.value());
+              }
+              else if( overrideListEntry.value()[identifier].get<size_t>() < outEntry_.size() ){
+                jsonPath.emplace_back(overrideListEntry.key());
+                overrideRecursive(outEntry_[overrideListEntry.value()[identifier].get<size_t>()], overrideListEntry.value());
+                jsonPath.pop_back();
+              }
+              else{
+                LogThrow("Invalid __INDEX__: " << overrideListEntry.value()[identifier].get<int>());
+              }
+            }
+            else{
+              for( auto& outListEntry : outEntry_ ){
+                if( GenericToolbox::Json::doKeyExist( outListEntry, identifier )
+                and outListEntry[identifier] == overrideListEntry.value()[identifier] ){
+                  outListEntryMatch = &outListEntry;
+                  break;
+                }
+              }
+
+              if( outListEntryMatch == nullptr ){
+                LogError << "Could not find key" << std::endl;
+                continue;
+              }
+              jsonPath.emplace_back(GenericToolbox::joinAsString("",overrideListEntry.key(),"(",identifier,":",overrideListEntry.value()[identifier],")"));
+              overrideRecursive(*outListEntryMatch, overrideListEntry.value());
+              jsonPath.pop_back();
+            }
+          }
+          else{
+            LogAlert << "No identifier found for list def in " << GenericToolbox::joinPath(jsonPath) << std::endl;
+            continue;
+          }
+        }
+      }
+      else{
+        // entry is dictionary
+        for( auto& overrideEntry : overrideEntry_.items() ){
+
+          // addition mode:
+          if( not GenericToolbox::Json::doKeyExist(outEntry_, overrideEntry.key()) ){
+            if( overrideEntry.key() != "__INDEX__" ){
+              if( allowAddMissingKey ){
+                LogAlert << "Adding: " << GenericToolbox::joinPath(jsonPath, overrideEntry.key()) << std::endl;
+                outEntry_[overrideEntry.key()] = overrideEntry.value();
+              }
+              else{
+                LogThrow("Could not edit missing key \"" << GenericToolbox::joinPath(jsonPath, overrideEntry.key()) << "\" ("
+                << GET_VAR_NAME_VALUE(allowAddMissingKey) << ")"
+                );
+              }
+            }
+            continue;
+          }
+
+          // override
+          auto& outSubEntry = outEntry_[overrideEntry.key()];
+
+          if( overrideEntry.value().is_structured() ){
+            // recursive candidate
+            jsonPath.emplace_back(overrideEntry.key());
+            overrideRecursive(outSubEntry, overrideEntry.value());
+            jsonPath.pop_back();
+          }
+          else{
+            // override
+            if( outSubEntry != overrideEntry.value() ){
+              LogWarning << "Overriding: " << GenericToolbox::joinPath(jsonPath, overrideEntry.key()) << ": "
+                         << outSubEntry << " -> " << overrideEntry.value() << std::endl;
+              outSubEntry = overrideEntry.value();
+            }
+          }
+        }
+      }
+
+    };
+
+    // recursive
+    overrideRecursive(outConfig_, overrideConfig_);
+
   }
 
 }
