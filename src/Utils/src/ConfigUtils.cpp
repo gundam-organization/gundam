@@ -141,7 +141,7 @@ namespace ConfigUtils {
 
       if( overrideEntry_.is_array() ){
         // entry is list
-        LogReturnIf(not outEntry_.is_array(), GenericToolbox::joinPath( jsonPath ) << " is not an array: " << std::endl << outEntry_);
+        LogThrowIf( not outEntry_.is_array(), GenericToolbox::joinPath( jsonPath ) << " is not an array: " << std::endl << outEntry_ << std::endl << std::endl << overrideEntry_ );
 
         // is it an array of primitive type? like std::vector<std::string>?
         bool isStructured{false};
