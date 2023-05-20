@@ -89,18 +89,18 @@ namespace JointProbability {
 
   class BarlowLLH_BANFF_OA2021 : public JointProbability{
 
-      protected:
-          void readConfigImpl() override;
+  protected:
+      void readConfigImpl() override;
 
-      public:
-          double eval(const FitSample& sample_, int bin_) override;
+  public:
+      double eval(const FitSample& sample_, int bin_) override;
 
-          bool usePoissonLikelihood{false};
-          bool BBNoUpdateWeights{false};
+      bool usePoissonLikelihood{false};
+      bool BBNoUpdateWeights{false};
   };
 
   class BarlowLLH_BANFF_OA2021_SFGD : public JointProbability{
-      double eval(const FitSample& sample_, int bin_) override;
+    double eval(const FitSample& sample_, int bin_) override;
   };
 
 }
