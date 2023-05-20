@@ -5,6 +5,7 @@
 #include "ConfigUtils.h"
 
 #include "GenericToolbox.Json.h"
+#include "GenericToolbox.Root.h"
 #include "GenericToolbox.Yaml.h"
 #include "Logger.h"
 
@@ -253,5 +254,84 @@ namespace ConfigUtils {
     overrideRecursive(outConfig_, overrideConfig_);
 
   }
+
+  // class impl
+  ConfigHandler::ConfigHandler(const std::string& filePath_){
+    if( GenericToolbox::doesFilePathHasExtension( filePath_, "root" ) ){
+      LogInfo << "Extracting config file for fitter file: " << filePath_ << std::endl;
+      auto fitFile = std::shared_ptr<TFile>( GenericToolbox::openExistingTFile( filePath_ ) );
+      auto* conf = fitFile->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed");
+      LogThrowIf(conf==nullptr, "no config in ROOT file " << filePath_);
+      config = GenericToolbox::Json::readConfigJsonStr( conf->GetTitle() );
+      fitFile->Close();
+    }
+    else{
+      LogInfo << "Reading config file: " << filePath_ << std::endl;
+      config = ConfigUtils::readConfigFile(filePath_ ); // works with yaml
+      ConfigUtils::unfoldConfig( config );
+    }
+
+  }
+
+  void ConfigHandler::override( const std::string& filePath_ ){
+    LogInfo << "Overriding config with \"" << filePath_ << "\"" << std::endl;
+    LogThrowIf(not GenericToolbox::doesPathIsFile(filePath_), "Could not find " << filePath_);
+
+    auto override{ConfigUtils::readConfigFile(filePath_)};
+    ConfigUtils::unfoldConfig(override);
+    ConfigUtils::applyOverrides(config, override);
+  }
+  void ConfigHandler::override( const std::vector<std::string>& filesList_ ){
+    for( auto& file : filesList_ ){ this->override( file ); }
+  }
+  void ConfigHandler::flatOverride( const std::string& flattenEntry_ ){
+    // Override the configuration values.  If the old value was a string then
+    // replace with the new string. Otherwise, the input value is parsed.  The
+    // configuration value are references like path names
+    // (e.g. /fitterEngineConfig/mcmcConfig/steps to change the MCMC interface
+    // "steps" value.)  This is intended to make minor changes to the behavior,
+    // so for sanity's sake, the key must already exist in the configuration
+    // files (if the key does not exist an exception will be thrown).  The
+    // command line syntax to change the number of mcmc steps to 1000 per cycle
+    // would be
+    //
+    // gundamFitter.exe -O /fitterEngineConfig/mcmcConfig/steps=1000 ...
+    //
+
+    std::vector<std::string> split = GenericToolbox::splitString( flattenEntry_,"=" );
+    LogWarning << "Override " << split[0] << " with " << split[1]
+               << std::endl;
+    nlohmann::json flat = config.flatten();
+    LogWarning << "    Original value: " << flat.at(split[0])
+               << std::endl;
+    if (flat.at(split[0]).is_string()) flat.at(split[0]) = split[1];
+    else flat.at(split[0]) = nlohmann::json::parse(split[1]);
+    LogWarning << "         New value: " << flat.at(split[0])
+               << std::endl;
+    config = flat.unflatten();
+  }
+  void ConfigHandler::flatOverride( const std::vector<std::string>& flattenEntryList_ ){
+    for( auto& flattenEntry : flattenEntryList_ ){ this->override( flattenEntry ); }
+  }
+
+  std::string ConfigHandler::toString() const{
+    return GenericToolbox::Json::toReadableString( config );
+  }
+  const nlohmann::json &ConfigHandler::getConfig() const {
+    return config;
+  }
+  void ConfigHandler::exportToJsonFile(const std::string &filePath_) const {
+    auto outPath{filePath_};
+
+    if( not GenericToolbox::doesStringEndsWithSubstring(outPath, ".json") ){
+      // add extension if missing
+      outPath += ".json";
+    }
+
+    LogInfo << "Writing as: " << outPath << std::endl;
+    GenericToolbox::dumpStringInFile(outPath, this->toString());
+    LogInfo << "Unfolded config written as: " << outPath << std::endl;
+  }
+
 
 }

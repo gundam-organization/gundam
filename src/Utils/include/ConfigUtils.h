@@ -26,6 +26,25 @@ namespace ConfigUtils {
 
   void applyOverrides(nlohmann::json& jsonConfig_, const nlohmann::json& overrideConfig_);
 
+
+  class ConfigHandler{
+    nlohmann::json config;
+
+  public:
+    explicit ConfigHandler(const std::string& filePath_);
+
+    void override( const std::string& filePath_ );
+    void override( const std::vector<std::string>& filesList_ );
+
+    void flatOverride( const std::string& flattenEntry_ );
+    void flatOverride( const std::vector<std::string>& flattenEntryList_ );
+
+    const nlohmann::json &getConfig() const;
+    std::string toString() const;
+    void exportToJsonFile( const std::string& filePath_ ) const;
+
+  };
+
 }
 
 #endif //GUNDAM_CONFIGUTILS_H

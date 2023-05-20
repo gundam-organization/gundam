@@ -162,46 +162,10 @@ int main(int argc, char** argv){
   // Reading configuration
   auto configFilePath = clParser.getOptionVal("configFile", "");
   LogThrowIf(configFilePath.empty(), "Config file not provided.");
-  LogInfo << "Reading config file: " << configFilePath << std::endl;
-  auto jsonConfig = ConfigUtils::readConfigFile(configFilePath); // works with yaml
-  ConfigUtils::unfoldConfig(jsonConfig);
 
-  for( auto& overrideFile: clParser.getOptionValList<std::string>("overrideFiles") ){
-    LogInfo << "Overriding config with \"" << overrideFile << "\"" << std::endl;
-
-    LogThrowIf(not GenericToolbox::doesPathIsFile(overrideFile), "Could not find " << overrideFile);
-
-    auto jsonOverride = ConfigUtils::readConfigFile( overrideFile );
-    ConfigUtils::unfoldConfig( jsonOverride );
-
-    ConfigUtils::applyOverrides(jsonConfig, jsonOverride);
-  }
-
-  // Override the configuration values.  If the old value was a string then
-  // replace with the new string. Otherwise, the input value is parsed.  The
-  // configuration value are references like path names
-  // (e.g. /fitterEngineConfig/mcmcConfig/steps to change the MCMC interface
-  // "steps" value.)  This is intended to make minor changes to the behavior,
-  // so for sanity's sake, the key must already exist in the configuration
-  // files (if the key does not exist an exception will be thrown).  The
-  // command line syntax to change the number of mcmc steps to 1000 per cycle
-  // would be
-  //
-  // gundamFitter.exe -O /fitterEngineConfig/mcmcConfig/steps=1000 ...
-  //
-  for( auto& overrideEntry : clParser.getOptionValList<std::string>("overrides") ){
-    std::vector<std::string> split = GenericToolbox::splitString( overrideEntry,"=" );
-    LogWarning << "Override " << split[0] << " with " << split[1]
-               << std::endl;
-    nlohmann::json flat = jsonConfig.flatten();
-    LogWarning << "    Original value: " << flat.at(split[0])
-               << std::endl;
-    if (flat.at(split[0]).is_string()) flat.at(split[0]) = split[1];
-    else flat.at(split[0]) = nlohmann::json::parse(split[1]);
-    LogWarning << "         New value: " << flat.at(split[0])
-               << std::endl;
-    jsonConfig = flat.unflatten();
-  }
+  ConfigUtils::ConfigHandler configHandler(configFilePath);
+  configHandler.override( clParser.getOptionValList<std::string>("overrideFiles") );
+  configHandler.flatOverride( clParser.getOptionValList<std::string>("overrides") );
 
   // Output file path
   std::string outFileName;
@@ -215,8 +179,8 @@ int main(int argc, char** argv){
       outFileName += "/";
       GenericToolbox::mkdirPath( outFileName );
     }
-    else if( GenericToolbox::Json::doKeyExist(jsonConfig, "outputFolder") ){
-      outFileName = GenericToolbox::Json::fetchValue<std::string>(jsonConfig, "outputFolder");
+    else if( GenericToolbox::Json::doKeyExist(configHandler.getConfig(), "outputFolder") ){
+      outFileName = GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "outputFolder");
       outFileName += "/";
       GenericToolbox::mkdirPath( outFileName );
     }
@@ -274,12 +238,12 @@ int main(int argc, char** argv){
   // --------------------------
 
   // Checking the minimal version for the config
-  if( GenericToolbox::Json::doKeyExist(jsonConfig, "minGundamVersion") and not clParser.isOptionTriggered("ignoreVersionCheck") ){
+  if( GenericToolbox::Json::doKeyExist(configHandler.getConfig(), "minGundamVersion") and not clParser.isOptionTriggered("ignoreVersionCheck") ){
     LogThrowIf(
-        not g.isNewerOrEqualVersion(GenericToolbox::Json::fetchValue<std::string>(jsonConfig, "minGundamVersion")),
-        "Version check FAILED: " << GundamVersionConfig::getVersionStr() << " < " << GenericToolbox::Json::fetchValue<std::string>(jsonConfig, "minGundamVersion")
+        not g.isNewerOrEqualVersion(GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "minGundamVersion")),
+        "Version check FAILED: " << GundamVersionConfig::getVersionStr() << " < " << GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "minGundamVersion")
     );
-    LogInfo << "Version check passed: " << GundamVersionConfig::getVersionStr() << " >= " << GenericToolbox::Json::fetchValue<std::string>(jsonConfig, "minGundamVersion") << std::endl;
+    LogInfo << "Version check passed: " << GundamVersionConfig::getVersionStr() << " >= " << GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "minGundamVersion") << std::endl;
   }
 
   // Ok, we should run. Create the out file.
@@ -295,7 +259,7 @@ int main(int argc, char** argv){
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamFitter"), &commandLineString);
 
   // Config unfolded ?
-  TNamed unfoldedConfigString("unfoldedConfig", GenericToolbox::Json::toReadableString(jsonConfig).c_str());
+  TNamed unfoldedConfigString("unfoldedConfig", GenericToolbox::Json::toReadableString(configHandler.getConfig()).c_str());
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamFitter"), &unfoldedConfigString);
 
   // Save point
@@ -308,7 +272,7 @@ int main(int argc, char** argv){
   LogInfo << "FitterEngine setup..." << std::endl;
   FitterEngine fitter{GenericToolbox::mkdirTFile(out, "FitterEngine")};
 
-  fitter.readConfig(GenericToolbox::Json::fetchSubEntry(jsonConfig, {"fitterEngineConfig"}));
+  fitter.readConfig(GenericToolbox::Json::fetchSubEntry(configHandler.getConfig(), {"fitterEngineConfig"}));
 
   // -a
   fitter.getPropagator().setLoadAsimovData( clParser.isOptionTriggered("asimov") );
@@ -370,15 +334,15 @@ int main(int argc, char** argv){
   }
 
   // Also check app level config options
-  GenericToolbox::Json::deprecatedAction(jsonConfig, "generateSamplePlots", [&]{
+  GenericToolbox::Json::deprecatedAction(configHandler.getConfig(), "generateSamplePlots", [&]{
     LogAlert << "Forwarding the option to FitterEngine. Consider moving it into \"fitterEngineConfig:\"" << std::endl;
-    fitter.setGenerateSamplePlots( GenericToolbox::Json::fetchValue<bool>(jsonConfig, "generateSamplePlots") );
+    fitter.setGenerateSamplePlots( GenericToolbox::Json::fetchValue<bool>(configHandler.getConfig(), "generateSamplePlots") );
   });
 
-  GenericToolbox::Json::deprecatedAction(jsonConfig, "allParamVariations", [&]{
+  GenericToolbox::Json::deprecatedAction(configHandler.getConfig(), "allParamVariations", [&]{
     LogAlert << "Forwarding the option to FitterEngine. Consider moving it into \"fitterEngineConfig:\"" << std::endl;
     fitter.setDoAllParamVariations(true);
-    fitter.setAllParamVariationsSigmas(GenericToolbox::Json::fetchValue<std::vector<double>>(jsonConfig, "allParamVariations"));
+    fitter.setAllParamVariationsSigmas(GenericToolbox::Json::fetchValue<std::vector<double>>(configHandler.getConfig(), "allParamVariations"));
   });
 
 
