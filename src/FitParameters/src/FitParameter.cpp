@@ -29,9 +29,12 @@ void FitParameter::readConfigImpl(){
     }
 
     if( GenericToolbox::Json::doKeyExist(_parameterConfig_, "priorValue") ){
-      _priorValue_ = GenericToolbox::Json::fetchValue(_parameterConfig_, "priorValue", _priorValue_);
-      LogWarning << this->getTitle() << ": prior value override -> " << _priorValue_ << std::endl;
-      this->setParameterValue(_priorValue_);
+      double priorOverride = GenericToolbox::Json::fetchValue(_parameterConfig_, "priorValue", this->getPriorValue());
+      if( not std::isnan(priorOverride) ){
+        LogWarning << this->getTitle() << ": prior value override -> " << priorOverride << std::endl;
+        this->setPriorValue(priorOverride);
+        this->setParameterValue(priorOverride);
+      }
     }
 
     if( GenericToolbox::Json::doKeyExist(_parameterConfig_, "parameterLimits") ){

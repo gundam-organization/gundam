@@ -11,7 +11,7 @@
 #include "iostream"
 
 LoggerInit([]{
-  Logger::setUserHeaderStr("[gundamRoot.cxx]");
+  Logger::getUserHeader() << "[" << FILENAME << "]";
 });
 
 

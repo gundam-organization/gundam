@@ -17,10 +17,12 @@
 #include "vector"
 #include <cstdlib>
 
+
 LoggerInit([]{
-Logger::setUserHeaderStr("[gundamConfigCompare.cxx]");
-Logger::setPrefixFormat("{TIME} {USER_HEADER}");
+  Logger::getUserHeader() << "[" << FILENAME << "]";
+  Logger::setPrefixFormat("{TIME} {USER_HEADER}");
 });
+
 
 bool __showAllKeys__{false};
 std::vector<std::string> __pathBuffer__;

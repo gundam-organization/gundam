@@ -12,7 +12,7 @@
 #include "future"
 
 LoggerInit([]{
-  Logger::setUserHeaderStr("[Sandbox]");
+  Logger::getUserHeader() << "[" << FILENAME << "]";
 });
 
 

@@ -21,7 +21,7 @@
 
 
 LoggerInit([]{
-  Logger::setUserHeaderStr("[gundamPlotExtractor.cxx]");
+  Logger::getUserHeader() << "[" << FILENAME << "]";
 });
 
 std::vector<std::string> outExtensions;

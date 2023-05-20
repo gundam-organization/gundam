@@ -108,20 +108,24 @@ namespace ConfigUtils {
     }
   }
   void unfoldConfig(nlohmann::json& config_){
-    for( auto& entry : config_ ){
-      if( entry.is_string() and (
-             GenericToolbox::doesStringEndsWithSubstring(entry.get<std::string>(), ".yaml", true)
-          or GenericToolbox::doesStringEndsWithSubstring(entry.get<std::string>(), ".json", true)
-      ) ){
-        ConfigUtils::forwardConfig( entry );
-        ConfigUtils::unfoldConfig( config_ ); // remake the loop on the unfolder config
-        break; // don't touch anymore
+
+    std::function<void(nlohmann::json&)> unfoldRecursive = [&](nlohmann::json& outEntry_){
+      for( auto& entry : config_ ){
+        if( entry.is_string() and (
+               GenericToolbox::doesStringEndsWithSubstring(entry.get<std::string>(), ".yaml", true)
+            or GenericToolbox::doesStringEndsWithSubstring(entry.get<std::string>(), ".json", true)
+        ) ){
+          ConfigUtils::forwardConfig( entry );
+          ConfigUtils::unfoldConfig( config_ ); // remake the loop on the unfolder config
+          break; // don't touch anymore
+        }
+
+        if( entry.is_structured() ){ ConfigUtils::unfoldConfig( entry ); }
       }
+    };
+    unfoldRecursive(config_);
 
-      if( entry.is_structured() ){ ConfigUtils::unfoldConfig( entry ); }
-    }
   }
-
 
   void applyOverrides(nlohmann::json& outConfig_, const nlohmann::json& overrideConfig_){
 
@@ -137,6 +141,15 @@ namespace ConfigUtils {
       if( overrideEntry_.is_array() ){
         // entry is list
         LogReturnIf(not outEntry_.is_array(), GenericToolbox::joinPath( jsonPath ) << " is not an array.");
+
+        // is it an array of primitive type? like std::vector<std::string>?
+        bool isStructured{false};
+        for( auto& outListEntry : outEntry_.items() ){ if( outListEntry.value().is_structured() ){ isStructured = true; break; } }
+        if( not isStructured ){
+          LogWarning << "Overriding list: " << GenericToolbox::joinPath(jsonPath) << std::endl;
+          outEntry_ = overrideEntry_;
+          return;
+        }
 
         // loop over to find the right entry
         for( auto& overrideListEntry: overrideEntry_.items() ){

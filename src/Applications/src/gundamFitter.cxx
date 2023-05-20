@@ -21,7 +21,7 @@
 #include "vector"
 
 LoggerInit([]{
-  Logger::setUserHeaderStr("[gundamFitter.cxx]");
+  Logger::getUserHeader() << "[" << FILENAME << "]";
 });
 
 
@@ -233,8 +233,8 @@ int main(int argc, char** argv){
         {"skipHesse", "NoHesse"},
         {"skipSimplex", "NoSimplex"},
         {"kickMc", "KickedMcAtStart"},
-        {"overrideFiles", "WithOverrides"},
         {"lightOutputMode", "LightOutput"},
+        {"overrideFiles", "Overrides_%s"},
         {"toyFit", "toyFit_%s"},
         {"useDataEntry", "dataEntry_%s"},
         {"dry-run", "DryRun"},
@@ -246,9 +246,13 @@ int main(int argc, char** argv){
       if( clParser.isOptionTriggered(appendixDictEntry.first) ){
         appendixList.emplace_back( appendixDictEntry.second );
         if( clParser.getNbValueSet(appendixDictEntry.first) > 0 ){
+
+          auto args = clParser.getOptionValList<std::string>(appendixDictEntry.first);
+          for( auto& arg : args ){ arg = GenericToolbox::getFileNameFromFilePath(arg, false); }
+
           appendixList.back() = Form(
               appendixList.back().c_str(),
-              clParser.getOptionVal<std::string>(appendixDictEntry.first, 0).c_str()
+              GenericToolbox::joinVectorString(args, "_").c_str()
           );
         }
         else{

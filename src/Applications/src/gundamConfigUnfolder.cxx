@@ -31,6 +31,7 @@ int main( int argc, char** argv ){
   clp.addOption("config-file", {"-c"}, "Provide YAML/Json configuration file.", 1);
   clp.addOption("fit-file", {"-f"}, "Provide ROOT fit file which contains the configuration.", 1);
   clp.addOption("output-file-path", {"-o"}, "Set output file name.", 1);
+  clp.addOption("overrideFiles", {"--override-files"}, "Provide config files that will override keys", -1);
 
   LogInfo << "Available options: " << std::endl;
   LogInfo << clp.getConfigSummary() << std::endl;
@@ -62,6 +63,19 @@ int main( int argc, char** argv ){
 
   LogInfo << "Unfolding configuration file..." << std::endl;
   ConfigUtils::unfoldConfig(config);
+
+  for( auto& overrideFile: clp.getOptionValList<std::string>("overrideFiles") ){
+    LogInfo << "Overriding config with \"" << overrideFile << "\"" << std::endl;
+
+    LogThrowIf(not GenericToolbox::doesPathIsFile(overrideFile), "Could not find " << overrideFile);
+
+    auto jsonOverride = ConfigUtils::readConfigFile( overrideFile );
+    ConfigUtils::unfoldConfig( jsonOverride );
+
+    ConfigUtils::applyOverrides(config, jsonOverride);
+  }
+
+
 
   auto configStr = GenericToolbox::Json::toReadableString(config);
 

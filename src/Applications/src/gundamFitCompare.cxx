@@ -17,7 +17,7 @@
 #include "vector"
 
 LoggerInit([]{
-  Logger::setUserHeaderStr("[gundamFitCompare.cxx]");
+  Logger::getUserHeader() << "[" << FILENAME << "]";
 });
 
 CmdLineParser clp;

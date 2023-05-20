@@ -25,7 +25,7 @@
 
 
 LoggerInit([]{
-  Logger::setUserHeaderStr("[gundamCalcXsec.cxx]");
+  Logger::getUserHeader() << "[" << FILENAME << "]";
 });
 
 
