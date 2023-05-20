@@ -259,6 +259,7 @@ namespace ConfigUtils {
   ConfigHandler::ConfigHandler(const std::string& filePath_){
     if( GenericToolbox::doesFilePathHasExtension( filePath_, "root" ) ){
       LogInfo << "Extracting config file for fitter file: " << filePath_ << std::endl;
+      LogThrowIf( not GenericToolbox::doesTFileIsValid(filePath_), "Invalid root file: " << filePath_ );
       auto fitFile = std::shared_ptr<TFile>( GenericToolbox::openExistingTFile( filePath_ ) );
       auto* conf = fitFile->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed");
       LogThrowIf(conf==nullptr, "no config in ROOT file " << filePath_);
