@@ -836,6 +836,7 @@ void FitParameterSet::defineParameters(){
 
     // par is now fully identifiable.
     if( not _enableOnlyParameters_.empty() ){
+      LogInfo << "Reading enableOnlyParameters..." << std::endl;
       bool isEnabled = false;
       for( auto& enableEntry : _enableOnlyParameters_ ){
         if( GenericToolbox::Json::doKeyExist(enableEntry, "name")
@@ -846,12 +847,15 @@ void FitParameterSet::defineParameters(){
       }
 
       if( not isEnabled ){
-        LogAlert << "Skipping parameter \"" << par.getFullTitle() << "\" as it is not set in enableOnlyParameters" << std::endl;
+        // set it of
         par.setIsEnabled( false );
-        continue;
+      }
+      else{
+        LogWarning << "Enabling parameter \"" << par.getFullTitle() << "\" as it is not set in enableOnlyParameters" << std::endl;
       }
     }
     if( not _disableParameters_.empty() ){
+      LogInfo << "Reading disableParameters..." << std::endl;
       bool isEnabled = true;
       for( auto& disableEntry : _disableParameters_ ){
         if( GenericToolbox::Json::doKeyExist(disableEntry, "name")
@@ -862,7 +866,7 @@ void FitParameterSet::defineParameters(){
       }
 
       if( not isEnabled ){
-        LogAlert << "Skipping parameter \"" << par.getFullTitle() << "\" as it is set in disableParameters" << std::endl;
+        LogWarning << "Skipping parameter \"" << par.getFullTitle() << "\" as it is set in disableParameters" << std::endl;
         par.setIsEnabled( false );
         continue;
       }
