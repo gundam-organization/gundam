@@ -77,8 +77,8 @@ int main(int argc, char** argv){
   // --------------------------
   // Initialize the fitter:
   // --------------------------
-  LogInfo << "Reading config file: " << configFilePath << std::endl;
-  auto configXsecExtractor = ConfigUtils::readConfigFile(configFilePath); // works with yaml
+  ConfigUtils::ConfigHandler ch{configFilePath};
+  auto configXsecExtractor = ch.getConfig();
 
   if( GenericToolbox::Json::doKeyExist(configXsecExtractor, "minGundamVersion") ){
     LogThrowIf(
