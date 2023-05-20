@@ -175,29 +175,29 @@ int main(int argc, char** argv){
   else{
 
     if( clParser.isOptionTriggered("outputDir") ){
+      GenericToolbox::mkdirPath( clParser.getOptionVal<std::string>("outputDir") );
       outFileName = clParser.getOptionVal<std::string>("outputDir");
-      outFileName += "/";
-      GenericToolbox::mkdirPath( outFileName );
     }
     else if( GenericToolbox::Json::doKeyExist(configHandler.getConfig(), "outputFolder") ){
-      outFileName = GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "outputFolder");
-      outFileName += "/";
       GenericToolbox::mkdirPath( outFileName );
+      outFileName = GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "outputFolder");
     }
 
-    outFileName += GenericToolbox::getFileNameFromFilePath(configFilePath, false);
+    outFileName = GenericToolbox::joinPath(outFileName, GenericToolbox::getFileNameFromFilePath(configFilePath, false));
 
     // appendixDict["optionName"] = "Appendix"
+    // this list insure all appendices will appear in the same order
     std::vector<std::pair<std::string, std::string>> appendixDict{
         {"asimov", "Asimov"},
         {"scanParameters", "Scan"},
-        {"scanLine", "WithLineScan"},
         {"generateOneSigmaPlots", "OneSigma"},
         {"enablePca", "PCA"},
         {"skipHesse", "NoHesse"},
         {"skipSimplex", "NoSimplex"},
-        {"kickMc", "KickedMcAtStart"},
-        {"lightOutputMode", "LightOutput"},
+        {"kickMc", "KickMc"},
+        {"lightOutputMode", "Light"},
+        {"injectParameterConfig", "Inj_%s"},
+        {"scanLine", "LineSc_%s"},
         {"overrideFiles", "With_%s"},
         {"useDataEntry", "DataEntry_%s"},
         {"toyFit", "ToyFit_%s"},
@@ -212,7 +212,16 @@ int main(int argc, char** argv){
         if( clParser.getNbValueSet(appendixDictEntry.first) > 0 ){
 
           auto args = clParser.getOptionValList<std::string>(appendixDictEntry.first);
-          for( auto& arg : args ){ arg = GenericToolbox::getFileNameFromFilePath(arg, false); }
+          for( auto& arg : args ){
+            arg = GenericToolbox::getFileNameFromFilePath(arg, false);
+            arg = arg.substr(0, 24); // cap length
+            if( arg.size() == 24 ){
+              // print dotdot if too long
+              arg[arg.size()-1] = '.';
+              arg[arg.size()-2] = '.';
+              arg[arg.size()-3] = '.';
+            }
+          }
 
           appendixList.back() = Form(
               appendixList.back().c_str(),
