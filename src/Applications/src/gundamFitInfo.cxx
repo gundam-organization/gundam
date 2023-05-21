@@ -219,6 +219,7 @@ int main(int argc, char** argv){
         if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
         auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".txt");
         LogInfo << blueLightText << "Writing pre-fit LLH stats under: " << resetColor << outConfigPath << std::endl;
+        LogInfo << injectorStr->GetTitle() << std::endl;
         GenericToolbox::dumpStringInFile( outConfigPath, injectorStr->GetTitle() );
       });
 
@@ -245,6 +246,7 @@ int main(int argc, char** argv){
         if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
         auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".txt");
         LogInfo << blueLightText << "Writing post-fit LLH stats under: " << resetColor << outConfigPath << std::endl;
+        LogInfo << injectorStr->GetTitle() << std::endl;
         GenericToolbox::dumpStringInFile( outConfigPath, injectorStr->GetTitle() );
       });
 
