@@ -191,7 +191,10 @@ int main(int argc, char** argv){
       LogAlert << "Dry run set. Not doing actions involving writing of files on disk" << std::endl;
       continue;
     }
-    auto outDir{GenericToolbox::getFileNameFromFilePath(file, false)};
+    auto outDir{GenericToolbox::joinPath(
+        GenericToolbox::getFolderPathFromFilePath(file),
+        GenericToolbox::getFileNameFromFilePath(file, false)
+    )};
     LogWarning << "Will now write data in sub-folder: " << outDir << std::endl;
 
 
