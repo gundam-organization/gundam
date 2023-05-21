@@ -5,6 +5,7 @@
 #include "FitterEngine.h"
 #include "VersionConfig.h"
 #include "ConfigUtils.h"
+#include "GundamUtils.h"
 #include "GlobalVariables.h"
 #include "GundamGreetings.h"
 #include "MinimizerInterface.h"
@@ -174,20 +175,17 @@ int main(int argc, char** argv){
   }
   else{
 
-    if( clParser.isOptionTriggered("outputDir") ){
-      GenericToolbox::mkdirPath( clParser.getOptionVal<std::string>("outputDir") );
-      outFileName = clParser.getOptionVal<std::string>("outputDir");
-    }
+    std::string outFolder{"./"};
+    if( clParser.isOptionTriggered("outputDir") ){ outFolder = clParser.getOptionVal<std::string>("outputDir"); }
     else if( GenericToolbox::Json::doKeyExist(configHandler.getConfig(), "outputFolder") ){
-      GenericToolbox::mkdirPath( outFileName );
-      outFileName = GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "outputFolder");
+      outFolder = GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "outputFolder");
     }
-
-    outFileName = GenericToolbox::joinPath(outFileName, GenericToolbox::getFileNameFromFilePath(configFilePath, false));
+    GenericToolbox::mkdirPath( outFolder );
 
     // appendixDict["optionName"] = "Appendix"
     // this list insure all appendices will appear in the same order
     std::vector<std::pair<std::string, std::string>> appendixDict{
+        {"configFile", "%s"},
         {"asimov", "Asimov"},
         {"scanParameters", "Scan"},
         {"generateOneSigmaPlots", "OneSigma"},
@@ -205,40 +203,10 @@ int main(int argc, char** argv){
         {"appendix", "%s"},
     };
 
-    std::vector<std::string> appendixList{};
-    for( const auto& appendixDictEntry : appendixDict ){
-      if( clParser.isOptionTriggered(appendixDictEntry.first) ){
-        appendixList.emplace_back( appendixDictEntry.second );
-        if( clParser.getNbValueSet(appendixDictEntry.first) > 0 ){
-
-          auto args = clParser.getOptionValList<std::string>(appendixDictEntry.first);
-          for( auto& arg : args ){
-            arg = GenericToolbox::getFileNameFromFilePath(arg, false);
-            arg = arg.substr(0, 24); // cap length
-            if( arg.size() == 24 ){
-              // print dotdot if too long
-              arg[arg.size()-1] = '.';
-              arg[arg.size()-2] = '.';
-              arg[arg.size()-3] = '.';
-            }
-          }
-
-          appendixList.back() = Form(
-              appendixList.back().c_str(),
-              GenericToolbox::joinVectorString(args, "_").c_str()
-          );
-        }
-        else{
-          appendixList.back() = GenericToolbox::trimString(Form( appendixList.back().c_str(), "" ), "_");
-        }
-      }
-    }
-
-    if( not appendixList.empty() ){
-      outFileName += "_";
-      outFileName += GenericToolbox::joinVectorString(appendixList, "_");
-    }
-    outFileName += ".root";
+    outFileName = GenericToolbox::joinPath(
+        outFolder,
+        GundamUtils::generateFileName(clParser, appendixDict)
+    ) + ".root";
   }
 
 

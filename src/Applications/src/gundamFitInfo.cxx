@@ -81,12 +81,18 @@ int main(int argc, char** argv){
   LogThrowIf( clParser.getNbValueSet("fitFiles") == 0, "no fit files provided" );
 
 
-  if( not clParser.isOptionTriggered("dryRun") ){
-    LogWarning << "Output files will be writen under: " << GenericToolbox::getCurrentWorkingDirectory() << std::endl;
-  }
+
   for( auto& file : clParser.getOptionValList<std::string>("fitFiles") ){
     LogInfo << std::endl << magentaLightText << "Opening: " << resetColor << file << std::endl;
     LogScopeIndent;
+
+    auto outDir{GenericToolbox::joinPath(
+        (clParser.isOptionTriggered("outFolder") ? clParser.getOptionVal<std::string>("outFolder"): GenericToolbox::getFolderPathFromFilePath(file)),
+        GenericToolbox::getFileNameFromFilePath(file, false)
+    )};
+    if( not clParser.isOptionTriggered("dryRun") ){
+      LogWarning << "Output files will be writen under: " << outDir << std::endl;
+    }
 
     auto f = std::make_shared<TFile>(file.c_str());
     LogContinueIf(not GenericToolbox::doesTFileIsValid(f.get()), "Could not open \"" << file << "\"");
@@ -97,6 +103,14 @@ int main(int argc, char** argv){
     });
     readObject<TNamed>(f.get(), GenericToolbox::joinPath("gundamFitter", "gundamVersion_TNamed"), [](TNamed* obj_){
       LogInfo << blueLightText << "Ran with GUNDAM version: " << resetColor << obj_->GetTitle() << std::endl;
+    });
+    readObject<TNamed>(f.get(), GenericToolbox::joinPath("gundamFitter", "unfoldedConfig_TNamed"), [&](TNamed* obj_){
+      if( not clParser.isOptionTriggered("dryRun") ){
+        if( not GenericToolbox::doesPathIsFolder(outDir) ){ GenericToolbox::mkdirPath(outDir); }
+        auto outConfigPath = GenericToolbox::joinPath(outDir, "config.json");
+        LogInfo << blueLightText << "Writing unfolded config under: " << resetColor << outConfigPath << std::endl;
+        GenericToolbox::dumpStringInFile( outConfigPath, obj_->GetTitle() );
+      }
     });
 
 
@@ -145,26 +159,65 @@ int main(int argc, char** argv){
       LogInfo << cyanLightText << "Reading inside: " << pathPreFit << resetColor << std::endl;
       LogScopeIndent;
 
-      readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPreFit, "preFitLlhState_TNamed"), [&](TNamed* injectorStr){
+      readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPreFit, "llhState_TNamed"), [&](TNamed* injectorStr){
         LogInfo << blueLightText << "Pre-fit Likelihood state: " << resetColor << injectorStr->GetTitle() << std::endl;
+        if( not clParser.isOptionTriggered("dryRun") ){
+          auto outSubDir{GenericToolbox::joinPath( outDir, pathPreFit)};
+          if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
+          auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".txt");
+          LogInfo << blueLightText << "Writing pre-fit LLH stats under: " << resetColor << outConfigPath << std::endl;
+          GenericToolbox::dumpStringInFile( outConfigPath, injectorStr->GetTitle() );
+        }
+      });
+
+      readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPreFit, "parState_TNamed"), [&](TNamed* injectorStr){
+        if( clParser.getOptionVal("verbose", 0) >= 1 ){
+          LogInfo << blueLightText << "Pre-fit parameters state: " << resetColor << injectorStr->GetTitle() << std::endl;
+        }
+        if( not clParser.isOptionTriggered("dryRun") ){
+          auto outSubDir{GenericToolbox::joinPath( outDir, pathPreFit)};
+          if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
+          auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".json");
+          LogInfo << blueLightText << "Writing pre-fit LLH parameter injector under: " << resetColor << outConfigPath << std::endl;
+          GenericToolbox::dumpStringInFile( outConfigPath, injectorStr->GetTitle() );
+        }
       });
 
     } while( false ); // allows to skip if not found
 
     /// FitterEngine/postFit
     do {
-      auto pathPreFit{GenericToolbox::joinPath("FitterEngine", "postFit")};
-      if( not readObject(f.get(), pathPreFit) ){ break; }
+      auto pathPostFit{GenericToolbox::joinPath("FitterEngine", "postFit")};
+      if( not readObject(f.get(), pathPostFit) ){ break; }
 
-      LogInfo << cyanLightText << "Reading inside: " << pathPreFit << resetColor << std::endl;
+      LogInfo << cyanLightText << "Reading inside: " << pathPostFit << resetColor << std::endl;
       LogScopeIndent;
 
-      readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPreFit, "postFitLlhState_TNamed"), [&](TNamed* injectorStr){
+      readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPostFit, "llhState_TNamed"), [&](TNamed* injectorStr){
         LogInfo << blueLightText << "Post-fit Likelihood state: " << resetColor << injectorStr->GetTitle() << std::endl;
+        if( not clParser.isOptionTriggered("dryRun") ){
+          auto outSubDir{GenericToolbox::joinPath( outDir, pathPostFit)};
+          if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
+          auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".txt");
+          LogInfo << blueLightText << "Writing post-fit LLH stats under: " << resetColor << outConfigPath << std::endl;
+          LogInfo << injectorStr->GetTitle() << std::endl;
+          GenericToolbox::dumpStringInFile( outConfigPath, injectorStr->GetTitle() );
+        }
+      });
+      readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPostFit, "parState_TNamed"), [&](TNamed* injectorStr){
+        if( clParser.getOptionVal("verbose", 0) >= 1 ){
+          LogInfo << blueLightText << "Post-fit parameters state: " << resetColor << injectorStr->GetTitle() << std::endl;
+        }
+        if( not clParser.isOptionTriggered("dryRun") ){
+          auto outSubDir{GenericToolbox::joinPath( outDir, pathPostFit)};
+          if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
+          auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".json");
+          LogInfo << blueLightText << "Writing post-fit LLH parameter injector under: " << resetColor << outConfigPath << std::endl;
+          GenericToolbox::dumpStringInFile( outConfigPath, injectorStr->GetTitle() );
+        }
       });
 
     } while( false ); // allows to skip if not found
-
 
     /// Multiple entries
     if( clParser.isOptionTriggered("showCorrelationsWith") ){
@@ -182,83 +235,9 @@ int main(int argc, char** argv){
 
         }
         LogThrowIf(not isFound, "Could not find parameter with name: " << parFullTitle);
-
       }
 
     }
-
-
-    if( clParser.isOptionTriggered("dryRun") ){
-      LogAlert << "Dry run set. Not doing actions involving writing of files on disk" << std::endl;
-      continue;
-    }
-    auto outDir{GenericToolbox::joinPath(
-        (clParser.isOptionTriggered("outFolder") ? clParser.getOptionVal<std::string>("outFolder"): GenericToolbox::getFolderPathFromFilePath(file)),
-        GenericToolbox::getFileNameFromFilePath(file, false)
-    )};
-    LogWarning << "Will now write data in sub-folder: " << outDir << std::endl;
-
-
-    readObject<TNamed>(f.get(), GenericToolbox::joinPath("gundamFitter", "unfoldedConfig_TNamed"), [&](TNamed* obj_){
-      if( not GenericToolbox::doesPathIsFolder(outDir) ){ GenericToolbox::mkdirPath(outDir); }
-      auto outConfigPath = GenericToolbox::joinPath(outDir, "config.json");
-      LogInfo << blueLightText << "Writing unfolded config under: " << resetColor << outConfigPath << std::endl;
-      GenericToolbox::dumpStringInFile( outConfigPath, obj_->GetTitle() );
-    });
-
-    /// FitterEngine/preFit
-    do {
-      auto pathPreFit{GenericToolbox::joinPath("FitterEngine", "preFit")};
-      if( not readObject(f.get(), pathPreFit) ){ break; }
-
-      LogInfo << cyanLightText << "Reading inside: " << pathPreFit << resetColor << std::endl;
-      LogScopeIndent;
-
-      readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPreFit, "llhState_TNamed"), [&](TNamed* injectorStr){
-        auto outSubDir{GenericToolbox::joinPath( outDir, pathPreFit)};
-        if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
-        auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".txt");
-        LogInfo << blueLightText << "Writing pre-fit LLH stats under: " << resetColor << outConfigPath << std::endl;
-        LogInfo << injectorStr->GetTitle() << std::endl;
-        GenericToolbox::dumpStringInFile( outConfigPath, injectorStr->GetTitle() );
-      });
-
-      readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPreFit, "parState_TNamed"), [&](TNamed* injectorStr){
-        auto outSubDir{GenericToolbox::joinPath( outDir, pathPreFit)};
-        if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
-        auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".json");
-        LogInfo << blueLightText << "Writing pre-fit LLH parameter injector under: " << resetColor << outConfigPath << std::endl;
-        GenericToolbox::dumpStringInFile( outConfigPath, injectorStr->GetTitle() );
-      });
-
-    } while( false ); // allows to skip if not found
-
-    /// FitterEngine/postFit
-    do {
-      auto pathPostFit{GenericToolbox::joinPath("FitterEngine", "postFit")};
-      if( not readObject(f.get(), pathPostFit) ){ break; }
-
-      LogInfo << cyanLightText << "Reading inside: " << pathPostFit << resetColor << std::endl;
-      LogScopeIndent;
-
-      readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPostFit, "llhState_TNamed"), [&](TNamed* injectorStr){
-        auto outSubDir{GenericToolbox::joinPath( outDir, pathPostFit)};
-        if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
-        auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".txt");
-        LogInfo << blueLightText << "Writing post-fit LLH stats under: " << resetColor << outConfigPath << std::endl;
-        LogInfo << injectorStr->GetTitle() << std::endl;
-        GenericToolbox::dumpStringInFile( outConfigPath, injectorStr->GetTitle() );
-      });
-
-      readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPostFit, "parState_TNamed"), [&](TNamed* injectorStr){
-        auto outSubDir{GenericToolbox::joinPath( outDir, pathPostFit)};
-        if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
-        auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".json");
-        LogInfo << blueLightText << "Writing post-fit LLH parameter injector under: " << resetColor << outConfigPath << std::endl;
-        GenericToolbox::dumpStringInFile( outConfigPath, injectorStr->GetTitle() );
-      });
-
-    } while( false ); // allows to skip if not found
 
     f->Close();
   }
