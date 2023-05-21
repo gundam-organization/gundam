@@ -37,7 +37,7 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_);
 
 int main( int argc, char** argv ){
   GundamGreetings g;
-  g.setAppName("FitCompare");
+  g.setAppName("fit compare tool");
   g.hello();
 
   // files
@@ -181,7 +181,10 @@ void makeSampleComparePlots(bool usePrefit_){
 
         auto* hCompValues = (TH1D*) h1->Clone();
         hCompValues->Add(h2, -1);
-        GenericToolbox::transformBinContent(hCompValues, [](TH1D* h_, int bin_){ h_->SetBinError(bin_, 0); });
+        GenericToolbox::transformBinContent(hCompValues, [](TH1D* h_, int bin_){
+          h_->SetBinError(bin_, 0);
+          if( std::isnan(h_->GetBinContent(bin_)) ){ h_->SetBinContent(bin_, 0); }
+        });
 
         hCompValues->SetTitle(Form("Comparing \"%s\"", dir1_->GetListOfKeys()->At(iKey)->GetName()));
         hCompValues->GetYaxis()->SetTitle("Bin content difference");
@@ -191,6 +194,23 @@ void makeSampleComparePlots(bool usePrefit_){
             hCompValues,
             dir1_->GetListOfKeys()->At(iKey)->GetName()
             );
+
+        auto* hCompValuesRatio = (TH1D*) hCompValues->Clone();
+        GenericToolbox::transformBinContent(hCompValuesRatio, [h1](TH1D* h_, int bin_){
+          h_->SetBinContent(bin_, 100. * h_->GetBinContent(bin_)/h1->GetBinContent(bin_));
+          h_->SetBinError(bin_, 0);
+          if( std::isnan(h_->GetBinContent(bin_)) ){ h_->SetBinContent(bin_, 0); }
+        });
+
+        hCompValuesRatio->SetTitle(Form("Comparing \"%s\"", dir1_->GetListOfKeys()->At(iKey)->GetName()));
+        hCompValuesRatio->GetYaxis()->SetTitle("Bin content relative difference (%)");
+
+        GenericToolbox::writeInTFile(
+            GenericToolbox::mkdirTFile(outFile, GenericToolbox::joinVectorString(pathBuffer, "/")),
+            hCompValuesRatio,
+            dir1_->GetListOfKeys()->At(iKey)->GetName() + std::string("_Ratio")
+        );
+
       }
     }
 

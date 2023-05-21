@@ -43,7 +43,7 @@ int main(int argc, char** argv){
   // Greetings:
   // --------------------------
   GundamGreetings g;
-  g.setAppName("GundamFitInfo");
+  g.setAppName("fit output reader tool");
   g.hello();
 
   // --------------------------

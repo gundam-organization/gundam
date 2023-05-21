@@ -32,7 +32,7 @@ int main(int argc, char** argv){
   // Greetings:
   // --------------------------
   GundamGreetings g;
-  g.setAppName("GundamFitter");
+  g.setAppName("main fitter");
   g.hello();
 
 #ifdef GUNDAM_USING_CACHE_MANAGER

@@ -3,7 +3,7 @@
 set( APPLICATION_LIST
     # GUNDAM apps
     gundamFitter
-    gundamFitInfo
+    gundamFitReader
     gundamCalcXsec
     gundamFitCompare
     gundamConfigCompare
@@ -71,7 +71,7 @@ endforeach()
 
 # Dependencies
 target_link_libraries( gundamFitter GundamFitter )
-target_link_libraries( gundamFitInfo GundamUtils )
+target_link_libraries( gundamFitReader GundamUtils )
 target_link_libraries( gundamFitCompare GundamUtils )
 target_link_libraries( gundamConfigUnfolder GundamUtils )
 target_link_libraries( gundamConfigCompare GundamUtils )

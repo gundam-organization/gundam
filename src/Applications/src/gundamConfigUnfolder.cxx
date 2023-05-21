@@ -24,7 +24,7 @@ LoggerInit([]{
 int main( int argc, char** argv ){
 
   GundamGreetings g;
-  g.setAppName("ConfigUnfolder");
+  g.setAppName("config unfolder tool");
   g.hello();
 
   CmdLineParser clp(argc, argv);

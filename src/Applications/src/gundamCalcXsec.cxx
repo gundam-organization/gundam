@@ -32,7 +32,7 @@ LoggerInit([]{
 int main(int argc, char** argv){
 
   GundamGreetings g;
-  g.setAppName("GundamCalcXsec");
+  g.setAppName("Xsec calculator tool");
   g.hello();
 
 

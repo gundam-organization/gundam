@@ -30,7 +30,7 @@ void compareConfigStage(const nlohmann::json& config1_, const nlohmann::json& co
 
 int main( int argc, char** argv ){
   GundamGreetings g;
-  g.setAppName("ConfigCompare");
+  g.setAppName("config compare tool");
   g.hello();
 
   clp.addOption("config-1", {"-c1"}, "Path to first config file.", 1);

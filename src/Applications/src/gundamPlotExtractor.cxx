@@ -33,7 +33,7 @@ void init();
 int main( int argc, char** argv ){
 
   GundamGreetings g;
-  g.setAppName("PlotExtractor");
+  g.setAppName("plot extractor tool");
   g.hello();
 
   CmdLineParser clp(argc, argv);
