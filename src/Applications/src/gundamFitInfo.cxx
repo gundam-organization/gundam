@@ -58,6 +58,7 @@ int main(int argc, char** argv){
   clParser.addOption("fitFiles", {"-f", "--file"}, "Specify path to fitter output files", -1);
   clParser.addOption("verbose", {"-v", "--verbose"}, "Set the verbosity level", 1, true);
   clParser.addOption("showCorrelationsWith", {"--show-correlations-with"}, "Show all correlation coefficients of a given par wrt others", -1);
+  clParser.addOption("outFolder", {"-o", "--out-folder"}, "Set output folder where files will be writen", 1);
 
   clParser.addDummyOption("Triggers");
   clParser.addTriggerOption("dryRun", {"-d", "--dry-run"}, "Don't write files on disk");
@@ -192,7 +193,7 @@ int main(int argc, char** argv){
       continue;
     }
     auto outDir{GenericToolbox::joinPath(
-        GenericToolbox::getFolderPathFromFilePath(file),
+        (clParser.isOptionTriggered("outFolder") ? clParser.getOptionVal<std::string>("outFolder"): GenericToolbox::getFolderPathFromFilePath(file)),
         GenericToolbox::getFileNameFromFilePath(file, false)
     )};
     LogWarning << "Will now write data in sub-folder: " << outDir << std::endl;
