@@ -6,6 +6,7 @@
 #include "ConfigUtils.h"
 #include "GlobalVariables.h"
 #include "GundamGreetings.h"
+#include "GundamUtils.h"
 
 #include "CmdLineParser.h"
 #include "Logger.h"
@@ -79,7 +80,6 @@ int main(int argc, char** argv){
 
 
   LogThrowIf( clParser.getNbValueSet("fitFiles") == 0, "no fit files provided" );
-
 
 
   for( auto& file : clParser.getOptionValList<std::string>("fitFiles") ){
@@ -160,7 +160,9 @@ int main(int argc, char** argv){
       LogScopeIndent;
 
       readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPreFit, "llhState_TNamed"), [&](TNamed* injectorStr){
-        LogInfo << blueLightText << "Pre-fit Likelihood state: " << resetColor << injectorStr->GetTitle() << std::endl;
+        if( clParser.isOptionTriggered("verbose") ){
+          LogInfo << blueLightText << "Pre-fit Likelihood state: " << resetColor << injectorStr->GetTitle() << std::endl;
+        }
         if( not clParser.isOptionTriggered("dryRun") ){
           auto outSubDir{GenericToolbox::joinPath( outDir, pathPreFit)};
           if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
@@ -193,6 +195,18 @@ int main(int argc, char** argv){
       LogInfo << cyanLightText << "Reading inside: " << pathPostFit << resetColor << std::endl;
       LogScopeIndent;
 
+      std::string minimizationAlgo{};
+      readObject<TTree>(f.get(), GenericToolbox::joinPath(pathPostFit, "bestFitStats"), [&](TTree* tree){
+        tree->GetEntry(0);
+
+        bool converged{tree->GetLeaf("fitConverged")->GetValue() == 1};
+        LogInfo << (converged? greenLightText: redLightText) << "Did the fit converge? " << (converged ? "yes": "no") << resetColor << std::endl;
+
+        int statusCode{int(tree->GetLeaf("fitStatusCode")->GetValue())};
+        LogInfo << blueLightText << "Fit status code: " << resetColor;
+        LogInfo << ( GenericToolbox::doesKeyIsInMap( statusCode, GundamUtils::minuitStatusCodeStr ) ? GundamUtils::minuitStatusCodeStr.at(statusCode) : std::to_string(statusCode) );
+        LogInfo << std::endl;
+      });
       readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPostFit, "llhState_TNamed"), [&](TNamed* injectorStr){
         LogInfo << blueLightText << "Post-fit Likelihood state: " << resetColor << injectorStr->GetTitle() << std::endl;
         if( not clParser.isOptionTriggered("dryRun") ){

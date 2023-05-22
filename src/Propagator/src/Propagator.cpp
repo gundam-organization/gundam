@@ -772,12 +772,8 @@ void Propagator::reweightMcEvents() {
 #endif
   if( not usedGPU ){
     GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-    if( not _devSingleThreadReweight_ ){
-      GlobalVariables::getParallelWorker().runJob("Propagator::reweightMcEvents");
-    }
-    else{
-      this->reweightMcEvents(-1);
-    }
+    if( not _devSingleThreadReweight_ ){ GlobalVariables::getParallelWorker().runJob("Propagator::reweightMcEvents"); }
+    else{ this->reweightMcEvents(-1); }
   }
   weightProp.counts++;
   weightProp.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);

@@ -38,6 +38,15 @@ void MinimizerBase::readConfigImpl(){
     getConvergenceMonitor().setMaxRefreshRateInMs(monitorRefreshRateInMs);
   }
 
+  if( GenericToolbox::Json::doKeyExist( _config_, "monitorGradientDescent" ) ){
+    getLikelihood().setMonitorGradientDescent(GenericToolbox::Json::fetchValue<bool>( _config_, "monitorGradientDescent" ));
+  }
+  else if( GenericToolbox::toLowerCase(getLikelihood().getMinimizerType()) == "minuit"
+        or GenericToolbox::toLowerCase(getLikelihood().getMinimizerType()) == "minuit2"
+  ){
+    getLikelihood().setMonitorGradientDescent( true );
+  }
+
 }
 
 void MinimizerBase::initializeImpl(){

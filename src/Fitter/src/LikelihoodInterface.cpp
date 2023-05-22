@@ -8,6 +8,7 @@
 
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
+#include "GenericToolbox.ScopedGuard.h"
 #include "Logger.h"
 
 #include <limits>
@@ -74,7 +75,28 @@ void LikelihoodInterface::initialize() {
 }
 
 void LikelihoodInterface::saveChi2History() {
+  LogInfo << "Saving LLH history..." << std::endl;
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "fit"), _chi2HistoryTree_.get());
+}
+void LikelihoodInterface::saveGradientSteps(){
+  LogInfo << "Saving " << _gradientDescentParStateList_.size() << " gradient steps..." << std::endl;
+
+  // make sure the parameter states get restored as we leave
+  nlohmann::json currentParState{};
+  GenericToolbox::ScopedGuard g{
+    [&](){ currentParState = _owner_->getPropagator().exportParameterInjectorConfig(); },
+    [&](){ _owner_->getPropagator().injectParameterValues( currentParState ); }
+  };
+
+  for( size_t iGradStep = 0 ; iGradStep < _gradientDescentParStateList_.size() ; iGradStep++ ){
+    _owner_->getPropagator().injectParameterValues( _gradientDescentParStateList_[iGradStep] );
+    _owner_->getPropagator().updateLlhCache();
+
+    auto outDir = GenericToolbox::mkdirTFile(_owner_->getSaveDir(), Form("fit/gradient/step_%i", int(iGradStep)));
+    GenericToolbox::writeInTFile( outDir, TNamed("parState", GenericToolbox::Json::toReadableString(_gradientDescentParStateList_[iGradStep]).c_str()) );
+    GenericToolbox::writeInTFile( outDir, TNamed("llhState", _owner_->getPropagator().getLlhBufferSummary().c_str()) );
+  }
+
 }
 
 double LikelihoodInterface::evalFit(const double* parArray_){
@@ -98,7 +120,21 @@ double LikelihoodInterface::evalFit(const double* parArray_){
 
   _evalFitAvgTimer_.counts++; _evalFitAvgTimer_.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 
+  // check if minuit is moving toward the minimum
+  bool isGradientDescentStep = std::all_of(_minimizerFitParameterPtr_.begin(), _minimizerFitParameterPtr_.end(), [](const FitParameter* par_){
+    return ( par_->gotUpdated() or par_->isFixed() or not par_->isEnabled() );
+  } );
+
+  if( isGradientDescentStep ){
+    // saving each step of the gradient descent
+    _gradientDescentParStateList_.emplace_back( _owner_->getPropagator().exportParameterInjectorConfig() );
+  }
+
+
   if(_enableFitMonitor_ && _convergenceMonitor_.isGenerateMonitorStringOk()){
+
+    _itSpeedMon_.cycle( _nbFitCalls_ - _itSpeedMon_.getCounts() );
+
     if( _itSpeed_.counts != 0 ){
       _itSpeed_.counts = _nbFitCalls_ - _itSpeed_.counts; // how many cycles since last print
       _itSpeed_.cumulated = GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("itSpeed"); // time since last print
@@ -127,7 +163,8 @@ double LikelihoodInterface::evalFit(const double* parArray_){
     t << _minimizerType_ << "/" << _minimizerAlgo_ << GenericToolbox::TablePrinter::NextLine;
 
     t << "Speed" << GenericToolbox::TablePrinter::NextColumn;
-    t << (double)_itSpeed_.counts / (double)_itSpeed_.cumulated * 1E6 << " it/s" << GenericToolbox::TablePrinter::NextColumn;
+    t << _itSpeedMon_ << GenericToolbox::TablePrinter::NextColumn;
+//    t << (double)_itSpeed_.counts / (double)_itSpeed_.cumulated * 1E6 << " it/s" << GenericToolbox::TablePrinter::NextColumn;
     t << _owner_->getPropagator().weightProp << GenericToolbox::TablePrinter::NextColumn;
     t << _owner_->getPropagator().fillProp << GenericToolbox::TablePrinter::NextColumn;
     t << _outEvalFitAvgTimer_ << GenericToolbox::TablePrinter::NextLine;

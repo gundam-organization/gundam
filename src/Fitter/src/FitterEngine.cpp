@@ -190,6 +190,29 @@ void FitterEngine::initializeImpl(){
       GenericToolbox::writeInTFile( outDir, TNamed( "min", std::to_string( par.getMinValue() ).c_str() ) );
       GenericToolbox::writeInTFile( outDir, TNamed( "max", std::to_string( par.getMaxValue() ).c_str() ) );
     }
+
+    if( parSet.isUseEigenDecompInFit() ){
+      auto eigenSaveFolder = GenericToolbox::joinPath( saveFolder, "eigen" );
+      for( auto& eigen : parSet.getEigenParameterList() ){
+        auto eigenFolder = GenericToolbox::joinPath(eigenSaveFolder, GenericToolbox::generateCleanBranchName(eigen.getTitle()));
+        auto outDir = GenericToolbox::mkdirTFile( _saveDir_, eigenFolder );
+
+        GenericToolbox::writeInTFile( outDir, TNamed( "title", eigen.getTitle().c_str() ) );
+        GenericToolbox::writeInTFile( outDir, TNamed( "fullTitle", eigen.getFullTitle().c_str() ) );
+        GenericToolbox::writeInTFile( outDir, TNamed( "name", eigen.getName().c_str() ) );
+        GenericToolbox::writeInTFile( outDir, TNamed( "isEnabled", std::to_string( eigen.isEnabled() ).c_str() ) );
+        GenericToolbox::writeInTFile( outDir, TNamed( "index", std::to_string( eigen.getParameterIndex() ).c_str() ) );
+        GenericToolbox::writeInTFile( outDir, TNamed( "prior", std::to_string( eigen.getPriorValue() ).c_str() ) );
+        GenericToolbox::writeInTFile( outDir, TNamed( "stdDev", std::to_string( eigen.getStdDevValue() ).c_str() ) );
+        GenericToolbox::writeInTFile( outDir, TNamed( "priorType", std::to_string( eigen.getPriorType() ).c_str() ) );
+        GenericToolbox::writeInTFile( outDir, TNamed( "min", std::to_string( eigen.getMinValue() ).c_str() ) );
+        GenericToolbox::writeInTFile( outDir, TNamed( "max", std::to_string( eigen.getMaxValue() ).c_str() ) );
+      }
+    }
+  }
+
+  if( dynamic_cast<const MinimizerInterface*>( &this->getMinimizer() ) ){
+    dynamic_cast<const MinimizerInterface*>( &this->getMinimizer() )->saveMinimizerSettings( GenericToolbox::mkdirTFile(_saveDir_, "fit/minimizer" ) );
   }
 
   this->_propagator_.updateLlhCache();

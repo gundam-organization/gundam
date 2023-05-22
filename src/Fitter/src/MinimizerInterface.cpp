@@ -7,6 +7,7 @@
 #include "FitterEngine.h"
 #include "GenericToolbox.Json.h"
 #include "GlobalVariables.h"
+#include "GundamUtils.h"
 
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
@@ -188,9 +189,9 @@ void MinimizerInterface::minimize(){
 
   LogInfo << getConvergenceMonitor().generateMonitorString(); // lasting printout
   LogInfo << "Minimization ended after " << nbMinimizeCalls << " calls." << std::endl;
-  if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogWarning << "Status code: " << this->minuitStatusCodeStr.at(_minimizer_->Status()) << std::endl;
+  if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogWarning << "Status code: " << GundamUtils::minuitStatusCodeStr.at(_minimizer_->Status()) << std::endl;
   else LogWarning << "Status code: " << _minimizer_->Status() << std::endl;
-  if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogWarning << "Covariance matrix status code: " << this->covMatrixStatusCodeStr.at(_minimizer_->CovMatrixStatus()) << std::endl;
+  if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogWarning << "Covariance matrix status code: " << GundamUtils::covMatrixStatusCodeStr.at(_minimizer_->CovMatrixStatus()) << std::endl;
   else LogWarning << "Covariance matrix status code: " << _minimizer_->CovMatrixStatus() << std::endl;
 
   // Make sure we are on the right spot
@@ -204,6 +205,8 @@ void MinimizerInterface::minimize(){
   );
 
   getLikelihood().saveChi2History();
+
+  if( getLikelihood().isMonitorGradientDescent() ){ getLikelihood().saveGradientSteps(); }
 
   if( _fitHasConverged_ ){ LogInfo << "Minimization has converged!" << std::endl; }
   else{ LogError << "Minimization did not converged." << std::endl; }
@@ -323,7 +326,7 @@ void MinimizerInterface::calcErrors(){
       getLikelihood().disableFitMonitor();
 
 #if ROOT_VERSION_CODE >= ROOT_VERSION(6,23,02)
-      LogWarning << minosStatusCodeStr.at(_minimizer_->MinosStatus()) << std::endl;
+      LogWarning << GundamUtils::minosStatusCodeStr.at(_minimizer_->MinosStatus()) << std::endl;
 #endif
       if( isOk ){
         LogInfo << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh << std::endl;
@@ -372,8 +375,8 @@ void MinimizerInterface::calcErrors(){
     getLikelihood().disableFitMonitor();
 
     LogInfo << "Hesse ended after " << getLikelihood().getNbFitCalls() - nbFitCallOffset << " calls." << std::endl;
-    LogWarning << "HESSE status code: " << hesseStatusCodeStr.at(_minimizer_->Status()) << std::endl;
-    LogWarning << "Covariance matrix status code: " << covMatrixStatusCodeStr.at(_minimizer_->CovMatrixStatus()) << std::endl;
+    LogWarning << "HESSE status code: " << GundamUtils::hesseStatusCodeStr.at(_minimizer_->Status()) << std::endl;
+    LogWarning << "Covariance matrix status code: " << GundamUtils::covMatrixStatusCodeStr.at(_minimizer_->CovMatrixStatus()) << std::endl;
 
     // Make sure we are on the right spot
     updateCacheToBestfitPoint();

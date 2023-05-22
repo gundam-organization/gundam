@@ -24,12 +24,12 @@ LoggerInit([]{
 int main( int argc, char** argv ){
 
   GundamGreetings g;
-  g.setAppName("config unfolder tool");
+  g.setAppName("config unfold tool");
   g.hello();
 
   CmdLineParser clp(argc, argv);
   clp.addOption("config-file", {"-c"}, "Provide YAML/Json configuration file.", 1);
-  clp.addOption("output-file-path", {"-o"}, "Set output file name.", 1);
+  clp.addOption("output-file", {"-o"}, "Set output file name.", 1);
   clp.addOption("overrideFiles", {"-of", "--override-files"}, "Provide config files that will override keys", -1);
 
   LogInfo << "Available options: " << std::endl;
@@ -49,8 +49,8 @@ int main( int argc, char** argv ){
   configHandler.override( clp.getOptionValList<std::string>("overrideFiles") );
 
   // Export
-  if( clp.isOptionTriggered("output-file-path") ){
-    configHandler.exportToJsonFile( clp.getOptionVal<std::string>("output-file-path") );
+  if( clp.isOptionTriggered("output-file") ){
+    configHandler.exportToJsonFile( clp.getOptionVal<std::string>("output-file") );
   }
   else{
     std::cout << configHandler.toString() << std::endl;
