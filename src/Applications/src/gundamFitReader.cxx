@@ -88,9 +88,16 @@ int main(int argc, char** argv){
     LogScopeIndent;
 
     auto outDir{GenericToolbox::joinPath(
-        (clParser.isOptionTriggered("outFolder") ? clParser.getOptionVal<std::string>("outFolder"): GenericToolbox::getFolderPathFromFilePath(file)),
+        (clParser.isOptionTriggered("outFolder") ?
+          clParser.getOptionVal<std::string>("outFolder"):
+          GenericToolbox::getFolderPathFromFilePath(file).empty() ? "./" : GenericToolbox::getFolderPathFromFilePath(file)
+        ),
         GenericToolbox::getFileNameFromFilePath(file, false)
     )};
+
+    LogDebug << GET_VAR_NAME_VALUE(GenericToolbox::getFolderPathFromFilePath(file)) << std::endl;
+    LogDebug << GET_VAR_NAME_VALUE(GenericToolbox::getFileNameFromFilePath(file, false)) << std::endl;
+
     if( not clParser.isOptionTriggered("dryRun") ){
       LogWarning << "Output files will be writen under: " << outDir << std::endl;
     }
