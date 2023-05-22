@@ -12,6 +12,7 @@
 #include "Logger.h"
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
+#include "GenericToolbox.TablePrinter.h"
 
 #include <TMatrixDEigen.h>
 
@@ -31,9 +32,9 @@ bool quiet{false};
 
 
 // template function that handles every case when the requested TObject isn't found.
-template<typename T> bool readObject( TFile* f_, const std::vector<std::string>& objPathList_, const std::function<void(T*)>& action_ = [](T*){} );
-template<typename T> bool readObject( TFile* f_, const std::string& objPath_, const std::function<void(T*)>& action_ = [](T*){} ){ return readObject(f_, std::vector<std::string>{objPath_}, action_); }
-bool readObject( TFile* f_, const std::string& objPath_){ return readObject<TObject>(f_, objPath_); }
+template<typename T> bool readObject( TDirectory* f_, const std::vector<std::string>& objPathList_, const std::function<void(T*)>& action_ = [](T*){} );
+template<typename T> bool readObject( TDirectory* f_, const std::string& objPath_, const std::function<void(T*)>& action_ = [](T*){} ){ return readObject(f_, std::vector<std::string>{objPath_}, action_); }
+bool readObject( TDirectory* f_, const std::string& objPath_){ return readObject<TObject>(f_, objPath_); }
 void readMatrix( const std::string& title_, TMatrixD* matrix_ );
 
 
@@ -251,22 +252,51 @@ int main(int argc, char** argv){
     }
 
     if( clParser.isOptionTriggered("showCorrelationsWith") ){
-      auto pathPropagator{GenericToolbox::joinPath("FitterEngine", "propagator")};
+      LogInfo << "Looking for strongest correlations with " << clParser.getOptionVal<std::string>("showCorrelationsWith", 0) << std::endl;
+      auto pathPostFit{"FitterEngine/postFit"};
 
+      readObject<TDirectory>( f.get(), pathPostFit, [&](TDirectory* postFitDir_){
+        readObject<TDirectory>( postFitDir_, {{"Hesse"}, {"Migrad"}}, [&](TDirectory* hesseDir_){
+          readObject<TH2D>( hesseDir_, "hessian/postfitCorrelationOriginal_TH2D", [&](TH2D* cor_){
 
-      for( auto& parFullTitle : clParser.getOptionValList<std::string>("showCorrelationsWith") ){
-        LogInfo << "Looking for \"" << parFullTitle << "\"..." << std::endl;
-        bool isFound{false};
-        bool isDisabled{false};
-        for( auto& parSetDir : GenericToolbox::lsSubDirTDirectory( f->Get<TDirectory>(pathPropagator.c_str()) ) ){
+            // clParser.getOptionVal<std::string>("showCorrelationsWith", 0)
+            int selectedParIndex{-1};
+            for( int iPar = 1 ; iPar <= cor_->GetNbinsX() ; iPar++ ){
+              if( cor_->GetXaxis()->GetBinLabel(iPar) == clParser.getOptionVal<std::string>("showCorrelationsWith", 0) ){
+                selectedParIndex = iPar;
+                break;
+              }
+            }
 
-//          for( auto& parEntry :  ){
-//
-//          }
+            if( selectedParIndex == -1 ){
+              LogError << "Could not find selected parameter" << std::endl;
+              return;
+            }
 
-        }
-        LogThrowIf(not isFound, "Could not find parameter with name: " << parFullTitle);
-      }
+            std::vector<std::pair<std::string, double>> corrDict{};
+            corrDict.reserve(cor_->GetNbinsX()-1);
+            for( int iPar = 1 ; iPar <= cor_->GetNbinsX() ; iPar++ ){
+              corrDict.emplace_back(cor_->GetXaxis()->GetBinLabel(iPar), cor_->GetBinContent(selectedParIndex, iPar));
+            }
+
+            GenericToolbox::sortVector(corrDict, [](const std::pair<std::string, double>& a, const std::pair<std::string, double>& b){
+              return std::abs( a.second ) > std::abs( b.second );
+            });
+
+            GenericToolbox::TablePrinter t;
+            t << "Fit parameter" << GenericToolbox::TablePrinter::NextColumn;
+            t << "Correlation" << GenericToolbox::TablePrinter::NextLine;
+
+            for( auto& corrEntry : corrDict ){
+              t << corrEntry.first << GenericToolbox::TablePrinter::NextColumn;
+              t << corrEntry.second * 100 << " %" << GenericToolbox::TablePrinter::NextLine;
+            }
+
+            t.printTable();
+
+          });
+        });
+      });
 
     }
 
@@ -282,7 +312,7 @@ int main(int argc, char** argv){
   return EXIT_SUCCESS;
 }
 
-template<typename T> bool readObject( TFile* f_, const std::vector<std::string>& objPathList_, const std::function<void(T*)>& action_ ){
+template<typename T> bool readObject( TDirectory* f_, const std::vector<std::string>& objPathList_, const std::function<void(T*)>& action_ ){
   T* obj;
   for( auto& objPath : objPathList_ ){
     obj = f_->Get<T>(objPath.c_str());
