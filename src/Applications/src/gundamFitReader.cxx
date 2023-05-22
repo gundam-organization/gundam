@@ -234,8 +234,25 @@ int main(int argc, char** argv){
     } while( false ); // allows to skip if not found
 
     /// Multiple entries
+    if( clParser.isOptionTriggered("showParList") ){
+      LogInfo << cyanLightText << "Listing defined parameters:" << resetColor << std::endl;
+
+      std::string pathPropagator{"FitterEngine/propagator"};
+      for( auto& parSetDir : GenericToolbox::lsSubDirTDirectory( f->Get<TDirectory>(pathPropagator.c_str()) ) ){
+        auto parSetPath = GenericToolbox::joinPath( pathPropagator, parSetDir, "parameters" );
+        for( auto& parEntry : GenericToolbox::lsSubDirTDirectory( f->Get<TDirectory>(parSetPath.c_str()) ) ){
+          LogScopeIndent;
+          readObject<TNamed>( f.get(), GenericToolbox::joinPath( parSetPath, parEntry, "fullTitle_TNamed" ), [&](TNamed* obj){
+            LogInfo << obj->GetTitle() << std::endl;
+          });
+        }
+      }
+
+    }
+
     if( clParser.isOptionTriggered("showCorrelationsWith") ){
       auto pathPropagator{GenericToolbox::joinPath("FitterEngine", "propagator")};
+
 
       for( auto& parFullTitle : clParser.getOptionValList<std::string>("showCorrelationsWith") ){
         LogInfo << "Looking for \"" << parFullTitle << "\"..." << std::endl;
@@ -253,6 +270,7 @@ int main(int argc, char** argv){
 
     }
 
+    LogInfo << "Closing " << f->GetPath() << std::endl;
     f->Close();
   }
 

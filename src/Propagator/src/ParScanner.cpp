@@ -20,6 +20,8 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[ParScanner]");
 });
 
+void ParScanner::muteLogger(){ Logger::setIsMuted(true); }
+void ParScanner::unmuteLogger(){ Logger::setIsMuted(false); }
 
 ParScanner::ParScanner(Propagator* owner_): _owner_(owner_) {}
 
@@ -297,9 +299,7 @@ void ParScanner::scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, c
 
   LogInfo << "Scanning along the line..." << std::endl;
   for( int iStep = 0 ; iStep < nTotalSteps ; iStep++ ){
-    if( not Logger::isMuted() ){
-      GenericToolbox::displayProgressBar(iStep, nTotalSteps-1, ss.str());
-    }
+    if( not Logger::isMuted() ){ GenericToolbox::displayProgressBar(iStep, nTotalSteps-1, ss.str()); }
 
     for( size_t iPar = 0 ; iPar < startPointParValList.size() ; iPar++ ){
       auto* par = startPointParValList[iPar].first;
@@ -544,10 +544,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
   }
 }
 
-void ParScanner::muteLogger(){ Logger::setIsMuted(true); }
-void ParScanner::unmuteLogger(){ Logger::setIsMuted(false); }
-
-
+// statics
 void ParScanner::writeGraphEntry(GraphEntry& entry_, TDirectory* saveDir_){
   entry_.graph.SetTitle(entry_.scanDataPtr->title.c_str());
   entry_.graph.GetYaxis()->SetTitle(entry_.scanDataPtr->yTitle.c_str());
