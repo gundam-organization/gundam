@@ -261,6 +261,12 @@ void FitterEngine::setAllParamVariationsSigmas(const std::vector<double> &allPar
 }
 
 // Getters
+const nlohmann::json &FitterEngine::getPreFitParState() const {
+  return _preFitParState_;
+}
+const nlohmann::json &FitterEngine::getPostFitParState() const {
+  return _postFitParState_;
+}
 const Propagator& FitterEngine::getPropagator() const {
   return _propagator_;
 }
@@ -270,6 +276,8 @@ const MinimizerBase& FitterEngine::getMinimizer() const {
 const LikelihoodInterface& FitterEngine::getLikelihood() const {
   return _likelihood_;
 }
+
+// non-const getters
 Propagator& FitterEngine::getPropagator() {
   return _propagator_;
 }

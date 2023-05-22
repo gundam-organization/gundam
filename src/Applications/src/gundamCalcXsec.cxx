@@ -125,6 +125,8 @@ int main(int argc, char** argv){
 
   // Get config from the fit
   auto configFit = GenericToolbox::Json::readConfigJsonStr(configStr); // works with yaml
+  if( configFit.is_array() ){ configFit = configFit[0]; } // hot fix for bad version of JSON lib
+
 //  auto configPropagator = GenericToolbox::Json::fetchValuePath<nlohmann::json>( configFit, "fitterEngineConfig/propagatorConfig" );
   auto configPropagator = GenericToolbox::Json::fetchValue<nlohmann::json>(GenericToolbox::Json::fetchValue<nlohmann::json>(configFit, "fitterEngineConfig"), "propagatorConfig");
 

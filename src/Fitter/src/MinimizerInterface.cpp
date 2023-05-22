@@ -205,7 +205,6 @@ void MinimizerInterface::minimize(){
   );
 
   getLikelihood().saveChi2History();
-
   if( getLikelihood().isMonitorGradientDescent() ){ getLikelihood().saveGradientSteps(); }
 
   if( _fitHasConverged_ ){ LogInfo << "Minimization has converged!" << std::endl; }

@@ -9,11 +9,26 @@
 #include "FitParameter.h"
 
 #include "TDirectory.h"
+#include "TGraph.h"
 #include "nlohmann/json.hpp"
 
 #include "utility"
 
 class Propagator;
+
+struct ScanData{
+  std::string folder{};
+  std::string title{};
+  std::string yTitle{};
+  std::vector<double> yPoints{};
+  std::function<double()> evalY{};
+};
+
+struct GraphEntry{
+  ScanData* scanDataPtr{nullptr};
+  FitParameter* fitParPtr{nullptr};
+  TGraph graph{};
+};
 
 class ParScanner : public JsonBaseClass {
 
@@ -30,13 +45,19 @@ public:
   [[nodiscard]] int getNbPoints() const;
   [[nodiscard]] const std::pair<double, double> &getParameterSigmaRange() const;
   [[nodiscard]] const nlohmann::json &getVarsConfig() const { return _varsConfig_; };
+  [[nodiscard]] const std::vector<GraphEntry> &getGraphEntriesBuf() const { return _graphEntriesBuf_; };
 
   // Core
   void scanFitParameters(std::vector<FitParameter>& par_, TDirectory* saveDir_);
   void scanFitParameter(FitParameter& par_, TDirectory* saveDir_);
-  void scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, const nlohmann::json &start_ = nlohmann::json());
+  void scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, const nlohmann::json &start_ = nlohmann::json(), int nSteps_=-1);
   void generateOneSigmaPlots(TDirectory* saveDir_);
   void varyEvenRates(const std::vector<double>& paramVariationList_, TDirectory* saveDir_);
+
+  static void muteLogger();
+  static void unmuteLogger();
+
+  static void writeGraphEntry(GraphEntry& entry_, TDirectory* saveDir_);
 
 
 protected:
@@ -53,18 +74,9 @@ private:
 
   // Internals
   Propagator* _owner_{nullptr};
-  struct ScanData{
-    std::string folder{};
-    std::string title{};
-    std::string yTitle{};
-    std::vector<double> yPoints{};
-    std::function<double()> evalY{};
 
-    void reset(){
-
-    }
-  };
   std::vector<ScanData> _scanDataDict_;
+  std::vector<GraphEntry> _graphEntriesBuf_;
 
 
 };

@@ -184,13 +184,15 @@ private:
   GenericToolbox::CycleTimer _evalFitAvgTimer_;
   GenericToolbox::CycleTimer _outEvalFitAvgTimer_;
   GenericToolbox::CycleTimer _itSpeed_;
-  GenericToolbox::CycleClock _itSpeedMon_;
+  GenericToolbox::CycleClock _itSpeedMon_{"it"};
 
   /// Parameters to control how the monitor behaves.
   bool _monitorGradientDescent_{true};
   bool _enableFitMonitor_{false};
   bool _showParametersOnFitMonitor_{false};
   int _maxNbParametersPerLineOnMonitor_{15};
+
+  int _lastGradientFall_{-2};
 };
 
 #endif //  GUNDAM_LikelihoodInterface_h

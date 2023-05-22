@@ -45,6 +45,8 @@ public:
   void setThrowGain(double throwGain_){ _throwGain_ = throwGain_; }
 
   // Getters (const)
+  const nlohmann::json &getPreFitParState() const;
+  const nlohmann::json &getPostFitParState() const;
   [[nodiscard]] const Propagator& getPropagator() const;
   [[nodiscard]] const MinimizerBase& getMinimizer() const;
   [[nodiscard]] const LikelihoodInterface& getLikelihood() const;
