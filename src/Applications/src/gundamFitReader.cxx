@@ -244,7 +244,13 @@ int main(int argc, char** argv){
         for( auto& parEntry : GenericToolbox::lsSubDirTDirectory( f->Get<TDirectory>(parSetPath.c_str()) ) ){
           LogScopeIndent;
           readObject<TNamed>( f.get(), GenericToolbox::joinPath( parSetPath, parEntry, "fullTitle_TNamed" ), [&](TNamed* obj){
-            LogInfo << obj->GetTitle() << std::endl;
+            bool isEnabled{false};
+            readObject<TNamed>( f.get(), GenericToolbox::joinPath( parSetPath, parEntry, "isEnabled_TNamed" ), [&](TNamed* obj){
+              isEnabled = GenericToolbox::toBool(obj->GetTitle());
+            });
+            if( isEnabled ){
+              LogInfo << obj->GetTitle() << std::endl;
+            }
           });
         }
       }
