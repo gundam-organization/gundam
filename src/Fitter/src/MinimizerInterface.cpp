@@ -348,8 +348,8 @@ void MinimizerInterface::calcErrors(){
       LogWarning << "Restoring step size before HESSE..." << std::endl;
       for( int iFitPar = 0 ; iFitPar < _minimizer_->NDim() ; iFitPar++ ){
         auto& par = *getMinimizerFitParameterPtr()[iFitPar];
-        if(not getLikelihood().getUseNormalizedFitSpace()){ _minimizer_->SetVariableStepSize(iFitPar, par.getStepSize()); }
-        else{ _minimizer_->SetVariableStepSize(iFitPar, FitParameterSet::toNormalizedParRange(par.getStepSize(), par)); } // should be 1
+        if(not getLikelihood().getUseNormalizedFitSpace()){ _minimizer_->SetVariableStepSize(iFitPar, par.getStepSize()*_stepSizeScaling_); }
+        else{ _minimizer_->SetVariableStepSize(iFitPar, FitParameterSet::toNormalizedParRange(par.getStepSize()*_stepSizeScaling_, par)); } // should be 1
       }
     }
 
