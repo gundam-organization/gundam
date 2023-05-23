@@ -172,7 +172,9 @@ namespace ConfigUtils {
             if( identifier == "__INDEX__" ){
               if( overrideListEntry.value()[identifier].get<int>() == -1 ){
                 // add entry
-                LogAlert << "Adding: " << GenericToolbox::joinPath(jsonPath, outEntry_.size()) << std::endl;
+                LogAlert << "Adding: " << GenericToolbox::joinPath(jsonPath, outEntry_.size());
+                if( overrideListEntry.value().is_primitive() ){ LogAlert << " -> " << overrideListEntry.value(); }
+                LogAlert << std::endl;
                 outEntry_.emplace_back(overrideListEntry.value());
               }
               else if( overrideListEntry.value()[identifier].get<size_t>() < outEntry_.size() ){
@@ -216,7 +218,9 @@ namespace ConfigUtils {
           if( not GenericToolbox::Json::doKeyExist(outEntry_, overrideEntry.key()) ){
             if( overrideEntry.key() != "__INDEX__" ){
               if( allowAddMissingKey ){
-                LogAlert << "Adding: " << GenericToolbox::joinPath(jsonPath, overrideEntry.key()) << std::endl;
+                LogAlert << "Adding: " << GenericToolbox::joinPath(jsonPath, overrideEntry.key());
+                if( overrideEntry.value().is_primitive() ){ LogAlert << " -> " << overrideEntry.value(); }
+                LogAlert << std::endl;
                 outEntry_[overrideEntry.key()] = overrideEntry.value();
               }
               else{
