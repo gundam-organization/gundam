@@ -177,7 +177,12 @@ private:
 
   /// A tree that save the history of the minimization.
   std::unique_ptr<TTree> _chi2HistoryTree_{nullptr};
-  std::vector<nlohmann::json> _gradientDescentParStateList_{};
+
+  struct GradientStepPoint {
+    nlohmann::json parState;
+    double llh;
+  };
+  std::vector<GradientStepPoint> _gradientMonitor_{};
 
   // Output monitors!
   GenericToolbox::VariablesMonitor _convergenceMonitor_;

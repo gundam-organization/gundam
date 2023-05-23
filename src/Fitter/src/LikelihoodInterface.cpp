@@ -80,7 +80,7 @@ void LikelihoodInterface::saveChi2History() {
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "fit"), _chi2HistoryTree_.get());
 }
 void LikelihoodInterface::saveGradientSteps(){
-  LogInfo << "Saving " << _gradientDescentParStateList_.size() << " gradient steps..." << std::endl;
+  LogInfo << "Saving " << _gradientMonitor_.size() << " gradient steps..." << std::endl;
 
 
   // make sure the parameter states get restored as we leave
@@ -103,22 +103,22 @@ void LikelihoodInterface::saveGradientSteps(){
   _owner_->getPropagator().updateLlhCache();
 
   std::vector<GraphEntry> globalGraphList;
-  for( size_t iGradStep = 0 ; iGradStep < _gradientDescentParStateList_.size() ; iGradStep++ ){
+  for(size_t iGradStep = 0 ; iGradStep < _gradientMonitor_.size() ; iGradStep++ ){
     FitParameterSet::muteLogger(); Propagator::muteLogger();
-    _owner_->getPropagator().injectParameterValues( _gradientDescentParStateList_[iGradStep] );
+    _owner_->getPropagator().injectParameterValues(_gradientMonitor_[iGradStep].parState );
     _owner_->getPropagator().updateLlhCache();
 
     auto outDir = GenericToolbox::mkdirTFile(_owner_->getSaveDir(), Form("fit/gradient/step_%i", int(iGradStep)));
-    GenericToolbox::writeInTFile( outDir, TNamed("parState", GenericToolbox::Json::toReadableString(_gradientDescentParStateList_[iGradStep]).c_str()) );
+    GenericToolbox::writeInTFile( outDir, TNamed("parState", GenericToolbox::Json::toReadableString(_gradientMonitor_[iGradStep].parState).c_str()) );
     GenericToolbox::writeInTFile( outDir, TNamed("llhState", _owner_->getPropagator().getLlhBufferSummary().c_str()) );
 
 
     // line scan from previous point
     _owner_->getPropagator().getParScanner().scanSegment(
         GenericToolbox::mkdirTFile(outDir, "lineScan"),
-        _gradientDescentParStateList_[iGradStep], lastParStep, 10
+        _gradientMonitor_[iGradStep].parState, lastParStep, 10
         );
-    lastParStep = _gradientDescentParStateList_[iGradStep];
+    lastParStep = _gradientMonitor_[iGradStep].parState;
     GenericToolbox::triggerTFileWrite(outDir);
 
     if( globalGraphList.empty() ){
@@ -176,14 +176,21 @@ double LikelihoodInterface::evalFit(const double* parArray_){
 
   if( isGradientDescentStep ){
     if( _lastGradientFall_ == _nbFitCalls_-1 ){
-      LogWarning << "Overriding last gradient descent entry..." << std::endl;
-      _gradientDescentParStateList_.back() = _owner_->getPropagator().exportParameterInjectorConfig();
+      LogWarning << "Overriding last gradient descent entry: ";
+      LogWarning(_gradientMonitor_.size() >= 2) << _gradientMonitor_[_gradientMonitor_.size() - 2].llh << " -> ";
+      LogWarning << _owner_->getPropagator().getLlhBuffer() << std::endl;
+      _gradientMonitor_.back().parState = _owner_->getPropagator().exportParameterInjectorConfig();
+      _gradientMonitor_.back().llh = _owner_->getPropagator().getLlhBuffer();
       _lastGradientFall_ = _nbFitCalls_;
     }
     else{
-      // saving each step of the gradient descent
-      LogWarning << "Gradient step detected at iteration #" << _nbFitCalls_ << ". Saving new parameters state..." << std::endl;
-      _gradientDescentParStateList_.emplace_back( _owner_->getPropagator().exportParameterInjectorConfig() );
+      // saving each step of the gradient descen
+      _gradientMonitor_.emplace_back();
+      LogWarning << "Gradient step detected at iteration #" << _nbFitCalls_ << ": " << std::endl;
+      LogWarning(_gradientMonitor_.size() >= 2) << _gradientMonitor_[_gradientMonitor_.size() - 2].llh << " -> ";
+      LogWarning << _owner_->getPropagator().getLlhBuffer() << std::endl;
+      _gradientMonitor_.back().parState = _owner_->getPropagator().exportParameterInjectorConfig();
+      _gradientMonitor_.back().llh = _owner_->getPropagator().getLlhBuffer();
       _lastGradientFall_ = _nbFitCalls_;
     }
   }
