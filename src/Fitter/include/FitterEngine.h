@@ -19,9 +19,9 @@
 #include "Math/Minimizer.h"
 #include "nlohmann/json.hpp"
 
-#include "string"
-#include "vector"
-#include "memory"
+#include <string>
+#include <vector>
+#include <memory>
 
 
 class FitterEngine : public JsonBaseClass {

@@ -9,8 +9,8 @@
 
 #include "TSpline.h"
 
-#include "memory"
-#include "string"
+#include <memory>
+#include <string>
 
 #ifdef USE_NEW_DIALS
 #warning Not used with new dial implementation

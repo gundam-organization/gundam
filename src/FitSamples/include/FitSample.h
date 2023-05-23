@@ -14,9 +14,9 @@
 #include <TH1D.h>
 #include <TTreeFormula.h>
 
-#include "vector"
-#include "string"
-#include "memory"
+#include <vector>
+#include <string>
+#include <memory>
 
 
 class FitSample : public JsonBaseClass {

@@ -12,10 +12,11 @@
 #include "JsonBaseClass.h"
 
 #include "GenericToolbox.h"
+
 #include "nlohmann/json.hpp"
 
-#include "string"
-#include "vector"
+#include <string>
+#include <vector>
 
 
 /// Hold a description of all of the event samples (both "data" and the

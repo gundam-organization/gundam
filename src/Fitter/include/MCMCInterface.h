@@ -15,8 +15,8 @@
 #include "TDirectory.h"
 #include "nlohmann/json.hpp"
 
-#include "memory"
-#include "vector"
+#include <memory>
+#include <vector>
 
 // Override TSimpleMCMC.H for how much output to use and where to send it.
 #define MCMC_DEBUG_LEVEL 3

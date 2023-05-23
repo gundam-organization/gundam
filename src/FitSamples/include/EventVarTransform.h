@@ -11,9 +11,9 @@
 
 #include "TFormula.h"
 
-#include "vector"
-#include "string"
-#include "memory"
+#include <vector>
+#include <string>
+#include <memory>
 
 
 class EventVarTransform : public JsonBaseClass {

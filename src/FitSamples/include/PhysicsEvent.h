@@ -23,10 +23,10 @@ class NestedDialTest; // Define for deprecated class
 #include "TTree.h"
 #include "TFormula.h"
 
-#include "vector"
-#include "string"
-#include "map"
-#include "mutex"
+#include <map>
+#include <mutex>
+#include <vector>
+#include <string>
 
 class PhysicsEvent {
 

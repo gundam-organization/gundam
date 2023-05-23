@@ -6,8 +6,10 @@
 #define GUNDAM_LIGHTGRAPH_H
 
 #include "DialBase.h"
+
 #include "TGraph.h"
-#include "vector"
+
+#include <vector>
 
 
 class LightGraph : public DialBase {

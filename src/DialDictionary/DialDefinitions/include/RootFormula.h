@@ -9,7 +9,7 @@
 
 #include "TFormula.h"
 
-#include "string"
+#include <string>
 
 
 class RootFormula : public DialBase {
