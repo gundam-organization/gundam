@@ -35,10 +35,21 @@ int main( int argc, char** argv ){
 
   clp.addOption("config-1", {"-c1"}, "Path to first config file.", 1);
   clp.addOption("config-2", {"-c2"}, "Path to second config file.", 1);
+  clp.addOption("overrides-1", {"-of1", "--override-files-1"}, "Provide config files that will override keys in config file 1", -1);
+  clp.addOption("overrides-2", {"-of2", "--override-files-2"}, "Provide config files that will override keys in config file 2", -1);
 
   clp.addTriggerOption("show-all-keys", {"-a"}, "Show all keys. (debug option)");
 
+  LogInfo << clp.getDescription().str() << std::endl;
+
+  LogInfo << "Usage: " << std::endl;
+  LogInfo << clp.getConfigSummary() << std::endl << std::endl;
+
   clp.parseCmdLine(argc, argv);
+
+  LogInfo << "Provided arguments: " << std::endl;
+  LogInfo << clp.getValueSummary() << std::endl << std::endl;
+  LogInfo << clp.dumpConfigAsJsonStr() << std::endl;
 
   if(      clp.isNoOptionTriggered()
     or not clp.isOptionTriggered("config-1")
@@ -52,6 +63,9 @@ int main( int argc, char** argv ){
   LogInfo << "Reading config..." << std::endl;
   ConfigUtils::ConfigHandler c1{clp.getOptionVal<std::string>("config-1")};
   ConfigUtils::ConfigHandler c2{clp.getOptionVal<std::string>("config-2")};
+
+  c1.override( clp.getOptionValList<std::string>("overrides-1") );
+  c2.override( clp.getOptionValList<std::string>("overrides-2") );
 
   if( GenericToolbox::doesTFileIsValid( clp.getOptionVal<std::string>("config-1") ) ){
     auto f = std::unique_ptr<TFile>( GenericToolbox::openExistingTFile( clp.getOptionVal<std::string>("config-1") ) );

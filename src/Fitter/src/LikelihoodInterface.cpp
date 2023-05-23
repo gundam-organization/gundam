@@ -82,7 +82,6 @@ void LikelihoodInterface::saveChi2History() {
 void LikelihoodInterface::saveGradientSteps(){
   LogInfo << "Saving " << _gradientMonitor_.size() << " gradient steps..." << std::endl;
 
-
   // make sure the parameter states get restored as we leave
   nlohmann::json currentParState{_owner_->getPropagator().exportParameterInjectorConfig()};
   GenericToolbox::ScopedGuard g{
@@ -111,7 +110,6 @@ void LikelihoodInterface::saveGradientSteps(){
     auto outDir = GenericToolbox::mkdirTFile(_owner_->getSaveDir(), Form("fit/gradient/step_%i", int(iGradStep)));
     GenericToolbox::writeInTFile( outDir, TNamed("parState", GenericToolbox::Json::toReadableString(_gradientMonitor_[iGradStep].parState).c_str()) );
     GenericToolbox::writeInTFile( outDir, TNamed("llhState", _owner_->getPropagator().getLlhBufferSummary().c_str()) );
-
 
     // line scan from previous point
     _owner_->getPropagator().getParScanner().scanSegment(
@@ -186,7 +184,7 @@ double LikelihoodInterface::evalFit(const double* parArray_){
     else{
       // saving each step of the gradient descen
       _gradientMonitor_.emplace_back();
-      LogWarning << "Gradient step detected at iteration #" << _nbFitCalls_ << ": " << std::endl;
+      LogWarning << "Gradient step detected at iteration #" << _nbFitCalls_ << ": ";
       LogWarning(_gradientMonitor_.size() >= 2) << _gradientMonitor_[_gradientMonitor_.size() - 2].llh << " -> ";
       LogWarning << _owner_->getPropagator().getLlhBuffer() << std::endl;
       _gradientMonitor_.back().parState = _owner_->getPropagator().exportParameterInjectorConfig();
