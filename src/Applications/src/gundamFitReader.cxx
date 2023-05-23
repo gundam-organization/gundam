@@ -95,9 +95,6 @@ int main(int argc, char** argv){
         GenericToolbox::getFileNameFromFilePath(file, false)
     )};
 
-    LogDebug << GET_VAR_NAME_VALUE(GenericToolbox::getFolderPathFromFilePath(file)) << std::endl;
-    LogDebug << GET_VAR_NAME_VALUE(GenericToolbox::getFileNameFromFilePath(file, false)) << std::endl;
-
     if( not clParser.isOptionTriggered("dryRun") ){
       LogWarning << "Output files will be writen under: " << outDir << std::endl;
     }
@@ -222,7 +219,6 @@ int main(int argc, char** argv){
           if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
           auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".txt");
           LogInfo << blueLightText << "Writing post-fit LLH stats under: " << resetColor << outConfigPath << std::endl;
-          LogInfo << injectorStr->GetTitle() << std::endl;
           GenericToolbox::dumpStringInFile( outConfigPath, injectorStr->GetTitle() );
         }
       });
