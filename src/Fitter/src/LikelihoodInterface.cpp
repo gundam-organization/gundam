@@ -35,6 +35,7 @@ void LikelihoodInterface::initialize() {
   _chi2HistoryTree_->Branch("chi2Total", (double*) _owner_->getPropagator().getLlhBufferPtr());
   _chi2HistoryTree_->Branch("chi2Stat", (double*) _owner_->getPropagator().getLlhStatBufferPtr());
   _chi2HistoryTree_->Branch("chi2Pulls", (double*) _owner_->getPropagator().getLlhPenaltyBufferPtr());
+  _chi2HistoryTree_->Branch("itSpeed", _itSpeedMon_.getCountSpeedPtr());
 
   LogWarning << "Fetching the effective number of fit parameters..." << std::endl;
   _minimizerFitParameterPtr_.clear();
