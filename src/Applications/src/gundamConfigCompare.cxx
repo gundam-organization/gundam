@@ -122,7 +122,7 @@ void compareConfigStage(const nlohmann::json& config1_, const nlohmann::json& co
                   found1 = true;
                   pathBuffer.emplace_back( "#"+std::to_string(iEntry1) + "(name:" + name1 + ")" );
                   if( iEntry1 != iEntry2 ) pathBuffer.back() += "<->" + std::to_string(iEntry2);
-                  compareConfigStage(entry1_[iEntry1], entry2_[iEntry2]);
+                  recursiveFct(entry1_[iEntry1], entry2_[iEntry2]);
                   pathBuffer.pop_back();
                   break;
                 }
@@ -151,7 +151,7 @@ void compareConfigStage(const nlohmann::json& config1_, const nlohmann::json& co
           else{
             for( int iEntry = 0 ; iEntry < std::min( entry1_.size(), entry2_.size() ) ; iEntry++ ){
               pathBuffer.emplace_back("#"+std::to_string(iEntry));
-              compareConfigStage(entry1_[iEntry], entry2_[iEntry]);
+              recursiveFct(entry1_[iEntry], entry2_[iEntry]);
               pathBuffer.pop_back();
             }
           }
@@ -178,7 +178,7 @@ void compareConfigStage(const nlohmann::json& config1_, const nlohmann::json& co
             auto content2 = GenericToolbox::Json::fetchValue<nlohmann::json>(entry2_, key);
 
             pathBuffer.emplace_back(key);
-            compareConfigStage(content1, content2);
+            recursiveFct(content1, content2);
             pathBuffer.pop_back();
           }
         }
