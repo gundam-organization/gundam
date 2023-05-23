@@ -836,7 +836,6 @@ void FitParameterSet::defineParameters(){
 
     // par is now fully identifiable.
     if( not _enableOnlyParameters_.empty() ){
-      LogInfo << "Reading enableOnlyParameters..." << std::endl;
       bool isEnabled = false;
       for( auto& enableEntry : _enableOnlyParameters_ ){
         if( GenericToolbox::Json::doKeyExist(enableEntry, "name")
@@ -855,7 +854,6 @@ void FitParameterSet::defineParameters(){
       }
     }
     if( not _disableParameters_.empty() ){
-      LogInfo << "Reading disableParameters..." << std::endl;
       bool isEnabled = true;
       for( auto& disableEntry : _disableParameters_ ){
         if( GenericToolbox::Json::doKeyExist(disableEntry, "name")

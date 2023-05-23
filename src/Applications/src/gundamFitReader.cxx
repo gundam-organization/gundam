@@ -52,7 +52,7 @@ int main(int argc, char** argv){
   // Read Command Line Args:
   // --------------------------
 
-  clParser.getDescription() << "gundamFitInfo is a program that reads in the output files of gundamFitter." << std::endl;
+  clParser.getDescription() << " > " << FILENAME << " is a program that reads in the output files of gundamFitter." << std::endl;
 
   LogInfo << clParser.getDescription().str() << std::endl;
 
