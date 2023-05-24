@@ -2,7 +2,6 @@
 // Created by Adrien Blanchet on 17/05/2023.
 //
 
-#include "VersionConfig.h"
 #include "ConfigUtils.h"
 #include "GlobalVariables.h"
 #include "GundamGreetings.h"

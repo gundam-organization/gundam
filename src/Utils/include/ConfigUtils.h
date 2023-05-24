@@ -33,14 +33,19 @@ namespace ConfigUtils {
   public:
     explicit ConfigHandler(const std::string& filePath_);
 
+    // const-getters
+    [[nodiscard]] std::string toString() const;
+    [[nodiscard]] const nlohmann::json &getConfig() const;
+
+    // non-const getters
+    nlohmann::json &getConfig();
+
     void override( const std::string& filePath_ );
     void override( const std::vector<std::string>& filesList_ );
 
     void flatOverride( const std::string& flattenEntry_ );
     void flatOverride( const std::vector<std::string>& flattenEntryList_ );
 
-    const nlohmann::json &getConfig() const;
-    std::string toString() const;
     void exportToJsonFile( const std::string& filePath_ ) const;
 
   };

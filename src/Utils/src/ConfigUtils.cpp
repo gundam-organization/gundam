@@ -133,10 +133,13 @@ namespace ConfigUtils {
     // dev options
     bool debug{false};
     bool allowAddMissingKey{true};
-    std::vector<std::string> listOfIdentifiers{{"name"}, {"__INDEX__"}}; // specific keys like "name" might help reference the lists
+
+    // specific keys like "name" might help reference the lists
+    std::vector<std::string> listOfIdentifiers{{"name"}, {"__INDEX__"}};
 
     std::vector<std::string> jsonPath{};
-    std::function<void(nlohmann::json&, const nlohmann::json&)> overrideRecursive = [&](nlohmann::json& outEntry_, const nlohmann::json& overrideEntry_){
+    std::function<void(nlohmann::json&, const nlohmann::json&)> overrideRecursive =
+        [&](nlohmann::json& outEntry_, const nlohmann::json& overrideEntry_){
       LogDebug(debug) << GET_VAR_NAME_VALUE(GenericToolbox::joinPath( jsonPath )) << std::endl;
 
       if( overrideEntry_.is_array() ){
@@ -284,6 +287,17 @@ namespace ConfigUtils {
 
   }
 
+  std::string ConfigHandler::toString() const{
+    return GenericToolbox::Json::toReadableString( config );
+  }
+  const nlohmann::json &ConfigHandler::getConfig() const {
+    return config;
+  }
+
+  nlohmann::json &ConfigHandler::getConfig(){
+    return config;
+  }
+
   void ConfigHandler::override( const std::string& filePath_ ){
     LogInfo << "Overriding config with \"" << filePath_ << "\"" << std::endl;
     LogThrowIf(not GenericToolbox::doesPathIsFile(filePath_), "Could not find " << filePath_);
@@ -325,12 +339,7 @@ namespace ConfigUtils {
     for( auto& flattenEntry : flattenEntryList_ ){ this->override( flattenEntry ); }
   }
 
-  std::string ConfigHandler::toString() const{
-    return GenericToolbox::Json::toReadableString( config );
-  }
-  const nlohmann::json &ConfigHandler::getConfig() const {
-    return config;
-  }
+
   void ConfigHandler::exportToJsonFile(const std::string &filePath_) const {
     auto outPath{filePath_};
 
@@ -343,6 +352,7 @@ namespace ConfigUtils {
     GenericToolbox::dumpStringInFile(outPath, this->toString());
     LogInfo << "Unfolded config written as: " << outPath << std::endl;
   }
+
 
 
 }
