@@ -37,7 +37,10 @@ void ParScanner::readConfigImpl() {
 
   _varsConfig_ = GenericToolbox::Json::fetchValue(_config_, "varsConfig", nlohmann::json());
 
-  LogDebug << "BUILDING SCANDATADICT" << std::endl;
+}
+void ParScanner::initializeImpl() {
+  LogInfo << "Initializing ParScanner..." << std::endl;
+  LogThrowIf(_owner_== nullptr, "_owner_ is not set");
 
   _scanDataDict_.clear();
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llh", true) ){
@@ -82,12 +85,6 @@ void ParScanner::readConfigImpl() {
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSamplePerBin", false) ){
     for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
-
-      LogDebug << GET_VAR_NAME_VALUE(sample.getBinning().getBinsList().size()) << std::endl;
-      LogDebug << GET_VAR_NAME_VALUE(sample.isEnabled()) << std::endl;
-      LogDebug << GET_VAR_NAME_VALUE(sample.getName()) << std::endl;
-      LogDebug << GET_VAR_NAME_VALUE(sample.getMcContainer().histogram->GetNbinsX()) << std::endl;
-
       for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
         _scanDataDict_.emplace_back();
         auto& scanEntry = _scanDataDict_.back();
@@ -132,12 +129,6 @@ void ParScanner::readConfigImpl() {
     }
   }
 
-  LogDebug << "BUILDING SCANDATADICT END" << std::endl;
-
-}
-void ParScanner::initializeImpl() {
-  LogInfo << "Initializing ParScanner..." << std::endl;
-  LogThrowIf(_owner_== nullptr, "_owner_ is not set");
 }
 
 void ParScanner::setOwner(Propagator *owner){
