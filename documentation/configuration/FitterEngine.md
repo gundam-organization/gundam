@@ -17,7 +17,7 @@
 | allParamVariations                                       | list(double) | List of points to perform individual parameter variation                      |         |
 | enablePca / fixGhostFitParameters                        | bool         | Fix parameter if the effect on stat LHH is lower than `pcaDeltaChi2Threshold` | false   |
 | pcaDeltaChi2Threshold / ghostParameterDeltaChi2Threshold | double       | LLH threshold for PCA                                                         | 1E-6    |
-| fixGhostEigenParametersAfterFirstRejected                 | bool         | Fix all next parameters once PCA has been triggered (dev)                     | false   |
+| fixGhostEigenParametersAfterFirstRejected                | bool         | Fix all next parameters once PCA has been triggered (dev)                     | false   |
 | throwMcBeforeFit                                         | bool         | Push MC parameter away from their prior before fitting (dev)                  | false   |
 | throwMcBeforeFitGain                                     | int          | Scale throws for MC parameters (dev)                                          | 1       |
 | customFitParThrow*                                       | list         | Use the custom thrown values for parameters (dev)                             |         |

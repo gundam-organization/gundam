@@ -466,6 +466,8 @@ void FitterEngine::fixGhostFitParameters(){
     bool fixNextEigenPars{false};
     auto& parList = parSet.getEffectiveParameterList();
     for( auto& par : parList ){
+      LogScopeIndent;
+
       ssPrint.str("");
       ssPrint << "(" << par.getParameterIndex()+1 << "/" << parList.size() << ") +1" << GUNDAM_SIGMA << " on " << parSet.getName() + "/" + par.getTitle();
 
