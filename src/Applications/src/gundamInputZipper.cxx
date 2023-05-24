@@ -89,7 +89,7 @@ int main(int argc, char** argv) {
     if( config_.is_string() ){
       std::string srcPath = GenericToolbox::expandEnvironmentVariables(config_.get<std::string>());
       if( GenericToolbox::doesPathIsFile( srcPath ) ){
-        LogWarning << "Copying file: " << GenericToolbox::getFileNameFromFilePath(srcPath) << std::endl;
+        LogInfo << "Copying local file and overriding entry: " << GenericToolbox::getFileNameFromFilePath(srcPath) << std::endl;
 
         auto localFolder{GenericToolbox::joinPath(recursivePathBufferList)};
         auto localPath{GenericToolbox::joinPath(localFolder, GenericToolbox::getFileNameFromFilePath(srcPath))};
@@ -97,7 +97,6 @@ int main(int argc, char** argv) {
         GenericToolbox::mkdirPath( GenericToolbox::joinPath(outFolder, localFolder) );
         GenericToolbox::copyFile( srcPath, GenericToolbox::joinPath(outFolder, localPath) );
 
-        LogInfo << "Overriding path in config..." << std::endl;
         config_ = localPath;
       }
 
@@ -128,6 +127,9 @@ int main(int argc, char** argv) {
   if( clParser.isOptionTriggered("zipOutFolder") ){
     LogInfo << "Creating a .gz archive of \"" << outFolder << "\"" << std::endl;
     std::system( ("tar -czvf \"" + outFolder + ".tar.gz\" \"" + outFolder + "\"").c_str() );
+    LogInfo << "Removing created temp folder..." << std::endl;
+    std::system( ("rm -r \"" + outFolder + "\"").c_str() );
+    LogInfo << "Archive writen under \"" << outFolder << ".tar.gz\"" << std::endl;
   }
 
   return EXIT_SUCCESS;
