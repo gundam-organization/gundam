@@ -7,6 +7,7 @@
 #include "FitterEngine.h"
 #include "GenericToolbox.Json.h"
 #include "GlobalVariables.h"
+#include "GundamUtils.h"
 
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
@@ -50,6 +51,7 @@ void MinimizerInterface::readConfigImpl(){
   _generatedPostFitParBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "generatedPostFitParBreakdown", _generatedPostFitParBreakdown_);
   _generatedPostFitEigenBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "generatedPostFitEigenBreakdown", _generatedPostFitEigenBreakdown_);
 
+  _stepSizeScaling_ = GenericToolbox::Json::fetchValue(_config_, "stepSizeScaling", _stepSizeScaling_);
 }
 void MinimizerInterface::initializeImpl(){
   MinimizerBase::initializeImpl();
@@ -81,23 +83,23 @@ void MinimizerInterface::initializeImpl(){
     auto& fitPar = *(getMinimizerFitParameterPtr()[iFitPar]);
 
     if( not getLikelihood().getUseNormalizedFitSpace() ){
-      _minimizer_->SetVariable(iFitPar, fitPar.getFullTitle(),fitPar.getParameterValue(),fitPar.getStepSize());
+      _minimizer_->SetVariable(iFitPar, fitPar.getFullTitle(),fitPar.getParameterValue(),fitPar.getStepSize()*_stepSizeScaling_);
       if( not std::isnan( fitPar.getMinValue() ) ){ _minimizer_->SetVariableLowerLimit(iFitPar, fitPar.getMinValue()); }
       if( not std::isnan( fitPar.getMaxValue() ) ){ _minimizer_->SetVariableUpperLimit(iFitPar, fitPar.getMaxValue()); }
       // Changing the boundaries, change the value/step size?
       _minimizer_->SetVariableValue(iFitPar, fitPar.getParameterValue());
-      _minimizer_->SetVariableStepSize(iFitPar, fitPar.getStepSize());
+      _minimizer_->SetVariableStepSize(iFitPar, fitPar.getStepSize()*_stepSizeScaling_);
     }
     else{
       _minimizer_->SetVariable( iFitPar,fitPar.getFullTitle(),
                                 FitParameterSet::toNormalizedParValue(fitPar.getParameterValue(), fitPar),
-                                FitParameterSet::toNormalizedParRange(fitPar.getStepSize(), fitPar)
+                                FitParameterSet::toNormalizedParRange(fitPar.getStepSize()*_stepSizeScaling_, fitPar)
       );
       if( not std::isnan( fitPar.getMinValue() ) ){ _minimizer_->SetVariableLowerLimit(iFitPar, FitParameterSet::toNormalizedParValue(fitPar.getMinValue(), fitPar)); }
       if( not std::isnan( fitPar.getMaxValue() ) ){ _minimizer_->SetVariableUpperLimit(iFitPar, FitParameterSet::toNormalizedParValue(fitPar.getMaxValue(), fitPar)); }
       // Changing the boundaries, change the value/step size?
       _minimizer_->SetVariableValue(iFitPar, FitParameterSet::toNormalizedParValue(fitPar.getParameterValue(), fitPar));
-      _minimizer_->SetVariableStepSize(iFitPar, FitParameterSet::toNormalizedParRange(fitPar.getStepSize(), fitPar));
+      _minimizer_->SetVariableStepSize(iFitPar, FitParameterSet::toNormalizedParRange(fitPar.getStepSize()*_stepSizeScaling_, fitPar));
     }
   }
 }
@@ -188,9 +190,9 @@ void MinimizerInterface::minimize(){
 
   LogInfo << getConvergenceMonitor().generateMonitorString(); // lasting printout
   LogInfo << "Minimization ended after " << nbMinimizeCalls << " calls." << std::endl;
-  if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogWarning << "Status code: " << this->minuitStatusCodeStr.at(_minimizer_->Status()) << std::endl;
+  if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogWarning << "Status code: " << GundamUtils::minuitStatusCodeStr.at(_minimizer_->Status()) << std::endl;
   else LogWarning << "Status code: " << _minimizer_->Status() << std::endl;
-  if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogWarning << "Covariance matrix status code: " << this->covMatrixStatusCodeStr.at(_minimizer_->CovMatrixStatus()) << std::endl;
+  if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogWarning << "Covariance matrix status code: " << GundamUtils::covMatrixStatusCodeStr.at(_minimizer_->CovMatrixStatus()) << std::endl;
   else LogWarning << "Covariance matrix status code: " << _minimizer_->CovMatrixStatus() << std::endl;
 
   // Make sure we are on the right spot
@@ -204,6 +206,7 @@ void MinimizerInterface::minimize(){
   );
 
   getLikelihood().saveChi2History();
+  if( getLikelihood().isMonitorGradientDescent() ){ getLikelihood().saveGradientSteps(); }
 
   if( _fitHasConverged_ ){ LogInfo << "Minimization has converged!" << std::endl; }
   else{ LogError << "Minimization did not converged." << std::endl; }
@@ -323,7 +326,7 @@ void MinimizerInterface::calcErrors(){
       getLikelihood().disableFitMonitor();
 
 #if ROOT_VERSION_CODE >= ROOT_VERSION(6,23,02)
-      LogWarning << minosStatusCodeStr.at(_minimizer_->MinosStatus()) << std::endl;
+      LogWarning << GundamUtils::minosStatusCodeStr.at(_minimizer_->MinosStatus()) << std::endl;
 #endif
       if( isOk ){
         LogInfo << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh << std::endl;
@@ -345,8 +348,8 @@ void MinimizerInterface::calcErrors(){
       LogWarning << "Restoring step size before HESSE..." << std::endl;
       for( int iFitPar = 0 ; iFitPar < _minimizer_->NDim() ; iFitPar++ ){
         auto& par = *getMinimizerFitParameterPtr()[iFitPar];
-        if(not getLikelihood().getUseNormalizedFitSpace()){ _minimizer_->SetVariableStepSize(iFitPar, par.getStepSize()); }
-        else{ _minimizer_->SetVariableStepSize(iFitPar, FitParameterSet::toNormalizedParRange(par.getStepSize(), par)); } // should be 1
+        if(not getLikelihood().getUseNormalizedFitSpace()){ _minimizer_->SetVariableStepSize(iFitPar, par.getStepSize()*_stepSizeScaling_); }
+        else{ _minimizer_->SetVariableStepSize(iFitPar, FitParameterSet::toNormalizedParRange(par.getStepSize()*_stepSizeScaling_, par)); } // should be 1
       }
     }
 
@@ -372,8 +375,8 @@ void MinimizerInterface::calcErrors(){
     getLikelihood().disableFitMonitor();
 
     LogInfo << "Hesse ended after " << getLikelihood().getNbFitCalls() - nbFitCallOffset << " calls." << std::endl;
-    LogWarning << "HESSE status code: " << hesseStatusCodeStr.at(_minimizer_->Status()) << std::endl;
-    LogWarning << "Covariance matrix status code: " << covMatrixStatusCodeStr.at(_minimizer_->CovMatrixStatus()) << std::endl;
+    LogWarning << "HESSE status code: " << GundamUtils::hesseStatusCodeStr.at(_minimizer_->Status()) << std::endl;
+    LogWarning << "Covariance matrix status code: " << GundamUtils::covMatrixStatusCodeStr.at(_minimizer_->CovMatrixStatus()) << std::endl;
 
     // Make sure we are on the right spot
     updateCacheToBestfitPoint();

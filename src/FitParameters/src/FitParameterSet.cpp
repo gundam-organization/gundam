@@ -471,7 +471,7 @@ void FitParameterSet::throwFitParameters(double gain_){
           LogInfo << " → " << par.getParameterValue() << std::endl;
         }
         else{
-          LogWarning << "Skipping parameter: " << par.getTitle() << std::endl;
+//          LogWarning << "Skipping parameter: " << par.getTitle() << std::endl;
         }
       }
 
@@ -846,9 +846,11 @@ void FitParameterSet::defineParameters(){
       }
 
       if( not isEnabled ){
-        LogAlert << "Skipping parameter \"" << par.getFullTitle() << "\" as it is not set in enableOnlyParameters" << std::endl;
+        // set it of
         par.setIsEnabled( false );
-        continue;
+      }
+      else{
+        LogWarning << "Enabling parameter \"" << par.getFullTitle() << "\" as it is not set in enableOnlyParameters" << std::endl;
       }
     }
     if( not _disableParameters_.empty() ){
@@ -862,7 +864,7 @@ void FitParameterSet::defineParameters(){
       }
 
       if( not isEnabled ){
-        LogAlert << "Skipping parameter \"" << par.getFullTitle() << "\" as it is set in disableParameters" << std::endl;
+        LogWarning << "Skipping parameter \"" << par.getFullTitle() << "\" as it is set in disableParameters" << std::endl;
         par.setIsEnabled( false );
         continue;
       }

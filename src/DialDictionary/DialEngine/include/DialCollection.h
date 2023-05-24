@@ -15,9 +15,9 @@
 
 #include "nlohmann/json.hpp"
 
-#include "vector"
-#include "string"
-#include "memory"
+#include <vector>
+#include <string>
+#include <memory>
 
 class DialCollection : public JsonBaseClass {
 

@@ -15,10 +15,10 @@
 #include "TH1D.h"
 #include "TLegend.h"
 
-#include "string"
-#include "vector"
-#include "sstream"
+#include <string>
+#include <vector>
 #include <memory>
+#include <sstream>
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[PlotGenerator]");

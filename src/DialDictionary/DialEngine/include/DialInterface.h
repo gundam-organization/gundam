@@ -12,9 +12,9 @@
 #include "FitSampleSet.h"
 #include "FitParameterSet.h"
 
-#include "string"
-#include "memory"
-#include "vector"
+#include <string>
+#include <memory>
+#include <vector>
 
 
 /// This class is size critical and should not be used as a base class (no

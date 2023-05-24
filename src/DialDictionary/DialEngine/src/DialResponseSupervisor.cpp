@@ -4,7 +4,7 @@
 
 #include "DialResponseSupervisor.h"
 
-#include "sstream"
+#include <sstream>
 
 
 void DialResponseSupervisor::setMinResponse(double minResponse) {

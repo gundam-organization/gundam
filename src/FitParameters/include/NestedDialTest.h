@@ -12,8 +12,8 @@
 #include "nlohmann/json.hpp"
 #include "TFormula.h"
 
-#include "vector"
-#include "string"
+#include <vector>
+#include <string>
 
 #ifdef USE_NEW_DIALS
 #warning Not used with new dial implementation

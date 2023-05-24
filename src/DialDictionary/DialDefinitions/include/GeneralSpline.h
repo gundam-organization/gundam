@@ -11,8 +11,8 @@
 #include "TGraph.h"
 #include "TSpline.h"
 
-#include "vector"
-#include "utility"
+#include <vector>
+#include <utility>
 
 
 class GeneralSpline : public DialBase {

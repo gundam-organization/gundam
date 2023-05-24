@@ -157,16 +157,62 @@ void FitterEngine::initializeImpl(){
       GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
       _propagator_.getGlobalCovarianceMatrix().get(), "globalCovarianceMatrix"
   );
+  GenericToolbox::writeInTFile(
+      GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
+      _propagator_.getStrippedCovarianceMatrix().get(), "strippedCovarianceMatrix"
+  );
   for( auto& parSet : _propagator_.getParameterSetsList() ){
     if(not parSet.isEnabled()) continue;
+
+    auto saveFolder = GenericToolbox::joinPath( "propagator", parSet.getName() );
     GenericToolbox::writeInTFile(
-        GenericToolbox::mkdirTFile( _saveDir_, GenericToolbox::joinPath("propagator", parSet.getName()) ),
+        GenericToolbox::mkdirTFile( _saveDir_, saveFolder ),
         parSet.getPriorCovarianceMatrix().get(), "covarianceMatrix"
     );
     GenericToolbox::writeInTFile(
-        GenericToolbox::mkdirTFile(_saveDir_, GenericToolbox::joinPath("propagator", parSet.getName()) ),
+        GenericToolbox::mkdirTFile(_saveDir_, saveFolder ),
         parSet.getPriorCorrelationMatrix().get(), "correlationMatrix"
     );
+
+    auto parsSaveFolder = GenericToolbox::joinPath( saveFolder, "parameters" );
+    for( auto& par : parSet.getParameterList() ){
+      auto parSaveFolder = GenericToolbox::joinPath(parsSaveFolder, GenericToolbox::generateCleanBranchName(par.getTitle()));
+      auto outDir = GenericToolbox::mkdirTFile(_saveDir_, parSaveFolder );
+
+      GenericToolbox::writeInTFile( outDir, TNamed( "title", par.getTitle().c_str() ) );
+      GenericToolbox::writeInTFile( outDir, TNamed( "fullTitle", par.getFullTitle().c_str() ) );
+      GenericToolbox::writeInTFile( outDir, TNamed( "name", par.getName().c_str() ) );
+      GenericToolbox::writeInTFile( outDir, TNamed( "isEnabled", std::to_string( par.isEnabled() ).c_str() ) );
+      GenericToolbox::writeInTFile( outDir, TNamed( "index", std::to_string( par.getParameterIndex() ).c_str() ) );
+      GenericToolbox::writeInTFile( outDir, TNamed( "prior", std::to_string( par.getPriorValue() ).c_str() ) );
+      GenericToolbox::writeInTFile( outDir, TNamed( "stdDev", std::to_string( par.getStdDevValue() ).c_str() ) );
+      GenericToolbox::writeInTFile( outDir, TNamed( "priorType", std::to_string( par.getPriorType() ).c_str() ) );
+      GenericToolbox::writeInTFile( outDir, TNamed( "min", std::to_string( par.getMinValue() ).c_str() ) );
+      GenericToolbox::writeInTFile( outDir, TNamed( "max", std::to_string( par.getMaxValue() ).c_str() ) );
+    }
+
+    if( parSet.isUseEigenDecompInFit() ){
+      auto eigenSaveFolder = GenericToolbox::joinPath( saveFolder, "eigen" );
+      for( auto& eigen : parSet.getEigenParameterList() ){
+        auto eigenFolder = GenericToolbox::joinPath(eigenSaveFolder, GenericToolbox::generateCleanBranchName(eigen.getTitle()));
+        auto outDir = GenericToolbox::mkdirTFile( _saveDir_, eigenFolder );
+
+        GenericToolbox::writeInTFile( outDir, TNamed( "title", eigen.getTitle().c_str() ) );
+        GenericToolbox::writeInTFile( outDir, TNamed( "fullTitle", eigen.getFullTitle().c_str() ) );
+        GenericToolbox::writeInTFile( outDir, TNamed( "name", eigen.getName().c_str() ) );
+        GenericToolbox::writeInTFile( outDir, TNamed( "isEnabled", std::to_string( eigen.isEnabled() ).c_str() ) );
+        GenericToolbox::writeInTFile( outDir, TNamed( "index", std::to_string( eigen.getParameterIndex() ).c_str() ) );
+        GenericToolbox::writeInTFile( outDir, TNamed( "prior", std::to_string( eigen.getPriorValue() ).c_str() ) );
+        GenericToolbox::writeInTFile( outDir, TNamed( "stdDev", std::to_string( eigen.getStdDevValue() ).c_str() ) );
+        GenericToolbox::writeInTFile( outDir, TNamed( "priorType", std::to_string( eigen.getPriorType() ).c_str() ) );
+        GenericToolbox::writeInTFile( outDir, TNamed( "min", std::to_string( eigen.getMinValue() ).c_str() ) );
+        GenericToolbox::writeInTFile( outDir, TNamed( "max", std::to_string( eigen.getMaxValue() ).c_str() ) );
+      }
+    }
+  }
+
+  if( dynamic_cast<const MinimizerInterface*>( &this->getMinimizer() ) ){
+    dynamic_cast<const MinimizerInterface*>( &this->getMinimizer() )->saveMinimizerSettings( GenericToolbox::mkdirTFile(_saveDir_, "fit/minimizer" ) );
   }
 
   this->_propagator_.updateLlhCache();
@@ -215,6 +261,12 @@ void FitterEngine::setAllParamVariationsSigmas(const std::vector<double> &allPar
 }
 
 // Getters
+const nlohmann::json &FitterEngine::getPreFitParState() const {
+  return _preFitParState_;
+}
+const nlohmann::json &FitterEngine::getPostFitParState() const {
+  return _postFitParState_;
+}
 const Propagator& FitterEngine::getPropagator() const {
   return _propagator_;
 }
@@ -224,6 +276,8 @@ const MinimizerBase& FitterEngine::getMinimizer() const {
 const LikelihoodInterface& FitterEngine::getLikelihood() const {
   return _likelihood_;
 }
+
+// non-const getters
 Propagator& FitterEngine::getPropagator() {
   return _propagator_;
 }
@@ -248,12 +302,12 @@ void FitterEngine::fit(){
   LogInfo << llhState << std::endl;
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile( _saveDir_, "preFit" ),
-      TNamed("preFitLlhState", llhState.c_str())
+      TNamed("llhState", llhState.c_str())
   );
   _preFitParState_ = _propagator_.exportParameterInjectorConfig();
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile( _saveDir_, "preFit" ),
-      TNamed("preFitParState", GenericToolbox::Json::toReadableString(_preFitParState_).c_str())
+      TNamed("parState", GenericToolbox::Json::toReadableString(_preFitParState_).c_str())
   );
 
   // Not moving parameters
@@ -337,13 +391,16 @@ void FitterEngine::fit(){
   _postFitParState_ = _propagator_.exportParameterInjectorConfig();
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile( _saveDir_, "postFit" ),
-      TNamed("postFitParState", GenericToolbox::Json::toReadableString(_postFitParState_).c_str())
+      TNamed("parState", GenericToolbox::Json::toReadableString(_postFitParState_).c_str())
   );
 
   LogWarning << "Post-fit likelihood state:" << std::endl;
   llhState = _propagator_.getLlhBufferSummary();
   LogInfo << llhState << std::endl;
-  GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile( _saveDir_, "postFit" ), TNamed("postFitLlhState", llhState.c_str()) );
+  GenericToolbox::writeInTFile(
+      GenericToolbox::mkdirTFile( _saveDir_, "postFit" ),
+      TNamed("llhState", llhState.c_str())
+  );
 
 
   if( _generateSamplePlots_ and not _propagator_.getPlotGenerator().getConfig().empty() ){
@@ -360,6 +417,7 @@ void FitterEngine::fit(){
     LogInfo << "Scanning along the line from pre-fit to post-fit points..." << std::endl;
     getPropagator().getParScanner().scanSegment(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scanConvergence"),
                                                 _postFitParState_, _preFitParState_);
+    GenericToolbox::triggerTFileWrite(_saveDir_);
   }
 
   if( getMinimizer().isFitHasConverged() and getMinimizer().isEnablePostFitErrorEval() ){

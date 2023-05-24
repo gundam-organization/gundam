@@ -3,6 +3,7 @@
 //
 
 #include "GundamGreetings.h"
+#include "GundamUtils.h"
 
 #include "Logger.h"
 #include "CmdLineParser.h"
@@ -13,60 +14,62 @@
 #include "TFile.h"
 #include <TLegend.h>
 
-#include "string"
-#include "vector"
+#include <string>
+#include <vector>
+#include <memory>
+#include <utility>
+
 
 LoggerInit([]{
-  Logger::setUserHeaderStr("[gundamFitCompare.cxx]");
+  Logger::getUserHeader() << "[" << FILENAME << "]";
 });
+
 
 CmdLineParser clp;
 TFile* outFile{nullptr};
 bool verbose{false};
 
+
 void makeSampleComparePlots(bool usePrefit_);
 void makeScanComparePlots(bool usePrefit_);
 void makeErrorComparePlots(bool usePrefit_, bool useNomVal_);
 
+
 int main( int argc, char** argv ){
   GundamGreetings g;
-  g.setAppName("FitCompare");
+  g.setAppName("fit compare tool");
   g.hello();
 
-  clp.addCmdLineArgs(argc, argv);
-
   // files
+  clp.addDummyOption("Main options");
   clp.addOption("file-1", {"-f1"}, "Path to first output fit file.", 1);
   clp.addOption("file-2", {"-f2"}, "Path to second output fit file.", 1);
-
-  // display name
   clp.addOption("name-1", {"-n1"}, "Set display name of the first fit file.", 1);
   clp.addOption("name-2", {"-n2"}, "Set display name of the  fit file.", 1);
-
-  // display name
   clp.addOption("algo-1", {"-a1"}, "Specify algo folder to compare for the first fit file.", 1);
   clp.addOption("algo-2", {"-a2"}, "Specify algo folder to compare for the second fit file.", 1);
-
-  // compare post-fit with pre-fit data (useful when f1 and f2 are the same file)
-  clp.addTriggerOption("use-prefit-1", {"--prefit-1"}, "Use prefit data only for file 1.");
-  clp.addTriggerOption("use-prefit-2", {"--prefit-2"}, "Use prefit data only for file 2.");
-
-  clp.addTriggerOption("verbose", {"-v"}, "Use prefit data only for file 2.");
-
   clp.addOption("output", {"-o"}, "Output file.", 1);
 
-  LogInfo << "Options list:" << std::endl;
-  {
-    LogScopeIndent;
-    LogInfo << clp.getConfigSummary() << std::endl;
-  }
+  // compare post-fit with pre-fit data (useful when f1 and f2 are the same file)
+  clp.addDummyOption("Trigger options");
+  clp.addTriggerOption("use-prefit-1", {"--prefit-1"}, "Use prefit data only for file 1.");
+  clp.addTriggerOption("use-prefit-2", {"--prefit-2"}, "Use prefit data only for file 2.");
+  clp.addTriggerOption("verbose", {"-v"}, "Recursive verbosity printout.");
 
-  clp.parseCmdLine();
+  clp.addDummyOption("");
+
+  LogInfo << "Options list:" << std::endl;
+  LogInfo << clp.getConfigSummary() << std::endl << std::endl;
+
+  // read cli
+  clp.parseCmdLine(argc, argv);
+
+  // printout what's been fired
+  LogInfo << "Fired options are: " << std::endl << clp.getValueSummary() << std::endl;
 
   if( clp.isNoOptionTriggered()
       or not clp.isOptionTriggered("file-1")
       or not clp.isOptionTriggered("file-2")
-      or not clp.isOptionTriggered("output")
       ){
     LogError << "Missing options." << std::endl;
     exit(EXIT_FAILURE);
@@ -76,15 +79,31 @@ int main( int argc, char** argv ){
              "Remove the two options to see prefit comparison of both files");
 
   LogInfo << "Reading config..." << std::endl;
-
-  auto outPath = clp.getOptionVal<std::string>("output");
-
   verbose = clp.isOptionTriggered("verbose");
 
+  std::string outPath{};
+  if( clp.isOptionTriggered("output") ){ outPath = clp.getOptionVal<std::string>("output"); }
+  else{
+    // auto generate
+    std::vector<std::pair<std::string, std::string>> appendixDict;
 
-  std::string strBuffer;
+    // file1
+    if( clp.isOptionTriggered("name-1") ){ appendixDict.emplace_back("name-1", "%s"); }
+    else                                 { appendixDict.emplace_back("file-1", "%s"); }
+    if( clp.isOptionTriggered("use-prefit-1") ){ appendixDict.emplace_back("use-prefit-1", "PreFit"); }
 
+    // file2
+    if( clp.isOptionTriggered("name-2") ){ appendixDict.emplace_back("name-2", "vs_%s"); }
+    else                                 { appendixDict.emplace_back("file-2", "vs_%s"); }
+    if( clp.isOptionTriggered("use-prefit-2") ){ appendixDict.emplace_back("use-prefit-2", "PreFit"); }
+
+    outPath = "fitCompare_" + GundamUtils::generateFileName(clp, appendixDict) + ".root";
+    LogWarning << "Output file: " << outPath << std::endl;
+  }
   outFile = TFile::Open(outPath.c_str(), "RECREATE");
+
+
+  LogAlert << std::endl << "Starting comparison..." << std::endl;
 
   LogInfo << "Comparing preFit scans..." << std::endl;
   makeScanComparePlots(true);
@@ -105,7 +124,7 @@ int main( int argc, char** argv ){
   LogInfo << "Comparing postFit (normalized) errors..." << std::endl;
   makeErrorComparePlots(false, true);
 
-  LogWarning << "Closing: " << outPath << std::endl;
+  LogAlert << std::endl << "Closing: " << outPath << std::endl;
   outFile->Close();
 
   g.goodbye();
@@ -162,7 +181,10 @@ void makeSampleComparePlots(bool usePrefit_){
 
         auto* hCompValues = (TH1D*) h1->Clone();
         hCompValues->Add(h2, -1);
-        GenericToolbox::transformBinContent(hCompValues, [](TH1D* h_, int bin_){ h_->SetBinError(bin_, 0); });
+        GenericToolbox::transformBinContent(hCompValues, [](TH1D* h_, int bin_){
+          h_->SetBinError(bin_, 0);
+          if( std::isnan(h_->GetBinContent(bin_)) ){ h_->SetBinContent(bin_, 0); }
+        });
 
         hCompValues->SetTitle(Form("Comparing \"%s\"", dir1_->GetListOfKeys()->At(iKey)->GetName()));
         hCompValues->GetYaxis()->SetTitle("Bin content difference");
@@ -172,12 +194,30 @@ void makeSampleComparePlots(bool usePrefit_){
             hCompValues,
             dir1_->GetListOfKeys()->At(iKey)->GetName()
             );
+
+        auto* hCompValuesRatio = (TH1D*) hCompValues->Clone();
+        GenericToolbox::transformBinContent(hCompValuesRatio, [h1](TH1D* h_, int bin_){
+          h_->SetBinContent(bin_, 100. * h_->GetBinContent(bin_)/h1->GetBinContent(bin_));
+          h_->SetBinError(bin_, 0);
+          if( std::isnan(h_->GetBinContent(bin_)) ){ h_->SetBinContent(bin_, 0); }
+        });
+
+        hCompValuesRatio->SetTitle(Form("Comparing \"%s\"", dir1_->GetListOfKeys()->At(iKey)->GetName()));
+        hCompValuesRatio->GetYaxis()->SetTitle("Bin content relative difference (%)");
+
+        GenericToolbox::writeInTFile(
+            GenericToolbox::mkdirTFile(outFile, GenericToolbox::joinVectorString(pathBuffer, "/")),
+            hCompValuesRatio,
+            dir1_->GetListOfKeys()->At(iKey)->GetName() + std::string("_Ratio")
+        );
+
       }
     }
 
   };
 
   recurseSampleCompareGraph(dir1, dir2);
+  GenericToolbox::triggerTFileWrite( outFile );
 }
 void makeScanComparePlots(bool usePrefit_){
 
@@ -312,6 +352,7 @@ void makeScanComparePlots(bool usePrefit_){
   LogReturnIf(dir2 == nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
 
   recurseScanCompareGraph(dir1, dir2);
+  GenericToolbox::triggerTFileWrite( outFile );
 }
 void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
 
@@ -495,4 +536,6 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
 
     delete overlayCanvas;
   }
+
+  GenericToolbox::triggerTFileWrite( outFile );
 }

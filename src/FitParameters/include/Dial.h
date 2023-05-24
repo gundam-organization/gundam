@@ -14,9 +14,9 @@
 
 #include "TSpline.h"
 
-#include "string"
-#include "mutex"
-#include "memory"
+#include <mutex>
+#include <string>
+#include <memory>
 
 #ifdef USE_NEW_DIALS
 #define DEPRECATED [[deprecated("Not used with new dial implementation")]]

@@ -5,13 +5,13 @@
 
 #include "TRint.h"
 
+#include <string>
+#include <vector>
 #include <cstdlib>
-#include "string"
-#include "vector"
-#include "iostream"
+#include <iostream>
 
 LoggerInit([]{
-  Logger::setUserHeaderStr("[gundamRoot.cxx]");
+  Logger::getUserHeader() << "[" << FILENAME << "]";
 });
 
 

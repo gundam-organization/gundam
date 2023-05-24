@@ -20,6 +20,8 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[ParScanner]");
 });
 
+void ParScanner::muteLogger(){ Logger::setIsMuted(true); }
+void ParScanner::unmuteLogger(){ Logger::setIsMuted(false); }
 
 ParScanner::ParScanner(Propagator* owner_): _owner_(owner_) {}
 
@@ -244,8 +246,9 @@ void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
   currentParValue[0] = par_.getParameterValue();
   GenericToolbox::writeInTFile(saveDir_, &currentParValue, ssVal.str());
 }
-void ParScanner::scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, const nlohmann::json &start_) {
-  LogWarning << "Scanning along a segment with " << _nbPointsLineScan_ << " steps." << std::endl;
+void ParScanner::scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, const nlohmann::json &start_, int nSteps_) {
+  if( nSteps_ == -1 ){ nSteps_ = _nbPointsLineScan_; }
+  LogWarning << "Scanning along a segment with " << nSteps_ << " steps." << std::endl;
 
   // don't shout while re-injecting parameters
   GenericToolbox::ScopedGuard s(
@@ -254,10 +257,10 @@ void ParScanner::scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, c
   );
 
   LogThrowIf(end_.empty(), "Ending injector config is empty()");
-  LogThrowIf(_nbPointsLineScan_ < 0, "Invalid nSteps");
+  LogThrowIf(nSteps_ < 0, "Invalid nSteps");
 
   // nSteps_+2 as we also want the first and last points
-  int nTotalSteps = _nbPointsLineScan_+2;
+  int nTotalSteps = nSteps_+2;
 
   LogInfo << "Backup current position of the propagator..." << std::endl;
   auto currentParState = _owner_->exportParameterInjectorConfig();
@@ -284,16 +287,10 @@ void ParScanner::scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, c
 
   LogInfo << "Creating graph holders..." << std::endl;
 
-  struct GraphEntry{
-    ScanData* scanDataPtr{nullptr};
-    FitParameter* fitParPtr{nullptr};
-    TGraph graph{};
-  };
-
-  std::vector<GraphEntry> graphEntryList;
+  _graphEntriesBuf_.clear();
   for( auto& scanData : _scanDataDict_ ){
     for( auto& parPair : startPointParValList ){
-      graphEntryList.emplace_back(GraphEntry{&scanData, parPair.first, TGraph(nTotalSteps)});
+      _graphEntriesBuf_.emplace_back(GraphEntry{&scanData, parPair.first, TGraph(nTotalSteps)});
     }
   }
 
@@ -302,7 +299,7 @@ void ParScanner::scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, c
 
   LogInfo << "Scanning along the line..." << std::endl;
   for( int iStep = 0 ; iStep < nTotalSteps ; iStep++ ){
-    GenericToolbox::displayProgressBar(iStep, nTotalSteps-1, ss.str());
+    if( not Logger::isMuted() ){ GenericToolbox::displayProgressBar(iStep, nTotalSteps-1, ss.str()); }
 
     for( size_t iPar = 0 ; iPar < startPointParValList.size() ; iPar++ ){
       auto* par = startPointParValList[iPar].first;
@@ -322,7 +319,7 @@ void ParScanner::scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, c
 
     _owner_->updateLlhCache();
 
-    for( auto& graphEntry : graphEntryList ){
+    for( auto& graphEntry : _graphEntriesBuf_ ){
       graphEntry.graph.SetPointX(iStep, graphEntry.fitParPtr->getParameterValue());
       graphEntry.graph.SetPointY(iStep, graphEntry.scanDataPtr->evalY());
     }
@@ -330,36 +327,9 @@ void ParScanner::scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, c
   }
 
   LogInfo << "Writing scan line graph in file..." << std::endl;
-  for( auto& graphEntry : graphEntryList ){
-    graphEntry.graph.SetTitle(graphEntry.scanDataPtr->title.c_str());
-    graphEntry.graph.GetYaxis()->SetTitle(graphEntry.scanDataPtr->yTitle.c_str());
-    graphEntry.graph.GetXaxis()->SetTitle(graphEntry.fitParPtr->getFullTitle().c_str());
-    graphEntry.graph.SetDrawOption("AP");
-
-    // marker indicates the direction
-    if( graphEntry.graph.GetY()[0] == graphEntry.graph.GetY()[graphEntry.graph.GetN()-1] ){
-      // Did not move
-      graphEntry.graph.SetMarkerStyle( kFullDotMedium );
-    }
-    else if( graphEntry.graph.GetY()[0] > graphEntry.graph.GetY()[graphEntry.graph.GetN()-1] ){
-      // Did go down
-      graphEntry.graph.SetMarkerStyle( kFullTriangleDown );
-    }
-    else{
-      // Did go up
-      graphEntry.graph.SetMarkerStyle( kFullTriangleUp );
-    }
-
-
-
-
-    GenericToolbox::writeInTFile(
-        GenericToolbox::mkdirTFile( saveDir_, graphEntry.scanDataPtr->folder ),
-        graphEntry.graph,
-        GenericToolbox::generateCleanBranchName(graphEntry.fitParPtr->getFullTitle())
-    );
+  for( auto& graphEntry : _graphEntriesBuf_ ){
+    ParScanner::writeGraphEntry( graphEntry, saveDir_ );
   }
-
 
   LogInfo << "Restore position of the propagator..." << std::endl;
   _owner_->injectParameterValues( currentParState );
@@ -574,5 +544,30 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
   }
 }
 
+// statics
+void ParScanner::writeGraphEntry(GraphEntry& entry_, TDirectory* saveDir_){
+  entry_.graph.SetTitle(entry_.scanDataPtr->title.c_str());
+  entry_.graph.GetYaxis()->SetTitle(entry_.scanDataPtr->yTitle.c_str());
+  entry_.graph.GetXaxis()->SetTitle(entry_.fitParPtr->getFullTitle().c_str());
+  entry_.graph.SetDrawOption("AP");
 
+  // marker indicates the direction
+  if( entry_.graph.GetY()[0] == entry_.graph.GetY()[entry_.graph.GetN()-1] ){
+    // Did not move
+    entry_.graph.SetMarkerStyle( kFullDotMedium );
+  }
+  else if( entry_.graph.GetY()[0] > entry_.graph.GetY()[entry_.graph.GetN()-1] ){
+    // Did go down
+    entry_.graph.SetMarkerStyle( kFullTriangleDown );
+  }
+  else{
+    // Did go up
+    entry_.graph.SetMarkerStyle( kFullTriangleUp );
+  }
 
+  GenericToolbox::writeInTFile(
+      GenericToolbox::mkdirTFile( saveDir_, entry_.scanDataPtr->folder ),
+      entry_.graph,
+      GenericToolbox::generateCleanBranchName(entry_.fitParPtr->getFullTitle())
+  );
+}

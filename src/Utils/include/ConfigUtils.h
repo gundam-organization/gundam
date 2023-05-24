@@ -8,7 +8,7 @@
 #include "nlohmann/json.hpp"
 #include "yaml-cpp/yaml.h"
 
-#include "string"
+#include <string>
 
 
 namespace ConfigUtils {
@@ -23,6 +23,32 @@ namespace ConfigUtils {
   nlohmann::json getForwardedConfig(const nlohmann::json& config_, const std::string& keyName_);
   void forwardConfig(nlohmann::json& config_, const std::string& className_ = "");
   void unfoldConfig(nlohmann::json& config_);
+
+  void applyOverrides(nlohmann::json& jsonConfig_, const nlohmann::json& overrideConfig_);
+
+
+  class ConfigHandler{
+    nlohmann::json config;
+
+  public:
+    explicit ConfigHandler(const std::string& filePath_);
+
+    // const-getters
+    [[nodiscard]] std::string toString() const;
+    [[nodiscard]] const nlohmann::json &getConfig() const;
+
+    // non-const getters
+    nlohmann::json &getConfig();
+
+    void override( const std::string& filePath_ );
+    void override( const std::vector<std::string>& filesList_ );
+
+    void flatOverride( const std::string& flattenEntry_ );
+    void flatOverride( const std::vector<std::string>& flattenEntryList_ );
+
+    void exportToJsonFile( const std::string& filePath_ ) const;
+
+  };
 
 }
 

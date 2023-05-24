@@ -10,9 +10,9 @@
 
 #include "TH1D.h"
 
-#include "vector"
-#include "memory"
-#include "string"
+#include <vector>
+#include <memory>
+#include <string>
 
 
 class SampleElement{

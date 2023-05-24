@@ -15,12 +15,12 @@
 #include "TDirectory.h"
 #include "TH1D.h"
 
-#include "memory"
-#include "vector"
-#include "functional"
-#include "mutex"
-#include "string"
-#include "map"
+#include <map>
+#include <mutex>
+#include <memory>
+#include <vector>
+#include <string>
+#include <functional>
 
 
 struct HistHolder{

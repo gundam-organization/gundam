@@ -8,7 +8,7 @@
 #include "Logger.h"
 #include "GenericToolbox.h"
 
-#include "sstream"
+#include <sstream>
 
 
 LoggerInit([]{
@@ -24,7 +24,7 @@ void GundamGreetings::setAppName(const std::string &appName) {
 
 void GundamGreetings::hello() {
   std::stringstream ss;
-  ss << "Welcome to the "
+  ss << "Welcome to GUNDAM "
      << (_appName_.empty() ? GenericToolbox::getExecutableName() : _appName_)
      << " v" + GundamVersionConfig::getVersionStr();
 

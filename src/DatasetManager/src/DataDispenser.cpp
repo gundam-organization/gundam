@@ -29,9 +29,9 @@
 #include "TChainElement.h"
 #include "THn.h"
 
-#include "sstream"
-#include "string"
-#include "vector"
+#include <string>
+#include <vector>
+#include <sstream>
 
 
 LoggerInit([]{

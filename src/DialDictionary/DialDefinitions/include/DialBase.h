@@ -7,9 +7,9 @@
 
 #include "DialInputBuffer.h"
 
-#include "vector"
-#include "string"
-#include "memory"
+#include <vector>
+#include <string>
+#include <memory>
 
 // should be thread safe -> add lock?
 // any number of inputs (provided doubles) -> set input size

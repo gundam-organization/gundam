@@ -25,14 +25,14 @@
 
 
 LoggerInit([]{
-  Logger::setUserHeaderStr("[gundamCalcXsec.cxx]");
+  Logger::getUserHeader() << "[" << FILENAME << "]";
 });
 
 
 int main(int argc, char** argv){
 
   GundamGreetings g;
-  g.setAppName("GundamCalcXsec");
+  g.setAppName("cross-section calculator tool");
   g.hello();
 
 
@@ -77,8 +77,8 @@ int main(int argc, char** argv){
   // --------------------------
   // Initialize the fitter:
   // --------------------------
-  LogInfo << "Reading config file: " << configFilePath << std::endl;
-  auto configXsecExtractor = ConfigUtils::readConfigFile(configFilePath); // works with yaml
+  ConfigUtils::ConfigHandler ch{configFilePath};
+  auto configXsecExtractor = ch.getConfig();
 
   if( GenericToolbox::Json::doKeyExist(configXsecExtractor, "minGundamVersion") ){
     LogThrowIf(
@@ -125,6 +125,8 @@ int main(int argc, char** argv){
 
   // Get config from the fit
   auto configFit = GenericToolbox::Json::readConfigJsonStr(configStr); // works with yaml
+  if( configFit.is_array() ){ configFit = configFit[0]; } // hot fix for bad version of JSON lib
+
 //  auto configPropagator = GenericToolbox::Json::fetchValuePath<nlohmann::json>( configFit, "fitterEngineConfig/propagatorConfig" );
   auto configPropagator = GenericToolbox::Json::fetchValue<nlohmann::json>(GenericToolbox::Json::fetchValue<nlohmann::json>(configFit, "fitterEngineConfig"), "propagatorConfig");
 

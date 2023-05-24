@@ -2,19 +2,6 @@
 // Created by Nadrino on 16/09/2020.
 //
 
-// C++
-#include "sstream"
-#include "string"
-
-// ROOT
-#include "TFile.h"
-#include "TTree.h"
-#include "TMatrixT.h"
-#include "TVectorT.h"
-#include "TLeaf.h"
-#include "TClonesArray.h"
-#include "TTree.h"
-
 // This project
 #include "XsecDial.hh"
 #include <FitStructs.hh>
@@ -27,6 +14,19 @@
 #include "Logger.h"
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
+
+// ROOT
+#include "TFile.h"
+#include "TTree.h"
+#include "TMatrixT.h"
+#include "TVectorT.h"
+#include "TLeaf.h"
+#include "TClonesArray.h"
+#include "TTree.h"
+
+// C++
+#include <string>
+#include <sstream>
 
 /****************************/
 //! Globals
