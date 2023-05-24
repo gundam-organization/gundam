@@ -28,12 +28,16 @@ ParScanner::ParScanner(Propagator* owner_): _owner_(owner_) {}
 void ParScanner::readConfigImpl() {
   if( _config_.empty() ) return;
 
+  LogInfo << "Reading ParScanner configuration..." << std::endl;
+
   _useParameterLimits_ = GenericToolbox::Json::fetchValue(_config_, "useParameterLimits", _useParameterLimits_);
   _nbPoints_ = GenericToolbox::Json::fetchValue(_config_, "nbPoints", _nbPoints_);
   _nbPointsLineScan_ = GenericToolbox::Json::fetchValue(_config_, "nbPointsLineScan", _nbPoints_);
   _parameterSigmaRange_ = GenericToolbox::Json::fetchValue(_config_, "parameterSigmaRange", _parameterSigmaRange_);
 
   _varsConfig_ = GenericToolbox::Json::fetchValue(_config_, "varsConfig", nlohmann::json());
+
+  LogDebug << "BUILDING SCANDATADICT" << std::endl;
 
   _scanDataDict_.clear();
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llh", true) ){
@@ -122,6 +126,11 @@ void ParScanner::readConfigImpl() {
       }
     }
   }
+
+
+
+  LogDebug << "BUILDING SCANDATADICT END" << std::endl;
+
 }
 void ParScanner::initializeImpl() {
   LogInfo << "Initializing ParScanner..." << std::endl;
