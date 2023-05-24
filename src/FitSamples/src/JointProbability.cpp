@@ -370,7 +370,6 @@ namespace JointProbability{
       double fgd_det_uncert = 0.;
       if (sample_.getName().find("FGD1") != std::string::npos){
           // to be applied on FGD1 samples only
-          //std::cout << "Adding FGD1 detector smearing :]\n";
           fgd_det_uncert = 0.;
           if (sample_.getName().find("0p") != std::string::npos){
               fgd_det_uncert = 0.016808;
@@ -390,7 +389,6 @@ namespace JointProbability{
       }
       else if (sample_.getName().find("FGD2") != std::string::npos){
           // to be applied on FGD2 samples only
-          //std::cout << "Adding FGD2 detector smearing :]\n";
           fgd_det_uncert = 0.;
           if (sample_.getName().find("0p") != std::string::npos){
               fgd_det_uncert = 0.019692;
@@ -408,12 +406,10 @@ namespace JointProbability{
               fgd_det_uncert = 0.056945;
           }
       }
-      //std::cout << "FGD detector uncertainty: " << fgd_det_uncert << "\n";
       
       // DETECTOR UNCERTAINTY FOR WAGASCI
       double wg_det_uncert = 0.;
       if (sample_.getName().find("WAGASCI") != std::string::npos){
-          //std::cout << "Adding WAGASCI detector smearing :]\n";
           wg_det_uncert = 0.; 
           if(sample_.getName().find("0#pi") != std::string::npos) {
 
