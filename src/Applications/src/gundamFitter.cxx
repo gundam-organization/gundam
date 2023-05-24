@@ -186,6 +186,10 @@ int main(int argc, char** argv){
     // this list insure all appendices will appear in the same order
     std::vector<std::pair<std::string, std::string>> appendixDict{
         {"configFile", "%s"},
+        {"overrideFiles", "With_%s"},
+        {"injectParameterConfig", "Inj_%s"},
+        {"scanLine", "LineSc_%s"},
+        {"useDataEntry", "DataEntry_%s"},
         {"asimov", "Asimov"},
         {"scanParameters", "Scan"},
         {"generateOneSigmaPlots", "OneSigma"},
@@ -194,10 +198,6 @@ int main(int argc, char** argv){
         {"skipSimplex", "NoSimplex"},
         {"kickMc", "KickMc"},
         {"lightOutputMode", "Light"},
-        {"useDataEntry", "DataEntry_%s"},
-        {"overrideFiles", "With_%s"},
-        {"injectParameterConfig", "Inj_%s"},
-        {"scanLine", "LineSc_%s"},
         {"toyFit", "ToyFit_%s"},
         {"dry-run", "DryRun"},
         {"appendix", "%s"},

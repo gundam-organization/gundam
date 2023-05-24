@@ -20,6 +20,9 @@ namespace GundamUtils {
 
   inline static std::string generateFileName(const CmdLineParser& clp_, const std::vector<std::pair<std::string, std::string>>& appendixDict_){
     std::vector<std::string> appendixList{};
+
+    int maxArgLength{64};
+
     for( const auto& appendixDictEntry : appendixDict_ ){
       if( clp_.isOptionTriggered(appendixDictEntry.first) ){
         appendixList.emplace_back( appendixDictEntry.second );
@@ -29,9 +32,9 @@ namespace GundamUtils {
           for( auto& arg : args ){
             // strip potential slashes and extensions
             arg = GenericToolbox::getFileNameFromFilePath(arg, false);
-            arg = arg.substr(0, 24); // cap length
-            if( arg.size() == 24 ){
+            if( arg.size() > maxArgLength ){
               // print dotdot if too long
+              arg = arg.substr(0, maxArgLength);
               arg[arg.size()-1] = '.';
               arg[arg.size()-2] = '.';
               arg[arg.size()-3] = '.';

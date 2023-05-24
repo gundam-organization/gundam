@@ -42,6 +42,7 @@ int main(int argc, char** argv) {
   clParser.addOption("configFile", {"-c", "--config-file"}, "Specify path to the fitter config file");
   clParser.addOption("overrideFiles", {"-of", "--override-files"}, "Provide config files that will override keys", -1);
   clParser.addOption("outputFolder", {"-o", "--out-folder"}, "Output folder name");
+  clParser.addOption("maxFileSizeInMb", {"--max-size"}, "Set the maximum size (in MB) an input file can be to be copied locally");
 
   clParser.addDummyOption();
 
@@ -70,6 +71,7 @@ int main(int argc, char** argv) {
     std::vector<std::pair<std::string, std::string>> appendixDict{
         {"configFile", "%s"},
         {"overrideFiles", "With_%s"},
+        {"maxFileSizeInMb", "MaxInputSize_%sMB"},
     };
 
     outFolder = {GundamUtils::generateFileName(clParser, appendixDict)};
@@ -89,8 +91,19 @@ int main(int argc, char** argv) {
     if( config_.is_string() ){
       std::string srcPath = GenericToolbox::expandEnvironmentVariables(config_.get<std::string>());
       if( GenericToolbox::doesPathIsFile( srcPath ) ){
-        LogInfo << "Copying local file and overriding entry: " << GenericToolbox::getFileNameFromFilePath(srcPath) << std::endl;
 
+        double fSize{double( GenericToolbox::getFileSizeInBytes(srcPath) )};
+        LogInfo << "Copying local file and overriding entry: " << GenericToolbox::getFileNameFromFilePath(srcPath)
+        << " ( " << GenericToolbox::parseSizeUnits(fSize) << " )" << std::endl;
+
+        if( clParser.isOptionTriggered("maxFileSizeInMb") ){
+          if( fSize/1E6 > clParser.getOptionVal<double>("maxFileSizeInMb") ){
+            LogAlert << "File too big wrt the threshold ( "
+            << clParser.getOptionVal<double>("maxFileSizeInMb")
+            << " MB ). Skipping the copy." << std::endl;
+            return;
+          }
+        }
         auto localFolder{GenericToolbox::joinPath(recursivePathBufferList)};
         auto localPath{GenericToolbox::joinPath(localFolder, GenericToolbox::getFileNameFromFilePath(srcPath))};
 

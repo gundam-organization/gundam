@@ -221,34 +221,42 @@ void Propagator::initializeImpl() {
       for( auto& parSet : _parameterSetList_ ){
         if( not parSet.isEnabled() ) continue;
 
-        bool keepThrow{false};
+        bool throwIsValid{false};
         if( parSet.isEnabledThrowToyParameters() and parSet.getPriorCovarianceMatrix() != nullptr ){
 
-          while( not keepThrow ){
+          int nTries{1};
+          while( not throwIsValid ){
+            LogScopeIndent;
+
             parSet.throwFitParameters();
-            keepThrow = true; // keep by default
+            throwIsValid = true; // keep by default
 
             if( _reThrowParSetIfOutOfBounds_ ){
               LogInfo << "Checking if the thrown parameters of the set are within bounds..." << std::endl;
 
               for( auto& par : parSet.getParameterList() ){
                 if( not std::isnan(par.getMinValue()) and par.getParameterValue() < par.getMinValue() ){
-                  keepThrow = false;
-                  LogAlert << par.getFullTitle() << ": thrown value lower than min bound ->" << std::endl;
+                  throwIsValid = false;
+                  LogAlert << par.getFullTitle() << ": "
+                  << GenericToolbox::ColorCodes::redLightText << "thrown value lower than min bound" << GenericToolbox::ColorCodes::resetColor
+                  << " ->" << std::endl;
                   LogAlert << par.getSummary(true) << std::endl;
                 }
                 else if( not std::isnan(par.getMaxValue()) and par.getParameterValue() > par.getMaxValue() ){
-                  keepThrow = false;
-                  LogAlert << par.getFullTitle() << ": thrown value higher than max bound ->" << std::endl;
+                  throwIsValid = false;
+                  LogAlert << par.getFullTitle() << ": "
+                  << GenericToolbox::ColorCodes::redLightText <<"thrown value higher than max bound" << GenericToolbox::ColorCodes::resetColor
+                  << " ->" << std::endl;
                   LogAlert << par.getSummary(true) << std::endl;
                 }
               }
 
-              if( not keepThrow ){
-                LogAlert << "Rethrowing \"" << parSet.getName() << "\"..." << std::endl;
+              if( not throwIsValid ){
+                LogAlert << "Rethrowing \"" << parSet.getName() << "\"... try #" << nTries+1 << std::endl << std::endl;
+                nTries++;
               }
               else{
-                LogWarning << "Keeping throw..." << std::endl;
+                LogWarning << "Keeping throw... (after " << nTries << " attempts)" << std::endl;
               }
             } // check bounds?
           } // keep?

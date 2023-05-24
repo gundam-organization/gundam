@@ -29,7 +29,7 @@ void FitParameterSet::readConfigImpl(){
   LogThrowIf(_config_.empty(), "FitParameterSet config not set.");
 
   _name_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
-  LogInfo << "Initializing parameter set: " << _name_ << std::endl;
+  LogInfo << std::endl << "Initializing parameter set: " << _name_ << std::endl;
 
   _isEnabled_ = GenericToolbox::Json::fetchValue<bool>(_config_, "isEnabled");
   LogReturnIf(not _isEnabled_, _name_ << " parameters are disabled.");
@@ -142,12 +142,12 @@ void FitParameterSet::processCovarianceMatrix(){
 
   if( _priorCovarianceMatrix_ == nullptr ){ return; } // nothing to do
 
-  LogInfo << "Stripping the matrix from fixed/disabled parameters in set: " << getName() << std::endl;
+  LogInfo << "Stripping the matrix from fixed/disabled parameters..." << std::endl;
   int nbFitParameters{0};
   for( const auto& par : _parameterList_ ){
     if( FitParameterSet::isValidCorrelatedParameter(par) ) nbFitParameters++;
   }
-  LogInfo << "Effective nb parameters: " << nbFitParameters << std::endl;
+  LogInfo << nbFitParameters << " effective parameters were defined in set: " << getName() << std::endl;
 
   _strippedCovarianceMatrix_ = std::make_shared<TMatrixDSym>(nbFitParameters);
   int iStrippedPar = -1;
@@ -173,7 +173,7 @@ void FitParameterSet::processCovarianceMatrix(){
     _inverseStrippedCovarianceMatrix_->Invert();
   }
   else {
-    LogWarning << "Decomposing the stripped covariance matrix in set: " << getName() << std::endl;
+    LogWarning << "Decomposing the stripped covariance matrix..." << std::endl;
     _eigenParameterList_.resize(_strippedCovarianceMatrix_->GetNrows(), FitParameter(this));
 
     _eigenDecomp_     = std::make_shared<TMatrixDSymEigen>(*_strippedCovarianceMatrix_);
@@ -382,13 +382,13 @@ void FitParameterSet::moveFitParametersToPrior(){
 
   if( not _useEigenDecompInFit_ ){
     for( auto& par : _parameterList_ ){
-      if( par.isFixed() ){ continue; }
+      if( par.isFixed() or not par.isEnabled() ){ continue; }
       par.setParameterValue(par.getPriorValue());
     }
   }
   else{
     for( auto& eigenPar : _eigenParameterList_ ){
-      if( eigenPar.isFixed() ) continue;
+      if( eigenPar.isFixed() or not eigenPar.isEnabled() ) continue;
       eigenPar.setParameterValue(eigenPar.getPriorValue());
     }
     this->propagateEigenToOriginal();
@@ -850,7 +850,7 @@ void FitParameterSet::defineParameters(){
         par.setIsEnabled( false );
       }
       else{
-        LogWarning << "Enabling parameter \"" << par.getFullTitle() << "\" as it is not set in enableOnlyParameters" << std::endl;
+        LogInfo << "Enabling parameter \"" << par.getFullTitle() << "\" as it is set in enableOnlyParameters" << std::endl;
       }
     }
     if( not _disableParameters_.empty() ){
