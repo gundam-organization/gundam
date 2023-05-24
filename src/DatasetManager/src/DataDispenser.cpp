@@ -171,8 +171,7 @@ void DataDispenser::parseStringParameters() {
 
   if( not _parameters_.overrideLeafDict.empty() ){
     for( auto& entryDict : _parameters_.overrideLeafDict ){ replaceToyIndexFct(entryDict.second); }
-    LogInfo << "Overriding leaf dict: " << std::endl;
-    LogInfo << GenericToolbox::parseMapAsString(_parameters_.overrideLeafDict) << std::endl;
+    LogInfo << "Overriding leaf dict: " << GenericToolbox::parseMapAsString(_parameters_.overrideLeafDict) << std::endl;
 
     for( auto& overrideEntry : _parameters_.overrideLeafDict ){
       _cache_.varsToOverrideList.emplace_back(overrideEntry.first);
