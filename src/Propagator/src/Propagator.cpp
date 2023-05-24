@@ -241,7 +241,6 @@ void Propagator::initializeImpl() {
                   throwIsValid = false;
                   LogAlert << redLightText << "thrown value lower than min bound -> " << resetColor
                   << par.getSummary(true) << std::endl;
-                  LogAlert << par.getSummary(true) << std::endl;
                 }
                 else if( not std::isnan(par.getMaxValue()) and par.getParameterValue() > par.getMaxValue() ){
                   throwIsValid = false;
