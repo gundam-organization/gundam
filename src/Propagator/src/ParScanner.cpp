@@ -84,6 +84,8 @@ void ParScanner::readConfigImpl() {
     for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
 
       LogDebug << GET_VAR_NAME_VALUE(sample.getBinning().getBinsList().size()) << std::endl;
+      LogDebug << GET_VAR_NAME_VALUE(sample.isEnabled()) << std::endl;
+      LogDebug << GET_VAR_NAME_VALUE(sample.getName()) << std::endl;
 
       for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
         _scanDataDict_.emplace_back();
