@@ -45,6 +45,8 @@ int main(int argc, char** argv) {
 
   clParser.addDummyOption();
 
+  clParser.addTriggerOption("zipOutFolder", {"-z", "--zip"}, "Zip the output folder");
+
   LogInfo << "Usage: " << std::endl;
   LogInfo << clParser.getConfigSummary() << std::endl << std::endl;
 
@@ -122,6 +124,11 @@ int main(int argc, char** argv) {
   pathBuffer = GenericToolbox::joinPath(outFolder, "config.json");
   LogInfo << "Writing config under: " << pathBuffer << std::endl;
   GenericToolbox::dumpStringInFile( pathBuffer, configHandler.toString() );
+
+  if( clParser.isOptionTriggered("zipOutFolder") ){
+    LogInfo << "Creating a .gz archive of \"" << outFolder << "\"" << std::endl;
+    std::system( ("tar -czvf \"" + outFolder + ".tar.gz\" \"" + outFolder + "\"").c_str() );
+  }
 
   return EXIT_SUCCESS;
 }
