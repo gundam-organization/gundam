@@ -382,13 +382,13 @@ void FitParameterSet::moveFitParametersToPrior(){
 
   if( not _useEigenDecompInFit_ ){
     for( auto& par : _parameterList_ ){
-      if( par.isFixed() ){ continue; }
+      if( par.isFixed() or not par.isEnabled() ){ continue; }
       par.setParameterValue(par.getPriorValue());
     }
   }
   else{
     for( auto& eigenPar : _eigenParameterList_ ){
-      if( eigenPar.isFixed() ) continue;
+      if( eigenPar.isFixed() or not eigenPar.isEnabled() ) continue;
       eigenPar.setParameterValue(eigenPar.getPriorValue());
     }
     this->propagateEigenToOriginal();
