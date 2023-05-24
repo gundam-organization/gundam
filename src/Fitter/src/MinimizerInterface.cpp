@@ -102,6 +102,17 @@ void MinimizerInterface::initializeImpl(){
       _minimizer_->SetVariableStepSize(iFitPar, FitParameterSet::toNormalizedParRange(fitPar.getStepSize()*_stepSizeScaling_, fitPar));
     }
   }
+
+  if( GenericToolbox::Json::doKeyExist( _config_, "monitorGradientDescent" ) ){
+    getLikelihood().setMonitorGradientDescent(GenericToolbox::Json::fetchValue<bool>( _config_, "monitorGradientDescent" ));
+  }
+  else if( GenericToolbox::toLowerCase(getLikelihood().getMinimizerType()) == "minuit"
+           or GenericToolbox::toLowerCase(getLikelihood().getMinimizerType()) == "minuit2"
+      ){
+    LogInfo << "Monitoring gradient as minimizer is Minuit" << std::endl;
+    getLikelihood().setMonitorGradientDescent( true );
+  }
+
 }
 
 bool MinimizerInterface::isFitHasConverged() const {
