@@ -226,8 +226,7 @@ std::string FitParameter::getFullTitle() const{
 std::string FitParameter::getSummary(bool shallow_) const {
   std::stringstream ss;
 
-  ss << "#" << _parameterIndex_;
-  if( not _name_.empty() ) ss << " (" << _name_ << ")";
+  ss << this->getFullTitle();
   ss << ", isEnabled=" << _isEnabled_;
   ss << ": value=" << _parameterValue_;
   ss << ", prior=" << _priorValue_;

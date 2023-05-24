@@ -244,10 +244,9 @@ void Propagator::initializeImpl() {
                 }
                 else if( not std::isnan(par.getMaxValue()) and par.getParameterValue() > par.getMaxValue() ){
                   throwIsValid = false;
-                  LogAlert << par.getFullTitle() << ": "
+                  LogAlert << par.getSummary(true) << ": "
                   << GenericToolbox::ColorCodes::redLightText <<"thrown value higher than max bound" << GenericToolbox::ColorCodes::resetColor
-                  << " ->" << std::endl;
-                  LogAlert << par.getSummary(true) << std::endl;
+                  << std::endl;
                 }
               }
 
