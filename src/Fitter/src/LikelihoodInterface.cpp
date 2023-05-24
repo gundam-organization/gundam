@@ -167,32 +167,33 @@ double LikelihoodInterface::evalFit(const double* parArray_){
 
   _evalFitAvgTimer_.counts++; _evalFitAvgTimer_.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 
-  // check if minuit is moving toward the minimum
-  bool isGradientDescentStep = std::all_of(_minimizerFitParameterPtr_.begin(), _minimizerFitParameterPtr_.end(), [](const FitParameter* par_){
-    return ( par_->gotUpdated() or par_->isFixed() or not par_->isEnabled() );
-  } );
-
-  if( isGradientDescentStep ){
-    if( _lastGradientFall_ == _nbFitCalls_-1 ){
-      LogWarning << "Overriding last gradient descent entry: ";
-      LogWarning(_gradientMonitor_.size() >= 2) << _gradientMonitor_[_gradientMonitor_.size() - 2].llh << " -> ";
-      LogWarning << _owner_->getPropagator().getLlhBuffer() << std::endl;
-      _gradientMonitor_.back().parState = _owner_->getPropagator().exportParameterInjectorConfig();
-      _gradientMonitor_.back().llh = _owner_->getPropagator().getLlhBuffer();
-      _lastGradientFall_ = _nbFitCalls_;
-    }
-    else{
-      // saving each step of the gradient descen
-      _gradientMonitor_.emplace_back();
-      LogWarning << "Gradient step detected at iteration #" << _nbFitCalls_ << ": ";
-      LogWarning(_gradientMonitor_.size() >= 2) << _gradientMonitor_[_gradientMonitor_.size() - 2].llh << " -> ";
-      LogWarning << _owner_->getPropagator().getLlhBuffer() << std::endl;
-      _gradientMonitor_.back().parState = _owner_->getPropagator().exportParameterInjectorConfig();
-      _gradientMonitor_.back().llh = _owner_->getPropagator().getLlhBuffer();
-      _lastGradientFall_ = _nbFitCalls_;
+  // Minuit based algo might want this
+  if( _monitorGradientDescent_ ){
+    // check if minuit is moving toward the minimum
+    bool isGradientDescentStep = std::all_of(_minimizerFitParameterPtr_.begin(), _minimizerFitParameterPtr_.end(), [](const FitParameter* par_){
+      return ( par_->gotUpdated() or par_->isFixed() or not par_->isEnabled() );
+    } );
+    if( isGradientDescentStep ){
+      if( _lastGradientFall_ == _nbFitCalls_-1 ){
+        LogWarning << "Overriding last gradient descent entry: ";
+        LogWarning(_gradientMonitor_.size() >= 2) << _gradientMonitor_[_gradientMonitor_.size() - 2].llh << " -> ";
+        LogWarning << _owner_->getPropagator().getLlhBuffer() << std::endl;
+        _gradientMonitor_.back().parState = _owner_->getPropagator().exportParameterInjectorConfig();
+        _gradientMonitor_.back().llh = _owner_->getPropagator().getLlhBuffer();
+        _lastGradientFall_ = _nbFitCalls_;
+      }
+      else{
+        // saving each step of the gradient descen
+        _gradientMonitor_.emplace_back();
+        LogWarning << "Gradient step detected at iteration #" << _nbFitCalls_ << ": ";
+        LogWarning(_gradientMonitor_.size() >= 2) << _gradientMonitor_[_gradientMonitor_.size() - 2].llh << " -> ";
+        LogWarning << _owner_->getPropagator().getLlhBuffer() << std::endl;
+        _gradientMonitor_.back().parState = _owner_->getPropagator().exportParameterInjectorConfig();
+        _gradientMonitor_.back().llh = _owner_->getPropagator().getLlhBuffer();
+        _lastGradientFall_ = _nbFitCalls_;
+      }
     }
   }
-
 
   if(_enableFitMonitor_ && _convergenceMonitor_.isGenerateMonitorStringOk()){
 

@@ -178,11 +178,6 @@ private:
   /// A tree that save the history of the minimization.
   std::unique_ptr<TTree> _chi2HistoryTree_{nullptr};
 
-  struct GradientStepPoint {
-    nlohmann::json parState;
-    double llh;
-  };
-  std::vector<GradientStepPoint> _gradientMonitor_{};
 
   // Output monitors!
   GenericToolbox::VariablesMonitor _convergenceMonitor_;
@@ -192,12 +187,17 @@ private:
   GenericToolbox::CycleClock _itSpeedMon_{"it"};
 
   /// Parameters to control how the monitor behaves.
-  bool _monitorGradientDescent_{true};
   bool _enableFitMonitor_{false};
   bool _showParametersOnFitMonitor_{false};
   int _maxNbParametersPerLineOnMonitor_{15};
 
+  bool _monitorGradientDescent_{false};
   int _lastGradientFall_{-2};
+  struct GradientStepPoint {
+    nlohmann::json parState;
+    double llh;
+  };
+  std::vector<GradientStepPoint> _gradientMonitor_{};
 };
 
 #endif //  GUNDAM_LikelihoodInterface_h
