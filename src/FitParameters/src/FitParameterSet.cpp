@@ -850,7 +850,7 @@ void FitParameterSet::defineParameters(){
         par.setIsEnabled( false );
       }
       else{
-        LogWarning << "Enabling parameter \"" << par.getFullTitle() << "\" as it is not set in enableOnlyParameters" << std::endl;
+        LogInfo << "Enabling parameter \"" << par.getFullTitle() << "\" as it is set in enableOnlyParameters" << std::endl;
       }
     }
     if( not _disableParameters_.empty() ){
