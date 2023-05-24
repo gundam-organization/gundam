@@ -5,6 +5,7 @@
 #include "GenericToolbox.Json.h"
 #include "ConfigUtils.h"
 #include "GundamGreetings.h"
+#include "GundamUtils.h"
 
 #include "Logger.h"
 #include "CmdLineParser.h"
@@ -28,9 +29,11 @@ int main( int argc, char** argv ){
   g.hello();
 
   CmdLineParser clp(argc, argv);
-  clp.addOption("config-file", {"-c"}, "Provide YAML/Json configuration file.", 1);
-  clp.addOption("output-file", {"-o"}, "Set output file name.", 1);
+  clp.addOption("configFile", {"-c"}, "Provide YAML/Json configuration file.", 1);
   clp.addOption("overrideFiles", {"-of", "--override-files"}, "Provide config files that will override keys", -1);
+
+  clp.addOption("output-file", {"-o"}, "Set output file name.", 1, true);
+  clp.addOption("appendix", {"--appendix"}, "Add appendix to output file name", 1);
 
   LogInfo << "Available options: " << std::endl;
   LogInfo << clp.getConfigSummary() << std::endl;
@@ -43,14 +46,28 @@ int main( int argc, char** argv ){
   LogInfo << "Reading config..." << std::endl;
 
   // Import
-  ConfigUtils::ConfigHandler configHandler( clp.getOptionVal<std::string>("config-file") );
-
-  // Edit
+  ConfigUtils::ConfigHandler configHandler( clp.getOptionVal<std::string>("configFile") );
   configHandler.override( clp.getOptionValList<std::string>("overrideFiles") );
 
   // Export
   if( clp.isOptionTriggered("output-file") ){
-    configHandler.exportToJsonFile( clp.getOptionVal<std::string>("output-file") );
+
+    // appendixDict["optionName"] = "Appendix"
+    // this list insure all appendices will appear in the same order
+    std::vector<std::pair<std::string, std::string>> appendixDict{
+        {"configFile", "%s"},
+        {"overrideFiles", "With_%s"},
+        {"appendix", "%s"},
+    };
+
+    std::string outPath{GundamUtils::generateFileName(clp, appendixDict) + ".json"};
+
+    if( clp.getNbValueSet("output-file") != 0 ){
+      outPath = clp.getOptionVal<std::string>("output-file");
+    }
+
+    // export now
+    configHandler.exportToJsonFile( outPath );
   }
   else{
     std::cout << configHandler.toString() << std::endl;

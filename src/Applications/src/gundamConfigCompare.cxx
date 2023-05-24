@@ -165,11 +165,11 @@ void compareConfigStage(const nlohmann::json& config1_, const nlohmann::json& co
 
           for( auto& key : keysToFetch ){
             if     ( not GenericToolbox::Json::doKeyExist(entry1_, key) ){
-              LogError << path <<  " -> missing key \"" << key << "\" in c1." << std::endl;
+              LogError << path <<  " -> missing key \"" << key << "\" in c1. Value in c2 is: " << entry2_[key] << std::endl;
               continue;
             }
             else if( not GenericToolbox::Json::doKeyExist(entry2_, key ) ){
-              LogError << path << " -> missing key \"" << key << "\" in c2." << std::endl;
+              LogError << path << " -> missing key \"" << key << "\" in c2. Value in c1 is: " << entry1_[key] << std::endl;
               continue;
             }
 
