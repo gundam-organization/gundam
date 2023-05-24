@@ -30,6 +30,8 @@ LoggerInit([]{
 void Propagator::muteLogger(){ Logger::setIsMuted( true ); }
 void Propagator::unmuteLogger(){ Logger::setIsMuted( false ); }
 
+using namespace GenericToolbox::ColorCodes;
+
 
 void Propagator::readConfigImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
@@ -237,16 +239,14 @@ void Propagator::initializeImpl() {
               for( auto& par : parSet.getParameterList() ){
                 if( not std::isnan(par.getMinValue()) and par.getParameterValue() < par.getMinValue() ){
                   throwIsValid = false;
-                  LogAlert << par.getFullTitle() << ": "
-                  << GenericToolbox::ColorCodes::redLightText << "thrown value lower than min bound" << GenericToolbox::ColorCodes::resetColor
-                  << " ->" << std::endl;
+                  LogAlert << redLightText << "thrown value lower than min bound -> " << resetColor
+                  << par.getSummary(true) << std::endl;
                   LogAlert << par.getSummary(true) << std::endl;
                 }
                 else if( not std::isnan(par.getMaxValue()) and par.getParameterValue() > par.getMaxValue() ){
                   throwIsValid = false;
-                  LogAlert << par.getSummary(true) << ": "
-                  << GenericToolbox::ColorCodes::redLightText <<"thrown value higher than max bound" << GenericToolbox::ColorCodes::resetColor
-                  << std::endl;
+                  LogAlert << redLightText <<"thrown value higher than max bound -> " << resetColor
+                  << par.getSummary(true) << std::endl;
                 }
               }
 
