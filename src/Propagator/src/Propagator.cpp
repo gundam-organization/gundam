@@ -234,12 +234,16 @@ void Propagator::initializeImpl() {
               for( auto& par : parSet.getParameterList() ){
                 if( not std::isnan(par.getMinValue()) and par.getParameterValue() < par.getMinValue() ){
                   keepThrow = false;
-                  LogAlert << par.getFullTitle() << ": thrown value lower than min bound ->" << std::endl;
+                  LogAlert << par.getFullTitle() << ": "
+                  << GenericToolbox::ColorCodes::redLightText << "thrown value lower than min bound" << GenericToolbox::ColorCodes::resetColor
+                  << " ->" << std::endl;
                   LogAlert << par.getSummary(true) << std::endl;
                 }
                 else if( not std::isnan(par.getMaxValue()) and par.getParameterValue() > par.getMaxValue() ){
                   keepThrow = false;
-                  LogAlert << par.getFullTitle() << ": thrown value higher than max bound ->" << std::endl;
+                  LogAlert << par.getFullTitle() << ": "
+                  << GenericToolbox::ColorCodes::redLightText <<"thrown value higher than max bound" << GenericToolbox::ColorCodes::resetColor
+                  << " ->" << std::endl;
                   LogAlert << par.getSummary(true) << std::endl;
                 }
               }
