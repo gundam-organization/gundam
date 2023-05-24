@@ -82,14 +82,16 @@ void ParScanner::readConfigImpl() {
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSamplePerBin", false) ){
     for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
+
+      LogDebug << GET_VAR_NAME_VALUE(sample.getBinning().getBinsList().size()) << std::endl;
+
       for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
         _scanDataDict_.emplace_back();
         auto& scanEntry = _scanDataDict_.back();
         scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
         scanEntry.folder = "llhStat/" + sample.getName() + "/bin_" + std::to_string(iBin);
         scanEntry.title = Form(R"(Stat LLH Scan of sample "%s", bin #%d "%s")",
-                               sample.getName().c_str(),
-                               iBin,
+                               sample.getName().c_str(), iBin,
                                sample.getBinning().getBinsList()[iBin-1].getSummary().c_str());
         scanEntry.yTitle = "Stat LLH value";
         auto* samplePtr = &sample;
@@ -126,8 +128,6 @@ void ParScanner::readConfigImpl() {
       }
     }
   }
-
-
 
   LogDebug << "BUILDING SCANDATADICT END" << std::endl;
 
