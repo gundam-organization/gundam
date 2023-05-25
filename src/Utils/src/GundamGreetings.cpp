@@ -3,7 +3,7 @@
 //
 
 #include "GundamGreetings.h"
-#include "VersionConfig.h"
+#include "GundamUtils.h"
 
 #include "Logger.h"
 #include "GenericToolbox.h"
@@ -26,7 +26,7 @@ void GundamGreetings::hello() {
   std::stringstream ss;
   ss << "Welcome to GUNDAM "
      << (_appName_.empty() ? GenericToolbox::getExecutableName() : _appName_)
-     << " v" + GundamVersionConfig::getVersionStr();
+     << " v" + GundamUtils::getVersionFullStr();
 
   LogInfo << GenericToolbox::addUpDownBars(ss.str()) << std::endl;
 }
@@ -38,14 +38,14 @@ void GundamGreetings::goodbye() {
 }
 
 bool GundamGreetings::isNewerOrEqualVersion(const std::string &minimalVersion_){
-  if( GundamVersionConfig::getVersionStr() == "X.X.X" ){
+  if( GundamUtils::getVersionStr() == "X.X.X" ){
     LogAlert << "Can't check version requirement. Assuming OK." << std::endl;
     return true;
   }
   auto minVersionSplit = GenericToolbox::splitString(minimalVersion_, ".");
   LogThrowIf(minVersionSplit.size() != 3, "Invalid version format: " << minimalVersion_);
-  auto curVersionSplit = GenericToolbox::splitString(GundamVersionConfig::getVersionStr(), ".");
-  LogThrowIf(curVersionSplit.size() != 3, "Invalid current version format: " << GundamVersionConfig::getVersionStr());
+  auto curVersionSplit = GenericToolbox::splitString(GundamUtils::getVersionStr(), ".");
+  LogThrowIf(curVersionSplit.size() != 3, "Invalid current version format: " << GundamUtils::getVersionStr());
 
   // stripping "f" tag
   if( minVersionSplit[2].back() == 'f' ){ minVersionSplit[2].pop_back(); }
