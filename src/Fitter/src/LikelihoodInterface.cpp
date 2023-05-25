@@ -86,12 +86,11 @@ void LikelihoodInterface::saveGradientSteps(){
   nlohmann::json currentParState{_owner_->getPropagator().exportParameterInjectorConfig()};
   GenericToolbox::ScopedGuard g{
     [&](){
-      ParScanner::muteLogger();
-    },
-    [&](){
       FitParameterSet::muteLogger();
       Propagator::muteLogger();
       ParScanner::muteLogger();
+    },
+    [&](){
       _owner_->getPropagator().injectParameterValues( currentParState );
       FitParameterSet::unmuteLogger();
       Propagator::unmuteLogger();
@@ -101,8 +100,6 @@ void LikelihoodInterface::saveGradientSteps(){
 
   // load starting point
   auto lastParStep{_owner_->getPreFitParState()};
-  _owner_->getPropagator().injectParameterValues( lastParStep );
-  _owner_->getPropagator().updateLlhCache();
 
   std::vector<GraphEntry> globalGraphList;
   for(size_t iGradStep = 0 ; iGradStep < _gradientMonitor_.size() ; iGradStep++ ){
