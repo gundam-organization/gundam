@@ -3,7 +3,6 @@
 //
 
 #include "FitterEngine.h"
-#include "VersionConfig.h"
 #include "ConfigUtils.h"
 #include "GundamUtils.h"
 #include "GlobalVariables.h"

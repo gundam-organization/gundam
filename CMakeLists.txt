@@ -36,11 +36,19 @@ option( CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ langauge (-std=gnu++1
 ###############################
 include( CTest )
 include( ${CMAKE_SOURCE_DIR}/cmake/cmessage.cmake )
-include( ${CMAKE_SOURCE_DIR}/cmake/versionCheck.cmake )
 
 
+# Printout version & generate header
+set(GENERATE_DIR_FOR_VERSION_CHECK ${CMAKE_BINARY_DIR} CACHE STRING "GENERATE_DIR_FOR_VERSION_CHECK")
+add_custom_target( preBuildVersionCheck
+    COMMAND echo "Cache variable: ${GENERATE_DIR_FOR_VERSION_CHECK}"
+    COMMAND ${CMAKE_COMMAND} -D GENERATE_DIR_FOR_VERSION_CHECK=${GENERATE_DIR_FOR_VERSION_CHECK} -P ${CMAKE_SOURCE_DIR}/cmake/updateVersion.cmake
+    COMMENT "Checking GUNDAM version with git files..."
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    )
 
-doVersionCheck()
+# Run now as well
+include( ${CMAKE_SOURCE_DIR}/cmake/updateVersion.cmake )
 
 set( VERBOSE TRUE )
 
@@ -69,7 +77,7 @@ if( ENABLE_CUDA )
         cmessage(WARNING "CUDA not present -- Cache::Manager use the CPU")
     endif(CMAKE_CUDA_COMPILER)
 else(ENABLE_CUDA)
-    cmessage(WARNING "CUDA support disabled")
+    cmessage(ALERT "CUDA support disabled")
 endif(ENABLE_CUDA)
 
 # Changes default install path to be a subdirectory of the build dir.
@@ -366,14 +374,6 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fPIC -g")
 cmessage (STATUS "C++ Compiler      : ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 cmessage (STATUS "C++ Release flags : ${CMAKE_CXX_FLAGS_RELEASE}")
 cmessage (STATUS "C++ Debug flags   : ${CMAKE_CXX_FLAGS_DEBUG}")
-
-
-################################################################################
-# CMake Generated
-###############################################################################
-
-configure_file( ${CMAKE_SOURCE_DIR}/cmake/VersionConfig.h.in ${CMAKE_BINARY_DIR}/generated/VersionConfig.h )
-include_directories( ${CMAKE_BINARY_DIR}/generated/ )
 
 
 ################################################################################

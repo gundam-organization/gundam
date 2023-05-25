@@ -1,6 +1,5 @@
 
 #include "GlobalVariables.h"
-#include "VersionConfig.h"
 #include "GundamGreetings.h"
 #include "Propagator.h"
 #include "ConfigUtils.h"

@@ -40,10 +40,13 @@ set( UTILS_HEADERS ${HEADERS} )
 #list(APPEND SRCFILES GundamUtilsDict.cxx)
 
 if( USE_STATIC_LINKS )
-  add_library(GundamUtils STATIC ${SRCFILES})
+  add_library( GundamUtils STATIC ${SRCFILES})
 else()
-  add_library(GundamUtils SHARED ${SRCFILES})
+  add_library( GundamUtils SHARED ${SRCFILES})
 endif()
+
+add_dependencies( GundamUtils preBuildVersionCheck )
+include_directories( ${CMAKE_BINARY_DIR}/generated/ ) # version header
 
 # Make sure the current directories are available for the later
 # compilation.
