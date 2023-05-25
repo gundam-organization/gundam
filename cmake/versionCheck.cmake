@@ -20,7 +20,7 @@ function( doVersionCheck )
   set( GUNDAM_VERSION_STRING "X.X.X" PARENT_SCOPE )
 
   if(RETURN_VAL EQUAL "0")
-    cmessage(STATUS "Git version: ${VERSION}")
+    cmessage( STATUS "Git version: ${VERSION}")
 
     string(REPLACE "-" ";" VERSION_SEP ${VERSION})
     list(LENGTH VERSION_SEP len)
