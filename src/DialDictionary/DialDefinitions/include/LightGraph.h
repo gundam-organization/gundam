@@ -12,6 +12,9 @@
 #include <vector>
 
 
+/// A DialBase class to do piecewise linear interpolation.  This is
+/// initialized using a ROOT TGraph, and will return the same values, but uses
+/// much less space and is generally faster.
 class LightGraph : public DialBase {
 
 public:
@@ -26,14 +29,14 @@ public:
 
   virtual void buildDial(const TGraph& grf, const std::string& option_="") override;
 
+  const std::vector<double>& getDialData() const override {return _Data_;}
+
 protected:
   bool _allowExtrapolation_{false};
-  Int_t nPoints{0};   ///< Number of points <= fMaxSize
-  std::vector<Double_t> xPoints; ///<[fNpoints] array of X points
-  std::vector<Double_t> yPoints; ///<[fNpoints] array of Y points
+
+  // The data for the graph packed as {y0,x0,y1,x1,y2,x2,...}
+  std::vector<Double_t> _Data_;
 };
 
 typedef CachedDial<LightGraph> LightGraphCache;
-
-
 #endif //GUNDAM_LIGHTGRAPH_H

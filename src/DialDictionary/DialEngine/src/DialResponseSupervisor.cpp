@@ -6,12 +6,19 @@
 
 #include <sstream>
 
-
 void DialResponseSupervisor::setMinResponse(double minResponse) {
   _minResponse_ = minResponse;
 }
 void DialResponseSupervisor::setMaxResponse(double maxResponse) {
   _maxResponse_ = maxResponse;
+}
+
+double DialResponseSupervisor::getMinResponse() const {
+    return _minResponse_;
+}
+
+double DialResponseSupervisor::getMaxResponse() const {
+    return _maxResponse_;
 }
 
 double DialResponseSupervisor::process(double reponse_) const {

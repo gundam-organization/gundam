@@ -23,6 +23,9 @@ public:
 
   [[nodiscard]] std::string getSummary() const;
 
+  [[nodiscard]] double getMinResponse() const;
+  [[nodiscard]] double getMaxResponse() const;
+
 private:
   double _minResponse_{std::nan("unset")};
   double _maxResponse_{std::nan("unset")};

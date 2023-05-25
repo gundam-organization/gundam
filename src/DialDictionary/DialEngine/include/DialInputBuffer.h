@@ -33,6 +33,7 @@ public:
 
   [[nodiscard]] bool isMasked() const;
   [[nodiscard]] bool isDialUpdateRequested() const;
+  [[nodiscard]] bool useParameterMirroring() const;
 
   /// Just a wrapper around the vector<double>::size() method.
   [[nodiscard]] size_t getBufferSize() const;
@@ -68,6 +69,14 @@ public:
   /// parameters are being used, there must be a mirror bound for every
   /// parameter.
   void addMirrorBounds(const std::pair<double, double>& lowEdgeAndRange_);
+
+  /// Get the vector of mirror bounds (will be empty if the parameter is not
+  /// mirrored) If mirrorred parameters have been provided, there must be a
+  /// mirror for each parameter.  The first entry in the pair is the lower
+  /// bound of the mirrored region, the second entry is the range of the
+  /// mirror.  The valid region will be between first, and first+second.
+  [[nodiscard]]
+       const std::pair<double,double>& getMirrorBounds(int i) const;
 
   /// Simple printout function for debug info on error
   [[nodiscard]] std::string getSummary() const;

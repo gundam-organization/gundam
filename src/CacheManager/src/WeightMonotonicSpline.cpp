@@ -121,19 +121,22 @@ void Cache::Weight::MonotonicSpline::AddSpline(int resIndex,
         throw std::runtime_error("Negative parameter index");
     }
     if (fParameters.size() <= parIndex) {
-        LogError << "Invalid parameter index"
-               << std::endl;
+        LogError << "Invalid parameter index: " << parIndex
+                 << " out of " << fParameters.size()
+                 << std::endl;
         throw std::runtime_error("Parameter index out of bounds");
     }
     if (splineData.size() < 5) {
-        LogError << "Insufficient points in spline"
+        LogError << "Insufficient points in spline: " << splineData.size()
                << std::endl;
         throw std::runtime_error("Invalid number of spline points");
     }
     int newIndex = fSplinesUsed++;
     if (fSplinesUsed > fSplinesReserved) {
         LogError << "Not enough space reserved for splines"
-                  << std::endl;
+                 << " Reserved: " << fSplinesReserved
+                 << " Used: " << fSplinesUsed
+                 << std::endl;
         throw std::runtime_error("Not enough space reserved for splines");
     }
     fSplineResult->hostPtr()[newIndex] = resIndex;
@@ -147,7 +150,9 @@ void Cache::Weight::MonotonicSpline::AddSpline(int resIndex,
     fSplineKnotsUsed += splineData.size();
     if (fSplineKnotsUsed > fSplineKnotsReserved) {
         LogError << "Not enough space reserved for spline knots"
-               << std::endl;
+                 << " Reserved: " << fSplineKnotsReserved
+                 << " Used: " << fSplineKnotsUsed
+                 << std::endl;
         throw std::runtime_error("Not enough space reserved for spline knots");
     }
     fSplineIndex->hostPtr()[newIndex+1] = fSplineKnotsUsed;

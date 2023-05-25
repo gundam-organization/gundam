@@ -11,8 +11,13 @@ LoggerInit([]{
 });
 
 const std::vector<double>& DialBase::getDialData() const {
-    throw std::runtime_error("getDialData not implemented for "
+    LogError << "getDialData not implemented for "
+             << this->getDialTypeName()
+             << std::endl;
+#ifdef NDEBUG
+    throw std::runtime_error("DialBase::getDialData not implemented for "
                              + this->getDialTypeName());
+#endif
     static const std::vector<double> dummy;
     return dummy;
 }

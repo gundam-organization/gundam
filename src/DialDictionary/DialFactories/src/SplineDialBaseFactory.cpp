@@ -1,6 +1,14 @@
 #include "SplineDialBaseFactory.h"
 
-#include "DialTypes.h"
+// Explicitly list the headers that are actually needed.  Do not include
+// others.
+#include "Spline.h"
+#include "SimpleSpline.h"
+#include "CompactSpline.h"
+#include "UniformSpline.h"
+#include "GeneralSpline.h"
+#include "MonotonicSpline.h"
+#include "Shift.h"
 
 #include "TGraph.h"
 #include "TSpline.h"
@@ -102,9 +110,10 @@ bool SplineDialBaseFactory::FillFromSpline(std::vector<double>& xPoint,
 void SplineDialBaseFactory::MakeMonotonic(const std::vector<double>& xPoint,
                                           const std::vector<double>& yPoint,
                                           std::vector<double>& slope) {
-  // Apply the monotonic condition to the slopes.  This always adjusts the
-  // slopes, however, with Catmull-Rom the modified slopes will be ignored
-  // and the monotonic criteria is applied as the spline is evaluated.
+  // Apply the Fritsh-Carlson monotonic condition to the slopes.  This adjusts
+  // the slopes (when necessary), however, with Catmull-Rom the modified
+  // slopes will be ignored and the monotonic criteria is applied as the
+  // spline is evaluated (saves memory).
   for (int i = 0; i<xPoint.size(); ++i) {
     double m{std::numeric_limits<double>::infinity()};
     if (i>0) m = (yPoint[i] - yPoint[i-1])/(xPoint[i] - xPoint[i-1]);
@@ -162,10 +171,6 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
   _yPointListBuffer_.clear();
   _slopeListBuffer_.clear();
 
-//  std::vector<double> xPoint;
-//  std::vector<double> yPoint;
-//  std::vector<double> slopePoint;
-
   ///////////////////////////////////////////////////////////////////////
   // Side-effect programming alert.  The conditionals are doing the actual
   // work and setting xPoint, yPoint and slopePoint.  We only have a couple
@@ -220,7 +225,7 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
     // Use a tolerance based on float in case the data when through a float.
     // Keep this inside the loop so it has the right scope, and depend on the
     // compiler to do the right thing.
-    const double toler{std::numeric_limits<float>::epsilon()};
+    const double toler{2*std::numeric_limits<float>::epsilon()};
     const double delta{std::abs(y-_yPointListBuffer_[0])};
     if (delta > toler) isFlat = false;
   }
@@ -228,7 +233,8 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
   // If the function is flat AND equal to one, the drop it.  Compare against
   // float accuracy in case the value was actually calculated against with a
   // float.
-  if (std::abs(_yPointListBuffer_[0]-1.0) < std::numeric_limits<float>::epsilon()
+  if (std::abs(_yPointListBuffer_[0]-1.0)
+      < 2*std::numeric_limits<float>::epsilon()
       and isFlat) {
     return nullptr;
   }
@@ -243,40 +249,12 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
     return dialBase.release();
   }
 
-  // If there is only two points, just create an affine dial
-  if( _xPointListBuffer_.size() == 2 ){
-    // Do the unique_ptr dance in case there are exceptions.
-    std::unique_ptr<DialBase> dialBase = std::make_unique<Polynomial>();
-
-    // create coefficients
-    _slopeListBuffer_.clear();
-    _slopeListBuffer_.resize(2, 0);
-
-    // delta(y)/delta(x)
-    _slopeListBuffer_[1] = (_yPointListBuffer_[1] - _yPointListBuffer_[0])/(_xPointListBuffer_[1] - _xPointListBuffer_[0]);
-
-    // intercept -> y = ax + b -> b = y - ax
-    _slopeListBuffer_[0] = _yPointListBuffer_[0] - _xPointListBuffer_[0]*_slopeListBuffer_[1];
-
-    // fill data
-    ((Polynomial*) dialBase.get())->setCoefficientList(_slopeListBuffer_);
-    ((Polynomial*) dialBase.get())->setSplineBounds({_xPointListBuffer_[0], _xPointListBuffer_[1]});
-
-    // release
-    return dialBase.release();
-  }
-
   // Sanity check.  By the time we get here, there can't be fewer than two
   // points, and it should have been trapped above by other conditionals
   // (e.g. a single point "spline" should have been flagged as flat).
   LogThrowIf((_xPointListBuffer_.size() < 2),
              "Input data logic error: two few points "
              << "for dial " << dialTitle_ );
-
-  // If there are only two points, then force catmull-rom.  This could be
-  // handled using a graph, but Catmull-Rom is fast, and works better with the
-  // GPU.
-  if (_xPointListBuffer_.size() < 3) { splType = "catmull-rom"; }
 
   ////////////////////////////////////////////////////////////////
   // Check if the spline can be treated as having uniformly spaced knots.
@@ -303,6 +281,15 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
   ////////////////////////////////////////////////////////////////
   bool isMonotonic = ( dialSubType_.find("monotonic") != std::string::npos );
   if ( isMonotonic ) { MakeMonotonic(_xPointListBuffer_, _yPointListBuffer_, _slopeListBuffer_); }
+
+  // If there are only two points, then force a catmull-rom.  This could be
+  // handled using a graph, but Catmull-Rom is fast, and works better with the
+  // GPU.  The isMonotonic is forced to false so that this uses CompactSpline
+  // instead of MonotonicSpline.
+  if (_xPointListBuffer_.size() < 3) {
+    splType = "catmull-rom";
+    isMonotonic = false;
+  }
 
   ///////////////////////////////////////////////////////////
   // Create the right kind low level spline class base on all of the previous
