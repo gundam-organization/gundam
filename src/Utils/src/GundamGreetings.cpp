@@ -26,7 +26,7 @@ void GundamGreetings::hello() {
   std::stringstream ss;
   ss << "Welcome to GUNDAM "
      << (_appName_.empty() ? GenericToolbox::getExecutableName() : _appName_)
-     << " v" + GundamUtils::getVersionStr();
+     << " v" + GundamUtils::getVersionFullStr();
 
   LogInfo << GenericToolbox::addUpDownBars(ss.str()) << std::endl;
 }

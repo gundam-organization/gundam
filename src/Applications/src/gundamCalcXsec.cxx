@@ -110,7 +110,7 @@ int main(int argc, char** argv){
   LogInfo << "Writing runtime parameters in output file..." << std::endl;
 
   // Gundam version?
-  TNamed gundamVersionString("gundamVersion", GundamUtils::getVersionStr().c_str());
+  TNamed gundamVersionString("gundamVersion", GundamUtils::getVersionFullStr().c_str());
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamCalcXsec"), &gundamVersionString);
 
   // Command line?
