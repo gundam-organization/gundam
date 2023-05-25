@@ -52,6 +52,12 @@ void MinimizerInterface::readConfigImpl(){
   _generatedPostFitEigenBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "generatedPostFitEigenBreakdown", _generatedPostFitEigenBreakdown_);
 
   _stepSizeScaling_ = GenericToolbox::Json::fetchValue(_config_, "stepSizeScaling", _stepSizeScaling_);
+
+  if( GenericToolbox::Json::doKeyExist( _config_, "monitorGradientDescent" ) ){
+    LogInfo << "Will monitor the gradient descent." << std::endl;
+    getLikelihood().setMonitorGradientDescent(GenericToolbox::Json::fetchValue<bool>( _config_, "monitorGradientDescent" ));
+  }
+
 }
 void MinimizerInterface::initializeImpl(){
   MinimizerBase::initializeImpl();
@@ -101,16 +107,6 @@ void MinimizerInterface::initializeImpl(){
       _minimizer_->SetVariableValue(iFitPar, FitParameterSet::toNormalizedParValue(fitPar.getParameterValue(), fitPar));
       _minimizer_->SetVariableStepSize(iFitPar, FitParameterSet::toNormalizedParRange(fitPar.getStepSize()*_stepSizeScaling_, fitPar));
     }
-  }
-
-  if( GenericToolbox::Json::doKeyExist( _config_, "monitorGradientDescent" ) ){
-    getLikelihood().setMonitorGradientDescent(GenericToolbox::Json::fetchValue<bool>( _config_, "monitorGradientDescent" ));
-  }
-  else if( GenericToolbox::toLowerCase(getLikelihood().getMinimizerType()) == "minuit"
-           or GenericToolbox::toLowerCase(getLikelihood().getMinimizerType()) == "minuit2"
-      ){
-    LogInfo << "Monitoring gradient as minimizer is Minuit" << std::endl;
-    getLikelihood().setMonitorGradientDescent( true );
   }
 
 }
