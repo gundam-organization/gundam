@@ -67,11 +67,11 @@ endif()
 
 cmessage( STATUS "CMAKE_INSTALL_PREFIX: \"${CMAKE_INSTALL_PREFIX}\"")
 
+# Set the default built type if it isn't already defined
 if(NOT DEFINED CMAKE_BUILD_TYPE
     OR CMAKE_BUILD_TYPE STREQUAL "")
     set(CMAKE_BUILD_TYPE Debug)
 endif()
-cmessage( STATUS "CMAKE_BUILD_TYPE: \"${CMAKE_BUILD_TYPE}\"")
 
 if(BATCH_MODE)
     set(COLOR_OUTPUT NO)
@@ -96,10 +96,12 @@ find_package(
 )
 
 if(ROOT_FOUND)
-    cmessage( STATUS "ROOT libraries were successfully found")
-    include( ${ROOT_USE_FILE} )
-    cmessage( STATUS "ROOT include directory: ${ROOT_INCLUDE_DIRS}")
-    cmessage( STATUS "ROOT imposed CXX flags: ${ROOT_CXX_FLAGS}")
+    cmessage(STATUS "[ROOT]: ROOT found")
+    include(${ROOT_USE_FILE})
+    # cmessage(STATUS "[ROOT]: ROOT packages found ${ROOT_LIBRARIES}")
+    cmessage( STATUS "[ROOT]: ROOT include directory: ${ROOT_INCLUDE_DIRS}")
+    cmessage(STATUS "[ROOT]: ROOT C++ Flags: ${ROOT_CXX_FLAGS}")
+
     if (NOT ROOT_minuit2_FOUND)
         # Minuit2 wasn't found, but make really sure before giving up.
         execute_process (COMMAND root-config --has-minuit2
@@ -148,6 +150,19 @@ else(ROOT_FOUND)
     add_link_options("SHELL:${ROOT_LINK_FLAGS}")
 
 endif(ROOT_FOUND)
+
+# Try to figure out which version of C++ was used to compile ROOT.  ROOT
+# generates header files that depend on the compiler version so we will
+# need to use the same version.
+execute_process(COMMAND root-config --has-cxx14 COMMAND grep yes
+  OUTPUT_VARIABLE ROOT_cxx14_FOUND
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND root-config --has-cxx17 COMMAND grep yes
+  OUTPUT_VARIABLE ROOT_cxx17_FOUND
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND root-config --has-cxx20 COMMAND grep yes
+  OUTPUT_VARIABLE ROOT_cxx20_FOUND
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
 
 if (NOT ROOT_minuit2_FOUND)
     cmessage( STATUS "[ROOT]:Rebuild root using -Dminuit2=on in the cmake command")
@@ -331,8 +346,8 @@ endif()
 
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )
     if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.8.5)
-        cmessage( STATUS "Detected GCC version: ${CMAKE_CXX_COMPILER_VERSION}" )
-        cmessage(FATAL_ERROR "GCC version must be at least 4.8.5" )
+        cmessage(STATUS "Detected GCC version: ${CMAKE_CXX_COMPILER_VERSION}")
+        cmessage(FATAL_ERROR "GCC version must be at least 5.0")
     endif()
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang" )
     if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 3.3)
@@ -343,8 +358,26 @@ else()
     cmessage(WARNING "You are using an untested compiler." )
 endif()
 
-# CXX standard is required but should match the one by ROOT
+# CXX standard is required and must match the version ROOT was compiled with.  
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Explicitly set the compiler version so that it will match the
+# compiler that was used to compile ROOT.  Recent ROOT documentation
+# explicitly notes that the appliation needs to use the same C++
+# standard as ROOT.
+if ( ROOT_cxx14_FOUND )
+  cmessage(STATUS "ROOT compiled with C++14")
+  set(CMAKE_CXX_STANDARD 14)
+elseif ( ROOT_cxx17_FOUND )
+  cmessage(STATUS "ROOT compiled with C++17")
+  set(CMAKE_CXX_STANDARD 17)
+elseif ( ROOT_cxx20_FOUND )
+  cmessage(STATUS "ROOT compiled with C++20")
+  set(CMAKE_CXX_STANDARD 20)
+else ( ROOT_cxx14_FOUND )
+  cmessage(WARNING "ROOT C++ standard not set, use ROOT minimum (C++14)")
+  set(CMAKE_CXX_STANDARD 14)
+endif ( ROOT_cxx14_FOUND)
 
 if( WITH_OPENMP )
     cmessage( STATUS "Compiling with OpenMP" )
@@ -381,13 +414,18 @@ if(TTYCHECK)
     add_definitions(-D TTYCHECK)
 endif()
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O2" )
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fPIC -g" )
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O2")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fPIC -g")
 
-cmessage( STATUS "C++ Compiler      : ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}" )
-cmessage( STATUS "C++ Release flags : ${CMAKE_CXX_FLAGS_RELEASE}" )
-cmessage( STATUS "C++ Debug flags   : ${CMAKE_CXX_FLAGS_DEBUG}" )
+################################################################################
+# CMake Generated
+###############################################################################
 
+cmessage (STATUS "C++ Compiler      : ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
+cmessage (STATUS "C++ Standard      : ${CMAKE_CXX_STANDARD}")
+cmessage (STATUS "C++ Release flags : ${CMAKE_CXX_FLAGS_RELEASE}")
+cmessage (STATUS "C++ Debug flags   : ${CMAKE_CXX_FLAGS_DEBUG}")
+cmessage (STATUS "Build type        : ${CMAKE_BUILD_TYPE}")
 
 ################################################################################
 # Doxygen
