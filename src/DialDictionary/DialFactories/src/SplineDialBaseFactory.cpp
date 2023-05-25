@@ -220,7 +220,7 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
     // Use a tolerance based on float in case the data when through a float.
     // Keep this inside the loop so it has the right scope, and depend on the
     // compiler to do the right thing.
-    const double toler{std::numeric_limits<float>::epsilon()};
+    const double toler{2*std::numeric_limits<float>::epsilon()};
     const double delta{std::abs(y-_yPointListBuffer_[0])};
     if (delta > toler) isFlat = false;
   }
@@ -228,7 +228,8 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
   // If the function is flat AND equal to one, the drop it.  Compare against
   // float accuracy in case the value was actually calculated against with a
   // float.
-  if (std::abs(_yPointListBuffer_[0]-1.0) < std::numeric_limits<float>::epsilon()
+  if (std::abs(_yPointListBuffer_[0]-1.0)
+      < 2*std::numeric_limits<float>::epsilon()
       and isFlat) {
     return nullptr;
   }

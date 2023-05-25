@@ -29,6 +29,17 @@ DialBase* GraphDialBaseFactory::makeDial(const std::string& dialTitle_,
       std::make_unique<GraphCache>():
       std::make_unique<Graph>();
   }
+  else if (srcGraph->GetN() < 2) {
+    // For one point graph, just use a scale. Do the unique_ptr dance in case
+    // there are exceptions.
+    double value = srcGraph->GetY()[0];
+    if (std::abs(value-1.0) < 2*std::numeric_limits<float>::epsilon()) {
+      return nullptr;
+    }
+    dialBase = std::make_unique<Shift>();
+    dialBase->buildDial(value);
+    return dialBase.release();
+  }
   else {
     dialBase = (useCachedDial_) ?
       std::make_unique<LightGraphCache>():
