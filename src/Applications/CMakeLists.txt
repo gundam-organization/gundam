@@ -84,7 +84,7 @@ if( WITH_GUNDAM_ROOT_APP )
 #target_sources( gundamRoot PRIVATE G__GundamRootDict.cxx )
 #target_link_libraries( gundamRoot GundamPropagator )
 target_link_libraries( gundamRoot
-    GundamRootDict
+    GundamRootDict GundamUtils
     #    GundamPropagator
     )
 endif ()

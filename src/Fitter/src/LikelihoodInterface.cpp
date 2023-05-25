@@ -89,6 +89,9 @@ void LikelihoodInterface::saveGradientSteps(){
       ParScanner::muteLogger();
     },
     [&](){
+      FitParameterSet::muteLogger();
+      Propagator::muteLogger();
+      ParScanner::muteLogger();
       _owner_->getPropagator().injectParameterValues( currentParState );
       FitParameterSet::unmuteLogger();
       Propagator::unmuteLogger();
@@ -107,17 +110,15 @@ void LikelihoodInterface::saveGradientSteps(){
     _owner_->getPropagator().injectParameterValues(_gradientMonitor_[iGradStep].parState );
     _owner_->getPropagator().updateLlhCache();
 
-    auto outDir = GenericToolbox::mkdirTFile(_owner_->getSaveDir(), Form("fit/gradient/step_%i", int(iGradStep)));
-    GenericToolbox::writeInTFile( outDir, TNamed("parState", GenericToolbox::Json::toReadableString(_gradientMonitor_[iGradStep].parState).c_str()) );
-    GenericToolbox::writeInTFile( outDir, TNamed("llhState", _owner_->getPropagator().getLlhBufferSummary().c_str()) );
+    if( not GlobalVariables::isLightOutputMode() ) {
+      auto outDir = GenericToolbox::mkdirTFile(_owner_->getSaveDir(), Form("fit/gradient/step_%i", int(iGradStep)));
+      GenericToolbox::writeInTFile(outDir, TNamed("parState", GenericToolbox::Json::toReadableString(_gradientMonitor_[iGradStep].parState).c_str()));
+      GenericToolbox::writeInTFile(outDir, TNamed("llhState", _owner_->getPropagator().getLlhBufferSummary().c_str()));
+    }
 
     // line scan from previous point
-    _owner_->getPropagator().getParScanner().scanSegment(
-        GenericToolbox::mkdirTFile(outDir, "lineScan"),
-        _gradientMonitor_[iGradStep].parState, lastParStep, 10
-        );
+    _owner_->getPropagator().getParScanner().scanSegment( nullptr, _gradientMonitor_[iGradStep].parState, lastParStep, 8 );
     lastParStep = _gradientMonitor_[iGradStep].parState;
-    GenericToolbox::triggerTFileWrite(outDir);
 
     if( globalGraphList.empty() ){
       // copy
