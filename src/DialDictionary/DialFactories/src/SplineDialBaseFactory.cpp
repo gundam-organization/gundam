@@ -243,40 +243,12 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
     return dialBase.release();
   }
 
-  // If there is only two points, just create an affine dial
-  if( _xPointListBuffer_.size() == 2 ){
-    // Do the unique_ptr dance in case there are exceptions.
-    std::unique_ptr<DialBase> dialBase = std::make_unique<Polynomial>();
-
-    // create coefficients
-    _slopeListBuffer_.clear();
-    _slopeListBuffer_.resize(2, 0);
-
-    // delta(y)/delta(x)
-    _slopeListBuffer_[1] = (_yPointListBuffer_[1] - _yPointListBuffer_[0])/(_xPointListBuffer_[1] - _xPointListBuffer_[0]);
-
-    // intercept -> y = ax + b -> b = y - ax
-    _slopeListBuffer_[0] = _yPointListBuffer_[0] - _xPointListBuffer_[0]*_slopeListBuffer_[1];
-
-    // fill data
-    ((Polynomial*) dialBase.get())->setCoefficientList(_slopeListBuffer_);
-    ((Polynomial*) dialBase.get())->setSplineBounds({_xPointListBuffer_[0], _xPointListBuffer_[1]});
-
-    // release
-    return dialBase.release();
-  }
-
   // Sanity check.  By the time we get here, there can't be fewer than two
   // points, and it should have been trapped above by other conditionals
   // (e.g. a single point "spline" should have been flagged as flat).
   LogThrowIf((_xPointListBuffer_.size() < 2),
              "Input data logic error: two few points "
              << "for dial " << dialTitle_ );
-
-  // If there are only two points, then force catmull-rom.  This could be
-  // handled using a graph, but Catmull-Rom is fast, and works better with the
-  // GPU.
-  if (_xPointListBuffer_.size() < 3) { splType = "catmull-rom"; }
 
   ////////////////////////////////////////////////////////////////
   // Check if the spline can be treated as having uniformly spaced knots.
@@ -303,6 +275,15 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
   ////////////////////////////////////////////////////////////////
   bool isMonotonic = ( dialSubType_.find("monotonic") != std::string::npos );
   if ( isMonotonic ) { MakeMonotonic(_xPointListBuffer_, _yPointListBuffer_, _slopeListBuffer_); }
+
+  // If there are only two points, then force a catmull-rom.  This could be
+  // handled using a graph, but Catmull-Rom is fast, and works better with the
+  // GPU.  The isMonotonic is forced to false so that this uses CompactSpline
+  // instead of MonotonicSpline.
+  if (_xPointListBuffer_.size() < 3) {
+    splType = "catmull-rom";
+    isMonotonic = false;
+  }
 
   ///////////////////////////////////////////////////////////
   // Create the right kind low level spline class base on all of the previous
