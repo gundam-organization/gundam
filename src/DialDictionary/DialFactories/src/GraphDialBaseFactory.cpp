@@ -1,6 +1,10 @@
 #include "GraphDialBaseFactory.h"
 
-#include "DialTypes.h"
+// Explicitly list the headers that are actually needed.  Do not include
+// others.
+#include "Graph.h"
+#include "LightGraph.h"
+#include "Shift.h"
 
 #include <TGraph.h>
 

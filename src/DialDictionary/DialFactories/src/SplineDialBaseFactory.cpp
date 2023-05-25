@@ -1,6 +1,14 @@
 #include "SplineDialBaseFactory.h"
 
-#include "DialTypes.h"
+// Explicitly list the headers that are actually needed.  Do not include
+// others.
+#include "Spline.h"
+#include "SimpleSpline.h"
+#include "CompactSpline.h"
+#include "UniformSpline.h"
+#include "GeneralSpline.h"
+#include "MonotonicSpline.h"
+#include "Shift.h"
 
 #include "TGraph.h"
 #include "TSpline.h"
@@ -102,9 +110,10 @@ bool SplineDialBaseFactory::FillFromSpline(std::vector<double>& xPoint,
 void SplineDialBaseFactory::MakeMonotonic(const std::vector<double>& xPoint,
                                           const std::vector<double>& yPoint,
                                           std::vector<double>& slope) {
-  // Apply the monotonic condition to the slopes.  This always adjusts the
-  // slopes, however, with Catmull-Rom the modified slopes will be ignored
-  // and the monotonic criteria is applied as the spline is evaluated.
+  // Apply the Fritsh-Carlson monotonic condition to the slopes.  This adjusts
+  // the slopes (when necessary), however, with Catmull-Rom the modified
+  // slopes will be ignored and the monotonic criteria is applied as the
+  // spline is evaluated (saves memory).
   for (int i = 0; i<xPoint.size(); ++i) {
     double m{std::numeric_limits<double>::infinity()};
     if (i>0) m = (yPoint[i] - yPoint[i-1])/(xPoint[i] - xPoint[i-1]);
@@ -161,10 +170,6 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
   _xPointListBuffer_.clear();
   _yPointListBuffer_.clear();
   _slopeListBuffer_.clear();
-
-//  std::vector<double> xPoint;
-//  std::vector<double> yPoint;
-//  std::vector<double> slopePoint;
 
   ///////////////////////////////////////////////////////////////////////
   // Side-effect programming alert.  The conditionals are doing the actual
