@@ -31,6 +31,9 @@ bool DialInputBuffer::isMasked() const {
 bool DialInputBuffer::isDialUpdateRequested() const {
   return _isDialUpdateRequested_;
 }
+bool DialInputBuffer::useParameterMirroring() const {
+  return _useParameterMirroring_;
+}
 size_t DialInputBuffer::getBufferSize() const{
   return _buffer_.size();
 }
@@ -109,6 +112,10 @@ void DialInputBuffer::addParameterIndices(const std::pair<size_t, size_t>& indic
 }
 void DialInputBuffer::addMirrorBounds(const std::pair<double, double>& lowEdgeAndRange_){
   _parameterMirrorBounds_.emplace_back(lowEdgeAndRange_);
+}
+const std::pair<double,double>&
+DialInputBuffer::getMirrorBounds(int i) const {
+    return _parameterMirrorBounds_.at(i);
 }
 std::string DialInputBuffer::getSummary() const{
   std::stringstream ss;
