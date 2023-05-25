@@ -8,6 +8,7 @@ set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Misc.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ParameterThrowerMarkHarz.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ConfigUtils.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamUtils.cpp
     )
 
 set(HEADERS
@@ -51,7 +52,9 @@ include_directories( ${CMAKE_BINARY_DIR}/generated/ ) # version header
 # Make sure the current directories are available for the later
 # compilation.
 target_include_directories( GundamUtils PUBLIC
-  ${CMAKE_CURRENT_SOURCE_DIR}/include)
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${CMAKE_BINARY_DIR}/generated
+)
 
 target_link_libraries( GundamUtils PUBLIC
         ${ROOT_LIBRARIES}

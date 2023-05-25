@@ -217,9 +217,9 @@ int main(int argc, char** argv){
   if( GenericToolbox::Json::doKeyExist(configHandler.getConfig(), "minGundamVersion") and not clParser.isOptionTriggered("ignoreVersionCheck") ){
     LogThrowIf(
         not g.isNewerOrEqualVersion(GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "minGundamVersion")),
-        "Version check FAILED: " << GundamVersionConfig::getVersionStr() << " < " << GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "minGundamVersion")
+        "Version check FAILED: " << GundamUtils::getVersionStr() << " < " << GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "minGundamVersion")
     );
-    LogInfo << "Version check passed: " << GundamVersionConfig::getVersionStr() << " >= " << GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "minGundamVersion") << std::endl;
+    LogInfo << "Version check passed: " << GundamUtils::getVersionStr() << " >= " << GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "minGundamVersion") << std::endl;
   }
 
   // Ok, we should run. Create the out file.
@@ -227,7 +227,7 @@ int main(int argc, char** argv){
   TFile* out = TFile::Open(outFileName.c_str(), "RECREATE");
 
   // Gundam version?
-  TNamed gundamVersionString("gundamVersion", GundamVersionConfig::getVersionStr().c_str());
+  TNamed gundamVersionString("gundamVersion", GundamUtils::getVersionStr().c_str());
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamFitter"), &gundamVersionString);
 
   // Command line?

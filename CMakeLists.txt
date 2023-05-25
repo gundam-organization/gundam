@@ -119,9 +119,9 @@ find_package(
 )
 
 if(ROOT_FOUND)
-    cmessage(STATUS "[ROOT]: ROOT found")
-    include(${ROOT_USE_FILE})
-    cmessage(STATUS "[ROOT]: ROOT package found ${ROOT_LIBRARIES}")
+    cmessage( STATUS "ROOT libraries were successfully found")
+    include( ${ROOT_USE_FILE} )
+    cmessage(STATUS "Will build using files in ${ROOT_INCLUDE_DIRS}")
     if (NOT ROOT_minuit2_FOUND)
         # Minuit2 wasn't found, but make really sure before giving up.
         execute_process (COMMAND root-config --has-minuit2

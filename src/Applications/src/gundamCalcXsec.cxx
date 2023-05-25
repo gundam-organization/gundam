@@ -1,6 +1,7 @@
 
 #include "GlobalVariables.h"
 #include "GundamGreetings.h"
+#include "GundamUtils.h"
 #include "Propagator.h"
 #include "ConfigUtils.h"
 
@@ -82,9 +83,9 @@ int main(int argc, char** argv){
   if( GenericToolbox::Json::doKeyExist(configXsecExtractor, "minGundamVersion") ){
     LogThrowIf(
       not g.isNewerOrEqualVersion(GenericToolbox::Json::fetchValue<std::string>(configXsecExtractor, "minGundamVersion")),
-      "Version check FAILED: " << GundamVersionConfig::getVersionStr() << " < " << GenericToolbox::Json::fetchValue<std::string>(configXsecExtractor, "minGundamVersion")
+      "Version check FAILED: " << GundamUtils::getVersionStr() << " < " << GenericToolbox::Json::fetchValue<std::string>(configXsecExtractor, "minGundamVersion")
     );
-    LogInfo << "Version check passed: " << GundamVersionConfig::getVersionStr() << " >= " << GenericToolbox::Json::fetchValue<std::string>(configXsecExtractor, "minGundamVersion") << std::endl;
+    LogInfo << "Version check passed: " << GundamUtils::getVersionStr() << " >= " << GenericToolbox::Json::fetchValue<std::string>(configXsecExtractor, "minGundamVersion") << std::endl;
   }
 
 
@@ -109,7 +110,7 @@ int main(int argc, char** argv){
   LogInfo << "Writing runtime parameters in output file..." << std::endl;
 
   // Gundam version?
-  TNamed gundamVersionString("gundamVersion", GundamVersionConfig::getVersionStr().c_str());
+  TNamed gundamVersionString("gundamVersion", GundamUtils::getVersionStr().c_str());
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamCalcXsec"), &gundamVersionString);
 
   // Command line?
