@@ -86,6 +86,8 @@ void LikelihoodInterface::saveGradientSteps(){
   nlohmann::json currentParState{_owner_->getPropagator().exportParameterInjectorConfig()};
   GenericToolbox::ScopedGuard g{
     [&](){
+      FitParameterSet::muteLogger();
+      Propagator::muteLogger();
       ParScanner::muteLogger();
     },
     [&](){
@@ -98,8 +100,6 @@ void LikelihoodInterface::saveGradientSteps(){
 
   // load starting point
   auto lastParStep{_owner_->getPreFitParState()};
-  _owner_->getPropagator().injectParameterValues( lastParStep );
-  _owner_->getPropagator().updateLlhCache();
 
   std::vector<GraphEntry> globalGraphList;
   for(size_t iGradStep = 0 ; iGradStep < _gradientMonitor_.size() ; iGradStep++ ){
@@ -107,17 +107,15 @@ void LikelihoodInterface::saveGradientSteps(){
     _owner_->getPropagator().injectParameterValues(_gradientMonitor_[iGradStep].parState );
     _owner_->getPropagator().updateLlhCache();
 
-    auto outDir = GenericToolbox::mkdirTFile(_owner_->getSaveDir(), Form("fit/gradient/step_%i", int(iGradStep)));
-    GenericToolbox::writeInTFile( outDir, TNamed("parState", GenericToolbox::Json::toReadableString(_gradientMonitor_[iGradStep].parState).c_str()) );
-    GenericToolbox::writeInTFile( outDir, TNamed("llhState", _owner_->getPropagator().getLlhBufferSummary().c_str()) );
+    if( not GlobalVariables::isLightOutputMode() ) {
+      auto outDir = GenericToolbox::mkdirTFile(_owner_->getSaveDir(), Form("fit/gradient/step_%i", int(iGradStep)));
+      GenericToolbox::writeInTFile(outDir, TNamed("parState", GenericToolbox::Json::toReadableString(_gradientMonitor_[iGradStep].parState).c_str()));
+      GenericToolbox::writeInTFile(outDir, TNamed("llhState", _owner_->getPropagator().getLlhBufferSummary().c_str()));
+    }
 
     // line scan from previous point
-    _owner_->getPropagator().getParScanner().scanSegment(
-        GenericToolbox::mkdirTFile(outDir, "lineScan"),
-        _gradientMonitor_[iGradStep].parState, lastParStep, 10
-        );
+    _owner_->getPropagator().getParScanner().scanSegment( nullptr, _gradientMonitor_[iGradStep].parState, lastParStep, 8 );
     lastParStep = _gradientMonitor_[iGradStep].parState;
-    GenericToolbox::triggerTFileWrite(outDir);
 
     if( globalGraphList.empty() ){
       // copy

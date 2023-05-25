@@ -88,7 +88,7 @@ void FitterEngine::initializeImpl(){
   LogThrowIf(_config_.empty(), "Config is not set.");
   LogThrowIf(_saveDir_== nullptr);
 
-  if( _lightMode_ ){
+  if( GlobalVariables::isLightOutputMode() ){
     LogWarning << "Light mode enabled, wiping plot gen config..." << std::endl;
     _propagator_.getPlotGenerator().readConfig(nlohmann::json());
   }
@@ -217,7 +217,7 @@ void FitterEngine::initializeImpl(){
 
   this->_propagator_.updateLlhCache();
 
-  if( not _lightMode_ ){
+  if( not GlobalVariables::isLightOutputMode() ){
     _propagator_.getTreeWriter().writeSamples(GenericToolbox::mkdirTFile(_saveDir_, "preFit/events"));
   }
 
@@ -234,9 +234,6 @@ void FitterEngine::setIsDryRun(bool isDryRun_){
 }
 void FitterEngine::setEnablePca(bool enablePca_){
   _enablePca_ = enablePca_;
-}
-void FitterEngine::setLightMode(bool lightMode_){
-  _lightMode_ = lightMode_;
 }
 void FitterEngine::setEnablePreFitScan(bool enablePreFitScan) {
   _enablePreFitScan_ = enablePreFitScan;

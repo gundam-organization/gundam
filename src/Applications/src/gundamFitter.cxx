@@ -301,7 +301,7 @@ int main(int argc, char** argv){
   fitter.setGenerateOneSigmaPlots( clParser.isOptionTriggered("generateOneSigmaPlots") );
 
   // --light-mode
-  fitter.setLightMode( clParser.isOptionTriggered("lightOutputMode") );
+  GlobalVariables::setLightOutputMode( clParser.isOptionTriggered("lightOutputMode") );
 
   // injectParameterPath
   if( not injectParameterPath.empty() ){
