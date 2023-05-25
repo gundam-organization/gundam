@@ -39,6 +39,7 @@ include( ${CMAKE_SOURCE_DIR}/cmake/cmessage.cmake )
 
 
 # Printout version & generate header
+cmessage( WARNING "Pre-checking GUNDAM version" )
 set(GENERATE_DIR_FOR_VERSION_CHECK ${CMAKE_BINARY_DIR} CACHE STRING "GENERATE_DIR_FOR_VERSION_CHECK")
 add_custom_target( preBuildVersionCheck
     COMMAND echo "Cache variable: ${GENERATE_DIR_FOR_VERSION_CHECK}"
@@ -110,6 +111,9 @@ endif(BATCH_MODE)
 ################################################################################
 
 #If you want to try an use the terminally buggy ROOT CMake scripts
+# ROOTConfig.cmake -> usually in /install/dir/of/root/6.26.06_2/share/root/cmake
+
+cmessage( WARNING "Looking for ROOT install..." )
 find_package(
     ROOT
     REQUIRED COMPONENTS
@@ -121,7 +125,8 @@ find_package(
 if(ROOT_FOUND)
     cmessage( STATUS "ROOT libraries were successfully found")
     include( ${ROOT_USE_FILE} )
-    cmessage(STATUS "Will build using files in ${ROOT_INCLUDE_DIRS}")
+    cmessage(STATUS "ROOT include directory: ${ROOT_INCLUDE_DIRS}")
+    cmessage(STATUS "ROOT imposed CXX flags: ${ROOT_CXX_FLAGS}")
     if (NOT ROOT_minuit2_FOUND)
         # Minuit2 wasn't found, but make really sure before giving up.
         execute_process (COMMAND root-config --has-minuit2
@@ -176,7 +181,9 @@ if (NOT ROOT_minuit2_FOUND)
     cmessage(FATAL_ERROR "[ROOT]: minuit2 is required")
 endif(NOT ROOT_minuit2_FOUND)
 
+
 # YAML-CPP
+cmessage( WARNING "Looking for YAML install..." )
 find_package( yaml-cpp REQUIRED HINTS ${YAMLCPP_DIR} )
 if(NOT yaml-cpp_FOUND)
     cmessage(FATAL_ERROR "yaml-cpp library not found.")
@@ -204,6 +211,8 @@ if( "${YAML_CPP_INCLUDE_DIR} " STREQUAL " ")
     #    list(APPEND LINK_LIBARY_LIST ${YAMLCPP_LIBRARY})
 endif()
 
+
+cmessage( WARNING "Looking for optional ZLib install..." )
 find_package(ZLIB)
 if (${ZLIB_FOUND})
     cmessage(STATUS "ZLIB found : ${ZLIB_VERSION_STRING}")
@@ -215,7 +224,8 @@ else()
 endif ()
 
 if (WITH_CACHE_MANAGER)
-    add_definitions( -DGUNDAM_USING_CACHE_MANAGER)
+    cmessage( WARNING "Enabling cache manager..." )
+    add_definitions( -D GUNDAM_USING_CACHE_MANAGER )
 
     # uncomment to enable the slow validations (NEVER during productions
     # or normal running).  These are whole code validations and are
@@ -228,7 +238,7 @@ if (WITH_CACHE_MANAGER)
 
     cmessage(STATUS "GPU support is enabled (compiled, but only used when CUDA enabled)")
 else()
-    cmessage(STATUS "GPU support is disabled")
+    cmessage(ALERT "GPU support is disabled")
 endif()
 
 set(WITH_GENERIC_SPLINES ON)
@@ -430,12 +440,13 @@ if(WITH_XSLLHFITTER)
     list( APPEND MODULES XsllhFitter/Fitter )
 endif()
 
-cmessage (STATUS "Configuring modules...")
+cmessage( WARNING "Configuring modules..." )
 foreach(mod ${MODULES})
     cmessage (STATUS "Adding cmake module: ${mod}")
     add_subdirectory( ${CMAKE_SOURCE_DIR}/src/${mod} )
 endforeach()
 
+cmessage( WARNING "Configuring applications..." )
 add_subdirectory( ${CMAKE_SOURCE_DIR}/src/Applications )
 
 if(WITH_XSLLHFITTER)
