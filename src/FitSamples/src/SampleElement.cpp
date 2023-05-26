@@ -103,6 +103,18 @@ void SampleElement::refillHistogram(int iThread_){
   int nbThreads = GlobalVariables::getNbThreads();
   if( iThread_ == -1 ){ nbThreads = 1; iThread_ = 0; }
 
+#ifdef GUNDAM_USING_CACHE_MANAGER
+  if (_CacheManagerValid_ and not (*_CacheManagerValid_)) {
+      // This is can be slowish when data must be copied from the device, but
+      // it makes sure that the results are copied from the device when they
+      // have changed. The values pointed to by _CacheManagerValue_ and
+      // _CacheManagerValid_ are inside of the summed index cache (a bit of
+      // evil coding here), and are updated by the cache.  The update is
+      // triggered by (*_CacheManagerUpdate_)().
+      if (_CacheManagerUpdate_) (*_CacheManagerUpdate_)();
+  }
+#endif
+
   // Faster that pointer shifter. -> would be slower if refillHistogram is
   // handled by the propagator
   int iBin = iThread_;
@@ -114,15 +126,6 @@ void SampleElement::refillHistogram(int iThread_){
     binErrorArray[iBin + 1] = 0;
 #ifdef GUNDAM_USING_CACHE_MANAGER
     if (_CacheManagerValue_ !=nullptr and _CacheManagerIndex_ >= 0) {
-      if (_CacheManagerValid_ and not (*_CacheManagerValid_)) {
-        // This is can be slowish on when data must be copied from the device,
-        // but makes sure that the cached result is updated when the cache has
-        // changed.  The values pointed to by _CacheManagerValue_ and
-        // _CacheManagerValid_ are inside of the summed index cache (a bit of
-        // evil coding here), and are updated by the cache.  The update is
-        // triggered by (*_CacheManagerUpdate_)().
-        if (_CacheManagerUpdate_) (*_CacheManagerUpdate_)();
-      }
       binContentArray[iBin + 1] += _CacheManagerValue_[_CacheManagerIndex_+iBin];
       binErrorArray[iBin + 1] += binContentArray[iBin + 1]*binContentArray[iBin + 1];
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
