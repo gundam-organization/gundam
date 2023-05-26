@@ -1,9 +1,9 @@
 [submodule "submodules/simple-cpp-logger"]
 	path = submodules/simple-cpp-logger
-	url = https://github.com/nadrino/simple-cpp-logger.git
+	url = https://github.com/gundam-organization/simple-cpp-logger.git
 [submodule "submodules/cpp-generic-toolbox"]
 	path = submodules/cpp-generic-toolbox
-	url = https://github.com/nadrino/cpp-generic-toolbox.git
+	url = https://github.com/gundam-organization/cpp-generic-toolbox.git
 [submodule "submodules/simple-cpp-cmd-line-parser"]
 	path = submodules/simple-cpp-cmd-line-parser
-	url = https://github.com/nadrino/simple-cpp-cmd-line-parser.git
+	url = https://github.com/gundam-organization/simple-cpp-cmd-line-parser.git
