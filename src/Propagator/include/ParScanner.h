@@ -9,11 +9,26 @@
 #include "FitParameter.h"
 
 #include "TDirectory.h"
+#include "TGraph.h"
 #include "nlohmann/json.hpp"
 
-#include "utility"
+#include <utility>
 
 class Propagator;
+
+struct ScanData{
+  std::string folder{};
+  std::string title{};
+  std::string yTitle{};
+  std::vector<double> yPoints{};
+  std::function<double()> evalY{};
+};
+
+struct GraphEntry{
+  ScanData* scanDataPtr{nullptr};
+  FitParameter* fitParPtr{nullptr};
+  TGraph graph{};
+};
 
 class ParScanner : public JsonBaseClass {
 
@@ -23,18 +38,26 @@ public:
   // Setters
   void setOwner(Propagator *owner);
   void setNbPoints(int nbPoints);
+  void setNbPointsLineScan(int nbPointsLineScan);
 
   // Getters
-  const nlohmann::json &getVarsConfig() const { return _varsConfig_; };
-  int getNbPoints() const;
-  const std::pair<double, double> &getParameterSigmaRange() const;
-  bool isUseParameterLimits() const;
+  [[nodiscard]] bool isUseParameterLimits() const;
+  [[nodiscard]] int getNbPoints() const;
+  [[nodiscard]] const std::pair<double, double> &getParameterSigmaRange() const;
+  [[nodiscard]] const nlohmann::json &getVarsConfig() const { return _varsConfig_; };
+  [[nodiscard]] const std::vector<GraphEntry> &getGraphEntriesBuf() const { return _graphEntriesBuf_; };
 
   // Core
   void scanFitParameters(std::vector<FitParameter>& par_, TDirectory* saveDir_);
   void scanFitParameter(FitParameter& par_, TDirectory* saveDir_);
+  void scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, const nlohmann::json &start_ = nlohmann::json(), int nSteps_=-1);
   void generateOneSigmaPlots(TDirectory* saveDir_);
   void varyEvenRates(const std::vector<double>& paramVariationList_, TDirectory* saveDir_);
+
+  static void muteLogger();
+  static void unmuteLogger();
+
+  static void writeGraphEntry(GraphEntry& entry_, TDirectory* saveDir_);
 
 
 protected:
@@ -45,19 +68,15 @@ private:
   // Parameters
   bool _useParameterLimits_{true};
   int _nbPoints_{100};
+  int _nbPointsLineScan_{_nbPoints_};
   std::pair<double, double> _parameterSigmaRange_{-3,3};
   nlohmann::json _varsConfig_{};
 
   // Internals
   Propagator* _owner_{nullptr};
-  struct ScanData{
-    std::string folder{};
-    std::string title{};
-    std::string yTitle{};
-    std::vector<double> yPoints{};
-    std::function<double()> evalY{};
-  };
-  std::vector<ScanData> scanDataDict;
+
+  std::vector<ScanData> _scanDataDict_;
+  std::vector<GraphEntry> _graphEntriesBuf_;
 
 
 };

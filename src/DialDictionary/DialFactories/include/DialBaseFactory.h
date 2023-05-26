@@ -20,13 +20,15 @@ public:
   DialBaseFactory() = default;
   ~DialBaseFactory() = default;
 
-  // Construct a pointer to the correct DialBase.  This uses the dialType and
+  // Construct a pointer to the correct DialBase.  The dial title is provided
+  // so that better error messages can be printed. This uses the dialType and
   // dialSubType to figure out the correct class, and then uses the object
   // pointed to by the dialInitializer to fill the dial.  The initializer is
   // not a constant due to constraints from ROOT.  NOTE: The ownership of the
   // pointer is passed to the caller, so it should be put in a managed
   // variable (e.g. a unique_ptr, or shared_ptr).
-  DialBase* makeDial(const std::string& dialType_,
+  DialBase* makeDial(const std::string& dialTitle_,
+                     const std::string& dialType_,
                      const std::string& dialSubType_,
                      TObject* dialInitializer_,
                      bool useCachedDial_);

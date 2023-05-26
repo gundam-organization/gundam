@@ -6,13 +6,14 @@
 #include "GenericToolbox.h"
 #include "GenericToolbox.ParallelWorker.h"
 
-#include "string"
-#include "vector"
-#include "memory"
-#include "future"
+#include <string>
+#include <vector>
+#include <memory>
+#include <future>
+
 
 LoggerInit([]{
-  Logger::setUserHeaderStr("[Sandbox]");
+  Logger::getUserHeader() << "[" << FILENAME << "]";
 });
 
 

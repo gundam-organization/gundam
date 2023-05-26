@@ -6,7 +6,7 @@
 
 #include "Logger.h"
 
-#include "sstream"
+#include <sstream>
 
 // Unset for this file since the entire file is deprecated.
 #ifdef USE_NEW_DIALS

@@ -20,7 +20,8 @@ public:
   // pointed to by the dialInitializer to fill the dial.  The ownership of the
   // pointer is passed to the caller, so it should be put in a managed
   // variable (e.g. a unique_ptr, or shared_ptr).
-  DialBase* makeDial(const std::string& dialType_,
+  DialBase* makeDial(const std::string& dialTitle_,
+                     const std::string& dialType_,
                      const std::string& dialSubType_,
                      TObject* dialInitializer_,
                      bool useCachedDial_);

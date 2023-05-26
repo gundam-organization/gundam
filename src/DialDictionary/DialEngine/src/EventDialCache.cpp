@@ -14,6 +14,9 @@ LoggerInit([]{
 std::vector<EventDialCache::CacheElem_t> &EventDialCache::getCache() {
   return _cache_;
 }
+const std::vector<EventDialCache::CacheElem_t> &EventDialCache::getCache() const {
+  return _cache_;
+}
 
 void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<DialCollection>& dialCollectionList_){
   LogInfo << "Building event dial cache..." << std::endl;
@@ -112,6 +115,11 @@ EventDialCache::IndexedEntry_t* EventDialCache::fetchNextCacheEntry(){
   return &_indexedCache_[_fillIndex_++];
 }
 
+void EventDialCache::shrinkIndexedCache(){
+  _indexedCache_.resize(_fillIndex_+1);
+  _indexedCache_.shrink_to_fit();
+}
+
 #ifndef USE_BREAKDOWN_CACHE
 void EventDialCache::reweightEntry(EventDialCache::CacheElem_t& entry_){
   entry_.event->resetEventWeight();
@@ -123,12 +131,20 @@ void EventDialCache::reweightEntry(EventDialCache::CacheElem_t& entry_){
 void EventDialCache::reweightEntry(EventDialCache::CacheElem_t& entry_){
   entry_.event->resetEventWeight();
   std::for_each(entry_.dials.begin(), entry_.dials.end(), [&](DialsElem_t& dial_){
-    if( dial_.dial->getInputBufferRef()->isMasked() ){ return ; }
-    if( std::isnan(dial_.result) or dial_.dial->getInputBufferRef()->isDialUpdateRequested() ){
-      dial_.result = dial_.dial->evalResponse();
+    if( dial_.interface->getInputBufferRef()->isMasked() ){ return ; }
+    if(std::isnan(dial_.response) or dial_.interface->getInputBufferRef()->isDialUpdateRequested() ){
+      dial_.response = dial_.interface->evalResponse();
     }
-    LogThrowIf(std::isnan(dial_.result), "Invalid dial response for " << dial_.dial->getSummary());
-    entry_.event->getEventWeightRef() *= dial_.result;
+
+    if( std::isnan( dial_.response ) ){
+      LogError << "Invalid dial response:" << std::endl;
+      LogError << dial_.interface->getSummary(false ) << std::endl;
+      LogError << GET_VAR_NAME_VALUE( dial_.interface->evalResponse() ) << std::endl;
+      LogThrow("Exception thrown because of invalid spline response.");
+    }
+
+    LogThrowIf(std::isnan(dial_.response), "Invalid dial response for " << dial_.interface->getSummary());
+    entry_.event->getEventWeightRef() *= dial_.response;
   });
 }
 #endif

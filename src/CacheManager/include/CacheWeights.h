@@ -9,6 +9,7 @@
 #include <memory>
 #include <vector>
 #include <array>
+#include <iostream>
 
 namespace Cache {
     class Weights;
@@ -48,9 +49,11 @@ private:
     /// An array of pointers to objects that will calculate the weights
     /// (e.g. WeightNormalization and WeightUniformSpline).  The objects are
     /// NOT owned by this array (they are owned by a unique_ptr's elsewyr in
-    /// the code), but pointers are needed for efficiency.
+    /// the code), but pointers are needed for efficiency.  This is an array
+    /// because vectors cause trouble with some versions of the nvcc cuda
+    /// compiler.
     int fWeightCalculators{0};
-    std::array<Cache::Weight::Base*,5> fWeightCalculator;
+    std::array<Cache::Weight::Base*,8> fWeightCalculator;
 
 public:
     // Construct the class.  This should allocate all the memory on the host
@@ -82,6 +85,12 @@ public:
 
     int AddWeightCalculator(Cache::Weight::Base* v) {
         int index = fWeightCalculators++;
+        if (fWeightCalculator.size() < fWeightCalculators) {
+            std::cout << "CacheWeights: Overflow --"
+                      << " Increase size of fWeightCalculator std::array. "
+                      << " Current Size: " << fWeightCalculator.size()
+                      << std::endl;
+        }
         fWeightCalculator.at(index) = v;
         return index;
     }

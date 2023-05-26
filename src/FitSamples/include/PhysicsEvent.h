@@ -23,10 +23,10 @@ class NestedDialTest; // Define for deprecated class
 #include "TTree.h"
 #include "TFormula.h"
 
-#include "vector"
-#include "string"
-#include "map"
-#include "mutex"
+#include <map>
+#include <mutex>
+#include <vector>
+#include <string>
 
 class PhysicsEvent {
 
@@ -41,6 +41,7 @@ public:
   void setNominalWeight(double nominalWeight);
   void setEventWeight(double eventWeight);
   void setSampleBinIndex(int sampleBinIndex);
+  void setSampleIndex(int sampleIndex);
   void setCommonLeafNameListPtr(const std::shared_ptr<std::vector<std::string>>& commonLeafNameListPtr_);
 
   // GETTERS
@@ -50,6 +51,7 @@ public:
   double getNominalWeight() const;
   double getEventWeight() const;
   int getSampleBinIndex() const;
+  int getSampleIndex() const;
   const std::vector<GenericToolbox::AnyType>& getLeafHolder(const std::string &leafName_) const;
   const std::vector<GenericToolbox::AnyType>& getLeafHolder(int index_) const;
   const std::vector<std::vector<GenericToolbox::AnyType>> &getLeafContentList() const;
@@ -119,6 +121,7 @@ private:
   double _nominalWeight_{1};
   double _eventWeight_{1};
   int _sampleBinIndex_{-1};
+  int _sampleIndex_{-1}; // this information is lost in the EventDialCache manager
 
   // Data storage variables
   std::shared_ptr<std::vector<std::string>> _commonLeafNameListPtr_{nullptr};

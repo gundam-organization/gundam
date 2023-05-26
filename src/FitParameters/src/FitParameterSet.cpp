@@ -21,12 +21,15 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[FitParameterSet]");
 } );
 
+void FitParameterSet::muteLogger(){ Logger::setIsMuted( true ); }
+void FitParameterSet::unmuteLogger(){ Logger::setIsMuted( false ); }
+
 
 void FitParameterSet::readConfigImpl(){
   LogThrowIf(_config_.empty(), "FitParameterSet config not set.");
 
   _name_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
-  LogInfo << "Initializing parameter set: " << _name_ << std::endl;
+  LogInfo << std::endl << "Initializing parameter set: " << _name_ << std::endl;
 
   _isEnabled_ = GenericToolbox::Json::fetchValue<bool>(_config_, "isEnabled");
   LogReturnIf(not _isEnabled_, _name_ << " parameters are disabled.");
@@ -74,6 +77,8 @@ void FitParameterSet::readConfigImpl(){
 
   _parameterDefinitionConfig_ = GenericToolbox::Json::fetchValue(_config_, "parameterDefinitions", _parameterDefinitionConfig_);
   _dialSetDefinitions_ = GenericToolbox::Json::fetchValue(_config_, "dialSetDefinitions", _dialSetDefinitions_);
+  _enableOnlyParameters_ = GenericToolbox::Json::fetchValue(_config_, "enableOnlyParameters", _enableOnlyParameters_);
+  _disableParameters_ = GenericToolbox::Json::fetchValue(_config_, "disableParameters", _disableParameters_);
 
 
   // MISC / DEV
@@ -137,12 +142,12 @@ void FitParameterSet::processCovarianceMatrix(){
 
   if( _priorCovarianceMatrix_ == nullptr ){ return; } // nothing to do
 
-  LogInfo << "Stripping the matrix from fixed/disabled parameters in set: " << getName() << std::endl;
+  LogInfo << "Stripping the matrix from fixed/disabled parameters..." << std::endl;
   int nbFitParameters{0};
   for( const auto& par : _parameterList_ ){
     if( FitParameterSet::isValidCorrelatedParameter(par) ) nbFitParameters++;
   }
-  LogInfo << "Effective nb parameters: " << nbFitParameters << std::endl;
+  LogInfo << nbFitParameters << " effective parameters were defined in set: " << getName() << std::endl;
 
   _strippedCovarianceMatrix_ = std::make_shared<TMatrixDSym>(nbFitParameters);
   int iStrippedPar = -1;
@@ -168,7 +173,7 @@ void FitParameterSet::processCovarianceMatrix(){
     _inverseStrippedCovarianceMatrix_->Invert();
   }
   else {
-    LogWarning << "Decomposing the stripped covariance matrix in set: " << getName() << std::endl;
+    LogWarning << "Decomposing the stripped covariance matrix..." << std::endl;
     _eigenParameterList_.resize(_strippedCovarianceMatrix_->GetNrows(), FitParameter(this));
 
     _eigenDecomp_     = std::make_shared<TMatrixDSymEigen>(*_strippedCovarianceMatrix_);
@@ -286,51 +291,77 @@ bool FitParameterSet::isEnabled() const {
 bool FitParameterSet::isEnablePca() const {
   return _enablePca_;
 }
-bool FitParameterSet::isEnabledThrowToyParameters() const {
-  return _enabledThrowToyParameters_;
-}
-const std::string &FitParameterSet::getName() const {
-  return _name_;
+bool FitParameterSet::isUseEigenDecompInFit() const {
+  return _useEigenDecompInFit_;
 }
 bool FitParameterSet::isMaskedForPropagation() const {
   return _maskedForPropagation_;
 }
-std::vector<FitParameter> &FitParameterSet::getParameterList() {
-  return _parameterList_;
+bool FitParameterSet::isEnabledThrowToyParameters() const {
+  return _enabledThrowToyParameters_;
 }
-std::vector<FitParameter> &FitParameterSet::getEigenParameterList(){
-  return _eigenParameterList_;
+bool FitParameterSet::isUseOnlyOneParameterPerEvent() const {
+  return _useOnlyOneParameterPerEvent_;
+}
+int FitParameterSet::getNbEnabledEigenParameters() const {
+  return _nbEnabledEigen_;
+}
+double FitParameterSet::getPenaltyChi2Buffer() const{
+  return _penaltyChi2Buffer_;
+}
+size_t FitParameterSet::getNbParameters() const {
+  return _parameterList_.size();
+}
+const std::string &FitParameterSet::getName() const {
+  return _name_;
+}
+const nlohmann::json &FitParameterSet::getDialSetDefinitions() const {
+  return _dialSetDefinitions_;
+}
+const TMatrixD* FitParameterSet::getInvertedEigenVectors() const{
+  return _eigenVectorsInv_.get();
+}
+const TMatrixD* FitParameterSet::getEigenVectors() const{
+  return _eigenVectors_.get();
 }
 const std::vector<FitParameter> &FitParameterSet::getParameterList() const{
-  return _parameterList_;
-}
-std::vector<FitParameter>& FitParameterSet::getEffectiveParameterList(){
-  if( _useEigenDecompInFit_ ) return _eigenParameterList_;
   return _parameterList_;
 }
 const std::vector<FitParameter>& FitParameterSet::getEffectiveParameterList() const{
   if( _useEigenDecompInFit_ ) return _eigenParameterList_;
   return _parameterList_;
 }
-const nlohmann::json &FitParameterSet::getDialSetDefinitions() const {
-  return _dialSetDefinitions_;
+const std::shared_ptr<TMatrixDSym> &FitParameterSet::getPriorCorrelationMatrix() const {
+  return _priorCorrelationMatrix_;
+}
+const std::shared_ptr<TMatrixDSym> &FitParameterSet::getPriorCovarianceMatrix() const {
+  return _priorCovarianceMatrix_;
+}
+
+// non const getters
+std::vector<FitParameter> &FitParameterSet::getParameterList() {
+  return _parameterList_;
+}
+std::vector<FitParameter> &FitParameterSet::getEigenParameterList(){
+  return _eigenParameterList_;
+}
+std::vector<FitParameter>& FitParameterSet::getEffectiveParameterList(){
+  if( _useEigenDecompInFit_ ) return _eigenParameterList_;
+  return _parameterList_;
 }
 
 // Core
-size_t FitParameterSet::getNbParameters() const {
-  return _parameterList_.size();
-}
 double FitParameterSet::getPenaltyChi2() {
 
   if (not _isEnabled_) { return 0; }
 
-  double chi2 = 0;
+  _penaltyChi2Buffer_ = 0;
 
   if( _priorCovarianceMatrix_ != nullptr ){
     if( _useEigenDecompInFit_ ){
       for( const auto& eigenPar : _eigenParameterList_ ){
         if( eigenPar.isFixed() ) continue;
-        chi2 += TMath::Sq( (eigenPar.getParameterValue() - eigenPar.getPriorValue()) / eigenPar.getStdDevValue() ) ;
+        _penaltyChi2Buffer_ += TMath::Sq( (eigenPar.getParameterValue() - eigenPar.getPriorValue()) / eigenPar.getStdDevValue() ) ;
       }
     }
     else{
@@ -338,11 +369,11 @@ double FitParameterSet::getPenaltyChi2() {
       this->fillDeltaParameterList();
 
       // compute penalty term with covariance
-      chi2 = (*_deltaParameterList_) * ( (*_inverseStrippedCovarianceMatrix_) * (*_deltaParameterList_) );
+      _penaltyChi2Buffer_ = (*_deltaParameterList_) * ( (*_inverseStrippedCovarianceMatrix_) * (*_deltaParameterList_) );
     }
   }
 
-  return chi2;
+  return _penaltyChi2Buffer_;
 }
 
 // Parameter throw
@@ -351,13 +382,13 @@ void FitParameterSet::moveFitParametersToPrior(){
 
   if( not _useEigenDecompInFit_ ){
     for( auto& par : _parameterList_ ){
-      if( par.isFixed() ){ continue; }
+      if( par.isFixed() or not par.isEnabled() ){ continue; }
       par.setParameterValue(par.getPriorValue());
     }
   }
   else{
     for( auto& eigenPar : _eigenParameterList_ ){
-      if( eigenPar.isFixed() ) continue;
+      if( eigenPar.isFixed() or not eigenPar.isEnabled() ) continue;
       eigenPar.setParameterValue(eigenPar.getPriorValue());
     }
     this->propagateEigenToOriginal();
@@ -440,7 +471,7 @@ void FitParameterSet::throwFitParameters(double gain_){
           LogInfo << " → " << par.getParameterValue() << std::endl;
         }
         else{
-          LogWarning << "Skipping parameter: " << par.getTitle() << std::endl;
+//          LogWarning << "Skipping parameter: " << par.getTitle() << std::endl;
         }
       }
 
@@ -459,20 +490,6 @@ const std::vector<nlohmann::json>& FitParameterSet::getCustomFitParThrow() const
   return _customFitParThrow_;
 }
 
-// Eigen
-bool FitParameterSet::isUseEigenDecompInFit() const {
-  return _useEigenDecompInFit_;
-}
-int FitParameterSet::getNbEnabledEigenParameters() const {
-  return _nbEnabledEigen_;
-}
-
-const TMatrixD* FitParameterSet::getInvertedEigenVectors() const{
-  return _eigenVectorsInv_.get();
-}
-const TMatrixD* FitParameterSet::getEigenVectors() const{
-  return _eigenVectors_.get();
-}
 void FitParameterSet::propagateOriginalToEigen(){
   // First propagate to the buffer
   int iParOffSet{0};
@@ -510,14 +527,6 @@ void FitParameterSet::propagateEigenToOriginal(){
 
 
 // Misc
-FitParameter* FitParameterSet::getParameterPtr(const std::string& parName_){
-  if( not parName_.empty() ){
-    for( auto& par : _parameterList_ ){
-      if( par.getName() == parName_ ){ return &par; }
-    }
-  }
-  return nullptr;
-}
 std::string FitParameterSet::getSummary() const {
   std::stringstream ss;
 
@@ -547,14 +556,14 @@ std::string FitParameterSet::getSummary() const {
 #endif
 
         t.addTableLine({
-          par.getTitle(),
-          std::to_string( par.getParameterValue() ),
-          std::to_string( par.getPriorValue() ),
-          std::to_string( par.getStdDevValue() ),
-          std::to_string( par.getMinValue() ),
-          std::to_string( par.getMaxValue() ),
-          statusStr
-        }, colorStr);
+                           par.getTitle(),
+                           std::to_string( par.getParameterValue() ),
+                           std::to_string( par.getPriorValue() ),
+                           std::to_string( par.getStdDevValue() ),
+                           std::to_string( par.getMinValue() ),
+                           std::to_string( par.getMaxValue() ),
+                           statusStr
+                       }, colorStr);
       }
 
       t.printTable();
@@ -563,6 +572,141 @@ std::string FitParameterSet::getSummary() const {
 
   return ss.str();
 }
+nlohmann::json FitParameterSet::exportInjectorConfig() const{
+  nlohmann::json out;
+
+  out["name"] = this->getName();
+
+  std::vector<nlohmann::json> parJsonList{};
+  parJsonList.reserve( _parameterList_.size() );
+
+  for( auto& par : _parameterList_ ){
+    if( not par.isEnabled() ){ continue; }
+    parJsonList.emplace_back();
+
+    if( par.getName().empty() ){
+      // will be identified by their index. For instance: '#52'
+      parJsonList.back()["title"] = par.getTitle();
+    }
+    else{
+      parJsonList.back()["name"] = par.getName();
+    }
+
+    parJsonList.back()["value"] = par.getParameterValue();
+  }
+
+  out["parameterValues"] = parJsonList;
+
+  return out;
+}
+void FitParameterSet::injectParameterValues(const nlohmann::json& config_){
+  LogWarning << "Importing parameters from config for \"" << this->getName() << "\"" << std::endl;
+
+  auto config = ConfigUtils::getForwardedConfig(config_);
+  LogThrowIf( config.empty(), "Invalid injector config" << std::endl << config_ );
+  LogThrowIf( not GenericToolbox::Json::doKeyExist(config, "name"), "No parameter set name provided in" << std::endl << config_ );
+  LogThrowIf( GenericToolbox::Json::fetchValue<std::string>(config, "name") != this->getName(),
+              "Mismatching between parSet name (" << this->getName() << ") and injector config ("
+              << GenericToolbox::Json::fetchValue<std::string>(config, "name") << ")" );
+
+  auto parValues = GenericToolbox::Json::fetchValue( config, "parameterValues", nlohmann::json() );
+  if     ( parValues.empty() ) {
+    LogThrow( "No parameterValues provided." );
+  }
+  else if( parValues.is_string() ){
+    //
+    LogInfo << "Reading parameter values from file: " << parValues.get<std::string>() << std::endl;
+    auto parList = GenericToolbox::dumpFileAsVectorString( parValues.get<std::string>(), true );
+    LogThrowIf( parList.size() != this->getNbParameters()  ,
+                parList.size() << " parameters provided for " << this->getName() << ", expecting " << this->getNbParameters()
+    );
+
+    for( size_t iPar = 0 ; iPar < this->getNbParameters() ; iPar++ ) {
+
+      if( not this->getParameterList()[iPar].isEnabled() ){
+        LogAlert << "NOT injecting \"" << this->getParameterList()[iPar].getFullTitle() << "\" as it is disabled." << std::endl;
+        continue;
+      }
+
+      LogScopeIndent;
+      LogInfo << "Injecting \"" << this->getParameterList()[iPar].getFullTitle() << "\": " << parList[iPar] << std::endl;
+      this->getParameterList()[iPar].setParameterValue( std::stod(parList[iPar]) );
+    }
+  }
+  else{
+    LogScopeIndent;
+    for( auto& parValueEntry : parValues ){
+      if     ( GenericToolbox::Json::doKeyExist(parValueEntry, "name") ) {
+        auto parName = GenericToolbox::Json::fetchValue<std::string>(parValueEntry, "name");
+        auto* parPtr = this->getParameterPtr(parName);
+        LogThrowIf(parPtr == nullptr, "Could not find " << parName << " among the defined parameters in " << this->getName());
+
+
+        if( not parPtr->isEnabled() ){
+          LogAlert << "NOT injecting \"" << parPtr->getFullTitle() << "\" as it is disabled." << std::endl;
+          continue;
+        }
+
+        LogInfo << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
+        parPtr->setParameterValue( GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") );
+      }
+      else if( GenericToolbox::Json::doKeyExist(parValueEntry, "title") ){
+        auto parTitle = GenericToolbox::Json::fetchValue<std::string>(parValueEntry, "title");
+        auto* parPtr = this->getParameterPtrWithTitle(parTitle);
+        LogThrowIf(parPtr == nullptr, "Could not find " << parTitle << " among the defined parameters in " << this->getName());
+
+
+        if( not parPtr->isEnabled() ){
+          LogAlert << "NOT injecting \"" << parPtr->getFullTitle() << "\" as it is disabled." << std::endl;
+          continue;
+        }
+
+        LogInfo << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
+        parPtr->setParameterValue( GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") );
+      }
+      else if( GenericToolbox::Json::doKeyExist(parValueEntry, "index") ){
+        auto parIndex = GenericToolbox::Json::fetchValue<int>(parValueEntry, "index");
+        LogThrowIf( parIndex < 0 or parIndex >= this->getParameterList().size(),
+                    "invalid parameter index (" << parIndex << ") for injection in parSet: " << this->getName() );
+
+        auto* parPtr = &this->getParameterList()[parIndex];
+        if( not parPtr->isEnabled() ){
+          LogAlert << "NOT injecting \"" << parPtr->getFullTitle() << "\" as it is disabled." << std::endl;
+          continue;
+        }
+
+        LogInfo << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
+        parPtr->setParameterValue( GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") );
+      }
+      else {
+        LogThrow("Unsupported: " << parValueEntry);
+      }
+    }
+  }
+
+  if( this->isUseEigenDecompInFit() ){
+    LogInfo << "Propagating back to the eigen decomposed parameters for parSet: " << this->getName() << std::endl;
+    this->propagateOriginalToEigen();
+  }
+
+}
+FitParameter* FitParameterSet::getParameterPtr(const std::string& parName_){
+  if( not parName_.empty() ){
+    for( auto& par : _parameterList_ ){
+      if( par.getName() == parName_ ){ return &par; }
+    }
+  }
+  return nullptr;
+}
+FitParameter* FitParameterSet::getParameterPtrWithTitle(const std::string& parTitle_){
+  if( not parTitle_.empty() ){
+    for( auto& par : _parameterList_ ){
+      if( par.getTitle() == parTitle_ ){ return &par; }
+    }
+  }
+  return nullptr;
+}
+
 
 double FitParameterSet::toNormalizedParRange(double parRange, const FitParameter& par){
   return (parRange)/par.getStdDevValue();
@@ -689,6 +833,45 @@ void FitParameterSet::defineParameters(){
     }
 
     if( _parameterNamesList_ != nullptr ){ par.setName(_parameterNamesList_->At(par.getParameterIndex())->GetName()); }
+
+    // par is now fully identifiable.
+    if( not _enableOnlyParameters_.empty() ){
+      bool isEnabled = false;
+      for( auto& enableEntry : _enableOnlyParameters_ ){
+        if( GenericToolbox::Json::doKeyExist(enableEntry, "name")
+            and par.getName() == GenericToolbox::Json::fetchValue<std::string>(enableEntry, "name") ){
+          isEnabled = true;
+          break;
+        }
+      }
+
+      if( not isEnabled ){
+        // set it of
+        par.setIsEnabled( false );
+      }
+      else{
+        LogInfo << "Enabling parameter \"" << par.getFullTitle() << "\" as it is set in enableOnlyParameters" << std::endl;
+      }
+    }
+    if( not _disableParameters_.empty() ){
+      bool isEnabled = true;
+      for( auto& disableEntry : _disableParameters_ ){
+        if( GenericToolbox::Json::doKeyExist(disableEntry, "name")
+            and par.getName() == GenericToolbox::Json::fetchValue<std::string>(disableEntry, "name") ){
+          isEnabled = false;
+          break;
+        }
+      }
+
+      if( not isEnabled ){
+        LogWarning << "Skipping parameter \"" << par.getFullTitle() << "\" as it is set in disableParameters" << std::endl;
+        par.setIsEnabled( false );
+        continue;
+      }
+    }
+
+
+
     if( _parameterPriorList_ != nullptr ){ par.setPriorValue((*_parameterPriorList_)[par.getParameterIndex()]); }
     else{ par.setPriorValue(1); }
 
@@ -709,7 +892,8 @@ void FitParameterSet::defineParameters(){
       if (_parameterNamesList_ != nullptr) {
         // Find the parameter using the name from the vector of names for
         // the covariance.
-        auto parConfig = GenericToolbox::Json::fetchMatchingEntry(_parameterDefinitionConfig_, "parameterName", std::string(_parameterNamesList_->At(par.getParameterIndex())->GetName()));
+        auto parConfig = GenericToolbox::Json::fetchMatchingEntry(_parameterDefinitionConfig_, "name", std::string(_parameterNamesList_->At(par.getParameterIndex())->GetName()));
+        if( parConfig.empty() ) parConfig = GenericToolbox::Json::fetchMatchingEntry(_parameterDefinitionConfig_, "parameterName", std::string(_parameterNamesList_->At(par.getParameterIndex())->GetName()));
         if( parConfig.empty() ){
             // try with par index
           parConfig = GenericToolbox::Json::fetchMatchingEntry(_parameterDefinitionConfig_, "parameterIndex", par.getParameterIndex());
@@ -722,7 +906,7 @@ void FitParameterSet::defineParameters(){
         auto configVector = _parameterDefinitionConfig_.get<std::vector<nlohmann::json>>();
         LogThrowIf(configVector.size() <= par.getParameterIndex());
         auto parConfig = configVector.at(par.getParameterIndex());
-        auto parName = GenericToolbox::Json::fetchValue<std::string>(parConfig, "parameterName");
+        auto parName = GenericToolbox::Json::fetchValue<std::string>(parConfig, {{"name"}, {"parameterName"}});
         if (not parName.empty()) par.setName(parName);
         par.setParameterDefinitionConfig(parConfig);
         LogWarning << "Parameter #" << par.getParameterIndex()
@@ -748,13 +932,4 @@ void FitParameterSet::fillDeltaParameterList(){
   }
 }
 
-bool FitParameterSet::isUseOnlyOneParameterPerEvent() const {
-  return _useOnlyOneParameterPerEvent_;
-}
 
-const std::shared_ptr<TMatrixDSym> &FitParameterSet::getPriorCorrelationMatrix() const {
-  return _priorCorrelationMatrix_;
-}
-const std::shared_ptr<TMatrixDSym> &FitParameterSet::getPriorCovarianceMatrix() const {
-  return _priorCovarianceMatrix_;
-}

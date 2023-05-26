@@ -11,10 +11,10 @@
 # If yaml-cpp is not installed in a standard path, you can use the YAMLCPP_INSTALL_DIR CMake variable
 # to tell CMake where yaml-cpp is.
 
-cmessage(STATUS "Looking for yaml-cpp library...")
-cmessage(STATUS " -> To manually select yaml-cpp: -D YAMLCPP_INSTALL_DIR=/path/to/yaml-cpp/install )")
+cmessage( STATUS "Looking for yaml-cpp library...")
+cmessage( STATUS " -> To manually select yaml-cpp: -D YAMLCPP_INSTALL_DIR=/path/to/yaml-cpp/install )")
 #if( YAMLCPP_INSTALL_DIR STREQUAL "" )
-#    cmessage(STATUS "User provided YAMLCPP_INSTALL_DIR=${YAMLCPP_INSTALL_DIR}")
+#    cmessage( STATUS "User provided YAMLCPP_INSTALL_DIR=${YAMLCPP_INSTALL_DIR}")
 #endif()
 
 # attempt to find static library first if this is set
@@ -24,7 +24,7 @@ endif()
 
 if( YAMLCPP_INSTALL_DIR )
     # find the yaml-cpp include directory
-    cmessage(STATUS "Custom yaml-cpp path has been set: ${YAMLCPP_INSTALL_DIR}")
+    cmessage( STATUS "Custom yaml-cpp path has been set: ${YAMLCPP_INSTALL_DIR}")
 
     # find the yaml-cpp include directory
     find_path(YAMLCPP_INCLUDE_DIR yaml-cpp/yaml.h
@@ -41,7 +41,7 @@ if( YAMLCPP_INSTALL_DIR )
             NO_DEFAULT_PATH
             )
 else()
-    cmessage(STATUS "Looking for the include and lib folders in the system...")
+    cmessage( STATUS "Looking for the include and lib folders in the system...")
     # find the yaml-cpp include directory
     find_path(YAMLCPP_INCLUDE_DIR yaml-cpp/yaml.h
             PATH_SUFFIXES include

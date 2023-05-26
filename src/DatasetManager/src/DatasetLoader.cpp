@@ -75,8 +75,12 @@ void DatasetLoader::initializeImpl() {
 DatasetLoader::DatasetLoader(const nlohmann::json& config_, int datasetIndex_): _dataSetIndex_(datasetIndex_) {
   this->readConfig(config_);
 }
+
 void DatasetLoader::setDataSetIndex(int dataSetIndex) {
   _dataSetIndex_ = dataSetIndex;
+}
+void DatasetLoader::setSelectedDataEntry(const std::string &selectedDataEntry) {
+  _selectedDataEntry_ = selectedDataEntry;
 }
 
 bool DatasetLoader::isEnabled() const {

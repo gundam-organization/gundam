@@ -3,11 +3,13 @@
 set( APPLICATION_LIST
     # GUNDAM apps
     gundamFitter
+    gundamFitReader
     gundamCalcXsec
-    gundamConfigUnfolder
-    gundamPlotExtractor
-    gundamConfigCompare
     gundamFitCompare
+    gundamInputZipper
+    gundamConfigCompare
+    gundamPlotExtractor
+    gundamConfigUnfolder
     )
 
 
@@ -70,6 +72,8 @@ endforeach()
 
 # Dependencies
 target_link_libraries( gundamFitter GundamFitter )
+target_link_libraries( gundamFitReader GundamUtils )
+target_link_libraries( gundamInputZipper GundamUtils )
 target_link_libraries( gundamFitCompare GundamUtils )
 target_link_libraries( gundamConfigUnfolder GundamUtils )
 target_link_libraries( gundamConfigCompare GundamUtils )
@@ -80,7 +84,7 @@ if( WITH_GUNDAM_ROOT_APP )
 #target_sources( gundamRoot PRIVATE G__GundamRootDict.cxx )
 #target_link_libraries( gundamRoot GundamPropagator )
 target_link_libraries( gundamRoot
-    GundamRootDict
+    GundamRootDict GundamUtils
     #    GundamPropagator
     )
 endif ()

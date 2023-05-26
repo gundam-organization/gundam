@@ -5,7 +5,8 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[NormFactory]");
 });
 
-DialBase* NormDialBaseFactory::makeDial(const std::string& dialType_,
+DialBase* NormDialBaseFactory::makeDial(const std::string& dialTitle_,
+                                        const std::string& dialType_,
                                         const std::string& dialSubType_,
                                         TObject* dialInitializer_,
                                         bool useCachedDial_) {

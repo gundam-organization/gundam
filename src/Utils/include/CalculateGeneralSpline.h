@@ -1,7 +1,8 @@
 #ifndef CALCULATE_GENERAL_SPLINE_H_SEEN
-// Calculate a spline knots.  This adds a function that can be called from CPU
-// (with c++), or a GPU (with CUDA).  With G++ running with O1, this is about
-// forty times faster than TSpline3.
+// Calculate a spline specified by the position, value, and slope at each
+// knot.  The knot positions must be in increasing order.  This adds a local
+// function that can be called from CPU (with c++), or a GPU (with CUDA).
+// With G++ running with "O1", this is about forty times faster than TSpline3.
 
 // Wrap the CUDA compiler attributes into a definition.  When this is compiled
 // with a CUDA compiler __CUDACC__ will be defined.  In that case, the code
@@ -35,18 +36,25 @@ namespace {
     // for this spline, and the number of data elements in the spline data.
     // The input data is arrange as
     //
-    // data[0] -- spline lower bound (not used)
-    // data[1] -- spline inverse step (not used)
+    // data[0] -- spline lower bound (not used, kept to match other splines)
+    // data[1] -- spline step (not used, kept to match other splines)
     // data[2+3*n+0] -- The function value for knot n
     // data[2+3*n+1] -- The function slope for knot n
     // data[2+3*n+2] -- The point for knot n
+    //
+    // NOTE: CalculateUniformSpline, CalculateGeneralSpline,
+    // CalculateCompactSpline, and CalculateMonotonicSpline have very similar,
+    // but different calls.  In particular the dim parameter meaning is not
+    // consistent.
     DEVICE_CALLABLE_INLINE
     double CalculateGeneralSpline(const double x,
                                   const double lowerBound, double upperBound,
                                   const DEVICE_FLOATING_POINT* data,
                                   const int dim) {
 
-        // Check to find a point that is less than x.
+        // Check to find a point that is less than x.  This is "brute force",
+        // but since we know that the splines will usually have 7 or fewer
+        // points, this will be faster, or comparable, to binary search.
         const int knotCount = (dim-2)/3;
         int ix = 0;
         if (x > data[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 1

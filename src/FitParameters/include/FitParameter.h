@@ -13,9 +13,10 @@
 
 #include "GenericToolbox.h"
 
-#include "vector"
-#include "string"
 #include "nlohmann/json.hpp"
+
+#include <vector>
+#include <string>
 
 namespace PriorType{
   ENUM_EXPANDER(
