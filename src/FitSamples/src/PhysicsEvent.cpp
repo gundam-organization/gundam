@@ -68,7 +68,7 @@ double PhysicsEvent::getEventWeight() const {
             // _CacheManagerValue_ and _CacheManagerValid_ are inside
             // of the weights cache (a bit of evil coding here), and are
             // updated by the cache.  The update is triggered by
-            // _CacheManagerUpdate().
+            // (*_CacheManagerUpdate_)().
             if (_CacheManagerUpdate_) (*_CacheManagerUpdate_)();
         }
 #ifdef CACHE_MANAGER_SLOW_VALIDATION

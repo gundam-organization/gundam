@@ -110,10 +110,19 @@ void SampleElement::refillHistogram(int iThread_){
   auto* binContentArray = histogram->GetArray();
   auto* binErrorArray = histogram->GetSumw2()->GetArray();
   while( iBin < nBins ) {
-    binContentArray[iBin + 1] = 0; 
+    binContentArray[iBin + 1] = 0;
     binErrorArray[iBin + 1] = 0;
 #ifdef GUNDAM_USING_CACHE_MANAGER
-    if (_CacheManagerValue_!=nullptr and _CacheManagerIndex_ >= 0) {
+    if (_CacheManagerValue_ !=nullptr and _CacheManagerIndex_ >= 0) {
+      if (_CacheManagerValid_ and not (*_CacheManagerValid_)) {
+        // This is can be slowish on when data must be copied from the device,
+        // but makes sure that the cached result is updated when the cache has
+        // changed.  The values pointed to by _CacheManagerValue_ and
+        // _CacheManagerValid_ are inside of the summed index cache (a bit of
+        // evil coding here), and are updated by the cache.  The update is
+        // triggered by (*_CacheManagerUpdate_)().
+        if (_CacheManagerUpdate_) (*_CacheManagerUpdate_)();
+      }
       binContentArray[iBin + 1] += _CacheManagerValue_[_CacheManagerIndex_+iBin];
       binErrorArray[iBin + 1] += binContentArray[iBin + 1]*binContentArray[iBin + 1];
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
