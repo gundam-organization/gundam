@@ -287,6 +287,10 @@ namespace ConfigUtils {
 
   }
 
+  void ConfigHandler::setConfig( const nlohmann::json& config_ ){
+    config = config_;
+  }
+
   std::string ConfigHandler::toString() const{
     return GenericToolbox::Json::toReadableString( config );
   }
@@ -297,6 +301,7 @@ namespace ConfigUtils {
   nlohmann::json &ConfigHandler::getConfig(){
     return config;
   }
+
 
   void ConfigHandler::override( const std::string& filePath_ ){
     LogInfo << "Overriding config with \"" << filePath_ << "\"" << std::endl;
