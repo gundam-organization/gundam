@@ -10,6 +10,11 @@ do
     echo "Get tag list..."
     git tag --sort=creatordate
     exit 0;
+  elif [ $arg == "--show-branches" ]; then
+    echo "Get branches list..."
+    git fetch --all
+    git branch -a --sort=committerdate
+    exit 0;
   elif [ $arg == "-v" ]; then
     shift
     if [[ -n $1 ]]; then
@@ -17,6 +22,15 @@ do
       git checkout $1 && git submodule update --init --remote
     else
       echo "You should provide a version after -v"
+    fi
+    exit 0;
+  elif [ $arg == "-b" ]; then
+    shift
+    if [[ -n $1 ]]; then
+      echo "Updating to branch: $1"
+      git checkout $1 && git submodule update --init --remote
+    else
+      echo "You should provide a version after -b"
     fi
     exit 0;
   elif [ $arg == "--latest" ]; then
@@ -36,12 +50,15 @@ do
 done
 
 
-echo "Simple script that help users to checkout a given version of GUNDAM"
-echo "Usage:"
-echo "--latest: checkout the latest tagged version"
-echo "--head: checkout the main branch"
-echo "--show-versions: printout all available versions"
-echo "-v: checkout a given version"
-
+echo "**********************************************************************"
+echo "* Simple script that help users to checkout a given version of GUNDAM"
+echo "* Usage:"
+echo "* --latest: checkout the latest tagged version"
+echo "* --head: checkout the main branch"
+echo "* --show-branches: printout all available versions"
+echo "* --show-versions: printout all available versions"
+echo "* -v: checkout a given version"
+echo "* -b: checkout a given branch"
+echo "**********************************************************************"
 
 #builtin cd - || exit 1;
