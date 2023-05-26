@@ -4,13 +4,19 @@
 # compiler/machine dependent build directory, and figures out the
 # installation directory.  It then runs cmake and make.
 #
-# gundam-build [force] [cmake] [clean] [help]
+# gundam-build [force] [cmake] [clean] [help] [-D<cmake-define>]
 #     force -- Force cmake to ignore the cache
 #     cmake -- Don't compile the source (only run cmake).
 #     clean -- Run clean the build area after running cmake (run make clean)
+#     keep  -- Keep going when there is a compilation error (add -k to make)
 #     test  -- Run tests after the build
+#     verbose -- Run make with verbose turned on.
 #     help  -- This message
 #
+#     -D<CMAKE_DEFINE> -- Add a definition to the cmake command.
+#
+# Set the GUNDAM_JOBS shell variable to control the number of threads
+# used during the compilation (defaults to 1).
 
 # Check that the source root directory is defined.
 if [ ${#GUNDAM_ROOT} == 0 ]; then
@@ -55,7 +61,14 @@ RUN_CLEAN="no"
 RUN_TEST="no"
 DEFINES=" -DCMAKE_INSTALL_PREFIX=${GUNDAM_INSTALL} "
 DEFINES="${DEFINES} -DCMAKE_EXPORT_COMPILE_COMMANDS=1 "
-MAKE_OPTIONS=" -j1 "
+if [ "x${GUNDAM_JOBS}" == x ]; then
+    GUNDAM_JOBS=1
+    echo XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+    echo Threads: ${GUNDAM_JOBS} -- Override with GUNDAM_JOBS shell variable.
+    echo XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+    echo
+fi
+MAKE_OPTIONS=" -j${GUNDAM_JOBS} "
 while [ "x${1}" != "x" ]; do
     case ${1} in
         fo*) # force
@@ -93,14 +106,17 @@ while [ "x${1}" != "x" ]; do
             export VERBOSE=true
             ;;
         he*) # help
-            echo gundam-build [force] [cmake] [clean] [help]
+            echo "gundam-build [force] [cmake] [clean] [help] [-D<cmake-define>]"
             echo "   force -- Force cmake to ignore the cache"
             echo "   cmake -- Don't build the package (only run cmake)"
             echo "   clean -- Run make clean after cmake"
+            echo "   keep  -- Keep going on a compilation error (make -k)"
+            echo "   test  -- Run tests after the build"
+            echo "   verbose -- Run make with verbose turned on."
             echo "   help  -- This message"
             exit 0
             ;;
-        -*) # Add definitions
+        -D*) # Add definitions
             echo Add $1
             DEFINES="${DEFINES} ${1}"
             shift
