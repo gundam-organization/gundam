@@ -288,6 +288,13 @@ endif(WITH_BREAKDOWN_CACHE)
 # as stand-alone projects.  This has the danger that it's not fully configured,
 # but should be OK
 
+include( ${CMAKE_SOURCE_DIR}/cmake/checkSubmodules.cmake )
+
+checkSubmodule( cpp-generic-toolbox )
+checkSubmodule( simple-cpp-logger )
+checkSubmodule( simple-cpp-cmd-line-parser )
+
+
 ## Add the CmdLineParser
 # Reproduce needed parts of the simple-cpp-cmd-line-parser CMakeLists.txt
 include_directories(submodules/simple-cpp-cmd-line-parser/include)
