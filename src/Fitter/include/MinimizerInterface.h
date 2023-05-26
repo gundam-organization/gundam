@@ -18,8 +18,8 @@
 #include "TDirectory.h"
 #include "nlohmann/json.hpp"
 
-#include "memory"
-#include "vector"
+#include <memory>
+#include <vector>
 
 class FitterEngine;
 
@@ -28,14 +28,45 @@ class MinimizerInterface : public MinimizerBase {
 public:
   explicit MinimizerInterface(FitterEngine* owner_);
 
+  // setters
+  void setEnableSimplexBeforeMinimize(bool enableSimplexBeforeMinimize_){ _enableSimplexBeforeMinimize_ = enableSimplexBeforeMinimize_; }
+
+  // getters
+  [[nodiscard]] std::string getMinimizerTypeName() const override { return "MinimizerInterface"; };
   [[nodiscard]] bool isFitHasConverged() const override;
+  [[nodiscard]] double getTargetEdm() const;
   [[nodiscard]] const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const;
 
   void minimize() override;
   void calcErrors() override;
   void scanParameters(TDirectory* saveDir_) override;
 
-  double getTargetEdm() const;
+  void saveMinimizerSettings(TDirectory* saveDir_) const {
+    LogInfo << "Saving minimizer settings..." << std::endl;
+
+    GenericToolbox::writeInTFile( saveDir_, TNamed("minimizerType", _minimizerType_.c_str()) );
+    GenericToolbox::writeInTFile( saveDir_, TNamed("minimizerAlgo", _minimizerAlgo_.c_str()) );
+    GenericToolbox::writeInTFile( saveDir_, TNamed("strategy", std::to_string(_strategy_).c_str()) );
+    GenericToolbox::writeInTFile( saveDir_, TNamed("printLevel", std::to_string(_printLevel_).c_str()) );
+    GenericToolbox::writeInTFile( saveDir_, TNamed("targetEDM", std::to_string(this->getTargetEdm()).c_str()) );
+    GenericToolbox::writeInTFile( saveDir_, TNamed("maxIterations", std::to_string(_maxIterations_).c_str()) );
+    GenericToolbox::writeInTFile( saveDir_, TNamed("maxFcnCalls", std::to_string(_maxFcnCalls_).c_str()) );
+    GenericToolbox::writeInTFile( saveDir_, TNamed("tolerance", std::to_string(_tolerance_).c_str()) );
+    GenericToolbox::writeInTFile( saveDir_, TNamed("stepSizeScaling", std::to_string(_stepSizeScaling_).c_str()) );
+    GenericToolbox::writeInTFile( saveDir_, TNamed("useNormalizedFitSpace", std::to_string(getLikelihood().getUseNormalizedFitSpace()).c_str()) );
+
+    if( _enableSimplexBeforeMinimize_ ){
+      GenericToolbox::writeInTFile( saveDir_, TNamed("enableSimplexBeforeMinimize", std::to_string(_enableSimplexBeforeMinimize_).c_str()) );
+      GenericToolbox::writeInTFile( saveDir_, TNamed("simplexMaxFcnCalls", std::to_string(_simplexMaxFcnCalls_).c_str()) );
+      GenericToolbox::writeInTFile( saveDir_, TNamed("simplexToleranceLoose", std::to_string(_simplexToleranceLoose_).c_str()) );
+      GenericToolbox::writeInTFile( saveDir_, TNamed("simplexStrategy", std::to_string(_simplexStrategy_).c_str()) );
+    }
+
+    if( this->isEnablePostFitErrorEval() ){
+      GenericToolbox::writeInTFile( saveDir_, TNamed("enablePostFitErrorFit", std::to_string(this->isEnablePostFitErrorEval()).c_str()) );
+      GenericToolbox::writeInTFile( saveDir_, TNamed("errorAlgo", _errorAlgo_.c_str()) );
+    }
+  }
 
 protected:
   void readConfigImpl() override;
@@ -55,6 +86,7 @@ private:
   int _strategy_{1};
   int _printLevel_{2};
   int _simplexStrategy_{1};
+  double _stepSizeScaling_{1};
   double _tolerance_{1E-4};
   double _simplexToleranceLoose_{1000.};
   unsigned int _maxIterations_{500};
@@ -69,41 +101,6 @@ private:
   bool _isBadCovMat_{false};
 
   std::unique_ptr<ROOT::Math::Minimizer> _minimizer_{nullptr};
-
-  // dict
-  const std::map<int, std::string> minuitStatusCodeStr{
-      { 0 , "status = 0    : OK" },
-      { 1 , "status = 1    : Covariance was mad! Thus made pos defined"},
-      { 2 , "status = 2    : Hesse is invalid"},
-      { 3 , "status = 3    : Edm is above max"},
-      { 4 , "status = 4    : Reached call limit"},
-      { 5 , "status = 5    : Any other failure"},
-      { -1, "status = -1   : We don't even know what happened"}
-  };
-  const std::map<int, std::string> hesseStatusCodeStr{
-      { 0, "status = 0    : OK" },
-      { 1, "status = 1    : Hesse failed"},
-      { 2, "status = 2    : Matrix inversion failed"},
-      { 3, "status = 3    : Matrix is not pos defined"},
-      { -1, "status = -1    : Minimize wasn't called before"}
-  };
-  const std::map<int, std::string> minosStatusCodeStr{
-      { 0, "status = 0    : last MINOS run was succesfull" },
-      { 1, "status = 1    : Maximum number of function calls exceeded when running for lower error"},
-      { 2, "status = 2    : maximum number of function calls exceeded when running for upper error"},
-      { 3, "status = 3    : new minimum found when running for lower error"},
-      { 4, "status = 4    : new minimum found when running for upper error"},
-      { 5, "status = 5    : any other failure"},
-      { -1, "status = -1   : Minos is not run"}
-  };
-
-  // 0 not calculated 1 approximated 2 made pos def , 3 accurate
-  const std::map<int, std::string> covMatrixStatusCodeStr{
-      { 0, "status = 0    : not calculated" },
-      { 1, "status = 1    : approximated"},
-      { 2, "status = 2    : made pos def"},
-      { 3, "status = 3    : accurate"}
-  };
 
 };
 #endif //GUNDAM_MINIMIZERINTERFACE_H

@@ -10,8 +10,8 @@
 
 #include "TGraph.h"
 
-#include "vector"
-#include "utility"
+#include <vector>
+#include <utility>
 
 class MonotonicSpline : public DialBase {
 

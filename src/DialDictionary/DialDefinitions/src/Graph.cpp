@@ -24,9 +24,15 @@ void Graph::buildDial(const TGraph &graph, const std::string& option_) {
 }
 
 double Graph::evalResponse(const DialInputBuffer& input_) const {
+  double dialInput{input_.getBuffer()[0]};
+
+#ifndef NDEBUG
+  LogThrowIf(not std::isfinite(dialInput), "Invalid input for Graph");
+#endif
+
   if( not _allowExtrapolation_ ){
-    if     (input_.getBuffer()[0] <= _graph_.GetX()[0])                { return _graph_.GetY()[0]; }
-    else if(input_.getBuffer()[0] >= _graph_.GetX()[_graph_.GetN()-1]) { return _graph_.GetY()[_graph_.GetN() - 1]; }
+    if     (dialInput <= _graph_.GetX()[0])                { return _graph_.GetY()[0]; }
+    else if(dialInput >= _graph_.GetX()[_graph_.GetN()-1]) { return _graph_.GetY()[_graph_.GetN() - 1]; }
   }
-  return _graph_.Eval(input_.getBuffer()[0]);
+  return _graph_.Eval(dialInput);
 }

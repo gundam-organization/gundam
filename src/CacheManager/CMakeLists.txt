@@ -10,27 +10,30 @@ set(HEADERS
   include/WeightMonotonicSpline.h
   include/WeightUniformSpline.h
   include/WeightGeneralSpline.h
+  include/WeightGraph.h
   include/WeightBase.h
   include/CacheIndexedSums.h
   )
 
 if(CMAKE_CUDA_COMPILER)
-  cmessage(STATUS "CUDA utilities being compiled")
+  cmessage( STATUS "CUDA utilities being compiled")
   set(SRCFILES ${SRCFILES} src/WeightNormalization.cu)
   set(SRCFILES ${SRCFILES} src/WeightCompactSpline.cu)
   set(SRCFILES ${SRCFILES} src/WeightMonotonicSpline.cu)
   set(SRCFILES ${SRCFILES} src/WeightUniformSpline.cu)
   set(SRCFILES ${SRCFILES} src/WeightGeneralSpline.cu)
+  set(SRCFILES ${SRCFILES} src/WeightGraph.cu)
   set(SRCFILES ${SRCFILES} src/CacheParameters.cu)
   set(SRCFILES ${SRCFILES} src/CacheWeights.cu)
   set(SRCFILES ${SRCFILES} src/CacheIndexedSums.cu)
 else(CMAKE_CUDA_COMPILER)
-  cmessage(STATUS "CUDA utilities are not being compiled")
+  cmessage( STATUS "CUDA utilities are not being compiled")
   set(SRCFILES ${SRCFILES} src/WeightNormalization.cpp)
   set(SRCFILES ${SRCFILES} src/WeightCompactSpline.cpp)
   set(SRCFILES ${SRCFILES} src/WeightMonotonicSpline.cpp)
   set(SRCFILES ${SRCFILES} src/WeightUniformSpline.cpp)
   set(SRCFILES ${SRCFILES} src/WeightGeneralSpline.cpp)
+  set(SRCFILES ${SRCFILES} src/WeightGraph.cpp)
   set(SRCFILES ${SRCFILES} src/CacheParameters.cpp)
   set(SRCFILES ${SRCFILES} src/CacheWeights.cpp)
   set(SRCFILES ${SRCFILES} src/CacheIndexedSums.cpp)

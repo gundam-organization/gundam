@@ -1,96 +1,58 @@
 cmake_minimum_required (VERSION 3.12 FATAL_ERROR)
 
-# Configure CMake project
-project(GUNDAM)
+###############################
+# CMake project definition
+###############################
+project( GUNDAM )
 
-option(CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ langauge (-std=gnu++14)." OFF)
-option(CXX_MARCH_FLAG "Enable cpu architecture specific optimzations." OFF)
-option(CXX_WARNINGS "Enable most C++ warning flags." ON)
-option(COLOR_OUTPUT "Enable colored terminal output." ON)
-option(TTYCHECK "Enable check if output is being sent to terminal/TTY." ON)
-option(WITH_OPENMP "(OLD) Build with OpenMP libraries" OFF )
-option(WITH_OLD_DIALS "Use the old dial implementation" OFF)
-option(WITH_BREAKDOWN_CACHE "Use the breakdown cache" ON)
-option(ENABLE_CUDA "Enable CUDA language check (Cache::Manager requires a GPU if CUDA is found)" OFF)
-option(YAMLCPP_DIR "Set custom path to yaml-cpp lib" OFF )
-option(ENABLE_DEV_MODE "Enable specific dev related printouts" OFF )
-option(BATCH_MODE "Build to run in a batch queue (affects output)" OFF)
-option(BUILD_DOC "Build documentation" OFF)
-option(WITH_XSLLHFITTER "Build old xsllhFitter apps/libraries" OFF)
-option(USE_STATIC_LINKS "Library build in static mod" OFF)
-option(WITH_GUNDAM_ROOT_APP "Build app gundamRoot" ON)
 
+###############################
+# CMake options
+###############################
+option( WITH_GUNDAM_ROOT_APP "Build app gundamRoot" ON )
+option( WITH_CACHE_MANAGER "Enable compiling of the cache manager used by the GPU" ON )
+option( WITH_BREAKDOWN_CACHE "Use the breakdown cache" ON )
+option( WITH_OLD_DIALS "Use the old dial implementation" OFF )
+option( WITH_XSLLHFITTER "Build old xsllhFitter apps/libraries" OFF )
+option( WITH_OPENMP "(OLD/xsllhFitter) Build with OpenMP libraries" OFF )
+option( ENABLE_CUDA "Enable CUDA language check (Cache::Manager requires a GPU if CUDA is found)" OFF )
+
+option( BUILD_DOC "Build documentation" OFF )
+option( ENABLE_DEV_MODE "Enable specific dev related printouts" OFF  )
+option( USE_STATIC_LINKS "Library build in static mod" OFF )
+option( YAMLCPP_DIR "Set custom path to yaml-cpp lib" OFF )
+
+option( COLOR_OUTPUT "Enable colored terminal output." ON )
+option( TTYCHECK "Enable check if output is being sent to terminal/TTY." ON )
+option( BATCH_MODE "Build to run in a batch queue (affects output)" OFF )
+
+option( CXX_WARNINGS "Enable most C++ warning flags." ON )
+option( CXX_MARCH_FLAG "Enable cpu architecture specific optimzations." OFF )
+option( CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ langauge (-std=gnu++14)." OFF )
+
+
+###############################
 # Cmake includes
-include(CTest)
-include(${CMAKE_SOURCE_DIR}/cmake/cmessage.cmake)
+###############################
+include( CTest )
+include( ${CMAKE_SOURCE_DIR}/cmake/cmessage.cmake )
 
-# Git version
-execute_process(
-    COMMAND git describe --tags
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    OUTPUT_VARIABLE VERSION
-    RESULT_VARIABLE RETURN_VAL
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
 
-if(RETURN_VAL EQUAL "0")
-    cmessage(STATUS "Git version: ${VERSION}")
+# Printout version & generate header
+cmessage( WARNING "Pre-checking GUNDAM version" )
+set(GENERATE_DIR_FOR_VERSION_CHECK ${CMAKE_BINARY_DIR} CACHE STRING "GENERATE_DIR_FOR_VERSION_CHECK")
+add_custom_target( preBuildVersionCheck
+    COMMAND echo "Cache variable: ${GENERATE_DIR_FOR_VERSION_CHECK}"
+    COMMAND ${CMAKE_COMMAND} -D GENERATE_DIR_FOR_VERSION_CHECK=${GENERATE_DIR_FOR_VERSION_CHECK} -P ${CMAKE_SOURCE_DIR}/cmake/updateVersion.cmake
+    COMMENT "Checking GUNDAM version with git files..."
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    )
 
-    string(REPLACE "-" ";" VERSION_SEP ${VERSION})
-    list(LENGTH VERSION_SEP len)
+# Run now as well
+include( ${CMAKE_SOURCE_DIR}/cmake/updateVersion.cmake )
 
-    if( ${len} GREATER_EQUAL 2 )
-        list(GET VERSION_SEP 0 VERSION_STR)         # VERSION_SEP[0] = X.X.X
-        list(GET VERSION_SEP 1 VERSION_POST_NB)     # VERSION_SEP[1] = NB COMMITS AFTER TAG
-        list(GET VERSION_SEP 2 VERSION_POST_COMMIT) # VERSION_COMMIT[2] = "g" + COMMIT HASH
-        #    set(GUNDAM_VERSION_TAG "-${VERSION_POST_NB}-${VERSION_POST_COMMIT}")
-        set(GUNDAM_VERSION_TAG "f")
-    else()
-        list(GET VERSION_SEP 0 VERSION_STR)         # VERSION_SEP[0] = X.X.X
-        set(GUNDAM_VERSION_TAG "")
-    endif()
+set( VERBOSE TRUE )
 
-    # Parsing version number
-    string(REPLACE "." ";" VERSION_STR_SEP ${VERSION_STR})
-    list(GET VERSION_STR_SEP 0 GUNDAM_VERSION_MAJOR)
-    list(GET VERSION_STR_SEP 1 GUNDAM_VERSION_MINOR)
-    list(GET VERSION_STR_SEP 2 GUNDAM_VERSION_REVISION)
-
-    set (GUNDAM_VERSION_STRING "${GUNDAM_VERSION_MAJOR}.${GUNDAM_VERSION_MINOR}.${GUNDAM_VERSION_REVISION}${GUNDAM_VERSION_TAG}")
-else()
-    cmessage(WARNING "Bad exit status")
-    set (GUNDAM_VERSION_STRING "X.X.X")
-endif()
-
-set(VERBOSE TRUE)
-
-# Check for the availability of CUDA
-if(ENABLE_CUDA)
-    include(CheckLanguage)
-    check_language(CUDA)
-    if(CMAKE_CUDA_COMPILER)
-        cmessage(STATUS "CUDA support enabled")
-        enable_language(CUDA)
-        if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-            # The default is taken from the CUDAARCHS environment
-            # variable.  If it isn't set, then set it to the earliest
-            # non-deprecated architecture.
-            #   2022: architectures before 52 are deprecated.
-            if (${CMAKE_VERSION} VERSION_GREATER_EQUAL 3.23)
-                # After cmake 3.23, this can be set to all or all-major
-                set(CMAKE_CUDA_ARCHITECTURES all)
-            else()
-                set(CMAKE_CUDA_ARCHITECTURES 52)
-            endif()
-        endif()
-        cmessage(STATUS "CUDA compilation architectures: \"${CMAKE_CUDA_ARCHITECTURES}\"")
-        cmessage(WARNING "The \"--cache-manager\" option requires a GPU")
-    else(CMAKE_CUDA_COMPILER)
-        cmessage(WARNING "CUDA not present -- Cache::Manager use the CPU")
-    endif(CMAKE_CUDA_COMPILER)
-else(ENABLE_CUDA)
-    cmessage(WARNING "CUDA support disabled")
-endif(ENABLE_CUDA)
 
 # Changes default install path to be a subdirectory of the build dir.
 # Should set the installation dir at configure time with
@@ -103,13 +65,13 @@ elseif(NOT DEFINED CMAKE_INSTALL_PREFIX)
     set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/${CMAKE_SYSTEM_NAME}")
 endif()
 
-cmessage(STATUS "CMAKE_INSTALL_PREFIX: \"${CMAKE_INSTALL_PREFIX}\"")
+cmessage( STATUS "CMAKE_INSTALL_PREFIX: \"${CMAKE_INSTALL_PREFIX}\"")
 
+# Set the default built type if it isn't already defined
 if(NOT DEFINED CMAKE_BUILD_TYPE
     OR CMAKE_BUILD_TYPE STREQUAL "")
     set(CMAKE_BUILD_TYPE Debug)
 endif()
-cmessage(STATUS "CMAKE_BUILD_TYPE: \"${CMAKE_BUILD_TYPE}\"")
 
 if(BATCH_MODE)
     set(COLOR_OUTPUT NO)
@@ -122,6 +84,9 @@ endif(BATCH_MODE)
 ################################################################################
 
 #If you want to try an use the terminally buggy ROOT CMake scripts
+# ROOTConfig.cmake -> usually in /install/dir/of/root/6.26.06_2/share/root/cmake
+
+cmessage( WARNING "Looking for ROOT install..." )
 find_package(
     ROOT
     REQUIRED COMPONENTS
@@ -133,7 +98,10 @@ find_package(
 if(ROOT_FOUND)
     cmessage(STATUS "[ROOT]: ROOT found")
     include(${ROOT_USE_FILE})
-    cmessage(STATUS "[ROOT]: ROOT package found ${ROOT_LIBRARIES}")
+    # cmessage(STATUS "[ROOT]: ROOT packages found ${ROOT_LIBRARIES}")
+    cmessage( STATUS "[ROOT]: ROOT include directory: ${ROOT_INCLUDE_DIRS}")
+    cmessage(STATUS "[ROOT]: ROOT C++ Flags: ${ROOT_CXX_FLAGS}")
+
     if (NOT ROOT_minuit2_FOUND)
         # Minuit2 wasn't found, but make really sure before giving up.
         execute_process (COMMAND root-config --has-minuit2
@@ -145,17 +113,17 @@ if(ROOT_FOUND)
     set(CMAKE_ROOTSYS ${ROOT_INCLUDE_DIRS}/..)
 
 else(ROOT_FOUND)
-    cmessage(STATUS "find_package didn't find ROOT. Using shell instead...")
+    cmessage( STATUS "find_package didn't find ROOT. Using shell instead...")
 
     # ROOT
     if(NOT DEFINED ENV{ROOTSYS} )
         cmessage(FATAL_ERROR "$ROOTSYS is not defined, please set up root first.")
     else()
-        cmessage(STATUS "Using ROOT installed at $ENV{ROOTSYS}")
+        cmessage( STATUS "Using ROOT installed at $ENV{ROOTSYS}")
         set(CMAKE_ROOTSYS $ENV{ROOTSYS})
     endif()
 
-    cmessage(STATUS "Including local GENERATE_ROOT_DICTIONARY implementation.")
+    cmessage( STATUS "Including local GENERATE_ROOT_DICTIONARY implementation.")
     include(${CMAKE_SOURCE_DIR}/cmake/GenROOTDictionary.cmake)
     execute_process(COMMAND root-config --cflags
      OUTPUT_VARIABLE ROOT_CXX_FLAGS
@@ -173,30 +141,45 @@ else(ROOT_FOUND)
      OUTPUT_VARIABLE ROOT_minuit2_FOUND
      OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-    cmessage(STATUS "[ROOT]: root-config --version: ${ROOT_VERSION}")
-    cmessage(STATUS "[ROOT]: root-config --libs: ${ROOT_LIBRARIES}")
-    cmessage(STATUS "[ROOT]: root-config --cflags: ${ROOT_CXX_FLAGS}")
-    cmessage(STATUS "[ROOT]: root-config --ldflags: ${ROOT_LINK_FLAGS}")
+    cmessage( STATUS "[ROOT]: root-config --version: ${ROOT_VERSION}")
+    cmessage( STATUS "[ROOT]: root-config --libs: ${ROOT_LIBRARIES}")
+    cmessage( STATUS "[ROOT]: root-config --cflags: ${ROOT_CXX_FLAGS}")
+    cmessage( STATUS "[ROOT]: root-config --ldflags: ${ROOT_LINK_FLAGS}")
 
     add_compile_options("SHELL:${ROOT_CXX_FLAGS}")
     add_link_options("SHELL:${ROOT_LINK_FLAGS}")
 
 endif(ROOT_FOUND)
 
+# Try to figure out which version of C++ was used to compile ROOT.  ROOT
+# generates header files that depend on the compiler version so we will
+# need to use the same version.
+execute_process(COMMAND root-config --has-cxx14 COMMAND grep yes
+  OUTPUT_VARIABLE ROOT_cxx14_FOUND
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND root-config --has-cxx17 COMMAND grep yes
+  OUTPUT_VARIABLE ROOT_cxx17_FOUND
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND root-config --has-cxx20 COMMAND grep yes
+  OUTPUT_VARIABLE ROOT_cxx20_FOUND
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+
 if (NOT ROOT_minuit2_FOUND)
-    cmessage(STATUS "[ROOT]:Rebuild root using -Dminuit2=on in the cmake command")
+    cmessage( STATUS "[ROOT]:Rebuild root using -Dminuit2=on in the cmake command")
     cmessage(FATAL_ERROR "[ROOT]: minuit2 is required")
 endif(NOT ROOT_minuit2_FOUND)
 
+
 # YAML-CPP
+cmessage( WARNING "Looking for YAML install..." )
 find_package( yaml-cpp REQUIRED HINTS ${YAMLCPP_DIR} )
 if(NOT yaml-cpp_FOUND)
     cmessage(FATAL_ERROR "yaml-cpp library not found.")
 endif()
 include_directories( ${YAML_CPP_INCLUDE_DIR} )
-cmessage(STATUS "Custom yaml-cpp installation: ${YAMLCPP_DIR}")
-cmessage(STATUS "yaml-cpp include directory: ${YAML_CPP_INCLUDE_DIR}")
-cmessage(STATUS "yaml-cpp lib: ${YAML_CPP_LIBRARIES}")
+cmessage( STATUS "Custom yaml-cpp installation: ${YAMLCPP_DIR}")
+cmessage( STATUS "yaml-cpp include directory: ${YAML_CPP_INCLUDE_DIR}")
+cmessage( STATUS "yaml-cpp lib: ${YAML_CPP_LIBRARIES}")
 if( "${YAML_CPP_INCLUDE_DIR} " STREQUAL " ")
     # WORKAROUND FOR CCLYON (old cmake version/pkg)
     set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
@@ -206,8 +189,8 @@ if( "${YAML_CPP_INCLUDE_DIR} " STREQUAL " ")
     if( NOT YAMLCPP_FOUND )
         cmessage(FATAL_ERROR "yaml-cpp library not found.")
     endif()
-    cmessage(STATUS " - yaml-cpp include directory: ${YAMLCPP_INCLUDE_DIR}")
-    cmessage(STATUS " - yaml-cpp lib: ${YAMLCPP_LIBRARY}")
+    cmessage( STATUS " - yaml-cpp include directory: ${YAMLCPP_INCLUDE_DIR}")
+    cmessage( STATUS " - yaml-cpp lib: ${YAMLCPP_LIBRARY}")
     if( "${YAMLCPP_INCLUDE_DIR} " STREQUAL " ")
         cmessage(FATAL_ERROR "empty YAMLCPP_INCLUDE_DIR returned.")
     endif()
@@ -216,38 +199,70 @@ if( "${YAML_CPP_INCLUDE_DIR} " STREQUAL " ")
     #    list(APPEND LINK_LIBARY_LIST ${YAMLCPP_LIBRARY})
 endif()
 
+
+cmessage( WARNING "Looking for optional ZLib install..." )
 find_package(ZLIB)
 if (${ZLIB_FOUND})
-    cmessage(STATUS "ZLIB found : ${ZLIB_VERSION_STRING}")
-    cmessage(STATUS "ZLIB_INCLUDE_DIRS = ${ZLIB_INCLUDE_DIRS}")
-    cmessage(STATUS "ZLIB_LIBRARIES = ${ZLIB_LIBRARIES}")
+    cmessage( STATUS "ZLIB found : ${ZLIB_VERSION_STRING}")
+    cmessage( STATUS "ZLIB_INCLUDE_DIRS = ${ZLIB_INCLUDE_DIRS}")
+    cmessage( STATUS "ZLIB_LIBRARIES = ${ZLIB_LIBRARIES}")
     add_definitions( -D USE_ZLIB=1 )
 else()
     add_definitions( -D USE_ZLIB=0 )
 endif ()
 
-set(WITH_CACHE_MANAGER ON)
+
+# Check for the availability of CUDA
+if( ENABLE_CUDA )
+    include(CheckLanguage)
+    check_language(CUDA)
+    if(CMAKE_CUDA_COMPILER)
+        cmessage( STATUS "CUDA support enabled")
+        enable_language(CUDA)
+        if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+            # The default is taken from the CUDAARCHS environment
+            # variable.  If it isn't set, then set it to the earliest
+            # non-deprecated architecture.
+            #   2022: architectures before 52 are deprecated.
+            if (${CMAKE_VERSION} VERSION_GREATER_EQUAL 3.23)
+                # After cmake 3.23, this can be set to all or all-major
+                set(CMAKE_CUDA_ARCHITECTURES all)
+            else()
+                set(CMAKE_CUDA_ARCHITECTURES 52)
+            endif()
+        endif()
+        cmessage( STATUS "CUDA compilation architectures: \"${CMAKE_CUDA_ARCHITECTURES}\"")
+        cmessage(WARNING "The \"--cache-manager\" option requires a GPU")
+    else(CMAKE_CUDA_COMPILER)
+        cmessage(WARNING "CUDA not present -- Cache::Manager use the CPU")
+    endif(CMAKE_CUDA_COMPILER)
+else( ENABLE_CUDA )
+    cmessage( ALERT "CUDA support disabled" )
+endif( ENABLE_CUDA )
+
+
 if (WITH_CACHE_MANAGER)
-    add_definitions( -DGUNDAM_USING_CACHE_MANAGER)
+    cmessage( WARNING "Enabling cache manager..." )
+    add_definitions( -D GUNDAM_USING_CACHE_MANAGER )
 
     # uncomment to enable the slow validations (NEVER during productions
     # or normal running).  These are whole code validations and are
     # extremely slow.
     if (CACHE_MANAGER_SLOW_VALIDATION)
-        cmessage(STATUS "Using slow validation for debugging")
-        cmessage(WARNING "Using slow validation so runs will be very slow")
+        cmessage( STATUS "Using slow validation for debugging" )
+        cmessage(WARNING "Using slow validation so runs will be very slow" )
         add_definitions( -DCACHE_MANAGER_SLOW_VALIDATION)
     endif (CACHE_MANAGER_SLOW_VALIDATION)
 
-    cmessage(STATUS "GPU support is enabled (compiled, but only used when CUDA enabled)")
+    cmessage( STATUS "GPU support is enabled (compiled, but only used when CUDA enabled)" )
 else()
-    cmessage(STATUS "GPU support is disabled")
+    cmessage( ALERT "GPU support is disabled" )
 endif()
 
 set(WITH_GENERIC_SPLINES ON)
 if(NOT WITH_GENERIC_SPLINES)
     if(WITH_CACHE_MANAGER)
-        cmessage(WARNING "Cache::Manager works best with generic splines")
+        cmessage(WARNING "Cache::Manager works best with generic splines" )
     else(WITH_CACHE_MANAGER)
         add_definitions(-D USE_TSPLINE3_EVAL)
     endif(WITH_CACHE_MANAGER)
@@ -256,13 +271,13 @@ endif(NOT WITH_GENERIC_SPLINES)
 if(NOT WITH_OLD_DIALS)
     add_definitions(-D USE_NEW_DIALS=1)
 else()
-    cmessage(WARNING "Using old dial implementation")
+    cmessage(WARNING "Using old dial implementation" )
 endif(NOT WITH_OLD_DIALS)
 
 if(WITH_BREAKDOWN_CACHE)
     add_definitions(-D USE_BREAKDOWN_CACHE)
 else()
-    cmessage(WARNING "Not using breakdown cache")
+    cmessage(WARNING "Not using breakdown cache" )
 endif(WITH_BREAKDOWN_CACHE)
 
 ################################################################################
@@ -308,15 +323,15 @@ add_definitions( -D LOGGER_PREFIX_LEVEL=3 )
 add_definitions( -D LOGGER_TIME_FORMAT="\\\"%d/%m/%Y %H:%M:%S"\\\" )
 
 if(${CMAKE_BUILD_TYPE} MATCHES Debug OR ${ENABLE_DEV_MODE})
-    cmessage(STATUS "Logger set in dev mode.")
+    cmessage( STATUS "Logger set in dev mode." )
     add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {USER_HEADER} {FILELINE}"\\\" )
 else()
-    cmessage(STATUS "Logger set in release mode.")
+    cmessage( STATUS "Logger set in release mode." )
     add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {USER_HEADER}"\\\" )
 endif()
 
 if(NOT COLOR_OUTPUT)
-    cmessage(STATUS "Color output is disabled.")
+    cmessage( STATUS "Color output is disabled." )
     add_definitions( -D LOGGER_ENABLE_COLORS=0 )
     add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=0 )
 else()
@@ -329,42 +344,60 @@ endif()
 #                            Compiler Setup
 ################################################################################
 
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )
     if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.8.5)
         cmessage(STATUS "Detected GCC version: ${CMAKE_CXX_COMPILER_VERSION}")
-        cmessage(FATAL_ERROR "GCC version must be at least 4.8.5")
+        cmessage(FATAL_ERROR "GCC version must be at least 5.0")
     endif()
-elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
+elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang" )
     if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 3.3)
-        cmessage(STATUS "Detected Clang version: ${CMAKE_CXX_COMPILER_VERSION}")
-        cmessage(FATAL_ERROR "Clang version must be at least 3.3")
+        cmessage( STATUS "Detected Clang version: ${CMAKE_CXX_COMPILER_VERSION}" )
+        cmessage(FATAL_ERROR "Clang version must be at least 3.3" )
     endif()
 else()
-    cmessage(WARNING "You are using an untested compiler.")
+    cmessage(WARNING "You are using an untested compiler." )
 endif()
 
-# CXX standard is required but should match the one by ROOT
+# CXX standard is required and must match the version ROOT was compiled with.  
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Explicitly set the compiler version so that it will match the
+# compiler that was used to compile ROOT.  Recent ROOT documentation
+# explicitly notes that the appliation needs to use the same C++
+# standard as ROOT.
+if ( ROOT_cxx14_FOUND )
+  cmessage(STATUS "ROOT compiled with C++14")
+  set(CMAKE_CXX_STANDARD 14)
+elseif ( ROOT_cxx17_FOUND )
+  cmessage(STATUS "ROOT compiled with C++17")
+  set(CMAKE_CXX_STANDARD 17)
+elseif ( ROOT_cxx20_FOUND )
+  cmessage(STATUS "ROOT compiled with C++20")
+  set(CMAKE_CXX_STANDARD 20)
+else ( ROOT_cxx14_FOUND )
+  cmessage(WARNING "ROOT C++ standard not set, use ROOT minimum (C++14)")
+  set(CMAKE_CXX_STANDARD 14)
+endif ( ROOT_cxx14_FOUND)
+
 if( WITH_OPENMP )
-    cmessage(STATUS "Compiling with OpenMP")
+    cmessage( STATUS "Compiling with OpenMP" )
     include(FindOpenMP)
     if(OPENMP_FOUND)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-        cmessage(STATUS "OpenMP include directory: ${OpenMP_CXX_INCLUDE_DIR}")
-        cmessage(STATUS "OpenMP libs: ${OpenMP_CXX_LIB_NAMES}")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}" )
+        cmessage( STATUS "OpenMP include directory: ${OpenMP_CXX_INCLUDE_DIR}" )
+        cmessage( STATUS "OpenMP libs: ${OpenMP_CXX_LIB_NAMES}" )
     else()
-        cmessage(ERROR "OpenMP not found.")
+        cmessage(ERROR "OpenMP not found." )
     endif()
 else()
-    #    cmessage(STATUS "Compiling without OpenMP, enable with \"-D WITH_OPENMP\"")
+    #    cmessage( STATUS "Compiling without OpenMP, enable with \"-D WITH_OPENMP\"" )
 endif()
 
 if(CXX_MARCH_FLAG)
 endif()
 
 if(CXX_WARNINGS)
-    cmessage(STATUS "Enable CXX warnings")
+    cmessage( STATUS "Enable CXX warnings" )
     add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wall>)
     add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-variable>)
     add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wno-sign-compare>)
@@ -384,18 +417,15 @@ endif()
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O2")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fPIC -g")
 
-cmessage (STATUS "C++ Compiler      : ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
-cmessage (STATUS "C++ Release flags : ${CMAKE_CXX_FLAGS_RELEASE}")
-cmessage (STATUS "C++ Debug flags   : ${CMAKE_CXX_FLAGS_DEBUG}")
-
-
 ################################################################################
 # CMake Generated
 ###############################################################################
 
-configure_file( ${CMAKE_SOURCE_DIR}/cmake/VersionConfig.h.in ${CMAKE_BINARY_DIR}/generated/VersionConfig.h )
-include_directories( ${CMAKE_BINARY_DIR}/generated/ )
-
+cmessage (STATUS "C++ Compiler      : ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
+cmessage (STATUS "C++ Standard      : ${CMAKE_CXX_STANDARD}")
+cmessage (STATUS "C++ Release flags : ${CMAKE_CXX_FLAGS_RELEASE}")
+cmessage (STATUS "C++ Debug flags   : ${CMAKE_CXX_FLAGS_DEBUG}")
+cmessage (STATUS "Build type        : ${CMAKE_BUILD_TYPE}")
 
 ################################################################################
 # Doxygen
@@ -411,7 +441,7 @@ if( BUILD_DOC )
 
         # request to configure the file
         configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
-        message("Doxygen build started")
+        message("Doxygen build started" )
 
         # note the option ALL which allows to build the docs together with the application
         add_custom_target( doxygen ALL
@@ -420,7 +450,7 @@ if( BUILD_DOC )
             COMMENT "Generating API documentation with Doxygen"
             VERBATIM )
     else (DOXYGEN_FOUND)
-        message("Doxygen need to be installed to generate the doxygen documentation")
+        message("Doxygen need to be installed to generate the doxygen documentation" )
     endif (DOXYGEN_FOUND)
 endif()
 
@@ -451,12 +481,13 @@ if(WITH_XSLLHFITTER)
     list( APPEND MODULES XsllhFitter/Fitter )
 endif()
 
-cmessage (STATUS "Configuring modules...")
+cmessage( WARNING "Configuring modules..." )
 foreach(mod ${MODULES})
-    cmessage (STATUS "Adding cmake module: ${mod}")
+    cmessage( STATUS "Adding cmake module: ${mod}" )
     add_subdirectory( ${CMAKE_SOURCE_DIR}/src/${mod} )
 endforeach()
 
+cmessage( WARNING "Configuring applications..." )
 add_subdirectory( ${CMAKE_SOURCE_DIR}/src/Applications )
 
 if(WITH_XSLLHFITTER)

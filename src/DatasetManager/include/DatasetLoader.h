@@ -14,8 +14,8 @@
 #include <TChain.h>
 #include "nlohmann/json.hpp"
 
-#include "vector"
-#include "string"
+#include <vector>
+#include <string>
 
 
 class DatasetLoader : public JsonBaseClass {
@@ -24,6 +24,8 @@ public:
   DatasetLoader(const nlohmann::json& config_, int datasetIndex_);
 
   void setDataSetIndex(int dataSetIndex);
+
+  void setSelectedDataEntry(const std::string &selectedDataEntry);
 
   [[nodiscard]] bool isEnabled() const;
   [[nodiscard]] bool isShowSelectedEventCount() const;

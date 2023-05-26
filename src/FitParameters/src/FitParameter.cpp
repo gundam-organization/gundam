@@ -9,7 +9,7 @@
 #include "GenericToolbox.Json.h"
 #include "Logger.h"
 
-#include "sstream"
+#include <sstream>
 
 
 LoggerInit([]{ Logger::setUserHeaderStr("[FitParameter]"); });
@@ -29,9 +29,12 @@ void FitParameter::readConfigImpl(){
     }
 
     if( GenericToolbox::Json::doKeyExist(_parameterConfig_, "priorValue") ){
-      _priorValue_ = GenericToolbox::Json::fetchValue(_parameterConfig_, "priorValue", _priorValue_);
-      LogWarning << this->getTitle() << ": prior value override -> " << _priorValue_ << std::endl;
-      this->setParameterValue(_priorValue_);
+      double priorOverride = GenericToolbox::Json::fetchValue(_parameterConfig_, "priorValue", this->getPriorValue());
+      if( not std::isnan(priorOverride) ){
+        LogWarning << this->getTitle() << ": prior value override -> " << priorOverride << std::endl;
+        this->setPriorValue(priorOverride);
+        this->setParameterValue(priorOverride);
+      }
     }
 
     if( GenericToolbox::Json::doKeyExist(_parameterConfig_, "parameterLimits") ){
@@ -63,11 +66,11 @@ void FitParameter::readConfigImpl(){
 void FitParameter::initializeImpl() {
   LogThrowIf(_owner_ == nullptr, "Parameter set ref is not set.");
   LogThrowIf(_parameterIndex_ == -1, "Parameter index is not set.");
+
+  if( not _isEnabled_ ) { return; }
   LogThrowIf(std::isnan(_priorValue_), "Prior value is not set.");
   LogThrowIf(std::isnan(_stdDevValue_), "Std dev value is not set.");
   LogThrowIf(std::isnan(_parameterValue_), "Parameter value is not set.");
-
-  if( not _isEnabled_ ) { return; }
 
 #if USE_NEW_DIALS
 #else
@@ -218,13 +221,12 @@ std::string FitParameter::getTitle() const {
   return ss.str();
 }
 std::string FitParameter::getFullTitle() const{
-  return ((FitParameterSet*) _owner_)->getName() + "/" + this->getTitle();
+  return _owner_->getName() + "/" + this->getTitle();
 }
 std::string FitParameter::getSummary(bool shallow_) const {
   std::stringstream ss;
 
-  ss << "#" << _parameterIndex_;
-  if( not _name_.empty() ) ss << " (" << _name_ << ")";
+  ss << this->getFullTitle();
   ss << ", isEnabled=" << _isEnabled_;
   ss << ": value=" << _parameterValue_;
   ss << ", prior=" << _priorValue_;

@@ -1270,7 +1270,7 @@ void ND280Fitter::WriteSamplePlots(TDirectory* outputDir_) {
         return aGoesFirst;
       };
       auto p = GenericToolbox::getSortPermutation( mcSampleHistList, aGoesFirst );
-      mcSampleHistList = GenericToolbox::applyPermutation(mcSampleHistList, p);
+      GenericToolbox::applyPermutation(mcSampleHistList, p);
 
       // Stacking histograms
       TH1D* histPileBuffer = nullptr;

@@ -9,6 +9,7 @@
 #include "WeightMonotonicSpline.h"
 #include "WeightUniformSpline.h"
 #include "WeightGeneralSpline.h"
+#include "WeightGraph.h"
 
 #include "CacheIndexedSums.h"
 
@@ -63,6 +64,7 @@ private:
             int monotonicSplines, int monotonicPoints,
             int uniformSplines, int uniformPoints,
             int generalSplines, int generalPoints,
+            int graphs, int graphPoints,
             int histBins, std::string spaceType);
     static Manager* fSingleton;  // You get one guess...
 
@@ -101,6 +103,9 @@ private:
 
     /// The cache for the general splines
     std::unique_ptr<Cache::Weight::GeneralSpline> fGeneralSplines;
+
+    /// The cache for the general splines
+    std::unique_ptr<Cache::Weight::Graph> fGraphs;
 
     /// The cache for the summed histgram weights
     std::unique_ptr<Cache::IndexedSums> fHistogramsCache;

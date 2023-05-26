@@ -59,7 +59,7 @@ Cache::Weight::GeneralSpline::GeneralSpline(
     LogInfo << "Reserved " << GetName()
             << " Spline Knots: " << GetSplineKnotsReserved()
             << std::endl;
-    fTotalBytes += GetSplineKnotsReserved()*sizeof(WEIGHT_BUFFER_FLOAT);  // fSpineKnots
+    fTotalBytes += GetSplineKnotsReserved()*sizeof(WEIGHT_BUFFER_FLOAT);  // fSplineKnots
 
     LogInfo << "Approximate Memory Size for " << GetName()
             << ": " << fTotalBytes/1E+9
@@ -122,15 +122,22 @@ void Cache::Weight::GeneralSpline::AddSpline(int resIndex, int parIndex,
         throw std::runtime_error("Negative parameter index");
     }
     if (fParameters.size() <= parIndex) {
-        LogError << "Invalid parameter index"
+        LogError << "Invalid parameter index " << parIndex
                << std::endl;
         throw std::runtime_error("Parameter index out of bounds");
     }
     if (splineData.size() < 11) {
-        LogError << "Insufficient points in spline"
+        LogError << "Insufficient points in spline " << splineData.size()
                << std::endl;
         throw std::runtime_error("Invalid number of spline points");
     }
+    int knots = (splineData.size()-2)/3;
+    if (15 < knots) {
+        LogError << "Up to 15 knots supported by GeneralSpline " << knots
+                 << std::endl;
+        throw std::runtime_error("Invalid number of spline points");
+    }
+
     int newIndex = fSplinesUsed++;
     if (fSplinesUsed > fSplinesReserved) {
         LogError << "Not enough space reserved for splines"
@@ -171,10 +178,10 @@ int Cache::Weight::GeneralSpline::GetSplineParameterIndex(int sIndex) {
 double Cache::Weight::GeneralSpline::GetSplineParameter(int sIndex) {
     int i = GetSplineParameterIndex(sIndex);
     if (i<0) {
-        throw std::runtime_error("Spine parameter index out of bounds");
+        throw std::runtime_error("Spline parameter index out of bounds");
     }
     if (fParameters.size() <= i) {
-        throw std::runtime_error("Spine parameter index out of bounds");
+        throw std::runtime_error("Spline parameter index out of bounds");
     }
     return fParameters.hostPtr()[i];
 }
@@ -218,10 +225,10 @@ double Cache::Weight::GeneralSpline::GetSplineUpperBound(int sIndex) {
 double Cache::Weight::GeneralSpline::GetSplineLowerClamp(int sIndex) {
     int i = GetSplineParameterIndex(sIndex);
     if (i<0) {
-        throw std::runtime_error("Spine lower clamp index out of bounds");
+        throw std::runtime_error("Spline lower clamp index out of bounds");
     }
     if (fLowerClamp.size() <= i) {
-        throw std::runtime_error("Spine lower clamp index out of bounds");
+        throw std::runtime_error("Spline lower clamp index out of bounds");
     }
     return fLowerClamp.hostPtr()[i];
 }
@@ -229,10 +236,10 @@ double Cache::Weight::GeneralSpline::GetSplineLowerClamp(int sIndex) {
 double Cache::Weight::GeneralSpline::GetSplineUpperClamp(int sIndex) {
     int i = GetSplineParameterIndex(sIndex);
     if (i<0) {
-        throw std::runtime_error("Spine upper clamp index out of bounds");
+        throw std::runtime_error("Spline upper clamp index out of bounds");
     }
     if (fUpperClamp.size() <= i) {
-        throw std::runtime_error("Spine upper clamp index out of bounds");
+        throw std::runtime_error("Spline upper clamp index out of bounds");
     }
     return fUpperClamp.hostPtr()[i];
 }
@@ -417,7 +424,7 @@ bool Cache::Weight::GeneralSpline::Apply() {
         );
 
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning Using SLOW VALIDATION and copying spine values
+#warning Using SLOW VALIDATION and copying spline values
     fSplineValue->hostPtr();
 #endif
 

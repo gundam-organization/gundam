@@ -100,7 +100,7 @@ double SplineDial::calcDial(double parameterValue_) {
   else if (_splineType_ == SplineDial::Monotonic) {
       dialResponse = CalculateMonotonicSpline(
           parameterValue_, -1E20, 1E20,
-          _splineData_.data(), int(_splineData_.size()));
+          _splineData_.data(), int(_splineData_.size()-2));
   }
   else if (_splineType_ == SplineDial::ROOTSpline) {
       dialResponse = _spline_.Eval(parameterValue_);

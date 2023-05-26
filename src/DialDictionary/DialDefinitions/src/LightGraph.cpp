@@ -4,6 +4,8 @@
 
 #include "LightGraph.h"
 
+#include "CalculateGraph.h"
+
 LoggerInit([]{
   Logger::setUserHeaderStr("[LightGraph]");
 });
@@ -21,45 +23,28 @@ void LightGraph::buildDial(const TGraph &grf, const std::string& option_) {
   TGraph graph(grf);
   graph.Sort();
 
-  nPoints = graph.GetN();
+  int nPoints = graph.GetN();
+  LogThrowIf(nPoints>15, "Light graphs must have fewer than 15 points");
 
-  xPoints.resize(nPoints);
-  yPoints.resize(nPoints);
-
-  memcpy(&xPoints[0], graph.GetX(), nPoints * sizeof(double));
-  memcpy(&yPoints[0], graph.GetY(), nPoints * sizeof(double));
+  _Data_.reserve(2*nPoints);
+  _Data_.clear();
+  for (int i=0; i< nPoints; ++i) {
+      _Data_.push_back(graph.GetY()[i]);
+      _Data_.push_back(graph.GetX()[i]);
+  }
 }
 
 double LightGraph::evalResponse(const DialInputBuffer& input_) const {
-  LogThrowIf(xPoints.empty(), "No graph point defined.");
-  if (nPoints == 1) return yPoints[0];
+  double dialInput{input_.getBuffer()[0]};
+
+#ifndef NDEBUG
+  LogThrowIf(not std::isfinite(dialInput), "Invalid input for LightGraph");
+#endif
 
   if( not _allowExtrapolation_ ){
-    if     (input_.getBuffer()[0] <= xPoints[0])     { return yPoints[0]; }
-    else if(input_.getBuffer()[0] >= xPoints.back()) { return yPoints.back(); }
+    if     (dialInput <= _Data_[1])     { return _Data_[0]; }
+    else if(dialInput >= _Data_.back()) { return _Data_[_Data_.size()-2]; }
   }
 
-  //linear interpolation
-  //In case x is < xPoints[0] or > xPoints[nPoints-1] return the extrapolated point
-
-  //find points in graph around x assuming points are not sorted
-  // (if point are sorted use a binary search)
-  auto low = Int_t( TMath::BinarySearch(nPoints, &xPoints[0], input_.getBuffer()[0] ) );
-  if (low == -1)  {
-    // use first two points for doing an extrapolation
-    low = 0;
-  }
-
-  Double_t yn;
-  if (xPoints[low] == input_.getBuffer()[0]){
-    yn = yPoints[low];
-  }
-  else{
-    if (low == xPoints.size() - 1) low--; // for extrapolating
-    Int_t up(low+1);
-
-    if (xPoints[low] == xPoints[up]) return yPoints[low];
-    yn = yPoints[up] + (input_.getBuffer()[0] - xPoints[up]) * (yPoints[low] - yPoints[up]) / (xPoints[low] - xPoints[up]);
-  }
-  return yn;
+  return CalculateGraph(dialInput,-1E20,1E20,_Data_.data(),_Data_.size());
 }

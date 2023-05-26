@@ -1,17 +1,20 @@
 //
 // Created by Adrien BLANCHET on 23/10/2022.
 //
+
+#include "GundamUtils.h"
+
 #include "Logger.h"
 
 #include "TRint.h"
 
+#include <string>
+#include <vector>
 #include <cstdlib>
-#include "string"
-#include "vector"
-#include "iostream"
+#include <iostream>
 
 LoggerInit([]{
-  Logger::setUserHeaderStr("[gundamRoot.cxx]");
+  Logger::getUserHeader() << "[" << FILENAME << "]";
 });
 
 
@@ -28,6 +31,7 @@ int main(int argc, char **argv) {
   int argcInterpreter = int( cstrings.size() );
   char** argvInterpreter{ cstrings.data() };
 
+  LogInfo << "gundamRoot build against: " << GundamUtils::getVersionFullStr() << std::endl;
   LogInfo << "Creating ROOT interpreter..." << std::endl;
   auto *theApp = new TRint(
       "Rint"

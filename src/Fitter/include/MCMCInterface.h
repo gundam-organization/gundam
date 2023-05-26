@@ -15,8 +15,8 @@
 #include "TDirectory.h"
 #include "nlohmann/json.hpp"
 
-#include "memory"
-#include "vector"
+#include <memory>
+#include <vector>
 
 // Override TSimpleMCMC.H for how much output to use and where to send it.
 #define MCMC_DEBUG_LEVEL 3
@@ -34,6 +34,9 @@ class MCMCInterface : public MinimizerBase {
 
 public:
   explicit MCMCInterface(FitterEngine* owner_);
+
+  /// Local RTTI
+  [[nodiscard]] std::string getMinimizerTypeName() const override { return "MCMCInterface"; };
 
   /// A boolean to flag indicating if the MCMC exited successfully.
   [[nodiscard]] virtual bool isFitHasConverged() const override;

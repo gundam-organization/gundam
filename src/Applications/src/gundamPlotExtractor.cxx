@@ -15,13 +15,13 @@
 #include "TKey.h"
 #include "TSystem.h"
 
+#include <string>
+#include <vector>
 #include <cstdlib>
-#include "string"
-#include "vector"
 
 
 LoggerInit([]{
-  Logger::setUserHeaderStr("[gundamPlotExtractor.cxx]");
+  Logger::getUserHeader() << "[" << FILENAME << "]";
 });
 
 std::vector<std::string> outExtensions;
@@ -33,7 +33,7 @@ void init();
 int main( int argc, char** argv ){
 
   GundamGreetings g;
-  g.setAppName("PlotExtractor");
+  g.setAppName("plot extractor tool");
   g.hello();
 
   CmdLineParser clp(argc, argv);

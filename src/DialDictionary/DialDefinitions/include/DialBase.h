@@ -7,9 +7,9 @@
 
 #include "DialInputBuffer.h"
 
-#include "vector"
-#include "string"
-#include "memory"
+#include <vector>
+#include <string>
+#include <memory>
 
 // should be thread safe -> add lock?
 // any number of inputs (provided doubles) -> set input size
@@ -42,6 +42,9 @@ public:
   /// forbid extrapolation.
   virtual void setAllowExtrapolation(bool allow_) {}
   [[nodiscard]] virtual bool getAllowExtrapolation() const {return false;}
+
+  /// Dial summary describing its content
+  [[nodiscard]] virtual std::string getSummary() const { return {}; };
 
   /////////////////////////////////////////////////////////////////////////
   // Pass information to the dial so that it can build it's internal
@@ -76,6 +79,7 @@ public:
   /// Return the data used by the dial to calculate the output values. The
   /// specific data contained in the vector depends on the derived class.
   [[nodiscard]] virtual const std::vector<double>& getDialData() const;
+
 
 };
 

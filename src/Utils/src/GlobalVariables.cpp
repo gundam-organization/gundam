@@ -15,6 +15,7 @@ LoggerInit([]{
 bool GlobalVariables::_enableDevMode_{false};
 bool GlobalVariables::_disableDialCache_{false};
 bool GlobalVariables::_enableCacheManager_{false};
+bool GlobalVariables::_lightOutputMode_{false};
 int GlobalVariables::_nbThreads_ = 1;
 std::mutex GlobalVariables::_threadMutex_;
 std::map<std::string, bool> GlobalVariables::_boolMap_;
@@ -39,8 +40,10 @@ void GlobalVariables::setNbThreads(int nbThreads_){
 
 void GlobalVariables::setEnableCacheManager(bool enable) {_enableCacheManager_ = enable;}
 void GlobalVariables::setDisableDialCache(bool disableDialCache_){ _disableDialCache_ = disableDialCache_; }
+void GlobalVariables::setLightOutputMode(bool enable_){ _lightOutputMode_ = enable_; }
 bool GlobalVariables::getEnableCacheManager() {return _enableCacheManager_;}
 bool GlobalVariables::isDisableDialCache(){ return _disableDialCache_; }
+bool GlobalVariables::isLightOutputMode(){ return _lightOutputMode_; }
 bool GlobalVariables::isEnableDevMode(){ return _enableDevMode_; }
 VerboseLevel GlobalVariables::getVerboseLevel(){ return _verboseLevel_; }
 const int& GlobalVariables::getNbThreads(){ return _nbThreads_; }

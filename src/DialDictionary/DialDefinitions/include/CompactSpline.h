@@ -10,8 +10,8 @@
 
 #include "TGraph.h"
 
-#include "vector"
-#include "utility"
+#include <vector>
+#include <utility>
 
 class CompactSpline : public DialBase {
 
@@ -22,6 +22,8 @@ public:
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<CompactSpline>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return {"CompactSpline"}; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
+
+  [[nodiscard]] std::string getSummary() const override;
 
   void setAllowExtrapolation(bool allowExtrapolation) override;
   [[nodiscard]] bool getAllowExtrapolation() const override;

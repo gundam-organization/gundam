@@ -80,6 +80,8 @@ public:
     _minimizerType_ = type;
     _minimizerAlgo_ = algo;
   }
+  std::string getMinimizerType() const { return _minimizerType_; }
+  std::string getMinimizerAlgo() const { return _minimizerAlgo_; }
 
   /// Set the target EDM for this fitter.  This is only informational in the
   /// LikelihoodInterface, but it appears in the running summaries.  It needs
@@ -110,15 +112,21 @@ public:
 
   /// Set whether fit parameters should be shown in the monitor output.
   void setShowParametersOnFitMonitor(bool v) {_showParametersOnFitMonitor_=v;}
-  bool getShowParametersOnFitMonitor() {return _showParametersOnFitMonitor_;}
+  bool getShowParametersOnFitMonitor() const {return _showParametersOnFitMonitor_;}
 
   /// Set the maximum number of parameters to show on a line when parameters
   /// are being show by the monitor.
   void setMaxNbParametersPerLineOnMonitor(int v) {_maxNbParametersPerLineOnMonitor_=v;}
-  bool getMaxNbParametersPerLineOnMonitor() {return _maxNbParametersPerLineOnMonitor_;}
+  bool getMaxNbParametersPerLineOnMonitor() const {return _maxNbParametersPerLineOnMonitor_;}
+
+  void setMonitorGradientDescent(bool monitorGradientDescent_){ _monitorGradientDescent_ = monitorGradientDescent_; }
+  bool isMonitorGradientDescent() const { return _monitorGradientDescent_; }
 
   /// Save the chi2 history to the current output file.
   void saveChi2History();
+
+  /// Save each step
+  void saveGradientSteps();
 
 private:
   /// True as soon as this has been initialized.
@@ -170,16 +178,26 @@ private:
   /// A tree that save the history of the minimization.
   std::unique_ptr<TTree> _chi2HistoryTree_{nullptr};
 
+
   // Output monitors!
   GenericToolbox::VariablesMonitor _convergenceMonitor_;
   GenericToolbox::CycleTimer _evalFitAvgTimer_;
   GenericToolbox::CycleTimer _outEvalFitAvgTimer_;
   GenericToolbox::CycleTimer _itSpeed_;
+  GenericToolbox::CycleClock _itSpeedMon_{"it"};
 
   /// Parameters to control how the monitor behaves.
   bool _enableFitMonitor_{false};
   bool _showParametersOnFitMonitor_{false};
   int _maxNbParametersPerLineOnMonitor_{15};
+
+  bool _monitorGradientDescent_{false};
+  int _lastGradientFall_{-2};
+  struct GradientStepPoint {
+    nlohmann::json parState;
+    double llh;
+  };
+  std::vector<GradientStepPoint> _gradientMonitor_{};
 };
 
 #endif //  GUNDAM_LikelihoodInterface_h

@@ -12,10 +12,11 @@
 #include "JsonBaseClass.h"
 
 #include "GenericToolbox.h"
+
 #include "nlohmann/json.hpp"
 
-#include "string"
-#include "vector"
+#include <string>
+#include <vector>
 
 
 /// Hold a description of all of the event samples (both "data" and the
@@ -38,8 +39,8 @@ public:
 
   //Core
   bool empty() const;
-  double evalLikelihood() const;
-  double evalLikelihood(const FitSample& sample_) const;
+  double evalLikelihood();
+  double evalLikelihood(FitSample& sample_);
 
   // Parallel
   void updateSampleEventBinIndexes() const;

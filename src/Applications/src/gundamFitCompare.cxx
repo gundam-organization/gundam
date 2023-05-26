@@ -3,6 +3,7 @@
 //
 
 #include "GundamGreetings.h"
+#include "GundamUtils.h"
 
 #include "Logger.h"
 #include "CmdLineParser.h"
@@ -13,66 +14,96 @@
 #include "TFile.h"
 #include <TLegend.h>
 
-#include "string"
-#include "vector"
+#include <string>
+#include <vector>
+#include <memory>
+#include <utility>
+
 
 LoggerInit([]{
-  Logger::setUserHeaderStr("[gundamFitCompare.cxx]");
+  Logger::getUserHeader() << "[" << FILENAME << "]";
 });
+
 
 CmdLineParser clp;
 TFile* outFile{nullptr};
+bool verbose{false};
+
 
 void makeSampleComparePlots(bool usePrefit_);
 void makeScanComparePlots(bool usePrefit_);
 void makeErrorComparePlots(bool usePrefit_, bool useNomVal_);
 
+
 int main( int argc, char** argv ){
   GundamGreetings g;
-  g.setAppName("FitCompare");
+  g.setAppName("fit compare tool");
   g.hello();
 
-  clp.addCmdLineArgs(argc, argv);
-
   // files
+  clp.addDummyOption("Main options");
   clp.addOption("file-1", {"-f1"}, "Path to first output fit file.", 1);
   clp.addOption("file-2", {"-f2"}, "Path to second output fit file.", 1);
-
-  // display name
   clp.addOption("name-1", {"-n1"}, "Set display name of the first fit file.", 1);
   clp.addOption("name-2", {"-n2"}, "Set display name of the  fit file.", 1);
-
-  // display name
   clp.addOption("algo-1", {"-a1"}, "Specify algo folder to compare for the first fit file.", 1);
   clp.addOption("algo-2", {"-a2"}, "Specify algo folder to compare for the second fit file.", 1);
-
   clp.addOption("output", {"-o"}, "Output file.", 1);
 
-  LogInfo << "Options list:" << std::endl;
-  {
-    Logger::Indent lIndent;
-    LogInfo << clp.getConfigSummary() << std::endl;
-  }
+  // compare post-fit with pre-fit data (useful when f1 and f2 are the same file)
+  clp.addDummyOption("Trigger options");
+  clp.addTriggerOption("use-prefit-1", {"--prefit-1"}, "Use prefit data only for file 1.");
+  clp.addTriggerOption("use-prefit-2", {"--prefit-2"}, "Use prefit data only for file 2.");
+  clp.addTriggerOption("verbose", {"-v"}, "Recursive verbosity printout.");
 
-  clp.parseCmdLine();
+  clp.addDummyOption("");
+
+  LogInfo << "Options list:" << std::endl;
+  LogInfo << clp.getConfigSummary() << std::endl << std::endl;
+
+  // read cli
+  clp.parseCmdLine(argc, argv);
+
+  // printout what's been fired
+  LogInfo << "Fired options are: " << std::endl << clp.getValueSummary() << std::endl;
 
   if( clp.isNoOptionTriggered()
       or not clp.isOptionTriggered("file-1")
       or not clp.isOptionTriggered("file-2")
-      or not clp.isOptionTriggered("output")
       ){
     LogError << "Missing options." << std::endl;
     exit(EXIT_FAILURE);
   }
 
+  LogThrowIf(clp.isOptionTriggered("use-prefit-1") and clp.isOptionTriggered("use-prefit-2"),
+             "Remove the two options to see prefit comparison of both files");
+
   LogInfo << "Reading config..." << std::endl;
+  verbose = clp.isOptionTriggered("verbose");
 
-  auto outPath = clp.getOptionVal<std::string>("output");
+  std::string outPath{};
+  if( clp.isOptionTriggered("output") ){ outPath = clp.getOptionVal<std::string>("output"); }
+  else{
+    // auto generate
+    std::vector<std::pair<std::string, std::string>> appendixDict;
 
+    // file1
+    if( clp.isOptionTriggered("name-1") ){ appendixDict.emplace_back("name-1", "%s"); }
+    else                                 { appendixDict.emplace_back("file-1", "%s"); }
+    if( clp.isOptionTriggered("use-prefit-1") ){ appendixDict.emplace_back("use-prefit-1", "PreFit"); }
 
-  std::string strBuffer;
+    // file2
+    if( clp.isOptionTriggered("name-2") ){ appendixDict.emplace_back("name-2", "vs_%s"); }
+    else                                 { appendixDict.emplace_back("file-2", "vs_%s"); }
+    if( clp.isOptionTriggered("use-prefit-2") ){ appendixDict.emplace_back("use-prefit-2", "PreFit"); }
 
+    outPath = "fitCompare_" + GundamUtils::generateFileName(clp, appendixDict) + ".root";
+    LogWarning << "Output file: " << outPath << std::endl;
+  }
   outFile = TFile::Open(outPath.c_str(), "RECREATE");
+
+
+  LogAlert << std::endl << "Starting comparison..." << std::endl;
 
   LogInfo << "Comparing preFit scans..." << std::endl;
   makeScanComparePlots(true);
@@ -93,7 +124,7 @@ int main( int argc, char** argv ){
   LogInfo << "Comparing postFit (normalized) errors..." << std::endl;
   makeErrorComparePlots(false, true);
 
-  LogWarning << "Closing: " << outPath << std::endl;
+  LogAlert << std::endl << "Closing: " << outPath << std::endl;
   outFile->Close();
 
   g.goodbye();
@@ -113,10 +144,11 @@ void makeSampleComparePlots(bool usePrefit_){
 
   std::string strBuffer;
 
-  strBuffer = Form("FitterEngine/%s/samples", (usePrefit_? "preFit": "postFit"));
+  strBuffer = Form("FitterEngine/%s/samples", ((usePrefit_ or clp.isOptionTriggered("use-prefit-1"))? "preFit": "postFit"));
   auto* dir1 = file1->Get<TDirectory>(strBuffer.c_str());
   LogReturnIf(dir1== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath1);
 
+  strBuffer = Form("FitterEngine/%s/samples", ((usePrefit_ or clp.isOptionTriggered("use-prefit-2"))? "preFit": "postFit"));
   auto* dir2 = file2->Get<TDirectory>(strBuffer.c_str());
   LogReturnIf(dir2== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
 
@@ -149,7 +181,10 @@ void makeSampleComparePlots(bool usePrefit_){
 
         auto* hCompValues = (TH1D*) h1->Clone();
         hCompValues->Add(h2, -1);
-        GenericToolbox::transformBinContent(hCompValues, [](TH1D* h_, int bin_){ h_->SetBinError(bin_, 0); });
+        GenericToolbox::transformBinContent(hCompValues, [](TH1D* h_, int bin_){
+          h_->SetBinError(bin_, 0);
+          if( std::isnan(h_->GetBinContent(bin_)) ){ h_->SetBinContent(bin_, 0); }
+        });
 
         hCompValues->SetTitle(Form("Comparing \"%s\"", dir1_->GetListOfKeys()->At(iKey)->GetName()));
         hCompValues->GetYaxis()->SetTitle("Bin content difference");
@@ -159,12 +194,30 @@ void makeSampleComparePlots(bool usePrefit_){
             hCompValues,
             dir1_->GetListOfKeys()->At(iKey)->GetName()
             );
+
+        auto* hCompValuesRatio = (TH1D*) hCompValues->Clone();
+        GenericToolbox::transformBinContent(hCompValuesRatio, [h1](TH1D* h_, int bin_){
+          h_->SetBinContent(bin_, 100. * h_->GetBinContent(bin_)/h1->GetBinContent(bin_));
+          h_->SetBinError(bin_, 0);
+          if( std::isnan(h_->GetBinContent(bin_)) ){ h_->SetBinContent(bin_, 0); }
+        });
+
+        hCompValuesRatio->SetTitle(Form("Comparing \"%s\"", dir1_->GetListOfKeys()->At(iKey)->GetName()));
+        hCompValuesRatio->GetYaxis()->SetTitle("Bin content relative difference (%)");
+
+        GenericToolbox::writeInTFile(
+            GenericToolbox::mkdirTFile(outFile, GenericToolbox::joinVectorString(pathBuffer, "/")),
+            hCompValuesRatio,
+            dir1_->GetListOfKeys()->At(iKey)->GetName() + std::string("_Ratio")
+        );
+
       }
     }
 
   };
 
   recurseSampleCompareGraph(dir1, dir2);
+  GenericToolbox::triggerTFileWrite( outFile );
 }
 void makeScanComparePlots(bool usePrefit_){
 
@@ -177,8 +230,10 @@ void makeScanComparePlots(bool usePrefit_){
   auto* file1 = GenericToolbox::openExistingTFile(filePath1);
   auto* file2 = GenericToolbox::openExistingTFile(filePath2);
 
+  // path buffer should not care about "use-prefit" option
+  // it is used for the output file.
   std::vector<std::string> pathBuffer;
-  pathBuffer.emplace_back(Form("%s/scan", (usePrefit_? "preFit": "postFit")));
+  pathBuffer.emplace_back( Form( "%s/scan", ( usePrefit_ ? "preFit": "postFit")) );
   std::function<void(TDirectory* dir1_, TDirectory* dir2_)> recurseScanCompareGraph;
   recurseScanCompareGraph = [&](TDirectory* dir1_, TDirectory* dir2_){
 
@@ -187,10 +242,11 @@ void makeScanComparePlots(bool usePrefit_){
       TKey* keyObj = (TKey*) dir1_->GetListOfKeys()->At(iKey);
 
 
-      if( (gROOT->GetClass( keyObj->GetClassName() ))->InheritsFrom("TDirectory") ){
+      if     ( (gROOT->GetClass( keyObj->GetClassName() ))->InheritsFrom("TDirectory") ){
         // recursive part
         pathBuffer.emplace_back( dir1_->GetListOfKeys()->At(iKey)->GetName() );
 
+        LogDebugIf(verbose) << "Exploring: " << GenericToolbox::joinPath(pathBuffer) << std::endl;
         recurseScanCompareGraph(
             dir1_->GetDirectory(dir1_->GetListOfKeys()->At(iKey)->GetName()),
             dir2_->GetDirectory(dir1_->GetListOfKeys()->At(iKey)->GetName())
@@ -199,11 +255,26 @@ void makeScanComparePlots(bool usePrefit_){
         pathBuffer.pop_back();
       }
       else if( (gROOT->GetClass( keyObj->GetClassName() ))->InheritsFrom("TGraph") ){
+        LogDebugIf(verbose) << "Found: " << dir1_->GetListOfKeys()->At(iKey)->GetName() << std::endl;
+
         auto* gr1 = dir1_->Get<TGraph>( dir1_->GetListOfKeys()->At(iKey)->GetName() );
-        auto* gr2 = dir2_->Get<TGraph>( dir1_->GetListOfKeys()->At(iKey)->GetName() );
+        auto* gr2 = dir2_->Get<TGraph>( dir1_->GetListOfKeys()->At(iKey)->GetName() ); // should be the same keyname.
 
-        auto* overlayCanvas = new TCanvas( dir1_->GetListOfKeys()->At(iKey)->GetName() , Form("Comparing %s scan: \"%s\"", (usePrefit_? "preFit": "postFit"), dir1_->GetListOfKeys()->At(iKey)->GetName()), 800, 600);
+        // look for current value:
+        std::string parValObjName = dir1_->GetListOfKeys()->At(iKey)->GetName();
+        // removing "_TGraph"
+        parValObjName = GenericToolbox::joinVectorString(GenericToolbox::splitString(parValObjName, "_"), "_", 0, -1);
+        parValObjName += "_CurrentPar_TVectorT_double";
+        auto* val1 = dir1_->GetDirectory("../")->Get<TVectorD>(parValObjName.c_str());
+        auto* val2 = dir2_->GetDirectory("../")->Get<TVectorD>(parValObjName.c_str());
 
+        auto* overlayCanvas = new TCanvas(
+            dir1_->GetListOfKeys()->At(iKey)->GetName() ,
+            Form("Comparing %s scan: \"%s\"", (usePrefit_? "preFit": "postFit"),
+                 dir1_->GetListOfKeys()->At(iKey)->GetName()
+            ),
+            800, 600
+        );
         overlayCanvas->cd();
 
         gr1->SetMarkerStyle(kFullSquare);
@@ -236,6 +307,25 @@ void makeScanComparePlots(bool usePrefit_){
         l.AddEntry(gr2, Form("%s", name2.c_str()));
         l.Draw();
 
+        if( val1 != nullptr ){
+          // vertical lines
+          overlayCanvas->Update(); // update Y1 and Y2
+          auto* line1 = new TLine((*val1)[0], gPad->GetFrame()->GetY1(), (*val1)[0], gPad->GetFrame()->GetY2());
+          line1->SetLineColor(kBlue-7);
+          line1->SetLineStyle(2);
+          line1->SetLineWidth(3);
+          line1->Draw();
+        }
+        if( val2 != nullptr ){
+          // vertical lines
+          overlayCanvas->Update();
+          auto* line2 = new TLine((*val2)[0], gPad->GetFrame()->GetY1(), (*val2)[0], gPad->GetFrame()->GetY2());
+          line2->SetLineColor(kBlack);
+          line2->SetLineStyle(3);
+          line2->SetLineWidth(3);
+          line2->Draw();
+        }
+
         gPad->SetGridx();
         gPad->SetGridy();
 
@@ -244,19 +334,25 @@ void makeScanComparePlots(bool usePrefit_){
             overlayCanvas
             );
         delete overlayCanvas;
+        delete val1;
+        delete val2;
       }
     }
 
   };
 
   std::string strBuffer;
-  strBuffer = Form("FitterEngine/%s/scan", (usePrefit_? "preFit": "postFit"));
+
+  strBuffer = Form("FitterEngine/%s/scan", ((usePrefit_ or clp.isOptionTriggered("use-prefit-1"))? "preFit": "postFit"));
   auto* dir1 = file1->Get<TDirectory>(strBuffer.c_str());
-  LogReturnIf(dir1== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath1);
+  LogReturnIf(dir1 == nullptr, "Could not find \"" << strBuffer << "\" within " << filePath1);
+
+  strBuffer = Form("FitterEngine/%s/scan", ((usePrefit_ or clp.isOptionTriggered("use-prefit-2"))? "preFit": "postFit"));
   auto* dir2 = file2->Get<TDirectory>(strBuffer.c_str());
-  LogReturnIf(dir2== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
+  LogReturnIf(dir2 == nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
 
   recurseScanCompareGraph(dir1, dir2);
+  GenericToolbox::triggerTFileWrite( outFile );
 }
 void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
 
@@ -275,18 +371,18 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
 
   std::string strBuffer;
 
-  strBuffer = Form("FitterEngine/%s/%s/errors", (usePrefit_? "preFit": "postFit"), algo1.c_str());
+  strBuffer = Form("FitterEngine/%s/%s/errors", ((usePrefit_ or clp.isOptionTriggered("use-prefit-1"))? "preFit": "postFit"), algo1.c_str());
   auto* dir1 = file1->Get<TDirectory>(strBuffer.c_str());
   LogReturnIf(dir1== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath1);
 
-  strBuffer = Form("FitterEngine/%s/%s/errors", (usePrefit_? "preFit": "postFit"), algo2.c_str());
+  strBuffer = Form("FitterEngine/%s/%s/errors", ((usePrefit_ or clp.isOptionTriggered("use-prefit-2"))? "preFit": "postFit"), algo2.c_str());
   auto* dir2 = file2->Get<TDirectory>(strBuffer.c_str());
   LogReturnIf(dir2== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
 
   // loop over parSets
   auto* outDir = GenericToolbox::mkdirTFile(outFile, Form("%s/errors%s", (usePrefit_? "preFit": "postFit"), (useNomVal_? "Norm": "")));
   for( int iKey = 0 ; iKey < dir1->GetListOfKeys()->GetEntries() ; iKey++ ){
-    Logger::Indent lIndent;
+    LogScopeIndent;
     std::string parSet = dir1->GetListOfKeys()->At(iKey)->GetName();
 
     strBuffer = Form("%s/values%s/%sErrors_TH1D", parSet.c_str(), (useNomVal_? "Norm": ""), (usePrefit_? "preFit": "postFit"));
@@ -440,4 +536,6 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
 
     delete overlayCanvas;
   }
+
+  GenericToolbox::triggerTFileWrite( outFile );
 }

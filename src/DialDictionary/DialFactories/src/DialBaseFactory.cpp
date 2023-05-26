@@ -10,10 +10,11 @@ LoggerInit([]{
 });
 
 
-DialBase* DialBaseFactory::makeDial(const std::string& dialType_,
-                                        const std::string& dialSubType_,
-                                        TObject* dialInitializer_,
-                                        bool useCachedDial_) {
+DialBase* DialBaseFactory::makeDial(const std::string& dialTitle_,
+                                    const std::string& dialType_,
+                                    const std::string& dialSubType_,
+                                    TObject* dialInitializer_,
+                                    bool useCachedDial_) {
 
   // Stuff the created dial into a unique_ptr, so it will be properly deleted
   // in the event of an exception.
@@ -21,15 +22,15 @@ DialBase* DialBaseFactory::makeDial(const std::string& dialType_,
 
   if (dialType_ == "Norm" || dialType_ == "Normalization") {
     NormDialBaseFactory factory;
-    dialBase.reset(factory.makeDial(dialType_, dialSubType_, dialInitializer_, useCachedDial_));
+    dialBase.reset(factory.makeDial(dialTitle_, dialType_, dialSubType_, dialInitializer_, useCachedDial_));
   }
   else if (dialType_ == "Graph") {
     GraphDialBaseFactory factory;
-    dialBase.reset(factory.makeDial(dialType_, dialSubType_, dialInitializer_, useCachedDial_));
+    dialBase.reset(factory.makeDial(dialTitle_, dialType_, dialSubType_, dialInitializer_, useCachedDial_));
   }
   else if (dialType_ == "Spline") {
     SplineDialBaseFactory factory;
-    dialBase.reset(factory.makeDial(dialType_, dialSubType_, dialInitializer_, useCachedDial_));
+    dialBase.reset(factory.makeDial(dialTitle_, dialType_, dialSubType_, dialInitializer_, useCachedDial_));
   }
 #define INCLUDE_DEPRECATED_DIAL_TYPES
 #ifdef INCLUDE_DEPRECATED_DIAL_TYPES
@@ -39,26 +40,26 @@ DialBase* DialBaseFactory::makeDial(const std::string& dialType_,
     << std::endl << "  dialSubType: \"catmull-rom, monotonic\""
             << std::endl;
     SplineDialBaseFactory factory;
-    dialBase.reset(factory.makeDial("Spline", "catmull-rom, monotonic",
+    dialBase.reset(factory.makeDial(dialTitle_, "Spline", "catmull-rom, monotonic",
                            dialInitializer_, useCachedDial_));
   }
   else if (dialType_ == "GeneralSpline") {
     LogAlertOnce << "DEPRECATED DIAL-TYPE USED: GeneralSpline will be removed. Instead use: \"Spline\""
             << std::endl;
     SplineDialBaseFactory factory;
-    dialBase.reset(factory.makeDial("Spline", "not-a-knot", dialInitializer_, useCachedDial_));
+    dialBase.reset(factory.makeDial(dialTitle_, "Spline", "not-a-knot", dialInitializer_, useCachedDial_));
   }
   else if (dialType_ == "SimpleSpline") {
     LogAlertOnce << "DEPRECATED DIAL-TYPE USED: SimpleSpline will be removed. Instead use: \"Spline\""
             << std::endl;
     SplineDialBaseFactory factory;
-    dialBase.reset(factory.makeDial("Spline", "knot-a-knot", dialInitializer_, useCachedDial_));
+    dialBase.reset(factory.makeDial(dialTitle_, "Spline", "knot-a-knot", dialInitializer_, useCachedDial_));
   }
   else if (dialType_ == "LightGraph") {
     LogAlertOnce << "DEPRECATED DIAL-TYPE USED: LightGraph will be removed. Instead use: \"Graph\""
             << std::endl;
     GraphDialBaseFactory factory;
-    dialBase.reset(factory.makeDial("Graph", "light", dialInitializer_, useCachedDial_));
+    dialBase.reset(factory.makeDial(dialTitle_, "Graph", "light", dialInitializer_, useCachedDial_));
   }
 #endif
 

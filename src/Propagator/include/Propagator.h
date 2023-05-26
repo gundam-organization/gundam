@@ -31,7 +31,7 @@ public:
   void setEnableEigenToOrigInPropagate(bool enableEigenToOrigInPropagate);
   void setIThrow(int iThrow);
   void setLoadAsimovData(bool loadAsimovData);
-  void setParameterInjector(const nlohmann::json &parameterInjector);
+  void setParameterInjectorConfig(const nlohmann::json &parameterInjector);
   void setGlobalCovarianceMatrix(const std::shared_ptr<TMatrixD> &globalCovarianceMatrix);
 
   // Const getters
@@ -43,6 +43,7 @@ public:
   [[nodiscard]] double getLlhRegBuffer() const;
   [[nodiscard]] const EventTreeWriter &getTreeWriter() const;
   [[nodiscard]] const std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix() const;
+  [[nodiscard]] const std::shared_ptr<TMatrixD> &getStrippedCovarianceMatrix() const;
   [[nodiscard]] const std::vector<DatasetLoader> &getDataSetList() const;
   [[nodiscard]] const std::vector<FitParameterSet> &getParameterSetsList() const;
 
@@ -55,13 +56,15 @@ public:
   std::vector<DatasetLoader> &getDataSetList();
 
   // Misc getters
-  double* getLlhBufferPtr(){ return &_llhBuffer_; }
-  double* getLlhStatBufferPtr(){ return &_llhStatBuffer_; }
-  double* getLlhPenaltyBufferPtr(){ return &_llhPenaltyBuffer_; }
-  double* getLlhRegBufferPtr(){ return &_llhRegBuffer_; }
-
+  [[nodiscard]] const double* getLlhBufferPtr() const { return &_llhBuffer_; }
+  [[nodiscard]] const double* getLlhStatBufferPtr() const { return &_llhStatBuffer_; }
+  [[nodiscard]] const double* getLlhPenaltyBufferPtr() const { return &_llhPenaltyBuffer_; }
+  [[nodiscard]] const double* getLlhRegBufferPtr() const { return &_llhRegBuffer_; }
+  [[nodiscard]] std::string getLlhBufferSummary() const;
+  [[nodiscard]] std::string getParametersSummary( bool showEigen_ = true ) const;
   [[nodiscard]] const FitParameterSet* getFitParameterSetPtr(const std::string& name_) const;
   [[nodiscard]] FitParameterSet* getFitParameterSetPtr(const std::string& name_);
+  [[nodiscard]] DatasetLoader* getDatasetLoaderPtr(const std::string& name_);
 
   // Core
   void updateLlhCache();
@@ -69,7 +72,15 @@ public:
   void resetReweight();
   void reweightMcEvents();
   void refillSampleHistograms();
+
+  // Misc
+  [[nodiscard]] nlohmann::json exportParameterInjectorConfig() const;
+  void injectParameterValues(const nlohmann::json &config_);
   void throwParametersFromGlobalCovariance();
+
+  // Logger related
+  static void muteLogger();
+  static void unmuteLogger();
 
 protected:
   void readConfigImpl() override;
@@ -86,7 +97,8 @@ private:
   bool _loadAsimovData_{false};
   bool _debugPrintLoadedEvents_{false};
   int _debugPrintLoadedEventsNbPerSample_{5};
-  nlohmann::json _parameterInjector_;
+  nlohmann::json _parameterInjectorMc_;
+  nlohmann::json _parameterInjectorToy_;
 
   // Internals
   bool _throwAsimovToyParameters_{false};
