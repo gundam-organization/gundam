@@ -152,13 +152,8 @@ Cache::Manager::Manager(int events, int parameters,
                                   fParameterCache->GetLowerClamps(),
                                   fParameterCache->GetUpperClamps(),
                                   graphs, graphPoints);
-        std::cout << "Allocated graphs Cache " << std::endl;
         fWeightsCache->AddWeightCalculator(fGraphs.get());
-        std::cout << "Added graph weight calculator" << std::endl;
         fTotalBytes += fGraphs->GetResidentMemory();
-        std::cout << "got total bytes " << std::endl;
-
-        std::cout << "Allocate histogram Cache " << histBins << std::endl;
         fHistogramsCache = std::make_unique<Cache::IndexedSums>(
                                   fWeightsCache->GetWeights(),
                                   histBins);
