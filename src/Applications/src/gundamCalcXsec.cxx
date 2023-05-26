@@ -58,6 +58,13 @@ int main(int argc, char** argv){
   LogInfo << clParser.getValueSummary() << std::endl << std::endl;
 
 
+  // Sanity checks
+  LogThrowIf(not clParser.isOptionTriggered("configFile"), "Xsec calculator config file not provided.");
+  LogThrowIf(not clParser.isOptionTriggered("fitterOutputFile"), "Did not provide the output fitter file.");
+  LogThrowIf(not clParser.isOptionTriggered("nToys"), "Did not provide number of toys.");
+
+
+  // Global parameters
   if( clParser.isOptionTriggered("randomSeed") ){
     LogAlert << "Using user-specified random seed: " << clParser.getOptionVal<ULong_t>("randomSeed") << std::endl;
     gRandom->SetSeed(clParser.getOptionVal<ULong_t>("randomSeed"));
@@ -67,68 +74,107 @@ int main(int argc, char** argv){
     LogInfo << "Using \"time(nullptr)\" random seed: " << seed << std::endl;
     gRandom->SetSeed(seed);
   }
-
-  auto configFilePath = clParser.getOptionVal("configFile", "");
-  LogThrowIf(configFilePath.empty(), "Config file not provided.");
-
   GlobalVariables::setNbThreads(clParser.getOptionVal("nbThreads", 1));
   LogInfo << "Running the fitter with " << GlobalVariables::getNbThreads() << " parallel threads." << std::endl;
 
-  // --------------------------
-  // Initialize the fitter:
-  // --------------------------
-  ConfigUtils::ConfigHandler ch{configFilePath};
-  auto configXsecExtractor = ch.getConfig();
 
-  if( GenericToolbox::Json::doKeyExist(configXsecExtractor, "minGundamVersion") ){
-    LogThrowIf(
-      not g.isNewerOrEqualVersion(GenericToolbox::Json::fetchValue<std::string>(configXsecExtractor, "minGundamVersion")),
-      "Version check FAILED: " << GundamUtils::getVersionStr() << " < " << GenericToolbox::Json::fetchValue<std::string>(configXsecExtractor, "minGundamVersion")
-    );
-    LogInfo << "Version check passed: " << GundamUtils::getVersionStr() << " >= " << GenericToolbox::Json::fetchValue<std::string>(configXsecExtractor, "minGundamVersion") << std::endl;
+  // Reading fitter file
+  LogInfo << "Opening fitter output file: " << clParser.getOptionVal<std::string>("fitterOutputFile") << std::endl;
+  auto fitterFile = std::unique_ptr<TFile>( TFile::Open( clParser.getOptionVal<std::string>("fitterOutputFile").c_str() ) );
+  LogThrowIf( fitterFile == nullptr, "Could not open fitter output file." );
+
+  using namespace GundamUtils;
+  ObjectReader::throwIfNotFound = true;
+
+  std::string configStr{};
+  ObjectReader::readObject<TNamed>(fitterFile.get(), "gundamFitter/unfoldedConfig_TNamed", [&](TNamed* config_){
+    configStr = config_->GetTitle();
+  });
+  ConfigUtils::ConfigHandler cHandler{ configStr };
+
+
+  // Editing fitter config to add truth samples
+  ConfigUtils::ConfigHandler cXsecHandler{ clParser.getOptionVal<std::string>("configFile") };
+  cHandler.override( cXsecHandler.toString() );
+  auto configPropagator = GenericToolbox::Json::fetchValuePath<nlohmann::json>( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig" );
+
+  // Create a propagator object
+  Propagator propagator;
+
+  // Read the whole fitter config with the overrided parameters
+  propagator.readConfig( configPropagator );
+
+  // We are only interested in our MC. Data has already been used to get the post-fit error/values
+  propagator.setLoadAsimovData( true );
+
+  // Load post-fit parameters as "prior" so we can reset the weight to this point when throwing toys
+  ObjectReader::readObject<TNamed>( fitterFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
+    propagator.injectParameterValues( parState_->GetTitle() );
+    for( auto& parSet : propagator.getParameterSetsList() ){
+      if( not parSet.isEnabled() ){ continue; }
+
+      if( parSet.isUseEigenDecompInFit() ){
+        // TODO: SHOULD NOT USE EIGEN DECOMP
+      }
+
+      for( auto& par : parSet.getParameterList() ){
+        if( not par.isEnabled() ){ continue; }
+        par.setPriorValue( par.getParameterValue() );
+      }
+    }
+  });
+
+  // Load the post-fit covariance matrix
+  ObjectReader::readObject<TH2D>(
+      fitterFile.get(), "FitterEngine/postFit/Hesse/hessian/postfitCovarianceOriginal_TH2D",
+      [&](TH2D* hCovPostFit_){
+    propagator.setGlobalCovarianceMatrix(std::make_shared<TMatrixD>(hCovPostFit_->GetNbinsX(), hCovPostFit_->GetNbinsX()));
+    for( int iBin = 0 ; iBin < hCovPostFit_->GetNbinsX() ; iBin++ ){
+      for( int jBin = 0 ; jBin < hCovPostFit_->GetNbinsX() ; jBin++ ){
+        (*propagator.getGlobalCovarianceMatrix())[iBin][jBin] = hCovPostFit_->GetBinContent(1 + iBin, 1 + jBin);
+      }
+    }
+  });
+
+  // Load everything
+  propagator.initialize();
+
+
+  // Creating output file
+  std::string outFilePath{};
+  if( clParser.isOptionTriggered("outputFile") ){ outFilePath = clParser.getOptionVal<std::string>("outputFile"); }
+  else{
+    // appendixDict["optionName"] = "Appendix"
+    // this list insure all appendices will appear in the same order
+    std::vector<std::pair<std::string, std::string>> appendixDict{
+        {"configFile", "%s"},
+        {"fitterOutputFile", "Fit_%s"},
+        {"nToys", "nToys_%s"},
+        {"randomSeed", "Seed_%s"},
+    };
+
+    outFilePath = "xsecCalc_" + GundamUtils::generateFileName(clParser, appendixDict) + ".root";
   }
+  auto outFile = std::unique_ptr<TFile>( TFile::Open( outFilePath.c_str(), "RECREATE" ) );
+
+  GenericToolbox::writeInTFile(
+      GenericToolbox::mkdirTFile(outFile.get(), "gundamCalcXsec"),
+      TNamed("gundamVersion", GundamUtils::getVersionFullStr().c_str())
+  );
+  GenericToolbox::writeInTFile(
+      GenericToolbox::mkdirTFile(outFile.get(), "gundamCalcXsec"),
+      TNamed("commandLine", clParser.getCommandLineString().c_str())
+  );
 
 
 
-  // Open output of the fitter
-  // Get configuration of fitter (TNamed) -> parse to json config file
 
 
 
-  std::string outFileName = configFilePath;
-
-  outFileName = clParser.getOptionVal("outputFile", outFileName + ".root");
-  if( GenericToolbox::Json::doKeyExist(configXsecExtractor, "outputFolder") ){
-    GenericToolbox::mkdirPath(GenericToolbox::Json::fetchValue<std::string>(configXsecExtractor, "outputFolder"));
-    outFileName.insert(0, GenericToolbox::Json::fetchValue<std::string>(configXsecExtractor, "outputFolder") + "/");
-  }
-
-  LogWarning << "Creating output file: \"" << outFileName << "\"..." << std::endl;
-  TFile* out = TFile::Open(outFileName.c_str(), "RECREATE");
 
 
-  LogInfo << "Writing runtime parameters in output file..." << std::endl;
 
-  // Gundam version?
-  TNamed gundamVersionString("gundamVersion", GundamUtils::getVersionFullStr().c_str());
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamCalcXsec"), &gundamVersionString);
 
-  // Command line?
-  TNamed commandLineString("commandLine", clParser.getCommandLineString().c_str());
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamCalcXsec"), &commandLineString);
-
-  // Fit file
-  LogThrowIf(not GenericToolbox::doesTFileIsValid(clParser.getOptionVal<std::string>("fitterOutputFile")),
-             "Can't open input fitter file: " << clParser.getOptionVal<std::string>("fitterOutputFile"));
-  auto* fitFile = TFile::Open(clParser.getOptionVal<std::string>("fitterOutputFile").c_str());
-  std::string configStr{fitFile->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed")->GetTitle()};
-
-  // Get config from the fit
-  auto configFit = GenericToolbox::Json::readConfigJsonStr(configStr); // works with yaml
-  if( configFit.is_array() ){ configFit = configFit[0]; } // hot fix for bad version of JSON lib
-
-//  auto configPropagator = GenericToolbox::Json::fetchValuePath<nlohmann::json>( configFit, "fitterEngineConfig/propagatorConfig" );
-  auto configPropagator = GenericToolbox::Json::fetchValue<nlohmann::json>(GenericToolbox::Json::fetchValue<nlohmann::json>(configFit, "fitterEngineConfig"), "propagatorConfig");
 
   bool enableEventMcThrow{true};
   bool enableStatThrowInToys{true};
@@ -136,110 +182,8 @@ int main(int argc, char** argv){
   enableStatThrowInToys = GenericToolbox::Json::fetchValue(configXsecExtractor, "enableStatThrowInToys", enableStatThrowInToys);
   enableEventMcThrow = GenericToolbox::Json::fetchValue(configXsecExtractor, "enableEventMcThrow", enableEventMcThrow);
 
-  // Create a propagator object
-  Propagator propagator;
-
-  // Read the whole fitter config
-  propagator.readConfig(configPropagator);
-
-  // We are only interested in our MC. Data has already been used to get the post-fit error/values
-  propagator.setLoadAsimovData(true );
-
   // Need this number later -> STILL NEEDED?
   size_t nFitSample{propagator.getFitSampleSet().getFitSampleList().size() };
-
-
-  for( auto& dataset : propagator.getDataSetList() ){ LogDebug << dataset.getDataDispenserDict().at("Asimov").getTitle() << std::endl; }
-
-  // As the signal sample might use external data-set, we need to make sure the fit sample will be filled up with
-  // the original ones:
-  LogInfo << "Defining explicit dataset names from fit samples..." << std::endl;
-  for( auto& sample : propagator.getFitSampleSet().getFitSampleList() ){
-    std::vector<std::string> explicitDatasetNameList;
-    for( auto& dataset : propagator.getDataSetList() ){
-      if( sample.isDatasetValid( dataset.getName() ) ){
-        explicitDatasetNameList.emplace_back( dataset.getName() );
-      }
-    }
-    LogInfo << "Sample \"" << sample.getName() << "\" will be loaded from datasets: "
-    << GenericToolbox::parseVectorAsString(explicitDatasetNameList) << std::endl;
-    sample.setEnabledDatasetList( explicitDatasetNameList );
-  }
-
-  if( GenericToolbox::Json::doKeyExist(configXsecExtractor, "signalDatasets") ){
-    LogWarning << "Defining additional datasets for signals..." << std::endl;
-    auto signalDatasetList = GenericToolbox::Json::fetchValue<std::vector<nlohmann::json>>(configXsecExtractor, "signalDatasets");
-
-    // WARNING THIS CHANGES THE SIZE OF THE VECTOR:
-    propagator.getDataSetList().reserve(propagator.getDataSetList().size() + signalDatasetList.size() );
-
-    // So DatasetLoaders get moved in memory so the _owner_ reference within the DataDispenser are pointing to garbage in memory
-    // We need to update this reference.
-    for( auto& dataset : propagator.getDataSetList() ){ dataset.updateDispenserOwnership(); }
-
-    for( auto& signalDatasetConfig : signalDatasetList ){
-      propagator.getDataSetList().emplace_back(signalDatasetConfig, propagator.getDataSetList().size());
-    }
-  }
-
-  // Add template sample
-  auto signalDefinitions = GenericToolbox::Json::fetchValue<std::vector<nlohmann::json>>(configXsecExtractor, "signalDefinitions");
-  LogInfo << "Adding 2 x " << signalDefinitions.size() << " signal samples (true + reconstructed) to the propagator..." << std::endl;
-  std::vector<std::pair<FitSample*, FitSample*>> signalSampleList;
-  propagator.getFitSampleSet().getFitSampleList().reserve(
-      propagator.getFitSampleSet().getFitSampleList().size() + signalDefinitions.size() * 2
-  );
-
-  LogInfo << "Defining sample for signal definitions..." << std::endl;
-  for( auto& signalDef : signalDefinitions ){
-
-    auto parameterSetName = GenericToolbox::Json::fetchValue<std::string>(signalDef, "parameterSetName");
-    LogInfo << "Adding signal samples: \"" << parameterSetName << "\"" << std::endl;
-
-    signalSampleList.emplace_back();
-    propagator.getFitSampleSet().getFitSampleList().emplace_back();
-
-    signalSampleList.back().first = &propagator.getFitSampleSet().getFitSampleList().back();
-    signalSampleList.back().first->readConfig(); // read empty config
-    signalSampleList.back().first->setName( parameterSetName );
-
-    auto templateBinningFilePath = GenericToolbox::Json::fetchValue<std::string>(
-        propagator.getFitParameterSetPtr(parameterSetName )->getDialSetDefinitions()[0], "parametersBinningPath"
-    );
-    auto applyOnCondition = GenericToolbox::Json::fetchValue<std::string>(
-        propagator.getFitParameterSetPtr(parameterSetName )->getDialSetDefinitions()[0], "applyCondition"
-    );
-
-    signalSampleList.back().first->setBinningFilePath( templateBinningFilePath );
-    signalSampleList.back().first->setVarSelectionFormulaStr( applyOnCondition );
-
-    if( GenericToolbox::Json::doKeyExist(signalDef, "datasetSources") ){
-      auto datasetSrcList = GenericToolbox::Json::fetchValue<std::vector<std::string>>(signalDef, "datasetSources");
-      LogInfo << "Signal sample \"" << parameterSetName << "\" (truth) will load data from datasets: "
-      << GenericToolbox::parseVectorAsString( datasetSrcList ) << std::endl;
-      signalSampleList.back().first->setEnabledDatasetList( datasetSrcList );
-    }
-
-
-    // Add template sample which will take care of the detection efficiency
-    // Same as templateSample but will need to make sure events belong to any of the fit sample
-    // Don't fill the events yet -> add a dummy cut
-    propagator.getFitSampleSet().getFitSampleList().emplace_back(*signalSampleList.back().first );
-    signalSampleList.back().second = &propagator.getFitSampleSet().getFitSampleList().back();
-    signalSampleList.back().second->setName( parameterSetName + " (Reconstructed)" );
-    signalSampleList.back().second->setSelectionCutStr("0"); // dummy cut to select no event during the data loading
-
-
-    // Events in templateSampleDetected will be loaded using the original fit samples
-    // To identify the right template bin for each detected event, one need to make sure the variables are kept in memory
-    DataBinSet templateBinning;
-    templateBinning.readBinningDefinition( templateBinningFilePath );
-    for( auto& varStorageList : templateBinning.getBinVariables() ){
-      if( not GenericToolbox::doesElementIsInVector(varStorageList, propagator.getFitSampleSet().getAdditionalVariablesForStorage()) ){
-        propagator.getFitSampleSet().getAdditionalVariablesForStorage().emplace_back(varStorageList);
-      }
-    }
-  }
 
   // Get best fit parameter values and postfit covariance matrix
   LogInfo << "Injecting post-fit values of fitted parameters..." << std::endl;
@@ -282,6 +226,7 @@ int main(int argc, char** argv){
     );
     int iTemplateEvt{0};
 
+
     auto isInTemplateBin = [&](const PhysicsEvent& ev_, const DataBin& b_){
       for( size_t iVar = 0 ; iVar < b_.getVariableNameList().size() ; iVar++ ){
         if( not b_.isBetweenEdges(iVar, ev_.getVarAsDouble(b_.getVariableNameList()[iVar])) ){
@@ -290,8 +235,6 @@ int main(int argc, char** argv){
       } // Var
       return true;
     };
-
-
     for( int iFitSample = 0 ; iFitSample < nFitSample ; iFitSample++ ){
       for( auto& event : propagator.getFitSampleSet().getFitSampleList()[iFitSample].getMcContainer().eventList ){
         for( size_t iBin = 0 ; iBin < signalSamplePair.first->getBinning().getBinsList().size() ; iBin++ ){
@@ -378,16 +321,16 @@ int main(int argc, char** argv){
     // Do the throwing:
     propagator.throwParametersFromGlobalCovariance();
     propagator.propagateParametersOnSamples();
-    if( enableStatThrowInToys ){
-      for( auto& sample : propagator.getFitSampleSet().getFitSampleList() ){
-        if( enableEventMcThrow ){
-          // Take into account the finite amount of event in MC
-          sample.getMcContainer().throwEventMcError();
-        }
-        // Asimov bin content -> toy data
-        sample.getMcContainer().throwStatError();
-      }
-    }
+//    if( enableStatThrowInToys ){
+//      for( auto& sample : propagator.getFitSampleSet().getFitSampleList() ){
+//        if( enableEventMcThrow ){
+//          // Take into account the finite amount of event in MC
+//          sample.getMcContainer().throwEventMcError();
+//        }
+//        // Asimov bin content -> toy data
+//        sample.getMcContainer().throwStatError();
+//      }
+//    }
 
     // Compute N_truth_i(flux, xsec) and N_selected_truth_i(flux, xsec, det) -> efficiency
     // mask detector parameters?

@@ -10,10 +10,14 @@
 #include "GenericToolbox.Root.h"
 #include "CmdLineParser.h"
 
+#include "TDirectory.h"
+#include "TObject.h"
+
 #include <map>
 #include <string>
 #include <vector>
 #include <utility>
+#include <functional>
 
 
 
@@ -58,6 +62,19 @@ namespace GundamUtils {
       { 1, "status = 1    : approximated"},
       { 2, "status = 2    : made pos def"},
       { 3, "status = 3    : accurate"}
+  };
+
+
+  class ObjectReader{
+
+  public:
+    template<typename T> static bool readObject( TDirectory* f_, const std::vector<std::string>& objPathList_, const std::function<void(T*)>& action_ = [](T*){} );
+    template<typename T> static bool readObject( TDirectory* f_, const std::string& objPath_, const std::function<void(T*)>& action_ = [](T*){} );
+    static bool readObject( TDirectory* f_, const std::string& objPath_);
+
+    static bool quiet;
+    static bool throwIfNotFound;
+
   };
 
 }
