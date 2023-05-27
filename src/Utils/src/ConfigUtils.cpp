@@ -182,10 +182,12 @@ namespace ConfigUtils {
             if( identifier == "__INDEX__" ){
               if( overrideListEntry.value()[identifier].get<int>() == -1 ){
                 // add entry
-                LogAlert << "Adding: " << GenericToolbox::joinPath(jsonPath, outEntry_.size());
-                if( overrideListEntry.value().is_primitive() ){ LogAlert << " -> " << overrideListEntry.value(); }
-                LogAlert << std::endl;
-                outEntry_.emplace_back(overrideListEntry.value());
+                if( allowAddMissingKey ){
+                  LogAlert << "Adding: " << GenericToolbox::joinPath(jsonPath, outEntry_.size());
+                  if( overrideListEntry.value().is_primitive() ){ LogAlert << " -> " << overrideListEntry.value(); }
+                  LogAlert << std::endl;
+                  outEntry_.emplace_back(overrideListEntry.value());
+                }
               }
               else if( overrideListEntry.value()[identifier].get<size_t>() < outEntry_.size() ){
                 jsonPath.emplace_back(overrideListEntry.key());
@@ -206,9 +208,12 @@ namespace ConfigUtils {
               }
 
               if( outListEntryMatch == nullptr ){
-                LogAlert << "Adding: " << GenericToolbox::joinPath(jsonPath, outEntry_.size()) << "(" << identifier << ":" << overrideListEntry.value()[identifier] << ")" << std::endl;
-                outEntry_.emplace_back(overrideListEntry.value());
-                continue;
+                if( allowAddMissingKey ) {
+                  LogAlert << "Adding: " << GenericToolbox::joinPath(jsonPath, outEntry_.size()) << "(" << identifier
+                           << ":" << overrideListEntry.value()[identifier] << ")" << std::endl;
+                  outEntry_.emplace_back(overrideListEntry.value());
+                  continue;
+                }
               }
               jsonPath.emplace_back(GenericToolbox::joinAsString("",overrideListEntry.key(),"(",identifier,":",overrideListEntry.value()[identifier],")"));
               overrideRecursive(*outListEntryMatch, overrideListEntry.value());
@@ -222,6 +227,13 @@ namespace ConfigUtils {
         }
       }
       else{
+
+        if( overrideEntry_.empty() ){
+          LogWarning << "Removing entry: " << GenericToolbox::joinPath(jsonPath) << std::endl;
+          outEntry_ = overrideEntry_;
+          return;
+        }
+
         // entry is dictionary
         for( auto& overrideEntry : overrideEntry_.items() ){
 

@@ -40,12 +40,17 @@ int main(int argc, char** argv){
   // Read Command Line Args:
   // --------------------------
   CmdLineParser clParser;
+
+  clParser.addDummyOption("Main options:");
   clParser.addOption("configFile", {"-c", "--config-file"}, "Specify path to the fitter config file");
   clParser.addOption("fitterOutputFile", {"-f"}, "Specify the fitter output file");
   clParser.addOption("outputFile", {"-o", "--out-file"}, "Specify the CalcXsec output file");
   clParser.addOption("nbThreads", {"-t", "--nb-threads"}, "Specify nb of parallel threads");
   clParser.addOption("nToys", {"-n"}, "Specify number of toys");
   clParser.addOption("randomSeed", {"-s", "--seed"}, "Set random seed");
+
+  clParser.addDummyOption("Trigger options:");
+  clParser.addTriggerOption("dryRun", {"-d", "--dry-run"}, "Only overrides fitter config and print it.");
 
   LogInfo << "Usage: " << std::endl;
   LogInfo << clParser.getConfigSummary() << std::endl << std::endl;
@@ -93,12 +98,14 @@ int main(int argc, char** argv){
   ConfigUtils::ConfigHandler cHandler{ fitterConfig };
 
   // Disabling defined samples:
+  LogInfo << "Removing defined samples..." << std::endl;
   ConfigUtils::applyOverrides(
       cHandler.getConfig(),
       GenericToolbox::Json::readConfigJsonStr(R"({"fitterEngineConfig":{"propagatorConfig":{"fitSampleSetConfig":{"fitSampleList":[]}}}})")
   );
 
   // Disabling defined plots:
+  LogInfo << "Removing defined plots..." << std::endl;
   ConfigUtils::applyOverrides(
       cHandler.getConfig(),
       GenericToolbox::Json::readConfigJsonStr(R"({"fitterEngineConfig":{"propagatorConfig":{"plotGeneratorConfig":{}}}})")
@@ -106,6 +113,14 @@ int main(int argc, char** argv){
 
   // Defining signal samples
   cHandler.override( clParser.getOptionVal<std::string>("configFile") );
+
+  if( clParser.isOptionTriggered("dryRun") ){
+    std::cout << cHandler.toString() << std::endl;
+
+    LogAlert << "Exiting as dry-run is set." << std::endl;
+    return EXIT_SUCCESS;
+  }
+
 
   auto configPropagator = GenericToolbox::Json::fetchValuePath<nlohmann::json>( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig" );
 
@@ -274,9 +289,6 @@ int main(int argc, char** argv){
     for( size_t iSignal = 0 ; iSignal < propagator.getFitSampleSet().getFitSampleList().size() ; iSignal++ ){
       signalThrowData[iSignal].resetCurrentByteOffset();
       for( int iBin = 0 ; iBin < propagator.getFitSampleSet().getFitSampleList()[iSignal].getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-        LogDebug(iBin == 0) << std::endl << iBin << " -> " << propagator.getFitSampleSet().getFitSampleList()[iSignal].getMcContainer().histogram->GetBinContent(1+iBin)
-//                    / numberOfTargets[iSignal] / integratedFlux[iSignal]
-                    << std::endl;
         signalThrowData[iSignal].writeRawData(
             propagator.getFitSampleSet().getFitSampleList()[iSignal].getMcContainer().histogram->GetBinContent(1+iBin)
             / numberOfTargets[iSignal] / integratedFlux[iSignal]
