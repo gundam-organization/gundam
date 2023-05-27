@@ -206,7 +206,8 @@ namespace ConfigUtils {
               }
 
               if( outListEntryMatch == nullptr ){
-                LogError << "Could not find key" << std::endl;
+                LogAlert << "Adding: " << GenericToolbox::joinPath(jsonPath, outEntry_.size()) << "(" << identifier << ":" << overrideListEntry.value()[identifier] << ")" << std::endl;
+                outEntry_.emplace_back(overrideListEntry.value());
                 continue;
               }
               jsonPath.emplace_back(GenericToolbox::joinAsString("",overrideListEntry.key(),"(",identifier,":",overrideListEntry.value()[identifier],")"));

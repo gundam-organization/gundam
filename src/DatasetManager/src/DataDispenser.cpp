@@ -110,7 +110,7 @@ void DataDispenser::load(){
   this->buildSampleToFillList();
 
   if( _cache_.samplesToFillList.empty() ){
-    LogError << "No samples were selected for dataset: " << getTitle() << std::endl;
+    LogAlert << "No samples were selected for dataset: " << getTitle() << std::endl;
     return;
   }
 
