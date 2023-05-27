@@ -40,12 +40,17 @@ int main(int argc, char** argv){
   // Read Command Line Args:
   // --------------------------
   CmdLineParser clParser;
+
+  clParser.addDummyOption("Main options:");
   clParser.addOption("configFile", {"-c", "--config-file"}, "Specify path to the fitter config file");
   clParser.addOption("fitterOutputFile", {"-f"}, "Specify the fitter output file");
   clParser.addOption("outputFile", {"-o", "--out-file"}, "Specify the CalcXsec output file");
   clParser.addOption("nbThreads", {"-t", "--nb-threads"}, "Specify nb of parallel threads");
   clParser.addOption("nToys", {"-n"}, "Specify number of toys");
   clParser.addOption("randomSeed", {"-s", "--seed"}, "Set random seed");
+
+  clParser.addDummyOption("Trigger options:");
+  clParser.addTriggerOption("dryRun", {"-d", "--dry-run"}, "Only overrides fitter config and print it.");
 
   LogInfo << "Usage: " << std::endl;
   LogInfo << clParser.getConfigSummary() << std::endl << std::endl;
@@ -58,6 +63,13 @@ int main(int argc, char** argv){
   LogInfo << clParser.getValueSummary() << std::endl << std::endl;
 
 
+  // Sanity checks
+  LogThrowIf(not clParser.isOptionTriggered("configFile"), "Xsec calculator config file not provided.");
+  LogThrowIf(not clParser.isOptionTriggered("fitterOutputFile"), "Did not provide the output fitter file.");
+  LogThrowIf(not clParser.isOptionTriggered("nToys"), "Did not provide number of toys.");
+
+
+  // Global parameters
   if( clParser.isOptionTriggered("randomSeed") ){
     LogAlert << "Using user-specified random seed: " << clParser.getOptionVal<ULong_t>("randomSeed") << std::endl;
     gRandom->SetSeed(clParser.getOptionVal<ULong_t>("randomSeed"));
@@ -67,282 +79,153 @@ int main(int argc, char** argv){
     LogInfo << "Using \"time(nullptr)\" random seed: " << seed << std::endl;
     gRandom->SetSeed(seed);
   }
-
-  auto configFilePath = clParser.getOptionVal("configFile", "");
-  LogThrowIf(configFilePath.empty(), "Config file not provided.");
-
   GlobalVariables::setNbThreads(clParser.getOptionVal("nbThreads", 1));
   LogInfo << "Running the fitter with " << GlobalVariables::getNbThreads() << " parallel threads." << std::endl;
 
-  // --------------------------
-  // Initialize the fitter:
-  // --------------------------
-  ConfigUtils::ConfigHandler ch{configFilePath};
-  auto configXsecExtractor = ch.getConfig();
 
-  if( GenericToolbox::Json::doKeyExist(configXsecExtractor, "minGundamVersion") ){
-    LogThrowIf(
-      not g.isNewerOrEqualVersion(GenericToolbox::Json::fetchValue<std::string>(configXsecExtractor, "minGundamVersion")),
-      "Version check FAILED: " << GundamUtils::getVersionStr() << " < " << GenericToolbox::Json::fetchValue<std::string>(configXsecExtractor, "minGundamVersion")
-    );
-    LogInfo << "Version check passed: " << GundamUtils::getVersionStr() << " >= " << GenericToolbox::Json::fetchValue<std::string>(configXsecExtractor, "minGundamVersion") << std::endl;
+  // Reading fitter file
+  LogInfo << "Opening fitter output file: " << clParser.getOptionVal<std::string>("fitterOutputFile") << std::endl;
+  auto fitterFile = std::unique_ptr<TFile>( TFile::Open( clParser.getOptionVal<std::string>("fitterOutputFile").c_str() ) );
+  LogThrowIf( fitterFile == nullptr, "Could not open fitter output file." );
+
+  using namespace GundamUtils;
+  ObjectReader::throwIfNotFound = true;
+
+  nlohmann::json fitterConfig;
+  ObjectReader::readObject<TNamed>(fitterFile.get(), "gundamFitter/unfoldedConfig_TNamed", [&](TNamed* config_){
+    fitterConfig = GenericToolbox::Json::readConfigJsonStr( config_->GetTitle() );
+  });
+  ConfigUtils::ConfigHandler cHandler{ fitterConfig };
+
+  // Disabling defined samples:
+  LogInfo << "Removing defined samples..." << std::endl;
+  ConfigUtils::applyOverrides(
+      cHandler.getConfig(),
+      GenericToolbox::Json::readConfigJsonStr(R"({"fitterEngineConfig":{"propagatorConfig":{"fitSampleSetConfig":{"fitSampleList":[]}}}})")
+  );
+
+  // Disabling defined plots:
+  LogInfo << "Removing defined plots..." << std::endl;
+  ConfigUtils::applyOverrides(
+      cHandler.getConfig(),
+      GenericToolbox::Json::readConfigJsonStr(R"({"fitterEngineConfig":{"propagatorConfig":{"plotGeneratorConfig":{}}}})")
+  );
+
+  // Defining signal samples
+  cHandler.override( clParser.getOptionVal<std::string>("configFile") );
+
+  if( clParser.isOptionTriggered("dryRun") ){
+    std::cout << cHandler.toString() << std::endl;
+
+    LogAlert << "Exiting as dry-run is set." << std::endl;
+    return EXIT_SUCCESS;
   }
 
 
-
-  // Open output of the fitter
-  // Get configuration of fitter (TNamed) -> parse to json config file
-
-
-
-  std::string outFileName = configFilePath;
-
-  outFileName = clParser.getOptionVal("outputFile", outFileName + ".root");
-  if( GenericToolbox::Json::doKeyExist(configXsecExtractor, "outputFolder") ){
-    GenericToolbox::mkdirPath(GenericToolbox::Json::fetchValue<std::string>(configXsecExtractor, "outputFolder"));
-    outFileName.insert(0, GenericToolbox::Json::fetchValue<std::string>(configXsecExtractor, "outputFolder") + "/");
-  }
-
-  LogWarning << "Creating output file: \"" << outFileName << "\"..." << std::endl;
-  TFile* out = TFile::Open(outFileName.c_str(), "RECREATE");
-
-
-  LogInfo << "Writing runtime parameters in output file..." << std::endl;
-
-  // Gundam version?
-  TNamed gundamVersionString("gundamVersion", GundamUtils::getVersionFullStr().c_str());
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamCalcXsec"), &gundamVersionString);
-
-  // Command line?
-  TNamed commandLineString("commandLine", clParser.getCommandLineString().c_str());
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamCalcXsec"), &commandLineString);
-
-  // Fit file
-  LogThrowIf(not GenericToolbox::doesTFileIsValid(clParser.getOptionVal<std::string>("fitterOutputFile")),
-             "Can't open input fitter file: " << clParser.getOptionVal<std::string>("fitterOutputFile"));
-  auto* fitFile = TFile::Open(clParser.getOptionVal<std::string>("fitterOutputFile").c_str());
-  std::string configStr{fitFile->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed")->GetTitle()};
-
-  // Get config from the fit
-  auto configFit = GenericToolbox::Json::readConfigJsonStr(configStr); // works with yaml
-  if( configFit.is_array() ){ configFit = configFit[0]; } // hot fix for bad version of JSON lib
-
-//  auto configPropagator = GenericToolbox::Json::fetchValuePath<nlohmann::json>( configFit, "fitterEngineConfig/propagatorConfig" );
-  auto configPropagator = GenericToolbox::Json::fetchValue<nlohmann::json>(GenericToolbox::Json::fetchValue<nlohmann::json>(configFit, "fitterEngineConfig"), "propagatorConfig");
-
-  bool enableEventMcThrow{true};
-  bool enableStatThrowInToys{true};
-
-  enableStatThrowInToys = GenericToolbox::Json::fetchValue(configXsecExtractor, "enableStatThrowInToys", enableStatThrowInToys);
-  enableEventMcThrow = GenericToolbox::Json::fetchValue(configXsecExtractor, "enableEventMcThrow", enableEventMcThrow);
+  auto configPropagator = GenericToolbox::Json::fetchValuePath<nlohmann::json>( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig" );
 
   // Create a propagator object
   Propagator propagator;
 
-  // Read the whole fitter config
-  propagator.readConfig(configPropagator);
+  // Read the whole fitter config with the override parameters
+  propagator.readConfig( configPropagator );
 
   // We are only interested in our MC. Data has already been used to get the post-fit error/values
-  propagator.setLoadAsimovData(true );
+  propagator.setLoadAsimovData( true );
 
-  // Need this number later -> STILL NEEDED?
-  size_t nFitSample{propagator.getFitSampleSet().getFitSampleList().size() };
+  // Disabling eigen decomposed parameters
+  propagator.setEnableEigenToOrigInPropagate( false );
 
+  // Load post-fit parameters as "prior" so we can reset the weight to this point when throwing toys
+  ObjectReader::readObject<TNamed>( fitterFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
+    propagator.injectParameterValues( parState_->GetTitle() );
+    for( auto& parSet : propagator.getParameterSetsList() ){
+      if( not parSet.isEnabled() ){ continue; }
+      for( auto& par : parSet.getParameterList() ){
+        if( not par.isEnabled() ){ continue; }
+        par.setPriorValue( par.getParameterValue() );
+      }
+    }
+  });
 
-  for( auto& dataset : propagator.getDataSetList() ){ LogDebug << dataset.getDataDispenserDict().at("Asimov").getTitle() << std::endl; }
+  // Load the post-fit covariance matrix
+  ObjectReader::readObject<TH2D>(
+      fitterFile.get(), "FitterEngine/postFit/Hesse/hessian/postfitCovarianceOriginal_TH2D",
+      [&](TH2D* hCovPostFit_){
+    propagator.setGlobalCovarianceMatrix(std::make_shared<TMatrixD>(hCovPostFit_->GetNbinsX(), hCovPostFit_->GetNbinsX()));
+    for( int iBin = 0 ; iBin < hCovPostFit_->GetNbinsX() ; iBin++ ){
+      for( int jBin = 0 ; jBin < hCovPostFit_->GetNbinsX() ; jBin++ ){
+        (*propagator.getGlobalCovarianceMatrix())[iBin][jBin] = hCovPostFit_->GetBinContent(1 + iBin, 1 + jBin);
+      }
+    }
+  });
 
-  // As the signal sample might use external data-set, we need to make sure the fit sample will be filled up with
-  // the original ones:
-  LogInfo << "Defining explicit dataset names from fit samples..." << std::endl;
+  // Sample binning using parameterSetName
   for( auto& sample : propagator.getFitSampleSet().getFitSampleList() ){
-    std::vector<std::string> explicitDatasetNameList;
-    for( auto& dataset : propagator.getDataSetList() ){
-      if( sample.isDatasetValid( dataset.getName() ) ){
-        explicitDatasetNameList.emplace_back( dataset.getName() );
-      }
-    }
-    LogInfo << "Sample \"" << sample.getName() << "\" will be loaded from datasets: "
-    << GenericToolbox::parseVectorAsString(explicitDatasetNameList) << std::endl;
-    sample.setEnabledDatasetList( explicitDatasetNameList );
+    auto associatedParSet = GenericToolbox::Json::fetchValue<std::string>(sample.getConfig(), "parameterSetName");
+
+    // Looking for parSet
+    auto foundDialCollection = std::find_if(
+        propagator.getDialCollections().begin(), propagator.getDialCollections().end(),
+        [&](const DialCollection& dialCollection_){
+          auto* parSetPtr{dialCollection_.getSupervisedParameterSet()};
+          if( parSetPtr == nullptr ){ return false; }
+          return ( parSetPtr->getName() == associatedParSet );
+    });
+    LogThrowIf(
+        foundDialCollection == propagator.getDialCollections().end(),
+        "Could not find " << associatedParSet << " among fit dial collections: "
+        << GenericToolbox::iterableToString(propagator.getDialCollections(), [](const DialCollection& dialCollection_){
+          return dialCollection_.getTitle();
+        }
+    ));
+
+    LogThrowIf(foundDialCollection->getDialBinSet().isEmpty(), "Could not find binning");
+    sample.setBinningFilePath( foundDialCollection->getDialBinSet().getFilePath() );
   }
 
-  if( GenericToolbox::Json::doKeyExist(configXsecExtractor, "signalDatasets") ){
-    LogWarning << "Defining additional datasets for signals..." << std::endl;
-    auto signalDatasetList = GenericToolbox::Json::fetchValue<std::vector<nlohmann::json>>(configXsecExtractor, "signalDatasets");
-
-    // WARNING THIS CHANGES THE SIZE OF THE VECTOR:
-    propagator.getDataSetList().reserve(propagator.getDataSetList().size() + signalDatasetList.size() );
-
-    // So DatasetLoaders get moved in memory so the _owner_ reference within the DataDispenser are pointing to garbage in memory
-    // We need to update this reference.
-    for( auto& dataset : propagator.getDataSetList() ){ dataset.updateDispenserOwnership(); }
-
-    for( auto& signalDatasetConfig : signalDatasetList ){
-      propagator.getDataSetList().emplace_back(signalDatasetConfig, propagator.getDataSetList().size());
-    }
-  }
-
-  // Add template sample
-  auto signalDefinitions = GenericToolbox::Json::fetchValue<std::vector<nlohmann::json>>(configXsecExtractor, "signalDefinitions");
-  LogInfo << "Adding 2 x " << signalDefinitions.size() << " signal samples (true + reconstructed) to the propagator..." << std::endl;
-  std::vector<std::pair<FitSample*, FitSample*>> signalSampleList;
-  propagator.getFitSampleSet().getFitSampleList().reserve(
-      propagator.getFitSampleSet().getFitSampleList().size() + signalDefinitions.size() * 2
-  );
-
-  LogInfo << "Defining sample for signal definitions..." << std::endl;
-  for( auto& signalDef : signalDefinitions ){
-
-    auto parameterSetName = GenericToolbox::Json::fetchValue<std::string>(signalDef, "parameterSetName");
-    LogInfo << "Adding signal samples: \"" << parameterSetName << "\"" << std::endl;
-
-    signalSampleList.emplace_back();
-    propagator.getFitSampleSet().getFitSampleList().emplace_back();
-
-    signalSampleList.back().first = &propagator.getFitSampleSet().getFitSampleList().back();
-    signalSampleList.back().first->readConfig(); // read empty config
-    signalSampleList.back().first->setName( parameterSetName );
-
-    auto templateBinningFilePath = GenericToolbox::Json::fetchValue<std::string>(
-        propagator.getFitParameterSetPtr(parameterSetName )->getDialSetDefinitions()[0], "parametersBinningPath"
-    );
-    auto applyOnCondition = GenericToolbox::Json::fetchValue<std::string>(
-        propagator.getFitParameterSetPtr(parameterSetName )->getDialSetDefinitions()[0], "applyCondition"
-    );
-
-    signalSampleList.back().first->setBinningFilePath( templateBinningFilePath );
-    signalSampleList.back().first->setVarSelectionFormulaStr( applyOnCondition );
-
-    if( GenericToolbox::Json::doKeyExist(signalDef, "datasetSources") ){
-      auto datasetSrcList = GenericToolbox::Json::fetchValue<std::vector<std::string>>(signalDef, "datasetSources");
-      LogInfo << "Signal sample \"" << parameterSetName << "\" (truth) will load data from datasets: "
-      << GenericToolbox::parseVectorAsString( datasetSrcList ) << std::endl;
-      signalSampleList.back().first->setEnabledDatasetList( datasetSrcList );
-    }
-
-
-    // Add template sample which will take care of the detection efficiency
-    // Same as templateSample but will need to make sure events belong to any of the fit sample
-    // Don't fill the events yet -> add a dummy cut
-    propagator.getFitSampleSet().getFitSampleList().emplace_back(*signalSampleList.back().first );
-    signalSampleList.back().second = &propagator.getFitSampleSet().getFitSampleList().back();
-    signalSampleList.back().second->setName( parameterSetName + " (Reconstructed)" );
-    signalSampleList.back().second->setSelectionCutStr("0"); // dummy cut to select no event during the data loading
-
-
-    // Events in templateSampleDetected will be loaded using the original fit samples
-    // To identify the right template bin for each detected event, one need to make sure the variables are kept in memory
-    DataBinSet templateBinning;
-    templateBinning.readBinningDefinition( templateBinningFilePath );
-    for( auto& varStorageList : templateBinning.getBinVariables() ){
-      if( not GenericToolbox::doesElementIsInVector(varStorageList, propagator.getFitSampleSet().getAdditionalVariablesForStorage()) ){
-        propagator.getFitSampleSet().getAdditionalVariablesForStorage().emplace_back(varStorageList);
-      }
-    }
-  }
-
-  // Get best fit parameter values and postfit covariance matrix
-  LogInfo << "Injecting post-fit values of fitted parameters..." << std::endl;
-  auto* postFitDir = fitFile->Get<TDirectory>("FitterEngine/postFit/Hesse/errors");
-  LogThrowIf(postFitDir == nullptr, "Could not find FitterEngine/postFit/Hesse/errors");
-  for( auto& parSet : propagator.getParameterSetsList() ){
-    if( not parSet.isEnabled() ) continue;
-    auto* postFitParHist = postFitDir->Get<TH1D>(Form("%s/values/postFitErrors_TH1D", parSet.getName().c_str()));
-    LogThrowIf( postFitParHist == nullptr, " Could not find " << Form("%s/values/postFitErrors_TH1D", parSet.getName().c_str()));
-    LogThrowIf(parSet.getNbParameters() != postFitParHist->GetNbinsX(),
-               "Expecting " << parSet.getNbParameters() << " postfit parameter values, but got: " << postFitParHist->GetNbinsX());
-    for( auto& par : parSet.getParameterList() ){
-      par.setPriorValue( postFitParHist->GetBinContent( 1+par.getParameterIndex() ) );
-    }
-  }
-
-  LogInfo << "Using post-fit covariance matrix as the global covariance matrix for the Propagator..." << std::endl;
-  auto* postFitCovMat = fitFile->Get<TH2D>("FitterEngine/postFit/Hesse/hessian/postfitCovarianceOriginal_TH2D");
-  LogThrowIf(postFitCovMat == nullptr, "Could not find postfit cov matrix");
-  propagator.setGlobalCovarianceMatrix(std::make_shared<TMatrixD>(postFitCovMat->GetNbinsX(), postFitCovMat->GetNbinsX()));
-  for( int iBin = 0 ; iBin < postFitCovMat->GetNbinsX() ; iBin++ ){
-    for( int jBin = 0 ; jBin < postFitCovMat->GetNbinsX() ; jBin++ ){
-      (*propagator.getGlobalCovarianceMatrix())[iBin][jBin] = postFitCovMat->GetBinContent(1 + iBin, 1 + jBin);
-    }
-  }
-
-  // load the data
+  // Load everything
   propagator.initialize();
 
-  LogWarning << std::endl << GenericToolbox::addUpDownBars("Propagator initialized. Now filling selected events...") << std::endl;
 
-  LogInfo << "Filling selected true signal events..." << std::endl;
-
-  for( auto& signalSamplePair : signalSampleList ){
-    // reserving events for templateSampleDetected by the maximum size it could be
-    signalSamplePair.second->getMcContainer().reserveEventMemory(
-        0,
-        signalSamplePair.first->getMcContainer().eventList.size(),
-        signalSamplePair.first->getMcContainer().eventList[0]
-    );
-    int iTemplateEvt{0};
-
-    auto isInTemplateBin = [&](const PhysicsEvent& ev_, const DataBin& b_){
-      for( size_t iVar = 0 ; iVar < b_.getVariableNameList().size() ; iVar++ ){
-        if( not b_.isBetweenEdges(iVar, ev_.getVarAsDouble(b_.getVariableNameList()[iVar])) ){
-          return false;
-        }
-      } // Var
-      return true;
+  // Creating output file
+  std::string outFilePath{};
+  if( clParser.isOptionTriggered("outputFile") ){ outFilePath = clParser.getOptionVal<std::string>("outputFile"); }
+  else{
+    // appendixDict["optionName"] = "Appendix"
+    // this list insure all appendices will appear in the same order
+    std::vector<std::pair<std::string, std::string>> appendixDict{
+        {"configFile", "%s"},
+        {"fitterOutputFile", "Fit_%s"},
+        {"nToys", "nToys_%s"},
+        {"randomSeed", "Seed_%s"},
     };
 
-
-    for( int iFitSample = 0 ; iFitSample < nFitSample ; iFitSample++ ){
-      for( auto& event : propagator.getFitSampleSet().getFitSampleList()[iFitSample].getMcContainer().eventList ){
-        for( size_t iBin = 0 ; iBin < signalSamplePair.first->getBinning().getBinsList().size() ; iBin++ ){
-          if( isInTemplateBin(event, signalSamplePair.first->getBinning().getBinsList()[iBin]) ){
-            // copy event in template bin
-            signalSamplePair.second->getMcContainer().eventList[iTemplateEvt++] = event;
-            signalSamplePair.second->getMcContainer().eventList[iTemplateEvt-1].setSampleBinIndex(int(iBin));
-            break;
-          }
-        } // template bins
-      } // sample event
-    } // sample loop
-    signalSamplePair.second->getMcContainer().shrinkEventList(iTemplateEvt);
-
-
-    // copying to data container..
-    signalSamplePair.second->getDataContainer().eventList.insert(
-        std::end(signalSamplePair.second->getDataContainer().eventList),
-        std::begin(signalSamplePair.second->getMcContainer().eventList),
-        std::end(signalSamplePair.second->getMcContainer().eventList)
-    );
+    outFilePath = "xsecCalc_" + GundamUtils::generateFileName(clParser, appendixDict) + ".root";
   }
+  auto outFile = std::unique_ptr<TFile>( TFile::Open( outFilePath.c_str(), "RECREATE" ) );
 
-  LogInfo << "Updating sample bin cache for signal sample (reconstructed)..." << std::endl;
-  propagator.getFitSampleSet().updateSampleBinEventList();
-  propagator.getFitSampleSet().updateSampleHistograms();
-
-  for( auto& signalSamplePair : signalSampleList ) {
-    signalSamplePair.second->getDataContainer().isLocked = true;
-  }
-
-  propagator.propagateParametersOnSamples();
-
-  // redefine histograms for the plot generator
-  propagator.getPlotGenerator().defineHistogramHolders();
-
-  for(size_t iSample = nFitSample ; iSample < propagator.getFitSampleSet().getFitSampleList().size() ; iSample++ ){
-    auto* sample = &propagator.getFitSampleSet().getFitSampleList()[iSample];
-    propagator.getTreeWriter().writeEvents(GenericToolbox::mkdirTFile(out, "XsecExtractor/postFit/events/" + sample->getName()), "MC", sample->getMcContainer().eventList);
-  }
+  GenericToolbox::writeInTFile(
+      GenericToolbox::mkdirTFile(outFile.get(), "gundamCalcXsec"),
+      TNamed("gundamVersion", GundamUtils::getVersionFullStr().c_str())
+  );
+  GenericToolbox::writeInTFile(
+      GenericToolbox::mkdirTFile(outFile.get(), "gundamCalcXsec"),
+      TNamed("commandLine", clParser.getCommandLineString().c_str())
+  );
 
   LogInfo << "Generating loaded sample plots..." << std::endl;
-  propagator.getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(out, "XsecExtractor/postFit/samples"));
+  propagator.getPlotGenerator().generateSamplePlots(
+    GenericToolbox::mkdirTFile(outFile.get(), "XsecExtractor/postFit/samples")
+  );
 
   LogInfo << "Creating throws tree" << std::endl;
   auto* signalThrowTree = new TTree("signalThrowTree", "signalThrowTree");
-  std::vector<GenericToolbox::RawDataArray> signalThrowData{signalSampleList.size()};
-  std::vector<std::vector<double>> bufferList{signalSampleList.size()};
-  for( size_t iSignal = 0 ; iSignal < signalSampleList.size() ; iSignal++ ){
+  std::vector<GenericToolbox::RawDataArray> signalThrowData{propagator.getFitSampleSet().getFitSampleList().size()};
+  std::vector<std::vector<double>> bufferList{propagator.getFitSampleSet().getFitSampleList().size()};
+  for( size_t iSignal = 0 ; iSignal < propagator.getFitSampleSet().getFitSampleList().size() ; iSignal++ ){
 
-    int nBins = signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX();
+    int nBins = propagator.getFitSampleSet().getFitSampleList()[iSignal].getMcContainer().histogram->GetNbinsX();
     bufferList[iSignal].resize(nBins, 0);
 
     signalThrowData[iSignal].resetCurrentByteOffset();
@@ -355,21 +238,27 @@ int main(int argc, char** argv){
 
     signalThrowData[iSignal].lockArraySize();
     signalThrowTree->Branch(
-        GenericToolbox::generateCleanBranchName(signalSampleList[iSignal].first->getName()).c_str(),
+        GenericToolbox::generateCleanBranchName(propagator.getFitSampleSet().getFitSampleList()[iSignal].getName()).c_str(),
         &signalThrowData[iSignal].getRawDataArray()[0],
         GenericToolbox::joinVectorString(leafNameList, ":").c_str()
     );
   }
 
-  std::vector<double> numberOfTargets(signalSampleList.size());
-  std::vector<double> integratedFlux(signalSampleList.size());
-  for( size_t iSignal = 0 ; iSignal < signalSampleList.size() ; iSignal++ ){
-    numberOfTargets[iSignal] = GenericToolbox::Json::fetchValue<double>(signalDefinitions[iSignal], "numberOfTargets", 1);
-    integratedFlux[iSignal] = GenericToolbox::Json::fetchValue<double>(signalDefinitions[iSignal], "integratedFlux", 1);
+  std::vector<double> numberOfTargets(signalThrowData.size());
+  std::vector<double> integratedFlux(signalThrowData.size());
+  for( size_t iSignal = 0 ; iSignal < signalThrowData.size() ; iSignal++ ){
+    numberOfTargets[iSignal] = GenericToolbox::Json::fetchValue<double>(propagator.getFitSampleSet().getFitSampleList()[iSignal].getConfig(), "numberOfTargets", 1);
+    integratedFlux[iSignal] = GenericToolbox::Json::fetchValue<double>(propagator.getFitSampleSet().getFitSampleList()[iSignal].getConfig(), "integratedFlux", 1);
   }
 
   int nToys{100};
   if(clParser.isOptionTriggered("nToys")) nToys = clParser.getOptionVal<int>("nToys");
+
+  bool enableEventMcThrow{true};
+  bool enableStatThrowInToys{true};
+  auto xsecCalcConfig = GenericToolbox::Json::fetchValue( cHandler.getConfig(), "xsecCalcConfig", nlohmann::json() );
+  enableStatThrowInToys = GenericToolbox::Json::fetchValue( xsecCalcConfig, "enableStatThrowInToys", enableStatThrowInToys);
+  enableEventMcThrow = GenericToolbox::Json::fetchValue( xsecCalcConfig, "enableEventMcThrow", enableEventMcThrow);
 
   std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating " << nToys << " toys...";
   for( int iToy = 0 ; iToy < nToys ; iToy++ ){
@@ -397,14 +286,11 @@ int main(int argc, char** argv){
 
 
     // Write N_i / efficiency / T / phi
-    for( size_t iSignal = 0 ; iSignal < signalSampleList.size() ; iSignal++ ){
+    for( size_t iSignal = 0 ; iSignal < propagator.getFitSampleSet().getFitSampleList().size() ; iSignal++ ){
       signalThrowData[iSignal].resetCurrentByteOffset();
-      for( int iBin = 0 ; iBin < signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-        LogDebug(iBin == 0) << std::endl << iBin << " -> " << signalSampleList[iSignal].first->getMcContainer().histogram->GetBinContent(1+iBin)
-//                    / numberOfTargets[iSignal] / integratedFlux[iSignal]
-                    << std::endl;
+      for( int iBin = 0 ; iBin < propagator.getFitSampleSet().getFitSampleList()[iSignal].getMcContainer().histogram->GetNbinsX() ; iBin++ ){
         signalThrowData[iSignal].writeRawData(
-            signalSampleList[iSignal].first->getMcContainer().histogram->GetBinContent(1+iBin)
+            propagator.getFitSampleSet().getFitSampleList()[iSignal].getMcContainer().histogram->GetBinContent(1+iBin)
             / numberOfTargets[iSignal] / integratedFlux[iSignal]
         );
       }
@@ -414,7 +300,7 @@ int main(int argc, char** argv){
     signalThrowTree->Fill();
   }
 
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "XsecExtractor/throws"), signalThrowTree, "signalThrow");
+  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outFile.get(), "XsecExtractor/throws"), signalThrowTree, "signalThrow");
   auto* meanValuesVector = GenericToolbox::generateMeanVectorOfTree(signalThrowTree);
   auto* globalCovMatrix = GenericToolbox::generateCovarianceMatrixOfTree(signalThrowTree);
 
@@ -422,33 +308,33 @@ int main(int argc, char** argv){
   auto* globalCorMatrixHist = GenericToolbox::convertTMatrixDtoTH2D(GenericToolbox::convertToCorrelationMatrix(globalCovMatrix));
 
   std::vector<TH1D> binValues{};
-  binValues.reserve( signalSampleList.size() );
+  binValues.reserve( propagator.getFitSampleSet().getFitSampleList().size() );
   int iGlobal{-1};
-  for( size_t iSignal = 0 ; iSignal < signalSampleList.size() ; iSignal++ ){
+  for( size_t iSignal = 0 ; iSignal < propagator.getFitSampleSet().getFitSampleList().size() ; iSignal++ ){
     binValues.emplace_back(
-      signalSampleList[iSignal].first->getName().c_str(),
-      signalSampleList[iSignal].first->getName().c_str(),
-      signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX(),
+        propagator.getFitSampleSet().getFitSampleList()[iSignal].getName().c_str(),
+        propagator.getFitSampleSet().getFitSampleList()[iSignal].getName().c_str(),
+        propagator.getFitSampleSet().getFitSampleList()[iSignal].getMcContainer().histogram->GetNbinsX(),
       0,
-      signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX()
+        propagator.getFitSampleSet().getFitSampleList()[iSignal].getMcContainer().histogram->GetNbinsX()
     );
 
-    std::string sampleTitle{ signalSampleList[iSignal].first->getName() };
+    std::string sampleTitle{ propagator.getFitSampleSet().getFitSampleList()[iSignal].getName() };
 
-    for( int iBin = 0 ; iBin < signalSampleList[iSignal].first->getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+    for( int iBin = 0 ; iBin < propagator.getFitSampleSet().getFitSampleList()[iSignal].getMcContainer().histogram->GetNbinsX() ; iBin++ ){
       iGlobal++;
 
-      std::string binTitle = signalSampleList[iSignal].first->getBinning().getBinsList()[iBin].getSummary();
-      double binVolume = signalSampleList[iSignal].first->getBinning().getBinsList()[iBin].getVolume();
+      std::string binTitle = propagator.getFitSampleSet().getFitSampleList()[iSignal].getBinning().getBinsList()[iBin].getSummary();
+      double binVolume = propagator.getFitSampleSet().getFitSampleList()[iSignal].getBinning().getBinsList()[iBin].getVolume();
 
       binValues[iSignal].SetBinContent(1+iBin, (*meanValuesVector)[iGlobal] / binVolume  );
       binValues[iSignal].SetBinError(1+iBin, TMath::Sqrt( (*globalCovMatrix)[iGlobal][iGlobal] ) / binVolume );
       binValues[iSignal].GetXaxis()->SetBinLabel( 1+iBin, binTitle.c_str() );
 
-      globalCovMatrixHist->GetXaxis()->SetBinLabel(1+iGlobal, (sampleTitle + "/" + binTitle).c_str());
-      globalCorMatrixHist->GetXaxis()->SetBinLabel(1+iGlobal, (sampleTitle + "/" + binTitle).c_str());
-      globalCovMatrixHist->GetYaxis()->SetBinLabel(1+iGlobal, (sampleTitle + "/" + binTitle).c_str());
-      globalCorMatrixHist->GetYaxis()->SetBinLabel(1+iGlobal, (sampleTitle + "/" + binTitle).c_str());
+      globalCovMatrixHist->GetXaxis()->SetBinLabel(1+iGlobal, GenericToolbox::joinPath(sampleTitle, binTitle).c_str());
+      globalCorMatrixHist->GetXaxis()->SetBinLabel(1+iGlobal, GenericToolbox::joinPath(sampleTitle, binTitle).c_str());
+      globalCovMatrixHist->GetYaxis()->SetBinLabel(1+iGlobal, GenericToolbox::joinPath(sampleTitle, binTitle).c_str());
+      globalCorMatrixHist->GetYaxis()->SetBinLabel(1+iGlobal, GenericToolbox::joinPath(sampleTitle, binTitle).c_str());
     }
 
     binValues[iSignal].SetMarkerStyle(kFullDotLarge);
@@ -462,24 +348,24 @@ int main(int argc, char** argv){
     binValues[iSignal].GetYaxis()->SetTitle("#delta#sigma");
 
     GenericToolbox::writeInTFile(
-        GenericToolbox::mkdirTFile(out, "XsecExtractor/histograms"),
+        GenericToolbox::mkdirTFile(outFile.get(), "XsecExtractor/histograms"),
         &binValues[iSignal],
-        GenericToolbox::generateCleanBranchName(signalSampleList[iSignal].first->getName())
+        GenericToolbox::generateCleanBranchName(propagator.getFitSampleSet().getFitSampleList()[iSignal].getName())
     );
   }
 
 
   globalCovMatrixHist->GetXaxis()->SetLabelSize(0.02);
   globalCovMatrixHist->GetYaxis()->SetLabelSize(0.02);
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "XsecExtractor/matrices"), globalCovMatrixHist, "covarianceMatrix");
+  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outFile.get(), "XsecExtractor/matrices"), globalCovMatrixHist, "covarianceMatrix");
 
   globalCorMatrixHist->GetXaxis()->SetLabelSize(0.02);
   globalCorMatrixHist->GetYaxis()->SetLabelSize(0.02);
   globalCorMatrixHist->GetZaxis()->SetRangeUser(-1, 1);
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "XsecExtractor/matrices"), globalCorMatrixHist, "correlationMatrix");
+  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outFile.get(), "XsecExtractor/matrices"), globalCorMatrixHist, "correlationMatrix");
 
-  LogWarning << "Closing output file \"" << out->GetName() << "\"..." << std::endl;
-  out->Close();
+  LogWarning << "Closing output file \"" << outFile->GetName() << "\"..." << std::endl;
+  outFile->Close();
   LogInfo << "Closed." << std::endl;
 
   // --------------------------

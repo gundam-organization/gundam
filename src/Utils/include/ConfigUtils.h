@@ -28,10 +28,11 @@ namespace ConfigUtils {
 
 
   class ConfigHandler{
-    nlohmann::json config;
+    nlohmann::json config{};
 
   public:
     explicit ConfigHandler(const std::string& filePath_);
+    explicit ConfigHandler(const nlohmann::json& config_);
 
     // const-getters
     [[nodiscard]] std::string toString() const;
@@ -40,6 +41,8 @@ namespace ConfigUtils {
     // non-const getters
     nlohmann::json &getConfig();
 
+
+    // config actions
     void override( const std::string& filePath_ );
     void override( const std::vector<std::string>& filesList_ );
 

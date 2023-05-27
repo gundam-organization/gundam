@@ -5,7 +5,14 @@
 #include "GundamUtils.h"
 #include "VersionConfig.h" // the only place it is included
 
+#include "Logger.h"
+#include "GenericToolbox.h"
+
 #include <sstream>
+
+LoggerInit([]{
+  Logger::getUserHeader() << "[" << FILENAME << "]";
+});
 
 
 namespace GundamUtils {
@@ -60,5 +67,9 @@ namespace GundamUtils {
 
     return GenericToolbox::joinVectorString(appendixList, "_");
   }
+
+  bool ObjectReader::quiet{false};
+  bool ObjectReader::throwIfNotFound{false};
+  bool ObjectReader::readObject( TDirectory* f_, const std::string& objPath_){ return readObject<TObject>(f_, objPath_); }
 
 }

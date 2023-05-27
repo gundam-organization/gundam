@@ -47,6 +47,8 @@ public:
   [[nodiscard]] const std::vector<DatasetLoader> &getDataSetList() const;
   [[nodiscard]] const std::vector<FitParameterSet> &getParameterSetsList() const;
 
+  const std::vector<DialCollection> &getDialCollections() const;
+
   // Non-const getters
   std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix();
   FitSampleSet &getFitSampleSet();

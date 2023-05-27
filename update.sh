@@ -43,8 +43,8 @@ do
     exit 0;
   elif [ $arg == "--head" ]; then
     echo "Checking out main branch..."
-    git pull origin main # updates repo
     git checkout main && git submodule update --init --remote
+    git pull origin main # updates repo
     exit 0;
   fi
 done

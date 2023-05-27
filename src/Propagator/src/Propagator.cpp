@@ -615,6 +615,9 @@ const std::vector<DatasetLoader> &Propagator::getDataSetList() const {
 const std::vector<FitParameterSet> &Propagator::getParameterSetsList() const {
   return _parameterSetList_;
 }
+const std::vector<DialCollection> &Propagator::getDialCollections() const {
+  return _dialCollections_;
+}
 
 FitSampleSet &Propagator::getFitSampleSet() {
   return _fitSampleSet_;
