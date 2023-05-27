@@ -28,7 +28,13 @@ do
     shift
     if [[ -n $1 ]]; then
       echo "Updating to branch: $1"
-      git checkout $1 && git submodule update --init --remote
+      git checkout $1
+      if [[ "$1" == "remotes/origin/"* ]]; then
+        # in case of remotes, checkout will be pointing at a commit hash without being attached to a branch.
+        # Need to checkout the real branch name now:
+        git checkout "${1#"remotes/origin/"}"
+      fi
+      git submodule update --init --remote
     else
       echo "You should provide a version after -b"
     fi
