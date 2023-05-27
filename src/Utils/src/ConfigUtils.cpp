@@ -146,6 +146,13 @@ namespace ConfigUtils {
         // entry is list
         LogThrowIf( not outEntry_.is_array(), GenericToolbox::joinPath( jsonPath ) << " is not an array: " << std::endl << outEntry_ << std::endl << std::endl << overrideEntry_ );
 
+        // is it empty? -> erase
+        if( overrideEntry_.empty() ){
+          LogWarning << "Overriding list: " << GenericToolbox::joinPath(jsonPath) << std::endl;
+          outEntry_ = overrideEntry_;
+          return;
+        }
+
         // is it an array of primitive type? like std::vector<std::string>?
         bool isStructured{false};
         for( auto& outListEntry : outEntry_.items() ){ if( outListEntry.value().is_structured() ){ isStructured = true; break; } }
@@ -286,10 +293,7 @@ namespace ConfigUtils {
     }
 
   }
-
-  void ConfigHandler::setConfig( const nlohmann::json& config_ ){
-    config = config_;
-  }
+  ConfigHandler::ConfigHandler(const nlohmann::json& config_) : config(config_) {}
 
   std::string ConfigHandler::toString() const{
     return GenericToolbox::Json::toReadableString( config );

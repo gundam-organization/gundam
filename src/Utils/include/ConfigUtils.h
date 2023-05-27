@@ -31,11 +31,8 @@ namespace ConfigUtils {
     nlohmann::json config{};
 
   public:
-    ConfigHandler() = default;
     explicit ConfigHandler(const std::string& filePath_);
-
-    // setters
-    void setConfig( const nlohmann::json& config_ );
+    explicit ConfigHandler(const nlohmann::json& config_);
 
     // const-getters
     [[nodiscard]] std::string toString() const;

@@ -86,21 +86,22 @@ int main(int argc, char** argv){
   using namespace GundamUtils;
   ObjectReader::throwIfNotFound = true;
 
-  ConfigUtils::ConfigHandler cHandler;
+  nlohmann::json fitterConfig;
   ObjectReader::readObject<TNamed>(fitterFile.get(), "gundamFitter/unfoldedConfig_TNamed", [&](TNamed* config_){
-    cHandler.setConfig( GenericToolbox::Json::readConfigJsonStr( config_->GetTitle() ) );
+    fitterConfig = GenericToolbox::Json::readConfigJsonStr( config_->GetTitle() );
   });
+  ConfigUtils::ConfigHandler cHandler{ fitterConfig };
 
   // Disabling defined samples:
   ConfigUtils::applyOverrides(
       cHandler.getConfig(),
-      R"({"fitterEngineConfig":{"propagatorConfig":{"fitSampleSetConfig":{"fitSampleList":[]}}}})"
+      GenericToolbox::Json::readConfigJsonStr(R"({"fitterEngineConfig":{"propagatorConfig":{"fitSampleSetConfig":{"fitSampleList":[]}}}})")
   );
 
   // Disabling defined plots:
   ConfigUtils::applyOverrides(
       cHandler.getConfig(),
-      R"({"fitterEngineConfig":{"propagatorConfig":{"plotGeneratorConfig":{}}}})"
+      GenericToolbox::Json::readConfigJsonStr(R"({"fitterEngineConfig":{"propagatorConfig":{"plotGeneratorConfig":{}}}})")
   );
 
   // Defining signal samples
@@ -143,6 +144,30 @@ int main(int argc, char** argv){
       }
     }
   });
+
+  // Sample binning using parameterSetName
+  for( auto& sample : propagator.getFitSampleSet().getFitSampleList() ){
+    auto associatedParSet = GenericToolbox::Json::fetchValue<std::string>(sample.getConfig(), "parameterSetName");
+
+    // Looking for parSet
+    auto foundDialCollection = std::find_if(
+        propagator.getDialCollections().begin(), propagator.getDialCollections().end(),
+        [&](const DialCollection& dialCollection_){
+          auto* parSetPtr{dialCollection_.getSupervisedParameterSet()};
+          if( parSetPtr == nullptr ){ return false; }
+          return ( parSetPtr->getName() == associatedParSet );
+    });
+    LogThrowIf(
+        foundDialCollection == propagator.getDialCollections().end(),
+        "Could not find " << associatedParSet << " among fit dial collections: "
+        << GenericToolbox::iterableToString(propagator.getDialCollections(), [](const DialCollection& dialCollection_){
+          return dialCollection_.getTitle();
+        }
+    ));
+
+    LogThrowIf(foundDialCollection->getDialBinSet().isEmpty(), "Could not find binning");
+    sample.setBinningFilePath( foundDialCollection->getDialBinSet().getFilePath() );
+  }
 
   // Load everything
   propagator.initialize();

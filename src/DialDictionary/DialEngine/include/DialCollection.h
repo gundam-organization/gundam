@@ -35,33 +35,42 @@ public:
   typedef std::shared_ptr<DialBase> DialBaseObject;
   // typedef GenericToolbox::PolymorphicObjectWrapper<DialBase> DialBaseObject;
 
+  // setters
   void setIndex(int index);
   void setSupervisedParameterIndex(int supervisedParameterIndex);
   void setSupervisedParameterSetIndex(int supervisedParameterSetIndex);
 
+  // const getters
   [[nodiscard]] bool isBinned() const;
   [[nodiscard]] bool isEnabled() const;
+  [[nodiscard]] bool useCachedDials() const;
   [[nodiscard]] bool isAllowDialExtrapolation() const;
   [[nodiscard]] int getIndex() const{ return _index_; }
   [[nodiscard]] const std::string &getGlobalDialLeafName() const;
   [[nodiscard]] const std::string &getGlobalDialType() const;
   [[nodiscard]] const std::string &getGlobalDialSubType() const;
-  [[nodiscard]] const std::shared_ptr<TFormula> &getApplyConditionFormula() const;
   [[nodiscard]] const DataBinSet &getDialBinSet() const;
-  const std::vector<std::string> &getDataSetNameList() const;
+  [[nodiscard]] const std::vector<std::string> &getDataSetNameList() const;
+  [[nodiscard]] const std::shared_ptr<TFormula> &getApplyConditionFormula() const;
+
+  // non-const getters
+  DataBinSet &getDialBinSet();
   std::vector<DialBaseObject> &getDialBaseList();
   std::vector<DialInterface> &getDialInterfaceList();
-  DataBinSet &getDialBinSet();
 
-  std::string getTitle();
-  std::string getSummary(bool shallow_ = true);
-  [[nodiscard]] bool useCachedDials() const;
+  // non-trivial getters
   [[nodiscard]] bool isDatasetValid(const std::string& datasetName_) const;
-  size_t getNextDialFreeSlot();
+  std::string getTitle() const;
+  std::string getSummary(bool shallow_ = true);
+  FitParameter* getSupervisedParameter() const;
+  FitParameterSet* getSupervisedParameterSet() const;
+
+  // core
+  void clear();
   void resizeContainers();
   void setupDialInterfaceReferences();
   void updateInputBuffers();
-  void clear();
+  size_t getNextDialFreeSlot();
 
 
 protected:
