@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
   int argcInterpreter = int( cstrings.size() );
   char** argvInterpreter{ cstrings.data() };
 
-  LogInfo << "gundamRoot build against: " << GundamUtils::getVersionFullStr() << std::endl;
+  LogInfo << "GUNDAM v" << GundamUtils::getVersionFullStr() << " / ROOT v" << ROOT_RELEASE << std::endl;
   LogInfo << "Creating ROOT interpreter..." << std::endl;
   auto *theApp = new TRint(
       "Rint"
