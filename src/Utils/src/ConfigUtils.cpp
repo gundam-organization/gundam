@@ -54,8 +54,7 @@ namespace ConfigUtils {
     };
     auto is_numeric = [](const std::string& str){
       auto result = double();
-      std::string inStr{str};
-      auto i = std::istringstream(std::move(inStr));
+      auto i = std::istringstream(str);
       i >> result;
       return !i.fail() && i.eof();
     };
