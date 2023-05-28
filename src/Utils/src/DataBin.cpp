@@ -95,7 +95,7 @@ bool DataBin::isInBin(const std::vector<double>& valuesList_) const{
   const double* buf = &valuesList_[0];
 
   // is "all_of" the variables between defined edges
-  return std::all_of(_edgesList_.begin(), _edgesList_.end(), [&](auto& edge){ return (DataBin::isBetweenEdges(edge, *(buf++))); });
+  return std::all_of(_edgesList_.begin(), _edgesList_.end(), [&](const std::pair<double, double>& edge){ return (DataBin::isBetweenEdges(edge, *(buf++))); });
 }
 bool DataBin::isBetweenEdges(const std::string& variableName_, double value_) const {
   if( not this->isVariableSet(variableName_) ){
