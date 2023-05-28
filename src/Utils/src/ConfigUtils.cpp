@@ -52,9 +52,9 @@ namespace ConfigUtils {
       return !s.empty() && std::find_if(s.begin(),
                                         s.end(), [](unsigned char c) { return !std::isdigit(c); }) == s.end();
     };
-    auto is_numeric = [](std::string const & str){
+    auto is_numeric = [](const std::string& str){
       auto result = double();
-      auto i = std::istringstream(str);
+      auto i = std::istringstream(std::string(str));
       i >> result;
       return !i.fail() && i.eof();
     };
