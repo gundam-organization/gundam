@@ -11,6 +11,11 @@
 
 #include "nlohmann/json.hpp"
 
+#include <string>
+#include <vector>
+#include <sstream>
+#include <iostream>
+
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[ConfigUtils]");
@@ -49,7 +54,7 @@ namespace ConfigUtils {
       return !s.empty() && std::find_if(s.begin(),
                                         s.end(), [](unsigned char c) { return !std::isdigit(c); }) == s.end();
     };
-    auto is_numeric = [](std::string const & str){
+    auto is_numeric = [](const std::string& str){
       auto result = double();
       auto i = std::istringstream(str);
       i >> result;
