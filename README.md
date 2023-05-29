@@ -42,6 +42,7 @@ and debugging for every project at once.
 - [ROOT 6, compiled with C++14 or later](https://github.com/root-project/root)
 - [JSON for Modern C++](https://github.com/nlohmann/json)
 - [yaml-cpp](https://github.com/jbeder/yaml-cpp)
+- Optional: zlib
 
 ### Shell setup
 
