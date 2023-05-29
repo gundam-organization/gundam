@@ -4,17 +4,20 @@
 
 [![Generic badge](https://img.shields.io/badge/Example_of_inputs-OA2020-GREEN.svg)](https://github.com/nadrino/gundamInputOa2020)  [![GitHub forks](https://badgen.net/github/forks/nadrino/gundam/)](https://github.com/nadrino/gundam/network/members) [![GitHub release](https://img.shields.io/github/release/nadrino/gundam.svg)](https://github.com/nadrino/gundam/releases/)
 
-GUNDAM, for *Generic fitter for Upgraded Near Detector Analysis Methods*, is a suite
-of applications which aims at performing various statistical analysis with different
-purposes and setups. It has been developed as a fork of 
-[xsllhFitter](https://gitlab.com/cuddandr/xsLLhFitter), in the context of the Upgrade
-of ND280 for the T2K neutrino experiment.
+GUNDAM, for *Generic fitter for Upgraded Near Detector Analysis Methods*,
+is a suite of applications which aims at performing various statistical
+analysis with different purposes and setups.
+It has been developed as a fork of 
+[xsllhFitter](https://gitlab.com/cuddandr/xsLLhFitter),
+in the context of the Upgrade of ND280 for the T2K neutrino experiment.
 
-The applications are intended to be fully configurable with a set of YAML/JSON files, as
-the philosophy of this project is to avoid users having to put their hands into the code
-for each study. A lot of time and efforts are usually invested by various working groups
-to debug and optimize pieces of codes which does generic tasks. As GUNDAM is designed for
-maximize flexibility to accommodate various physics works, it allows to share optimizations
+The applications are intended to be fully configurable with a set
+of YAML/JSON files, as the philosophy of this project is to avoid users
+having to put their hands into the code for each study.
+A lot of time and efforts are usually invested by various working
+groups to debug and optimize pieces of codes which does generic tasks.
+As GUNDAM is designed for maximize flexibility to accommodate
+various physics works, it allows to share optimizations
 and debugging for every project at once.
 
 ## Showcase
@@ -28,18 +31,18 @@ and debugging for every project at once.
 
 </details>
 
+![bannerStyle.001.png](resources/images/bannerStyle/bannerStyle.001.png)
 
+### There are several requirements for building the fitter:
 
-## How do I get setup?
-
-### Prerequisites
-
-There are several requirements for building the fitter:
-- GCC 4.8.5+ or Clang 3.3+ (a C++11 enabled compiler)
-- CMake 3.5+
-- [ROOT 6](https://github.com/root-project/root)
+- CMake 3.12+
+- A C++14 enabled compiler
+  - Recommended GCC 8+ ( GCC 5 minumim )
+  - Recommended Clang 9+ ( Clang 3.4 minimum )
+- [ROOT 6, compiled with C++14 or later](https://github.com/root-project/root)
 - [JSON for Modern C++](https://github.com/nlohmann/json)
 - [yaml-cpp](https://github.com/jbeder/yaml-cpp)
+- Optional: zlib
 
 ### Shell setup
 
@@ -74,50 +77,37 @@ mkdir -p $BUILD_DIR
 mkdir -p $REPO_DIR
 ```
 
-### Cloning repository
+
+![bannerStyle.001.png](resources/images/bannerStyle/bannerStyle.002.png)
+
+### Cloning the source code
+
+GUNDAM source code is officially available under the 
+[GUNDAM-organization on GitHub](https://github.com/gundam-organization/gundam).
+To copy the code on your computer or cluster, we recommend to use GIT.
+We assume 
 
 ```bash
 cd $REPO_DIR
-git clone https://github.com/nadrino/gundam.git
-cd $REPO_DIR/gundam
+git clone https://github.com/gundam-organization/gundam.git
+cd gundam
 ```
 
-As a user, it is recommended for you to check out the latest tagged version of this
-repository:
+For GUNDAM users, it is recommended for you to check out the latest
+tagged version of this repository. A simple bash script allows you to
+check out the latest tagged version by tapping:
 
 ```bash
-git checkout $(git describe --tags `git rev-list --tags --max-count=1`)
+./update.sh --latest
 ```
 
-GUNDAM depends on additional libraries which are included as submodules of this git
-project. It is necessary to download those:
+Note that this command will also automatically check out the submodule
+included in the project. Therefore, in order to update your code when
+a new release is available, simply use the same command.
 
-```bash
-git submodule update --init --recursive
-```
 
-### Updating your repository
 
-Pull the latest version on github with the following commands:
-
-```bash
-cd $REPO_DIR/gundam
-git pull
-git checkout $(git describe --tags `git rev-list --tags --max-count=1`)
-git submodule update --init --recursive
-cd -
-```
-
-### Alternative installation procedure
-
-```bash
-cd $REPO_DIR/gundam
-cd cmake
-./gundam-setup.sh
-./gundam-build.sh
-```
-
-this will create the build directory `gundam-${compiler}_${compiler_version}-${compiler_machine}`.
+![bannerStyle.001.png](resources/images/bannerStyle/bannerStyle.003.png)
 
 ### Compiling on macOS:
 
@@ -139,15 +129,41 @@ this will create the build directory `gundam-${compiler}_${compiler_version}-${c
 [![](./resources/guides/images/lxplusLogo.png)](./resources/guides/.md)
 
 
+### Alternative installation procedure
+
+```bash
+cd $REPO_DIR/gundam
+cd cmake
+./gundam-setup.sh
+./gundam-build.sh
+```
+
+this will create the build directory `gundam-${compiler}_${compiler_version}-${compiler_machine}`.
 
 
-### Input documentation
+## How do I use GUNDAM?
+
+![bannerStyle.001.png](resources/images/bannerStyle/bannerStyle.004.png)
 
 [gundamFitter options](./documentation/applications/gundamFitter.md)
 
+
 ## I want to contribute!
 
-## Lineage
+![bannerStyle.001.png](resources/images/bannerStyle/bannerStyle.005.png)
+
+### Development policy
+
+- Main development of the code should take place in the main branch.
+- Code developments must be discussed with the group before they happen.
+- Developments should happen in a feature brach with a name descriptive of the feature you are developing.
+- Commit messages must be detailed. This means that messages like "Minor fix" or "Update" must be avoided.
+- Pull requests and merge request do not need to be merged by an admin but all the CI tests must be successfull before merging.
+- Avoid pull request for a single commit.
+- Forks are allowed and the usage of the forked code is regulated by the code license.
+- Share of the code is regulated by the code license.
+
+## Lineage & Legacy
 
 GUNDAM was born as a fork of the *xsllhFitter* project which was developped and used by
 the cross-section working group of T2K. The original project can be found on *gitlab*:
@@ -159,13 +175,4 @@ ND280 Detectors* will be performed.
 
 ![](./resources/images/ride.png)
 
-### Development policy 
 
-- Main development of the code should take place in the main branch.
-- Code developments must be discussed with the group before they happen.
-- Developments should happen in a feature brach with a name descriptive of the feature you are developing. 
-- Commit messages must be detailed. This means that messages like "Minor fix" or "Update" must be avoided.
-- Pull requests and merge request do not need to be merged by an admin but all the CI tests must be successfull before merging.
-- Avoid pull request for a single commit. 
-- Forks are allowed and the usage of the forked code is regulated by the code license. 
-- Share of the code is regulated by the code license. 
