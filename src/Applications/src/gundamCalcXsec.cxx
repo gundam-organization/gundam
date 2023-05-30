@@ -315,7 +315,7 @@ int main(int argc, char** argv){
         propagator.getFitSampleSet().getFitSampleList()[iSignal].getName().c_str(),
         propagator.getFitSampleSet().getFitSampleList()[iSignal].getName().c_str(),
         propagator.getFitSampleSet().getFitSampleList()[iSignal].getMcContainer().histogram->GetNbinsX(),
-      0,
+        0,
         propagator.getFitSampleSet().getFitSampleList()[iSignal].getMcContainer().histogram->GetNbinsX()
     );
 
