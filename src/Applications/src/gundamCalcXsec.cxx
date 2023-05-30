@@ -208,7 +208,7 @@ int main(int argc, char** argv){
 
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile(outFile.get(), "gundam"),
-      TNamed("gundamVersion", GundamUtils::getVersionFullStr().c_str())
+      TNamed("version", GundamUtils::getVersionFullStr().c_str())
   );
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile(outFile.get(), "gundam"),

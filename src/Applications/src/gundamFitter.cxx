@@ -227,7 +227,7 @@ int main(int argc, char** argv){
   TFile* out = TFile::Open(outFileName.c_str(), "RECREATE");
 
   // Gundam version?
-  TNamed gundamVersionString("gundamVersion", GundamUtils::getVersionFullStr().c_str());
+  TNamed gundamVersionString("version", GundamUtils::getVersionFullStr().c_str());
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundam"), &gundamVersionString);
 
   // Command line?

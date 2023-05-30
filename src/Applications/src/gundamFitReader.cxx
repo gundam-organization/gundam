@@ -106,7 +106,7 @@ int main(int argc, char** argv){
     GundamUtils::ObjectReader::readObject<TNamed>(f.get(), GenericToolbox::joinPath(gundamDirName, "commandLine_TNamed"), [](TNamed* obj_){
       LogInfo << blueLightText << "Cmd line: " << resetColor << obj_->GetTitle() << std::endl;
     });
-    GundamUtils::ObjectReader::readObject<TNamed>(f.get(), GenericToolbox::joinPath(gundamDirName, "gundamVersion_TNamed"), [](TNamed* obj_){
+    GundamUtils::ObjectReader::readObject<TNamed>(f.get(), GenericToolbox::joinPath(gundamDirName, "version_TNamed"), [](TNamed* obj_){
       LogInfo << blueLightText << "Ran with GUNDAM version: " << resetColor << obj_->GetTitle() << std::endl;
     });
     GundamUtils::ObjectReader::readObject<TNamed>(
