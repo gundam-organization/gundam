@@ -12,7 +12,9 @@
 #include "nlohmann/json.hpp"
 
 #include <string>
+#include <utility>
 #include <vector>
+#include <utility>
 #include <sstream>
 #include <iostream>
 
@@ -54,7 +56,7 @@ namespace ConfigUtils {
       return !s.empty() && std::find_if(s.begin(),
                                         s.end(), [](unsigned char c) { return !std::isdigit(c); }) == s.end();
     };
-    auto is_numeric = [](const std::string& str){
+    auto is_numeric = [](std::string const & str){
       auto result = double();
       auto i = std::istringstream(str);
       i >> result;
@@ -311,7 +313,7 @@ namespace ConfigUtils {
     }
 
   }
-  ConfigHandler::ConfigHandler(const nlohmann::json& config_) : config(config_) {}
+  ConfigHandler::ConfigHandler(nlohmann::json config_) : config(std::move(config_)) {}
 
   std::string ConfigHandler::toString() const{
     return GenericToolbox::Json::toReadableString( config );
@@ -325,13 +327,15 @@ namespace ConfigUtils {
   }
 
 
+  void ConfigHandler::override( const nlohmann::json& overrideConfig_ ){
+    ConfigUtils::applyOverrides(config, overrideConfig_);
+  }
   void ConfigHandler::override( const std::string& filePath_ ){
     LogInfo << "Overriding config with \"" << filePath_ << "\"" << std::endl;
     LogThrowIf(not GenericToolbox::doesPathIsFile(filePath_), "Could not find " << filePath_);
 
     auto override{ConfigUtils::readConfigFile(filePath_)};
-    ConfigUtils::unfoldConfig(override);
-    ConfigUtils::applyOverrides(config, override);
+    ConfigHandler::override(override);
   }
   void ConfigHandler::override( const std::vector<std::string>& filesList_ ){
     for( auto& file : filesList_ ){ this->override( file ); }

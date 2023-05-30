@@ -96,15 +96,23 @@ int main(int argc, char** argv){
 
     auto f = std::make_shared<TFile>(file.c_str());
     LogContinueIf(not GenericToolbox::doesTFileIsValid(f.get()), "Could not open \"" << file << "\"");
-    LogContinueIf(f->Get("gundamFitter") == nullptr, "Not a gundam fitter output file.");
 
-    GundamUtils::ObjectReader::readObject<TNamed>(f.get(), GenericToolbox::joinPath("gundamFitter", "commandLine_TNamed"), [](TNamed* obj_){
+    std::string gundamDirName{};
+    if     ( f->Get("gundam") != nullptr ){ gundamDirName = "gundam"; }
+    else if( f->Get("gundamFitter") != nullptr ){ gundamDirName = "gundamFitter"; } // legacy
+    else if( f->Get("gundamCalcXsec") != nullptr ){ gundamDirName = "gundamCalcXsec"; } // legacy
+    LogContinueIf(gundamDirName.empty(), "Not a gundam fitter output file.");
+
+    GundamUtils::ObjectReader::readObject<TNamed>(f.get(), GenericToolbox::joinPath(gundamDirName, "commandLine_TNamed"), [](TNamed* obj_){
       LogInfo << blueLightText << "Cmd line: " << resetColor << obj_->GetTitle() << std::endl;
     });
-    GundamUtils::ObjectReader::readObject<TNamed>(f.get(), GenericToolbox::joinPath("gundamFitter", "gundamVersion_TNamed"), [](TNamed* obj_){
+    GundamUtils::ObjectReader::readObject<TNamed>(f.get(), GenericToolbox::joinPath(gundamDirName, "version_TNamed"), [](TNamed* obj_){
       LogInfo << blueLightText << "Ran with GUNDAM version: " << resetColor << obj_->GetTitle() << std::endl;
     });
-    GundamUtils::ObjectReader::readObject<TNamed>(f.get(), GenericToolbox::joinPath("gundamFitter", "unfoldedConfig_TNamed"), [&](TNamed* obj_){
+    GundamUtils::ObjectReader::readObject<TNamed>(
+        f.get(),
+        {GenericToolbox::joinPath(gundamDirName, "config_TNamed"), GenericToolbox::joinPath(gundamDirName, "unfoldedConfig_TNamed")},
+        [&](TNamed* obj_){
       if( not clParser.isOptionTriggered("dryRun") ){
         if( not GenericToolbox::doesPathIsFolder(outDir) ){ GenericToolbox::mkdirPath(outDir); }
         auto outConfigPath = GenericToolbox::joinPath(outDir, "config.json");

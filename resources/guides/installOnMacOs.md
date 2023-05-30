@@ -1,16 +1,36 @@
 ![](./images/macOsLogo.png)
 
+## Quick installation with Homebrew
+
+You can add the gundam-organization brew tap and install
+the latest released version with the following commands:
+
+```bash
+brew tap gundam-organization/tap
+brew install gundam
+```
+
+If you which to fetch the main branch instead:
+
+```bash
+brew install gundam --HEAD
+```
+
+If a new version is available, simply do:
+
+```bash
+brew upgrade gundam
+```
+
+
+## Compiling the code
+
 To compile on macOS you'll need to install XCode with the command line tools. Once it is done, 
 dependencies on macOS can be handled by the package manager [Homebrew](https://brew.sh/index_fr):
 
 ```bash
-brew install \
-  root \
-  yaml-cpp \
-  nlohmann-json
+brew install root yaml-cpp nlohmann-json
 ```
-
-### Compiling the code
 
 Let's create the Build and Install folder:
 
