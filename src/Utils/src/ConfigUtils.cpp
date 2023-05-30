@@ -327,13 +327,15 @@ namespace ConfigUtils {
   }
 
 
+  void ConfigHandler::override( const nlohmann::json& overrideConfig_ ){
+    ConfigUtils::applyOverrides(config, overrideConfig_);
+  }
   void ConfigHandler::override( const std::string& filePath_ ){
     LogInfo << "Overriding config with \"" << filePath_ << "\"" << std::endl;
     LogThrowIf(not GenericToolbox::doesPathIsFile(filePath_), "Could not find " << filePath_);
 
     auto override{ConfigUtils::readConfigFile(filePath_)};
-    ConfigUtils::unfoldConfig(override);
-    ConfigUtils::applyOverrides(config, override);
+    ConfigHandler::override(override);
   }
   void ConfigHandler::override( const std::vector<std::string>& filesList_ ){
     for( auto& file : filesList_ ){ this->override( file ); }
