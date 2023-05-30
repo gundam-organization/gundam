@@ -12,6 +12,7 @@
 #include "nlohmann/json.hpp"
 
 #include <string>
+#include <utility>
 #include <vector>
 #include <utility>
 #include <sstream>
@@ -312,7 +313,7 @@ namespace ConfigUtils {
     }
 
   }
-  ConfigHandler::ConfigHandler(const nlohmann::json& config_) : config(config_) {}
+  ConfigHandler::ConfigHandler(nlohmann::json config_) : config(std::move(config_)) {}
 
   std::string ConfigHandler::toString() const{
     return GenericToolbox::Json::toReadableString( config );
