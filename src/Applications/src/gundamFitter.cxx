@@ -228,15 +228,15 @@ int main(int argc, char** argv){
 
   // Gundam version?
   TNamed gundamVersionString("gundamVersion", GundamUtils::getVersionFullStr().c_str());
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamFitter"), &gundamVersionString);
+  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundam"), &gundamVersionString);
 
   // Command line?
   TNamed commandLineString("commandLine", clParser.getCommandLineString().c_str());
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamFitter"), &commandLineString);
+  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundam"), &commandLineString);
 
   // Config unfolded ?
-  TNamed unfoldedConfigString("unfoldedConfig", GenericToolbox::Json::toReadableString(configHandler.getConfig()).c_str());
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamFitter"), &unfoldedConfigString);
+  TNamed unfoldedConfigString("config", GenericToolbox::Json::toReadableString(configHandler.getConfig()).c_str());
+  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundam"), &unfoldedConfigString);
 
   // Save point
   GenericToolbox::triggerTFileWrite( out );

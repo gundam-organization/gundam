@@ -92,7 +92,7 @@ int main(int argc, char** argv){
   ObjectReader::throwIfNotFound = true;
 
   nlohmann::json fitterConfig;
-  ObjectReader::readObject<TNamed>(fitterFile.get(), "gundamFitter/unfoldedConfig_TNamed", [&](TNamed* config_){
+  ObjectReader::readObject<TNamed>(fitterFile.get(), {{"gundam/config_TNamed"}, {"gundamFitter/unfoldedConfig_TNamed"}}, [&](TNamed* config_){
     fitterConfig = GenericToolbox::Json::readConfigJsonStr( config_->GetTitle() );
   });
   ConfigUtils::ConfigHandler cHandler{ fitterConfig };
@@ -112,7 +112,8 @@ int main(int argc, char** argv){
   );
 
   // Defining signal samples
-  cHandler.override( clParser.getOptionVal<std::string>("configFile") );
+  nlohmann::json xsecConfig{ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") )};
+  cHandler.override( xsecConfig );
 
   if( clParser.isOptionTriggered("dryRun") ){
     std::cout << cHandler.toString() << std::endl;
@@ -206,12 +207,16 @@ int main(int argc, char** argv){
   auto outFile = std::unique_ptr<TFile>( TFile::Open( outFilePath.c_str(), "RECREATE" ) );
 
   GenericToolbox::writeInTFile(
-      GenericToolbox::mkdirTFile(outFile.get(), "gundamCalcXsec"),
+      GenericToolbox::mkdirTFile(outFile.get(), "gundam"),
       TNamed("gundamVersion", GundamUtils::getVersionFullStr().c_str())
   );
   GenericToolbox::writeInTFile(
-      GenericToolbox::mkdirTFile(outFile.get(), "gundamCalcXsec"),
+      GenericToolbox::mkdirTFile(outFile.get(), "gundam"),
       TNamed("commandLine", clParser.getCommandLineString().c_str())
+  );
+  GenericToolbox::writeInTFile(
+      GenericToolbox::mkdirTFile(outFile.get(), "gundam"),
+      TNamed("config", ConfigUtils::ConfigHandler{xsecConfig}.toString().c_str())
   );
 
   LogInfo << "Generating loaded sample plots..." << std::endl;
@@ -311,21 +316,24 @@ int main(int argc, char** argv){
   binValues.reserve( propagator.getFitSampleSet().getFitSampleList().size() );
   int iGlobal{-1};
   for( size_t iSignal = 0 ; iSignal < propagator.getFitSampleSet().getFitSampleList().size() ; iSignal++ ){
+
+    auto& sample = propagator.getFitSampleSet().getFitSampleList()[iSignal];
+
     binValues.emplace_back(
-        propagator.getFitSampleSet().getFitSampleList()[iSignal].getName().c_str(),
-        propagator.getFitSampleSet().getFitSampleList()[iSignal].getName().c_str(),
-        propagator.getFitSampleSet().getFitSampleList()[iSignal].getMcContainer().histogram->GetNbinsX(),
+        sample.getName().c_str(),
+        sample.getName().c_str(),
+        sample.getMcContainer().histogram->GetNbinsX(),
         0,
-        propagator.getFitSampleSet().getFitSampleList()[iSignal].getMcContainer().histogram->GetNbinsX()
+        sample.getMcContainer().histogram->GetNbinsX()
     );
 
-    std::string sampleTitle{ propagator.getFitSampleSet().getFitSampleList()[iSignal].getName() };
+    std::string sampleTitle{ sample.getName() };
 
-    for( int iBin = 0 ; iBin < propagator.getFitSampleSet().getFitSampleList()[iSignal].getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+    for( int iBin = 0 ; iBin < sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
       iGlobal++;
 
-      std::string binTitle = propagator.getFitSampleSet().getFitSampleList()[iSignal].getBinning().getBinsList()[iBin].getSummary();
-      double binVolume = propagator.getFitSampleSet().getFitSampleList()[iSignal].getBinning().getBinsList()[iBin].getVolume();
+      std::string binTitle = sample.getBinning().getBinsList()[iBin].getSummary();
+      double binVolume = sample.getBinning().getBinsList()[iBin].getVolume();
 
       binValues[iSignal].SetBinContent(1+iBin, (*meanValuesVector)[iGlobal] / binVolume  );
       binValues[iSignal].SetBinError(1+iBin, TMath::Sqrt( (*globalCovMatrix)[iGlobal][iGlobal] ) / binVolume );
@@ -345,12 +353,12 @@ int main(int argc, char** argv){
     binValues[iSignal].SetDrawOption("E1");
     binValues[iSignal].GetXaxis()->LabelsOption("v");
     binValues[iSignal].GetXaxis()->SetLabelSize(0.02);
-    binValues[iSignal].GetYaxis()->SetTitle("#delta#sigma");
+    binValues[iSignal].GetYaxis()->SetTitle( GenericToolbox::Json::fetchValue(sample.getConfig(), "yAxis", "#delta#sigma").c_str() );
 
     GenericToolbox::writeInTFile(
         GenericToolbox::mkdirTFile(outFile.get(), "XsecExtractor/histograms"),
         &binValues[iSignal],
-        GenericToolbox::generateCleanBranchName(propagator.getFitSampleSet().getFitSampleList()[iSignal].getName())
+        GenericToolbox::generateCleanBranchName(sample.getName())
     );
   }
 

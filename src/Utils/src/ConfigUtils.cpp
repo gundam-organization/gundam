@@ -11,6 +11,8 @@
 
 #include "nlohmann/json.hpp"
 
+#include <utility>
+
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[ConfigUtils]");
@@ -306,7 +308,7 @@ namespace ConfigUtils {
     }
 
   }
-  ConfigHandler::ConfigHandler(const nlohmann::json& config_) : config(config_) {}
+  ConfigHandler::ConfigHandler(nlohmann::json  config_) : config(std::move(config_)) {}
 
   std::string ConfigHandler::toString() const{
     return GenericToolbox::Json::toReadableString( config );
@@ -320,13 +322,16 @@ namespace ConfigUtils {
   }
 
 
+  void ConfigHandler::override( const nlohmann::json& overrideConfig_ ){
+    ConfigUtils::applyOverrides(config, overrideConfig_);
+  }
   void ConfigHandler::override( const std::string& filePath_ ){
     LogInfo << "Overriding config with \"" << filePath_ << "\"" << std::endl;
     LogThrowIf(not GenericToolbox::doesPathIsFile(filePath_), "Could not find " << filePath_);
 
     auto override{ConfigUtils::readConfigFile(filePath_)};
     ConfigUtils::unfoldConfig(override);
-    ConfigUtils::applyOverrides(config, override);
+    this->override( override );
   }
   void ConfigHandler::override( const std::vector<std::string>& filesList_ ){
     for( auto& file : filesList_ ){ this->override( file ); }
