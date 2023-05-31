@@ -129,30 +129,30 @@ void SampleElement::refillHistogram(int iThread_){
       binContentArray[iBin + 1] += _CacheManagerValue_[_CacheManagerIndex_+iBin];
       binErrorArray[iBin + 1] += binContentArray[iBin + 1]*binContentArray[iBin + 1];
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
+      double content = binContentArray[iBin+1];
       double slowValue = 0.0;
-        for( auto* eventPtr : perBinEventPtrList.at(iBin)){
-            slowValue += eventPtr->getEventWeight();
-        }
-        double delta = std::abs(slowValue-content);
-        if (delta > 1E-6) {
-            LogInfo << "VALIDATION: Bin mismatch " << _CacheManagerIndex_
-                    << " " << iBin
-                    << " " << name
-                    << " " << slowValue
-                    << " " << content
-                    << " " << delta
-                    << std::endl;
-        }
+      for( auto* eventPtr : perBinEventPtrList.at(iBin)){
+        slowValue += eventPtr->getEventWeight();
+      }
+      double delta = std::abs(slowValue-content);
+      if (delta > 1E-6) {
+        LogInfo << "VALIDATION: Mismatched bin: " << _CacheManagerIndex_
+                << "+" << iBin
+                << "(" << name
+                << ") gpu: " << content
+                << " PhysEvt: " << slowValue
+                << " delta: " << delta
+                << std::endl;
+      }
 #endif // CACHE_MANAGER_SLOW_VALIDATION
     }
     else {
-//      LogThrow(GET_VAR_NAME_VALUE(_CacheManagerValue_) << " / " << GET_VAR_NAME_VALUE(_CacheManagerIndex_)); // debug
 #endif // GUNDAM_USING_CACHE_MANAGER
       for (auto *eventPtr: perBinEventPtrList[iBin]) {
         binContentArray[iBin + 1] += eventPtr->getEventWeight();
         binErrorArray[iBin + 1] += eventPtr->getEventWeight() * eventPtr->getEventWeight();
       }
-    LogThrowIf(std::isnan(binContentArray[iBin + 1]));
+      LogThrowIf(std::isnan(binContentArray[iBin + 1]));
 #ifdef GUNDAM_USING_CACHE_MANAGER
     }
 #endif // GUNDAM_USING_CACHE_MANAGER
@@ -234,3 +234,30 @@ void SampleElement::print() const{
   LogInfo << " - " << "Nb events: " << eventList.size() << std::endl;
   LogInfo << " - " << "Hist rescale: " << histScale << std::endl;
 }
+
+//  A Lesser GNU Public License
+
+//  Copyright (C) 2023 GUNDAM DEVELOPERS
+
+//  This library is free software; you can redistribute it and/or
+//  modify it under the terms of the GNU Lesser General Public
+//  License as published by the Free Software Foundation; either
+//  version 2.1 of the License, or (at your option) any later version.
+
+//  This library is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+//  Lesser General Public License for more details.
+
+//  You should have received a copy of the GNU Lesser General Public
+//  License along with this library; if not, write to the
+//
+//  Free Software Foundation, Inc.
+//  51 Franklin Street, Fifth Floor,
+//  Boston, MA  02110-1301  USA
+
+// Local Variables:
+// mode:c++
+// c-basic-offset:2
+// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
+// End:
