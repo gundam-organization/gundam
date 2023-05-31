@@ -69,6 +69,7 @@ Cache::Weight::Graph::Graph(
 
     // Initialize the caches.  Don't try to zero everything since the
     // caches can be huge.
+    Reset();
     fGraphIndex->hostPtr()[0] = 0;
 }
 
@@ -285,6 +286,14 @@ namespace {
             CacheAtomicMult(&results[rIndex[i]], v);
         }
     }
+}
+
+void Cache::Weight::Graph::Reset() {
+    // Use the parent reset.
+    Cache::Weight::Base::Reset();
+    // Reset this class
+    fGraphsUsed = 0;
+    fGraphSpaceUsed = 0;
 }
 
 bool Cache::Weight::Graph::Apply() {

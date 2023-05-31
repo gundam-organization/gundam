@@ -28,7 +28,7 @@ Cache::Weight::UniformSpline::UniformSpline(
     : Cache::Weight::Base("uniformSpline",weights,parameters),
       fLowerClamp(lowerClamps), fUpperClamp(upperClamps),
       fSplinesReserved(splines), fSplinesUsed(0),
-      fSplineKnotsReserved(knots), fSplineKnotsUsed(0) {
+      fSplineSpaceReserved(knots), fSplineSpaceUsed(0) {
 
     LogInfo << "Reserved " << GetName() << " Splines: "
            << GetSplinesReserved() << std::endl;
@@ -41,7 +41,7 @@ Cache::Weight::UniformSpline::UniformSpline(
     // Calculate the space needed to store the spline data.  This needs
     // to know how the spline data is packed for CalculateUniformSpline.
     if (spaceOption == "points") {
-        fSplineKnotsReserved = 2*fSplinesReserved + 2*fSplineKnotsReserved;
+        fSplineSpaceReserved = 2*fSplinesReserved + 2*fSplineSpaceReserved;
     }
     else {
         LogThrowIf(spaceOption != "space",
@@ -56,9 +56,9 @@ Cache::Weight::UniformSpline::UniformSpline(
 #endif
 
     LogInfo << "Reserved " << GetName()
-            << " Spline Knots: " << GetSplineKnotsReserved()
+            << " Spline Knots: " << GetSplineSpaceReserved()
             << std::endl;
-    fTotalBytes += GetSplineKnotsReserved()*sizeof(WEIGHT_BUFFER_FLOAT);  // fSpineKnots
+    fTotalBytes += GetSplineSpaceReserved()*sizeof(WEIGHT_BUFFER_FLOAT);  // fSpineKnots
 
     LogInfo << "Approximate Memory Size for " << GetName()
             << ": " << fTotalBytes/1E+9
@@ -83,8 +83,8 @@ Cache::Weight::UniformSpline::UniformSpline(
         // Get the CPU/GPU memory for the spline knots.  This is copied once
         // during initialization so do not pin the CPU memory into the page
         // set.
-        fSplineKnots.reset(
-            new hemi::Array<WEIGHT_BUFFER_FLOAT>(GetSplineKnotsReserved(),false));
+        fSplineSpace.reset(
+            new hemi::Array<WEIGHT_BUFFER_FLOAT>(GetSplineSpaceReserved(),false));
     }
     catch (std::bad_alloc&) {
         LogError << "Failed to allocate memory, so stopping" << std::endl;
@@ -93,6 +93,7 @@ Cache::Weight::UniformSpline::UniformSpline(
 
     // Initialize the caches.  Don't try to zero everything since the
     // caches can be huge.
+    Reset();
     fSplineIndex->hostPtr()[0] = 0;
 }
 
@@ -139,23 +140,23 @@ void Cache::Weight::UniformSpline::AddSpline(int resIndex, int parIndex,
     }
     fSplineResult->hostPtr()[newIndex] = resIndex;
     fSplineParameter->hostPtr()[newIndex] = parIndex;
-    if (fSplineIndex->hostPtr()[newIndex] != fSplineKnotsUsed) {
+    if (fSplineIndex->hostPtr()[newIndex] != fSplineSpaceUsed) {
         LogError << "Last spline knot index should be at old end of splines"
                   << std::endl;
         throw std::runtime_error("Problem with control indices");
     }
-    int knotIndex = fSplineKnotsUsed;
-    fSplineKnotsUsed += points;
-    if (fSplineKnotsUsed > fSplineKnotsReserved) {
+    int knotIndex = fSplineSpaceUsed;
+    fSplineSpaceUsed += points;
+    if (fSplineSpaceUsed > fSplineSpaceReserved) {
         LogError << "Not enough space reserved for spline knots"
-                 << " -> SplineKnotsReserved = " << fSplineKnotsReserved
-                 << " / SplineKnotsUsed = " << fSplineKnotsUsed
+                 << " -> SplineSpaceReserved = " << fSplineSpaceReserved
+                 << " / SplineSpaceUsed = " << fSplineSpaceUsed
                  << std::endl;
         throw std::runtime_error("Not enough space reserved for spline knots");
     }
-    fSplineIndex->hostPtr()[newIndex+1] = fSplineKnotsUsed;
+    fSplineIndex->hostPtr()[newIndex+1] = fSplineSpaceUsed;
     for (std::size_t i = 0; i<splineData.size(); ++i) {
-        fSplineKnots->hostPtr()[knotIndex+i] = splineData.at(i);
+        fSplineSpace->hostPtr()[knotIndex+i] = splineData.at(i);
     }
 
 }
@@ -200,7 +201,7 @@ double Cache::Weight::UniformSpline::GetSplineLowerBound(int sIndex) {
         throw std::runtime_error("Spline index invalid");
     }
     int knotsIndex = fSplineIndex->hostPtr()[sIndex];
-    return fSplineKnots->hostPtr()[knotsIndex];
+    return fSplineSpace->hostPtr()[knotsIndex];
 }
 
 double Cache::Weight::UniformSpline::GetSplineUpperBound(int sIndex) {
@@ -213,7 +214,7 @@ double Cache::Weight::UniformSpline::GetSplineUpperBound(int sIndex) {
     int knotCount = GetSplineKnotCount(sIndex);
     double lower = GetSplineLowerBound(sIndex);
     int knotsIndex = fSplineIndex->hostPtr()[sIndex];
-    double step = fSplineKnots->hostPtr()[knotsIndex+1];
+    double step = fSplineSpace->hostPtr()[knotsIndex+1];
     return lower + (knotCount-1)/step;
 }
 
@@ -254,7 +255,7 @@ double Cache::Weight::UniformSpline::GetSplineKnotValue(int sIndex, int knot) {
     if (count <= knot) {
         throw std::runtime_error("Knot index invalid");
     }
-    return fSplineKnots->hostPtr()[knotsIndex+2+2*knot];
+    return fSplineSpace->hostPtr()[knotsIndex+2+2*knot];
 }
 
 double Cache::Weight::UniformSpline::GetSplineKnotSlope(int sIndex, int knot) {
@@ -272,7 +273,7 @@ double Cache::Weight::UniformSpline::GetSplineKnotSlope(int sIndex, int knot) {
     if (count <= knot) {
         throw std::runtime_error("Knot index invalid");
     }
-    return fSplineKnots->hostPtr()[knotsIndex+2+2*knot+1];
+    return fSplineSpace->hostPtr()[knotsIndex+2+2*knot+1];
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -372,6 +373,14 @@ namespace {
     }
 }
 
+void Cache::Weight::UniformSpline::Reset() {
+    // Use the parent reset.
+    Cache::Weight::Base::Reset();
+    // Reset this class
+    fSplinesUsed = 0;
+    fSplineSpaceUsed = 0;
+}
+
 bool Cache::Weight::UniformSpline::Apply() {
     if (GetSplinesUsed() < 1) return false;
 
@@ -385,7 +394,7 @@ bool Cache::Weight::UniformSpline::Apply() {
                  fParameters.readOnlyPtr(),
                  fLowerClamp.readOnlyPtr(),
                  fUpperClamp.readOnlyPtr(),
-                 fSplineKnots->readOnlyPtr(),
+                 fSplineSpace->readOnlyPtr(),
                  fSplineResult->readOnlyPtr(),
                  fSplineParameter->readOnlyPtr(),
                  fSplineIndex->readOnlyPtr(),

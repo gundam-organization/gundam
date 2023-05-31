@@ -66,8 +66,12 @@ public:
     // everyplace.
     virtual ~Graph();
 
+    /// Reinitialize the cache.  This puts it into a state to be refilled, but
+    /// does not deallocate any memory.
+    virtual void Reset() override;
+
     // Apply the kernel to the event weights.
-    virtual bool Apply();
+    virtual bool Apply() override;
 
     /// Return the number of reserved graphs.
     std::size_t GetGraphsReserved() {return fGraphsReserved;}

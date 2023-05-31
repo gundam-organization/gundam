@@ -46,6 +46,14 @@ public:
     // everyplace.
     virtual ~Normalization();
 
+    /// Reinitialize the cache.  This puts it into a state to be refilled, but
+    /// does not deallocate any memory.
+    virtual void Reset() override;
+
+    /// Apply the normalizations to the event weight cache.  This will run a
+    /// HEMI kernel to modify the weights cache.
+    virtual bool Apply() override;
+
     /// Return the number of normalization parameters that are reserved
     std::size_t GetNormsReserved() {return fNormsReserved;}
 
@@ -55,10 +63,6 @@ public:
     /// Add a normalization parameter. This takes a result index, and a
     /// parameter index as inputs.
     int ReserveNorm(int resIndex, int parIndex);
-
-    /// Apply the normalizations to the event weight cache.  This will run a
-    /// HEMI kernel to modify the weights cache.
-    bool Apply();
 };
 
 // An MIT Style License

@@ -46,6 +46,7 @@ Cache::Weight::Normalization::Normalization(
         throw std::runtime_error("Not enough memory available");
     }
 
+    Reset();
 }
 
 // The destructor
@@ -75,8 +76,10 @@ int Cache::Weight::Normalization::ReserveNorm(int resIndex, int parIndex) {
     }
     int newIndex = fNormsUsed++;
     if (fNormsUsed > fNormsReserved) {
-        LogError << "Not enough space reserved for Norms"
-                  << std::endl;
+        LogError << "Not enough space reserved for Norms "
+                 << " Reserved: " << fNormsReserved
+                 << " Requested: " << fNormsUsed
+                 << std::endl;
         throw std::runtime_error("Not enough space reserved for results");
     }
     fNormResult->hostPtr()[newIndex] = resIndex;
@@ -111,6 +114,13 @@ namespace {
 #endif
         }
     }
+}
+
+void Cache::Weight::Normalization::Reset() {
+    // Use the parent reset.
+    Cache::Weight::Base::Reset();
+    // Reset this class
+    fNormsUsed = 0;
 }
 
 bool Cache::Weight::Normalization::Apply() {
