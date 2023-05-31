@@ -37,9 +37,13 @@ public:
     IndexedSums(Cache::Weights::Results& eventWeight,
                std::size_t bins);
 
-    // Deconstruct the class.  This should deallocate all the memory
-    // everyplace.
+    /// Deconstruct the class.  This should deallocate all the memory
+    /// everyplace.
     virtual ~IndexedSums();
+
+    /// Reinitialize the cache.  This puts it into a state to be refilled, but
+    /// does not deallocate any memory.
+    void Reset();
 
     /// Return the approximate allocated memory (e.g. on the GPU).
     std::size_t GetResidentMemory() const {return fTotalBytes;}

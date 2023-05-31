@@ -58,18 +58,21 @@ Cache::Parameters::Parameters(std::size_t parameters)
         throw std::runtime_error("Not enough memory available");
     }
 
-        // Initialize the caches.  Don't try to zero everything since the
+    // Initialize the caches.  Don't try to zero everything since the
     // caches can be huge.
+    Reset();
+}
+
+Cache::Parameters::~Parameters() {}
+
+void Cache::Parameters::Reset() {
     std::fill(fLowerClamp->hostPtr(),
               fLowerClamp->hostPtr() + GetParameterCount(),
               std::numeric_limits<double>::lowest());
     std::fill(fUpperClamp->hostPtr(),
               fUpperClamp->hostPtr() + GetParameterCount(),
               std::numeric_limits<double>::max());
-
 }
-
-Cache::Parameters::~Parameters() {}
 
 double Cache::Parameters::GetParameter(int parIdx) const {
     if (parIdx < 0) throw;
