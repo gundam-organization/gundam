@@ -13,6 +13,8 @@
 #include "TGraph.h"
 #include "TSpline.h"
 
+#include "GraphDialBaseFactory.h"
+
 #include <limits>
 
 LoggerInit([]{
@@ -248,6 +250,17 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
     dialBase->buildDial(_yPointListBuffer_[0]);
     return dialBase.release();
   }
+
+#define SHORT_CIRCUIT_SMALL_SPLINES
+#ifdef  SHORT_CIRCUIT_SMALL_SPLINES
+  if (_xPointListBuffer_.size() < 3) {
+    GraphDialBaseFactory grapher;
+    return grapher.makeDial(dialTitle_,
+                            "Graph","",
+                            dialInitializer_,
+                            useCachedDial_);
+  }
+#endif
 
   // Sanity check.  By the time we get here, there can't be fewer than two
   // points, and it should have been trapped above by other conditionals
