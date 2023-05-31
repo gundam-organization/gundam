@@ -34,16 +34,28 @@ public:
     // cache is not being used.
     static Manager* Get() {return fSingleton;}
 
-    // Fill the cache for the current iteration.  This needs to be called
-    // before the cached weights can be used.  This is used in Propagator.cpp.
+    /// Fill the cache for the current iteration.  This needs to be called
+    /// before the cached weights can be used.  This is used in Propagator.cpp.
     static bool Fill();
 
-    // Build the cache and load it into the device.  This is used in
-    // Propagator.cpp to fill the constants needed to for the calculations.
+    /// Build the cache and load it into the device.  This is used in
+    /// Propagator.cpp to fill the constants needed to for the calculations.
 #ifndef USE_NEW_DIALS
     static bool Build(FitSampleSet& sampleList);
 #else
     static bool Build(FitSampleSet& sampleList, EventDialCache& eventDials);
+#endif
+
+#ifdef USE_NEW_DIALS
+    /// Update the cache with the event and spline information.  This is
+    /// called as part of Build, and can be called in other code if the cache
+    /// needs to be changed.  It forages all of the information from the
+    /// original sample list and event dials.
+    static bool Update(FitSampleSet& sampleList, EventDialCache& eventDials);
+
+    /// Flag that the Cache::Manager internal caches must be updated from the
+    /// FitSampleSet and EventDialCache before it can be used.
+    static void UpdateRequired();
 #endif
 
     /// This returns the index of the parameter in the cache.  If the
@@ -67,6 +79,7 @@ private:
             int graphs, int graphPoints,
             int histBins, std::string spaceType);
     static Manager* fSingleton;  // You get one guess...
+    static bool fUpdateRequired; // Set to true when the cache needs an update.
 
     // A map between the fit parameter pointers and the parameter index used
     // by the fitter.
