@@ -47,6 +47,9 @@ Cache::IndexedSums::IndexedSums(Cache::Weights::Results& inputs,
         throw std::runtime_error("Not enough memory available");
     }
 
+    // Place the cache into a default state.
+    Reset();
+
     // Initialize the caches.  Don't try to zero everything since the
     // caches can be huge.
     std::fill(fSums->hostPtr(),
@@ -56,6 +59,13 @@ Cache::IndexedSums::IndexedSums(Cache::Weights::Results& inputs,
 
 // The destructor
 Cache::IndexedSums::~IndexedSums() = default;
+
+/// Reset the index sum cache to it's state immediately after construction.
+void Cache::IndexedSums::Reset() {
+    // Very little to do here since the indexed sum cache is zeroed with it is
+    // filled.  Mark it as invalid out of an abundance of caution!
+    fSumsValid = false;
+}
 
 void Cache::IndexedSums::SetEventIndex(int event, int bin) {
     if (event < 0) throw;

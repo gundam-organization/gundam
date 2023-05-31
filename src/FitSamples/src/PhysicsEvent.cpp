@@ -68,7 +68,7 @@ double PhysicsEvent::getEventWeight() const {
             // _CacheManagerValue_ and _CacheManagerValid_ are inside
             // of the weights cache (a bit of evil coding here), and are
             // updated by the cache.  The update is triggered by
-            // _CacheManagerUpdate().
+            // (*_CacheManagerUpdate_)().
             if (_CacheManagerUpdate_) (*_CacheManagerUpdate_)();
         }
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
@@ -83,36 +83,41 @@ double PhysicsEvent::getEventWeight() const {
             if (avg < getTreeWeight()) avg = getTreeWeight();
             double delta = std::abs(res - _eventWeight_);
             delta /= avg;
-            sumDelta += delta;
-            sum2Delta += delta*delta;
-            ++numDelta;
-            if (numDelta < 0) throw std::runtime_error("validation wrap");
             maxDelta = std::max(maxDelta,delta);
-            if ((numDelta % 1000000) == 0) {
-                LogInfo << "VALIDATION: Average event weight delta: "
-                        << sumDelta/numDelta
-                        << " +/- " << std::sqrt(
-                            sum2Delta/numDelta
-                            - sumDelta*sumDelta/numDelta/numDelta)
-                        << " Maximum: " << maxDelta
-                        << std::endl;
+            if (delta < 1e-4) {
+                sumDelta += delta;
+                sum2Delta += delta*delta;
+                ++numDelta;
+                if (numDelta < 0) throw std::runtime_error("validation wrap");
+                if ((numDelta % 1000000) == 0) {
+                    LogInfo << "VALIDATION: Average event weight delta: "
+                            << sumDelta/numDelta
+                            << " +/- " << std::sqrt(
+                                sum2Delta/numDelta
+                                - sumDelta*sumDelta/numDelta/numDelta)
+                            << " Maximum: " << maxDelta
+                            << " " << numDelta
+                            << std::endl;
+                }
             }
             if (maxDelta < 1E-5) break;
-            if (delta < maxDelta) break;
+            if (delta > 100.0*sumDelta/numDelta) break;
             LogWarning << "WARNING: Event weight difference: " << delta
                        << " Cache: " << res
                        << " Dial: " << _eventWeight_
                        << " Tree: " << getTreeWeight()
+                       << " Delta: " << delta
+                       << " Max: " << maxDelta
                        << std::endl;
         } while(false);
 #endif
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning CACHE_MANAGER_SLOW_VALIDATION force CPU _eventWeight
+#warning CACHE_MANAGER_SLOW_VALIDATION force CPU _eventWeight_
         // When the slow validation is running, the "CPU" event weight is
         // calculated after Cache::Manager::Fill
         return _eventWeight_;
 #endif
-      LogThrowIf(*_CacheManagerValue_!=*_CacheManagerValue_, "Nan weight: " << this->getSummary());
+        LogThrowIf(not std::isfinite(*_CacheManagerValue_), "NaN weight: " << this->getSummary());
       return *_CacheManagerValue_;
     }
 #endif
@@ -620,3 +625,30 @@ std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p ){
 const std::shared_ptr<std::vector<std::string>>& PhysicsEvent::getCommonLeafNameListPtr() const {
   return _commonLeafNameListPtr_;
 }
+
+//  A Lesser GNU Public License
+
+//  Copyright (C) 2023 GUNDAM DEVELOPERS
+
+//  This library is free software; you can redistribute it and/or
+//  modify it under the terms of the GNU Lesser General Public
+//  License as published by the Free Software Foundation; either
+//  version 2.1 of the License, or (at your option) any later version.
+
+//  This library is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+//  Lesser General Public License for more details.
+
+//  You should have received a copy of the GNU Lesser General Public
+//  License along with this library; if not, write to the
+//
+//  Free Software Foundation, Inc.
+//  51 Franklin Street, Fifth Floor,
+//  Boston, MA  02110-1301  USA
+
+// Local Variables:
+// mode:c++
+// c-basic-offset:2
+// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
+// End:

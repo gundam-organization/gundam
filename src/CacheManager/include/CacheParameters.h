@@ -28,6 +28,10 @@ public:
 
     ~Parameters();
 
+    /// Reinitialize the cache.  This puts it into a state to be refilled, but
+    /// does not deallocate any memory.
+    void Reset();
+
     /// The arrays of values mirrored on the CPU and GPU (e.g. hemi arrays).
     Values& GetParameters() {return *fParameters;}
     Clamps& GetLowerClamps() {return *fLowerClamp;}

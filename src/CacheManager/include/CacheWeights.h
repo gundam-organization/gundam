@@ -75,6 +75,10 @@ public:
     // everyplace.
     virtual ~Weights() = default;
 
+    /// Reinitialize the cache.  This puts it into a state to be refilled, but
+    /// does not deallocate any memory.
+    virtual void Reset();
+
     Results& GetWeights() {return *fResults;}
 
     /// Return the approximate allocated memory (e.g. on the GPU).

@@ -67,6 +67,7 @@ public:
   [[nodiscard]] const FitParameterSet* getFitParameterSetPtr(const std::string& name_) const;
   [[nodiscard]] FitParameterSet* getFitParameterSetPtr(const std::string& name_);
   [[nodiscard]] DatasetLoader* getDatasetLoaderPtr(const std::string& name_);
+  [[nodiscard]] EventDialCache& getEventDialCache();
 
   // Core
   void updateLlhCache();
@@ -133,22 +134,6 @@ private:
   // Monitoring
   bool _showEventBreakdown_{true};
 
-#ifdef GUNDAM_USING_CACHE_MANAGER
-  // Build the precalculated caches.  This is only relevant when using a GPU
-  // and must be done after the datasets are loaded.  This returns true if
-  // the cache is built.
-  bool buildGPUCaches();
-
-  // Prefill the caches using a GPU (if available).  If the GPU is not
-  // available, then this is a NOP.  This copies the fit parameter values into
-  // the GPU, triggers the appropriate kernel(s), and copies the results into
-  // a CPU based cache.  This returns true if the cache is filled.
-  bool fillGPUCaches();
-
-  // A map of parameters to the indices that got used by the GPU.
-  std::map<const FitParameter*, int> _gpuParameterIndex_;
-#endif
-
   // DEV
 #if USE_NEW_DIALS
   // A vector of all the dial collections used by all of the fit samples.
@@ -169,6 +154,31 @@ public:
   GenericToolbox::CycleTimer fillProp;
 
 };
-
-
 #endif //GUNDAM_PROPAGATOR_H
+
+//  A Lesser GNU Public License
+
+//  Copyright (C) 2023 GUNDAM DEVELOPERS
+
+//  This library is free software; you can redistribute it and/or
+//  modify it under the terms of the GNU Lesser General Public
+//  License as published by the Free Software Foundation; either
+//  version 2.1 of the License, or (at your option) any later version.
+
+//  This library is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+//  Lesser General Public License for more details.
+
+//  You should have received a copy of the GNU Lesser General Public
+//  License along with this library; if not, write to the
+//
+//  Free Software Foundation, Inc.
+//  51 Franklin Street, Fifth Floor,
+//  Boston, MA  02110-1301  USA
+
+// Local Variables:
+// mode:c++
+// c-basic-offset:2
+// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
+// End:

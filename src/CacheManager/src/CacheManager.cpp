@@ -41,6 +41,7 @@ LoggerInit([]{
 });
 
 Cache::Manager* Cache::Manager::fSingleton = nullptr;
+bool Cache::Manager::fUpdateRequired = true;
 std::map<const FitParameter*, int> Cache::Manager::ParameterMap;
 
 #ifndef USE_NEW_DIALS
@@ -152,13 +153,8 @@ Cache::Manager::Manager(int events, int parameters,
                                   fParameterCache->GetLowerClamps(),
                                   fParameterCache->GetUpperClamps(),
                                   graphs, graphPoints);
-        std::cout << "Allocated graphs Cache " << std::endl;
         fWeightsCache->AddWeightCalculator(fGraphs.get());
-        std::cout << "Added graph weight calculator" << std::endl;
         fTotalBytes += fGraphs->GetResidentMemory();
-        std::cout << "got total bytes " << std::endl;
-
-        std::cout << "Allocate histogram Cache " << histBins << std::endl;
         fHistogramsCache = std::make_unique<Cache::IndexedSums>(
                                   fWeightsCache->GetWeights(),
                                   histBins);
@@ -170,7 +166,7 @@ Cache::Manager::Manager(int events, int parameters,
         throw std::runtime_error("Not enough memory available");
     }
 
-    LogInfo  << "Approximate cache manager size for"
+    LogInfo << "Approximate cache manager size for"
             << " " << events << " events:"
             << " " << double(GetResidentMemory())/1E+9 << " GB "
             << " (" << GetResidentMemory()/events << " bytes per event)"
@@ -184,7 +180,7 @@ bool Cache::Manager::HasCUDA() {
 #ifdef USE_NEW_DIALS
 bool Cache::Manager::Build(FitSampleSet& sampleList,
                            EventDialCache& eventDials) {
-    LogInfo << "Build the cache for Cache::Manager" << std::endl;
+    LogInfo << "Build the internal caches " << std::endl;
 
     /// Zero everything before counting the amount of space needed for the
     /// event dials
@@ -373,10 +369,42 @@ bool Cache::Manager::Build(FitSampleSet& sampleList,
         return false;
     }
 
-    // Add the dials in the EventDialCache to the GPU cache.
-    LogInfo << "Add the dials to the cache." << std::endl;
+    Cache::Manager::UpdateRequired();
+
+    // return Update(sampleList, eventDials);
+    return true;
+}
+
+void Cache::Manager::UpdateRequired() {
+    fUpdateRequired = true;
+}
+
+
+bool Cache::Manager::Update(FitSampleSet& sampleList,
+                           EventDialCache& eventDials) {
+    if (not fUpdateRequired) return true;
+
+    // This is the updated that is required!
+    fUpdateRequired = false;
+
+    // In case the cache isn't allocated (usually because it's turned off on
+    // the command line), but this is a safety check.
+    if (!Cache::Manager::Get()) {
+        LogWarning << "Cache will not be used"
+                   << std::endl;
+        return false;
+    }
+
+    LogInfo << "Update the internal caches" << std::endl;
+
+    // Initialize the internal caches so they are in the default state.
+    Cache::Manager::Get()->GetParameterCache().Reset();
+    Cache::Manager::Get()->GetHistogramsCache().Reset();
+    Cache::Manager::Get()->GetWeightsCache().Reset();
+
     int usedResults = 0;
 
+    // Add the dials in the EventDialCache to the internal cache.
     for (EventDialCache::CacheElem_t& elem : eventDials.getCache()) {
         // Skip events that are not in a bin.
         if (elem.event->getSampleBinIndex() < 0) continue;
@@ -406,6 +434,9 @@ bool Cache::Manager::Build(FitSampleSet& sampleList,
             DialInterface* dialInterface = dialElem;
 #endif
             DialInputBuffer* dialInputs = dialInterface->getInputBufferRef();
+
+            // Check if this dial is used at all.
+            if (dialInputs->isMasked()) continue;
 
             // Make sure all of the used parameters are in the parameter
             // map.
@@ -453,9 +484,8 @@ bool Cache::Manager::Build(FitSampleSet& sampleList,
                     .SetUpperClamp(parIndex,resp->getMaxResponse());
             }
 
-            int dialUsed = 0;
-
             // Add the dial information to the appropriate caches
+            int dialUsed = 0;
             const DialBase* baseDial = dialInterface->getDialBaseRef();
             const Norm* normDial = dynamic_cast<const Norm*>(baseDial);
             if (normDial) {
@@ -525,7 +555,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList,
                 = dynamic_cast<const Shift*>(baseDial);
             if (shift) {
                 ++dialUsed;
-                initialEventWeight = shift->evalResponse(DialInputBuffer());
+                initialEventWeight *= shift->evalResponse(DialInputBuffer());
             }
 
             if (dialUsed != 1) {
@@ -545,7 +575,6 @@ bool Cache::Manager::Build(FitSampleSet& sampleList,
             .SetInitialValue(resultIndex,initialEventWeight);
 
     }
-
 
     LogInfo << "Error checking for cache" << std::endl;
 
@@ -597,7 +626,8 @@ bool Cache::Manager::Build(FitSampleSet& sampleList,
         }
     }
 
-    if (histCells != nextHist) {
+    if (Cache::Manager::Get()->GetHistogramsCache().GetSumCount()
+        != nextHist) {
         throw std::runtime_error("Histogram cells are missing");
     }
 
@@ -954,6 +984,10 @@ bool Cache::Manager::Build(FitSampleSet& sampleList) {
 bool Cache::Manager::Fill() {
     Cache::Manager* cache = Cache::Manager::Get();
     if (!cache) return false;
+    if (fUpdateRequired) {
+        LogError << "Fill while an update is required" << std::endl;
+        LogThrow("Fill while an update is required");
+    }
 #define DUMP_FILL_INPUT_PARAMETERS
 #ifdef DUMP_FILL_INPUT_PARAMETERS
     do {
