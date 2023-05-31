@@ -126,6 +126,7 @@ void Propagator::readConfigImpl(){
   ConfigUtils::forwardConfig(_parameterInjectorMc_);
 
 }
+
 void Propagator::initializeImpl() {
   LogWarning << __METHOD_NAME__ << std::endl;
 
@@ -352,9 +353,9 @@ void Propagator::initializeImpl() {
   // reweightMcEvents.
   if(GlobalVariables::getEnableCacheManager()) {
 #ifdef USE_NEW_DIALS
-      Cache::Manager::Build(getFitSampleSet(), _eventDialCache_);
+    Cache::Manager::Build(getFitSampleSet(), getEventDialCache());
 #else
-      Cache::Manager::Build(getFitSampleSet());
+    Cache::Manager::Build(getFitSampleSet());
 #endif
   }
 #endif
@@ -618,6 +619,9 @@ const std::vector<FitParameterSet> &Propagator::getParameterSetsList() const {
 const std::vector<DialCollection> &Propagator::getDialCollections() const {
   return _dialCollections_;
 }
+EventDialCache &Propagator::getEventDialCache() {
+  return _eventDialCache_;
+}
 
 FitSampleSet &Propagator::getFitSampleSet() {
   return _fitSampleSet_;
@@ -777,7 +781,10 @@ void Propagator::reweightMcEvents() {
   } while (false);
 #endif
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-  if(GlobalVariables::getEnableCacheManager()) usedGPU = Cache::Manager::Fill();
+  if(GlobalVariables::getEnableCacheManager()) {
+    Cache::Manager::Update(getFitSampleSet(), getEventDialCache());
+    usedGPU = Cache::Manager::Fill();
+  }
 #endif
   if( not usedGPU ){
     GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
@@ -950,8 +957,31 @@ void Propagator::reweightMcEvents(int iThread_) {
     }
   );
 #endif
-
-
-
 }
 
+//  A Lesser GNU Public License
+
+//  Copyright (C) 2023 GUNDAM DEVELOPERS
+
+//  This library is free software; you can redistribute it and/or
+//  modify it under the terms of the GNU Lesser General Public
+//  License as published by the Free Software Foundation; either
+//  version 2.1 of the License, or (at your option) any later version.
+
+//  This library is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+//  Lesser General Public License for more details.
+
+//  You should have received a copy of the GNU Lesser General Public
+//  License along with this library; if not, write to the
+//
+//  Free Software Foundation, Inc.
+//  51 Franklin Street, Fifth Floor,
+//  Boston, MA  02110-1301  USA
+
+// Local Variables:
+// mode:c++
+// c-basic-offset:2
+// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
+// End:
