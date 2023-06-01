@@ -219,9 +219,29 @@ int main(int argc, char** argv){
 
   // to be filled up
   struct BinNormaliser{
-    nlohmann::json config{};
+    void readConfig(const nlohmann::json& config_){
+      LogScopeIndent;
 
-    
+      name = GenericToolbox::Json::fetchValue<std::string>(config_, "name");
+      LogInfo << "Re-normalization config \"" << name << "\": ";
+
+      if     ( GenericToolbox::Json::doKeyExist( config_, "meanValue" ) ){
+        normParameter.first  = GenericToolbox::Json::fetchValue<double>(config_, "meanValue");
+        normParameter.second = GenericToolbox::Json::fetchValue(config_, "stdDev", 0);
+        LogInfo << "mean ± sigma = " << normParameter.first << " ± " << normParameter.second;
+      }
+      else if( GenericToolbox::Json::doKeyExist( config_, "disabledBinDim" ) ){
+        disabledBinDim = GenericToolbox::Json::fetchValue<std::string>(config_, "disabledBinDim");
+        LogInfo << "disabledBinDim = " << disabledBinDim;
+      }
+
+      LogInfo << std::endl;
+    }
+
+    std::string name{};
+    std::pair<double, double> normParameter{std::nan("mean unset"), std::nan("stddev unset")};
+    std::string disabledBinDim{};
+
   };
 
   struct CrossSectionData{
@@ -240,6 +260,8 @@ int main(int argc, char** argv){
     crossSectionDataList.emplace_back();
     auto& xsecEntry = crossSectionDataList.back();
 
+    LogScopeIndent;
+    LogInfo << "Defining xsec entry: " << sample.getName() << std::endl;
     xsecEntry.samplePtr = &sample;
     xsecEntry.config = sample.getConfig();
     xsecEntry.branchBinsData.resetCurrentByteOffset();
@@ -261,7 +283,7 @@ int main(int argc, char** argv){
     xsecEntry.normList.reserve( normConfigList.size() );
     for( auto& normConfig : normConfigList ){
       xsecEntry.normList.emplace_back();
-      xsecEntry.normList.back().config = normConfig;
+      xsecEntry.normList.back().readConfig( normConfig );
     }
 
     xsecEntry.histogram = TH1D(
@@ -285,7 +307,7 @@ int main(int argc, char** argv){
   for( int iToy = 0 ; iToy < nToys ; iToy++ ){
 
     // loading...
-    GenericToolbox::displayProgressBar( iToy, nToys, ss.str() );
+    GenericToolbox::displayProgressBar( iToy+1, nToys, ss.str() );
 
     // Do the throwing:
     propagator.throwParametersFromGlobalCovariance();
@@ -305,6 +327,38 @@ int main(int argc, char** argv){
       xsec.branchBinsData.resetCurrentByteOffset();
       for( int iBin = 0 ; iBin < xsec.samplePtr->getMcContainer().histogram->GetNbinsX() ; iBin++ ){
         double binData{ xsec.samplePtr->getMcContainer().histogram->GetBinContent(1+iBin) };
+
+        // special re-norm
+        for( auto& normData : xsec.normList ){
+          if( not std::isnan( normData.normParameter.first ) ){
+            double norm{normData.normParameter.first};
+            if( normData.normParameter.second != 0 ){ norm += normData.normParameter.second * gRandom->Gaus(); }
+            binData /= norm;
+          }
+        }
+
+        // bin volume
+        auto& bin = xsec.samplePtr->getMcContainer().binning.getBinsList()[iBin];
+        double binVolume{1};
+
+        for( size_t iDim = 0 ; iDim < bin.getEdgesList().size() ; iDim++ ){
+          auto& edges = bin.getEdgesList()[iDim];
+          if( edges.first == edges.second ) continue; // no volume, just a condition variable
+
+          // is this bin excluded from norm?
+          if( not bin.getVariableNameList()[iDim].empty() and std::any_of(
+                xsec.normList.begin(), xsec.normList.end(), [&](const BinNormaliser& normData_){
+                  return (
+                      not normData_.disabledBinDim.empty()
+                      and normData_.disabledBinDim == bin.getVariableNameList()[iDim] );
+                }
+              )
+          ){ continue; }
+          binVolume *= std::max( edges.first, edges.second ) - std::min(edges.first, edges.second);
+        }
+
+        binData /= binVolume;
+
         xsec.branchBinsData.writeRawData( binData );
       }
     }
