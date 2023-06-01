@@ -740,6 +740,13 @@ public:
         fProposalType[dim].param1 = sigma*sigma;
     }
 
+    /// Reset the correlations (removes all prior correlations).  This should
+    /// be used when the correlations between the parameters will be changed.
+    /// If it's not called, you will always get the last values of the
+    /// correlations that were set, but an internal vector will "grow without
+    /// end".
+    void ResetCorrelations() {fCorrelations.clear();}
+
     /// Set the correlation between two dimensions of the proposal function.
     /// The initial proposal function assumes that all of the dimensions are
     /// uncorrelated.  The optimal proposal will be the same as the posterior
