@@ -199,6 +199,9 @@ int main(int argc, char** argv){
     };
 
     outFilePath = "xsecCalc_" + GundamUtils::generateFileName(clParser, appendixDict) + ".root";
+
+    std::string outFolder{GenericToolbox::Json::fetchValue<std::string>(xsecConfig, "outputFolder", "./")};
+    outFilePath = GenericToolbox::joinPath(outFolder, outFilePath);
   }
 
   app.setCmdLinePtr( &clParser );
@@ -222,7 +225,15 @@ int main(int argc, char** argv){
     void readConfig(const nlohmann::json& config_){
       LogScopeIndent;
 
+
+
       name = GenericToolbox::Json::fetchValue<std::string>(config_, "name");
+
+      if( not GenericToolbox::Json::fetchValue(config_, "isEnabled", true) ){
+        LogWarning << "Skipping disabled re-normalization config \"" << name << "\"" << std::endl;
+        return;
+      }
+
       LogInfo << "Re-normalization config \"" << name << "\": ";
 
       if     ( GenericToolbox::Json::doKeyExist( config_, "meanValue" ) ){
