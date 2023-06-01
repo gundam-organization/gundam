@@ -1,6 +1,6 @@
 
 #include "GlobalVariables.h"
-#include "GundamGreetings.h"
+#include "GundamApp.h"
 #include "GundamUtils.h"
 #include "Propagator.h"
 #include "ConfigUtils.h"
@@ -31,10 +31,7 @@ LoggerInit([]{
 
 int main(int argc, char** argv){
 
-  GundamGreetings g;
-  g.setAppName("cross-section calculator tool");
-  g.hello();
-
+  GundamApp app{"cross-section calculator tool"};
 
   // --------------------------
   // Read Command Line Args:
@@ -204,24 +201,17 @@ int main(int argc, char** argv){
 
     outFilePath = "xsecCalc_" + GundamUtils::generateFileName(clParser, appendixDict) + ".root";
   }
-  auto outFile = std::unique_ptr<TFile>( TFile::Open( outFilePath.c_str(), "RECREATE" ) );
 
-  GenericToolbox::writeInTFile(
-      GenericToolbox::mkdirTFile(outFile.get(), "gundam"),
-      TNamed("version", GundamUtils::getVersionFullStr().c_str())
-  );
-  GenericToolbox::writeInTFile(
-      GenericToolbox::mkdirTFile(outFile.get(), "gundam"),
-      TNamed("commandLine", clParser.getCommandLineString().c_str())
-  );
-  GenericToolbox::writeInTFile(
-      GenericToolbox::mkdirTFile(outFile.get(), "gundam"),
-      TNamed("config", ConfigUtils::ConfigHandler{xsecConfig}.toString().c_str())
-  );
+  app.setCmdLinePtr( &clParser );
+  app.setConfigString( ConfigUtils::ConfigHandler{xsecConfig}.toString() );
+  app.openOutputFile( outFilePath );
+  app.writeAppInfo();
+
+  auto* calcXsecDir{ GenericToolbox::mkdirTFile(app.getOutfilePtr(), "XsecExtractor") };
 
   LogInfo << "Generating loaded sample plots..." << std::endl;
   propagator.getPlotGenerator().generateSamplePlots(
-    GenericToolbox::mkdirTFile(outFile.get(), "XsecExtractor/postFit/samples")
+    GenericToolbox::mkdirTFile(calcXsecDir, "postFit/samples")
   );
 
   LogInfo << "Creating throws tree" << std::endl;
@@ -305,7 +295,7 @@ int main(int argc, char** argv){
     signalThrowTree->Fill();
   }
 
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outFile.get(), "XsecExtractor/throws"), signalThrowTree, "signalThrow");
+  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(calcXsecDir, "throws"), signalThrowTree, "signalThrow");
   auto* meanValuesVector = GenericToolbox::generateMeanVectorOfTree(signalThrowTree);
   auto* globalCovMatrix = GenericToolbox::generateCovarianceMatrixOfTree(signalThrowTree);
 
@@ -356,7 +346,7 @@ int main(int argc, char** argv){
     binValues[iSignal].GetYaxis()->SetTitle( GenericToolbox::Json::fetchValue(sample.getConfig(), "yAxis", "#delta#sigma").c_str() );
 
     GenericToolbox::writeInTFile(
-        GenericToolbox::mkdirTFile(outFile.get(), "XsecExtractor/histograms"),
+        GenericToolbox::mkdirTFile(calcXsecDir, "histograms"),
         &binValues[iSignal],
         GenericToolbox::generateCleanBranchName(sample.getName())
     );
@@ -365,21 +355,12 @@ int main(int argc, char** argv){
 
   globalCovMatrixHist->GetXaxis()->SetLabelSize(0.02);
   globalCovMatrixHist->GetYaxis()->SetLabelSize(0.02);
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outFile.get(), "XsecExtractor/matrices"), globalCovMatrixHist, "covarianceMatrix");
+  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), globalCovMatrixHist, "covarianceMatrix");
 
   globalCorMatrixHist->GetXaxis()->SetLabelSize(0.02);
   globalCorMatrixHist->GetYaxis()->SetLabelSize(0.02);
   globalCorMatrixHist->GetZaxis()->SetRangeUser(-1, 1);
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outFile.get(), "XsecExtractor/matrices"), globalCorMatrixHist, "correlationMatrix");
-
-  LogWarning << "Closing output file \"" << outFile->GetName() << "\"..." << std::endl;
-  outFile->Close();
-  LogInfo << "Closed." << std::endl;
-
-  // --------------------------
-  // Goodbye:
-  // --------------------------
-  g.goodbye();
+  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), globalCorMatrixHist, "correlationMatrix");
 
   GlobalVariables::getParallelWorker().reset();
 }

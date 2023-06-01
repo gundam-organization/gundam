@@ -27,6 +27,30 @@ namespace GundamUtils {
     }
     return ss.str();
   }
+  bool isNewerOrEqualVersion( const std::string& minVersion_ ){
+    if( GundamUtils::getVersionStr() == "X.X.X" ){
+      LogAlert << "Can't check version requirement. Assuming OK." << std::endl;
+      return true;
+    }
+    auto minVersionSplit = GenericToolbox::splitString(minVersion_, ".");
+    LogThrowIf(minVersionSplit.size() != 3, "Invalid version format: " << minVersion_);
+
+    // stripping "f" tag
+    if( minVersionSplit[2].back() == 'f' ){ minVersionSplit[2].pop_back(); }
+
+    if( std::stoi(GundamVersionConfig::getVersionMajor()) > std::stoi(minVersionSplit[0]) ) return true; // major is GREATER -> OK
+    if( std::stoi(GundamVersionConfig::getVersionMajor()) < std::stoi(minVersionSplit[0]) ) return false; // major is LOWER -> NOT OK
+    // major is equal -> next
+
+    if( std::stoi(GundamVersionConfig::getVersionMinor()) > std::stoi(minVersionSplit[1]) ) return true; // minor is GREATER -> OK
+    if( std::stoi(GundamVersionConfig::getVersionMinor()) < std::stoi(minVersionSplit[1]) ) return false; // minor is LOWER -> NOT OK
+    // minor is equal -> next
+
+    if( std::stoi(GundamVersionConfig::getVersionMicro()) > std::stoi(minVersionSplit[2]) ) return true; // revision is GREATER -> OK
+    if( std::stoi(GundamVersionConfig::getVersionMicro()) < std::stoi(minVersionSplit[2]) ) return false; // revision is LOWER -> NOT OK
+    // minor is equal -> OK
+    return true;
+  }
 
   std::string generateFileName(const CmdLineParser& clp_, const std::vector<std::pair<std::string, std::string>>& appendixDict_){
     std::vector<std::string> appendixList{};

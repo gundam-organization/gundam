@@ -55,10 +55,10 @@ int main(int argc, char** argv){
   clParser.addOption("fitFiles", {"-f", "--file"}, "Specify path to fitter output files", -1);
   clParser.addOption("verbose", {"-v", "--verbose"}, "Set the verbosity level", 1, true);
   clParser.addOption("showCorrelationsWith", {"--show-correlations-with"}, "Show all correlation coefficients of a given par wrt others", -1);
-  clParser.addOption("outFolder", {"-o", "--out-folder"}, "Set output folder where files will be writen", 1);
+  clParser.addOption("outFolder", {"-o", "--out-folder"}, "Set output folder where files will be writen (when extractDataToDisk option is triggered)", 1);
 
   clParser.addDummyOption("Triggers");
-  clParser.addTriggerOption("dryRun", {"-d", "--dry-run"}, "Don't write files on disk");
+  clParser.addTriggerOption("extractDataToDisk", {"-e", "--extract"}, "Export data to output files");
   clParser.addTriggerOption("showParList", {"--show-par-list"}, "Show parameters list");
 
   clParser.addDummyOption();
@@ -90,7 +90,7 @@ int main(int argc, char** argv){
         GenericToolbox::getFileNameFromFilePath(file, false)
     )};
 
-    if( not clParser.isOptionTriggered("dryRun") ){
+    if( clParser.isOptionTriggered("extractDataToDisk") ){
       LogWarning << "Output files will be writen under: " << outDir << std::endl;
     }
 
@@ -114,7 +114,7 @@ int main(int argc, char** argv){
         {{GenericToolbox::joinPath(gundamDirName, "config_TNamed")},
          {GenericToolbox::joinPath(gundamDirName, "unfoldedConfig_TNamed")}},
         [&](TNamed* obj_){
-      if( not clParser.isOptionTriggered("dryRun") ){
+      if( clParser.isOptionTriggered("extractDataToDisk") ){
         if( not GenericToolbox::doesPathIsFolder(outDir) ){ GenericToolbox::mkdirPath(outDir); }
         auto outConfigPath = GenericToolbox::joinPath(outDir, "config.json");
         LogInfo << blueLightText << "Writing unfolded config under: " << resetColor << outConfigPath << std::endl;
@@ -172,7 +172,7 @@ int main(int argc, char** argv){
         if( clParser.isOptionTriggered("verbose") ){
           LogInfo << blueLightText << "Pre-fit Likelihood state: " << resetColor << injectorStr->GetTitle() << std::endl;
         }
-        if( not clParser.isOptionTriggered("dryRun") ){
+        if( clParser.isOptionTriggered("extractDataToDisk") ){
           auto outSubDir{GenericToolbox::joinPath( outDir, pathPreFit)};
           if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
           auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".txt");
@@ -185,7 +185,7 @@ int main(int argc, char** argv){
         if( clParser.getOptionVal("verbose", 0) >= 1 ){
           LogInfo << blueLightText << "Pre-fit parameters state: " << resetColor << injectorStr->GetTitle() << std::endl;
         }
-        if( not clParser.isOptionTriggered("dryRun") ){
+        if( clParser.isOptionTriggered("extractDataToDisk") ){
           auto outSubDir{GenericToolbox::joinPath( outDir, pathPreFit)};
           if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
           auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".json");
@@ -218,7 +218,7 @@ int main(int argc, char** argv){
       });
       GundamUtils::ObjectReader::readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPostFit, "llhState_TNamed"), [&](TNamed* injectorStr){
         LogInfo << blueLightText << "Post-fit Likelihood state: " << resetColor << injectorStr->GetTitle() << std::endl;
-        if( not clParser.isOptionTriggered("dryRun") ){
+        if( clParser.isOptionTriggered("extractDataToDisk") ){
           auto outSubDir{GenericToolbox::joinPath( outDir, pathPostFit)};
           if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
           auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".txt");
@@ -230,7 +230,7 @@ int main(int argc, char** argv){
         if( clParser.getOptionVal("verbose", 0) >= 1 ){
           LogInfo << blueLightText << "Post-fit parameters state: " << resetColor << injectorStr->GetTitle() << std::endl;
         }
-        if( not clParser.isOptionTriggered("dryRun") ){
+        if( clParser.isOptionTriggered("extractDataToDisk") ){
           auto outSubDir{GenericToolbox::joinPath( outDir, pathPostFit)};
           if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
           auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".json");

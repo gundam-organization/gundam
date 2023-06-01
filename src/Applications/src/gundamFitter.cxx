@@ -5,8 +5,8 @@
 #include "FitterEngine.h"
 #include "ConfigUtils.h"
 #include "GundamUtils.h"
+#include "GundamApp.h"
 #include "GlobalVariables.h"
-#include "GundamGreetings.h"
 #include "MinimizerInterface.h"
 #ifdef GUNDAM_USING_CACHE_MANAGER
 #include "CacheManager.h"
@@ -27,12 +27,7 @@ LoggerInit([]{
 
 int main(int argc, char** argv){
 
-  // --------------------------
-  // Greetings:
-  // --------------------------
-  GundamGreetings g;
-  g.setAppName("main fitter");
-  g.hello();
+  GundamApp app{"main fitter"};
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   if (Cache::Manager::HasCUDA()){ LogWarning << "CUDA compatible build." << std::endl; }
@@ -175,11 +170,10 @@ int main(int argc, char** argv){
   else{
 
     std::string outFolder{"./"};
-    if( clParser.isOptionTriggered("outputDir") ){ outFolder = clParser.getOptionVal<std::string>("outputDir"); }
+    if     ( clParser.isOptionTriggered("outputDir") ){ outFolder = clParser.getOptionVal<std::string>("outputDir"); }
     else if( GenericToolbox::Json::doKeyExist(configHandler.getConfig(), "outputFolder") ){
       outFolder = GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "outputFolder");
     }
-    GenericToolbox::mkdirPath( outFolder );
 
     // appendixDict["optionName"] = "Appendix"
     // this list insure all appendices will appear in the same order
@@ -216,37 +210,28 @@ int main(int argc, char** argv){
   // Checking the minimal version for the config
   if( GenericToolbox::Json::doKeyExist(configHandler.getConfig(), "minGundamVersion") and not clParser.isOptionTriggered("ignoreVersionCheck") ){
     LogThrowIf(
-        not g.isNewerOrEqualVersion(GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "minGundamVersion")),
+        not GundamUtils::isNewerOrEqualVersion(GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "minGundamVersion")),
         "Version check FAILED: " << GundamUtils::getVersionStr() << " < " << GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "minGundamVersion")
     );
     LogInfo << "Version check passed: " << GundamUtils::getVersionStr() << " >= " << GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "minGundamVersion") << std::endl;
   }
 
+  // to write cmdLine info
+  app.setCmdLinePtr( &clParser );
+
+  // unfolded config
+  app.setConfigString( GenericToolbox::Json::toReadableString(configHandler.getConfig()) );
+
   // Ok, we should run. Create the out file.
-  LogWarning << "Creating output file: \"" << outFileName << "\"..." << std::endl;
-  TFile* out = TFile::Open(outFileName.c_str(), "RECREATE");
-
-  // Gundam version?
-  TNamed gundamVersionString("version", GundamUtils::getVersionFullStr().c_str());
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundam"), &gundamVersionString);
-
-  // Command line?
-  TNamed commandLineString("commandLine", clParser.getCommandLineString().c_str());
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundam"), &commandLineString);
-
-  // Config unfolded ?
-  TNamed unfoldedConfigString("config", GenericToolbox::Json::toReadableString(configHandler.getConfig()).c_str());
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundam"), &unfoldedConfigString);
-
-  // Save point
-  GenericToolbox::triggerTFileWrite( out );
+  app.openOutputFile(outFileName);
+  app.writeAppInfo();
 
 
   // --------------------------
   // Configure:
   // --------------------------
   LogInfo << "FitterEngine setup..." << std::endl;
-  FitterEngine fitter{GenericToolbox::mkdirTFile(out, "FitterEngine")};
+  FitterEngine fitter{GenericToolbox::mkdirTFile(app.getOutfilePtr(), "FitterEngine")};
 
   fitter.readConfig(GenericToolbox::Json::fetchSubEntry(configHandler.getConfig(), {"fitterEngineConfig"}));
 
@@ -379,15 +364,6 @@ int main(int argc, char** argv){
   // Run the fitter:
   // --------------------------
   fitter.fit();
-
-  LogWarning << "Closing output file \"" << out->GetName() << "\"..." << std::endl;
-  out->Close();
-  LogInfo << "Closed." << std::endl;
-
-  // --------------------------
-  // Goodbye:
-  // --------------------------
-  g.goodbye();
 
   GlobalVariables::getParallelWorker().reset();
 }
