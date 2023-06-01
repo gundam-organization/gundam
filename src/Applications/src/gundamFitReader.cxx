@@ -111,7 +111,8 @@ int main(int argc, char** argv){
     });
     GundamUtils::ObjectReader::readObject<TNamed>(
         f.get(),
-        {GenericToolbox::joinPath(gundamDirName, "config_TNamed"), GenericToolbox::joinPath(gundamDirName, "unfoldedConfig_TNamed")},
+        {{GenericToolbox::joinPath(gundamDirName, "config_TNamed")},
+         {GenericToolbox::joinPath(gundamDirName, "unfoldedConfig_TNamed")}},
         [&](TNamed* obj_){
       if( not clParser.isOptionTriggered("dryRun") ){
         if( not GenericToolbox::doesPathIsFolder(outDir) ){ GenericToolbox::mkdirPath(outDir); }

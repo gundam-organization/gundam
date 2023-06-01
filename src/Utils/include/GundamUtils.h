@@ -65,7 +65,6 @@ namespace GundamUtils {
       { 3, "status = 3    : accurate"}
   };
 
-
   class ObjectReader{
 
   public:
