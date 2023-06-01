@@ -185,7 +185,6 @@ int main(int argc, char** argv){
   // Load everything
   propagator.initialize();
 
-
   // Creating output file
   std::string outFilePath{};
   if( clParser.isOptionTriggered("outputFile") ){ outFilePath = clParser.getOptionVal<std::string>("outputFile"); }
@@ -207,7 +206,7 @@ int main(int argc, char** argv){
   app.openOutputFile( outFilePath );
   app.writeAppInfo();
 
-  auto* calcXsecDir{ GenericToolbox::mkdirTFile(app.getOutfilePtr(), "XsecExtractor") };
+  auto* calcXsecDir{ GenericToolbox::mkdirTFile(app.getOutfilePtr(), "calcXsec") };
 
   LogInfo << "Generating loaded sample plots..." << std::endl;
   propagator.getPlotGenerator().generateSamplePlots(
@@ -215,143 +214,153 @@ int main(int argc, char** argv){
   );
 
   LogInfo << "Creating throws tree" << std::endl;
-  auto* signalThrowTree = new TTree("signalThrowTree", "signalThrowTree");
-  std::vector<GenericToolbox::RawDataArray> signalThrowData{propagator.getFitSampleSet().getFitSampleList().size()};
-  std::vector<std::vector<double>> bufferList{propagator.getFitSampleSet().getFitSampleList().size()};
-  for( size_t iSignal = 0 ; iSignal < propagator.getFitSampleSet().getFitSampleList().size() ; iSignal++ ){
+  auto* xsecThrowTree = new TTree("xsecThrow", "xsecThrow");
 
-    int nBins = propagator.getFitSampleSet().getFitSampleList()[iSignal].getMcContainer().histogram->GetNbinsX();
-    bufferList[iSignal].resize(nBins, 0);
 
-    signalThrowData[iSignal].resetCurrentByteOffset();
+  // to be filled up
+  struct BinNormaliser{
+    nlohmann::json config{};
+
+    
+  };
+
+  struct CrossSectionData{
+    FitSample* samplePtr{nullptr};
+    nlohmann::json config{};
+    GenericToolbox::RawDataArray branchBinsData{};
+
+    TH1D histogram{};
+    std::vector<BinNormaliser> normList{};
+  };
+  std::vector<CrossSectionData> crossSectionDataList{};
+
+  LogInfo << "Initializing xsec samples..." << std::endl;
+  crossSectionDataList.reserve( propagator.getFitSampleSet().getFitSampleList().size() );
+  for( auto& sample : propagator.getFitSampleSet().getFitSampleList() ){
+    crossSectionDataList.emplace_back();
+    auto& xsecEntry = crossSectionDataList.back();
+
+    xsecEntry.samplePtr = &sample;
+    xsecEntry.config = sample.getConfig();
+    xsecEntry.branchBinsData.resetCurrentByteOffset();
     std::vector<std::string> leafNameList{};
-    leafNameList.reserve(nBins);
-    for( int iBin = 0 ; iBin < nBins ; iBin++ ){
+    leafNameList.reserve( sample.getMcContainer().histogram->GetNbinsX() );
+    for( int iBin = 0 ; iBin < sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
       leafNameList.emplace_back(Form("bin_%i/D", iBin));
-      signalThrowData[iSignal].writeRawData( double(0) );
+      xsecEntry.branchBinsData.writeRawData( double(0) );
     }
+    xsecEntry.branchBinsData.lockArraySize();
 
-    signalThrowData[iSignal].lockArraySize();
-    signalThrowTree->Branch(
-        GenericToolbox::generateCleanBranchName(propagator.getFitSampleSet().getFitSampleList()[iSignal].getName()).c_str(),
-        &signalThrowData[iSignal].getRawDataArray()[0],
+    xsecThrowTree->Branch(
+        GenericToolbox::generateCleanBranchName( sample.getName() ).c_str(),
+        xsecEntry.branchBinsData.getRawDataArray().data(),
         GenericToolbox::joinVectorString(leafNameList, ":").c_str()
     );
-  }
 
-  std::vector<double> numberOfTargets(signalThrowData.size());
-  std::vector<double> integratedFlux(signalThrowData.size());
-  for( size_t iSignal = 0 ; iSignal < signalThrowData.size() ; iSignal++ ){
-    numberOfTargets[iSignal] = GenericToolbox::Json::fetchValue<double>(propagator.getFitSampleSet().getFitSampleList()[iSignal].getConfig(), "numberOfTargets", 1);
-    integratedFlux[iSignal] = GenericToolbox::Json::fetchValue<double>(propagator.getFitSampleSet().getFitSampleList()[iSignal].getConfig(), "integratedFlux", 1);
-  }
-
-  int nToys{100};
-  if(clParser.isOptionTriggered("nToys")) nToys = clParser.getOptionVal<int>("nToys");
-
-  bool enableEventMcThrow{true};
-  bool enableStatThrowInToys{true};
-  auto xsecCalcConfig = GenericToolbox::Json::fetchValue( cHandler.getConfig(), "xsecCalcConfig", nlohmann::json() );
-  enableStatThrowInToys = GenericToolbox::Json::fetchValue( xsecCalcConfig, "enableStatThrowInToys", enableStatThrowInToys);
-  enableEventMcThrow = GenericToolbox::Json::fetchValue( xsecCalcConfig, "enableEventMcThrow", enableEventMcThrow);
-
-  std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating " << nToys << " toys...";
-  for( int iToy = 0 ; iToy < nToys ; iToy++ ){
-    GenericToolbox::displayProgressBar(iToy, nToys, ss.str());
-
-    // Do the throwing:
-    propagator.throwParametersFromGlobalCovariance();
-    propagator.propagateParametersOnSamples();
-    if( enableStatThrowInToys ){
-      for( auto& sample : propagator.getFitSampleSet().getFitSampleList() ){
-        if( enableEventMcThrow ){
-          // Take into account the finite amount of event in MC
-          sample.getMcContainer().throwEventMcError();
-        }
-        // Asimov bin content -> toy data
-        sample.getMcContainer().throwStatError();
-      }
+    auto normConfigList = GenericToolbox::Json::fetchValue( xsecEntry.config, "normaliseParameterList", nlohmann::json() );
+    xsecEntry.normList.reserve( normConfigList.size() );
+    for( auto& normConfig : normConfigList ){
+      xsecEntry.normList.emplace_back();
+      xsecEntry.normList.back().config = normConfig;
     }
 
-    // Compute N_truth_i(flux, xsec) and N_selected_truth_i(flux, xsec, det) -> efficiency
-    // mask detector parameters?
-
-
-    // Then compute N_selected_truth_i(flux, xsec, det, c_i) -> N_i
-
-
-    // Write N_i / efficiency / T / phi
-    for( size_t iSignal = 0 ; iSignal < propagator.getFitSampleSet().getFitSampleList().size() ; iSignal++ ){
-      signalThrowData[iSignal].resetCurrentByteOffset();
-      for( int iBin = 0 ; iBin < propagator.getFitSampleSet().getFitSampleList()[iSignal].getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-        signalThrowData[iSignal].writeRawData(
-            propagator.getFitSampleSet().getFitSampleList()[iSignal].getMcContainer().histogram->GetBinContent(1+iBin)
-            / numberOfTargets[iSignal] / integratedFlux[iSignal]
-        );
-      }
-    }
-
-    // Write the branches
-    signalThrowTree->Fill();
-  }
-
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(calcXsecDir, "throws"), signalThrowTree, "signalThrow");
-  auto* meanValuesVector = GenericToolbox::generateMeanVectorOfTree(signalThrowTree);
-  auto* globalCovMatrix = GenericToolbox::generateCovarianceMatrixOfTree(signalThrowTree);
-
-  auto* globalCovMatrixHist = GenericToolbox::convertTMatrixDtoTH2D(globalCovMatrix);
-  auto* globalCorMatrixHist = GenericToolbox::convertTMatrixDtoTH2D(GenericToolbox::convertToCorrelationMatrix(globalCovMatrix));
-
-  std::vector<TH1D> binValues{};
-  binValues.reserve( propagator.getFitSampleSet().getFitSampleList().size() );
-  int iGlobal{-1};
-  for( size_t iSignal = 0 ; iSignal < propagator.getFitSampleSet().getFitSampleList().size() ; iSignal++ ){
-
-    auto& sample = propagator.getFitSampleSet().getFitSampleList()[iSignal];
-
-    binValues.emplace_back(
+    xsecEntry.histogram = TH1D(
         sample.getName().c_str(),
         sample.getName().c_str(),
         sample.getMcContainer().histogram->GetNbinsX(),
         0,
         sample.getMcContainer().histogram->GetNbinsX()
     );
+  }
 
-    std::string sampleTitle{ sample.getName() };
+  int nToys{ clParser.getOptionVal<int>("nToys") };
 
-    for( int iBin = 0 ; iBin < sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-      iGlobal++;
+  bool enableEventMcThrow{true};
+  bool enableStatThrowInToys{true};
+  auto xsecCalcConfig   = GenericToolbox::Json::fetchValue( cHandler.getConfig(), "xsecCalcConfig", nlohmann::json() );
+  enableStatThrowInToys = GenericToolbox::Json::fetchValue( xsecCalcConfig, "enableStatThrowInToys", enableStatThrowInToys);
+  enableEventMcThrow    = GenericToolbox::Json::fetchValue( xsecCalcConfig, "enableEventMcThrow", enableEventMcThrow);
 
-      std::string binTitle = sample.getBinning().getBinsList()[iBin].getSummary();
-      double binVolume = sample.getBinning().getBinsList()[iBin].getVolume();
+  std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating " << nToys << " toys...";
+  for( int iToy = 0 ; iToy < nToys ; iToy++ ){
 
-      binValues[iSignal].SetBinContent(1+iBin, (*meanValuesVector)[iGlobal] / binVolume  );
-      binValues[iSignal].SetBinError(1+iBin, TMath::Sqrt( (*globalCovMatrix)[iGlobal][iGlobal] ) / binVolume );
-      binValues[iSignal].GetXaxis()->SetBinLabel( 1+iBin, binTitle.c_str() );
+    // loading...
+    GenericToolbox::displayProgressBar( iToy, nToys, ss.str() );
 
-      globalCovMatrixHist->GetXaxis()->SetBinLabel(1+iGlobal, GenericToolbox::joinPath(sampleTitle, binTitle).c_str());
-      globalCorMatrixHist->GetXaxis()->SetBinLabel(1+iGlobal, GenericToolbox::joinPath(sampleTitle, binTitle).c_str());
-      globalCovMatrixHist->GetYaxis()->SetBinLabel(1+iGlobal, GenericToolbox::joinPath(sampleTitle, binTitle).c_str());
-      globalCorMatrixHist->GetYaxis()->SetBinLabel(1+iGlobal, GenericToolbox::joinPath(sampleTitle, binTitle).c_str());
+    // Do the throwing:
+    propagator.throwParametersFromGlobalCovariance();
+    propagator.propagateParametersOnSamples();
+
+    for( auto& xsec : crossSectionDataList ){
+
+      if( enableStatThrowInToys ){
+        if( enableEventMcThrow ){
+          // Take into account the finite amount of event in MC
+          xsec.samplePtr->getMcContainer().throwEventMcError();
+        }
+        // Asimov bin content -> toy data
+        xsec.samplePtr->getMcContainer().throwStatError();
+      }
+
+      xsec.branchBinsData.resetCurrentByteOffset();
+      for( int iBin = 0 ; iBin < xsec.samplePtr->getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+        double binData{ xsec.samplePtr->getMcContainer().histogram->GetBinContent(1+iBin) };
+        xsec.branchBinsData.writeRawData( binData );
+      }
     }
 
-    binValues[iSignal].SetMarkerStyle(kFullDotLarge);
-    binValues[iSignal].SetMarkerColor(kGreen-3);
-    binValues[iSignal].SetMarkerSize(0.5);
-    binValues[iSignal].SetLineWidth(2);
-    binValues[iSignal].SetLineColor(kGreen-3);
-    binValues[iSignal].SetDrawOption("E1");
-    binValues[iSignal].GetXaxis()->LabelsOption("v");
-    binValues[iSignal].GetXaxis()->SetLabelSize(0.02);
-    binValues[iSignal].GetYaxis()->SetTitle( GenericToolbox::Json::fetchValue(sample.getConfig(), "yAxis", "#delta#sigma").c_str() );
+    // Write the branches
+    xsecThrowTree->Fill();
+  }
+
+  LogInfo << "Writing throws..." << std::endl;
+  GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(calcXsecDir, "throws"), xsecThrowTree );
+
+  LogInfo << "Calculating mean & covariance matrix..." << std::endl;
+  auto* meanValuesVector = GenericToolbox::generateMeanVectorOfTree( xsecThrowTree );
+  auto* globalCovMatrix = GenericToolbox::generateCovarianceMatrixOfTree( xsecThrowTree );
+
+  auto* globalCovMatrixHist = GenericToolbox::convertTMatrixDtoTH2D(globalCovMatrix);
+  auto* globalCorMatrixHist = GenericToolbox::convertTMatrixDtoTH2D(GenericToolbox::convertToCorrelationMatrix(globalCovMatrix));
+
+  std::vector<TH1D> binValues{};
+  binValues.reserve( propagator.getFitSampleSet().getFitSampleList().size() );
+  int iBinGlobal{-1};
+
+  for( auto& xsec : crossSectionDataList ){
+
+    for( int iBin = 0 ; iBin < xsec.samplePtr->getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+      iBinGlobal++;
+
+      std::string binTitle = xsec.samplePtr->getBinning().getBinsList()[iBin].getSummary();
+      double binVolume = xsec.samplePtr->getBinning().getBinsList()[iBin].getVolume();
+
+      xsec.histogram.SetBinContent( 1+iBin, (*meanValuesVector)[iBinGlobal] );
+      xsec.histogram.SetBinError( 1+iBin, TMath::Sqrt( (*globalCovMatrix)[iBinGlobal][iBinGlobal] ) );
+      xsec.histogram.GetXaxis()->SetBinLabel( 1+iBin, binTitle.c_str() );
+
+      globalCovMatrixHist->GetXaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
+      globalCorMatrixHist->GetXaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
+      globalCovMatrixHist->GetYaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
+      globalCorMatrixHist->GetYaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
+    }
+
+    xsec.histogram.SetMarkerStyle(kFullDotLarge);
+    xsec.histogram.SetMarkerColor(kGreen-3);
+    xsec.histogram.SetMarkerSize(0.5);
+    xsec.histogram.SetLineWidth(2);
+    xsec.histogram.SetLineColor(kGreen-3);
+    xsec.histogram.SetDrawOption("E1");
+    xsec.histogram.GetXaxis()->LabelsOption("v");
+    xsec.histogram.GetXaxis()->SetLabelSize(0.02);
+    xsec.histogram.GetYaxis()->SetTitle( GenericToolbox::Json::fetchValue(xsec.samplePtr->getConfig(), "yAxis", "#delta#sigma").c_str() );
 
     GenericToolbox::writeInTFile(
         GenericToolbox::mkdirTFile(calcXsecDir, "histograms"),
-        &binValues[iSignal],
-        GenericToolbox::generateCleanBranchName(sample.getName())
+        &xsec.histogram, GenericToolbox::generateCleanBranchName( xsec.samplePtr->getName() )
     );
-  }
 
+  }
 
   globalCovMatrixHist->GetXaxis()->SetLabelSize(0.02);
   globalCovMatrixHist->GetYaxis()->SetLabelSize(0.02);
