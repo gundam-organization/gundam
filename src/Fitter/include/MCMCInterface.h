@@ -82,14 +82,26 @@ private:
   // Parameters for the adaptive stepper.
 
   // An input file name that contains a chain.  This causes the previous state
-  // to be restored.
-  std::string _adaptiveRestore_{""};
+  // to be restored.  If the state is restored, then the burn-in will be
+  // skipped.
+  std::string _adaptiveRestore_{"none"};
+
+  // An input file name that contains a TH2D with the covariance matrix that
+  // will be used by the default proposal distribution.  If it's provided, it
+  // will usually be the result of a previous MINUIT asimov fit.
+  std::string _adaptiveCovFile_{"none"};
+
+  // The name of a TH2D with a covariance matrix describing the proposal
+  // distribution.  The default value is where GUNDAM puts the covariance for
+  // from MINUIT.  If decomposition was used during the fit, this will be in
+  // the decomposed space.
+  std::string _adaptiveCovName_{"FitterEngine/postFit/Hesse/hessian/postfitCovariance_TH2D"};
 
   // Freeze the burn-in step after this many cycles.
   int _burninFreezeAfter_{1000000000}; // Never freeze except by request
 
   // The window to calculate the covariance during burn-in
-  int _burninCovWindow_{20000};
+  int _burninCovWindow_{100000};
 
   // The amount of deweighting during burning updates.
   double _burninCovDeweighting_{0.5};
@@ -162,15 +174,34 @@ private:
 
   /// The implementation with the simple step is used.  This is mostly an
   /// example of how to setup an alternate stepping proposal.
+  typedef TSimpleMCMC<PrivateProxyLikelihood,TProposeSimpleStep> SimpleStepMCMC;
   void setupAndRunSimpleStep(
-    TSimpleMCMC<PrivateProxyLikelihood,TProposeSimpleStep>& mcmc);
+    SimpleStepMCMC& mcmc);
 
   /// The implementation when the adaptive step is used.  This is the default
   /// proposal for TSimpleMCMC, but is also dangerous for "unpleasant"
   /// likelihoods that have a lot of correlations between parameters.
-  void setupAndRunAdaptiveStep(
-    TSimpleMCMC<PrivateProxyLikelihood,TProposeAdaptiveStep>& mcmc);
+  typedef TSimpleMCMC<PrivateProxyLikelihood,TProposeAdaptiveStep> AdaptiveStepMCMC;
+  void setupAndRunAdaptiveStep(AdaptiveStepMCMC& mcmc);
 
+  /////////////////////////////////////////////////////////////////
+  // Support routines for the adaptive step.
+
+  /// Restore the state from an input file (and the tree in the file).  This
+  /// returns true if the state was restored and the chain is being continued.
+  bool adaptiveRestoreState(AdaptiveStepMCMC& mcmc,
+                            const std::string& fileName,
+                            const std::string& treeName);
+
+  /// Set the covariance of the proposal based on a TH2D histogram in a file.
+  /// This returns true if the parameter correlations have been set.
+  bool adaptiveLoadProposalCovariance(AdaptiveStepMCMC& mcmc,
+                                      const std::string& fileName,
+                                      const std::string& histName);
+
+
+  /// Set the default proposal based on the FitParameter values and steps.
+  bool adaptiveDefaultProposalCovariance(AdaptiveStepMCMC& mcmc);
 };
 #endif // GUNDAM_MCMCInterface_h
 

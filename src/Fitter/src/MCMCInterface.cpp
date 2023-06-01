@@ -12,6 +12,8 @@
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
 
+#include <locale>
+
 LoggerInit([]{
   Logger::setUserHeaderStr("[MCMC]");
 });
@@ -98,10 +100,11 @@ void MCMCInterface::readConfigImpl(){
   _burninWindow_ = GenericToolbox::Json::fetchValue(
     _config_, "burninWindow", _burninWindow_);
 
-  // Set the name of a file containing a previous sequence of the chain.  This
-  // restores the state from the end of the chain and continues.  This is also
-  // be settable from the command line (setting from the command line is the
-  // better option) using the override option
+  // Set the name of a file containing an existing Markov chain to be
+  // extended.  If this is set, then the burn-in will be skipped.
+  //
+  // The value is settable from the command line (setting from the command
+  // line is the better option) using the override option
   //
   // "-O /fitterEngineConfig/mcmcConfig/adaptiveRestore=<filename>"
   //
@@ -109,6 +112,30 @@ void MCMCInterface::readConfigImpl(){
   // the configuration file (with a NULL value)
   _adaptiveRestore_ = GenericToolbox::Json::fetchValue(
     _config_, "adaptiveRestore", _adaptiveRestore_);
+  _adaptiveRestore_
+    = GenericToolbox::expandEnvironmentVariables(_adaptiveRestore_);
+
+  // Set the name of a file containing a TH2D that describes the covariance of
+  // the proposal distribution.
+  //
+  // The value is settable from the command line (setting from the command
+  // line is the better option) using the override option
+  //
+  // "-O /fitterEngineConfig/mcmcConfig/adaptiveCovFile=<filename>"
+  //
+  // For this to be used the adaptiveCovFile value must exist in the
+  // configuration file (with a value of "none" to be ignored, or a default
+  // value if a default should be loaded)
+  _adaptiveCovFile_ = GenericToolbox::Json::fetchValue(
+    _config_, "adaptiveCovFile", _adaptiveCovFile_);
+  _adaptiveCovFile_
+    = GenericToolbox::expandEnvironmentVariables(_adaptiveCovFile_);
+
+  // Set the name of a ROOT TH2D that will be used as the covariance of the
+  // step proposal.  If adaptiveCovFile is not set, or has a value of "none",
+  // this will be ignored.
+  _adaptiveCovName_ = GenericToolbox::Json::fetchValue(
+    _config_, "adaptiveCovName", _adaptiveCovName_);
 
   // Set the window to calculate the current covariance value over.  If this
   // is set to short, the covariance will not sample the entire posterior.
@@ -160,7 +187,7 @@ void MCMCInterface::initializeImpl(){
 /// success.
 bool MCMCInterface::isFitHasConverged() const {return true;}
 
-/// coyp the current parameter values to the tree.
+/// Copy the current parameter values to the tree.
 void MCMCInterface::fillPoint() {
   int count = 0;
   for (const FitParameterSet& parSet: getPropagator().getParameterSetsList()) {
@@ -174,29 +201,67 @@ void MCMCInterface::fillPoint() {
   }
 }
 
-void MCMCInterface::setupAndRunAdaptiveStep(
-  TSimpleMCMC<PrivateProxyLikelihood,TProposeAdaptiveStep>& mcmc) {
+bool MCMCInterface::adaptiveRestoreState(AdaptiveStepMCMC& mcmc,
+                                         const std::string& fileName,
+                                         const std::string& treeName) {
 
-  mcmc.GetProposeStep().SetDim(getMinimizerFitParameterPtr().size());
-  mcmc.GetLogLikelihood().functor = getLikelihood().evalFitValidFunctor();
+  // No filename so, no restoration.
+  if (fileName.empty()) return false;
 
-  // Create a fitting parameter vector and initialize it.  No need to worry
-  // about resizing it or it moving, so be lazy and just use push_back.
-  Vector p;
+  // Filename is "null"
+  std::string tmp = fileName;
+  std::use_facet<std::ctype<std::string::value_type>>(std::locale())
+    .tolower(&tmp[0],&tmp[0]+tmp.size());
+  if (tmp == "none") return false;
+
+  // Open the file with the state.
+  TFile* saveFile = gFile;
+  std::unique_ptr<TFile> restoreFile
+    (new TFile(fileName.c_str(), "old"));
+  if (!restoreFile || !restoreFile->IsOpen()) {
+    LogInfo << "File to restore was not found: "
+            << fileName << std::endl;
+    throw std::runtime_error("Old state file not open");
+  }
+  LogInfo << "Restore the state of a previous MCMC and extend" << std::endl;
+
+  // Get the tree with the state.
+  TTree* restoreTree = dynamic_cast<TTree*>(restoreFile->Get(treeName.c_str()));
+  if (!restoreTree) {
+    LogInfo << "Tree to restore state is not found"
+            << treeName << std::endl;
+    throw std::runtime_error("Old state tree not open");
+  }
+
+  // Load the old state from the tree.
+  mcmc.Restore(restoreTree);
+  LogInfo << "State Restored" << std::endl;
+
+  // Set the deweighting to zero so set covariance is directly used.
+  mcmc.GetProposeStep().SetCovarianceUpdateDeweighting(0.0);
+
+  // Restore the original file status.
+  gFile = saveFile;
+  gFile->cd((std::string(owner().getSaveDir()->GetName())+"/fit").c_str());
+
+  return true;
+}
+
+bool
+MCMCInterface::adaptiveDefaultProposalCovariance(AdaptiveStepMCMC& mcmc) {
+
+  /// Set the diagonal elements for the parameters.
+  int count0 = 0;
   for (const FitParameter* par : getMinimizerFitParameterPtr() ) {
+    ++count0;
     if (getLikelihood().getUseNormalizedFitSpace()) {
       // Changing the boundaries, change the value/step size?
-      double val
-        = FitParameterSet::toNormalizedParValue(
-          par->getParameterValue(), *par);
       double step
         = FitParameterSet::toNormalizedParRange(
           par->getStepSize(), *par);
-      mcmc.GetProposeStep().SetGaussian(p.size(),step);
-      p.push_back(val);
+      mcmc.GetProposeStep().SetGaussian(count0-1,step);
       continue;
     }
-    p.push_back(par->getPriorValue());
     switch (par->getPriorType()) {
     case PriorType::Flat: {
       // Gundam uses flat to mean "free", so this doesn't use a Uniform
@@ -206,16 +271,18 @@ void MCMCInterface::setupAndRunAdaptiveStep(
         step = std::max(par->getStepSize(),par->getStdDevValue());
       }
       step /= std::sqrt(getMinimizerFitParameterPtr().size());
-      mcmc.GetProposeStep().SetGaussian(p.size()-1,step);
+      mcmc.GetProposeStep().SetGaussian(count0-1,step);
       break;
     }
     default: {
       double step = par->getStdDevValue();
-      mcmc.GetProposeStep().SetGaussian(p.size()-1,step);
+      mcmc.GetProposeStep().SetGaussian(count0-1,step);
       break;
     }
     }
   }
+
+  mcmc.GetProposeStep().ResetCorrelations();
 
   // Set up the correlations in the priors.
   int count1 = 0;
@@ -271,6 +338,123 @@ void MCMCInterface::setupAndRunAdaptiveStep(
     }
   }
 
+  return true;
+}
+
+bool
+MCMCInterface::adaptiveLoadProposalCovariance(AdaptiveStepMCMC& mcmc,
+                                              const std::string& fileName,
+                                              const std::string& histName) {
+  // No filename so, no restoration.
+  if (fileName.empty()) return false;
+
+  // Filename is "null"
+  std::string tmp = fileName;
+  std::use_facet<std::ctype<std::string::value_type>>(std::locale())
+    .tolower(&tmp[0],&tmp[0]+tmp.size());
+  if (tmp == "none") return false;
+
+  TFile* saveFile = gFile;
+  std::unique_ptr<TFile> restoreFile
+    (new TFile(fileName.c_str(), "old"));
+  if (!restoreFile || !restoreFile->IsOpen()) {
+    LogInfo << "File to restore was not found: "
+            << fileName << std::endl;
+    throw std::runtime_error("Old state file not open");
+  }
+  LogInfo << "Restore the state of a previous MCMC and extend" << std::endl;
+
+  gFile = saveFile;
+  gFile->cd((std::string(owner().getSaveDir()->GetName())+"/fit").c_str());
+
+  LogInfo << "Set the value of the proposal covariance" << std::endl;
+  TH2D* proposalCov = dynamic_cast<TH2D*>(
+    restoreFile->Get(_adaptiveCovName_.c_str()));
+  if (!proposalCov) {
+    LogError << "Proposal TH2D not found "
+             << _adaptiveCovName_ << std::endl;
+  }
+
+  // Check that the covariance that was read matchs the number of parameters.
+  if (mcmc.GetProposeStep().GetDim() != proposalCov->GetNbinsX()
+      or mcmc.GetProposeStep().GetDim() != proposalCov->GetNbinsY()) {
+    LogError << "Loading proposal covariance with incorrect dimensions"
+             << std::endl;
+    LogError << "   Expected Dimensions: " << mcmc.GetProposeStep().GetDim()
+             << std::endl;
+    LogError << "   Proposal X Bins:     " << proposalCov->GetNbinsX()
+             << std::endl;
+    LogError << "   Proposal Y Bins:     " << proposalCov->GetNbinsY()
+             << std::endl;
+    LogThrow("Mismatched proposal covariance matrix");
+  }
+
+  // Set the diagonal elements for the parameters.
+  int count0 = 0;
+  for (const FitParameter* par : getMinimizerFitParameterPtr() ) {
+    ++count0;
+    double sigma = std::sqrt(proposalCov->GetBinContent(count0,count0));
+    if (getLikelihood().getUseNormalizedFitSpace()) {
+      // Changing the boundaries, change the value/step size?
+      sigma = FitParameterSet::toNormalizedParRange(sigma, *par);
+    }
+    mcmc.GetProposeStep().SetGaussian(count0-1,sigma);
+  }
+
+  // Dump all of the previous correlations.
+  mcmc.GetProposeStep().ResetCorrelations();
+
+  int count1 = 0;
+  for (const FitParameter* par1 : getMinimizerFitParameterPtr() ) {
+    ++count1;
+    double sig1 = std::sqrt(proposalCov->GetBinContent(count1,count1));
+    int count2 = 0;
+    for (const FitParameter* par2 : getMinimizerFitParameterPtr() ) {
+      ++count2;
+      double sig2 = std::sqrt(proposalCov->GetBinContent(count2,count2));
+      if (count2 == count1) {
+        // Set the sigma for this variable
+        double step = sig1;
+        if (getLikelihood().getUseNormalizedFitSpace()) {
+          step = FitParameterSet::toNormalizedParRange(sig1,*par1);
+        }
+        mcmc.GetProposeStep().SetGaussian(count1-1,step);
+        continue;
+      }
+      double corr = proposalCov->GetBinContent(count1,count2)/sig1/sig2;
+      mcmc.GetProposeStep().SetCorrelation(count1-1,count2-1,corr);
+    }
+  }
+
+  return true;
+}
+
+
+void MCMCInterface::setupAndRunAdaptiveStep(AdaptiveStepMCMC& mcmc) {
+
+  mcmc.GetProposeStep().SetDim(getMinimizerFitParameterPtr().size());
+  mcmc.GetLogLikelihood().functor = getLikelihood().evalFitValidFunctor();
+
+  // Create a fitting parameter vector and initialize it.  No need to worry
+  // about resizing it or it moving, so be lazy and just use push_back.
+  Vector p;
+  for (const FitParameter* par : getMinimizerFitParameterPtr() ) {
+    if (not getLikelihood().getUseNormalizedFitSpace()) {
+      p.push_back(par->getPriorValue());
+    }
+    else {
+      // Changing the boundaries, change the value/step size?
+      double val
+        = FitParameterSet::toNormalizedParValue(
+          par->getParameterValue(), *par);
+      p.push_back(val);
+    }
+  }
+
+  // Set the correlations in the default step proposal.
+  adaptiveDefaultProposalCovariance(mcmc);
+  adaptiveLoadProposalCovariance(mcmc,_adaptiveCovFile_,_adaptiveCovName_);
+
   // Fill the initial point.
   fillPoint();
 
@@ -280,36 +464,10 @@ void MCMCInterface::setupAndRunAdaptiveStep(
   mcmc.GetProposeStep().SetAcceptanceWindow(_adaptiveWindow_);
   mcmc.SetStepRMSWindow(_adaptiveWindow_);
 
-  // Restore the chain if exist
-  if (!_adaptiveRestore_.empty() && _adaptiveRestore_ != "none") {
-    // Check for restore file
-    LogInfo << "Restore from: " << _adaptiveRestore_ << std::endl;
-    TFile* saveFile = gFile;
-    {
-      std::unique_ptr<TFile> restoreFile
-        (new TFile(_adaptiveRestore_.c_str(), "old"));
-      if (!restoreFile || !restoreFile->IsOpen()) {
-        LogInfo << "File to restore was is found: "
-                << _adaptiveRestore_ << std::endl;
-        throw std::runtime_error("Old state file not open");
-      }
-      std::string treeName = "FitterEngine/fit/" + _outTreeName_;
-      TTree* restoreTree = (TTree*) restoreFile->Get(treeName.c_str());
-      if (!restoreTree) {
-        LogInfo << "Tree to restore state is not found"
-                << treeName << std::endl;
-        throw std::runtime_error("Old state tree not open");
-      }
-      // Set the deweighting to zero so the previous state is directly used.
-      mcmc.GetProposeStep().SetCovarianceUpdateDeweighting(0.0);
-      // Load the old state from the tree.
-      mcmc.Restore(restoreTree);
-      LogInfo << "State Restored" << std::endl;
-    }
-    gFile = saveFile;
-    gFile->cd((std::string(owner().getSaveDir()->GetName())+"/fit").c_str());
-  }
-  else {
+  // Restore the chain if exist, otherwise, burn-in
+  std::string restorationTree = "FitterEngine/fit/" + _outTreeName_;
+  bool restored = adaptiveRestoreState(mcmc,_adaptiveRestore_, restorationTree);
+  if (not restored) {
     // Burnin cycles
     mcmc.GetProposeStep().SetCovarianceWindow(_burninCovWindow_);
     mcmc.GetProposeStep().SetAcceptanceWindow(_burninWindow_);
@@ -423,8 +581,7 @@ void MCMCInterface::setupAndRunAdaptiveStep(
 
 }
 
-void MCMCInterface::setupAndRunSimpleStep(
-  TSimpleMCMC<PrivateProxyLikelihood,TProposeSimpleStep>& mcmc) {
+void MCMCInterface::setupAndRunSimpleStep(SimpleStepMCMC& mcmc) {
 
   mcmc.GetProposeStep().SetDim(getMinimizerFitParameterPtr().size());
   mcmc.GetLogLikelihood().functor = getLikelihood().evalFitFunctor();
