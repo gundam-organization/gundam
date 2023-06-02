@@ -261,7 +261,7 @@ int main(int argc, char** argv){
     void initialize(){
       LogThrowIf(dialCollectionPtr == nullptr, "Associated dial collection not provided.");
       LogThrowIf(not dialCollectionPtr->isBinned(), "Dial collection is not binned.");
-      LogThrowIf(dialCollectionPtr->getSupervisedParameter() == nullptr, "Need a dial collection that handle a whole parSet.");
+      LogThrowIf(dialCollectionPtr->getSupervisedParameter() != nullptr, "Need a dial collection that handle a whole parSet.");
 
       file = std::make_shared<TFile>( filePath.c_str() );
       LogThrowIf(file == nullptr, "Could not open file");
@@ -274,10 +274,7 @@ int main(int argc, char** argv){
     [[nodiscard]] double getNormFactor() const {
       double out{0};
 
-      LogDebug << __METHOD_NAME__ << std::endl;
-
       for( int iBin = 0 ; iBin < histogram->GetNbinsX() ; iBin++ ){
-        LogDebug << "GETBINCONTENT" << std::endl;
         double binValue{histogram->GetBinContent(1+iBin)};
 
 
@@ -286,7 +283,6 @@ int main(int argc, char** argv){
         for( size_t iParBin = 0 ; iParBin < dialCollectionPtr->getDialBinSet().getBinsList().size() ; iParBin++ ){
           const DataBin& parBin = dialCollectionPtr->getDialBinSet().getBinsList()[iParBin];
 
-          LogDebug << __LINE__ << std::endl;
           bool isParBinValid{true};
 
           // first check the conditions
@@ -341,6 +337,7 @@ int main(int argc, char** argv){
         for( auto& dialCollection : propagator.getDialCollections() ){
           if( dialCollection.getSupervisedParameterSet() == &parSet ){
             parSetNormList.back().dialCollectionPtr = &dialCollection;
+            break;
           }
         }
 
