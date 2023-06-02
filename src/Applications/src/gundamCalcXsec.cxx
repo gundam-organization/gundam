@@ -220,13 +220,137 @@ int main(int argc, char** argv){
   auto* xsecThrowTree = new TTree("xsecThrow", "xsecThrow");
 
 
+  LogInfo << "Creating normalizer objects..." << std::endl;
+  // flux renorm with toys
+  struct ParSetNormaliser{
+
+    void readConfig(const nlohmann::json& config_){
+      LogScopeIndent;
+
+      name = GenericToolbox::Json::fetchValue<std::string>(config_, "name");
+      LogInfo << "ParSetNormaliser config \"" << name << "\": " << std::endl;
+
+      // mandatory
+      filePath = GenericToolbox::Json::fetchValue<std::string>(config_, "filePath");
+      histogramPath = GenericToolbox::Json::fetchValue<std::string>(config_, "histogramPath");
+      axisVariable = GenericToolbox::Json::fetchValue<std::string>(config_, "axisVariable");
+
+      // optionals
+      parSelections = GenericToolbox::Json::fetchValue(config_, "parSelections", parSelections);
+
+      // init
+      LogScopeIndent;
+      LogInfo << GET_VAR_NAME_VALUE(filePath) << std::endl;
+      LogInfo << GET_VAR_NAME_VALUE(histogramPath) << std::endl;
+      LogInfo << GET_VAR_NAME_VALUE(axisVariable) << std::endl;
+
+      if( not parSelections.empty() ){
+        LogInfo << "parSelections:" << std::endl;
+        for( auto& parSelection : parSelections ){
+          LogScopeIndent;
+          LogInfo << parSelection.first << " -> " << parSelection.second << std::endl;
+        }
+      }
+
+    }
+    void initialize(){
+      LogThrowIf(dialCollectionPtr == nullptr, "Associated dial collection not provided.");
+      LogThrowIf(not dialCollectionPtr->isBinned(), "Dial collection is not binned.");
+      LogThrowIf(dialCollectionPtr->getSupervisedParameter() == nullptr, "Need a dial collection that handle a whole parSet.");
+
+      file = std::make_shared<TFile>( filePath.c_str() );
+      LogThrowIf(file == nullptr, "Could not open file");
+
+      histogram = file->Get<TH1D>( histogramPath.c_str() );
+      LogThrowIf(histogram == nullptr, "Could not find histogram.");
+    }
+
+
+    [[nodiscard]] double getNormFactor() const {
+      double out{0};
+
+      LogDebug << __METHOD_NAME__ << std::endl;
+
+      for( int iBin = 0 ; iBin < histogram->GetNbinsX() ; iBin++ ){
+        LogDebug << "GETBINCONTENT" << std::endl;
+        double binValue{histogram->GetBinContent(1+iBin)};
+
+
+        // do we skip this bin? if not, apply coefficient
+        bool skipBin{true};
+        for( size_t iParBin = 0 ; iParBin < dialCollectionPtr->getDialBinSet().getBinsList().size() ; iParBin++ ){
+          const DataBin& parBin = dialCollectionPtr->getDialBinSet().getBinsList()[iParBin];
+
+          LogDebug << __LINE__ << std::endl;
+          bool isParBinValid{true};
+
+          // first check the conditions
+          for( auto& selection : parSelections ){
+            if( parBin.isVariableSet(selection.first) and not parBin.isBetweenEdges(selection.first, selection.second) ){
+              isParBinValid = false;
+              break;
+            }
+          }
+
+          // checking if the hist bin correspond to this
+          if( parBin.isVariableSet(axisVariable) and not parBin.isBetweenEdges(axisVariable, histogram->GetBinCenter(1+iBin)) ){
+            isParBinValid = false;
+          }
+
+          if( isParBinValid ){
+            // ok, then apply the weight
+            binValue *= dialCollectionPtr->getSupervisedParameterSet()->getParameterList()[iParBin].getParameterValue();
+
+            skipBin = false;
+            break;
+          }
+        }
+        if( skipBin ){ continue; }
+
+        // ok, add the fluctuated value
+        out += binValue;
+      }
+
+      return out;
+    }
+
+    // config
+    std::string name{};
+    std::string filePath{};
+    std::string histogramPath{};
+    std::string axisVariable{};
+    std::vector<std::pair<std::string, double>> parSelections{};
+
+    // internals
+    std::shared_ptr<TFile> file{nullptr};
+    TH1D* histogram{nullptr};
+    const DialCollection* dialCollectionPtr{nullptr}; // where the binning is defined
+  };
+  std::vector<ParSetNormaliser> parSetNormList;
+  for( auto& parSet : propagator.getParameterSetsList() ){
+    if( GenericToolbox::Json::doKeyExist(parSet.getConfig(), "normalisations") ){
+      for( auto& parSetNormConfig : GenericToolbox::Json::fetchValue<nlohmann::json>(parSet.getConfig(), "normalisations") ){
+        parSetNormList.emplace_back();
+        parSetNormList.back().readConfig( parSetNormConfig );
+
+        for( auto& dialCollection : propagator.getDialCollections() ){
+          if( dialCollection.getSupervisedParameterSet() == &parSet ){
+            parSetNormList.back().dialCollectionPtr = &dialCollection;
+          }
+        }
+
+        parSetNormList.back().initialize();
+      }
+    }
+  }
+
+
+
   // to be filled up
   struct BinNormaliser{
     void readConfig(const nlohmann::json& config_){
       LogScopeIndent;
-
-
-
+      
       name = GenericToolbox::Json::fetchValue<std::string>(config_, "name");
 
       if( not GenericToolbox::Json::fetchValue(config_, "isEnabled", true) ){
@@ -245,6 +369,13 @@ int main(int argc, char** argv){
         disabledBinDim = GenericToolbox::Json::fetchValue<std::string>(config_, "disabledBinDim");
         LogInfo << "disabledBinDim = " << disabledBinDim;
       }
+      else if( GenericToolbox::Json::doKeyExist( config_, "parSetNormName" ) ){
+        parSetNormaliserName = GenericToolbox::Json::fetchValue<std::string>(config_, "parSetNormName");
+        LogInfo << "parSetNormName = " << parSetNormaliserName;
+      }
+      else{
+        LogThrow("Unrecognized config.");
+      }
 
       LogInfo << std::endl;
     }
@@ -252,6 +383,7 @@ int main(int argc, char** argv){
     std::string name{};
     std::pair<double, double> normParameter{std::nan("mean unset"), std::nan("stddev unset")};
     std::string disabledBinDim{};
+    std::string parSetNormaliserName{};
 
   };
 
@@ -345,6 +477,18 @@ int main(int argc, char** argv){
             double norm{normData.normParameter.first};
             if( normData.normParameter.second != 0 ){ norm += normData.normParameter.second * gRandom->Gaus(); }
             binData /= norm;
+          }
+          else if( not normData.parSetNormaliserName.empty() ){
+            ParSetNormaliser* parSetNormPtr{nullptr};
+            for( auto& parSetNorm : parSetNormList ){
+              if( parSetNorm.name == normData.parSetNormaliserName ){
+                parSetNormPtr = &parSetNorm;
+                break;
+              }
+            }
+            LogThrowIf(parSetNormPtr == nullptr, "Could not find parSetNorm obj with name: " << normData.parSetNormaliserName);
+
+            binData /= parSetNormPtr->getNormFactor();
           }
         }
 
