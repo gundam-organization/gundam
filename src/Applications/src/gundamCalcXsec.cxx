@@ -1,6 +1,6 @@
 
 #include "GlobalVariables.h"
-#include "GundamGreetings.h"
+#include "GundamApp.h"
 #include "GundamUtils.h"
 #include "Propagator.h"
 #include "ConfigUtils.h"
@@ -31,10 +31,7 @@ LoggerInit([]{
 
 int main(int argc, char** argv){
 
-  GundamGreetings g;
-  g.setAppName("cross-section calculator tool");
-  g.hello();
-
+  GundamApp app{"cross-section calculator tool"};
 
   // --------------------------
   // Read Command Line Args:
@@ -188,7 +185,6 @@ int main(int argc, char** argv){
   // Load everything
   propagator.initialize();
 
-
   // Creating output file
   std::string outFilePath{};
   if( clParser.isOptionTriggered("outputFile") ){ outFilePath = clParser.getOptionVal<std::string>("outputFile"); }
@@ -203,183 +199,388 @@ int main(int argc, char** argv){
     };
 
     outFilePath = "xsecCalc_" + GundamUtils::generateFileName(clParser, appendixDict) + ".root";
-  }
-  auto outFile = std::unique_ptr<TFile>( TFile::Open( outFilePath.c_str(), "RECREATE" ) );
 
-  GenericToolbox::writeInTFile(
-      GenericToolbox::mkdirTFile(outFile.get(), "gundam"),
-      TNamed("version", GundamUtils::getVersionFullStr().c_str())
-  );
-  GenericToolbox::writeInTFile(
-      GenericToolbox::mkdirTFile(outFile.get(), "gundam"),
-      TNamed("commandLine", clParser.getCommandLineString().c_str())
-  );
-  GenericToolbox::writeInTFile(
-      GenericToolbox::mkdirTFile(outFile.get(), "gundam"),
-      TNamed("config", ConfigUtils::ConfigHandler{xsecConfig}.toString().c_str())
-  );
+    std::string outFolder{GenericToolbox::Json::fetchValue<std::string>(xsecConfig, "outputFolder", "./")};
+    outFilePath = GenericToolbox::joinPath(outFolder, outFilePath);
+  }
+
+  app.setCmdLinePtr( &clParser );
+  app.setConfigString( ConfigUtils::ConfigHandler{xsecConfig}.toString() );
+  app.openOutputFile( outFilePath );
+  app.writeAppInfo();
+
+  auto* calcXsecDir{ GenericToolbox::mkdirTFile(app.getOutfilePtr(), "calcXsec") };
 
   LogInfo << "Generating loaded sample plots..." << std::endl;
   propagator.getPlotGenerator().generateSamplePlots(
-    GenericToolbox::mkdirTFile(outFile.get(), "XsecExtractor/postFit/samples")
+    GenericToolbox::mkdirTFile(calcXsecDir, "postFit/samples")
   );
 
   LogInfo << "Creating throws tree" << std::endl;
-  auto* signalThrowTree = new TTree("signalThrowTree", "signalThrowTree");
-  std::vector<GenericToolbox::RawDataArray> signalThrowData{propagator.getFitSampleSet().getFitSampleList().size()};
-  std::vector<std::vector<double>> bufferList{propagator.getFitSampleSet().getFitSampleList().size()};
-  for( size_t iSignal = 0 ; iSignal < propagator.getFitSampleSet().getFitSampleList().size() ; iSignal++ ){
+  auto* xsecThrowTree = new TTree("xsecThrow", "xsecThrow");
 
-    int nBins = propagator.getFitSampleSet().getFitSampleList()[iSignal].getMcContainer().histogram->GetNbinsX();
-    bufferList[iSignal].resize(nBins, 0);
 
-    signalThrowData[iSignal].resetCurrentByteOffset();
-    std::vector<std::string> leafNameList{};
-    leafNameList.reserve(nBins);
-    for( int iBin = 0 ; iBin < nBins ; iBin++ ){
-      leafNameList.emplace_back(Form("bin_%i/D", iBin));
-      signalThrowData[iSignal].writeRawData( double(0) );
+  LogInfo << "Creating normalizer objects..." << std::endl;
+  // flux renorm with toys
+  struct ParSetNormaliser{
+
+    void readConfig(const nlohmann::json& config_){
+      LogScopeIndent;
+
+      name = GenericToolbox::Json::fetchValue<std::string>(config_, "name");
+      LogInfo << "ParSetNormaliser config \"" << name << "\": " << std::endl;
+
+      // mandatory
+      filePath = GenericToolbox::Json::fetchValue<std::string>(config_, "filePath");
+      histogramPath = GenericToolbox::Json::fetchValue<std::string>(config_, "histogramPath");
+      axisVariable = GenericToolbox::Json::fetchValue<std::string>(config_, "axisVariable");
+
+      // optionals
+      for( auto& parSelConfig : GenericToolbox::Json::fetchValue<nlohmann::json>(config_, "parSelections") ){
+        parSelections.emplace_back();
+        parSelections.back().first = GenericToolbox::Json::fetchValue<std::string>(parSelConfig, "name");
+        parSelections.back().second = GenericToolbox::Json::fetchValue<double>(parSelConfig, "value");
+      }
+      parSelections = GenericToolbox::Json::fetchValue(config_, "parSelections", parSelections);
+
+      // init
+      LogScopeIndent;
+      LogInfo << GET_VAR_NAME_VALUE(filePath) << std::endl;
+      LogInfo << GET_VAR_NAME_VALUE(histogramPath) << std::endl;
+      LogInfo << GET_VAR_NAME_VALUE(axisVariable) << std::endl;
+
+      if( not parSelections.empty() ){
+        LogInfo << "parSelections:" << std::endl;
+        for( auto& parSelection : parSelections ){
+          LogScopeIndent;
+          LogInfo << parSelection.first << " -> " << parSelection.second << std::endl;
+        }
+      }
+
+    }
+    void initialize(){
+      LogThrowIf(dialCollectionPtr == nullptr, "Associated dial collection not provided.");
+      LogThrowIf(not dialCollectionPtr->isBinned(), "Dial collection is not binned.");
+      LogThrowIf(dialCollectionPtr->getSupervisedParameter() != nullptr, "Need a dial collection that handle a whole parSet.");
+
+      file = std::make_shared<TFile>( filePath.c_str() );
+      LogThrowIf(file == nullptr, "Could not open file");
+
+      histogram = file->Get<TH1D>( histogramPath.c_str() );
+      LogThrowIf(histogram == nullptr, "Could not find histogram.");
     }
 
-    signalThrowData[iSignal].lockArraySize();
-    signalThrowTree->Branch(
-        GenericToolbox::generateCleanBranchName(propagator.getFitSampleSet().getFitSampleList()[iSignal].getName()).c_str(),
-        &signalThrowData[iSignal].getRawDataArray()[0],
+
+    [[nodiscard]] double getNormFactor() const {
+      double out{0};
+
+      for( int iBin = 0 ; iBin < histogram->GetNbinsX() ; iBin++ ){
+        double binValue{histogram->GetBinContent(1+iBin)};
+
+
+        // do we skip this bin? if not, apply coefficient
+        bool skipBin{true};
+        for( size_t iParBin = 0 ; iParBin < dialCollectionPtr->getDialBinSet().getBinsList().size() ; iParBin++ ){
+          const DataBin& parBin = dialCollectionPtr->getDialBinSet().getBinsList()[iParBin];
+
+          bool isParBinValid{true};
+
+          // first check the conditions
+          for( auto& selection : parSelections ){
+            if( parBin.isVariableSet(selection.first) and not parBin.isBetweenEdges(selection.first, selection.second) ){
+              isParBinValid = false;
+              break;
+            }
+          }
+
+          // checking if the hist bin correspond to this
+          if( parBin.isVariableSet(axisVariable) and not parBin.isBetweenEdges(axisVariable, histogram->GetBinCenter(1+iBin)) ){
+            isParBinValid = false;
+          }
+
+          if( isParBinValid ){
+            // ok, then apply the weight
+            binValue *= dialCollectionPtr->getSupervisedParameterSet()->getParameterList()[iParBin].getParameterValue();
+
+            skipBin = false;
+            break;
+          }
+        }
+        if( skipBin ){ continue; }
+
+        // ok, add the fluctuated value
+        out += binValue;
+      }
+
+      return out;
+    }
+
+    // config
+    std::string name{};
+    std::string filePath{};
+    std::string histogramPath{};
+    std::string axisVariable{};
+    std::vector<std::pair<std::string, double>> parSelections{};
+
+    // internals
+    std::shared_ptr<TFile> file{nullptr};
+    TH1D* histogram{nullptr};
+    const DialCollection* dialCollectionPtr{nullptr}; // where the binning is defined
+  };
+  std::vector<ParSetNormaliser> parSetNormList;
+  for( auto& parSet : propagator.getParameterSetsList() ){
+    if( GenericToolbox::Json::doKeyExist(parSet.getConfig(), "normalisations") ){
+      for( auto& parSetNormConfig : GenericToolbox::Json::fetchValue<nlohmann::json>(parSet.getConfig(), "normalisations") ){
+        parSetNormList.emplace_back();
+        parSetNormList.back().readConfig( parSetNormConfig );
+
+        for( auto& dialCollection : propagator.getDialCollections() ){
+          if( dialCollection.getSupervisedParameterSet() == &parSet ){
+            parSetNormList.back().dialCollectionPtr = &dialCollection;
+            break;
+          }
+        }
+
+        parSetNormList.back().initialize();
+      }
+    }
+  }
+
+
+
+  // to be filled up
+  struct BinNormaliser{
+    void readConfig(const nlohmann::json& config_){
+      LogScopeIndent;
+      
+      name = GenericToolbox::Json::fetchValue<std::string>(config_, "name");
+
+      if( not GenericToolbox::Json::fetchValue(config_, "isEnabled", true) ){
+        LogWarning << "Skipping disabled re-normalization config \"" << name << "\"" << std::endl;
+        return;
+      }
+
+      LogInfo << "Re-normalization config \"" << name << "\": ";
+
+      if     ( GenericToolbox::Json::doKeyExist( config_, "meanValue" ) ){
+        normParameter.first  = GenericToolbox::Json::fetchValue<double>(config_, "meanValue");
+        normParameter.second = GenericToolbox::Json::fetchValue(config_, "stdDev", 0);
+        LogInfo << "mean ± sigma = " << normParameter.first << " ± " << normParameter.second;
+      }
+      else if( GenericToolbox::Json::doKeyExist( config_, "disabledBinDim" ) ){
+        disabledBinDim = GenericToolbox::Json::fetchValue<std::string>(config_, "disabledBinDim");
+        LogInfo << "disabledBinDim = " << disabledBinDim;
+      }
+      else if( GenericToolbox::Json::doKeyExist( config_, "parSetNormName" ) ){
+        parSetNormaliserName = GenericToolbox::Json::fetchValue<std::string>(config_, "parSetNormName");
+        LogInfo << "parSetNormName = " << parSetNormaliserName;
+      }
+      else{
+        LogThrow("Unrecognized config.");
+      }
+
+      LogInfo << std::endl;
+    }
+
+    std::string name{};
+    std::pair<double, double> normParameter{std::nan("mean unset"), std::nan("stddev unset")};
+    std::string disabledBinDim{};
+    std::string parSetNormaliserName{};
+
+  };
+
+  struct CrossSectionData{
+    FitSample* samplePtr{nullptr};
+    nlohmann::json config{};
+    GenericToolbox::RawDataArray branchBinsData{};
+
+    TH1D histogram{};
+    std::vector<BinNormaliser> normList{};
+  };
+  std::vector<CrossSectionData> crossSectionDataList{};
+
+  LogInfo << "Initializing xsec samples..." << std::endl;
+  crossSectionDataList.reserve( propagator.getFitSampleSet().getFitSampleList().size() );
+  for( auto& sample : propagator.getFitSampleSet().getFitSampleList() ){
+    crossSectionDataList.emplace_back();
+    auto& xsecEntry = crossSectionDataList.back();
+
+    LogScopeIndent;
+    LogInfo << "Defining xsec entry: " << sample.getName() << std::endl;
+    xsecEntry.samplePtr = &sample;
+    xsecEntry.config = sample.getConfig();
+    xsecEntry.branchBinsData.resetCurrentByteOffset();
+    std::vector<std::string> leafNameList{};
+    leafNameList.reserve( sample.getMcContainer().histogram->GetNbinsX() );
+    for( int iBin = 0 ; iBin < sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+      leafNameList.emplace_back(Form("bin_%i/D", iBin));
+      xsecEntry.branchBinsData.writeRawData( double(0) );
+    }
+    xsecEntry.branchBinsData.lockArraySize();
+
+    xsecThrowTree->Branch(
+        GenericToolbox::generateCleanBranchName( sample.getName() ).c_str(),
+        xsecEntry.branchBinsData.getRawDataArray().data(),
         GenericToolbox::joinVectorString(leafNameList, ":").c_str()
     );
-  }
 
-  std::vector<double> numberOfTargets(signalThrowData.size());
-  std::vector<double> integratedFlux(signalThrowData.size());
-  for( size_t iSignal = 0 ; iSignal < signalThrowData.size() ; iSignal++ ){
-    numberOfTargets[iSignal] = GenericToolbox::Json::fetchValue<double>(propagator.getFitSampleSet().getFitSampleList()[iSignal].getConfig(), "numberOfTargets", 1);
-    integratedFlux[iSignal] = GenericToolbox::Json::fetchValue<double>(propagator.getFitSampleSet().getFitSampleList()[iSignal].getConfig(), "integratedFlux", 1);
-  }
-
-  int nToys{100};
-  if(clParser.isOptionTriggered("nToys")) nToys = clParser.getOptionVal<int>("nToys");
-
-  bool enableEventMcThrow{true};
-  bool enableStatThrowInToys{true};
-  auto xsecCalcConfig = GenericToolbox::Json::fetchValue( cHandler.getConfig(), "xsecCalcConfig", nlohmann::json() );
-  enableStatThrowInToys = GenericToolbox::Json::fetchValue( xsecCalcConfig, "enableStatThrowInToys", enableStatThrowInToys);
-  enableEventMcThrow = GenericToolbox::Json::fetchValue( xsecCalcConfig, "enableEventMcThrow", enableEventMcThrow);
-
-  std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating " << nToys << " toys...";
-  for( int iToy = 0 ; iToy < nToys ; iToy++ ){
-    GenericToolbox::displayProgressBar(iToy, nToys, ss.str());
-
-    // Do the throwing:
-    propagator.throwParametersFromGlobalCovariance();
-    propagator.propagateParametersOnSamples();
-    if( enableStatThrowInToys ){
-      for( auto& sample : propagator.getFitSampleSet().getFitSampleList() ){
-        if( enableEventMcThrow ){
-          // Take into account the finite amount of event in MC
-          sample.getMcContainer().throwEventMcError();
-        }
-        // Asimov bin content -> toy data
-        sample.getMcContainer().throwStatError();
-      }
+    auto normConfigList = GenericToolbox::Json::fetchValue( xsecEntry.config, "normaliseParameterList", nlohmann::json() );
+    xsecEntry.normList.reserve( normConfigList.size() );
+    for( auto& normConfig : normConfigList ){
+      xsecEntry.normList.emplace_back();
+      xsecEntry.normList.back().readConfig( normConfig );
     }
 
-    // Compute N_truth_i(flux, xsec) and N_selected_truth_i(flux, xsec, det) -> efficiency
-    // mask detector parameters?
-
-
-    // Then compute N_selected_truth_i(flux, xsec, det, c_i) -> N_i
-
-
-    // Write N_i / efficiency / T / phi
-    for( size_t iSignal = 0 ; iSignal < propagator.getFitSampleSet().getFitSampleList().size() ; iSignal++ ){
-      signalThrowData[iSignal].resetCurrentByteOffset();
-      for( int iBin = 0 ; iBin < propagator.getFitSampleSet().getFitSampleList()[iSignal].getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-        signalThrowData[iSignal].writeRawData(
-            propagator.getFitSampleSet().getFitSampleList()[iSignal].getMcContainer().histogram->GetBinContent(1+iBin)
-            / numberOfTargets[iSignal] / integratedFlux[iSignal]
-        );
-      }
-    }
-
-    // Write the branches
-    signalThrowTree->Fill();
-  }
-
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outFile.get(), "XsecExtractor/throws"), signalThrowTree, "signalThrow");
-  auto* meanValuesVector = GenericToolbox::generateMeanVectorOfTree(signalThrowTree);
-  auto* globalCovMatrix = GenericToolbox::generateCovarianceMatrixOfTree(signalThrowTree);
-
-  auto* globalCovMatrixHist = GenericToolbox::convertTMatrixDtoTH2D(globalCovMatrix);
-  auto* globalCorMatrixHist = GenericToolbox::convertTMatrixDtoTH2D(GenericToolbox::convertToCorrelationMatrix(globalCovMatrix));
-
-  std::vector<TH1D> binValues{};
-  binValues.reserve( propagator.getFitSampleSet().getFitSampleList().size() );
-  int iGlobal{-1};
-  for( size_t iSignal = 0 ; iSignal < propagator.getFitSampleSet().getFitSampleList().size() ; iSignal++ ){
-
-    auto& sample = propagator.getFitSampleSet().getFitSampleList()[iSignal];
-
-    binValues.emplace_back(
+    xsecEntry.histogram = TH1D(
         sample.getName().c_str(),
         sample.getName().c_str(),
         sample.getMcContainer().histogram->GetNbinsX(),
         0,
         sample.getMcContainer().histogram->GetNbinsX()
     );
-
-    std::string sampleTitle{ sample.getName() };
-
-    for( int iBin = 0 ; iBin < sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-      iGlobal++;
-
-      std::string binTitle = sample.getBinning().getBinsList()[iBin].getSummary();
-      double binVolume = sample.getBinning().getBinsList()[iBin].getVolume();
-
-      binValues[iSignal].SetBinContent(1+iBin, (*meanValuesVector)[iGlobal] / binVolume  );
-      binValues[iSignal].SetBinError(1+iBin, TMath::Sqrt( (*globalCovMatrix)[iGlobal][iGlobal] ) / binVolume );
-      binValues[iSignal].GetXaxis()->SetBinLabel( 1+iBin, binTitle.c_str() );
-
-      globalCovMatrixHist->GetXaxis()->SetBinLabel(1+iGlobal, GenericToolbox::joinPath(sampleTitle, binTitle).c_str());
-      globalCorMatrixHist->GetXaxis()->SetBinLabel(1+iGlobal, GenericToolbox::joinPath(sampleTitle, binTitle).c_str());
-      globalCovMatrixHist->GetYaxis()->SetBinLabel(1+iGlobal, GenericToolbox::joinPath(sampleTitle, binTitle).c_str());
-      globalCorMatrixHist->GetYaxis()->SetBinLabel(1+iGlobal, GenericToolbox::joinPath(sampleTitle, binTitle).c_str());
-    }
-
-    binValues[iSignal].SetMarkerStyle(kFullDotLarge);
-    binValues[iSignal].SetMarkerColor(kGreen-3);
-    binValues[iSignal].SetMarkerSize(0.5);
-    binValues[iSignal].SetLineWidth(2);
-    binValues[iSignal].SetLineColor(kGreen-3);
-    binValues[iSignal].SetDrawOption("E1");
-    binValues[iSignal].GetXaxis()->LabelsOption("v");
-    binValues[iSignal].GetXaxis()->SetLabelSize(0.02);
-    binValues[iSignal].GetYaxis()->SetTitle( GenericToolbox::Json::fetchValue(sample.getConfig(), "yAxis", "#delta#sigma").c_str() );
-
-    GenericToolbox::writeInTFile(
-        GenericToolbox::mkdirTFile(outFile.get(), "XsecExtractor/histograms"),
-        &binValues[iSignal],
-        GenericToolbox::generateCleanBranchName(sample.getName())
-    );
   }
 
+  int nToys{ clParser.getOptionVal<int>("nToys") };
+
+  bool enableEventMcThrow{true};
+  bool enableStatThrowInToys{true};
+  auto xsecCalcConfig   = GenericToolbox::Json::fetchValue( cHandler.getConfig(), "xsecCalcConfig", nlohmann::json() );
+  enableStatThrowInToys = GenericToolbox::Json::fetchValue( xsecCalcConfig, "enableStatThrowInToys", enableStatThrowInToys);
+  enableEventMcThrow    = GenericToolbox::Json::fetchValue( xsecCalcConfig, "enableEventMcThrow", enableEventMcThrow);
+
+  std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating " << nToys << " toys...";
+  for( int iToy = 0 ; iToy < nToys ; iToy++ ){
+
+    // loading...
+    GenericToolbox::displayProgressBar( iToy+1, nToys, ss.str() );
+
+    // Do the throwing:
+    propagator.throwParametersFromGlobalCovariance();
+    propagator.propagateParametersOnSamples();
+
+    for( auto& xsec : crossSectionDataList ){
+
+      if( enableStatThrowInToys ){
+        if( enableEventMcThrow ){
+          // Take into account the finite amount of event in MC
+          xsec.samplePtr->getMcContainer().throwEventMcError();
+        }
+        // Asimov bin content -> toy data
+        xsec.samplePtr->getMcContainer().throwStatError();
+      }
+
+      xsec.branchBinsData.resetCurrentByteOffset();
+      for( int iBin = 0 ; iBin < xsec.samplePtr->getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+        double binData{ xsec.samplePtr->getMcContainer().histogram->GetBinContent(1+iBin) };
+
+        // special re-norm
+        for( auto& normData : xsec.normList ){
+          if( not std::isnan( normData.normParameter.first ) ){
+            double norm{normData.normParameter.first};
+            if( normData.normParameter.second != 0 ){ norm += normData.normParameter.second * gRandom->Gaus(); }
+            binData /= norm;
+          }
+          else if( not normData.parSetNormaliserName.empty() ){
+            ParSetNormaliser* parSetNormPtr{nullptr};
+            for( auto& parSetNorm : parSetNormList ){
+              if( parSetNorm.name == normData.parSetNormaliserName ){
+                parSetNormPtr = &parSetNorm;
+                break;
+              }
+            }
+            LogThrowIf(parSetNormPtr == nullptr, "Could not find parSetNorm obj with name: " << normData.parSetNormaliserName);
+
+            binData /= parSetNormPtr->getNormFactor();
+          }
+        }
+
+        // bin volume
+        auto& bin = xsec.samplePtr->getMcContainer().binning.getBinsList()[iBin];
+        double binVolume{1};
+
+        for( size_t iDim = 0 ; iDim < bin.getEdgesList().size() ; iDim++ ){
+          auto& edges = bin.getEdgesList()[iDim];
+          if( edges.first == edges.second ) continue; // no volume, just a condition variable
+
+          // is this bin excluded from norm?
+          if( not bin.getVariableNameList()[iDim].empty() and std::any_of(
+                xsec.normList.begin(), xsec.normList.end(), [&](const BinNormaliser& normData_){
+                  return (
+                      not normData_.disabledBinDim.empty()
+                      and normData_.disabledBinDim == bin.getVariableNameList()[iDim] );
+                }
+              )
+          ){ continue; }
+          binVolume *= std::max( edges.first, edges.second ) - std::min(edges.first, edges.second);
+        }
+
+        binData /= binVolume;
+
+        xsec.branchBinsData.writeRawData( binData );
+      }
+    }
+
+    // Write the branches
+    xsecThrowTree->Fill();
+  }
+
+  LogInfo << "Writing throws..." << std::endl;
+  GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(calcXsecDir, "throws"), xsecThrowTree );
+
+  LogInfo << "Calculating mean & covariance matrix..." << std::endl;
+  auto* meanValuesVector = GenericToolbox::generateMeanVectorOfTree( xsecThrowTree );
+  auto* globalCovMatrix = GenericToolbox::generateCovarianceMatrixOfTree( xsecThrowTree );
+
+  auto* globalCovMatrixHist = GenericToolbox::convertTMatrixDtoTH2D(globalCovMatrix);
+  auto* globalCorMatrixHist = GenericToolbox::convertTMatrixDtoTH2D(GenericToolbox::convertToCorrelationMatrix(globalCovMatrix));
+
+  std::vector<TH1D> binValues{};
+  binValues.reserve( propagator.getFitSampleSet().getFitSampleList().size() );
+  int iBinGlobal{-1};
+
+  for( auto& xsec : crossSectionDataList ){
+
+    for( int iBin = 0 ; iBin < xsec.samplePtr->getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+      iBinGlobal++;
+
+      std::string binTitle = xsec.samplePtr->getBinning().getBinsList()[iBin].getSummary();
+      double binVolume = xsec.samplePtr->getBinning().getBinsList()[iBin].getVolume();
+
+      xsec.histogram.SetBinContent( 1+iBin, (*meanValuesVector)[iBinGlobal] );
+      xsec.histogram.SetBinError( 1+iBin, TMath::Sqrt( (*globalCovMatrix)[iBinGlobal][iBinGlobal] ) );
+      xsec.histogram.GetXaxis()->SetBinLabel( 1+iBin, binTitle.c_str() );
+
+      globalCovMatrixHist->GetXaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
+      globalCorMatrixHist->GetXaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
+      globalCovMatrixHist->GetYaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
+      globalCorMatrixHist->GetYaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
+    }
+
+    xsec.histogram.SetMarkerStyle(kFullDotLarge);
+    xsec.histogram.SetMarkerColor(kGreen-3);
+    xsec.histogram.SetMarkerSize(0.5);
+    xsec.histogram.SetLineWidth(2);
+    xsec.histogram.SetLineColor(kGreen-3);
+    xsec.histogram.SetDrawOption("E1");
+    xsec.histogram.GetXaxis()->LabelsOption("v");
+    xsec.histogram.GetXaxis()->SetLabelSize(0.02);
+    xsec.histogram.GetYaxis()->SetTitle( GenericToolbox::Json::fetchValue(xsec.samplePtr->getConfig(), "yAxis", "#delta#sigma").c_str() );
+
+    GenericToolbox::writeInTFile(
+        GenericToolbox::mkdirTFile(calcXsecDir, "histograms"),
+        &xsec.histogram, GenericToolbox::generateCleanBranchName( xsec.samplePtr->getName() )
+    );
+
+  }
 
   globalCovMatrixHist->GetXaxis()->SetLabelSize(0.02);
   globalCovMatrixHist->GetYaxis()->SetLabelSize(0.02);
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outFile.get(), "XsecExtractor/matrices"), globalCovMatrixHist, "covarianceMatrix");
+  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), globalCovMatrixHist, "covarianceMatrix");
 
   globalCorMatrixHist->GetXaxis()->SetLabelSize(0.02);
   globalCorMatrixHist->GetYaxis()->SetLabelSize(0.02);
   globalCorMatrixHist->GetZaxis()->SetRangeUser(-1, 1);
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outFile.get(), "XsecExtractor/matrices"), globalCorMatrixHist, "correlationMatrix");
-
-  LogWarning << "Closing output file \"" << outFile->GetName() << "\"..." << std::endl;
-  outFile->Close();
-  LogInfo << "Closed." << std::endl;
-
-  // --------------------------
-  // Goodbye:
-  // --------------------------
-  g.goodbye();
+  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), globalCorMatrixHist, "correlationMatrix");
 
   GlobalVariables::getParallelWorker().reset();
 }
