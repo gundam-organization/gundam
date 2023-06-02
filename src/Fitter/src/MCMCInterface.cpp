@@ -137,6 +137,15 @@ void MCMCInterface::readConfigImpl(){
   _adaptiveCovName_ = GenericToolbox::Json::fetchValue(
     _config_, "adaptiveCovName", _adaptiveCovName_);
 
+  // Get the effective number of trials for a proposal covariance that is
+  // being read from a file. This should typically be about 0.5*N^2 where N is
+  // the dimension of the covariance.  That works out to the approximate
+  // number of function calculations that were used to estimate the
+  // covariance.  The default value of zero triggers the interface to make
+  // it's own estimate.
+  _adaptiveCovTrials_ = GenericToolbox::Json::fetchValue(
+    _config_, "adaptiveCovTrials", _adaptiveCovTrials_);
+
   // Set the window to calculate the current covariance value over.  If this
   // is set to short, the covariance will not sample the entire posterior.
   // Generally, the window should be long compared to the number of steps
@@ -425,9 +434,11 @@ MCMCInterface::adaptiveLoadProposalCovariance(AdaptiveStepMCMC& mcmc,
   // Set the effective number of trials for the covariance that was loaded.
   // The covariance is usually calculated by HESSE.  Empirically, HESSE calls
   // the function around constant plus half N^2 times.  Use that as the
-  // initial number of trials.  This could also be set as a config file
+  // initial number of trials.  This can also be set as a config file
   // parameter.
-  mcmc.GetProposeStep().SetCovarianceTrials(100+0.5*count1*count1);
+  double effectiveTrials = 100+0.5*count1*count1;
+  if (_adaptiveCovTrials_ > 0) effectiveTrials = _adaptiveCovTrials_;
+  mcmc.GetProposeStep().SetCovarianceTrials(effectiveTrials);
 
   return true;
 }

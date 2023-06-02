@@ -97,6 +97,13 @@ private:
   // the decomposed space.
   std::string _adaptiveCovName_{"FitterEngine/postFit/Hesse/hessian/postfitCovariance_TH2D"};
 
+  // The number of effective trials that the input covariance will count for.
+  // This should typically be about 0.5*N^2 where N is the dimension of the
+  // covariance.  That works out to the approximate number of function
+  // calculations that were used to estimate the covariance.  The default
+  // value of zero triggers the interface to make it's own estimate.
+  double _adaptiveCovTrials_{0.0};
+
   // Freeze the burn-in step after this many cycles.
   int _burninFreezeAfter_{1000000000}; // Never freeze except by request
 
