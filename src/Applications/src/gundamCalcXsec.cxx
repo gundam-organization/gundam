@@ -236,6 +236,11 @@ int main(int argc, char** argv){
       axisVariable = GenericToolbox::Json::fetchValue<std::string>(config_, "axisVariable");
 
       // optionals
+      for( auto& parSelConfig : GenericToolbox::Json::fetchValue<nlohmann::json>(config_, "parSelections") ){
+        parSelections.emplace_back();
+        parSelections.back().first = GenericToolbox::Json::fetchValue<std::string>(parSelConfig, "name");
+        parSelections.back().second = GenericToolbox::Json::fetchValue<double>(parSelConfig, "value");
+      }
       parSelections = GenericToolbox::Json::fetchValue(config_, "parSelections", parSelections);
 
       // init
