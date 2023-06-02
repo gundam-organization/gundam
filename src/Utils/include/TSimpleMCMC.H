@@ -376,7 +376,7 @@ public:
         /// This is when all steps should be accepted.  This can be used to
         /// force calculation of the likelihood at a cloud of points.
         if (metropolis == 2) {
-            std::cout << "Scanning step" << std::endl;
+            MCMC_DEBUG(0) << "Scanning step" << std::endl;
             // Always keep the new step.
             std::copy(fProposed.begin(), fProposed.end(), fAccepted.begin());
             fAcceptedLogLikelihood = fProposedLogLikelihood;
@@ -629,7 +629,7 @@ public:
             }
             double r = gRandom->Gaus(fCentralPoint[scan],sigma);
             proposal[scan] = r;
-            std::cout << "propose " << r << " for " << scan << std::endl;
+            MCMC_DEBUG(0) << "propose " << r << " for " << scan << std::endl;
             return;
         }
 
@@ -800,8 +800,23 @@ public:
     /// means that the newly accepted points will have more effect.
     void SetCovarianceUpdateDeweighting(double d) {fCovarianceDeweight = d;}
 
-    /// Get the number of trials used to calculate the covariance.
+    /// Get the number of trials that are currently included in the covariance
+    /// calculation.
     double GetCovarianceTrials() const {return fCovarianceTrials;}
+
+    /// Set the effective number of trials that should be associated with the
+    /// current covariance value.  This is mostly useful when you know a good
+    /// initial value for the step proposal covariance.
+    void SetCovarianceTrials(double v) {
+        fCovarianceTrials = v;
+        if (fCovarianceTrials > fCovarianceWindow) {
+            MCMC_DEBUG(0) << "Number of effective covariance trials"
+                          << " (" << fCovarianceTrials << ")"
+                          << " is set larger than window"
+                          << " (" << fCovarianceWindow << ")"
+                          << std::endl;
+        }
+    }
 
     /// Get the trace of the covariance.
     double GetCovarianceTrace() const {
