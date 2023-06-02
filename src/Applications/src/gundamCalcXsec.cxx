@@ -223,7 +223,6 @@ int main(int argc, char** argv){
   LogInfo << "Creating normalizer objects..." << std::endl;
   // flux renorm with toys
   struct ParSetNormaliser{
-
     void readConfig(const nlohmann::json& config_){
       LogScopeIndent;
 
@@ -269,8 +268,6 @@ int main(int argc, char** argv){
       histogram = file->Get<TH1D>( histogramPath.c_str() );
       LogThrowIf(histogram == nullptr, "Could not find histogram.");
     }
-
-
     [[nodiscard]] double getNormFactor() const {
       double out{0};
 
@@ -442,6 +439,21 @@ int main(int argc, char** argv){
 
   int nToys{ clParser.getOptionVal<int>("nToys") };
 
+  // no bin volume of events -> use the nominal weight container
+  for( auto& xsec : crossSectionDataList ){
+    {
+      auto& mcEvList{xsec.samplePtr->getMcContainer().eventList};
+      std::for_each(mcEvList.begin(), mcEvList.end(), [](PhysicsEvent& ev_){ ev_.setNominalWeight(0); });
+    }
+    {
+      auto& dataEvList{xsec.samplePtr->getDataContainer().eventList};
+      std::for_each(dataEvList.begin(), dataEvList.end(), [](PhysicsEvent& ev_){ ev_.setNominalWeight(0); });
+    }
+  }
+
+
+
+
   bool enableEventMcThrow{true};
   bool enableStatThrowInToys{true};
   auto xsecCalcConfig   = GenericToolbox::Json::fetchValue( cHandler.getConfig(), "xsecCalcConfig", nlohmann::json() );
@@ -493,6 +505,24 @@ int main(int argc, char** argv){
             binData /= parSetNormPtr->getNormFactor();
           }
         }
+
+        // no bin volume of events
+        {
+          auto& mcEvList{xsec.samplePtr->getMcContainer().eventList};
+          std::for_each(mcEvList.begin(), mcEvList.end(), [&](PhysicsEvent& ev_){
+            if( iBin == ev_.getSampleBinIndex() ){ return; }
+            ev_.setNominalWeight( ev_.getNominalWeight() + binData );
+          });
+        }
+        {
+          auto& dataEvList{xsec.samplePtr->getDataContainer().eventList};
+          std::for_each(dataEvList.begin(), dataEvList.end(), [&](PhysicsEvent& ev_){
+            if( iBin == ev_.getSampleBinIndex() ){ return; }
+            ev_.setNominalWeight( ev_.getNominalWeight() + binData );
+          });
+        }
+
+
 
         // bin volume
         auto& bin = xsec.samplePtr->getMcContainer().binning.getBinsList()[iBin];
@@ -581,6 +611,77 @@ int main(int argc, char** argv){
   globalCorMatrixHist->GetYaxis()->SetLabelSize(0.02);
   globalCorMatrixHist->GetZaxis()->SetRangeUser(-1, 1);
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), globalCorMatrixHist, "correlationMatrix");
+
+  // now propagate to the engine for the plot generator
+  LogInfo << "Re-normalizing the samples for the plot generator..." << std::endl;
+
+  for( auto& xsec : crossSectionDataList ){
+    // this gives the average as the event weights were summed together
+    {
+      auto &mcEvList{xsec.samplePtr->getMcContainer().eventList};
+      std::vector<size_t> nEventInBin(xsec.histogram.GetNbinsX(), 0);
+      for( size_t iBin = 0 ; iBin < nEventInBin.size() ; iBin++ ){
+        nEventInBin[iBin] = std::count_if(mcEvList.begin(), mcEvList.end(), [iBin](PhysicsEvent &ev_) {
+          return ev_.getSampleBinIndex() == iBin;
+        });
+      }
+
+      std::for_each(mcEvList.begin(), mcEvList.end(), [&](PhysicsEvent &ev_) {
+        ev_.setEventWeight(ev_.getNominalWeight() / nToys / double(nEventInBin[ev_.getSampleBinIndex()]) );
+      });
+    }
+    {
+      auto &dataEvList{xsec.samplePtr->getDataContainer().eventList};
+      std::vector<size_t> nEventInBin(xsec.histogram.GetNbinsX(), 0);
+      for( size_t iBin = 0 ; iBin < nEventInBin.size() ; iBin++ ){
+        nEventInBin[iBin] = std::count_if(dataEvList.begin(), dataEvList.end(), [iBin](PhysicsEvent &ev_) {
+          return ev_.getSampleBinIndex() == iBin;
+        });
+      }
+
+      std::for_each(dataEvList.begin(), dataEvList.end(), [&](PhysicsEvent &ev_) {
+        ev_.setEventWeight(ev_.getNominalWeight() / nToys / double(nEventInBin[ev_.getSampleBinIndex()]) );
+      });
+    }
+  }
+
+  LogInfo << "Generating xsec sample plots..." << std::endl;
+  // manual trigger to tweak the error bars
+  propagator.getPlotGenerator().generateSampleHistograms(GenericToolbox::mkdirTFile(calcXsecDir, "plots/histograms"));
+
+  for( auto& histHolder : propagator.getPlotGenerator().getHistHolderList(0) ){
+    if( not histHolder.isData ){ continue; } // only data will print errors
+
+    const CrossSectionData* xsecDataPtr{nullptr};
+    for( auto& xsecData : crossSectionDataList ){
+      if( xsecData.samplePtr  == histHolder.fitSamplePtr){
+        xsecDataPtr = &xsecData;
+        break;
+      }
+    }
+    LogThrowIf(xsecDataPtr==nullptr, "corresponding data not found");
+
+    // alright, now rescale error bars
+    for( int iBin = 0 ; iBin < histHolder.histPtr->GetNbinsX() ; iBin++ ){
+      // relative error should be set
+      histHolder.histPtr->SetBinError(
+          1+iBin,
+          histHolder.histPtr->GetBinContent(1+iBin)
+          * xsecDataPtr->histogram.GetBinError(1+iBin)
+          / xsecDataPtr->histogram.GetBinContent(1+iBin)
+      );
+    }
+  }
+
+  propagator.getPlotGenerator().generateCanvas(
+      propagator.getPlotGenerator().getHistHolderList(0),
+      GenericToolbox::mkdirTFile(calcXsecDir, "plots/canvas")
+  );
+
+
+  LogInfo << "Writing event samples in TTrees..." << std::endl;
+  propagator.getTreeWriter().writeSamples( GenericToolbox::mkdirTFile(calcXsecDir, "events") );
+
 
   GlobalVariables::getParallelWorker().reset();
 }

@@ -60,6 +60,11 @@ std::map<std::string, std::shared_ptr<TCanvas>> PlotGenerator::getBufferCanvasLi
   return _bufferCanvasList_;
 }
 
+
+std::vector<HistHolder> &PlotGenerator::getHistHolderList(int cacheSlot_){
+  return _histHolderCacheList_[cacheSlot_];
+}
+
 // Core
 void PlotGenerator::generateSamplePlots(TDirectory *saveDir_, int cacheSlot_) {
   LogThrowIf(not isInitialized());
@@ -311,8 +316,8 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
       // separating histograms
       TH1D *dataSampleHist{nullptr};
       std::vector<TH1D *> mcSampleHistList;
-      double minYValue = 1;
-      double maxYValue = minYValue;
+      double minYValue{std::nan("unset")};
+      double maxYValue{std::nan("unset")};
       for( const auto* histHolder : histList.second ) {
         TH1D* hist = histHolder->histPtr.get();
         if ( histHolder->isData ) {
@@ -320,8 +325,8 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
         }
         else {
           mcSampleHistList.emplace_back(hist);
-          minYValue = std::min(minYValue, hist->GetMinimum(0));
-          maxYValue = std::max(maxYValue, hist->GetMaximum());
+          minYValue = std::min(hist->GetMinimum(0), minYValue); // NAN on the right!!
+          maxYValue = std::max(hist->GetMaximum(), maxYValue);
         }
       }
 
@@ -416,7 +421,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
       // Draw the data hist on top
       if (dataSampleHist != nullptr) {
         std::string originalTitle = dataSampleHist->GetTitle(); // title can be used for figuring out the type of the histogram
-        maxYValue = std::max(maxYValue, dataSampleHist->GetMaximum());
+        maxYValue = std::max(dataSampleHist->GetMaximum(), maxYValue);
         dataSampleHist->SetTitle("Data");
         splitLegend->AddEntry(dataSampleHist, dataSampleHist->GetTitle(), "lep"); nLegend++;
         if ( firstHistToPlot != nullptr ) {
