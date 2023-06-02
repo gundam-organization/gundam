@@ -260,10 +260,8 @@ MCMCInterface::adaptiveDefaultProposalCovariance(AdaptiveStepMCMC& mcmc) {
         = FitParameterSet::toNormalizedParRange(
           par->getStepSize(), *par);
       mcmc.GetProposeStep().SetGaussian(count0-1,step);
-      continue;
     }
-    switch (par->getPriorType()) {
-    case PriorType::Flat: {
+    else if (par->getPriorType() == PriorType::Flat) {
       // Gundam uses flat to mean "free", so this doesn't use a Uniform
       // step between bounds.
       double step = std::min(par->getStepSize(),par->getStdDevValue());
@@ -272,13 +270,10 @@ MCMCInterface::adaptiveDefaultProposalCovariance(AdaptiveStepMCMC& mcmc) {
       }
       step /= std::sqrt(getMinimizerFitParameterPtr().size());
       mcmc.GetProposeStep().SetGaussian(count0-1,step);
-      break;
     }
-    default: {
+    else {
       double step = par->getStdDevValue();
       mcmc.GetProposeStep().SetGaussian(count0-1,step);
-      break;
-    }
     }
   }
 
@@ -389,35 +384,36 @@ MCMCInterface::adaptiveLoadProposalCovariance(AdaptiveStepMCMC& mcmc,
     LogThrow("Mismatched proposal covariance matrix");
   }
 
-  // Set the diagonal elements for the parameters.
-  int count0 = 0;
-  for (const FitParameter* par : getMinimizerFitParameterPtr() ) {
-    ++count0;
-    double sigma = std::sqrt(proposalCov->GetBinContent(count0,count0));
-    if (getLikelihood().getUseNormalizedFitSpace()) {
-      // Changing the boundaries, change the value/step size?
-      sigma = FitParameterSet::toNormalizedParRange(sigma, *par);
-    }
-    mcmc.GetProposeStep().SetGaussian(count0-1,sigma);
-  }
-
   // Dump all of the previous correlations.
   mcmc.GetProposeStep().ResetCorrelations();
 
+  TAxis* covAxisLabels = dynamic_cast<TAxis*>(proposalCov->GetXaxis());
   int count1 = 0;
   for (const FitParameter* par1 : getMinimizerFitParameterPtr() ) {
     ++count1;
+    std::string parName(par1->getFullTitle());
+    std::string covName(covAxisLabels->GetBinLabel(count1));
+    if (parName != covName) {
+      LogError << "Mismatch of parameter and covariance names" << std::endl;
+      LogError << "Parameter:  " << parName << std::endl;
+      LogError << "Covariance: " << covName << std::endl;
+      LogThrow("Mismatched covariance histogram");
+    }
     double sig1 = std::sqrt(proposalCov->GetBinContent(count1,count1));
     int count2 = 0;
     for (const FitParameter* par2 : getMinimizerFitParameterPtr() ) {
       ++count2;
       double sig2 = std::sqrt(proposalCov->GetBinContent(count2,count2));
-      if (count2 == count1) {
+      if (count2 < count1) continue;
+      else if (count2 == count1) {
         // Set the sigma for this variable
         double step = sig1;
+#define COVARIANCE_NOT_IN_NORMALIZED_FIT_SPACE
+#ifdef  COVARIANCE_NOT_IN_NORMALIZED_FIT_SPACE
         if (getLikelihood().getUseNormalizedFitSpace()) {
           step = FitParameterSet::toNormalizedParRange(sig1,*par1);
         }
+#endif
         mcmc.GetProposeStep().SetGaussian(count1-1,step);
         continue;
       }
@@ -426,9 +422,15 @@ MCMCInterface::adaptiveLoadProposalCovariance(AdaptiveStepMCMC& mcmc,
     }
   }
 
+  // Set the effective number of trials for the covariance that was loaded.
+  // The covariance is usually calculated by HESSE.  Empirically, HESSE calls
+  // the function around constant plus half N^2 times.  Use that as the
+  // initial number of trials.  This could also be set as a config file
+  // parameter.
+  mcmc.GetProposeStep().SetCovarianceTrials(100+0.5*count1*count1);
+
   return true;
 }
-
 
 void MCMCInterface::setupAndRunAdaptiveStep(AdaptiveStepMCMC& mcmc) {
 
@@ -452,8 +454,10 @@ void MCMCInterface::setupAndRunAdaptiveStep(AdaptiveStepMCMC& mcmc) {
   }
 
   // Set the correlations in the default step proposal.
-  adaptiveDefaultProposalCovariance(mcmc);
-  adaptiveLoadProposalCovariance(mcmc,_adaptiveCovFile_,_adaptiveCovName_);
+  if (not adaptiveLoadProposalCovariance(
+        mcmc,_adaptiveCovFile_,_adaptiveCovName_)) {;
+    adaptiveDefaultProposalCovariance(mcmc);
+  }
 
   // Fill the initial point.
   fillPoint();
@@ -600,7 +604,7 @@ void MCMCInterface::setupAndRunSimpleStep(SimpleStepMCMC& mcmc) {
 
   // Burnin cycles
   for (int chain = 0; chain < _burninCycles_; ++chain){
-    LogInfo << "Start Burnin chain " << chain << std::endl;
+    LogInfo << "Start Burnin Cycle " << chain << std::endl;
     // Burnin chain in each cycle
     for (int i = 0; i < _burninLength_; ++i) {
       // Run step
@@ -616,11 +620,10 @@ void MCMCInterface::setupAndRunSimpleStep(SimpleStepMCMC& mcmc) {
       }
     }
   }
-  LogInfo << "Finished burnin chains" << std::endl;
 
   // Run cycles
   for (int chain = 0; chain < _cycles_; ++chain){
-    LogInfo << "Start run chain " << chain << std::endl;
+    LogInfo << "Start Main Cycle " << chain << std::endl;
     // Update the covariance with the steps from the last cycle.  This
     // starts a new "reversible-chain".
     mcmc.GetProposeStep().UpdateProposal();
@@ -630,8 +633,10 @@ void MCMCInterface::setupAndRunSimpleStep(SimpleStepMCMC& mcmc) {
       // accepted step can be copied into the points (which will have
       // any decomposition removed).
       if (mcmc.Step(false)) fillPoint();
-      // Now save the step.
-      mcmc.SaveStep(false);
+      // Now save the step.  If this is the last step in the cycle, do a full
+      // save.
+      if (i < (_steps_-1)) mcmc.SaveStep(false);
+      else mcmc.SaveStep(true);
       if(_steps_ > 100 && !(i%(_steps_/100))){
         LogInfo << "Chain: " << chain
                 << " step: " << i << "/" << _steps_ << " "
@@ -639,13 +644,11 @@ void MCMCInterface::setupAndRunSimpleStep(SimpleStepMCMC& mcmc) {
                 << std::endl;
       }
     }
-    // Save the final state.  This step should be skipped when analyzing the
-    // chain, the steps can be identified since the covariance is not empty.
+
     LogInfo << "Chain: " << chain << " complete"
             << " Run Length: " << _steps_
             << " -- Saving state"
             << std::endl;
-    mcmc.SaveStep(true);
   }
   LogInfo << "Finished Running chains" << std::endl;
 
