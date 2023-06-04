@@ -335,7 +335,6 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
         }
         minYValue = std::min(yBounds.first, minYValue); // NAN on the right!!
         maxYValue = std::max(yBounds.second, maxYValue);
-        LogDebug << hist->GetTitle() << " -> maxYValue = " << maxYValue << std::endl;
       }
 
       TH1D* firstHistToPlot{nullptr};
