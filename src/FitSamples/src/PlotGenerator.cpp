@@ -60,9 +60,14 @@ std::map<std::string, std::shared_ptr<TCanvas>> PlotGenerator::getBufferCanvasLi
   return _bufferCanvasList_;
 }
 
+
+std::vector<HistHolder> &PlotGenerator::getHistHolderList(int cacheSlot_){
+  return _histHolderCacheList_[cacheSlot_];
+}
+
 // Core
 void PlotGenerator::generateSamplePlots(TDirectory *saveDir_, int cacheSlot_) {
-  LogThrowIf(not isInitialized());
+  LogThrowIf( not isInitialized() );
   LogScopeIndent;
   this->generateSampleHistograms(GenericToolbox::mkdirTFile(saveDir_, "histograms"), cacheSlot_);
   this->generateCanvas(_histHolderCacheList_[cacheSlot_], GenericToolbox::mkdirTFile(saveDir_, "canvas"));
@@ -307,30 +312,37 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
         _bufferCanvasList_[canvasPath]->Divide(canvasNbXplots, canvasNbYplots);
       }
       _bufferCanvasList_[canvasPath]->cd(iSampleSlot);
+      _bufferCanvasList_[canvasPath]->GetPad(iSampleSlot)->SetLeftMargin(0.12); // Y title prints ok
+      _bufferCanvasList_[canvasPath]->GetPad(iSampleSlot)->SetTopMargin(0.105); // 10^XX print correctly
+      _bufferCanvasList_[canvasPath]->GetPad(iSampleSlot)->SetRightMargin(0.); // don't lose space on the right
+      _bufferCanvasList_[canvasPath]->GetPad(iSampleSlot)->SetBottomMargin(0.11); // Leave a bit of space at the bottom
 
       // separating histograms
       TH1D *dataSampleHist{nullptr};
       std::vector<TH1D *> mcSampleHistList;
-      double minYValue = 1;
-      double maxYValue = minYValue;
+      double minYValue{std::nan("unset")};
+      double maxYValue{std::nan("unset")};
       for( const auto* histHolder : histList.second ) {
-        TH1D* hist = histHolder->histPtr.get();
-        if ( histHolder->isData ) {
+        TH1D* hist{ histHolder->histPtr.get() };
+        std::pair<double, double> yBounds;
+        if( histHolder->isData ){
           dataSampleHist = hist;
+          yBounds = GenericToolbox::fetchYRange(hist);
         }
-        else {
+        else{
           mcSampleHistList.emplace_back(hist);
-          minYValue = std::min(minYValue, hist->GetMinimum(0));
-          maxYValue = std::max(maxYValue, hist->GetMaximum());
+          yBounds = GenericToolbox::fetchYRange(hist, false); // don't consider un-ploted errors on MC
         }
+        minYValue = std::min(yBounds.first, minYValue); // NAN on the right!!
+        maxYValue = std::max(yBounds.second, maxYValue);
       }
 
       TH1D* firstHistToPlot{nullptr};
 
       // Legend
-      double Xmax = 0.9;
+      double Xmax = 1;
       double Ymax = 0.9;
-      double Xmin = 0.5;
+      double Xmin = 0.6;
       double Ymin = Ymax - 0.04 * _maxLegendLength_;
       auto* splitLegend = new TLegend(Xmin, Ymin, Xmax, Ymax); // ptr required to transfert ownership
       int nLegend{0};
@@ -416,7 +428,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
       // Draw the data hist on top
       if (dataSampleHist != nullptr) {
         std::string originalTitle = dataSampleHist->GetTitle(); // title can be used for figuring out the type of the histogram
-        maxYValue = std::max(maxYValue, dataSampleHist->GetMaximum());
+        maxYValue = std::max(dataSampleHist->GetMaximum(), maxYValue);
         dataSampleHist->SetTitle("Data");
         splitLegend->AddEntry(dataSampleHist, dataSampleHist->GetTitle(), "lep"); nLegend++;
         if ( firstHistToPlot != nullptr ) {
