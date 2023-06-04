@@ -211,13 +211,9 @@ int main(int argc, char** argv){
 
   auto* calcXsecDir{ GenericToolbox::mkdirTFile(app.getOutfilePtr(), "calcXsec") };
 
-  LogInfo << "Generating loaded sample plots..." << std::endl;
-  propagator.getPlotGenerator().generateSamplePlots(
-    GenericToolbox::mkdirTFile(calcXsecDir, "postFit/samples")
-  );
-
   LogInfo << "Creating throws tree" << std::endl;
   auto* xsecThrowTree = new TTree("xsecThrow", "xsecThrow");
+  xsecThrowTree->SetDirectory( GenericToolbox::mkdirTFile(calcXsecDir, "throws") ); // temp saves will be done here
 
 
   LogInfo << "Creating normalizer objects..." << std::endl;
@@ -647,7 +643,7 @@ int main(int argc, char** argv){
 
   LogInfo << "Generating xsec sample plots..." << std::endl;
   // manual trigger to tweak the error bars
-  propagator.getPlotGenerator().generateSampleHistograms(GenericToolbox::mkdirTFile(calcXsecDir, "plots/histograms"));
+  propagator.getPlotGenerator().generateSampleHistograms();
 
   for( auto& histHolder : propagator.getPlotGenerator().getHistHolderList(0) ){
     if( not histHolder.isData ){ continue; } // only data will print errors
