@@ -510,14 +510,14 @@ int main(int argc, char** argv){
         {
           auto& mcEvList{xsec.samplePtr->getMcContainer().eventList};
           std::for_each(mcEvList.begin(), mcEvList.end(), [&](PhysicsEvent& ev_){
-            if( iBin == ev_.getSampleBinIndex() ){ return; }
+            if( iBin != ev_.getSampleBinIndex() ){ return; }
             ev_.setNominalWeight( ev_.getNominalWeight() + binData );
           });
         }
         {
           auto& dataEvList{xsec.samplePtr->getDataContainer().eventList};
           std::for_each(dataEvList.begin(), dataEvList.end(), [&](PhysicsEvent& ev_){
-            if( iBin == ev_.getSampleBinIndex() ){ return; }
+            if( iBin != ev_.getSampleBinIndex() ){ return; }
             ev_.setNominalWeight( ev_.getNominalWeight() + binData );
           });
         }
