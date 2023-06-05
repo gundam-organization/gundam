@@ -134,7 +134,7 @@ void compareConfigStage(const nlohmann::json& config1_, const nlohmann::json& co
                 }
               }
               if( not found1 ){
-                LogError << "Could not find key with name \"" << name1 << "\" in config2." << std::endl;
+                LogError << path << ": could not find key with name \"" << name1 << "\" in config2." << std::endl;
               }
             }
 
@@ -150,7 +150,7 @@ void compareConfigStage(const nlohmann::json& config1_, const nlohmann::json& co
                 }
               }
               if( not found2 ){
-                LogError << "Could not find key with name \"" << name2 << "\" in config1." << std::endl;
+                LogError << path << ": could not find key with name \"" << name2 << "\" in config1." << std::endl;
               }
             }
           }
