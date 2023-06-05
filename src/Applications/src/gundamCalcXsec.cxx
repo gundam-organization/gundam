@@ -109,15 +109,9 @@ int main(int argc, char** argv){
   );
 
   // Defining signal samples
-  auto confJson = ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") );
-
-  // fix for broken versions of JSON:
-  if( confJson.is_array() and confJson.size() == 1 ){ confJson = confJson[0]; }
-
-  nlohmann::json xsecConfig{ confJson };
+  nlohmann::json xsecConfig{ ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ) };
   cHandler.override( xsecConfig );
-
-  LogDebug << "Override done." << std::endl;
+  LogInfo << "Override done." << std::endl;
 
   if( clParser.isOptionTriggered("dryRun") ){
     std::cout << cHandler.toString() << std::endl;
