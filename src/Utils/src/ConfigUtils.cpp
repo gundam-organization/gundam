@@ -312,6 +312,8 @@ namespace ConfigUtils {
       ConfigUtils::unfoldConfig( config );
     }
 
+    // fix for old version of json
+    if( config.is_array() and config.size() == 1 ){ config = config[0]; }
   }
   ConfigHandler::ConfigHandler(nlohmann::json config_) : config(std::move(config_)) {}
 

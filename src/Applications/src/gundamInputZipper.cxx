@@ -39,9 +39,9 @@ int main(int argc, char** argv) {
   LogInfo << clParser.getDescription().str() << std::endl;
 
   clParser.addDummyOption("Options");
-  clParser.addOption("configFile", {"-c", "--config-file"}, "Specify path to the fitter config file");
-  clParser.addOption("overrideFiles", {"-of", "--override-files"}, "Provide config files that will override keys", -1);
-  clParser.addOption("outputFolder", {"-o", "--out-folder"}, "Output folder name");
+  clParser.addOption("configFile",      {"-c", "--config-file"}, "Specify path to the fitter config file");
+  clParser.addOption("overrideFiles",   {"-of", "--override-files"}, "Provide config files that will override keys", -1);
+  clParser.addOption("outputFolder",    {"-o", "--out-folder"}, "Output folder name");
   clParser.addOption("maxFileSizeInMb", {"--max-size"}, "Set the maximum size (in MB) an input file can be to be copied locally");
 
   clParser.addDummyOption();
