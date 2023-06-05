@@ -187,7 +187,7 @@ namespace ConfigUtils {
             nlohmann::json* outListEntryMatch{nullptr};
 
             if( identifier == "__INDEX__" ){
-              if( overrideListEntry.value()[identifier].get<int>() == -1 ){
+              if     ( overrideListEntry.value()[identifier].get<int>() == -1 ){
                 // add entry
                 if( allowAddMissingKey ){
                   LogAlert << "Adding: " << GenericToolbox::joinPath(jsonPath, outEntry_.size());
@@ -197,8 +197,8 @@ namespace ConfigUtils {
                 }
               }
               else if( overrideListEntry.value()[identifier].get<size_t>() < outEntry_.size() ){
-                jsonPath.emplace_back(overrideListEntry.key());
-                overrideRecursive(outEntry_[overrideListEntry.value()[identifier].get<size_t>()], overrideListEntry.value());
+                jsonPath.emplace_back( overrideListEntry.key() );
+                overrideRecursive( outEntry_[overrideListEntry.value()[identifier].get<size_t>()], overrideListEntry.value() );
                 jsonPath.pop_back();
               }
               else{
