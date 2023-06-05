@@ -117,6 +117,8 @@ int main(int argc, char** argv){
   nlohmann::json xsecConfig{ confJson };
   cHandler.override( xsecConfig );
 
+  LogDebug << "Override done." << std::endl;
+
   if( clParser.isOptionTriggered("dryRun") ){
     std::cout << cHandler.toString() << std::endl;
 
