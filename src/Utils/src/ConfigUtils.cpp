@@ -138,7 +138,7 @@ namespace ConfigUtils {
   void applyOverrides(nlohmann::json& outConfig_, const nlohmann::json& overrideConfig_){
 
     // dev options
-    bool debug{false};
+    bool debug{true};
     bool allowAddMissingKey{true};
 
     // specific keys like "name" might help reference the lists
@@ -301,7 +301,12 @@ namespace ConfigUtils {
       LogInfo << "Extracting config file for fitter file: " << filePath_ << std::endl;
       LogThrowIf( not GenericToolbox::doesTFileIsValid(filePath_), "Invalid root file: " << filePath_ );
       auto fitFile = std::shared_ptr<TFile>( GenericToolbox::openExistingTFile( filePath_ ) );
-      auto* conf = fitFile->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed");
+
+      auto* conf = fitFile->Get<TNamed>("gundam/config_TNamed");
+      if( conf == nullptr ){
+        // legacy
+        conf = fitFile->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed");
+      }
       LogThrowIf(conf==nullptr, "no config in ROOT file " << filePath_);
       config = GenericToolbox::Json::readConfigJsonStr( conf->GetTitle() );
       fitFile->Close();
@@ -311,7 +316,6 @@ namespace ConfigUtils {
       config = ConfigUtils::readConfigFile(filePath_ ); // works with yaml
       ConfigUtils::unfoldConfig( config );
     }
-
   }
   ConfigHandler::ConfigHandler(nlohmann::json config_) : config(std::move(config_)) {}
 

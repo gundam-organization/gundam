@@ -109,8 +109,9 @@ int main(int argc, char** argv){
   );
 
   // Defining signal samples
-  nlohmann::json xsecConfig{ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") )};
+  nlohmann::json xsecConfig{ ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ) };
   cHandler.override( xsecConfig );
+  LogInfo << "Override done." << std::endl;
 
   if( clParser.isOptionTriggered("dryRun") ){
     std::cout << cHandler.toString() << std::endl;
