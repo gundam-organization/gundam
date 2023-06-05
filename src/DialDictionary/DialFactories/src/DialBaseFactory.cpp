@@ -20,6 +20,8 @@ DialBase* DialBaseFactory::makeDial(const std::string& dialTitle_,
   // in the event of an exception.
   std::unique_ptr<DialBase> dialBase;
 
+  LogThrowIf(dialType_.empty(), "Dial type not set.");
+
   if (dialType_ == "Norm" || dialType_ == "Normalization") {
     NormDialBaseFactory factory;
     dialBase.reset(factory.makeDial(dialTitle_, dialType_, dialSubType_, dialInitializer_, useCachedDial_));
@@ -62,6 +64,9 @@ DialBase* DialBaseFactory::makeDial(const std::string& dialTitle_,
     dialBase.reset(factory.makeDial(dialTitle_, "Graph", "light", dialInitializer_, useCachedDial_));
   }
 #endif
+  else{
+    LogThrow("Unrecognized dial type: " << dialType_);
+  }
 
   // Pass the ownership without any constraints!
   return dialBase.release();
