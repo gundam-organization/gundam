@@ -301,7 +301,12 @@ namespace ConfigUtils {
       LogInfo << "Extracting config file for fitter file: " << filePath_ << std::endl;
       LogThrowIf( not GenericToolbox::doesTFileIsValid(filePath_), "Invalid root file: " << filePath_ );
       auto fitFile = std::shared_ptr<TFile>( GenericToolbox::openExistingTFile( filePath_ ) );
-      auto* conf = fitFile->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed");
+
+      auto* conf = fitFile->Get<TNamed>("gundam/config_TNamed");
+      if( conf == nullptr ){
+        // legacy
+        conf = fitFile->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed");
+      }
       LogThrowIf(conf==nullptr, "no config in ROOT file " << filePath_);
       config = GenericToolbox::Json::readConfigJsonStr( conf->GetTitle() );
       fitFile->Close();

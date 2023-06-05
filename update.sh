@@ -15,6 +15,11 @@ do
     git fetch --all
     git branch -a --sort=committerdate
     exit 0;
+  elif [ $arg == "--fix-submodules" ]; then
+    echo "Re-initializing submodules..."
+    git submodule deinit --all
+    git submodule update --init --remote --recursive
+    exit 0;
   elif [ $arg == "-v" ]; then
     shift
     if [[ -n $1 ]]; then
