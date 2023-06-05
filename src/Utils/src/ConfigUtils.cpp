@@ -43,6 +43,9 @@ namespace ConfigUtils {
       output = GenericToolbox::Json::readConfigFile(configFilePath_);
     }
 
+    // fix for broken versions of JSON:
+    if( output.is_array() and output.size() == 1 ){ output = output[0]; }
+
     return output;
   }
 
