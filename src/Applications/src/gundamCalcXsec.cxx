@@ -109,7 +109,12 @@ int main(int argc, char** argv){
   );
 
   // Defining signal samples
-  nlohmann::json xsecConfig{ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") )};
+  auto confJson = ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") );
+
+  // fix for broken versions of JSON:
+  if( confJson.is_array() and confJson.size() == 1 ){ confJson = confJson[0]; }
+
+  nlohmann::json xsecConfig{ confJson };
   cHandler.override( xsecConfig );
 
   if( clParser.isOptionTriggered("dryRun") ){
