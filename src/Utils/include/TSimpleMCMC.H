@@ -1374,6 +1374,9 @@ public:
         // Initialize the central point.
         fCentralPoint.resize(fLastPoint.size());
         std::copy(fLastPoint.begin(), fLastPoint.end(), fCentralPoint.begin());
+        // Make sure the central point change is resized and starts at zero
+        fCentralPointChange.clear();
+        fCentralPointChange.resize(fLastPoint.size(),0.0);
         // Start with a non-zero number of trials to represent the prior
         // information coming from the first guess at the central point.
         fCentralPointTrials = std::max(fCentralPointTrials,1.0);
@@ -1666,9 +1669,11 @@ private:
         // Update the estimate of the central value.  This is simply a running
         // average of the position of the points in the posterior.
         for (std::size_t i=0; i< current.size(); ++i) {
+            fCentralPointChange[i] = fCentralPoint[i];
             fCentralPoint[i] *= fCentralPointTrials;
             fCentralPoint[i] += current[i];
             fCentralPoint[i] /= fCentralPointTrials + 1;
+            fCentralPointChange[i] = fCentralPoint[i] - fCentralPointChange[i];
         }
         fCentralPointTrials = std::min(fCovarianceWindow,
                                        fCentralPointTrials+1.0);
@@ -1681,11 +1686,18 @@ private:
         for (std::size_t i=0; i<current.size(); ++i) {
             for (std::size_t j=0; j<i+1; ++j) {
                 double v = fCurrentCov(i,j);
+                // Correct for the center having moved!
+                v -= fCentralPointChange[i]*fCentralPoint[j];
+                v -= fCentralPointChange[j]*fCentralPoint[i];
+                v += fCentralPointChange[i]*fCentralPointChange[j];
+                // Calculate the "covariance" of the new point.
                 double r = (current[i]-fCentralPoint[i])
                     *(current[j]-fCentralPoint[j]);
+                // Update the running average of the covariance.
                 v *= fCovarianceTrials;
                 v += r;
                 v /= fCovarianceTrials + 1.0;
+                // Make sure the covariance stays symmetric
                 if (i == j) fCurrentCov(i,j) = v;
                 else fCurrentCov(i,j) = fCurrentCov(j,i) = v;
             }
@@ -1714,6 +1726,9 @@ private:
     // The current (running) estimate for the central value of each parameter.
     Vector fCentralPoint;
     Vector fSaveCentralPoint;
+
+    // The change from the last position of the central point.
+    Vector fCentralPointChange;
 
     // The trials being used for the current estimated central value.  This
     // will be a value between one and fCovarianceWindow.
