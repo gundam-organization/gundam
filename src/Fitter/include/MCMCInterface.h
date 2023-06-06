@@ -19,9 +19,9 @@
 #include <vector>
 
 // Override TSimpleMCMC.H for how much output to use and where to send it.
-#define MCMC_DEBUG_LEVEL 3
+#define MCMC_DEBUG_LEVEL 1
 #define MCMC_DEBUG(level) if (level <= (MCMC_DEBUG_LEVEL)) LogInfo
-#define MCMC_ERROR (LogInfo << "ERROR: ")
+#define MCMC_ERROR LogError
 #include "TSimpleMCMC.H"
 
 class FitterEngine;
@@ -203,12 +203,12 @@ private:
   /// Set the covariance of the proposal based on a TH2D histogram in a file.
   /// This returns true if the parameter correlations have been set.
   bool adaptiveLoadProposalCovariance(AdaptiveStepMCMC& mcmc,
+                                      Vector& prior,
                                       const std::string& fileName,
                                       const std::string& histName);
 
-
   /// Set the default proposal based on the FitParameter values and steps.
-  bool adaptiveDefaultProposalCovariance(AdaptiveStepMCMC& mcmc);
+  bool adaptiveDefaultProposalCovariance(AdaptiveStepMCMC& mcmc,Vector& prior);
 };
 #endif // GUNDAM_MCMCInterface_h
 

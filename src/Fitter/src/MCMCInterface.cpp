@@ -37,8 +37,8 @@ void MCMCInterface::readConfigImpl(){
   // to be changed.  Generally, leave it alone.
   _outTreeName_ = GenericToolbox::Json::fetchValue(_config_, "mcmcOutputTree", "MCMC");
 
-  // Get the MCMC chain parameters to be used during burn-in.  The burnin will
-  // be skipped if the state has been restored from a file.  The burnin can be
+  // Get the MCMC chain parameters to be used during burn-in.  The burn-in will
+  // be skipped if the state has been restored from a file.  The burn-in can be
   // skipped in favor of discarding the initial parts of the MCMC chain
   // (usually a better option).  A run is broken into "mini-Chains" called a
   // "cycle" where the posterior covariance information is updated after each
@@ -50,9 +50,9 @@ void MCMCInterface::readConfigImpl(){
   _burninLength_ = GenericToolbox::Json::fetchValue(_config_,
                                          "burninSteps", _burninLength_);
 
-  // If this is set to false, the burnin steps will not be saved to disk.
+  // If this is set to false, the burn-in steps will not be saved to disk.
   // This should usually be true since it lets you see the progress of the
-  // burnin.
+  // burn-in.
   _saveBurnin_ = GenericToolbox::Json::fetchValue(_config_,
                                        "saveBurnin", _saveBurnin_);
 
@@ -80,7 +80,7 @@ void MCMCInterface::readConfigImpl(){
   _burninCovDeweighting_ = GenericToolbox::Json::fetchValue(
     _config_, "burninCovDeweighting", _burninCovDeweighting_);
 
-  // The number of times that the burnin state will be reset.  If this is
+  // The number of times that the burn-in state will be reset.  If this is
   // zero, then there are no resets (one means reset after the first cycle,
   // &c).  Resets are sometimes needed if the initial conditions are far from
   // the main probability in the posterior and the "best fit" parameters need
@@ -232,15 +232,18 @@ bool MCMCInterface::adaptiveRestoreState(AdaptiveStepMCMC& mcmc,
             << fileName << std::endl;
     throw std::runtime_error("Old state file not open");
   }
-  LogInfo << "Restore the state of a previous MCMC and extend" << std::endl;
 
   // Get the tree with the state.
   TTree* restoreTree = dynamic_cast<TTree*>(restoreFile->Get(treeName.c_str()));
   if (!restoreTree) {
-    LogInfo << "Tree to restore state is not found"
+    LogInfo << "Tree to restore state is not found in "
+            << restoreFile->GetName()
             << treeName << std::endl;
     throw std::runtime_error("Old state tree not open");
   }
+
+  LogInfo << "Restore the state of a previous MCMC and extend: "
+          << restoreFile->GetName() << std::endl;
 
   // Load the old state from the tree.
   mcmc.Restore(restoreTree);
@@ -257,7 +260,8 @@ bool MCMCInterface::adaptiveRestoreState(AdaptiveStepMCMC& mcmc,
 }
 
 bool
-MCMCInterface::adaptiveDefaultProposalCovariance(AdaptiveStepMCMC& mcmc) {
+MCMCInterface::adaptiveDefaultProposalCovariance(AdaptiveStepMCMC& mcmc,
+                                                 Vector& prior) {
 
   /// Set the diagonal elements for the parameters.
   int count0 = 0;
@@ -347,6 +351,7 @@ MCMCInterface::adaptiveDefaultProposalCovariance(AdaptiveStepMCMC& mcmc) {
 
 bool
 MCMCInterface::adaptiveLoadProposalCovariance(AdaptiveStepMCMC& mcmc,
+                                              Vector& prior,
                                               const std::string& fileName,
                                               const std::string& histName) {
   // No filename so, no restoration.
@@ -366,7 +371,8 @@ MCMCInterface::adaptiveLoadProposalCovariance(AdaptiveStepMCMC& mcmc,
             << fileName << std::endl;
     throw std::runtime_error("Old state file not open");
   }
-  LogInfo << "Restore the state of a previous MCMC and extend" << std::endl;
+  LogInfo << "Restore the covariance from external file: "
+          << restoreFile->GetName() << std::endl;
 
   gFile = saveFile;
   gFile->cd((std::string(owner().getSaveDir()->GetName())+"/fit").c_str());
@@ -377,6 +383,7 @@ MCMCInterface::adaptiveLoadProposalCovariance(AdaptiveStepMCMC& mcmc,
   if (!proposalCov) {
     LogError << "Proposal TH2D not found "
              << _adaptiveCovName_ << std::endl;
+    throw std::runtime_error("Covariance not in file");
   }
 
   // Check that the covariance that was read matchs the number of parameters.
@@ -437,8 +444,14 @@ MCMCInterface::adaptiveLoadProposalCovariance(AdaptiveStepMCMC& mcmc,
   // initial number of trials.  This can also be set as a config file
   // parameter.
   double effectiveTrials = 100+0.5*count1*count1;
+  LogInfo << "Setting effective number of trials "
+          << effectiveTrials
+          << "   User Request: " << _adaptiveCovTrials_
+          << std::endl;
   if (_adaptiveCovTrials_ > 0) effectiveTrials = _adaptiveCovTrials_;
-  mcmc.GetProposeStep().SetCovarianceTrials(effectiveTrials);
+  _adaptiveCovTrials_ = effectiveTrials;
+  mcmc.GetProposeStep().SetCovarianceTrials(_adaptiveCovTrials_);
+  mcmc.GetProposeStep().SetEstimatedCenterTrials(_adaptiveCovTrials_);
 
   return true;
 }
@@ -447,50 +460,48 @@ void MCMCInterface::setupAndRunAdaptiveStep(AdaptiveStepMCMC& mcmc) {
 
   mcmc.GetProposeStep().SetDim(getMinimizerFitParameterPtr().size());
   mcmc.GetLogLikelihood().functor = getLikelihood().evalFitValidFunctor();
+  mcmc.GetProposeStep().SetCovarianceUpdateDeweighting(0.0);
 
   // Create a fitting parameter vector and initialize it.  No need to worry
   // about resizing it or it moving, so be lazy and just use push_back.
-  Vector p;
+  Vector prior;
   for (const FitParameter* par : getMinimizerFitParameterPtr() ) {
+    double val = par->getParameterValue();
     if (not getLikelihood().getUseNormalizedFitSpace()) {
-      p.push_back(par->getPriorValue());
+      prior.push_back(val);
     }
     else {
-      // Changing the boundaries, change the value/step size?
-      double val
-        = FitParameterSet::toNormalizedParValue(
-          par->getParameterValue(), *par);
-      p.push_back(val);
+      prior.push_back(FitParameterSet::toNormalizedParValue(val, *par));
     }
   }
 
   // Set the correlations in the default step proposal.
   if (not adaptiveLoadProposalCovariance(
-        mcmc,_adaptiveCovFile_,_adaptiveCovName_)) {;
-    adaptiveDefaultProposalCovariance(mcmc);
+        mcmc,prior,_adaptiveCovFile_,_adaptiveCovName_)) {;
+    adaptiveDefaultProposalCovariance(mcmc,prior);
   }
 
   // Fill the initial point.
   fillPoint();
 
   // Initializing the mcmc sampler
-  LogInfo << "Start with " << p.size() << " parameters" << std::endl;
-  mcmc.Start(p, _saveBurnin_);
+  LogInfo << "Start with " << prior.size() << " parameters" << std::endl;
+  mcmc.Start(prior, _saveBurnin_);
   mcmc.GetProposeStep().SetAcceptanceWindow(_adaptiveWindow_);
   mcmc.SetStepRMSWindow(_adaptiveWindow_);
 
   // Restore the chain if exist, otherwise, burn-in
   std::string restorationTree = "FitterEngine/fit/" + _outTreeName_;
   bool restored = adaptiveRestoreState(mcmc,_adaptiveRestore_, restorationTree);
-  if (not restored) {
-    // Burnin cycles
+  if (not restored and _burninCycles_ > 0 and _burninLength_ > 0) {
+    // Burn-In cycles
     mcmc.GetProposeStep().SetCovarianceWindow(_burninCovWindow_);
     mcmc.GetProposeStep().SetAcceptanceWindow(_burninWindow_);
     mcmc.SetStepRMSWindow(_burninWindow_);
     mcmc.GetProposeStep()
       .SetCovarianceUpdateDeweighting(_burninCovDeweighting_);
     for (int chain = 0; chain < _burninCycles_; ++chain){
-      LogInfo << "Start Burnin chain " << chain << std::endl;
+      LogInfo << "Start burn-In chain " << chain << std::endl;
       mcmc.GetProposeStep().UpdateProposal();
       // Override default number of steps until the next automatic
       // UpdateProposal call.  This disables automatic updates during adaptive
@@ -506,7 +517,7 @@ void MCMCInterface::setupAndRunAdaptiveStep(AdaptiveStepMCMC& mcmc) {
         LogInfo << "Burn-in step size variance is frozen" << std::endl;
         mcmc.GetProposeStep().SetAcceptanceRigidity(-1);
       }
-      // Burnin chain in each cycle
+      // Burn-In chain in each cycle
       for (int i = 0; i < _burninLength_; ++i) {
         // Run step
         if (mcmc.Step(false)) fillPoint();
@@ -529,17 +540,32 @@ void MCMCInterface::setupAndRunAdaptiveStep(AdaptiveStepMCMC& mcmc) {
       }
       // Reset the covariance to the initial state.  This forgets the path of
       // the previous cycle.  This only happens a few times to let it forget
-      // about the very first burning cycles
-      if (chain < _burninResets_) mcmc.GetProposeStep().ResetProposal();
-
+      // about the very first burn-in cycles
+      if (chain < _burninResets_) {
+        Vector saveCenter{mcmc.GetProposeStep().GetEstimatedCenter()};
+        mcmc.GetProposeStep().ResetProposal();
+        // After the reset, set how many trials the prior covariance counts
+        // for.  This needs to be done by hand since the extra weight lives
+        // here, and not in TSimpleMCMC.h (TSimpleMCMC doesn't, and shouldn't,
+        // know about this burn-in process).
+        if (_adaptiveCovTrials_ > 0) {
+          mcmc.GetProposeStep().SetCovarianceTrials(_adaptiveCovTrials_);
+          // We have a good prior (usually based on a previous MINUIT fit), so
+          // restore the current estimate of the centeral value.
+          mcmc.GetProposeStep().SetEstimatedCenter(saveCenter);
+          mcmc.GetProposeStep().SetEstimatedCenterTrials(_adaptiveCovTrials_);
+        }
+      }
     }
-    LogInfo << "Finished burnin chains" << std::endl;
+    LogInfo << "Finished burn-in chains" << std::endl;
   }
 
   // Run cycles
   mcmc.GetProposeStep().SetCovarianceWindow(_adaptiveCovWindow_);
   mcmc.GetProposeStep().SetAcceptanceWindow(_adaptiveWindow_);
   mcmc.SetStepRMSWindow(_adaptiveWindow_);
+  mcmc.GetProposeStep()
+    .SetCovarianceUpdateDeweighting(_adaptiveCovDeweighting_);
   for (int chain = 0; chain < _cycles_; ++chain){
     LogInfo << "Start run chain " << chain << std::endl;
     // Update the covariance with the steps from the last cycle.  This
@@ -602,25 +628,25 @@ void MCMCInterface::setupAndRunSimpleStep(SimpleStepMCMC& mcmc) {
   mcmc.GetLogLikelihood().functor = getLikelihood().evalFitFunctor();
   mcmc.GetProposeStep().fSigma = _simpleSigma_;
 
-  Vector p;
+  Vector prior;
   for (const FitParameter* par : getMinimizerFitParameterPtr() ) {
-    p.push_back(par->getPriorValue());
+    prior.push_back(par->getPriorValue());
   }
 
   // Fill the initial point.
   fillPoint();
 
   // Initializing the mcmc sampler
-  mcmc.Start(p, _saveBurnin_);
+  mcmc.Start(prior, _saveBurnin_);
 
-  // Burnin cycles
+  // Burn-In cycles
   for (int chain = 0; chain < _burninCycles_; ++chain){
-    LogInfo << "Start Burnin Cycle " << chain << std::endl;
-    // Burnin chain in each cycle
+    LogInfo << "Start Burn-In Cycle " << chain << std::endl;
+    // Burn-In chain in each cycle
     for (int i = 0; i < _burninLength_; ++i) {
       // Run step
       if (mcmc.Step(false)) fillPoint();
-      // Save the step if burnin steps are being saved..  Check to see if this
+      // Save the step if burn-in steps are being saved..  Check to see if this
       // is the last step of the run, and if it is, then save the full state.
       if (_saveBurnin_) mcmc.SaveStep(_burninLength_ <= (i+1));
       if(_burninLength_ > 100 && !(i%(_burninLength_/100))){
