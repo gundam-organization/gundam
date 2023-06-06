@@ -585,7 +585,8 @@ class TProposeAdaptiveStep {
 public:
     TProposeAdaptiveStep() :
         fLastValue(0.0),
-        fCovarianceTrials(0.0), fCovarianceDeweight(0.5), fCovarianceWindow(-1),
+        fCentralPointTrials(0.0), fCovarianceTrials(0.0),
+        fCovarianceDeweight(0.5), fCovarianceWindow(-1),
         fTrials(0), fSuccesses(0), fNextUpdate(-1),
         fAcceptance(0.0), fAcceptanceTrials(0), fAcceptanceDeweight(0.5),
         fAcceptanceWindow(-1), fAcceptanceRigidity(2.0),
@@ -655,8 +656,39 @@ public:
         }
     }
 
-    /// Get the current estimated center of the point cloud.
+    /// Get (set) the current estimated center of the point cloud.  The
+    /// estimated central point is a running average of the center of the
+    /// point cloud and is used in the calculation of the current point cloud
+    /// covariance.  A case where it might be set is when there is prior
+    /// information about the expected central value.
     const Vector& GetEstimatedCenter() const {return fCentralPoint;}
+    bool SetEstimatedCenter(const Vector& v) {
+        if (fCentralPoint.size() != v.size()) return false;
+        std::copy(v.begin(), v.end(), fCentralPoint.begin());
+        return true;
+    }
+
+    /// Get the number of trials that are currently included in the central
+    /// point estimation.
+    double GetEstimatedCenterTrials() const {return fCentralPointTrials;}
+
+    /// Set the effective number of trials that should be associated with the
+    /// current central point value.  This is mostly useful when you know a
+    /// good initial value for the central point (which is set using
+    /// SetEstimatedCenter().
+    void SetEstimatedCenterTrials(double v) {
+        fCentralPointTrials = v;
+        MCMC_DEBUG(1) << "Set estimated center trials to "
+                      << fCentralPointTrials
+                      << std::endl;
+        if (fCentralPointTrials > fCovarianceWindow) {
+            MCMC_DEBUG(0) << "Number of effective covariance trials"
+                          << " (" << fCentralPointTrials << ")"
+                          << " is set larger than window"
+                          << " (" << fCovarianceWindow << ")"
+                          << std::endl;
+        }
+    }
 
     /// Get the number of steps tried in the current chain.
     int GetTrials() const {return fTrials;}
@@ -809,6 +841,8 @@ public:
     /// initial value for the step proposal covariance.
     void SetCovarianceTrials(double v) {
         fCovarianceTrials = v;
+        MCMC_DEBUG(1) << "Set covariance trials to " << fCovarianceTrials
+                      << std::endl;
         if (fCovarianceTrials > fCovarianceWindow) {
             MCMC_DEBUG(0) << "Number of effective covariance trials"
                           << " (" << fCovarianceTrials << ")"
@@ -868,6 +902,7 @@ public:
     /// to be updated.  It's automatically called during the run, so (while it
     /// can be) it probably doesn't need to be called in user code.
     void UpdateProposal(bool fromReset = false) {
+        if (fromReset) MCMC_DEBUG(1) << "Updating after a reset" << std::endl;
         MCMC_DEBUG(1) << "Update after "
                       << fSuccesses << "/" << fTrials << " successes"
                       << " (Accepting: " << fAcceptance
@@ -911,14 +946,25 @@ public:
         // so that the new information weighs more.
         if (fCovarianceDeweight > 0.0) {
             if (fCovarianceDeweight > 1.0) fCovarianceDeweight = 1.0;
+            MCMC_DEBUG(1) << "Deweight current covariance by "
+                          << fCovarianceDeweight
+                          << std::endl;
             double w = 1.0 - fCovarianceDeweight;
             fCovarianceTrials = std::max(1.0,w*fCovarianceTrials);
             fCovarianceTrials = std::min(fCovarianceTrials,w*fCovarianceWindow);
+            fCentralPointTrials = std::max(1.0,w*fCentralPointTrials);
+            fCentralPointTrials =
+                std::min(fCentralPointTrials,w*fCovarianceWindow);
         }
 
         MCMC_DEBUG(1) << " Next update: " << fNextUpdate
                       << " Effective trials in previous covariance: "
                       << fCovarianceTrials
+                      << "   Window: " << fCovarianceWindow
+                      << std::endl;
+        MCMC_DEBUG(1) << " Next update: " << fNextUpdate
+                      << " Effective trials in central point: "
+                      << fCentralPointTrials
                       << std::endl;
 
         // The proposal is being updated, so deweight the current acceptance
@@ -1065,6 +1111,7 @@ public:
         TDecompChol chol2(fCurrentCov);
         if (chol2.Decompose()) {
             MCMC_DEBUG(1) << "Correlation matrix was decomposed"
+                          << " after conditioning"
                           << std::endl;
             fDecomposition = chol2.GetU();
             if (MCMC_DEBUG_LEVEL>1 && fLastPoint.size() < 6) {
@@ -1329,7 +1376,7 @@ public:
         std::copy(fLastPoint.begin(), fLastPoint.end(), fCentralPoint.begin());
         // Start with a non-zero number of trials to represent the prior
         // information coming from the first guess at the central point.
-        fCentralPointTrials =  std::min(10.0, 0.1*fCovarianceWindow);
+        fCentralPointTrials = std::max(fCentralPointTrials,1.0);
         // This makes sure everything is set properly.
         UpdateProposal(true);
     }
