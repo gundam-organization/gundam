@@ -176,7 +176,7 @@ if (nlohmann_json_FOUND)
     cmessage( STATUS "nlohmann JSON library found")
     # Additional actions for when the library is found
 else()
-    cmessage( FATAL_ERROR "nlohmann JSON library not found")
+    cmessage( ALERT "nlohmann JSON library not found with CMake. Compiler might complain if it can't found the corresponding headers")
     # Additional actions for when the library is not found
 endif()
 
