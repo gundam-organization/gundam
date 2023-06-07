@@ -1687,9 +1687,9 @@ private:
             for (std::size_t j=0; j<i+1; ++j) {
                 double v = fCurrentCov(i,j);
                 // Correct for the center having moved!
-                v -= fCentralPointChange[i]*fCentralPoint[j];
-                v -= fCentralPointChange[j]*fCentralPoint[i];
-                v += fCentralPointChange[i]*fCentralPointChange[j];
+                v += fCentralPointChange[i]*fCentralPoint[j];
+                v += fCentralPointChange[j]*fCentralPoint[i];
+                v -= fCentralPointChange[i]*fCentralPointChange[j];
                 // Calculate the "covariance" of the new point.
                 double r = (current[i]-fCentralPoint[i])
                     *(current[j]-fCentralPoint[j]);
