@@ -18,13 +18,16 @@ do
   elif [ $arg == "--fix-submodules" ]; then
     echo "Re-initializing submodules..."
     git submodule deinit --all
+    git submodule sync
     git submodule update --init --remote --recursive
     exit 0;
   elif [ $arg == "-v" ]; then
     shift
     if [[ -n $1 ]]; then
       echo "Updating to version: $1"
-      git checkout $1 && git submodule update --init --remote
+      git checkout $1
+      git submodule sync
+      git submodule update --init --remote
     else
       echo "You should provide a version after -v"
     fi
@@ -39,6 +42,7 @@ do
         # Need to checkout the real branch name now:
         git checkout "${1#"remotes/origin/"}"
       fi
+      git submodule sync
       git submodule update --init --remote
     else
       echo "You should provide a version after -b"
@@ -50,12 +54,15 @@ do
     LATEST_VERSION=$(git describe --tags `git rev-list --tags --max-count=1`)
     echo "Checking out latest version: $LATEST_VERSION"
     git checkout $LATEST_VERSION
+    git submodule sync
     git submodule update --init --remote
     exit 0;
   elif [ $arg == "--head" ]; then
     echo "Checking out main branch..."
-    git checkout main && git submodule update --init --remote
+    git checkout main
     git pull origin main # updates repo
+    git submodule sync
+    git submodule update --init --remote
     exit 0;
   fi
 done
