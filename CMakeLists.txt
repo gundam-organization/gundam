@@ -170,14 +170,22 @@ endif(NOT ROOT_minuit2_FOUND)
 
 
 # NLOHMANN JSON
-find_package(nlohmann_json REQUIRED)
+find_package(nlohmann_json)
 
 if (nlohmann_json_FOUND)
     cmessage( STATUS "nlohmann JSON library found")
     # Additional actions for when the library is found
 else()
-    cmessage( ALERT "nlohmann JSON library not found with CMake. Compiler might complain if it can't found the corresponding headers")
-    # Additional actions for when the library is not found
+    # sometimes the header can be found in ROOT...
+    find_path(NLOHMANN_JSON_INCLUDE_DIR NAMES nlohmann/json.hpp)
+
+    if (NLOHMANN_JSON_INCLUDE_DIR)
+        cmessage( STATUS "nlohmann JSON header found: ${NLOHMANN_JSON_INCLUDE_DIR}/nlohmann/json.hpp")
+        # Additional actions for when the library is found
+    else()
+        cmessage( FATAL_ERROR "nlohmann JSON library not found")
+        # Additional actions for when the library is not found
+    endif()
 endif()
 
 
