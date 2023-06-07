@@ -169,6 +169,10 @@ if (NOT ROOT_minuit2_FOUND)
 endif(NOT ROOT_minuit2_FOUND)
 
 
+# NLOHMANN JSON
+find_package(nlohmann_json 3.2.0 REQUIRED)
+
+
 # YAML-CPP
 cmessage( WARNING "Looking for YAML install..." )
 find_package( yaml-cpp REQUIRED HINTS ${YAMLCPP_DIR} )

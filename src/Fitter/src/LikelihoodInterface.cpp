@@ -137,6 +137,25 @@ void LikelihoodInterface::saveGradientSteps(){
   if( not globalGraphList.empty() ){
     auto outDir = GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "fit/gradient/global");
     for( auto& gEntry : globalGraphList ){
+      gEntry.scanDataPtr->title = "Minimizer path to minimum";
+      ParScanner::writeGraphEntry(gEntry, outDir);
+    }
+    GenericToolbox::triggerTFileWrite(outDir);
+
+    outDir = GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "fit/gradient/globalRelative");
+    for( auto& gEntry : globalGraphList ){
+      if( gEntry.graph.GetN() == 0 ){ continue; }
+
+      double minY{gEntry.graph.GetY()[gEntry.graph.GetN()-1]};
+      double maxY{gEntry.graph.GetY()[0]};
+      double delta{1E-6*std::abs( maxY - minY )};
+      // allow log scale
+      minY += delta;
+
+      for( int iPt = 0 ; iPt < gEntry.graph.GetN() ; iPt++ ){
+        gEntry.graph.GetY()[iPt] -= minY;
+      }
+      gEntry.scanDataPtr->title = "Minimizer path to minimum (difference)";
       ParScanner::writeGraphEntry(gEntry, outDir);
     }
     GenericToolbox::triggerTFileWrite(outDir);

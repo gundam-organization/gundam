@@ -1122,7 +1122,7 @@ void MinimizerInterface::scanParameters(TDirectory* saveDir_){
 void MinimizerInterface::updateCacheToBestfitPoint(){
   LogThrowIf(_minimizer_->X() == nullptr, "No best fit point provided by the minimizer.");
 
-  LogWarning << "Updating propagator cache to the best fit point..." << std::endl;
+  LogWarning << "Updating propagator cache to theA best fit point..." << std::endl;
   getLikelihood().evalFit( _minimizer_->X() );
 }
 
