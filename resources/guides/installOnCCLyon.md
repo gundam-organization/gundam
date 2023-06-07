@@ -7,32 +7,19 @@ the T2K computing group, i.e. you can access the SPS storage: `ls /sps/t2k/`.
 
 ## Environment Setup
 
-The following bash commands can be set in a single bash file you can readAndFill
-each time you login.
-
-Let's first make sure we have a not-too-old compiler. Here an example with 
-GCC-7:
-
+Nowadays, the computing cluster of Lyon uses `module load` command to setup the
+bash environement. Here is my environment:
 ```sh
-ccenv gcc 7.3.0
-source /opt/rh/devtoolset-7/enable
-export CC="$(which gcc)"
-export CXX="$(which g++)"
-echo "   ├─ GCC Version : $(gcc --version | head -n 1)"
+module load Compilers/gcc/9.3.1
+module load Analysis/root
+module load Programming_Languages/perl
+module load python
+module load fortran
+module load Collaborative_Tools/git
+module load Production/cmake
+module load HPC_GPU_Cloud/openmpi
+module load geant4
 ```
-
-Note that you should be able to compile with a more recent version of GCC.
-Our goal is to keep the software compatible with the most recent version of
-GCC. If you find any issue related to the compilation, please post a ticket
-on the issue tracker of github!
-
-Let's now use a more up-to-date version of cmake:
-```sh
-ccenv cmake 3.20.2
-```
-
-You can also provide a specific version with `ccenv`. Available versions can
-be shown with `ccenv cmake --list`.
 
 Since all the available versions of ROOT on the CC are compiled either with a quite
 old compiler or with missing features, a shared ROOT library has been installed
