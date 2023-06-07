@@ -170,7 +170,15 @@ endif(NOT ROOT_minuit2_FOUND)
 
 
 # NLOHMANN JSON
-find_package(nlohmann_json 3.2.0 REQUIRED)
+find_package(nlohmann_json REQUIRED)
+
+if (nlohmann_json_FOUND)
+    cmessage( STATUS "nlohmann JSON library found")
+    # Additional actions for when the library is found
+else()
+    cmessage( FATAL_ERROR "nlohmann JSON library not found")
+    # Additional actions for when the library is not found
+endif()
 
 
 # YAML-CPP
