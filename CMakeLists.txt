@@ -170,7 +170,7 @@ endif(NOT ROOT_minuit2_FOUND)
 
 
 # NLOHMANN JSON
-find_package(nlohmann_json REQUIRED)
+find_package(nlohmann_json)
 
 if (nlohmann_json_FOUND)
     cmessage( STATUS "nlohmann JSON library found")
