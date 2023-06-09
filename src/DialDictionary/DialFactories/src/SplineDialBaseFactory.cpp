@@ -150,6 +150,13 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
   if (dialSubType_.find("not-a-knot") != std::string::npos) splType = "not-a-knot";
   if (dialSubType_.find("catmull") != std::string::npos) splType = "catmull-rom";
   if (dialSubType_.find("natural") != std::string::npos) splType = "natural";
+  if (dialSubType_.find("pixar") != std::string::npos) {
+    splType = "catmull-rom";
+    // sneaky output... logger would tattle on me.
+    static bool woody=true;
+    if (woody) std::cout << std::endl << std::endl << "You got a friend in me!" << std::endl;
+    woody=false;
+  }
   if (dialSubType_.find("ROOT") != std::string::npos) splType = "ROOT";
 
   // Get the numeric tolerance for when a uniform spline can be used.  We

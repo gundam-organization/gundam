@@ -371,7 +371,7 @@ namespace ConfigUtils {
     config = flat.unflatten();
   }
   void ConfigHandler::flatOverride( const std::vector<std::string>& flattenEntryList_ ){
-    for( auto& flattenEntry : flattenEntryList_ ){ this->override( flattenEntry ); }
+    for( auto& flattenEntry : flattenEntryList_ ){ this->flatOverride( flattenEntry ); }
   }
 
 
