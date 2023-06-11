@@ -599,7 +599,7 @@ void FitterEngine::checkNumericalAccuracy(){
       if(not parSet.isEnabled()) continue;
       if( not parSet.isEnabledThrowToyParameters() ){ continue;}
       parSet.throwFitParameters(gain);
-      throwEntry.emplace_back(std::vector<double>(parSet.getParameterList().size(), 0));
+      throwEntry.emplace_back(parSet.getParameterList().size(), 0);
       for( size_t iPar = 0 ; iPar < parSet.getParameterList().size() ; iPar++){
         throwEntry.back()[iPar] = parSet.getParameterList()[iPar].getParameterValue();
       }

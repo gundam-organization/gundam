@@ -457,17 +457,6 @@ void FitParameterSet::throwFitParameters(double gain_){
     else{
       LogInfo << "Throwing parameters for " << _name_ << " using Cholesky matrix" << std::endl;
 
-      // TODO: CHOLESKY THROW IS NOT WORKING PROPERLY
-
-
-//      if( _choleskyMatrix_ == nullptr ){
-//        LogInfo << "Generating Cholesky matrix in set: " << getName() << std::endl;
-//        _choleskyMatrix_ = std::shared_ptr<TMatrixD>(
-//            GenericToolbox::getCholeskyMatrix( _strippedCovarianceMatrix_.get() )
-//        );
-//      }
-//      auto throws = GenericToolbox::throwCorrelatedParameters(_choleskyMatrix_.get());
-
       if( not _correlatedVariableThrower_.isInitialized() ){
         _correlatedVariableThrower_.setCovarianceMatrixPtr(_strippedCovarianceMatrix_.get());
         _correlatedVariableThrower_.initialize();
@@ -484,17 +473,14 @@ void FitParameterSet::throwFitParameters(double gain_){
           par.setParameterValue( par.getThrowValue() );
           LogInfo << " → " << par.getParameterValue() << std::endl;
         }
-        else{
-//          LogWarning << "Skipping parameter: " << par.getTitle() << std::endl;
-        }
       }
 
-//    if( _useEigenDecompInFit_ ){
-//      this->propagateOriginalToEigen();
-//      for( auto& eigenPar : _eigenParameterList_ ){
-//        eigenPar.setThrowValue( eigenPar.getParameterValue() );
-//      }
-//    }
+      if( _useEigenDecompInFit_ ){
+        this->propagateOriginalToEigen();
+        for( auto& eigenPar : _eigenParameterList_ ){
+          eigenPar.setThrowValue( eigenPar.getParameterValue() );
+        }
+      }
     }
   }
 
