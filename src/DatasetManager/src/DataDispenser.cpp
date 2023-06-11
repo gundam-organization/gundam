@@ -787,7 +787,7 @@ void DataDispenser::readAndFill(){
   }
 
   if( _owner_->isSortLoadedEvents() ){
-    LogAlert << "[DEV OPTION] Sorting loaded events..." << std::endl;
+    LogWarning << "Re-sorting loaded events..." << std::endl;
     for( auto& evList : _cache_.sampleEventListPtrToFill ){
       GenericToolbox::sortVector(*evList, [](const PhysicsEvent& a, const PhysicsEvent& b){
         if( a.getDataSetIndex() < b.getDataSetIndex() ) { return true; }
@@ -797,8 +797,6 @@ void DataDispenser::readAndFill(){
       });
     }
   }
-
-
 
 }
 void DataDispenser::loadFromHistContent(){
