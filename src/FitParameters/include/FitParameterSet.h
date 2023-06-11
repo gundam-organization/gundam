@@ -137,6 +137,7 @@ private:
 
   double _globalParameterMinValue_{std::nan("unset")};
   double _globalParameterMaxValue_{std::nan("unset")};
+  std::pair<double, double> _eigenParBounds_{std::nan("unset"), std::nan("unset")};
 
   double _penaltyChi2Buffer_{std::nan("unset")};
 
