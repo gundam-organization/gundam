@@ -37,6 +37,13 @@ void MCMCInterface::readConfigImpl(){
   // to be changed.  Generally, leave it alone.
   _outTreeName_ = GenericToolbox::Json::fetchValue(_config_, "mcmcOutputTree", "MCMC");
 
+  // Define what sort of validity the parameters have to have for a finite
+  // likelihood.  The "range" value means that the parameter needs to be
+  // between the allowed minimum and maximum values for the parameter.  The
+  // "mirror" value means that the parameter needs to be between the mirror
+  // bounds too.
+  _likelihoodValidity_ = GenericToolbox::Json::fetchValue(_config_, "likelihoodValidity", _likelihoodValidity_);
+
   // Get the MCMC chain parameters to be used during burn-in.  The burn-in will
   // be skipped if the state has been restored from a file.  The burn-in can be
   // skipped in favor of discarding the initial parts of the MCMC chain

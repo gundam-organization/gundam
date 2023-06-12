@@ -60,6 +60,13 @@ private:
   std::string _proposalName_{"adaptive"};
   std::string _outTreeName_{"MCMC"};
 
+  // Define what sort of validity the parameters have to have for a finite
+  // likelihood.  The "range" value means that the parameter needs to be
+  // between the allowed minimum and maximum values for the parameter.  The
+  // "mirror" value means that the parameter needs to be between the mirror
+  // bounds too.
+  std::string _likelihoodValidity_{"range,mirror"};
+
   // The number of burn-in cylces to use.
   int _burninCycles_{0};
 
