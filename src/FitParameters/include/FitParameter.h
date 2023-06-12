@@ -52,6 +52,10 @@ public:
   void setOwner(const FitParameterSet *owner_);
   void setPriorType(PriorType::PriorType priorType);
 
+  // Record the mirroring being used by any dials.
+  void setMinMirror(double minMirror);
+  void setMaxMirror(double maxMirror);
+
   void setValueAtPrior();
   void setCurrentValueAsPrior();
 
@@ -65,6 +69,8 @@ public:
   [[nodiscard]] int getParameterIndex() const;
   [[nodiscard]] double getMinValue() const;
   [[nodiscard]] double getMaxValue() const;
+  [[nodiscard]] double getMinMirror() const;
+  [[nodiscard]] double getMaxMirror() const;
   [[nodiscard]] double getStepSize() const;
   [[nodiscard]] double getPriorValue() const;
   [[nodiscard]] double getThrowValue() const;
@@ -109,6 +115,8 @@ private:
   double _stdDevValue_{std::nan("unset")};
   double _minValue_{std::nan("unset")};
   double _maxValue_{std::nan("unset")};
+  double _minMirror_{std::nan("unset")};
+  double _maxMirror_{std::nan("unset")};
   double _stepSize_{std::nan("unset")};
   std::string _name_{};
   std::string _dialsWorkingDirectory_{"."};

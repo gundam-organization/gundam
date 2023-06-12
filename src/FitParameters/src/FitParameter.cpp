@@ -139,6 +139,24 @@ void FitParameter::setMinValue(double minValue) {
 void FitParameter::setMaxValue(double maxValue) {
   _maxValue_ = maxValue;
 }
+void FitParameter::setMinMirror(double minMirror) {
+  if (std::isfinite(_minMirror_) and std::abs(_minMirror_-minMirror) > 1E-6) {
+    LogWarning << "Minimum mirror bound changed for " << getFullTitle()
+               << " old: " << _minMirror_
+               << " new: " << minMirror
+               << std::endl;
+  }
+  _minMirror_ = minMirror;
+}
+void FitParameter::setMaxMirror(double maxMirror) {
+  if (std::isfinite(_maxMirror_) and std::abs(_maxMirror_-maxMirror) > 1E-6) {
+    LogWarning << "Maximum mirror bound changed for " << getFullTitle()
+               << " old: " << _maxMirror_
+               << " new: " << maxMirror
+               << std::endl;
+  }
+  _maxMirror_ = maxMirror;
+}
 void FitParameter::setStepSize(double stepSize) {
   _stepSize_ = stepSize;
 }
@@ -176,6 +194,12 @@ double FitParameter::getMinValue() const {
 }
 double FitParameter::getMaxValue() const {
   return _maxValue_;
+}
+double FitParameter::getMinMirror() const {
+  return _minMirror_;
+}
+double FitParameter::getMaxMirror() const {
+  return _maxMirror_;
 }
 double FitParameter::getStepSize() const {
   return _stepSize_;
