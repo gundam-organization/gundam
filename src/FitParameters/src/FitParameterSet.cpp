@@ -437,6 +437,13 @@ void FitParameterSet::throwFitParameters(double gain_){
         LogInfo << " → " << par.getParameterValue() << std::endl;
       }
     }
+
+    if( _useEigenDecompInFit_ ){
+      this->propagateOriginalToEigen();
+      for( auto& eigenPar : _eigenParameterList_ ){
+        eigenPar.setThrowValue( eigenPar.getParameterValue() );
+      }
+    }
   }
   else{
     if( _useEigenDecompForThrows_ and _useEigenDecompInFit_ ){
@@ -474,7 +481,6 @@ void FitParameterSet::throwFitParameters(double gain_){
           LogInfo << " → " << par.getParameterValue() << std::endl;
         }
       }
-
       if( _useEigenDecompInFit_ ){
         this->propagateOriginalToEigen();
         for( auto& eigenPar : _eigenParameterList_ ){
