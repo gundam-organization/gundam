@@ -237,7 +237,7 @@ void Propagator::initializeImpl() {
             if( _reThrowParSetIfOutOfBounds_ ){
               LogInfo << "Checking if the thrown parameters of the set are within bounds..." << std::endl;
 
-              for( auto& par : parSet.getParameterList() ){
+              for( auto& par : parSet.getEffectiveParameterList() ){
                 if( not std::isnan(par.getMinValue()) and par.getParameterValue() < par.getMinValue() ){
                   throwIsValid = false;
                   LogAlert << redLightText << "thrown value lower than min bound -> " << resetColor

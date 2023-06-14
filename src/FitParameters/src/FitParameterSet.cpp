@@ -485,6 +485,8 @@ void FitParameterSet::throwFitParameters(double gain_){
         this->propagateOriginalToEigen();
         for( auto& eigenPar : _eigenParameterList_ ){
           eigenPar.setThrowValue( eigenPar.getParameterValue() );
+          LogInfo << "Eigen par " << eigenPar.getTitle() << ": " << eigenPar.getPriorValue();
+          LogInfo << " → " << eigenPar.getParameterValue() << std::endl;
         }
       }
     }
