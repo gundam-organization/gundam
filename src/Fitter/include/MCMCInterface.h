@@ -67,6 +67,10 @@ private:
   // bounds too.
   std::string _likelihoodValidity_{"range,mirror"};
 
+  // Save or dump the raw (fitter space) points.  This can save about half the
+  // output file space.
+  bool _saveRaw_{false};
+
   // The number of burn-in cylces to use.
   int _burninCycles_{0};
 

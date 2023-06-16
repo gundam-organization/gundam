@@ -44,6 +44,10 @@ void MCMCInterface::readConfigImpl(){
   // bounds too.
   _likelihoodValidity_ = GenericToolbox::Json::fetchValue(_config_, "likelihoodValidity", _likelihoodValidity_);
 
+  // Set whether the raw step should be saved, or only the step translated
+  // into the likelihood space.
+  _saveRaw_ = false; // Hard code.  Why would we want to save these steps?
+
   // Get the MCMC chain parameters to be used during burn-in.  The burn-in will
   // be skipped if the state has been restored from a file.  The burn-in can be
   // skipped in favor of discarding the initial parts of the MCMC chain
@@ -601,7 +605,14 @@ void MCMCInterface::setupAndRunAdaptiveStep(AdaptiveStepMCMC& mcmc) {
       // accepted step can be copied into the points (which will have
       // any decomposition removed).
       if (mcmc.Step(false)) fillPoint();
-      // Now save the step.
+      // Now save the step.  This is going to write the points in the
+      // "likelihood" space.  If "_saveRaw_" is true, then this also saves the
+      // accepted point in the (possibly) decomposed state.
+      if (not _saveRaw_) {
+        // Zero the size of the raw accepted points and only save the filled
+        // points (which are in likelihood space).
+        mcmc.ClearSavedAccepted();
+      }
       mcmc.SaveStep(false);
       if(_steps_ > 100 && !(i%(_steps_/100))){
         LogInfo << "Chain: " << chain
@@ -617,12 +628,16 @@ void MCMCInterface::setupAndRunAdaptiveStep(AdaptiveStepMCMC& mcmc) {
                 << std::endl;
       }
     }
-    // Save the final state.  This step should be skipped when analyzing the
-    // chain, the steps can be identified since the covariance is not empty.
+    if (mcmc.Step(false)) fillPoint();
+    // Make a final step and then save it with the covariance information.
+    // These steps can be identified since the covariance is not empty, but
+    // they should be real independent steps.
     LogInfo << "Chain: " << chain << " complete"
             << " Run Length: " << _steps_
             << " -- Saving state"
             << std::endl;
+    // This is not reseting the "SaveAccepted" size so the step is actually
+    // saved.
     mcmc.SaveStep(true);
   }
   LogInfo << "Finished Running chains" << std::endl;

@@ -18,6 +18,9 @@
 typedef double Parameter;
 typedef std::vector<Parameter> Vector;
 
+// A typedef for how the parameters are written to a tree.
+typedef std::vector<Parameter> SavedVector;
+
 #ifndef MCMC_DEBUG_LEVEL
 #define MCMC_DEBUG_LEVEL 2
 #endif
@@ -194,7 +197,7 @@ public:
                           << std::endl;
             fTree->Branch("LogLikelihood",&fAcceptedLogLikelihood);
             fTree->Branch("TotalSteps", &fTotalSteps);
-            fTree->Branch("Accepted",&fAccepted);
+            fTree->Branch("Accepted",&fSaveAccepted);
             fTree->Branch("StepRMS",&fStepRMS);
             if (saveStep) {
                 MCMC_DEBUG(0) << "TSimpleMCMC: Saving the trial steps."
@@ -237,6 +240,8 @@ public:
         fAccepted.resize(start.size());
         std::copy(start.begin(), start.end(), fAccepted.begin());
 
+        fSaveAccepted.reserve(fAccepted.size());
+
         fTrialStep.resize(start.size());
         std::copy(start.begin(), start.end(), fTrialStep.begin());
 
@@ -259,8 +264,8 @@ public:
 
         /// A place to get the last accepted point.  This will be the same as
         /// the proposed point if the last step was accepted.
-        Vector getAccepted;
-        Vector* addrAccepted = &getAccepted;
+        SavedVector getAccepted;
+        SavedVector* addrAccepted = &getAccepted;
 
         /// A place to get the likelihood at the last accepted point.
         double getAcceptedLogLikelihood;
@@ -350,6 +355,15 @@ public:
 
         fProposeStep(fProposed,fAccepted,fAcceptedLogLikelihood);
 
+        // Make sure that the last accepted is in the "save" accepted
+        // location.  This is needed uncase the user did something evil, like
+        // zero the save location (to save memory).
+        if (fSaveAccepted.size() != fAccepted.size()) {
+            fSaveAccepted.resize(fAccepted.size());
+            std::copy(fAccepted.begin(), fAccepted.end(),
+                      fSaveAccepted.begin());
+        }
+
         // Only cache the trial step when it's being saved in the tree, or the
         // step RMS is being calculated.
         if (save || fStepRMSWindow > 0) {
@@ -379,6 +393,10 @@ public:
             MCMC_DEBUG(0) << "Scanning step" << std::endl;
             // Always keep the new step.
             std::copy(fProposed.begin(), fProposed.end(), fAccepted.begin());
+            // Save a copy for output
+            fSaveAccepted.resize(fAccepted.size());
+            std::copy(fProposed.begin(), fProposed.end(),
+                      fSaveAccepted.begin());
             fAcceptedLogLikelihood = fProposedLogLikelihood;
             // Check to see if it gest written.
             if (save) SaveStep(false);
@@ -441,8 +459,14 @@ public:
         }
 
         // We're keeping a new step.
-        std::copy(fProposed.begin(), fProposed.end(), fAccepted.begin());
         fAcceptedLogLikelihood = fProposedLogLikelihood;
+
+        // Save it for internal usage
+        std::copy(fProposed.begin(), fProposed.end(), fAccepted.begin());
+
+        // Save a copy for output
+        fSaveAccepted.resize(fAccepted.size());
+        std::copy(fProposed.begin(), fProposed.end(), fSaveAccepted.begin());
 
         // Save the information to the output tree.
         if (save) SaveStep(false);
@@ -467,12 +491,18 @@ public:
     /// Get the most recently proposed point.
     const Vector& GetProposed() const {return fProposed;}
 
+    /// Clear the accepted position data that will be saved to the file.  This
+    /// can be used to help reduce the size of the output file.  This only
+    /// affect the data saved in the output file, and does not accept the
+    /// actual chain.
+    void ClearSavedAccepted() {fSaveAccepted.clear();}
+
     /// If possible, save the step.  The only time that user code needs to
     /// call this method is after the last step of the chain, and even then
     /// that is only required if the chain will be extended in another run.
     /// The forceSave parameter is a cheap way to flag if this is called by
     /// the user, or directly by TSimpleMCMC.  TSimpleMCMC always uses
-    /// SaveStep(false), and users should use SaveStep().
+    /// SaveStep(false), and users should (usually) use SaveStep().
     void SaveStep(bool forceSave=true) {
         fProposeStep.SaveState(forceSave);
         if (fTree) fTree->Fill();
@@ -507,6 +537,10 @@ protected:
     /// The last accepted point.  This will be the same as the proposed point
     /// if the last step was accepted.
     Vector fAccepted;
+
+    /// A copy of the accepted points to be attached to a tree and save the
+    /// accepted points.
+    SavedVector fSaveAccepted;
 
     /// The likelihood at the last accepted pont.
     double fAcceptedLogLikelihood;
