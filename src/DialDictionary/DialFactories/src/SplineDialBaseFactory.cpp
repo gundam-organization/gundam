@@ -109,6 +109,24 @@ bool SplineDialBaseFactory::FillFromSpline(std::vector<double>& xPoint,
   return true;
 }
 
+void SplineDialBaseFactory::FillCatmullRomSlopes(
+  const std::vector<double>& xPoint,
+  const std::vector<double>& yPoint,
+  std::vector<double>& slope) {
+
+  if (xPoint.size() < 1) return;
+  if (xPoint.size() < 2) slope.front() = 0.0;
+
+  int k = 0;
+  slope[k] = (yPoint[k+1]-yPoint[k])/(xPoint[k+1]-xPoint[k]);
+  for (int i = 1; i<xPoint.size()-1; ++i) {
+    slope[i] = (yPoint[i+1] - yPoint[i-1])/(xPoint[i+1]-xPoint[i-1]);
+  }
+  k = yPoint.size()-1;
+  slope[k] = (yPoint[k]-yPoint[k-1])/(xPoint[k]-xPoint[k-1]);
+}
+
+
 void SplineDialBaseFactory::MakeMonotonic(const std::vector<double>& xPoint,
                                           const std::vector<double>& yPoint,
                                           std::vector<double>& slope) {
@@ -143,7 +161,7 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
   // and "ROOT".  The "not-a-knot" spline will give the same curve as ROOT
   // (and might be implemented with at TSpline3).  The "ROOT" spline will use
   // an actual TSpline3 (and is slow).  The "natural" and "catmull-rom"
-  // splines are just as expected (you can seen the underlying math on
+  // splines are just as expected (you can see the underlying math on
   // Wikipedia or another source).  Be careful about the order since later
   // conditionals can override earlier ones.
   std::string splType = "not-a-knot";  // The default.
@@ -275,6 +293,18 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
   LogThrowIf((_xPointListBuffer_.size() < 2),
              "Input data logic error: two few points "
              << "for dial " << dialTitle_ );
+
+  ////////////////////////////////////////////////////////////////
+  // Check if the spline slope calculation should be updated.  The slopes for
+  // not-a-knot and natural splines are calculated by FillFromGraph and
+  // FillFromSpoline using ROOT code.  That means we need to fill in the
+  // slopes for the other types ("catmull-rom", "akima")
+  if (splType == "catmull-rom") {
+    // Fill the slopes according to the Catmull-Rom prescription.
+    FillCatmullRomSlopes(_xPointListBuffer_,
+                         _yPointListBuffer_,
+                         _slopeListBuffer_);
+  }
 
   ////////////////////////////////////////////////////////////////
   // Check if the spline can be treated as having uniformly spaced knots.
