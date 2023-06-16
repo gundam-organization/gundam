@@ -113,6 +113,12 @@ void SplineDialBaseFactory::FillCatmullRomSlopes(
   const std::vector<double>& xPoint,
   const std::vector<double>& yPoint,
   std::vector<double>& slope) {
+  // Fill the slopes with the values for a Catmull-Rom spline.
+  //
+  // E. Catmull and R.Rom, "A class of local interpolating splines", in
+  // Barnhill, R. E.; Riesenfeld, R. F. (eds.), Computer Aided Geometric
+  // Design, New York: Academic Press, pp. 317–326
+  // doi:10.1016/B978-0-12-079050-0.50020-5
 
   if (xPoint.size() < 1) return;
   if (xPoint.size() < 2) slope.front() = 0.0;
@@ -134,6 +140,11 @@ void SplineDialBaseFactory::MakeMonotonic(const std::vector<double>& xPoint,
   // the slopes (when necessary), however, with Catmull-Rom the modified
   // slopes will be ignored and the monotonic criteria is applied as the
   // spline is evaluated (saves memory).
+  //
+  // F.N.Fritsch, and R.E.Carlson, "Monotone Piecewise Cubic Interpolation"
+  // SIAM Journal on Numerical Analysis, Vol. 17, Iss. 2 (1980)
+  // doi:10.1137/0717021
+  //
   for (int i = 0; i<xPoint.size(); ++i) {
     double m{std::numeric_limits<double>::infinity()};
     if (i>0) m = (yPoint[i] - yPoint[i-1])/(xPoint[i] - xPoint[i-1]);
