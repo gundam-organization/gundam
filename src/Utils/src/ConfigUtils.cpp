@@ -138,7 +138,7 @@ namespace ConfigUtils {
   void applyOverrides(nlohmann::json& outConfig_, const nlohmann::json& overrideConfig_){
 
     // dev options
-    bool debug{true};
+    bool debug{false};
     bool allowAddMissingKey{true};
 
     // specific keys like "name" might help reference the lists
