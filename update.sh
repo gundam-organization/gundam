@@ -1,5 +1,7 @@
 #! /bin/bash
 
+PROJECT_NAME="GUNDAM"
+
 THIS_SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 builtin cd ${THIS_SCRIPT_DIR} || exit 1;
 
@@ -27,7 +29,7 @@ do
       echo "Updating to version: $1"
       git checkout $1
       git submodule sync
-      git submodule update --init --remote
+       git submodule update --init --remote --recursive
     else
       echo "You should provide a version after -v"
     fi
@@ -43,7 +45,7 @@ do
         git checkout "${1#"remotes/origin/"}"
       fi
       git submodule sync
-      git submodule update --init --remote
+       git submodule update --init --remote --recursive
     else
       echo "You should provide a version after -b"
     fi
@@ -55,22 +57,29 @@ do
     echo "Checking out latest version: $LATEST_VERSION"
     git checkout $LATEST_VERSION
     git submodule sync
-    git submodule update --init --remote
+     git submodule update --init --remote --recursive
     exit 0;
   elif [ $arg == "--head" ]; then
     echo "Checking out main branch..."
     git checkout main
     git pull origin main # updates repo
     git submodule sync
-    git submodule update --init --remote
+     git submodule update --init --remote --recursive
+    exit 0;
+  elif [ $arg == "--up" ]; then
+    echo "Updating..."
+    git pull
+    git submodule sync
+    git submodule update --init --remote --recursive
     exit 0;
   fi
 done
 
 
 echo "**********************************************************************"
-echo "* Simple script that help users to checkout a given version of GUNDAM"
+echo "* Simple script that help users to checkout a given version of $PROJECT_NAME"
 echo "* Usage:"
+echo "* --up: Update with remote (staying on your current branch)"
 echo "* --latest: checkout the latest tagged version"
 echo "* --head: checkout the main branch"
 echo "* --fix-submodules: Reinitialize submodules"
