@@ -223,11 +223,12 @@ void Propagator::initializeImpl() {
 
       for( auto& parSet : _parameterSetList_ ){
         if( not parSet.isEnabled() ) continue;
+        LogContinueIf( not parSet.isEnabledThrowToyParameters(), "Toy throw is disabled for " << parSet.getName() );
 
-        bool throwIsValid{false};
-        if( parSet.isEnabledThrowToyParameters() and parSet.getPriorCovarianceMatrix() != nullptr ){
+        if( parSet.getPriorCovarianceMatrix() != nullptr ){
 
           int nTries{1};
+          bool throwIsValid{false};
           while( not throwIsValid ){
             LogScopeIndent;
 
@@ -255,7 +256,7 @@ void Propagator::initializeImpl() {
                 nTries++;
               }
               else{
-                LogWarning << "Keeping throw... (after " << nTries << " attempts)" << std::endl;
+                LogInfo << "Keeping throw after " << nTries << " attempt(s)." << std::endl;
               }
             } // check bounds?
           } // keep?

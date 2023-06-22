@@ -482,6 +482,7 @@ void FitParameterSet::throwFitParameters(double gain_){
         }
       }
       if( _useEigenDecompInFit_ ){
+        LogInfo << "Converting to eigen space..." << std::endl;
         this->propagateOriginalToEigen();
         for( auto& eigenPar : _eigenParameterList_ ){
           eigenPar.setThrowValue( eigenPar.getParameterValue() );

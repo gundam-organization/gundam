@@ -221,6 +221,36 @@ void FitterEngine::initializeImpl(){
     _propagator_.getTreeWriter().writeSamples(GenericToolbox::mkdirTFile(_saveDir_, "preFit/events"));
   }
 
+  // writing event rates
+  LogInfo << "Writing event rates..." << std::endl;
+  for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
+    if( not sample.isEnabled() ){ continue; }
+
+
+    {
+      TVectorD mcRate(1);
+      mcRate[0] = sample.getMcContainer().getSumWeights();
+      auto outDir = GenericToolbox::joinPath("preFit/rates", GenericToolbox::generateCleanBranchName(sample.getName()), "MC");
+      GenericToolbox::writeInTFile(
+          GenericToolbox::mkdirTFile(_saveDir_, outDir),
+          mcRate, "sumWeights"
+      );
+    }
+
+    {
+      TVectorD dataRate(1);
+      dataRate[0] = sample.getMcContainer().getSumWeights();
+      auto outDir = GenericToolbox::joinPath("preFit/rates", GenericToolbox::generateCleanBranchName(sample.getName()), "Data");
+      GenericToolbox::writeInTFile(
+          GenericToolbox::mkdirTFile(_saveDir_, outDir),
+          dataRate, "sumWeights"
+      );
+    }
+
+
+  }
+
+
   LogWarning << "Saving all objects to disk..." << std::endl;
   GenericToolbox::triggerTFileWrite(_saveDir_);
 }
