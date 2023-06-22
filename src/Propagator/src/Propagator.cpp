@@ -13,7 +13,7 @@
 #include "Dial.h"
 #endif
 #include "GenericToolbox.Json.h"
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 #include "ConfigUtils.h"
 
 #include "GenericToolbox.h"
@@ -175,7 +175,7 @@ void Propagator::initializeImpl() {
 
   LogInfo << "Initializing propagation threads..." << std::endl;
   initializeThreads();
-  GlobalVariables::getParallelWorker().setCpuTimeSaverIsEnabled(true);
+  GundamGlobals::getParallelWorker().setCpuTimeSaverIsEnabled(true);
 
   // First start with the data:
   bool usedMcContainer{false};
@@ -272,11 +272,11 @@ void Propagator::initializeImpl() {
       if( parSet.isUseEigenDecompInFit() ) { parSet.propagateEigenToOriginal(); }
     }
 
-    bool cacheManagerState = GlobalVariables::getEnableCacheManager();
-    GlobalVariables::setEnableCacheManager(false);
+    bool cacheManagerState = GundamGlobals::getEnableCacheManager();
+    GundamGlobals::setEnableCacheManager(false);
     this->resetReweight();
     this->reweightMcEvents();
-    GlobalVariables::setEnableCacheManager(cacheManagerState);
+    GundamGlobals::setEnableCacheManager(cacheManagerState);
 
     // Copies MC events in data container for both Asimov and FakeData event types
     LogWarning << "Copying loaded mc-like event to data container..." << std::endl;
@@ -351,7 +351,7 @@ void Propagator::initializeImpl() {
   // the MC has been copied for the Asimov fit, or the "data" use the MC
   // reweighting cache.  This must also be before the first use of
   // reweightMcEvents.
-  if(GlobalVariables::getEnableCacheManager()) {
+  if(GundamGlobals::getEnableCacheManager()) {
 #ifdef USE_NEW_DIALS
     Cache::Manager::Build(getFitSampleSet(), getEventDialCache());
 #else
@@ -558,7 +558,7 @@ void Propagator::initializeImpl() {
 
 
   /// Propagator needs to be responsive, let the workers wait for the signal
-  GlobalVariables::getParallelWorker().setCpuTimeSaverIsEnabled(false);
+  GundamGlobals::getParallelWorker().setCpuTimeSaverIsEnabled(false);
 }
 
 void Propagator::setShowTimeStats(bool showTimeStats) {
@@ -781,14 +781,14 @@ void Propagator::reweightMcEvents() {
   } while (false);
 #endif
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-  if(GlobalVariables::getEnableCacheManager()) {
+  if(GundamGlobals::getEnableCacheManager()) {
     Cache::Manager::Update(getFitSampleSet(), getEventDialCache());
     usedGPU = Cache::Manager::Fill();
   }
 #endif
   if( not usedGPU ){
     GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-    if( not _devSingleThreadReweight_ ){ GlobalVariables::getParallelWorker().runJob("Propagator::reweightMcEvents"); }
+    if( not _devSingleThreadReweight_ ){ GundamGlobals::getParallelWorker().runJob("Propagator::reweightMcEvents"); }
     else{ this->reweightMcEvents(-1); }
   }
   weightProp.counts++;
@@ -797,7 +797,7 @@ void Propagator::reweightMcEvents() {
 void Propagator::refillSampleHistograms(){
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
   if( not _devSingleThreadHistFill_ ){
-    GlobalVariables::getParallelWorker().runJob("Propagator::refillSampleHistograms");
+    GundamGlobals::getParallelWorker().runJob("Propagator::refillSampleHistograms");
   }
   else{
     refillSampleHistogramsFct(-1);
@@ -897,7 +897,7 @@ void Propagator::initializeThreads() {
   reweightMcEventsFct = [this](int iThread){
     this->reweightMcEvents(iThread);
   };
-  GlobalVariables::getParallelWorker().addJob("Propagator::reweightMcEvents", reweightMcEventsFct);
+  GundamGlobals::getParallelWorker().addJob("Propagator::reweightMcEvents", reweightMcEventsFct);
 
   refillSampleHistogramsFct = [this](int iThread){
     for( auto& sample : _fitSampleSet_.getFitSampleList() ){
@@ -911,8 +911,8 @@ void Propagator::initializeThreads() {
       sample.getDataContainer().rescaleHistogram();
     }
   };
-  GlobalVariables::getParallelWorker().addJob("Propagator::refillSampleHistograms", refillSampleHistogramsFct);
-  GlobalVariables::getParallelWorker().setPostParallelJob("Propagator::refillSampleHistograms", refillSampleHistogramsPostParallelFct);
+  GundamGlobals::getParallelWorker().addJob("Propagator::refillSampleHistograms", refillSampleHistogramsFct);
+  GundamGlobals::getParallelWorker().setPostParallelJob("Propagator::refillSampleHistograms", refillSampleHistogramsPostParallelFct);
 }
 
 void Propagator::reweightMcEvents(int iThread_) {
@@ -924,10 +924,10 @@ void Propagator::reweightMcEvents(int iThread_) {
   auto start = _eventDialCache_.getCache().begin();
   auto end = _eventDialCache_.getCache().end();
 
-  if( iThread_ != -1 and GlobalVariables::getNbThreads() != 1 ){
-    start = _eventDialCache_.getCache().begin() + Long64_t(iThread_)*(Long64_t(_eventDialCache_.getCache().size())/GlobalVariables::getNbThreads());
-    if( iThread_+1 != GlobalVariables::getNbThreads() ){
-      end = _eventDialCache_.getCache().begin() + (Long64_t(iThread_) + 1) * (Long64_t(_eventDialCache_.getCache().size())/GlobalVariables::getNbThreads());
+  if( iThread_ != -1 and GundamGlobals::getNbThreads() != 1 ){
+    start = _eventDialCache_.getCache().begin() + Long64_t(iThread_)*(Long64_t(_eventDialCache_.getCache().size()) / GundamGlobals::getNbThreads());
+    if( iThread_+1 != GundamGlobals::getNbThreads() ){
+      end = _eventDialCache_.getCache().begin() + (Long64_t(iThread_) + 1) * (Long64_t(_eventDialCache_.getCache().size()) / GundamGlobals::getNbThreads());
     }
   }
 

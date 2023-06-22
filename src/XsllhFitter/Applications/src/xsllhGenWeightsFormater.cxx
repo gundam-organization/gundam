@@ -8,7 +8,7 @@
 #include <TGraph.h>
 #include <TSpline.h>
 #include <future>
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 
 // Submodules
 #include "Logger.h"

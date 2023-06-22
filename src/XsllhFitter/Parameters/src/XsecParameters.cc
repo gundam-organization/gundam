@@ -2,7 +2,7 @@
 #include "GenericToolbox.h"
 #include "Logger.h"
 #include <future>
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[XsecParameters]");

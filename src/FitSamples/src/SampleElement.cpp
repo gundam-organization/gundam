@@ -2,7 +2,7 @@
 // Created by Adrien BLANCHET on 30/07/2021.
 //
 
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 #include "SampleElement.h"
 
 #include "Logger.h"
@@ -46,9 +46,8 @@ void SampleElement::updateEventBinIndexes(int iThread_){
   if( isLocked ) return;
   int nBins = int(binning.getBinsList().size());
   if(iThread_ <= 0){ LogScopeIndent; LogInfo << "Finding bin indexes for \"" << name << "\"..." << std::endl; }
-  int toDelete = 0;
   for( size_t iEvent = 0 ; iEvent < eventList.size() ; iEvent++ ){
-    if( iThread_ != -1 and iEvent % GlobalVariables::getNbThreads() != iThread_ ) continue;
+    if( iThread_ != -1 and iEvent % GundamGlobals::getNbThreads() != iThread_ ) continue;
     auto& event = eventList.at(iEvent);
     for( int iBin = 0 ; iBin < nBins ; iBin++ ){
       auto& bin = binning.getBinsList().at(iBin);
@@ -64,21 +63,14 @@ void SampleElement::updateEventBinIndexes(int iThread_){
         break;
       }
     } // Bin
-
-    if( event.getSampleBinIndex() == -1 ){
-      toDelete++;
-    }
-
   } // Event
-
-//  LogTrace << iThread_ << " -> unbinned events: " << toDelete << std::endl;
 }
 void SampleElement::updateBinEventList(int iThread_) {
   if( isLocked ) return;
 
   if( iThread_ <= 0 ){ LogScopeIndent; LogInfo << "Filling bin event cache for \"" << name << "\"..." << std::endl; }
   int nBins = int(perBinEventPtrList.size());
-  int nbThreads = GlobalVariables::getNbThreads();
+  int nbThreads = GundamGlobals::getNbThreads();
   if( iThread_ == -1 ){
     nbThreads = 1;
     iThread_ = 0;
@@ -100,7 +92,7 @@ void SampleElement::updateBinEventList(int iThread_) {
 void SampleElement::refillHistogram(int iThread_){
   if( isLocked ) return;
 
-  int nbThreads = GlobalVariables::getNbThreads();
+  int nbThreads = GundamGlobals::getNbThreads();
   if( iThread_ == -1 ){ nbThreads = 1; iThread_ = 0; }
 
 #ifdef GUNDAM_USING_CACHE_MANAGER

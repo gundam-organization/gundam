@@ -6,7 +6,7 @@
 #include "MinimizerInterface.h"
 #include "FitterEngine.h"
 #include "GenericToolbox.Json.h"
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 #include "GundamUtils.h"
 
 #include "GenericToolbox.h"

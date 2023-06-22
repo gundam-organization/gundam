@@ -2,14 +2,12 @@
 // Created by Adrien Blanchet on 29/11/2022.
 //
 
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 #include "DialCollection.h"
 #include "DialTypes.h"
 #include "DialBaseFactory.h"
 
 #include "GenericToolbox.Json.h"
-#include "Misc.h"
-
 #include "Logger.h"
 
 #include <sstream>
@@ -31,7 +29,7 @@ void DialCollection::readConfigImpl() {
     _config_, "applyOnDataSets", std::vector<std::string>());
   if( _dataSetNameList_.empty() ){ _dataSetNameList_.emplace_back("*"); }
 
-  if( GlobalVariables::isDisableDialCache() ){
+  if( GundamGlobals::isDisableDialCache() ){
     _disableDialCache_ = true;
   }
 

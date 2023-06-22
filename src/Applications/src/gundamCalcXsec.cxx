@@ -1,5 +1,5 @@
 
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 #include "GundamApp.h"
 #include "GundamUtils.h"
 #include "Propagator.h"
@@ -76,8 +76,8 @@ int main(int argc, char** argv){
     LogInfo << "Using \"time(nullptr)\" random seed: " << seed << std::endl;
     gRandom->SetSeed(seed);
   }
-  GlobalVariables::setNbThreads(clParser.getOptionVal("nbThreads", 1));
-  LogInfo << "Running the fitter with " << GlobalVariables::getNbThreads() << " parallel threads." << std::endl;
+  GundamGlobals::setNbThreads(clParser.getOptionVal("nbThreads", 1));
+  LogInfo << "Running the fitter with " << GundamGlobals::getNbThreads() << " parallel threads." << std::endl;
 
 
   // Reading fitter file
@@ -680,6 +680,6 @@ int main(int argc, char** argv){
   propagator.getTreeWriter().writeSamples( GenericToolbox::mkdirTFile(calcXsecDir, "events") );
 
 
-  GlobalVariables::getParallelWorker().reset();
+  GundamGlobals::getParallelWorker().reset();
 }
 

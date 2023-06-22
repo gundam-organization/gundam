@@ -24,7 +24,7 @@
 #include "AnaEvent.hh"
 #include "BinManager.hh"
 #include "ColorOutput.hh"
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 
 struct SplineBin {
 

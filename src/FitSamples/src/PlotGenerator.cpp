@@ -3,7 +3,7 @@
 //
 
 #include "GenericToolbox.Json.h"
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 #include "PlotGenerator.h"
 #include "ConfigUtils.h"
 
@@ -162,7 +162,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
 
 
         // Filling the selected histograms
-        int nThreads = GlobalVariables::getNbThreads();
+        int nThreads = GundamGlobals::getNbThreads();
         std::function<void(int)> fillJob = [&]( int iThread ){
           int iEvent = -1;
           int iHist = -1;
@@ -180,9 +180,9 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
           }
         };
 
-        GlobalVariables::getParallelWorker().addJob("fillJob", fillJob);
-        GlobalVariables::getParallelWorker().runJob("fillJob");
-        GlobalVariables::getParallelWorker().removeJob("fillJob");
+        GundamGlobals::getParallelWorker().addJob("fillJob", fillJob);
+        GundamGlobals::getParallelWorker().runJob("fillJob");
+        GundamGlobals::getParallelWorker().removeJob("fillJob");
       } // isData loop
     } // sample
 
@@ -638,7 +638,7 @@ void PlotGenerator::defineHistogramHolders() {
     int iHistDef;
     for( const auto& sample : _fitSampleSetPtr_->getFitSampleList() ){
       iSample++;
-      if( iSample % GlobalVariables::getNbThreads() != iThread_ ){ continue; }
+      if(iSample % GundamGlobals::getNbThreads() != iThread_ ){ continue; }
       for( const auto& event : sample.getMcContainer().eventList ){
         for( auto& splitVarInstance: splitVarsDictionary ){
           if(splitVarInstance.first.empty()) continue;
@@ -650,9 +650,9 @@ void PlotGenerator::defineHistogramHolders() {
       } // Event
     } // Sample
   };
-  GlobalVariables::getParallelWorker().addJob("fetchSplitVar", fetchSplitVar);
-  GlobalVariables::getParallelWorker().runJob("fetchSplitVar");
-  GlobalVariables::getParallelWorker().removeJob("fetchSplitVar");
+  GundamGlobals::getParallelWorker().addJob("fetchSplitVar", fetchSplitVar);
+  GundamGlobals::getParallelWorker().runJob("fetchSplitVar");
+  GundamGlobals::getParallelWorker().removeJob("fetchSplitVar");
 
   int sampleCounter = -1;
   HistHolder histDefBase;
@@ -867,7 +867,7 @@ void PlotGenerator::buildEventBinCache(const std::vector<HistHolder *> &histPtrT
     for( auto& histPtrToFill : histPtrToFillList ){
       iHistCache++;
 
-      if( iHistCache % GlobalVariables::getNbThreads() != iThread_ ) continue;
+      if(iHistCache % GundamGlobals::getNbThreads() != iThread_ ) continue;
 
       if( not histPtrToFill->isBinCacheBuilt ){
 
@@ -888,9 +888,9 @@ void PlotGenerator::buildEventBinCache(const std::vector<HistHolder *> &histPtrT
     }
   };
 
-  GlobalVariables::getParallelWorker().addJob("fillEventHistCache", fillEventHistCache);
-  GlobalVariables::getParallelWorker().runJob("fillEventHistCache");
-  GlobalVariables::getParallelWorker().removeJob("fillEventHistCache");
+  GundamGlobals::getParallelWorker().addJob("fillEventHistCache", fillEventHistCache);
+  GundamGlobals::getParallelWorker().runJob("fillEventHistCache");
+  GundamGlobals::getParallelWorker().removeJob("fillEventHistCache");
 
 }
 

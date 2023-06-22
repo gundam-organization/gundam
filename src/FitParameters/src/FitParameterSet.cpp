@@ -5,7 +5,7 @@
 #include "FitParameterSet.h"
 #include "DataBinSet.h"
 
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 #include "ParameterThrowerMarkHarz.h"
 #include "ConfigUtils.h"
 

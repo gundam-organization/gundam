@@ -4,7 +4,7 @@
 
 #include "FitterEngine.h"
 #include "GenericToolbox.Json.h"
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 #include "MinimizerInterface.h"
 #include "MCMCInterface.h"
 
@@ -88,7 +88,7 @@ void FitterEngine::initializeImpl(){
   LogThrowIf(_config_.empty(), "Config is not set.");
   LogThrowIf(_saveDir_== nullptr);
 
-  if( GlobalVariables::isLightOutputMode() ){
+  if( GundamGlobals::isLightOutputMode() ){
     LogWarning << "Light mode enabled, wiping plot gen config..." << std::endl;
     _propagator_.getPlotGenerator().readConfig(nlohmann::json());
   }
@@ -144,7 +144,7 @@ void FitterEngine::initializeImpl(){
   // and other properties)
   getMinimizer().initialize();
 
-  if(GlobalVariables::getVerboseLevel() >= MORE_PRINTOUT) checkNumericalAccuracy();
+  if(GundamGlobals::getVerboseLevel() >= MORE_PRINTOUT) checkNumericalAccuracy();
 
   // Write data
   LogInfo << "Writing propagator objects..." << std::endl;
@@ -217,7 +217,7 @@ void FitterEngine::initializeImpl(){
 
   this->_propagator_.updateLlhCache();
 
-  if( not GlobalVariables::isLightOutputMode() ){
+  if( not GundamGlobals::isLightOutputMode() ){
     _propagator_.getTreeWriter().writeSamples(GenericToolbox::mkdirTFile(_saveDir_, "preFit/events"));
   }
 
@@ -539,15 +539,11 @@ void FitterEngine::rescaleParametersStepSize(){
   double baseChi2 = _propagator_.getLlhBuffer();
 
   // +1 sigma
-  int iFitPar = -1;
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 
     for( auto& par : parSet.getEffectiveParameterList() ){
-      iFitPar++;
 
-      if( not par.isEnabled() ){
-        continue;
-      }
+      if( not par.isEnabled() ){ continue; }
 
       double currentParValue = par.getParameterValue();
       par.setParameterValue( currentParValue + par.getStdDevValue() );

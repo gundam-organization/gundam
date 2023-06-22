@@ -3,7 +3,7 @@
 //
 
 #include "ConfigUtils.h"
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 #include "GundamGreetings.h"
 #include "GundamUtils.h"
 

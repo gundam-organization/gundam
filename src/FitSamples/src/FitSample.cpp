@@ -3,7 +3,7 @@
 //
 
 #include "FitSample.h"
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 #include "GenericToolbox.Json.h"
 
 #include "GenericToolbox.h"
