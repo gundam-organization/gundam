@@ -12,7 +12,7 @@
 #include "CacheIndexedSums.h"
 
 #include "FitParameterSet.h"
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 
 #ifndef USE_NEW_DIALS
 #include "Dial.h"
@@ -344,7 +344,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList,
     // Try to allocate the Cache::Manager memory (including for the GPU if
     // it's being used).
     if (!Cache::Manager::Get()
-        && GlobalVariables::getEnableCacheManager()) {
+        && GundamGlobals::getEnableCacheManager()) {
         LogInfo << "Creating the Cache::Manager" << std::endl;
         if (!Cache::Manager::HasCUDA()) {
             LogInfo << "    GPU Not enabled with Cache::Manager"

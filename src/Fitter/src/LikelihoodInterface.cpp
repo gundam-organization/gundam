@@ -4,7 +4,7 @@
 
 #include "LikelihoodInterface.h"
 #include "FitterEngine.h"
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
@@ -29,13 +29,16 @@ void LikelihoodInterface::setStateTitleMonitor(const std::string& stateTitleMoni
 
 
 void LikelihoodInterface::initialize() {
-  _chi2HistoryTree_ = std::make_unique<TTree>("chi2History", "chi2History");
-  _chi2HistoryTree_->SetDirectory(nullptr);
-  _chi2HistoryTree_->Branch("nbFitCalls", &_nbFitCalls_);
-  _chi2HistoryTree_->Branch("chi2Total", (double*) _owner_->getPropagator().getLlhBufferPtr());
-  _chi2HistoryTree_->Branch("chi2Stat", (double*) _owner_->getPropagator().getLlhStatBufferPtr());
-  _chi2HistoryTree_->Branch("chi2Pulls", (double*) _owner_->getPropagator().getLlhPenaltyBufferPtr());
-  _chi2HistoryTree_->Branch("itSpeed", _itSpeedMon_.getCountSpeedPtr());
+
+  if( not GundamGlobals::isLightOutputMode() ){
+    _chi2HistoryTree_ = std::make_unique<TTree>("chi2History", "chi2History");
+    _chi2HistoryTree_->SetDirectory(nullptr);
+    _chi2HistoryTree_->Branch("nbFitCalls", &_nbFitCalls_);
+    _chi2HistoryTree_->Branch("chi2Total", (double*) _owner_->getPropagator().getLlhBufferPtr());
+    _chi2HistoryTree_->Branch("chi2Stat", (double*) _owner_->getPropagator().getLlhStatBufferPtr());
+    _chi2HistoryTree_->Branch("chi2Pulls", (double*) _owner_->getPropagator().getLlhPenaltyBufferPtr());
+    _chi2HistoryTree_->Branch("itSpeed", _itSpeedMon_.getCountSpeedPtr());
+  }
 
   LogWarning << "Fetching the effective number of fit parameters..." << std::endl;
   _minimizerFitParameterPtr_.clear();
@@ -76,10 +79,21 @@ void LikelihoodInterface::initialize() {
 }
 
 void LikelihoodInterface::saveChi2History() {
-  LogInfo << "Saving LLH history..." << std::endl;
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "fit"), _chi2HistoryTree_.get());
+  if( not GundamGlobals::isLightOutputMode() ){
+    LogInfo << "Saving LLH history..." << std::endl;
+    GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "fit"), _chi2HistoryTree_.get());
+  }
+  else{
+    LogAlert << "Not saving LLH history as light output mode is fired." << std::endl;
+  }
 }
 void LikelihoodInterface::saveGradientSteps(){
+
+  if( GundamGlobals::isLightOutputMode() ){
+    LogAlert << "Skipping saveGradientSteps as light output mode is fired." << std::endl;
+    return;
+  }
+
   LogInfo << "Saving " << _gradientMonitor_.size() << " gradient steps..." << std::endl;
 
   // make sure the parameter states get restored as we leave
@@ -107,7 +121,7 @@ void LikelihoodInterface::saveGradientSteps(){
     _owner_->getPropagator().injectParameterValues(_gradientMonitor_[iGradStep].parState );
     _owner_->getPropagator().updateLlhCache();
 
-    if( not GlobalVariables::isLightOutputMode() ) {
+    if( not GundamGlobals::isLightOutputMode() ) {
       auto outDir = GenericToolbox::mkdirTFile(_owner_->getSaveDir(), Form("fit/gradient/step_%i", int(iGradStep)));
       GenericToolbox::writeInTFile(outDir, TNamed("parState", GenericToolbox::Json::toReadableString(_gradientMonitor_[iGradStep].parState).c_str()));
       GenericToolbox::writeInTFile(outDir, TNamed("llhState", _owner_->getPropagator().getLlhBufferSummary().c_str()));
@@ -231,7 +245,7 @@ double LikelihoodInterface::evalFit(const double* parArray_){
 //    ssHeader << std::endl << "Target EDM: " << _owner_->getMinimizer().get;
     ssHeader << std::endl << "RAM: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
     double cpuPercent = GenericToolbox::getCpuUsageByProcess();
-    ssHeader << " / CPU: " << cpuPercent << "% (" << cpuPercent / GlobalVariables::getNbThreads() << "% efficiency)";
+    ssHeader << " / CPU: " << cpuPercent << "% (" << cpuPercent / GundamGlobals::getNbThreads() << "% efficiency)";
     ssHeader << std::endl << "Avg " << GUNDAM_CHI2 << " computation time: " << _evalFitAvgTimer_;
     ssHeader << std::endl;
 
@@ -298,8 +312,10 @@ double LikelihoodInterface::evalFit(const double* parArray_){
     _itSpeed_.counts = _nbFitCalls_;
   }
 
-  // Fill History
-  _chi2HistoryTree_->Fill();
+  if( not GundamGlobals::isLightOutputMode() ){
+    // Fill History
+    _chi2HistoryTree_->Fill();
+  }
 
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("out_evalFit");
   return _owner_->getPropagator().getLlhBuffer();

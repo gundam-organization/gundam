@@ -57,7 +57,7 @@ private:
   std::string _selectedDataEntry_{"Asimov"};
   std::string _selectedToyEntry_{"Asimov"};
 
-  bool _sortLoadedEvents_{false};
+  bool _sortLoadedEvents_{true}; // needed for reproducibility of toys in stat throw
   bool _devSingleThreadEventLoaderAndIndexer_{false};
   bool _devSingleThreadEventSelection_{false};
 

@@ -2,8 +2,8 @@
 // Created by Nadrino on 11/02/2021.
 //
 
-#ifndef GUNDAM_GLOBALVARIABLES_H
-#define GUNDAM_GLOBALVARIABLES_H
+#ifndef GUNDAM_GUNDAMGLOBALS_H
+#define GUNDAM_GUNDAMGLOBALS_H
 
 #include "GenericToolbox.ParallelWorker.h"
 #include "GenericToolbox.h"
@@ -36,7 +36,7 @@ ENUM_EXPANDER(
     );
 
 
-class GlobalVariables{
+class GundamGlobals{
 
 public:
 

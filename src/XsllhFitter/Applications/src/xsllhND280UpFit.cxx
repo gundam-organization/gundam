@@ -17,7 +17,7 @@
 #include "ND280Fitter.h"
 #include "XsecParameters.h"
 
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 
 #include <GenericToolbox.h>
 #include <GenericToolbox.Root.h>

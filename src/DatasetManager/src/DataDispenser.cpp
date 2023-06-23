@@ -4,10 +4,9 @@
 
 #include "EventVarTransform.h"
 #include "DataDispenser.h"
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 #include "DatasetLoader.h"
 #include "GenericToolbox.Json.h"
-#include "Misc.h"
 #include "ConfigUtils.h"
 
 #if USE_NEW_DIALS
@@ -101,7 +100,7 @@ void DataDispenser::load(){
   LogThrowIf(not this->isInitialized(), "Can't load while not initialized.");
   LogThrowIf(_sampleSetPtrToLoad_==nullptr, "SampleSet not specified.");
 
-  if( GlobalVariables::getVerboseLevel() >= MORE_PRINTOUT ){
+  if(GundamGlobals::getVerboseLevel() >= MORE_PRINTOUT ){
     LogDebug << "Configuration: " << _parameters_.getSummary() << std::endl;
   }
 
@@ -215,7 +214,7 @@ void DataDispenser::doEventSelection(){
 
   ROOT::EnableThreadSafety();
   int nThreads = 1;
-  if( not _owner_->isDevSingleThreadEventSelection() ) { nThreads = GlobalVariables::getNbThreads(); }
+  if( not _owner_->isDevSingleThreadEventSelection() ) { nThreads = GundamGlobals::getNbThreads(); }
   std::vector<std::vector<std::vector<bool>>> perThreadEventIsInSamplesList(nThreads);
   std::vector<std::vector<size_t>> perThreadSampleNbOfEvents(nThreads);
   auto selectionFct = [&](int iThread_){
@@ -225,7 +224,7 @@ void DataDispenser::doEventSelection(){
       nThreads = 1;
     }
 
-    GlobalVariables::getThreadMutex().lock();
+    GundamGlobals::getThreadMutex().lock();
     TChain treeChain(_parameters_.treePath.c_str());
     for (const auto &file: _parameters_.filePathList) {
       std::string name = GenericToolbox::expandEnvironmentVariables(file);
@@ -320,7 +319,7 @@ void DataDispenser::doEventSelection(){
     std::string progressTitle = "Performing event selection on " + this->getTitle() + "...";
     std::stringstream ssProgressTitle;
     TFile *lastFilePtr{nullptr};
-    GlobalVariables::getThreadMutex().unlock();
+    GundamGlobals::getThreadMutex().unlock();
     for ( Long64_t iEntry = iStart ; iEntry < iEnd ; iEntry++ ) {
       if( iThread_ == 0 ){
         readSpeed.addQuantity(treeChain.GetEntry(iEntry)*nThreads);
@@ -348,7 +347,7 @@ void DataDispenser::doEventSelection(){
         for (size_t iSample = 0; iSample < sampleCutFormulaList.size(); iSample++) {
           perThreadEventIsInSamplesList[iThread_][iEntry][iSample] = false;
         }
-        if (GlobalVariables::getVerboseLevel() == INLOOP_TRACE) {
+        if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
           LogTrace << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
                    << " rejected because of " << treeSelectionCutFormula->GetExpFormula() << std::endl;
         }
@@ -359,7 +358,7 @@ void DataDispenser::doEventSelection(){
 
         if( sampleCutFormulaList[iSample] == nullptr ){
           perThreadSampleNbOfEvents[iThread_][iSample]++;
-          if (GlobalVariables::getVerboseLevel() == INLOOP_TRACE) {
+          if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
             LogDebug << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
                      << " included as sample " << iSample << " (NO SELECTION CUT)" << std::endl;
           }
@@ -368,14 +367,14 @@ void DataDispenser::doEventSelection(){
 
         if ( not GenericToolbox::doesEntryPassCut(sampleCutFormulaList[iSample])) {
           perThreadEventIsInSamplesList[iThread_][iEntry][iSample] = false;
-          if (GlobalVariables::getVerboseLevel() == INLOOP_TRACE) {
+          if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
             LogTrace << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
                      << " rejected as sample " << iSample << " because of "
                      << sampleCutFormulaList[iSample]->GetExpFormula() << std::endl;
           }
         } else {
           perThreadSampleNbOfEvents[iThread_][iSample]++;
-          if (GlobalVariables::getVerboseLevel() == INLOOP_TRACE) {
+          if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
             LogDebug << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
                      << " included as sample " << iSample << " using "
                      << sampleCutFormulaList[iSample]->GetExpFormula() << std::endl;
@@ -387,9 +386,9 @@ void DataDispenser::doEventSelection(){
   };
 
   if( not _owner_->isDevSingleThreadEventSelection() ) {
-    GlobalVariables::getParallelWorker().addJob(__METHOD_NAME__, selectionFct);
-    GlobalVariables::getParallelWorker().runJob(__METHOD_NAME__);
-    GlobalVariables::getParallelWorker().removeJob(__METHOD_NAME__);
+    GundamGlobals::getParallelWorker().addJob(__METHOD_NAME__, selectionFct);
+    GundamGlobals::getParallelWorker().runJob(__METHOD_NAME__);
+    GundamGlobals::getParallelWorker().removeJob(__METHOD_NAME__);
   }
   else {
     selectionFct(0);
@@ -768,12 +767,12 @@ void DataDispenser::readAndFill(){
   }
 
   LogWarning << "Loading and indexing..." << std::endl;
-  if( not _owner_->isDevSingleThreadEventLoaderAndIndexer() and GlobalVariables::getNbThreads() > 1 ){
+  if(not _owner_->isDevSingleThreadEventLoaderAndIndexer() and GundamGlobals::getNbThreads() > 1 ){
     ROOT::EnableThreadSafety();
     std::function<void(int)> f = [&](int iThread_){ this->fillFunction(iThread_); };
-    GlobalVariables::getParallelWorker().addJob(__METHOD_NAME__, f);
-    GlobalVariables::getParallelWorker().runJob(__METHOD_NAME__);
-    GlobalVariables::getParallelWorker().removeJob(__METHOD_NAME__);
+    GundamGlobals::getParallelWorker().addJob(__METHOD_NAME__, f);
+    GundamGlobals::getParallelWorker().runJob(__METHOD_NAME__);
+    GundamGlobals::getParallelWorker().removeJob(__METHOD_NAME__);
   }
   else{
     this->fillFunction(-1); // for better debug breakdown
@@ -787,7 +786,7 @@ void DataDispenser::readAndFill(){
   }
 
   if( _owner_->isSortLoadedEvents() ){
-    LogAlert << "[DEV OPTION] Sorting loaded events..." << std::endl;
+    LogWarning << "Re-sorting loaded events..." << std::endl;
     for( auto& evList : _cache_.sampleEventListPtrToFill ){
       GenericToolbox::sortVector(*evList, [](const PhysicsEvent& a, const PhysicsEvent& b){
         if( a.getDataSetIndex() < b.getDataSetIndex() ) { return true; }
@@ -797,8 +796,6 @@ void DataDispenser::readAndFill(){
       });
     }
   }
-
-
 
 }
 void DataDispenser::loadFromHistContent(){
@@ -906,7 +903,7 @@ void DataDispenser::loadFromHistContent(){
 void DataDispenser::fillFunction(int iThread_){
 //  std::scoped_lock<std::mutex> l(_mutex_);
 
-  int nThreads = GlobalVariables::getNbThreads();
+  int nThreads = GundamGlobals::getNbThreads();
   if( iThread_ == -1 ){
     iThread_ = 0;
     nThreads = 1;

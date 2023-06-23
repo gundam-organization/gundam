@@ -6,7 +6,7 @@
 #include "MinimizerInterface.h"
 #include "FitterEngine.h"
 #include "GenericToolbox.Json.h"
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 #include "GundamUtils.h"
 
 #include "GenericToolbox.h"
@@ -467,11 +467,15 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
 
       auto eigenVectors = std::unique_ptr<TH2D>( GenericToolbox::convertTMatrixDtoTH2D(&decompCovMatrix.GetEigenVectors()) );
       applyBinLabels(eigenVectors.get());
-      GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), eigenVectors.get(), "eigenVectors");
+      if( not GundamGlobals::isLightOutputMode() ) {
+        GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), eigenVectors.get(), "eigenVectors");
+      }
 
       auto eigenValues = std::unique_ptr<TH1D>( GenericToolbox::convertTVectorDtoTH1D(&decompCovMatrix.GetEigenValues()) );
       applyBinLabels(eigenValues.get());
-      GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), eigenValues.get(), "eigenValues");
+      if( not GundamGlobals::isLightOutputMode() ) {
+        GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), eigenValues.get(), "eigenValues");
+      }
 
       double conditioning = decompCovMatrix.GetEigenValues().Min() / decompCovMatrix.GetEigenValues().Max();
       LogWarning << "Post-fit error conditioning is: " << conditioning << std::endl;
@@ -490,7 +494,9 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
 
       TH2D* postfitHessianTH2D = GenericToolbox::convertTMatrixDtoTH2D(&hessianMatrix);
       applyBinLabels(postfitHessianTH2D);
-      GenericToolbox::writeInTFile(outDir_, postfitHessianTH2D, "postfitHessian");
+      if( not GundamGlobals::isLightOutputMode() ){
+        GenericToolbox::writeInTFile(outDir_, postfitHessianTH2D, "postfitHessian");
+      }
 
       if( _generatedPostFitEigenBreakdown_ ){
         LogInfo << "Eigen breakdown..." << std::endl;
@@ -573,7 +579,10 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
         l.Draw();
         gPad->SetGridx();
         gPad->SetGridy();
-        GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), &accumPlot, "eigenBreakdown");
+
+        if( not GundamGlobals::isLightOutputMode() ) {
+          GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), &accumPlot, "eigenBreakdown");
+        }
       }
 
       if( _generatedPostFitParBreakdown_ ){
@@ -617,10 +626,13 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
           isFirst ? parHist.Draw("HIST") : parHist.Draw("HIST SAME");
           isFirst = false;
         }
-        GenericToolbox::writeInTFile(
+
+        if( not GundamGlobals::isLightOutputMode() ) {
+          GenericToolbox::writeInTFile(
             GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"),
             &accumPlot, "parBreakdown"
             );
+        }
       }
 
     }
@@ -747,7 +759,9 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
 
   if( getLikelihood().getUseNormalizedFitSpace() ){
     LogInfo << "Writing normalized decomposition of the output matrix..." << std::endl;
-    decomposeCovarianceMatrixFct(GenericToolbox::mkdirTFile(matricesDir, "normalizedFitSpace"));
+    if( not GundamGlobals::isLightOutputMode() ) {
+      decomposeCovarianceMatrixFct(GenericToolbox::mkdirTFile(matricesDir, "normalizedFitSpace"));
+    }
 
     // Rescale the post-fit values:
     for(int iRow = 0 ; iRow < postfitCovarianceMatrix.GetNrows() ; iRow++ ){
@@ -1032,7 +1046,9 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
         }; // makePrePostFitCompPlot
 
         makePrePostFitCompPlot(GenericToolbox::mkdirTFile(saveSubdir_, "values"), false);
-        makePrePostFitCompPlot(GenericToolbox::mkdirTFile(saveSubdir_, "valuesNorm"), true);
+        if( not GundamGlobals::isLightOutputMode() ) {
+          makePrePostFitCompPlot(GenericToolbox::mkdirTFile(saveSubdir_, "valuesNorm"), true);
+        }
 
       }; // savePostFitObjFct
 
@@ -1122,7 +1138,7 @@ void MinimizerInterface::scanParameters(TDirectory* saveDir_){
 void MinimizerInterface::updateCacheToBestfitPoint(){
   LogThrowIf(_minimizer_->X() == nullptr, "No best fit point provided by the minimizer.");
 
-  LogWarning << "Updating propagator cache to theA best fit point..." << std::endl;
+  LogWarning << "Updating propagator cache to the best fit point..." << std::endl;
   getLikelihood().evalFit( _minimizer_->X() );
 }
 

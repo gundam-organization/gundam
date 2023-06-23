@@ -7,7 +7,7 @@
 
 
 #include "DataBin.h"
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 
 #include "GenericToolbox.h"
 #include "GenericToolbox.Wrappers.h"

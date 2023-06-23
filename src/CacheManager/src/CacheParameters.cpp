@@ -5,7 +5,7 @@
 #include "SplineDial.h"
 #include "GraphDial.h"
 #include "NormDial.h"
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"

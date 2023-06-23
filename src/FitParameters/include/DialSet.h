@@ -7,7 +7,7 @@
 
 #include "DialWrapper.h"
 #include "DataBinSet.h"
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 #include "JsonBaseClass.h"
 
 #include "GenericToolbox.h"

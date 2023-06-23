@@ -3,7 +3,7 @@
 //
 
 #include "DialInterface.h"
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 
 #include "Logger.h"
 

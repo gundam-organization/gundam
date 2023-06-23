@@ -5,7 +5,7 @@
 #include "FitParameterSet.h"
 #include "DataBinSet.h"
 
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 #include "ParameterThrowerMarkHarz.h"
 #include "ConfigUtils.h"
 
@@ -43,13 +43,15 @@ void FitParameterSet::readConfigImpl(){
 
   if( GenericToolbox::Json::doKeyExist(_config_, "parameterLimits") ){
     auto parLimits = GenericToolbox::Json::fetchValue(_config_, "parameterLimits", nlohmann::json());
-    _globalParameterMinValue_ = GenericToolbox::Json::fetchValue(parLimits, "minValue", std::nan("UNSET"));
-    _globalParameterMaxValue_ = GenericToolbox::Json::fetchValue(parLimits, "maxValue", std::nan("UNSET"));
+    _globalParameterMinValue_ = GenericToolbox::Json::fetchValue(parLimits, "minValue", _globalParameterMinValue_);
+    _globalParameterMaxValue_ = GenericToolbox::Json::fetchValue(parLimits, "maxValue", _globalParameterMaxValue_);
   }
 
   _useEigenDecompInFit_ = GenericToolbox::Json::fetchValue(_config_ , "useEigenDecompInFit", false);
   if( _useEigenDecompInFit_ ){
     LogWarning << "Using eigen decomposition in fit." << std::endl;
+    LogScopeIndent;
+
     _maxNbEigenParameters_ = GenericToolbox::Json::fetchValue(_config_ , "maxNbEigenParameters", -1);
     if( _maxNbEigenParameters_ != -1 ){
       LogInfo << "Maximum nb of eigen parameters is set to " << _maxNbEigenParameters_ << std::endl;
@@ -58,6 +60,17 @@ void FitParameterSet::readConfigImpl(){
     if( _maxEigenFraction_ != 1 ){
       LogInfo << "Max eigen fraction set to: " << _maxEigenFraction_*100 << "%" << std::endl;
     }
+
+    if( GenericToolbox::Json::doKeyExist(_config_, "eigenParBounds") ){
+      auto eigenLimits = GenericToolbox::Json::fetchValue(_config_, "eigenParBounds", nlohmann::json());
+      _eigenParBounds_.first = GenericToolbox::Json::fetchValue(eigenLimits, "minValue", _eigenParBounds_.first);
+      _eigenParBounds_.second = GenericToolbox::Json::fetchValue(eigenLimits, "maxValue", _eigenParBounds_.second);
+      LogInfo << "Using eigen parameter limits: [ " << _eigenParBounds_.first << ", " << _eigenParBounds_.first << "]" << std::endl;
+    }
+
+    _devUseParLimitsOnEigen_ = GenericToolbox::Json::fetchValue(_config_, "devUseParLimitsOnEigen", _devUseParLimitsOnEigen_);
+    if( _devUseParLimitsOnEigen_ ){ LogAlert << "USING DEV OPTION: _devUseParLimitsOnEigen_ = true" << std::endl; }
+
   }
 
   _enablePca_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"allowPca", "fixGhostFitParameters", "enablePca"}, _enablePca_);
@@ -84,12 +97,6 @@ void FitParameterSet::readConfigImpl(){
   // MISC / DEV
   _useMarkGenerator_ = GenericToolbox::Json::fetchValue(_config_, "useMarkGenerator", _useMarkGenerator_);
   _useEigenDecompForThrows_ = GenericToolbox::Json::fetchValue(_config_, "useEigenDecompForThrows", _useEigenDecompForThrows_);
-  _devUseParLimitsOnEigen_ = GenericToolbox::Json::fetchValue(_config_, "devUseParLimitsOnEigen", _devUseParLimitsOnEigen_);
-  if( _devUseParLimitsOnEigen_ ){
-    LogAlert << "USING DEV OPTION: _devUseParLimitsOnEigen_ = true" << std::endl;
-  }
-
-
 
   this->readParameterDefinitionFile();
 
@@ -278,6 +285,13 @@ void FitParameterSet::processCovarianceMatrix(){
         LogThrowIf( not std::isnan(eigenPar.getMinValue()) and eigenPar.getPriorValue() < eigenPar.getMinValue(), "PRIOR IS BELLOW MIN: " << eigenPar.getSummary(true) );
         LogThrowIf( not std::isnan(eigenPar.getMaxValue()) and eigenPar.getPriorValue() > eigenPar.getMaxValue(), "PRIOR IS ABOVE MAX: " << eigenPar.getSummary(true) );
       }
+      else{
+        eigenPar.setMinValue( _eigenParBounds_.first );
+        eigenPar.setMaxValue( _eigenParBounds_.second );
+
+        LogThrowIf( not std::isnan(eigenPar.getMinValue()) and eigenPar.getPriorValue() < eigenPar.getMinValue(), "Prior value is bellow min: " << eigenPar.getSummary(true) );
+        LogThrowIf( not std::isnan(eigenPar.getMaxValue()) and eigenPar.getPriorValue() > eigenPar.getMaxValue(), "Prior value is above max: " << eigenPar.getSummary(true) );
+      }
     }
 
   }
@@ -423,6 +437,13 @@ void FitParameterSet::throwFitParameters(double gain_){
         LogInfo << " → " << par.getParameterValue() << std::endl;
       }
     }
+
+    if( _useEigenDecompInFit_ ){
+      this->propagateOriginalToEigen();
+      for( auto& eigenPar : _eigenParameterList_ ){
+        eigenPar.setThrowValue( eigenPar.getParameterValue() );
+      }
+    }
   }
   else{
     if( _useEigenDecompForThrows_ and _useEigenDecompInFit_ ){
@@ -443,17 +464,6 @@ void FitParameterSet::throwFitParameters(double gain_){
     else{
       LogInfo << "Throwing parameters for " << _name_ << " using Cholesky matrix" << std::endl;
 
-      // TODO: CHOLESKY THROW IS NOT WORKING PROPERLY
-
-
-//      if( _choleskyMatrix_ == nullptr ){
-//        LogInfo << "Generating Cholesky matrix in set: " << getName() << std::endl;
-//        _choleskyMatrix_ = std::shared_ptr<TMatrixD>(
-//            GenericToolbox::getCholeskyMatrix( _strippedCovarianceMatrix_.get() )
-//        );
-//      }
-//      auto throws = GenericToolbox::throwCorrelatedParameters(_choleskyMatrix_.get());
-
       if( not _correlatedVariableThrower_.isInitialized() ){
         _correlatedVariableThrower_.setCovarianceMatrixPtr(_strippedCovarianceMatrix_.get());
         _correlatedVariableThrower_.initialize();
@@ -470,17 +480,16 @@ void FitParameterSet::throwFitParameters(double gain_){
           par.setParameterValue( par.getThrowValue() );
           LogInfo << " → " << par.getParameterValue() << std::endl;
         }
-        else{
-//          LogWarning << "Skipping parameter: " << par.getTitle() << std::endl;
+      }
+      if( _useEigenDecompInFit_ ){
+        LogInfo << "Converting to eigen space..." << std::endl;
+        this->propagateOriginalToEigen();
+        for( auto& eigenPar : _eigenParameterList_ ){
+          eigenPar.setThrowValue( eigenPar.getParameterValue() );
+          LogInfo << "Eigen par " << eigenPar.getTitle() << ": " << eigenPar.getPriorValue();
+          LogInfo << " → " << eigenPar.getParameterValue() << std::endl;
         }
       }
-
-//    if( _useEigenDecompInFit_ ){
-//      this->propagateOriginalToEigen();
-//      for( auto& eigenPar : _eigenParameterList_ ){
-//        eigenPar.setThrowValue( eigenPar.getParameterValue() );
-//      }
-//    }
     }
   }
 
@@ -499,7 +508,7 @@ void FitParameterSet::propagateOriginalToEigen(){
   }
 
   // Base swap: ORIG -> EIGEN
-  (*_eigenParBuffer_) = (*_originalParBuffer_);
+  (*_eigenParBuffer_) =  (*_originalParBuffer_);
   (*_eigenParBuffer_) *= (*_eigenVectorsInv_);
 
   // Propagate back to eigen parameters

@@ -1,5 +1,5 @@
 
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 #include "GundamApp.h"
 #include "GundamUtils.h"
 #include "Propagator.h"
@@ -72,10 +72,14 @@ int main(int argc, char** argv){
     LogAlert << "Using user-specified random seed: " << clParser.getOptionVal<ULong_t>("randomSeed") << std::endl;
     gRandom->SetSeed(clParser.getOptionVal<ULong_t>("randomSeed"));
   }
-
-  GlobalVariables::setNbThreads(clParser.getOptionVal("nbThreads", 1));
-  LogInfo << "Running the fitter with " << GlobalVariables::getNbThreads() << " parallel threads." << std::endl;
-
+  else{
+    ULong_t seed = time(nullptr);
+    LogInfo << "Using \"time(nullptr)\" random seed: " << seed << std::endl;
+    gRandom->SetSeed(seed);
+  }
+  
+  GundamGlobals::setNbThreads(clParser.getOptionVal("nbThreads", 1));
+  LogInfo << "Running the fitter with " << GundamGlobals::getNbThreads() << " parallel threads." << std::endl;
 
   // Reading fitter file
   LogInfo << "Opening fitter output file: " << clParser.getOptionVal<std::string>("fitterOutputFile") << std::endl;
@@ -677,5 +681,5 @@ int main(int argc, char** argv){
   propagator.getTreeWriter().writeSamples( GenericToolbox::mkdirTFile(calcXsecDir, "events") );
 
 
-  GlobalVariables::getParallelWorker().reset();
+  GundamGlobals::getParallelWorker().reset();
 }

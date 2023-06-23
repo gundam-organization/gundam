@@ -6,7 +6,7 @@
 #include "ConfigUtils.h"
 #include "GundamUtils.h"
 #include "GundamApp.h"
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 #include "MinimizerInterface.h"
 #ifdef GUNDAM_USING_CACHE_MANAGER
 #include "CacheManager.h"
@@ -105,7 +105,7 @@ int main(int argc, char** argv){
   // Init command line args:
   // --------------------------
 
-  if( clParser.isOptionTriggered("debugVerbose") ) GlobalVariables::setVerboseLevel(clParser.getOptionVal("debugVerbose", 1));
+  if( clParser.isOptionTriggered("debugVerbose") ) GundamGlobals::setVerboseLevel(clParser.getOptionVal("debugVerbose", 1));
 
   // Is build compatible with GPU option?
   if( clParser.isOptionTriggered("usingGpu") ){
@@ -120,7 +120,7 @@ int main(int argc, char** argv){
   // Is build compatible with cache manager option?
   if( clParser.isOptionTriggered("usingCacheManager") or clParser.isOptionTriggered("usingGpu") ){
 #ifdef GUNDAM_USING_CACHE_MANAGER
-    GlobalVariables::setEnableCacheManager(true);
+    GundamGlobals::setEnableCacheManager(true);
 #else
     LogThrow("useCacheManager can only be set while GUNDAM is compiled with GUNDAM_USING_CACHE_MANAGER option.");
 #endif
@@ -129,7 +129,7 @@ int main(int argc, char** argv){
   // No cache on dials?
   if( clParser.isOptionTriggered("noDialCache") ){
     LogAlert << "Disabling cache in dial evaluation (when available)..." << std::endl;
-    GlobalVariables::setDisableDialCache(true);
+    GundamGlobals::setDisableDialCache(true);
   }
 
   // inject parameter config?
@@ -147,8 +147,8 @@ int main(int argc, char** argv){
   }
 
   // How many parallel threads?
-  GlobalVariables::setNbThreads(clParser.getOptionVal("nbThreads", 1));
-  LogInfo << "Running the fitter with " << GlobalVariables::getNbThreads() << " parallel threads." << std::endl;
+  GundamGlobals::setNbThreads(clParser.getOptionVal("nbThreads", 1));
+  LogInfo << "Running the fitter with " << GundamGlobals::getNbThreads() << " parallel threads." << std::endl;
 
   // Reading configuration
   auto configFilePath = clParser.getOptionVal("configFile", "");
@@ -282,7 +282,7 @@ int main(int argc, char** argv){
   fitter.setGenerateOneSigmaPlots( clParser.isOptionTriggered("generateOneSigmaPlots") );
 
   // --light-mode
-  GlobalVariables::setLightOutputMode( clParser.isOptionTriggered("lightOutputMode") );
+  GundamGlobals::setLightOutputMode(clParser.isOptionTriggered("lightOutputMode") );
 
   // injectParameterPath
   if( not injectParameterPath.empty() ){
@@ -326,9 +326,8 @@ int main(int argc, char** argv){
     LogDebug << fitter.getPropagator().getParametersSummary( false ) << std::endl;
   }
 
-  auto* outDir = GenericToolbox::mkdirTFile(fitter.getSaveDir(), GenericToolbox::joinPath("preFit", "cmdScanLine"));
-
   if( clParser.isOptionTriggered("scanLine") ){
+    auto* outDir = GenericToolbox::mkdirTFile(fitter.getSaveDir(), GenericToolbox::joinPath("preFit", "cmdScanLine"));
     LogThrowIf( clParser.getNbValueSet("scanLine") == 0, "No injector file provided.");
     if( clParser.getNbValueSet("scanLine") == 1 ){
       LogAlert << "Will scan the line toward the point set in: " << clParser.getOptionVal<std::string>("scanLine", 0) << std::endl;
@@ -361,5 +360,5 @@ int main(int argc, char** argv){
   // --------------------------
   fitter.fit();
 
-  GlobalVariables::getParallelWorker().reset();
+  GundamGlobals::getParallelWorker().reset();
 }
