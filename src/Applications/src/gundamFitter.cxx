@@ -140,14 +140,10 @@ int main(int argc, char** argv){
   }
 
   // PRNG seed?
+  gRandom = new TRandom3(0);    // Initialize with a UUID;
   if( clParser.isOptionTriggered("randomSeed") ){
     LogAlert << "Using user-specified random seed: " << clParser.getOptionVal<ULong_t>("randomSeed") << std::endl;
     gRandom->SetSeed(clParser.getOptionVal<ULong_t>("randomSeed"));
-  }
-  else{
-    ULong_t seed = time(nullptr);
-    LogInfo << "Using \"time(nullptr)\" random seed: " << seed << std::endl;
-    gRandom->SetSeed(seed);
   }
 
   // How many parallel threads?

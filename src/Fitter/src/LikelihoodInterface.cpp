@@ -304,8 +304,8 @@ double LikelihoodInterface::evalFit(const double* parArray_){
     }
     else{
       LogInfo << _convergenceMonitor_.generateMonitorString(
-          GenericToolbox::getTerminalWidth() != 0, // trail back if not in batch mode
-          true // force generate
+        GenericToolbox::getTerminalWidth() != 0, // trail back if not in batch mode
+        true // force generate
       );
     }
 
@@ -332,12 +332,37 @@ double LikelihoodInterface::evalFitValid(const double* parArray_) {
   return RBN;
 }
 
+void LikelihoodInterface::setParameterValidity(const std::string& validity) {
+  if (validity.find("ran") != std::string::npos) _validFlags_ |= 1;
+  if (validity.find("noran") != std::string::npos) _validFlags_ &= ~1;
+  if (validity.find("mir") != std::string::npos) _validFlags_ |= 2;
+  if (validity.find("nomir") != std::string::npos) _validFlags_ &= ~2;
+}
+
 bool LikelihoodInterface::hasValidParameterValues() const {
   for (const FitParameterSet& parSet:
          _owner_->getPropagator().getParameterSetsList()) {
     for (const FitParameter& par : parSet.getParameterList()) {
-      if (std::isfinite(par.getMinValue()) && par.getParameterValue() < par.getMinValue()) [[unlikely]] return false;
-      if (std::isfinite(par.getMaxValue()) && par.getParameterValue() > par.getMaxValue()) [[unlikely]] return false;
+      if ( (_validFlags_&1) != 0
+          and std::isfinite(par.getMinValue())
+          and par.getParameterValue() < par.getMinValue()) [[unlikely]] {
+        return false;
+      }
+      if ((_validFlags_&1) != 0
+          and std::isfinite(par.getMaxValue())
+          and par.getParameterValue() > par.getMaxValue()) [[unlikely]] {
+        return false;
+      }
+      if ((_validFlags_&2) != 0
+          and std::isfinite(par.getMinMirror())
+          and par.getParameterValue() < par.getMinMirror()) [[unlikely]] {
+        return false;
+      }
+      if ((_validFlags_&2) != 0
+          and std::isfinite(par.getMaxMirror())
+          and par.getParameterValue() > par.getMaxMirror()) [[unlikely]] {
+        return false;
+      }
     }
   }
   return true;

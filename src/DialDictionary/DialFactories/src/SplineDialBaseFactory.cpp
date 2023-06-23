@@ -109,6 +109,74 @@ bool SplineDialBaseFactory::FillFromSpline(std::vector<double>& xPoint,
   return true;
 }
 
+void SplineDialBaseFactory::FillCatmullRomSlopes(
+  const std::vector<double>& xPoint,
+  const std::vector<double>& yPoint,
+  std::vector<double>& slope) {
+  // Fill the slopes with the values for a Catmull-Rom spline.
+  //
+  // E. Catmull and R.Rom, "A class of local interpolating splines", in
+  // Barnhill, R. E.; Riesenfeld, R. F. (eds.), Computer Aided Geometric
+  // Design, New York: Academic Press, pp. 317-326
+  // doi:10.1016/B978-0-12-079050-0.50020-5
+
+  if (xPoint.size() < 1) return;
+  if (xPoint.size() < 2) slope.front() = 0.0;
+
+  int k = 0;
+  slope[k] = (yPoint[k+1]-yPoint[k])/(xPoint[k+1]-xPoint[k]);
+  for (int i = 1; i<xPoint.size()-1; ++i) {
+    slope[i] = (yPoint[i+1] - yPoint[i-1])/(xPoint[i+1]-xPoint[i-1]);
+  }
+  k = yPoint.size()-1;
+  slope[k] = (yPoint[k]-yPoint[k-1])/(xPoint[k]-xPoint[k-1]);
+}
+
+void SplineDialBaseFactory::FillAkimaSlopes(
+  const std::vector<double>& xPoint,
+  const std::vector<double>& yPoint,
+  std::vector<double>& slope) {
+  // Fill the slopes with the values for an Akima spline.
+  //
+  // H.Akima, A New Method of Interpolation and Smooth Curve Fitting Based on
+  // Local Procedures, Journal of the ACM, Volume 17, Issue 4, pp 589-602,
+  // doi:10.1145/321607.321609
+
+  if (xPoint.size() < 1) return;
+  if (xPoint.size() < 2) slope.front() = 0.0;
+
+  int k = 0;
+  slope[k] = (yPoint[k+1]-yPoint[k])/(xPoint[k+1]-xPoint[k]);
+  if (xPoint.size() > 2) {
+    k = 1;
+    slope[k] = (yPoint[k+1]-yPoint[k-1])/(xPoint[k+1]-xPoint[k-1]);
+  }
+
+  for (int i = 2; i<xPoint.size()-2; ++i) {
+    double mp1 = (yPoint[i+2] - yPoint[i+1])/(xPoint[i+2]-xPoint[i+1]);
+    double m0 = (yPoint[i+1] - yPoint[i])/(xPoint[i+1]-xPoint[i]);
+    double mm1 = (yPoint[i] - yPoint[i-1])/(xPoint[i]-xPoint[i-1]);
+    double mm2 = (yPoint[i-1] - yPoint[i-2])/(xPoint[i-1]-xPoint[i-2]);
+    double n1 = std::abs(mp1-m0);
+    double n0 = std::abs(mm1-mm2);
+
+    if (n0 > 1E-6 or n1 < 1E-6) {
+      slope[i] = (n1*mm1 + n0*m0)/(n1+n0);
+    }
+    else {
+      slope[i] = 0.5*(m0+mm1);
+    }
+  }
+
+  if (xPoint.size() > 2) {
+    k = yPoint.size()-2;
+    slope[k] = (yPoint[k+1]-yPoint[k-1])/(xPoint[k+1]-xPoint[k-1]);
+  }
+  k = yPoint.size()-1;
+  slope[k] = (yPoint[k]-yPoint[k-1])/(xPoint[k]-xPoint[k-1]);
+}
+
+
 void SplineDialBaseFactory::MakeMonotonic(const std::vector<double>& xPoint,
                                           const std::vector<double>& yPoint,
                                           std::vector<double>& slope) {
@@ -116,6 +184,11 @@ void SplineDialBaseFactory::MakeMonotonic(const std::vector<double>& xPoint,
   // the slopes (when necessary), however, with Catmull-Rom the modified
   // slopes will be ignored and the monotonic criteria is applied as the
   // spline is evaluated (saves memory).
+  //
+  // F.N.Fritsch, and R.E.Carlson, "Monotone Piecewise Cubic Interpolation"
+  // SIAM Journal on Numerical Analysis, Vol. 17, Iss. 2 (1980)
+  // doi:10.1137/0717021
+  //
   for (int i = 0; i<xPoint.size(); ++i) {
     double m{std::numeric_limits<double>::infinity()};
     if (i>0) m = (yPoint[i] - yPoint[i-1])/(xPoint[i] - xPoint[i-1]);
@@ -143,13 +216,21 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
   // and "ROOT".  The "not-a-knot" spline will give the same curve as ROOT
   // (and might be implemented with at TSpline3).  The "ROOT" spline will use
   // an actual TSpline3 (and is slow).  The "natural" and "catmull-rom"
-  // splines are just as expected (you can seen the underlying math on
+  // splines are just as expected (you can see the underlying math on
   // Wikipedia or another source).  Be careful about the order since later
   // conditionals can override earlier ones.
   std::string splType = "not-a-knot";  // The default.
-  if (dialSubType_.find("not-a-knot") != std::string::npos) splType = "not-a-knot";
+  if (dialSubType_.find("akima") != std::string::npos) splType = "akima";
   if (dialSubType_.find("catmull") != std::string::npos) splType = "catmull-rom";
   if (dialSubType_.find("natural") != std::string::npos) splType = "natural";
+  if (dialSubType_.find("not-a-knot") != std::string::npos) splType = "not-a-knot";
+  if (dialSubType_.find("pixar") != std::string::npos) {
+    splType = "catmull-rom";
+    // sneaky output... logger would tattle on me.
+    static bool woody=true;
+    if (woody) std::cout << std::endl << std::endl << "You got a friend in me!" << std::endl;
+    woody=false;
+  }
   if (dialSubType_.find("ROOT") != std::string::npos) splType = "ROOT";
 
   // Get the numeric tolerance for when a uniform spline can be used.  We
@@ -268,6 +349,22 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
   LogThrowIf((_xPointListBuffer_.size() < 2),
              "Input data logic error: two few points "
              << "for dial " << dialTitle_ );
+
+  ////////////////////////////////////////////////////////////////
+  // Check if the spline slope calculation should be updated.  The slopes for
+  // not-a-knot and natural splines are calculated by FillFromGraph and
+  // FillFromSpoline using ROOT code.  That means we need to fill in the
+  // slopes for the other types ("catmull-rom", "akima")
+  if (splType == "catmull-rom") {
+    // Fill the slopes according to the Catmull-Rom prescription.
+    FillCatmullRomSlopes(_xPointListBuffer_,
+                         _yPointListBuffer_,
+                         _slopeListBuffer_);
+  }
+  else if (splType == "akima") {
+    // Fill the slopes according to the Akima prescription.
+    FillAkimaSlopes(_xPointListBuffer_, _yPointListBuffer_, _slopeListBuffer_);
+  }
 
   ////////////////////////////////////////////////////////////////
   // Check if the spline can be treated as having uniformly spaced knots.

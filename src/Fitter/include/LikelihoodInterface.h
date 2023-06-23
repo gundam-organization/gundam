@@ -27,7 +27,7 @@ class FitterEngine;
 /// more closely related to the chi-square (so -LLH/2).
 
 class LikelihoodInterface {
-  
+
 public:
   /////////////////////////////////////////////////////////////////
   // Getters and Setters are defined in this file so the compiler can inline
@@ -64,6 +64,17 @@ public:
 
   /// A pointer to a ROOT runctor that calls the evalFitValid method.
   ROOT::Math::Functor* evalFitValidFunctor() {return _validFunctor_.get();}
+
+  /// Define the type of validity that needs to be required by
+  /// hasValidParameterValues.  This accepts a string with the possible values
+  /// being:
+  ///
+  ///  "range" (default) -- Between the parameter minimum and maximum values.
+  ///  "mirror"          -- Between the mirrored values (if parameter has
+  ///                       mirroring).
+  ///
+  /// Example: setParameterValidity("range,mirror")
+  void setParameterValidity(const std::string& validity);
 
   /// Check that the parameters for the last time the propagator was used are
   /// all within the allowed ranges.
@@ -143,6 +154,12 @@ private:
   /// evalFitValid.
   std::unique_ptr<ROOT::Math::Functor> _validFunctor_;
 
+  /// A set of flags used by the evalFitValid method to determine the function
+  /// validity.  The flaggs are:
+  /// "1" -- require valid parameters
+  /// "2" -- require in the mirrored range
+  int _validFlags_{3};
+
   /// A vector of pointers to fit parameters that defined the elements in the
   /// array of parameters passed to evalFit.
   std::vector<FitParameter*> _minimizerFitParameterPtr_{};
@@ -177,7 +194,6 @@ private:
 
   /// A tree that save the history of the minimization.
   std::unique_ptr<TTree> _chi2HistoryTree_{nullptr};
-
 
   // Output monitors!
   GenericToolbox::VariablesMonitor _convergenceMonitor_;

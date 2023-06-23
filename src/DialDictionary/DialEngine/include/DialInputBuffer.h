@@ -75,14 +75,14 @@ public:
   /// mirror for each parameter.  The first entry in the pair is the lower
   /// bound of the mirrored region, the second entry is the range of the
   /// mirror.  The valid region will be between first, and first+second.
-  [[nodiscard]]
-       const std::pair<double,double>& getMirrorBounds(int i) const;
+  [[nodiscard]] const std::pair<double,double>& getMirrorBounds(int i) const;
 
   /// Simple printout function for debug info on error
   [[nodiscard]] std::string getSummary() const;
 
-  /// Function that allow to tweak the buffer from the inside. Used for individual spline evaluation.
-  std::vector<double>& getBufferVector(){ return _buffer_; }
+  /// Function that allow to tweak the buffer from the inside. Used for
+  /// individual spline evaluation.
+  std::vector<double>& getBufferVector() { return _buffer_; }
 
 protected:
   uint32_t generateHash();
