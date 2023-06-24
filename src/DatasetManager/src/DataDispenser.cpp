@@ -785,17 +785,17 @@ void DataDispenser::readAndFill(){
     container->shrinkEventList(_cache_.sampleIndexOffsetList[iSample]);
   }
 
-  if( _owner_->isSortLoadedEvents() ){
-    LogWarning << "Re-sorting loaded events..." << std::endl;
-    for( auto& evList : _cache_.sampleEventListPtrToFill ){
-      GenericToolbox::sortVector(*evList, [](const PhysicsEvent& a, const PhysicsEvent& b){
-        if( a.getDataSetIndex() < b.getDataSetIndex() ) { return true; }
-        if( a.getEntryIndex() < b.getEntryIndex() ) { return true; }
-        if( a.getEntryIndex() == b.getEntryIndex() and a.getDataSetIndex() == b.getDataSetIndex() ){ return false; }
-        return false;
-      });
-    }
-  }
+//  if( _owner_->isSortLoadedEvents() ){
+//    LogWarning << "Re-sorting loaded events..." << std::endl;
+//    for( auto& evList : _cache_.sampleEventListPtrToFill ){
+//      GenericToolbox::sortVector(*evList, [](const PhysicsEvent& a, const PhysicsEvent& b){
+//        if( a.getDataSetIndex() < b.getDataSetIndex() ) { return true; }
+//        if( a.getEntryIndex() < b.getEntryIndex() ) { return true; }
+//        if( a.getEntryIndex() == b.getEntryIndex() and a.getDataSetIndex() == b.getDataSetIndex() ){ return false; }
+//        return false;
+//      });
+//    }
+//  }
 
 }
 void DataDispenser::loadFromHistContent(){

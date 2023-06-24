@@ -86,7 +86,7 @@ public:
   /// DialInterface objects), and each DialInterface object could be in the
   /// cache multiple times (but for different Physics event objects).
   std::vector<CacheElem_t> &getCache();
-  const std::vector<CacheElem_t> &getCache() const;
+  [[nodiscard]] const std::vector<CacheElem_t> &getCache() const;
 
   /// Allocate entries for events in the indexed cache.  The first parameter
   /// arethe number of events to allocate space for, and the second number is

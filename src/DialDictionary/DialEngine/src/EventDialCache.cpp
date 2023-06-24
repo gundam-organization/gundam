@@ -24,13 +24,16 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
   auto countValidDials = [](std::vector<DialIndexEntry_t>& dialIndices_){
     return std::count_if(dialIndices_.begin(), dialIndices_.end(),
       [](DialIndexEntry_t& dialIndex_){
-        if( dialIndex_.collectionIndex == size_t(-1) or dialIndex_.interfaceIndex == size_t(-1) ){ return false; }
+        if( dialIndex_.collectionIndex == size_t(-1) ){ return false; }
+        if( dialIndex_.interfaceIndex == size_t(-1) ){ return false; }
         return true;
       });
   };
 
   auto isCacheEntryValid = [&](IndexedEntry_t& entry_){
-    if( entry_.event.sampleIndex == size_t(-1) or entry_.event.eventIndex == size_t(-1) or entry_.dials.empty() ){ return false; }
+    if( entry_.event.sampleIndex == size_t(-1) ){ return false; }
+    if( entry_.event.eventIndex == size_t(-1) ){ return false; }
+    if( entry_.dials.empty() ){ return false; }
     return countValidDials(entry_.dials) != 0;
   };
 
@@ -86,6 +89,16 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
 #endif
     }
   }
+
+  LogInfo << "Re-sorting event cache entries..." << std::endl;
+  auto p = GenericToolbox::getSortPermutation(_cache_, [](const CacheElem_t& a, const CacheElem_t& b){
+    if( a.event->getDataSetIndex() < b.event->getDataSetIndex() ) { return true; }
+    if( a.event->getEntryIndex()   < b.event->getEntryIndex()   ) { return true; }
+    return false;
+  });
+
+  GenericToolbox::applyPermutation(_cache_, p);
+
 }
 
 void EventDialCache::allocateCacheEntries(size_t nEvent_, size_t nDialsMaxPerEvent_) {
