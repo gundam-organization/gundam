@@ -127,10 +127,6 @@ private:
   /// A cache of all of the valid PhysicsEvent* and DialInterface*
   /// associations for efficient use when reweighting the MC events.
   std::vector<CacheElem_t> _cache_;
-
-  /// Flag that all events should have dials (or not).  At the end to have
-  /// better packed alignment.
-  bool _warnForDialLessEvent_{false};
 };
 
 
