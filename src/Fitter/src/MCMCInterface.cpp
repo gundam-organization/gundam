@@ -41,7 +41,8 @@ void MCMCInterface::readConfigImpl(){
   // likelihood.  The "range" value means that the parameter needs to be
   // between the allowed minimum and maximum values for the parameter.  The
   // "mirror" value means that the parameter needs to be between the mirror
-  // bounds too.
+  // bounds too.  The "physical" value means that the parameter has to be in
+  // the physically allowed range.
   _likelihoodValidity_ = GenericToolbox::Json::fetchValue(_config_, "likelihoodValidity", _likelihoodValidity_);
 
   // Set whether the raw step should be saved, or only the step translated
@@ -201,6 +202,9 @@ void MCMCInterface::initializeImpl(){
   // likelihood code runs.
   getLikelihood().setMinimizerInfo(_algorithmName_,_proposalName_);
 
+  // Set how the parameter values are handled (outside of different validity
+  // ranges)
+  getLikelihood().setParameterValidity(_likelihoodValidity_);
 }
 
 /// An MCMC doesn't really converge in the sense meant here. This flags
