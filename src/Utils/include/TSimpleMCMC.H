@@ -951,6 +951,10 @@ public:
         }
 
         double currentTrace = GetCovarianceTrace();
+        if (currentTrace <= 0) {
+            fCurrentCov.Print();
+            throw std::runtime_error("Invalid trace");
+        }
 
         MCMC_DEBUG(1) << " Covariance Trace: " << currentTrace
                       << std::endl;
@@ -1720,10 +1724,13 @@ private:
         for (std::size_t i=0; i<current.size(); ++i) {
             for (std::size_t j=0; j<i+1; ++j) {
                 double v = fCurrentCov(i,j);
-                // Correct for the center having moved!
+#ifdef APPLY_CENTRAL_MOVEMENT_CORRECTION
+                // Correct for the center having moved!  Only apply this
+                // when requested by the user.
                 v += fCentralPointChange[i]*fCentralPoint[j];
                 v += fCentralPointChange[j]*fCentralPoint[i];
                 v -= fCentralPointChange[i]*fCentralPointChange[j];
+#endif
                 // Calculate the "covariance" of the new point.
                 double r = (current[i]-fCentralPoint[i])
                     *(current[j]-fCentralPoint[j]);
