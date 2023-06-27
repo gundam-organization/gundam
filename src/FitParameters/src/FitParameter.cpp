@@ -51,7 +51,7 @@ void FitParameter::readConfigImpl(){
       this->setStepSize( stepSize );
     }
 
-    if( GenericToolbox::Json::doKeyExist(_config_, "physicalLimits") ){
+    if( GenericToolbox::Json::doKeyExist(_parameterConfig_, "physicalLimits") ){
         auto physLimits = GenericToolbox::Json::fetchValue(_parameterConfig_, "physicalLimits", nlohmann::json());
         _minPhysical_ = GenericToolbox::Json::fetchValue(physLimits, "minValue", std::nan("UNSET"));
         _maxPhysical_ = GenericToolbox::Json::fetchValue(physLimits, "maxValue", std::nan("UNSET"));
