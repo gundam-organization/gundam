@@ -42,24 +42,24 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
     }
     _indexedCache_.clear();
 
-//    std::stringstream ssUnsorted;
-//    for( auto& sampleIndexCache : sampleIndexCacheList ){
-//      for( auto& entry : sampleIndexCache ){
-//        auto& ev = sampleSet_.getFitSampleList().at(
-//            entry.event.sampleIndex
-//        ).getMcContainer().eventList.at(
-//            entry.event.eventIndex
-//        );
-//
-//        ssUnsorted << entry.event.sampleIndex << "/" << entry.event.eventIndex << " -> ";
-//        ssUnsorted << ev.getEntryIndex() << " =dials=> ";
-//
-//        ssUnsorted << GenericToolbox::iterableToString(sampleIndexCacheList[entry.event.sampleIndex][entry.event.eventIndex].dials, [](const DialIndexEntry_t& e){
-//          return "{" + std::to_string(e.collectionIndex) + ", " +std::to_string(e.interfaceIndex) + "}";
-//        }, false) << std::endl;
-//      }
-//    }
-//    GenericToolbox::dumpStringInFile("./indexedCacheUnsorted.txt", ssUnsorted.str());
+    std::stringstream ssUnsorted;
+    for( auto& sampleIndexCache : sampleIndexCacheList ){
+      for( auto& entry : sampleIndexCache ){
+        auto& ev = sampleSet_.getFitSampleList().at(
+            entry.event.sampleIndex
+        ).getMcContainer().eventList.at(
+            entry.event.eventIndex
+        );
+
+        ssUnsorted << entry.event.sampleIndex << "/" << entry.event.eventIndex << " -> ";
+        ssUnsorted << ev.getEntryIndex() << " =dials=> ";
+
+        ssUnsorted << GenericToolbox::iterableToString(sampleIndexCacheList[entry.event.sampleIndex][entry.event.eventIndex].dials, [](const DialIndexEntry_t& e){
+          return "{" + std::to_string(e.collectionIndex) + ", " +std::to_string(e.interfaceIndex) + "}";
+        }, false) << std::endl;
+      }
+    }
+    GenericToolbox::dumpStringInFile("./indexedCacheUnsorted.txt", ssUnsorted.str());
 
 
     LogInfo << "Performing per sample sorting..." << std::endl;
@@ -90,7 +90,7 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
     }
 
     LogInfo << "Propagating per sample indexed cache to the full indexed cache..." << std::endl;
-//    std::stringstream ss;
+    std::stringstream ss;
     for( auto& sampleIndexCache : sampleIndexCacheList ){
       _indexedCache_.reserve( _indexedCache_.size() + sampleIndexCache.size() );
       for( auto& entry : sampleIndexCache ){
@@ -102,14 +102,14 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
             entry.event.eventIndex
         );
 
-//        ss << entry.event.sampleIndex << "/" << entry.event.eventIndex << " -> ";
-//        ss << ev.getEntryIndex() << " =dials=> ";
-//        ss << GenericToolbox::iterableToString(entry.dials, [](const DialIndexEntry_t& e){
-//          return "{" + std::to_string(e.collectionIndex) + ", " +std::to_string(e.interfaceIndex) + "}";
-//        }, false) << std::endl;
+        ss << entry.event.sampleIndex << "/" << entry.event.eventIndex << " -> ";
+        ss << ev.getEntryIndex() << " =dials=> ";
+        ss << GenericToolbox::iterableToString(entry.dials, [](const DialIndexEntry_t& e){
+          return "{" + std::to_string(e.collectionIndex) + ", " +std::to_string(e.interfaceIndex) + "}";
+        }, false) << std::endl;
       }
     }
-//    GenericToolbox::dumpStringInFile("./indexedCache.txt", ss.str());
+    GenericToolbox::dumpStringInFile("./indexedCache.txt", ss.str());
   }
 
   auto countValidDials = [](std::vector<DialIndexEntry_t>& dialIndices_){
@@ -121,6 +121,7 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
       });
   };
 
+  std::stringstream ssRef;
   _cache_.reserve( _indexedCache_.size() );
   for( auto& entry : _indexedCache_ ){
 
@@ -148,7 +149,14 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
       );
 #endif
     }
+
+    ssRef << entry.event.sampleIndex << "/" << entry.event.eventIndex << " -> ";
+    ssRef << _cache_.back().event->getEntryIndex() << " =dials=> ";
+    ssRef << GenericToolbox::iterableToString(_cache_.back().dials, [](const DialsElem_t& e){
+      return e.interface->getSummary();
+    }, false) << std::endl;
   }
+  GenericToolbox::dumpStringInFile("./refCache.txt", ssRef.str());
 
 }
 
@@ -166,14 +174,12 @@ EventDialCache::IndexedEntry_t* EventDialCache::fetchNextCacheEntry(){
 #else
   std::lock_guard<std::mutex> g(_mutex_);
 #endif
-  // This is VERY not thread safe since another thread could emplace a new
-  // value on the back of the indexed cache and force the vector to be copied.
-  // I don't see where the space for the cache is reserved (there is a resize,
-  // but that doesn't solve this problem.
-  if( _fillIndex_ >= _indexedCache_.size() ){
-    LogThrow("out of range: " << _fillIndex_);
-    _indexedCache_.emplace_back();
-  }
+  LogThrowIf(
+      _fillIndex_ >= _indexedCache_.size(),
+      "out of range: " << GET_VAR_NAME_VALUE(_fillIndex_)
+      << " while: " << GET_VAR_NAME_VALUE(_indexedCache_.size())
+  );
+
   // Warning warning Will Robinson!  This only works IFF the indexed cache is
   // not resized (violated by the previouls stanza).
   return &_indexedCache_[_fillIndex_++];
