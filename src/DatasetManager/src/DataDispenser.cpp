@@ -658,43 +658,45 @@ void DataDispenser::preAllocateMemory(){
 
   size_t nEvents = treeChain.GetEntries();
 #if USE_NEW_DIALS
-  // DEV
-  if( not _cache_.dialCollectionsRefList.empty() ){
-    LogInfo << "Creating slots for event-by-event dials..." << std::endl;
-    size_t nDialsMaxPerEvent{0};
-    for( auto& dialCollection : _cache_.dialCollectionsRefList ){
-      LogScopeIndent;
-      nDialsMaxPerEvent += 1;
-      if( dialCollection->isBinned() ){
-        // Filling var indexes for faster eval with PhysicsEvent:
-        for( auto& bin : dialCollection->getDialBinSet().getBinsList() ){
-          std::vector<int> varIndexes;
-          for( auto& var : bin.getVariableNameList() ){
-            varIndexes.emplace_back(
-                GenericToolbox::findElementIndex(
-                    var, _cache_.varsRequestedForIndexing));
+  if( _eventDialCacheRef_ != nullptr ){
+    // DEV
+    if( not _cache_.dialCollectionsRefList.empty() ){
+      LogInfo << "Creating slots for event-by-event dials..." << std::endl;
+      size_t nDialsMaxPerEvent{0};
+      for( auto& dialCollection : _cache_.dialCollectionsRefList ){
+        LogScopeIndent;
+        nDialsMaxPerEvent += 1;
+        if( dialCollection->isBinned() ){
+          // Filling var indexes for faster eval with PhysicsEvent:
+          for( auto& bin : dialCollection->getDialBinSet().getBinsList() ){
+            std::vector<int> varIndexes;
+            for( auto& var : bin.getVariableNameList() ){
+              varIndexes.emplace_back(
+                  GenericToolbox::findElementIndex(
+                      var, _cache_.varsRequestedForIndexing));
+            }
+            bin.setEventVarIndexCache(varIndexes);
           }
-          bin.setEventVarIndexCache(varIndexes);
+        }
+        else if( not dialCollection->getGlobalDialLeafName().empty() ){
+          // Reserve memory for additional dials (those on a tree leaf)
+          auto dialType = dialCollection->getGlobalDialType();
+          LogInfo << dialCollection->getTitle() << ": creating " << nEvents;
+          LogInfo << " slots for " << dialType << std::endl;
+
+          dialCollection->getDialBaseList().clear();
+          dialCollection->getDialBaseList().resize(nEvents);
+        }
+        else{
+          LogThrow("DEV ERROR: not binned, not event-by-event?");
         }
       }
-      else if( not dialCollection->getGlobalDialLeafName().empty() ){
-        // Reserve memory for additional dials (those on a tree leaf)
-        auto dialType = dialCollection->getGlobalDialType();
-        LogInfo << dialCollection->getTitle() << ": creating " << nEvents;
-        LogInfo << " slots for " << dialType << std::endl;
-
-        dialCollection->getDialBaseList().clear();
-        dialCollection->getDialBaseList().resize(nEvents);
-      }
-      else{
-        LogThrow("DEV ERROR: not binned, not event-by-event?");
-      }
+      _eventDialCacheRef_->allocateCacheEntries(nEvents, nDialsMaxPerEvent);
     }
-    _eventDialCacheRef_->allocateCacheEntries(nEvents, nDialsMaxPerEvent);
-  }
-  else{
-    // all events should be referenced in the cache
-    _eventDialCacheRef_->allocateCacheEntries(nEvents, 0);
+    else{
+      // all events should be referenced in the cache
+      _eventDialCacheRef_->allocateCacheEntries(nEvents, 0);
+    }
   }
 #else
   // DIALS
