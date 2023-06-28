@@ -42,26 +42,6 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
     }
     _indexedCache_.clear();
 
-    std::stringstream ssUnsorted;
-    for( auto& sampleIndexCache : sampleIndexCacheList ){
-      for( auto& entry : sampleIndexCache ){
-        auto& ev = sampleSet_.getFitSampleList().at(
-            entry.event.sampleIndex
-        ).getMcContainer().eventList.at(
-            entry.event.eventIndex
-        );
-
-        ssUnsorted << entry.event.sampleIndex << "/" << entry.event.eventIndex << " -> ";
-        ssUnsorted << ev.getEntryIndex() << " =dials=> ";
-
-        ssUnsorted << GenericToolbox::iterableToString(sampleIndexCacheList[entry.event.sampleIndex][entry.event.eventIndex].dials, [](const DialIndexEntry_t& e){
-          return "{" + std::to_string(e.collectionIndex) + ", " +std::to_string(e.interfaceIndex) + "}";
-        }, false) << std::endl;
-      }
-    }
-    GenericToolbox::dumpStringInFile("./indexedCacheUnsorted.txt", ssUnsorted.str());
-
-
     LogInfo << "Performing per sample sorting..." << std::endl;
     int iSample{-1};
     for( auto& sample : sampleSet_.getFitSampleList() ){
@@ -73,7 +53,6 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
             if( a.getEntryIndex() < b.getEntryIndex() ){ return true; }
             return false;
           });
-
 
       LogThrowIf(
           sampleIndexCacheList[iSample].size() != sample.getMcContainer().eventList.size(),
@@ -90,26 +69,12 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
     }
 
     LogInfo << "Propagating per sample indexed cache to the full indexed cache..." << std::endl;
-    std::stringstream ss;
     for( auto& sampleIndexCache : sampleIndexCacheList ){
       _indexedCache_.reserve( _indexedCache_.size() + sampleIndexCache.size() );
       for( auto& entry : sampleIndexCache ){
         _indexedCache_.emplace_back( entry );
-
-        auto& ev = sampleSet_.getFitSampleList().at(
-            entry.event.sampleIndex
-        ).getMcContainer().eventList.at(
-            entry.event.eventIndex
-        );
-
-        ss << entry.event.sampleIndex << "/" << entry.event.eventIndex << " -> ";
-        ss << ev.getEntryIndex() << " =dials=> ";
-        ss << GenericToolbox::iterableToString(entry.dials, [](const DialIndexEntry_t& e){
-          return "{" + std::to_string(e.collectionIndex) + ", " +std::to_string(e.interfaceIndex) + "}";
-        }, false) << std::endl;
       }
     }
-    GenericToolbox::dumpStringInFile("./indexedCache.txt", ss.str());
   }
 
   auto countValidDials = [](std::vector<DialIndexEntry_t>& dialIndices_){
