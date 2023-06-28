@@ -23,10 +23,12 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
 
   LogInfo << "Sorting events in sync with indexed cache..." << std::endl;
 
+  size_t nCacheSlots{0};
+  std::vector<std::vector<IndexedEntry_t>> sampleIndexCacheList{sampleSet_.getFitSampleList().size()};
+
   {
     LogScopeIndent;
     LogInfo << "Breaking down indexed cache per sample..." << std::endl;
-    std::vector<std::vector<IndexedEntry_t>> sampleIndexCacheList{sampleSet_.getFitSampleList().size()};
     for( auto& entry : _indexedCache_ ){
       if( entry.event.sampleIndex == size_t(-1) ){ continue; }
       if( entry.event.eventIndex == size_t(-1) ){ continue; }
@@ -38,7 +40,6 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
         if( dial.interfaceIndex == size_t(-1)  ){ continue; }
         sampleIndexCacheList[entry.event.sampleIndex].back().dials.emplace_back(dial);
       }
-
     }
     _indexedCache_.clear();
 
@@ -58,6 +59,7 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
           sampleIndexCacheList[iSample].size() != sample.getMcContainer().eventList.size(),
           "MISMATCH cache and event list"
       );
+      nCacheSlots += sampleIndexCacheList[iSample].size();
 
       GenericToolbox::applyPermutation( sample.getMcContainer().eventList, p );
       GenericToolbox::applyPermutation( sampleIndexCacheList[iSample],     p );
@@ -68,13 +70,13 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
       }
     }
 
-    LogInfo << "Propagating per sample indexed cache to the full indexed cache..." << std::endl;
-    for( auto& sampleIndexCache : sampleIndexCacheList ){
-      _indexedCache_.reserve( _indexedCache_.size() + sampleIndexCache.size() );
-      for( auto& entry : sampleIndexCache ){
-        _indexedCache_.emplace_back( entry );
-      }
-    }
+//    LogInfo << "Propagating per sample indexed cache to the full indexed cache..." << std::endl;
+//    for( auto& sampleIndexCache : sampleIndexCacheList ){
+//      _indexedCache_.reserve( _indexedCache_.size() + sampleIndexCache.size() );
+//      for( auto& entry : sampleIndexCache ){
+//        _indexedCache_.emplace_back( entry );
+//      }
+//    }
   }
 
   auto countValidDials = [](std::vector<DialIndexEntry_t>& dialIndices_){
@@ -86,43 +88,40 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
       });
   };
 
-  std::stringstream ssRef;
-  _cache_.reserve( _indexedCache_.size() );
-  for( auto& entry : _indexedCache_ ){
+  LogInfo << "Filling up the cache dial with references..." << std::endl;
+  _cache_.reserve( nCacheSlots );
 
-    _cache_.emplace_back();
-    _cache_.back().event =
-        &sampleSet_.getFitSampleList().at(
-            entry.event.sampleIndex
-        ).getMcContainer().eventList.at(
-            entry.event.eventIndex
-        );
+  for( auto& sampleIndexCache : sampleIndexCacheList ){
+    for( auto& indexCache : sampleIndexCache ){
+      _cache_.emplace_back();
 
-    _cache_.back().dials.reserve( countValidDials(entry.dials) );
-    for( auto& dialIndex : entry.dials ){
-      if( dialIndex.collectionIndex == size_t(-1) or dialIndex.interfaceIndex == size_t(-1) ){ continue; }
+      auto& cacheEntry{_cache_.back()};
+
+      cacheEntry.event =
+          &sampleSet_.getFitSampleList().at(
+              indexCache.event.sampleIndex
+          ).getMcContainer().eventList.at(
+              indexCache.event.eventIndex
+          );
+
+      cacheEntry.dials.reserve( countValidDials(indexCache.dials) );
+      for( auto& dialIndex : indexCache.dials ){
+        if( dialIndex.collectionIndex == size_t(-1) or dialIndex.interfaceIndex == size_t(-1) ){ continue; }
 #ifndef USE_BREAKDOWN_CACHE
-      _cache_.back().dials.emplace_back(
+        cacheEntry.dials.emplace_back(
           &dialCollectionList_.at(dialIndex.collectionIndex)
           .getDialInterfaceList().at(dialIndex.interfaceIndex)
       );
 #else
-      _cache_.back().dials.emplace_back(
-          &dialCollectionList_.at(dialIndex.collectionIndex)
-          .getDialInterfaceList().at(dialIndex.interfaceIndex),
-          std::nan("unset")
-      );
+        cacheEntry.dials.emplace_back(
+            &dialCollectionList_.at(dialIndex.collectionIndex)
+                .getDialInterfaceList().at(dialIndex.interfaceIndex),
+            std::nan("unset")
+        );
 #endif
+      }
     }
-
-    ssRef << entry.event.sampleIndex << "/" << entry.event.eventIndex << " -> ";
-    ssRef << _cache_.back().event->getEntryIndex() << " =dials=> ";
-    ssRef << GenericToolbox::iterableToString(_cache_.back().dials, [](const DialsElem_t& e){
-      return e.interface->getSummary();
-    }, false) << std::endl;
   }
-  GenericToolbox::dumpStringInFile("./refCache.txt", ssRef.str());
-
 }
 
 void EventDialCache::allocateCacheEntries(size_t nEvent_, size_t nDialsMaxPerEvent_) {
