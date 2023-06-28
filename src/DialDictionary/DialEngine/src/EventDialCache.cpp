@@ -144,8 +144,8 @@ EventDialCache::IndexedEntry_t* EventDialCache::fetchNextCacheEntry(){
       << " while: " << GET_VAR_NAME_VALUE(_indexedCache_.size())
   );
 
-  // Warning warning Will Robinson!  This only works IFF the indexed cache is
-  // not resized (violated by the previouls stanza).
+  // Warning warning Will Robinson!
+  // This only works IFF the indexed cache is not resized.
   return &_indexedCache_[_fillIndex_++];
 }
 
