@@ -56,6 +56,11 @@ public:
   void setMinMirror(double minMirror);
   void setMaxMirror(double maxMirror);
 
+  // Record the physical bounds for the parameter.  This is the range where
+  // the parameter has a physically meaningful value.
+  void setMinPhysical(double minPhysical);
+  void setMaxPhysical(double maxPhysical);
+
   void setValueAtPrior();
   void setCurrentValueAsPrior();
 
@@ -71,6 +76,8 @@ public:
   [[nodiscard]] double getMaxValue() const;
   [[nodiscard]] double getMinMirror() const;
   [[nodiscard]] double getMaxMirror() const;
+  [[nodiscard]] double getMinPhysical() const;
+  [[nodiscard]] double getMaxPhysical() const;
   [[nodiscard]] double getStepSize() const;
   [[nodiscard]] double getPriorValue() const;
   [[nodiscard]] double getThrowValue() const;
@@ -117,6 +124,8 @@ private:
   double _maxValue_{std::nan("unset")};
   double _minMirror_{std::nan("unset")};
   double _maxMirror_{std::nan("unset")};
+  double _minPhysical_{std::nan("unset")};
+  double _maxPhysical_{std::nan("unset")};
   double _stepSize_{std::nan("unset")};
   std::string _name_{};
   std::string _dialsWorkingDirectory_{"."};

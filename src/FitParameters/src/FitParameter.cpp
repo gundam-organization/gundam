@@ -51,6 +51,12 @@ void FitParameter::readConfigImpl(){
       this->setStepSize( stepSize );
     }
 
+    if( GenericToolbox::Json::doKeyExist(_parameterConfig_, "physicalLimits") ){
+        auto physLimits = GenericToolbox::Json::fetchValue(_parameterConfig_, "physicalLimits", nlohmann::json());
+        _minPhysical_ = GenericToolbox::Json::fetchValue(physLimits, "minValue", std::nan("UNSET"));
+        _maxPhysical_ = GenericToolbox::Json::fetchValue(physLimits, "maxValue", std::nan("UNSET"));
+    }
+
     _dialDefinitionsList_ = GenericToolbox::Json::fetchValue(_parameterConfig_, "dialSetDefinitions", _dialDefinitionsList_);
   }
 
@@ -157,6 +163,12 @@ void FitParameter::setMaxMirror(double maxMirror) {
   }
   _maxMirror_ = maxMirror;
 }
+void FitParameter::setMinPhysical(double minPhysical) {
+  _minPhysical_ = minPhysical;
+}
+void FitParameter::setMaxPhysical(double maxPhysical) {
+  _maxPhysical_ = maxPhysical;
+}
 void FitParameter::setStepSize(double stepSize) {
   _stepSize_ = stepSize;
 }
@@ -200,6 +212,12 @@ double FitParameter::getMinMirror() const {
 }
 double FitParameter::getMaxMirror() const {
   return _maxMirror_;
+}
+double FitParameter::getMinPhysical() const {
+  return _minPhysical_;
+}
+double FitParameter::getMaxPhysical() const {
+  return _maxPhysical_;
 }
 double FitParameter::getStepSize() const {
   return _stepSize_;

@@ -72,8 +72,9 @@ public:
   ///  "range" (default) -- Between the parameter minimum and maximum values.
   ///  "mirror"          -- Between the mirrored values (if parameter has
   ///                       mirroring).
+  ///  "physical"        -- Only physically meaningful values.
   ///
-  /// Example: setParameterValidity("range,mirror")
+  /// Example: setParameterValidity("range,mirror,physical")
   void setParameterValidity(const std::string& validity);
 
   /// Check that the parameters for the last time the propagator was used are
@@ -158,7 +159,8 @@ private:
   /// validity.  The flaggs are:
   /// "1" -- require valid parameters
   /// "2" -- require in the mirrored range
-  int _validFlags_{3};
+  /// "4" -- require in the physical range
+  int _validFlags_{7};
 
   /// A vector of pointers to fit parameters that defined the elements in the
   /// array of parameters passed to evalFit.

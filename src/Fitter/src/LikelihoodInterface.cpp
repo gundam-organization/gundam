@@ -333,39 +333,56 @@ double LikelihoodInterface::evalFitValid(const double* parArray_) {
 }
 
 void LikelihoodInterface::setParameterValidity(const std::string& validity) {
-  if (validity.find("ran") != std::string::npos) _validFlags_ |= 1;
-  if (validity.find("noran") != std::string::npos) _validFlags_ &= ~1;
-  if (validity.find("mir") != std::string::npos) _validFlags_ |= 2;
-  if (validity.find("nomir") != std::string::npos) _validFlags_ &= ~2;
+  LogWarning << "Set parameter validity to " << validity << std::endl;
+  if (validity.find("noran") != std::string::npos) _validFlags_ &= ~0b0001;
+  else if (validity.find("ran") != std::string::npos) _validFlags_ |= 0b0001;
+  if (validity.find("nomir") != std::string::npos) _validFlags_ &= ~0b0010;
+  else if (validity.find("mir") != std::string::npos) _validFlags_ |= 0b0010;
+  if (validity.find("nophy") != std::string::npos) _validFlags_ &= ~0b0100;
+  else if (validity.find("phy") != std::string::npos) _validFlags_ |= 0b0100;
+  LogWarning << "Set parameter validity to " << validity
+             << " (" << _validFlags_ << ")" << std::endl;
 }
 
 bool LikelihoodInterface::hasValidParameterValues() const {
+  int invalid = 0;
   for (const FitParameterSet& parSet:
          _owner_->getPropagator().getParameterSetsList()) {
     for (const FitParameter& par : parSet.getParameterList()) {
-      if ( (_validFlags_&1) != 0
+      if ( (_validFlags_ & 0b0001) != 0
           and std::isfinite(par.getMinValue())
           and par.getParameterValue() < par.getMinValue()) [[unlikely]] {
-        return false;
+        ++invalid;
       }
-      if ((_validFlags_&1) != 0
+      if ((_validFlags_ & 0b0001) != 0
           and std::isfinite(par.getMaxValue())
           and par.getParameterValue() > par.getMaxValue()) [[unlikely]] {
-        return false;
+        ++invalid;
       }
-      if ((_validFlags_&2) != 0
+      if ((_validFlags_ & 0b0010) != 0
           and std::isfinite(par.getMinMirror())
           and par.getParameterValue() < par.getMinMirror()) [[unlikely]] {
-        return false;
+        ++invalid;
       }
-      if ((_validFlags_&2) != 0
+      if ((_validFlags_ & 0b0010) != 0
           and std::isfinite(par.getMaxMirror())
           and par.getParameterValue() > par.getMaxMirror()) [[unlikely]] {
-        return false;
+        ++invalid;
       }
+      if ((_validFlags_ & 0b0100) != 0
+          and std::isfinite(par.getMinPhysical())
+          and par.getParameterValue() < par.getMinPhysical()) [[unlikely]] {
+        ++invalid;
+      }
+      if ((_validFlags_ & 0b0100) != 0
+          and std::isfinite(par.getMaxPhysical())
+          and par.getParameterValue() > par.getMaxPhysical()) [[unlikely]] {
+        ++invalid;
+      }
+
     }
   }
-  return true;
+  return (invalid == 0);
 }
 
 // An MIT Style License

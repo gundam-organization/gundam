@@ -65,7 +65,7 @@ private:
   // between the allowed minimum and maximum values for the parameter.  The
   // "mirror" value means that the parameter needs to be between the mirror
   // bounds too.
-  std::string _likelihoodValidity_{"range,mirror"};
+  std::string _likelihoodValidity_{"range,mirror,physical"};
 
   // Save or dump the raw (fitter space) points.  This can save about half the
   // output file space.
