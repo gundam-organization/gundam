@@ -286,10 +286,6 @@ if(NOT WITH_GENERIC_SPLINES)
     endif(WITH_CACHE_MANAGER)
 endif(NOT WITH_GENERIC_SPLINES)
 
-# Always set USE_NEW_DIALS since the old dials are being removed.
-# This should be removed after the old dials are completely removed.
-add_definitions(-D USE_NEW_DIALS=1)
-
 if(WITH_BREAKDOWN_CACHE)
     add_definitions(-D USE_BREAKDOWN_CACHE)
 else()
