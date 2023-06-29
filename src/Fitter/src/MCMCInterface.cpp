@@ -49,6 +49,15 @@ void MCMCInterface::readConfigImpl(){
   // into the likelihood space.
   _saveRaw_ = false; // Hard code.  Why would we want to save these steps?
 
+  // The number of steps between when the predicted sample histograms should
+  // be saved into the output file.  The sample histograms can then be used
+  // with the parameterSampleData vector to calculate the PPP for the chain.
+  // Note that the model is what the MC is predicting, so for a PPP
+  // calculation, the data will need to be fluctuated around the prediction.
+  _modelStride_ = GenericToolbox::Json::fetchValue(_config_,
+                                                   "savedModelStride",
+                                                   _modelStride_);
+
   // Get the MCMC chain parameters to be used during burn-in.  The burn-in will
   // be skipped if the state has been restored from a file.  The burn-in can be
   // skipped in favor of discarding the initial parts of the MCMC chain
@@ -212,7 +221,7 @@ void MCMCInterface::initializeImpl(){
 bool MCMCInterface::isFitHasConverged() const {return true;}
 
 /// Copy the current parameter values to the tree.
-void MCMCInterface::fillPoint() {
+void MCMCInterface::fillPoint(bool fillModel) {
   int count = 0;
   for (const FitParameterSet& parSet: getPropagator().getParameterSetsList()) {
     for (const FitParameter& iPar : parSet.getParameterList()) {
@@ -221,6 +230,22 @@ void MCMCInterface::fillPoint() {
         continue;
       }
       _point_[count++] = iPar.getParameterValue();
+    }
+  }
+  _llhStatistical_ = getLikelihood().getLastLikelihoodStat();
+  _llhPenalty_ = getLikelihood().getLastLikelihoodPenalty();
+  // Watch this next line for speed.  It DOES call the "float" destructor
+  // which is trivial (i.e. a noop).  In gcc, all it does is reset the vector
+  // "size".
+  _model_.clear();
+  _uncertainty_.clear();
+  if (not fillModel) return;
+  for (const FitSample& sample
+         : getPropagator().getFitSampleSet().getFitSampleList()) {
+    std::shared_ptr<TH1D> hist = sample.getMcContainer().histogram;
+    for (int i = 1; i < hist->GetNbinsX(); ++i) {
+      _model_.push_back(hist->GetBinContent(i));
+      _uncertainty_.push_back(hist->GetBinError(i));
     }
   }
 }
@@ -609,14 +634,19 @@ void MCMCInterface::setupAndRunAdaptiveStep(AdaptiveStepMCMC& mcmc) {
       // accepted step can be copied into the points (which will have
       // any decomposition removed).
       if (mcmc.Step(false)) fillPoint();
+      // Zero the size of the raw accepted points and only save the filled
+      // points (which are in likelihood space).
+      if (not _saveRaw_) mcmc.ClearSavedAccepted();
+      // Limit the number of times that the model histogram data is saved to
+      // the output file.  It won't be saved if the _modelStride_ is less than
+      // one.  Otherwise it will be saved every _modelStride_ steps.
+      if (_modelStride_ < 1 || (i%_modelStride_)) {
+        _model_.clear();
+        _uncertainty_.clear();
+      }
       // Now save the step.  This is going to write the points in the
       // "likelihood" space.  If "_saveRaw_" is true, then this also saves the
       // accepted point in the (possibly) decomposed state.
-      if (not _saveRaw_) {
-        // Zero the size of the raw accepted points and only save the filled
-        // points (which are in likelihood space).
-        mcmc.ClearSavedAccepted();
-      }
       mcmc.SaveStep(false);
       if(_steps_ > 100 && !(i%(_steps_/100))){
         LogInfo << "Chain: " << chain
@@ -732,10 +762,15 @@ void MCMCInterface::minimize(){
 
   // Store parameter names as a tree in the currentdirectory
   TTree *parameterSetsTree = new TTree("parameterSets",
-                                       "Tree of Parameter Set Information");
+                                       "Tree of MCMC Model Information");
   std::vector<std::string> parameterSetNames;
   std::vector<int> parameterSetOffsets;
   std::vector<int> parameterSetCounts;
+
+  parameterSetsTree->Branch("parameterSetNames", &parameterSetNames);
+  parameterSetsTree->Branch("parameterSetOffsets", &parameterSetOffsets);
+  parameterSetsTree->Branch("parameterSetCounts", &parameterSetCounts);
+
   std::vector<int> parameterIndex;
   std::vector<bool> parameterFixed;
   std::vector<bool> parameterEnabled;
@@ -744,9 +779,7 @@ void MCMCInterface::minimize(){
   std::vector<double> parameterSigma;
   std::vector<double> parameterMin;
   std::vector<double> parameterMax;
-  parameterSetsTree->Branch("parameterSetNames", &parameterSetNames);
-  parameterSetsTree->Branch("parameterSetOffsets", &parameterSetOffsets);
-  parameterSetsTree->Branch("parameterSetCounts", &parameterSetCounts);
+
   parameterSetsTree->Branch("parameterIndex", &parameterIndex);
   parameterSetsTree->Branch("parameterFixed", &parameterFixed);
   parameterSetsTree->Branch("parameterEnabled", &parameterEnabled);
@@ -755,6 +788,14 @@ void MCMCInterface::minimize(){
   parameterSetsTree->Branch("parameterSigma", &parameterSigma);
   parameterSetsTree->Branch("parameterMin", &parameterMin);
   parameterSetsTree->Branch("parameterMax", &parameterMax);
+
+  std::vector<std::string> parameterSampleNames;
+  std::vector<int> parameterSampleOffsets;
+  std::vector<double> parameterSampleData;
+
+  parameterSetsTree->Branch("parameterSampleName", &parameterSampleNames);
+  parameterSetsTree->Branch("parameterSampleOffsets", &parameterSampleOffsets);
+  parameterSetsTree->Branch("parameterSampleData", &parameterSampleData);
 
   // Pull all of the parameters out of the parameter sets and save the
   // names, index, priors, and sigmas to the output.  The order in these
@@ -782,9 +823,21 @@ void MCMCInterface::minimize(){
     }
     parameterSetCounts.push_back(countParameters);
   }
+
+  parameterSampleData.clear();
+  for (const FitSample& sample
+         : getPropagator().getFitSampleSet().getFitSampleList()) {
+    parameterSampleNames.push_back(sample.getName());
+    parameterSampleOffsets.push_back(parameterSampleData.size());
+    std::shared_ptr<TH1D> hist = sample.getDataContainer().histogram;
+    for (int i = 1; i < hist->GetNbinsX(); ++i) {
+      parameterSampleData.push_back(hist->GetBinContent(i));
+    }
+  }
+
   parameterSetsTree->Fill();
   parameterSetsTree->Write();
-  // End Storing parameter name informations
+  // End Storing model information
 
   _point_.resize(parameterName.size());
   LogInfo << "Parameters in likelihood: " << _point_.size() << std::endl;
@@ -793,6 +846,10 @@ void MCMCInterface::minimize(){
   TTree *outputTree = new TTree(_outTreeName_.c_str(),
                                 "Tree of accepted points");
   outputTree->Branch("Points",&_point_);
+  if (_modelStride_ > 0) {
+    outputTree->Branch("Models",&_model_);
+    outputTree->Branch("ModelUncertainty",&_uncertainty_);
+  }
 
   // Run a chain.
   int nbFitCallOffset = getLikelihood().getNbFitCalls();
