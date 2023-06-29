@@ -134,14 +134,11 @@ private:
   // Monitoring
   bool _showEventBreakdown_{true};
 
-  // DEV
-#if USE_NEW_DIALS
   // A vector of all the dial collections used by all of the fit samples.
   // Once a dial collection has been added to this vector, it's index becomes
   // the immutable tag for that specific group of dials.
   std::vector<DialCollection> _dialCollections_{};
   EventDialCache _eventDialCache_{};
-#endif
 
   // parallel holders
   std::function<void(int)> reweightMcEventsFct;

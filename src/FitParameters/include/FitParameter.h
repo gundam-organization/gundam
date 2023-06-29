@@ -5,10 +5,6 @@
 #ifndef GUNDAM_FITPARAMETER_H
 #define GUNDAM_FITPARAMETER_H
 
-#if USE_NEW_DIALS
-#else
-#include "DialSet.h"
-#endif
 #include "JsonBaseClass.h"
 
 #include "GenericToolbox.h"
@@ -88,21 +84,11 @@ public:
   [[nodiscard]] const FitParameterSet *getOwner() const;
   [[nodiscard]] PriorType::PriorType getPriorType() const;
 
-#if USE_NEW_DIALS
-#else
-  std::vector<DialSet> &getDialSetList();
-#endif
-
   // Core
   [[nodiscard]] double getDistanceFromNominal() const; // in unit of sigmas
   [[nodiscard]] std::string getSummary(bool shallow_=false) const;
   [[nodiscard]] std::string getTitle() const;
   [[nodiscard]] std::string getFullTitle() const;
-
-#if USE_NEW_DIALS
-#else
-  DialSet* findDialSet(const std::string& dataSetName_);
-#endif
 
 protected:
   void readConfigImpl() override;
@@ -135,11 +121,6 @@ private:
   // Internals
   const FitParameterSet* _owner_{nullptr};
   PriorType::PriorType _priorType_{PriorType::Gaussian};
-
-#if USE_NEW_DIALS
-#else
-  std::vector<DialSet> _dialSetList_; // one dial set per detector
-#endif
 
 };
 
