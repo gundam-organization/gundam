@@ -12,7 +12,6 @@ project( GUNDAM )
 option( WITH_GUNDAM_ROOT_APP "Build app gundamRoot" ON )
 option( WITH_CACHE_MANAGER "Enable compiling of the cache manager used by the GPU" ON )
 option( WITH_BREAKDOWN_CACHE "Use the breakdown cache" ON )
-option( WITH_OLD_DIALS "Use the old dial implementation" OFF )
 option( WITH_XSLLHFITTER "Build old xsllhFitter apps/libraries" OFF )
 option( WITH_OPENMP "(OLD/xsllhFitter) Build with OpenMP libraries" OFF )
 option( ENABLE_CUDA "Enable CUDA language check (Cache::Manager requires a GPU if CUDA is found)" OFF )
@@ -287,11 +286,9 @@ if(NOT WITH_GENERIC_SPLINES)
     endif(WITH_CACHE_MANAGER)
 endif(NOT WITH_GENERIC_SPLINES)
 
-if(NOT WITH_OLD_DIALS)
-    add_definitions(-D USE_NEW_DIALS=1)
-else()
-    cmessage(WARNING "Using old dial implementation" )
-endif(NOT WITH_OLD_DIALS)
+# Always set USE_NEW_DIALS since the old dials are being removed.
+# This should be removed after the old dials are completely removed.
+add_definitions(-D USE_NEW_DIALS=1)
 
 if(WITH_BREAKDOWN_CACHE)
     add_definitions(-D USE_BREAKDOWN_CACHE)
