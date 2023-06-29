@@ -11,9 +11,7 @@
 
 #include <sstream>
 
-
 LoggerInit([]{ Logger::setUserHeaderStr("[FitParameter]"); });
-
 
 FitParameter::FitParameter(const FitParameterSet* owner_): _owner_(owner_) {}
 
@@ -59,16 +57,8 @@ void FitParameter::readConfigImpl(){
 
     _dialDefinitionsList_ = GenericToolbox::Json::fetchValue(_parameterConfig_, "dialSetDefinitions", _dialDefinitionsList_);
   }
-
-#if USE_NEW_DIALS
-#else
-  _dialSetList_.reserve(_dialDefinitionsList_.size());
-  for( const auto& dialDefinitionConfig : _dialDefinitionsList_ ){
-    _dialSetList_.emplace_back(this);
-    _dialSetList_.back().readConfig(dialDefinitionConfig);
-  }
-#endif
 }
+
 void FitParameter::initializeImpl() {
   LogThrowIf(_owner_ == nullptr, "Parameter set ref is not set.");
   LogThrowIf(_parameterIndex_ == -1, "Parameter index is not set.");
@@ -77,19 +67,6 @@ void FitParameter::initializeImpl() {
   LogThrowIf(std::isnan(_priorValue_), "Prior value is not set.");
   LogThrowIf(std::isnan(_stdDevValue_), "Std dev value is not set.");
   LogThrowIf(std::isnan(_parameterValue_), "Parameter value is not set.");
-
-#if USE_NEW_DIALS
-#else
-  for( auto& dialSet : _dialSetList_ ){ dialSet.initialize(); }
-  // Check if no dials is actually defined -> disable the parameter in that case
-  bool dialSetAreAllDisabled = true;
-  for( const auto& dialSet : _dialSetList_ ){ if( dialSet.isEnabled() ){ dialSetAreAllDisabled = false; break; } }
-  if( dialSetAreAllDisabled ){
-    LogWarning << "Parameter " << getTitle() << " has no dials: disabled." << std::endl;
-    _isEnabled_ = false;
-  }
-#endif
-
 }
 
 void FitParameter::setIsEnabled(bool isEnabled){
@@ -104,6 +81,7 @@ void FitParameter::setIsEigen(bool isEigen) {
 void FitParameter::setIsFree(bool isFree) {
   _isFree_ = isFree;
 }
+
 void FitParameter::setDialSetConfig(const nlohmann::json &jsonConfig_) {
   auto jsonConfig = jsonConfig_;
   while( jsonConfig.is_string() ){
@@ -112,6 +90,7 @@ void FitParameter::setDialSetConfig(const nlohmann::json &jsonConfig_) {
   }
   _dialDefinitionsList_ = jsonConfig.get<std::vector<nlohmann::json>>();
 }
+
 void FitParameter::setParameterDefinitionConfig(const nlohmann::json &config_){
   _parameterConfig_ = config_;
   ConfigUtils::forwardConfig(_parameterConfig_);
@@ -246,25 +225,22 @@ const FitParameterSet *FitParameter::getOwner() const {
 PriorType::PriorType FitParameter::getPriorType() const {
   return _priorType_;
 }
-#if USE_NEW_DIALS
-#else
-std::vector<DialSet> &FitParameter::getDialSetList() {
-  return _dialSetList_;
-}
-#endif
 
 double FitParameter::getDistanceFromNominal() const{
   return (_parameterValue_ - _priorValue_) / _stdDevValue_;
 }
+
 std::string FitParameter::getTitle() const {
   std::stringstream ss;
   ss << "#" << _parameterIndex_;
   if( not _name_.empty() ) ss << "_" << _name_;
   return ss.str();
 }
+
 std::string FitParameter::getFullTitle() const{
   return _owner_->getName() + "/" + this->getTitle();
 }
+
 std::string FitParameter::getSummary(bool shallow_) const {
   std::stringstream ss;
 
@@ -281,37 +257,32 @@ std::string FitParameter::getSummary(bool shallow_) const {
   else ss << _maxValue_;
   ss << " ]";
 
-#if USE_NEW_DIALS
-#else
-  if( not shallow_ ){
-    ss << ":";
-    for( const auto& dialSet : _dialSetList_ ){
-      ss << std::endl << GenericToolbox::indentString(dialSet.getSummary(), 2);
-    }
-  }
-#endif
-
   return ss.str();
 }
-#if USE_NEW_DIALS
-#else
-DialSet* FitParameter::findDialSet(const std::string& dataSetName_){
-  for( auto& dialSet : _dialSetList_ ){
-    if( GenericToolbox::doesElementIsInVector(dataSetName_, dialSet.getDataSetNameList()) ){
-      return &dialSet;
-    }
-  }
 
-  // If not found, find general dialSet
-  for( auto& dialSet : _dialSetList_ ){
-    if( GenericToolbox::doesElementIsInVector("", dialSet.getDataSetNameList())
-        or GenericToolbox::doesElementIsInVector("*", dialSet.getDataSetNameList())
-        ){
-      return &dialSet;
-    }
-  }
+//  A Lesser GNU Public License
 
-  // If no general dialSet found, this parameter does not apply on this dataSet
-  return nullptr;
-}
-#endif
+//  Copyright (C) 2023 GUNDAM DEVELOPERS
+
+//  This library is free software; you can redistribute it and/or
+//  modify it under the terms of the GNU Lesser General Public
+//  License as published by the Free Software Foundation; either
+//  version 2.1 of the License, or (at your option) any later version.
+
+//  This library is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+//  Lesser General Public License for more details.
+
+//  You should have received a copy of the GNU Lesser General Public
+//  License along with this library; if not, write to the
+//
+//  Free Software Foundation, Inc.
+//  51 Franklin Street, Fifth Floor,
+//  Boston, MA  02110-1301  USA
+
+// Local Variables:
+// mode:c++
+// c-basic-offset:2
+// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
+// End:
