@@ -55,7 +55,7 @@ void MCMCInterface::readConfigImpl(){
   // Note that the model is what the MC is predicting, so for a PPP
   // calculation, the data will need to be fluctuated around the prediction.
   _modelStride_ = GenericToolbox::Json::fetchValue(_config_,
-                                                   "savedModelStride",
+                                                   "modelSaveStride",
                                                    _modelStride_);
 
   // Get the MCMC chain parameters to be used during burn-in.  The burn-in will
@@ -239,6 +239,8 @@ void MCMCInterface::fillPoint(bool fillModel) {
   // "size".
   _model_.clear();
   _uncertainty_.clear();
+  _saveModel_.clear();
+  _saveUncertainty_.clear();
   if (not fillModel) return;
   for (const FitSample& sample
          : getPropagator().getFitSampleSet().getFitSampleList()) {
@@ -559,8 +561,15 @@ void MCMCInterface::setupAndRunAdaptiveStep(AdaptiveStepMCMC& mcmc) {
       }
       // Burn-In chain in each cycle
       for (int i = 0; i < _burninLength_; ++i) {
-        // Run step
-        if (mcmc.Step(false)) fillPoint();
+        // Run the burn-in step.
+        if (mcmc.Step(false)) fillPoint(false);
+        if (_modelStride_ > 0
+            and 0 == (mcmc.GetProposeStep().GetTrials()%_modelStride_)) {
+          _saveModel_.resize(_model_.size());
+          std::copy(_model_.begin(), _model_.end(), _saveModel_.begin());
+          _saveUncertainty_.resize(_uncertainty_.size());
+          std::copy(_uncertainty_.begin(), _uncertainty_.end(), _saveUncertainty_.begin());
+        }
         // Now save the step.  Check to see if this is the last step of the
         // run, and if it is, then save the full state.
         if (_saveBurnin_) mcmc.SaveStep(_burninLength_ <= (i+1));
@@ -640,9 +649,12 @@ void MCMCInterface::setupAndRunAdaptiveStep(AdaptiveStepMCMC& mcmc) {
       // Limit the number of times that the model histogram data is saved to
       // the output file.  It won't be saved if the _modelStride_ is less than
       // one.  Otherwise it will be saved every _modelStride_ steps.
-      if (_modelStride_ < 1 || (i%_modelStride_)) {
-        _model_.clear();
-        _uncertainty_.clear();
+      if (_modelStride_ > 0
+          and 0 == (mcmc.GetProposeStep().GetTrials()%_modelStride_)) {
+        _saveModel_.resize(_model_.size());
+        std::copy(_model_.begin(), _model_.end(), _saveModel_.begin());
+        _saveUncertainty_.resize(_uncertainty_.size());
+        std::copy(_uncertainty_.begin(), _uncertainty_.end(), _saveUncertainty_.begin());
       }
       // Now save the step.  This is going to write the points in the
       // "likelihood" space.  If "_saveRaw_" is true, then this also saves the
@@ -833,11 +845,16 @@ void MCMCInterface::minimize(){
     for (int i = 1; i < hist->GetNbinsX(); ++i) {
       parameterSampleData.push_back(hist->GetBinContent(i));
     }
+    LogInfo << "Save data histogram for " << parameterSampleNames.back()
+            << " @ " << parameterSampleOffsets.back()
+            << " w/ " << hist->GetNbinsX() << " bins"
+            << std::endl;
   }
 
   parameterSetsTree->Fill();
   parameterSetsTree->Write();
-  // End Storing model information
+
+  // End of saving model information
 
   _point_.resize(parameterName.size());
   LogInfo << "Parameters in likelihood: " << _point_.size() << std::endl;
@@ -846,10 +863,10 @@ void MCMCInterface::minimize(){
   TTree *outputTree = new TTree(_outTreeName_.c_str(),
                                 "Tree of accepted points");
   outputTree->Branch("Points",&_point_);
-  if (_modelStride_ > 0) {
-    outputTree->Branch("Models",&_model_);
-    outputTree->Branch("ModelUncertainty",&_uncertainty_);
-  }
+  outputTree->Branch("LLHPenalty",&_llhPenalty_);
+  outputTree->Branch("LLHStatistical",&_llhStatistical_);
+  outputTree->Branch("Models",&_saveModel_);
+  outputTree->Branch("ModelUncertainty",&_saveUncertainty_);
 
   // Run a chain.
   int nbFitCallOffset = getLikelihood().getNbFitCalls();
