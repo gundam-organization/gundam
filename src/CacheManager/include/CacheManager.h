@@ -40,13 +40,8 @@ public:
 
     /// Build the cache and load it into the device.  This is used in
     /// Propagator.cpp to fill the constants needed to for the calculations.
-#ifndef USE_NEW_DIALS
-    static bool Build(FitSampleSet& sampleList);
-#else
     static bool Build(FitSampleSet& sampleList, EventDialCache& eventDials);
-#endif
 
-#ifdef USE_NEW_DIALS
     /// Update the cache with the event and spline information.  This is
     /// called as part of Build, and can be called in other code if the cache
     /// needs to be changed.  It forages all of the information from the
@@ -56,7 +51,6 @@ public:
     /// Flag that the Cache::Manager internal caches must be updated from the
     /// FitSampleSet and EventDialCache before it can be used.
     static void UpdateRequired();
-#endif
 
     /// This returns the index of the parameter in the cache.  If the
     /// parameter isn't defined, this will return a negative value.
@@ -84,14 +78,6 @@ private:
     // A map between the fit parameter pointers and the parameter index used
     // by the fitter.
     static std::map<const FitParameter*, int> ParameterMap;
-
-#ifndef USE_NEW_DIALS
-    // Determine the type of spline cache to use.  The possible results are
-    // "compactSpline", "uniformSpline", "generalSpline", or
-    // "this-cannot-happen".  This is used to determine which cache is used
-    // for each event.
-    static std::string SplineType(const SplineDial* dial);
-#endif
 
     /// Declare all of the actual GPU caches here.  There is one GPU, so this
     /// is the ONE place that everything is collected together.

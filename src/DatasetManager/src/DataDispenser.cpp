@@ -9,14 +9,9 @@
 #include "GenericToolbox.Json.h"
 #include "ConfigUtils.h"
 
-#if USE_NEW_DIALS
 #include "DialCollection.h"
 #include "DialTypes.h"
 #include "DialBaseFactory.h"
-#else
-#include "SplineDial.h"
-#include "GraphDial.h"
-#endif
 
 #include "GenericToolbox.Root.TreeEntryBuffer.h"
 #include "GenericToolbox.Root.h"
@@ -32,11 +27,9 @@
 #include <vector>
 #include <sstream>
 
-
 LoggerInit([]{
   Logger::setUserHeaderStr("[DataDispenser]");
 });
-
 
 DataDispenser::DataDispenser(DatasetLoader* owner_): _owner_(owner_) {}
 
@@ -425,7 +418,6 @@ void DataDispenser::doEventSelection(){
 void DataDispenser::fetchRequestedLeaves(){
   LogWarning << "Poll every objects for requested variables..." << std::endl;
 
-#if USE_NEW_DIALS
   if( _dialCollectionListPtr_ != nullptr ){
     LogInfo << "Selecting dial collections..." << std::endl;
     for( auto& dialCollection : *_dialCollectionListPtr_ ){
@@ -455,44 +447,6 @@ void DataDispenser::fetchRequestedLeaves(){
     LogInfo << "DialCollection requests for indexing: " << GenericToolbox::parseVectorAsString(indexRequests) << std::endl;
     for( auto& var : indexRequests ){ _cache_.addVarRequestedForIndexing(var); }
   }
-#else
-  // parSet
-  if( _parSetListPtrToLoad_ != nullptr ){
-    std::vector<std::string> indexRequests;
-    for( auto& parSet : *_parSetListPtrToLoad_ ){
-      if( not parSet.isEnabled() ) continue;
-
-      for( auto& par : parSet.getParameterList() ){
-        if( not par.isEnabled() ) continue;
-
-        auto* dialSetPtr = par.findDialSet( _owner_->getName() );
-        if( dialSetPtr == nullptr ){ continue; }
-
-        if( not dialSetPtr->getDialLeafName().empty() ){
-          GenericToolbox::addIfNotInVector(dialSetPtr->getDialLeafName(), indexRequests);
-        }
-        else{
-          if( dialSetPtr->getApplyConditionFormula() != nullptr ){
-            for( int iPar = 0 ; iPar < dialSetPtr->getApplyConditionFormula()->GetNpar() ; iPar++ ){
-              GenericToolbox::addIfNotInVector(dialSetPtr->getApplyConditionFormula()->GetParName(iPar), indexRequests);
-            }
-          }
-
-          for( auto& dial : dialSetPtr->getDialList() ){
-            if( dial->getApplyConditionBinPtr() != nullptr ){
-              for( auto& var : dial->getApplyConditionBinPtr()->getVariableNameList() ){
-                GenericToolbox::addIfNotInVector(var, indexRequests);
-              } // var
-            }
-          } // dial
-        }
-      } // par
-    } // parSet
-
-    LogInfo << "ParameterSets requests for indexing: " << GenericToolbox::parseVectorAsString(indexRequests) << std::endl;
-    for( auto& var : indexRequests ){ _cache_.addVarRequestedForIndexing(var); }
-  }
-#endif
 
   // sample binning
   if( _sampleSetPtrToLoad_ != nullptr ){
@@ -633,17 +587,6 @@ void DataDispenser::preAllocateMemory(){
   auto copyDict = eventPlaceholder.generateDict(tBuf, _parameters_.overrideLeafDict);
   eventPlaceholder.copyData(copyDict);
 
-#if USE_NEW_DIALS
-#else
-  if( _parSetListPtrToLoad_ != nullptr ){
-    size_t dialCacheSize = 0;
-    for( auto& parSet : *_parSetListPtrToLoad_ ){
-      parSet.isUseOnlyOneParameterPerEvent() ? dialCacheSize++: dialCacheSize += parSet.getNbParameters();
-    }
-    eventPlaceholder.getRawDialPtrList().resize(dialCacheSize);
-  }
-#endif
-
   LogInfo << "Reserving event memory..." << std::endl;
   _cache_.sampleIndexOffsetList.resize(_cache_.samplesToFillList.size());
   _cache_.sampleEventListPtrToFill.resize(_cache_.samplesToFillList.size());
@@ -657,7 +600,6 @@ void DataDispenser::preAllocateMemory(){
   }
 
   size_t nEvents = treeChain.GetEntries();
-#if USE_NEW_DIALS
   if( _eventDialCacheRef_ != nullptr ){
     // DEV
     if( not _cache_.dialCollectionsRefList.empty() ){
@@ -698,65 +640,6 @@ void DataDispenser::preAllocateMemory(){
       _eventDialCacheRef_->allocateCacheEntries(nEvents, 0);
     }
   }
-#else
-  // DIALS
-  DialSet* dialSetPtr;
-  if( _parSetListPtrToLoad_ != nullptr ){
-    LogInfo << "Claiming memory for event-by-event dials..." << std::endl;
-    double eventByEventDialSize{0};
-    for( auto& parSet : *_parSetListPtrToLoad_ ){
-      if( not parSet.isEnabled() ){ continue; }
-      for( auto& par : parSet.getParameterList() ){
-        if( not par.isEnabled() ){ continue; }
-        dialSetPtr = par.findDialSet( _owner_->getName() );
-        if( dialSetPtr != nullptr and ( not dialSetPtr->getDialList().empty() or not dialSetPtr->getDialLeafName().empty() ) ){
-
-          // Filling var indexes for faster eval with PhysicsEvent:
-          for( auto& dial : dialSetPtr->getDialList() ){
-            if( dial->getApplyConditionBinPtr() != nullptr ){
-              std::vector<int> varIndexes;
-              for( const auto& var : dial->getApplyConditionBinPtr()->getVariableNameList() ){
-                varIndexes.emplace_back(GenericToolbox::findElementIndex(var, _cache_.varsRequestedForIndexing));
-              }
-              dial->getApplyConditionBinPtr()->setEventVarIndexCache(varIndexes);
-            }
-          }
-
-          // Reserve memory for additional dials (those on a tree leaf)
-          if( not dialSetPtr->getDialLeafName().empty() ){
-
-            auto dialType = dialSetPtr->getGlobalDialType();
-
-            LogInfo << par.getFullTitle() << ": creating " << nEvents;
-            LogInfo << " " << DialType::DialTypeEnumNamespace::toString(dialType, true);
-
-            if     ( dialType == DialType::Spline ){
-              double dialsSizeInRam = double(nEvents) * sizeof(SplineDial);
-              eventByEventDialSize += dialsSizeInRam;
-              LogInfo << " dials (" << GenericToolbox::parseSizeUnits( dialsSizeInRam ) << ")" << std::endl;
-              dialSetPtr->getDialList().resize(nEvents, DialWrapper(SplineDial(dialSetPtr)));
-            }
-            else if( dialType == DialType::Graph ){
-              double dialsSizeInRam = double(nEvents) * sizeof(GraphDial);
-              eventByEventDialSize += dialsSizeInRam;
-              LogInfo << " dials (" << GenericToolbox::parseSizeUnits( dialsSizeInRam ) << ")" << std::endl;
-              dialSetPtr->getDialList().resize(nEvents, DialWrapper(GraphDial(dialSetPtr)));
-            }
-            else{
-              LogInfo << std::endl;
-              LogThrow("Invalid dial type for event-by-event dial: " << DialType::DialTypeEnumNamespace::toString(dialType))
-            }
-
-          }
-
-          // Add the dialSet to the list
-          _cache_.dialSetPtrMap[&parSet].emplace_back( dialSetPtr );
-        }
-      }
-    }
-    LogInfo << "Event-by-event dials take " << GenericToolbox::parseSizeUnits(eventByEventDialSize) << " in RAM." << std::endl;
-  }
-#endif
 
 }
 void DataDispenser::readAndFill(){
@@ -1064,7 +947,6 @@ void DataDispenser::fillFunction(int iThread_){
 
   // Dial bin search
   DataBin* dataBin{nullptr};
-#if USE_NEW_DIALS
   size_t freeSlotDial{0};
   size_t iCollection(-1);
   EventDialCache::IndexedEntry_t* eventDialCacheEntry;
@@ -1081,25 +963,6 @@ void DataDispenser::fillFunction(int iThread_){
     }
     return true;
   };
-#else
-  SplineDial* spDialPtr{nullptr};
-  GraphDial* grDialPtr{nullptr};
-  DialSet* dialSetPtr;
-  std::vector<DialWrapper>::iterator dialFoundItr;
-  auto isDialValid = [&](const DialWrapper& d_){
-    dataBin = d_->getApplyConditionBinPtr();
-    nBinEdges = dataBin->getEdgesList().size();
-    for( iVar = 0 ; iVar < nBinEdges ; iVar++ ){
-      if( not DataBin::isBetweenEdges(
-          dataBin->getEdgesList()[iVar],
-          eventBuffer.getVarAsDouble( dataBin->getEventVarIndexCache()[iVar] ) )
-          ){
-        return false;
-      }
-    }
-    return true;
-  };
-#endif
 
   // Formula
   std::vector<std::shared_ptr<TFormula>> varSelectionFormulaList{};
@@ -1249,7 +1112,6 @@ void DataDispenser::fillFunction(int iThread_){
         // Now the event is ready. Let's index the dials:
         eventDialOffset = 0;
 
-#if USE_NEW_DIALS
         if( _eventDialCacheRef_ != nullptr ) {
           // there should always be a cache entry even if no dials are applied.
           // This cache is actually used to write MC events with dials in output tree
@@ -1342,113 +1204,6 @@ void DataDispenser::fillFunction(int iThread_){
         else{
           // it is "data"
         }
-#else
-        // Loop over the parameter Sets (the ones which have a valid dialSet for this dataSet)
-        for( auto& dialSetPair : _cache_.dialSetPtrMap ){
-          for( iDialSet = 0 ; iDialSet < dialSetPair.second.size() ; iDialSet++ ){
-            dialSetPtr = dialSetPair.second[iDialSet];
-
-            if( dialSetPtr->getApplyConditionFormula() != nullptr ){
-              if( eventBuffer.evalFormula(dialSetPtr->getApplyConditionFormula()) == 0 ){
-                // next dialSet
-                continue;
-              }
-            }
-
-            if( not dialSetPtr->getDialLeafName().empty() ){
-              // Event-by-event dial?
-              if     ( not strcmp(treeChain.GetLeaf(dialSetPtr->getDialLeafName().c_str())->GetTypeName(), "TClonesArray") ){
-                grPtr = (TGraph*) eventBuffer.getVariable<TClonesArray*>(dialSetPtr->getDialLeafName())->At(0);
-                if(grPtr->GetN() > 1){
-                  if     ( dialSetPtr->getGlobalDialType() == DialType::Spline ){
-                    spDialPtr = (SplineDial*) dialSetPtr->getDialList()[iEntry].get();
-                    spDialPtr->createSpline( grPtr );
-                    spDialPtr->initialize();
-                    spDialPtr->setIsReferenced(true);
-                    // Adding dial in the event
-                    eventPtr->getRawDialPtrList()[eventDialOffset++] = spDialPtr;
-                  }
-                  else if( dialSetPtr->getGlobalDialType() == DialType::Graph ){
-                    grDialPtr = (GraphDial*) dialSetPtr->getDialList()[iEntry].get();
-                    grDialPtr->setGraph(*grPtr);
-                    grDialPtr->initialize();
-                    grDialPtr->setIsReferenced(true);
-                    // Adding dial in the event
-                    eventPtr->getRawDialPtrList()[eventDialOffset++] = grDialPtr;
-                  }
-                  else{
-                    LogThrow("Unsupported event-by-event dial: " << DialType::DialTypeEnumNamespace::toString(dialSetPtr->getGlobalDialType()))
-                  }
-                }
-              }
-              else if( not strcmp(treeChain.GetLeaf(dialSetPtr->getDialLeafName().c_str())->GetTypeName(), "TGraph") ){
-                grPtr = (TGraph*) eventBuffer.getVariable<TGraph*>(dialSetPtr->getDialLeafName());
-                if     ( dialSetPtr->getGlobalDialType() == DialType::Spline ){
-                  spDialPtr = (SplineDial*) dialSetPtr->getDialList()[iEntry].get();
-                  spDialPtr->createSpline(grPtr);
-                  spDialPtr->initialize();
-                  spDialPtr->setIsReferenced(true);
-                  // Adding dial in the event
-                  eventPtr->getRawDialPtrList()[eventDialOffset++] = spDialPtr;
-                }
-                else if( dialSetPtr->getGlobalDialType() == DialType::Graph ){
-                  grDialPtr = (GraphDial*) dialSetPtr->getDialList()[iEntry].get();
-                  grDialPtr->setGraph(*grPtr);
-                  grDialPtr->initialize();
-                  grDialPtr->setIsReferenced(true);
-                  // Adding dial in the event
-                  eventPtr->getRawDialPtrList()[eventDialOffset++] = grDialPtr;
-                }
-                else{
-                  LogThrow("Unsupported event-by-event dial: " << DialType::DialTypeEnumNamespace::toString(dialSetPtr->getGlobalDialType()))
-                }
-              }
-              else{
-                LogThrow("Unsupported event-by-event dial type: " << treeChain.GetLeaf(dialSetPtr->getDialLeafName().c_str())->GetTypeName() )
-              }
-            }
-            else{
-              // Binned dial:
-              foundValidDialAmongTheSet = false;
-
-              if( dialSetPtr->getDialList().size() == 1 and dialSetPtr->getDialList()[0]->getApplyConditionBinPtr() == nullptr ){
-                foundValidDialAmongTheSet = true;
-                dialSetPtr->getDialList()[0]->setIsReferenced(true);
-                eventPtr->getRawDialPtrList()[eventDialOffset++] = dialSetPtr->getDialList()[0].get();
-              }
-              else {
-                // -- probably the slowest part of the indexing: ----
-                dialFoundItr = std::find_if(
-                    dialSetPtr->getDialList().begin(),
-                    dialSetPtr->getDialList().end(),
-                    isDialValid
-                );
-                // --------------------------------------------------
-
-                if (dialFoundItr != dialSetPtr->getDialList().end()) {
-                  // found DIAL -> get index
-                  iDial = std::distance(dialSetPtr->getDialList().begin(), dialFoundItr);
-
-                  foundValidDialAmongTheSet = true;
-                  dialSetPtr->getDialList()[iDial]->setIsReferenced(true);
-                  eventPtr->getRawDialPtrList()[eventDialOffset++] = dialSetPtr->getDialList()[iDial].get();
-                }
-              }
-
-              if( foundValidDialAmongTheSet and dialSetPair.first->isUseOnlyOneParameterPerEvent() ){
-                // leave dialSet (corresponding to a given parameter) loop since we explicitly ask for 1 parameter for this parSet
-                break;
-              }
-            } // else (not dialSetPtr->getDialLeafName().empty())
-
-          } // iDialSet / Enabled-parameter
-        } // ParSet / DialSet Pairs
-
-        // Resize the dialRef list
-        eventPtr->getRawDialPtrList().resize(eventDialOffset);
-        eventPtr->getRawDialPtrList().shrink_to_fit();
-#endif
-
       } // event has passed the selection?
     } // samples
   } // entries
@@ -1498,8 +1253,36 @@ void DataDispenserCache::addVarRequestedForIndexing(const std::string& varName_)
   LogThrowIf(varName_.empty(), "no var name provided.");
   GenericToolbox::addIfNotInVector(varName_, this->varsRequestedForIndexing);
 }
+
 void DataDispenserCache::addVarRequestedForStorage(const std::string& varName_){
   LogThrowIf(varName_.empty(), "no var name provided.");
   GenericToolbox::addIfNotInVector(varName_, this->varsRequestedForStorage);
   this->addVarRequestedForIndexing(varName_);
 }
+
+//  A Lesser GNU Public License
+
+//  Copyright (C) 2023 GUNDAM DEVELOPERS
+
+//  This library is free software; you can redistribute it and/or
+//  modify it under the terms of the GNU Lesser General Public
+//  License as published by the Free Software Foundation; either
+//  version 2.1 of the License, or (at your option) any later version.
+
+//  This library is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+//  Lesser General Public License for more details.
+
+//  You should have received a copy of the GNU Lesser General Public
+//  License along with this library; if not, write to the
+//
+//  Free Software Foundation, Inc.
+//  51 Franklin Street, Fifth Floor,
+//  Boston, MA  02110-1301  USA
+
+// Local Variables:
+// mode:c++
+// c-basic-offset:2
+// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
+// End:

@@ -6,9 +6,6 @@
 #define GUNDAM_FITPARAMETERSET_H
 
 #include "FitParameter.h"
-#ifndef USE_NEW_DIALS
-#include "NestedDialTest.h"
-#endif
 #include "JsonBaseClass.h"
 #include "ParameterThrowerMarkHarz.h"
 
@@ -107,9 +104,6 @@ protected:
 private:
   // Internals
   std::vector<FitParameter> _parameterList_;
-#ifndef USE_NEW_DIALS
-  std::vector<NestedDialTest> _nestedDialList_;
-#endif
 
   // JSON
   std::string _name_{};

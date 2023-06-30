@@ -7,14 +7,6 @@
 
 #include "FitParameterSet.h"
 
-#ifndef USE_NEW_DIALS
-#include "Dial.h"
-#include "NestedDialTest.h"
-#else
-class Dial;           // Define for deprecated class
-class NestedDialTest; // Define for deprecated class
-#endif
-
 #include "GenericToolbox.Root.TreeEntryBuffer.h"
 #include "GenericToolbox.Root.LeafHolder.h"
 #include <GenericToolbox.RawDataArray.h>
@@ -96,23 +88,6 @@ public:
   // Stream operator
   friend std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p );
 
-#if USE_NEW_DIALS
-  [[deprecated]] std::vector<Dial *> getRawDialPtrList() const {
-       LogThrow("PhysicsEvent::getRawDialPtrList() not implemented");
-       return std::vector<Dial*>();
-  }
-  [[deprecated]] void reweightUsingDialCache() {LogThrow("PhysicsEvent::reweightUsingDialCache() not implemented");}
-  [[deprecated]] void trimDialCache() {LogThrow("PhysicsEvent::trimDialCache() not implemented");}
-  [[deprecated]] void addNestedDialRefToCache(NestedDialTest* nestedDialPtr_, const std::vector<Dial*>& dialPtrList_ = {}) {LogThrow("PhysicsEvent::addNestedDialRefToCache() not implemented");}
-#else
-  std::vector<Dial *> &getRawDialPtrList();
-  const std::vector<Dial *> &getRawDialPtrList() const;
-  void reweightUsingDialCache();
-  void trimDialCache();
-  void addNestedDialRefToCache(NestedDialTest* nestedDialPtr_, const std::vector<Dial*>& dialPtrList_ = {});
-#endif
-
-
 private:
   // Context variables
   int _dataSetIndex_{-1};
@@ -129,11 +104,6 @@ private:
 
   // Cache variables
   mutable std::vector<std::vector<double>> _varToDoubleCache_{};
-#if USE_NEW_DIALS
-#else
-  std::vector<Dial*> _rawDialPtrList_{};
-  std::vector<std::pair<NestedDialTest*, std::vector<Dial*>>> _nestedDialRefList_{};
-#endif
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
 public:
