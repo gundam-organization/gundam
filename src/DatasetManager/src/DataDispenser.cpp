@@ -1250,7 +1250,7 @@ void DataDispenser::fillFunction(int iThread_){
         eventDialOffset = 0;
 
 #if USE_NEW_DIALS
-        if( _eventDialCacheRef_ != nullptr ) {
+        if( eventDialCacheEntry != nullptr ) {
           // there should always be a cache entry even if no dials are applied.
           // This cache is actually used to write MC events with dials in output tree
           eventDialCacheEntry->event.sampleIndex = std::size_t(_cache_.samplesToFillList[iSample]->getIndex());
