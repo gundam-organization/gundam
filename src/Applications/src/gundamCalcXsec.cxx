@@ -48,6 +48,7 @@ int main(int argc, char** argv){
 
   clParser.addDummyOption("Trigger options:");
   clParser.addTriggerOption("dryRun", {"-d", "--dry-run"}, "Only overrides fitter config and print it.");
+  clParser.addTriggerOption("useBfAsXsec", {"--use-bf-as-xsec"}, "Use best-fit as x-sec value instead of mean of toys.");
 
   LogInfo << "Usage: " << std::endl;
   LogInfo << clParser.getConfigSummary() << std::endl << std::endl;
@@ -120,7 +121,6 @@ int main(int argc, char** argv){
     LogAlert << "Exiting as dry-run is set." << std::endl;
     return EXIT_SUCCESS;
   }
-
 
   auto configPropagator = GenericToolbox::Json::fetchValuePath<nlohmann::json>( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig" );
 
@@ -212,11 +212,17 @@ int main(int argc, char** argv){
   app.writeAppInfo();
 
   auto* calcXsecDir{ GenericToolbox::mkdirTFile(app.getOutfilePtr(), "calcXsec") };
+  bool useBestFitAsCentralValue{
+    clParser.isOptionTriggered("useBfAsXsec")
+    or GenericToolbox::Json::fetchValue<bool>(xsecConfig, "useBestFitAsCentralValue", false)
+  };
 
   LogInfo << "Creating throws tree" << std::endl;
   auto* xsecThrowTree = new TTree("xsecThrow", "xsecThrow");
   xsecThrowTree->SetDirectory( GenericToolbox::mkdirTFile(calcXsecDir, "throws") ); // temp saves will be done here
 
+  auto* xsecAtBestFitTree = new TTree("xsecAtBestFitTree", "xsecAtBestFitTree");
+  xsecAtBestFitTree->SetDirectory( GenericToolbox::mkdirTFile(calcXsecDir, "throws") ); // temp saves will be done here
 
   LogInfo << "Creating normalizer objects..." << std::endl;
   // flux renorm with toys
@@ -418,6 +424,11 @@ int main(int argc, char** argv){
         xsecEntry.branchBinsData.getRawDataArray().data(),
         GenericToolbox::joinVectorString(leafNameList, ":").c_str()
     );
+    xsecAtBestFitTree->Branch(
+        GenericToolbox::generateCleanBranchName( sample.getName() ).c_str(),
+        xsecEntry.branchBinsData.getRawDataArray().data(),
+        GenericToolbox::joinVectorString(leafNameList, ":").c_str()
+    );
 
     auto normConfigList = GenericToolbox::Json::fetchValue( xsecEntry.config, "normaliseParameterList", nlohmann::json() );
     xsecEntry.normList.reserve( normConfigList.size() );
@@ -458,26 +469,9 @@ int main(int argc, char** argv){
   enableStatThrowInToys = GenericToolbox::Json::fetchValue( xsecCalcConfig, "enableStatThrowInToys", enableStatThrowInToys);
   enableEventMcThrow    = GenericToolbox::Json::fetchValue( xsecCalcConfig, "enableEventMcThrow", enableEventMcThrow);
 
-  std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating " << nToys << " toys...";
-  for( int iToy = 0 ; iToy < nToys ; iToy++ ){
 
-    // loading...
-    GenericToolbox::displayProgressBar( iToy+1, nToys, ss.str() );
-
-    // Do the throwing:
-    propagator.throwParametersFromGlobalCovariance();
-    propagator.propagateParametersOnSamples();
-
+  auto writeBinDataFct = std::function<void()>([&]{
     for( auto& xsec : crossSectionDataList ){
-
-      if( enableStatThrowInToys ){
-        if( enableEventMcThrow ){
-          // Take into account the finite amount of event in MC
-          xsec.samplePtr->getMcContainer().throwEventMcError();
-        }
-        // Asimov bin content -> toy data
-        xsec.samplePtr->getMcContainer().throwStatError();
-      }
 
       xsec.branchBinsData.resetCurrentByteOffset();
       for( int iBin = 0 ; iBin < xsec.samplePtr->getMcContainer().histogram->GetNbinsX() ; iBin++ ){
@@ -512,6 +506,8 @@ int main(int argc, char** argv){
             ev_.setNominalWeight( ev_.getNominalWeight() + binData );
           });
         }
+
+        // set event weight
         {
           auto& dataEvList{xsec.samplePtr->getDataContainer().eventList};
           std::for_each(dataEvList.begin(), dataEvList.end(), [&](PhysicsEvent& ev_){
@@ -532,13 +528,13 @@ int main(int argc, char** argv){
 
           // is this bin excluded from norm?
           if( not bin.getVariableNameList()[iDim].empty() and std::any_of(
-                xsec.normList.begin(), xsec.normList.end(), [&](const BinNormaliser& normData_){
-                  return (
-                      not normData_.disabledBinDim.empty()
-                      and normData_.disabledBinDim == bin.getVariableNameList()[iDim] );
-                }
-              )
-          ){ continue; }
+              xsec.normList.begin(), xsec.normList.end(), [&](const BinNormaliser& normData_){
+                return (
+                    not normData_.disabledBinDim.empty()
+                    and normData_.disabledBinDim == bin.getVariableNameList()[iDim] );
+              }
+          )
+              ){ continue; }
           binVolume *= std::max( edges.first, edges.second ) - std::min(edges.first, edges.second);
         }
 
@@ -547,6 +543,39 @@ int main(int argc, char** argv){
         xsec.branchBinsData.writeRawData( binData );
       }
     }
+  });
+
+  {
+    LogWarning << "Calculating weight at best-fit" << std::endl;
+    for( auto& parSet : propagator.getParameterSetsList() ){ parSet.moveFitParametersToPrior(); }
+    propagator.propagateParametersOnSamples();
+    writeBinDataFct();
+    xsecAtBestFitTree->Fill();
+    GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(calcXsecDir, "throws"), xsecAtBestFitTree );
+  }
+
+  std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating " << nToys << " toys...";
+  for( int iToy = 0 ; iToy < nToys ; iToy++ ){
+
+    // loading...
+    GenericToolbox::displayProgressBar( iToy+1, nToys, ss.str() );
+
+    // Do the throwing:
+    propagator.throwParametersFromGlobalCovariance();
+    propagator.propagateParametersOnSamples();
+
+    if( enableStatThrowInToys ){
+      for( auto& xsec : crossSectionDataList ){
+        if( enableEventMcThrow ){
+          // Take into account the finite amount of event in MC
+          xsec.samplePtr->getMcContainer().throwEventMcError();
+        }
+        // Asimov bin content -> toy data
+        xsec.samplePtr->getMcContainer().throwStatError();
+      }
+    }
+
+    writeBinDataFct();
 
     // Write the branches
     xsecThrowTree->Fill();
@@ -556,7 +585,9 @@ int main(int argc, char** argv){
   GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(calcXsecDir, "throws"), xsecThrowTree );
 
   LogInfo << "Calculating mean & covariance matrix..." << std::endl;
-  auto* meanValuesVector = GenericToolbox::generateMeanVectorOfTree( xsecThrowTree );
+  auto* meanValuesVector = GenericToolbox::generateMeanVectorOfTree(
+      useBestFitAsCentralValue ? xsecAtBestFitTree : xsecThrowTree
+  );
   auto* globalCovMatrix = GenericToolbox::generateCovarianceMatrixOfTree( xsecThrowTree );
 
   auto* globalCovMatrixHist = GenericToolbox::convertTMatrixDtoTH2D(globalCovMatrix);
@@ -612,7 +643,6 @@ int main(int argc, char** argv){
 
   // now propagate to the engine for the plot generator
   LogInfo << "Re-normalizing the samples for the plot generator..." << std::endl;
-
   for( auto& xsec : crossSectionDataList ){
     // this gives the average as the event weights were summed together
     {

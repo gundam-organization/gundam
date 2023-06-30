@@ -658,8 +658,8 @@ void DataDispenser::preAllocateMemory(){
 
   size_t nEvents = treeChain.GetEntries();
 #if USE_NEW_DIALS
-  // DEV
   if( _eventDialCacheRef_ != nullptr ){
+    // DEV
     if( not _cache_.dialCollectionsRefList.empty() ){
       LogInfo << "Creating slots for event-by-event dials..." << std::endl;
       size_t nDialsMaxPerEvent{0};
@@ -785,17 +785,17 @@ void DataDispenser::readAndFill(){
     container->shrinkEventList(_cache_.sampleIndexOffsetList[iSample]);
   }
 
-  if( _owner_->isSortLoadedEvents() ){
-    LogWarning << "Re-sorting loaded events..." << std::endl;
-    for( auto& evList : _cache_.sampleEventListPtrToFill ){
-      GenericToolbox::sortVector(*evList, [](const PhysicsEvent& a, const PhysicsEvent& b){
-        if( a.getDataSetIndex() < b.getDataSetIndex() ) { return true; }
-        if( a.getEntryIndex() < b.getEntryIndex() ) { return true; }
-        if( a.getEntryIndex() == b.getEntryIndex() and a.getDataSetIndex() == b.getDataSetIndex() ){ return false; }
-        return false;
-      });
-    }
-  }
+//  if( _owner_->isSortLoadedEvents() ){
+//    LogWarning << "Re-sorting loaded events..." << std::endl;
+//    for( auto& evList : _cache_.sampleEventListPtrToFill ){
+//      GenericToolbox::sortVector(*evList, [](const PhysicsEvent& a, const PhysicsEvent& b){
+//        if( a.getDataSetIndex() < b.getDataSetIndex() ) { return true; }
+//        if( a.getEntryIndex() < b.getEntryIndex() ) { return true; }
+//        if( a.getEntryIndex() == b.getEntryIndex() and a.getDataSetIndex() == b.getDataSetIndex() ){ return false; }
+//        return false;
+//      });
+//    }
+//  }
 
 }
 void DataDispenser::loadFromHistContent(){
@@ -1223,7 +1223,12 @@ void DataDispenser::fillFunction(int iThread_){
         eventBuffer.setSampleBinIndex(int(std::distance(binsListPtr->begin(), binFoundItr)));
 
         // OK, now we have a valid fit bin. Let's claim an index.
+        GundamGlobals::getThreadMutex().lock();
+        // EXTRA LOCK HERE:
+        // internal lock seems to not be sufficient when catching a event dial cache entry...
         sampleEventIndex = _cache_.sampleIndexOffsetList[iSample]++;
+        if(_eventDialCacheRef_ != nullptr) eventDialCacheEntry = _eventDialCacheRef_->fetchNextCacheEntry();
+        GundamGlobals::getThreadMutex().unlock();
 
         // Get the next free event in our buffer
         eventPtr = &(*_cache_.sampleEventListPtrToFill[iSample])[sampleEventIndex];
@@ -1246,38 +1251,34 @@ void DataDispenser::fillFunction(int iThread_){
 
 #if USE_NEW_DIALS
         if( _eventDialCacheRef_ != nullptr ) {
-
           // there should always be a cache entry even if no dials are applied.
           // This cache is actually used to write MC events with dials in output tree
-          eventDialCacheEntry = _eventDialCacheRef_->fetchNextCacheEntry();
-          eventDialCacheEntry->event.sampleIndex
-              = std::size_t(_cache_.samplesToFillList[iSample]->getIndex());
+          eventDialCacheEntry->event.sampleIndex = std::size_t(_cache_.samplesToFillList[iSample]->getIndex());
           eventDialCacheEntry->event.eventIndex = sampleEventIndex;
 
           iCollection = -1;
-          for( auto* dialCollectionRef : _cache_.dialCollectionsRefList ){
+          for (auto *dialCollectionRef: _cache_.dialCollectionsRefList) {
             iCollection = dialCollectionRef->getIndex();
 
-            if( not dialCollectionRef->isEnabled() ){ continue; }
+            if (not dialCollectionRef->isEnabled()) { continue; }
 
-            if( dialCollectionRef->getApplyConditionFormula() != nullptr ){
-              if( eventBuffer.evalFormula(dialCollectionRef->getApplyConditionFormula().get()) == 0 ){
+            if (dialCollectionRef->getApplyConditionFormula() != nullptr) {
+              if (eventBuffer.evalFormula(dialCollectionRef->getApplyConditionFormula().get()) == 0) {
                 // next dialSet
                 continue;
               }
             }
 
-            if     ( dialCollectionRef->isBinned() ){
+            if (dialCollectionRef->isBinned()) {
 
               // is only one bin with no condition:
-              if( dialCollectionRef->getDialBaseList().size() == 1 and dialCollectionRef->getDialBinSet().isEmpty() ){
+              if (dialCollectionRef->getDialBaseList().size() == 1 and dialCollectionRef->getDialBinSet().isEmpty()) {
                 // if is it NOT a DialBinned -> this is the one we are
                 // supposed to use
                 eventDialCacheEntry->dials[eventDialOffset].collectionIndex = iCollection;
                 eventDialCacheEntry->dials[eventDialOffset].interfaceIndex = 0;
                 eventDialOffset++;
-              }
-              else {
+              } else {
                 // ---- probably the slowest part of the indexing: ----
                 dial2FoundItr = std::find_if(
                     dialCollectionRef->getDialBinSet().getBinsList().begin(),
@@ -1286,29 +1287,29 @@ void DataDispenser::fillFunction(int iThread_){
                 );
                 // ----------------------------------------------------
 
-                if (dial2FoundItr !=  dialCollectionRef->getDialBinSet().getBinsList().end()) {
+                if (dial2FoundItr != dialCollectionRef->getDialBinSet().getBinsList().end()) {
                   // found DIAL -> get index
                   eventDialCacheEntry->dials[eventDialOffset].collectionIndex = iCollection;
                   eventDialCacheEntry->dials[eventDialOffset].interfaceIndex = std::distance(
                       dialCollectionRef->getDialBinSet().getBinsList().begin(), dial2FoundItr
                   );
                   eventDialOffset++;
-                }
-                else {
+                } else {
                   // dial not valid
                 }
               }
-            }
-            else if( not dialCollectionRef->getGlobalDialLeafName().empty() ){
+            } else if (not dialCollectionRef->getGlobalDialLeafName().empty()) {
               // Event-by-event dial?
-              if     ( not strcmp(treeChain.GetLeaf(dialCollectionRef->getGlobalDialLeafName().c_str())->GetTypeName(), "TClonesArray") ){
-                grPtr = (TGraph*) eventBuffer.getVariable<TClonesArray*>(dialCollectionRef->getGlobalDialLeafName())->At(0);
-              }
-              else if( not strcmp(treeChain.GetLeaf(dialCollectionRef->getGlobalDialLeafName().c_str())->GetTypeName(), "TGraph") ){
-                grPtr = (TGraph*) eventBuffer.getVariable<TGraph*>(dialCollectionRef->getGlobalDialLeafName());
-              }
-              else{
-                LogThrow("Unsupported event-by-event dial type: " << treeChain.GetLeaf(dialCollectionRef->getGlobalDialLeafName().c_str())->GetTypeName() )
+              if (not strcmp(treeChain.GetLeaf(dialCollectionRef->getGlobalDialLeafName().c_str())->GetTypeName(),
+                             "TClonesArray")) {
+                grPtr = (TGraph *) eventBuffer.getVariable<TClonesArray *>(
+                    dialCollectionRef->getGlobalDialLeafName())->At(0);
+              } else if (not strcmp(
+                  treeChain.GetLeaf(dialCollectionRef->getGlobalDialLeafName().c_str())->GetTypeName(), "TGraph")) {
+                grPtr = (TGraph *) eventBuffer.getVariable<TGraph *>(dialCollectionRef->getGlobalDialLeafName());
+              } else {
+                LogThrow("Unsupported event-by-event dial type: "
+                             << treeChain.GetLeaf(dialCollectionRef->getGlobalDialLeafName().c_str())->GetTypeName())
               }
 
               // Do the unique_ptr dance so that memory gets deleted if
@@ -1324,7 +1325,6 @@ void DataDispenser::fillFunction(int iThread_){
               );
 
 
-
               if (dialBase) {
                 freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
                 dialBase->setAllowExtrapolation(dialCollectionRef->isAllowDialExtrapolation());
@@ -1333,12 +1333,14 @@ void DataDispenser::fillFunction(int iThread_){
                 eventDialCacheEntry->dials[eventDialOffset].interfaceIndex = freeSlotDial;
                 eventDialOffset++;
               }
-            }
-            else{
+            } else {
               LogThrow("neither an event by event dial, nor a binned dial");
             }
 
           }
+        }
+        else{
+          // it is "data"
         }
 #else
         // Loop over the parameter Sets (the ones which have a valid dialSet for this dataSet)
