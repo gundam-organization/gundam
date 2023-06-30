@@ -119,8 +119,7 @@ void Propagator::readConfigImpl(){
   ConfigUtils::forwardConfig(_parameterInjectorMc_);
 
 }
-
-void Propagator::initializeImpl() {
+void Propagator::initializeImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
 
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing parameters...") << std::endl;
