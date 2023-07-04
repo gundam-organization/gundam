@@ -27,6 +27,9 @@ private:
     // The accumulated weights for each histogram bin.
     std::unique_ptr<hemi::Array<double>> fSums;
 
+    // The accumulated weights for each histogram bin.
+    std::unique_ptr<hemi::Array<double>> fSums2;
+
     // Cache of whether the result values in memory are valid.
     bool fSumsValid;
 
@@ -62,8 +65,15 @@ public:
     /// from the device if that is necessary.
     double GetSum(int i);
 
+    /// Get the sum squared for index i from host memory.  This might trigger
+    /// a copy from the device if that is necessary.
+    double GetSum2(int i);
+
     /// The pointer to the array of sums on the host.
     const double* GetSumsPointer();
+
+    /// The pointer to the array of sums squared on the host.
+    const double* GetSums2Pointer();
 
     /// A pointer to the validity flag.
     bool* GetSumsValidPointer();

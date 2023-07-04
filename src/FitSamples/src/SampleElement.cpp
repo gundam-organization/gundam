@@ -118,8 +118,10 @@ void SampleElement::refillHistogram(int iThread_){
     binErrorArray[iBin + 1] = 0;
 #ifdef GUNDAM_USING_CACHE_MANAGER
     if (_CacheManagerValue_ !=nullptr and _CacheManagerIndex_ >= 0) {
-      binContentArray[iBin + 1] += _CacheManagerValue_[_CacheManagerIndex_+iBin];
-      binErrorArray[iBin + 1] += binContentArray[iBin + 1]*binContentArray[iBin + 1];
+      const double ew = _CacheManagerValue_[_CacheManagerIndex_+iBin];
+      const double ew2 = _CacheManagerValue2_[_CacheManagerIndex_+iBin];
+      binContentArray[iBin + 1] += ew;
+      binErrorArray[iBin + 1] += ew2;
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
       double content = binContentArray[iBin+1];
       double slowValue = 0.0;

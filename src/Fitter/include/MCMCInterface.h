@@ -75,10 +75,10 @@ private:
   int _burninCycles_{0};
 
   // The number of cycles to dump during burn-in
-  int _burninResets_{1};
+  int _burninResets_{0};
 
   // The length of each burn-in cycle
-  int _burninLength_{0};
+  int _burninLength_{10000};
 
   // Save the burnin (true) or dump it (false)
   bool _saveBurnin_{true};
@@ -88,6 +88,14 @@ private:
 
   // The number of steps in each run cycle.
   int _steps_{10000};
+
+  // The model for the likelihood takes up quite a bit of space, so it should
+  // NOT be saved most of the time.  The _modelStride_ sets the number of
+  // steps between when the model is saved to the output file.  The model is a
+  // copy of the predicted sample histogram and can be used to calculate the
+  // posterior predictive p-value.  The stride should be large(ish) compared
+  // to the autocorrelation lag, or zero (if not saving the model).
+  int _modelStride_{5000};
 
   //////////////////////////////////////////
   // Parameters for the adaptive stepper.
@@ -113,25 +121,25 @@ private:
   // covariance.  That works out to the approximate number of function
   // calculations that were used to estimate the covariance.  The default
   // value of zero triggers the interface to make it's own estimate.
-  double _adaptiveCovTrials_{0.0};
+  double _adaptiveCovTrials_{500000.0};
 
   // Freeze the burn-in step after this many cycles.
   int _burninFreezeAfter_{1000000000}; // Never freeze except by request
 
   // The window to calculate the covariance during burn-in
-  int _burninCovWindow_{100000};
+  int _burninCovWindow_{1000000};
 
   // The amount of deweighting during burning updates.
-  double _burninCovDeweighting_{0.5};
+  double _burninCovDeweighting_{0.0};
 
   // The acceptance window during burn-in.
-  int _burninWindow_{3000};
+  int _burninWindow_{1000};
 
   // Freeze the step after this many cycles.
   int _adaptiveFreezeAfter_{1000000000}; // Never freeze except by request
 
   // The window to calculate the covariance during normal chains.
-  int _adaptiveCovWindow_{1000000000};
+  int _adaptiveCovWindow_{1000000};
 
   // The covariance deweighting while the chain is running.  This should
   // usually be left at zero so the entire chain history is used after an
@@ -140,7 +148,7 @@ private:
   double _adaptiveCovDeweighting_{0.0};
 
   // The window used to calculate the current acceptance value.
-  int _adaptiveWindow_{5000};
+  int _adaptiveWindow_{1000};
 
   //////////////////////////////////////////
   // Parameters for the simple stepper
@@ -155,9 +163,34 @@ private:
   // point
   std::vector<float> _point_;
 
+  // The predicted values from the reweighted MC (histogram) for the last
+  // accepted step.
+  std::vector<float> _model_;
+
+  // The predicted values from the reweighted MC (histogram) to be saved to
+  // the output file. This will often be empty to reduce the size of the
+  // output file.
+  std::vector<float> _saveModel_;
+
+  // The uncertainty for the predicted values from the reweighted MC
+  // (histogram) for the last accepted step.
+  std::vector<float> _uncertainty_;
+
+  // The uncertainty for the predicted values from the MC (histogram) to be
+  // saved to the output file. This will often be empty to reduce the size of
+  // the output file.
+  std::vector<float> _saveUncertainty_;
+
+  // The statistical part of the likelihood
+  float _llhStatistical_{0.0};
+
+  // The penalty part of the likelihood
+  float _llhPenalty_{0.0};
+
   // Fill the point that will be saved to the output tree with the current set
-  // of parameters.
-  void fillPoint();
+  // of parameters.  If fillModel is true, this will also fill the model of
+  // the expected data for this set of parametrs.
+  void fillPoint(bool fillModel = true);
 
   /// A local proxy so the likelihood uses a ROOT::Math::Functor provided by
   /// the Likelihood interface.  The functor field MUST by accessing the

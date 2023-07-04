@@ -68,6 +68,7 @@ public:
   void setCacheManagerIndex(int i) {_CacheManagerIndex_ = i;}
   int  getCacheManagerIndex() {return _CacheManagerIndex_;}
   void setCacheManagerValuePointer(const double* v) {_CacheManagerValue_ = v;}
+  void setCacheManagerValue2Pointer(const double* v) {_CacheManagerValue2_ = v;}
   void setCacheManagerValidPointer(const bool* v) {_CacheManagerValid_ = v;}
   void setCacheManagerUpdatePointer(void (*p)()) {_CacheManagerUpdate_ = p;}
 private:
@@ -75,6 +76,8 @@ private:
   int _CacheManagerIndex_{-1};
   // A pointer to the cached result.
   const double* _CacheManagerValue_{nullptr};
+  // A pointer to the cached result.
+  const double* _CacheManagerValue2_{nullptr};
   // A pointer to the cache validity flag.
   const bool* _CacheManagerValid_{nullptr};
   // A pointer to a callback to force the cache to be updated.

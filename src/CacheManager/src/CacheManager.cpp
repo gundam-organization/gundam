@@ -561,11 +561,17 @@ bool Cache::Manager::Update(FitSampleSet& sampleList,
         sample.getMcContainer().setCacheManagerValuePointer(
             Cache::Manager::Get()->GetHistogramsCache()
             .GetSumsPointer());
+        sample.getMcContainer().setCacheManagerValue2Pointer(
+            Cache::Manager::Get()->GetHistogramsCache()
+            .GetSums2Pointer());
         sample.getMcContainer().setCacheManagerValidPointer(
             Cache::Manager::Get()->GetHistogramsCache()
             .GetSumsValidPointer());
         sample.getMcContainer().setCacheManagerUpdatePointer(
-            [](){Cache::Manager::Get()->GetHistogramsCache().GetSum(0);});
+            [](){
+                Cache::Manager::Get()->GetHistogramsCache().GetSum(0);
+                Cache::Manager::Get()->GetHistogramsCache().GetSum2(0);
+            });
         int cells = hist->GetNcells();
         nextHist += cells;
         /// ARE ALL OF THE EVENTS HANDLED?

@@ -332,6 +332,18 @@ double LikelihoodInterface::evalFitValid(const double* parArray_) {
   return RBN;
 }
 
+double LikelihoodInterface::getLastLikelihood() const {
+  return _owner_->getPropagator().getLlhBuffer();
+}
+
+double LikelihoodInterface::getLastLikelihoodStat() const {
+  return _owner_->getPropagator().getLlhStatBuffer();
+}
+
+double LikelihoodInterface::getLastLikelihoodPenalty() const {
+  return _owner_->getPropagator().getLlhPenaltyBuffer();
+}
+
 void LikelihoodInterface::setParameterValidity(const std::string& validity) {
   LogWarning << "Set parameter validity to " << validity << std::endl;
   if (validity.find("noran") != std::string::npos) _validFlags_ &= ~0b0001;

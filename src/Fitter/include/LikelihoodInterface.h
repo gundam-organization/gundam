@@ -65,14 +65,31 @@ public:
   /// A pointer to a ROOT runctor that calls the evalFitValid method.
   ROOT::Math::Functor* evalFitValidFunctor() {return _validFunctor_.get();}
 
+  /// Return the last likelihood value that was calculated.  This is a
+  /// short cut to call the owner's getPropagator().getLlhBuffer() method.
+  [[nodiscard]] double getLastLikelihood() const;
+
+  /// Return the statistical part of the last likelihood value that was
+  /// calculated.  This is a short cut to call the owner's
+  /// getPropagator().GetLlhStatBuffer() method
+  [[nodiscard]] double getLastLikelihoodStat() const;
+
+  /// Return the penalty part of the last likelihood value that was
+  /// calculated.  This is a short cut to call the owner's
+  /// getPropagator().GetLlhPenaltyBuffer() method.
+  [[nodiscard]] double getLastLikelihoodPenalty() const;
+
   /// Define the type of validity that needs to be required by
   /// hasValidParameterValues.  This accepts a string with the possible values
   /// being:
   ///
   ///  "range" (default) -- Between the parameter minimum and maximum values.
+  ///  "norange"         -- Do not require parameters in the valid range
   ///  "mirror"          -- Between the mirrored values (if parameter has
   ///                       mirroring).
+  ///  "nomirror"        -- Do not require parameters in the mirrored range
   ///  "physical"        -- Only physically meaningful values.
+  ///  "nophysical"      -- Do not require parameters in the physical range.
   ///
   /// Example: setParameterValidity("range,mirror,physical")
   void setParameterValidity(const std::string& validity);
