@@ -138,7 +138,7 @@ int main(int argc, char** argv){
 
   // Load post-fit parameters as "prior" so we can reset the weight to this point when throwing toys
   ObjectReader::readObject<TNamed>( fitterFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
-    propagator.injectParameterValues( parState_->GetTitle() );
+    propagator.injectParameterValues( GenericToolbox::Json::readConfigJsonStr( parState_->GetTitle() ) );
     for( auto& parSet : propagator.getParameterSetsList() ){
       if( not parSet.isEnabled() ){ continue; }
       for( auto& par : parSet.getParameterList() ){

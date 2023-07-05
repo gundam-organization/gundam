@@ -745,7 +745,12 @@ nlohmann::json Propagator::exportParameterInjectorConfig() const{
 void Propagator::injectParameterValues(const nlohmann::json &config_) {
   LogWarning << "Injecting parameters..." << std::endl;
 
-  for( auto& entryParSet : GenericToolbox::Json::fetchValue(config_, "parameterSetList", nlohmann::json() ) ){
+  LogThrowIf(
+      not GenericToolbox::Json::doKeyExist(config_, "parameterSetList"),
+      "No parameter injection defined. Missing \"parameterSetList\" entry"
+  );
+
+  for( auto& entryParSet : GenericToolbox::Json::fetchValue<nlohmann::json>( config_, "parameterSetList" ) ){
     auto parSetName = GenericToolbox::Json::fetchValue<std::string>(entryParSet, "name");
     LogInfo << "Reading injection parameters for parSet: " << parSetName << std::endl;
 
