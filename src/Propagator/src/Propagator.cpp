@@ -812,8 +812,11 @@ void Propagator::throwParametersFromGlobalCovariance(){
   }
 
   bool keepThrowing{true};
+  int throwNb{0};
 
   while( keepThrowing ){
+    throwNb++;
+    bool rethrow{false};
     auto throws = GenericToolbox::throwCorrelatedParameters(_choleskyMatrix_.get());
     for( int iPar = 0 ; iPar < _choleskyMatrix_->GetNrows() ; iPar++ ){
       _strippedParameterList_[iPar]->setParameterValue(
@@ -824,7 +827,8 @@ void Propagator::throwParametersFromGlobalCovariance(){
       if( _reThrowParSetIfOutOfBounds_ ){
         if( not _strippedParameterList_[iPar]->isValueWithinBounds() ){
           // re-do the throwing
-          continue;
+//          LogDebug << "Not within bounds: " << _strippedParameterList_[iPar]->getSummary() << std::endl;
+          rethrow = true;
         }
       }
     }
@@ -836,7 +840,6 @@ void Propagator::throwParametersFromGlobalCovariance(){
 
       // also check the bounds of real parameter space
       if( _reThrowParSetIfOutOfBounds_ ){
-        bool rethrow{false};
         for( auto& par : parSet.getParameterList() ){
           if( not par.isEnabled() ) continue;
           if( not par.isValueWithinBounds() ){
@@ -845,11 +848,14 @@ void Propagator::throwParametersFromGlobalCovariance(){
             break;
           }
         }
-        if( rethrow ){
-          // wrap back to the while loop
-          continue;
-        }
       }
+    }
+
+
+    if( rethrow ){
+      // wrap back to the while loop
+//      LogDebug << "RE-THROW #" << throwNb << std::endl;
+      continue;
     }
 
     // reached this point: all parameters are within bounds
