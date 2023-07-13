@@ -811,18 +811,58 @@ void Propagator::throwParametersFromGlobalCovariance(){
     );
   }
 
-  auto throws = GenericToolbox::throwCorrelatedParameters(_choleskyMatrix_.get());
-  for( int iPar = 0 ; iPar < _choleskyMatrix_->GetNrows() ; iPar++ ){
-    _strippedParameterList_[iPar]->setParameterValue(
-        _strippedParameterList_[iPar]->getPriorValue()
-        + throws[iPar]
-    );
+  bool keepThrowing{true};
+  int throwNb{0};
+
+  while( keepThrowing ){
+    throwNb++;
+    bool rethrow{false};
+    auto throws = GenericToolbox::throwCorrelatedParameters(_choleskyMatrix_.get());
+    for( int iPar = 0 ; iPar < _choleskyMatrix_->GetNrows() ; iPar++ ){
+      _strippedParameterList_[iPar]->setParameterValue(
+          _strippedParameterList_[iPar]->getPriorValue()
+          + throws[iPar]
+      );
+
+      if( _reThrowParSetIfOutOfBounds_ ){
+        if( not _strippedParameterList_[iPar]->isValueWithinBounds() ){
+          // re-do the throwing
+//          LogDebug << "Not within bounds: " << _strippedParameterList_[iPar]->getSummary() << std::endl;
+          rethrow = true;
+        }
+      }
+    }
+
+    // Making sure eigen decomposed parameters get the conversion done
+    for( auto& parSet : _parameterSetList_ ){
+      if( not parSet.isEnabled() ) continue;
+      if( parSet.isUseEigenDecompInFit() ){ parSet.propagateOriginalToEigen(); }
+
+      // also check the bounds of real parameter space
+      if( _reThrowParSetIfOutOfBounds_ ){
+        for( auto& par : parSet.getParameterList() ){
+          if( not par.isEnabled() ) continue;
+          if( not par.isValueWithinBounds() ){
+            // re-do the throwing
+            rethrow = true;
+            break;
+          }
+        }
+      }
+    }
+
+
+    if( rethrow ){
+      // wrap back to the while loop
+//      LogDebug << "RE-THROW #" << throwNb << std::endl;
+      continue;
+    }
+
+    // reached this point: all parameters are within bounds
+    keepThrowing = false;
   }
 
-  // Making sure eigen decomposed parameters get the conversion done
-  for( auto& parSet : _parameterSetList_ ){
-    if( parSet.isUseEigenDecompInFit() ){ parSet.propagateOriginalToEigen(); }
-  }
+
 
 }
 
