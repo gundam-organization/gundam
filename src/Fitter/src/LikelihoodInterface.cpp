@@ -97,7 +97,7 @@ void LikelihoodInterface::saveGradientSteps(){
   LogInfo << "Saving " << _gradientMonitor_.size() << " gradient steps..." << std::endl;
 
   // make sure the parameter states get restored as we leave
-  nlohmann::json currentParState{_owner_->getPropagator().exportParameterInjectorConfig()};
+  auto currentParState = _owner_->getPropagator().exportParameterInjectorConfig();
   GenericToolbox::ScopedGuard g{
     [&](){
       FitParameterSet::muteLogger();

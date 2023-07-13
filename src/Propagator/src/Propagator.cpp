@@ -739,6 +739,13 @@ nlohmann::json Propagator::exportParameterInjectorConfig() const{
 
   out["parameterSetList"] = parSetConfig;
 
+  out = GenericToolbox::Json::readConfigJsonStr(
+      // conversion: json -> str -> json obj (some broken JSON version)
+      GenericToolbox::Json::toReadableString(
+          out
+      )
+  );
+
   return out;
 }
 
