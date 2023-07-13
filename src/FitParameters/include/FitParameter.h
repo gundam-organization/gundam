@@ -85,6 +85,7 @@ public:
   [[nodiscard]] PriorType::PriorType getPriorType() const;
 
   // Core
+  [[nodiscard]] bool isValueWithinBounds() const;
   [[nodiscard]] double getDistanceFromNominal() const; // in unit of sigmas
   [[nodiscard]] std::string getSummary(bool shallow_=false) const;
   [[nodiscard]] std::string getTitle() const;

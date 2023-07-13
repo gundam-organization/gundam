@@ -226,6 +226,11 @@ PriorType::PriorType FitParameter::getPriorType() const {
   return _priorType_;
 }
 
+bool FitParameter::isValueWithinBounds() const{
+  if( not std::isnan(_minValue_) and _parameterValue_ < _minValue_ ) return false;
+  if( not std::isnan(_maxValue_) and _parameterValue_ > _minValue_ ) return false;
+  return true;
+}
 double FitParameter::getDistanceFromNominal() const{
   return (_parameterValue_ - _priorValue_) / _stdDevValue_;
 }

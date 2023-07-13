@@ -554,6 +554,10 @@ int main(int argc, char** argv){
     GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(calcXsecDir, "throws"), xsecAtBestFitTree );
   }
 
+
+  //////////////////////////////////////
+  // THROWS LOOP
+  /////////////////////////////////////
   std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating " << nToys << " toys...";
   for( int iToy = 0 ; iToy < nToys ; iToy++ ){
 
@@ -580,6 +584,7 @@ int main(int argc, char** argv){
     // Write the branches
     xsecThrowTree->Fill();
   }
+
 
   LogInfo << "Writing throws..." << std::endl;
   GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(calcXsecDir, "throws"), xsecThrowTree );
