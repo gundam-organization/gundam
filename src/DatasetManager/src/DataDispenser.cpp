@@ -733,7 +733,7 @@ void DataDispenser::loadFromHistContent(){
 
   LogInfo << "Opening: " << filePath << std::endl;
 
-  LogThrowIf( GenericToolbox::doesTFileIsValid(filePath), "Could not open file: " << filePath );
+  LogThrowIf( not GenericToolbox::doesTFileIsValid(filePath), "Could not open file: " << filePath );
   fHist = TFile::Open(filePath.c_str());
   LogThrowIf(fHist == nullptr, "Could not open file: " << filePath);
 
