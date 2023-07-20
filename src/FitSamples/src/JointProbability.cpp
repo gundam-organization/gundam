@@ -62,8 +62,8 @@ namespace JointProbability{
     LogInfo << GET_VAR_NAME_VALUE(usePoissonLikelihood) << std::endl;
     LogInfo << GET_VAR_NAME_VALUE(BBNoUpdateWeights) << std::endl;
   }
-  double BarlowLLH_BANFF_OA2021::eval(const FitSample& sample_, int bin_){
 
+  double BarlowLLH_BANFF_OA2021::eval(const FitSample& sample_, int bin_) {
     TH1D* data = sample_.getDataContainer().histogram.get();
     TH1D* predMC = sample_.getMcContainer().histogram.get();
     TH1D* nomMC = sample_.getMcContainer().histogramNominal.get();
@@ -71,100 +71,132 @@ namespace JointProbability{
     // From OA2021_Eb branch -> BANFFBinnedSample::CalcLLRContrib
     // https://github.com/t2k-software/BANFF/blob/OA2021_Eb/src/BANFFSample/BANFFBinnedSample.cxx
 
-    double chisq = 0.0;
-    double dataVal, predVal;
+    double dataVal = data->GetBinContent(bin_);
+    double predVal = predMC->GetBinContent(bin_);
 
-//    bool usePoissonLikelihood = (bool)ND::params().GetParameterI("BANFF.UsePoissonLikelihood");
-//    bool BBNoUpdateWeights = (bool)ND::params().GetParameterI("BANFF.BarlowBeestonNoUpdateWeights");
-
-    //Loop over all the bins one by one using their unique bin index.
-    //Use the stored nBins value and bins array so avoid trying to calculate
-    //over underflow or overflow bins.
-//    for (int i = 0; i < nBins; i++)
-//    {
-
-    dataVal = data->GetBinContent(bin_);
-    predVal = predMC->GetBinContent(bin_);
-    double mcuncert;
-
-    // Why SQUARE?? -> GetBinError is returning the sqrt(Sum^2) but the BANFF let the BBH make the sqrt
+    // Why SQUARE?? -> GetBinError is returning the sqrt(Sum^2) but the BANFF
+    // let the BBH make the sqrt
     // https://github.com/t2k-software/BANFF/blob/9140ec11bd74606c10ab4af9ec525352de119c06/src/BANFFSample/BANFFBinnedSample.cxx#L374
-    if (BBNoUpdateWeights){
+    double mcuncert{0.0};
+    if (BBNoUpdateWeights) {
       mcuncert = nomMC->GetBinError(bin_) * nomMC->GetBinError(bin_);
+      if (not std::isfinite(mcuncert) or mcuncert < 0.0) {
+        LogError << "BBNoUpdateWeights mcuncert is not valid "
+                 << mcuncert
+                 << std::endl;
+        LogError << "nomMC bin " << bin_
+                 << " error is " << nomMC->GetBinError(bin_);
+        LogThrow("The mc uncertainty is not a usable number");
+      }
     }
-    else{
+    else {
       mcuncert = predMC->GetBinError(bin_) * predMC->GetBinError(bin_);
+      if (not std::isfinite(mcuncert) or mcuncert < 0.0) {
+        LogError << "The mcuncert is not finite " << mcuncert << std::endl;
+        LogError << "nomMC bin " << bin_
+                 << " error is " << predMC->GetBinError(bin_);
+        LogThrow("The mc uncertainty is not a usable number");
+      }
     }
 
-    //implementing Barlow-Beeston correction for LH calculation
-    //the following comments are inspired/copied from Clarence's comments in the MaCh3
-    //implementation of the same feature
+    // Implementing Barlow-Beeston correction for LH calculation. The
+    // following comments are inspired/copied from Clarence's comments in the
+    // MaCh3 implementation of the same feature
 
-    // The MC used in the likelihood calculation
-    // Is allowed to be changed by Barlow Beeston beta parameters
+    // The MC used in the likelihood calculation is allowed to be changed by
+    // Barlow Beeston beta parameters
     double newmc = predVal;
-    // Not full Barlow-Beeston or what is referred to as "light": we're not introducing any more parameters
-    // Assume the MC has a Gaussian distribution around generated
-    // As in https://arxiv.org/abs/1103.0354 eq 10, 11
+
+    // Not full Barlow-Beeston or what is referred to as "light": we're not
+    // introducing any more parameters.  Assume the MC has a Gaussian
+    // distribution generated as in https://arxiv.org/abs/1103.0354 eq 10, 11
 
     // The penalty from MC statistics
-    double penalty = 0;
+    double penalty = 0.0;
+
     // Barlow-Beeston uses fractional uncertainty on MC, so sqrt(sum[w^2])/mc
-    double fractional = sqrt(mcuncert) / predVal;
     // -b/2a in quadratic equation
-    double temp = predVal * fractional * fractional - 1;
-    // b^2 - 4ac in quadratic equation
-    double temp2 = temp * temp + 4 * dataVal * fractional * fractional;
-    if (temp2 < 0)
-    {
-      std::cerr << "Negative square root in Barlow Beeston coefficient calculation!" << std::endl;
-      std::cerr << __FILE__ << ":" << __LINE__ << std::endl;
-      throw;
+    if (mcuncert > std::numeric_limits<double>::epsilon()
+        and predVal > std::numeric_limits<double>::epsilon()) {
+      double fractional = sqrt(mcuncert) / predVal;
+      double temp = predVal * fractional * fractional - 1;
+      // b^2 - 4ac in quadratic equation
+      double temp2 = temp * temp + 4 * dataVal * fractional * fractional;
+      LogThrowIf((temp2 < 0),
+                 "Negative square root in Barlow Beeston");
+      // Solve for the positive beta
+      double beta = (-1 * temp + sqrt(temp2)) / 2.;
+      newmc = predVal * beta;
+      // And penalise the movement in beta relative the mc uncertainty
+      penalty = (beta - 1) * (beta - 1) / (2 * fractional * fractional);
     }
-    // Solve for the positive beta
-    double beta = (-1 * temp + sqrt(temp2)) / 2.;
-    newmc = predVal * beta;
-    // And penalise the movement in beta relative the mc uncertainty
-    penalty = (beta - 1) * (beta - 1) / (2 * fractional * fractional);
-    // And calculate the new Poisson likelihood
-    // For Barlow-Beeston newmc is modified, so can only calculate Poisson likelihood after Barlow-Beeston
+
+    // And calculate the new Poisson likelihood.  For Barlow-Beeston newmc is
+    // modified, so can only calculate Poisson likelihood after Barlow-Beeston
     double stat = 0;
-    if (dataVal == 0)
+    if (dataVal <= std::numeric_limits<double>::epsilon()) {
+      // dataVal should be roughly an integer, so this safer, but roughly
+      // equivalent to "dataVal == 0"
       stat = newmc;
-    else if (newmc > 0)
+    }
+    else if (newmc > std::numeric_limits<double>::epsilon()) {
+      // The newMC value should not be a lot less than O(1), This protects
+      // against small values (intentionally use epsilon() instead of min()
+      // since this is relative to 1.0).
       stat = newmc - dataVal + dataVal * TMath::Log(dataVal / newmc);
-
-    if ((predVal > 0.0) && (dataVal > 0.0))
-    {
-      if (usePoissonLikelihood)
-        chisq += 2.0*(predVal - dataVal +dataVal*TMath::Log( dataVal/predVal) );
-      // Barlow-Beeston likelihood
-      else
-        chisq += 2.0 * (stat + penalty);
+    }
+    else {
+      // The mc predicted value is zero, and the data value is not zero.
+      // Inconceivable!
+      LogError << "Data and predicted value give infinite statistical LLH"
+               << "Data: " << dataVal
+               << "Barlow Beeston adjusted MC: " << newmc
+               << std::endl;
     }
 
-    else if (predVal > 0.0)
-    {
-      if (usePoissonLikelihood)
+    double chisq = 0.0;
+    if ((predVal > 0.0) && (dataVal > 0.0)) [[likely]] {
+      if (usePoissonLikelihood) [[unlikely]] {
+        // Not quite safe, but not used much, so don't protect
+        chisq += 2.0*(predVal - dataVal + dataVal*TMath::Log( dataVal/predVal));
+      }
+      else [[likely]] {
+        // Barlow-Beeston likelihood.
+        chisq += 2.0 * (stat + penalty);
+      }
+    }
+    else if (predVal > 0.0) {
+      if (usePoissonLikelihood) [[unlikely]] {
         chisq += 2.0*predVal;
-      else // Barlow-Beeston likelihood
+      }
+      else [[likely]] {
+        // Barlow-Beeston likelihood
         chisq += 2.0 * (stat + penalty);
+      }
+    }
+    else {
+      chisq += 1E+20;
+      LogError << "Data and predicted value give infinite statistical LLH"
+               << "Data: " << dataVal
+               << "MC: " << newmc
+               << std::endl;
     }
 
-    if (std::isnan(chisq))
-    {
+    if (not std::isfinite(chisq)) [[unlikely]] {
       LogError << "Infinite chi2: " << chisq << std::endl
-      << GET_VAR_NAME_VALUE(predVal) << std::endl
-      << GET_VAR_NAME_VALUE(dataVal) << std::endl
-      << GET_VAR_NAME_VALUE(stat) << std::endl
-      << GET_VAR_NAME_VALUE(penalty) << std::endl
-      << GET_VAR_NAME_VALUE(beta) << std::endl
-      << GET_VAR_NAME_VALUE(fractional) << std::endl
-      << GET_VAR_NAME_VALUE( nomMC->GetBinContent(bin_) ) << std::endl
-      << GET_VAR_NAME_VALUE( predMC->GetBinError(bin_) ) << std::endl
-      << GET_VAR_NAME_VALUE( predMC->GetBinContent(bin_) ) << std::endl;
+               << " bin " << bin_
+               << GET_VAR_NAME_VALUE(predVal) << std::endl
+               << GET_VAR_NAME_VALUE(dataVal) << std::endl
+               << GET_VAR_NAME_VALUE(newmc) << std::endl
+               << GET_VAR_NAME_VALUE(stat) << std::endl
+               << GET_VAR_NAME_VALUE(penalty) << std::endl
+               << GET_VAR_NAME_VALUE(mcuncert) << std::endl
+               << GET_VAR_NAME_VALUE(nomMC->GetBinContent(bin_)) << std::endl
+               << GET_VAR_NAME_VALUE(nomMC->GetBinError(bin_)) << std::endl
+               << GET_VAR_NAME_VALUE(predMC->GetBinError(bin_)) << std::endl
+               << GET_VAR_NAME_VALUE(predMC->GetBinContent(bin_)) << std::endl;
+      LogThrow("Bad chisq for bin");
     }
-    //    }
 
     return chisq;
   }
@@ -182,9 +214,9 @@ namespace JointProbability{
       double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
       double mcuncert = sample_.getMcContainer().histogram->GetBinError(bin_);
 
-      //implementing Barlow-Beeston correction for LH calculation
-      //the following comments are inspired/copied from Clarence's comments in the MaCh3
-      //implementation of the same feature
+      //implementing Barlow-Beeston correction for LH calculation the
+      //following comments are inspired/copied from Clarence's comments in the
+      //MaCh3 implementation of the same feature
 
       // The MC used in the likeliihood calculation
       // Is allowed to be changed by Barlow Beeston beta parameters
@@ -369,7 +401,7 @@ namespace JointProbability{
       // DETECTOR UNCERTAINTY FOR WAGASCI
       double wg_det_uncert = 0.;
       if (sample_.getName().find("WAGASCI") != std::string::npos){
-          wg_det_uncert = 0.; 
+          wg_det_uncert = 0.;
           if(sample_.getName().find("#0pi") != std::string::npos) {
               if(sample_.getName().find("PM-BM") != std::string::npos) wg_det_uncert = 0.05;
               if(sample_.getName().find("PM-WMRD") != std::string::npos) wg_det_uncert = 0.1;
@@ -384,7 +416,7 @@ namespace JointProbability{
       }
 
       // Barlow-Beeston uses fractional uncertainty on MC, so sqrt(sum[w^2])/mc
-      double fractional = mcuncert / predVal + sfgd_det_uncert + wg_det_uncert; // Add SFGD detector uncertainty 
+      double fractional = mcuncert / predVal + sfgd_det_uncert + wg_det_uncert; // Add SFGD detector uncertainty
       // -b/2a in quadratic equation
       double temp = predVal * fractional * fractional - 1;
       // b^2 - 4ac in quadratic equation
@@ -433,3 +465,30 @@ namespace JointProbability{
   }
 
 }
+
+//  A Lesser GNU Public License
+
+//  Copyright (C) 2023 GUNDAM DEVELOPERS
+
+//  This library is free software; you can redistribute it and/or
+//  modify it under the terms of the GNU Lesser General Public
+//  License as published by the Free Software Foundation; either
+//  version 2.1 of the License, or (at your option) any later version.
+
+//  This library is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+//  Lesser General Public License for more details.
+
+//  You should have received a copy of the GNU Lesser General Public
+//  License along with this library; if not, write to the
+//
+//  Free Software Foundation, Inc.
+//  51 Franklin Street, Fifth Floor,
+//  Boston, MA  02110-1301  USA
+
+// Local Variables:
+// mode:c++
+// c-basic-offset:2
+// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
+// End:
