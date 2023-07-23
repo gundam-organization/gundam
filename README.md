@@ -124,9 +124,9 @@ a new release is available, simply use the same command.
 [![](./resources/guides/images/hpcLogo.png)](./resources/guides/installOnHpc.md)
 
 
-### Compiling on LXPLUS: - TO BE DONE
+### Compiling on LXPLUS:
 
-[![](./resources/guides/images/lxplusLogo.png)](./resources/guides/.md)
+[![](./resources/guides/images/lxplusLogo.png)](./resources/guides/installOnLXPLUS.md)
 
 
 ### Alternative installation procedure
