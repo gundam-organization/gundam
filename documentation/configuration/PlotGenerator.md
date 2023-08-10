@@ -5,7 +5,7 @@
 ### Description
 
 ### Config options
-Note that the leaf used in the `varvarDictionnaries` must be an int.
+Note that the leaf used in the `varDictionnaries` must be an int.
 
 ### Example
 
