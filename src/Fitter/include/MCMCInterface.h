@@ -68,8 +68,9 @@ private:
   std::string _likelihoodValidity_{"range,mirror,physical"};
 
   // Save or dump the raw (fitter space) points.  This can save about half the
-  // output file space.
-  bool _saveRaw_{false};
+  // output file space.  About the only time these would ever need to be saved
+  // is during a burn-in run when the proposal covariance is being tuned.
+  bool _saveRawSteps_{false};
 
   // The number of burn-in cylces to use.
   int _burninCycles_{0};
@@ -135,8 +136,14 @@ private:
   // The acceptance window during burn-in.
   int _burninWindow_{1000};
 
-  // Freeze the step after this many cycles.
-  int _adaptiveFreezeAfter_{1000000000}; // Never freeze except by request
+  // Freeze the step after this many cycles by fixing the `sigma` parameter.
+  // the proposal will be update when the state is restore, the sigma should
+  // be adjusted when the state is restore, or the acceptance will generally
+  // increase.  The default is one greater than _adaptiveFreezeCorrelations_
+  int _adaptiveFreezeAfter_{0};
+
+  // Stop updating the running covariance after this many cycles.
+  int _adaptiveFreezeCorrelations_{100000000}; // Default: Never freeze
 
   // The window to calculate the covariance during normal chains.
   int _adaptiveCovWindow_{1000000};

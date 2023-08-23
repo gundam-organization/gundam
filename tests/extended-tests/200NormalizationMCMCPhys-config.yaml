@@ -1,0 +1,108 @@
+# A test yaml file for GUNDAM.
+#
+# Do a data fit to the tree_dt tree in 100NormalizationTree.root.  This
+# fits the (A,B) distribution with two free normalization variables.
+#
+#   Positive_C : Normalization for events where the C truth variable is >0
+#   Negative_C : Normalization for events where the C truth variable is <=0
+#
+
+fit: true                    # can be disabled with -d
+scanParameters: false        # can be triggered with --scan
+generateOneSigmaPlots: false # can be enabled with --one-sigma
+
+fitterEngineConfig:
+  engineType: mcmc
+
+  mcmcConfig:
+    algorithm: metropolis
+    proposal: adaptive
+    adaptiveRestore: none
+    
+    burninCycles: 4
+    burninSteps: 1000
+    burninResets: 1
+    saveBurnin: false
+    burninWindow: 100
+    burninCovWindow: 10000
+    burninCovDeweighting: 0.5
+    burninFreezeAfter: 2
+
+    cycles: 4
+    steps: 10000
+    adaptiveWindow: 400
+    adaptiveCovWindow: 100000
+    burninCovDeweighting: 0.0
+    adaptiveFreezeAfter: 1
+
+  minimizerConfig:
+    minimizer: "Minuit2"
+    algorithm: "Migrad"
+    errors: "Hesse"
+    print_level: 2
+
+  propagatorConfig:
+    throwAsimovFitParameters: false
+
+    dataSetList:
+      - name: "TestSample"
+        isEnabled: true
+        selectedDataEntry: "TestData"
+        mc:
+          tree: tree_mc
+          selectionCutFormula: "(1)"
+          nominalWeightFormula: "(1.0)"
+          filePathList:
+            - "${DATA_DIR}/100NormalizationTree.root"
+        data:
+          - name: "TestData"
+            tree: tree_dt
+            filePathList:
+              - "${DATA_DIR}/100NormalizationTree.root"
+
+
+    fitSampleSetConfig:
+      # PoissonLLH is used for tests because it is mathematically simple
+      llhStatFunction: LeastSquares
+      dataEventType: TestData
+
+      llhConfig:
+        lsqPoissonianApproximation: true
+
+      fitSampleList:
+        - name: AB
+          isEnabled: true
+          binning: "${CONFIG_DIR}/200NormalizationMCMC-binning.txt"
+          dataSets: [ "TestSample" ]
+
+    parameterSetListConfig:
+      - name: Normalizations
+        isEnabled: true
+        nominalStepSize: 0.1
+
+        parameterDefinitions:
+
+          - parameterName: "Positive_C"
+            isEnabled: true
+            priorValue: 1.0
+            priorType: Flat
+            physicalLimits:
+              minValue: 0.77
+            dialSetDefinitions:
+              - dialsType: Normalization
+                applyCondition: "[C] > 0"
+
+          - parameterName: "Negative_C"
+            isEnabled: true
+            priorValue: 1.0
+            priorType: Flat
+            physicalLimits:
+              minValue: 0.15
+            dialSetDefinitions:
+              - dialsType: Normalization
+                applyCondition: "[C] <= 0"
+
+# End of the yaml file
+# Local Variables:
+# mode:yaml
+# End:
