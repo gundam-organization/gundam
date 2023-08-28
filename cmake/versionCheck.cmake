@@ -18,6 +18,7 @@ function( doVersionCheck )
   set( GUNDAM_VERSION_POST_NB "" PARENT_SCOPE )
   set( GUNDAM_VERSION_POST_COMMIT "" PARENT_SCOPE )
   set( GUNDAM_VERSION_STRING "X.X.X" PARENT_SCOPE )
+  set( GUNDAM_VERSION_BRANCH "" PARENT_SCOPE )
 
   if(RETURN_VAL EQUAL "0")
     cmessage( STATUS "Git version: ${VERSION}")
@@ -33,6 +34,22 @@ function( doVersionCheck )
       set( GUNDAM_VERSION_TAG "f" )
       set( GUNDAM_VERSION_POST_NB "${VERSION_POST_NB}" PARENT_SCOPE )
       set( GUNDAM_VERSION_POST_COMMIT "${VERSION_POST_COMMIT}" PARENT_SCOPE )
+
+      # Git version
+      execute_process(
+          COMMAND git rev-parse --abbrev-ref HEAD
+          WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+          OUTPUT_VARIABLE CURRENT_BRANCH_NAME
+          RESULT_VARIABLE RETURN_VAL
+          OUTPUT_STRIP_TRAILING_WHITESPACE
+      )
+
+      if(RETURN_VAL EQUAL "0")
+        set( GUNDAM_VERSION_BRANCH "${CURRENT_BRANCH_NAME}" PARENT_SCOPE )
+        cmessage( STATUS "Git branch: ${CURRENT_BRANCH_NAME}")
+      endif()
+
+
     else()
       list(GET VERSION_SEP 0 VERSION_STR)         # VERSION_SEP[0] = X.X.X
       set(GUNDAM_VERSION_TAG "")
