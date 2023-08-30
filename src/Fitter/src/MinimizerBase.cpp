@@ -23,7 +23,7 @@ void MinimizerBase::readConfigImpl(){
   bool showParametersOnFitMonitor = getLikelihood().getShowParametersOnFitMonitor();
   showParametersOnFitMonitor = GenericToolbox::Json::fetchValue(_config_, "showParametersOnFitMonitor", showParametersOnFitMonitor);
   getLikelihood().setShowParametersOnFitMonitor(showParametersOnFitMonitor);
-
+//
   bool maxNbParametersPerLineOnMonitor = getLikelihood().getMaxNbParametersPerLineOnMonitor();
   maxNbParametersPerLineOnMonitor = GenericToolbox::Json::fetchValue(_config_, "maxNbParametersPerLineOnMonitor", maxNbParametersPerLineOnMonitor);
   getLikelihood().setMaxNbParametersPerLineOnMonitor(maxNbParametersPerLineOnMonitor);
