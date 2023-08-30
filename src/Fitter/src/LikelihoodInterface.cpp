@@ -4,7 +4,7 @@
 
 #include "LikelihoodInterface.h"
 #include "FitterEngine.h"
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
@@ -29,13 +29,16 @@ void LikelihoodInterface::setStateTitleMonitor(const std::string& stateTitleMoni
 
 
 void LikelihoodInterface::initialize() {
-  _chi2HistoryTree_ = std::make_unique<TTree>("chi2History", "chi2History");
-  _chi2HistoryTree_->SetDirectory(nullptr);
-  _chi2HistoryTree_->Branch("nbFitCalls", &_nbFitCalls_);
-  _chi2HistoryTree_->Branch("chi2Total", (double*) _owner_->getPropagator().getLlhBufferPtr());
-  _chi2HistoryTree_->Branch("chi2Stat", (double*) _owner_->getPropagator().getLlhStatBufferPtr());
-  _chi2HistoryTree_->Branch("chi2Pulls", (double*) _owner_->getPropagator().getLlhPenaltyBufferPtr());
-  _chi2HistoryTree_->Branch("itSpeed", _itSpeedMon_.getCountSpeedPtr());
+
+  if( not GundamGlobals::isLightOutputMode() ){
+    _chi2HistoryTree_ = std::make_unique<TTree>("chi2History", "chi2History");
+    _chi2HistoryTree_->SetDirectory(nullptr);
+    _chi2HistoryTree_->Branch("nbFitCalls", &_nbFitCalls_);
+    _chi2HistoryTree_->Branch("chi2Total", (double*) _owner_->getPropagator().getLlhBufferPtr());
+    _chi2HistoryTree_->Branch("chi2Stat", (double*) _owner_->getPropagator().getLlhStatBufferPtr());
+    _chi2HistoryTree_->Branch("chi2Pulls", (double*) _owner_->getPropagator().getLlhPenaltyBufferPtr());
+    _chi2HistoryTree_->Branch("itSpeed", _itSpeedMon_.getCountSpeedPtr());
+  }
 
   LogWarning << "Fetching the effective number of fit parameters..." << std::endl;
   _minimizerFitParameterPtr_.clear();
@@ -76,14 +79,25 @@ void LikelihoodInterface::initialize() {
 }
 
 void LikelihoodInterface::saveChi2History() {
-  LogInfo << "Saving LLH history..." << std::endl;
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "fit"), _chi2HistoryTree_.get());
+  if( not GundamGlobals::isLightOutputMode() ){
+    LogInfo << "Saving LLH history..." << std::endl;
+    GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "fit"), _chi2HistoryTree_.get());
+  }
+  else{
+    LogAlert << "Not saving LLH history as light output mode is fired." << std::endl;
+  }
 }
 void LikelihoodInterface::saveGradientSteps(){
+
+  if( GundamGlobals::isLightOutputMode() ){
+    LogAlert << "Skipping saveGradientSteps as light output mode is fired." << std::endl;
+    return;
+  }
+
   LogInfo << "Saving " << _gradientMonitor_.size() << " gradient steps..." << std::endl;
 
   // make sure the parameter states get restored as we leave
-  nlohmann::json currentParState{_owner_->getPropagator().exportParameterInjectorConfig()};
+  auto currentParState = _owner_->getPropagator().exportParameterInjectorConfig();
   GenericToolbox::ScopedGuard g{
     [&](){
       FitParameterSet::muteLogger();
@@ -107,7 +121,7 @@ void LikelihoodInterface::saveGradientSteps(){
     _owner_->getPropagator().injectParameterValues(_gradientMonitor_[iGradStep].parState );
     _owner_->getPropagator().updateLlhCache();
 
-    if( not GlobalVariables::isLightOutputMode() ) {
+    if( not GundamGlobals::isLightOutputMode() ) {
       auto outDir = GenericToolbox::mkdirTFile(_owner_->getSaveDir(), Form("fit/gradient/step_%i", int(iGradStep)));
       GenericToolbox::writeInTFile(outDir, TNamed("parState", GenericToolbox::Json::toReadableString(_gradientMonitor_[iGradStep].parState).c_str()));
       GenericToolbox::writeInTFile(outDir, TNamed("llhState", _owner_->getPropagator().getLlhBufferSummary().c_str()));
@@ -137,6 +151,25 @@ void LikelihoodInterface::saveGradientSteps(){
   if( not globalGraphList.empty() ){
     auto outDir = GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "fit/gradient/global");
     for( auto& gEntry : globalGraphList ){
+      gEntry.scanDataPtr->title = "Minimizer path to minimum";
+      ParScanner::writeGraphEntry(gEntry, outDir);
+    }
+    GenericToolbox::triggerTFileWrite(outDir);
+
+    outDir = GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "fit/gradient/globalRelative");
+    for( auto& gEntry : globalGraphList ){
+      if( gEntry.graph.GetN() == 0 ){ continue; }
+
+      double minY{gEntry.graph.GetY()[gEntry.graph.GetN()-1]};
+      double maxY{gEntry.graph.GetY()[0]};
+      double delta{1E-6*std::abs( maxY - minY )};
+      // allow log scale
+      minY += delta;
+
+      for( int iPt = 0 ; iPt < gEntry.graph.GetN() ; iPt++ ){
+        gEntry.graph.GetY()[iPt] -= minY;
+      }
+      gEntry.scanDataPtr->title = "Minimizer path to minimum (difference)";
       ParScanner::writeGraphEntry(gEntry, outDir);
     }
     GenericToolbox::triggerTFileWrite(outDir);
@@ -212,7 +245,7 @@ double LikelihoodInterface::evalFit(const double* parArray_){
 //    ssHeader << std::endl << "Target EDM: " << _owner_->getMinimizer().get;
     ssHeader << std::endl << "RAM: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
     double cpuPercent = GenericToolbox::getCpuUsageByProcess();
-    ssHeader << " / CPU: " << cpuPercent << "% (" << cpuPercent / GlobalVariables::getNbThreads() << "% efficiency)";
+    ssHeader << " / CPU: " << cpuPercent << "% (" << cpuPercent / GundamGlobals::getNbThreads() << "% efficiency)";
     ssHeader << std::endl << "Avg " << GUNDAM_CHI2 << " computation time: " << _evalFitAvgTimer_;
     ssHeader << std::endl;
 
@@ -271,16 +304,18 @@ double LikelihoodInterface::evalFit(const double* parArray_){
     }
     else{
       LogInfo << _convergenceMonitor_.generateMonitorString(
-          GenericToolbox::getTerminalWidth() != 0, // trail back if not in batch mode
-          true // force generate
+        GenericToolbox::getTerminalWidth() != 0, // trail back if not in batch mode
+        true // force generate
       );
     }
 
     _itSpeed_.counts = _nbFitCalls_;
   }
 
-  // Fill History
-  _chi2HistoryTree_->Fill();
+  if( not GundamGlobals::isLightOutputMode() ){
+    // Fill History
+    _chi2HistoryTree_->Fill();
+  }
 
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("out_evalFit");
   return _owner_->getPropagator().getLlhBuffer();
@@ -297,15 +332,69 @@ double LikelihoodInterface::evalFitValid(const double* parArray_) {
   return RBN;
 }
 
+double LikelihoodInterface::getLastLikelihood() const {
+  return _owner_->getPropagator().getLlhBuffer();
+}
+
+double LikelihoodInterface::getLastLikelihoodStat() const {
+  return _owner_->getPropagator().getLlhStatBuffer();
+}
+
+double LikelihoodInterface::getLastLikelihoodPenalty() const {
+  return _owner_->getPropagator().getLlhPenaltyBuffer();
+}
+
+void LikelihoodInterface::setParameterValidity(const std::string& validity) {
+  LogWarning << "Set parameter validity to " << validity << std::endl;
+  if (validity.find("noran") != std::string::npos) _validFlags_ &= ~0b0001;
+  else if (validity.find("ran") != std::string::npos) _validFlags_ |= 0b0001;
+  if (validity.find("nomir") != std::string::npos) _validFlags_ &= ~0b0010;
+  else if (validity.find("mir") != std::string::npos) _validFlags_ |= 0b0010;
+  if (validity.find("nophy") != std::string::npos) _validFlags_ &= ~0b0100;
+  else if (validity.find("phy") != std::string::npos) _validFlags_ |= 0b0100;
+  LogWarning << "Set parameter validity to " << validity
+             << " (" << _validFlags_ << ")" << std::endl;
+}
+
 bool LikelihoodInterface::hasValidParameterValues() const {
+  int invalid = 0;
   for (const FitParameterSet& parSet:
          _owner_->getPropagator().getParameterSetsList()) {
     for (const FitParameter& par : parSet.getParameterList()) {
-      if (std::isfinite(par.getMinValue()) && par.getParameterValue() < par.getMinValue()) [[unlikely]] return false;
-      if (std::isfinite(par.getMaxValue()) && par.getParameterValue() > par.getMaxValue()) [[unlikely]] return false;
+      if ( (_validFlags_ & 0b0001) != 0
+          and std::isfinite(par.getMinValue())
+          and par.getParameterValue() < par.getMinValue()) [[unlikely]] {
+        ++invalid;
+      }
+      if ((_validFlags_ & 0b0001) != 0
+          and std::isfinite(par.getMaxValue())
+          and par.getParameterValue() > par.getMaxValue()) [[unlikely]] {
+        ++invalid;
+      }
+      if ((_validFlags_ & 0b0010) != 0
+          and std::isfinite(par.getMinMirror())
+          and par.getParameterValue() < par.getMinMirror()) [[unlikely]] {
+        ++invalid;
+      }
+      if ((_validFlags_ & 0b0010) != 0
+          and std::isfinite(par.getMaxMirror())
+          and par.getParameterValue() > par.getMaxMirror()) [[unlikely]] {
+        ++invalid;
+      }
+      if ((_validFlags_ & 0b0100) != 0
+          and std::isfinite(par.getMinPhysical())
+          and par.getParameterValue() < par.getMinPhysical()) [[unlikely]] {
+        ++invalid;
+      }
+      if ((_validFlags_ & 0b0100) != 0
+          and std::isfinite(par.getMaxPhysical())
+          and par.getParameterValue() > par.getMaxPhysical()) [[unlikely]] {
+        ++invalid;
+      }
+
     }
   }
-  return true;
+  return (invalid == 0);
 }
 
 // An MIT Style License

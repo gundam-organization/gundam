@@ -4,10 +4,6 @@
 
 #include "PhysicsEvent.h"
 
-#ifndef USE_NEW_DIALS
-#include "SplineDial.h"
-#endif
-
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
 
@@ -68,7 +64,7 @@ double PhysicsEvent::getEventWeight() const {
             // _CacheManagerValue_ and _CacheManagerValid_ are inside
             // of the weights cache (a bit of evil coding here), and are
             // updated by the cache.  The update is triggered by
-            // _CacheManagerUpdate().
+            // (*_CacheManagerUpdate_)().
             if (_CacheManagerUpdate_) (*_CacheManagerUpdate_)();
         }
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
@@ -83,36 +79,41 @@ double PhysicsEvent::getEventWeight() const {
             if (avg < getTreeWeight()) avg = getTreeWeight();
             double delta = std::abs(res - _eventWeight_);
             delta /= avg;
-            sumDelta += delta;
-            sum2Delta += delta*delta;
-            ++numDelta;
-            if (numDelta < 0) throw std::runtime_error("validation wrap");
             maxDelta = std::max(maxDelta,delta);
-            if ((numDelta % 1000000) == 0) {
-                LogInfo << "VALIDATION: Average event weight delta: "
-                        << sumDelta/numDelta
-                        << " +/- " << std::sqrt(
-                            sum2Delta/numDelta
-                            - sumDelta*sumDelta/numDelta/numDelta)
-                        << " Maximum: " << maxDelta
-                        << std::endl;
+            if (delta < 1e-4) {
+                sumDelta += delta;
+                sum2Delta += delta*delta;
+                ++numDelta;
+                if (numDelta < 0) throw std::runtime_error("validation wrap");
+                if ((numDelta % 1000000) == 0) {
+                    LogInfo << "VALIDATION: Average event weight delta: "
+                            << sumDelta/numDelta
+                            << " +/- " << std::sqrt(
+                                sum2Delta/numDelta
+                                - sumDelta*sumDelta/numDelta/numDelta)
+                            << " Maximum: " << maxDelta
+                            << " " << numDelta
+                            << std::endl;
+                }
             }
             if (maxDelta < 1E-5) break;
-            if (delta < maxDelta) break;
+            if (delta > 100.0*sumDelta/numDelta) break;
             LogWarning << "WARNING: Event weight difference: " << delta
                        << " Cache: " << res
                        << " Dial: " << _eventWeight_
                        << " Tree: " << getTreeWeight()
+                       << " Delta: " << delta
+                       << " Max: " << maxDelta
                        << std::endl;
         } while(false);
 #endif
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning CACHE_MANAGER_SLOW_VALIDATION force CPU _eventWeight
+#warning CACHE_MANAGER_SLOW_VALIDATION force CPU _eventWeight_
         // When the slow validation is running, the "CPU" event weight is
         // calculated after Cache::Manager::Fill
         return _eventWeight_;
 #endif
-      LogThrowIf(*_CacheManagerValue_!=*_CacheManagerValue_, "Nan weight: " << this->getSummary());
+        LogThrowIf(not std::isfinite(*_CacheManagerValue_), "NaN weight: " << this->getSummary());
       return *_CacheManagerValue_;
     }
 #endif
@@ -138,16 +139,6 @@ std::vector<std::vector<GenericToolbox::AnyType>> &PhysicsEvent::getLeafContentL
   return _leafContentList_;
 }
 
-#if USE_NEW_DIALS
-#else
-std::vector<Dial *> &PhysicsEvent::getRawDialPtrList() {
-  return _rawDialPtrList_;
-}
-const std::vector<Dial *> &PhysicsEvent::getRawDialPtrList() const{
-  return _rawDialPtrList_;
-}
-#endif
-
 void PhysicsEvent::copyOnlyExistingLeaves(const PhysicsEvent& other_){
   LogThrowIf(_commonLeafNameListPtr_ == nullptr, "_commonLeafNameListPtr_ not set")
   for( size_t iLeaf = 0 ; iLeaf < _commonLeafNameListPtr_->size() ; iLeaf++ ){
@@ -161,219 +152,6 @@ void PhysicsEvent::addEventWeight(double weight_){
 void PhysicsEvent::resetEventWeight(){
   _eventWeight_ = _treeWeight_;
 }
-
-#if USE_NEW_DIALS
-#else
-void PhysicsEvent::reweightUsingDialCache(){
-
-#ifdef USE_ACCUMULATE_PHYSICSEVENT
-  _eventWeight_ = std::accumulate(
-    _rawDialPtrList_.begin(), _rawDialPtrList_.end(), _treeWeight_,
-    [](double weight_, auto& dial){
-      if( dial == nullptr or dial->isMasked() ) return weight_;
-#ifdef CACHE_MANAGER_SLOW_VALIDATION
-    double response = dial->evalResponse();
-#warning CACHE_MANAGER_SLOW_VALIDATION in PhysicsEvent::reweightUsingDialCache
-    /////////////////////////////////////////////////////////////////
-    // The internal GPU values for the splines are made available during slow
-    // validation, but are never used in the CPU calculation.  This code here
-    // is checking that the GPU value for the spline agrees with the direct
-    // dial calculation of the spline.
-    static std::map<std::string,double> maxDelta;
-    static std::map<std::string,double> sumDelta;
-    static std::map<std::string,double> sum2Delta;
-    static std::map<std::string,long long int> numDelta;
-    static int deltaTrials = 0;
-    const SplineDial* sDial = dynamic_cast<const SplineDial*>(dial);
-    while (sDial) {
-        if (!dial->getCacheManagerValuePointer()) {
-            LogWarning << "VALIDATION: SplineDial without cache" << std::endl;
-            break;
-        }
-        // This only compiles with slow validation, and the cache validity
-        // is managed elsewhere.
-        if (!std::isfinite(response)) {
-            LogWarning << "VALIDATION: Dial response is not finite" << std::endl;
-            break;
-        }
-        if (response < 0) {
-            LogWarning << "VALIDATION: Dial response is negative" << std::endl;
-            break;
-        }
-        double cacheResponse = *dial->getCacheManagerValuePointer();
-        std::string cacheName = dial->getCacheManagerName();
-        std::string parName = dial->getOwner()->getParameterName();
-        std::string sumName = parName;
-        if (!std::isfinite(cacheResponse)) {
-            LogError << "GPU cache response is not finite" << std::endl;
-            std::runtime_error("GPU cache response is not finite");
-        }
-        if (cacheResponse < 0) {
-            LogWarning << "VALIDATION: GPU cache response is negative" << std::endl;
-        }
-        double avg = 0.5*(std::abs(cacheResponse)+std::abs(response));
-        if (avg < 1.0) avg = 1.0;
-        double delta = std::abs(cacheResponse-response)/avg;
-        sumDelta[sumName] += delta;
-        sum2Delta[sumName] += delta*delta;
-        ++numDelta[sumName];
-        if (numDelta[sumName] < 0) {
-            LogError << "Wrap around during validation" << std::endl;
-            throw std::runtime_error("Validation wrap around");
-        }
-        if (delta > maxDelta[sumName]) {
-            maxDelta[sumName] = delta;
-            LogInfo << "VALIDATION: Increase GPU and Dial max delta"
-                    << " GPU (" << cacheName << "-" << sumName << "): "
-                    << cacheResponse
-                    << " Dial: " << response
-                    << " delta: " << delta
-                    << " par: " << dial->getAssociatedParameter()
-                    << " name: " << parName
-                    << std::endl;
-            LogInfo << "VALIDATION: Maximum Dial ("
-                    << cacheName << "-" << sumName << "): "
-                    << maxDelta[sumName]
-                    << " Average value delta: "
-                    << sumDelta[sumName]/numDelta[sumName]
-                    << " +/- "
-                    << std::sqrt(
-                        sum2Delta[sumName]/numDelta[sumName]
-                        - sumDelta[sumName]*sumDelta[sumName]
-                        /numDelta[sumName]/numDelta[sumName])
-                    << std::endl;
-        }
-
-        if ((deltaTrials++ % 1000000) == 0) {
-            for (auto maxD : maxDelta) {
-                std::string name = maxD.first;
-                LogInfo << "VALIDATION: Average cache delta for"
-                        << " " << name << ": "
-                        << sumDelta[name]/numDelta[name]
-                        << " +/- "
-                        << std::sqrt(
-                            sum2Delta[name]/numDelta[name]
-                            - sumDelta[name]*sumDelta[name]
-                            /numDelta[name]/numDelta[name])
-                        << " Maximum: " << maxDelta[name]
-                        << std::endl;
-            }
-        }
-
-        break;
-    }
-#endif
-      return weight_ * dial->evalResponse();
-    }
-  );
-#else
-  // bare dials
-  _eventWeight_ = _treeWeight_;
-  for( auto& dial : _rawDialPtrList_ ){
-    if( dial == nullptr ) return;
-    if( Dial::enableMaskCheck and dial->isMasked() ){ continue; }
-    _eventWeight_ *= dial->evalResponse();
-#ifdef CACHE_MANAGER_SLOW_VALIDATION
-    double response = dial->evalResponse();
-#warning CACHE_MANAGER_SLOW_VALIDATION in PhysicsEvent::reweightUsingDialCache
-    /////////////////////////////////////////////////////////////////
-    // The internal GPU values for the splines are made available during slow
-    // validation, but are never used in the CPU calculation.  This code here
-    // is checking that the GPU value for the spline agrees with the direct
-    // dial calculation of the spline.
-    static std::map<std::string,double> maxDelta;
-    static std::map<std::string,double> sumDelta;
-    static std::map<std::string,double> sum2Delta;
-    static std::map<std::string,long long int> numDelta;
-    static int deltaTrials = 0;
-    const SplineDial* sDial = dynamic_cast<const SplineDial*>(dial);
-    while (sDial) {
-        if (!dial->getCacheManagerValuePointer()) {
-            LogWarning << "VALIDATION: SplineDial without cache" << std::endl;
-            break;
-        }
-        // This only compiles with slow validation, and the cache validity
-        // is managed elsewhere.
-        if (!std::isfinite(response)) {
-            LogWarning << "VALIDATION: Dial response is not finite" << std::endl;
-            break;
-        }
-        if (response < 0) {
-            LogWarning << "VALIDATION: Dial response is negative" << std::endl;
-            break;
-        }
-        double cacheResponse = *dial->getCacheManagerValuePointer();
-        std::string cacheName = dial->getCacheManagerName();
-        std::string parName = dial->getOwner()->getParameterName();
-        std::string sumName = parName;
-        if (!std::isfinite(cacheResponse)) {
-            LogError << "GPU cache response is not finite" << std::endl;
-            std::runtime_error("GPU cache response is not finite");
-        }
-        if (cacheResponse < 0) {
-            LogWarning << "VALIDATION: GPU cache response is negative" << std::endl;
-        }
-        double avg = 0.5*(std::abs(cacheResponse)+std::abs(response));
-        if (avg < 1.0) avg = 1.0;
-        double delta = std::abs(cacheResponse-response)/avg;
-        sumDelta[sumName] += delta;
-        sum2Delta[sumName] += delta*delta;
-        ++numDelta[sumName];
-        if (numDelta[sumName] < 0) {
-            LogError << "Wrap around during validation" << std::endl;
-            throw std::runtime_error("Validation wrap around");
-        }
-        if (delta > maxDelta[sumName]) {
-            maxDelta[sumName] = delta;
-            LogInfo << "VALIDATION: Increase GPU and Dial max delta"
-                    << " GPU (" << cacheName << ") : " << cacheResponse
-                    << " Dial: " << response
-                    << " delta: " << delta
-                    << " par: " << dial->getAssociatedParameter()
-                    << " name: " << parName
-                    << std::endl;
-            LogInfo << "VALIDATION: Maximum Dial ("
-                    << sumName << ") delta: "
-                    << maxDelta[sumName]
-                    << " Average value delta: "
-                    << sumDelta[sumName]/numDelta[sumName]
-                    << " +/- "
-                    << std::sqrt(
-                        sum2Delta[sumName]/numDelta[sumName]
-                        - sumDelta[sumName]*sumDelta[sumName]
-                        /numDelta[sumName]/numDelta[sumName])
-                    << std::endl;
-        }
-
-        if ((deltaTrials++ % 1000000) == 0) {
-            for (auto maxD : maxDelta) {
-                std::string name = maxD.first;
-                LogInfo << "VALIDATION: Average cache delta for"
-                        << " " << name << ": "
-                        << sumDelta[name]/numDelta[name]
-                        << " +/- "
-                        << std::sqrt(
-                            sum2Delta[name]/numDelta[name]
-                            - sumDelta[name]*sumDelta[name]
-                            /numDelta[name]/numDelta[name])
-                        << " Maximum: " << maxDelta[name]
-                        << std::endl;
-            }
-        }
-
-        break;
-    }
-#endif
-  }
-
-//  // nested dials
-//  for( auto& nestedDialEntry : _nestedDialRefList_ ){
-//    if( nestedDialEntry.first == nullptr ) return;
-//    this->addEventWeight( nestedDialEntry.first->eval(nestedDialEntry.second) );
-//  }
-#endif
-}
-#endif
 
 int PhysicsEvent::findVarIndex(const std::string& leafName_, bool throwIfNotFound_) const{
   LogThrowIf(_commonLeafNameListPtr_ == nullptr, "Can't " << __METHOD_NAME__ << " while _commonLeafNameListPtr_ is empty.");
@@ -453,66 +231,12 @@ std::string PhysicsEvent::getSummary() const {
     ss << std::endl << "}";
   }
 
-#if USE_NEW_DIALS
-#else
-  ss << std::endl << "_rawDialPtrList_: {";
-  if( not _rawDialPtrList_.empty() ){
-    for( auto* dialPtr : _rawDialPtrList_ ){
-      ss << std::endl << "  ";
-      if( dialPtr != nullptr ) ss << dialPtr->getSummary();
-      else ss << "nullptr";
-    }
-    ss << std::endl << "}";
-  }
-  else{
-    ss << "}";
-  }
-#endif
-
   return ss.str();
 }
 void PhysicsEvent::print() const {
   LogInfo << *this << std::endl;
 }
 
-#if USE_NEW_DIALS
-#else
-void PhysicsEvent::trimDialCache(){
-  size_t newSize{0};
-  for( auto& dial : _rawDialPtrList_ ){
-    if( dial == nullptr ) break;
-    newSize++;
-  }
-  _rawDialPtrList_.resize(newSize);
-  _rawDialPtrList_.shrink_to_fit();
-
-  // nested dials
-  newSize = 0;
-  for( auto& nestedDial : _nestedDialRefList_ ){
-    if( nestedDial.first == nullptr ) break;
-    newSize++;
-  }
-  _nestedDialRefList_.resize(newSize);
-  _nestedDialRefList_.shrink_to_fit();
-}
-void PhysicsEvent::addNestedDialRefToCache(NestedDialTest* nestedDialPtr_, const std::vector<Dial*>& dialPtrList_) {
-  if (nestedDialPtr_ == nullptr) return; // don't store null ptr
-
-  // fetch the next free slot:
-  for (auto &nestedDialEntry: _nestedDialRefList_) {
-    if (nestedDialEntry.first == nullptr) {
-      nestedDialEntry.first = nestedDialPtr_;
-      nestedDialEntry.second = dialPtrList_;
-      return;
-    }
-  }
-
-  // no new slot available:
-  _nestedDialRefList_.emplace_back();
-  _nestedDialRefList_.back().first = nestedDialPtr_;
-  _nestedDialRefList_.back().second = dialPtrList_;
-}
-#endif
 std::map< std::string,
   std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>> PhysicsEvent::generateLeavesDictionary(bool disableArrays_) const {
   std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>> out;
@@ -620,3 +344,30 @@ std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p ){
 const std::shared_ptr<std::vector<std::string>>& PhysicsEvent::getCommonLeafNameListPtr() const {
   return _commonLeafNameListPtr_;
 }
+
+//  A Lesser GNU Public License
+
+//  Copyright (C) 2023 GUNDAM DEVELOPERS
+
+//  This library is free software; you can redistribute it and/or
+//  modify it under the terms of the GNU Lesser General Public
+//  License as published by the Free Software Foundation; either
+//  version 2.1 of the License, or (at your option) any later version.
+
+//  This library is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+//  Lesser General Public License for more details.
+
+//  You should have received a copy of the GNU Lesser General Public
+//  License along with this library; if not, write to the
+//
+//  Free Software Foundation, Inc.
+//  51 Franklin Street, Fifth Floor,
+//  Boston, MA  02110-1301  USA
+
+// Local Variables:
+// mode:c++
+// c-basic-offset:2
+// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
+// End:

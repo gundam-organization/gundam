@@ -11,9 +11,7 @@
 
 #include <sstream>
 
-
 LoggerInit([]{ Logger::setUserHeaderStr("[FitParameter]"); });
-
 
 FitParameter::FitParameter(const FitParameterSet* owner_): _owner_(owner_) {}
 
@@ -51,18 +49,16 @@ void FitParameter::readConfigImpl(){
       this->setStepSize( stepSize );
     }
 
+    if( GenericToolbox::Json::doKeyExist(_parameterConfig_, "physicalLimits") ){
+        auto physLimits = GenericToolbox::Json::fetchValue(_parameterConfig_, "physicalLimits", nlohmann::json());
+        _minPhysical_ = GenericToolbox::Json::fetchValue(physLimits, "minValue", std::nan("UNSET"));
+        _maxPhysical_ = GenericToolbox::Json::fetchValue(physLimits, "maxValue", std::nan("UNSET"));
+    }
+
     _dialDefinitionsList_ = GenericToolbox::Json::fetchValue(_parameterConfig_, "dialSetDefinitions", _dialDefinitionsList_);
   }
-
-#if USE_NEW_DIALS
-#else
-  _dialSetList_.reserve(_dialDefinitionsList_.size());
-  for( const auto& dialDefinitionConfig : _dialDefinitionsList_ ){
-    _dialSetList_.emplace_back(this);
-    _dialSetList_.back().readConfig(dialDefinitionConfig);
-  }
-#endif
 }
+
 void FitParameter::initializeImpl() {
   LogThrowIf(_owner_ == nullptr, "Parameter set ref is not set.");
   LogThrowIf(_parameterIndex_ == -1, "Parameter index is not set.");
@@ -71,19 +67,6 @@ void FitParameter::initializeImpl() {
   LogThrowIf(std::isnan(_priorValue_), "Prior value is not set.");
   LogThrowIf(std::isnan(_stdDevValue_), "Std dev value is not set.");
   LogThrowIf(std::isnan(_parameterValue_), "Parameter value is not set.");
-
-#if USE_NEW_DIALS
-#else
-  for( auto& dialSet : _dialSetList_ ){ dialSet.initialize(); }
-  // Check if no dials is actually defined -> disable the parameter in that case
-  bool dialSetAreAllDisabled = true;
-  for( const auto& dialSet : _dialSetList_ ){ if( dialSet.isEnabled() ){ dialSetAreAllDisabled = false; break; } }
-  if( dialSetAreAllDisabled ){
-    LogWarning << "Parameter " << getTitle() << " has no dials: disabled." << std::endl;
-    _isEnabled_ = false;
-  }
-#endif
-
 }
 
 void FitParameter::setIsEnabled(bool isEnabled){
@@ -98,6 +81,7 @@ void FitParameter::setIsEigen(bool isEigen) {
 void FitParameter::setIsFree(bool isFree) {
   _isFree_ = isFree;
 }
+
 void FitParameter::setDialSetConfig(const nlohmann::json &jsonConfig_) {
   auto jsonConfig = jsonConfig_;
   while( jsonConfig.is_string() ){
@@ -106,6 +90,7 @@ void FitParameter::setDialSetConfig(const nlohmann::json &jsonConfig_) {
   }
   _dialDefinitionsList_ = jsonConfig.get<std::vector<nlohmann::json>>();
 }
+
 void FitParameter::setParameterDefinitionConfig(const nlohmann::json &config_){
   _parameterConfig_ = config_;
   ConfigUtils::forwardConfig(_parameterConfig_);
@@ -138,6 +123,30 @@ void FitParameter::setMinValue(double minValue) {
 }
 void FitParameter::setMaxValue(double maxValue) {
   _maxValue_ = maxValue;
+}
+void FitParameter::setMinMirror(double minMirror) {
+  if (std::isfinite(_minMirror_) and std::abs(_minMirror_-minMirror) > 1E-6) {
+    LogWarning << "Minimum mirror bound changed for " << getFullTitle()
+               << " old: " << _minMirror_
+               << " new: " << minMirror
+               << std::endl;
+  }
+  _minMirror_ = minMirror;
+}
+void FitParameter::setMaxMirror(double maxMirror) {
+  if (std::isfinite(_maxMirror_) and std::abs(_maxMirror_-maxMirror) > 1E-6) {
+    LogWarning << "Maximum mirror bound changed for " << getFullTitle()
+               << " old: " << _maxMirror_
+               << " new: " << maxMirror
+               << std::endl;
+  }
+  _maxMirror_ = maxMirror;
+}
+void FitParameter::setMinPhysical(double minPhysical) {
+  _minPhysical_ = minPhysical;
+}
+void FitParameter::setMaxPhysical(double maxPhysical) {
+  _maxPhysical_ = maxPhysical;
 }
 void FitParameter::setStepSize(double stepSize) {
   _stepSize_ = stepSize;
@@ -177,6 +186,18 @@ double FitParameter::getMinValue() const {
 double FitParameter::getMaxValue() const {
   return _maxValue_;
 }
+double FitParameter::getMinMirror() const {
+  return _minMirror_;
+}
+double FitParameter::getMaxMirror() const {
+  return _maxMirror_;
+}
+double FitParameter::getMinPhysical() const {
+  return _minPhysical_;
+}
+double FitParameter::getMaxPhysical() const {
+  return _maxPhysical_;
+}
 double FitParameter::getStepSize() const {
   return _stepSize_;
 }
@@ -204,25 +225,27 @@ const FitParameterSet *FitParameter::getOwner() const {
 PriorType::PriorType FitParameter::getPriorType() const {
   return _priorType_;
 }
-#if USE_NEW_DIALS
-#else
-std::vector<DialSet> &FitParameter::getDialSetList() {
-  return _dialSetList_;
-}
-#endif
 
+bool FitParameter::isValueWithinBounds() const{
+  if( not std::isnan(_minValue_) and _parameterValue_ < _minValue_ ) return false;
+  if( not std::isnan(_maxValue_) and _parameterValue_ > _maxValue_ ) return false;
+  return true;
+}
 double FitParameter::getDistanceFromNominal() const{
   return (_parameterValue_ - _priorValue_) / _stdDevValue_;
 }
+
 std::string FitParameter::getTitle() const {
   std::stringstream ss;
   ss << "#" << _parameterIndex_;
   if( not _name_.empty() ) ss << "_" << _name_;
   return ss.str();
 }
+
 std::string FitParameter::getFullTitle() const{
   return _owner_->getName() + "/" + this->getTitle();
 }
+
 std::string FitParameter::getSummary(bool shallow_) const {
   std::stringstream ss;
 
@@ -239,37 +262,32 @@ std::string FitParameter::getSummary(bool shallow_) const {
   else ss << _maxValue_;
   ss << " ]";
 
-#if USE_NEW_DIALS
-#else
-  if( not shallow_ ){
-    ss << ":";
-    for( const auto& dialSet : _dialSetList_ ){
-      ss << std::endl << GenericToolbox::indentString(dialSet.getSummary(), 2);
-    }
-  }
-#endif
-
   return ss.str();
 }
-#if USE_NEW_DIALS
-#else
-DialSet* FitParameter::findDialSet(const std::string& dataSetName_){
-  for( auto& dialSet : _dialSetList_ ){
-    if( GenericToolbox::doesElementIsInVector(dataSetName_, dialSet.getDataSetNameList()) ){
-      return &dialSet;
-    }
-  }
 
-  // If not found, find general dialSet
-  for( auto& dialSet : _dialSetList_ ){
-    if( GenericToolbox::doesElementIsInVector("", dialSet.getDataSetNameList())
-        or GenericToolbox::doesElementIsInVector("*", dialSet.getDataSetNameList())
-        ){
-      return &dialSet;
-    }
-  }
+//  A Lesser GNU Public License
 
-  // If no general dialSet found, this parameter does not apply on this dataSet
-  return nullptr;
-}
-#endif
+//  Copyright (C) 2023 GUNDAM DEVELOPERS
+
+//  This library is free software; you can redistribute it and/or
+//  modify it under the terms of the GNU Lesser General Public
+//  License as published by the Free Software Foundation; either
+//  version 2.1 of the License, or (at your option) any later version.
+
+//  This library is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+//  Lesser General Public License for more details.
+
+//  You should have received a copy of the GNU Lesser General Public
+//  License along with this library; if not, write to the
+//
+//  Free Software Foundation, Inc.
+//  51 Franklin Street, Fifth Floor,
+//  Boston, MA  02110-1301  USA
+
+// Local Variables:
+// mode:c++
+// c-basic-offset:2
+// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
+// End:

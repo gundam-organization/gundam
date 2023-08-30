@@ -39,6 +39,7 @@ Cache::IndexedSums::IndexedSums(Cache::Weights::Results& inputs,
         // set.  The initial values are seldom changed, so they are not
         // pinned.
         fSums = std::make_unique<hemi::Array<double>>(bins,true);
+        fSums2 = std::make_unique<hemi::Array<double>>(bins,true);
         fIndexes = std::make_unique<hemi::Array<short>>(fEventWeights.size(),false);
 
     }
@@ -47,15 +48,28 @@ Cache::IndexedSums::IndexedSums(Cache::Weights::Results& inputs,
         throw std::runtime_error("Not enough memory available");
     }
 
+    // Place the cache into a default state.
+    Reset();
+
     // Initialize the caches.  Don't try to zero everything since the
     // caches can be huge.
     std::fill(fSums->hostPtr(),
               fSums->hostPtr() + fSums->size(),
               0.0);
+    std::fill(fSums2->hostPtr(),
+              fSums2->hostPtr() + fSums2->size(),
+              0.0);
 }
 
 // The destructor
 Cache::IndexedSums::~IndexedSums() = default;
+
+/// Reset the index sum cache to it's state immediately after construction.
+void Cache::IndexedSums::Reset() {
+    // Very little to do here since the indexed sum cache is zeroed with it is
+    // filled.  Mark it as invalid out of an abundance of caution!
+    fSumsValid = false;
+}
 
 void Cache::IndexedSums::SetEventIndex(int event, int bin) {
     if (event < 0) throw;
@@ -76,8 +90,23 @@ double Cache::IndexedSums::GetSum(int i) {
     return value;
 }
 
+double Cache::IndexedSums::GetSum2(int i) {
+    if (i < 0) throw;
+    if (fSums2->size() <= i) throw;
+    // This odd ordering is to make sure the thread-safe hostPtr update
+    // finishes before the sum is set to be valid.  The use of isfinite is to
+    // make sure that the optimizer doesn't reorder the statements.
+    double value = fSums2->hostPtr()[i];
+    if (std::isfinite(value)) fSumsValid = true;
+    return value;
+}
+
 const double* Cache::IndexedSums::GetSumsPointer() {
     return fSums->hostPtr();
+}
+
+const double* Cache::IndexedSums::GetSums2Pointer() {
+    return fSums2->hostPtr();
 }
 
 bool* Cache::IndexedSums::GetSumsValidPointer() {
@@ -104,14 +133,18 @@ namespace {
     // A function to do the sums
     HEMI_KERNEL_FUNCTION(HEMIIndexedSumKernel,
                          double* sums,
+                         double* sums2,
                          const double* inputs,
                          const short* indexes,
                          const int NP) {
         for (int i : hemi::grid_stride_range(0,NP)) {
+            const double v = inputs[i];
 #ifdef HEMI_DEV_CODE
-            CacheAtomicAdd(&sums[indexes[i]],inputs[i]);
+            CacheAtomicAdd(&sums[indexes[i]],v);
+            CacheAtomicAdd(&sums2[indexes[i]],v*v);
 #else
-            sums[indexes[i]] += inputs[i];
+            sums[indexes[i]] += v;
+            sums2[indexes[i]] += v*v;
 #endif
         }
     }
@@ -128,9 +161,15 @@ bool Cache::IndexedSums::Apply() {
                  0.0,
                  fSums->size());
 
+    hemi::launch(resetKernel,
+                 fSums2->writeOnlyPtr(),
+                 0.0,
+                 fSums2->size());
+
     HEMIIndexedSumKernel indexedSumKernel;
     hemi::launch(indexedSumKernel,
                  fSums->writeOnlyPtr(),
+                 fSums2->writeOnlyPtr(),
                  fEventWeights.readOnlyPtr(),
                  fIndexes->readOnlyPtr(),
                  fEventWeights.size());

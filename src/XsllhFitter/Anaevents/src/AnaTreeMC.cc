@@ -6,7 +6,7 @@
 #include "Logger.h"
 #include "TTreeFormula.h"
 #include <future>
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[AnaTreeMC]");

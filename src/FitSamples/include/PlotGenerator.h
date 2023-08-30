@@ -89,6 +89,9 @@ public:
   [[nodiscard]] const std::vector<HistHolder> &getComparisonHistHolderList() const;
   [[nodiscard]] std::map<std::string, std::shared_ptr<TCanvas>> getBufferCanvasList() const;
 
+  // non-const getters
+  std::vector<HistHolder> &getHistHolderList(int cacheSlot_ = 0);
+
   // Core
   void generateSamplePlots(TDirectory *saveDir_ = nullptr, int cacheSlot_ = 0);
   void generateSampleHistograms(TDirectory *saveDir_ = nullptr, int cacheSlot_ = 0);

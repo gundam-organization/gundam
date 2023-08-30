@@ -111,6 +111,11 @@ void DialInputBuffer::addParameterIndices(const std::pair<size_t, size_t>& indic
   _buffer_.emplace_back(std::nan("unset"));
 }
 void DialInputBuffer::addMirrorBounds(const std::pair<double, double>& lowEdgeAndRange_){
+  const int p = _parameterMirrorBounds_.size();
+  // Overriding the const to allow the mirroring information to be stored
+  FitParameter& par = const_cast<FitParameter&>(getFitParameter(p));
+  par.setMinMirror(lowEdgeAndRange_.first);
+  par.setMaxMirror(lowEdgeAndRange_.first + lowEdgeAndRange_.second);
   _parameterMirrorBounds_.emplace_back(lowEdgeAndRange_);
 }
 const std::pair<double,double>&

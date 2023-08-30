@@ -27,7 +27,7 @@ class FitterEngine;
 /// more closely related to the chi-square (so -LLH/2).
 
 class LikelihoodInterface {
-  
+
 public:
   /////////////////////////////////////////////////////////////////
   // Getters and Setters are defined in this file so the compiler can inline
@@ -64,6 +64,35 @@ public:
 
   /// A pointer to a ROOT runctor that calls the evalFitValid method.
   ROOT::Math::Functor* evalFitValidFunctor() {return _validFunctor_.get();}
+
+  /// Return the last likelihood value that was calculated.  This is a
+  /// short cut to call the owner's getPropagator().getLlhBuffer() method.
+  [[nodiscard]] double getLastLikelihood() const;
+
+  /// Return the statistical part of the last likelihood value that was
+  /// calculated.  This is a short cut to call the owner's
+  /// getPropagator().GetLlhStatBuffer() method
+  [[nodiscard]] double getLastLikelihoodStat() const;
+
+  /// Return the penalty part of the last likelihood value that was
+  /// calculated.  This is a short cut to call the owner's
+  /// getPropagator().GetLlhPenaltyBuffer() method.
+  [[nodiscard]] double getLastLikelihoodPenalty() const;
+
+  /// Define the type of validity that needs to be required by
+  /// hasValidParameterValues.  This accepts a string with the possible values
+  /// being:
+  ///
+  ///  "range" (default) -- Between the parameter minimum and maximum values.
+  ///  "norange"         -- Do not require parameters in the valid range
+  ///  "mirror"          -- Between the mirrored values (if parameter has
+  ///                       mirroring).
+  ///  "nomirror"        -- Do not require parameters in the mirrored range
+  ///  "physical"        -- Only physically meaningful values.
+  ///  "nophysical"      -- Do not require parameters in the physical range.
+  ///
+  /// Example: setParameterValidity("range,mirror,physical")
+  void setParameterValidity(const std::string& validity);
 
   /// Check that the parameters for the last time the propagator was used are
   /// all within the allowed ranges.
@@ -143,6 +172,13 @@ private:
   /// evalFitValid.
   std::unique_ptr<ROOT::Math::Functor> _validFunctor_;
 
+  /// A set of flags used by the evalFitValid method to determine the function
+  /// validity.  The flaggs are:
+  /// "1" -- require valid parameters
+  /// "2" -- require in the mirrored range
+  /// "4" -- require in the physical range
+  int _validFlags_{7};
+
   /// A vector of pointers to fit parameters that defined the elements in the
   /// array of parameters passed to evalFit.
   std::vector<FitParameter*> _minimizerFitParameterPtr_{};
@@ -177,7 +213,6 @@ private:
 
   /// A tree that save the history of the minimization.
   std::unique_ptr<TTree> _chi2HistoryTree_{nullptr};
-
 
   // Output monitors!
   GenericToolbox::VariablesMonitor _convergenceMonitor_;

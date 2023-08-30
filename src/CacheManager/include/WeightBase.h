@@ -35,6 +35,10 @@ public:
     // everyplace.
     virtual ~Base() {}
 
+    /// Reinitialize the cache.  This puts it into a state to be refilled, but
+    /// does not deallocate any memory.
+    virtual void Reset() = 0;
+
     /// Apply the weights to the event weight cache.  This will run a kernel
     /// to modify the weights cache.
     virtual bool Apply() = 0;

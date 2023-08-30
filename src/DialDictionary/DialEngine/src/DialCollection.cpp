@@ -2,14 +2,12 @@
 // Created by Adrien Blanchet on 29/11/2022.
 //
 
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 #include "DialCollection.h"
 #include "DialTypes.h"
 #include "DialBaseFactory.h"
 
 #include "GenericToolbox.Json.h"
-#include "Misc.h"
-
 #include "Logger.h"
 
 #include <sstream>
@@ -20,7 +18,10 @@ LoggerInit([]{
 });
 
 DialCollection::DialCollection(std::vector<FitParameterSet> *targetParameterSetListPtr)
-  : _parameterSetListPtr_(targetParameterSetListPtr) {}
+  : _parameterSetListPtr_(targetParameterSetListPtr) {
+
+}
+
 
 void DialCollection::readConfigImpl() {
 
@@ -28,7 +29,7 @@ void DialCollection::readConfigImpl() {
     _config_, "applyOnDataSets", std::vector<std::string>());
   if( _dataSetNameList_.empty() ){ _dataSetNameList_.emplace_back("*"); }
 
-  if( GlobalVariables::isDisableDialCache() ){
+  if( GundamGlobals::isDisableDialCache() ){
     _disableDialCache_ = true;
   }
 
@@ -40,7 +41,6 @@ void DialCollection::readConfigImpl() {
     _isEnabled_ = false;
   }
 }
-
 void DialCollection::initializeImpl() {
   LogInfo << "Initialising dial collection \"" << this->getTitle() << "\"" << std::endl;
 
@@ -48,77 +48,101 @@ void DialCollection::initializeImpl() {
   this->setupDialInterfaceReferences();
 }
 
+// setters
 void DialCollection::setIndex(int index) {
   _index_ = index;
 }
-
 void DialCollection::setSupervisedParameterIndex(int supervisedParameterIndex) {
   _supervisedParameterIndex_ = supervisedParameterIndex;
 }
-
 void DialCollection::setSupervisedParameterSetIndex(int supervisedParameterSetIndex) {
   _supervisedParameterSetIndex_ = supervisedParameterSetIndex;
 }
 
+// const getters
 bool DialCollection::isEnabled() const {
   return _isEnabled_;
 }
-
 bool DialCollection::isBinned() const {
   return _isBinned_;
 }
+bool DialCollection::useCachedDials() const{
+#ifdef USE_BREAKDOWN_CACHE
+  return false;
+#endif
 
+  if( _disableDialCache_ ) return false;
+
+  // only:
+  // and not "norm"
+  if( _globalDialType_ == "Norm" or _globalDialType_ == "Normalization" ) return false;
+  // binned dials -> NO! use cache: event by event dial cache is usefull since fitters don't move all parameters at once
+//  if( not _isBinned_ ) return false;
+  // and not eigen decomp (as the cache will never be triggered)
+  // NO ! fitters don't move all parameters at once
+//  if( _parameterSetListPtr_->at(_supervisedParameterSetIndex_).isUseEigenDecompInFit() ) return false;
+
+  // then ok:
+  return true;
+}
 bool DialCollection::isAllowDialExtrapolation() const {
   return _allowDialExtrapolation_;
 }
-
 const std::string &DialCollection::getGlobalDialLeafName() const {
   return _globalDialLeafName_;
 }
-
 const std::string &DialCollection::getGlobalDialType() const {
   return _globalDialType_;
 }
-
 const std::string &DialCollection::getGlobalDialSubType() const {
   return _globalDialSubType_;
 }
-
-const std::shared_ptr<TFormula> &DialCollection::getApplyConditionFormula() const {
-  return _applyConditionFormula_;
-}
-
 const DataBinSet &DialCollection::getDialBinSet() const {
   return _dialBinSet_;
+}
+const std::shared_ptr<TFormula> &DialCollection::getApplyConditionFormula() const {
+  return _applyConditionFormula_;
 }
 const std::vector<std::string> &DialCollection::getDataSetNameList() const {
   return _dataSetNameList_;
 }
 
+// non-const getters
+DataBinSet &DialCollection::getDialBinSet(){
+  return _dialBinSet_;
+}
 std::vector<DialCollection::DialBaseObject> &DialCollection::getDialBaseList() {
   return _dialBaseList_;
 }
-
 std::vector<DialInterface> &DialCollection::getDialInterfaceList() {
   return _dialInterfaceList_;
 }
 
-DataBinSet &DialCollection::getDialBinSet(){
-  return _dialBinSet_;
-}
+// non-trivial getters
+bool DialCollection::isDatasetValid(const std::string& datasetName_) const{
+  if( GenericToolbox::doesElementIsInVector(datasetName_, _dataSetNameList_) ){ return true; }
 
-std::string DialCollection::getTitle() {
-  if( _supervisedParameterSetIndex_ != -1 ){
-    if( _supervisedParameterIndex_ != -1 ){
-      return _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().at(_supervisedParameterIndex_).getFullTitle();
-    }
-    else{
-      return _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getName();
+  // If not found, find general dialSet
+  if( _dataSetNameList_.size() == 1 ){
+    if(    GenericToolbox::doesElementIsInVector("", _dataSetNameList_)
+           or GenericToolbox::doesElementIsInVector("*", _dataSetNameList_)
+        ){
+      return true;
     }
   }
+
+  return false;
+}
+std::string DialCollection::getTitle() const {
+
+  auto* parPtr{this->getSupervisedParameter()};
+  if( parPtr != nullptr ){ return parPtr->getFullTitle(); }
+
+  auto* parSetPtr{this->getSupervisedParameterSet()};
+  if( parSetPtr != nullptr ){ return parSetPtr->getName(); }
+
   return {"UnsetParameterSuperVision"};
 }
-
 std::string DialCollection::getSummary(bool shallow_){
   std::stringstream ss;
   ss << "DialCollection: ";
@@ -136,32 +160,40 @@ std::string DialCollection::getSummary(bool shallow_){
 
   return ss.str();
 }
-
-bool DialCollection::isDatasetValid(const std::string& datasetName_) const{
-  if( GenericToolbox::doesElementIsInVector(datasetName_, _dataSetNameList_) ){ return true; }
-
-  // If not found, find general dialSet
-  if( _dataSetNameList_.size() == 1 ){
-    if(    GenericToolbox::doesElementIsInVector("", _dataSetNameList_)
-        or GenericToolbox::doesElementIsInVector("*", _dataSetNameList_)
-        ){
-      return true;
-    }
-  }
-
-  return false;
+FitParameter* DialCollection::getSupervisedParameter() const {
+  auto* parSetPtr = this->getSupervisedParameterSet();
+  if( parSetPtr == nullptr ) return nullptr;
+  if( _supervisedParameterIndex_ < 0 ) return nullptr;
+  if( _supervisedParameterIndex_ > parSetPtr->getParameterList().size() ) return nullptr;
+  return &parSetPtr->getParameterList().at(_supervisedParameterIndex_);
 }
-size_t DialCollection::getNextDialFreeSlot(){
-  return _dialFreeSlot_++;
+FitParameterSet* DialCollection::getSupervisedParameterSet() const{
+  if( _supervisedParameterSetIndex_ < 0 ) return nullptr;
+  if( _supervisedParameterSetIndex_ > _parameterSetListPtr_->size() ) return nullptr;
+  return &_parameterSetListPtr_->at(_supervisedParameterSetIndex_);
+}
+
+// core
+void DialCollection::clear(){
+  _dialInterfaceList_.clear();
+  _dialBaseList_.clear();
+  _dialInterfaceList_.shrink_to_fit();
+  _dialBaseList_.shrink_to_fit();
+  _dialFreeSlot_ = 0;
 }
 void DialCollection::resizeContainers(){
   LogInfo << "Resizing containers of the dial collection \"" << this->getTitle() << "\" from "
-  << _dialInterfaceList_.size() << " to " << _dialFreeSlot_ << std::endl;
+          << _dialInterfaceList_.size() << " to " << _dialFreeSlot_ << std::endl;
   _dialInterfaceList_.resize(_dialFreeSlot_);
   _dialBaseList_.resize(_dialFreeSlot_);
   _dialInterfaceList_.shrink_to_fit();
   _dialBaseList_.shrink_to_fit();
   this->setupDialInterfaceReferences();
+}
+void DialCollection::updateInputBuffers(){
+  std::for_each(_dialInputBufferList_.begin(), _dialInputBufferList_.end(), [](DialInputBuffer& i_){
+    i_.updateBuffer();
+  });
 }
 void DialCollection::setupDialInterfaceReferences(){
   LogThrowIf(_supervisedParameterSetIndex_==-1, "par set index not set.");
@@ -172,9 +204,9 @@ void DialCollection::setupDialInterfaceReferences(){
   if( _supervisedParameterIndex_ == -1 ){
     // one dial interface per parameter
     LogThrowIf(_dialBaseList_.size() != _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size(),
-      "Nb of dial base don't match the number of parameters of the selected set: nDials=" << _dialBaseList_.size()
-      << " != " << "nPars=" << _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size()
-      << std::endl << "is the defined dial binning matching the number of parameters?"
+               "Nb of dial base don't match the number of parameters of the selected set: nDials=" << _dialBaseList_.size()
+                                                                                                   << " != " << "nPars=" << _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size()
+                                                                                                   << std::endl << "is the defined dial binning matching the number of parameters?"
     );
     _dialInputBufferList_.resize(_dialBaseList_.size());
     for( size_t iDial = 0 ; iDial < _dialBaseList_.size() ; iDial++ ){
@@ -253,40 +285,144 @@ void DialCollection::setupDialInterfaceReferences(){
     }
   }
 }
-
-void DialCollection::updateInputBuffers(){
-  std::for_each(_dialInputBufferList_.begin(), _dialInputBufferList_.end(), [](DialInputBuffer& i_){
-    i_.updateBuffer();
-  });
-}
-void DialCollection::clear(){
-  _dialInterfaceList_.clear();
-  _dialBaseList_.clear();
-  _dialInterfaceList_.shrink_to_fit();
-  _dialBaseList_.shrink_to_fit();
-  _dialFreeSlot_ = 0;
+size_t DialCollection::getNextDialFreeSlot(){
+  return _dialFreeSlot_++;
 }
 
-bool DialCollection::useCachedDials() const{
-#ifdef USE_BREAKDOWN_CACHE
-  return false;
-#endif
 
-  if( _disableDialCache_ ) return false;
+// init protected
+void DialCollection::readGlobals(const nlohmann::json &config_) {
+  // globals for the dialSet
+  _enableDialsSummary_ = GenericToolbox::Json::fetchValue<bool>(_config_, "printDialsSummary", _enableDialsSummary_);
 
-  // only:
-  // and not "norm"
-  if( _globalDialType_ == "Norm" or _globalDialType_ == "Normalization" ) return false;
-  // binned dials -> NO! use cache: event by event dial cache is usefull since fitters don't move all parameters at once
-//  if( not _isBinned_ ) return false;
-  // and not eigen decomp (as the cache will never be triggered)
-  // NO ! fitters don't move all parameters at once
-//  if( _parameterSetListPtr_->at(_supervisedParameterSetIndex_).isUseEigenDecompInFit() ) return false;
+  _globalDialType_ = GenericToolbox::Json::fetchValue(config_, "dialsType", _globalDialType_);
 
-  // then ok:
-  return true;
+  _globalDialSubType_ =  GenericToolbox::Json::fetchValue<std::string>(config_, "dialSubType", _globalDialSubType_);
+
+  _globalDialLeafName_ = GenericToolbox::Json::fetchValue<std::string>(config_, "dialLeafName", _globalDialLeafName_);
+
+  if (GenericToolbox::Json::doKeyExist(config_, "applyCondition")) {
+    _applyConditionStr_ = GenericToolbox::Json::fetchValue<std::string>(config_, "applyCondition");
+  } else if (GenericToolbox::Json::doKeyExist(config_, "applyConditions")) {
+    std::vector<std::string> conditionsList;
+
+    for (auto &condEntry: GenericToolbox::Json::fetchValue<std::vector<nlohmann::json>>(config_, "applyConditions")) {
+      if (condEntry.is_string()) {
+        conditionsList.emplace_back(condEntry.get<std::string>());
+      } else if (condEntry.is_structured()) {
+        auto expression = GenericToolbox::Json::fetchValue<std::string>(condEntry, {{"exp"},
+                                                                                    {"expression"},
+                                                                                    {"var"},
+                                                                                    {"variable"}});
+        std::stringstream ssCondEntry;
+
+        // allowedRanges
+        {
+          auto allowedRanges = GenericToolbox::Json::fetchValue(condEntry, "allowedRanges",
+                                                                std::vector<std::pair<double, double>>());
+          if (not allowedRanges.empty()) {
+            std::vector<std::string> allowedRangesCond;
+            for (auto &allowedRange: allowedRanges) {
+              LogThrowIf(allowedRange.first >= allowedRange.second,
+                         "Invalid range bounds: min(" << allowedRange.first << ") max(" << allowedRange.second << ")")
+              std::stringstream condSs;
+              condSs << "(" << expression << " >= " << allowedRange.first;
+              condSs << " && " << expression << " < " << allowedRange.second << ")";
+              allowedRangesCond.emplace_back(condSs.str());
+            }
+            ssCondEntry << GenericToolbox::joinVectorString(allowedRangesCond, " || ");
+          }
+        }
+
+        // allowedValues
+        {
+          auto allowedValues = GenericToolbox::Json::fetchValue(condEntry, "allowedValues", std::vector<double>());
+          if (not allowedValues.empty()) {
+            std::vector<std::string> allowedValuesCond;
+            for (auto &allowedValue: allowedValues) {
+              std::stringstream condSs;
+              condSs << expression << " == " << allowedValue;
+              allowedValuesCond.emplace_back(condSs.str());
+            }
+            if (not ssCondEntry.str().empty()) ssCondEntry << " || "; // allowed regions are linked with "OR"
+            ssCondEntry << GenericToolbox::joinVectorString(allowedValuesCond, " || ");
+          }
+        }
+
+        auto excludedRanges = GenericToolbox::Json::fetchValue(condEntry, "excludedRanges",
+                                                               std::vector<std::pair<double, double>>());
+        auto excludedValues = GenericToolbox::Json::fetchValue(condEntry, "excludedValues", std::vector<double>());
+        if (not excludedRanges.empty() or not excludedValues.empty()) {
+          if (not ssCondEntry.str().empty()) {
+            // exclusion ranges are linked with &&: they are supposed to prevail
+            ssCondEntry.str("(" + ssCondEntry.str() + ")");
+            // after that no parenthesis needed since only && will be used
+          }
+
+          {
+            if (not excludedRanges.empty()) {
+              std::vector<std::string> excludedRangesCond;
+              for (auto &excludedRange: excludedRanges) {
+                LogThrowIf(excludedRange.first >= excludedRange.second,
+                           "Invalid range bounds: min(" << excludedRange.first << ") max(" << excludedRange.second
+                                                        << ")")
+                std::stringstream condSs;
+                condSs << expression << " < " << excludedRange.first << " && ";
+                condSs << expression << " >= " << excludedRange.second;
+                excludedRangesCond.emplace_back(condSs.str());
+              }
+              if (not ssCondEntry.str().empty()) ssCondEntry << " && "; // allowed regions are linked with "OR"
+              ssCondEntry << GenericToolbox::joinVectorString(excludedRangesCond, " && ");
+            }
+          }
+
+          {
+            if (not excludedValues.empty()) {
+              std::vector<std::string> excludedValuesCond;
+              for (auto &excludedValue: excludedValues) {
+                std::stringstream condSs;
+                condSs << expression << " == " << excludedValue;
+                excludedValuesCond.emplace_back(condSs.str());
+              }
+              if (not ssCondEntry.str().empty()) ssCondEntry << " && "; // allowed regions are linked with "OR"
+              ssCondEntry << GenericToolbox::joinVectorString(excludedValuesCond, " && ");
+            }
+          }
+        }
+
+        LogThrowIf(ssCondEntry.str().empty(), "Could not parse condition entry: " << condEntry)
+        conditionsList.emplace_back(ssCondEntry.str());
+      } else {
+        LogThrow("Could not recognise condition entry: " << condEntry);
+      }
+    }
+
+    LogThrowIf(conditionsList.empty(), "No apply condition was recognised.")
+    _applyConditionStr_ = "( ";
+    _applyConditionStr_ += GenericToolbox::joinVectorString(conditionsList, " ) && ( ");
+    _applyConditionStr_ += " )";
+  }
+
+  if (not _applyConditionStr_.empty()) {
+    _applyConditionFormula_ = std::make_shared<TFormula>("_applyConditionFormula_", _applyConditionStr_.c_str());
+    LogThrowIf(not _applyConditionFormula_->IsValid(),
+               "\"" << _applyConditionStr_ << "\": could not be parsed as formula expression.")
+  }
+
+  _minDialResponse_ = GenericToolbox::Json::fetchValue(config_, {{"minDialResponse"},
+                                                                 {"minimumSplineResponse"}}, _minDialResponse_);
+  _maxDialResponse_ = GenericToolbox::Json::fetchValue(config_, "maxDialResponse", _maxDialResponse_);
+
+  _useMirrorDial_ = GenericToolbox::Json::fetchValue(config_, "useMirrorDial", _useMirrorDial_);
+  if (_useMirrorDial_) {
+    _mirrorLowEdge_ = GenericToolbox::Json::fetchValue(config_, "mirrorLowEdge", _mirrorLowEdge_);
+    _mirrorHighEdge_ = GenericToolbox::Json::fetchValue(config_, "mirrorHighEdge", _mirrorHighEdge_);
+    _mirrorRange_ = _mirrorHighEdge_ - _mirrorLowEdge_;
+    LogThrowIf(_mirrorRange_ < 0, GET_VAR_NAME_VALUE(_mirrorHighEdge_) << " < " << GET_VAR_NAME_VALUE(_mirrorLowEdge_))
+  }
+
+  _allowDialExtrapolation_ = GenericToolbox::Json::fetchValue(config_, "allowDialExtrapolation", _allowDialExtrapolation_);
 }
-
 bool DialCollection::initializeNormDialsWithParBinning() {
   auto parameterBinningPath = GenericToolbox::Json::fetchValue<std::string>(_config_, "parametersBinningPath", "");
   if( parameterBinningPath.empty() ){ return false; }
@@ -314,7 +450,6 @@ bool DialCollection::initializeNormDialsWithParBinning() {
 
   return true;
 }
-
 bool DialCollection::initializeDialsWithDefinition() {
 
   nlohmann::json dialsDefinition = _config_;
@@ -498,145 +633,10 @@ bool DialCollection::initializeDialsWithDefinition() {
 
   return true;
 }
-
-
-void DialCollection::readGlobals(const nlohmann::json &config_) {
-    // globals for the dialSet
-  _enableDialsSummary_ = GenericToolbox::Json::fetchValue<bool>(_config_, "printDialsSummary", _enableDialsSummary_);
-
-  _globalDialType_ = GenericToolbox::Json::fetchValue(config_, "dialsType", _globalDialType_);
-
-  _globalDialSubType_ =  GenericToolbox::Json::fetchValue<std::string>(config_, "dialSubType", _globalDialSubType_);
-
-  _globalDialLeafName_ = GenericToolbox::Json::fetchValue<std::string>(config_, "dialLeafName", _globalDialLeafName_);
-
-  if (GenericToolbox::Json::doKeyExist(config_, "applyCondition")) {
-    _applyConditionStr_ = GenericToolbox::Json::fetchValue<std::string>(config_, "applyCondition");
-  } else if (GenericToolbox::Json::doKeyExist(config_, "applyConditions")) {
-    std::vector<std::string> conditionsList;
-
-    for (auto &condEntry: GenericToolbox::Json::fetchValue<std::vector<nlohmann::json>>(config_, "applyConditions")) {
-      if (condEntry.is_string()) {
-        conditionsList.emplace_back(condEntry.get<std::string>());
-      } else if (condEntry.is_structured()) {
-        auto expression = GenericToolbox::Json::fetchValue<std::string>(condEntry, {{"exp"},
-                                                                         {"expression"},
-                                                                         {"var"},
-                                                                         {"variable"}});
-        std::stringstream ssCondEntry;
-
-        // allowedRanges
-        {
-          auto allowedRanges = GenericToolbox::Json::fetchValue(condEntry, "allowedRanges",
-                                                     std::vector<std::pair<double, double>>());
-          if (not allowedRanges.empty()) {
-            std::vector<std::string> allowedRangesCond;
-            for (auto &allowedRange: allowedRanges) {
-              LogThrowIf(allowedRange.first >= allowedRange.second,
-                         "Invalid range bounds: min(" << allowedRange.first << ") max(" << allowedRange.second << ")")
-              std::stringstream condSs;
-              condSs << "(" << expression << " >= " << allowedRange.first;
-              condSs << " && " << expression << " < " << allowedRange.second << ")";
-              allowedRangesCond.emplace_back(condSs.str());
-            }
-            ssCondEntry << GenericToolbox::joinVectorString(allowedRangesCond, " || ");
-          }
-        }
-
-        // allowedValues
-        {
-          auto allowedValues = GenericToolbox::Json::fetchValue(condEntry, "allowedValues", std::vector<double>());
-          if (not allowedValues.empty()) {
-            std::vector<std::string> allowedValuesCond;
-            for (auto &allowedValue: allowedValues) {
-              std::stringstream condSs;
-              condSs << expression << " == " << allowedValue;
-              allowedValuesCond.emplace_back(condSs.str());
-            }
-            if (not ssCondEntry.str().empty()) ssCondEntry << " || "; // allowed regions are linked with "OR"
-            ssCondEntry << GenericToolbox::joinVectorString(allowedValuesCond, " || ");
-          }
-        }
-
-        auto excludedRanges = GenericToolbox::Json::fetchValue(condEntry, "excludedRanges",
-                                                    std::vector<std::pair<double, double>>());
-        auto excludedValues = GenericToolbox::Json::fetchValue(condEntry, "excludedValues", std::vector<double>());
-        if (not excludedRanges.empty() or not excludedValues.empty()) {
-          if (not ssCondEntry.str().empty()) {
-            // exclusion ranges are linked with &&: they are supposed to prevail
-            ssCondEntry.str("(" + ssCondEntry.str() + ")");
-            // after that no parenthesis needed since only && will be used
-          }
-
-          {
-            if (not excludedRanges.empty()) {
-              std::vector<std::string> excludedRangesCond;
-              for (auto &excludedRange: excludedRanges) {
-                LogThrowIf(excludedRange.first >= excludedRange.second,
-                           "Invalid range bounds: min(" << excludedRange.first << ") max(" << excludedRange.second
-                                                        << ")")
-                std::stringstream condSs;
-                condSs << expression << " < " << excludedRange.first << " && ";
-                condSs << expression << " >= " << excludedRange.second;
-                excludedRangesCond.emplace_back(condSs.str());
-              }
-              if (not ssCondEntry.str().empty()) ssCondEntry << " && "; // allowed regions are linked with "OR"
-              ssCondEntry << GenericToolbox::joinVectorString(excludedRangesCond, " && ");
-            }
-          }
-
-          {
-            if (not excludedValues.empty()) {
-              std::vector<std::string> excludedValuesCond;
-              for (auto &excludedValue: excludedValues) {
-                std::stringstream condSs;
-                condSs << expression << " == " << excludedValue;
-                excludedValuesCond.emplace_back(condSs.str());
-              }
-              if (not ssCondEntry.str().empty()) ssCondEntry << " && "; // allowed regions are linked with "OR"
-              ssCondEntry << GenericToolbox::joinVectorString(excludedValuesCond, " && ");
-            }
-          }
-        }
-
-        LogThrowIf(ssCondEntry.str().empty(), "Could not parse condition entry: " << condEntry)
-        conditionsList.emplace_back(ssCondEntry.str());
-      } else {
-        LogThrow("Could not recognise condition entry: " << condEntry);
-      }
-    }
-
-    LogThrowIf(conditionsList.empty(), "No apply condition was recognised.")
-    _applyConditionStr_ = "( ";
-    _applyConditionStr_ += GenericToolbox::joinVectorString(conditionsList, " ) && ( ");
-    _applyConditionStr_ += " )";
-  }
-
-  if (not _applyConditionStr_.empty()) {
-    _applyConditionFormula_ = std::make_shared<TFormula>("_applyConditionFormula_", _applyConditionStr_.c_str());
-    LogThrowIf(not _applyConditionFormula_->IsValid(),
-               "\"" << _applyConditionStr_ << "\": could not be parsed as formula expression.")
-  }
-
-  _minDialResponse_ = GenericToolbox::Json::fetchValue(config_, {{"minDialResponse"},
-                                                      {"minimumSplineResponse"}}, _minDialResponse_);
-  _maxDialResponse_ = GenericToolbox::Json::fetchValue(config_, "maxDialResponse", _maxDialResponse_);
-
-  _useMirrorDial_ = GenericToolbox::Json::fetchValue(config_, "useMirrorDial", _useMirrorDial_);
-  if (_useMirrorDial_) {
-    _mirrorLowEdge_ = GenericToolbox::Json::fetchValue(config_, "mirrorLowEdge", _mirrorLowEdge_);
-    _mirrorHighEdge_ = GenericToolbox::Json::fetchValue(config_, "mirrorHighEdge", _mirrorHighEdge_);
-    _mirrorRange_ = _mirrorHighEdge_ - _mirrorLowEdge_;
-    LogThrowIf(_mirrorRange_ < 0, GET_VAR_NAME_VALUE(_mirrorHighEdge_) << " < " << GET_VAR_NAME_VALUE(_mirrorLowEdge_))
-  }
-
-  _allowDialExtrapolation_ = GenericToolbox::Json::fetchValue(config_, "allowDialExtrapolation", _allowDialExtrapolation_);
-}
-
-
 nlohmann::json DialCollection::fetchDialsDefinition(const nlohmann::json &definitionsList_) {
-  LogThrowIf(_supervisedParameterIndex_==-1, "Can't fetch dial definition of parameter: par ref not set.");
-  auto* par = &_parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList()[_supervisedParameterIndex_];
+  auto* parSetPtr = this->getSupervisedParameterSet();
+  LogThrowIf(parSetPtr == nullptr, "Can't fetch dial definition of parameter: par ref not set.");
+  auto* par = &parSetPtr->getParameterList()[_supervisedParameterIndex_];
   for(size_t iDial = 0 ; iDial < definitionsList_.size() ; iDial++ ){
     if( par->getName().empty() ){
       if( par->getParameterIndex() == iDial ){
@@ -649,6 +649,7 @@ nlohmann::json DialCollection::fetchDialsDefinition(const nlohmann::json &defini
   }
   return {};
 }
+
 
 //  A Lesser GNU Public License
 

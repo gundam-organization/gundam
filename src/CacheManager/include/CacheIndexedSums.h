@@ -27,6 +27,9 @@ private:
     // The accumulated weights for each histogram bin.
     std::unique_ptr<hemi::Array<double>> fSums;
 
+    // The accumulated weights for each histogram bin.
+    std::unique_ptr<hemi::Array<double>> fSums2;
+
     // Cache of whether the result values in memory are valid.
     bool fSumsValid;
 
@@ -37,9 +40,13 @@ public:
     IndexedSums(Cache::Weights::Results& eventWeight,
                std::size_t bins);
 
-    // Deconstruct the class.  This should deallocate all the memory
-    // everyplace.
+    /// Deconstruct the class.  This should deallocate all the memory
+    /// everyplace.
     virtual ~IndexedSums();
+
+    /// Reinitialize the cache.  This puts it into a state to be refilled, but
+    /// does not deallocate any memory.
+    void Reset();
 
     /// Return the approximate allocated memory (e.g. on the GPU).
     std::size_t GetResidentMemory() const {return fTotalBytes;}
@@ -58,8 +65,15 @@ public:
     /// from the device if that is necessary.
     double GetSum(int i);
 
+    /// Get the sum squared for index i from host memory.  This might trigger
+    /// a copy from the device if that is necessary.
+    double GetSum2(int i);
+
     /// The pointer to the array of sums on the host.
     const double* GetSumsPointer();
+
+    /// The pointer to the array of sums squared on the host.
+    const double* GetSums2Pointer();
 
     /// A pointer to the validity flag.
     bool* GetSumsValidPointer();

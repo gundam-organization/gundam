@@ -1,26 +1,11 @@
 set(SRCFILES
         src/FitParameterSet.cpp
         src/FitParameter.cpp
-        src/DialSet.cpp
-        src/Dial.cpp
-        src/NormDial.cpp
-        src/SplineDial.cpp
-        src/GraphDial.cpp
-        src/NestedDialTest.cpp
         )
 
-#file( GLOB MY_PUBLIC_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/../Utils/include/*.h" )
-
 set(HEADERS
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/Dial.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/DialSet.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/DialWrapper.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/FitParameter.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/FitParameterSet.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/GraphDial.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/NestedDialTest.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/NormDial.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/SplineDial.h
         )
 
 

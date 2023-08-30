@@ -48,9 +48,9 @@ private:
 
     /// An array of the knots to calculate the splines.  This is copied from
     /// the CPU to the GPU once, and is then constant.
-    std::size_t    fSplineKnotsReserved;
-    std::size_t    fSplineKnotsUsed;
-    std::unique_ptr<hemi::Array<WEIGHT_BUFFER_FLOAT>> fSplineKnots;
+    std::size_t    fSplineSpaceReserved;
+    std::size_t    fSplineSpaceUsed;
+    std::unique_ptr<hemi::Array<WEIGHT_BUFFER_FLOAT>> fSplineSpace;
 
 public:
     // A static method to return the number of knots that will be used by this
@@ -78,8 +78,12 @@ public:
     // everyplace.
     virtual ~UniformSpline();
 
+    /// Reinitialize the cache.  This puts it into a state to be refilled, but
+    /// does not deallocate any memory.
+    virtual void Reset() override;
+
     // Apply the kernel to the event weights.
-    virtual bool Apply();
+    virtual bool Apply() override;
 
     /// Return the number of parameters using a spline with uniform knots that
     /// are reserved.
@@ -90,10 +94,10 @@ public:
     std::size_t GetSplinesUsed() {return fSplinesUsed;}
 
     /// Return the number of elements reserved to hold knots.
-    std::size_t GetSplineKnotsReserved() const {return fSplineKnotsReserved;}
+    std::size_t GetSplineSpaceReserved() const {return fSplineSpaceReserved;}
 
     /// Return the number of elements currently used to hold knots.
-    std::size_t GetSplineKnotsUsed() const {return fSplineKnotsUsed;}
+    std::size_t GetSplineSpaceUsed() const {return fSplineSpaceUsed;}
 
     /// Add a spline data.
     void AddSpline(int resultIndex, int parIndex, const std::vector<double>& splineData);

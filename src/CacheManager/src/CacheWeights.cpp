@@ -52,9 +52,18 @@ Cache::Weights::Weights(
 
     // Initialize the caches.  Don't try to zero everything since the
     // caches can be huge.
+    Reset();
+}
+
+void Cache::Weights::Reset() {
+    fResultsValid = false;
     std::fill(fInitialValues->hostPtr(),
               fInitialValues->hostPtr() + fInitialValues->size(),
               1.0);
+    for (int i=0; i<fWeightCalculators; ++i) {
+        if (!fWeightCalculator.at(i)) continue;
+        fWeightCalculator.at(i)->Reset();
+    }
 }
 
 double Cache::Weights::GetResult(int i) {

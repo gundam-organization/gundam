@@ -1,7 +1,7 @@
 #include <utility>
 
 #include "AnaSample.hh"
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 #include "Logger.h"
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"

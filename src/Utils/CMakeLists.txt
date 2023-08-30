@@ -1,14 +1,14 @@
 set(SRCFILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/GlobalVariables.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamGlobals.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/DataBinSet.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/DataBin.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamGreetings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/JsonBaseClass.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/VariableDictionary.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Misc.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ParameterThrowerMarkHarz.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ConfigUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamUtils.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamApp.cpp
     )
 
 set(HEADERS
@@ -17,14 +17,15 @@ set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/CalculateUniformSpline.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/DataBin.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/DataBinSet.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/GlobalVariables.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamGlobals.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamGreetings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/JsonBaseClass.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/Likelihoods.hh
     ${CMAKE_CURRENT_SOURCE_DIR}/include/VariableDictionary.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/Misc.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ParameterThrowerMarkHarz.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ConfigUtils.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamUtils.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamApp.h
     )
 
 

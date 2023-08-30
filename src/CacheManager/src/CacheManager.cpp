@@ -12,15 +12,8 @@
 #include "CacheIndexedSums.h"
 
 #include "FitParameterSet.h"
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 
-#ifndef USE_NEW_DIALS
-#include "Dial.h"
-#include "DialSet.h"
-#include "SplineDial.h"
-#include "GraphDial.h"
-#include "NormDial.h"
-#else
 #include "EventDialCache.h"
 #include "Norm.h"
 #include "GeneralSpline.h"
@@ -29,8 +22,6 @@
 #include "MonotonicSpline.h"
 #include "LightGraph.h"
 #include "Shift.h"
-#endif
-
 
 #include <memory>
 #include <vector>
@@ -41,41 +32,8 @@ LoggerInit([]{
 });
 
 Cache::Manager* Cache::Manager::fSingleton = nullptr;
+bool Cache::Manager::fUpdateRequired = true;
 std::map<const FitParameter*, int> Cache::Manager::ParameterMap;
-
-#ifndef USE_NEW_DIALS
-std::string Cache::Manager::SplineType(const SplineDial* dial) {
-    const TSpline3* s = dial->getSplinePtr();
-    if (!s) throw std::runtime_error("Null spline pointer");
-    const int points = s->GetNp();
-
-    // Check if the spline has uniformly spaced knots.  There is a flag for
-    // this is TSpline3, but it's not uniformly (or ever) filled correctly.
-    bool uniform = true;
-    for (int i = 1; i < points-1; ++i) {
-        double x;
-        double y;
-        s->GetKnot(i-1,x,y);
-        double d1 = x;
-        s->GetKnot(i,x,y);
-        d1 = x - d1;
-        double d2 = x;
-        s->GetKnot(i+1,x,y);
-        d2 = x - d2;
-        if (std::abs((d1-d2)/(d1+d2)) > 1E-6) {
-            uniform = false;
-            break;
-        }
-    }
-
-    std::string subType = dial->getOwner()->getDialSubType();
-
-    if (!uniform) return {"generalSpline"};
-    if (subType == "compact") return {"compactSpline"};
-    if (subType == "monotonic") return {"monotonicSpline"};
-    return {"uniformSpline"};
-}
-#endif
 
 Cache::Manager::Manager(int events, int parameters,
                         int norms,
@@ -152,13 +110,8 @@ Cache::Manager::Manager(int events, int parameters,
                                   fParameterCache->GetLowerClamps(),
                                   fParameterCache->GetUpperClamps(),
                                   graphs, graphPoints);
-        std::cout << "Allocated graphs Cache " << std::endl;
         fWeightsCache->AddWeightCalculator(fGraphs.get());
-        std::cout << "Added graph weight calculator" << std::endl;
         fTotalBytes += fGraphs->GetResidentMemory();
-        std::cout << "got total bytes " << std::endl;
-
-        std::cout << "Allocate histogram Cache " << histBins << std::endl;
         fHistogramsCache = std::make_unique<Cache::IndexedSums>(
                                   fWeightsCache->GetWeights(),
                                   histBins);
@@ -170,7 +123,7 @@ Cache::Manager::Manager(int events, int parameters,
         throw std::runtime_error("Not enough memory available");
     }
 
-    LogInfo  << "Approximate cache manager size for"
+    LogInfo << "Approximate cache manager size for"
             << " " << events << " events:"
             << " " << double(GetResidentMemory())/1E+9 << " GB "
             << " (" << GetResidentMemory()/events << " bytes per event)"
@@ -181,10 +134,9 @@ bool Cache::Manager::HasCUDA() {
     return Cache::Parameters::UsingCUDA();
 }
 
-#ifdef USE_NEW_DIALS
 bool Cache::Manager::Build(FitSampleSet& sampleList,
                            EventDialCache& eventDials) {
-    LogInfo << "Build the cache for Cache::Manager" << std::endl;
+    LogInfo << "Build the internal caches " << std::endl;
 
     /// Zero everything before counting the amount of space needed for the
     /// event dials
@@ -348,7 +300,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList,
     // Try to allocate the Cache::Manager memory (including for the GPU if
     // it's being used).
     if (!Cache::Manager::Get()
-        && GlobalVariables::getEnableCacheManager()) {
+        && GundamGlobals::getEnableCacheManager()) {
         LogInfo << "Creating the Cache::Manager" << std::endl;
         if (!Cache::Manager::HasCUDA()) {
             LogInfo << "    GPU Not enabled with Cache::Manager"
@@ -373,10 +325,42 @@ bool Cache::Manager::Build(FitSampleSet& sampleList,
         return false;
     }
 
-    // Add the dials in the EventDialCache to the GPU cache.
-    LogInfo << "Add the dials to the cache." << std::endl;
+    Cache::Manager::UpdateRequired();
+
+    // return Update(sampleList, eventDials);
+    return true;
+}
+
+void Cache::Manager::UpdateRequired() {
+    fUpdateRequired = true;
+}
+
+
+bool Cache::Manager::Update(FitSampleSet& sampleList,
+                           EventDialCache& eventDials) {
+    if (not fUpdateRequired) return true;
+
+    // This is the updated that is required!
+    fUpdateRequired = false;
+
+    // In case the cache isn't allocated (usually because it's turned off on
+    // the command line), but this is a safety check.
+    if (!Cache::Manager::Get()) {
+        LogWarning << "Cache will not be used"
+                   << std::endl;
+        return false;
+    }
+
+    LogInfo << "Update the internal caches" << std::endl;
+
+    // Initialize the internal caches so they are in the default state.
+    Cache::Manager::Get()->GetParameterCache().Reset();
+    Cache::Manager::Get()->GetHistogramsCache().Reset();
+    Cache::Manager::Get()->GetWeightsCache().Reset();
+
     int usedResults = 0;
 
+    // Add the dials in the EventDialCache to the internal cache.
     for (EventDialCache::CacheElem_t& elem : eventDials.getCache()) {
         // Skip events that are not in a bin.
         if (elem.event->getSampleBinIndex() < 0) continue;
@@ -406,6 +390,9 @@ bool Cache::Manager::Build(FitSampleSet& sampleList,
             DialInterface* dialInterface = dialElem;
 #endif
             DialInputBuffer* dialInputs = dialInterface->getInputBufferRef();
+
+            // Check if this dial is used at all.
+            if (dialInputs->isMasked()) continue;
 
             // Make sure all of the used parameters are in the parameter
             // map.
@@ -453,9 +440,8 @@ bool Cache::Manager::Build(FitSampleSet& sampleList,
                     .SetUpperClamp(parIndex,resp->getMaxResponse());
             }
 
-            int dialUsed = 0;
-
             // Add the dial information to the appropriate caches
+            int dialUsed = 0;
             const DialBase* baseDial = dialInterface->getDialBaseRef();
             const Norm* normDial = dynamic_cast<const Norm*>(baseDial);
             if (normDial) {
@@ -525,7 +511,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList,
                 = dynamic_cast<const Shift*>(baseDial);
             if (shift) {
                 ++dialUsed;
-                initialEventWeight = shift->evalResponse(DialInputBuffer());
+                initialEventWeight *= shift->evalResponse(DialInputBuffer());
             }
 
             if (dialUsed != 1) {
@@ -545,7 +531,6 @@ bool Cache::Manager::Build(FitSampleSet& sampleList,
             .SetInitialValue(resultIndex,initialEventWeight);
 
     }
-
 
     LogInfo << "Error checking for cache" << std::endl;
 
@@ -576,11 +561,17 @@ bool Cache::Manager::Build(FitSampleSet& sampleList,
         sample.getMcContainer().setCacheManagerValuePointer(
             Cache::Manager::Get()->GetHistogramsCache()
             .GetSumsPointer());
+        sample.getMcContainer().setCacheManagerValue2Pointer(
+            Cache::Manager::Get()->GetHistogramsCache()
+            .GetSums2Pointer());
         sample.getMcContainer().setCacheManagerValidPointer(
             Cache::Manager::Get()->GetHistogramsCache()
             .GetSumsValidPointer());
         sample.getMcContainer().setCacheManagerUpdatePointer(
-            [](){Cache::Manager::Get()->GetHistogramsCache().GetSum(0);});
+            [](){
+                Cache::Manager::Get()->GetHistogramsCache().GetSum(0);
+                Cache::Manager::Get()->GetHistogramsCache().GetSum2(0);
+            });
         int cells = hist->GetNcells();
         nextHist += cells;
         /// ARE ALL OF THE EVENTS HANDLED?
@@ -597,363 +588,21 @@ bool Cache::Manager::Build(FitSampleSet& sampleList,
         }
     }
 
-    if (histCells != nextHist) {
+    if (Cache::Manager::Get()->GetHistogramsCache().GetSumCount()
+        != nextHist) {
         throw std::runtime_error("Histogram cells are missing");
     }
 
     return true;
 }
-#else
-bool Cache::Manager::Build(FitSampleSet& sampleList) {
-    std::cout  << "Build the cache for Cache::Manager" << std::endl;
-
-    /// Zero everything before counting the amount of space needed for the
-    /// event dials
-    int events = 0;
-    int compactSplines = 0;
-    int compactPoints = 0;
-    int monotonicSplines = 0;
-    int monotonicPoints = 0;
-    int uniformSplines = 0;
-    int uniformPoints = 0;
-    int generalSplines = 0;
-    int generalPoints = 0;
-    int graphs = 0;
-    int graphPoints = 0;
-    int norms = 0;
-    Cache::Manager::ParameterMap.clear();
-
-    /// Find the amount of space needed for the cache.
-    std::set<const FitParameter*> usedParameters;
-    for(const FitSample& sample : sampleList.getFitSampleList() ){
-        std::cout  << "Sample " << sample.getName()
-                << " with " << sample.getMcContainer().eventList.size()
-                << " events" << std::endl;
-        std::map<std::string, int> useCount;
-        for (const PhysicsEvent& event
-                 : sample.getMcContainer().eventList) {
-            ++events;
-            if (event.getSampleBinIndex() < 0) {
-                throw std::runtime_error("Caching event that isn't used");
-            }
-            for (const Dial* dial
-                     : event.getRawDialPtrList()) {
-                auto* fp = dial->getOwner()->getOwner();
-                usedParameters.insert(fp);
-                ++useCount[fp->getFullTitle()];
-                auto* sDial = dynamic_cast<const SplineDial*>(dial);
-                if (sDial) {
-                    std::string splineType = Cache::Manager::SplineType(sDial);
-                    if (sDial->getSplineType() == SplineDial::Monotonic
-                        && splineType != "monotonicSpline") LogThrow("Bad mono");
-                    if (sDial->getSplineType() == SplineDial::Uniform
-                        && splineType != "uniformSpline") LogThrow("Bad unif");
-                    if (sDial->getSplineType() == SplineDial::General
-                        && splineType != "generalSpline") LogThrow("Bad gene");
-                    const TSpline3* s = sDial->getSplinePtr();
-                    if (!s) throw std::runtime_error("Null spline pointer");
-                    if (splineType == "monotonicSpline") {
-                        ++monotonicSplines;
-                        monotonicPoints
-                            += Cache::Weight::MonotonicSpline::FindPoints(s);
-                    }
-                    else if (splineType == "uniformSpline") {
-                        ++uniformSplines;
-                        uniformPoints
-                            += Cache::Weight::UniformSpline::FindPoints(s);
-                    }
-                    else if (splineType == "generalSpline") {
-                        ++generalSplines;
-                        generalPoints
-                            += Cache::Weight::GeneralSpline::FindPoints(s);
-                    }
-                    else {
-                        std::cout << "Not a valid spline type: " << splineType
-                                 << std::endl;
-                        throw std::runtime_error("Invalid spline type");
-                    }
-                }
-                auto* gDial = dynamic_cast<const GraphDial*>(dial);
-                if (gDial) {
-                    ++graphs;
-                }
-                auto* nDial = dynamic_cast<const NormDial*>(dial);
-                if (nDial) {
-                    ++norms;
-                }
-            }
-        }
-#define DUMP_USED_PARAMETERS
-#ifdef DUMP_USED_PARAMETERS
-        for (auto& used : useCount) {
-            std::cout  << sample.getName()
-                    << " used " << used.first
-                    << " " << used.second
-                    << " times"
-                    << std::endl;
-        }
-#endif
-
-    }
-
-    // Count the total number of histogram cells.
-    int histCells = 0;
-    for(const FitSample& sample : sampleList.getFitSampleList() ){
-        if (!sample.getMcContainer().histogram) continue;
-        int cells = sample.getMcContainer().histogram->GetNcells();
-        std::cout  << "Add histogram for " << sample.getName()
-                << " with " << cells
-                << " cells (includes under/over-flows)" << std::endl;
-        histCells += cells;
-    }
-
-    int parameters = int(usedParameters.size());
-    std::cout  << "Cache for " << events << " events --"
-            << " using " << parameters << " parameters"
-            << std::endl;
-    std::cout  << "    Compact splines: " << compactSplines
-            << " (" << 1.0*compactSplines/events << " per event)"
-            << std::endl;
-    std::cout  << "    Monotonic splines: " << monotonicSplines
-            << " (" << 1.0*monotonicSplines/events << " per event)"
-            << std::endl;
-    std::cout  << "    Uniform Splines: " << uniformSplines
-            << " (" << 1.0*uniformSplines/events << " per event)"
-            << std::endl;
-    std::cout  << "    General Splines: " << generalSplines
-            << " (" << 1.0*generalSplines/events << " per event)"
-            << std::endl;
-    std::cout  << "    Graphs: " << graphs
-            << " (" << 1.0*graphs/events << " per event)"
-            << std::endl;
-    std::cout  << "    Normalizations: " << norms
-            <<" ("<< 1.0*norms/events <<" per event)"
-            << std::endl;
-    std::cout  << "    Histogram bins: " << histCells
-            << " (" << 1.0*events/histCells << " events per bin)"
-            << std::endl;
-
-    if (compactSplines > 0) {
-        std::cout  << "    Compact spline cache uses "
-                << compactPoints << " control points --"
-                << " (" << 1.0*compactPoints/compactSplines
-                << " points per spline)"
-                << " for " << compactSplines << " splines"
-                << std::endl;
-    }
-    if (monotonicSplines > 0) {
-        std::cout  << "    Monotonic spline cache uses "
-                << monotonicPoints << " control points --"
-                << " (" << 1.0*monotonicPoints/monotonicSplines
-                << " points per spline)"
-                << " for " << monotonicSplines << " splines"
-                << std::endl;
-    }
-    if (uniformSplines > 0) {
-        std::cout  << "    Uniform spline cache uses "
-                << uniformPoints << " control points --"
-                << " (" << 1.0*uniformPoints/uniformSplines
-                << " points per spline)"
-                << " for " << uniformSplines << " splines"
-                << std::endl;
-    }
-    if (generalSplines > 0) {
-        std::cout  << "    General spline cache uses "
-                << generalPoints << " control points --"
-                << " (" << 1.0*generalPoints/generalSplines
-                << " points per spline)"
-                << " for " << generalSplines << " splines"
-                << std::endl;
-    }
-    if (graphs > 0) {
-        std::cout  << "   Graph cache for " << graphPoints << " control points --"
-                << " (" << 1.0*graphPoints/graphs << " points per graph)"
-                << std::endl;
-    }
-
-    // Try to allocate the GPU
-    if (!Cache::Manager::Get()
-        && GlobalVariables::getEnableCacheManager()) {
-        if (!Cache::Manager::HasCUDA()) {
-            LogWarning("Creating Cache::Manager without a GPU");
-        }
-
-        fSingleton = new Manager(events,parameters,
-                                 norms,
-                                 compactSplines,compactPoints,
-                                 monotonicSplines,monotonicPoints,
-                                 uniformSplines,uniformPoints,
-                                 generalSplines,generalPoints,
-                                 histCells,
-                                 "points");
-    }
-
-    // In case the cache isn't allocated (usually because it's turned off on
-    // the command line).
-    if (!Cache::Manager::Get()) {
-        std::cout  << "Cache will not be used"
-                << std::endl;
-        return false;
-    }
-
-    // Add the dials to the cache.
-    std::cout << "Add the dials to the cache." << std::endl;
-    int usedResults = 0; // Number of cached results that have been used up.
-    for(FitSample& sample : sampleList.getFitSampleList() ) {
-        std::cout  << "Fill cache for " << sample.getName()
-                << " with " << sample.getMcContainer().eventList.size()
-                << " events" << std::endl;
-        for (PhysicsEvent& event
-                 : sample.getMcContainer().eventList) {
-            // The reduce index to save the result for this event.
-            int resultIndex = usedResults++;
-            event.setCacheManagerIndex(resultIndex);
-            event.setCacheManagerValuePointer(Cache::Manager::Get()
-                                              ->GetWeightsCache()
-                                              .GetResultPointer(resultIndex));
-            event.setCacheManagerValidPointer(Cache::Manager::Get()
-                                              ->GetWeightsCache()
-                                              .GetResultValidPointer());
-            event.setCacheManagerUpdatePointer(
-                [](){Cache::Manager::Get()->GetWeightsCache().GetResult(0);});
-            Cache::Manager::Get()
-                ->GetWeightsCache()
-                .SetInitialValue(resultIndex,event.getTreeWeight());
-            for (Dial* dial
-                     : event.getRawDialPtrList()) {
-                if (!dial->isReferenced()) continue;
-                auto* fp = dial->getOwner()->getOwner();
-                auto parMapIt = Cache::Manager::ParameterMap.find(fp);
-                if (parMapIt == Cache::Manager::ParameterMap.end()) {
-                    Cache::Manager::ParameterMap[fp] = int(Cache::Manager::ParameterMap.size());
-                }
-                int parIndex = Cache::Manager::ParameterMap[fp];
-                if (dial->getOwner()->useMirrorDial()) {
-                    double xLow = dial->getOwner()->getMirrorLowEdge();
-                    double xHigh = xLow + dial->getOwner()->getMirrorRange();
-                    Cache::Manager::Get()
-                        ->GetParameterCache()
-                        .SetLowerMirror(parIndex,xLow);
-                    Cache::Manager::Get()
-                        ->GetParameterCache()
-                        .SetUpperMirror(parIndex,xHigh);
-                }
-                double lowerClamp = dial->getOwner()->getMinDialResponse();
-                if (std::isnan(lowerClamp)) {
-                    // Applied by default when USE_NEW_DIALS is set, and by
-                    // the old dials, so apply explicitly here.
-                    lowerClamp = 0.0;
-                }
-                if (not std::isnan(lowerClamp)) {
-                    Cache::Manager::Get()
-                        ->GetParameterCache()
-                        .SetLowerClamp(parIndex,lowerClamp);
-                }
-                double upperClamp = dial->getOwner()->getMaxDialResponse();
-                if (not std::isnan(upperClamp)) {
-                    Cache::Manager::Get()
-                        ->GetParameterCache()
-                        .SetUpperClamp(parIndex,upperClamp);
-                }
-                if (lowerClamp > upperClamp) {
-                    throw std::runtime_error(
-                        "lower and upper clamps reversed");
-                }
-                int dialUsed = 0;
-                if(dial->getDialType() == DialType::Norm) {
-                    ++dialUsed;
-                    Cache::Manager::Get()
-                        ->fNormalizations
-                        ->ReserveNorm(resultIndex,parIndex);
-                }
-                auto* sDial = dynamic_cast<SplineDial*>(dial);
-                if (sDial) {
-                    ++dialUsed;
-                    std::string splineType = Cache::Manager::SplineType(sDial);
-                    if (splineType == "monotonicSpline") {
-                        Cache::Manager::Get()
-                            ->fMonotonicSplines
-                            ->AddSpline(resultIndex,parIndex,sDial->getSplineData());
-                    }
-                    else if (splineType == "uniformSpline") {
-                        Cache::Manager::Get()
-                            ->fUniformSplines
-                            ->AddSpline(resultIndex,parIndex,sDial->getSplineData());
-                    }
-                    else if (splineType == "generalSpline") {
-                        Cache::Manager::Get()
-                            ->fGeneralSplines
-                            ->AddSpline(resultIndex,parIndex,sDial->getSplineData());
-                    }
-                    else {
-                        std::cout << "Not a valid spline type: " << splineType
-                                 << std::endl;
-                        throw std::runtime_error("Invalid spline type");
-                    }
-                }
-                if (!dialUsed) throw std::runtime_error("Unused dial");
-            }
-        }
-    }
-
-    // Error checking!
-    if (usedResults != Cache::Manager::Get()
-        ->GetWeightsCache().GetResultCount()) {
-        std::cout << "Cache Manager -- used Results:     "
-                 << usedResults << std::endl;
-        std::cout << "Cache Manager -- expected Results: "
-                 << Cache::Manager::Get()->GetWeightsCache().GetResultCount()
-                 << std::endl;
-        throw std::runtime_error("Probable problem putting dials in cache");
-    }
-
-    // Add this histogram cells to the cache.
-    std::cout << "Add this histogram cells to the cache." << std::endl;
-    int nextHist = 0;
-    for(FitSample& sample : sampleList.getFitSampleList() ) {
-        std::cout  << "Fill cache for " << sample.getName()
-                << " with " << sample.getMcContainer().eventList.size()
-                << " events" << std::endl;
-        std::shared_ptr<TH1> hist(sample.getMcContainer().histogram);
-        if (!hist) {
-            throw std::runtime_error("missing sample histogram");
-        }
-        int thisHist = nextHist;
-        sample.getMcContainer().setCacheManagerIndex(thisHist);
-        sample.getMcContainer().setCacheManagerValuePointer(
-            Cache::Manager::Get()->GetHistogramsCache()
-            .GetSumsPointer());
-        sample.getMcContainer().setCacheManagerValidPointer(
-            Cache::Manager::Get()->GetHistogramsCache()
-            .GetSumsValidPointer());
-        sample.getMcContainer().setCacheManagerUpdatePointer(
-            [](){Cache::Manager::Get()->GetHistogramsCache().GetSum(0);});
-        int cells = hist->GetNcells();
-        nextHist += cells;
-        for (PhysicsEvent& event
-                 : sample.getMcContainer().eventList) {
-            int eventIndex = event.getCacheManagerIndex();
-            int cellIndex = event.getSampleBinIndex();
-            if (cellIndex < 0 || cells <= cellIndex) {
-                throw std::runtime_error("Histogram bin out of range");
-            }
-            int theEntry = thisHist + cellIndex;
-            Cache::Manager::Get()->GetHistogramsCache()
-                .SetEventIndex(eventIndex,theEntry);
-        }
-    }
-
-    if (histCells != nextHist) {
-        throw std::runtime_error("Histogram cells are missing");
-    }
-
-    return true;
-}
-#endif
 
 bool Cache::Manager::Fill() {
     Cache::Manager* cache = Cache::Manager::Get();
     if (!cache) return false;
+    if (fUpdateRequired) {
+        LogError << "Fill while an update is required" << std::endl;
+        LogThrow("Fill while an update is required");
+    }
 #define DUMP_FILL_INPUT_PARAMETERS
 #ifdef DUMP_FILL_INPUT_PARAMETERS
     do {

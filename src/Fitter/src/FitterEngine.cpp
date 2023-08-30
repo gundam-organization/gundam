@@ -4,7 +4,7 @@
 
 #include "FitterEngine.h"
 #include "GenericToolbox.Json.h"
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 #include "MinimizerInterface.h"
 #include "MCMCInterface.h"
 
@@ -90,7 +90,7 @@ void FitterEngine::initializeImpl(){
   LogThrowIf(_config_.empty(), "Config is not set.");
   LogThrowIf(_saveDir_== nullptr);
 
-  if( GlobalVariables::isLightOutputMode() ){
+  if( GundamGlobals::isLightOutputMode() ){
     LogWarning << "Light mode enabled, wiping plot gen config..." << std::endl;
     _propagator_.getPlotGenerator().readConfig(nlohmann::json());
   }
@@ -146,7 +146,7 @@ void FitterEngine::initializeImpl(){
   // and other properties)
   getMinimizer().initialize();
 
-  if(GlobalVariables::getVerboseLevel() >= MORE_PRINTOUT) checkNumericalAccuracy();
+  if(GundamGlobals::getVerboseLevel() >= MORE_PRINTOUT) checkNumericalAccuracy();
 
   // Write data
   LogInfo << "Writing propagator objects..." << std::endl;
@@ -219,9 +219,39 @@ void FitterEngine::initializeImpl(){
 
   this->_propagator_.updateLlhCache();
 
-  if( not GlobalVariables::isLightOutputMode() ){
+  if( not GundamGlobals::isLightOutputMode() ){
     _propagator_.getTreeWriter().writeSamples(GenericToolbox::mkdirTFile(_saveDir_, "preFit/events"));
   }
+
+  // writing event rates
+  LogInfo << "Writing event rates..." << std::endl;
+  for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
+    if( not sample.isEnabled() ){ continue; }
+
+
+    {
+      TVectorD mcRate(1);
+      mcRate[0] = sample.getMcContainer().getSumWeights();
+      auto outDir = GenericToolbox::joinPath("preFit/rates", GenericToolbox::generateCleanBranchName(sample.getName()), "MC");
+      GenericToolbox::writeInTFile(
+          GenericToolbox::mkdirTFile(_saveDir_, outDir),
+          mcRate, "sumWeights"
+      );
+    }
+
+    {
+      TVectorD dataRate(1);
+      dataRate[0] = sample.getMcContainer().getSumWeights();
+      auto outDir = GenericToolbox::joinPath("preFit/rates", GenericToolbox::generateCleanBranchName(sample.getName()), "Data");
+      GenericToolbox::writeInTFile(
+          GenericToolbox::mkdirTFile(_saveDir_, outDir),
+          dataRate, "sumWeights"
+      );
+    }
+
+
+  }
+
 
   LogWarning << "Saving all objects to disk..." << std::endl;
   GenericToolbox::triggerTFileWrite(_saveDir_);
@@ -417,10 +447,12 @@ void FitterEngine::fit(){
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
   if( _enablePreFitToPostFitLineScan_ ){
-    LogInfo << "Scanning along the line from pre-fit to post-fit points..." << std::endl;
-    getPropagator().getParScanner().scanSegment(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scanConvergence"),
-                                                _postFitParState_, _preFitParState_);
-    GenericToolbox::triggerTFileWrite(_saveDir_);
+    if( not GundamGlobals::isLightOutputMode() ){
+      LogInfo << "Scanning along the line from pre-fit to post-fit points..." << std::endl;
+      getPropagator().getParScanner().scanSegment(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scanConvergence"),
+                                                  _postFitParState_, _preFitParState_);
+      GenericToolbox::triggerTFileWrite(_saveDir_);
+    }
   }
 
   if( getMinimizer().isFitHasConverged() and getMinimizer().isEnablePostFitErrorEval() ){
@@ -545,15 +577,11 @@ void FitterEngine::rescaleParametersStepSize(){
   double baseChi2 = _propagator_.getLlhBuffer();
 
   // +1 sigma
-  int iFitPar = -1;
   for( auto& parSet : _propagator_.getParameterSetsList() ){
 
     for( auto& par : parSet.getEffectiveParameterList() ){
-      iFitPar++;
 
-      if( not par.isEnabled() ){
-        continue;
-      }
+      if( not par.isEnabled() ){ continue; }
 
       double currentParValue = par.getParameterValue();
       par.setParameterValue( currentParValue + par.getStdDevValue() );
@@ -605,7 +633,7 @@ void FitterEngine::checkNumericalAccuracy(){
       if(not parSet.isEnabled()) continue;
       if( not parSet.isEnabledThrowToyParameters() ){ continue;}
       parSet.throwFitParameters(gain);
-      throwEntry.emplace_back(std::vector<double>(parSet.getParameterList().size(), 0));
+      throwEntry.emplace_back(parSet.getParameterList().size(), 0);
       for( size_t iPar = 0 ; iPar < parSet.getParameterList().size() ; iPar++){
         throwEntry.back()[iPar] = parSet.getParameterList()[iPar].getParameterValue();
       }

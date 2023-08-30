@@ -34,17 +34,23 @@ public:
     // cache is not being used.
     static Manager* Get() {return fSingleton;}
 
-    // Fill the cache for the current iteration.  This needs to be called
-    // before the cached weights can be used.  This is used in Propagator.cpp.
+    /// Fill the cache for the current iteration.  This needs to be called
+    /// before the cached weights can be used.  This is used in Propagator.cpp.
     static bool Fill();
 
-    // Build the cache and load it into the device.  This is used in
-    // Propagator.cpp to fill the constants needed to for the calculations.
-#ifndef USE_NEW_DIALS
-    static bool Build(FitSampleSet& sampleList);
-#else
+    /// Build the cache and load it into the device.  This is used in
+    /// Propagator.cpp to fill the constants needed to for the calculations.
     static bool Build(FitSampleSet& sampleList, EventDialCache& eventDials);
-#endif
+
+    /// Update the cache with the event and spline information.  This is
+    /// called as part of Build, and can be called in other code if the cache
+    /// needs to be changed.  It forages all of the information from the
+    /// original sample list and event dials.
+    static bool Update(FitSampleSet& sampleList, EventDialCache& eventDials);
+
+    /// Flag that the Cache::Manager internal caches must be updated from the
+    /// FitSampleSet and EventDialCache before it can be used.
+    static void UpdateRequired();
 
     /// This returns the index of the parameter in the cache.  If the
     /// parameter isn't defined, this will return a negative value.
@@ -67,18 +73,11 @@ private:
             int graphs, int graphPoints,
             int histBins, std::string spaceType);
     static Manager* fSingleton;  // You get one guess...
+    static bool fUpdateRequired; // Set to true when the cache needs an update.
 
     // A map between the fit parameter pointers and the parameter index used
     // by the fitter.
     static std::map<const FitParameter*, int> ParameterMap;
-
-#ifndef USE_NEW_DIALS
-    // Determine the type of spline cache to use.  The possible results are
-    // "compactSpline", "uniformSpline", "generalSpline", or
-    // "this-cannot-happen".  This is used to determine which cache is used
-    // for each event.
-    static std::string SplineType(const SplineDial* dial);
-#endif
 
     /// Declare all of the actual GPU caches here.  There is one GPU, so this
     /// is the ONE place that everything is collected together.

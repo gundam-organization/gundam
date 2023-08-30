@@ -2,7 +2,7 @@
 // Created by Adrien BLANCHET on 30/07/2021.
 //
 
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 #include "SampleElement.h"
 
 #include "Logger.h"
@@ -46,9 +46,8 @@ void SampleElement::updateEventBinIndexes(int iThread_){
   if( isLocked ) return;
   int nBins = int(binning.getBinsList().size());
   if(iThread_ <= 0){ LogScopeIndent; LogInfo << "Finding bin indexes for \"" << name << "\"..." << std::endl; }
-  int toDelete = 0;
   for( size_t iEvent = 0 ; iEvent < eventList.size() ; iEvent++ ){
-    if( iThread_ != -1 and iEvent % GlobalVariables::getNbThreads() != iThread_ ) continue;
+    if( iThread_ != -1 and iEvent % GundamGlobals::getNbThreads() != iThread_ ) continue;
     auto& event = eventList.at(iEvent);
     for( int iBin = 0 ; iBin < nBins ; iBin++ ){
       auto& bin = binning.getBinsList().at(iBin);
@@ -64,21 +63,14 @@ void SampleElement::updateEventBinIndexes(int iThread_){
         break;
       }
     } // Bin
-
-    if( event.getSampleBinIndex() == -1 ){
-      toDelete++;
-    }
-
   } // Event
-
-//  LogTrace << iThread_ << " -> unbinned events: " << toDelete << std::endl;
 }
 void SampleElement::updateBinEventList(int iThread_) {
   if( isLocked ) return;
 
   if( iThread_ <= 0 ){ LogScopeIndent; LogInfo << "Filling bin event cache for \"" << name << "\"..." << std::endl; }
   int nBins = int(perBinEventPtrList.size());
-  int nbThreads = GlobalVariables::getNbThreads();
+  int nbThreads = GundamGlobals::getNbThreads();
   if( iThread_ == -1 ){
     nbThreads = 1;
     iThread_ = 0;
@@ -100,8 +92,20 @@ void SampleElement::updateBinEventList(int iThread_) {
 void SampleElement::refillHistogram(int iThread_){
   if( isLocked ) return;
 
-  int nbThreads = GlobalVariables::getNbThreads();
+  int nbThreads = GundamGlobals::getNbThreads();
   if( iThread_ == -1 ){ nbThreads = 1; iThread_ = 0; }
+
+#ifdef GUNDAM_USING_CACHE_MANAGER
+  if (_CacheManagerValid_ and not (*_CacheManagerValid_)) {
+      // This is can be slowish when data must be copied from the device, but
+      // it makes sure that the results are copied from the device when they
+      // have changed. The values pointed to by _CacheManagerValue_ and
+      // _CacheManagerValid_ are inside of the summed index cache (a bit of
+      // evil coding here), and are updated by the cache.  The update is
+      // triggered by (*_CacheManagerUpdate_)().
+      if (_CacheManagerUpdate_) (*_CacheManagerUpdate_)();
+  }
+#endif
 
   // Faster that pointer shifter. -> would be slower if refillHistogram is
   // handled by the propagator
@@ -110,37 +114,39 @@ void SampleElement::refillHistogram(int iThread_){
   auto* binContentArray = histogram->GetArray();
   auto* binErrorArray = histogram->GetSumw2()->GetArray();
   while( iBin < nBins ) {
-    binContentArray[iBin + 1] = 0; 
+    binContentArray[iBin + 1] = 0;
     binErrorArray[iBin + 1] = 0;
 #ifdef GUNDAM_USING_CACHE_MANAGER
-    if (_CacheManagerValue_!=nullptr and _CacheManagerIndex_ >= 0) {
-      binContentArray[iBin + 1] += _CacheManagerValue_[_CacheManagerIndex_+iBin];
-      binErrorArray[iBin + 1] += binContentArray[iBin + 1]*binContentArray[iBin + 1];
+    if (_CacheManagerValue_ !=nullptr and _CacheManagerIndex_ >= 0) {
+      const double ew = _CacheManagerValue_[_CacheManagerIndex_+iBin];
+      const double ew2 = _CacheManagerValue2_[_CacheManagerIndex_+iBin];
+      binContentArray[iBin + 1] += ew;
+      binErrorArray[iBin + 1] += ew2;
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
+      double content = binContentArray[iBin+1];
       double slowValue = 0.0;
-        for( auto* eventPtr : perBinEventPtrList.at(iBin)){
-            slowValue += eventPtr->getEventWeight();
-        }
-        double delta = std::abs(slowValue-content);
-        if (delta > 1E-6) {
-            LogInfo << "VALIDATION: Bin mismatch " << _CacheManagerIndex_
-                    << " " << iBin
-                    << " " << name
-                    << " " << slowValue
-                    << " " << content
-                    << " " << delta
-                    << std::endl;
-        }
+      for( auto* eventPtr : perBinEventPtrList.at(iBin)){
+        slowValue += eventPtr->getEventWeight();
+      }
+      double delta = std::abs(slowValue-content);
+      if (delta > 1E-6) {
+        LogInfo << "VALIDATION: Mismatched bin: " << _CacheManagerIndex_
+                << "+" << iBin
+                << "(" << name
+                << ") gpu: " << content
+                << " PhysEvt: " << slowValue
+                << " delta: " << delta
+                << std::endl;
+      }
 #endif // CACHE_MANAGER_SLOW_VALIDATION
     }
     else {
-//      LogThrow(GET_VAR_NAME_VALUE(_CacheManagerValue_) << " / " << GET_VAR_NAME_VALUE(_CacheManagerIndex_)); // debug
 #endif // GUNDAM_USING_CACHE_MANAGER
       for (auto *eventPtr: perBinEventPtrList[iBin]) {
         binContentArray[iBin + 1] += eventPtr->getEventWeight();
         binErrorArray[iBin + 1] += eventPtr->getEventWeight() * eventPtr->getEventWeight();
       }
-    LogThrowIf(std::isnan(binContentArray[iBin + 1]));
+      LogThrowIf(std::isnan(binContentArray[iBin + 1]));
 #ifdef GUNDAM_USING_CACHE_MANAGER
     }
 #endif // GUNDAM_USING_CACHE_MANAGER
@@ -222,3 +228,30 @@ void SampleElement::print() const{
   LogInfo << " - " << "Nb events: " << eventList.size() << std::endl;
   LogInfo << " - " << "Hist rescale: " << histScale << std::endl;
 }
+
+//  A Lesser GNU Public License
+
+//  Copyright (C) 2023 GUNDAM DEVELOPERS
+
+//  This library is free software; you can redistribute it and/or
+//  modify it under the terms of the GNU Lesser General Public
+//  License as published by the Free Software Foundation; either
+//  version 2.1 of the License, or (at your option) any later version.
+
+//  This library is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+//  Lesser General Public License for more details.
+
+//  You should have received a copy of the GNU Lesser General Public
+//  License along with this library; if not, write to the
+//
+//  Free Software Foundation, Inc.
+//  51 Franklin Street, Fifth Floor,
+//  Boston, MA  02110-1301  USA
+
+// Local Variables:
+// mode:c++
+// c-basic-offset:2
+// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
+// End:

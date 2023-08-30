@@ -12,7 +12,6 @@ project( GUNDAM )
 option( WITH_GUNDAM_ROOT_APP "Build app gundamRoot" ON )
 option( WITH_CACHE_MANAGER "Enable compiling of the cache manager used by the GPU" ON )
 option( WITH_BREAKDOWN_CACHE "Use the breakdown cache" ON )
-option( WITH_OLD_DIALS "Use the old dial implementation" OFF )
 option( WITH_XSLLHFITTER "Build old xsllhFitter apps/libraries" OFF )
 option( WITH_OPENMP "(OLD/xsllhFitter) Build with OpenMP libraries" OFF )
 option( ENABLE_CUDA "Enable CUDA language check (Cache::Manager requires a GPU if CUDA is found)" OFF )
@@ -42,7 +41,6 @@ include( ${CMAKE_SOURCE_DIR}/cmake/cmessage.cmake )
 cmessage( WARNING "Pre-checking GUNDAM version" )
 set(GENERATE_DIR_FOR_VERSION_CHECK ${CMAKE_BINARY_DIR} CACHE STRING "GENERATE_DIR_FOR_VERSION_CHECK")
 add_custom_target( preBuildVersionCheck
-    COMMAND echo "Cache variable: ${GENERATE_DIR_FOR_VERSION_CHECK}"
     COMMAND ${CMAKE_COMMAND} -D GENERATE_DIR_FOR_VERSION_CHECK=${GENERATE_DIR_FOR_VERSION_CHECK} -P ${CMAKE_SOURCE_DIR}/cmake/updateVersion.cmake
     COMMENT "Checking GUNDAM version with git files..."
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -170,6 +168,26 @@ if (NOT ROOT_minuit2_FOUND)
 endif(NOT ROOT_minuit2_FOUND)
 
 
+# NLOHMANN JSON
+find_package(nlohmann_json)
+
+if (nlohmann_json_FOUND)
+    cmessage( STATUS "nlohmann JSON library found")
+    # Additional actions for when the library is found
+else()
+    # sometimes the header can be found in ROOT...
+    find_path(NLOHMANN_JSON_INCLUDE_DIR NAMES nlohmann/json.hpp)
+
+    if (NLOHMANN_JSON_INCLUDE_DIR)
+        cmessage( STATUS "nlohmann JSON header found: ${NLOHMANN_JSON_INCLUDE_DIR}/nlohmann/json.hpp")
+        # Additional actions for when the library is found
+    else()
+        cmessage( FATAL_ERROR "nlohmann JSON library not found")
+        # Additional actions for when the library is not found
+    endif()
+endif()
+
+
 # YAML-CPP
 cmessage( WARNING "Looking for YAML install..." )
 find_package( yaml-cpp REQUIRED HINTS ${YAMLCPP_DIR} )
@@ -268,12 +286,6 @@ if(NOT WITH_GENERIC_SPLINES)
     endif(WITH_CACHE_MANAGER)
 endif(NOT WITH_GENERIC_SPLINES)
 
-if(NOT WITH_OLD_DIALS)
-    add_definitions(-D USE_NEW_DIALS=1)
-else()
-    cmessage(WARNING "Using old dial implementation" )
-endif(NOT WITH_OLD_DIALS)
-
 if(WITH_BREAKDOWN_CACHE)
     add_definitions(-D USE_BREAKDOWN_CACHE)
 else()
@@ -287,6 +299,13 @@ endif(WITH_BREAKDOWN_CACHE)
 # SubModules: These are just adding the code directly, and not being compiled
 # as stand-alone projects.  This has the danger that it's not fully configured,
 # but should be OK
+
+include( ${CMAKE_SOURCE_DIR}/cmake/checkSubmodules.cmake )
+
+checkSubmodule( cpp-generic-toolbox )
+checkSubmodule( simple-cpp-logger )
+checkSubmodule( simple-cpp-cmd-line-parser )
+
 
 ## Add the CmdLineParser
 # Reproduce needed parts of the simple-cpp-cmd-line-parser CMakeLists.txt

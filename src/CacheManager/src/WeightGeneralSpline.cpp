@@ -28,7 +28,7 @@ Cache::Weight::GeneralSpline::GeneralSpline(
     : Cache::Weight::Base("generalSpline",weights,parameters),
       fLowerClamp(lowerClamps), fUpperClamp(upperClamps),
       fSplinesReserved(splines), fSplinesUsed(0),
-      fSplineKnotsReserved(knots), fSplineKnotsUsed(0) {
+      fSplineSpaceReserved(knots), fSplineSpaceUsed(0) {
 
     LogInfo << "Reserved " << GetName() << " Splines: "
             << GetSplinesReserved() << std::endl;
@@ -41,7 +41,7 @@ Cache::Weight::GeneralSpline::GeneralSpline(
     // Calculate the space needed to store the spline data.  This needs
     // to know how the spline data is packed for CalculateGeneralSpline.
     if (spaceOption == "points") {
-        fSplineKnotsReserved = 2*fSplinesReserved + 3*fSplineKnotsReserved;
+        fSplineSpaceReserved = 2*fSplinesReserved + 3*fSplineSpaceReserved;
     }
     else {
         LogThrowIf(spaceOption != "space",
@@ -57,9 +57,9 @@ Cache::Weight::GeneralSpline::GeneralSpline(
 #endif
 
     LogInfo << "Reserved " << GetName()
-            << " Spline Knots: " << GetSplineKnotsReserved()
+            << " Spline Knots: " << GetSplineSpaceReserved()
             << std::endl;
-    fTotalBytes += GetSplineKnotsReserved()*sizeof(WEIGHT_BUFFER_FLOAT);  // fSplineKnots
+    fTotalBytes += GetSplineSpaceReserved()*sizeof(WEIGHT_BUFFER_FLOAT);  // fSplineSpace
 
     LogInfo << "Approximate Memory Size for " << GetName()
             << ": " << fTotalBytes/1E+9
@@ -84,8 +84,8 @@ Cache::Weight::GeneralSpline::GeneralSpline(
         // Get the CPU/GPU memory for the spline knots.  This is copied once
         // during initialization so do not pin the CPU memory into the page
         // set.
-        fSplineKnots.reset(
-            new hemi::Array<WEIGHT_BUFFER_FLOAT>(GetSplineKnotsReserved(),false));
+        fSplineSpace.reset(
+            new hemi::Array<WEIGHT_BUFFER_FLOAT>(GetSplineSpaceReserved(),false));
     }
     catch (std::bad_alloc&) {
         LogError << "Failed to allocate memory, so stopping" << std::endl;
@@ -94,6 +94,7 @@ Cache::Weight::GeneralSpline::GeneralSpline(
 
     // Initialize the caches.  Don't try to zero everything since the
     // caches can be huge.
+    Reset();
     fSplineIndex->hostPtr()[0] = 0;
 }
 
@@ -146,21 +147,21 @@ void Cache::Weight::GeneralSpline::AddSpline(int resIndex, int parIndex,
     }
     fSplineResult->hostPtr()[newIndex] = resIndex;
     fSplineParameter->hostPtr()[newIndex] = parIndex;
-    if (fSplineIndex->hostPtr()[newIndex] != fSplineKnotsUsed) {
+    if (fSplineIndex->hostPtr()[newIndex] != fSplineSpaceUsed) {
         LogError << "Last spline knot index should be at old end of splines"
                   << std::endl;
         throw std::runtime_error("Problem with control indices");
     }
-    int knotIndex = fSplineKnotsUsed;
-    fSplineKnotsUsed += splineData.size();
-    if (fSplineKnotsUsed > fSplineKnotsReserved) {
+    int knotIndex = fSplineSpaceUsed;
+    fSplineSpaceUsed += splineData.size();
+    if (fSplineSpaceUsed > fSplineSpaceReserved) {
         LogError << "Not enough space reserved for spline knots"
                << std::endl;
         throw std::runtime_error("Not enough space reserved for spline knots");
     }
-    fSplineIndex->hostPtr()[newIndex+1] = fSplineKnotsUsed;
+    fSplineIndex->hostPtr()[newIndex+1] = fSplineSpaceUsed;
     for (std::size_t i = 0; i<splineData.size(); ++i) {
-        fSplineKnots->hostPtr()[knotIndex+i] = splineData.at(i);
+        fSplineSpace->hostPtr()[knotIndex+i] = splineData.at(i);
     }
 
 }
@@ -205,7 +206,7 @@ double Cache::Weight::GeneralSpline::GetSplineLowerBound(int sIndex) {
         throw std::runtime_error("Spline index invalid");
     }
     int knotsIndex = fSplineIndex->hostPtr()[sIndex];
-    return fSplineKnots->hostPtr()[knotsIndex];
+    return fSplineSpace->hostPtr()[knotsIndex];
 }
 
 double Cache::Weight::GeneralSpline::GetSplineUpperBound(int sIndex) {
@@ -218,7 +219,7 @@ double Cache::Weight::GeneralSpline::GetSplineUpperBound(int sIndex) {
     int knotCount = GetSplineKnotCount(sIndex);
     double lower = GetSplineLowerBound(sIndex);
     int knotsIndex = fSplineIndex->hostPtr()[sIndex];
-    double step = fSplineKnots->hostPtr()[knotsIndex+1];
+    double step = fSplineSpace->hostPtr()[knotsIndex+1];
     return lower + (knotCount-1)/step;
 }
 
@@ -259,7 +260,7 @@ double Cache::Weight::GeneralSpline::GetSplineKnotValue(int sIndex, int knot) {
     if (count <= knot) {
         throw std::runtime_error("Knot index invalid");
     }
-    return fSplineKnots->hostPtr()[knotsIndex+2+3*knot];
+    return fSplineSpace->hostPtr()[knotsIndex+2+3*knot];
 }
 
 double Cache::Weight::GeneralSpline::GetSplineKnotSlope(int sIndex, int knot) {
@@ -277,7 +278,7 @@ double Cache::Weight::GeneralSpline::GetSplineKnotSlope(int sIndex, int knot) {
     if (count <= knot) {
         throw std::runtime_error("Knot index invalid");
     }
-    return fSplineKnots->hostPtr()[knotsIndex+2+3*knot+1];
+    return fSplineSpace->hostPtr()[knotsIndex+2+3*knot+1];
 }
 
 double Cache::Weight::GeneralSpline::GetSplineKnotPlace(int sIndex, int knot) {
@@ -295,7 +296,7 @@ double Cache::Weight::GeneralSpline::GetSplineKnotPlace(int sIndex, int knot) {
     if (count <= knot) {
         throw std::runtime_error("Knot index invalid");
     }
-    return fSplineKnots->hostPtr()[knotsIndex+2+3*knot+2];
+    return fSplineSpace->hostPtr()[knotsIndex+2+3*knot+2];
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -403,6 +404,14 @@ namespace {
     }
 }
 
+void Cache::Weight::GeneralSpline::Reset() {
+    // Use the parent reset.
+    Cache::Weight::Base::Reset();
+    // Reset this class
+    fSplinesUsed = 0;
+    fSplineSpaceUsed = 0;
+}
+
 bool Cache::Weight::GeneralSpline::Apply() {
     if (GetSplinesUsed() < 1) return false;
 
@@ -416,7 +425,7 @@ bool Cache::Weight::GeneralSpline::Apply() {
                  fParameters.readOnlyPtr(),
                  fLowerClamp.readOnlyPtr(),
                  fUpperClamp.readOnlyPtr(),
-                 fSplineKnots->readOnlyPtr(),
+                 fSplineSpace->readOnlyPtr(),
                  fSplineResult->readOnlyPtr(),
                  fSplineParameter->readOnlyPtr(),
                  fSplineIndex->readOnlyPtr(),

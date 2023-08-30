@@ -12,7 +12,7 @@
 
 
 // DEV
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 
 #include "GenericToolbox.Wrappers.h"
 
@@ -86,7 +86,7 @@ public:
   /// DialInterface objects), and each DialInterface object could be in the
   /// cache multiple times (but for different Physics event objects).
   std::vector<CacheElem_t> &getCache();
-  const std::vector<CacheElem_t> &getCache() const;
+  [[nodiscard]] const std::vector<CacheElem_t> &getCache() const;
 
   /// Allocate entries for events in the indexed cache.  The first parameter
   /// arethe number of events to allocate space for, and the second number is
@@ -127,10 +127,6 @@ private:
   /// A cache of all of the valid PhysicsEvent* and DialInterface*
   /// associations for efficient use when reweighting the MC events.
   std::vector<CacheElem_t> _cache_;
-
-  /// Flag that all events should have dials (or not).  At the end to have
-  /// better packed alignment.
-  bool _warnForDialLessEvent_{false};
 };
 
 

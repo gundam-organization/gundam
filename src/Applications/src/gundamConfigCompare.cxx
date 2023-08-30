@@ -4,6 +4,7 @@
 
 #include "GundamGreetings.h"
 #include "ConfigUtils.h"
+#include "GundamUtils.h"
 
 #include "CmdLineParser.h"
 #include "Logger.h"
@@ -12,6 +13,7 @@
 #include "GenericToolbox.Json.h"
 
 #include "nlohmann/json.hpp"
+#include "TNamed.h"
 
 #include <string>
 #include <vector>
@@ -69,16 +71,20 @@ int main( int argc, char** argv ){
 
   if( GenericToolbox::doesTFileIsValid( clp.getOptionVal<std::string>("config-1") ) ){
     auto f = std::unique_ptr<TFile>( GenericToolbox::openExistingTFile( clp.getOptionVal<std::string>("config-1") ) );
-    auto* version = f->Get<TNamed>("gundamFitter/gundamVersion_TNamed");
-    auto* cmdLine = f->Get<TNamed>("gundamFitter/commandLine_TNamed");
+    TNamed* version{nullptr};
+    GundamUtils::ObjectReader::readObject<TNamed>( f.get(), {{"gundam/version_TNamed"}, {"gundamFitter/gundamVersion_TNamed"}}, [&](TNamed* obj_){ version = obj_; });
+    TNamed* cmdLine{nullptr};
+    GundamUtils::ObjectReader::readObject<TNamed>( f.get(), {{"gundam/commandLine_TNamed"}, {"gundamFitter/commandLine_TNamed"}}, [&](TNamed* obj_){ version = cmdLine; });
     if( version != nullptr and cmdLine != nullptr ){
       LogInfo << "config-1 is within .root file. Ran under GUNDAM v" << version->GetTitle() << " with cmdLine: "<< cmdLine->GetTitle() << std::endl;
     }
   }
   if( GenericToolbox::doesTFileIsValid( clp.getOptionVal<std::string>("config-2") ) ){
     auto f = std::unique_ptr<TFile>( GenericToolbox::openExistingTFile( clp.getOptionVal<std::string>("config-2") ) );
-    auto* version = f->Get<TNamed>("gundamFitter/gundamVersion_TNamed");
-    auto* cmdLine = f->Get<TNamed>("gundamFitter/commandLine_TNamed");
+    TNamed* version{nullptr};
+    GundamUtils::ObjectReader::readObject<TNamed>( f.get(), {{"gundam/version_TNamed"}, {"gundamFitter/gundamVersion_TNamed"}}, [&](TNamed* obj_){ version = obj_; });
+    TNamed* cmdLine{nullptr};
+    GundamUtils::ObjectReader::readObject<TNamed>( f.get(), {{"gundam/commandLine_TNamed"}, {"gundamFitter/gundamVersion_TNamed"}}, [&](TNamed* obj_){ version = cmdLine; });
     if( version != nullptr and cmdLine != nullptr ){
       LogInfo << "config-2 is within .root file. Ran under GUNDAM v" << version->GetTitle() << " with cmdLine: "<< cmdLine->GetTitle() << std::endl;
     }
@@ -128,7 +134,7 @@ void compareConfigStage(const nlohmann::json& config1_, const nlohmann::json& co
                 }
               }
               if( not found1 ){
-                LogError << "Could not find key with name \"" << name1 << "\" in config2." << std::endl;
+                LogError << path << ": could not find key with name \"" << name1 << "\" in config2." << std::endl;
               }
             }
 
@@ -144,7 +150,7 @@ void compareConfigStage(const nlohmann::json& config1_, const nlohmann::json& co
                 }
               }
               if( not found2 ){
-                LogError << "Could not find key with name \"" << name2 << "\" in config1." << std::endl;
+                LogError << path << ": could not find key with name \"" << name2 << "\" in config1." << std::endl;
               }
             }
           }

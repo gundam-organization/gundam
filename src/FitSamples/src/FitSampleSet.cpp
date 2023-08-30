@@ -5,7 +5,7 @@
 
 
 #include "GenericToolbox.Json.h"
-#include "GlobalVariables.h"
+#include "GundamGlobals.h"
 #include "FitSampleSet.h"
 
 #include "Logger.h"
@@ -70,7 +70,7 @@ void FitSampleSet::initializeImpl() {
       sample.getDataContainer().updateEventBinIndexes(iThread);
     }
   };
-  GlobalVariables::getParallelWorker().addJob("FitSampleSet::updateSampleEventBinIndexes", updateSampleEventBinIndexesFct);
+  GundamGlobals::getParallelWorker().addJob("FitSampleSet::updateSampleEventBinIndexes", updateSampleEventBinIndexesFct);
 
   // Fill bin event caches
   std::function<void(int)> updateSampleBinEventListFct = [this](int iThread){
@@ -80,7 +80,7 @@ void FitSampleSet::initializeImpl() {
       sample.getDataContainer().updateBinEventList(iThread);
     }
   };
-  GlobalVariables::getParallelWorker().addJob("FitSampleSet::updateSampleBinEventList", updateSampleBinEventListFct);
+  GundamGlobals::getParallelWorker().addJob("FitSampleSet::updateSampleBinEventList", updateSampleBinEventListFct);
 
 
   // Histogram fills
@@ -96,8 +96,8 @@ void FitSampleSet::initializeImpl() {
       sample.getDataContainer().rescaleHistogram();
     }
   };
-  GlobalVariables::getParallelWorker().addJob("FitSampleSet::updateSampleHistograms", refillMcHistogramsFct);
-  GlobalVariables::getParallelWorker().setPostParallelJob("FitSampleSet::updateSampleHistograms", rescaleMcHistogramsFct);
+  GundamGlobals::getParallelWorker().addJob("FitSampleSet::updateSampleHistograms", refillMcHistogramsFct);
+  GundamGlobals::getParallelWorker().setPostParallelJob("FitSampleSet::updateSampleHistograms", rescaleMcHistogramsFct);
 }
 
 const std::vector<FitSample> &FitSampleSet::getFitSampleList() const {
@@ -151,16 +151,16 @@ void FitSampleSet::clearMcContainers(){
 
 void FitSampleSet::updateSampleEventBinIndexes() const{
   if( _showTimeStats_ ) GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-  GlobalVariables::getParallelWorker().runJob("FitSampleSet::updateSampleEventBinIndexes");
+  GundamGlobals::getParallelWorker().runJob("FitSampleSet::updateSampleEventBinIndexes");
   if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
 }
 void FitSampleSet::updateSampleBinEventList() const{
   if( _showTimeStats_ ) GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-  GlobalVariables::getParallelWorker().runJob("FitSampleSet::updateSampleBinEventList");
+  GundamGlobals::getParallelWorker().runJob("FitSampleSet::updateSampleBinEventList");
   if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
 }
 void FitSampleSet::updateSampleHistograms() const {
   if( _showTimeStats_ ) GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
-  GlobalVariables::getParallelWorker().runJob("FitSampleSet::updateSampleHistograms");
+  GundamGlobals::getParallelWorker().runJob("FitSampleSet::updateSampleHistograms");
   if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
 }

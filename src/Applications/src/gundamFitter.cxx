@@ -5,8 +5,8 @@
 #include "FitterEngine.h"
 #include "ConfigUtils.h"
 #include "GundamUtils.h"
-#include "GlobalVariables.h"
-#include "GundamGreetings.h"
+#include "GundamApp.h"
+#include "GundamGlobals.h"
 #include "MinimizerInterface.h"
 #ifdef GUNDAM_USING_CACHE_MANAGER
 #include "CacheManager.h"
@@ -27,12 +27,7 @@ LoggerInit([]{
 
 int main(int argc, char** argv){
 
-  // --------------------------
-  // Greetings:
-  // --------------------------
-  GundamGreetings g;
-  g.setAppName("main fitter");
-  g.hello();
+  GundamApp app{"main fitter"};
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   if (Cache::Manager::HasCUDA()){ LogWarning << "CUDA compatible build." << std::endl; }
@@ -110,7 +105,7 @@ int main(int argc, char** argv){
   // Init command line args:
   // --------------------------
 
-  if( clParser.isOptionTriggered("debugVerbose") ) GlobalVariables::setVerboseLevel(clParser.getOptionVal("debugVerbose", 1));
+  if( clParser.isOptionTriggered("debugVerbose") ) GundamGlobals::setVerboseLevel(clParser.getOptionVal("debugVerbose", 1));
 
   // Is build compatible with GPU option?
   if( clParser.isOptionTriggered("usingGpu") ){
@@ -125,7 +120,7 @@ int main(int argc, char** argv){
   // Is build compatible with cache manager option?
   if( clParser.isOptionTriggered("usingCacheManager") or clParser.isOptionTriggered("usingGpu") ){
 #ifdef GUNDAM_USING_CACHE_MANAGER
-    GlobalVariables::setEnableCacheManager(true);
+    GundamGlobals::setEnableCacheManager(true);
 #else
     LogThrow("useCacheManager can only be set while GUNDAM is compiled with GUNDAM_USING_CACHE_MANAGER option.");
 #endif
@@ -134,7 +129,7 @@ int main(int argc, char** argv){
   // No cache on dials?
   if( clParser.isOptionTriggered("noDialCache") ){
     LogAlert << "Disabling cache in dial evaluation (when available)..." << std::endl;
-    GlobalVariables::setDisableDialCache(true);
+    GundamGlobals::setDisableDialCache(true);
   }
 
   // inject parameter config?
@@ -145,19 +140,15 @@ int main(int argc, char** argv){
   }
 
   // PRNG seed?
+  gRandom = new TRandom3(0);    // Initialize with a UUID;
   if( clParser.isOptionTriggered("randomSeed") ){
     LogAlert << "Using user-specified random seed: " << clParser.getOptionVal<ULong_t>("randomSeed") << std::endl;
     gRandom->SetSeed(clParser.getOptionVal<ULong_t>("randomSeed"));
   }
-  else{
-    ULong_t seed = time(nullptr);
-    LogInfo << "Using \"time(nullptr)\" random seed: " << seed << std::endl;
-    gRandom->SetSeed(seed);
-  }
 
   // How many parallel threads?
-  GlobalVariables::setNbThreads(clParser.getOptionVal("nbThreads", 1));
-  LogInfo << "Running the fitter with " << GlobalVariables::getNbThreads() << " parallel threads." << std::endl;
+  GundamGlobals::setNbThreads(clParser.getOptionVal("nbThreads", 1));
+  LogInfo << "Running the fitter with " << GundamGlobals::getNbThreads() << " parallel threads." << std::endl;
 
   // Reading configuration
   auto configFilePath = clParser.getOptionVal("configFile", "");
@@ -175,11 +166,10 @@ int main(int argc, char** argv){
   else{
 
     std::string outFolder{"./"};
-    if( clParser.isOptionTriggered("outputDir") ){ outFolder = clParser.getOptionVal<std::string>("outputDir"); }
+    if     ( clParser.isOptionTriggered("outputDir") ){ outFolder = clParser.getOptionVal<std::string>("outputDir"); }
     else if( GenericToolbox::Json::doKeyExist(configHandler.getConfig(), "outputFolder") ){
       outFolder = GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "outputFolder");
     }
-    GenericToolbox::mkdirPath( outFolder );
 
     // appendixDict["optionName"] = "Appendix"
     // this list insure all appendices will appear in the same order
@@ -216,37 +206,28 @@ int main(int argc, char** argv){
   // Checking the minimal version for the config
   if( GenericToolbox::Json::doKeyExist(configHandler.getConfig(), "minGundamVersion") and not clParser.isOptionTriggered("ignoreVersionCheck") ){
     LogThrowIf(
-        not g.isNewerOrEqualVersion(GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "minGundamVersion")),
+        not GundamUtils::isNewerOrEqualVersion(GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "minGundamVersion")),
         "Version check FAILED: " << GundamUtils::getVersionStr() << " < " << GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "minGundamVersion")
     );
     LogInfo << "Version check passed: " << GundamUtils::getVersionStr() << " >= " << GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "minGundamVersion") << std::endl;
   }
 
+  // to write cmdLine info
+  app.setCmdLinePtr( &clParser );
+
+  // unfolded config
+  app.setConfigString( GenericToolbox::Json::toReadableString(configHandler.getConfig()) );
+
   // Ok, we should run. Create the out file.
-  LogWarning << "Creating output file: \"" << outFileName << "\"..." << std::endl;
-  TFile* out = TFile::Open(outFileName.c_str(), "RECREATE");
-
-  // Gundam version?
-  TNamed gundamVersionString("gundamVersion", GundamUtils::getVersionFullStr().c_str());
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamFitter"), &gundamVersionString);
-
-  // Command line?
-  TNamed commandLineString("commandLine", clParser.getCommandLineString().c_str());
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamFitter"), &commandLineString);
-
-  // Config unfolded ?
-  TNamed unfoldedConfigString("unfoldedConfig", GenericToolbox::Json::toReadableString(configHandler.getConfig()).c_str());
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(out, "gundamFitter"), &unfoldedConfigString);
-
-  // Save point
-  GenericToolbox::triggerTFileWrite( out );
+  app.openOutputFile(outFileName);
+  app.writeAppInfo();
 
 
   // --------------------------
   // Configure:
   // --------------------------
   LogInfo << "FitterEngine setup..." << std::endl;
-  FitterEngine fitter{GenericToolbox::mkdirTFile(out, "FitterEngine")};
+  FitterEngine fitter{GenericToolbox::mkdirTFile(app.getOutfilePtr(), "FitterEngine")};
 
   fitter.readConfig(GenericToolbox::Json::fetchSubEntry(configHandler.getConfig(), {"fitterEngineConfig"}));
 
@@ -301,7 +282,7 @@ int main(int argc, char** argv){
   fitter.setGenerateOneSigmaPlots( clParser.isOptionTriggered("generateOneSigmaPlots") );
 
   // --light-mode
-  GlobalVariables::setLightOutputMode( clParser.isOptionTriggered("lightOutputMode") );
+  GundamGlobals::setLightOutputMode(clParser.isOptionTriggered("lightOutputMode") );
 
   // injectParameterPath
   if( not injectParameterPath.empty() ){
@@ -345,9 +326,8 @@ int main(int argc, char** argv){
     LogDebug << fitter.getPropagator().getParametersSummary( false ) << std::endl;
   }
 
-  auto* outDir = GenericToolbox::mkdirTFile(fitter.getSaveDir(), GenericToolbox::joinPath("preFit", "cmdScanLine"));
-
   if( clParser.isOptionTriggered("scanLine") ){
+    auto* outDir = GenericToolbox::mkdirTFile(fitter.getSaveDir(), GenericToolbox::joinPath("preFit", "cmdScanLine"));
     LogThrowIf( clParser.getNbValueSet("scanLine") == 0, "No injector file provided.");
     if( clParser.getNbValueSet("scanLine") == 1 ){
       LogAlert << "Will scan the line toward the point set in: " << clParser.getOptionVal<std::string>("scanLine", 0) << std::endl;
@@ -380,14 +360,5 @@ int main(int argc, char** argv){
   // --------------------------
   fitter.fit();
 
-  LogWarning << "Closing output file \"" << out->GetName() << "\"..." << std::endl;
-  out->Close();
-  LogInfo << "Closed." << std::endl;
-
-  // --------------------------
-  // Goodbye:
-  // --------------------------
-  g.goodbye();
-
-  GlobalVariables::getParallelWorker().reset();
+  GundamGlobals::getParallelWorker().reset();
 }
