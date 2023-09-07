@@ -16,6 +16,8 @@
 #include "TChain.h"
 #include "nlohmann/json.hpp"
 
+#include "GenericToolbox.Root.LeafCollection.h"
+
 #include <map>
 #include <string>
 #include <vector>

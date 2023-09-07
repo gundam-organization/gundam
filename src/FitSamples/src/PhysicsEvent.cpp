@@ -308,7 +308,10 @@ std::vector<std::pair<const GenericToolbox::LeafHolder*, int>> PhysicsEvent::gen
     if( GenericToolbox::doesKeyIsInMap(leafName, leafDict_) ){
       std::vector<std::string> argBuf;
       strBuf = leafDict_.at(leafName);
+      LogDebug << strBuf << " -> ";
       strBuf = GenericToolbox::stripBracket(strBuf, '[', ']', false, &argBuf);
+
+      LogDebug << strBuf << "/" << GenericToolbox::parseVectorAsString(argBuf) << std::endl;
       if     ( argBuf.size() == 1 ){ out.back().second = std::stoi(argBuf[0]); }
       else if( argBuf.size() > 1 ){ LogThrow("No support for multi-dim array."); }
     }
@@ -326,7 +329,7 @@ void PhysicsEvent::copyLeafContent(const PhysicsEvent& ref_){
 void PhysicsEvent::resizeVarToDoubleCache(){
   _varToDoubleCache_.reserve(_leafContentList_.size());
   for( auto& leaf: _leafContentList_ ){
-    _varToDoubleCache_.emplace_back(std::vector<double>(leaf.size(), std::nan("unset")));
+    _varToDoubleCache_.emplace_back(leaf.size(), std::nan("unset"));
   }
   this->invalidateVarToDoubleCache();
 }

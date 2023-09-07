@@ -578,6 +578,21 @@ void DataDispenser::preAllocateMemory(){
   }
   treeChain.SetBranchStatus("*", false);
 
+  GenericToolbox::LeafCollection lCollection;
+  lCollection.setTreePtr( &treeChain );
+  LogDebug << "ADD LEAVES" << std::endl;
+  for( auto& var: _cache_.varsRequestedForStorage ){
+    auto leafStr = var;
+    if( GenericToolbox::doesKeyIsInMap(var, _parameters_.overrideLeafDict) ){
+      leafStr = _parameters_.overrideLeafDict[var];
+    }
+    lCollection.addLeafExpression( leafStr );
+  }
+  LogDebug << "INIT" << std::endl;
+  lCollection.initialize();
+
+  exit(0);
+
   // Just a placeholder for creating the dictionary
   auto tBuf = this->generateTreeEventBuffer(&treeChain, _cache_.varsRequestedForStorage);
 
