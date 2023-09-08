@@ -14,6 +14,7 @@
 #include "DialBaseFactory.h"
 
 #include "GenericToolbox.Root.TreeEntryBuffer.h"
+#include "GenericToolbox.Root.LeafCollection.h"
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.VariablesMonitor.h"
 #include "Logger.h"
@@ -229,6 +230,39 @@ void DataDispenser::doEventSelection(){
     LogThrowIf(treeChain.GetEntries() == 0, "TChain is empty.");
 
     if( iThread_ == 0 ) LogInfo << "Defining selection formulas..." << std::endl;
+
+    GenericToolbox::LeafCollection lCollection;
+    lCollection.setTreePtr( &treeChain );
+
+    lCollection.addLeafExpression( _parameters_.selectionCutFormulaStr );
+
+    for(size_t iSample = 0; iSample < _cache_.samplesToFillList.size(); iSample++){
+
+      std::string selectionCut = _cache_.samplesToFillList[iSample]->getSelectionCutsStr();
+      for (auto &replaceEntry: _cache_.varsToOverrideList) {
+        GenericToolbox::replaceSubstringInsideInputString(selectionCut, replaceEntry,
+                                                          _parameters_.overrideLeafDict[replaceEntry]);
+      }
+
+      if( selectionCut.empty() ) continue;
+
+      lCollection.addLeafExpression( selectionCut );
+
+
+    }
+
+    lCollection.initialize();
+
+    treeChain.LoadTree(0);
+    treeChain.GetEntry(0);
+    LogDebug << lCollection.getSummary() << std::endl;
+
+    exit(0);
+
+
+
+
+
     treeChain.SetBranchStatus("*", true); // enabling every branch to define formula
 
     TTreeFormula *treeSelectionCutFormula{nullptr};
@@ -580,25 +614,29 @@ void DataDispenser::preAllocateMemory(){
 
   GenericToolbox::LeafCollection lCollection;
   lCollection.setTreePtr( &treeChain );
-  LogDebug << "ADD LEAVES" << std::endl;
-  for( auto& var: _cache_.varsRequestedForStorage ){
-    auto leafStr = var;
+
+  for( auto& var : _cache_.varsRequestedForIndexing ){
+    // look for override requests
     if( GenericToolbox::doesKeyIsInMap(var, _parameters_.overrideLeafDict) ){
-      leafStr = _parameters_.overrideLeafDict[var];
+      lCollection.addLeafExpression( _parameters_.overrideLeafDict[var] );
     }
-    lCollection.addLeafExpression( leafStr );
+    else{
+      lCollection.addLeafExpression( _cache_.varToLeafDict[var].first );
+    }
   }
-  LogDebug << "INIT" << std::endl;
   lCollection.initialize();
+
+
+  PhysicsEvent eventPlaceholder;
+  eventPlaceholder.setDataSetIndex(_owner_->getDataSetIndex());
+  eventPlaceholder.setCommonLeafNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
+
+//  eventPlaceholder.;
 
   exit(0);
 
   // Just a placeholder for creating the dictionary
   auto tBuf = this->generateTreeEventBuffer(&treeChain, _cache_.varsRequestedForStorage);
-
-  PhysicsEvent eventPlaceholder;
-  eventPlaceholder.setDataSetIndex(_owner_->getDataSetIndex());
-  eventPlaceholder.setCommonLeafNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
   auto copyDict = eventPlaceholder.generateDict(tBuf, _parameters_.overrideLeafDict);
   eventPlaceholder.copyData(copyDict);
 
