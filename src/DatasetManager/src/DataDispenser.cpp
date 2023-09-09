@@ -234,102 +234,44 @@ void DataDispenser::doEventSelection(){
     GenericToolbox::LeafCollection lCollection;
     lCollection.setTreePtr( &treeChain );
 
-    lCollection.addLeafExpression( _parameters_.selectionCutFormulaStr );
+    int selectionCutLeafFormIndex{-1};
 
-    for(size_t iSample = 0; iSample < _cache_.samplesToFillList.size(); iSample++){
+    // global cut
+    if( not _parameters_.selectionCutFormulaStr.empty() ){
+      selectionCutLeafFormIndex = lCollection.addLeafExpression( _parameters_.selectionCutFormulaStr );
+    }
 
-      std::string selectionCut = _cache_.samplesToFillList[iSample]->getSelectionCutsStr();
+    // sample cuts
+    GenericToolbox::TablePrinter tableSelectionCuts;
+    tableSelectionCuts.setColTitles({{"Sample"}, {"Selection Cut"}});
+
+    std::vector<std::pair<int, int>> sampleCutIdxList;
+
+    for( size_t iSample = 0; iSample < _cache_.samplesToFillList.size(); iSample++ ){
+      auto* samplePtr = _cache_.samplesToFillList[iSample];
+      sampleCutIdxList.emplace_back(iSample, -1);
+
+      std::string selectionCut = samplePtr->getSelectionCutsStr();
       for (auto &replaceEntry: _cache_.varsToOverrideList) {
-        GenericToolbox::replaceSubstringInsideInputString(selectionCut, replaceEntry,
-                                                          _parameters_.overrideLeafDict[replaceEntry]);
+        GenericToolbox::replaceSubstringInsideInputString(
+            selectionCut, replaceEntry, _parameters_.overrideLeafDict[replaceEntry]
+        );
       }
 
-      if( selectionCut.empty() ) continue;
+      if( selectionCut.empty() ){ continue; }
 
-      lCollection.addLeafExpression( selectionCut );
-
+      sampleCutIdxList.back().second = lCollection.addLeafExpression( selectionCut );
+      tableSelectionCuts << samplePtr->getName() << GenericToolbox::TablePrinter::Action::NextColumn;
+      tableSelectionCuts << selectionCut << GenericToolbox::TablePrinter::Action::NextLine;
 
     }
+    if( iThread_==0 ){ tableSelectionCuts.printTable(); }
 
     lCollection.initialize();
 
-    treeChain.LoadTree(0);
-    treeChain.GetEntry(0);
-    LogDebug << lCollection.getSummary() << std::endl;
-
-    exit(0);
-
-
-
-
-
-    treeChain.SetBranchStatus("*", true); // enabling every branch to define formula
-
-    TTreeFormula *treeSelectionCutFormula{nullptr};
-    std::vector<TTreeFormula *> sampleCutFormulaList(_cache_.samplesToFillList.size(), nullptr);
-    TTreeFormulaManager formulaManager; // TTreeFormulaManager handles the notification of multiple TTreeFormula for one TTChain
-
-    if ( not _parameters_.selectionCutFormulaStr.empty() ) {
-      treeSelectionCutFormula = new TTreeFormula(
-          "SelectionCutFormula",
-          _parameters_.selectionCutFormulaStr.c_str(),
-          &treeChain
-      );
-
-      // ROOT Hot fix: https://root-forum.cern.ch/t/ttreeformula-evalinstance-return-0-0/16366/10
-      treeSelectionCutFormula->GetNdata();
-
-      LogThrowIf(treeSelectionCutFormula->GetNdim() == 0,
-                 "\"" << _parameters_.selectionCutFormulaStr << "\" could not be parsed by the TChain");
-
-      // The TChain will notify the formula that it has to update leaves addresses while swaping TFile
-      formulaManager.Add(treeSelectionCutFormula);
-      if(iThread_==0) LogInfo << "Using tree selection cut: \"" << _parameters_.selectionCutFormulaStr << "\"" << std::endl;
-    }
-
-    GenericToolbox::TablePrinter t;
-    t.setColTitles({{"Sample"}, {"Selection Cut"}});
-    for (size_t iSample = 0; iSample < _cache_.samplesToFillList.size(); iSample++) {
-
-      std::string selectionCut = _cache_.samplesToFillList[iSample]->getSelectionCutsStr();
-      for (auto &replaceEntry: _cache_.varsToOverrideList) {
-        GenericToolbox::replaceSubstringInsideInputString(selectionCut, replaceEntry,
-                                                          _parameters_.overrideLeafDict[replaceEntry]);
-      }
-
-      t.addTableLine({{"\"" + _cache_.samplesToFillList[iSample]->getName() + "\""},
-                      {"\"" + selectionCut + "\""}});
-
-      if( selectionCut.empty() ) continue;
-
-      sampleCutFormulaList[iSample] = new TTreeFormula(_cache_.samplesToFillList[iSample]->getName().c_str(),
-                                                       selectionCut.c_str(), &treeChain);
-
-      // ROOT Hot fix: https://root-forum.cern.ch/t/ttreeformula-evalinstance-return-0-0/16366/10
-      sampleCutFormulaList[iSample]->GetNdata();
-
-      LogThrowIf(sampleCutFormulaList[iSample]->GetNdim() == 0,
-                 "\"" << selectionCut << "\" could not be parsed by the TChain");
-
-      // The TChain will notify the formula that it has to update leaves addresses while swaping TFile
-      formulaManager.Add(sampleCutFormulaList[iSample]);
-    }
-    treeChain.SetNotify(&formulaManager);
-    if(iThread_==0) t.printTable();
-
-
-    if(iThread_ == 0) LogInfo << "Enabling required branches..." << std::endl;
-    treeChain.SetBranchStatus("*", false);
-
-    if (treeSelectionCutFormula != nullptr) GenericToolbox::enableSelectedBranches(&treeChain, treeSelectionCutFormula);
-    for (auto &sampleFormula: sampleCutFormulaList) {
-      if( sampleFormula == nullptr ) continue;
-      GenericToolbox::enableSelectedBranches(&treeChain, sampleFormula);
-    }
-
-
     GenericToolbox::VariableMonitor readSpeed("bytes");
 
+    // Multi-thread index splitting
     Long64_t nEvents = treeChain.GetEntries();
     Long64_t nEventPerThread = nEvents/Long64_t(nThreads);
     Long64_t iEnd = nEvents;
@@ -338,7 +280,7 @@ void DataDispenser::doEventSelection(){
     Long64_t iGlobal = 0;
 
     // Load the branches
-    treeChain.LoadTree(iStart);
+    treeChain.LoadTree(0);
 
     // for each event, which sample is active?
     perThreadEventIsInSamplesList[iThread_].resize(nEvents, std::vector<bool>(_cache_.samplesToFillList.size(), true));
@@ -370,45 +312,49 @@ void DataDispenser::doEventSelection(){
         treeChain.GetEntry(iEntry);
       }
 
-      if (treeSelectionCutFormula != nullptr and not GenericToolbox::doesEntryPassCut(treeSelectionCutFormula)) {
-        for (size_t iSample = 0; iSample < sampleCutFormulaList.size(); iSample++) {
-          perThreadEventIsInSamplesList[iThread_][iEntry][iSample] = false;
+      if ( selectionCutLeafFormIndex != -1 ){
+        if( lCollection.getLeafFormList()[selectionCutLeafFormIndex].eval<double>() == 0 ){
+          for (size_t iSample = 0; iSample < _cache_.samplesToFillList.size(); iSample++) {
+            perThreadEventIsInSamplesList[iThread_][iEntry][iSample] = false;
+          }
+          if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
+            LogTrace << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
+                     << " rejected because of " << _parameters_.selectionCutFormulaStr << std::endl;
+          }
+          continue;
         }
-        if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
-          LogTrace << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
-                   << " rejected because of " << treeSelectionCutFormula->GetExpFormula() << std::endl;
-        }
-        continue;
       }
 
-      for (size_t iSample = 0; iSample < sampleCutFormulaList.size(); iSample++) {
-
-        if( sampleCutFormulaList[iSample] == nullptr ){
-          perThreadSampleNbOfEvents[iThread_][iSample]++;
+      for( auto& sampleCutIdx : sampleCutIdxList ){
+        if( sampleCutIdx.second == -1 ){
+          perThreadSampleNbOfEvents[iThread_][sampleCutIdx.first]++;
           if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
             LogDebug << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
-                     << " included as sample " << iSample << " (NO SELECTION CUT)" << std::endl;
+                     << " included as sample " << sampleCutIdx.first << " (NO SELECTION CUT)" << std::endl;
           }
           continue;
         }
 
-        if ( not GenericToolbox::doesEntryPassCut(sampleCutFormulaList[iSample])) {
-          perThreadEventIsInSamplesList[iThread_][iEntry][iSample] = false;
+        if( lCollection.getLeafFormList()[sampleCutIdx.second].eval<double>() == 0 ){
+          perThreadEventIsInSamplesList[iThread_][iEntry][sampleCutIdx.first] = false;
           if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
             LogTrace << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
-                     << " rejected as sample " << iSample << " because of "
-                     << sampleCutFormulaList[iSample]->GetExpFormula() << std::endl;
-          }
-        } else {
-          perThreadSampleNbOfEvents[iThread_][iSample]++;
-          if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
-            LogDebug << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
-                     << " included as sample " << iSample << " using "
-                     << sampleCutFormulaList[iSample]->GetExpFormula() << std::endl;
+                     << " rejected as sample " << sampleCutIdx.first << " because of "
+                     << lCollection.getLeafFormList()[sampleCutIdx.second].getSummary() << std::endl;
           }
         }
-      } // iSample
+        else {
+          perThreadSampleNbOfEvents[iThread_][sampleCutIdx.first]++;
+          if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
+            LogDebug << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
+                     << " included as sample " << sampleCutIdx.first << " because of "
+                     << lCollection.getLeafFormList()[sampleCutIdx.second].getSummary() << std::endl;
+          }
+        }
+      }
+
     } // iEvent
+
     if( iThread_ == 0 ){ GenericToolbox::displayProgressBar(nEvents, nEvents, ssProgressTitle.str()); }
   };
 
@@ -614,31 +560,33 @@ void DataDispenser::preAllocateMemory(){
 
   GenericToolbox::LeafCollection lCollection;
   lCollection.setTreePtr( &treeChain );
-
   for( auto& var : _cache_.varsRequestedForIndexing ){
     // look for override requests
-    if( GenericToolbox::doesKeyIsInMap(var, _parameters_.overrideLeafDict) ){
-      lCollection.addLeafExpression( _parameters_.overrideLeafDict[var] );
-    }
-    else{
-      lCollection.addLeafExpression( _cache_.varToLeafDict[var].first );
-    }
+    lCollection.addLeafExpression(
+        GenericToolbox::doesKeyIsInMap(var, _parameters_.overrideLeafDict) ?
+        _parameters_.overrideLeafDict[var]: var
+    );
   }
   lCollection.initialize();
 
-
   PhysicsEvent eventPlaceholder;
   eventPlaceholder.setDataSetIndex(_owner_->getDataSetIndex());
-  eventPlaceholder.setCommonLeafNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
+  eventPlaceholder.setCommonVarNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
 
-//  eventPlaceholder.;
+  std::vector<const GenericToolbox::LeafForm*> leafFormToVarList{};
+  for( auto& storageVar : *eventPlaceholder.getCommonLeafNameListPtr() ){
+    leafFormToVarList.emplace_back( lCollection.getLeafFormPtr(
+        GenericToolbox::doesKeyIsInMap(storageVar, _parameters_.overrideLeafDict) ?
+        _parameters_.overrideLeafDict[storageVar]: storageVar
+    ));
+  }
 
-  exit(0);
+  eventPlaceholder.allocateMemory( leafFormToVarList );
 
-  // Just a placeholder for creating the dictionary
-  auto tBuf = this->generateTreeEventBuffer(&treeChain, _cache_.varsRequestedForStorage);
-  auto copyDict = eventPlaceholder.generateDict(tBuf, _parameters_.overrideLeafDict);
-  eventPlaceholder.copyData(copyDict);
+//  // Just a placeholder for creating the dictionary
+//  auto tBuf = this->generateTreeEventBuffer(&treeChain, _cache_.varsRequestedForStorage);
+//  auto copyDict = eventPlaceholder.generateDict(tBuf, _parameters_.overrideLeafDict);
+//  eventPlaceholder.copyData(copyDict);
 
   LogInfo << "Reserving event memory..." << std::endl;
   _cache_.sampleIndexOffsetList.resize(_cache_.samplesToFillList.size());
@@ -693,7 +641,6 @@ void DataDispenser::preAllocateMemory(){
       _eventDialCacheRef_->allocateCacheEntries(nEvents, 0);
     }
   }
-
 }
 void DataDispenser::readAndFill(){
   LogWarning << "Reading dataset and loading..." << std::endl;
@@ -753,8 +700,8 @@ void DataDispenser::loadFromHistContent(){
   // claiming event memory
   for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
 
-    eventPlaceholder.setCommonLeafNameListPtr(
-      std::make_shared<std::vector<std::string>>(_cache_.samplesToFillList[iSample]->getBinning().getBinVariables())
+    eventPlaceholder.setCommonVarNameListPtr(
+        std::make_shared<std::vector<std::string>>(_cache_.samplesToFillList[iSample]->getBinning().getBinVariables())
     );
     for( size_t iVar = 0 ; iVar < _cache_.samplesToFillList[iSample]->getBinning().getBinVariables().size() ; iVar++ ){
       eventPlaceholder.getLeafContentList()[iVar].emplace_back( double(0.) );
@@ -854,6 +801,15 @@ void DataDispenser::fillFunction(int iThread_){
     treeChain.Add(name.c_str());
   }
 
+  GenericToolbox::LeafCollection lCollection;
+  lCollection.setTreePtr( &treeChain );
+
+  GenericToolbox::LeafForm* nominalWeightLeafForm{nullptr};
+
+  lCollection.initialize();
+
+  exit(0);
+
   TTreeFormula* threadNominalWeightFormula{nullptr};
   TList objToNotify;
   treeChain.SetNotify(&objToNotify);
@@ -914,7 +870,7 @@ void DataDispenser::fillFunction(int iThread_){
   // buffer that will store the data for indexing
   PhysicsEvent eventBuffer;
   eventBuffer.setDataSetIndex(_owner_->getDataSetIndex());
-  eventBuffer.setCommonLeafNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForIndexing));
+  eventBuffer.setCommonVarNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForIndexing));
   auto copyDict = eventBuffer.generateDict(tEventBuffer, _parameters_.overrideLeafDict);
   if(iThread_ == 0){
     LogInfo << "Feeding event variables with:" << std::endl;
@@ -963,7 +919,7 @@ void DataDispenser::fillFunction(int iThread_){
   // only here to create a dictionary to copy data from the TTree that should store in RAM
   PhysicsEvent evStore;
   evStore.setDataSetIndex(_owner_->getDataSetIndex());
-  evStore.setCommonLeafNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
+  evStore.setCommonVarNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
   auto copyStoreDict = evStore.generateDict(tEventBuffer, _parameters_.overrideLeafDict);
 
   // Will keep track of a picked event pointer
