@@ -1195,10 +1195,12 @@ void DataDispenser::fillFunction(int iThread_){
                 grPtr = (TGraph *) eventIndexingBuffer.getVariable<TClonesArray *>(
                     dialCollectionRef->getGlobalDialLeafName()
                 )->At(dialArrayIndex);
-              } else if (not strcmp(
+              }
+              else if (not strcmp(
                   treeChain.GetLeaf(dialCollectionRef->getGlobalDialLeafName().c_str())->GetTypeName(), "TGraph")) {
                 grPtr = (TGraph *) eventIndexingBuffer.getVariable<TGraph *>(dialCollectionRef->getGlobalDialLeafName());
-              } else {
+              }
+              else {
                 LogThrow("Unsupported event-by-event dial type: "
                              << treeChain.GetLeaf(dialCollectionRef->getGlobalDialLeafName().c_str())->GetTypeName())
               }
