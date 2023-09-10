@@ -81,6 +81,7 @@ public:
   std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>> generateLeavesDictionary(bool disableArrays_ = false) const;
 
   void allocateMemory(const std::vector<const GenericToolbox::LeafForm*>& leafFormList_);
+  void copyData(const std::vector<const GenericToolbox::LeafForm*>& leafFormList_);
   void copyData(const std::vector<std::pair<const GenericToolbox::LeafHolder *, int>> &dict_);
   std::vector<std::pair<const GenericToolbox::LeafHolder*, int>> generateDict(const GenericToolbox::TreeEntryBuffer& treeEventBuffer_, const std::map<std::string, std::string>& leafDict_={});
   void copyLeafContent(const PhysicsEvent& ref_);

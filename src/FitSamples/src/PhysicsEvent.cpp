@@ -286,6 +286,14 @@ void PhysicsEvent::allocateMemory(const std::vector<const GenericToolbox::LeafFo
         GenericToolbox::leafToAnyType( leafFormList_[iVar]->getLeafTypeName() )
     );
   }
+  this->resizeVarToDoubleCache();
+}
+void PhysicsEvent::copyData(const std::vector<const GenericToolbox::LeafForm*>& leafFormList_){
+  // Don't check for the size? it has to be very fast
+  size_t nLeaf{leafFormList_.size()};
+  for( size_t iLeaf = 0 ; iLeaf < nLeaf ; iLeaf++ ){
+    leafFormList_[iLeaf]->dropToAny(_leafContentList_[iLeaf][0]);
+  }
   this->invalidateVarToDoubleCache();
 }
 void PhysicsEvent::copyData(const std::vector<std::pair<const GenericToolbox::LeafHolder *, int>> &dict_) {

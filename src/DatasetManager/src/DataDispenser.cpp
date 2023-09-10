@@ -804,38 +804,36 @@ void DataDispenser::fillFunction(int iThread_){
   GenericToolbox::LeafCollection lCollection;
   lCollection.setTreePtr( &treeChain );
 
-  GenericToolbox::LeafForm* nominalWeightLeafForm{nullptr};
+  // nominal weight
+  const GenericToolbox::LeafForm* nominalWeightLeafForm{nullptr};
+  if( not _parameters_.nominalWeightFormulaStr.empty() ){
+    auto idx = size_t(lCollection.addLeafExpression( _parameters_.nominalWeightFormulaStr ));
+    nominalWeightLeafForm = (GenericToolbox::LeafForm*) idx; // tweaking types. Ptr will be attributed after init
+  }
+
+  // variables definition
+  std::vector<const GenericToolbox::LeafForm*> leafFormIndexingList{};
+  std::vector<const GenericToolbox::LeafForm*> leafFormStorageList{};
+  for( auto& var : _cache_.varsRequestedForIndexing ){
+    std::string leafExp{var};
+    if( GenericToolbox::doesKeyIsInMap( var, _parameters_.overrideLeafDict ) ){
+      leafExp = _parameters_.overrideLeafDict[leafExp];
+    }
+    auto idx = size_t(lCollection.addLeafExpression(leafExp));
+    leafFormIndexingList.emplace_back( (GenericToolbox::LeafForm*) idx ); // tweaking types
+    if( GenericToolbox::doesElementIsInVector(var, _cache_.varsRequestedForStorage) ){
+      leafFormStorageList.emplace_back( (GenericToolbox::LeafForm*) idx );
+    }
+  }
 
   lCollection.initialize();
 
-  exit(0);
-
-  TTreeFormula* threadNominalWeightFormula{nullptr};
-  TList objToNotify;
-  treeChain.SetNotify(&objToNotify);
-
-  treeChain.SetBranchStatus("*", false);
-
+  // grab ptr address now
   if( not _parameters_.nominalWeightFormulaStr.empty() ){
-    treeChain.SetBranchStatus("*", true);
-    threadNominalWeightFormula = new TTreeFormula(
-        Form("NominalWeightFormula%i", iThread_),
-        _parameters_.nominalWeightFormulaStr.c_str(),
-        &treeChain
-    );
-
-    // ROOT Hot fix: https://root-forum.cern.ch/t/ttreeformula-evalinstance-return-0-0/16366/10
-    threadNominalWeightFormula->GetNdata();
-
-    LogThrowIf(threadNominalWeightFormula->GetNdim() == 0,
-               "\"" <<  _parameters_.nominalWeightFormulaStr << "\" could not be parsed by the TChain");
-    objToNotify.Add(threadNominalWeightFormula); // memory handled here!
-    treeChain.SetBranchStatus("*", false);
-    GenericToolbox::enableSelectedBranches(&treeChain, threadNominalWeightFormula);
+    nominalWeightLeafForm = &(lCollection.getLeafFormList()[(size_t) nominalWeightLeafForm]);
   }
-
-  // TTree data buffer
-  auto tEventBuffer = this->generateTreeEventBuffer(&treeChain, _cache_.varsRequestedForIndexing);
+  for( auto& lfInd: leafFormIndexingList ){ lfInd = &(lCollection.getLeafFormList()[(size_t) lfInd]); }
+  for( auto& lfSto: leafFormStorageList ){ lfSto = &(lCollection.getLeafFormList()[(size_t) lfSto]); }
 
   // Event Var Transform
   auto eventVarTransformList = _cache_.eventVarTransformList; // copy for cache
@@ -868,59 +866,59 @@ void DataDispenser::fillFunction(int iThread_){
   }
 
   // buffer that will store the data for indexing
-  PhysicsEvent eventBuffer;
-  eventBuffer.setDataSetIndex(_owner_->getDataSetIndex());
-  eventBuffer.setCommonVarNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForIndexing));
-  auto copyDict = eventBuffer.generateDict(tEventBuffer, _parameters_.overrideLeafDict);
+  PhysicsEvent eventIndexingBuffer;
+  eventIndexingBuffer.setDataSetIndex(_owner_->getDataSetIndex());
+  eventIndexingBuffer.setCommonVarNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForIndexing));
+  eventIndexingBuffer.allocateMemory(leafFormIndexingList);
+
+  PhysicsEvent eventStorageBuffer;
+  eventStorageBuffer.setDataSetIndex(_owner_->getDataSetIndex());
+  eventStorageBuffer.setCommonVarNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
+  eventStorageBuffer.allocateMemory(leafFormStorageList);
+
   if(iThread_ == 0){
     LogInfo << "Feeding event variables with:" << std::endl;
-    GenericToolbox::TablePrinter t;
+    GenericToolbox::TablePrinter table;
 
-    t << "Variable" << GenericToolbox::TablePrinter::NextColumn;
-    t << "Leaf" << GenericToolbox::TablePrinter::NextColumn;
-    t << "Transforms" << GenericToolbox::TablePrinter::NextLine;
+    table << "Variable" << GenericToolbox::TablePrinter::NextColumn;
+    table << "LeafForm" << GenericToolbox::TablePrinter::NextColumn;
+    table << "Transforms" << GenericToolbox::TablePrinter::NextLine;
 
-    for( size_t iVar = 0 ; iVar < eventBuffer.getCommonLeafNameListPtr()->size() ; iVar++ ){
-      std::string variableName = (*eventBuffer.getCommonLeafNameListPtr())[iVar];
+    for( size_t iVar = 0 ; iVar < _cache_.varsRequestedForIndexing.size() ; iVar++ ){
+      std::string var = _cache_.varsRequestedForIndexing[iVar];
 
       // line color?
-      if( GenericToolbox::doesElementIsInVector(variableName, _cache_.varsRequestedForStorage)){
-        t.setColorBuffer(GenericToolbox::ColorCodes::blueBackground);
+      if( GenericToolbox::doesElementIsInVector(var, _cache_.varsRequestedForStorage)){
+        table.setColorBuffer(GenericToolbox::ColorCodes::blueBackground);
       }
       else if(
-          copyDict[iVar].first->getLeafTypeName() == "TClonesArray"
-          or copyDict[iVar].first->getLeafTypeName() == "TGraph"
+             leafFormIndexingList[iVar]->getLeafTypeName() == "TClonesArray"
+          or leafFormIndexingList[iVar]->getLeafTypeName() == "TGraph"
           ){
-        t.setColorBuffer(GenericToolbox::ColorCodes::magentaBackground);
+        table.setColorBuffer( GenericToolbox::ColorCodes::magentaBackground );
       }
 
-      t << variableName << GenericToolbox::TablePrinter::NextColumn;
+      table << var << GenericToolbox::TablePrinter::NextColumn;
 
-      t << copyDict[iVar].first->getLeafFullName();
-      if(copyDict[iVar].second != -1) t << "[" << copyDict[iVar].second << "]";
-      t << GenericToolbox::TablePrinter::NextColumn;
+      table << leafFormIndexingList[iVar]->getPrimaryExprStr();
+      table << GenericToolbox::TablePrinter::NextColumn;
 
       std::vector<std::string> transformsList;
       for( auto* varTransformForIndexing : varTransformForIndexingList ){
-        if( varTransformForIndexing->getOutputVariableName() == variableName ){
+        if( varTransformForIndexing->getOutputVariableName() == var ){
           transformsList.emplace_back(varTransformForIndexing->getTitle());
         }
       }
-      t << GenericToolbox::parseVectorAsString(transformsList) << GenericToolbox::TablePrinter::NextColumn;
+      table << GenericToolbox::parseVectorAsString(transformsList) << GenericToolbox::TablePrinter::NextColumn;
     }
 
-    t.printTable();
-    LogInfo(Logger::Color::BG_BLUE) << "      " << Logger::getColorEscapeCode(Logger::Color::RESET) << " -> Variables stored in RAM" << std::endl;
+
+    table.printTable();
+
+    // printing legend
+    LogInfo(Logger::Color::BG_BLUE)    << "      " << Logger::getColorEscapeCode(Logger::Color::RESET) << " -> Variables stored in RAM" << std::endl;
     LogInfo(Logger::Color::BG_MAGENTA) << "      " << Logger::getColorEscapeCode(Logger::Color::RESET) << " -> Dials stored in RAM" << std::endl;
   }
-  eventBuffer.copyData(copyDict); // resize array obj
-  eventBuffer.resizeVarToDoubleCache();
-
-  // only here to create a dictionary to copy data from the TTree that should store in RAM
-  PhysicsEvent evStore;
-  evStore.setDataSetIndex(_owner_->getDataSetIndex());
-  evStore.setCommonVarNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
-  auto copyStoreDict = evStore.generateDict(tEventBuffer, _parameters_.overrideLeafDict);
 
   // Will keep track of a picked event pointer
   PhysicsEvent* eventPtr{nullptr};
@@ -947,7 +945,7 @@ void DataDispenser::fillFunction(int iThread_){
   std::vector<DataBin>::const_iterator binFoundItr;
   auto isBinValid = [&](const DataBin& b_){
     for( iVar = 0 ; iVar < b_.getVariableNameList().size() ; iVar++ ){
-      if( not b_.isBetweenEdges(iVar, eventBuffer.getVarAsDouble(b_.getVariableNameList()[iVar])) ){
+      if( not b_.isBetweenEdges(iVar, eventIndexingBuffer.getVarAsDouble(b_.getVariableNameList()[iVar])) ){
         return false;
       }
     } // Var
@@ -965,7 +963,7 @@ void DataDispenser::fillFunction(int iThread_){
     for( iVar = 0 ; iVar < nBinEdges ; iVar++ ){
       if( not DataBin::isBetweenEdges(
           d_.getEdgesList()[iVar],
-          eventBuffer.getVarAsDouble( d_.getEventVarIndexCache()[iVar] ) )
+          eventIndexingBuffer.getVarAsDouble(d_.getEventVarIndexCache()[iVar] ) )
           ){
         return false;
       }
@@ -1037,24 +1035,26 @@ void DataDispenser::fillFunction(int iThread_){
     nBytes = treeChain.GetEntry(iEntry);
 
     // monitor
-    if( iThread_ == 0 ) readSpeed.addQuantity(nBytes*nThreads);
+    if( iThread_ == 0 ){
+      readSpeed.addQuantity(nBytes * nThreads);
+    }
 
-    if( threadNominalWeightFormula != nullptr ){
-      eventBuffer.setTreeWeight(threadNominalWeightFormula->EvalInstance<Double_t>());
-      if( eventBuffer.getTreeWeight() < 0 ){
+    if( nominalWeightLeafForm != nullptr ){
+      eventIndexingBuffer.setTreeWeight( nominalWeightLeafForm->eval<double>() );
+      if(eventIndexingBuffer.getTreeWeight() < 0 ){
         LogError << "Negative nominal weight:" << std::endl;
 
-        LogError << "Event buffer is: " << eventBuffer.getSummary() << std::endl;
+        LogError << "Event buffer is: " << eventIndexingBuffer.getSummary() << std::endl;
 
         LogError << "Formula leaves:" << std::endl;
-        for( int iLeaf = 0 ; iLeaf < threadNominalWeightFormula->GetNcodes() ; iLeaf++ ){
-          if( threadNominalWeightFormula->GetLeaf(iLeaf) == nullptr ) continue; // for "Entry$" like dummy leaves
-          LogError << "Leaf: " << threadNominalWeightFormula->GetLeaf(iLeaf)->GetName() << "[0] = " << threadNominalWeightFormula->GetLeaf(iLeaf)->GetValue(0) << std::endl;
+        for( int iLeaf = 0 ; iLeaf < nominalWeightLeafForm->getTreeFormulaPtr()->GetNcodes() ; iLeaf++ ){
+          if( nominalWeightLeafForm->getTreeFormulaPtr()->GetLeaf(iLeaf) == nullptr ) continue; // for "Entry$" like dummy leaves
+          LogError << "Leaf: " << nominalWeightLeafForm->getTreeFormulaPtr()->GetLeaf(iLeaf)->GetName() << "[0] = " << nominalWeightLeafForm->getTreeFormulaPtr()->GetLeaf(iLeaf)->GetValue(0) << std::endl;
         }
 
         LogThrow("Negative nominal weight");
       }
-      if( eventBuffer.getTreeWeight() == 0 ){
+      if(eventIndexingBuffer.getTreeWeight() == 0 ){
         continue;
       } // skip this event
     }
@@ -1063,19 +1063,19 @@ void DataDispenser::fillFunction(int iThread_){
       if( _cache_.eventIsInSamplesList[iEntry][iSample] ){
 
         // Reset bin index of the buffer
-        eventBuffer.setSampleBinIndex(-1);
+        eventIndexingBuffer.setSampleBinIndex(-1);
 
         // Getting loaded data in tEventBuffer
-        eventBuffer.copyData(copyDict);
+        eventIndexingBuffer.copyData( leafFormIndexingList );
 
         // Propagate transformations for indexing
         for( auto* varTransformPtr : varTransformForIndexingList ){
-          varTransformPtr->evalAndStore(eventBuffer);
+          varTransformPtr->evalAndStore(eventIndexingBuffer);
         }
 
         // Sample variable
         if( varSelectionFormulaList[iSample] != nullptr ){
-          if( eventBuffer.evalFormula( varSelectionFormulaList[iSample].get() ) == 0 ) break;
+          if(eventIndexingBuffer.evalFormula(varSelectionFormulaList[iSample].get() ) == 0 ) break;
         }
 
         // Has valid bin?
@@ -1086,13 +1086,21 @@ void DataDispenser::fillFunction(int iThread_){
             isBinValid
         );
 
+//        eventIndexingBuffer.print();
+
         if (binFoundItr == binsListPtr->end()) {
           // Invalid bin -> next sample
+//          LogDebug << "not in bin" << std::endl;
+//          eventIndexingBuffer.print();
+//          LogDebug << lCollection.getSummary() << std::endl;
+//          exit(0);
           break;
         }
 
+//        exit(0);
+
         // found the bin
-        eventBuffer.setSampleBinIndex(int(std::distance(binsListPtr->begin(), binFoundItr)));
+        eventIndexingBuffer.setSampleBinIndex(int(std::distance(binsListPtr->begin(), binFoundItr)));
 
         // OK, now we have a valid fit bin. Let's claim an index.
         GundamGlobals::getThreadMutex().lock();
@@ -1104,7 +1112,7 @@ void DataDispenser::fillFunction(int iThread_){
 
         // Get the next free event in our buffer
         eventPtr = &(*_cache_.sampleEventListPtrToFill[iSample])[sampleEventIndex];
-        eventPtr->copyData(copyStoreDict); // buffer has the right size already
+        eventPtr->copyData( leafFormStorageList ); // buffer has the right size already
 
         // Propagate transformation for storage -> use the previous results calculated for indexing
         for( auto* varTransformPtr : varTransformForStorageList ){
@@ -1112,11 +1120,13 @@ void DataDispenser::fillFunction(int iThread_){
         }
 
         eventPtr->setEntryIndex(iEntry);
-        eventPtr->setSampleBinIndex(eventBuffer.getSampleBinIndex());
-        eventPtr->setTreeWeight(eventBuffer.getTreeWeight());
-        eventPtr->setNominalWeight(eventBuffer.getTreeWeight());
+        eventPtr->setSampleBinIndex(eventIndexingBuffer.getSampleBinIndex());
+        eventPtr->setTreeWeight(eventIndexingBuffer.getTreeWeight());
+        eventPtr->setNominalWeight(eventIndexingBuffer.getTreeWeight());
         eventPtr->setSampleIndex(_cache_.samplesToFillList[iSample]->getIndex());
         eventPtr->resetEventWeight();
+
+//        eventPtr->print();
 
         // Now the event is ready. Let's index the dials:
         eventDialOffset = 0;
@@ -1134,7 +1144,7 @@ void DataDispenser::fillFunction(int iThread_){
             if (not dialCollectionRef->isEnabled()) { continue; }
 
             if (dialCollectionRef->getApplyConditionFormula() != nullptr) {
-              if (eventBuffer.evalFormula(dialCollectionRef->getApplyConditionFormula().get()) == 0) {
+              if (eventIndexingBuffer.evalFormula(dialCollectionRef->getApplyConditionFormula().get()) == 0) {
                 // next dialSet
                 continue;
               }
@@ -1173,11 +1183,11 @@ void DataDispenser::fillFunction(int iThread_){
               // Event-by-event dial?
               if (not strcmp(treeChain.GetLeaf(dialCollectionRef->getGlobalDialLeafName().c_str())->GetTypeName(),
                              "TClonesArray")) {
-                grPtr = (TGraph *) eventBuffer.getVariable<TClonesArray *>(
+                grPtr = (TGraph *) eventIndexingBuffer.getVariable<TClonesArray *>(
                     dialCollectionRef->getGlobalDialLeafName())->At(0);
               } else if (not strcmp(
                   treeChain.GetLeaf(dialCollectionRef->getGlobalDialLeafName().c_str())->GetTypeName(), "TGraph")) {
-                grPtr = (TGraph *) eventBuffer.getVariable<TGraph *>(dialCollectionRef->getGlobalDialLeafName());
+                grPtr = (TGraph *) eventIndexingBuffer.getVariable<TGraph *>(dialCollectionRef->getGlobalDialLeafName());
               } else {
                 LogThrow("Unsupported event-by-event dial type: "
                              << treeChain.GetLeaf(dialCollectionRef->getGlobalDialLeafName().c_str())->GetTypeName())
