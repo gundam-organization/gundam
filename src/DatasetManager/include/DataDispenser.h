@@ -28,6 +28,7 @@ struct DataDispenserParameters{
   bool useMcContainer{false}; // define the container to fill -> could get rid of it?
   std::string name{};
   std::string treePath{};
+  std::string dialIndexFormula{};
   std::string nominalWeightFormulaStr{};
   std::string selectionCutFormulaStr{};
   std::vector<std::string> activeLeafNameList{};

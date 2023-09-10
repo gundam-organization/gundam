@@ -53,6 +53,7 @@ void DataDispenser::readConfigImpl(){
   _parameters_.dummyVariablesList = GenericToolbox::Json::fetchValue(_config_, "dummyVariablesList", _parameters_.dummyVariablesList);
   _parameters_.useMcContainer = GenericToolbox::Json::fetchValue(_config_, "useMcContainer", _parameters_.useMcContainer);
 
+  _parameters_.dialIndexFormula = GenericToolbox::Json::fetchValue(_config_, "dialIndexFormula", _parameters_.dialIndexFormula);
   _parameters_.selectionCutFormulaStr = GenericToolbox::Json::buildFormula(_config_, "selectionCutFormula", "&&", _parameters_.selectionCutFormulaStr);
   _parameters_.nominalWeightFormulaStr = GenericToolbox::Json::buildFormula(_config_, "nominalWeightFormula", "*", _parameters_.nominalWeightFormulaStr);
 
@@ -194,9 +195,11 @@ void DataDispenser::parseStringParameters() {
     });
   }
 
+  replaceToyIndexFct(_parameters_.dialIndexFormula);
   replaceToyIndexFct(_parameters_.nominalWeightFormulaStr);
   replaceToyIndexFct(_parameters_.selectionCutFormulaStr);
 
+  overrideLeavesNamesFct(_parameters_.dialIndexFormula);
   overrideLeavesNamesFct(_parameters_.nominalWeightFormulaStr);
   overrideLeavesNamesFct(_parameters_.selectionCutFormulaStr);
 
@@ -647,6 +650,9 @@ void DataDispenser::readAndFill(){
   if( not _parameters_.nominalWeightFormulaStr.empty() ){
     LogInfo << "Nominal weight: \"" << _parameters_.nominalWeightFormulaStr << "\"" << std::endl;
   }
+  if( not _parameters_.dialIndexFormula.empty() ){
+    LogInfo << "Dial index for TClonesArray: \"" << _parameters_.dialIndexFormula << "\"" << std::endl;
+  }
 
   LogWarning << "Loading and indexing..." << std::endl;
   if(not _owner_->isDevSingleThreadEventLoaderAndIndexer() and GundamGlobals::getNbThreads() > 1 ){
@@ -810,6 +816,15 @@ void DataDispenser::fillFunction(int iThread_){
     nominalWeightTreeFormula = (TTreeFormula*) idx; // tweaking types. Ptr will be attributed after init
   }
 
+  // dial array index
+  TTreeFormula* dialIndexTreeFormula{nullptr};
+  int dialArrayIndex{0};
+  if( not _parameters_.dialIndexFormula.empty() ){
+    auto idx = size_t(lCollection.addLeafExpression( _parameters_.dialIndexFormula ));
+    dialIndexTreeFormula = (TTreeFormula*) idx; // tweaking types. Ptr will be attributed after init
+  }
+
+
   // variables definition
   std::vector<const GenericToolbox::LeafForm*> leafFormIndexingList{};
   std::vector<const GenericToolbox::LeafForm*> leafFormStorageList{};
@@ -830,6 +845,9 @@ void DataDispenser::fillFunction(int iThread_){
   // grab ptr address now
   if( not _parameters_.nominalWeightFormulaStr.empty() ){
     nominalWeightTreeFormula = lCollection.getLeafFormList()[(size_t) nominalWeightTreeFormula].getTreeFormulaPtr().get();
+  }
+  if( not _parameters_.dialIndexFormula.empty() ){
+    dialIndexTreeFormula = lCollection.getLeafFormList()[(size_t) dialIndexTreeFormula].getTreeFormulaPtr().get();
   }
   for( auto& lfInd: leafFormIndexingList ){ lfInd = &(lCollection.getLeafFormList()[(size_t) lfInd]); }
   for( auto& lfSto: leafFormStorageList ){ lfSto = &(lCollection.getLeafFormList()[(size_t) lfSto]); }
@@ -1117,6 +1135,8 @@ void DataDispenser::fillFunction(int iThread_){
         eventPtr->setSampleIndex(_cache_.samplesToFillList[iSample]->getIndex());
         eventPtr->resetEventWeight();
 
+        dialArrayIndex = (dialIndexTreeFormula == nullptr ? 0 : int(dialIndexTreeFormula->EvalInstance()));
+
         // Now the event is ready. Let's index the dials:
         eventDialOffset = 0;
 
@@ -1173,7 +1193,8 @@ void DataDispenser::fillFunction(int iThread_){
               if (not strcmp(treeChain.GetLeaf(dialCollectionRef->getGlobalDialLeafName().c_str())->GetTypeName(),
                              "TClonesArray")) {
                 grPtr = (TGraph *) eventIndexingBuffer.getVariable<TClonesArray *>(
-                    dialCollectionRef->getGlobalDialLeafName())->At(0);
+                    dialCollectionRef->getGlobalDialLeafName()
+                )->At(dialArrayIndex);
               } else if (not strcmp(
                   treeChain.GetLeaf(dialCollectionRef->getGlobalDialLeafName().c_str())->GetTypeName(), "TGraph")) {
                 grPtr = (TGraph *) eventIndexingBuffer.getVariable<TGraph *>(dialCollectionRef->getGlobalDialLeafName());
