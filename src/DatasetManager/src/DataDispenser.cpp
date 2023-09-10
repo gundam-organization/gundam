@@ -556,7 +556,6 @@ void DataDispenser::preAllocateMemory(){
     }
     treeChain.Add(name.c_str());
   }
-  treeChain.SetBranchStatus("*", false);
 
   GenericToolbox::LeafCollection lCollection;
   lCollection.setTreePtr( &treeChain );
@@ -805,10 +804,10 @@ void DataDispenser::fillFunction(int iThread_){
   lCollection.setTreePtr( &treeChain );
 
   // nominal weight
-  const GenericToolbox::LeafForm* nominalWeightLeafForm{nullptr};
+  TTreeFormula* nominalWeightTreeFormula{nullptr};
   if( not _parameters_.nominalWeightFormulaStr.empty() ){
     auto idx = size_t(lCollection.addLeafExpression( _parameters_.nominalWeightFormulaStr ));
-    nominalWeightLeafForm = (GenericToolbox::LeafForm*) idx; // tweaking types. Ptr will be attributed after init
+    nominalWeightTreeFormula = (TTreeFormula*) idx; // tweaking types. Ptr will be attributed after init
   }
 
   // variables definition
@@ -830,7 +829,7 @@ void DataDispenser::fillFunction(int iThread_){
 
   // grab ptr address now
   if( not _parameters_.nominalWeightFormulaStr.empty() ){
-    nominalWeightLeafForm = &(lCollection.getLeafFormList()[(size_t) nominalWeightLeafForm]);
+    nominalWeightTreeFormula = lCollection.getLeafFormList()[(size_t) nominalWeightTreeFormula].getTreeFormulaPtr().get();
   }
   for( auto& lfInd: leafFormIndexingList ){ lfInd = &(lCollection.getLeafFormList()[(size_t) lfInd]); }
   for( auto& lfSto: leafFormStorageList ){ lfSto = &(lCollection.getLeafFormList()[(size_t) lfSto]); }
@@ -1039,17 +1038,17 @@ void DataDispenser::fillFunction(int iThread_){
       readSpeed.addQuantity(nBytes * nThreads);
     }
 
-    if( nominalWeightLeafForm != nullptr ){
-      eventIndexingBuffer.setTreeWeight( nominalWeightLeafForm->eval<double>() );
+    if( nominalWeightTreeFormula != nullptr ){
+      eventIndexingBuffer.setTreeWeight( nominalWeightTreeFormula->EvalInstance() );
       if(eventIndexingBuffer.getTreeWeight() < 0 ){
         LogError << "Negative nominal weight:" << std::endl;
 
         LogError << "Event buffer is: " << eventIndexingBuffer.getSummary() << std::endl;
 
         LogError << "Formula leaves:" << std::endl;
-        for( int iLeaf = 0 ; iLeaf < nominalWeightLeafForm->getTreeFormulaPtr()->GetNcodes() ; iLeaf++ ){
-          if( nominalWeightLeafForm->getTreeFormulaPtr()->GetLeaf(iLeaf) == nullptr ) continue; // for "Entry$" like dummy leaves
-          LogError << "Leaf: " << nominalWeightLeafForm->getTreeFormulaPtr()->GetLeaf(iLeaf)->GetName() << "[0] = " << nominalWeightLeafForm->getTreeFormulaPtr()->GetLeaf(iLeaf)->GetValue(0) << std::endl;
+        for( int iLeaf = 0 ; iLeaf < nominalWeightTreeFormula->GetNcodes() ; iLeaf++ ){
+          if( nominalWeightTreeFormula->GetLeaf(iLeaf) == nullptr ) continue; // for "Entry$" like dummy leaves
+          LogError << "Leaf: " << nominalWeightTreeFormula->GetLeaf(iLeaf)->GetName() << "[0] = " << nominalWeightTreeFormula->GetLeaf(iLeaf)->GetValue(0) << std::endl;
         }
 
         LogThrow("Negative nominal weight");
@@ -1086,18 +1085,10 @@ void DataDispenser::fillFunction(int iThread_){
             isBinValid
         );
 
-//        eventIndexingBuffer.print();
-
         if (binFoundItr == binsListPtr->end()) {
           // Invalid bin -> next sample
-//          LogDebug << "not in bin" << std::endl;
-//          eventIndexingBuffer.print();
-//          LogDebug << lCollection.getSummary() << std::endl;
-//          exit(0);
           break;
         }
-
-//        exit(0);
 
         // found the bin
         eventIndexingBuffer.setSampleBinIndex(int(std::distance(binsListPtr->begin(), binFoundItr)));
@@ -1125,8 +1116,6 @@ void DataDispenser::fillFunction(int iThread_){
         eventPtr->setNominalWeight(eventIndexingBuffer.getTreeWeight());
         eventPtr->setSampleIndex(_cache_.samplesToFillList[iSample]->getIndex());
         eventPtr->resetEventWeight();
-
-//        eventPtr->print();
 
         // Now the event is ready. Let's index the dials:
         eventDialOffset = 0;
