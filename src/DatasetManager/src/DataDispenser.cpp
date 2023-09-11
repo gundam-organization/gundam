@@ -918,7 +918,7 @@ void DataDispenser::fillFunction(int iThread_){
 
       table << var << GenericToolbox::TablePrinter::NextColumn;
 
-      table << leafFormIndexingList[iVar]->getPrimaryExprStr();
+      table << leafFormIndexingList[iVar]->getPrimaryExprStr() << "/" << leafFormIndexingList[iVar]->getLeafTypeName();
       table << GenericToolbox::TablePrinter::NextColumn;
 
       std::vector<std::string> transformsList;
