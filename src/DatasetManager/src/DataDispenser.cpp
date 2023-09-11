@@ -317,7 +317,7 @@ void DataDispenser::doEventSelection(){
       }
 
       if ( selectionCutLeafFormIndex != -1 ){
-        if( lCollection.getLeafFormList()[selectionCutLeafFormIndex].eval<double>() == 0 ){
+        if( lCollection.getLeafFormList()[selectionCutLeafFormIndex].evalAsDouble() == 0 ){
           for (size_t iSample = 0; iSample < _cache_.samplesToFillList.size(); iSample++) {
             perThreadEventIsInSamplesList[iThread_][iEntry][iSample] = false;
           }
@@ -339,7 +339,7 @@ void DataDispenser::doEventSelection(){
           continue;
         }
 
-        if( lCollection.getLeafFormList()[sampleCutIdx.second].eval<double>() == 0 ){
+        if( lCollection.getLeafFormList()[sampleCutIdx.second].evalAsDouble() == 0 ){
           perThreadEventIsInSamplesList[iThread_][iEntry][sampleCutIdx.first] = false;
           if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
             LogTrace << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
