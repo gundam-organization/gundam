@@ -2,8 +2,10 @@
 // Created by Adrien BLANCHET on 14/05/2022.
 //
 
-#include "EventVarTransform.h"
+
 #include "DataDispenser.h"
+
+#include "EventVarTransform.h"
 #include "GundamGlobals.h"
 #include "DatasetLoader.h"
 #include "GenericToolbox.Json.h"
@@ -13,9 +15,8 @@
 #include "DialTypes.h"
 #include "DialBaseFactory.h"
 
-#include "GenericToolbox.Root.TreeEntryBuffer.h"
-#include "GenericToolbox.Root.LeafCollection.h"
 #include "GenericToolbox.Root.h"
+#include "GenericToolbox.Root.LeafCollection.h"
 #include "GenericToolbox.VariablesMonitor.h"
 #include "Logger.h"
 
@@ -1137,6 +1138,15 @@ void DataDispenser::fillFunction(int iThread_){
 
         dialArrayIndex = (dialIndexTreeFormula == nullptr ? 0 : int(dialIndexTreeFormula->EvalInstance()));
 
+//        if( dialArrayIndex != 0 ){
+//          LogDebug << std::endl << std::endl;
+//          LogDebug << GET_VAR_NAME_VALUE(dialArrayIndex) << std::endl;
+//          LogDebug << GET_VAR_NAME_VALUE(iEntry) << std::endl;
+//          LogDebug << lCollection.getSummary() << std::endl;
+//          eventIndexingBuffer.print();
+//          exit(0);
+//        }
+
         // Now the event is ready. Let's index the dials:
         eventDialOffset = 0;
 
@@ -1244,47 +1254,10 @@ void DataDispenser::fillFunction(int iThread_){
 
 }
 
-GenericToolbox::TreeEntryBuffer DataDispenser::generateTreeEventBuffer(TChain* treeChain_, const std::vector<std::string>& varsList_){
-  GenericToolbox::TreeEntryBuffer tBuf;
-
-  // Gather leaves names list that will have to be hooked to the tree
-  std::vector<std::string> leafVarList, isDummyList;
-  leafVarList.reserve(varsList_.size());
-  isDummyList.reserve(varsList_.size());
-
-  // Find associated leaf according to the dictionary
-  for( auto& var : varsList_ ){
-    LogThrowIf(
-        not GenericToolbox::doesKeyIsInMap(var, _cache_.varToLeafDict),
-        "Could not find \"" << var << "\" in " << GenericToolbox::parseMapAsString(_cache_.varToLeafDict)
-    );
-    if( not GenericToolbox::doesElementIsInVector(_cache_.varToLeafDict[var].first, leafVarList) ){
-      leafVarList.emplace_back(_cache_.varToLeafDict[var].first);
-    }
-  }
-
-  tBuf.setLeafNameList(leafVarList);
-
-  for( auto& var : varsList_ ){
-    // don't activate as dummy if the leaf exists
-    if( treeChain_->GetLeaf(_cache_.varToLeafDict[var].first.c_str()) != nullptr ) continue;
-    tBuf.setIsDummyLeaf(_cache_.varToLeafDict[var].first, _cache_.varToLeafDict[var].second);
-  }
-
-  for( auto& dummyVar : _parameters_.dummyVariablesList ){
-    tBuf.setIsDummyLeaf(dummyVar, true);
-  }
-
-  tBuf.hook(treeChain_);
-
-  return tBuf;
-}
-
 void DataDispenserCache::addVarRequestedForIndexing(const std::string& varName_) {
   LogThrowIf(varName_.empty(), "no var name provided.");
   GenericToolbox::addIfNotInVector(varName_, this->varsRequestedForIndexing);
 }
-
 void DataDispenserCache::addVarRequestedForStorage(const std::string& varName_){
   LogThrowIf(varName_.empty(), "no var name provided.");
   GenericToolbox::addIfNotInVector(varName_, this->varsRequestedForStorage);

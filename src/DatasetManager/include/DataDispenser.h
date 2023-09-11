@@ -5,18 +5,16 @@
 #ifndef GUNDAM_DATADISPENSER_H
 #define GUNDAM_DATADISPENSER_H
 
-#include "EventVarTransformLib.h"
 #include "FitSampleSet.h"
-#include "FitParameterSet.h"
 #include "PlotGenerator.h"
 #include "JsonBaseClass.h"
 #include "DialCollection.h"
 #include "EventDialCache.h"
+#include "FitParameterSet.h"
+#include "EventVarTransformLib.h"
 
 #include "TChain.h"
 #include "nlohmann/json.hpp"
-
-#include "GenericToolbox.Root.LeafCollection.h"
 
 #include <map>
 #include <string>
@@ -111,7 +109,6 @@ public:
   std::string getTitle();
 
   void load();
-  GenericToolbox::TreeEntryBuffer generateTreeEventBuffer(TChain* treeChain_, const std::vector<std::string>& varsList_);
 
 protected:
   void readConfigImpl() override;
