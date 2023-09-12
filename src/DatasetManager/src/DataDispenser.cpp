@@ -1169,7 +1169,7 @@ void DataDispenser::fillFunction(int iThread_){
               }
             }
 
-            if (dialCollectionRef->isBinned()) {
+            if     ( dialCollectionRef->isBinned() ){
 
               // is only one bin with no condition:
               if (dialCollectionRef->getDialBaseList().size() == 1 and dialCollectionRef->getDialBinSet().isEmpty()) {
@@ -1198,7 +1198,8 @@ void DataDispenser::fillFunction(int iThread_){
                   // dial not valid
                 }
               }
-            } else if (not dialCollectionRef->getGlobalDialLeafName().empty()) {
+            }
+            else if( not dialCollectionRef->getGlobalDialLeafName().empty() ){
               // Event-by-event dial?
               if (not strcmp(treeChain.GetLeaf(dialCollectionRef->getGlobalDialLeafName().c_str())->GetTypeName(),
                              "TClonesArray")) {
@@ -1206,8 +1207,8 @@ void DataDispenser::fillFunction(int iThread_){
                     dialCollectionRef->getGlobalDialLeafName()
                 )->At(dialArrayIndex);
               }
-              else if (not strcmp(
-                  treeChain.GetLeaf(dialCollectionRef->getGlobalDialLeafName().c_str())->GetTypeName(), "TGraph")) {
+              else if( not strcmp(
+                  treeChain.GetLeaf(dialCollectionRef->getGlobalDialLeafName().c_str())->GetTypeName(), "TGraph") ){
                 grPtr = (TGraph *) eventIndexingBuffer.getVariable<TGraph *>(dialCollectionRef->getGlobalDialLeafName());
               }
               else {
@@ -1236,7 +1237,8 @@ void DataDispenser::fillFunction(int iThread_){
                 eventDialCacheEntry->dials[eventDialOffset].interfaceIndex = freeSlotDial;
                 eventDialOffset++;
               }
-            } else {
+            }
+            else {
               LogThrow("neither an event by event dial, nor a binned dial");
             }
 
