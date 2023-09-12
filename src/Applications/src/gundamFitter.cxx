@@ -122,7 +122,7 @@ int main(int argc, char** argv){
 #ifdef GUNDAM_USING_CACHE_MANAGER
     GundamGlobals::setEnableCacheManager(true);
 #else
-    LogThrow("useCacheManager can only be set while GUNDAM is compiled with GUNDAM_USING_CACHE_MANAGER option.");
+    LogThrow("useCacheManager can only be set while GUNDAM is compiled with -D WITH_CACHE_MANAGER=ON cmake option.");
 #endif
   }
 
