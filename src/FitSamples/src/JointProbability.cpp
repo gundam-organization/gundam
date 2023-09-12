@@ -148,9 +148,9 @@ namespace JointProbability{
     else {
       // The mc predicted value is zero, and the data value is not zero.
       // Inconceivable!
-      LogError << "Data and predicted value give infinite statistical LLH"
+      LogError << "Data and predicted value give infinite statistical LLH / "
                << "Data: " << dataVal
-               << "Barlow Beeston adjusted MC: " << newmc
+               << " / Barlow Beeston adjusted MC: " << newmc
                << std::endl;
     }
 
@@ -176,9 +176,9 @@ namespace JointProbability{
     }
     else {
       chisq += 1E+20;
-      LogError << "Data and predicted value give infinite statistical LLH"
+      LogError << "Data and predicted value give infinite statistical LLH / "
                << "Data: " << dataVal
-               << "MC: " << newmc
+               << " / MC: " << newmc
                << std::endl;
     }
 

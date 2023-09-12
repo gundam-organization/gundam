@@ -5,13 +5,13 @@
 #ifndef GUNDAM_DATADISPENSER_H
 #define GUNDAM_DATADISPENSER_H
 
-#include "EventVarTransformLib.h"
 #include "FitSampleSet.h"
-#include "FitParameterSet.h"
 #include "PlotGenerator.h"
 #include "JsonBaseClass.h"
 #include "DialCollection.h"
 #include "EventDialCache.h"
+#include "FitParameterSet.h"
+#include "EventVarTransformLib.h"
 
 #include "TChain.h"
 #include "nlohmann/json.hpp"
@@ -26,6 +26,7 @@ struct DataDispenserParameters{
   bool useMcContainer{false}; // define the container to fill -> could get rid of it?
   std::string name{};
   std::string treePath{};
+  std::string dialIndexFormula{};
   std::string nominalWeightFormulaStr{};
   std::string selectionCutFormulaStr{};
   std::vector<std::string> activeLeafNameList{};
@@ -108,7 +109,6 @@ public:
   std::string getTitle();
 
   void load();
-  GenericToolbox::TreeEntryBuffer generateTreeEventBuffer(TChain* treeChain_, const std::vector<std::string>& varsList_);
 
 protected:
   void readConfigImpl() override;

@@ -16,9 +16,9 @@ LoggerInit([]{
 PhysicsEvent::PhysicsEvent() = default;
 PhysicsEvent::~PhysicsEvent()  = default;
 
-void PhysicsEvent::setCommonLeafNameListPtr(const std::shared_ptr<std::vector<std::string>>& commonLeafNameListPtr_){
-  _commonLeafNameListPtr_ = commonLeafNameListPtr_;
-  _leafContentList_.resize(_commonLeafNameListPtr_->size());
+void PhysicsEvent::setCommonVarNameListPtr(const std::shared_ptr<std::vector<std::string>>& commonVarNameListPtr_){
+  _commonVarNameListPtr_ = commonVarNameListPtr_;
+  _leafContentList_.resize(_commonVarNameListPtr_->size());
 }
 void PhysicsEvent::setDataSetIndex(int dataSetIndex_) {
   _dataSetIndex_ = dataSetIndex_;
@@ -140,9 +140,9 @@ std::vector<std::vector<GenericToolbox::AnyType>> &PhysicsEvent::getLeafContentL
 }
 
 void PhysicsEvent::copyOnlyExistingLeaves(const PhysicsEvent& other_){
-  LogThrowIf(_commonLeafNameListPtr_ == nullptr, "_commonLeafNameListPtr_ not set")
-  for( size_t iLeaf = 0 ; iLeaf < _commonLeafNameListPtr_->size() ; iLeaf++ ){
-    _leafContentList_[iLeaf] = other_.getLeafHolder((*_commonLeafNameListPtr_)[iLeaf]);
+  LogThrowIf(_commonVarNameListPtr_ == nullptr, "_commonLeafNameListPtr_ not set")
+  for(size_t iLeaf = 0 ; iLeaf < _commonVarNameListPtr_->size() ; iLeaf++ ){
+    _leafContentList_[iLeaf] = other_.getLeafHolder((*_commonVarNameListPtr_)[iLeaf]);
   }
 }
 
@@ -154,9 +154,9 @@ void PhysicsEvent::resetEventWeight(){
 }
 
 int PhysicsEvent::findVarIndex(const std::string& leafName_, bool throwIfNotFound_) const{
-  LogThrowIf(_commonLeafNameListPtr_ == nullptr, "Can't " << __METHOD_NAME__ << " while _commonLeafNameListPtr_ is empty.");
+  LogThrowIf(_commonVarNameListPtr_ == nullptr, "Can't " << __METHOD_NAME__ << " while _commonLeafNameListPtr_ is empty.");
   for( size_t iLeaf = 0 ; iLeaf < _leafContentList_.size() ; iLeaf++ ){
-    if( _commonLeafNameListPtr_->at(iLeaf) == leafName_ ){
+    if(_commonVarNameListPtr_->at(iLeaf) == leafName_ ){
       return int(iLeaf);
     }
   }
@@ -165,7 +165,7 @@ int PhysicsEvent::findVarIndex(const std::string& leafName_, bool throwIfNotFoun
     for( auto& leaf : _leafContentList_  ){
       LogWarning << GenericToolbox::parseVectorAsString(leaf) << std::endl;
     }
-    LogThrow(leafName_ << " not found in: " << GenericToolbox::parseVectorAsString(*_commonLeafNameListPtr_));
+    LogThrow(leafName_ << " not found in: " << GenericToolbox::parseVectorAsString(*_commonVarNameListPtr_));
   }
   return -1;
 }
@@ -223,8 +223,8 @@ std::string PhysicsEvent::getSummary() const {
     ss << std::endl << "_leafContentList_ = { ";
     for( size_t iLeaf = 0 ; iLeaf < _leafContentList_.size() ; iLeaf++ ){
       ss << std::endl;
-      if(_commonLeafNameListPtr_ != nullptr and _commonLeafNameListPtr_->size() == _leafContentList_.size()) {
-        ss << "  " << _commonLeafNameListPtr_->at(iLeaf) << " -> ";
+      if(_commonVarNameListPtr_ != nullptr and _commonVarNameListPtr_->size() == _leafContentList_.size()) {
+        ss << "  " << _commonVarNameListPtr_->at(iLeaf) << " -> ";
       }
       ss << GenericToolbox::parseVectorAsString(_leafContentList_[iLeaf]);
     }
@@ -240,8 +240,8 @@ void PhysicsEvent::print() const {
 std::map< std::string,
   std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>> PhysicsEvent::generateLeavesDictionary(bool disableArrays_) const {
   std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>> out;
-  if( _commonLeafNameListPtr_ != nullptr ){
-    for( auto& leafName : *_commonLeafNameListPtr_ ){
+  if(_commonVarNameListPtr_ != nullptr ){
+    for( auto& leafName : *_commonVarNameListPtr_ ){
 
       const auto& lH = this->getLeafHolder(leafName);
       char typeTag = GenericToolbox::findOriginalVariableType(lH[0]);
@@ -275,6 +275,27 @@ std::map< std::string,
   return out;
 }
 
+
+void PhysicsEvent::allocateMemory(const std::vector<const GenericToolbox::LeafForm*>& leafFormList_){
+  LogThrowIf( _commonVarNameListPtr_ == nullptr, "var name list not set." );
+  LogThrowIf( _commonVarNameListPtr_->size() != leafFormList_.size(), "size mismatch." );
+
+  auto nLeaf{_commonVarNameListPtr_->size()};
+  for(size_t iVar = 0 ; iVar < nLeaf ; iVar++ ){
+    _leafContentList_[iVar].emplace_back(
+        GenericToolbox::leafToAnyType( leafFormList_[iVar]->getLeafTypeName() )
+    );
+  }
+  this->resizeVarToDoubleCache();
+}
+void PhysicsEvent::copyData(const std::vector<const GenericToolbox::LeafForm*>& leafFormList_){
+  // Don't check for the size? it has to be very fast
+  size_t nLeaf{leafFormList_.size()};
+  for( size_t iLeaf = 0 ; iLeaf < nLeaf ; iLeaf++ ){
+    leafFormList_[iLeaf]->dropToAny(_leafContentList_[iLeaf][0]);
+  }
+  this->invalidateVarToDoubleCache();
+}
 void PhysicsEvent::copyData(const std::vector<std::pair<const GenericToolbox::LeafHolder *, int>> &dict_) {
   // Don't check for size? it has to be very fast
   size_t nLeaf{dict_.size()};
@@ -300,15 +321,18 @@ std::vector<std::pair<const GenericToolbox::LeafHolder*, int>> PhysicsEvent::gen
     const std::map<std::string, std::string>& leafDict_
     ){
   std::vector<std::pair<const GenericToolbox::LeafHolder*, int>> out;
-  out.reserve(_commonLeafNameListPtr_->size());
+  out.reserve(_commonVarNameListPtr_->size());
   std::string strBuf;
-  for( const auto& leafName : (*_commonLeafNameListPtr_)){
+  for( const auto& leafName : (*_commonVarNameListPtr_)){
     out.emplace_back(std::pair<GenericToolbox::LeafHolder*, int>{nullptr, -1});
     strBuf = leafName;
     if( GenericToolbox::doesKeyIsInMap(leafName, leafDict_) ){
       std::vector<std::string> argBuf;
       strBuf = leafDict_.at(leafName);
+      LogDebug << strBuf << " -> ";
       strBuf = GenericToolbox::stripBracket(strBuf, '[', ']', false, &argBuf);
+
+      LogDebug << strBuf << "/" << GenericToolbox::parseVectorAsString(argBuf) << std::endl;
       if     ( argBuf.size() == 1 ){ out.back().second = std::stoi(argBuf[0]); }
       else if( argBuf.size() > 1 ){ LogThrow("No support for multi-dim array."); }
     }
@@ -317,7 +341,7 @@ std::vector<std::pair<const GenericToolbox::LeafHolder*, int>> PhysicsEvent::gen
   return out;
 }
 void PhysicsEvent::copyLeafContent(const PhysicsEvent& ref_){
-  LogThrowIf(ref_.getCommonLeafNameListPtr() != _commonLeafNameListPtr_, "source event don't have the same leaf name list")
+  LogThrowIf(ref_.getCommonLeafNameListPtr() != _commonVarNameListPtr_, "source event don't have the same leaf name list")
   _leafContentList_ = ref_.getLeafContentList();
 //  for( size_t iLeaf = 0 ; iLeaf < _commonLeafNameListPtr_->size() ; iLeaf++ ){
 //    _leafContentList_[iLeaf] = ref_.getLeafContentList()[iLeaf];
@@ -326,7 +350,7 @@ void PhysicsEvent::copyLeafContent(const PhysicsEvent& ref_){
 void PhysicsEvent::resizeVarToDoubleCache(){
   _varToDoubleCache_.reserve(_leafContentList_.size());
   for( auto& leaf: _leafContentList_ ){
-    _varToDoubleCache_.emplace_back(std::vector<double>(leaf.size(), std::nan("unset")));
+    _varToDoubleCache_.emplace_back(leaf.size(), std::nan("unset"));
   }
   this->invalidateVarToDoubleCache();
 }
@@ -342,7 +366,7 @@ std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p ){
 }
 
 const std::shared_ptr<std::vector<std::string>>& PhysicsEvent::getCommonLeafNameListPtr() const {
-  return _commonLeafNameListPtr_;
+  return _commonVarNameListPtr_;
 }
 
 //  A Lesser GNU Public License

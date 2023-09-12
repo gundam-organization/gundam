@@ -19,7 +19,7 @@ do
     exit 0;
   elif [ $arg == "--fix-submodules" ]; then
     echo "Re-initializing submodules..."
-    git submodule deinit --all
+    git submodule deinit --all -f
     git submodule sync
     git submodule update --init --remote --recursive
     exit 0;
