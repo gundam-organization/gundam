@@ -40,6 +40,9 @@ void Propagator::readConfigImpl(){
   _gaussStatThrowInToys_ = GenericToolbox::Json::fetchValue(_config_, "gaussStatThrowInToys", _gaussStatThrowInToys_);
   _enableEventMcThrow_ = GenericToolbox::Json::fetchValue(_config_, "enableEventMcThrow", _enableEventMcThrow_);
 
+  // EventDialCache parameters
+  EventDialCache::globalEventReweightCap = GenericToolbox::Json::fetchValue(_config_, "globalEventReweightCap", EventDialCache::globalEventReweightCap);
+
   auto parameterSetListConfig = ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue(_config_, "parameterSetListConfig", nlohmann::json()));
   _parameterSetList_.reserve(parameterSetListConfig.size()); // make sure the objects aren't moved in RAM ( since FitParameter* will be used )
   for( const auto& parameterSetConfig : parameterSetListConfig ){
@@ -562,10 +565,10 @@ const std::vector<FitParameterSet> &Propagator::getParameterSetsList() const {
 const std::vector<DialCollection> &Propagator::getDialCollections() const {
   return _dialCollections_;
 }
+
 EventDialCache &Propagator::getEventDialCache() {
   return _eventDialCache_;
 }
-
 FitSampleSet &Propagator::getFitSampleSet() {
   return _fitSampleSet_;
 }

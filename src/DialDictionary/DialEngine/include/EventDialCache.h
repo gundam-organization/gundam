@@ -22,6 +22,9 @@
 class EventDialCache {
 
 public:
+  static double globalEventReweightCap;
+
+public:
   EventDialCache() = default;
 
 #ifndef USE_BREAKDOWN_CACHE
@@ -109,6 +112,7 @@ public:
   void shrinkIndexedCache();
 
   static void reweightEntry(CacheElem_t& entry_);
+
 
 private:
   // The next available entry in the indexed cache.
