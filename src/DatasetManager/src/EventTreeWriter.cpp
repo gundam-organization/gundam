@@ -126,7 +126,7 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
       if( not leavesDefStr.empty() ) leavesDefStr += ":";
       leavesDefStr += leafDef.first;
       leafNamesList.emplace_back(leafDef.first.substr(0,leafDef.first.find("[")).substr(0, leafDef.first.find("/")));
-      leafDef.second(loadedLeavesArr, EventTreeWriter::getEventPtr(eventList_[0])->getLeafHolder(leafNamesList.back())); // resize buffer
+      leafDef.second(loadedLeavesArr, EventTreeWriter::getEventPtr(eventList_[0])->getVarHolder(leafNamesList.back())); // resize buffer
     }
     loadedLeavesArr.lockArraySize();
     tree->Branch("Leaves", &loadedLeavesArr.getRawDataArray()[0], leavesDefStr.c_str());
@@ -234,7 +234,7 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
 
     iLeaf = 0;
     loadedLeavesArr.resetCurrentByteOffset();
-    for( auto& leafDef : loadedLeavesDict ){ leafDef.second(loadedLeavesArr, EventTreeWriter::getEventPtr(cacheEntry)->getLeafHolder(leafNamesList[iLeaf++])); }
+    for( auto& leafDef : loadedLeavesDict ){ leafDef.second(loadedLeavesArr, EventTreeWriter::getEventPtr(cacheEntry)->getVarHolder(leafNamesList[iLeaf++])); }
 
     if( writeDials ){
       dialElements = getDialElementsPtr(cacheEntry);

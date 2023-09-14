@@ -8,7 +8,6 @@
 #include "FitParameterSet.h"
 
 #include "GenericToolbox.Root.TreeEntryBuffer.h"
-#include "GenericToolbox.Root.LeafHolder.h"
 #include "GenericToolbox.Root.LeafCollection.h"
 #include <GenericToolbox.RawDataArray.h>
 #include "GenericToolbox.AnyType.h"
@@ -28,28 +27,29 @@ public:
   virtual ~PhysicsEvent();
 
   // SETTERS
-  void setDataSetIndex(int dataSetIndex_);
-  void setEntryIndex(Long64_t entryIndex_);
-  void setTreeWeight(double treeWeight);
-  void setNominalWeight(double nominalWeight);
-  void setEventWeight(double eventWeight);
-  void setSampleBinIndex(int sampleBinIndex);
-  void setSampleIndex(int sampleIndex);
+  void setSampleIndex(int sampleIndex){ _sampleIndex_ = sampleIndex; }
+  void setDataSetIndex(int dataSetIndex_){ _dataSetIndex_ = dataSetIndex_; }
+  void setSampleBinIndex(int sampleBinIndex){ _sampleBinIndex_ = sampleBinIndex; }
+  void setEntryIndex(Long64_t entryIndex_){ _entryIndex_ = entryIndex_; }
+  void setTreeWeight(double treeWeight){ _treeWeight_ = treeWeight; }
+  void setEventWeight(double eventWeight){ _eventWeight_ = eventWeight; }
+  void setNominalWeight(double nominalWeight){ _nominalWeight_ = nominalWeight; }
   void setCommonVarNameListPtr(const std::shared_ptr<std::vector<std::string>>& commonVarNameListPtr_);
 
   // GETTERS
-  int getDataSetIndex() const;
-  Long64_t getEntryIndex() const;
-  double getTreeWeight() const;
-  double getNominalWeight() const;
+  int getSampleIndex() const{ return _sampleIndex_; }
+  int getDataSetIndex() const { return _dataSetIndex_; }
+  int getSampleBinIndex() const{ return _sampleBinIndex_; }
+  Long64_t getEntryIndex() const { return _entryIndex_; }
+  double getTreeWeight() const { return _treeWeight_; }
+  double getNominalWeight() const { return _nominalWeight_; }
   double getEventWeight() const;
-  int getSampleBinIndex() const;
-  int getSampleIndex() const;
-  const std::vector<GenericToolbox::AnyType>& getLeafHolder(const std::string &leafName_) const;
-  const std::vector<GenericToolbox::AnyType>& getLeafHolder(int index_) const;
-  const std::vector<std::vector<GenericToolbox::AnyType>> &getLeafContentList() const;
-  const std::shared_ptr<std::vector<std::string>>& getCommonLeafNameListPtr() const;
-  std::vector<std::vector<GenericToolbox::AnyType>> &getLeafContentList();
+  const std::vector<GenericToolbox::AnyType>& getVarHolder(int index_) const { return _varHolderList_[index_]; }
+  const std::vector<GenericToolbox::AnyType>& getVarHolder(const std::string &leafName_) const;
+  const std::vector<std::vector<GenericToolbox::AnyType>> &getVarHolderList() const { return _varHolderList_; }
+  const std::shared_ptr<std::vector<std::string>>& getCommonLeafNameListPtr() const { return _commonVarNameListPtr_; }
+
+  std::vector<std::vector<GenericToolbox::AnyType>> &getLeafContentList(){ return _varHolderList_; }
   double& getEventWeightRef(){ return _eventWeight_; }
 
   // CORE
@@ -57,8 +57,8 @@ public:
   void copyOnlyExistingLeaves(const PhysicsEvent& other_);
 
   // Weight
-  void addEventWeight(double weight_);
-  void resetEventWeight();
+  void addEventWeight(double weight_){ _eventWeight_ *= weight_; }
+  void resetEventWeight(){ _eventWeight_ = _treeWeight_; }
 
   // Fetch var
   int findVarIndex(const std::string& leafName_, bool throwIfNotFound_ = true) const;
@@ -85,8 +85,6 @@ public:
 
   void allocateMemory(const std::vector<const GenericToolbox::LeafForm*>& leafFormList_);
   void copyData(const std::vector<const GenericToolbox::LeafForm*>& leafFormList_);
-  void copyData(const std::vector<std::pair<const GenericToolbox::LeafHolder *, int>> &dict_);
-  std::vector<std::pair<const GenericToolbox::LeafHolder*, int>> generateDict(const GenericToolbox::TreeEntryBuffer& treeEventBuffer_, const std::map<std::string, std::string>& leafDict_={});
   void copyLeafContent(const PhysicsEvent& ref_);
   void resizeVarToDoubleCache();
   void invalidateVarToDoubleCache();
