@@ -14,6 +14,7 @@
 #include "GenericToolbox.h"
 #include "GenericToolbox.Json.h"
 #include "GenericToolbox.Root.h"
+#include "GenericToolbox.RawDataArray.h"
 
 #include <TFile.h>
 #include "TDirectory.h"

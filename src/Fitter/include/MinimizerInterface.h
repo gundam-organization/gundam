@@ -12,6 +12,7 @@
 
 #include "GenericToolbox.VariablesMonitor.h"
 #include "GenericToolbox.CycleTimer.h"
+#include "GenericToolbox.RawDataArray.h"
 
 #include "Math/Minimizer.h"
 #include "Math/Functor.h"

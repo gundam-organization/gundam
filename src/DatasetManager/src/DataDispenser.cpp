@@ -577,7 +577,7 @@ void DataDispenser::preAllocateMemory(){
   eventPlaceholder.setCommonVarNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
 
   std::vector<const GenericToolbox::LeafForm*> leafFormToVarList{};
-  for( auto& storageVar : *eventPlaceholder.getCommonLeafNameListPtr() ){
+  for( auto& storageVar : *eventPlaceholder.getCommonVarNameListPtr() ){
     leafFormToVarList.emplace_back( lCollection.getLeafFormPtr(
         GenericToolbox::doesKeyIsInMap(storageVar, _parameters_.overrideLeafDict) ?
         _parameters_.overrideLeafDict[storageVar]: storageVar
@@ -710,7 +710,7 @@ void DataDispenser::loadFromHistContent(){
         std::make_shared<std::vector<std::string>>(_cache_.samplesToFillList[iSample]->getBinning().getBinVariables())
     );
     for( size_t iVar = 0 ; iVar < _cache_.samplesToFillList[iSample]->getBinning().getBinVariables().size() ; iVar++ ){
-      eventPlaceholder.getLeafContentList()[iVar].emplace_back( double(0.) );
+      eventPlaceholder.getVarHolderList()[iVar].emplace_back(double(0.) );
     }
     eventPlaceholder.resizeVarToDoubleCache();
 
@@ -836,9 +836,14 @@ void DataDispenser::fillFunction(int iThread_){
     }
     auto idx = size_t(lCollection.addLeafExpression(leafExp));
     leafFormIndexingList.emplace_back( (GenericToolbox::LeafForm*) idx ); // tweaking types
-    if( GenericToolbox::doesElementIsInVector(var, _cache_.varsRequestedForStorage) ){
-      leafFormStorageList.emplace_back( (GenericToolbox::LeafForm*) idx );
+  }
+  for( auto& var : _cache_.varsRequestedForStorage ){
+    std::string leafExp{var};
+    if( GenericToolbox::doesKeyIsInMap( var, _parameters_.overrideLeafDict ) ){
+      leafExp = _parameters_.overrideLeafDict[leafExp];
     }
+    auto idx = size_t(lCollection.getLeafExpIndex(leafExp));
+    leafFormStorageList.emplace_back( (GenericToolbox::LeafForm*) idx ); // tweaking types
   }
 
   lCollection.initialize();

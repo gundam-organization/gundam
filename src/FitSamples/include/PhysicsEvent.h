@@ -9,7 +9,6 @@
 
 #include "GenericToolbox.Root.TreeEntryBuffer.h"
 #include "GenericToolbox.Root.LeafCollection.h"
-#include <GenericToolbox.RawDataArray.h>
 #include "GenericToolbox.AnyType.h"
 
 #include "TTree.h"
@@ -49,7 +48,7 @@ public:
   const std::vector<GenericToolbox::AnyType>& getVarHolder(int index_) const { return _varHolderList_[index_]; }
   const std::vector<GenericToolbox::AnyType>& getVarHolder(const std::string &leafName_) const;
   const std::vector<std::vector<GenericToolbox::AnyType>> &getVarHolderList() const { return _varHolderList_; }
-  const std::shared_ptr<std::vector<std::string>>& getCommonLeafNameListPtr() const { return _commonVarNameListPtr_; }
+  const std::shared_ptr<std::vector<std::string>>& getCommonVarNameListPtr() const { return _commonVarNameListPtr_; }
   const GenericToolbox::AnyType& getVariableAsAnyType(const std::string& leafName_, size_t arrayIndex_ = 0) const;
   template<typename T> auto getVarValue(const std::string& leafName_, size_t arrayIndex_ = 0) const -> T;
   template<typename T> auto getVariable(const std::string& leafName_, size_t arrayIndex_ = 0) const -> const T&;
@@ -57,7 +56,7 @@ public:
   // non-const getters
   double& getEventWeightRef(){ return _eventWeight_; }
   void* getVariableAddress(const std::string& leafName_, size_t arrayIndex_ = 0);
-  std::vector<std::vector<GenericToolbox::AnyType>> &getLeafContentList(){ return _varHolderList_; }
+  std::vector<std::vector<GenericToolbox::AnyType>> &getVarHolderList(){ return _varHolderList_; }
   GenericToolbox::AnyType& getVariableAsAnyType(const std::string& leafName_, size_t arrayIndex_ = 0);
 
   // core
@@ -74,10 +73,9 @@ public:
   // misc
   void print() const;
   std::string getSummary() const;
-  void copyLeafContent(const PhysicsEvent& ref_);
-  void copyOnlyExistingLeaves(const PhysicsEvent& other_);
+  void copyVarHolderList(const PhysicsEvent& ref_);
+  void copyOnlyExistingVarHolders(const PhysicsEvent& other_);
   void fillBuffer(const std::vector<int>& indexList_, std::vector<double>& buffer_) const;
-  std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>> generateLeavesDictionary(bool disableArrays_ = false) const;
 
   // operators
   friend std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p );

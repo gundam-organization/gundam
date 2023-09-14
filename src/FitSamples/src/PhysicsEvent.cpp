@@ -204,11 +204,11 @@ std::string PhysicsEvent::getSummary() const {
 
   return ss.str();
 }
-void PhysicsEvent::copyLeafContent(const PhysicsEvent& ref_){
-  LogThrowIf(ref_.getCommonLeafNameListPtr() != _commonVarNameListPtr_, "source event don't have the same leaf name list")
+void PhysicsEvent::copyVarHolderList(const PhysicsEvent& ref_){
+  LogThrowIf(ref_.getCommonVarNameListPtr() != _commonVarNameListPtr_, "source event don't have the same leaf name list")
   _varHolderList_ = ref_.getVarHolderList();
 }
-void PhysicsEvent::copyOnlyExistingLeaves(const PhysicsEvent& other_){
+void PhysicsEvent::copyOnlyExistingVarHolders(const PhysicsEvent& other_){
   LogThrowIf(_commonVarNameListPtr_ == nullptr, "_commonLeafNameListPtr_ not set");
   for(size_t iLeaf = 0 ; iLeaf < _commonVarNameListPtr_->size() ; iLeaf++ ){
     _varHolderList_[iLeaf] = other_.getVarHolder((*_commonVarNameListPtr_)[iLeaf]);
@@ -217,43 +217,6 @@ void PhysicsEvent::copyOnlyExistingLeaves(const PhysicsEvent& other_){
 void PhysicsEvent::fillBuffer(const std::vector<int>& indexList_, std::vector<double>& buffer_) const{
   buffer_.resize(indexList_.size()); double* slot = &buffer_[0];
   std::for_each(indexList_.begin(), indexList_.end(), [&](auto& index){ *(slot++) = this->getVarAsDouble(index); });
-}
-std::map< std::string,
-  std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>> PhysicsEvent::generateLeavesDictionary(bool disableArrays_) const {
-  std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>> out;
-  if(_commonVarNameListPtr_ != nullptr ){
-    for( auto& leafName : *_commonVarNameListPtr_ ){
-
-      const auto& lH = this->getVarHolder(leafName);
-      char typeTag = GenericToolbox::findOriginalVariableType(lH[0]);
-      LogThrowIf( typeTag == 0 or typeTag == char(0xFF), leafName << " has an invalid leaf type." )
-
-      std::string leafDefStr{leafName};
-      if(not disableArrays_ and lH.size() > 1){ leafDefStr += "[" + std::to_string(lH.size()) + "]"; }
-      leafDefStr += "/";
-      leafDefStr += typeTag;
-      if(not disableArrays_){
-        out[leafDefStr] = [](GenericToolbox::RawDataArray& arr_, const std::vector<GenericToolbox::AnyType>& variablesList_){
-          for(const auto & variable : variablesList_){
-            arr_.writeMemoryContent(
-                variable.getPlaceHolderPtr()->getVariableAddress(),
-                variable.getPlaceHolderPtr()->getVariableSize()
-            );
-          }
-        };
-      }
-      else{
-        out[leafDefStr] = [](GenericToolbox::RawDataArray& arr_, const std::vector<GenericToolbox::AnyType>& variablesList_){
-          arr_.writeMemoryContent(
-              variablesList_[0].getPlaceHolderPtr()->getVariableAddress(),
-              variablesList_[0].getPlaceHolderPtr()->getVariableSize()
-          );
-        };
-      }
-
-    }
-  }
-  return out;
 }
 
 // operators
