@@ -12,6 +12,7 @@
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.h"
 #include "GenericToolbox.TablePrinter.h"
+#include "GenericToolbox.RawDataArray.h"
 
 #include <Math/Factory.h>
 #include "TGraph.h"

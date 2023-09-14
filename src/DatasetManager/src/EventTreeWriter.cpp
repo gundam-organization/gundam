@@ -10,6 +10,7 @@
 #include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.Json.h"
+#include "GenericToolbox.RawDataArray.h"
 
 
 LoggerInit([]{
@@ -108,28 +109,64 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
   leafDictionary["sampleBinIndex/I"]= [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getSampleBinIndex()); };
   leafDictionary["dataSetIndex/I"] =  [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getDataSetIndex()); };
   leafDictionary["entryIndex/L"] =    [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getEntryIndex()); };
-  std::string leavesDefStr;
+  std::string branchDefStr;
   for( auto& leafDef : leafDictionary ){
-    if( not leavesDefStr.empty() ) leavesDefStr += ":";
-    leavesDefStr += leafDef.first;
+    if( not branchDefStr.empty() ) branchDefStr += ":";
+    branchDefStr += leafDef.first;
     leafDef.second(privateMemberArr, *EventTreeWriter::getEventPtr(eventList_[0])); // resize buffer
   }
   privateMemberArr.lockArraySize();
-  tree->Branch("Event", &privateMemberArr.getRawDataArray()[0], leavesDefStr.c_str());
+  tree->Branch("Event", &privateMemberArr.getRawDataArray()[0], branchDefStr.c_str());
 
   GenericToolbox::RawDataArray loadedLeavesArr;
-  auto loadedLeavesDict = EventTreeWriter::getEventPtr(eventList_[0])->generateLeavesDictionary(true);
+
+  struct LeavesDictionary{
+    std::string leafDefinitionStr{};
+    bool disableArray{false};
+
+    void dropData(GenericToolbox::RawDataArray& arr_, const std::vector<GenericToolbox::AnyType>& variablesList_){
+      for(const auto & variable : variablesList_){
+        arr_.writeMemoryContent(
+            variable.getPlaceHolderPtr()->getVariableAddress(),
+            variable.getPlaceHolderPtr()->getVariableSize()
+        );
+        if( disableArray ){ return; }
+      }
+    }
+  };
+  std::vector<LeavesDictionary> lDict;
+
+
+  auto* evPtr = EventTreeWriter::getEventPtr(eventList_[0]);
+  if( evPtr != nullptr and evPtr->getCommonVarNameListPtr() != nullptr ){
+    for( auto& varName : *EventTreeWriter::getEventPtr(eventList_[0])->getCommonVarNameListPtr() ){
+      lDict.emplace_back();
+      lDict.back().disableArray = true;
+
+      const auto& lH = evPtr->getVarHolder( varName );
+      char typeTag = GenericToolbox::findOriginalVariableType(lH[0]);
+      LogThrowIf( typeTag == 0 or typeTag == char(0xFF), varName << " has an invalid leaf type." );
+
+      std::string leafDefStr{ varName };
+//      if(not disableArrays_ and lH.size() > 1){ leafDefStr += "[" + std::to_string(lH.size()) + "]"; }
+      leafDefStr += "/";
+      leafDefStr += typeTag;
+      lDict.back().leafDefinitionStr = leafDefStr;
+    }
+  }
+
   std::vector<std::string> leafNamesList;
-  if( not loadedLeavesDict.empty() ){
-    leavesDefStr = "";
-    for( auto& leafDef : loadedLeavesDict ){
-      if( not leavesDefStr.empty() ) leavesDefStr += ":";
-      leavesDefStr += leafDef.first;
-      leafNamesList.emplace_back(leafDef.first.substr(0,leafDef.first.find("[")).substr(0, leafDef.first.find("/")));
-      leafDef.second(loadedLeavesArr, EventTreeWriter::getEventPtr(eventList_[0])->getLeafHolder(leafNamesList.back())); // resize buffer
+  if( not lDict.empty() ){
+    branchDefStr = "";
+    int iLeaf{0};
+    for( auto& entry : lDict ){
+      if( not branchDefStr.empty() ) branchDefStr += ":";
+      branchDefStr += entry.leafDefinitionStr;
+      leafNamesList.emplace_back(entry.leafDefinitionStr.substr(0,entry.leafDefinitionStr.find("[")).substr(0, entry.leafDefinitionStr.find("/")));
+      entry.dropData(loadedLeavesArr, EventTreeWriter::getEventPtr(eventList_[0])->getVarHolder( iLeaf++ )); // resize buffer
     }
     loadedLeavesArr.lockArraySize();
-    tree->Branch("Leaves", &loadedLeavesArr.getRawDataArray()[0], leavesDefStr.c_str());
+    tree->Branch("Leaves", &loadedLeavesArr.getRawDataArray()[0], branchDefStr.c_str());
   }
 
 
@@ -234,7 +271,12 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
 
     iLeaf = 0;
     loadedLeavesArr.resetCurrentByteOffset();
-    for( auto& leafDef : loadedLeavesDict ){ leafDef.second(loadedLeavesArr, EventTreeWriter::getEventPtr(cacheEntry)->getLeafHolder(leafNamesList[iLeaf++])); }
+    for( auto& entry : lDict ){
+      entry.dropData(
+          loadedLeavesArr,
+          EventTreeWriter::getEventPtr( cacheEntry )->getVarHolder( iLeaf++ )
+      );
+    }
 
     if( writeDials ){
       dialElements = getDialElementsPtr(cacheEntry);
