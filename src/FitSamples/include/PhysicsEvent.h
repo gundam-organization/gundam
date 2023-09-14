@@ -23,10 +23,10 @@
 class PhysicsEvent {
 
 public:
-  PhysicsEvent();
-  virtual ~PhysicsEvent();
+  PhysicsEvent() = default;
+  virtual ~PhysicsEvent() = default;
 
-  // SETTERS
+  // setters
   void setSampleIndex(int sampleIndex){ _sampleIndex_ = sampleIndex; }
   void setDataSetIndex(int dataSetIndex_){ _dataSetIndex_ = dataSetIndex_; }
   void setSampleBinIndex(int sampleBinIndex){ _sampleBinIndex_ = sampleBinIndex; }
@@ -35,8 +35,9 @@ public:
   void setEventWeight(double eventWeight){ _eventWeight_ = eventWeight; }
   void setNominalWeight(double nominalWeight){ _nominalWeight_ = nominalWeight; }
   void setCommonVarNameListPtr(const std::shared_ptr<std::vector<std::string>>& commonVarNameListPtr_);
+  template<typename T> void setVariable(const T& value_, const std::string& leafName_, size_t arrayIndex_ = 0);
 
-  // GETTERS
+  // const getters
   int getSampleIndex() const{ return _sampleIndex_; }
   int getDataSetIndex() const { return _dataSetIndex_; }
   int getSampleBinIndex() const{ return _sampleBinIndex_; }
@@ -44,63 +45,52 @@ public:
   double getTreeWeight() const { return _treeWeight_; }
   double getNominalWeight() const { return _nominalWeight_; }
   double getEventWeight() const;
+  const GenericToolbox::AnyType& getVar(int varIndex_, size_t arrayIndex_ = 0) const { return _varHolderList_[varIndex_][arrayIndex_]; }
   const std::vector<GenericToolbox::AnyType>& getVarHolder(int index_) const { return _varHolderList_[index_]; }
   const std::vector<GenericToolbox::AnyType>& getVarHolder(const std::string &leafName_) const;
   const std::vector<std::vector<GenericToolbox::AnyType>> &getVarHolderList() const { return _varHolderList_; }
   const std::shared_ptr<std::vector<std::string>>& getCommonLeafNameListPtr() const { return _commonVarNameListPtr_; }
-
-  std::vector<std::vector<GenericToolbox::AnyType>> &getLeafContentList(){ return _varHolderList_; }
-  double& getEventWeightRef(){ return _eventWeight_; }
-
-  // CORE
-  // Filling up
-  void copyOnlyExistingLeaves(const PhysicsEvent& other_);
-
-  // Weight
-  void addEventWeight(double weight_){ _eventWeight_ *= weight_; }
-  void resetEventWeight(){ _eventWeight_ = _treeWeight_; }
-
-  // Fetch var
-  int findVarIndex(const std::string& leafName_, bool throwIfNotFound_ = true) const;
-  template<typename T> auto getVarValue(const std::string& leafName_, size_t arrayIndex_ = 0) const -> T;
-  template<typename T> auto getVariable(const std::string& leafName_, size_t arrayIndex_ = 0) -> const T&;
-  template<typename T> void setVariable(const T& value_, const std::string& leafName_, size_t arrayIndex_ = 0);
-
   const GenericToolbox::AnyType& getVariableAsAnyType(const std::string& leafName_, size_t arrayIndex_ = 0) const;
-  GenericToolbox::AnyType& getVariableAsAnyType(const std::string& leafName_, size_t arrayIndex_ = 0);
+  template<typename T> auto getVarValue(const std::string& leafName_, size_t arrayIndex_ = 0) const -> T;
+  template<typename T> auto getVariable(const std::string& leafName_, size_t arrayIndex_ = 0) const -> const T&;
+
+  // non-const getters
+  double& getEventWeightRef(){ return _eventWeight_; }
   void* getVariableAddress(const std::string& leafName_, size_t arrayIndex_ = 0);
-  double getVarAsDouble(const std::string& leafName_, size_t arrayIndex_ = 0) const;
-  double getVarAsDouble(int varIndex_, size_t arrayIndex_ = 0) const;
-  const GenericToolbox::AnyType& getVar(int varIndex_, size_t arrayIndex_ = 0) const;
-  void fillBuffer(const std::vector<int>& indexList_, std::vector<double>& buffer_) const;
+  std::vector<std::vector<GenericToolbox::AnyType>> &getLeafContentList(){ return _varHolderList_; }
+  GenericToolbox::AnyType& getVariableAsAnyType(const std::string& leafName_, size_t arrayIndex_ = 0);
 
-  // Eval
-  double evalFormula(const TFormula* formulaPtr_, std::vector<int>* indexDict_ = nullptr) const;
-
-  // Misc
-  void print() const;
-  std::string getSummary() const;
-
-  std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>> generateLeavesDictionary(bool disableArrays_ = false) const;
-
-  void allocateMemory(const std::vector<const GenericToolbox::LeafForm*>& leafFormList_);
-  void copyData(const std::vector<const GenericToolbox::LeafForm*>& leafFormList_);
-  void copyLeafContent(const PhysicsEvent& ref_);
+  // core
+  void resetEventWeight(){ _eventWeight_ = _treeWeight_; }
   void resizeVarToDoubleCache();
   void invalidateVarToDoubleCache();
+  void copyData(const std::vector<const GenericToolbox::LeafForm*>& leafFormList_);
+  void allocateMemory(const std::vector<const GenericToolbox::LeafForm*>& leafFormList_);
+  int findVarIndex(const std::string& leafName_, bool throwIfNotFound_ = true) const;
+  double getVarAsDouble(int varIndex_, size_t arrayIndex_ = 0) const;
+  double getVarAsDouble(const std::string& leafName_, size_t arrayIndex_ = 0) const;
+  double evalFormula(const TFormula* formulaPtr_, std::vector<int>* indexDict_ = nullptr) const;
 
-  // Stream operator
+  // misc
+  void print() const;
+  std::string getSummary() const;
+  void copyLeafContent(const PhysicsEvent& ref_);
+  void copyOnlyExistingLeaves(const PhysicsEvent& other_);
+  void fillBuffer(const std::vector<int>& indexList_, std::vector<double>& buffer_) const;
+  std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const std::vector<GenericToolbox::AnyType>&)>> generateLeavesDictionary(bool disableArrays_ = false) const;
+
+  // operators
   friend std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p );
 
 private:
   // Context variables
+  int _sampleIndex_{-1}; // this information is lost in the EventDialCache manager
   int _dataSetIndex_{-1};
+  int _sampleBinIndex_{-1};
   Long64_t _entryIndex_{-1};
   double _treeWeight_{1};
   double _nominalWeight_{1};
   double _eventWeight_{1};
-  int _sampleBinIndex_{-1};
-  int _sampleIndex_{-1}; // this information is lost in the EventDialCache manager
 
   // Data storage variables
   std::shared_ptr<std::vector<std::string>> _commonVarNameListPtr_{nullptr};
@@ -133,9 +123,9 @@ private:
 
 // TEMPLATES IMPLEMENTATION
 template<typename T> auto PhysicsEvent::getVarValue(const std::string &leafName_, size_t arrayIndex_) const -> T {
-  return this->getVariableAsAnyType(leafName_, arrayIndex_).template getValue<T>();
+  return this->getVariable<T>(leafName_, arrayIndex_);
 }
-template<typename T> auto PhysicsEvent::getVariable(const std::string& leafName_, size_t arrayIndex_) -> const T&{
+template<typename T> auto PhysicsEvent::getVariable(const std::string& leafName_, size_t arrayIndex_) const -> const T&{
   return this->getVariableAsAnyType(leafName_, arrayIndex_).template getValue<T>();
 }
 template<typename T> void PhysicsEvent::setVariable(const T& value_, const std::string& leafName_, size_t arrayIndex_){
