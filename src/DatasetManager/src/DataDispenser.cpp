@@ -1203,6 +1203,8 @@ void DataDispenser::fillFunction(int iThread_){
               // Event-by-event dial?
               // grab the dial as a general TObject -> let the factory figure out what to do with it
               dialObjectPtr = (TObject*) *((TObject**) eventIndexingBuffer.getVariableAddress( dialCollectionRef->getGlobalDialLeafName() ));
+
+              // Extra-step for selecting the right dial with TClonesArray
               if( not strcmp(dialObjectPtr->ClassName(), "TClonesArray") ){
                 dialObjectPtr = ((TClonesArray*) dialObjectPtr)->At( dialArrayIndex );
               }
@@ -1219,6 +1221,7 @@ void DataDispenser::fillFunction(int iThread_){
                   )
               );
 
+              // dialBase is valid -> store it
               if( dialBase != nullptr ){
                 freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
                 dialBase->setAllowExtrapolation(dialCollectionRef->isAllowDialExtrapolation());
