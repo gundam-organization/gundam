@@ -65,6 +65,9 @@ public:
   template<typename T> auto getVarValue(const std::string& leafName_, size_t arrayIndex_ = 0) const -> T;
   template<typename T> auto getVariable(const std::string& leafName_, size_t arrayIndex_ = 0) -> const T&;
   template<typename T> void setVariable(const T& value_, const std::string& leafName_, size_t arrayIndex_ = 0);
+
+  const GenericToolbox::AnyType& getVariableAsAnyType(const std::string& leafName_, size_t arrayIndex_ = 0) const;
+  GenericToolbox::AnyType& getVariableAsAnyType(const std::string& leafName_, size_t arrayIndex_ = 0);
   void* getVariableAddress(const std::string& leafName_, size_t arrayIndex_ = 0);
   double getVarAsDouble(const std::string& leafName_, size_t arrayIndex_ = 0) const;
   double getVarAsDouble(int varIndex_, size_t arrayIndex_ = 0) const;
@@ -103,27 +106,28 @@ private:
 
   // Data storage variables
   std::shared_ptr<std::vector<std::string>> _commonVarNameListPtr_{nullptr};
-  std::vector<std::vector<GenericToolbox::AnyType>> _leafContentList_{};
+  std::vector<std::vector<GenericToolbox::AnyType>> _varHolderList_{};
 
   // Cache variables
   mutable std::vector<std::vector<double>> _varToDoubleCache_{};
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
 public:
-  void setCacheManagerIndex(int i) {_CacheManagerIndex_ = i;}
-  int  getCacheManagerIndex() const {return _CacheManagerIndex_;}
-  void setCacheManagerValuePointer(const double* v) {_CacheManagerValue_ = v;}
-  void setCacheManagerValidPointer(const bool* v) {_CacheManagerValid_ = v;}
-  void setCacheManagerUpdatePointer(void (*p)()) {_CacheManagerUpdate_ = p;}
+  void setCacheManagerIndex(int i) { _cacheManagerIndex_ = i;}
+  void setCacheManagerValuePointer(const double* v) { _cacheManagerValue_ = v;}
+  void setCacheManagerValidPointer(const bool* v) { _cacheManagerValid_ = v;}
+  void setCacheManagerUpdatePointer(void (*p)()) { _cacheManagerUpdate_ = p;}
+
+  int getCacheManagerIndex() const {return _cacheManagerIndex_;}
 private:
   // An "opaque" index into the cache that is used to simplify bookkeeping.
-  int _CacheManagerIndex_{-1};
+  int _cacheManagerIndex_{-1};
   // A pointer to the cached result.
-  const double* _CacheManagerValue_{nullptr};
+  const double* _cacheManagerValue_{nullptr};
   // A pointer to the cache validity flag.
-  const bool* _CacheManagerValid_{nullptr};
+  const bool* _cacheManagerValid_{nullptr};
   // A pointer to a callback to force the cache to be updated.
-  void (*_CacheManagerUpdate_)(){nullptr};
+  void (*_cacheManagerUpdate_)(){nullptr};
 #endif
 
 };
@@ -131,16 +135,14 @@ private:
 
 // TEMPLATES IMPLEMENTATION
 template<typename T> auto PhysicsEvent::getVarValue(const std::string &leafName_, size_t arrayIndex_) const -> T {
-  int index = this->findVarIndex(leafName_, true);
-  return _leafContentList_[index][arrayIndex_].template getValue<T>();
+  return this->getVariableAsAnyType(leafName_, arrayIndex_).template getValue<T>();
 }
 template<typename T> auto PhysicsEvent::getVariable(const std::string& leafName_, size_t arrayIndex_) -> const T&{
-  int index = this->findVarIndex(leafName_, true);
-  return _leafContentList_[index][arrayIndex_].template getValue<T>();
+  return this->getVariableAsAnyType(leafName_, arrayIndex_).template getValue<T>();
 }
 template<typename T> void PhysicsEvent::setVariable(const T& value_, const std::string& leafName_, size_t arrayIndex_){
   int index = this->findVarIndex(leafName_, true);
-  _leafContentList_[index][arrayIndex_].template getValue<T>() = value_;
+  _varHolderList_[index][arrayIndex_].template getValue<T>() = value_;
   if( not _varToDoubleCache_.empty() ){ _varToDoubleCache_[index][arrayIndex_] = std::nan("unset"); }
 }
 

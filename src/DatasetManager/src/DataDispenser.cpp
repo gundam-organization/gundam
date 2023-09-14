@@ -956,7 +956,7 @@ void DataDispenser::fillFunction(int iThread_){
   size_t eventDialOffset;
   size_t iDialSet, iDial;
   size_t nBinEdges;
-  TGraph* grPtr{nullptr};
+  TObject* dialObjectPtr{nullptr};
 
   // Bin searches
   const std::vector<DataBin>* binsListPtr;
@@ -1201,19 +1201,10 @@ void DataDispenser::fillFunction(int iThread_){
             }
             else if( not dialCollectionRef->getGlobalDialLeafName().empty() ){
               // Event-by-event dial?
-              if (not strcmp(treeChain.GetLeaf(dialCollectionRef->getGlobalDialLeafName().c_str())->GetTypeName(),
-                             "TClonesArray")) {
-                grPtr = (TGraph *) eventIndexingBuffer.getVariable<TClonesArray *>(
-                    dialCollectionRef->getGlobalDialLeafName()
-                )->At(dialArrayIndex);
-              }
-              else if( not strcmp(
-                  treeChain.GetLeaf(dialCollectionRef->getGlobalDialLeafName().c_str())->GetTypeName(), "TGraph") ){
-                grPtr = (TGraph *) eventIndexingBuffer.getVariable<TGraph *>(dialCollectionRef->getGlobalDialLeafName());
-              }
-              else {
-                LogThrow("Unsupported event-by-event dial type: "
-                             << treeChain.GetLeaf(dialCollectionRef->getGlobalDialLeafName().c_str())->GetTypeName())
+              // grab the dial as a general TObject -> let the factory figure out what to do with it
+              dialObjectPtr = (TObject*) *((TObject**) eventIndexingBuffer.getVariableAddress( dialCollectionRef->getGlobalDialLeafName() ));
+              if( not strcmp(dialObjectPtr->ClassName(), "TClonesArray") ){
+                dialObjectPtr = ((TClonesArray*) dialObjectPtr)->At( dialArrayIndex );
               }
 
               // Do the unique_ptr dance so that memory gets deleted if
@@ -1223,13 +1214,12 @@ void DataDispenser::fillFunction(int iThread_){
                       dialCollectionRef->getTitle(),
                       dialCollectionRef->getGlobalDialType(),
                       dialCollectionRef->getGlobalDialSubType(),
-                      grPtr,
+                      dialObjectPtr,
                       dialCollectionRef->useCachedDials()
                   )
               );
 
-
-              if (dialBase) {
+              if( dialBase != nullptr ){
                 freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
                 dialBase->setAllowExtrapolation(dialCollectionRef->isAllowDialExtrapolation());
                 dialCollectionRef->getDialBaseList()[freeSlotDial] = DialCollection::DialBaseObject(dialBase.release());
