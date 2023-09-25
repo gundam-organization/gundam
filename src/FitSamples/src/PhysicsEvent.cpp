@@ -184,7 +184,7 @@ std::string PhysicsEvent::getSummary() const {
 
   ss << GET_VAR_NAME_VALUE(_dataSetIndex_);
   ss << std::endl << GET_VAR_NAME_VALUE(_entryIndex_);
-  ss << std::endl << GET_VAR_NAME_VALUE(_treeWeight_);
+  ss << std::endl << GET_VAR_NAME_VALUE(_baseWeight_);
   ss << std::endl << GET_VAR_NAME_VALUE(_nominalWeight_);
   ss << std::endl << GET_VAR_NAME_VALUE(_eventWeight_);
   ss << std::endl << GET_VAR_NAME_VALUE(_sampleBinIndex_);

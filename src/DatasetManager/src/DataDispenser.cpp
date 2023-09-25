@@ -780,7 +780,7 @@ void DataDispenser::loadFromHistContent(){
       for( size_t iVar = 0 ; iVar < target.size() ; iVar++ ){
         container->eventList[iBin].setVariable( target[iVar], axisNameList[iVar] );
       }
-      container->eventList[iBin].setTreeWeight( hist->GetBinContent( histBinIndex ) );
+      container->eventList[iBin].setBaseWeight(hist->GetBinContent(histBinIndex));
       container->eventList[iBin].resetEventWeight();
     }
 
@@ -1063,8 +1063,8 @@ void DataDispenser::fillFunction(int iThread_){
     }
 
     if( nominalWeightTreeFormula != nullptr ){
-      eventIndexingBuffer.setTreeWeight( nominalWeightTreeFormula->EvalInstance() );
-      if(eventIndexingBuffer.getTreeWeight() < 0 ){
+      eventIndexingBuffer.setBaseWeight(nominalWeightTreeFormula->EvalInstance());
+      if(eventIndexingBuffer.getBaseWeight() < 0 ){
         LogError << "Negative nominal weight:" << std::endl;
 
         LogError << "Event buffer is: " << eventIndexingBuffer.getSummary() << std::endl;
@@ -1077,7 +1077,7 @@ void DataDispenser::fillFunction(int iThread_){
 
         LogThrow("Negative nominal weight");
       }
-      if(eventIndexingBuffer.getTreeWeight() == 0 ){
+      if(eventIndexingBuffer.getBaseWeight() == 0 ){
         continue;
       } // skip this event
     }
@@ -1136,8 +1136,8 @@ void DataDispenser::fillFunction(int iThread_){
 
         eventPtr->setEntryIndex(iEntry);
         eventPtr->setSampleBinIndex(eventIndexingBuffer.getSampleBinIndex());
-        eventPtr->setTreeWeight(eventIndexingBuffer.getTreeWeight());
-        eventPtr->setNominalWeight(eventIndexingBuffer.getTreeWeight());
+        eventPtr->setBaseWeight(eventIndexingBuffer.getBaseWeight());
+        eventPtr->setNominalWeight(eventIndexingBuffer.getBaseWeight());
         eventPtr->setSampleIndex(_cache_.samplesToFillList[iSample]->getIndex());
         eventPtr->resetEventWeight();
 

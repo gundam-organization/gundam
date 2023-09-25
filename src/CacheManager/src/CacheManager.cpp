@@ -380,7 +380,7 @@ bool Cache::Manager::Update(FitSampleSet& sampleList,
             [](){Cache::Manager::Get()->GetWeightsCache().GetResult(0);});
 
         // Get the initial value for this event and save it.
-        double initialEventWeight = event.getTreeWeight();
+        double initialEventWeight = event.getBaseWeight();
 
         // Add each dial for the event to the GPU caches.
         for (EventDialCache::DialsElem_t& dialElem : elem.dials) {

@@ -30,7 +30,7 @@ public:
   void setDataSetIndex(int dataSetIndex_){ _dataSetIndex_ = dataSetIndex_; }
   void setSampleBinIndex(int sampleBinIndex){ _sampleBinIndex_ = sampleBinIndex; }
   void setEntryIndex(Long64_t entryIndex_){ _entryIndex_ = entryIndex_; }
-  void setTreeWeight(double treeWeight){ _treeWeight_ = treeWeight; }
+  void setBaseWeight(double baseWeight_){ _baseWeight_ = baseWeight_; }
   void setEventWeight(double eventWeight){ _eventWeight_ = eventWeight; }
   void setNominalWeight(double nominalWeight){ _nominalWeight_ = nominalWeight; }
   void setCommonVarNameListPtr(const std::shared_ptr<std::vector<std::string>>& commonVarNameListPtr_);
@@ -41,7 +41,7 @@ public:
   int getDataSetIndex() const { return _dataSetIndex_; }
   int getSampleBinIndex() const{ return _sampleBinIndex_; }
   Long64_t getEntryIndex() const { return _entryIndex_; }
-  double getTreeWeight() const { return _treeWeight_; }
+  double getBaseWeight() const { return _baseWeight_; }
   double getNominalWeight() const { return _nominalWeight_; }
   double getEventWeight() const;
   const GenericToolbox::AnyType& getVar(int varIndex_, size_t arrayIndex_ = 0) const { return _varHolderList_[varIndex_][arrayIndex_]; }
@@ -60,7 +60,7 @@ public:
   GenericToolbox::AnyType& getVariableAsAnyType(const std::string& leafName_, size_t arrayIndex_ = 0);
 
   // core
-  void resetEventWeight(){ _eventWeight_ = _treeWeight_; }
+  void resetEventWeight(){ _eventWeight_ = _baseWeight_; }
   void resizeVarToDoubleCache();
   void invalidateVarToDoubleCache();
   void copyData(const std::vector<const GenericToolbox::LeafForm*>& leafFormList_);
@@ -86,7 +86,7 @@ private:
   int _dataSetIndex_{-1};
   int _sampleBinIndex_{-1};
   Long64_t _entryIndex_{-1};
-  double _treeWeight_{1};
+  double _baseWeight_{1};
   double _nominalWeight_{1};
   double _eventWeight_{1};
 
