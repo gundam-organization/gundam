@@ -184,8 +184,8 @@ void EventDialCache::reweightEntry(EventDialCache::CacheElem_t& entry_){
 
     // Applying event weight cap
     if( not std::isnan(EventDialCache::globalEventReweightCap) ){
-      if( entry_.event->getEventWeight() > EventDialCache::globalEventReweightCap){
-        entry_.event->setEventWeight( EventDialCache::globalEventReweightCap );
+      if( entry_.event->getEventWeight()/entry_.event->getTreeWeight() > EventDialCache::globalEventReweightCap){
+        entry_.event->setEventWeight( entry_.event->getTreeWeight() * EventDialCache::globalEventReweightCap );
       }
     }
   });
