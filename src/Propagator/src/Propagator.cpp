@@ -216,7 +216,6 @@ void Propagator::initializeImpl(){
           parSet.setMaskedForPropagation( true );
         }
 
-
         LogContinueIf( not parSet.isEnabledThrowToyParameters(), "Toy throw is disabled for " << parSet.getName() );
 
         if( parSet.getPriorCovarianceMatrix() != nullptr ){

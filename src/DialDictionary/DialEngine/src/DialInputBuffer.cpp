@@ -15,51 +15,17 @@ LoggerInit([]{
 });
 
 
-void DialInputBuffer::setIsMasked(bool isMasked) {
-  _isMasked_ = isMasked;
-}
-void DialInputBuffer::setUseParameterMirroring(bool useParameterMirroring) {
-  _useParameterMirroring_ = useParameterMirroring;
-}
-void DialInputBuffer::setParSetRef(std::vector<FitParameterSet> *parSetRef) {
-  _parSetRef_ = parSetRef;
-}
-
-bool DialInputBuffer::isMasked() const {
-  return _isMasked_;
-}
-bool DialInputBuffer::isDialUpdateRequested() const {
-  return _isDialUpdateRequested_;
-}
-bool DialInputBuffer::useParameterMirroring() const {
-  return _useParameterMirroring_;
-}
-size_t DialInputBuffer::getBufferSize() const{
-  return _buffer_.size();
-}
-const double* DialInputBuffer::getBuffer() const{
-  return _buffer_.data();
-}
-const uint32_t& DialInputBuffer::getCurrentHash() const{
-  return _currentHash_;
-}
-
 const FitParameter& DialInputBuffer::getFitParameter(int i) const {
     return _parSetRef_->at(_inputParameterIndicesList_[i].first).getParameterList().at(_inputParameterIndicesList_[i].second);
 }
-
 const FitParameterSet& DialInputBuffer::getFitParameterSet(int i) const {
   return _parSetRef_->at(_inputParameterIndicesList_[i].first);
-}
-
-const std::vector<std::pair<size_t, size_t>> &DialInputBuffer::getInputParameterIndicesList() const {
-  return _inputParameterIndicesList_;
 }
 
 void DialInputBuffer::updateBuffer(){
   LogThrowIf(_parSetRef_ == nullptr, "parSetRef is not set.");
 
-  _isMasked_ = false;
+  this->setIsMasked( false );
   double* bufferPtr{_buffer_.data()};
   double buffer;
 
@@ -69,7 +35,8 @@ void DialInputBuffer::updateBuffer(){
   for( auto& parIndices : _inputParameterIndicesList_ ){
 
     if( (*_parSetRef_)[parIndices.first].isMaskedForPropagation() ){
-      _isMasked_ = true;
+      // in that case, the DialInterface will always return 1.
+      this->setIsMasked( true );
       return;
     }
 
