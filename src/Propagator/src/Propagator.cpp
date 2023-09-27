@@ -241,6 +241,20 @@ void Propagator::initializeImpl(){
     this->reweightMcEvents();
     GundamGlobals::setEnableCacheManager(cacheManagerState);
 
+    if( _debugPrintLoadedEvents_ ){
+      LogDebug << "Toy events:" << std::endl;
+      LogDebug << GET_VAR_NAME_VALUE(_debugPrintLoadedEventsNbPerSample_) << std::endl;
+      int iEvt{0};
+      for( auto& entry : _eventDialCache_.getCache() ) {
+        LogDebug << "Event #" << iEvt++ << "{" << std::endl;
+        {
+          LogScopeIndent;
+          LogDebug << entry.getSummary() << std::endl;
+        }
+        LogDebug << "}" << std::endl;
+        if( iEvt >= _debugPrintLoadedEventsNbPerSample_ ) break;
+      }
+    }
     // Copies MC events in data container for both Asimov and FakeData event types
     LogWarning << "Copying loaded mc-like event to data container..." << std::endl;
     _fitSampleSet_.copyMcEventListToDataContainer();
@@ -471,16 +485,7 @@ void Propagator::initializeImpl(){
       LogDebug << "Event #" << iEvt++ << "{" << std::endl;
       {
         LogScopeIndent;
-        LogDebug << entry.event->getSummary() << std::endl;
-        LogDebug << "dialCache = {";
-        for( auto& dialInterface : entry.dials ) {
-#ifndef USE_BREAKDOWN_CACHE
-          LogDebug << std::endl << "  - " << dialInterface->getSummary();
-#else
-          LogDebug << std::endl << "  - " << dialInterface.interface->getSummary();
-#endif
-        }
-        LogDebug << std::endl << "}" << std::endl;
+        LogDebug << entry.getSummary() << std::endl;
       }
       LogDebug << "}" << std::endl;
       if( iEvt >= _debugPrintLoadedEventsNbPerSample_ ) break;

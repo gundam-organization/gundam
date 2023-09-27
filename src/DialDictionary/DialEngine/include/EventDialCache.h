@@ -45,6 +45,21 @@ public:
   struct CacheElem_t {
     PhysicsEvent* event;
     std::vector<DialsElem_t> dials;
+
+    std::string getSummary() const {
+      std::stringstream ss;
+      ss << event->getSummary() << std::endl;
+      ss << "dialCache = {";
+      for( auto& dialInterface : dials ) {
+#ifndef USE_BREAKDOWN_CACHE
+        ss << std::endl << "  - " << dialInterface->getSummary();
+#else
+        ss << std::endl << "  - " << dialInterface.interface->getSummary();
+#endif
+      }
+      ss << std::endl << "}";
+      return ss.str();
+    }
   };
 
   /// A pair of indices into the vector of dial collections, and then the
@@ -88,8 +103,8 @@ public:
   /// PhysicsEvent will probably be in the cache multiple times (for different
   /// DialInterface objects), and each DialInterface object could be in the
   /// cache multiple times (but for different Physics event objects).
-  std::vector<CacheElem_t> &getCache();
-  [[nodiscard]] const std::vector<CacheElem_t> &getCache() const;
+  std::vector<CacheElem_t> &getCache(){ return _cache_; }
+  [[nodiscard]] const std::vector<CacheElem_t> &getCache() const{ return _cache_; }
 
   /// Allocate entries for events in the indexed cache.  The first parameter
   /// arethe number of events to allocate space for, and the second number is

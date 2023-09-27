@@ -300,66 +300,12 @@ void FitParameterSet::processCovarianceMatrix(){
 }
 
 // Getters
-bool FitParameterSet::isEnabled() const {
-  return _isEnabled_;
-}
-bool FitParameterSet::isEnablePca() const {
-  return _enablePca_;
-}
-bool FitParameterSet::isUseEigenDecompInFit() const {
-  return _useEigenDecompInFit_;
-}
-bool FitParameterSet::isMaskedForPropagation() const {
-  return _maskedForPropagation_;
-}
-bool FitParameterSet::isEnabledThrowToyParameters() const {
-  return _enabledThrowToyParameters_;
-}
-bool FitParameterSet::isUseOnlyOneParameterPerEvent() const {
-  return _useOnlyOneParameterPerEvent_;
-}
-int FitParameterSet::getNbEnabledEigenParameters() const {
-  return _nbEnabledEigen_;
-}
-double FitParameterSet::getPenaltyChi2Buffer() const{
-  return _penaltyChi2Buffer_;
-}
-size_t FitParameterSet::getNbParameters() const {
-  return _parameterList_.size();
-}
-const std::string &FitParameterSet::getName() const {
-  return _name_;
-}
-const nlohmann::json &FitParameterSet::getDialSetDefinitions() const {
-  return _dialSetDefinitions_;
-}
-const TMatrixD* FitParameterSet::getInvertedEigenVectors() const{
-  return _eigenVectorsInv_.get();
-}
-const TMatrixD* FitParameterSet::getEigenVectors() const{
-  return _eigenVectors_.get();
-}
-const std::vector<FitParameter> &FitParameterSet::getParameterList() const{
-  return _parameterList_;
-}
 const std::vector<FitParameter>& FitParameterSet::getEffectiveParameterList() const{
   if( _useEigenDecompInFit_ ) return _eigenParameterList_;
   return _parameterList_;
 }
-const std::shared_ptr<TMatrixDSym> &FitParameterSet::getPriorCorrelationMatrix() const {
-  return _priorCorrelationMatrix_;
-}
-const std::shared_ptr<TMatrixDSym> &FitParameterSet::getPriorCovarianceMatrix() const {
-  return _priorCovarianceMatrix_;
-}
 
 // non const getters
-std::vector<FitParameter> &FitParameterSet::getParameterList() {
-  return _parameterList_;
-}
-std::vector<FitParameter> &FitParameterSet::getEigenParameterList(){
-  return _eigenParameterList_;
-}
 std::vector<FitParameter>& FitParameterSet::getEffectiveParameterList(){
   if( _useEigenDecompInFit_ ) return _eigenParameterList_;
   return _parameterList_;
@@ -461,7 +407,7 @@ void FitParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain
             }
 
             if( not throwIsValid ){
-              LogAlert << "Rethrowing \"" << this->getName() << "\"... try #" << nTries+1 << std::endl << std::endl;
+              LogAlert << "Rethrowing \"" << this->getName() << "\"... try #" << nTries+1 << std::endl;
               nTries++;
               continue;
             }
@@ -548,7 +494,7 @@ void FitParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain
           }
 
           if( not throwIsValid ){
-            LogAlert << "Rethrowing \"" << this->getName() << "\"... try #" << nTries+1 << std::endl << std::endl;
+            LogAlert << "Rethrowing \"" << this->getName() << "\"... try #" << nTries+1 << std::endl;
             nTries++;
             continue;
           }
@@ -584,9 +530,6 @@ void FitParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain
   }
 
 
-}
-const std::vector<nlohmann::json>& FitParameterSet::getCustomFitParThrow() const{
-  return _customFitParThrow_;
 }
 
 void FitParameterSet::propagateOriginalToEigen(){

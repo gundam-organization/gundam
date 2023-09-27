@@ -11,18 +11,6 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[DialInterface]");
 });
 
-void DialInterface::setDialBaseRef(DialBase *dialBasePtr) {
-  _dialBaseRef_ = dialBasePtr;
-}
-void DialInterface::setInputBufferRef(DialInputBuffer *inputBufferRef) {
-  _inputBufferRef_ = inputBufferRef;
-}
-void DialInterface::setResponseSupervisorRef(const DialResponseSupervisor *responseSupervisorRef) {
-  _responseSupervisorRef_ = responseSupervisorRef;
-}
-void DialInterface::setDialBinRef(const DataBin *dialBinRef) {
-  _dialBinRef_ = dialBinRef;
-}
 
 double DialInterface::evalResponse() const {
   return DialInterface::evalResponse(_inputBufferRef_, _dialBaseRef_, _responseSupervisorRef_);
@@ -32,7 +20,18 @@ std::string DialInterface::getSummary(bool shallow_) const {
   ss << _dialBaseRef_->getDialTypeName() << ":";
 
   if( _inputBufferRef_ != nullptr ){
-    ss << " input(" << _inputBufferRef_->getSummary() << ")";
+
+    ss << " ";
+
+    if( _inputBufferRef_->isMasked() ){
+      ss << GenericToolbox::ColorCodes::redBackground;
+    }
+
+    ss << "input(" << _inputBufferRef_->getSummary() << ")";
+
+    if( _inputBufferRef_->isMasked() ){
+      ss << "/MASKED" << GenericToolbox::ColorCodes::resetColor;
+    }
   }
 
   // apply on?
