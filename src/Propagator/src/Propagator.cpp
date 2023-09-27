@@ -210,9 +210,17 @@ void Propagator::initializeImpl(){
 
       for( auto& parSet : _parameterSetList_ ){
         if( not parSet.isEnabled() ) continue;
+
+        if( parSet.isMaskForToyGeneration() ){
+          LogWarning << parSet.getName() << " will be masked for the toy generation." << std::endl;
+          parSet.setMaskedForPropagation( true );
+        }
+
+
         LogContinueIf( not parSet.isEnabledThrowToyParameters(), "Toy throw is disabled for " << parSet.getName() );
 
         if( parSet.getPriorCovarianceMatrix() != nullptr ){
+          LogWarning << parSet.getName() << ": throwing correlated parameters..." << std::endl;
 
           int nTries{1};
           bool throwIsValid{false};
@@ -277,6 +285,13 @@ void Propagator::initializeImpl(){
     // back to prior
     if( _throwAsimovToyParameters_ ){
       for( auto& parSet : _parameterSetList_ ){
+
+        if( parSet.isMaskForToyGeneration() ){
+          // unmasking
+          LogWarning << "Unmasking parSet: " << parSet.getName() << std::endl;
+          parSet.setMaskedForPropagation( false );
+        }
+
         parSet.moveFitParametersToPrior();
       }
     }
@@ -426,19 +441,21 @@ void Propagator::initializeImpl(){
       }
 
       int iStage{0};
+      std::vector<FitParameterSet*> maskedParSetList;
       for( auto& parSet : _parameterSetList_ ){
         if( not parSet.isEnabled() ){ continue; }
+        maskedParSetList.emplace_back( &parSet );
         parSet.setMaskedForPropagation( true );
       }
+
       this->resetReweight();
       this->reweightMcEvents();
       for( size_t iSample = 0 ; iSample < _fitSampleSet_.getFitSampleList().size() ; iSample++ ){
         stageBreakdownList[iSample][iStage] = _fitSampleSet_.getFitSampleList()[iSample].getMcContainer().getSumWeights();
       }
 
-      for( auto& parSet : _parameterSetList_ ){
-        if( not parSet.isEnabled() ){ continue; }
-        parSet.setMaskedForPropagation(false);
+      for( auto* parSetPtr : maskedParSetList ){
+        parSetPtr->setMaskedForPropagation(false);
         this->resetReweight();
         this->reweightMcEvents();
         iStage++;
@@ -507,83 +524,7 @@ void Propagator::initializeImpl(){
   GundamGlobals::getParallelWorker().setCpuTimeSaverIsEnabled(false);
 }
 
-void Propagator::setShowTimeStats(bool showTimeStats) {
-  _showTimeStats_ = showTimeStats;
-}
-void Propagator::setThrowAsimovToyParameters(bool throwAsimovToyParameters) {
-  _throwAsimovToyParameters_ = throwAsimovToyParameters;
-}
-void Propagator::setEnableEigenToOrigInPropagate(bool enableEigenToOrigInPropagate) {
-  _enableEigenToOrigInPropagate_ = enableEigenToOrigInPropagate;
-}
-void Propagator::setIThrow(int iThrow) {
-  _iThrow_ = iThrow;
-}
-void Propagator::setLoadAsimovData(bool loadAsimovData) {
-  _loadAsimovData_ = loadAsimovData;
-}
-void Propagator::setParameterInjectorConfig(const nlohmann::json &parameterInjector) {
-  _parameterInjectorMc_ = parameterInjector;
-}
-void Propagator::setGlobalCovarianceMatrix(const std::shared_ptr<TMatrixD> &globalCovarianceMatrix) {
-  _globalCovarianceMatrix_ = globalCovarianceMatrix;
-}
 
-bool Propagator::isThrowAsimovToyParameters() const {
-  return _throwAsimovToyParameters_;
-}
-int Propagator::getIThrow() const {
-  return _iThrow_;
-}
-double Propagator::getLlhBuffer() const {
-  return _llhBuffer_;
-}
-double Propagator::getLlhStatBuffer() const {
-  return _llhStatBuffer_;
-}
-double Propagator::getLlhPenaltyBuffer() const {
-  return _llhPenaltyBuffer_;
-}
-double Propagator::getLlhRegBuffer() const {
-  return _llhRegBuffer_;
-}
-const EventTreeWriter &Propagator::getTreeWriter() const {
-  return _treeWriter_;
-}
-const std::shared_ptr<TMatrixD> &Propagator::getGlobalCovarianceMatrix() const {
-  return _globalCovarianceMatrix_;
-}
-const std::shared_ptr<TMatrixD> &Propagator::getStrippedCovarianceMatrix() const {
-  return _strippedCovarianceMatrix_;
-}
-const std::vector<DatasetLoader> &Propagator::getDataSetList() const {
-  return _dataSetList_;
-}
-const std::vector<FitParameterSet> &Propagator::getParameterSetsList() const {
-  return _parameterSetList_;
-}
-const std::vector<DialCollection> &Propagator::getDialCollections() const {
-  return _dialCollections_;
-}
-
-EventDialCache &Propagator::getEventDialCache() {
-  return _eventDialCache_;
-}
-FitSampleSet &Propagator::getFitSampleSet() {
-  return _fitSampleSet_;
-}
-PlotGenerator &Propagator::getPlotGenerator() {
-  return _plotGenerator_;
-}
-std::vector<FitParameterSet> &Propagator::getParameterSetsList() {
-  return _parameterSetList_;
-}
-std::shared_ptr<TMatrixD> &Propagator::getGlobalCovarianceMatrix(){
-  return _globalCovarianceMatrix_;
-}
-std::vector<DatasetLoader> &Propagator::getDataSetList() {
-  return _dataSetList_;
-}
 
 // Misc getters
 std::string Propagator::getLlhBufferSummary() const{

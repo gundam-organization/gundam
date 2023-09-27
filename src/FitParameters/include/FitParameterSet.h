@@ -46,6 +46,7 @@ public:
   [[nodiscard]] bool isEnablePca() const;
   [[nodiscard]] bool isUseEigenDecompInFit() const;
   [[nodiscard]] bool isEnabledThrowToyParameters() const;
+  [[nodiscard]] bool isMaskForToyGeneration() const { return _maskForToyGeneration_; }
   [[nodiscard]] bool isUseOnlyOneParameterPerEvent() const;
   [[nodiscard]] bool isMaskedForPropagation() const;
   [[nodiscard]] int getNbEnabledEigenParameters() const;
@@ -124,6 +125,7 @@ private:
   bool _printParametersSummary_{false};
   bool _releaseFixedParametersOnHesse_{false};
   bool _devUseParLimitsOnEigen_{false};
+  bool _maskForToyGeneration_{false};
   int _nbParameterDefinition_{-1};
   double _nominalStepSize_{std::nan("unset")};
   int _maxNbEigenParameters_{-1};

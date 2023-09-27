@@ -75,6 +75,7 @@ void FitParameterSet::readConfigImpl(){
 
   _enablePca_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"allowPca", "fixGhostFitParameters", "enablePca"}, _enablePca_);
   _enabledThrowToyParameters_ = GenericToolbox::Json::fetchValue(_config_, "enabledThrowToyParameters", _enabledThrowToyParameters_);
+  _maskForToyGeneration_ = GenericToolbox::Json::fetchValue(_config_, "maskForToyGeneration", _maskForToyGeneration_);
   _customFitParThrow_ = GenericToolbox::Json::fetchValue(_config_, "customFitParThrow", std::vector<nlohmann::json>());
   _releaseFixedParametersOnHesse_ = GenericToolbox::Json::fetchValue(_config_, "releaseFixedParametersOnHesse", _releaseFixedParametersOnHesse_);
 
