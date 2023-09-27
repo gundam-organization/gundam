@@ -984,7 +984,7 @@ void DataDispenser::fillFunction(int iThread_){
   auto isDial2Valid = [&](const DataBin& d_){
     nBinEdges = d_.getEdgesList().size();
     for( iVar = 0 ; iVar < nBinEdges ; iVar++ ){
-      if( not DataBin::isBetweenEdges(
+      if( not d_.isBetweenEdges(
           d_.getEdgesList()[iVar],
           eventIndexingBuffer.getVarAsDouble(d_.getEventVarIndexCache()[iVar] ) )
           ){
