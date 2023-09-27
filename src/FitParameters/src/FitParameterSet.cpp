@@ -410,57 +410,161 @@ void FitParameterSet::moveFitParametersToPrior(){
   }
 
 }
-void FitParameterSet::throwFitParameters(double gain_){
+void FitParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain_){
 
   LogThrowIf(_strippedCovarianceMatrix_==nullptr, "No covariance matrix provided");
 
+
+  TVectorD throwsList{_strippedCovarianceMatrix_->GetNrows()};
+
+  // generic function to handle multiple throws
+  std::function<void(std::function<void()>)> throwParsFct =
+      [&](const std::function<void()>& throwFct_){
+
+        int nTries{0};
+        bool throwIsValid{false};
+        while( not throwIsValid ){
+
+          throwFct_();
+
+          // throws with this function are always done in real space.
+          int iFit{-1};
+          for( auto& par : this->getParameterList() ){
+            if( FitParameterSet::isValidCorrelatedParameter(par) ){
+              iFit++;
+              par.setThrowValue( par.getPriorValue() + gain_ * throwsList[iFit] );
+              par.setParameterValue( par.getThrowValue() );
+            }
+          }
+          if( _useEigenDecompInFit_ ){
+            this->propagateOriginalToEigen();
+            for( auto& eigenPar : _eigenParameterList_ ){
+              eigenPar.setThrowValue( eigenPar.getParameterValue() );
+            }
+          }
+
+          throwIsValid = true; // default case
+          if( rethrowIfNotInbounds_ ){
+            LogInfo << "Checking if the thrown parameters of the set are within bounds..." << std::endl;
+
+            for( auto& par : this->getEffectiveParameterList() ){
+              if( not std::isnan(par.getMinValue()) and par.getParameterValue() < par.getMinValue() ){
+                throwIsValid = false;
+                LogAlert << GenericToolbox::ColorCodes::redLightText << "thrown value lower than min bound -> " << GenericToolbox::ColorCodes::resetColor
+                         << par.getSummary(true) << std::endl;
+              }
+              else if( not std::isnan(par.getMaxValue()) and par.getParameterValue() > par.getMaxValue() ){
+                throwIsValid = false;
+                LogAlert << GenericToolbox::ColorCodes::redLightText <<"thrown value higher than max bound -> " << GenericToolbox::ColorCodes::resetColor
+                         << par.getSummary(true) << std::endl;
+              }
+            }
+
+            if( not throwIsValid ){
+              LogAlert << "Rethrowing \"" << this->getName() << "\"... try #" << nTries+1 << std::endl << std::endl;
+              nTries++;
+              continue;
+            }
+            else{
+              LogInfo << "Keeping throw after " << nTries+1 << " attempt(s)." << std::endl;
+            }
+          } // check bounds?
+
+
+          // alright at this point it's fine, print them
+          for( auto& par : _parameterList_ ){
+            if( FitParameterSet::isValidCorrelatedParameter(par) ){
+              LogInfo << "Thrown par " << par.getTitle() << ": " << par.getPriorValue();
+              LogInfo << " → " << par.getParameterValue() << std::endl;
+            }
+          }
+          if( _useEigenDecompInFit_ ){
+            LogInfo << "Translated to eigen space:" << std::endl;
+            for( auto& eigenPar : _eigenParameterList_ ){
+              LogInfo << "Eigen par " << eigenPar.getTitle() << ": " << eigenPar.getPriorValue();
+              LogInfo << " → " << eigenPar.getParameterValue() << std::endl;
+            }
+          }
+        }
+
+  };
+
+
+
   if( _useMarkGenerator_ ){
-    TVectorD parms(_strippedCovarianceMatrix_->GetNrows());
     int iPar{0};
     for( auto& par : _parameterList_ ){
-      if( FitParameterSet::isValidCorrelatedParameter(par) ){ parms[iPar++] = par.getPriorValue(); }
+      if( FitParameterSet::isValidCorrelatedParameter(par) ){ throwsList[iPar++] = par.getPriorValue(); }
     }
 
     if( _markHartzGen_ == nullptr ){
       LogInfo << "Generating Cholesky matrix in set: " << getName() << std::endl;
-      _markHartzGen_ = std::make_shared<ParameterThrowerMarkHarz>(parms, *_strippedCovarianceMatrix_);
+      _markHartzGen_ = std::make_shared<ParameterThrowerMarkHarz>(throwsList, *_strippedCovarianceMatrix_);
     }
+    TVectorD throws(_strippedCovarianceMatrix_->GetNrows());
+
     std::vector<double> throwPars(_strippedCovarianceMatrix_->GetNrows());
-    _markHartzGen_->ThrowSet(throwPars);
-    // THROWS ARE CENTERED AROUND 1!!
+    std::function<void()> markScottThrowFct = [&](){
+      _markHartzGen_->ThrowSet(throwPars);
+      // THROWS ARE CENTERED AROUND 1!!
 
-    iPar = 0;
-    for( auto& par : _parameterList_ ){
-      if( FitParameterSet::isValidCorrelatedParameter(par) ){
-        LogInfo << "Throwing par (mark's generator) " << par.getTitle() << ": " << par.getPriorValue();
-        par.setThrowValue(throwPars[iPar++]);
-        par.setParameterValue( par.getThrowValue() );
-        LogInfo << " → " << par.getParameterValue() << std::endl;
+      // convert to TVectorD
+      int iPar{0};
+      for( auto& thrownPar : throwPars ){
+        throwsList[iPar++] = thrownPar;
       }
-    }
+    };
 
-    if( _useEigenDecompInFit_ ){
-      this->propagateOriginalToEigen();
-      for( auto& eigenPar : _eigenParameterList_ ){
-        eigenPar.setThrowValue( eigenPar.getParameterValue() );
-      }
-    }
+    throwParsFct( markScottThrowFct );
   }
   else{
     if( _useEigenDecompForThrows_ and _useEigenDecompInFit_ ){
       LogInfo << "Throwing eigen parameters for " << _name_ << std::endl;
-      for( auto& eigenPar : _eigenParameterList_ ){
-        if( eigenPar.isFixed() ){ LogWarning << "Eigen parameter #" << eigenPar.getParameterIndex() << " is fixed. Not throwing" << std::endl; continue; }
-        eigenPar.setThrowValue(eigenPar.getPriorValue() + gain_ * gRandom->Gaus(0, eigenPar.getStdDevValue()));
-        eigenPar.setParameterValue( eigenPar.getThrowValue() );
-      }
-      this->propagateEigenToOriginal();
 
-      for( auto& par : _parameterList_ ){
-        LogInfo << "Throwing par (through eigen decomp) " << par.getTitle() << ": " << par.getPriorValue();
-        par.setThrowValue(par.getParameterValue());
-        LogInfo << " → " << par.getParameterValue() << std::endl;
+      int nTries{0};
+      bool throwIsValid{false};
+      while( not throwIsValid ){
+        for( auto& eigenPar : _eigenParameterList_ ){
+          eigenPar.setThrowValue(eigenPar.getPriorValue() + gain_ * gRandom->Gaus(0, eigenPar.getStdDevValue()));
+          eigenPar.setParameterValue( eigenPar.getThrowValue() );
+        }
+        this->propagateEigenToOriginal();
+
+        throwIsValid = true;
+        if( rethrowIfNotInbounds_ ){
+          LogInfo << "Checking if the thrown parameters of the set are within bounds..." << std::endl;
+
+          for( auto& par : this->getEffectiveParameterList() ){
+            if( not std::isnan(par.getMinValue()) and par.getParameterValue() < par.getMinValue() ){
+              throwIsValid = false;
+              LogAlert << GenericToolbox::ColorCodes::redLightText << "thrown value lower than min bound -> " << GenericToolbox::ColorCodes::resetColor
+                       << par.getSummary(true) << std::endl;
+            }
+            else if( not std::isnan(par.getMaxValue()) and par.getParameterValue() > par.getMaxValue() ){
+              throwIsValid = false;
+              LogAlert << GenericToolbox::ColorCodes::redLightText <<"thrown value higher than max bound -> " << GenericToolbox::ColorCodes::resetColor
+                       << par.getSummary(true) << std::endl;
+            }
+          }
+
+          if( not throwIsValid ){
+            LogAlert << "Rethrowing \"" << this->getName() << "\"... try #" << nTries+1 << std::endl << std::endl;
+            nTries++;
+            continue;
+          }
+          else{
+            LogInfo << "Keeping throw after " << nTries << " attempt(s)." << std::endl;
+          }
+        } // check bounds?
+
+        for( auto& par : _parameterList_ ){
+          LogInfo << "Thrown par (through eigen decomp) " << par.getTitle() << ": " << par.getPriorValue();
+          par.setThrowValue(par.getParameterValue());
+          LogInfo << " → " << par.getParameterValue() << std::endl;
+        }
       }
+
+
     }
     else{
       LogInfo << "Throwing parameters for " << _name_ << " using Cholesky matrix" << std::endl;
@@ -469,28 +573,13 @@ void FitParameterSet::throwFitParameters(double gain_){
         _correlatedVariableThrower_.setCovarianceMatrixPtr(_strippedCovarianceMatrix_.get());
         _correlatedVariableThrower_.initialize();
       }
-      TVectorD throws(_strippedCovarianceMatrix_->GetNrows());
-      _correlatedVariableThrower_.throwCorrelatedVariables(throws);
 
-      int iFit{-1};
-      for( auto& par : _parameterList_ ){
-        if( FitParameterSet::isValidCorrelatedParameter(par) ){
-          iFit++;
-          LogInfo << "Throwing par " << par.getTitle() << ": " << par.getPriorValue();
-          par.setThrowValue(par.getPriorValue() + gain_ * throws[iFit]);
-          par.setParameterValue( par.getThrowValue() );
-          LogInfo << " → " << par.getParameterValue() << std::endl;
-        }
-      }
-      if( _useEigenDecompInFit_ ){
-        LogInfo << "Converting to eigen space..." << std::endl;
-        this->propagateOriginalToEigen();
-        for( auto& eigenPar : _eigenParameterList_ ){
-          eigenPar.setThrowValue( eigenPar.getParameterValue() );
-          LogInfo << "Eigen par " << eigenPar.getTitle() << ": " << eigenPar.getPriorValue();
-          LogInfo << " → " << eigenPar.getParameterValue() << std::endl;
-        }
-      }
+      std::function<void()> gundamThrowFct = [&](){
+        _correlatedVariableThrower_.throwCorrelatedVariables(throwsList);
+      };
+
+      throwParsFct( gundamThrowFct );
+
     }
   }
 

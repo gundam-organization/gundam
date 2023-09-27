@@ -72,7 +72,7 @@ public:
 
   // Throw / Shifts
   void moveFitParametersToPrior();
-  void throwFitParameters(double gain_ = 1);
+  void throwFitParameters(bool rethrowIfNotInbounds_ = true, double gain_ = 1);
 
   void propagateEigenToOriginal();
   void propagateOriginalToEigen();

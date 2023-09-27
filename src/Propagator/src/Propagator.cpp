@@ -221,40 +221,8 @@ void Propagator::initializeImpl(){
 
         if( parSet.getPriorCovarianceMatrix() != nullptr ){
           LogWarning << parSet.getName() << ": throwing correlated parameters..." << std::endl;
-
-          int nTries{1};
-          bool throwIsValid{false};
-          while( not throwIsValid ){
-            LogScopeIndent;
-
-            parSet.throwFitParameters();
-            throwIsValid = true; // keep by default
-
-            if( _reThrowParSetIfOutOfBounds_ ){
-              LogInfo << "Checking if the thrown parameters of the set are within bounds..." << std::endl;
-
-              for( auto& par : parSet.getEffectiveParameterList() ){
-                if( not std::isnan(par.getMinValue()) and par.getParameterValue() < par.getMinValue() ){
-                  throwIsValid = false;
-                  LogAlert << redLightText << "thrown value lower than min bound -> " << resetColor
-                  << par.getSummary(true) << std::endl;
-                }
-                else if( not std::isnan(par.getMaxValue()) and par.getParameterValue() > par.getMaxValue() ){
-                  throwIsValid = false;
-                  LogAlert << redLightText <<"thrown value higher than max bound -> " << resetColor
-                  << par.getSummary(true) << std::endl;
-                }
-              }
-
-              if( not throwIsValid ){
-                LogAlert << "Rethrowing \"" << parSet.getName() << "\"... try #" << nTries+1 << std::endl << std::endl;
-                nTries++;
-              }
-              else{
-                LogInfo << "Keeping throw after " << nTries << " attempt(s)." << std::endl;
-              }
-            } // check bounds?
-          } // keep?
+          LogScopeIndent;
+          parSet.throwFitParameters(_reThrowParSetIfOutOfBounds_);
         } // throw?
       } // parSet
     } // throw asimov?
