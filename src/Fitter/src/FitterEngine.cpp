@@ -28,9 +28,6 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[FitterEngine]");
 });
 
-FitterEngine::FitterEngine(TDirectory *saveDir_){
-  this->setSaveDir(saveDir_); // propagate
-}
 
 void FitterEngine::readConfigImpl(){
   LogInfo << "Reading FitterEngine config..." << std::endl;
@@ -256,69 +253,6 @@ void FitterEngine::initializeImpl(){
 
   LogWarning << "Saving all objects to disk..." << std::endl;
   GenericToolbox::triggerTFileWrite(_saveDir_);
-}
-
-// Setters
-void FitterEngine::setSaveDir(TDirectory *saveDir) {
-  _saveDir_ = saveDir;
-}
-void FitterEngine::setIsDryRun(bool isDryRun_){
-  _isDryRun_ = isDryRun_;
-}
-void FitterEngine::setEnablePca(bool enablePca_){
-  _enablePca_ = enablePca_;
-}
-void FitterEngine::setEnablePreFitScan(bool enablePreFitScan) {
-  _enablePreFitScan_ = enablePreFitScan;
-}
-void FitterEngine::setEnablePostFitScan(bool enablePostFitScan) {
-  _enablePostFitScan_ = enablePostFitScan;
-}
-void FitterEngine::setEnablePreFitToPostFitLineScan(bool enablePreFitToPostFitLineScan_) {
-  _enablePreFitToPostFitLineScan_ = enablePreFitToPostFitLineScan_;
-}
-void FitterEngine::setGenerateSamplePlots(bool generateSamplePlots) {
-  _generateSamplePlots_ = generateSamplePlots;
-}
-void FitterEngine::setGenerateOneSigmaPlots(bool generateOneSigmaPlots){
-  _generateOneSigmaPlots_ = generateOneSigmaPlots;
-}
-void FitterEngine::setDoAllParamVariations(bool doAllParamVariations_){
-  _doAllParamVariations_ = doAllParamVariations_;
-}
-void FitterEngine::setAllParamVariationsSigmas(const std::vector<double> &allParamVariationsSigmas) {
-  _allParamVariationsSigmas_ = allParamVariationsSigmas;
-}
-
-// Getters
-const nlohmann::json &FitterEngine::getPreFitParState() const {
-  return _preFitParState_;
-}
-const nlohmann::json &FitterEngine::getPostFitParState() const {
-  return _postFitParState_;
-}
-const Propagator& FitterEngine::getPropagator() const {
-  return _propagator_;
-}
-const MinimizerBase& FitterEngine::getMinimizer() const {
-  return *_minimizer_;
-}
-const LikelihoodInterface& FitterEngine::getLikelihood() const {
-  return _likelihood_;
-}
-
-// non-const getters
-Propagator& FitterEngine::getPropagator() {
-  return _propagator_;
-}
-MinimizerBase& FitterEngine::getMinimizer(){
-  return *_minimizer_;
-}
-LikelihoodInterface& FitterEngine::getLikelihood(){
-  return _likelihood_;
-}
-TDirectory* FitterEngine::getSaveDir(){
-  return _saveDir_;
 }
 
 // Core
