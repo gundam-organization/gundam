@@ -78,7 +78,7 @@ public:
   // Misc
   [[nodiscard]] nlohmann::json exportParameterInjectorConfig() const;
   void injectParameterValues(const nlohmann::json &config_);
-  void throwParametersFromGlobalCovariance();
+  void throwParametersFromGlobalCovariance(bool quietVerbose_ = true);
 
   // Logger related
   static void muteLogger();
@@ -104,6 +104,7 @@ private:
 
   // Internals
   bool _throwAsimovToyParameters_{false};
+  bool _throwToyParametersWithGlobalCov_{false};
   bool _reThrowParSetIfOutOfBounds_{true};
   bool _enableStatThrowInToys_{true};
   bool _gaussStatThrowInToys_{false};
@@ -114,10 +115,11 @@ private:
   double _llhStatBuffer_{0};
   double _llhPenaltyBuffer_{0};
   double _llhRegBuffer_{0};
+  std::vector<FitParameter*> _globalCovParList_{};
+  std::vector<FitParameter*> _strippedParameterList_{};
   std::shared_ptr<TMatrixD> _globalCovarianceMatrix_{nullptr};
   std::shared_ptr<TMatrixD> _strippedCovarianceMatrix_{nullptr};
   std::shared_ptr<TMatrixD> _choleskyMatrix_{nullptr};
-  std::vector<FitParameter*> _strippedParameterList_{};
 
   bool _devSingleThreadReweight_{false};
   bool _devSingleThreadHistFill_{false};

@@ -392,7 +392,7 @@ void FitParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain
             LogInfo << "Checking if the thrown parameters of the set are within bounds..." << std::endl;
 
             for( auto& par : this->getEffectiveParameterList() ){
-              if( not std::isnan(par.getMinValue()) and par.getParameterValue() < par.getMinValue() ){
+              if      ( not std::isnan(par.getMinValue()) and par.getParameterValue() < par.getMinValue() ){
                 throwIsValid = false;
                 LogAlert << GenericToolbox::ColorCodes::redLightText << "thrown value lower than min bound -> " << GenericToolbox::ColorCodes::resetColor
                          << par.getSummary(true) << std::endl;
@@ -414,7 +414,6 @@ void FitParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain
             }
           } // check bounds?
 
-
           // alright at this point it's fine, print them
           for( auto& par : _parameterList_ ){
             if( FitParameterSet::isValidCorrelatedParameter(par) ){
@@ -432,8 +431,6 @@ void FitParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain
         }
 
   };
-
-
 
   if( _useMarkGenerator_ ){
     int iPar{0};
@@ -526,7 +523,6 @@ void FitParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain
 
     }
   }
-
 
 }
 
