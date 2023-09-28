@@ -24,21 +24,27 @@
 /// samples in the set can be referred to by their sample set index.
 class FitSampleSet : public JsonBaseClass {
 
+protected:
+  // called through public JsonBaseClass::readConfig() and JsonBaseClass::initialize()
+  void readConfigImpl() override;
+  void initializeImpl() override;
+
 public:
   // Post init
   void copyMcEventListToDataContainer();
   void clearMcContainers();
 
-  // Getters
-  const std::vector<FitSample> &getFitSampleList() const;
-  std::vector<FitSample> &getFitSampleList();
-  const nlohmann::json &getConfig() const;
-  const std::shared_ptr<JointProbability::JointProbability> &getJointProbabilityFct() const;
+  // const getters
+  const std::vector<FitSample> &getFitSampleList() const { return _fitSampleList_; }
+  const std::shared_ptr<JointProbability::JointProbability> &getJointProbabilityFct() const{ return _jointProbabilityPtr_; }
   const std::vector<std::string>& getAdditionalVariablesForStorage() const { return _additionalVariablesForStorage_; }
+
+  // non-const getters
+  std::vector<FitSample> &getFitSampleList(){ return _fitSampleList_; }
   std::vector<std::string>& getAdditionalVariablesForStorage() { return _additionalVariablesForStorage_; }
 
   //Core
-  bool empty() const;
+  bool empty() const{ return _fitSampleList_.empty(); }
   double evalLikelihood();
   double evalLikelihood(FitSample& sample_);
 
@@ -46,10 +52,6 @@ public:
   void updateSampleEventBinIndexes() const;
   void updateSampleBinEventList() const;
   void updateSampleHistograms() const;
-
-protected:
-  void readConfigImpl() override;
-  void initializeImpl() override;
 
 private:
   bool _showTimeStats_{false};

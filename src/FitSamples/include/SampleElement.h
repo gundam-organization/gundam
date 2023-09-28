@@ -19,8 +19,8 @@ class SampleElement{
 
 public:
 
-  SampleElement();
-  virtual ~SampleElement();
+  SampleElement() = default;
+  virtual ~SampleElement() = default;
 
   std::string name;
 

@@ -34,12 +34,21 @@
 
 class FitParameterSet : public JsonBaseClass  {
 
+protected:
+  // called through public JsonBaseClass::readConfig() and JsonBaseClass::initialize()
+  void readConfigImpl() override;
+  void initializeImpl() override;
+
 public:
+  // in src dependent
+  static void muteLogger();
+  static void unmuteLogger();
+
   // Post-init
   void processCovarianceMatrix(); // invert the matrices, and make sure fixed parameters are detached from correlations
 
   // Setters
-  void setMaskedForPropagation(bool maskedForPropagation_);
+  void setMaskedForPropagation(bool maskedForPropagation_){ _maskedForPropagation_ = maskedForPropagation_; }
 
   // Getters
   [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
@@ -84,20 +93,14 @@ public:
   FitParameter* getParameterPtr(const std::string& parName_);
   FitParameter* getParameterPtrWithTitle(const std::string& parTitle_);
 
+  // statics
   static double toNormalizedParRange(double parRange, const FitParameter& par);
   static double toNormalizedParValue(double parValue, const FitParameter& par);
   static double toRealParValue(double normParValue, const FitParameter& par);
   static double toRealParRange(double normParRange, const FitParameter& par);
   static bool isValidCorrelatedParameter(const FitParameter& par_);
 
-  // in src dependent
-  static void muteLogger();
-  static void unmuteLogger();
-
 protected:
-  void readConfigImpl() override;
-  void initializeImpl() override;
-
   void readParameterDefinitionFile();
   void defineParameters();
   void fillDeltaParameterList();

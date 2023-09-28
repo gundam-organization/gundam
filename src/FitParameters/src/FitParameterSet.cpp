@@ -21,9 +21,6 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[FitParameterSet]");
 } );
 
-void FitParameterSet::muteLogger(){ Logger::setIsMuted( true ); }
-void FitParameterSet::unmuteLogger(){ Logger::setIsMuted( false ); }
-
 
 void FitParameterSet::readConfigImpl(){
   LogThrowIf(_config_.empty(), "FitParameterSet config not set.");
@@ -142,10 +139,11 @@ void FitParameterSet::initializeImpl() {
   this->processCovarianceMatrix();
 }
 
-void FitParameterSet::setMaskedForPropagation(bool maskedForPropagation_) {
-  _maskedForPropagation_ = maskedForPropagation_;
-}
+// statics in src dependent
+void FitParameterSet::muteLogger(){ Logger::setIsMuted( true ); }
+void FitParameterSet::unmuteLogger(){ Logger::setIsMuted( false ); }
 
+// Post-init
 void FitParameterSet::processCovarianceMatrix(){
 
   if( _priorCovarianceMatrix_ == nullptr ){ return; } // nothing to do
@@ -749,7 +747,7 @@ FitParameter* FitParameterSet::getParameterPtrWithTitle(const std::string& parTi
   return nullptr;
 }
 
-
+// Static
 double FitParameterSet::toNormalizedParRange(double parRange, const FitParameter& par){
   return (parRange)/par.getStdDevValue();
 }

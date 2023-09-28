@@ -27,7 +27,13 @@ class FitParameterSet;
 
 class FitParameter : public JsonBaseClass {
 
+protected:
+  // called through public JsonBaseClass::readConfig() and JsonBaseClass::initialize()
+  void readConfigImpl() override;
+  void initializeImpl() override;
+
 public:
+  FitParameter() = delete; // should always provide the owner
   explicit FitParameter(const FitParameterSet* owner_): _owner_(owner_) {}
 
   void setIsEnabled(bool isEnabled){ _isEnabled_ = isEnabled; }
@@ -86,10 +92,6 @@ public:
   [[nodiscard]] std::string getSummary(bool shallow_=false) const;
   [[nodiscard]] std::string getTitle() const;
   [[nodiscard]] std::string getFullTitle() const;
-
-protected:
-  void readConfigImpl() override;
-  void initializeImpl() override;
 
 private:
   // Parameters
