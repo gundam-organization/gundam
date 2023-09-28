@@ -746,11 +746,7 @@ void Propagator::throwParametersFromGlobalCovariance(bool quietVerbose_){
         (*_strippedCovarianceMatrix_)[iStrippedPar][jStrippedPar] = (*_globalCovarianceMatrix_)[iGlobPar][jGlobPar];
       }
     }
-
-    _strippedCovarianceMatrix_->Print();
   }
-
-
 
   bool isLoggerAlreadyMuted{Logger::isMuted()};
   GenericToolbox::ScopedGuard g{
