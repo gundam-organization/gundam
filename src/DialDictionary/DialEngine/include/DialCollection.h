@@ -22,7 +22,8 @@
 class DialCollection : public JsonBaseClass {
 
 public:
-  explicit DialCollection(std::vector<FitParameterSet> *targetParameterSetListPtr);
+  DialCollection() = delete;
+  explicit DialCollection(std::vector<FitParameterSet> *targetParameterSetListPtr): _parameterSetListPtr_(targetParameterSetListPtr) {}
 
   //  The PolymorphicObjectWrapper doesn't have the correct semantics since it
   // clones the payload when it's copied.  We want to leave the pointee alone
@@ -36,29 +37,29 @@ public:
   // typedef GenericToolbox::PolymorphicObjectWrapper<DialBase> DialBaseObject;
 
   // setters
-  void setIndex(int index);
-  void setSupervisedParameterIndex(int supervisedParameterIndex);
-  void setSupervisedParameterSetIndex(int supervisedParameterSetIndex);
+  void setIndex(int index){ _index_ = index; }
+  void setSupervisedParameterIndex(int supervisedParameterIndex){ _supervisedParameterIndex_ = supervisedParameterIndex; }
+  void setSupervisedParameterSetIndex(int supervisedParameterSetIndex){ _supervisedParameterSetIndex_ = supervisedParameterSetIndex; }
 
   // const getters
-  [[nodiscard]] bool isBinned() const;
-  [[nodiscard]] bool isEnabled() const;
-  [[nodiscard]] bool useCachedDials() const;
-  [[nodiscard]] bool isAllowDialExtrapolation() const;
+  [[nodiscard]] bool isBinned() const{ return _isBinned_; }
+  [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
+  [[nodiscard]] bool isAllowDialExtrapolation() const{ return _allowDialExtrapolation_; }
   [[nodiscard]] int getIndex() const{ return _index_; }
-  [[nodiscard]] const std::string &getGlobalDialLeafName() const;
-  [[nodiscard]] const std::string &getGlobalDialType() const;
-  [[nodiscard]] const std::string &getGlobalDialSubType() const;
-  [[nodiscard]] const DataBinSet &getDialBinSet() const;
-  [[nodiscard]] const std::vector<std::string> &getDataSetNameList() const;
-  [[nodiscard]] const std::shared_ptr<TFormula> &getApplyConditionFormula() const;
+  [[nodiscard]] const std::string &getGlobalDialType() const{return _globalDialType_; }
+  [[nodiscard]] const std::string &getGlobalDialSubType() const{ return _globalDialSubType_; }
+  [[nodiscard]] const std::string &getGlobalDialLeafName() const{ return _globalDialLeafName_; }
+  [[nodiscard]] const DataBinSet &getDialBinSet() const{ return _dialBinSet_; }
+  [[nodiscard]] const std::vector<std::string> &getDataSetNameList() const{ return _dataSetNameList_; }
+  [[nodiscard]] const std::shared_ptr<TFormula> &getApplyConditionFormula() const{ return _applyConditionFormula_; }
 
   // non-const getters
-  DataBinSet &getDialBinSet();
-  std::vector<DialBaseObject> &getDialBaseList();
-  std::vector<DialInterface> &getDialInterfaceList();
+  DataBinSet &getDialBinSet(){ return _dialBinSet_; }
+  std::vector<DialBaseObject> &getDialBaseList(){ return _dialBaseList_; }
+  std::vector<DialInterface> &getDialInterfaceList(){ return _dialInterfaceList_; }
 
   // non-trivial getters
+  [[nodiscard]] bool useCachedDials() const;
   [[nodiscard]] bool isDatasetValid(const std::string& datasetName_) const;
   std::string getTitle() const;
   std::string getSummary(bool shallow_ = true);

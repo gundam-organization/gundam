@@ -16,15 +16,17 @@ class DialResponseSupervisor {
 public:
   DialResponseSupervisor() = default;
 
-  void setMinResponse(double minResponse);
-  void setMaxResponse(double maxResponse);
+  // setters
+  void setMinResponse(double minResponse){ _minResponse_ = minResponse; }
+  void setMaxResponse(double maxResponse){ _maxResponse_ = maxResponse; }
+
+  // const getters
+  [[nodiscard]] double getMinResponse() const{ return _minResponse_; }
+  [[nodiscard]] double getMaxResponse() const{ return _maxResponse_; }
 
   [[nodiscard]] double process(double reponse_) const;
-
   [[nodiscard]] std::string getSummary() const;
 
-  [[nodiscard]] double getMinResponse() const;
-  [[nodiscard]] double getMaxResponse() const;
 
 private:
   double _minResponse_{std::nan("unset")};

@@ -20,6 +20,10 @@
 
 class DatasetLoader : public JsonBaseClass {
 
+protected:
+  void readConfigImpl() override;
+  void initializeImpl() override;
+
 public:
   explicit DatasetLoader(const nlohmann::json& config_, int datasetIndex_): _dataSetIndex_(datasetIndex_) { this->readConfig(config_); }
 
@@ -42,10 +46,6 @@ public:
   std::map<std::string, DataDispenser> &getDataDispenserDict(){ return _dataDispenserDict_; }
 
   void updateDispenserOwnership();
-
-protected:
-  void readConfigImpl() override;
-  void initializeImpl() override;
 
 private:
   // config
