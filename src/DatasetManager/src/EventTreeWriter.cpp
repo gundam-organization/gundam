@@ -17,8 +17,6 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[TreeWriter]");
 });
 
-EventTreeWriter::EventTreeWriter() = default;
-EventTreeWriter::~EventTreeWriter() = default;
 
 void EventTreeWriter::readConfigImpl() {
   ConfigUtils::forwardConfig( _config_ );
@@ -36,15 +34,6 @@ void EventTreeWriter::readConfigImpl() {
   }
 }
 
-void EventTreeWriter::setFitSampleSetPtr(const FitSampleSet *fitSampleSetPtr) {
-  _fitSampleSetPtr_ = fitSampleSetPtr;
-}
-void EventTreeWriter::setParSetListPtr(const std::vector<FitParameterSet> *parSetListPtr) {
-  _parSetListPtr_ = parSetListPtr;
-}
-void EventTreeWriter::setEventDialCachePtr(const EventDialCache *eventDialCachePtr_){
-  _eventDialCachePtr_ = eventDialCachePtr_;
-}
 
 void EventTreeWriter::writeSamples(TDirectory* saveDir_) const{
   LogInfo << "Writing sample data in TTrees..." << std::endl;

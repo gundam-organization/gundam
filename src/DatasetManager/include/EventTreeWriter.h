@@ -20,12 +20,11 @@
 class EventTreeWriter : public GenericToolbox::ConfigBaseClass<nlohmann::json> {
 
 public:
-  EventTreeWriter();
-  ~EventTreeWriter() override;
+  EventTreeWriter() = default;
 
-  void setFitSampleSetPtr(const FitSampleSet *fitSampleSetPtr);
-  void setParSetListPtr(const std::vector<FitParameterSet> *parSetListPtr);
-  void setEventDialCachePtr(const EventDialCache *eventDialCachePtr_);
+  void setFitSampleSetPtr(const FitSampleSet *fitSampleSetPtr){ _fitSampleSetPtr_ = fitSampleSetPtr; }
+  void setEventDialCachePtr(const EventDialCache *eventDialCachePtr_){ _eventDialCachePtr_ = eventDialCachePtr_; }
+  void setParSetListPtr(const std::vector<FitParameterSet> *parSetListPtr){ _parSetListPtr_ = parSetListPtr; }
 
   void writeSamples(TDirectory* saveDir_) const;
 
@@ -51,8 +50,8 @@ private:
 
   // parameters
   const FitSampleSet* _fitSampleSetPtr_{nullptr};
-  const std::vector<FitParameterSet>* _parSetListPtr_{nullptr};
   const EventDialCache* _eventDialCachePtr_{nullptr};
+  const std::vector<FitParameterSet>* _parSetListPtr_{nullptr};
 
 
 };

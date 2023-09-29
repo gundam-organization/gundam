@@ -21,7 +21,8 @@
 #include <string>
 #include <vector>
 
-class DatasetLoader;
+
+class DatasetLoader; // owner
 
 
 class DataDispenser : public JsonBaseClass {
