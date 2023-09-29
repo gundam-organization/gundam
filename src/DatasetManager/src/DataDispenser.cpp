@@ -33,7 +33,6 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[DataDispenser]");
 });
 
-DataDispenser::DataDispenser(DatasetLoader* owner_): _owner_(owner_) {}
 
 void DataDispenser::readConfigImpl(){
   LogThrowIf( _config_.empty(), "Config is not set." );
@@ -66,13 +65,6 @@ void DataDispenser::readConfigImpl(){
 void DataDispenser::initializeImpl(){
   // Nothing else to do other than read config?
   LogWarning << "Initialized data dispenser: " << getTitle() << std::endl;
-}
-
-const DataDispenserParameters &DataDispenser::getParameters() const {
-  return _parameters_;
-}
-DataDispenserParameters &DataDispenser::getParameters() {
-  return _parameters_;
 }
 
 void DataDispenser::setSampleSetPtrToLoad(FitSampleSet *sampleSetPtrToLoad) {
@@ -1252,16 +1244,6 @@ void DataDispenser::fillFunction(int iThread_){
     GenericToolbox::displayProgressBar(nEvents, nEvents, ssProgressBar.str());
   }
 
-}
-
-void DataDispenserCache::addVarRequestedForIndexing(const std::string& varName_) {
-  LogThrowIf(varName_.empty(), "no var name provided.");
-  GenericToolbox::addIfNotInVector(varName_, this->varsRequestedForIndexing);
-}
-void DataDispenserCache::addVarRequestedForStorage(const std::string& varName_){
-  LogThrowIf(varName_.empty(), "no var name provided.");
-  GenericToolbox::addIfNotInVector(varName_, this->varsRequestedForStorage);
-  this->addVarRequestedForIndexing(varName_);
 }
 
 //  A Lesser GNU Public License
