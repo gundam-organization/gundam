@@ -44,14 +44,13 @@ int main(int argc, char** argv){
     clParser.addDummyOption("Main options:");
 
     // I need a config file where the list of parameters to marginalise over are specified (look at the XSec config file to get inspired)
-    // TODO: understand the format/syntax of this file. This should be a required file.
     clParser.addOption("configFile", {"-c"}, "Specify the parameters to marginalise over");
 
     // (I think) I need the output file from a fitter to use as input here
     clParser.addOption("fitterOutputFile", {"-f"}, "Specify the fitter output file");
 
     // Think carefully what do you need to put in the output file
-    // 1. Marginalised covariance matrix
+    // 1. Marginalised covariance matrix: gotten from teh outoutFitter file
     // what else?
     clParser.addOption("outputFile", {"-o", "--out-file"}, "Specify the Marginaliser output file");
 
@@ -107,27 +106,31 @@ int main(int argc, char** argv){
     using namespace GundamUtils;
     ObjectReader::throwIfNotFound = true;
 
+
+
     nlohmann::json fitterConfig;
     ObjectReader::readObject<TNamed>(fitterFile.get(), {{"gundam/config_TNamed"}, {"gundamFitter/unfoldedConfig_TNamed"}}, [&](TNamed* config_){
         fitterConfig = GenericToolbox::Json::readConfigJsonStr( config_->GetTitle() );
     });
     ConfigUtils::ConfigHandler cHandler{ fitterConfig };
 
-    // Disabling defined samples:
-    LogInfo << "Removing defined samples..." << std::endl;
-    ConfigUtils::applyOverrides(
-            cHandler.getConfig(),
-            GenericToolbox::Json::readConfigJsonStr(R"({"fitterEngineConfig":{"propagatorConfig":{"fitSampleSetConfig":{"fitSampleList":[]}}}})")
-    );
+//    // Disabling defined samples:
+//    LogInfo << "Removing defined samples..." << std::endl;
+//    ConfigUtils::applyOverrides(
+//            cHandler.getConfig(),
+//            GenericToolbox::Json::readConfigJsonStr(R"({"fitterEngineConfig":{"propagatorConfig":{"fitSampleSetConfig":{"fitSampleList":[]}}}})")
+//    );
 
-    // Disabling defined plots:
-    LogInfo << "Removing defined plots..." << std::endl;
-    ConfigUtils::applyOverrides(
-            cHandler.getConfig(),
-            GenericToolbox::Json::readConfigJsonStr(R"({"fitterEngineConfig":{"propagatorConfig":{"plotGeneratorConfig":{}}}})")
-    );
+//    // Disabling defined plots:
+//    LogInfo << "Removing defined plots..." << std::endl;
+//    ConfigUtils::applyOverrides(
+//            cHandler.getConfig(),
+//            GenericToolbox::Json::readConfigJsonStr(R"({"fitterEngineConfig":{"propagatorConfig":{"plotGeneratorConfig":{}}}})")
+//    );
 
-    // Defining signal samples
+
+
+    // Reading marginaliser config file
     nlohmann::json margConfig{ ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ) };
     cHandler.override( margConfig );
     LogInfo << "Override done." << std::endl;
@@ -144,7 +147,7 @@ int main(int argc, char** argv){
     // Create a propagator object
     Propagator propagator;
 
-    // Read the whole fitter config with the override parameters
+//    // Read the whole fitter config with the override parameters
     propagator.readConfig( configPropagator );
 
     // We are only interested in our MC. Data has already been used to get the post-fit error/values
@@ -153,13 +156,31 @@ int main(int argc, char** argv){
     // Disabling eigen decomposed parameters
     propagator.setEnableEigenToOrigInPropagate( false );
 
+    // Load everything
+    propagator.initialize();
+
+    propagator.getParameterSetsList();
+    for( auto& parSet : propagator.getParameterSetsList() ){
+        if( not parSet.isEnabled() ){ continue; }
+        LogInfo <<parSet.getName()<<std::endl;
+        for( auto& par : parSet.getParameterList() ){
+            if( not par.isEnabled() ){ continue; }
+            LogInfo<<par.getTitle()<<" -> "<<par.getParameterValue()<<std::endl;
+            par.setPriorValue( par.getParameterValue() );
+        }
+    }
+
+
+
     // Load post-fit parameters as "prior" so we can reset the weight to this point when throwing toys
     ObjectReader::readObject<TNamed>( fitterFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
         propagator.injectParameterValues( GenericToolbox::Json::readConfigJsonStr( parState_->GetTitle() ) );
         for( auto& parSet : propagator.getParameterSetsList() ){
             if( not parSet.isEnabled() ){ continue; }
+            LogInfo<< parSet.getName()<<std::endl;
             for( auto& par : parSet.getParameterList() ){
                 if( not par.isEnabled() ){ continue; }
+                LogInfo<<"  "<<par.getTitle()<<" -> "<<par.getParameterValue()<<std::endl;
                 par.setPriorValue( par.getParameterValue() );
             }
         }
@@ -176,34 +197,31 @@ int main(int argc, char** argv){
                     }
                 }
             });
+//    // Sample binning using parameterSetName
+//    for( auto& sample : propagator.getFitSampleSet().getFitSampleList() ){
+//        auto associatedParSet = GenericToolbox::Json::fetchValue<std::string>(sample.getConfig(), "parameterSetName");
+//
+//        // Looking for parSet
+//        auto foundDialCollection = std::find_if(
+//                propagator.getDialCollections().begin(), propagator.getDialCollections().end(),
+//                [&](const DialCollection& dialCollection_){
+//                    auto* parSetPtr{dialCollection_.getSupervisedParameterSet()};
+//                    if( parSetPtr == nullptr ){ return false; }
+//                    return ( parSetPtr->getName() == associatedParSet );
+//                });
+//        LogThrowIf(
+//                foundDialCollection == propagator.getDialCollections().end(),
+//                "Could not find " << associatedParSet << " among fit dial collections: "
+//                                  << GenericToolbox::iterableToString(propagator.getDialCollections(), [](const DialCollection& dialCollection_){
+//                                                                          return dialCollection_.getTitle();
+//                                                                      }
+//                                  ));
+//
+//        LogThrowIf(foundDialCollection->getDialBinSet().isEmpty(), "Could not find binning");
+//        sample.setBinningFilePath( foundDialCollection->getDialBinSet().getFilePath() );
+//    }
 
 
-    // Sample binning using parameterSetName
-    for( auto& sample : propagator.getFitSampleSet().getFitSampleList() ){
-        auto associatedParSet = GenericToolbox::Json::fetchValue<std::string>(sample.getConfig(), "parameterSetName");
-
-        // Looking for parSet
-        auto foundDialCollection = std::find_if(
-                propagator.getDialCollections().begin(), propagator.getDialCollections().end(),
-                [&](const DialCollection& dialCollection_){
-                    auto* parSetPtr{dialCollection_.getSupervisedParameterSet()};
-                    if( parSetPtr == nullptr ){ return false; }
-                    return ( parSetPtr->getName() == associatedParSet );
-                });
-        LogThrowIf(
-                foundDialCollection == propagator.getDialCollections().end(),
-                "Could not find " << associatedParSet << " among fit dial collections: "
-                                  << GenericToolbox::iterableToString(propagator.getDialCollections(), [](const DialCollection& dialCollection_){
-                                                                          return dialCollection_.getTitle();
-                                                                      }
-                                  ));
-
-        LogThrowIf(foundDialCollection->getDialBinSet().isEmpty(), "Could not find binning");
-        sample.setBinningFilePath( foundDialCollection->getDialBinSet().getFilePath() );
-    }
-
-    // Load everything
-    propagator.initialize();
 
     // Creating output file
     std::string outFilePath{};
@@ -223,10 +241,32 @@ int main(int argc, char** argv){
         outFilePath = GenericToolbox::joinPath(outFolder, outFilePath);
     }
 
+    app.setCmdLinePtr( &clParser );
+    app.setConfigString( ConfigUtils::ConfigHandler{margConfig}.toString() );
+    app.openOutputFile( outFilePath );
+    app.writeAppInfo();
+
     auto* marginalisationDir{ GenericToolbox::mkdirTFile(app.getOutfilePtr(), "marginalisation") };
     LogInfo << "Creating throws tree" << std::endl;
     auto* margThrowTree = new TTree("margThrow", "margThrow");
     margThrowTree->SetDirectory( GenericToolbox::mkdirTFile(marginalisationDir, "throws") ); // temp saves will be done here
+    // make a TTree with the following branches, to be filled with the throws
+    // 1. marginalised parameters drew: vector<double>
+    // 2. non-marginalised parameters drew: vector<double>
+    // 3. LLH value: double
+    // 4. "g" value: the chi square value as extracted from the covariance matrix: double
+    // 5. value of the priors for the marginalised parameters: vector<double>
+
+    std::vector<double> eta;
+    std::vector<double> theta;
+    std::vector<double> prior;
+    double LLH, gLLH;
+    margThrowTree->Branch("marginalisedParameters", &eta);
+    margThrowTree->Branch("nonMarginalisedParameters", &theta);
+    margThrowTree->Branch("prior", &prior);
+    margThrowTree->Branch("LLH", &LLH);
+    margThrowTree->Branch("gLLH", &gLLH);
+
 
 
     int nToys{ clParser.getOptionVal<int>("nToys") };
@@ -236,18 +276,39 @@ int main(int argc, char** argv){
     // THROWS LOOP
     /////////////////////////////////////
     std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating " << nToys << " toys...";
+
+
     for( int iToy = 0 ; iToy < nToys ; iToy++ ){
 
         // loading...
         GenericToolbox::displayProgressBar( iToy+1, nToys, ss.str() );
 
         // Do the throwing:
-        // TODO: ask Adrien: when I do the throwing at this stage, the parameters to "be thrown" are already set? should I already set before the parameters to marginalise over?
         propagator.throwParametersFromGlobalCovariance();
-        //propagator.propagateParametersOnSamples();
+        //propagator.propagateParametersOnSamples(); // Adrien says this is not necessary
         propagator.updateLlhCache();
-        double LLH_value = propagator.getLlhBuffer();
-        // get the prior covariance matrix for a subset of parameters (to marginalise over them)
+        LLH = propagator.getLlhBuffer();
+
+
+
+        for( auto& parSet : propagator.getParameterSetsList() ){
+            if( not parSet.isEnabled() ){ continue; }
+//            LogInfo<< parSet.getName()<<std::endl;
+            for( auto& par : parSet.getParameterList() ){
+                if( not par.isEnabled() ){ continue; }
+//                LogInfo<<"  "<<par.getTitle()<<" -> "<<par.getParameterValue()<<std::endl;
+                eta.push_back(par.getParameterValue());
+                theta.push_back(par.getParameterValue());
+                prior.push_back( ( par.getPriorValue() - par.getParameterValue() )/ par.());
+            }
+        }
+
+        // print the parameters
+
+//        for(int iPar=0;iPar<propagator.getParameterSetPtr().size();iPar++){
+//            propagator.getFitParameterSetPtr("all")->getParameterList().at(0).getParameterValue();
+//
+//        }
 
 
         // for now set it to false. Still need to understand/implement this
@@ -269,6 +330,8 @@ int main(int argc, char** argv){
         // Write the branches
         margThrowTree->Fill();
     }
+
+    margThrowTree->Write();
 
 
     GundamGlobals::getParallelWorker().reset();
