@@ -149,18 +149,6 @@ int main(int argc, char** argv){
     }
   });
 
-  // Load the post-fit covariance matrix
-  ObjectReader::readObject<TH2D>(
-      fitterFile.get(), "FitterEngine/postFit/Hesse/hessian/postfitCovarianceOriginal_TH2D",
-      [&](TH2D* hCovPostFit_){
-    propagator.setGlobalCovarianceMatrix(std::make_shared<TMatrixD>(hCovPostFit_->GetNbinsX(), hCovPostFit_->GetNbinsX()));
-    for( int iBin = 0 ; iBin < hCovPostFit_->GetNbinsX() ; iBin++ ){
-      for( int jBin = 0 ; jBin < hCovPostFit_->GetNbinsX() ; jBin++ ){
-        (*propagator.getGlobalCovarianceMatrix())[iBin][jBin] = hCovPostFit_->GetBinContent(1 + iBin, 1 + jBin);
-      }
-    }
-  });
-
   // Sample binning using parameterSetName
   for( auto& sample : propagator.getFitSampleSet().getFitSampleList() ){
     auto associatedParSet = GenericToolbox::Json::fetchValue<std::string>(sample.getConfig(), "parameterSetName");
@@ -187,6 +175,18 @@ int main(int argc, char** argv){
 
   // Load everything
   propagator.initialize();
+
+  // Load the post-fit covariance matrix
+  ObjectReader::readObject<TH2D>(
+      fitterFile.get(), "FitterEngine/postFit/Hesse/hessian/postfitCovarianceOriginal_TH2D",
+      [&](TH2D* hCovPostFit_){
+        propagator.setGlobalCovarianceMatrix(std::make_shared<TMatrixD>(hCovPostFit_->GetNbinsX(), hCovPostFit_->GetNbinsX()));
+        for( int iBin = 0 ; iBin < hCovPostFit_->GetNbinsX() ; iBin++ ){
+          for( int jBin = 0 ; jBin < hCovPostFit_->GetNbinsX() ; jBin++ ){
+            (*propagator.getGlobalCovarianceMatrix())[iBin][jBin] = hCovPostFit_->GetBinContent(1 + iBin, 1 + jBin);
+          }
+        }
+      });
 
   // Creating output file
   std::string outFilePath{};
@@ -378,6 +378,7 @@ int main(int argc, char** argv){
         LogInfo << "parSetNormName = " << parSetNormaliserName;
       }
       else{
+        LogInfo << std::endl;
         LogThrow("Unrecognized config.");
       }
 

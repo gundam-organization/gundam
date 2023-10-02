@@ -27,34 +27,34 @@
 class FitterEngine : public JsonBaseClass {
 
 public:
-  explicit FitterEngine(TDirectory *saveDir_);
+  explicit FitterEngine(TDirectory *saveDir_) : _saveDir_(saveDir_) {};
 
   // Setters
-  void setSaveDir(TDirectory *saveDir);
-  void setIsDryRun(bool isDryRun_);
-  void setEnablePca(bool enablePca_);
-  void setEnablePreFitScan(bool enablePreFitScan);
-  void setEnablePostFitScan(bool enablePostFitScan);
-  void setEnablePreFitToPostFitLineScan(bool enablePreFitToPostFitScan);
-  void setGenerateSamplePlots(bool generateSamplePlots);
-  void setGenerateOneSigmaPlots(bool generateOneSigmaPlots);
-  void setDoAllParamVariations(bool doAllParamVariations_);
-  void setAllParamVariationsSigmas(const std::vector<double> &allParamVariationsSigmas);
+  void setSaveDir(TDirectory *saveDir){ _saveDir_ = saveDir; }
+  void setIsDryRun(bool isDryRun_){ _isDryRun_ = isDryRun_; }
+  void setEnablePca(bool enablePca_){ _enablePca_ = enablePca_; }
+  void setEnablePreFitScan(bool enablePreFitScan){ _enablePreFitScan_ = enablePreFitScan; }
+  void setEnablePostFitScan(bool enablePostFitScan){ _enablePostFitScan_ = enablePostFitScan; }
+  void setEnablePreFitToPostFitLineScan(bool enablePreFitToPostFitScan){ _enablePreFitToPostFitLineScan_ = enablePreFitToPostFitScan; }
+  void setGenerateSamplePlots(bool generateSamplePlots){ _generateSamplePlots_ = generateSamplePlots; }
+  void setGenerateOneSigmaPlots(bool generateOneSigmaPlots){ _generateOneSigmaPlots_ = generateOneSigmaPlots; }
+  void setDoAllParamVariations(bool doAllParamVariations_){ _doAllParamVariations_ = doAllParamVariations_; }
+  void setAllParamVariationsSigmas(const std::vector<double> &allParamVariationsSigmas){ _allParamVariationsSigmas_ = allParamVariationsSigmas; }
   void setThrowMcBeforeFit(bool throwMcBeforeFit_){ _throwMcBeforeFit_ = throwMcBeforeFit_; }
   void setThrowGain(double throwGain_){ _throwGain_ = throwGain_; }
 
   // Getters (const)
-  const nlohmann::json &getPreFitParState() const;
-  const nlohmann::json &getPostFitParState() const;
-  [[nodiscard]] const Propagator& getPropagator() const;
-  [[nodiscard]] const MinimizerBase& getMinimizer() const;
-  [[nodiscard]] const LikelihoodInterface& getLikelihood() const;
+  const nlohmann::json &getPreFitParState() const{ return _preFitParState_; }
+  const nlohmann::json &getPostFitParState() const{ return _postFitParState_; }
+  [[nodiscard]] const Propagator& getPropagator() const{ return _propagator_; }
+  [[nodiscard]] const MinimizerBase& getMinimizer() const{ return *_minimizer_; }
+  [[nodiscard]] const LikelihoodInterface& getLikelihood() const{ return _likelihood_; }
 
   // Getters (non-const)
-  Propagator& getPropagator();
-  MinimizerBase& getMinimizer();
-  LikelihoodInterface& getLikelihood();
-  TDirectory* getSaveDir();
+  Propagator& getPropagator(){ return _propagator_; }
+  MinimizerBase& getMinimizer(){ return *_minimizer_; }
+  LikelihoodInterface& getLikelihood(){ return _likelihood_; }
+  TDirectory* getSaveDir(){ return _saveDir_; }
 
   // Core
   void fit();

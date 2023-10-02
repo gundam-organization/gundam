@@ -20,33 +20,32 @@
 
 class DatasetLoader : public JsonBaseClass {
 
-public:
-  DatasetLoader(const nlohmann::json& config_, int datasetIndex_);
-
-  void setDataSetIndex(int dataSetIndex);
-
-  void setSelectedDataEntry(const std::string &selectedDataEntry);
-
-  [[nodiscard]] bool isEnabled() const;
-  [[nodiscard]] bool isShowSelectedEventCount() const;
-  [[nodiscard]] bool isDevSingleThreadEventLoaderAndIndexer() const;
-  [[nodiscard]] bool isDevSingleThreadEventSelection() const;
-  [[nodiscard]] bool isSortLoadedEvents() const;
-  [[nodiscard]] int getDataSetIndex() const;
-  [[nodiscard]] const std::string &getName() const;
-  [[nodiscard]] const std::string &getSelectedDataEntry() const;
-  [[nodiscard]] const std::string &getToyDataEntry() const;
-
-  DataDispenser &getMcDispenser();
-  DataDispenser &getSelectedDataDispenser();
-  DataDispenser &getToyDataDispenser();
-  std::map<std::string, DataDispenser> &getDataDispenserDict();
-
-  void updateDispenserOwnership();
-
 protected:
   void readConfigImpl() override;
   void initializeImpl() override;
+
+public:
+  explicit DatasetLoader(const nlohmann::json& config_, int datasetIndex_): _dataSetIndex_(datasetIndex_) { this->readConfig(config_); }
+
+  void setDataSetIndex(int dataSetIndex){ _dataSetIndex_ = dataSetIndex; }
+  void setSelectedDataEntry(const std::string &selectedDataEntry){ _selectedDataEntry_ = selectedDataEntry; }
+
+  [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
+  [[nodiscard]] bool isSortLoadedEvents() const{ return _sortLoadedEvents_; }
+  [[nodiscard]] bool isShowSelectedEventCount() const{ return _showSelectedEventCount_; }
+  [[nodiscard]] bool isDevSingleThreadEventSelection() const{ return _devSingleThreadEventSelection_; }
+  [[nodiscard]] bool isDevSingleThreadEventLoaderAndIndexer() const{ return _devSingleThreadEventLoaderAndIndexer_; }
+  [[nodiscard]] int getDataSetIndex() const{ return _dataSetIndex_; }
+  [[nodiscard]] const std::string &getName() const{ return _name_; }
+  [[nodiscard]] const std::string &getToyDataEntry() const{ return _selectedToyEntry_; }
+  [[nodiscard]] const std::string &getSelectedDataEntry() const{ return _selectedDataEntry_; }
+
+  DataDispenser &getMcDispenser(){ return _mcDispenser_; }
+  DataDispenser &getToyDataDispenser(){ return _dataDispenserDict_.at(_selectedToyEntry_); }
+  DataDispenser &getSelectedDataDispenser(){ return _dataDispenserDict_.at(_selectedDataEntry_); }
+  std::map<std::string, DataDispenser> &getDataDispenserDict(){ return _dataDispenserDict_; }
+
+  void updateDispenserOwnership();
 
 private:
   // config

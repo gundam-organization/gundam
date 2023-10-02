@@ -13,9 +13,6 @@
 
 LoggerInit([]{ Logger::setUserHeaderStr("[SampleElement]"); });
 
-SampleElement::SampleElement() = default;
-SampleElement::~SampleElement() = default;
-
 void SampleElement::reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const PhysicsEvent &eventBuffer_) {
   LogScopeIndent;
   LogThrowIf(isLocked, "Can't " << __METHOD_NAME__ << " while locked");

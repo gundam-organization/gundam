@@ -72,58 +72,6 @@ void DatasetLoader::initializeImpl() {
   }
 }
 
-DatasetLoader::DatasetLoader(const nlohmann::json& config_, int datasetIndex_): _dataSetIndex_(datasetIndex_) {
-  this->readConfig(config_);
-}
-
-void DatasetLoader::setDataSetIndex(int dataSetIndex) {
-  _dataSetIndex_ = dataSetIndex;
-}
-void DatasetLoader::setSelectedDataEntry(const std::string &selectedDataEntry) {
-  _selectedDataEntry_ = selectedDataEntry;
-}
-
-bool DatasetLoader::isEnabled() const {
-  return _isEnabled_;
-}
-bool DatasetLoader::isShowSelectedEventCount() const {
-  return _showSelectedEventCount_;
-}
-int DatasetLoader::getDataSetIndex() const {
-  return _dataSetIndex_;
-}
-const std::string &DatasetLoader::getName() const {
-  return _name_;
-}
-const std::string &DatasetLoader::getSelectedDataEntry() const {
-  return _selectedDataEntry_;
-}
-const std::string &DatasetLoader::getToyDataEntry() const {
-  return _selectedToyEntry_;
-}
-bool DatasetLoader::isDevSingleThreadEventLoaderAndIndexer() const {
-  return _devSingleThreadEventLoaderAndIndexer_;
-}
-bool DatasetLoader::isDevSingleThreadEventSelection() const {
-  return _devSingleThreadEventSelection_;
-}
-bool DatasetLoader::isSortLoadedEvents() const {
-  return _sortLoadedEvents_;
-}
-
-DataDispenser &DatasetLoader::getMcDispenser() {
-  return _mcDispenser_;
-}
-DataDispenser &DatasetLoader::getSelectedDataDispenser(){
-  return _dataDispenserDict_.at(_selectedDataEntry_);
-}
-DataDispenser &DatasetLoader::getToyDataDispenser(){
-  return _dataDispenserDict_.at(_selectedToyEntry_);
-}
-std::map<std::string, DataDispenser> &DatasetLoader::getDataDispenserDict() {
-  return _dataDispenserDict_;
-}
-
 void DatasetLoader::updateDispenserOwnership(){
   _mcDispenser_.setOwner(this);
   for( auto& dispenser : _dataDispenserDict_ ){

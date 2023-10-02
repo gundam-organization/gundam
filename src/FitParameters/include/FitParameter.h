@@ -27,73 +27,71 @@ class FitParameterSet;
 
 class FitParameter : public JsonBaseClass {
 
+protected:
+  // called through public JsonBaseClass::readConfig() and JsonBaseClass::initialize()
+  void readConfigImpl() override;
+  void initializeImpl() override;
+
 public:
-  explicit FitParameter(const FitParameterSet* owner_);
+  FitParameter() = delete; // should always provide the owner
+  explicit FitParameter(const FitParameterSet* owner_): _owner_(owner_) {}
 
-  void setIsEnabled(bool isEnabled);
-  void setIsFixed(bool isFixed);
-  void setIsEigen(bool isEigen);
-  void setIsFree(bool isFree);
-  void setName(const std::string &name);
-  void setParameterIndex(int parameterIndex);
-  void setParameterValue(double parameterValue);
-  void setPriorValue(double priorValue);
-  void setThrowValue(double throwValue);
-  void setStdDevValue(double stdDevValue);
-  void setDialSetConfig(const nlohmann::json &jsonConfig_);
-  void setParameterDefinitionConfig(const nlohmann::json &config_);
-  void setMinValue(double minValue);
-  void setMaxValue(double maxValue);
-  void setStepSize(double stepSize);
-  void setOwner(const FitParameterSet *owner_);
-  void setPriorType(PriorType::PriorType priorType);
-
+  void setIsEnabled(bool isEnabled){ _isEnabled_ = isEnabled; }
+  void setIsFixed(bool isFixed){ _isFixed_ = isFixed; }
+  void setIsEigen(bool isEigen){ _isEigen_ = isEigen; }
+  void setIsFree(bool isFree){ _isFree_ = isFree; }
+  void setParameterIndex(int parameterIndex){ _parameterIndex_ = parameterIndex; }
+  void setStepSize(double stepSize){ _stepSize_ = stepSize; }
+  void setMinValue(double minValue){ _minValue_ = minValue; }
+  void setMaxValue(double maxValue){ _maxValue_ = maxValue; }
   // Record the mirroring being used by any dials.
   void setMinMirror(double minMirror);
   void setMaxMirror(double maxMirror);
-
   // Record the physical bounds for the parameter.  This is the range where
   // the parameter has a physically meaningful value.
-  void setMinPhysical(double minPhysical);
-  void setMaxPhysical(double maxPhysical);
-
-  void setValueAtPrior();
-  void setCurrentValueAsPrior();
-
+  void setMinPhysical(double minPhysical){ _minPhysical_ = minPhysical; }
+  void setMaxPhysical(double maxPhysical){ _maxPhysical_ = maxPhysical; }
+  void setPriorValue(double priorValue){ _priorValue_ = priorValue; }
+  void setThrowValue(double throwValue){ _throwValue_ = throwValue; }
+  void setStdDevValue(double stdDevValue){ _stdDevValue_ = stdDevValue; }
+  void setParameterValue(double parameterValue);
+  void setName(const std::string &name){ _name_ = name; }
+  void setDialSetConfig(const nlohmann::json &jsonConfig_);
+  void setParameterDefinitionConfig(const nlohmann::json &config_);
+  void setOwner(const FitParameterSet *owner_){ _owner_ = owner_; }
+  void setPriorType(PriorType::PriorType priorType){ _priorType_ = priorType; }
 
   // Getters
-  [[nodiscard]] bool isEnabled() const;
-  [[nodiscard]] bool isFixed() const;
-  [[nodiscard]] bool isEigen() const;
-  [[nodiscard]] bool isFree() const;
+  [[nodiscard]] bool isFree() const{ return _isFree_; }
+  [[nodiscard]] bool isFixed() const{ return _isFixed_; }
+  [[nodiscard]] bool isEigen() const{ return _isEigen_; }
+  [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
   [[nodiscard]] bool gotUpdated() const { return _gotUpdated_; }
-  [[nodiscard]] int getParameterIndex() const;
-  [[nodiscard]] double getMinValue() const;
-  [[nodiscard]] double getMaxValue() const;
-  [[nodiscard]] double getMinMirror() const;
-  [[nodiscard]] double getMaxMirror() const;
-  [[nodiscard]] double getMinPhysical() const;
-  [[nodiscard]] double getMaxPhysical() const;
-  [[nodiscard]] double getStepSize() const;
-  [[nodiscard]] double getPriorValue() const;
-  [[nodiscard]] double getThrowValue() const;
-  [[nodiscard]] double getStdDevValue() const;
-  [[nodiscard]] double getParameterValue() const;
-  [[nodiscard]] const std::string &getName() const;
-  [[nodiscard]] const nlohmann::json &getDialDefinitionsList() const;
-  [[nodiscard]] const FitParameterSet *getOwner() const;
-  [[nodiscard]] PriorType::PriorType getPriorType() const;
+  [[nodiscard]] int getParameterIndex() const{ return _parameterIndex_; }
+  [[nodiscard]] double getStepSize() const{ return _stepSize_; }
+  [[nodiscard]] double getMinValue() const{ return _minValue_; }
+  [[nodiscard]] double getMaxValue() const{ return _maxValue_; }
+  [[nodiscard]] double getMinMirror() const{ return _minMirror_; }
+  [[nodiscard]] double getMaxMirror() const{ return _maxMirror_; }
+  [[nodiscard]] double getPriorValue() const{ return _priorValue_; }
+  [[nodiscard]] double getThrowValue() const{ return _throwValue_; }
+  [[nodiscard]] double getMinPhysical() const{ return _minPhysical_; }
+  [[nodiscard]] double getMaxPhysical() const{ return _maxPhysical_; }
+  [[nodiscard]] double getStdDevValue() const{ return _stdDevValue_; }
+  [[nodiscard]] double getParameterValue() const{ return _parameterValue_; }
+  [[nodiscard]] const std::string &getName() const{ return _name_; }
+  [[nodiscard]] const nlohmann::json &getDialDefinitionsList() const{ return _dialDefinitionsList_; }
+  [[nodiscard]] const FitParameterSet *getOwner() const{ return _owner_; }
+  [[nodiscard]] PriorType::PriorType getPriorType() const{ return _priorType_; }
 
   // Core
+  void setValueAtPrior();
+  void setCurrentValueAsPrior();
   [[nodiscard]] bool isValueWithinBounds() const;
   [[nodiscard]] double getDistanceFromNominal() const; // in unit of sigmas
   [[nodiscard]] std::string getSummary(bool shallow_=false) const;
   [[nodiscard]] std::string getTitle() const;
   [[nodiscard]] std::string getFullTitle() const;
-
-protected:
-  void readConfigImpl() override;
-  void initializeImpl() override;
 
 private:
   // Parameters

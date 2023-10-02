@@ -100,22 +100,6 @@ void FitSampleSet::initializeImpl() {
   GundamGlobals::getParallelWorker().setPostParallelJob("FitSampleSet::updateSampleHistograms", rescaleMcHistogramsFct);
 }
 
-const std::vector<FitSample> &FitSampleSet::getFitSampleList() const {
-  return _fitSampleList_;
-}
-std::vector<FitSample> &FitSampleSet::getFitSampleList() {
-  return _fitSampleList_;
-}
-const nlohmann::json &FitSampleSet::getConfig() const {
-  return _config_;
-}
-const std::shared_ptr<JointProbability::JointProbability> &FitSampleSet::getJointProbabilityFct() const{
-  return _jointProbabilityPtr_;
-}
-
-bool FitSampleSet::empty() const {
-  return _fitSampleList_.empty();
-}
 double FitSampleSet::evalLikelihood(){
   double llh = 0.;
   for( auto& sample : _fitSampleList_ ){

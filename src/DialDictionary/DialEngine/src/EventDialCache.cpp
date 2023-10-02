@@ -12,14 +12,6 @@ LoggerInit([]{
 
 double EventDialCache::globalEventReweightCap{std::nan("unset")};
 
-
-std::vector<EventDialCache::CacheElem_t> &EventDialCache::getCache() {
-  return _cache_;
-}
-const std::vector<EventDialCache::CacheElem_t> &EventDialCache::getCache() const {
-  return _cache_;
-}
-
 void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<DialCollection>& dialCollectionList_){
   LogInfo << "Building event dial cache..." << std::endl;
 
@@ -125,13 +117,16 @@ void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<D
     }
   }
 }
-
 void EventDialCache::allocateCacheEntries(size_t nEvent_, size_t nDialsMaxPerEvent_) {
     _indexedCache_.resize(
         _indexedCache_.size() + nEvent_,
         {{std::size_t(-1),std::size_t(-1)},
          std::vector<DialIndexEntry_t>(nDialsMaxPerEvent_,
                                        {std::size_t(-1),std::size_t(-1)})} );
+}
+void EventDialCache::shrinkIndexedCache(){
+  _indexedCache_.resize(_fillIndex_+1);
+  _indexedCache_.shrink_to_fit();
 }
 
 EventDialCache::IndexedEntry_t* EventDialCache::fetchNextCacheEntry(){
@@ -151,10 +146,6 @@ EventDialCache::IndexedEntry_t* EventDialCache::fetchNextCacheEntry(){
   return &_indexedCache_[_fillIndex_++];
 }
 
-void EventDialCache::shrinkIndexedCache(){
-  _indexedCache_.resize(_fillIndex_+1);
-  _indexedCache_.shrink_to_fit();
-}
 
 #ifndef USE_BREAKDOWN_CACHE
 void EventDialCache::reweightEntry(EventDialCache::CacheElem_t& entry_){
@@ -165,7 +156,9 @@ void EventDialCache::reweightEntry(EventDialCache::CacheElem_t& entry_){
 }
 #else
 void EventDialCache::reweightEntry(EventDialCache::CacheElem_t& entry_){
-  entry_.event->resetEventWeight();
+  double tempReweight{1};
+
+  // calculate the dial responses
   std::for_each(entry_.dials.begin(), entry_.dials.end(), [&](DialsElem_t& dial_){
     if( dial_.interface->getInputBufferRef()->isMasked() ){ return ; }
     if(std::isnan(dial_.response) or dial_.interface->getInputBufferRef()->isDialUpdateRequested() ){
@@ -180,14 +173,17 @@ void EventDialCache::reweightEntry(EventDialCache::CacheElem_t& entry_){
     }
 
     LogThrowIf(std::isnan(dial_.response), "Invalid dial response for " << dial_.interface->getSummary());
-    entry_.event->getEventWeightRef() *= dial_.response;
-
-    // Applying event weight cap
-    if( not std::isnan(EventDialCache::globalEventReweightCap) ){
-      if( entry_.event->getEventWeight() > EventDialCache::globalEventReweightCap){
-        entry_.event->setEventWeight( EventDialCache::globalEventReweightCap );
-      }
-    }
+    tempReweight *= dial_.response;
   });
+
+  // Applying event weight cap
+  if( not std::isnan(EventDialCache::globalEventReweightCap) ){
+    if( tempReweight > EventDialCache::globalEventReweightCap ){
+      tempReweight = EventDialCache::globalEventReweightCap;
+    }
+  }
+
+  entry_.event->resetEventWeight(); // reset to the base weight
+  entry_.event->getEventWeightRef() *= tempReweight; // apply the reweight factor
 }
 #endif

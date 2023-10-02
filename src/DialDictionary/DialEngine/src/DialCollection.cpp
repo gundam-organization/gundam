@@ -17,11 +17,6 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[DialCollection]");
 });
 
-DialCollection::DialCollection(std::vector<FitParameterSet> *targetParameterSetListPtr)
-  : _parameterSetListPtr_(targetParameterSetListPtr) {
-
-}
-
 
 void DialCollection::readConfigImpl() {
 
@@ -48,24 +43,7 @@ void DialCollection::initializeImpl() {
   this->setupDialInterfaceReferences();
 }
 
-// setters
-void DialCollection::setIndex(int index) {
-  _index_ = index;
-}
-void DialCollection::setSupervisedParameterIndex(int supervisedParameterIndex) {
-  _supervisedParameterIndex_ = supervisedParameterIndex;
-}
-void DialCollection::setSupervisedParameterSetIndex(int supervisedParameterSetIndex) {
-  _supervisedParameterSetIndex_ = supervisedParameterSetIndex;
-}
-
-// const getters
-bool DialCollection::isEnabled() const {
-  return _isEnabled_;
-}
-bool DialCollection::isBinned() const {
-  return _isBinned_;
-}
+// non-trivial getters
 bool DialCollection::useCachedDials() const{
 #ifdef USE_BREAKDOWN_CACHE
   return false;
@@ -85,40 +63,6 @@ bool DialCollection::useCachedDials() const{
   // then ok:
   return true;
 }
-bool DialCollection::isAllowDialExtrapolation() const {
-  return _allowDialExtrapolation_;
-}
-const std::string &DialCollection::getGlobalDialLeafName() const {
-  return _globalDialLeafName_;
-}
-const std::string &DialCollection::getGlobalDialType() const {
-  return _globalDialType_;
-}
-const std::string &DialCollection::getGlobalDialSubType() const {
-  return _globalDialSubType_;
-}
-const DataBinSet &DialCollection::getDialBinSet() const {
-  return _dialBinSet_;
-}
-const std::shared_ptr<TFormula> &DialCollection::getApplyConditionFormula() const {
-  return _applyConditionFormula_;
-}
-const std::vector<std::string> &DialCollection::getDataSetNameList() const {
-  return _dataSetNameList_;
-}
-
-// non-const getters
-DataBinSet &DialCollection::getDialBinSet(){
-  return _dialBinSet_;
-}
-std::vector<DialCollection::DialBaseObject> &DialCollection::getDialBaseList() {
-  return _dialBaseList_;
-}
-std::vector<DialInterface> &DialCollection::getDialInterfaceList() {
-  return _dialInterfaceList_;
-}
-
-// non-trivial getters
 bool DialCollection::isDatasetValid(const std::string& datasetName_) const{
   if( GenericToolbox::doesElementIsInVector(datasetName_, _dataSetNameList_) ){ return true; }
 

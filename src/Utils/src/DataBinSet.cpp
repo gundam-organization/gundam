@@ -47,7 +47,7 @@ void DataBinSet::readBinningDefinition(const std::string &filePath_) {
 
   for( const auto& line : lines ){
 
-    if( line.empty() ) continue;
+    if( line.empty() ){ continue; }
 
     int offSet = 0;
     char firstChar = line[offSet];
@@ -74,10 +74,10 @@ void DataBinSet::readBinningDefinition(const std::string &filePath_) {
       for( size_t iElement = 1 ; iElement < lineElements.size() ; iElement++ ){
 
         if( not expectedVariableList.empty() and lineElements.at(iElement) == expectedVariableList.back() ){
-          if( expectedVariableIsRangeList.back() == true ){
-            LogError << "Same variable appear more than 2 times: " << GenericToolbox::parseVectorAsString(lineElements) << std::endl;
-            throw std::runtime_error("Invalid bin definition line.");
-          }
+          LogThrowIf(
+              expectedVariableIsRangeList.back(),
+              "Same variable appear more than 2 times: " << GenericToolbox::parseVectorAsString(lineElements)
+          );
           expectedVariableIsRangeList.back() = true;
           nbExpectedValues += 1;
         }

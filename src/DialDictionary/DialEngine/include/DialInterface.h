@@ -24,10 +24,10 @@ class DialInterface {
 public:
   DialInterface() = default;
 
-  void setDialBaseRef(DialBase *dialBasePtr);
-  void setInputBufferRef(DialInputBuffer *inputBufferRef);
-  void setResponseSupervisorRef(const DialResponseSupervisor *responseSupervisorRef);
-  void setDialBinRef(const DataBin *dialBinRef);
+  void setDialBaseRef(DialBase *dialBasePtr){ _dialBaseRef_ = dialBasePtr; }
+  void setInputBufferRef(DialInputBuffer *inputBufferRef){ _inputBufferRef_ = inputBufferRef; }
+  void setResponseSupervisorRef(const DialResponseSupervisor *responseSupervisorRef){ _responseSupervisorRef_ = responseSupervisorRef; }
+  void setDialBinRef(const DataBin *dialBinRef){ _dialBinRef_ = dialBinRef; }
 
   /// Return the input buffer containing the connection to the FitParameter(s)
   /// used by this dial.  The number of FitParameters contained in the input

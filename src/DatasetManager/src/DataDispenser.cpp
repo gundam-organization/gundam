@@ -33,7 +33,6 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[DataDispenser]");
 });
 
-DataDispenser::DataDispenser(DatasetLoader* owner_): _owner_(owner_) {}
 
 void DataDispenser::readConfigImpl(){
   LogThrowIf( _config_.empty(), "Config is not set." );
@@ -66,13 +65,6 @@ void DataDispenser::readConfigImpl(){
 void DataDispenser::initializeImpl(){
   // Nothing else to do other than read config?
   LogWarning << "Initialized data dispenser: " << getTitle() << std::endl;
-}
-
-const DataDispenserParameters &DataDispenser::getParameters() const {
-  return _parameters_;
-}
-DataDispenserParameters &DataDispenser::getParameters() {
-  return _parameters_;
 }
 
 void DataDispenser::setSampleSetPtrToLoad(FitSampleSet *sampleSetPtrToLoad) {
@@ -780,7 +772,7 @@ void DataDispenser::loadFromHistContent(){
       for( size_t iVar = 0 ; iVar < target.size() ; iVar++ ){
         container->eventList[iBin].setVariable( target[iVar], axisNameList[iVar] );
       }
-      container->eventList[iBin].setTreeWeight( hist->GetBinContent( histBinIndex ) );
+      container->eventList[iBin].setBaseWeight(hist->GetBinContent(histBinIndex));
       container->eventList[iBin].resetEventWeight();
     }
 
@@ -984,7 +976,7 @@ void DataDispenser::fillFunction(int iThread_){
   auto isDial2Valid = [&](const DataBin& d_){
     nBinEdges = d_.getEdgesList().size();
     for( iVar = 0 ; iVar < nBinEdges ; iVar++ ){
-      if( not DataBin::isBetweenEdges(
+      if( not d_.isBetweenEdges(
           d_.getEdgesList()[iVar],
           eventIndexingBuffer.getVarAsDouble(d_.getEventVarIndexCache()[iVar] ) )
           ){
@@ -1063,8 +1055,8 @@ void DataDispenser::fillFunction(int iThread_){
     }
 
     if( nominalWeightTreeFormula != nullptr ){
-      eventIndexingBuffer.setTreeWeight( nominalWeightTreeFormula->EvalInstance() );
-      if(eventIndexingBuffer.getTreeWeight() < 0 ){
+      eventIndexingBuffer.setBaseWeight(nominalWeightTreeFormula->EvalInstance());
+      if(eventIndexingBuffer.getBaseWeight() < 0 ){
         LogError << "Negative nominal weight:" << std::endl;
 
         LogError << "Event buffer is: " << eventIndexingBuffer.getSummary() << std::endl;
@@ -1077,7 +1069,7 @@ void DataDispenser::fillFunction(int iThread_){
 
         LogThrow("Negative nominal weight");
       }
-      if(eventIndexingBuffer.getTreeWeight() == 0 ){
+      if(eventIndexingBuffer.getBaseWeight() == 0 ){
         continue;
       } // skip this event
     }
@@ -1136,8 +1128,8 @@ void DataDispenser::fillFunction(int iThread_){
 
         eventPtr->setEntryIndex(iEntry);
         eventPtr->setSampleBinIndex(eventIndexingBuffer.getSampleBinIndex());
-        eventPtr->setTreeWeight(eventIndexingBuffer.getTreeWeight());
-        eventPtr->setNominalWeight(eventIndexingBuffer.getTreeWeight());
+        eventPtr->setBaseWeight(eventIndexingBuffer.getBaseWeight());
+        eventPtr->setNominalWeight(eventIndexingBuffer.getBaseWeight());
         eventPtr->setSampleIndex(_cache_.samplesToFillList[iSample]->getIndex());
         eventPtr->resetEventWeight();
 
@@ -1252,16 +1244,6 @@ void DataDispenser::fillFunction(int iThread_){
     GenericToolbox::displayProgressBar(nEvents, nEvents, ssProgressBar.str());
   }
 
-}
-
-void DataDispenserCache::addVarRequestedForIndexing(const std::string& varName_) {
-  LogThrowIf(varName_.empty(), "no var name provided.");
-  GenericToolbox::addIfNotInVector(varName_, this->varsRequestedForIndexing);
-}
-void DataDispenserCache::addVarRequestedForStorage(const std::string& varName_){
-  LogThrowIf(varName_.empty(), "no var name provided.");
-  GenericToolbox::addIfNotInVector(varName_, this->varsRequestedForStorage);
-  this->addVarRequestedForIndexing(varName_);
 }
 
 //  A Lesser GNU Public License

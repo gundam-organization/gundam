@@ -26,35 +26,36 @@ class Propagator : public JsonBaseClass {
 
 public:
   // Setters
-  void setShowTimeStats(bool showTimeStats);
-  void setThrowAsimovToyParameters(bool throwAsimovToyParameters);
-  void setEnableEigenToOrigInPropagate(bool enableEigenToOrigInPropagate);
-  void setIThrow(int iThrow);
-  void setLoadAsimovData(bool loadAsimovData);
-  void setParameterInjectorConfig(const nlohmann::json &parameterInjector);
-  void setGlobalCovarianceMatrix(const std::shared_ptr<TMatrixD> &globalCovarianceMatrix);
+  void setShowTimeStats(bool showTimeStats){ _showTimeStats_ = showTimeStats; }
+  void setThrowAsimovToyParameters(bool throwAsimovToyParameters){ _throwAsimovToyParameters_ = throwAsimovToyParameters; }
+  void setEnableEigenToOrigInPropagate(bool enableEigenToOrigInPropagate){ _enableEigenToOrigInPropagate_ = enableEigenToOrigInPropagate; }
+  void setIThrow(int iThrow){ _iThrow_ = iThrow; }
+  void setLoadAsimovData(bool loadAsimovData){ _loadAsimovData_ = loadAsimovData; }
+  void setParameterInjectorConfig(const nlohmann::json &parameterInjector){ _parameterInjectorMc_ = parameterInjector; }
+  void setGlobalCovarianceMatrix(const std::shared_ptr<TMatrixD> &globalCovarianceMatrix){ _globalCovarianceMatrix_ = globalCovarianceMatrix; }
 
   // Const getters
-  [[nodiscard]] bool isThrowAsimovToyParameters() const;
-  [[nodiscard]] int getIThrow() const;
-  [[nodiscard]] double getLlhBuffer() const;
-  [[nodiscard]] double getLlhStatBuffer() const;
-  [[nodiscard]] double getLlhPenaltyBuffer() const;
-  [[nodiscard]] double getLlhRegBuffer() const;
-  [[nodiscard]] const EventTreeWriter &getTreeWriter() const;
-  [[nodiscard]] const std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix() const;
-  [[nodiscard]] const std::shared_ptr<TMatrixD> &getStrippedCovarianceMatrix() const;
-  [[nodiscard]] const std::vector<DatasetLoader> &getDataSetList() const;
-  [[nodiscard]] const std::vector<FitParameterSet> &getParameterSetsList() const;
-  [[nodiscard]] const std::vector<DialCollection> &getDialCollections() const;
+  [[nodiscard]] bool isThrowAsimovToyParameters() const { return _throwAsimovToyParameters_; }
+  [[nodiscard]] int getIThrow() const { return _iThrow_; }
+  [[nodiscard]] double getLlhBuffer() const{ return _llhBuffer_; }
+  [[nodiscard]] double getLlhStatBuffer() const{ return _llhStatBuffer_; }
+  [[nodiscard]] double getLlhPenaltyBuffer() const{ return _llhPenaltyBuffer_; }
+  [[nodiscard]] double getLlhRegBuffer() const{ return _llhRegBuffer_; }
+  [[nodiscard]] const EventTreeWriter &getTreeWriter() const{ return _treeWriter_; }
+  [[nodiscard]] const std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix() const{ return _globalCovarianceMatrix_; }
+  [[nodiscard]] const std::shared_ptr<TMatrixD> &getStrippedCovarianceMatrix() const{ return _strippedCovarianceMatrix_; }
+  [[nodiscard]] const std::vector<DatasetLoader> &getDataSetList() const{ return _dataSetList_; }
+  [[nodiscard]] const std::vector<FitParameterSet> &getParameterSetsList() const{ return _parameterSetList_; }
+  [[nodiscard]] const std::vector<DialCollection> &getDialCollections() const{ return _dialCollections_; }
 
   // Non-const getters
-  std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix();
-  FitSampleSet &getFitSampleSet();
-  PlotGenerator &getPlotGenerator();
   ParScanner& getParScanner(){ return _parScanner_; }
-  std::vector<FitParameterSet> &getParameterSetsList();
-  std::vector<DatasetLoader> &getDataSetList();
+  FitSampleSet &getFitSampleSet(){ return _fitSampleSet_; }
+  PlotGenerator &getPlotGenerator(){ return _plotGenerator_; }
+  EventDialCache& getEventDialCache(){ return _eventDialCache_; }
+  std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix(){ return _globalCovarianceMatrix_; }
+  std::vector<DatasetLoader> &getDataSetList(){ return _dataSetList_; }
+  std::vector<FitParameterSet> &getParameterSetsList(){ return _parameterSetList_; }
 
   // Misc getters
   [[nodiscard]] const double* getLlhBufferPtr() const { return &_llhBuffer_; }
@@ -66,7 +67,6 @@ public:
   [[nodiscard]] const FitParameterSet* getFitParameterSetPtr(const std::string& name_) const;
   [[nodiscard]] FitParameterSet* getFitParameterSetPtr(const std::string& name_);
   [[nodiscard]] DatasetLoader* getDatasetLoaderPtr(const std::string& name_);
-  [[nodiscard]] EventDialCache& getEventDialCache();
 
   // Core
   void updateLlhCache();
@@ -78,7 +78,7 @@ public:
   // Misc
   [[nodiscard]] nlohmann::json exportParameterInjectorConfig() const;
   void injectParameterValues(const nlohmann::json &config_);
-  void throwParametersFromGlobalCovariance();
+  void throwParametersFromGlobalCovariance(bool quietVerbose_ = true);
 
   // Logger related
   static void muteLogger();
@@ -104,6 +104,7 @@ private:
 
   // Internals
   bool _throwAsimovToyParameters_{false};
+  bool _throwToyParametersWithGlobalCov_{false};
   bool _reThrowParSetIfOutOfBounds_{true};
   bool _enableStatThrowInToys_{true};
   bool _gaussStatThrowInToys_{false};
@@ -114,10 +115,11 @@ private:
   double _llhStatBuffer_{0};
   double _llhPenaltyBuffer_{0};
   double _llhRegBuffer_{0};
+  std::vector<FitParameter*> _globalCovParList_{};
+  std::vector<FitParameter*> _strippedParameterList_{};
   std::shared_ptr<TMatrixD> _globalCovarianceMatrix_{nullptr};
   std::shared_ptr<TMatrixD> _strippedCovarianceMatrix_{nullptr};
   std::shared_ptr<TMatrixD> _choleskyMatrix_{nullptr};
-  std::vector<FitParameter*> _strippedParameterList_{};
 
   bool _devSingleThreadReweight_{false};
   bool _devSingleThreadHistFill_{false};
@@ -133,7 +135,7 @@ private:
   // Monitoring
   bool _showEventBreakdown_{true};
 
-  // A vector of all the dial collections used by all of the fit samples.
+  // A vector of all the dial collections used by all the fit samples.
   // Once a dial collection has been added to this vector, it's index becomes
   // the immutable tag for that specific group of dials.
   std::vector<DialCollection> _dialCollections_{};

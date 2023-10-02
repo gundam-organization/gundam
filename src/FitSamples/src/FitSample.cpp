@@ -64,56 +64,6 @@ void FitSample::initializeImpl() {
   _dataContainer_.histogram->SetDirectory(nullptr);
 }
 
-void FitSample::setName(const std::string &name) {
-  _name_ = name;
-}
-void FitSample::setIndex(int index) {
-  _index_ = index;
-}
-void FitSample::setBinningFilePath(const std::string &binningFilePath_) {
-  _binningFilePath_ = binningFilePath_;
-}
-void FitSample::setSelectionCutStr(const std::string &selectionCutStr_) {
-  _selectionCutStr_ = selectionCutStr_;
-}
-void FitSample::setVarSelectionFormulaStr(const std::string &varSelectionFormulaStr_){
-  _varSelectionFormulaStr_ = varSelectionFormulaStr_;
-}
-void FitSample::setEnabledDatasetList(const std::vector<std::string>& enabledDatasetList_){
-  _enabledDatasetList_ = enabledDatasetList_;
-}
-
-bool FitSample::isEnabled() const {
-  return _isEnabled_;
-}
-int FitSample::getIndex() const {
-  return _index_;
-}
-const std::string &FitSample::getName() const {
-  return _name_;
-}
-const std::string &FitSample::getSelectionCutsStr() const {
-  return _selectionCutStr_;
-}
-const std::string &FitSample::getVarSelectionFormulaStr() const {
-  return _varSelectionFormulaStr_;
-}
-const DataBinSet &FitSample::getBinning() const {
-  return _binning_;
-}
-const SampleElement &FitSample::getMcContainer() const {
-  return _mcContainer_;
-}
-const SampleElement &FitSample::getDataContainer() const {
-  return _dataContainer_;
-}
-SampleElement &FitSample::getMcContainer() {
-  return _mcContainer_;
-}
-SampleElement &FitSample::getDataContainer() {
-  return _dataContainer_;
-}
-
 bool FitSample::isDatasetValid(const std::string& datasetName_){
   if( _enabledDatasetList_.empty() ) return true;
   for( auto& dataSetName : _enabledDatasetList_){

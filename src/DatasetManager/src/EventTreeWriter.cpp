@@ -17,8 +17,6 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[TreeWriter]");
 });
 
-EventTreeWriter::EventTreeWriter() = default;
-EventTreeWriter::~EventTreeWriter() = default;
 
 void EventTreeWriter::readConfigImpl() {
   ConfigUtils::forwardConfig( _config_ );
@@ -36,15 +34,6 @@ void EventTreeWriter::readConfigImpl() {
   }
 }
 
-void EventTreeWriter::setFitSampleSetPtr(const FitSampleSet *fitSampleSetPtr) {
-  _fitSampleSetPtr_ = fitSampleSetPtr;
-}
-void EventTreeWriter::setParSetListPtr(const std::vector<FitParameterSet> *parSetListPtr) {
-  _parSetListPtr_ = parSetListPtr;
-}
-void EventTreeWriter::setEventDialCachePtr(const EventDialCache *eventDialCachePtr_){
-  _eventDialCachePtr_ = eventDialCachePtr_;
-}
 
 void EventTreeWriter::writeSamples(TDirectory* saveDir_) const{
   LogInfo << "Writing sample data in TTrees..." << std::endl;
@@ -105,7 +94,7 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
   std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const PhysicsEvent&)>> leafDictionary;
   leafDictionary["eventWeight/D"] =   [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getEventWeight()); };
   leafDictionary["nominalWeight/D"] = [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getNominalWeight()); };
-  leafDictionary["treeWeight/D"] =    [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getTreeWeight()); };
+  leafDictionary["treeWeight/D"] =    [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getBaseWeight()); };
   leafDictionary["sampleBinIndex/I"]= [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getSampleBinIndex()); };
   leafDictionary["dataSetIndex/I"] =  [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getDataSetIndex()); };
   leafDictionary["entryIndex/L"] =    [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getEntryIndex()); };

@@ -28,9 +28,6 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[FitterEngine]");
 });
 
-FitterEngine::FitterEngine(TDirectory *saveDir_){
-  this->setSaveDir(saveDir_); // propagate
-}
 
 void FitterEngine::readConfigImpl(){
   LogInfo << "Reading FitterEngine config..." << std::endl;
@@ -258,69 +255,6 @@ void FitterEngine::initializeImpl(){
   GenericToolbox::triggerTFileWrite(_saveDir_);
 }
 
-// Setters
-void FitterEngine::setSaveDir(TDirectory *saveDir) {
-  _saveDir_ = saveDir;
-}
-void FitterEngine::setIsDryRun(bool isDryRun_){
-  _isDryRun_ = isDryRun_;
-}
-void FitterEngine::setEnablePca(bool enablePca_){
-  _enablePca_ = enablePca_;
-}
-void FitterEngine::setEnablePreFitScan(bool enablePreFitScan) {
-  _enablePreFitScan_ = enablePreFitScan;
-}
-void FitterEngine::setEnablePostFitScan(bool enablePostFitScan) {
-  _enablePostFitScan_ = enablePostFitScan;
-}
-void FitterEngine::setEnablePreFitToPostFitLineScan(bool enablePreFitToPostFitLineScan_) {
-  _enablePreFitToPostFitLineScan_ = enablePreFitToPostFitLineScan_;
-}
-void FitterEngine::setGenerateSamplePlots(bool generateSamplePlots) {
-  _generateSamplePlots_ = generateSamplePlots;
-}
-void FitterEngine::setGenerateOneSigmaPlots(bool generateOneSigmaPlots){
-  _generateOneSigmaPlots_ = generateOneSigmaPlots;
-}
-void FitterEngine::setDoAllParamVariations(bool doAllParamVariations_){
-  _doAllParamVariations_ = doAllParamVariations_;
-}
-void FitterEngine::setAllParamVariationsSigmas(const std::vector<double> &allParamVariationsSigmas) {
-  _allParamVariationsSigmas_ = allParamVariationsSigmas;
-}
-
-// Getters
-const nlohmann::json &FitterEngine::getPreFitParState() const {
-  return _preFitParState_;
-}
-const nlohmann::json &FitterEngine::getPostFitParState() const {
-  return _postFitParState_;
-}
-const Propagator& FitterEngine::getPropagator() const {
-  return _propagator_;
-}
-const MinimizerBase& FitterEngine::getMinimizer() const {
-  return *_minimizer_;
-}
-const LikelihoodInterface& FitterEngine::getLikelihood() const {
-  return _likelihood_;
-}
-
-// non-const getters
-Propagator& FitterEngine::getPropagator() {
-  return _propagator_;
-}
-MinimizerBase& FitterEngine::getMinimizer(){
-  return *_minimizer_;
-}
-LikelihoodInterface& FitterEngine::getLikelihood(){
-  return _likelihood_;
-}
-TDirectory* FitterEngine::getSaveDir(){
-  return _saveDir_;
-}
-
 // Core
 void FitterEngine::fit(){
   LogWarning << __METHOD_NAME__ << std::endl;
@@ -398,7 +332,7 @@ void FitterEngine::fit(){
       }
       else{
         LogAlert << "Throwing correlated parameters for " << parSet.getName() << std::endl;
-        parSet.throwFitParameters(_throwGain_);
+        parSet.throwFitParameters(true, _throwGain_);
       }
     } // parSet
 
@@ -633,7 +567,7 @@ void FitterEngine::checkNumericalAccuracy(){
     for( auto& parSet : _propagator_.getParameterSetsList() ){
       if(not parSet.isEnabled()) continue;
       if( not parSet.isEnabledThrowToyParameters() ){ continue;}
-      parSet.throwFitParameters(gain);
+      parSet.throwFitParameters(true, gain);
       throwEntry.emplace_back(parSet.getParameterList().size(), 0);
       for( size_t iPar = 0 ; iPar < parSet.getParameterList().size() ; iPar++){
         throwEntry.back()[iPar] = parSet.getParameterList()[iPar].getParameterValue();

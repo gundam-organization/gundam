@@ -34,36 +34,46 @@
 
 class FitParameterSet : public JsonBaseClass  {
 
+protected:
+  // called through public JsonBaseClass::readConfig() and JsonBaseClass::initialize()
+  void readConfigImpl() override;
+  void initializeImpl() override;
+
 public:
+  // in src dependent
+  static void muteLogger();
+  static void unmuteLogger();
+
   // Post-init
   void processCovarianceMatrix(); // invert the matrices, and make sure fixed parameters are detached from correlations
 
   // Setters
-  void setMaskedForPropagation(bool maskedForPropagation_);
+  void setMaskedForPropagation(bool maskedForPropagation_){ _maskedForPropagation_ = maskedForPropagation_; }
 
   // Getters
-  [[nodiscard]] bool isEnabled() const;
-  [[nodiscard]] bool isEnablePca() const;
-  [[nodiscard]] bool isUseEigenDecompInFit() const;
-  [[nodiscard]] bool isEnabledThrowToyParameters() const;
-  [[nodiscard]] bool isUseOnlyOneParameterPerEvent() const;
-  [[nodiscard]] bool isMaskedForPropagation() const;
-  [[nodiscard]] int getNbEnabledEigenParameters() const;
-  [[nodiscard]] double getPenaltyChi2Buffer() const;
-  [[nodiscard]] size_t getNbParameters() const;
-  [[nodiscard]] const std::string &getName() const;
-  [[nodiscard]] const nlohmann::json &getDialSetDefinitions() const;
-  [[nodiscard]] const TMatrixD* getInvertedEigenVectors() const;
-  [[nodiscard]] const TMatrixD* getEigenVectors() const;
-  [[nodiscard]] const std::vector<nlohmann::json>& getCustomFitParThrow() const;
-  [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCorrelationMatrix() const;
-  [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const;
-  [[nodiscard]] const std::vector<FitParameter> &getParameterList() const;
+  [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
+  [[nodiscard]] bool isEnablePca() const{ return _enablePca_; }
+  [[nodiscard]] bool isUseEigenDecompInFit() const{ return _useEigenDecompInFit_; }
+  [[nodiscard]] bool isEnabledThrowToyParameters() const{ return _enabledThrowToyParameters_; }
+  [[nodiscard]] bool isMaskForToyGeneration() const { return _maskForToyGeneration_; }
+  [[nodiscard]] bool isMaskedForPropagation() const{ return _maskedForPropagation_; }
+  [[nodiscard]] bool isUseOnlyOneParameterPerEvent() const{ return _useOnlyOneParameterPerEvent_; }
+  [[nodiscard]] int getNbEnabledEigenParameters() const{ return _nbEnabledEigen_; }
+  [[nodiscard]] double getPenaltyChi2Buffer() const{ return _penaltyChi2Buffer_; }
+  [[nodiscard]] size_t getNbParameters() const{ return _parameterList_.size(); }
+  [[nodiscard]] const std::string &getName() const{ return _name_; }
+  [[nodiscard]] const nlohmann::json &getDialSetDefinitions() const{ return _dialSetDefinitions_; }
+  [[nodiscard]] const TMatrixD* getInvertedEigenVectors() const{ return _eigenVectorsInv_.get(); }
+  [[nodiscard]] const TMatrixD* getEigenVectors() const{ return _eigenVectors_.get(); }
+  [[nodiscard]] const std::vector<nlohmann::json>& getCustomFitParThrow() const{ return _customFitParThrow_; }
+  [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCorrelationMatrix() const{ return _priorCorrelationMatrix_; }
+  [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const { return _priorCovarianceMatrix_; }
+  [[nodiscard]] const std::vector<FitParameter> &getParameterList() const{ return _parameterList_; }
   [[nodiscard]] const std::vector<FitParameter>& getEffectiveParameterList() const;
 
   // non-const Getters
-  std::vector<FitParameter> &getParameterList();
-  std::vector<FitParameter> &getEigenParameterList();
+  std::vector<FitParameter> &getParameterList(){ return _parameterList_; }
+  std::vector<FitParameter> &getEigenParameterList(){ return _eigenParameterList_; }
   std::vector<FitParameter>& getEffectiveParameterList();
 
   // Core
@@ -71,7 +81,7 @@ public:
 
   // Throw / Shifts
   void moveFitParametersToPrior();
-  void throwFitParameters(double gain_ = 1);
+  void throwFitParameters(bool rethrowIfNotInbounds_ = true, double gain_ = 1);
 
   void propagateEigenToOriginal();
   void propagateOriginalToEigen();
@@ -83,20 +93,14 @@ public:
   FitParameter* getParameterPtr(const std::string& parName_);
   FitParameter* getParameterPtrWithTitle(const std::string& parTitle_);
 
+  // statics
   static double toNormalizedParRange(double parRange, const FitParameter& par);
   static double toNormalizedParValue(double parValue, const FitParameter& par);
   static double toRealParValue(double normParValue, const FitParameter& par);
   static double toRealParRange(double normParRange, const FitParameter& par);
   static bool isValidCorrelatedParameter(const FitParameter& par_);
 
-  // in src dependent
-  static void muteLogger();
-  static void unmuteLogger();
-
 protected:
-  void readConfigImpl() override;
-  void initializeImpl() override;
-
   void readParameterDefinitionFile();
   void defineParameters();
   void fillDeltaParameterList();
@@ -124,6 +128,7 @@ private:
   bool _printParametersSummary_{false};
   bool _releaseFixedParametersOnHesse_{false};
   bool _devUseParLimitsOnEigen_{false};
+  bool _maskForToyGeneration_{false};
   int _nbParameterDefinition_{-1};
   double _nominalStepSize_{std::nan("unset")};
   int _maxNbEigenParameters_{-1};

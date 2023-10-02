@@ -2,12 +2,14 @@ set(SRCFILES
         src/DatasetLoader.cpp
         src/EventTreeWriter.cpp
         src/DataDispenser.cpp
+        src/DataDispenserUtils.cpp
     )
 
 set(HEADERS
         include/DatasetLoader.h
         include/EventTreeWriter.h
         include/DataDispenser.h
+        include/DataDispenserUtils.h
 )
 
 if( USE_STATIC_LINKS )

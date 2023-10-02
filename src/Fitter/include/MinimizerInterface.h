@@ -26,53 +26,33 @@ class FitterEngine;
 
 class MinimizerInterface : public MinimizerBase {
 
-public:
-  explicit MinimizerInterface(FitterEngine* owner_);
-
-  // setters
-  void setEnableSimplexBeforeMinimize(bool enableSimplexBeforeMinimize_){ _enableSimplexBeforeMinimize_ = enableSimplexBeforeMinimize_; }
-
-  // getters
-  [[nodiscard]] std::string getMinimizerTypeName() const override { return "MinimizerInterface"; };
-  [[nodiscard]] bool isFitHasConverged() const override;
-  [[nodiscard]] double getTargetEdm() const;
-  [[nodiscard]] const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const;
-
-  void minimize() override;
-  void calcErrors() override;
-  void scanParameters(TDirectory* saveDir_) override;
-
-  void saveMinimizerSettings(TDirectory* saveDir_) const {
-    LogInfo << "Saving minimizer settings..." << std::endl;
-
-    GenericToolbox::writeInTFile( saveDir_, TNamed("minimizerType", _minimizerType_.c_str()) );
-    GenericToolbox::writeInTFile( saveDir_, TNamed("minimizerAlgo", _minimizerAlgo_.c_str()) );
-    GenericToolbox::writeInTFile( saveDir_, TNamed("strategy", std::to_string(_strategy_).c_str()) );
-    GenericToolbox::writeInTFile( saveDir_, TNamed("printLevel", std::to_string(_printLevel_).c_str()) );
-    GenericToolbox::writeInTFile( saveDir_, TNamed("targetEDM", std::to_string(this->getTargetEdm()).c_str()) );
-    GenericToolbox::writeInTFile( saveDir_, TNamed("maxIterations", std::to_string(_maxIterations_).c_str()) );
-    GenericToolbox::writeInTFile( saveDir_, TNamed("maxFcnCalls", std::to_string(_maxFcnCalls_).c_str()) );
-    GenericToolbox::writeInTFile( saveDir_, TNamed("tolerance", std::to_string(_tolerance_).c_str()) );
-    GenericToolbox::writeInTFile( saveDir_, TNamed("stepSizeScaling", std::to_string(_stepSizeScaling_).c_str()) );
-    GenericToolbox::writeInTFile( saveDir_, TNamed("useNormalizedFitSpace", std::to_string(getLikelihood().getUseNormalizedFitSpace()).c_str()) );
-
-    if( _enableSimplexBeforeMinimize_ ){
-      GenericToolbox::writeInTFile( saveDir_, TNamed("enableSimplexBeforeMinimize", std::to_string(_enableSimplexBeforeMinimize_).c_str()) );
-      GenericToolbox::writeInTFile( saveDir_, TNamed("simplexMaxFcnCalls", std::to_string(_simplexMaxFcnCalls_).c_str()) );
-      GenericToolbox::writeInTFile( saveDir_, TNamed("simplexToleranceLoose", std::to_string(_simplexToleranceLoose_).c_str()) );
-      GenericToolbox::writeInTFile( saveDir_, TNamed("simplexStrategy", std::to_string(_simplexStrategy_).c_str()) );
-    }
-
-    if( this->isEnablePostFitErrorEval() ){
-      GenericToolbox::writeInTFile( saveDir_, TNamed("enablePostFitErrorFit", std::to_string(this->isEnablePostFitErrorEval()).c_str()) );
-      GenericToolbox::writeInTFile( saveDir_, TNamed("errorAlgo", _errorAlgo_.c_str()) );
-    }
-  }
-
 protected:
   void readConfigImpl() override;
   void initializeImpl() override;
 
+public:
+  explicit MinimizerInterface(FitterEngine* owner_): MinimizerBase(owner_) {} // forwarding owner
+
+  // setters
+  void setEnableSimplexBeforeMinimize(bool enableSimplexBeforeMinimize_){ _enableSimplexBeforeMinimize_ = enableSimplexBeforeMinimize_; }
+
+  // overridden getters
+  [[nodiscard]] bool isFitHasConverged() const override{ return _fitHasConverged_; }
+  [[nodiscard]] std::string getMinimizerTypeName() const override { return "MinimizerInterface"; };
+
+  // getters
+  [[nodiscard]] double getTargetEdm() const;
+  [[nodiscard]] const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const{ return _minimizer_; }
+
+  // core overrides
+  void minimize() override;
+  void calcErrors() override;
+  void scanParameters(TDirectory* saveDir_) override;
+
+  // misc
+  void saveMinimizerSettings(TDirectory* saveDir_) const;
+
+protected:
   void writePostFitData(TDirectory* saveDir_);
   void updateCacheToBestfitPoint();
 
@@ -87,8 +67,8 @@ private:
   int _strategy_{1};
   int _printLevel_{2};
   int _simplexStrategy_{1};
-  double _stepSizeScaling_{1};
   double _tolerance_{1E-4};
+  double _stepSizeScaling_{1};
   double _simplexToleranceLoose_{1000.};
   unsigned int _maxIterations_{500};
   unsigned int _maxFcnCalls_{1000000000};
@@ -99,7 +79,6 @@ private:
 
   // internals
   bool _fitHasConverged_{false};
-  bool _isBadCovMat_{false};
 
   std::unique_ptr<ROOT::Math::Minimizer> _minimizer_{nullptr};
 

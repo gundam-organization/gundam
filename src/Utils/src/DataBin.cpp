@@ -16,12 +16,6 @@ LoggerInit([]{
 } );
 
 // Setters
-void DataBin::setIsLowMemoryUsageMode(bool isLowMemoryUsageMode_){
-  _isLowMemoryUsageMode_ = isLowMemoryUsageMode_;
-}
-void DataBin::setIsZeroWideRangesTolerated(bool isZeroWideRangesTolerated_){
-  _isZeroWideRangesTolerated_ = isZeroWideRangesTolerated_;
-}
 void DataBin::addBinEdge(double lowEdge_, double highEdge_){
   if( lowEdge_ == highEdge_ and not _isZeroWideRangesTolerated_ ){
     LogError << GET_VAR_NAME_VALUE(_isZeroWideRangesTolerated_) << " but lowEdge_ == highEdge_." << std::endl;
@@ -38,43 +32,13 @@ void DataBin::addBinEdge(const std::string &variableName_, double lowEdge_, doub
 
   this->addBinEdge(lowEdge_, highEdge_);
 }
-void DataBin::setEventVarIndexCache(const std::vector<int> &eventVarIndexCache) {
-  _eventVarIndexCache_ = eventVarIndexCache;
-}
 
 
 // Getters
-bool DataBin::isLowMemoryUsageMode() const {
-  return _isLowMemoryUsageMode_;
-}
-bool DataBin::isZeroWideRangesTolerated() const {
-  return _isZeroWideRangesTolerated_;
-}
-const std::vector<std::string> &DataBin::getVariableNameList() const {
-  return _variableNameList_;
-}
-const std::vector<std::pair<double, double>> &DataBin::getEdgesList() const {
-  return _edgesList_;
-}
 const std::pair<double, double>& DataBin::getVarEdges( const std::string& varName_ ) const{
   int varIndex = GenericToolbox::findElementIndex(varName_, _variableNameList_);
   LogThrowIf(varIndex == -1, varName_ << " not found in: " << GenericToolbox::parseVectorAsString(_variableNameList_));
   return _edgesList_.at(varIndex);
-}
-const std::string &DataBin::getFormulaStr() const {
-  return _formulaStr_;
-}
-const std::string &DataBin::getTreeFormulaStr() const {
-  return _treeFormulaStr_;
-}
-TFormula *DataBin::getFormula() const {
-  return _formula_.get();
-}
-TTreeFormula *DataBin::getTreeFormula() const {
-  return _treeFormula_.get();
-}
-size_t DataBin::getNbEdges() const{
-  return _edgesList_.size();
 }
 double DataBin::getVolume() const{
   double out{1};
@@ -84,9 +48,7 @@ double DataBin::getVolume() const{
   }
   return out;
 }
-const std::vector<int> &DataBin::getEventVarIndexCache() const {
-  return _eventVarIndexCache_;
-}
+
 
 // Management
 bool DataBin::isInBin(const std::vector<double>& valuesList_) const{
@@ -95,7 +57,14 @@ bool DataBin::isInBin(const std::vector<double>& valuesList_) const{
   const double* buf = &valuesList_[0];
 
   // is "all_of" the variables between defined edges
-  return std::all_of(_edgesList_.begin(), _edgesList_.end(), [&](const std::pair<double, double>& edge){ return (DataBin::isBetweenEdges(edge, *(buf++))); });
+  return std::all_of(_edgesList_.begin(), _edgesList_.end(), [&](const std::pair<double, double>& edge){ return (this->isBetweenEdges(edge, *(buf++))); });
+}
+bool DataBin::isVariableSet(const std::string& variableName_) const{
+  if( _isLowMemoryUsageMode_ ){
+    LogError << "Can't fetch variable name while in low memory mode. (var name is not stored)" << std::endl;
+    throw std::logic_error("can't fetch var name while _isLowMemoryUsageMode_");
+  }
+  return GenericToolbox::findElementIndex(variableName_, _variableNameList_) != -1;
 }
 bool DataBin::isBetweenEdges(const std::string& variableName_, double value_) const {
   if( not this->isVariableSet(variableName_) ){
@@ -114,14 +83,42 @@ bool DataBin::isBetweenEdges(size_t varIndex_, double value_) const{
 
   return this->isBetweenEdges(_edgesList_.at(varIndex_), value_);
 }
+bool DataBin::isBetweenEdges(const std::pair<double,double>& edges_, double value_) const {
+  // condition variable?
+  if(edges_.first == edges_.second ){ return (edges_.first == value_); }
+
+  // reject?
+  if( _includeLowerBoundVal_ ? (edges_.first > value_ ) : (edges_.first >= value_) ){ return false; }
+  if( _includeHigherBoundVal_ ? (edges_.second < value_ ) : (edges_.second <= value_) ){ return false; }
+
+  // inside
+  return true;
+}
+
 
 // Misc
-bool DataBin::isVariableSet(const std::string& variableName_) const{
-  if( _isLowMemoryUsageMode_ ){
-    LogError << "Can't fetch variable name while in low memory mode. (var name is not stored)" << std::endl;
-    throw std::logic_error("can't fetch var name while _isLowMemoryUsageMode_");
+void DataBin::generateFormula() {
+  _formulaStr_ = generateFormulaStr(false);
+  _formula_ = std::make_shared<TFormula>(_formulaStr_.c_str(), _formulaStr_.c_str());
+}
+void DataBin::generateTreeFormula() {
+  _treeFormulaStr_ = generateFormulaStr(true);
+  // For treeFormula we need a fake tree to compile the formula
+  std::vector<std::string> varNameList;
+  for( size_t iEdge = 0 ; iEdge < _edgesList_.size() ; iEdge++ ){
+    std::string nameCandidate;
+    if( not _variableNameList_.empty() ){
+      // Careful: array might be defined
+      nameCandidate = GenericToolbox::splitString(_variableNameList_.at(iEdge), "[")[0];
+    }
+    else{
+      nameCandidate = "var" + std::to_string(iEdge);
+    }
+    if( not GenericToolbox::doesElementIsInVector(nameCandidate, varNameList) ){
+      varNameList.emplace_back(nameCandidate);
+    }
   }
-  return GenericToolbox::findElementIndex(variableName_, _variableNameList_) != -1;
+  _treeFormula_ = std::shared_ptr<TTreeFormula>(GenericToolbox::createTreeFormulaWithoutTree(_treeFormulaStr_, varNameList));
 }
 std::string DataBin::getSummary() const{
   std::stringstream ss;
@@ -166,37 +163,7 @@ std::vector<double> DataBin::generateBinTarget( const std::vector<std::string>& 
   }
   return out;
 }
-void DataBin::generateFormula() {
-  _formulaStr_ = generateFormulaStr(false);
-  _formula_ = std::make_shared<TFormula>(_formulaStr_.c_str(), _formulaStr_.c_str());
-}
-void DataBin::generateTreeFormula() {
-  _treeFormulaStr_ = generateFormulaStr(true);
-  // For treeFormula we need a fake tree to compile the formula
-  std::vector<std::string> varNameList;
-  for( size_t iEdge = 0 ; iEdge < _edgesList_.size() ; iEdge++ ){
-    std::string nameCandidate;
-    if( not _variableNameList_.empty() ){
-      // Careful: array might be defined
-      nameCandidate = GenericToolbox::splitString(_variableNameList_.at(iEdge), "[")[0];
-    }
-    else{
-      nameCandidate = "var" + std::to_string(iEdge);
-    }
-    if( not GenericToolbox::doesElementIsInVector(nameCandidate, varNameList) ){
-      varNameList.emplace_back(nameCandidate);
-    }
-  }
-  _treeFormula_ = std::shared_ptr<TTreeFormula>(GenericToolbox::createTreeFormulaWithoutTree(_treeFormulaStr_, varNameList));
 
-}
-
-// Static
-bool DataBin::isBetweenEdges(const std::pair<double,double>& edges_, double value_){
-  if(edges_.first == edges_.second ){ return (edges_.first == value_); } // condition variable?
-  if(edges_.first > value_ or edges_.second <= value_){ return false; }  // out of range
-  return true; // inside
-}
 
 // Protected
 std::string DataBin::generateFormulaStr(bool varNamesAsTreeFormula_) {
