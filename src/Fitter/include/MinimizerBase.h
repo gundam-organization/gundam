@@ -5,16 +5,19 @@
 #ifndef GUNDAM_MinimizerBase_h
 #define GUNDAM_MinimizerBase_h
 
+#include "Propagator.h"
+#include "FitParameter.h"
 #include "JsonBaseClass.h"
+#include "LikelihoodInterface.h"
+
 #include "GenericToolbox.VariablesMonitor.h"
 
+#include "TDirectory.h"
+
+#include <vector>
 #include <string>
 
-class TDirectory;
 class FitterEngine;
-class FitParameter;
-class Propagator;
-class LikelihoodInterface;
 
 /// An (almost) abstract base class for minimizer interfaces.  Classes derived
 /// from MinimizerBase are used by the FitterEngine to run different types of
@@ -24,8 +27,17 @@ class LikelihoodInterface;
 /// calcErrors() is expected to calculate the covariance of the LLH function.
 class MinimizerBase : public JsonBaseClass {
 
+protected:
+  /// Implement the methods required by JsonBaseClass.  These MinimizerBase
+  /// methods may be overridden by the derived class, but if overriden, the
+  /// derived class must run these instantiations (i.e. call
+  /// MinimizerBase::readConfigImpl() and MinimizerBase::initializeImpl in the
+  /// respective methods).
+  void readConfigImpl() override;
+  void initializeImpl() override;
+
 public:
-  explicit MinimizerBase(FitterEngine* owner_);
+  explicit MinimizerBase(FitterEngine* owner_): _owner_(owner_){}
 
   /// Local RTTI
   [[nodiscard]] virtual std::string getMinimizerTypeName() const { return "MinimizerBase"; };
@@ -59,14 +71,6 @@ protected:
   /// Get a reference to the FitterEngine that owns this minimizer.
   inline FitterEngine& owner() { return *_owner_; }
   [[nodiscard]] inline const FitterEngine& owner() const { return *_owner_; }
-
-  /// Implement the methods required by JsonBaseClass.  These MinimizerBase
-  /// methods may be overridden by the derived class, but if overriden, the
-  /// derived class must run these instantiations (i.e. call
-  /// MinimizerBase::readConfigImpl() and MinimizerBase::initializeImpl in the
-  /// respective methods).
-  void readConfigImpl() override;
-  void initializeImpl() override;
 
   // Get the propagator being used to calculate the likelihood.  This is a
   // local convenience function to get the propagator from the owner.

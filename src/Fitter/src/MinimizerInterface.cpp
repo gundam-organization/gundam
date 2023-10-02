@@ -24,9 +24,6 @@ LoggerInit([]{
 });
 
 
-MinimizerInterface::MinimizerInterface(FitterEngine* owner_):
-  MinimizerBase(owner_){}
-
 void MinimizerInterface::readConfigImpl(){
   MinimizerBase::readConfigImpl();
   LogInfo << "Reading minimizer config..." << std::endl;
@@ -111,14 +108,7 @@ void MinimizerInterface::initializeImpl(){
 
 }
 
-bool MinimizerInterface::isFitHasConverged() const {
-  return _fitHasConverged_;
-}
-
-const std::unique_ptr<ROOT::Math::Minimizer> &MinimizerInterface::getMinimizer() const {
-  return _minimizer_;
-}
-
+// overridden getters
 double MinimizerInterface::getTargetEdm() const{
   // Migrad: The default tolerance is 0.1, and the minimization will stop
   // when the estimated vertical distance to the minimum (EDM) is less
@@ -130,6 +120,7 @@ double MinimizerInterface::getTargetEdm() const{
   return 0.001 * _tolerance_ * 1;
 }
 
+// core overrides
 void MinimizerInterface::minimize(){
   LogThrowIf(not isInitialized(), "not initialized");
 
@@ -360,20 +351,8 @@ void MinimizerInterface::calcErrors(){
       }
     }
 
-//    LogDebug << "DEBUG: PUSHING AWAY PARAMETERS FOR HESSE TO NOT FREAK OUT FOR SOME REASON..." << std::endl;
     // Make sure we are on the right spot
     updateCacheToBestfitPoint();
-
-//    TMatrixDSym postfitCovarianceMatrix(int(_minimizer_->NDim()));
-//    _minimizer_->GetCovMatrix(postfitCovarianceMatrix.GetMatrixArray());
-//
-//    for( int iPar = 0 ; iPar < int(_minimizer_->NDim()) ; iPar++ ){
-//      _minimizerFitParameterPtr_[iPar]->setParameterValue(
-//          _minimizerFitParameterPtr_[iPar]->getParameterValue()
-//          + TMath::Sqrt( postfitCovarianceMatrix[iPar][iPar] )
-//          );
-//    }
-
 
     getLikelihood().setStateTitleMonitor("Running HESSE...");
 
@@ -387,8 +366,6 @@ void MinimizerInterface::calcErrors(){
 
     // Make sure we are on the right spot
     updateCacheToBestfitPoint();
-
-    if( _minimizer_->CovMatrixStatus() == 2 ){ _isBadCovMat_ = true; }
 
     if(not _fitHasConverged_){
       LogError  << "Hesse did not converge." << std::endl;
@@ -417,7 +394,58 @@ void MinimizerInterface::calcErrors(){
     LogError << GET_VAR_NAME_VALUE(_errorAlgo_) << " not implemented." << std::endl;
   }
 }
+void MinimizerInterface::scanParameters(TDirectory* saveDir_){
+  LogThrowIf(not isInitialized());
+  LogInfo << "Performing scans of fit parameters..." << std::endl;
+  for( int iPar = 0 ; iPar < getMinimizer()->NDim() ; iPar++ ){
+    if( getMinimizer()->IsFixedVariable(iPar) ){
+      LogWarning << getMinimizer()->VariableName(iPar)
+                 << " is fixed. Skipping..." << std::endl;
+      continue;
+    }
+    this->getPropagator().getParScanner().scanFitParameter(*getMinimizerFitParameterPtr()[iPar], saveDir_);
+  } // iPar
+  for( auto& parSet : this->getPropagator().getParameterSetsList() ){
+    if( not parSet.isEnabled() ) continue;
+    if( parSet.isUseEigenDecompInFit() ){
+      LogWarning << parSet.getName() << " is using eigen decomposition. Scanning original parameters..." << std::endl;
+      for( auto& par : parSet.getParameterList() ){
+        if( not par.isEnabled() ) continue;
+        this->getPropagator().getParScanner().scanFitParameter(par, saveDir_);
+      }
+    }
+  }
+}
 
+// misc
+void MinimizerInterface::saveMinimizerSettings(TDirectory* saveDir_) const {
+  LogInfo << "Saving minimizer settings..." << std::endl;
+
+  GenericToolbox::writeInTFile( saveDir_, TNamed("minimizerType", _minimizerType_.c_str()) );
+  GenericToolbox::writeInTFile( saveDir_, TNamed("minimizerAlgo", _minimizerAlgo_.c_str()) );
+  GenericToolbox::writeInTFile( saveDir_, TNamed("strategy", std::to_string(_strategy_).c_str()) );
+  GenericToolbox::writeInTFile( saveDir_, TNamed("printLevel", std::to_string(_printLevel_).c_str()) );
+  GenericToolbox::writeInTFile( saveDir_, TNamed("targetEDM", std::to_string(this->getTargetEdm()).c_str()) );
+  GenericToolbox::writeInTFile( saveDir_, TNamed("maxIterations", std::to_string(_maxIterations_).c_str()) );
+  GenericToolbox::writeInTFile( saveDir_, TNamed("maxFcnCalls", std::to_string(_maxFcnCalls_).c_str()) );
+  GenericToolbox::writeInTFile( saveDir_, TNamed("tolerance", std::to_string(_tolerance_).c_str()) );
+  GenericToolbox::writeInTFile( saveDir_, TNamed("stepSizeScaling", std::to_string(_stepSizeScaling_).c_str()) );
+  GenericToolbox::writeInTFile( saveDir_, TNamed("useNormalizedFitSpace", std::to_string(getLikelihood().getUseNormalizedFitSpace()).c_str()) );
+
+  if( _enableSimplexBeforeMinimize_ ){
+    GenericToolbox::writeInTFile( saveDir_, TNamed("enableSimplexBeforeMinimize", std::to_string(_enableSimplexBeforeMinimize_).c_str()) );
+    GenericToolbox::writeInTFile( saveDir_, TNamed("simplexMaxFcnCalls", std::to_string(_simplexMaxFcnCalls_).c_str()) );
+    GenericToolbox::writeInTFile( saveDir_, TNamed("simplexToleranceLoose", std::to_string(_simplexToleranceLoose_).c_str()) );
+    GenericToolbox::writeInTFile( saveDir_, TNamed("simplexStrategy", std::to_string(_simplexStrategy_).c_str()) );
+  }
+
+  if( this->isEnablePostFitErrorEval() ){
+    GenericToolbox::writeInTFile( saveDir_, TNamed("enablePostFitErrorFit", std::to_string(this->isEnablePostFitErrorEval()).c_str()) );
+    GenericToolbox::writeInTFile( saveDir_, TNamed("errorAlgo", _errorAlgo_.c_str()) );
+  }
+}
+
+// protected
 void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
   LogInfo << __METHOD_NAME__ << std::endl;
   LogThrowIf(not isInitialized(), "not initialized");
@@ -612,7 +640,7 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
           GenericToolbox::writeInTFile(
               GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition/parBreakdown"),
               &parBreakdownHist, Form("par#%i", iPar)
-              );
+          );
 
           parBreakdownAccum[iPar].Add(&parBreakdownHist);
           parBreakdownAccum[iPar].SetLabelSize(0.02);
@@ -629,9 +657,9 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
 
         if( not GundamGlobals::isLightOutputMode() ) {
           GenericToolbox::writeInTFile(
-            GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"),
-            &accumPlot, "parBreakdown"
-            );
+              GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"),
+              &accumPlot, "parBreakdown"
+          );
         }
       }
 
@@ -685,7 +713,7 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
 
         auto* iParList = &iParSet.getEffectiveParameterList();
         for( auto& iPar : *iParList ){
-            int iMinimizerIndex = GenericToolbox::findElementIndex((FitParameter*) &iPar, getMinimizerFitParameterPtr());
+          int iMinimizerIndex = GenericToolbox::findElementIndex((FitParameter*) &iPar, getMinimizerFitParameterPtr());
 
           int jOffset{0};
           for( const auto& jParSet : getPropagator().getParameterSetsList() ){
@@ -1111,30 +1139,6 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
 
   } // parSet
 }
-
-void MinimizerInterface::scanParameters(TDirectory* saveDir_){
-  LogThrowIf(not isInitialized());
-  LogInfo << "Performing scans of fit parameters..." << std::endl;
-  for( int iPar = 0 ; iPar < getMinimizer()->NDim() ; iPar++ ){
-    if( getMinimizer()->IsFixedVariable(iPar) ){
-      LogWarning << getMinimizer()->VariableName(iPar)
-                 << " is fixed. Skipping..." << std::endl;
-      continue;
-    }
-    this->getPropagator().getParScanner().scanFitParameter(*getMinimizerFitParameterPtr()[iPar], saveDir_);
-  } // iPar
-  for( auto& parSet : this->getPropagator().getParameterSetsList() ){
-    if( not parSet.isEnabled() ) continue;
-    if( parSet.isUseEigenDecompInFit() ){
-      LogWarning << parSet.getName() << " is using eigen decomposition. Scanning original parameters..." << std::endl;
-      for( auto& par : parSet.getParameterList() ){
-        if( not par.isEnabled() ) continue;
-        this->getPropagator().getParScanner().scanFitParameter(par, saveDir_);
-      }
-    }
-  }
-}
-
 void MinimizerInterface::updateCacheToBestfitPoint(){
   LogThrowIf(_minimizer_->X() == nullptr, "No best fit point provided by the minimizer.");
 

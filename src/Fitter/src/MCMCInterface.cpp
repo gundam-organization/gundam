@@ -18,8 +18,6 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[MCMC]");
 });
 
-MCMCInterface::MCMCInterface(FitterEngine* owner_):
-  MinimizerBase(owner_){}
 
 void MCMCInterface::readConfigImpl(){
   MinimizerBase::readConfigImpl();
@@ -208,7 +206,6 @@ void MCMCInterface::readConfigImpl(){
   _simpleSigma_ = GenericToolbox::Json::fetchValue(_config_,
                                         "simpleSigma", _simpleSigma_);
 }
-
 void MCMCInterface::initializeImpl(){
   MinimizerBase::initializeImpl();
   LogInfo << "Initializing the MCMC Integration..." << std::endl;
@@ -222,10 +219,6 @@ void MCMCInterface::initializeImpl(){
   // ranges)
   getLikelihood().setParameterValidity(_likelihoodValidity_);
 }
-
-/// An MCMC doesn't really converge in the sense meant here. This flags
-/// success.
-bool MCMCInterface::isFitHasConverged() const {return true;}
 
 /// Copy the current parameter values to the tree.
 void MCMCInterface::fillPoint(bool fillModel) {
@@ -307,9 +300,7 @@ bool MCMCInterface::adaptiveRestoreState(AdaptiveStepMCMC& mcmc,
 
   return true;
 }
-
-bool
-MCMCInterface::adaptiveDefaultProposalCovariance(AdaptiveStepMCMC& mcmc,
+bool MCMCInterface::adaptiveDefaultProposalCovariance(AdaptiveStepMCMC& mcmc,
                                                  Vector& prior) {
 
   /// Set the diagonal elements for the parameters.
@@ -397,9 +388,7 @@ MCMCInterface::adaptiveDefaultProposalCovariance(AdaptiveStepMCMC& mcmc,
 
   return true;
 }
-
-bool
-MCMCInterface::adaptiveLoadProposalCovariance(AdaptiveStepMCMC& mcmc,
+bool MCMCInterface::adaptiveLoadProposalCovariance(AdaptiveStepMCMC& mcmc,
                                               Vector& prior,
                                               const std::string& fileName,
                                               const std::string& histName) {
@@ -504,7 +493,6 @@ MCMCInterface::adaptiveLoadProposalCovariance(AdaptiveStepMCMC& mcmc,
 
   return true;
 }
-
 void MCMCInterface::setupAndRunAdaptiveStep(AdaptiveStepMCMC& mcmc) {
 
   mcmc.GetProposeStep().SetDim(getMinimizerFitParameterPtr().size());
@@ -723,7 +711,6 @@ void MCMCInterface::setupAndRunAdaptiveStep(AdaptiveStepMCMC& mcmc) {
   LogInfo << "Finished running chains" << std::endl;
 
 }
-
 void MCMCInterface::setupAndRunSimpleStep(SimpleStepMCMC& mcmc) {
 
   mcmc.GetProposeStep().SetDim(getMinimizerFitParameterPtr().size());
@@ -926,11 +913,9 @@ void MCMCInterface::minimize() {
   if (outputTree) outputTree->Write();
 
 }
-
 void MCMCInterface::calcErrors() {
     LogWarning << "Errors not calculated with MCMC" << std::endl;
 }
-
 void MCMCInterface::scanParameters(TDirectory* saveDir_) {
   LogThrowIf(not isInitialized());
   LogInfo << "Performing scans of fit parameters..." << std::endl;

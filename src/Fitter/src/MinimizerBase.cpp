@@ -9,8 +9,6 @@ LoggerInit([]{
 });
 
 
-MinimizerBase::MinimizerBase(FitterEngine* owner_): _owner_(owner_){}
-
 void MinimizerBase::readConfigImpl(){
   LogInfo << "Reading MinimizerBase config..." << std::endl;
 
@@ -39,7 +37,6 @@ void MinimizerBase::readConfigImpl(){
   }
 
 }
-
 void MinimizerBase::initializeImpl(){
   LogInfo << "Initializing the minimizer..." << std::endl;
   LogThrowIf( _owner_== nullptr, "FitterEngine ptr not set." );

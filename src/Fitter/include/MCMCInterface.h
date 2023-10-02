@@ -32,14 +32,18 @@ class FitterEngine;
 /// LikelihoodInterface).
 class MCMCInterface : public MinimizerBase {
 
+protected:
+  void readConfigImpl() override;
+  void initializeImpl() override;
+
 public:
-  explicit MCMCInterface(FitterEngine* owner_);
+  explicit MCMCInterface(FitterEngine* owner_): MinimizerBase(owner_){}
 
   /// Local RTTI
   [[nodiscard]] std::string getMinimizerTypeName() const override { return "MCMCInterface"; };
 
-  /// A boolean to flag indicating if the MCMC exited successfully.
-  [[nodiscard]] virtual bool isFitHasConverged() const override;
+  /// An MCMC doesn't really converge in the sense meant here. This flags success.
+  [[nodiscard]] virtual bool isFitHasConverged() const override  {return true;}
 
   /// Generate a chain.
   void minimize() override;
@@ -51,9 +55,6 @@ public:
   /// Scan the parameters.
   void scanParameters(TDirectory* saveDir_) override;
 
-protected:
-  void readConfigImpl() override;
-  void initializeImpl() override;
 
 private:
   std::string _algorithmName_{"metropolis"};
