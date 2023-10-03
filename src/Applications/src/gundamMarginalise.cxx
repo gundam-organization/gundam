@@ -177,10 +177,10 @@ int main(int argc, char** argv){
         propagator.injectParameterValues( GenericToolbox::Json::readConfigJsonStr( parState_->GetTitle() ) );
         for( auto& parSet : propagator.getParameterSetsList() ){
             if( not parSet.isEnabled() ){ continue; }
-            LogInfo<< parSet.getName()<<std::endl;
+//            LogInfo<< parSet.getName()<<std::endl;
             for( auto& par : parSet.getParameterList() ){
                 if( not par.isEnabled() ){ continue; }
-                LogInfo<<"  "<<par.getTitle()<<" -> "<<par.getParameterValue()<<std::endl;
+//                LogInfo<<"  "<<par.getTitle()<<" -> "<<par.getParameterValue()<<std::endl;
                 par.setPriorValue( par.getParameterValue() );
             }
         }
@@ -257,12 +257,12 @@ int main(int argc, char** argv){
     // 4. "g" value: the chi square value as extracted from the covariance matrix: double
     // 5. value of the priors for the marginalised parameters: vector<double>
 
-    std::vector<double> eta;
-    std::vector<double> theta;
+    std::vector<double> parameters;
+    std::vector<bool> margThis;
     std::vector<double> prior;
     double LLH, gLLH;
-    margThrowTree->Branch("marginalisedParameters", &eta);
-    margThrowTree->Branch("nonMarginalisedParameters", &theta);
+    margThrowTree->Branch("Parameters", &parameters);
+    margThrowTree->Branch("Marginalise", &margThis);
     margThrowTree->Branch("prior", &prior);
     margThrowTree->Branch("LLH", &LLH);
     margThrowTree->Branch("gLLH", &gLLH);
@@ -288,18 +288,20 @@ int main(int argc, char** argv){
         //propagator.propagateParametersOnSamples(); // Adrien says this is not necessary
         propagator.updateLlhCache();
         LLH = propagator.getLlhBuffer();
+        gLLH = 0;
 
-
-
+        parameters.clear();
+        margThis.clear();
+        prior.clear();
         for( auto& parSet : propagator.getParameterSetsList() ){
             if( not parSet.isEnabled() ){ continue; }
 //            LogInfo<< parSet.getName()<<std::endl;
             for( auto& par : parSet.getParameterList() ){
                 if( not par.isEnabled() ){ continue; }
 //                LogInfo<<"  "<<par.getTitle()<<" -> "<<par.getParameterValue()<<std::endl;
-                eta.push_back(par.getParameterValue());
-                theta.push_back(par.getParameterValue());
-                prior.push_back( ( par.getPriorValue() - par.getParameterValue() )/ par.());
+                parameters.push_back(par.getParameterValue());
+                margThis.push_back(false);
+                prior.push_back( par.getDistanceFromNominal()*par.getDistanceFromNominal() );
             }
         }
 
