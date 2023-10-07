@@ -79,6 +79,7 @@ public:
   [[nodiscard]] nlohmann::json exportParameterInjectorConfig() const;
   void injectParameterValues(const nlohmann::json &config_);
   void throwParametersFromGlobalCovariance(bool quietVerbose_ = true);
+  std::string getSampleBreakdownTableStr() const;
 
   // Logger related
   static void muteLogger();

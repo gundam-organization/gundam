@@ -228,7 +228,21 @@ void Propagator::initializeImpl(){
   // Copy to data container
   if( usedMcContainer ){
     if( _throwAsimovToyParameters_ ){
-      LogInfo << "Throwing asimov toy parameters..." << std::endl;
+      LogWarning << "Will throw toy parameters..." << std::endl;
+
+      if( _showEventBreakdown_ ){
+        LogInfo << "Propagating prior parameters on the initially loaded events..." << std::endl;
+        bool cacheManagerState = GundamGlobals::getEnableCacheManager();
+        GundamGlobals::setEnableCacheManager(false);
+        this->resetReweight();
+        this->reweightMcEvents();
+        GundamGlobals::setEnableCacheManager(cacheManagerState);
+
+        LogInfo << "Sample breakdown prior to the throwing:" << std::endl;
+        std::cout << getSampleBreakdownTableStr() << std::endl;
+      }
+
+
 
       if( not _throwToyParametersWithGlobalCov_ ){
         LogInfo << "Throwing parameter using each parameter sets..." << std::endl;
@@ -497,23 +511,7 @@ void Propagator::initializeImpl(){
     }
 
     LogWarning << "Sample breakdown:" << std::endl;
-    GenericToolbox::TablePrinter t;
-
-    t << "Sample" << GenericToolbox::TablePrinter::NextColumn;
-    t << "MC (# binned event)" << GenericToolbox::TablePrinter::NextColumn;
-    t << "Data (# binned event)" << GenericToolbox::TablePrinter::NextColumn;
-    t << "MC (weighted)" << GenericToolbox::TablePrinter::NextColumn;
-    t << "Data (weighted)" << GenericToolbox::TablePrinter::NextLine;
-
-    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-      t << "\"" << sample.getName() << "\"" << GenericToolbox::TablePrinter::NextColumn;
-      t << sample.getMcContainer().getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
-      t << sample.getDataContainer().getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
-      t << sample.getMcContainer().getSumWeights() << GenericToolbox::TablePrinter::NextColumn;
-      t << sample.getDataContainer().getSumWeights() << GenericToolbox::TablePrinter::NextLine;
-    }
-
-    t.printTable();
+    std::cout << getSampleBreakdownTableStr() << std::endl;
 
   }
   if( _debugPrintLoadedEvents_ ){
@@ -845,6 +843,27 @@ void Propagator::throwParametersFromGlobalCovariance(bool quietVerbose_){
     // reached this point: all parameters are within bounds
     keepThrowing = false;
   }
+}
+std::string Propagator::getSampleBreakdownTableStr() const{
+  GenericToolbox::TablePrinter t;
+
+  t << "Sample" << GenericToolbox::TablePrinter::NextColumn;
+  t << "MC (# binned event)" << GenericToolbox::TablePrinter::NextColumn;
+  t << "Data (# binned event)" << GenericToolbox::TablePrinter::NextColumn;
+  t << "MC (weighted)" << GenericToolbox::TablePrinter::NextColumn;
+  t << "Data (weighted)" << GenericToolbox::TablePrinter::NextLine;
+
+  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    t << "\"" << sample.getName() << "\"" << GenericToolbox::TablePrinter::NextColumn;
+    t << sample.getMcContainer().getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
+    t << sample.getDataContainer().getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
+    t << sample.getMcContainer().getSumWeights() << GenericToolbox::TablePrinter::NextColumn;
+    t << sample.getDataContainer().getSumWeights() << GenericToolbox::TablePrinter::NextLine;
+  }
+
+  std::stringstream ss;
+  ss << t.generateTableString();
+  return ss.str();
 }
 
 // Protected
