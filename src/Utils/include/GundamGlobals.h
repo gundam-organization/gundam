@@ -41,35 +41,26 @@ class GundamGlobals{
 public:
 
   // Setters
-  static void setEnableCacheManager(bool enable = true);
-  static void setLightOutputMode(bool enable_);
-  static void setDisableDialCache(bool disableDialCache_);
+  static void setEnableCacheManager(bool enable = true){ _enableCacheManager_ = enable; }
+  static void setLightOutputMode(bool enable_){ _lightOutputMode_ = enable_; }
+  static void setDisableDialCache(bool disableDialCache_){ _disableDialCache_ = disableDialCache_; }
   static void setVerboseLevel(VerboseLevel verboseLevel_);
   static void setVerboseLevel(int verboseLevel_);
-  static void setNbThreads(int nbThreads_);
 
   // Getters
-  static bool isEnableDevMode();
-  static bool getEnableCacheManager();
-  static bool isDisableDialCache();
-  static bool isLightOutputMode();
-  static VerboseLevel getVerboseLevel();
-  static const int& getNbThreads();
-  static std::mutex& getThreadMutex();
-  static std::map<std::string, bool>& getBoolMap();
-  static std::vector<TChain*>& getChainList();
-  static GenericToolbox::ParallelWorker &getParallelWorker();
+  static bool getEnableCacheManager(){ return _enableCacheManager_; }
+  static bool isDisableDialCache(){ return _disableDialCache_; }
+  static bool isLightOutputMode(){ return _lightOutputMode_; }
+  static VerboseLevel getVerboseLevel(){ return _verboseLevel_; }
+  static std::mutex& getThreadMutex(){ return _threadMutex_; }
+  static GenericToolbox::ParallelWorker &getParallelWorker(){ return _threadPool_; }
 
 private:
 
-  static bool _enableDevMode_;
   static bool _disableDialCache_;
   static bool _enableCacheManager_;
   static bool _lightOutputMode_;
-  static int _nbThreads_;
   static std::mutex _threadMutex_;
-  static std::map<std::string, bool> _boolMap_;
-  static std::vector<TChain*> _chainList_;
   static VerboseLevel _verboseLevel_;
   static GenericToolbox::ParallelWorker _threadPool_;
 

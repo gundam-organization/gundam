@@ -155,22 +155,22 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
           if( not histPtrToFill->isBinCacheBuilt ){
             // If any, launch rebuild cache
             LogInfo << "Build event bin cache for sample \"" << sample.getName() << "\" " << (isData? "(data)":"(mc)") << std::endl;
-            this->buildEventBinCache(histPtrToFillList, eventListPtr, isData);
+            PlotGenerator::buildEventBinCache(histPtrToFillList, eventListPtr, isData);
             break; // all caches done at once
           }
         }
 
-
         // Filling the selected histograms
-        int nThreads = GundamGlobals::getNbThreads();
-        std::function<void(int)> fillJob = [&]( int iThread ){
-          int iEvent = -1;
-          int iHist = -1;
-          std::string pBarTitle;
-          if( iThread == 0 ) pBarTitle = LogDebug.getPrefixString() + "Filling histograms of sample \"" + sample.getName() + "\"";
+        std::function<void(int)> fillJob = [&]( int iThread_ ){
 
-          for( auto& hist : histPtrToFillList ){
-            for( int iBin = iThread+1 ; iBin <= hist->histPtr->GetNbinsX() ; iBin += nThreads ){
+          for( auto* hist : histPtrToFillList ){
+
+            auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
+                iThread_, GundamGlobals::getParallelWorker().getNbThreads(),
+                hist->histPtr->GetNbinsX()
+            );
+
+            for( int iBin = bounds.first+1 ; iBin <= bounds.second ; iBin++ ){
               hist->histPtr->SetBinContent(iBin, 0);
               for( auto* evtPtr : hist->_binEventPtrList_[iBin-1] ){
                 hist->histPtr->AddBinContent(iBin, evtPtr->getEventWeight());
@@ -634,11 +634,13 @@ void PlotGenerator::defineHistogramHolders() {
   }
 
   std::function<void(int)> fetchSplitVar = [&](int iThread_){
-    int iSample{-1};
-    int iHistDef;
-    for( const auto& sample : _fitSampleSetPtr_->getFitSampleList() ){
-      iSample++;
-      if(iSample % GundamGlobals::getNbThreads() != iThread_ ){ continue; }
+    auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
+        iThread_, GundamGlobals::getParallelWorker().getNbThreads(),
+        int(_fitSampleSetPtr_->getFitSampleList().size())
+    );
+
+    for( int iSample = bounds.first ; iSample < bounds.second ; iSample++ ){
+      const FitSample& sample = _fitSampleSetPtr_->getFitSampleList()[iSample];
       for( const auto& event : sample.getMcContainer().eventList ){
         for( auto& splitVarInstance: splitVarsDictionary ){
           if(splitVarInstance.first.empty()) continue;
@@ -648,8 +650,9 @@ void PlotGenerator::defineHistogramHolders() {
           }
         } // splitVarList
       } // Event
-    } // Sample
+    }
   };
+
   GundamGlobals::getParallelWorker().addJob("fetchSplitVar", fetchSplitVar);
   GundamGlobals::getParallelWorker().runJob("fetchSplitVar");
   GundamGlobals::getParallelWorker().removeJob("fetchSplitVar");
@@ -861,34 +864,60 @@ void PlotGenerator::defineHistogramHolders() {
 }
 void PlotGenerator::buildEventBinCache(const std::vector<HistHolder *> &histPtrToFillList, const std::vector<PhysicsEvent> *eventListPtr, bool isData_) {
 
+  std::function<void()> prepareCacheFct = [&]() {
+    for (auto *holder: histPtrToFillList) {
+      if (not holder->isBinCacheBuilt) {
+        if (holder->histPtr == nullptr) { continue; }
+
+        // pre-allocate
+        holder->_binEventPtrList_.resize(holder->histPtr->GetNbinsX());
+        for (auto &evtList: holder->_binEventPtrList_) { evtList.reserve(eventListPtr->size()); }
+
+        // fill any to double cache
+        if (holder->varToPlot != "Raw") {
+          for (auto &evt: *eventListPtr) { evt.getVarAsDouble(holder->varToPlot); }
+        }
+      }
+    }
+  };
   std::function<void(int)> fillEventHistCache = [&](int iThread_){
-    int iHistCache{-1};
-    std::string pBarTitle;
-    for( auto& histPtrToFill : histPtrToFillList ){
-      iHistCache++;
 
-      if(iHistCache % GundamGlobals::getNbThreads() != iThread_ ) continue;
+    auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
+        iThread_, GundamGlobals::getParallelWorker().getNbThreads(),
+        int(histPtrToFillList.size())
+    );
 
-      if( not histPtrToFill->isBinCacheBuilt ){
+    HistHolder* histPtr{nullptr};
+    for( int iHist = bounds.first ; iHist < bounds.second ; iHist++ ){
+      histPtr = histPtrToFillList[iHist];
 
-        histPtrToFill->_binEventPtrList_.resize(histPtrToFill->histPtr->GetNbinsX());
+      if( not histPtr->isBinCacheBuilt ){
         int iBin{-1};
         for( const auto& event : *eventListPtr ){
-          if( histPtrToFill->splitVarName.empty() or event.getVarValue<int>(histPtrToFill->splitVarName) == histPtrToFill->splitVarValue){
-            if( histPtrToFill->varToPlot == "Raw" ) iBin = event.getSampleBinIndex() + 1;
-            else iBin = histPtrToFill->histPtr->FindBin(event.getVarAsDouble(histPtrToFill->varToPlot));
-            if( iBin > 0 and iBin <= histPtrToFill->histPtr->GetNbinsX() ){
+          if( histPtr->splitVarName.empty() or event.getVarValue<int>(histPtr->splitVarName) == histPtr->splitVarValue){
+
+            if( histPtr->varToPlot == "Raw" ){ iBin = event.getSampleBinIndex() + 1; }
+            else                             { iBin = histPtr->histPtr->FindBin(event.getVarAsDouble(histPtr->varToPlot)); }
+
+            if( iBin > 0 and iBin <= histPtr->histPtr->GetNbinsX() ){
               // so it's a valid bin!
-              histPtrToFill->_binEventPtrList_[iBin-1].emplace_back(&event);
+              histPtr->_binEventPtrList_[iBin-1].emplace_back( &event );
             }
           }
         }
-        histPtrToFill->isBinCacheBuilt = true;
+        histPtr->isBinCacheBuilt = true;
       }
+    }
+  };
+  std::function<void()> shrinkAllocationsFct = [&]() {
+    for( auto* holder : histPtrToFillList ){
+      for( auto& evtList : holder->_binEventPtrList_ ){ evtList.shrink_to_fit(); }
     }
   };
 
   GundamGlobals::getParallelWorker().addJob("fillEventHistCache", fillEventHistCache);
+  GundamGlobals::getParallelWorker().setPreParallelJob("fillEventHistCache", prepareCacheFct);
+  GundamGlobals::getParallelWorker().setPostParallelJob("fillEventHistCache", shrinkAllocationsFct);
   GundamGlobals::getParallelWorker().runJob("fillEventHistCache");
   GundamGlobals::getParallelWorker().removeJob("fillEventHistCache");
 

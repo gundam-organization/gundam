@@ -109,7 +109,7 @@ protected:
   void initializeImpl() override;
 
   // Internals
-  void buildEventBinCache(const std::vector<HistHolder *> &histPtrToFillList, const std::vector<PhysicsEvent> *eventListPtr, bool isData_);
+  static void buildEventBinCache(const std::vector<HistHolder *> &histPtrToFillList, const std::vector<PhysicsEvent> *eventListPtr, bool isData_);
 
 private:
   // Parameters

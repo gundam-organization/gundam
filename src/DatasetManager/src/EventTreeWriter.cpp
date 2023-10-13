@@ -214,7 +214,7 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
     GundamGlobals::getParallelWorker().addJob("buildResponseGraph", [&](int iThread_){
       TGraph* grPtr{nullptr};
       for( size_t iGlobalPar = 0 ; iGlobalPar < parIndexList.size() ; iGlobalPar++ ){
-        if( iThread_ != -1 and iGlobalPar % GundamGlobals::getNbThreads() != iThread_ ) continue;
+        if( iThread_ != -1 and iGlobalPar % GundamGlobals::getParallelWorker().getNbThreads() != iThread_ ) continue;
 
         // reset the corresponding graph
         grPtr = graphParResponse[iGlobalPar];

@@ -4,7 +4,6 @@
 
 #include "Logger.h"
 #include "GenericToolbox.h"
-#include "GenericToolbox.ParallelWorker.h"
 
 #include <string>
 #include <vector>
