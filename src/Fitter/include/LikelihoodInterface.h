@@ -146,7 +146,7 @@ public:
   /// Set the maximum number of parameters to show on a line when parameters
   /// are being show by the monitor.
   void setMaxNbParametersPerLineOnMonitor(int v) {_maxNbParametersPerLineOnMonitor_=v;}
-  bool getMaxNbParametersPerLineOnMonitor() const {return _maxNbParametersPerLineOnMonitor_;}
+  int getMaxNbParametersPerLineOnMonitor() const {return _maxNbParametersPerLineOnMonitor_;}
 
   void setMonitorGradientDescent(bool monitorGradientDescent_){ _monitorGradientDescent_ = monitorGradientDescent_; }
   bool isMonitorGradientDescent() const { return _monitorGradientDescent_; }

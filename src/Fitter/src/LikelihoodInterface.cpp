@@ -282,7 +282,9 @@ double LikelihoodInterface::evalFit(const double* parArray_){
         }
         else{
           ssHeader << ", ";
-          if( nParPerLine >= _maxNbParametersPerLineOnMonitor_ ) { ssHeader << std::endl; nParPerLine = 0; }
+          if( nParPerLine >= _maxNbParametersPerLineOnMonitor_ ) {
+            ssHeader << std::endl; nParPerLine = 0;
+          }
         }
         if(fitPar->gotUpdated()) ssHeader << GenericToolbox::ColorCodes::blueBackground;
         if(getUseNormalizedFitSpace()) ssHeader << ParameterSet::toNormalizedParValue(fitPar->getParameterValue(), *fitPar);
