@@ -42,7 +42,7 @@ void PlotGenerator::initializeImpl() {
 }
 
 // Setters
-void PlotGenerator::setFitSampleSetPtr(const FitSampleSet *fitSampleSetPtr) {
+void PlotGenerator::setFitSampleSetPtr(const SampleSet *fitSampleSetPtr) {
   _fitSampleSetPtr_ = fitSampleSetPtr;
 }
 
@@ -261,7 +261,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
   int canvasNbXplots = GenericToolbox::Json::fetchValue(_canvasParameters_, "nbXplots", 3);
   int canvasNbYplots = GenericToolbox::Json::fetchValue(_canvasParameters_, "nbYplots", 2);
 
-  std::map<std::string, std::map<const FitSample*, std::vector<const HistHolder*>>> histsToStackMap; // histsToStackMap[path][FitSample] = listOfTh1d
+  std::map<std::string, std::map<const Sample*, std::vector<const HistHolder*>>> histsToStackMap; // histsToStackMap[path][FitSample] = listOfTh1d
   for( auto& histHolder : histHolderList_ ){
     if( histHolder.isData ) continue; // data associated to each later
     histsToStackMap[buildCanvasPath(&histHolder)][histHolder.fitSamplePtr].emplace_back(&histHolder );
@@ -272,7 +272,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
     const std::string& canvasPath = histsSamples.first;
     for( auto& histsToStack : histsSamples.second ){
       for( auto& histHolder : histHolderList_ ){
-        const FitSample* samplePtr = histsToStack.first;
+        const Sample* samplePtr = histsToStack.first;
 
         // we are searching for data
         if( not histHolder.isData ) continue;
@@ -297,7 +297,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
     int canvasIndex = 0;
     int iSampleSlot = 0;
     for (const auto &histList : histsToStackPair.second) {
-      const FitSample* samplePtr = histList.first;
+      const Sample* samplePtr = histList.first;
       iSampleSlot++;
 
       if (iSampleSlot > canvasNbXplots * canvasNbYplots) {
@@ -620,7 +620,7 @@ void PlotGenerator::defineHistogramHolders() {
   _histHolderCacheList_[0].clear();
 
   LogInfo << "Fetching appearing split vars..." << std::endl;
-  std::map<std::string, std::map<const FitSample*, std::vector<int>>> splitVarsDictionary;
+  std::map<std::string, std::map<const Sample*, std::vector<int>>> splitVarsDictionary;
   for( const auto& histConfig : _histogramsDefinition_ ){
     auto splitVars = GenericToolbox::Json::fetchValue(histConfig, "splitVars", std::vector<std::string>{""});
     for( auto& splitVar : splitVars ){
@@ -640,7 +640,7 @@ void PlotGenerator::defineHistogramHolders() {
     );
 
     for( int iSample = bounds.first ; iSample < bounds.second ; iSample++ ){
-      const FitSample& sample = _fitSampleSetPtr_->getFitSampleList()[iSample];
+      const Sample& sample = _fitSampleSetPtr_->getFitSampleList()[iSample];
       for( const auto& event : sample.getMcContainer().eventList ){
         for( auto& splitVarInstance: splitVarsDictionary ){
           if(splitVarInstance.first.empty()) continue;

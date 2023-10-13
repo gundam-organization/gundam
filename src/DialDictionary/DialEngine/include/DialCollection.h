@@ -9,7 +9,7 @@
 #include "DialInterface.h"
 #include "DialInputBuffer.h"
 #include "DialResponseSupervisor.h"
-#include "FitSampleSet.h"
+#include "SampleSet.h"
 
 #include "GenericToolbox.Wrappers.h"
 
@@ -23,7 +23,7 @@ class DialCollection : public JsonBaseClass {
 
 public:
   DialCollection() = delete;
-  explicit DialCollection(std::vector<FitParameterSet> *targetParameterSetListPtr): _parameterSetListPtr_(targetParameterSetListPtr) {}
+  explicit DialCollection(std::vector<ParameterSet> *targetParameterSetListPtr): _parameterSetListPtr_(targetParameterSetListPtr) {}
 
   //  The PolymorphicObjectWrapper doesn't have the correct semantics since it
   // clones the payload when it's copied.  We want to leave the pointee alone
@@ -63,8 +63,8 @@ public:
   [[nodiscard]] bool isDatasetValid(const std::string& datasetName_) const;
   std::string getTitle() const;
   std::string getSummary(bool shallow_ = true);
-  FitParameter* getSupervisedParameter() const;
-  FitParameterSet* getSupervisedParameterSet() const;
+  Parameter* getSupervisedParameter() const;
+  ParameterSet* getSupervisedParameterSet() const;
 
   // core
   void clear();
@@ -115,7 +115,7 @@ private:
   GenericToolbox::CopiableAtomic<size_t> _dialFreeSlot_{0};
 
   // external refs
-  std::vector<FitParameterSet>* _parameterSetListPtr_{nullptr};
+  std::vector<ParameterSet>* _parameterSetListPtr_{nullptr};
 
 };
 

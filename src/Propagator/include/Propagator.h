@@ -9,8 +9,8 @@
 #include "DatasetLoader.h"
 #include "PlotGenerator.h"
 #include "EventTreeWriter.h"
-#include "FitSampleSet.h"
-#include "FitParameterSet.h"
+#include "SampleSet.h"
+#include "ParametersManager.h"
 #include "JsonBaseClass.h"
 #include "ParScanner.h"
 #include "DialCollection.h"
@@ -32,7 +32,6 @@ public:
   void setIThrow(int iThrow){ _iThrow_ = iThrow; }
   void setLoadAsimovData(bool loadAsimovData){ _loadAsimovData_ = loadAsimovData; }
   void setParameterInjectorConfig(const nlohmann::json &parameterInjector){ _parameterInjectorMc_ = parameterInjector; }
-  void setGlobalCovarianceMatrix(const std::shared_ptr<TMatrixD> &globalCovarianceMatrix){ _globalCovarianceMatrix_ = globalCovarianceMatrix; }
 
   // Const getters
   [[nodiscard]] bool isThrowAsimovToyParameters() const { return _throwAsimovToyParameters_; }
@@ -41,21 +40,18 @@ public:
   [[nodiscard]] double getLlhStatBuffer() const{ return _llhStatBuffer_; }
   [[nodiscard]] double getLlhPenaltyBuffer() const{ return _llhPenaltyBuffer_; }
   [[nodiscard]] double getLlhRegBuffer() const{ return _llhRegBuffer_; }
+  [[nodiscard]] const ParametersManager &getParametersManager() const { return _parManager_; }
   [[nodiscard]] const EventTreeWriter &getTreeWriter() const{ return _treeWriter_; }
-  [[nodiscard]] const std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix() const{ return _globalCovarianceMatrix_; }
-  [[nodiscard]] const std::shared_ptr<TMatrixD> &getStrippedCovarianceMatrix() const{ return _strippedCovarianceMatrix_; }
   [[nodiscard]] const std::vector<DatasetLoader> &getDataSetList() const{ return _dataSetList_; }
-  [[nodiscard]] const std::vector<FitParameterSet> &getParameterSetsList() const{ return _parameterSetList_; }
   [[nodiscard]] const std::vector<DialCollection> &getDialCollections() const{ return _dialCollections_; }
 
   // Non-const getters
   ParScanner& getParScanner(){ return _parScanner_; }
-  FitSampleSet &getFitSampleSet(){ return _fitSampleSet_; }
+  SampleSet &getFitSampleSet(){ return _fitSampleSet_; }
+  ParametersManager &getParametersManager(){ return _parManager_; }
   PlotGenerator &getPlotGenerator(){ return _plotGenerator_; }
   EventDialCache& getEventDialCache(){ return _eventDialCache_; }
-  std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix(){ return _globalCovarianceMatrix_; }
   std::vector<DatasetLoader> &getDataSetList(){ return _dataSetList_; }
-  std::vector<FitParameterSet> &getParameterSetsList(){ return _parameterSetList_; }
 
   // Misc getters
   [[nodiscard]] const double* getLlhBufferPtr() const { return &_llhBuffer_; }
@@ -63,9 +59,6 @@ public:
   [[nodiscard]] const double* getLlhPenaltyBufferPtr() const { return &_llhPenaltyBuffer_; }
   [[nodiscard]] const double* getLlhRegBufferPtr() const { return &_llhRegBuffer_; }
   [[nodiscard]] std::string getLlhBufferSummary() const;
-  [[nodiscard]] std::string getParametersSummary( bool showEigen_ = true ) const;
-  [[nodiscard]] const FitParameterSet* getFitParameterSetPtr(const std::string& name_) const;
-  [[nodiscard]] FitParameterSet* getFitParameterSetPtr(const std::string& name_);
   [[nodiscard]] DatasetLoader* getDatasetLoaderPtr(const std::string& name_);
 
   // Core
@@ -76,10 +69,7 @@ public:
   void refillSampleHistograms();
 
   // Misc
-  [[nodiscard]] nlohmann::json exportParameterInjectorConfig() const;
-  void injectParameterValues(const nlohmann::json &config_);
-  void throwParametersFromGlobalCovariance(bool quietVerbose_ = true);
-  std::string getSampleBreakdownTableStr() const;
+  [[nodiscard]] std::string getSampleBreakdownTableStr() const;
 
   // Logger related
   static void muteLogger();
@@ -99,14 +89,14 @@ private:
   bool _showTimeStats_{false};
   bool _loadAsimovData_{false};
   bool _debugPrintLoadedEvents_{false};
+  bool _devSingleThreadReweight_{false};
+  bool _devSingleThreadHistFill_{false};
   int _debugPrintLoadedEventsNbPerSample_{5};
   nlohmann::json _parameterInjectorMc_;
   nlohmann::json _parameterInjectorToy_;
 
   // Internals
   bool _throwAsimovToyParameters_{false};
-  bool _throwToyParametersWithGlobalCov_{false};
-  bool _reThrowParSetIfOutOfBounds_{true};
   bool _enableStatThrowInToys_{true};
   bool _gaussStatThrowInToys_{false};
   bool _enableEventMcThrow_{true};
@@ -116,21 +106,13 @@ private:
   double _llhStatBuffer_{0};
   double _llhPenaltyBuffer_{0};
   double _llhRegBuffer_{0};
-  std::vector<FitParameter*> _globalCovParList_{};
-  std::vector<FitParameter*> _strippedParameterList_{};
-  std::shared_ptr<TMatrixD> _globalCovarianceMatrix_{nullptr};
-  std::shared_ptr<TMatrixD> _strippedCovarianceMatrix_{nullptr};
-  std::shared_ptr<TMatrixD> _choleskyMatrix_{nullptr};
-
-  bool _devSingleThreadReweight_{false};
-  bool _devSingleThreadHistFill_{false};
 
   // Sub-layers
-  FitSampleSet _fitSampleSet_;
+  SampleSet _fitSampleSet_;
+  ParametersManager _parManager_;
   PlotGenerator _plotGenerator_;
   EventTreeWriter _treeWriter_;
   ParScanner _parScanner_{this};
-  std::vector<FitParameterSet> _parameterSetList_;
   std::vector<DatasetLoader> _dataSetList_;
 
   // Monitoring

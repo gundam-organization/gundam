@@ -84,8 +84,8 @@ target_include_directories(
 
 target_link_libraries(
     ${LIB_NAME}
-    GundamFitParameters
-    GundamFitSamples
+    GundamParameters
+    GundamSamples
     ${ZLIB_LIBRARIES}
     ${ROOT_LIBRARIES}
 )

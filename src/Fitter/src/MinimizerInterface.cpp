@@ -94,15 +94,15 @@ void MinimizerInterface::initializeImpl(){
       _minimizer_->SetVariableStepSize(iFitPar, fitPar.getStepSize()*_stepSizeScaling_);
     }
     else{
-      _minimizer_->SetVariable( iFitPar,fitPar.getFullTitle(),
-                                FitParameterSet::toNormalizedParValue(fitPar.getParameterValue(), fitPar),
-                                FitParameterSet::toNormalizedParRange(fitPar.getStepSize()*_stepSizeScaling_, fitPar)
+      _minimizer_->SetVariable(iFitPar, fitPar.getFullTitle(),
+                               ParameterSet::toNormalizedParValue(fitPar.getParameterValue(), fitPar),
+                               ParameterSet::toNormalizedParRange(fitPar.getStepSize() * _stepSizeScaling_, fitPar)
       );
-      if( not std::isnan( fitPar.getMinValue() ) ){ _minimizer_->SetVariableLowerLimit(iFitPar, FitParameterSet::toNormalizedParValue(fitPar.getMinValue(), fitPar)); }
-      if( not std::isnan( fitPar.getMaxValue() ) ){ _minimizer_->SetVariableUpperLimit(iFitPar, FitParameterSet::toNormalizedParValue(fitPar.getMaxValue(), fitPar)); }
+      if( not std::isnan( fitPar.getMinValue() ) ){ _minimizer_->SetVariableLowerLimit(iFitPar, ParameterSet::toNormalizedParValue(fitPar.getMinValue(), fitPar)); }
+      if( not std::isnan( fitPar.getMaxValue() ) ){ _minimizer_->SetVariableUpperLimit(iFitPar, ParameterSet::toNormalizedParValue(fitPar.getMaxValue(), fitPar)); }
       // Changing the boundaries, change the value/step size?
-      _minimizer_->SetVariableValue(iFitPar, FitParameterSet::toNormalizedParValue(fitPar.getParameterValue(), fitPar));
-      _minimizer_->SetVariableStepSize(iFitPar, FitParameterSet::toNormalizedParRange(fitPar.getStepSize()*_stepSizeScaling_, fitPar));
+      _minimizer_->SetVariableValue(iFitPar, ParameterSet::toNormalizedParValue(fitPar.getParameterValue(), fitPar));
+      _minimizer_->SetVariableStepSize(iFitPar, ParameterSet::toNormalizedParRange(fitPar.getStepSize() * _stepSizeScaling_, fitPar));
     }
   }
 
@@ -165,7 +165,7 @@ void MinimizerInterface::minimize(){
     LogInfo << "Writing " << _minimizerType_ << "/Simplex best fit parameters..." << std::endl;
     GenericToolbox::writeInTFile(
         GenericToolbox::mkdirTFile( owner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_) ),
-        TNamed("parameterStateAfterSimplex", GenericToolbox::Json::toReadableString( getPropagator().exportParameterInjectorConfig() ).c_str() )
+        TNamed("parameterStateAfterSimplex", GenericToolbox::Json::toReadableString( getPropagator().getParametersManager().exportParameterInjectorConfig() ).c_str() )
     );
 
     // Back to original
@@ -200,7 +200,7 @@ void MinimizerInterface::minimize(){
   LogInfo << "Writing " << _minimizerType_ << "/" << _minimizerAlgo_ << " best fit parameters..." << std::endl;
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile( owner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_) ),
-      TNamed("parameterStateAfterMinimize", GenericToolbox::Json::toReadableString( getPropagator().exportParameterInjectorConfig() ).c_str() )
+      TNamed("parameterStateAfterMinimize", GenericToolbox::Json::toReadableString( getPropagator().getParametersManager().exportParameterInjectorConfig() ).c_str() )
   );
 
   getLikelihood().saveChi2History();
@@ -266,9 +266,9 @@ void MinimizerInterface::minimize(){
     );
   }
 
-  std::vector<GenericToolbox::RawDataArray> parameterSetArrList(getPropagator().getParameterSetsList().size());
+  std::vector<GenericToolbox::RawDataArray> parameterSetArrList(getPropagator().getParametersManager().getParameterSetsList().size());
   int iParSet{-1};
-  for( auto& parSet : getPropagator().getParameterSetsList() ){
+  for( auto& parSet : getPropagator().getParametersManager().getParameterSetsList() ){
     if( not parSet.isEnabled() ) continue;
 
     std::vector<std::string> leavesDict;
@@ -347,7 +347,7 @@ void MinimizerInterface::calcErrors(){
       for( int iFitPar = 0 ; iFitPar < _minimizer_->NDim() ; iFitPar++ ){
         auto& par = *getMinimizerFitParameterPtr()[iFitPar];
         if(not getLikelihood().getUseNormalizedFitSpace()){ _minimizer_->SetVariableStepSize(iFitPar, par.getStepSize()*_stepSizeScaling_); }
-        else{ _minimizer_->SetVariableStepSize(iFitPar, FitParameterSet::toNormalizedParRange(par.getStepSize()*_stepSizeScaling_, par)); } // should be 1
+        else{ _minimizer_->SetVariableStepSize(iFitPar, ParameterSet::toNormalizedParRange(par.getStepSize() * _stepSizeScaling_, par)); } // should be 1
       }
     }
 
@@ -405,7 +405,7 @@ void MinimizerInterface::scanParameters(TDirectory* saveDir_){
     }
     this->getPropagator().getParScanner().scanFitParameter(*getMinimizerFitParameterPtr()[iPar], saveDir_);
   } // iPar
-  for( auto& parSet : this->getPropagator().getParameterSetsList() ){
+  for( auto& parSet : this->getPropagator().getParametersManager().getParameterSetsList() ){
     if( not parSet.isEnabled() ) continue;
     if( parSet.isUseEigenDecompInFit() ){
       LogWarning << parSet.getName() << " is using eigen decomposition. Scanning original parameters..." << std::endl;
@@ -676,14 +676,14 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
       };
 
       int nGlobalPars{0};
-      for( const auto& parSet : getPropagator().getParameterSetsList() ){ if( parSet.isEnabled() ) nGlobalPars += int(parSet.getNbParameters()); }
+      for( const auto& parSet : getPropagator().getParametersManager().getParameterSetsList() ){ if( parSet.isEnabled() ) nGlobalPars += int(parSet.getNbParameters()); }
 
       // Reconstruct the global passage matrix
       std::vector<std::string> parameterLabels(nGlobalPars);
       auto globalPassageMatrix = std::make_unique<TMatrixD>(nGlobalPars, nGlobalPars);
       for(int i = 0 ; i < nGlobalPars; i++ ){ (*globalPassageMatrix)[i][i] = 1; }
       int blocOffset{0};
-      for( const auto& parSet : getPropagator().getParameterSetsList() ){
+      for( const auto& parSet : getPropagator().getParametersManager().getParameterSetsList() ){
         if( not parSet.isEnabled() ) continue;
 
         auto* parList = &parSet.getParameterList(); // we want the original names
@@ -708,20 +708,20 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
       // Reconstruct the global cov matrix (including eigen decomp parameters)
       auto unstrippedCovMatrix = std::make_unique<TMatrixD>(nGlobalPars, nGlobalPars);
       int iOffset{0};
-      for( const auto& iParSet : getPropagator().getParameterSetsList() ){
+      for( const auto& iParSet : getPropagator().getParametersManager().getParameterSetsList() ){
         if( not iParSet.isEnabled() ) continue;
 
         auto* iParList = &iParSet.getEffectiveParameterList();
         for( auto& iPar : *iParList ){
-          int iMinimizerIndex = GenericToolbox::findElementIndex((FitParameter*) &iPar, getMinimizerFitParameterPtr());
+          int iMinimizerIndex = GenericToolbox::findElementIndex((Parameter*) &iPar, getMinimizerFitParameterPtr());
 
           int jOffset{0};
-          for( const auto& jParSet : getPropagator().getParameterSetsList() ){
+          for( const auto& jParSet : getPropagator().getParametersManager().getParameterSetsList() ){
             if( not jParSet.isEnabled() ) continue;
 
             auto* jParList = &jParSet.getEffectiveParameterList();
             for( auto& jPar : *jParList ){
-              int jMinimizerIndex = GenericToolbox::findElementIndex((FitParameter*) &jPar,
+              int jMinimizerIndex = GenericToolbox::findElementIndex((Parameter*) &jPar,
                                                                      getMinimizerFitParameterPtr());
 
               if( iMinimizerIndex != -1 and jMinimizerIndex != -1 ){
@@ -807,7 +807,7 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
   auto* errorDir = GenericToolbox::mkdirTFile(saveDir_, "errors");
 
   auto savePostFitObjFct =
-      [&](const FitParameterSet& parSet_, const std::vector<FitParameter>& parList_, TMatrixD* covMatrix_, TDirectory* saveSubdir_){
+      [&](const ParameterSet& parSet_, const std::vector<Parameter>& parList_, TMatrixD* covMatrix_, TDirectory* saveSubdir_){
         GenericToolbox::mkdirTFile(saveSubdir_, "matrices")->cd(); // prevent ROOT to delete other hists with the same name...
 
         auto* covMatrixTH2D = GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) covMatrix_, Form("Covariance_%s", parSet_.getName().c_str()));
@@ -951,13 +951,13 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
             else{
               postFitErrorHist->SetBinContent(
                   1 + par.getParameterIndex(),
-                  FitParameterSet::toNormalizedParValue(par.getParameterValue(), par)
+                  ParameterSet::toNormalizedParValue(par.getParameterValue(), par)
               );
               preFitErrorHist->SetBinContent( 1 + par.getParameterIndex(), 0 );
 
               postFitErrorHist->SetBinError(
                   1 + par.getParameterIndex(),
-                  FitParameterSet::toNormalizedParRange(
+                  ParameterSet::toNormalizedParRange(
                       TMath::Sqrt((*covMatrix_)[par.getParameterIndex()][par.getParameterIndex()]), par
                   )
               );
@@ -973,7 +973,7 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
             for( auto& par : parList_ ){
               double val{par.getThrowValue()};
               val == val ? draw = true : val = par.getPriorValue();
-              if( isNorm_ ) val = FitParameterSet::toNormalizedParValue(val, par);
+              if( isNorm_ ) val = ParameterSet::toNormalizedParValue(val, par);
               toyParametersLine->SetBinContent(1+par.getParameterIndex(), val);
             }
 
@@ -1081,7 +1081,7 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
       }; // savePostFitObjFct
 
   LogInfo << "Extracting post-fit errors..." << std::endl;
-  for( const auto& parSet : getPropagator().getParameterSetsList() ){
+  for( const auto& parSet : getPropagator().getParametersManager().getParameterSetsList() ){
     if( not parSet.isEnabled() ){ continue; }
 
     LogInfo << "Extracting post-fit errors of parameter set: " << parSet.getName() << std::endl;
@@ -1091,10 +1091,10 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
     // dimension should be the right one -> parList includes the fixed one
     auto covMatrix = std::make_unique<TMatrixD>(int(parList->size()), int(parList->size()));
     for( auto& iPar : *parList ){
-      int iMinimizerIndex = GenericToolbox::findElementIndex((FitParameter*) &iPar,getMinimizerFitParameterPtr());
+      int iMinimizerIndex = GenericToolbox::findElementIndex((Parameter*) &iPar, getMinimizerFitParameterPtr());
       if( iMinimizerIndex == -1 ) continue;
       for( auto& jPar : *parList ){
-        int jMinimizerIndex = GenericToolbox::findElementIndex((FitParameter*) &jPar,getMinimizerFitParameterPtr());
+        int jMinimizerIndex = GenericToolbox::findElementIndex((Parameter*) &jPar, getMinimizerFitParameterPtr());
         if( jMinimizerIndex == -1 ) continue;
         (*covMatrix)[iPar.getParameterIndex()][jPar.getParameterIndex()] = postfitCovarianceMatrix[iMinimizerIndex][jMinimizerIndex];
       }

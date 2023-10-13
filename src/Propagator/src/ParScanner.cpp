@@ -6,7 +6,7 @@
 #include "GenericToolbox.Json.h"
 #include "GenericToolbox.ScopedGuard.h"
 #include "Propagator.h"
-#include "FitParameter.h"
+#include "Parameter.h"
 
 #include "Logger.h"
 
@@ -151,12 +151,12 @@ bool ParScanner::isUseParameterLimits() const {
   return _useParameterLimits_;
 }
 
-void ParScanner::scanFitParameters(std::vector<FitParameter>& parList_, TDirectory* saveDir_){
+void ParScanner::scanFitParameters(std::vector<Parameter>& parList_, TDirectory* saveDir_){
   LogThrowIf(not isInitialized());
   LogThrowIf(saveDir_ == nullptr);
   for( auto& par : parList_ ){ this->scanFitParameter(par, saveDir_); }
 }
-void ParScanner::scanFitParameter(FitParameter& par_, TDirectory* saveDir_) {
+void ParScanner::scanFitParameter(Parameter& par_, TDirectory* saveDir_) {
   LogThrowIf(not isInitialized());
   LogThrowIf(saveDir_ == nullptr);
   std::vector<double> parPoints(_nbPoints_+1,0);
@@ -255,8 +255,8 @@ void ParScanner::scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, c
 
   // don't shout while re-injecting parameters
   GenericToolbox::ScopedGuard s(
-      []{ FitParameterSet::muteLogger(); Propagator::muteLogger(); },
-      []{ FitParameterSet::unmuteLogger(); Propagator::unmuteLogger(); }
+      []{ ParameterSet::muteLogger(); Propagator::muteLogger(); },
+      []{ ParameterSet::unmuteLogger(); Propagator::unmuteLogger(); }
   );
 
   LogThrowIf(end_.empty(), "Ending injector config is empty()");
@@ -266,13 +266,13 @@ void ParScanner::scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, c
   int nTotalSteps = nSteps_+2;
 
   LogInfo << "Backup current position of the propagator..." << std::endl;
-  auto currentParState = _owner_->exportParameterInjectorConfig();
+  auto currentParState = _owner_->getParametersManager().exportParameterInjectorConfig();
 
   LogInfo << "Reading start point parameter state..." << std::endl;
-  std::vector<std::pair<FitParameter*, double>> startPointParValList;
-  if( not start_.empty() ){ _owner_->injectParameterValues(start_); }
-  else{ _owner_->injectParameterValues(currentParState); }
-  for( auto& parSet : _owner_->getParameterSetsList() ){
+  std::vector<std::pair<Parameter*, double>> startPointParValList;
+  if( not start_.empty() ){ _owner_->getParametersManager().injectParameterValues(start_); }
+  else{ _owner_->getParametersManager().injectParameterValues(currentParState); }
+  for( auto& parSet : _owner_->getParametersManager().getParameterSetsList() ){
     if( not parSet.isEnabled() ){ continue; }
     for( auto& par : parSet.getParameterList() ){
       if( not par.isEnabled() ){ continue; }
@@ -281,8 +281,8 @@ void ParScanner::scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, c
   }
 
   LogInfo << "Reading end point parameter state..." << std::endl;
-  std::vector<std::pair<FitParameter*, double>> endPointParValList;
-  _owner_->injectParameterValues(end_);
+  std::vector<std::pair<Parameter*, double>> endPointParValList;
+  _owner_->getParametersManager().injectParameterValues(end_);
   endPointParValList.reserve(startPointParValList.size());
   for( auto& parPair : startPointParValList ){
     endPointParValList.emplace_back(parPair.first, parPair.first->getParameterValue());
@@ -312,7 +312,7 @@ void ParScanner::scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, c
           );
     }
 
-    for( auto& parSet : _owner_->getParameterSetsList() ){
+    for( auto& parSet : _owner_->getParametersManager().getParameterSetsList() ){
       if( not parSet.isEnabled() ){ continue; }
       if( parSet.isUseEigenDecompInFit() ){
         // make sure the parameters don't get overwritten
@@ -335,7 +335,7 @@ void ParScanner::scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, c
   }
 
   LogInfo << "Restore position of the propagator..." << std::endl;
-  _owner_->injectParameterValues( currentParState );
+  _owner_->getParametersManager().injectParameterValues( currentParState );
   _owner_->updateLlhCache();
 }
 void ParScanner::generateOneSigmaPlots(TDirectory* saveDir_){
@@ -347,7 +347,7 @@ void ParScanner::generateOneSigmaPlots(TDirectory* saveDir_){
   _owner_->getPlotGenerator().generateSamplePlots();
   auto refHistList = _owner_->getPlotGenerator().getHistHolderList();
 
-  auto makeOneSigmaPlotFct = [&](FitParameter& par_, TDirectory* parSavePath_){
+  auto makeOneSigmaPlotFct = [&](Parameter& par_, TDirectory* parSavePath_){
     LogInfo << "Generating one sigma plots for \"" << par_.getFullTitle() << "\" -> " << par_.getParameterValue() << " + " << par_.getStdDevValue() << std::endl;
     double currentParValue = par_.getParameterValue();
 
@@ -372,7 +372,7 @@ void ParScanner::generateOneSigmaPlots(TDirectory* saveDir_){
   };
 
   // +1 sigma
-  for( auto& parSet : _owner_->getParameterSetsList() ){
+  for( auto& parSet : _owner_->getParametersManager().getParameterSetsList() ){
 
     if( not parSet.isEnabled() ) continue;
 
@@ -408,12 +408,12 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
   LogScopeIndent;
 
   // make sure the parameters are rolled back to their original value
-  std::map<FitParameter*, double> parStateList{};
+  std::map<Parameter*, double> parStateList{};
   GenericToolbox::ScopedGuard g(
       [&]{
         LogScopeIndent;
         LogDebug << "Temporarily pulling back parameters at their prior before performing the event rate..." << std::endl;
-        for( auto& parSet : _owner_->getParameterSetsList() ){
+        for( auto& parSet : _owner_->getParametersManager().getParameterSetsList() ){
           if( not parSet.isEnabled() ) { continue; }
           for( auto& par : parSet.getParameterList() ){
             if( not par.isEnabled() ) { continue; }
@@ -426,7 +426,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
       [&]{
         LogScopeIndent;
         LogDebug << "Restoring parameters to their original values..." << std::endl;
-        for( auto& parSet : _owner_->getParameterSetsList() ){
+        for( auto& parSet : _owner_->getParametersManager().getParameterSetsList() ){
           if( not parSet.isEnabled() ) { continue; }
           for( auto& par : parSet.getParameterList() ){
             if( not par.isEnabled() ){ continue; }
@@ -437,11 +437,11 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
       }
   );
 
-  auto makeVariedEventRatesFct = [&](FitParameter& par_, std::vector<double> variationList_, TDirectory* saveSubDir_){
+  auto makeVariedEventRatesFct = [&](Parameter& par_, std::vector<double> variationList_, TDirectory* saveSubDir_){
     LogInfo << "Making varied event rates for " << par_.getFullTitle() << std::endl;
 
     // First make sure all params are at their prior <- is it necessary?
-    for( auto& parSet : _owner_->getParameterSetsList() ){
+    for( auto& parSet : _owner_->getParametersManager().getParameterSetsList() ){
       if( not parSet.isEnabled() ) continue;
       for( auto& par : parSet.getParameterList() ){
         if( not par.isEnabled() ) continue;
@@ -517,7 +517,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
 
   // vary parameters
 
-  for( auto& parSet : _owner_->getParameterSetsList() ){
+  for( auto& parSet : _owner_->getParametersManager().getParameterSetsList() ){
 
     if( not parSet.isEnabled() ) continue;
     if( GenericToolbox::Json::fetchValue(parSet.getConfig(), "skipVariedEventRates", false) ){

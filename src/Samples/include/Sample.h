@@ -2,8 +2,8 @@
 // Created by Nadrino on 22/07/2021.
 //
 
-#ifndef GUNDAM_FITSAMPLE_H
-#define GUNDAM_FITSAMPLE_H
+#ifndef GUNDAM_SAMPLE_H
+#define GUNDAM_SAMPLE_H
 
 
 #include "SampleElement.h"
@@ -19,7 +19,7 @@
 #include <memory>
 
 
-class FitSample : public JsonBaseClass {
+class Sample : public JsonBaseClass {
 
 protected:
   // called through public JsonBaseClass::readConfig() and JsonBaseClass::initialize()
@@ -74,4 +74,4 @@ private:
 };
 
 
-#endif //GUNDAM_FITSAMPLE_H
+#endif //GUNDAM_SAMPLE_H

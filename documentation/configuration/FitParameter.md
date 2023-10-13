@@ -1,6 +1,6 @@
-## FitParameter
+## Parameter
 
-[< back to parent (FitParameterSet)](./FitParameterSet.md)
+[< back to parent (ParameterSet)](./ParameterSet.md)
 
 ### Description
 

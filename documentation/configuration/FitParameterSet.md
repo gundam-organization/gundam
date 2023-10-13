@@ -1,4 +1,4 @@
-## FitParameterSet
+## ParameterSet
 
 [< back to parent (Propagator)](./Propagator.md)
 
@@ -11,7 +11,7 @@
 |--------------------------------------------------------|------------|---------------------------------------------------------------------------------------------------|---------|
 | **name**                                               | string     | parameter set name                                                                                |         |
 | isEnabled                                              | bool       | use in the propagator                                                                             | true    |
-| [parameterDefinitions](./FitParameter.md)              | list(json) | config of individual parameter                                                                    |         |
+| [parameterDefinitions](./Parameter.md)              | list(json) | config of individual parameter                                                                    |         |
 | [dialSetDefinitions](./DialSet.md)                     | list(json) | config of dials                                                                                   |         |
 | parameterDefinitionFilePath / covarianceMatrixFilePath | string     | path to root file containing cov matrix                                                           |         |
 | covarianceMatrixTMatrixD                               | string     | path to covariance matrix in root file                                                            |         |

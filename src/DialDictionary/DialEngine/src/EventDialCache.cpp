@@ -12,7 +12,7 @@ LoggerInit([]{
 
 double EventDialCache::globalEventReweightCap{std::nan("unset")};
 
-void EventDialCache::buildReferenceCache(FitSampleSet& sampleSet_, std::vector<DialCollection>& dialCollectionList_){
+void EventDialCache::buildReferenceCache(SampleSet& sampleSet_, std::vector<DialCollection>& dialCollectionList_){
   LogInfo << "Building event dial cache..." << std::endl;
 
   LogInfo << "Sorting events in sync with indexed cache..." << std::endl;

@@ -5,7 +5,7 @@
 #ifndef GUNDAM_MCMCInterface_h
 #define GUNDAM_MCMCInterface_h
 
-#include "FitParameterSet.h"
+#include "ParameterSet.h"
 #include "MinimizerBase.h"
 #include "JsonBaseClass.h"
 

@@ -2,8 +2,8 @@
 // Created by Nadrino on 21/05/2021.
 //
 
-#ifndef GUNDAM_FITPARAMETER_H
-#define GUNDAM_FITPARAMETER_H
+#ifndef GUNDAM_PARAMETER_H
+#define GUNDAM_PARAMETER_H
 
 #include "JsonBaseClass.h"
 
@@ -23,9 +23,9 @@ namespace PriorType{
   );
 }
 
-class FitParameterSet;
+class ParameterSet;
 
-class FitParameter : public JsonBaseClass {
+class Parameter : public JsonBaseClass {
 
 protected:
   // called through public JsonBaseClass::readConfig() and JsonBaseClass::initialize()
@@ -33,8 +33,8 @@ protected:
   void initializeImpl() override;
 
 public:
-  FitParameter() = delete; // should always provide the owner
-  explicit FitParameter(const FitParameterSet* owner_): _owner_(owner_) {}
+  Parameter() = delete; // should always provide the owner
+  explicit Parameter(const ParameterSet* owner_): _owner_(owner_) {}
 
   void setIsEnabled(bool isEnabled){ _isEnabled_ = isEnabled; }
   void setIsFixed(bool isFixed){ _isFixed_ = isFixed; }
@@ -58,7 +58,7 @@ public:
   void setName(const std::string &name){ _name_ = name; }
   void setDialSetConfig(const nlohmann::json &jsonConfig_);
   void setParameterDefinitionConfig(const nlohmann::json &config_);
-  void setOwner(const FitParameterSet *owner_){ _owner_ = owner_; }
+  void setOwner(const ParameterSet *owner_){ _owner_ = owner_; }
   void setPriorType(PriorType::PriorType priorType){ _priorType_ = priorType; }
 
   // Getters
@@ -81,7 +81,7 @@ public:
   [[nodiscard]] double getParameterValue() const{ return _parameterValue_; }
   [[nodiscard]] const std::string &getName() const{ return _name_; }
   [[nodiscard]] const nlohmann::json &getDialDefinitionsList() const{ return _dialDefinitionsList_; }
-  [[nodiscard]] const FitParameterSet *getOwner() const{ return _owner_; }
+  [[nodiscard]] const ParameterSet *getOwner() const{ return _owner_; }
   [[nodiscard]] PriorType::PriorType getPriorType() const{ return _priorType_; }
 
   // Core
@@ -118,10 +118,10 @@ private:
   nlohmann::json _dialDefinitionsList_{};
 
   // Internals
-  const FitParameterSet* _owner_{nullptr};
+  const ParameterSet* _owner_{nullptr};
   PriorType::PriorType _priorType_{PriorType::Gaussian};
 
 };
 
 
-#endif //GUNDAM_FITPARAMETER_H
+#endif //GUNDAM_PARAMETER_H

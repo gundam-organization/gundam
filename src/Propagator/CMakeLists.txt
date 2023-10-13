@@ -37,8 +37,8 @@ else()
 endif()
 
 target_link_libraries( GundamPropagator
-  GundamFitParameters
-  GundamFitSamples
+  GundamParameters
+  GundamSamples
   GundamDatasetManager
   GundamDialDictionary
   ${CACHE_MANAGER_LIBRARIES}

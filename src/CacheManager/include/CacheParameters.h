@@ -11,7 +11,7 @@ namespace Cache {
     class Parameters;
 }
 
-class FitParameter;
+class Parameter;
 
 /// A cache to hold the function parameter values, and the clamp values on the
 /// output weights.  This also manages any mirroring that needs to be done.

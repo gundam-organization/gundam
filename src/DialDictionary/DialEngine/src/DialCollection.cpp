@@ -104,14 +104,14 @@ std::string DialCollection::getSummary(bool shallow_){
 
   return ss.str();
 }
-FitParameter* DialCollection::getSupervisedParameter() const {
+Parameter* DialCollection::getSupervisedParameter() const {
   auto* parSetPtr = this->getSupervisedParameterSet();
   if( parSetPtr == nullptr ) return nullptr;
   if( _supervisedParameterIndex_ < 0 ) return nullptr;
   if( _supervisedParameterIndex_ > parSetPtr->getParameterList().size() ) return nullptr;
   return &parSetPtr->getParameterList().at(_supervisedParameterIndex_);
 }
-FitParameterSet* DialCollection::getSupervisedParameterSet() const{
+ParameterSet* DialCollection::getSupervisedParameterSet() const{
   if( _supervisedParameterSetIndex_ < 0 ) return nullptr;
   if( _supervisedParameterSetIndex_ > _parameterSetListPtr_->size() ) return nullptr;
   return &_parameterSetListPtr_->at(_supervisedParameterSetIndex_);

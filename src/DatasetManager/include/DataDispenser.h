@@ -5,12 +5,12 @@
 #ifndef GUNDAM_DATADISPENSER_H
 #define GUNDAM_DATADISPENSER_H
 
-#include "FitSampleSet.h"
+#include "SampleSet.h"
 #include "PlotGenerator.h"
 #include "JsonBaseClass.h"
 #include "DialCollection.h"
 #include "EventDialCache.h"
-#include "FitParameterSet.h"
+#include "ParameterSet.h"
 #include "EventVarTransformLib.h"
 #include "DataDispenserUtils.h"
 
@@ -44,8 +44,8 @@ public:
   // non-const getters
   DataDispenserParameters &getParameters(){ return _parameters_; }
 
-  void setSampleSetPtrToLoad(FitSampleSet *sampleSetPtrToLoad);
-  void setParSetPtrToLoad(std::vector<FitParameterSet> *parSetListPtrToLoad_);
+  void setSampleSetPtrToLoad(SampleSet *sampleSetPtrToLoad);
+  void setParSetPtrToLoad(std::vector<ParameterSet> *parSetListPtrToLoad_);
   void setDialCollectionListPtr(std::vector<DialCollection> *dialCollectionListPtr);
   void setPlotGenPtr(PlotGenerator *plotGenPtr);
   void setEventDialCache(EventDialCache* eventDialCache_);
@@ -72,8 +72,8 @@ private:
 
   // Internals
   DatasetLoader* _owner_{nullptr};
-  FitSampleSet* _sampleSetPtrToLoad_{nullptr};
-  std::vector<FitParameterSet>* _parSetListPtrToLoad_{nullptr};
+  SampleSet* _sampleSetPtrToLoad_{nullptr};
+  std::vector<ParameterSet>* _parSetListPtrToLoad_{nullptr};
   std::vector<DialCollection>* _dialCollectionListPtr_{nullptr};
   PlotGenerator* _plotGenPtr_{nullptr}; // used to know which vars have to be kept in memory
   EventDialCache* _eventDialCacheRef_{nullptr};

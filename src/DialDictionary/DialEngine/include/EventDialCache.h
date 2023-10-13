@@ -5,7 +5,7 @@
 #ifndef GUNDAM_EVENTDIALCACHE_H
 #define GUNDAM_EVENTDIALCACHE_H
 
-#include "FitSampleSet.h"
+#include "SampleSet.h"
 #include "DialCollection.h"
 #include "PhysicsEvent.h"
 #include "DialInterface.h"
@@ -120,7 +120,7 @@ public:
   /// Build the association between pointers to PhysicsEvent objects and the
   /// pointers to DialInterface objects.  This must be done before the event
   /// dial cache can be used, but after the index cache has been filled.
-  void buildReferenceCache(FitSampleSet& sampleSet_,
+  void buildReferenceCache(SampleSet& sampleSet_,
                            std::vector<DialCollection>& dialCollectionList_);
 
   /// Resize the cache vectors to remove entries with null events

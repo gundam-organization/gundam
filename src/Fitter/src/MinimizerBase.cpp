@@ -21,8 +21,8 @@ void MinimizerBase::readConfigImpl(){
   bool showParametersOnFitMonitor = getLikelihood().getShowParametersOnFitMonitor();
   showParametersOnFitMonitor = GenericToolbox::Json::fetchValue(_config_, "showParametersOnFitMonitor", showParametersOnFitMonitor);
   getLikelihood().setShowParametersOnFitMonitor(showParametersOnFitMonitor);
-//
-  bool maxNbParametersPerLineOnMonitor = getLikelihood().getMaxNbParametersPerLineOnMonitor();
+
+  auto maxNbParametersPerLineOnMonitor = getLikelihood().getMaxNbParametersPerLineOnMonitor();
   maxNbParametersPerLineOnMonitor = GenericToolbox::Json::fetchValue(_config_, "maxNbParametersPerLineOnMonitor", maxNbParametersPerLineOnMonitor);
   getLikelihood().setMaxNbParametersPerLineOnMonitor(maxNbParametersPerLineOnMonitor);
 
@@ -47,7 +47,7 @@ void MinimizerBase::scanParameters(TDirectory* saveDir_) {
              << std::endl;
 }
 
-std::vector<FitParameter *>& MinimizerBase::getMinimizerFitParameterPtr() {
+std::vector<Parameter *>& MinimizerBase::getMinimizerFitParameterPtr() {
   return getLikelihood().getMinimizerFitParameterPtr();
 }
 
@@ -67,7 +67,7 @@ void MinimizerBase::printMinimizerFitParameters () {
   // output is a little more clear.
 
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Summary of the fit parameters:") << std::endl;
-  for( const auto& parSet : getPropagator().getParameterSetsList() ){
+  for( const auto& parSet : getPropagator().getParametersManager().getParameterSetsList() ){
 
     GenericToolbox::TablePrinter t;
     t.setColTitles({ {"Title"}, {"Starting"}, {"Prior"}, {"StdDev"}, {"Min"}, {"Max"}, {"Status"} });

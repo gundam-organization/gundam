@@ -9,8 +9,8 @@
 #include "DialInputBuffer.h"
 #include "DialResponseSupervisor.h"
 
-#include "FitSampleSet.h"
-#include "FitParameterSet.h"
+#include "SampleSet.h"
+#include "ParameterSet.h"
 
 #include <string>
 #include <memory>

@@ -6,8 +6,8 @@
 #define GUNDAM_DATASETLOADER_H
 
 #include "DataDispenser.h"
-#include "FitParameterSet.h"
-#include <FitSampleSet.h>
+#include "ParameterSet.h"
+#include <SampleSet.h>
 #include "PlotGenerator.h"
 #include "JsonBaseClass.h"
 

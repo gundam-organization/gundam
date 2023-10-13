@@ -223,8 +223,8 @@ void MCMCInterface::initializeImpl(){
 /// Copy the current parameter values to the tree.
 void MCMCInterface::fillPoint(bool fillModel) {
   int count = 0;
-  for (const FitParameterSet& parSet: getPropagator().getParameterSetsList()) {
-    for (const FitParameter& iPar : parSet.getParameterList()) {
+  for (const ParameterSet& parSet: getPropagator().getParametersManager().getParameterSetsList()) {
+    for (const Parameter& iPar : parSet.getParameterList()) {
       if (count >= _point_.size()) {
         LogWarning << "Point out of range " << _point_.size() << " " << count << std::endl;
         continue;
@@ -242,7 +242,7 @@ void MCMCInterface::fillPoint(bool fillModel) {
   _saveModel_.clear();
   _saveUncertainty_.clear();
   if (not fillModel) return;
-  for (const FitSample& sample
+  for (const Sample& sample
          : getPropagator().getFitSampleSet().getFitSampleList()) {
     std::shared_ptr<TH1D> hist = sample.getMcContainer().histogram;
     for (int i = 1; i < hist->GetNbinsX(); ++i) {
@@ -305,12 +305,12 @@ bool MCMCInterface::adaptiveDefaultProposalCovariance(AdaptiveStepMCMC& mcmc,
 
   /// Set the diagonal elements for the parameters.
   int count0 = 0;
-  for (const FitParameter* par : getMinimizerFitParameterPtr() ) {
+  for (const Parameter* par : getMinimizerFitParameterPtr() ) {
     ++count0;
     if (getLikelihood().getUseNormalizedFitSpace()) {
       // Changing the boundaries, change the value/step size?
       double step
-        = FitParameterSet::toNormalizedParRange(
+        = ParameterSet::toNormalizedParRange(
           par->getStepSize(), *par);
       mcmc.GetProposeStep().SetGaussian(count0-1,step);
     }
@@ -334,9 +334,9 @@ bool MCMCInterface::adaptiveDefaultProposalCovariance(AdaptiveStepMCMC& mcmc,
 
   // Set up the correlations in the priors.
   int count1 = 0;
-  for (const FitParameter* par1 : getMinimizerFitParameterPtr() ) {
+  for (const Parameter* par1 : getMinimizerFitParameterPtr() ) {
     ++count1;
-    const FitParameterSet* set1 = par1->getOwner();
+    const ParameterSet* set1 = par1->getOwner();
     if (!set1) {
       LogInfo << "Parameter set reference is not defined for"
               << " " << par1->getName()
@@ -348,9 +348,9 @@ bool MCMCInterface::adaptiveDefaultProposalCovariance(AdaptiveStepMCMC& mcmc,
     }
 
     int count2 = 0;
-    for (const FitParameter* par2 : getMinimizerFitParameterPtr()) {
+    for (const Parameter* par2 : getMinimizerFitParameterPtr()) {
       ++count2;
-      const FitParameterSet* set2 = par2->getOwner();
+      const ParameterSet* set2 = par2->getOwner();
       if (!set2) {
         LogInfo << "Parameter set reference is not defined for"
                 << " " << par1->getName()
@@ -443,7 +443,7 @@ bool MCMCInterface::adaptiveLoadProposalCovariance(AdaptiveStepMCMC& mcmc,
 
   TAxis* covAxisLabels = dynamic_cast<TAxis*>(proposalCov->GetXaxis());
   int count1 = 0;
-  for (const FitParameter* par1 : getMinimizerFitParameterPtr() ) {
+  for (const Parameter* par1 : getMinimizerFitParameterPtr() ) {
     ++count1;
     std::string parName(par1->getFullTitle());
     std::string covName(covAxisLabels->GetBinLabel(count1));
@@ -455,7 +455,7 @@ bool MCMCInterface::adaptiveLoadProposalCovariance(AdaptiveStepMCMC& mcmc,
     }
     double sig1 = std::sqrt(proposalCov->GetBinContent(count1,count1));
     int count2 = 0;
-    for (const FitParameter* par2 : getMinimizerFitParameterPtr() ) {
+    for (const Parameter* par2 : getMinimizerFitParameterPtr() ) {
       ++count2;
       double sig2 = std::sqrt(proposalCov->GetBinContent(count2,count2));
       if (count2 < count1) continue;
@@ -465,7 +465,7 @@ bool MCMCInterface::adaptiveLoadProposalCovariance(AdaptiveStepMCMC& mcmc,
 #define COVARIANCE_NOT_IN_NORMALIZED_FIT_SPACE
 #ifdef  COVARIANCE_NOT_IN_NORMALIZED_FIT_SPACE
         if (getLikelihood().getUseNormalizedFitSpace()) {
-          step = FitParameterSet::toNormalizedParRange(sig1,*par1);
+          step = ParameterSet::toNormalizedParRange(sig1, *par1);
         }
 #endif
         mcmc.GetProposeStep().SetGaussian(count1-1,step);
@@ -503,13 +503,13 @@ void MCMCInterface::setupAndRunAdaptiveStep(AdaptiveStepMCMC& mcmc) {
   // Create a fitting parameter vector and initialize it.  No need to worry
   // about resizing it or it moving, so be lazy and just use push_back.
   Vector prior;
-  for (const FitParameter* par : getMinimizerFitParameterPtr() ) {
+  for (const Parameter* par : getMinimizerFitParameterPtr() ) {
     double val = par->getParameterValue();
     if (not getLikelihood().getUseNormalizedFitSpace()) {
       prior.push_back(val);
     }
     else {
-      prior.push_back(FitParameterSet::toNormalizedParValue(val, *par));
+      prior.push_back(ParameterSet::toNormalizedParValue(val, *par));
     }
   }
 
@@ -718,7 +718,7 @@ void MCMCInterface::setupAndRunSimpleStep(SimpleStepMCMC& mcmc) {
   mcmc.GetProposeStep().fSigma = _simpleSigma_;
 
   Vector prior;
-  for (const FitParameter* par : getMinimizerFitParameterPtr() ) {
+  for (const Parameter* par : getMinimizerFitParameterPtr() ) {
     prior.push_back(par->getPriorValue());
   }
 
@@ -837,13 +837,13 @@ void MCMCInterface::minimize() {
   // of the parameters in the call to the likelihood function.  Those
   // parameters are defined by the _minimizerFitParameterPtr_ vector.
 
-  for (const FitParameterSet& parSet: getPropagator().getParameterSetsList()) {
+  for (const ParameterSet& parSet: getPropagator().getParametersManager().getParameterSetsList()) {
     // Save name of parameter set
     parameterSetNames.push_back(parSet.getName());
     parameterSetOffsets.push_back(parameterIndex.size());
 
     int countParameters = 0;
-    for (const FitParameter& iPar : parSet.getParameterList()) {
+    for (const Parameter& iPar : parSet.getParameterList()) {
       ++countParameters;
       parameterIndex.push_back(iPar.getParameterIndex());
       parameterFixed.push_back(iPar.isFixed());
@@ -858,7 +858,7 @@ void MCMCInterface::minimize() {
   }
 
   parameterSampleData.clear();
-  for (const FitSample& sample
+  for (const Sample& sample
          : getPropagator().getFitSampleSet().getFitSampleList()) {
     parameterSampleNames.push_back(sample.getName());
     parameterSampleOffsets.push_back(parameterSampleData.size());
@@ -919,7 +919,7 @@ void MCMCInterface::calcErrors() {
 void MCMCInterface::scanParameters(TDirectory* saveDir_) {
   LogThrowIf(not isInitialized());
   LogInfo << "Performing scans of fit parameters..." << std::endl;
-  for(FitParameter* par : getMinimizerFitParameterPtr()) {
+  for(Parameter* par : getMinimizerFitParameterPtr()) {
     getPropagator().getParScanner().scanFitParameter(*par, saveDir_);
   }
 }

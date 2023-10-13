@@ -22,8 +22,8 @@ target_include_directories(GundamDatasetManager PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 target_link_libraries( GundamDatasetManager
-        GundamFitParameters
-        GundamFitSamples
+        GundamParameters
+        GundamSamples
         GundamDialDictionary
         ${ROOT_LIBRARIES}
         )
