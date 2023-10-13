@@ -54,7 +54,7 @@ target_include_directories( GundamCache PUBLIC
 
 target_link_libraries( GundamCache PUBLIC
   GundamDialDictionary
-  GundamFitParameters
+  GundamParameters
   GundamFitSamples
   ${ROOT_LIBRARIES} )
 

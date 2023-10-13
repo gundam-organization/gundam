@@ -11,7 +11,7 @@
 #include "WeightGraph.h"
 #include "CacheIndexedSums.h"
 
-#include "FitParameterSet.h"
+#include "ParameterSet.h"
 #include "GundamGlobals.h"
 
 #include "EventDialCache.h"
@@ -33,7 +33,7 @@ LoggerInit([]{
 
 Cache::Manager* Cache::Manager::fSingleton = nullptr;
 bool Cache::Manager::fUpdateRequired = true;
-std::map<const FitParameter*, int> Cache::Manager::ParameterMap;
+std::map<const Parameter*, int> Cache::Manager::ParameterMap;
 
 Cache::Manager::Manager(int events, int parameters,
                         int norms,
@@ -156,7 +156,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList,
     Cache::Manager::ParameterMap.clear();
 
     /// Find the amount of space needed for the cache.
-    std::set<const FitParameter*> usedParameters;
+    std::set<const Parameter*> usedParameters;
 
     std::map<std::string, int> useCount;
     for (EventDialCache::CacheElem_t& elem : eventDials.getCache()) {
@@ -176,7 +176,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList,
             // not being moved.  This happens after the vectors are "closed",
             // so it is probably safe, but this isn't good.  The particular
             // usage is forced do to an API change.
-            const FitParameter* fp = &(dialInterface->getInputBufferRef()->getFitParameter());
+            const Parameter* fp = &(dialInterface->getInputBufferRef()->getFitParameter());
             usedParameters.insert(fp);
             ++useCount[fp->getFullTitle()];
 
@@ -399,7 +399,7 @@ bool Cache::Manager::Update(FitSampleSet& sampleList,
             for (std::size_t i = 0; i < dialInputs->getBufferSize(); ++i) {
                 // Find the index (or allocate a new one) for the dial
                 // parameter.  This only works for 1D dials.
-                const FitParameter* fp
+                const Parameter* fp
                     = &(dialInterface->getInputBufferRef()
                         ->getFitParameter(i));
                 auto parMapIt = Cache::Manager::ParameterMap.find(fp);
@@ -412,7 +412,7 @@ bool Cache::Manager::Update(FitSampleSet& sampleList,
             // Apply the mirroring for the parameters
             if (dialInputs->useParameterMirroring()) {
                 for (std::size_t i = 0; i < dialInputs->getBufferSize(); ++i) {
-                    const FitParameter* fp = &(dialInputs->getFitParameter(i));
+                    const Parameter* fp = &(dialInputs->getFitParameter(i));
                     const std::pair<double,double>& bounds =
                         dialInputs->getMirrorBounds(i);
                     int parIndex = Cache::Manager::ParameterMap[fp];
@@ -425,7 +425,7 @@ bool Cache::Manager::Update(FitSampleSet& sampleList,
 
             // Apply the clamps to the parameter range
             for (std::size_t i = 0; i < dialInputs->getBufferSize(); ++i) {
-                const FitParameter* fp = &(dialInputs->getFitParameter(i));
+                const Parameter* fp = &(dialInputs->getFitParameter(i));
                 const DialResponseSupervisor* resp
                     = dialInterface->getResponseSupervisorRef();
                 int parIndex = Cache::Manager::ParameterMap[fp];
@@ -446,7 +446,7 @@ bool Cache::Manager::Update(FitSampleSet& sampleList,
             const Norm* normDial = dynamic_cast<const Norm*>(baseDial);
             if (normDial) {
                 ++dialUsed;
-                const FitParameter* fp = &(dialInputs->getFitParameter(0));
+                const Parameter* fp = &(dialInputs->getFitParameter(0));
                 int parIndex = Cache::Manager::ParameterMap[fp];
                 Cache::Manager::Get()
                     ->fNormalizations
@@ -456,7 +456,7 @@ bool Cache::Manager::Update(FitSampleSet& sampleList,
                 = dynamic_cast<const CompactSpline*>(baseDial);
             if (compactSpline) {
                 ++dialUsed;
-                const FitParameter* fp = &(dialInputs->getFitParameter(0));
+                const Parameter* fp = &(dialInputs->getFitParameter(0));
                 int parIndex = Cache::Manager::ParameterMap[fp];
                 Cache::Manager::Get()
                     ->fCompactSplines
@@ -467,7 +467,7 @@ bool Cache::Manager::Update(FitSampleSet& sampleList,
                 = dynamic_cast<const MonotonicSpline*>(baseDial);
             if (monotonicSpline) {
                 ++dialUsed;
-                const FitParameter* fp = &(dialInputs->getFitParameter(0));
+                const Parameter* fp = &(dialInputs->getFitParameter(0));
                 int parIndex = Cache::Manager::ParameterMap[fp];
                 Cache::Manager::Get()
                     ->fMonotonicSplines
@@ -478,7 +478,7 @@ bool Cache::Manager::Update(FitSampleSet& sampleList,
                 = dynamic_cast<const UniformSpline*>(baseDial);
             if (uniformSpline) {
                 ++dialUsed;
-                const FitParameter* fp = &(dialInputs->getFitParameter(0));
+                const Parameter* fp = &(dialInputs->getFitParameter(0));
                 int parIndex = Cache::Manager::ParameterMap[fp];
                 Cache::Manager::Get()
                     ->fUniformSplines
@@ -489,7 +489,7 @@ bool Cache::Manager::Update(FitSampleSet& sampleList,
                 = dynamic_cast<const GeneralSpline*>(baseDial);
             if (generalSpline) {
                 ++dialUsed;
-                const FitParameter* fp = &(dialInputs->getFitParameter(0));
+                const Parameter* fp = &(dialInputs->getFitParameter(0));
                 int parIndex = Cache::Manager::ParameterMap[fp];
                 Cache::Manager::Get()
                     ->fGeneralSplines
@@ -500,7 +500,7 @@ bool Cache::Manager::Update(FitSampleSet& sampleList,
                 = dynamic_cast<const LightGraph*>(baseDial);
             if (lightGraph) {
                 ++dialUsed;
-                const FitParameter* fp = &(dialInputs->getFitParameter(0));
+                const Parameter* fp = &(dialInputs->getFitParameter(0));
                 int parIndex = Cache::Manager::ParameterMap[fp];
                 Cache::Manager::Get()
                     ->fGraphs
@@ -636,7 +636,7 @@ bool Cache::Manager::Fill() {
     return true;
 }
 
-int Cache::Manager::ParameterIndex(const FitParameter* fp) {
+int Cache::Manager::ParameterIndex(const Parameter* fp) {
     auto parMapIt = Cache::Manager::ParameterMap.find(fp);
     if (parMapIt == Cache::Manager::ParameterMap.end()) return -1;
     return parMapIt->second;

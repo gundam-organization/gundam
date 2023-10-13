@@ -6,7 +6,7 @@
 #define GUNDAM_MinimizerBase_h
 
 #include "Propagator.h"
-#include "FitParameter.h"
+#include "Parameter.h"
 #include "JsonBaseClass.h"
 #include "LikelihoodInterface.h"
 
@@ -90,7 +90,7 @@ protected:
   // Get the vector of parameters being fitted.  This is a local convenience
   // function to get the vector of fit parameter pointers.  The actual vector
   // lives in the likelihood.
-  std::vector<FitParameter *> &getMinimizerFitParameterPtr();
+  std::vector<Parameter *> &getMinimizerFitParameterPtr();
 
   // Print a table of the fitting parameters.
   void printMinimizerFitParameters();

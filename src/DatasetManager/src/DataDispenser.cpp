@@ -70,7 +70,7 @@ void DataDispenser::initializeImpl(){
 void DataDispenser::setSampleSetPtrToLoad(FitSampleSet *sampleSetPtrToLoad) {
   _sampleSetPtrToLoad_ = sampleSetPtrToLoad;
 }
-void DataDispenser::setParSetPtrToLoad(std::vector<FitParameterSet> *parSetListPtrToLoad_) {
+void DataDispenser::setParSetPtrToLoad(std::vector<ParameterSet> *parSetListPtrToLoad_) {
   _parSetListPtrToLoad_ = parSetListPtrToLoad_;
 }
 void DataDispenser::setDialCollectionListPtr(std::vector<DialCollection> *dialCollectionListPtr) {

@@ -2,10 +2,10 @@
 // Created by Nadrino on 21/05/2021.
 //
 
-#ifndef GUNDAM_FITPARAMETERSET_H
-#define GUNDAM_FITPARAMETERSET_H
+#ifndef GUNDAM_PARAMETERSET_H
+#define GUNDAM_PARAMETERSET_H
 
-#include "FitParameter.h"
+#include "Parameter.h"
 #include "JsonBaseClass.h"
 #include "ParameterThrowerMarkHarz.h"
 
@@ -32,7 +32,7 @@
  *
  * */
 
-class FitParameterSet : public JsonBaseClass  {
+class ParameterSet : public JsonBaseClass  {
 
 protected:
   // called through public JsonBaseClass::readConfig() and JsonBaseClass::initialize()
@@ -68,13 +68,13 @@ public:
   [[nodiscard]] const std::vector<nlohmann::json>& getCustomFitParThrow() const{ return _customFitParThrow_; }
   [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCorrelationMatrix() const{ return _priorCorrelationMatrix_; }
   [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const { return _priorCovarianceMatrix_; }
-  [[nodiscard]] const std::vector<FitParameter> &getParameterList() const{ return _parameterList_; }
-  [[nodiscard]] const std::vector<FitParameter>& getEffectiveParameterList() const;
+  [[nodiscard]] const std::vector<Parameter> &getParameterList() const{ return _parameterList_; }
+  [[nodiscard]] const std::vector<Parameter>& getEffectiveParameterList() const;
 
   // non-const Getters
-  std::vector<FitParameter> &getParameterList(){ return _parameterList_; }
-  std::vector<FitParameter> &getEigenParameterList(){ return _eigenParameterList_; }
-  std::vector<FitParameter>& getEffectiveParameterList();
+  std::vector<Parameter> &getParameterList(){ return _parameterList_; }
+  std::vector<Parameter> &getEigenParameterList(){ return _eigenParameterList_; }
+  std::vector<Parameter>& getEffectiveParameterList();
 
   // Core
   double getPenaltyChi2();
@@ -90,15 +90,15 @@ public:
   [[nodiscard]] std::string getSummary() const;
   [[nodiscard]] nlohmann::json exportInjectorConfig() const;
   void injectParameterValues(const nlohmann::json& config_);
-  FitParameter* getParameterPtr(const std::string& parName_);
-  FitParameter* getParameterPtrWithTitle(const std::string& parTitle_);
+  Parameter* getParameterPtr(const std::string& parName_);
+  Parameter* getParameterPtrWithTitle(const std::string& parTitle_);
 
   // statics
-  static double toNormalizedParRange(double parRange, const FitParameter& par);
-  static double toNormalizedParValue(double parValue, const FitParameter& par);
-  static double toRealParValue(double normParValue, const FitParameter& par);
-  static double toRealParRange(double normParRange, const FitParameter& par);
-  static bool isValidCorrelatedParameter(const FitParameter& par_);
+  static double toNormalizedParRange(double parRange, const Parameter& par);
+  static double toNormalizedParValue(double parValue, const Parameter& par);
+  static double toRealParValue(double normParValue, const Parameter& par);
+  static double toRealParRange(double normParRange, const Parameter& par);
+  static bool isValidCorrelatedParameter(const Parameter& par_);
 
 protected:
   void readParameterDefinitionFile();
@@ -107,7 +107,7 @@ protected:
 
 private:
   // Internals
-  std::vector<FitParameter> _parameterList_;
+  std::vector<Parameter> _parameterList_;
 
   // JSON
   std::string _name_{};
@@ -149,7 +149,7 @@ private:
   bool _enablePca_{false};
   bool _useEigenDecompInFit_{false};
   bool _useOnlyOneParameterPerEvent_{false};
-  std::vector<FitParameter> _eigenParameterList_{};
+  std::vector<Parameter> _eigenParameterList_{};
   std::shared_ptr<TMatrixDSymEigen> _eigenDecomp_{nullptr};
 
   // Toy throwing
@@ -185,4 +185,4 @@ private:
 };
 
 
-#endif //GUNDAM_FITPARAMETERSET_H
+#endif //GUNDAM_PARAMETERSET_H

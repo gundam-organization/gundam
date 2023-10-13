@@ -47,7 +47,7 @@ void MinimizerBase::scanParameters(TDirectory* saveDir_) {
              << std::endl;
 }
 
-std::vector<FitParameter *>& MinimizerBase::getMinimizerFitParameterPtr() {
+std::vector<Parameter *>& MinimizerBase::getMinimizerFitParameterPtr() {
   return getLikelihood().getMinimizerFitParameterPtr();
 }
 

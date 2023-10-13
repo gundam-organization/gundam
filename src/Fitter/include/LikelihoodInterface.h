@@ -5,7 +5,7 @@
 #ifndef GUNDAM_LikelihoodInterface_h
 #define GUNDAM_LikelihoodInterface_h
 
-#include "FitParameterSet.h"
+#include "ParameterSet.h"
 
 #include "GenericToolbox.VariablesMonitor.h"
 #include "GenericToolbox.CycleTimer.h"
@@ -43,7 +43,7 @@ public:
   /// A vector of the parameters being used in the fit.  This provides
   /// the correspondence between an array of doubles (param[]) and the
   /// pointers to the parameters.
-  std::vector<FitParameter *> &getMinimizerFitParameterPtr(){ return _minimizerFitParameterPtr_; }
+  std::vector<Parameter *> &getMinimizerFitParameterPtr(){ return _minimizerFitParameterPtr_; }
 
   /// Initialize the likelihood interface.  Must be called after all of the
   /// paramters are set, but before the first function evaluation.
@@ -181,7 +181,7 @@ private:
 
   /// A vector of pointers to fit parameters that defined the elements in the
   /// array of parameters passed to evalFit.
-  std::vector<FitParameter*> _minimizerFitParameterPtr_{};
+  std::vector<Parameter*> _minimizerFitParameterPtr_{};
 
   /// The number of calls to the fitter function.
   int _nbFitCalls_{0};

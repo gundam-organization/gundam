@@ -23,7 +23,7 @@ target_include_directories(GundamFitSamples PUBLIC
 target_link_libraries(
         GundamFitSamples PUBLIC
         GundamUtils
-        GundamFitParameters
+        GundamParameters
         ${ROOT_LIBRARIES}
         -ldl
 )

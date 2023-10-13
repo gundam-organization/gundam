@@ -15,10 +15,10 @@ LoggerInit([]{
 });
 
 
-const FitParameter& DialInputBuffer::getFitParameter(int i) const {
+const Parameter& DialInputBuffer::getFitParameter(int i) const {
     return _parSetRef_->at(_inputParameterIndicesList_[i].first).getParameterList().at(_inputParameterIndicesList_[i].second);
 }
-const FitParameterSet& DialInputBuffer::getFitParameterSet(int i) const {
+const ParameterSet& DialInputBuffer::getFitParameterSet(int i) const {
   return _parSetRef_->at(_inputParameterIndicesList_[i].first);
 }
 
@@ -80,7 +80,7 @@ void DialInputBuffer::addParameterIndices(const std::pair<size_t, size_t>& indic
 void DialInputBuffer::addMirrorBounds(const std::pair<double, double>& lowEdgeAndRange_){
   const int p = _parameterMirrorBounds_.size();
   // Overriding the const to allow the mirroring information to be stored
-  FitParameter& par = const_cast<FitParameter&>(getFitParameter(p));
+  Parameter& par = const_cast<Parameter&>(getFitParameter(p));
   par.setMinMirror(lowEdgeAndRange_.first);
   par.setMaxMirror(lowEdgeAndRange_.first + lowEdgeAndRange_.second);
   _parameterMirrorBounds_.emplace_back(lowEdgeAndRange_);

@@ -100,13 +100,13 @@ void LikelihoodInterface::saveGradientSteps(){
   auto currentParState = _owner_->getPropagator().getParametersManager().exportParameterInjectorConfig();
   GenericToolbox::ScopedGuard g{
     [&](){
-      FitParameterSet::muteLogger();
+      ParameterSet::muteLogger();
       Propagator::muteLogger();
       ParScanner::muteLogger();
     },
     [&](){
       _owner_->getPropagator().getParametersManager().injectParameterValues( currentParState );
-      FitParameterSet::unmuteLogger();
+      ParameterSet::unmuteLogger();
       Propagator::unmuteLogger();
       ParScanner::unmuteLogger();
     }
@@ -117,7 +117,7 @@ void LikelihoodInterface::saveGradientSteps(){
 
   std::vector<GraphEntry> globalGraphList;
   for(size_t iGradStep = 0 ; iGradStep < _gradientMonitor_.size() ; iGradStep++ ){
-    FitParameterSet::muteLogger(); Propagator::muteLogger();
+    ParameterSet::muteLogger(); Propagator::muteLogger();
     _owner_->getPropagator().getParametersManager().injectParameterValues(_gradientMonitor_[iGradStep].parState );
     _owner_->getPropagator().updateLlhCache();
 
@@ -189,7 +189,7 @@ double LikelihoodInterface::evalFit(const double* parArray_){
   // Update fit parameter values:
   int iFitPar{0};
   for( auto* par : _minimizerFitParameterPtr_ ){
-    if( getUseNormalizedFitSpace() ) par->setParameterValue(FitParameterSet::toRealParValue(parArray_[iFitPar++], *par));
+    if( getUseNormalizedFitSpace() ) par->setParameterValue(ParameterSet::toRealParValue(parArray_[iFitPar++], *par));
     else par->setParameterValue(parArray_[iFitPar++]);
   }
 
@@ -201,7 +201,7 @@ double LikelihoodInterface::evalFit(const double* parArray_){
   // Minuit based algo might want this
   if( _monitorGradientDescent_ ){
     // check if minuit is moving toward the minimum
-    bool isGradientDescentStep = std::all_of(_minimizerFitParameterPtr_.begin(), _minimizerFitParameterPtr_.end(), [](const FitParameter* par_){
+    bool isGradientDescentStep = std::all_of(_minimizerFitParameterPtr_.begin(), _minimizerFitParameterPtr_.end(), [](const Parameter* par_){
       return ( par_->gotUpdated() or par_->isFixed() or not par_->isEnabled() );
     } );
     if( isGradientDescentStep ){
@@ -285,7 +285,7 @@ double LikelihoodInterface::evalFit(const double* parArray_){
           if( nParPerLine >= _maxNbParametersPerLineOnMonitor_ ) { ssHeader << std::endl; nParPerLine = 0; }
         }
         if(fitPar->gotUpdated()) ssHeader << GenericToolbox::ColorCodes::blueBackground;
-        if(getUseNormalizedFitSpace()) ssHeader << FitParameterSet::toNormalizedParValue(fitPar->getParameterValue(), *fitPar);
+        if(getUseNormalizedFitSpace()) ssHeader << ParameterSet::toNormalizedParValue(fitPar->getParameterValue(), *fitPar);
         else ssHeader << fitPar->getParameterValue();
         if(fitPar->gotUpdated()) ssHeader << GenericToolbox::ColorCodes::resetColor;
         nParPerLine++;
@@ -358,9 +358,9 @@ void LikelihoodInterface::setParameterValidity(const std::string& validity) {
 
 bool LikelihoodInterface::hasValidParameterValues() const {
   int invalid = 0;
-  for (const FitParameterSet& parSet:
+  for (const ParameterSet& parSet:
          _owner_->getPropagator().getParametersManager().getParameterSetsList()) {
-    for (const FitParameter& par : parSet.getParameterList()) {
+    for (const Parameter& par : parSet.getParameterList()) {
       if ( (_validFlags_ & 0b0001) != 0
           and std::isfinite(par.getMinValue())
           and par.getParameterValue() < par.getMinValue()) [[unlikely]] {

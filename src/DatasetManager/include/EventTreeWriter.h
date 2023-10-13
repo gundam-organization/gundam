@@ -6,7 +6,7 @@
 #define GUNDAM_EVENTTREEWRITER_H
 
 #include "FitSampleSet.h"
-#include "FitParameterSet.h"
+#include "ParameterSet.h"
 #include "EventDialCache.h"
 #include "PhysicsEvent.h"
 
@@ -24,7 +24,7 @@ public:
 
   void setFitSampleSetPtr(const FitSampleSet *fitSampleSetPtr){ _fitSampleSetPtr_ = fitSampleSetPtr; }
   void setEventDialCachePtr(const EventDialCache *eventDialCachePtr_){ _eventDialCachePtr_ = eventDialCachePtr_; }
-  void setParSetListPtr(const std::vector<FitParameterSet> *parSetListPtr){ _parSetListPtr_ = parSetListPtr; }
+  void setParSetListPtr(const std::vector<ParameterSet> *parSetListPtr){ _parSetListPtr_ = parSetListPtr; }
 
   void writeSamples(TDirectory* saveDir_) const;
 
@@ -51,7 +51,7 @@ private:
   // parameters
   const FitSampleSet* _fitSampleSetPtr_{nullptr};
   const EventDialCache* _eventDialCachePtr_{nullptr};
-  const std::vector<FitParameterSet>* _parSetListPtr_{nullptr};
+  const std::vector<ParameterSet>* _parSetListPtr_{nullptr};
 
 
 };

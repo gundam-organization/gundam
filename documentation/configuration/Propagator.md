@@ -13,7 +13,7 @@ It owns the parameters, the samples, and the data loader.
 | Option                                         | Type   | Description                                                                                | Default |
 |------------------------------------------------|--------|--------------------------------------------------------------------------------------------|---------|
 | [fitSampleSetConfig](./FitSampleSet.md)        | json   | FitSampleSet config                                                                        |         |
-| [parameterSetListConfig](./FitParameterSet.md) | json   | ParameterSetList config                                                                    |         |
+| [parameterSetListConfig](./ParameterSet.md) | json   | ParameterSetList config                                                                    |         |
 | [dataSetList](./DatasetLoader.md)              | json   | DatasetManager config                                                                      |         |
 | [plotGeneratorConfig](./PlotGenerator.md)      | json   | PlotGenerator config                                                                       |         |
 | [eventTreeWriter](./EventTreeWriter.md)        | json   | EventTreeWriter config                                                                     |         |

@@ -6,7 +6,7 @@
 #define GUNDAM_MINIMIZERINTERFACE_H
 
 
-#include "FitParameterSet.h"
+#include "ParameterSet.h"
 #include "MinimizerBase.h"
 #include "JsonBaseClass.h"
 

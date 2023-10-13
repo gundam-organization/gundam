@@ -10,7 +10,7 @@
 #include "DialResponseSupervisor.h"
 
 #include "FitSampleSet.h"
-#include "FitParameterSet.h"
+#include "ParameterSet.h"
 
 #include <string>
 #include <memory>

@@ -8,7 +8,7 @@
 #include "CacheManager.h"
 #endif
 
-#include "FitParameterSet.h"
+#include "ParameterSet.h"
 #include "GundamGlobals.h"
 #include "ConfigUtils.h"
 
@@ -412,7 +412,7 @@ void Propagator::initializeImpl(){
       }
 
       int iStage{0};
-      std::vector<FitParameterSet*> maskedParSetList;
+      std::vector<ParameterSet*> maskedParSetList;
       for( auto& parSet : _parManager_.getParameterSetsList() ){
         if( not parSet.isEnabled() ){ continue; }
         maskedParSetList.emplace_back( &parSet );
@@ -488,7 +488,7 @@ std::string Propagator::getLlhBufferSummary() const{
   );
   ss << std::endl << "Penalty likelihood = " << getLlhPenaltyBuffer();
   ss << " = sum of: " << GenericToolbox::iterableToString(
-      _parManager_.getParameterSetsList(), [](const FitParameterSet& parSet_){
+      _parManager_.getParameterSetsList(), [](const ParameterSet& parSet_){
         std::stringstream ssSub;
         ssSub << parSet_.getName() << ": ";
         if( parSet_.isEnabled() ){ ssSub << parSet_.getPenaltyChi2Buffer(); }

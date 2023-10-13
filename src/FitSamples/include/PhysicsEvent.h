@@ -5,7 +5,7 @@
 #ifndef GUNDAM_PHYSICSEVENT_H
 #define GUNDAM_PHYSICSEVENT_H
 
-#include "FitParameterSet.h"
+#include "ParameterSet.h"
 
 #include "GenericToolbox.Root.TreeEntryBuffer.h"
 #include "GenericToolbox.Root.LeafCollection.h"

@@ -24,7 +24,7 @@ namespace Cache {
     class Manager;
 }
 
-class FitParameter;
+class Parameter;
 
 /// Manage the cache calculations on the GPU.  This will work even when there
 /// isn't a GPU, but it's really slow on the CPU.  This is a singleton.
@@ -54,7 +54,7 @@ public:
 
     /// This returns the index of the parameter in the cache.  If the
     /// parameter isn't defined, this will return a negative value.
-    static int ParameterIndex(const FitParameter* fp);
+    static int ParameterIndex(const Parameter* fp);
 
     /// Return true if a GPU is available.
     static bool HasCUDA();
@@ -77,7 +77,7 @@ private:
 
     // A map between the fit parameter pointers and the parameter index used
     // by the fitter.
-    static std::map<const FitParameter*, int> ParameterMap;
+    static std::map<const Parameter*, int> ParameterMap;
 
     /// Declare all of the actual GPU caches here.  There is one GPU, so this
     /// is the ONE place that everything is collected together.

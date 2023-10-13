@@ -2,7 +2,7 @@
 // Created by Nadrino on 21/05/2021.
 //
 
-#include "FitParameterSet.h"
+#include "ParameterSet.h"
 #include "DataBinSet.h"
 
 #include "GundamGlobals.h"
@@ -18,11 +18,11 @@
 #include <memory>
 
 LoggerInit([]{
-  Logger::setUserHeaderStr("[FitParameterSet]");
+  Logger::setUserHeaderStr("[ParameterSet]");
 } );
 
 
-void FitParameterSet::readConfigImpl(){
+void ParameterSet::readConfigImpl(){
   LogThrowIf(_config_.empty(), "FitParameterSet config not set.");
 
   _name_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
@@ -123,7 +123,7 @@ void FitParameterSet::readConfigImpl(){
 
   this->defineParameters();
 }
-void FitParameterSet::initializeImpl() {
+void ParameterSet::initializeImpl() {
   LogInfo << "Initializing \"" << this->getName() << "\"" << std::endl;
 
   LogReturnIf(not _isEnabled_, this->getName() << " is not enabled. Skipping.");
@@ -140,29 +140,29 @@ void FitParameterSet::initializeImpl() {
 }
 
 // statics in src dependent
-void FitParameterSet::muteLogger(){ Logger::setIsMuted( true ); }
-void FitParameterSet::unmuteLogger(){ Logger::setIsMuted( false ); }
+void ParameterSet::muteLogger(){ Logger::setIsMuted(true ); }
+void ParameterSet::unmuteLogger(){ Logger::setIsMuted(false ); }
 
 // Post-init
-void FitParameterSet::processCovarianceMatrix(){
+void ParameterSet::processCovarianceMatrix(){
 
   if( _priorCovarianceMatrix_ == nullptr ){ return; } // nothing to do
 
   LogInfo << "Stripping the matrix from fixed/disabled parameters..." << std::endl;
   int nbFitParameters{0};
   for( const auto& par : _parameterList_ ){
-    if( FitParameterSet::isValidCorrelatedParameter(par) ) nbFitParameters++;
+    if( ParameterSet::isValidCorrelatedParameter(par) ) nbFitParameters++;
   }
   LogInfo << nbFitParameters << " effective parameters were defined in set: " << getName() << std::endl;
 
   _strippedCovarianceMatrix_ = std::make_shared<TMatrixDSym>(nbFitParameters);
   int iStrippedPar = -1;
   for( int iPar = 0 ; iPar < int(_parameterList_.size()) ; iPar++ ){
-    if( not FitParameterSet::isValidCorrelatedParameter(_parameterList_[iPar]) ) continue;
+    if( not ParameterSet::isValidCorrelatedParameter(_parameterList_[iPar]) ) continue;
     iStrippedPar++;
     int jStrippedPar = -1;
     for( int jPar = 0 ; jPar < int(_parameterList_.size()) ; jPar++ ){
-      if( not FitParameterSet::isValidCorrelatedParameter(_parameterList_[jPar]) ) continue;
+      if( not ParameterSet::isValidCorrelatedParameter(_parameterList_[jPar]) ) continue;
       jStrippedPar++;
       (*_strippedCovarianceMatrix_)[iStrippedPar][jStrippedPar] = (*_priorCovarianceMatrix_)[iPar][jPar];
     }
@@ -180,7 +180,7 @@ void FitParameterSet::processCovarianceMatrix(){
   }
   else {
     LogWarning << "Decomposing the stripped covariance matrix..." << std::endl;
-    _eigenParameterList_.resize(_strippedCovarianceMatrix_->GetNrows(), FitParameter(this));
+    _eigenParameterList_.resize(_strippedCovarianceMatrix_->GetNrows(), Parameter(this));
 
     _eigenDecomp_     = std::make_shared<TMatrixDSymEigen>(*_strippedCovarianceMatrix_);
 
@@ -298,19 +298,19 @@ void FitParameterSet::processCovarianceMatrix(){
 }
 
 // Getters
-const std::vector<FitParameter>& FitParameterSet::getEffectiveParameterList() const{
+const std::vector<Parameter>& ParameterSet::getEffectiveParameterList() const{
   if( _useEigenDecompInFit_ ) return _eigenParameterList_;
   return _parameterList_;
 }
 
 // non const getters
-std::vector<FitParameter>& FitParameterSet::getEffectiveParameterList(){
+std::vector<Parameter>& ParameterSet::getEffectiveParameterList(){
   if( _useEigenDecompInFit_ ) return _eigenParameterList_;
   return _parameterList_;
 }
 
 // Core
-double FitParameterSet::getPenaltyChi2() {
+double ParameterSet::getPenaltyChi2() {
 
   if (not _isEnabled_) { return 0; }
 
@@ -336,7 +336,7 @@ double FitParameterSet::getPenaltyChi2() {
 }
 
 // Parameter throw
-void FitParameterSet::moveFitParametersToPrior(){
+void ParameterSet::moveFitParametersToPrior(){
   LogInfo << "Moving back fit parameters to their prior value in set: " << getName() << std::endl;
 
   if( not _useEigenDecompInFit_ ){
@@ -354,7 +354,7 @@ void FitParameterSet::moveFitParametersToPrior(){
   }
 
 }
-void FitParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain_){
+void ParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain_){
 
   LogThrowIf(_strippedCovarianceMatrix_==nullptr, "No covariance matrix provided");
 
@@ -374,7 +374,7 @@ void FitParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain
           // throws with this function are always done in real space.
           int iFit{-1};
           for( auto& par : this->getParameterList() ){
-            if( FitParameterSet::isValidCorrelatedParameter(par) ){
+            if( ParameterSet::isValidCorrelatedParameter(par) ){
               iFit++;
               par.setThrowValue( par.getPriorValue() + gain_ * throwsList[iFit] );
               par.setParameterValue( par.getThrowValue() );
@@ -416,7 +416,7 @@ void FitParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain
 
           // alright at this point it's fine, print them
           for( auto& par : _parameterList_ ){
-            if( FitParameterSet::isValidCorrelatedParameter(par) ){
+            if( ParameterSet::isValidCorrelatedParameter(par) ){
               LogInfo << "Thrown par " << par.getTitle() << ": " << par.getPriorValue();
               LogInfo << " → " << par.getParameterValue() << std::endl;
             }
@@ -435,7 +435,7 @@ void FitParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain
   if( _useMarkGenerator_ ){
     int iPar{0};
     for( auto& par : _parameterList_ ){
-      if( FitParameterSet::isValidCorrelatedParameter(par) ){ throwsList[iPar++] = par.getPriorValue(); }
+      if( ParameterSet::isValidCorrelatedParameter(par) ){ throwsList[iPar++] = par.getPriorValue(); }
     }
 
     if( _markHartzGen_ == nullptr ){
@@ -526,7 +526,7 @@ void FitParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain
 
 }
 
-void FitParameterSet::propagateOriginalToEigen(){
+void ParameterSet::propagateOriginalToEigen(){
   // First propagate to the buffer
   int iParOffSet{0};
   for( const auto& par : _parameterList_ ){
@@ -543,7 +543,7 @@ void FitParameterSet::propagateOriginalToEigen(){
     _eigenParameterList_[iEigen].setParameterValue((*_eigenParBuffer_)[iEigen]);
   }
 }
-void FitParameterSet::propagateEigenToOriginal(){
+void ParameterSet::propagateEigenToOriginal(){
   // First propagate to the buffer
   for( int iEigen = 0 ; iEigen < _eigenParBuffer_->GetNrows() ; iEigen++ ){
     (*_eigenParBuffer_)[iEigen] = _eigenParameterList_[iEigen].getParameterValue();
@@ -563,7 +563,7 @@ void FitParameterSet::propagateEigenToOriginal(){
 
 
 // Misc
-std::string FitParameterSet::getSummary() const {
+std::string ParameterSet::getSummary() const {
   std::stringstream ss;
 
   ss << "FitParameterSet summary: " << _name_ << " -> enabled=" << _isEnabled_;
@@ -608,7 +608,7 @@ std::string FitParameterSet::getSummary() const {
 
   return ss.str();
 }
-nlohmann::json FitParameterSet::exportInjectorConfig() const{
+nlohmann::json ParameterSet::exportInjectorConfig() const{
   nlohmann::json out;
 
   out["name"] = this->getName();
@@ -635,7 +635,7 @@ nlohmann::json FitParameterSet::exportInjectorConfig() const{
 
   return out;
 }
-void FitParameterSet::injectParameterValues(const nlohmann::json& config_){
+void ParameterSet::injectParameterValues(const nlohmann::json& config_){
   LogWarning << "Importing parameters from config for \"" << this->getName() << "\"" << std::endl;
 
   auto config = ConfigUtils::getForwardedConfig(config_);
@@ -726,7 +726,7 @@ void FitParameterSet::injectParameterValues(const nlohmann::json& config_){
   }
 
 }
-FitParameter* FitParameterSet::getParameterPtr(const std::string& parName_){
+Parameter* ParameterSet::getParameterPtr(const std::string& parName_){
   if( not parName_.empty() ){
     for( auto& par : _parameterList_ ){
       if( par.getName() == parName_ ){ return &par; }
@@ -734,7 +734,7 @@ FitParameter* FitParameterSet::getParameterPtr(const std::string& parName_){
   }
   return nullptr;
 }
-FitParameter* FitParameterSet::getParameterPtrWithTitle(const std::string& parTitle_){
+Parameter* ParameterSet::getParameterPtrWithTitle(const std::string& parTitle_){
   if( not parTitle_.empty() ){
     for( auto& par : _parameterList_ ){
       if( par.getTitle() == parTitle_ ){ return &par; }
@@ -744,25 +744,25 @@ FitParameter* FitParameterSet::getParameterPtrWithTitle(const std::string& parTi
 }
 
 // Static
-double FitParameterSet::toNormalizedParRange(double parRange, const FitParameter& par){
+double ParameterSet::toNormalizedParRange(double parRange, const Parameter& par){
   return (parRange)/par.getStdDevValue();
 }
-double FitParameterSet::toNormalizedParValue(double parValue, const FitParameter& par) {
-  return FitParameterSet::toNormalizedParRange(parValue - par.getPriorValue(), par);
+double ParameterSet::toNormalizedParValue(double parValue, const Parameter& par) {
+  return ParameterSet::toNormalizedParRange(parValue - par.getPriorValue(), par);
 }
-double FitParameterSet::toRealParRange(double normParRange, const FitParameter& par){
+double ParameterSet::toRealParRange(double normParRange, const Parameter& par){
   return normParRange*par.getStdDevValue();
 }
-double FitParameterSet::toRealParValue(double normParValue, const FitParameter& par) {
+double ParameterSet::toRealParValue(double normParValue, const Parameter& par) {
   return normParValue*par.getStdDevValue() + par.getPriorValue();
 }
-bool FitParameterSet::isValidCorrelatedParameter(const FitParameter& par_){
+bool ParameterSet::isValidCorrelatedParameter(const Parameter& par_){
   return ( par_.isEnabled() and not par_.isFixed() and not par_.isFree() );
 }
 
 
 // Protected
-void FitParameterSet::readParameterDefinitionFile(){
+void ParameterSet::readParameterDefinitionFile(){
 
   if( _parameterDefinitionFilePath_.empty() ) return;
 
@@ -848,9 +848,9 @@ void FitParameterSet::readParameterDefinitionFile(){
 
   parDefFile->Close();
 }
-void FitParameterSet::defineParameters(){
+void ParameterSet::defineParameters(){
   LogInfo << "Defining " << _nbParameterDefinition_ << " parameters for the set: " << getName() << std::endl;
-  _parameterList_.resize(_nbParameterDefinition_, FitParameter(this));
+  _parameterList_.resize(_nbParameterDefinition_, Parameter(this));
   int parIndex{0};
 
   for( auto& par : _parameterList_ ){
@@ -959,10 +959,10 @@ void FitParameterSet::defineParameters(){
   }
 }
 
-void FitParameterSet::fillDeltaParameterList(){
+void ParameterSet::fillDeltaParameterList(){
   int iFit{0};
   for( const auto& par : _parameterList_ ){
-    if( FitParameterSet::isValidCorrelatedParameter(par) ){
+    if( ParameterSet::isValidCorrelatedParameter(par) ){
       (*_deltaParameterList_)[iFit++] = par.getParameterValue() - par.getPriorValue();
     }
   }

@@ -6,7 +6,7 @@
 #define GUNDAM_FITSAMPLESET_H
 
 #include "FitSample.h"
-#include "FitParameterSet.h"
+#include "ParameterSet.h"
 #include "Likelihoods.hh"
 #include "JointProbability.h"
 #include "JsonBaseClass.h"

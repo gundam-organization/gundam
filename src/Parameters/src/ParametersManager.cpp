@@ -112,7 +112,7 @@ nlohmann::json ParametersManager::exportParameterInjectorConfig() const{
 
   return out;
 }
-const FitParameterSet* ParametersManager::getFitParameterSetPtr(const std::string& name_) const{
+const ParameterSet* ParametersManager::getFitParameterSetPtr(const std::string& name_) const{
   for( auto& parSet : _parameterSetList_ ){
     if( parSet.getName() == name_ ) return &parSet;
   }
@@ -250,7 +250,7 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
         LogInfo << parSet.getName() << ":" << std::endl;
         for( auto& par : parSet.getParameterList() ){
           LogScopeIndent;
-          if( FitParameterSet::isValidCorrelatedParameter(par) ){
+          if( ParameterSet::isValidCorrelatedParameter(par) ){
             par.setThrowValue( par.getParameterValue() );
             LogInfo << "Thrown par " << par.getFullTitle() << ": " << par.getPriorValue();
             LogInfo << " → " << par.getParameterValue() << std::endl;
@@ -295,7 +295,7 @@ void ParametersManager::injectParameterValues(const nlohmann::json &config_) {
     selectedParSet->injectParameterValues(entryParSet);
   }
 }
-FitParameterSet* ParametersManager::getFitParameterSetPtr(const std::string& name_){
-  return const_cast<FitParameterSet*>(const_cast<const ParametersManager*>(this)->getFitParameterSetPtr(name_));
+ParameterSet* ParametersManager::getFitParameterSetPtr(const std::string& name_){
+  return const_cast<ParameterSet*>(const_cast<const ParametersManager*>(this)->getFitParameterSetPtr(name_));
 }
 
