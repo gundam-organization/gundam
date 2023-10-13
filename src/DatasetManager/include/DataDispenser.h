@@ -5,7 +5,7 @@
 #ifndef GUNDAM_DATADISPENSER_H
 #define GUNDAM_DATADISPENSER_H
 
-#include "FitSampleSet.h"
+#include "SampleSet.h"
 #include "PlotGenerator.h"
 #include "JsonBaseClass.h"
 #include "DialCollection.h"
@@ -44,7 +44,7 @@ public:
   // non-const getters
   DataDispenserParameters &getParameters(){ return _parameters_; }
 
-  void setSampleSetPtrToLoad(FitSampleSet *sampleSetPtrToLoad);
+  void setSampleSetPtrToLoad(SampleSet *sampleSetPtrToLoad);
   void setParSetPtrToLoad(std::vector<ParameterSet> *parSetListPtrToLoad_);
   void setDialCollectionListPtr(std::vector<DialCollection> *dialCollectionListPtr);
   void setPlotGenPtr(PlotGenerator *plotGenPtr);
@@ -72,7 +72,7 @@ private:
 
   // Internals
   DatasetLoader* _owner_{nullptr};
-  FitSampleSet* _sampleSetPtrToLoad_{nullptr};
+  SampleSet* _sampleSetPtrToLoad_{nullptr};
   std::vector<ParameterSet>* _parSetListPtrToLoad_{nullptr};
   std::vector<DialCollection>* _dialCollectionListPtr_{nullptr};
   PlotGenerator* _plotGenPtr_{nullptr}; // used to know which vars have to be kept in memory

@@ -13,7 +13,7 @@
 
 #include "CacheIndexedSums.h"
 
-#include "FitSampleSet.h"
+#include "SampleSet.h"
 #include "EventDialCache.h"
 
 #include "hemi/array.h"
@@ -40,13 +40,13 @@ public:
 
     /// Build the cache and load it into the device.  This is used in
     /// Propagator.cpp to fill the constants needed to for the calculations.
-    static bool Build(FitSampleSet& sampleList, EventDialCache& eventDials);
+    static bool Build(SampleSet& sampleList, EventDialCache& eventDials);
 
     /// Update the cache with the event and spline information.  This is
     /// called as part of Build, and can be called in other code if the cache
     /// needs to be changed.  It forages all of the information from the
     /// original sample list and event dials.
-    static bool Update(FitSampleSet& sampleList, EventDialCache& eventDials);
+    static bool Update(SampleSet& sampleList, EventDialCache& eventDials);
 
     /// Flag that the Cache::Manager internal caches must be updated from the
     /// FitSampleSet and EventDialCache before it can be used.

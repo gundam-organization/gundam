@@ -483,7 +483,7 @@ set( MODULES Utils)
 # Add the basic modules
 list( APPEND MODULES DialDictionary)
 list( APPEND MODULES Parameters)
-list( APPEND MODULES FitSamples)
+list( APPEND MODULES Samples)
 list( APPEND MODULES DatasetManager)
 list( APPEND MODULES Propagator)
 list( APPEND MODULES Fitter)

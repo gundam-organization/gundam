@@ -7,7 +7,7 @@
 
 #include "DataDispenser.h"
 #include "ParameterSet.h"
-#include <FitSampleSet.h>
+#include <SampleSet.h>
 #include "PlotGenerator.h"
 #include "JsonBaseClass.h"
 

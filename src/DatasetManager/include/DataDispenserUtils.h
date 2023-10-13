@@ -7,7 +7,7 @@
 
 #include "EventVarTransformLib.h"
 #include "DialCollection.h"
-#include "FitSample.h"
+#include "Sample.h"
 
 #include "GenericToolbox.Wrappers.h"
 
@@ -37,7 +37,7 @@ struct DataDispenserParameters{
 };
 
 struct DataDispenserCache{
-  std::vector<FitSample*> samplesToFillList{};
+  std::vector<Sample*> samplesToFillList{};
   std::vector<size_t> sampleNbOfEvents;
   std::vector<std::vector<bool>> eventIsInSamplesList{};
   std::vector<GenericToolbox::CopiableAtomic<size_t>> sampleIndexOffsetList;

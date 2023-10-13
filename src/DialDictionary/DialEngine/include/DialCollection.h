@@ -9,7 +9,7 @@
 #include "DialInterface.h"
 #include "DialInputBuffer.h"
 #include "DialResponseSupervisor.h"
-#include "FitSampleSet.h"
+#include "SampleSet.h"
 
 #include "GenericToolbox.Wrappers.h"
 

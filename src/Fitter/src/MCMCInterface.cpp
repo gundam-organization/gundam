@@ -242,7 +242,7 @@ void MCMCInterface::fillPoint(bool fillModel) {
   _saveModel_.clear();
   _saveUncertainty_.clear();
   if (not fillModel) return;
-  for (const FitSample& sample
+  for (const Sample& sample
          : getPropagator().getFitSampleSet().getFitSampleList()) {
     std::shared_ptr<TH1D> hist = sample.getMcContainer().histogram;
     for (int i = 1; i < hist->GetNbinsX(); ++i) {
@@ -858,7 +858,7 @@ void MCMCInterface::minimize() {
   }
 
   parameterSampleData.clear();
-  for (const FitSample& sample
+  for (const Sample& sample
          : getPropagator().getFitSampleSet().getFitSampleList()) {
     parameterSampleNames.push_back(sample.getName());
     parameterSampleOffsets.push_back(parameterSampleData.size());

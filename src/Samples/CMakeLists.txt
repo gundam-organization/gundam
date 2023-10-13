@@ -1,9 +1,10 @@
 # Samples
+set( LIB_NAME GundamSamples )
 
 set( SRCFILES
         src/SampleElement.cpp
-        src/FitSampleSet.cpp
-        src/FitSample.cpp
+    src/SampleSet.cpp
+    src/Sample.cpp
         src/PhysicsEvent.cpp
         src/PlotGenerator.cpp
         src/JointProbability.cpp
@@ -12,23 +13,23 @@ set( SRCFILES
         )
 
 if( USE_STATIC_LINKS )
-  add_library(GundamFitSamples STATIC ${SRCFILES})
+  add_library(${LIB_NAME} STATIC ${SRCFILES})
 else()
-  add_library(GundamFitSamples SHARED ${SRCFILES})
+  add_library(${LIB_NAME} SHARED ${SRCFILES})
 endif()
 
-target_include_directories(GundamFitSamples PUBLIC
+target_include_directories(${LIB_NAME} PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 target_link_libraries(
-        GundamFitSamples PUBLIC
+        ${LIB_NAME} PUBLIC
         GundamUtils
         GundamParameters
         ${ROOT_LIBRARIES}
         -ldl
 )
 
-#set_target_properties( GundamFitSamples PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")
+#set_target_properties( ${LIB_NAME} PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")
 
-install(TARGETS GundamFitSamples DESTINATION lib)
+install(TARGETS ${LIB_NAME} DESTINATION lib)
 

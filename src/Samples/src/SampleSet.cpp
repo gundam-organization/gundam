@@ -3,13 +3,13 @@
 //
 
 
+#include "SampleSet.h"
+
+#include "GundamGlobals.h"
 
 #include "GenericToolbox.Json.h"
-#include "GundamGlobals.h"
-#include "FitSampleSet.h"
-
-#include "Logger.h"
 #include "GenericToolbox.h"
+#include "Logger.h"
 
 #include "nlohmann/json.hpp"
 #include <TTreeFormulaManager.h>
@@ -17,10 +17,10 @@
 #include <memory>
 
 
-LoggerInit([]{ Logger::setUserHeaderStr("[FitSampleSet]"); });
+LoggerInit([]{ Logger::setUserHeaderStr("[SampleSet]"); });
 
 
-void FitSampleSet::readConfigImpl(){
+void SampleSet::readConfigImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
   LogThrowIf(_config_.empty(), "_config_ is not set." << std::endl);
 
@@ -56,7 +56,7 @@ void FitSampleSet::readConfigImpl(){
   _jointProbabilityPtr_->readConfig(configJointProbability);
   _jointProbabilityPtr_->initialize();
 }
-void FitSampleSet::initializeImpl() {
+void SampleSet::initializeImpl() {
   LogWarning << __METHOD_NAME__ << std::endl;
   LogThrowIf(_fitSampleList_.empty(), "No sample is defined.");
 
@@ -100,7 +100,7 @@ void FitSampleSet::initializeImpl() {
   GundamGlobals::getParallelWorker().setPostParallelJob("FitSampleSet::updateSampleHistograms", rescaleMcHistogramsFct);
 }
 
-double FitSampleSet::evalLikelihood(){
+double SampleSet::evalLikelihood(){
   double llh = 0.;
   for( auto& sample : _fitSampleList_ ){
     llh += this->evalLikelihood(sample);
@@ -108,12 +108,12 @@ double FitSampleSet::evalLikelihood(){
   }
   return llh;
 }
-double FitSampleSet::evalLikelihood(FitSample& sample_){
+double SampleSet::evalLikelihood(Sample& sample_){
   sample_.setLlhStatBuffer(_jointProbabilityPtr_->eval(sample_));
   return sample_.getLlhStatBuffer();
 }
 
-void FitSampleSet::copyMcEventListToDataContainer(){
+void SampleSet::copyMcEventListToDataContainer(){
   for( auto& sample : _fitSampleList_ ){
     LogInfo << "Copying MC events in sample \"" << sample.getName() << "\"" << std::endl;
     sample.getDataContainer().eventList.clear();
@@ -126,24 +126,24 @@ void FitSampleSet::copyMcEventListToDataContainer(){
     );
   }
 }
-void FitSampleSet::clearMcContainers(){
+void SampleSet::clearMcContainers(){
   for( auto& sample : _fitSampleList_ ){
     LogInfo << "Clearing event list for \"" << sample.getName() << "\"" << std::endl;
     sample.getMcContainer().eventList.clear();
   }
 }
 
-void FitSampleSet::updateSampleEventBinIndexes() const{
+void SampleSet::updateSampleEventBinIndexes() const{
   if( _showTimeStats_ ) GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
   GundamGlobals::getParallelWorker().runJob("FitSampleSet::updateSampleEventBinIndexes");
   if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
 }
-void FitSampleSet::updateSampleBinEventList() const{
+void SampleSet::updateSampleBinEventList() const{
   if( _showTimeStats_ ) GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
   GundamGlobals::getParallelWorker().runJob("FitSampleSet::updateSampleBinEventList");
   if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
 }
-void FitSampleSet::updateSampleHistograms() const {
+void SampleSet::updateSampleHistograms() const {
   if( _showTimeStats_ ) GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
   GundamGlobals::getParallelWorker().runJob("FitSampleSet::updateSampleHistograms");
   if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;

@@ -5,7 +5,7 @@
 #ifndef GUNDAM_EVENTTREEWRITER_H
 #define GUNDAM_EVENTTREEWRITER_H
 
-#include "FitSampleSet.h"
+#include "SampleSet.h"
 #include "ParameterSet.h"
 #include "EventDialCache.h"
 #include "PhysicsEvent.h"
@@ -22,7 +22,7 @@ class EventTreeWriter : public GenericToolbox::ConfigBaseClass<nlohmann::json> {
 public:
   EventTreeWriter() = default;
 
-  void setFitSampleSetPtr(const FitSampleSet *fitSampleSetPtr){ _fitSampleSetPtr_ = fitSampleSetPtr; }
+  void setFitSampleSetPtr(const SampleSet *fitSampleSetPtr){ _fitSampleSetPtr_ = fitSampleSetPtr; }
   void setEventDialCachePtr(const EventDialCache *eventDialCachePtr_){ _eventDialCachePtr_ = eventDialCachePtr_; }
   void setParSetListPtr(const std::vector<ParameterSet> *parSetListPtr){ _parSetListPtr_ = parSetListPtr; }
 
@@ -49,7 +49,7 @@ private:
   int _nPointsPerDial_{3};
 
   // parameters
-  const FitSampleSet* _fitSampleSetPtr_{nullptr};
+  const SampleSet* _fitSampleSetPtr_{nullptr};
   const EventDialCache* _eventDialCachePtr_{nullptr};
   const std::vector<ParameterSet>* _parSetListPtr_{nullptr};
 

@@ -9,7 +9,7 @@
 #include "DatasetLoader.h"
 #include "PlotGenerator.h"
 #include "EventTreeWriter.h"
-#include "FitSampleSet.h"
+#include "SampleSet.h"
 #include "ParametersManager.h"
 #include "JsonBaseClass.h"
 #include "ParScanner.h"
@@ -47,7 +47,7 @@ public:
 
   // Non-const getters
   ParScanner& getParScanner(){ return _parScanner_; }
-  FitSampleSet &getFitSampleSet(){ return _fitSampleSet_; }
+  SampleSet &getFitSampleSet(){ return _fitSampleSet_; }
   ParametersManager &getParametersManager(){ return _parManager_; }
   PlotGenerator &getPlotGenerator(){ return _plotGenerator_; }
   EventDialCache& getEventDialCache(){ return _eventDialCache_; }
@@ -108,7 +108,7 @@ private:
   double _llhRegBuffer_{0};
 
   // Sub-layers
-  FitSampleSet _fitSampleSet_;
+  SampleSet _fitSampleSet_;
   ParametersManager _parManager_;
   PlotGenerator _plotGenerator_;
   EventTreeWriter _treeWriter_;

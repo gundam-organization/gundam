@@ -2,10 +2,10 @@
 // Created by Nadrino on 22/07/2021.
 //
 
-#include "FitSample.h"
+#include "Sample.h"
 #include "GundamGlobals.h"
-#include "GenericToolbox.Json.h"
 
+#include "GenericToolbox.Json.h"
 #include "GenericToolbox.h"
 #include "Logger.h"
 
@@ -15,11 +15,11 @@
 
 
 LoggerInit([]{
-  Logger::setUserHeaderStr("[FitSample]");
+  Logger::setUserHeaderStr("[Sample]");
 });
 
 
-void FitSample::readConfigImpl(){
+void Sample::readConfigImpl(){
   _name_ = GenericToolbox::Json::fetchValue(_config_, "name", _name_);
   LogThrowIf(
       GenericToolbox::doesStringContainsSubstring(_name_, "/"),
@@ -35,7 +35,7 @@ void FitSample::readConfigImpl(){
   _mcNorm_ = GenericToolbox::Json::fetchValue(_config_, "mcNorm", _mcNorm_);
   _dataNorm_ = GenericToolbox::Json::fetchValue(_config_, "dataNorm", _dataNorm_);
 }
-void FitSample::initializeImpl() {
+void Sample::initializeImpl() {
   if( not _isEnabled_ ) return;
 
   LogInfo << "Initializing FitSample: " << _name_ << std::endl;
@@ -64,7 +64,7 @@ void FitSample::initializeImpl() {
   _dataContainer_.histogram->SetDirectory(nullptr);
 }
 
-bool FitSample::isDatasetValid(const std::string& datasetName_){
+bool Sample::isDatasetValid(const std::string& datasetName_){
   if( _enabledDatasetList_.empty() ) return true;
   for( auto& dataSetName : _enabledDatasetList_){
     if( dataSetName == "*" or dataSetName == datasetName_ ){

@@ -23,7 +23,7 @@ target_include_directories(GundamDatasetManager PUBLIC
 
 target_link_libraries( GundamDatasetManager
         GundamParameters
-        GundamFitSamples
+        GundamSamples
         GundamDialDictionary
         ${ROOT_LIBRARIES}
         )

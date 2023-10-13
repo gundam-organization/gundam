@@ -392,7 +392,7 @@ int main(int argc, char** argv){
   };
 
   struct CrossSectionData{
-    FitSample* samplePtr{nullptr};
+    Sample* samplePtr{nullptr};
     nlohmann::json config{};
     GenericToolbox::RawDataArray branchBinsData{};
 

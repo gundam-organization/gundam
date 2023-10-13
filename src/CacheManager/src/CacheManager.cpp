@@ -134,7 +134,7 @@ bool Cache::Manager::HasCUDA() {
     return Cache::Parameters::UsingCUDA();
 }
 
-bool Cache::Manager::Build(FitSampleSet& sampleList,
+bool Cache::Manager::Build(SampleSet& sampleList,
                            EventDialCache& eventDials) {
     LogInfo << "Build the internal caches " << std::endl;
 
@@ -219,7 +219,7 @@ bool Cache::Manager::Build(FitSampleSet& sampleList,
 
     // Count the total number of histogram cells.
     int histCells = 0;
-    for(const FitSample& sample : sampleList.getFitSampleList() ){
+    for(const Sample& sample : sampleList.getFitSampleList() ){
         if (!sample.getMcContainer().histogram) continue;
         int cells = sample.getMcContainer().histogram->GetNcells();
         LogInfo  << "Add histogram for " << sample.getName()
@@ -336,8 +336,8 @@ void Cache::Manager::UpdateRequired() {
 }
 
 
-bool Cache::Manager::Update(FitSampleSet& sampleList,
-                           EventDialCache& eventDials) {
+bool Cache::Manager::Update(SampleSet& sampleList,
+                            EventDialCache& eventDials) {
     if (not fUpdateRequired) return true;
 
     // This is the updated that is required!
@@ -548,7 +548,7 @@ bool Cache::Manager::Update(FitSampleSet& sampleList,
     // Add the histogram cells to the cache.  THIS CODE IS SUSPECT!!!!
     LogInfo << "Add this histogram cells to the cache." << std::endl;
     int nextHist = 0;
-    for(FitSample& sample : sampleList.getFitSampleList() ) {
+    for(Sample& sample : sampleList.getFitSampleList() ) {
         LogInfo  << "Fill cache for " << sample.getName()
                 << " with " << sample.getMcContainer().eventList.size()
                 << " events" << std::endl;

@@ -67,7 +67,7 @@ void DataDispenser::initializeImpl(){
   LogWarning << "Initialized data dispenser: " << getTitle() << std::endl;
 }
 
-void DataDispenser::setSampleSetPtrToLoad(FitSampleSet *sampleSetPtrToLoad) {
+void DataDispenser::setSampleSetPtrToLoad(SampleSet *sampleSetPtrToLoad) {
   _sampleSetPtrToLoad_ = sampleSetPtrToLoad;
 }
 void DataDispenser::setParSetPtrToLoad(std::vector<ParameterSet> *parSetListPtrToLoad_) {

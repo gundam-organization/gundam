@@ -478,7 +478,7 @@ std::string Propagator::getLlhBufferSummary() const{
   ss << "Total likelihood = " << getLlhBuffer();
   ss << std::endl << "Stat likelihood = " << getLlhStatBuffer();
   ss << " = sum of: " << GenericToolbox::iterableToString(
-      _fitSampleSet_.getFitSampleList(), [](const FitSample& sample_){
+      _fitSampleSet_.getFitSampleList(), [](const Sample& sample_){
         std::stringstream ssSub;
         ssSub << sample_.getName() << ": ";
         if( sample_.isEnabled() ){ ssSub << sample_.getLlhStatBuffer(); }

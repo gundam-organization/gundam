@@ -5,7 +5,7 @@
 #ifndef GUNDAM_JOINTPROBABILITY_H
 #define GUNDAM_JOINTPROBABILITY_H
 
-#include "FitSample.h"
+#include "Sample.h"
 #include "JsonBaseClass.h"
 
 #include "GenericToolbox.h"
@@ -25,8 +25,8 @@ namespace JointProbability {
   class JointProbability : public JsonBaseClass {
   public:
     // two choices -> either override bin by bin llh or global eval function
-    virtual double eval(const FitSample& sample_, int bin_){ return 0; }
-    virtual double eval(const FitSample& sample_){
+    virtual double eval(const Sample& sample_, int bin_){ return 0; }
+    virtual double eval(const Sample& sample_){
       double out{0};
       int nBins = int(sample_.getBinning().getBinsList().size());
       for( int iBin = 1 ; iBin <= nBins ; iBin++ ){ out += this->eval(sample_, iBin); }
@@ -37,7 +37,7 @@ namespace JointProbability {
   class JointProbabilityPlugin : public JointProbability{
 
   public:
-    double eval(const FitSample& sample_, int bin_) override;
+    double eval(const Sample& sample_, int bin_) override;
 
     std::string llhPluginSrc;
     std::string llhSharedLib;
@@ -56,11 +56,11 @@ namespace JointProbability {
 
 
   class Chi2 : public JointProbability{
-    double eval(const FitSample& sample_, int bin_) override;
+    double eval(const Sample& sample_, int bin_) override;
   };
 
   class PoissonLLH : public JointProbability{
-    double eval(const FitSample& sample_, int bin_) override;
+    double eval(const Sample& sample_, int bin_) override;
   };
 
   /// Evaluate the Least Squares difference between the expected and observed.
@@ -71,7 +71,7 @@ namespace JointProbability {
     void readConfigImpl() override;
 
   public:
-    double eval(const FitSample& sample_, int bin_) override;
+    double eval(const Sample& sample_, int bin_) override;
 
     /// If true the use Poissonian approximation with the variance equal to
     /// the observed value (i.e. the data).
@@ -79,13 +79,13 @@ namespace JointProbability {
   };
 
   class BarlowLLH : public JointProbability{
-    double eval(const FitSample& sample_, int bin_) override;
+    double eval(const Sample& sample_, int bin_) override;
   private:
     double rel_var, b, c, beta, mc_hat, chi2;
   };
 
   class BarlowLLH_BANFF_OA2020 : public JointProbability{
-    double eval(const FitSample& sample_, int bin_) override;
+    double eval(const Sample& sample_, int bin_) override;
   };
 
   class BarlowLLH_BANFF_OA2021 : public JointProbability{
@@ -94,14 +94,14 @@ namespace JointProbability {
     void readConfigImpl() override;
 
   public:
-    double eval(const FitSample& sample_, int bin_) override;
+    double eval(const Sample& sample_, int bin_) override;
 
     bool usePoissonLikelihood{false};
     bool BBNoUpdateWeights{false};
   };
 
   class BarlowLLH_BANFF_OA2021_SFGD : public JointProbability{
-    double eval(const FitSample& sample_, int bin_) override;
+    double eval(const Sample& sample_, int bin_) override;
   };
 
 }
