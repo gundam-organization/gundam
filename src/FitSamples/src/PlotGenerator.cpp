@@ -652,6 +652,7 @@ void PlotGenerator::defineHistogramHolders() {
       } // Event
     }
   };
+
   GundamGlobals::getParallelWorker().addJob("fetchSplitVar", fetchSplitVar);
   GundamGlobals::getParallelWorker().runJob("fetchSplitVar");
   GundamGlobals::getParallelWorker().removeJob("fetchSplitVar");
@@ -863,21 +864,22 @@ void PlotGenerator::defineHistogramHolders() {
 }
 void PlotGenerator::buildEventBinCache(const std::vector<HistHolder *> &histPtrToFillList, const std::vector<PhysicsEvent> *eventListPtr, bool isData_) {
 
-  for( auto* holder : histPtrToFillList ){
-    if( not holder->isBinCacheBuilt ){
-      if(holder->histPtr == nullptr ){ continue; }
+  std::function<void()> prepareCacheFct = [&]() {
+    for (auto *holder: histPtrToFillList) {
+      if (not holder->isBinCacheBuilt) {
+        if (holder->histPtr == nullptr) { continue; }
 
-      // pre-allocate
-      holder->_binEventPtrList_.resize( holder->histPtr->GetNbinsX() );
-      for( auto& evtList : holder->_binEventPtrList_ ){ evtList.reserve( eventListPtr->size() ); }
+        // pre-allocate
+        holder->_binEventPtrList_.resize(holder->histPtr->GetNbinsX());
+        for (auto &evtList: holder->_binEventPtrList_) { evtList.reserve(eventListPtr->size()); }
 
-      // fill any to double cache
-      if( holder->varToPlot != "Raw" ){
-        for( auto& evt : *eventListPtr ){ evt.getVarAsDouble( holder->varToPlot ); }
+        // fill any to double cache
+        if (holder->varToPlot != "Raw") {
+          for (auto &evt: *eventListPtr) { evt.getVarAsDouble(holder->varToPlot); }
+        }
       }
     }
-  }
-
+  };
   std::function<void(int)> fillEventHistCache = [&](int iThread_){
 
     auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
@@ -907,14 +909,17 @@ void PlotGenerator::buildEventBinCache(const std::vector<HistHolder *> &histPtrT
       }
     }
   };
+  std::function<void()> shrinkAllocationsFct = [&]() {
+    for( auto* holder : histPtrToFillList ){
+      for( auto& evtList : holder->_binEventPtrList_ ){ evtList.shrink_to_fit(); }
+    }
+  };
 
   GundamGlobals::getParallelWorker().addJob("fillEventHistCache", fillEventHistCache);
+  GundamGlobals::getParallelWorker().setPreParallelJob("fillEventHistCache", prepareCacheFct);
+  GundamGlobals::getParallelWorker().setPostParallelJob("fillEventHistCache", shrinkAllocationsFct);
   GundamGlobals::getParallelWorker().runJob("fillEventHistCache");
   GundamGlobals::getParallelWorker().removeJob("fillEventHistCache");
-
-  for( auto* holder : histPtrToFillList ){
-    for( auto& evtList : holder->_binEventPtrList_ ){ evtList.shrink_to_fit(); }
-  }
 
 }
 
