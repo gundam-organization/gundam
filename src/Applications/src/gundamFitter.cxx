@@ -323,7 +323,7 @@ int main(int argc, char** argv){
   // show initial conditions
   if( clParser.isOptionTriggered("injectParameterConfig") ) {
     LogDebug << "Starting mc parameters that where injected:" << std::endl;
-    LogDebug << fitter.getPropagator().getParametersSummary( false ) << std::endl;
+    LogDebug << fitter.getPropagator().getParametersManager().getParametersSummary( false ) << std::endl;
   }
 
   if( clParser.isOptionTriggered("scanLine") ){

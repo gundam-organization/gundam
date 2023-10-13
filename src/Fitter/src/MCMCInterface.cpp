@@ -223,7 +223,7 @@ void MCMCInterface::initializeImpl(){
 /// Copy the current parameter values to the tree.
 void MCMCInterface::fillPoint(bool fillModel) {
   int count = 0;
-  for (const FitParameterSet& parSet: getPropagator().getParameterSetsList()) {
+  for (const FitParameterSet& parSet: getPropagator().getParametersManager().getParameterSetsList()) {
     for (const FitParameter& iPar : parSet.getParameterList()) {
       if (count >= _point_.size()) {
         LogWarning << "Point out of range " << _point_.size() << " " << count << std::endl;
@@ -837,7 +837,7 @@ void MCMCInterface::minimize() {
   // of the parameters in the call to the likelihood function.  Those
   // parameters are defined by the _minimizerFitParameterPtr_ vector.
 
-  for (const FitParameterSet& parSet: getPropagator().getParameterSetsList()) {
+  for (const FitParameterSet& parSet: getPropagator().getParametersManager().getParameterSetsList()) {
     // Save name of parameter set
     parameterSetNames.push_back(parSet.getName());
     parameterSetOffsets.push_back(parameterIndex.size());

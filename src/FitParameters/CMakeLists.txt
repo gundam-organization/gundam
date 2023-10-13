@@ -1,12 +1,14 @@
 set(SRCFILES
-        src/FitParameterSet.cpp
-        src/FitParameter.cpp
-        )
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/FitParameterSet.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/FitParameter.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ParametersManager.cpp
+)
 
 set(HEADERS
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/FitParameter.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/FitParameterSet.h
-        )
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/FitParameter.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/FitParameterSet.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ParametersManager.h
+)
 
 
 #ROOT_GENERATE_DICTIONARY(

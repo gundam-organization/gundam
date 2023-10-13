@@ -43,7 +43,7 @@ void LikelihoodInterface::initialize() {
   LogWarning << "Fetching the effective number of fit parameters..." << std::endl;
   _minimizerFitParameterPtr_.clear();
   _nbFreePars_ = 0;
-  for( auto& parSet : _owner_->getPropagator().getParameterSetsList() ){
+  for( auto& parSet : _owner_->getPropagator().getParametersManager().getParameterSetsList() ){
     for( auto& par : parSet.getEffectiveParameterList() ){
       if( par.isEnabled() and not par.isFixed() ) {
         _minimizerFitParameterPtr_.emplace_back(&par);
@@ -97,7 +97,7 @@ void LikelihoodInterface::saveGradientSteps(){
   LogInfo << "Saving " << _gradientMonitor_.size() << " gradient steps..." << std::endl;
 
   // make sure the parameter states get restored as we leave
-  auto currentParState = _owner_->getPropagator().exportParameterInjectorConfig();
+  auto currentParState = _owner_->getPropagator().getParametersManager().exportParameterInjectorConfig();
   GenericToolbox::ScopedGuard g{
     [&](){
       FitParameterSet::muteLogger();
@@ -105,7 +105,7 @@ void LikelihoodInterface::saveGradientSteps(){
       ParScanner::muteLogger();
     },
     [&](){
-      _owner_->getPropagator().injectParameterValues( currentParState );
+      _owner_->getPropagator().getParametersManager().injectParameterValues( currentParState );
       FitParameterSet::unmuteLogger();
       Propagator::unmuteLogger();
       ParScanner::unmuteLogger();
@@ -118,7 +118,7 @@ void LikelihoodInterface::saveGradientSteps(){
   std::vector<GraphEntry> globalGraphList;
   for(size_t iGradStep = 0 ; iGradStep < _gradientMonitor_.size() ; iGradStep++ ){
     FitParameterSet::muteLogger(); Propagator::muteLogger();
-    _owner_->getPropagator().injectParameterValues(_gradientMonitor_[iGradStep].parState );
+    _owner_->getPropagator().getParametersManager().injectParameterValues(_gradientMonitor_[iGradStep].parState );
     _owner_->getPropagator().updateLlhCache();
 
     if( not GundamGlobals::isLightOutputMode() ) {
@@ -209,7 +209,7 @@ double LikelihoodInterface::evalFit(const double* parArray_){
         LogWarning << "Overriding last gradient descent entry: ";
         LogWarning(_gradientMonitor_.size() >= 2) << _gradientMonitor_[_gradientMonitor_.size() - 2].llh << " -> ";
         LogWarning << _owner_->getPropagator().getLlhBuffer() << std::endl;
-        _gradientMonitor_.back().parState = _owner_->getPropagator().exportParameterInjectorConfig();
+        _gradientMonitor_.back().parState = _owner_->getPropagator().getParametersManager().exportParameterInjectorConfig();
         _gradientMonitor_.back().llh = _owner_->getPropagator().getLlhBuffer();
         _lastGradientFall_ = _nbFitCalls_;
       }
@@ -219,7 +219,7 @@ double LikelihoodInterface::evalFit(const double* parArray_){
         LogWarning << "Gradient step detected at iteration #" << _nbFitCalls_ << ": ";
         LogWarning(_gradientMonitor_.size() >= 2) << _gradientMonitor_[_gradientMonitor_.size() - 2].llh << " -> ";
         LogWarning << _owner_->getPropagator().getLlhBuffer() << std::endl;
-        _gradientMonitor_.back().parState = _owner_->getPropagator().exportParameterInjectorConfig();
+        _gradientMonitor_.back().parState = _owner_->getPropagator().getParametersManager().exportParameterInjectorConfig();
         _gradientMonitor_.back().llh = _owner_->getPropagator().getLlhBuffer();
         _lastGradientFall_ = _nbFitCalls_;
       }
@@ -359,7 +359,7 @@ void LikelihoodInterface::setParameterValidity(const std::string& validity) {
 bool LikelihoodInterface::hasValidParameterValues() const {
   int invalid = 0;
   for (const FitParameterSet& parSet:
-         _owner_->getPropagator().getParameterSetsList()) {
+         _owner_->getPropagator().getParametersManager().getParameterSetsList()) {
     for (const FitParameter& par : parSet.getParameterList()) {
       if ( (_validFlags_ & 0b0001) != 0
           and std::isfinite(par.getMinValue())

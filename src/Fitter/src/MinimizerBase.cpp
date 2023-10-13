@@ -67,7 +67,7 @@ void MinimizerBase::printMinimizerFitParameters () {
   // output is a little more clear.
 
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Summary of the fit parameters:") << std::endl;
-  for( const auto& parSet : getPropagator().getParameterSetsList() ){
+  for( const auto& parSet : getPropagator().getParametersManager().getParameterSetsList() ){
 
     GenericToolbox::TablePrinter t;
     t.setColTitles({ {"Title"}, {"Starting"}, {"Prior"}, {"StdDev"}, {"Min"}, {"Max"}, {"Status"} });

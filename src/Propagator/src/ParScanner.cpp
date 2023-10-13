@@ -266,13 +266,13 @@ void ParScanner::scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, c
   int nTotalSteps = nSteps_+2;
 
   LogInfo << "Backup current position of the propagator..." << std::endl;
-  auto currentParState = _owner_->exportParameterInjectorConfig();
+  auto currentParState = _owner_->getParametersManager().exportParameterInjectorConfig();
 
   LogInfo << "Reading start point parameter state..." << std::endl;
   std::vector<std::pair<FitParameter*, double>> startPointParValList;
-  if( not start_.empty() ){ _owner_->injectParameterValues(start_); }
-  else{ _owner_->injectParameterValues(currentParState); }
-  for( auto& parSet : _owner_->getParameterSetsList() ){
+  if( not start_.empty() ){ _owner_->getParametersManager().injectParameterValues(start_); }
+  else{ _owner_->getParametersManager().injectParameterValues(currentParState); }
+  for( auto& parSet : _owner_->getParametersManager().getParameterSetsList() ){
     if( not parSet.isEnabled() ){ continue; }
     for( auto& par : parSet.getParameterList() ){
       if( not par.isEnabled() ){ continue; }
@@ -282,7 +282,7 @@ void ParScanner::scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, c
 
   LogInfo << "Reading end point parameter state..." << std::endl;
   std::vector<std::pair<FitParameter*, double>> endPointParValList;
-  _owner_->injectParameterValues(end_);
+  _owner_->getParametersManager().injectParameterValues(end_);
   endPointParValList.reserve(startPointParValList.size());
   for( auto& parPair : startPointParValList ){
     endPointParValList.emplace_back(parPair.first, parPair.first->getParameterValue());
@@ -312,7 +312,7 @@ void ParScanner::scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, c
           );
     }
 
-    for( auto& parSet : _owner_->getParameterSetsList() ){
+    for( auto& parSet : _owner_->getParametersManager().getParameterSetsList() ){
       if( not parSet.isEnabled() ){ continue; }
       if( parSet.isUseEigenDecompInFit() ){
         // make sure the parameters don't get overwritten
@@ -335,7 +335,7 @@ void ParScanner::scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, c
   }
 
   LogInfo << "Restore position of the propagator..." << std::endl;
-  _owner_->injectParameterValues( currentParState );
+  _owner_->getParametersManager().injectParameterValues( currentParState );
   _owner_->updateLlhCache();
 }
 void ParScanner::generateOneSigmaPlots(TDirectory* saveDir_){
@@ -372,7 +372,7 @@ void ParScanner::generateOneSigmaPlots(TDirectory* saveDir_){
   };
 
   // +1 sigma
-  for( auto& parSet : _owner_->getParameterSetsList() ){
+  for( auto& parSet : _owner_->getParametersManager().getParameterSetsList() ){
 
     if( not parSet.isEnabled() ) continue;
 
@@ -413,7 +413,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
       [&]{
         LogScopeIndent;
         LogDebug << "Temporarily pulling back parameters at their prior before performing the event rate..." << std::endl;
-        for( auto& parSet : _owner_->getParameterSetsList() ){
+        for( auto& parSet : _owner_->getParametersManager().getParameterSetsList() ){
           if( not parSet.isEnabled() ) { continue; }
           for( auto& par : parSet.getParameterList() ){
             if( not par.isEnabled() ) { continue; }
@@ -426,7 +426,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
       [&]{
         LogScopeIndent;
         LogDebug << "Restoring parameters to their original values..." << std::endl;
-        for( auto& parSet : _owner_->getParameterSetsList() ){
+        for( auto& parSet : _owner_->getParametersManager().getParameterSetsList() ){
           if( not parSet.isEnabled() ) { continue; }
           for( auto& par : parSet.getParameterList() ){
             if( not par.isEnabled() ){ continue; }
@@ -441,7 +441,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
     LogInfo << "Making varied event rates for " << par_.getFullTitle() << std::endl;
 
     // First make sure all params are at their prior <- is it necessary?
-    for( auto& parSet : _owner_->getParameterSetsList() ){
+    for( auto& parSet : _owner_->getParametersManager().getParameterSetsList() ){
       if( not parSet.isEnabled() ) continue;
       for( auto& par : parSet.getParameterList() ){
         if( not par.isEnabled() ) continue;
@@ -517,7 +517,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
 
   // vary parameters
 
-  for( auto& parSet : _owner_->getParameterSetsList() ){
+  for( auto& parSet : _owner_->getParametersManager().getParameterSetsList() ){
 
     if( not parSet.isEnabled() ) continue;
     if( GenericToolbox::Json::fetchValue(parSet.getConfig(), "skipVariedEventRates", false) ){

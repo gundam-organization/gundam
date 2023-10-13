@@ -3,22 +3,19 @@
 //
 
 #include "FitterEngine.h"
-#include "GenericToolbox.Json.h"
 #include "GundamGlobals.h"
 #include "MinimizerInterface.h"
 #include "MCMCInterface.h"
 
-#include "Logger.h"
+#include "GenericToolbox.RawDataArray.h"
+#include "GenericToolbox.Json.h"
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.h"
-#include "GenericToolbox.TablePrinter.h"
-#include "GenericToolbox.RawDataArray.h"
+#include "Logger.h"
 
 #include <Math/Factory.h>
 #include "TGraph.h"
 #include "TLegend.h"
-#include "TH1D.h"
-#include "TBox.h"
 
 #include <cmath>
 #include <memory>
@@ -100,8 +97,8 @@ void FitterEngine::initializeImpl(){
     auto* throwsTree = new TTree("throws", "throws");
 
     std::vector<GenericToolbox::RawDataArray> thrownParameterValues{};
-    thrownParameterValues.reserve(_propagator_.getParameterSetsList().size());
-    for( auto& parSet : _propagator_.getParameterSetsList() ){
+    thrownParameterValues.reserve(_propagator_.getParametersManager().getParameterSetsList().size());
+    for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
       if( not parSet.isEnabled() ) continue;
 
       std::vector<std::string> leavesList;
@@ -150,18 +147,18 @@ void FitterEngine::initializeImpl(){
   LogInfo << "Writing propagator objects..." << std::endl;
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
-      TNamed("initialParameterState", GenericToolbox::Json::toReadableString(_propagator_.exportParameterInjectorConfig()).c_str())
+      TNamed("initialParameterState", GenericToolbox::Json::toReadableString(_propagator_.getParametersManager().exportParameterInjectorConfig()).c_str())
   );
 
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
-      _propagator_.getGlobalCovarianceMatrix().get(), "globalCovarianceMatrix"
+      _propagator_.getParametersManager().getGlobalCovarianceMatrix().get(), "globalCovarianceMatrix"
   );
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
-      _propagator_.getStrippedCovarianceMatrix().get(), "strippedCovarianceMatrix"
+      _propagator_.getParametersManager().getStrippedCovarianceMatrix().get(), "strippedCovarianceMatrix"
   );
-  for( auto& parSet : _propagator_.getParameterSetsList() ){
+  for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
     if(not parSet.isEnabled()) continue;
 
     auto saveFolder = GenericToolbox::joinPath( "propagator", parSet.getName() );
@@ -268,7 +265,7 @@ void FitterEngine::fit(){
       GenericToolbox::mkdirTFile( _saveDir_, "preFit" ),
       TNamed("llhState", llhState.c_str())
   );
-  _preFitParState_ = _propagator_.exportParameterInjectorConfig();
+  _preFitParState_ = _propagator_.getParametersManager().exportParameterInjectorConfig();
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile( _saveDir_, "preFit" ),
       TNamed("parState", GenericToolbox::Json::toReadableString(_preFitParState_).c_str())
@@ -300,7 +297,7 @@ void FitterEngine::fit(){
   if( _throwMcBeforeFit_ ){
     LogAlert << "Throwing correlated parameters of MC away from their prior..." << std::endl;
     LogAlert << "Throw gain form MC push set to: " << _throwGain_ << std::endl;
-    for( auto& parSet : _propagator_.getParameterSetsList() ){
+    for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
       if(not parSet.isEnabled()) continue;
       if( not parSet.isEnabledThrowToyParameters() ){
         LogWarning << "\"" << parSet.getName() << "\" has marked disabled throwMcBeforeFit: skipping." << std::endl;
@@ -352,7 +349,7 @@ void FitterEngine::fit(){
   this->getMinimizer().minimize();
 
   LogWarning << "Saving post-fit par state..." << std::endl;
-  _postFitParState_ = _propagator_.exportParameterInjectorConfig();
+  _postFitParState_ = _propagator_.getParametersManager().exportParameterInjectorConfig();
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile( _saveDir_, "postFit" ),
       TNamed("parState", GenericToolbox::Json::toReadableString(_postFitParState_).c_str())
@@ -421,7 +418,7 @@ void FitterEngine::fixGhostFitParameters(){
   std::stringstream ssPrint;
   double deltaChi2Stat;
 
-  for( auto& parSet : _propagator_.getParameterSetsList() ){
+  for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
 
     if( not parSet.isEnabled() ){ continue; }
 
@@ -512,7 +509,7 @@ void FitterEngine::rescaleParametersStepSize(){
   double baseChi2 = _propagator_.getLlhBuffer();
 
   // +1 sigma
-  for( auto& parSet : _propagator_.getParameterSetsList() ){
+  for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
 
     for( auto& par : parSet.getEffectiveParameterList() ){
 
@@ -564,7 +561,7 @@ void FitterEngine::checkNumericalAccuracy(){
 
   LogInfo << "Throwing..." << std::endl;
   for(auto& throwEntry : throws ){
-    for( auto& parSet : _propagator_.getParameterSetsList() ){
+    for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
       if(not parSet.isEnabled()) continue;
       if( not parSet.isEnabledThrowToyParameters() ){ continue;}
       parSet.throwFitParameters(true, gain);
@@ -581,7 +578,7 @@ void FitterEngine::checkNumericalAccuracy(){
     GenericToolbox::displayProgressBar(iTest, nTest, "Testing computational accuracy...");
     for( size_t iThrow = 0 ; iThrow < throws.size() ; iThrow++ ){
       int iParSet{-1};
-      for( auto& parSet : _propagator_.getParameterSetsList() ){
+      for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
         if(not parSet.isEnabled()) continue;
         if( not parSet.isEnabledThrowToyParameters() ){ continue;}
         iParSet++;

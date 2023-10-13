@@ -9,14 +9,12 @@
 #endif
 
 #include "FitParameterSet.h"
-#include "GenericToolbox.Json.h"
 #include "GundamGlobals.h"
 #include "ConfigUtils.h"
 
-#include "GenericToolbox.h"
-#include "GenericToolbox.Root.h"
 #include "GenericToolbox.TablePrinter.h"
-#include "GenericToolbox.ScopedGuard.h"
+#include "GenericToolbox.Json.h"
+#include "GenericToolbox.h"
 
 #include <memory>
 #include <vector>
@@ -33,11 +31,21 @@ using namespace GenericToolbox::ColorCodes;
 void Propagator::readConfigImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
 
+  _parManager_.readConfig( GenericToolbox::Json::fetchValue(_config_, "parametersManagerConfig", nlohmann::json()) );
+
+  // legacy -- option within propagator -> should be defined elsewhere
+  GenericToolbox::Json::deprecatedAction(_config_, "reThrowParSetIfOutOfBounds", [&]{
+    LogAlert << "Forwarding the option to ParametersManager. Consider moving it into \"parametersManagerConfig:\"" << std::endl;
+    _parManager_.setReThrowParSetIfOutOfBounds(GenericToolbox::Json::fetchValue<bool>(_config_, "reThrowParSetIfOutOfBounds"));
+  });
+  GenericToolbox::Json::deprecatedAction(_config_, "throwToyParametersWithGlobalCov", [&]{
+    LogAlert << "Forwarding the option to ParametersManager. Consider moving it into \"parametersManagerConfig:\"" << std::endl;
+    _parManager_.setThrowToyParametersWithGlobalCov(GenericToolbox::Json::fetchValue<bool>(_config_, "throwToyParametersWithGlobalCov"));
+  });
+
   // Monitoring parameters
   _showEventBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showEventBreakdown", _showEventBreakdown_);
   _throwAsimovToyParameters_ = GenericToolbox::Json::fetchValue(_config_, "throwAsimovFitParameters", _throwAsimovToyParameters_);
-  _throwToyParametersWithGlobalCov_ = GenericToolbox::Json::fetchValue(_config_, "throwToyParametersWithGlobalCov", _throwToyParametersWithGlobalCov_);
-  _reThrowParSetIfOutOfBounds_ = GenericToolbox::Json::fetchValue(_config_, "reThrowParSetIfOutOfBounds", _reThrowParSetIfOutOfBounds_);
   _enableStatThrowInToys_ = GenericToolbox::Json::fetchValue(_config_, "enableStatThrowInToys", _enableStatThrowInToys_);
   _gaussStatThrowInToys_ = GenericToolbox::Json::fetchValue(_config_, "gaussStatThrowInToys", _gaussStatThrowInToys_);
   _enableEventMcThrow_ = GenericToolbox::Json::fetchValue(_config_, "enableEventMcThrow", _enableEventMcThrow_);
@@ -46,12 +54,12 @@ void Propagator::readConfigImpl(){
   EventDialCache::globalEventReweightCap = GenericToolbox::Json::fetchValue(_config_, "globalEventReweightCap", EventDialCache::globalEventReweightCap);
 
   auto parameterSetListConfig = ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue(_config_, "parameterSetListConfig", nlohmann::json()));
-  _parameterSetList_.reserve(parameterSetListConfig.size()); // make sure the objects aren't moved in RAM ( since FitParameter* will be used )
+  _parManager_.getParameterSetsList().reserve(parameterSetListConfig.size()); // make sure the objects aren't moved in RAM ( since FitParameter* will be used )
   for( const auto& parameterSetConfig : parameterSetListConfig ){
-    _parameterSetList_.emplace_back();
-    _parameterSetList_.back().setConfig(parameterSetConfig);
-    _parameterSetList_.back().readConfig();
-    LogInfo << _parameterSetList_.back().getSummary() << std::endl;
+    _parManager_.getParameterSetsList().emplace_back();
+    _parManager_.getParameterSetsList().back().setConfig(parameterSetConfig);
+    _parManager_.getParameterSetsList().back().readConfig();
+    LogInfo << _parManager_.getParameterSetsList().back().getSummary() << std::endl;
   }
 
   auto fitSampleSetConfig = GenericToolbox::Json::fetchValue(_config_, "fitSampleSetConfig", nlohmann::json());
@@ -82,13 +90,13 @@ void Propagator::readConfigImpl(){
   _devSingleThreadReweight_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadReweight", _devSingleThreadReweight_);
   _devSingleThreadHistFill_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadHistFill", _devSingleThreadHistFill_);
 
-  for(size_t iParSet = 0 ; iParSet < _parameterSetList_.size() ; iParSet++ ){
-    if( not _parameterSetList_[iParSet].isEnabled() ) continue;
+  for(size_t iParSet = 0 ; iParSet < _parManager_.getParameterSetsList().size() ; iParSet++ ){
+    if( not _parManager_.getParameterSetsList()[iParSet].isEnabled() ) continue;
     // DEV / DialCollections
-    if( not _parameterSetList_[iParSet].getDialSetDefinitions().empty() ){
-      for( auto& dialSetDef : _parameterSetList_[iParSet].getDialSetDefinitions().get<std::vector<nlohmann::json>>() ){
+    if( not _parManager_.getParameterSetsList()[iParSet].getDialSetDefinitions().empty() ){
+      for( auto& dialSetDef : _parManager_.getParameterSetsList()[iParSet].getDialSetDefinitions().get<std::vector<nlohmann::json>>() ){
         if( GenericToolbox::Json::doKeyExist(dialSetDef, "parametersBinningPath") ){
-          _dialCollections_.emplace_back(&_parameterSetList_);
+          _dialCollections_.emplace_back(&_parManager_.getParameterSetsList());
           _dialCollections_.back().setIndex(int(_dialCollections_.size())-1);
           _dialCollections_.back().setSupervisedParameterSetIndex( int(iParSet) );
           _dialCollections_.back().readConfig( dialSetDef );
@@ -97,7 +105,7 @@ void Propagator::readConfigImpl(){
       }
     }
     else{
-      for( auto& par : _parameterSetList_[iParSet].getParameterList() ){
+      for( auto& par : _parManager_.getParameterSetsList()[iParSet].getParameterList() ){
         if( not par.isEnabled() ) continue;
 
         // Check if no definition is present -> disable the parameter in that case
@@ -108,7 +116,7 @@ void Propagator::readConfigImpl(){
         }
 
         for( const auto& dialDefinitionConfig : par.getDialDefinitionsList() ){
-          _dialCollections_.emplace_back(&_parameterSetList_);
+          _dialCollections_.emplace_back(&_parManager_.getParameterSetsList());
           _dialCollections_.back().setIndex(int(_dialCollections_.size())-1);
           _dialCollections_.back().setSupervisedParameterSetIndex( int(iParSet) );
           _dialCollections_.back().setSupervisedParameterIndex( par.getParameterIndex() );
@@ -128,55 +136,7 @@ void Propagator::initializeImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
 
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing parameters...") << std::endl;
-  int nEnabledPars = 0;
-  for( auto& parSet : _parameterSetList_ ){
-    parSet.initialize();
-
-    int nPars{0};
-    for( auto& par : parSet.getParameterList() ){
-      if( par.isEnabled() ){ nPars++; }
-    }
-
-    nEnabledPars += nPars;
-    LogInfo << nPars << " enabled parameters in " << parSet.getName() << std::endl;
-  }
-  LogInfo << "Total number of parameters: " << nEnabledPars << std::endl;
-
-  LogInfo << "Building global covariance matrix (" << nEnabledPars << "x" << nEnabledPars << ")" << std::endl;
-  _globalCovarianceMatrix_ = std::make_shared<TMatrixD>(nEnabledPars, nEnabledPars );
-  int parSetOffset = 0;
-  for( auto& parSet : _parameterSetList_ ){
-    if( parSet.getPriorCovarianceMatrix() != nullptr ){
-      int iGlobalOffset{-1};
-      bool hasZero{false};
-      for(int iCov = 0 ; iCov < parSet.getPriorCovarianceMatrix()->GetNrows() ; iCov++ ){
-        if( not parSet.getParameterList()[iCov].isEnabled() ){ continue; }
-        iGlobalOffset++;
-        _globalCovParList_.emplace_back( &parSet.getParameterList()[iCov] );
-        int jGlobalOffset{-1};
-        for(int jCov = 0 ; jCov < parSet.getPriorCovarianceMatrix()->GetNcols() ; jCov++ ){
-          if( not parSet.getParameterList()[jCov].isEnabled() ){ continue; }
-          jGlobalOffset++;
-          (*_globalCovarianceMatrix_)[parSetOffset + iGlobalOffset][parSetOffset + jGlobalOffset] = (*parSet.getPriorCovarianceMatrix())[iCov][jCov];
-        }
-      }
-      parSetOffset += (iGlobalOffset+1);
-    }
-    else{
-      // diagonal
-      for( auto& par : parSet.getParameterList() ){
-        if( not par.isEnabled() ){ continue; }
-        _globalCovParList_.emplace_back(&par);
-        if( par.isFree() ){
-          (*_globalCovarianceMatrix_)[parSetOffset][parSetOffset] = 0;
-        }
-        else{
-          (*_globalCovarianceMatrix_)[parSetOffset][parSetOffset] = par.getStdDevValue() * par.getStdDevValue();
-        }
-        parSetOffset++;
-      }
-    }
-  }
+  _parManager_.initialize();
 
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing samples...") << std::endl;
   _fitSampleSet_.initialize();
@@ -209,7 +169,7 @@ void Propagator::initializeImpl(){
     dispenser.setPlotGenPtr(&_plotGenerator_);
     if(dispenser.getParameters().useMcContainer ){
       usedMcContainer = true;
-      dispenser.setParSetPtrToLoad(&_parameterSetList_);
+      dispenser.setParSetPtrToLoad(&_parManager_.getParameterSetsList());
       dispenser.setDialCollectionListPtr(&_dialCollections_);
       dispenser.setEventDialCache(&_eventDialCache_);
     }
@@ -242,32 +202,10 @@ void Propagator::initializeImpl(){
         std::cout << getSampleBreakdownTableStr() << std::endl;
       }
 
-
-
-      if( not _throwToyParametersWithGlobalCov_ ){
-        LogInfo << "Throwing parameter using each parameter sets..." << std::endl;
-        for( auto& parSet : _parameterSetList_ ){
-          if( not parSet.isEnabled() ) continue;
-
-          LogContinueIf( not parSet.isEnabledThrowToyParameters(), "Toy throw is disabled for " << parSet.getName() );
-
-          if( parSet.getPriorCovarianceMatrix() != nullptr ){
-            LogWarning << parSet.getName() << ": throwing correlated parameters..." << std::endl;
-            LogScopeIndent;
-            parSet.throwFitParameters(_reThrowParSetIfOutOfBounds_);
-          } // throw?
-          else{
-            LogAlert << "No correlation matrix defined for " << parSet.getName() << ". NOT THROWING. (dev: could throw only with sigmas?)" << std::endl;
-          }
-        } // parSet
-      }
-      else{
-        LogInfo << "Throwing parameter using global covariance matrix..." << std::endl;
-        this->throwParametersFromGlobalCovariance(false);
-      }
+      _parManager_.throwParameters();
 
       // Handling possible masks
-      for( auto& parSet : _parameterSetList_ ){
+      for( auto& parSet : _parManager_.getParameterSetsList() ){
         if( not parSet.isEnabled() ) continue;
 
         if( parSet.isMaskForToyGeneration() ){
@@ -283,7 +221,7 @@ void Propagator::initializeImpl(){
     // Make sure before the copy to the data:
     // At this point, MC events have been reweighted using their prior
     // but when using eigen decomp, the conversion eigen -> original has a small computational error
-    for( auto& parSet: _parameterSetList_ ) {
+    for( auto& parSet: _parManager_.getParameterSetsList() ) {
       if( parSet.isUseEigenDecompInFit() ) { parSet.propagateEigenToOriginal(); }
     }
 
@@ -317,7 +255,7 @@ void Propagator::initializeImpl(){
 
     // back to prior
     if( _throwAsimovToyParameters_ ){
-      for( auto& parSet : _parameterSetList_ ){
+      for( auto& parSet : _parManager_.getParameterSetsList() ){
 
         if( parSet.isMaskForToyGeneration() ){
           // unmasking
@@ -351,7 +289,7 @@ void Propagator::initializeImpl(){
       auto& dispenser = dataSet.getMcDispenser();
       dispenser.setSampleSetPtrToLoad(&_fitSampleSet_);
       dispenser.setPlotGenPtr(&_plotGenerator_);
-      dispenser.setParSetPtrToLoad(&_parameterSetList_);
+      dispenser.setParSetPtrToLoad(&_parManager_.getParameterSetsList());
       dispenser.setDialCollectionListPtr(&_dialCollections_);
       dispenser.setEventDialCache(&_eventDialCache_);
       dispenser.load();
@@ -427,7 +365,7 @@ void Propagator::initializeImpl(){
 
   if( not _parameterInjectorMc_.empty() ){
     LogWarning << "Injecting parameters on MC samples..." << std::endl;
-    this->injectParameterValues(_parameterInjectorMc_);
+    _parManager_.injectParameterValues( _parameterInjectorMc_ );
     this->resetReweight();
     this->reweightMcEvents();
   }
@@ -449,7 +387,7 @@ void Propagator::initializeImpl(){
 
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the tree writer") << std::endl;
   _treeWriter_.setFitSampleSetPtr( &_fitSampleSet_ );
-  _treeWriter_.setParSetListPtr( &_parameterSetList_ );
+  _treeWriter_.setParSetListPtr( &_parManager_.getParameterSetsList() );
   _treeWriter_.setEventDialCachePtr( &_eventDialCache_ );
 
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the par scanner") << std::endl;
@@ -463,19 +401,19 @@ void Propagator::initializeImpl(){
       LogWarning << "Staged event breakdown:" << std::endl;
       std::vector<std::vector<double>> stageBreakdownList(
           _fitSampleSet_.getFitSampleList().size(),
-          std::vector<double>(_parameterSetList_.size() + 1, 0)
+          std::vector<double>(_parManager_.getParameterSetsList().size() + 1, 0)
       ); // [iSample][iStage]
       std::vector<std::string> stageTitles;
       stageTitles.emplace_back("Sample");
       stageTitles.emplace_back("No reweight");
-      for( auto& parSet : _parameterSetList_ ){
+      for( auto& parSet : _parManager_.getParameterSetsList() ){
         if( not parSet.isEnabled() ){ continue; }
         stageTitles.emplace_back("+ " + parSet.getName());
       }
 
       int iStage{0};
       std::vector<FitParameterSet*> maskedParSetList;
-      for( auto& parSet : _parameterSetList_ ){
+      for( auto& parSet : _parManager_.getParameterSetsList() ){
         if( not parSet.isEnabled() ){ continue; }
         maskedParSetList.emplace_back( &parSet );
         parSet.setMaskedForPropagation( true );
@@ -550,7 +488,7 @@ std::string Propagator::getLlhBufferSummary() const{
   );
   ss << std::endl << "Penalty likelihood = " << getLlhPenaltyBuffer();
   ss << " = sum of: " << GenericToolbox::iterableToString(
-      _parameterSetList_, [](const FitParameterSet& parSet_){
+      _parManager_.getParameterSetsList(), [](const FitParameterSet& parSet_){
         std::stringstream ssSub;
         ssSub << parSet_.getName() << ": ";
         if( parSet_.isEnabled() ){ ssSub << parSet_.getPenaltyChi2Buffer(); }
@@ -560,37 +498,7 @@ std::string Propagator::getLlhBufferSummary() const{
   );
   return ss.str();
 }
-std::string Propagator::getParametersSummary( bool showEigen_ ) const{
-  std::stringstream ss;
-  for( auto &parSet: getParameterSetsList() ){
-    if( not parSet.isEnabled() ){ continue; }
-    if( not ss.str().empty() ) ss << std::endl;
-    ss << parSet.getName();
-    for( auto &par: parSet.getParameterList() ){
-      if( not par.isEnabled() ){ continue; }
-      ss << std::endl << "  " << par.getTitle() << ": " << par.getParameterValue();
-    }
-  }
-  return ss.str();
-}
-const FitParameterSet* Propagator::getFitParameterSetPtr(const std::string& name_) const{
-  for( auto& parSet : _parameterSetList_ ){
-    if( parSet.getName() == name_ ) return &parSet;
-  }
-  std::vector<std::string> parSetNames{};
-  for( auto& parSet : _parameterSetList_ ){ parSetNames.emplace_back(parSet.getName()); }
-  LogThrow("Could not find fit parameter set named \"" << name_ << "\" among defined: " << GenericToolbox::parseVectorAsString(parSetNames));
-  return nullptr;
-}
-FitParameterSet* Propagator::getFitParameterSetPtr(const std::string& name_){
-  for( auto& parSet : _parameterSetList_ ){
-    if( parSet.getName() == name_ ) return &parSet;
-  }
-  std::vector<std::string> parSetNames{};
-  for( auto& parSet : _parameterSetList_ ){ parSetNames.emplace_back(parSet.getName()); }
-  LogThrow("Could not find fit parameter set named \"" << name_ << "\" among defined: " << GenericToolbox::parseVectorAsString(parSetNames));
-  return nullptr;
-}
+
 DatasetLoader* Propagator::getDatasetLoaderPtr(const std::string& name_){
   for( auto& dataSet : _dataSetList_ ){
     if( dataSet.getName() == name_ ){ return &dataSet; }
@@ -614,7 +522,7 @@ void Propagator::updateLlhCache(){
   // Compute the penalty terms
   ////////////////////////////////
   _llhPenaltyBuffer_ = 0;
-  for( auto& parSet : _parameterSetList_ ){
+  for( auto& parSet : _parManager_.getParameterSetsList() ){
     buffer = parSet.getPenaltyChi2();
     LogThrowIf(std::isnan(buffer), parSet.getName() << " penalty chi2 is Nan");
     _llhPenaltyBuffer_ += buffer;
@@ -634,7 +542,7 @@ void Propagator::propagateParametersOnSamples(){
 
   if( _enableEigenToOrigInPropagate_ ){
     // Only real parameters are propagated on the spectra -> need to convert the eigen to original
-    for( auto& parSet : _parameterSetList_ ){
+    for( auto& parSet : _parManager_.getParameterSetsList() ){
       if( parSet.isUseEigenDecompInFit() ) parSet.propagateEigenToOriginal();
     }
   }
@@ -679,171 +587,8 @@ void Propagator::refillSampleHistograms(){
 }
 
 // Misc
-nlohmann::json Propagator::exportParameterInjectorConfig() const{
-  nlohmann::json out;
-
-  std::vector<nlohmann::json> parSetConfig;
-  parSetConfig.reserve( _parameterSetList_.size() );
-  for( auto& parSet : _parameterSetList_ ){
-    if( not parSet.isEnabled() ){ continue; }
-    parSetConfig.emplace_back( parSet.exportInjectorConfig() );
-  }
-
-  out["parameterSetList"] = parSetConfig;
-
-  out = GenericToolbox::Json::readConfigJsonStr(
-      // conversion: json -> str -> json obj (some broken JSON version)
-      GenericToolbox::Json::toReadableString(
-          out
-      )
-  );
-
-  return out;
-}
-
-void Propagator::injectParameterValues(const nlohmann::json &config_) {
-  LogWarning << "Injecting parameters..." << std::endl;
-
-  if( not GenericToolbox::Json::doKeyExist(config_, "parameterSetList") ){
-    LogError << "Bad parameter injector config: missing \"parameterSetList\" entry" << std::endl;
-    LogError << GenericToolbox::Json::toReadableString( config_ ) << std::endl;
-    return;
-  }
-
-  for( auto& entryParSet : GenericToolbox::Json::fetchValue<nlohmann::json>( config_, "parameterSetList" ) ){
-    auto parSetName = GenericToolbox::Json::fetchValue<std::string>(entryParSet, "name");
-    LogInfo << "Reading injection parameters for parSet: " << parSetName << std::endl;
-
-    auto* selectedParSet = this->getFitParameterSetPtr(parSetName );
-    LogThrowIf( selectedParSet == nullptr, "Could not find parSet: " << parSetName );
-
-    selectedParSet->injectParameterValues(entryParSet);
-  }
-}
-
-void Propagator::throwParametersFromGlobalCovariance(bool quietVerbose_){
-
-  if( _strippedCovarianceMatrix_ == nullptr ){
-    LogInfo << "Creating stripped global covariance matrix..." << std::endl;
-    LogThrowIf( _globalCovarianceMatrix_ == nullptr, "Global covariance matrix not set." );
-
-    _strippedParameterList_.clear();
-    for( int iGlobPar = 0 ; iGlobPar < _globalCovarianceMatrix_->GetNrows() ; iGlobPar++ ){
-      if( _globalCovParList_[iGlobPar]->isFixed() ){ continue; }
-      if( _globalCovParList_[iGlobPar]->isFree() and (*_globalCovarianceMatrix_)[iGlobPar][iGlobPar] == 0 ){ continue; }
-      _strippedParameterList_.emplace_back( _globalCovParList_[iGlobPar] );
-    }
-
-    int nStripped{int(_strippedParameterList_.size())};
-    _strippedCovarianceMatrix_ = std::make_shared<TMatrixD>(nStripped, nStripped);
-
-    for( int iStrippedPar = 0 ; iStrippedPar < nStripped ; iStrippedPar++ ){
-      int iGlobPar{GenericToolbox::findElementIndex(_strippedParameterList_[iStrippedPar], _globalCovParList_)};
-      for( int jStrippedPar = 0 ; jStrippedPar < nStripped ; jStrippedPar++ ){
-        int jGlobPar{GenericToolbox::findElementIndex(_strippedParameterList_[jStrippedPar], _globalCovParList_)};
-        (*_strippedCovarianceMatrix_)[iStrippedPar][jStrippedPar] = (*_globalCovarianceMatrix_)[iGlobPar][jGlobPar];
-      }
-    }
-  }
-
-  bool isLoggerAlreadyMuted{Logger::isMuted()};
-  GenericToolbox::ScopedGuard g{
-      [&](){ if(quietVerbose_ and not isLoggerAlreadyMuted) Logger::setIsMuted(true); },
-      [&](){ if(quietVerbose_ and not isLoggerAlreadyMuted) Logger::setIsMuted(false); }
-  };
-
-  if(quietVerbose_){
-    Logger::setIsMuted(quietVerbose_);
-  }
-
-  if( _choleskyMatrix_ == nullptr ){
-    LogInfo << "Generating global cholesky matrix" << std::endl;
-    _choleskyMatrix_ = std::shared_ptr<TMatrixD>(
-        GenericToolbox::getCholeskyMatrix(_strippedCovarianceMatrix_.get())
-    );
-  }
-
-  bool keepThrowing{true};
-  int throwNb{0};
-
-  while( keepThrowing ){
-    throwNb++;
-    bool rethrow{false};
-    auto throws = GenericToolbox::throwCorrelatedParameters(_choleskyMatrix_.get());
-    for( int iPar = 0 ; iPar < _choleskyMatrix_->GetNrows() ; iPar++ ){
-      auto* parPtr = _strippedParameterList_[iPar];
-      parPtr->setParameterValue( parPtr->getPriorValue() + throws[iPar] );
-      if( _reThrowParSetIfOutOfBounds_ ){
-        if      ( not std::isnan(parPtr->getMinValue()) and parPtr->getParameterValue() < parPtr->getMinValue() ){
-          rethrow = true;
-          LogAlert << GenericToolbox::ColorCodes::redLightText << "thrown value lower than min bound -> " << GenericToolbox::ColorCodes::resetColor
-                   << parPtr->getSummary(true) << std::endl;
-        }
-        else if( not std::isnan(parPtr->getMaxValue()) and parPtr->getParameterValue() > parPtr->getMaxValue() ){
-          rethrow = true;
-          LogAlert << GenericToolbox::ColorCodes::redLightText <<"thrown value higher than max bound -> " << GenericToolbox::ColorCodes::resetColor
-                   << parPtr->getSummary(true) << std::endl;
-        }
-      }
-    }
-
-    // Making sure eigen decomposed parameters get the conversion done
-    for( auto& parSet : _parameterSetList_ ){
-      if( not parSet.isEnabled() ) continue;
-      if( parSet.isUseEigenDecompInFit() ){
-        parSet.propagateOriginalToEigen();
-
-        // also check the bounds of real parameter space
-        if( _reThrowParSetIfOutOfBounds_ ){
-          for( auto& par : parSet.getEigenParameterList() ){
-            if( not par.isEnabled() ) continue;
-            if( not par.isValueWithinBounds() ){
-              // re-do the throwing
-              rethrow = true;
-              break;
-            }
-          }
-        }
-      }
-    }
 
 
-    if( rethrow ){
-      // wrap back to the while loop
-      LogWarning << "Re-throwing attempt #" << throwNb << std::endl;
-      continue;
-    }
-    else{
-      for( auto& parSet : _parameterSetList_ ){
-        LogInfo << parSet.getName() << ":" << std::endl;
-        for( auto& par : parSet.getParameterList() ){
-          LogScopeIndent;
-          if( FitParameterSet::isValidCorrelatedParameter(par) ){
-            par.setThrowValue( par.getParameterValue() );
-            LogInfo << "Thrown par " << par.getFullTitle() << ": " << par.getPriorValue();
-            LogInfo << " → " << par.getParameterValue() << std::endl;
-          }
-        }
-        if( parSet.isUseEigenDecompInFit() ){
-          LogInfo << "Translated to eigen space:" << std::endl;
-          for( auto& eigenPar : parSet.getEigenParameterList() ){
-            LogScopeIndent;
-            eigenPar.setThrowValue( eigenPar.getParameterValue() );
-            LogInfo << "Eigen par " << eigenPar.getFullTitle() << ": " << eigenPar.getPriorValue();
-            LogInfo << " → " << eigenPar.getParameterValue() << std::endl;
-          }
-        }
-      }
-
-    }
-
-
-
-
-    // reached this point: all parameters are within bounds
-    keepThrowing = false;
-  }
-}
 std::string Propagator::getSampleBreakdownTableStr() const{
   GenericToolbox::TablePrinter t;
 
