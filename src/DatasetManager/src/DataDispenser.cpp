@@ -203,16 +203,17 @@ void DataDispenser::doEventSelection(){
   LogInfo << "Event selection..." << std::endl;
 
   ROOT::EnableThreadSafety();
-  int nThreads = 1;
-  if( not _owner_->isDevSingleThreadEventSelection() ) { nThreads = GundamGlobals::getNbThreads(); }
+
+  // how meaning buffers?
+  int nThreads{GundamGlobals::getParallelWorker().getNbThreads()};
+  if( _owner_->isDevSingleThreadEventSelection() ) { nThreads = 1; }
+
+  // declare the buffers
   std::vector<std::vector<std::vector<bool>>> perThreadEventIsInSamplesList(nThreads);
   std::vector<std::vector<size_t>> perThreadSampleNbOfEvents(nThreads);
-  auto selectionFct = [&](int iThread_){
 
-    if( iThread_ == -1 ){
-      iThread_ = 0;
-      nThreads = 1;
-    }
+  // selection
+  auto selectionFct = [&](int iThread_){
 
     GundamGlobals::getThreadMutex().lock();
     TChain treeChain(_parameters_.treePath.c_str());
@@ -269,14 +270,12 @@ void DataDispenser::doEventSelection(){
 
     // Multi-thread index splitting
     Long64_t nEvents = treeChain.GetEntries();
-    Long64_t nEventPerThread = nEvents/Long64_t(nThreads);
-    Long64_t iEnd = nEvents;
-    Long64_t iStart = Long64_t(iThread_)*nEventPerThread;
-    if( iThread_+1 != nThreads ) iEnd = (Long64_t(iThread_)+1)*nEventPerThread;
     Long64_t iGlobal = 0;
 
+    auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices( iThread_, nThreads, nEvents );
+
     // Load the branches
-    treeChain.LoadTree(0);
+    treeChain.LoadTree( bounds.first );
 
     // for each event, which sample is active?
     perThreadEventIsInSamplesList[iThread_].resize(nEvents, std::vector<bool>(_cache_.samplesToFillList.size(), true));
@@ -285,7 +284,9 @@ void DataDispenser::doEventSelection(){
     std::stringstream ssProgressTitle;
     TFile *lastFilePtr{nullptr};
     GundamGlobals::getThreadMutex().unlock();
-    for ( Long64_t iEntry = iStart ; iEntry < iEnd ; iEntry++ ) {
+
+
+    for ( Long64_t iEntry = bounds.first ; iEntry < bounds.second ; iEntry++ ) {
       if( iThread_ == 0 ){
         readSpeed.addQuantity(treeChain.GetEntry(iEntry)*nThreads);
         if (GenericToolbox::showProgressBar(iGlobal, nEvents)) {
@@ -648,7 +649,7 @@ void DataDispenser::readAndFill(){
   }
 
   LogWarning << "Loading and indexing..." << std::endl;
-  if(not _owner_->isDevSingleThreadEventLoaderAndIndexer() and GundamGlobals::getNbThreads() > 1 ){
+  if(not _owner_->isDevSingleThreadEventLoaderAndIndexer() and GundamGlobals::getParallelWorker().getNbThreads() > 1 ){
     ROOT::EnableThreadSafety();
     std::function<void(int)> f = [&](int iThread_){ this->fillFunction(iThread_); };
     GundamGlobals::getParallelWorker().addJob(__METHOD_NAME__, f);
@@ -784,11 +785,8 @@ void DataDispenser::loadFromHistContent(){
 void DataDispenser::fillFunction(int iThread_){
 //  std::scoped_lock<std::mutex> l(_mutex_);
 
-  int nThreads = GundamGlobals::getNbThreads();
-  if( iThread_ == -1 ){
-    iThread_ = 0;
-    nThreads = 1;
-  }
+  int nThreads = GundamGlobals::getParallelWorker().getNbThreads();
+  if( iThread_ == -1 ){ iThread_ = 0; nThreads = 1; } // special mode
 
   TChain treeChain(_parameters_.treePath.c_str());
   for( const auto& file: _parameters_.filePathList){
@@ -1001,17 +999,17 @@ void DataDispenser::fillFunction(int iThread_){
 
   // Try to read TTree the closest to sequentially possible
   Long64_t nEvents = treeChain.GetEntries();
-  Long64_t nEventPerThread = nEvents/Long64_t(nThreads);
-  Long64_t iEnd = nEvents;
-  Long64_t iStart = Long64_t(iThread_)*nEventPerThread;
-  if( iThread_+1 != nThreads ) iEnd = (Long64_t(iThread_)+1)*nEventPerThread;
   Long64_t iGlobal = 0;
+
+  auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
+      iThread_, nThreads, nEvents
+      );
 
   // to generate dials
   DialBaseFactory factory;
 
   // Load the branches
-  treeChain.LoadTree(iStart);
+  treeChain.LoadTree(bounds.first);
 
   // IO speed monitor
   GenericToolbox::VariableMonitor readSpeed("bytes");
@@ -1020,7 +1018,7 @@ void DataDispenser::fillFunction(int iThread_){
   std::string progressTitle = "Loading and indexing...";
   std::stringstream ssProgressBar;
 
-  for(Long64_t iEntry = iStart ; iEntry < iEnd ; iEntry++ ){
+  for(Long64_t iEntry = bounds.first ; iEntry < bounds.second; iEntry++ ){
 
     if( iThread_ == 0 ){
       if( GenericToolbox::showProgressBar(iGlobal, nEvents) ){

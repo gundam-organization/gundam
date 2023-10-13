@@ -147,8 +147,8 @@ int main(int argc, char** argv){
   }
 
   // How many parallel threads?
-  GundamGlobals::setNbThreads(clParser.getOptionVal("nbThreads", 1));
-  LogInfo << "Running the fitter with " << GundamGlobals::getNbThreads() << " parallel threads." << std::endl;
+  GundamGlobals::getParallelWorker().setNThreads( clParser.getOptionVal("nbThreads", 1) );
+  LogInfo << "Running the fitter with " << GundamGlobals::getParallelWorker().getNbThreads() << " parallel threads." << std::endl;
 
   // Reading configuration
   auto configFilePath = clParser.getOptionVal("configFile", "");
@@ -360,5 +360,4 @@ int main(int argc, char** argv){
   // --------------------------
   fitter.fit();
 
-  GundamGlobals::getParallelWorker().reset();
 }

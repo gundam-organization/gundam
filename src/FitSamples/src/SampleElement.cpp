@@ -44,7 +44,7 @@ void SampleElement::updateEventBinIndexes(int iThread_){
   int nBins = int(binning.getBinsList().size());
   if(iThread_ <= 0){ LogScopeIndent; LogInfo << "Finding bin indexes for \"" << name << "\"..." << std::endl; }
   for( size_t iEvent = 0 ; iEvent < eventList.size() ; iEvent++ ){
-    if( iThread_ != -1 and iEvent % GundamGlobals::getNbThreads() != iThread_ ) continue;
+    if( iThread_ != -1 and iEvent % GundamGlobals::getParallelWorker().getNbThreads() != iThread_ ) continue;
     auto& event = eventList.at(iEvent);
     for( int iBin = 0 ; iBin < nBins ; iBin++ ){
       auto& bin = binning.getBinsList().at(iBin);
@@ -67,7 +67,7 @@ void SampleElement::updateBinEventList(int iThread_) {
 
   if( iThread_ <= 0 ){ LogScopeIndent; LogInfo << "Filling bin event cache for \"" << name << "\"..." << std::endl; }
   int nBins = int(perBinEventPtrList.size());
-  int nbThreads = GundamGlobals::getNbThreads();
+  int nbThreads = GundamGlobals::getParallelWorker().getNbThreads();
   if( iThread_ == -1 ){
     nbThreads = 1;
     iThread_ = 0;
@@ -89,7 +89,7 @@ void SampleElement::updateBinEventList(int iThread_) {
 void SampleElement::refillHistogram(int iThread_){
   if( isLocked ) return;
 
-  int nbThreads = GundamGlobals::getNbThreads();
+  int nbThreads = GundamGlobals::getParallelWorker().getNbThreads();
   if( iThread_ == -1 ){ nbThreads = 1; iThread_ = 0; }
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
@@ -108,17 +108,24 @@ void SampleElement::refillHistogram(int iThread_){
   // handled by the propagator
   int iBin = iThread_;
   int nBins = int(perBinEventPtrList.size());
-  auto* binContentArray = histogram->GetArray();
-  auto* binErrorArray = histogram->GetSumw2()->GetArray();
+  auto* binContentArrayPtr = histogram->GetArray();
+  auto* binErrorArrayPtr = histogram->GetSumw2()->GetArray();
+
+  double* binContentPtr{nullptr};
+  double* binErrorPtr{nullptr};
+
   while( iBin < nBins ) {
-    binContentArray[iBin + 1] = 0;
-    binErrorArray[iBin + 1] = 0;
+    binContentPtr = &binContentArrayPtr[iBin+1];
+    binErrorPtr = &binErrorArrayPtr[iBin+1];
+
+    (*binContentPtr) = 0;
+    (*binErrorPtr) = 0;
 #ifdef GUNDAM_USING_CACHE_MANAGER
     if (_CacheManagerValue_ !=nullptr and _CacheManagerIndex_ >= 0) {
       const double ew = _CacheManagerValue_[_CacheManagerIndex_+iBin];
       const double ew2 = _CacheManagerValue2_[_CacheManagerIndex_+iBin];
-      binContentArray[iBin + 1] += ew;
-      binErrorArray[iBin + 1] += ew2;
+      (*binContentPtr) += ew;
+      (*binErrorPtr) += ew2;
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
       double content = binContentArray[iBin+1];
       double slowValue = 0.0;
@@ -140,10 +147,10 @@ void SampleElement::refillHistogram(int iThread_){
     else {
 #endif // GUNDAM_USING_CACHE_MANAGER
       for (auto *eventPtr: perBinEventPtrList[iBin]) {
-        binContentArray[iBin + 1] += eventPtr->getEventWeight();
-        binErrorArray[iBin + 1] += eventPtr->getEventWeight() * eventPtr->getEventWeight();
+        (*binContentPtr) += eventPtr->getEventWeight();
+        (*binErrorPtr) += eventPtr->getEventWeight() * eventPtr->getEventWeight();
       }
-      LogThrowIf(std::isnan(binContentArray[iBin + 1]));
+      LogThrowIf(std::isnan((*binContentPtr)));
 #ifdef GUNDAM_USING_CACHE_MANAGER
     }
 #endif // GUNDAM_USING_CACHE_MANAGER

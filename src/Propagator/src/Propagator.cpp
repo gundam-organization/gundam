@@ -894,17 +894,17 @@ void Propagator::reweightMcEvents(int iThread_) {
   //! Warning: everything you modify here, may significantly slow down the
   //! fitter
 
-  auto start = _eventDialCache_.getCache().begin();
-  auto end = _eventDialCache_.getCache().end();
+  auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
+      iThread_, GundamGlobals::getParallelWorker().getNbThreads(),
+      int(_eventDialCache_.getCache().size())
+  );
 
-  if( iThread_ != -1 and GundamGlobals::getNbThreads() != 1 ){
-    start = _eventDialCache_.getCache().begin() + Long64_t(iThread_)*(Long64_t(_eventDialCache_.getCache().size()) / GundamGlobals::getNbThreads());
-    if( iThread_+1 != GundamGlobals::getNbThreads() ){
-      end = _eventDialCache_.getCache().begin() + (Long64_t(iThread_) + 1) * (Long64_t(_eventDialCache_.getCache().size()) / GundamGlobals::getNbThreads());
-    }
-  }
+  std::for_each(
+      _eventDialCache_.getCache().begin() + bounds.first,
+      _eventDialCache_.getCache().begin() + bounds.second,
+      &EventDialCache::reweightEntry
+  );
 
-  std::for_each(start, end, &EventDialCache::reweightEntry);
 }
 
 //  A Lesser GNU Public License

@@ -245,7 +245,7 @@ double LikelihoodInterface::evalFit(const double* parArray_){
 //    ssHeader << std::endl << "Target EDM: " << _owner_->getMinimizer().get;
     ssHeader << std::endl << "RAM: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
     double cpuPercent = GenericToolbox::getCpuUsageByProcess();
-    ssHeader << " / CPU: " << cpuPercent << "% (" << cpuPercent / GundamGlobals::getNbThreads() << "% efficiency)";
+    ssHeader << " / CPU: " << cpuPercent << "% (" << cpuPercent / GundamGlobals::getParallelWorker().getNbThreads() << "% efficiency)";
     ssHeader << std::endl << "Avg " << GUNDAM_CHI2 << " computation time: " << _evalFitAvgTimer_;
     ssHeader << std::endl;
 
