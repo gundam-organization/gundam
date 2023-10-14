@@ -1,5 +1,5 @@
 
-set( LIB_NAME GundamParameters )
+set( LIB_NAME GundamParametersManager )
 
 set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ParameterSet.cpp
@@ -34,7 +34,10 @@ target_include_directories(${LIB_NAME} PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # Dependencies
-target_link_libraries( ${LIB_NAME} PUBLIC GundamUtils ${ROOT_LIBRARIES} )
+target_link_libraries( ${LIB_NAME} PUBLIC
+    GundamUtils
+    ${ROOT_LIBRARIES}
+)
 
 #set_target_properties(${LIB_NAME} PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")
 

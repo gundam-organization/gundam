@@ -482,8 +482,8 @@ set( MODULES Utils)
 
 # Add the basic modules
 list( APPEND MODULES DialDictionary)
-list( APPEND MODULES Parameters)
-list( APPEND MODULES Samples)
+list( APPEND MODULES ParametersManager)
+list( APPEND MODULES SamplesManager)
 list( APPEND MODULES DatasetManager)
 list( APPEND MODULES Propagator)
 list( APPEND MODULES Fitter)

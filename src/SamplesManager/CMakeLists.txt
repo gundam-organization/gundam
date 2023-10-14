@@ -1,5 +1,5 @@
 # Samples
-set( LIB_NAME GundamSamples )
+set( LIB_NAME GundamSamplesManager )
 
 set( SRCFILES
         src/SampleElement.cpp
@@ -8,8 +8,6 @@ set( SRCFILES
         src/PhysicsEvent.cpp
         src/PlotGenerator.cpp
         src/JointProbability.cpp
-        src/EventVarTransform.cpp
-        src/EventVarTransformLib.cpp
         )
 
 if( USE_STATIC_LINKS )
@@ -21,12 +19,10 @@ endif()
 target_include_directories(${LIB_NAME} PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-target_link_libraries(
-        ${LIB_NAME} PUBLIC
-        GundamUtils
-        GundamParameters
-        ${ROOT_LIBRARIES}
-        -ldl
+target_link_libraries( ${LIB_NAME} PUBLIC
+    GundamParametersManager
+    GundamUtils
+    ${ROOT_LIBRARIES}
 )
 
 #set_target_properties( ${LIB_NAME} PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")

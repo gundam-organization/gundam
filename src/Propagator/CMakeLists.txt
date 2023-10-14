@@ -36,14 +36,11 @@ else()
   set(CACHE_MANAGER_LIBRARIES "")
 endif()
 
-target_link_libraries( GundamPropagator
-  GundamParameters
-  GundamSamples
-  GundamDatasetManager
-  GundamDialDictionary
-  ${CACHE_MANAGER_LIBRARIES}
-  ${ROOT_LIBRARIES}
-  )
+target_link_libraries( GundamPropagator PUBLIC
+    GundamDatasetManager
+    GundamDialDictionary
+    ${CACHE_MANAGER_LIBRARIES}
+)
 
 #set_target_properties( GundamPropagator PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")
 
