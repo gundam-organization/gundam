@@ -175,11 +175,13 @@ namespace JointProbability{
       }
     }
     else {
-      chisq += 1E+20;
-      LogError << "Data and predicted value give infinite statistical LLH / "
-               << "Data: " << dataVal
-               << " / MC: " << newmc
-               << std::endl;
+      if( dataVal != 0 ){
+        chisq += 1E+20;
+        LogError << "Data and predicted value give infinite statistical LLH / "
+                 << "Data: " << dataVal
+                 << " / MC: " << newmc
+                 << std::endl;
+      }
     }
 
     if (not std::isfinite(chisq)) [[unlikely]] {
