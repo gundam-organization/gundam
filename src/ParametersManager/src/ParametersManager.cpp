@@ -17,6 +17,10 @@ LoggerInit([]{
 });
 
 
+// logger
+void ParametersManager::muteLogger(){ Logger::setIsMuted( true ); }
+void ParametersManager::unmuteLogger(){ Logger::setIsMuted( false ); }
+
 // config
 void ParametersManager::readConfigImpl(){
 

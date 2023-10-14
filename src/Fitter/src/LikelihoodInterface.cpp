@@ -104,13 +104,13 @@ void LikelihoodInterface::saveGradientSteps(){
   GenericToolbox::ScopedGuard g{
     [&](){
       ParameterSet::muteLogger();
-      Propagator::muteLogger();
+      ParametersManager::muteLogger();
       ParScanner::muteLogger();
     },
     [&](){
       _owner_->getPropagator().getParametersManager().injectParameterValues( currentParState );
       ParameterSet::unmuteLogger();
-      Propagator::unmuteLogger();
+      ParametersManager::unmuteLogger();
       ParScanner::unmuteLogger();
     }
   };

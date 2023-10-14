@@ -255,8 +255,8 @@ void ParScanner::scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, c
 
   // don't shout while re-injecting parameters
   GenericToolbox::ScopedGuard s(
-      []{ ParameterSet::muteLogger(); Propagator::muteLogger(); },
-      []{ ParameterSet::unmuteLogger(); Propagator::unmuteLogger(); }
+      []{ ParameterSet::muteLogger(); ParametersManager::muteLogger(); },
+      []{ ParameterSet::unmuteLogger(); ParametersManager::unmuteLogger(); }
   );
 
   LogThrowIf(end_.empty(), "Ending injector config is empty()");
