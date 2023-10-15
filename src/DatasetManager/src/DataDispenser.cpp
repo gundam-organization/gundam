@@ -215,7 +215,7 @@ void DataDispenser::doEventSelection(){
   // selection
   auto selectionFct = [&](int iThread_){
 
-    GundamGlobals::getThreadMutex().lock();
+//    GundamGlobals::getThreadMutex().lock();
     TChain treeChain(_parameters_.treePath.c_str());
     for (const auto &file: _parameters_.filePathList) {
       std::string name = GenericToolbox::expandEnvironmentVariables(file);
@@ -283,7 +283,7 @@ void DataDispenser::doEventSelection(){
     std::string progressTitle = "Performing event selection on " + this->getTitle() + "...";
     std::stringstream ssProgressTitle;
     TFile *lastFilePtr{nullptr};
-    GundamGlobals::getThreadMutex().unlock();
+//    GundamGlobals::getThreadMutex().unlock();
 
 
     for ( Long64_t iEntry = bounds.first ; iEntry < bounds.second ; iEntry++ ) {
@@ -664,7 +664,7 @@ void DataDispenser::readAndFill(){
   for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
     auto* container = &_cache_.samplesToFillList[iSample]->getDataContainer();
     if(_parameters_.useMcContainer) container = &_cache_.samplesToFillList[iSample]->getMcContainer();
-    container->shrinkEventList(_cache_.sampleIndexOffsetList[iSample]);
+    container->shrinkEventList( _cache_.sampleIndexOffsetList[iSample] );
   }
 
 //  if( _owner_->isSortLoadedEvents() ){
@@ -690,7 +690,6 @@ void DataDispenser::loadFromHistContent(){
   _cache_.sampleNbOfEvents.resize(_cache_.samplesToFillList.size());
   _cache_.sampleIndexOffsetList.resize(_cache_.samplesToFillList.size());
   _cache_.sampleEventListPtrToFill.resize(_cache_.samplesToFillList.size());
-
 
   PhysicsEvent eventPlaceholder;
   eventPlaceholder.setDataSetIndex(_owner_->getDataSetIndex());
@@ -958,7 +957,7 @@ void DataDispenser::fillFunction(int iThread_){
   std::vector<DataBin>::const_iterator binFoundItr;
   auto isBinValid = [&](const DataBin& b_){
     for( iVar = 0 ; iVar < b_.getVariableNameList().size() ; iVar++ ){
-      if( not b_.isBetweenEdges(iVar, eventIndexingBuffer.getVarAsDouble(b_.getVariableNameList()[iVar])) ){
+      if( not b_.isBetweenEdges(iVar, eventIndexingBuffer.getVarAsDouble(b_.getVariableNameList()[iVar])) ) [[likely]] {
         return false;
       }
     } // Var
@@ -977,7 +976,7 @@ void DataDispenser::fillFunction(int iThread_){
       if( not d_.isBetweenEdges(
           d_.getEdgesList()[iVar],
           eventIndexingBuffer.getVarAsDouble(d_.getEventVarIndexCache()[iVar] ) )
-          ){
+          ) [[likely]] {
         return false;
       }
     }
@@ -1108,12 +1107,12 @@ void DataDispenser::fillFunction(int iThread_){
         eventIndexingBuffer.setSampleBinIndex(int(std::distance(binsListPtr->begin(), binFoundItr)));
 
         // OK, now we have a valid fit bin. Let's claim an index.
-        GundamGlobals::getThreadMutex().lock();
-        // EXTRA LOCK HERE:
-        // internal lock seems to not be sufficient when catching a event dial cache entry...
-        sampleEventIndex = _cache_.sampleIndexOffsetList[iSample]++;
-        if(_eventDialCacheRef_ != nullptr) eventDialCacheEntry = _eventDialCacheRef_->fetchNextCacheEntry();
-        GundamGlobals::getThreadMutex().unlock();
+        // Shared index among threads
+        {
+          std::unique_lock<std::mutex> lock(GundamGlobals::getThreadMutex());
+          sampleEventIndex = _cache_.sampleIndexOffsetList[iSample]++;
+          if(_eventDialCacheRef_ != nullptr){ eventDialCacheEntry = _eventDialCacheRef_->fetchNextCacheEntry(); }
+        }
 
         // Get the next free event in our buffer
         eventPtr = &(*_cache_.sampleEventListPtrToFill[iSample])[sampleEventIndex];

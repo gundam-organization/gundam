@@ -25,6 +25,8 @@
 class Propagator : public JsonBaseClass {
 
 public:
+  Propagator() = default;
+
   // Setters
   void setShowTimeStats(bool showTimeStats){ _showTimeStats_ = showTimeStats; }
   void setThrowAsimovToyParameters(bool throwAsimovToyParameters){ _throwAsimovToyParameters_ = throwAsimovToyParameters; }

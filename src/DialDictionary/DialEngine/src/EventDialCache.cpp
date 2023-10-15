@@ -130,16 +130,12 @@ void EventDialCache::shrinkIndexedCache(){
 }
 
 EventDialCache::IndexedEntry_t* EventDialCache::fetchNextCacheEntry(){
-#if HAS_CPP_17
-  std::scoped_lock<std::mutex> g(_mutex_);
-#else
-  std::lock_guard<std::mutex> g(_mutex_);
-#endif
-  LogThrowIf(
-      _fillIndex_ >= _indexedCache_.size(),
-      "out of range: " << GET_VAR_NAME_VALUE(_fillIndex_)
-      << " while: " << GET_VAR_NAME_VALUE(_indexedCache_.size())
-  );
+  // for debug, uncomment:
+//  LogThrowIf(
+//      _fillIndex_ >= _indexedCache_.size(),
+//      "out of range: " << GET_VAR_NAME_VALUE(_fillIndex_)
+//      << " while: " << GET_VAR_NAME_VALUE(_indexedCache_.size())
+//  );
 
   // Warning warning Will Robinson!
   // This only works IFF the indexed cache is not resized.

@@ -587,8 +587,6 @@ void Propagator::refillSampleHistograms(){
 }
 
 // Misc
-
-
 std::string Propagator::getSampleBreakdownTableStr() const{
   GenericToolbox::TablePrinter t;
 
@@ -634,6 +632,7 @@ void Propagator::initializeThreads() {
   GundamGlobals::getParallelWorker().setPostParallelJob("Propagator::refillSampleHistograms", refillSampleHistogramsPostParallelFct);
 }
 
+// multithreading
 void Propagator::reweightMcEvents(int iThread_) {
 
   //! Warning: everything you modify here, may significantly slow down the

@@ -40,7 +40,7 @@ struct DataDispenserCache{
   std::vector<Sample*> samplesToFillList{};
   std::vector<size_t> sampleNbOfEvents;
   std::vector<std::vector<bool>> eventIsInSamplesList{};
-  std::vector<GenericToolbox::CopiableAtomic<size_t>> sampleIndexOffsetList;
+  std::vector<size_t> sampleIndexOffsetList;
   std::vector< std::vector<PhysicsEvent>* > sampleEventListPtrToFill;
   std::vector<DialCollection*> dialCollectionsRefList{};
 

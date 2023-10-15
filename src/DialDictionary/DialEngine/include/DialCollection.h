@@ -112,7 +112,7 @@ private:
   std::vector<DialResponseSupervisor> _dialResponseSupervisorList_{};
   std::vector<DialBaseObject> _dialBaseList_{};
   std::shared_ptr<TFormula> _applyConditionFormula_{nullptr};
-  GenericToolbox::CopiableAtomic<size_t> _dialFreeSlot_{0};
+  GenericToolbox::Atomic<size_t> _dialFreeSlot_{0};
 
   // external refs
   std::vector<ParameterSet>* _parameterSetListPtr_{nullptr};
