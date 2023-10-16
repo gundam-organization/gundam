@@ -523,24 +523,18 @@ int main(int argc, char** argv){
         auto& bin = xsec.samplePtr->getMcContainer().binning.getBinsList()[iBin];
         double binVolume{1};
 
-        for( size_t iDim = 0 ; iDim < bin.getEdgesList().size() ; iDim++ ){
-          auto& edges = bin.getEdgesList()[iDim];
-          if( edges.first == edges.second ) continue; // no volume, just a condition variable
+        for( auto& edges : bin.getEdgesList() ){
+          if( edges.isConditionVar ){ continue; } // no volume, just a condition variable
 
-          // is this bin excluded from norm?
-          if( not bin.getVariableNameList()[iDim].empty() and std::any_of(
-              xsec.normList.begin(), xsec.normList.end(), [&](const BinNormaliser& normData_){
-                return (
-                    not normData_.disabledBinDim.empty()
-                    and normData_.disabledBinDim == bin.getVariableNameList()[iDim] );
-              }
-          )
-              ){ continue; }
-          binVolume *= std::max( edges.first, edges.second ) - std::min(edges.first, edges.second);
+          // is this bin excluded from the normalisation ?
+          if( GenericToolbox::doesElementIsInVector(edges.varName, xsec.normList, [](const BinNormaliser& n){ return n.disabledBinDim; }) ){
+            continue;
+          }
+
+          binVolume *= (edges.max - edges.min);
         }
 
         binData /= binVolume;
-
         xsec.branchBinsData.writeRawData( binData );
       }
     }

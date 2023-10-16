@@ -16,33 +16,44 @@
 class DataBin {
 
 public:
-  DataBin() = default;
+  struct Edges{
+    Edges() = delete;
+    Edges(int index_) : index(index_) {}
+
+    bool isConditionVar{false};
+    int index{-1};
+    int varIndexCache{-1};
+    std::string varName{};
+    double min{std::nan("unset")};
+    double max{std::nan("unset")};
+  };
+
+public:
+  DataBin() = delete;
+  DataBin(int index_) : _index_(index_) {}
   virtual ~DataBin() = default;
 
-  // Setters
+  // setters
   void setIsLowMemoryUsageMode(bool isLowMemoryUsageMode_){ _isLowMemoryUsageMode_ = isLowMemoryUsageMode_; }
   void setIsZeroWideRangesTolerated(bool isZeroWideRangesTolerated_){ _isZeroWideRangesTolerated_ = isZeroWideRangesTolerated_; } // make it explicit! -> double precision might not be enough if you play with long int
-  void setEventVarIndexCache(const std::vector<int> &eventVarIndexCache){ _eventVarIndexCache_ = eventVarIndexCache; }
   void addBinEdge(double lowEdge_, double highEdge_);
   void addBinEdge(const std::string& variableName_, double lowEdge_, double highEdge_);
 
-
-  // Init
-
-  // Getters
+  // const getters
   [[nodiscard]] bool isLowMemoryUsageMode() const { return _isLowMemoryUsageMode_; }
   [[nodiscard]] bool isZeroWideRangesTolerated() const { return _isZeroWideRangesTolerated_; }
+  [[nodiscard]] int getIndex() const { return _index_; }
   [[nodiscard]] const std::string &getFormulaStr() const { return _formulaStr_; }
   [[nodiscard]] const std::string &getTreeFormulaStr() const{ return _treeFormulaStr_; }
   [[nodiscard]] TFormula *getFormula() const{ return _formula_.get(); }
   [[nodiscard]] TTreeFormula *getTreeFormula() const{ return _treeFormula_.get(); }
-  [[nodiscard]] const std::vector<int> &getEventVarIndexCache() const{ return _eventVarIndexCache_; }
-  [[nodiscard]] const std::vector<std::string> &getVariableNameList() const { return _variableNameList_; }
-  [[nodiscard]] const std::vector<std::pair<double, double>> &getEdgesList() const { return _edgesList_; }
-  [[nodiscard]] const std::pair<double, double>& getVarEdges( const std::string& varName_ ) const;
+  [[nodiscard]] const std::vector<Edges> &getEdgesList() const { return _binEdgesList_; }
+  [[nodiscard]] const Edges& getVarEdges( const std::string& varName_ ) const;
+
+  // non-const getters
+  std::vector<Edges> &getEdgesList() { return _binEdgesList_; }
 
   // Non-native Getters
-  [[nodiscard]] size_t getNbEdges() const{ return _edgesList_.size(); }
   [[nodiscard]] double getVolume() const;
 
   // Management
@@ -50,7 +61,7 @@ public:
   [[nodiscard]] bool isVariableSet(const std::string& variableName_) const;
   [[nodiscard]] bool isBetweenEdges(const std::string& variableName_, double value_) const;
   [[nodiscard]] bool isBetweenEdges(size_t varIndex_, double value_) const;
-  [[nodiscard]] bool isBetweenEdges(const std::pair<double,double>& edges_, double value_) const;
+  [[nodiscard]] bool isBetweenEdges(const Edges& edges_, double value_) const;
 
   // Misc
   void generateFormula();
@@ -66,15 +77,13 @@ private:
   bool _isZeroWideRangesTolerated_{false};
   bool _includeLowerBoundVal_{true}; // by default it's [a,b[
   bool _includeHigherBoundVal_{false};
-  std::vector<std::string> _variableNameList_{};
-  std::vector<std::pair<double, double>> _edgesList_{};
+  int _index_{-1};
+  std::vector<Edges> _binEdgesList_{};
 
   std::string _formulaStr_{};
   std::string _treeFormulaStr_{};
   std::shared_ptr<TFormula> _formula_{nullptr};
   std::shared_ptr<TTreeFormula> _treeFormula_{nullptr};
-
-  std::vector<int> _eventVarIndexCache_{};
 
 };
 

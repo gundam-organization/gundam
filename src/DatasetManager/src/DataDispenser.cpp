@@ -12,12 +12,14 @@
 #include "ConfigUtils.h"
 
 #include "DialCollection.h"
-#include "DialTypes.h"
 #include "DialBaseFactory.h"
+#include "DialTypes.h"
 
-#include "GenericToolbox.Root.h"
 #include "GenericToolbox.Root.LeafCollection.h"
 #include "GenericToolbox.VariablesMonitor.h"
+#include "GenericToolbox.ZipIterator.h"
+#include "GenericToolbox.Root.h"
+#include "GenericToolbox.h"
 #include "Logger.h"
 
 #include "TTreeFormulaManager.h"
@@ -416,8 +418,8 @@ void DataDispenser::fetchRequestedLeaves(){
         GenericToolbox::addIfNotInVector(dialCollection->getGlobalDialLeafName(), indexRequests);
       }
       for( auto& bin : dialCollection->getDialBinSet().getBinsList() ) {
-        for( auto& var : bin.getVariableNameList() ) {
-          GenericToolbox::addIfNotInVector(var, indexRequests);
+        for( auto& edges : bin.getEdgesList() ){
+          GenericToolbox::addIfNotInVector(edges.varName, indexRequests);
         }
       }
     }
@@ -430,8 +432,8 @@ void DataDispenser::fetchRequestedLeaves(){
     std::vector<std::string> indexRequests;
     for (auto &sample: _sampleSetPtrToLoad_->getFitSampleList()) {
       for (auto &bin: sample.getBinning().getBinsList()) {
-        for (auto &var: bin.getVariableNameList()) {
-          GenericToolbox::addIfNotInVector(var, indexRequests);
+        for (auto &edges: bin.getEdgesList()) {
+          GenericToolbox::addIfNotInVector(edges.varName, indexRequests);
         }
       }
     }
@@ -608,13 +610,9 @@ void DataDispenser::preAllocateMemory(){
         if( dialCollection->isBinned() ){
           // Filling var indexes for faster eval with PhysicsEvent:
           for( auto& bin : dialCollection->getDialBinSet().getBinsList() ){
-            std::vector<int> varIndexes;
-            for( auto& var : bin.getVariableNameList() ){
-              varIndexes.emplace_back(
-                  GenericToolbox::findElementIndex(
-                      var, _cache_.varsRequestedForIndexing));
+            for( auto& edges : bin.getEdgesList() ){
+              edges.varIndexCache = GenericToolbox::findElementIndex( edges.varName, _cache_.varsRequestedForIndexing );
             }
-            bin.setEventVarIndexCache(varIndexes);
           }
         }
         else if( not dialCollection->getGlobalDialLeafName().empty() ){
@@ -699,10 +697,12 @@ void DataDispenser::loadFromHistContent(){
   for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
 
     eventPlaceholder.setCommonVarNameListPtr(
-        std::make_shared<std::vector<std::string>>(_cache_.samplesToFillList[iSample]->getBinning().getBinVariables())
+        std::make_shared<std::vector<std::string>>(
+            _cache_.samplesToFillList[iSample]->getBinning().buildVariableNameList()
+        )
     );
-    for( size_t iVar = 0 ; iVar < _cache_.samplesToFillList[iSample]->getBinning().getBinVariables().size() ; iVar++ ){
-      eventPlaceholder.getVarHolderList()[iVar].emplace_back(double(0.) );
+    for( auto& varHolder : eventPlaceholder.getVarHolderList() ){
+      varHolder.emplace_back( double(0.) );
     }
     eventPlaceholder.resizeVarToDoubleCache();
 
@@ -956,12 +956,9 @@ void DataDispenser::fillFunction(int iThread_){
   const std::vector<DataBin>* binsListPtr;
   std::vector<DataBin>::const_iterator binFoundItr;
   auto isBinValid = [&](const DataBin& b_){
-    for( iVar = 0 ; iVar < b_.getVariableNameList().size() ; iVar++ ){
-      if( not b_.isBetweenEdges(iVar, eventIndexingBuffer.getVarAsDouble(b_.getVariableNameList()[iVar])) ) [[likely]] {
-        return false;
-      }
-    } // Var
-    return true;
+    return std::all_of(b_.getEdgesList().begin(), b_.getEdgesList().end(), [&](const DataBin::Edges& e){
+      return b_.isBetweenEdges( e, eventIndexingBuffer.getVarAsDouble( e.varName ) );
+    });
   };
 
   // Dial bin search
@@ -971,16 +968,45 @@ void DataDispenser::fillFunction(int iThread_){
   EventDialCache::IndexedEntry_t* eventDialCacheEntry;
   std::vector<DataBin>::iterator dial2FoundItr;
   auto isDial2Valid = [&](const DataBin& d_){
-    nBinEdges = d_.getEdgesList().size();
-    for( iVar = 0 ; iVar < nBinEdges ; iVar++ ){
-      if( not d_.isBetweenEdges(
-          d_.getEdgesList()[iVar],
-          eventIndexingBuffer.getVarAsDouble(d_.getEventVarIndexCache()[iVar] ) )
-          ) [[likely]] {
-        return false;
-      }
-    }
-    return true;
+
+    return std::all_of(d_.getEdgesList().begin(), d_.getEdgesList().end(), [&](const DataBin::Edges& e){
+      return d_.isBetweenEdges( e, eventIndexingBuffer.getVarAsDouble( e.varIndexCache ) );
+    });
+
+//    for( auto& edges : d_.getEdgesList() ){
+//      if( not d_.isBetweenEdges( edges, eventIndexingBuffer.getVarAsDouble( edges.varIndexCache ) ) ) [[likely]] {
+//        return false;
+//      }
+//    }
+//    return true;
+
+//    std::vector<int> list1 = {1, 2, 3, 4, 5};
+//    std::vector<double> list2 = {10, 20, 30, 40, 50};
+//
+//    for ( auto i : GenericToolbox::zip(list1, list2)) {
+////      std::cout << "obj1: " << obj1 << ", obj2: " << obj2 << std::endl;
+//    }
+//
+//
+//    for( auto edgeIt : GenericToolbox::zip(d_.getEdgesList(), d_.getEventVarIndexCache()) ){
+//
+//    }
+//
+////    GenericToolbox::zip(d_.getEdgesList(), d_.getEdgesList());
+////    for( const auto& [edges, varIndex] : GenericToolbox::zip(d_.getEdgesList(), d_.getEdgesList()) ){
+////
+////    }
+
+//    nBinEdges = d_.getEdgesList().size();
+//    for( iVar = 0 ; iVar < nBinEdges ; iVar++ ){
+//      if( not d_.isBetweenEdges(
+//          d_.getEdgesList()[iVar],
+//          eventIndexingBuffer.getVarAsDouble(d_.getEventVarIndexCache()[iVar] ) )
+//          ) [[likely]] {
+//        return false;
+//      }
+//    }
+//    return true;
   };
 
   // Formula

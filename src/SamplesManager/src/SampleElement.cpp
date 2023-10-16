@@ -41,26 +41,28 @@ void SampleElement::shrinkEventList(size_t newTotalSize_){
 }
 void SampleElement::updateEventBinIndexes(int iThread_){
   if( isLocked ) return;
-  int nBins = int(binning.getBinsList().size());
-  if(iThread_ <= 0){ LogScopeIndent; LogInfo << "Finding bin indexes for \"" << name << "\"..." << std::endl; }
-  for( size_t iEvent = 0 ; iEvent < eventList.size() ; iEvent++ ){
-    if( iThread_ != -1 and iEvent % GundamGlobals::getParallelWorker().getNbThreads() != iThread_ ) continue;
-    auto& event = eventList.at(iEvent);
-    for( int iBin = 0 ; iBin < nBins ; iBin++ ){
-      auto& bin = binning.getBinsList().at(iBin);
-      bool isInBin = true;
-      for( size_t iVar = 0 ; iVar < bin.getVariableNameList().size() ; iVar++ ){
-        if( not bin.isBetweenEdges(iVar, event.getVarAsDouble(bin.getVariableNameList().at(iVar))) ){
-          isInBin = false;
-          break;
-        }
-      } // Var
+
+  int nThreads{GundamGlobals::getParallelWorker().getNbThreads()};
+  if( iThread_ == -1 ){ iThread_ = 0; nThreads = 1; }
+
+  PhysicsEvent* eventPtr{nullptr};
+  auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices( iThread_, nThreads, int( eventList.size() ) );
+
+  if( iThread_ == 0 ){ LogScopeIndent; LogInfo << "Finding bin indexes for \"" << name << "\"..." << std::endl; }
+
+  for( int iEvent = bounds.first ; iEvent < bounds.second ; iEvent++ ){
+    eventPtr = &eventList[iEvent];
+    for( auto& bin : binning.getBinsList() ){
+      bool isInBin = std::all_of(bin.getEdgesList().begin(), bin.getEdgesList().end(), [&](const DataBin::Edges& e){
+        return bin.isBetweenEdges( e, eventPtr->getVarAsDouble( e.varName ) );
+      });
+
       if( isInBin ){
-        event.setSampleBinIndex(iBin);
+        eventPtr->setSampleBinIndex( bin.getIndex() );
         break;
       }
-    } // Bin
-  } // Event
+    }
+  }
 }
 void SampleElement::updateBinEventList(int iThread_) {
   if( isLocked ) return;

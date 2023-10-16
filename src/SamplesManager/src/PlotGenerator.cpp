@@ -719,10 +719,10 @@ void PlotGenerator::defineHistogramHolders() {
                   for( const auto& bin : sample.getBinning().getBinsList() ){
                     std::string variableNameForBinning{sampleObsBinning};
 
-                    if( not GenericToolbox::doesElementIsInVector(sampleObsBinning, bin.getVariableNameList()) ){
+                    if( not GenericToolbox::doesElementIsInVector(sampleObsBinning, bin.getEdgesList(), [](const DataBin::Edges& e){ return e.varName; }) ){
                       if( GenericToolbox::Json::doKeyExist(histConfig, "sampleVariableIfNotAvailable") ){
                         for( auto& varSubstitution : GenericToolbox::Json::fetchValue<std::vector<std::string>>(histConfig, "sampleVariableIfNotAvailable") ){
-                          if( GenericToolbox::doesElementIsInVector(varSubstitution, bin.getVariableNameList()) ){
+                          if( GenericToolbox::doesElementIsInVector(varSubstitution, bin.getEdgesList(), [](const DataBin::Edges& e){ return e.varName; }) ){
                             variableNameForBinning = varSubstitution;
                             break;
                           }
@@ -730,9 +730,9 @@ void PlotGenerator::defineHistogramHolders() {
                       } // sampleVariableIfNotAvailable
                     } // sampleObsBinning not in the sample binning
 
-                    std::pair<double, double> edges;
+                    const DataBin::Edges* edges;
                     try{
-                      edges = bin.getVarEdges(variableNameForBinning);
+                      edges = &bin.getVarEdges(variableNameForBinning);
                     }
                     catch(...){
                       LogAlert << "Can't use sample binning for var " << variableNameForBinning << " and sample " << sample.getName() << std::endl;
@@ -740,10 +740,9 @@ void PlotGenerator::defineHistogramHolders() {
                       break;
                     }
 
-
-                    for( const auto& edge : { edges.first, edges.second } ) {
-                      if ((histDefBase.xMin != histDefBase.xMin or histDefBase.xMin <= edge)
-                          and (histDefBase.xMax != histDefBase.xMax or histDefBase.xMax >= edge)) {
+                    for( const auto& edge : { edges->min, edges->max } ) {
+                      if (    ( std::isnan( histDefBase.xMin ) or histDefBase.xMin <= edge )
+                          and ( std::isnan( histDefBase.xMax ) or histDefBase.xMax >= edge)) {
                         // either NaN or in bounds
                         if (not GenericToolbox::doesElementIsInVector(edge, histDefBase.xEdges)) {
                           histDefBase.xEdges.emplace_back(edge);
@@ -761,13 +760,15 @@ void PlotGenerator::defineHistogramHolders() {
                 else if( GenericToolbox::Json::doKeyExist(histConfig, "binningFile") ){
                   DataBinSet b;
                   b.readBinningDefinition(GenericToolbox::Json::fetchValue<std::string>(histConfig, "binningFile") );
-                  LogThrowIf(b.getBinVariables().size()!=1, "Binning should be defined with only one variable, here: " << GenericToolbox::parseVectorAsString(b.getBinVariables()))
+
+                  auto varList{b.buildVariableNameList()};
+                  LogThrowIf(varList.size()!=1, "Binning should be defined with only one variable, here: " << GenericToolbox::parseVectorAsString(varList))
 
                   for(const auto& bin: b.getBinsList()){
-                    const auto& edges = bin.getVarEdges(b.getBinVariables()[0]);
-                    for( const auto& edge : { edges.first, edges.second } ) {
-                      if ((histDefBase.xMin != histDefBase.xMin or histDefBase.xMin <= edge)
-                          and (histDefBase.xMax != histDefBase.xMax or histDefBase.xMax >= edge)) {
+                    const auto& edges = bin.getVarEdges(varList[0]);
+                    for( const auto& edge : { edges.min, edges.max } ) {
+                      if (    ( std::isnan( histDefBase.xMin ) or histDefBase.xMin <= edge)
+                          and ( std::isnan( histDefBase.xMax ) or histDefBase.xMax >= edge)) {
                         // either NaN or in bounds
                         if (not GenericToolbox::doesElementIsInVector(edge, histDefBase.xEdges)) {
                           histDefBase.xEdges.emplace_back(edge);

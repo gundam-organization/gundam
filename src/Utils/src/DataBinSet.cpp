@@ -16,20 +16,9 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[DataBinSet]");
 } );
 
-DataBinSet::DataBinSet() {
-  this->reset();
-}
-DataBinSet::~DataBinSet() { this->reset(); }
+void DataBinSet::setVerbosity(int maxLogLevel_) { Logger::setMaxLogLevel(maxLogLevel_); }
 
-void DataBinSet::reset() {
-  _binsList_.clear();
-  _binVariables_.clear();
-}
-
-// Setters
-void DataBinSet::setName(const std::string &name) {
-  _name_ = name;
-}
+// core
 void DataBinSet::readBinningDefinition(const std::string &filePath_) {
 
   _filePath_ = GenericToolbox::expandEnvironmentVariables(filePath_);
@@ -89,7 +78,6 @@ void DataBinSet::readBinningDefinition(const std::string &filePath_) {
           }
 
           expectedVariableList.emplace_back( lineElements.at(iElement) );
-          if( not GenericToolbox::doesElementIsInVector(expectedVariableList.back(), _binVariables_) ) _binVariables_.emplace_back(expectedVariableList.back());
           expectedVariableIsRangeList.push_back(false);
           nbExpectedValues += 1;
         }
@@ -120,8 +108,7 @@ void DataBinSet::readBinningDefinition(const std::string &filePath_) {
       }
 
       size_t iElement = 0;
-      _binsList_.emplace_back();
-      _binContent_.emplace_back(0);
+      _binsList_.emplace_back(_binsList_.size());
       for( size_t iVar = 0; iVar < expectedVariableList.size() ; iVar++ ){
 
         if( expectedVariableIsRangeList.at(iVar) ){
@@ -147,30 +134,6 @@ void DataBinSet::readBinningDefinition(const std::string &filePath_) {
     }
   }
 }
-void DataBinSet::addBin(const DataBin& bin_){
-  _binsList_.emplace_back(bin_);
-  _binContent_.emplace_back(0);
-}
-void DataBinSet::setVerbosity(int maxLogLevel_) {
-  Logger::setMaxLogLevel(maxLogLevel_);
-}
-
-const std::vector<DataBin> &DataBinSet::getBinsList() const {
-  return _binsList_;
-}
-const std::string &DataBinSet::getFilePath() const {
-  return _filePath_;
-}
-const std::vector<std::string> &DataBinSet::getBinVariables() const {
-  return _binVariables_;
-}
-std::vector<DataBin> &DataBinSet::getBinsList(){
-  return _binsList_;
-}
-
-bool DataBinSet::isEmpty() const{
-  return _binsList_.empty();
-}
 std::string DataBinSet::getSummary() const{
   std::stringstream ss;
   ss << "DataBinSet";
@@ -184,11 +147,12 @@ std::string DataBinSet::getSummary() const{
   }
   return ss.str();
 }
-
-void DataBinSet::addBinContent(int binIndex_, double weight_) {
-  if( binIndex_ < 0 or binIndex_ >= _binsList_.size() ){
-    LogError << GET_VAR_NAME_VALUE(binIndex_) << " is out of range: " << GET_VAR_NAME_VALUE(_binsList_.size()) << std::endl;
-    throw std::logic_error("Invalid binIndex");
+std::vector<std::string> DataBinSet::buildVariableNameList() const{
+  std::vector<std::string> out;
+  for( auto& bin : _binsList_ ){
+    for( auto& edges : bin.getEdgesList() ){
+      GenericToolbox::addIfNotInVector(edges.varName, out);
+    }
   }
-  _binContent_.at(binIndex_) += weight_;
+  return out;
 }
