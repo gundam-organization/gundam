@@ -123,6 +123,26 @@ void PhysicsEvent::copyData(const std::vector<const GenericToolbox::LeafForm*>& 
   }
   this->invalidateVarToDoubleCache();
 }
+bool PhysicsEvent::isInBin(const DataBin& bin_) const{
+  return std::all_of(
+      bin_.getEdgesList().begin(), bin_.getEdgesList().end(),
+      [&](const DataBin::Edges& e){
+        return bin_.isBetweenEdges( e, (e.varIndexCache == -1 ? this->getVarAsDouble( e.varName ): this->getVarAsDouble( e.varIndexCache )) );
+      }
+  );
+}
+int PhysicsEvent::findBinIndex(const DataBinSet& binSet_) const{
+  return this->findBinIndex( binSet_.getBinList() );
+}
+int PhysicsEvent::findBinIndex(const std::vector<DataBin>& binList_) const{
+  auto dialItr = std::find_if(
+      binList_.begin(), binList_.end(),
+      [&](const DataBin& bin_){ return this->isInBin(bin_); }
+  );
+
+  if ( dialItr == binList_.end() ){ return -1; }
+  return int( std::distance( binList_.begin(), dialItr ) );
+}
 void PhysicsEvent::allocateMemory(const std::vector<const GenericToolbox::LeafForm*>& leafFormList_){
   LogThrowIf( _commonVarNameListPtr_ == nullptr, "var name list not set." );
   LogThrowIf( _commonVarNameListPtr_->size() != leafFormList_.size(), "size mismatch." );

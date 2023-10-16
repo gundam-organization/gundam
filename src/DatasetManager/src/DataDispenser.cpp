@@ -962,26 +962,11 @@ void DataDispenser::fillFunction(int iThread_){
   size_t nBinEdges;
   TObject* dialObjectPtr{nullptr};
 
-  // Bin searches
-  const std::vector<DataBin>* binsListPtr;
-  std::vector<DataBin>::const_iterator binFoundItr;
-  auto isBinValid = [&](const DataBin& b_){
-    return std::all_of(b_.getEdgesList().begin(), b_.getEdgesList().end(), [&](const DataBin::Edges& e){
-      return b_.isBetweenEdges( e, eventIndexingBuffer.getVarAsDouble( e.varIndexCache ) );
-    });
-  };
-
   // Dial bin search
   DataBin* dataBin{nullptr};
   size_t freeSlotDial{0};
   size_t iCollection(-1);
   EventDialCache::IndexedEntry_t* eventDialCacheEntry;
-  std::vector<DataBin>::iterator dial2FoundItr;
-  auto isDial2Valid = [&](const DataBin& b_){
-    return std::all_of(b_.getEdgesList().begin(), b_.getEdgesList().end(), [&](const DataBin::Edges& e){
-      return b_.isBetweenEdges( e, eventIndexingBuffer.getVarAsDouble( e.varIndexCache ) );
-    });
-  };
 
   // Formula
   std::vector<std::shared_ptr<TFormula>> varSelectionFormulaList{};
@@ -1000,9 +985,7 @@ void DataDispenser::fillFunction(int iThread_){
   Long64_t nEvents = treeChain.GetEntries();
   Long64_t iGlobal = 0;
 
-  auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
-      iThread_, nThreads, nEvents
-      );
+  auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices( iThread_, nThreads, nEvents );
 
   // to generate dials
   DialBaseFactory factory;
@@ -1066,7 +1049,7 @@ void DataDispenser::fillFunction(int iThread_){
 
         LogThrow("Negative nominal weight");
       }
-      if(eventIndexingBuffer.getBaseWeight() == 0 ){
+      if( eventIndexingBuffer.getBaseWeight() == 0 ){
         continue;
       } // skip this event
     }
@@ -1091,20 +1074,15 @@ void DataDispenser::fillFunction(int iThread_){
         }
 
         // Has valid bin?
-        binsListPtr = &_cache_.samplesToFillList[iSample]->getBinning().getBinList();
-        binFoundItr = std::find_if(
-            binsListPtr->begin(),
-            binsListPtr->end(),
-            isBinValid
+        eventIndexingBuffer.setSampleBinIndex(
+            eventIndexingBuffer.findBinIndex(
+                _cache_.samplesToFillList[iSample]->getBinning()
+            )
         );
-
-        if (binFoundItr == binsListPtr->end()) {
-          // Invalid bin -> next sample
+        if( eventIndexingBuffer.getSampleBinIndex() == -1){
+          // No bin found -> next sample
           break;
         }
-
-        // found the bin
-        eventIndexingBuffer.setSampleBinIndex(int(std::distance(binsListPtr->begin(), binFoundItr)));
 
         // OK, now we have a valid fit bin. Let's claim an index.
         // Shared index among threads
@@ -1131,15 +1109,6 @@ void DataDispenser::fillFunction(int iThread_){
         eventPtr->resetEventWeight();
 
         dialArrayIndex = (dialIndexTreeFormula == nullptr ? 0 : int(dialIndexTreeFormula->EvalInstance()));
-
-//        if( dialArrayIndex != 0 ){
-//          LogDebug << std::endl << std::endl;
-//          LogDebug << GET_VAR_NAME_VALUE(dialArrayIndex) << std::endl;
-//          LogDebug << GET_VAR_NAME_VALUE(iEntry) << std::endl;
-//          LogDebug << lCollection.getSummary() << std::endl;
-//          eventIndexingBuffer.print();
-//          exit(0);
-//        }
 
         // Now the event is ready. Let's index the dials:
         eventDialOffset = 0;
@@ -1172,24 +1141,13 @@ void DataDispenser::fillFunction(int iThread_){
                 eventDialCacheEntry->dials[eventDialOffset].collectionIndex = iCollection;
                 eventDialCacheEntry->dials[eventDialOffset].interfaceIndex = 0;
                 eventDialOffset++;
-              } else {
-                // ---- probably the slowest part of the indexing: ----
-                dial2FoundItr = std::find_if(
-                    dialCollectionRef->getDialBinSet().getBinList().begin(),
-                    dialCollectionRef->getDialBinSet().getBinList().end(),
-                    isDial2Valid
-                );
-                // ----------------------------------------------------
-
-                if (dial2FoundItr != dialCollectionRef->getDialBinSet().getBinList().end()) {
-                  // found DIAL -> get index
+              }
+              else {
+                auto dialBinIdx = eventIndexingBuffer.findBinIndex( dialCollectionRef->getDialBinSet() );
+                if( dialBinIdx != -1 ){
                   eventDialCacheEntry->dials[eventDialOffset].collectionIndex = iCollection;
-                  eventDialCacheEntry->dials[eventDialOffset].interfaceIndex = std::distance(
-                      dialCollectionRef->getDialBinSet().getBinList().begin(), dial2FoundItr
-                  );
+                  eventDialCacheEntry->dials[eventDialOffset].interfaceIndex = dialBinIdx;
                   eventDialOffset++;
-                } else {
-                  // dial not valid
                 }
               }
             }
