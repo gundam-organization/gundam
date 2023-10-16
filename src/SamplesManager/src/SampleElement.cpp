@@ -52,7 +52,7 @@ void SampleElement::updateEventBinIndexes(int iThread_){
 
   for( int iEvent = bounds.first ; iEvent < bounds.second ; iEvent++ ){
     eventPtr = &eventList[iEvent];
-    for( auto& bin : binning.getBinsList() ){
+    for( auto& bin : binning.getBinList() ){
       bool isInBin = std::all_of(bin.getEdgesList().begin(), bin.getEdgesList().end(), [&](const DataBin::Edges& e){
         return bin.isBetweenEdges( e, eventPtr->getVarAsDouble( e.varName ) );
       });
@@ -67,18 +67,14 @@ void SampleElement::updateEventBinIndexes(int iThread_){
 void SampleElement::updateBinEventList(int iThread_) {
   if( isLocked ) return;
 
-  if( iThread_ <= 0 ){ LogScopeIndent; LogInfo << "Filling bin event cache for \"" << name << "\"..." << std::endl; }
-  int nBins = int(perBinEventPtrList.size());
   int nbThreads = GundamGlobals::getParallelWorker().getNbThreads();
-  if( iThread_ == -1 ){
-    nbThreads = 1;
-    iThread_ = 0;
-  }
+  if( iThread_ == -1 ){ iThread_ = 0; nbThreads = 1; }
+  if( iThread_ == 0 ){ LogScopeIndent; LogInfo << "Filling bin event cache for \"" << name << "\"..." << std::endl; }
 
-  int iBin = iThread_;
-  size_t count;
+  // multithread technique with iBin += nbThreads;
+  int iBin{iThread_}, nBins{int(perBinEventPtrList.size())};
   while( iBin < nBins ){
-    count = std::count_if(eventList.begin(), eventList.end(), [&](auto& e) {return e.getSampleBinIndex() == iBin;});
+    size_t count = std::count_if(eventList.begin(), eventList.end(), [&](auto& e) {return e.getSampleBinIndex() == iBin;});
     perBinEventPtrList[iBin].resize(count, nullptr);
 
     // Now filling the event indexes
@@ -108,7 +104,7 @@ void SampleElement::refillHistogram(int iThread_){
 
   // Faster that pointer shifter. -> would be slower if refillHistogram is
   // handled by the propagator
-  int iBin = iThread_;
+  int iBin = iThread_; // iBin += nbThreads;
   int nBins = int(perBinEventPtrList.size());
   auto* binContentArrayPtr = histogram->GetArray();
   auto* binErrorArrayPtr = histogram->GetSumw2()->GetArray();
@@ -230,7 +226,7 @@ size_t SampleElement::getNbBinnedEvents() const{
 
 void SampleElement::print() const{
   LogInfo << "SampleElement: " << name << std::endl;
-  LogInfo << " - " << "Nb bins: " << binning.getBinsList().size() << std::endl;
+  LogInfo << " - " << "Nb bins: " << binning.getBinList().size() << std::endl;
   LogInfo << " - " << "Nb events: " << eventList.size() << std::endl;
   LogInfo << " - " << "Hist rescale: " << histScale << std::endl;
 }

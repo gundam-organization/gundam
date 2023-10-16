@@ -92,7 +92,7 @@ void ParScanner::initializeImpl() {
         scanEntry.folder = "llhStat/" + sample.getName() + "/bin_" + std::to_string(iBin);
         scanEntry.title = Form(R"(Stat LLH Scan of sample "%s", bin #%d "%s")",
                                sample.getName().c_str(), iBin,
-                               sample.getBinning().getBinsList()[iBin-1].getSummary().c_str());
+                               sample.getBinning().getBinList()[iBin-1].getSummary().c_str());
         scanEntry.yTitle = "Stat LLH value";
         auto* samplePtr = &sample;
         scanEntry.evalY = [this, samplePtr, iBin](){ return _owner_->getFitSampleSet().getJointProbabilityFct()->eval(*samplePtr, iBin); };
@@ -121,7 +121,7 @@ void ParScanner::initializeImpl() {
         scanEntry.title = Form(R"(MC event weight scan of sample "%s", bin #%d "%s")",
                                sample.getName().c_str(),
                                iBin,
-                               sample.getBinning().getBinsList()[iBin-1].getSummary().c_str());
+                               sample.getBinning().getBinList()[iBin-1].getSummary().c_str());
         scanEntry.yTitle = "Total MC event weight";
         auto* samplePtr = &sample;
         scanEntry.evalY = [samplePtr, iBin](){ return samplePtr->getMcContainer().histogram->GetBinContent(iBin); };

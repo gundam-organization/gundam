@@ -62,7 +62,7 @@ void LikelihoodInterface::initialize() {
 
   _nbFitBins_ = 0;
   for( auto& sample : _owner_->getPropagator().getFitSampleSet().getFitSampleList() ){
-    _nbFitBins_ += int(sample.getBinning().getBinsList().size());
+    _nbFitBins_ += int(sample.getBinning().getBinList().size());
   }
 
   _convergenceMonitor_.addDisplayedQuantity("VarName");

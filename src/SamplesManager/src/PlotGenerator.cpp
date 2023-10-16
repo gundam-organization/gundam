@@ -716,7 +716,7 @@ void PlotGenerator::defineHistogramHolders() {
                   bool varNotAvailable{false};
                   std::string sampleObsBinning = GenericToolbox::Json::fetchValue(histConfig, "useSampleBinningOfObservable", histDefBase.varToPlot);
 
-                  for( const auto& bin : sample.getBinning().getBinsList() ){
+                  for( const auto& bin : sample.getBinning().getBinList() ){
                     std::string variableNameForBinning{sampleObsBinning};
 
                     if( not GenericToolbox::doesElementIsInVector(sampleObsBinning, bin.getEdgesList(), [](const DataBin::Edges& e){ return e.varName; }) ){
@@ -764,7 +764,7 @@ void PlotGenerator::defineHistogramHolders() {
                   auto varList{b.buildVariableNameList()};
                   LogThrowIf(varList.size()!=1, "Binning should be defined with only one variable, here: " << GenericToolbox::parseVectorAsString(varList))
 
-                  for(const auto& bin: b.getBinsList()){
+                  for(const auto& bin: b.getBinList()){
                     const auto& edges = bin.getVarEdges(varList[0]);
                     for( const auto& edge : { edges.min, edges.max } ) {
                       if (    ( std::isnan( histDefBase.xMin ) or histDefBase.xMin <= edge)

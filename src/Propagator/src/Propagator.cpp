@@ -638,6 +638,17 @@ void Propagator::reweightMcEvents(int iThread_) {
   //! Warning: everything you modify here, may significantly slow down the
   //! fitter
 
+//  int nThreads{GundamGlobals::getParallelWorker().getNbThreads()};
+//  if( iThread_ == -1 ){ iThread_ = 0 ; nThreads = 1; }
+//
+//  int iCache{iThread_};
+//  int nCache{int(_eventDialCache_.getCache().size())};
+//
+//  while( iCache < nCache ){
+//    EventDialCache::reweightEntry(_eventDialCache_.getCache()[iCache]);
+//    iCache += nThreads;
+//  }
+
   auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
       iThread_, GundamGlobals::getParallelWorker().getNbThreads(),
       int(_eventDialCache_.getCache().size())

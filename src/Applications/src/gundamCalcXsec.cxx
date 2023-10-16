@@ -281,8 +281,8 @@ int main(int argc, char** argv){
 
         // do we skip this bin? if not, apply coefficient
         bool skipBin{true};
-        for( size_t iParBin = 0 ; iParBin < dialCollectionPtr->getDialBinSet().getBinsList().size() ; iParBin++ ){
-          const DataBin& parBin = dialCollectionPtr->getDialBinSet().getBinsList()[iParBin];
+        for( size_t iParBin = 0 ; iParBin < dialCollectionPtr->getDialBinSet().getBinList().size() ; iParBin++ ){
+          const DataBin& parBin = dialCollectionPtr->getDialBinSet().getBinList()[iParBin];
 
           bool isParBinValid{true};
 
@@ -520,7 +520,7 @@ int main(int argc, char** argv){
 
 
         // bin volume
-        auto& bin = xsec.samplePtr->getMcContainer().binning.getBinsList()[iBin];
+        auto& bin = xsec.samplePtr->getMcContainer().binning.getBinList()[iBin];
         double binVolume{1};
 
         for( auto& edges : bin.getEdgesList() ){
@@ -602,8 +602,8 @@ int main(int argc, char** argv){
     for( int iBin = 0 ; iBin < xsec.samplePtr->getMcContainer().histogram->GetNbinsX() ; iBin++ ){
       iBinGlobal++;
 
-      std::string binTitle = xsec.samplePtr->getBinning().getBinsList()[iBin].getSummary();
-      double binVolume = xsec.samplePtr->getBinning().getBinsList()[iBin].getVolume();
+      std::string binTitle = xsec.samplePtr->getBinning().getBinList()[iBin].getSummary();
+      double binVolume = xsec.samplePtr->getBinning().getBinList()[iBin].getVolume();
 
       xsec.histogram.SetBinContent( 1+iBin, (*meanValuesVector)[iBinGlobal] );
       xsec.histogram.SetBinError( 1+iBin, TMath::Sqrt( (*globalCovMatrix)[iBinGlobal][iBinGlobal] ) );

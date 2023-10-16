@@ -23,12 +23,12 @@ public:
   void setName(const std::string &name){ _name_ = name; }
 
   // const getters
-  [[nodiscard]] bool isEmpty() const { return _binsList_.empty(); }
+  [[nodiscard]] bool isEmpty() const { return _binList_.empty(); }
   [[nodiscard]] const std::string &getFilePath() const { return _filePath_; }
-  [[nodiscard]] const std::vector<DataBin> &getBinsList() const { return _binsList_; }
+  [[nodiscard]] const std::vector<DataBin> &getBinList() const { return _binList_; }
 
   // getters
-  std::vector<DataBin> &getBinsList() { return _binsList_; }
+  std::vector<DataBin> &getBinList() { return _binList_; }
 
   // core
   void readBinningDefinition(const std::string& filePath_);
@@ -38,7 +38,7 @@ public:
 private:
   std::string _name_;
   std::string _filePath_;
-  std::vector<DataBin> _binsList_{};
+  std::vector<DataBin> _binList_{};
 
 };
 

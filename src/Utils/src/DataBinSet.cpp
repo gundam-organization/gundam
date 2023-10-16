@@ -108,11 +108,11 @@ void DataBinSet::readBinningDefinition(const std::string &filePath_) {
       }
 
       size_t iElement = 0;
-      _binsList_.emplace_back(_binsList_.size());
+      _binList_.emplace_back(_binList_.size());
       for( size_t iVar = 0; iVar < expectedVariableList.size() ; iVar++ ){
 
         if( expectedVariableIsRangeList.at(iVar) ){
-          _binsList_.back().addBinEdge(
+          _binList_.back().addBinEdge(
             expectedVariableList[iVar],
             std::stod(lineElements.at(iElement)),
             std::stod(lineElements.at(iElement+1))
@@ -120,8 +120,8 @@ void DataBinSet::readBinningDefinition(const std::string &filePath_) {
           iElement += 2;
         }
         else{
-          _binsList_.back().setIsZeroWideRangesTolerated(true);
-          _binsList_.back().addBinEdge(
+          _binList_.back().setIsZeroWideRangesTolerated(true);
+          _binList_.back().addBinEdge(
             expectedVariableList[iVar],
             std::stod(lineElements.at(iElement)),
             std::stod(lineElements.at(iElement))
@@ -138,18 +138,18 @@ std::string DataBinSet::getSummary() const{
   std::stringstream ss;
   ss << "DataBinSet";
   if( not _name_.empty() ) ss << "(" << _name_ << ")";
-  ss << ": holding " << _binsList_.size() << " bins.";
+  ss << ": holding " << _binList_.size() << " bins.";
 
-  if( not _binsList_.empty() ){
-    for( size_t iBin = 0 ; iBin < _binsList_.size() ; iBin++ ){
-      ss << std::endl << GenericToolbox::indentString( "#" + std::to_string(iBin) + ": " + _binsList_.at(iBin).getSummary(), 2);
+  if( not _binList_.empty() ){
+    for(size_t iBin = 0 ; iBin < _binList_.size() ; iBin++ ){
+      ss << std::endl << GenericToolbox::indentString("#" + std::to_string(iBin) + ": " + _binList_.at(iBin).getSummary(), 2);
     }
   }
   return ss.str();
 }
 std::vector<std::string> DataBinSet::buildVariableNameList() const{
   std::vector<std::string> out;
-  for( auto& bin : _binsList_ ){
+  for( auto& bin : _binList_ ){
     for( auto& edges : bin.getEdgesList() ){
       GenericToolbox::addIfNotInVector(edges.varName, out);
     }
