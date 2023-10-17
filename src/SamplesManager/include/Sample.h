@@ -40,6 +40,7 @@ public:
   [[nodiscard]] int getIndex() const{ return _index_; }
   [[nodiscard]] double getLlhStatBuffer() const { return _llhStatBuffer_; }
   [[nodiscard]] const std::string &getName() const{ return _name_; }
+  [[nodiscard]] const std::string &getBinningFilePath() const{ return _binningFilePath_; }
   [[nodiscard]] const std::string &getSelectionCutsStr() const{ return _selectionCutStr_; }
   [[nodiscard]] const DataBinSet &getBinning() const{ return _binning_; }
   [[nodiscard]] const SampleElement &getMcContainer() const{ return _mcContainer_; }

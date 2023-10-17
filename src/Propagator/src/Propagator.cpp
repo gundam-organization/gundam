@@ -131,6 +131,7 @@ void Propagator::readConfigImpl(){
   _parameterInjectorMc_ = GenericToolbox::Json::fetchValue(_config_, "parameterInjection", _parameterInjectorMc_);
   ConfigUtils::forwardConfig(_parameterInjectorMc_);
 
+  LogInfo << "Reading config of the Propagator done." << std::endl;
 }
 void Propagator::initializeImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
@@ -200,6 +201,21 @@ void Propagator::initializeImpl(){
 
         LogInfo << "Sample breakdown prior to the throwing:" << std::endl;
         std::cout << getSampleBreakdownTableStr() << std::endl;
+
+        if( _debugPrintLoadedEvents_ ){
+          LogDebug << "Toy events:" << std::endl;
+          LogDebug << GET_VAR_NAME_VALUE(_debugPrintLoadedEventsNbPerSample_) << std::endl;
+          int iEvt{0};
+          for( auto& entry : _eventDialCache_.getCache() ) {
+            LogDebug << "Event #" << iEvt++ << "{" << std::endl;
+            {
+              LogScopeIndent;
+              LogDebug << entry.getSummary() << std::endl;
+            }
+            LogDebug << "}" << std::endl;
+            if( iEvt >= _debugPrintLoadedEventsNbPerSample_ ) break;
+          }
+        }
       }
 
       _parManager_.throwParameters();
@@ -231,20 +247,6 @@ void Propagator::initializeImpl(){
     this->reweightMcEvents();
     GundamGlobals::setEnableCacheManager(cacheManagerState);
 
-    if( _debugPrintLoadedEvents_ ){
-      LogDebug << "Toy events:" << std::endl;
-      LogDebug << GET_VAR_NAME_VALUE(_debugPrintLoadedEventsNbPerSample_) << std::endl;
-      int iEvt{0};
-      for( auto& entry : _eventDialCache_.getCache() ) {
-        LogDebug << "Event #" << iEvt++ << "{" << std::endl;
-        {
-          LogScopeIndent;
-          LogDebug << entry.getSummary() << std::endl;
-        }
-        LogDebug << "}" << std::endl;
-        if( iEvt >= _debugPrintLoadedEventsNbPerSample_ ) break;
-      }
-    }
     // Copies MC events in data container for both Asimov and FakeData event types
     LogWarning << "Copying loaded mc-like event to data container..." << std::endl;
     _fitSampleSet_.copyMcEventListToDataContainer();

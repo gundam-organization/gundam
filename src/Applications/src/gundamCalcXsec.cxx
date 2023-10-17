@@ -128,6 +128,7 @@ int main(int argc, char** argv){
   Propagator propagator;
 
   // Read the whole fitter config with the override parameters
+  LogWarning << std::endl << GenericToolbox::addUpDownBars("Reading propagator config...") << std::endl;
   propagator.readConfig( configPropagator );
 
   // We are only interested in our MC. Data has already been used to get the post-fit error/values
@@ -136,7 +137,48 @@ int main(int argc, char** argv){
   // Disabling eigen decomposed parameters
   propagator.setEnableEigenToOrigInPropagate( false );
 
+  // Sample binning using parameterSetName
+  for( auto& sample : propagator.getFitSampleSet().getFitSampleList() ){
+
+    // binning already set?
+    if( not sample.getBinningFilePath().empty() ){ continue; }
+
+    LogScopeIndent;
+    LogInfo << sample.getName() << ": binning not set, looking for parSetBinning..." << std::endl;
+    auto associatedParSet = GenericToolbox::Json::fetchValue(
+        sample.getConfig(),
+        {{"parSetBinning"}, {"parameterSetName"}},
+        std::string()
+    );
+
+    LogThrowIf(associatedParSet.empty(), "Could not find parSetBinning.");
+
+    // Looking for parSet
+    auto foundDialCollection = std::find_if(
+        propagator.getDialCollections().begin(), propagator.getDialCollections().end(),
+        [&](const DialCollection& dialCollection_){
+          auto* parSetPtr{dialCollection_.getSupervisedParameterSet()};
+          if( parSetPtr == nullptr ){ return false; }
+          return ( parSetPtr->getName() == associatedParSet );
+        });
+    LogThrowIf(
+        foundDialCollection == propagator.getDialCollections().end(),
+        "Could not find " << associatedParSet << " among fit dial collections: "
+                          << GenericToolbox::iterableToString(propagator.getDialCollections(), [](const DialCollection& dialCollection_){
+                                                                return dialCollection_.getTitle();
+                                                              }
+                          ));
+
+    LogThrowIf(foundDialCollection->getDialBinSet().isEmpty(), "Could not find binning");
+    sample.setBinningFilePath( foundDialCollection->getDialBinSet().getFilePath() );
+
+  }
+
+  // Load everything
+  propagator.initialize();
+
   // Load post-fit parameters as "prior" so we can reset the weight to this point when throwing toys
+  LogWarning << std::endl << GenericToolbox::addUpDownBars("Injecting post-fit parameters...") << std::endl;
   ObjectReader::readObject<TNamed>( fitterFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
     propagator.getParametersManager().injectParameterValues( GenericToolbox::Json::readConfigJsonStr( parState_->GetTitle() ) );
     for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
@@ -147,33 +189,6 @@ int main(int argc, char** argv){
       }
     }
   });
-
-  // Sample binning using parameterSetName
-  for( auto& sample : propagator.getFitSampleSet().getFitSampleList() ){
-    auto associatedParSet = GenericToolbox::Json::fetchValue<std::string>(sample.getConfig(), "parameterSetName");
-
-    // Looking for parSet
-    auto foundDialCollection = std::find_if(
-        propagator.getDialCollections().begin(), propagator.getDialCollections().end(),
-        [&](const DialCollection& dialCollection_){
-          auto* parSetPtr{dialCollection_.getSupervisedParameterSet()};
-          if( parSetPtr == nullptr ){ return false; }
-          return ( parSetPtr->getName() == associatedParSet );
-    });
-    LogThrowIf(
-        foundDialCollection == propagator.getDialCollections().end(),
-        "Could not find " << associatedParSet << " among fit dial collections: "
-        << GenericToolbox::iterableToString(propagator.getDialCollections(), [](const DialCollection& dialCollection_){
-          return dialCollection_.getTitle();
-        }
-    ));
-
-    LogThrowIf(foundDialCollection->getDialBinSet().isEmpty(), "Could not find binning");
-    sample.setBinningFilePath( foundDialCollection->getDialBinSet().getFilePath() );
-  }
-
-  // Load everything
-  propagator.initialize();
 
   // Load the post-fit covariance matrix
   ObjectReader::readObject<TH2D>(

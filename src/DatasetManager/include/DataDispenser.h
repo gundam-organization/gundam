@@ -62,27 +62,27 @@ protected:
   void preAllocateMemory();
   void readAndFill();
   void loadFromHistContent();
+
+  // utils
   std::unique_ptr<TChain> openChain(bool verbose_ = false);
 
-  void fillFunction(int iThread_);
+  // multi-thread
   void eventSelectionFunction(int iThread_);
+  void fillFunction(int iThread_);
 
 
 private:
-  // Parameters
+  // config
   DataDispenserParameters _parameters_;
 
-  // Internals
+  // internals
   DatasetLoader* _owner_{nullptr};
   SampleSet* _sampleSetPtrToLoad_{nullptr};
-  std::vector<ParameterSet>* _parSetListPtrToLoad_{nullptr};
-  std::vector<DialCollection>* _dialCollectionListPtr_{nullptr};
   PlotGenerator* _plotGenPtr_{nullptr}; // used to know which vars have to be kept in memory
   EventDialCache* _eventDialCacheRef_{nullptr};
-
   DataDispenserCache _cache_;
-
-  GenericToolbox::NoCopyWrapper<std::mutex> _mutex_{};
+  std::vector<ParameterSet>* _parSetListPtrToLoad_{nullptr};
+  std::vector<DialCollection>* _dialCollectionListPtr_{nullptr};
 
 };
 

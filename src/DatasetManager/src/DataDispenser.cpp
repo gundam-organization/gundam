@@ -636,6 +636,7 @@ void DataDispenser::loadFromHistContent(){
 
   fHist->Close();
 }
+
 std::unique_ptr<TChain> DataDispenser::openChain(bool verbose_){
   LogInfo << "Opening ROOT files containing events..." << std::endl;
 

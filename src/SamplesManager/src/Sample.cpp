@@ -25,6 +25,9 @@ void Sample::readConfigImpl(){
       GenericToolbox::doesStringContainsSubstring(_name_, "/"),
       "Invalid sample name: \"" << _name_ << "\": should not have '/'.");
 
+  LogScopeIndent;
+  LogInfo << "Defining sample: " << _name_ << std::endl;
+
   _binningFilePath_ = GenericToolbox::Json::fetchValue(_config_, {{"binningFilePath"}, {"binningFile"}, {"binning"}}, _binningFilePath_);
 
   _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", true);
@@ -40,7 +43,7 @@ void Sample::initializeImpl() {
 
   LogInfo << "Initializing FitSample: " << _name_ << std::endl;
 
-  _binning_.readBinningDefinition(_binningFilePath_ );
+  _binning_.readBinningDefinition( _binningFilePath_ );
 
   TH1::SetDefaultSumw2(true);
 

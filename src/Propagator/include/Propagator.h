@@ -24,6 +24,11 @@
 
 class Propagator : public JsonBaseClass {
 
+
+protected:
+  void readConfigImpl() override;
+  void initializeImpl() override;
+
 public:
   Propagator() = default;
 
@@ -78,9 +83,6 @@ public:
   static void unmuteLogger();
 
 protected:
-  void readConfigImpl() override;
-  void initializeImpl() override;
-
   void initializeThreads();
 
   // multithreading
