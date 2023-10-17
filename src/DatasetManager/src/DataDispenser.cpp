@@ -203,184 +203,58 @@ void DataDispenser::doEventSelection(){
 
   LogInfo << "Event selection..." << std::endl;
 
+  // Could lead to weird behaviour of ROOT object otherwise:
   ROOT::EnableThreadSafety();
 
   // how meaning buffers?
   int nThreads{GundamGlobals::getParallelWorker().getNbThreads()};
   if( _owner_->isDevSingleThreadEventSelection() ) { nThreads = 1; }
 
-  // declare the buffers
-  std::vector<std::vector<std::vector<bool>>> perThreadEventIsInSamplesList(nThreads);
-  std::vector<std::vector<size_t>> perThreadSampleNbOfEvents(nThreads);
+  Long64_t nEntries{0};
+  {
+    auto treeChain{this->openChain(true)};
+    nEntries = treeChain->GetEntries();
+  }
+  LogThrowIf(nEntries == 0, "TChain is empty.");
+  LogInfo << "Will read " << nEntries << " event entries." << std::endl;
 
-  // selection
-  auto selectionFct = [&](int iThread_){
-
-//    GundamGlobals::getThreadMutex().lock();
-    TChain treeChain(_parameters_.treePath.c_str());
-    for (const auto &file: _parameters_.filePathList) {
-      std::string name = GenericToolbox::expandEnvironmentVariables(file);
-      if (name != file and iThread_ == 0) {
-        LogWarning << "Filename expanded to: " << name << std::endl;
-      }
-      treeChain.Add(name.c_str());
-    }
-    LogThrowIf(treeChain.GetEntries() == 0, "TChain is empty.");
-
-    if( iThread_ == 0 ) LogInfo << "Defining selection formulas..." << std::endl;
-
-    GenericToolbox::LeafCollection lCollection;
-    lCollection.setTreePtr( &treeChain );
-
-    int selectionCutLeafFormIndex{-1};
-
-    // global cut
-    if( not _parameters_.selectionCutFormulaStr.empty() ){
-      selectionCutLeafFormIndex = lCollection.addLeafExpression( _parameters_.selectionCutFormulaStr );
-    }
-
-    // sample cuts
-    GenericToolbox::TablePrinter tableSelectionCuts;
-    tableSelectionCuts.setColTitles({{"Sample"}, {"Selection Cut"}});
-
-    std::vector<std::pair<int, int>> sampleCutIdxList;
-
-    for( size_t iSample = 0; iSample < _cache_.samplesToFillList.size(); iSample++ ){
-      auto* samplePtr = _cache_.samplesToFillList[iSample];
-      sampleCutIdxList.emplace_back(iSample, -1);
-
-      std::string selectionCut = samplePtr->getSelectionCutsStr();
-      for (auto &replaceEntry: _cache_.varsToOverrideList) {
-        GenericToolbox::replaceSubstringInsideInputString(
-            selectionCut, replaceEntry, _parameters_.overrideLeafDict[replaceEntry]
-        );
-      }
-
-      if( selectionCut.empty() ){ continue; }
-
-      sampleCutIdxList.back().second = lCollection.addLeafExpression( selectionCut );
-      tableSelectionCuts << samplePtr->getName() << GenericToolbox::TablePrinter::Action::NextColumn;
-      tableSelectionCuts << selectionCut << GenericToolbox::TablePrinter::Action::NextLine;
-
-    }
-    if( iThread_==0 ){ tableSelectionCuts.printTable(); }
-
-    lCollection.initialize();
-
-    GenericToolbox::VariableMonitor readSpeed("bytes");
-
-    // Multi-thread index splitting
-    Long64_t nEvents = treeChain.GetEntries();
-    Long64_t iGlobal = 0;
-
-    auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices( iThread_, nThreads, nEvents );
-
-    // Load the branches
-    treeChain.LoadTree( bounds.first );
-
-    // for each event, which sample is active?
-    perThreadEventIsInSamplesList[iThread_].resize(nEvents, std::vector<bool>(_cache_.samplesToFillList.size(), true));
-    perThreadSampleNbOfEvents[iThread_].resize(_cache_.samplesToFillList.size(), 0);
-    std::string progressTitle = "Performing event selection on " + this->getTitle() + "...";
-    std::stringstream ssProgressTitle;
-    TFile *lastFilePtr{nullptr};
-//    GundamGlobals::getThreadMutex().unlock();
-
-
-    for ( Long64_t iEntry = bounds.first ; iEntry < bounds.second ; iEntry++ ) {
-      if( iThread_ == 0 ){
-        readSpeed.addQuantity(treeChain.GetEntry(iEntry)*nThreads);
-        if (GenericToolbox::showProgressBar(iGlobal, nEvents)) {
-          ssProgressTitle.str("");
-
-          ssProgressTitle << LogInfo.getPrefixString() << "Read from disk: "
-                          << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.getTotalAccumulated()), 8) << " ("
-                          << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.evalTotalGrowthRate()), 8) << "/s)";
-
-          int cpuPercent = int(GenericToolbox::getCpuUsageByProcess());
-          ssProgressTitle << " / CPU efficiency: " << GenericToolbox::padString(std::to_string(cpuPercent/nThreads), 3,' ')
-                          << "%" << std::endl;
-
-          ssProgressTitle << LogInfo.getPrefixString() << progressTitle;
-          GenericToolbox::displayProgressBar(iGlobal, nEvents, ssProgressTitle.str());
-        }
-        iGlobal += nThreads;
-      }
-      else{
-        treeChain.GetEntry(iEntry);
-      }
-
-      if ( selectionCutLeafFormIndex != -1 ){
-        if( lCollection.getLeafFormList()[selectionCutLeafFormIndex].evalAsDouble() == 0 ){
-          for (size_t iSample = 0; iSample < _cache_.samplesToFillList.size(); iSample++) {
-            perThreadEventIsInSamplesList[iThread_][iEntry][iSample] = false;
-          }
-          if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
-            LogTrace << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
-                     << " rejected because of " << _parameters_.selectionCutFormulaStr << std::endl;
-          }
-          continue;
-        }
-      }
-
-      for( auto& sampleCutIdx : sampleCutIdxList ){
-        if( sampleCutIdx.second == -1 ){
-          perThreadSampleNbOfEvents[iThread_][sampleCutIdx.first]++;
-          if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
-            LogDebug << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
-                     << " included as sample " << sampleCutIdx.first << " (NO SELECTION CUT)" << std::endl;
-          }
-          continue;
-        }
-
-        if( lCollection.getLeafFormList()[sampleCutIdx.second].evalAsDouble() == 0 ){
-          perThreadEventIsInSamplesList[iThread_][iEntry][sampleCutIdx.first] = false;
-          if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
-            LogTrace << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
-                     << " rejected as sample " << sampleCutIdx.first << " because of "
-                     << lCollection.getLeafFormList()[sampleCutIdx.second].getSummary() << std::endl;
-          }
-        }
-        else {
-          perThreadSampleNbOfEvents[iThread_][sampleCutIdx.first]++;
-          if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
-            LogDebug << "Event #" << treeChain.GetFileNumber() << ":" << treeChain.GetReadEntry()
-                     << " included as sample " << sampleCutIdx.first << " because of "
-                     << lCollection.getLeafFormList()[sampleCutIdx.second].getSummary() << std::endl;
-          }
-        }
-      }
-
-    } // iEvent
-
-    if( iThread_ == 0 ){ GenericToolbox::displayProgressBar(nEvents, nEvents, ssProgressTitle.str()); }
-  };
+  _cache_.threadSelectionResults.resize(nThreads);
+  for( auto& threadResults : _cache_.threadSelectionResults ){
+    threadResults.sampleNbOfEvents.resize(_cache_.samplesToFillList.size(), 0);
+    threadResults.eventIsInSamplesList.resize(nEntries, std::vector<bool>(_cache_.samplesToFillList.size(), false));
+  }
 
   if( not _owner_->isDevSingleThreadEventSelection() ) {
-    GundamGlobals::getParallelWorker().addJob(__METHOD_NAME__, selectionFct);
+    GundamGlobals::getParallelWorker().addJob(__METHOD_NAME__, [this](int iThread_){ this->eventSelectionFunction(iThread_); });
     GundamGlobals::getParallelWorker().runJob(__METHOD_NAME__);
     GundamGlobals::getParallelWorker().removeJob(__METHOD_NAME__);
   }
   else {
-    selectionFct(0);
+    this->eventSelectionFunction(-1);
   }
 
-
-  LogInfo << "Merging thread results" << std::endl;
+  LogInfo << "Merging thread results..." << std::endl;
   _cache_.sampleNbOfEvents.resize(_cache_.samplesToFillList.size(), 0);
-  for( size_t iThread = 0 ; iThread < nThreads ; iThread++ ){
-    if( _cache_.eventIsInSamplesList.empty() ){
-      _cache_.eventIsInSamplesList.resize(perThreadEventIsInSamplesList[iThread].size(), std::vector<bool>(_cache_.samplesToFillList.size(), true));
+  _cache_.eventIsInSamplesList.resize(nEntries, std::vector<bool>(_cache_.samplesToFillList.size(), false));
+  for( auto& threadResults : _cache_.threadSelectionResults ){
+    // merging nEvents
+
+    for( int iSample = 0 ; iSample < int(_cache_.sampleNbOfEvents.size()) ; iSample++ ){
+      _cache_.sampleNbOfEvents[iSample] += threadResults.sampleNbOfEvents[iSample];
     }
-    for( size_t iEntry = 0 ; iEntry < perThreadEventIsInSamplesList[iThread].size() ; iEntry++ ){
-      for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
-        if(not perThreadEventIsInSamplesList[iThread][iEntry][iSample]) _cache_.eventIsInSamplesList[iEntry][iSample] = false;
+
+    for( size_t iEntry = 0 ; iEntry < int(_cache_.eventIsInSamplesList.size()) ; iEntry++ ){
+      for( size_t iSample = 0 ; iSample < int(_cache_.eventIsInSamplesList[iEntry].size()) ; iSample++ ){
+        if( threadResults.eventIsInSamplesList[iEntry][iSample] ){
+          _cache_.eventIsInSamplesList[iEntry][iSample] = true;
+        }
       }
     }
-    for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
-      _cache_.sampleNbOfEvents[iSample] += perThreadSampleNbOfEvents[iThread][iSample];
-    }
+
   }
+
+  LogInfo << "Freeing up thread buffers..." << std::endl;
+  _cache_.threadSelectionResults.clear();
 
   if( _owner_->isShowSelectedEventCount() ){
     LogWarning << "Events passing selection cuts:" << std::endl;
@@ -643,7 +517,7 @@ void DataDispenser::readAndFill(){
 
   LogWarning << "Loading and indexing..." << std::endl;
   if(not _owner_->isDevSingleThreadEventLoaderAndIndexer() and GundamGlobals::getParallelWorker().getNbThreads() > 1 ){
-    ROOT::EnableThreadSafety();
+    ROOT::EnableThreadSafety(); // EXTREMELY IMPORTANT
     GundamGlobals::getParallelWorker().addJob(__METHOD_NAME__, [&](int iThread_){ this->fillFunction(iThread_); });
     GundamGlobals::getParallelWorker().runJob(__METHOD_NAME__);
     GundamGlobals::getParallelWorker().removeJob(__METHOD_NAME__);
@@ -762,24 +636,174 @@ void DataDispenser::loadFromHistContent(){
 
   fHist->Close();
 }
+std::unique_ptr<TChain> DataDispenser::openChain(bool verbose_){
+  LogInfo << "Opening ROOT files containing events..." << std::endl;
 
+  std::unique_ptr<TChain> treeChain(std::make_unique<TChain>(_parameters_.treePath.c_str()));
+  for( const auto& file: _parameters_.filePathList){
+    std::string name = GenericToolbox::expandEnvironmentVariables(file);
+    GenericToolbox::replaceSubstringInsideInputString(name, "//", "/");
+    if( verbose_ ){
+      LogScopeIndent;
+      LogWarning << name << std::endl;
+    }
+    treeChain->Add(name.c_str());
+  }
+
+  return treeChain;
+}
+
+void DataDispenser::eventSelectionFunction(int iThread_){
+
+  int nThreads{GundamGlobals::getParallelWorker().getNbThreads()};
+  if( iThread_ == -1 ){ iThread_ = 0; nThreads = 1; }
+
+  // Opening ROOT file...
+  auto treeChain{this->openChain(false)};
+
+  GenericToolbox::LeafCollection lCollection;
+  lCollection.setTreePtr( treeChain.get() );
+
+  LogInfoIf(iThread_ == 0) << "Defining selection formulas..." << std::endl;
+
+  // global cut
+  int selectionCutLeafFormIndex{-1};
+  if( not _parameters_.selectionCutFormulaStr.empty() ){
+    LogInfoIf(iThread_ == 0) << "Global selection cut: \"" << _parameters_.selectionCutFormulaStr << "\"" << std::endl;
+    selectionCutLeafFormIndex = lCollection.addLeafExpression( _parameters_.selectionCutFormulaStr );
+  }
+
+  // sample cuts
+  GenericToolbox::TablePrinter tableSelectionCuts;
+  tableSelectionCuts.setColTitles({{"Sample"}, {"Selection Cut"}});
+
+  struct SampleCut{
+    int sampleIndex{-1};
+    int cutIndex{-1};
+  };
+  std::vector<SampleCut> sampleCutList;
+  sampleCutList.reserve( _cache_.samplesToFillList.size() );
+
+  for( int iSample = 0; iSample < int(_cache_.samplesToFillList.size()) ; iSample++ ){
+    auto* samplePtr = _cache_.samplesToFillList[iSample];
+    sampleCutList.emplace_back();
+    sampleCutList.back().sampleIndex = iSample;
+
+    std::string selectionCut = samplePtr->getSelectionCutsStr();
+    for (auto &replaceEntry: _cache_.varsToOverrideList) {
+      GenericToolbox::replaceSubstringInsideInputString(
+          selectionCut, replaceEntry, _parameters_.overrideLeafDict[replaceEntry]
+      );
+    }
+
+    if( selectionCut.empty() ){ continue; }
+
+    sampleCutList.back().cutIndex = lCollection.addLeafExpression( selectionCut );
+    tableSelectionCuts << samplePtr->getName() << GenericToolbox::TablePrinter::Action::NextColumn;
+    tableSelectionCuts << selectionCut << GenericToolbox::TablePrinter::Action::NextLine;
+
+  }
+  if( iThread_==0 ){ tableSelectionCuts.printTable(); }
+
+  lCollection.initialize();
+
+  GenericToolbox::VariableMonitor readSpeed("bytes");
+
+  // Multi-thread index splitting
+  Long64_t nEvents = treeChain->GetEntries();
+  Long64_t iGlobal = 0;
+
+  auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices( iThread_, nThreads, nEvents );
+
+  // Load the branches
+  treeChain->LoadTree( bounds.first );
+
+  // for each event, which sample is active?
+  std::string progressTitle = "Performing event selection on " + this->getTitle() + "...";
+  std::stringstream ssProgressTitle;
+  TFile *lastFilePtr{nullptr};
+
+  for ( Long64_t iEntry = bounds.first ; iEntry < bounds.second ; iEntry++ ) {
+    if( iThread_ == 0 ){
+      readSpeed.addQuantity(treeChain->GetEntry(iEntry)*nThreads);
+      if (GenericToolbox::showProgressBar(iGlobal, nEvents)) {
+        ssProgressTitle.str("");
+
+        ssProgressTitle << LogInfo.getPrefixString() << "Read from disk: "
+                        << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.getTotalAccumulated()), 8) << " ("
+                        << GenericToolbox::padString(GenericToolbox::parseSizeUnits(readSpeed.evalTotalGrowthRate()), 8) << "/s)";
+
+        int cpuPercent = int(GenericToolbox::getCpuUsageByProcess());
+        ssProgressTitle << " / CPU efficiency: " << GenericToolbox::padString(std::to_string(cpuPercent/nThreads), 3,' ')
+                        << "%" << std::endl;
+
+        ssProgressTitle << LogInfo.getPrefixString() << progressTitle;
+        GenericToolbox::displayProgressBar(iGlobal, nEvents, ssProgressTitle.str());
+      }
+      iGlobal += nThreads;
+    }
+    else{
+      treeChain->GetEntry(iEntry);
+    }
+
+    if ( selectionCutLeafFormIndex != -1 ){
+      if( lCollection.getLeafFormList()[selectionCutLeafFormIndex].evalAsDouble() == 0 ){
+        for (size_t iSample = 0; iSample < _cache_.samplesToFillList.size(); iSample++) {
+          _cache_.threadSelectionResults[iThread_].eventIsInSamplesList[iEntry][iSample] = false;
+        }
+        if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
+          LogTrace << "Event #" << treeChain->GetFileNumber() << ":" << treeChain->GetReadEntry()
+                   << " rejected because of " << _parameters_.selectionCutFormulaStr << std::endl;
+        }
+        continue;
+      }
+    }
+
+    for( auto& sampleCut : sampleCutList ){
+
+      // no cut?
+      if( sampleCut.cutIndex == -1 ){
+        _cache_.threadSelectionResults[iThread_].eventIsInSamplesList[iEntry][sampleCut.sampleIndex] = true;
+        _cache_.threadSelectionResults[iThread_].sampleNbOfEvents[sampleCut.sampleIndex]++;
+        if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
+          LogDebug << "Event #" << treeChain->GetFileNumber() << ":" << treeChain->GetReadEntry()
+                   << " included as sample " << sampleCut.sampleIndex << " (NO SELECTION CUT)" << std::endl;
+        }
+      }
+        // pass cut?
+      else if( lCollection.getLeafFormList()[sampleCut.cutIndex].evalAsDouble() != 0 ){
+        _cache_.threadSelectionResults[iThread_].eventIsInSamplesList[iEntry][sampleCut.sampleIndex] = true;
+        _cache_.threadSelectionResults[iThread_].sampleNbOfEvents[sampleCut.sampleIndex]++;
+        if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
+          LogDebug << "Event #" << treeChain->GetFileNumber() << ":" << treeChain->GetReadEntry()
+                   << " included as sample " << sampleCut.sampleIndex << " because of "
+                   << lCollection.getLeafFormList()[sampleCut.cutIndex].getSummary() << std::endl;
+        }
+      }
+        // don't pass cut?
+      else {
+        if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
+          LogTrace << "Event #" << treeChain->GetFileNumber() << ":" << treeChain->GetReadEntry()
+                   << " rejected as sample " << sampleCut.sampleIndex << " because of "
+                   << lCollection.getLeafFormList()[sampleCut.cutIndex].getSummary() << std::endl;
+        }
+      }
+    }
+
+  } // iEvent
+
+  if( iThread_ == 0 ){ GenericToolbox::displayProgressBar(nEvents, nEvents, ssProgressTitle.str()); }
+
+}
 void DataDispenser::fillFunction(int iThread_){
-//  std::scoped_lock<std::mutex> l(_mutex_);
 
   int nThreads = GundamGlobals::getParallelWorker().getNbThreads();
   if( iThread_ == -1 ){ iThread_ = 0; nThreads = 1; } // special mode
 
-  TChain treeChain(_parameters_.treePath.c_str());
-  for( const auto& file: _parameters_.filePathList){
-    std::string name = GenericToolbox::expandEnvironmentVariables(file);
-    if (name != file and iThread_ == 0) {
-      LogWarning << "Filename expanded to: " << name << std::endl;
-    }
-    treeChain.Add(name.c_str());
-  }
+  auto treeChain = this->openChain();
 
   GenericToolbox::LeafCollection lCollection;
-  lCollection.setTreePtr( &treeChain );
+  lCollection.setTreePtr( treeChain.get() );
 
   // nominal weight
   TTreeFormula* nominalWeightTreeFormula{nullptr};
@@ -914,12 +938,12 @@ void DataDispenser::fillFunction(int iThread_){
   }
 
   // Try to read TTree the closest to sequentially possible
-  Long64_t nEvents{treeChain.GetEntries()};
+  Long64_t nEvents{treeChain->GetEntries()};
 
   auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices( iThread_, nThreads, nEvents );
 
   // Load the branches
-  treeChain.LoadTree(bounds.first);
+  treeChain->LoadTree(bounds.first);
 
   // IO speed monitor
   GenericToolbox::VariableMonitor readSpeed("bytes");
@@ -947,13 +971,14 @@ void DataDispenser::fillFunction(int iThread_){
       }
     }
 
-    bool skipEvent = true;
-    for( bool isInSample : _cache_.eventIsInSamplesList[iEntry] ){
-      if( isInSample ){ skipEvent = false; break; }
-    }
-    if( skipEvent ) continue;
+    bool hasSample =
+        std::any_of(
+            _cache_.eventIsInSamplesList[iEntry].begin(), _cache_.eventIsInSamplesList[iEntry].end(),
+            [](bool isInSample_){ return isInSample_; }
+        );
+    if( not hasSample ){ continue; }
 
-    Int_t nBytes{ treeChain.GetEntry(iEntry) };
+    Int_t nBytes{ treeChain->GetEntry(iEntry) };
 
     // monitor
     if( iThread_ == 0 ){

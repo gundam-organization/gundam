@@ -53,6 +53,12 @@ struct DataDispenserCache{
   // Variable transformations
   std::vector<EventVarTransformLib> eventVarTransformList;
 
+  struct ThreadSelectionResult{
+    std::vector<size_t> sampleNbOfEvents;
+    std::vector<std::vector<bool>> eventIsInSamplesList;
+  };
+  std::vector<ThreadSelectionResult> threadSelectionResults;
+
   void clear();
   void addVarRequestedForIndexing(const std::string& varName_);
   void addVarRequestedForStorage(const std::string& varName_);

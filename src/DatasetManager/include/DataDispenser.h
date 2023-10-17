@@ -62,8 +62,10 @@ protected:
   void preAllocateMemory();
   void readAndFill();
   void loadFromHistContent();
+  std::unique_ptr<TChain> openChain(bool verbose_ = false);
 
   void fillFunction(int iThread_);
+  void eventSelectionFunction(int iThread_);
 
 
 private:
