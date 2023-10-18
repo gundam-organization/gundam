@@ -38,10 +38,7 @@ RUN cmake \
       $REPO_DIR
 RUN make -j3 install
 
-# setup env
-RUN . $INSTALL_DIR/setup.sh
-
 # run the tests
-RUN CTEST_OUTPUT_ON_FAILURE=1 make test
+RUN . $INSTALL_DIR/setup.sh && CTEST_OUTPUT_ON_FAILURE=1 make test
 
 # End of the file
