@@ -29,7 +29,6 @@ RUN cd $REPO_DIR/gundam && \
     # for some reason yaml-cpp in not found by cmake, so put the paths manually
     cmake \
       -D CMAKE_INSTALL_PREFIX=$INSTALL_DIR \
-      -D WITH_CUDA=ON \
       $REPO_DIR/gundam && \
     make -j3 install && \
     . $INSTALL_DIR/setup.sh && \
