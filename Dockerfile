@@ -21,6 +21,7 @@ COPY ./src $REPO_DIR/.
 COPY ./submodules $REPO_DIR/.
 COPY ./cmake $REPO_DIR/.
 COPY ./CMakeLists.txt $REPO_DIR/.
+COPY ./.git $REPO_DIR/.
 
 WORKDIR $BUILD_DIR
 
