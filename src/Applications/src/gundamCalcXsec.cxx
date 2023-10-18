@@ -147,6 +147,10 @@ int main(int argc, char** argv){
   // Sample binning using parameterSetName
   for( auto& sample : propagator.getFitSampleSet().getFitSampleList() ){
 
+    if( clParser.isOptionTriggered("usePreFit") ){
+      sample.setName( sample.getName() + " (pre-fit)" );
+    }
+
     // binning already set?
     if( not sample.getBinningFilePath().empty() ){ continue; }
 

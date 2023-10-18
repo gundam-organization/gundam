@@ -34,7 +34,7 @@ void DataBinSet::readBinningDefinition(const std::string &filePath_) {
   std::vector<bool> expectedVariableIsRangeList;
   int nbExpectedValues{0};
 
-  for( const auto& line : lines ){
+  for( auto& line : lines ){
 
     if( line.empty() ){ continue; }
 
@@ -50,8 +50,12 @@ void DataBinSet::readBinningDefinition(const std::string &filePath_) {
     }
     if( firstChar == '#' ) continue;
 
+    // stripping comments
+    line = GenericToolbox::splitString(line, "#")[0];
+    GenericToolbox::trimInputString(line, " "); // removing trailing spaces
+
     std::vector<std::string> lineElements = GenericToolbox::splitString(line, " ", true);
-    if( lineElements.empty() ) continue;
+    if( lineElements.empty() ){ continue; }
 
     if( lineElements.at(0) == "variables:" ){
 
