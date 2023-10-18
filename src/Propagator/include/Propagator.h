@@ -87,6 +87,8 @@ protected:
 
   // multithreading
   void reweightMcEvents(int iThread_);
+  void refillSampleHistogramsFct(int iThread_);
+  void refillSampleHistogramsPostParallelFct();
 
 private:
   // Parameters
@@ -127,11 +129,6 @@ private:
   // the immutable tag for that specific group of dials.
   std::vector<DialCollection> _dialCollections_{};
   EventDialCache _eventDialCache_{};
-
-  // parallel holders
-  std::function<void(int)> reweightMcEventsFct;
-  std::function<void(int)> refillSampleHistogramsFct;
-  std::function<void()> refillSampleHistogramsPostParallelFct;
 
 public:
   GenericToolbox::CycleTimer dialUpdate;

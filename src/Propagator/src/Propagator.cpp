@@ -613,25 +613,22 @@ std::string Propagator::getSampleBreakdownTableStr() const{
 
 // Protected
 void Propagator::initializeThreads() {
-  reweightMcEventsFct = [this](int iThread){
-    this->reweightMcEvents(iThread);
-  };
-  GundamGlobals::getParallelWorker().addJob("Propagator::reweightMcEvents", reweightMcEventsFct);
 
-  refillSampleHistogramsFct = [this](int iThread){
-    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-      sample.getMcContainer().refillHistogram(iThread);
-      sample.getDataContainer().refillHistogram(iThread);
-    }
-  };
-  refillSampleHistogramsPostParallelFct = [this](){
-    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-      sample.getMcContainer().rescaleHistogram();
-      sample.getDataContainer().rescaleHistogram();
-    }
-  };
-  GundamGlobals::getParallelWorker().addJob("Propagator::refillSampleHistograms", refillSampleHistogramsFct);
-  GundamGlobals::getParallelWorker().setPostParallelJob("Propagator::refillSampleHistograms", refillSampleHistogramsPostParallelFct);
+  GundamGlobals::getParallelWorker().addJob(
+      "Propagator::reweightMcEvents",
+      [this](int iThread){ this->reweightMcEvents(iThread); }
+  );
+
+  GundamGlobals::getParallelWorker().addJob(
+      "Propagator::refillSampleHistograms",
+      [this](int iThread){ this->refillSampleHistogramsFct(iThread); }
+  );
+
+  GundamGlobals::getParallelWorker().setPostParallelJob(
+      "Propagator::refillSampleHistograms",
+      [this](){ this->refillSampleHistogramsPostParallelFct(); }
+  );
+
 }
 
 // multithreading
@@ -662,6 +659,18 @@ void Propagator::reweightMcEvents(int iThread_) {
       &EventDialCache::reweightEntry
   );
 
+}
+void Propagator::refillSampleHistogramsFct(int iThread_){
+  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    sample.getMcContainer().refillHistogram(iThread_);
+    sample.getDataContainer().refillHistogram(iThread_);
+  }
+}
+void Propagator::refillSampleHistogramsPostParallelFct(){
+  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    sample.getMcContainer().rescaleHistogram();
+    sample.getDataContainer().rescaleHistogram();
+  }
 }
 
 //  A Lesser GNU Public License
