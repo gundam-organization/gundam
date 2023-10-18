@@ -25,7 +25,7 @@ COPY ./CMakeLists.txt $REPO_DIR/.
 WORKDIR $BUILD_DIR
 
 # sudo is required by github actions since git clone is done by root
-RUN #git submodule update --init --recursive
+RUN git submodule update --init --recursive
 RUN cmake \
       -D CMAKE_INSTALL_PREFIX=$INSTALL_DIR \
       -D ENABLE_CUDA=ON \
