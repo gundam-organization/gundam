@@ -139,7 +139,7 @@ void DataBinSet::readBinningDefinition(const std::string &filePath_) {
   }
 
   // sort bins?
-  this->sortBins();
+//  this->sortBins();
 }
 void DataBinSet::sortBins(){
 
