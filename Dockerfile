@@ -17,16 +17,17 @@ RUN mkdir -p $INSTALL_DIR
 
 
 # Copying GUNDAM source files
-COPY ./src $REPO_DIR/.
-COPY ./submodules $REPO_DIR/.
-COPY ./cmake $REPO_DIR/.
-COPY ./CMakeLists.txt $REPO_DIR/.
-COPY ./.git $REPO_DIR/.
+COPY ./src $REPO_DIR/src
+COPY ./submodules $REPO_DIR/submodules
+COPY ./cmake $REPO_DIR/cmake
+COPY ./CMakeLists.txt $REPO_DIR/CMakeLists.txt
+COPY ./tests $REPO_DIR/tests
+#COPY ./.git $REPO_DIR/.git
 
 
 # Checking out missing code
 WORKDIR $REPO_DIR
-RUN git submodule update --init --recursive
+RUN #git submodule update --init --recursive
 
 
 # Now build GUNDAM
