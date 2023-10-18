@@ -16,6 +16,12 @@ RUN mkdir -p $INSTALL_DIR
 SHELL ["/bin/bash", "-c"]
 
 COPY . $REPO_DIR/.
+
+COPY ./src $REPO_DIR/.
+COPY ./submodules $REPO_DIR/.
+COPY ./cmake $REPO_DIR/.
+COPY ./CMakeLists.txt $REPO_DIR/.
+
 WORKDIR $BUILD_DIR
 
 # sudo is required by github actions since git clone is done by root
