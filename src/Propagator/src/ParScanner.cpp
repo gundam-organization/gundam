@@ -411,8 +411,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
   std::map<Parameter*, double> parStateList{};
   GenericToolbox::ScopedGuard g(
       [&]{
-        LogScopeIndent;
-        LogDebug << "Temporarily pulling back parameters at their prior before performing the event rate..." << std::endl;
+        LogWarning << "Temporarily pulling back parameters at their prior before performing the event rate..." << std::endl;
         for( auto& parSet : _owner_->getParametersManager().getParameterSetsList() ){
           if( not parSet.isEnabled() ) { continue; }
           for( auto& par : parSet.getParameterList() ){
@@ -424,8 +423,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
         _owner_->propagateParametersOnSamples();
       },
       [&]{
-        LogScopeIndent;
-        LogDebug << "Restoring parameters to their original values..." << std::endl;
+        LogWarning << "Restoring parameters to their original values..." << std::endl;
         for( auto& parSet : _owner_->getParametersManager().getParameterSetsList() ){
           if( not parSet.isEnabled() ) { continue; }
           for( auto& par : parSet.getParameterList() ){

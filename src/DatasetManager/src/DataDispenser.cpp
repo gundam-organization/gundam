@@ -638,7 +638,7 @@ void DataDispenser::loadFromHistContent(){
 }
 
 std::unique_ptr<TChain> DataDispenser::openChain(bool verbose_){
-  LogInfo << "Opening ROOT files containing events..." << std::endl;
+  LogInfoIf(verbose_) << "Opening ROOT files containing events..." << std::endl;
 
   std::unique_ptr<TChain> treeChain(std::make_unique<TChain>(_parameters_.treePath.c_str()));
   for( const auto& file: _parameters_.filePathList){

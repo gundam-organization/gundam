@@ -133,6 +133,41 @@ void DataBinSet::readBinningDefinition(const std::string &filePath_) {
 
     }
   }
+
+  // sort bins?
+  this->sortBins();
+}
+void DataBinSet::sortBins(){
+
+  std::vector<std::string> varNameList{};
+  for( auto& bin : _binList_ ){
+    for( auto& edges : bin.getEdgesList() ){
+      GenericToolbox::addIfNotInVector(edges.varName, varNameList);
+    }
+  }
+
+  GenericToolbox::sortVector(
+      _binList_,
+      [&](const DataBin& bin1_, const DataBin& bin2_){
+        // returns: does bin1 goes first?
+        for( auto& varName : varNameList ){
+          auto* edges1 = bin1_.getVarEdgesPtr(varName);
+          auto* edges2 = bin2_.getVarEdgesPtr(varName);
+          if( edges1 == nullptr ){ return true; } // missing variable bins goes first
+          if( edges2 == nullptr ){ return false; } // missing variable bins goes first
+
+          if( edges1->min < edges2->min ){ return true; } // lowest bins first
+        }
+
+        return false; // default
+      }
+      );
+
+  // update indices
+  for( int iBin = 0 ; iBin < int(_binList_.size()) ; iBin++ ){
+    _binList_[iBin].setIndex( iBin );
+  }
+
 }
 std::string DataBinSet::getSummary() const{
   std::stringstream ss;

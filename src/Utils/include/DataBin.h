@@ -18,7 +18,7 @@ class DataBin {
 public:
   struct Edges{
     Edges() = delete;
-    Edges(int index_) : index(index_) {}
+    explicit Edges(int index_) : index(index_) {}
 
     bool isConditionVar{false};
     int index{-1};
@@ -30,10 +30,11 @@ public:
 
 public:
   DataBin() = delete;
-  DataBin(int index_) : _index_(index_) {}
+  explicit DataBin(int index_) : _index_(index_) {}
   virtual ~DataBin() = default;
 
   // setters
+  void setIndex(int index_){ _index_ = index_; }
   void setIsLowMemoryUsageMode(bool isLowMemoryUsageMode_){ _isLowMemoryUsageMode_ = isLowMemoryUsageMode_; }
   void setIsZeroWideRangesTolerated(bool isZeroWideRangesTolerated_){ _isZeroWideRangesTolerated_ = isZeroWideRangesTolerated_; } // make it explicit! -> double precision might not be enough if you play with long int
   void addBinEdge(double lowEdge_, double highEdge_);
@@ -49,6 +50,7 @@ public:
   [[nodiscard]] TTreeFormula *getTreeFormula() const{ return _treeFormula_.get(); }
   [[nodiscard]] const std::vector<Edges> &getEdgesList() const { return _binEdgesList_; }
   [[nodiscard]] const Edges& getVarEdges( const std::string& varName_ ) const;
+  [[nodiscard]] const Edges* getVarEdgesPtr( const std::string& varName_ ) const;
 
   // non-const getters
   std::vector<Edges> &getEdgesList() { return _binEdgesList_; }

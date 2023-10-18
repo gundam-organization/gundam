@@ -40,9 +40,14 @@ void DataBin::addBinEdge(const std::string &variableName_, double lowEdge_, doub
 
 // Getters
 const DataBin::Edges& DataBin::getVarEdges( const std::string& varName_ ) const{
+  auto* varEgdesPtr{getVarEdgesPtr(varName_)};
+  LogThrowIf(varEgdesPtr == nullptr, "Couldn't find varEdges corresponding to varName:" << varName_);
+  return *varEgdesPtr;
+}
+const DataBin::Edges* DataBin::getVarEdgesPtr( const std::string& varName_ ) const{
   int varIndex = GenericToolbox::findElementIndex( varName_, _binEdgesList_, [](const Edges& e_){ return e_.varName; });
-  LogThrowIf(varIndex == -1, varName_ << " not found in: " << GenericToolbox::iterableToString(_binEdgesList_, [](const Edges& e_){ return e_.varName; }));
-  return _binEdgesList_[varIndex];
+  if( varIndex == -1 ){ return nullptr; }
+  return &_binEdgesList_[varIndex];
 }
 double DataBin::getVolume() const{
   double out{1};

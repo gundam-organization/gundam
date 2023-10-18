@@ -730,11 +730,8 @@ void PlotGenerator::defineHistogramHolders() {
                       } // sampleVariableIfNotAvailable
                     } // sampleObsBinning not in the sample binning
 
-                    const DataBin::Edges* edges;
-                    try{
-                      edges = &bin.getVarEdges(variableNameForBinning);
-                    }
-                    catch(...){
+                    const DataBin::Edges* edges{bin.getVarEdgesPtr(variableNameForBinning)};
+                    if( edges == nullptr ){
                       LogAlert << "Can't use sample binning for var " << variableNameForBinning << " and sample " << sample.getName() << std::endl;
                       varNotAvailable = true;
                       break;

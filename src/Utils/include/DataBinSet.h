@@ -32,6 +32,7 @@ public:
 
   // core
   void readBinningDefinition(const std::string& filePath_);
+  void sortBins();
   [[nodiscard]] std::string getSummary() const;
   [[nodiscard]] std::vector<std::string> buildVariableNameList() const;
 

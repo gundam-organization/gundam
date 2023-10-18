@@ -5,10 +5,6 @@
 #include "Propagator.h"
 #include "ConfigUtils.h"
 
-#ifdef GUNDAM_USING_CACHE_MANAGER
-#include "CacheManager.h"
-#endif
-
 #include "Logger.h"
 #include "CmdLineParser.h"
 #include "GenericToolbox.h"
@@ -31,6 +27,8 @@ LoggerInit([]{
 
 int main(int argc, char** argv){
 
+  using namespace GundamUtils;
+
   GundamApp app{"cross-section calculator tool"};
 
   // --------------------------
@@ -40,7 +38,7 @@ int main(int argc, char** argv){
 
   clParser.addDummyOption("Main options:");
   clParser.addOption("configFile", {"-c", "--config-file"}, "Specify path to the fitter config file");
-  clParser.addOption("fitterOutputFile", {"-f"}, "Specify the fitter output file");
+  clParser.addOption("fitterFile", {"-f"}, "Specify the fitter output file");
   clParser.addOption("outputFile", {"-o", "--out-file"}, "Specify the CalcXsec output file");
   clParser.addOption("nbThreads", {"-t", "--nb-threads"}, "Specify nb of parallel threads");
   clParser.addOption("nToys", {"-n"}, "Specify number of toys");
@@ -49,6 +47,7 @@ int main(int argc, char** argv){
   clParser.addDummyOption("Trigger options:");
   clParser.addTriggerOption("dryRun", {"-d", "--dry-run"}, "Only overrides fitter config and print it.");
   clParser.addTriggerOption("useBfAsXsec", {"--use-bf-as-xsec"}, "Use best-fit as x-sec value instead of mean of toys.");
+  clParser.addTriggerOption("usePreFit", {"--use-prefit"}, "Use prefit covariance matrices for the toy throws.");
 
   LogInfo << "Usage: " << std::endl;
   LogInfo << clParser.getConfigSummary() << std::endl << std::endl;
@@ -63,7 +62,7 @@ int main(int argc, char** argv){
 
   // Sanity checks
   LogThrowIf(not clParser.isOptionTriggered("configFile"), "Xsec calculator config file not provided.");
-  LogThrowIf(not clParser.isOptionTriggered("fitterOutputFile"), "Did not provide the output fitter file.");
+  LogThrowIf(not clParser.isOptionTriggered("fitterFile"), "Did not provide the output fitter file.");
   LogThrowIf(not clParser.isOptionTriggered("nToys"), "Did not provide number of toys.");
 
 
@@ -83,20 +82,33 @@ int main(int argc, char** argv){
   LogInfo << "Running the fitter with " << GundamGlobals::getParallelWorker().getNbThreads() << " parallel threads." << std::endl;
 
   // Reading fitter file
-  LogInfo << "Opening fitter output file: " << clParser.getOptionVal<std::string>("fitterOutputFile") << std::endl;
-  auto fitterFile = std::unique_ptr<TFile>( TFile::Open( clParser.getOptionVal<std::string>("fitterOutputFile").c_str() ) );
-  LogThrowIf( fitterFile == nullptr, "Could not open fitter output file." );
+  std::string fitterFile{clParser.getOptionVal<std::string>("fitterFile")};
+  std::unique_ptr<TFile> fitterRootFile{nullptr};
+  nlohmann::json fitterConfig; // will be used to load the propagator
 
-  using namespace GundamUtils;
-  ObjectReader::throwIfNotFound = true;
+  if( GenericToolbox::doesFilePathHasExtension(fitterFile, "root") ){
+    LogWarning << "Opening fitter output file: " << fitterFile << std::endl;
+    auto fitterRootFile = std::unique_ptr<TFile>( TFile::Open( fitterFile.c_str() ) );
+    LogThrowIf( fitterRootFile == nullptr, "Could not open fitter output file." );
 
-  nlohmann::json fitterConfig;
-  ObjectReader::readObject<TNamed>(fitterFile.get(), {{"gundam/config_TNamed"}, {"gundamFitter/unfoldedConfig_TNamed"}}, [&](TNamed* config_){
-    fitterConfig = GenericToolbox::Json::readConfigJsonStr( config_->GetTitle() );
-  });
+    ObjectReader::throwIfNotFound = true;
+
+    ObjectReader::readObject<TNamed>(fitterRootFile.get(), {{"gundam/config_TNamed"}, {"gundamFitter/unfoldedConfig_TNamed"}}, [&](TNamed* config_){
+      fitterConfig = GenericToolbox::Json::readConfigJsonStr( config_->GetTitle() );
+    });
+  }
+  else{
+    LogWarning << "Reading fitter config file: " << fitterFile << std::endl;
+    fitterConfig = GenericToolbox::Json::readConfigFile( fitterFile );
+
+    clParser.getOptionPtr("usePreFit")->setIsTriggered( true );
+  }
+
+  LogAlertIf(clParser.isOptionTriggered("usePreFit")) << "Pre-fit mode enabled: will throw toys according to the prior covariance matrices..." << std::endl;
+
   ConfigUtils::ConfigHandler cHandler{ fitterConfig };
 
-  // Disabling defined samples:
+  // Disabling defined fit samples:
   LogInfo << "Removing defined samples..." << std::endl;
   ConfigUtils::applyOverrides(
       cHandler.getConfig(),
@@ -115,13 +127,8 @@ int main(int argc, char** argv){
   cHandler.override( xsecConfig );
   LogInfo << "Override done." << std::endl;
 
-  if( clParser.isOptionTriggered("dryRun") ){
-    std::cout << cHandler.toString() << std::endl;
 
-    LogAlert << "Exiting as dry-run is set." << std::endl;
-    return EXIT_SUCCESS;
-  }
-
+  LogInfo << "Fetching propagator config into fitter config..." << std::endl;
   auto configPropagator = GenericToolbox::Json::fetchValuePath<nlohmann::json>( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig" );
 
   // Create a propagator object
@@ -177,30 +184,45 @@ int main(int argc, char** argv){
   // Load everything
   propagator.initialize();
 
-  // Load post-fit parameters as "prior" so we can reset the weight to this point when throwing toys
-  LogWarning << std::endl << GenericToolbox::addUpDownBars("Injecting post-fit parameters...") << std::endl;
-  ObjectReader::readObject<TNamed>( fitterFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
-    propagator.getParametersManager().injectParameterValues( GenericToolbox::Json::readConfigJsonStr( parState_->GetTitle() ) );
-    for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
-      if( not parSet.isEnabled() ){ continue; }
-      for( auto& par : parSet.getParameterList() ){
-        if( not par.isEnabled() ){ continue; }
-        par.setPriorValue( par.getParameterValue() );
-      }
-    }
-  });
+  if( clParser.isOptionTriggered("dryRun") ){
+    std::cout << cHandler.toString() << std::endl;
 
-  // Load the post-fit covariance matrix
-  ObjectReader::readObject<TH2D>(
-      fitterFile.get(), "FitterEngine/postFit/Hesse/hessian/postfitCovarianceOriginal_TH2D",
-      [&](TH2D* hCovPostFit_){
-        propagator.getParametersManager().setGlobalCovarianceMatrix(std::make_shared<TMatrixD>(hCovPostFit_->GetNbinsX(), hCovPostFit_->GetNbinsX()));
-        for( int iBin = 0 ; iBin < hCovPostFit_->GetNbinsX() ; iBin++ ){
-          for( int jBin = 0 ; jBin < hCovPostFit_->GetNbinsX() ; jBin++ ){
-            (*propagator.getParametersManager().getGlobalCovarianceMatrix())[iBin][jBin] = hCovPostFit_->GetBinContent(1 + iBin, 1 + jBin);
+    LogAlert << "Exiting as dry-run is set." << std::endl;
+    return EXIT_SUCCESS;
+  }
+
+
+  if( not clParser.isOptionTriggered("usePreFit") and fitterRootFile != nullptr ){
+
+    // Load post-fit parameters as "prior" so we can reset the weight to this point when throwing toys
+    LogWarning << std::endl << GenericToolbox::addUpDownBars("Injecting post-fit parameters...") << std::endl;
+    ObjectReader::readObject<TNamed>( fitterRootFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
+      propagator.getParametersManager().injectParameterValues( GenericToolbox::Json::readConfigJsonStr( parState_->GetTitle() ) );
+      for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
+        if( not parSet.isEnabled() ){ continue; }
+        for( auto& par : parSet.getParameterList() ){
+          if( not par.isEnabled() ){ continue; }
+          par.setPriorValue( par.getParameterValue() );
+        }
+      }
+    });
+
+    // Load the post-fit covariance matrix
+    LogWarning << std::endl << GenericToolbox::addUpDownBars("Injecting post-fit covariance matrix...") << std::endl;
+    ObjectReader::readObject<TH2D>(
+        fitterRootFile.get(), "FitterEngine/postFit/Hesse/hessian/postfitCovarianceOriginal_TH2D",
+        [&](TH2D* hCovPostFit_){
+          propagator.getParametersManager().setGlobalCovarianceMatrix(std::make_shared<TMatrixD>(hCovPostFit_->GetNbinsX(), hCovPostFit_->GetNbinsX()));
+          for( int iBin = 0 ; iBin < hCovPostFit_->GetNbinsX() ; iBin++ ){
+            for( int jBin = 0 ; jBin < hCovPostFit_->GetNbinsX() ; jBin++ ){
+              (*propagator.getParametersManager().getGlobalCovarianceMatrix())[iBin][jBin] = hCovPostFit_->GetBinContent(1 + iBin, 1 + jBin);
+            }
           }
         }
-      });
+    );
+  }
+
+
 
   // Creating output file
   std::string outFilePath{};
@@ -210,9 +232,10 @@ int main(int argc, char** argv){
     // this list insure all appendices will appear in the same order
     std::vector<std::pair<std::string, std::string>> appendixDict{
         {"configFile", "%s"},
-        {"fitterOutputFile", "Fit_%s"},
+        {"fitterFile", "Fit_%s"},
         {"nToys", "nToys_%s"},
         {"randomSeed", "Seed_%s"},
+        {"usePreFit", "PreFit"},
     };
 
     outFilePath = "xsecCalc_" + GundamUtils::generateFileName(clParser, appendixDict) + ".root";
@@ -568,6 +591,8 @@ int main(int argc, char** argv){
   //////////////////////////////////////
   // THROWS LOOP
   /////////////////////////////////////
+  LogWarning << std::endl << GenericToolbox::addUpDownBars( "Generating toys..." ) << std::endl;
+
   std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating " << nToys << " toys...";
   for( int iToy = 0 ; iToy < nToys ; iToy++ ){
 
