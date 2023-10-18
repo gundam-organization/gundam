@@ -1,5 +1,7 @@
 FROM rootproject/root as base
 
+SHELL ["/bin/bash", "-c"]
+
 RUN apt-get dist-upgrade -y 
 RUN apt-get update && apt-get upgrade -y
 RUN apt-get install git libyaml-cpp-dev nlohmann-json3-dev -y
@@ -13,20 +15,22 @@ RUN mkdir -p $REPO_DIR
 RUN mkdir -p $BUILD_DIR
 RUN mkdir -p $INSTALL_DIR
 
-SHELL ["/bin/bash", "-c"]
 
-COPY . $REPO_DIR/.
-
+# Copying GUNDAM source files
 COPY ./src $REPO_DIR/.
 COPY ./submodules $REPO_DIR/.
 COPY ./cmake $REPO_DIR/.
 COPY ./CMakeLists.txt $REPO_DIR/.
 COPY ./.git $REPO_DIR/.
 
-WORKDIR $BUILD_DIR
 
-# sudo is required by github actions since git clone is done by root
+# Checking out missing code
+WORKDIR $REPO_DIR
 RUN git submodule update --init --recursive
+
+
+# Now build GUNDAM
+WORKDIR $BUILD_DIR
 RUN cmake \
       -D CMAKE_INSTALL_PREFIX=$INSTALL_DIR \
       -D ENABLE_CUDA=ON \
