@@ -359,7 +359,7 @@ void DataDispenser::fetchRequestedLeaves(){
       std::string outVarName = _cache_.eventVarTransformList[iTrans].getOutputVariableName();
       if( GenericToolbox::doesElementIsInVector( outVarName, _cache_.varsRequestedForIndexing )
           or GenericToolbox::doesElementIsInVector( outVarName, indexRequests )
-      ){
+          ){
         // ok it is needed -> activate dependencies
         for( auto& var: _cache_.eventVarTransformList[iTrans].fetchRequestedVars() ){
           GenericToolbox::addIfNotInVector(var, indexRequests);
@@ -615,9 +615,9 @@ void DataDispenser::loadFromHistContent(){
     }
 
     LogAlertIf( nBins != int( sample->getBinning().getBinList().size() ) ) <<
-      "Mismatching bin number for " << sample->getName() << ":" << std::endl
-      << GET_VAR_NAME_VALUE(nBins) << std::endl
-      << GET_VAR_NAME_VALUE(sample->getBinning().getBinList().size()) << std::endl;
+                                                                           "Mismatching bin number for " << sample->getName() << ":" << std::endl
+                                                                           << GET_VAR_NAME_VALUE(nBins) << std::endl
+                                                                           << GET_VAR_NAME_VALUE(sample->getBinning().getBinList().size()) << std::endl;
 
     auto* container = &sample->getDataContainer();
     for( size_t iBin = 0 ; iBin < sample->getBinning().getBinList().size() ; iBin++ ){
@@ -910,7 +910,7 @@ void DataDispenser::fillFunction(int iThread_){
         table.setColorBuffer(GenericToolbox::ColorCodes::blueBackground);
       }
       else if(
-             leafFormIndexingList[iVar]->getLeafTypeName() == "TClonesArray"
+          leafFormIndexingList[iVar]->getLeafTypeName() == "TClonesArray"
           or leafFormIndexingList[iVar]->getLeafTypeName() == "TGraph"
           ){
         table.setColorBuffer( GenericToolbox::ColorCodes::magentaBackground );
@@ -1064,7 +1064,8 @@ void DataDispenser::fillFunction(int iThread_){
         eventDialCacheEntry->event.sampleIndex = std::size_t(_cache_.samplesToFillList[iSample]->getIndex());
         eventDialCacheEntry->event.eventIndex = sampleEventIndex;
 
-        int eventDialOffset{-1};
+        auto* dialEntryPtr = &eventDialCacheEntry->dials[0];
+
         for( auto *dialCollectionRef: _cache_.dialCollectionsRefList ){
 
           // dial collections may come with a condition formula
@@ -1080,19 +1081,19 @@ void DataDispenser::fillFunction(int iThread_){
           if     ( dialCollectionRef->isBinned() ){
 
             // is only one bin with no condition:
-            if (dialCollectionRef->getDialBaseList().size() == 1 and dialCollectionRef->getDialBinSet().isEmpty()) {
+            if( dialCollectionRef->getDialBaseList().size() == 1 and dialCollectionRef->getDialBinSet().getBinList().empty() ){
               // if is it NOT a DialBinned -> this is the one we are
               // supposed to use
-              eventDialOffset++;
-              eventDialCacheEntry->dials[eventDialOffset].collectionIndex = iCollection;
-              eventDialCacheEntry->dials[eventDialOffset].interfaceIndex = 0;
+              dialEntryPtr->collectionIndex = iCollection;
+              dialEntryPtr->interfaceIndex = 0;
+              dialEntryPtr++;
             }
-            else {
-              auto dialBinIdx = eventIndexingBuffer.findBinIndex(dialCollectionRef->getDialBinSet());
-              if (dialBinIdx != -1) {
-                eventDialOffset++;
-                eventDialCacheEntry->dials[eventDialOffset].collectionIndex = iCollection;
-                eventDialCacheEntry->dials[eventDialOffset].interfaceIndex = dialBinIdx;
+            else{
+              auto dialBinIdx = eventIndexingBuffer.findBinIndex( dialCollectionRef->getDialBinSet() );
+              if( dialBinIdx != -1 ){
+                dialEntryPtr->collectionIndex = iCollection;
+                dialEntryPtr->interfaceIndex = dialBinIdx;
+                dialEntryPtr++;
               }
             }
           }
@@ -1100,16 +1101,16 @@ void DataDispenser::fillFunction(int iThread_){
             // Event-by-event dial?
             // grab the dial as a general TObject -> let the factory figure out what to do with it
             auto *dialObjectPtr = (TObject *) *(
-              (TObject **) eventIndexingBuffer.getVariableAddress(
-                dialCollectionRef->getGlobalDialLeafName()
-              )
+                (TObject **) eventIndexingBuffer.getVariableAddress(
+                    dialCollectionRef->getGlobalDialLeafName()
+                )
             );
 
             // Extra-step for selecting the right dial with TClonesArray
             if (not strcmp(dialObjectPtr->ClassName(), "TClonesArray")) {
               dialObjectPtr = ((TClonesArray *) dialObjectPtr)->At(
                   (dialIndexTreeFormula == nullptr ? 0 : int(dialIndexTreeFormula->EvalInstance()))
-                  );
+              );
             }
 
             // Do the unique_ptr dance so that memory gets deleted if
@@ -1131,9 +1132,10 @@ void DataDispenser::fillFunction(int iThread_){
               dialBase->setAllowExtrapolation(dialCollectionRef->isAllowDialExtrapolation());
               dialCollectionRef->getDialBaseList()[freeSlotDial] = DialCollection::DialBaseObject(
                   dialBase.release());
-              eventDialOffset++;
-              eventDialCacheEntry->dials[eventDialOffset].collectionIndex = iCollection;
-              eventDialCacheEntry->dials[eventDialOffset].interfaceIndex = freeSlotDial;
+
+              dialEntryPtr->collectionIndex = iCollection;
+              dialEntryPtr->interfaceIndex = freeSlotDial;
+              dialEntryPtr++;
             }
           }
           else {
@@ -1142,9 +1144,8 @@ void DataDispenser::fillFunction(int iThread_){
 
         } // dial collection loop
       }
-      else {
-        // it is "data", no dial
-      }
+
+
     } // samples
   } // entries
   if( iThread_ == 0 ){

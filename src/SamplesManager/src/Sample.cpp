@@ -44,6 +44,7 @@ void Sample::initializeImpl() {
   LogInfo << "Initializing FitSample: " << _name_ << std::endl;
 
   _binning_.readBinningDefinition( _binningFilePath_ );
+  _binning_.sortBins();
 
   TH1::SetDefaultSumw2(true);
 

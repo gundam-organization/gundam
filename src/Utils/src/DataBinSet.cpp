@@ -138,26 +138,45 @@ void DataBinSet::readBinningDefinition(const std::string &filePath_) {
     }
   }
 
-  // sort bins?
-//  this->sortBins();
+  this->sortBinEdges();
+  this->checkBinning();
 }
-void DataBinSet::sortBins(){
 
-  std::vector<std::string> varNameList{};
+void DataBinSet::checkBinning(){
+
+  bool hasErrors{false};
+  LogWarning << "Checking for overlaps in the binning: " << _filePath_ << std::endl; // debug
+
   for( auto& bin : _binList_ ){
-    for( auto& edges : bin.getEdgesList() ){
-      GenericToolbox::addIfNotInVector(edges.varName, varNameList);
+    for( auto& otherBin : _binList_ ) {
+      if( &otherBin == &bin ){ continue; } // skip if it's the same bin
+      if( bin.isOverlapping( otherBin ) ){
+        LogError << "BIN OVERLAP DETECTED" << std::endl;
+        LogError << bin.getSummary() << std::endl;
+        LogError << otherBin.getSummary() << std::endl;
+        hasErrors = true;
+      }
     }
   }
 
-  GenericToolbox::sortVector(
-      _binList_,
+  LogThrowIf(hasErrors);
+
+}
+void DataBinSet::sortBins(){
+
+  /// DON'T SORT THE BINS FOR DIALS!!! THE ORDER MIGHT REFER TO THE COV MATRIX DEFINITION
+
+  // weird things going on if uncommented...
+  std::vector<std::string> varNameList{this->buildVariableNameList()};
+  std::sort(
+      _binList_.begin(), _binList_.end(),
       [&](const DataBin& bin1_, const DataBin& bin2_){
         // returns: does bin1 goes first?
         for( auto& varName : varNameList ){
           auto* edges1 = bin1_.getVarEdgesPtr(varName);
-          auto* edges2 = bin2_.getVarEdgesPtr(varName);
           if( edges1 == nullptr ){ return true; } // missing variable bins goes first
+
+          auto* edges2 = bin2_.getVarEdgesPtr(varName);
           if( edges2 == nullptr ){ return false; } // missing variable bins goes first
 
           if( edges1->min < edges2->min ){ return true; } // lowest bins first
@@ -165,7 +184,7 @@ void DataBinSet::sortBins(){
 
         return false; // default
       }
-      );
+  );
 
   // update indices
   for( int iBin = 0 ; iBin < int(_binList_.size()) ; iBin++ ){
@@ -179,12 +198,28 @@ std::string DataBinSet::getSummary() const{
   if( not _name_.empty() ) ss << "(" << _name_ << ")";
   ss << ": holding " << _binList_.size() << " bins.";
 
-  if( not _binList_.empty() ){
-    for(size_t iBin = 0 ; iBin < _binList_.size() ; iBin++ ){
-      ss << std::endl << GenericToolbox::indentString("#" + std::to_string(iBin) + ": " + _binList_.at(iBin).getSummary(), 2);
-    }
+
+  for( auto& bin : _binList_ ){
+    ss << std::endl << GenericToolbox::indentString("#" + std::to_string(bin.getIndex()) + ": " + bin.getSummary(), 2);
   }
+
   return ss.str();
+}
+
+
+void DataBinSet::sortBinEdges(){
+  for( auto& bin : _binList_ ){
+    std::sort(
+        bin.getEdgesList().begin(), bin.getEdgesList().end(),
+        [](const DataBin::Edges& edges1_, const DataBin::Edges& edges2_){
+          if( edges1_.isConditionVar and not edges2_.isConditionVar ){ return true; }
+          if( not edges1_.isConditionVar and edges2_.isConditionVar ){ return false; }
+          return GenericToolbox::toLowerCase(edges1_.varName) < GenericToolbox::toLowerCase(edges2_.varName);
+        }
+    );
+    // update the indices
+    for( int iEdges = 0 ; iEdges < int(bin.getEdgesList().size()) ; iEdges++ ){ bin.getEdgesList()[iEdges].index = iEdges; }
+  }
 }
 std::vector<std::string> DataBinSet::buildVariableNameList() const{
   std::vector<std::string> out;

@@ -20,6 +20,11 @@ public:
     Edges() = delete;
     explicit Edges(int index_) : index(index_) {}
 
+    // utils
+    bool isOverlapping(const Edges& other_) const;
+    std::string getSummary() const;
+
+
     bool isConditionVar{false};
     int index{-1};
     int varIndexCache{-1};
@@ -37,7 +42,6 @@ public:
   void setIndex(int index_){ _index_ = index_; }
   void setIsLowMemoryUsageMode(bool isLowMemoryUsageMode_){ _isLowMemoryUsageMode_ = isLowMemoryUsageMode_; }
   void setIsZeroWideRangesTolerated(bool isZeroWideRangesTolerated_){ _isZeroWideRangesTolerated_ = isZeroWideRangesTolerated_; } // make it explicit! -> double precision might not be enough if you play with long int
-  void addBinEdge(double lowEdge_, double highEdge_);
   void addBinEdge(const std::string& variableName_, double lowEdge_, double highEdge_);
 
   // const getters
@@ -59,11 +63,13 @@ public:
   [[nodiscard]] double getVolume() const;
 
   // Management
+  [[nodiscard]] bool isOverlapping(const DataBin& other_) const;
   [[nodiscard]] bool isInBin(const std::vector<double>& valuesList_) const;
   [[nodiscard]] bool isVariableSet(const std::string& variableName_) const;
   [[nodiscard]] bool isBetweenEdges(const std::string& variableName_, double value_) const;
   [[nodiscard]] bool isBetweenEdges(size_t varIndex_, double value_) const;
   [[nodiscard]] bool isBetweenEdges(const Edges& edges_, double value_) const;
+  [[nodiscard]] std::vector<std::string> buildVariableNameList() const;
 
   // Misc
   void generateFormula();

@@ -15,8 +15,38 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[DataBin]");
 } );
 
+bool DataBin::Edges::isOverlapping(const DataBin::Edges& other_) const{
+  if( this->isConditionVar != other_.isConditionVar ){
+    LogError << "Mismatch with a variable: in one bin, it is a condition variable while in another it's a range." << std::endl;
+    LogError << "ref edge: " << this->getSummary() << std::endl;
+    LogError << "other edge: " << this->getSummary() << std::endl;
+  }
+
+  if( this->min == other_.min ){ return true; }
+  if( this->max == other_.max ){ return true; }
+  if( this->min > other_.min and this->min  < other_.max ){ return true; } // other is supposed to be lower
+  if( this->max < other_.max and other_.min < this->max  ){ return true; } // other is supposed to be higher
+
+  return false;
+}
+std::string DataBin::Edges::getSummary() const {
+  std::stringstream ss;
+  if( not this->varName.empty() ){ ss << this->varName << ": "; }
+  ss << "[" << this->min;
+  if( this->isConditionVar ){ ss << "]"; }
+  else{
+    ss << ", " << this->max << "[";
+  }
+  return ss.str();
+}
+
+
 // Setters
-void DataBin::addBinEdge(double lowEdge_, double highEdge_){
+void DataBin::addBinEdge(const std::string &variableName_, double lowEdge_, double highEdge_) {
+  if( this->isVariableSet(variableName_) ){
+    LogError << __METHOD_NAME__ << ": variableName_ = " << variableName_ << " is already set." << std::endl;
+    throw std::logic_error("Input variableName_ is already set.");
+  }
   _binEdgesList_.emplace_back(_binEdgesList_.size());
   _binEdgesList_.back().min = std::min( lowEdge_, highEdge_ );
   _binEdgesList_.back().max = std::max( lowEdge_, highEdge_ );
@@ -27,13 +57,6 @@ void DataBin::addBinEdge(double lowEdge_, double highEdge_){
     }
     _binEdgesList_.back().isConditionVar = true;
   }
-}
-void DataBin::addBinEdge(const std::string &variableName_, double lowEdge_, double highEdge_) {
-  if( this->isVariableSet(variableName_) ){
-    LogError << __METHOD_NAME__ << ": variableName_ = " << variableName_ << " is already set." << std::endl;
-    throw std::logic_error("Input variableName_ is already set.");
-  }
-  this->addBinEdge(lowEdge_, highEdge_);
   _binEdgesList_.back().varName = variableName_;
 }
 
@@ -60,6 +83,25 @@ double DataBin::getVolume() const{
 
 
 // Management
+bool DataBin::isOverlapping(const DataBin& other_) const{
+  std::vector<std::string> varNameList{this->buildVariableNameList()};
+  GenericToolbox::mergeInVector(varNameList, other_.buildVariableNameList());
+
+  // is overlapping only if all edges report "true"
+
+  for( auto& var : varNameList ){
+    auto* edgesPtr = this->getVarEdgesPtr(var);
+    if( edgesPtr == nullptr ){ continue; } // no condition, considered as a possible overlap
+
+    auto* edgesOtherPtr = other_.getVarEdgesPtr(var);
+    if( edgesOtherPtr == nullptr ){ continue; } // no condition, considered as a possible overlap
+
+    if( not edgesPtr->isOverlapping(*edgesOtherPtr) ){ return false; }
+  }
+
+  // if reached this point, all edges reported an overlap
+  return true;
+}
 bool DataBin::isInBin(const std::vector<double>& valuesList_) const{
   LogThrowIf( valuesList_.size() != _binEdgesList_.size(),
               "Provided " << GET_VAR_NAME_VALUE(valuesList_.size()) << " does not match " << GET_VAR_NAME_VALUE(_binEdgesList_.size()));
@@ -103,6 +145,13 @@ bool DataBin::isBetweenEdges(const Edges& edges_, double value_) const {
   // inside
   return true;
 }
+std::vector<std::string> DataBin::buildVariableNameList() const{
+  std::vector<std::string> out;
+  for( auto& edges : this->getEdgesList() ){
+    GenericToolbox::addIfNotInVector(edges.varName, out);
+  }
+  return out;
+}
 
 
 // Misc
@@ -135,12 +184,7 @@ std::string DataBin::getSummary() const{
     else{
       for( auto& edges : _binEdgesList_ ){
         if( edges.index != 0 ){ ss << ", "; }
-        if( not edges.varName.empty() ){ ss << edges.varName << ": "; }
-        ss << "[" << edges.min;
-        if( edges.isConditionVar ){ ss << "]"; }
-        else{
-          ss << ", " << edges.max << "[";
-        }
+        ss << edges.getSummary();
       }
     }
   }

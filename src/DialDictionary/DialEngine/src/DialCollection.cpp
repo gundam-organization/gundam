@@ -377,9 +377,7 @@ bool DialCollection::initializeNormDialsWithParBinning() {
   // Read the binning
   _dialBinSet_ = DataBinSet();
   _dialBinSet_.setName("parameterBinning");
-  DataBinSet::setVerbosity(static_cast<int>(Logger::LogLevel::ERROR)); // only print errors if any
   _dialBinSet_.readBinningDefinition(parameterBinningPath);
-  DataBinSet::setVerbosity(static_cast<int>(Logger::getMaxLogLevel())); // take back the log level with this instance
 
   // By default use min dial response for norm dials
   _dialResponseSupervisorList_.resize( 1 );

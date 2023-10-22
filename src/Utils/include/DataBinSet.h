@@ -5,10 +5,12 @@
 #ifndef GUNDAM_DATABINSET_H
 #define GUNDAM_DATABINSET_H
 
+
+#include "DataBin.h"
+
 #include <vector>
 #include <string>
 
-#include "DataBin.h"
 
 class DataBinSet {
 
@@ -23,7 +25,6 @@ public:
   void setName(const std::string &name){ _name_ = name; }
 
   // const getters
-  [[nodiscard]] bool isEmpty() const { return _binList_.empty(); }
   [[nodiscard]] const std::string &getFilePath() const { return _filePath_; }
   [[nodiscard]] const std::vector<DataBin> &getBinList() const { return _binList_; }
 
@@ -32,8 +33,12 @@ public:
 
   // core
   void readBinningDefinition(const std::string& filePath_);
-  void sortBins();
+  void checkBinning();
   [[nodiscard]] std::string getSummary() const;
+
+  // utils
+  void sortBinEdges();
+  void sortBins();
   [[nodiscard]] std::vector<std::string> buildVariableNameList() const;
 
 private:

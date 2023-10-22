@@ -180,7 +180,7 @@ int main(int argc, char** argv){
                                                               }
                           ));
 
-    LogThrowIf(foundDialCollection->getDialBinSet().isEmpty(), "Could not find binning");
+    LogThrowIf(foundDialCollection->getDialBinSet().getBinList().empty(), "Could not find binning");
     sample.setBinningFilePath( foundDialCollection->getDialBinSet().getFilePath() );
 
   }

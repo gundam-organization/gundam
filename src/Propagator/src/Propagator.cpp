@@ -49,10 +49,18 @@ void Propagator::readConfigImpl(){
   _enableStatThrowInToys_ = GenericToolbox::Json::fetchValue(_config_, "enableStatThrowInToys", _enableStatThrowInToys_);
   _gaussStatThrowInToys_ = GenericToolbox::Json::fetchValue(_config_, "gaussStatThrowInToys", _gaussStatThrowInToys_);
   _enableEventMcThrow_ = GenericToolbox::Json::fetchValue(_config_, "enableEventMcThrow", _enableEventMcThrow_);
+  _parameterInjectorMc_ = GenericToolbox::Json::fetchValue(_config_, "parameterInjection", _parameterInjectorMc_);
+
+  // debug/dev parameters
+  _debugPrintLoadedEvents_ = GenericToolbox::Json::fetchValue(_config_, "debugPrintLoadedEvents", _debugPrintLoadedEvents_);
+  _debugPrintLoadedEventsNbPerSample_ = GenericToolbox::Json::fetchValue(_config_, "debugPrintLoadedEventsNbPerSample", _debugPrintLoadedEventsNbPerSample_);
+  _devSingleThreadReweight_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadReweight", _devSingleThreadReweight_);
+  _devSingleThreadHistFill_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadHistFill", _devSingleThreadHistFill_);
 
   // EventDialCache parameters
   EventDialCache::globalEventReweightCap = GenericToolbox::Json::fetchValue(_config_, "globalEventReweightCap", EventDialCache::globalEventReweightCap);
 
+  LogInfo << "Reading parameter configuration..." << std::endl;
   auto parameterSetListConfig = ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue(_config_, "parameterSetListConfig", nlohmann::json()));
   _parManager_.getParameterSetsList().reserve(parameterSetListConfig.size()); // make sure the objects aren't moved in RAM ( since FitParameter* will be used )
   for( const auto& parameterSetConfig : parameterSetListConfig ){
@@ -62,14 +70,17 @@ void Propagator::readConfigImpl(){
     LogInfo << _parManager_.getParameterSetsList().back().getSummary() << std::endl;
   }
 
+  LogInfo << "Reading samples configuration..." << std::endl;
   auto fitSampleSetConfig = GenericToolbox::Json::fetchValue(_config_, "fitSampleSetConfig", nlohmann::json());
   _fitSampleSet_.setConfig(fitSampleSetConfig);
   _fitSampleSet_.readConfig();
 
+  LogInfo << "Reading PlotGenerator configuration..." << std::endl;
   auto plotGeneratorConfig = ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue(_config_, "plotGeneratorConfig", nlohmann::json()));
   _plotGenerator_.setConfig(plotGeneratorConfig);
   _plotGenerator_.readConfig();
 
+  LogInfo << "Reading datasets configuration..." << std::endl;
   auto dataSetListConfig = ConfigUtils::getForwardedConfig(_config_, "dataSetList");
   if( dataSetListConfig.empty() ){
     // Old config files
@@ -82,14 +93,10 @@ void Propagator::readConfigImpl(){
     _dataSetList_.emplace_back(dataSetConfig, int(_dataSetList_.size()));
   }
 
+  LogInfo << "Reading ParScanner configuration..." << std::endl;
   _parScanner_.readConfig( GenericToolbox::Json::fetchValue(_config_, "scanConfig", nlohmann::json()) );
 
-  _debugPrintLoadedEvents_ = GenericToolbox::Json::fetchValue(_config_, "debugPrintLoadedEvents", _debugPrintLoadedEvents_);
-  _debugPrintLoadedEventsNbPerSample_ = GenericToolbox::Json::fetchValue(_config_, "debugPrintLoadedEventsNbPerSample", _debugPrintLoadedEventsNbPerSample_);
-
-  _devSingleThreadReweight_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadReweight", _devSingleThreadReweight_);
-  _devSingleThreadHistFill_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadHistFill", _devSingleThreadHistFill_);
-
+  LogInfo << "Reading DialCollection configurations..." << std::endl;
   for(size_t iParSet = 0 ; iParSet < _parManager_.getParameterSetsList().size() ; iParSet++ ){
     if( not _parManager_.getParameterSetsList()[iParSet].isEnabled() ) continue;
     // DEV / DialCollections
@@ -126,10 +133,8 @@ void Propagator::readConfigImpl(){
     }
   }
 
+  LogInfo << "Reading TreeWriter configurations..." << std::endl;
   _treeWriter_.readConfig( GenericToolbox::Json::fetchValue(_config_, "eventTreeWriter", nlohmann::json()) );
-
-  _parameterInjectorMc_ = GenericToolbox::Json::fetchValue(_config_, "parameterInjection", _parameterInjectorMc_);
-  ConfigUtils::forwardConfig(_parameterInjectorMc_);
 
   LogInfo << "Reading config of the Propagator done." << std::endl;
 }
@@ -367,7 +372,7 @@ void Propagator::initializeImpl(){
 
   if( not _parameterInjectorMc_.empty() ){
     LogWarning << "Injecting parameters on MC samples..." << std::endl;
-    _parManager_.injectParameterValues( _parameterInjectorMc_ );
+    _parManager_.injectParameterValues( ConfigUtils::getForwardedConfig(_parameterInjectorMc_) );
     this->resetReweight();
     this->reweightMcEvents();
   }

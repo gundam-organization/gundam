@@ -135,6 +135,8 @@ int PhysicsEvent::findBinIndex(const DataBinSet& binSet_) const{
   return this->findBinIndex( binSet_.getBinList() );
 }
 int PhysicsEvent::findBinIndex(const std::vector<DataBin>& binList_) const{
+  if( binList_.empty() ){ return -1; }
+
   auto dialItr = std::find_if(
       binList_.begin(), binList_.end(),
       [&](const DataBin& bin_){ return this->isInBin(bin_); }

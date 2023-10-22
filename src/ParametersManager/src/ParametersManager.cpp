@@ -3,6 +3,7 @@
 //
 
 #include "ParametersManager.h"
+#include "ConfigUtils.h"
 
 #include "GenericToolbox.ScopedGuard.h"
 #include "GenericToolbox.Json.h"

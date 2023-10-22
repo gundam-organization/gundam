@@ -757,6 +757,7 @@ void PlotGenerator::defineHistogramHolders() {
                 else if( GenericToolbox::Json::doKeyExist(histConfig, "binningFile") ){
                   DataBinSet b;
                   b.readBinningDefinition(GenericToolbox::Json::fetchValue<std::string>(histConfig, "binningFile") );
+                  b.sortBins();
 
                   auto varList{b.buildVariableNameList()};
                   LogThrowIf(varList.size()!=1, "Binning should be defined with only one variable, here: " << GenericToolbox::parseVectorAsString(varList))
