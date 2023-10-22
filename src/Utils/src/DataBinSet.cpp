@@ -166,30 +166,30 @@ void DataBinSet::sortBins(){
 
   /// DON'T SORT THE BINS FOR DIALS!!! THE ORDER MIGHT REFER TO THE COV MATRIX DEFINITION
 
-  // weird things going on if uncommented...
-  std::vector<std::string> varNameList{this->buildVariableNameList()};
-  std::sort(
-      _binList_.begin(), _binList_.end(),
-      [&](const DataBin& bin1_, const DataBin& bin2_){
-        // returns: does bin1 goes first?
-        for( auto& varName : varNameList ){
-          auto* edges1 = bin1_.getVarEdgesPtr(varName);
-          if( edges1 == nullptr ){ return true; } // missing variable bins goes first
-
-          auto* edges2 = bin2_.getVarEdgesPtr(varName);
-          if( edges2 == nullptr ){ return false; } // missing variable bins goes first
-
-          if( edges1->min < edges2->min ){ return true; } // lowest bins first
-        }
-
-        return false; // default
-      }
-  );
-
-  // update indices
-  for( int iBin = 0 ; iBin < int(_binList_.size()) ; iBin++ ){
-    _binList_[iBin].setIndex( iBin );
-  }
+//  // weird things going on if uncommented...
+//  std::vector<std::string> varNameList{this->buildVariableNameList()};
+//  std::sort(
+//      _binList_.begin(), _binList_.end(),
+//      [&](const DataBin& bin1_, const DataBin& bin2_){
+//        // returns: does bin1 goes first?
+//        for( auto& varName : varNameList ){
+//          auto* edges1 = bin1_.getVarEdgesPtr(varName);
+//          if( edges1 == nullptr ){ return true; } // missing variable bins goes first
+//
+//          auto* edges2 = bin2_.getVarEdgesPtr(varName);
+//          if( edges2 == nullptr ){ return false; } // missing variable bins goes first
+//
+//          if( edges1->min < edges2->min ){ return true; } // lowest bins first
+//        }
+//
+//        return false; // default
+//      }
+//  );
+//
+//  // update indices
+//  for( int iBin = 0 ; iBin < int(_binList_.size()) ; iBin++ ){
+//    _binList_[iBin].setIndex( iBin );
+//  }
 
 }
 std::string DataBinSet::getSummary() const{
