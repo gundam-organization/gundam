@@ -23,7 +23,7 @@ std::string DataDispenserParameters::getSummary() const{
   ss << std::endl << GET_VAR_NAME_VALUE(selectionCutFormulaStr);
   ss << std::endl << "activeLeafNameList = " << GenericToolbox::parseVectorAsString(activeLeafNameList, true);
   ss << std::endl << "filePathList = " << GenericToolbox::parseVectorAsString(filePathList, true);
-  ss << std::endl << "overrideLeafDict = " << GenericToolbox::parseMapAsString(overrideLeafDict, true);
+  ss << std::endl << "variableDict = " << GenericToolbox::parseMapAsString(variableDict, true);
   ss << std::endl << "additionalVarsStorage = " << GenericToolbox::parseVectorAsString(additionalVarsStorage, true);
   ss << std::endl << GET_VAR_NAME_VALUE(iThrow);
   return ss.str();

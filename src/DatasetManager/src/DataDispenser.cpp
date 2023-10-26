@@ -58,9 +58,11 @@ void DataDispenser::readConfigImpl(){
   _parameters_.selectionCutFormulaStr = GenericToolbox::Json::buildFormula(_config_, "selectionCutFormula", "&&", _parameters_.selectionCutFormulaStr);
   _parameters_.nominalWeightFormulaStr = GenericToolbox::Json::buildFormula(_config_, "nominalWeightFormula", "*", _parameters_.nominalWeightFormulaStr);
 
-  _parameters_.overrideLeafDict.clear();
-  for( auto& entry : GenericToolbox::Json::fetchValue(_config_, "overrideLeafDict", nlohmann::json()) ){
-    _parameters_.overrideLeafDict[entry["eventVar"]] = entry["leafVar"];
+  _parameters_.variableDict.clear();
+  for( auto& entry : GenericToolbox::Json::fetchValue(_config_, {{"variableDict"}, {"overrideLeafDict"}}, nlohmann::json()) ){
+    auto varName = GenericToolbox::Json::fetchValue<std::string>(entry, {{"name"}, {"eventVar"}});
+    auto varExpr = GenericToolbox::Json::fetchValue<std::string>(entry, {{"expr"}, {"expression"}, {"leafVar"}});
+    _parameters_.variableDict[ varName ] = varExpr;
   }
 }
 void DataDispenser::initializeImpl(){
@@ -153,15 +155,15 @@ void DataDispenser::parseStringParameters() {
   };
   auto overrideLeavesNamesFct = [&](std::string& formula_){
     for( auto& replaceEntry : _cache_.varsToOverrideList ){
-      GenericToolbox::replaceSubstringInsideInputString(formula_, replaceEntry, _parameters_.overrideLeafDict[replaceEntry]);
+      GenericToolbox::replaceSubstringInsideInputString(formula_, replaceEntry, _parameters_.variableDict[replaceEntry]);
     }
   };
 
-  if( not _parameters_.overrideLeafDict.empty() ){
-    for( auto& entryDict : _parameters_.overrideLeafDict ){ replaceToyIndexFct(entryDict.second); }
-    LogInfo << "Overriding leaf dict: " << GenericToolbox::parseMapAsString(_parameters_.overrideLeafDict) << std::endl;
+  if( not _parameters_.variableDict.empty() ){
+    for( auto& entryDict : _parameters_.variableDict ){ replaceToyIndexFct(entryDict.second); }
+    LogInfo << "Variable dictionary: " << GenericToolbox::parseMapAsString(_parameters_.variableDict) << std::endl;
 
-    for( auto& overrideEntry : _parameters_.overrideLeafDict ){
+    for( auto& overrideEntry : _parameters_.variableDict ){
       _cache_.varsToOverrideList.emplace_back(overrideEntry.first);
     }
     // make sure we process the longest words first: "thisIsATest" variable should be replaced before "thisIs"
@@ -383,9 +385,9 @@ void DataDispenser::fetchRequestedLeaves(){
     _cache_.varToLeafDict[var].first = GenericToolbox::stripBracket(_cache_.varToLeafDict[var].first, '[', ']');
 
     // look for override requests
-    if( GenericToolbox::doesKeyIsInMap(_cache_.varToLeafDict[var].first, _parameters_.overrideLeafDict) ){
+    if( GenericToolbox::doesKeyIsInMap(_cache_.varToLeafDict[var].first, _parameters_.variableDict) ){
       // leafVar will actually be the override leaf name while event will keep the original name
-      _cache_.varToLeafDict[var].first = _parameters_.overrideLeafDict[_cache_.varToLeafDict[var].first];
+      _cache_.varToLeafDict[var].first = _parameters_.variableDict[_cache_.varToLeafDict[var].first];
       _cache_.varToLeafDict[var].first = GenericToolbox::stripBracket(_cache_.varToLeafDict[var].first, '[', ']');
     }
 
@@ -425,8 +427,8 @@ void DataDispenser::preAllocateMemory(){
   for( auto& var : _cache_.varsRequestedForIndexing ){
     // look for override requests
     lCollection.addLeafExpression(
-        GenericToolbox::doesKeyIsInMap(var, _parameters_.overrideLeafDict) ?
-        _parameters_.overrideLeafDict[var]: var
+        GenericToolbox::doesKeyIsInMap(var, _parameters_.variableDict) ?
+        _parameters_.variableDict[var] : var
     );
   }
   lCollection.initialize();
@@ -438,8 +440,8 @@ void DataDispenser::preAllocateMemory(){
   std::vector<const GenericToolbox::LeafForm*> leafFormToVarList{};
   for( auto& storageVar : *eventPlaceholder.getCommonVarNameListPtr() ){
     leafFormToVarList.emplace_back( lCollection.getLeafFormPtr(
-        GenericToolbox::doesKeyIsInMap(storageVar, _parameters_.overrideLeafDict) ?
-        _parameters_.overrideLeafDict[storageVar]: storageVar
+        GenericToolbox::doesKeyIsInMap(storageVar, _parameters_.variableDict) ?
+        _parameters_.variableDict[storageVar] : storageVar
     ));
   }
 
@@ -693,7 +695,7 @@ void DataDispenser::eventSelectionFunction(int iThread_){
     std::string selectionCut = samplePtr->getSelectionCutsStr();
     for (auto &replaceEntry: _cache_.varsToOverrideList) {
       GenericToolbox::replaceSubstringInsideInputString(
-          selectionCut, replaceEntry, _parameters_.overrideLeafDict[replaceEntry]
+          selectionCut, replaceEntry, _parameters_.variableDict[replaceEntry]
       );
     }
 
@@ -826,16 +828,16 @@ void DataDispenser::fillFunction(int iThread_){
   std::vector<const GenericToolbox::LeafForm*> leafFormStorageList{};
   for( auto& var : _cache_.varsRequestedForIndexing ){
     std::string leafExp{var};
-    if( GenericToolbox::doesKeyIsInMap( var, _parameters_.overrideLeafDict ) ){
-      leafExp = _parameters_.overrideLeafDict[leafExp];
+    if( GenericToolbox::doesKeyIsInMap( var, _parameters_.variableDict ) ){
+      leafExp = _parameters_.variableDict[leafExp];
     }
     auto idx = size_t(lCollection.addLeafExpression(leafExp));
     leafFormIndexingList.emplace_back( (GenericToolbox::LeafForm*) idx ); // tweaking types
   }
   for( auto& var : _cache_.varsRequestedForStorage ){
     std::string leafExp{var};
-    if( GenericToolbox::doesKeyIsInMap( var, _parameters_.overrideLeafDict ) ){
-      leafExp = _parameters_.overrideLeafDict[leafExp];
+    if( GenericToolbox::doesKeyIsInMap( var, _parameters_.variableDict ) ){
+      leafExp = _parameters_.variableDict[leafExp];
     }
     auto idx = size_t(lCollection.getLeafExpIndex(leafExp));
     leafFormStorageList.emplace_back( (GenericToolbox::LeafForm*) idx ); // tweaking types
@@ -858,6 +860,8 @@ void DataDispenser::fillFunction(int iThread_){
   std::vector<EventVarTransformLib*> varTransformForIndexingList;
   std::vector<EventVarTransformLib*> varTransformForStorageList;
   for( auto& eventVarTransform : eventVarTransformList ){
+    ((EventVarTransformLib*) &eventVarTransform)->reload();
+
     if( GenericToolbox::doesElementIsInVector(eventVarTransform.getOutputVariableName(), _cache_.varsRequestedForIndexing) ){
       varTransformForIndexingList.emplace_back(&eventVarTransform);
     }

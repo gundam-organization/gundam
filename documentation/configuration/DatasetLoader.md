@@ -34,7 +34,7 @@ As an entry list
 | filePathList            | list(string)        | list of ROOT files containing the TTree                         |         |
 | additionalLeavesStorage | list(string)        | list of variables to be stored in memory                        |         |
 | variablesTransform      | list(json)          | list of transform operations that will be applied while loading |         |
-| overrideLeafDict        | list(json)          | dictionary translating a leaf/formula to variable name          |         |
+| variableDict        | list(json)          | dictionary translating a leaf/formula to variable name          |         |
 | fromHistContent         | json                | use hist bin content directly. This will create dummy events    |         |
 
 
