@@ -49,10 +49,18 @@ void Propagator::readConfigImpl(){
   _enableStatThrowInToys_ = GenericToolbox::Json::fetchValue(_config_, "enableStatThrowInToys", _enableStatThrowInToys_);
   _gaussStatThrowInToys_ = GenericToolbox::Json::fetchValue(_config_, "gaussStatThrowInToys", _gaussStatThrowInToys_);
   _enableEventMcThrow_ = GenericToolbox::Json::fetchValue(_config_, "enableEventMcThrow", _enableEventMcThrow_);
+  _parameterInjectorMc_ = GenericToolbox::Json::fetchValue(_config_, "parameterInjection", _parameterInjectorMc_);
+
+  // debug/dev parameters
+  _debugPrintLoadedEvents_ = GenericToolbox::Json::fetchValue(_config_, "debugPrintLoadedEvents", _debugPrintLoadedEvents_);
+  _debugPrintLoadedEventsNbPerSample_ = GenericToolbox::Json::fetchValue(_config_, "debugPrintLoadedEventsNbPerSample", _debugPrintLoadedEventsNbPerSample_);
+  _devSingleThreadReweight_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadReweight", _devSingleThreadReweight_);
+  _devSingleThreadHistFill_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadHistFill", _devSingleThreadHistFill_);
 
   // EventDialCache parameters
   EventDialCache::globalEventReweightCap = GenericToolbox::Json::fetchValue(_config_, "globalEventReweightCap", EventDialCache::globalEventReweightCap);
 
+  LogInfo << "Reading parameter configuration..." << std::endl;
   auto parameterSetListConfig = ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue(_config_, "parameterSetListConfig", nlohmann::json()));
   _parManager_.getParameterSetsList().reserve(parameterSetListConfig.size()); // make sure the objects aren't moved in RAM ( since FitParameter* will be used )
   for( const auto& parameterSetConfig : parameterSetListConfig ){
@@ -62,14 +70,17 @@ void Propagator::readConfigImpl(){
     LogInfo << _parManager_.getParameterSetsList().back().getSummary() << std::endl;
   }
 
+  LogInfo << "Reading samples configuration..." << std::endl;
   auto fitSampleSetConfig = GenericToolbox::Json::fetchValue(_config_, "fitSampleSetConfig", nlohmann::json());
   _fitSampleSet_.setConfig(fitSampleSetConfig);
   _fitSampleSet_.readConfig();
 
+  LogInfo << "Reading PlotGenerator configuration..." << std::endl;
   auto plotGeneratorConfig = ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue(_config_, "plotGeneratorConfig", nlohmann::json()));
   _plotGenerator_.setConfig(plotGeneratorConfig);
   _plotGenerator_.readConfig();
 
+  LogInfo << "Reading datasets configuration..." << std::endl;
   auto dataSetListConfig = ConfigUtils::getForwardedConfig(_config_, "dataSetList");
   if( dataSetListConfig.empty() ){
     // Old config files
@@ -82,14 +93,10 @@ void Propagator::readConfigImpl(){
     _dataSetList_.emplace_back(dataSetConfig, int(_dataSetList_.size()));
   }
 
+  LogInfo << "Reading ParScanner configuration..." << std::endl;
   _parScanner_.readConfig( GenericToolbox::Json::fetchValue(_config_, "scanConfig", nlohmann::json()) );
 
-  _debugPrintLoadedEvents_ = GenericToolbox::Json::fetchValue(_config_, "debugPrintLoadedEvents", _debugPrintLoadedEvents_);
-  _debugPrintLoadedEventsNbPerSample_ = GenericToolbox::Json::fetchValue(_config_, "debugPrintLoadedEventsNbPerSample", _debugPrintLoadedEventsNbPerSample_);
-
-  _devSingleThreadReweight_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadReweight", _devSingleThreadReweight_);
-  _devSingleThreadHistFill_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadHistFill", _devSingleThreadHistFill_);
-
+  LogInfo << "Reading DialCollection configurations..." << std::endl;
   for(size_t iParSet = 0 ; iParSet < _parManager_.getParameterSetsList().size() ; iParSet++ ){
     if( not _parManager_.getParameterSetsList()[iParSet].isEnabled() ) continue;
     // DEV / DialCollections
@@ -126,11 +133,10 @@ void Propagator::readConfigImpl(){
     }
   }
 
+  LogInfo << "Reading TreeWriter configurations..." << std::endl;
   _treeWriter_.readConfig( GenericToolbox::Json::fetchValue(_config_, "eventTreeWriter", nlohmann::json()) );
 
-  _parameterInjectorMc_ = GenericToolbox::Json::fetchValue(_config_, "parameterInjection", _parameterInjectorMc_);
-  ConfigUtils::forwardConfig(_parameterInjectorMc_);
-
+  LogInfo << "Reading config of the Propagator done." << std::endl;
 }
 void Propagator::initializeImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
@@ -200,6 +206,21 @@ void Propagator::initializeImpl(){
 
         LogInfo << "Sample breakdown prior to the throwing:" << std::endl;
         std::cout << getSampleBreakdownTableStr() << std::endl;
+
+        if( _debugPrintLoadedEvents_ ){
+          LogDebug << "Toy events:" << std::endl;
+          LogDebug << GET_VAR_NAME_VALUE(_debugPrintLoadedEventsNbPerSample_) << std::endl;
+          int iEvt{0};
+          for( auto& entry : _eventDialCache_.getCache() ) {
+            LogDebug << "Event #" << iEvt++ << "{" << std::endl;
+            {
+              LogScopeIndent;
+              LogDebug << entry.getSummary() << std::endl;
+            }
+            LogDebug << "}" << std::endl;
+            if( iEvt >= _debugPrintLoadedEventsNbPerSample_ ) break;
+          }
+        }
       }
 
       _parManager_.throwParameters();
@@ -231,20 +252,6 @@ void Propagator::initializeImpl(){
     this->reweightMcEvents();
     GundamGlobals::setEnableCacheManager(cacheManagerState);
 
-    if( _debugPrintLoadedEvents_ ){
-      LogDebug << "Toy events:" << std::endl;
-      LogDebug << GET_VAR_NAME_VALUE(_debugPrintLoadedEventsNbPerSample_) << std::endl;
-      int iEvt{0};
-      for( auto& entry : _eventDialCache_.getCache() ) {
-        LogDebug << "Event #" << iEvt++ << "{" << std::endl;
-        {
-          LogScopeIndent;
-          LogDebug << entry.getSummary() << std::endl;
-        }
-        LogDebug << "}" << std::endl;
-        if( iEvt >= _debugPrintLoadedEventsNbPerSample_ ) break;
-      }
-    }
     // Copies MC events in data container for both Asimov and FakeData event types
     LogWarning << "Copying loaded mc-like event to data container..." << std::endl;
     _fitSampleSet_.copyMcEventListToDataContainer();
@@ -365,7 +372,7 @@ void Propagator::initializeImpl(){
 
   if( not _parameterInjectorMc_.empty() ){
     LogWarning << "Injecting parameters on MC samples..." << std::endl;
-    _parManager_.injectParameterValues( _parameterInjectorMc_ );
+    _parManager_.injectParameterValues( ConfigUtils::getForwardedConfig(_parameterInjectorMc_) );
     this->resetReweight();
     this->reweightMcEvents();
   }
@@ -587,8 +594,6 @@ void Propagator::refillSampleHistograms(){
 }
 
 // Misc
-
-
 std::string Propagator::getSampleBreakdownTableStr() const{
   GenericToolbox::TablePrinter t;
 
@@ -613,31 +618,40 @@ std::string Propagator::getSampleBreakdownTableStr() const{
 
 // Protected
 void Propagator::initializeThreads() {
-  reweightMcEventsFct = [this](int iThread){
-    this->reweightMcEvents(iThread);
-  };
-  GundamGlobals::getParallelWorker().addJob("Propagator::reweightMcEvents", reweightMcEventsFct);
 
-  refillSampleHistogramsFct = [this](int iThread){
-    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-      sample.getMcContainer().refillHistogram(iThread);
-      sample.getDataContainer().refillHistogram(iThread);
-    }
-  };
-  refillSampleHistogramsPostParallelFct = [this](){
-    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
-      sample.getMcContainer().rescaleHistogram();
-      sample.getDataContainer().rescaleHistogram();
-    }
-  };
-  GundamGlobals::getParallelWorker().addJob("Propagator::refillSampleHistograms", refillSampleHistogramsFct);
-  GundamGlobals::getParallelWorker().setPostParallelJob("Propagator::refillSampleHistograms", refillSampleHistogramsPostParallelFct);
+  GundamGlobals::getParallelWorker().addJob(
+      "Propagator::reweightMcEvents",
+      [this](int iThread){ this->reweightMcEvents(iThread); }
+  );
+
+  GundamGlobals::getParallelWorker().addJob(
+      "Propagator::refillSampleHistograms",
+      [this](int iThread){ this->refillSampleHistogramsFct(iThread); }
+  );
+
+  GundamGlobals::getParallelWorker().setPostParallelJob(
+      "Propagator::refillSampleHistograms",
+      [this](){ this->refillSampleHistogramsPostParallelFct(); }
+  );
+
 }
 
+// multithreading
 void Propagator::reweightMcEvents(int iThread_) {
 
   //! Warning: everything you modify here, may significantly slow down the
   //! fitter
+
+//  int nThreads{GundamGlobals::getParallelWorker().getNbThreads()};
+//  if( iThread_ == -1 ){ iThread_ = 0 ; nThreads = 1; }
+//
+//  int iCache{iThread_};
+//  int nCache{int(_eventDialCache_.getCache().size())};
+//
+//  while( iCache < nCache ){
+//    EventDialCache::reweightEntry(_eventDialCache_.getCache()[iCache]);
+//    iCache += nThreads;
+//  }
 
   auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
       iThread_, GundamGlobals::getParallelWorker().getNbThreads(),
@@ -650,6 +664,18 @@ void Propagator::reweightMcEvents(int iThread_) {
       &EventDialCache::reweightEntry
   );
 
+}
+void Propagator::refillSampleHistogramsFct(int iThread_){
+  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    sample.getMcContainer().refillHistogram(iThread_);
+    sample.getDataContainer().refillHistogram(iThread_);
+  }
+}
+void Propagator::refillSampleHistogramsPostParallelFct(){
+  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    sample.getMcContainer().rescaleHistogram();
+    sample.getDataContainer().rescaleHistogram();
+  }
 }
 
 //  A Lesser GNU Public License

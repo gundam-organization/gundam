@@ -55,12 +55,19 @@ namespace JointProbability{
 
   // BarlowLLH_BANFF_OA2021
   void BarlowLLH_BANFF_OA2021::readConfigImpl(){
+    allowZeroMcWhenZeroData = GenericToolbox::Json::fetchValue(_config_, "allowZeroMcWhenZeroData", allowZeroMcWhenZeroData);
     usePoissonLikelihood = GenericToolbox::Json::fetchValue(_config_, "usePoissonLikelihood", usePoissonLikelihood);
     BBNoUpdateWeights = GenericToolbox::Json::fetchValue(_config_, "BBNoUpdateWeights", BBNoUpdateWeights);
+    verbose = GenericToolbox::Json::fetchValue(_config_, "isVerbose", verbose);
 
     LogInfo << "Using BarlowLLH_BANFF_OA2021 parameters:" << std::endl;
-    LogInfo << GET_VAR_NAME_VALUE(usePoissonLikelihood) << std::endl;
-    LogInfo << GET_VAR_NAME_VALUE(BBNoUpdateWeights) << std::endl;
+    {
+      LogScopeIndent;
+      LogInfo << GET_VAR_NAME_VALUE(allowZeroMcWhenZeroData) << std::endl;
+      LogInfo << GET_VAR_NAME_VALUE(usePoissonLikelihood) << std::endl;
+      LogInfo << GET_VAR_NAME_VALUE(BBNoUpdateWeights) << std::endl;
+      LogInfo << GET_VAR_NAME_VALUE(verbose) << std::endl;
+    }
   }
 
   double BarlowLLH_BANFF_OA2021::eval(const Sample& sample_, int bin_) {
@@ -148,7 +155,7 @@ namespace JointProbability{
     else {
       // The mc predicted value is zero, and the data value is not zero.
       // Inconceivable!
-      LogError << "Data and predicted value give infinite statistical LLH / "
+      LogErrorIf(verbose) << "Data and predicted value give infinite statistical LLH / "
                << "Data: " << dataVal
                << " / Barlow Beeston adjusted MC: " << newmc
                << std::endl;
@@ -175,11 +182,13 @@ namespace JointProbability{
       }
     }
     else {
-      chisq += 1E+20;
-      LogError << "Data and predicted value give infinite statistical LLH / "
-               << "Data: " << dataVal
-               << " / MC: " << newmc
-               << std::endl;
+      if( not allowZeroMcWhenZeroData or dataVal != 0 ){
+        chisq += 1E+20;
+        LogErrorIf(verbose) << "Data and predicted value give infinite statistical LLH / "
+                 << "Data: " << dataVal
+                 << " / MC: " << newmc
+                 << std::endl;
+      }
     }
 
     if (not std::isfinite(chisq)) [[unlikely]] {

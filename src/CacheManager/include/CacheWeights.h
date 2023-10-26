@@ -27,9 +27,9 @@ public:
 
 private:
     // Save the event weight cache reference for later use
-    Cache::Parameters::Values& fParameters;
-    Cache::Parameters::Clamps& fLowerClamp;
-    Cache::Parameters::Clamps& fUpperClamp;
+    [[maybe_unused]] Cache::Parameters::Values& fParameters;
+    [[maybe_unused]] Cache::Parameters::Clamps& fLowerClamp;
+    [[maybe_unused]] Cache::Parameters::Clamps& fUpperClamp;
 
     /// The (approximate) amount of memory required on the GPU.
     std::size_t fTotalBytes;

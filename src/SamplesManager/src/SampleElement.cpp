@@ -41,42 +41,40 @@ void SampleElement::shrinkEventList(size_t newTotalSize_){
 }
 void SampleElement::updateEventBinIndexes(int iThread_){
   if( isLocked ) return;
-  int nBins = int(binning.getBinsList().size());
-  if(iThread_ <= 0){ LogScopeIndent; LogInfo << "Finding bin indexes for \"" << name << "\"..." << std::endl; }
-  for( size_t iEvent = 0 ; iEvent < eventList.size() ; iEvent++ ){
-    if( iThread_ != -1 and iEvent % GundamGlobals::getParallelWorker().getNbThreads() != iThread_ ) continue;
-    auto& event = eventList.at(iEvent);
-    for( int iBin = 0 ; iBin < nBins ; iBin++ ){
-      auto& bin = binning.getBinsList().at(iBin);
-      bool isInBin = true;
-      for( size_t iVar = 0 ; iVar < bin.getVariableNameList().size() ; iVar++ ){
-        if( not bin.isBetweenEdges(iVar, event.getVarAsDouble(bin.getVariableNameList().at(iVar))) ){
-          isInBin = false;
-          break;
-        }
-      } // Var
+
+  int nThreads{GundamGlobals::getParallelWorker().getNbThreads()};
+  if( iThread_ == -1 ){ iThread_ = 0; nThreads = 1; }
+
+  PhysicsEvent* eventPtr{nullptr};
+  auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices( iThread_, nThreads, int( eventList.size() ) );
+
+  if( iThread_ == 0 ){ LogScopeIndent; LogInfo << "Finding bin indexes for \"" << name << "\"..." << std::endl; }
+
+  for( int iEvent = bounds.first ; iEvent < bounds.second ; iEvent++ ){
+    eventPtr = &eventList[iEvent];
+    for( auto& bin : binning.getBinList() ){
+      bool isInBin = std::all_of(bin.getEdgesList().begin(), bin.getEdgesList().end(), [&](const DataBin::Edges& e){
+        return bin.isBetweenEdges( e, eventPtr->getVarAsDouble( e.varName ) );
+      });
+
       if( isInBin ){
-        event.setSampleBinIndex(iBin);
+        eventPtr->setSampleBinIndex( bin.getIndex() );
         break;
       }
-    } // Bin
-  } // Event
+    }
+  }
 }
 void SampleElement::updateBinEventList(int iThread_) {
   if( isLocked ) return;
 
-  if( iThread_ <= 0 ){ LogScopeIndent; LogInfo << "Filling bin event cache for \"" << name << "\"..." << std::endl; }
-  int nBins = int(perBinEventPtrList.size());
   int nbThreads = GundamGlobals::getParallelWorker().getNbThreads();
-  if( iThread_ == -1 ){
-    nbThreads = 1;
-    iThread_ = 0;
-  }
+  if( iThread_ == -1 ){ iThread_ = 0; nbThreads = 1; }
+  if( iThread_ == 0 ){ LogScopeIndent; LogInfo << "Filling bin event cache for \"" << name << "\"..." << std::endl; }
 
-  int iBin = iThread_;
-  size_t count;
+  // multithread technique with iBin += nbThreads;
+  int iBin{iThread_}, nBins{int(perBinEventPtrList.size())};
   while( iBin < nBins ){
-    count = std::count_if(eventList.begin(), eventList.end(), [&](auto& e) {return e.getSampleBinIndex() == iBin;});
+    size_t count = std::count_if(eventList.begin(), eventList.end(), [&](auto& e) {return e.getSampleBinIndex() == iBin;});
     perBinEventPtrList[iBin].resize(count, nullptr);
 
     // Now filling the event indexes
@@ -106,7 +104,7 @@ void SampleElement::refillHistogram(int iThread_){
 
   // Faster that pointer shifter. -> would be slower if refillHistogram is
   // handled by the propagator
-  int iBin = iThread_;
+  int iBin = iThread_; // iBin += nbThreads;
   int nBins = int(perBinEventPtrList.size());
   auto* binContentArrayPtr = histogram->GetArray();
   auto* binErrorArrayPtr = histogram->GetSumw2()->GetArray();
@@ -228,7 +226,7 @@ size_t SampleElement::getNbBinnedEvents() const{
 
 void SampleElement::print() const{
   LogInfo << "SampleElement: " << name << std::endl;
-  LogInfo << " - " << "Nb bins: " << binning.getBinsList().size() << std::endl;
+  LogInfo << " - " << "Nb bins: " << binning.getBinList().size() << std::endl;
   LogInfo << " - " << "Nb events: " << eventList.size() << std::endl;
   LogInfo << " - " << "Hist rescale: " << histScale << std::endl;
 }

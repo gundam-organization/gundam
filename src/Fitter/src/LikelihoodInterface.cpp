@@ -6,16 +6,19 @@
 #include "FitterEngine.h"
 #include "GundamGlobals.h"
 
-#include "GenericToolbox.h"
-#include "GenericToolbox.Root.h"
 #include "GenericToolbox.ScopedGuard.h"
+#include "GenericToolbox.Root.h"
+#include "GenericToolbox.Json.h"
+#include "GenericToolbox.h"
 #include "Logger.h"
 
 #include <limits>
 
+
 LoggerInit([]{
   Logger::setUserHeaderStr("[Likelihood]");
 });
+
 
 LikelihoodInterface::LikelihoodInterface(FitterEngine* owner_): _owner_(owner_) {}
 LikelihoodInterface::~LikelihoodInterface() = default;
@@ -59,7 +62,7 @@ void LikelihoodInterface::initialize() {
 
   _nbFitBins_ = 0;
   for( auto& sample : _owner_->getPropagator().getFitSampleSet().getFitSampleList() ){
-    _nbFitBins_ += int(sample.getBinning().getBinsList().size());
+    _nbFitBins_ += int(sample.getBinning().getBinList().size());
   }
 
   _convergenceMonitor_.addDisplayedQuantity("VarName");
@@ -100,14 +103,14 @@ void LikelihoodInterface::saveGradientSteps(){
   auto currentParState = _owner_->getPropagator().getParametersManager().exportParameterInjectorConfig();
   GenericToolbox::ScopedGuard g{
     [&](){
+      ParametersManager::muteLogger();
       ParameterSet::muteLogger();
-      Propagator::muteLogger();
       ParScanner::muteLogger();
     },
     [&](){
       _owner_->getPropagator().getParametersManager().injectParameterValues( currentParState );
+      ParametersManager::unmuteLogger();
       ParameterSet::unmuteLogger();
-      Propagator::unmuteLogger();
       ParScanner::unmuteLogger();
     }
   };
@@ -117,7 +120,10 @@ void LikelihoodInterface::saveGradientSteps(){
 
   std::vector<GraphEntry> globalGraphList;
   for(size_t iGradStep = 0 ; iGradStep < _gradientMonitor_.size() ; iGradStep++ ){
-    ParameterSet::muteLogger(); Propagator::muteLogger();
+    GenericToolbox::displayProgressBar(iGradStep, _gradientMonitor_.size(), LogInfo.getPrefixString() + "Saving gradient steps...");
+
+    // why do we need to remute the logger at each loop??
+    ParameterSet::muteLogger(); Propagator::muteLogger(); ParametersManager::muteLogger();
     _owner_->getPropagator().getParametersManager().injectParameterValues(_gradientMonitor_[iGradStep].parState );
     _owner_->getPropagator().updateLlhCache();
 
@@ -206,7 +212,7 @@ double LikelihoodInterface::evalFit(const double* parArray_){
     } );
     if( isGradientDescentStep ){
       if( _lastGradientFall_ == _nbFitCalls_-1 ){
-        LogWarning << "Overriding last gradient descent entry: ";
+        LogWarning << "Overriding last gradient descent entry (minimizer adjusting step size...): ";
         LogWarning(_gradientMonitor_.size() >= 2) << _gradientMonitor_[_gradientMonitor_.size() - 2].llh << " -> ";
         LogWarning << _owner_->getPropagator().getLlhBuffer() << std::endl;
         _gradientMonitor_.back().parState = _owner_->getPropagator().getParametersManager().exportParameterInjectorConfig();

@@ -33,19 +33,21 @@ public:
   void setName(const std::string &name){ _name_ = name; }
   void setBinningFilePath(const std::string &binningFilePath_){ _binningFilePath_ = binningFilePath_; }
   void setSelectionCutStr(const std::string &selectionCutStr_){ _selectionCutStr_ = selectionCutStr_; }
-  void setVarSelectionFormulaStr(const std::string &varSelectionFormulaStr_){ _varSelectionFormulaStr_ = varSelectionFormulaStr_; }
   void setEnabledDatasetList(const std::vector<std::string>& enabledDatasetList_){ _enabledDatasetList_ = enabledDatasetList_; }
 
-  // GETTERS
+  // const getters
   [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
   [[nodiscard]] int getIndex() const{ return _index_; }
   [[nodiscard]] double getLlhStatBuffer() const { return _llhStatBuffer_; }
   [[nodiscard]] const std::string &getName() const{ return _name_; }
+  [[nodiscard]] const std::string &getBinningFilePath() const{ return _binningFilePath_; }
   [[nodiscard]] const std::string &getSelectionCutsStr() const{ return _selectionCutStr_; }
-  [[nodiscard]] const std::string &getVarSelectionFormulaStr() const{ return _varSelectionFormulaStr_; }
   [[nodiscard]] const DataBinSet &getBinning() const{ return _binning_; }
   [[nodiscard]] const SampleElement &getMcContainer() const{ return _mcContainer_; }
   [[nodiscard]] const SampleElement &getDataContainer() const{ return _dataContainer_; }
+
+  // getters
+  DataBinSet &getBinning() { return _binning_; }
   SampleElement &getMcContainer(){ return _mcContainer_; }
   SampleElement &getDataContainer(){ return _dataContainer_; }
 
@@ -60,7 +62,6 @@ private:
   double _dataNorm_{1};
   std::string _name_;
   std::string _selectionCutStr_;
-  std::string _varSelectionFormulaStr_;
   std::string _binningFilePath_;
   std::vector<std::string> _enabledDatasetList_;
 

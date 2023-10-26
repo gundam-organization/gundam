@@ -6,6 +6,8 @@
 #define GUNDAM_PHYSICSEVENT_H
 
 #include "ParameterSet.h"
+#include "DataBinSet.h"
+#include "DataBin.h"
 
 #include "GenericToolbox.Root.TreeEntryBuffer.h"
 #include "GenericToolbox.Root.LeafCollection.h"
@@ -65,6 +67,9 @@ public:
   void invalidateVarToDoubleCache();
   void copyData(const std::vector<const GenericToolbox::LeafForm*>& leafFormList_);
   void allocateMemory(const std::vector<const GenericToolbox::LeafForm*>& leafFormList_);
+  bool isInBin(const DataBin& bin_) const;
+  int findBinIndex(const DataBinSet& binSet_) const;
+  int findBinIndex(const std::vector<DataBin>& binSet_) const;
   int findVarIndex(const std::string& leafName_, bool throwIfNotFound_ = true) const;
   double getVarAsDouble(int varIndex_, size_t arrayIndex_ = 0) const;
   double getVarAsDouble(const std::string& leafName_, size_t arrayIndex_ = 0) const;

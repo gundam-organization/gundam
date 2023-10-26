@@ -252,7 +252,7 @@ void MinimizerInterface::minimize(){
     leavesDict.emplace_back("llhSample/D");
     samplesArrList[iSample].writeRawData(getPropagator().getFitSampleSet().getJointProbabilityFct()->eval(sample));
 
-    int nBins = int(sample.getBinning().getBinsList().size());
+    int nBins = int(sample.getBinning().getBinList().size());
     for( int iBin = 1 ; iBin <= nBins ; iBin++ ){
       leavesDict.emplace_back("llhSample_bin" + std::to_string(iBin) + "/D");
       samplesArrList[iSample].writeRawData(getPropagator().getFitSampleSet().getJointProbabilityFct()->eval(sample, iBin));

@@ -49,6 +49,10 @@ public:
   void throwParametersFromParSetCovariance();
   void throwParametersFromGlobalCovariance(bool quietVerbose_ = true);
   ParameterSet* getFitParameterSetPtr(const std::string& name_);
+  
+  // Logger related
+  static void muteLogger();
+  static void unmuteLogger();
 
 private:
   // config

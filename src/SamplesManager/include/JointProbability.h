@@ -13,9 +13,8 @@
 #include "nlohmann/json.hpp"
 
 #include <dlfcn.h>
-
-#include <string>
 #include <sstream>
+#include <string>
 #include <memory>
 
 
@@ -28,7 +27,7 @@ namespace JointProbability {
     virtual double eval(const Sample& sample_, int bin_){ return 0; }
     virtual double eval(const Sample& sample_){
       double out{0};
-      int nBins = int(sample_.getBinning().getBinsList().size());
+      int nBins = int(sample_.getBinning().getBinList().size());
       for( int iBin = 1 ; iBin <= nBins ; iBin++ ){ out += this->eval(sample_, iBin); }
       return out;
     }
@@ -96,6 +95,8 @@ namespace JointProbability {
   public:
     double eval(const Sample& sample_, int bin_) override;
 
+    bool verbose{false};
+    bool allowZeroMcWhenZeroData{false};
     bool usePoissonLikelihood{false};
     bool BBNoUpdateWeights{false};
   };

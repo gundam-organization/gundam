@@ -92,7 +92,7 @@ void ParScanner::initializeImpl() {
         scanEntry.folder = "llhStat/" + sample.getName() + "/bin_" + std::to_string(iBin);
         scanEntry.title = Form(R"(Stat LLH Scan of sample "%s", bin #%d "%s")",
                                sample.getName().c_str(), iBin,
-                               sample.getBinning().getBinsList()[iBin-1].getSummary().c_str());
+                               sample.getBinning().getBinList()[iBin-1].getSummary().c_str());
         scanEntry.yTitle = "Stat LLH value";
         auto* samplePtr = &sample;
         scanEntry.evalY = [this, samplePtr, iBin](){ return _owner_->getFitSampleSet().getJointProbabilityFct()->eval(*samplePtr, iBin); };
@@ -121,7 +121,7 @@ void ParScanner::initializeImpl() {
         scanEntry.title = Form(R"(MC event weight scan of sample "%s", bin #%d "%s")",
                                sample.getName().c_str(),
                                iBin,
-                               sample.getBinning().getBinsList()[iBin-1].getSummary().c_str());
+                               sample.getBinning().getBinList()[iBin-1].getSummary().c_str());
         scanEntry.yTitle = "Total MC event weight";
         auto* samplePtr = &sample;
         scanEntry.evalY = [samplePtr, iBin](){ return samplePtr->getMcContainer().histogram->GetBinContent(iBin); };
@@ -255,8 +255,8 @@ void ParScanner::scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, c
 
   // don't shout while re-injecting parameters
   GenericToolbox::ScopedGuard s(
-      []{ ParameterSet::muteLogger(); Propagator::muteLogger(); },
-      []{ ParameterSet::unmuteLogger(); Propagator::unmuteLogger(); }
+      []{ ParameterSet::muteLogger(); ParametersManager::muteLogger(); },
+      []{ ParameterSet::unmuteLogger(); ParametersManager::unmuteLogger(); }
   );
 
   LogThrowIf(end_.empty(), "Ending injector config is empty()");
@@ -411,8 +411,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
   std::map<Parameter*, double> parStateList{};
   GenericToolbox::ScopedGuard g(
       [&]{
-        LogScopeIndent;
-        LogDebug << "Temporarily pulling back parameters at their prior before performing the event rate..." << std::endl;
+        LogWarning << "Temporarily pulling back parameters at their prior before performing the event rate..." << std::endl;
         for( auto& parSet : _owner_->getParametersManager().getParameterSetsList() ){
           if( not parSet.isEnabled() ) { continue; }
           for( auto& par : parSet.getParameterList() ){
@@ -424,8 +423,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
         _owner_->propagateParametersOnSamples();
       },
       [&]{
-        LogScopeIndent;
-        LogDebug << "Restoring parameters to their original values..." << std::endl;
+        LogWarning << "Restoring parameters to their original values..." << std::endl;
         for( auto& parSet : _owner_->getParametersManager().getParameterSetsList() ){
           if( not parSet.isEnabled() ) { continue; }
           for( auto& par : parSet.getParameterList() ){

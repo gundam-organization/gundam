@@ -3,6 +3,7 @@
 //
 
 #include "ParametersManager.h"
+#include "ConfigUtils.h"
 
 #include "GenericToolbox.ScopedGuard.h"
 #include "GenericToolbox.Json.h"
@@ -16,6 +17,10 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[ParameterManager]");
 });
 
+
+// logger
+void ParametersManager::muteLogger(){ Logger::setIsMuted( true ); }
+void ParametersManager::unmuteLogger(){ Logger::setIsMuted( false ); }
 
 // config
 void ParametersManager::readConfigImpl(){
@@ -268,9 +273,6 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
       }
 
     }
-
-
-
 
     // reached this point: all parameters are within bounds
     keepThrowing = false;
