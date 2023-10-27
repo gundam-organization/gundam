@@ -860,8 +860,6 @@ void DataDispenser::fillFunction(int iThread_){
   std::vector<EventVarTransformLib*> varTransformForIndexingList;
   std::vector<EventVarTransformLib*> varTransformForStorageList;
   for( auto& eventVarTransform : eventVarTransformList ){
-    ((EventVarTransformLib*) &eventVarTransform)->reload();
-
     if( GenericToolbox::doesElementIsInVector(eventVarTransform.getOutputVariableName(), _cache_.varsRequestedForIndexing) ){
       varTransformForIndexingList.emplace_back(&eventVarTransform);
     }
