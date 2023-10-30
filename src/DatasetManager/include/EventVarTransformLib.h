@@ -13,6 +13,8 @@ public:
   EventVarTransformLib() = default;
   explicit EventVarTransformLib(const nlohmann::json& config_){ this->readConfig(config_); }
 
+  void reload();
+
 protected:
   void initializeImpl() override;
   void readConfigImpl() override;

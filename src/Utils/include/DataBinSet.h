@@ -41,6 +41,10 @@ public:
   void sortBins();
   [[nodiscard]] std::vector<std::string> buildVariableNameList() const;
 
+protected:
+  void readTxtBinningDefinition();    // original txt
+  void readBinningConfig(); // yaml/json
+
 private:
   std::string _name_;
   std::string _filePath_;

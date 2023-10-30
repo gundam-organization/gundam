@@ -30,6 +30,7 @@ TFile* outFile{nullptr};
 bool verbose{false};
 
 
+void makeEventComparePlots(bool usePrefit_);
 void makeSampleComparePlots(bool usePrefit_);
 void makeScanComparePlots(bool usePrefit_);
 void makeErrorComparePlots(bool usePrefit_, bool useNomVal_);
@@ -54,6 +55,7 @@ int main( int argc, char** argv ){
   clp.addDummyOption("Trigger options");
   clp.addTriggerOption("use-prefit-1", {"--prefit-1"}, "Use prefit data only for file 1.");
   clp.addTriggerOption("use-prefit-2", {"--prefit-2"}, "Use prefit data only for file 2.");
+  clp.addTriggerOption("compare-event-trees", {"--tree"}, "Comparing loaded events in tree.");
   clp.addTriggerOption("verbose", {"-v"}, "Recursive verbosity printout.");
 
   clp.addDummyOption("");
@@ -102,8 +104,11 @@ int main( int argc, char** argv ){
   }
   outFile = TFile::Open(outPath.c_str(), "RECREATE");
 
-
   LogAlert << std::endl << "Starting comparison..." << std::endl;
+
+  if( clp.isOptionTriggered("compare-event-trees") ){
+
+  }
 
   LogInfo << "Comparing preFit scans..." << std::endl;
   makeScanComparePlots(true);
@@ -132,6 +137,29 @@ int main( int argc, char** argv ){
 }
 
 
+void makeEventComparePlots(bool usePrefit_){
+  auto filePath1 = clp.getOptionVal<std::string>("file-1");
+  auto filePath2 = clp.getOptionVal<std::string>("file-2");
+
+  auto name1 = clp.getOptionVal("name-1", filePath1);
+  auto name2 = clp.getOptionVal("name-2", filePath2);
+
+  auto* file1 = GenericToolbox::openExistingTFile(filePath1);
+  auto* file2 = GenericToolbox::openExistingTFile(filePath2);
+
+  std::string strBuffer;
+
+  strBuffer = Form("FitterEngine/%s/events", ((usePrefit_ or clp.isOptionTriggered("use-prefit-1"))? "preFit": "postFit"));
+  auto* dir1 = file1->Get<TDirectory>(strBuffer.c_str());
+  LogReturnIf(dir1== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath1);
+
+  strBuffer = Form("FitterEngine/%s/events", ((usePrefit_ or clp.isOptionTriggered("use-prefit-2"))? "preFit": "postFit"));
+  auto* dir2 = file2->Get<TDirectory>(strBuffer.c_str());
+  LogReturnIf(dir2== nullptr, "Could not find \"" << strBuffer << "\" within " << filePath2);
+
+
+
+}
 void makeSampleComparePlots(bool usePrefit_){
   auto filePath1 = clp.getOptionVal<std::string>("file-1");
   auto filePath2 = clp.getOptionVal<std::string>("file-2");

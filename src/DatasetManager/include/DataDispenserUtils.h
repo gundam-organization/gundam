@@ -26,7 +26,7 @@ struct DataDispenserParameters{
   std::string selectionCutFormulaStr{};
   std::vector<std::string> activeLeafNameList{};
   std::vector<std::string> filePathList{};
-  std::map<std::string, std::string> overrideLeafDict{};
+  std::map<std::string, std::string> variableDict{};
   std::vector<std::string> additionalVarsStorage{};
   std::vector<std::string> dummyVariablesList;
   int iThrow{-1};

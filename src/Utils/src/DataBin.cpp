@@ -15,6 +15,28 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[DataBin]");
 } );
 
+
+void DataBin::Edges::readConfig(const nlohmann::json& config_){
+
+  varName = GenericToolbox::Json::fetchValue<std::string>(config_, "var");
+
+  if( GenericToolbox::Json::doKeyExist(config_, "bounds") ){
+    auto bounds = GenericToolbox::Json::fetchValue<std::vector<double>>(config_, "bounds");
+    LogThrowIf( bounds.size() != 2, "bounds don't have two elements: " << config_ );
+    min = std::min( bounds[0], bounds[1] );
+    max = std::max( bounds[0], bounds[1] );
+    if( min == max ){ isConditionVar = true; }
+  }
+  else if( GenericToolbox::Json::doKeyExist(config_, "value") ){
+    min = GenericToolbox::Json::fetchValue<double>(config_, "value");
+    max = min;
+    isConditionVar = true;
+  }
+  else{
+    LogThrow("No bound definition for edges: " << config_);
+  }
+
+}
 bool DataBin::Edges::isOverlapping(const DataBin::Edges& other_) const{
   if( this->isConditionVar != other_.isConditionVar ){
     LogError << "Mismatch with a variable: in one bin, it is a condition variable while in another it's a range." << std::endl;
@@ -50,7 +72,7 @@ void DataBin::addBinEdge(const std::string &variableName_, double lowEdge_, doub
   _binEdgesList_.emplace_back(_binEdgesList_.size());
   _binEdgesList_.back().min = std::min( lowEdge_, highEdge_ );
   _binEdgesList_.back().max = std::max( lowEdge_, highEdge_ );
-  if( lowEdge_ == highEdge_ ){
+  if( _binEdgesList_.back().max == _binEdgesList_.back().min ){
     if( not _isZeroWideRangesTolerated_ ){
       LogError << GET_VAR_NAME_VALUE(_isZeroWideRangesTolerated_) << " but lowEdge_ == highEdge_ = " << lowEdge_ << std::endl;
       throw std::logic_error(GET_VAR_NAME_VALUE(_isZeroWideRangesTolerated_) + " but lowEdge_ == highEdge_.");
@@ -171,6 +193,16 @@ void DataBin::generateTreeFormula() {
     }
   }
   _treeFormula_ = std::shared_ptr<TTreeFormula>(GenericToolbox::createTreeFormulaWithoutTree(_treeFormulaStr_, varNameList));
+}
+void DataBin::readConfig( const nlohmann::json& config_){
+
+  auto edgesConfigList = GenericToolbox::Json::fetchValue(config_, "edgesList", nlohmann::json());
+  _binEdgesList_.reserve( edgesConfigList.size() );
+  for( auto& edgeConfig : edgesConfigList ){
+    _binEdgesList_.emplace_back( _binEdgesList_.size() );
+    _binEdgesList_.back().readConfig( edgeConfig );
+  }
+
 }
 std::string DataBin::getSummary() const{
   std::stringstream ss;
