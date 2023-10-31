@@ -97,8 +97,8 @@ int main(int argc, char** argv){
         gRandom->SetSeed(seed);
     }
 
-    GundamGlobals::setNbThreads(clParser.getOptionVal("nbThreads", 1));
-    LogInfo << "Running the fitter with " << GundamGlobals::getNbThreads() << " parallel threads." << std::endl;
+    GundamGlobals::getParallelWorker().setNThreads(clParser.getOptionVal("nbThreads", 1));
+    LogInfo << "Running the fitter with " << GundamGlobals::getParallelWorker().getNbThreads() << " parallel threads." << std::endl;
 
     // Reading fitter file
     LogInfo << "Opening fitter output file: " << clParser.getOptionVal<std::string>("fitterOutputFile") << std::endl;
