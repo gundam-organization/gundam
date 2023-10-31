@@ -13,7 +13,7 @@
 
 #include "CacheIndexedSums.h"
 
-#include "FitSampleSet.h"
+#include "SampleSet.h"
 #include "EventDialCache.h"
 
 #include "hemi/array.h"
@@ -24,7 +24,7 @@ namespace Cache {
     class Manager;
 }
 
-class FitParameter;
+class Parameter;
 
 /// Manage the cache calculations on the GPU.  This will work even when there
 /// isn't a GPU, but it's really slow on the CPU.  This is a singleton.
@@ -40,13 +40,13 @@ public:
 
     /// Build the cache and load it into the device.  This is used in
     /// Propagator.cpp to fill the constants needed to for the calculations.
-    static bool Build(FitSampleSet& sampleList, EventDialCache& eventDials);
+    static bool Build(SampleSet& sampleList, EventDialCache& eventDials);
 
     /// Update the cache with the event and spline information.  This is
     /// called as part of Build, and can be called in other code if the cache
     /// needs to be changed.  It forages all of the information from the
     /// original sample list and event dials.
-    static bool Update(FitSampleSet& sampleList, EventDialCache& eventDials);
+    static bool Update(SampleSet& sampleList, EventDialCache& eventDials);
 
     /// Flag that the Cache::Manager internal caches must be updated from the
     /// FitSampleSet and EventDialCache before it can be used.
@@ -54,7 +54,7 @@ public:
 
     /// This returns the index of the parameter in the cache.  If the
     /// parameter isn't defined, this will return a negative value.
-    static int ParameterIndex(const FitParameter* fp);
+    static int ParameterIndex(const Parameter* fp);
 
     /// Return true if a GPU is available.
     static bool HasCUDA();
@@ -77,7 +77,7 @@ private:
 
     // A map between the fit parameter pointers and the parameter index used
     // by the fitter.
-    static std::map<const FitParameter*, int> ParameterMap;
+    static std::map<const Parameter*, int> ParameterMap;
 
     /// Declare all of the actual GPU caches here.  There is one GPU, so this
     /// is the ONE place that everything is collected together.

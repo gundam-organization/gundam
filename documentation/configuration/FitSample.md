@@ -1,6 +1,6 @@
-## FitSample
+## Sample
 
-[< back to parent (FitSampleSet)](./FitSampleSet.md)
+[< back to parent (SampleSet)](./SampleSet.md)
 
 ### Description
 

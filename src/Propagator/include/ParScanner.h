@@ -6,7 +6,7 @@
 #define GUNDAM_PARSCANNER_H
 
 #include "JsonBaseClass.h"
-#include "FitParameter.h"
+#include "Parameter.h"
 
 #include "TDirectory.h"
 #include "TGraph.h"
@@ -26,7 +26,7 @@ struct ScanData{
 
 struct GraphEntry{
   ScanData* scanDataPtr{nullptr};
-  FitParameter* fitParPtr{nullptr};
+  Parameter* fitParPtr{nullptr};
   TGraph graph{};
 };
 
@@ -48,8 +48,8 @@ public:
   [[nodiscard]] const std::vector<GraphEntry> &getGraphEntriesBuf() const { return _graphEntriesBuf_; };
 
   // Core
-  void scanFitParameters(std::vector<FitParameter>& par_, TDirectory* saveDir_);
-  void scanFitParameter(FitParameter& par_, TDirectory* saveDir_);
+  void scanFitParameters(std::vector<Parameter>& par_, TDirectory* saveDir_);
+  void scanFitParameter(Parameter& par_, TDirectory* saveDir_);
   void scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, const nlohmann::json &start_ = nlohmann::json(), int nSteps_=-1);
   void generateOneSigmaPlots(TDirectory* saveDir_);
   void varyEvenRates(const std::vector<double>& paramVariationList_, TDirectory* saveDir_);

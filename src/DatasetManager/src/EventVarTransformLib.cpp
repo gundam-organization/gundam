@@ -4,6 +4,8 @@
 
 #include "EventVarTransformLib.h"
 
+#include "GenericToolbox.Json.h"
+
 #include <dlfcn.h>
 
 LoggerInit([]{
@@ -19,6 +21,10 @@ void EventVarTransformLib::initializeImpl(){
   LogInfo << "Loading variable transformation: " << _title_ << std::endl;
   LogThrowIf(_outputVariableName_.empty(), "output variable name not set.");
 
+  this->reload();
+}
+
+void EventVarTransformLib::reload(){
   this->loadLibrary();
   this->initInputFormulas();
 }

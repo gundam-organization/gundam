@@ -1,8 +1,8 @@
 ## DialSet
 
-[< back to parent (FitParameterSet)](./FitParameterSet.md)
+[< back to parent (ParameterSet)](./ParameterSet.md)
 
-[< back to parent (FitParameterSet)](./FitParameter.md)
+[< back to parent (ParameterSet)](./Parameter.md)
 
 ### Description
 

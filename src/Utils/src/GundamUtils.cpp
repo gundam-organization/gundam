@@ -24,6 +24,7 @@ namespace GundamUtils {
     ss << GundamVersionConfig::getVersionStr();
     if( not GundamVersionConfig::getVersionPostCommitNb().empty() ){
       ss << "+" << GundamVersionConfig::getVersionPostCommitNb() << "-" << GundamVersionConfig::getVersionPostCommitHash();
+      ss << "/" << GundamVersionConfig::getVersionBranch();
     }
     return ss.str();
   }

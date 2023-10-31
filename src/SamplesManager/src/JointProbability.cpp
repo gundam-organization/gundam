@@ -27,7 +27,7 @@ namespace JointProbability{
     else if( not llhPluginSrc.empty() ){ this->compile(); this->load(); }
     else{ LogThrow("Can't initialize JointProbabilityPlugin without llhSharedLib nor llhPluginSrc."); }
   }
-  double JointProbabilityPlugin::eval(const FitSample& sample_, int bin_) {
+  double JointProbabilityPlugin::eval(const Sample& sample_, int bin_) {
     LogThrowIf(evalFcn == nullptr, "Library not loaded properly.");
     return reinterpret_cast<double(*)(double, double, double)>(evalFcn)(
         sample_.getDataContainer().histogram->GetBinContent(bin_),
@@ -55,15 +55,22 @@ namespace JointProbability{
 
   // BarlowLLH_BANFF_OA2021
   void BarlowLLH_BANFF_OA2021::readConfigImpl(){
+    allowZeroMcWhenZeroData = GenericToolbox::Json::fetchValue(_config_, "allowZeroMcWhenZeroData", allowZeroMcWhenZeroData);
     usePoissonLikelihood = GenericToolbox::Json::fetchValue(_config_, "usePoissonLikelihood", usePoissonLikelihood);
     BBNoUpdateWeights = GenericToolbox::Json::fetchValue(_config_, "BBNoUpdateWeights", BBNoUpdateWeights);
+    verbose = GenericToolbox::Json::fetchValue(_config_, "isVerbose", verbose);
 
     LogInfo << "Using BarlowLLH_BANFF_OA2021 parameters:" << std::endl;
-    LogInfo << GET_VAR_NAME_VALUE(usePoissonLikelihood) << std::endl;
-    LogInfo << GET_VAR_NAME_VALUE(BBNoUpdateWeights) << std::endl;
+    {
+      LogScopeIndent;
+      LogInfo << GET_VAR_NAME_VALUE(allowZeroMcWhenZeroData) << std::endl;
+      LogInfo << GET_VAR_NAME_VALUE(usePoissonLikelihood) << std::endl;
+      LogInfo << GET_VAR_NAME_VALUE(BBNoUpdateWeights) << std::endl;
+      LogInfo << GET_VAR_NAME_VALUE(verbose) << std::endl;
+    }
   }
 
-  double BarlowLLH_BANFF_OA2021::eval(const FitSample& sample_, int bin_) {
+  double BarlowLLH_BANFF_OA2021::eval(const Sample& sample_, int bin_) {
     TH1D* data = sample_.getDataContainer().histogram.get();
     TH1D* predMC = sample_.getMcContainer().histogram.get();
     TH1D* nomMC = sample_.getMcContainer().histogramNominal.get();
@@ -148,9 +155,9 @@ namespace JointProbability{
     else {
       // The mc predicted value is zero, and the data value is not zero.
       // Inconceivable!
-      LogError << "Data and predicted value give infinite statistical LLH"
+      LogErrorIf(verbose) << "Data and predicted value give infinite statistical LLH / "
                << "Data: " << dataVal
-               << "Barlow Beeston adjusted MC: " << newmc
+               << " / Barlow Beeston adjusted MC: " << newmc
                << std::endl;
     }
 
@@ -175,11 +182,13 @@ namespace JointProbability{
       }
     }
     else {
-      chisq += 1E+20;
-      LogError << "Data and predicted value give infinite statistical LLH"
-               << "Data: " << dataVal
-               << "MC: " << newmc
-               << std::endl;
+      if( not allowZeroMcWhenZeroData or dataVal != 0 ){
+        chisq += 1E+20;
+        LogErrorIf(verbose) << "Data and predicted value give infinite statistical LLH / "
+                 << "Data: " << dataVal
+                 << " / MC: " << newmc
+                 << std::endl;
+      }
     }
 
     if (not std::isfinite(chisq)) [[unlikely]] {
@@ -202,7 +211,7 @@ namespace JointProbability{
   }
 
   // BarlowLLH_BANFF_OA2020
-  double BarlowLLH_BANFF_OA2020::eval(const FitSample& sample_, int bin_){
+  double BarlowLLH_BANFF_OA2020::eval(const Sample& sample_, int bin_){
       // From BANFF: origin/OA2020 branch -> BANFFBinnedSample::CalcLLRContrib()
 
       //Loop over all the bins one by one using their unique bin index.
@@ -285,7 +294,7 @@ namespace JointProbability{
   }
 
   // Chi2
-  double Chi2::eval(const FitSample& sample_, int bin_){
+  double Chi2::eval(const Sample& sample_, int bin_){
     double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
     double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
     if( predVal == 0 ){
@@ -298,7 +307,7 @@ namespace JointProbability{
   }
 
   // PoissonLLH
-  double PoissonLLH::eval(const FitSample& sample_, int bin_){
+  double PoissonLLH::eval(const Sample& sample_, int bin_){
       double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
       double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
 
@@ -323,7 +332,7 @@ namespace JointProbability{
     lsqPoissonianApproximation = GenericToolbox::Json::fetchValue(_config_, "lsqPoissonianApproximation", lsqPoissonianApproximation);
     LogWarning << "Using Least Squares Poissonian Approximation" << std::endl;
   }
-  double LeastSquaresLLH::eval(const FitSample& sample_, int bin_){
+  double LeastSquaresLLH::eval(const Sample& sample_, int bin_){
     double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
     double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
     double v = dataVal - predVal;
@@ -333,7 +342,7 @@ namespace JointProbability{
   }
 
   // BarlowLLH
-  double BarlowLLH::eval(const FitSample& sample_, int bin_){
+  double BarlowLLH::eval(const Sample& sample_, int bin_){
       rel_var = sample_.getMcContainer().histogram->GetBinError(bin_) / TMath::Sq(sample_.getMcContainer().histogram->GetBinContent(bin_));
       b       = (sample_.getMcContainer().histogram->GetBinContent(bin_) * rel_var) - 1;
       c       = 4 * sample_.getDataContainer().histogram->GetBinContent(bin_) * rel_var;
@@ -360,7 +369,7 @@ namespace JointProbability{
       return chi2;
   }
 
-  double BarlowLLH_BANFF_OA2021_SFGD::eval(const FitSample& sample_, int bin_){
+  double BarlowLLH_BANFF_OA2021_SFGD::eval(const Sample& sample_, int bin_){
 
       double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
       double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);

@@ -5,7 +5,7 @@
 #ifndef GUNDAM_DIALINPUTBUFFER_H
 #define GUNDAM_DIALINPUTBUFFER_H
 
-#include "FitParameterSet.h"
+#include "ParameterSet.h"
 
 #include <vector>
 #include <utility>
@@ -19,40 +19,40 @@ public:
   /// Set the IsMasked flag.  This flag is ignored internally, but
   /// can be set internally when a parameter set is masked.  The value
   /// of the flag is checked using isMasked()
-  void setIsMasked(bool isMasked);
+  void setIsMasked(bool isMasked){ _isMasked_ = isMasked; }
 
   /// Flag that the parameters being used in this DialInputBuffer include
   /// mirroring.  If this is set, then mirroring bounds must be provided
   /// for all parameters in the DialInputBuffer.
-  void setUseParameterMirroring(bool useParameterMirroring);
+  void setUseParameterMirroring(bool useParameterMirroring){ _useParameterMirroring_ = useParameterMirroring; }
 
   /// Tell the input buffer about the global vector of fit parameter sets.
   /// This is required, so it must be set before the DialInputBuffer can
   /// be used.
-  void setParSetRef(std::vector<FitParameterSet> *parSetRef);
+  void setParSetRef(std::vector<ParameterSet> *parSetRef){ _parSetRef_ = parSetRef; }
 
-  [[nodiscard]] bool isMasked() const;
-  [[nodiscard]] bool isDialUpdateRequested() const;
-  [[nodiscard]] bool useParameterMirroring() const;
+  // Getters
+  [[nodiscard]] bool isMasked() const{ return _isMasked_; }
+  [[nodiscard]] bool isDialUpdateRequested() const{ return _isDialUpdateRequested_; }
+  [[nodiscard]] bool useParameterMirroring() const{ return _useParameterMirroring_; }
 
   /// Just a wrapper around the vector<double>::size() method.
-  [[nodiscard]] size_t getBufferSize() const;
+  [[nodiscard]] size_t getBufferSize() const{ return _buffer_.size(); }
 
   /// All I can say is "wow".  This is returning a raw pointer the underlying
   /// vector memory.  This is vector<double>::data(), so it returns an array
   /// of parameter values that should be passed to the dial.
-  [[nodiscard]] const double* getBuffer() const;
+  [[nodiscard]] const double* getBuffer() const{ return _buffer_.data(); }
 
   /// Get a pointer to the FitParameter for a DialInputBuffer entry.
-  [[nodiscard]] const FitParameter& getFitParameter(int i=0) const;
+  [[nodiscard]] const Parameter& getFitParameter(int i=0) const;
 
   /// Get a pointer to the FitParameterSet for the DialInputBuffer entry.
-  [[nodiscard]] const FitParameterSet& getFitParameterSet(int i=0) const;
+  [[nodiscard]] const ParameterSet& getFitParameterSet(int i=0) const;
 
   /// Get the reference to the hash for the current cache.
-  [[nodiscard]] const uint32_t& getCurrentHash() const;
-
-  [[nodiscard]] const std::vector<std::pair<size_t, size_t>> &getInputParameterIndicesList() const;
+  [[nodiscard]] const uint32_t& getCurrentHash() const{ return _currentHash_; }
+  [[nodiscard]] const std::vector<std::pair<size_t, size_t>> &getInputParameterIndicesList() const{ return _inputParameterIndicesList_; }
 
   /// Update the buffer to flag if any parameter has changed, and apply any
   /// mirroring to the parameter values.
@@ -125,7 +125,7 @@ private:
 
   /// A pointer to the "global" vector of fit parameter sets.  This provides
   /// the connection to the fit parameters.
-  std::vector<FitParameterSet>* _parSetRef_{nullptr};
+  std::vector<ParameterSet>* _parSetRef_{nullptr};
 
   // for cache
   uint32_t _currentHash_{0};

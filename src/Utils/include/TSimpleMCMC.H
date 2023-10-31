@@ -1,12 +1,7 @@
 #ifndef TSimpleMCMC_H_SEEN
 #define TSimpleMCMC_H_SEEN
 
-#include <iostream>
-#include <vector>
-#include <algorithm>
-#include <limits>
-#include <cmath>
-#include <stdexcept>
+#include "Logger.h"
 
 #include <TRandom.h>
 #include <TFile.h>
@@ -15,11 +10,19 @@
 #include <TMatrixDSymEigen.h>
 #include <TDecompChol.h>
 
-typedef double Parameter;
-typedef std::vector<Parameter> Vector;
+#include <iostream>
+#include <vector>
+#include <algorithm>
+#include <limits>
+#include <cmath>
+#include <stdexcept>
+
+
+typedef double ParameterType;
+typedef std::vector<ParameterType> Vector;
 
 // A typedef for how the parameters are written to a tree.
-typedef std::vector<Parameter> SavedVector;
+typedef std::vector<ParameterType> SavedVector;
 
 #ifndef MCMC_DEBUG_LEVEL
 #define MCMC_DEBUG_LEVEL 2
@@ -627,7 +630,7 @@ public:
         fAcceptanceWindow(-1), fAcceptanceRigidity(2.0),
         fTargetAcceptance(-1), fSigma(0.0), fStateInitialized(false),
         fScanDimension(-1) {
-        fMaxCorrelation = std::numeric_limits<Parameter>::epsilon();
+        fMaxCorrelation = std::numeric_limits<ParameterType>::epsilon();
         fMaxCorrelation = 1.0 - std::sqrt(fMaxCorrelation);
     }
 
@@ -1036,7 +1039,7 @@ public:
         }
 
         // The minimum allowed variance for the posterior along any axis.
-        double minVar = std::numeric_limits<Parameter>::epsilon();
+        double minVar = std::numeric_limits<ParameterType>::epsilon();
 
 #ifndef MCMC_SKIP_CHOLESKY_DECOMPOSITION
         // Decompose the current covariance and use it for the proposal.  If
@@ -1273,7 +1276,7 @@ public:
         // to the initial value.
 
         // Set the amount to increast the variances by at each trial.
-        double step = std::numeric_limits<Parameter>::epsilon();
+        double step = std::numeric_limits<ParameterType>::epsilon();
         for (std::size_t i=0; i<fLastPoint.size(); ++i) {
             step = std::max(step,fCurrentCov(i,i));
         }
@@ -1412,7 +1415,7 @@ public:
             fCovarianceWindow *= fLastPoint.size();
             fCovarianceWindow *= fLastPoint.size();
             fCovarianceWindow += minWindow;
-            double r = std::numeric_limits<Parameter>::epsilon();
+            double r = std::numeric_limits<ParameterType>::epsilon();
             fCovarianceWindow = std::min(fCovarianceWindow,std::sqrt(1.0/r));
         }
         // After reseting, erase the acceptance history.

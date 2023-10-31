@@ -42,7 +42,7 @@ void PlotGenerator::initializeImpl() {
 }
 
 // Setters
-void PlotGenerator::setFitSampleSetPtr(const FitSampleSet *fitSampleSetPtr) {
+void PlotGenerator::setFitSampleSetPtr(const SampleSet *fitSampleSetPtr) {
   _fitSampleSetPtr_ = fitSampleSetPtr;
 }
 
@@ -155,22 +155,22 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
           if( not histPtrToFill->isBinCacheBuilt ){
             // If any, launch rebuild cache
             LogInfo << "Build event bin cache for sample \"" << sample.getName() << "\" " << (isData? "(data)":"(mc)") << std::endl;
-            this->buildEventBinCache(histPtrToFillList, eventListPtr, isData);
+            PlotGenerator::buildEventBinCache(histPtrToFillList, eventListPtr, isData);
             break; // all caches done at once
           }
         }
 
-
         // Filling the selected histograms
-        int nThreads = GundamGlobals::getNbThreads();
-        std::function<void(int)> fillJob = [&]( int iThread ){
-          int iEvent = -1;
-          int iHist = -1;
-          std::string pBarTitle;
-          if( iThread == 0 ) pBarTitle = LogDebug.getPrefixString() + "Filling histograms of sample \"" + sample.getName() + "\"";
+        std::function<void(int)> fillJob = [&]( int iThread_ ){
 
-          for( auto& hist : histPtrToFillList ){
-            for( int iBin = iThread+1 ; iBin <= hist->histPtr->GetNbinsX() ; iBin += nThreads ){
+          for( auto* hist : histPtrToFillList ){
+
+            auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
+                iThread_, GundamGlobals::getParallelWorker().getNbThreads(),
+                hist->histPtr->GetNbinsX()
+            );
+
+            for( int iBin = bounds.first+1 ; iBin <= bounds.second ; iBin++ ){
               hist->histPtr->SetBinContent(iBin, 0);
               for( auto* evtPtr : hist->_binEventPtrList_[iBin-1] ){
                 hist->histPtr->AddBinContent(iBin, evtPtr->getEventWeight());
@@ -261,7 +261,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
   int canvasNbXplots = GenericToolbox::Json::fetchValue(_canvasParameters_, "nbXplots", 3);
   int canvasNbYplots = GenericToolbox::Json::fetchValue(_canvasParameters_, "nbYplots", 2);
 
-  std::map<std::string, std::map<const FitSample*, std::vector<const HistHolder*>>> histsToStackMap; // histsToStackMap[path][FitSample] = listOfTh1d
+  std::map<std::string, std::map<const Sample*, std::vector<const HistHolder*>>> histsToStackMap; // histsToStackMap[path][FitSample] = listOfTh1d
   for( auto& histHolder : histHolderList_ ){
     if( histHolder.isData ) continue; // data associated to each later
     histsToStackMap[buildCanvasPath(&histHolder)][histHolder.fitSamplePtr].emplace_back(&histHolder );
@@ -272,7 +272,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
     const std::string& canvasPath = histsSamples.first;
     for( auto& histsToStack : histsSamples.second ){
       for( auto& histHolder : histHolderList_ ){
-        const FitSample* samplePtr = histsToStack.first;
+        const Sample* samplePtr = histsToStack.first;
 
         // we are searching for data
         if( not histHolder.isData ) continue;
@@ -297,7 +297,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
     int canvasIndex = 0;
     int iSampleSlot = 0;
     for (const auto &histList : histsToStackPair.second) {
-      const FitSample* samplePtr = histList.first;
+      const Sample* samplePtr = histList.first;
       iSampleSlot++;
 
       if (iSampleSlot > canvasNbXplots * canvasNbYplots) {
@@ -620,7 +620,7 @@ void PlotGenerator::defineHistogramHolders() {
   _histHolderCacheList_[0].clear();
 
   LogInfo << "Fetching appearing split vars..." << std::endl;
-  std::map<std::string, std::map<const FitSample*, std::vector<int>>> splitVarsDictionary;
+  std::map<std::string, std::map<const Sample*, std::vector<int>>> splitVarsDictionary;
   for( const auto& histConfig : _histogramsDefinition_ ){
     auto splitVars = GenericToolbox::Json::fetchValue(histConfig, "splitVars", std::vector<std::string>{""});
     for( auto& splitVar : splitVars ){
@@ -634,11 +634,13 @@ void PlotGenerator::defineHistogramHolders() {
   }
 
   std::function<void(int)> fetchSplitVar = [&](int iThread_){
-    int iSample{-1};
-    int iHistDef;
-    for( const auto& sample : _fitSampleSetPtr_->getFitSampleList() ){
-      iSample++;
-      if(iSample % GundamGlobals::getNbThreads() != iThread_ ){ continue; }
+    auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
+        iThread_, GundamGlobals::getParallelWorker().getNbThreads(),
+        int(_fitSampleSetPtr_->getFitSampleList().size())
+    );
+
+    for( int iSample = bounds.first ; iSample < bounds.second ; iSample++ ){
+      const Sample& sample = _fitSampleSetPtr_->getFitSampleList()[iSample];
       for( const auto& event : sample.getMcContainer().eventList ){
         for( auto& splitVarInstance: splitVarsDictionary ){
           if(splitVarInstance.first.empty()) continue;
@@ -648,8 +650,9 @@ void PlotGenerator::defineHistogramHolders() {
           }
         } // splitVarList
       } // Event
-    } // Sample
+    }
   };
+
   GundamGlobals::getParallelWorker().addJob("fetchSplitVar", fetchSplitVar);
   GundamGlobals::getParallelWorker().runJob("fetchSplitVar");
   GundamGlobals::getParallelWorker().removeJob("fetchSplitVar");
@@ -713,13 +716,13 @@ void PlotGenerator::defineHistogramHolders() {
                   bool varNotAvailable{false};
                   std::string sampleObsBinning = GenericToolbox::Json::fetchValue(histConfig, "useSampleBinningOfObservable", histDefBase.varToPlot);
 
-                  for( const auto& bin : sample.getBinning().getBinsList() ){
+                  for( const auto& bin : sample.getBinning().getBinList() ){
                     std::string variableNameForBinning{sampleObsBinning};
 
-                    if( not GenericToolbox::doesElementIsInVector(sampleObsBinning, bin.getVariableNameList()) ){
+                    if( not GenericToolbox::doesElementIsInVector(sampleObsBinning, bin.getEdgesList(), [](const DataBin::Edges& e){ return e.varName; }) ){
                       if( GenericToolbox::Json::doKeyExist(histConfig, "sampleVariableIfNotAvailable") ){
                         for( auto& varSubstitution : GenericToolbox::Json::fetchValue<std::vector<std::string>>(histConfig, "sampleVariableIfNotAvailable") ){
-                          if( GenericToolbox::doesElementIsInVector(varSubstitution, bin.getVariableNameList()) ){
+                          if( GenericToolbox::doesElementIsInVector(varSubstitution, bin.getEdgesList(), [](const DataBin::Edges& e){ return e.varName; }) ){
                             variableNameForBinning = varSubstitution;
                             break;
                           }
@@ -727,20 +730,16 @@ void PlotGenerator::defineHistogramHolders() {
                       } // sampleVariableIfNotAvailable
                     } // sampleObsBinning not in the sample binning
 
-                    std::pair<double, double> edges;
-                    try{
-                      edges = bin.getVarEdges(variableNameForBinning);
-                    }
-                    catch(...){
+                    const DataBin::Edges* edges{bin.getVarEdgesPtr(variableNameForBinning)};
+                    if( edges == nullptr ){
                       LogAlert << "Can't use sample binning for var " << variableNameForBinning << " and sample " << sample.getName() << std::endl;
                       varNotAvailable = true;
                       break;
                     }
 
-
-                    for( const auto& edge : { edges.first, edges.second } ) {
-                      if ((histDefBase.xMin != histDefBase.xMin or histDefBase.xMin <= edge)
-                          and (histDefBase.xMax != histDefBase.xMax or histDefBase.xMax >= edge)) {
+                    for( const auto& edge : { edges->min, edges->max } ) {
+                      if (    ( std::isnan( histDefBase.xMin ) or histDefBase.xMin <= edge )
+                          and ( std::isnan( histDefBase.xMax ) or histDefBase.xMax >= edge)) {
                         // either NaN or in bounds
                         if (not GenericToolbox::doesElementIsInVector(edge, histDefBase.xEdges)) {
                           histDefBase.xEdges.emplace_back(edge);
@@ -758,13 +757,16 @@ void PlotGenerator::defineHistogramHolders() {
                 else if( GenericToolbox::Json::doKeyExist(histConfig, "binningFile") ){
                   DataBinSet b;
                   b.readBinningDefinition(GenericToolbox::Json::fetchValue<std::string>(histConfig, "binningFile") );
-                  LogThrowIf(b.getBinVariables().size()!=1, "Binning should be defined with only one variable, here: " << GenericToolbox::parseVectorAsString(b.getBinVariables()))
+                  b.sortBins();
 
-                  for(const auto& bin: b.getBinsList()){
-                    const auto& edges = bin.getVarEdges(b.getBinVariables()[0]);
-                    for( const auto& edge : { edges.first, edges.second } ) {
-                      if ((histDefBase.xMin != histDefBase.xMin or histDefBase.xMin <= edge)
-                          and (histDefBase.xMax != histDefBase.xMax or histDefBase.xMax >= edge)) {
+                  auto varList{b.buildVariableNameList()};
+                  LogThrowIf(varList.size()!=1, "Binning should be defined with only one variable, here: " << GenericToolbox::parseVectorAsString(varList))
+
+                  for(const auto& bin: b.getBinList()){
+                    const auto& edges = bin.getVarEdges(varList[0]);
+                    for( const auto& edge : { edges.min, edges.max } ) {
+                      if (    ( std::isnan( histDefBase.xMin ) or histDefBase.xMin <= edge)
+                          and ( std::isnan( histDefBase.xMax ) or histDefBase.xMax >= edge)) {
                         // either NaN or in bounds
                         if (not GenericToolbox::doesElementIsInVector(edge, histDefBase.xEdges)) {
                           histDefBase.xEdges.emplace_back(edge);
@@ -861,34 +863,60 @@ void PlotGenerator::defineHistogramHolders() {
 }
 void PlotGenerator::buildEventBinCache(const std::vector<HistHolder *> &histPtrToFillList, const std::vector<PhysicsEvent> *eventListPtr, bool isData_) {
 
+  std::function<void()> prepareCacheFct = [&]() {
+    for (auto *holder: histPtrToFillList) {
+      if (not holder->isBinCacheBuilt) {
+        if (holder->histPtr == nullptr) { continue; }
+
+        // pre-allocate
+        holder->_binEventPtrList_.resize(holder->histPtr->GetNbinsX());
+        for (auto &evtList: holder->_binEventPtrList_) { evtList.reserve(eventListPtr->size()); }
+
+        // fill any to double cache
+        if (holder->varToPlot != "Raw") {
+          for (auto &evt: *eventListPtr) { evt.getVarAsDouble(holder->varToPlot); }
+        }
+      }
+    }
+  };
   std::function<void(int)> fillEventHistCache = [&](int iThread_){
-    int iHistCache{-1};
-    std::string pBarTitle;
-    for( auto& histPtrToFill : histPtrToFillList ){
-      iHistCache++;
 
-      if(iHistCache % GundamGlobals::getNbThreads() != iThread_ ) continue;
+    auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
+        iThread_, GundamGlobals::getParallelWorker().getNbThreads(),
+        int(histPtrToFillList.size())
+    );
 
-      if( not histPtrToFill->isBinCacheBuilt ){
+    HistHolder* histPtr{nullptr};
+    for( int iHist = bounds.first ; iHist < bounds.second ; iHist++ ){
+      histPtr = histPtrToFillList[iHist];
 
-        histPtrToFill->_binEventPtrList_.resize(histPtrToFill->histPtr->GetNbinsX());
+      if( not histPtr->isBinCacheBuilt ){
         int iBin{-1};
         for( const auto& event : *eventListPtr ){
-          if( histPtrToFill->splitVarName.empty() or event.getVarValue<int>(histPtrToFill->splitVarName) == histPtrToFill->splitVarValue){
-            if( histPtrToFill->varToPlot == "Raw" ) iBin = event.getSampleBinIndex() + 1;
-            else iBin = histPtrToFill->histPtr->FindBin(event.getVarAsDouble(histPtrToFill->varToPlot));
-            if( iBin > 0 and iBin <= histPtrToFill->histPtr->GetNbinsX() ){
+          if( histPtr->splitVarName.empty() or event.getVarValue<int>(histPtr->splitVarName) == histPtr->splitVarValue){
+
+            if( histPtr->varToPlot == "Raw" ){ iBin = event.getSampleBinIndex() + 1; }
+            else                             { iBin = histPtr->histPtr->FindBin(event.getVarAsDouble(histPtr->varToPlot)); }
+
+            if( iBin > 0 and iBin <= histPtr->histPtr->GetNbinsX() ){
               // so it's a valid bin!
-              histPtrToFill->_binEventPtrList_[iBin-1].emplace_back(&event);
+              histPtr->_binEventPtrList_[iBin-1].emplace_back( &event );
             }
           }
         }
-        histPtrToFill->isBinCacheBuilt = true;
+        histPtr->isBinCacheBuilt = true;
       }
+    }
+  };
+  std::function<void()> shrinkAllocationsFct = [&]() {
+    for( auto* holder : histPtrToFillList ){
+      for( auto& evtList : holder->_binEventPtrList_ ){ evtList.shrink_to_fit(); }
     }
   };
 
   GundamGlobals::getParallelWorker().addJob("fillEventHistCache", fillEventHistCache);
+  GundamGlobals::getParallelWorker().setPreParallelJob("fillEventHistCache", prepareCacheFct);
+  GundamGlobals::getParallelWorker().setPostParallelJob("fillEventHistCache", shrinkAllocationsFct);
   GundamGlobals::getParallelWorker().runJob("fillEventHistCache");
   GundamGlobals::getParallelWorker().removeJob("fillEventHistCache");
 
