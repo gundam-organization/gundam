@@ -80,8 +80,9 @@ public:
   [[nodiscard]] nlohmann::json exportParameterInjectorConfig() const;
   void injectParameterValues(const nlohmann::json &config_);
   void throwParametersFromGlobalCovariance();
+  void throwParametersFromGlobalCovariance(std::vector<double> &weightsChiSquare);
 
-  // Logger related
+        // Logger related
   static void muteLogger();
   static void unmuteLogger();
 

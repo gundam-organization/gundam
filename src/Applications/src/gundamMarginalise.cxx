@@ -57,6 +57,8 @@ int main(int argc, char** argv){
     clParser.addOption("nbThreads", {"-t", "--nb-threads"}, "Specify nb of parallel threads");
     clParser.addOption("nToys", {"-n"}, "Specify number of toys");
     clParser.addOption("randomSeed", {"-s", "--seed"}, "Set random seed");
+    clParser.addTriggerOption("usingGpu", {"--gpu"}, "Use GPU parallelization");
+
 
     clParser.addDummyOption("Trigger options:");
     clParser.addTriggerOption("dryRun", {"-d", "--dry-run"}, "Only overrides fitter config and print it.");
@@ -135,6 +137,11 @@ int main(int argc, char** argv){
     cHandler.override( margConfig );
     LogInfo << "Override done." << std::endl;
 
+    // read the parameters to include in the TTree
+
+    // read the parameters to marginalise over
+
+
     if( clParser.isOptionTriggered("dryRun") ){
         std::cout << cHandler.toString() << std::endl;
 
@@ -185,6 +192,12 @@ int main(int argc, char** argv){
             }
         }
     });
+    // also save the value of the LLH at the best fit point:
+    propagator.propagateParametersOnSamples();
+    propagator.updateLlhCache();
+    double bestFitLLH = propagator.getLlhBuffer();
+    LogInfo<<"Best fit LLH: "<<bestFitLLH<<std::endl;
+
 
     // Load the post-fit covariance matrix
     ObjectReader::readObject<TH2D>(
@@ -260,16 +273,25 @@ int main(int argc, char** argv){
     std::vector<double> parameters;
     std::vector<bool> margThis;
     std::vector<double> prior;
-    double LLH, gLLH;
+    std::vector<double> weightsChiSquare;
+//    weightsChiSquare.reserve(1000);
+    double LLH, gLLH, priorSum, LLHwrtBestFit;
     margThrowTree->Branch("Parameters", &parameters);
     margThrowTree->Branch("Marginalise", &margThis);
     margThrowTree->Branch("prior", &prior);
     margThrowTree->Branch("LLH", &LLH);
+    margThrowTree->Branch("LLHwrtBestFit", &LLHwrtBestFit);
     margThrowTree->Branch("gLLH", &gLLH);
-
+    margThrowTree->Branch("priorSum", &priorSum);
+    margThrowTree->Branch("weightsChiSquare", &weightsChiSquare);
 
 
     int nToys{ clParser.getOptionVal<int>("nToys") };
+
+    // Get parameters to be marginalised
+    //std::string marginalisedParameters{GenericToolbox::Json::fetchValue<std::string>(margConfig, "marginalisedParameters", "")};
+
+
 
 
     //////////////////////////////////////
@@ -277,34 +299,54 @@ int main(int argc, char** argv){
     /////////////////////////////////////
     std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating " << nToys << " toys...";
 
+    LogInfo<<"Prior information: "<<std::endl;
+    for( auto& parSet : propagator.getParameterSetsList() ){
+        if( not parSet.isEnabled() ){ continue; }
+//            LogInfo<< parSet.getName()<<std::endl;
+        for( auto& par : parSet.getParameterList() ){
+            if( not par.isEnabled() ){ continue; }
+                LogInfo<<par.getTitle()<<" -> type: "<<par.getPriorType()<<" mu="<<par.getPriorValue()<<" sigma= "<<par.getStdDevValue()<<" limits: "<<par.getMinValue()<<" - "<<par.getMaxValue() <<" limits (phys): "<<par.getMinPhysical()<<" - "<<par.getMaxPhysical() <<" limits (mirr): "<<par.getMinMirror()<<" - "<<par.getMaxMirror() <<std::endl;
+        }
+    }
+
 
     for( int iToy = 0 ; iToy < nToys ; iToy++ ){
 
         // loading...
         GenericToolbox::displayProgressBar( iToy+1, nToys, ss.str() );
 
+        // reset weights vector
+        weightsChiSquare.clear();
         // Do the throwing:
-        propagator.throwParametersFromGlobalCovariance();
-        //propagator.propagateParametersOnSamples(); // Adrien says this is not necessary
+        propagator.throwParametersFromGlobalCovariance(weightsChiSquare);
+//        propagator.propagateParametersOnSamples(); // Probably not necessary (what's that for?)
         propagator.updateLlhCache();
         LLH = propagator.getLlhBuffer();
+        LLHwrtBestFit = LLH - bestFitLLH;
         gLLH = 0;
+        priorSum = 0;
 
         parameters.clear();
         margThis.clear();
         prior.clear();
-        for( auto& parSet : propagator.getParameterSetsList() ){
-            if( not parSet.isEnabled() ){ continue; }
+        int iPar=0;
+        for( auto& parSet : propagator.getParameterSetsList() ) {
+            if (not parSet.isEnabled()) { continue; }
 //            LogInfo<< parSet.getName()<<std::endl;
-            for( auto& par : parSet.getParameterList() ){
-                if( not par.isEnabled() ){ continue; }
+            for (auto &par: parSet.getParameterList()) {
+                if (not par.isEnabled()) { continue; }
 //                LogInfo<<"  "<<par.getTitle()<<" -> "<<par.getParameterValue()<<std::endl;
                 parameters.push_back(par.getParameterValue());
                 margThis.push_back(false);
-                prior.push_back( par.getDistanceFromNominal()*par.getDistanceFromNominal() );
+                prior.push_back(par.getDistanceFromNominal() * par.getDistanceFromNominal());
+                priorSum += prior.back();
+                gLLH += weightsChiSquare[iPar];
+                //LogInfo<<iPar<<": "<<weightsChiSquare[iPar]<<std::endl;
+                iPar++;
             }
         }
-
+        //LogInfo<<"->   gLLH: "<<gLLH<<std::endl;
+        //LogDebugIf(gLLH<50)<<gLLH<<std::endl;
         // print the parameters
 
 //        for(int iPar=0;iPar<propagator.getParameterSetPtr().size();iPar++){
@@ -315,7 +357,7 @@ int main(int argc, char** argv){
 
         // for now set it to false. Still need to understand/implement this
         bool enableStatThrowInToys{false};
-        if( enableStatThrowInToys ){
+//        if( enableStatThrowInToys ){
 //            for( auto& xsec : crossSectionDataList ){
 //                if( enableEventMcThrow ){
 //                    // Take into account the finite amount of event in MC
@@ -324,7 +366,7 @@ int main(int argc, char** argv){
 //                // Asimov bin content -> toy data
 //                xsec.samplePtr->getMcContainer().throwStatError();
 //            }
-        }
+//        }
 
         // i don't know what is this for, so I comment it for now
 //        writeBinDataFct();
