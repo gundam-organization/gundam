@@ -166,8 +166,8 @@ int main(int argc, char** argv){
     // Load everything
     propagator.initialize();
 
-    propagator.getParameterSetsList();
-    for( auto& parSet : propagator.getParameterSetsList() ){
+    propagator.getParametersManager().getParameterSetsList();
+    for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
         if( not parSet.isEnabled() ){ continue; }
         LogInfo <<parSet.getName()<<std::endl;
         for( auto& par : parSet.getParameterList() ){
@@ -181,8 +181,8 @@ int main(int argc, char** argv){
 
     // Load post-fit parameters as "prior" so we can reset the weight to this point when throwing toys
     ObjectReader::readObject<TNamed>( fitterFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
-        propagator.injectParameterValues( GenericToolbox::Json::readConfigJsonStr( parState_->GetTitle() ) );
-        for( auto& parSet : propagator.getParameterSetsList() ){
+        propagator.getParametersManager().injectParameterValues( GenericToolbox::Json::readConfigJsonStr( parState_->GetTitle() ) );
+        for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
             if( not parSet.isEnabled() ){ continue; }
 //            LogInfo<< parSet.getName()<<std::endl;
             for( auto& par : parSet.getParameterList() ){
@@ -203,10 +203,10 @@ int main(int argc, char** argv){
     ObjectReader::readObject<TH2D>(
             fitterFile.get(), "FitterEngine/postFit/Hesse/hessian/postfitCovarianceOriginal_TH2D",
             [&](TH2D* hCovPostFit_){
-                propagator.setGlobalCovarianceMatrix(std::make_shared<TMatrixD>(hCovPostFit_->GetNbinsX(), hCovPostFit_->GetNbinsX()));
+                propagator.getParametersManager().setGlobalCovarianceMatrix(std::make_shared<TMatrixD>(hCovPostFit_->GetNbinsX(), hCovPostFit_->GetNbinsX()));
                 for( int iBin = 0 ; iBin < hCovPostFit_->GetNbinsX() ; iBin++ ){
                     for( int jBin = 0 ; jBin < hCovPostFit_->GetNbinsX() ; jBin++ ){
-                        (*propagator.getGlobalCovarianceMatrix())[iBin][jBin] = hCovPostFit_->GetBinContent(1 + iBin, 1 + jBin);
+                        (*propagator.getParametersManager().getGlobalCovarianceMatrix())[iBin][jBin] = hCovPostFit_->GetBinContent(1 + iBin, 1 + jBin);
                     }
                 }
             });
@@ -300,7 +300,7 @@ int main(int argc, char** argv){
     std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating " << nToys << " toys...";
 
     LogInfo<<"Prior information: "<<std::endl;
-    for( auto& parSet : propagator.getParameterSetsList() ){
+    for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
         if( not parSet.isEnabled() ){ continue; }
 //            LogInfo<< parSet.getName()<<std::endl;
         for( auto& par : parSet.getParameterList() ){
@@ -318,7 +318,7 @@ int main(int argc, char** argv){
         // reset weights vector
         weightsChiSquare.clear();
         // Do the throwing:
-        propagator.throwParametersFromGlobalCovariance(weightsChiSquare);
+        propagator.getParametersManager().throwParametersFromGlobalCovariance(weightsChiSquare);
 //        propagator.propagateParametersOnSamples(); // Probably not necessary (what's that for?)
         propagator.updateLlhCache();
         LLH = propagator.getLlhBuffer();
@@ -330,7 +330,7 @@ int main(int argc, char** argv){
         margThis.clear();
         prior.clear();
         int iPar=0;
-        for( auto& parSet : propagator.getParameterSetsList() ) {
+        for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ) {
             if (not parSet.isEnabled()) { continue; }
 //            LogInfo<< parSet.getName()<<std::endl;
             for (auto &par: parSet.getParameterList()) {
