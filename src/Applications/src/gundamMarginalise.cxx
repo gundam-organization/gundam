@@ -378,5 +378,5 @@ int main(int argc, char** argv){
     margThrowTree->Write();
 
 
-    GundamGlobals::getParallelWorker().reset();
+    //GundamGlobals::getParallelWorker().reset();
 }
