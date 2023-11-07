@@ -366,25 +366,68 @@ namespace JointProbability{
           }
       }
 
+      // FGD detector uncertainty
+      double fgd_det_uncert = 0.;
+      if (sample_.getName().find("FGD1") != std::string::npos){
+          // to be applied on FGD1 samples only
+          fgd_det_uncert = 0.;
+          if (sample_.getName().find("0p") != std::string::npos){
+              fgd_det_uncert = 0.016808;
+              }
+          else if (sample_.getName().find("Np") != std::string::npos){
+              fgd_det_uncert = 0.036612;
+          }
+          else if (sample_.getName().find("1#pi") != std::string::npos){
+              fgd_det_uncert = 0.025623;
+          }
+          else if (sample_.getName().find("CC #gamma") != std::string::npos){
+              fgd_det_uncert = 0.027519;
+          }
+          else if (sample_.getName().find("CC Other") != std::string::npos){
+              fgd_det_uncert = 0.047243;
+          }
+      }
+      else if (sample_.getName().find("FGD2") != std::string::npos){
+          // to be applied on FGD2 samples only
+          fgd_det_uncert = 0.;
+          if (sample_.getName().find("0p") != std::string::npos){
+              fgd_det_uncert = 0.019692;
+              }
+          else if (sample_.getName().find("Np") != std::string::npos){
+              fgd_det_uncert = 0.042466;
+          }
+          else if (sample_.getName().find("1#pi") != std::string::npos){
+              fgd_det_uncert = 0.030641;
+          }
+          else if (sample_.getName().find("CC #gamma") != std::string::npos){
+              fgd_det_uncert = 0.028189;
+          }
+          else if (sample_.getName().find("CC Other") != std::string::npos){
+              fgd_det_uncert = 0.056945;
+          }
+      }
+      
       // DETECTOR UNCERTAINTY FOR WAGASCI
       double wg_det_uncert = 0.;
       if (sample_.getName().find("WAGASCI") != std::string::npos){
           wg_det_uncert = 0.; 
-          if(sample_.getName().find("#0pi") != std::string::npos) {
+          if(sample_.getName().find("0#pi") != std::string::npos) {
+
               if(sample_.getName().find("PM-BM") != std::string::npos) wg_det_uncert = 0.05;
               if(sample_.getName().find("PM-WMRD") != std::string::npos) wg_det_uncert = 0.1;
               if(sample_.getName().find("DWG-BM") != std::string::npos) wg_det_uncert = 0.1;
               if(sample_.getName().find("UWG-BM") != std::string::npos) wg_det_uncert = 0.12;
               if(sample_.getName().find("UWG-WMRD") != std::string::npos) wg_det_uncert = 0.1;
           }
-          if(sample_.getName().find("#1pi") != std::string::npos)  {
+
+          if(sample_.getName().find("1#pi") != std::string::npos)  {
               if(sample_.getName().find("PM") != std::string::npos) wg_det_uncert = 0.1;
               if(sample_.getName().find("WG") != std::string::npos) wg_det_uncert = 0.08;
           }
       }
 
       // Barlow-Beeston uses fractional uncertainty on MC, so sqrt(sum[w^2])/mc
-      double fractional = mcuncert / predVal + sfgd_det_uncert + wg_det_uncert; // Add SFGD detector uncertainty 
+      double fractional = sqrt((mcuncert / predVal)*(mcuncert / predVal) + sfgd_det_uncert*sfgd_det_uncert + fgd_det_uncert*fgd_det_uncert + wg_det_uncert*wg_det_uncert); // Add ALL detector uncertainty
       // -b/2a in quadratic equation
       double temp = predVal * fractional * fractional - 1;
       // b^2 - 4ac in quadratic equation
