@@ -60,6 +60,7 @@ public:
   void setParameterDefinitionConfig(const nlohmann::json &config_);
   void setOwner(const ParameterSet *owner_){ _owner_ = owner_; }
   void setPriorType(PriorType::PriorType priorType){ _priorType_ = priorType; }
+  void setMarginalised(bool isMarginalised){ _isMarginalised_ = isMarginalised; }
 
   // Getters
   [[nodiscard]] bool isFree() const{ return _isFree_; }
@@ -83,6 +84,7 @@ public:
   [[nodiscard]] const nlohmann::json &getDialDefinitionsList() const{ return _dialDefinitionsList_; }
   [[nodiscard]] const ParameterSet *getOwner() const{ return _owner_; }
   [[nodiscard]] PriorType::PriorType getPriorType() const{ return _priorType_; }
+  [[nodiscard]] bool isMarginalised() const{ return _isMarginalised_; }
 
   // Core
   void setValueAtPrior();
@@ -116,6 +118,7 @@ private:
   std::string _dialsWorkingDirectory_{"."};
   nlohmann::json _parameterConfig_{};
   nlohmann::json _dialDefinitionsList_{};
+  bool _isMarginalised_{false};
 
   // Internals
   const ParameterSet* _owner_{nullptr};
