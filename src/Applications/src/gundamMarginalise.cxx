@@ -210,6 +210,10 @@ int main(int argc, char** argv){
                     }
                 }
             });
+
+    // Compute the determinant
+    double det = propagator.getParametersManager().getGlobalCovarianceMatrix()->Determinant();
+
 //    // Sample binning using parameterSetName
 //    for( auto& sample : propagator.getFitSampleSet().getFitSampleList() ){
 //        auto associatedParSet = GenericToolbox::Json::fetchValue<std::string>(sample.getConfig(), "parameterSetName");
@@ -289,8 +293,60 @@ int main(int argc, char** argv){
     int nToys{ clParser.getOptionVal<int>("nToys") };
 
     // Get parameters to be marginalised
-    //std::string marginalisedParameters{GenericToolbox::Json::fetchValue<std::string>(margConfig, "marginalisedParameters", "")};
+    std::vector<std::string> marginalisedParameters;
+    std::vector<std::string> marginalisedParameterSets;
+    marginalisedParameters = GenericToolbox::Json::fetchValue<std::vector<std::string>>(margConfig, "parameterList");
+    marginalisedParameterSets = GenericToolbox::Json::fetchValue<std::vector<std::string>>(margConfig, "parameterSetList");
+    LogInfo<<"Marginalised parameters: "<<GenericToolbox::parseVectorAsString(marginalisedParameters,true,true)<<std::endl;
+    LogInfo<<"Marginalised parameter Sets: "<<GenericToolbox::parseVectorAsString(marginalisedParameterSets,true,true)<<std::endl;
+    // loop over parameters and compare their titles with the ones in the marginalisedParameters string
+    // if they match, set the corresponding margThis to true
+    // Also display the prior information
+    LogInfo<<"Prior information: "<<std::endl;
+    for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ) {
+        if (not parSet.isEnabled()) {
+            LogInfo << "Parameter set " << parSet.getName() << " is disabled" << std::endl;
+            continue;
+        }else{
+            bool setMatches = false;
+            for (int i = 0; i < marginalisedParameterSets.size(); i++) {
+                if (0 == std::strcmp(parSet.getName().c_str(), marginalisedParameterSets[i].c_str())) {
+                    setMatches = (true);
+                    break;
+                } else {
+                    setMatches = (false);
+                }
+            }
+            if (setMatches){
+                // loop over the parameters in the set and set the corresponding margThis to true
+                for (auto &par: parSet.getParameterList()) {
+                    par.setMarginalised(true);
+                }
+            }
+        }
+        for (auto &par: parSet.getParameterList()) {
+            if (not par.isEnabled()) {
+                LogInfo << "Parameter " << par.getName() << " is disabled" << std::endl;
+                continue;
 
+            }
+            bool matches = false;
+            for (int i = 0; i < marginalisedParameters.size(); i++) {
+                if (0 == std::strcmp(par.getFullTitle().c_str(), marginalisedParameters[i].c_str())) {
+                    matches = (true);
+                    break;
+                } else {
+                    matches = (false);
+                }
+            }
+            par.setMarginalised(matches);
+            LogInfo << par.getFullTitle() << " -> type: " << par.getPriorType() << " mu=" << par.getPriorValue()
+                << " sigma= " << par.getStdDevValue() << " limits: " << par.getMinValue() << " - "
+                << par.getMaxValue() << " limits (phys): " << par.getMinPhysical() << " - "
+                << par.getMaxPhysical() << " limits (mirr): " << par.getMinMirror() << " - "
+                << par.getMaxMirror() <<" --- marg? "<<par.isMarginalised() << std::endl;
+        }
+    }
 
 
 
@@ -299,15 +355,7 @@ int main(int argc, char** argv){
     /////////////////////////////////////
     std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating " << nToys << " toys...";
 
-    LogInfo<<"Prior information: "<<std::endl;
-    for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
-        if( not parSet.isEnabled() ){ continue; }
-//            LogInfo<< parSet.getName()<<std::endl;
-        for( auto& par : parSet.getParameterList() ){
-            if( not par.isEnabled() ){ continue; }
-                LogInfo<<par.getTitle()<<" -> type: "<<par.getPriorType()<<" mu="<<par.getPriorValue()<<" sigma= "<<par.getStdDevValue()<<" limits: "<<par.getMinValue()<<" - "<<par.getMaxValue() <<" limits (phys): "<<par.getMinPhysical()<<" - "<<par.getMaxPhysical() <<" limits (mirr): "<<par.getMinMirror()<<" - "<<par.getMaxMirror() <<std::endl;
-        }
-    }
+
 
 
     for( int iToy = 0 ; iToy < nToys ; iToy++ ){
@@ -337,7 +385,7 @@ int main(int argc, char** argv){
                 if (not par.isEnabled()) { continue; }
 //                LogInfo<<"  "<<par.getTitle()<<" -> "<<par.getParameterValue()<<std::endl;
                 parameters.push_back(par.getParameterValue());
-                margThis.push_back(false);
+                margThis.push_back(par.isMarginalised());
                 prior.push_back(par.getDistanceFromNominal() * par.getDistanceFromNominal());
                 priorSum += prior.back();
                 gLLH += weightsChiSquare[iPar];
@@ -373,9 +421,29 @@ int main(int argc, char** argv){
 
         // Write the branches
         margThrowTree->Fill();
+
+        //debug
+//        if(iToy==0 || iToy==1){
+//            LogInfo<<"DEBUG: Toy "<<iToy<<std::endl;
+//            for(int i=0;i<parameters.size();i++){
+//                LogInfo<<i<<": "<<parameters[i]<<" "<<margThis[i]<<std::endl;
+//            }
+//        }
     }
 
     margThrowTree->Write();
+
+    det = 1.0;
+    TMatrixD eigenVectors = (*propagator.getParametersManager().getGlobalCovarianceMatrix());
+    TVectorD eigenValues(parameters.size());
+    eigenVectors.EigenVectors(eigenValues);
+    LogInfo<<"Eigenvalues: "<<std::endl;
+    for(int i=0;i<eigenValues.GetNrows();i++){
+        det *= pow(eigenValues[i],1./2);
+        LogInfo<<eigenValues[i]<<" "<<det<<std::endl;
+
+    }
+    LogInfo<<"SQUARE ROOT OF the determinant of the covariance matrix: "<<det<<std::endl;
 
 
     //GundamGlobals::getParallelWorker().reset();
