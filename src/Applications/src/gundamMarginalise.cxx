@@ -307,23 +307,31 @@ int main(int argc, char** argv){
         if (not parSet.isEnabled()) {
             LogInfo << "Parameter set " << parSet.getName() << " is disabled" << std::endl;
             continue;
-        }else{
+        } else {
             bool setMatches = false;
+            LogInfo << "Set: " << parSet.getName().c_str();
             for (int i = 0; i < marginalisedParameterSets.size(); i++) {
+
                 if (0 == std::strcmp(parSet.getName().c_str(), marginalisedParameterSets[i].c_str())) {
                     setMatches = (true);
                     break;
                 } else {
                     setMatches = (false);
+
                 }
             }
-            if (setMatches){
+            if (setMatches) {
+                LogInfo << " will be marginalized out.   \n";
                 // loop over the parameters in the set and set the corresponding margThis to true
                 for (auto &par: parSet.getParameterList()) {
                     par.setMarginalised(true);
                 }
+                continue; // skip the single params thing and go to the next ParameterSet
+            } else {
+                LogInfo << " will not be marginalized out.   \n";
             }
         }
+    // Do the same for single parameters
         for (auto &par: parSet.getParameterList()) {
             if (not par.isEnabled()) {
                 LogInfo << "Parameter " << par.getName() << " is disabled" << std::endl;
@@ -340,14 +348,19 @@ int main(int argc, char** argv){
                 }
             }
             par.setMarginalised(matches);
-            LogInfo << par.getFullTitle() << " -> type: " << par.getPriorType() << " mu=" << par.getPriorValue()
-                << " sigma= " << par.getStdDevValue() << " limits: " << par.getMinValue() << " - "
-                << par.getMaxValue() << " limits (phys): " << par.getMinPhysical() << " - "
-                << par.getMaxPhysical() << " limits (mirr): " << par.getMinMirror() << " - "
-                << par.getMaxMirror() <<" --- marg? "<<par.isMarginalised() << std::endl;
+            if(par.isMarginalised()){
+                LogInfo << "Parameter " << par.getFullTitle() << " will be marginalized out.   \n";
+            }else{
+                LogInfo << "Parameter " << par.getFullTitle() << " will not be marginalized out.   \n";
+            }
         }
     }
 
+//    LogInfo << par.getFullTitle() << " -> type: " << par.getPriorType() << " mu=" << par.getPriorValue()
+//            << " sigma= " << par.getStdDevValue() << " limits: " << par.getMinValue() << " - "
+//            << par.getMaxValue() << " limits (phys): " << par.getMinPhysical() << " - "
+//            << par.getMaxPhysical() << " limits (mirr): " << par.getMinMirror() << " - "
+//            << par.getMaxMirror() <<" --- marg? "<<par.isMarginalised() << std::endl;
 
 
     //////////////////////////////////////
@@ -367,9 +380,10 @@ int main(int argc, char** argv){
         weightsChiSquare.clear();
         // Do the throwing:
         propagator.getParametersManager().throwParametersFromGlobalCovariance(weightsChiSquare);
-//        propagator.propagateParametersOnSamples(); // Probably not necessary (what's that for?)
+        //propagator.propagateParametersOnSamples(); // Probably not necessary (what's that for?)
         propagator.updateLlhCache();
         LLH = propagator.getLlhBuffer();
+        LogInfo<<"LLH: "<<LLH<<std::endl;
         LLHwrtBestFit = LLH - bestFitLLH;
         gLLH = 0;
         priorSum = 0;
@@ -437,11 +451,10 @@ int main(int argc, char** argv){
     TMatrixD eigenVectors = (*propagator.getParametersManager().getGlobalCovarianceMatrix());
     TVectorD eigenValues(parameters.size());
     eigenVectors.EigenVectors(eigenValues);
-    LogInfo<<"Eigenvalues: "<<std::endl;
+    //LogInfo<<"Eigenvalues: "<<std::endl;
     for(int i=0;i<eigenValues.GetNrows();i++){
         det *= pow(eigenValues[i],1./2);
-        LogInfo<<eigenValues[i]<<" "<<det<<std::endl;
-
+        //LogInfo<<eigenValues[i]<<" "<<det<<std::endl;
     }
     LogInfo<<"SQUARE ROOT OF the determinant of the covariance matrix: "<<det<<std::endl;
 
