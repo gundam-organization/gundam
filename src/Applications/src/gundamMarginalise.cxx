@@ -136,13 +136,13 @@ int main(int argc, char** argv){
 
     // Reading marginaliser config file
     nlohmann::json margConfig{ ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ) };
-    cHandler.override( margConfig );
-    LogInfo << "Override done." << std::endl;
     if(margConfig.size()==1) {
         // broken json library puts everything in the same level
         // normal behavior
         margConfig = margConfig[0];
     }
+    cHandler.override( margConfig );
+    LogInfo << "Override done." << std::endl;
 
 
         // read the parameters to include in the TTree
