@@ -392,7 +392,6 @@ int main(int argc, char** argv){
         //propagator.propagateParametersOnSamples(); // Probably not necessary (what's that for?)
         propagator.updateLlhCache();
         LLH = propagator.getLlhBuffer();
-        LogInfo<<"LLH: "<<LLH<<std::endl;
         LLHwrtBestFit = LLH - bestFitLLH;
         gLLH = 0;
         priorSum = 0;
@@ -416,6 +415,8 @@ int main(int argc, char** argv){
                 iPar++;
             }
         }
+        LogInfo<<"LLH: "<<LLH<<"  gLLH: "<<gLLH<<std::endl;
+
         //LogInfo<<"->   gLLH: "<<gLLH<<std::endl;
         //LogDebugIf(gLLH<50)<<gLLH<<std::endl;
         // print the parameters
