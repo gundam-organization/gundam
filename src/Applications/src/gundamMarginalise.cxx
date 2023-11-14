@@ -138,10 +138,14 @@ int main(int argc, char** argv){
     nlohmann::json margConfig{ ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ) };
     cHandler.override( margConfig );
     LogInfo << "Override done." << std::endl;
+    if(margConfig.size()==1) {
+        // broken json library puts everything in the same level
+        // normal behavior
+        margConfig = margConfig[0];
+    }
 
 
-
-    // read the parameters to include in the TTree
+        // read the parameters to include in the TTree
 
     // read the parameters to marginalise over
 
@@ -299,15 +303,9 @@ int main(int argc, char** argv){
     // Get parameters to be marginalised
     std::vector<std::string> marginalisedParameters;
     std::vector<std::string> marginalisedParameterSets;
-    if(margConfig.size()==1){
-        // broken json library puts everything in the same level
-        marginalisedParameters = GenericToolbox::Json::fetchValue<std::vector<std::string>>(margConfig[0], "parameterList");
-        marginalisedParameterSets = GenericToolbox::Json::fetchValue<std::vector<std::string>>(margConfig[0], "parameterSetList");
-    }else{
-        // normal behavior
         marginalisedParameters = GenericToolbox::Json::fetchValue<std::vector<std::string>>(margConfig, "parameterList");
         marginalisedParameterSets = GenericToolbox::Json::fetchValue<std::vector<std::string>>(margConfig, "parameterSetList");
-    }
+
     LogInfo<<"Marginalised parameters: "<<GenericToolbox::parseVectorAsString(marginalisedParameters,true,true)<<std::endl;
     LogInfo<<"Marginalised parameter Sets: "<<GenericToolbox::parseVectorAsString(marginalisedParameterSets,true,true)<<std::endl;
     // loop over parameters and compare their titles with the ones in the marginalisedParameters string
