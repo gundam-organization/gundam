@@ -114,6 +114,8 @@ int main(int argc, char** argv){
     ObjectReader::readObject<TNamed>(fitterFile.get(), {{"gundam/config_TNamed"}, {"gundamFitter/unfoldedConfig_TNamed"}}, [&](TNamed* config_){
         fitterConfig = GenericToolbox::Json::readConfigJsonStr( config_->GetTitle() );
     });
+    // Check if the config is an array (baobab compatibility)
+
     ConfigUtils::ConfigHandler cHandler{ fitterConfig };
 
 //    // Disabling defined samples:
@@ -136,6 +138,8 @@ int main(int argc, char** argv){
     nlohmann::json margConfig{ ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ) };
     cHandler.override( margConfig );
     LogInfo << "Override done." << std::endl;
+
+
 
     // read the parameters to include in the TTree
 
@@ -295,8 +299,15 @@ int main(int argc, char** argv){
     // Get parameters to be marginalised
     std::vector<std::string> marginalisedParameters;
     std::vector<std::string> marginalisedParameterSets;
-    marginalisedParameters = GenericToolbox::Json::fetchValue<std::vector<std::string>>(margConfig, "parameterList");
-    marginalisedParameterSets = GenericToolbox::Json::fetchValue<std::vector<std::string>>(margConfig, "parameterSetList");
+    if(margConfig.size()==1){
+        // broken json library puts everything in the same level
+        marginalisedParameters = GenericToolbox::Json::fetchValue<std::vector<std::string>>(margConfig[0], "parameterList");
+        marginalisedParameterSets = GenericToolbox::Json::fetchValue<std::vector<std::string>>(margConfig[0], "parameterSetList");
+    }else{
+        // normal behavior
+        marginalisedParameters = GenericToolbox::Json::fetchValue<std::vector<std::string>>(margConfig, "parameterList");
+        marginalisedParameterSets = GenericToolbox::Json::fetchValue<std::vector<std::string>>(margConfig, "parameterSetList");
+    }
     LogInfo<<"Marginalised parameters: "<<GenericToolbox::parseVectorAsString(marginalisedParameters,true,true)<<std::endl;
     LogInfo<<"Marginalised parameter Sets: "<<GenericToolbox::parseVectorAsString(marginalisedParameterSets,true,true)<<std::endl;
     // loop over parameters and compare their titles with the ones in the marginalisedParameters string
