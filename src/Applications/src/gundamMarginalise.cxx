@@ -186,8 +186,9 @@ int main(int argc, char** argv){
     }
 
 
-
+    std::vector<double> parametersBestFit;
     // Load post-fit parameters as "prior" so we can reset the weight to this point when throwing toys
+    // also save the values in a vector so we can use them to compute the LLH at the best fit point
     ObjectReader::readObject<TNamed>( fitterFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
         propagator.getParametersManager().injectParameterValues( GenericToolbox::Json::readConfigJsonStr( parState_->GetTitle() ) );
         for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
@@ -196,6 +197,7 @@ int main(int argc, char** argv){
             for( auto& par : parSet.getParameterList() ){
                 if( not par.isEnabled() ){ continue; }
 //                LogInfo<<"  "<<par.getTitle()<<" -> "<<par.getParameterValue()<<std::endl;
+                parametersBestFit.push_back( par.getParameterValue() );
                 par.setPriorValue( par.getParameterValue() );
             }
         }
@@ -206,6 +208,23 @@ int main(int argc, char** argv){
     double bestFitLLH = propagator.getLlhBuffer();
     LogInfo<<"Best fit LLH: "<<bestFitLLH<<std::endl;
 
+    // Creating output file
+    std::string outFilePath{};
+    if( clParser.isOptionTriggered("outputFile") ){ outFilePath = clParser.getOptionVal<std::string>("outputFile"); }
+    else {
+        // appendixDict["optionName"] = "Appendix"
+        // this list insure all appendices will appear in the same order
+        std::vector<std::pair<std::string, std::string>> appendixDict{
+                {"configFile",       "%s"},
+                {"fitterOutputFile", "Fit_%s"},
+                {"nToys",            "nToys_%s"},
+                {"randomSeed",       "Seed_%s"},
+        };
+        outFilePath = GundamUtils::generateFileName(clParser, appendixDict) + ".root";
+
+        std::string outFolder{GenericToolbox::Json::fetchValue<std::string>(margConfig, "outputFolder", "./")};
+        outFilePath = GenericToolbox::joinPath(outFolder, outFilePath);
+    }
 
     // Load the post-fit covariance matrix
     ObjectReader::readObject<TH2D>(
@@ -219,8 +238,6 @@ int main(int argc, char** argv){
                 }
             });
 
-    // Compute the determinant
-    double det = propagator.getParametersManager().getGlobalCovarianceMatrix()->Determinant();
 
 //    // Sample binning using parameterSetName
 //    for( auto& sample : propagator.getFitSampleSet().getFitSampleList() ){
@@ -248,28 +265,31 @@ int main(int argc, char** argv){
 
 
 
-    // Creating output file
-    std::string outFilePath{};
-    if( clParser.isOptionTriggered("outputFile") ){ outFilePath = clParser.getOptionVal<std::string>("outputFile"); }
-    else {
-        // appendixDict["optionName"] = "Appendix"
-        // this list insure all appendices will appear in the same order
-        std::vector<std::pair<std::string, std::string>> appendixDict{
-                {"configFile",       "%s"},
-                {"fitterOutputFile", "Fit_%s"},
-                {"nToys",            "nToys_%s"},
-                {"randomSeed",       "Seed_%s"},
-        };
-        outFilePath = "marg_" + GundamUtils::generateFileName(clParser, appendixDict) + ".root";
 
-        std::string outFolder{GenericToolbox::Json::fetchValue<std::string>(margConfig, "outputFolder", "./")};
-        outFilePath = GenericToolbox::joinPath(outFolder, outFilePath);
-    }
 
     app.setCmdLinePtr( &clParser );
     app.setConfigString( ConfigUtils::ConfigHandler{margConfig}.toString() );
     app.openOutputFile( outFilePath );
     app.writeAppInfo();
+
+    // write the post fit covariance matrix in the output file
+    TDirectory* postFitInfo = app.getOutfilePtr()->mkdir("postFitInfo");
+    postFitInfo->cd();
+    ObjectReader::readObject<TH2D>(
+            fitterFile.get(), "FitterEngine/postFit/Hesse/hessian/postfitCovarianceOriginal_TH2D",
+            [&](TH2D* hCovPostFit_) {
+                hCovPostFit_->SetName("postFitCovarianceOriginal_TH2D");
+                hCovPostFit_->Write();// save the TH2D cov. matrix also in the output file
+            });
+    // write the best fit parameters vector to the output file
+    // TODO: implement using TH1D: (FitterEngine/postFit/Migrad/errors/<parListTitle>/values/postFitErrors_TH1D)
+    ObjectReader::readObject<TNamed>( fitterFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
+        parState_->SetName("postFitParameters_TNamed");
+        parState_->Write();
+    });
+    TVectorD bestFitParameters (parametersBestFit.size(), parametersBestFit.data());
+    bestFitParameters.Write("bestFitParameters_TVectorD");
+    app.getOutfilePtr()->cd();
 
     auto* marginalisationDir{ GenericToolbox::mkdirTFile(app.getOutfilePtr(), "marginalisation") };
     LogInfo << "Creating throws tree" << std::endl;
@@ -457,7 +477,7 @@ int main(int argc, char** argv){
 
     margThrowTree->Write();
 
-    det = 1.0;
+    double det = 1.0;
     TMatrixD eigenVectors = (*propagator.getParametersManager().getGlobalCovarianceMatrix());
     TVectorD eigenValues(parameters.size());
     eigenVectors.EigenVectors(eigenValues);
