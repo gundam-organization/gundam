@@ -435,7 +435,8 @@ int main(int argc, char** argv){
                 iPar++;
             }
         }
-        LogInfo<<"LLH: "<<LLH<<"  gLLH: "<<gLLH<<std::endl;
+        if(iToy%(nToys/10)==0)
+            LogInfo<<"LLH: "<<LLH<<"  gLLH: "<<gLLH<<std::endl;
 
         //LogInfo<<"->   gLLH: "<<gLLH<<std::endl;
         //LogDebugIf(gLLH<50)<<gLLH<<std::endl;
