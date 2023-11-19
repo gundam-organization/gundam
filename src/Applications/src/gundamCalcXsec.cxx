@@ -88,7 +88,7 @@ int main(int argc, char** argv){
 
   if( GenericToolbox::doesFilePathHasExtension(fitterFile, "root") ){
     LogWarning << "Opening fitter output file: " << fitterFile << std::endl;
-    auto fitterRootFile = std::unique_ptr<TFile>( TFile::Open( fitterFile.c_str() ) );
+    fitterRootFile = std::unique_ptr<TFile>( TFile::Open( fitterFile.c_str() ) );
     LogThrowIf( fitterRootFile == nullptr, "Could not open fitter output file." );
 
     ObjectReader::throwIfNotFound = true;

@@ -938,6 +938,10 @@ void DataDispenser::fillFunction(int iThread_){
     // printing legend
     LogInfo(Logger::Color::BG_BLUE)    << "      " << Logger::getColorEscapeCode(Logger::Color::RESET) << " -> Variables stored in RAM" << std::endl;
     LogInfo(Logger::Color::BG_MAGENTA) << "      " << Logger::getColorEscapeCode(Logger::Color::RESET) << " -> Dials stored in RAM" << std::endl;
+
+    if( _owner_->isDevSingleThreadEventLoaderAndIndexer() ){
+      LogAlert << "Loading data in single thread (devSingleThreadEventLoaderAndIndexer option set to true)" << std::endl;
+    }
   }
 
   // Try to read TTree the closest to sequentially possible
