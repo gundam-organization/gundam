@@ -187,6 +187,7 @@ int main(int argc, char** argv){
 
 
     std::vector<double> parametersBestFit;
+    std::vector<std::string> parameterFullTitles;
     // Load post-fit parameters as "prior" so we can reset the weight to this point when throwing toys
     // also save the values in a vector so we can use them to compute the LLH at the best fit point
     ObjectReader::readObject<TNamed>( fitterFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
@@ -198,6 +199,7 @@ int main(int argc, char** argv){
                 if( not par.isEnabled() ){ continue; }
 //                LogInfo<<"  "<<par.getTitle()<<" -> "<<par.getParameterValue()<<std::endl;
                 parametersBestFit.push_back( par.getParameterValue() );
+                parameterFullTitles.push_back( par.getFullTitle() );
                 par.setPriorValue( par.getParameterValue() );
             }
         }
@@ -289,7 +291,9 @@ int main(int argc, char** argv){
     });
     TVectorD bestFitParameters (parametersBestFit.size(), parametersBestFit.data());
     bestFitParameters.Write("bestFitParameters_TVectorD");
+    app.getOutfilePtr()->WriteObject(&parameterFullTitles, "parameterFullTitles");
     app.getOutfilePtr()->cd();
+
 
     auto* marginalisationDir{ GenericToolbox::mkdirTFile(app.getOutfilePtr(), "marginalisation") };
     LogInfo << "Creating throws tree" << std::endl;
