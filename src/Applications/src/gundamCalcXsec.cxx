@@ -398,7 +398,7 @@ int main(int argc, char** argv){
 
       name = GenericToolbox::Json::fetchValue<std::string>(config_, "name");
 
-      if( not GenericToolbox::Json::fetchValue(config_, "isEnabled", true) ){
+      if( not GenericToolbox::Json::fetchValue(config_, "isEnabled", bool(true)) ){
         LogWarning << "Skipping disabled re-normalization config \"" << name << "\"" << std::endl;
         return;
       }
@@ -407,7 +407,7 @@ int main(int argc, char** argv){
 
       if     ( GenericToolbox::Json::doKeyExist( config_, "meanValue" ) ){
         normParameter.first  = GenericToolbox::Json::fetchValue<double>(config_, "meanValue");
-        normParameter.second = GenericToolbox::Json::fetchValue(config_, "stdDev", 0);
+        normParameter.second = GenericToolbox::Json::fetchValue(config_, "stdDev", double(0.));
         LogInfo << "mean ± sigma = " << normParameter.first << " ± " << normParameter.second;
       }
       else if( GenericToolbox::Json::doKeyExist( config_, "disabledBinDim" ) ){
