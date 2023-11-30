@@ -58,7 +58,7 @@ namespace JointProbability{
     allowZeroMcWhenZeroData = GenericToolbox::Json::fetchValue(_config_, "allowZeroMcWhenZeroData", allowZeroMcWhenZeroData);
     usePoissonLikelihood = GenericToolbox::Json::fetchValue(_config_, "usePoissonLikelihood", usePoissonLikelihood);
     BBNoUpdateWeights = GenericToolbox::Json::fetchValue(_config_, "BBNoUpdateWeights", BBNoUpdateWeights);
-    verboseLevel = GenericToolbox::Json::fetchValue(_config_, "isVerbose", verboseLevel);
+    verboseLevel = GenericToolbox::Json::fetchValue(_config_, {{"verboseLevel"}, {"isVerbose"}}, verboseLevel);
 
     LogInfo << "Using BarlowLLH_BANFF_OA2021 parameters:" << std::endl;
     {
