@@ -28,11 +28,11 @@ void MinimizerBase::readConfigImpl(){
 
   if( GenericToolbox::getTerminalWidth() == 0 ){
     // batch mode
-    double monitorBashModeRefreshRateInS = GenericToolbox::Json::fetchValue(_config_, "monitorBashModeRefreshRateInS", 30.0);
+    double monitorBashModeRefreshRateInS = GenericToolbox::Json::fetchValue(_config_, "monitorBashModeRefreshRateInS", double(30.0));
     getConvergenceMonitor().setMaxRefreshRateInMs(monitorBashModeRefreshRateInS * 1000.);
   }
   else{
-    int monitorRefreshRateInMs = GenericToolbox::Json::fetchValue(_config_, "monitorRefreshRateInMs", 5000);
+    int monitorRefreshRateInMs = GenericToolbox::Json::fetchValue(_config_, "monitorRefreshRateInMs", int(5000));
     getConvergenceMonitor().setMaxRefreshRateInMs(monitorRefreshRateInMs);
   }
 
