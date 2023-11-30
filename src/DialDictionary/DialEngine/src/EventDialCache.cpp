@@ -51,7 +51,9 @@ void EventDialCache::buildReferenceCache(SampleSet& sampleSet_, std::vector<Dial
 
       LogThrowIf(
           sampleIndexCacheList[iSample].size() != sample.getMcContainer().eventList.size(),
-          "MISMATCH cache and event list"
+          std::endl << "MISMATCH cache and event list for sample: #" << sample.getIndex() << " " << sample.getName()
+              << std::endl << GET_VAR_NAME_VALUE(sampleIndexCacheList[iSample].size())
+              << " <-> " << GET_VAR_NAME_VALUE(sample.getMcContainer().eventList.size())
       );
       nCacheSlots += sampleIndexCacheList[iSample].size();
 
