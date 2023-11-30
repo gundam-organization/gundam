@@ -184,7 +184,7 @@ namespace JointProbability{
     else {
       if( not allowZeroMcWhenZeroData or dataVal != 0 ){
         chisq += 1E+20;
-        LogErrorIf(verbose) << "Data and predicted value give infinite statistical LLH / "
+        LogErrorIf(verboseLevel) << "Data and predicted value give infinite statistical LLH / "
                  << "Data: " << dataVal
                  << " / MC: " << newmc
                  << std::endl;
