@@ -199,6 +199,10 @@ void DataDispenser::parseStringParameters() {
   overrideLeavesNamesFct(_parameters_.nominalWeightFormulaStr);
   overrideLeavesNamesFct(_parameters_.selectionCutFormulaStr);
 
+  // add surrounding parenthesis to force the LeafForm to treat it as a TFormula
+  _parameters_.dialIndexFormula = "(" + _parameters_.dialIndexFormula + ")";
+  _parameters_.nominalWeightFormulaStr = "(" + _parameters_.nominalWeightFormulaStr + ")";
+  _parameters_.selectionCutFormulaStr = "(" + _parameters_.selectionCutFormulaStr + ")";
 }
 void DataDispenser::doEventSelection(){
   LogWarning << "Performing event selection..." << std::endl;

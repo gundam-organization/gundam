@@ -34,7 +34,7 @@ void SampleSet::readConfigImpl(){
     _fitSampleList_.back().readConfig();
   }
 
-  // To be moved elsewhere -> nothing to do in sample... -> this should belong to the fitter engine
+  // TODO: To be moved elsewhere -> nothing to do in sample... -> this should belong to the fitter engine
   std::string llhMethod = "PoissonLLH";
   llhMethod = GenericToolbox::Json::fetchValue(_config_, "llhStatFunction", llhMethod);
 
