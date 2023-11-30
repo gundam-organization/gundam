@@ -12,7 +12,6 @@ project( GUNDAM )
 option( WITH_GUNDAM_ROOT_APP "Build app gundamRoot" ON )
 option( WITH_CACHE_MANAGER "Enable compiling of the cache manager used by the GPU" ON )
 option( WITH_BREAKDOWN_CACHE "Use the breakdown cache" ON )
-option( WITH_XSLLHFITTER "Build old xsllhFitter apps/libraries" OFF )
 option( WITH_OPENMP "(OLD/xsllhFitter) Build with OpenMP libraries" OFF )
 option( ENABLE_CUDA "Enable CUDA language check (Cache::Manager requires a GPU if CUDA is found)" OFF )
 
@@ -492,14 +491,6 @@ if(WITH_CACHE_MANAGER)
     list( APPEND MODULES CacheManager )
 endif()
 
-if(WITH_XSLLHFITTER)
-    list( APPEND MODULES XsllhFitter/Utils )
-    list( APPEND MODULES XsllhFitter/Parameters )
-    list( APPEND MODULES XsllhFitter/Anaevents )
-    list( APPEND MODULES XsllhFitter/ErrProp )
-    list( APPEND MODULES XsllhFitter/Fitter )
-endif()
-
 cmessage( WARNING "Configuring modules..." )
 foreach(mod ${MODULES})
     cmessage( STATUS "Adding cmake module: ${mod}" )
@@ -508,10 +499,6 @@ endforeach()
 
 cmessage( WARNING "Configuring applications..." )
 add_subdirectory( ${CMAKE_SOURCE_DIR}/src/Applications )
-
-if(WITH_XSLLHFITTER)
-    add_subdirectory( ${CMAKE_SOURCE_DIR}/src/XsllhFitter/Applications )
-endif()
 
 add_subdirectory( ${CMAKE_SOURCE_DIR}/tests )
 
