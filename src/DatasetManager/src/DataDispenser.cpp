@@ -58,6 +58,8 @@ void DataDispenser::readConfigImpl(){
   _parameters_.selectionCutFormulaStr = GenericToolbox::Json::buildFormula(_config_, "selectionCutFormula", "&&", _parameters_.selectionCutFormulaStr);
   _parameters_.nominalWeightFormulaStr = GenericToolbox::Json::buildFormula(_config_, "nominalWeightFormula", "*", _parameters_.nominalWeightFormulaStr);
 
+  _parameters_.debugNbMaxEventsToLoad = GenericToolbox::Json::fetchValue(_config_, "debugNbMaxEventsToLoad", _parameters_.debugNbMaxEventsToLoad);
+
   _parameters_.variableDict.clear();
   for( auto& entry : GenericToolbox::Json::fetchValue(_config_, {{"variableDict"}, {"overrideLeafDict"}}, nlohmann::json()) ){
     auto varName = GenericToolbox::Json::fetchValue<std::string>(entry, {{"name"}, {"eventVar"}});
@@ -1045,8 +1047,21 @@ void DataDispenser::fillFunction(int iThread_){
       EventDialCache::IndexedEntry_t* eventDialCacheEntry{nullptr};
       {
         std::unique_lock<std::mutex> lock(GundamGlobals::getThreadMutex());
+        if(_eventDialCacheRef_ != nullptr){
+
+          if( _parameters_.debugNbMaxEventsToLoad != 0 ){
+            // check if the limit has been reached
+            if( _eventDialCacheRef_->getFillIndex() >= _parameters_.debugNbMaxEventsToLoad ){
+              LogAlertIf(iThread_==0) << std::endl << std::endl; // flush pBar
+              LogAlertIf(iThread_==0) << "debugNbMaxEventsToLoad: Event number cap reached (";
+              LogAlertIf(iThread_==0) << _parameters_.debugNbMaxEventsToLoad << ")" << std::endl;
+              return;
+            }
+          }
+
+          eventDialCacheEntry = _eventDialCacheRef_->fetchNextCacheEntry();
+        }
         sampleEventIndex = _cache_.sampleIndexOffsetList[iSample]++;
-        if(_eventDialCacheRef_ != nullptr){ eventDialCacheEntry = _eventDialCacheRef_->fetchNextCacheEntry(); }
       }
 
       // Get the next free event in our buffer

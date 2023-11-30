@@ -96,6 +96,9 @@ public:
     std::vector<DialIndexEntry_t> dials;
   };
 
+  // returns the current index
+  [[nodiscard]] size_t getFillIndex() const { return _fillIndex_; }
+
   /// Provide the event dial cache.  The event dial cache containes a
   /// CacheElem_t object for every dial applied to a physics event.  The
   /// CacheElem_t is a pointer to the PhysicsEvent that will be reweighted and
