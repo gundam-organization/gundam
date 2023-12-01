@@ -198,22 +198,3 @@ if( ENABLE_CUDA )
 else( ENABLE_CUDA )
   cmessage( ALERT "CUDA support disabled" )
 endif( ENABLE_CUDA )
-
-
-if (WITH_CACHE_MANAGER)
-  cmessage( WARNING "Enabling cache manager..." )
-  add_definitions( -D GUNDAM_USING_CACHE_MANAGER )
-
-  # uncomment to enable the slow validations (NEVER during productions
-  # or normal running).  These are whole code validations and are
-  # extremely slow.
-  if (CACHE_MANAGER_SLOW_VALIDATION)
-    cmessage( STATUS "Using slow validation for debugging" )
-    cmessage(WARNING "Using slow validation so runs will be very slow" )
-    add_definitions( -DCACHE_MANAGER_SLOW_VALIDATION)
-  endif (CACHE_MANAGER_SLOW_VALIDATION)
-
-  cmessage( STATUS "GPU support is enabled (compiled, but only used when CUDA enabled)" )
-else()
-  cmessage( ALERT "GPU support is disabled" )
-endif()

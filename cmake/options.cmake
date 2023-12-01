@@ -46,9 +46,9 @@ if (WITH_CACHE_MANAGER)
     add_definitions( -DCACHE_MANAGER_SLOW_VALIDATION)
   endif (CACHE_MANAGER_SLOW_VALIDATION)
 
-  cmessage( STATUS "GPU support is enabled (compiled, but only used when CUDA enabled)" )
+  cmessage( STATUS "Cache manager is enabled. GPU support can be enabled using ENABLE_CUDA option." )
 else()
-  cmessage( ALERT "GPU support is disabled" )
+  cmessage( ALERT "Cache manager is disabled." )
 endif()
 
 
