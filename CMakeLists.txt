@@ -12,7 +12,7 @@ include( ${CMAKE_SOURCE_DIR}/cmake/options.cmake )
 include( ${CMAKE_SOURCE_DIR}/cmake/version.cmake )
 
 # ?
-#include( CTest )
+include( CTest )
 
 
 ################################################################################
