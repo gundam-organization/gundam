@@ -165,11 +165,7 @@ bool Cache::Manager::Build(SampleSet& sampleList,
         }
         ++events;
         for (EventDialCache::DialsElem_t& dialElem : elem.dials) {
-#ifdef USE_BREAKDOWN_CACHE
             DialInterface* dialInterface = dialElem.interface;
-#else
-            DialInterface* dialInterface = dialElem;
-#endif
             // This is depending behavior that is not guarranteed, but which
             // is probably valid because of the particular usage.
             // Specifically, it depends on the vector of FitParameter objects
@@ -384,11 +380,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
 
         // Add each dial for the event to the GPU caches.
         for (EventDialCache::DialsElem_t& dialElem : elem.dials) {
-#ifdef USE_BREAKDOWN_CACHE
             DialInterface* dialInterface = dialElem.interface;
-#else
-            DialInterface* dialInterface = dialElem;
-#endif
             DialInputBuffer* dialInputs = dialInterface->getInputBufferRef();
 
             // Check if this dial is used at all.

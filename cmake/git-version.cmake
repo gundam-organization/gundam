@@ -1,4 +1,8 @@
 
+# Runs on cmake AND make
+
+# reloading cmessage since
+include( ${CMAKE_SOURCE_DIR}/cmake/utils/cmessage.cmake )
 
 function( doVersionCheck )
   # Git version
@@ -69,10 +73,23 @@ function( doVersionCheck )
     set( GUNDAM_VERSION_STRING
         "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_MICRO}${GUNDAM_VERSION_TAG}"
         PARENT_SCOPE
-        )
+    )
 
   else()
     cmessage( WARNING "Could not find git version." )
   endif()
 
 endfunction( doVersionCheck )
+
+# Check last git tag
+doVersionCheck()
+
+
+#####################
+# CMake Generated
+#####################
+
+cmessage( STATUS "Generating version config header: ${GENERATE_DIR_FOR_VERSION_CHECK}/generated/VersionConfig.h" )
+configure_file( ${CMAKE_SOURCE_DIR}/cmake/VersionConfig.h.in ${GENERATE_DIR_FOR_VERSION_CHECK}/generated/VersionConfig.h )
+
+

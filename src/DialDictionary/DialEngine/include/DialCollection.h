@@ -59,7 +59,6 @@ public:
   std::vector<DialInterface> &getDialInterfaceList(){ return _dialInterfaceList_; }
 
   // non-trivial getters
-  [[nodiscard]] bool useCachedDials() const;
   [[nodiscard]] bool isDatasetValid(const std::string& datasetName_) const;
   std::string getTitle() const;
   std::string getSummary(bool shallow_ = true);

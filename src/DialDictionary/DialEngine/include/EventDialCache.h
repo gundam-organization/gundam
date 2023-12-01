@@ -27,10 +27,6 @@ public:
 public:
   EventDialCache() = default;
 
-#ifndef USE_BREAKDOWN_CACHE
-  // The dial interface to be used with the PhysicsEvent
-  typedef DialInterface* DialsElem_t;
-#else
   struct DialsElem_t {
     DialsElem_t(DialInterface* interface_, double response_): interface(interface_), response(response_) {}
     // The dial interface to be used with the PhysicsEvent.
@@ -38,7 +34,6 @@ public:
     // The cached result calculated by the dial.
     double response;
   };
-#endif
 
   /// The cache element associating a PhysicsEvent to the appropriate
   /// DialInterface.
@@ -51,11 +46,7 @@ public:
       ss << event->getSummary() << std::endl;
       ss << "dialCache = {";
       for( auto& dialInterface : dials ) {
-#ifndef USE_BREAKDOWN_CACHE
-        ss << std::endl << "  - " << dialInterface->getSummary();
-#else
         ss << std::endl << "  - " << dialInterface.interface->getSummary();
-#endif
       }
       ss << std::endl << "}";
       return ss.str();
