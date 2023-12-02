@@ -65,13 +65,13 @@ else( ROOT_FOUND )
 
   # ROOT
   if(NOT DEFINED ENV{ROOTSYS} )
-    cmessage(FATAL_ERROR "$ROOTSYS is not defined, please set up root first.")
+    cmessage( FATAL_ERROR "$ROOTSYS is not defined, please set up root first." )
   else()
     cmessage( STATUS "Using ROOT installed at $ENV{ROOTSYS}")
     set(CMAKE_ROOTSYS $ENV{ROOTSYS})
   endif()
 
-  cmessage( STATUS "Including local GENERATE_ROOT_DICTIONARY implementation.")
+  cmessage( STATUS "Including local GENERATE_ROOT_DICTIONARY implementation." )
   include(${CMAKE_SOURCE_DIR}/cmake/utils/GenROOTDictionary.cmake)
   execute_process(COMMAND root-config --cflags
       OUTPUT_VARIABLE ROOT_CXX_FLAGS
@@ -180,10 +180,12 @@ endif ()
 
 # Check for the availability of CUDA
 if( ENABLE_CUDA )
-  include(CheckLanguage)
-  check_language(CUDA)
+  cmessage( STATUS "ENABLE_CUDA: Checking for CUDA support...")
+  cmake_minimum_required( VERSION 3.12 FATAL_ERROR )
+  include( CheckLanguage )
+  check_language( CUDA )
   if(CMAKE_CUDA_COMPILER)
-    cmessage( STATUS "CUDA support enabled")
+    cmessage( STATUS "CUDA support enabled." )
     enable_language(CUDA)
     if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
       # The default is taken from the CUDAARCHS environment

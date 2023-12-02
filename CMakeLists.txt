@@ -1,9 +1,14 @@
-cmake_minimum_required( VERSION 3.12 FATAL_ERROR )
-
+#
+# GUNDAM project CMake main file
+#
 project( GUNDAM )
 
+# 3.2 minimum a priori. Might require higher version for specific features
+cmake_minimum_required( VERSION 3.2 FATAL_ERROR )
+
+
 # necessary ?
-include( CTest )
+#include( CTest )
 
 # colored messages
 include( ${CMAKE_SOURCE_DIR}/cmake/utils/cmessage.cmake )

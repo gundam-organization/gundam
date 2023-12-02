@@ -32,7 +32,7 @@ else()
 endif()
 
 # CXX standard is required and must match the version ROOT was compiled with.
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set( CMAKE_CXX_STANDARD_REQUIRED ON )
 
 # Explicitly set the compiler version so that it will match the
 # compiler that was used to compile ROOT.  Recent ROOT documentation
