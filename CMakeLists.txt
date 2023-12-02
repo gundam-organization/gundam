@@ -12,9 +12,6 @@ cmake_minimum_required( VERSION 3.5 FATAL_ERROR )
 project( GUNDAM )
 
 
-# necessary ?
-#include( CTest )
-
 # colored messages
 include( ${CMAKE_SOURCE_DIR}/cmake/utils/cmessage.cmake )
 
