@@ -34,13 +34,8 @@ cmessage( STATUS "Looking for ROOT install..." )
 find_package(
     ROOT
     COMPONENTS
-    Matrix
-    Tree
-    Minuit2
-    Physics
-    Matrix
-    MathCore
-    RIO
+    Tree Minuit2 Matrix
+    Physics MathCore RIO
 )
 
 if( ROOT_FOUND )

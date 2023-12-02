@@ -50,11 +50,7 @@ Cache::Manager::Manager(int events, int parameters,
         fParameterCache = std::make_unique<Cache::Parameters>(parameters);
         fTotalBytes += fParameterCache->GetResidentMemory();
 
-        fWeightsCache = std::make_unique<Cache::Weights>(
-                               fParameterCache->GetParameters(),
-                               fParameterCache->GetLowerClamps(),
-                               fParameterCache->GetUpperClamps(),
-                               events);
+        fWeightsCache = std::make_unique<Cache::Weights>(events);
         fTotalBytes += fWeightsCache->GetResidentMemory();
 
         fNormalizations = std::make_unique<Cache::Weight::Normalization>(
