@@ -33,7 +33,6 @@ endif()
 cmessage( STATUS "Looking for ROOT install..." )
 find_package(
     ROOT
-    REQUIRED
     COMPONENTS
     Matrix
     Tree
@@ -44,12 +43,12 @@ find_package(
     RIO
 )
 
-if(ROOT_FOUND)
+if( ROOT_FOUND )
   cmessage( STATUS "[ROOT]: ROOT found" )
   include(${ROOT_USE_FILE})
   # cmessage(STATUS "[ROOT]: ROOT packages found ${ROOT_LIBRARIES}")
-  cmessage( STATUS "[ROOT]: ROOT include directory: ${ROOT_INCLUDE_DIRS}")
-  cmessage(STATUS "[ROOT]: ROOT C++ Flags: ${ROOT_CXX_FLAGS}")
+  cmessage( STATUS "[ROOT]: ROOT include directory: ${ROOT_INCLUDE_DIRS}" )
+  cmessage( STATUS "[ROOT]: ROOT C++ Flags: ${ROOT_CXX_FLAGS}" )
 
   if (NOT ROOT_minuit2_FOUND)
     # Minuit2 wasn't found, but make really sure before giving up.
@@ -61,7 +60,7 @@ if(ROOT_FOUND)
   # inc dir is $ROOTSYS/include/root
   set(CMAKE_ROOTSYS ${ROOT_INCLUDE_DIRS}/..)
 
-else(ROOT_FOUND)
+else( ROOT_FOUND )
   cmessage( STATUS "find_package didn't find ROOT. Using shell instead...")
 
   # ROOT
@@ -98,7 +97,7 @@ else(ROOT_FOUND)
   add_compile_options("SHELL:${ROOT_CXX_FLAGS}")
   add_link_options("SHELL:${ROOT_LINK_FLAGS}")
 
-endif(ROOT_FOUND)
+endif( ROOT_FOUND )
 
 # Try to figure out which version of C++ was used to compile ROOT.  ROOT
 # generates header files that depend on the compiler version so we will

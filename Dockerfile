@@ -4,8 +4,8 @@ SHELL ["/bin/bash", "-c"]
 
 RUN apt-get dist-upgrade -y 
 RUN apt-get update && apt-get upgrade -y
-RUN apt-get install git libyaml-cpp-dev -y
-RUN #apt-get install git libyaml-cpp-dev nlohmann-json3-dev -y
+RUN #apt-get install git libyaml-cpp-dev -y
+RUN apt-get install git libyaml-cpp-dev nlohmann-json3-dev -y
 
 ENV WORK_DIR /home/work
 ENV REPO_DIR $WORK_DIR/repo
