@@ -1147,7 +1147,7 @@ void DataDispenser::fillFunction(int iThread_){
                     dialCollectionRef->getGlobalDialType(),
                     dialCollectionRef->getGlobalDialSubType(),
                     dialObjectPtr,
-                    dialCollectionRef->useCachedDials()
+                    false
                 )
             );
 

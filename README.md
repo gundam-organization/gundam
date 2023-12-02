@@ -133,7 +133,7 @@ a new release is available, simply use the same command.
 
 ```bash
 cd $REPO_DIR/gundam
-cd cmake
+cd cmake/scripts
 ./gundam-setup.sh
 ./gundam-build.sh
 ```

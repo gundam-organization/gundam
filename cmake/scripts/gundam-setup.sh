@@ -4,7 +4,7 @@
 # running the test).  This makes sure that the ROOT environment
 # variables are set (using thisroot.sh) since that helps debugging.
 #
-#  gundam-build == Source ./build/gundam-build.sh which will conveniently
+#  gundam-build == Source ./cmake/scripts/gundam-build.sh which will conveniently
 #           run cmake/make/make install from any place so that it's
 #           really easy to recompile.
 #
@@ -36,7 +36,7 @@ fi
 ___gundam_root() {
     COUNT=5
     while true; do
-	if [ -e ./cmake -a -d ./cmake -a -e ./cmake/gundam-build.sh ]; then
+	if [ -e ./cmake -a -d ./cmake -a -e ./cmake/scripts/gundam-build.sh ]; then
 	    echo ${PWD}
 	    return
 	fi
@@ -95,8 +95,8 @@ ___path_prepend LD_LIBRARY_PATH ${GUNDAM_ROOT}/${GUNDAM_TARGET}/lib
 unset -f ___path_prepend
 unset -f ___path_remove
 
-alias gundam-setup=". ${GUNDAM_ROOT}/cmake/gundam-setup.sh"
-alias gundam-build="${GUNDAM_ROOT}/cmake/gundam-build.sh"
+alias gundam-setup=". ${GUNDAM_ROOT}/cmake/scripts/gundam-setup.sh"
+alias gundam-build="${GUNDAM_ROOT}/cmake/scripts/gundam-build.sh"
 
 echo Source code: ${GUNDAM_ROOT}
 echo Build target: ${GUNDAM_TARGET}
