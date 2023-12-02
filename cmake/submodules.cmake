@@ -40,7 +40,7 @@ include_directories(submodules/cpp-generic-toolbox/include)
 #install(FILES ${CPP_GENERIC_TOOLBOX_HEADERS} DESTINATION include)
 #install(FILES ${CPP_GENERIC_TOOLBOX_HEADERS_IMPL} DESTINATION include/implementation)
 
-add_definitions( -D PROGRESS_BAR_FILL_TAG="\\\"GUNDAM\#"\\\" )
+add_definitions( -D PROGRESS_BAR_FILL_TAG="\\\"GUNDAM"\\\" )
 if (COLOR_OUTPUT)
   add_definitions( -D PROGRESS_BAR_ENABLE_RAINBOW=1 )
 else (COLOR_OUTPUT)
