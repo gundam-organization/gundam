@@ -1,7 +1,7 @@
 # CMake options
 
 message("")
-cmessage(STATUS "Setting up options...")
+cmessage( WARNING "Setting up options...")
 
 option( WITH_GUNDAM_ROOT_APP "Build app gundamRoot" ON )
 option( WITH_CACHE_MANAGER "Enable compiling of the cache manager used by the GPU" ON )
@@ -34,17 +34,17 @@ if(BATCH_MODE)
 endif(BATCH_MODE)
 
 if (WITH_CACHE_MANAGER)
-  cmessage( WARNING "Enabling cache manager..." )
+  cmessage( STATUS "Enabling cache manager..." )
   add_definitions( -D GUNDAM_USING_CACHE_MANAGER )
 
   # uncomment to enable the slow validations (NEVER during productions
   # or normal running).  These are whole code validations and are
   # extremely slow.
-  if (CACHE_MANAGER_SLOW_VALIDATION)
-    cmessage( STATUS "Using slow validation for debugging" )
-    cmessage(WARNING "Using slow validation so runs will be very slow" )
-    add_definitions( -DCACHE_MANAGER_SLOW_VALIDATION)
-  endif (CACHE_MANAGER_SLOW_VALIDATION)
+  if( CACHE_MANAGER_SLOW_VALIDATION )
+    cmessage( STATUS "  Using slow validation for debugging" )
+    cmessage( STATUS "  Using slow validation so runs will be very slow" )
+    add_definitions( -D CACHE_MANAGER_SLOW_VALIDATION )
+  endif( CACHE_MANAGER_SLOW_VALIDATION )
 
   cmessage( STATUS "Cache manager is enabled. GPU support can be enabled using ENABLE_CUDA option." )
 else()

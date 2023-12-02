@@ -2,12 +2,12 @@
 # SubModules: These are just adding the code directly, as stand-alone projects.
 
 message("")
-cmessage(STATUS "Checking submodules...")
+cmessage( WARNING "Checking submodules..." )
 
 function( checkSubmodule )
 
   list( GET ARGV 0 SELECTED_SUBMODULE )
-  cmessage( WARNING "Checking submodule: ${SELECTED_SUBMODULE}" )
+  cmessage( STATUS "Checking submodule: ${SELECTED_SUBMODULE}" )
 
   file( GLOB FILES_IN_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/submodules/${SELECTED_SUBMODULE}/*")
 
@@ -40,7 +40,7 @@ include_directories(submodules/cpp-generic-toolbox/include)
 #install(FILES ${CPP_GENERIC_TOOLBOX_HEADERS} DESTINATION include)
 #install(FILES ${CPP_GENERIC_TOOLBOX_HEADERS_IMPL} DESTINATION include/implementation)
 
-add_definitions( -D PROGRESS_BAR_FILL_TAG="\\\"T2K\#"\\\" )
+add_definitions( -D PROGRESS_BAR_FILL_TAG="\\\"GUNDAM\#"\\\" )
 if (COLOR_OUTPUT)
   add_definitions( -D PROGRESS_BAR_ENABLE_RAINBOW=1 )
 else (COLOR_OUTPUT)

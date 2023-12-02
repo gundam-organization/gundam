@@ -1,7 +1,7 @@
 
 
 message("")
-cmessage(STATUS "Configuring compiler options...")
+cmessage( WARNING "Configuring compiler options...")
 
 # Changes default install path to be a subdirectory of the build dir.
 # Should set the installation dir at configure time with
@@ -28,7 +28,7 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang" )
     cmessage(FATAL_ERROR "Clang version must be at least 3.3" )
   endif()
 else()
-  cmessage(WARNING "You are using an untested compiler." )
+  cmessage( ALERT "You are using an untested compiler." )
 endif()
 
 # CXX standard is required and must match the version ROOT was compiled with.
@@ -48,7 +48,7 @@ elseif ( ROOT_cxx20_FOUND )
   cmessage(STATUS "ROOT compiled with C++20")
   set(CMAKE_CXX_STANDARD 20)
 else ( ROOT_cxx14_FOUND )
-  cmessage(WARNING "ROOT C++ standard not set, use ROOT minimum (C++14)")
+  cmessage( ALERT "ROOT C++ standard not set, use ROOT minimum (C++14)")
   set(CMAKE_CXX_STANDARD 14)
 endif ( ROOT_cxx14_FOUND)
 
@@ -80,9 +80,9 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fPIC -g")
 # CMake Generated
 ###############################################################################
 
-cmessage (STATUS "C++ Compiler      : ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
-cmessage (STATUS "C++ Standard      : ${CMAKE_CXX_STANDARD}")
-cmessage (STATUS "C++ Release flags : ${CMAKE_CXX_FLAGS_RELEASE}")
-cmessage (STATUS "C++ Debug flags   : ${CMAKE_CXX_FLAGS_DEBUG}")
-cmessage (STATUS "Build type        : ${CMAKE_BUILD_TYPE}")
+cmessage( STATUS "C++ Compiler      : ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}" )
+cmessage( STATUS "C++ Standard      : ${CMAKE_CXX_STANDARD}" )
+cmessage( STATUS "C++ Release flags : ${CMAKE_CXX_FLAGS_RELEASE}" )
+cmessage( STATUS "C++ Debug flags   : ${CMAKE_CXX_FLAGS_DEBUG}" )
+cmessage( STATUS "Build type        : ${CMAKE_BUILD_TYPE}" )
 

@@ -1,7 +1,26 @@
 
 
 message("")
-cmessage(STATUS "Checking dependencies...")
+cmessage( WARNING "Checking dependencies...")
+
+
+cmessage( STATUS "Looking for JSON install..." )
+find_package( nlohmann_json QUIET )
+
+if( nlohmann_json_FOUND )
+  cmessage( STATUS "nlohmann JSON library found.")
+  link_libraries( nlohmann_json::nlohmann_json )
+else()
+  cmessage( ALERT "nlohmann JSON library not found. Using fetch content... (CMake version >= 3.11)")
+  cmake_minimum_required( VERSION 3.11 FATAL_ERROR )
+  include( FetchContent )
+
+  FetchContent_Declare( json URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz )
+  FetchContent_MakeAvailable( json )
+
+  include_directories( ${nlohmann_json_SOURCE_DIR}/include )
+  cmessage( STATUS "nlohmann JSON library fetched: ${nlohmann_json_SOURCE_DIR}/include")
+endif()
 
 
 ##########
@@ -11,17 +30,22 @@ cmessage(STATUS "Checking dependencies...")
 #If you want to try an use the terminally buggy ROOT CMake scripts
 # ROOTConfig.cmake -> usually in /install/dir/of/root/6.26.06_2/share/root/cmake
 
-cmessage( WARNING "Looking for ROOT install..." )
+cmessage( STATUS "Looking for ROOT install..." )
 find_package(
     ROOT
-    REQUIRED COMPONENTS
-    Geom Physics Matrix MathCore Tree RIO
-    OPTIONAL_COMPONENTS
+    REQUIRED
+    COMPONENTS
+    Matrix
+    Tree
     Minuit2
+    Physics
+    Matrix
+    MathCore
+    RIO
 )
 
 if(ROOT_FOUND)
-  cmessage(STATUS "[ROOT]: ROOT found")
+  cmessage( STATUS "[ROOT]: ROOT found" )
   include(${ROOT_USE_FILE})
   # cmessage(STATUS "[ROOT]: ROOT packages found ${ROOT_LIBRARIES}")
   cmessage( STATUS "[ROOT]: ROOT include directory: ${ROOT_INCLUDE_DIRS}")
@@ -99,30 +123,13 @@ endif(NOT ROOT_minuit2_FOUND)
 # NLOHMANN JSON
 ####################
 
-find_package(nlohmann_json)
-
-if (nlohmann_json_FOUND)
-  cmessage( STATUS "nlohmann JSON library found")
-  # Additional actions for when the library is found
-else()
-  # sometimes the header can be found in ROOT...
-  find_path(NLOHMANN_JSON_INCLUDE_DIR NAMES nlohmann/json.hpp)
-
-  if (NLOHMANN_JSON_INCLUDE_DIR)
-    cmessage( STATUS "nlohmann JSON header found: ${NLOHMANN_JSON_INCLUDE_DIR}/nlohmann/json.hpp")
-    # Additional actions for when the library is found
-  else()
-    cmessage( FATAL_ERROR "nlohmann JSON library not found")
-    # Additional actions for when the library is not found
-  endif()
-endif()
 
 
 ####################
 # YAML-CPP
 ####################
 
-cmessage( WARNING "Looking for YAML install..." )
+cmessage( STATUS "Looking for YAML install..." )
 find_package( yaml-cpp REQUIRED HINTS ${YAMLCPP_DIR} )
 if(NOT yaml-cpp_FOUND)
   cmessage(FATAL_ERROR "yaml-cpp library not found.")
@@ -133,8 +140,8 @@ cmessage( STATUS "yaml-cpp include directory: ${YAML_CPP_INCLUDE_DIR}")
 cmessage( STATUS "yaml-cpp lib: ${YAML_CPP_LIBRARIES}")
 if( "${YAML_CPP_INCLUDE_DIR} " STREQUAL " ")
   # WORKAROUND FOR CCLYON (old cmake version/pkg)
-  set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils )
-  set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils )
+  set( CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils )
+  set( CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils )
   set(YAMLCPP_INSTALL_DIR ${YAMLCPP_DIR})
   find_package( YAMLCPP REQUIRED )
   if( NOT YAMLCPP_FOUND )
@@ -155,7 +162,7 @@ endif()
 # ZLIB (optional)
 ####################
 
-cmessage( WARNING "Looking for optional ZLib install..." )
+cmessage( STATUS "Looking for optional ZLib install..." )
 find_package(ZLIB)
 if (${ZLIB_FOUND})
   cmessage( STATUS "ZLIB found : ${ZLIB_VERSION_STRING}")
@@ -163,6 +170,7 @@ if (${ZLIB_FOUND})
   cmessage( STATUS "ZLIB_LIBRARIES = ${ZLIB_LIBRARIES}")
   add_definitions( -D USE_ZLIB=1 )
 else()
+  cmessage( WARNING "ZLib not found. Will compile without the associated features." )
   add_definitions( -D USE_ZLIB=0 )
 endif ()
 
@@ -191,9 +199,9 @@ if( ENABLE_CUDA )
       endif()
     endif()
     cmessage( STATUS "CUDA compilation architectures: \"${CMAKE_CUDA_ARCHITECTURES}\"")
-    cmessage(WARNING "The \"--cache-manager\" option requires a GPU")
+    cmessage( ALERT "The \"--cache-manager\" option requires a GPU" )
   else(CMAKE_CUDA_COMPILER)
-    cmessage(WARNING "CUDA not present -- Cache::Manager use the CPU")
+    cmessage( ALERT "CUDA not present -- Cache::Manager use the CPU")
   endif(CMAKE_CUDA_COMPILER)
 else( ENABLE_CUDA )
   cmessage( ALERT "CUDA support disabled" )
