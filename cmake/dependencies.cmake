@@ -21,10 +21,13 @@ find_package(
 
 if( ROOT_FOUND )
   cmessage( STATUS "[ROOT]: ROOT found" )
-  include(${ROOT_USE_FILE})
-  # cmessage(STATUS "[ROOT]: ROOT packages found ${ROOT_LIBRARIES}")
+
+  cmessage( STATUS "[ROOT]: ROOT cmake use file ${ROOT_USE_FILE}")
   cmessage( STATUS "[ROOT]: ROOT include directory: ${ROOT_INCLUDE_DIRS}" )
   cmessage( STATUS "[ROOT]: ROOT C++ Flags: ${ROOT_CXX_FLAGS}" )
+
+  # Grab functions such as generate dictionary
+  include( ${ROOT_USE_FILE} )
 
   if (NOT ROOT_minuit2_FOUND)
     # Minuit2 wasn't found, but make really sure before giving up.
