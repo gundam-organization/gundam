@@ -172,7 +172,7 @@ namespace JointProbability{
         chisq += 2.0 * (stat + penalty);
       }
     }
-    else if (predVal > 0.0) {
+    else if( predVal > 0.0 ) {
       if (usePoissonLikelihood) [[unlikely]] {
         chisq += 2.0*predVal;
       }
@@ -181,13 +181,20 @@ namespace JointProbability{
         chisq += 2.0 * (stat + penalty);
       }
     }
-    else {
-      if( not allowZeroMcWhenZeroData or dataVal != 0 ){
-        chisq += 1E+20;
+    else { // predVal == 0
+      if( allowZeroMcWhenZeroData and dataVal == 0 ){
+        // need to warn the user something is wrong with the binning definition
+        // This might indicate that more MC stat would be needed
+        LogErrorOnce << "allowZeroMcWhenZeroData=true: MC bin(s) with 0 as predicted value. "
+          << "Data is also 0, null penalty is applied."
+          << "This is an ill conditioned problem. Please check your inputs."
+          << std::endl;
+        chisq = 0.;
+      }
+      else{
+        chisq = std::numeric_limits<double>::infinity();
         LogErrorIf(verboseLevel) << "Data and predicted value give infinite statistical LLH / "
-                 << "Data: " << dataVal
-                 << " / MC: " << newmc
-                 << std::endl;
+           << "Data: " << dataVal << " / MC: " << newmc << std::endl;
       }
     }
 

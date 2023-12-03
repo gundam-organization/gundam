@@ -96,7 +96,7 @@ namespace JointProbability {
     double eval(const Sample& sample_, int bin_) override;
 
     int verboseLevel{0};
-    bool allowZeroMcWhenZeroData{false};
+    bool allowZeroMcWhenZeroData{true};
     bool usePoissonLikelihood{false};
     bool BBNoUpdateWeights{false};
   };
