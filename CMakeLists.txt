@@ -36,9 +36,12 @@ include( ${CMAKE_SOURCE_DIR}/cmake/modules.cmake )
 # defining GUNDAM applications
 include( ${CMAKE_SOURCE_DIR}/cmake/applications.cmake )
 
+# defining GUNDAM tests
+include( ${CMAKE_SOURCE_DIR}/cmake/tests.cmake )
+
 
 message("")
-cmessage( WARNING "Identified GUNDAM version: ${GUNDAM_VERSION_STRING}+${GUNDAM_VERSION_POST_NB}-${GUNDAM_VERSION_POST_COMMIT}/${GUNDAM_VERSION_BRANCH}" )
+cmessage( WARNING "Identified GUNDAM version: ${GUNDAM_FULL_VERSION_STR}" )
 
 # A command that works to compile gundam from any sub-directory.  You
 # can get this aliased to "gundam-build" by sourcing

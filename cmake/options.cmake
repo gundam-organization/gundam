@@ -4,8 +4,10 @@ message("")
 cmessage( WARNING "Setting up options...")
 
 option( WITH_GUNDAM_ROOT_APP "Build app gundamRoot" ON )
-option( WITH_CACHE_MANAGER "Enable compiling of the cache manager used by the GPU" ON )
-option( ENABLE_CUDA "Enable CUDA language check (Cache::Manager requires a GPU if CUDA is found)" OFF )
+option( WITH_CACHE_MANAGER "Enable compiling of the cache manager (required for GPU computing)" ON )
+
+# extensions
+option( WITH_CUDA_LIB "Enable CUDA language check (Cache::Manager requires a GPU if CUDA is found)" OFF )
 
 option( BUILD_DOC "Build documentation" OFF )
 option( ENABLE_DEV_MODE "Enable specific dev related printouts" OFF  )
@@ -21,6 +23,9 @@ option( CXX_MARCH_FLAG "Enable cpu architecture specific optimzations." OFF )
 option( CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ langauge (-std=gnu++14)." OFF )
 
 
+# Reading options
+##################
+
 # Set the default built type if it isn't already defined
 if(NOT DEFINED CMAKE_BUILD_TYPE
     OR CMAKE_BUILD_TYPE STREQUAL "")
@@ -33,7 +38,7 @@ if(BATCH_MODE)
   add_definitions( -D GUNDAM_BATCH )
 endif(BATCH_MODE)
 
-if (WITH_CACHE_MANAGER)
+if( WITH_CACHE_MANAGER )
   cmessage( STATUS "Enabling cache manager..." )
   add_definitions( -D GUNDAM_USING_CACHE_MANAGER )
 
@@ -46,9 +51,9 @@ if (WITH_CACHE_MANAGER)
     add_definitions( -D CACHE_MANAGER_SLOW_VALIDATION )
   endif( CACHE_MANAGER_SLOW_VALIDATION )
 
-  cmessage( STATUS "Cache manager is enabled. GPU support can be enabled using ENABLE_CUDA option." )
+  cmessage( STATUS "Cache manager is enabled. GPU support can be enabled using WITH_CUDA_LIB option." )
 else()
-  cmessage( ALERT "Cache manager is disabled." )
+  cmessage( STATUS "Cache manager is disabled. Use -D WITH_CACHE_MANAGER=ON if needed." )
 endif()
 
 
