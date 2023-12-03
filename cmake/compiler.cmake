@@ -65,12 +65,12 @@ if(CXX_WARNINGS)
   # add_compile_options(-Wno-reorder)
 endif()
 
-if(NOT COLOR_OUTPUT)
-  add_definitions(-D NOCOLOR)
+if( NOT ENABLE_COLOR_OUTPUT )
+  add_definitions( -D NOCOLOR )
 endif()
 
-if(TTYCHECK)
-  add_definitions(-D TTYCHECK)
+if(ENABLE_TTY_CHECK)
+  add_definitions(-D ENABLE_TTY_CHECK)
 endif()
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O2")
