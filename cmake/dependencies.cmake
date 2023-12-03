@@ -20,7 +20,7 @@ find_package(
 )
 
 if( ROOT_FOUND )
-  cmessage( STATUS "[ROOT]: ROOT found" )
+  cmessage( STATUS "[ROOT]: ROOT found." )
 
   cmessage( STATUS "[ROOT]: ROOT cmake use file ${ROOT_USE_FILE}")
   cmessage( STATUS "[ROOT]: ROOT include directory: ${ROOT_INCLUDE_DIRS}" )
@@ -175,31 +175,33 @@ endif ()
 ####################
 
 # Check for the availability of CUDA
-if( ENABLE_CUDA )
-  cmessage( STATUS "ENABLE_CUDA: Checking for CUDA support...")
+if( WITH_CUDA_LIB )
+  cmessage( STATUS "WITH_CUDA_LIB=ON: Checking for CUDA support...")
   cmake_minimum_required( VERSION 3.12 FATAL_ERROR )
   include( CheckLanguage )
   check_language( CUDA )
-  if(CMAKE_CUDA_COMPILER)
+  if( CMAKE_CUDA_COMPILER )
     cmessage( STATUS "CUDA support enabled." )
     enable_language(CUDA)
-    if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+    if( NOT DEFINED CMAKE_CUDA_ARCHITECTURES )
       # The default is taken from the CUDAARCHS environment
       # variable.  If it isn't set, then set it to the earliest
       # non-deprecated architecture.
       #   2022: architectures before 52 are deprecated.
-      if (${CMAKE_VERSION} VERSION_GREATER_EQUAL 3.23)
+      if( ${CMAKE_VERSION} VERSION_GREATER_EQUAL 3.23 )
         # After cmake 3.23, this can be set to all or all-major
-        set(CMAKE_CUDA_ARCHITECTURES all)
+        set( CMAKE_CUDA_ARCHITECTURES all )
       else()
-        set(CMAKE_CUDA_ARCHITECTURES 52)
+        set( CMAKE_CUDA_ARCHITECTURES 52 )
       endif()
     endif()
     cmessage( STATUS "CUDA compilation architectures: \"${CMAKE_CUDA_ARCHITECTURES}\"")
-    cmessage( ALERT "The \"--cache-manager\" option requires a GPU" )
-  else(CMAKE_CUDA_COMPILER)
-    cmessage( ALERT "CUDA not present -- Cache::Manager use the CPU")
-  endif(CMAKE_CUDA_COMPILER)
-else( ENABLE_CUDA )
-  cmessage( ALERT "CUDA support disabled" )
-endif( ENABLE_CUDA )
+    cmessage( ALERT "Running with \"--cache-manager\" option requires a GPU" )
+  else( CMAKE_CUDA_COMPILER )
+    cmessage( FATAL_ERROR "Option WITH_CUDA_LIB=ON: CUDA not present." )
+  endif( CMAKE_CUDA_COMPILER )
+else( WITH_CUDA_LIB )
+  if( WITH_CACHE_MANAGER )
+    cmessage( STATUS "WITH_CACHE_MANAGER=ON: CUDA support disabled. Use -D WITH_CUDA_LIB=ON if needed." )
+  endif()
+endif( WITH_CUDA_LIB )

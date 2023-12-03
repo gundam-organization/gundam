@@ -13,3 +13,5 @@ add_custom_target( preBuildVersionCheck
 
 # Run the command while building makefiles
 include( ${CMAKE_SOURCE_DIR}/cmake/utils/git-version.cmake )
+
+set( GUNDAM_FULL_VERSION_STR "${GUNDAM_VERSION_STRING}+${GUNDAM_VERSION_POST_NB}-${GUNDAM_VERSION_POST_COMMIT}/${GUNDAM_VERSION_BRANCH}" )
