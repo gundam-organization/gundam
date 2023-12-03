@@ -44,8 +44,9 @@ do
         # Need to checkout the real branch name now:
         git checkout "${1#"remotes/origin/"}"
       fi
+      git pull
       git submodule sync
-       git submodule update --init --remote --recursive
+      git submodule update --init --remote --recursive
     else
       echo "You should provide a version after -b"
     fi
