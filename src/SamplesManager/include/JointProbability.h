@@ -98,7 +98,7 @@ namespace JointProbability {
     int verboseLevel{0};
     bool allowZeroMcWhenZeroData{true};
     bool usePoissonLikelihood{false};
-    bool BBNoUpdateWeights{false};
+    bool BBNoUpdateWeights{false}; // OA 2021 bug reimplementation
   };
 
   class BarlowLLH_BANFF_OA2021_SFGD : public JointProbability{

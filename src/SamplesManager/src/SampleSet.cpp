@@ -104,7 +104,7 @@ double SampleSet::evalLikelihood(){
   double llh = 0.;
   for( auto& sample : _fitSampleList_ ){
     llh += this->evalLikelihood(sample);
-    LogThrowIf(llh!=llh, sample.getName() << " LLH is NaN.");
+    LogThrowIf(std::isnan(llh) or std::isinf(llh), sample.getName() << ": reportde likelihood is invalid:" << llh);
   }
   return llh;
 }
