@@ -16,7 +16,6 @@
 
 #include "GenericToolbox.Root.LeafCollection.h"
 #include "GenericToolbox.VariablesMonitor.h"
-#include "GenericToolbox.ZipIterator.h"
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.h"
 #include "Logger.h"
