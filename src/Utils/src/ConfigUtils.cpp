@@ -234,6 +234,7 @@ namespace ConfigUtils {
         }
       }
       else{
+        LogDebug(debug) << "Not array: " << overrideEntry_.empty() << std::endl;
 
         if( overrideEntry_.empty() ){
           LogWarning << "Removing entry: " << GenericToolbox::joinPath(jsonPath) << std::endl;
@@ -243,6 +244,7 @@ namespace ConfigUtils {
 
         // entry is dictionary
         for( auto& overrideEntry : overrideEntry_.items() ){
+          LogDebug(debug) << GET_VAR_NAME_VALUE(overrideEntry.key()) << std::endl;
 
           // addition mode:
           if( not GenericToolbox::Json::doKeyExist(outEntry_, overrideEntry.key()) ){
@@ -259,6 +261,9 @@ namespace ConfigUtils {
                 );
               }
             }
+            else{
+              LogDebug(debug) << "skipping __INDEX__ entry" << std::endl;
+            }
             continue;
           }
 
@@ -266,6 +271,7 @@ namespace ConfigUtils {
           auto& outSubEntry = outEntry_[overrideEntry.key()];
 
           if( overrideEntry.value().is_structured() ){
+            LogDebug(debug) << "Is structured... going recursive..." << std::endl;
             // recursive candidate
             jsonPath.emplace_back(overrideEntry.key());
             overrideRecursive(outSubEntry, overrideEntry.value());
@@ -273,11 +279,9 @@ namespace ConfigUtils {
           }
           else{
             // override
-            if( outSubEntry != overrideEntry.value() ){
-              LogWarning << "Overriding: " << GenericToolbox::joinPath(jsonPath, overrideEntry.key()) << ": "
-                         << outSubEntry << " -> " << overrideEntry.value() << std::endl;
-              outSubEntry = overrideEntry.value();
-            }
+            LogWarning << "Overriding: " << GenericToolbox::joinPath(jsonPath, overrideEntry.key()) << ": "
+                       << outSubEntry << " -> " << overrideEntry.value() << std::endl;
+            outSubEntry = overrideEntry.value();
           }
         }
       }
@@ -338,6 +342,7 @@ namespace ConfigUtils {
     LogInfo << "Overriding config with \"" << filePath_ << "\"" << std::endl;
     LogThrowIf(not GenericToolbox::doesPathIsFile(filePath_), "Could not find " << filePath_);
 
+    LogScopeIndent;
     auto override{ConfigUtils::readConfigFile(filePath_)};
     ConfigHandler::override(override);
   }
