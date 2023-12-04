@@ -50,7 +50,9 @@ namespace ConfigUtils {
     return ConfigUtils::convertYamlToJson(GenericToolbox::Yaml::readConfigFile(configFilePath_));
   }
   nlohmann::json convertYamlToJson(const YAML::Node& yaml){
-    nlohmann::json output = nlohmann::json::parse(GenericToolbox::Yaml::toJsonString(yaml));
+    auto yamlStr{GenericToolbox::Yaml::toJsonString(yaml)};
+    LogDebug << GET_VAR_NAME_VALUE(yamlStr) << std::endl;
+    nlohmann::json output = nlohmann::json::parse(yamlStr);
 
     auto is_number = [](const std::string& s){
       return !s.empty() && std::find_if(s.begin(),
