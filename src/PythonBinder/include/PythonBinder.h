@@ -6,23 +6,28 @@
 #define GUNDAM_PYTHONBINDER_H
 
 
+#include "FitterEngine.h"
 #include "DataBin.h"
 #include "ConfigUtils.h"
+#include "GundamApp.h"
 
 #include "GenericToolbox.h"
 
 #include <pybind11/stl.h> // support for vectors
 
 #include <cmath>
+#include <utility>
 #include <vector>
 #include <iostream>
+#include <string>
 
 
 class PythonBinder{
 
-  int N{};
-  double a{};
-  double b{};
+  std::string filePath{};
+
+  GundamApp app{"test fitter"};
+  FitterEngine* fitter{nullptr};
 
 public:
 
@@ -30,22 +35,22 @@ public:
   std::vector<double> v_gamma{};
 
   PythonBinder() = default;
-  PythonBinder( double a_in, double b_in, int N_in) {
-    N = N_in;
-    a = a_in;
-    b = b_in;
+  explicit PythonBinder( std::string  filePath_ ) : filePath(std::move(filePath_)) {
+    ConfigUtils::ConfigHandler configHandler(filePath);
+    configHandler.override( std::vector<std::string>{{"./override/onlyRun4and5.yaml"}} );
+
+    app.openOutputFile("test.root");
+    app.writeAppInfo();
+
+    fitter = new FitterEngine{GenericToolbox::mkdirTFile(app.getOutfilePtr(), "FitterEngine")};
+
+    fitter->readConfig(GenericToolbox::Json::fetchSubEntry(configHandler.getConfig(), {"fitterEngineConfig"}));
+    fitter->getPropagator().setLoadAsimovData( true );
+    fitter->initialize();
   }
 
   void run() {
-    v_data = {a, b};
-
-    if( GenericToolbox::doesElementIsInVector(a, v_data) ){
-      LogDebug << "YES" << std::endl;
-    }
-
-    auto d = DataBin( 0 );
-
-    ConfigUtils::readConfigFile("");
+    fitter->fit();
   }
 
 };
