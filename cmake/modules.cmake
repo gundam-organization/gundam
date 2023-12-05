@@ -11,6 +11,7 @@ list( APPEND MODULES SamplesManager)
 list( APPEND MODULES DatasetManager)
 list( APPEND MODULES Propagator)
 list( APPEND MODULES Fitter)
+list( APPEND MODULES PythonBinder)
 
 if(WITH_CACHE_MANAGER)
   list( APPEND MODULES CacheManager )
