@@ -6,10 +6,15 @@
 #define GUNDAM_PYTHONBINDER_H
 
 
+#include "GenericToolbox.h"
+
 #include <pybind11/stl.h> // support for vectors
 
 #include <cmath>
 #include <vector>
+#include <iostream>
+
+
 
 
 
@@ -33,6 +38,9 @@ public:
 
   void run() {
     v_data = {a, b};
+    if( GenericToolbox::doesElementIsInVector(a, v_data) ){
+      LogDebug << "YES" << std::endl;
+    }
   }
 
 };

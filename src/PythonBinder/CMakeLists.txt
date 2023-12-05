@@ -1,7 +1,7 @@
 
 set( LIB_NAME "PythonBinder" )
 
-set( SRCFILES
+set( SRC_FILE_LIST
     src/PythonBinder.cpp
 )
 
@@ -9,14 +9,20 @@ set( PYBIND11_PYTHON_VERSION 3.11.6 )
 
 find_package(pybind11 REQUIRED)
 
-pybind11_add_module(${LIB_NAME} ${SRCFILES})
+pybind11_add_module( ${LIB_NAME} ${SRC_FILE_LIST} )
 
-target_include_directories(${LIB_NAME} PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories( ${LIB_NAME} PRIVATE
+    ${PYBIND11_INCLUDE_DIRS}
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
 
-target_compile_definitions(${LIB_NAME} PRIVATE VERSION_INFO=${EXAMPLE_VERSION_INFO})
-target_include_directories(${LIB_NAME} PRIVATE ${PYBIND11_INCLUDE_DIRS})
-#target_link_libraries(${PROJECT_NAME} PRIVATE Eigen3::Eigen)
+target_compile_definitions( ${LIB_NAME} PRIVATE
+    VERSION_INFO=${GUNDAM_FULL_VERSION_STR}
+)
+
+target_link_libraries( ${LIB_NAME} PRIVATE
+    GundamUtils
+)
 
 #target_include_directories(${LIB_NAME} PUBLIC
 #    ${CMAKE_CURRENT_SOURCE_DIR}/include)
