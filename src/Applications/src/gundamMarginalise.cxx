@@ -217,7 +217,8 @@ int main(int argc, char** argv){
                     par.setPriorValue(par.getParameterValue());
                 }else{
                     par.setPriorValue(par.getParameterValue());
-                    par.setParameterValue(getParameterValueFromTextFile(parInjectFile,par.getFullTitle()) );
+                    double parValue = getParameterValueFromTextFile(parInjectFile,par.getFullTitle());
+                    par.setParameterValue( parValue );
                 }
             }
         }
