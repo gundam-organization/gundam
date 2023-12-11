@@ -165,6 +165,9 @@ int main(int argc, char** argv){
     if( clParser.isOptionTriggered("parInject") ){
         parInjectFile = clParser.getOptionVal<std::string>("parInject");
         injectParamsManually = true;
+        LogInfo << "Injecting parameters from file: " << parInjectFile << std::endl;
+    }else{
+        LogInfo << "Injecting best fit parameters as prior" << std::endl;
     }
 
     auto configPropagator = GenericToolbox::Json::fetchValuePath<nlohmann::json>( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig" );
@@ -428,7 +431,7 @@ int main(int argc, char** argv){
         // reset weights vector
         weightsChiSquare.clear();
         // Do the throwing:
-        //propagator.getParametersManager().throwParametersFromGlobalCovariance(weightsChiSquare);
+        propagator.getParametersManager().throwParametersFromGlobalCovariance(weightsChiSquare);
         //propagator.propagateParametersOnSamples(); // Not necessary (included in updateLlhCache())
         propagator.updateLlhCache();
         LLH = propagator.getLlhBuffer();
