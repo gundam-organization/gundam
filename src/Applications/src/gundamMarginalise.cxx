@@ -536,7 +536,7 @@ double getParameterValueFromTextFile(std::string fileName="LargeWeight_parVector
 
 
         parValue = std::stod(value);
-        if ("Parameter "+title == parameterName) {
+        if (title == parameterName) {
             return parValue;
         }
     }
