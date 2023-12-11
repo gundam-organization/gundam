@@ -540,6 +540,6 @@ double getParameterValueFromTextFile(std::string fileName="LargeWeight_parVector
             return parValue;
         }
     }
-    cout << "Parameter \"" << parameterName << "\" not found in file " << fileName << std::endl;
+    LogInfo << "Parameter \"" << parameterName << "\" not found in file " << fileName << std::endl;
     return -999;
 }
