@@ -218,6 +218,7 @@ int main(int argc, char** argv){
                 }else{
                     par.setPriorValue(par.getParameterValue());
                     double parValue = getParameterValueFromTextFile(parInjectFile,par.getFullTitle());
+                    LogInfo<<"Setting  "<<par.getTitle()<<" -> "<<parValue<<std::endl;
                     par.setParameterValue( parValue );
                 }
             }
