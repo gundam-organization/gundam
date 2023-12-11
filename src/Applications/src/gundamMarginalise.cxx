@@ -34,6 +34,8 @@ LoggerInit([]{
 
 int main(int argc, char** argv){
 
+    std::cout<<"Hello world"<<std::endl;
+
     GundamApp app{"contours marginalisation tool"};
 
     // --------------------------
@@ -310,6 +312,7 @@ int main(int argc, char** argv){
     std::vector<bool> margThis;
     std::vector<double> prior;
     std::vector<double> weightsChiSquare;
+    std::vector<double> dialResponse;
 //    weightsChiSquare.reserve(1000);
     double LLH, gLLH, priorSum, LLHwrtBestFit;
     margThrowTree->Branch("Parameters", &parameters);
@@ -320,6 +323,7 @@ int main(int argc, char** argv){
     margThrowTree->Branch("gLLH", &gLLH);
     margThrowTree->Branch("priorSum", &priorSum);
     margThrowTree->Branch("weightsChiSquare", &weightsChiSquare);
+    margThrowTree->Branch("dialResponse", &dialResponse);
 
 
     int nToys{ clParser.getOptionVal<int>("nToys") };
@@ -413,7 +417,7 @@ int main(int argc, char** argv){
         weightsChiSquare.clear();
         // Do the throwing:
         propagator.getParametersManager().throwParametersFromGlobalCovariance(weightsChiSquare);
-        //propagator.propagateParametersOnSamples(); // Probably not necessary (what's that for?)
+        //propagator.propagateParametersOnSamples(); // Not necessary (included in updateLlhCache())
         propagator.updateLlhCache();
         LLH = propagator.getLlhBuffer();
         LLHwrtBestFit = LLH - bestFitLLH;
