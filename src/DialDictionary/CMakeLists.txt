@@ -77,16 +77,14 @@ target_include_directories(
     DialDefinitions/include
 )
 
-target_include_directories(
-    ${LIB_NAME} PRIVATE
-    ${ZLIB_INCLUDE_DIRS}
-)
+#target_include_directories(
+#    ${LIB_NAME} PRIVATE
+#    ${ZLIB_INCLUDE_DIRS}
+#)
 
 target_link_libraries( ${LIB_NAME} PUBLIC
     GundamParametersManager
     GundamSamplesManager
-    ${ZLIB_LIBRARIES}
-    ${ROOT_LIBRARIES}
 )
 
 

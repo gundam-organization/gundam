@@ -57,10 +57,7 @@ target_include_directories( GundamUtils PUBLIC
   ${CMAKE_BINARY_DIR}/generated
 )
 
-target_link_libraries( GundamUtils PUBLIC
-        ${ROOT_LIBRARIES}
-        ${YAML_CPP_LIBRARIES}
-        )
+#target_link_libraries( GundamUtils PUBLIC )
 
 #set_target_properties(GundamUtils PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")
 
