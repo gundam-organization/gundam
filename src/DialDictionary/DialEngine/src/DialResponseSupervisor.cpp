@@ -10,13 +10,13 @@
 
 double DialResponseSupervisor::process(double reponse_) const {
   // apply cap?
-  // print out info if out of range
+  // print out info
+    LogWarning << "Response " << reponse_ << " limits: " << getSummary() << std::endl;
+
   if     ( not std::isnan(_minResponse_) and reponse_ < _minResponse_ ){
-      LogWarning << "Response " << reponse_ << " is below the minimum response " << _minResponse_ << std::endl;
       return _minResponse_;
   }
   else if( not std::isnan(_maxResponse_) and reponse_ > _maxResponse_ ){
-      LogWarning << "Response " << reponse_ << " is above the maximum response " << _maxResponse_ << std::endl;
       return _maxResponse_;
   }
 

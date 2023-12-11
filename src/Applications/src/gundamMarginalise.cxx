@@ -444,6 +444,9 @@ int main(int argc, char** argv){
             }
         }
         LogInfo<<"LLH: "<<LLH/2.<<"  gLLH: "<<gLLH/2.<<"\tdifference: "<<(LLH-gLLH)/2.  <<std::endl;
+        if((LLH-gLLH)/2. > 10){
+            LogInfo<<"WARNING: BIG THROW!!"<<std::endl;
+        }
 
         //LogInfo<<"->   gLLH: "<<gLLH<<std::endl;
         //LogDebugIf(gLLH<50)<<gLLH<<std::endl;
