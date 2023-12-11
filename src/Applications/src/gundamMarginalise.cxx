@@ -31,6 +31,8 @@ LoggerInit([]{
     Logger::getUserHeader() << "[" << FILENAME << "]";
 });
 
+double getParameterValueFromTextFile(std::string fileName, std::string parameterName);
+
 
 int main(int argc, char** argv){
 
@@ -202,7 +204,7 @@ int main(int argc, char** argv){
 //                LogInfo<<"  "<<par.getTitle()<<" -> "<<par.getParameterValue()<<std::endl;
                 parametersBestFit.push_back( par.getParameterValue() );
                 parameterFullTitles.push_back( par.getFullTitle() );
-                par.setPriorValue( par.getParameterValue() );
+                par.setPriorValue(getParameterValueFromTextFile("LargeWeight_parVector.txt",par.getFullTitle()) );
             }
         }
     });
@@ -416,7 +418,7 @@ int main(int argc, char** argv){
         // reset weights vector
         weightsChiSquare.clear();
         // Do the throwing:
-        propagator.getParametersManager().throwParametersFromGlobalCovariance(weightsChiSquare);
+        //propagator.getParametersManager().throwParametersFromGlobalCovariance(weightsChiSquare);
         //propagator.propagateParametersOnSamples(); // Not necessary (included in updateLlhCache())
         propagator.updateLlhCache();
         LLH = propagator.getLlhBuffer();
@@ -501,4 +503,29 @@ int main(int argc, char** argv){
 
 
     //GundamGlobals::getParallelWorker().reset();
+}
+
+
+
+double getParameterValueFromTextFile(std::string fileName, std::string parameterName) {
+    std::ifstream file(fileName);
+    std::string line;
+    std::string parName;
+    double parValue;
+    // title and parvalue are separateed by a colon
+    while (std::getline(file, line)) {
+        std::istringstream iss(line);
+        std::string title, value;
+
+        // Splitting the line by ':'
+        std::getline(iss, title, ':');
+        std::getline(iss, value);
+
+        iss >> parName >> parValue;
+        if (parName == parameterName) {
+            return parValue;
+        }
+    }
+    LogInfo << "Parameter " << parameterName << " not found in file " << fileName << std::endl;
+    return -999;
 }
