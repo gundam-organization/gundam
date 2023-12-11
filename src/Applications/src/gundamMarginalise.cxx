@@ -218,7 +218,7 @@ int main(int argc, char** argv){
                 }else{
                     par.setPriorValue(par.getParameterValue());
                     double parValue = getParameterValueFromTextFile(parInjectFile,par.getFullTitle());
-                    LogInfo<<"Setting  "<<par.getTitle()<<" -> "<<parValue<<std::endl;
+                    LogInfo<<"Setting  "<<par.getFullTitle()<<" -> "<<parValue<<std::endl;
                     par.setParameterValue( parValue );
                 }
             }
@@ -228,7 +228,7 @@ int main(int argc, char** argv){
     propagator.propagateParametersOnSamples();
     propagator.updateLlhCache();
     double bestFitLLH = propagator.getLlhBuffer();
-    LogInfo<<"Best fit LLH: "<<bestFitLLH<<std::endl;
+    LogInfo<<"LLH (computed on injected parameters): "<<bestFitLLH<<std::endl;
 
     // Creating output file
     std::string outFilePath{};
@@ -461,8 +461,8 @@ int main(int argc, char** argv){
                 iPar++;
             }
         }
-        LogInfo<<"LLH: "<<LLH/2.<<"  gLLH: "<<gLLH<<"\tdifference: "<<(LLH/2.-gLLH)  <<std::endl;
-        if((LLH-gLLH)/2. > 10){
+        LogInfo<<"LLH: "<<LLH/2.<<"  gLLH: "<<gLLH/2.<<"\tdifference: "<<(-LLH/2.+gLLH/2.)  <<std::endl;
+        if((-LLH+gLLH)/2. > 10){
             LogInfo<<"WARNING: BIG THROW!!"<<std::endl;
         }
 
