@@ -62,7 +62,7 @@ int main(int argc, char** argv){
     clParser.addOption("nToys", {"-n"}, "Specify number of toys");
     clParser.addOption("randomSeed", {"-s", "--seed"}, "Set random seed");
     clParser.addTriggerOption("usingGpu", {"--gpu"}, "Use GPU parallelization");
-
+    clParser.addOption("parInject", {"--parameters-inject"}, "Input txt file for injecting params");
 
     clParser.addDummyOption("Trigger options:");
     clParser.addTriggerOption("dryRun", {"-d", "--dry-run"}, "Only overrides fitter config and print it.");
@@ -160,6 +160,12 @@ int main(int argc, char** argv){
         LogAlert << "Exiting as dry-run is set." << std::endl;
         return EXIT_SUCCESS;
     }
+    bool injectParamsManually = false;
+    std::string parInjectFile;
+    if( clParser.isOptionTriggered("parInject") ){
+        parInjectFile = clParser.getOptionVal<std::string>("parInject");
+        injectParamsManually = true;
+    }
 
     auto configPropagator = GenericToolbox::Json::fetchValuePath<nlohmann::json>( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig" );
 
@@ -204,7 +210,11 @@ int main(int argc, char** argv){
 //                LogInfo<<"  "<<par.getTitle()<<" -> "<<par.getParameterValue()<<std::endl;
                 parametersBestFit.push_back( par.getParameterValue() );
                 parameterFullTitles.push_back( par.getFullTitle() );
-                par.setPriorValue(getParameterValueFromTextFile("LargeWeight_parVector.txt",par.getFullTitle()) );
+                if (not injectParamsManually) {
+                    par.setPriorValue(par.getParameterValue());
+                }else{
+                    par.setPriorValue(getParameterValueFromTextFile(parInjectFile,par.getFullTitle()) );
+                }
             }
         }
     });
