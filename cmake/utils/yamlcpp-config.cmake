@@ -12,7 +12,7 @@
 # to tell CMake where yaml-cpp is.
 
 cmessage( STATUS "Looking for yaml-cpp library...")
-cmessage( STATUS " -> To manually select yaml-cpp: -D YAMLCPP_INSTALL_DIR=/path/to/yaml-cpp/install )")
+#cmessage( STATUS " -> To manually select yaml-cpp: -D YAMLCPP_INSTALL_DIR=/path/to/yaml-cpp/install )")
 #if( YAMLCPP_INSTALL_DIR STREQUAL "" )
 #    cmessage( STATUS "User provided YAMLCPP_INSTALL_DIR=${YAMLCPP_INSTALL_DIR}")
 #endif()
