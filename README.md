@@ -103,7 +103,8 @@ check out the latest tagged version by tapping:
 
 Note that this command will also automatically check out the submodule
 included in the project. Therefore, in order to update your code when
-a new release is available, simply use the same command.
+a new release is available, simply use the same command. Note that git versions 
+before 2.0 may have issues to checkout the correct submodules (see issue #429)
 
 
 
