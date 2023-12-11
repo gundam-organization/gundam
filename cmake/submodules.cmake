@@ -27,9 +27,7 @@ checkSubmodule( simple-cpp-cmd-line-parser )
 ## Add the CmdLineParser
 # Reproduce needed parts of the simple-cpp-cmd-line-parser CMakeLists.txt
 include_directories(submodules/simple-cpp-cmd-line-parser/include)
-if(yaml-cpp_FOUND)
-  add_definitions( -DCMDLINEPARSER_YAML_CPP_ENABLED=1 )
-endif()
+add_definitions( -D CMDLINEPARSER_YAML_CPP_ENABLED=1 )
 
 ## Add the GenericToolbox²
 # Reproduce needed parts of the cpp-generic-toolbox CMakeLists.txt
