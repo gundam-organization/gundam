@@ -46,7 +46,7 @@ else()
 
 
     set( LD_HINT "" )
-    foreach ( LIBRARY_DIR IN LISTS ${LIBRARY_DIRS})
+    foreach( LIBRARY_DIR ${LIBRARY_DIRS} )
         cmessage( ALERT "${LIBRARY_DIR}/../" )
         list( APPEND LD_HINT "${LIBRARY_DIR}/../" )
     endforeach()
