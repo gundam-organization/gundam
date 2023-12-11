@@ -42,14 +42,15 @@ if( YAMLCPP_INSTALL_DIR )
             )
 else()
     cmessage( STATUS "Looking for the include and lib folders in the system...")
-    cmessage( ALERT "$ENV{LD_LIBRARY_PATH}" )
-    string(REPLACE ":" ";" LIBRARY_DIRS $ENV{LD_LIBRARY_PATH})
 
     set( LD_HINT "" )
-    foreach( LIBRARY_DIR ${LIBRARY_DIRS} )
-#        cmessage( ALERT "${LIBRARY_DIR}/../" )
-        list( APPEND LD_HINT "${LIBRARY_DIR}/../" )
-    endforeach()
+    if( DEFINED $ENV{LD_LIBRARY_PATH} )
+        string(REPLACE ":" ";" LIBRARY_DIRS $ENV{LD_LIBRARY_PATH})
+        foreach( LIBRARY_DIR ${LIBRARY_DIRS} )
+    #        cmessage( ALERT "${LIBRARY_DIR}/../" )
+            list( APPEND LD_HINT "${LIBRARY_DIR}/../" )
+        endforeach()
+    endif()
 
     # find the yaml-cpp include directory
     find_path(YAMLCPP_INCLUDE_DIR yaml-cpp/yaml.h
