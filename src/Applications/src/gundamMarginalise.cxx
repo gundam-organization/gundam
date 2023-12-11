@@ -216,7 +216,8 @@ int main(int argc, char** argv){
                 if (not injectParamsManually) {
                     par.setPriorValue(par.getParameterValue());
                 }else{
-                    par.setPriorValue(getParameterValueFromTextFile(parInjectFile,par.getFullTitle()) );
+                    par.setPriorValue(par.getParameterValue());
+                    par.setParameterValue(getParameterValueFromTextFile(parInjectFile,par.getFullTitle()) );
                 }
             }
         }
