@@ -42,8 +42,8 @@ if( YAMLCPP_INSTALL_DIR )
             )
 else()
     cmessage( STATUS "Looking for the include and lib folders in the system...")
+    cmessage( ALERT "$ENV{LD_LIBRARY_PATH}" )
     string(REPLACE ":" ";" LIBRARY_DIRS $ENV{LD_LIBRARY_PATH})
-
 
     set( LD_HINT "" )
     foreach( LIBRARY_DIR ${LIBRARY_DIRS} )
