@@ -458,7 +458,7 @@ int main(int argc, char** argv){
                 iPar++;
             }
         }
-        LogInfo<<"LLH: "<<LLH/2.<<"  gLLH: "<<gLLH/2.<<"\tdifference: "<<(LLH-gLLH)/2.  <<std::endl;
+        LogInfo<<"LLH: "<<LLH/2.<<"  gLLH: "<<gLLH<<"\tdifference: "<<(LLH/2.-gLLH)  <<std::endl;
         if((LLH-gLLH)/2. > 10){
             LogInfo<<"WARNING: BIG THROW!!"<<std::endl;
         }
