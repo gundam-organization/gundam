@@ -42,6 +42,9 @@ if( YAMLCPP_INSTALL_DIR )
             )
 else()
     cmessage( STATUS "Looking for the include and lib folders in the system...")
+    string(REPLACE ":" ";" LIBRARY_DIRS $ENV{LD_LIBRARY_PATH})
+    cmessage( ALERT "${LIBRARY_DIRS}" )
+
     # find the yaml-cpp include directory
     find_path(YAMLCPP_INCLUDE_DIR yaml-cpp/yaml.h
             PATH_SUFFIXES include
@@ -53,7 +56,9 @@ else()
             /sw/yaml-cpp/         # Fink
             /opt/local/yaml-cpp/  # DarwinPorts
             /opt/csw/yaml-cpp/    # Blastwave
-            /opt/yaml-cpp/)
+            /opt/yaml-cpp/
+        ${LIBRARY_DIRS}/../
+    )
 
     # find the yaml-cpp library
     find_library(YAMLCPP_LIBRARY
@@ -67,7 +72,9 @@ else()
             /sw
             /opt/local
             /opt/csw
-            /opt)
+            /opt
+        ${LIBRARY_DIRS}/../
+    )
 endif()
 
 
