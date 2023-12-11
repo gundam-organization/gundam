@@ -34,7 +34,7 @@ LoggerInit([]{
 
 int main(int argc, char** argv){
 
-    std::cout<<"Hello world"<<std::endl;
+    std::cout<<"Hello world 11.12.23"<<std::endl;
 
     GundamApp app{"contours marginalisation tool"};
 
@@ -443,8 +443,7 @@ int main(int argc, char** argv){
                 iPar++;
             }
         }
-        if(iToy%(nToys/10)==0)
-            LogInfo<<"LLH: "<<LLH<<"  gLLH: "<<gLLH<<std::endl;
+        LogInfo<<"LLH: "<<LLH<<"  gLLH: "<<gLLH<<std::endl;
 
         //LogInfo<<"->   gLLH: "<<gLLH<<std::endl;
         //LogDebugIf(gLLH<50)<<gLLH<<std::endl;
