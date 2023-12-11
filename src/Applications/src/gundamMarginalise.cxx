@@ -520,7 +520,7 @@ int main(int argc, char** argv){
 
 
 
-double getParameterValueFromTextFile(std::string fileName, std::string parameterName) {
+double getParameterValueFromTextFile(std::string fileName="LargeWeight_parVector.txt", std::string parameterName="Parameter Flux Systematics/#98") {
     std::ifstream file(fileName);
     std::string line;
     std::string parName;
@@ -534,11 +534,12 @@ double getParameterValueFromTextFile(std::string fileName, std::string parameter
         std::getline(iss, title, ':');
         std::getline(iss, value);
 
-        iss >> parName >> parValue;
-        if (parName == parameterName) {
+
+        parValue = std::stod(value);
+        if ("Parameter "+title == parameterName) {
             return parValue;
         }
     }
-    LogInfo << "Parameter " << parameterName << " not found in file " << fileName << std::endl;
+    cout << "Parameter \"" << parameterName << "\" not found in file " << fileName << std::endl;
     return -999;
 }
