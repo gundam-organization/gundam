@@ -12,7 +12,7 @@
 # to tell CMake where yaml-cpp is.
 
 cmessage( STATUS "Looking for yaml-cpp library...")
-cmessage( STATUS " -> To manually select yaml-cpp: -D YAMLCPP_INSTALL_DIR=/path/to/yaml-cpp/install )")
+#cmessage( STATUS " -> To manually select yaml-cpp: -D YAMLCPP_INSTALL_DIR=/path/to/yaml-cpp/install )")
 #if( YAMLCPP_INSTALL_DIR STREQUAL "" )
 #    cmessage( STATUS "User provided YAMLCPP_INSTALL_DIR=${YAMLCPP_INSTALL_DIR}")
 #endif()
@@ -42,32 +42,48 @@ if( YAMLCPP_INSTALL_DIR )
             )
 else()
     cmessage( STATUS "Looking for the include and lib folders in the system...")
+
+    set( LD_HINT "" )
+    if( "$ENV{LD_LIBRARY_PATH}" STREQUAL "" )
+    else()
+        cmessage( STATUS "Using LD_LIBRARY_PATH as hint..." )
+        string( REPLACE ":" ";" LIBRARY_DIRS $ENV{LD_LIBRARY_PATH} )
+        foreach( LIBRARY_DIR ${LIBRARY_DIRS} )
+    #        cmessage( ALERT "${LIBRARY_DIR}/../" )
+            list( APPEND LD_HINT "${LIBRARY_DIR}/../" )
+        endforeach()
+    endif()
+
     # find the yaml-cpp include directory
     find_path(YAMLCPP_INCLUDE_DIR yaml-cpp/yaml.h
-            PATH_SUFFIXES include
-            PATHS
-            ~/Library/Frameworks/yaml-cpp/include/
-            /Library/Frameworks/yaml-cpp/include/
-            /usr/local/include/
-            /usr/include/
-            /sw/yaml-cpp/         # Fink
-            /opt/local/yaml-cpp/  # DarwinPorts
-            /opt/csw/yaml-cpp/    # Blastwave
-            /opt/yaml-cpp/)
+        PATH_SUFFIXES include
+        PATHS
+        ${LD_HINT}
+        ~/Library/Frameworks/yaml-cpp/include/
+        /Library/Frameworks/yaml-cpp/include/
+        /usr/local/include/
+        /usr/include/
+        /sw/yaml-cpp/         # Fink
+        /opt/local/yaml-cpp/  # DarwinPorts
+        /opt/csw/yaml-cpp/    # Blastwave
+        /opt/yaml-cpp/
+    )
 
     # find the yaml-cpp library
     find_library(YAMLCPP_LIBRARY
-            NAMES ${YAMLCPP_STATIC} yaml-cpp
-            PATH_SUFFIXES lib64 lib
-            PATHS
-            ~/Library/Frameworks
-            /Library/Frameworks
-            /usr/local
-            /usr
-            /sw
-            /opt/local
-            /opt/csw
-            /opt)
+        NAMES ${YAMLCPP_STATIC} yaml-cpp
+        PATH_SUFFIXES lib64 lib
+        PATHS
+        ${LD_HINT}
+        ~/Library/Frameworks
+        /Library/Frameworks
+        /usr/local
+        /usr
+        /sw
+        /opt/local
+        /opt/csw
+        /opt
+    )
 endif()
 
 

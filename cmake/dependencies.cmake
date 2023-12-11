@@ -96,6 +96,9 @@ if (NOT ROOT_minuit2_FOUND)
   cmessage(FATAL_ERROR "[ROOT]: minuit2 is required")
 endif(NOT ROOT_minuit2_FOUND)
 
+include_directories( ${ROOT_INCLUDE_DIR} )
+link_libraries( ${ROOT_LIBRARIES} )
+
 
 ####################
 # NLOHMANN JSON
@@ -125,32 +128,28 @@ endif()
 ####################
 
 cmessage( STATUS "Looking for YAML install..." )
-find_package( yaml-cpp REQUIRED HINTS ${YAMLCPP_DIR} )
-if(NOT yaml-cpp_FOUND)
+
+# WORKAROUND FOR CCLYON (old cmake version/pkg)
+set( CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils )
+set( CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils )
+
+if( DEFINED $YAMLCPP_DIR )
+  cmessage( ALERT "Setting yaml-cpp hint to ${YAMLCPP_DIR}." )
+  set( YAMLCPP_INSTALL_DIR ${YAMLCPP_DIR} )
+endif()
+
+find_package( YAMLCPP REQUIRED HINTS ${YAMLCPP_DIR} )
+if( NOT YAMLCPP_FOUND )
   cmessage(FATAL_ERROR "yaml-cpp library not found.")
 endif()
-include_directories( ${YAML_CPP_INCLUDE_DIR} )
-cmessage( STATUS "Custom yaml-cpp installation: ${YAMLCPP_DIR}")
-cmessage( STATUS "yaml-cpp include directory: ${YAML_CPP_INCLUDE_DIR}")
-cmessage( STATUS "yaml-cpp lib: ${YAML_CPP_LIBRARIES}")
-if( "${YAML_CPP_INCLUDE_DIR} " STREQUAL " ")
-  # WORKAROUND FOR CCLYON (old cmake version/pkg)
-  set( CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils )
-  set( CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils )
-  set(YAMLCPP_INSTALL_DIR ${YAMLCPP_DIR})
-  find_package( YAMLCPP REQUIRED )
-  if( NOT YAMLCPP_FOUND )
-    cmessage(FATAL_ERROR "yaml-cpp library not found.")
-  endif()
-  cmessage( STATUS " - yaml-cpp include directory: ${YAMLCPP_INCLUDE_DIR}")
-  cmessage( STATUS " - yaml-cpp lib: ${YAMLCPP_LIBRARY}")
-  if( "${YAMLCPP_INCLUDE_DIR} " STREQUAL " ")
-    cmessage(FATAL_ERROR "empty YAMLCPP_INCLUDE_DIR returned.")
-  endif()
-  include_directories( ${YAMLCPP_INCLUDE_DIR} )
-  set(YAML_CPP_LIBRARIES ${YAMLCPP_LIBRARY})
-  #    list(APPEND LINK_LIBARY_LIST ${YAMLCPP_LIBRARY})
+cmessage( STATUS " - yaml-cpp include directory: ${YAMLCPP_INCLUDE_DIR}")
+cmessage( STATUS " - yaml-cpp lib: ${YAMLCPP_LIBRARY}")
+if( "${YAMLCPP_INCLUDE_DIR} " STREQUAL " ")
+  cmessage(FATAL_ERROR "empty YAMLCPP_INCLUDE_DIR returned.")
 endif()
+set(YAML_CPP_LIBRARIES ${YAMLCPP_LIBRARY})
+include_directories( ${YAMLCPP_INCLUDE_DIR} )
+link_libraries( ${YAML_CPP_LIBRARIES} )
 
 
 ####################
@@ -163,7 +162,10 @@ if (${ZLIB_FOUND})
   cmessage( STATUS "ZLIB found : ${ZLIB_VERSION_STRING}")
   cmessage( STATUS "ZLIB_INCLUDE_DIRS = ${ZLIB_INCLUDE_DIRS}")
   cmessage( STATUS "ZLIB_LIBRARIES = ${ZLIB_LIBRARIES}")
+
   add_definitions( -D USE_ZLIB=1 )
+  include_directories( ${ZLIB_INCLUDE_DIRS} )
+  link_libraries( ${ZLIB_LIBRARIES} )
 else()
   cmessage( WARNING "ZLib not found. Will compile without the associated features." )
   add_definitions( -D USE_ZLIB=0 )
