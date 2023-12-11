@@ -443,7 +443,7 @@ int main(int argc, char** argv){
                 iPar++;
             }
         }
-        LogInfo<<"LLH: "<<LLH<<"  gLLH: "<<gLLH<<std::endl;
+        LogInfo<<"LLH: "<<LLH/2.<<"  gLLH: "<<gLLH/2.<<"\tdifference: "<<(LLH-gLLH)/2.  <<std::endl;
 
         //LogInfo<<"->   gLLH: "<<gLLH<<std::endl;
         //LogDebugIf(gLLH<50)<<gLLH<<std::endl;
