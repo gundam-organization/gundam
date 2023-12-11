@@ -44,7 +44,7 @@ else()
     cmessage( STATUS "Looking for the include and lib folders in the system...")
 
     set( LD_HINT "" )
-    if( $ENV{LD_LIBRARY_PATH} STREQUAL "" )
+    if( "$ENV{LD_LIBRARY_PATH}" STREQUAL "" )
     else()
         cmessage( STATUS "Using LD_LIBRARY_PATH as hint..." )
         string( REPLACE ":" ";" LIBRARY_DIRS $ENV{LD_LIBRARY_PATH} )
