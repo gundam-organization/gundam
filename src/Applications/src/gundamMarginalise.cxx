@@ -380,7 +380,7 @@ int main(int argc, char** argv){
         }
     // Do the same for single parameters
         for (auto &par: parSet.getParameterList()) {
-            if (not par.isEnabled() and not setMatches) {
+            if (not par.isEnabled()) {
                 LogInfo << "Parameter " << par.getName() << " is disabled" << std::endl;
                 continue;
 
@@ -394,19 +394,19 @@ int main(int argc, char** argv){
                     matches = (false);
                 }
             }
-            par.setMarginalised(matches);
+            par.setMarginalised(matches or setMatches);
             if(par.isMarginalised()){
                 LogInfo << "Parameter " << par.getFullTitle()
                 << " -> type: " << par.getPriorType() << " mu=" << par.getPriorValue()
                 << " sigma= " << par.getStdDevValue() << " limits: " << par.getMinValue() << " - "
                 << par.getMaxValue() <<par.isMarginalised()
-                <<" will be marginalized out.   \n";
+                <<" will be marg. out\n";
             }else{
                 LogInfo << "Parameter " << par.getFullTitle()
                         << " -> type: " << par.getPriorType() << " mu=" << par.getPriorValue()
                         << " sigma= " << par.getStdDevValue() << " limits: " << par.getMinValue() << " - "
                         << par.getMaxValue() << par.isMarginalised()
-                <<" will NOT be marginalized out.   \n";
+                <<" will NOT be marg. out\n";
             }
         }
     }
