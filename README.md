@@ -20,15 +20,6 @@ As GUNDAM is designed for maximize flexibility to accommodate
 various physics works, it allows to share optimizations
 and debugging for every project at once.
 
-## Showcase
-
-![](./resources/images/samplesExample.png)
-
-<details>
-  <summary><b>Spoiler: More Screenshots</b></summary>
-
-![](./resources/images/postFitCorrExample.png)
-
 </details>
 
 ![bannerStyle.001.png](resources/images/bannerStyle/bannerStyle.001.png)
