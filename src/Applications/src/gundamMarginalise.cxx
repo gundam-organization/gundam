@@ -432,13 +432,22 @@ int main(int argc, char** argv){
 
         if(injectParamsManually) {
             LogInfo<< "Injecting parameters from file: " << parInjectFile << std::endl;
+
+            std::vector<Parameter*> parPtrList{};
+            // save a list of parameter pointers (NOT IN EIGEN SPACE)
+            for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
+                for( auto& par : parSet.getParameterList() ){
+                    if( par.isEnabled() and not par.isFixed() ) {
+                        parPtrList.emplace_back(&par);
+                        // set the parameter value from the injector file
+                        parPtrList.back()->setParameterValue(getParameterValueFromTextFile(parInjectFile, par.getFullTitle()));
+                    }
+                }
+            }
+
+            // If is in eigen space, propagateOriginalToEigen
             for (auto &parSet: propagator.getParametersManager().getParameterSetsList()) {
                 if (not parSet.isEnabled()) { continue; }
-                for (auto &par: parSet.getParameterList()) {
-                    if (not par.isEnabled()) { continue; }
-                    par.setParameterValue(getParameterValueFromTextFile(parInjectFile, par.getFullTitle()));
-                    //LogInfo << "Setting: " << par.getFullTitle() << " to " << par.getParameterValue() << std::endl;
-                }
                 if (parSet.isUseEigenDecompInFit()){
                     parSet.propagateEigenToOriginal();
                 }
