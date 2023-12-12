@@ -438,8 +438,10 @@ int main(int argc, char** argv){
                     par.setParameterValue(getParameterValueFromTextFile(parInjectFile, par.getFullTitle()));
                     LogInfo << "Setting: " << par.getFullTitle() << " to " << par.getParameterValue() << std::endl;
                 }
+                propagator.getParametersManager().injectParameterValues( parSet.exportInjectorConfig() );
             }
         }
+
         LogInfo<<"Computing LH..."<<std::endl;
         propagator.updateLlhCache();
         LLH = propagator.getLlhBuffer();
