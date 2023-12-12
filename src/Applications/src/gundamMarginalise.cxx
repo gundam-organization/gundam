@@ -439,7 +439,6 @@ int main(int argc, char** argv){
                     par.setParameterValue(getParameterValueFromTextFile(parInjectFile, par.getFullTitle()));
                     //LogInfo << "Setting: " << par.getFullTitle() << " to " << par.getParameterValue() << std::endl;
                 }
-                parSet.propagateOriginalToEigen();
             }
         }
 
