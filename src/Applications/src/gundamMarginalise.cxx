@@ -213,15 +213,7 @@ int main(int argc, char** argv){
 //                LogInfo<<"  "<<par.getTitle()<<" -> "<<par.getParameterValue()<<std::endl;
                 parametersBestFit.push_back( par.getParameterValue() );
                 parameterFullTitles.push_back( par.getFullTitle() );
-                if (not injectParamsManually) {
-                    par.setPriorValue(par.getParameterValue());
-                }else{
-                    par.setPriorValue(par.getParameterValue());
-                    // TODO: this is probably wrong, do it in "injectParameterValues" instead
-                    double parValue = getParameterValueFromTextFile(parInjectFile,par.getFullTitle());
-                    LogInfo<<"Setting  "<<par.getFullTitle()<<" -> "<<parValue<<std::endl;
-                    par.setParameterValue( parValue );
-                }
+                par.setPriorValue(par.getParameterValue());
             }
         }
     });
@@ -437,16 +429,16 @@ int main(int argc, char** argv){
         // Do the throwing:
         propagator.getParametersManager().throwParametersFromGlobalCovariance(weightsChiSquare);
         //propagator.propagateParametersOnSamples(); // Not necessary (included in updateLlhCache())
-        for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ) {
-            if (not parSet.isEnabled()) { continue; }
-//            LogInfo<< parSet.getName()<<std::endl;
-            for (auto &par: parSet.getParameterList()) {
-                if (not par.isEnabled()) { continue; }
-                double parValue = getParameterValueFromTextFile(parInjectFile, par.getFullTitle());
-                par.setParameterValue(parValue);
+
+        for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
+            if( not parSet.isEnabled() ){ continue; }
+            for( auto& par : parSet.getParameterList() ){
+                if( not par.isEnabled() ){ continue; }
+                par.setParameterValue(getParameterValueFromTextFile(parInjectFile, par.getFullTitle()));
+                LogInfo<<"Setting: "<<par.getFullTitle()<<" to "<<par.getParameterValue()<<std::endl;
             }
         }
-
+        LogInfo<<"Computing LH..."<<std::endl;
         propagator.updateLlhCache();
         LLH = propagator.getLlhBuffer();
         LLHwrtBestFit = LLH - bestFitLLH;
