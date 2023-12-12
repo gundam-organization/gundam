@@ -431,6 +431,7 @@ int main(int argc, char** argv){
         //propagator.propagateParametersOnSamples(); // Not necessary (included in updateLlhCache())
 
         if(injectParamsManually) {
+            LogInfo<< "Injecting parameters from file: " << parInjectFile << std::endl;
             for (auto &parSet: propagator.getParametersManager().getParameterSetsList()) {
                 if (not parSet.isEnabled()) { continue; }
                 for (auto &par: parSet.getParameterList()) {
