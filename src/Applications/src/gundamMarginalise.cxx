@@ -438,14 +438,13 @@ int main(int argc, char** argv){
                     par.setParameterValue(getParameterValueFromTextFile(parInjectFile, par.getFullTitle()));
                     //LogInfo << "Setting: " << par.getFullTitle() << " to " << par.getParameterValue() << std::endl;
                 }
-                LogInfo << "Injecting parameterSet values for parSet "<<parSet.getName()<<" from injectParams file" <<std::endl;
-                propagator.getParametersManager().injectParameterValues( parSet.exportInjectorConfig() );
             }
         }
 
         LogInfo<<"Computing LH..."<<std::endl;
         propagator.updateLlhCache();
         LLH = propagator.getLlhBuffer();
+        LogInfo<<"LLH: "<<LLH<<std::endl;
         LLHwrtBestFit = LLH - bestFitLLH;
         gLLH = 0;
         priorSum = 0;
@@ -469,10 +468,11 @@ int main(int argc, char** argv){
                 iPar++;
             }
         }
-        LogInfo<<"LLH: "<<LLH/2.<<"  gLLH: "<<gLLH/2.<<"\tdifference: "<<(-LLH/2.+gLLH/2.)  <<std::endl;
-        if((-LLH+gLLH)/2. > 10){
-            LogInfo<<"WARNING: BIG THROW!!"<<std::endl;
-        }
+
+//        LogInfo<<"LLH: "<<LLH/2.<<"  gLLH: "<<gLLH/2.<<"\tdifference: "<<(-LLH/2.+gLLH/2.)  <<std::endl;
+//        if((-LLH+gLLH)/2. > 10){
+//            LogInfo<<"WARNING: BIG THROW!!"<<std::endl;
+//        }
 
         //LogInfo<<"->   gLLH: "<<gLLH<<std::endl;
         //LogDebugIf(gLLH<50)<<gLLH<<std::endl;
