@@ -427,7 +427,7 @@ int main(int argc, char** argv){
         // reset weights vector
         weightsChiSquare.clear();
         // Do the throwing:
-        //propagator.getParametersManager().throwParametersFromGlobalCovariance(weightsChiSquare);
+        propagator.getParametersManager().throwParametersFromGlobalCovariance(weightsChiSquare);
         //propagator.propagateParametersOnSamples(); // Not necessary (included in updateLlhCache())
 
         if(injectParamsManually) {
@@ -458,6 +458,7 @@ int main(int argc, char** argv){
                         getParameterValueFromTextFile(parInjectFile, strippedParameterList[iPar]->getFullTitle())
                 );
             }
+            // print out the parameter values
             // If is in eigen space, propagateOriginalToEigen
             for (auto &parSet: propagator.getParametersManager().getParameterSetsList()) {
                 if (not parSet.isEnabled()) { continue; }
