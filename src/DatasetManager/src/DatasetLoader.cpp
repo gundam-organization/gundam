@@ -25,7 +25,7 @@ void DatasetLoader::readConfigImpl() {
   _name_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
   LogInfo << "Reading config for dataset: \"" << _name_ << "\"" << std::endl;
 
-  _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", true);
+  _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", bool(true));
   LogReturnIf(not _isEnabled_, "\"" << _name_ << "\" is disabled.");
 
   _selectedDataEntry_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "selectedDataEntry", "Asimov");
@@ -46,7 +46,7 @@ void DatasetLoader::readConfigImpl() {
     LogThrowIf( GenericToolbox::doesKeyIsInMap(name, _dataDispenserDict_),
                 "\"" << name << "\" already taken, please use another name." )
 
-    if( GenericToolbox::Json::fetchValue(dataEntry, "fromMc", false) ){ _dataDispenserDict_.emplace(name, _mcDispenser_); }
+    if( GenericToolbox::Json::fetchValue(dataEntry, "fromMc", bool(false)) ){ _dataDispenserDict_.emplace(name, _mcDispenser_); }
     else{ _dataDispenserDict_.emplace(name, DataDispenser(this)); }
     _dataDispenserDict_.at(name).readConfig(dataEntry);
   }
@@ -70,58 +70,6 @@ void DatasetLoader::initializeImpl() {
                  << GenericToolbox::iterableToString(_dataDispenserDict_, [](const std::pair<std::string, DataDispenser>& elm){ return elm.first; })
                  << std::endl);
   }
-}
-
-DatasetLoader::DatasetLoader(const nlohmann::json& config_, int datasetIndex_): _dataSetIndex_(datasetIndex_) {
-  this->readConfig(config_);
-}
-
-void DatasetLoader::setDataSetIndex(int dataSetIndex) {
-  _dataSetIndex_ = dataSetIndex;
-}
-void DatasetLoader::setSelectedDataEntry(const std::string &selectedDataEntry) {
-  _selectedDataEntry_ = selectedDataEntry;
-}
-
-bool DatasetLoader::isEnabled() const {
-  return _isEnabled_;
-}
-bool DatasetLoader::isShowSelectedEventCount() const {
-  return _showSelectedEventCount_;
-}
-int DatasetLoader::getDataSetIndex() const {
-  return _dataSetIndex_;
-}
-const std::string &DatasetLoader::getName() const {
-  return _name_;
-}
-const std::string &DatasetLoader::getSelectedDataEntry() const {
-  return _selectedDataEntry_;
-}
-const std::string &DatasetLoader::getToyDataEntry() const {
-  return _selectedToyEntry_;
-}
-bool DatasetLoader::isDevSingleThreadEventLoaderAndIndexer() const {
-  return _devSingleThreadEventLoaderAndIndexer_;
-}
-bool DatasetLoader::isDevSingleThreadEventSelection() const {
-  return _devSingleThreadEventSelection_;
-}
-bool DatasetLoader::isSortLoadedEvents() const {
-  return _sortLoadedEvents_;
-}
-
-DataDispenser &DatasetLoader::getMcDispenser() {
-  return _mcDispenser_;
-}
-DataDispenser &DatasetLoader::getSelectedDataDispenser(){
-  return _dataDispenserDict_.at(_selectedDataEntry_);
-}
-DataDispenser &DatasetLoader::getToyDataDispenser(){
-  return _dataDispenserDict_.at(_selectedToyEntry_);
-}
-std::map<std::string, DataDispenser> &DatasetLoader::getDataDispenserDict() {
-  return _dataDispenserDict_;
 }
 
 void DatasetLoader::updateDispenserOwnership(){

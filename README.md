@@ -103,7 +103,8 @@ check out the latest tagged version by tapping:
 
 Note that this command will also automatically check out the submodule
 included in the project. Therefore, in order to update your code when
-a new release is available, simply use the same command.
+a new release is available, simply use the same command. Note that git versions 
+before 2.0 may have issues to checkout the correct submodules (see issue #429)
 
 
 
@@ -124,16 +125,16 @@ a new release is available, simply use the same command.
 [![](./resources/guides/images/hpcLogo.png)](./resources/guides/installOnHpc.md)
 
 
-### Compiling on LXPLUS: - TO BE DONE
+### Compiling on LXPLUS:
 
-[![](./resources/guides/images/lxplusLogo.png)](./resources/guides/.md)
+[![](./resources/guides/images/lxplusLogo.png)](./resources/guides/installOnLXPLUS.md)
 
 
 ### Alternative installation procedure
 
 ```bash
 cd $REPO_DIR/gundam
-cd cmake
+cd cmake/scripts
 ./gundam-setup.sh
 ./gundam-build.sh
 ```

@@ -9,5 +9,9 @@
 # to run in the source directory, but puts the output in a
 # sub-directory of the binary directory.
 #
-add_test(NAME gundam-tests
-         COMMAND "sh" "-c" "(cd ${CMAKE_SOURCE_DIR}/tests && ./gundam-tests.sh -f -a ${CMAKE_CURRENT_BINARY_DIR}/output.$(date +%Y-%m-%d-%H%M%S) )" )
+
+cmessage( STATUS "Setting up test command..." )
+add_test(
+    NAME gundam-tests
+    COMMAND "sh" "-c" "(cd ${CMAKE_SOURCE_DIR}/tests && ./gundam-tests.sh -f -a ${CMAKE_CURRENT_BINARY_DIR}/output.$(date +%Y-%m-%d-%H%M%S) )"
+)

@@ -122,7 +122,7 @@ int main(int argc, char** argv){
 #ifdef GUNDAM_USING_CACHE_MANAGER
     GundamGlobals::setEnableCacheManager(true);
 #else
-    LogThrow("useCacheManager can only be set while GUNDAM is compiled with GUNDAM_USING_CACHE_MANAGER option.");
+    LogThrow("useCacheManager can only be set while GUNDAM is compiled with -D WITH_CACHE_MANAGER=ON cmake option.");
 #endif
   }
 
@@ -147,8 +147,8 @@ int main(int argc, char** argv){
   }
 
   // How many parallel threads?
-  GundamGlobals::setNbThreads(clParser.getOptionVal("nbThreads", 1));
-  LogInfo << "Running the fitter with " << GundamGlobals::getNbThreads() << " parallel threads." << std::endl;
+  GundamGlobals::getParallelWorker().setNThreads( clParser.getOptionVal("nbThreads", 1) );
+  LogInfo << "Running the fitter with " << GundamGlobals::getParallelWorker().getNbThreads() << " parallel threads." << std::endl;
 
   // Reading configuration
   auto configFilePath = clParser.getOptionVal("configFile", "");
@@ -209,7 +209,10 @@ int main(int argc, char** argv){
         not GundamUtils::isNewerOrEqualVersion(GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "minGundamVersion")),
         "Version check FAILED: " << GundamUtils::getVersionStr() << " < " << GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "minGundamVersion")
     );
-    LogInfo << "Version check passed: " << GundamUtils::getVersionStr() << " >= " << GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "minGundamVersion") << std::endl;
+    LogInfo << "Version check passed: ";
+    LogInfo << GundamUtils::getVersionStr() << " >= ";
+    LogInfo << GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "minGundamVersion");
+    LogInfo << std::endl;
   }
 
   // to write cmdLine info
@@ -323,7 +326,7 @@ int main(int argc, char** argv){
   // show initial conditions
   if( clParser.isOptionTriggered("injectParameterConfig") ) {
     LogDebug << "Starting mc parameters that where injected:" << std::endl;
-    LogDebug << fitter.getPropagator().getParametersSummary( false ) << std::endl;
+    LogDebug << fitter.getPropagator().getParametersManager().getParametersSummary( false ) << std::endl;
   }
 
   if( clParser.isOptionTriggered("scanLine") ){
@@ -360,5 +363,4 @@ int main(int argc, char** argv){
   // --------------------------
   fitter.fit();
 
-  GundamGlobals::getParallelWorker().reset();
 }

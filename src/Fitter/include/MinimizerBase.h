@@ -5,16 +5,19 @@
 #ifndef GUNDAM_MinimizerBase_h
 #define GUNDAM_MinimizerBase_h
 
+#include "Propagator.h"
+#include "Parameter.h"
 #include "JsonBaseClass.h"
+#include "LikelihoodInterface.h"
+
 #include "GenericToolbox.VariablesMonitor.h"
 
+#include "TDirectory.h"
+
+#include <vector>
 #include <string>
 
-class TDirectory;
 class FitterEngine;
-class FitParameter;
-class Propagator;
-class LikelihoodInterface;
 
 /// An (almost) abstract base class for minimizer interfaces.  Classes derived
 /// from MinimizerBase are used by the FitterEngine to run different types of
@@ -24,8 +27,17 @@ class LikelihoodInterface;
 /// calcErrors() is expected to calculate the covariance of the LLH function.
 class MinimizerBase : public JsonBaseClass {
 
+protected:
+  /// Implement the methods required by JsonBaseClass.  These MinimizerBase
+  /// methods may be overridden by the derived class, but if overriden, the
+  /// derived class must run these instantiations (i.e. call
+  /// MinimizerBase::readConfigImpl() and MinimizerBase::initializeImpl in the
+  /// respective methods).
+  void readConfigImpl() override;
+  void initializeImpl() override;
+
 public:
-  explicit MinimizerBase(FitterEngine* owner_);
+  explicit MinimizerBase(FitterEngine* owner_): _owner_(owner_){}
 
   /// Local RTTI
   [[nodiscard]] virtual std::string getMinimizerTypeName() const { return "MinimizerBase"; };
@@ -60,14 +72,6 @@ protected:
   inline FitterEngine& owner() { return *_owner_; }
   [[nodiscard]] inline const FitterEngine& owner() const { return *_owner_; }
 
-  /// Implement the methods required by JsonBaseClass.  These MinimizerBase
-  /// methods may be overridden by the derived class, but if overriden, the
-  /// derived class must run these instantiations (i.e. call
-  /// MinimizerBase::readConfigImpl() and MinimizerBase::initializeImpl in the
-  /// respective methods).
-  void readConfigImpl() override;
-  void initializeImpl() override;
-
   // Get the propagator being used to calculate the likelihood.  This is a
   // local convenience function to get the propagator from the owner.
   Propagator& getPropagator();
@@ -86,7 +90,7 @@ protected:
   // Get the vector of parameters being fitted.  This is a local convenience
   // function to get the vector of fit parameter pointers.  The actual vector
   // lives in the likelihood.
-  std::vector<FitParameter *> &getMinimizerFitParameterPtr();
+  std::vector<Parameter *> &getMinimizerFitParameterPtr();
 
   // Print a table of the fitting parameters.
   void printMinimizerFitParameters();

@@ -1,4 +1,4 @@
-## FitSampleSet
+## SampleSet
 
 [< back to parent (Propagator)](./Propagator.md)
 
@@ -8,7 +8,7 @@
 
 | Option                          | Type       | Description                                               | Default    |
 |---------------------------------|------------|-----------------------------------------------------------|------------|
-| [fitSampleList](./FitSample.md) | list(json) | list of FitSample config                                  |            |
+| [fitSampleList](./Sample.md) | list(json) | list of Sample config                                  |            |
 | llhStatFunction                 | string     | name of the stat. LLH function                            | PoissonLLH |
 
 ### llhStatFunction entries

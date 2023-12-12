@@ -9,8 +9,6 @@ LoggerInit([]{
 });
 
 
-MinimizerBase::MinimizerBase(FitterEngine* owner_): _owner_(owner_){}
-
 void MinimizerBase::readConfigImpl(){
   LogInfo << "Reading MinimizerBase config..." << std::endl;
 
@@ -24,22 +22,21 @@ void MinimizerBase::readConfigImpl(){
   showParametersOnFitMonitor = GenericToolbox::Json::fetchValue(_config_, "showParametersOnFitMonitor", showParametersOnFitMonitor);
   getLikelihood().setShowParametersOnFitMonitor(showParametersOnFitMonitor);
 
-  bool maxNbParametersPerLineOnMonitor = getLikelihood().getMaxNbParametersPerLineOnMonitor();
+  auto maxNbParametersPerLineOnMonitor = getLikelihood().getMaxNbParametersPerLineOnMonitor();
   maxNbParametersPerLineOnMonitor = GenericToolbox::Json::fetchValue(_config_, "maxNbParametersPerLineOnMonitor", maxNbParametersPerLineOnMonitor);
   getLikelihood().setMaxNbParametersPerLineOnMonitor(maxNbParametersPerLineOnMonitor);
 
   if( GenericToolbox::getTerminalWidth() == 0 ){
     // batch mode
-    double monitorBashModeRefreshRateInS = GenericToolbox::Json::fetchValue(_config_, "monitorBashModeRefreshRateInS", 30.0);
+    double monitorBashModeRefreshRateInS = GenericToolbox::Json::fetchValue(_config_, "monitorBashModeRefreshRateInS", double(30.0));
     getConvergenceMonitor().setMaxRefreshRateInMs(monitorBashModeRefreshRateInS * 1000.);
   }
   else{
-    int monitorRefreshRateInMs = GenericToolbox::Json::fetchValue(_config_, "monitorRefreshRateInMs", 5000);
+    int monitorRefreshRateInMs = GenericToolbox::Json::fetchValue(_config_, "monitorRefreshRateInMs", int(5000));
     getConvergenceMonitor().setMaxRefreshRateInMs(monitorRefreshRateInMs);
   }
 
 }
-
 void MinimizerBase::initializeImpl(){
   LogInfo << "Initializing the minimizer..." << std::endl;
   LogThrowIf( _owner_== nullptr, "FitterEngine ptr not set." );
@@ -50,7 +47,7 @@ void MinimizerBase::scanParameters(TDirectory* saveDir_) {
              << std::endl;
 }
 
-std::vector<FitParameter *>& MinimizerBase::getMinimizerFitParameterPtr() {
+std::vector<Parameter *>& MinimizerBase::getMinimizerFitParameterPtr() {
   return getLikelihood().getMinimizerFitParameterPtr();
 }
 
@@ -70,7 +67,7 @@ void MinimizerBase::printMinimizerFitParameters () {
   // output is a little more clear.
 
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Summary of the fit parameters:") << std::endl;
-  for( const auto& parSet : getPropagator().getParameterSetsList() ){
+  for( const auto& parSet : getPropagator().getParametersManager().getParameterSetsList() ){
 
     GenericToolbox::TablePrinter t;
     t.setColTitles({ {"Title"}, {"Starting"}, {"Prior"}, {"StdDev"}, {"Min"}, {"Max"}, {"Status"} });

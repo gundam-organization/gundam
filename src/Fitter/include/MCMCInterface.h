@@ -5,7 +5,7 @@
 #ifndef GUNDAM_MCMCInterface_h
 #define GUNDAM_MCMCInterface_h
 
-#include "FitParameterSet.h"
+#include "ParameterSet.h"
 #include "MinimizerBase.h"
 #include "JsonBaseClass.h"
 
@@ -32,14 +32,18 @@ class FitterEngine;
 /// LikelihoodInterface).
 class MCMCInterface : public MinimizerBase {
 
+protected:
+  void readConfigImpl() override;
+  void initializeImpl() override;
+
 public:
-  explicit MCMCInterface(FitterEngine* owner_);
+  explicit MCMCInterface(FitterEngine* owner_): MinimizerBase(owner_){}
 
   /// Local RTTI
   [[nodiscard]] std::string getMinimizerTypeName() const override { return "MCMCInterface"; };
 
-  /// A boolean to flag indicating if the MCMC exited successfully.
-  [[nodiscard]] virtual bool isFitHasConverged() const override;
+  /// An MCMC doesn't really converge in the sense meant here. This flags success.
+  [[nodiscard]] virtual bool isFitHasConverged() const override  {return true;}
 
   /// Generate a chain.
   void minimize() override;
@@ -51,9 +55,6 @@ public:
   /// Scan the parameters.
   void scanParameters(TDirectory* saveDir_) override;
 
-protected:
-  void readConfigImpl() override;
-  void initializeImpl() override;
 
 private:
   std::string _algorithmName_{"metropolis"};
@@ -68,8 +69,9 @@ private:
   std::string _likelihoodValidity_{"range,mirror,physical"};
 
   // Save or dump the raw (fitter space) points.  This can save about half the
-  // output file space.
-  bool _saveRaw_{false};
+  // output file space.  About the only time these would ever need to be saved
+  // is during a burn-in run when the proposal covariance is being tuned.
+  bool _saveRawSteps_{false};
 
   // The number of burn-in cylces to use.
   int _burninCycles_{0};
@@ -135,8 +137,14 @@ private:
   // The acceptance window during burn-in.
   int _burninWindow_{1000};
 
-  // Freeze the step after this many cycles.
-  int _adaptiveFreezeAfter_{1000000000}; // Never freeze except by request
+  // Freeze the step after this many cycles by fixing the `sigma` parameter.
+  // the proposal will be update when the state is restore, the sigma should
+  // be adjusted when the state is restore, or the acceptance will generally
+  // increase.  The default is one greater than _adaptiveFreezeCorrelations_
+  int _adaptiveFreezeAfter_{0};
+
+  // Stop updating the running covariance after this many cycles.
+  int _adaptiveFreezeCorrelations_{100000000}; // Default: Never freeze
 
   // The window to calculate the covariance during normal chains.
   int _adaptiveCovWindow_{1000000};

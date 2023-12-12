@@ -26,11 +26,6 @@ public:
     typedef hemi::Array<double> Results;
 
 private:
-    // Save the event weight cache reference for later use
-    Cache::Parameters::Values& fParameters;
-    Cache::Parameters::Clamps& fLowerClamp;
-    Cache::Parameters::Clamps& fUpperClamp;
-
     /// The (approximate) amount of memory required on the GPU.
     std::size_t fTotalBytes;
 
@@ -66,10 +61,7 @@ public:
     // results (typically a few per event).  The knots are the total number of
     // knots in all of the uniform splines (e.g. For 1000 splines with 7
     // knots for each spline, knots is 7000).
-    Weights(Cache::Parameters::Values& parameters,
-            Cache::Parameters::Clamps& lowerClamp,
-            Cache::Parameters::Clamps& upperClamp,
-            std::size_t results);
+    Weights(std::size_t results);
 
     // Deconstruct the class.  This should deallocate all the memory
     // everyplace.

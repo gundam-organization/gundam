@@ -139,9 +139,11 @@ int main(int argc, char** argv) {
 
   if( clParser.isOptionTriggered("zipOutFolder") ){
     LogInfo << "Creating a .gz archive of \"" << outFolder << "\"" << std::endl;
-    std::system( ("tar -czvf \"" + outFolder + ".tar.gz\" \"" + outFolder + "\"").c_str() );
+    auto err = std::system( ("tar -czvf \"" + outFolder + ".tar.gz\" \"" + outFolder + "\"").c_str() );
+    LogThrowIf( err != 0, "Error while running the tar command." );
     LogInfo << "Removing created temp folder..." << std::endl;
-    std::system( ("rm -r \"" + outFolder + "\"").c_str() );
+    err = std::system( ("rm -r \"" + outFolder + "\"").c_str() );
+    LogThrowIf( err != 0, "Error while running the tar command." );
     LogInfo << "Archive writen under \"" << outFolder << ".tar.gz\"" << std::endl;
   }
 

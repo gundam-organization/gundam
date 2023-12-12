@@ -3,21 +3,19 @@
 //
 
 #include "FitterEngine.h"
-#include "GenericToolbox.Json.h"
 #include "GundamGlobals.h"
 #include "MinimizerInterface.h"
 #include "MCMCInterface.h"
 
-#include "Logger.h"
+#include "GenericToolbox.RawDataArray.h"
+#include "GenericToolbox.Json.h"
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.h"
-#include "GenericToolbox.TablePrinter.h"
+#include "Logger.h"
 
 #include <Math/Factory.h>
 #include "TGraph.h"
 #include "TLegend.h"
-#include "TH1D.h"
-#include "TBox.h"
 
 #include <cmath>
 #include <memory>
@@ -27,9 +25,6 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[FitterEngine]");
 });
 
-FitterEngine::FitterEngine(TDirectory *saveDir_){
-  this->setSaveDir(saveDir_); // propagate
-}
 
 void FitterEngine::readConfigImpl(){
   LogInfo << "Reading FitterEngine config..." << std::endl;
@@ -54,6 +49,8 @@ void FitterEngine::readConfigImpl(){
   _throwGain_ = GenericToolbox::Json::fetchValue(_config_, "throwMcBeforeFitGain", _throwGain_);
 
   _propagator_.readConfig( GenericToolbox::Json::fetchValue<nlohmann::json>(_config_, "propagatorConfig") );
+  _savePostfitEventTrees_ = GenericToolbox::Json::fetchValue(_config_, "savePostfitEventTrees", _savePostfitEventTrees_);
+
 
   std::string engineType = GenericToolbox::Json::fetchValue(_config_,"engineType","minimizer");
 
@@ -100,8 +97,8 @@ void FitterEngine::initializeImpl(){
     auto* throwsTree = new TTree("throws", "throws");
 
     std::vector<GenericToolbox::RawDataArray> thrownParameterValues{};
-    thrownParameterValues.reserve(_propagator_.getParameterSetsList().size());
-    for( auto& parSet : _propagator_.getParameterSetsList() ){
+    thrownParameterValues.reserve(_propagator_.getParametersManager().getParameterSetsList().size());
+    for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
       if( not parSet.isEnabled() ) continue;
 
       std::vector<std::string> leavesList;
@@ -150,18 +147,18 @@ void FitterEngine::initializeImpl(){
   LogInfo << "Writing propagator objects..." << std::endl;
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
-      TNamed("initialParameterState", GenericToolbox::Json::toReadableString(_propagator_.exportParameterInjectorConfig()).c_str())
+      TNamed("initialParameterState", GenericToolbox::Json::toReadableString(_propagator_.getParametersManager().exportParameterInjectorConfig()).c_str())
   );
 
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
-      _propagator_.getGlobalCovarianceMatrix().get(), "globalCovarianceMatrix"
+      _propagator_.getParametersManager().getGlobalCovarianceMatrix().get(), "globalCovarianceMatrix"
   );
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
-      _propagator_.getStrippedCovarianceMatrix().get(), "strippedCovarianceMatrix"
+      _propagator_.getParametersManager().getStrippedCovarianceMatrix().get(), "strippedCovarianceMatrix"
   );
-  for( auto& parSet : _propagator_.getParameterSetsList() ){
+  for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
     if(not parSet.isEnabled()) continue;
 
     auto saveFolder = GenericToolbox::joinPath( "propagator", parSet.getName() );
@@ -239,7 +236,7 @@ void FitterEngine::initializeImpl(){
 
     {
       TVectorD dataRate(1);
-      dataRate[0] = sample.getMcContainer().getSumWeights();
+      dataRate[0] = sample.getDataContainer().getSumWeights();
       auto outDir = GenericToolbox::joinPath("preFit/rates", GenericToolbox::generateCleanBranchName(sample.getName()), "Data");
       GenericToolbox::writeInTFile(
           GenericToolbox::mkdirTFile(_saveDir_, outDir),
@@ -255,69 +252,6 @@ void FitterEngine::initializeImpl(){
   GenericToolbox::triggerTFileWrite(_saveDir_);
 }
 
-// Setters
-void FitterEngine::setSaveDir(TDirectory *saveDir) {
-  _saveDir_ = saveDir;
-}
-void FitterEngine::setIsDryRun(bool isDryRun_){
-  _isDryRun_ = isDryRun_;
-}
-void FitterEngine::setEnablePca(bool enablePca_){
-  _enablePca_ = enablePca_;
-}
-void FitterEngine::setEnablePreFitScan(bool enablePreFitScan) {
-  _enablePreFitScan_ = enablePreFitScan;
-}
-void FitterEngine::setEnablePostFitScan(bool enablePostFitScan) {
-  _enablePostFitScan_ = enablePostFitScan;
-}
-void FitterEngine::setEnablePreFitToPostFitLineScan(bool enablePreFitToPostFitLineScan_) {
-  _enablePreFitToPostFitLineScan_ = enablePreFitToPostFitLineScan_;
-}
-void FitterEngine::setGenerateSamplePlots(bool generateSamplePlots) {
-  _generateSamplePlots_ = generateSamplePlots;
-}
-void FitterEngine::setGenerateOneSigmaPlots(bool generateOneSigmaPlots){
-  _generateOneSigmaPlots_ = generateOneSigmaPlots;
-}
-void FitterEngine::setDoAllParamVariations(bool doAllParamVariations_){
-  _doAllParamVariations_ = doAllParamVariations_;
-}
-void FitterEngine::setAllParamVariationsSigmas(const std::vector<double> &allParamVariationsSigmas) {
-  _allParamVariationsSigmas_ = allParamVariationsSigmas;
-}
-
-// Getters
-const nlohmann::json &FitterEngine::getPreFitParState() const {
-  return _preFitParState_;
-}
-const nlohmann::json &FitterEngine::getPostFitParState() const {
-  return _postFitParState_;
-}
-const Propagator& FitterEngine::getPropagator() const {
-  return _propagator_;
-}
-const MinimizerBase& FitterEngine::getMinimizer() const {
-  return *_minimizer_;
-}
-const LikelihoodInterface& FitterEngine::getLikelihood() const {
-  return _likelihood_;
-}
-
-// non-const getters
-Propagator& FitterEngine::getPropagator() {
-  return _propagator_;
-}
-MinimizerBase& FitterEngine::getMinimizer(){
-  return *_minimizer_;
-}
-LikelihoodInterface& FitterEngine::getLikelihood(){
-  return _likelihood_;
-}
-TDirectory* FitterEngine::getSaveDir(){
-  return _saveDir_;
-}
-
 // Core
 void FitterEngine::fit(){
   LogWarning << __METHOD_NAME__ << std::endl;
@@ -331,7 +265,7 @@ void FitterEngine::fit(){
       GenericToolbox::mkdirTFile( _saveDir_, "preFit" ),
       TNamed("llhState", llhState.c_str())
   );
-  _preFitParState_ = _propagator_.exportParameterInjectorConfig();
+  _preFitParState_ = _propagator_.getParametersManager().exportParameterInjectorConfig();
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile( _saveDir_, "preFit" ),
       TNamed("parState", GenericToolbox::Json::toReadableString(_preFitParState_).c_str())
@@ -363,7 +297,7 @@ void FitterEngine::fit(){
   if( _throwMcBeforeFit_ ){
     LogAlert << "Throwing correlated parameters of MC away from their prior..." << std::endl;
     LogAlert << "Throw gain form MC push set to: " << _throwGain_ << std::endl;
-    for( auto& parSet : _propagator_.getParameterSetsList() ){
+    for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
       if(not parSet.isEnabled()) continue;
       if( not parSet.isEnabledThrowToyParameters() ){
         LogWarning << "\"" << parSet.getName() << "\" has marked disabled throwMcBeforeFit: skipping." << std::endl;
@@ -395,7 +329,7 @@ void FitterEngine::fit(){
       }
       else{
         LogAlert << "Throwing correlated parameters for " << parSet.getName() << std::endl;
-        parSet.throwFitParameters(_throwGain_);
+        parSet.throwFitParameters(true, _throwGain_);
       }
     } // parSet
 
@@ -415,7 +349,7 @@ void FitterEngine::fit(){
   this->getMinimizer().minimize();
 
   LogWarning << "Saving post-fit par state..." << std::endl;
-  _postFitParState_ = _propagator_.exportParameterInjectorConfig();
+  _postFitParState_ = _propagator_.getParametersManager().exportParameterInjectorConfig();
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile( _saveDir_, "postFit" ),
       TNamed("parState", GenericToolbox::Json::toReadableString(_postFitParState_).c_str())
@@ -430,6 +364,10 @@ void FitterEngine::fit(){
   );
 
 
+  if (_savePostfitEventTrees_){
+      LogInfo << "Saving PostFit event Trees" << std::endl;
+      _propagator_.getTreeWriter().writeSamples(GenericToolbox::mkdirTFile(_saveDir_, "postFit/events"));
+  }
   if( _generateSamplePlots_ and not _propagator_.getPlotGenerator().getConfig().empty() ){
     LogInfo << "Generating post-fit sample plots..." << std::endl;
     _propagator_.getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(_saveDir_, "postFit/samples"));
@@ -480,7 +418,7 @@ void FitterEngine::fixGhostFitParameters(){
   std::stringstream ssPrint;
   double deltaChi2Stat;
 
-  for( auto& parSet : _propagator_.getParameterSetsList() ){
+  for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
 
     if( not parSet.isEnabled() ){ continue; }
 
@@ -571,7 +509,7 @@ void FitterEngine::rescaleParametersStepSize(){
   double baseChi2 = _propagator_.getLlhBuffer();
 
   // +1 sigma
-  for( auto& parSet : _propagator_.getParameterSetsList() ){
+  for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
 
     for( auto& par : parSet.getEffectiveParameterList() ){
 
@@ -623,10 +561,10 @@ void FitterEngine::checkNumericalAccuracy(){
 
   LogInfo << "Throwing..." << std::endl;
   for(auto& throwEntry : throws ){
-    for( auto& parSet : _propagator_.getParameterSetsList() ){
+    for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
       if(not parSet.isEnabled()) continue;
       if( not parSet.isEnabledThrowToyParameters() ){ continue;}
-      parSet.throwFitParameters(gain);
+      parSet.throwFitParameters(true, gain);
       throwEntry.emplace_back(parSet.getParameterList().size(), 0);
       for( size_t iPar = 0 ; iPar < parSet.getParameterList().size() ; iPar++){
         throwEntry.back()[iPar] = parSet.getParameterList()[iPar].getParameterValue();
@@ -640,7 +578,7 @@ void FitterEngine::checkNumericalAccuracy(){
     GenericToolbox::displayProgressBar(iTest, nTest, "Testing computational accuracy...");
     for( size_t iThrow = 0 ; iThrow < throws.size() ; iThrow++ ){
       int iParSet{-1};
-      for( auto& parSet : _propagator_.getParameterSetsList() ){
+      for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
         if(not parSet.isEnabled()) continue;
         if( not parSet.isEnabledThrowToyParameters() ){ continue;}
         iParSet++;

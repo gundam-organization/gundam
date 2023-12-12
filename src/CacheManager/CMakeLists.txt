@@ -1,45 +1,40 @@
-set(SRCFILES
-  src/CacheManager.cpp
-  )
-set(HEADERS
-  include/CacheManager.h
-  include/CacheParameters.h
-  include/CacheWeights.h
-  include/WeightNormalization.h
-  include/WeightCompactSpline.h
-  include/WeightMonotonicSpline.h
-  include/WeightUniformSpline.h
-  include/WeightGeneralSpline.h
-  include/WeightGraph.h
-  include/WeightBase.h
-  include/CacheIndexedSums.h
-  )
 
+
+set( SRCFILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheManager.cpp
+)
+
+set( HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/CacheManager.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/CacheParameters.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/CacheWeights.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/WeightNormalization.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/WeightCompactSpline.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/WeightMonotonicSpline.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/WeightUniformSpline.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/WeightGeneralSpline.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/WeightGraph.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/WeightBase.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/CacheIndexedSums.h
+)
+
+set( SRC_FILE_EXT "cpp" )
 if(CMAKE_CUDA_COMPILER)
-  cmessage( STATUS "CUDA utilities being compiled")
-  set(SRCFILES ${SRCFILES} src/WeightNormalization.cu)
-  set(SRCFILES ${SRCFILES} src/WeightCompactSpline.cu)
-  set(SRCFILES ${SRCFILES} src/WeightMonotonicSpline.cu)
-  set(SRCFILES ${SRCFILES} src/WeightUniformSpline.cu)
-  set(SRCFILES ${SRCFILES} src/WeightGeneralSpline.cu)
-  set(SRCFILES ${SRCFILES} src/WeightGraph.cu)
-  set(SRCFILES ${SRCFILES} src/WeightBase.cu)
-  set(SRCFILES ${SRCFILES} src/CacheParameters.cu)
-  set(SRCFILES ${SRCFILES} src/CacheWeights.cu)
-  set(SRCFILES ${SRCFILES} src/CacheIndexedSums.cu)
-else(CMAKE_CUDA_COMPILER)
-  cmessage( STATUS "CUDA utilities are not being compiled")
-  set(SRCFILES ${SRCFILES} src/WeightNormalization.cpp)
-  set(SRCFILES ${SRCFILES} src/WeightCompactSpline.cpp)
-  set(SRCFILES ${SRCFILES} src/WeightMonotonicSpline.cpp)
-  set(SRCFILES ${SRCFILES} src/WeightUniformSpline.cpp)
-  set(SRCFILES ${SRCFILES} src/WeightGeneralSpline.cpp)
-  set(SRCFILES ${SRCFILES} src/WeightGraph.cpp)
-  set(SRCFILES ${SRCFILES} src/WeightBase.cpp)
-  set(SRCFILES ${SRCFILES} src/CacheParameters.cpp)
-  set(SRCFILES ${SRCFILES} src/CacheWeights.cpp)
-  set(SRCFILES ${SRCFILES} src/CacheIndexedSums.cpp)
+  cmessage( STATUS "CUDA utilities being compiled.")
+  set( SRC_FILE_EXT "cu" )
 endif(CMAKE_CUDA_COMPILER)
+
+list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/WeightNormalization.${SRC_FILE_EXT} )
+list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/WeightNormalization.${SRC_FILE_EXT} )
+list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/WeightCompactSpline.${SRC_FILE_EXT} )
+list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/WeightMonotonicSpline.${SRC_FILE_EXT} )
+list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/WeightUniformSpline.${SRC_FILE_EXT} )
+list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/WeightGeneralSpline.${SRC_FILE_EXT} )
+list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/WeightGraph.${SRC_FILE_EXT} )
+list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/WeightBase.${SRC_FILE_EXT} )
+list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheParameters.${SRC_FILE_EXT} )
+list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheWeights.${SRC_FILE_EXT} )
+list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheIndexedSums.${SRC_FILE_EXT} )
 
 if( USE_STATIC_LINKS )
   add_library(GundamCache STATIC ${SRCFILES})
@@ -53,10 +48,11 @@ target_include_directories( GundamCache PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 target_link_libraries( GundamCache PUBLIC
-  GundamDialDictionary
-  GundamFitParameters
-  GundamFitSamples
-  ${ROOT_LIBRARIES} )
+    GundamDialDictionary
+    GundamParametersManager
+    GundamSamplesManager
+    ${ROOT_LIBRARIES}
+)
 
 #  set_target_properties(GundamCache PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")
 
