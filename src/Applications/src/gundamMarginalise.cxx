@@ -441,6 +441,7 @@ int main(int argc, char** argv){
                         parPtrList.emplace_back(&par);
                         // set the parameter value from the injector file
                         parPtrList.back()->setParameterValue(getParameterValueFromTextFile(parInjectFile, par.getFullTitle()));
+                        LogInfo<<"Setting: "<<par.getFullTitle()<<" to "<<par.getParameterValue()<<std::endl;
                     }
                 }
             }
@@ -452,7 +453,8 @@ int main(int argc, char** argv){
                     parSet.propagateEigenToOriginal();
                 }
             }
-        }
+
+        }// end if(injectParamsManually)
 
         LogInfo<<"Computing LH..."<<std::endl;
         propagator.updateLlhCache();
