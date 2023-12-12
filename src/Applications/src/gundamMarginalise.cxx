@@ -434,11 +434,12 @@ int main(int argc, char** argv){
             LogInfo<< "Injecting parameters from file: " << parInjectFile << std::endl;
             for (auto &parSet: propagator.getParametersManager().getParameterSetsList()) {
                 if (not parSet.isEnabled()) { continue; }
-                for (auto &par: parSet.getEffectiveParameterList()) {
+                for (auto &par: parSet.getParameterList()) {
                     if (not par.isEnabled()) { continue; }
                     par.setParameterValue(getParameterValueFromTextFile(parInjectFile, par.getFullTitle()));
                     //LogInfo << "Setting: " << par.getFullTitle() << " to " << par.getParameterValue() << std::endl;
                 }
+                parSet.propagateOriginalToEigen();
             }
         }
 
