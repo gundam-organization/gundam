@@ -443,7 +443,8 @@ int main(int argc, char** argv){
                 }
             }
             // allocate a vector of parameter pointers
-            std::vector<Parameter*> strippedParameterList.reserve( nStripped );
+            std::vector<Parameter*> strippedParameterList;
+            strippedParameterList.reserve( nStripped );
             for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
                 if( not parSet.isEnabled() ) continue;
                 for( auto& par : parSet.getParameterList() ){
