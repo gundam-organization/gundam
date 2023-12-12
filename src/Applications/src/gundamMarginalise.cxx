@@ -436,8 +436,9 @@ int main(int argc, char** argv){
                 for (auto &par: parSet.getParameterList()) {
                     if (not par.isEnabled()) { continue; }
                     par.setParameterValue(getParameterValueFromTextFile(parInjectFile, par.getFullTitle()));
-                    LogInfo << "Setting: " << par.getFullTitle() << " to " << par.getParameterValue() << std::endl;
+                    //LogInfo << "Setting: " << par.getFullTitle() << " to " << par.getParameterValue() << std::endl;
                 }
+                LogInfo << "Injecting parameterSet values for parSet "<<parSet.getName()<<" from injectParams file" <<std::endl;
                 propagator.getParametersManager().injectParameterValues( parSet.exportInjectorConfig() );
             }
         }
