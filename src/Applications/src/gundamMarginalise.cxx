@@ -352,11 +352,11 @@ int main(int argc, char** argv){
     // Also display the prior information
     LogInfo<<"Prior information: "<<std::endl;
     for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ) {
+        bool setMatches = false;
         if (not parSet.isEnabled()) {
             LogInfo << "Parameter set " << parSet.getName() << " is disabled" << std::endl;
             continue;
         } else {
-            bool setMatches = false;
             LogInfo << "Set: " << parSet.getName().c_str();
             for (int i = 0; i < marginalisedParameterSets.size(); i++) {
 
@@ -374,14 +374,13 @@ int main(int argc, char** argv){
                 for (auto &par: parSet.getParameterList()) {
                     par.setMarginalised(true);
                 }
-                continue; // skip the single params thing and go to the next ParameterSet
             } else {
                 LogInfo << " will not be marginalized out.   \n";
             }
         }
     // Do the same for single parameters
         for (auto &par: parSet.getParameterList()) {
-            if (not par.isEnabled()) {
+            if (not par.isEnabled() and not setMatches) {
                 LogInfo << "Parameter " << par.getName() << " is disabled" << std::endl;
                 continue;
 
@@ -400,17 +399,13 @@ int main(int argc, char** argv){
                 LogInfo << "Parameter " << par.getFullTitle()
                 << " -> type: " << par.getPriorType() << " mu=" << par.getPriorValue()
                 << " sigma= " << par.getStdDevValue() << " limits: " << par.getMinValue() << " - "
-                << par.getMaxValue() << " limits (phys): " << par.getMinPhysical() << " - "
-                << par.getMaxPhysical() << " limits (mirr): " << par.getMinMirror() << " - "
-                << par.getMaxMirror() <<" --- marg? "<<par.isMarginalised()
+                << par.getMaxValue() <<par.isMarginalised()
                 <<" will be marginalized out.   \n";
             }else{
                 LogInfo << "Parameter " << par.getFullTitle()
                         << " -> type: " << par.getPriorType() << " mu=" << par.getPriorValue()
                         << " sigma= " << par.getStdDevValue() << " limits: " << par.getMinValue() << " - "
-                        << par.getMaxValue() << " limits (phys): " << par.getMinPhysical() << " - "
-                        << par.getMaxPhysical() << " limits (mirr): " << par.getMinMirror() << " - "
-                        << par.getMaxMirror() <<" --- marg? "<<par.isMarginalised()
+                        << par.getMaxValue() << par.isMarginalised()
                 <<" will NOT be marginalized out.   \n";
             }
         }
