@@ -397,9 +397,21 @@ int main(int argc, char** argv){
             }
             par.setMarginalised(matches);
             if(par.isMarginalised()){
-                LogInfo << "Parameter " << par.getFullTitle() << " will be marginalized out.   \n";
+                LogInfo << "Parameter " << par.getFullTitle()
+                << " -> type: " << par.getPriorType() << " mu=" << par.getPriorValue()
+                << " sigma= " << par.getStdDevValue() << " limits: " << par.getMinValue() << " - "
+                << par.getMaxValue() << " limits (phys): " << par.getMinPhysical() << " - "
+                << par.getMaxPhysical() << " limits (mirr): " << par.getMinMirror() << " - "
+                << par.getMaxMirror() <<" --- marg? "<<par.isMarginalised()
+                <<" will be marginalized out.   \n";
             }else{
-                LogInfo << "Parameter " << par.getFullTitle() << " will not be marginalized out.   \n";
+                LogInfo << "Parameter " << par.getFullTitle()
+                        << " -> type: " << par.getPriorType() << " mu=" << par.getPriorValue()
+                        << " sigma= " << par.getStdDevValue() << " limits: " << par.getMinValue() << " - "
+                        << par.getMaxValue() << " limits (phys): " << par.getMinPhysical() << " - "
+                        << par.getMaxPhysical() << " limits (mirr): " << par.getMinMirror() << " - "
+                        << par.getMaxMirror() <<" --- marg? "<<par.isMarginalised()
+                <<" will NOT be marginalized out.   \n";
             }
         }
     }
