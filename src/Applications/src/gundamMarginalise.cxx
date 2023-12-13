@@ -457,9 +457,8 @@ int main(int argc, char** argv){
                 for( auto& par : parSet.getParameterList() ){
                     if( not par.isEnabled() ) continue;
                     strippedParameterList.emplace_back(&par);
-                    if (par.getFullTitle()=="ND280 Detector Systematics/#551"){
-                        LogInfo<<"Parameter "<<par.getFullTitle()<<" has value "<<par.getParameterValue()<<std::endl;
-                    }
+                    LogInfo<<par.getFullTitle()<<" has value "<<par.getParameterValue()<<std::endl;
+
                 }
             }
             // change the parameter values
@@ -467,9 +466,7 @@ int main(int argc, char** argv){
                 strippedParameterList[iPar]->setParameterValue(
                         getParameterValueFromTextFile(parInjectFile, strippedParameterList[iPar]->getFullTitle())
                 );
-                if (strippedParameterList[iPar]->getFullTitle()=="Parameter Flux Systematics/#98"){
-                    LogInfo<<"Parameter "<<strippedParameterList[iPar]->getFullTitle()<<" has value "<<strippedParameterList[iPar]->getParameterValue()<<std::endl;
-                }
+                LogInfo<<strippedParameterList[iPar]->getFullTitle()<<" has value "<<strippedParameterList[iPar]->getParameterValue()<<std::endl;
             }
             // print out the parameter values
             // If is in eigen space, propagateOriginalToEigen
@@ -477,6 +474,11 @@ int main(int argc, char** argv){
                 if (not parSet.isEnabled()) { continue; }
                 if (parSet.isUseEigenDecompInFit()){
                     parSet.propagateEigenToOriginal();
+                }
+                for( auto& par : parSet.getParameterList() ){
+                    if( not par.isEnabled() ) continue;
+                    LogInfo<<par.getFullTitle()<<" has value "<<par.getParameterValue()<<std::endl;
+
                 }
             }
 
