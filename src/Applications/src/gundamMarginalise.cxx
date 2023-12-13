@@ -468,7 +468,7 @@ int main(int argc, char** argv){
                         getParameterValueFromTextFile(parInjectFile, strippedParameterList[iPar]->getFullTitle())
                 );
                 if (strippedParameterList[iPar]->getFullTitle()=="Parameter Flux Systematics/#98"){
-                    LogInfo<<"Parameter "<<strippedParameterList[iPar].getFullTitle()<<" has value "<<strippedParameterList[iPar].getParameterValue()<<std::endl;
+                    LogInfo<<"Parameter "<<strippedParameterList[iPar]->getFullTitle()<<" has value "<<strippedParameterList[iPar]->getParameterValue()<<std::endl;
                 }
             }
             // print out the parameter values
@@ -485,7 +485,7 @@ int main(int argc, char** argv){
         LogInfo<<"Computing LH..."<<std::endl;
         propagator.updateLlhCache();
         LLH = propagator.getLlhBuffer();
-        LogInfo<<"LLH: "<<LLH<<std::endl;
+        LogInfo<<"LLH: "<<LLH;
         LLHwrtBestFit = LLH - bestFitLLH;
         gLLH = 0;
         priorSum = 0;
@@ -515,7 +515,7 @@ int main(int argc, char** argv){
 //            LogInfo<<"WARNING: BIG THROW!!"<<std::endl;
 //        }
 
-        //LogInfo<<"->   gLLH: "<<gLLH<<std::endl;
+        LogInfo<<"   gLLH: "<<gLLH<<std::endl;
         //LogDebugIf(gLLH<50)<<gLLH<<std::endl;
         // print the parameters
 
@@ -551,7 +551,7 @@ int main(int argc, char** argv){
 //                LogInfo<<i<<": "<<parameters[i]<<" "<<margThis[i]<<std::endl;
 //            }
 //        }
-    }
+    }// end of main throws loop
 
     margThrowTree->Write();
 
