@@ -425,6 +425,9 @@ int main(int argc, char** argv){
 
     double LLH_sum{0};// needed when injecting parameters manually
     double injectedLLH{-1};// needed when injecting parameters manually
+    if (injectParamsManually){
+        LogInfo<< "Injecting parameters from file: " << parInjectFile << std::endl;
+    }
 
     for( int iToy = 0 ; iToy < nToys ; iToy++ ){
 
@@ -438,7 +441,6 @@ int main(int argc, char** argv){
         //propagator.propagateParametersOnSamples(); // Not necessary (included in updateLlhCache())
 
         if(injectParamsManually) {
-            LogInfo<< "Injecting parameters from file: " << parInjectFile << std::endl;
 
             // count the number of parameters to be injected
             int nStripped{0};
