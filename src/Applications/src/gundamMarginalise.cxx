@@ -50,12 +50,8 @@ int main(int argc, char** argv){
     // I need a config file where the list of parameters to marginalise over are specified (look at the XSec config file to get inspired)
     clParser.addOption("configFile", {"-c"}, "Specify the parameters to marginalise over");
 
-    // (I think) I need the output file from a fitter to use as input here
     clParser.addOption("fitterOutputFile", {"-f"}, "Specify the fitter output file");
 
-    // Think carefully what do you need to put in the output file
-    // 1. Marginalised covariance matrix: gotten from teh outoutFitter file
-    // what else?
     clParser.addOption("outputFile", {"-o", "--out-file"}, "Specify the Marginaliser output file");
 
     clParser.addOption("nbThreads", {"-t", "--nb-threads"}, "Specify nb of parallel threads");
@@ -234,6 +230,7 @@ int main(int argc, char** argv){
                 {"fitterOutputFile", "Fit_%s"},
                 {"nToys",            "nToys_%s"},
                 {"randomSeed",       "Seed_%s"},
+                {"parInject",        "parInject_%s"
         };
         outFilePath = GundamUtils::generateFileName(clParser, appendixDict) + ".root";
 
