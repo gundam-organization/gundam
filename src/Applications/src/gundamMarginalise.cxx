@@ -230,7 +230,7 @@ int main(int argc, char** argv){
                 {"fitterOutputFile", "Fit_%s"},
                 {"nToys",            "nToys_%s"},
                 {"randomSeed",       "Seed_%s"},
-                {"parInject",        "parInject_%s"
+                {"parInject",        "parInject_%s"}
         };
         outFilePath = GundamUtils::generateFileName(clParser, appendixDict) + ".root";
 
