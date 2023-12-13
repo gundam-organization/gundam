@@ -423,8 +423,8 @@ int main(int argc, char** argv){
     /////////////////////////////////////
     std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating " << nToys << " toys...";
 
-
-
+    double LLH_sum{0};// needed when injecting parameters manually
+    double injectedLLH{0};// needed when injecting parameters manually
 
     for( int iToy = 0 ; iToy < nToys ; iToy++ ){
 
@@ -463,6 +463,7 @@ int main(int argc, char** argv){
             for( int iPar = 0 ; iPar < nStripped ; iPar++ ) {
                 double sigma = strippedParameterList[iPar]->getStdDevValue();
                 double epsilon = gRandom->Gaus(0, sigma/50.);
+                if (iToy==0) epsilon = 0;
                 //LogInfo<<strippedParameterList[iPar]->getFullTitle()<<" e: "<<epsilon<<std::endl;
                 strippedParameterList[iPar]->setParameterValue(
                         epsilon + getParameterValueFromTextFile(parInjectFile, strippedParameterList[iPar]->getFullTitle())
@@ -480,10 +481,14 @@ int main(int argc, char** argv){
 
         }// end if(injectParamsManually)
 
-        LogInfo<<"Computing LH..."<<std::endl;
+        //LogInfo<<"Computing LH..."<<std::endl;
         propagator.updateLlhCache();
         LLH = propagator.getLlhBuffer();
-        LogInfo<<"LLH: "<<LLH;
+        LLH_sum += LLH;
+        if(iToy==0){
+            injectedLLH = LLH;
+        }
+        //LogInfo<<"LLH: "<<LLH;
         LLHwrtBestFit = LLH - bestFitLLH;
         gLLH = 0;
         priorSum = 0;
@@ -513,7 +518,7 @@ int main(int argc, char** argv){
 //            LogInfo<<"WARNING: BIG THROW!!"<<std::endl;
 //        }
 
-        LogInfo<<"   gLLH: "<<gLLH<<std::endl;
+        //LogInfo<<"   gLLH: "<<gLLH<<std::endl;
         //LogDebugIf(gLLH<50)<<gLLH<<std::endl;
         // print the parameters
 
@@ -550,6 +555,12 @@ int main(int argc, char** argv){
 //            }
 //        }
     }// end of main throws loop
+
+    double averageLLH = LLH_sum/nToys;
+    if(injectParamsManually){
+        LogInfo<<"Injected LLH: "<<injectedLLH<<std::endl;
+        LogInfo<<"Average  LLH: "<<averageLLH<<std::endl;
+    }
 
     margThrowTree->Write();
 
