@@ -457,7 +457,7 @@ int main(int argc, char** argv){
                 for( auto& par : parSet.getParameterList() ){
                     if( not par.isEnabled() ) continue;
                     strippedParameterList.emplace_back(&par);
-                    if (par.getFullTitle()=="Parameter Flux Systematics/#98"){
+                    if (par.getFullTitle()=="ND280 Detector Systematics/#551"){
                         LogInfo<<"Parameter "<<par.getFullTitle()<<" has value "<<par.getParameterValue()<<std::endl;
                     }
                 }
