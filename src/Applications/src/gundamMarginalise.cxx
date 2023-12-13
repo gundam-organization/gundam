@@ -434,7 +434,7 @@ int main(int argc, char** argv){
         // reset weights vector
         weightsChiSquare.clear();
         // Do the throwing:
-        //propagator.getParametersManager().throwParametersFromGlobalCovariance(weightsChiSquare);
+        propagator.getParametersManager().throwParametersFromGlobalCovariance(weightsChiSquare);
         //propagator.propagateParametersOnSamples(); // Not necessary (included in updateLlhCache())
 
         if(injectParamsManually) {
