@@ -463,7 +463,7 @@ int main(int argc, char** argv){
             for( int iPar = 0 ; iPar < nStripped ; iPar++ ) {
                 double sigma = strippedParameterList[iPar]->getStdDevValue();
                 double epsilon = gRandom->Gaus(0, sigma/50.);
-                LogInfo<<strippedParameterList[iPar]->getFullTitle()<<" e: "<<epsilon<<std::endl;
+                //LogInfo<<strippedParameterList[iPar]->getFullTitle()<<" e: "<<epsilon<<std::endl;
                 strippedParameterList[iPar]->setParameterValue(
                         epsilon + getParameterValueFromTextFile(parInjectFile, strippedParameterList[iPar]->getFullTitle())
                 );
