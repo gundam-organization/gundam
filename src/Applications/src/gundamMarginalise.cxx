@@ -457,8 +457,10 @@ int main(int argc, char** argv){
                 for( auto& par : parSet.getParameterList() ){
                     if( not par.isEnabled() ) continue;
                     strippedParameterList.emplace_back(&par);
-                    LogInfo<<par.getFullTitle()<<" has value "<<par.getParameterValue()<<std::endl;
-
+                    if (par.getFullTitle()=="ND280 Detector Systematics/#551" or
+                        par.getFullTitle()=="Cross-Section (binned) Systematics/#0_EB_bin_C_nu") {
+                        LogInfo << par.getFullTitle() << " has value " << par.getParameterValue() << std::endl;
+                    }
                 }
             }
             // change the parameter values
@@ -466,7 +468,11 @@ int main(int argc, char** argv){
                 strippedParameterList[iPar]->setParameterValue(
                         getParameterValueFromTextFile(parInjectFile, strippedParameterList[iPar]->getFullTitle())
                 );
-                LogInfo<<strippedParameterList[iPar]->getFullTitle()<<" has value "<<strippedParameterList[iPar]->getParameterValue()<<std::endl;
+                if (strippedParameterList[iPar]->getFullTitle() == "ND280 Detector Systematics/#551" or
+                    strippedParameterList[iPar]->getFullTitle() == "Cross-Section (binned) Systematics/#0_EB_bin_C_nu") {
+                    LogInfo << strippedParameterList[iPar]->getFullTitle() << " has value "
+                            << strippedParameterList[iPar]->getParameterValue() << std::endl;
+                }
             }
             // print out the parameter values
             // If is in eigen space, propagateOriginalToEigen
@@ -477,7 +483,10 @@ int main(int argc, char** argv){
                 }
                 for( auto& par : parSet.getParameterList() ){
                     if( not par.isEnabled() ) continue;
-                    LogInfo<<par.getFullTitle()<<" has value "<<par.getParameterValue()<<std::endl;
+                    if (par.getFullTitle()=="ND280 Detector Systematics/#551" or
+                        par.getFullTitle()=="Cross-Section (binned) Systematics/#0_EB_bin_C_nu"){
+                        LogInfo<<par.getFullTitle()<<" has value "<<par.getParameterValue()<<std::endl;
+                    }
 
                 }
             }
