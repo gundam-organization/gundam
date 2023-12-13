@@ -422,6 +422,7 @@ int main(int argc, char** argv){
 
     double LLH_sum{0};// needed when injecting parameters manually
     double injectedLLH{-1};// needed when injecting parameters manually
+    double epsilonNormAverage{0};// needed when injecting parameters manually
     if (injectParamsManually){
         LogInfo<< "Injecting parameters from file: " << parInjectFile << std::endl;
     }
@@ -462,7 +463,7 @@ int main(int argc, char** argv){
             double epsilonNorm=0;
             for( int iPar = 0 ; iPar < nStripped ; iPar++ ) {
                 double sigma = strippedParameterList[iPar]->getStdDevValue();
-                double epsilon = gRandom->Gaus(0, sigma/(nStripped/10.));
+                double epsilon = gRandom->Gaus(0, sigma/(nStripped));
                 epsilonNorm += epsilon*epsilon;
                 if (iToy==0) epsilon = 0;
                 //LogInfo<<strippedParameterList[iPar]->getFullTitle()<<" e: "<<epsilon<<std::endl;
@@ -472,6 +473,7 @@ int main(int argc, char** argv){
             }
             epsilonNorm = sqrt(epsilonNorm);
             LogInfo<<"epsilonNorm: "<<epsilonNorm;
+            epsilonNormAverage += epsilonNorm;
 
             // print out the parameter values
             // If is in eigen space, propagateOriginalToEigen
@@ -561,9 +563,11 @@ int main(int argc, char** argv){
     }// end of main throws loop
 
     double averageLLH = LLH_sum/nToys;
+    epsilonNormAverage /= nToys;
     if(injectParamsManually){
         LogInfo<<"Injected LLH: "<<injectedLLH<<std::endl;
         LogInfo<<"Average  LLH: "<<averageLLH<<std::endl;
+        LogInfo<<"Average  epsilonNorm: "<<epsilonNormAverage<<std::endl;
     }
 
     margThrowTree->Write();
