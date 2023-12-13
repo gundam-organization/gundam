@@ -462,16 +462,20 @@ int main(int argc, char** argv){
                 }
             }
             // change the parameter values
+            double epsilonNorm=0;
             for( int iPar = 0 ; iPar < nStripped ; iPar++ ) {
                 double sigma = strippedParameterList[iPar]->getStdDevValue();
-                double epsilon = gRandom->Gaus(0, sigma/200.);
+                double epsilon = gRandom->Gaus(0, sigma/nStripped);
+                epsilonNorm += epsilon*epsilon;
                 if (iToy==0) epsilon = 0;
                 //LogInfo<<strippedParameterList[iPar]->getFullTitle()<<" e: "<<epsilon<<std::endl;
                 strippedParameterList[iPar]->setParameterValue(
                         epsilon + getParameterValueFromTextFile(parInjectFile, strippedParameterList[iPar]->getFullTitle())
                 );
-
             }
+            epsilonNorm = sqrt(epsilonNorm);
+            LogInfo<<"epsilonNorm: "<<epsilonNorm;
+
             // print out the parameter values
             // If is in eigen space, propagateOriginalToEigen
             for (auto &parSet: propagator.getParametersManager().getParameterSetsList()) {
@@ -490,6 +494,7 @@ int main(int argc, char** argv){
         if(iToy==0 and injectParamsManually){
             injectedLLH = LLH;
         }
+        LogInfo<<" dLLH: "<<LLH-injectedLLH<<std::endl;
         //LogInfo<<"LLH: "<<LLH;
         LLHwrtBestFit = LLH - bestFitLLH;
         gLLH = 0;
