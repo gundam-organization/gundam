@@ -462,7 +462,7 @@ int main(int argc, char** argv){
             double epsilonNorm=0;
             for( int iPar = 0 ; iPar < nStripped ; iPar++ ) {
                 double sigma = strippedParameterList[iPar]->getStdDevValue();
-                double epsilon = gRandom->Gaus(0, sigma/nStripped);
+                double epsilon = gRandom->Gaus(0, sigma/(nStripped/10.));
                 epsilonNorm += epsilon*epsilon;
                 if (iToy==0) epsilon = 0;
                 //LogInfo<<strippedParameterList[iPar]->getFullTitle()<<" e: "<<epsilon<<std::endl;
