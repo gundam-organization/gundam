@@ -424,7 +424,7 @@ int main(int argc, char** argv){
     std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating " << nToys << " toys...";
 
     double LLH_sum{0};// needed when injecting parameters manually
-    double injectedLLH{0};// needed when injecting parameters manually
+    double injectedLLH{-1};// needed when injecting parameters manually
 
     for( int iToy = 0 ; iToy < nToys ; iToy++ ){
 
@@ -462,7 +462,7 @@ int main(int argc, char** argv){
             // change the parameter values
             for( int iPar = 0 ; iPar < nStripped ; iPar++ ) {
                 double sigma = strippedParameterList[iPar]->getStdDevValue();
-                double epsilon = gRandom->Gaus(0, sigma/50.);
+                double epsilon = gRandom->Gaus(0, sigma/100.);
                 if (iToy==0) epsilon = 0;
                 //LogInfo<<strippedParameterList[iPar]->getFullTitle()<<" e: "<<epsilon<<std::endl;
                 strippedParameterList[iPar]->setParameterValue(
@@ -485,7 +485,7 @@ int main(int argc, char** argv){
         propagator.updateLlhCache();
         LLH = propagator.getLlhBuffer();
         LLH_sum += LLH;
-        if(iToy==0){
+        if(iToy==0 and injectParamsManually){
             injectedLLH = LLH;
         }
         //LogInfo<<"LLH: "<<LLH;
