@@ -481,8 +481,8 @@ int main(int argc, char** argv){
             for (auto &parSet: propagator.getParametersManager().getParameterSetsList()) {
                 if (not parSet.isEnabled()) { continue; }
                 if (parSet.isUseEigenDecompInFit()){
-                    parSet.propagateEigenToOriginal();
-                    LogInfo<< "propagating to original space: "<<parSet.getName()<<std::endl;
+                    parSet.propagateOriginalToEigen();
+                    LogInfo<< "propagating to eigen space: "<<parSet.getName()<<std::endl;
                 }
                 for( auto& par : parSet.getParameterList() ){
                     if( not par.isEnabled() ) continue;
