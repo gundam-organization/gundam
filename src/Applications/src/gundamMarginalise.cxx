@@ -461,7 +461,7 @@ int main(int argc, char** argv){
             }
             // change the parameter values
             for( int iPar = 0 ; iPar < nStripped ; iPar++ ) {
-                double epsilon = gRandom->Gaus(0, 0.001);
+                double epsilon = gRandom->Gaus(0, 0.000001);
                 strippedParameterList[iPar]->setParameterValue(
                         epsilon + getParameterValueFromTextFile(parInjectFile, strippedParameterList[iPar]->getFullTitle())
                 );
