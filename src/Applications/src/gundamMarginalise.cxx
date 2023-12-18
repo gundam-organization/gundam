@@ -534,18 +534,7 @@ int main(int argc, char** argv){
 //        }
 
 
-        // for now set it to false. Still need to understand/implement this
-        bool enableStatThrowInToys{false};
-//        if( enableStatThrowInToys ){
-//            for( auto& xsec : crossSectionDataList ){
-//                if( enableEventMcThrow ){
-//                    // Take into account the finite amount of event in MC
-//                    xsec.samplePtr->getMcContainer().throwEventMcError();
-//                }
-//                // Asimov bin content -> toy data
-//                xsec.samplePtr->getMcContainer().throwStatError();
-//            }
-//        }
+
 
         // i don't know what is this for, so I comment it for now
 //        writeBinDataFct();
