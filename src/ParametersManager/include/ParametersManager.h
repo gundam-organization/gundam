@@ -49,6 +49,7 @@ public:
   void throwParametersFromParSetCovariance();
   void throwParametersFromGlobalCovariance(bool quietVerbose_ = true);
   void throwParametersFromGlobalCovariance(std::vector<double> &weightsChiSquare);
+  void throwParametersFromGlobalCovariance(std::vector<double> &weightsChiSquare, double pedestalEntity, double pedestalLeftEdge, double pedestalRightEdge);
   ParameterSet* getFitParameterSetPtr(const std::string& name_);
   
   // Logger related

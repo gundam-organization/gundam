@@ -59,6 +59,7 @@ int main(int argc, char** argv){
     clParser.addOption("randomSeed", {"-s", "--seed"}, "Set random seed");
     clParser.addTriggerOption("usingGpu", {"--gpu"}, "Use GPU parallelization");
     clParser.addOption("parInject", {"--parameters-inject"}, "Input txt file for injecting params");
+    clParser.addOption("pedestal", {"--pedestal"}, "Add pedestal to the sampling distribution (percents)");
 
     clParser.addDummyOption("Trigger options:");
     clParser.addTriggerOption("dryRun", {"-d", "--dry-run"}, "Only overrides fitter config and print it.");
@@ -165,6 +166,16 @@ int main(int argc, char** argv){
     }else{
         LogInfo << "Injecting best fit parameters as prior" << std::endl;
     }
+    double pedestalEntity = 0;
+    bool usePedestal = false;
+    double pedestalLeftEdge = -5, pedestalRightEdge = 5;
+    if(clParser.isOptionTriggered("pedestal")){
+        usePedestal = true;
+        pedestalEntity = clParser.getOptionVal<double>("pedestal")/100.;
+        LogInfo << "Using Gauss+pedestal sampling: "<< pedestalEntity*100 << "% of the throws will be drawn from a uniform distribution."<<std::endl;
+        LogInfo <<"Using default pedestal interval: ["<<pedestalLeftEdge<<"sigma, "<<pedestalRightEdge<<"sigma]";
+        LogInfo <<". User defined interval to be implemented"<<std::endl;
+    }
 
     auto configPropagator = GenericToolbox::Json::fetchValuePath<nlohmann::json>( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig" );
 
@@ -230,7 +241,8 @@ int main(int argc, char** argv){
                 {"fitterOutputFile", "Fit_%s"},
                 {"nToys",            "nToys_%s"},
                 {"randomSeed",       "Seed_%s"},
-                {"parInject",        "parInject_%s"}
+                {"parInject",        "parInject_%s"},
+                {"pedestal",        "ped_%s_percent"}
         };
         outFilePath = GundamUtils::generateFileName(clParser, appendixDict) + ".root";
 
@@ -299,7 +311,8 @@ int main(int argc, char** argv){
         parState_->SetName("postFitParameters_TNamed");
         parState_->Write();
     });
-    TVectorD bestFitParameters (parametersBestFit.size(), parametersBestFit.data());
+    int nParameters = parametersBestFit.size();
+    TVectorD bestFitParameters (nParameters, parametersBestFit.data());
     bestFitParameters.Write("bestFitParameters_TVectorD");
     app.getOutfilePtr()->WriteObject(&parameterFullTitles, "parameterFullTitles");
     app.getOutfilePtr()->cd();
@@ -323,6 +336,7 @@ int main(int argc, char** argv){
     std::vector<double> dialResponse;
 //    weightsChiSquare.reserve(1000);
     double LLH, gLLH, priorSum, LLHwrtBestFit;
+    double totalWeight; // use in the pedestal case, just as a placeholder
     margThrowTree->Branch("Parameters", &parameters);
     margThrowTree->Branch("Marginalise", &margThis);
     margThrowTree->Branch("prior", &prior);
@@ -415,11 +429,7 @@ int main(int argc, char** argv){
 //            << par.getMaxMirror() <<" --- marg? "<<par.isMarginalised() << std::endl;
 
 
-    //////////////////////////////////////
-    // THROWS LOOP
-    /////////////////////////////////////
-    std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating " << nToys << " toys...";
-
+    // initializing variables for "parametersInject" mode
     double LLH_sum{0};// needed when injecting parameters manually
     double injectedLLH{-1};// needed when injecting parameters manually
     double epsilonNormAverage{0};// needed when injecting parameters manually
@@ -427,6 +437,10 @@ int main(int argc, char** argv){
         LogInfo<< "Injecting parameters from file: " << parInjectFile << std::endl;
     }
 
+    std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating " << nToys << " toys...";
+    //////////////////////////////////////
+    // THROWS LOOP
+    /////////////////////////////////////
     for( int iToy = 0 ; iToy < nToys ; iToy++ ){
 
         // loading...
@@ -435,11 +449,13 @@ int main(int argc, char** argv){
         // reset weights vector
         weightsChiSquare.clear();
         // Do the throwing:
-        propagator.getParametersManager().throwParametersFromGlobalCovariance(weightsChiSquare);
-        //propagator.propagateParametersOnSamples(); // Not necessary (included in updateLlhCache())
+        if (usePedestal){
+            propagator.getParametersManager().throwParametersFromGlobalCovariance(weightsChiSquare, pedestalEntity, pedestalLeftEdge, pedestalRightEdge);
+        }else {
+            propagator.getParametersManager().throwParametersFromGlobalCovariance(weightsChiSquare);
+        }
 
         if(injectParamsManually) {
-
             // count the number of parameters to be injected
             int nStripped{0};
             for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
@@ -489,11 +505,19 @@ int main(int argc, char** argv){
         //LogInfo<<"Computing LH..."<<std::endl;
         propagator.updateLlhCache();
         LLH = propagator.getLlhBuffer();
+        // make the LH a probability distribution (but still work with the log)
+        LLH /= 2.0;
+        //LLH -= bestFitLLH/2.0;
+        // TODO: figure out normalization factor here.
+        //LLH -= nParameters*log(1.0/2.0*TMath::Pi());
+
         LLH_sum += LLH;
         if(iToy==0 and injectParamsManually){
             injectedLLH = LLH;
         }
-        LogInfo<<" dLLH: "<<LLH-injectedLLH<<std::endl;
+        if(injectParamsManually)
+            LogInfo<<" dLLH: "<<LLH-injectedLLH<<std::endl;
+
         //LogInfo<<"LLH: "<<LLH;
         LLHwrtBestFit = LLH - bestFitLLH;
         gLLH = 0;
@@ -519,29 +543,18 @@ int main(int argc, char** argv){
             }
         }
 
-//        LogInfo<<"LLH: "<<LLH/2.<<"  gLLH: "<<gLLH/2.<<"\tdifference: "<<(-LLH/2.+gLLH/2.)  <<std::endl;
-//        if((-LLH+gLLH)/2. > 10){
-//            LogInfo<<"WARNING: BIG THROW!!"<<std::endl;
-//        }
-
-        //LogInfo<<"   gLLH: "<<gLLH<<std::endl;
-        //LogDebugIf(gLLH<50)<<gLLH<<std::endl;
-        // print the parameters
-
+        LogInfo<<"LLH: "<<LLH<<"  gLLH: "<<gLLH<<"\tdifference: "<<(-LLH+gLLH)  <<std::endl;
+        if((-LLH+gLLH)/2. > 10){
+            LogInfo<<"WARNING: BIG THROW!!"<<std::endl;
+        }
+//        LogDebugIf(gLLH<50)<<gLLH<<std::endl;
+//        // print the parameters
 //        for(int iPar=0;iPar<propagator.getParameterSetPtr().size();iPar++){
 //            propagator.getFitParameterSetPtr("all")->getParameterList().at(0).getParameterValue();
-//
 //        }
-
-
-
-
-        // i don't know what is this for, so I comment it for now
-//        writeBinDataFct();
 
         // Write the branches
         margThrowTree->Fill();
-
         //debug
 //        if(iToy==0 || iToy==1){
 //            LogInfo<<"DEBUG: Toy "<<iToy<<std::endl;

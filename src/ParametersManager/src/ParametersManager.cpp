@@ -280,6 +280,12 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
 }
 
 void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> &weightsChiSquare){
+    throwParametersFromGlobalCovariance(weightsChiSquare,0,0,0);
+}// end of function
+
+void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> &weightsChiSquare,
+                                                            double pedestalEntity, double pedestalLeftEdge, double pedestalRightEdge
+                                                            ){
 
     // check that weightsChiSquare is an empty vector
     LogThrowIf( not weightsChiSquare.empty(), "ERROR: argument weightsChiSquare is not empty" );
@@ -331,7 +337,12 @@ void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> 
 //    throwNb++;
         bool rethrow{false};
         std::vector<double> throws,weights;
-        GenericToolbox::throwCorrelatedParameters(_choleskyMatrix_.get(),throws, weights);
+        if(pedestalEntity==0){
+            GenericToolbox::throwCorrelatedParameters(_choleskyMatrix_.get(),throws, weights);
+        }else{
+            GenericToolbox::throwCorrelatedParameters(_choleskyMatrix_.get(),throws, weights,
+                                                      pedestalEntity,pedestalLeftEdge,pedestalRightEdge);
+        }
         if(throws.size() != weights.size()){
             LogInfo<<"WARNING: throws.size() != weights.size() "<< throws.size()<<weights.size()<<std::endl;
         }
@@ -381,10 +392,8 @@ void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> 
         // reached this point: all parameters are within bounds
         keepThrowing = false;
     }
+}// end of function
 
-
-
-}
 void ParametersManager::injectParameterValues(const nlohmann::json &config_) {
   LogWarning << "Injecting parameters..." << std::endl;
 
