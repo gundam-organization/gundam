@@ -92,7 +92,6 @@ execute_process(COMMAND root-config --has-cxx20 COMMAND grep yes
     OUTPUT_STRIP_TRAILING_WHITESPACE)
 
 include_directories( ${ROOT_INCLUDE_DIR} )
-link_libraries( ${ROOT_LIBRARIES} )
 
 
 ####################
