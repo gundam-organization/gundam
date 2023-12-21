@@ -4,7 +4,6 @@ set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/DataBin.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamGreetings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/JsonBaseClass.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/VariableDictionary.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ParameterThrowerMarkHarz.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ConfigUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamUtils.cpp

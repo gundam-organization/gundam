@@ -96,10 +96,10 @@ std::string ParametersManager::getParametersSummary(bool showEigen_ ) const{
   }
   return ss.str();
 }
-nlohmann::json ParametersManager::exportParameterInjectorConfig() const{
-  nlohmann::json out;
+JsonType ParametersManager::exportParameterInjectorConfig() const{
+  JsonType out;
 
-  std::vector<nlohmann::json> parSetConfig;
+  std::vector<JsonType> parSetConfig;
   parSetConfig.reserve( _parameterSetList_.size() );
   for( auto& parSet : _parameterSetList_ ){
     if( not parSet.isEnabled() ){ continue; }
@@ -278,7 +278,7 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
     keepThrowing = false;
   }
 }
-void ParametersManager::injectParameterValues(const nlohmann::json &config_) {
+void ParametersManager::injectParameterValues(const JsonType &config_) {
   LogWarning << "Injecting parameters..." << std::endl;
 
   if( not GenericToolbox::Json::doKeyExist(config_, "parameterSetList") ){
@@ -287,7 +287,7 @@ void ParametersManager::injectParameterValues(const nlohmann::json &config_) {
     return;
   }
 
-  for( auto& entryParSet : GenericToolbox::Json::fetchValue<nlohmann::json>( config_, "parameterSetList" ) ){
+  for( auto& entryParSet : GenericToolbox::Json::fetchValue<JsonType>( config_, "parameterSetList" ) ){
     auto parSetName = GenericToolbox::Json::fetchValue<std::string>(entryParSet, "name");
     LogInfo << "Reading injection parameters for parSet: " << parSetName << std::endl;
 

@@ -17,7 +17,7 @@
 #include <vector>
 #include <string>
 
-class EventTreeWriter : public GenericToolbox::ConfigBaseClass<nlohmann::json> {
+class EventTreeWriter : public GenericToolbox::ConfigBaseClass<JsonType> {
 
 public:
   EventTreeWriter() = default;

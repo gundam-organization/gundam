@@ -56,8 +56,8 @@ public:
   void setStdDevValue(double stdDevValue){ _stdDevValue_ = stdDevValue; }
   void setParameterValue(double parameterValue);
   void setName(const std::string &name){ _name_ = name; }
-  void setDialSetConfig(const nlohmann::json &jsonConfig_);
-  void setParameterDefinitionConfig(const nlohmann::json &config_);
+  void setDialSetConfig(const JsonType &jsonConfig_);
+  void setParameterDefinitionConfig(const JsonType &config_);
   void setOwner(const ParameterSet *owner_){ _owner_ = owner_; }
   void setPriorType(PriorType::PriorType priorType){ _priorType_ = priorType; }
 
@@ -80,7 +80,7 @@ public:
   [[nodiscard]] double getStdDevValue() const{ return _stdDevValue_; }
   [[nodiscard]] double getParameterValue() const{ return _parameterValue_; }
   [[nodiscard]] const std::string &getName() const{ return _name_; }
-  [[nodiscard]] const nlohmann::json &getDialDefinitionsList() const{ return _dialDefinitionsList_; }
+  [[nodiscard]] const JsonType &getDialDefinitionsList() const{ return _dialDefinitionsList_; }
   [[nodiscard]] const ParameterSet *getOwner() const{ return _owner_; }
   [[nodiscard]] PriorType::PriorType getPriorType() const{ return _priorType_; }
 
@@ -114,8 +114,8 @@ private:
   double _stepSize_{std::nan("unset")};
   std::string _name_{};
   std::string _dialsWorkingDirectory_{"."};
-  nlohmann::json _parameterConfig_{};
-  nlohmann::json _dialDefinitionsList_{};
+  JsonType _parameterConfig_{};
+  JsonType _dialDefinitionsList_{};
 
   // Internals
   const ParameterSet* _owner_{nullptr};

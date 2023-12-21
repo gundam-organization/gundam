@@ -29,9 +29,9 @@ void PlotGenerator::readConfigImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
   gStyle->SetOptStat(0);
   _histHolderCacheList_.resize(1);
-  _varDictionary_ = GenericToolbox::Json::fetchValue(_config_, "varDictionnaries", nlohmann::json());
-  _canvasParameters_ = GenericToolbox::Json::fetchValue(_config_, "canvasParameters", nlohmann::json());
-  _histogramsDefinition_ = GenericToolbox::Json::fetchValue(_config_, "histogramsDefinition", nlohmann::json());
+  _varDictionary_ = GenericToolbox::Json::fetchValue(_config_, "varDictionnaries", JsonType());
+  _canvasParameters_ = GenericToolbox::Json::fetchValue(_config_, "canvasParameters", JsonType());
+  _histogramsDefinition_ = GenericToolbox::Json::fetchValue(_config_, "histogramsDefinition", JsonType());
 
   _writeGeneratedHistograms_ = GenericToolbox::Json::fetchValue(_config_, "writeGeneratedHistograms", _writeGeneratedHistograms_);
 }
@@ -585,7 +585,7 @@ void PlotGenerator::generateComparisonHistograms(const std::vector<HistHolder> &
 // Misc
 std::vector<std::string> PlotGenerator::fetchListOfVarToPlot(bool isData_){
   std::vector<std::string> varNameList;
-  _histogramsDefinition_ = GenericToolbox::Json::fetchValue(_config_, "histogramsDefinition", nlohmann::json());
+  _histogramsDefinition_ = GenericToolbox::Json::fetchValue(_config_, "histogramsDefinition", JsonType());
   for( const auto& histConfig : _histogramsDefinition_ ){
     auto varToPlot = GenericToolbox::Json::fetchValue<std::string>(histConfig, "varToPlot");
     if( varToPlot != "Raw"
@@ -602,7 +602,7 @@ std::vector<std::string> PlotGenerator::fetchListOfSplitVarNames(){
 //  LogThrowIf(_config_.empty(), "Config not set, can't call " << __METHOD_NAME__);
 
   std::vector<std::string> varNameList;
-  _histogramsDefinition_ = GenericToolbox::Json::fetchValue(_config_, "histogramsDefinition", nlohmann::json());
+  _histogramsDefinition_ = GenericToolbox::Json::fetchValue(_config_, "histogramsDefinition", JsonType());
   for( const auto& histConfig : _histogramsDefinition_ ){
     auto splitVars = GenericToolbox::Json::fetchValue(histConfig, "splitVars", std::vector<std::string>{""});
     for( const auto& splitVar : splitVars ){

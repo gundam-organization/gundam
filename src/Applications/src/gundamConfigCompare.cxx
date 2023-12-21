@@ -26,7 +26,7 @@ LoggerInit([]{
 
 CmdLineParser clp{};
 
-void compareConfigStage(const nlohmann::json& config1_, const nlohmann::json& config2_);
+void compareConfigStage(const JsonType& config1_, const JsonType& config2_);
 
 
 int main( int argc, char** argv ){
@@ -98,13 +98,13 @@ int main( int argc, char** argv ){
 }
 
 
-void compareConfigStage(const nlohmann::json& config1_, const nlohmann::json& config2_){
+void compareConfigStage(const JsonType& config1_, const JsonType& config2_){
 
 
   std::vector<std::string> pathBuffer;
 
-  std::function<void(const nlohmann::json&, const nlohmann::json&)> recursiveFct =
-      [&](const nlohmann::json& entry1_, const nlohmann::json& entry2_){
+  std::function<void(const JsonType&, const JsonType&)> recursiveFct =
+      [&](const JsonType& entry1_, const JsonType& entry2_){
         std::string path = GenericToolbox::joinVectorString(pathBuffer, "/");
 
         if( entry1_.is_array() and entry2_.is_array() ){
@@ -179,8 +179,8 @@ void compareConfigStage(const nlohmann::json& config1_, const nlohmann::json& co
             }
 
             // both have the key:
-            auto content1 = GenericToolbox::Json::fetchValue<nlohmann::json>(entry1_, key);
-            auto content2 = GenericToolbox::Json::fetchValue<nlohmann::json>(entry2_, key);
+            auto content1 = GenericToolbox::Json::fetchValue<JsonType>(entry1_, key);
+            auto content2 = GenericToolbox::Json::fetchValue<JsonType>(entry2_, key);
 
             pathBuffer.emplace_back(key);
             recursiveFct(content1, content2);

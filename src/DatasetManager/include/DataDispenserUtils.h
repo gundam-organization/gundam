@@ -32,7 +32,7 @@ struct DataDispenserParameters{
   int iThrow{-1};
   size_t debugNbMaxEventsToLoad{0};
 
-  nlohmann::json fromHistContent{};
+  JsonType fromHistContent{};
 
   [[nodiscard]] std::string getSummary() const;
 };

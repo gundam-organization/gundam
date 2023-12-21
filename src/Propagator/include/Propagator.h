@@ -38,7 +38,7 @@ public:
   void setEnableEigenToOrigInPropagate(bool enableEigenToOrigInPropagate){ _enableEigenToOrigInPropagate_ = enableEigenToOrigInPropagate; }
   void setIThrow(int iThrow){ _iThrow_ = iThrow; }
   void setLoadAsimovData(bool loadAsimovData){ _loadAsimovData_ = loadAsimovData; }
-  void setParameterInjectorConfig(const nlohmann::json &parameterInjector){ _parameterInjectorMc_ = parameterInjector; }
+  void setParameterInjectorConfig(const JsonType &parameterInjector){ _parameterInjectorMc_ = parameterInjector; }
 
   // Const getters
   [[nodiscard]] bool isThrowAsimovToyParameters() const { return _throwAsimovToyParameters_; }
@@ -98,8 +98,8 @@ private:
   bool _devSingleThreadReweight_{false};
   bool _devSingleThreadHistFill_{false};
   int _debugPrintLoadedEventsNbPerSample_{5};
-  nlohmann::json _parameterInjectorMc_;
-  nlohmann::json _parameterInjectorToy_;
+  JsonType _parameterInjectorMc_;
+  JsonType _parameterInjectorToy_;
 
   // Internals
   bool _throwAsimovToyParameters_{false};

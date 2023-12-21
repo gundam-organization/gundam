@@ -7,7 +7,7 @@
 #include "ConfigUtils.h"
 
 
-void JsonBaseClass::setConfig(const nlohmann::json& config_){
+void JsonBaseClass::setConfig(const JsonType& config_){
   _config_ = config_;
   ConfigUtils::forwardConfig(_config_);
 }

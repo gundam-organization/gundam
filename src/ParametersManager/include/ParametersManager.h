@@ -40,11 +40,11 @@ public:
 
   // const core
   [[nodiscard]] std::string getParametersSummary( bool showEigen_ = true ) const;
-  [[nodiscard]] nlohmann::json exportParameterInjectorConfig() const;
+  [[nodiscard]] JsonType exportParameterInjectorConfig() const;
   [[nodiscard]] const ParameterSet* getFitParameterSetPtr(const std::string& name_) const;
 
   // core
-  void injectParameterValues(const nlohmann::json &config_);
+  void injectParameterValues(const JsonType &config_);
   void throwParameters();
   void throwParametersFromParSetCovariance();
   void throwParametersFromGlobalCovariance(bool quietVerbose_ = true);

@@ -5,6 +5,9 @@
 #ifndef GUNDAM_DATABIN_H
 #define GUNDAM_DATABIN_H
 
+
+#include "ConfigUtils.h"
+
 #include "GenericToolbox.Json.h"
 
 #include <TFormula.h>
@@ -22,7 +25,7 @@ public:
     explicit Edges(int index_) : index(index_) {}
 
     // utils
-    void readConfig(const nlohmann::json& config_);
+    void readConfig(const JsonType& config_);
     [[nodiscard]] bool isOverlapping(const Edges& other_) const;
     [[nodiscard]] std::string getSummary() const;
 
@@ -76,7 +79,7 @@ public:
   // Misc
   void generateFormula();
   void generateTreeFormula();
-  void readConfig( const nlohmann::json& config_);
+  void readConfig( const JsonType& config_);
   [[nodiscard]] std::string getSummary() const;
   [[nodiscard]] std::vector<double> generateBinTarget(const std::vector<std::string>& varNameList_ = {}) const;
 

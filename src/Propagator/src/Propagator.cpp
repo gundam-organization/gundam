@@ -31,7 +31,7 @@ using namespace GenericToolbox::ColorCodes;
 void Propagator::readConfigImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
 
-  _parManager_.readConfig( GenericToolbox::Json::fetchValue(_config_, "parametersManagerConfig", nlohmann::json()) );
+  _parManager_.readConfig( GenericToolbox::Json::fetchValue(_config_, "parametersManagerConfig", JsonType()) );
 
   // legacy -- option within propagator -> should be defined elsewhere
   GenericToolbox::Json::deprecatedAction(_config_, "reThrowParSetIfOutOfBounds", [&]{
@@ -61,7 +61,7 @@ void Propagator::readConfigImpl(){
   EventDialCache::globalEventReweightCap = GenericToolbox::Json::fetchValue(_config_, "globalEventReweightCap", EventDialCache::globalEventReweightCap);
 
   LogInfo << "Reading parameter configuration..." << std::endl;
-  auto parameterSetListConfig = ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue(_config_, "parameterSetListConfig", nlohmann::json()));
+  auto parameterSetListConfig = ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue(_config_, "parameterSetListConfig", JsonType()));
   _parManager_.getParameterSetsList().reserve(parameterSetListConfig.size()); // make sure the objects aren't moved in RAM ( since FitParameter* will be used )
   for( const auto& parameterSetConfig : parameterSetListConfig ){
     _parManager_.getParameterSetsList().emplace_back();
@@ -71,12 +71,12 @@ void Propagator::readConfigImpl(){
   }
 
   LogInfo << "Reading samples configuration..." << std::endl;
-  auto fitSampleSetConfig = GenericToolbox::Json::fetchValue(_config_, "fitSampleSetConfig", nlohmann::json());
+  auto fitSampleSetConfig = GenericToolbox::Json::fetchValue(_config_, "fitSampleSetConfig", JsonType());
   _fitSampleSet_.setConfig(fitSampleSetConfig);
   _fitSampleSet_.readConfig();
 
   LogInfo << "Reading PlotGenerator configuration..." << std::endl;
-  auto plotGeneratorConfig = ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue(_config_, "plotGeneratorConfig", nlohmann::json()));
+  auto plotGeneratorConfig = ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue(_config_, "plotGeneratorConfig", JsonType()));
   _plotGenerator_.setConfig(plotGeneratorConfig);
   _plotGenerator_.readConfig();
 
@@ -94,14 +94,14 @@ void Propagator::readConfigImpl(){
   }
 
   LogInfo << "Reading ParScanner configuration..." << std::endl;
-  _parScanner_.readConfig( GenericToolbox::Json::fetchValue(_config_, "scanConfig", nlohmann::json()) );
+  _parScanner_.readConfig( GenericToolbox::Json::fetchValue(_config_, "scanConfig", JsonType()) );
 
   LogInfo << "Reading DialCollection configurations..." << std::endl;
   for(size_t iParSet = 0 ; iParSet < _parManager_.getParameterSetsList().size() ; iParSet++ ){
     if( not _parManager_.getParameterSetsList()[iParSet].isEnabled() ) continue;
     // DEV / DialCollections
     if( not _parManager_.getParameterSetsList()[iParSet].getDialSetDefinitions().empty() ){
-      for( auto& dialSetDef : _parManager_.getParameterSetsList()[iParSet].getDialSetDefinitions().get<std::vector<nlohmann::json>>() ){
+      for( auto& dialSetDef : _parManager_.getParameterSetsList()[iParSet].getDialSetDefinitions().get<std::vector<JsonType>>() ){
         if( GenericToolbox::Json::doKeyExist(dialSetDef, "parametersBinningPath") ){
           _dialCollections_.emplace_back(&_parManager_.getParameterSetsList());
           _dialCollections_.back().setIndex(int(_dialCollections_.size())-1);
@@ -134,7 +134,7 @@ void Propagator::readConfigImpl(){
   }
 
   LogInfo << "Reading TreeWriter configurations..." << std::endl;
-  _treeWriter_.readConfig( GenericToolbox::Json::fetchValue(_config_, "eventTreeWriter", nlohmann::json()) );
+  _treeWriter_.readConfig( GenericToolbox::Json::fetchValue(_config_, "eventTreeWriter", JsonType()) );
 
   LogInfo << "Reading config of the Propagator done." << std::endl;
 }

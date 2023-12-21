@@ -26,7 +26,7 @@ void EventVarTransform::initializeImpl(){
 }
 
 
-EventVarTransform::EventVarTransform(const nlohmann::json& config_){ this->readConfig(config_); }
+EventVarTransform::EventVarTransform(const JsonType& config_){ this->readConfig(config_); }
 
 const std::vector<std::string>& EventVarTransform::fetchRequestedVars() const {
   if( _requestedLeavesForEvalCache_.empty() ){

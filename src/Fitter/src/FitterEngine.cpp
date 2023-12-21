@@ -48,7 +48,7 @@ void FitterEngine::readConfigImpl(){
   _throwMcBeforeFit_ = GenericToolbox::Json::fetchValue(_config_, "throwMcBeforeFit", _throwMcBeforeFit_);
   _throwGain_ = GenericToolbox::Json::fetchValue(_config_, "throwMcBeforeFitGain", _throwGain_);
 
-  _propagator_.readConfig( GenericToolbox::Json::fetchValue<nlohmann::json>(_config_, "propagatorConfig") );
+  _propagator_.readConfig( GenericToolbox::Json::fetchValue<JsonType>(_config_, "propagatorConfig") );
   _savePostfitEventTrees_ = GenericToolbox::Json::fetchValue(_config_, "savePostfitEventTrees", _savePostfitEventTrees_);
 
 
@@ -56,11 +56,11 @@ void FitterEngine::readConfigImpl(){
 
   if (engineType == "minimizer") {
       this->_minimizer_ = std::make_unique<MinimizerInterface>(this);
-      getMinimizer().readConfig( GenericToolbox::Json::fetchValue(_config_, "minimizerConfig", nlohmann::json()));
+      getMinimizer().readConfig( GenericToolbox::Json::fetchValue(_config_, "minimizerConfig", JsonType()));
   }
   else if (engineType == "mcmc") {
       this->_minimizer_ = std::make_unique<MCMCInterface>(this);
-      getMinimizer().readConfig( GenericToolbox::Json::fetchValue(_config_, "mcmcConfig", nlohmann::json()));
+      getMinimizer().readConfig( GenericToolbox::Json::fetchValue(_config_, "mcmcConfig", JsonType()));
   }
   else {
       LogWarning << "Allowed engine types: minimizer, mcmc" << std::endl;
@@ -71,7 +71,7 @@ void FitterEngine::readConfigImpl(){
   // legacy
   GenericToolbox::Json::deprecatedAction(_config_, "scanConfig", [&]{
     LogAlert << "Forwarding the option to Propagator. Consider moving it into \"propagatorConfig:\"" << std::endl;
-    _propagator_.getParScanner().readConfig( GenericToolbox::Json::fetchValue(_config_, "scanConfig", nlohmann::json()) );
+    _propagator_.getParScanner().readConfig( GenericToolbox::Json::fetchValue(_config_, "scanConfig", JsonType()) );
   });
 
   GenericToolbox::Json::deprecatedAction(_config_, "monitorRefreshRateInMs", [&]{
@@ -87,7 +87,7 @@ void FitterEngine::initializeImpl(){
 
   if( GundamGlobals::isLightOutputMode() ){
     LogWarning << "Light mode enabled, wiping plot gen config..." << std::endl;
-    _propagator_.getPlotGenerator().readConfig(nlohmann::json());
+    _propagator_.getPlotGenerator().readConfig(JsonType());
   }
 
   _propagator_.initialize();
@@ -307,7 +307,7 @@ void FitterEngine::fit(){
 
         LogAlert << "Using custom mc parameter push for " << parSet.getName() << std::endl;
 
-        for(auto& entry : GenericToolbox::Json::fetchValue(parSet.getConfig(), "customFitParThrow", std::vector<nlohmann::json>())){
+        for(auto& entry : GenericToolbox::Json::fetchValue(parSet.getConfig(), "customFitParThrow", std::vector<JsonType>())){
 
           int parIndex = GenericToolbox::Json::fetchValue<int>(entry, "parIndex");
 

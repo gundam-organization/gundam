@@ -34,14 +34,14 @@ void DatasetLoader::readConfigImpl() {
   _showSelectedEventCount_ = GenericToolbox::Json::fetchValue(_config_, "showSelectedEventCount", _showSelectedEventCount_);
 
   _mcDispenser_ = DataDispenser(this);
-  _mcDispenser_.readConfig(GenericToolbox::Json::fetchValue<nlohmann::json>(_config_, "mc"));
+  _mcDispenser_.readConfig(GenericToolbox::Json::fetchValue<JsonType>(_config_, "mc"));
   _mcDispenser_.getParameters().name = "Asimov";
   _mcDispenser_.getParameters().useMcContainer = true;
 
   // Always loaded by default
   _dataDispenserDict_.emplace("Asimov", DataDispenser(_mcDispenser_));
 
-  for( auto& dataEntry : GenericToolbox::Json::fetchValue(_config_, "data", nlohmann::json()) ){
+  for( auto& dataEntry : GenericToolbox::Json::fetchValue(_config_, "data", JsonType()) ){
     std::string name = GenericToolbox::Json::fetchValue(dataEntry, "name", "data");
     LogThrowIf( GenericToolbox::doesKeyIsInMap(name, _dataDispenserDict_),
                 "\"" << name << "\" already taken, please use another name." )

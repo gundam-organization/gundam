@@ -39,7 +39,7 @@ void ParameterSet::readConfigImpl(){
   _printParametersSummary_ = GenericToolbox::Json::fetchValue<bool>(_config_, "printParametersSummary", _printDialSetsSummary_);
 
   if( GenericToolbox::Json::doKeyExist(_config_, "parameterLimits") ){
-    auto parLimits = GenericToolbox::Json::fetchValue(_config_, "parameterLimits", nlohmann::json());
+    auto parLimits = GenericToolbox::Json::fetchValue(_config_, "parameterLimits", JsonType());
     _globalParameterMinValue_ = GenericToolbox::Json::fetchValue(parLimits, "minValue", _globalParameterMinValue_);
     _globalParameterMaxValue_ = GenericToolbox::Json::fetchValue(parLimits, "maxValue", _globalParameterMaxValue_);
   }
@@ -59,7 +59,7 @@ void ParameterSet::readConfigImpl(){
     }
 
     if( GenericToolbox::Json::doKeyExist(_config_, "eigenParBounds") ){
-      auto eigenLimits = GenericToolbox::Json::fetchValue(_config_, "eigenParBounds", nlohmann::json());
+      auto eigenLimits = GenericToolbox::Json::fetchValue(_config_, "eigenParBounds", JsonType());
       _eigenParBounds_.first = GenericToolbox::Json::fetchValue(eigenLimits, "minValue", _eigenParBounds_.first);
       _eigenParBounds_.second = GenericToolbox::Json::fetchValue(eigenLimits, "maxValue", _eigenParBounds_.second);
       LogInfo << "Using eigen parameter limits: [ " << _eigenParBounds_.first << ", " << _eigenParBounds_.first << "]" << std::endl;
@@ -73,7 +73,7 @@ void ParameterSet::readConfigImpl(){
   _enablePca_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"allowPca", "fixGhostFitParameters", "enablePca"}, _enablePca_);
   _enabledThrowToyParameters_ = GenericToolbox::Json::fetchValue(_config_, "enabledThrowToyParameters", _enabledThrowToyParameters_);
   _maskForToyGeneration_ = GenericToolbox::Json::fetchValue(_config_, "maskForToyGeneration", _maskForToyGeneration_);
-  _customFitParThrow_ = GenericToolbox::Json::fetchValue(_config_, "customFitParThrow", std::vector<nlohmann::json>());
+  _customFitParThrow_ = GenericToolbox::Json::fetchValue(_config_, "customFitParThrow", std::vector<JsonType>());
   _releaseFixedParametersOnHesse_ = GenericToolbox::Json::fetchValue(_config_, "releaseFixedParametersOnHesse", _releaseFixedParametersOnHesse_);
 
   _parameterDefinitionFilePath_ = GenericToolbox::Json::fetchValue( _config_,
@@ -102,7 +102,7 @@ void ParameterSet::readConfigImpl(){
     LogWarning << "No number of parameter provided. Looking for alternative definitions..." << std::endl;
 
     if( not _dialSetDefinitions_.empty() ){
-      for( auto& dialSetDef : _dialSetDefinitions_.get<std::vector<nlohmann::json>>() ){
+      for( auto& dialSetDef : _dialSetDefinitions_.get<std::vector<JsonType>>() ){
         if( GenericToolbox::Json::doKeyExist(dialSetDef, "parametersBinningPath") ){
           LogInfo << "Found parameter binning within dialSetDefinition. Defining parameters number..." << std::endl;
           DataBinSet b;
@@ -116,7 +116,7 @@ void ParameterSet::readConfigImpl(){
 
     if( _nbParameterDefinition_ == -1 and not _parameterDefinitionConfig_.empty() ){
       LogInfo << "Using parameter definition config list to determine the number of parameters..." << std::endl;
-      _nbParameterDefinition_ = int(_parameterDefinitionConfig_.get<std::vector<nlohmann::json>>().size());
+      _nbParameterDefinition_ = int(_parameterDefinitionConfig_.get<std::vector<JsonType>>().size());
     }
 
     LogThrowIf(_nbParameterDefinition_==-1, "Could not figure out the number of parameters to be defined for the set: " << _name_ );
@@ -609,12 +609,12 @@ std::string ParameterSet::getSummary() const {
 
   return ss.str();
 }
-nlohmann::json ParameterSet::exportInjectorConfig() const{
-  nlohmann::json out;
+JsonType ParameterSet::exportInjectorConfig() const{
+  JsonType out;
 
   out["name"] = this->getName();
 
-  std::vector<nlohmann::json> parJsonList{};
+  std::vector<JsonType> parJsonList{};
   parJsonList.reserve( _parameterList_.size() );
 
   for( auto& par : _parameterList_ ){
@@ -636,7 +636,7 @@ nlohmann::json ParameterSet::exportInjectorConfig() const{
 
   return out;
 }
-void ParameterSet::injectParameterValues(const nlohmann::json& config_){
+void ParameterSet::injectParameterValues(const JsonType& config_){
   LogWarning << "Importing parameters from config for \"" << this->getName() << "\"" << std::endl;
 
   auto config = ConfigUtils::getForwardedConfig(config_);
@@ -646,7 +646,7 @@ void ParameterSet::injectParameterValues(const nlohmann::json& config_){
               "Mismatching between parSet name (" << this->getName() << ") and injector config ("
               << GenericToolbox::Json::fetchValue<std::string>(config, "name") << ")" );
 
-  auto parValues = GenericToolbox::Json::fetchValue( config, "parameterValues", nlohmann::json() );
+  auto parValues = GenericToolbox::Json::fetchValue( config, "parameterValues", JsonType() );
   if     ( parValues.empty() ) {
     LogThrow( "No parameterValues provided." );
   }
@@ -940,7 +940,7 @@ void ParameterSet::defineParameters(){
       else {
         // No covariance provided, so find the name based on the order in
         // the parameter set.
-        auto configVector = _parameterDefinitionConfig_.get<std::vector<nlohmann::json>>();
+        auto configVector = _parameterDefinitionConfig_.get<std::vector<JsonType>>();
         LogThrowIf(configVector.size() <= par.getParameterIndex());
         auto parConfig = configVector.at(par.getParameterIndex());
         auto parName = GenericToolbox::Json::fetchValue<std::string>(parConfig, {{"name"}, {"parameterName"}});

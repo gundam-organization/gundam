@@ -19,7 +19,7 @@ class EventVarTransform : public JsonBaseClass {
 
 public:
   EventVarTransform() = default;
-  explicit EventVarTransform(const nlohmann::json& config_);
+  explicit EventVarTransform(const JsonType& config_);
 
   void setIndex(int index_){ _index_ = index_; }
   void setUseCache(bool useCache_){ _useCache_ = useCache_; }

@@ -115,9 +115,9 @@ private:
   // Parameters
   bool _writeGeneratedHistograms_{false};
   int _maxLegendLength_{15};
-  nlohmann::json _varDictionary_;
-  nlohmann::json _canvasParameters_;
-  nlohmann::json _histogramsDefinition_;
+  JsonType _varDictionary_;
+  JsonType _canvasParameters_;
+  JsonType _histogramsDefinition_;
   std::vector<Color_t> defaultColorWheel {
       kGreen-3, kTeal+3, kAzure+7,
       kCyan-2, kBlue-7, kBlue+2,

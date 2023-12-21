@@ -62,10 +62,10 @@ public:
   [[nodiscard]] double getPenaltyChi2Buffer() const{ return _penaltyChi2Buffer_; }
   [[nodiscard]] size_t getNbParameters() const{ return _parameterList_.size(); }
   [[nodiscard]] const std::string &getName() const{ return _name_; }
-  [[nodiscard]] const nlohmann::json &getDialSetDefinitions() const{ return _dialSetDefinitions_; }
+  [[nodiscard]] const JsonType &getDialSetDefinitions() const{ return _dialSetDefinitions_; }
   [[nodiscard]] const TMatrixD* getInvertedEigenVectors() const{ return _eigenVectorsInv_.get(); }
   [[nodiscard]] const TMatrixD* getEigenVectors() const{ return _eigenVectors_.get(); }
-  [[nodiscard]] const std::vector<nlohmann::json>& getCustomFitParThrow() const{ return _customFitParThrow_; }
+  [[nodiscard]] const std::vector<JsonType>& getCustomFitParThrow() const{ return _customFitParThrow_; }
   [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCorrelationMatrix() const{ return _priorCorrelationMatrix_; }
   [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const { return _priorCovarianceMatrix_; }
   [[nodiscard]] const std::vector<Parameter> &getParameterList() const{ return _parameterList_; }
@@ -88,8 +88,8 @@ public:
 
   // Misc
   [[nodiscard]] std::string getSummary() const;
-  [[nodiscard]] nlohmann::json exportInjectorConfig() const;
-  void injectParameterValues(const nlohmann::json& config_);
+  [[nodiscard]] JsonType exportInjectorConfig() const;
+  void injectParameterValues(const JsonType& config_);
   Parameter* getParameterPtr(const std::string& parName_);
   Parameter* getParameterPtrWithTitle(const std::string& parTitle_);
 
@@ -118,8 +118,8 @@ private:
   std::string _parameterLowerBoundsTVectorD_{};
   std::string _parameterUpperBoundsTVectorD_{};
   std::string _throwEnabledListPath_{};
-  nlohmann::json _parameterDefinitionConfig_{};
-  nlohmann::json _dialSetDefinitions_{};
+  JsonType _parameterDefinitionConfig_{};
+  JsonType _dialSetDefinitions_{};
   bool _isEnabled_{};
   bool _useMarkGenerator_{false};
   bool _useEigenDecompForThrows_{false};
@@ -140,9 +140,9 @@ private:
 
   double _penaltyChi2Buffer_{std::nan("unset")};
 
-  std::vector<nlohmann::json> _enableOnlyParameters_{};
-  std::vector<nlohmann::json> _disableParameters_{};
-  std::vector<nlohmann::json> _customFitParThrow_{};
+  std::vector<JsonType> _enableOnlyParameters_{};
+  std::vector<JsonType> _disableParameters_{};
+  std::vector<JsonType> _customFitParThrow_{};
 
   // Eigen objects
   int _nbEnabledEigen_{0};

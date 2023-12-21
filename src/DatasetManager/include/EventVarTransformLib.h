@@ -11,7 +11,7 @@ class EventVarTransformLib : public EventVarTransform {
 
 public:
   EventVarTransformLib() = default;
-  explicit EventVarTransformLib(const nlohmann::json& config_){ this->readConfig(config_); }
+  explicit EventVarTransformLib(const JsonType& config_){ this->readConfig(config_); }
 
   void reload();
 

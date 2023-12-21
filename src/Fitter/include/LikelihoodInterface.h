@@ -232,7 +232,7 @@ private:
   bool _monitorGradientDescent_{false};
   int _lastGradientFall_{-2};
   struct GradientStepPoint {
-    nlohmann::json parState;
+    JsonType parState;
     double llh;
   };
   std::vector<GradientStepPoint> _gradientMonitor_{};

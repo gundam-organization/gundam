@@ -26,13 +26,13 @@ LoggerInit([]{
 
 namespace ConfigUtils {
 
-  nlohmann::json readConfigFile(const std::string& configFilePath_){
+  JsonType readConfigFile(const std::string& configFilePath_){
     if( not GenericToolbox::doesPathIsFile(configFilePath_) ){
       LogError << "\"" << configFilePath_ << "\" could not be found." << std::endl;
       throw std::runtime_error("file not found.");
     }
 
-    nlohmann::json output;
+    JsonType output;
 
     if( GenericToolbox::doesFilePathHasExtension(configFilePath_, "yml")
         or GenericToolbox::doesFilePathHasExtension(configFilePath_,"yaml")
@@ -46,11 +46,11 @@ namespace ConfigUtils {
     return output;
   }
 
-  nlohmann::json convertYamlToJson(const std::string& configFilePath_){
+  JsonType convertYamlToJson(const std::string& configFilePath_){
     return ConfigUtils::convertYamlToJson(GenericToolbox::Yaml::readConfigFile(configFilePath_));
   }
-  nlohmann::json convertYamlToJson(const YAML::Node& yaml){
-    nlohmann::json output = nlohmann::json::parse(GenericToolbox::Yaml::toJsonString(yaml));
+  JsonType convertYamlToJson(const YAML::Node& yaml){
+    JsonType output = JsonType::parse(GenericToolbox::Yaml::toJsonString(yaml));
 
     auto is_number = [](const std::string& s){
       return !s.empty() && std::find_if(s.begin(),
@@ -63,8 +63,8 @@ namespace ConfigUtils {
       return !i.fail() && i.eof();
     };
 
-    std::function<void(nlohmann::json&)> recursiveFix;
-    recursiveFix = [&recursiveFix, is_number, is_numeric](nlohmann::json& jsonEntry_){
+    std::function<void(JsonType&)> recursiveFix;
+    recursiveFix = [&recursiveFix, is_number, is_numeric](JsonType& jsonEntry_){
 
       if( jsonEntry_.is_null() ){
         return;
@@ -97,17 +97,17 @@ namespace ConfigUtils {
     return output;
   }
 
-  nlohmann::json getForwardedConfig(const nlohmann::json& config_){
-    nlohmann::json out = config_;
+  JsonType getForwardedConfig(const JsonType& config_){
+    JsonType out = config_;
     while( out.is_string() ){
       out = ConfigUtils::readConfigFile(out.get<std::string>());
     }
     return out;
   }
-  nlohmann::json getForwardedConfig(const nlohmann::json& config_, const std::string& keyName_){
-    return ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue<nlohmann::json>(config_, keyName_));
+  JsonType getForwardedConfig(const JsonType& config_, const std::string& keyName_){
+    return ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue<JsonType>(config_, keyName_));
   }
-  void forwardConfig(nlohmann::json& config_, const std::string& className_){
+  void forwardConfig(JsonType& config_, const std::string& className_){
     while( config_.is_string() ){
 //      LogDebug << "Forwarding " << (className_.empty()? "": className_ + " ") << "config: \"" << config_.get<std::string>() << "\"" << std::endl;
       auto name = config_.get<std::string>();
@@ -115,9 +115,9 @@ namespace ConfigUtils {
       config_ = ConfigUtils::readConfigFile(expand);
     }
   }
-  void unfoldConfig(nlohmann::json& config_){
+  void unfoldConfig(JsonType& config_){
 
-    std::function<void(nlohmann::json&)> unfoldRecursive = [&](nlohmann::json& outEntry_){
+    std::function<void(JsonType&)> unfoldRecursive = [&](JsonType& outEntry_){
       for( auto& entry : config_ ){
         if( entry.is_string() and (
                GenericToolbox::doesStringEndsWithSubstring(entry.get<std::string>(), ".yaml", true)
@@ -135,7 +135,7 @@ namespace ConfigUtils {
 
   }
 
-  void applyOverrides(nlohmann::json& outConfig_, const nlohmann::json& overrideConfig_){
+  void applyOverrides(JsonType& outConfig_, const JsonType& overrideConfig_){
 
     // dev options
     bool debug{false};
@@ -145,8 +145,8 @@ namespace ConfigUtils {
     std::vector<std::string> listOfIdentifiers{{"name"}, {"__INDEX__"}};
 
     std::vector<std::string> jsonPath{};
-    std::function<void(nlohmann::json&, const nlohmann::json&)> overrideRecursive =
-        [&](nlohmann::json& outEntry_, const nlohmann::json& overrideEntry_){
+    std::function<void(JsonType&, const JsonType&)> overrideRecursive =
+        [&](JsonType& outEntry_, const JsonType& overrideEntry_){
       LogDebug(debug) << GET_VAR_NAME_VALUE(GenericToolbox::joinPath( jsonPath )) << std::endl;
 
       if( overrideEntry_.is_array() ){
@@ -184,7 +184,7 @@ namespace ConfigUtils {
             // will i
             LogDebug(debug) << "Will identify override list item with key \"" << identifier << "\" = " << overrideListEntry.value()[identifier] << std::endl;
 
-            nlohmann::json* outListEntryMatch{nullptr};
+            JsonType* outListEntryMatch{nullptr};
 
             if( identifier == "__INDEX__" ){
               if     ( overrideListEntry.value()[identifier].get<int>() == -1 ){
@@ -321,21 +321,21 @@ namespace ConfigUtils {
       ConfigUtils::unfoldConfig( config );
     }
   }
-  ConfigHandler::ConfigHandler(nlohmann::json config_) : config(std::move(config_)) {}
+  ConfigHandler::ConfigHandler(JsonType config_) : config(std::move(config_)) {}
 
   std::string ConfigHandler::toString() const{
     return GenericToolbox::Json::toReadableString( config );
   }
-  const nlohmann::json &ConfigHandler::getConfig() const {
+  const JsonType &ConfigHandler::getConfig() const {
     return config;
   }
 
-  nlohmann::json &ConfigHandler::getConfig(){
+  JsonType &ConfigHandler::getConfig(){
     return config;
   }
 
 
-  void ConfigHandler::override( const nlohmann::json& overrideConfig_ ){
+  void ConfigHandler::override( const JsonType& overrideConfig_ ){
     ConfigUtils::applyOverrides(config, overrideConfig_);
   }
   void ConfigHandler::override( const std::string& filePath_ ){
@@ -366,11 +366,11 @@ namespace ConfigUtils {
     std::vector<std::string> split = GenericToolbox::splitString( flattenEntry_,"=" );
     LogWarning << "Override " << split[0] << " with " << split[1]
                << std::endl;
-    nlohmann::json flat = config.flatten();
+    JsonType flat = config.flatten();
     LogWarning << "    Original value: " << flat.at(split[0])
                << std::endl;
     if (flat.at(split[0]).is_string()) flat.at(split[0]) = split[1];
-    else flat.at(split[0]) = nlohmann::json::parse(split[1]);
+    else flat.at(split[0]) = JsonType::parse(split[1]);
     LogWarning << "         New value: " << flat.at(split[0])
                << std::endl;
     config = flat.unflatten();

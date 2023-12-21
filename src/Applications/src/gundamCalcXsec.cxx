@@ -84,7 +84,7 @@ int main(int argc, char** argv){
   // Reading fitter file
   std::string fitterFile{clParser.getOptionVal<std::string>("fitterFile")};
   std::unique_ptr<TFile> fitterRootFile{nullptr};
-  nlohmann::json fitterConfig; // will be used to load the propagator
+  JsonType fitterConfig; // will be used to load the propagator
 
   if( GenericToolbox::doesFilePathHasExtension(fitterFile, "root") ){
     LogWarning << "Opening fitter output file: " << fitterFile << std::endl;
@@ -123,13 +123,13 @@ int main(int argc, char** argv){
   );
 
   // Defining signal samples
-  nlohmann::json xsecConfig{ ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ) };
+  JsonType xsecConfig{ ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ) };
   cHandler.override( xsecConfig );
   LogInfo << "Override done." << std::endl;
 
 
   LogInfo << "Fetching propagator config into fitter config..." << std::endl;
-  auto configPropagator = GenericToolbox::Json::fetchValuePath<nlohmann::json>( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig" );
+  auto configPropagator = GenericToolbox::Json::fetchValuePath<JsonType>( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig" );
 
   // Create a propagator object
   Propagator propagator;
@@ -269,7 +269,7 @@ int main(int argc, char** argv){
   LogInfo << "Creating normalizer objects..." << std::endl;
   // flux renorm with toys
   struct ParSetNormaliser{
-    void readConfig(const nlohmann::json& config_){
+    void readConfig(const JsonType& config_){
       LogScopeIndent;
 
       name = GenericToolbox::Json::fetchValue<std::string>(config_, "name");
@@ -281,7 +281,7 @@ int main(int argc, char** argv){
       axisVariable = GenericToolbox::Json::fetchValue<std::string>(config_, "axisVariable");
 
       // optionals
-      for( auto& parSelConfig : GenericToolbox::Json::fetchValue<nlohmann::json>(config_, "parSelections") ){
+      for( auto& parSelConfig : GenericToolbox::Json::fetchValue<JsonType>(config_, "parSelections") ){
         parSelections.emplace_back();
         parSelections.back().first = GenericToolbox::Json::fetchValue<std::string>(parSelConfig, "name");
         parSelections.back().second = GenericToolbox::Json::fetchValue<double>(parSelConfig, "value");
@@ -373,7 +373,7 @@ int main(int argc, char** argv){
   std::vector<ParSetNormaliser> parSetNormList;
   for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
     if( GenericToolbox::Json::doKeyExist(parSet.getConfig(), "normalisations") ){
-      for( auto& parSetNormConfig : GenericToolbox::Json::fetchValue<nlohmann::json>(parSet.getConfig(), "normalisations") ){
+      for( auto& parSetNormConfig : GenericToolbox::Json::fetchValue<JsonType>(parSet.getConfig(), "normalisations") ){
         parSetNormList.emplace_back();
         parSetNormList.back().readConfig( parSetNormConfig );
 
@@ -393,7 +393,7 @@ int main(int argc, char** argv){
 
   // to be filled up
   struct BinNormaliser{
-    void readConfig(const nlohmann::json& config_){
+    void readConfig(const JsonType& config_){
       LogScopeIndent;
 
       name = GenericToolbox::Json::fetchValue<std::string>(config_, "name");
@@ -435,7 +435,7 @@ int main(int argc, char** argv){
 
   struct CrossSectionData{
     Sample* samplePtr{nullptr};
-    nlohmann::json config{};
+    JsonType config{};
     GenericToolbox::RawDataArray branchBinsData{};
 
     TH1D histogram{};
@@ -473,7 +473,7 @@ int main(int argc, char** argv){
         GenericToolbox::joinVectorString(leafNameList, ":").c_str()
     );
 
-    auto normConfigList = GenericToolbox::Json::fetchValue( xsecEntry.config, "normaliseParameterList", nlohmann::json() );
+    auto normConfigList = GenericToolbox::Json::fetchValue( xsecEntry.config, "normaliseParameterList", JsonType() );
     xsecEntry.normList.reserve( normConfigList.size() );
     for( auto& normConfig : normConfigList ){
       xsecEntry.normList.emplace_back();
@@ -508,7 +508,7 @@ int main(int argc, char** argv){
 
   bool enableEventMcThrow{true};
   bool enableStatThrowInToys{true};
-  auto xsecCalcConfig   = GenericToolbox::Json::fetchValue( cHandler.getConfig(), "xsecCalcConfig", nlohmann::json() );
+  auto xsecCalcConfig   = GenericToolbox::Json::fetchValue( cHandler.getConfig(), "xsecCalcConfig", JsonType() );
   enableStatThrowInToys = GenericToolbox::Json::fetchValue( xsecCalcConfig, "enableStatThrowInToys", enableStatThrowInToys);
   enableEventMcThrow    = GenericToolbox::Json::fetchValue( xsecCalcConfig, "enableEventMcThrow", enableEventMcThrow);
 

@@ -86,7 +86,7 @@ int main(int argc, char** argv) {
   LogInfo << "Now copying input src files..." << std::endl;
   std::string pathBuffer;
   std::vector<std::string> recursivePathBufferList;
-  std::function<void(nlohmann::json&)> recursive = [&](nlohmann::json& config_){
+  std::function<void(JsonType&)> recursive = [&](JsonType& config_){
 
     if( config_.is_string() ){
       std::string srcPath = GenericToolbox::expandEnvironmentVariables(config_.get<std::string>());
