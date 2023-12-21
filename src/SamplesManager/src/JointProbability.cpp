@@ -59,6 +59,7 @@ namespace JointProbability{
     usePoissonLikelihood = GenericToolbox::Json::fetchValue(_config_, "usePoissonLikelihood", usePoissonLikelihood);
     BBNoUpdateWeights = GenericToolbox::Json::fetchValue(_config_, "BBNoUpdateWeights", BBNoUpdateWeights);
     verboseLevel = GenericToolbox::Json::fetchValue(_config_, {{"verboseLevel"}, {"isVerbose"}}, verboseLevel);
+    throwIfInfLlh = GenericToolbox::Json::fetchValue(_config_, "throwIfInfLlh", throwIfInfLlh);
 
     LogInfo << "Using BarlowLLH_BANFF_OA2021 parameters:" << std::endl;
     {
@@ -67,6 +68,7 @@ namespace JointProbability{
       LogInfo << GET_VAR_NAME_VALUE(usePoissonLikelihood) << std::endl;
       LogInfo << GET_VAR_NAME_VALUE(BBNoUpdateWeights) << std::endl;
       LogInfo << GET_VAR_NAME_VALUE(verboseLevel) << std::endl;
+      LogInfo << GET_VAR_NAME_VALUE(throwIfInfLlh) << std::endl;
     }
   }
 
@@ -193,12 +195,10 @@ namespace JointProbability{
       }
       else{
         chisq = std::numeric_limits<double>::infinity();
-        LogErrorIf(verboseLevel) << "Data and predicted value give infinite statistical LLH / "
-           << "Data: " << dataVal << " / MC: " << newmc << std::endl;
       }
     }
 
-    if (not std::isfinite(chisq)) [[unlikely]] {
+    if( not std::isfinite(chisq) and throwIfInfLlh ) [[unlikely]] {
       LogError << "Infinite chi2: " << chisq << std::endl
                << " bin " << bin_
                << GET_VAR_NAME_VALUE(predVal) << std::endl

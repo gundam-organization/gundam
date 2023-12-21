@@ -161,6 +161,9 @@ private:
   /// True as soon as this has been initialized.
   bool _isInitialized_{false};
 
+  // stop the fitter if LLH = +inf
+  bool _throwOnBadLlh_{false};
+
     /// The fitter engion that owns this likelihood.
   FitterEngine* _owner_{nullptr};
 

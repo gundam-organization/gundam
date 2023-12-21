@@ -13,7 +13,6 @@
 #include "GenericToolbox.Json.h"
 
 #include "nlohmann/json.hpp"
-#include "TNamed.h"
 
 #include <string>
 #include <vector>

@@ -7,7 +7,7 @@
 
 #include "EventVarTransform.h"
 
-class EventVarTransformLib : public EventVarTransform{
+class EventVarTransformLib : public EventVarTransform {
 
 public:
   EventVarTransformLib() = default;
@@ -21,7 +21,6 @@ protected:
 
   void loadLibrary();
   void initInputFormulas();
-
 
   double evalTransformation(const PhysicsEvent& event_, std::vector<double>& inputBuffer_) const override;
 

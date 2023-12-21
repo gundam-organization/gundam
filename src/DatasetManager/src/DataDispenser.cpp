@@ -878,14 +878,14 @@ void DataDispenser::fillFunction(int iThread_){
       LogInfo << "EventVarTransformLib used for indexing: "
               << GenericToolbox::iterableToString(
                   varTransformForIndexingList,
-                  [](const EventVarTransformLib* elm_){ return "\"" + elm_->getTitle() + "\"";}, false)
+                  [](const EventVarTransformLib* elm_){ return "\"" + elm_->getName() + "\"";}, false)
               << std::endl;
     }
     if( not varTransformForStorageList.empty() ){
       LogInfo << "EventVarTransformLib used for storage: "
               << GenericToolbox::iterableToString(
                   varTransformForStorageList,
-                  []( const EventVarTransformLib* elm_){ return "\"" + elm_->getTitle() + "\""; }, false)
+                  []( const EventVarTransformLib* elm_){ return "\"" + elm_->getName() + "\""; }, false)
               << std::endl;
     }
   }
@@ -931,7 +931,7 @@ void DataDispenser::fillFunction(int iThread_){
       std::vector<std::string> transformsList;
       for( auto* varTransformForIndexing : varTransformForIndexingList ){
         if( varTransformForIndexing->getOutputVariableName() == var ){
-          transformsList.emplace_back(varTransformForIndexing->getTitle());
+          transformsList.emplace_back(varTransformForIndexing->getName());
         }
       }
       table << GenericToolbox::parseVectorAsString(transformsList) << GenericToolbox::TablePrinter::NextColumn;
