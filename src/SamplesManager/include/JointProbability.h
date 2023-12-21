@@ -96,6 +96,7 @@ namespace JointProbability {
     double eval(const Sample& sample_, int bin_) override;
 
     int verboseLevel{0};
+    bool throwIfInfLlh{false};
     bool allowZeroMcWhenZeroData{true};
     bool usePoissonLikelihood{false};
     bool BBNoUpdateWeights{false}; // OA 2021 bug reimplementation

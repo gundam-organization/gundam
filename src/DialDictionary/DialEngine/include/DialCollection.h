@@ -79,8 +79,8 @@ protected:
 
   bool initializeNormDialsWithParBinning();
   bool initializeDialsWithDefinition();
-  void readGlobals(const nlohmann::json &config_);
-  nlohmann::json fetchDialsDefinition(const nlohmann::json &definitionsList_);
+  void readGlobals(const JsonType &config_);
+  JsonType fetchDialsDefinition(const JsonType &definitionsList_);
 
 private:
   // parameters

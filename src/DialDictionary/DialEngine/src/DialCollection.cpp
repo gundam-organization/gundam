@@ -216,7 +216,7 @@ size_t DialCollection::getNextDialFreeSlot(){
 
 
 // init protected
-void DialCollection::readGlobals(const nlohmann::json &config_) {
+void DialCollection::readGlobals(const JsonType &config_) {
   // globals for the dialSet
   _enableDialsSummary_ = GenericToolbox::Json::fetchValue<bool>(_config_, "printDialsSummary", _enableDialsSummary_);
 
@@ -231,7 +231,7 @@ void DialCollection::readGlobals(const nlohmann::json &config_) {
   } else if (GenericToolbox::Json::doKeyExist(config_, "applyConditions")) {
     std::vector<std::string> conditionsList;
 
-    for (auto &condEntry: GenericToolbox::Json::fetchValue<std::vector<nlohmann::json>>(config_, "applyConditions")) {
+    for (auto &condEntry: GenericToolbox::Json::fetchValue<std::vector<JsonType>>(config_, "applyConditions")) {
       if (condEntry.is_string()) {
         conditionsList.emplace_back(condEntry.get<std::string>());
       } else if (condEntry.is_structured()) {
@@ -375,10 +375,10 @@ bool DialCollection::initializeNormDialsWithParBinning() {
 }
 bool DialCollection::initializeDialsWithDefinition() {
 
-  nlohmann::json dialsDefinition = _config_;
+  JsonType dialsDefinition = _config_;
   if( GenericToolbox::Json::doKeyExist(dialsDefinition, "dialsDefinitions") ) {
     // Fetch the dialSet corresponding to the selected parameter
-    dialsDefinition = this->fetchDialsDefinition(GenericToolbox::Json::fetchValue<nlohmann::json>(_config_, "dialsDefinitions"));
+    dialsDefinition = this->fetchDialsDefinition(GenericToolbox::Json::fetchValue<JsonType>(_config_, "dialsDefinitions"));
   }
 
   if( dialsDefinition.empty() ) {return false;}
@@ -556,7 +556,7 @@ bool DialCollection::initializeDialsWithDefinition() {
 
   return true;
 }
-nlohmann::json DialCollection::fetchDialsDefinition(const nlohmann::json &definitionsList_) {
+JsonType DialCollection::fetchDialsDefinition(const JsonType &definitionsList_) {
   auto* parSetPtr = this->getSupervisedParameterSet();
   LogThrowIf(parSetPtr == nullptr, "Can't fetch dial definition of parameter: par ref not set.");
   auto* par = &parSetPtr->getParameterList()[_supervisedParameterIndex_];

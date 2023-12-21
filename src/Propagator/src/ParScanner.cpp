@@ -35,7 +35,7 @@ void ParScanner::readConfigImpl() {
   _nbPointsLineScan_ = GenericToolbox::Json::fetchValue(_config_, "nbPointsLineScan", _nbPoints_);
   _parameterSigmaRange_ = GenericToolbox::Json::fetchValue(_config_, "parameterSigmaRange", _parameterSigmaRange_);
 
-  _varsConfig_ = GenericToolbox::Json::fetchValue(_config_, "varsConfig", nlohmann::json());
+  _varsConfig_ = GenericToolbox::Json::fetchValue(_config_, "varsConfig", JsonType());
 
 }
 void ParScanner::initializeImpl() {
@@ -249,7 +249,7 @@ void ParScanner::scanFitParameter(Parameter& par_, TDirectory* saveDir_) {
   currentParValue[0] = par_.getParameterValue();
   GenericToolbox::writeInTFile(saveDir_, &currentParValue, ssVal.str());
 }
-void ParScanner::scanSegment(TDirectory *saveDir_, const nlohmann::json &end_, const nlohmann::json &start_, int nSteps_) {
+void ParScanner::scanSegment(TDirectory *saveDir_, const JsonType &end_, const JsonType &start_, int nSteps_) {
   if( nSteps_ == -1 ){ nSteps_ = _nbPointsLineScan_; }
   LogWarning << "Scanning along a segment with " << nSteps_ << " steps." << std::endl;
 

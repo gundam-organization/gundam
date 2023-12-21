@@ -47,11 +47,8 @@ endif()
 target_include_directories( GundamCache PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-target_link_libraries( GundamCache PUBLIC
-    GundamDialDictionary
-    GundamParametersManager
-    GundamSamplesManager
-    ${ROOT_LIBRARIES}
+target_link_libraries( GundamCache
+    PUBLIC GundamDialDictionary GundamParametersManager GundamSamplesManager
 )
 
 #  set_target_properties(GundamCache PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")

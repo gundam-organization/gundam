@@ -25,7 +25,7 @@ void SampleSet::readConfigImpl(){
   LogThrowIf(_config_.empty(), "_config_ is not set." << std::endl);
 
   LogInfo << "Reading samples definition..." << std::endl;
-  auto fitSampleListConfig = GenericToolbox::Json::fetchValue(_config_, "fitSampleList", nlohmann::json());
+  auto fitSampleListConfig = GenericToolbox::Json::fetchValue(_config_, "fitSampleList", JsonType());
   for( const auto& fitSampleConfig: fitSampleListConfig ){
     if( not GenericToolbox::Json::fetchValue(fitSampleConfig, "isEnabled", true) ) continue;
     _fitSampleList_.emplace_back();
@@ -39,7 +39,7 @@ void SampleSet::readConfigImpl(){
   llhMethod = GenericToolbox::Json::fetchValue(_config_, "llhStatFunction", llhMethod);
 
   // new config structure
-  auto configJointProbability = GenericToolbox::Json::fetchValue(_config_, {{"jointProbability"}, {"llhConfig"}}, nlohmann::json());
+  auto configJointProbability = GenericToolbox::Json::fetchValue(_config_, {{"jointProbability"}, {"llhConfig"}}, JsonType());
   llhMethod = GenericToolbox::Json::fetchValue(configJointProbability, "type", llhMethod);
 
   LogInfo << "Using \"" << llhMethod << "\" LLH function." << std::endl;

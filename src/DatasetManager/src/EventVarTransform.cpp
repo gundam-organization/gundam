@@ -15,26 +15,18 @@ LoggerInit([]{
 });
 
 void EventVarTransform::readConfigImpl(){
-  _title_ = GenericToolbox::Json::fetchValue(_config_, "title", _title_);
+  _name_ = GenericToolbox::Json::fetchValue(_config_, {{"name"}, {"title"}}, _name_);
   _messageOnError_ = GenericToolbox::Json::fetchValue(_config_, "messageOnError", _messageOnError_);
   _outputVariableName_ = GenericToolbox::Json::fetchValue(_config_, "outputVariableName", _outputVariableName_);
   _inputFormulaStrList_ = GenericToolbox::Json::fetchValue(_config_, "inputList", _inputFormulaStrList_);
 }
 void EventVarTransform::initializeImpl(){
-  LogInfo << "Loading variable transformation: " << _title_ << std::endl;
+  LogInfo << "Loading variable transformation: " << _name_ << std::endl;
   LogThrowIf(_outputVariableName_.empty(), "output variable name not set.");
 }
 
 
-EventVarTransform::EventVarTransform(const nlohmann::json& config_){ this->readConfig(config_); }
-
-void EventVarTransform::setIndex(int index_){ _index_ = index_; }
-void EventVarTransform::setUseCache(bool useCache_) { _useCache_ = useCache_; }
-
-int EventVarTransform::getIndex() const { return _index_; }
-bool EventVarTransform::useCache() const { return _useCache_; }
-const std::string &EventVarTransform::getTitle() const { return _title_; }
-const std::string &EventVarTransform::getOutputVariableName() const { return _outputVariableName_; }
+EventVarTransform::EventVarTransform(const JsonType& config_){ this->readConfig(config_); }
 
 const std::vector<std::string>& EventVarTransform::fetchRequestedVars() const {
   if( _requestedLeavesForEvalCache_.empty() ){

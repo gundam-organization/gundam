@@ -249,7 +249,7 @@ void DataBinSet::readBinningConfig(){
 
   auto conf = ConfigUtils::ConfigHandler( _filePath_ ).getConfig();
 
-  for( auto& binDef : GenericToolbox::Json::fetchValue(conf, "binList", nlohmann::json()) ){
+  for( auto& binDef : GenericToolbox::Json::fetchValue(conf, "binList", JsonType()) ){
     _binList_.emplace_back( _binList_.size() );
     _binList_.back().readConfig( binDef );
   }

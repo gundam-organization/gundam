@@ -49,7 +49,7 @@ void Parameter::readConfigImpl(){
     }
 
     if( GenericToolbox::Json::doKeyExist(_parameterConfig_, "physicalLimits") ){
-        auto physLimits = GenericToolbox::Json::fetchValue(_parameterConfig_, "physicalLimits", nlohmann::json());
+        auto physLimits = GenericToolbox::Json::fetchValue(_parameterConfig_, "physicalLimits", JsonType());
         _minPhysical_ = GenericToolbox::Json::fetchValue(physLimits, "minValue", std::nan("UNSET"));
         _maxPhysical_ = GenericToolbox::Json::fetchValue(physLimits, "maxValue", std::nan("UNSET"));
     }
@@ -93,15 +93,15 @@ void Parameter::setParameterValue(double parameterValue) {
   }
   else{ _gotUpdated_ = false; }
 }
-void Parameter::setDialSetConfig(const nlohmann::json &jsonConfig_) {
+void Parameter::setDialSetConfig(const JsonType &jsonConfig_) {
   auto jsonConfig = jsonConfig_;
   while( jsonConfig.is_string() ){
     LogWarning << "Forwarding FitParameterSet config to: \"" << jsonConfig.get<std::string>() << "\"..." << std::endl;
     jsonConfig = ConfigUtils::readConfigFile(jsonConfig.get<std::string>());
   }
-  _dialDefinitionsList_ = jsonConfig.get<std::vector<nlohmann::json>>();
+  _dialDefinitionsList_ = jsonConfig.get<std::vector<JsonType>>();
 }
-void Parameter::setParameterDefinitionConfig(const nlohmann::json &config_){
+void Parameter::setParameterDefinitionConfig(const JsonType &config_){
   _parameterConfig_ = config_;
   ConfigUtils::forwardConfig(_parameterConfig_);
 }

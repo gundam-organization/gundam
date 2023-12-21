@@ -42,7 +42,7 @@ void DataDispenser::readConfigImpl(){
   if( GenericToolbox::Json::doKeyExist( _config_, "fromHistContent" ) ) {
     LogWarning << "Dataset \"" << _parameters_.name << "\" will be defined with histogram data." << std::endl;
 
-    _parameters_.fromHistContent = GenericToolbox::Json::fetchValue<nlohmann::json>( _config_, "fromHistContent" );
+    _parameters_.fromHistContent = GenericToolbox::Json::fetchValue<JsonType>( _config_, "fromHistContent" );
     ConfigUtils::forwardConfig( _parameters_.fromHistContent );
     return;
   }
@@ -60,7 +60,7 @@ void DataDispenser::readConfigImpl(){
   _parameters_.debugNbMaxEventsToLoad = GenericToolbox::Json::fetchValue(_config_, "debugNbMaxEventsToLoad", _parameters_.debugNbMaxEventsToLoad);
 
   _parameters_.variableDict.clear();
-  for( auto& entry : GenericToolbox::Json::fetchValue(_config_, {{"variableDict"}, {"overrideLeafDict"}}, nlohmann::json()) ){
+  for( auto& entry : GenericToolbox::Json::fetchValue(_config_, {{"variableDict"}, {"overrideLeafDict"}}, JsonType()) ){
     auto varName = GenericToolbox::Json::fetchValue<std::string>(entry, {{"name"}, {"eventVar"}});
     auto varExpr = GenericToolbox::Json::fetchValue<std::string>(entry, {{"expr"}, {"expression"}, {"leafVar"}});
     _parameters_.variableDict[ varName ] = varExpr;
@@ -174,7 +174,7 @@ void DataDispenser::parseStringParameters() {
   if( GenericToolbox::Json::doKeyExist(_config_, "variablesTransform") ){
     // load transformations
     int index{0};
-    for( auto& varTransform : GenericToolbox::Json::fetchValue<std::vector<nlohmann::json>>(_config_, "variablesTransform") ){
+    for( auto& varTransform : GenericToolbox::Json::fetchValue<std::vector<JsonType>>(_config_, "variablesTransform") ){
       _cache_.eventVarTransformList.emplace_back( varTransform );
       _cache_.eventVarTransformList.back().setIndex(index++);
       _cache_.eventVarTransformList.back().initialize();
@@ -599,7 +599,7 @@ void DataDispenser::loadFromHistContent(){
   LogThrowIf(fHist == nullptr, "Could not open file: " << filePath);
 
   LogThrowIf( not GenericToolbox::Json::doKeyExist(_parameters_.fromHistContent, "sampleList"), "Could not find samplesList." );
-  auto sampleList = GenericToolbox::Json::fetchValue<nlohmann::json>(_parameters_.fromHistContent, "sampleList");
+  auto sampleList = GenericToolbox::Json::fetchValue<JsonType>(_parameters_.fromHistContent, "sampleList");
   for( auto& sample : _cache_.samplesToFillList ){
     LogScopeIndent;
 
@@ -878,14 +878,14 @@ void DataDispenser::fillFunction(int iThread_){
       LogInfo << "EventVarTransformLib used for indexing: "
               << GenericToolbox::iterableToString(
                   varTransformForIndexingList,
-                  [](const EventVarTransformLib* elm_){ return "\"" + elm_->getTitle() + "\"";}, false)
+                  [](const EventVarTransformLib* elm_){ return "\"" + elm_->getName() + "\"";}, false)
               << std::endl;
     }
     if( not varTransformForStorageList.empty() ){
       LogInfo << "EventVarTransformLib used for storage: "
               << GenericToolbox::iterableToString(
                   varTransformForStorageList,
-                  []( const EventVarTransformLib* elm_){ return "\"" + elm_->getTitle() + "\""; }, false)
+                  []( const EventVarTransformLib* elm_){ return "\"" + elm_->getName() + "\""; }, false)
               << std::endl;
     }
   }
@@ -931,7 +931,7 @@ void DataDispenser::fillFunction(int iThread_){
       std::vector<std::string> transformsList;
       for( auto* varTransformForIndexing : varTransformForIndexingList ){
         if( varTransformForIndexing->getOutputVariableName() == var ){
-          transformsList.emplace_back(varTransformForIndexing->getTitle());
+          transformsList.emplace_back(varTransformForIndexing->getName());
         }
       }
       table << GenericToolbox::parseVectorAsString(transformsList) << GenericToolbox::TablePrinter::NextColumn;

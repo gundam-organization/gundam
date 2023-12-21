@@ -15,10 +15,10 @@ endif()
 target_include_directories(GundamFitter PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-target_link_libraries( GundamFitter PUBLIC
-        GundamPropagator
-        ${ROOT_LIBRARIES}
-        )
+target_link_libraries(
+    GundamFitter
+    PUBLIC GundamPropagator
+)
 
 #set_target_properties( GundamFitter PROPERTIES VERSION "${GUNDAM_VERSION_STRING}" )
 

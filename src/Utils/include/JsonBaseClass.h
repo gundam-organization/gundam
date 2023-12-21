@@ -5,16 +5,19 @@
 #ifndef GUNDAM_JSONBASECLASS_H
 #define GUNDAM_JSONBASECLASS_H
 
+#include "ConfigUtils.h"
+
 #include "GenericToolbox.ConfigBaseClass.h"
 
 #include "nlohmann/json.hpp"
 
-class JsonBaseClass : public GenericToolbox::ConfigBaseClass<nlohmann::json> {
+
+class JsonBaseClass : public GenericToolbox::ConfigBaseClass<JsonType> {
 
 public:
   JsonBaseClass() = default;
 
-  void setConfig(const nlohmann::json& config_) override;
+  void setConfig(const JsonType& config_) override;
 
 
 };

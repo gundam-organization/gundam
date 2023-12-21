@@ -18,7 +18,7 @@ void EventVarTransformLib::readConfigImpl(){
   _libraryFile_ = GenericToolbox::Json::fetchValue(_config_, "libraryFile", _libraryFile_);
 }
 void EventVarTransformLib::initializeImpl(){
-  LogInfo << "Loading variable transformation: " << _title_ << std::endl;
+  LogInfo << "Loading variable transformation: " << _name_ << std::endl;
   LogThrowIf(_outputVariableName_.empty(), "output variable name not set.");
 
   this->reload();

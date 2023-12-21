@@ -325,7 +325,7 @@ double LikelihoodInterface::evalFit(const double* parArray_){
     _chi2HistoryTree_->Fill();
   }
 
-  if( std::isnan(_owner_->getPropagator().getLlhBuffer()) ){
+  if( std::isnan(_owner_->getPropagator().getLlhBuffer()) and _throwOnBadLlh_ ){
     LogError << _owner_->getPropagator().getLlhBuffer() << ": invalid reported likelihood value." << std::endl;
     LogError << GET_VAR_NAME_VALUE( _owner_->getPropagator().getLlhStatBuffer() ) << std::endl;
     for( auto& sample : _owner_->getPropagator().getFitSampleSet().getFitSampleList() ){

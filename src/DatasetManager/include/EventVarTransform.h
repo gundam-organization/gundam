@@ -19,15 +19,15 @@ class EventVarTransform : public JsonBaseClass {
 
 public:
   EventVarTransform() = default;
-  explicit EventVarTransform(const nlohmann::json& config_);
+  explicit EventVarTransform(const JsonType& config_);
 
-  void setIndex(int index_);
-  void setUseCache(bool useCache_);
+  void setIndex(int index_){ _index_ = index_; }
+  void setUseCache(bool useCache_){ _useCache_ = useCache_; }
 
-  int getIndex() const;
-  bool useCache() const;
-  const std::string &getTitle() const;
-  const std::string &getOutputVariableName() const;
+  int getIndex() const { return _index_; }
+  bool useCache() const { return _useCache_; }
+  const std::string &getName() const { return _name_; }
+  const std::string &getOutputVariableName() const { return _outputVariableName_; }
   const std::vector<std::string>& fetchRequestedVars() const;
 
   double eval(const PhysicsEvent& event_);
@@ -44,7 +44,7 @@ protected:
   virtual double evalTransformation(const PhysicsEvent& event_, std::vector<double>& inputBuffer_) const;
 
   // config
-  std::string _title_;
+  std::string _name_;
   std::string _messageOnError_;
   std::string _outputVariableName_;
   std::vector<std::string> _inputFormulaStrList_;

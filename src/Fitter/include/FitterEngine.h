@@ -44,8 +44,8 @@ public:
   void setThrowGain(double throwGain_){ _throwGain_ = throwGain_; }
 
   // Getters (const)
-  const nlohmann::json &getPreFitParState() const{ return _preFitParState_; }
-  const nlohmann::json &getPostFitParState() const{ return _postFitParState_; }
+  const JsonType &getPreFitParState() const{ return _preFitParState_; }
+  const JsonType &getPostFitParState() const{ return _postFitParState_; }
   [[nodiscard]] const Propagator& getPropagator() const{ return _propagator_; }
   [[nodiscard]] const MinimizerBase& getMinimizer() const{ return *_minimizer_; }
   [[nodiscard]] const LikelihoodInterface& getLikelihood() const{ return _likelihood_; }
@@ -98,8 +98,8 @@ private:
   Propagator _propagator_{};
   std::unique_ptr<MinimizerBase> _minimizer_{nullptr};
   LikelihoodInterface _likelihood_{this};
-  nlohmann::json _preFitParState_{};
-  nlohmann::json _postFitParState_{};
+  JsonType _preFitParState_{};
+  JsonType _postFitParState_{};
 
 };
 #endif //GUNDAM_FITTERENGINE_H

@@ -161,6 +161,9 @@ private:
   /// True as soon as this has been initialized.
   bool _isInitialized_{false};
 
+  // stop the fitter if LLH = +inf
+  bool _throwOnBadLlh_{false};
+
     /// The fitter engion that owns this likelihood.
   FitterEngine* _owner_{nullptr};
 
@@ -229,7 +232,7 @@ private:
   bool _monitorGradientDescent_{false};
   int _lastGradientFall_{-2};
   struct GradientStepPoint {
-    nlohmann::json parState;
+    JsonType parState;
     double llh;
   };
   std::vector<GradientStepPoint> _gradientMonitor_{};
