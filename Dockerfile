@@ -2,7 +2,7 @@ FROM rootproject/root as base
 
 SHELL ["/bin/bash", "-c"]
 
-RUN apt-get install -y \
+RUN apt-get install --no-upgrade -y \
     git libyaml-cpp-dev nlohmann-json3-dev
 
 ENV WORK_DIR /home/work
