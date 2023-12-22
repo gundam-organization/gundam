@@ -195,19 +195,11 @@ int main(int argc, char** argv){
     propagator.initialize();
 
     propagator.getParametersManager().getParameterSetsList();
-    for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
-        if( not parSet.isEnabled() ){ continue; }
-        LogInfo <<parSet.getName()<<std::endl;
-        for( auto& par : parSet.getParameterList() ){
-            if( not par.isEnabled() ){ continue; }
-            LogInfo<<par.getTitle()<<" -> "<<par.getParameterValue()<<std::endl;
-            par.setPriorValue( par.getParameterValue() );
-        }
-    }
 
-
-    std::vector<double> parametersBestFit;
-    std::vector<std::string> parameterFullTitles;
+    std::vector<std::string> parameterNames;
+    std::vector<double> bestFitValues;
+    std::vector<double> priorValues;
+    std::vector<double> priorSigmas;
     // Load post-fit parameters as "prior" so we can reset the weight to this point when throwing toys
     // also save the values in a vector so we can use them to compute the LLH at the best fit point
     ObjectReader::readObject<TNamed>( fitterFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
@@ -218,8 +210,11 @@ int main(int argc, char** argv){
             for( auto& par : parSet.getParameterList() ){
                 if( not par.isEnabled() ){ continue; }
 //                LogInfo<<"  "<<par.getTitle()<<" -> "<<par.getParameterValue()<<std::endl;
-                parametersBestFit.push_back( par.getParameterValue() );
-                parameterFullTitles.push_back( par.getFullTitle() );
+                parameterNames.emplace_back(par.getFullTitle());
+                bestFitValues.emplace_back(par.getParameterValue());
+                priorValues.emplace_back(par.getPriorValue());
+                priorSigmas.emplace_back(par.getStdDevValue());
+                // set prior to best fit
                 par.setPriorValue(par.getParameterValue());
             }
         }
@@ -263,33 +258,6 @@ int main(int argc, char** argv){
             });
 
 
-//    // Sample binning using parameterSetName
-//    for( auto& sample : propagator.getFitSampleSet().getFitSampleList() ){
-//        auto associatedParSet = GenericToolbox::Json::fetchValue<std::string>(sample.getConfig(), "parameterSetName");
-//
-//        // Looking for parSet
-//        auto foundDialCollection = std::find_if(
-//                propagator.getDialCollections().begin(), propagator.getDialCollections().end(),
-//                [&](const DialCollection& dialCollection_){
-//                    auto* parSetPtr{dialCollection_.getSupervisedParameterSet()};
-//                    if( parSetPtr == nullptr ){ return false; }
-//                    return ( parSetPtr->getName() == associatedParSet );
-//                });
-//        LogThrowIf(
-//                foundDialCollection == propagator.getDialCollections().end(),
-//                "Could not find " << associatedParSet << " among fit dial collections: "
-//                                  << GenericToolbox::iterableToString(propagator.getDialCollections(), [](const DialCollection& dialCollection_){
-//                                                                          return dialCollection_.getTitle();
-//                                                                      }
-//                                  ));
-//
-//        LogThrowIf(foundDialCollection->getDialBinSet().isEmpty(), "Could not find binning");
-//        sample.setBinningFilePath( foundDialCollection->getDialBinSet().getFilePath() );
-//    }
-
-
-
-
 
     app.setCmdLinePtr( &clParser );
     app.setConfigString( ConfigUtils::ConfigHandler{margConfig}.toString() );
@@ -311,12 +279,15 @@ int main(int argc, char** argv){
         parState_->SetName("postFitParameters_TNamed");
         parState_->Write();
     });
-    int nParameters = parametersBestFit.size();
-    TVectorD bestFitParameters (nParameters, parametersBestFit.data());
-    bestFitParameters.Write("bestFitParameters_TVectorD");
-    app.getOutfilePtr()->WriteObject(&parameterFullTitles, "parameterFullTitles");
+    unsigned int nParameters = parameterNames.size();
+    TVectorD bestFitParameters_TVectorD(nParameters,bestFitValues.data());
+    TVectorD priorParameters_TVectorD(nParameters,priorValues.data());
+    TVectorD priorSigmas_TVectorD(nParameters,priorSigmas.data());
+    app.getOutfilePtr()->WriteObject(&parameterNames, "parameterFullTitles");
+    app.getOutfilePtr()->WriteObject(&bestFitParameters_TVectorD, "bestFitParameters_TVectorD");
+    app.getOutfilePtr()->WriteObject(&priorParameters_TVectorD, "priorParameters_TVectorD");
+    app.getOutfilePtr()->WriteObject(&priorSigmas_TVectorD, "priorSigmas_TVectorD");
     app.getOutfilePtr()->cd();
-
 
     auto* marginalisationDir{ GenericToolbox::mkdirTFile(app.getOutfilePtr(), "marginalisation") };
     LogInfo << "Creating throws tree" << std::endl;
