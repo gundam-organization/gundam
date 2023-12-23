@@ -81,7 +81,7 @@ int main(int argc, char** argv) {
   }
 
   LogInfo << "Output files will be written in: " << outFolder << std::endl;
-  GenericToolbox::mkdirPath( outFolder );
+  GenericToolbox::mkdir( outFolder );
 
   LogInfo << "Now copying input src files..." << std::endl;
   std::string pathBuffer;
@@ -90,10 +90,10 @@ int main(int argc, char** argv) {
 
     if( config_.is_string() ){
       std::string srcPath = GenericToolbox::expandEnvironmentVariables(config_.get<std::string>());
-      if( GenericToolbox::doesPathIsFile( srcPath ) ){
+      if( GenericToolbox::isFile( srcPath ) ){
 
         double fSize{double( GenericToolbox::getFileSizeInBytes(srcPath) )};
-        LogInfo << "Copying local file and overriding entry: " << GenericToolbox::getFileNameFromFilePath(srcPath)
+        LogInfo << "Copying local file and overriding entry: " << GenericToolbox::getFileName(srcPath)
         << " ( " << GenericToolbox::parseSizeUnits(fSize) << " )" << std::endl;
 
         if( clParser.isOptionTriggered("maxFileSizeInMb") ){
@@ -105,10 +105,10 @@ int main(int argc, char** argv) {
           }
         }
         auto localFolder{GenericToolbox::joinPath(recursivePathBufferList)};
-        auto localPath{GenericToolbox::joinPath(localFolder, GenericToolbox::getFileNameFromFilePath(srcPath))};
+        auto localPath{GenericToolbox::joinPath(localFolder, GenericToolbox::getFileName(srcPath))};
 
-        GenericToolbox::mkdirPath( GenericToolbox::joinPath(outFolder, localFolder) );
-        GenericToolbox::copyFile( srcPath, GenericToolbox::joinPath(outFolder, localPath) );
+        GenericToolbox::mkdir( GenericToolbox::joinPath(outFolder, localFolder) );
+        GenericToolbox::cp( srcPath, GenericToolbox::joinPath(outFolder, localPath) );
 
         config_ = localPath;
       }

@@ -37,7 +37,7 @@ namespace JointProbability{
   }
   void JointProbabilityPlugin::compile(){
     LogInfo << "Compiling: " << llhPluginSrc << std::endl;
-    llhSharedLib = GenericToolbox::replaceFileExtension(llhPluginSrc, "so");
+    llhSharedLib = GenericToolbox::replaceExtension(llhPluginSrc, "so");
 
     // create library
     std::stringstream ss;

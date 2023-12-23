@@ -86,7 +86,7 @@ int main(int argc, char** argv){
   std::unique_ptr<TFile> fitterRootFile{nullptr};
   JsonType fitterConfig; // will be used to load the propagator
 
-  if( GenericToolbox::doesFilePathHasExtension(fitterFile, "root") ){
+  if( GenericToolbox::hasExtension(fitterFile, "root") ){
     LogWarning << "Opening fitter output file: " << fitterFile << std::endl;
     fitterRootFile = std::unique_ptr<TFile>( TFile::Open( fitterFile.c_str() ) );
     LogThrowIf( fitterRootFile == nullptr, "Could not open fitter output file." );

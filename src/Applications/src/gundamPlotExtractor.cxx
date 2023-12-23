@@ -105,7 +105,7 @@ void walkAndUnfoldTDirectory(TDirectory* dir_, const std::string &saveFolderPath
 //        std::cin >> WhileBool;
 //      }
 
-      GenericToolbox::mkdirPath(saveFolderPath_);
+      GenericToolbox::mkdir(saveFolderPath_);
       nPlots++;
       for( auto& ext : outExtensions ){
         std::string outPath =
@@ -116,7 +116,7 @@ void walkAndUnfoldTDirectory(TDirectory* dir_, const std::string &saveFolderPath
             );
 
         LogWarning << outPath << std::endl;
-        if( GenericToolbox::doesPathIsFile(outPath) ){
+        if( GenericToolbox::isFile(outPath) ){
           std::remove(outPath.c_str());
         }
 

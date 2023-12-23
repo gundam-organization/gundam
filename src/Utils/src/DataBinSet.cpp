@@ -24,15 +24,15 @@ void DataBinSet::setVerbosity(int maxLogLevel_) { Logger::setMaxLogLevel(maxLogL
 void DataBinSet::readBinningDefinition(const std::string &filePath_) {
 
   _filePath_ = GenericToolbox::expandEnvironmentVariables(filePath_);
-  if( not GenericToolbox::doesPathIsFile(_filePath_) ){
+  if( not GenericToolbox::isFile(_filePath_) ){
     LogError << GET_VAR_NAME_VALUE(_filePath_) << ": file not found." << std::endl;
     throw std::runtime_error(GET_VAR_NAME_VALUE(_filePath_) + ": file not found.");
   }
 
-  if( GenericToolbox::doesFilePathHasExtension(_filePath_, "txt") ){ this->readTxtBinningDefinition(); }
-  if( GenericToolbox::doesFilePathHasExtension(_filePath_, "yaml") or
-      GenericToolbox::doesFilePathHasExtension(_filePath_, "json") or
-      GenericToolbox::doesFilePathHasExtension(_filePath_, "yml")
+  if( GenericToolbox::hasExtension(_filePath_, "txt") ){ this->readTxtBinningDefinition(); }
+  if( GenericToolbox::hasExtension(_filePath_, "yaml") or
+      GenericToolbox::hasExtension(_filePath_, "json") or
+      GenericToolbox::hasExtension(_filePath_, "yml")
   ){
     this->readBinningConfig();
   }

@@ -27,15 +27,15 @@ LoggerInit([]{
 namespace ConfigUtils {
 
   JsonType readConfigFile(const std::string& configFilePath_){
-    if( not GenericToolbox::doesPathIsFile(configFilePath_) ){
+    if( not GenericToolbox::isFile(configFilePath_) ){
       LogError << "\"" << configFilePath_ << "\" could not be found." << std::endl;
       throw std::runtime_error("file not found.");
     }
 
     JsonType output;
 
-    if( GenericToolbox::doesFilePathHasExtension(configFilePath_, "yml")
-        or GenericToolbox::doesFilePathHasExtension(configFilePath_,"yaml")
+    if( GenericToolbox::hasExtension(configFilePath_, "yml")
+        or GenericToolbox::hasExtension(configFilePath_,"yaml")
         ){
       output = ConfigUtils::convertYamlToJson(configFilePath_);
     }
@@ -301,7 +301,7 @@ namespace ConfigUtils {
 
   // class impl
   ConfigHandler::ConfigHandler(const std::string& filePath_){
-    if( GenericToolbox::doesFilePathHasExtension( filePath_, "root" ) ){
+    if( GenericToolbox::hasExtension( filePath_, "root" ) ){
       LogInfo << "Extracting config file for fitter file: " << filePath_ << std::endl;
       LogThrowIf( not GenericToolbox::doesTFileIsValid(filePath_), "Invalid root file: " << filePath_ );
       auto fitFile = std::shared_ptr<TFile>( GenericToolbox::openExistingTFile( filePath_ ) );
@@ -340,7 +340,7 @@ namespace ConfigUtils {
   }
   void ConfigHandler::override( const std::string& filePath_ ){
     LogInfo << "Overriding config with \"" << filePath_ << "\"" << std::endl;
-    LogThrowIf(not GenericToolbox::doesPathIsFile(filePath_), "Could not find " << filePath_);
+    LogThrowIf(not GenericToolbox::isFile(filePath_), "Could not find " << filePath_);
 
     LogScopeIndent;
     auto override{ConfigUtils::readConfigFile(filePath_)};
