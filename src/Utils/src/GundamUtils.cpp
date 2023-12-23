@@ -6,7 +6,7 @@
 #include "VersionConfig.h" // the only place it is included
 
 #include "Logger.h"
-#include "GenericToolbox.h"
+#include "GenericToolbox.Root.h"
 
 #include <sstream>
 

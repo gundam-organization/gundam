@@ -6,8 +6,7 @@
 #define GUNDAM_GUNDAMUTILS_H
 
 
-#include "GenericToolbox.h"
-#include "GenericToolbox.Root.h"
+#include "GenericToolbox.String.h"
 #include "CmdLineParser.h"
 #include "Logger.h"
 
