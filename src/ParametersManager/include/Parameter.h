@@ -14,14 +14,14 @@
 #include <vector>
 #include <string>
 
-namespace PriorType{
-  ENUM_EXPANDER(
-    PriorType, -1,
-    Unset,
-    Gaussian,
-    Flat
-  );
-}
+#define MAKE_ENUM \
+  ENUM_NAME(PriorType) \
+  ENUM_ENTRY(Unset, -1) \
+  ENUM_ENTRY(Gaussian) \
+  ENUM_ENTRY(Flat)
+#include "GenericToolbox.MakeEnum.h"
+#undef MAKE_ENUM
+
 
 class ParameterSet;
 
@@ -59,7 +59,7 @@ public:
   void setDialSetConfig(const JsonType &jsonConfig_);
   void setParameterDefinitionConfig(const JsonType &config_);
   void setOwner(const ParameterSet *owner_){ _owner_ = owner_; }
-  void setPriorType(PriorType::PriorType priorType){ _priorType_ = priorType; }
+  void setPriorType(PriorType priorType){ _priorType_ = priorType; }
 
   // Getters
   [[nodiscard]] bool isFree() const{ return _isFree_; }
@@ -82,7 +82,7 @@ public:
   [[nodiscard]] const std::string &getName() const{ return _name_; }
   [[nodiscard]] const JsonType &getDialDefinitionsList() const{ return _dialDefinitionsList_; }
   [[nodiscard]] const ParameterSet *getOwner() const{ return _owner_; }
-  [[nodiscard]] PriorType::PriorType getPriorType() const{ return _priorType_; }
+  [[nodiscard]] PriorType getPriorType() const{ return _priorType_; }
 
   // Core
   void setValueAtPrior();
@@ -119,7 +119,7 @@ private:
 
   // Internals
   const ParameterSet* _owner_{nullptr};
-  PriorType::PriorType _priorType_{PriorType::Gaussian};
+  PriorType _priorType_{PriorType::Gaussian};
 
 };
 

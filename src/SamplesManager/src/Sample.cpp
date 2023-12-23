@@ -22,7 +22,7 @@ LoggerInit([]{
 void Sample::readConfigImpl(){
   _name_ = GenericToolbox::Json::fetchValue(_config_, "name", _name_);
   LogThrowIf(
-      GenericToolbox::doesStringContainsSubstring(_name_, "/"),
+      GenericToolbox::hasSubStr(_name_, "/"),
       "Invalid sample name: \"" << _name_ << "\": should not have '/'.");
 
   LogScopeIndent;

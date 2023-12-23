@@ -55,7 +55,7 @@ int main( int argc, char** argv ){
   outExtensions = clp.getOptionValList<std::string>("output-plot-extensions");
 
   if( outExtensions.empty() ) outExtensions.emplace_back("pdf");
-  LogInfo << "Output plot extensions: " << GenericToolbox::parseVectorAsString(outExtensions) << std::endl;
+  LogInfo << "Output plot extensions: " << GenericToolbox::toString(outExtensions) << std::endl;
 
   auto* rootFile = GenericToolbox::openExistingTFile(rootFilePath);
 

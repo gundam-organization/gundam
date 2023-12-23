@@ -183,7 +183,7 @@ void FitterEngine::initializeImpl(){
       GenericToolbox::writeInTFile( outDir, TNamed( "index", std::to_string( par.getParameterIndex() ).c_str() ) );
       GenericToolbox::writeInTFile( outDir, TNamed( "prior", std::to_string( par.getPriorValue() ).c_str() ) );
       GenericToolbox::writeInTFile( outDir, TNamed( "stdDev", std::to_string( par.getStdDevValue() ).c_str() ) );
-      GenericToolbox::writeInTFile( outDir, TNamed( "priorType", std::to_string( par.getPriorType() ).c_str() ) );
+      GenericToolbox::writeInTFile( outDir, TNamed( "priorType", std::to_string( par.getPriorType().value ).c_str() ) );
       GenericToolbox::writeInTFile( outDir, TNamed( "min", std::to_string( par.getMinValue() ).c_str() ) );
       GenericToolbox::writeInTFile( outDir, TNamed( "max", std::to_string( par.getMaxValue() ).c_str() ) );
     }
@@ -201,7 +201,7 @@ void FitterEngine::initializeImpl(){
         GenericToolbox::writeInTFile( outDir, TNamed( "index", std::to_string( eigen.getParameterIndex() ).c_str() ) );
         GenericToolbox::writeInTFile( outDir, TNamed( "prior", std::to_string( eigen.getPriorValue() ).c_str() ) );
         GenericToolbox::writeInTFile( outDir, TNamed( "stdDev", std::to_string( eigen.getStdDevValue() ).c_str() ) );
-        GenericToolbox::writeInTFile( outDir, TNamed( "priorType", std::to_string( eigen.getPriorType() ).c_str() ) );
+        GenericToolbox::writeInTFile( outDir, TNamed( "priorType", std::to_string( eigen.getPriorType().value ).c_str() ) );
         GenericToolbox::writeInTFile( outDir, TNamed( "min", std::to_string( eigen.getMinValue() ).c_str() ) );
         GenericToolbox::writeInTFile( outDir, TNamed( "max", std::to_string( eigen.getMaxValue() ).c_str() ) );
       }
@@ -595,7 +595,7 @@ void FitterEngine::checkNumericalAccuracy(){
       }
       responses[iThrow] = _propagator_.getLlhBuffer();
     }
-    LogDebug << GenericToolbox::parseVectorAsString(responses) << std::endl;
+    LogDebug << GenericToolbox::toString(responses) << std::endl;
   }
   LogInfo << "OK" << std::endl;
 }

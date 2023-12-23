@@ -120,8 +120,8 @@ namespace ConfigUtils {
     std::function<void(JsonType&)> unfoldRecursive = [&](JsonType& outEntry_){
       for( auto& entry : config_ ){
         if( entry.is_string() and (
-               GenericToolbox::doesStringEndsWithSubstring(entry.get<std::string>(), ".yaml", true)
-            or GenericToolbox::doesStringEndsWithSubstring(entry.get<std::string>(), ".json", true)
+               GenericToolbox::endsWith(entry.get<std::string>(), ".yaml", true)
+            or GenericToolbox::endsWith(entry.get<std::string>(), ".json", true)
         ) ){
           ConfigUtils::forwardConfig( entry );
           ConfigUtils::unfoldConfig( config_ ); // remake the loop on the unfolder config
@@ -383,7 +383,7 @@ namespace ConfigUtils {
   void ConfigHandler::exportToJsonFile(const std::string &filePath_) const {
     auto outPath{filePath_};
 
-    if( not GenericToolbox::doesStringEndsWithSubstring(outPath, ".json") ){
+    if( not GenericToolbox::endsWith(outPath, ".json") ){
       // add extension if missing
       outPath += ".json";
     }

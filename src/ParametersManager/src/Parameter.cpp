@@ -21,7 +21,7 @@ void Parameter::readConfigImpl(){
 
     auto priorTypeStr = GenericToolbox::Json::fetchValue(_parameterConfig_, "priorType", "");
     if( not priorTypeStr.empty() ){
-      _priorType_ = PriorType::PriorTypeEnumNamespace::toEnum(priorTypeStr);
+      _priorType_ = PriorType::toEnum( priorTypeStr );
       if( _priorType_ == PriorType::Flat ){ _isFree_ = true; }
     }
 

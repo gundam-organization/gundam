@@ -175,7 +175,7 @@ int main(int argc, char** argv){
     LogThrowIf(
         foundDialCollection == propagator.getDialCollections().end(),
         "Could not find " << associatedParSet << " among fit dial collections: "
-                          << GenericToolbox::iterableToString(propagator.getDialCollections(), [](const DialCollection& dialCollection_){
+                          << GenericToolbox::toString(propagator.getDialCollections(), [](const DialCollection& dialCollection_){
                                                                 return dialCollection_.getTitle();
                                                               }
                           ));

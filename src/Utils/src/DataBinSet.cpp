@@ -174,7 +174,7 @@ void DataBinSet::readTxtBinningDefinition(){
         if( not expectedVariableList.empty() and lineElements.at(iElement) == expectedVariableList.back() ){
           LogThrowIf(
               expectedVariableIsRangeList.back(),
-              "Same variable appear more than 2 times: " << GenericToolbox::parseVectorAsString(lineElements)
+              "Same variable appear more than 2 times: " << GenericToolbox::toString(lineElements)
           );
           expectedVariableIsRangeList.back() = true;
           nbExpectedValues += 1;
@@ -182,7 +182,7 @@ void DataBinSet::readTxtBinningDefinition(){
         else{
 
           if( GenericToolbox::doesElementIsInVector(lineElements.at(iElement), expectedVariableList) ){
-            LogError << lineElements.at(iElement) << " is already set: " << GenericToolbox::parseVectorAsString(lineElements) << std::endl;
+            LogError << lineElements.at(iElement) << " is already set: " << GenericToolbox::toString(lineElements) << std::endl;
             throw std::runtime_error("Invalid bin definition line.");
           }
 
@@ -211,8 +211,8 @@ void DataBinSet::readTxtBinningDefinition(){
 
       if( int(lineElements.size()) != nbExpectedValues ){
         LogError << "(" << GET_VAR_NAME_VALUE(lineElements.size()) << ") != (" << GET_VAR_NAME_VALUE(lineElements.size()) << ")" << std::endl;
-        LogError << "Expected: " << GenericToolbox::parseVectorAsString(expectedVariableTitleList) << std::endl;
-        LogError << "Got: " << GenericToolbox::parseVectorAsString(lineElements) << std::endl;
+        LogError << "Expected: " << GenericToolbox::toString(expectedVariableTitleList) << std::endl;
+        LogError << "Got: " << GenericToolbox::toString(lineElements) << std::endl;
         throw std::runtime_error("lineElements.size() != nbExpectedValues");
       }
 

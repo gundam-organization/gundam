@@ -167,9 +167,9 @@ int PhysicsEvent::findVarIndex(const std::string& leafName_, bool throwIfNotFoun
   if( throwIfNotFound_ ){
     LogWarning << leafName_ << " not found in:";
     for( auto& leaf : _varHolderList_  ){
-      LogWarning << GenericToolbox::parseVectorAsString(leaf) << std::endl;
+      LogWarning << GenericToolbox::toString(leaf) << std::endl;
     }
-    LogThrow(leafName_ << " not found in: " << GenericToolbox::parseVectorAsString(*_commonVarNameListPtr_));
+    LogThrow(leafName_ << " not found in: " << GenericToolbox::toString(*_commonVarNameListPtr_));
   }
   return -1;
 }
@@ -219,7 +219,7 @@ std::string PhysicsEvent::getSummary() const {
       if(_commonVarNameListPtr_ != nullptr and _commonVarNameListPtr_->size() == _varHolderList_.size()) {
         ss << "  " << _commonVarNameListPtr_->at(iLeaf) << " -> ";
       }
-      ss << GenericToolbox::parseVectorAsString(_varHolderList_[iLeaf]);
+      ss << GenericToolbox::toString(_varHolderList_[iLeaf]);
     }
     ss << std::endl << "}";
   }
