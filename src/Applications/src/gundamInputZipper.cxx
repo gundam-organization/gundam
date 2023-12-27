@@ -92,7 +92,7 @@ int main(int argc, char** argv) {
       std::string srcPath = GenericToolbox::expandEnvironmentVariables(config_.get<std::string>());
       if( GenericToolbox::isFile( srcPath ) ){
 
-        double fSize{double( GenericToolbox::getFileSizeInBytes(srcPath) )};
+        double fSize{double( GenericToolbox::getFileSize( srcPath ) )};
         LogInfo << "Copying local file and overriding entry: " << GenericToolbox::getFileName(srcPath)
         << " ( " << GenericToolbox::parseSizeUnits(fSize) << " )" << std::endl;
 
