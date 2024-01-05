@@ -168,7 +168,7 @@ int main(int argc, char** argv){
     }
     double pedestalEntity = 0;
     bool usePedestal = false;
-    double pedestalLeftEdge = -5, pedestalRightEdge = 5;
+    double pedestalLeftEdge = -3, pedestalRightEdge = -pedestalLeftEdge;
     if(clParser.isOptionTriggered("pedestal")){
         usePedestal = true;
         pedestalEntity = clParser.getOptionVal<double>("pedestal")/100.;
@@ -512,10 +512,9 @@ int main(int argc, char** argv){
             }
         }
 
-        LogInfo<<"LLH: "<<LLH<<"  gLLH: "<<gLLH<<"\tdifference: "<<(-LLH+gLLH)  <<std::endl;
-        if((-LLH+gLLH)/2. > 10){
-            LogInfo<<"WARNING: BIG THROW!!"<<std::endl;
-        }
+           LogInfo<<"LLH: "<<LLH<<" gLLH: "<<gLLH<<std::endl;
+
+
 //        LogDebugIf(gLLH<50)<<gLLH<<std::endl;
 //        // print the parameters
 //        for(int iPar=0;iPar<propagator.getParameterSetPtr().size();iPar++){
