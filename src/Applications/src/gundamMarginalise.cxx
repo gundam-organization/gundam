@@ -274,7 +274,6 @@ int main(int argc, char** argv){
                 hCovPostFit_->Write();// save the TH2D cov. matrix also in the output file
             });
     // write the best fit parameters vector to the output file
-    // TODO: implement using TH1D: (FitterEngine/postFit/Migrad/errors/<parListTitle>/values/postFitErrors_TH1D)
     ObjectReader::readObject<TNamed>( fitterFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
         parState_->SetName("postFitParameters_TNamed");
         parState_->Write();
@@ -479,7 +478,6 @@ int main(int argc, char** argv){
         // make the LH a probability distribution (but still work with the log)
         LLH /= 2.0;
         //LLH -= bestFitLLH/2.0;
-        // TODO: figure out normalization factor here.
         //LLH -= nParameters*log(1.0/2.0*TMath::Pi());
 
         LLH_sum += LLH;
