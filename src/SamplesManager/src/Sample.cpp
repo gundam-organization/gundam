@@ -6,7 +6,6 @@
 #include "GundamGlobals.h"
 
 #include "GenericToolbox.Json.h"
-#include "GenericToolbox.h"
 #include "Logger.h"
 
 #include <vector>

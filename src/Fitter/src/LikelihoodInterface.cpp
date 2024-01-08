@@ -6,10 +6,9 @@
 #include "FitterEngine.h"
 #include "GundamGlobals.h"
 
-#include "GenericToolbox.ScopedGuard.h"
+#include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.Json.h"
-#include "GenericToolbox.h"
 #include "Logger.h"
 
 #include <limits>

@@ -11,8 +11,8 @@
 #include "MinimizerBase.h"
 #include "JsonBaseClass.h"
 
-#include "GenericToolbox.VariablesMonitor.h"
-#include "GenericToolbox.CycleTimer.h"
+#include "GenericToolbox.Utils.h"
+#include "GenericToolbox.Time.h"
 
 #include "TDirectory.h"
 #include "Math/Functor.h"

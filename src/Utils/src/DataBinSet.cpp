@@ -5,7 +5,6 @@
 #include "DataBinSet.h"
 #include "ConfigUtils.h"
 
-#include "GenericToolbox.h"
 #include "GenericToolbox.Json.h"
 #include "Logger.h"
 
@@ -18,7 +17,7 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[DataBinSet]");
 } );
 
-void DataBinSet::setVerbosity(int maxLogLevel_) { Logger::setMaxLogLevel(maxLogLevel_); }
+void DataBinSet::setVerbosity(int maxLogLevel_){ Logger::setMaxLogLevel(maxLogLevel_); }
 
 // core
 void DataBinSet::readBinningDefinition(const std::string &filePath_) {
@@ -134,6 +133,7 @@ std::vector<std::string> DataBinSet::buildVariableNameList() const{
 void DataBinSet::readTxtBinningDefinition(){
 
   auto lines = GenericToolbox::dumpFileAsVectorString(_filePath_);
+
   std::vector<std::string> expectedVariableList;
   std::vector<std::string> expectedVariableTitleList;
   std::vector<bool> expectedVariableIsRangeList;

@@ -4,7 +4,7 @@
 
 #include "DataDispenserUtils.h"
 
-#include "GenericToolbox.h"
+#include "GenericToolbox.Map.h"
 #include "Logger.h"
 
 #include "sstream"
@@ -23,7 +23,7 @@ std::string DataDispenserParameters::getSummary() const{
   ss << std::endl << GET_VAR_NAME_VALUE(selectionCutFormulaStr);
   ss << std::endl << "activeLeafNameList = " << GenericToolbox::toString(activeLeafNameList, true);
   ss << std::endl << "filePathList = " << GenericToolbox::toString(filePathList, true);
-  ss << std::endl << "variableDict = " << GenericToolbox::parseMapAsString(variableDict, true);
+  ss << std::endl << "variableDict = " << GenericToolbox::toString(variableDict, true);
   ss << std::endl << "additionalVarsStorage = " << GenericToolbox::toString(additionalVarsStorage, true);
   ss << std::endl << GET_VAR_NAME_VALUE(iThrow);
   return ss.str();

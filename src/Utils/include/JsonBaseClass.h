@@ -7,7 +7,7 @@
 
 #include "ConfigUtils.h"
 
-#include "GenericToolbox.ConfigBaseClass.h"
+#include "GenericToolbox.Utils.h"
 
 #include "nlohmann/json.hpp"
 

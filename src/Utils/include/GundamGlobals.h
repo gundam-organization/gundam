@@ -5,8 +5,7 @@
 #ifndef GUNDAM_GUNDAMGLOBALS_H
 #define GUNDAM_GUNDAMGLOBALS_H
 
-#include "GenericToolbox.ParallelWorker.h"
-#include "GenericToolbox.h"
+#include "GenericToolbox.Thread.h"
 
 #include <TTree.h>
 #include <TChain.h>
@@ -26,14 +25,16 @@
 #define GUNDAM_DELTA "delta-"
 #endif
 
-ENUM_EXPANDER(
-    VerboseLevel, 0,
-    NORMAL_MODE,
-    MORE_PRINTOUT,
-    DEBUG_TRACE,
-    INLOOP_TRACE,
-    DEV_TRACE
-    );
+
+#define MAKE_ENUM \
+  ENUM_NAME(VerboseLevel) \
+  ENUM_ENTRY(NORMAL_MODE, 0) \
+  ENUM_ENTRY(MORE_PRINTOUT) \
+  ENUM_ENTRY(DEBUG_TRACE) \
+  ENUM_ENTRY(INLOOP_TRACE) \
+  ENUM_ENTRY(DEV_TRACE)
+#include "GenericToolbox.MakeEnum.h"
+#undef MAKE_ENUM
 
 
 class GundamGlobals{
@@ -51,7 +52,7 @@ public:
   static bool getEnableCacheManager(){ return _enableCacheManager_; }
   static bool isDisableDialCache(){ return _disableDialCache_; }
   static bool isLightOutputMode(){ return _lightOutputMode_; }
-  static VerboseLevel getVerboseLevel(){ return _verboseLevel_; }
+  static VerboseLevel::EnumType getVerboseLevel(){ return _verboseLevel_.value; }
   static std::mutex& getThreadMutex(){ return _threadMutex_; }
   static GenericToolbox::ParallelWorker &getParallelWorker(){ return _threadPool_; }
 

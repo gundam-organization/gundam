@@ -14,15 +14,15 @@
 #include "DialCollection.h"
 #include "DialBaseFactory.h"
 
-#include "GenericToolbox.Root.LeafCollection.h"
-#include "GenericToolbox.VariablesMonitor.h"
+#include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Root.h"
-#include "GenericToolbox.h"
+#include "GenericToolbox.Map.h"
 #include "Logger.h"
 
 #include "TTreeFormulaManager.h"
-#include "TChain.h"
 #include "TChainElement.h"
+#include "TClonesArray.h"
+#include "TChain.h"
 #include "THn.h"
 
 #include <string>
@@ -92,7 +92,7 @@ void DataDispenser::load(){
   LogThrowIf(not this->isInitialized(), "Can't load while not initialized.");
   LogThrowIf(_sampleSetPtrToLoad_==nullptr, "SampleSet not specified.");
 
-  if(GundamGlobals::getVerboseLevel() >= MORE_PRINTOUT ){
+  if(GundamGlobals::getVerboseLevel() >= VerboseLevel::MORE_PRINTOUT ){
     LogDebug << "Configuration: " << _parameters_.getSummary() << std::endl;
   }
 
@@ -162,7 +162,7 @@ void DataDispenser::parseStringParameters() {
 
   if( not _parameters_.variableDict.empty() ){
     for( auto& entryDict : _parameters_.variableDict ){ replaceToyIndexFct(entryDict.second); }
-    LogInfo << "Variable dictionary: " << GenericToolbox::parseMapAsString(_parameters_.variableDict) << std::endl;
+    LogInfo << "Variable dictionary: " << GenericToolbox::toString(_parameters_.variableDict) << std::endl;
 
     for( auto& overrideEntry : _parameters_.variableDict ){
       _cache_.varsToOverrideList.emplace_back(overrideEntry.first);
@@ -759,7 +759,7 @@ void DataDispenser::eventSelectionFunction(int iThread_){
         for (size_t iSample = 0; iSample < _cache_.samplesToFillList.size(); iSample++) {
           _cache_.threadSelectionResults[iThread_].eventIsInSamplesList[iEntry][iSample] = false;
         }
-        if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
+        if (GundamGlobals::getVerboseLevel() == VerboseLevel::INLOOP_TRACE) {
           LogTrace << "Event #" << treeChain->GetFileNumber() << ":" << treeChain->GetReadEntry()
                    << " rejected because of " << _parameters_.selectionCutFormulaStr << std::endl;
         }
@@ -773,7 +773,7 @@ void DataDispenser::eventSelectionFunction(int iThread_){
       if( sampleCut.cutIndex == -1 ){
         _cache_.threadSelectionResults[iThread_].eventIsInSamplesList[iEntry][sampleCut.sampleIndex] = true;
         _cache_.threadSelectionResults[iThread_].sampleNbOfEvents[sampleCut.sampleIndex]++;
-        if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
+        if (GundamGlobals::getVerboseLevel() == VerboseLevel::INLOOP_TRACE) {
           LogDebug << "Event #" << treeChain->GetFileNumber() << ":" << treeChain->GetReadEntry()
                    << " included as sample " << sampleCut.sampleIndex << " (NO SELECTION CUT)" << std::endl;
         }
@@ -782,7 +782,7 @@ void DataDispenser::eventSelectionFunction(int iThread_){
       else if( lCollection.getLeafFormList()[sampleCut.cutIndex].evalAsDouble() != 0 ){
         _cache_.threadSelectionResults[iThread_].eventIsInSamplesList[iEntry][sampleCut.sampleIndex] = true;
         _cache_.threadSelectionResults[iThread_].sampleNbOfEvents[sampleCut.sampleIndex]++;
-        if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
+        if (GundamGlobals::getVerboseLevel() == VerboseLevel::INLOOP_TRACE) {
           LogDebug << "Event #" << treeChain->GetFileNumber() << ":" << treeChain->GetReadEntry()
                    << " included as sample " << sampleCut.sampleIndex << " because of "
                    << lCollection.getLeafFormList()[sampleCut.cutIndex].getSummary() << std::endl;
@@ -790,7 +790,7 @@ void DataDispenser::eventSelectionFunction(int iThread_){
       }
         // don't pass cut?
       else {
-        if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
+        if (GundamGlobals::getVerboseLevel() == VerboseLevel::INLOOP_TRACE) {
           LogTrace << "Event #" << treeChain->GetFileNumber() << ":" << treeChain->GetReadEntry()
                    << " rejected as sample " << sampleCut.sampleIndex << " because of "
                    << lCollection.getLeafFormList()[sampleCut.cutIndex].getSummary() << std::endl;

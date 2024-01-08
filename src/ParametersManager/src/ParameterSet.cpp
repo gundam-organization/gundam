@@ -9,10 +9,9 @@
 #include "ParameterThrowerMarkHarz.h"
 #include "ConfigUtils.h"
 
-#include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.Json.h"
-#include "GenericToolbox.TablePrinter.h"
+#include "GenericToolbox.Utils.h"
 #include "Logger.h"
 
 #include <memory>

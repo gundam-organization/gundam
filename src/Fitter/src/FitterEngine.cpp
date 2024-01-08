@@ -7,10 +7,9 @@
 #include "MinimizerInterface.h"
 #include "MCMCInterface.h"
 
-#include "GenericToolbox.RawDataArray.h"
+#include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Json.h"
 #include "GenericToolbox.Root.h"
-#include "GenericToolbox.h"
 #include "Logger.h"
 
 #include <Math/Factory.h>
@@ -141,7 +140,7 @@ void FitterEngine::initializeImpl(){
   // and other properties)
   getMinimizer().initialize();
 
-  if(GundamGlobals::getVerboseLevel() >= MORE_PRINTOUT) checkNumericalAccuracy();
+  if( GundamGlobals::getVerboseLevel() >= VerboseLevel::MORE_PRINTOUT ){ checkNumericalAccuracy(); }
 
   // Write data
   LogInfo << "Writing propagator objects..." << std::endl;

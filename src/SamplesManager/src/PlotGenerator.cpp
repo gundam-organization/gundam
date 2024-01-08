@@ -8,8 +8,8 @@
 #include "ConfigUtils.h"
 
 #include "Logger.h"
-#include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
+#include "GenericToolbox.Map.h"
 
 #include "TCanvas.h"
 #include "TH1D.h"

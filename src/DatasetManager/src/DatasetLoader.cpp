@@ -4,16 +4,13 @@
 
 #include "DatasetLoader.h"
 
-#include "GundamGlobals.h"
+#include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Json.h"
-
-#include "GenericToolbox.h"
-#include "GenericToolbox.Root.h"
-#include "GenericToolbox.VariablesMonitor.h"
+#include "GenericToolbox.Map.h"
 #include "Logger.h"
 
-#include <TTreeFormulaManager.h>
-#include "TTree.h"
+#include "TTreeFormulaManager.h"
+
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[DataSetLoader]");

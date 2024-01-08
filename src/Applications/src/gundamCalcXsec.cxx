@@ -7,10 +7,9 @@
 
 #include "Logger.h"
 #include "CmdLineParser.h"
-#include "GenericToolbox.h"
 #include "GenericToolbox.Json.h"
 #include "GenericToolbox.Root.h"
-#include "GenericToolbox.RawDataArray.h"
+#include "GenericToolbox.Utils.h"
 
 #include <TFile.h>
 #include "TH1D.h"

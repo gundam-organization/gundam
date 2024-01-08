@@ -12,9 +12,8 @@
 #include "GundamGlobals.h"
 #include "ConfigUtils.h"
 
-#include "GenericToolbox.TablePrinter.h"
+#include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Json.h"
-#include "GenericToolbox.h"
 
 #include <memory>
 #include <vector>

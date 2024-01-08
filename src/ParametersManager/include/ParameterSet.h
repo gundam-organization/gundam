@@ -10,7 +10,7 @@
 #include "ParameterThrowerMarkHarz.h"
 
 #include "Logger.h"
-#include "GenericToolbox.CorrelatedVariablesSampler.h"
+#include "GenericToolbox.Root.h"
 
 #include "nlohmann/json.hpp"
 #include "TMatrixDSym.h"

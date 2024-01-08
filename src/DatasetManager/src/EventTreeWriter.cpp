@@ -7,10 +7,9 @@
 #include "ConfigUtils.h"
 
 #include "Logger.h"
-#include "GenericToolbox.h"
+#include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.Json.h"
-#include "GenericToolbox.RawDataArray.h"
 
 
 LoggerInit([]{

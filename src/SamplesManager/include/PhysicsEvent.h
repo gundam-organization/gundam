@@ -9,9 +9,8 @@
 #include "DataBinSet.h"
 #include "DataBin.h"
 
-#include "GenericToolbox.Root.TreeEntryBuffer.h"
-#include "GenericToolbox.Root.LeafCollection.h"
-#include "GenericToolbox.AnyType.h"
+#include "GenericToolbox.Root.h"
+#include "GenericToolbox.Utils.h"
 
 #include "TTree.h"
 #include "TFormula.h"
