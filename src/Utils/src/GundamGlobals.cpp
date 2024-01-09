@@ -24,4 +24,3 @@ void GundamGlobals::setVerboseLevel(VerboseLevel verboseLevel_){
   _verboseLevel_ = verboseLevel_;
   LogWarning << "Verbose level set to: " << _verboseLevel_.toString() << std::endl;
 }
-void GundamGlobals::setVerboseLevel(int verboseLevel_){ GundamGlobals::setVerboseLevel(static_cast<VerboseLevel>(verboseLevel_)); }

@@ -46,7 +46,6 @@ public:
   static void setLightOutputMode(bool enable_){ _lightOutputMode_ = enable_; }
   static void setDisableDialCache(bool disableDialCache_){ _disableDialCache_ = disableDialCache_; }
   static void setVerboseLevel(VerboseLevel verboseLevel_);
-  static void setVerboseLevel(int verboseLevel_);
 
   // Getters
   static bool getEnableCacheManager(){ return _enableCacheManager_; }
