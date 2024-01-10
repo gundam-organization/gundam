@@ -7,19 +7,17 @@
 
 #include "JsonBaseClass.h"
 
-
 #include "nlohmann/json.hpp"
 
 #include <vector>
 #include <string>
 
-#define MAKE_ENUM \
-  ENUM_NAME(PriorType) \
-  ENUM_ENTRY(Unset, -1) \
-  ENUM_ENTRY(Gaussian) \
-  ENUM_ENTRY(Flat)
+#define ENUM_NAME PriorType
+#define ENUM_FIELDS \
+  ENUM_FIELD(Unset, -1) \
+  ENUM_FIELD(Gaussian) \
+  ENUM_FIELD(Flat)
 #include "GenericToolbox.MakeEnum.h"
-#undef MAKE_ENUM
 
 
 class ParameterSet;

@@ -26,16 +26,14 @@
 #endif
 
 
-#define MAKE_ENUM \
-  ENUM_NAME(VerboseLevel) \
-  ENUM_ENTRY(NORMAL_MODE, 0) \
-  ENUM_ENTRY(MORE_PRINTOUT) \
-  ENUM_ENTRY(DEBUG_TRACE) \
-  ENUM_ENTRY(INLOOP_TRACE) \
-  ENUM_ENTRY(DEV_TRACE)
+#define ENUM_NAME VerboseLevel
+#define ENUM_FIELDS \
+  ENUM_FIELD(NORMAL_MODE, 0) \
+  ENUM_FIELD(MORE_PRINTOUT) \
+  ENUM_FIELD(DEBUG_TRACE) \
+  ENUM_FIELD(INLOOP_TRACE) \
+  ENUM_FIELD(DEV_TRACE)
 #include "GenericToolbox.MakeEnum.h"
-#undef MAKE_ENUM
-
 
 class GundamGlobals{
 
