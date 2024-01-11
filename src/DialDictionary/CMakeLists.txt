@@ -1,67 +1,69 @@
 set( LIB_NAME GundamDialDictionary )
 
+
+
 set( SRCFILES
-    DialEngine/src/DialInputBuffer.cpp
-    DialEngine/src/DialInterface.cpp
-    DialEngine/src/DialResponseSupervisor.cpp
-    DialEngine/src/DialCollection.cpp
-    DialEngine/src/EventDialCache.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialEngine/src/DialInputBuffer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialEngine/src/DialInterface.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialEngine/src/DialResponseSupervisor.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialEngine/src/DialCollection.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialEngine/src/EventDialCache.cpp
 
     # DialDefinitions
-    DialDefinitions/src/DialBase.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialDefinitions/src/DialBase.cpp
 
-    DialDefinitions/src/Graph.cpp
-    DialDefinitions/src/LightGraph.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialDefinitions/src/Graph.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialDefinitions/src/LightGraph.cpp
 
-    DialDefinitions/src/Spline.cpp
-    DialDefinitions/src/SimpleSpline.cpp
-    DialDefinitions/src/GeneralSpline.cpp
-    DialDefinitions/src/UniformSpline.cpp
-    DialDefinitions/src/CompactSpline.cpp
-    DialDefinitions/src/MonotonicSpline.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialDefinitions/src/Spline.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialDefinitions/src/SimpleSpline.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialDefinitions/src/GeneralSpline.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialDefinitions/src/UniformSpline.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialDefinitions/src/CompactSpline.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialDefinitions/src/MonotonicSpline.cpp
 
-    DialDefinitions/src/RootFormula.cpp
-    DialDefinitions/src/Polynomial.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialDefinitions/src/RootFormula.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialDefinitions/src/Polynomial.cpp
 
     # DialFactories
-    DialFactories/src/DialBaseFactory.cpp
-    DialFactories/src/NormDialBaseFactory.cpp
-    DialFactories/src/GraphDialBaseFactory.cpp
-    DialFactories/src/SplineDialBaseFactory.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialFactories/src/DialBaseFactory.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialFactories/src/NormDialBaseFactory.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialFactories/src/GraphDialBaseFactory.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialFactories/src/SplineDialBaseFactory.cpp
     )
 
 set( HEADERS
-    DialEngine/include/DialInputBuffer.h
-    DialEngine/include/DialInterface.h
-    DialEngine/include/DialResponseSupervisor.h
-    DialEngine/include/DialCollection.h
-    DialEngine/include/EventDialCache.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialEngine/include/DialInputBuffer.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialEngine/include/DialInterface.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialEngine/include/DialResponseSupervisor.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialEngine/include/DialCollection.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialEngine/include/EventDialCache.h
 
     # DialDefinitions
-    DialDefinitions/include/DialBase.h
-    DialDefinitions/include/DialTypes.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialDefinitions/include/DialBase.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialDefinitions/include/DialTypes.h
 
-    DialDefinitions/include/Norm.h
-    DialDefinitions/include/Shift.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialDefinitions/include/Norm.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialDefinitions/include/Shift.h
 
-    DialDefinitions/include/Graph.h
-    DialDefinitions/include/LightGraph.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialDefinitions/include/Graph.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialDefinitions/include/LightGraph.h
 
-    DialDefinitions/include/Spline.h
-    DialDefinitions/include/SimpleSpline.h
-    DialDefinitions/include/GeneralSpline.h
-    DialDefinitions/include/UniformSpline.h
-    DialDefinitions/include/CompactSpline.h
-    DialDefinitions/include/MonotonicSpline.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialDefinitions/include/Spline.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialDefinitions/include/SimpleSpline.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialDefinitions/include/GeneralSpline.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialDefinitions/include/UniformSpline.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialDefinitions/include/CompactSpline.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialDefinitions/include/MonotonicSpline.h
 
-    DialDefinitions/include/RootFormula.h
-    DialDefinitions/include/Polynomial.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialDefinitions/include/RootFormula.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialDefinitions/include/Polynomial.h
 
     # DialFactories
-    DialFactories/include/DialBaseFactory.h
-    DialFactories/include/NormDialBaseFactory.h
-    DialFactories/include/GraphDialBaseFactory.h
-    DialFactories/include/SplineDialBaseFactory.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialFactories/include/DialBaseFactory.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialFactories/include/NormDialBaseFactory.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialFactories/include/GraphDialBaseFactory.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialFactories/include/SplineDialBaseFactory.h
     )
 
 if( USE_STATIC_LINKS )
@@ -72,9 +74,9 @@ endif()
 
 target_include_directories(
     ${LIB_NAME} PUBLIC
-    DialEngine/include
-    DialFactories/include
-    DialDefinitions/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialEngine/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialFactories/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/DialDefinitions/include
 )
 
 #target_include_directories(
@@ -94,5 +96,3 @@ target_link_libraries( ${LIB_NAME} PUBLIC
 install( TARGETS ${LIB_NAME} DESTINATION lib )
 #Can uncomment this to install the headers... but is it really neccessary?
 # install(FILES ${HEADERS} DESTINATION include)
-
-set(MODULETargets ${MODULETargets} GundamErrorPropagator PARENT_SCOPE)

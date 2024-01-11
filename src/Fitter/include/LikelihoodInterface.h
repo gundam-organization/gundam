@@ -2,220 +2,113 @@
 // Created by Clark McGrew 10/01/23
 //
 
-#ifndef GUNDAM_LikelihoodInterface_h
-#define GUNDAM_LikelihoodInterface_h
+#ifndef GUNDAM_LIKELIHOOD_INTERFACE_H
+#define GUNDAM_LIKELIHOOD_INTERFACE_H
 
+#include "JointProbability.h"
 #include "ParameterSet.h"
+#include "Propagator.h"
+#include "JsonBaseClass.h"
 
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Time.h"
 
 #include "Math/Functor.h"
 
-class FitterEngine;
+#include <string>
+#include <vector>
 
-/// Wrap the calculation of the "likelihood" using the propagator into a single
-/// place.  This provides an abstract interface that can is provided to the
-/// FitterEngine and can be accessed by any MinimizerInterface.  The main
-/// access is through the evalFit method which takes an array of floating
-/// point values and returns the likelihood.  The meaning of the parameters is
-/// defined by the vector of pointers to FitParameter returned by
-/// getMinimizerFitParameterPtr.
-///
-/// The "likelihood" for GUNDAM is documented in various places as the LLH
-/// (Log Likelihood), but while it is proportional to the LLH, it's actually
-/// more closely related to the chi-square (so -LLH/2).
 
-class LikelihoodInterface {
+/*
+ The LikelihoodInterface job is to evaluate the Likelihood component of a given pair of data/MC.
+ It contains a few buffers that are used externally to monitor the fit status.
+*/
+
+class LikelihoodInterface : public JsonBaseClass {
+
+  struct FitMonitor;
+
+protected:
+  // called through public JsonBaseClass::readConfig() and JsonBaseClass::initialize()
+  void readConfigImpl() override;
+  void initializeImpl() override;
 
 public:
-  /////////////////////////////////////////////////////////////////
-  // Getters and Setters are defined in this file so the compiler can inline
-  // the code very early in optimization.
-  /////////////////////////////////////////////////////////////////
+  LikelihoodInterface() = default;
+  ~LikelihoodInterface() override = default;
 
-  explicit LikelihoodInterface(FitterEngine* owner_);
-  virtual ~LikelihoodInterface();
-
-  void setOwner(FitterEngine* owner_);
-  void setStateTitleMonitor(const std::string& stateTitleMonitor_);
-
-  /// A vector of the parameters being used in the fit.  This provides
-  /// the correspondence between an array of doubles (param[]) and the
-  /// pointers to the parameters.
-  std::vector<Parameter *> &getMinimizerFitParameterPtr(){ return _minimizerFitParameterPtr_; }
-
-  /// Initialize the likelihood interface.  Must be called after all of the
-  /// paramters are set, but before the first function evaluation.
-  void initialize();
-
-  /// Calculate the likelihood based on an array of parameters.  Used
-  /// to create a functor that can be used by MINIUT or TSimpleMCMC.
-  double evalFit(const double* parArray_);
-
-  /// Same as `evalFit` but also check that all the parameters are within
-  /// the allowed ranges.  If a parameter is out of range, then return an
-  /// "infinite" likelihood.
-  double evalFitValid(const double* parArray_);
-
-  /// A pointer to a ROOT functor that calls the evalFit method.  The object
-  /// referenced by the functor can be handed directly to Minuit.
-  ROOT::Math::Functor* evalFitFunctor() {return _functor_.get();}
-
-  /// A pointer to a ROOT runctor that calls the evalFitValid method.
-  ROOT::Math::Functor* evalFitValidFunctor() {return _validFunctor_.get();}
-
-  /// Return the last likelihood value that was calculated.  This is a
-  /// short cut to call the owner's getPropagator().getLlhBuffer() method.
-  [[nodiscard]] double getLastLikelihood() const;
-
-  /// Return the statistical part of the last likelihood value that was
-  /// calculated.  This is a short cut to call the owner's
-  /// getPropagator().GetLlhStatBuffer() method
-  [[nodiscard]] double getLastLikelihoodStat() const;
-
-  /// Return the penalty part of the last likelihood value that was
-  /// calculated.  This is a short cut to call the owner's
-  /// getPropagator().GetLlhPenaltyBuffer() method.
-  [[nodiscard]] double getLastLikelihoodPenalty() const;
-
-  /// Define the type of validity that needs to be required by
-  /// hasValidParameterValues.  This accepts a string with the possible values
-  /// being:
-  ///
-  ///  "range" (default) -- Between the parameter minimum and maximum values.
-  ///  "norange"         -- Do not require parameters in the valid range
-  ///  "mirror"          -- Between the mirrored values (if parameter has
-  ///                       mirroring).
-  ///  "nomirror"        -- Do not require parameters in the mirrored range
-  ///  "physical"        -- Only physically meaningful values.
-  ///  "nophysical"      -- Do not require parameters in the physical range.
-  ///
-  /// Example: setParameterValidity("range,mirror,physical")
+  // setters
+  void setUseNormalizedFitSpace(bool useNormalizedFitSpace_) {_useNormalizedFitSpace_ = useNormalizedFitSpace_;}
+  void setTargetEDM(double targetEDM_) { _targetEDM_=targetEDM_; }
+  void setStateTitleMonitor(const std::string& stateTitleMonitor_){ _stateTitleMonitor_ = stateTitleMonitor_; }
   void setParameterValidity(const std::string& validity);
+  void setMinimizerType(const std::string& type_){ _minimizerType_ = type_; }
+  void setMinimizerAlgo(const std::string& algo_){ _minimizerAlgo_ = algo_; }
 
-  /// Check that the parameters for the last time the propagator was used are
-  /// all within the allowed ranges.
+  // const getters
   [[nodiscard]] bool hasValidParameterValues() const;
+  [[nodiscard]] bool getUseNormalizedFitSpace() const { return _useNormalizedFitSpace_; }
+  [[nodiscard]] int getNbFitParameters() const { return _nbFitParameters_; }
+  [[nodiscard]] int getNbFreePars() const {return _nbFreePars_; }
+  [[nodiscard]] int getNbFitCalls() const {return _nbFitCalls_; } // TODO: relocate? or rename?
+  [[nodiscard]] int getNbFitBins() const {return _nbFitBins_; }
+  [[nodiscard]] double getLastLikelihood() const { return _llhBuffer_; }
+  [[nodiscard]] double getLastLikelihoodStat() const { return _llhStatBuffer_; }
+  [[nodiscard]] double getLastLikelihoodPenalty() const { return _llhPenaltyBuffer_; }
+  [[nodiscard]] double getTargetEdm() const { return _targetEDM_; }
+  [[nodiscard]] const std::string& getMinimizerType() const { return _minimizerType_; }
+  [[nodiscard]] const std::string& getMinimizerAlgo() const { return _minimizerAlgo_; }
+  const Propagator& getPropagator() const { return _propagator_; }
 
-  /// Set whether a normalized fit space should be used.  This controls how
-  /// the fit parameter array is copied into the propagator parameter
-  /// structures.
-  void setUseNormalizedFitSpace(bool v) {_useNormalizedFitSpace_ = v;}
-  [[nodiscard]] bool getUseNormalizedFitSpace() const {return _useNormalizedFitSpace_;}
+  // non-const getters
+  Propagator& getPropagator(){ return _propagator_; }
+  FitMonitor& getFitMonitor(){ return _fitMonitor_; }
+  std::vector<Parameter *> &getMinimizerFitParameterPtr(){ return _minimizerFitParameterPtr_; }
+  ROOT::Math::Functor* getFunctor() { return _functor_.get(); }
+  ROOT::Math::Functor* getValidFunctor() { return _validFunctor_.get(); }
+  GenericToolbox::VariablesMonitor& getConvergenceMonitor(){ return _convergenceMonitor_; } // TODO: relocate?
 
-  /// Set the minimizer type and algorithm.
-  void setMinimizerInfo(const std::string& type, const std::string& algo) {
-    _minimizerType_ = type;
-    _minimizerAlgo_ = algo;
-  }
-  std::string getMinimizerType() const { return _minimizerType_; }
-  std::string getMinimizerAlgo() const { return _minimizerAlgo_; }
-
-  /// Set the target EDM for this fitter.  This is only informational in the
-  /// LikelihoodInterface, but it appears in the running summaries.  It needs
-  /// to be set by the minimizer.
-  void setTargetEDM(double v) { _targetEDM_=v; }
-  double getTargetEdm(){ return _targetEDM_; }
-
-  /// Get the total number of parameters expected by the evalFit method.
-  int getNbFitParameters() const {return _nbFitParameters_;}
-
-  /// Get the number of parameters that are free in the likelihood
-  int getNbFreePars() const {return _nbFreePars_; }
-
-  /// Get the number of times the evalFit function was called.
-  int getNbFitCalls() const {return _nbFitCalls_; }
-
-  /// Return the number of sample bins being used in the fit.  This really
-  /// belongs to the propagator!
-  int getNbFitBins() const {return _nbFitBins_; }
-
-  /// Get the convergence monitor.
-  GenericToolbox::VariablesMonitor& getConvergenceMonitor()
-    {return _convergenceMonitor_;}
-
-  /// Enable and disable the monitor output.
-  void enableFitMonitor(){ _enableFitMonitor_ = true; }
-  void disableFitMonitor(){ _enableFitMonitor_ = false; }
-
-  /// Set whether fit parameters should be shown in the monitor output.
-  void setShowParametersOnFitMonitor(bool v) {_showParametersOnFitMonitor_=v;}
-  bool getShowParametersOnFitMonitor() const {return _showParametersOnFitMonitor_;}
-
-  /// Set the maximum number of parameters to show on a line when parameters
-  /// are being show by the monitor.
-  void setMaxNbParametersPerLineOnMonitor(int v) {_maxNbParametersPerLineOnMonitor_=v;}
-  int getMaxNbParametersPerLineOnMonitor() const {return _maxNbParametersPerLineOnMonitor_;}
+  double evalFit(const double* parArray_);
+  double evalFitValid(const double* parArray_);
 
   void setMonitorGradientDescent(bool monitorGradientDescent_){ _monitorGradientDescent_ = monitorGradientDescent_; }
   bool isMonitorGradientDescent() const { return _monitorGradientDescent_; }
 
-  /// Save the chi2 history to the current output file.
-  void saveChi2History();
-
-  /// Save each step
+  void writeChi2History();
   void saveGradientSteps();
 
 private:
-  /// True as soon as this has been initialized.
-  bool _isInitialized_{false};
-
-  // stop the fitter if LLH = +inf
   bool _throwOnBadLlh_{false};
+  bool _useNormalizedFitSpace_{true};
 
-    /// The fitter engion that owns this likelihood.
-  FitterEngine* _owner_{nullptr};
+  int _nbFitBins_{0};
+  int _nbFitCalls_{0};
+  int _nbFreePars_{0};
+  int _nbFitParameters_{0};
 
-  /// A functor that can be called by Minuit or anybody else.  This wraps
-  /// evalFit.
+  double _targetEDM_{1E-6};
+  double _llhBuffer_{std::nan("unset")};
+  double _llhStatBuffer_{std::nan("unset")};
+  double _llhPenaltyBuffer_{std::nan("unset")};
+
+  std::string _minimizerType_{};
+  std::string _minimizerAlgo_{};
+  std::string _stateTitleMonitor_{};
+
+  Propagator _propagator_{};
+  std::vector<Parameter*> _minimizerFitParameterPtr_{};
+  std::shared_ptr<JointProbability::JointProbability> _jointProbabilityPtr_{nullptr};
+
   std::unique_ptr<ROOT::Math::Functor> _functor_;
-
-  /// A functor that can be called by MINUIT or anybody else.  This wraps
-  /// evalFitValid.
   std::unique_ptr<ROOT::Math::Functor> _validFunctor_;
+  std::unique_ptr<TTree> _chi2HistoryTree_{nullptr};
 
   /// A set of flags used by the evalFitValid method to determine the function
   /// validity.  The flaggs are:
   /// "1" -- require valid parameters
   /// "2" -- require in the mirrored range
   /// "4" -- require in the physical range
-  int _validFlags_{7};
-
-  /// A vector of pointers to fit parameters that defined the elements in the
-  /// array of parameters passed to evalFit.
-  std::vector<Parameter*> _minimizerFitParameterPtr_{};
-
-  /// The number of calls to the fitter function.
-  int _nbFitCalls_{0};
-
-  /// The total number of parameters in the likelihood.
-  int _nbFitParameters_{0};
-
-  /// The number of parameters in the likelihood.
-  int _nbFreePars_{0};
-
-  /// The number of sample bins being fitted.
-  int _nbFitBins_{0};
-
-  /// Flag for if a normalized fit space is being used.
-  bool _useNormalizedFitSpace_{true};
-
-  /// The type of minimizer being used (usually minuit2)
-  std::string _minimizerType_{"not-set"};
-
-  /// The algorithm being used (usually Migrad).
-  std::string _minimizerAlgo_{"not-set"};
-
-  /// The target EDM for the best fit point.  This will have different
-  /// meanings for different "minimizers"
-  double _targetEDM_{1E-6};
-
-  /// Monitor state title buffer. Briefly summarize what the fitter is currently doing
-  std::string _stateTitleMonitor_{};
-
-  /// A tree that save the history of the minimization.
-  std::unique_ptr<TTree> _chi2HistoryTree_{nullptr};
+  int _validFlags_{7}; // TODO: Use enum instead
 
   // Output monitors!
   GenericToolbox::VariablesMonitor _convergenceMonitor_;
@@ -224,11 +117,16 @@ private:
   GenericToolbox::Time::CycleTimer _itSpeed_;
   GenericToolbox::Time::CycleClock _itSpeedMon_{"it"};
 
+  // TODO: relocate?
+  struct FitMonitor{
+    bool isEnabled{false};
+    bool showParameters{false};
+    int maxNbParametersPerLine{15};
+  };
+  FitMonitor _fitMonitor_{};
   /// Parameters to control how the monitor behaves.
-  bool _enableFitMonitor_{false};
-  bool _showParametersOnFitMonitor_{false};
-  int _maxNbParametersPerLineOnMonitor_{15};
 
+  // TODO: relocate too?
   bool _monitorGradientDescent_{false};
   int _lastGradientFall_{-2};
   struct GradientStepPoint {
@@ -236,9 +134,10 @@ private:
     double llh;
   };
   std::vector<GradientStepPoint> _gradientMonitor_{};
+
 };
 
-#endif //  GUNDAM_LikelihoodInterface_h
+#endif //  GUNDAM_LIKELIHOOD_INTERFACE_H
 
 // An MIT Style License
 

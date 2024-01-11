@@ -11,9 +11,6 @@
 #include "JointProbability.h"
 #include "JsonBaseClass.h"
 
-
-#include "nlohmann/json.hpp"
-
 #include <string>
 #include <vector>
 
@@ -43,7 +40,7 @@ public:
   std::vector<std::string>& getAdditionalVariablesForStorage() { return _additionalVariablesForStorage_; }
 
   //Core
-  bool empty() const{ return _fitSampleList_.empty(); }
+  [[nodiscard]] bool empty() const{ return _fitSampleList_.empty(); }
   double evalLikelihood();
   double evalLikelihood(Sample& sample_);
 
@@ -55,7 +52,7 @@ public:
 private:
   bool _showTimeStats_{false};
   std::vector<Sample> _fitSampleList_;
-  std::shared_ptr<JointProbability::JointProbability> _jointProbabilityPtr_{nullptr};
+
   std::vector<std::string> _eventByEventDialLeafList_;
   std::vector<std::string> _additionalVariablesForStorage_;
 

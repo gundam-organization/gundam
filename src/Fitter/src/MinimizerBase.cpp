@@ -18,13 +18,13 @@ void MinimizerBase::readConfigImpl(){
   useNormalizedFitSpace = GenericToolbox::Json::fetchValue(_config_, "useNormalizedFitSpace", useNormalizedFitSpace);
   getLikelihood().setUseNormalizedFitSpace(useNormalizedFitSpace);
 
-  bool showParametersOnFitMonitor = getLikelihood().getShowParametersOnFitMonitor();
+  bool showParametersOnFitMonitor = getLikelihood().getFitMonitor().showParameters;
   showParametersOnFitMonitor = GenericToolbox::Json::fetchValue(_config_, "showParametersOnFitMonitor", showParametersOnFitMonitor);
-  getLikelihood().setShowParametersOnFitMonitor(showParametersOnFitMonitor);
+  getLikelihood().getFitMonitor().showParameters = showParametersOnFitMonitor;
 
-  auto maxNbParametersPerLineOnMonitor = getLikelihood().getMaxNbParametersPerLineOnMonitor();
+  auto maxNbParametersPerLineOnMonitor = getLikelihood().getFitMonitor().maxNbParametersPerLine;
   maxNbParametersPerLineOnMonitor = GenericToolbox::Json::fetchValue(_config_, "maxNbParametersPerLineOnMonitor", maxNbParametersPerLineOnMonitor);
-  getLikelihood().setMaxNbParametersPerLineOnMonitor(maxNbParametersPerLineOnMonitor);
+  getLikelihood().getFitMonitor().maxNbParametersPerLine = maxNbParametersPerLineOnMonitor;
 
   if( GenericToolbox::getTerminalWidth() == 0 ){
     // batch mode

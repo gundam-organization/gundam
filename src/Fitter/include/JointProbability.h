@@ -8,7 +8,6 @@
 #include "Sample.h"
 #include "JsonBaseClass.h"
 
-
 #include "nlohmann/json.hpp"
 
 #include <dlfcn.h>

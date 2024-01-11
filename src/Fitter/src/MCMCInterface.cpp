@@ -495,7 +495,7 @@ bool MCMCInterface::adaptiveLoadProposalCovariance(AdaptiveStepMCMC& mcmc,
 void MCMCInterface::setupAndRunAdaptiveStep(AdaptiveStepMCMC& mcmc) {
 
   mcmc.GetProposeStep().SetDim(getMinimizerFitParameterPtr().size());
-  mcmc.GetLogLikelihood().functor = getLikelihood().evalFitValidFunctor();
+  mcmc.GetLogLikelihood().functor = getLikelihood().getValidFunctor();
   mcmc.GetProposeStep().SetCovarianceUpdateDeweighting(0.0);
   mcmc.GetProposeStep().SetCovarianceFrozen(false);
 
@@ -713,7 +713,7 @@ void MCMCInterface::setupAndRunAdaptiveStep(AdaptiveStepMCMC& mcmc) {
 void MCMCInterface::setupAndRunSimpleStep(SimpleStepMCMC& mcmc) {
 
   mcmc.GetProposeStep().SetDim(getMinimizerFitParameterPtr().size());
-  mcmc.GetLogLikelihood().functor = getLikelihood().evalFitFunctor();
+  mcmc.GetLogLikelihood().functor = getLikelihood().getFunctor();
   mcmc.GetProposeStep().fSigma = _simpleSigma_;
 
   Vector prior;

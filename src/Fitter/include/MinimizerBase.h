@@ -28,11 +28,6 @@ class FitterEngine;
 class MinimizerBase : public JsonBaseClass {
 
 protected:
-  /// Implement the methods required by JsonBaseClass.  These MinimizerBase
-  /// methods may be overridden by the derived class, but if overriden, the
-  /// derived class must run these instantiations (i.e. call
-  /// MinimizerBase::readConfigImpl() and MinimizerBase::initializeImpl in the
-  /// respective methods).
   void readConfigImpl() override;
   void initializeImpl() override;
 

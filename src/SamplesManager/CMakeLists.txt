@@ -3,11 +3,10 @@ set( LIB_NAME GundamSamplesManager )
 
 set( SRCFILES
         src/SampleElement.cpp
-    src/SampleSet.cpp
-    src/Sample.cpp
+        src/SampleSet.cpp
+        src/Sample.cpp
         src/PhysicsEvent.cpp
         src/PlotGenerator.cpp
-        src/JointProbability.cpp
         )
 
 if( USE_STATIC_LINKS )

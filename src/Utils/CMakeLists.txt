@@ -1,9 +1,11 @@
+
+set( LIB_NAME GundamUtils )
+
 set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamGlobals.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/DataBinSet.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/DataBin.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamGreetings.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/JsonBaseClass.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ParameterThrowerMarkHarz.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ConfigUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamUtils.cpp
@@ -41,23 +43,23 @@ set( UTILS_HEADERS ${HEADERS} )
 #list(APPEND SRCFILES GundamUtilsDict.cxx)
 
 if( USE_STATIC_LINKS )
-  add_library( GundamUtils STATIC ${SRCFILES})
+  add_library( ${LIB_NAME} STATIC ${SRCFILES})
 else()
-  add_library( GundamUtils SHARED ${SRCFILES})
+  add_library( ${LIB_NAME} SHARED ${SRCFILES})
 endif()
 
-add_dependencies( GundamUtils preBuildVersionCheck )
+add_dependencies( ${LIB_NAME} preBuildVersionCheck )
 include_directories( ${CMAKE_BINARY_DIR}/generated/ ) # version header
 
 # Make sure the current directories are available for the later
 # compilation.
-target_include_directories( GundamUtils PUBLIC
+target_include_directories( ${LIB_NAME} PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${CMAKE_BINARY_DIR}/generated
 )
 
-target_link_libraries( GundamUtils PUBLIC ${ROOT_LIBRARIES} )
-install( TARGETS GundamUtils DESTINATION lib )
+target_link_libraries( ${LIB_NAME} PUBLIC ${ROOT_LIBRARIES} )
+install( TARGETS ${LIB_NAME} DESTINATION lib )
 
 #Can uncomment this to install the headers... but is it really neccessary?
 #install(FILES ${HEADERS} DESTINATION include)

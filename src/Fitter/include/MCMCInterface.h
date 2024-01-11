@@ -205,7 +205,7 @@ private:
   /// likelihood using the TSimpleMCMC<>::GetLogLikelihood() method.  For
   /// example:
   ///
-  /// mcmc.GetLogLikelihood().functor = getLikelihood().evalFitFunctor()
+  /// mcmc.GetLogLikelihood().functor = getLikelihood().getFunctor()
   ///
   struct PrivateProxyLikelihood {
     ROOT::Math::Functor* functor;

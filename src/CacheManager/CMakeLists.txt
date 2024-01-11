@@ -1,4 +1,5 @@
 
+set( LIB_NAME GundamCache )
 
 set( SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheManager.cpp
@@ -37,20 +38,20 @@ list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheWeights.${SRC_FILE_EX
 list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheIndexedSums.${SRC_FILE_EXT} )
 
 if( USE_STATIC_LINKS )
-  add_library(GundamCache STATIC ${SRCFILES})
+  add_library(${LIB_NAME} STATIC ${SRCFILES})
 else()
-  add_library(GundamCache SHARED ${SRCFILES})
+  add_library(${LIB_NAME} SHARED ${SRCFILES})
 endif()
 
 # Make sure the current directories are available for the later
 # compilation.
-target_include_directories( GundamCache PUBLIC
+target_include_directories( ${LIB_NAME} PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-target_link_libraries( GundamCache
+target_link_libraries( ${LIB_NAME}
     PUBLIC GundamDialDictionary GundamParametersManager GundamSamplesManager
 )
 
-#  set_target_properties(GundamCache PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")
+#  set_target_properties(${LIB_NAME} PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")
 
-install(TARGETS GundamCache DESTINATION lib)
+install(TARGETS ${LIB_NAME} DESTINATION lib)

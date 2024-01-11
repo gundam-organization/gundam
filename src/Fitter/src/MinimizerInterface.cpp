@@ -36,7 +36,7 @@ void MinimizerInterface::readConfigImpl(){
   _maxIterations_ = GenericToolbox::Json::fetchValue(_config_, {{"maxIterations"}, {"max_iter"}}, _maxIterations_ );
   _maxFcnCalls_ = GenericToolbox::Json::fetchValue(_config_, {{"maxFcnCalls"}, {"max_fcn"}}, _maxFcnCalls_ );
 
-  _enableSimplexBeforeMinimize_ = GenericToolbox::Json::fetchValue(_config_, "enableSimplexBeforeMinimize", _enableSimplexBeforeMinimize_);
+  _preFitWithSimplex_ = GenericToolbox::Json::fetchValue(_config_, "enableSimplexBeforeMinimize", _preFitWithSimplex_);
   _simplexMaxFcnCalls_ = GenericToolbox::Json::fetchValue(_config_, "simplexMaxFcnCalls", _simplexMaxFcnCalls_);
   _simplexToleranceLoose_ = GenericToolbox::Json::fetchValue(_config_, "simplexToleranceLoose", _simplexToleranceLoose_);
   _simplexStrategy_ = GenericToolbox::Json::fetchValue(_config_, "simplexStrategy", _simplexStrategy_);
@@ -74,7 +74,7 @@ void MinimizerInterface::initializeImpl(){
   getLikelihood().setMinimizerInfo(_minimizerType_,_minimizerAlgo_);
   getLikelihood().setTargetEDM(0.001*_tolerance_*2);
 
-  _minimizer_->SetFunction(*(getLikelihood().evalFitFunctor()));
+  _minimizer_->SetFunction(*(getLikelihood().getFunctor()));
   _minimizer_->SetStrategy(_strategy_);
   _minimizer_->SetPrintLevel(_printLevel_);
   _minimizer_->SetTolerance(_tolerance_);
@@ -139,7 +139,7 @@ void MinimizerInterface::minimize(){
   int nbFitCallOffset = getLikelihood().getNbFitCalls();
   LogInfo << "Fit call offset: " << nbFitCallOffset << std::endl;
 
-  if( _enableSimplexBeforeMinimize_ ){
+  if( _preFitWithSimplex_ ){
     LogWarning << "Running simplex algo before the minimizer" << std::endl;
     LogThrowIf(_minimizerType_ != "Minuit2", "Can't launch simplex with " << _minimizerType_);
 
@@ -153,9 +153,9 @@ void MinimizerInterface::minimize(){
     getLikelihood().setStateTitleMonitor("Running Simplex...");
 
     // SIMPLEX
-    getLikelihood().enableFitMonitor();
+    getLikelihood().getFitMonitor().isEnabled = true;
     _fitHasConverged_ = _minimizer_->Minimize();
-    getLikelihood().disableFitMonitor();
+    getLikelihood().getFitMonitor().isEnabled = false;
 
     // Make sure we are on the right spot
     updateCacheToBestfitPoint();
@@ -179,9 +179,9 @@ void MinimizerInterface::minimize(){
 
   getLikelihood().setStateTitleMonitor("Running " + _minimizer_->Options().MinimizerAlgorithm() + "...");
 
-  getLikelihood().enableFitMonitor();
+  getLikelihood().getFitMonitor().isEnabled = true;
   _fitHasConverged_ = _minimizer_->Minimize();
-  getLikelihood().disableFitMonitor();
+  getLikelihood().getFitMonitor().isEnabled = false;
 
   int nbMinimizeCalls = getLikelihood().getNbFitCalls() - nbFitCallOffset;
 
@@ -202,7 +202,7 @@ void MinimizerInterface::minimize(){
       TNamed("parameterStateAfterMinimize", GenericToolbox::Json::toReadableString( getPropagator().getParametersManager().exportParameterInjectorConfig() ).c_str() )
   );
 
-  getLikelihood().saveChi2History();
+  getLikelihood().writeChi2History();
   if( getLikelihood().isMonitorGradientDescent() ){ getLikelihood().saveGradientSteps(); }
 
   if( _fitHasConverged_ ){ LogInfo << "Minimization has converged!" << std::endl; }
@@ -318,9 +318,9 @@ void MinimizerInterface::calcErrors(){
     for( int iFitPar = 0 ; iFitPar < _minimizer_->NDim() ; iFitPar++ ){
       LogInfo << "Evaluating: " << _minimizer_->VariableName(iFitPar) << "..." << std::endl;
 
-      getLikelihood().enableFitMonitor();
+      getLikelihood().getFitMonitor().isEnabled = true;
       bool isOk = _minimizer_->GetMinosError(iFitPar, errLow, errHigh);
-      getLikelihood().disableFitMonitor();
+      getLikelihood().getFitMonitor().isEnabled = false;
 
 #if ROOT_VERSION_CODE >= ROOT_VERSION(6,23,02)
       LogWarning << GundamUtils::minosStatusCodeStr.at(_minimizer_->MinosStatus()) << std::endl;
@@ -355,9 +355,9 @@ void MinimizerInterface::calcErrors(){
 
     getLikelihood().setStateTitleMonitor("Running HESSE...");
 
-    getLikelihood().enableFitMonitor();
+    getLikelihood().getFitMonitor().isEnabled = true;
     _fitHasConverged_ = _minimizer_->Hesse();
-    getLikelihood().disableFitMonitor();
+    getLikelihood().getFitMonitor().isEnabled = false;
 
     LogInfo << "Hesse ended after " << getLikelihood().getNbFitCalls() - nbFitCallOffset << " calls." << std::endl;
     LogWarning << "HESSE status code: " << GundamUtils::hesseStatusCodeStr.at(_minimizer_->Status()) << std::endl;
@@ -431,8 +431,8 @@ void MinimizerInterface::saveMinimizerSettings(TDirectory* saveDir_) const {
   GenericToolbox::writeInTFile( saveDir_, TNamed("stepSizeScaling", std::to_string(_stepSizeScaling_).c_str()) );
   GenericToolbox::writeInTFile( saveDir_, TNamed("useNormalizedFitSpace", std::to_string(getLikelihood().getUseNormalizedFitSpace()).c_str()) );
 
-  if( _enableSimplexBeforeMinimize_ ){
-    GenericToolbox::writeInTFile( saveDir_, TNamed("enableSimplexBeforeMinimize", std::to_string(_enableSimplexBeforeMinimize_).c_str()) );
+  if( _preFitWithSimplex_ ){
+    GenericToolbox::writeInTFile( saveDir_, TNamed("enableSimplexBeforeMinimize", std::to_string(_preFitWithSimplex_).c_str()) );
     GenericToolbox::writeInTFile( saveDir_, TNamed("simplexMaxFcnCalls", std::to_string(_simplexMaxFcnCalls_).c_str()) );
     GenericToolbox::writeInTFile( saveDir_, TNamed("simplexToleranceLoose", std::to_string(_simplexToleranceLoose_).c_str()) );
     GenericToolbox::writeInTFile( saveDir_, TNamed("simplexStrategy", std::to_string(_simplexStrategy_).c_str()) );

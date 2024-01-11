@@ -17,8 +17,10 @@ class JsonBaseClass : public GenericToolbox::ConfigBaseClass<JsonType> {
 public:
   JsonBaseClass() = default;
 
-  void setConfig(const JsonType& config_) override;
-
+  void setConfig(const JsonType& config_) override{
+    _config_ = config_;
+    ConfigUtils::forwardConfig( _config_ );
+  }
 
 };
 

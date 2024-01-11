@@ -6,7 +6,6 @@
 #define GUNDAM_FITTERENGINE_H
 
 
-#include "Propagator.h"
 #include "LikelihoodInterface.h"
 #include "MinimizerBase.h"
 #include "JsonBaseClass.h"
@@ -27,7 +26,7 @@
 class FitterEngine : public JsonBaseClass {
 
 public:
-  explicit FitterEngine(TDirectory *saveDir_) : _saveDir_(saveDir_) {};
+  explicit FitterEngine( TDirectory *saveDir_ ) : _saveDir_(saveDir_) {};
 
   // Setters
   void setSaveDir(TDirectory *saveDir){ _saveDir_ = saveDir; }
@@ -46,12 +45,12 @@ public:
   // Getters (const)
   const JsonType &getPreFitParState() const{ return _preFitParState_; }
   const JsonType &getPostFitParState() const{ return _postFitParState_; }
-  [[nodiscard]] const Propagator& getPropagator() const{ return _propagator_; }
+  [[nodiscard]] const Propagator& getPropagator() const{ return _likelihood_.getPropagator(); }
   [[nodiscard]] const MinimizerBase& getMinimizer() const{ return *_minimizer_; }
   [[nodiscard]] const LikelihoodInterface& getLikelihood() const{ return _likelihood_; }
 
   // Getters (non-const)
-  Propagator& getPropagator(){ return _propagator_; }
+  Propagator& getPropagator(){ return _likelihood_.getPropagator(); }
   MinimizerBase& getMinimizer(){ return *_minimizer_; }
   LikelihoodInterface& getLikelihood(){ return _likelihood_; }
   TDirectory* getSaveDir(){ return _saveDir_; }
@@ -95,9 +94,10 @@ private:
 
   // Internals
   TDirectory* _saveDir_{nullptr};
-  Propagator _propagator_{};
+  LikelihoodInterface _likelihood_{};
   std::unique_ptr<MinimizerBase> _minimizer_{nullptr};
-  LikelihoodInterface _likelihood_{this};
+
+  // monitor?
   JsonType _preFitParState_{};
   JsonType _postFitParState_{};
 

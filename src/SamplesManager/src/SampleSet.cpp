@@ -55,6 +55,10 @@ void SampleSet::readConfigImpl(){
 
   _jointProbabilityPtr_->readConfig(configJointProbability);
   _jointProbabilityPtr_->initialize();
+
+
+
+
 }
 void SampleSet::initializeImpl() {
   LogWarning << __METHOD_NAME__ << std::endl;
