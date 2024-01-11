@@ -8,8 +8,8 @@
 #include "ConfigUtils.h"
 
 #include "Logger.h"
-#include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
+#include "GenericToolbox.Map.h"
 
 #include "TCanvas.h"
 #include "TH1D.h"
@@ -278,7 +278,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
         if( not histHolder.isData ) continue;
 
         // canvasPath may have the trailing splitVar -> need to check the beginning of the path with the External hist
-        if( not GenericToolbox::doesStringStartsWithSubstring(canvasPath, buildCanvasPath(&histHolder)) ) continue;
+        if( not GenericToolbox::startsWith(canvasPath, buildCanvasPath(&histHolder)) ) continue;
 
         // same sample?
         if( samplePtr != histHolder.fitSamplePtr ) continue;
@@ -760,7 +760,7 @@ void PlotGenerator::defineHistogramHolders() {
                   b.sortBins();
 
                   auto varList{b.buildVariableNameList()};
-                  LogThrowIf(varList.size()!=1, "Binning should be defined with only one variable, here: " << GenericToolbox::parseVectorAsString(varList))
+                  LogThrowIf(varList.size()!=1, "Binning should be defined with only one variable, here: " << GenericToolbox::toString(varList))
 
                   for(const auto& bin: b.getBinList()){
                     const auto& edges = bin.getVarEdges(varList[0]);

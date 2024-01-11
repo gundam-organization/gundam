@@ -14,15 +14,15 @@
 #include "DialCollection.h"
 #include "DialBaseFactory.h"
 
-#include "GenericToolbox.Root.LeafCollection.h"
-#include "GenericToolbox.VariablesMonitor.h"
+#include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Root.h"
-#include "GenericToolbox.h"
+#include "GenericToolbox.Map.h"
 #include "Logger.h"
 
 #include "TTreeFormulaManager.h"
-#include "TChain.h"
 #include "TChainElement.h"
+#include "TClonesArray.h"
+#include "TChain.h"
 #include "THn.h"
 
 #include <string>
@@ -92,7 +92,7 @@ void DataDispenser::load(){
   LogThrowIf(not this->isInitialized(), "Can't load while not initialized.");
   LogThrowIf(_sampleSetPtrToLoad_==nullptr, "SampleSet not specified.");
 
-  if(GundamGlobals::getVerboseLevel() >= MORE_PRINTOUT ){
+  if(GundamGlobals::getVerboseLevel() >= VerboseLevel::MORE_PRINTOUT ){
     LogDebug << "Configuration: " << _parameters_.getSummary() << std::endl;
   }
 
@@ -110,7 +110,7 @@ void DataDispenser::load(){
     return;
   }
 
-  LogInfo << "Data will be extracted from: " << GenericToolbox::parseVectorAsString(_parameters_.filePathList, true) << std::endl;
+  LogInfo << "Data will be extracted from: " << GenericToolbox::toString(_parameters_.filePathList, true) << std::endl;
   for( const auto& file: _parameters_.filePathList){
     std::string path = GenericToolbox::expandEnvironmentVariables(file);
     LogThrowIf(not GenericToolbox::doesTFileIsValid(path, {_parameters_.treePath}), "Invalid file: " << path);
@@ -149,7 +149,7 @@ void DataDispenser::buildSampleToFillList(){
 void DataDispenser::parseStringParameters() {
 
   auto replaceToyIndexFct = [&](std::string& formula_){
-    if( GenericToolbox::doesStringContainsSubstring(formula_, "<I_TOY>") ){
+    if( GenericToolbox::hasSubStr(formula_, "<I_TOY>") ){
       LogThrowIf(_parameters_.iThrow==-1, "<I_TOY> not set.");
       GenericToolbox::replaceSubstringInsideInputString(formula_, "<I_TOY>", std::to_string(_parameters_.iThrow));
     }
@@ -162,7 +162,7 @@ void DataDispenser::parseStringParameters() {
 
   if( not _parameters_.variableDict.empty() ){
     for( auto& entryDict : _parameters_.variableDict ){ replaceToyIndexFct(entryDict.second); }
-    LogInfo << "Variable dictionary: " << GenericToolbox::parseMapAsString(_parameters_.variableDict) << std::endl;
+    LogInfo << "Variable dictionary: " << GenericToolbox::toString(_parameters_.variableDict) << std::endl;
 
     for( auto& overrideEntry : _parameters_.variableDict ){
       _cache_.varsToOverrideList.emplace_back(overrideEntry.first);
@@ -303,7 +303,7 @@ void DataDispenser::fetchRequestedLeaves(){
         }
       }
     }
-    LogInfo << "DialCollection requests for indexing: " << GenericToolbox::parseVectorAsString(indexRequests) << std::endl;
+    LogInfo << "DialCollection requests for indexing: " << GenericToolbox::toString(indexRequests) << std::endl;
     for( auto& var : indexRequests ){ _cache_.addVarRequestedForIndexing(var); }
   }
 
@@ -317,7 +317,7 @@ void DataDispenser::fetchRequestedLeaves(){
         }
       }
     }
-    LogInfo << "Samples requests for indexing: " << GenericToolbox::parseVectorAsString(indexRequests) << std::endl;
+    LogInfo << "Samples requests for indexing: " << GenericToolbox::toString(indexRequests) << std::endl;
     for( auto& var : indexRequests ){ _cache_.addVarRequestedForIndexing(var); }
   }
 
@@ -334,7 +334,7 @@ void DataDispenser::fetchRequestedLeaves(){
       }
     }
 
-    LogInfo << "PlotGenerator requests for storage:" << GenericToolbox::parseVectorAsString(storeRequests) << std::endl;
+    LogInfo << "PlotGenerator requests for storage:" << GenericToolbox::toString(storeRequests) << std::endl;
     for (auto &var: storeRequests) { _cache_.addVarRequestedForStorage(var); }
   }
 
@@ -344,7 +344,7 @@ void DataDispenser::fetchRequestedLeaves(){
     for (auto &additionalLeaf: _parameters_.additionalVarsStorage) {
       GenericToolbox::addIfNotInVector(additionalLeaf, storeRequests);
     }
-    LogInfo << "Dataset additional requests for storage:" << GenericToolbox::parseVectorAsString(storeRequests) << std::endl;
+    LogInfo << "Dataset additional requests for storage:" << GenericToolbox::toString(storeRequests) << std::endl;
     for (auto &var: storeRequests) { _cache_.addVarRequestedForStorage(var); }
   }
 
@@ -354,7 +354,7 @@ void DataDispenser::fetchRequestedLeaves(){
     for (auto &var: _sampleSetPtrToLoad_->getAdditionalVariablesForStorage()) {
       GenericToolbox::addIfNotInVector(var, storeRequests);
     }
-    LogInfo << "SampleSet additional request for storage:" << GenericToolbox::parseVectorAsString(storeRequests) << std::endl;
+    LogInfo << "SampleSet additional request for storage:" << GenericToolbox::toString(storeRequests) << std::endl;
     for (auto &var: storeRequests) { _cache_.addVarRequestedForStorage(var); }
   }
 
@@ -374,12 +374,12 @@ void DataDispenser::fetchRequestedLeaves(){
       }
     }
 
-    LogInfo << "EventVariableTransformation requests for indexing: " << GenericToolbox::parseVectorAsString(indexRequests) << std::endl;
+    LogInfo << "EventVariableTransformation requests for indexing: " << GenericToolbox::toString(indexRequests) << std::endl;
     for( auto& var : indexRequests ){ _cache_.addVarRequestedForIndexing(var); }
   }
 
-  LogInfo << "Vars requested for indexing: " << GenericToolbox::parseVectorAsString(_cache_.varsRequestedForIndexing, false) << std::endl;
-  LogInfo << "Vars requested for storage: " << GenericToolbox::parseVectorAsString(_cache_.varsRequestedForStorage, false) << std::endl;
+  LogInfo << "Vars requested for indexing: " << GenericToolbox::toString(_cache_.varsRequestedForIndexing, false) << std::endl;
+  LogInfo << "Vars requested for storage: " << GenericToolbox::toString(_cache_.varsRequestedForStorage, false) << std::endl;
 
   // Now build the var to leaf translation
   for( auto& var : _cache_.varsRequestedForIndexing ){
@@ -759,7 +759,7 @@ void DataDispenser::eventSelectionFunction(int iThread_){
         for (size_t iSample = 0; iSample < _cache_.samplesToFillList.size(); iSample++) {
           _cache_.threadSelectionResults[iThread_].eventIsInSamplesList[iEntry][iSample] = false;
         }
-        if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
+        if (GundamGlobals::getVerboseLevel() == VerboseLevel::INLOOP_TRACE) {
           LogTrace << "Event #" << treeChain->GetFileNumber() << ":" << treeChain->GetReadEntry()
                    << " rejected because of " << _parameters_.selectionCutFormulaStr << std::endl;
         }
@@ -773,7 +773,7 @@ void DataDispenser::eventSelectionFunction(int iThread_){
       if( sampleCut.cutIndex == -1 ){
         _cache_.threadSelectionResults[iThread_].eventIsInSamplesList[iEntry][sampleCut.sampleIndex] = true;
         _cache_.threadSelectionResults[iThread_].sampleNbOfEvents[sampleCut.sampleIndex]++;
-        if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
+        if (GundamGlobals::getVerboseLevel() == VerboseLevel::INLOOP_TRACE) {
           LogDebug << "Event #" << treeChain->GetFileNumber() << ":" << treeChain->GetReadEntry()
                    << " included as sample " << sampleCut.sampleIndex << " (NO SELECTION CUT)" << std::endl;
         }
@@ -782,7 +782,7 @@ void DataDispenser::eventSelectionFunction(int iThread_){
       else if( lCollection.getLeafFormList()[sampleCut.cutIndex].evalAsDouble() != 0 ){
         _cache_.threadSelectionResults[iThread_].eventIsInSamplesList[iEntry][sampleCut.sampleIndex] = true;
         _cache_.threadSelectionResults[iThread_].sampleNbOfEvents[sampleCut.sampleIndex]++;
-        if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
+        if (GundamGlobals::getVerboseLevel() == VerboseLevel::INLOOP_TRACE) {
           LogDebug << "Event #" << treeChain->GetFileNumber() << ":" << treeChain->GetReadEntry()
                    << " included as sample " << sampleCut.sampleIndex << " because of "
                    << lCollection.getLeafFormList()[sampleCut.cutIndex].getSummary() << std::endl;
@@ -790,7 +790,7 @@ void DataDispenser::eventSelectionFunction(int iThread_){
       }
         // don't pass cut?
       else {
-        if (GundamGlobals::getVerboseLevel() == INLOOP_TRACE) {
+        if (GundamGlobals::getVerboseLevel() == VerboseLevel::INLOOP_TRACE) {
           LogTrace << "Event #" << treeChain->GetFileNumber() << ":" << treeChain->GetReadEntry()
                    << " rejected as sample " << sampleCut.sampleIndex << " because of "
                    << lCollection.getLeafFormList()[sampleCut.cutIndex].getSummary() << std::endl;
@@ -876,14 +876,14 @@ void DataDispenser::fillFunction(int iThread_){
   if( iThread_ == 0 ){
     if( not varTransformForIndexingList.empty() ){
       LogInfo << "EventVarTransformLib used for indexing: "
-              << GenericToolbox::iterableToString(
+              << GenericToolbox::toString(
                   varTransformForIndexingList,
                   [](const EventVarTransformLib* elm_){ return "\"" + elm_->getName() + "\"";}, false)
               << std::endl;
     }
     if( not varTransformForStorageList.empty() ){
       LogInfo << "EventVarTransformLib used for storage: "
-              << GenericToolbox::iterableToString(
+              << GenericToolbox::toString(
                   varTransformForStorageList,
                   []( const EventVarTransformLib* elm_){ return "\"" + elm_->getName() + "\""; }, false)
               << std::endl;
@@ -934,7 +934,7 @@ void DataDispenser::fillFunction(int iThread_){
           transformsList.emplace_back(varTransformForIndexing->getName());
         }
       }
-      table << GenericToolbox::parseVectorAsString(transformsList) << GenericToolbox::TablePrinter::NextColumn;
+      table << GenericToolbox::toString(transformsList) << GenericToolbox::TablePrinter::NextColumn;
     }
 
 

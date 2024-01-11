@@ -2,20 +2,21 @@
 // Created by Nadrino on 01/06/2021.
 //
 
+#include "MinimizerInterface.h"
+#include "GundamGlobals.h"
 #include "FitterEngine.h"
 #include "ConfigUtils.h"
 #include "GundamUtils.h"
 #include "GundamApp.h"
-#include "GundamGlobals.h"
-#include "MinimizerInterface.h"
 #ifdef GUNDAM_USING_CACHE_MANAGER
 #include "CacheManager.h"
 #endif
 
-#include "CmdLineParser.h"
-#include "Logger.h"
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.Json.h"
+#include "GenericToolbox.Map.h"
+#include "CmdLineParser.h"
+#include "Logger.h"
 
 #include <string>
 #include <vector>

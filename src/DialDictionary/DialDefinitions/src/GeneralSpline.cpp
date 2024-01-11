@@ -69,7 +69,7 @@ void GeneralSpline::buildDial(const std::vector<double>& xPoints,
     _splineData_[2 + 3*i + 2] = x;
   }
 
-//  LogThrow(GenericToolbox::parseVectorAsString(_splineData_));
+//  LogThrow(GenericToolbox::toString(_splineData_));
 }
 
 double GeneralSpline::evalResponse(const DialInputBuffer& input_) const {

@@ -5,9 +5,8 @@
 #include "ParametersManager.h"
 #include "ConfigUtils.h"
 
-#include "GenericToolbox.ScopedGuard.h"
+#include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Json.h"
-#include "GenericToolbox.h"
 #include "Logger.h"
 
 #include <sstream>
@@ -124,7 +123,7 @@ const ParameterSet* ParametersManager::getFitParameterSetPtr(const std::string& 
   std::vector<std::string> parSetNames{};
   parSetNames.reserve( _parameterSetList_.size() );
   for( auto& parSet : _parameterSetList_ ){ parSetNames.emplace_back(parSet.getName()); }
-  LogThrow("Could not find fit parameter set named \"" << name_ << "\" among defined: " << GenericToolbox::parseVectorAsString(parSetNames));
+  LogThrow("Could not find fit parameter set named \"" << name_ << "\" among defined: " << GenericToolbox::toString(parSetNames));
   return nullptr;
 }
 

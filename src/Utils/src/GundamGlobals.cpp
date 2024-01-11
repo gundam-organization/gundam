@@ -16,12 +16,11 @@ bool GundamGlobals::_disableDialCache_{false};
 bool GundamGlobals::_enableCacheManager_{false};
 bool GundamGlobals::_lightOutputMode_{false};
 std::mutex GundamGlobals::_threadMutex_;
-VerboseLevel GundamGlobals::_verboseLevel_{NORMAL_MODE};
+VerboseLevel GundamGlobals::_verboseLevel_{VerboseLevel::NORMAL_MODE};
 GenericToolbox::ParallelWorker GundamGlobals::_threadPool_;
 
 // setters
 void GundamGlobals::setVerboseLevel(VerboseLevel verboseLevel_){
   _verboseLevel_ = verboseLevel_;
-  LogWarning << "Verbose level set to: " << VerboseLevelEnumNamespace::toString(_verboseLevel_) << std::endl;
+  LogWarning << "Verbose level set to: " << _verboseLevel_.toString() << std::endl;
 }
-void GundamGlobals::setVerboseLevel(int verboseLevel_){ GundamGlobals::setVerboseLevel(static_cast<VerboseLevel>(verboseLevel_)); }

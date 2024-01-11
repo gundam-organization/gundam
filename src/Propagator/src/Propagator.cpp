@@ -12,9 +12,8 @@
 #include "GundamGlobals.h"
 #include "ConfigUtils.h"
 
-#include "GenericToolbox.TablePrinter.h"
+#include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Json.h"
-#include "GenericToolbox.h"
 
 #include <memory>
 #include <vector>
@@ -484,7 +483,7 @@ std::string Propagator::getLlhBufferSummary() const{
   std::stringstream ss;
   ss << "Total likelihood = " << getLlhBuffer();
   ss << std::endl << "Stat likelihood = " << getLlhStatBuffer();
-  ss << " = sum of: " << GenericToolbox::iterableToString(
+  ss << " = sum of: " << GenericToolbox::toString(
       _fitSampleSet_.getFitSampleList(), [](const Sample& sample_){
         std::stringstream ssSub;
         ssSub << sample_.getName() << ": ";
@@ -494,7 +493,7 @@ std::string Propagator::getLlhBufferSummary() const{
       }
   );
   ss << std::endl << "Penalty likelihood = " << getLlhPenaltyBuffer();
-  ss << " = sum of: " << GenericToolbox::iterableToString(
+  ss << " = sum of: " << GenericToolbox::toString(
       _parManager_.getParameterSetsList(), [](const ParameterSet& parSet_){
         std::stringstream ssSub;
         ssSub << parSet_.getName() << ": ";

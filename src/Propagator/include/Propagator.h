@@ -6,17 +6,17 @@
 #define GUNDAM_PROPAGATOR_H
 
 
-#include "DatasetLoader.h"
-#include "PlotGenerator.h"
-#include "EventTreeWriter.h"
-#include "SampleSet.h"
 #include "ParametersManager.h"
-#include "JsonBaseClass.h"
-#include "ParScanner.h"
+#include "EventTreeWriter.h"
 #include "DialCollection.h"
 #include "EventDialCache.h"
+#include "DatasetLoader.h"
+#include "PlotGenerator.h"
+#include "JsonBaseClass.h"
+#include "ParScanner.h"
+#include "SampleSet.h"
 
-#include "GenericToolbox.CycleTimer.h"
+#include "GenericToolbox.Time.h"
 
 #include <vector>
 #include <map>
@@ -131,9 +131,9 @@ private:
   EventDialCache _eventDialCache_{};
 
 public:
-  GenericToolbox::CycleTimer dialUpdate;
-  GenericToolbox::CycleTimer weightProp;
-  GenericToolbox::CycleTimer fillProp;
+  GenericToolbox::Time::CycleTimer dialUpdate;
+  GenericToolbox::Time::CycleTimer weightProp;
+  GenericToolbox::Time::CycleTimer fillProp;
 
 };
 #endif //GUNDAM_PROPAGATOR_H

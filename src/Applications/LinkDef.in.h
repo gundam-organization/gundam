@@ -16,8 +16,7 @@
 #pragma link C++ nestedtypedef;
 
 #pragma link C++ defined_in "@CMAKE_SOURCE_DIR@/submodules/cpp-generic-toolbox/include/GenericToolbox.Root.h";
-#pragma link C++ defined_in "@CMAKE_SOURCE_DIR@/submodules/cpp-generic-toolbox/include/GenericToolbox.RawDataArray.h";
-#pragma link C++ defined_in "@CMAKE_SOURCE_DIR@/submodules/cpp-generic-toolbox/include/GenericToolbox.CorrelatedVariablesSampler.h";
+#pragma link C++ defined_in "@CMAKE_SOURCE_DIR@/submodules/cpp-generic-toolbox/include/GenericToolbox.Utils.h";
 #pragma link C++ defined_in "@CMAKE_SOURCE_DIR@/submodules/simple-cpp-logger/include/Logger.h";
 
 #endif

@@ -10,7 +10,7 @@
 #include "EventDialCache.h"
 #include "PhysicsEvent.h"
 
-#include "GenericToolbox.ConfigBaseClass.h"
+#include "GenericToolbox.Utils.h"
 
 #include <TDirectory.h>
 

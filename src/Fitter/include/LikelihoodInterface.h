@@ -7,8 +7,8 @@
 
 #include "ParameterSet.h"
 
-#include "GenericToolbox.VariablesMonitor.h"
-#include "GenericToolbox.CycleTimer.h"
+#include "GenericToolbox.Utils.h"
+#include "GenericToolbox.Time.h"
 
 #include "Math/Functor.h"
 
@@ -219,10 +219,10 @@ private:
 
   // Output monitors!
   GenericToolbox::VariablesMonitor _convergenceMonitor_;
-  GenericToolbox::CycleTimer _evalFitAvgTimer_;
-  GenericToolbox::CycleTimer _outEvalFitAvgTimer_;
-  GenericToolbox::CycleTimer _itSpeed_;
-  GenericToolbox::CycleClock _itSpeedMon_{"it"};
+  GenericToolbox::Time::CycleTimer _evalFitAvgTimer_;
+  GenericToolbox::Time::CycleTimer _outEvalFitAvgTimer_;
+  GenericToolbox::Time::CycleTimer _itSpeed_;
+  GenericToolbox::Time::CycleClock _itSpeedMon_{"it"};
 
   /// Parameters to control how the monitor behaves.
   bool _enableFitMonitor_{false};

@@ -9,14 +9,15 @@
 
 #include "CmdLineParser.h"
 #include "Logger.h"
-#include "GenericToolbox.h"
+#include "GenericToolbox.Map.h"
 #include "GenericToolbox.Root.h"
-#include "GenericToolbox.TablePrinter.h"
+#include "GenericToolbox.Utils.h"
 
 #include <TMatrixDEigen.h>
 
 #include <string>
 #include <vector>
+#include <map>
 
 
 LoggerInit([]{
@@ -85,9 +86,9 @@ int main(int argc, char** argv){
     auto outDir{GenericToolbox::joinPath(
         (clParser.isOptionTriggered("outFolder") ?
           clParser.getOptionVal<std::string>("outFolder"):
-          GenericToolbox::getFolderPathFromFilePath(file).empty() ? "./" : GenericToolbox::getFolderPathFromFilePath(file)
+          GenericToolbox::getFolderPath(file).empty() ? "./" : GenericToolbox::getFolderPath(file)
         ),
-        GenericToolbox::getFileNameFromFilePath(file, false)
+        GenericToolbox::getFileName(file, false)
     )};
 
     if( clParser.isOptionTriggered("extractDataToDisk") ){
@@ -115,7 +116,7 @@ int main(int argc, char** argv){
          {GenericToolbox::joinPath(gundamDirName, "unfoldedConfig_TNamed")}},
         [&](TNamed* obj_){
       if( clParser.isOptionTriggered("extractDataToDisk") ){
-        if( not GenericToolbox::doesPathIsFolder(outDir) ){ GenericToolbox::mkdirPath(outDir); }
+        if( not GenericToolbox::isDir(outDir) ){ GenericToolbox::mkdir(outDir); }
         auto outConfigPath = GenericToolbox::joinPath(outDir, "config.json");
         LogInfo << blueLightText << "Writing unfolded config under: " << resetColor << outConfigPath << std::endl;
         GenericToolbox::dumpStringInFile( outConfigPath, obj_->GetTitle() );
@@ -174,7 +175,7 @@ int main(int argc, char** argv){
         }
         if( clParser.isOptionTriggered("extractDataToDisk") ){
           auto outSubDir{GenericToolbox::joinPath( outDir, pathPreFit)};
-          if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
+          if( not GenericToolbox::isDir( outSubDir ) ){ GenericToolbox::mkdir( outSubDir ); }
           auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".txt");
           LogInfo << blueLightText << "Writing pre-fit LLH stats under: " << resetColor << outConfigPath << std::endl;
           GenericToolbox::dumpStringInFile( outConfigPath, injectorStr->GetTitle() );
@@ -187,7 +188,7 @@ int main(int argc, char** argv){
         }
         if( clParser.isOptionTriggered("extractDataToDisk") ){
           auto outSubDir{GenericToolbox::joinPath( outDir, pathPreFit)};
-          if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
+          if( not GenericToolbox::isDir( outSubDir ) ){ GenericToolbox::mkdir( outSubDir ); }
           auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".json");
           LogInfo << blueLightText << "Writing pre-fit LLH parameter injector under: " << resetColor << outConfigPath << std::endl;
           GenericToolbox::dumpStringInFile( outConfigPath, injectorStr->GetTitle() );
@@ -220,7 +221,7 @@ int main(int argc, char** argv){
         LogInfo << blueLightText << "Post-fit Likelihood state: " << resetColor << injectorStr->GetTitle() << std::endl;
         if( clParser.isOptionTriggered("extractDataToDisk") ){
           auto outSubDir{GenericToolbox::joinPath( outDir, pathPostFit)};
-          if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
+          if( not GenericToolbox::isDir( outSubDir ) ){ GenericToolbox::mkdir( outSubDir ); }
           auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".txt");
           LogInfo << blueLightText << "Writing post-fit LLH stats under: " << resetColor << outConfigPath << std::endl;
           GenericToolbox::dumpStringInFile( outConfigPath, injectorStr->GetTitle() );
@@ -232,7 +233,7 @@ int main(int argc, char** argv){
         }
         if( clParser.isOptionTriggered("extractDataToDisk") ){
           auto outSubDir{GenericToolbox::joinPath( outDir, pathPostFit)};
-          if( not GenericToolbox::doesPathIsFolder( outSubDir ) ){ GenericToolbox::mkdirPath( outSubDir ); }
+          if( not GenericToolbox::isDir( outSubDir ) ){ GenericToolbox::mkdir( outSubDir ); }
           auto outConfigPath = GenericToolbox::joinPath( outSubDir, std::string(injectorStr->GetName()) + ".json");
           LogInfo << blueLightText << "Writing post-fit LLH parameter injector under: " << resetColor << outConfigPath << std::endl;
           GenericToolbox::dumpStringInFile( outConfigPath, injectorStr->GetTitle() );

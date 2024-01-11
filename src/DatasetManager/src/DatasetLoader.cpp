@@ -4,16 +4,13 @@
 
 #include "DatasetLoader.h"
 
-#include "GundamGlobals.h"
+#include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Json.h"
-
-#include "GenericToolbox.h"
-#include "GenericToolbox.Root.h"
-#include "GenericToolbox.VariablesMonitor.h"
+#include "GenericToolbox.Map.h"
 #include "Logger.h"
 
-#include <TTreeFormulaManager.h>
-#include "TTree.h"
+#include "TTreeFormulaManager.h"
+
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[DataSetLoader]");
@@ -67,7 +64,7 @@ void DatasetLoader::initializeImpl() {
 
   if( not GenericToolbox::doesKeyIsInMap(_selectedDataEntry_, _dataDispenserDict_) ){
     LogThrow("selectedDataEntry could not be find in available data: "
-                 << GenericToolbox::iterableToString(_dataDispenserDict_, [](const std::pair<std::string, DataDispenser>& elm){ return elm.first; })
+                 << GenericToolbox::toString(_dataDispenserDict_, [](const std::pair<std::string, DataDispenser>& elm){ return elm.first; })
                  << std::endl);
   }
 }

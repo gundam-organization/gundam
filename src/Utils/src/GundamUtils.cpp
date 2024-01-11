@@ -6,7 +6,7 @@
 #include "VersionConfig.h" // the only place it is included
 
 #include "Logger.h"
-#include "GenericToolbox.h"
+#include "GenericToolbox.Root.h"
 
 #include <sstream>
 
@@ -66,7 +66,7 @@ namespace GundamUtils {
           auto args = clp_.getOptionValList<std::string>(appendixDictEntry.first);
           for( auto& arg : args ){
             // strip potential slashes and extensions
-            arg = GenericToolbox::getFileNameFromFilePath(arg, false);
+            arg = GenericToolbox::getFileName(arg, false);
             if( arg.size() > maxArgLength ){
               // print dotdot if too long
               arg = arg.substr(0, maxArgLength);

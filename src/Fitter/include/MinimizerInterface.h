@@ -10,9 +10,8 @@
 #include "MinimizerBase.h"
 #include "JsonBaseClass.h"
 
-#include "GenericToolbox.VariablesMonitor.h"
-#include "GenericToolbox.CycleTimer.h"
-#include "GenericToolbox.RawDataArray.h"
+#include "GenericToolbox.Utils.h"
+#include "GenericToolbox.Time.h"
 
 #include "Math/Minimizer.h"
 #include "Math/Functor.h"
