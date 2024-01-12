@@ -21,6 +21,12 @@
 #include <memory>
 
 
+#define ENUM_NAME MinimizerType
+#define ENUM_FIELDS \
+  ENUM_FIELD( RootFactory, 0 ) \
+  ENUM_FIELD( SimpleMCMC )
+#include "GenericToolbox.MakeEnum.h"
+
 class FitterEngine : public JsonBaseClass {
 
 public:
@@ -43,14 +49,14 @@ public:
   // Getters (const)
   const JsonType &getPreFitParState() const{ return _preFitParState_; }
   const JsonType &getPostFitParState() const{ return _postFitParState_; }
-  [[nodiscard]] const Propagator& getPropagator() const{ return _likelihood_.getPropagator(); }
+  [[nodiscard]] const Propagator& getPropagator() const{ return _likelihoodInterface_.getPropagator(); }
   [[nodiscard]] const MinimizerBase& getMinimizer() const{ return *_minimizer_; }
-  [[nodiscard]] const LikelihoodInterface& getLikelihood() const{ return _likelihood_; }
+  [[nodiscard]] const LikelihoodInterface& getLikelihood() const{ return _likelihoodInterface_; }
 
   // Getters (non-const)
-  Propagator& getPropagator(){ return _likelihood_.getPropagator(); }
+  Propagator& getPropagator(){ return _likelihoodInterface_.getPropagator(); }
   MinimizerBase& getMinimizer(){ return *_minimizer_; }
-  LikelihoodInterface& getLikelihood(){ return _likelihood_; }
+  LikelihoodInterface& getLikelihood(){ return _likelihoodInterface_; }
   TDirectory* getSaveDir(){ return _saveDir_; }
 
   // Core
@@ -92,8 +98,9 @@ private:
 
   // Internals
   TDirectory* _saveDir_{nullptr};
-  LikelihoodInterface _likelihood_{};
-  std::unique_ptr<MinimizerBase> _minimizer_{nullptr};
+  LikelihoodInterface _likelihoodInterface_{};
+  MinimizerType _minimizerType_{};
+  std::unique_ptr<MinimizerBase> _minimizer_{};
 
   // monitor?
   JsonType _preFitParState_{};

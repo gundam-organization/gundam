@@ -3,7 +3,7 @@
 //
 
 #include "LikelihoodInterface.h"
-#include "MinimizerInterface.h"
+#include "RootFactoryInterface.h"
 #include "FitterEngine.h"
 #include "GenericToolbox.Json.h"
 #include "GundamGlobals.h"
@@ -23,7 +23,7 @@ LoggerInit([]{
 });
 
 
-void MinimizerInterface::readConfigImpl(){
+void RootFactoryInterface::readConfigImpl(){
   MinimizerBase::readConfigImpl();
   LogInfo << "Reading minimizer config..." << std::endl;
 
@@ -55,7 +55,7 @@ void MinimizerInterface::readConfigImpl(){
   }
 
 }
-void MinimizerInterface::initializeImpl(){
+void RootFactoryInterface::initializeImpl(){
   MinimizerBase::initializeImpl();
   LogInfo << "Initializing the minimizer..." << std::endl;
 
@@ -108,7 +108,7 @@ void MinimizerInterface::initializeImpl(){
 }
 
 // overridden getters
-double MinimizerInterface::getTargetEdm() const{
+double RootFactoryInterface::getTargetEdm() const{
   // Migrad: The default tolerance is 0.1, and the minimization will stop
   // when the estimated vertical distance to the minimum (EDM) is less
   // than 0.001*[tolerance]*UP (see SET ERR).
@@ -120,7 +120,7 @@ double MinimizerInterface::getTargetEdm() const{
 }
 
 // core overrides
-void MinimizerInterface::minimize(){
+void RootFactoryInterface::minimize(){
   LogThrowIf(not isInitialized(), "not initialized");
 
   printMinimizerFitParameters();
@@ -295,7 +295,7 @@ void MinimizerInterface::minimize(){
   this->writePostFitData(GenericToolbox::mkdirTFile(owner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_)));
   GenericToolbox::triggerTFileWrite(GenericToolbox::mkdirTFile(owner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_)));
 }
-void MinimizerInterface::calcErrors(){
+void RootFactoryInterface::calcErrors(){
   LogThrowIf(not isInitialized(), "not initialized");
 
   int nbFitCallOffset = getLikelihood().getNbFitCalls();
@@ -393,7 +393,7 @@ void MinimizerInterface::calcErrors(){
     LogError << GET_VAR_NAME_VALUE(_errorAlgo_) << " not implemented." << std::endl;
   }
 }
-void MinimizerInterface::scanParameters(TDirectory* saveDir_){
+void RootFactoryInterface::scanParameters( TDirectory* saveDir_){
   LogThrowIf(not isInitialized());
   LogInfo << "Performing scans of fit parameters..." << std::endl;
   for( int iPar = 0 ; iPar < getMinimizer()->NDim() ; iPar++ ){
@@ -417,7 +417,7 @@ void MinimizerInterface::scanParameters(TDirectory* saveDir_){
 }
 
 // misc
-void MinimizerInterface::saveMinimizerSettings(TDirectory* saveDir_) const {
+void RootFactoryInterface::saveMinimizerSettings( TDirectory* saveDir_) const {
   LogInfo << "Saving minimizer settings..." << std::endl;
 
   GenericToolbox::writeInTFile( saveDir_, TNamed("minimizerType", _minimizerType_.c_str()) );
@@ -445,7 +445,7 @@ void MinimizerInterface::saveMinimizerSettings(TDirectory* saveDir_) const {
 }
 
 // protected
-void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
+void RootFactoryInterface::writePostFitData( TDirectory* saveDir_) {
   LogInfo << __METHOD_NAME__ << std::endl;
   LogThrowIf(not isInitialized(), "not initialized");
   LogThrowIf(saveDir_==nullptr, "Save dir not specified");
@@ -1138,7 +1138,7 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
 
   } // parSet
 }
-void MinimizerInterface::updateCacheToBestfitPoint(){
+void RootFactoryInterface::updateCacheToBestfitPoint(){
   LogThrowIf(_minimizer_->X() == nullptr, "No best fit point provided by the minimizer.");
 
   LogWarning << "Updating propagator cache to the best fit point..." << std::endl;

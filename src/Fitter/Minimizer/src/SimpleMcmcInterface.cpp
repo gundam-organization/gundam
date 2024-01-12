@@ -3,7 +3,7 @@
 //
 
 #include "LikelihoodInterface.h"
-#include "MCMCInterface.h"
+#include "SimpleMcmcInterface.h"
 #include "FitterEngine.h"
 #include "GenericToolbox.Json.h"
 #include "GundamGlobals.h"
@@ -18,7 +18,7 @@ LoggerInit([]{
 });
 
 
-void MCMCInterface::readConfigImpl(){
+void SimpleMcmcInterface::readConfigImpl(){
   MinimizerBase::readConfigImpl();
   LogInfo << "Reading minimizer config..." << std::endl;
 
@@ -205,7 +205,7 @@ void MCMCInterface::readConfigImpl(){
   _simpleSigma_ = GenericToolbox::Json::fetchValue(_config_,
                                         "simpleSigma", _simpleSigma_);
 }
-void MCMCInterface::initializeImpl(){
+void SimpleMcmcInterface::initializeImpl(){
   MinimizerBase::initializeImpl();
   LogInfo << "Initializing the MCMC Integration..." << std::endl;
 
@@ -220,7 +220,7 @@ void MCMCInterface::initializeImpl(){
 }
 
 /// Copy the current parameter values to the tree.
-void MCMCInterface::fillPoint(bool fillModel) {
+void SimpleMcmcInterface::fillPoint( bool fillModel) {
   int count = 0;
   for (const ParameterSet& parSet: getPropagator().getParametersManager().getParameterSetsList()) {
     for (const Parameter& iPar : parSet.getParameterList()) {
@@ -251,9 +251,9 @@ void MCMCInterface::fillPoint(bool fillModel) {
   }
 }
 
-bool MCMCInterface::adaptiveRestoreState(AdaptiveStepMCMC& mcmc,
-                                         const std::string& fileName,
-                                         const std::string& treeName) {
+bool SimpleMcmcInterface::adaptiveRestoreState( AdaptiveStepMCMC& mcmc,
+                                                const std::string& fileName,
+                                                const std::string& treeName) {
 
   // No filename so, no restoration.
   if (fileName.empty()) return false;
@@ -299,8 +299,8 @@ bool MCMCInterface::adaptiveRestoreState(AdaptiveStepMCMC& mcmc,
 
   return true;
 }
-bool MCMCInterface::adaptiveDefaultProposalCovariance(AdaptiveStepMCMC& mcmc,
-                                                 Vector& prior) {
+bool SimpleMcmcInterface::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
+                                                             Vector& prior) {
 
   /// Set the diagonal elements for the parameters.
   int count0 = 0;
@@ -387,10 +387,10 @@ bool MCMCInterface::adaptiveDefaultProposalCovariance(AdaptiveStepMCMC& mcmc,
 
   return true;
 }
-bool MCMCInterface::adaptiveLoadProposalCovariance(AdaptiveStepMCMC& mcmc,
-                                              Vector& prior,
-                                              const std::string& fileName,
-                                              const std::string& histName) {
+bool SimpleMcmcInterface::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
+                                                          Vector& prior,
+                                                          const std::string& fileName,
+                                                          const std::string& histName) {
   // No filename so, no restoration.
   if (fileName.empty()) return false;
 
@@ -492,7 +492,7 @@ bool MCMCInterface::adaptiveLoadProposalCovariance(AdaptiveStepMCMC& mcmc,
 
   return true;
 }
-void MCMCInterface::setupAndRunAdaptiveStep(AdaptiveStepMCMC& mcmc) {
+void SimpleMcmcInterface::setupAndRunAdaptiveStep( AdaptiveStepMCMC& mcmc) {
 
   mcmc.GetProposeStep().SetDim(getMinimizerFitParameterPtr().size());
   mcmc.GetLogLikelihood().functor = getLikelihood().getValidFunctor();
@@ -710,7 +710,7 @@ void MCMCInterface::setupAndRunAdaptiveStep(AdaptiveStepMCMC& mcmc) {
   LogInfo << "Finished running chains" << std::endl;
 
 }
-void MCMCInterface::setupAndRunSimpleStep(SimpleStepMCMC& mcmc) {
+void SimpleMcmcInterface::setupAndRunSimpleStep( SimpleStepMCMC& mcmc) {
 
   mcmc.GetProposeStep().SetDim(getMinimizerFitParameterPtr().size());
   mcmc.GetLogLikelihood().functor = getLikelihood().getFunctor();
@@ -779,7 +779,7 @@ void MCMCInterface::setupAndRunSimpleStep(SimpleStepMCMC& mcmc) {
 
 }
 
-void MCMCInterface::minimize() {
+void SimpleMcmcInterface::minimize() {
   LogThrowIf(not isInitialized(), "not initialized");
 
   printMinimizerFitParameters();
@@ -912,10 +912,10 @@ void MCMCInterface::minimize() {
   if (outputTree) outputTree->Write();
 
 }
-void MCMCInterface::calcErrors() {
+void SimpleMcmcInterface::calcErrors() {
     LogWarning << "Errors not calculated with MCMC" << std::endl;
 }
-void MCMCInterface::scanParameters(TDirectory* saveDir_) {
+void SimpleMcmcInterface::scanParameters( TDirectory* saveDir_) {
   LogThrowIf(not isInitialized());
   LogInfo << "Performing scans of fit parameters..." << std::endl;
   for(Parameter* par : getMinimizerFitParameterPtr()) {

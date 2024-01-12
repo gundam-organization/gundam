@@ -27,6 +27,7 @@
 class LikelihoodInterface : public JsonBaseClass {
 
   struct Monitor;
+  struct Buffer;
 
 protected:
   // called through public JsonBaseClass::readConfig() and JsonBaseClass::initialize()
@@ -51,6 +52,7 @@ public:
   [[nodiscard]] int getNbFreePars() const {return _nbFreePars_; }
   [[nodiscard]] int getNbFitBins() const {return _nbFitBins_; }
   const Propagator& getPropagator() const { return _propagator_; }
+  const Buffer& getBuffer() const { return _buffer_; }
 
   // mutable getters
   Propagator& getPropagator(){ return _propagator_; }
@@ -63,6 +65,7 @@ public:
   double evalLikelihood( const double* parArray_);
   double evalFitValid(const double* parArray_);
 
+  double evalLikelihood();
   double evalStatLikelihood();
 
   void writeChi2History();

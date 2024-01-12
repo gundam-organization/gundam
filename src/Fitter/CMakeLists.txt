@@ -5,8 +5,8 @@ set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/Engine/src/FitterEngine.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/MinimizerBase.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/MinimizerInterface.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/MCMCInterface.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/RootFactoryInterface.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/SimpleMcmcInterface.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/Likelihood/src/LikelihoodInterface.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Likelihood/src/JointProbability.cpp

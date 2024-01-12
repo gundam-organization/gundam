@@ -58,9 +58,6 @@ protected:
   void printMinimizerFitParameters();
 
 private:
-  /// Save a copy of the address of the engine that owns this object.
-  FitterEngine* _owner_{nullptr};
-
   bool _enablePostFitErrorEval_{true};
 
 };

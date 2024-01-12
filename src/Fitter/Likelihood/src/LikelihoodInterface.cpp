@@ -66,7 +66,6 @@ void LikelihoodInterface::initializeImpl() {
   _convergenceMonitor_.addVariable("Stat");
   _convergenceMonitor_.addVariable("Syst");
 
-
 }
 
 void LikelihoodInterface::writeChi2History() {
@@ -182,20 +181,6 @@ double LikelihoodInterface::evalLikelihood( const double* parArray_ ){
     if( getUseNormalizedFitSpace() ) par->setParameterValue(ParameterSet::toRealParValue(parArray_[iFitPar++], *par));
     else par->setParameterValue(parArray_[iFitPar++]);
   }
-
-
-  _propagator_.propagateParameters();
-
-  this->evalStatLikelihood();
-
-  _buffer_.penaltyLikelihood = 0;
-  for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
-    _buffer_.penaltyLikelihood += parSet.getPenaltyChi2();
-  }
-
-  _buffer_.regulariseLikelihood = 0; // unused
-
-  _buffer_.totalLikelihood = _buffer_.statLikelihood + _buffer_.penaltyLikelihood + _buffer_.regulariseLikelihood;
 
   _evalFitAvgTimer_.counts++; _evalFitAvgTimer_.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 
@@ -332,7 +317,23 @@ double LikelihoodInterface::evalLikelihood( const double* parArray_ ){
   }
 
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("out_evalFit");
-  return _propagator_.getLlhBuffer();
+  return _buffer_.totalLikelihood;
+}
+double LikelihoodInterface::evalLikelihood(){
+  _propagator_.propagateParameters();
+
+  this->evalStatLikelihood();
+
+  _buffer_.penaltyLikelihood = 0;
+  for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
+    _buffer_.penaltyLikelihood += parSet.getPenaltyChi2();
+  }
+
+  _buffer_.regulariseLikelihood = 0; // unused
+
+  _buffer_.totalLikelihood = _buffer_.statLikelihood + _buffer_.penaltyLikelihood + _buffer_.regulariseLikelihood;
+
+  return _buffer_.totalLikelihood;
 }
 double LikelihoodInterface::evalStatLikelihood(){
 

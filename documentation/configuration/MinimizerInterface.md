@@ -1,4 +1,4 @@
-## MinimizerInterface
+## RootFactoryInterface
 
 [< back to parent (FitterEngine)](./FitterEngine.md)
 

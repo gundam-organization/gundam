@@ -24,20 +24,18 @@
 #define MCMC_ERROR LogError
 #include "TSimpleMCMC.H"
 
-class FitterEngine;
-
 /// Run generate an MCMC doing a Bayesian integration of the likelihood. The
 /// parameters are assumed to have a uniform metric, and the priors are
 /// defined as part of the propagator (i.e. included in the
 /// LikelihoodInterface).
-class MCMCInterface : public MinimizerBase {
+class SimpleMcmcInterface : public MinimizerBase {
 
 protected:
   void readConfigImpl() override;
   void initializeImpl() override;
 
 public:
-  explicit MCMCInterface(FitterEngine* owner_): MinimizerBase(owner_){}
+  SimpleMcmcInterface(): MinimizerBase() {}
 
   /// Local RTTI
   [[nodiscard]] std::string getMinimizerTypeName() const override { return "MCMCInterface"; };

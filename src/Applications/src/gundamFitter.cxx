@@ -2,7 +2,7 @@
 // Created by Nadrino on 01/06/2021.
 //
 
-#include "MinimizerInterface.h"
+#include "RootFactoryInterface.h"
 #include "GundamGlobals.h"
 #include "FitterEngine.h"
 #include "ConfigUtils.h"
@@ -315,7 +315,7 @@ int main(int argc, char** argv){
   if( clParser.isOptionTriggered("skipSimplex") ){
     LogAlert << "Explicitly disabling SIMPLEX first pass" << std::endl;
     LogThrowIf( fitter.getMinimizer().getMinimizerTypeName() != "MinimizerInterface", "invalid option --skip-simplex" );
-    ((MinimizerInterface*) &fitter.getMinimizer())->setEnableSimplexBeforeMinimize( false );
+    ((RootFactoryInterface*) &fitter.getMinimizer())->setEnableSimplexBeforeMinimize(false );
   }
 
 

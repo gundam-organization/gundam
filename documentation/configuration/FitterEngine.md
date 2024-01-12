@@ -9,7 +9,7 @@
 | FitterEngine Options                                     | Type         | Description                                                                   | Default |
 |----------------------------------------------------------|--------------|-------------------------------------------------------------------------------|---------|
 | [propagatorConfig](./Propagator.md)                      | json         | Propagator config                                                             |         |
-| [minimizerConfig](./MinimizerInterface.md)               | json         | MinimizerInterface config                                                     |         |
+| [minimizerConfig](./RootFactoryInterface.md)               | json         | RootFactoryInterface config                                                     |         |
 | [scanConfig](./ParScanner.md)                            | json         | Scan config                                                                   |         |
 | enablePreFitScan                                         | bool         | Run fit parameter scan right before the minimization                          | false   |
 | enablePostFitScan                                        | bool         | Run fit parameter scan right after the minimization                           | false   |

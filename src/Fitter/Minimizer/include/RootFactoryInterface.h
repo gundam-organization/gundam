@@ -2,8 +2,8 @@
 // Created by Adrien BLANCHET on 16/12/2021.
 //
 
-#ifndef GUNDAM_MINIMIZERINTERFACE_H
-#define GUNDAM_MINIMIZERINTERFACE_H
+#ifndef GUNDAM_ROOTFACTORYINTERFACE_H
+#define GUNDAM_ROOTFACTORYINTERFACE_H
 
 
 #include "ParameterSet.h"
@@ -21,16 +21,15 @@
 #include <memory>
 #include <vector>
 
-class FitterEngine;
 
-class MinimizerInterface : public MinimizerBase {
+class RootFactoryInterface : public MinimizerBase {
 
 protected:
   void readConfigImpl() override;
   void initializeImpl() override;
 
 public:
-  explicit MinimizerInterface(FitterEngine* owner_): MinimizerBase(owner_) {} // forwarding owner
+  RootFactoryInterface(): MinimizerBase() {}
 
   // setters
   void setEnableSimplexBeforeMinimize(bool enableSimplexBeforeMinimize_){ _preFitWithSimplex_ = enableSimplexBeforeMinimize_; }
@@ -77,7 +76,7 @@ private:
   unsigned int _simplexMaxFcnCalls_{1000};
 
   std::string _minimizerType_{"Minuit2"};
-  std::string _minimizerAlgo_{};
+  std::string _minimizerAlgo_{"Migrad"};
   std::string _errorAlgo_{"Hesse"};
 
   // internals
@@ -86,4 +85,4 @@ private:
   std::unique_ptr<ROOT::Math::Minimizer> _minimizer_{nullptr};
 
 };
-#endif //GUNDAM_MINIMIZERINTERFACE_H
+#endif //GUNDAM_ROOTFACTORYINTERFACE_H
