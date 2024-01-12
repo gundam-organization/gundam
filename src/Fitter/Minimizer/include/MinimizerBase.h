@@ -17,14 +17,7 @@
 #include <vector>
 #include <string>
 
-class FitterEngine;
 
-/// An (almost) abstract base class for minimizer interfaces.  Classes derived
-/// from MinimizerBase are used by the FitterEngine to run different types of
-/// fits (primarily a MINUIT based maximization of the likelihood the fits).
-/// Classes need to implement two worker methods.  The minimize() method is
-/// expected to find the minimim of the LLH function (or Chi-Squared), and the
-/// calcErrors() is expected to calculate the covariance of the LLH function.
 class MinimizerBase : public JsonBaseClass {
 
 protected:
@@ -32,30 +25,15 @@ protected:
   void initializeImpl() override;
 
 public:
-  explicit MinimizerBase(FitterEngine* owner_): _owner_(owner_){}
+  MinimizerBase() = default;
 
   /// Local RTTI
   [[nodiscard]] virtual std::string getMinimizerTypeName() const { return "MinimizerBase"; };
-
-  /// A pure virtual method that is called by the FitterEngine to find the
-  /// minimum of the likelihood, or, in the case of a Bayesian integration find
-  /// the posterior distribution.
-  virtual void minimize() = 0;
-
-  /// A pure virtual method that is called by the FiterEngine to calculate the
-  /// covariance at best fit point.  In the case of a Bayesian integration, it
-  /// should either be skipped, or the covariance can be filled using
-  /// information from the posterior.
-  virtual void calcErrors() = 0;
-
-  /// A pure virtual method that returns true if the fit has converted.
   [[nodiscard]] virtual bool isFitHasConverged() const = 0;
 
-  /// A virtual method that should scan the parameters used by the minimizer.
-  /// This provides a view of the parameters seen by the minimizer, which may
-  /// be different from the parameters used for the likelihood.  Most
-  /// MinimizerBase derived classes should override this method.  If it is not
-  /// provided then it will be a no-op.
+  virtual void minimize() = 0;
+  virtual void calcErrors() = 0;
+
   virtual void scanParameters(TDirectory* saveDir_);
 
   /// Set if the calcErrors method should be called by the FitterEngine.
@@ -63,18 +41,7 @@ public:
   [[nodiscard]] bool isEnablePostFitErrorEval() const {return _enablePostFitErrorEval_;}
 
 protected:
-  /// Get a reference to the FitterEngine that owns this minimizer.
-  inline FitterEngine& owner() { return *_owner_; }
-  [[nodiscard]] inline const FitterEngine& owner() const { return *_owner_; }
 
-  // Get the propagator being used to calculate the likelihood.  This is a
-  // local convenience function to get the propagator from the owner.
-  Propagator& getPropagator();
-  [[nodiscard]] const Propagator& getPropagator() const;
-
-  // Get the likelihood that should be used by the minimization.  This is a
-  // local convenience function to get the likelihood from the owner.
-  LikelihoodInterface& getLikelihood();
   [[nodiscard]] const LikelihoodInterface& getLikelihood() const;
 
   // Get the convergence monitor that is maintained by the likelihood

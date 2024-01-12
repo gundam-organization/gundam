@@ -53,7 +53,7 @@ public:
   [[nodiscard]] const std::vector<std::string> &getDataSetNameList() const{ return _dataSetNameList_; }
   [[nodiscard]] const std::shared_ptr<TFormula> &getApplyConditionFormula() const{ return _applyConditionFormula_; }
 
-  // non-const getters
+  // mutable getters
   DataBinSet &getDialBinSet(){ return _dialBinSet_; }
   std::vector<DialBaseObject> &getDialBaseList(){ return _dialBaseList_; }
   std::vector<DialInterface> &getDialInterfaceList(){ return _dialInterfaceList_; }

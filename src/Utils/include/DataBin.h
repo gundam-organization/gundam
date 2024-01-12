@@ -61,7 +61,7 @@ public:
   [[nodiscard]] const Edges& getVarEdges( const std::string& varName_ ) const;
   [[nodiscard]] const Edges* getVarEdgesPtr( const std::string& varName_ ) const;
 
-  // non-const getters
+  // mutable getters
   std::vector<Edges> &getEdgesList() { return _binEdgesList_; }
 
   // Non-native Getters

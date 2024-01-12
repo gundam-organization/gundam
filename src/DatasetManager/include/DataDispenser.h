@@ -41,7 +41,7 @@ public:
   // const getters
   [[nodiscard]] const DataDispenserParameters &getParameters() const{ return _parameters_; }
 
-  // non-const getters
+  // mutable getters
   DataDispenserParameters &getParameters(){ return _parameters_; }
 
   void setSampleSetPtrToLoad(SampleSet *sampleSetPtrToLoad);

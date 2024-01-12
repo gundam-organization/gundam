@@ -54,7 +54,7 @@ public:
   template<typename T> auto getVarValue(const std::string& leafName_, size_t arrayIndex_ = 0) const -> T;
   template<typename T> auto getVariable(const std::string& leafName_, size_t arrayIndex_ = 0) const -> const T&;
 
-  // non-const getters
+  // mutable getters
   double& getEventWeightRef(){ return _eventWeight_; }
   void* getVariableAddress(const std::string& leafName_, size_t arrayIndex_ = 0);
   std::vector<std::vector<GenericToolbox::AnyType>> &getVarHolderList(){ return _varHolderList_; }

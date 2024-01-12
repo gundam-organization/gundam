@@ -31,18 +31,15 @@ public:
   void clearMcContainers();
 
   // const getters
-  const std::vector<Sample> &getFitSampleList() const { return _fitSampleList_; }
-  const std::shared_ptr<JointProbability::JointProbability> &getJointProbabilityFct() const{ return _jointProbabilityPtr_; }
+  const std::vector<Sample> &getSampleList() const { return _sampleList_; }
   const std::vector<std::string>& getAdditionalVariablesForStorage() const { return _additionalVariablesForStorage_; }
 
-  // non-const getters
-  std::vector<Sample> &getFitSampleList(){ return _fitSampleList_; }
+  // mutable getters
+  std::vector<Sample> &getSampleList(){ return _sampleList_; }
   std::vector<std::string>& getAdditionalVariablesForStorage() { return _additionalVariablesForStorage_; }
 
   //Core
-  [[nodiscard]] bool empty() const{ return _fitSampleList_.empty(); }
-  double evalLikelihood();
-  double evalLikelihood(Sample& sample_);
+  [[nodiscard]] bool empty() const{ return _sampleList_.empty(); }
 
   // Parallel
   void updateSampleEventBinIndexes() const;
@@ -51,7 +48,7 @@ public:
 
 private:
   bool _showTimeStats_{false};
-  std::vector<Sample> _fitSampleList_;
+  std::vector<Sample> _sampleList_;
 
   std::vector<std::string> _eventByEventDialLeafList_;
   std::vector<std::string> _additionalVariablesForStorage_;

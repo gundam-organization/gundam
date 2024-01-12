@@ -134,7 +134,7 @@ std::string DataDispenser::getTitle(){
 void DataDispenser::buildSampleToFillList(){
   LogWarning << "Fetching samples to fill..." << std::endl;
 
-  for( auto& sample : _sampleSetPtrToLoad_->getFitSampleList() ){
+  for( auto& sample : _sampleSetPtrToLoad_->getSampleList() ){
     if( not sample.isEnabled() ) continue;
     if( sample.isDatasetValid(_owner_->getName()) ){
       _cache_.samplesToFillList.emplace_back(&sample);
@@ -310,7 +310,7 @@ void DataDispenser::fetchRequestedLeaves(){
   // sample binning
   if( _sampleSetPtrToLoad_ != nullptr ){
     std::vector<std::string> indexRequests;
-    for (auto &sample: _sampleSetPtrToLoad_->getFitSampleList()) {
+    for (auto &sample: _sampleSetPtrToLoad_->getSampleList()) {
       for (auto &bin: sample.getBinning().getBinList()) {
         for (auto &edges: bin.getEdgesList()) {
           GenericToolbox::addIfNotInVector(edges.varName, indexRequests);

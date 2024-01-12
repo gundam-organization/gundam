@@ -72,7 +72,7 @@ void ParScanner::initializeImpl() {
     scanEntry.evalY = [this](){ return _owner_->getLlhStatBuffer(); };
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSample", false) ){
-    for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
+    for( auto& sample : _owner_->getFitSampleSet().getSampleList() ){
       _scanDataDict_.emplace_back();
       auto& scanEntry = _scanDataDict_.back();
       scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
@@ -84,7 +84,7 @@ void ParScanner::initializeImpl() {
     }
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSamplePerBin", false) ){
-    for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
+    for( auto& sample : _owner_->getFitSampleSet().getSampleList() ){
       for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
         _scanDataDict_.emplace_back();
         auto& scanEntry = _scanDataDict_.back();
@@ -100,7 +100,7 @@ void ParScanner::initializeImpl() {
     }
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSample", false) ){
-    for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
+    for( auto& sample : _owner_->getFitSampleSet().getSampleList() ){
       _scanDataDict_.emplace_back();
       auto& scanEntry = _scanDataDict_.back();
       scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
@@ -112,7 +112,7 @@ void ParScanner::initializeImpl() {
     }
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSamplePerBin", false) ){
-    for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
+    for( auto& sample : _owner_->getFitSampleSet().getSampleList() ){
       for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
         _scanDataDict_.emplace_back();
         auto& scanEntry = _scanDataDict_.back();
@@ -343,7 +343,7 @@ void ParScanner::generateOneSigmaPlots(TDirectory* saveDir_){
   LogThrowIf(saveDir_ == nullptr, "saveDir_ not set.");
 
   // Build the histograms with the current parameters
-  _owner_->propagateParametersOnSamples();
+  _owner_->propagateParameters();
   _owner_->getPlotGenerator().generateSamplePlots();
   auto refHistList = _owner_->getPlotGenerator().getHistHolderList();
 
@@ -355,7 +355,7 @@ void ParScanner::generateOneSigmaPlots(TDirectory* saveDir_){
     par_.setParameterValue( currentParValue + par_.getStdDevValue() );
 
     // Propagate the parameters
-    _owner_->propagateParametersOnSamples();
+    _owner_->propagateParameters();
 
     // put the saved histograms in slot 1 of the buffer
     _owner_->getPlotGenerator().generateSampleHistograms(nullptr, 1);
@@ -368,7 +368,7 @@ void ParScanner::generateOneSigmaPlots(TDirectory* saveDir_){
 
     // Come back to the original place
     par_.setParameterValue( currentParValue );
-    _owner_->propagateParametersOnSamples();
+    _owner_->propagateParameters();
   };
 
   // +1 sigma
@@ -420,7 +420,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
             par.setParameterValue( par.getPriorValue() );
           }
         }
-        _owner_->propagateParametersOnSamples();
+        _owner_->propagateParameters();
       },
       [&]{
         LogWarning << "Restoring parameters to their original values..." << std::endl;
@@ -431,7 +431,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
             par.setParameterValue( parStateList[&par] );
           }
         }
-        _owner_->propagateParametersOnSamples();
+        _owner_->propagateParameters();
       }
   );
 
@@ -446,7 +446,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
         par.setParameterValue( par.getPriorValue() );
       }
     }
-    _owner_->propagateParametersOnSamples();
+    _owner_->propagateParameters();
 
     saveSubDir_->cd();
 
@@ -471,15 +471,15 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
       cappedParValue = std::max(cappedParValue, par_.getMinValue());
 
       par_.setParameterValue( cappedParValue );
-      _owner_->propagateParametersOnSamples();
+      _owner_->propagateParameters();
 
-      for(auto & sample : _owner_->getFitSampleSet().getFitSampleList()){
+      for(auto & sample : _owner_->getFitSampleSet().getSampleList()){
         buffEvtRatesMap[iVar].emplace_back( sample.getMcContainer().getSumWeights() );
       }
 
       // back to the prior
       par_.setParameterValue( par_.getPriorValue() );
-      _owner_->propagateParametersOnSamples();
+      _owner_->propagateParameters();
     }
 
 
@@ -497,7 +497,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
 
     TVectorD* buffVariedEvtRates_TVectorD{nullptr};
 
-    for( size_t iSample = 0 ; iSample < _owner_->getFitSampleSet().getFitSampleList().size() ; iSample++ ){
+    for( size_t iSample = 0 ; iSample < _owner_->getFitSampleSet().getSampleList().size() ; iSample++ ){
 
       buffVariedEvtRates_TVectorD = new TVectorD(int(variationList_.size()));
 
@@ -506,7 +506,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
       }
 
       GenericToolbox::writeInTFile(saveSubDir_, buffVariedEvtRates_TVectorD,
-                                   _owner_->getFitSampleSet().getFitSampleList()[iSample].getName());
+                                   _owner_->getFitSampleSet().getSampleList()[iSample].getName());
 
     }
 

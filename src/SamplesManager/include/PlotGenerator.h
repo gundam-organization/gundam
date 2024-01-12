@@ -89,7 +89,7 @@ public:
   [[nodiscard]] const std::vector<HistHolder> &getComparisonHistHolderList() const;
   [[nodiscard]] std::map<std::string, std::shared_ptr<TCanvas>> getBufferCanvasList() const;
 
-  // non-const getters
+  // mutable getters
   std::vector<HistHolder> &getHistHolderList(int cacheSlot_ = 0);
 
   // Core

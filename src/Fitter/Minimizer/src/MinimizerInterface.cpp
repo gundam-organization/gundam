@@ -240,9 +240,9 @@ void MinimizerInterface::minimize(){
   bestFitStats->Branch("chi2StatBestFit",  (double*) getPropagator().getLlhStatBufferPtr() );
   bestFitStats->Branch("chi2PullsBestFit", (double*) getPropagator().getLlhPenaltyBufferPtr() );
 
-  std::vector<GenericToolbox::RawDataArray> samplesArrList(getPropagator().getFitSampleSet().getFitSampleList().size());
+  std::vector<GenericToolbox::RawDataArray> samplesArrList(getPropagator().getFitSampleSet().getSampleList().size());
   int iSample{-1};
-  for( auto& sample : getPropagator().getFitSampleSet().getFitSampleList() ){
+  for( auto& sample : getPropagator().getFitSampleSet().getSampleList() ){
     if( not sample.isEnabled() ) continue;
 
     std::vector<std::string> leavesDict;
@@ -1142,7 +1142,7 @@ void MinimizerInterface::updateCacheToBestfitPoint(){
   LogThrowIf(_minimizer_->X() == nullptr, "No best fit point provided by the minimizer.");
 
   LogWarning << "Updating propagator cache to the best fit point..." << std::endl;
-  getLikelihood().evalFit( _minimizer_->X() );
+  getLikelihood().evalLikelihood(_minimizer_->X());
 }
 
 // Local Variables:

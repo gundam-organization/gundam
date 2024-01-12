@@ -14,8 +14,6 @@
 #include "GenericToolbox.Time.h"
 
 #include "TDirectory.h"
-#include "Math/Functor.h"
-#include "Math/Minimizer.h"
 #include "nlohmann/json.hpp"
 
 #include <string>

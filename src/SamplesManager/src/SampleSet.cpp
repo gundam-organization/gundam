@@ -28,10 +28,10 @@ void SampleSet::readConfigImpl(){
   auto fitSampleListConfig = GenericToolbox::Json::fetchValue(_config_, "fitSampleList", JsonType());
   for( const auto& fitSampleConfig: fitSampleListConfig ){
     if( not GenericToolbox::Json::fetchValue(fitSampleConfig, "isEnabled", true) ) continue;
-    _fitSampleList_.emplace_back();
-    _fitSampleList_.back().setIndex(int(_fitSampleList_.size())-1);
-    _fitSampleList_.back().setConfig(fitSampleConfig);
-    _fitSampleList_.back().readConfig();
+    _sampleList_.emplace_back();
+    _sampleList_.back().setIndex(int(_sampleList_.size()) - 1);
+    _sampleList_.back().setConfig(fitSampleConfig);
+    _sampleList_.back().readConfig();
   }
 
   // TODO: To be moved elsewhere -> nothing to do in sample... -> this should belong to the fitter engine
@@ -62,14 +62,14 @@ void SampleSet::readConfigImpl(){
 }
 void SampleSet::initializeImpl() {
   LogWarning << __METHOD_NAME__ << std::endl;
-  LogThrowIf(_fitSampleList_.empty(), "No sample is defined.");
+  LogThrowIf(_sampleList_.empty(), "No sample is defined.");
 
-  for( auto& sample : _fitSampleList_ ){ sample.initialize(); }
+  for( auto& sample : _sampleList_ ){ sample.initialize(); }
 
   // Fill the bin index inside each event
   std::function<void(int)> updateSampleEventBinIndexesFct = [this](int iThread){
     LogInfoIf(iThread <= 0) << "Updating event sample bin indices..." << std::endl;
-    for( auto& sample : _fitSampleList_ ){
+    for( auto& sample : _sampleList_ ){
       sample.getMcContainer().updateEventBinIndexes(iThread);
       sample.getDataContainer().updateEventBinIndexes(iThread);
     }
@@ -79,7 +79,7 @@ void SampleSet::initializeImpl() {
   // Fill bin event caches
   std::function<void(int)> updateSampleBinEventListFct = [this](int iThread){
     LogInfoIf(iThread <= 0) << "Updating sample per bin event lists..." << std::endl;
-    for( auto& sample : _fitSampleList_ ){
+    for( auto& sample : _sampleList_ ){
       sample.getMcContainer().updateBinEventList(iThread);
       sample.getDataContainer().updateBinEventList(iThread);
     }
@@ -89,13 +89,13 @@ void SampleSet::initializeImpl() {
 
   // Histogram fills
   std::function<void(int)> refillMcHistogramsFct = [this](int iThread){
-    for( auto& sample : _fitSampleList_ ){
+    for( auto& sample : _sampleList_ ){
       sample.getMcContainer().refillHistogram(iThread);
       sample.getDataContainer().refillHistogram(iThread);
     }
   };
   std::function<void()> rescaleMcHistogramsFct = [this](){
-    for( auto& sample : _fitSampleList_ ){
+    for( auto& sample : _sampleList_ ){
       sample.getMcContainer().rescaleHistogram();
       sample.getDataContainer().rescaleHistogram();
     }
@@ -104,21 +104,8 @@ void SampleSet::initializeImpl() {
   GundamGlobals::getParallelWorker().setPostParallelJob("FitSampleSet::updateSampleHistograms", rescaleMcHistogramsFct);
 }
 
-double SampleSet::evalLikelihood(){
-  double llh = 0.;
-  for( auto& sample : _fitSampleList_ ){
-    llh += this->evalLikelihood(sample);
-    LogThrowIf(std::isnan(llh) or std::isinf(llh), sample.getName() << ": reportde likelihood is invalid:" << llh);
-  }
-  return llh;
-}
-double SampleSet::evalLikelihood(Sample& sample_){
-  sample_.setLlhStatBuffer(_jointProbabilityPtr_->eval(sample_));
-  return sample_.getLlhStatBuffer();
-}
-
 void SampleSet::copyMcEventListToDataContainer(){
-  for( auto& sample : _fitSampleList_ ){
+  for( auto& sample : _sampleList_ ){
     LogInfo << "Copying MC events in sample \"" << sample.getName() << "\"" << std::endl;
     sample.getDataContainer().eventList.clear();
     sample.getDataContainer().eventList.reserve(sample.getMcContainer().eventList.size());
@@ -131,7 +118,7 @@ void SampleSet::copyMcEventListToDataContainer(){
   }
 }
 void SampleSet::clearMcContainers(){
-  for( auto& sample : _fitSampleList_ ){
+  for( auto& sample : _sampleList_ ){
     LogInfo << "Clearing event list for \"" << sample.getName() << "\"" << std::endl;
     sample.getMcContainer().eventList.clear();
   }

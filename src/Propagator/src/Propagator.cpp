@@ -255,7 +255,7 @@ void Propagator::initializeImpl(){
     LogWarning << "Copying loaded mc-like event to data container..." << std::endl;
     _fitSampleSet_.copyMcEventListToDataContainer();
 
-    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    for( auto& sample : _fitSampleSet_.getSampleList() ){
       sample.getDataContainer().histScale = sample.getMcContainer().histScale;
     }
 
@@ -326,7 +326,7 @@ void Propagator::initializeImpl(){
   this->reweightMcEvents();
 
   LogInfo << "Set the current MC prior weights as nominal weight..." << std::endl;
-  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+  for( auto& sample : _fitSampleSet_.getSampleList() ){
     for( auto& event : sample.getMcContainer().eventList ){
       event.setNominalWeight(event.getEventWeight());
     }
@@ -345,7 +345,7 @@ void Propagator::initializeImpl(){
     if( _enableEventMcThrow_ ){
       // Take into account the finite amount of event in MC
       LogInfo << "enableEventMcThrow is enabled: throwing individual MC events" << std::endl;
-      for( auto& sample : _fitSampleSet_.getFitSampleList() ) {
+      for( auto& sample : _fitSampleSet_.getSampleList() ) {
         sample.getDataContainer().throwEventMcError();
       }
     }
@@ -357,14 +357,14 @@ void Propagator::initializeImpl(){
     if( _gaussStatThrowInToys_ ) {
       LogWarning << "Using gaussian statistical throws. (caveat: distribution truncated when the bins are close to zero)" << std::endl;
     }
-    for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+    for( auto& sample : _fitSampleSet_.getSampleList() ){
       // Asimov bin content -> toy data
       sample.getDataContainer().throwStatError(_gaussStatThrowInToys_);
     }
   }
 
   LogInfo << "Locking data event containers..." << std::endl;
-  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+  for( auto& sample : _fitSampleSet_.getSampleList() ){
     // Now the data won't be refilled each time
     sample.getDataContainer().isLocked = true;
   }
@@ -382,7 +382,7 @@ void Propagator::initializeImpl(){
 
   /// Copy the current state of MC as "nominal" histogram
   LogInfo << "Copy the current state of MC as \"nominal\" histogram..." << std::endl;
-  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+  for( auto& sample : _fitSampleSet_.getSampleList() ){
     sample.getMcContainer().saveAsHistogramNominal();
   }
 
@@ -406,7 +406,7 @@ void Propagator::initializeImpl(){
       // STAGED MASK
       LogWarning << "Staged event breakdown:" << std::endl;
       std::vector<std::vector<double>> stageBreakdownList(
-          _fitSampleSet_.getFitSampleList().size(),
+          _fitSampleSet_.getSampleList().size(),
           std::vector<double>(_parManager_.getParameterSetsList().size() + 1, 0)
       ); // [iSample][iStage]
       std::vector<std::string> stageTitles;
@@ -427,8 +427,8 @@ void Propagator::initializeImpl(){
 
       this->resetReweight();
       this->reweightMcEvents();
-      for( size_t iSample = 0 ; iSample < _fitSampleSet_.getFitSampleList().size() ; iSample++ ){
-        stageBreakdownList[iSample][iStage] = _fitSampleSet_.getFitSampleList()[iSample].getMcContainer().getSumWeights();
+      for( size_t iSample = 0 ; iSample < _fitSampleSet_.getSampleList().size() ; iSample++ ){
+        stageBreakdownList[iSample][iStage] = _fitSampleSet_.getSampleList()[iSample].getMcContainer().getSumWeights();
       }
 
       for( auto* parSetPtr : maskedParSetList ){
@@ -436,16 +436,16 @@ void Propagator::initializeImpl(){
         this->resetReweight();
         this->reweightMcEvents();
         iStage++;
-        for( size_t iSample = 0 ; iSample < _fitSampleSet_.getFitSampleList().size() ; iSample++ ){
-          stageBreakdownList[iSample][iStage] = _fitSampleSet_.getFitSampleList()[iSample].getMcContainer().getSumWeights();
+        for( size_t iSample = 0 ; iSample < _fitSampleSet_.getSampleList().size() ; iSample++ ){
+          stageBreakdownList[iSample][iStage] = _fitSampleSet_.getSampleList()[iSample].getMcContainer().getSumWeights();
         }
       }
 
       GenericToolbox::TablePrinter t;
       t.setColTitles(stageTitles);
-      for( size_t iSample = 0 ; iSample < _fitSampleSet_.getFitSampleList().size() ; iSample++ ) {
+      for( size_t iSample = 0 ; iSample < _fitSampleSet_.getSampleList().size() ; iSample++ ) {
         std::vector<std::string> tableLine;
-        tableLine.emplace_back("\""+_fitSampleSet_.getFitSampleList()[iSample].getName()+"\"");
+        tableLine.emplace_back("\"" + _fitSampleSet_.getSampleList()[iSample].getName() + "\"");
         for( iStage = 0 ; iStage < stageBreakdownList[iSample].size() ; iStage++ ){
           tableLine.emplace_back( std::to_string(stageBreakdownList[iSample][iStage]) );
         }
@@ -484,7 +484,7 @@ std::string Propagator::getLlhBufferSummary() const{
   ss << "Total likelihood = " << getLlhBuffer();
   ss << std::endl << "Stat likelihood = " << getLlhStatBuffer();
   ss << " = sum of: " << GenericToolbox::toString(
-      _fitSampleSet_.getFitSampleList(), [](const Sample& sample_){
+      _fitSampleSet_.getSampleList(), []( const Sample& sample_){
         std::stringstream ssSub;
         ssSub << sample_.getName() << ": ";
         if( sample_.isEnabled() ){ ssSub << sample_.getLlhStatBuffer(); }
@@ -513,38 +513,7 @@ DatasetLoader* Propagator::getDatasetLoaderPtr(const std::string& name_){
 }
 
 // Core
-void Propagator::updateLlhCache(){
-  double buffer;
-
-  // Propagate on histograms
-  this->propagateParametersOnSamples();
-
-  ////////////////////////////////
-  // Compute LLH stat
-  ////////////////////////////////
-  _llhStatBuffer_ = _fitSampleSet_.evalLikelihood();
-
-  ////////////////////////////////
-  // Compute the penalty terms
-  ////////////////////////////////
-  _llhPenaltyBuffer_ = 0;
-  for( auto& parSet : _parManager_.getParameterSetsList() ){
-    buffer = parSet.getPenaltyChi2();
-    LogThrowIf(std::isnan(buffer), parSet.getName() << " penalty chi2 is Nan");
-    _llhPenaltyBuffer_ += buffer;
-  }
-
-  ////////////////////////////////
-  // Compute the regularisation term
-  ////////////////////////////////
-  _llhRegBuffer_ = 0; // unused
-
-  ////////////////////////////////
-  // Total LLH
-  ////////////////////////////////
-  _llhBuffer_ = _llhStatBuffer_ + _llhPenaltyBuffer_ + _llhRegBuffer_;
-}
-void Propagator::propagateParametersOnSamples(){
+void Propagator::propagateParameters(){
 
   if( _enableEigenToOrigInPropagate_ ){
     // Only real parameters are propagated on the spectra -> need to convert the eigen to original
@@ -602,7 +571,7 @@ std::string Propagator::getSampleBreakdownTableStr() const{
   t << "MC (weighted)" << GenericToolbox::TablePrinter::NextColumn;
   t << "Data (weighted)" << GenericToolbox::TablePrinter::NextLine;
 
-  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+  for( auto& sample : _fitSampleSet_.getSampleList() ){
     t << "\"" << sample.getName() << "\"" << GenericToolbox::TablePrinter::NextColumn;
     t << sample.getMcContainer().getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
     t << sample.getDataContainer().getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
@@ -665,13 +634,13 @@ void Propagator::reweightMcEvents(int iThread_) {
 
 }
 void Propagator::refillSampleHistogramsFct(int iThread_){
-  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+  for( auto& sample : _fitSampleSet_.getSampleList() ){
     sample.getMcContainer().refillHistogram(iThread_);
     sample.getDataContainer().refillHistogram(iThread_);
   }
 }
 void Propagator::refillSampleHistogramsPostParallelFct(){
-  for( auto& sample : _fitSampleSet_.getFitSampleList() ){
+  for( auto& sample : _fitSampleSet_.getSampleList() ){
     sample.getMcContainer().rescaleHistogram();
     sample.getDataContainer().rescaleHistogram();
   }

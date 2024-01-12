@@ -41,7 +41,7 @@ namespace ConfigUtils {
     [[nodiscard]] std::string toString() const;
     [[nodiscard]] const JsonType &getConfig() const;
 
-    // non-const getters
+    // mutable getters
     JsonType &getConfig();
 
 

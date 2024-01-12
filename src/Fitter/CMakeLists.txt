@@ -2,12 +2,14 @@
 set( LIB_NAME GundamFitter )
 
 set(SRCFILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/FitterEngine.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/LikelihoodInterface.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/MinimizerBase.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/MinimizerInterface.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/MCMCInterface.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/JointProbability.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Engine/src/FitterEngine.cpp
+
+    ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/MinimizerBase.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/MinimizerInterface.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/MCMCInterface.cpp
+
+    ${CMAKE_CURRENT_SOURCE_DIR}/Likelihood/src/LikelihoodInterface.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Likelihood/src/JointProbability.cpp
   )
 
 if( USE_STATIC_LINKS )
@@ -17,7 +19,9 @@ else()
 endif()
 
 target_include_directories(${LIB_NAME} PUBLIC
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/Engine/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/Likelihood/include
 )
 
 target_link_libraries(

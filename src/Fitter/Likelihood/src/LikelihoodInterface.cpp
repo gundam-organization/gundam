@@ -24,7 +24,7 @@ void LikelihoodInterface::initializeImpl() {
   if( not GundamGlobals::isLightOutputMode() ){
     _chi2HistoryTree_ = std::make_unique<TTree>("chi2History", "chi2History");
     _chi2HistoryTree_->SetDirectory(nullptr);
-    _chi2HistoryTree_->Branch("nbFitCalls", &_nbFitCalls_);
+    _chi2HistoryTree_->Branch("nbFitCalls", &_nbLlhEvals_);
     _chi2HistoryTree_->Branch("chi2Total", (double*) _propagator_.getLlhBufferPtr());
     _chi2HistoryTree_->Branch("chi2Stat", (double*) _propagator_.getLlhStatBufferPtr());
     _chi2HistoryTree_->Branch("chi2Pulls", (double*) _propagator_.getLlhPenaltyBufferPtr());
@@ -45,11 +45,11 @@ void LikelihoodInterface::initializeImpl() {
   _nbFitParameters_ = int(_minimizerFitParameterPtr_.size());
 
   LogInfo << "Building functor with " << _nbFitParameters_ << " parameters ..." << std::endl;
-  _functor_ = std::make_unique<ROOT::Math::Functor>(this, &LikelihoodInterface::evalFit, _nbFitParameters_);
+  _functor_ = std::make_unique<ROOT::Math::Functor>(this, &LikelihoodInterface::evalLikelihood, _nbFitParameters_);
   _validFunctor_ = std::make_unique<ROOT::Math::Functor>(this, &LikelihoodInterface::evalFitValid, _nbFitParameters_);
 
   _nbFitBins_ = 0;
-  for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
+  for( auto& sample : _propagator_.getFitSampleSet().getSampleList() ){
     _nbFitBins_ += int(sample.getBinning().getBinList().size());
   }
 
@@ -66,7 +66,7 @@ void LikelihoodInterface::initializeImpl() {
   _convergenceMonitor_.addVariable("Stat");
   _convergenceMonitor_.addVariable("Syst");
 
-  _isInitialized_ = true;
+
 }
 
 void LikelihoodInterface::writeChi2History() {
@@ -168,13 +168,13 @@ void LikelihoodInterface::saveGradientSteps(){
 
 }
 
-double LikelihoodInterface::evalFit(const double* parArray_){
+double LikelihoodInterface::evalLikelihood( const double* parArray_ ){
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 
-  if(_nbFitCalls_ != 0){
+  if( _nbLlhEvals_ != 0){
     _outEvalFitAvgTimer_.counts++ ; _outEvalFitAvgTimer_.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("out_evalFit");
   }
-  ++_nbFitCalls_;
+  ++_nbLlhEvals_;
 
   // Update fit parameter values:
   int iFitPar{0};
@@ -183,8 +183,19 @@ double LikelihoodInterface::evalFit(const double* parArray_){
     else par->setParameterValue(parArray_[iFitPar++]);
   }
 
-  // Compute the Chi2
-  _propagator_.updateLlhCache();
+
+  _propagator_.propagateParameters();
+
+  this->evalStatLikelihood();
+
+  _buffer_.penaltyLikelihood = 0;
+  for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
+    _buffer_.penaltyLikelihood += parSet.getPenaltyChi2();
+  }
+
+  _buffer_.regulariseLikelihood = 0; // unused
+
+  _buffer_.totalLikelihood = _buffer_.statLikelihood + _buffer_.penaltyLikelihood + _buffer_.regulariseLikelihood;
 
   _evalFitAvgTimer_.counts++; _evalFitAvgTimer_.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 
@@ -195,42 +206,42 @@ double LikelihoodInterface::evalFit(const double* parArray_){
       return ( par_->gotUpdated() or par_->isFixed() or not par_->isEnabled() );
     } );
     if( isGradientDescentStep ){
-      if( _lastGradientFall_ == _nbFitCalls_-1 ){
+      if( _lastGradientFall_ == _nbLlhEvals_ - 1 ){
         LogWarning << "Overriding last gradient descent entry (minimizer adjusting step size...): ";
         LogWarning(_gradientMonitor_.size() >= 2) << _gradientMonitor_[_gradientMonitor_.size() - 2].llh << " -> ";
         LogWarning << _propagator_.getLlhBuffer() << std::endl;
         _gradientMonitor_.back().parState = _propagator_.getParametersManager().exportParameterInjectorConfig();
         _gradientMonitor_.back().llh = _propagator_.getLlhBuffer();
-        _lastGradientFall_ = _nbFitCalls_;
+        _lastGradientFall_ = _nbLlhEvals_;
       }
       else{
         // saving each step of the gradient descen
         _gradientMonitor_.emplace_back();
-        LogWarning << "Gradient step detected at iteration #" << _nbFitCalls_ << ": ";
+        LogWarning << "Gradient step detected at iteration #" << _nbLlhEvals_ << ": ";
         LogWarning(_gradientMonitor_.size() >= 2) << _gradientMonitor_[_gradientMonitor_.size() - 2].llh << " -> ";
         LogWarning << _propagator_.getLlhBuffer() << std::endl;
         _gradientMonitor_.back().parState = _propagator_.getParametersManager().exportParameterInjectorConfig();
         _gradientMonitor_.back().llh = _propagator_.getLlhBuffer();
-        _lastGradientFall_ = _nbFitCalls_;
+        _lastGradientFall_ = _nbLlhEvals_;
       }
     }
   }
 
   if( _fitMonitor_.isEnabled and _convergenceMonitor_.isGenerateMonitorStringOk() ){
 
-    _itSpeedMon_.cycle( _nbFitCalls_ - _itSpeedMon_.getCounts() );
+    _itSpeedMon_.cycle(_nbLlhEvals_ - _itSpeedMon_.getCounts() );
 
     if( _itSpeed_.counts != 0 ){
-      _itSpeed_.counts = _nbFitCalls_ - _itSpeed_.counts; // how many cycles since last print
+      _itSpeed_.counts = _nbLlhEvals_ - _itSpeed_.counts; // how many cycles since last print
       _itSpeed_.cumulated = GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("itSpeed"); // time since last print
     }
     else{
-      _itSpeed_.counts = _nbFitCalls_;
+      _itSpeed_.counts = _nbLlhEvals_;
       GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("itSpeed");
     }
 
     std::stringstream ssHeader;
-    ssHeader << std::endl << __METHOD_NAME__ << ": call #" << _nbFitCalls_;
+    ssHeader << std::endl << __METHOD_NAME__ << ": call #" << _nbLlhEvals_;
     ssHeader << std::endl << _stateTitleMonitor_;
 //    ssHeader << std::endl << "Target EDM: " << _owner_->getMinimizer().get;
     ssHeader << std::endl << "RAM: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
@@ -290,7 +301,7 @@ double LikelihoodInterface::evalFit(const double* parArray_){
     _convergenceMonitor_.getVariable("Stat").addQuantity(_propagator_.getLlhStatBuffer());
     _convergenceMonitor_.getVariable("Syst").addQuantity(_propagator_.getLlhPenaltyBuffer());
 
-    if( _nbFitCalls_ == 1 ){
+    if( _nbLlhEvals_ == 1 ){
       // don't erase these lines
       LogWarning << _convergenceMonitor_.generateMonitorString();
     }
@@ -301,7 +312,7 @@ double LikelihoodInterface::evalFit(const double* parArray_){
       );
     }
 
-    _itSpeed_.counts = _nbFitCalls_;
+    _itSpeed_.counts = _nbLlhEvals_;
   }
 
   if( not GundamGlobals::isLightOutputMode() ){
@@ -312,7 +323,7 @@ double LikelihoodInterface::evalFit(const double* parArray_){
   if( std::isnan(_propagator_.getLlhBuffer()) and _throwOnBadLlh_ ){
     LogError << _propagator_.getLlhBuffer() << ": invalid reported likelihood value." << std::endl;
     LogError << GET_VAR_NAME_VALUE( _propagator_.getLlhStatBuffer() ) << std::endl;
-    for( auto& sample : _propagator_.getFitSampleSet().getFitSampleList() ){
+    for( auto& sample : _propagator_.getFitSampleSet().getSampleList() ){
       LogScopeIndent;
       LogError << sample.getName() << ": " << sample.getLlhStatBuffer() << std::endl;
     }
@@ -323,9 +334,21 @@ double LikelihoodInterface::evalFit(const double* parArray_){
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("out_evalFit");
   return _propagator_.getLlhBuffer();
 }
+double LikelihoodInterface::evalStatLikelihood(){
+
+  _buffer_.statLikelihood = _propagator_.getFitSampleSet().evalLikelihood();
+
+  _buffer_.statLikelihood = 0.;
+  for( auto& sample : _propagator_.getFitSampleSet().getSampleList() ){
+    // TODO: keep buffer per sample
+    _buffer_.statLikelihood += _jointProbabilityPtr_->eval( sample );
+  }
+  return _buffer_.statLikelihood;
+
+}
 
 double LikelihoodInterface::evalFitValid(const double* parArray_) {
-  double value = evalFit(parArray_);
+  double value = evalLikelihood(parArray_);
   if (hasValidParameterValues()) return value;
   /// A "Really Big Number".  This is nominally just infinity, but is done as
   /// a defined constant to make the code easier to understand.  This needs to

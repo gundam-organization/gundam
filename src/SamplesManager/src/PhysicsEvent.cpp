@@ -94,7 +94,7 @@ const GenericToolbox::AnyType& PhysicsEvent::getVariableAsAnyType(const std::str
   return _varHolderList_[index][arrayIndex_];
 }
 
-// non-const getters
+// mutable getters
 void* PhysicsEvent::getVariableAddress(const std::string& leafName_, size_t arrayIndex_){
   return this->getVariableAsAnyType(leafName_, arrayIndex_).getPlaceHolderPtr()->getVariableAddress();
 }

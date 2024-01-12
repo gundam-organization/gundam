@@ -18,7 +18,7 @@ void EventDialCache::buildReferenceCache(SampleSet& sampleSet_, std::vector<Dial
   LogInfo << "Sorting events in sync with indexed cache..." << std::endl;
 
   size_t nCacheSlots{0};
-  std::vector<std::vector<IndexedEntry_t>> sampleIndexCacheList{sampleSet_.getFitSampleList().size()};
+  std::vector<std::vector<IndexedEntry_t>> sampleIndexCacheList{sampleSet_.getSampleList().size()};
 
   {
     LogScopeIndent;
@@ -39,7 +39,7 @@ void EventDialCache::buildReferenceCache(SampleSet& sampleSet_, std::vector<Dial
 
     LogInfo << "Performing per sample sorting..." << std::endl;
     int iSample{-1};
-    for( auto& sample : sampleSet_.getFitSampleList() ){
+    for( auto& sample : sampleSet_.getSampleList() ){
       iSample++;
 
       auto p = GenericToolbox::getSortPermutation(
@@ -94,7 +94,7 @@ void EventDialCache::buildReferenceCache(SampleSet& sampleSet_, std::vector<Dial
       auto& cacheEntry{_cache_.back()};
 
       cacheEntry.event =
-          &sampleSet_.getFitSampleList().at(
+          &sampleSet_.getSampleList().at(
               indexCache.event.sampleIndex
           ).getMcContainer().eventList.at(
               indexCache.event.eventIndex

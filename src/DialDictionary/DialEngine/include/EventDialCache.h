@@ -70,7 +70,7 @@ public:
   struct EventIndexEntry_t {
     /// The index of the fit sample being referenced by this indexed cache
     /// entry in the FitSampleSet vector of FitSample objects (returned by
-    /// getFitSampleList().
+    /// getSampleList().
     std::size_t sampleIndex {std::size_t(-1)};
     /// The index of the MC event being reference by this indexed cache entry
     /// in the SampleElement eveltList vector for the SampleElement returned
