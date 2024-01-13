@@ -202,21 +202,14 @@ void SimpleMcmcInterface::readConfigImpl(){
   // Get parameters for the simple proposal.
 
   // Set the step size for the simple proposal.
-  _simpleSigma_ = GenericToolbox::Json::fetchValue(_config_,
-                                        "simpleSigma", _simpleSigma_);
+  _simpleSigma_ = GenericToolbox::Json::fetchValue(_config_, "simpleSigma", _simpleSigma_);
 }
 void SimpleMcmcInterface::initializeImpl(){
   MinimizerBase::initializeImpl();
   LogInfo << "Initializing the MCMC Integration..." << std::endl;
 
-  // Configure the likelihood with the local settings.  These are used by the
-  // likelihood to print informational messages, but do not affect how the
-  // likelihood code runs.
-  getLikelihood().setMinimizerInfo(_algorithmName_,_proposalName_);
-
-  // Set how the parameter values are handled (outside of different validity
-  // ranges)
-  getLikelihood().setParameterValidity(_likelihoodValidity_);
+  // Set how the parameter values are handled (outside of different validity ranges)
+  this->setParameterValidity( _likelihoodValidity_ );
 }
 
 /// Copy the current parameter values to the tree.
@@ -231,8 +224,8 @@ void SimpleMcmcInterface::fillPoint( bool fillModel) {
       _point_[count++] = iPar.getParameterValue();
     }
   }
-  _llhStatistical_ = getLikelihood().getLastLikelihoodStat();
-  _llhPenalty_ = getLikelihood().getLastLikelihoodPenalty();
+  _llhStatistical_ = getLikelihoodInterface().getBuffer().statLikelihood;
+  _llhPenalty_ = getLikelihoodInterface().getBuffer().penaltyLikelihood;
   // Watch this next line for speed.  It DOES call the "float" destructor
   // which is trivial (i.e. a noop).  In gcc, all it does is reset the vector
   // "size".
@@ -295,7 +288,7 @@ bool SimpleMcmcInterface::adaptiveRestoreState( AdaptiveStepMCMC& mcmc,
 
   // Restore the original file status.
   gFile = saveFile;
-  gFile->cd((std::string(owner().getSaveDir()->GetName())+"/fit").c_str());
+  gFile->cd((std::string(getOwner().getSaveDir()->GetName())+"/fit").c_str());
 
   return true;
 }
@@ -304,9 +297,9 @@ bool SimpleMcmcInterface::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& m
 
   /// Set the diagonal elements for the parameters.
   int count0 = 0;
-  for (const Parameter* par : getMinimizerFitParameterPtr() ) {
+  for (const Parameter* par : _minimizerParameterPtrList_ ) {
     ++count0;
-    if (getLikelihood().getUseNormalizedFitSpace()) {
+    if( _useNormalizedFitSpace_ ){
       // Changing the boundaries, change the value/step size?
       double step
         = ParameterSet::toNormalizedParRange(
@@ -320,7 +313,7 @@ bool SimpleMcmcInterface::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& m
       if (step <= std::abs(1E-10*par->getPriorValue())) {
         step = std::max(par->getStepSize(),par->getStdDevValue());
       }
-      step /= std::sqrt(getMinimizerFitParameterPtr().size());
+      step /= std::sqrt(_minimizerParameterPtrList_.size());
       mcmc.GetProposeStep().SetGaussian(count0-1,step);
     }
     else {
@@ -333,7 +326,7 @@ bool SimpleMcmcInterface::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& m
 
   // Set up the correlations in the priors.
   int count1 = 0;
-  for (const Parameter* par1 : getMinimizerFitParameterPtr() ) {
+  for (const Parameter* par1 : _minimizerParameterPtrList_ ) {
     ++count1;
     const ParameterSet* set1 = par1->getOwner();
     if (!set1) {
@@ -347,7 +340,7 @@ bool SimpleMcmcInterface::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& m
     }
 
     int count2 = 0;
-    for (const Parameter* par2 : getMinimizerFitParameterPtr()) {
+    for (const Parameter* par2 : _minimizerParameterPtrList_) {
       ++count2;
       const ParameterSet* set2 = par2->getOwner();
       if (!set2) {
@@ -412,7 +405,7 @@ bool SimpleMcmcInterface::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc
           << restoreFile->GetName() << std::endl;
 
   gFile = saveFile;
-  gFile->cd((std::string(owner().getSaveDir()->GetName())+"/fit").c_str());
+  gFile->cd((std::string(getOwner().getSaveDir()->GetName())+"/fit").c_str());
 
   LogInfo << "Set the value of the proposal covariance" << std::endl;
   TH2D* proposalCov = dynamic_cast<TH2D*>(
@@ -442,7 +435,7 @@ bool SimpleMcmcInterface::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc
 
   TAxis* covAxisLabels = dynamic_cast<TAxis*>(proposalCov->GetXaxis());
   int count1 = 0;
-  for (const Parameter* par1 : getMinimizerFitParameterPtr() ) {
+  for (const Parameter* par1 : _minimizerParameterPtrList_ ) {
     ++count1;
     std::string parName(par1->getFullTitle());
     std::string covName(covAxisLabels->GetBinLabel(count1));
@@ -454,7 +447,7 @@ bool SimpleMcmcInterface::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc
     }
     double sig1 = std::sqrt(proposalCov->GetBinContent(count1,count1));
     int count2 = 0;
-    for (const Parameter* par2 : getMinimizerFitParameterPtr() ) {
+    for (const Parameter* par2 : _minimizerParameterPtrList_ ) {
       ++count2;
       double sig2 = std::sqrt(proposalCov->GetBinContent(count2,count2));
       if (count2 < count1) continue;
@@ -463,7 +456,7 @@ bool SimpleMcmcInterface::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc
         double step = sig1;
 #define COVARIANCE_NOT_IN_NORMALIZED_FIT_SPACE
 #ifdef  COVARIANCE_NOT_IN_NORMALIZED_FIT_SPACE
-        if (getLikelihood().getUseNormalizedFitSpace()) {
+        if (_useNormalizedFitSpace_) {
           step = ParameterSet::toNormalizedParRange(sig1, *par1);
         }
 #endif
@@ -494,17 +487,17 @@ bool SimpleMcmcInterface::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc
 }
 void SimpleMcmcInterface::setupAndRunAdaptiveStep( AdaptiveStepMCMC& mcmc) {
 
-  mcmc.GetProposeStep().SetDim(getMinimizerFitParameterPtr().size());
-  mcmc.GetLogLikelihood().functor = getLikelihood().getValidFunctor();
+  mcmc.GetProposeStep().SetDim(_minimizerParameterPtrList_.size());
+  mcmc.GetLogLikelihood().functor = std::make_unique<ROOT::Math::Functor>(this, &SimpleMcmcInterface::evalFitValid, _minimizerParameterPtrList_.size());
   mcmc.GetProposeStep().SetCovarianceUpdateDeweighting(0.0);
   mcmc.GetProposeStep().SetCovarianceFrozen(false);
 
   // Create a fitting parameter vector and initialize it.  No need to worry
   // about resizing it or it moving, so be lazy and just use push_back.
   Vector prior;
-  for (const Parameter* par : getMinimizerFitParameterPtr() ) {
+  for (const Parameter* par : _minimizerParameterPtrList_ ) {
     double val = par->getParameterValue();
-    if (not getLikelihood().getUseNormalizedFitSpace()) {
+    if (not _useNormalizedFitSpace_) {
       prior.push_back(val);
     }
     else {
@@ -712,12 +705,12 @@ void SimpleMcmcInterface::setupAndRunAdaptiveStep( AdaptiveStepMCMC& mcmc) {
 }
 void SimpleMcmcInterface::setupAndRunSimpleStep( SimpleStepMCMC& mcmc) {
 
-  mcmc.GetProposeStep().SetDim(getMinimizerFitParameterPtr().size());
-  mcmc.GetLogLikelihood().functor = getLikelihood().getFunctor();
+  mcmc.GetProposeStep().SetDim(_minimizerParameterPtrList_.size());
+  mcmc.GetLogLikelihood().functor = std::make_unique<ROOT::Math::Functor>(this, &SimpleMcmcInterface::evalFitValid, _minimizerParameterPtrList_.size());
   mcmc.GetProposeStep().fSigma = _simpleSigma_;
 
   Vector prior;
-  for (const Parameter* par : getMinimizerFitParameterPtr() ) {
+  for (const Parameter* par : _minimizerParameterPtrList_ ) {
     prior.push_back(par->getPriorValue());
   }
 
@@ -884,7 +877,7 @@ void SimpleMcmcInterface::minimize() {
   outputTree->Branch("ModelUncertainty",&_saveUncertainty_);
 
   // Run a chain.
-  int nbFitCallOffset = getLikelihood().getNbFitCalls();
+  int nbFitCallOffset = _monitor_.nbEvalLikelihoodCalls;
   LogInfo << "Fit call offset: " << nbFitCallOffset << std::endl;
 
   // Create the TSimpleMCMC object and call the specific runner.
@@ -897,7 +890,7 @@ void SimpleMcmcInterface::minimize() {
     setupAndRunSimpleStep(mcmc);
   }
 
-  int nbMCMCCalls = getLikelihood().getNbFitCalls() - nbFitCallOffset;
+  int nbMCMCCalls = _monitor_.nbEvalLikelihoodCalls - nbFitCallOffset;
 
  // lasting printout
   LogInfo << _monitor_.convergenceMonitor.generateMonitorString();
@@ -907,13 +900,85 @@ void SimpleMcmcInterface::minimize() {
   if (outputTree) outputTree->Write();
 
 }
-void SimpleMcmcInterface::scanParameters( TDirectory* saveDir_) {
-  LogThrowIf(not isInitialized());
-  LogInfo << "Performing scans of fit parameters..." << std::endl;
-  for(Parameter* par : getMinimizerFitParameterPtr()) {
-    getPropagator().getParameterScanner().scanParameter(*par, saveDir_);
-  }
+
+double SimpleMcmcInterface::evalFitValid(const double* parArray_) {
+  double value = this->evalFit( parArray_ );
+  if (hasValidParameterValues()) return value;
+  /// A "Really Big Number".  This is nominally just infinity, but is done as
+  /// a defined constant to make the code easier to understand.  This needs to
+  /// be an appropriate value to safely represent an impossible chi-squared
+  /// value "representing" -log(0.0)/2 and should should be larger than 5E+30.
+  const double RBN = std::numeric_limits<double>::infinity();
+  return RBN;
 }
+void SimpleMcmcInterface::setParameterValidity(const std::string& validity) {
+  /// Define the type of validity that needs to be required by
+  /// hasValidParameterValues.  This accepts a string with the possible values
+  /// being:
+  ///
+  ///  "range" (default) -- Between the parameter minimum and maximum values.
+  ///  "norange"         -- Do not require parameters in the valid range
+  ///  "mirror"          -- Between the mirrored values (if parameter has
+  ///                       mirroring).
+  ///  "nomirror"        -- Do not require parameters in the mirrored range
+  ///  "physical"        -- Only physically meaningful values.
+  ///  "nophysical"      -- Do not require parameters in the physical range.
+  ///
+  /// Example: setParameterValidity("range,mirror,physical")
+
+  LogWarning << "Set parameter validity to " << validity << std::endl;
+
+  if      ( GenericToolbox::hasSubStr(validity, "noran") ){ _validFlags_ &= ~0b0001; }
+  else if ( GenericToolbox::hasSubStr(validity, "ran")   ){ _validFlags_ |= 0b0001; }
+
+  if (validity.find("nomir") != std::string::npos) _validFlags_ &= ~0b0010;
+  else if (validity.find("mir") != std::string::npos) _validFlags_ |= 0b0010;
+
+  if (validity.find("nophy") != std::string::npos) _validFlags_ &= ~0b0100;
+  else if (validity.find("phy") != std::string::npos) _validFlags_ |= 0b0100;
+
+  LogWarning << "Set parameter validity to " << validity << " (" << _validFlags_ << ")" << std::endl;
+}
+bool SimpleMcmcInterface::hasValidParameterValues() const {
+  int invalid = 0;
+  for( auto& parSet: getPropagator().getParametersManager().getParameterSetsList() ){
+    for( auto& par : parSet.getParameterList() ){
+      if ( (_validFlags_ & 0b0001) != 0
+           and std::isfinite(par.getMinValue())
+           and par.getParameterValue() < par.getMinValue()) [[unlikely]] {
+        ++invalid;
+      }
+      if ((_validFlags_ & 0b0001) != 0
+          and std::isfinite(par.getMaxValue())
+          and par.getParameterValue() > par.getMaxValue()) [[unlikely]] {
+        ++invalid;
+      }
+      if ((_validFlags_ & 0b0010) != 0
+          and std::isfinite(par.getMinMirror())
+          and par.getParameterValue() < par.getMinMirror()) [[unlikely]] {
+        ++invalid;
+      }
+      if ((_validFlags_ & 0b0010) != 0
+          and std::isfinite(par.getMaxMirror())
+          and par.getParameterValue() > par.getMaxMirror()) [[unlikely]] {
+        ++invalid;
+      }
+      if ((_validFlags_ & 0b0100) != 0
+          and std::isfinite(par.getMinPhysical())
+          and par.getParameterValue() < par.getMinPhysical()) [[unlikely]] {
+        ++invalid;
+      }
+      if ((_validFlags_ & 0b0100) != 0
+          and std::isfinite(par.getMaxPhysical())
+          and par.getParameterValue() > par.getMaxPhysical()) [[unlikely]] {
+        ++invalid;
+      }
+
+    }
+  }
+  return (invalid == 0);
+}
+
 
 //  A Lesser GNU Public License
 

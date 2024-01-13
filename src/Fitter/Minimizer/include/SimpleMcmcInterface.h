@@ -44,13 +44,19 @@ public:
   /// An MCMC doesn't really converge in the sense meant here. This flags success.
   [[nodiscard]] virtual bool isFitHasConverged() const override  {return true;}
 
-
-
-  /// Scan the parameters.
-  void scanParameters(TDirectory* saveDir_) override;
-
+  double evalFitValid(const double* parArray_);
+  void setParameterValidity(const std::string& validity);
+  [[nodiscard]] bool hasValidParameterValues() const;
 
 private:
+
+  /// A set of flags used by the evalFitValid method to determine the function
+  /// validity.  The flaggs are:
+  /// "1" -- require valid parameters
+  /// "2" -- require in the mirrored range
+  /// "4" -- require in the physical range
+  int _validFlags_{7}; // TODO: Use enum instead
+
   std::string _algorithmName_{"metropolis"};
   std::string _proposalName_{"adaptive"};
   std::string _outTreeName_{"MCMC"};
@@ -202,7 +208,7 @@ private:
   /// mcmc.GetLogLikelihood().functor = getLikelihood().getFunctor()
   ///
   struct PrivateProxyLikelihood {
-    ROOT::Math::Functor* functor;
+    std::unique_ptr<ROOT::Math::Functor> functor{};
     std::vector<double> x;
     double operator() (const Vector& point) {
       LogThrowIf(functor == nullptr, "Functor is not initialized");

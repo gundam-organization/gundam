@@ -102,7 +102,153 @@ void MinimizerBase::scanParameters(TDirectory* saveDir_){
   LogThrowIf( not isInitialized() );
   for( auto& parPtr : _minimizerParameterPtrList_ ) { getParameterScanner().scanParameter( *parPtr, saveDir_ ); }
 }
+double MinimizerBase::evalFit( const double* parArray_ ){
+  _monitor_.externalTimer.stop();
 
+  // Update fit parameter values:
+  int iFitPar{0};
+  for( auto* parPtr : _minimizerParameterPtrList_ ){
+    parPtr->setParameterValue(
+        _useNormalizedFitSpace_ ?
+        ParameterSet::toRealParValue(parArray_[iFitPar++], *parPtr) :
+        parArray_[iFitPar++]
+    );
+  }
+
+  // Propagate the parameters
+  getLikelihoodInterface().propagateAndEvalLikelihood();
+
+  // Monitor if enabled
+  if( _monitor_.isEnabled ){
+    if( _monitor_.historyTree != nullptr ){ _monitor_.historyTree->Fill(); }
+    if( _monitor_.gradientDescentMonitor.isEnabled ){
+
+      auto& gradient = _monitor_.gradientDescentMonitor;
+
+      // When gradient descent base minimizer probe a point toward the minimum, every parameter get updated
+      bool isGradientDescentStep =
+          std::all_of(
+              _minimizerParameterPtrList_.begin(), _minimizerParameterPtrList_.end(),
+              [](const Parameter* par_){
+                return ( par_->gotUpdated() or par_->isFixed() or not par_->isEnabled() );
+              } );
+      if( isGradientDescentStep ){
+
+        if( gradient.lastGradientFall == _monitor_.nbEvalLikelihoodCalls - 1 ){
+          LogWarning << "Overriding last gradient descent entry (minimizer adjusting step size...): ";
+        }
+        else{
+          gradient.stepPointList.emplace_back();
+          LogWarning << "Gradient step detected at iteration #" << _monitor_.nbEvalLikelihoodCalls << ": ";
+        }
+        LogWarningIf(gradient.stepPointList.size() >= 2) << gradient.stepPointList[gradient.stepPointList.size() - 2].llh << " -> ";
+        LogWarning << getLikelihoodInterface().getBuffer().totalLikelihood << std::endl;
+        gradient.stepPointList.back().parState = getPropagator().getParametersManager().exportParameterInjectorConfig();
+        gradient.stepPointList.back().llh = getLikelihoodInterface().getBuffer().totalLikelihood;
+        gradient.lastGradientFall = _monitor_.nbEvalLikelihoodCalls;
+      }
+    }
+    if( _monitor_.convergenceMonitor.isGenerateMonitorStringOk() ){
+
+      _monitor_.itSpeedMon.cycle( _monitor_.nbEvalLikelihoodCalls - _monitor_.itSpeedMon.getCounts() );
+
+      if( _monitor_.itSpeed.counts != 0 ){
+        _monitor_.itSpeed.counts = _monitor_.nbEvalLikelihoodCalls - _monitor_.itSpeed.counts; // how many cycles since last print
+        _monitor_.itSpeed.cumulated = GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("itSpeed"); // time since last print
+      }
+      else{
+        _monitor_.itSpeed.counts = _monitor_.nbEvalLikelihoodCalls;
+        GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("itSpeed");
+      }
+
+      std::stringstream ssHeader;
+      ssHeader << std::endl << __METHOD_NAME__ << ": call #" << _monitor_.nbEvalLikelihoodCalls;
+      ssHeader << std::endl << _monitor_.stateTitleMonitor;
+//    ssHeader << std::endl << "Target EDM: " << getMinimizer().get;
+      ssHeader << std::endl << "RAM: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
+      double cpuPercent = GenericToolbox::getCpuUsageByProcess();
+      ssHeader << " / CPU: " << cpuPercent << "% (" << cpuPercent / GundamGlobals::getParallelWorker().getNbThreads() << "% efficiency)";
+      ssHeader << std::endl << "Avg " << GUNDAM_CHI2 << " computation time: " << _monitor_.evalLlhTimer;
+      ssHeader << std::endl;
+
+      GenericToolbox::TablePrinter t;
+
+      t << "" << GenericToolbox::TablePrinter::NextColumn;
+      t << "Propagator" << GenericToolbox::TablePrinter::NextColumn;
+      t << "Re-weight" << GenericToolbox::TablePrinter::NextColumn;
+      t << "histograms fill" << GenericToolbox::TablePrinter::NextColumn;
+      t << _monitor_.minimizerTitle << GenericToolbox::TablePrinter::NextLine;
+
+      t << "Speed" << GenericToolbox::TablePrinter::NextColumn;
+      t << _monitor_.itSpeedMon << GenericToolbox::TablePrinter::NextColumn;
+//    t << (double)_monitor_.itSpeed.counts / (double)_monitor_.itSpeed.cumulated * 1E6 << " it/s" << GenericToolbox::TablePrinter::NextColumn;
+      t << getPropagator().weightProp << GenericToolbox::TablePrinter::NextColumn;
+      t << getPropagator().fillProp << GenericToolbox::TablePrinter::NextColumn;
+      t << _monitor_.externalTimer << GenericToolbox::TablePrinter::NextLine;
+
+      ssHeader << t.generateTableString();
+
+      if( _monitor_.showParameters ){
+        std::string curParSet;
+        ssHeader << std::endl << std::setprecision(1) << std::scientific << std::showpos;
+        int nParPerLine{0};
+        for( auto* fitPar : _minimizerParameterPtrList_ ){
+          if( fitPar->isFixed() ) continue;
+          if( curParSet != fitPar->getOwner()->getName() ){
+            if( not curParSet.empty() ) ssHeader << std::endl;
+            curParSet = fitPar->getOwner()->getName();
+            ssHeader << curParSet
+                     << (fitPar->getOwner()->useEigenDecomposition() ? " (eigen)" : "")
+                     << ":" << std::endl;
+            nParPerLine = 0;
+          }
+          else{
+            ssHeader << ", ";
+            if( nParPerLine >= _monitor_.maxNbParametersPerLine ) {
+              ssHeader << std::endl; nParPerLine = 0;
+            }
+          }
+          if(fitPar->gotUpdated()) ssHeader << GenericToolbox::ColorCodes::blueBackground;
+          if(_useNormalizedFitSpace_){
+            ssHeader << ParameterSet::toNormalizedParValue(fitPar->getParameterValue(), *fitPar);
+          }
+          else{ ssHeader << fitPar->getParameterValue(); }
+          if(fitPar->gotUpdated()) ssHeader << GenericToolbox::ColorCodes::resetColor;
+          nParPerLine++;
+        }
+      }
+
+      _monitor_.convergenceMonitor.setHeaderString(ssHeader.str());
+      _monitor_.convergenceMonitor.getVariable("Total/dof").addQuantity(
+          getLikelihoodInterface().getBuffer().totalLikelihood / getNbDegreeOfFreedom()
+      );
+      _monitor_.convergenceMonitor.getVariable("Total").addQuantity( getLikelihoodInterface().getBuffer().totalLikelihood );
+      _monitor_.convergenceMonitor.getVariable("Stat").addQuantity( getLikelihoodInterface().getBuffer().statLikelihood );
+      _monitor_.convergenceMonitor.getVariable("Syst").addQuantity( getLikelihoodInterface().getBuffer().penaltyLikelihood );
+
+      if( _monitor_.nbEvalLikelihoodCalls == 1 ){
+        // don't erase these lines
+        LogWarning << _monitor_.convergenceMonitor.generateMonitorString();
+      }
+      else{
+        LogInfo << _monitor_.convergenceMonitor.generateMonitorString(
+            GenericToolbox::getTerminalWidth() != 0, // trail back if not in batch mode
+            true // force generate
+        );
+      }
+
+      _monitor_.itSpeed.counts = _monitor_.nbEvalLikelihoodCalls;
+    }
+  }
+
+  if( _throwOnBadLlh_ and not getLikelihoodInterface().getBuffer().isValid() ){
+    LogError << getLikelihoodInterface().getSummary() << std::endl;
+    LogThrow( "Invalid total likelihood value." );
+  }
+
+  _monitor_.externalTimer.start();
+  return getLikelihoodInterface().getBuffer().totalLikelihood;
+}
 
 
 void MinimizerBase::printParameters(){

@@ -22,14 +22,35 @@ LoggerInit([]{
 void LikelihoodInterface::readConfigImpl(){
 
   _propagator_.readConfig(
-      GenericToolbox::Json::fetchValue(_config_, "propagatorConfig", _propagator_.getConfig())
+      GenericToolbox::Json::fetchValue( _config_, "propagatorConfig", _propagator_.getConfig() )
   );
+
+  std::string llhMethod = "PoissonLLH";
+  llhMethod = GenericToolbox::Json::fetchValue(_config_, "llhStatFunction", llhMethod);
+
+  // new config structure
+  auto configJointProbability = GenericToolbox::Json::fetchValue(_config_, {{"jointProbability"}, {"llhConfig"}}, JsonType());
+  llhMethod = GenericToolbox::Json::fetchValue(configJointProbability, "type", llhMethod);
+
+  LogInfo << "Using \"" << llhMethod << "\" LLH function." << std::endl;
+  if     ( llhMethod == "Chi2" ){                    _jointProbabilityPtr_ = std::make_shared<JointProbability::Chi2>(); }
+  else if( llhMethod == "PoissonLLH" ){              _jointProbabilityPtr_ = std::make_shared<JointProbability::PoissonLLH>(); }
+  else if( llhMethod == "BarlowLLH" ) {              _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH>(); }
+  else if( llhMethod == "Plugin" ) {                 _jointProbabilityPtr_ = std::make_shared<JointProbability::JointProbabilityPlugin>(); }
+  else if( llhMethod == "BarlowLLH_BANFF_OA2020" ) { _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2020>(); }
+  else if( llhMethod == "BarlowLLH_BANFF_OA2021" ) { _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2021>(); }
+  else if( llhMethod == "LeastSquares" ) { _jointProbabilityPtr_ = std::make_shared<JointProbability::LeastSquaresLLH>(); }
+  else if( llhMethod == "BarlowLLH_BANFF_OA2021_SFGD" ) {  _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2021_SFGD>(); }
+  else{ LogThrow("Unknown LLH Method: " << llhMethod); }
+
+  _jointProbabilityPtr_->readConfig(configJointProbability);
 
 }
 void LikelihoodInterface::initializeImpl() {
   LogWarning << "Initializing LikelihoodInterface..." << std::endl;
 
   _propagator_.initialize();
+  _jointProbabilityPtr_->initialize();
 
   LogWarning << "Fetching the effective number of fit parameters..." << std::endl;
   _nbParameters_ = 0;
@@ -66,6 +87,7 @@ double LikelihoodInterface::evalPenaltyLikelihood() const {
   for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
     _buffer_.penaltyLikelihood += this->evalPenaltyLikelihood( parSet );
   }
+  return _buffer_.penaltyLikelihood;
 }
 double LikelihoodInterface::evalStatLikelihood(const Sample& sample_) const {
   return _jointProbabilityPtr_->eval( sample_ );
@@ -127,84 +149,6 @@ double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) c
 void LikelihoodInterface::propagateAndEvalLikelihood(){
   _propagator_.propagateParameters();
   this->evalLikelihood();
-}
-
-double LikelihoodInterface::evalFitValid(const double* parArray_) {
-  double value = this->evalLikelihood(parArray_);
-  if (hasValidParameterValues()) return value;
-  /// A "Really Big Number".  This is nominally just infinity, but is done as
-  /// a defined constant to make the code easier to understand.  This needs to
-  /// be an appropriate value to safely represent an impossible chi-squared
-  /// value "representing" -log(0.0)/2 and should should be larger than 5E+30.
-  const double RBN = std::numeric_limits<double>::infinity();
-  return RBN;
-}
-void LikelihoodInterface::setParameterValidity(const std::string& validity) {
-  /// Define the type of validity that needs to be required by
-  /// hasValidParameterValues.  This accepts a string with the possible values
-  /// being:
-  ///
-  ///  "range" (default) -- Between the parameter minimum and maximum values.
-  ///  "norange"         -- Do not require parameters in the valid range
-  ///  "mirror"          -- Between the mirrored values (if parameter has
-  ///                       mirroring).
-  ///  "nomirror"        -- Do not require parameters in the mirrored range
-  ///  "physical"        -- Only physically meaningful values.
-  ///  "nophysical"      -- Do not require parameters in the physical range.
-  ///
-  /// Example: setParameterValidity("range,mirror,physical")
-
-  LogWarning << "Set parameter validity to " << validity << std::endl;
-
-  if      ( GenericToolbox::hasSubStr(validity, "noran") ){ _validFlags_ &= ~0b0001; }
-  else if ( GenericToolbox::hasSubStr(validity, "ran")   ){ _validFlags_ |= 0b0001; }
-
-  if (validity.find("nomir") != std::string::npos) _validFlags_ &= ~0b0010;
-  else if (validity.find("mir") != std::string::npos) _validFlags_ |= 0b0010;
-
-  if (validity.find("nophy") != std::string::npos) _validFlags_ &= ~0b0100;
-  else if (validity.find("phy") != std::string::npos) _validFlags_ |= 0b0100;
-
-  LogWarning << "Set parameter validity to " << validity << " (" << _validFlags_ << ")" << std::endl;
-}
-bool LikelihoodInterface::hasValidParameterValues() const {
-  int invalid = 0;
-  for (auto& parSet: _propagator_.getParametersManager().getParameterSetsList()) {
-    for (auto& par : parSet.getParameterList()) {
-      if ( (_validFlags_ & 0b0001) != 0
-          and std::isfinite(par.getMinValue())
-          and par.getParameterValue() < par.getMinValue()) [[unlikely]] {
-        ++invalid;
-      }
-      if ((_validFlags_ & 0b0001) != 0
-          and std::isfinite(par.getMaxValue())
-          and par.getParameterValue() > par.getMaxValue()) [[unlikely]] {
-        ++invalid;
-      }
-      if ((_validFlags_ & 0b0010) != 0
-          and std::isfinite(par.getMinMirror())
-          and par.getParameterValue() < par.getMinMirror()) [[unlikely]] {
-        ++invalid;
-      }
-      if ((_validFlags_ & 0b0010) != 0
-          and std::isfinite(par.getMaxMirror())
-          and par.getParameterValue() > par.getMaxMirror()) [[unlikely]] {
-        ++invalid;
-      }
-      if ((_validFlags_ & 0b0100) != 0
-          and std::isfinite(par.getMinPhysical())
-          and par.getParameterValue() < par.getMinPhysical()) [[unlikely]] {
-        ++invalid;
-      }
-      if ((_validFlags_ & 0b0100) != 0
-          and std::isfinite(par.getMaxPhysical())
-          and par.getParameterValue() > par.getMaxPhysical()) [[unlikely]] {
-        ++invalid;
-      }
-
-    }
-  }
-  return (invalid == 0);
 }
 
 // An MIT Style License

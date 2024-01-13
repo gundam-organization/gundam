@@ -34,6 +34,7 @@ public:
   virtual void minimize();
   virtual void calcErrors(){}
   virtual void scanParameters( TDirectory* saveDir_ );
+  virtual double evalFit( const double* parArray_ );
   virtual bool isErrorCalcEnabled(){ return false; }
   [[nodiscard]] virtual bool isFitHasConverged() const = 0;
 

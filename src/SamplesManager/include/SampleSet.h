@@ -8,7 +8,6 @@
 #include "Sample.h"
 #include "ParameterSet.h"
 #include "Likelihoods.hh"
-#include "JointProbability.h"
 #include "JsonBaseClass.h"
 
 #include <string>

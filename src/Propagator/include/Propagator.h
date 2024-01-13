@@ -56,7 +56,6 @@ public:
   std::vector<DatasetLoader> &getDataSetList(){ return _dataSetList_; }
 
   // Misc getters
-  [[nodiscard]] std::string getLlhBufferSummary() const;
   [[nodiscard]] DatasetLoader* getDatasetLoaderPtr(const std::string& name_);
 
   // Core

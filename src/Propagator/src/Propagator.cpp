@@ -92,9 +92,6 @@ void Propagator::readConfigImpl(){
     _dataSetList_.emplace_back(dataSetConfig, int(_dataSetList_.size()));
   }
 
-  LogInfo << "Reading ParameterScanner configuration..." << std::endl;
-  _parScanner_.readConfig( GenericToolbox::Json::fetchValue(_config_, "scanConfig", JsonType()) );
-
   LogInfo << "Reading DialCollection configurations..." << std::endl;
   for(size_t iParSet = 0 ; iParSet < _parManager_.getParameterSetsList().size() ; iParSet++ ){
     if( not _parManager_.getParameterSetsList()[iParSet].isEnabled() ) continue;
@@ -395,9 +392,6 @@ void Propagator::initializeImpl(){
   _treeWriter_.setFitSampleSetPtr( &_fitSampleSet_ );
   _treeWriter_.setParSetListPtr( &_parManager_.getParameterSetsList() );
   _treeWriter_.setEventDialCachePtr( &_eventDialCache_ );
-
-  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the par scanner") << std::endl;
-  _parScanner_.initialize();
 
   /// Printouts for quick monitoring
   if( _showEventBreakdown_ ){

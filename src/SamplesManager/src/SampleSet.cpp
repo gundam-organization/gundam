@@ -33,32 +33,6 @@ void SampleSet::readConfigImpl(){
     _sampleList_.back().setConfig(fitSampleConfig);
     _sampleList_.back().readConfig();
   }
-
-  // TODO: To be moved elsewhere -> nothing to do in sample... -> this should belong to the fitter engine
-  std::string llhMethod = "PoissonLLH";
-  llhMethod = GenericToolbox::Json::fetchValue(_config_, "llhStatFunction", llhMethod);
-
-  // new config structure
-  auto configJointProbability = GenericToolbox::Json::fetchValue(_config_, {{"jointProbability"}, {"llhConfig"}}, JsonType());
-  llhMethod = GenericToolbox::Json::fetchValue(configJointProbability, "type", llhMethod);
-
-  LogInfo << "Using \"" << llhMethod << "\" LLH function." << std::endl;
-  if     ( llhMethod == "Chi2" ){                    _jointProbabilityPtr_ = std::make_shared<JointProbability::Chi2>(); }
-  else if( llhMethod == "PoissonLLH" ){              _jointProbabilityPtr_ = std::make_shared<JointProbability::PoissonLLH>(); }
-  else if( llhMethod == "BarlowLLH" ) {              _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH>(); }
-  else if( llhMethod == "Plugin" ) {                 _jointProbabilityPtr_ = std::make_shared<JointProbability::JointProbabilityPlugin>(); }
-  else if( llhMethod == "BarlowLLH_BANFF_OA2020" ) { _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2020>(); }
-  else if( llhMethod == "BarlowLLH_BANFF_OA2021" ) { _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2021>(); }
-  else if( llhMethod == "LeastSquares" ) { _jointProbabilityPtr_ = std::make_shared<JointProbability::LeastSquaresLLH>(); }
-  else if( llhMethod == "BarlowLLH_BANFF_OA2021_SFGD" ) {  _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2021_SFGD>(); }
-  else{ LogThrow("Unknown LLH Method: " << llhMethod); }
-
-  _jointProbabilityPtr_->readConfig(configJointProbability);
-  _jointProbabilityPtr_->initialize();
-
-
-
-
 }
 void SampleSet::initializeImpl() {
   LogWarning << __METHOD_NAME__ << std::endl;

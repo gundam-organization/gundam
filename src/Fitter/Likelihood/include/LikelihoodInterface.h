@@ -58,11 +58,6 @@ public:
   [[nodiscard]] double evalPenaltyLikelihood(const ParameterSet& parSet_) const;
   [[nodiscard]] std::string getSummary() const;
 
-  // TODO: to relocate
-  double evalFitValid(const double* parArray_);
-  void setParameterValidity(const std::string& validity);
-  [[nodiscard]] bool hasValidParameterValues() const;
-
 private:
   // internals
   int _nbParameters_{0};
@@ -81,15 +76,6 @@ private:
     [[nodiscard]] bool isValid() const { return not ( std::isnan(totalLikelihood) or std::isinf(totalLikelihood) ); }
   };
   mutable Buffer _buffer_{};
-
-
-  // TODO: relocate
-  /// A set of flags used by the evalFitValid method to determine the function
-  /// validity.  The flaggs are:
-  /// "1" -- require valid parameters
-  /// "2" -- require in the mirrored range
-  /// "4" -- require in the physical range
-  int _validFlags_{7}; // TODO: Use enum instead
 
 };
 

@@ -68,16 +68,24 @@ void FitterEngine::readConfigImpl(){
       LogThrow("Unknown minimizer type selected: " << minimizerTypeStr << std::endl << "Available: " << MinimizerType::generateEnumFieldsAsString());
   }
 
-  this->_minimizer_->readConfig( minimizerConfig );
+  _minimizer_->readConfig( minimizerConfig );
+
 
   GenericToolbox::Json::deprecatedAction(_config_, "monitorRefreshRateInMs", [&]{
     LogAlert << "Forwarding the option to Propagator. Consider moving it into \"minimizerConfig:\"" << std::endl;
     _minimizer_->getMonitor().convergenceMonitor.setMaxRefreshRateInMs(GenericToolbox::Json::fetchValue<int>(_config_, "monitorRefreshRateInMs"));
   });
+  GenericToolbox::Json::deprecatedAction(_config_, "propagatorConfig", [&]{
+    LogAlert << R"("propagatorConfig" should now be set within "likelihoodInterfaceConfig".)" << std::endl;
+    _likelihoodInterface_.getPropagator().setConfig( GenericToolbox::Json::fetchValue<JsonType>(_config_, "propagatorConfig") );
+  });
+  GenericToolbox::Json::deprecatedAction(_likelihoodInterface_.getPropagator().getConfig(), "scanConfig", [&]{
+    LogAlert << R"("scanConfig" should now be set within "fitterEngineConfig".)" << std::endl;
+    _parameterScanner_.setConfig( GenericToolbox::Json::fetchValue<JsonType>(_likelihoodInterface_.getPropagator().getConfig(), "scanConfig") );
+  });
 
-
-  // nested
-  _parameterScanner_.readConfig( GenericToolbox::Json::fetchValue(_config_, "scanConfig", JsonType()) );
+  _likelihoodInterface_.readConfig( GenericToolbox::Json::fetchValue(_config_, "likelihoodInterfaceConfig", _likelihoodInterface_.getConfig()) );
+  _parameterScanner_.readConfig( GenericToolbox::Json::fetchValue(_config_, "scanConfig", _parameterScanner_.getConfig()) );
 
   // members
   _enablePca_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"enablePca", "runPcaCheck"}, _enablePca_);
@@ -278,7 +286,7 @@ void FitterEngine::fit(){
 
   LogWarning << "Pre-fit likelihood state:" << std::endl;
 
-  std::string llhState{_likelihoodInterface_.getPropagator().getLlhBufferSummary()};
+  std::string llhState{_likelihoodInterface_.getSummary()};
   LogInfo << llhState << std::endl;
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile( _saveDir_, "preFit" ),
@@ -313,7 +321,7 @@ void FitterEngine::fit(){
   }
   if( _enablePreFitScan_ ){
     LogInfo << "Scanning fit parameters before minimizing..." << std::endl;
-    _minimizer_->scanParameterList( GenericToolbox::mkdirTFile(_saveDir_, "preFit/scan") );
+    _minimizer_->scanParameters( GenericToolbox::mkdirTFile(_saveDir_, "preFit/scan") );
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
   if( _throwMcBeforeFit_ ){
@@ -359,7 +367,7 @@ void FitterEngine::fit(){
     LogAlert << "Current LLH state:" << std::endl;
     _likelihoodInterface_.propagateAndEvalLikelihood();
 
-    LogAlert << _likelihoodInterface_.getPropagator().getLlhBufferSummary() << std::endl;
+    LogAlert << _likelihoodInterface_.getSummary() << std::endl;
   }
 
   // Leaving now?
@@ -379,7 +387,7 @@ void FitterEngine::fit(){
   );
 
   LogWarning << "Post-fit likelihood state:" << std::endl;
-  llhState = _likelihoodInterface_.getPropagator().getLlhBufferSummary();
+  llhState = _likelihoodInterface_.getSummary();
   LogInfo << llhState << std::endl;
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile( _saveDir_, "postFit" ),
@@ -398,7 +406,7 @@ void FitterEngine::fit(){
   }
   if( _enablePostFitScan_ ){
     LogInfo << "Scanning fit parameters around the minimum point..." << std::endl;
-    _minimizer_->scanParameterList( GenericToolbox::mkdirTFile(_saveDir_, "postFit/scan") );
+    _minimizer_->scanParameters( GenericToolbox::mkdirTFile(_saveDir_, "postFit/scan") );
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
   if( _enablePreFitToPostFitLineScan_ ){
